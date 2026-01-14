@@ -293,22 +293,20 @@ func (h *Headers) BlockIDByHeight(height uint64) (flow.Identifier, error) {
 //
 // Expected error returns during normal operations:
 //   - [storage.ErrNotFound] if no block with the given parentID is known
-//   - [storage.ErrWrongChain] if any children exist but are part of a different chain than expected
+//   - [storage.ErrWrongChain] if the parent is part of a different chain than expected
 func (h *Headers) ByParentID(parentID flow.Identifier) ([]*flow.Header, error) {
+	// first check the parent exists on the correct chain
+	_, err := h.retrieveTx(parentID)
+	if err != nil {
+		return nil, fmt.Errorf("could not check existence of parent %x: %w", parentID, err)
+	}
 	var blockIDs flow.IdentifierList
-	err := operation.RetrieveBlockChildren(h.db.Reader(), parentID, &blockIDs)
+	err = operation.RetrieveBlockChildren(h.db.Reader(), parentID, &blockIDs)
 	if err != nil {
 		// if not found error is returned, there are two possible reasons:
-		// 1. the parent block does not exist, in which case we should return not found error
+		// 1. the parent block does not exist - has already been ruled out above
 		// 2. the parent block exists but has no children, in which case we should return empty list
 		if errors.Is(err, storage.ErrNotFound) {
-			exists, err := h.Exists(parentID)
-			if err != nil {
-				return nil, fmt.Errorf("could not check existence of parent %x: %w", parentID, err)
-			}
-			if !exists {
-				return nil, fmt.Errorf("cannot retrieve children of unknown block %x: %w", parentID, storage.ErrNotFound)
-			}
 			// parent exists but has no children
 			return []*flow.Header{}, nil
 		}
@@ -318,7 +316,8 @@ func (h *Headers) ByParentID(parentID flow.Identifier) ([]*flow.Header, error) {
 	for _, blockID := range blockIDs {
 		header, err := h.ByBlockID(blockID)
 		if err != nil {
-			return nil, fmt.Errorf("could not retrieve child (%x): %w", blockID, err)
+			// failure to retrieve an indexed child indicates state corruption
+			return nil, irrecoverable.NewExceptionf("could not retrieve indexed block %x: %w", blockID, err)
 		}
 		headers = append(headers, header)
 	}

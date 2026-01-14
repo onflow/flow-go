@@ -115,6 +115,7 @@ func TestHeaderRetrieveWithoutStore(t *testing.T) {
 //  1. a known parent with no children should return an empty list;
 //  2. a known parent with 3 children should return the headers of those children;
 //  3. an unknown parent should return [storage.ErrNotFound].
+//  4. a known parent on a different chain should return [storage.ErrWrongChain].
 func TestHeadersByParentID(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		lockManager := storage.NewTestingLockManager()
@@ -172,6 +173,17 @@ func TestHeadersByParentID(t *testing.T) {
 		nonExistentParent := unittest.IdentifierFixture()
 		_, err = headers.ByParentID(nonExistentParent)
 		require.ErrorIs(t, err, storage.ErrNotFound)
+
+		// Test case 4: parent on a different chain should return ErrWrongChain
+		clusterBlock := unittest.ClusterBlockFixture()
+		err = unittest.WithLock(t, lockManager, storage.LockInsertOrFinalizeClusterBlock, func(lctx lockctx.Context) error {
+			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return operation.InsertClusterBlock(lctx, rw, unittest.ClusterProposalFromBlock(clusterBlock))
+			})
+		})
+		require.NoError(t, err)
+		_, err = headers.ByParentID(clusterBlock.ID())
+		require.ErrorIs(t, err, storage.ErrWrongChain)
 	})
 }
 

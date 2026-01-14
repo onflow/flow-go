@@ -51,7 +51,7 @@ type Headers interface {
 	//
 	// Expected error returns during normal operations:
 	//   - [storage.ErrNotFound] if no block with the given parentID is known
-	//   - [storage.ErrWrongChain] if any children exist but are part of a different chain than expected
+	//   - [storage.ErrWrongChain] if the parent is part of a different chain than expected
 	ByParentID(parentID flow.Identifier) ([]*flow.Header, error)
 
 	// ProposalByBlockID returns the header with the given ID, along with the corresponding proposer signature.
