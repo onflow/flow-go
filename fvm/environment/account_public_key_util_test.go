@@ -238,11 +238,17 @@ func TestGetStoredPublicKey(t *testing.T) {
 		expectedStoredPublicKey1 := accountPublicKeyToStoredKey(accountPublicKey1)
 		expectedStoredPublicKey2 := accountPublicKeyToStoredKey(newAccountPublicKey(t, 1))
 
+		encodedStoredPublicKey2, err := flow.EncodeStoredPublicKey(expectedStoredPublicKey2)
+		require.NoError(t, err)
+
+		encodedBatchPublicKey := newBatchPublicKey(t, []*flow.StoredPublicKey{nil, &expectedStoredPublicKey2})
+		expectedBatchPublicKeys := [][]byte{[]byte{}, encodedStoredPublicKey2}
+
 		accounts := envMock.NewAccounts(t)
 		accounts.On("GetValue", flow.AccountPublicKey0RegisterID(address)).
 			Return(encodedAccountPublicKey1, nil)
 		accounts.On("GetValue", flow.AccountBatchPublicKeyRegisterID(address, 0)).
-			Return(newBatchPublicKey(t, []*flow.StoredPublicKey{nil, &expectedStoredPublicKey2}), nil)
+			Return(encodedBatchPublicKey, nil)
 
 		spk, err := environment.GetStoredPublicKey(accounts, address, 0)
 		require.NoError(t, err)
@@ -251,6 +257,10 @@ func TestGetStoredPublicKey(t *testing.T) {
 		spk, err = environment.GetStoredPublicKey(accounts, address, 1)
 		require.NoError(t, err)
 		require.Equal(t, expectedStoredPublicKey2, spk)
+
+		encodedKeys, err := environment.DecodeBatchPublicKeys(encodedBatchPublicKey)
+		require.NoError(t, err)
+		require.Equal(t, expectedBatchPublicKeys, encodedKeys)
 	})
 
 	t.Run("one full batch", func(t *testing.T) {
@@ -260,17 +270,26 @@ func TestGetStoredPublicKey(t *testing.T) {
 
 		storedKeyCount := environment.MaxPublicKeyCountInBatch
 		expectedStoredKeys := make([]*flow.StoredPublicKey, storedKeyCount)
+		expectedBatchPublicKeys := make([][]byte, storedKeyCount)
+		expectedBatchPublicKeys[0] = []byte{}
 
 		for i := 1; i < environment.MaxPublicKeyCountInBatch; i++ {
 			key := accountPublicKeyToStoredKey(newAccountPublicKey(t, 1))
 			expectedStoredKeys[i] = &key
+
+			encodedStoredPublicKey, err := flow.EncodeStoredPublicKey(key)
+			require.NoError(t, err)
+
+			expectedBatchPublicKeys[i] = encodedStoredPublicKey
 		}
+
+		encodedBatchPublicKey := newBatchPublicKey(t, expectedStoredKeys)
 
 		accounts := envMock.NewAccounts(t)
 		accounts.On("GetValue", flow.AccountPublicKey0RegisterID(address)).
 			Return(encodedAccountPublicKey1, nil)
 		accounts.On("GetValue", flow.AccountBatchPublicKeyRegisterID(address, 0)).
-			Return(newBatchPublicKey(t, expectedStoredKeys), nil)
+			Return(encodedBatchPublicKey, nil)
 
 		spk, err := environment.GetStoredPublicKey(accounts, address, 0)
 		require.NoError(t, err)
@@ -281,6 +300,10 @@ func TestGetStoredPublicKey(t *testing.T) {
 			require.NoError(t, err)
 			require.Equal(t, *expectedStoredKeys[i], spk)
 		}
+
+		encodedKeys, err := environment.DecodeBatchPublicKeys(encodedBatchPublicKey)
+		require.NoError(t, err)
+		require.Equal(t, expectedBatchPublicKeys, encodedKeys)
 	})
 
 	t.Run("more than one batch", func(t *testing.T) {
@@ -291,19 +314,32 @@ func TestGetStoredPublicKey(t *testing.T) {
 		storedKeyCount := environment.MaxPublicKeyCountInBatch + 1
 
 		expectedStoredKeys := make([]*flow.StoredPublicKey, storedKeyCount)
+		expectedBatchPublicKeys := make([][]byte, storedKeyCount)
+		expectedBatchPublicKeys[0] = []byte{}
 
 		for i := 1; i < storedKeyCount; i++ {
 			key := accountPublicKeyToStoredKey(newAccountPublicKey(t, 1))
 			expectedStoredKeys[i] = &key
+
+			encodedStoredPublicKey, err := flow.EncodeStoredPublicKey(key)
+			require.NoError(t, err)
+
+			expectedBatchPublicKeys[i] = encodedStoredPublicKey
 		}
+
+		encodedBatchPublicKey1 := newBatchPublicKey(t, expectedStoredKeys[:environment.MaxPublicKeyCountInBatch])
+		encodedBatchPublicKey2 := newBatchPublicKey(t, expectedStoredKeys[environment.MaxPublicKeyCountInBatch:])
+
+		expectedBatchPublicKeys1 := expectedBatchPublicKeys[:environment.MaxPublicKeyCountInBatch]
+		expectedBatchPublicKeys2 := expectedBatchPublicKeys[environment.MaxPublicKeyCountInBatch:]
 
 		accounts := envMock.NewAccounts(t)
 		accounts.On("GetValue", flow.AccountPublicKey0RegisterID(address)).
 			Return(encodedAccountPublicKey1, nil)
 		accounts.On("GetValue", flow.AccountBatchPublicKeyRegisterID(address, 0)).
-			Return(newBatchPublicKey(t, expectedStoredKeys[:environment.MaxPublicKeyCountInBatch]), nil)
+			Return(encodedBatchPublicKey1, nil)
 		accounts.On("GetValue", flow.AccountBatchPublicKeyRegisterID(address, 1)).
-			Return(newBatchPublicKey(t, expectedStoredKeys[environment.MaxPublicKeyCountInBatch:]), nil)
+			Return(encodedBatchPublicKey2, nil)
 
 		spk, err := environment.GetStoredPublicKey(accounts, address, 0)
 		require.NoError(t, err)
@@ -314,6 +350,14 @@ func TestGetStoredPublicKey(t *testing.T) {
 			require.NoError(t, err)
 			require.Equal(t, *expectedStoredKeys[i], spk)
 		}
+
+		encodedKeys1, err := environment.DecodeBatchPublicKeys(encodedBatchPublicKey1)
+		require.NoError(t, err)
+		require.Equal(t, expectedBatchPublicKeys1, encodedKeys1)
+
+		encodedKeys2, err := environment.DecodeBatchPublicKeys(encodedBatchPublicKey2)
+		require.NoError(t, err)
+		require.Equal(t, expectedBatchPublicKeys2, encodedKeys2)
 	})
 }
 

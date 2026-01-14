@@ -161,17 +161,17 @@ func NewBasicBlockExecutor(tb testing.TB, chain flow.Chain, logger zerolog.Logge
 	opts := []fvm.Option{
 		fvm.WithTransactionFeesEnabled(true),
 		fvm.WithAccountStorageLimit(true),
-		fvm.WithChain(chain),
 		fvm.WithLogger(logger),
 		fvm.WithMaxStateInteractionSize(interactionLimit),
 		fvm.WithReusableCadenceRuntimePool(
 			reusableRuntime.NewReusableCadenceRuntimePool(
 				computation.ReusableCadenceRuntimePoolSize,
+				chain,
 				runtime.Config{},
 			),
 		),
 	}
-	fvmContext := fvm.NewContext(opts...)
+	fvmContext := fvm.NewContext(chain, opts...)
 
 	collector := metrics.NewNoopCollector()
 	tracer := trace.NewNoopTracer()
@@ -236,7 +236,6 @@ func NewBasicBlockExecutor(tb testing.TB, chain flow.Chain, logger zerolog.Logge
 		ledgerCommitter,
 		me,
 		prov,
-		nil,
 		testutil.ProtocolStateWithSourceFixture(nil),
 		1) // We're interested in fvm's serial execution time
 	require.NoError(tb, err)
