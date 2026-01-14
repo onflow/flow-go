@@ -22,7 +22,7 @@ import (
 
 var (
 	triedir           = flag.String("triedir", "", "Directory for trie files (required)")
-	grpcListenAddr    = flag.String("grpc-addr", "0.0.0.0:9000", "gRPC server listen address (TCP: ip:port or Unix: unix:///path/to/socket)")
+	ledgerServiceAddr = flag.String("ledger-service-addr", "0.0.0.0:9000", "Ledger service listen address (TCP: ip:port or Unix: unix:///path/to/socket)")
 	mtrieCacheSize    = flag.Int("mtrie-cache-size", 500, "MTrie cache size (number of tries)")
 	checkpointDist    = flag.Uint("checkpoint-distance", 100, "Checkpoint distance")
 	checkpointsToKeep = flag.Uint("checkpoints-to-keep", 3, "Number of checkpoints to keep")
@@ -54,7 +54,7 @@ func main() {
 
 	logger.Info().
 		Str("triedir", *triedir).
-		Str("grpc_addr", *grpcListenAddr).
+		Str("ledger_service_addr", *ledgerServiceAddr).
 		Int("mtrie_cache_size", *mtrieCacheSize).
 		Msg("starting ledger service")
 
