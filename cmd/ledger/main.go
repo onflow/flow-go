@@ -105,10 +105,10 @@ func main() {
 	var socketPath string
 	var isUnixSocket bool
 
-	if strings.HasPrefix(*grpcListenAddr, "unix://") {
+	if strings.HasPrefix(*ledgerServiceAddr, "unix://") {
 		// Unix domain socket
 		isUnixSocket = true
-		socketPath = strings.TrimPrefix(*grpcListenAddr, "unix://")
+		socketPath = strings.TrimPrefix(*ledgerServiceAddr, "unix://")
 		// Handle both unix:///absolute/path and unix://relative/path formats
 		// net.Listen("unix", ...) expects the path without the unix:// prefix
 
@@ -133,12 +133,12 @@ func main() {
 		logger.Info().Str("socket_path", socketPath).Msg("gRPC server listening on Unix domain socket")
 	} else {
 		// TCP socket
-		lis, err = net.Listen("tcp", *grpcListenAddr)
+		lis, err = net.Listen("tcp", *ledgerServiceAddr)
 		if err != nil {
 			logger.Fatal().Err(err).Msg("failed to listen")
 		}
 
-		logger.Info().Str("address", *grpcListenAddr).Msg("gRPC server listening on TCP")
+		logger.Info().Str("address", *ledgerServiceAddr).Msg("gRPC server listening on TCP")
 	}
 
 	// Start server in goroutine
