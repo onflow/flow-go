@@ -28,7 +28,7 @@ var (
 	checkpointsToKeep = flag.Uint("checkpoints-to-keep", 3, "Number of checkpoints to keep")
 	logLevel          = flag.String("loglevel", "info", "Log level (panic, fatal, error, warn, info, debug)")
 	maxRequestSize    = flag.Uint("max-request-size", 1<<30, "Maximum request message size in bytes (default: 1 GiB)")
-	maxResponseSize   = flag.Uint("max-response-size", 10<<30, "Maximum response message size in bytes (default: 10 GiB)")
+	maxResponseSize   = flag.Uint("max-response-size", 1<<30, "Maximum response message size in bytes (default: 1 GiB)")
 )
 
 func main() {
