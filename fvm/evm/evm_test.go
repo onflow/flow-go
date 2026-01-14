@@ -8,6 +8,7 @@ import (
 	"math/big"
 	"testing"
 
+	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	gethTypes "github.com/ethereum/go-ethereum/core/types"
 	gethParams "github.com/ethereum/go-ethereum/params"
@@ -3862,11 +3863,11 @@ func TestCadenceArch(t *testing.T) {
 					import EVM from %s
 
 					access(all)
-					fun main(tx: [UInt8], coinbaseBytes: [UInt8; 20]) {
+					fun main(tx: [UInt8], coinbaseBytes: [UInt8; 20]): EVM.Result {
 						let coinbase = EVM.EVMAddress(bytes: coinbaseBytes)
-						let res = EVM.run(tx: tx, coinbase: coinbase)
+						return EVM.run(tx: tx, coinbase: coinbase)
 					}
-                    `,
+					`,
 					sc.EVMContract.Address.HexWithPrefix(),
 				))
 
@@ -3899,8 +3900,15 @@ func TestCadenceArch(t *testing.T) {
 					script,
 					snapshot)
 				require.NoError(t, err)
+				require.NoError(t, output.Err)
+
 				// make sure the error is correct
-				require.ErrorContains(t, output.Err, "Source of randomness not yet recorded")
+				res, err := impl.ResultSummaryFromEVMResultValue(output.Value)
+				require.NoError(t, err)
+
+				revertReason, err := abi.UnpackRevert(res.ReturnedData)
+				require.NoError(t, err)
+				require.Equal(t, "unsuccessful call to arch ", revertReason)
 			})
 	})
 
