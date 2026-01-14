@@ -69,6 +69,7 @@ func (entry *signatureContinuation) verify() errors.CodedError {
 	valid, message := entry.ValidateExtensionDataAndReconstructMessage(entry.payload)
 	if !valid {
 		entry.verifyErr = entry.newError(fmt.Errorf("signature extension data is not valid"))
+		return entry.verifyErr
 	}
 
 	valid, err := crypto.VerifySignatureFromTransaction(

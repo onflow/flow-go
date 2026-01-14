@@ -443,7 +443,7 @@ func (v *TransactionValidator) checkAccounts(tx *flow.TransactionBody) error {
 	return nil
 }
 
-// checkSignatureFormat checks the format of each transaction signature idependently.
+// checkSignatureFormat checks the format of each transaction signature independently.
 // The current checks are:
 //   - the format is correct with regards to the authentication scheme
 //   - sanity check that the cryptographic signature can be an ECDSA signature of either P-256 or secp256k1 curve
