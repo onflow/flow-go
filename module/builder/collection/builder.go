@@ -296,9 +296,7 @@ func (b *Builder) getBlockBuildContext(parentID flow.Identifier) (*blockBuildCon
 	// called once the epoch has started, i.e. consensus has finalized the first block in the epoch. Consequently, we
 	// retrieve the epoch's first height on the first call of the builder, and cache it for future calls.
 	r := b.db.Reader()
-	if b.epochFirstHeight != nil {
-		ctx.refEpochFirstHeight = *b.epochFirstHeight
-	} else {
+	if b.epochFirstHeight == nil {
 		var refEpochFirstHeight uint64
 		err = operation.RetrieveEpochFirstHeight(r, b.clusterEpoch, &refEpochFirstHeight)
 		if err != nil {
@@ -312,8 +310,8 @@ func (b *Builder) getBlockBuildContext(parentID flow.Identifier) (*blockBuildCon
 			}
 		}
 		b.epochFirstHeight = &refEpochFirstHeight
-		ctx.refEpochFirstHeight = *b.epochFirstHeight
 	}
+	ctx.refEpochFirstHeight = *b.epochFirstHeight
 
 	// if the epoch has ended and the final block is cached, use the cached values
 	if b.epochFinalHeight != nil && b.epochFinalID != nil {
