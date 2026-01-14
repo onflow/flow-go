@@ -18,6 +18,7 @@ type ClusterBlocks interface {
 	//
 	// Error returns:
 	//   - [storage.ErrNotFound] if the block ID was not found
+	//   - [storage.ErrWrongChain] if the block header exists in the database but is part of a different chain than expected
 	//   - generic error in case of unexpected failure from the database layer, or failure
 	//     to decode an existing database value
 	ProposalByID(blockID flow.Identifier) (*cluster.Proposal, error)

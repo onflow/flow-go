@@ -6,6 +6,7 @@ import (
 	"github.com/jordanschalm/lockctx"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/operation"
 )
@@ -65,7 +66,7 @@ func (b *Blocks) retrieve(blockID flow.Identifier) (*flow.Block, error) {
 	}
 	payload, err := b.payloads.retrieveTx(blockID)
 	if err != nil {
-		return nil, fmt.Errorf("could not retrieve payload: %w", err)
+		return nil, irrecoverable.NewExceptionf("could not retrieve payload for block %x: %w", blockID, err)
 	}
 	untrustedBlock := flow.UntrustedBlock{
 		HeaderBody: header.HeaderBody,
@@ -88,7 +89,7 @@ func (b *Blocks) retrieve(blockID flow.Identifier) (*flow.Block, error) {
 
 // retrieveProposal returns the proposal with the given block ID.
 // It is available for finalized and pending blocks.
-// Expected error returns during normal operations:
+// Expected errors during normal operations:
 // - [storage.ErrNotFound] if no block is found
 // - [storage.ErrWrongChain] if a block with that ID exists but on a different chain, such as a cluster chain
 func (b *Blocks) retrieveProposal(blockID flow.Identifier) (*flow.Proposal, error) {
@@ -98,7 +99,7 @@ func (b *Blocks) retrieveProposal(blockID flow.Identifier) (*flow.Proposal, erro
 	}
 	sig, err := b.headers.sigs.retrieveTx(blockID)
 	if err != nil {
-		return nil, fmt.Errorf("could not retrieve proposer signature: %w", err)
+		return nil, irrecoverable.NewExceptionf("could not retrieve proposer signature for block %x: %w", blockID, err)
 	}
 
 	untrustedProposal := flow.UntrustedProposal{
@@ -124,7 +125,7 @@ func (b *Blocks) retrieveProposal(blockID flow.Identifier) (*flow.Proposal, erro
 // ByID returns the block with the given hash. It is available for all incorporated blocks (validated blocks
 // that have been appended to any of the known forks) no matter whether the block has been finalized or not.
 //
-// Expected errors returns during normal operations:
+// Expected errors during normal operations:
 //   - [storage.ErrNotFound] if no block with the corresponding ID was found
 //   - [storage.ErrWrongChain] if a block with that ID exists but on a different chain, such as a cluster chain
 func (b *Blocks) ByID(blockID flow.Identifier) (*flow.Block, error) {
@@ -135,7 +136,7 @@ func (b *Blocks) ByID(blockID flow.Identifier) (*flow.Block, error) {
 // It is available for all incorporated blocks (validated blocks that have been appended to any
 // of the known forks) no matter whether the block has been finalized or not.
 //
-// Expected errors returns during normal operations:
+// Expected errors during normal operations:
 //   - [storage.ErrNotFound] if no block with the corresponding ID was found
 //   - [storage.ErrWrongChain] if a block with that ID exists but on a different chain, such as a cluster chain
 func (b *Blocks) ProposalByID(blockID flow.Identifier) (*flow.Proposal, error) {
@@ -146,7 +147,7 @@ func (b *Blocks) ProposalByID(blockID flow.Identifier) (*flow.Proposal, error) {
 // certified blocks are the blocks that have received QC. Hotstuff guarantees that for each view,
 // at most one block is certified. Hence, the return value of `ByView` is guaranteed to be unique
 // even for non-finalized blocks.
-// Expected errors returns during normal operations:
+// Expected errors during normal operations:
 //   - [storage.ErrNotFound] if no certified block is known at given view.
 func (b *Blocks) ByView(view uint64) (*flow.Block, error) {
 	blockID, err := b.headers.BlockIDByView(view)
@@ -165,13 +166,18 @@ func (b *Blocks) ProposalByView(view uint64) (*flow.Proposal, error) {
 	if err != nil {
 		return nil, err
 	}
-	return b.retrieveProposal(blockID)
+	proposal, err := b.retrieveProposal(blockID)
+	if err != nil {
+		// not being able to retrieve a proposal indexed by view indicates state corruption
+		return nil, irrecoverable.NewExceptionf("could not retrieve proposal for view %d: %w", view, err)
+	}
+	return proposal, nil
 }
 
 // ByHeight returns the block at the given height. It is only available
 // for finalized blocks.
 //
-// Expected errors returns during normal operations:
+// Expected errors during normal operations:
 //   - [storage.ErrNotFound] if no block for the corresponding height was found
 func (b *Blocks) ByHeight(height uint64) (*flow.Block, error) {
 	blockID, err := b.headers.retrieveIdByHeightTx(height)
@@ -184,7 +190,7 @@ func (b *Blocks) ByHeight(height uint64) (*flow.Block, error) {
 // ProposalByHeight returns the block at the given height, along with the proposer's
 // signature on it. It is only available for finalized blocks.
 //
-// Expected errors returns during normal operations:
+// Expected errors during normal operations:
 //   - [storage.ErrNotFound] if no block proposal for the corresponding height was found
 func (b *Blocks) ProposalByHeight(height uint64) (*flow.Proposal, error) {
 	blockID, err := b.headers.retrieveIdByHeightTx(height)
@@ -201,7 +207,7 @@ func (b *Blocks) ProposalByHeight(height uint64) (*flow.Proposal, error) {
 // finality.
 // CAUTION: this method is not backed by a cache and therefore comparatively slow!
 //
-// Expected errors returns during normal operations:
+// Expected errors during normal operations:
 //   - [storage.ErrNotFound] if the collection ID was not found
 func (b *Blocks) ByCollectionID(collID flow.Identifier) (*flow.Block, error) {
 	blockID, err := b.BlockIDByCollectionID(collID)
@@ -221,7 +227,7 @@ func (b *Blocks) ByCollectionID(collID flow.Identifier) (*flow.Block, error) {
 // finality.
 // CAUTION: this method is not backed by a cache and therefore comparatively slow!
 //
-// Expected errors returns during normal operations:
+// Expected errors during normal operations:
 //   - [storage.ErrNotFound] if no FINALIZED block exists containing the expected collection guarantee
 func (b *Blocks) BlockIDByCollectionID(collID flow.Identifier) (flow.Identifier, error) {
 	guarantee, err := b.payloads.guarantees.ByCollectionID(collID)
@@ -250,7 +256,7 @@ func (b *Blocks) BlockIDByCollectionID(collID flow.Identifier) (flow.Identifier,
 // Hence, this function should be treated as a temporary solution, which requires generalization
 // (one-to-many mapping) for soft finality and the mature protocol.
 //
-// Expected error returns during normal operations:
+// Expected errors during normal operations:
 //   - [storage.ErrAlreadyExists] if any collection guarantee is already indexed
 func (b *Blocks) BatchIndexBlockContainingCollectionGuarantees(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockID flow.Identifier, guaranteeIDs []flow.Identifier) error {
 	return operation.BatchIndexBlockContainingCollectionGuarantees(lctx, rw, blockID, guaranteeIDs)
