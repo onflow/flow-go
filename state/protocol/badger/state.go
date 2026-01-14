@@ -1002,7 +1002,7 @@ func IsBootstrapped(db storage.DB) (bool, error) {
 // Note: This function should only be called on properly bootstrapped nodes. If the state is corrupted
 // or the node is not properly bootstrapped, this function may return [operation.IncompleteStateError].
 // The reason for not returning [storage.ErrNotFound] directly is to avoid confusion between an often
-// benign [storage.ErrNotFound] and failed reads of quantities that the protocol mandates to be present./
+// benign [storage.ErrNotFound] and failed reads of quantities that the protocol mandates to be present.
 //
 // No error returns expected during normal operations.
 func GetChainID(db storage.DB) (flow.ChainID, error) {

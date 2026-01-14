@@ -81,7 +81,7 @@ func NewClusterHeaders(collector module.CacheMetrics, db storage.DB, chainID flo
 		err := operation.LookupClusterBlockHeight(r, chainID, height, &id)
 		return id, err
 	}
-	retrieveView := func(r storage.Reader, height uint64) (flow.Identifier, error) {
+	retrieveView := func(r storage.Reader, view uint64) (flow.Identifier, error) {
 		return flow.ZeroID, storage.ErrNotAvailableForClusterConsensus
 	}
 	return newHeaders(collector, db, chainID, storeWithLock, retrieveHeight, retrieveView), nil
@@ -105,7 +105,7 @@ func newHeaders(collector module.CacheMetrics,
 		if header.ChainID != chainID {
 			return nil, fmt.Errorf("expected chain ID %v, got %v: %w", chainID, header.ChainID, storage.ErrWrongChain)
 		}
-		return &header, err
+		return &header, nil
 	}
 
 	h := &Headers{

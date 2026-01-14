@@ -73,7 +73,7 @@ func (f *ClusterStateFactory) Create(stateRoot *clusterkv.StateRoot, consensusCh
 
 	mutableState, err := clusterkv.NewMutableState(clusterState, f.lockManager, f.tracer, clusterHeaders, clusterPayloads, consensusHeaders)
 	if err != nil {
-		return nil, nil, nil, nil, nil, fmt.Errorf("could create mutable cluster state: %w", err)
+		return nil, nil, nil, nil, nil, fmt.Errorf("could not create mutable cluster state: %w", err)
 	}
-	return mutableState, clusterHeaders, clusterPayloads, clusterBlocks, consensusHeaders, err
+	return mutableState, clusterHeaders, clusterPayloads, clusterBlocks, consensusHeaders, nil
 }
