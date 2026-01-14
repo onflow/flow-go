@@ -90,6 +90,7 @@ func main() {
 	// Default to 10 GiB for responses (instead of standard 4 MiB) to handle large proofs that can exceed 4MB.
 	// This was increased to fix "grpc: received message larger than max" errors when generating
 	// proofs for blocks with many state changes.
+	// Compression is automatically handled by the server when clients request it (e.g., for large proofs).
 	grpcServer := grpc.NewServer(
 		grpc.MaxRecvMsgSize(int(*maxRequestSize)),
 		grpc.MaxSendMsgSize(int(*maxResponseSize)),

@@ -42,12 +42,14 @@ func NewClient(grpcAddr string, logger zerolog.Logger, maxRequestSize, maxRespon
 	// Default to 1 GiB (instead of standard 4 MiB) to handle large proofs that can exceed 4MB.
 	// This was increased to fix "grpc: received message larger than max" errors when generating
 	// proofs for blocks with many state changes.
+	// Compression is enabled for large messages (proofs, trie updates) to reduce network bandwidth.
 	conn, err := grpc.NewClient(
 		grpcAddr,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithDefaultCallOptions(
 			grpc.MaxCallRecvMsgSize(int(maxResponseSize)),
 			grpc.MaxCallSendMsgSize(int(maxRequestSize)),
+			grpc.UseCompressor("gzip"),
 		),
 	)
 	if err != nil {
@@ -202,7 +204,8 @@ func (c *Client) Set(update *ledger.Update) (ledger.State, *ledger.TrieUpdate, e
 		}
 	}
 
-	resp, err := c.client.Set(ctx, req)
+	// Use compression for Set operations since trie updates can be large
+	resp, err := c.client.Set(ctx, req, grpc.UseCompressor("gzip"))
 	if err != nil {
 		return ledger.DummyState, nil, fmt.Errorf("failed to set values: %w", err)
 	}
@@ -223,6 +226,7 @@ func (c *Client) Set(update *ledger.Update) (ledger.State, *ledger.TrieUpdate, e
 }
 
 // Prove returns proofs for the given keys at a specific state.
+// Compression is explicitly enabled for this call since proofs can be very large.
 func (c *Client) Prove(query *ledger.Query) (ledger.Proof, error) {
 	ctx := context.Background()
 	state := query.State()
@@ -237,7 +241,8 @@ func (c *Client) Prove(query *ledger.Query) (ledger.Proof, error) {
 		req.Keys[i] = ledgerKeyToProtoKey(key)
 	}
 
-	resp, err := c.client.Prove(ctx, req)
+	// Use compression for large proof responses
+	resp, err := c.client.Prove(ctx, req, grpc.UseCompressor("gzip"))
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate proof: %w", err)
 	}
