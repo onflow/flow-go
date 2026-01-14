@@ -60,7 +60,7 @@ func TestFindBlockTransactions(t *testing.T) {
 		)
 
 		// prepare dependencies
-		storages, err := common.InitStorages(db, b1.ChainID)
+		storages, err := common.InitStorages(db, flow.Emulator)
 		require.NoError(t, err)
 		payloads, collections := storages.Payloads, storages.Collections
 		snap4 := &mock.Snapshot{}
