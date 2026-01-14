@@ -95,13 +95,46 @@ func main() {
 	ledgerService := remote.NewService(ledgerStorage, logger)
 	ledgerpb.RegisterLedgerServiceServer(grpcServer, ledgerService)
 
-	// Start gRPC server
-	lis, err := net.Listen("tcp", *ledgerServiceAddr)
-	if err != nil {
-		logger.Fatal().Err(err).Msg("failed to listen")
-	}
+	// Determine if we're using Unix domain socket or TCP
+	var lis net.Listener
+	var socketPath string
+	var isUnixSocket bool
 
-	logger.Info().Str("address", *ledgerServiceAddr).Msg("gRPC server listening")
+	if strings.HasPrefix(*ledgerServiceAddr, "unix://") {
+		// Unix domain socket
+		isUnixSocket = true
+		socketPath = strings.TrimPrefix(*ledgerServiceAddr, "unix://")
+		// Handle both unix:///absolute/path and unix://relative/path formats
+		// net.Listen("unix", ...) expects the path without the unix:// prefix
+
+		// Clean up any existing socket file
+		if _, err := os.Stat(socketPath); err == nil {
+			logger.Info().Str("socket_path", socketPath).Msg("removing existing socket file")
+			if err := os.Remove(socketPath); err != nil {
+				logger.Warn().Err(err).Str("socket_path", socketPath).Msg("failed to remove existing socket file")
+			}
+		}
+
+		lis, err = net.Listen("unix", socketPath)
+		if err != nil {
+			logger.Fatal().Err(err).Str("socket_path", socketPath).Msg("failed to listen on Unix socket")
+		}
+
+		// Set socket file permissions (readable/writable by owner and group)
+		if err := os.Chmod(socketPath, 0660); err != nil {
+			logger.Warn().Err(err).Str("socket_path", socketPath).Msg("failed to set socket file permissions")
+		}
+
+		logger.Info().Str("socket_path", socketPath).Msg("gRPC server listening on Unix domain socket")
+	} else {
+		// TCP socket
+		lis, err = net.Listen("tcp", *ledgerServiceAddr)
+		if err != nil {
+			logger.Fatal().Err(err).Msg("failed to listen")
+		}
+
+		logger.Info().Str("address", *ledgerServiceAddr).Msg("gRPC server listening on TCP")
+	}
 
 	// Start server in goroutine
 	errCh := make(chan error, 1)
