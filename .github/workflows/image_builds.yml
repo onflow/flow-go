@@ -60,10 +60,10 @@ jobs:
           - docker-cross-build-execution-arm docker-push-execution-arm
 
           # execution Ledger Service Build Commands
-          - docker-build-execution-ledger-service-with-adx docker-push-execution-ledger-service-with-adx
-          - docker-build-execution-ledger-service-without-adx docker-push-execution-ledger-service-without-adx
-          - docker-build-execution-ledger-service-without-netgo-without-adx docker-push-execution-ledger-service-without-netgo-without-adx
-          - docker-cross-build-execution-ledger-service-arm docker-push-execution-ledger-service-arm
+          - docker-build-execution-ledger-with-adx docker-push-execution-ledger-with-adx
+          - docker-build-execution-ledger-without-adx docker-push-execution-ledger-without-adx
+          - docker-build-execution-ledger-without-netgo-without-adx docker-push-execution-ledger-without-netgo-without-adx
+          - docker-cross-build-execution-ledger-arm docker-push-execution-ledger-arm
 
           # observer Build Commands
           - docker-build-observer-with-adx docker-push-observer-with-adx
