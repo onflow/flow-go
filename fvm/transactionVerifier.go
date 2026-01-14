@@ -272,7 +272,9 @@ func (v *TransactionVerifier) verifyTransaction(
 	}
 
 	// Verify all cryptographic signatures against account public keys (concurrently)
-	// and fail if at least one signature is invalid
+	// and fail if at least one signature is invalid.
+	// (at this point, signatures have been deduplicated and weights have been checked,
+	// we wouldn't verify the signatures if any of those checks failed)
 	err = v.verifySignatures(signatures)
 	if err != nil {
 		return errors.NewInvalidProposalSignatureError(tx.ProposalKey, err)
