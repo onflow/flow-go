@@ -23,7 +23,6 @@ type Headers interface {
 	// ByHeight returns the block with the given number. It is only available for finalized blocks.
 	// Error returns:
 	//  - [storage.ErrNotFound] if no finalized block is known at the given height
-	//  - [storage.ErrWrongChain] if the block header exists in the database but is part of a different chain than expected
 	ByHeight(height uint64) (*flow.Header, error)
 
 	// ByView returns the block with the given view. It is only available for certified blocks on a consensus chain.
@@ -37,7 +36,6 @@ type Headers interface {
 	ByView(view uint64) (*flow.Header, error)
 
 	// Exists returns true if a header with the given ID has been stored.
-	// NOTE: this method does not distinguish between cluster and consensus headers.
 	// No errors are expected during normal operation.
 	Exists(blockID flow.Identifier) (bool, error)
 

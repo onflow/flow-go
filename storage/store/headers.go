@@ -183,7 +183,8 @@ func (h *Headers) retrieveProposalTx(blockID flow.Identifier) (*flow.ProposalHea
 	}
 	sig, err := h.sigs.retrieveTx(blockID)
 	if err != nil {
-		return nil, fmt.Errorf("could not retrieve proposer signature for id %x: %w", blockID, err)
+		// a missing proposer signature implies state corruption
+		return nil, irrecoverable.NewExceptionf("could not retrieve proposer signature for id %x: %w", blockID, err)
 	}
 	return &flow.ProposalHeader{Header: header, ProposerSigData: sig}, nil
 }
@@ -222,16 +223,20 @@ func (h *Headers) ProposalByBlockID(blockID flow.Identifier) (*flow.ProposalHead
 // ByHeight returns the block with the given number. It is only available for finalized blocks.
 // Error returns:
 //   - [storage.ErrNotFound] if no finalized block is known at the given height
-//   - [storage.ErrWrongChain] if the block header exists in the database but is part of a different chain than expected
 func (h *Headers) ByHeight(height uint64) (*flow.Header, error) {
 	blockID, err := h.retrieveIdByHeightTx(height)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("could not retrieve header for height %d: %w", height, err)
 	}
-	return h.retrieveTx(blockID)
+	header, err := h.retrieveTx(blockID)
+	if err != nil {
+		// any error here implies state corruption, since the block indicated by the height index was unavailable
+		return nil, irrecoverable.NewExceptionf("could not retrieve indexed header %x for height %d: %w", blockID, height, err)
+	}
+	return header, nil
 }
 
-// ByView returns the block with the given view. It is only available for certified blocks.
+// ByView returns the block with the given view. It is only available for certified blocks on a consensus chain.
 // Certified blocks are the blocks that have received QC. Hotstuff guarantees that for each view,
 // at most one block is certified. Hence, the return value of `ByView` is guaranteed to be unique
 // even for non-finalized blocks.
@@ -244,23 +249,30 @@ func (h *Headers) ByView(view uint64) (*flow.Header, error) {
 	if err != nil {
 		return nil, err
 	}
-	return h.retrieveTx(blockID)
+	header, err := h.retrieveTx(blockID)
+	if err != nil {
+		// any error here implies state corruption, since the block indicated by the view index was unavailable
+		return nil, irrecoverable.NewExceptionf("could not retrieve indexed header %x for view %d: %w", blockID, view, err)
+	}
+	return header, nil
 }
 
-// Exists returns true if a header with the given ID has been stored.
-// NOTE: this method does not distinguish between cluster and consensus headers.
+// Exists returns true if a header with the given ID has been stored on the appropriate chain.
 // No errors are expected during normal operation.
 func (h *Headers) Exists(blockID flow.Identifier) (bool, error) {
-	// if the block is in the cache, return true
+	// if the block is in the cache, return true (blocks on a different chain are never cached)
 	if ok := h.cache.IsCached(blockID); ok {
 		return ok, nil
 	}
-	// otherwise, check badger store
-	exists, err := operation.BlockExists(h.db.Reader(), blockID)
+	// otherwise, try retrieve the header and check the ChainID is correct
+	_, err := h.retrieveTx(blockID)
 	if err != nil {
+		if errors.Is(err, storage.ErrNotFound) || errors.Is(err, storage.ErrWrongChain) {
+			return false, nil
+		}
 		return false, fmt.Errorf("could not check existence: %w", err)
 	}
-	return exists, nil
+	return true, nil
 }
 
 // BlockIDByHeight returns the block ID that is finalized at the given height. It is an optimized
@@ -316,6 +328,7 @@ func (h *Headers) ByParentID(parentID flow.Identifier) ([]*flow.Header, error) {
 // BlockIDByView returns the block ID that is certified at the given view. It is an optimized
 // version of `ByView` that skips retrieving the block. Expected errors during normal operations:
 //   - [storage.ErrNotFound] if no certified block is known at given view.
+//   - [storage.ErrNotAvailableForClusterConsensus] if called on a cluster Headers instance (created by [NewClusterHeaders])
 //
 // NOTE: this method is not available until next spork (mainnet27) or a migration that builds the index.
 func (h *Headers) BlockIDByView(view uint64) (flow.Identifier, error) {
