@@ -96,12 +96,12 @@ func main() {
 	ledgerpb.RegisterLedgerServiceServer(grpcServer, ledgerService)
 
 	// Start gRPC server
-	lis, err := net.Listen("tcp", *grpcListenAddr)
+	lis, err := net.Listen("tcp", *ledgerServiceAddr)
 	if err != nil {
 		logger.Fatal().Err(err).Msg("failed to listen")
 	}
 
-	logger.Info().Str("address", *grpcListenAddr).Msg("gRPC server listening")
+	logger.Info().Str("address", *ledgerServiceAddr).Msg("gRPC server listening")
 
 	// Start server in goroutine
 	errCh := make(chan error, 1)
