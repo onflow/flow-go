@@ -102,7 +102,7 @@ func (b *ClusterBlocks) ProposalByHeight(height uint64) (*cluster.Proposal, erro
 	}
 	proposal, err := b.ProposalByID(blockID)
 	if err != nil {
-		// a missing proposal implies state corruption
+		// failure to retrieve a proposal that has been indexed indicates state corruption
 		return nil, irrecoverable.NewExceptionf("could not retrieve proposal for id %x: %w", blockID, err)
 	}
 	return proposal, nil

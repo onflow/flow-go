@@ -154,7 +154,12 @@ func (b *Blocks) ByView(view uint64) (*flow.Block, error) {
 	if err != nil {
 		return nil, err
 	}
-	return b.ByID(blockID)
+	block, err := b.ByID(blockID)
+	if err != nil {
+		// failure to retrieve a block that has been indexed indicates state corruption
+		return nil, irrecoverable.NewExceptionf("could not retrieve indexed block for view %d: %w", view, err)
+	}
+	return block, nil
 }
 
 // ProposalByView returns the block proposal with the given view. It is only available for certified blocks.
@@ -184,7 +189,12 @@ func (b *Blocks) ByHeight(height uint64) (*flow.Block, error) {
 	if err != nil {
 		return nil, err
 	}
-	return b.retrieve(blockID)
+	block, err := b.retrieve(blockID)
+	if err != nil {
+		// failure to retrieve a block that has been indexed indicates state corruption
+		return nil, irrecoverable.NewExceptionf("could not retrieve indexed block for height %d: %w", height, err)
+	}
+	return block, nil
 }
 
 // ProposalByHeight returns the block at the given height, along with the proposer's
@@ -197,7 +207,12 @@ func (b *Blocks) ProposalByHeight(height uint64) (*flow.Proposal, error) {
 	if err != nil {
 		return nil, err
 	}
-	return b.retrieveProposal(blockID)
+	proposal, err := b.retrieveProposal(blockID)
+	if err != nil {
+		// failure to retrieve a block that has been indexed indicates state corruption
+		return nil, irrecoverable.NewExceptionf("could not retrieve indexed proposal for height %d: %w", height, err)
+	}
+	return proposal, nil
 }
 
 // ByCollectionID returns the block for the given [flow.CollectionGuarantee] ID.
