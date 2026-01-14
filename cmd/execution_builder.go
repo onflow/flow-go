@@ -173,6 +173,13 @@ type ExecutionNode struct {
 	blobService            network.BlobService
 	blobserviceDependable  *module.ProxiedReadyDoneAware
 	metricsProvider        txmetrics.TransactionExecutionMetricsProvider
+
+	// used by ingestion engine to notify executed block, and
+	// used by background indexer engine to trigger indexing
+	blockExecutedNotifier *ingestion.BlockExecutedNotifier
+
+	// save register updates in storehouse when it is not enabled
+	backgroundIndexerEngine *storehouse.BackgroundIndexerEngine
 }
 
 func (builder *ExecutionNodeBuilder) LoadComponentsAndModules() {
@@ -213,6 +220,7 @@ func (builder *ExecutionNodeBuilder) LoadComponentsAndModules() {
 		Module("sync core", exeNode.LoadSyncCore).
 		Module("execution storage", exeNode.LoadExecutionStorage).
 		Module("follower distributor", exeNode.LoadFollowerDistributor).
+		Module("block executed notifier", exeNode.LoadBlockExecutedNotifier).
 		Module("authorization checking function", exeNode.LoadAuthorizationCheckingFunction).
 		Module("execution data datastore", exeNode.LoadExecutionDataDatastore).
 		Module("execution data getter", exeNode.LoadExecutionDataGetter).
@@ -258,7 +266,8 @@ func (builder *ExecutionNodeBuilder) LoadComponentsAndModules() {
 		Component("collection requester engine", exeNode.LoadCollectionRequesterEngine).
 		Component("receipt provider engine", exeNode.LoadReceiptProviderEngine).
 		Component("synchronization engine", exeNode.LoadSynchronizationEngine).
-		Component("grpc server", exeNode.LoadGrpcServer)
+		Component("grpc server", exeNode.LoadGrpcServer).
+		Component("background indexer engine", exeNode.LoadBackgroundIndexerEngine)
 }
 
 func (exeNode *ExecutionNode) LoadCollections(node *NodeConfig) error {
@@ -354,6 +363,11 @@ func (exeNode *ExecutionNode) LoadExecutionStorage(
 func (exeNode *ExecutionNode) LoadFollowerDistributor(node *NodeConfig) error {
 	exeNode.followerDistributor = pubsub.NewFollowerDistributor()
 	exeNode.followerDistributor.AddProposalViolationConsumer(notifications.NewSlashingViolationsConsumer(node.Logger))
+	return nil
+}
+
+func (exeNode *ExecutionNode) LoadBlockExecutedNotifier(node *NodeConfig) error {
+	exeNode.blockExecutedNotifier = ingestion.NewBlockExecutedNotifier()
 	return nil
 }
 
@@ -1113,6 +1127,11 @@ func (exeNode *ExecutionNode) LoadIngestionEngine(
 		exeNode.collectionRequester = reqEng
 	}
 
+	var blockExecutedCallback ingestion.BlockExecutedCallback
+	if exeNode.blockExecutedNotifier != nil {
+		blockExecutedCallback = exeNode.blockExecutedNotifier.OnExecuted
+	}
+
 	_, core, err := ingestion.NewMachine(
 		node.Logger,
 		node.ProtocolEvents,
@@ -1128,6 +1147,7 @@ func (exeNode *ExecutionNode) LoadIngestionEngine(
 		exeNode.providerEngine,
 		exeNode.blockDataUploader,
 		exeNode.stopControl,
+		blockExecutedCallback,
 	)
 
 	return core, err
@@ -1376,6 +1396,43 @@ func (exeNode *ExecutionNode) LoadGrpcServer(
 		exeNode.exeConf.apiRatelimits,
 		exeNode.exeConf.apiBurstlimits,
 	), nil
+}
+
+func (exeNode *ExecutionNode) LoadBackgroundIndexerEngine(
+	node *NodeConfig,
+) (
+	module.ReadyDoneAware,
+	error,
+) {
+	engine, created, err := storehouse.LoadBackgroundIndexerEngine(
+		node.Logger,
+		exeNode.exeConf.enableStorehouse,
+		exeNode.exeConf.enableBackgroundStorehouseIndexing,
+		node.State,
+		node.Storage.Headers,
+		node.ProtocolEvents,
+		node.LastFinalizedHeader.Height,
+		exeNode.collector,
+		exeNode.exeConf.registerDir,
+		exeNode.exeConf.triedir,
+		exeNode.exeConf.importCheckpointWorkerCount,
+		bootstrap.ImportRegistersFromCheckpoint,
+		exeNode.executionDataStore,
+		exeNode.resultsReader,
+		exeNode.blockExecutedNotifier,
+		exeNode.followerDistributor,
+		exeNode.exeConf.backgroundIndexerHeightsPerSecond,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	if !created {
+		return &module.NoopReadyDoneAware{}, nil
+	}
+
+	exeNode.backgroundIndexerEngine = engine
+	return engine, nil
 }
 
 func (exeNode *ExecutionNode) LoadBootstrapper(node *NodeConfig) error {
