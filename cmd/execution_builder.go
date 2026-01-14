@@ -936,9 +936,10 @@ func (exeNode *ExecutionNode) LoadExecutionStateLedger(
 ) {
 	// Create ledger using factory
 	result, err := ledgerfactory.NewLedger(ledgerfactory.Config{
-		LedgerServiceAddr:                    exeNode.exeConf.ledgerServiceAddr,
-		LedgerMaxRequestSize:                 exeNode.exeConf.ledgerMaxRequestSize,
-		LedgerMaxResponseSize:                exeNode.exeConf.ledgerMaxResponseSize,
+		LedgerServiceAddr:      exeNode.exeConf.ledgerServiceAddr,
+		LedgerMaxRequestSize:   exeNode.exeConf.ledgerMaxRequestSize,
+		LedgerMaxResponseSize: exeNode.exeConf.ledgerMaxResponseSize,
+		LedgerEnableCompression: exeNode.exeConf.ledgerEnableCompression,
 		Triedir:                              exeNode.exeConf.triedir,
 		MTrieCacheSize:                       exeNode.exeConf.mTrieCacheSize,
 		CheckpointDistance:                   exeNode.exeConf.checkpointDistance,

@@ -22,7 +22,7 @@ import (
 
 var (
 	triedir           = flag.String("triedir", "", "Directory for trie files (required)")
-	grpcListenAddr    = flag.String("grpc-addr", "0.0.0.0:9000", "gRPC server listen address")
+	grpcListenAddr    = flag.String("grpc-addr", "0.0.0.0:9000", "gRPC server listen address (TCP: ip:port or Unix: unix:///path/to/socket)")
 	mtrieCacheSize    = flag.Int("mtrie-cache-size", 500, "MTrie cache size (number of tries)")
 	checkpointDist    = flag.Uint("checkpoint-distance", 100, "Checkpoint distance")
 	checkpointsToKeep = flag.Uint("checkpoints-to-keep", 3, "Number of checkpoints to keep")
@@ -96,13 +96,46 @@ func main() {
 	ledgerService := remote.NewService(ledgerStorage, logger)
 	ledgerpb.RegisterLedgerServiceServer(grpcServer, ledgerService)
 
-	// Start gRPC server
-	lis, err := net.Listen("tcp", *grpcListenAddr)
-	if err != nil {
-		logger.Fatal().Err(err).Msg("failed to listen")
-	}
+	// Determine if we're using Unix domain socket or TCP
+	var lis net.Listener
+	var socketPath string
+	var isUnixSocket bool
 
-	logger.Info().Str("address", *grpcListenAddr).Msg("gRPC server listening")
+	if strings.HasPrefix(*grpcListenAddr, "unix://") {
+		// Unix domain socket
+		isUnixSocket = true
+		socketPath = strings.TrimPrefix(*grpcListenAddr, "unix://")
+		// Handle both unix:///absolute/path and unix://relative/path formats
+		// net.Listen("unix", ...) expects the path without the unix:// prefix
+
+		// Clean up any existing socket file
+		if _, err := os.Stat(socketPath); err == nil {
+			logger.Info().Str("socket_path", socketPath).Msg("removing existing socket file")
+			if err := os.Remove(socketPath); err != nil {
+				logger.Warn().Err(err).Str("socket_path", socketPath).Msg("failed to remove existing socket file")
+			}
+		}
+
+		lis, err = net.Listen("unix", socketPath)
+		if err != nil {
+			logger.Fatal().Err(err).Str("socket_path", socketPath).Msg("failed to listen on Unix socket")
+		}
+
+		// Set socket file permissions (readable/writable by owner and group)
+		if err := os.Chmod(socketPath, 0660); err != nil {
+			logger.Warn().Err(err).Str("socket_path", socketPath).Msg("failed to set socket file permissions")
+		}
+
+		logger.Info().Str("socket_path", socketPath).Msg("gRPC server listening on Unix domain socket")
+	} else {
+		// TCP socket
+		lis, err = net.Listen("tcp", *grpcListenAddr)
+		if err != nil {
+			logger.Fatal().Err(err).Msg("failed to listen")
+		}
+
+		logger.Info().Str("address", *grpcListenAddr).Msg("gRPC server listening on TCP")
+	}
 
 	// Start server in goroutine
 	errCh := make(chan error, 1)
@@ -126,6 +159,15 @@ func main() {
 	// Graceful shutdown
 	logger.Info().Msg("shutting down gRPC server...")
 	grpcServer.GracefulStop()
+
+	// Clean up Unix socket file if we used one
+	if isUnixSocket && socketPath != "" {
+		if err := os.Remove(socketPath); err != nil {
+			logger.Warn().Err(err).Str("socket_path", socketPath).Msg("failed to remove socket file")
+		} else {
+			logger.Info().Str("socket_path", socketPath).Msg("removed socket file")
+		}
+	}
 
 	logger.Info().Msg("waiting for ledger to stop...")
 	<-ledgerStorage.Done()
