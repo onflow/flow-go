@@ -178,11 +178,9 @@ func (suite *CollectorSuite) TxForCluster(target flow.IdentitySkeletonList) *sdk
 
 	// hash-grind the script until the transaction will be routed to target cluster
 	for {
-		serviceAccountAddr, err := suite.net.Root().ChainID.Chain().AddressAtIndex(suite.serviceAccountIdx)
-		suite.Require().NoError(err)
-		suite.serviceAccountIdx++
+		// update the script for each loop
 		tx.SetScript(append(tx.Script, '/', '/'))
-		err = tx.SignEnvelope(sdk.Address(serviceAccountAddr), acct.key.Index, acct.signer)
+		err := tx.SignEnvelope(acct.addr, acct.key.Index, acct.signer)
 		require.NoError(suite.T(), err)
 		routed, ok := clusters.ByTxID(convert.IDFromSDK(tx.ID()))
 		require.True(suite.T(), ok)
