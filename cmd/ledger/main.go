@@ -126,6 +126,15 @@ func main() {
 	logger.Info().Msg("shutting down gRPC server...")
 	grpcServer.GracefulStop()
 
+	// Clean up Unix socket file if we used one
+	if isUnixSocket && socketPath != "" {
+		if err := os.Remove(socketPath); err != nil {
+			logger.Warn().Err(err).Str("socket_path", socketPath).Msg("failed to remove socket file")
+		} else {
+			logger.Info().Str("socket_path", socketPath).Msg("removed socket file")
+		}
+	}
+
 	logger.Info().Msg("waiting for ledger to stop...")
 	<-ledgerStorage.Done()
 
