@@ -315,6 +315,10 @@ func CollectionNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ro
 		node.Net,
 		node.Me,
 		node.State,
+		// CAUTION: the HeroStore fifo queue is NOT BFT. It should be used for messages from trusted sources only!
+		// In the requester engine, the injected fifo queue is used to hold [flow.EntityResponse] messages from other
+		// potentially byzantine peers. In PRODUCTION, you can NOT use a HeroStore here. However, for testing we
+		// use the HeroStore for its better performance (reduced GC load on the maxed-out testing server).
 		queue.NewHeroStore(uint32(1000), unittest.Logger(), metrics.NewNoopCollector()),
 		uint(1000),
 		channels.ProvideCollections,
@@ -701,6 +705,10 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ide
 		execState,
 		metricsCollector,
 		checkAuthorizedAtBlock,
+		// CAUTION: the HeroStore fifo queue is NOT BFT. It should be used for messages from trusted sources only!
+		// In the requester engine, the injected fifo queue is used to hold [flow.EntityResponse] messages from other
+		// potentially byzantine peers. In PRODUCTION, you can NOT use a HeroStore here. However, for testing we
+		// use the HeroStore for its better performance (reduced GC load on the maxed-out testing server).
 		queue.NewHeroStore(uint32(1000), unittest.Logger(), metrics.NewNoopCollector()),
 		executionprovider.DefaultChunkDataPackRequestWorker,
 		executionprovider.DefaultChunkDataPackQueryTimeout,
