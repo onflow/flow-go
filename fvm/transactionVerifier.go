@@ -223,7 +223,7 @@ func (v *TransactionVerifier) verifyTransaction(
 	}
 
 	// return the signature entries (both payload and envelope) and empty weight maps
-	// that will be used to aggregate weights during signature verification.
+	// that will be used to aggregate weights.
 	// the account keys are deduplicated during this call.
 	signatures, payloadWeights, envelopeWeights, err := newSignatureEntries(tx)
 	if err != nil {

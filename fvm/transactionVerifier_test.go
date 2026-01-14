@@ -415,7 +415,7 @@ func TestTransactionVerification(t *testing.T) {
 
 		ctx := newContext()
 		err = run(tx, ctx, txnState)
-		assert.ErrorContains(t, err, "payer account does not have sufficient signatures", "error should be about insufficient payer weights not invald signature")
+		assert.ErrorContains(t, err, "payer account does not have sufficient signatures", "error should be about insufficient payer weights not invalid signature")
 	})
 
 	t.Run("signature from unrelated address", func(t *testing.T) {
@@ -441,7 +441,7 @@ func TestTransactionVerification(t *testing.T) {
 			KeyIndex:    0,
 		}
 
-		// authotizer signature
+		// authorizer signature
 		sig3 := flow.TransactionSignature{
 			Address:     authorizers[0],
 			SignerIndex: 0,
