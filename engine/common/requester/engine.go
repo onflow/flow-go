@@ -525,7 +525,20 @@ func (e *Engine) dispatchRequest() (bool, error) {
 	// we accept answer for aggressively. However, most requests should be responded to on the first attempt and clearing
 	// these up only removes the ability to instantly retry upon partial responses, so it won't affect much.
 	go func() {
-		<-time.After(e.cfg.RetryInitial)
+		done := e.Done()
+		// check if the goroutine didn't outlive the context
+		select {
+		case <-done:
+			return
+		default:
+		}
+
+		// wait for retry interval but return early in case done was signalled
+		select {
+		case <-done:
+			return
+		case <-time.After(e.cfg.RetryInitial):
+		}
 
 		e.mu.Lock()
 		delete(e.requests, req.Nonce)
