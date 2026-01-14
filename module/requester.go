@@ -13,13 +13,17 @@ type Requester interface {
 	// This allows finer-grained control over which providers to request from on a per-entity basis.
 	// Use `filter.Any` if no additional restrictions are required.
 	// Received entities will be verified for integrity using their ID function.
+	// Idempotent w.r.t. `queryKey` (if prior request is still ongoing, we just continue trying).
+	// Concurrency safe.
 	EntityByID(entityID flow.Identifier, selector flow.IdentityFilter[flow.Identity])
 
 	// EntityBySecondaryKey will enqueue the given entity for request by some secondary identifier (NOT its content hash).
 	// The selector will be applied to the subset of valid providers configured globally for the Requester instance.
 	// This allows finer-grained control over which providers to request from on a per-entity basis.
 	// Use `filter.Any` if no additional restrictions are required.
-	// Received entities WILL NOT be verified for integrity using their ID function.
+	// CAUTION: NOT BFT, because received entities WILL NOT be verified for integrity using their ID function.
+	// Idempotent w.r.t. `queryKey` (if prior request is still ongoing, we just continue trying).
+	// Concurrency safe.
 	EntityBySecondaryKey(queryKey flow.Identifier, selector flow.IdentityFilter[flow.Identity])
 
 	// Force will force the dispatcher to send all possible batches immediately.

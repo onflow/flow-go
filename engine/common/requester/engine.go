@@ -25,7 +25,7 @@ import (
 	"github.com/onflow/flow-go/utils/rand"
 )
 
-// DefaultEntityRequestCacheSize is the default max message queue size for the provider engine.
+// DefaultEntityRequestCacheSize is the default max message queue size for the requester engine.
 // Assuming a maximum size 10MB per message, a full queue would consume ~5GB of memory (10M*500).
 // While most messages (such as execution receipts) are significantly smaller than 10MB, some
 // messages like chunk data packs can be significantly larger.  The user should properly tune
@@ -141,7 +141,7 @@ func New(
 		engine.NewNotifier(),
 		engine.Pattern{
 			// Match is called on every new message coming to this engine.
-			// Provider engine only expects *flow.EntityResponse.
+			// Requester engine only expects *flow.EntityResponse.
 			// Other message types are discarded by Match.
 			Match: func(message *engine.Message) bool {
 				_, ok := message.Payload.(*flow.EntityResponse)
@@ -230,9 +230,10 @@ func (e *Engine) processInboundEntityResponses(ctx irrecoverable.SignalerContext
 	ready()
 	e.log.Debug().Msg("process entity request shoveller worker started")
 
+	receivedResponseNotifier := e.requestHandler.GetNotifier()
 	for {
 		select {
-		case <-e.requestHandler.GetNotifier():
+		case <-receivedResponseNotifier:
 			// there is at least a single request in the queue, so we try to process it.
 			e.onQueuedEntityResponses(ctx)
 		case <-ctx.Done():
@@ -285,6 +286,8 @@ func (e *Engine) onQueuedEntityResponses(ctx irrecoverable.SignalerContext) {
 // This allows finer-grained control over which providers to request from on a per-entity basis.
 // Use `filter.Any` if no additional restrictions are required.
 // Received entities will be verified for integrity using their ID function.
+// Idempotent w.r.t. `queryKey` (if prior request is still ongoing, we just continue trying).
+// Concurrency safe.
 func (e *Engine) EntityByID(entityID flow.Identifier, selector flow.IdentityFilter[flow.Identity]) {
 	e.addEntityRequest(entityID, selector, true)
 }
@@ -296,6 +299,8 @@ func (e *Engine) EntityByID(entityID flow.Identifier, selector flow.IdentityFilt
 // Use `filter.Any` if no additional restrictions are required.
 // It is the CALLER's RESPONSIBILITY to verify integrity (and authenticity if applicable) of the received data
 // which might be provided by a byzantine peer.
+// Idempotent w.r.t. `queryKey` (if prior request is still ongoing, we just continue trying).
+// Concurrency safe.
 func (e *Engine) EntityBySecondaryKey(key flow.Identifier, selector flow.IdentityFilter[flow.Identity]) {
 	e.addEntityRequest(key, selector, false)
 }
