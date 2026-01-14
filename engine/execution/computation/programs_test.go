@@ -44,7 +44,7 @@ func TestPrograms_TestContractUpdates(t *testing.T) {
 
 	chain := flow.Mainnet.Chain()
 	vm := fvm.NewVirtualMachine()
-	execCtx := fvm.NewContext(fvm.WithChain(chain))
+	execCtx := fvm.NewContext(chain)
 
 	privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
 	require.NoError(t, err)
@@ -222,9 +222,10 @@ func TestPrograms_TestBlockForks(t *testing.T) {
 	chain := flow.Emulator.Chain()
 	vm := fvm.NewVirtualMachine()
 	execCtx := fvm.NewContext(
+		chain,
 		fvm.WithBlockHeader(block.ToHeader()),
 		fvm.WithBlocks(blockProvider{map[uint64]*flow.Block{0: block}}),
-		fvm.WithChain(chain))
+	)
 	privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
 	require.NoError(t, err)
 	snapshotTree, accounts, err := testutil.CreateAccounts(

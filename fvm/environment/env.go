@@ -2,9 +2,10 @@ package environment
 
 import (
 	"github.com/onflow/cadence"
+	"github.com/onflow/cadence/common"
 	"github.com/onflow/cadence/runtime"
+	"github.com/onflow/cadence/sema"
 
-	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -20,8 +21,8 @@ type Environment interface {
 	MetricsReporter
 
 	// Runtime
-	BorrowCadenceRuntime() *reusableRuntime.ReusableCadenceRuntime
-	ReturnCadenceRuntime(*reusableRuntime.ReusableCadenceRuntime)
+	BorrowCadenceRuntime() ReusableCadenceRuntime
+	ReturnCadenceRuntime(ReusableCadenceRuntime)
 
 	TransactionInfo
 
@@ -84,6 +85,54 @@ type Environment interface {
 	Reset()
 }
 
+// ReusableCadenceRuntime is a wrapper around the cadence runtime and environment that
+// is reused between procedures
+type ReusableCadenceRuntime interface {
+	// ReadStored calls the internal runtime.Runtime.ReadStored
+	ReadStored(
+		address common.Address,
+		path cadence.Path,
+	) (
+		cadence.Value,
+		error,
+	)
+
+	// NewTransactionExecutor calls the internal runtime.Runtime.NewTransactionExecutor
+	NewTransactionExecutor(
+		script runtime.Script,
+		location common.Location,
+	) runtime.Executor
+
+	// ExecuteScript calls the internal runtime.Runtime.ExecuteScript
+	ExecuteScript(
+		script runtime.Script,
+		location common.Location,
+	) (
+		cadence.Value,
+		error,
+	)
+
+	// InvokeContractFunction calls the internal runtime.Runtime.InvokeContractFunction
+	InvokeContractFunction(
+		contractLocation common.AddressLocation,
+		functionName string,
+		arguments []cadence.Value,
+		argumentTypes []sema.Type,
+	) (
+		cadence.Value,
+		error,
+	)
+
+	// CadenceTXEnv returns a cadence runtime.Environment set up for use in transactions
+	CadenceTXEnv() runtime.Environment
+
+	// CadenceScriptEnv returns a cadence runtime.Environment set up for use in scripts
+	CadenceScriptEnv() runtime.Environment
+
+	// SetFvmEnvironment sets the underlying Environment for the cadence runtime to use
+	SetFvmEnvironment(fvmEnv Environment)
+}
+
 type EnvironmentParams struct {
 	Chain flow.Chain
 
@@ -105,21 +154,6 @@ type EnvironmentParams struct {
 	ExecutionVersionProvider
 
 	ContractUpdaterParams
-}
-
-func DefaultEnvironmentParams() EnvironmentParams {
-	const chainID = flow.Mainnet
-	return EnvironmentParams{
-		Chain:                    chainID.Chain(),
-		ServiceAccountEnabled:    true,
-		RuntimeParams:            DefaultRuntimeParams(chainID.Chain()),
-		ProgramLoggerParams:      DefaultProgramLoggerParams(),
-		EventEmitterParams:       DefaultEventEmitterParams(),
-		BlockInfoParams:          DefaultBlockInfoParams(),
-		TransactionInfoParams:    DefaultTransactionInfoParams(),
-		ContractUpdaterParams:    DefaultContractUpdaterParams(),
-		ExecutionVersionProvider: ZeroExecutionVersionProvider{},
-	}
 }
 
 func (env *EnvironmentParams) SetScriptInfoParams(info *ScriptInfoParams) {

@@ -134,7 +134,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 	t.Run("single collection", func(t *testing.T) {
 
-		execCtx := fvm.NewContext()
+		execCtx := fvm.NewContext(flow.Mainnet.Chain())
 
 		vm := &testVM{
 			t:                    t,
@@ -314,7 +314,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 	t.Run("empty block still computes system chunk", func(t *testing.T) {
 
-		execCtx := fvm.NewContext()
+		execCtx := fvm.NewContext(flow.Mainnet.Chain())
 
 		vm := new(fvmmock.VM)
 		committer := new(computermock.ViewCommitter)
@@ -398,12 +398,11 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		vm := fvm.NewVirtualMachine()
 		derivedBlockData := derived.NewEmptyDerivedBlockData(0)
 		baseOpts := []fvm.Option{
-			fvm.WithChain(chain),
 			fvm.WithDerivedBlockData(derivedBlockData),
 		}
 
 		opts := append(baseOpts, contextOptions...)
-		ctx := fvm.NewContext(opts...)
+		ctx := fvm.NewContext(chain, opts...)
 		snapshotTree := snapshot.NewSnapshotTree(nil)
 
 		baseBootstrapOpts := []fvm.BootstrapProcedureOption{
@@ -471,7 +470,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 	})
 
 	t.Run("multiple collections", func(t *testing.T) {
-		execCtx := fvm.NewContext()
+		execCtx := fvm.NewContext(flow.Mainnet.Chain())
 
 		committer := new(computermock.ViewCommitter)
 
@@ -587,6 +586,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 	t.Run(
 		"service events are emitted", func(t *testing.T) {
 			execCtx := fvm.NewContext(
+				flow.Mainnet.Chain(),
 				fvm.WithAuthorizationChecksEnabled(false),
 				fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
 			)
@@ -776,7 +776,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 	t.Run("succeeding transactions store programs", func(t *testing.T) {
 
-		execCtx := fvm.NewContext()
+		execCtx := fvm.NewContext(flow.Mainnet.Chain())
 
 		address := common.Address{0x1}
 		contractLocation := common.AddressLocation{
@@ -866,6 +866,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 	t.Run("failing transactions do not store programs", func(t *testing.T) {
 		execCtx := fvm.NewContext(
+			flow.Mainnet.Chain(),
 			fvm.WithAuthorizationChecksEnabled(false),
 			fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
 		)
@@ -975,7 +976,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 	})
 
 	t.Run("internal error", func(t *testing.T) {
-		execCtx := fvm.NewContext()
+		execCtx := fvm.NewContext(flow.Mainnet.Chain())
 
 		committer := new(computermock.ViewCommitter)
 
@@ -1225,7 +1226,7 @@ func (f *FixedAddressGenerator) AddressCount() uint64 {
 func Test_ExecutingSystemCollection(t *testing.T) {
 
 	execCtx := fvm.NewContext(
-		fvm.WithChain(flow.Localnet.Chain()),
+		flow.Localnet.Chain(),
 		fvm.WithBlocks(&environment.NoopBlockFinder{}),
 	)
 
@@ -1443,8 +1444,8 @@ func testScheduledTransactionsWithError(
 	testLogger := NewTestLogger()
 
 	execCtx := fvm.NewContext(
-		fvm.WithScheduledTransactionsEnabled(true), // Enable scheduled transactions
-		fvm.WithChain(chain),
+		chain,
+		fvm.WithScheduledTransactionsEnabled(true),
 		fvm.WithLogger(testLogger.Logger),
 	)
 

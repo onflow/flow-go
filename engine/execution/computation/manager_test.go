@@ -56,7 +56,7 @@ func TestComputeBlockWithStorage(t *testing.T) {
 	chain := flow.Mainnet.Chain()
 
 	vm := fvm.NewVirtualMachine()
-	execCtx := fvm.NewContext(fvm.WithChain(chain))
+	execCtx := fvm.NewContext(chain)
 
 	privateKeys, err := testutil.GenerateAccountPrivateKeys(2)
 	require.NoError(t, err)
@@ -236,7 +236,7 @@ func TestExecuteScript(t *testing.T) {
 
 	logger := zerolog.Nop()
 
-	execCtx := fvm.NewContext(fvm.WithLogger(logger))
+	execCtx := fvm.NewContext(flow.Mainnet.Chain(), fvm.WithLogger(logger))
 
 	me := new(module.Local)
 	me.On("NodeID").Return(unittest.IdentifierFixture())
@@ -303,7 +303,7 @@ func TestExecuteScript_BalanceScriptFailsIfViewIsEmpty(t *testing.T) {
 
 	logger := zerolog.Nop()
 
-	execCtx := fvm.NewContext(fvm.WithLogger(logger))
+	execCtx := fvm.NewContext(flow.Mainnet.Chain(), fvm.WithLogger(logger))
 
 	me := new(module.Local)
 	me.On("NodeID").Return(unittest.IdentifierFixture())
@@ -367,7 +367,7 @@ func TestExecuteScript_BalanceScriptFailsIfViewIsEmpty(t *testing.T) {
 func TestExecuteScripPanicsAreHandled(t *testing.T) {
 	t.Parallel()
 
-	ctx := fvm.NewContext()
+	ctx := fvm.NewContext(flow.Mainnet.Chain())
 
 	buffer := &bytes.Buffer{}
 	log := zerolog.New(buffer)
@@ -418,7 +418,7 @@ func TestExecuteScripPanicsAreHandled(t *testing.T) {
 func TestExecuteScript_LongScriptsAreLogged(t *testing.T) {
 	t.Parallel()
 
-	ctx := fvm.NewContext()
+	ctx := fvm.NewContext(flow.Mainnet.Chain())
 
 	buffer := &bytes.Buffer{}
 	log := zerolog.New(buffer)
@@ -472,7 +472,7 @@ func TestExecuteScript_LongScriptsAreLogged(t *testing.T) {
 func TestExecuteScript_ShortScriptsAreNotLogged(t *testing.T) {
 	t.Parallel()
 
-	ctx := fvm.NewContext()
+	ctx := fvm.NewContext(flow.Mainnet.Chain())
 
 	buffer := &bytes.Buffer{}
 	log := zerolog.New(buffer)
@@ -663,7 +663,7 @@ func TestExecuteScriptTimeout(t *testing.T) {
 		trace.NewNoopTracer(),
 		nil,
 		testutil.ProtocolStateWithSourceFixture(nil),
-		fvm.NewContext(),
+		fvm.NewContext(flow.Mainnet.Chain()),
 		committer.NewNoopViewCommitter(),
 		nil,
 		ComputationConfig{
@@ -711,7 +711,7 @@ func TestExecuteScriptCancelled(t *testing.T) {
 		trace.NewNoopTracer(),
 		nil,
 		testutil.ProtocolStateWithSourceFixture(nil),
-		fvm.NewContext(),
+		fvm.NewContext(flow.Mainnet.Chain()),
 		committer.NewNoopViewCommitter(),
 		nil,
 		ComputationConfig{
@@ -769,7 +769,7 @@ func Test_EventEncodingFailsOnlyTxAndCarriesOn(t *testing.T) {
 	}
 
 	execCtx := fvm.NewContext(
-		fvm.WithChain(chain),
+		chain,
 		fvm.WithEventEncoder(eventEncoder),
 	)
 
@@ -921,7 +921,7 @@ func TestScriptStorageMutationsDiscarded(t *testing.T) {
 
 	timeout := 10 * time.Second
 	chain := flow.Mainnet.Chain()
-	ctx := fvm.NewContext(fvm.WithChain(chain))
+	ctx := fvm.NewContext(chain)
 	manager, _ := New(
 		zerolog.Nop(),
 		metrics.NewExecutionCollector(ctx.Tracer),
