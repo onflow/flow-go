@@ -180,6 +180,7 @@ func (suite *CollectorSuite) TxForCluster(target flow.IdentitySkeletonList) *sdk
 	for {
 		// update the script for each loop
 		tx.SetScript(append(tx.Script, '/', '/'))
+		tx.EnvelopeSignatures = nil // clear the envelope signatures before adding fresh ones
 		err := tx.SignEnvelope(acct.addr, acct.key.Index, acct.signer)
 		require.NoError(suite.T(), err)
 		routed, ok := clusters.ByTxID(convert.IDFromSDK(tx.ID()))
