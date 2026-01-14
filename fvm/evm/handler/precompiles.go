@@ -33,7 +33,7 @@ func preparePrecompiledContracts(
 func blockHeightProvider(backend types.Backend) func() (uint64, error) {
 	return func() (uint64, error) {
 		h, err := backend.GetCurrentBlockHeight()
-		if types.IsAFatalError(err) || types.IsABackendError(err) {
+		if types.IsAFatalError(err) {
 			panic(err)
 		}
 		return h, err
@@ -60,7 +60,7 @@ func randomSourceProvider(contractAddress flow.Address, backend types.Backend) f
 			},
 		)
 		if err != nil {
-			if types.IsAFatalError(err) || types.IsABackendError(err) {
+			if types.IsAFatalError(err) {
 				panic(err)
 			}
 			return nil, err
@@ -116,7 +116,7 @@ func coaOwnershipProofValidator(contractAddress flow.Address, backend types.Back
 			proof.ToCadenceValues(),
 		)
 		if err != nil {
-			if types.IsAFatalError(err) || types.IsABackendError(err) {
+			if types.IsAFatalError(err) {
 				panic(err)
 			}
 			return false, err
