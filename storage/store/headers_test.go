@@ -57,7 +57,7 @@ func TestHeaderStoreRetrieve(t *testing.T) {
 		// retrieve with proposer signature
 		headerProp, err := headers.ProposalByBlockID(block.ID())
 		require.NoError(t, err)
-		require.Equal(t, proposal.ProposalHeader(), headerProp.Header)
+		require.Equal(t, proposal.ProposalHeader(), headerProp)
 	})
 }
 
