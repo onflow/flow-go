@@ -532,13 +532,7 @@ func (e *Engine) dispatchRequest() (bool, error) {
 			return
 		default:
 		}
-
-		// wait for retry interval but return early in case done was signalled
-		select {
-		case <-done:
-			return
-		case <-time.After(e.cfg.RetryInitial):
-		}
+		<-time.After(e.cfg.RetryInitial)
 
 		e.mu.Lock()
 		delete(e.requests, req.Nonce)

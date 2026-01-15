@@ -180,7 +180,7 @@ func (s *RequesterEngineSuite) TestDispatchRequestVarious() {
 		s.engine.mu.Unlock()
 
 		time.Sleep(cfg.BatchInterval)
-		synctest.Wait()
+		unittest.RequireReturnsBefore(s.T(), synctest.Wait, 5*time.Second, "should return before timeout")
 
 		s.engine.mu.Lock()
 		assert.NotContains(s.T(), s.engine.requests, nonce)
