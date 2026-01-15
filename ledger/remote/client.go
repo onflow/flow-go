@@ -310,6 +310,22 @@ func (c *Client) Done() <-chan struct{} {
 	return c.done
 }
 
+// StateCount returns the number of states in the ledger.
+// This is not supported for remote clients as it requires gRPC methods that are not yet implemented.
+func (c *Client) StateCount() int {
+	// Remote client doesn't have access to state count without additional gRPC methods
+	// Return 0 to indicate no states are available (or unknown)
+	// This will cause the health check to fail, which is appropriate
+	return 0
+}
+
+// StateByIndex returns the state at the given index.
+// -1 is the last index.
+// This is not supported for remote clients as it requires gRPC methods that are not yet implemented.
+func (c *Client) StateByIndex(index int) (ledger.State, error) {
+	return ledger.DummyState, fmt.Errorf("StateByIndex is not supported for remote ledger clients")
+}
+
 // ledgerKeyToProtoKey converts a ledger.Key to a protobuf Key.
 func ledgerKeyToProtoKey(key ledger.Key) *ledgerpb.Key {
 	parts := make([]*ledgerpb.KeyPart, len(key.KeyParts))
