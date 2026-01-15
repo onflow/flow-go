@@ -87,7 +87,7 @@ func main() {
 	if stateCount == 0 {
 		logger.Fatal().Msg("no trie loaded after startup - no states available")
 	}
-	
+
 	// Get the last trie state for logging
 	lastState, err := ledgerStorage.StateByIndex(-1)
 	if err != nil {
