@@ -791,7 +791,7 @@ func (t *Transactions) GetScheduledTransactionResult(ctx context.Context, schedu
 		return nil, rpc.ConvertStorageError(err)
 	}
 
-	// TODO: optimistic_sync.DefaultCriteria should be replaced with user criteria
+	// TODO(#8344): optimistic_sync.DefaultCriteria should be replaced with user criteria
 	txResult, _, isScheduledTx, err := t.lookupScheduledTransactionResult(ctx, txID, flow.ZeroID, encodingVersion, optimistic_sync.DefaultCriteria)
 	if err != nil {
 		return nil, err
@@ -830,7 +830,8 @@ func (t *Transactions) getHistoricalTransaction(
 		if status.Code(err) == codes.NotFound {
 			continue
 		}
-		// TODO should we do something if the error isn't not found?
+		//
+		// should we do something if the error isn't not found?
 	}
 	return nil, status.Errorf(codes.NotFound, "no known transaction with ID %s", txID)
 }

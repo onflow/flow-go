@@ -944,7 +944,6 @@ func (suite *Suite) TestGetTransactionResult() {
 
 		enNodeIDs := enIdentities.NodeIDs()
 		allIdentities := append(colIdentities, enIdentities...)
-		//finalSnapshot.On("Identities", mock.Anything).Return(allIdentities, nil)
 
 		suite.state.On("AtBlockID", blockNegativeId).Return(suite.sealedSnapshot)
 		suite.sealedSnapshot.On("Identities", mock.Anything).Return(allIdentities, nil)

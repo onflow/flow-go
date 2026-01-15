@@ -244,16 +244,7 @@ func (s *TransactionStreamSuite) initializeBackend() {
 		s.preferredExecutionNodeIDs,
 		s.fixedExecutionNodeIDs,
 	)
-
-	//errorMessageProvider := error_messages.NewTxErrorMessageProvider(
-	//	s.log,
-	//	nil,
-	//	s.txResultIndex,
-	//	s.connectionFactory,
-	//	nodeCommunicator,
-	//	execNodeProvider,
-	//)
-
+	
 	var systemCollections *systemcollection.Versioned
 	localTxProvider := provider.NewLocalTransactionProvider(
 		s.state,
