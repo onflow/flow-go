@@ -5,11 +5,25 @@ import (
 	"fmt"
 )
 
-// DataProvider represents a source of sequential items to be streamed to a client.
+// DataProvider is a port that abstracts the retrieval of sequential data items for streaming subscriptions.
 //
-// TODO: This should operate on a concrete generic type rather than `any`. It requires
-// substantial refactoring and should be addressed alongside broader subscription
-// package refactors in a dedicated PR.
+// In hexagonal architecture terms, this interface acts as a "driven port" (or secondary port) that
+// defines how the subscription/streaming core (the hexagon) retrieves data from external sources.
+// Concrete implementations serve as "adapters" that connect specific data sources (e.g., execution data,
+// block headers, account statuses) to the streaming infrastructure.
+//
+// The Streamer component depends on this port to fetch data items sequentially, decoupling the
+// streaming logic from the specifics of how and where data is retrieved. This allows:
+//   - The streaming core to remain agnostic of data source implementations
+//   - Easy testing via mock adapters
+//   - Flexible addition of new data sources without modifying the streaming infrastructure
+//
+// Adapter implementations should:
+//   - Maintain internal state to track the current position in the data sequence (e.g., block height)
+//   - Advance to the next item only after successful retrieval
+//   - Return appropriate sentinel errors to signal stream state (ErrBlockNotReady, ErrEndOfData)
+//
+// TODO: This should operate on a concrete generic type rather than `any` type. (issue #8093)
 type DataProvider interface {
 	// NextData returns the next item in sequence.
 	//

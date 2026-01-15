@@ -238,8 +238,7 @@ func (b *ExecutionDataBackend) SubscribeExecutionDataFromStartBlockHeight(
 	criteria optimistic_sync.Criteria,
 ) subscription.Subscription {
 	if startBlockHeight < b.nodeRootBlock.Height {
-		return subscription.NewFailedSubscription(nil,
-			"start height must be greater than or equal to the spork root height")
+		return subscription.NewFailedSubscription(nil, "start height is below the node's range of available blocks.")
 	}
 
 	snapshot := b.state.AtHeight(startBlockHeight)
