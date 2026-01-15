@@ -672,11 +672,6 @@ func (s *WebsocketSubscriptionSuite) testHappyCases() {
 		// including sending a subscription and unsubscription requests, listening for incoming responses, and validating
 		// them using a provided validation function.
 		s.Run(tt.name, func() {
-			if tt.name == "Events streaming" || tt.name == "Account statuses streaming" {
-				s.T().Skip("skipping until account statuses backend is fixed. " +
-					"it is broken by new changes to the execution result provider")
-			}
-
 			// Step 1: Establish a WebSocket connection
 			wsClient, err := common.GetWSClient(s.ctx, getWebsocketsUrl(s.restAccessAddress))
 			s.Require().NoError(err)
