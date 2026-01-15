@@ -166,7 +166,7 @@ func (reusable *ReusableCadenceRuntime) ExecuteScript(
 }
 
 // ReusableCadenceTransactionRuntime is a wrapper around ReusableCadenceRuntime
-// that is ment to be used in transactions.
+// that is meant to be used in transactions.
 // see: ReusableCadenceRuntime
 type ReusableCadenceTransactionRuntime struct {
 	*ReusableCadenceRuntime
@@ -217,7 +217,7 @@ func (reusable ReusableCadenceTransactionRuntime) InvokeContractFunction(
 }
 
 // ReusableCadenceScriptRuntime is a wrapper around ReusableCadenceRuntime
-// that is ment to be used in scripts.
+// that is meant to be used in scripts.
 // see: ReusableCadenceRuntime
 type ReusableCadenceScriptRuntime struct {
 	*ReusableCadenceRuntime
