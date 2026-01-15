@@ -41,8 +41,6 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/cadence"
-	"github.com/onflow/cadence/runtime"
-
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
 
 	"github.com/onflow/flow-go/access/validator"
@@ -50,7 +48,6 @@ import (
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/environment"
 	fvmerrors "github.com/onflow/flow-go/fvm/errors"
-	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
 	accessmodel "github.com/onflow/flow-go/model/access"
 	flowgo "github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
@@ -118,21 +115,15 @@ func (b *Blockchain) ReloadBlockchain() (*Blockchain, error) {
 
 	b.vm = fvm.NewVirtualMachine()
 	b.vmCtx = fvm.NewContext(
+		b.conf.GetChainID().Chain(),
 		fvm.WithLogger(b.conf.Logger),
 		fvm.WithCadenceLogging(true),
-		fvm.WithChain(b.conf.GetChainID().Chain()),
 		fvm.WithBlocks(b.storage),
 		fvm.WithContractDeploymentRestricted(false),
 		fvm.WithContractRemovalRestricted(!b.conf.ContractRemovalEnabled),
 		fvm.WithComputationLimit(b.conf.ScriptGasLimit),
 		fvm.WithAccountStorageLimit(b.conf.StorageLimitEnabled),
 		fvm.WithTransactionFeesEnabled(b.conf.TransactionFeesEnabled),
-		fvm.WithReusableCadenceRuntimePool(
-			reusableRuntime.NewReusableCadenceRuntimePool(
-				0,
-				b.conf.GetChainID().Chain(),
-				runtime.Config{}),
-		),
 		fvm.WithEntropyProvider(b.entropyProvider),
 		fvm.WithAuthorizationChecksEnabled(b.conf.TransactionValidationEnabled),
 		fvm.WithSequenceNumberCheckAndIncrementEnabled(b.conf.TransactionValidationEnabled),
