@@ -53,16 +53,38 @@ func NewClient(grpcAddr string, logger zerolog.Logger, maxRequestSize, maxRespon
 	// Default to 1 GiB (instead of standard 4 MiB) to handle large proofs that can exceed 4MB.
 	// This was increased to fix "grpc: received message larger than max" errors when generating
 	// proofs for blocks with many state changes.
-	conn, err := grpc.NewClient(
-		normalizedAddr,
-		grpc.WithTransportCredentials(insecure.NewCredentials()),
-		grpc.WithDefaultCallOptions(
-			grpc.MaxCallRecvMsgSize(int(maxResponseSize)),
-			grpc.MaxCallSendMsgSize(int(maxRequestSize)),
-		),
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to connect to ledger service: %w", err)
+	// Retry connection with exponential backoff until the service becomes available.
+	var conn *grpc.ClientConn
+	retryDelay := 100 * time.Millisecond
+	maxRetryDelay := 30 * time.Second
+
+	for {
+		var err error
+		conn, err = grpc.NewClient(
+			normalizedAddr,
+			grpc.WithTransportCredentials(insecure.NewCredentials()),
+			grpc.WithDefaultCallOptions(
+				grpc.MaxCallRecvMsgSize(int(maxResponseSize)),
+				grpc.MaxCallSendMsgSize(int(maxRequestSize)),
+			),
+		)
+		if err == nil {
+			logger.Info().Str("address", grpcAddr).Msg("successfully connected to ledger service")
+			break
+		}
+
+		logger.Debug().
+			Err(err).
+			Dur("retry_delay", retryDelay).
+			Str("address", grpcAddr).
+			Msg("failed to connect to ledger service, retrying...")
+
+		time.Sleep(retryDelay)
+		// Exponential backoff with max cap
+		retryDelay = time.Duration(float64(retryDelay) * 1.5)
+		if retryDelay > maxRetryDelay {
+			retryDelay = maxRetryDelay
+		}
 	}
 
 	client := ledgerpb.NewLedgerServiceClient(conn)
