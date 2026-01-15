@@ -213,8 +213,9 @@ func (c *Client) Set(update *ledger.Update) (ledger.State, *ledger.TrieUpdate, e
 	}
 	copy(newState[:], resp.NewState.Hash)
 
-	// Decode trie update if present using CBOR decoding to preserve nil vs []byte{} distinction
-	trieUpdate, err := ledger.DecodeTrieUpdateCBOR(resp.TrieUpdate)
+	// Decode trie update using centralized decoding function to ensure
+	// client and server use the same encoding method
+	trieUpdate, err := decodeTrieUpdateFromTransport(resp.TrieUpdate)
 	if err != nil {
 		return ledger.DummyState, nil, fmt.Errorf("failed to decode trie update: %w", err)
 	}
