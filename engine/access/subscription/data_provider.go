@@ -23,6 +23,17 @@ type DataProvider interface {
 	NextData(ctx context.Context) (any, error)
 }
 
+// GetDataByHeightFunc is a callback implemented by backends and used in HeightByFuncProvider.
+//
+// If (nil, nil) is returned, the stream progresses forward to the next item.
+//
+// Expected errors during normal operation:
+//   - [context.Canceled], [context.DeadlineExceeded]: If the context is canceled, or its deadline expires.
+//   - [ErrBlockNotReady]: If the next item is not yet available. Callers may retry later,
+//     and the streamer will pause until new data is broadcast.
+//   - [ErrEndOfData]: If no further items are produced, the subscription is closed gracefully.
+type GetDataByHeightFunc func(ctx context.Context, height uint64) (interface{}, error)
+
 // HeightByFuncProvider is a DataProvider that uses a GetDataByHeightFunc
 // and internal height counter to sequentially fetch data by height.
 //
