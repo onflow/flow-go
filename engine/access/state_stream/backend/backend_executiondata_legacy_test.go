@@ -51,7 +51,7 @@ var (
 	}
 )
 
-// Legacy: This suite doesn't support new logic implemented in the optimistic sync package (e.g. result info provider)
+// Deprecated: This suite doesn't support new logic implemented in the optimistic sync package (e.g. result info provider)
 type LegacyBackendExecutionDataSuite struct {
 	suite.Suite
 	logger         zerolog.Logger
@@ -214,6 +214,7 @@ func (s *LegacyBackendExecutionDataSuite) SetupTestMocks() {
 	s.state.On("Params").Return(s.params).Maybe()
 	s.params.On("SporkRootBlockHeight").Return(s.rootBlock.Height, nil).Maybe()
 	s.params.On("SporkRootBlock").Return(s.rootBlock, nil).Maybe()
+	s.params.On("SealedRoot").Return(s.rootBlock.ToHeader(), nil).Maybe()
 	s.headers.On("BlockIDByHeight", s.rootBlock.Height).Return(s.rootBlock.ID(), nil).Maybe()
 
 	s.seals.On("FinalizedSealForBlock", mock.AnythingOfType("flow.Identifier")).Return(
@@ -273,7 +274,7 @@ func (s *LegacyBackendExecutionDataSuite) SetupBackend(useEventsIndex bool) {
 		s.executionDataTracker,
 		s.executionResultProvider,
 		s.executionStateCache,
-		s.rootBlock,
+		s.rootBlock.ToHeader(),
 	)
 	require.NoError(s.T(), err)
 

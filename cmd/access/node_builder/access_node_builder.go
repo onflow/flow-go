@@ -1094,7 +1094,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				executionDataTracker,
 				notNil(builder.executionResultInfoProvider),
 				builder.executionStateCache, // might be nil
-				builder.State.Params().SporkRootBlock(),
+				builder.State.Params().SealedRoot(),
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create state stream backend: %w", err)

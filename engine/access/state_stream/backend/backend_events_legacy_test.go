@@ -53,7 +53,7 @@ type eventsTestType struct {
 // The suite focuses on events extracted from local storage and extracted from ExecutionData,
 // ensuring proper testing of event retrieval from both sources.
 //
-// Legacy: this test suite is obsolete and declared legacy since it doesn't support new logic implemented
+// Deprecated: this test suite is obsolete and declared legacy since it doesn't support new logic implemented
 // in the optimistic sync package.
 type LegacyBackendEventsSuite struct {
 	LegacyBackendExecutionDataSuite

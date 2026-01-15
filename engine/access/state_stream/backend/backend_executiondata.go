@@ -31,10 +31,10 @@ type ExecutionDataResponse struct {
 
 // ExecutionDataBackend exposes read-only access to execution data.
 type ExecutionDataBackend struct {
-	log            zerolog.Logger
-	state          protocol.State
-	headers        storage.Headers
-	sporkRootBlock *flow.Block
+	log           zerolog.Logger
+	state         protocol.State
+	headers       storage.Headers
+	nodeRootBlock *flow.Header
 
 	subscriptionFactory  *subscription.SubscriptionHandler
 	executionDataTracker tracker.ExecutionDataTracker
@@ -51,13 +51,13 @@ func NewExecutionDataBackend(
 	executionDataTracker tracker.ExecutionDataTracker,
 	executionResultProvider optimistic_sync.ExecutionResultInfoProvider,
 	executionStateCache optimistic_sync.ExecutionStateCache,
-	sporkRootBlock *flow.Block,
+	nodeRootBlock *flow.Header,
 ) *ExecutionDataBackend {
 	return &ExecutionDataBackend{
 		log:                     log.With().Str("module", "execution_data_backend").Logger(),
 		state:                   state,
 		headers:                 headers,
-		sporkRootBlock:          sporkRootBlock,
+		nodeRootBlock:           nodeRootBlock,
 		subscriptionFactory:     subscriptionHandler,
 		executionDataTracker:    executionDataTracker,
 		executionResultProvider: executionResultProvider,
@@ -237,7 +237,7 @@ func (b *ExecutionDataBackend) SubscribeExecutionDataFromStartBlockHeight(
 	startBlockHeight uint64,
 	criteria optimistic_sync.Criteria,
 ) subscription.Subscription {
-	if startBlockHeight < b.sporkRootBlock.Height {
+	if startBlockHeight < b.nodeRootBlock.Height {
 		return subscription.NewFailedSubscription(nil,
 			"start height must be greater than or equal to the spork root height")
 	}

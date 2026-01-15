@@ -56,6 +56,7 @@ type BackendExecutionDataSuite struct {
 
 	// data for the tests
 	sporkRootBlock *flow.Block
+	nodeRootBlock  *flow.Header
 
 	blocks                 []*flow.Block
 	blocksHeightToBlockMap map[uint64]*flow.Block
@@ -88,6 +89,7 @@ func (s *BackendExecutionDataSuite) SetupTest() {
 	s.T().Logf("first block height: %d, last block height: %d", s.blocks[0].Height, s.blocks[len(s.blocks)-1].Height)
 
 	s.sporkRootBlock = s.blocks[0]
+	s.nodeRootBlock = s.sporkRootBlock.ToHeader()
 	s.blocksHeightToBlockMap = make(map[uint64]*flow.Block)
 	s.blocksIDToBlockMap = make(map[flow.Identifier]*flow.Block)
 	s.executionDataList = make([]*execution_data.BlockExecutionData, len(s.blocks))
@@ -102,7 +104,7 @@ func (s *BackendExecutionDataSuite) SetupTest() {
 		execData := s.g.BlockExecutionDatas().Fixture(
 			fixtures.BlockExecutionData.WithBlockID(block.ID()),
 		)
-		if block.ID() == s.sporkRootBlock.ID() {
+		if block.ID() == s.nodeRootBlock.ID() {
 			// sport root block doesn't have chunks of execution data
 			execData.ChunkExecutionDatas = nil
 		}
@@ -159,7 +161,7 @@ func (s *BackendExecutionDataSuite) SetupTest() {
 	s.executionDataTracker = tracker.NewExecutionDataTracker(
 		s.log,
 		s.state,
-		s.sporkRootBlock.Height,
+		s.nodeRootBlock.Height,
 		s.headers,
 		s.executionDataBroadcaster,
 		s.blocks[len(s.blocks)-1].Height,
@@ -207,7 +209,7 @@ func (s *BackendExecutionDataSuite) SetupTest() {
 func (s *BackendExecutionDataSuite) TestSubscribeExecutionData() {
 	s.mockSubscribeFuncState()
 
-	currentHeight := s.sporkRootBlock.Height
+	currentHeight := s.nodeRootBlock.Height
 	s.state.
 		On("AtHeight", currentHeight).
 		Return(s.snapshot).
@@ -215,7 +217,7 @@ func (s *BackendExecutionDataSuite) TestSubscribeExecutionData() {
 
 	s.snapshot.
 		On("Head").
-		Return(s.sporkRootBlock.ToHeader(), nil).
+		Return(s.nodeRootBlock, nil).
 		Once()
 
 	s.state.
@@ -230,7 +232,7 @@ func (s *BackendExecutionDataSuite) TestSubscribeExecutionData() {
 		s.executionDataTracker,
 		s.executionResultProvider,
 		s.executionStateCache,
-		s.sporkRootBlock,
+		s.nodeRootBlock,
 	)
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -278,7 +280,7 @@ func (s *BackendExecutionDataSuite) TestSubscribeExecutionDataFromNonRoot() {
 	s.mockSubscribeFuncState()
 
 	// start from the block right after the spork root
-	startBlock := s.blocksHeightToBlockMap[s.sporkRootBlock.Height+1]
+	startBlock := s.blocksHeightToBlockMap[s.nodeRootBlock.Height+1]
 	s.state.
 		On("AtBlockID", mock.Anything).
 		Return(s.snapshot)
@@ -295,7 +297,7 @@ func (s *BackendExecutionDataSuite) TestSubscribeExecutionDataFromNonRoot() {
 		s.executionDataTracker,
 		s.executionResultProvider,
 		s.executionStateCache,
-		s.sporkRootBlock,
+		s.nodeRootBlock,
 	)
 
 	currentHeight := startBlock.Height
@@ -342,7 +344,7 @@ func (s *BackendExecutionDataSuite) TestSubscribeExecutionDataFromNonRoot() {
 func (s *BackendExecutionDataSuite) TestSubscribeExecutionDataFromStartHeight() {
 	s.mockSubscribeFuncState()
 
-	currentHeight := s.sporkRootBlock.Height
+	currentHeight := s.nodeRootBlock.Height
 	s.state.
 		On("AtHeight", currentHeight).
 		Return(s.snapshot).
@@ -350,7 +352,7 @@ func (s *BackendExecutionDataSuite) TestSubscribeExecutionDataFromStartHeight() 
 
 	s.snapshot.
 		On("Head").
-		Return(s.sporkRootBlock.ToHeader(), nil).
+		Return(s.nodeRootBlock, nil).
 		Once()
 
 	s.state.
@@ -365,7 +367,7 @@ func (s *BackendExecutionDataSuite) TestSubscribeExecutionDataFromStartHeight() 
 		s.executionDataTracker,
 		s.executionResultProvider,
 		s.executionStateCache,
-		s.sporkRootBlock,
+		s.nodeRootBlock,
 	)
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -373,7 +375,7 @@ func (s *BackendExecutionDataSuite) TestSubscribeExecutionDataFromStartHeight() 
 
 	sub := backend.SubscribeExecutionDataFromStartBlockHeight(
 		ctx,
-		s.sporkRootBlock.Height,
+		s.nodeRootBlock.Height,
 		s.criteria,
 	)
 
@@ -413,7 +415,7 @@ func (s *BackendExecutionDataSuite) TestSubscribeExecutionDataFromStartID() {
 
 	s.snapshot.
 		On("Head").
-		Return(s.sporkRootBlock.ToHeader(), nil)
+		Return(s.nodeRootBlock, nil)
 
 	s.state.
 		On("AtBlockID", mock.Anything).
@@ -427,16 +429,16 @@ func (s *BackendExecutionDataSuite) TestSubscribeExecutionDataFromStartID() {
 		s.executionDataTracker,
 		s.executionResultProvider,
 		s.executionStateCache,
-		s.sporkRootBlock,
+		s.nodeRootBlock,
 	)
-	currentHeight := s.sporkRootBlock.Height
+	currentHeight := s.nodeRootBlock.Height
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	sub := backend.SubscribeExecutionDataFromStartBlockID(
 		ctx,
-		s.sporkRootBlock.ID(),
+		s.nodeRootBlock.ID(),
 		s.criteria,
 	)
 
@@ -474,7 +476,7 @@ func (s *BackendExecutionDataSuite) TestSubscribeExecutionDataFromStartID() {
 func (s *BackendExecutionDataSuite) TestSubscribeExecutionDataFromLatest() {
 	s.mockSubscribeFuncState()
 
-	currentHeight := s.sporkRootBlock.Height
+	currentHeight := s.nodeRootBlock.Height
 	s.state.
 		On("AtHeight", currentHeight).
 		Return(s.snapshot).
@@ -482,7 +484,7 @@ func (s *BackendExecutionDataSuite) TestSubscribeExecutionDataFromLatest() {
 
 	s.snapshot.
 		On("Head").
-		Return(s.sporkRootBlock.ToHeader(), nil).
+		Return(s.nodeRootBlock, nil).
 		Twice() // once in SubscribeExecutionDataFromLatest, once in underlying SubscribeExecutionDataFromStartBlockHeight
 
 	s.state.
@@ -505,7 +507,7 @@ func (s *BackendExecutionDataSuite) TestSubscribeExecutionDataFromLatest() {
 		s.executionDataTracker,
 		s.executionResultProvider,
 		s.executionStateCache,
-		s.sporkRootBlock,
+		s.nodeRootBlock,
 	)
 
 	sub := backend.SubscribeExecutionDataFromLatest(ctx, s.criteria)
@@ -560,12 +562,12 @@ func (s *BackendExecutionDataSuite) TestGetExecutionData() {
 		s.executionDataTracker,
 		s.executionResultProvider,
 		s.executionStateCache,
-		s.sporkRootBlock,
+		s.nodeRootBlock,
 	)
 
 	actualExecData, metadata, err :=
-		backend.GetExecutionDataByBlockID(context.Background(), s.sporkRootBlock.ID(), s.criteria)
-	expectedExecData := s.blockIDToExecutionDataMap[s.sporkRootBlock.ID()]
+		backend.GetExecutionDataByBlockID(context.Background(), s.nodeRootBlock.ID(), s.criteria)
+	expectedExecData := s.blockIDToExecutionDataMap[s.nodeRootBlock.ID()]
 
 	require.NoError(s.T(), err)
 	require.NotEmpty(s.T(), metadata)
@@ -583,12 +585,12 @@ func (s *BackendExecutionDataSuite) TestGetExecutionData_Errors() {
 		s.executionDataTracker,
 		s.executionResultProviderMock,
 		s.executionStateCache,
-		s.sporkRootBlock,
+		s.nodeRootBlock,
 	)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	block := s.sporkRootBlock
+	block := s.nodeRootBlock
 
 	s.Run("execution result info returns block not found", func() {
 		s.executionResultProviderMock.
@@ -882,7 +884,7 @@ func (s *BackendExecutionDataSuite) TestExecutionDataProviderErrors() {
 
 	s.snapshot.
 		On("Head").
-		Return(s.sporkRootBlock.ToHeader(), nil)
+		Return(s.nodeRootBlock, nil)
 
 	s.state.
 		On("AtBlockID", mock.Anything).
@@ -898,7 +900,7 @@ func (s *BackendExecutionDataSuite) TestExecutionDataProviderErrors() {
 		s.executionDataTracker,
 		s.executionResultProviderMock,
 		s.executionStateCache,
-		s.sporkRootBlock,
+		s.nodeRootBlock,
 	)
 
 	for _, test := range tests {
@@ -908,8 +910,8 @@ func (s *BackendExecutionDataSuite) TestExecutionDataProviderErrors() {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 
-			currentHeight := s.sporkRootBlock.Height
-			sub := backend.SubscribeExecutionDataFromStartBlockID(ctx, s.sporkRootBlock.ID(), s.criteria)
+			currentHeight := s.nodeRootBlock.Height
+			sub := backend.SubscribeExecutionDataFromStartBlockID(ctx, s.nodeRootBlock.ID(), s.criteria)
 
 			for value := range sub.Channel() {
 				actualExecutionData, ok := value.(*ExecutionDataResponse)
@@ -937,7 +939,7 @@ func (s *BackendExecutionDataSuite) TestExecutionResultNotReadyError() {
 
 	s.snapshot.
 		On("Head").
-		Return(s.sporkRootBlock.ToHeader(), nil)
+		Return(s.nodeRootBlock, nil)
 
 	s.state.
 		On("AtBlockID", mock.Anything).
@@ -970,14 +972,14 @@ func (s *BackendExecutionDataSuite) TestExecutionResultNotReadyError() {
 		s.executionDataTracker,
 		s.executionResultProviderMock,
 		s.executionStateCache,
-		s.sporkRootBlock,
+		s.nodeRootBlock,
 	)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	currentHeight := s.sporkRootBlock.Height
-	sub := backend.SubscribeExecutionDataFromStartBlockID(ctx, s.sporkRootBlock.ID(), s.criteria)
+	currentHeight := s.nodeRootBlock.Height
+	sub := backend.SubscribeExecutionDataFromStartBlockID(ctx, s.nodeRootBlock.ID(), s.criteria)
 
 	// cancel after we have received all expected blocks.
 	received := 0
