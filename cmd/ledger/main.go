@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"net"
@@ -15,9 +16,12 @@ import (
 	"go.uber.org/atomic"
 	"google.golang.org/grpc"
 
+	"github.com/onflow/flow-go/admin"
+	executionCommands "github.com/onflow/flow-go/admin/commands/execution"
 	ledgerfactory "github.com/onflow/flow-go/ledger/factory"
 	ledgerpb "github.com/onflow/flow-go/ledger/protobuf"
 	"github.com/onflow/flow-go/ledger/remote"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 )
 
@@ -25,6 +29,7 @@ var (
 	triedir             = flag.String("triedir", "", "Directory for trie files (required)")
 	ledgerServiceTCP    = flag.String("ledger-service-tcp", "", "Ledger service TCP listen address (e.g., 0.0.0.0:9000). If provided, server accepts TCP connections.")
 	ledgerServiceSocket = flag.String("ledger-service-socket", "", "Ledger service Unix socket path (e.g., /sockets/ledger.sock). If provided, server accepts Unix socket connections. Can specify multiple sockets separated by comma.")
+	adminAddr           = flag.String("admin-addr", "", "Address to bind on for admin HTTP server (e.g., 0.0.0.0:9002). If provided, enables admin commands.")
 	mtrieCacheSize      = flag.Int("mtrie-cache-size", 500, "MTrie cache size (number of tries)")
 	checkpointDist      = flag.Uint("checkpoint-distance", 100, "Checkpoint distance")
 	checkpointsToKeep   = flag.Uint("checkpoints-to-keep", 3, "Number of checkpoints to keep")
@@ -64,8 +69,12 @@ func main() {
 		Str("triedir", *triedir).
 		Str("ledger_service_tcp", *ledgerServiceTCP).
 		Str("ledger_service_socket", *ledgerServiceSocket).
+		Str("admin_addr", *adminAddr).
 		Int("mtrie_cache_size", *mtrieCacheSize).
 		Msg("starting ledger service")
+
+	// Create trigger for manual checkpointing (used by admin command)
+	triggerCheckpointOnNextSegmentFinish := atomic.NewBool(false)
 
 	// Create ledger using factory
 	metricsCollector := metrics.NewLedgerCollector("ledger", "wal")
@@ -74,7 +83,7 @@ func main() {
 		MTrieCacheSize:                       uint32(*mtrieCacheSize),
 		CheckpointDistance:                   *checkpointDist,
 		CheckpointsToKeep:                    *checkpointsToKeep,
-		TriggerCheckpointOnNextSegmentFinish: atomic.NewBool(false),
+		TriggerCheckpointOnNextSegmentFinish: triggerCheckpointOnNextSegmentFinish,
 		MetricsRegisterer:                    prometheus.DefaultRegisterer,
 		WALMetrics:                           metricsCollector,
 		LedgerMetrics:                        metricsCollector,
@@ -96,7 +105,7 @@ func main() {
 	if stateCount == 0 {
 		logger.Fatal().Msg("no trie loaded after startup - no states available")
 	}
-	
+
 	// Get the last trie state for logging
 	lastState, err := ledgerStorage.StateByIndex(-1)
 	if err != nil {
@@ -193,6 +202,42 @@ func main() {
 		}
 	}
 
+	// Set up admin server if admin address is provided
+	var adminRunner *admin.CommandRunner
+	var adminCancel context.CancelFunc
+	if *adminAddr != "" {
+		adminBootstrapper := admin.NewCommandRunnerBootstrapper()
+
+		// Register trigger-checkpoint command
+		triggerCheckpointCmd := executionCommands.NewTriggerCheckpointCommand(triggerCheckpointOnNextSegmentFinish)
+		adminBootstrapper.RegisterHandler("trigger-checkpoint", triggerCheckpointCmd.Handler)
+		adminBootstrapper.RegisterValidator("trigger-checkpoint", triggerCheckpointCmd.Validator)
+
+		// Create admin command runner
+		adminRunner = adminBootstrapper.Bootstrap(logger, *adminAddr)
+
+		// Start admin server in background
+		adminCtx, cancel := context.WithCancel(context.Background())
+		adminCancel = cancel
+
+		signalerCtx, errChan := irrecoverable.WithSignaler(adminCtx)
+		go func() {
+			adminRunner.Start(signalerCtx)
+			// Monitor for irrecoverable errors
+			select {
+			case err := <-errChan:
+				if err != nil {
+					logger.Error().Err(err).Msg("admin server encountered irrecoverable error")
+				}
+			case <-adminCtx.Done():
+			}
+		}()
+
+		// Wait for admin server to be ready
+		<-adminRunner.Ready()
+		logger.Info().Str("admin_addr", *adminAddr).Msg("admin server started")
+	}
+
 	// Start server on all listeners in separate goroutines
 	errCh := make(chan error, len(listeners))
 	for _, info := range listeners {
@@ -228,6 +273,16 @@ func main() {
 				logger.Info().Str("socket_path", socketPath).Msg("removed socket file")
 			}
 		}
+	}
+
+	// Shutdown admin server if it was started
+	if adminRunner != nil && adminCancel != nil {
+		logger.Info().Msg("shutting down admin server...")
+		// Cancel the context to signal shutdown
+		adminCancel()
+		// Wait for admin server to stop
+		<-adminRunner.Done()
+		logger.Info().Msg("admin server stopped")
 	}
 
 	logger.Info().Msg("waiting for ledger to stop...")
