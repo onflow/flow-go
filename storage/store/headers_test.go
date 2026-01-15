@@ -50,6 +50,14 @@ func TestHeaderStoreRetrieve(t *testing.T) {
 		actual, err := headers.ByHeight(block.Height)
 		require.NoError(t, err)
 		require.Equal(t, block.ToHeader(), actual)
+		// retrieve by ID
+		actual, err = headers.ByBlockID(block.ID())
+		require.NoError(t, err)
+		require.Equal(t, block.ToHeader(), actual)
+		// retrieve with proposer signature
+		headerProp, err := headers.ProposalByBlockID(block.ID())
+		require.NoError(t, err)
+		require.Equal(t, proposal.ProposalHeader(), headerProp.Header)
 	})
 }
 
@@ -322,11 +330,16 @@ func TestHeadersRetrieveWrongChainID(t *testing.T) {
 		actual, err = headers.ByBlockID(block.ID())
 		require.NoError(t, err)
 		require.Equal(t, block.ToHeader(), actual)
+		headerProp, err := headers.ProposalByBlockID(block.ID())
+		require.NoError(t, err)
+		require.Equal(t, proposal.ProposalHeader(), headerProp)
 
 		// 3. clusterHeaders should not be able to retrieve that block by height or ID
 		_, err = clusterHeaders.ByHeight(block.Height)
 		require.ErrorIs(t, err, storage.ErrNotFound) // there are no finalized cluster blocks at any height
 		_, err = clusterHeaders.ByBlockID(block.ID())
+		require.ErrorIs(t, err, storage.ErrWrongChain)
+		_, err = clusterHeaders.ProposalByBlockID(block.ID())
 		require.ErrorIs(t, err, storage.ErrWrongChain)
 
 		// 4. Store a block on a different cluster chain
@@ -342,9 +355,13 @@ func TestHeadersRetrieveWrongChainID(t *testing.T) {
 		// 5. clusterHeaders should not be able to retrieve it, as it is for a different cluster chain
 		_, err = clusterHeaders.ByBlockID(differentClusterBlock.ID())
 		require.ErrorIs(t, err, storage.ErrWrongChain)
+		_, err = clusterHeaders.ProposalByBlockID(differentClusterBlock.ID())
+		require.ErrorIs(t, err, storage.ErrWrongChain)
 
 		// 6. main consensus chain Headers should also not be able to retrieve the cluster header
 		_, err = headers.ByBlockID(differentClusterBlock.ID())
+		require.ErrorIs(t, err, storage.ErrWrongChain)
+		_, err = headers.ProposalByBlockID(differentClusterBlock.ID())
 		require.ErrorIs(t, err, storage.ErrWrongChain)
 	})
 }

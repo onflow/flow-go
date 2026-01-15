@@ -26,6 +26,12 @@ func TestBlockStoreAndRetrieve(t *testing.T) {
 		block := unittest.FullBlockFixture()
 		prop := unittest.ProposalFromBlock(block)
 
+		// Test that retrieving a nonexistent block by ID returns ErrNotFound
+		_, err = blocks.ByID(block.ID())
+		require.ErrorIs(t, err, storage.ErrNotFound)
+		_, err = blocks.ProposalByID(block.ID())
+		require.ErrorIs(t, err, storage.ErrNotFound)
+
 		err = unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
 			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				return blocks.BatchStore(lctx, rw, prop)
@@ -107,6 +113,8 @@ func TestBlockIndexByHeightAndRetrieve(t *testing.T) {
 		// Test that retrieving by non-existent height returns ErrNotFound
 		_, err = blocks.ByHeight(block.Height + 1000)
 		require.ErrorIs(t, err, storage.ErrNotFound)
+		_, err = blocks.ProposalByHeight(block.Height + 1000)
+		require.ErrorIs(t, err, storage.ErrNotFound)
 
 		// Verify after a restart, the block indexed by height is still retrievable
 		allAfterRestart, err := store.InitAll(cacheMetrics, db, flow.Emulator)
@@ -162,6 +170,8 @@ func TestBlockIndexByViewAndRetrieve(t *testing.T) {
 		// Test that retrieving by non-existent view returns ErrNotFound
 		_, err = blocks.ByView(block.View + 1000)
 		require.ErrorIs(t, err, storage.ErrNotFound)
+		_, err = blocks.ProposalByView(block.View + 1000)
+		require.ErrorIs(t, err, storage.ErrNotFound)
 
 		// Verify after a restart, the block indexed by view is still retrievable
 		allAfterRestart, err := store.InitAll(cacheMetrics, db, flow.Emulator)
@@ -170,5 +180,45 @@ func TestBlockIndexByViewAndRetrieve(t *testing.T) {
 		receivedAfterRestart, err := blocksAfterRestart.ByView(block.View)
 		require.NoError(t, err)
 		require.Equal(t, *block, *receivedAfterRestart)
+	})
+}
+
+func TestBlockRetrieveWrongChain(t *testing.T) {
+	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
+		lockManager := storage.NewTestingLockManager()
+		cacheMetrics := &metrics.NoopCollector{}
+		all, err := store.InitAll(cacheMetrics, db, flow.Emulator)
+		require.NoError(t, err)
+		blocks := all.Blocks
+
+		// insert and finalize a block on a cluster chain
+		clusterBlock := unittest.ClusterBlockFixture()
+		err = unittest.WithLock(t, lockManager, storage.LockInsertOrFinalizeClusterBlock, func(lctx lockctx.Context) error {
+			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				err := operation.InsertClusterBlock(lctx, rw, unittest.ClusterProposalFromBlock(clusterBlock))
+				if err != nil {
+					return err
+				}
+				err = operation.IndexClusterBlockHeight(lctx, rw, clusterBlock.ChainID, clusterBlock.Height, clusterBlock.ID())
+				if err != nil {
+					return err
+				}
+				return operation.BootstrapClusterFinalizedHeight(lctx, rw, clusterBlock.ChainID, clusterBlock.Height)
+			})
+		})
+		require.NoError(t, err)
+
+		// error should reflect that the block ID exists on a cluster chain
+		_, err = blocks.ByID(clusterBlock.ID())
+		require.ErrorIs(t, err, storage.ErrWrongChain)
+		_, err = blocks.ProposalByID(clusterBlock.ID())
+		require.ErrorIs(t, err, storage.ErrWrongChain)
+
+		// However, height index is chain-specific, so should simply reflect
+		// that the height does not exist on the consensus chain
+		_, err = blocks.ByHeight(clusterBlock.Height)
+		require.ErrorIs(t, err, storage.ErrNotFound)
+		_, err = blocks.ProposalByHeight(clusterBlock.Height)
+		require.ErrorIs(t, err, storage.ErrNotFound)
 	})
 }
