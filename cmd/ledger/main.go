@@ -12,10 +12,6 @@ import (
 	"github.com/rs/zerolog"
 	"go.uber.org/atomic"
 	"google.golang.org/grpc"
-	_ "google.golang.org/grpc/encoding/gzip" // required for gRPC compression
-
-	_ "github.com/onflow/flow-go/engine/common/grpc/compressor/deflate" // required for gRPC compression
-	_ "github.com/onflow/flow-go/engine/common/grpc/compressor/snappy"  // required for gRPC compression
 
 	ledgerfactory "github.com/onflow/flow-go/ledger/factory"
 	ledgerpb "github.com/onflow/flow-go/ledger/protobuf"
@@ -87,10 +83,9 @@ func main() {
 	logger.Info().Msg("ledger ready")
 
 	// Create gRPC server with max message size configuration.
-	// Default to 10 GiB for responses (instead of standard 4 MiB) to handle large proofs that can exceed 4MB.
+	// Default to 1 GiB for responses (instead of standard 4 MiB) to handle large proofs that can exceed 4MB.
 	// This was increased to fix "grpc: received message larger than max" errors when generating
 	// proofs for blocks with many state changes.
-	// Compression is automatically handled by the server when clients request it (e.g., for large proofs).
 	grpcServer := grpc.NewServer(
 		grpc.MaxRecvMsgSize(int(*maxRequestSize)),
 		grpc.MaxSendMsgSize(int(*maxResponseSize)),
