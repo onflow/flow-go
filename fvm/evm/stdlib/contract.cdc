@@ -1066,11 +1066,9 @@ access(all) contract EVM {
     /// are executed.
     access(all)
     view fun isPaused(): Bool {
-        let evmOperationsPaused = self.account.storage.borrow<&Bool>(
+        return self.account.storage.copy<Bool>(
             from: /storage/evmOperationsPaused
-        )
-
-        return *evmOperationsPaused == true
+        ) ?? false
     }
 
     init() {
