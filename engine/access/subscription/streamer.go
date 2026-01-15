@@ -24,7 +24,6 @@ var ErrEndOfData = errors.New("end of data")
 //
 // Expected errors during normal operation:
 //   - [context.Canceled], [context.DeadlineExceeded]: If the context is canceled, or its deadline expires.
-//   - [storage.ErrNotFound]: If the data for a block not found in storage.
 //   - [ErrBlockNotReady]: If the next item is not yet available. Callers may retry later,
 //     and the streamer will pause until new data is broadcast.
 //   - [ErrEndOfData]: If no further items are produced, the subscription is closed gracefully.

@@ -388,7 +388,7 @@ func (suite *ExecutionResultInfoProviderSuite) TestPreferredAndRequiredExecution
 			actualExecutors := query.ExecutionNodes.NodeIDs()
 
 			suite.Assert().ElementsMatch(
-				provider.executionNodes.preferredENIdentifiers,
+				provider.executionNodeSelector.preferredENIdentifiers,
 				actualExecutors,
 			)
 		},
@@ -409,7 +409,7 @@ func (suite *ExecutionResultInfoProviderSuite) TestPreferredAndRequiredExecution
 			actualExecutors := query.ExecutionNodes.NodeIDs()
 
 			// Just one required executor contains the result
-			expectedExecutors := provider.executionNodes.requiredENIdentifiers[0:1]
+			expectedExecutors := provider.executionNodeSelector.requiredENIdentifiers[0:1]
 
 			suite.Assert().ElementsMatch(expectedExecutors, actualExecutors)
 		},
@@ -429,8 +429,8 @@ func (suite *ExecutionResultInfoProviderSuite) TestPreferredAndRequiredExecution
 
 			// `preferredENIdentifiers` contain 1 executor, that is not enough, so the logic will get 2 executors from `requiredENIdentifiers` to fill `defaultMaxNodesCnt` executors.
 			expectedExecutors := append(
-				provider.executionNodes.preferredENIdentifiers,
-				provider.executionNodes.requiredENIdentifiers[0:2]...,
+				provider.executionNodeSelector.preferredENIdentifiers,
+				provider.executionNodeSelector.requiredENIdentifiers[0:2]...,
 			)
 			actualExecutors := query.ExecutionNodes.NodeIDs()
 
@@ -520,30 +520,31 @@ func (suite *ExecutionResultInfoProviderSuite) TestExecutionResultProviderForkEr
 		Return(flow.ExecutionReceiptList{receipt2}, nil).
 		Once()
 
-	// request execution result from the first executor
 	suite.snapshot.
 		On("Identities", mock.Anything).
-		Return(flow.IdentityList{executors[0]}, nil).
-		Once()
+		Return(flow.IdentityList{executors[0], executors[1]}, nil).
+		Twice() // for each call
 
-	result1, err := provider.ExecutionResultInfo(block.ID(), optimistic_sync.Criteria{
-		RequiredExecutors:       flow.IdentifierList{executors[0].NodeID},
-		ParentExecutionResultID: baseExecutionResult.ID(),
-	})
+	// request execution result from the first executor
+	result1, err := provider.ExecutionResultInfo(
+		block.ID(),
+		optimistic_sync.Criteria{
+			RequiredExecutors:       flow.IdentifierList{executors[0].NodeID},
+			ParentExecutionResultID: baseExecutionResult.ID(),
+		},
+	)
 	suite.Require().NoError(err)
 	suite.Require().Equal(executionResult1.ID(), result1.ExecutionResultID)
 
 	// now request the second executor's result (also a child of baseExecutionResult),
 	// but require that it descends from result1; since it's on a different fork, no match should be found.
-	suite.snapshot.
-		On("Identities", mock.Anything).
-		Return(flow.IdentityList{executors[0], executors[1]}, nil).
-		Once()
-
-	result2, err := provider.ExecutionResultInfo(block.ID(), optimistic_sync.Criteria{
-		RequiredExecutors:       flow.IdentifierList{executors[1].NodeID},
-		ParentExecutionResultID: result1.ExecutionResultID,
-	})
+	result2, err := provider.ExecutionResultInfo(
+		block.ID(),
+		optimistic_sync.Criteria{
+			RequiredExecutors:       flow.IdentifierList{executors[1].NodeID},
+			ParentExecutionResultID: result1.ExecutionResultID,
+		},
+	)
 	suite.Require().True(optimistic_sync.IsExecutionResultNotReadyError(err))
 	suite.Require().Empty(result2)
 }

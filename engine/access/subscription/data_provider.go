@@ -25,6 +25,9 @@ type DataProvider interface {
 
 // HeightByFuncProvider is a DataProvider that uses a GetDataByHeightFunc
 // and internal height counter to sequentially fetch data by height.
+//
+// Deprecated: The DataProvider interface should be implemented directly by each abstraction that needs
+// to provide data to a streamer/subscription.
 type HeightByFuncProvider struct {
 	nextHeight uint64
 	getData    GetDataByHeightFunc

@@ -192,18 +192,15 @@ func (b *ExecutionDataBackend) SubscribeExecutionDataFromStartBlockID(
 	startBlockID flow.Identifier,
 	criteria optimistic_sync.Criteria,
 ) subscription.Subscription {
-	// check if the block header for the given block ID is available in the storage
-	header, err := b.headers.ByBlockID(startBlockID)
+	snapshot := b.state.AtBlockID(startBlockID)
+
+	// check if the block header for the given block is available in the storage
+	header, err := snapshot.Head()
 	if err != nil {
-		return subscription.NewFailedSubscription(err, "could not get header for block height")
+		return subscription.NewFailedSubscription(err, "could not get header for start block")
 	}
 
-	if header.Height < b.sporkRootBlock.Height {
-		return subscription.NewFailedSubscription(err, "block height is less than the spork root block")
-	}
-
-	availableExecutors, err :=
-		b.state.AtHeight(header.Height).Identities(filter.HasRole[flow.Identity](flow.RoleExecution))
+	availableExecutors, err := snapshot.Identities(filter.HasRole[flow.Identity](flow.RoleExecution))
 	if err != nil {
 		return subscription.NewFailedSubscription(err, "could not retrieve available executors")
 	}
@@ -245,14 +242,15 @@ func (b *ExecutionDataBackend) SubscribeExecutionDataFromStartBlockHeight(
 			"start height must be greater than or equal to the spork root height")
 	}
 
-	// check if the block header for the given height is available in the storage
-	header, err := b.headers.ByHeight(startBlockHeight)
+	snapshot := b.state.AtHeight(startBlockHeight)
+
+	// check if the block header for the given block is available in the storage
+	header, err := snapshot.Head()
 	if err != nil {
-		return subscription.NewFailedSubscription(err, "error getting block header by height")
+		return subscription.NewFailedSubscription(err, "could not get header for start block")
 	}
 
-	availableExecutors, err :=
-		b.state.AtHeight(header.Height).Identities(filter.HasRole[flow.Identity](flow.RoleExecution))
+	availableExecutors, err := snapshot.Identities(filter.HasRole[flow.Identity](flow.RoleExecution))
 	if err != nil {
 		return subscription.NewFailedSubscription(err, "could not retrieve available executors")
 	}
