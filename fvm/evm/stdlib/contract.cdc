@@ -200,8 +200,8 @@ access(all) contract EVM {
         /// Deposits the given vault into the EVM account with the given address
         access(all)
         fun deposit(from: @FlowToken.Vault) {
-            if EVM.isPaused() {
-                panic("EVM operations are temporarily paused")
+            pre {
+                !EVM.isPaused(): "EVM operations are temporarily paused"
             }
 
             let amount = from.balance
@@ -507,8 +507,8 @@ access(all) contract EVM {
         /// @return the token decimals of the ERC20
         access(all)
         fun deposit(from: @FlowToken.Vault) {
-            if EVM.isPaused() {
-                panic("EVM operations are temporarily paused")
+            pre {
+                !EVM.isPaused(): "EVM operations are temporarily paused"
             }
 
             self.address().deposit(from: <-from)
@@ -535,8 +535,8 @@ access(all) contract EVM {
         /// @return A FlowToken Vault with the requested balance
         access(Owner | Withdraw)
         fun withdraw(balance: Balance): @FlowToken.Vault {
-            if EVM.isPaused() {
-                panic("EVM operations are temporarily paused")
+            pre {
+                !EVM.isPaused(): "EVM operations are temporarily paused"
             }
 
             if balance.isZero() {
@@ -570,8 +570,8 @@ access(all) contract EVM {
             gasLimit: UInt64,
             value: Balance
         ): Result {
-            if EVM.isPaused() {
-                panic("EVM operations are temporarily paused")
+            pre {
+                !EVM.isPaused(): "EVM operations are temporarily paused"
             }
 
             return InternalEVM.deploy(
@@ -591,8 +591,8 @@ access(all) contract EVM {
             gasLimit: UInt64,
             value: Balance
         ): Result {
-            if EVM.isPaused() {
-                panic("EVM operations are temporarily paused")
+            pre {
+                !EVM.isPaused(): "EVM operations are temporarily paused"
             }
 
             return InternalEVM.call(
@@ -634,6 +634,10 @@ access(all) contract EVM {
             nft: @{NonFungibleToken.NFT},
             feeProvider: auth(FungibleToken.Withdraw) &{FungibleToken.Provider}
         ) {
+            pre {
+                !EVM.isPaused(): "EVM operations are temporarily paused"
+            }
+
             EVM.borrowBridgeAccessor().depositNFT(nft: <-nft, to: self.address(), feeProvider: feeProvider)
         }
 
@@ -653,6 +657,10 @@ access(all) contract EVM {
             id: UInt256,
             feeProvider: auth(FungibleToken.Withdraw) &{FungibleToken.Provider}
         ): @{NonFungibleToken.NFT} {
+            pre {
+                !EVM.isPaused(): "EVM operations are temporarily paused"
+            }
+
             return <- EVM.borrowBridgeAccessor().withdrawNFT(
                 caller: &self as auth(Call) &CadenceOwnedAccount,
                 type: type,
@@ -667,6 +675,10 @@ access(all) contract EVM {
             vault: @{FungibleToken.Vault},
             feeProvider: auth(FungibleToken.Withdraw) &{FungibleToken.Provider}
         ) {
+            pre {
+                !EVM.isPaused(): "EVM operations are temporarily paused"
+            }
+
             EVM.borrowBridgeAccessor().depositTokens(vault: <-vault, to: self.address(), feeProvider: feeProvider)
         }
 
@@ -679,6 +691,10 @@ access(all) contract EVM {
             amount: UInt256,
             feeProvider: auth(FungibleToken.Withdraw) &{FungibleToken.Provider}
         ): @{FungibleToken.Vault} {
+            pre {
+                !EVM.isPaused(): "EVM operations are temporarily paused"
+            }
+
             return <- EVM.borrowBridgeAccessor().withdrawTokens(
                 caller: &self as auth(Call) &CadenceOwnedAccount,
                 type: type,
@@ -709,8 +725,8 @@ access(all) contract EVM {
     /// @return: The transaction result
     access(all)
     fun run(tx: [UInt8], coinbase: EVMAddress): Result {
-        if self.isPaused() {
-            panic("EVM operations are temporarily paused")
+        pre {
+            !self.isPaused(): "EVM operations are temporarily paused"
         }
 
         return InternalEVM.run(
@@ -771,8 +787,8 @@ access(all) contract EVM {
     /// An invalid transaction is not executed and not included in the block.
     access(all)
     fun batchRun(txs: [[UInt8]], coinbase: EVMAddress): [Result] {
-        if self.isPaused() {
-            panic("EVM operations are temporarily paused")
+        pre {
+            !self.isPaused(): "EVM operations are temporarily paused"
         }
 
         return InternalEVM.batchRun(
