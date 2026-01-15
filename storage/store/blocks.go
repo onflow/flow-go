@@ -229,7 +229,12 @@ func (b *Blocks) ByCollectionID(collID flow.Identifier) (*flow.Block, error) {
 	if err != nil {
 		return nil, err
 	}
-	return b.ByID(blockID)
+	block, err := b.ByID(blockID)
+	if err != nil {
+		// failure to retrieve a block that has been indexed indicates state corruption
+		return nil, irrecoverable.NewExceptionf("could not retrieve indexed block %x for collection id %x: %w", blockID, collID, err)
+	}
+	return block, nil
 }
 
 // BlockIDByCollectionID returns the block ID for the finalized block which includes the guarantee for the
