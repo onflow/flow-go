@@ -3,108 +3,117 @@ package runtime
 import (
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/common"
-	"github.com/onflow/cadence/interpreter"
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/sema"
-	"github.com/onflow/cadence/stdlib"
 
-	"github.com/onflow/flow-go/fvm/errors"
+	"github.com/onflow/flow-go/fvm/environment"
+	"github.com/onflow/flow-go/fvm/evm"
+	"github.com/onflow/flow-go/fvm/evm/backends"
+	"github.com/onflow/flow-go/fvm/evm/emulator"
+	"github.com/onflow/flow-go/fvm/evm/handler"
+	"github.com/onflow/flow-go/fvm/evm/impl"
+	"github.com/onflow/flow-go/fvm/evm/stdlib"
+	"github.com/onflow/flow-go/fvm/systemcontracts"
+	"github.com/onflow/flow-go/model/flow"
 )
-
-// Note: this is a subset of environment.Environment, redeclared to handle
-// circular dependency.
-type Environment interface {
-	runtime.Interface
-	common.Gauge
-
-	RandomSourceHistory() ([]byte, error)
-}
-
-// randomSourceFunctionType is the type of the `randomSource` function.
-// This defines the signature as `func(): [UInt8]`
-var randomSourceFunctionType = &sema.FunctionType{
-	ReturnTypeAnnotation: sema.NewTypeAnnotation(sema.ByteArrayType),
-}
 
 type ReusableCadenceRuntime struct {
 	runtime.Runtime
+
+	chain flow.Chain
+
 	TxRuntimeEnv     runtime.Environment
 	ScriptRuntimeEnv runtime.Environment
 
-	fvmEnv Environment
+	fvmEnv     environment.Environment
+	evmBackend *backends.WrappedEnvironment
 }
+
+var _ environment.ReusableCadenceRuntime = (*ReusableCadenceRuntime)(nil)
 
 func NewReusableCadenceRuntime(
 	rt runtime.Runtime,
+	chain flow.Chain,
 	config runtime.Config,
 ) *ReusableCadenceRuntime {
 	reusable := &ReusableCadenceRuntime{
 		Runtime:          rt,
+		chain:            chain,
 		TxRuntimeEnv:     runtime.NewBaseInterpreterEnvironment(config),
 		ScriptRuntimeEnv: runtime.NewScriptInterpreterEnvironment(config),
 	}
 
-	reusable.declareRandomSourceHistory()
+	reusable.declareStandardLibraryFunctions()
 
 	return reusable
 }
 
-func (reusable *ReusableCadenceRuntime) declareRandomSourceHistory() {
+func (reusable *ReusableCadenceRuntime) declareStandardLibraryFunctions() {
+	// random source for transactions
+	reusable.TxRuntimeEnv.DeclareValue(blockRandomSourceDeclaration(reusable), nil)
 
-	// Declare the `randomSourceHistory` function. This function is **only** used by the
-	// System transaction, to fill the `RandomBeaconHistory` contract via the heartbeat
-	// resource. This allows the `RandomBeaconHistory` contract to be a standard contract,
-	// without any special parts.
-	// Since the `randomSourceHistory` function is only used by the System transaction,
-	// it is not part of the cadence standard library, and can just be injected from here.
-	// It also doesnt need user documentation, since it is not (and should not)
-	// be called by the user. If it is called by the user it will panic.
-	functionType := randomSourceFunctionType
+	// transaction index
+	declaration := transactionIndexDeclaration(reusable)
+	reusable.TxRuntimeEnv.DeclareValue(declaration, nil)
+	reusable.ScriptRuntimeEnv.DeclareValue(declaration, nil)
 
-	blockRandomSource := stdlib.StandardLibraryValue{
-		Name: "randomSourceHistory",
-		Type: functionType,
-		Kind: common.DeclarationKindFunction,
-		Value: interpreter.NewUnmeteredStaticHostFunctionValue(
-			functionType,
-			func(invocation interpreter.Invocation) interpreter.Value {
-
-				actualArgumentCount := len(invocation.Arguments)
-				expectedArgumentCount := len(functionType.Parameters)
-
-				if actualArgumentCount != expectedArgumentCount {
-					panic(errors.NewInvalidArgumentErrorf(
-						"incorrect number of arguments: got %d, expected %d",
-						actualArgumentCount,
-						expectedArgumentCount,
-					))
-				}
-
-				var err error
-				var source []byte
-				fvmEnv := reusable.fvmEnv
-				if fvmEnv != nil {
-					source, err = fvmEnv.RandomSourceHistory()
-				} else {
-					err = errors.NewOperationNotSupportedError("randomSourceHistory")
-				}
-
-				if err != nil {
-					panic(err)
-				}
-
-				return interpreter.ByteSliceToByteArrayValue(
-					invocation.InvocationContext,
-					source)
-			},
-		),
-	}
-
-	reusable.TxRuntimeEnv.DeclareValue(blockRandomSource, nil)
+	reusable.declareEVM()
 }
 
-func (reusable *ReusableCadenceRuntime) SetFvmEnvironment(fvmEnv Environment) {
+func (reusable *ReusableCadenceRuntime) declareEVM() {
+	chainID := reusable.chain.ChainID()
+	sc := systemcontracts.SystemContractsForChain(chainID)
+	randomBeaconAddress := sc.RandomBeaconHistory.Address
+	flowTokenAddress := sc.FlowToken.Address
+
+	reusable.evmBackend = backends.NewWrappedEnvironment(reusable.fvmEnv)
+	evmEmulator := emulator.NewEmulator(reusable.evmBackend, evm.StorageAccountAddress(chainID))
+	blockStore := handler.NewBlockStore(chainID, reusable.evmBackend, evm.StorageAccountAddress(chainID))
+	addressAllocator := handler.NewAddressAllocator()
+
+	evmContractAddress := evm.ContractAccountAddress(chainID)
+
+	contractHandler := handler.NewContractHandler(
+		chainID,
+		evmContractAddress,
+		common.Address(flowTokenAddress),
+		randomBeaconAddress,
+		blockStore,
+		addressAllocator,
+		reusable.evmBackend,
+		evmEmulator,
+	)
+
+	internalEVMContractValue := impl.NewInternalEVMContractValue(
+		nil,
+		contractHandler,
+		evmContractAddress,
+	)
+
+	stdlib.SetupEnvironment(
+		reusable.TxRuntimeEnv,
+		internalEVMContractValue,
+		evmContractAddress,
+	)
+
+	stdlib.SetupEnvironment(
+		reusable.ScriptRuntimeEnv,
+		internalEVMContractValue,
+		evmContractAddress,
+	)
+}
+
+func (reusable *ReusableCadenceRuntime) SetFvmEnvironment(fvmEnv environment.Environment) {
 	reusable.fvmEnv = fvmEnv
+	reusable.evmBackend.SetEnv(fvmEnv)
+}
+
+func (reusable *ReusableCadenceRuntime) CadenceTXEnv() runtime.Environment {
+	return reusable.TxRuntimeEnv
+}
+
+func (reusable *ReusableCadenceRuntime) CadenceScriptEnv() runtime.Environment {
+	return reusable.ScriptRuntimeEnv
 }
 
 func (reusable *ReusableCadenceRuntime) ReadStored(
@@ -182,98 +191,4 @@ func (reusable *ReusableCadenceRuntime) ExecuteScript(
 			ComputationGauge: reusable.fvmEnv,
 		},
 	)
-}
-
-type CadenceRuntimeConstructor func(config runtime.Config) runtime.Runtime
-
-type ReusableCadenceRuntimePool struct {
-	pool chan *ReusableCadenceRuntime
-
-	config runtime.Config
-
-	// When newCustomRuntime is nil, the pool will create standard cadence
-	// interpreter runtimes via runtime.NewRuntime.  Otherwise, the
-	// pool will create runtimes using this function.
-	//
-	// Note that this is primarily used for testing.
-	newCustomRuntime CadenceRuntimeConstructor
-}
-
-func newReusableCadenceRuntimePool(
-	poolSize int,
-	config runtime.Config,
-	newCustomRuntime CadenceRuntimeConstructor,
-) ReusableCadenceRuntimePool {
-	var pool chan *ReusableCadenceRuntime
-	if poolSize > 0 {
-		pool = make(chan *ReusableCadenceRuntime, poolSize)
-	}
-
-	return ReusableCadenceRuntimePool{
-		pool:             pool,
-		config:           config,
-		newCustomRuntime: newCustomRuntime,
-	}
-}
-
-func NewReusableCadenceRuntimePool(
-	poolSize int,
-	config runtime.Config,
-) ReusableCadenceRuntimePool {
-	return newReusableCadenceRuntimePool(
-		poolSize,
-		config,
-		nil,
-	)
-}
-
-func NewCustomReusableCadenceRuntimePool(
-	poolSize int,
-	config runtime.Config,
-	newCustomRuntime CadenceRuntimeConstructor,
-) ReusableCadenceRuntimePool {
-	return newReusableCadenceRuntimePool(
-		poolSize,
-		config,
-		newCustomRuntime,
-	)
-}
-
-func (pool ReusableCadenceRuntimePool) newRuntime() runtime.Runtime {
-	if pool.newCustomRuntime != nil {
-		return pool.newCustomRuntime(pool.config)
-	}
-	return runtime.NewRuntime(pool.config)
-}
-
-func (pool ReusableCadenceRuntimePool) Borrow(
-	fvmEnv Environment,
-) *ReusableCadenceRuntime {
-	var reusable *ReusableCadenceRuntime
-	select {
-	case reusable = <-pool.pool:
-		// Do nothing.
-	default:
-		reusable = NewReusableCadenceRuntime(
-			WrappedCadenceRuntime{
-				pool.newRuntime(),
-			},
-			pool.config,
-		)
-	}
-
-	reusable.SetFvmEnvironment(fvmEnv)
-	return reusable
-}
-
-func (pool ReusableCadenceRuntimePool) Return(
-	reusable *ReusableCadenceRuntime,
-) {
-	reusable.SetFvmEnvironment(nil)
-	select {
-	case pool.pool <- reusable:
-		// Do nothing.
-	default:
-		// Do nothing.  Discard the overflow entry.
-	}
 }
