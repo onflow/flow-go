@@ -115,28 +115,28 @@ func (suite *Suite) MockFactoryCreate(arg any) {
 			suite.components[epoch.Counter()] = newMockComponents(suite.T())
 		}).
 		Return(
-			func(epoch realprotocol.CommittedEpoch, chainID flow.ChainID) realcluster.State {
+			func(epoch realprotocol.CommittedEpoch, consensusChainID flow.ChainID) realcluster.State {
 				return suite.ComponentsForEpoch(epoch).state
 			},
-			func(epoch realprotocol.CommittedEpoch, chainID flow.ChainID) component.Component {
+			func(epoch realprotocol.CommittedEpoch, consensusChainID flow.ChainID) component.Component {
 				return suite.ComponentsForEpoch(epoch).prop
 			},
-			func(epoch realprotocol.CommittedEpoch, chainID flow.ChainID) realmodule.ReadyDoneAware {
+			func(epoch realprotocol.CommittedEpoch, consensusChainID flow.ChainID) realmodule.ReadyDoneAware {
 				return suite.ComponentsForEpoch(epoch).sync
 			},
-			func(epoch realprotocol.CommittedEpoch, chainID flow.ChainID) realmodule.HotStuff {
+			func(epoch realprotocol.CommittedEpoch, consensusChainID flow.ChainID) realmodule.HotStuff {
 				return suite.ComponentsForEpoch(epoch).hotstuff
 			},
-			func(epoch realprotocol.CommittedEpoch, chainID flow.ChainID) hotstuff.VoteAggregator {
+			func(epoch realprotocol.CommittedEpoch, consensusChainID flow.ChainID) hotstuff.VoteAggregator {
 				return suite.ComponentsForEpoch(epoch).voteAggregator
 			},
-			func(epoch realprotocol.CommittedEpoch, chainID flow.ChainID) hotstuff.TimeoutAggregator {
+			func(epoch realprotocol.CommittedEpoch, consensusChainID flow.ChainID) hotstuff.TimeoutAggregator {
 				return suite.ComponentsForEpoch(epoch).timeoutAggregator
 			},
-			func(epoch realprotocol.CommittedEpoch, chainID flow.ChainID) component.Component {
+			func(epoch realprotocol.CommittedEpoch, consensusChainID flow.ChainID) component.Component {
 				return suite.ComponentsForEpoch(epoch).messageHub
 			},
-			func(epoch realprotocol.CommittedEpoch, chainID flow.ChainID) error { return nil },
+			func(epoch realprotocol.CommittedEpoch, consensusChainID flow.ChainID) error { return nil },
 		).Maybe()
 }
 
@@ -165,7 +165,7 @@ func (suite *Suite) SetupTest() {
 	suite.state.On("Final").Return(suite.snap)
 	suite.state.On("AtBlockID", suite.header.ID()).Return(suite.snap).Maybe()
 	params := protocol.NewParams(suite.T())
-	params.On("ChainID").Return(flow.ChainID("chain-id")).Maybe()
+	params.On("ChainID").Return(flow.ChainID("Consensus-Chain-ID")).Maybe()
 	suite.state.On("Params").Return(params)
 	suite.snap.On("Epochs").Return(suite.epochQuery)
 	suite.snap.On("Head").Return(

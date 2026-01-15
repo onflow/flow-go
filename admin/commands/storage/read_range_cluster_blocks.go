@@ -50,7 +50,7 @@ func (c *ReadRangeClusterBlocksCommand) Handler(ctx context.Context, req *admin.
 		return nil, admin.NewInvalidAdminReqErrorf("getting for more than %v blocks at a time might have an impact to node's performance and is not allowed", Max_Range_Cluster_Block_Limit)
 	}
 
-	clusterHeaders, err := store.NewClusterHeaders(&metrics.NoopCollector{}, c.db, flow.ChainID(chainID))
+	clusterHeaders, err := store.NewClusterHeaders(metrics.NewNoopCollector(), c.db, flow.ChainID(chainID))
 	if err != nil {
 		return nil, err
 	}

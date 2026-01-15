@@ -19,9 +19,9 @@ func TestIsCanonicalClusterID(t *testing.T) {
 	for _, chainID := range flow.AllChainIDs() {
 		require.False(t, cluster.IsCanonicalClusterID(chainID))
 	}
-	for range 100 {
+	for n := range 100 {
 		epoch := rand.Uint64()
-		clusterID := cluster.CanonicalClusterID(epoch, unittest.IdentifierListFixture(2))
+		clusterID := cluster.CanonicalClusterID(epoch, unittest.IdentifierListFixture(n))
 		require.True(t, cluster.IsCanonicalClusterID(clusterID))
 		require.True(t, strings.HasPrefix(string(clusterID), cluster.ClusterChainPrefix))
 	}

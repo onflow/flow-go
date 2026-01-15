@@ -50,6 +50,14 @@ func TestHeaderStoreRetrieve(t *testing.T) {
 		actual, err := headers.ByHeight(block.Height)
 		require.NoError(t, err)
 		require.Equal(t, block.ToHeader(), actual)
+		// retrieve by ID
+		actual, err = headers.ByBlockID(block.ID())
+		require.NoError(t, err)
+		require.Equal(t, block.ToHeader(), actual)
+		// retrieve with proposer signature
+		headerProp, err := headers.ProposalByBlockID(block.ID())
+		require.NoError(t, err)
+		require.Equal(t, proposal.ProposalHeader(), headerProp)
 	})
 }
 
@@ -115,6 +123,7 @@ func TestHeaderRetrieveWithoutStore(t *testing.T) {
 //  1. a known parent with no children should return an empty list;
 //  2. a known parent with 3 children should return the headers of those children;
 //  3. an unknown parent should return [storage.ErrNotFound].
+//  4. a known parent on a different chain should return [storage.ErrWrongChain].
 func TestHeadersByParentID(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		lockManager := storage.NewTestingLockManager()
@@ -172,6 +181,17 @@ func TestHeadersByParentID(t *testing.T) {
 		nonExistentParent := unittest.IdentifierFixture()
 		_, err = headers.ByParentID(nonExistentParent)
 		require.ErrorIs(t, err, storage.ErrNotFound)
+
+		// Test case 4: parent on a different chain should return ErrWrongChain
+		clusterBlock := unittest.ClusterBlockFixture()
+		err = unittest.WithLock(t, lockManager, storage.LockInsertOrFinalizeClusterBlock, func(lctx lockctx.Context) error {
+			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return operation.InsertClusterBlock(lctx, rw, unittest.ClusterProposalFromBlock(clusterBlock))
+			})
+		})
+		require.NoError(t, err)
+		_, err = headers.ByParentID(clusterBlock.ID())
+		require.ErrorIs(t, err, storage.ErrWrongChain)
 	})
 }
 
@@ -310,11 +330,16 @@ func TestHeadersRetrieveWrongChainID(t *testing.T) {
 		actual, err = headers.ByBlockID(block.ID())
 		require.NoError(t, err)
 		require.Equal(t, block.ToHeader(), actual)
+		headerProp, err := headers.ProposalByBlockID(block.ID())
+		require.NoError(t, err)
+		require.Equal(t, proposal.ProposalHeader(), headerProp)
 
 		// 3. clusterHeaders should not be able to retrieve that block by height or ID
 		_, err = clusterHeaders.ByHeight(block.Height)
 		require.ErrorIs(t, err, storage.ErrNotFound) // there are no finalized cluster blocks at any height
 		_, err = clusterHeaders.ByBlockID(block.ID())
+		require.ErrorIs(t, err, storage.ErrWrongChain)
+		_, err = clusterHeaders.ProposalByBlockID(block.ID())
 		require.ErrorIs(t, err, storage.ErrWrongChain)
 
 		// 4. Store a block on a different cluster chain
@@ -330,9 +355,13 @@ func TestHeadersRetrieveWrongChainID(t *testing.T) {
 		// 5. clusterHeaders should not be able to retrieve it, as it is for a different cluster chain
 		_, err = clusterHeaders.ByBlockID(differentClusterBlock.ID())
 		require.ErrorIs(t, err, storage.ErrWrongChain)
+		_, err = clusterHeaders.ProposalByBlockID(differentClusterBlock.ID())
+		require.ErrorIs(t, err, storage.ErrWrongChain)
 
 		// 6. main consensus chain Headers should also not be able to retrieve the cluster header
 		_, err = headers.ByBlockID(differentClusterBlock.ID())
+		require.ErrorIs(t, err, storage.ErrWrongChain)
+		_, err = headers.ProposalByBlockID(differentClusterBlock.ID())
 		require.ErrorIs(t, err, storage.ErrWrongChain)
 	})
 }

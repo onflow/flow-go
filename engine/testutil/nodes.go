@@ -692,8 +692,8 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ide
 	blockFinder := environment.NewBlockFinder(node.Headers)
 
 	vmCtx := fvm.NewContext(
+		node.ChainID.Chain(),
 		fvm.WithLogger(node.Log),
-		fvm.WithChain(node.ChainID.Chain()),
 		fvm.WithBlocks(blockFinder),
 	)
 	committer := committer.NewLedgerViewCommitter(ls, node.Tracer)
@@ -1040,8 +1040,8 @@ func VerificationNode(t testing.TB,
 		blockFinder := environment.NewBlockFinder(node.Headers)
 
 		vmCtx := fvm.NewContext(
+			node.ChainID.Chain(),
 			fvm.WithLogger(node.Log),
-			fvm.WithChain(node.ChainID.Chain()),
 			fvm.WithBlocks(blockFinder),
 		)
 

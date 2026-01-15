@@ -10,7 +10,6 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
-	"github.com/onflow/flow-go/module/irrecoverable"
 	statepkg "github.com/onflow/flow-go/state"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/datastore"
@@ -978,6 +977,7 @@ func newState(
 }
 
 // IsBootstrapped returns whether the database contains a bootstrapped state
+// No errors expected during normal operation. Any error is a symptom of a bug or state corruption.
 func IsBootstrapped(db storage.DB) (bool, error) {
 	var finalized uint64
 	err := operation.RetrieveFinalizedHeight(db.Reader(), &finalized)
@@ -1001,13 +1001,13 @@ func IsBootstrapped(db storage.DB) (bool, error) {
 // Note: This function should only be called on properly bootstrapped nodes. If the state is corrupted
 // or the node is not properly bootstrapped, this function may return [operation.IncompleteStateError].
 // The reason for not returning [storage.ErrNotFound] directly is to avoid confusion between an often
-// benign [storage.ErrNotFound] and failed reads of quantities that the protocol mandates to be present./
+// benign [storage.ErrNotFound] and failed reads of quantities that the protocol mandates to be present.
 //
 // No error returns expected during normal operations.
 func GetChainID(db storage.DB) (flow.ChainID, error) {
 	h, err := GetLatestFinalizedHeader(db)
 	if err != nil {
-		return "", irrecoverable.NewException(err)
+		return "", fmt.Errorf("failed to determine chain ID: %w", err)
 	}
 	return h.ChainID, nil
 }
@@ -1030,17 +1030,17 @@ func GetLatestFinalizedHeader(db storage.DB) (*flow.Header, error) {
 	r := db.Reader()
 	err := operation.RetrieveFinalizedHeight(r, &finalized)
 	if err != nil {
-		return nil, irrecoverable.NewExceptionf("could not retrieve finalized height: %w", err)
+		return nil, fmt.Errorf("could not retrieve latest finalized height: %w", err)
 	}
 	var id flow.Identifier
 	err = operation.LookupBlockHeight(r, finalized, &id)
 	if err != nil {
-		return nil, irrecoverable.NewExceptionf("could not retrieve blockID of finalized block: %w", err)
+		return nil, fmt.Errorf("could not retrieve blockID of finalized block at height %d: %w", finalized, operation.IncompleteStateError)
 	}
 	var header flow.Header
 	err = operation.RetrieveHeader(r, id, &header)
 	if err != nil {
-		return nil, irrecoverable.NewExceptionf("could not retrieve finalized block: %w", err)
+		return nil, fmt.Errorf("could not retrieve latest finalized block %x: %w", id, operation.IncompleteStateError)
 	}
 	return &header, nil
 }

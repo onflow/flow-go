@@ -30,7 +30,7 @@ var collectionsCmd = &cobra.Command{
 	Short: "get collection by collection or transaction ID",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return common.WithStorage(flagDatadir, func(db storage.DB) error {
-			transactions := store.NewTransactions(&metrics.NoopCollector{}, db)
+			transactions := store.NewTransactions(metrics.NewNoopCollector(), db)
 			collections := store.NewCollections(db, transactions)
 
 			if flagCollectionID != "" {

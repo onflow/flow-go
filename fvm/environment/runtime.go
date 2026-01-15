@@ -1,25 +1,21 @@
 package environment
 
-import (
-	cadenceRuntime "github.com/onflow/cadence/runtime"
-
-	"github.com/onflow/flow-go/fvm/runtime"
-)
+// ReusableCadenceRuntimePool is the pool that holds ReusableCadenceRuntime-s so that they
+// can be reused between procedures
+type ReusableCadenceRuntimePool interface {
+	Borrow(
+		fvmEnv Environment,
+	) ReusableCadenceRuntime
+	Return(
+		reusable ReusableCadenceRuntime,
+	)
+}
 
 type RuntimeParams struct {
-	runtime.ReusableCadenceRuntimePool
+	ReusableCadenceRuntimePool
 }
 
-func DefaultRuntimeParams() RuntimeParams {
-	return RuntimeParams{
-		ReusableCadenceRuntimePool: runtime.NewReusableCadenceRuntimePool(
-			0,
-			cadenceRuntime.Config{},
-		),
-	}
-}
-
-// Runtime expose the cadence runtime to the rest of the envionment package.
+// Runtime expose the cadence runtime to the rest of the environment package.
 type Runtime struct {
 	RuntimeParams
 
@@ -36,12 +32,12 @@ func (runtime *Runtime) SetEnvironment(env Environment) {
 	runtime.env = env
 }
 
-func (runtime *Runtime) BorrowCadenceRuntime() *runtime.ReusableCadenceRuntime {
+func (runtime *Runtime) BorrowCadenceRuntime() ReusableCadenceRuntime {
 	return runtime.ReusableCadenceRuntimePool.Borrow(runtime.env)
 }
 
 func (runtime *Runtime) ReturnCadenceRuntime(
-	reusable *runtime.ReusableCadenceRuntime,
+	reusable ReusableCadenceRuntime,
 ) {
 	runtime.ReusableCadenceRuntimePool.Return(reusable)
 }

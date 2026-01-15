@@ -33,7 +33,7 @@ var blocksCmd = &cobra.Command{
 			if err != nil {
 				return err
 			}
-			cacheMetrics := &metrics.NoopCollector{}
+			cacheMetrics := metrics.NewNoopCollector()
 			headers, err := store.NewHeaders(cacheMetrics, db, chainID)
 			if err != nil {
 				return err

@@ -1,6 +1,8 @@
 package store
 
 import (
+	"fmt"
+
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/storage"
@@ -35,7 +37,7 @@ type All struct {
 func InitAll(metrics module.CacheMetrics, db storage.DB, chainID flow.ChainID) (*All, error) {
 	headers, err := NewHeaders(metrics, db, chainID)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("instantiating header storage abstraction failed: %w", err)
 	}
 	guarantees := NewGuarantees(metrics, db, DefaultCacheSize, DefaultCacheSize)
 	seals := NewSeals(metrics, db)

@@ -34,7 +34,7 @@ func NewClusterStateFactory(
 	return factory, nil
 }
 
-func (f *ClusterStateFactory) Create(stateRoot *clusterkv.StateRoot, chainID flow.ChainID) (
+func (f *ClusterStateFactory) Create(stateRoot *clusterkv.StateRoot, consensusChainID flow.ChainID) (
 	*clusterkv.MutableState,
 	*store.Headers,
 	storage.ClusterPayloads,
@@ -45,13 +45,13 @@ func (f *ClusterStateFactory) Create(stateRoot *clusterkv.StateRoot, chainID flo
 
 	clusterHeaders, err := store.NewClusterHeaders(f.metrics, f.db, stateRoot.ClusterID())
 	if err != nil {
-		return nil, nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, fmt.Errorf("failed to create storage abstraction for cluster headers: %w", err)
 	}
 	clusterPayloads := store.NewClusterPayloads(f.metrics, f.db)
 	clusterBlocks := store.NewClusterBlocks(f.db, stateRoot.ClusterID(), clusterHeaders, clusterPayloads)
-	consensusHeaders, err := store.NewHeaders(f.metrics, f.db, chainID) // for reference blocks
+	consensusHeaders, err := store.NewHeaders(f.metrics, f.db, consensusChainID) // for reference blocks
 	if err != nil {
-		return nil, nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, fmt.Errorf("failed to create storage abstraction for consensus headers: %w", err)
 	}
 
 	isBootStrapped, err := clusterkv.IsBootstrapped(f.db, stateRoot.ClusterID())
@@ -73,7 +73,7 @@ func (f *ClusterStateFactory) Create(stateRoot *clusterkv.StateRoot, chainID flo
 
 	mutableState, err := clusterkv.NewMutableState(clusterState, f.lockManager, f.tracer, clusterHeaders, clusterPayloads, consensusHeaders)
 	if err != nil {
-		return nil, nil, nil, nil, nil, fmt.Errorf("could create mutable cluster state: %w", err)
+		return nil, nil, nil, nil, nil, fmt.Errorf("could not create mutable cluster state: %w", err)
 	}
-	return mutableState, clusterHeaders, clusterPayloads, clusterBlocks, consensusHeaders, err
+	return mutableState, clusterHeaders, clusterPayloads, clusterBlocks, consensusHeaders, nil
 }
