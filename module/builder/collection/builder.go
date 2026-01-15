@@ -198,20 +198,22 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.HeaderBody
 	// ensure that we have sufficient history such that we can scan all non-expired collections for
 	// duplicates. Otherwise, we might be accidentally including a non-expired transaction again that
 	// was already included in a collection further back in history - this would be a slashable offense.
+	sufficientHistory := true
 	span, _ = b.tracer.StartSpanFromContext(ctx, trace.COLBuildOnFinalizedLookup)
 	err = b.populateFinalizedAncestryLookup(lctx, buildCtx)
 	span.End()
-
-	var payload *cluster.Payload
-	var priorityTransactionsCount uint
 	if err != nil {
 		if !errors.Is(err, ErrNotEnoughHistory) {
 			return nil, fmt.Errorf("could not populate finalized ancestry lookup: %w", err)
 		}
-		// STEP 2b: if we don't have enough history to propose a valid regular collection, build an empty payload
-		payload = cluster.NewEmptyPayload(buildCtx.highestPossibleReferenceBlockID())
-	} else {
-		// STEP 2: build a payload of valid transactions, while at the same
+		sufficientHistory = false
+	}
+
+	// STEP 2: construct payload
+	var payload *cluster.Payload
+	var priorityTransactionsCount uint
+	if sufficientHistory {
+		// Step 2 (common case): build a payload of valid transactions, while at the same
 		// time figuring out the correct reference block ID for the collection.
 		span, _ = b.tracer.StartSpanFromContext(ctx, trace.COLBuildOnCreatePayload)
 		payload, priorityTransactionsCount, err = b.buildPayload(buildCtx)
@@ -219,6 +221,10 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.HeaderBody
 		if err != nil {
 			return nil, fmt.Errorf("could not build payload: %w", err)
 		}
+	} else {
+		// Step 2 (edge case of very recently bootstrapped node with truncated history):
+		// we can't guarantee that no transactions are duplicated because we have too little history, hence build an empty payload
+		payload = cluster.NewEmptyPayload(buildCtx.highestPossibleReferenceBlockID())
 	}
 
 	// STEP 3: we have a set of transactions that are valid to include on this fork.
