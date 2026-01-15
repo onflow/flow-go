@@ -465,7 +465,7 @@ func prepareExecutionService(container testnet.ContainerConfig, i int, n int) Se
 			fmt.Sprintf("%s:/sockets:z", SocketDir),
 		)
 		service.Command = append(service.Command,
-			fmt.Sprintf("--ledger-service-addr=unix:///sockets/ledger.sock"),
+			fmt.Sprintf("--ledger-service-socket=/sockets/ledger.sock"),
 		)
 		// Execution node depends on ledger service
 		service.DependsOn = append(service.DependsOn, "ledger_service_1")
@@ -859,7 +859,7 @@ func prepareLedgerService(dockerServices Services, flowNodeContainerConfigs []te
 		Image: "localnet-ledger",
 		Command: []string{
 			"--triedir=/trie",
-			"--ledger-service-addr=unix:///sockets/ledger.sock",
+			"--ledger-service-socket=/sockets/ledger.sock",
 			"--mtrie-cache-size=100",
 			"--checkpoint-distance=100",
 			"--checkpoints-to-keep=3",
