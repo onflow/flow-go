@@ -177,8 +177,9 @@ func (s *Service) Set(ctx context.Context, req *ledgerpb.SetRequest) (*ledgerpb.
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
-	// Encode trie update using CBOR encoding to preserve nil vs []byte{} distinction
-	trieUpdateBytes := ledger.EncodeTrieUpdateCBOR(trieUpdate)
+	// Encode trie update using centralized encoding function to ensure
+	// client and server use the same encoding method
+	trieUpdateBytes := encodeTrieUpdateForTransport(trieUpdate)
 
 	return &ledgerpb.SetResponse{
 		NewState: &ledgerpb.State{
