@@ -53,7 +53,7 @@ func blockRandomSourceDeclaration(renv *ReusableCadenceRuntime) stdlib.StandardL
 }
 
 // transactionIndexFunctionType is the type of the `getTransactionIndex` function.
-// This defines the signature as `func(): UInt32`
+// This defines the signature as `func(): UInt32`.
 var transactionIndexFunctionType = &sema.FunctionType{
 	ReturnTypeAnnotation: sema.NewTypeAnnotation(sema.UInt32Type),
 }
