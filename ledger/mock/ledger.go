@@ -219,6 +219,54 @@ func (_m *Ledger) Set(update *ledger.Update) (ledger.State, *ledger.TrieUpdate, 
 	return r0, r1, r2
 }
 
+// StateByIndex provides a mock function with given fields: index
+func (_m *Ledger) StateByIndex(index int) (ledger.State, error) {
+	ret := _m.Called(index)
+
+	if len(ret) == 0 {
+		panic("no return value specified for StateByIndex")
+	}
+
+	var r0 ledger.State
+	var r1 error
+	if rf, ok := ret.Get(0).(func(int) (ledger.State, error)); ok {
+		return rf(index)
+	}
+	if rf, ok := ret.Get(0).(func(int) ledger.State); ok {
+		r0 = rf(index)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(ledger.State)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(int) error); ok {
+		r1 = rf(index)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// StateCount provides a mock function with no fields
+func (_m *Ledger) StateCount() int {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for StateCount")
+	}
+
+	var r0 int
+	if rf, ok := ret.Get(0).(func() int); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(int)
+	}
+
+	return r0
+}
+
 // NewLedger creates a new instance of Ledger. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
 // The first argument is typically a *testing.T value.
 func NewLedger(t interface {
