@@ -18,11 +18,11 @@ import (
 
 // Client implements ledger.Ledger interface using gRPC calls to a remote ledger service.
 type Client struct {
-	conn             *grpc.ClientConn
-	client           ledgerpb.LedgerServiceClient
-	logger           zerolog.Logger
-	done             chan struct{}
-	once             sync.Once
+	conn              *grpc.ClientConn
+	client            ledgerpb.LedgerServiceClient
+	logger            zerolog.Logger
+	done              chan struct{}
+	once              sync.Once
 	enableCompression bool // Enable gzip compression for proof operations (for testing/benchmarking)
 }
 
@@ -65,9 +65,9 @@ func NewClient(grpcAddr string, logger zerolog.Logger, maxRequestSize, maxRespon
 	}
 	// Only enable compression for TCP connections, not Unix sockets
 	// Unix sockets on same machine don't benefit from compression due to CPU overhead
-	if !isUnixSocket {
-		callOpts = append(callOpts, grpc.UseCompressor("gzip"))
-	}
+	// if !isUnixSocket {
+	// 	callOpts = append(callOpts, grpc.UseCompressor("gzip"))
+	// }
 
 	conn, err := grpc.NewClient(
 		normalizedAddr,
