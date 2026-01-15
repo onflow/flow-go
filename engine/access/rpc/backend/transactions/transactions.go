@@ -498,14 +498,14 @@ func (t *Transactions) lookupSystemTransactionResult(
 		return nil, nil, false, status.Errorf(codes.InvalidArgument, "block ID is required for system transactions")
 	}
 
-	executionResultInfo, err := t.executionResultProvider.ExecutionResultInfo(blockID, criteria)
-	if err != nil {
-		return nil, nil, false, status.Errorf(codes.NotFound, "failed to get execution result for block: %v", err)
-	}
-
 	header, err := t.state.AtBlockID(blockID).Head()
 	if err != nil {
 		return nil, nil, false, status.Errorf(codes.NotFound, "could not find block: %v", err)
+	}
+
+	executionResultInfo, err := t.executionResultProvider.ExecutionResultInfo(blockID, criteria)
+	if err != nil {
+		return nil, nil, false, status.Errorf(codes.NotFound, "failed to get execution result for block: %v", err)
 	}
 
 	result, metadata, err := t.txProvider.TransactionResult(ctx, header, txID, flow.ZeroID, encodingVersion, executionResultInfo)
@@ -537,11 +537,6 @@ func (t *Transactions) lookupScheduledTransactionResult(
 		return nil, nil, false, status.Errorf(codes.NotFound, "scheduled transaction found in block %s, but %s was provided", scheduledTxBlockID, blockID)
 	}
 
-	executionResultInfo, err := t.executionResultProvider.ExecutionResultInfo(scheduledTxBlockID, criteria)
-	if err != nil {
-		return nil, nil, false, status.Errorf(codes.NotFound, "failed to get execution result for block: %v", err)
-	}
-
 	header, err := t.state.AtBlockID(scheduledTxBlockID).Head()
 	if err != nil {
 		// the scheduled transaction is indexed at this block, so this block must exist in storage.
@@ -549,6 +544,11 @@ func (t *Transactions) lookupScheduledTransactionResult(
 		err = fmt.Errorf("failed to get scheduled transaction's block from storage: %w", err)
 		irrecoverable.Throw(ctx, err)
 		return nil, nil, false, err
+	}
+
+	executionResultInfo, err := t.executionResultProvider.ExecutionResultInfo(scheduledTxBlockID, criteria)
+	if err != nil {
+		return nil, nil, false, status.Errorf(codes.NotFound, "failed to get execution result for block: %v", err)
 	}
 
 	result, metadata, err := t.txProvider.TransactionResult(ctx, header, txID, flow.ZeroID, encodingVersion, executionResultInfo)

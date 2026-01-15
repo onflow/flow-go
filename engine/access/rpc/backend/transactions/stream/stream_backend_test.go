@@ -244,7 +244,7 @@ func (s *TransactionStreamSuite) initializeBackend() {
 		s.preferredExecutionNodeIDs,
 		s.fixedExecutionNodeIDs,
 	)
-	
+
 	var systemCollections *systemcollection.Versioned
 	localTxProvider := provider.NewLocalTransactionProvider(
 		s.state,
