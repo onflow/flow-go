@@ -85,6 +85,17 @@ func (lwc *LedgerWithCompactor) Prove(query *ledger.Query) (ledger.Proof, error)
 	return lwc.ledger.Prove(query)
 }
 
+// StateCount returns the number of states (tries) stored in the forest
+func (lwc *LedgerWithCompactor) StateCount() int {
+	return lwc.ledger.StateCount()
+}
+
+// StateByIndex returns the state at the given index
+// -1 is the last index
+func (lwc *LedgerWithCompactor) StateByIndex(index int) (ledger.State, error) {
+	return lwc.ledger.StateByIndex(index)
+}
+
 // Ready manages lifecycle of both ledger and compactor.
 // Signals when initialization (WAL replay) is complete and compactor is ready.
 func (lwc *LedgerWithCompactor) Ready() <-chan struct{} {

@@ -82,6 +82,22 @@ func main() {
 	<-ledgerStorage.Ready()
 	logger.Info().Msg("ledger ready")
 
+	// Check if any trie is loaded after startup
+	stateCount := ledgerStorage.StateCount()
+	if stateCount == 0 {
+		logger.Fatal().Msg("no trie loaded after startup - no states available")
+	}
+	
+	// Get the last trie state for logging
+	lastState, err := ledgerStorage.StateByIndex(-1)
+	if err != nil {
+		logger.Fatal().Err(err).Msg("failed to get last state for logging")
+	}
+	logger.Info().
+		Int("state_count", stateCount).
+		Str("last_state", lastState.String()).
+		Msg("ledger health check passed")
+
 	// Create gRPC server with max message size configuration.
 	// Default to 10 GiB for responses (instead of standard 4 MiB) to handle large proofs that can exceed 4MB.
 	// This was increased to fix "grpc: received message larger than max" errors when generating
