@@ -20,18 +20,29 @@ go build -o flow-ledger-service ./cmd/ledger
 ## Running
 
 ```bash
+# Listen on TCP only
 ./flow-ledger-service \
   -triedir /path/to/trie \
-  -ledger-service-addr 0.0.0.0:9000 \
-  -mtrie-cache-size 500 \
-  -checkpoint-distance 100 \
-  -checkpoints-to-keep 3
+  -ledger-service-tcp 0.0.0.0:9000
+
+# Listen on Unix socket only
+./flow-ledger-service \
+  -triedir /path/to/trie \
+  -ledger-service-socket /sockets/ledger.sock
+
+# Listen on both TCP and Unix socket
+./flow-ledger-service \
+  -triedir /path/to/trie \
+  -ledger-service-tcp 0.0.0.0:9000 \
+  -ledger-service-socket /sockets/ledger.sock
 ```
 
 ## Flags
 
 - `-triedir`: Directory for trie files (required)
-- `-ledger-service-addr`: Ledger service listen address (TCP: ip:port or Unix: unix:///path/to/socket) (default: 0.0.0.0:9000)
+- `-ledger-service-tcp`: TCP listen address (e.g., 0.0.0.0:9000). If provided, server accepts TCP connections.
+- `-ledger-service-socket`: Unix socket path (e.g., /sockets/ledger.sock). If provided, server accepts Unix socket connections. Can specify multiple sockets separated by comma.
+- **Note**: At least one of `-ledger-service-tcp` or `-ledger-service-socket` must be provided.
 - `-mtrie-cache-size`: MTrie cache size - number of tries (default: 500)
 - `-checkpoint-distance`: Checkpoint distance (default: 100)
 - `-checkpoints-to-keep`: Number of checkpoints to keep (default: 3)
