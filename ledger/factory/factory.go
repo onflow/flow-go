@@ -21,7 +21,6 @@ type Config struct {
 	LedgerServiceAddr     string // gRPC address for remote ledger service (empty means use local ledger)
 	LedgerMaxRequestSize  uint   // Maximum request message size in bytes for remote ledger client (0 = default 1 GiB)
 	LedgerMaxResponseSize uint   // Maximum response message size in bytes for remote ledger client (0 = default 1 GiB)
-	LedgerEnableCompression bool // Enable gzip compression for proof operations (useful for testing/benchmarking)
 
 	// Local ledger configuration
 	Triedir                              string
@@ -60,7 +59,6 @@ func NewLedger(config Config) (*Result, error) {
 			config.Logger.With().Str("subcomponent", "ledger").Logger(),
 			config.LedgerMaxRequestSize,
 			config.LedgerMaxResponseSize,
-			config.LedgerEnableCompression,
 		)
 		// TODO(leo): handle ping/retry logic for remote ledger client
 		// TODO(leo): add admin tool to trigger checkpointing

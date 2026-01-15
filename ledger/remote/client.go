@@ -18,20 +18,18 @@ import (
 
 // Client implements ledger.Ledger interface using gRPC calls to a remote ledger service.
 type Client struct {
-	conn              *grpc.ClientConn
-	client            ledgerpb.LedgerServiceClient
-	logger            zerolog.Logger
-	done              chan struct{}
-	once              sync.Once
-	enableCompression bool // Enable gzip compression for proof operations (for testing/benchmarking)
+	conn   *grpc.ClientConn
+	client ledgerpb.LedgerServiceClient
+	logger zerolog.Logger
+	done   chan struct{}
+	once   sync.Once
 }
 
 // NewClient creates a new remote ledger client.
 // grpcAddr can be either a TCP address (e.g., "localhost:9000") or a Unix domain socket (e.g., "unix:///tmp/ledger.sock").
 // maxRequestSize and maxResponseSize specify the maximum message sizes in bytes.
 // If both are 0, defaults to 1 GiB for both requests and responses.
-// enableCompression enables gzip compression for proof operations (useful for testing/benchmarking).
-func NewClient(grpcAddr string, logger zerolog.Logger, maxRequestSize, maxResponseSize uint, enableCompression bool) (*Client, error) {
+func NewClient(grpcAddr string, logger zerolog.Logger, maxRequestSize, maxResponseSize uint) (*Client, error) {
 	logger = logger.With().Str("component", "remote_ledger_client").Logger()
 
 	// Use defaults if not specified
@@ -55,24 +53,13 @@ func NewClient(grpcAddr string, logger zerolog.Logger, maxRequestSize, maxRespon
 	// Default to 1 GiB (instead of standard 4 MiB) to handle large proofs that can exceed 4MB.
 	// This was increased to fix "grpc: received message larger than max" errors when generating
 	// proofs for blocks with many state changes.
-	// Compression: For Unix domain sockets (same-machine), compression is typically NOT beneficial
-	// because kernel memory copies are fast and compression adds CPU overhead. However, for very
-	// large messages (>10MB) that are highly compressible, compression might still help.
-	// For TCP connections, compression is beneficial to reduce network bandwidth.
-	callOpts := []grpc.CallOption{
-		grpc.MaxCallRecvMsgSize(int(maxResponseSize)),
-		grpc.MaxCallSendMsgSize(int(maxRequestSize)),
-	}
-	// Only enable compression for TCP connections, not Unix sockets
-	// Unix sockets on same machine don't benefit from compression due to CPU overhead
-	// if !isUnixSocket {
-	// 	callOpts = append(callOpts, grpc.UseCompressor("gzip"))
-	// }
-
 	conn, err := grpc.NewClient(
 		normalizedAddr,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
-		grpc.WithDefaultCallOptions(callOpts...),
+		grpc.WithDefaultCallOptions(
+			grpc.MaxCallRecvMsgSize(int(maxResponseSize)),
+			grpc.MaxCallSendMsgSize(int(maxRequestSize)),
+		),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to ledger service: %w", err)
@@ -81,11 +68,10 @@ func NewClient(grpcAddr string, logger zerolog.Logger, maxRequestSize, maxRespon
 	client := ledgerpb.NewLedgerServiceClient(conn)
 
 	return &Client{
-		conn:              conn,
-		client:            client,
-		logger:            logger,
-		done:              make(chan struct{}),
-		enableCompression: enableCompression,
+		conn:   conn,
+		client: client,
+		logger: logger,
+		done:   make(chan struct{}),
 	}, nil
 }
 
@@ -227,7 +213,6 @@ func (c *Client) Set(update *ledger.Update) (ledger.State, *ledger.TrieUpdate, e
 		}
 	}
 
-	// Set operations can return large trie updates, but compression is handled at connection level
 	resp, err := c.client.Set(ctx, req)
 	if err != nil {
 		return ledger.DummyState, nil, fmt.Errorf("failed to set values: %w", err)
@@ -249,7 +234,6 @@ func (c *Client) Set(update *ledger.Update) (ledger.State, *ledger.TrieUpdate, e
 }
 
 // Prove returns proofs for the given keys at a specific state.
-// Compression can be enabled via enableCompression flag for testing/benchmarking.
 func (c *Client) Prove(query *ledger.Query) (ledger.Proof, error) {
 	ctx := context.Background()
 	state := query.State()
@@ -264,13 +248,7 @@ func (c *Client) Prove(query *ledger.Query) (ledger.Proof, error) {
 		req.Keys[i] = ledgerKeyToProtoKey(key)
 	}
 
-	// Conditionally enable compression for proof operations based on flag
-	var opts []grpc.CallOption
-	if c.enableCompression {
-		opts = append(opts, grpc.UseCompressor("gzip"))
-	}
-
-	resp, err := c.client.Prove(ctx, req, opts...)
+	resp, err := c.client.Prove(ctx, req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate proof: %w", err)
 	}
