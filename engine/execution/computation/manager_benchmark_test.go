@@ -155,13 +155,14 @@ func benchmarkComputeBlock(
 
 	const chainID = flow.Emulator
 	execCtx := fvm.NewContext(
-		fvm.WithChain(chainID.Chain()),
+		chainID.Chain(),
 		fvm.WithAccountStorageLimit(true),
 		fvm.WithTransactionFeesEnabled(true),
 		fvm.WithTracer(tracer),
 		fvm.WithReusableCadenceRuntimePool(
 			reusableRuntime.NewReusableCadenceRuntimePool(
 				ReusableCadenceRuntimePoolSize,
+				chainID.Chain(),
 				runtime.Config{},
 			)),
 	)
@@ -203,7 +204,6 @@ func benchmarkComputeBlock(
 		committer.NewNoopViewCommitter(),
 		me,
 		prov,
-		nil,
 		testutil.ProtocolStateWithSourceFixture(nil),
 		maxConcurrency)
 	require.NoError(b, err)

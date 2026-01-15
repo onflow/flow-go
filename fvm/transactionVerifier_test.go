@@ -67,10 +67,12 @@ func TestTransactionVerification(t *testing.T) {
 		}
 
 		ctx := fvm.NewContext(
+			flow.Mainnet.Chain(),
 			fvm.WithAuthorizationChecksEnabled(true),
 			fvm.WithAccountKeyWeightThreshold(1000),
 			fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
-			fvm.WithTransactionBodyExecutionEnabled(false))
+			fvm.WithTransactionBodyExecutionEnabled(false),
+		)
 		err = run(tx, ctx, txnState)
 		require.ErrorContains(
 			t,
@@ -97,10 +99,12 @@ func TestTransactionVerification(t *testing.T) {
 		}
 
 		ctx := fvm.NewContext(
+			flow.Mainnet.Chain(),
 			fvm.WithAuthorizationChecksEnabled(true),
 			fvm.WithAccountKeyWeightThreshold(1000),
 			fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
-			fvm.WithTransactionBodyExecutionEnabled(false))
+			fvm.WithTransactionBodyExecutionEnabled(false),
+		)
 		err = run(tx, ctx, txnState)
 		require.ErrorContains(
 			t,
@@ -142,10 +146,12 @@ func TestTransactionVerification(t *testing.T) {
 		tx.EnvelopeSignatures = []flow.TransactionSignature{sig2}
 
 		ctx := fvm.NewContext(
+			flow.Mainnet.Chain(),
 			fvm.WithAuthorizationChecksEnabled(true),
 			fvm.WithAccountKeyWeightThreshold(1000),
 			fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
-			fvm.WithTransactionBodyExecutionEnabled(false))
+			fvm.WithTransactionBodyExecutionEnabled(false),
+		)
 		err = run(tx, ctx, txnState)
 		require.Error(t, err)
 		require.True(t, errors.IsInvalidEnvelopeSignatureError(err))
@@ -186,10 +192,12 @@ func TestTransactionVerification(t *testing.T) {
 		tx.EnvelopeSignatures = []flow.TransactionSignature{sig2}
 
 		ctx := fvm.NewContext(
+			flow.Mainnet.Chain(),
 			fvm.WithAuthorizationChecksEnabled(true),
 			fvm.WithAccountKeyWeightThreshold(1000),
 			fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
-			fvm.WithTransactionBodyExecutionEnabled(false))
+			fvm.WithTransactionBodyExecutionEnabled(false),
+		)
 		err = run(tx, ctx, txnState)
 		require.Error(t, err)
 		require.True(t, errors.IsInvalidPayloadSignatureError(err))
@@ -226,10 +234,12 @@ func TestTransactionVerification(t *testing.T) {
 		}
 
 		ctx := fvm.NewContext(
+			flow.Mainnet.Chain(),
 			fvm.WithAuthorizationChecksEnabled(true),
 			fvm.WithAccountKeyWeightThreshold(1000),
 			fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
-			fvm.WithTransactionBodyExecutionEnabled(false))
+			fvm.WithTransactionBodyExecutionEnabled(false),
+		)
 		err = run(tx, ctx, txnState)
 		require.Error(t, err)
 
@@ -286,10 +296,12 @@ func TestTransactionVerification(t *testing.T) {
 				tx.EnvelopeSignatures[0].Signature = sig
 
 				ctx := fvm.NewContext(
+					flow.Mainnet.Chain(),
 					fvm.WithAuthorizationChecksEnabled(true),
 					fvm.WithAccountKeyWeightThreshold(1000),
 					fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
-					fvm.WithTransactionBodyExecutionEnabled(false))
+					fvm.WithTransactionBodyExecutionEnabled(false),
+				)
 				err = run(tx, ctx, txnState)
 				if c.validity {
 					require.NoError(t, err)

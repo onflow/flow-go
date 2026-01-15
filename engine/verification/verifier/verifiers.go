@@ -356,7 +356,7 @@ func makeVerifier(
 			scheduledTransactionsEnabled,
 		)...,
 	)
-	vmCtx := fvm.NewContext(fvmOptions...)
+	vmCtx := fvm.NewContext(chainID.Chain(), fvmOptions...)
 
 	chunkVerifier := chunks.NewChunkVerifier(vm, vmCtx, logger)
 	return chunkVerifier
