@@ -10,6 +10,7 @@ import (
 	"path"
 
 	"github.com/cockroachdb/pebble/v2"
+	"github.com/hashicorp/go-multierror"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
@@ -107,7 +108,8 @@ func loadRegisterStore(
 
 	bootstrapped, err := storagepebble.IsBootstrapped(pebbledb)
 	if err != nil {
-		return nil, nil, fmt.Errorf("could not check if registers db is bootstrapped: %w", err)
+		originalErr := fmt.Errorf("could not check if registers db is bootstrapped: %w", err)
+		return nil, nil, multierror.Append(originalErr, closer.Close()).ErrorOrNil()
 	}
 
 	log.Info().Msgf("register store bootstrapped: %v", bootstrapped)
@@ -119,7 +121,8 @@ func loadRegisterStore(
 		rootSeal := state.Params().Seal()
 
 		if sealedRoot.ID() != rootSeal.BlockID {
-			return nil, nil, fmt.Errorf("mismatching root seal and sealed root: %v != %v", sealedRoot.ID(), rootSeal.BlockID)
+			originalErr := fmt.Errorf("mismatching root seal and sealed root: %v != %v", sealedRoot.ID(), rootSeal.BlockID)
+			return nil, nil, multierror.Append(originalErr, closer.Close()).ErrorOrNil()
 		}
 
 		checkpointHeight := sealedRoot.Height
@@ -128,13 +131,15 @@ func loadRegisterStore(
 		err = importFunc(log.With().Str("component", "background-indexing").Logger(),
 			checkpointFile, checkpointHeight, rootHash, pebbledb, importCheckpointWorkerCount)
 		if err != nil {
-			return nil, nil, fmt.Errorf("could not import registers from checkpoint: %w", err)
+			originalErr := fmt.Errorf("could not import registers from checkpoint: %w", err)
+			return nil, nil, multierror.Append(originalErr, closer.Close()).ErrorOrNil()
 		}
 	}
 
 	diskStore, err := storagepebble.NewRegisters(pebbledb, storagepebble.PruningDisabled)
 	if err != nil {
-		return nil, nil, fmt.Errorf("could not create registers storage: %w", err)
+		originalErr := fmt.Errorf("could not create registers storage: %w", err)
+		return nil, nil, multierror.Append(originalErr, closer.Close()).ErrorOrNil()
 	}
 
 	reader := finalizedreader.NewFinalizedReader(headers, lastFinalizedHeight)
@@ -152,7 +157,7 @@ func loadRegisterStore(
 		notifier,
 	)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, multierror.Append(err, closer.Close()).ErrorOrNil()
 	}
 
 	return registerStore, closer, nil
