@@ -1056,17 +1056,6 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 			}
 			broadcaster := engine.NewBroadcaster()
 
-			// TODO: figure out what to do with it? (remove or keep somehow?)
-			//eventQueryMode, err := query_mode.ParseIndexQueryMode(builder.rpcConf.BackendConfig.EventQueryMode)
-			//if err != nil {
-			//	return nil, fmt.Errorf("could not parse event query mode: %w", err)
-			//}
-
-			// use the events index for events if enabled and the node is configured to use it for
-			// regular event queries
-			//useIndex := builder.executionDataIndexingEnabled &&
-			//	eventQueryMode != query_mode.IndexQueryModeExecutionNodesOnly
-
 			executionDataTracker := subscriptiontracker.NewExecutionDataTracker(
 				builder.Logger,
 				node.State,
