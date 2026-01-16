@@ -13,13 +13,12 @@ import (
 
 	"github.com/rs/zerolog"
 	"go.uber.org/atomic"
-	"google.golang.org/grpc"
 
 	"github.com/onflow/flow-go/admin"
 	executionCommands "github.com/onflow/flow-go/admin/commands/execution"
 	ledgerfactory "github.com/onflow/flow-go/ledger/factory"
-	ledgerpb "github.com/onflow/flow-go/ledger/protobuf"
 	"github.com/onflow/flow-go/ledger/remote"
+	"github.com/onflow/flow-go/ledger/remote/transport"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 )
@@ -35,6 +34,8 @@ var (
 	logLevel            = flag.String("loglevel", "info", "Log level (panic, fatal, error, warn, info, debug)")
 	maxRequestSize      = flag.Uint("max-request-size", 1<<30, "Maximum request message size in bytes (default: 1 GiB)")
 	maxResponseSize     = flag.Uint("max-response-size", 1<<30, "Maximum response message size in bytes (default: 1 GiB)")
+	ledgerTransport     = flag.String("ledger-transport", "grpc", "Transport type for ledger service: 'grpc' or 'shmipc' (default: grpc)")
+	bufferSize          = flag.Uint("buffer-size", 2<<30, "Shared memory buffer size in bytes for shmipc transport (default: 2 GiB)")
 )
 
 func main() {
@@ -116,18 +117,14 @@ func main() {
 		Str("last_state", lastState.String()).
 		Msg("ledger health check passed")
 
-	// Create gRPC server with max message size configuration.
-	// Default to 1 GiB for responses (instead of standard 4 MiB) to handle large proofs that can exceed 4MB.
-	// This was increased to fix "grpc: received message larger than max" errors when generating
-	// proofs for blocks with many state changes.
-	grpcServer := grpc.NewServer(
-		grpc.MaxRecvMsgSize(int(*maxRequestSize)),
-		grpc.MaxSendMsgSize(int(*maxResponseSize)),
-	)
+	// Parse transport type
+	transportType := transport.TransportType(*ledgerTransport)
+	if transportType != transport.TransportTypeGRPC && transportType != transport.TransportTypeShmipc {
+		logger.Fatal().Str("transport", *ledgerTransport).Msg("invalid transport type, must be 'grpc' or 'shmipc'")
+	}
 
-	// Create and register ledger service
-	ledgerService := remote.NewService(ledgerStorage, logger)
-	ledgerpb.RegisterLedgerServiceServer(grpcServer, ledgerService)
+	// Create handler adapter
+	handler := transport.NewLedgerHandlerAdapter(ledgerStorage)
 
 	// Create listeners based on provided flags
 	type listenerInfo struct {
@@ -146,7 +143,7 @@ func main() {
 			logger.Fatal().Err(err).Str("address", *ledgerServiceTCP).Msg("failed to listen on TCP")
 		}
 
-		logger.Info().Str("address", *ledgerServiceTCP).Msg("gRPC server listening on TCP")
+		logger.Info().Str("address", *ledgerServiceTCP).Str("transport", *ledgerTransport).Msg("transport server listening on TCP")
 		listeners = append(listeners, listenerInfo{
 			listener:     lis,
 			address:      *ledgerServiceTCP,
@@ -191,7 +188,7 @@ func main() {
 				logger.Warn().Err(err).Str("socket_path", socketPath).Msg("failed to set socket file permissions")
 			}
 
-			logger.Info().Str("socket_path", socketPath).Msg("gRPC server listening on Unix domain socket")
+			logger.Info().Str("socket_path", socketPath).Str("transport", *ledgerTransport).Msg("transport server listening on Unix domain socket")
 			socketPaths = append(socketPaths, socketPath)
 			listeners = append(listeners, listenerInfo{
 				listener:     lis,
@@ -238,15 +235,41 @@ func main() {
 		logger.Info().Str("admin_addr", *adminAddr).Msg("admin server started")
 	}
 
-	// Start server on all listeners in separate goroutines
+	// Start transport server on all listeners
 	errCh := make(chan error, len(listeners))
+	var transportServers []transport.ServerTransport
+
 	for _, info := range listeners {
 		info := info // capture loop variable
+
+		// Create transport server based on transport type
+		server, err := remote.NewTransportServer(
+			transportType,
+			info.listener,
+			logger,
+			*maxRequestSize,
+			*maxResponseSize,
+			*bufferSize,
+		)
+		if err != nil {
+			logger.Fatal().Err(err).Str("address", info.address).Msg("failed to create transport server")
+		}
+
+		transportServers = append(transportServers, server)
+
+		// Start server in goroutine
 		go func() {
-			if err := grpcServer.Serve(info.listener); err != nil {
-				errCh <- fmt.Errorf("gRPC server error on %s: %w", info.address, err)
+			if err := server.Serve(handler); err != nil {
+				errCh <- fmt.Errorf("transport server error on %s: %w", info.address, err)
 			}
 		}()
+
+		// Wait for server to be ready
+		<-server.Ready()
+		logger.Info().
+			Str("transport", *ledgerTransport).
+			Str("address", info.address).
+			Msg("transport server ready")
 	}
 
 	// Wait for interrupt signal or error
@@ -261,8 +284,10 @@ func main() {
 	}
 
 	// Graceful shutdown
-	logger.Info().Msg("shutting down gRPC server...")
-	grpcServer.GracefulStop()
+	logger.Info().Msg("shutting down transport servers...")
+	for _, server := range transportServers {
+		server.Stop()
+	}
 
 	// Clean up Unix socket files
 	for _, socketPath := range socketPaths {

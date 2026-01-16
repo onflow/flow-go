@@ -80,8 +80,10 @@ type ExecutionConfig struct {
 	pruningConfigSleepAfterIteration time.Duration
 
 	ledgerServiceAddr     string // gRPC address for remote ledger service (empty means use local ledger)
+	ledgerTransport       string // Transport type for remote ledger service: "grpc" or "shmipc" (default: "grpc")
 	ledgerMaxRequestSize  uint   // Maximum request message size in bytes for remote ledger client (0 = default 1 GiB)
 	ledgerMaxResponseSize uint   // Maximum response message size in bytes for remote ledger client (0 = default 1 GiB)
+	ledgerBufferSize      uint   // Shared memory buffer size in bytes for shmipc transport (0 = default 1 GiB)
 }
 
 func (exeConf *ExecutionConfig) SetupFlags(flags *pflag.FlagSet) {
@@ -160,8 +162,10 @@ func (exeConf *ExecutionConfig) SetupFlags(flags *pflag.FlagSet) {
 	flags.DurationVar(&exeConf.pruningConfigSleepAfterCommit, "pruning-config-sleep-after-commit", exepruner.DefaultConfig.SleepAfterEachBatchCommit, "sleep time after each batch commit, default 1s")
 	flags.DurationVar(&exeConf.pruningConfigSleepAfterIteration, "pruning-config-sleep-after-iteration", exepruner.DefaultConfig.SleepAfterEachIteration, "sleep time after each iteration, default max int64")
 	flags.StringVar(&exeConf.ledgerServiceAddr, "ledger-service-addr", "", "gRPC address for remote ledger service (TCP: e.g., localhost:9000, or Unix socket: unix:///path/to/socket). If empty, uses local ledger")
+	flags.StringVar(&exeConf.ledgerTransport, "ledger-transport", "grpc", "transport type for remote ledger service: 'grpc' or 'shmipc' (default: grpc)")
 	flags.UintVar(&exeConf.ledgerMaxRequestSize, "ledger-max-request-size", 0, "maximum request message size in bytes for remote ledger client (0 = default 1 GiB)")
 	flags.UintVar(&exeConf.ledgerMaxResponseSize, "ledger-max-response-size", 0, "maximum response message size in bytes for remote ledger client (0 = default 1 GiB)")
+	flags.UintVar(&exeConf.ledgerBufferSize, "ledger-buffer-size", 0, "shared memory buffer size in bytes for shmipc transport (0 = default 2 GiB)")
 }
 
 func (exeConf *ExecutionConfig) ValidateFlags() error {

@@ -12,15 +12,18 @@ import (
 	"github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/ledger/complete/wal"
 	"github.com/onflow/flow-go/ledger/remote"
+	"github.com/onflow/flow-go/ledger/remote/transport"
 	"github.com/onflow/flow-go/module"
 )
 
 // Config holds configuration for creating a ledger instance.
 type Config struct {
 	// Remote ledger service configuration
-	LedgerServiceAddr     string // gRPC address for remote ledger service (empty means use local ledger)
+	LedgerServiceAddr     string // Address for remote ledger service (empty means use local ledger)
+	LedgerTransport       string // Transport type: "grpc" or "shmipc" (default: "grpc")
 	LedgerMaxRequestSize  uint   // Maximum request message size in bytes for remote ledger client (0 = default 1 GiB)
 	LedgerMaxResponseSize uint   // Maximum response message size in bytes for remote ledger client (0 = default 1 GiB)
+	LedgerBufferSize      uint   // Shared memory buffer size in bytes for shmipc transport (0 = default 1 GiB)
 
 	// Local ledger configuration
 	Triedir                              string
@@ -50,15 +53,43 @@ func NewLedger(config Config) (*Result, error) {
 	// Check if remote ledger service is configured
 	if config.LedgerServiceAddr != "" {
 		// the remote ledger service is for execution to connect to a remote ledger service
+		// Parse transport type
+		transportTypeStr := config.LedgerTransport
+		if transportTypeStr == "" {
+			transportTypeStr = "grpc"
+		}
+		transportType, err := transport.NewTransportTypeFromString(transportTypeStr)
+		if err != nil {
+			return nil, fmt.Errorf("invalid ledger transport type %q: %w", transportTypeStr, err)
+		}
+
+		// Set defaults for message sizes
+		maxRequestSize := config.LedgerMaxRequestSize
+		if maxRequestSize == 0 {
+			maxRequestSize = 1 << 30 // 1 GiB
+		}
+		maxResponseSize := config.LedgerMaxResponseSize
+		if maxResponseSize == 0 {
+			maxResponseSize = 1 << 30 // 1 GiB
+		}
+		bufferSize := config.LedgerBufferSize
+		if bufferSize == 0 {
+			bufferSize = 2 << 30 // 2 GiB (matches Docker shm_size)
+		}
+
 		config.Logger.Info().
 			Str("ledger_service_addr", config.LedgerServiceAddr).
+			Str("transport", transportTypeStr).
 			Msg("using remote ledger service")
 
-		factory = remote.NewRemoteLedgerFactory(
+		// Create transport-based factory
+		factory = remote.NewTransportLedgerFactory(
+			transportType,
 			config.LedgerServiceAddr,
 			config.Logger.With().Str("subcomponent", "ledger").Logger(),
-			config.LedgerMaxRequestSize,
-			config.LedgerMaxResponseSize,
+			maxRequestSize,
+			maxResponseSize,
+			bufferSize,
 		)
 	} else {
 		// the local ledger service is used when:

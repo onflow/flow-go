@@ -17,10 +17,10 @@ import (
 
 // Client implements transport.ClientTransport using shmipc-go.
 type Client struct {
-	session *shmipc.Session
-	logger  zerolog.Logger
-	ready   chan struct{}
-	once    sync.Once
+	sessionManager *shmipc.SessionManager
+	logger         zerolog.Logger
+	ready          chan struct{}
+	once           sync.Once
 }
 
 // NewClient creates a new shmipc-go transport client.
@@ -30,13 +30,8 @@ func NewClient(addr string, logger zerolog.Logger, bufferSize uint) (*Client, er
 	logger = logger.With().Str("component", "shmipc_ledger_client").Logger()
 
 	if bufferSize == 0 {
-		bufferSize = 1 << 30 // 1 GiB default
+		bufferSize = 2 << 30 // 2 GiB default (matches Docker shm_size)
 	}
-
-	// Configure shmipc session
-	config := shmipc.DefaultConfig()
-	config.ShareMemorySize = int(bufferSize)
-	config.Network = "unix" // Default to unix, can be "tcp" for TCP addresses
 
 	// Parse address to determine network type
 	var network string
@@ -53,16 +48,28 @@ func NewClient(addr string, logger zerolog.Logger, bufferSize uint) (*Client, er
 		address = addr
 	}
 
+	// Configure session manager
+	config := shmipc.DefaultSessionManagerConfig()
+	config.Address = address
 	config.Network = network
+	config.SessionNum = 1
+	config.InitializeTimeout = 30 * time.Second
+
+	// Configure shared memory buffer capacity (in bytes, uint32)
+	// Note: ShareMemoryBufferCap is per-session, so we set it based on bufferSize
+	if bufferSize > 1<<32-1 {
+		bufferSize = 1<<32 - 1 // Max uint32
+	}
+	config.ShareMemoryBufferCap = uint32(bufferSize)
 
 	// Retry connection with exponential backoff
-	var session *shmipc.Session
+	var sessionManager *shmipc.SessionManager
 	retryDelay := 100 * time.Millisecond
 	maxRetryDelay := 30 * time.Second
 
 	for {
 		var err error
-		session, err = shmipc.Dial(address, config)
+		sessionManager, err = shmipc.NewSessionManager(config)
 		if err == nil {
 			logger.Info().
 				Str("address", addr).
@@ -86,9 +93,9 @@ func NewClient(addr string, logger zerolog.Logger, bufferSize uint) (*Client, er
 	}
 
 	return &Client{
-		session: session,
-		logger:  logger,
-		ready:   make(chan struct{}),
+		sessionManager: sessionManager,
+		logger:         logger,
+		ready:          make(chan struct{}),
 	}, nil
 }
 
@@ -203,8 +210,8 @@ func (c *Client) Prove(ctx context.Context, state *ledgerpb.State, keys []*ledge
 
 // Close closes the transport connection.
 func (c *Client) Close() error {
-	if c.session != nil {
-		return c.session.Close()
+	if c.sessionManager != nil {
+		return c.sessionManager.Close()
 	}
 	return nil
 }
@@ -244,15 +251,21 @@ func (c *Client) Ready() <-chan struct{} {
 }
 
 // sendRequest sends a request and receives a response using shmipc-go.
-func (c *Client) sendRequest(ctx context.Context, msgType messageType, req interface{}) ([]byte, error) {
+func (c *Client) sendRequest(ctx context.Context, msgType messageType, req proto.Message) ([]byte, error) {
+	// Get stream from session manager
+	stream, err := c.sessionManager.GetStream()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get stream: %w", err)
+	}
+	defer c.sessionManager.PutBack(stream)
+
 	// Serialize request
 	reqData, err := proto.Marshal(req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal request: %w", err)
 	}
 
-	// Get stream for zero-copy communication
-	stream := c.session.GetStream()
+	// Get buffer writer for zero-copy communication
 	writer := stream.BufferWriter()
 
 	// Reserve space for message header (type + length) and data
@@ -260,9 +273,9 @@ func (c *Client) sendRequest(ctx context.Context, msgType messageType, req inter
 	totalSize := headerSize + len(reqData)
 
 	// Reserve space in shared memory buffer
-	buf := writer.Reserve(totalSize)
-	if len(buf) < totalSize {
-		return nil, fmt.Errorf("insufficient buffer space: need %d, got %d", totalSize, len(buf))
+	buf, err := writer.Reserve(totalSize)
+	if err != nil {
+		return nil, fmt.Errorf("failed to reserve buffer: %w", err)
 	}
 
 	// Write message header
@@ -273,38 +286,44 @@ func (c *Client) sendRequest(ctx context.Context, msgType messageType, req inter
 	copy(buf[5:], reqData)
 
 	// Flush to send (zero-copy)
-	if err := writer.Flush(); err != nil {
+	if err := stream.Flush(false); err != nil {
 		return nil, fmt.Errorf("failed to flush request: %w", err)
 	}
 
-	// Read response
+	// Read response header (5 bytes: 1 byte type + 4 bytes length)
 	reader := stream.BufferReader()
-	respBuf, err := reader.ReadBytes()
+	headerBuf, err := reader.ReadBytes(5)
 	if err != nil {
 		if err == io.EOF {
 			return nil, fmt.Errorf("connection closed")
 		}
-		return nil, fmt.Errorf("failed to read response: %w", err)
-	}
-
-	if len(respBuf) < 5 {
-		return nil, fmt.Errorf("invalid response: too short")
+		return nil, fmt.Errorf("failed to read response header: %w", err)
 	}
 
 	// Check for error response
-	respType := messageType(respBuf[0])
+	respType := messageType(headerBuf[0])
+	respLen := binary.BigEndian.Uint32(headerBuf[1:5])
+
 	if respType == msgTypeError {
-		errorMsg := string(respBuf[5:])
+		errorMsgBuf, err := reader.ReadBytes(int(respLen))
+		if err != nil {
+			return nil, fmt.Errorf("failed to read error message: %w", err)
+		}
+		errorMsg := string(errorMsgBuf)
+		reader.ReleasePreviousRead()
 		return nil, fmt.Errorf("server error: %s", errorMsg)
 	}
 
-	// Extract response data (skip header)
-	respLen := binary.BigEndian.Uint32(respBuf[1:5])
-	if len(respBuf) < 5+int(respLen) {
-		return nil, fmt.Errorf("invalid response: length mismatch")
+	// Read response data
+	respData, err := reader.ReadBytes(int(respLen))
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response data: %w", err)
 	}
 
-	return respBuf[5 : 5+respLen], nil
+	// Release the read buffer after we've copied the data
+	reader.ReleasePreviousRead()
+
+	return respData, nil
 }
 
 // messageType represents the type of message in the protocol.

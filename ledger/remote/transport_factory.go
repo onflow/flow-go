@@ -39,7 +39,7 @@ func NewTransportServer(
 	case transport.TransportTypeGRPC:
 		return grpc.NewServer(listener, logger, maxRequestSize, maxResponseSize), nil
 	case transport.TransportTypeShmipc:
-		return shmipctransport.NewServer(listener.Addr().String(), logger, bufferSize)
+		return shmipctransport.NewServer(listener, logger, bufferSize)
 	default:
 		return nil, fmt.Errorf("unknown transport type: %s", transportType)
 	}

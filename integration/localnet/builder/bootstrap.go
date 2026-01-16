@@ -201,16 +201,19 @@ func main() {
 
 	// Generate Flow network services docker-compose-nodes.yml
 	dockerServices := make(Services)
+	
+	// Only create ledger service if at least one execution node uses remote ledger
+	// IMPORTANT: Create ledger service BEFORE flow services to ensure it exists
+	// when execution nodes reference it for IPC namespace sharing
+	if ledgerExecutionCount > 0 {
+		dockerServices = prepareLedgerService(dockerServices, flowNodeContainerConfigs)
+	}
+	
 	dockerServices = prepareFlowServices(dockerServices, flowNodeContainerConfigs)
 	serviceDisc := prepareServiceDiscovery(flowNodeContainerConfigs)
 	err = writePrometheusConfig(serviceDisc)
 	if err != nil {
 		panic(err)
-	}
-
-	// Only create ledger service if at least one execution node uses remote ledger
-	if ledgerExecutionCount > 0 {
-		dockerServices = prepareLedgerService(dockerServices, flowNodeContainerConfigs)
 	}
 	dockerServices = prepareObserverServices(dockerServices, flowNodeContainerConfigs)
 	dockerServices = prepareTestExecutionService(dockerServices, flowNodeContainerConfigs)
@@ -294,7 +297,7 @@ type Services map[string]Service
 type Service struct {
 	Build       Build            `yaml:"build,omitempty"`
 	Image       string           `yaml:"image,omitempty"`
-	DependsOn   []string         `yaml:"depends_on,omitempty"`
+	DependsOn   interface{}      `yaml:"depends_on,omitempty"` // Can be []string or map[string]map[string]string for conditions
 	Command     []string         `yaml:"command,omitempty"`
 	Environment []string         `yaml:"environment,omitempty"`
 	Volumes     []string         `yaml:"volumes,omitempty"`
@@ -394,7 +397,11 @@ func prepareService(container testnet.ContainerConfig, i int, n int) Service {
 	if i == 0 {
 		// bring up access node before any other nodes
 		if container.Role == flow.RoleConsensus || container.Role == flow.RoleCollection {
-			service.DependsOn = append(service.DependsOn, "access_1")
+			if existingDepends, ok := service.DependsOn.([]string); ok {
+				service.DependsOn = append(existingDepends, "access_1")
+			} else {
+				service.DependsOn = []string{"access_1"}
+			}
 		}
 	}
 
@@ -475,24 +482,31 @@ func prepareExecutionService(container testnet.ContainerConfig, i int, n int) Se
 
 		// Configure transport type
 		if ledgerTransportType == "shmipc" {
-			// For shmipc-go, share IPC namespace with ledger service
-			service.IpcMode = "container:ledger_service_1"
+			// For shmipc-go, use host IPC namespace to share shared memory
+			// This avoids the "container doesn't exist" issue during creation
+			service.IpcMode = "host"
 			// Set shared memory size (2 GiB for large proofs)
 			service.ShmSize = "2g"
 			// Use shmipc transport with Unix socket for synchronization
 			service.Command = append(service.Command,
-				fmt.Sprintf("--ledger-service-socket=/sockets/ledger.sock"),
+				"--ledger-service-addr=unix:///sockets/ledger.sock",
 				"--ledger-transport=shmipc",
 			)
 		} else {
 			// Default to gRPC over Unix domain socket
 			service.Command = append(service.Command,
-				fmt.Sprintf("--ledger-service-socket=/sockets/ledger.sock"),
+				"--ledger-service-addr=unix:///sockets/ledger.sock",
 			)
 		}
 
 		// Execution node depends on ledger service
-		service.DependsOn = append(service.DependsOn, "ledger_service_1")
+		// For shmipc, we still need depends_on to ensure ledger service starts first
+		// (even though we're using host IPC, the service needs to be ready)
+		if existingDepends, ok := service.DependsOn.([]string); ok {
+			service.DependsOn = append(existingDepends, "ledger_service_1")
+		} else {
+			service.DependsOn = []string{"ledger_service_1"}
+		}
 		// Execution nodes using remote ledger should NOT mount the trie directory
 		// because the ledger service manages it
 	} else {
@@ -577,7 +591,11 @@ func prepareObserverService(i int, observerName string, agPublicKey string) Serv
 	)
 
 	// observer services rely on the access gateway
-	service.DependsOn = append(service.DependsOn, testnet.PrimaryAN)
+	if existingDepends, ok := service.DependsOn.([]string); ok {
+		service.DependsOn = append(existingDepends, testnet.PrimaryAN)
+	} else {
+		service.DependsOn = []string{testnet.PrimaryAN}
+	}
 
 	return service
 }
@@ -639,8 +657,11 @@ func defaultService(name, role, dataDir, profilerDir string, i int) Service {
 		}
 	} else {
 		// remaining services of this role must depend on first service
-		service.DependsOn = []string{
-			fmt.Sprintf("%s_1", role),
+		firstServiceName := fmt.Sprintf("%s_1", role)
+		if existingDepends, ok := service.DependsOn.([]string); ok && len(existingDepends) > 0 {
+			service.DependsOn = append(existingDepends, firstServiceName)
+		} else {
+			service.DependsOn = []string{firstServiceName}
 		}
 	}
 
@@ -905,12 +926,16 @@ func prepareLedgerService(dockerServices Services, flowNodeContainerConfigs []te
 
 	// Configure transport type
 	if ledgerTransportType == "shmipc" {
-		// For shmipc-go, make IPC namespace shareable
-		service.IpcMode = "shareable"
+		// For shmipc-go, use host IPC namespace to share shared memory
+		// This allows both ledger service and execution nodes to access the same IPC namespace
+		service.IpcMode = "host"
 		// Set shared memory size (2 GiB for large proofs)
 		service.ShmSize = "2g"
-		// Add transport flag to ledger service command
-		service.Command = append(service.Command, "--ledger-transport=shmipc")
+		// Add transport flag and buffer size to ledger service command
+		service.Command = append(service.Command,
+			"--ledger-transport=shmipc",
+			"--buffer-size=2147483648", // 2 GiB in bytes
+		)
 	}
 
 	// Build configuration for ledger service

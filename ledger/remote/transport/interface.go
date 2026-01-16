@@ -2,6 +2,7 @@ package transport
 
 import (
 	"context"
+	"fmt"
 
 	ledgerpb "github.com/onflow/flow-go/ledger/protobuf"
 )
@@ -64,3 +65,15 @@ const (
 	TransportTypeGRPC   TransportType = "grpc"
 	TransportTypeShmipc TransportType = "shmipc"
 )
+
+// NewTransportTypeFromString converts a string to TransportType.
+func NewTransportTypeFromString(s string) (TransportType, error) {
+	switch s {
+	case string(TransportTypeGRPC):
+		return TransportTypeGRPC, nil
+	case string(TransportTypeShmipc):
+		return TransportTypeShmipc, nil
+	default:
+		return "", fmt.Errorf("invalid transport type: %s", s)
+	}
+}

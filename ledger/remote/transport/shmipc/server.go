@@ -28,45 +28,26 @@ type Server struct {
 	once     sync.Once
 }
 
-// NewServer creates a new shmipc-go transport server.
-// addr can be a Unix domain socket path (e.g., "/tmp/ledger.sock") or TCP address (e.g., "0.0.0.0:9000").
+// NewServer creates a new shmipc-go transport server using the provided listener.
 // bufferSize specifies the shared memory buffer size in bytes (default: 1 GiB).
-func NewServer(addr string, logger zerolog.Logger, bufferSize uint) (*Server, error) {
+func NewServer(listener net.Listener, logger zerolog.Logger, bufferSize uint) (*Server, error) {
 	logger = logger.With().Str("component", "shmipc_ledger_server").Logger()
 
 	if bufferSize == 0 {
-		bufferSize = 1 << 30 // 1 GiB default
-	}
-
-	// Parse address to determine network type
-	var network string
-	var address string
-	if len(addr) > 7 && addr[:7] == "unix://" {
-		network = "unix"
-		address = addr[7:]
-	} else if len(addr) > 6 && addr[:6] == "tcp://" {
-		network = "tcp"
-		address = addr[6:]
-	} else {
-		// Default to unix if no prefix
-		network = "unix"
-		address = addr
-	}
-
-	// Create listener
-	listener, err := net.Listen(network, address)
-	if err != nil {
-		return nil, fmt.Errorf("failed to listen on %s: %w", addr, err)
+		bufferSize = 2 << 30 // 2 GiB default (matches Docker shm_size)
 	}
 
 	// Configure shmipc
 	config := shmipc.DefaultConfig()
-	config.ShareMemorySize = int(bufferSize)
-	config.Network = network
+	// Configure shared memory buffer capacity (in bytes, uint32)
+	if bufferSize > 1<<32-1 {
+		bufferSize = 1<<32 - 1 // Max uint32
+	}
+	config.ShareMemoryBufferCap = uint32(bufferSize)
 
 	logger.Info().
-		Str("address", addr).
-		Str("network", network).
+		Str("address", listener.Addr().String()).
+		Str("network", listener.Addr().Network()).
 		Uint("buffer_size", bufferSize).
 		Msg("shmipc server listening")
 
@@ -145,6 +126,7 @@ func (s *Server) handleConnection(conn net.Conn) {
 
 	s.logger.Debug().Msg("new shmipc client connected")
 
+	// Accept and handle streams from this session
 	for {
 		select {
 		case <-s.stopCh:
@@ -152,35 +134,55 @@ func (s *Server) handleConnection(conn net.Conn) {
 		default:
 		}
 
-		// Read request from shared memory
-		stream := session.GetStream()
-		reader := stream.BufferReader()
-
-		reqBuf, err := reader.ReadBytes()
+		stream, err := session.AcceptStream()
 		if err != nil {
-			if err == io.EOF {
-				s.logger.Debug().Msg("client disconnected")
-				return
-			}
-			s.logger.Error().Err(err).Msg("failed to read request")
+			s.logger.Debug().Err(err).Msg("failed to accept stream or connection closed")
 			return
 		}
 
-		if len(reqBuf) < 5 {
-			s.logger.Error().Int("len", len(reqBuf)).Msg("invalid request: too short")
-			continue
+		// Handle stream in goroutine
+		s.wg.Add(1)
+		go s.handleStream(stream)
+	}
+}
+
+// handleStream handles a single stream.
+func (s *Server) handleStream(stream *shmipc.Stream) {
+	defer s.wg.Done()
+
+	for {
+		select {
+		case <-s.stopCh:
+			return
+		default:
+		}
+
+		// Read request header from shared memory (5 bytes: 1 byte type + 4 bytes length)
+		reader := stream.BufferReader()
+
+		headerBuf, err := reader.ReadBytes(5)
+		if err != nil {
+			if err == io.EOF {
+				s.logger.Debug().Msg("stream closed")
+				return
+			}
+			s.logger.Error().Err(err).Msg("failed to read request header")
+			return
 		}
 
 		// Parse message header
-		msgType := messageType(reqBuf[0])
-		reqLen := binary.BigEndian.Uint32(reqBuf[1:5])
+		msgType := messageType(headerBuf[0])
+		reqLen := binary.BigEndian.Uint32(headerBuf[1:5])
 
-		if len(reqBuf) < 5+int(reqLen) {
-			s.logger.Error().Msg("invalid request: length mismatch")
-			continue
+		// Read request data
+		reqData, err := reader.ReadBytes(int(reqLen))
+		if err != nil {
+			s.logger.Error().Err(err).Msg("failed to read request data")
+			return
 		}
 
-		reqData := reqBuf[5 : 5+reqLen]
+		// Release the read buffer after we've processed the data
+		reader.ReleasePreviousRead()
 
 		// Handle request
 		respData, err := s.handleRequest(context.Background(), msgType, reqData)
@@ -290,9 +292,9 @@ func (s *Server) sendResponse(stream *shmipc.Stream, msgType messageType, respDa
 	headerSize := 1 + 4 // 1 byte for type, 4 bytes for length
 	totalSize := headerSize + len(respData)
 
-	buf := writer.Reserve(totalSize)
-	if len(buf) < totalSize {
-		return fmt.Errorf("insufficient buffer space: need %d, got %d", totalSize, len(buf))
+	buf, err := writer.Reserve(totalSize)
+	if err != nil {
+		return fmt.Errorf("failed to reserve buffer: %w", err)
 	}
 
 	// Write header
@@ -303,7 +305,7 @@ func (s *Server) sendResponse(stream *shmipc.Stream, msgType messageType, respDa
 	copy(buf[5:], respData)
 
 	// Flush (zero-copy)
-	return writer.Flush()
+	return stream.Flush(false)
 }
 
 // encodeError encodes an error message.

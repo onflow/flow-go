@@ -120,14 +120,16 @@ start-metrics:
 # Starts a version of localnet with just flow nodes and without metrics services.
 # This prevents port collision and consumption when these services are not needed.
 # All images are re-built prior to being started.
+# Note: Includes metrics compose file to avoid orphan container warnings, but metrics
+# services are started separately via start-metrics target.
 .PHONY: start-flow
 start-flow:
-	DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker compose -f docker-compose.nodes.yml up -d --build
+	DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker compose -f docker-compose.metrics.yml -f docker-compose.nodes.yml up -d --build --remove-orphans
 
 # Same as start-flow, but most recently built images are used.
 .PHONY: start-flow-cached
 start-flow-cached:
-	DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker compose -f docker-compose.nodes.yml up -d
+	DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker compose -f docker-compose.metrics.yml -f docker-compose.nodes.yml up -d --remove-orphans
 
 .PHONY: build-flow
 build-flow:
