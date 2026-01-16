@@ -233,7 +233,6 @@ func LoadBackgroundIndexerEngine(
 		provider := NewExecutionDataRegisterUpdatesProvider(
 			executionDataStore,
 			resultsReader,
-			headers,
 		)
 
 		// Create the background indexer

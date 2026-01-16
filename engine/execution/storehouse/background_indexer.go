@@ -15,7 +15,7 @@ import (
 
 // RegisterUpdatesProvider defines an interface to fetch register updates for a given block ID.
 type RegisterUpdatesProvider interface {
-	RegisterUpdatesByHeight(ctx context.Context, blockID flow.Identifier) (flow.RegisterEntries, bool, error)
+	RegisterUpdatesByBlockID(ctx context.Context, blockID flow.Identifier) (flow.RegisterEntries, bool, error)
 }
 
 const DefaultHeightsPerSecond = 0 // 0 means no rate limiting by default
@@ -53,14 +53,14 @@ func NewBackgroundIndexer(
 // and executed block, starting from the last indexed height up to the latest finalized and
 // executed height.
 func (b *BackgroundIndexer) IndexUpToLatestFinalizedAndExecutedHeight(ctx context.Context) error {
-	startHeight := b.registerStore.LastFinalizedAndExecutedHeight()
+	lastIndexedHeight := b.registerStore.LastFinalizedAndExecutedHeight()
 	latestFinalized, err := b.state.Final().Head()
 	if err != nil {
 		return fmt.Errorf("failed to get latest finalized height: %w", err)
 	}
 
 	b.log.Info().
-		Uint64("start_height", startHeight).
+		Uint64("last_indexed_height", lastIndexedHeight).
 		Uint64("latest_finalized_height", latestFinalized.Height).
 		Uint64("heights_per_second", b.heightsPerSecond).
 		Msg("indexing registers up to latest finalized and executed height")
@@ -72,7 +72,7 @@ func (b *BackgroundIndexer) IndexUpToLatestFinalizedAndExecutedHeight(ctx contex
 	}
 
 	// Loop through each unindexed finalized height, fetch register updates and store them
-	for h := startHeight + 1; h <= latestFinalized.Height; h++ {
+	for h := lastIndexedHeight + 1; h <= latestFinalized.Height; h++ {
 		// Check context cancellation before processing each height
 		select {
 		case <-ctx.Done():
@@ -86,7 +86,7 @@ func (b *BackgroundIndexer) IndexUpToLatestFinalizedAndExecutedHeight(ctx contex
 		}
 
 		// Get register entries for this height
-		registerEntries, executed, err := b.provider.RegisterUpdatesByHeight(ctx, header.ID())
+		registerEntries, executed, err := b.provider.RegisterUpdatesByBlockID(ctx, header.ID())
 		if err != nil {
 			return fmt.Errorf("failed to get register entries for height %d: %w", h, err)
 		}

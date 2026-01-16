@@ -22,7 +22,6 @@ var _ RegisterUpdatesProvider = (*ExecutionDataRegisterUpdatesProvider)(nil)
 func NewExecutionDataRegisterUpdatesProvider(
 	dataStore execution_data.ExecutionDataGetter,
 	results storage.ExecutionResultsReader,
-	headers storage.Headers,
 ) *ExecutionDataRegisterUpdatesProvider {
 	return &ExecutionDataRegisterUpdatesProvider{
 		dataStore: dataStore,
@@ -30,7 +29,7 @@ func NewExecutionDataRegisterUpdatesProvider(
 	}
 }
 
-func (p *ExecutionDataRegisterUpdatesProvider) RegisterUpdatesByHeight(ctx context.Context, blockID flow.Identifier) (flow.RegisterEntries, bool, error) {
+func (p *ExecutionDataRegisterUpdatesProvider) RegisterUpdatesByBlockID(ctx context.Context, blockID flow.Identifier) (flow.RegisterEntries, bool, error) {
 	result, err := p.results.ByBlockID(blockID)
 	if err != nil {
 		if errors.Is(err, storage.ErrNotFound) {
