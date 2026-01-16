@@ -31,10 +31,10 @@ type ExecutionDataResponse struct {
 
 // ExecutionDataBackend exposes read-only access to execution data.
 type ExecutionDataBackend struct {
-	log            zerolog.Logger
-	state          protocol.State
-	headers        storage.Headers
-	sporkRootBlock *flow.Block
+	log           zerolog.Logger
+	state         protocol.State
+	headers       storage.Headers
+	nodeRootBlock *flow.Header
 
 	subscriptionFactory  *subscription.SubscriptionHandler
 	executionDataTracker tracker.ExecutionDataTracker
@@ -51,13 +51,13 @@ func NewExecutionDataBackend(
 	executionDataTracker tracker.ExecutionDataTracker,
 	executionResultProvider optimistic_sync.ExecutionResultInfoProvider,
 	executionStateCache optimistic_sync.ExecutionStateCache,
-	sporkRootBlock *flow.Block,
+	nodeRootBlock *flow.Header,
 ) *ExecutionDataBackend {
 	return &ExecutionDataBackend{
 		log:                     log.With().Str("module", "execution_data_backend").Logger(),
 		state:                   state,
 		headers:                 headers,
-		sporkRootBlock:          sporkRootBlock,
+		nodeRootBlock:           nodeRootBlock,
 		subscriptionFactory:     subscriptionHandler,
 		executionDataTracker:    executionDataTracker,
 		executionResultProvider: executionResultProvider,
@@ -192,18 +192,15 @@ func (b *ExecutionDataBackend) SubscribeExecutionDataFromStartBlockID(
 	startBlockID flow.Identifier,
 	criteria optimistic_sync.Criteria,
 ) subscription.Subscription {
-	// check if the block header for the given block ID is available in the storage
-	header, err := b.headers.ByBlockID(startBlockID)
+	snapshot := b.state.AtBlockID(startBlockID)
+
+	// check if the block header for the given block is available in the storage
+	header, err := snapshot.Head()
 	if err != nil {
-		return subscription.NewFailedSubscription(err, "could not get header for block height")
+		return subscription.NewFailedSubscription(err, "could not get header for start block")
 	}
 
-	if header.Height < b.sporkRootBlock.Height {
-		return subscription.NewFailedSubscription(err, "block height is less than the spork root block")
-	}
-
-	availableExecutors, err :=
-		b.state.AtHeight(header.Height).Identities(filter.HasRole[flow.Identity](flow.RoleExecution))
+	availableExecutors, err := snapshot.Identities(filter.HasRole[flow.Identity](flow.RoleExecution))
 	if err != nil {
 		return subscription.NewFailedSubscription(err, "could not retrieve available executors")
 	}
@@ -240,19 +237,19 @@ func (b *ExecutionDataBackend) SubscribeExecutionDataFromStartBlockHeight(
 	startBlockHeight uint64,
 	criteria optimistic_sync.Criteria,
 ) subscription.Subscription {
-	if startBlockHeight < b.sporkRootBlock.Height {
-		return subscription.NewFailedSubscription(nil,
-			"start height must be greater than or equal to the spork root height")
+	if startBlockHeight < b.nodeRootBlock.Height {
+		return subscription.NewFailedSubscription(nil, "start height is below the node's range of available blocks.")
 	}
 
-	// check if the block header for the given height is available in the storage
-	header, err := b.headers.ByHeight(startBlockHeight)
+	snapshot := b.state.AtHeight(startBlockHeight)
+
+	// check if the block header for the given block is available in the storage
+	header, err := snapshot.Head()
 	if err != nil {
-		return subscription.NewFailedSubscription(err, "error getting block header by height")
+		return subscription.NewFailedSubscription(err, "could not get header for start block")
 	}
 
-	availableExecutors, err :=
-		b.state.AtHeight(header.Height).Identities(filter.HasRole[flow.Identity](flow.RoleExecution))
+	availableExecutors, err := snapshot.Identities(filter.HasRole[flow.Identity](flow.RoleExecution))
 	if err != nil {
 		return subscription.NewFailedSubscription(err, "could not retrieve available executors")
 	}
