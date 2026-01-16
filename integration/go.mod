@@ -89,10 +89,12 @@ require (
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/bits-and-blooms/bitset v1.24.4 // indirect
 	github.com/btcsuite/btcd/btcec/v2 v2.3.4 // indirect
+	github.com/bytedance/gopkg v0.0.0-20220817015305-b879a72dc90f // indirect
 	github.com/cenkalti/backoff/v4 v4.3.0 // indirect
 	github.com/cespare/xxhash v1.1.0 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/cloudflare/circl v1.3.3 // indirect
+	github.com/cloudwego/shmipc-go v0.2.0 // indirect
 	github.com/cncf/xds/go v0.0.0-20250501225837-2ac532fd4443 // indirect
 	github.com/cockroachdb/crlib v0.0.0-20241015224233-894974b3ad94 // indirect
 	github.com/cockroachdb/errors v1.11.3 // indirect
