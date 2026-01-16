@@ -16,6 +16,8 @@ import (
 
 // executionDataProvider connects subscription/streamer with backends.
 // It is intended to be used as a data provider for the subscription package.
+//
+// NOT CONCURRENCY SAFE! executionDataProvider is designed to be used by a single streamer goroutine.
 type executionDataProvider struct {
 	state                   protocol.State
 	headers                 storage.Headers
@@ -80,7 +82,7 @@ func (e *executionDataProvider) NextData(ctx context.Context) (any, error) {
 	if err != nil {
 		// this function is called after the headers are updated, so if we didn't find the block header in the storage,
 		// we treat it as an exception
-		return nil, fmt.Errorf("block %d might not be finalized yet: %w", e.height, err)
+		return nil, fmt.Errorf("could not find finalized block at height %d in storage: %w", e.height, err)
 	}
 
 	execResultInfo, err := e.executionResultProvider.ExecutionResultInfo(blockID, e.criteria)

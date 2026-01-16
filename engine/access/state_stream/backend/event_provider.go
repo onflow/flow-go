@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"time"
 
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/engine/access/subscription"
@@ -14,6 +13,10 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
+// eventProvider is responsible for managing event-related data and interactions within the protocol state.
+// It interacts with multiple components, such as protocol state, execution results, and event filters.
+//
+// NOT CONCURRENCY SAFE! eventProvider is designed to be used by a single streamer goroutine.
 type eventProvider struct {
 	state                   protocol.State
 	headers                 storage.Headers
@@ -50,14 +53,6 @@ func newEventProvider(
 var _ subscription.DataProvider = (*eventProvider)(nil)
 
 func (e *eventProvider) NextData(_ context.Context) (any, error) {
-	availableFinalizedHeight := e.executionDataTracker.GetHighestAvailableFinalizedHeight()
-	if e.height > availableFinalizedHeight {
-		// fail early if no notification has been received for the given block height.
-		// note: it's possible for the data to exist in the data store before the notification is
-		// received. this ensures a consistent view is available to all streams.
-		return nil, subscription.ErrBlockNotReady
-	}
-
 	// the spork root block will never have execution data available. If requested, return an empty result.
 	if e.height == e.state.Params().SporkRootBlockHeight() {
 		response := &EventsResponse{
@@ -73,7 +68,7 @@ func (e *eventProvider) NextData(_ context.Context) (any, error) {
 	if err != nil {
 		// this function is called after the headers are updated, so if we didn't find the block header in the storage,
 		// we treat it as an exception
-		return nil, fmt.Errorf("block %d might not be finalized yet: %w", e.height, err)
+		return nil, fmt.Errorf("could not find finalized block at height %d in storage: %w", e.height, err)
 	}
 
 	execResultInfo, err := e.executionResultProvider.ExecutionResultInfo(blockID, e.criteria)
@@ -102,10 +97,9 @@ func (e *eventProvider) NextData(_ context.Context) (any, error) {
 	}
 
 	response := &EventsResponse{
-		BlockID:        blockID,
-		Height:         e.height,
-		Events:         e.eventFilter.Filter(events),
-		BlockTimestamp: time.Time{}, // TODO: do we even set this?
+		BlockID: blockID,
+		Height:  e.height,
+		Events:  e.eventFilter.Filter(events),
 	}
 
 	// prepare criteria for the next call
