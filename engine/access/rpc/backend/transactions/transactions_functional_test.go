@@ -312,15 +312,9 @@ func (s *TransactionsFunctionalSuite) defaultTransactionsParams() Params {
 
 // TODO: this test helper should be refactored by removing .Maybe() mock calls, after all endpoints will be refactored to use fork-aware approach
 func (s *TransactionsFunctionalSuite) defaultExecutionNodeParams() Params {
-	blockID := s.tf.Block.ID()
-
 	connectionFactory := connectionmock.NewConnectionFactory(s.T())
 	connectionFactory.On("GetExecutionAPIClient", mock.Anything).Return(s.execClient, &mocks.MockCloser{}, nil).Once()
 	nodeCommunicator := node_communicator.NewNodeCommunicator(false)
-
-	stateParams := protocolmock.NewParams(s.T())
-	stateParams.On("FinalizedRoot").Return(s.rootBlock.ToHeader()).Maybe()
-	s.mockState.On("Params").Return(stateParams).Maybe()
 
 	params := s.defaultTransactionsParams()
 	params.TxProvider = provider.NewENTransactionProvider(
@@ -335,19 +329,25 @@ func (s *TransactionsFunctionalSuite) defaultExecutionNodeParams() Params {
 		s.g.ChainID(),
 	)
 
+	return params
+}
+
+func (s *TransactionsFunctionalSuite) defaultStateMocks(blockID flow.Identifier) {
+	stateParams := protocolmock.NewParams(s.T())
+	stateParams.On("FinalizedRoot").Return(s.rootBlock.ToHeader()).Once()
+	s.mockState.On("Params").Return(stateParams).Once()
+
 	snapshot := protocolmock.NewSnapshot(s.T())
 	snapshot.On("Identities", mock.Anything).Return(func(filter flow.IdentityFilter[flow.Identity]) (flow.IdentityList, error) {
 		return s.participants.Filter(filter), nil
-	}).Maybe()
-	s.mockState.On("AtBlockID", blockID).Return(snapshot).Maybe()
+	}).Once()
+	s.mockState.On("AtBlockID", blockID).Return(snapshot).Once()
 
 	finalizedSnapshot := protocolmock.NewSnapshot(s.T())
 	finalizedSnapshot.On("Identities", mock.Anything).Return(func(filter flow.IdentityFilter[flow.Identity]) (flow.IdentityList, error) {
 		return s.participants.Filter(filter), nil
-	}).Maybe()
-	s.mockState.On("Final").Return(finalizedSnapshot).Maybe()
-
-	return params
+	}).Once()
+	s.mockState.On("Final").Return(finalizedSnapshot).Once()
 }
 
 func eventsForTransaction(events flow.EventsList, txID flow.Identifier) flow.EventsList {
@@ -766,6 +766,7 @@ func (s *TransactionsFunctionalSuite) TestTransactionResultByIndex_ExecutionNode
 			"there are no available nodes",
 		)
 		s.setupExecutionGetEventsRequestFailed(blockID, pendingExecuteEventType, eventsExpectedErr)
+		s.defaultStateMocks(blockID)
 
 		params := s.defaultExecutionNodeParams()
 		txBackend, err := NewTransactionsBackend(params)
@@ -872,6 +873,7 @@ func (s *TransactionsFunctionalSuite) TestTransactionsByBlockID_ExecutionNode() 
 	s.execClient.
 		On("GetEventsForBlockIDs", mock.Anything, expectedRequest).
 		Return(nodeResponse, nil).Once()
+	s.defaultStateMocks(blockID)
 
 	params := s.defaultExecutionNodeParams()
 	txBackend, err := NewTransactionsBackend(params)
@@ -893,6 +895,7 @@ func (s *TransactionsFunctionalSuite) TestTransactionsByBlockID_ExecutionNode_Er
 			"there are no available nodes",
 		)
 		s.setupExecutionGetEventsRequestFailed(blockID, pendingExecuteEventType, eventsExpectedErr)
+		s.defaultStateMocks(blockID)
 
 		params := s.defaultExecutionNodeParams()
 		txBackend, err := NewTransactionsBackend(params)
@@ -922,6 +925,7 @@ func (s *TransactionsFunctionalSuite) TestScheduledTransactionsByBlockID_Executi
 		}
 	}
 	s.setupExecutionGetEventsRequest(blockID, pendingExecuteEventType, block.Height, events)
+	s.defaultStateMocks(blockID)
 
 	params := s.defaultExecutionNodeParams()
 	txBackend, err := NewTransactionsBackend(params)
@@ -951,6 +955,7 @@ func (s *TransactionsFunctionalSuite) TestScheduledTransactionsByBlockID_Executi
 			"there are no available nodes",
 		)
 		s.setupExecutionGetEventsRequestFailed(blockID, pendingExecuteEventType, eventsExpectedErr)
+		s.defaultStateMocks(blockID)
 
 		params := s.defaultExecutionNodeParams()
 		txBackend, err := NewTransactionsBackend(params)
