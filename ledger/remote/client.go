@@ -290,8 +290,9 @@ func (c *Client) Ready() <-chan struct{} {
 		// This ensures the service has finished WAL replay and is ready to serve requests
 		// Retry with exponential backoff for up to 30 seconds
 		ctx := context.Background()
-		maxRetries := 30
+		maxRetries := 100
 		retryDelay := 100 * time.Millisecond
+		maxRetryDelay := 30 * time.Second
 
 		for i := 0; i < maxRetries; i++ {
 			_, err := c.client.InitialState(ctx, &emptypb.Empty{})
@@ -307,7 +308,11 @@ func (c *Client) Ready() <-chan struct{} {
 					Dur("retry_delay", retryDelay).
 					Msg("ledger service not ready, retrying...")
 				time.Sleep(retryDelay)
-				retryDelay = time.Duration(float64(retryDelay) * 1.5) // exponential backoff
+				// Exponential backoff with max cap
+				retryDelay = time.Duration(float64(retryDelay) * 1.5)
+				if retryDelay > maxRetryDelay {
+					retryDelay = maxRetryDelay
+				}
 			} else {
 				c.logger.Warn().Err(err).Msg("ledger service not ready after retries, proceeding anyway")
 				// Still close the channel to avoid blocking forever
