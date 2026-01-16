@@ -81,6 +81,7 @@ var (
 	consensusDelay              time.Duration
 	collectionDelay             time.Duration
 	logLevel                    string
+	ledgerTransportType         string
 
 	ports *PortAllocator
 )
@@ -109,6 +110,7 @@ func init() {
 	flag.DurationVar(&collectionDelay, "collection-delay", DefaultCollectionDelay, "delay on collection node block proposals")
 	flag.StringVar(&logLevel, "loglevel", DefaultLogLevel, "log level for all nodes")
 	flag.IntVar(&ledgerExecutionCount, "ledger-execution", 0, "number of execution nodes that use remote ledger service (0 = all use local ledger, max = execution count)")
+	flag.StringVar(&ledgerTransportType, "ledger-transport", "grpc", "transport type for remote ledger service: 'grpc' or 'shmipc' (default: grpc)")
 }
 
 func generateBootstrapData(flowNetworkConf testnet.NetworkConfig) []testnet.ContainerConfig {
@@ -187,6 +189,11 @@ func main() {
 	}
 	if ledgerExecutionCount > executionCount {
 		panic(fmt.Sprintf("ledger-execution (%d) must not be greater than execution count (%d)", ledgerExecutionCount, executionCount))
+	}
+
+	// Validate transport type
+	if ledgerTransportType != "grpc" && ledgerTransportType != "shmipc" {
+		panic(fmt.Sprintf("ledger-transport must be 'grpc' or 'shmipc', got %s", ledgerTransportType))
 	}
 
 	// Generate the Flow network bootstrap files for this localnet
@@ -285,14 +292,16 @@ type Services map[string]Service
 
 // Service ...
 type Service struct {
-	Build       Build `yaml:"build,omitempty"`
-	Image       string
-	DependsOn   []string `yaml:"depends_on,omitempty"`
-	Command     []string
-	Environment []string `yaml:"environment,omitempty"`
-	Volumes     []string
-	Ports       []string `yaml:"ports,omitempty"`
-	Labels      map[string]string
+	Build       Build            `yaml:"build,omitempty"`
+	Image       string           `yaml:"image,omitempty"`
+	DependsOn   []string         `yaml:"depends_on,omitempty"`
+	Command     []string         `yaml:"command,omitempty"`
+	Environment []string         `yaml:"environment,omitempty"`
+	Volumes     []string         `yaml:"volumes,omitempty"`
+	Ports       []string         `yaml:"ports,omitempty"`
+	Labels      map[string]string `yaml:"labels,omitempty"`
+	IpcMode     string           `yaml:"ipc,omitempty"`     // IPC namespace mode (e.g., "host", "shareable", "container:name")
+	ShmSize     string           `yaml:"shm_size,omitempty"` // Shared memory size (e.g., "2g")
 
 	name string // don't export
 }
@@ -459,14 +468,29 @@ func prepareExecutionService(container testnet.ContainerConfig, i int, n int) Se
 
 	// Configure ledger service: execution nodes with index < ledgerExecutionCount use remote ledger
 	if i < ledgerExecutionCount {
-		// This execution node uses remote ledger service via Unix domain socket
 		// Mount shared socket directory for Unix domain socket communication
 		service.Volumes = append(service.Volumes,
 			fmt.Sprintf("%s:/sockets:z", SocketDir),
 		)
-		service.Command = append(service.Command,
-			fmt.Sprintf("--ledger-service-socket=/sockets/ledger.sock"),
-		)
+
+		// Configure transport type
+		if ledgerTransportType == "shmipc" {
+			// For shmipc-go, share IPC namespace with ledger service
+			service.IpcMode = "container:ledger_service_1"
+			// Set shared memory size (2 GiB for large proofs)
+			service.ShmSize = "2g"
+			// Use shmipc transport with Unix socket for synchronization
+			service.Command = append(service.Command,
+				fmt.Sprintf("--ledger-service-socket=/sockets/ledger.sock"),
+				"--ledger-transport=shmipc",
+			)
+		} else {
+			// Default to gRPC over Unix domain socket
+			service.Command = append(service.Command,
+				fmt.Sprintf("--ledger-service-socket=/sockets/ledger.sock"),
+			)
+		}
+
 		// Execution node depends on ledger service
 		service.DependsOn = append(service.DependsOn, "ledger_service_1")
 		// Execution nodes using remote ledger should NOT mount the trie directory
@@ -877,6 +901,16 @@ func prepareLedgerService(dockerServices Services, flowNodeContainerConfigs []te
 			"org.flowfoundation.role": "ledger",
 			"org.flowfoundation.num":  "001",
 		},
+	}
+
+	// Configure transport type
+	if ledgerTransportType == "shmipc" {
+		// For shmipc-go, make IPC namespace shareable
+		service.IpcMode = "shareable"
+		// Set shared memory size (2 GiB for large proofs)
+		service.ShmSize = "2g"
+		// Add transport flag to ledger service command
+		service.Command = append(service.Command, "--ledger-transport=shmipc")
 	}
 
 	// Build configuration for ledger service

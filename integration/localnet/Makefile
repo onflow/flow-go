@@ -5,6 +5,7 @@ EXECUTION = 2
 VALID_EXECUTION := $(shell test $(EXECUTION) -ge 2; echo $$?)
 LEDGER_EXECUTION = 0
 VALID_LEDGER_EXECUTION := $(shell test $(LEDGER_EXECUTION) -le $(EXECUTION); echo $$?)
+LEDGER_TRANSPORT = grpc
 TEST_EXECUTION = 0
 VERIFICATION = 1
 ACCESS = 1
@@ -79,7 +80,8 @@ else
 		-extensive-tracing=$(EXTENSIVE_TRACING) \
 		-consensus-delay=$(CONSENSUS_DELAY) \
 		-collection-delay=$(COLLECTION_DELAY) \
-		-ledger-execution=$(LEDGER_EXECUTION)
+		-ledger-execution=$(LEDGER_EXECUTION) \
+		-ledger-transport=$(LEDGER_TRANSPORT)
 endif
 
 # Creates a light version of the localnet with just 1 instance for each node type
