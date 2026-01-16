@@ -50,7 +50,9 @@ func TestLoadBackgroundIndexerEngine_StorehouseEnabled(t *testing.T) {
 	triedir := t.TempDir()
 	importCheckpointWorkerCount := 1
 	var importFunc storehouse.ImportRegistersFromCheckpoint = nil
-	var executionDataStore execution_data.ExecutionDataGetter = nil
+	// Set up execution data store (required when indexing is enabled)
+	bs := blobs.NewBlobstore(dssync.MutexWrap(datastore.NewMapDatastore()))
+	executionDataStore := execution_data.NewExecutionDataStore(bs, execution_data.DefaultSerializer)
 	resultsReader := storagemock.NewExecutionResults(t)
 	blockExecutedNotifier := ingestion.NewBlockExecutedNotifier()
 	followerDistributor := pubsub.NewFollowerDistributor()
@@ -75,8 +77,8 @@ func TestLoadBackgroundIndexerEngine_StorehouseEnabled(t *testing.T) {
 	)
 
 	require.NoError(t, err)
-	require.Nil(t, engine)
-	require.False(t, created)
+	require.NotNil(t, engine)
+	require.True(t, created)
 }
 
 // TestLoadBackgroundIndexerEngine_BackgroundIndexingDisabled tests that LoadBackgroundIndexerEngine returns nil when enableBackgroundStorehouseIndexing is false
