@@ -1073,8 +1073,6 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				node.Storage.Headers,
 				broadcaster,
 				highestAvailableHeight,
-				builder.EventsIndex,
-				useIndex,
 			)
 
 			builder.stateStreamBackend, err = statestreambackend.New(
@@ -1082,9 +1080,6 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				node.State,
 				node.Storage.Headers,
 				node.Storage.Seals,
-				node.Storage.Results,
-				builder.ExecutionDataStore,
-				notNil(builder.ExecutionDataCache),
 				builder.RegistersAsyncStore,
 				builder.EventsIndex,
 				useIndex,
@@ -1099,6 +1094,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				executionDataTracker,
 				notNil(builder.executionResultInfoProvider),
 				builder.executionStateCache, // might be nil
+				builder.State.Params().SealedRoot(),
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create state stream backend: %w", err)
@@ -1780,6 +1776,8 @@ func (builder *FlowAccessNodeBuilder) buildExecutionResultInfoProvider() *FlowAc
 			RequiredExecutors:      requiredENIdentifiers,
 		}
 
+		resolver := execution_result.NewSealingStatusResolver(node.Storage.Headers, node.State)
+
 		builder.executionResultInfoProvider = execution_result.NewExecutionResultInfoProvider(
 			node.Logger,
 			node.State,
@@ -1787,6 +1785,7 @@ func (builder *FlowAccessNodeBuilder) buildExecutionResultInfoProvider() *FlowAc
 			node.Storage.Headers,
 			execNodeSelector,
 			operatorCriteria,
+			resolver,
 		)
 
 		return nil

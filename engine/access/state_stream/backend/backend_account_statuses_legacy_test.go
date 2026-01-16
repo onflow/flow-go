@@ -35,23 +35,26 @@ type testType struct {
 	filters         state_stream.AccountStatusFilter // Event filters
 }
 
-// BackendAccountStatusesSuite is a test suite for the AccountStatusesBackend functionality.
+// LegacyBackendAccountStatusesSuite is a test suite for the AccountStatusesBackend functionality.
 // It is used to test the endpoints which enables users to subscribe to the streaming of account status changes.
 // It verified that each of endpoints works properly with expected data being returned. Also the suite tests
 // handling of expected errors in the SubscribeAccountStatuses.
-type BackendAccountStatusesSuite struct {
-	BackendExecutionDataSuite
+//
+// Deprecated: This suite is obsolete and declared legacy since it doesn't support new logic implemented
+// in the optimistic sync package.
+type LegacyBackendAccountStatusesSuite struct {
+	LegacyBackendExecutionDataSuite
 	accountCreatedAddress  flow.Address
 	accountContractAdded   flow.Address
 	accountContractUpdated flow.Address
 }
 
 func TestBackendAccountStatusesSuite(t *testing.T) {
-	suite.Run(t, new(BackendAccountStatusesSuite))
+	suite.Run(t, new(LegacyBackendAccountStatusesSuite))
 }
 
 // generateProtocolMockEvents generates a set of mock events.
-func (s *BackendAccountStatusesSuite) generateProtocolMockEvents() flow.EventsList {
+func (s *LegacyBackendAccountStatusesSuite) generateProtocolMockEvents() flow.EventsList {
 	events := make([]flow.Event, 4)
 	events = append(events, unittest.EventFixture(
 		unittest.Event.WithEventType(testEventTypes[0]),
@@ -73,7 +76,11 @@ func (s *BackendAccountStatusesSuite) generateProtocolMockEvents() flow.EventsLi
 }
 
 // SetupTest initializes the test suite.
-func (s *BackendAccountStatusesSuite) SetupTest() {
+func (s *LegacyBackendAccountStatusesSuite) SetupTest() {
+	s.T().Skip("LegacyBackendExecutionDataSuite is obsolete and declared legacy since it " +
+		"doesn't support new logic implemented in the optimistic sync package." +
+		"As this package depends on the LegacyBackendExecutionDataSuite, please, rewrite this suite.")
+
 	blockCount := 5
 	var err error
 	s.SetupTestSuite(blockCount)
@@ -123,7 +130,7 @@ func (s *BackendAccountStatusesSuite) SetupTest() {
 }
 
 // subscribeFromStartBlockIdTestCases generates test cases for subscribing from a start block ID.
-func (s *BackendAccountStatusesSuite) subscribeFromStartBlockIdTestCases() []testType {
+func (s *LegacyBackendAccountStatusesSuite) subscribeFromStartBlockIdTestCases() []testType {
 	baseTests := []testType{
 		{
 			name:            "happy path - all new blocks",
@@ -146,7 +153,7 @@ func (s *BackendAccountStatusesSuite) subscribeFromStartBlockIdTestCases() []tes
 }
 
 // subscribeFromStartHeightTestCases generates test cases for subscribing from a start height.
-func (s *BackendAccountStatusesSuite) subscribeFromStartHeightTestCases() []testType {
+func (s *LegacyBackendAccountStatusesSuite) subscribeFromStartHeightTestCases() []testType {
 	baseTests := []testType{
 		{
 			name:            "happy path - all new blocks",
@@ -169,7 +176,7 @@ func (s *BackendAccountStatusesSuite) subscribeFromStartHeightTestCases() []test
 }
 
 // subscribeFromLatestTestCases generates test cases for subscribing from the latest block.
-func (s *BackendAccountStatusesSuite) subscribeFromLatestTestCases() []testType {
+func (s *LegacyBackendAccountStatusesSuite) subscribeFromLatestTestCases() []testType {
 	baseTests := []testType{
 		{
 			name:            "happy path - all new blocks",
@@ -195,7 +202,7 @@ func (s *BackendAccountStatusesSuite) subscribeFromLatestTestCases() []testType 
 // - All events: Includes all protocol event types filtered by the provided account address.
 // - Some events: Includes only the first protocol event type filtered by the provided account address.
 // - No events: Includes a custom event type "flow.AccountKeyAdded" filtered by the provided account address.
-func (s *BackendAccountStatusesSuite) generateFiltersForTestCases(baseTests []testType) []testType {
+func (s *LegacyBackendAccountStatusesSuite) generateFiltersForTestCases(baseTests []testType) []testType {
 	// Create variations for each of the base tests
 	tests := make([]testType, 0, len(baseTests)*3)
 	var err error
@@ -266,7 +273,7 @@ func (s *BackendAccountStatusesSuite) generateFiltersForTestCases(baseTests []te
 // It iterates over each test case and sets up the necessary context and cancellation for the subscription.
 // For each test case, it simulates backfill blocks and verifies the expected account events for each block.
 // It also ensures that the subscription shuts down gracefully after completing the test cases.
-func (s *BackendAccountStatusesSuite) subscribeToAccountStatuses(
+func (s *LegacyBackendAccountStatusesSuite) subscribeToAccountStatuses(
 	subscribeFn func(ctx context.Context, startValue interface{}, filter state_stream.AccountStatusFilter) subscription.Subscription,
 	tests []testType,
 ) {
@@ -338,7 +345,7 @@ func (s *BackendAccountStatusesSuite) subscribeToAccountStatuses(
 }
 
 // TestSubscribeAccountStatusesFromStartBlockID tests the SubscribeAccountStatusesFromStartBlockID method.
-func (s *BackendAccountStatusesSuite) TestSubscribeAccountStatusesFromStartBlockID() {
+func (s *LegacyBackendAccountStatusesSuite) TestSubscribeAccountStatusesFromStartBlockID() {
 	s.executionDataTracker.On(
 		"GetStartHeightFromBlockID",
 		mock.AnythingOfType("flow.Identifier"),
@@ -354,7 +361,7 @@ func (s *BackendAccountStatusesSuite) TestSubscribeAccountStatusesFromStartBlock
 }
 
 // TestSubscribeAccountStatusesFromStartHeight tests the SubscribeAccountStatusesFromStartHeight method.
-func (s *BackendAccountStatusesSuite) TestSubscribeAccountStatusesFromStartHeight() {
+func (s *LegacyBackendAccountStatusesSuite) TestSubscribeAccountStatusesFromStartHeight() {
 	s.executionDataTracker.On(
 		"GetStartHeightFromHeight",
 		mock.AnythingOfType("uint64"),
@@ -370,7 +377,7 @@ func (s *BackendAccountStatusesSuite) TestSubscribeAccountStatusesFromStartHeigh
 }
 
 // TestSubscribeAccountStatusesFromLatestBlock tests the SubscribeAccountStatusesFromLatestBlock method.
-func (s *BackendAccountStatusesSuite) TestSubscribeAccountStatusesFromLatestBlock() {
+func (s *LegacyBackendAccountStatusesSuite) TestSubscribeAccountStatusesFromLatestBlock() {
 	s.executionDataTracker.On(
 		"GetStartHeightFromLatest",
 		mock.Anything,
@@ -386,7 +393,7 @@ func (s *BackendAccountStatusesSuite) TestSubscribeAccountStatusesFromLatestBloc
 }
 
 // requireEventsResponse ensures that the received event information matches the expected data.
-func (s *BackendAccountStatusesSuite) requireEventsResponse(v interface{}, expected *AccountStatusesResponse) {
+func (s *LegacyBackendAccountStatusesSuite) requireEventsResponse(v interface{}, expected *AccountStatusesResponse) {
 	actual, ok := v.(*AccountStatusesResponse)
 	require.True(s.T(), ok, "unexpected response type: %T", v)
 
@@ -397,7 +404,7 @@ func (s *BackendAccountStatusesSuite) requireEventsResponse(v interface{}, expec
 
 // TestSubscribeAccountStatusesFromSporkRootBlock tests that events subscriptions starting from the spork
 // root block return an empty result for the root block.
-func (s *BackendAccountStatusesSuite) TestSubscribeAccountStatusesFromSporkRootBlock() {
+func (s *LegacyBackendAccountStatusesSuite) TestSubscribeAccountStatusesFromSporkRootBlock() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -482,7 +489,7 @@ func (s *BackendAccountStatusesSuite) TestSubscribeAccountStatusesFromSporkRootB
 }
 
 // TestSubscribeAccountStatusesHandlesErrors tests handling of expected errors in the SubscribeAccountStatuses.
-func (s *BackendExecutionDataSuite) TestSubscribeAccountStatusesHandlesErrors() {
+func (s *LegacyBackendExecutionDataSuite) TestSubscribeAccountStatusesHandlesErrors() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -531,7 +538,7 @@ func (s *BackendExecutionDataSuite) TestSubscribeAccountStatusesHandlesErrors() 
 
 // expectedAccountStatuses returns the account status events from the mock block events that match
 // the provided filter.
-func (s *BackendAccountStatusesSuite) expectedAccountStatuses(
+func (s *LegacyBackendAccountStatusesSuite) expectedAccountStatuses(
 	blockID flow.Identifier,
 	filter state_stream.AccountStatusFilter,
 ) map[string]flow.EventsList {

@@ -30,7 +30,9 @@ func TestStream(t *testing.T) {
 	timeout := subscription.DefaultSendTimeout
 
 	sub := submock.NewStreamable(t)
-	sub.On("ID").Return(uuid.NewString())
+	sub.
+		On("ID").
+		Return(uuid.NewString())
 
 	tests := []testData{}
 	for i := 0; i < 4; i++ {
@@ -39,14 +41,52 @@ func TestStream(t *testing.T) {
 	tests = append(tests, testData{"", testErr})
 
 	broadcaster := engine.NewBroadcaster()
-	streamer := subscription.NewStreamer(unittest.Logger(), broadcaster, timeout, subscription.DefaultResponseLimit, sub)
+
+	// return test data sequentially by height. heights will start from 0 for this test
+	dataByHeight := map[uint64]testData{}
+	for i, d := range tests {
+		dataByHeight[uint64(i)] = d
+	}
+
+	nextHeight := uint64(0)
+	dataProvider := submock.NewDataProvider(t)
+	dataProvider.
+		On("NextData", mock.Anything).
+		Return(func(ctx context.Context) (interface{}, error) {
+			if td, ok := dataByHeight[nextHeight]; ok {
+				nextHeight++
+				if td.err != nil {
+					return nil, td.err
+				}
+
+				return td.data, nil
+			}
+
+			// default to block not ready once we run out of prepared data
+			return nil, subscription.ErrBlockNotReady
+		})
+
+	streamer := subscription.NewStreamer(
+		unittest.Logger(),
+		broadcaster,
+		timeout,
+		subscription.DefaultResponseLimit,
+		sub,
+		dataProvider,
+	)
 
 	for _, d := range tests {
-		sub.On("Next", mock.Anything).Return(d.data, d.err).Once()
 		if d.err == nil {
-			sub.On("Send", mock.Anything, d.data, timeout).Return(nil).Once()
+			sub.
+				On("Send", mock.Anything, d.data, timeout).
+				Return(nil).
+				Once()
 		} else {
-			mocked := sub.On("Fail", mock.Anything).Return().Once()
+			mocked := sub.
+				On("Fail", mock.Anything).
+				Return().
+				Once()
+
 			mocked.RunFn = func(args mock.Arguments) {
 				assert.ErrorIs(t, args.Get(0).(error), d.err)
 			}
@@ -70,18 +110,37 @@ func TestStreamRatelimited(t *testing.T) {
 	for _, limit := range []float64{0.2, 3, 20, 500} {
 		t.Run(fmt.Sprintf("responses are limited - %.1f rps", limit), func(t *testing.T) {
 			sub := submock.NewStreamable(t)
-			sub.On("ID").Return(uuid.NewString())
+			sub.
+				On("ID").
+				Return(uuid.NewString())
 
 			broadcaster := engine.NewBroadcaster()
-			streamer := subscription.NewStreamer(unittest.Logger(), broadcaster, timeout, limit, sub)
 
 			var nextCalls, sendCalls int
-			sub.On("Next", mock.Anything).Return("data", nil).Run(func(args mock.Arguments) {
-				nextCalls++
-			})
-			sub.On("Send", mock.Anything, "data", timeout).Return(nil).Run(func(args mock.Arguments) {
-				sendCalls++
-			})
+
+			dataProvider := submock.NewDataProvider(t)
+			dataProvider.
+				On("NextData", mock.Anything).
+				Return(func(ctx context.Context) (interface{}, error) {
+					nextCalls++
+					return "data", nil
+				})
+
+			streamer := subscription.NewStreamer(
+				unittest.Logger(),
+				broadcaster,
+				timeout,
+				limit,
+				sub,
+				dataProvider,
+			)
+
+			sub.
+				On("Send", mock.Anything, "data", timeout).
+				Return(nil).
+				Run(func(args mock.Arguments) {
+					sendCalls++
+				})
 
 			broadcaster.Publish()
 
@@ -121,18 +180,27 @@ func TestLongStreamRatelimited(t *testing.T) {
 	duration := 30 * time.Second
 
 	sub := submock.NewStreamable(t)
-	sub.On("ID").Return(uuid.NewString())
+	sub.
+		On("ID").
+		Return(uuid.NewString())
 
 	broadcaster := engine.NewBroadcaster()
-	streamer := subscription.NewStreamer(unittest.Logger(), broadcaster, timeout, limit, sub)
 
 	var nextCalls, sendCalls int
-	sub.On("Next", mock.Anything).Return("data", nil).Run(func(args mock.Arguments) {
+	getData := func(ctx context.Context, height uint64) (interface{}, error) {
 		nextCalls++
-	})
-	sub.On("Send", mock.Anything, "data", timeout).Return(nil).Run(func(args mock.Arguments) {
-		sendCalls++
-	})
+		return "data", nil
+	}
+
+	dataProvider := subscription.NewHeightByFuncProvider(0, getData)
+	streamer := subscription.NewStreamer(unittest.Logger(), broadcaster, timeout, limit, sub, dataProvider)
+
+	sub.
+		On("Send", mock.Anything, "data", timeout).
+		Return(nil).
+		Run(func(args mock.Arguments) {
+			sendCalls++
+		})
 
 	broadcaster.Publish()
 

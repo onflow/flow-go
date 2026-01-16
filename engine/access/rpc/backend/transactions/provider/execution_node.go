@@ -11,7 +11,6 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	"github.com/onflow/flow-go/engine/access/rpc/backend/common"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/node_communicator"
 	txstatus "github.com/onflow/flow-go/engine/access/rpc/backend/transactions/status"
 	"github.com/onflow/flow-go/engine/access/rpc/connection"
@@ -22,6 +21,7 @@ import (
 	accessmodel "github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/access/systemcollection"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
@@ -92,7 +92,7 @@ func (e *ENTransactionProvider) TransactionResult(
 	)
 	if err != nil {
 		// if no execution receipt were found, return a NotFound GRPC error
-		if common.IsInsufficientExecutionReceipts(err) {
+		if optimistic_sync.IsExecutionResultNotReadyError(err) {
 			return nil, status.Error(codes.NotFound, err.Error())
 		}
 		return nil, err
@@ -191,7 +191,7 @@ func (e *ENTransactionProvider) TransactionResultByIndex(
 		blockID,
 	)
 	if err != nil {
-		if common.IsInsufficientExecutionReceipts(err) {
+		if optimistic_sync.IsExecutionResultNotReadyError(err) {
 			return nil, status.Error(codes.NotFound, err.Error())
 		}
 		return nil, rpc.ConvertError(err, "failed to retrieve result from any execution node", codes.Internal)
@@ -248,7 +248,7 @@ func (e *ENTransactionProvider) TransactionResultsByBlockID(
 		blockID,
 	)
 	if err != nil {
-		if common.IsInsufficientExecutionReceipts(err) {
+		if optimistic_sync.IsExecutionResultNotReadyError(err) {
 			return nil, status.Error(codes.NotFound, err.Error())
 		}
 		return nil, rpc.ConvertError(err, "failed to retrieve result from any execution node", codes.Internal)
@@ -483,7 +483,7 @@ func (e *ENTransactionProvider) getBlockEvents(
 		blockID,
 	)
 	if err != nil {
-		if common.IsInsufficientExecutionReceipts(err) {
+		if optimistic_sync.IsExecutionResultNotReadyError(err) {
 			return nil, status.Error(codes.NotFound, err.Error())
 		}
 		return nil, rpc.ConvertError(err, "failed to retrieve result from any execution node", codes.Internal)

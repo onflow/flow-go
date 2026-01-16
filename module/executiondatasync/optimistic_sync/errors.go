@@ -7,6 +7,29 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
+// ErrBlockBeforeNodeHistory is returned when the requested block predates what the node has in storage
+// (for example, requesting the spork root block while the node was bootstrapped from a newer block).
+var ErrBlockBeforeNodeHistory = errors.New("requested block is before node history")
+
+type ErrExecutionResultNotReady struct {
+	reason string
+}
+
+func NewExecutionResultNotReadyError(reason string) *ErrExecutionResultNotReady {
+	return &ErrExecutionResultNotReady{
+		reason: reason,
+	}
+}
+
+func (e *ErrExecutionResultNotReady) Error() string {
+	return e.reason
+}
+
+func IsExecutionResultNotReadyError(err error) bool {
+	var notAvailableError *ErrExecutionResultNotReady
+	return errors.As(err, &notAvailableError)
+}
+
 // AgreeingExecutorsCountExceededError indicates that the requested number of agreeing executors
 // exceeds the total available execution nodes.
 type AgreeingExecutorsCountExceededError struct {
