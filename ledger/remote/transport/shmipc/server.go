@@ -48,8 +48,10 @@ func NewServer(listener net.Listener, logger zerolog.Logger, bufferSize uint) (*
 	logger.Info().
 		Str("address", listener.Addr().String()).
 		Str("network", listener.Addr().Network()).
-		Uint("buffer_size", bufferSize).
-		Msg("shmipc server listening")
+		Uint("buffer_size_bytes", bufferSize).
+		Uint32("buffer_size_configured", config.ShareMemoryBufferCap).
+		Str("buffer_size_mb", fmt.Sprintf("%.2f", float64(bufferSize)/(1024*1024))).
+		Msg("shmipc server listening with configured buffer size")
 
 	return &Server{
 		listener: listener,

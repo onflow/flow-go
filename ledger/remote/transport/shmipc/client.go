@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"strings"
 	"sync"
 	"time"
 
@@ -252,10 +253,39 @@ func (c *Client) Ready() <-chan struct{} {
 
 // sendRequest sends a request and receives a response using shmipc-go.
 func (c *Client) sendRequest(ctx context.Context, msgType messageType, req proto.Message) ([]byte, error) {
-	// Get stream from session manager
-	stream, err := c.sessionManager.GetStream()
-	if err != nil {
+	// Retry logic for unhealthy sessions (e.g., due to buffer exhaustion)
+	maxRetries := 3
+	retryDelay := 50 * time.Millisecond
+	
+	var stream *shmipc.Stream
+	var err error
+	for attempt := 0; attempt < maxRetries; attempt++ {
+		stream, err = c.sessionManager.GetStream()
+		if err == nil {
+			break
+		}
+		
+		// Check if error indicates unhealthy session
+		errStr := err.Error()
+		if strings.Contains(errStr, "unhealthy") || strings.Contains(errStr, "retry") {
+			if attempt < maxRetries-1 {
+				c.logger.Debug().
+					Err(err).
+					Int("attempt", attempt+1).
+					Dur("retry_delay", retryDelay).
+					Msg("session unhealthy, retrying...")
+				time.Sleep(retryDelay)
+				retryDelay = time.Duration(float64(retryDelay) * 1.5)
+				continue
+			}
+		}
+		
+		// For other errors or final attempt, return error
 		return nil, fmt.Errorf("failed to get stream: %w", err)
+	}
+	
+	if stream == nil {
+		return nil, fmt.Errorf("failed to get stream after %d attempts", maxRetries)
 	}
 	defer c.sessionManager.PutBack(stream)
 
