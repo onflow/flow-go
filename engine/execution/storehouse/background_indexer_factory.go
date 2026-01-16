@@ -166,7 +166,6 @@ func loadRegisterStore(
 // LoadBackgroundIndexerEngine creates and initializes a BackgroundIndexerEngine.
 func LoadBackgroundIndexerEngine(
 	log zerolog.Logger,
-	enableStorehouse bool,
 	enableBackgroundStorehouseIndexing bool,
 	state protocol.State,
 	headers storageerr.Headers,
@@ -185,13 +184,6 @@ func LoadBackgroundIndexerEngine(
 ) (*BackgroundIndexerEngine, bool, error) {
 
 	lg := log.With().Str("component", "background_indexer_loader").Logger()
-
-	// Only create background indexer engine if storehouse is not enabled
-	// and background indexing is enabled
-	if enableStorehouse {
-		lg.Info().Msg("background indexer engine disabled, since storehouse is enabled")
-		return nil, false, nil
-	}
 
 	if !enableBackgroundStorehouseIndexing {
 		lg.Info().Msg("background indexer engine disabled, since --enableBackgroundStorehouseIndexing==false")

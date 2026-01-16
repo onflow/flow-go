@@ -182,5 +182,9 @@ func (exeConf *ExecutionConfig) ValidateFlags() error {
 	if exeConf.rpcConf.MaxResponseMsgSize == 0 {
 		return errors.New("rpc-max-response-message-size must be greater than 0")
 	}
+	// Explicitly turn off background storehouse indexing when storehouse is enabled
+	if exeConf.enableStorehouse {
+		exeConf.enableBackgroundStorehouseIndexing = false
+	}
 	return nil
 }

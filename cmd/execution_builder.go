@@ -266,8 +266,12 @@ func (builder *ExecutionNodeBuilder) LoadComponentsAndModules() {
 		Component("collection requester engine", exeNode.LoadCollectionRequesterEngine).
 		Component("receipt provider engine", exeNode.LoadReceiptProviderEngine).
 		Component("synchronization engine", exeNode.LoadSynchronizationEngine).
-		Component("grpc server", exeNode.LoadGrpcServer).
-		Component("background indexer engine", exeNode.LoadBackgroundIndexerEngine)
+		Component("grpc server", exeNode.LoadGrpcServer)
+
+	// Only load background indexer engine when both flags indicate it should be enabled
+	if !exeNode.exeConf.enableStorehouse && exeNode.exeConf.enableBackgroundStorehouseIndexing {
+		builder.FlowNodeBuilder.Component("background indexer engine", exeNode.LoadBackgroundIndexerEngine)
+	}
 }
 
 func (exeNode *ExecutionNode) LoadCollections(node *NodeConfig) error {
@@ -367,7 +371,14 @@ func (exeNode *ExecutionNode) LoadFollowerDistributor(node *NodeConfig) error {
 }
 
 func (exeNode *ExecutionNode) LoadBlockExecutedNotifier(node *NodeConfig) error {
+	// background storehouse indexing is the only consumer of this notifier,
+	// only create the notifier when background storehouse indexing is enabled
+	if !exeNode.exeConf.enableBackgroundStorehouseIndexing {
+		return nil
+	}
+
 	exeNode.blockExecutedNotifier = ingestion.NewBlockExecutedNotifier()
+
 	return nil
 }
 
@@ -1362,7 +1373,6 @@ func (exeNode *ExecutionNode) LoadBackgroundIndexerEngine(
 ) {
 	engine, created, err := storehouse.LoadBackgroundIndexerEngine(
 		node.Logger,
-		exeNode.exeConf.enableStorehouse,
 		exeNode.exeConf.enableBackgroundStorehouseIndexing,
 		node.State,
 		node.Storage.Headers,
