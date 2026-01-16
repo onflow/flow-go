@@ -677,6 +677,14 @@ func (suite *Suite) TestGetTransactionResult_SystemTx() {
 	})
 
 	suite.Run("execution result info returns data not found", func() {
+		snapshot := protocolmock.NewSnapshot(suite.T())
+		snapshot.On("Head").Return(block.ToHeader(), nil)
+
+		suite.state.
+			On("AtBlockID", blockID).
+			Return(snapshot, nil).
+			Once()
+
 		suite.executionResultProvider.
 			On("ExecutionResultInfo", blockID, suite.criteria).
 			Return(nil, storage.ErrNotFound).
@@ -709,11 +717,6 @@ func (suite *Suite) TestGetTransactionResult_SystemTx() {
 		suite.state.
 			On("AtBlockID", blockID).
 			Return(snapshot, nil).
-			Once()
-
-		suite.executionResultProvider.
-			On("ExecutionResultInfo", blockID, suite.criteria).
-			Return(suite.executionResultInfo, nil).
 			Once()
 
 		params := suite.defaultTransactionsParams()
@@ -916,8 +919,7 @@ func (suite *Suite) TestGetTransactionResult_ScheduledTx() {
 
 		suite.executionResultProvider.
 			On("ExecutionResultInfo", blockID, suite.criteria).
-			Return(suite.executionResultInfo, nil).
-			Once()
+			Return(suite.executionResultInfo, nil)
 
 		provider := providermock.NewTransactionProvider(suite.T())
 		provider.
@@ -2406,11 +2408,6 @@ func (suite *Suite) TestGetScheduledTransactionResult() {
 		suite.state.
 			On("AtBlockID", blockID).
 			Return(snapshot, nil).
-			Once()
-
-		suite.executionResultProvider.
-			On("ExecutionResultInfo", blockID, optimistic_sync.DefaultCriteria).
-			Return(suite.executionResultInfo, nil).
 			Once()
 
 		params := suite.defaultTransactionsParams()
