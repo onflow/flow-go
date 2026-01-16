@@ -10,6 +10,7 @@ import (
 
 	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
+	clusterstate "github.com/onflow/flow-go/state/cluster"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/operation"
 	"github.com/onflow/flow-go/storage/operation/dbtest"
@@ -20,7 +21,7 @@ func TestClusterHeights(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		lockManager := storage.NewTestingLockManager()
 		var (
-			clusterID flow.ChainID = "cluster"
+			clusterID flow.ChainID = clusterstate.CanonicalClusterID(0, unittest.IdentifierListFixture(1))
 			height    uint64       = 42
 			expected               = unittest.IdentifierFixture()
 			err       error
@@ -80,7 +81,7 @@ func TestClusterHeights(t *testing.T) {
 			// First writing all three is important to detect bugs, where the logic ignores the cluster ID
 			// and only memorizes the latest block stored for a given height (irrespective of cluster ID).
 			clusterBlockIDs := unittest.IdentifierListFixture(3)
-			clusterIDs := []flow.ChainID{"cluster-0", "cluster-1", "cluster-2"}
+			clusterIDs := []flow.ChainID{"cluster-0-00", "cluster-1-ff", "cluster-2-02"}
 			var actual flow.Identifier
 			for i := 0; i < len(clusterBlockIDs); i++ {
 				err = operation.LookupClusterBlockHeight(db.Reader(), clusterIDs[i], height, &actual)
@@ -107,7 +108,7 @@ func Test_RetrieveClusterFinalizedHeight(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		lockManager := storage.NewTestingLockManager()
 		var (
-			clusterID flow.ChainID = "cluster"
+			clusterID flow.ChainID = clusterstate.CanonicalClusterID(0, unittest.IdentifierListFixture(1))
 			err       error
 		)
 
@@ -154,7 +155,7 @@ func Test_RetrieveClusterFinalizedHeight(t *testing.T) {
 			// First writing all three is important to detect bugs, where the logic ignores the cluster ID
 			// and only memorizes the last value stored (irrespective of cluster ID).
 			clusterFinalizedHeights := []uint64{117, 11, 791}
-			clusterIDs := []flow.ChainID{"cluster-0", "cluster-1", "cluster-2"}
+			clusterIDs := []flow.ChainID{"cluster-0-00", "cluster-1-ff", "cluster-2-02"}
 			var actual uint64
 			for i := 0; i < len(clusterFinalizedHeights); i++ {
 				err = operation.RetrieveClusterFinalizedHeight(db.Reader(), clusterIDs[i], &actual)

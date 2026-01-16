@@ -6,6 +6,7 @@ import (
 	"github.com/jordanschalm/lockctx"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/operation/dbtest"
@@ -18,7 +19,8 @@ func TestPayloadStoreRetrieve(t *testing.T) {
 		lockManager := storage.NewTestingLockManager()
 		metrics := metrics.NewNoopCollector()
 
-		all := store.InitAll(metrics, db)
+		all, err := store.InitAll(metrics, db, flow.Emulator)
+		require.NoError(t, err)
 		payloads := all.Payloads
 		blocks := all.Blocks
 
@@ -28,7 +30,7 @@ func TestPayloadStoreRetrieve(t *testing.T) {
 		require.Equal(t, expected, block.Payload)
 		blockID := block.ID()
 
-		err := unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
+		err = unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
 			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				return blocks.BatchStore(lctx, rw, proposal)
 			})

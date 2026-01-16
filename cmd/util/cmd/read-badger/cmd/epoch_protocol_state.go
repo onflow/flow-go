@@ -8,7 +8,9 @@ import (
 
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/storage/store"
 )
 
 func init() {
@@ -23,7 +25,11 @@ var epochProtocolStateCmd = &cobra.Command{
 	Short: "get epoch protocol state by block ID",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return common.WithStorage(flagDatadir, func(db storage.DB) error {
-			storages := common.InitStorages(db)
+			metrics := metrics.NewNoopCollector()
+			setups := store.NewEpochSetups(metrics, db)
+			epochCommits := store.NewEpochCommits(metrics, db)
+			epochProtocolStateEntries := store.NewEpochProtocolStateEntries(metrics, setups, epochCommits, db,
+				store.DefaultEpochProtocolStateCacheSize, store.DefaultProtocolStateIndexCacheSize)
 
 			log.Info().Msgf("got flag block id: %s", flagBlockID)
 			blockID, err := flow.HexStringToIdentifier(flagBlockID)
@@ -32,7 +38,7 @@ var epochProtocolStateCmd = &cobra.Command{
 			}
 
 			log.Info().Msgf("getting protocol state by block id: %v", blockID)
-			protocolState, err := storages.EpochProtocolStateEntries.ByBlockID(blockID)
+			protocolState, err := epochProtocolStateEntries.ByBlockID(blockID)
 			if err != nil {
 				return fmt.Errorf("could not get protocol state for block id: %v: %w", blockID, err)
 			}

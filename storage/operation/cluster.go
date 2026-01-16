@@ -215,8 +215,8 @@ func LookupClusterBlocksByReferenceHeightRange(lctx lockctx.Proof, r storage.Rea
 func InsertClusterBlock(lctx lockctx.Proof, rw storage.ReaderBatchWriter, proposal *cluster.Proposal) error {
 	// We need to enforce that each cluster block is inserted and indexed exactly once (no overwriting allowed):
 	//   1. We check that the lock [storage.LockInsertOrFinalizeClusterBlock] for cluster block insertion is held.
-	//   2. When calling `operation.InsertHeader`, we append the storage operations for inserting the header to the
-	//      provided write batch. Note that `operation.InsertHeader` checks whether the header already exists,
+	//   2. When calling `operation.InsertClusterHeader `, we append the storage operations for inserting the header to the
+	//      provided write batch. Note that `operation.InsertClusterHeader` checks whether the header already exists,
 	//      returning [storage.ErrAlreadyExists] if so.
 	//   3. We append all other storage indexing operations to the same write batch, without additional existence
 	//      checks. This is safe, because this is the only place where these indexes are created, and we always
@@ -224,7 +224,7 @@ func InsertClusterBlock(lctx lockctx.Proof, rw storage.ReaderBatchWriter, propos
 	//      that the header did not exist before, we also know that none of the other indexes existed before either
 	//   4. We require that the caller holds the lock until the write batch has been committed.
 	//      Thereby, we guarantee that no other thread can write data about the same block concurrently.
-	// When these constraints are met, we know that no overwrites occurred because `InsertHeader`
+	// When these constraints are met, we know that no overwrites occurred because `InsertClusterHeader`
 	// includes guarantees that the key `blockID` has not yet been used before.
 	if !lctx.HoldsLock(storage.LockInsertOrFinalizeClusterBlock) { // 1. check lock
 		return fmt.Errorf("missing required lock: %s", storage.LockInsertOrFinalizeClusterBlock)
@@ -234,7 +234,7 @@ func InsertClusterBlock(lctx lockctx.Proof, rw storage.ReaderBatchWriter, propos
 	// Hence, two different blocks having the same key is practically impossible.
 	blockID := proposal.Block.ID()
 	// 2. Store the block header; errors with [storage.ErrAlreadyExists] if some entry for `blockID` already exists
-	err := InsertHeader(lctx, rw, blockID, proposal.Block.ToHeader())
+	err := InsertClusterHeader(lctx, rw, blockID, proposal.Block.ToHeader())
 	if err != nil {
 		return fmt.Errorf("could not insert cluster block header: %w", err)
 	}

@@ -1186,8 +1186,45 @@ func (fnb *FlowNodeBuilder) initStorageLockManager() error {
 	return nil
 }
 
+// determineChainID attempts to determine the chain this node is running on
+// directly from the database or root snapshot, before storage interfaces have been initialized.
+// No errors expected during normal operation.
+func (fnb *FlowNodeBuilder) determineChainID() error {
+	bootstrapped, err := badgerState.IsBootstrapped(fnb.ProtocolDB)
+	if err != nil {
+		return err
+	}
+	if bootstrapped {
+		chainID, err := badgerState.GetChainID(fnb.ProtocolDB)
+		if err != nil {
+			return err
+		}
+		fnb.RootChainID = chainID
+	} else {
+		// if no root snapshot is configured, attempt to load the file from disk
+		var rootSnapshot = fnb.RootSnapshot
+		if rootSnapshot == nil {
+			fnb.Logger.Info().Msgf("loading root protocol state snapshot from disk")
+			rootSnapshot, err = loadRootProtocolSnapshot(fnb.BaseConfig.BootstrapDir)
+			if err != nil {
+				return fmt.Errorf("failed to read protocol snapshot from disk: %w", err)
+			}
+		}
+		// retrieve ChainID from the snapshot
+		sealingSegment, err := rootSnapshot.SealingSegment()
+		if err != nil {
+			return fmt.Errorf("failed to read ChainID from root snapshot: %w", err)
+		}
+		fnb.RootChainID = sealingSegment.Highest().ChainID
+	}
+	return nil
+}
+
 func (fnb *FlowNodeBuilder) initStorage() error {
-	headers := store.NewHeaders(fnb.Metrics.Cache, fnb.ProtocolDB)
+	headers, err := store.NewHeaders(fnb.Metrics.Cache, fnb.ProtocolDB, fnb.RootChainID)
+	if err != nil {
+		return err
+	}
 	guarantees := store.NewGuarantees(fnb.Metrics.Cache, fnb.ProtocolDB, fnb.BaseConfig.guaranteesCacheSize,
 		store.DefaultCacheSize)
 	seals := store.NewSeals(fnb.Metrics.Cache, fnb.ProtocolDB)
@@ -1457,7 +1494,6 @@ func (fnb *FlowNodeBuilder) setRootSnapshot(rootSnapshot protocol.Snapshot) erro
 		return fmt.Errorf("failed to read root QC: %w", err)
 	}
 
-	fnb.RootChainID = fnb.FinalizedRootBlock.ChainID
 	fnb.SporkID = fnb.RootSnapshot.Params().SporkID()
 
 	return nil
@@ -2081,14 +2117,18 @@ func (fnb *FlowNodeBuilder) onStart() error {
 		return err
 	}
 
-	if err := fnb.initStorage(); err != nil {
-		return err
-	}
-
 	for _, f := range fnb.preInitFns {
 		if err := fnb.handlePreInit(f); err != nil {
 			return err
 		}
+	}
+
+	if err := fnb.determineChainID(); err != nil {
+		return err
+	}
+
+	if err := fnb.initStorage(); err != nil {
+		return err
 	}
 
 	if err := fnb.initState(); err != nil {

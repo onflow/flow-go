@@ -5,6 +5,7 @@ import (
 
 	"github.com/rs/zerolog/log"
 
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage"
 	storagebadger "github.com/onflow/flow-go/storage/badger"
@@ -53,9 +54,14 @@ func IsPebbleFolder(dataDir string) (bool, error) {
 	return pebblestorage.IsPebbleFolder(dataDir)
 }
 
-func InitStorages(db storage.DB) *store.All {
+// InitStorages initializes the common storage abstractions used by all node roles (with default cache sizes
+// suitable for mainnet). However, no metrics are collected (if you need metrics, use [store.InitAll] directly).
+// The chain ID indicates which Flow network the node is operating, referencing the ID of the blockchain
+// build by the main consensus, i.e. security nodes (not the chains built by collector clusters).
+// No errors are expected during normal operations.
+func InitStorages(db storage.DB, chainID flow.ChainID) (*store.All, error) {
 	metrics := &metrics.NoopCollector{}
-	return store.InitAll(metrics, db)
+	return store.InitAll(metrics, db, chainID)
 }
 
 // WithStorage runs the given function with the storage depending on the flags.

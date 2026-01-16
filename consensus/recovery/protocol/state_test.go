@@ -46,7 +46,8 @@ func TestSaveBlockAsReplica(t *testing.T) {
 		require.NoError(t, err)
 
 		metrics := metrics.NewNoopCollector()
-		headers := store.NewHeaders(metrics, db)
+		headers, err := store.NewHeaders(metrics, db, flow.Emulator)
+		require.NoError(t, err)
 		finalized, pending, err := recovery.FindLatest(state, headers)
 		require.NoError(t, err)
 		require.Equal(t, b0.ID(), finalized.ID(), "recover find latest returns inconsistent finalized block")

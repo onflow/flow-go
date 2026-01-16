@@ -8,7 +8,9 @@ import (
 
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/storage/store"
 )
 
 var flagEpochCommitID string
@@ -25,7 +27,7 @@ var epochCommitCmd = &cobra.Command{
 	Short: "get epoch commit by ID",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return common.WithStorage(flagDatadir, func(db storage.DB) error {
-			storages := common.InitStorages(db)
+			epochCommits := store.NewEpochCommits(metrics.NewNoopCollector(), db)
 
 			log.Info().Msgf("got flag commit id: %s", flagEpochCommitID)
 			commitID, err := flow.HexStringToIdentifier(flagEpochCommitID)
@@ -34,7 +36,7 @@ var epochCommitCmd = &cobra.Command{
 			}
 
 			log.Info().Msgf("getting epoch commit by id: %v", commitID)
-			epochCommit, err := storages.EpochCommits.ByID(commitID)
+			epochCommit, err := epochCommits.ByID(commitID)
 			if err != nil {
 				return fmt.Errorf("could not get epoch commit with id: %v: %w", commitID, err)
 			}
