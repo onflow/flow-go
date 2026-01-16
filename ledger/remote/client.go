@@ -73,7 +73,7 @@ func NewClient(grpcAddr string, logger zerolog.Logger, maxRequestSize, maxRespon
 			break
 		}
 
-		logger.Debug().
+		logger.Warn().
 			Err(err).
 			Dur("retry_delay", retryDelay).
 			Str("address", grpcAddr).
