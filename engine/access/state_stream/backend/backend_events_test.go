@@ -62,16 +62,6 @@ func (s *BackendEventsSuite) SetupTest() {
 	s.eventFilters = append(s.eventFilters, filter)
 }
 
-// extractExpectedEvents extracts events from execution data and applies the filter.
-func (s *BackendEventsSuite) extractExpectedEvents(blockID flow.Identifier, filter state_stream.EventFilter) flow.EventsList {
-	events := s.blockIDToEventsMap[blockID]
-	if events == nil {
-		return nil
-	}
-
-	return filter.Filter(events)
-}
-
 // TestSubscribeEvents verifies that the subscription to events works correctly
 // starting from the spork root block ID. It ensures that the events are received
 // sequentially and matches the expected data after applying the event filter.
@@ -86,6 +76,10 @@ func (s *BackendEventsSuite) TestSubscribeEvents() {
 	s.state.
 		On("AtBlockID", mock.Anything).
 		Return(s.snapshot)
+
+	s.snapshot.
+		On("SealedResult").
+		Return(s.executionResults[0], nil, nil)
 
 	for _, eventFilter := range s.eventFilters {
 		backend := NewEventsBackend(
@@ -234,6 +228,10 @@ func (s *BackendEventsSuite) TestSubscribeEventsFromStartHeight() {
 		On("AtBlockID", mock.Anything).
 		Return(s.snapshot)
 
+	s.snapshot.
+		On("SealedResult").
+		Return(s.executionResults[0], nil, nil)
+
 	for _, eventFilter := range s.eventFilters {
 		backend := NewEventsBackend(
 			s.log,
@@ -302,6 +300,10 @@ func (s *BackendEventsSuite) TestSubscribeEventsFromStartID() {
 	s.state.
 		On("AtBlockID", mock.Anything).
 		Return(s.snapshot)
+
+	s.snapshot.
+		On("SealedResult").
+		Return(s.executionResults[0], nil, nil)
 
 	for _, eventFilter := range s.eventFilters {
 		backend := NewEventsBackend(
@@ -374,6 +376,7 @@ func (s *BackendEventsSuite) TestSubscribeEventsFromLatest() {
 
 	s.state.On("Sealed").Return(s.snapshot)
 	s.snapshot.On("Head").Return(s.blocks[0].ToHeader(), nil)
+	s.snapshot.On("SealedResult").Return(s.executionResults[0], nil, nil)
 
 	for _, eventFilter := range s.eventFilters {
 		ctx, cancel := context.WithCancel(context.Background())
@@ -448,4 +451,14 @@ func (s *BackendExecutionDataSuite) mockExecutionResultProviderStateForEvents() 
 	s.executionStateCache.
 		On("Snapshot", mock.Anything).
 		Return(s.executionDataSnapshot, nil)
+}
+
+// extractExpectedEvents extracts events from execution data and applies the filter.
+func (s *BackendEventsSuite) extractExpectedEvents(blockID flow.Identifier, filter state_stream.EventFilter) flow.EventsList {
+	events := s.blockIDToEventsMap[blockID]
+	if events == nil {
+		return nil
+	}
+
+	return filter.Filter(events)
 }
