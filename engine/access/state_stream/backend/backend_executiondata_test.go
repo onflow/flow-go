@@ -236,6 +236,11 @@ func (s *BackendExecutionDataSuite) TestSubscribeExecutionData() {
 		On("AtBlockID", mock.Anything).
 		Return(s.snapshot)
 
+	s.snapshot.
+		On("SealedResult").
+		Return(s.executionResults[0], nil, nil).
+		Once()
+
 	backend := NewExecutionDataBackend(
 		s.log,
 		s.state,
@@ -373,6 +378,11 @@ func (s *BackendExecutionDataSuite) TestSubscribeExecutionDataFromStartHeight() 
 		On("AtBlockID", mock.Anything).
 		Return(s.snapshot)
 
+	s.snapshot.
+		On("SealedResult").
+		Return(s.executionResults[0], nil, nil).
+		Once()
+
 	backend := NewExecutionDataBackend(
 		s.log,
 		s.state,
@@ -435,6 +445,11 @@ func (s *BackendExecutionDataSuite) TestSubscribeExecutionDataFromStartID() {
 	s.state.
 		On("AtBlockID", mock.Anything).
 		Return(s.snapshot)
+
+	s.snapshot.
+		On("SealedResult").
+		Return(s.executionResults[0], nil, nil).
+		Once()
 
 	backend := NewExecutionDataBackend(
 		s.log,
@@ -511,6 +526,11 @@ func (s *BackendExecutionDataSuite) TestSubscribeExecutionDataFromLatest() {
 	s.state.
 		On("AtBlockID", mock.Anything).
 		Return(s.snapshot)
+
+	s.snapshot.
+		On("SealedResult").
+		Return(s.executionResults[0], nil, nil).
+		Once()
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -898,6 +918,9 @@ func (s *BackendExecutionDataSuite) TestExecutionDataProviderErrors() {
 		},
 	}
 
+	s.mockSubscribeFuncState()
+	s.mockExecutionResultProviderState()
+
 	s.snapshot.
 		On("Head").
 		Return(s.nodeRootBlock, nil)
@@ -906,8 +929,9 @@ func (s *BackendExecutionDataSuite) TestExecutionDataProviderErrors() {
 		On("AtBlockID", mock.Anything).
 		Return(s.snapshot)
 
-	s.mockSubscribeFuncState()
-	s.mockExecutionResultProviderState()
+	s.snapshot.
+		On("SealedResult").
+		Return(s.executionResults[0], nil, nil)
 
 	backend := NewExecutionDataBackend(
 		s.log,
@@ -963,6 +987,10 @@ func (s *BackendExecutionDataSuite) TestExecutionResultNotReadyError() {
 		On("AtBlockID", mock.Anything).
 		Return(s.snapshot)
 
+	s.snapshot.
+		On("SealedResult").
+		Return(s.executionResults[0], nil, nil)
+
 	s.executionResultProviderMock.
 		On("ExecutionResultInfo", mock.Anything, mock.Anything).
 		Return(func(blockID flow.Identifier, criteria optimistic_sync.Criteria) (*optimistic_sync.ExecutionResultInfo, error) {
@@ -976,11 +1004,10 @@ func (s *BackendExecutionDataSuite) TestExecutionResultNotReadyError() {
 		}).
 		Once()
 
-	// called `len(s.blocks) - 1` times because we return the error for the first block
 	s.executionResultProviderMock.
 		On("ExecutionResultInfo", mock.Anything, mock.Anything).
 		Return(s.executionResultProvider.ExecutionResultInfo).
-		Times(len(s.blocks) - 1)
+		Times(len(s.blocks))
 
 	backend := NewExecutionDataBackend(
 		s.log,
@@ -1027,19 +1054,18 @@ func (s *BackendExecutionDataSuite) TestExecutionResultNotReadyError() {
 // mockSubscribeFuncState sets up mock expectations for Subscribe* functions that require access to the
 // execution state.
 func (s *BackendExecutionDataSuite) mockSubscribeFuncState() {
-	s.params.On("SporkRootBlockHeight").Return(s.sporkRootBlock.Height)
 	s.params.On("SporkRootBlock").Return(s.sporkRootBlock)
 	s.state.On("Params").Return(s.params)
 
-	s.receipts.
-		On("ByBlockID", mock.Anything).
-		Return(func(blockID flow.Identifier) (flow.ExecutionReceiptList, error) {
-			if blockID == s.sporkRootBlock.ID() {
-				return nil, errors.New("no execution receipts exist for spork root block")
-			}
-
-			return s.blockIDToReceiptsMap[blockID], nil
-		})
+	//s.receipts.
+	//	On("ByBlockID", mock.Anything).
+	//	Return(func(blockID flow.Identifier) (flow.ExecutionReceiptList, error) {
+	//		if blockID == s.sporkRootBlock.ID() {
+	//			return nil, errors.New("no execution receipts exist for spork root block")
+	//		}
+	//
+	//		return s.blockIDToReceiptsMap[blockID], nil
+	//	})
 
 	s.headers.
 		On("BlockIDByHeight", mock.Anything).

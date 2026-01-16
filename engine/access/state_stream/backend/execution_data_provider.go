@@ -65,19 +65,6 @@ func (e *executionDataProvider) NextData(ctx context.Context) (any, error) {
 		return nil, subscription.ErrBlockNotReady
 	}
 
-	// the spork root block will never have execution data available. If requested, return an empty result.
-	if e.height == e.state.Params().SporkRootBlockHeight() {
-		response := &ExecutionDataResponse{
-			Height: e.height,
-			ExecutionData: &execution_data.BlockExecutionData{
-				BlockID: e.state.Params().SporkRootBlock().ID(),
-			},
-		}
-
-		e.height += 1
-		return response, nil
-	}
-
 	blockID, err := e.headers.BlockIDByHeight(e.height)
 	if err != nil {
 		return nil, errors.Join(subscription.ErrBlockNotReady, err)
@@ -97,10 +84,26 @@ func (e *executionDataProvider) NextData(ctx context.Context) (any, error) {
 		}
 	}
 
-	executionResultID := execResultInfo.ExecutionResultID
-	snapshot, err := e.executionStateCache.Snapshot(executionResultID)
+	// the spork root block will never have execution data available. If requested, return an empty result.
+	sporkRootBlock := e.state.Params().SporkRootBlock()
+	if e.height == sporkRootBlock.Height {
+		response := &ExecutionDataResponse{
+			Height: e.height,
+			ExecutionData: &execution_data.BlockExecutionData{
+				BlockID: sporkRootBlock.ID(),
+			},
+		}
+
+		// prepare criteria for the next call
+		e.criteria.ParentExecutionResultID = execResultInfo.ExecutionResultID
+		e.height += 1
+
+		return response, nil
+	}
+
+	snapshot, err := e.executionStateCache.Snapshot(execResultInfo.ExecutionResultID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to find snapshot by execution result ID %s: %w", executionResultID.String(), err)
+		return nil, fmt.Errorf("failed to find snapshot by execution result ID %s: %w", execResultInfo.ExecutionResultID.String(), err)
 	}
 
 	executionData, err := snapshot.BlockExecutionData().ByBlockID(ctx, blockID)
@@ -112,13 +115,13 @@ func (e *executionDataProvider) NextData(ctx context.Context) (any, error) {
 		Height:        e.height,
 		ExecutionData: executionData.BlockExecutionData,
 		ExecutorMetadata: accessmodel.ExecutorMetadata{
-			ExecutionResultID: executionResultID,
+			ExecutionResultID: execResultInfo.ExecutionResultID,
 			ExecutorIDs:       execResultInfo.ExecutionNodes.NodeIDs(),
 		},
 	}
 
 	// prepare criteria for the next call
-	e.criteria.ParentExecutionResultID = executionResultID
+	e.criteria.ParentExecutionResultID = execResultInfo.ExecutionResultID
 	e.height += 1
 
 	return response, nil

@@ -53,17 +53,6 @@ func newEventProvider(
 var _ subscription.DataProvider = (*eventProvider)(nil)
 
 func (e *eventProvider) NextData(_ context.Context) (any, error) {
-	// the spork root block will never have execution data available. If requested, return an empty result.
-	if e.height == e.state.Params().SporkRootBlockHeight() {
-		response := &EventsResponse{
-			BlockID: e.state.Params().SporkRootBlock().ID(),
-			Height:  e.height,
-		}
-
-		e.height += 1
-		return response, nil
-	}
-
 	blockID, err := e.headers.BlockIDByHeight(e.height)
 	if err != nil {
 		return nil, errors.Join(subscription.ErrBlockNotReady, err)
@@ -83,13 +72,28 @@ func (e *eventProvider) NextData(_ context.Context) (any, error) {
 		}
 	}
 
-	executionResultID := execResultInfo.ExecutionResultID
-	snapshot, err := e.executionStateCache.Snapshot(executionResultID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to find snapshot by execution result ID %s: %w", executionResultID.String(), err)
+	// the spork root block will never have execution data available. If requested, return an empty result.
+	sporkRootBlock := e.state.Params().SporkRootBlock()
+	if e.height == sporkRootBlock.Height {
+		response := &EventsResponse{
+			BlockID: sporkRootBlock.ID(),
+			Height:  e.height,
+		}
+
+		// prepare criteria for the next call
+		e.criteria.ParentExecutionResultID = execResultInfo.ExecutionResultID
+		e.height += 1
+
+		return response, nil
 	}
 
-	events, err := snapshot.Events().ByBlockID(blockID)
+	executionStateSnapshot, err := e.executionStateCache.Snapshot(execResultInfo.ExecutionResultID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find execution state snapshot by execution result ID %s: %w",
+			execResultInfo.ExecutionResultID.String(), err)
+	}
+
+	events, err := executionStateSnapshot.Events().ByBlockID(blockID)
 	if err != nil {
 		return nil, fmt.Errorf("could not find events for block %s: %w", blockID, err)
 	}
@@ -101,7 +105,7 @@ func (e *eventProvider) NextData(_ context.Context) (any, error) {
 	}
 
 	// prepare criteria for the next call
-	e.criteria.ParentExecutionResultID = executionResultID
+	e.criteria.ParentExecutionResultID = execResultInfo.ExecutionResultID
 	e.height += 1
 
 	return response, nil

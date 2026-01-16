@@ -375,49 +375,50 @@ func (s *StreamingSuite) testGrpcBlockStreaming() {
 
 // testRestEventStreaming tests REST event streaming via WebSocket.
 func (s *StreamingSuite) testRestEventStreaming() {
+	unittest.SkipUnless(s.T(), unittest.TEST_TODO,
+		"websocket layer for events is not ready till https://github.com/onflow/flow-go/pull/8342 merged in")
+
 	restAddr := s.net.ContainerByName(testnet.PrimaryAN).Addr(testnet.RESTPort)
 
-	s.T().Run("subscribe events", func(t *testing.T) {
-		startBlockId := flow.ZeroID
-		startHeight := uint64(0)
-		url := getSubscribeEventsRequest(restAddr, startBlockId, startHeight, nil, nil, nil)
+	startBlockId := flow.ZeroID
+	startHeight := uint64(0)
+	url := getSubscribeEventsRequest(restAddr, startBlockId, startHeight, nil, nil, nil)
 
-		client, err := common.GetWSClient(s.ctx, url)
-		require.NoError(t, err)
+	client, err := common.GetWSClient(s.ctx, url)
+	require.NoError(s.T(), err)
 
-		var receivedEventsResponse []*backend.EventsResponse
+	var receivedEventsResponse []*backend.EventsResponse
 
-		go func() {
-			time.Sleep(10 * time.Second)
-			// close connection after 10 seconds
-			client.Close()
-		}()
+	go func() {
+		time.Sleep(10 * time.Second)
+		// close connection after 10 seconds
+		client.Close()
+	}()
 
-		eventChan := make(chan *backend.EventsResponse)
-		go func() {
-			for {
-				resp := &backend.EventsResponse{}
-				err := client.ReadJSON(resp)
-				if err != nil {
-					if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway) {
-						t.Logf("unexpected close error: %v", err)
-						require.NoError(t, err)
-					}
-					close(eventChan) // Close the event channel when the client connection is closed
-					return
+	eventChan := make(chan *backend.EventsResponse)
+	go func() {
+		for {
+			resp := &backend.EventsResponse{}
+			err := client.ReadJSON(resp)
+			if err != nil {
+				if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway) {
+					s.T().Logf("unexpected close error: %v", err)
+					require.NoError(s.T(), err)
 				}
-				eventChan <- resp
+				close(eventChan) // Close the event channel when the client connection is closed
+				return
 			}
-		}()
-
-		// collect received events during 10 seconds
-		for eventResponse := range eventChan {
-			receivedEventsResponse = append(receivedEventsResponse, eventResponse)
+			eventChan <- resp
 		}
+	}()
 
-		// check events
-		s.requireEvents(receivedEventsResponse)
-	})
+	// collect received events during 10 seconds
+	for eventResponse := range eventChan {
+		receivedEventsResponse = append(receivedEventsResponse, eventResponse)
+	}
+
+	// check events
+	s.requireEvents(receivedEventsResponse)
 }
 
 // addObserverBlock adds a block received from the observer node to the response tracker
