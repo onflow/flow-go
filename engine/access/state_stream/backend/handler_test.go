@@ -417,7 +417,7 @@ func TestEventStream(t *testing.T) {
 	) {
 		sub := subscription.NewSubscription(1)
 
-		api.On("SubscribeEvents", mock.Anything, flow.ZeroID, uint64(0), mock.Anything).Return(sub)
+		api.On("SubscribeEvents", mock.Anything, flow.ZeroID, uint64(0), mock.Anything, mock.Anything).Return(sub)
 
 		h := NewHandler(api, flow.Localnet.Chain(), makeConfig(1))
 

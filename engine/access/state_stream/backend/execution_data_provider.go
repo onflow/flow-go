@@ -108,9 +108,6 @@ func (e *executionDataProvider) NextData(ctx context.Context) (any, error) {
 		return nil, fmt.Errorf("could not find execution data for block %s: %w", blockID, err)
 	}
 
-	// update criteria for the next call
-	e.criteria.ParentExecutionResultID = executionResultID
-
 	response := &ExecutionDataResponse{
 		Height:        e.height,
 		ExecutionData: executionData.BlockExecutionData,
@@ -120,6 +117,9 @@ func (e *executionDataProvider) NextData(ctx context.Context) (any, error) {
 		},
 	}
 
+	// prepare criteria for the next call
+	e.criteria.ParentExecutionResultID = executionResultID
 	e.height += 1
+
 	return response, nil
 }

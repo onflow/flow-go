@@ -49,7 +49,8 @@ type BackendExecutionDataSuite struct {
 	// optimistic sync stuff
 	executionResultProviderMock *osyncmock.ExecutionResultInfoProvider
 	executionResultProvider     optimistic_sync.ExecutionResultInfoProvider
-	executionDataReader         *osyncmock.BlockExecutionDataReader
+	executionDataReader         *osyncmock.BlockExecutionDataReader // only for execution data
+	eventsReader                *storagemock.EventsReader           // only for events
 	executionStateCache         *osyncmock.ExecutionStateCache
 	executionDataSnapshot       *osyncmock.Snapshot
 	criteria                    optimistic_sync.Criteria
@@ -63,7 +64,8 @@ type BackendExecutionDataSuite struct {
 	blocksIDToBlockMap     map[flow.Identifier]*flow.Block
 
 	executionDataList         []*execution_data.BlockExecutionData
-	blockIDToExecutionDataMap map[flow.Identifier]*execution_data.BlockExecutionData
+	blockIDToExecutionDataMap map[flow.Identifier]*execution_data.BlockExecutionData // only for exec data suite
+	blockIDToEventsMap        map[flow.Identifier][]flow.Event                       // only for events suite
 
 	executionResults     []*flow.ExecutionResult
 	blockIDToReceiptsMap map[flow.Identifier]flow.ExecutionReceiptList
@@ -94,6 +96,7 @@ func (s *BackendExecutionDataSuite) SetupTest() {
 	s.blocksIDToBlockMap = make(map[flow.Identifier]*flow.Block)
 	s.executionDataList = make([]*execution_data.BlockExecutionData, len(s.blocks))
 	s.blockIDToExecutionDataMap = make(map[flow.Identifier]*execution_data.BlockExecutionData)
+	s.blockIDToEventsMap = make(map[flow.Identifier][]flow.Event)
 	s.executionResults = make([]*flow.ExecutionResult, len(s.blocks))
 	s.blockIDToReceiptsMap = make(map[flow.Identifier]flow.ExecutionReceiptList)
 
@@ -111,6 +114,13 @@ func (s *BackendExecutionDataSuite) SetupTest() {
 
 		s.executionDataList[i] = execData
 		s.blockIDToExecutionDataMap[block.ID()] = execData
+
+		var events flow.EventsList
+		for _, ed := range execData.ChunkExecutionDatas {
+			events = append(events, ed.Events...)
+		}
+
+		s.blockIDToEventsMap[block.ID()] = events
 	}
 
 	s.fixedExecutionNodes = unittest.IdentityListFixture(2, unittest.WithRole(flow.RoleExecution))
@@ -183,7 +193,7 @@ func (s *BackendExecutionDataSuite) SetupTest() {
 
 	// these are used in provider constructor
 	s.state.On("Params").Return(s.params).Once()
-	s.params.On("SporkRootBlock").Return(s.sporkRootBlock, nil).Once()
+	s.params.On("SporkRootBlock").Return(s.sporkRootBlock).Once()
 
 	resolver := execution_result.NewSealingStatusResolver(s.headers, s.state)
 	s.executionResultProvider = execution_result.NewExecutionResultInfoProvider(
@@ -198,6 +208,7 @@ func (s *BackendExecutionDataSuite) SetupTest() {
 
 	s.executionResultProviderMock = osyncmock.NewExecutionResultInfoProvider(s.T())
 	s.executionDataReader = osyncmock.NewBlockExecutionDataReader(s.T())
+	s.eventsReader = storagemock.NewEventsReader(s.T())
 	s.executionDataSnapshot = osyncmock.NewSnapshot(s.T())
 	s.executionStateCache = osyncmock.NewExecutionStateCache(s.T())
 	s.criteria = optimistic_sync.DefaultCriteria
@@ -208,6 +219,7 @@ func (s *BackendExecutionDataSuite) SetupTest() {
 // sequentially and matches the expected data.
 func (s *BackendExecutionDataSuite) TestSubscribeExecutionData() {
 	s.mockSubscribeFuncState()
+	s.mockExecutionResultProviderState()
 
 	currentHeight := s.nodeRootBlock.Height
 	s.state.
@@ -278,6 +290,7 @@ func (s *BackendExecutionDataSuite) TestSubscribeExecutionData() {
 // after the spork root and stream all remaining blocks.
 func (s *BackendExecutionDataSuite) TestSubscribeExecutionDataFromNonRoot() {
 	s.mockSubscribeFuncState()
+	s.mockExecutionResultProviderState()
 
 	// start from the block right after the spork root
 	startBlock := s.blocksHeightToBlockMap[s.nodeRootBlock.Height+1]
@@ -343,6 +356,7 @@ func (s *BackendExecutionDataSuite) TestSubscribeExecutionDataFromNonRoot() {
 // from the correct block.
 func (s *BackendExecutionDataSuite) TestSubscribeExecutionDataFromStartHeight() {
 	s.mockSubscribeFuncState()
+	s.mockExecutionResultProviderState()
 
 	currentHeight := s.nodeRootBlock.Height
 	s.state.
@@ -412,6 +426,7 @@ func (s *BackendExecutionDataSuite) TestSubscribeExecutionDataFromStartHeight() 
 // streaming proceeds.
 func (s *BackendExecutionDataSuite) TestSubscribeExecutionDataFromStartID() {
 	s.mockSubscribeFuncState()
+	s.mockExecutionResultProviderState()
 
 	s.snapshot.
 		On("Head").
@@ -475,6 +490,7 @@ func (s *BackendExecutionDataSuite) TestSubscribeExecutionDataFromStartID() {
 // streaming begins.
 func (s *BackendExecutionDataSuite) TestSubscribeExecutionDataFromLatest() {
 	s.mockSubscribeFuncState()
+	s.mockExecutionResultProviderState()
 
 	currentHeight := s.nodeRootBlock.Height
 	s.state.
@@ -645,7 +661,7 @@ func (s *BackendExecutionDataSuite) TestGetExecutionData_Errors() {
 
 		s.state.
 			On("AtBlockID", block.ID()).
-			Return(s.snapshot, nil).
+			Return(s.snapshot).
 			Twice()
 
 		s.snapshot.
@@ -684,7 +700,7 @@ func (s *BackendExecutionDataSuite) TestGetExecutionData_Errors() {
 
 		s.state.
 			On("AtBlockID", block.ID()).
-			Return(s.snapshot, nil).
+			Return(s.snapshot).
 			Twice()
 
 		s.snapshot.
@@ -726,7 +742,7 @@ func (s *BackendExecutionDataSuite) TestGetExecutionData_Errors() {
 
 		s.state.
 			On("AtBlockID", block.ID()).
-			Return(s.snapshot, nil).
+			Return(s.snapshot).
 			Twice()
 
 		s.snapshot.
@@ -773,7 +789,7 @@ func (s *BackendExecutionDataSuite) TestGetExecutionData_Errors() {
 
 		s.state.
 			On("AtBlockID", block.ID()).
-			Return(s.snapshot, nil).
+			Return(s.snapshot).
 			Twice()
 
 		s.snapshot.
@@ -891,6 +907,7 @@ func (s *BackendExecutionDataSuite) TestExecutionDataProviderErrors() {
 		Return(s.snapshot)
 
 	s.mockSubscribeFuncState()
+	s.mockExecutionResultProviderState()
 
 	backend := NewExecutionDataBackend(
 		s.log,
@@ -936,6 +953,7 @@ func (s *BackendExecutionDataSuite) TestExecutionDataProviderErrors() {
 // until the context is canceled.
 func (s *BackendExecutionDataSuite) TestExecutionResultNotReadyError() {
 	s.mockSubscribeFuncState()
+	s.mockExecutionResultProviderState()
 
 	s.snapshot.
 		On("Head").
@@ -1009,8 +1027,8 @@ func (s *BackendExecutionDataSuite) TestExecutionResultNotReadyError() {
 // mockSubscribeFuncState sets up mock expectations for Subscribe* functions that require access to the
 // execution state.
 func (s *BackendExecutionDataSuite) mockSubscribeFuncState() {
-	s.params.On("SporkRootBlockHeight").Return(s.sporkRootBlock.Height, nil)
-	s.params.On("SporkRootBlock").Return(s.sporkRootBlock, nil)
+	s.params.On("SporkRootBlockHeight").Return(s.sporkRootBlock.Height)
+	s.params.On("SporkRootBlock").Return(s.sporkRootBlock)
 	s.state.On("Params").Return(s.params)
 
 	s.receipts.
@@ -1032,8 +1050,6 @@ func (s *BackendExecutionDataSuite) mockSubscribeFuncState() {
 			}
 			return block.ID(), nil
 		})
-
-	s.mockExecutionResultProviderState()
 }
 
 // mockExecutionResultProviderState sets up mock expectations for the code that calls the execution result provider.
