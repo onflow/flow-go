@@ -12,6 +12,7 @@ type PersisterStore interface {
 	// The caller must acquire [storage.LockGroupAccessOptimisticSyncBlockPersist] and hold it until the database
 	// write has been committed.
 	//
-	// No error returns are expected during normal operations
+	// Expected error returns during normal operations:
+	//   - [storage.ErrAlreadyExists] if data for the block already exists.
 	Persist(lctx lockctx.Proof, batch storage.ReaderBatchWriter) error
 }
