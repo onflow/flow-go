@@ -12,17 +12,17 @@ type ReusableCadenceRuntimePool struct {
 	mock.Mock
 }
 
-// Borrow provides a mock function with given fields: fvmEnv
-func (_m *ReusableCadenceRuntimePool) Borrow(fvmEnv environment.Environment) environment.ReusableCadenceRuntime {
-	ret := _m.Called(fvmEnv)
+// Borrow provides a mock function with given fields: fvmEnv, runtimeType
+func (_m *ReusableCadenceRuntimePool) Borrow(fvmEnv environment.Environment, runtimeType environment.CadenceRuntimeType) environment.ReusableCadenceRuntime {
+	ret := _m.Called(fvmEnv, runtimeType)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Borrow")
 	}
 
 	var r0 environment.ReusableCadenceRuntime
-	if rf, ok := ret.Get(0).(func(environment.Environment) environment.ReusableCadenceRuntime); ok {
-		r0 = rf(fvmEnv)
+	if rf, ok := ret.Get(0).(func(environment.Environment, environment.CadenceRuntimeType) environment.ReusableCadenceRuntime); ok {
+		r0 = rf(fvmEnv, runtimeType)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(environment.ReusableCadenceRuntime)

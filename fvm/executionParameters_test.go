@@ -32,13 +32,15 @@ func TestGetExecutionMemoryWeights(t *testing.T) {
 	) (cadence.Value, error)) environment.Environment {
 		envMock := &fvmmock.Environment{}
 		envMock.On("BorrowCadenceRuntime", mock.Anything).Return(
-			reusableRuntime.NewReusableCadenceRuntime(
-				&testutil.TestRuntime{
-					ReadStoredFunc: readStored,
-				},
-				flow.Mainnet.Chain(),
-				runtime.Config{},
-			),
+			reusableRuntime.ReusableCadenceTransactionRuntime{
+				ReusableCadenceRuntime: reusableRuntime.NewReusableCadenceRuntime(
+					&testutil.TestRuntime{
+						ReadStoredFunc: readStored,
+					},
+					flow.Mainnet.Chain(),
+					runtime.Config{},
+				),
+			},
 		)
 		envMock.On("ReturnCadenceRuntime", mock.Anything).Return()
 		return envMock
@@ -163,13 +165,15 @@ func TestGetExecutionEffortWeights(t *testing.T) {
 	) (cadence.Value, error)) environment.Environment {
 		envMock := &fvmmock.Environment{}
 		envMock.On("BorrowCadenceRuntime", mock.Anything).Return(
-			reusableRuntime.NewReusableCadenceRuntime(
-				&testutil.TestRuntime{
-					ReadStoredFunc: readStored,
-				},
-				flow.Mainnet.Chain(),
-				runtime.Config{},
-			),
+			reusableRuntime.ReusableCadenceTransactionRuntime{
+				ReusableCadenceRuntime: reusableRuntime.NewReusableCadenceRuntime(
+					&testutil.TestRuntime{
+						ReadStoredFunc: readStored,
+					},
+					flow.Mainnet.Chain(),
+					runtime.Config{},
+				),
+			},
 		)
 		envMock.On("ReturnCadenceRuntime", mock.Anything).Return()
 		return envMock
