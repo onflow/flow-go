@@ -257,6 +257,38 @@ func (suite *Suite) TestInvalidTransaction() {
 			suite.Assert().Error(err)
 			suite.Assert().True(errors.As(err, &validator.DuplicatedSignatureError{}))
 		})
+
+		suite.Run("unrelated signature (envelope only)", func() {
+			tx := unittest.TransactionBodyFixture()
+			tx.ReferenceBlockID = suite.root.ID()
+			tx.Payer = signer
+			tx.ProposalKey.Address = signer
+			tx.Authorizers = []flow.Address{signer}
+
+			unrelatedSig := unittest.TransactionSignatureFixture()
+			unrelatedSig.Address = unittest.RandomAddressFixture() // unrelated address
+			tx.EnvelopeSignatures = []flow.TransactionSignature{sig1, unrelatedSig}
+
+			err := suite.engine.ProcessTransaction(&tx)
+			suite.Assert().Error(err)
+			suite.Assert().True(errors.As(err, &validator.UnrelatedAccountSignatureError{}))
+		})
+
+		suite.Run("unrelated signature (payload only)", func() {
+			tx := unittest.TransactionBodyFixture()
+			tx.ReferenceBlockID = suite.root.ID()
+			tx.Payer = signer
+			tx.ProposalKey.Address = signer
+			tx.Authorizers = []flow.Address{signer}
+
+			unrelatedSig := unittest.TransactionSignatureFixture()
+			unrelatedSig.Address = unittest.RandomAddressFixture() // unrelated address
+			tx.PayloadSignatures = []flow.TransactionSignature{sig1, unrelatedSig}
+
+			err := suite.engine.ProcessTransaction(&tx)
+			suite.Assert().Error(err)
+			suite.Assert().True(errors.As(err, &validator.UnrelatedAccountSignatureError{}))
+		})
 	})
 
 	suite.Run("invalid signature", func() {
