@@ -66,9 +66,7 @@ func (e *eventProvider) NextData(_ context.Context) (any, error) {
 
 	blockID, err := e.headers.BlockIDByHeight(e.height)
 	if err != nil {
-		// this function is called after the headers are updated, so if we didn't find the block header in the storage,
-		// we treat it as an exception
-		return nil, fmt.Errorf("could not find finalized block at height %d in storage: %w", e.height, err)
+		return nil, errors.Join(subscription.ErrBlockNotReady, err)
 	}
 
 	execResultInfo, err := e.executionResultProvider.ExecutionResultInfo(blockID, e.criteria)
