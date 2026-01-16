@@ -10,7 +10,7 @@ import (
 type CadenceRuntimeConstructor func(config runtime.Config) runtime.Runtime
 
 type ReusableCadenceRuntimePool struct {
-	pool chan environment.ReusableCadenceRuntime
+	pool chan *ReusableCadenceRuntime
 
 	runtimeConfig runtime.Config
 
@@ -36,9 +36,9 @@ func newReusableCadenceRuntimePool(
 	config runtime.Config,
 	newCustomRuntime CadenceRuntimeConstructor,
 ) ReusableCadenceRuntimePool {
-	var pool chan environment.ReusableCadenceRuntime
+	var pool chan *ReusableCadenceRuntime
 	if poolSize > 0 {
-		pool = make(chan environment.ReusableCadenceRuntime, poolSize)
+		pool = make(chan *ReusableCadenceRuntime, poolSize)
 	}
 
 	return ReusableCadenceRuntimePool{
@@ -85,8 +85,9 @@ func (pool ReusableCadenceRuntimePool) newRuntime() runtime.Runtime {
 
 func (pool ReusableCadenceRuntimePool) Borrow(
 	fvmEnv environment.Environment,
+	runtimeType environment.CadenceRuntimeType,
 ) environment.ReusableCadenceRuntime {
-	var reusable environment.ReusableCadenceRuntime
+	var reusable *ReusableCadenceRuntime
 	select {
 	case reusable = <-pool.pool:
 		// Do nothing.
@@ -101,15 +102,38 @@ func (pool ReusableCadenceRuntimePool) Borrow(
 	}
 
 	reusable.SetFvmEnvironment(fvmEnv)
-	return reusable
+
+	switch runtimeType {
+	case environment.CadenceScriptRuntime:
+		return ReusableCadenceScriptRuntime{
+			ReusableCadenceRuntime: reusable,
+		}
+	case environment.CadenceTransactionRuntime:
+		return ReusableCadenceTransactionRuntime{
+			ReusableCadenceRuntime: reusable,
+		}
+	default:
+		panic("unreachable")
+
+	}
 }
 
 func (pool ReusableCadenceRuntimePool) Return(
 	reusable environment.ReusableCadenceRuntime,
 ) {
-	reusable.SetFvmEnvironment(nil)
+	var inner *ReusableCadenceRuntime
+	switch v := reusable.(type) {
+	case ReusableCadenceScriptRuntime:
+		inner = v.ReusableCadenceRuntime
+	case ReusableCadenceTransactionRuntime:
+		inner = v.ReusableCadenceRuntime
+	default:
+		panic("unreachable")
+	}
+	inner.SetFvmEnvironment(nil)
+
 	select {
-	case pool.pool <- reusable:
+	case pool.pool <- inner:
 		// Do nothing.
 	default:
 		// Do nothing.  Discard the overflow entry.
