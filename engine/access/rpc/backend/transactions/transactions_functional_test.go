@@ -310,7 +310,6 @@ func (s *TransactionsFunctionalSuite) defaultTransactionsParams() Params {
 	}
 }
 
-// TODO: this test helper should be refactored by removing .Maybe() mock calls, after all endpoints will be refactored to use fork-aware approach
 func (s *TransactionsFunctionalSuite) defaultExecutionNodeParams() Params {
 	connectionFactory := connectionmock.NewConnectionFactory(s.T())
 	connectionFactory.On("GetExecutionAPIClient", mock.Anything).Return(s.execClient, &mocks.MockCloser{}, nil).Once()
