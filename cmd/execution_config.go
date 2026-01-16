@@ -78,6 +78,10 @@ type ExecutionConfig struct {
 	pruningConfigBatchSize           uint
 	pruningConfigSleepAfterCommit    time.Duration
 	pruningConfigSleepAfterIteration time.Duration
+
+	ledgerServiceAddr     string // gRPC address for remote ledger service (empty means use local ledger)
+	ledgerMaxRequestSize  uint   // Maximum request message size in bytes for remote ledger client (0 = default 1 GiB)
+	ledgerMaxResponseSize uint   // Maximum response message size in bytes for remote ledger client (0 = default 1 GiB)
 }
 
 func (exeConf *ExecutionConfig) SetupFlags(flags *pflag.FlagSet) {
@@ -155,6 +159,9 @@ func (exeConf *ExecutionConfig) SetupFlags(flags *pflag.FlagSet) {
 	flags.UintVar(&exeConf.pruningConfigBatchSize, "pruning-config-batch-size", exepruner.DefaultConfig.BatchSize, "the batch size is the number of blocks that we want to delete in one batch, default 1200")
 	flags.DurationVar(&exeConf.pruningConfigSleepAfterCommit, "pruning-config-sleep-after-commit", exepruner.DefaultConfig.SleepAfterEachBatchCommit, "sleep time after each batch commit, default 1s")
 	flags.DurationVar(&exeConf.pruningConfigSleepAfterIteration, "pruning-config-sleep-after-iteration", exepruner.DefaultConfig.SleepAfterEachIteration, "sleep time after each iteration, default max int64")
+	flags.StringVar(&exeConf.ledgerServiceAddr, "ledger-service-addr", "", "gRPC address for remote ledger service (e.g., localhost:9000). If empty, uses local ledger")
+	flags.UintVar(&exeConf.ledgerMaxRequestSize, "ledger-max-request-size", 0, "maximum request message size in bytes for remote ledger client (0 = default 1 GiB)")
+	flags.UintVar(&exeConf.ledgerMaxResponseSize, "ledger-max-response-size", 0, "maximum response message size in bytes for remote ledger client (0 = default 1 GiB)")
 }
 
 func (exeConf *ExecutionConfig) ValidateFlags() error {
