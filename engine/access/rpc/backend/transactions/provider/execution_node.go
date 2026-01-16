@@ -11,7 +11,6 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	"github.com/onflow/flow-go/engine/access/rpc/backend/common"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/node_communicator"
 	txstatus "github.com/onflow/flow-go/engine/access/rpc/backend/transactions/status"
 	"github.com/onflow/flow-go/engine/access/rpc/connection"
@@ -465,7 +464,7 @@ func (e *ENTransactionProvider) getBlockEvents(
 		blockID,
 	)
 	if err != nil {
-		if common.IsInsufficientExecutionReceipts(err) {
+		if optimistic_sync.IsExecutionResultNotReadyError(err) {
 			return nil, status.Error(codes.NotFound, err.Error())
 		}
 		return nil, rpc.ConvertError(err, "failed to retrieve result from any execution node", codes.Internal)

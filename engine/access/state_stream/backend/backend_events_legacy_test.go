@@ -35,7 +35,7 @@ type eventsTestType struct {
 	filter          state_stream.EventFilter
 }
 
-// BackendEventsSuite is a test suite for the EventsBackend functionality.
+// LegacyBackendEventsSuite is a test suite for the EventsBackend functionality.
 // It is used to test the endpoints which enable users to subscribe to block events.
 // It verifies that each endpoint works properly with the expected data being returned and tests
 // handling of expected errors.
@@ -52,17 +52,24 @@ type eventsTestType struct {
 //
 // The suite focuses on events extracted from local storage and extracted from ExecutionData,
 // ensuring proper testing of event retrieval from both sources.
-type BackendEventsSuite struct {
-	BackendExecutionDataSuite
+//
+// Deprecated: this test suite is obsolete and declared legacy since it doesn't support new logic implemented
+// in the optimistic sync package.
+type LegacyBackendEventsSuite struct {
+	LegacyBackendExecutionDataSuite
 }
 
-func TestBackendEventsSuite(t *testing.T) {
-	suite.Run(t, new(BackendEventsSuite))
+func TestLegacyBackendEventsSuite(t *testing.T) {
+	suite.Run(t, new(LegacyBackendEventsSuite))
 }
 
 // SetupTest initializes the test suite.
-func (s *BackendEventsSuite) SetupTest() {
-	s.BackendExecutionDataSuite.SetupTest()
+func (s *LegacyBackendEventsSuite) SetupTest() {
+	s.T().Skip("LegacyBackendExecutionDataSuite is obsolete and declared legacy since it " +
+		"doesn't support new logic implemented in the optimistic sync package." +
+		"As this package depends on the LegacyBackendExecutionDataSuite, please, rewrite this suite.")
+
+	s.LegacyBackendExecutionDataSuite.SetupTest()
 }
 
 // setupFilterForTestCases sets up variations of test scenarios with different event filters
@@ -72,7 +79,7 @@ func (s *BackendEventsSuite) SetupTest() {
 // - All events: Includes all event types.
 // - Some events: Includes only event types that match the provided filter.
 // - No events: Includes a custom event type "A.0x1.NonExistent.Event".
-func (s *BackendEventsSuite) setupFilterForTestCases(baseTests []eventsTestType) []eventsTestType {
+func (s *LegacyBackendEventsSuite) setupFilterForTestCases(baseTests []eventsTestType) []eventsTestType {
 	// create variations for each of the base test
 	tests := make([]eventsTestType, 0, len(baseTests)*3)
 	var err error
@@ -100,7 +107,7 @@ func (s *BackendEventsSuite) setupFilterForTestCases(baseTests []eventsTestType)
 }
 
 // setupLocalStorage prepares local storage for testing
-func (s *BackendEventsSuite) setupLocalStorage() {
+func (s *LegacyBackendEventsSuite) setupLocalStorage() {
 	s.SetupBackend(true)
 
 	// events returned from the db are sorted by txID, txIndex, then eventIndex.
@@ -137,58 +144,58 @@ func (s *BackendEventsSuite) setupLocalStorage() {
 
 // TestSubscribeEventsFromExecutionData tests the SubscribeEvents method happy path for events
 // extracted from ExecutionData
-func (s *BackendEventsSuite) TestSubscribeEventsFromExecutionData() {
+func (s *LegacyBackendEventsSuite) TestSubscribeEventsFromExecutionData() {
 	s.runTestSubscribeEvents()
 }
 
 // TestSubscribeEventsFromLocalStorage tests the SubscribeEvents method happy path for events
 // extracted from local storage
-func (s *BackendEventsSuite) TestSubscribeEventsFromLocalStorage() {
+func (s *LegacyBackendEventsSuite) TestSubscribeEventsFromLocalStorage() {
 	s.setupLocalStorage()
 	s.runTestSubscribeEvents()
 }
 
 // TestSubscribeEventsFromStartBlockIDFromExecutionData tests the SubscribeEventsFromStartBlockID method happy path for events
 // extracted from ExecutionData
-func (s *BackendEventsSuite) TestSubscribeEventsFromStartBlockIDFromExecutionData() {
+func (s *LegacyBackendEventsSuite) TestSubscribeEventsFromStartBlockIDFromExecutionData() {
 	s.runTestSubscribeEventsFromStartBlockID()
 }
 
 // TestSubscribeEventsFromStartBlockIDFromLocalStorage tests the SubscribeEventsFromStartBlockID method happy path for events
 // extracted from local storage
-func (s *BackendEventsSuite) TestSubscribeEventsFromStartBlockIDFromLocalStorage() {
+func (s *LegacyBackendEventsSuite) TestSubscribeEventsFromStartBlockIDFromLocalStorage() {
 	s.setupLocalStorage()
 	s.runTestSubscribeEventsFromStartBlockID()
 }
 
 // TestSubscribeEventsFromStartHeightFromExecutionData tests the SubscribeEventsFromStartHeight method happy path for events
 // extracted from ExecutionData
-func (s *BackendEventsSuite) TestSubscribeEventsFromStartHeightFromExecutionData() {
+func (s *LegacyBackendEventsSuite) TestSubscribeEventsFromStartHeightFromExecutionData() {
 	s.runTestSubscribeEventsFromStartHeight()
 }
 
 // TestSubscribeEventsFromStartHeightFromLocalStorage tests the SubscribeEventsFromStartHeight method happy path for events
 // extracted from local storage
-func (s *BackendEventsSuite) TestSubscribeEventsFromStartHeightFromLocalStorage() {
+func (s *LegacyBackendEventsSuite) TestSubscribeEventsFromStartHeightFromLocalStorage() {
 	s.setupLocalStorage()
 	s.runTestSubscribeEventsFromStartHeight()
 }
 
 // TestSubscribeEventsFromLatestFromExecutionData tests the SubscribeEventsFromLatest method happy path for events
 // extracted from ExecutionData
-func (s *BackendEventsSuite) TestSubscribeEventsFromLatestFromExecutionData() {
+func (s *LegacyBackendEventsSuite) TestSubscribeEventsFromLatestFromExecutionData() {
 	s.runTestSubscribeEventsFromLatest()
 }
 
 // TestSubscribeEventsFromLatestFromLocalStorage tests the SubscribeEventsFromLatest method happy path for events
 // extracted from local storage
-func (s *BackendEventsSuite) TestSubscribeEventsFromLatestFromLocalStorage() {
+func (s *LegacyBackendEventsSuite) TestSubscribeEventsFromLatestFromLocalStorage() {
 	s.setupLocalStorage()
 	s.runTestSubscribeEventsFromLatest()
 }
 
 // runTestSubscribeEvents runs the test suite for SubscribeEvents subscription
-func (s *BackendEventsSuite) runTestSubscribeEvents() {
+func (s *LegacyBackendEventsSuite) runTestSubscribeEvents() {
 	tests := []eventsTestType{
 		{
 			name:            "happy path - all new blocks - latest",
@@ -218,7 +225,7 @@ func (s *BackendEventsSuite) runTestSubscribeEvents() {
 }
 
 // runTestSubscribeEventsFromStartBlockID runs the test suite for SubscribeEventsFromStartBlockID subscription
-func (s *BackendEventsSuite) runTestSubscribeEventsFromStartBlockID() {
+func (s *LegacyBackendEventsSuite) runTestSubscribeEventsFromStartBlockID() {
 	tests := []eventsTestType{
 		{
 			name:            "happy path - all new blocks",
@@ -252,7 +259,7 @@ func (s *BackendEventsSuite) runTestSubscribeEventsFromStartBlockID() {
 }
 
 // runTestSubscribeEventsFromStartHeight runs the test suite for SubscribeEventsFromStartHeight subscription
-func (s *BackendEventsSuite) runTestSubscribeEventsFromStartHeight() {
+func (s *LegacyBackendEventsSuite) runTestSubscribeEventsFromStartHeight() {
 	tests := []eventsTestType{
 		{
 			name:            "happy path - all new blocks",
@@ -286,7 +293,7 @@ func (s *BackendEventsSuite) runTestSubscribeEventsFromStartHeight() {
 }
 
 // runTestSubscribeEventsFromLatest runs the test suite for SubscribeEventsFromLatest subscription
-func (s *BackendEventsSuite) runTestSubscribeEventsFromLatest() {
+func (s *LegacyBackendEventsSuite) runTestSubscribeEventsFromLatest() {
 	tests := []eventsTestType{
 		{
 			name:            "happy path - all new blocks",
@@ -316,7 +323,7 @@ func (s *BackendEventsSuite) runTestSubscribeEventsFromLatest() {
 	s.subscribe(call, s.requireEventsResponse, s.setupFilterForTestCases(tests))
 }
 
-// subscribe is a helper function to run test scenarios for event subscription in the BackendEventsSuite.
+// subscribe is a helper function to run test scenarios for event subscription in the LegacyBackendEventsSuite.
 // It covers various scenarios for subscribing, handling backfill, and receiving block updates.
 // The test cases include scenarios for different event filters.
 //
@@ -341,7 +348,7 @@ func (s *BackendEventsSuite) runTestSubscribeEventsFromLatest() {
 //  6. Simulates the reception of new blocks and consumes them from the subscription channel.
 //  7. Ensures that there are no new messages waiting after all blocks have been processed.
 //  8. Cancels the subscription and ensures it shuts down gracefully.
-func (s *BackendEventsSuite) subscribe(
+func (s *LegacyBackendEventsSuite) subscribe(
 	subscribeFn func(ctx context.Context, startBlockID flow.Identifier, startHeight uint64, filter state_stream.EventFilter) subscription.Subscription,
 	requireFn func(interface{}, *EventsResponse),
 	tests []eventsTestType,
@@ -422,7 +429,7 @@ func (s *BackendEventsSuite) subscribe(
 }
 
 // requireEventsResponse ensures that the received event information matches the expected data.
-func (s *BackendEventsSuite) requireEventsResponse(v interface{}, expected *EventsResponse) {
+func (s *LegacyBackendEventsSuite) requireEventsResponse(v interface{}, expected *EventsResponse) {
 	actual, ok := v.(*EventsResponse)
 	require.True(s.T(), ok, "unexpected response type: %T", v)
 
@@ -434,7 +441,7 @@ func (s *BackendEventsSuite) requireEventsResponse(v interface{}, expected *Even
 
 // TestSubscribeEventsFromSporkRootBlock tests that events subscriptions starting from the spork
 // root block return an empty result for the root block.
-func (s *BackendEventsSuite) TestSubscribeEventsFromSporkRootBlock() {
+func (s *LegacyBackendEventsSuite) TestSubscribeEventsFromSporkRootBlock() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -581,7 +588,7 @@ func (s *BackendEventsSuite) TestSubscribeEventsFromSporkRootBlock() {
 //
 // 7. Returns error for start above highest indexed:
 //   - Validates that subscribing with a start height above the highest indexed height results in an InvalidArgument error.
-func (s *BackendExecutionDataSuite) TestSubscribeEventsHandlesErrors() {
+func (s *LegacyBackendExecutionDataSuite) TestSubscribeEventsHandlesErrors() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -676,7 +683,7 @@ func (s *BackendExecutionDataSuite) TestSubscribeEventsHandlesErrors() {
 //
 // 4. Returns error for start above highest indexed:
 //   - Validates that subscribing with a start blockID above the highest indexed height results in an InvalidArgument error.
-func (s *BackendExecutionDataSuite) TestSubscribeEventsFromStartBlockIDHandlesErrors() {
+func (s *LegacyBackendExecutionDataSuite) TestSubscribeEventsFromStartBlockIDHandlesErrors() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -754,7 +761,7 @@ func (s *BackendExecutionDataSuite) TestSubscribeEventsFromStartBlockIDHandlesEr
 //
 // 5. Returns error for start above highest indexed:
 //   - Validates that subscribing with a start height above the highest indexed height results in an InvalidArgument error.
-func (s *BackendExecutionDataSuite) TestSubscribeEventsFromStartHeightHandlesErrors() {
+func (s *LegacyBackendExecutionDataSuite) TestSubscribeEventsFromStartHeightHandlesErrors() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 

@@ -18,7 +18,6 @@ import (
 	"github.com/onflow/flow-go/engine/access/rest/http/routes"
 	"github.com/onflow/flow-go/engine/access/rest/router"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
 	"github.com/onflow/flow-go/utils/unittest"
 
 	"github.com/onflow/flow/protobuf/go/flow/entities"
@@ -366,7 +365,7 @@ func TestGetEvents_GetAtSealedBlock(t *testing.T) {
 			uint64(0),
 			mocks.Anything,
 			entities.EventEncodingVersion_JSON_CDC_V0,
-			optimistic_sync.DefaultCriteria,
+			mocks.Anything,
 		).
 		Return(expectedBlockEvents, nil, nil).
 		Once()

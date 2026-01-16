@@ -10,10 +10,10 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/onflow/flow-go/engine/access/index"
-	"github.com/onflow/flow-go/engine/access/rpc/backend/common"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/node_communicator"
 	"github.com/onflow/flow-go/engine/access/rpc/connection"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
+	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
 
 	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/model/flow"
@@ -135,7 +135,7 @@ func (e *ProviderImpl) ErrorMessageByTransactionID(
 		blockID,
 	)
 	if err != nil {
-		if common.IsInsufficientExecutionReceipts(err) {
+		if optimistic_sync.IsExecutionResultNotReadyError(err) {
 			return "", status.Error(codes.NotFound, err.Error())
 		}
 		return "", rpc.ConvertError(err, "failed to select execution nodes", codes.Internal)
@@ -190,7 +190,7 @@ func (e *ProviderImpl) ErrorMessageByIndex(
 		blockID,
 	)
 	if err != nil {
-		if common.IsInsufficientExecutionReceipts(err) {
+		if optimistic_sync.IsExecutionResultNotReadyError(err) {
 			return "", status.Error(codes.NotFound, err.Error())
 		}
 		return "", rpc.ConvertError(err, "failed to select execution nodes", codes.Internal)
@@ -250,7 +250,7 @@ func (e *ProviderImpl) ErrorMessagesByBlockID(
 		blockID,
 	)
 	if err != nil {
-		if common.IsInsufficientExecutionReceipts(err) {
+		if optimistic_sync.IsExecutionResultNotReadyError(err) {
 			return nil, status.Error(codes.NotFound, err.Error())
 		}
 		return nil, rpc.ConvertError(err, "failed to select execution nodes", codes.Internal)
