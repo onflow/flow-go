@@ -918,8 +918,22 @@ func (s *BackendExecutionDataSuite) TestExecutionDataProviderErrors() {
 		},
 	}
 
-	s.mockSubscribeFuncState()
-	s.mockExecutionResultProviderState()
+	s.snapshot.
+		On("Identities", mock.Anything).
+		Return(s.fixedExecutionNodes, nil)
+
+	s.params.On("SporkRootBlock").Return(s.sporkRootBlock)
+	s.state.On("Params").Return(s.params)
+
+	s.headers.
+		On("BlockIDByHeight", mock.Anything).
+		Return(func(height uint64) (flow.Identifier, error) {
+			block, ok := s.blocksHeightToBlockMap[height]
+			if !ok {
+				return flow.ZeroID, storage.ErrNotFound
+			}
+			return block.ID(), nil
+		})
 
 	s.snapshot.
 		On("Head").
@@ -1057,15 +1071,15 @@ func (s *BackendExecutionDataSuite) mockSubscribeFuncState() {
 	s.params.On("SporkRootBlock").Return(s.sporkRootBlock)
 	s.state.On("Params").Return(s.params)
 
-	//s.receipts.
-	//	On("ByBlockID", mock.Anything).
-	//	Return(func(blockID flow.Identifier) (flow.ExecutionReceiptList, error) {
-	//		if blockID == s.sporkRootBlock.ID() {
-	//			return nil, errors.New("no execution receipts exist for spork root block")
-	//		}
-	//
-	//		return s.blockIDToReceiptsMap[blockID], nil
-	//	})
+	s.receipts.
+		On("ByBlockID", mock.Anything).
+		Return(func(blockID flow.Identifier) (flow.ExecutionReceiptList, error) {
+			if blockID == s.sporkRootBlock.ID() {
+				return nil, errors.New("no execution receipts exist for spork root block")
+			}
+
+			return s.blockIDToReceiptsMap[blockID], nil
+		})
 
 	s.headers.
 		On("BlockIDByHeight", mock.Anything).
