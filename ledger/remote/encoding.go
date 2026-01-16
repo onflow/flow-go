@@ -15,7 +15,7 @@ import (
 // values in payloads. If the encoding method needs to change, update this function
 // and ensure decodeTrieUpdateFromTransport uses the matching decoder.
 func encodeTrieUpdateForTransport(trieUpdate *ledger.TrieUpdate) []byte {
-	return ledger.EncodeTrieUpdateCBOR(trieUpdate)
+	return ledger.EncodeTrieUpdate(trieUpdate)
 }
 
 // decodeTrieUpdateFromTransport decodes a trie update received over gRPC.
@@ -29,5 +29,5 @@ func encodeTrieUpdateForTransport(trieUpdate *ledger.TrieUpdate) []byte {
 // values in payloads. If the encoding method needs to change, update this function
 // and ensure encodeTrieUpdateForTransport uses the matching encoder.
 func decodeTrieUpdateFromTransport(encodedTrieUpdate []byte) (*ledger.TrieUpdate, error) {
-	return ledger.DecodeTrieUpdateCBOR(encodedTrieUpdate)
+	return ledger.DecodeTrieUpdate(encodedTrieUpdate)
 }
