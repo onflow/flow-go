@@ -13,7 +13,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// The Cadence Arch precompild contract that is injected in the EVM environment,
+// The Cadence Arch precompiled contract that is injected in the EVM environment,
 // implements the following functions:
 // - `flowBlockHeight()`
 // - `revertibleRandom()`
