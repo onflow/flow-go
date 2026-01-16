@@ -45,43 +45,6 @@ func LoadRegisterStore(
 	protocolEvents *events.Distributor,
 	lastFinalizedHeight uint64,
 	collector module.ExecutionMetrics,
-	enableStorehouse bool,
-	registerDir string,
-	triedir string,
-	importCheckpointWorkerCount int,
-	importFunc ImportRegistersFromCheckpoint,
-) (
-	*RegisterStore,
-	io.Closer,
-	error,
-) {
-	if !enableStorehouse {
-		log.Info().Msg("register store disabled")
-		return nil, nil, nil
-	}
-	return loadRegisterStore(
-		log,
-		state,
-		headers,
-		protocolEvents,
-		lastFinalizedHeight,
-		collector,
-		registerDir,
-		triedir,
-		importCheckpointWorkerCount,
-		importFunc,
-	)
-}
-
-// loadRegisterStore is an internal function that creates and initializes a RegisterStore.
-// it is reused by both LoadRegisterStore and LoadBackgroundIndexerEngine.
-func loadRegisterStore(
-	log zerolog.Logger,
-	state protocol.State,
-	headers storageerr.Headers,
-	protocolEvents *events.Distributor,
-	lastFinalizedHeight uint64,
-	collector module.ExecutionMetrics,
 	registerDir string,
 	triedir string,
 	importCheckpointWorkerCount int,
@@ -205,7 +168,7 @@ func LoadBackgroundIndexerEngine(
 	// and not block the component initialization
 	bootstrapper := func(ctx context.Context) (*BackgroundIndexer, io.Closer, error) {
 		// Load register store for background indexing
-		registerStore, closer, err := loadRegisterStore(
+		registerStore, closer, err := LoadRegisterStore(
 			log,
 			state,
 			headers,

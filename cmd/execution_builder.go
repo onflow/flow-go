@@ -883,6 +883,12 @@ func (exeNode *ExecutionNode) LoadStopControl(
 func (exeNode *ExecutionNode) LoadRegisterStore(
 	node *NodeConfig,
 ) error {
+	if !exeNode.exeConf.enableStorehouse {
+		node.Logger.Info().Msg("register store disabled")
+		exeNode.registerStore = nil
+		return nil
+	}
+
 	registerStore, closer, err := storehouse.LoadRegisterStore(
 		node.Logger,
 		node.State,
@@ -890,7 +896,6 @@ func (exeNode *ExecutionNode) LoadRegisterStore(
 		node.ProtocolEvents,
 		node.LastFinalizedHeader.Height,
 		exeNode.collector,
-		exeNode.exeConf.enableStorehouse,
 		exeNode.exeConf.registerDir,
 		exeNode.exeConf.triedir,
 		exeNode.exeConf.importCheckpointWorkerCount,

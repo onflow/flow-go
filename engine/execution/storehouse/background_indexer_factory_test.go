@@ -35,47 +35,11 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-// TestLoadRegisterStore_Disabled tests that LoadRegisterStore returns nil when enableStorehouse is false
-func TestLoadRegisterStore_Disabled(t *testing.T) {
-	t.Parallel()
-
-	log := unittest.Logger()
-	state := protocolmock.NewState(t)
-	headers := storagemock.NewHeaders(t)
-	protocolEvents := events.NewDistributor()
-	lastFinalizedHeight := uint64(100)
-	collector := &metrics.NoopCollector{}
-	enableStorehouse := false
-	registerDir := t.TempDir()
-	triedir := t.TempDir()
-	importCheckpointWorkerCount := 1
-	var importFunc storehouse.ImportRegistersFromCheckpoint = nil
-
-	registerStore, closer, err := storehouse.LoadRegisterStore(
-		log,
-		state,
-		headers,
-		protocolEvents,
-		lastFinalizedHeight,
-		collector,
-		enableStorehouse,
-		registerDir,
-		triedir,
-		importCheckpointWorkerCount,
-		importFunc,
-	)
-
-	require.NoError(t, err)
-	require.Nil(t, registerStore)
-	require.Nil(t, closer)
-}
-
 // TestLoadBackgroundIndexerEngine_StorehouseEnabled tests that LoadBackgroundIndexerEngine returns nil when enableStorehouse is true
 func TestLoadBackgroundIndexerEngine_StorehouseEnabled(t *testing.T) {
 	t.Parallel()
 
 	log := unittest.Logger()
-	enableStorehouse := true
 	enableBackgroundStorehouseIndexing := true
 	state := protocolmock.NewState(t)
 	headers := storagemock.NewHeaders(t)
@@ -93,7 +57,6 @@ func TestLoadBackgroundIndexerEngine_StorehouseEnabled(t *testing.T) {
 	heightsPerSecond := uint64(10)
 	engine, created, err := storehouse.LoadBackgroundIndexerEngine(
 		log,
-		enableStorehouse,
 		enableBackgroundStorehouseIndexing,
 		state,
 		headers,
@@ -121,7 +84,6 @@ func TestLoadBackgroundIndexerEngine_BackgroundIndexingDisabled(t *testing.T) {
 	t.Parallel()
 
 	log := unittest.Logger()
-	enableStorehouse := false
 	enableBackgroundStorehouseIndexing := false
 	state := protocolmock.NewState(t)
 	headers := storagemock.NewHeaders(t)
@@ -139,7 +101,6 @@ func TestLoadBackgroundIndexerEngine_BackgroundIndexingDisabled(t *testing.T) {
 	heightsPerSecond := uint64(10)
 	engine, created, err := storehouse.LoadBackgroundIndexerEngine(
 		log,
-		enableStorehouse,
 		enableBackgroundStorehouseIndexing,
 		state,
 		headers,
@@ -173,7 +134,6 @@ func TestLoadBackgroundIndexerEngine_Bootstrap(t *testing.T) {
 	)
 
 	log := unittest.Logger()
-	enableStorehouse := false
 	enableBackgroundStorehouseIndexing := true
 
 	// Set up protocol state with finalized blocks
@@ -255,7 +215,6 @@ func TestLoadBackgroundIndexerEngine_Bootstrap(t *testing.T) {
 	// Create background indexer engine
 	engine, created, err := storehouse.LoadBackgroundIndexerEngine(
 		log,
-		enableStorehouse,
 		enableBackgroundStorehouseIndexing,
 		state,
 		headers,
@@ -321,7 +280,6 @@ func TestLoadBackgroundIndexerEngine_Bootstrap(t *testing.T) {
 		protocolEvents,
 		registerStoreStart,
 		collector,
-		true, // enableStorehouse
 		registerDir,
 		triedir,
 		importCheckpointWorkerCount,
@@ -356,7 +314,6 @@ func TestLoadBackgroundIndexerEngine_Indexing(t *testing.T) {
 	)
 
 	log := unittest.Logger()
-	enableStorehouse := false
 	enableBackgroundStorehouseIndexing := true
 
 	// Set up protocol state
@@ -503,7 +460,6 @@ func TestLoadBackgroundIndexerEngine_Indexing(t *testing.T) {
 	// Create background indexer engine
 	engine, created, err := storehouse.LoadBackgroundIndexerEngine(
 		log,
-		enableStorehouse,
 		enableBackgroundStorehouseIndexing,
 		state,
 		headers,
@@ -616,7 +572,6 @@ indexingComplete:
 		protocolEvents,
 		targetHeight, // Use targetHeight instead of registerStoreStart so FinalizedReader knows about all blocks
 		collector,
-		true, // enableStorehouse
 		registerDir,
 		triedir,
 		importCheckpointWorkerCount,
