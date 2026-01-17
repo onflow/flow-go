@@ -11,7 +11,6 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rs/zerolog"
 	"go.uber.org/atomic"
 	"google.golang.org/grpc"
@@ -77,14 +76,15 @@ func main() {
 	triggerCheckpointOnNextSegmentFinish := atomic.NewBool(false)
 
 	// Create ledger using factory
-	metricsCollector := metrics.NewLedgerCollector("ledger", "wal")
+	// TODO(leo): to use real metrics collector
+	metricsCollector := &metrics.NoopCollector{}
 	result, err := ledgerfactory.NewLedger(ledgerfactory.Config{
 		Triedir:                              *triedir,
 		MTrieCacheSize:                       uint32(*mtrieCacheSize),
 		CheckpointDistance:                   *checkpointDist,
 		CheckpointsToKeep:                    *checkpointsToKeep,
 		TriggerCheckpointOnNextSegmentFinish: triggerCheckpointOnNextSegmentFinish,
-		MetricsRegisterer:                    prometheus.DefaultRegisterer,
+		MetricsRegisterer:                    nil,
 		WALMetrics:                           metricsCollector,
 		LedgerMetrics:                        metricsCollector,
 		Logger:                               logger,

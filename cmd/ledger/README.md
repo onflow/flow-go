@@ -35,6 +35,9 @@ go build -o flow-ledger-service ./cmd/ledger
   -triedir /path/to/trie \
   -ledger-service-tcp 0.0.0.0:9000 \
   -ledger-service-socket /sockets/ledger.sock
+  -mtrie-cache-size 500 \
+  -checkpoint-distance 100 \
+  -checkpoints-to-keep 3
 ```
 
 ## Flags
