@@ -66,8 +66,8 @@ func (p *executionDataProvider) NextData(ctx context.Context) (any, error) {
 	}
 
 	// handle spork root special case
-	if p.isSporkRoot() {
-		sporkRootBlock := p.state.Params().SporkRootBlock()
+	sporkRootBlock := p.state.Params().SporkRootBlock()
+	if p.blockHeight == sporkRootBlock.Height {
 		response := &ExecutionDataResponse{
 			Height: p.blockHeight,
 			ExecutionData: &execution_data.BlockExecutionData{

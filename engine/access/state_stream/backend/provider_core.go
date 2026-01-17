@@ -49,10 +49,6 @@ func (c *providerCore) getSnapshotMetadata() (*executionStateSnapshotMetadata, e
 	return metadata, nil
 }
 
-func (c *providerCore) isSporkRoot() bool {
-	return c.blockHeight == c.state.Params().SporkRootBlock().Height
-}
-
 func (c *providerCore) incrementHeight(resultID flow.Identifier) {
 	c.criteria.ParentExecutionResultID = resultID
 	c.blockHeight++

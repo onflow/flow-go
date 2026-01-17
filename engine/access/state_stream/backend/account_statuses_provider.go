@@ -48,8 +48,8 @@ func (p *accountStatusesProvider) NextData(_ context.Context) (any, error) {
 	}
 
 	// handle spork root special case
-	if p.isSporkRoot() {
-		sporkRootBlock := p.state.Params().SporkRootBlock()
+	sporkRootBlock := p.state.Params().SporkRootBlock()
+	if p.blockHeight == sporkRootBlock.Height {
 		response := &AccountStatusesResponse{
 			BlockID:        sporkRootBlock.ID(),
 			Height:         sporkRootBlock.Height,
