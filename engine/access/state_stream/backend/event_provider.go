@@ -6,20 +6,19 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/engine/access/subscription/tracker"
-	accessmodel "github.com/onflow/flow-go/model/access"
-	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 )
 
-// executionDataProvider connects subscription/streamer with backends.
-// It is intended to be used as a data provider for the subscription package.
+// eventProvider is responsible for managing event-related data and interactions within the protocol state.
+// It interacts with multiple components, such as protocol state, execution results, and event filters.
 //
-// NOT CONCURRENCY SAFE! executionDataProvider is designed to be used by a single streamer goroutine.
-type executionDataProvider struct {
+// NOT CONCURRENCY SAFE! eventProvider is designed to be used by a single streamer goroutine.
+type eventProvider struct {
 	state                   protocol.State
 	headers                 storage.Headers
 	executionDataTracker    tracker.ExecutionDataTracker
@@ -27,9 +26,10 @@ type executionDataProvider struct {
 	executionStateCache     optimistic_sync.ExecutionStateCache
 	criteria                optimistic_sync.Criteria
 	height                  uint64
+	eventFilter             state_stream.EventFilter
 }
 
-func newExecutionDataProvider(
+func newEventProvider(
 	state protocol.State,
 	headers storage.Headers,
 	executionDataTracker tracker.ExecutionDataTracker,
@@ -37,8 +37,9 @@ func newExecutionDataProvider(
 	executionStateCache optimistic_sync.ExecutionStateCache,
 	nextCriteria optimistic_sync.Criteria,
 	startHeight uint64,
-) *executionDataProvider {
-	return &executionDataProvider{
+	eventFilter state_stream.EventFilter,
+) *eventProvider {
+	return &eventProvider{
 		state:                   state,
 		headers:                 headers,
 		executionDataTracker:    executionDataTracker,
@@ -46,26 +47,13 @@ func newExecutionDataProvider(
 		executionStateCache:     executionStateCache,
 		criteria:                nextCriteria,
 		height:                  startHeight,
+		eventFilter:             eventFilter,
 	}
 }
 
-var _ subscription.DataProvider = (*executionDataProvider)(nil)
+var _ subscription.DataProvider = (*eventProvider)(nil)
 
-// NextData returns the execution data for the next block height.
-// It is intended to be used by the streamer to fetch data sequentially.
-//
-//   - [subscription.ErrBlockNotReady]: If the execution data is not yet available. This includes cases where
-//     the block is not finalized yet, or the execution result is pending (e.g. not enough agreeing executors).
-//   - [optimistic_sync.ErrBlockBeforeNodeHistory]: If the request is for data before the node's root block.
-func (e *executionDataProvider) NextData(ctx context.Context) (any, error) {
-	availableFinalizedHeight := e.executionDataTracker.GetHighestAvailableFinalizedHeight()
-	if e.height > availableFinalizedHeight {
-		// fail early if no notification has been received for the given block height.
-		// note: it's possible for the data to exist in the data store before the notification is
-		// received. this ensures a consistent view is available to all streams.
-		return nil, subscription.ErrBlockNotReady
-	}
-
+func (e *eventProvider) NextData(_ context.Context) (any, error) {
 	blockHeader, err := e.headers.ByHeight(e.height)
 	if err != nil {
 		return nil, errors.Join(subscription.ErrBlockNotReady, err)
@@ -89,11 +77,9 @@ func (e *executionDataProvider) NextData(ctx context.Context) (any, error) {
 	// the spork root block will never have execution data available. If requested, return an empty result.
 	sporkRootBlock := e.state.Params().SporkRootBlock()
 	if e.height == sporkRootBlock.Height {
-		response := &ExecutionDataResponse{
-			Height: e.height,
-			ExecutionData: &execution_data.BlockExecutionData{
-				BlockID: sporkRootBlock.ID(),
-			},
+		response := &EventsResponse{
+			BlockID:        sporkRootBlock.ID(),
+			Height:         e.height,
 			BlockTimestamp: time.UnixMilli(int64(sporkRootBlock.Timestamp)).UTC(),
 		}
 
@@ -104,23 +90,21 @@ func (e *executionDataProvider) NextData(ctx context.Context) (any, error) {
 		return response, nil
 	}
 
-	snapshot, err := e.executionStateCache.Snapshot(execResultInfo.ExecutionResultID)
+	executionStateSnapshot, err := e.executionStateCache.Snapshot(execResultInfo.ExecutionResultID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to find snapshot by execution result ID %s: %w", execResultInfo.ExecutionResultID.String(), err)
+		return nil, fmt.Errorf("failed to find execution state snapshot by execution result ID %s: %w",
+			execResultInfo.ExecutionResultID.String(), err)
 	}
 
-	executionData, err := snapshot.BlockExecutionData().ByBlockID(ctx, blockID)
+	events, err := executionStateSnapshot.Events().ByBlockID(blockID)
 	if err != nil {
-		return nil, fmt.Errorf("could not find execution data for block %s: %w", blockID, err)
+		return nil, fmt.Errorf("could not find events for block %s: %w", blockID, err)
 	}
 
-	response := &ExecutionDataResponse{
-		Height:        e.height,
-		ExecutionData: executionData.BlockExecutionData,
-		ExecutorMetadata: accessmodel.ExecutorMetadata{
-			ExecutionResultID: execResultInfo.ExecutionResultID,
-			ExecutorIDs:       execResultInfo.ExecutionNodes.NodeIDs(),
-		},
+	response := &EventsResponse{
+		BlockID:        blockID,
+		Height:         e.height,
+		Events:         e.eventFilter.Filter(events),
 		BlockTimestamp: time.UnixMilli(int64(blockHeader.Timestamp)).UTC(),
 	}
 

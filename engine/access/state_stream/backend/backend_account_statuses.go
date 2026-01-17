@@ -27,7 +27,7 @@ type AccountStatusesBackend struct {
 	subscriptionHandler *subscription.SubscriptionHandler
 
 	executionDataTracker tracker.ExecutionDataTracker
-	eventsProvider       EventsProvider
+	eventsProvider       LegacyEventsProvider
 }
 
 // subscribe creates and returns a subscription to receive account status updates starting from the specified height.

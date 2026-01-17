@@ -9,14 +9,12 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/access"
-	"github.com/onflow/flow-go/engine/access/index"
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/engine/access/subscription/tracker"
 	accessmodel "github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/execution"
-	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
 	"github.com/onflow/flow-go/module/state_synchronization/indexer"
 	"github.com/onflow/flow-go/state/protocol"
@@ -61,8 +59,6 @@ type Config struct {
 	HeartbeatInterval uint64
 }
 
-type GetExecutionDataFunc func(context.Context, uint64) (*execution_data.BlockExecutionDataEntity, error)
-
 type StateStreamBackend struct {
 	tracker.ExecutionDataTracker
 
@@ -84,10 +80,8 @@ func New(
 	headers storage.Headers,
 	seals storage.Seals,
 	registers *execution.RegistersAsyncStore,
-	eventsIndex *index.EventsIndex,
-	useEventsIndex bool,
 	registerIDsRequestLimit int,
-	subscriptionHandler *subscription.SubscriptionHandler,
+	subscriptionFactory *subscription.SubscriptionHandler,
 	executionDataTracker tracker.ExecutionDataTracker,
 	executionResultProvider optimistic_sync.ExecutionResultInfoProvider,
 	executionStateCache optimistic_sync.ExecutionStateCache,
@@ -109,33 +103,31 @@ func New(
 		log,
 		state,
 		headers,
-		subscriptionHandler,
+		subscriptionFactory,
 		executionDataTracker,
 		executionResultProvider,
 		executionStateCache,
 		nodeRootBlock,
 	)
 
-	eventsProvider := EventsProvider{
-		log:              logger,
-		headers:          headers,
-		useEventsIndex:   useEventsIndex,
-		eventsIndex:      eventsIndex, // TODO: event index should be removed (do it in events PR)
-		getExecutionData: nil,         //TODO: fix it in the events PR
-	}
-
-	b.EventsBackend = EventsBackend{
-		log:                  logger,
-		subscriptionHandler:  subscriptionHandler,
-		executionDataTracker: executionDataTracker,
-		eventsProvider:       eventsProvider,
-	}
+	b.EventsBackend = *NewEventsBackend(
+		logger,
+		state,
+		headers,
+		nodeRootBlock,
+		executionDataTracker,
+		executionResultProvider,
+		executionStateCache,
+		subscriptionFactory,
+	)
 
 	b.AccountStatusesBackend = AccountStatusesBackend{
 		log:                  logger,
-		subscriptionHandler:  subscriptionHandler,
+		subscriptionHandler:  subscriptionFactory,
 		executionDataTracker: b.ExecutionDataTracker,
-		eventsProvider:       eventsProvider,
+		// TODO: this type is deprecated and should not be used.
+		// Fix this in the account statuses PR.
+		eventsProvider: LegacyEventsProvider{},
 	}
 
 	return b, nil
@@ -170,7 +162,8 @@ func (b *StateStreamBackend) GetRegisterValues(
 		return nil, nil, access.NewDataNotFoundError("header", err)
 	}
 
-	execResultInfo, err := b.executionResultProvider.ExecutionResultInfo(header.ID(), criteria)
+	// TODO: move this whole function to a separate small backend
+	execResultInfo, err := b.EventsBackend.executionResultProvider.ExecutionResultInfo(header.ID(), criteria)
 	if err != nil {
 		err = fmt.Errorf("failed to get execution result info for block: %w", err)
 		switch {
@@ -190,7 +183,7 @@ func (b *StateStreamBackend) GetRegisterValues(
 	}
 
 	executionResultID := execResultInfo.ExecutionResultID
-	snapshot, err := b.executionStateCache.Snapshot(executionResultID)
+	snapshot, err := b.EventsBackend.executionStateCache.Snapshot(executionResultID)
 	if err != nil {
 		err = access.RequireErrorIs(ctx, err, storage.ErrNotFound)
 		err = fmt.Errorf("failed to find snapshot by execution result ID %s: %w", executionResultID.String(), err)
