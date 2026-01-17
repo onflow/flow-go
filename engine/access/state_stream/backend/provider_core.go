@@ -3,7 +3,6 @@ package backend
 import (
 	"errors"
 	"fmt"
-	"time"
 
 	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/model/flow"
@@ -52,11 +51,6 @@ func (c *providerCore) getSnapshotMetadata() (*executionStateSnapshotMetadata, e
 
 func (c *providerCore) isSporkRoot() bool {
 	return c.blockHeight == c.state.Params().SporkRootBlock().Height
-}
-
-func (c *providerCore) sporkRootBlockInfo() (flow.Identifier, time.Time) {
-	sporkRoot := c.state.Params().SporkRootBlock()
-	return sporkRoot.ID(), time.UnixMilli(int64(sporkRoot.Timestamp)).UTC()
 }
 
 func (c *providerCore) incrementHeight(resultID flow.Identifier) {

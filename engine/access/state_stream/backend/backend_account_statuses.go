@@ -73,13 +73,7 @@ func NewAccountStatusesBackend(
 // those that match the filter are returned. If no filter is provided,
 // all account statuses are returned.
 //
-// Parameters:
-// - ctx: Context for the operation.
-// - startBlockID: The identifier of the starting block. If provided, startHeight should be 0.
-// - startHeight: The height of the starting block. If provided, startBlockID should be flow.ZeroID.
-// - filter: The account status filter used to filter account statuses.
-//
-// If invalid parameters will be supplied SubscribeAccountStatuses will return a failed subscription.
+// If invalid parameters are supplied, SubscribeAccountStatuses will return a failed subscription.
 func (b *AccountStatusesBackend) SubscribeAccountStatuses(
 	ctx context.Context,
 	startBlockID flow.Identifier,
@@ -101,12 +95,7 @@ func (b *AccountStatusesBackend) SubscribeAccountStatuses(
 // SubscribeAccountStatusesFromStartBlockID subscribes to the streaming of account status changes starting from
 // a specific block ID with an optional status filter.
 //
-// Parameters:
-// - ctx: Context for the operation.
-// - startBlockID: The identifier of the starting block.
-// - filter: The account status filter used to filter account statuses.
-//
-// If invalid parameters will be supplied SubscribeAccountStatusesFromStartBlockID will return a failed subscription.
+// If invalid parameters are supplied, SubscribeAccountStatusesFromStartBlockID will return a failed subscription.
 func (b *AccountStatusesBackend) SubscribeAccountStatusesFromStartBlockID(
 	ctx context.Context,
 	startBlockID flow.Identifier,
@@ -155,12 +144,7 @@ func (b *AccountStatusesBackend) SubscribeAccountStatusesFromStartBlockID(
 // SubscribeAccountStatusesFromStartHeight subscribes to the streaming of account status changes starting from
 // a specific block height, with an optional status filter.
 //
-// Parameters:
-// - ctx: Context for the operation.
-// - startHeight: The height of the starting block.
-// - filter: The account status filter used to filter account statuses.
-//
-// If invalid parameters will be supplied SubscribeAccountStatusesFromStartHeight will return a failed subscription.
+// If invalid parameters are supplied, SubscribeAccountStatusesFromStartHeight will return a failed subscription.
 func (b *AccountStatusesBackend) SubscribeAccountStatusesFromStartHeight(
 	ctx context.Context,
 	startBlockHeight uint64,
@@ -210,11 +194,7 @@ func (b *AccountStatusesBackend) SubscribeAccountStatusesFromStartHeight(
 // SubscribeAccountStatusesFromLatestBlock subscribes to the streaming of account status changes starting from a
 // latest sealed block, with an optional status filter.
 //
-// Parameters:
-// - ctx: Context for the operation.
-// - filter: The account status filter used to filter account statuses.
-//
-// If invalid parameters will be supplied SubscribeAccountStatusesFromLatestBlock will return a failed subscription.
+// If invalid parameters are supplied, SubscribeAccountStatusesFromLatestBlock will return a failed subscription.
 func (b *AccountStatusesBackend) SubscribeAccountStatusesFromLatestBlock(
 	ctx context.Context,
 	statusFilter state_stream.AccountStatusFilter,
