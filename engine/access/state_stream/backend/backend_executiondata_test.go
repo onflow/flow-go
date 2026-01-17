@@ -218,7 +218,7 @@ func (s *BackendExecutionDataSuite) SetupTest() {
 // starting from the spork root block ID. It ensures that the execution data is received
 // sequentially and matches the expected data.
 func (s *BackendExecutionDataSuite) TestSubscribeExecutionData() {
-	s.mockSubscribeFuncState()
+	s.mockDataProviderState()
 	s.mockExecutionResultProviderState()
 
 	currentHeight := s.nodeRootBlock.Height
@@ -294,7 +294,7 @@ func (s *BackendExecutionDataSuite) TestSubscribeExecutionData() {
 // ID different from the spork root works as expected. We start from the block right
 // after the spork root and stream all remaining blocks.
 func (s *BackendExecutionDataSuite) TestSubscribeExecutionDataFromNonRoot() {
-	s.mockSubscribeFuncState()
+	s.mockDataProviderState()
 	s.mockExecutionResultProviderState()
 
 	// start from the block right after the spork root
@@ -360,7 +360,7 @@ func (s *BackendExecutionDataSuite) TestSubscribeExecutionDataFromNonRoot() {
 // block height. It ensures that the correct block header is retrieved and data streaming starts
 // from the correct block.
 func (s *BackendExecutionDataSuite) TestSubscribeExecutionDataFromStartHeight() {
-	s.mockSubscribeFuncState()
+	s.mockDataProviderState()
 	s.mockExecutionResultProviderState()
 
 	currentHeight := s.nodeRootBlock.Height
@@ -435,7 +435,7 @@ func (s *BackendExecutionDataSuite) TestSubscribeExecutionDataFromStartHeight() 
 // block ID. It checks that the start height is correctly resolved from the block ID and data
 // streaming proceeds.
 func (s *BackendExecutionDataSuite) TestSubscribeExecutionDataFromStartID() {
-	s.mockSubscribeFuncState()
+	s.mockDataProviderState()
 	s.mockExecutionResultProviderState()
 
 	s.snapshot.
@@ -504,7 +504,7 @@ func (s *BackendExecutionDataSuite) TestSubscribeExecutionDataFromStartID() {
 // available finalized block. It ensures that the start height is correctly determined and data
 // streaming begins.
 func (s *BackendExecutionDataSuite) TestSubscribeExecutionDataFromLatest() {
-	s.mockSubscribeFuncState()
+	s.mockDataProviderState()
 	s.mockExecutionResultProviderState()
 
 	currentHeight := s.nodeRootBlock.Height
@@ -926,13 +926,13 @@ func (s *BackendExecutionDataSuite) TestExecutionDataProviderErrors() {
 	s.state.On("Params").Return(s.params)
 
 	s.headers.
-		On("BlockIDByHeight", mock.Anything).
-		Return(func(height uint64) (flow.Identifier, error) {
+		On("ByHeight", mock.Anything).
+		Return(func(height uint64) (*flow.Header, error) {
 			block, ok := s.blocksHeightToBlockMap[height]
 			if !ok {
-				return flow.ZeroID, storage.ErrNotFound
+				return nil, storage.ErrNotFound
 			}
-			return block.ID(), nil
+			return block.ToHeader(), nil
 		})
 
 	s.snapshot.
@@ -990,7 +990,7 @@ func (s *BackendExecutionDataSuite) TestExecutionDataProviderErrors() {
 // errors like missing required executors, rather than terminating the subscription immediately,
 // until the context is canceled.
 func (s *BackendExecutionDataSuite) TestExecutionResultNotReadyError() {
-	s.mockSubscribeFuncState()
+	s.mockDataProviderState()
 	s.mockExecutionResultProviderState()
 
 	s.snapshot.
@@ -1065,9 +1065,9 @@ func (s *BackendExecutionDataSuite) TestExecutionResultNotReadyError() {
 	require.ErrorIs(s.T(), sub.Err(), context.Canceled)
 }
 
-// mockSubscribeFuncState sets up mock expectations for Subscribe* functions that require access to the
+// mockDataProviderState sets up mock expectations for Subscribe* functions that require access to the
 // execution state.
-func (s *BackendExecutionDataSuite) mockSubscribeFuncState() {
+func (s *BackendExecutionDataSuite) mockDataProviderState() {
 	s.params.On("SporkRootBlock").Return(s.sporkRootBlock)
 	s.state.On("Params").Return(s.params)
 
@@ -1082,13 +1082,13 @@ func (s *BackendExecutionDataSuite) mockSubscribeFuncState() {
 		})
 
 	s.headers.
-		On("BlockIDByHeight", mock.Anything).
-		Return(func(height uint64) (flow.Identifier, error) {
+		On("ByHeight", mock.Anything).
+		Return(func(height uint64) (*flow.Header, error) {
 			block, ok := s.blocksHeightToBlockMap[height]
 			if !ok {
-				return flow.ZeroID, storage.ErrNotFound
+				return nil, storage.ErrNotFound
 			}
-			return block.ID(), nil
+			return block.ToHeader(), nil
 		})
 }
 

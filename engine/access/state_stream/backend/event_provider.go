@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/engine/access/subscription"
@@ -53,10 +54,11 @@ func newEventProvider(
 var _ subscription.DataProvider = (*eventProvider)(nil)
 
 func (e *eventProvider) NextData(_ context.Context) (any, error) {
-	blockID, err := e.headers.BlockIDByHeight(e.height)
+	blockHeader, err := e.headers.ByHeight(e.height)
 	if err != nil {
 		return nil, errors.Join(subscription.ErrBlockNotReady, err)
 	}
+	blockID := blockHeader.ID()
 
 	execResultInfo, err := e.executionResultProvider.ExecutionResultInfo(blockID, e.criteria)
 	if err != nil {
@@ -76,8 +78,9 @@ func (e *eventProvider) NextData(_ context.Context) (any, error) {
 	sporkRootBlock := e.state.Params().SporkRootBlock()
 	if e.height == sporkRootBlock.Height {
 		response := &EventsResponse{
-			BlockID: sporkRootBlock.ID(),
-			Height:  e.height,
+			BlockID:        sporkRootBlock.ID(),
+			Height:         e.height,
+			BlockTimestamp: time.UnixMilli(int64(sporkRootBlock.Timestamp)).UTC(),
 		}
 
 		// prepare criteria for the next call
@@ -99,9 +102,10 @@ func (e *eventProvider) NextData(_ context.Context) (any, error) {
 	}
 
 	response := &EventsResponse{
-		BlockID: blockID,
-		Height:  e.height,
-		Events:  e.eventFilter.Filter(events),
+		BlockID:        blockID,
+		Height:         e.height,
+		Events:         e.eventFilter.Filter(events),
+		BlockTimestamp: time.UnixMilli(int64(blockHeader.Timestamp)).UTC(),
 	}
 
 	// prepare criteria for the next call

@@ -66,7 +66,7 @@ func (s *BackendEventsSuite) SetupTest() {
 // starting from the spork root block ID. It ensures that the events are received
 // sequentially and matches the expected data after applying the event filter.
 func (s *BackendEventsSuite) TestSubscribeEvents() {
-	s.mockSubscribeFuncState()
+	s.mockDataProviderState()
 	s.mockExecutionResultProviderStateForEvents()
 
 	s.snapshot.
@@ -140,7 +140,7 @@ func (s *BackendEventsSuite) TestSubscribeEvents() {
 // ID different from the spork root works as expected. We start from the block right
 // after the spork root and stream all remaining blocks.
 func (s *BackendEventsSuite) TestSubscribeEventsFromNonRoot() {
-	s.mockSubscribeFuncState()
+	s.mockDataProviderState()
 	s.mockExecutionResultProviderStateForEvents()
 
 	// called on the start by tracker
@@ -213,7 +213,7 @@ func (s *BackendEventsSuite) TestSubscribeEventsFromNonRoot() {
 // block height. It ensures that the correct block header is retrieved and data streaming starts
 // from the correct block.
 func (s *BackendEventsSuite) TestSubscribeEventsFromStartHeight() {
-	s.mockSubscribeFuncState()
+	s.mockDataProviderState()
 	s.mockExecutionResultProviderStateForEvents()
 
 	s.snapshot.
@@ -290,7 +290,7 @@ func (s *BackendEventsSuite) TestSubscribeEventsFromStartHeight() {
 // block ID. It checks that the start height is correctly resolved from the block ID and data
 // streaming proceeds.
 func (s *BackendEventsSuite) TestSubscribeEventsFromStartID() {
-	s.mockSubscribeFuncState()
+	s.mockDataProviderState()
 	s.mockExecutionResultProviderStateForEvents()
 
 	s.snapshot.
@@ -363,7 +363,7 @@ func (s *BackendEventsSuite) TestSubscribeEventsFromStartID() {
 // available finalized block. It ensures that the start height is correctly determined and data
 // streaming begins.
 func (s *BackendEventsSuite) TestSubscribeEventsFromLatest() {
-	s.mockSubscribeFuncState()
+	s.mockDataProviderState()
 	s.mockExecutionResultProviderStateForEvents()
 
 	s.state.

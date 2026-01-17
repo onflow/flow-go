@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/engine/access/subscription/tracker"
@@ -65,10 +66,11 @@ func (e *executionDataProvider) NextData(ctx context.Context) (any, error) {
 		return nil, subscription.ErrBlockNotReady
 	}
 
-	blockID, err := e.headers.BlockIDByHeight(e.height)
+	blockHeader, err := e.headers.ByHeight(e.height)
 	if err != nil {
 		return nil, errors.Join(subscription.ErrBlockNotReady, err)
 	}
+	blockID := blockHeader.ID()
 
 	execResultInfo, err := e.executionResultProvider.ExecutionResultInfo(blockID, e.criteria)
 	if err != nil {
@@ -92,6 +94,7 @@ func (e *executionDataProvider) NextData(ctx context.Context) (any, error) {
 			ExecutionData: &execution_data.BlockExecutionData{
 				BlockID: sporkRootBlock.ID(),
 			},
+			BlockTimestamp: time.UnixMilli(int64(sporkRootBlock.Timestamp)).UTC(),
 		}
 
 		// prepare criteria for the next call
@@ -118,6 +121,7 @@ func (e *executionDataProvider) NextData(ctx context.Context) (any, error) {
 			ExecutionResultID: execResultInfo.ExecutionResultID,
 			ExecutorIDs:       execResultInfo.ExecutionNodes.NodeIDs(),
 		},
+		BlockTimestamp: time.UnixMilli(int64(blockHeader.Timestamp)).UTC(),
 	}
 
 	// prepare criteria for the next call
