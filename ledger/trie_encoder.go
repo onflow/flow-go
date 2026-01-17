@@ -617,12 +617,12 @@ func DecodeTrieUpdate(encodedTrieUpdate []byte) (*TrieUpdate, error) {
 	// check the enc dec version
 	rest, version, err := CheckVersion(encodedTrieUpdate, TrieUpdateVersion)
 	if err != nil {
-		return nil, fmt.Errorf("error decoding trie update: %w", err)
+		return nil, fmt.Errorf("error decoding trie update version: %w", err)
 	}
 	// check the encoding type
 	rest, err = CheckType(rest, TypeTrieUpdate)
 	if err != nil {
-		return nil, fmt.Errorf("error decoding trie update: %w", err)
+		return nil, fmt.Errorf("error decoding trie update type: %w", err)
 	}
 	return decodeTrieUpdate(rest, version)
 }
@@ -632,28 +632,28 @@ func decodeTrieUpdate(inp []byte, version uint16) (*TrieUpdate, error) {
 	// decode root hash
 	rhSize, rest, err := utils.ReadUint16(inp)
 	if err != nil {
-		return nil, fmt.Errorf("error decoding trie update: %w", err)
+		return nil, fmt.Errorf("error decoding trie update root hash size: %w", err)
 	}
 
 	rhBytes, rest, err := utils.ReadSlice(rest, int(rhSize))
 	if err != nil {
-		return nil, fmt.Errorf("error decoding trie update: %w", err)
+		return nil, fmt.Errorf("error decoding trie update root hash bytes: %w", err)
 	}
 	rh, err := ToRootHash(rhBytes)
 	if err != nil {
-		return nil, fmt.Errorf("decode trie update failed: %w", err)
+		return nil, fmt.Errorf("error decoding trie update root hash conversion: %w", err)
 	}
 
 	// decode number of paths
 	numOfPaths, rest, err := utils.ReadUint32(rest)
 	if err != nil {
-		return nil, fmt.Errorf("error decoding trie update: %w", err)
+		return nil, fmt.Errorf("error decoding trie update number of paths: %w", err)
 	}
 
 	// decode path size
 	pathSize, rest, err := utils.ReadUint16(rest)
 	if err != nil {
-		return nil, fmt.Errorf("error decoding trie update: %w", err)
+		return nil, fmt.Errorf("error decoding trie update path size: %w", err)
 	}
 
 	paths := make([]Path, numOfPaths)
@@ -664,11 +664,11 @@ func decodeTrieUpdate(inp []byte, version uint16) (*TrieUpdate, error) {
 	for i := 0; i < int(numOfPaths); i++ {
 		encPath, rest, err = utils.ReadSlice(rest, int(pathSize))
 		if err != nil {
-			return nil, fmt.Errorf("error decoding trie update: %w", err)
+			return nil, fmt.Errorf("error decoding trie update path %d: %w", i, err)
 		}
 		path, err = ToPath(encPath)
 		if err != nil {
-			return nil, fmt.Errorf("error decoding trie update: %w", err)
+			return nil, fmt.Errorf("error decoding trie update path %d conversion: %w", i, err)
 		}
 		paths[i] = path
 	}
@@ -680,16 +680,16 @@ func decodeTrieUpdate(inp []byte, version uint16) (*TrieUpdate, error) {
 	for i := 0; i < int(numOfPaths); i++ {
 		payloadSize, rest, err = utils.ReadUint32(rest)
 		if err != nil {
-			return nil, fmt.Errorf("error decoding trie update: %w", err)
+			return nil, fmt.Errorf("error decoding trie update payload %d size: %w", i, err)
 		}
 		encPayload, rest, err = utils.ReadSlice(rest, int(payloadSize))
 		if err != nil {
-			return nil, fmt.Errorf("error decoding trie update: %w", err)
+			return nil, fmt.Errorf("error decoding trie update payload %d bytes: %w", i, err)
 		}
 		// Decode payload (zerocopy)
 		payload, err = decodePayload(encPayload, true, version)
 		if err != nil {
-			return nil, fmt.Errorf("error decoding trie update: %w", err)
+			return nil, fmt.Errorf("error decoding trie update payload %d: %w", i, err)
 		}
 		payloads[i] = payload
 	}
