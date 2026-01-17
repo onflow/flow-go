@@ -14,10 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/atomic"
 	"google.golang.org/grpc"
-	_ "google.golang.org/grpc/encoding/gzip" // required for gRPC compression
 
-	_ "github.com/onflow/flow-go/engine/common/grpc/compressor/deflate" // required for gRPC compression
-	_ "github.com/onflow/flow-go/engine/common/grpc/compressor/snappy"  // required for gRPC compression
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/utils/unittest"
