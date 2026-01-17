@@ -6,6 +6,7 @@ import (
 
 	"github.com/rs/zerolog"
 
+	httpmodels "github.com/onflow/flow-go/engine/access/rest/http/models"
 	"github.com/onflow/flow-go/engine/access/rest/http/request"
 	"github.com/onflow/flow-go/engine/access/rest/websockets/data_providers/models"
 	wsmodels "github.com/onflow/flow-go/engine/access/rest/websockets/models"
@@ -18,10 +19,11 @@ import (
 
 // accountStatusesArguments contains the arguments required for subscribing to account statuses
 type accountStatusesArguments struct {
-	StartBlockID      flow.Identifier                  // ID of the block to start subscription from
-	StartBlockHeight  uint64                           // Height of the block to start subscription from
-	Filter            state_stream.AccountStatusFilter // Filter applied to events for a given subscription
-	HeartbeatInterval uint64                           // Maximum number of blocks message won't be sent
+	StartBlockID        flow.Identifier                  // ID of the block to start subscription from
+	StartBlockHeight    uint64                           // Height of the block to start subscription from
+	Filter              state_stream.AccountStatusFilter // Filter applied to events for a given subscription
+	HeartbeatInterval   uint64                           // Maximum number of blocks message won't be sent
+	ExecutionStateQuery httpmodels.ExecutionStateQuery   //TODO: we don't parse it yet
 }
 
 type AccountStatusesDataProvider struct {
@@ -135,15 +137,16 @@ func (p *AccountStatusesDataProvider) createAndStartSubscription(
 	ctx context.Context,
 	args accountStatusesArguments,
 ) subscription.Subscription {
+	criteria := httpmodels.NewCriteria(args.ExecutionStateQuery)
 	if args.StartBlockID != flow.ZeroID {
-		return p.stateStreamApi.SubscribeAccountStatusesFromStartBlockID(ctx, args.StartBlockID, args.Filter)
+		return p.stateStreamApi.SubscribeAccountStatusesFromStartBlockID(ctx, args.StartBlockID, args.Filter, criteria)
 	}
 
 	if args.StartBlockHeight != request.EmptyHeight {
-		return p.stateStreamApi.SubscribeAccountStatusesFromStartHeight(ctx, args.StartBlockHeight, args.Filter)
+		return p.stateStreamApi.SubscribeAccountStatusesFromStartHeight(ctx, args.StartBlockHeight, args.Filter, criteria)
 	}
 
-	return p.stateStreamApi.SubscribeAccountStatusesFromLatestBlock(ctx, args.Filter)
+	return p.stateStreamApi.SubscribeAccountStatusesFromLatestBlock(ctx, args.Filter, criteria)
 }
 
 // convertAccountStatusesResponse converts events in the provided AccountStatusesResponse from CCF

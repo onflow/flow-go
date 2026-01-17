@@ -210,12 +210,16 @@ func (b *ExecutionDataBackend) SubscribeExecutionDataFromStartBlockID(
 		return subscription.NewFailedSubscription(err, "criteria validation failed")
 	}
 
-	executionDataProvider := newExecutionDataProvider(
-		b.state,
+	snapshotBuilder := newExecutionStateSnapshotBuilder(
 		b.headers,
-		b.executionDataTracker,
 		b.executionResultProvider,
 		b.executionStateCache,
+	)
+
+	executionDataProvider := newExecutionDataProvider(
+		b.state,
+		b.executionDataTracker,
+		snapshotBuilder,
 		criteria,
 		header.Height,
 	)
@@ -259,12 +263,16 @@ func (b *ExecutionDataBackend) SubscribeExecutionDataFromStartBlockHeight(
 		return subscription.NewFailedSubscription(err, "criteria validation failed")
 	}
 
-	executionDataProvider := newExecutionDataProvider(
-		b.state,
+	snapshotBuilder := newExecutionStateSnapshotBuilder(
 		b.headers,
-		b.executionDataTracker,
 		b.executionResultProvider,
 		b.executionStateCache,
+	)
+
+	executionDataProvider := newExecutionDataProvider(
+		b.state,
+		b.executionDataTracker,
+		snapshotBuilder,
 		criteria,
 		header.Height,
 	)

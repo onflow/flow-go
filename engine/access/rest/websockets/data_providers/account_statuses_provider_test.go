@@ -131,6 +131,7 @@ func (s *AccountStatusesProviderSuite) subscribeAccountStatusesDataProviderTestC
 					mock.Anything,
 					s.rootBlock.ID(),
 					mock.Anything,
+					mock.Anything,
 				).Return(sub).Once()
 			},
 			expectedResponses: expectedResponses,
@@ -148,6 +149,7 @@ func (s *AccountStatusesProviderSuite) subscribeAccountStatusesDataProviderTestC
 					mock.Anything,
 					s.rootBlock.Height,
 					mock.Anything,
+					mock.Anything,
 				).Return(sub).Once()
 			},
 			expectedResponses: expectedResponses,
@@ -161,6 +163,7 @@ func (s *AccountStatusesProviderSuite) subscribeAccountStatusesDataProviderTestC
 			setupBackend: func(sub *submock.Subscription) {
 				s.api.On(
 					"SubscribeAccountStatusesFromLatestBlock",
+					mock.Anything,
 					mock.Anything,
 					mock.Anything,
 				).Return(sub).Once()
@@ -264,7 +267,7 @@ func (s *AccountStatusesProviderSuite) TestMessageIndexAccountStatusesProviderRe
 	sub.On("Channel").Return((<-chan interface{})(accountStatusesChan))
 	sub.On("Err").Return(nil).Once()
 
-	s.api.On("SubscribeAccountStatusesFromStartBlockID", mock.Anything, mock.Anything, mock.Anything).Return(sub)
+	s.api.On("SubscribeAccountStatusesFromStartBlockID", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(sub)
 
 	arguments :=
 		map[string]interface{}{
