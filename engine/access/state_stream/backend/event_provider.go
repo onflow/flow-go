@@ -8,7 +8,6 @@ import (
 
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/engine/access/subscription"
-	"github.com/onflow/flow-go/engine/access/subscription/tracker"
 	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
@@ -21,7 +20,6 @@ import (
 type eventProvider struct {
 	state                   protocol.State
 	headers                 storage.Headers
-	executionDataTracker    tracker.ExecutionDataTracker
 	executionResultProvider optimistic_sync.ExecutionResultInfoProvider
 	executionStateCache     optimistic_sync.ExecutionStateCache
 	criteria                optimistic_sync.Criteria
@@ -29,10 +27,11 @@ type eventProvider struct {
 	eventFilter             state_stream.EventFilter
 }
 
+var _ subscription.DataProvider = (*eventProvider)(nil)
+
 func newEventProvider(
 	state protocol.State,
 	headers storage.Headers,
-	executionDataTracker tracker.ExecutionDataTracker,
 	executionResultProvider optimistic_sync.ExecutionResultInfoProvider,
 	executionStateCache optimistic_sync.ExecutionStateCache,
 	nextCriteria optimistic_sync.Criteria,
@@ -42,7 +41,6 @@ func newEventProvider(
 	return &eventProvider{
 		state:                   state,
 		headers:                 headers,
-		executionDataTracker:    executionDataTracker,
 		executionResultProvider: executionResultProvider,
 		executionStateCache:     executionStateCache,
 		criteria:                nextCriteria,
@@ -50,8 +48,6 @@ func newEventProvider(
 		eventFilter:             eventFilter,
 	}
 }
-
-var _ subscription.DataProvider = (*eventProvider)(nil)
 
 func (e *eventProvider) NextData(_ context.Context) (any, error) {
 	blockHeader, err := e.headers.ByHeight(e.height)

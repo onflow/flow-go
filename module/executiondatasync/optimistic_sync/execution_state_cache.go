@@ -1,6 +1,10 @@
 package optimistic_sync
 
-import "github.com/onflow/flow-go/model/flow"
+import (
+	"errors"
+
+	"github.com/onflow/flow-go/model/flow"
+)
 
 // ExecutionStateCache provides access to execution state snapshots for querying data at specific ExecutionResults.
 type ExecutionStateCache interface {
@@ -10,6 +14,8 @@ type ExecutionStateCache interface {
 	// The result may be sealed or unsealed. Only data for finalized blocks is available.
 	//
 	// Expected error returns during normal operation:
-	//   - [storage.ErrNotFound]: Result is not available, not ready for querying, or does not descend from the latest sealed result.
+	//   - [SnapshotNotFoundError]: Result is not available, not ready for querying, or does not descend from the latest sealed result.
 	Snapshot(executionResultID flow.Identifier) (Snapshot, error)
 }
+
+var SnapshotNotFoundError = errors.New("execution state snapshot for the given execution result ID not found")

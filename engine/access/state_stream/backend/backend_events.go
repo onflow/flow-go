@@ -128,9 +128,9 @@ func (b *EventsBackend) SubscribeEventsFromStartBlockID(
 		return subscription.NewFailedSubscription(err, "criteria validation failed")
 	}
 
-	eventProvider := newEventProvider(b.state,
+	eventProvider := newEventProvider(
+		b.state,
 		b.headers,
-		b.executionDataTracker,
 		b.executionResultProvider,
 		b.executionStateCache,
 		criteria,
@@ -186,7 +186,6 @@ func (b *EventsBackend) SubscribeEventsFromStartHeight(
 
 	eventProvider := newEventProvider(b.state,
 		b.headers,
-		b.executionDataTracker,
 		b.executionResultProvider,
 		b.executionStateCache,
 		criteria,

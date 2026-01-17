@@ -863,8 +863,8 @@ func (s *BackendExecutionDataSuite) TestExecutionDataProviderErrors() {
 		mockState   func()
 	}{
 		{
-			name:        "block is not finalized",
-			expectedErr: storage.ErrNotFound,
+			name:        "block before history",
+			expectedErr: optimistic_sync.ErrBlockBeforeNodeHistory,
 			mockState: func() {
 				// stream the first block normally, then stream an error
 				s.executionResultProviderMock.
@@ -875,7 +875,7 @@ func (s *BackendExecutionDataSuite) TestExecutionDataProviderErrors() {
 				s.executionResultProviderMock.
 					On("ExecutionResultInfo", mock.Anything, mock.Anything).
 					Return(func(blockID flow.Identifier, criteria optimistic_sync.Criteria) (*optimistic_sync.ExecutionResultInfo, error) {
-						return nil, storage.ErrNotFound
+						return nil, optimistic_sync.ErrBlockBeforeNodeHistory
 					}).
 					Once()
 			},
@@ -925,6 +925,10 @@ func (s *BackendExecutionDataSuite) TestExecutionDataProviderErrors() {
 	s.params.On("SporkRootBlock").Return(s.sporkRootBlock)
 	s.state.On("Params").Return(s.params)
 
+	s.executionStateCache.
+		On("Snapshot", mock.Anything).
+		Return(s.executionDataSnapshot, nil)
+
 	s.headers.
 		On("ByHeight", mock.Anything).
 		Return(func(height uint64) (*flow.Header, error) {
@@ -967,6 +971,9 @@ func (s *BackendExecutionDataSuite) TestExecutionDataProviderErrors() {
 
 			currentHeight := s.nodeRootBlock.Height
 			sub := backend.SubscribeExecutionDataFromStartBlockID(ctx, s.nodeRootBlock.ID(), s.criteria)
+
+			// Notify the streamer that data is available
+			s.executionDataBroadcaster.Publish()
 
 			for value := range sub.Channel() {
 				actualExecutionData, ok := value.(*ExecutionDataResponse)
