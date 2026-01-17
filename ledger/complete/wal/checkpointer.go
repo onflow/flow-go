@@ -665,6 +665,102 @@ func LoadCheckpoint(filepath string, logger zerolog.Logger) (
 	return readCheckpoint(file, logger)
 }
 
+// LoadCheckpointRootHashes reads only the trie root hashes from a checkpoint file without loading the entire checkpoint.
+// This is much faster than LoadCheckpoint for large checkpoint files.
+// It returns the root hashes in the same order as they appear in the checkpoint.
+func LoadCheckpointRootHashes(checkpointPath string, logger zerolog.Logger) ([]ledger.RootHash, error) {
+	file, err := os.Open(checkpointPath)
+	if err != nil {
+		return nil, fmt.Errorf("cannot open checkpoint file %s: %w", checkpointPath, err)
+	}
+	defer func() {
+		evictErr := evictFileFromLinuxPageCache(file, false, logger)
+		if evictErr != nil {
+			logger.Warn().Msgf("failed to evict file %s from Linux page cache: %s", checkpointPath, evictErr)
+		}
+		_ = file.Close()
+	}()
+
+	// Read header: magic (2 bytes) + version (2 bytes)
+	header := make([]byte, headerSize)
+	_, err = io.ReadFull(file, header)
+	if err != nil {
+		return nil, fmt.Errorf("cannot read header: %w", err)
+	}
+
+	// Decode header
+	magicBytes := binary.BigEndian.Uint16(header)
+	version := binary.BigEndian.Uint16(header[encMagicSize:])
+
+	if magicBytes != MagicBytesCheckpointHeader {
+		return nil, fmt.Errorf("unknown file format. Magic constant %x does not match expected %x", magicBytes, MagicBytesCheckpointHeader)
+	}
+
+	switch version {
+	case VersionV6:
+		// For V6, use the existing fast reading function
+		headerPath := checkpointPath
+		dir, fileName := filepath.Split(headerPath)
+		return ReadTriesRootHash(logger, dir, fileName)
+	case VersionV4, VersionV5:
+		// For V4 and V5, read footer to get trie count, then seek backwards to read encoded tries
+		return readCheckpointRootHashesV4V5(file, version)
+	case VersionV1, VersionV3:
+		// For V3 and earlier, fast mode is not supported due to format differences
+		return nil, fmt.Errorf("fast mode is not supported for checkpoint version %x. Please use full loading mode", version)
+	default:
+		return nil, fmt.Errorf("unsupported file version %x", version)
+	}
+}
+
+// readCheckpointRootHashesV4V5 reads root hashes from V4 or V5 checkpoint files.
+// It reads the footer to get the trie count, then seeks backwards to read just the encoded tries.
+func readCheckpointRootHashesV4V5(f *os.File, version uint16) ([]ledger.RootHash, error) {
+	// Read footer to get node count and trie count
+	const footerOffset = encNodeCountSize + encTrieCountSize + crc32SumSize
+	const footerSize = encNodeCountSize + encTrieCountSize
+
+	// Seek to footer
+	_, err := f.Seek(-footerOffset, io.SeekEnd)
+	if err != nil {
+		return nil, fmt.Errorf("cannot seek to footer: %w", err)
+	}
+
+	footer := make([]byte, footerSize)
+	_, err = io.ReadFull(f, footer)
+	if err != nil {
+		return nil, fmt.Errorf("cannot read footer: %w", err)
+	}
+
+	// Decode trie count
+	triesCount := binary.BigEndian.Uint16(footer[encNodeCountSize:])
+
+	// Calculate offset to start of encoded tries
+	// Encoded tries are stored just before the footer
+	trieRootOffset := footerOffset + int(flattener.EncodedTrieSize)*int(triesCount)
+
+	// Seek to start of encoded tries
+	_, err = f.Seek(int64(-trieRootOffset), io.SeekEnd)
+	if err != nil {
+		return nil, fmt.Errorf("cannot seek to trie roots: %w", err)
+	}
+
+	// Read encoded tries
+	reader := bufio.NewReaderSize(f, defaultBufioReadSize)
+	trieRoots := make([]ledger.RootHash, 0, triesCount)
+	scratch := make([]byte, 1024*4) // must not be less than 1024
+
+	for i := uint16(0); i < triesCount; i++ {
+		encodedTrie, err := flattener.ReadEncodedTrie(reader, scratch)
+		if err != nil {
+			return nil, fmt.Errorf("cannot read encoded trie %d: %w", i, err)
+		}
+		trieRoots = append(trieRoots, ledger.RootHash(encodedTrie.RootHash))
+	}
+
+	return trieRoots, nil
+}
+
 func readCheckpoint(f *os.File, logger zerolog.Logger) ([]*trie.MTrie, error) {
 
 	// Read header: magic (2 bytes) + version (2 bytes)
