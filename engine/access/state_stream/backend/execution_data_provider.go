@@ -36,7 +36,7 @@ func newExecutionDataProvider(
 			state:           state,
 			snapshotBuilder: snapshotBuilder,
 			criteria:        nextCriteria,
-			height:          startHeight,
+			blockHeight:     startHeight,
 		},
 		executionDataTracker: executionDataTracker,
 	}
@@ -52,31 +52,31 @@ func newExecutionDataProvider(
 //   - [optimistic_sync.SnapshotNotFoundError]: Result is not available, not ready for querying, or does not descend from the latest sealed result.
 //   - [optimistic_sync.CriteriaNotMetError]: Returned when the block is already sealed but no execution result can satisfy the provided criteria.
 //   - All other errors are potential indicators of bugs or corrupted internal state (continuation impossible)
-func (e *executionDataProvider) NextData(ctx context.Context) (any, error) {
+func (p *executionDataProvider) NextData(ctx context.Context) (any, error) {
 	// execution data provider specific check: it's possible for the data to exist in the data store before
 	// the notification is received. This ensures a consistent view is available to all streams.
-	availableFinalizedHeight := e.executionDataTracker.GetHighestAvailableFinalizedHeight()
-	if e.height > availableFinalizedHeight {
+	availableFinalizedHeight := p.executionDataTracker.GetHighestAvailableFinalizedHeight()
+	if p.blockHeight > availableFinalizedHeight {
 		return nil, subscription.ErrBlockNotReady
 	}
 
-	metadata, err := e.getSnapshotMetadata()
+	metadata, err := p.getSnapshotMetadata()
 	if err != nil {
 		return nil, err
 	}
 
 	// handle spork root special case
-	if e.isSporkRoot() {
-		blockID, timestamp := e.sporkRootBlockInfo()
+	if p.isSporkRoot() {
+		sporkRootBlock := p	.state.Params().SporkRootBlock()
 		response := &ExecutionDataResponse{
-			Height: e.height,
+			Height: p.blockHeight,
 			ExecutionData: &execution_data.BlockExecutionData{
-				BlockID: blockID,
+				BlockID: sporkRootBlock.ID(),
 			},
-			BlockTimestamp: timestamp,
+			BlockTimestamp: time.UnixMilli(int64(sporkRootBlock.Timestamp)).UTC(),
 		}
 
-		e.incrementHeight(metadata.ExecutionResultInfo.ExecutionResultID)
+		p.incrementHeight(metadata.ExecutionResultInfo.ExecutionResultID)
 		return response, nil
 	}
 
@@ -89,7 +89,7 @@ func (e *executionDataProvider) NextData(ctx context.Context) (any, error) {
 
 	// build response
 	response := &ExecutionDataResponse{
-		Height:        e.height,
+		Height:        p.blockHeight,
 		ExecutionData: executionData.BlockExecutionData,
 		ExecutorMetadata: accessmodel.ExecutorMetadata{
 			ExecutionResultID: metadata.ExecutionResultInfo.ExecutionResultID,
@@ -98,6 +98,6 @@ func (e *executionDataProvider) NextData(ctx context.Context) (any, error) {
 		BlockTimestamp: time.UnixMilli(int64(metadata.BlockHeader.Timestamp)).UTC(),
 	}
 
-	e.incrementHeight(metadata.ExecutionResultInfo.ExecutionResultID)
+	p.incrementHeight(metadata.ExecutionResultInfo.ExecutionResultID)
 	return response, nil
 }

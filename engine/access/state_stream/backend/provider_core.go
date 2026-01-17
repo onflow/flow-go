@@ -17,7 +17,7 @@ type providerCore struct {
 	state           protocol.State
 	snapshotBuilder *executionStateSnapshotBuilder
 	criteria        optimistic_sync.Criteria
-	height          uint64
+	blockHeight     uint64
 }
 
 // getSnapshotMetadata retrieves the execution state snapshot metadata for the current block height.
@@ -29,7 +29,7 @@ type providerCore struct {
 //   - [optimistic_sync.SnapshotNotFoundError]: Result is not available, not ready for querying, or does not descend from the latest sealed result.
 //   - [optimistic_sync.CriteriaNotMetError]: Returned when the block is already sealed but no execution result can satisfy the provided criteria.
 func (c *providerCore) getSnapshotMetadata() (*executionStateSnapshotMetadata, error) {
-	metadata, err := c.snapshotBuilder.BuildSnapshot(c.height, c.criteria)
+	metadata, err := c.snapshotBuilder.BuildSnapshot(c.blockHeight, c.criteria)
 	if err != nil {
 		switch {
 		case optimistic_sync.IsExecutionResultNotReadyError(err):
@@ -51,7 +51,7 @@ func (c *providerCore) getSnapshotMetadata() (*executionStateSnapshotMetadata, e
 }
 
 func (c *providerCore) isSporkRoot() bool {
-	return c.height == c.state.Params().SporkRootBlock().Height
+	return c.blockHeight == c.state.Params().SporkRootBlock().Height
 }
 
 func (c *providerCore) sporkRootBlockInfo() (flow.Identifier, time.Time) {
@@ -61,5 +61,5 @@ func (c *providerCore) sporkRootBlockInfo() (flow.Identifier, time.Time) {
 
 func (c *providerCore) incrementHeight(resultID flow.Identifier) {
 	c.criteria.ParentExecutionResultID = resultID
-	c.height++
+	c.blockHeight++
 }

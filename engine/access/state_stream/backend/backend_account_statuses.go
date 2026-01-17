@@ -2,6 +2,7 @@ package backend
 
 import (
 	"context"
+	"time"
 
 	"github.com/rs/zerolog"
 
@@ -17,9 +18,10 @@ import (
 )
 
 type AccountStatusesResponse struct {
-	BlockID       flow.Identifier
-	Height        uint64
-	AccountEvents map[string]flow.EventsList
+	BlockID        flow.Identifier
+	Height         uint64
+	AccountEvents  map[string]flow.EventsList
+	BlockTimestamp time.Time
 }
 
 // AccountStatusesBackend is a struct representing a backend implementation for subscribing to account statuses changes.
@@ -27,7 +29,7 @@ type AccountStatusesBackend struct {
 	log                     zerolog.Logger
 	state                   protocol.State
 	headers                 storage.Headers
-	sporkRootBlock          *flow.Block
+	nodeRootBlock           *flow.Header
 	executionDataTracker    tracker.ExecutionDataTracker
 	executionResultProvider optimistic_sync.ExecutionResultInfoProvider
 	executionStateCache     optimistic_sync.ExecutionStateCache
@@ -38,7 +40,7 @@ func NewAccountStatusesBackend(
 	log zerolog.Logger,
 	state protocol.State,
 	headers storage.Headers,
-	sporkRootBlock *flow.Block,
+	nodeRootBlock *flow.Header,
 	executionDataTracker tracker.ExecutionDataTracker,
 	executionResultProvider optimistic_sync.ExecutionResultInfoProvider,
 	executionStateCache optimistic_sync.ExecutionStateCache,
@@ -48,7 +50,7 @@ func NewAccountStatusesBackend(
 		log:                     log,
 		state:                   state,
 		headers:                 headers,
-		sporkRootBlock:          sporkRootBlock,
+		nodeRootBlock:           nodeRootBlock,
 		executionDataTracker:    executionDataTracker,
 		executionResultProvider: executionResultProvider,
 		executionStateCache:     executionStateCache,
@@ -117,7 +119,7 @@ func (b *AccountStatusesBackend) SubscribeAccountStatusesFromStartBlockID(
 		return subscription.NewFailedSubscription(err, "could not get header for block height")
 	}
 
-	if header.Height < b.sporkRootBlock.Height {
+	if header.Height < b.nodeRootBlock.Height {
 		return subscription.NewFailedSubscription(err, "block height is less than the spork root block")
 	}
 
@@ -132,18 +134,22 @@ func (b *AccountStatusesBackend) SubscribeAccountStatusesFromStartBlockID(
 		return subscription.NewFailedSubscription(err, "criteria validation failed")
 	}
 
-	executionDataProvider := newExecutionDataProvider(
-		b.state,
+	snapshotBuilder := newExecutionStateSnapshotBuilder(
 		b.headers,
-		b.executionDataTracker,
 		b.executionResultProvider,
 		b.executionStateCache,
+	)
+
+	accountStatusesProvider := newAccountStatusProvider(
+		b.log,
+		b.state,
+		snapshotBuilder,
 		criteria,
 		header.Height,
+		statusFilter,
 	)
-	accountStatusProvider := newAccountStatusProvider(b.log, executionDataProvider, statusFilter)
 
-	return b.subscriptionFactory.Subscribe(ctx, accountStatusProvider)
+	return b.subscriptionFactory.Subscribe(ctx, accountStatusesProvider)
 }
 
 // SubscribeAccountStatusesFromStartHeight subscribes to the streaming of account status changes starting from
@@ -161,7 +167,7 @@ func (b *AccountStatusesBackend) SubscribeAccountStatusesFromStartHeight(
 	statusFilter state_stream.AccountStatusFilter,
 	criteria optimistic_sync.Criteria,
 ) subscription.Subscription {
-	if startBlockHeight < b.sporkRootBlock.Height {
+	if startBlockHeight < b.nodeRootBlock.Height {
 		return subscription.NewFailedSubscription(nil,
 			"start height must be greater than or equal to the spork root height")
 	}
@@ -183,18 +189,22 @@ func (b *AccountStatusesBackend) SubscribeAccountStatusesFromStartHeight(
 		return subscription.NewFailedSubscription(err, "criteria validation failed")
 	}
 
-	executionDataProvider := newExecutionDataProvider(
-		b.state,
+	snapshotBuilder := newExecutionStateSnapshotBuilder(
 		b.headers,
-		b.executionDataTracker,
 		b.executionResultProvider,
 		b.executionStateCache,
+	)
+
+	accountStatusesProvider := newAccountStatusProvider(
+		b.log,
+		b.state,
+		snapshotBuilder,
 		criteria,
 		header.Height,
+		statusFilter,
 	)
-	accountStatusProvider := newAccountStatusProvider(b.log, executionDataProvider, statusFilter)
 
-	return b.subscriptionFactory.Subscribe(ctx, accountStatusProvider)
+	return b.subscriptionFactory.Subscribe(ctx, accountStatusesProvider)
 }
 
 // SubscribeAccountStatusesFromLatestBlock subscribes to the streaming of account status changes starting from a

@@ -40,28 +40,12 @@ func (s *BackendAccountStatusesSuite) SetupTest() {
 	s.statusFilters = append(s.statusFilters, filter)
 }
 
-// extractExpectedAccountStatuses extracts events from execution data, applies the filter,
-// and groups them by account address.
-func (s *BackendAccountStatusesSuite) extractExpectedAccountStatuses(blockID flow.Identifier, filter state_stream.AccountStatusFilter) map[string]flow.EventsList {
-	execData := s.blockIDToExecutionDataMap[blockID]
-	if execData == nil {
-		return nil
-	}
-
-	var events flow.EventsList
-	for _, chunkExecutionData := range execData.ChunkExecutionDatas {
-		events = append(events, chunkExecutionData.Events...)
-	}
-
-	filteredProtocolEvents := filter.Filter(events)
-	return filter.GroupCoreEventsByAccountAddress(filteredProtocolEvents, s.log)
-}
-
 // TestSubscribeAccountStatuses verifies that the subscription to account statuses works correctly
 // starting from the spork root block ID. It ensures that the account statuses are received
 // sequentially and matches the expected data after applying the status filter.
 func (s *BackendAccountStatusesSuite) TestSubscribeAccountStatuses() {
-	s.mockSubscribeFuncState()
+	s.mockDataProviderState()
+	s.mockExecutionResultProviderStateForEvents()
 
 	s.headers.
 		On("ByBlockID", mock.Anything).
@@ -74,28 +58,36 @@ func (s *BackendAccountStatusesSuite) TestSubscribeAccountStatuses() {
 		})
 
 	s.state.
+		On("AtBlockID", mock.Anything).
+		Return(s.snapshot)
+
+	s.state.
 		On("AtHeight", mock.Anything).
-		Return(s.snapshot, nil)
+		Return(s.snapshot)
+
+	s.snapshot.
+		On("SealedResult").
+		Return(s.executionResults[0], nil, nil)
 
 	for _, statusFilter := range s.statusFilters {
 		backend := NewAccountStatusesBackend(
 			s.log,
 			s.state,
 			s.headers,
-			s.sporkRootBlock,
+			s.nodeRootBlock,
 			s.executionDataTracker,
 			s.executionResultProvider,
 			s.executionStateCache,
 			s.subscriptionFactory,
 		)
-		currentHeight := s.sporkRootBlock.Height
+		currentHeight := s.nodeRootBlock.Height
 
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
 		sub := backend.SubscribeAccountStatuses(
 			ctx,
-			s.sporkRootBlock.ID(),
+			s.nodeRootBlock.ID(),
 			0, // either id or height must be provided
 			statusFilter,
 			s.criteria,
@@ -136,7 +128,8 @@ func (s *BackendAccountStatusesSuite) TestSubscribeAccountStatuses() {
 // ID different from the spork root works as expected. We start from the block right
 // after the spork root and stream all remaining blocks.
 func (s *BackendAccountStatusesSuite) TestSubscribeAccountStatusesFromNonRoot() {
-	s.mockSubscribeFuncState()
+	s.mockDataProviderState()
+	s.mockExecutionResultProviderStateForEvents()
 
 	s.headers.
 		On("ByBlockID", mock.Anything).
@@ -152,15 +145,19 @@ func (s *BackendAccountStatusesSuite) TestSubscribeAccountStatusesFromNonRoot() 
 		On("AtHeight", mock.Anything).
 		Return(s.snapshot, nil)
 
+	s.state.
+		On("AtBlockID", mock.Anything).
+		Return(s.snapshot)
+
 	// called on the start by tracker
-	startBlock := s.blocksHeightToBlockMap[s.sporkRootBlock.Height+1]
+	startBlock := s.blocksHeightToBlockMap[s.nodeRootBlock.Height+1]
 
 	for _, statusFilter := range s.statusFilters {
 		backend := NewAccountStatusesBackend(
 			s.log,
 			s.state,
 			s.headers,
-			s.sporkRootBlock,
+			s.nodeRootBlock,
 			s.executionDataTracker,
 			s.executionResultProvider,
 			s.executionStateCache,
@@ -214,35 +211,44 @@ func (s *BackendAccountStatusesSuite) TestSubscribeAccountStatusesFromNonRoot() 
 // block height. It ensures that the correct block header is retrieved and data streaming starts
 // from the correct block.
 func (s *BackendAccountStatusesSuite) TestSubscribeAccountStatusesFromStartHeight() {
-	s.mockSubscribeFuncState()
+	s.mockDataProviderState()
+	s.mockExecutionResultProviderStateForEvents()
 
 	s.state.
 		On("AtHeight", mock.Anything).
 		Return(s.snapshot, nil)
 
 	s.headers.
-		On("ByHeight", s.sporkRootBlock.Height).
-		Return(s.sporkRootBlock.ToHeader(), nil)
+		On("ByHeight", s.nodeRootBlock.Height).
+		Return(s.nodeRootBlock, nil)
+
+	s.state.
+		On("AtBlockID", mock.Anything).
+		Return(s.snapshot)
+
+	s.snapshot.
+		On("SealedResult").
+		Return(s.executionResults[0], nil, nil)
 
 	for _, statusFilter := range s.statusFilters {
 		backend := NewAccountStatusesBackend(
 			s.log,
 			s.state,
 			s.headers,
-			s.sporkRootBlock,
+			s.nodeRootBlock,
 			s.executionDataTracker,
 			s.executionResultProvider,
 			s.executionStateCache,
 			s.subscriptionFactory,
 		)
-		currentHeight := s.sporkRootBlock.Height
+		currentHeight := s.nodeRootBlock.Height
 
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
 		sub := backend.SubscribeAccountStatusesFromStartHeight(
 			ctx,
-			s.sporkRootBlock.Height,
+			s.nodeRootBlock.Height,
 			statusFilter,
 			s.criteria,
 		)
@@ -282,7 +288,16 @@ func (s *BackendAccountStatusesSuite) TestSubscribeAccountStatusesFromStartHeigh
 // block ID. It checks that the start height is correctly resolved from the block ID and data
 // streaming proceeds.
 func (s *BackendAccountStatusesSuite) TestSubscribeAccountStatusesFromStartID() {
-	s.mockSubscribeFuncState()
+	s.mockDataProviderState()
+	s.mockExecutionResultProviderStateForEvents()
+
+	s.state.
+		On("AtBlockID", mock.Anything).
+		Return(s.snapshot)
+
+	s.snapshot.
+		On("SealedResult").
+		Return(s.executionResults[0], nil, nil)
 
 	s.headers.
 		On("ByBlockID", mock.Anything).
@@ -303,7 +318,7 @@ func (s *BackendAccountStatusesSuite) TestSubscribeAccountStatusesFromStartID() 
 			s.log,
 			s.state,
 			s.headers,
-			s.sporkRootBlock,
+			s.nodeRootBlock,
 			s.executionDataTracker,
 			s.executionResultProvider,
 			s.executionStateCache,
@@ -356,7 +371,8 @@ func (s *BackendAccountStatusesSuite) TestSubscribeAccountStatusesFromStartID() 
 // available finalized block. It ensures that the start height is correctly determined and data
 // streaming begins.
 func (s *BackendAccountStatusesSuite) TestSubscribeAccountStatusesFromLatest() {
-	s.mockSubscribeFuncState()
+	s.mockDataProviderState()
+	s.mockExecutionResultProviderStateForEvents()
 
 	s.headers.
 		On("ByHeight", s.sporkRootBlock.Height).
@@ -365,6 +381,14 @@ func (s *BackendAccountStatusesSuite) TestSubscribeAccountStatusesFromLatest() {
 	s.state.
 		On("AtHeight", mock.Anything).
 		Return(s.snapshot, nil)
+
+	s.state.
+		On("AtBlockID", mock.Anything).
+		Return(s.snapshot)
+
+	s.snapshot.
+		On("SealedResult").
+		Return(s.executionResults[0], nil, nil)
 
 	s.state.On("Sealed").Return(s.snapshot, nil)
 	s.snapshot.On("Head").Return(s.blocks[0].ToHeader(), nil)
@@ -377,7 +401,7 @@ func (s *BackendAccountStatusesSuite) TestSubscribeAccountStatusesFromLatest() {
 			s.log,
 			s.state,
 			s.headers,
-			s.sporkRootBlock,
+			s.nodeRootBlock,
 			s.executionDataTracker,
 			s.executionResultProvider,
 			s.executionStateCache,
@@ -416,4 +440,21 @@ func (s *BackendAccountStatusesSuite) TestSubscribeAccountStatusesFromLatest() {
 		// the context cancellation is processed. At this point, the subscription should contain the error.
 		require.ErrorIs(s.T(), sub.Err(), context.Canceled)
 	}
+}
+
+// extractExpectedAccountStatuses extracts events from execution data, applies the filter,
+// and groups them by account address.
+func (s *BackendAccountStatusesSuite) extractExpectedAccountStatuses(
+	blockID flow.Identifier,
+	filter state_stream.AccountStatusFilter,
+) map[string]flow.EventsList {
+	events := s.blockIDToEventsMap[blockID]
+	if events == nil {
+		return nil
+	}
+
+	filteredEvents := filter.Filter(events)
+	accountEvents := filter.GroupCoreEventsByAccountAddress(filteredEvents, s.log)
+
+	return accountEvents
 }

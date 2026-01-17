@@ -454,7 +454,10 @@ func (s *BackendExecutionDataSuite) mockExecutionResultProviderStateForEvents() 
 }
 
 // extractExpectedEvents extracts events from execution data and applies the filter.
-func (s *BackendEventsSuite) extractExpectedEvents(blockID flow.Identifier, filter state_stream.EventFilter) flow.EventsList {
+func (s *BackendEventsSuite) extractExpectedEvents(
+	blockID flow.Identifier,
+	filter state_stream.EventFilter,
+) flow.EventsList {
 	events := s.blockIDToEventsMap[blockID]
 	if events == nil {
 		return nil

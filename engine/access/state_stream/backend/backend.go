@@ -125,7 +125,7 @@ func New(
 		logger,
 		state,
 		headers,
-		sporkRootBlock,
+		nodeRootBlock,
 		executionDataTracker,
 		executionResultProvider,
 		executionStateCache,

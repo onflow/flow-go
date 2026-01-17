@@ -106,8 +106,9 @@ func (s *BackendExecutionDataSuite) SetupTest() {
 
 		execData := s.g.BlockExecutionDatas().Fixture(
 			fixtures.BlockExecutionData.WithBlockID(block.ID()),
+			fixtures.BlockExecutionData.WithChunkExecutionDatas(s.g.ChunkExecutionDatas().List(3)...),
 		)
-		if block.ID() == s.nodeRootBlock.ID() {
+		if block.ID() == s.sporkRootBlock.ID() {
 			// sport root block doesn't have chunks of execution data
 			execData.ChunkExecutionDatas = nil
 		}

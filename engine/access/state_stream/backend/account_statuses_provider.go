@@ -5,42 +5,43 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/rs/zerolog"
+
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
 	"github.com/onflow/flow-go/state/protocol"
 )
 
-// eventProvider is responsible for managing event-related data and interactions within the protocol state.
-// It interacts with multiple components, such as protocol state, execution results, and event filters.
-//
-// NOT CONCURRENCY SAFE! eventProvider is designed to be used by a single streamer goroutine.
-type eventProvider struct {
+type accountStatusesProvider struct {
 	providerCore
-	eventFilter state_stream.EventFilter
+	log    zerolog.Logger
+	filter state_stream.AccountStatusFilter
 }
 
-var _ subscription.DataProvider = (*eventProvider)(nil)
-
-func newEventProvider(
+func newAccountStatusProvider(
+	log zerolog.Logger,
 	state protocol.State,
 	snapshotBuilder *executionStateSnapshotBuilder,
 	nextCriteria optimistic_sync.Criteria,
 	startHeight uint64,
-	eventFilter state_stream.EventFilter,
-) *eventProvider {
-	return &eventProvider{
+	filter state_stream.AccountStatusFilter,
+) *accountStatusesProvider {
+	return &accountStatusesProvider{
 		providerCore: providerCore{
 			state:           state,
 			snapshotBuilder: snapshotBuilder,
 			criteria:        nextCriteria,
 			blockHeight:     startHeight,
 		},
-		eventFilter: eventFilter,
+		log:    log,
+		filter: filter,
 	}
 }
 
-func (p *eventProvider) NextData(_ context.Context) (any, error) {
+var _ subscription.DataProvider = (*accountStatusesProvider)(nil)
+
+func (p *accountStatusesProvider) NextData(_ context.Context) (any, error) {
 	metadata, err := p.getSnapshotMetadata()
 	if err != nil {
 		return nil, err
@@ -49,7 +50,7 @@ func (p *eventProvider) NextData(_ context.Context) (any, error) {
 	// handle spork root special case
 	if p.isSporkRoot() {
 		sporkRootBlock := p.state.Params().SporkRootBlock()
-		response := &EventsResponse{
+		response := &AccountStatusesResponse{
 			BlockID:        sporkRootBlock.ID(),
 			Height:         sporkRootBlock.Height,
 			BlockTimestamp: time.UnixMilli(int64(sporkRootBlock.Timestamp)).UTC(),
@@ -66,15 +67,15 @@ func (p *eventProvider) NextData(_ context.Context) (any, error) {
 		return nil, fmt.Errorf("could not find events for block %s: %w", blockID, err)
 	}
 
-	// apply filter
-	filteredEvents := p.eventFilter.Filter(events)
+	// apply filter and group by account address
+	filteredEvents := p.filter.Filter(events)
+	accountEvents := p.filter.GroupCoreEventsByAccountAddress(filteredEvents, p.log)
 
 	// build response
-	response := &EventsResponse{
-		BlockID:        blockID,
-		Height:         metadata.BlockHeader.Height,
-		Events:         filteredEvents,
-		BlockTimestamp: time.UnixMilli(int64(metadata.BlockHeader.Timestamp)).UTC(),
+	response := &AccountStatusesResponse{
+		BlockID:       blockID,
+		Height:        metadata.BlockHeader.Height,
+		AccountEvents: accountEvents,
 	}
 
 	p.incrementHeight(metadata.ExecutionResultInfo.ExecutionResultID)
