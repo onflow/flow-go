@@ -26,6 +26,7 @@ import (
 	ssmock "github.com/onflow/flow-go/engine/access/state_stream/mock"
 	submock "github.com/onflow/flow-go/engine/access/subscription/mock"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -237,7 +238,7 @@ func (s *SubscribeEventsSuite) TestSubscribeEvents() {
 				startHeight = test.startHeight
 			}
 			stateStreamBackend.Mock.
-				On("SubscribeEvents", mocks.Anything, test.startBlockID, startHeight, filter).
+				On("SubscribeEvents", mocks.Anything, test.startBlockID, startHeight, filter, optimistic_sync.DefaultCriteria).
 				Return(subscription)
 
 			req, err := getSubscribeEventsRequest(s.T(), test.startBlockID, test.startHeight, test.eventTypes, test.addresses, test.contracts, test.heartbeatInterval, test.headers)
@@ -279,7 +280,7 @@ func (s *SubscribeEventsSuite) TestSubscribeEventsHandlesErrors() {
 		subscription.Mock.On("Channel").Return(chReadOnly)
 		subscription.Mock.On("Err").Return(fmt.Errorf("subscription error"))
 		stateStreamBackend.Mock.
-			On("SubscribeEvents", mocks.Anything, invalidBlock.ID(), uint64(0), mocks.Anything).
+			On("SubscribeEvents", mocks.Anything, invalidBlock.ID(), uint64(0), mocks.Anything, mocks.Anything).
 			Return(subscription)
 
 		req, err := getSubscribeEventsRequest(s.T(), invalidBlock.ID(), request.EmptyHeight, nil, nil, nil, 1, nil)
@@ -313,7 +314,7 @@ func (s *SubscribeEventsSuite) TestSubscribeEventsHandlesErrors() {
 		subscription.Mock.On("Channel").Return(chReadOnly)
 		subscription.Mock.On("Err").Return(nil)
 		stateStreamBackend.Mock.
-			On("SubscribeEvents", mocks.Anything, s.blocks[0].ID(), uint64(0), mocks.Anything).
+			On("SubscribeEvents", mocks.Anything, s.blocks[0].ID(), uint64(0), mocks.Anything, mocks.Anything).
 			Return(subscription)
 
 		req, err := getSubscribeEventsRequest(s.T(), s.blocks[0].ID(), request.EmptyHeight, nil, nil, nil, 1, nil)

@@ -40,7 +40,7 @@ type testType struct {
 // It verified that each of endpoints works properly with expected data being returned. Also the suite tests
 // handling of expected errors in the SubscribeAccountStatuses.
 //
-// Legacy: This suite is obsolete and declared legacy since it doesn't support new logic implemented
+// Deprecated: This suite is obsolete and declared legacy since it doesn't support new logic implemented
 // in the optimistic sync package.
 type LegacyBackendAccountStatusesSuite struct {
 	LegacyBackendExecutionDataSuite

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/engine/access/subscription/tracker"
@@ -16,6 +17,8 @@ import (
 
 // executionDataProvider connects subscription/streamer with backends.
 // It is intended to be used as a data provider for the subscription package.
+//
+// NOT CONCURRENCY SAFE! executionDataProvider is designed to be used by a single streamer goroutine.
 type executionDataProvider struct {
 	state                   protocol.State
 	headers                 storage.Headers
@@ -63,25 +66,11 @@ func (e *executionDataProvider) NextData(ctx context.Context) (any, error) {
 		return nil, subscription.ErrBlockNotReady
 	}
 
-	// the spork root block will never have execution data available. If requested, return an empty result.
-	if e.height == e.state.Params().SporkRootBlockHeight() {
-		response := &ExecutionDataResponse{
-			Height: e.height,
-			ExecutionData: &execution_data.BlockExecutionData{
-				BlockID: e.state.Params().SporkRootBlock().ID(),
-			},
-		}
-
-		e.height += 1
-		return response, nil
-	}
-
-	blockID, err := e.headers.BlockIDByHeight(e.height)
+	blockHeader, err := e.headers.ByHeight(e.height)
 	if err != nil {
-		// this function is called after the headers are updated, so if we didn't find the block header in the storage,
-		// we treat it as an exception
-		return nil, fmt.Errorf("block %d might not be finalized yet: %w", e.height, err)
+		return nil, errors.Join(subscription.ErrBlockNotReady, err)
 	}
+	blockID := blockHeader.ID()
 
 	execResultInfo, err := e.executionResultProvider.ExecutionResultInfo(blockID, e.criteria)
 	if err != nil {
@@ -97,10 +86,27 @@ func (e *executionDataProvider) NextData(ctx context.Context) (any, error) {
 		}
 	}
 
-	executionResultID := execResultInfo.ExecutionResultID
-	snapshot, err := e.executionStateCache.Snapshot(executionResultID)
+	// the spork root block will never have execution data available. If requested, return an empty result.
+	sporkRootBlock := e.state.Params().SporkRootBlock()
+	if e.height == sporkRootBlock.Height {
+		response := &ExecutionDataResponse{
+			Height: e.height,
+			ExecutionData: &execution_data.BlockExecutionData{
+				BlockID: sporkRootBlock.ID(),
+			},
+			BlockTimestamp: time.UnixMilli(int64(sporkRootBlock.Timestamp)).UTC(),
+		}
+
+		// prepare criteria for the next call
+		e.criteria.ParentExecutionResultID = execResultInfo.ExecutionResultID
+		e.height += 1
+
+		return response, nil
+	}
+
+	snapshot, err := e.executionStateCache.Snapshot(execResultInfo.ExecutionResultID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to find snapshot by execution result ID %s: %w", executionResultID.String(), err)
+		return nil, fmt.Errorf("failed to find snapshot by execution result ID %s: %w", execResultInfo.ExecutionResultID.String(), err)
 	}
 
 	executionData, err := snapshot.BlockExecutionData().ByBlockID(ctx, blockID)
@@ -108,18 +114,19 @@ func (e *executionDataProvider) NextData(ctx context.Context) (any, error) {
 		return nil, fmt.Errorf("could not find execution data for block %s: %w", blockID, err)
 	}
 
-	// update criteria for the next call
-	e.criteria.ParentExecutionResultID = executionResultID
-
 	response := &ExecutionDataResponse{
 		Height:        e.height,
 		ExecutionData: executionData.BlockExecutionData,
 		ExecutorMetadata: accessmodel.ExecutorMetadata{
-			ExecutionResultID: executionResultID,
+			ExecutionResultID: execResultInfo.ExecutionResultID,
 			ExecutorIDs:       execResultInfo.ExecutionNodes.NodeIDs(),
 		},
+		BlockTimestamp: time.UnixMilli(int64(blockHeader.Timestamp)).UTC(),
 	}
 
+	// prepare criteria for the next call
+	e.criteria.ParentExecutionResultID = execResultInfo.ExecutionResultID
 	e.height += 1
+
 	return response, nil
 }
