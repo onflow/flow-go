@@ -227,11 +227,10 @@ func New(params Params) (*Backend, error) {
 		params.Collections,
 		params.Blocks,
 		params.EventsIndex,
-		params.TxResultsIndex,
-		params.TxErrorMessageProvider,
 		systemCollections,
 		txStatusDeriver,
 		params.ChainID,
+		params.ExecutionStateCache,
 	)
 	execNodeTxProvider := provider.NewENTransactionProvider(
 		params.Log,
@@ -260,13 +259,12 @@ func New(params Params) (*Backend, error) {
 		Blocks:                      params.Blocks,
 		Collections:                 params.Collections,
 		Transactions:                params.Transactions,
-		TxErrorMessageProvider:      params.TxErrorMessageProvider,
 		ScheduledTransactions:       params.ScheduledTransactions,
+		ExecutionStateCache:         params.ExecutionStateCache,
+		ExecutionResultProvider:     params.ExecutionResultInfoProvider,
 		TxResultCache:               txResCache,
 		TxValidator:                 txValidator,
 		TxStatusDeriver:             txStatusDeriver,
-		EventsIndex:                 params.EventsIndex,
-		TxResultsIndex:              params.TxResultsIndex,
 	}
 
 	switch params.TxResultQueryMode {
@@ -296,6 +294,7 @@ func New(params Params) (*Backend, error) {
 		params.Transactions,
 		failoverTxProvider,
 		txStatusDeriver,
+		params.ExecutionResultInfoProvider,
 	)
 
 	subscribeBlocksBackend := blockstream.NewSubscribeBlocks(

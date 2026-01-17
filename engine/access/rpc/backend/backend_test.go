@@ -39,6 +39,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/counters"
+	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
 	osyncmock "github.com/onflow/flow-go/module/executiondatasync/optimistic_sync/mock"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
@@ -104,6 +105,8 @@ type Suite struct {
 	executionResultInfoProvider *osyncmock.ExecutionResultInfoProvider
 	executionStateCache         *osyncmock.ExecutionStateCache
 	executionDataSnapshot       *osyncmock.Snapshot
+	executionResultInfo         *optimistic_sync.ExecutionResultInfo
+	criteria                    optimistic_sync.Criteria
 }
 
 func TestHandler(t *testing.T) {
@@ -157,6 +160,14 @@ func (suite *Suite) SetupTest() {
 	suite.executionResultInfoProvider = osyncmock.NewExecutionResultInfoProvider(suite.T())
 	suite.executionDataSnapshot = osyncmock.NewSnapshot(suite.T())
 	suite.executionStateCache = osyncmock.NewExecutionStateCache(suite.T())
+	suite.criteria = optimistic_sync.Criteria{}
+
+	executionNodes := unittest.IdentityListFixture(2, unittest.WithRole(flow.RoleExecution))
+	executionResult := unittest.ExecutionResultFixture()
+	suite.executionResultInfo = &optimistic_sync.ExecutionResultInfo{
+		ExecutionResultID: executionResult.ID(),
+		ExecutionNodes:    executionNodes.ToSkeleton(),
+	}
 }
 
 // TearDownTest cleans up the db
@@ -1000,9 +1011,16 @@ func (suite *Suite) TestGetTransactionResultByIndex() {
 
 	suite.Run("TestGetTransactionResultByIndex - happy path", func() {
 		suite.snapshot.On("Head").Return(block.ToHeader(), nil).Once()
-		result, err := backend.GetTransactionResultByIndex(ctx, blockId, index, entitiesproto.EventEncodingVersion_JSON_CDC_V0)
+
+		suite.executionResultInfoProvider.
+			On("ExecutionResultInfo", blockId, suite.criteria).
+			Return(suite.executionResultInfo, nil).
+			Once()
+
+		result, resMetadata, err := backend.GetTransactionResultByIndex(ctx, blockId, index, entitiesproto.EventEncodingVersion_JSON_CDC_V0, suite.criteria)
 		suite.Require().NoError(err)
 		suite.Require().NotNil(result)
+		suite.Require().NotNil(resMetadata)
 		suite.Assert().Equal(result.BlockHeight, block.Height)
 
 		suite.assertAllExpectations()
@@ -1013,13 +1031,15 @@ func (suite *Suite) TestGetTransactionResultByIndex() {
 		err := fmt.Errorf("inconsistent node state")
 		suite.snapshot.On("Head").Return(nil, err).Once()
 
-		// mock signaler context expect an error
-		signCtxErr := fmt.Errorf("failed to derive transaction status: %w", irrecoverable.NewExceptionf("failed to lookup sealed header: %w", err))
-		signalerCtx := rpcContextExpectError(suite.T(), context.Background(), signCtxErr)
+		suite.executionResultInfoProvider.
+			On("ExecutionResultInfo", blockId, suite.criteria).
+			Return(suite.executionResultInfo, nil).
+			Once()
 
-		actual, err := backend.GetTransactionResultByIndex(signalerCtx, blockId, index, entitiesproto.EventEncodingVersion_JSON_CDC_V0)
+		actual, resMetadata, err := backend.GetTransactionResultByIndex(ctx, blockId, index, entitiesproto.EventEncodingVersion_JSON_CDC_V0, suite.criteria)
 		suite.Require().Error(err)
 		suite.Require().Nil(actual)
+		suite.Require().Nil(resMetadata)
 	})
 }
 
@@ -1041,7 +1061,6 @@ func (suite *Suite) TestGetTransactionResultsByBlockID() {
 
 	_, fixedENIDs := suite.setupReceipts(block)
 	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
-	suite.snapshot.On("Identities", mock.Anything).Return(fixedENIDs, nil)
 
 	exeEventReq := &execproto.GetTransactionsByBlockIDRequest{
 		BlockId: blockId[:],
@@ -1075,9 +1094,15 @@ func (suite *Suite) TestGetTransactionResultsByBlockID() {
 	suite.Run("GetTransactionResultsByBlockID - happy path", func() {
 		suite.snapshot.On("Head").Return(block.ToHeader(), nil).Once()
 
-		result, err := backend.GetTransactionResultsByBlockID(ctx, blockId, entitiesproto.EventEncodingVersion_JSON_CDC_V0)
+		suite.executionResultInfoProvider.
+			On("ExecutionResultInfo", blockId, suite.criteria).
+			Return(suite.executionResultInfo, nil).
+			Once()
+
+		result, resMetadata, err := backend.GetTransactionResultsByBlockID(ctx, blockId, entitiesproto.EventEncodingVersion_JSON_CDC_V0, suite.criteria)
 		suite.Require().NoError(err)
 		suite.Require().NotNil(result)
+		suite.Require().NotNil(resMetadata)
 
 		suite.assertAllExpectations()
 	})
@@ -1087,13 +1112,15 @@ func (suite *Suite) TestGetTransactionResultsByBlockID() {
 		err := fmt.Errorf("inconsistent node state")
 		suite.snapshot.On("Head").Return(nil, err).Once()
 
-		// mock signaler context expect an error
-		signCtxErr := fmt.Errorf("failed to derive transaction status: %w", irrecoverable.NewExceptionf("failed to lookup sealed header: %w", err))
-		signalerCtx := rpcContextExpectError(suite.T(), context.Background(), signCtxErr)
+		suite.executionResultInfoProvider.
+			On("ExecutionResultInfo", blockId, suite.criteria).
+			Return(suite.executionResultInfo, nil).
+			Once()
 
-		actual, err := backend.GetTransactionResultsByBlockID(signalerCtx, blockId, entitiesproto.EventEncodingVersion_JSON_CDC_V0)
+		actual, resMetadata, err := backend.GetTransactionResultsByBlockID(ctx, blockId, entitiesproto.EventEncodingVersion_JSON_CDC_V0, suite.criteria)
 		suite.Require().Error(err)
 		suite.Require().Nil(actual)
+		suite.Require().Nil(resMetadata)
 	})
 }
 
@@ -1143,7 +1170,6 @@ func (suite *Suite) TestTransactionStatusTransition() {
 	blockID := block.ID()
 	_, fixedENIDs := suite.setupReceipts(block)
 	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
-	suite.snapshot.On("Identities", mock.Anything).Return(fixedENIDs, nil)
 
 	exeEventReq := &execproto.GetTransactionResultRequest{
 		BlockId:       blockID[:],
@@ -1163,6 +1189,10 @@ func (suite *Suite) TestTransactionStatusTransition() {
 	backend, err := New(params)
 	suite.Require().NoError(err)
 
+	suite.executionResultInfoProvider.
+		On("ExecutionResultInfo", blockID, suite.criteria).
+		Return(suite.executionResultInfo, nil)
+
 	// Successfully return empty event list
 	suite.execClient.
 		On("GetTransactionResult", ctx, exeEventReq).
@@ -1170,9 +1200,10 @@ func (suite *Suite) TestTransactionStatusTransition() {
 		Times(len(fixedENIDs)) // should call each EN once
 
 	// first call - when block under test is greater height than the sealed head, but execution node does not know about Tx
-	result, err := backend.GetTransactionResult(ctx, txID, flow.ZeroID, flow.ZeroID, entitiesproto.EventEncodingVersion_JSON_CDC_V0)
+	result, resMetadata, err := backend.GetTransactionResult(ctx, txID, flow.ZeroID, flow.ZeroID, entitiesproto.EventEncodingVersion_JSON_CDC_V0, suite.criteria)
 	suite.Require().NoError(err)
 	suite.Require().NotNil(result)
+	suite.Require().Nil(resMetadata)
 
 	// status should be finalized since the sealed Blocks is smaller in height
 	suite.Assert().Equal(flow.TransactionStatusFinalized, result.Status)
@@ -1186,9 +1217,10 @@ func (suite *Suite) TestTransactionStatusTransition() {
 		Return(exeEventResp, nil)
 
 	// second call - when block under test's height is greater height than the sealed head
-	result, err = backend.GetTransactionResult(ctx, txID, flow.ZeroID, flow.ZeroID, entitiesproto.EventEncodingVersion_JSON_CDC_V0)
+	result, resMetadata, err = backend.GetTransactionResult(ctx, txID, flow.ZeroID, flow.ZeroID, entitiesproto.EventEncodingVersion_JSON_CDC_V0, suite.criteria)
 	suite.Require().NoError(err)
 	suite.Require().NotNil(result)
+	suite.Require().NotNil(resMetadata)
 
 	// status should be executed since no `NotFound` error in the `GetTransactionResult` call
 	suite.Assert().Equal(flow.TransactionStatusExecuted, result.Status)
@@ -1197,9 +1229,10 @@ func (suite *Suite) TestTransactionStatusTransition() {
 	headBlock.Height = block.Height + 1
 
 	// third call - when block under test's height is less than sealed head's height
-	result, err = backend.GetTransactionResult(ctx, txID, flow.ZeroID, flow.ZeroID, entitiesproto.EventEncodingVersion_JSON_CDC_V0)
+	result, resMetadata, err = backend.GetTransactionResult(ctx, txID, flow.ZeroID, flow.ZeroID, entitiesproto.EventEncodingVersion_JSON_CDC_V0, suite.criteria)
 	suite.Require().NoError(err)
 	suite.Require().NotNil(result)
+	suite.Require().NotNil(resMetadata)
 
 	// status should be sealed since the sealed Blocks is greater in height
 	suite.Assert().Equal(flow.TransactionStatusSealed, result.Status)
@@ -1209,9 +1242,10 @@ func (suite *Suite) TestTransactionStatusTransition() {
 
 	// fourth call - when block under test's height so much less than the head's height that it's considered expired,
 	// but since there is a execution result, means it should retain it's sealed status
-	result, err = backend.GetTransactionResult(ctx, txID, flow.ZeroID, flow.ZeroID, entitiesproto.EventEncodingVersion_JSON_CDC_V0)
+	result, resMetadata, err = backend.GetTransactionResult(ctx, txID, flow.ZeroID, flow.ZeroID, entitiesproto.EventEncodingVersion_JSON_CDC_V0, suite.criteria)
 	suite.Require().NoError(err)
 	suite.Require().NotNil(result)
+	suite.Require().NotNil(resMetadata)
 
 	// status should be expired since
 	suite.Assert().Equal(flow.TransactionStatusSealed, result.Status)
@@ -1274,9 +1308,10 @@ func (suite *Suite) TestTransactionExpiredStatusTransition() {
 	// should return pending status when we have not observed an expiry block
 	suite.Run("pending", func() {
 		// referenced block isn't known yet, so should return pending status
-		result, err := backend.GetTransactionResult(ctx, txID, flow.ZeroID, flow.ZeroID, entitiesproto.EventEncodingVersion_JSON_CDC_V0)
+		result, resMetadata, err := backend.GetTransactionResult(ctx, txID, flow.ZeroID, flow.ZeroID, entitiesproto.EventEncodingVersion_JSON_CDC_V0, suite.criteria)
 		suite.Require().NoError(err)
 		suite.Require().NotNil(result)
+		suite.Require().Nil(resMetadata)
 
 		suite.Assert().Equal(flow.TransactionStatusPending, result.Status)
 	})
@@ -1292,9 +1327,10 @@ func (suite *Suite) TestTransactionExpiredStatusTransition() {
 			err := suite.lastFullBlockHeight.Set(fullHeight)
 			suite.Require().NoError(err)
 
-			result, err := backend.GetTransactionResult(ctx, txID, flow.ZeroID, flow.ZeroID, entitiesproto.EventEncodingVersion_JSON_CDC_V0)
+			result, resMetadata, err := backend.GetTransactionResult(ctx, txID, flow.ZeroID, flow.ZeroID, entitiesproto.EventEncodingVersion_JSON_CDC_V0, suite.criteria)
 			suite.Require().NoError(err)
 			suite.Require().NotNil(result)
+			suite.Require().Nil(resMetadata)
 			suite.Assert().Equal(flow.TransactionStatusPending, result.Status)
 		})
 
@@ -1307,9 +1343,10 @@ func (suite *Suite) TestTransactionExpiredStatusTransition() {
 			// we have NOT finalized an expiry block
 			headBlock.Height = block.Height + flow.DefaultTransactionExpiry/2
 
-			result, err := backend.GetTransactionResult(ctx, txID, flow.ZeroID, flow.ZeroID, entitiesproto.EventEncodingVersion_JSON_CDC_V0)
+			result, resMetadata, err := backend.GetTransactionResult(ctx, txID, flow.ZeroID, flow.ZeroID, entitiesproto.EventEncodingVersion_JSON_CDC_V0, suite.criteria)
 			suite.Require().NoError(err)
 			suite.Require().NotNil(result)
+			suite.Require().Nil(resMetadata)
 			suite.Assert().Equal(flow.TransactionStatusPending, result.Status)
 		})
 
@@ -1319,9 +1356,10 @@ func (suite *Suite) TestTransactionExpiredStatusTransition() {
 			// we have finalized an expiry block
 			headBlock.Height = block.Height + flow.DefaultTransactionExpiry + 1
 
-			result, err := backend.GetTransactionResult(ctx, txID, flow.ZeroID, flow.ZeroID, entitiesproto.EventEncodingVersion_JSON_CDC_V0)
+			result, resMetadata, err := backend.GetTransactionResult(ctx, txID, flow.ZeroID, flow.ZeroID, entitiesproto.EventEncodingVersion_JSON_CDC_V0, suite.criteria)
 			suite.Require().NoError(err)
 			suite.Require().NotNil(result)
+			suite.Require().Nil(resMetadata)
 			suite.Assert().Equal(flow.TransactionStatusExpired, result.Status)
 		})
 	})
@@ -1366,7 +1404,10 @@ func (suite *Suite) TestTransactionPendingToFinalizedStatusTransition() {
 	_, enIDs := suite.setupReceipts(block)
 	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
 
-	suite.snapshot.On("Identities", mock.Anything).Return(enIDs, nil)
+	suite.executionResultInfoProvider.
+		On("ExecutionResultInfo", blockID, suite.criteria).
+		Return(suite.executionResultInfo, nil).
+		Once()
 
 	suite.state.
 		On("AtBlockID", refBlockID).
@@ -1426,9 +1467,10 @@ func (suite *Suite) TestTransactionPendingToFinalizedStatusTransition() {
 	// should return pending status when we have not observed collection for the transaction
 	suite.Run("pending", func() {
 		currentState = flow.TransactionStatusPending
-		result, err := backend.GetTransactionResult(ctx, txID, flow.ZeroID, flow.ZeroID, entitiesproto.EventEncodingVersion_JSON_CDC_V0)
+		result, resMetadata, err := backend.GetTransactionResult(ctx, txID, flow.ZeroID, flow.ZeroID, entitiesproto.EventEncodingVersion_JSON_CDC_V0, suite.criteria)
 		suite.Require().NoError(err)
 		suite.Require().NotNil(result)
+		suite.Require().Nil(resMetadata)
 		suite.Assert().Equal(flow.TransactionStatusPending, result.Status)
 		// assert that no call to an execution node is made
 		suite.execClient.AssertNotCalled(suite.T(), "GetTransactionResult", mock.Anything, mock.Anything)
@@ -1438,9 +1480,10 @@ func (suite *Suite) TestTransactionPendingToFinalizedStatusTransition() {
 	// preceding sealed refBlock)
 	suite.Run("finalized", func() {
 		currentState = flow.TransactionStatusFinalized
-		result, err := backend.GetTransactionResult(ctx, txID, flow.ZeroID, flow.ZeroID, entitiesproto.EventEncodingVersion_JSON_CDC_V0)
+		result, resMetadata, err := backend.GetTransactionResult(ctx, txID, flow.ZeroID, flow.ZeroID, entitiesproto.EventEncodingVersion_JSON_CDC_V0, suite.criteria)
 		suite.Require().NoError(err)
 		suite.Require().NotNil(result)
+		suite.Require().Nil(resMetadata)
 		suite.Assert().Equal(flow.TransactionStatusFinalized, result.Status)
 	})
 
@@ -1468,9 +1511,10 @@ func (suite *Suite) TestTransactionResultUnknown() {
 	suite.Require().NoError(err)
 
 	// first call - when block under test is greater height than the sealed head, but execution node does not know about Tx
-	result, err := backend.GetTransactionResult(ctx, txID, flow.ZeroID, flow.ZeroID, entitiesproto.EventEncodingVersion_JSON_CDC_V0)
+	result, resMetadata, err := backend.GetTransactionResult(ctx, txID, flow.ZeroID, flow.ZeroID, entitiesproto.EventEncodingVersion_JSON_CDC_V0, suite.criteria)
 	suite.Require().NoError(err)
 	suite.Require().NotNil(result)
+	suite.Require().Nil(resMetadata)
 
 	// status should be reported as unknown
 	suite.Assert().Equal(flow.TransactionStatusUnknown, result.Status)
@@ -1873,6 +1917,10 @@ func (suite *Suite) TestGetTransactionResultEventEncodingVersion() {
 
 	suite.fixedExecutionNodeIDs = fixedENIDs.NodeIDs()
 
+	suite.executionResultInfoProvider.
+		On("ExecutionResultInfo", blockID, suite.criteria).
+		Return(suite.executionResultInfo, nil)
+
 	params := suite.defaultBackendParams()
 	// the connection factory should be used to get the execution node client
 	params.ConnFactory = suite.setupConnectionFactory()
@@ -1898,9 +1946,10 @@ func (suite *Suite) TestGetTransactionResultEventEncodingVersion() {
 				Return(exeEventResp, nil).
 				Once()
 
-			result, err := backend.GetTransactionResult(ctx, txID, blockID, flow.ZeroID, version)
+			result, resMetadata, err := backend.GetTransactionResult(ctx, txID, blockID, flow.ZeroID, version, suite.criteria)
 			suite.Require().NoError(err)
 			suite.Require().NotNil(result)
+			suite.Require().NotNil(resMetadata)
 
 			var expectedResult []flow.Event
 			switch version {
@@ -1934,6 +1983,10 @@ func (suite *Suite) TestGetTransactionResultByIndexAndBlockIdEventEncodingVersio
 	_, fixedENIDs := suite.setupReceipts(block)
 	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
 	suite.snapshot.On("Identities", mock.Anything).Return(fixedENIDs, nil)
+
+	suite.executionResultInfoProvider.
+		On("ExecutionResultInfo", blockId, suite.criteria).
+		Return(suite.executionResultInfo, nil)
 
 	suite.fixedExecutionNodeIDs = fixedENIDs.NodeIDs()
 
@@ -1971,9 +2024,10 @@ func (suite *Suite) TestGetTransactionResultByIndexAndBlockIdEventEncodingVersio
 				Return(exeEventResp, nil).
 				Once()
 
-			result, err := backend.GetTransactionResultByIndex(ctx, blockId, index, version)
+			result, resMetadata, err := backend.GetTransactionResultByIndex(ctx, blockId, index, version, suite.criteria)
 			suite.Require().NoError(err)
 			suite.Require().NotNil(result)
+			suite.Require().NotNil(resMetadata)
 
 			var expectedResult []flow.Event
 			switch version {
@@ -2007,9 +2061,10 @@ func (suite *Suite) TestGetTransactionResultByIndexAndBlockIdEventEncodingVersio
 				Return(exeEventResp, nil).
 				Once()
 
-			results, err := backend.GetTransactionResultsByBlockID(ctx, blockId, version)
+			results, resMetadata, err := backend.GetTransactionResultsByBlockID(ctx, blockId, version, suite.criteria)
 			suite.Require().NoError(err)
 			suite.Require().NotNil(results)
+			suite.Require().NotNil(resMetadata)
 
 			var expectedResult []flow.Event
 			switch version {
@@ -2066,8 +2121,14 @@ func (suite *Suite) TestNodeCommunicator() {
 		On("GetTransactionResultsByBlockID", ctx, exeEventReq).
 		Return(nil, gobreaker.ErrOpenState)
 
-	result, err := backend.GetTransactionResultsByBlockID(ctx, blockId, entitiesproto.EventEncodingVersion_JSON_CDC_V0)
+	suite.executionResultInfoProvider.
+		On("ExecutionResultInfo", blockId, suite.criteria).
+		Return(suite.executionResultInfo, nil).
+		Once()
+
+	result, resMetadata, err := backend.GetTransactionResultsByBlockID(ctx, blockId, entitiesproto.EventEncodingVersion_JSON_CDC_V0, suite.criteria)
 	suite.Assert().Nil(result)
+	suite.Assert().Nil(resMetadata)
 	suite.Assert().Error(err)
 	suite.Assert().Equal(codes.Unavailable, status.Code(err))
 }

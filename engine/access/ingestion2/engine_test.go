@@ -342,7 +342,7 @@ func (s *Suite) TestOnFinalizedBlockSingle() {
 			wg.Done()
 		}).Once()
 	}
-	s.request.On("Force").Return().Once()
+	s.request.On("Force").Return()
 
 	// process the block through the finalized callback
 	eng.OnFinalizedBlock(&hotstuffBlock)

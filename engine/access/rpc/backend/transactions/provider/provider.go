@@ -7,6 +7,7 @@ import (
 
 	accessmodel "github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
 )
 
 // TransactionProvider defines an interface for retrieving transaction results
@@ -18,7 +19,8 @@ type TransactionProvider interface {
 		txID flow.Identifier,
 		collectionID flow.Identifier,
 		encodingVersion entities.EventEncodingVersion,
-	) (*accessmodel.TransactionResult, error)
+		executionResultInfo *optimistic_sync.ExecutionResultInfo,
+	) (*accessmodel.TransactionResult, *accessmodel.ExecutorMetadata, error)
 
 	TransactionResultByIndex(
 		ctx context.Context,
@@ -26,13 +28,15 @@ type TransactionProvider interface {
 		index uint32,
 		collectionID flow.Identifier,
 		encodingVersion entities.EventEncodingVersion,
-	) (*accessmodel.TransactionResult, error)
+		executionResultInfo *optimistic_sync.ExecutionResultInfo,
+	) (*accessmodel.TransactionResult, *accessmodel.ExecutorMetadata, error)
 
 	TransactionResultsByBlockID(
 		ctx context.Context,
 		block *flow.Block,
 		encodingVersion entities.EventEncodingVersion,
-	) ([]*accessmodel.TransactionResult, error)
+		executionResultInfo *optimistic_sync.ExecutionResultInfo,
+	) ([]*accessmodel.TransactionResult, *accessmodel.ExecutorMetadata, error)
 
 	TransactionsByBlockID(
 		ctx context.Context,

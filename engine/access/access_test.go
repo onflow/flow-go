@@ -689,6 +689,9 @@ func (suite *Suite) TestGetSealedTransaction() {
 		// generate receipts
 		executionReceipts := unittest.ReceiptsForBlockFixture(&block, enNodeIDs)
 
+		suite.executionResultInfoProvider.On("ExecutionResultInfo", mock.Anything, mock.Anything).
+			Return(unittest.ExecutionResultInfo(2), nil).Once()
+
 		// assume execution node returns an empty list of events
 		suite.execClient.On("GetTransactionResult", mock.Anything, mock.Anything).Return(&exeEventResp, nil)
 
@@ -941,7 +944,6 @@ func (suite *Suite) TestGetTransactionResult() {
 
 		enNodeIDs := enIdentities.NodeIDs()
 		allIdentities := append(colIdentities, enIdentities...)
-		finalSnapshot.On("Identities", mock.Anything).Return(allIdentities, nil)
 
 		suite.state.On("AtBlockID", blockNegativeId).Return(suite.sealedSnapshot)
 		suite.sealedSnapshot.On("Identities", mock.Anything).Return(allIdentities, nil)
@@ -1149,6 +1151,9 @@ func (suite *Suite) TestGetTransactionResult() {
 			getReq := &accessproto.GetTransactionRequest{
 				Id: txId[:],
 			}
+			suite.executionResultInfoProvider.On("ExecutionResultInfo", mock.Anything, mock.Anything).
+				Return(unittest.ExecutionResultInfo(2), nil).Once()
+
 			resp, err := handler.GetTransactionResult(apiCtx, getReq)
 			assertTransactionResult(resp, err)
 		})
@@ -1159,6 +1164,8 @@ func (suite *Suite) TestGetTransactionResult() {
 				Id:      txId[:],
 				BlockId: blockId[:],
 			}
+			suite.executionResultInfoProvider.On("ExecutionResultInfo", blockId, mock.Anything).
+				Return(unittest.ExecutionResultInfo(2), nil).Once()
 			resp, err := handler.GetTransactionResult(apiCtx, getReq)
 			assertTransactionResult(resp, err)
 		})
@@ -1168,6 +1175,9 @@ func (suite *Suite) TestGetTransactionResult() {
 				Id:      txId[:],
 				BlockId: blockNegativeId[:],
 			}
+			suite.executionResultInfoProvider.On("ExecutionResultInfo", mock.Anything, mock.Anything).
+				Return(unittest.ExecutionResultInfo(2), nil).Once()
+
 			resp, err := handler.GetTransactionResult(apiCtx, getReq)
 			require.Error(suite.T(), err)
 			require.Contains(suite.T(), err.Error(), "transaction found in block")
@@ -1180,6 +1190,9 @@ func (suite *Suite) TestGetTransactionResult() {
 				Id:           txId[:],
 				CollectionId: collectionId[:],
 			}
+			suite.executionResultInfoProvider.On("ExecutionResultInfo", mock.Anything, mock.Anything).
+				Return(unittest.ExecutionResultInfo(2), nil).Once()
+
 			resp, err := handler.GetTransactionResult(apiCtx, getReq)
 			assertTransactionResult(resp, err)
 		})
@@ -1189,6 +1202,7 @@ func (suite *Suite) TestGetTransactionResult() {
 				Id:           txId[:],
 				CollectionId: collectionIdNegative[:],
 			}
+
 			resp, err := handler.GetTransactionResult(apiCtx, getReq)
 			require.Error(suite.T(), err)
 			require.Nil(suite.T(), resp)
@@ -1201,6 +1215,7 @@ func (suite *Suite) TestGetTransactionResult() {
 				BlockId:      blockId[:],
 				CollectionId: collectionId[:],
 			}
+
 			resp, err := handler.GetTransactionResult(apiCtx, getReq)
 			assertTransactionResult(resp, err)
 		})
@@ -1211,6 +1226,7 @@ func (suite *Suite) TestGetTransactionResult() {
 				BlockId:      blockId[:],
 				CollectionId: collectionIdNegative[:],
 			}
+
 			resp, err := handler.GetTransactionResult(apiCtx, getReq)
 			require.Error(suite.T(), err)
 			require.Nil(suite.T(), resp)

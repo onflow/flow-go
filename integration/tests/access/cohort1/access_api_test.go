@@ -1371,8 +1371,7 @@ func (s *AccessAPISuite) testScheduledTransactionsRest(transactionID uint64, exp
 		txResultResponse, _, err := restClient.TransactionsApi.TransactionResultsTransactionIdGet(s.ctx, expectedTxID.String(), nil)
 		s.Require().NoError(err)
 
-		var expected commonmodels.TransactionResult
-		expected.Build(scheduledTxResult, expectedTxID, link)
+		var expected = commonmodels.NewTransactionResult(scheduledTxResult, expectedTxID, link, nil, false)
 
 		assertSystemTxResultResponse(s.T(), &expected, &txResultResponse)
 	})
@@ -1381,8 +1380,7 @@ func (s *AccessAPISuite) testScheduledTransactionsRest(transactionID uint64, exp
 		txResultResponse, _, err := restClient.TransactionsApi.TransactionResultsTransactionIdGet(s.ctx, fmt.Sprint(transactionID), nil)
 		s.Require().NoError(err)
 
-		var expected commonmodels.TransactionResult
-		expected.Build(scheduledTxResult, expectedTxID, link)
+		var expected = commonmodels.NewTransactionResult(scheduledTxResult, expectedTxID, link, nil, false)
 
 		assertSystemTxResultResponse(s.T(), &expected, &txResultResponse)
 	})
@@ -1543,8 +1541,7 @@ func (s *AccessAPISuite) testSystemTransactionsRest(systemCollection *flow.Colle
 			})
 			s.Require().NoError(err)
 
-			var expected commonmodels.TransactionResult
-			expected.Build(txResult, txID, link)
+			var expected = commonmodels.NewTransactionResult(txResult, txID, link, nil, false)
 
 			assertSystemTxResultResponse(s.T(), &expected, &txResultResponse)
 		}
