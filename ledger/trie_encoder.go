@@ -650,6 +650,11 @@ func decodeTrieUpdate(inp []byte, version uint16) (*TrieUpdate, error) {
 		return nil, fmt.Errorf("error decoding trie update number of paths: %w", err)
 	}
 
+	// If there are no paths, return early (matching encoder behavior)
+	if numOfPaths == 0 {
+		return &TrieUpdate{RootHash: rh, Paths: []Path{}, Payloads: []*Payload{}}, nil
+	}
+
 	// decode path size
 	pathSize, rest, err := utils.ReadUint16(rest)
 	if err != nil {
