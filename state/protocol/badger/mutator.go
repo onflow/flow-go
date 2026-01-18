@@ -195,7 +195,7 @@ func (m *FollowerState) ExtendCertified(ctx context.Context, certified *flow.Cer
 		return fmt.Errorf("failed to determine the lastest sealed block in fork: %w", err)
 	}
 	deferredBlockPersist.AddNextOperation(func(lctx lockctx.Proof, blockID flow.Identifier, rw storage.ReaderBatchWriter) error {
-		return operation.IndexLatestSealAtBlock(lctx, rw.Writer(), blockID, latestSeal.ID())
+		return operation.IndexLatestSealAtBlockFunctor(blockID, latestSeal.ID())(lctx, rw)
 	})
 
 	// TODO: we might not need the deferred db updates, because the candidate passed into
