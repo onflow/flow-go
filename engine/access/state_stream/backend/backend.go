@@ -85,7 +85,7 @@ func New(
 	executionDataTracker tracker.ExecutionDataTracker,
 	executionResultProvider optimistic_sync.ExecutionResultInfoProvider,
 	executionStateCache optimistic_sync.ExecutionStateCache,
-	sporkRootBlock *flow.Block,
+	nodeRootBlock *flow.Header,
 ) (*StateStreamBackend, error) {
 	logger := log.With().Str("module", "state_stream_api").Logger()
 
@@ -107,14 +107,14 @@ func New(
 		executionDataTracker,
 		executionResultProvider,
 		executionStateCache,
-		sporkRootBlock,
+		nodeRootBlock,
 	)
 
 	b.EventsBackend = *NewEventsBackend(
 		logger,
 		state,
 		headers,
-		sporkRootBlock,
+		nodeRootBlock,
 		executionDataTracker,
 		executionResultProvider,
 		executionStateCache,
@@ -125,7 +125,7 @@ func New(
 		logger,
 		state,
 		headers,
-		sporkRootBlock,
+		nodeRootBlock,
 		executionDataTracker,
 		executionResultProvider,
 		executionStateCache,

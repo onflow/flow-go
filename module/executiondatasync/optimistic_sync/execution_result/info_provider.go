@@ -23,7 +23,7 @@ type Provider struct {
 	headers               storage.Headers
 	state                 protocol.State
 	rootBlockID           flow.Identifier
-	executionNodes        *ExecutionNodeSelector
+	executionNodeSelector *ExecutionNodeSelector
 	baseCriteria          optimistic_sync.Criteria
 	sealingStatusResolver SealingStatusResolver
 }
@@ -45,7 +45,7 @@ func NewExecutionResultInfoProvider(
 		executionReceipts:     executionReceipts,
 		headers:               headers,
 		state:                 state,
-		executionNodes:        executionNodes,
+		executionNodeSelector: executionNodes,
 		rootBlockID:           state.Params().SporkRootBlock().ID(),
 		baseCriteria:          optimistic_sync.DefaultCriteria.OverrideWith(operatorCriteria),
 		sealingStatusResolver: sealingStatusResolver,
@@ -64,7 +64,7 @@ func (p *Provider) ExecutionResultInfo(
 	blockID flow.Identifier,
 	criteria optimistic_sync.Criteria,
 ) (*optimistic_sync.ExecutionResultInfo, error) {
-	availableExecutors, err :=
+	allAvailableExecutors, err :=
 		p.state.AtBlockID(blockID).Identities(filter.HasRole[flow.Identity](flow.RoleExecution))
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve available executors for the block: %w", err)
@@ -81,7 +81,7 @@ func (p *Provider) ExecutionResultInfo(
 		}
 
 		effectiveExecutors, err :=
-			p.executionNodes.SelectExecutionNodes(availableExecutors, criteria.RequiredExecutors)
+			p.executionNodeSelector.SelectExecutionNodes(allAvailableExecutors, criteria.RequiredExecutors)
 		if err != nil {
 			return nil, fmt.Errorf("failed to choose execution nodes for root block ID %v: %w", p.rootBlockID, err)
 		}
@@ -92,7 +92,7 @@ func (p *Provider) ExecutionResultInfo(
 		}, nil
 	}
 
-	resultID, executorIDs, err := p.findResultAndExecutors(blockID, criteria)
+	resultID, allExecutorsProducedResult, err := p.findResultAndExecutors(blockID, criteria)
 	if err != nil {
 		if optimistic_sync.IsExecutionResultNotReadyError(err) {
 			isBlockSealed, err := p.sealingStatusResolver.IsSealed(blockID)
@@ -109,13 +109,13 @@ func (p *Provider) ExecutionResultInfo(
 		return nil, fmt.Errorf("failed to find result and executors for block ID %v: %w", blockID, err)
 	}
 
-	executors := availableExecutors.Filter(filter.HasNodeID[flow.Identity](executorIDs...))
-	subsetENs, err := p.executionNodes.SelectExecutionNodes(executors, criteria.RequiredExecutors)
+	executorsProducedResult := allAvailableExecutors.Filter(filter.HasNodeID[flow.Identity](allExecutorsProducedResult...))
+	chosenExecutors, err := p.executionNodeSelector.SelectExecutionNodes(executorsProducedResult, criteria.RequiredExecutors)
 	if err != nil {
-		return nil, fmt.Errorf("failed to choose execution nodes for block ID %v: %w", blockID, err)
+		return nil, fmt.Errorf("failed to select executors that produced the execution result for block ID %v: %w", blockID, err)
 	}
 
-	if len(subsetENs) == 0 {
+	if len(chosenExecutors) == 0 {
 		// this is unexpected, and probably indicates there is a bug.
 		// There are only three ways that SelectExecutionNodes can return an empty list:
 		//   1. there are no executors for the result
@@ -129,7 +129,7 @@ func (p *Provider) ExecutionResultInfo(
 
 	return &optimistic_sync.ExecutionResultInfo{
 		ExecutionResultID: resultID,
-		ExecutionNodes:    subsetENs,
+		ExecutionNodes:    chosenExecutors,
 	}, nil
 }
 

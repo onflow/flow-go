@@ -29,7 +29,7 @@ type EventsBackend struct {
 	log                     zerolog.Logger
 	state                   protocol.State
 	headers                 storage.Headers
-	sporkRootBlock          *flow.Block
+	nodeRootBlock           *flow.Header
 	executionDataTracker    tracker.ExecutionDataTracker
 	executionResultProvider optimistic_sync.ExecutionResultInfoProvider
 	executionStateCache     optimistic_sync.ExecutionStateCache
@@ -40,7 +40,7 @@ func NewEventsBackend(
 	log zerolog.Logger,
 	state protocol.State,
 	headers storage.Headers,
-	sporkRootBlock *flow.Block,
+	nodeRootBlock *flow.Header,
 	executionDataTracker tracker.ExecutionDataTracker,
 	executionResultProvider optimistic_sync.ExecutionResultInfoProvider,
 	executionStateCache optimistic_sync.ExecutionStateCache,
@@ -50,7 +50,7 @@ func NewEventsBackend(
 		log:                     log,
 		state:                   state,
 		headers:                 headers,
-		sporkRootBlock:          sporkRootBlock,
+		nodeRootBlock:           nodeRootBlock,
 		executionDataTracker:    executionDataTracker,
 		executionResultProvider: executionResultProvider,
 		executionStateCache:     executionStateCache,
@@ -119,18 +119,15 @@ func (b *EventsBackend) SubscribeEventsFromStartBlockID(
 	eventFilter state_stream.EventFilter,
 	criteria optimistic_sync.Criteria,
 ) subscription.Subscription {
-	// check if the block header for the given block ID is available in the storage
-	header, err := b.headers.ByBlockID(startBlockID)
+	snapshot := b.state.AtBlockID(startBlockID)
+
+	// check if the block header for the given block is available in the storage
+	header, err := snapshot.Head()
 	if err != nil {
-		return subscription.NewFailedSubscription(err, "could not get header for block height")
+		return subscription.NewFailedSubscription(err, "could not get header for start block")
 	}
 
-	if header.Height < b.sporkRootBlock.Height {
-		return subscription.NewFailedSubscription(err, "block height is less than the spork root block")
-	}
-
-	availableExecutors, err :=
-		b.state.AtHeight(header.Height).Identities(filter.HasRole[flow.Identity](flow.RoleExecution))
+	availableExecutors, err := snapshot.Identities(filter.HasRole[flow.Identity](flow.RoleExecution))
 	if err != nil {
 		return subscription.NewFailedSubscription(err, "could not retrieve available executors")
 	}
@@ -140,16 +137,19 @@ func (b *EventsBackend) SubscribeEventsFromStartBlockID(
 		return subscription.NewFailedSubscription(err, "criteria validation failed")
 	}
 
-	executionDataProvider := newExecutionDataProvider(
-		b.state,
+	snapshotBuilder := newExecutionStateSnapshotBuilder(
 		b.headers,
-		b.executionDataTracker,
 		b.executionResultProvider,
 		b.executionStateCache,
+	)
+
+	eventProvider := newEventProvider(
+		b.state,
+		snapshotBuilder,
 		criteria,
 		header.Height,
+		eventFilter,
 	)
-	eventProvider := newEventProvider(executionDataProvider, eventFilter)
 
 	return b.subscriptionFactory.Subscribe(ctx, eventProvider)
 }
@@ -175,19 +175,19 @@ func (b *EventsBackend) SubscribeEventsFromStartHeight(
 	eventFilter state_stream.EventFilter,
 	criteria optimistic_sync.Criteria,
 ) subscription.Subscription {
-	if startBlockHeight < b.sporkRootBlock.Height {
-		return subscription.NewFailedSubscription(nil,
-			"start height must be greater than or equal to the spork root height")
+	if startBlockHeight < b.nodeRootBlock.Height {
+		return subscription.NewFailedSubscription(nil, "start height is below the node's range of available blocks.")
 	}
 
-	// check if the block header for the given height is available in the storage
-	header, err := b.headers.ByHeight(startBlockHeight)
+	snapshot := b.state.AtHeight(startBlockHeight)
+
+	// check if the block header for the given block is available in the storage
+	header, err := snapshot.Head()
 	if err != nil {
-		return subscription.NewFailedSubscription(err, "error getting block header by height")
+		return subscription.NewFailedSubscription(err, "could not get header for start block")
 	}
 
-	availableExecutors, err :=
-		b.state.AtHeight(header.Height).Identities(filter.HasRole[flow.Identity](flow.RoleExecution))
+	availableExecutors, err := snapshot.Identities(filter.HasRole[flow.Identity](flow.RoleExecution))
 	if err != nil {
 		return subscription.NewFailedSubscription(err, "could not retrieve available executors")
 	}
@@ -197,16 +197,19 @@ func (b *EventsBackend) SubscribeEventsFromStartHeight(
 		return subscription.NewFailedSubscription(err, "criteria validation failed")
 	}
 
-	executionDataProvider := newExecutionDataProvider(
-		b.state,
+	snapshotBuilder := newExecutionStateSnapshotBuilder(
 		b.headers,
-		b.executionDataTracker,
 		b.executionResultProvider,
 		b.executionStateCache,
+	)
+
+	eventProvider := newEventProvider(
+		b.state,
+		snapshotBuilder,
 		criteria,
 		header.Height,
+		eventFilter,
 	)
-	eventProvider := newEventProvider(executionDataProvider, eventFilter)
 
 	return b.subscriptionFactory.Subscribe(ctx, eventProvider)
 }
