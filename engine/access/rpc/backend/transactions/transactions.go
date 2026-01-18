@@ -26,6 +26,7 @@ import (
 	"github.com/onflow/flow-go/model/access/systemcollection"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/state_synchronization/indexer"
 	"github.com/onflow/flow-go/state/protocol"
@@ -436,7 +437,7 @@ func (t *Transactions) lookupSubmittedTransactionResult(
 		return nil, nil, err
 	}
 
-	txResult, err := t.txProvider.TransactionResult(ctx, block.ToHeader(), txID, collectionID, encodingVersion)
+	txResult, err := t.txProvider.TransactionResult(ctx, block.ToHeader(), txID, collectionID, encodingVersion, optimistic_sync.Criteria{})
 	if err != nil {
 		switch {
 		case errors.Is(err, storage.ErrNotFound):
@@ -493,7 +494,7 @@ func (t *Transactions) lookupSystemTransactionResult(
 		return nil, false, status.Errorf(codes.NotFound, "could not find block: %v", err)
 	}
 
-	result, err := t.txProvider.TransactionResult(ctx, header, txID, flow.ZeroID, encodingVersion)
+	result, err := t.txProvider.TransactionResult(ctx, header, txID, flow.ZeroID, encodingVersion, optimistic_sync.Criteria{})
 	return result, true, err
 }
 
@@ -530,7 +531,7 @@ func (t *Transactions) lookupScheduledTransactionResult(
 		return nil, false, err
 	}
 
-	result, err := t.txProvider.TransactionResult(ctx, header, txID, flow.ZeroID, encodingVersion)
+	result, err := t.txProvider.TransactionResult(ctx, header, txID, flow.ZeroID, encodingVersion, optimistic_sync.Criteria{})
 	return result, true, err
 }
 

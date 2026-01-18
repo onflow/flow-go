@@ -259,6 +259,7 @@ type TransactionStreamAPI interface {
 		ctx context.Context,
 		txID flow.Identifier,
 		requiredEventEncodingVersion entities.EventEncodingVersion,
+		criteria optimistic_sync.Criteria,
 	) subscription.Subscription
 
 	// SendAndSubscribeTransactionStatuses sends a transaction to the execution node and subscribes to its status updates.
@@ -271,6 +272,7 @@ type TransactionStreamAPI interface {
 		ctx context.Context,
 		tx *flow.TransactionBody,
 		requiredEventEncodingVersion entities.EventEncodingVersion,
+		criteria optimistic_sync.Criteria,
 	) subscription.Subscription
 }
 

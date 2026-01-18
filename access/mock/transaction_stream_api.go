@@ -10,6 +10,8 @@ import (
 
 	mock "github.com/stretchr/testify/mock"
 
+	optimistic_sync "github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
+
 	subscription "github.com/onflow/flow-go/engine/access/subscription"
 )
 
@@ -18,17 +20,17 @@ type TransactionStreamAPI struct {
 	mock.Mock
 }
 
-// SendAndSubscribeTransactionStatuses provides a mock function with given fields: ctx, tx, requiredEventEncodingVersion
-func (_m *TransactionStreamAPI) SendAndSubscribeTransactionStatuses(ctx context.Context, tx *flow.TransactionBody, requiredEventEncodingVersion entities.EventEncodingVersion) subscription.Subscription {
-	ret := _m.Called(ctx, tx, requiredEventEncodingVersion)
+// SendAndSubscribeTransactionStatuses provides a mock function with given fields: ctx, tx, requiredEventEncodingVersion, criteria
+func (_m *TransactionStreamAPI) SendAndSubscribeTransactionStatuses(ctx context.Context, tx *flow.TransactionBody, requiredEventEncodingVersion entities.EventEncodingVersion, criteria optimistic_sync.Criteria) subscription.Subscription {
+	ret := _m.Called(ctx, tx, requiredEventEncodingVersion, criteria)
 
 	if len(ret) == 0 {
 		panic("no return value specified for SendAndSubscribeTransactionStatuses")
 	}
 
 	var r0 subscription.Subscription
-	if rf, ok := ret.Get(0).(func(context.Context, *flow.TransactionBody, entities.EventEncodingVersion) subscription.Subscription); ok {
-		r0 = rf(ctx, tx, requiredEventEncodingVersion)
+	if rf, ok := ret.Get(0).(func(context.Context, *flow.TransactionBody, entities.EventEncodingVersion, optimistic_sync.Criteria) subscription.Subscription); ok {
+		r0 = rf(ctx, tx, requiredEventEncodingVersion, criteria)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(subscription.Subscription)
@@ -38,17 +40,17 @@ func (_m *TransactionStreamAPI) SendAndSubscribeTransactionStatuses(ctx context.
 	return r0
 }
 
-// SubscribeTransactionStatuses provides a mock function with given fields: ctx, txID, requiredEventEncodingVersion
-func (_m *TransactionStreamAPI) SubscribeTransactionStatuses(ctx context.Context, txID flow.Identifier, requiredEventEncodingVersion entities.EventEncodingVersion) subscription.Subscription {
-	ret := _m.Called(ctx, txID, requiredEventEncodingVersion)
+// SubscribeTransactionStatuses provides a mock function with given fields: ctx, txID, requiredEventEncodingVersion, criteria
+func (_m *TransactionStreamAPI) SubscribeTransactionStatuses(ctx context.Context, txID flow.Identifier, requiredEventEncodingVersion entities.EventEncodingVersion, criteria optimistic_sync.Criteria) subscription.Subscription {
+	ret := _m.Called(ctx, txID, requiredEventEncodingVersion, criteria)
 
 	if len(ret) == 0 {
 		panic("no return value specified for SubscribeTransactionStatuses")
 	}
 
 	var r0 subscription.Subscription
-	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier, entities.EventEncodingVersion) subscription.Subscription); ok {
-		r0 = rf(ctx, txID, requiredEventEncodingVersion)
+	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier, entities.EventEncodingVersion, optimistic_sync.Criteria) subscription.Subscription); ok {
+		r0 = rf(ctx, txID, requiredEventEncodingVersion, criteria)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(subscription.Subscription)

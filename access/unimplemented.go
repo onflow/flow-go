@@ -222,6 +222,7 @@ func (u *UnimplementedAPI) SubscribeTransactionStatuses(
 	ctx context.Context,
 	txID flow.Identifier,
 	requiredEventEncodingVersion entities.EventEncodingVersion,
+	criteria optimistic_sync.Criteria,
 ) subscription.Subscription {
 	msg := "method SubscribeTransactionStatuses not implemented"
 	return subscription.NewFailedSubscription(status.Error(codes.Unimplemented, msg), msg)
@@ -232,6 +233,7 @@ func (u *UnimplementedAPI) SendAndSubscribeTransactionStatuses(
 	ctx context.Context,
 	tx *flow.TransactionBody,
 	requiredEventEncodingVersion entities.EventEncodingVersion,
+	criteria optimistic_sync.Criteria,
 ) subscription.Subscription {
 	msg := "method SendAndSubscribeTransactionStatuses not implemented"
 	return subscription.NewFailedSubscription(status.Error(codes.Unimplemented, msg), msg)

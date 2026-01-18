@@ -78,6 +78,7 @@ func (e *ENTransactionProvider) TransactionResult(
 	transactionID flow.Identifier,
 	collectionID flow.Identifier,
 	requiredEventEncodingVersion entities.EventEncodingVersion,
+	criteria optimistic_sync.Criteria,
 ) (*accessmodel.TransactionResult, error) {
 	blockID := block.ID()
 	// create an execution API request for events at blockID and transactionID
