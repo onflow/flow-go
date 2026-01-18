@@ -23,7 +23,7 @@ type accountStatusesArguments struct {
 	StartBlockHeight    uint64                           // Height of the block to start subscription from
 	Filter              state_stream.AccountStatusFilter // Filter applied to events for a given subscription
 	HeartbeatInterval   uint64                           // Maximum number of blocks message won't be sent
-	ExecutionStateQuery httpmodels.ExecutionStateQuery   //TODO: we don't parse it yet
+	ExecutionStateQuery httpmodels.ExecutionStateQuery   // For granular control over execution nodes that produce data
 }
 
 type AccountStatusesDataProvider struct {
@@ -178,11 +178,12 @@ func parseAccountStatusesArguments(
 	defaultHeartbeatInterval uint64,
 ) (accountStatusesArguments, error) {
 	allowedFields := map[string]struct{}{
-		"start_block_id":     {},
-		"start_block_height": {},
-		"event_types":        {},
-		"account_addresses":  {},
-		"heartbeat_interval": {},
+		"start_block_id":        {},
+		"start_block_height":    {},
+		"event_types":           {},
+		"account_addresses":     {},
+		"heartbeat_interval":    {},
+		"execution_state_query": {},
 	}
 	err := ensureAllowedFields(arguments, allowedFields)
 	if err != nil {
@@ -222,6 +223,12 @@ func parseAccountStatusesArguments(
 	args.Filter, err = state_stream.NewAccountStatusFilter(eventFilterConfig, chain, eventTypes, accountAddresses)
 	if err != nil {
 		return accountStatusesArguments{}, fmt.Errorf("failed to create event filter: %w", err)
+	}
+
+	// Parse 'execution_state_query' as JSON object
+	args.ExecutionStateQuery, err = extractExecutionStateQueryFields(arguments, "execution_state_query", false)
+	if err != nil {
+		return accountStatusesArguments{}, fmt.Errorf("error extracting execution_state_query fields: %w", err)
 	}
 
 	return args, nil

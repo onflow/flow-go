@@ -31,9 +31,8 @@ type EventsProviderSuite struct {
 	log zerolog.Logger
 	api *ssmock.API
 
-	chain          flow.Chain
-	rootBlock      *flow.Block
-	finalizedBlock *flow.Header
+	chain     flow.Chain
+	rootBlock *flow.Block
 
 	factory *DataProviderFactoryImpl
 }
@@ -99,6 +98,11 @@ func (s *EventsProviderSuite) subscribeEventsDataProviderTestCases(backendRespon
 				"addresses":          []string{unittest.AddressFixture().String()},
 				"contracts":          []string{"A.0000000000000001.Contract1", "A.0000000000000001.Contract2"},
 				"heartbeat_interval": "3",
+				"execution_state_query": map[string]interface{}{
+					"agreeing_executors_count":  "2",
+					"required_executor_ids":     []string{},
+					"include_executor_metadata": "false",
+				},
 			},
 			setupBackend: func(sub *submock.Subscription) {
 				s.api.On(
@@ -119,6 +123,11 @@ func (s *EventsProviderSuite) subscribeEventsDataProviderTestCases(backendRespon
 				"addresses":          []string{unittest.AddressFixture().String()},
 				"contracts":          []string{"A.0000000000000001.Contract1", "A.0000000000000001.Contract2"},
 				"heartbeat_interval": "3",
+				"execution_state_query": map[string]interface{}{
+					"agreeing_executors_count":  "2",
+					"required_executor_ids":     []string{},
+					"include_executor_metadata": "false",
+				},
 			},
 			setupBackend: func(sub *submock.Subscription) {
 				s.api.On(
@@ -138,6 +147,11 @@ func (s *EventsProviderSuite) subscribeEventsDataProviderTestCases(backendRespon
 				"addresses":          []string{unittest.AddressFixture().String()},
 				"contracts":          []string{"A.0000000000000001.Contract1", "A.0000000000000001.Contract2"},
 				"heartbeat_interval": "3",
+				"execution_state_query": map[string]interface{}{
+					"agreeing_executors_count":  "2",
+					"required_executor_ids":     []string{},
+					"include_executor_metadata": "false",
+				},
 			},
 			setupBackend: func(sub *submock.Subscription) {
 				s.api.On(
@@ -232,6 +246,11 @@ func (s *EventsProviderSuite) TestMessageIndexEventProviderResponse_HappyPath() 
 			"event_types":    []string{state_stream.CoreEventAccountCreated},
 			"addresses":      []string{unittest.AddressFixture().String()},
 			"contracts":      []string{"A.0000000000000001.Contract1", "A.0000000000000001.Contract2"},
+			"execution_state_query": map[string]interface{}{
+				"agreeing_executors_count":  "2",
+				"required_executor_ids":     []string{},
+				"include_executor_metadata": "false",
+			},
 		}
 
 	// Create the EventsDataProvider instance
@@ -396,6 +415,39 @@ func invalidEventsArgumentsTestCases() []testErrType {
 				"heartbeat_interval": "-1",
 			},
 			expectedErrorMsg: "'heartbeat_interval' must be convertible to uint64",
+		},
+		{
+			name: "invalid 'execution_state_query' argument (invalid 'agreeing_executors_count')",
+			arguments: map[string]interface{}{
+				"execution_state_query": map[string]interface{}{
+					"agreeing_executors_count":  "-1",
+					"required_executor_ids":     []string{},
+					"include_executor_metadata": "false",
+				},
+			},
+			expectedErrorMsg: "'agreeing_executors_count' must be a number",
+		},
+		{
+			name: "invalid 'execution_state_query' argument (invalid 'required_executor_ids')",
+			arguments: map[string]interface{}{
+				"execution_state_query": map[string]interface{}{
+					"agreeing_executors_count":  "5",
+					"required_executor_ids":     "not-array-of-strings",
+					"include_executor_metadata": "false",
+				},
+			},
+			expectedErrorMsg: "'required_executor_ids' must be an array of strings",
+		},
+		{
+			name: "invalid 'execution_state_query' argument (invalid 'include_executor_metadata')",
+			arguments: map[string]interface{}{
+				"execution_state_query": map[string]interface{}{
+					"agreeing_executors_count":  "5",
+					"required_executor_ids":     []string{unittest.IdentifierFixture().String()},
+					"include_executor_metadata": "not-bool",
+				},
+			},
+			expectedErrorMsg: "'include_executor_metadata' must be a boolean",
 		},
 		{
 			name: "unexpected argument",

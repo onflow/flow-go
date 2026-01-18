@@ -13,7 +13,8 @@ type ExecutionStateQuery struct {
 
 func NewCriteria(query ExecutionStateQuery) optimistic_sync.Criteria {
 	return optimistic_sync.Criteria{
-		AgreeingExecutorsCount: uint(query.AgreeingExecutorsCount),
-		RequiredExecutors:      query.RequiredExecutorIDs,
+		AgreeingExecutorsCount:  uint(query.AgreeingExecutorsCount),
+		RequiredExecutors:       query.RequiredExecutorIDs,
+		ParentExecutionResultID: flow.ZeroID,
 	}
 }

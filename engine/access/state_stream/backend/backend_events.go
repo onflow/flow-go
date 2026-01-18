@@ -2,6 +2,7 @@ package backend
 
 import (
 	"context"
+	"time"
 
 	"github.com/rs/zerolog"
 
@@ -15,6 +16,14 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 )
+
+// EventsResponse represents the response containing events for a specific block.
+type EventsResponse struct {
+	BlockID        flow.Identifier
+	Height         uint64
+	Events         flow.EventsList
+	BlockTimestamp time.Time
+}
 
 type EventsBackend struct {
 	log                     zerolog.Logger
