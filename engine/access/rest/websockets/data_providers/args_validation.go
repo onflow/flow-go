@@ -120,9 +120,7 @@ func extractExecutionStateQueryFields(
 	}
 
 	agreeingExecutorsCountRaw, exists := executionStateQuery["agreeing_executors_count"]
-	if !exists {
-		out.AgreeingExecutorsCount = 0
-	} else {
+	if exists {
 		str, ok := agreeingExecutorsCountRaw.(string)
 		if !ok {
 			return httpmodels.ExecutionStateQuery{},
@@ -137,9 +135,7 @@ func extractExecutionStateQueryFields(
 	}
 
 	requiredExecutorIDsRaw, exists := executionStateQuery["required_executor_ids"]
-	if !exists {
-		out.RequiredExecutorIDs = nil
-	} else {
+	if exists {
 		converted, err := common.ConvertInterfaceToArrayOfStrings(requiredExecutorIDsRaw)
 		if err != nil {
 			return httpmodels.ExecutionStateQuery{},
@@ -156,9 +152,7 @@ func extractExecutionStateQueryFields(
 	}
 
 	includeExecutorMetadataRaw, exists := executionStateQuery["include_executor_metadata"]
-	if !exists {
-		out.IncludeExecutorMetadata = false
-	} else {
+	if exists {
 		str, ok := includeExecutorMetadataRaw.(string)
 		if !ok {
 			return httpmodels.ExecutionStateQuery{},
