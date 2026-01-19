@@ -53,6 +53,7 @@ type API interface {
 		ctx context.Context,
 		criteria optimistic_sync.Criteria,
 	) subscription.Subscription
+
 	// SubscribeEvents is deprecated and will be removed in a future version.
 	// Use SubscribeEventsFromStartBlockID, SubscribeEventsFromStartHeight or SubscribeEventsFromLatest.
 	//
@@ -75,7 +76,14 @@ type API interface {
 	// - filter: The event filter used to filter events.
 	//
 	// If invalid parameters will be supplied SubscribeEvents will return a failed subscription.
-	SubscribeEvents(ctx context.Context, startBlockID flow.Identifier, startHeight uint64, filter EventFilter) subscription.Subscription
+	SubscribeEvents(
+		ctx context.Context,
+		startBlockID flow.Identifier,
+		startHeight uint64,
+		filter EventFilter,
+		criteria optimistic_sync.Criteria,
+	) subscription.Subscription
+
 	// SubscribeEventsFromStartBlockID streams events starting at the specified block ID,
 	// up until the latest available block. Once the latest is
 	// reached, the stream will remain open and responses are sent for each new
@@ -91,7 +99,13 @@ type API interface {
 	// - filter: The event filter used to filter events.
 	//
 	// If invalid parameters will be supplied SubscribeEventsFromStartBlockID will return a failed subscription.
-	SubscribeEventsFromStartBlockID(ctx context.Context, startBlockID flow.Identifier, filter EventFilter) subscription.Subscription
+	SubscribeEventsFromStartBlockID(
+		ctx context.Context,
+		startBlockID flow.Identifier,
+		filter EventFilter,
+		criteria optimistic_sync.Criteria,
+	) subscription.Subscription
+
 	// SubscribeEventsFromStartHeight streams events starting at the specified block height,
 	// up until the latest available block. Once the latest is
 	// reached, the stream will remain open and responses are sent for each new
@@ -107,7 +121,13 @@ type API interface {
 	// - filter: The event filter used to filter events.
 	//
 	// If invalid parameters will be supplied SubscribeEventsFromStartHeight will return a failed subscription.
-	SubscribeEventsFromStartHeight(ctx context.Context, startHeight uint64, filter EventFilter) subscription.Subscription
+	SubscribeEventsFromStartHeight(
+		ctx context.Context,
+		startBlockHeight uint64,
+		filter EventFilter,
+		criteria optimistic_sync.Criteria,
+	) subscription.Subscription
+
 	// SubscribeEventsFromLatest subscribes to events starting at the latest sealed block,
 	// up until the latest available block. Once the latest is
 	// reached, the stream will remain open and responses are sent for each new
@@ -122,7 +142,12 @@ type API interface {
 	// - filter: The event filter used to filter events.
 	//
 	// If invalid parameters will be supplied SubscribeEventsFromLatest will return a failed subscription.
-	SubscribeEventsFromLatest(ctx context.Context, filter EventFilter) subscription.Subscription
+	SubscribeEventsFromLatest(
+		ctx context.Context,
+		filter EventFilter,
+		criteria optimistic_sync.Criteria,
+	) subscription.Subscription
+
 	// GetRegisterValues returns register values for a set of register IDs at the provided block height.
 	//
 	// CAUTION: this layer SIMPLIFIES the ERROR HANDLING convention

@@ -8,6 +8,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/rest/websockets/legacy/request"
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/engine/access/subscription"
+	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
 )
 
 // SubscribeEvents create websocket connection and write to it requested events.
@@ -37,5 +38,6 @@ func SubscribeEvents(
 		wsController.HeartbeatInterval = req.HeartbeatInterval
 	}
 
-	return wsController.Api.SubscribeEvents(ctx, req.StartBlockID, req.StartHeight, filter), nil
+	// TODO: replace DefaultCriteria with a real one
+	return wsController.Api.SubscribeEvents(ctx, req.StartBlockID, req.StartHeight, filter, optimistic_sync.DefaultCriteria), nil
 }

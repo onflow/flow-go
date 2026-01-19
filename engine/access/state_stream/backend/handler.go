@@ -240,7 +240,8 @@ func (h *Handler) SubscribeEvents(request *executiondata.SubscribeEventsRequest,
 		return err
 	}
 
-	sub := h.api.SubscribeEvents(stream.Context(), startBlockID, request.GetStartBlockHeight(), filter)
+	criteria := convert.NewCriteria(request.GetExecutionStateQuery())
+	sub := h.api.SubscribeEvents(stream.Context(), startBlockID, request.GetStartBlockHeight(), filter, criteria)
 
 	return HandleRPCSubscription(sub, h.handleEventsResponse(stream.Send, request.HeartbeatInterval, request.GetEventEncodingVersion()))
 }
@@ -275,7 +276,8 @@ func (h *Handler) SubscribeEventsFromStartBlockID(request *executiondata.Subscri
 		return err
 	}
 
-	sub := h.api.SubscribeEventsFromStartBlockID(stream.Context(), startBlockID, filter)
+	criteria := convert.NewCriteria(request.GetExecutionStateQuery())
+	sub := h.api.SubscribeEventsFromStartBlockID(stream.Context(), startBlockID, filter, criteria)
 
 	return HandleRPCSubscription(sub, h.handleEventsResponse(stream.Send, request.HeartbeatInterval, request.GetEventEncodingVersion()))
 }
@@ -305,7 +307,8 @@ func (h *Handler) SubscribeEventsFromStartHeight(request *executiondata.Subscrib
 		return err
 	}
 
-	sub := h.api.SubscribeEventsFromStartHeight(stream.Context(), request.GetStartBlockHeight(), filter)
+	criteria := convert.NewCriteria(request.GetExecutionStateQuery())
+	sub := h.api.SubscribeEventsFromStartHeight(stream.Context(), request.GetStartBlockHeight(), filter, criteria)
 
 	return HandleRPCSubscription(sub, h.handleEventsResponse(stream.Send, request.HeartbeatInterval, request.GetEventEncodingVersion()))
 }
@@ -335,7 +338,8 @@ func (h *Handler) SubscribeEventsFromLatest(request *executiondata.SubscribeEven
 		return err
 	}
 
-	sub := h.api.SubscribeEventsFromLatest(stream.Context(), filter)
+	criteria := convert.NewCriteria(request.GetExecutionStateQuery())
+	sub := h.api.SubscribeEventsFromLatest(stream.Context(), filter, criteria)
 
 	return HandleRPCSubscription(sub, h.handleEventsResponse(stream.Send, request.HeartbeatInterval, request.GetEventEncodingVersion()))
 }
