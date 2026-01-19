@@ -184,7 +184,7 @@ func (t *LocalTransactionProvider) TransactionResultByIndex(
 	var txErrorMessageStr string
 	var txStatusCode uint = 0
 	if txResult.Failed {
-		txErrorMessage, err := snapshot.TransactionResultErrorMessages().ByBlockIDTransactionIndex(blockID, index)
+		msg, err := snapshot.TransactionResultErrorMessages().ByBlockIDTransactionIndex(blockID, index)
 		if err != nil {
 			if !errors.Is(err, storage.ErrNotFound) {
 				return nil, nil, fmt.Errorf("failed to get transaction error message: %w", err)
@@ -193,15 +193,14 @@ func (t *LocalTransactionProvider) TransactionResultByIndex(
 			// use a placeholder error message in this case to ensure graceful degradation.
 			txErrorMessageStr = error_messages.DefaultFailedErrorMessage
 		} else {
-			txErrorMessageStr = txErrorMessage.ErrorMessage
+			if len(msg.ErrorMessage) == 0 {
+				// this means that the error message stored in the db is inconsistent with the tx result.
+				return nil, nil, fmt.Errorf("transaction failed but error message is empty")
+			}
+			txErrorMessageStr = msg.ErrorMessage
 		}
 
-		if len(txErrorMessage.ErrorMessage) == 0 {
-			// this means that the error message stored in the db is inconsistent with the tx result.
-			return nil, nil, fmt.Errorf("transaction failed but error message is empty")
-		}
-
-		txStatusCode = 1 // statusCode of 1 indicates an error and 0 indicates no error, the same as on EN
+		txStatusCode = 1
 	}
 
 	events, err := snapshot.Events().ByBlockIDTransactionIndex(blockID, index)
