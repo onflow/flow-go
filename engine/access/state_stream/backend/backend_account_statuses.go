@@ -109,7 +109,7 @@ func (b *AccountStatusesBackend) SubscribeAccountStatusesFromStartBlockID(
 	}
 
 	if header.Height < b.nodeRootBlock.Height {
-		return subscription.NewFailedSubscription(err, "block height is less than the spork root block")
+		return subscription.NewFailedSubscription(err, "block height is less than the node's root block")
 	}
 
 	availableExecutors, err :=

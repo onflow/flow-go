@@ -59,7 +59,7 @@ func (p *accountStatusesProvider) NextData(_ context.Context) (any, error) {
 			BlockTimestamp: time.UnixMilli(int64(sporkRootBlock.Timestamp)).UTC(),
 		}
 
-		p.incrementHeight(metadata.ExecutionResultInfo.ExecutionResultID)
+		p.advanceToNextBlock(metadata.ExecutionResultInfo.ExecutionResultID)
 		return response, nil
 	}
 
@@ -81,6 +81,6 @@ func (p *accountStatusesProvider) NextData(_ context.Context) (any, error) {
 		AccountEvents: accountEvents,
 	}
 
-	p.incrementHeight(metadata.ExecutionResultInfo.ExecutionResultID)
+	p.advanceToNextBlock(metadata.ExecutionResultInfo.ExecutionResultID)
 	return response, nil
 }
