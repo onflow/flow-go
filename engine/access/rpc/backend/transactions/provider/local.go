@@ -200,7 +200,7 @@ func (t *LocalTransactionProvider) TransactionResultByIndex(
 			txErrorMessageStr = msg.ErrorMessage
 		}
 
-		txStatusCode = 1
+		txStatusCode = 1 // statusCode of 1 indicates an error and 0 indicates no error, the same as on EN
 	}
 
 	events, err := snapshot.Events().ByBlockIDTransactionIndex(blockID, index)
