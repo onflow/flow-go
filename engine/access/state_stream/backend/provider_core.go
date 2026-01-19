@@ -49,7 +49,7 @@ func (c *providerCore) getSnapshotMetadata() (*executionStateSnapshotMetadata, e
 	return metadata, nil
 }
 
-func (c *providerCore) incrementHeight(resultID flow.Identifier) {
+func (c *providerCore) advanceToNextBlock(resultID flow.Identifier) {
 	c.criteria.ParentExecutionResultID = resultID
 	c.blockHeight++
 }
