@@ -2,6 +2,7 @@ package backend
 
 import (
 	"context"
+	"time"
 
 	"github.com/rs/zerolog"
 
@@ -15,6 +16,14 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 )
+
+// EventsResponse represents the response containing events for a specific block.
+type EventsResponse struct {
+	BlockID        flow.Identifier
+	Height         uint64
+	Events         flow.EventsList
+	BlockTimestamp time.Time
+}
 
 type EventsBackend struct {
 	log                     zerolog.Logger
@@ -64,13 +73,7 @@ func NewEventsBackend(
 // those events that match the filter are returned. If no filter is provided,
 // all events are returned.
 //
-// Parameters:
-// - ctx: Context for the operation.
-// - startBlockID: The identifier of the starting block. If provided, startHeight should be 0.
-// - startHeight: The height of the starting block. If provided, startBlockID should be flow.ZeroID.
-// - filter: The event filter used to filter events.
-//
-// If invalid parameters will be supplied SubscribeEvents will return a failed subscription.
+// If invalid parameters are supplied, SubscribeEvents will return a failed subscription.
 func (b *EventsBackend) SubscribeEvents(
 	ctx context.Context,
 	startBlockID flow.Identifier,
@@ -98,12 +101,7 @@ func (b *EventsBackend) SubscribeEvents(
 // those events that match the filter are returned. If no filter is provided,
 // all events are returned.
 //
-// Parameters:
-// - ctx: Context for the operation.
-// - startBlockID: The identifier of the starting block.
-// - filter: The event filter used to filter events.
-//
-// If invalid parameters will be supplied SubscribeEventsFromStartBlockID will return a failed subscription.
+// If invalid parameters are supplied, SubscribeEventsFromStartBlockID will return a failed subscription.
 func (b *EventsBackend) SubscribeEventsFromStartBlockID(
 	ctx context.Context,
 	startBlockID flow.Identifier,
@@ -154,12 +152,7 @@ func (b *EventsBackend) SubscribeEventsFromStartBlockID(
 // those events that match the filter are returned. If no filter is provided,
 // all events are returned.
 //
-// Parameters:
-// - ctx: Context for the operation.
-// - startHeight: The height of the starting block.
-// - filter: The event filter used to filter events.
-//
-// If invalid parameters will be supplied SubscribeEventsFromStartHeight will return a failed subscription.
+// If invalid parameters are supplied, SubscribeEventsFromStartHeight will return a failed subscription.
 func (b *EventsBackend) SubscribeEventsFromStartHeight(
 	ctx context.Context,
 	startBlockHeight uint64,
@@ -214,11 +207,7 @@ func (b *EventsBackend) SubscribeEventsFromStartHeight(
 // those events that match the filter are returned. If no filter is provided,
 // all events are returned.
 //
-// Parameters:
-// - ctx: Context for the operation.
-// - filter: The event filter used to filter events.
-//
-// If invalid parameters will be supplied SubscribeEventsFromLatest will return a failed subscription.
+// If invalid parameters are supplied, SubscribeEventsFromLatest will return a failed subscription.
 func (b *EventsBackend) SubscribeEventsFromLatest(
 	ctx context.Context,
 	eventFilter state_stream.EventFilter,

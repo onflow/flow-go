@@ -165,6 +165,7 @@ func (b *StateStreamBackend) GetRegisterValues(
 	}
 
 	// TODO: move this whole function to a separate small backend
+	// TODO: fix error handling
 	execResultInfo, err := b.EventsBackend.executionResultProvider.ExecutionResultInfo(header.ID(), criteria)
 	if err != nil {
 		err = fmt.Errorf("failed to get execution result info for block: %w", err)

@@ -38,8 +38,13 @@ func TestHeartbeatResponseSuite(t *testing.T) {
 }
 
 type HandlerTestSuite struct {
-	LegacyBackendExecutionDataSuite
-	handler *Handler
+	suite.Suite
+
+	backend            *ssmock.API
+	handler            *Handler
+	blocks             []*flow.Block
+	highestBlockHeader *flow.Header
+	testEventTypes     []flow.EventType
 }
 
 // fakeReadServerImpl is an utility structure for receiving response from grpc handler without building a complete pipeline with client and server.
@@ -62,9 +67,21 @@ func (fake *fakeReadServerImpl) Send(response *executiondata.SubscribeEventsResp
 }
 
 func (s *HandlerTestSuite) SetupTest() {
-	s.LegacyBackendExecutionDataSuite.SetupTest()
+	// Generate test blocks
+	s.blocks = unittest.BlockchainFixture(5)
+	s.highestBlockHeader = s.blocks[len(s.blocks)-1].ToHeader()
+
+	// Create mock API backend
+	s.backend = ssmock.NewAPI(s.T())
+
+	// Create handler with mock backend
 	chain := flow.MonotonicEmulator.Chain()
 	s.handler = NewHandler(s.backend, chain, makeConfig(5))
+
+	s.testEventTypes = []flow.EventType{
+		"A.0x1.Foo.Bar",
+		"A.0x2.Baz.Qux",
+	}
 }
 
 // TestHeartbeatResponse tests the periodic heartbeat response.
@@ -75,8 +92,11 @@ func (s *HandlerTestSuite) SetupTest() {
 // - Wait for either responses with filtered events or heartbeat responses.
 // - Verify that the responses are being sent with proper heartbeat interval.
 func (s *HandlerTestSuite) TestHeartbeatResponse() {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	reader := &fakeReadServerImpl{
-		ctx:      context.Background(),
+		ctx:      ctx,
 		received: make(chan *executiondata.SubscribeEventsResponse, 100),
 	}
 
@@ -84,6 +104,8 @@ func (s *HandlerTestSuite) TestHeartbeatResponse() {
 	s.highestBlockHeader = s.blocks[len(s.blocks)-1].ToHeader()
 
 	s.Run("All events filter", func() {
+		s.setupSubscribeEventsMock(ctx)
+
 		// create empty event filter
 		filter := &executiondata.EventFilter{}
 		// create subscribe events request, set the created filter and heartbeatInterval
@@ -114,9 +136,11 @@ func (s *HandlerTestSuite) TestHeartbeatResponse() {
 	})
 
 	s.Run("Event A.0x1.Foo.Bar filter with heartbeat interval 1", func() {
+		s.setupSubscribeEventsMock(ctx)
+
 		// create A.0x1.Foo.Bar event filter
 		pbFilter := &executiondata.EventFilter{
-			EventType: []string{string(testEventTypes[0])},
+			EventType: []string{string(s.testEventTypes[0])},
 			Contract:  nil,
 			Address:   nil,
 		}
@@ -149,6 +173,8 @@ func (s *HandlerTestSuite) TestHeartbeatResponse() {
 	})
 
 	s.Run("Non existent filter with heartbeat interval 2", func() {
+		s.setupSubscribeEventsMock(ctx)
+
 		// create non existent filter
 		pbFilter := &executiondata.EventFilter{
 			EventType: []string{"A.0x1.NonExistent.Event"},
@@ -714,4 +740,29 @@ func (m *StreamMock[R, T]) RecvToClient() (*T, error) {
 		return nil, io.EOF
 	}
 	return response, nil
+}
+
+// setupSubscribeEventsMock sets up the mock for SubscribeEvents to return a subscription
+// that sends EventsResponse for each block
+func (s *HandlerTestSuite) setupSubscribeEventsMock(ctx context.Context) {
+	sub := subscription.NewSubscription(len(s.blocks))
+
+	s.backend.
+		On("SubscribeEvents", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+		Return(sub).
+		Once()
+
+	go func() {
+		for _, block := range s.blocks {
+			response := &EventsResponse{
+				BlockID: block.ID(),
+				Height:  block.Height,
+				Events:  flow.EventsList{}, // empty events for simplicity
+			}
+			if err := sub.Send(ctx, response, time.Second); err != nil {
+				return
+			}
+		}
+		sub.Close()
+	}()
 }

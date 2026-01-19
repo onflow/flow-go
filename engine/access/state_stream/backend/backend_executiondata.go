@@ -72,7 +72,8 @@ func NewExecutionDataBackend(
 //   - To prevent delivering incorrect results to clients in case of an error, all other return values should be discarded.
 //
 // Expected errors:
-// - [access.DataNotFoundError]: when data required to process the request is not available.
+//   - [access.DataNotFoundError]: When data required to process the request is not available.
+//   - [access.InvalidRequestError]: When the criteria could not be met.
 func (b *ExecutionDataBackend) GetExecutionDataByBlockID(
 	ctx context.Context,
 	blockID flow.Identifier,
@@ -131,12 +132,7 @@ func (b *ExecutionDataBackend) GetExecutionDataByBlockID(
 // Only one of startBlockID and startHeight may be set. If neither startBlockID nor startHeight is provided,
 // the latest sealed block is used.
 //
-// Parameters:
-// - ctx: Context for the operation.
-// - startBlockID: The identifier of the starting block. If provided, startHeight should be 0.
-// - startHeight: The height of the starting block. If provided, startBlockID should be flow.ZeroID.
-//
-// If invalid parameters are provided, failed subscription will be returned.
+// If invalid parameters are provided, a failed subscription will be returned.
 func (b *ExecutionDataBackend) SubscribeExecutionData(
 	ctx context.Context,
 	startBlockID flow.Identifier,
@@ -158,10 +154,7 @@ func (b *ExecutionDataBackend) SubscribeExecutionData(
 // Once the latest is reached, the stream will remain open and responses are sent for each new
 // block as it becomes available.
 //
-// Parameters:
-// - ctx: Context for the operation.
-//
-// If invalid parameters are provided, failed subscription will be returned.
+// If invalid parameters are provided, a failed subscription will be returned.
 func (b *ExecutionDataBackend) SubscribeExecutionDataFromLatest(
 	ctx context.Context,
 	criteria optimistic_sync.Criteria,
@@ -182,11 +175,7 @@ func (b *ExecutionDataBackend) SubscribeExecutionDataFromLatest(
 // up until the latest available block. Once the latest is reached, the stream will remain open and responses
 // are sent for each new block as it becomes available.
 //
-// Parameters:
-// - ctx: Context for the operation.
-// - startBlockID: The identifier of the starting block.
-//
-// If invalid parameters are provided, failed subscription will be returned.
+// If invalid parameters are provided, a failed subscription will be returned.
 func (b *ExecutionDataBackend) SubscribeExecutionDataFromStartBlockID(
 	ctx context.Context,
 	startBlockID flow.Identifier,
@@ -231,11 +220,7 @@ func (b *ExecutionDataBackend) SubscribeExecutionDataFromStartBlockID(
 // up until the latest available block. Once the latest is reached, the stream will remain open and responses
 // are sent for each new block as it becomes available.
 //
-// Parameters:
-// - ctx: Context for the operation.
-// - startHeight: The height of the starting block.
-//
-// If invalid parameters are provided, failed subscription will be returned.
+// If invalid parameters are provided, a failed subscription will be returned.
 func (b *ExecutionDataBackend) SubscribeExecutionDataFromStartBlockHeight(
 	ctx context.Context,
 	startBlockHeight uint64,
