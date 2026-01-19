@@ -19,6 +19,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/subscription/tracker"
 	accessmodel "github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
@@ -47,6 +48,8 @@ type TransactionStream struct {
 
 	txProvider      *txprovider.FailoverTransactionProvider
 	txStatusDeriver *txstatus.TxStatusDeriver
+
+	executionResultProvider optimistic_sync.ExecutionResultInfoProvider
 }
 
 var _ access.TransactionStreamAPI = (*TransactionStream)(nil)
@@ -62,18 +65,20 @@ func NewTransactionStreamBackend(
 	transactions storage.Transactions,
 	txProvider *txprovider.FailoverTransactionProvider,
 	txStatusDeriver *txstatus.TxStatusDeriver,
+	executionResultProvider optimistic_sync.ExecutionResultInfoProvider,
 ) *TransactionStream {
 	return &TransactionStream{
-		log:                 log,
-		state:               state,
-		subscriptionHandler: subscriptionHandler,
-		blockTracker:        blockTracker,
-		sendTransaction:     sendTransaction,
-		blocks:              blocks,
-		collections:         collections,
-		transactions:        transactions,
-		txProvider:          txProvider,
-		txStatusDeriver:     txStatusDeriver,
+		log:                     log,
+		state:                   state,
+		subscriptionHandler:     subscriptionHandler,
+		blockTracker:            blockTracker,
+		sendTransaction:         sendTransaction,
+		blocks:                  blocks,
+		collections:             collections,
+		transactions:            transactions,
+		txProvider:              txProvider,
+		txStatusDeriver:         txStatusDeriver,
+		executionResultProvider: executionResultProvider,
 	}
 }
 
@@ -166,6 +171,7 @@ func (t *TransactionStream) createSubscription(
 		requiredEventEncodingVersion,
 		t.txProvider,
 		t.txStatusDeriver,
+		t.executionResultProvider,
 	)
 	txProvider := subscription.NewHeightByFuncProvider(startHeight, t.getTransactionStatusResponse(txInfo, startHeight))
 

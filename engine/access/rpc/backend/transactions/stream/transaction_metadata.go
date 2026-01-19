@@ -13,6 +13,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/subscription"
 	accessmodel "github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/storage"
 
@@ -36,6 +37,8 @@ type TransactionMetadata struct {
 
 	txProvider      *txprovider.FailoverTransactionProvider
 	txStatusDeriver *txstatus.TxStatusDeriver
+
+	executionResultProvider optimistic_sync.ExecutionResultInfoProvider
 }
 
 // NewTransactionMetadata initializes a new metadata object for a transaction subscription.
@@ -61,16 +64,18 @@ func NewTransactionMetadata(
 	eventEncodingVersion entities.EventEncodingVersion,
 	txProvider *txprovider.FailoverTransactionProvider,
 	txStatusDeriver *txstatus.TxStatusDeriver,
+	executionResultProvider optimistic_sync.ExecutionResultInfoProvider,
 ) *TransactionMetadata {
 	return &TransactionMetadata{
-		txResult:             &accessmodel.TransactionResult{TransactionID: txID},
-		eventEncodingVersion: eventEncodingVersion,
-		blocks:               blocks,
-		collections:          collections,
-		transactions:         transactions,
-		txReferenceBlockID:   txReferenceBlockID,
-		txProvider:           txProvider,
-		txStatusDeriver:      txStatusDeriver,
+		txResult:                &accessmodel.TransactionResult{TransactionID: txID},
+		eventEncodingVersion:    eventEncodingVersion,
+		blocks:                  blocks,
+		collections:             collections,
+		transactions:            transactions,
+		txReferenceBlockID:      txReferenceBlockID,
+		txProvider:              txProvider,
+		txStatusDeriver:         txStatusDeriver,
+		executionResultProvider: executionResultProvider,
 	}
 }
 
@@ -223,12 +228,19 @@ func (t *TransactionMetadata) refreshTransactionResult(ctx context.Context) erro
 		return nil
 	}
 
-	txResult, err := t.txProvider.TransactionResult(
+	// TODO(#7654): add support for custom criteria and integrate fork checking.
+	executionResultInfo, err := t.executionResultProvider.ExecutionResultInfo(t.blockWithTx.ID(), optimistic_sync.Criteria{})
+	if err != nil {
+		return fmt.Errorf("failed to get execution result info for block: %w", err)
+	}
+
+	txResult, _, err := t.txProvider.TransactionResult(
 		ctx,
 		t.blockWithTx,
 		t.txResult.TransactionID,
 		t.txResult.CollectionID,
 		t.eventEncodingVersion,
+		executionResultInfo,
 	)
 	if err != nil {
 		// TODO: I don't like the fact we propagate this error from txProvider.

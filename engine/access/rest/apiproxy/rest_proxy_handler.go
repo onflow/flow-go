@@ -175,10 +175,11 @@ func (r *RestProxyHandler) GetTransactionResult(
 	blockID flow.Identifier,
 	collectionID flow.Identifier,
 	requiredEventEncodingVersion entities.EventEncodingVersion,
-) (*accessmodel.TransactionResult, error) {
+	criteria optimistic_sync.Criteria,
+) (*accessmodel.TransactionResult, *accessmodel.ExecutorMetadata, error) {
 	upstream, closer, err := r.FaultTolerantClient()
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	defer closer.Close()
 
@@ -187,16 +188,27 @@ func (r *RestProxyHandler) GetTransactionResult(
 		BlockId:              blockID[:],
 		CollectionId:         collectionID[:],
 		EventEncodingVersion: requiredEventEncodingVersion,
+		ExecutionStateQuery:  executionStateQuery(criteria),
 	}
 
 	transactionResultResponse, err := upstream.GetTransactionResult(ctx, getTransactionResultRequest)
 	r.log("upstream", "GetTransactionResult", err)
 
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	return convert.MessageToTransactionResult(transactionResultResponse)
+	transactionResult, err := convert.MessageToTransactionResult(transactionResultResponse)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	var metadata *accessmodel.ExecutorMetadata
+	if rawMetadata := transactionResultResponse.GetMetadata(); rawMetadata != nil {
+		metadata = convert.MessageToExecutorMetadata(rawMetadata.GetExecutorMetadata())
+	}
+
+	return transactionResult, metadata, nil
 }
 
 // GetAccountAtBlockHeight returns the account by its address at a specific block height.
