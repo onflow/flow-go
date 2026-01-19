@@ -7,6 +7,13 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 )
 
+// TxStatusDeriver encapsulates the rules for deriving a transaction status when the transaction
+// cannot be reliably looked up (e.g. its containing block/collection is unknown or not yet indexed).
+//
+// It combines protocol progress (finalized/sealed heads) with indexing progress (lastFullBlockHeight)
+// to avoid reporting Expired too early, returning Pending until the node has indexed all collections
+// through the transaction’s expiry boundary, and deriving Finalized/Executed/Sealed for transactions
+// known to be in finalized blocks.
 type TxStatusDeriver struct {
 	state               protocol.State
 	lastFullBlockHeight *counters.PersistentStrictMonotonicCounter
@@ -92,4 +99,16 @@ func isExpired(refHeight, compareToHeight uint64) bool {
 		return false
 	}
 	return compareToHeight-refHeight > flow.DefaultTransactionExpiry
+}
+
+// DeriveExecutedTransactionStatus returns the transaction status for an executed transaction based on its block's status.
+func (t *TxStatusDeriver) DeriveExecutedTransactionStatus(blockStatus flow.BlockStatus) flow.TransactionStatus {
+	switch blockStatus {
+	case flow.BlockStatusSealed:
+		return flow.TransactionStatusSealed
+	case flow.BlockStatusFinalized:
+		return flow.TransactionStatusFinalized
+	default:
+		return flow.TransactionStatusExecuted
+	}
 }

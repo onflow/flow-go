@@ -360,9 +360,22 @@ func (h *Handler) GetTransactionResult(
 	}
 
 	eventEncodingVersion := req.GetEventEncodingVersion()
-	result, err := h.api.GetTransactionResult(ctx, transactionID, blockId, collectionId, eventEncodingVersion)
+	executionState := req.GetExecutionStateQuery()
+
+	result, executorMetadata, err := h.api.GetTransactionResult(
+		ctx,
+		transactionID,
+		blockId,
+		collectionId,
+		eventEncodingVersion,
+		convert.NewCriteria(executionState),
+	)
 	if err != nil {
 		return nil, err
+	}
+
+	if executionState.GetIncludeExecutorMetadata() {
+		metadata.ExecutorMetadata = convert.ExecutorMetadataToMessage(executorMetadata)
 	}
 
 	message := convert.TransactionResultToMessage(result)
@@ -386,10 +399,20 @@ func (h *Handler) GetTransactionResultsByBlockID(
 	}
 
 	eventEncodingVersion := req.GetEventEncodingVersion()
+	executionState := req.GetExecutionStateQuery()
 
-	results, err := h.api.GetTransactionResultsByBlockID(ctx, id, eventEncodingVersion)
+	results, executorMetadata, err := h.api.GetTransactionResultsByBlockID(
+		ctx,
+		id,
+		eventEncodingVersion,
+		convert.NewCriteria(executionState),
+	)
 	if err != nil {
 		return nil, err
+	}
+
+	if executionState.GetIncludeExecutorMetadata() {
+		metadata.ExecutorMetadata = convert.ExecutorMetadataToMessage(executorMetadata)
 	}
 
 	message := convert.TransactionResultsToMessage(results)
@@ -550,10 +573,20 @@ func (h *Handler) GetTransactionResultByIndex(
 	}
 
 	eventEncodingVersion := req.GetEventEncodingVersion()
+	executionState := req.GetExecutionStateQuery()
 
-	result, err := h.api.GetTransactionResultByIndex(ctx, blockID, req.GetIndex(), eventEncodingVersion)
+	result, executorMetadata, err := h.api.GetTransactionResultByIndex(
+		ctx,
+		blockID,
+		req.GetIndex(),
+		eventEncodingVersion,
+		convert.NewCriteria(executionState),
+	)
 	if err != nil {
 		return nil, err
+	}
+	if executionState.GetIncludeExecutorMetadata() {
+		metadata.ExecutorMetadata = convert.ExecutorMetadataToMessage(executorMetadata)
 	}
 
 	message := convert.TransactionResultToMessage(result)
