@@ -31,7 +31,7 @@ type LocalTransactionProvider struct {
 	state       protocol.State
 	collections storage.Collections
 	blocks      storage.Blocks
-	//TODO: eventsIndex should be removed when TransactionsByBlockID and ScheduledTransactionsByBlockID endpoints will be updated
+	//TODO(#8344, #7652): eventsIndex should be removed when TransactionsByBlockID and ScheduledTransactionsByBlockID endpoints will be updated
 	eventsIndex       *index.EventsIndex
 	systemCollections *systemcollection.Versioned
 	txStatusDeriver   *txstatus.TxStatusDeriver

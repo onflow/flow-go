@@ -328,15 +328,12 @@ func (s *TransactionStreamSuite) initializeBackend() {
 		Blocks:                      s.blocks,
 		Collections:                 s.collections,
 		Transactions:                s.transactions,
-		//TxErrorMessageProvider:      errorMessageProvider,
-		TxResultCache:           txResCache,
-		TxProvider:              txProvider,
-		TxValidator:             txValidator,
-		TxStatusDeriver:         txStatusDeriver,
-		ExecutionStateCache:     s.executionStateCache,
-		ExecutionResultProvider: s.executionResultProvider,
-		//EventsIndex:                 s.eventIndex,
-		//TxResultsIndex:              s.txResultIndex,
+		TxResultCache:               txResCache,
+		TxProvider:                  txProvider,
+		TxValidator:                 txValidator,
+		TxStatusDeriver:             txStatusDeriver,
+		ExecutionStateCache:         s.executionStateCache,
+		ExecutionResultProvider:     s.executionResultProvider,
 	}
 	txBackend, err := transactions.NewTransactionsBackend(txParams)
 	s.Require().NoError(err)

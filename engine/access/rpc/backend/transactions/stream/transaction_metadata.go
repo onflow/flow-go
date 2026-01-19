@@ -228,7 +228,7 @@ func (t *TransactionMetadata) refreshTransactionResult(ctx context.Context) erro
 		return nil
 	}
 
-	// TODO: add support for custom criteria and integrate fork checking.
+	// TODO(#7654): add support for custom criteria and integrate fork checking.
 	executionResultInfo, err := t.executionResultProvider.ExecutionResultInfo(t.blockWithTx.ID(), optimistic_sync.Criteria{})
 	if err != nil {
 		return fmt.Errorf("failed to get execution result info for block: %w", err)
