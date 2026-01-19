@@ -106,6 +106,7 @@ func (s *EventsProviderSuite) subscribeEventsDataProviderTestCases(backendRespon
 					mock.Anything,
 					s.rootBlock.ID(),
 					mock.Anything,
+					mock.Anything,
 				).Return(sub).Once()
 			},
 			expectedResponses: expectedResponses,
@@ -125,6 +126,7 @@ func (s *EventsProviderSuite) subscribeEventsDataProviderTestCases(backendRespon
 					mock.Anything,
 					s.rootBlock.Height,
 					mock.Anything,
+					mock.Anything,
 				).Return(sub).Once()
 			},
 			expectedResponses: expectedResponses,
@@ -140,6 +142,7 @@ func (s *EventsProviderSuite) subscribeEventsDataProviderTestCases(backendRespon
 			setupBackend: func(sub *submock.Subscription) {
 				s.api.On(
 					"SubscribeEventsFromLatest",
+					mock.Anything,
 					mock.Anything,
 					mock.Anything,
 				).Return(sub).Once()
@@ -221,7 +224,7 @@ func (s *EventsProviderSuite) TestMessageIndexEventProviderResponse_HappyPath() 
 	sub.On("Channel").Return((<-chan interface{})(eventChan))
 	sub.On("Err").Return(nil).Once()
 
-	s.api.On("SubscribeEventsFromStartBlockID", mock.Anything, mock.Anything, mock.Anything).Return(sub)
+	s.api.On("SubscribeEventsFromStartBlockID", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(sub)
 
 	arguments :=
 		map[string]interface{}{

@@ -6,6 +6,7 @@ import (
 
 	"github.com/rs/zerolog"
 
+	httpmodels "github.com/onflow/flow-go/engine/access/rest/http/models"
 	"github.com/onflow/flow-go/engine/access/rest/http/request"
 	"github.com/onflow/flow-go/engine/access/rest/websockets/data_providers/models"
 	wsmodels "github.com/onflow/flow-go/engine/access/rest/websockets/models"
@@ -19,10 +20,11 @@ import (
 
 // eventsArguments contains the arguments a user passes to subscribe to events
 type eventsArguments struct {
-	StartBlockID      flow.Identifier          // ID of the block to start subscription from
-	StartBlockHeight  uint64                   // Height of the block to start subscription from
-	Filter            state_stream.EventFilter // Filter applied to events for a given subscription
-	HeartbeatInterval uint64                   // Maximum number of blocks message won't be sent
+	StartBlockID        flow.Identifier                // ID of the block to start subscription from
+	StartBlockHeight    uint64                         // Height of the block to start subscription from
+	Filter              state_stream.EventFilter       // Filter applied to events for a given subscription
+	HeartbeatInterval   uint64                         // Maximum number of blocks message won't be sent
+	ExecutionStateQuery httpmodels.ExecutionStateQuery //TODO: we don't parse it yet
 }
 
 // EventsDataProvider is responsible for providing events
@@ -134,15 +136,16 @@ func (p *EventsDataProvider) sendResponse(eventsResponse *backend.EventsResponse
 
 // createAndStartSubscription creates a new subscription using the specified input arguments.
 func (p *EventsDataProvider) createAndStartSubscription(ctx context.Context, args eventsArguments) subscription.Subscription {
+	criteria := httpmodels.NewCriteria(args.ExecutionStateQuery)
 	if args.StartBlockID != flow.ZeroID {
-		return p.stateStreamApi.SubscribeEventsFromStartBlockID(ctx, args.StartBlockID, args.Filter)
+		return p.stateStreamApi.SubscribeEventsFromStartBlockID(ctx, args.StartBlockID, args.Filter, criteria)
 	}
 
 	if args.StartBlockHeight != request.EmptyHeight {
-		return p.stateStreamApi.SubscribeEventsFromStartHeight(ctx, args.StartBlockHeight, args.Filter)
+		return p.stateStreamApi.SubscribeEventsFromStartHeight(ctx, args.StartBlockHeight, args.Filter, criteria)
 	}
 
-	return p.stateStreamApi.SubscribeEventsFromLatest(ctx, args.Filter)
+	return p.stateStreamApi.SubscribeEventsFromLatest(ctx, args.Filter, criteria)
 }
 
 // convertEventsResponse converts events in the provided EventsResponse from CCF to JSON-CDC format.
