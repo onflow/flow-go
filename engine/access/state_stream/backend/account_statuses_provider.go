@@ -13,6 +13,9 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 )
 
+// accountStatusesProvider provides account status data by processing and filtering events.
+//
+// NOT CONCURRENCY SAFE! accountStatusesProvider is designed to be used by a single streamer goroutine.
 type accountStatusesProvider struct {
 	providerCore
 	log    zerolog.Logger
