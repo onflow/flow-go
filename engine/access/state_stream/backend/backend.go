@@ -121,14 +121,16 @@ func New(
 		subscriptionFactory,
 	)
 
-	b.AccountStatusesBackend = AccountStatusesBackend{
-		log:                  logger,
-		subscriptionHandler:  subscriptionFactory,
-		executionDataTracker: b.ExecutionDataTracker,
-		// TODO: this type is deprecated and should not be used.
-		// Fix this in the account statuses PR.
-		eventsProvider: LegacyEventsProvider{},
-	}
+	b.AccountStatusesBackend = *NewAccountStatusesBackend(
+		logger,
+		state,
+		headers,
+		nodeRootBlock,
+		executionDataTracker,
+		executionResultProvider,
+		executionStateCache,
+		subscriptionFactory,
+	)
 
 	return b, nil
 }

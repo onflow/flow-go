@@ -103,17 +103,37 @@ func (_m *API) GetRegisterValues(ctx context.Context, registerIDs flow.RegisterI
 	return r0, r1, r2
 }
 
-// SubscribeAccountStatusesFromLatestBlock provides a mock function with given fields: ctx, filter
-func (_m *API) SubscribeAccountStatusesFromLatestBlock(ctx context.Context, filter state_stream.AccountStatusFilter) subscription.Subscription {
-	ret := _m.Called(ctx, filter)
+// SubscribeAccountStatuses provides a mock function with given fields: ctx, startBlockID, startBlockHeight, filter, criteria
+func (_m *API) SubscribeAccountStatuses(ctx context.Context, startBlockID flow.Identifier, startBlockHeight uint64, filter state_stream.AccountStatusFilter, criteria optimistic_sync.Criteria) subscription.Subscription {
+	ret := _m.Called(ctx, startBlockID, startBlockHeight, filter, criteria)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SubscribeAccountStatuses")
+	}
+
+	var r0 subscription.Subscription
+	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier, uint64, state_stream.AccountStatusFilter, optimistic_sync.Criteria) subscription.Subscription); ok {
+		r0 = rf(ctx, startBlockID, startBlockHeight, filter, criteria)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(subscription.Subscription)
+		}
+	}
+
+	return r0
+}
+
+// SubscribeAccountStatusesFromLatestBlock provides a mock function with given fields: ctx, filter, criteria
+func (_m *API) SubscribeAccountStatusesFromLatestBlock(ctx context.Context, filter state_stream.AccountStatusFilter, criteria optimistic_sync.Criteria) subscription.Subscription {
+	ret := _m.Called(ctx, filter, criteria)
 
 	if len(ret) == 0 {
 		panic("no return value specified for SubscribeAccountStatusesFromLatestBlock")
 	}
 
 	var r0 subscription.Subscription
-	if rf, ok := ret.Get(0).(func(context.Context, state_stream.AccountStatusFilter) subscription.Subscription); ok {
-		r0 = rf(ctx, filter)
+	if rf, ok := ret.Get(0).(func(context.Context, state_stream.AccountStatusFilter, optimistic_sync.Criteria) subscription.Subscription); ok {
+		r0 = rf(ctx, filter, criteria)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(subscription.Subscription)
@@ -123,17 +143,17 @@ func (_m *API) SubscribeAccountStatusesFromLatestBlock(ctx context.Context, filt
 	return r0
 }
 
-// SubscribeAccountStatusesFromStartBlockID provides a mock function with given fields: ctx, startBlockID, filter
-func (_m *API) SubscribeAccountStatusesFromStartBlockID(ctx context.Context, startBlockID flow.Identifier, filter state_stream.AccountStatusFilter) subscription.Subscription {
-	ret := _m.Called(ctx, startBlockID, filter)
+// SubscribeAccountStatusesFromStartBlockID provides a mock function with given fields: ctx, startBlockID, filter, criteria
+func (_m *API) SubscribeAccountStatusesFromStartBlockID(ctx context.Context, startBlockID flow.Identifier, filter state_stream.AccountStatusFilter, criteria optimistic_sync.Criteria) subscription.Subscription {
+	ret := _m.Called(ctx, startBlockID, filter, criteria)
 
 	if len(ret) == 0 {
 		panic("no return value specified for SubscribeAccountStatusesFromStartBlockID")
 	}
 
 	var r0 subscription.Subscription
-	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier, state_stream.AccountStatusFilter) subscription.Subscription); ok {
-		r0 = rf(ctx, startBlockID, filter)
+	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier, state_stream.AccountStatusFilter, optimistic_sync.Criteria) subscription.Subscription); ok {
+		r0 = rf(ctx, startBlockID, filter, criteria)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(subscription.Subscription)
@@ -143,17 +163,17 @@ func (_m *API) SubscribeAccountStatusesFromStartBlockID(ctx context.Context, sta
 	return r0
 }
 
-// SubscribeAccountStatusesFromStartHeight provides a mock function with given fields: ctx, startHeight, filter
-func (_m *API) SubscribeAccountStatusesFromStartHeight(ctx context.Context, startHeight uint64, filter state_stream.AccountStatusFilter) subscription.Subscription {
-	ret := _m.Called(ctx, startHeight, filter)
+// SubscribeAccountStatusesFromStartHeight provides a mock function with given fields: ctx, startHeight, filter, criteria
+func (_m *API) SubscribeAccountStatusesFromStartHeight(ctx context.Context, startHeight uint64, filter state_stream.AccountStatusFilter, criteria optimistic_sync.Criteria) subscription.Subscription {
+	ret := _m.Called(ctx, startHeight, filter, criteria)
 
 	if len(ret) == 0 {
 		panic("no return value specified for SubscribeAccountStatusesFromStartHeight")
 	}
 
 	var r0 subscription.Subscription
-	if rf, ok := ret.Get(0).(func(context.Context, uint64, state_stream.AccountStatusFilter) subscription.Subscription); ok {
-		r0 = rf(ctx, startHeight, filter)
+	if rf, ok := ret.Get(0).(func(context.Context, uint64, state_stream.AccountStatusFilter, optimistic_sync.Criteria) subscription.Subscription); ok {
+		r0 = rf(ctx, startHeight, filter, criteria)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(subscription.Subscription)

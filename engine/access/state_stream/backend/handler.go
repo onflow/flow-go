@@ -595,7 +595,8 @@ func (h *Handler) SubscribeAccountStatusesFromStartBlockID(
 		return status.Errorf(codes.InvalidArgument, "could not create account status filter: %v", err)
 	}
 
-	sub := h.api.SubscribeAccountStatusesFromStartBlockID(stream.Context(), startBlockID, filter)
+	criteria := convert.NewCriteria(request.GetExecutionStateQuery())
+	sub := h.api.SubscribeAccountStatusesFromStartBlockID(stream.Context(), startBlockID, filter, criteria)
 
 	return HandleRPCSubscription(sub, h.handleAccountStatusesResponse(request.HeartbeatInterval, request.GetEventEncodingVersion(), stream.Send))
 }
@@ -622,7 +623,8 @@ func (h *Handler) SubscribeAccountStatusesFromStartHeight(
 		return status.Errorf(codes.InvalidArgument, "could not create account status filter: %v", err)
 	}
 
-	sub := h.api.SubscribeAccountStatusesFromStartHeight(stream.Context(), request.GetStartBlockHeight(), filter)
+	criteria := convert.NewCriteria(request.GetExecutionStateQuery())
+	sub := h.api.SubscribeAccountStatusesFromStartHeight(stream.Context(), request.GetStartBlockHeight(), filter, criteria)
 
 	return HandleRPCSubscription(sub, h.handleAccountStatusesResponse(request.HeartbeatInterval, request.GetEventEncodingVersion(), stream.Send))
 }
@@ -649,7 +651,8 @@ func (h *Handler) SubscribeAccountStatusesFromLatestBlock(
 		return status.Errorf(codes.InvalidArgument, "could not create account status filter: %v", err)
 	}
 
-	sub := h.api.SubscribeAccountStatusesFromLatestBlock(stream.Context(), filter)
+	criteria := convert.NewCriteria(request.GetExecutionStateQuery())
+	sub := h.api.SubscribeAccountStatusesFromLatestBlock(stream.Context(), filter, criteria)
 
 	return HandleRPCSubscription(sub, h.handleAccountStatusesResponse(request.HeartbeatInterval, request.GetEventEncodingVersion(), stream.Send))
 }

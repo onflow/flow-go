@@ -11,78 +11,66 @@ import (
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
-	"github.com/onflow/flow-go/utils/unittest"
 )
 
-type BackendEventsSuite struct {
+type BackendAccountStatusesSuite struct {
 	BackendExecutionDataSuite
 
-	chainID      flow.ChainID
-	eventTypes   []flow.EventType
-	eventFilters []state_stream.EventFilter
+	chainID       flow.ChainID
+	statusFilters []state_stream.AccountStatusFilter
 }
 
-func TestBackendEventsSuite(t *testing.T) {
-	suite.Run(t, new(BackendEventsSuite))
+func TestBackendAccountStatusesSuite2(t *testing.T) {
+	suite.Run(t, new(BackendAccountStatusesSuite))
 }
 
-func (s *BackendEventsSuite) SetupTest() {
+func (s *BackendAccountStatusesSuite) SetupTest() {
 	s.BackendExecutionDataSuite.SetupTest()
 
 	s.chainID = flow.MonotonicEmulator
-	s.eventTypes = []flow.EventType{
-		unittest.EventTypeFixture(s.chainID),
-		unittest.EventTypeFixture(s.chainID),
-		unittest.EventTypeFixture(s.chainID),
-	}
 
-	// empty filter; all events should be returned
-	s.eventFilters = append(s.eventFilters, state_stream.EventFilter{})
-
-	// filter for some event types; only events of those types should be returned
-	filter, err := state_stream.NewEventFilter(
+	// empty filter (no event types, no addresses); all account statuses should be returned
+	filter, err := state_stream.NewAccountStatusFilter(
 		state_stream.DefaultEventFilterConfig,
 		s.chainID.Chain(),
-		[]string{string(s.eventTypes[0])},
-		nil,
-		nil,
+		[]string{},
+		[]string{},
 	)
 	require.NoError(s.T(), err)
-	s.eventFilters = append(s.eventFilters, filter)
-
-	// filter for non-existent event types; no events should be returned
-	filter, err = state_stream.NewEventFilter(
-		state_stream.DefaultEventFilterConfig,
-		s.chainID.Chain(),
-		[]string{"A.0x1.NonExistent.Event"},
-		nil,
-		nil,
-	)
-	require.NoError(s.T(), err)
-	s.eventFilters = append(s.eventFilters, filter)
+	s.statusFilters = append(s.statusFilters, filter)
 }
 
-// TestSubscribeEvents verifies that the subscription to events works correctly
-// starting from the spork root block ID. It ensures that the events are received
-// sequentially and matches the expected data after applying the event filter.
-func (s *BackendEventsSuite) TestSubscribeEvents() {
+// TestSubscribeAccountStatuses verifies that the subscription to account statuses works correctly
+// starting from the spork root block ID. It ensures that the account statuses are received
+// sequentially and matches the expected data after applying the status filter.
+func (s *BackendAccountStatusesSuite) TestSubscribeAccountStatuses() {
 	s.mockDataProviderState()
 	s.mockExecutionResultProviderStateForEvents()
 
-	s.snapshot.
-		On("Head").
-		Return(s.nodeRootBlock, nil)
+	s.headers.
+		On("ByBlockID", mock.Anything).
+		Return(func(blockID flow.Identifier) (*flow.Header, error) {
+			block, ok := s.blocksIDToBlockMap[blockID]
+			if !ok {
+				return nil, storage.ErrNotFound
+			}
+			return block.ToHeader(), nil
+		})
 
 	s.state.
 		On("AtBlockID", mock.Anything).
+		Return(s.snapshot)
+
+	s.state.
+		On("AtHeight", mock.Anything).
 		Return(s.snapshot)
 
 	s.snapshot.
 		On("SealedResult").
 		Return(s.executionResults[0], nil, nil)
 
-	for _, eventFilter := range s.eventFilters {
-		backend := NewEventsBackend(
+	for _, statusFilter := range s.statusFilters {
+		backend := NewAccountStatusesBackend(
 			s.log,
 			s.state,
 			s.headers,
@@ -97,11 +85,11 @@ func (s *BackendEventsSuite) TestSubscribeEvents() {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
-		sub := backend.SubscribeEvents(
+		sub := backend.SubscribeAccountStatuses(
 			ctx,
 			s.nodeRootBlock.ID(),
 			0, // either id or height must be provided
-			eventFilter,
+			statusFilter,
 			s.criteria,
 		)
 
@@ -111,15 +99,15 @@ func (s *BackendEventsSuite) TestSubscribeEvents() {
 		expected := len(s.blocks)
 
 		for value := range sub.Channel() {
-			actualEventsResponse, ok := value.(*EventsResponse)
-			require.True(s.T(), ok, "expected *EventsResponse on the channel")
+			actualResponse, ok := value.(*AccountStatusesResponse)
+			require.True(s.T(), ok, "expected *AccountStatusesResponse on the channel")
 
 			block := s.blocksHeightToBlockMap[currentHeight]
-			expectedEvents := s.extractExpectedEvents(block.ID(), eventFilter)
+			expectedAccountEvents := s.extractExpectedAccountStatuses(block.ID(), statusFilter)
 
-			require.Equal(s.T(), block.ID(), actualEventsResponse.BlockID)
-			require.Equal(s.T(), block.Height, actualEventsResponse.Height)
-			require.Equal(s.T(), expectedEvents, actualEventsResponse.Events)
+			require.Equal(s.T(), block.ID(), actualResponse.BlockID)
+			require.Equal(s.T(), block.Height, actualResponse.Height)
+			require.Equal(s.T(), expectedAccountEvents, actualResponse.AccountEvents)
 
 			currentHeight += 1
 
@@ -136,26 +124,36 @@ func (s *BackendEventsSuite) TestSubscribeEvents() {
 	}
 }
 
-// TestSubscribeEventsFromNonRoot verifies that subscribing with a start block
+// TestSubscribeAccountStatusesFromNonRoot verifies that subscribing with a start block
 // ID different from the spork root works as expected. We start from the block right
 // after the spork root and stream all remaining blocks.
-func (s *BackendEventsSuite) TestSubscribeEventsFromNonRoot() {
+func (s *BackendAccountStatusesSuite) TestSubscribeAccountStatusesFromNonRoot() {
 	s.mockDataProviderState()
 	s.mockExecutionResultProviderStateForEvents()
 
-	// called on the start by tracker
-	startBlock := s.blocksHeightToBlockMap[s.sporkRootBlock.Height+1]
+	s.headers.
+		On("ByBlockID", mock.Anything).
+		Return(func(blockID flow.Identifier) (*flow.Header, error) {
+			block, ok := s.blocksIDToBlockMap[blockID]
+			if !ok {
+				return nil, storage.ErrNotFound
+			}
+			return block.ToHeader(), nil
+		})
 
-	s.snapshot.
-		On("Head").
-		Return(startBlock.ToHeader(), nil)
+	s.state.
+		On("AtHeight", mock.Anything).
+		Return(s.snapshot, nil)
 
 	s.state.
 		On("AtBlockID", mock.Anything).
 		Return(s.snapshot)
 
-	for _, eventFilter := range s.eventFilters {
-		backend := NewEventsBackend(
+	// called on the start by tracker
+	startBlock := s.blocksHeightToBlockMap[s.nodeRootBlock.Height+1]
+
+	for _, statusFilter := range s.statusFilters {
+		backend := NewAccountStatusesBackend(
 			s.log,
 			s.state,
 			s.headers,
@@ -172,11 +170,11 @@ func (s *BackendEventsSuite) TestSubscribeEventsFromNonRoot() {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
-		sub := backend.SubscribeEvents(
+		sub := backend.SubscribeAccountStatuses(
 			ctx,
 			startBlock.ID(),
 			0, // either id or height must be provided
-			eventFilter,
+			statusFilter,
 			s.criteria,
 		)
 
@@ -184,15 +182,15 @@ func (s *BackendEventsSuite) TestSubscribeEventsFromNonRoot() {
 		expected := len(s.blocks) - 1 // streaming all blocks except the spork root
 
 		for value := range sub.Channel() {
-			actualEventsResponse, ok := value.(*EventsResponse)
-			require.True(s.T(), ok, "expected *EventsResponse on the channel")
+			actualResponse, ok := value.(*AccountStatusesResponse)
+			require.True(s.T(), ok, "expected *AccountStatusesResponse on the channel")
 
 			block := s.blocksHeightToBlockMap[currentHeight]
-			expectedEvents := s.extractExpectedEvents(block.ID(), eventFilter)
+			expectedAccountEvents := s.extractExpectedAccountStatuses(block.ID(), statusFilter)
 
-			require.Equal(s.T(), block.ID(), actualEventsResponse.BlockID)
-			require.Equal(s.T(), block.Height, actualEventsResponse.Height)
-			require.Equal(s.T(), expectedEvents, actualEventsResponse.Events)
+			require.Equal(s.T(), block.ID(), actualResponse.BlockID)
+			require.Equal(s.T(), block.Height, actualResponse.Height)
+			require.Equal(s.T(), expectedAccountEvents, actualResponse.AccountEvents)
 
 			currentHeight += 1
 
@@ -209,20 +207,20 @@ func (s *BackendEventsSuite) TestSubscribeEventsFromNonRoot() {
 	}
 }
 
-// TestSubscribeEventsFromStartHeight verifies that the subscription can start from a specific
+// TestSubscribeAccountStatusesFromStartHeight verifies that the subscription can start from a specific
 // block height. It ensures that the correct block header is retrieved and data streaming starts
 // from the correct block.
-func (s *BackendEventsSuite) TestSubscribeEventsFromStartHeight() {
+func (s *BackendAccountStatusesSuite) TestSubscribeAccountStatusesFromStartHeight() {
 	s.mockDataProviderState()
 	s.mockExecutionResultProviderStateForEvents()
 
-	s.snapshot.
-		On("Head").
-		Return(s.nodeRootBlock, nil)
-
 	s.state.
 		On("AtHeight", mock.Anything).
-		Return(s.snapshot)
+		Return(s.snapshot, nil)
+
+	s.headers.
+		On("ByHeight", s.nodeRootBlock.Height).
+		Return(s.nodeRootBlock, nil)
 
 	s.state.
 		On("AtBlockID", mock.Anything).
@@ -232,8 +230,8 @@ func (s *BackendEventsSuite) TestSubscribeEventsFromStartHeight() {
 		On("SealedResult").
 		Return(s.executionResults[0], nil, nil)
 
-	for _, eventFilter := range s.eventFilters {
-		backend := NewEventsBackend(
+	for _, statusFilter := range s.statusFilters {
+		backend := NewAccountStatusesBackend(
 			s.log,
 			s.state,
 			s.headers,
@@ -243,15 +241,15 @@ func (s *BackendEventsSuite) TestSubscribeEventsFromStartHeight() {
 			s.executionStateCache,
 			s.subscriptionFactory,
 		)
-		currentHeight := s.sporkRootBlock.Height
+		currentHeight := s.nodeRootBlock.Height
 
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
-		sub := backend.SubscribeEventsFromStartHeight(
+		sub := backend.SubscribeAccountStatusesFromStartHeight(
 			ctx,
-			s.sporkRootBlock.Height,
-			eventFilter,
+			s.nodeRootBlock.Height,
+			statusFilter,
 			s.criteria,
 		)
 
@@ -261,15 +259,15 @@ func (s *BackendEventsSuite) TestSubscribeEventsFromStartHeight() {
 		expected := len(s.blocks)
 
 		for value := range sub.Channel() {
-			actualEventsResponse, ok := value.(*EventsResponse)
-			require.True(s.T(), ok, "expected *EventsResponse on the channel")
+			actualResponse, ok := value.(*AccountStatusesResponse)
+			require.True(s.T(), ok, "expected *AccountStatusesResponse on the channel")
 
 			block := s.blocksHeightToBlockMap[currentHeight]
-			expectedEvents := s.extractExpectedEvents(block.ID(), eventFilter)
+			expectedAccountEvents := s.extractExpectedAccountStatuses(block.ID(), statusFilter)
 
-			require.Equal(s.T(), block.ID(), actualEventsResponse.BlockID)
-			require.Equal(s.T(), block.Height, actualEventsResponse.Height)
-			require.Equal(s.T(), expectedEvents, actualEventsResponse.Events)
+			require.Equal(s.T(), block.ID(), actualResponse.BlockID)
+			require.Equal(s.T(), block.Height, actualResponse.Height)
+			require.Equal(s.T(), expectedAccountEvents, actualResponse.AccountEvents)
 
 			currentHeight += 1
 
@@ -286,16 +284,12 @@ func (s *BackendEventsSuite) TestSubscribeEventsFromStartHeight() {
 	}
 }
 
-// TestSubscribeEventsFromStartID verifies that the subscription can start from a specific
+// TestSubscribeAccountStatusesFromStartID verifies that the subscription can start from a specific
 // block ID. It checks that the start height is correctly resolved from the block ID and data
 // streaming proceeds.
-func (s *BackendEventsSuite) TestSubscribeEventsFromStartID() {
+func (s *BackendAccountStatusesSuite) TestSubscribeAccountStatusesFromStartID() {
 	s.mockDataProviderState()
 	s.mockExecutionResultProviderStateForEvents()
-
-	s.snapshot.
-		On("Head").
-		Return(s.nodeRootBlock, nil)
 
 	s.state.
 		On("AtBlockID", mock.Anything).
@@ -305,163 +299,162 @@ func (s *BackendEventsSuite) TestSubscribeEventsFromStartID() {
 		On("SealedResult").
 		Return(s.executionResults[0], nil, nil)
 
-	for _, eventFilter := range s.eventFilters {
-		backend := NewEventsBackend(
-			s.log,
-			s.state,
-			s.headers,
-			s.nodeRootBlock,
-			s.executionDataTracker,
-			s.executionResultProvider,
-			s.executionStateCache,
-			s.subscriptionFactory,
-		)
-		currentHeight := s.sporkRootBlock.Height
-
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
-
-		sub := backend.SubscribeEventsFromStartBlockID(
-			ctx,
-			s.sporkRootBlock.ID(),
-			eventFilter,
-			s.criteria,
-		)
-
-		// cancel after we have received all expected blocks to avoid waiting for
-		// streamer/provider to hit the "block not ready" or missing height path.
-		received := 0
-		expected := len(s.blocks)
-
-		for value := range sub.Channel() {
-			actualEventsResponse, ok := value.(*EventsResponse)
-			require.True(s.T(), ok, "expected *EventsResponse on the channel")
-
-			block := s.blocksHeightToBlockMap[currentHeight]
-			expectedEvents := s.extractExpectedEvents(block.ID(), eventFilter)
-
-			require.Equal(s.T(), block.ID(), actualEventsResponse.BlockID)
-			require.Equal(s.T(), block.Height, actualEventsResponse.Height)
-			require.Equal(s.T(), expectedEvents, actualEventsResponse.Events)
-
-			currentHeight += 1
-
-			received++
-			if received == expected {
-				// we've validated enough; stop the stream.
-				cancel()
-			}
-		}
-
-		// we only break out of the above loop when the subscription's channel is closed. this happens after
-		// the context cancellation is processed. At this point, the subscription should contain the error.
-		require.ErrorIs(s.T(), sub.Err(), context.Canceled)
-	}
-}
-
-// TestSubscribeEventsFromLatest verifies that the subscription can start from the latest
-// available finalized block. It ensures that the start height is correctly determined and data
-// streaming begins.
-func (s *BackendEventsSuite) TestSubscribeEventsFromLatest() {
-	s.mockDataProviderState()
-	s.mockExecutionResultProviderStateForEvents()
-
-	s.state.
-		On("AtHeight", mock.Anything).
-		Return(s.snapshot)
-
-	s.state.
-		On("AtBlockID", mock.Anything).
-		Return(s.snapshot)
-
-	s.state.On("Sealed").Return(s.snapshot)
-	s.snapshot.On("Head").Return(s.blocks[0].ToHeader(), nil)
-	s.snapshot.On("SealedResult").Return(s.executionResults[0], nil, nil)
-
-	for _, eventFilter := range s.eventFilters {
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
-
-		backend := NewEventsBackend(
-			s.log,
-			s.state,
-			s.headers,
-			s.nodeRootBlock,
-			s.executionDataTracker,
-			s.executionResultProvider,
-			s.executionStateCache,
-			s.subscriptionFactory,
-		)
-
-		sub := backend.SubscribeEventsFromLatest(ctx, eventFilter, s.criteria)
-		currentHeight := s.sporkRootBlock.Height
-
-		// cancel after we have received all expected blocks to avoid waiting for
-		// streamer/provider to hit the "block not ready" or missing height path.
-		received := 0
-		expected := len(s.blocks)
-
-		for value := range sub.Channel() {
-			actualEventsResponse, ok := value.(*EventsResponse)
-			require.True(s.T(), ok, "expected *EventsResponse on the channel")
-
-			block := s.blocksHeightToBlockMap[currentHeight]
-			expectedEvents := s.extractExpectedEvents(block.ID(), eventFilter)
-
-			require.Equal(s.T(), block.ID(), actualEventsResponse.BlockID)
-			require.Equal(s.T(), block.Height, actualEventsResponse.Height)
-			require.Equal(s.T(), expectedEvents, actualEventsResponse.Events)
-
-			currentHeight += 1
-
-			received++
-			if received == expected {
-				// we've validated enough; stop the stream.
-				cancel()
-			}
-		}
-
-		// we only break out of the above loop when the subscription's channel is closed. this happens after
-		// the context cancellation is processed. At this point, the subscription should contain the error.
-		require.ErrorIs(s.T(), sub.Err(), context.Canceled)
-	}
-}
-
-// mockExecutionResultProviderState sets up mock expectations for the code that calls the execution result provider.
-func (s *BackendExecutionDataSuite) mockExecutionResultProviderStateForEvents() {
-	s.snapshot.
-		On("Identities", mock.Anything).
-		Return(s.fixedExecutionNodes, nil)
-
-	s.eventsReader.
+	s.headers.
 		On("ByBlockID", mock.Anything).
-		Return(func(blockID flow.Identifier) ([]flow.Event, error) {
-			events, ok := s.blockIDToEventsMap[blockID]
+		Return(func(blockID flow.Identifier) (*flow.Header, error) {
+			block, ok := s.blocksIDToBlockMap[blockID]
 			if !ok {
 				return nil, storage.ErrNotFound
 			}
-
-			return events, nil
+			return block.ToHeader(), nil
 		})
 
-	s.executionDataSnapshot.
-		On("Events").
-		Return(s.eventsReader)
+	s.state.
+		On("AtHeight", mock.Anything).
+		Return(s.snapshot, nil)
 
-	s.executionStateCache.
-		On("Snapshot", mock.Anything).
-		Return(s.executionDataSnapshot, nil)
+	for _, statusFilter := range s.statusFilters {
+		backend := NewAccountStatusesBackend(
+			s.log,
+			s.state,
+			s.headers,
+			s.nodeRootBlock,
+			s.executionDataTracker,
+			s.executionResultProvider,
+			s.executionStateCache,
+			s.subscriptionFactory,
+		)
+		currentHeight := s.sporkRootBlock.Height
+
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		sub := backend.SubscribeAccountStatusesFromStartBlockID(
+			ctx,
+			s.sporkRootBlock.ID(),
+			statusFilter,
+			s.criteria,
+		)
+
+		// cancel after we have received all expected blocks to avoid waiting for
+		// streamer/provider to hit the "block not ready" or missing height path.
+		received := 0
+		expected := len(s.blocks)
+
+		for value := range sub.Channel() {
+			actualResponse, ok := value.(*AccountStatusesResponse)
+			require.True(s.T(), ok, "expected *AccountStatusesResponse on the channel")
+
+			block := s.blocksHeightToBlockMap[currentHeight]
+			expectedAccountEvents := s.extractExpectedAccountStatuses(block.ID(), statusFilter)
+
+			require.Equal(s.T(), block.ID(), actualResponse.BlockID)
+			require.Equal(s.T(), block.Height, actualResponse.Height)
+			require.Equal(s.T(), expectedAccountEvents, actualResponse.AccountEvents)
+
+			currentHeight += 1
+
+			received++
+			if received == expected {
+				// we've validated enough; stop the stream.
+				cancel()
+			}
+		}
+
+		// we only break out of the above loop when the subscription's channel is closed. this happens after
+		// the context cancellation is processed. At this point, the subscription should contain the error.
+		require.ErrorIs(s.T(), sub.Err(), context.Canceled)
+	}
 }
 
-// extractExpectedEvents extracts events from execution data and applies the filter.
-func (s *BackendEventsSuite) extractExpectedEvents(
+// TestSubscribeAccountStatusesFromLatest verifies that the subscription can start from the latest
+// available finalized block. It ensures that the start height is correctly determined and data
+// streaming begins.
+func (s *BackendAccountStatusesSuite) TestSubscribeAccountStatusesFromLatest() {
+	s.mockDataProviderState()
+	s.mockExecutionResultProviderStateForEvents()
+
+	s.headers.
+		On("ByHeight", s.sporkRootBlock.Height).
+		Return(s.sporkRootBlock.ToHeader(), nil)
+
+	s.state.
+		On("AtHeight", mock.Anything).
+		Return(s.snapshot, nil)
+
+	s.state.
+		On("AtBlockID", mock.Anything).
+		Return(s.snapshot)
+
+	s.snapshot.
+		On("SealedResult").
+		Return(s.executionResults[0], nil, nil)
+
+	s.state.On("Sealed").Return(s.snapshot, nil)
+	s.snapshot.On("Head").Return(s.blocks[0].ToHeader(), nil)
+
+	for _, statusFilter := range s.statusFilters {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		backend := NewAccountStatusesBackend(
+			s.log,
+			s.state,
+			s.headers,
+			s.nodeRootBlock,
+			s.executionDataTracker,
+			s.executionResultProvider,
+			s.executionStateCache,
+			s.subscriptionFactory,
+		)
+
+		sub := backend.SubscribeAccountStatusesFromLatestBlock(ctx, statusFilter, s.criteria)
+		currentHeight := s.sporkRootBlock.Height
+
+		// cancel after we have received all expected blocks to avoid waiting for
+		// streamer/provider to hit the "block not ready" or missing height path.
+		received := 0
+		expected := len(s.blocks)
+
+		for value := range sub.Channel() {
+			actualResponse, ok := value.(*AccountStatusesResponse)
+			require.True(s.T(), ok, "expected *AccountStatusesResponse on the channel")
+
+			block := s.blocksHeightToBlockMap[currentHeight]
+			expectedAccountEvents := s.extractExpectedAccountStatuses(block.ID(), statusFilter)
+
+			require.Equal(s.T(), block.ID(), actualResponse.BlockID)
+			require.Equal(s.T(), block.Height, actualResponse.Height)
+			require.Equal(s.T(), expectedAccountEvents, actualResponse.AccountEvents)
+
+			currentHeight += 1
+
+			received++
+			if received == expected {
+				// we've validated enough; stop the stream.
+				cancel()
+			}
+		}
+
+		// we only break out of the above loop when the subscription's channel is closed. this happens after
+		// the context cancellation is processed. At this point, the subscription should contain the error.
+		require.ErrorIs(s.T(), sub.Err(), context.Canceled)
+	}
+}
+
+// extractExpectedAccountStatuses extracts events from execution data, applies the filter,
+// and groups them by account address.
+func (s *BackendAccountStatusesSuite) extractExpectedAccountStatuses(
 	blockID flow.Identifier,
-	filter state_stream.EventFilter,
-) flow.EventsList {
+	filter state_stream.AccountStatusFilter,
+) map[string]flow.EventsList {
 	events := s.blockIDToEventsMap[blockID]
 	if events == nil {
 		return nil
 	}
 
-	return filter.Filter(events)
+	filteredEvents := filter.Filter(events)
+	accountEvents := filter.GroupCoreEventsByAccountAddress(filteredEvents, s.log)
+
+	return accountEvents
 }

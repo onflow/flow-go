@@ -2,7 +2,6 @@ package backend
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"time"
 
@@ -12,121 +11,93 @@ import (
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
 	"github.com/onflow/flow-go/state/protocol"
-	"github.com/onflow/flow-go/storage"
 )
 
 // executionDataProvider connects subscription/streamer with backends.
 // It is intended to be used as a data provider for the subscription package.
 //
-// NOT CONCURRENCY SAFE! executionDataProvider is designed to be used by a single streamer goroutine.
+// NOT CONCURRENCY SAFE! executionDataProvider is designed to be used by a single goroutine.
 type executionDataProvider struct {
-	state                   protocol.State
-	headers                 storage.Headers
-	executionDataTracker    tracker.ExecutionDataTracker
-	executionResultProvider optimistic_sync.ExecutionResultInfoProvider
-	executionStateCache     optimistic_sync.ExecutionStateCache
-	criteria                optimistic_sync.Criteria
-	height                  uint64
-}
-
-func newExecutionDataProvider(
-	state protocol.State,
-	headers storage.Headers,
-	executionDataTracker tracker.ExecutionDataTracker,
-	executionResultProvider optimistic_sync.ExecutionResultInfoProvider,
-	executionStateCache optimistic_sync.ExecutionStateCache,
-	nextCriteria optimistic_sync.Criteria,
-	startHeight uint64,
-) *executionDataProvider {
-	return &executionDataProvider{
-		state:                   state,
-		headers:                 headers,
-		executionDataTracker:    executionDataTracker,
-		executionResultProvider: executionResultProvider,
-		executionStateCache:     executionStateCache,
-		criteria:                nextCriteria,
-		height:                  startHeight,
-	}
+	providerCore
+	executionDataTracker tracker.ExecutionDataTracker
 }
 
 var _ subscription.DataProvider = (*executionDataProvider)(nil)
 
+func newExecutionDataProvider(
+	state protocol.State,
+	executionDataTracker tracker.ExecutionDataTracker,
+	snapshotBuilder *executionStateSnapshotBuilder,
+	nextCriteria optimistic_sync.Criteria,
+	startHeight uint64,
+) *executionDataProvider {
+	return &executionDataProvider{
+		providerCore: providerCore{
+			state:           state,
+			snapshotBuilder: snapshotBuilder,
+			criteria:        nextCriteria,
+			blockHeight:     startHeight,
+		},
+		executionDataTracker: executionDataTracker,
+	}
+}
+
 // NextData returns the execution data for the next block height.
 // It is intended to be used by the streamer to fetch data sequentially.
 //
+// Expected errors during normal operations:
 //   - [subscription.ErrBlockNotReady]: If the execution data is not yet available. This includes cases where
 //     the block is not finalized yet, or the execution result is pending (e.g. not enough agreeing executors).
 //   - [optimistic_sync.ErrBlockBeforeNodeHistory]: If the request is for data before the node's root block.
-func (e *executionDataProvider) NextData(ctx context.Context) (any, error) {
-	availableFinalizedHeight := e.executionDataTracker.GetHighestAvailableFinalizedHeight()
-	if e.height > availableFinalizedHeight {
-		// fail early if no notification has been received for the given block height.
-		// note: it's possible for the data to exist in the data store before the notification is
-		// received. this ensures a consistent view is available to all streams.
+//   - [optimistic_sync.SnapshotNotFoundError]: Result is not available, not ready for querying, or does not descend from the latest sealed result.
+//   - [optimistic_sync.CriteriaNotMetError]: Returned when the block is already sealed but no execution result can satisfy the provided criteria.
+//   - All other errors are potential indicators of bugs or corrupted internal state (continuation impossible)
+func (p *executionDataProvider) NextData(ctx context.Context) (any, error) {
+	// execution data provider specific check: it's possible for the data to exist in the data store before
+	// the notification is received. This ensures a consistent view is available to all streams.
+	availableFinalizedHeight := p.executionDataTracker.GetHighestAvailableFinalizedHeight()
+	if p.blockHeight > availableFinalizedHeight {
 		return nil, subscription.ErrBlockNotReady
 	}
 
-	blockHeader, err := e.headers.ByHeight(e.height)
+	metadata, err := p.getSnapshotMetadata()
 	if err != nil {
-		return nil, errors.Join(subscription.ErrBlockNotReady, err)
-	}
-	blockID := blockHeader.ID()
-
-	execResultInfo, err := e.executionResultProvider.ExecutionResultInfo(blockID, e.criteria)
-	if err != nil {
-		switch {
-		case optimistic_sync.IsExecutionResultNotReadyError(err):
-			return nil, errors.Join(subscription.ErrBlockNotReady, err)
-
-		case errors.Is(err, optimistic_sync.ErrBlockBeforeNodeHistory) || optimistic_sync.IsCriteriaNotMetError(err):
-			return nil, err
-
-		default:
-			return nil, fmt.Errorf("unexpected error: %w", err)
-		}
+		return nil, err
 	}
 
-	// the spork root block will never have execution data available. If requested, return an empty result.
-	sporkRootBlock := e.state.Params().SporkRootBlock()
-	if e.height == sporkRootBlock.Height {
+	// handle spork root special case
+	sporkRootBlock := p.state.Params().SporkRootBlock()
+	if p.blockHeight == sporkRootBlock.Height {
 		response := &ExecutionDataResponse{
-			Height: e.height,
+			Height: p.blockHeight,
 			ExecutionData: &execution_data.BlockExecutionData{
 				BlockID: sporkRootBlock.ID(),
 			},
 			BlockTimestamp: time.UnixMilli(int64(sporkRootBlock.Timestamp)).UTC(),
 		}
 
-		// prepare criteria for the next call
-		e.criteria.ParentExecutionResultID = execResultInfo.ExecutionResultID
-		e.height += 1
-
+		p.advanceToNextBlock(metadata.ExecutionResultInfo.ExecutionResultID)
 		return response, nil
 	}
 
-	snapshot, err := e.executionStateCache.Snapshot(execResultInfo.ExecutionResultID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to find snapshot by execution result ID %s: %w", execResultInfo.ExecutionResultID.String(), err)
-	}
-
-	executionData, err := snapshot.BlockExecutionData().ByBlockID(ctx, blockID)
+	// extract execution data from snapshot
+	blockID := metadata.BlockHeader.ID()
+	executionData, err := metadata.Snapshot.BlockExecutionData().ByBlockID(ctx, blockID)
 	if err != nil {
 		return nil, fmt.Errorf("could not find execution data for block %s: %w", blockID, err)
 	}
 
+	// build response
 	response := &ExecutionDataResponse{
-		Height:        e.height,
+		Height:        p.blockHeight,
 		ExecutionData: executionData.BlockExecutionData,
 		ExecutorMetadata: accessmodel.ExecutorMetadata{
-			ExecutionResultID: execResultInfo.ExecutionResultID,
-			ExecutorIDs:       execResultInfo.ExecutionNodes.NodeIDs(),
+			ExecutionResultID: metadata.ExecutionResultInfo.ExecutionResultID,
+			ExecutorIDs:       metadata.ExecutionResultInfo.ExecutionNodes.NodeIDs(),
 		},
-		BlockTimestamp: time.UnixMilli(int64(blockHeader.Timestamp)).UTC(),
+		BlockTimestamp: time.UnixMilli(int64(metadata.BlockHeader.Timestamp)).UTC(),
 	}
 
-	// prepare criteria for the next call
-	e.criteria.ParentExecutionResultID = execResultInfo.ExecutionResultID
-	e.height += 1
-
+	p.advanceToNextBlock(metadata.ExecutionResultInfo.ExecutionResultID)
 	return response, nil
 }

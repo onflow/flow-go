@@ -160,13 +160,60 @@ type API interface {
 	//   - [access.OutOfRangeError]: If the data for the requested height is outside the node's available range.
 	//   - [access.PreconditionFailedError]: When the register's database isn't initialized yet.
 	GetRegisterValues(ctx context.Context, registerIDs flow.RegisterIDs, height uint64, criteria optimistic_sync.Criteria) ([]flow.RegisterValue, *accessmodel.ExecutorMetadata, error)
+
+	// SubscribeAccountStatuses is deprecated and will be removed in a future version.
+	// Use SubscribeAccountStatusesFromStartBlockID, SubscribeAccountStatusesFromStartHeight or SubscribeAccountStatusesFromLatestBlock.
+	//
+	// SubscribeAccountStatuses streams account status changes for all blocks starting at the specified block ID or block height
+	// up until the latest available block. Once the latest is
+	// reached, the stream will remain open and responses are sent for each new
+	// block as it becomes available.
+	//
+	// Only one of startBlockID and startHeight may be set. If neither startBlockID nor startHeight is provided,
+	// the latest sealed block is used.
+	//
+	// Account statuses within each block are filtered by the provided AccountStatusFilter, and only
+	// those that match the filter are returned. If no filter is provided,
+	// all account statuses are returned.
+	//
+	// Parameters:
+	// - ctx: Context for the operation.
+	// - startBlockID: The identifier of the starting block. If provided, startHeight should be 0.
+	// - startHeight: The height of the starting block. If provided, startBlockID should be flow.ZeroID.
+	// - filter: The account status filter used to filter account statuses.
+	//
+	// If invalid parameters will be supplied SubscribeAccountStatuses will return a failed subscription.
+	SubscribeAccountStatuses(
+		ctx context.Context,
+		startBlockID flow.Identifier,
+		startBlockHeight uint64,
+		filter AccountStatusFilter,
+		criteria optimistic_sync.Criteria,
+	) subscription.Subscription
+
 	// SubscribeAccountStatusesFromStartBlockID subscribes to the streaming of account status changes starting from
 	// a specific block ID with an optional status filter.
-	SubscribeAccountStatusesFromStartBlockID(ctx context.Context, startBlockID flow.Identifier, filter AccountStatusFilter) subscription.Subscription
+	SubscribeAccountStatusesFromStartBlockID(
+		ctx context.Context,
+		startBlockID flow.Identifier,
+		filter AccountStatusFilter,
+		criteria optimistic_sync.Criteria,
+	) subscription.Subscription
+
 	// SubscribeAccountStatusesFromStartHeight subscribes to the streaming of account status changes starting from
 	// a specific block height, with an optional status filter.
-	SubscribeAccountStatusesFromStartHeight(ctx context.Context, startHeight uint64, filter AccountStatusFilter) subscription.Subscription
+	SubscribeAccountStatusesFromStartHeight(
+		ctx context.Context,
+		startHeight uint64,
+		filter AccountStatusFilter,
+		criteria optimistic_sync.Criteria,
+	) subscription.Subscription
+
 	// SubscribeAccountStatusesFromLatestBlock subscribes to the streaming of account status changes starting from a
 	// latest sealed block, with an optional status filter.
-	SubscribeAccountStatusesFromLatestBlock(ctx context.Context, filter AccountStatusFilter) subscription.Subscription
+	SubscribeAccountStatusesFromLatestBlock(
+		ctx context.Context,
+		filter AccountStatusFilter,
+		criteria optimistic_sync.Criteria,
+	) subscription.Subscription
 }

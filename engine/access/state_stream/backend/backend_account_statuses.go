@@ -2,117 +2,212 @@ package backend
 
 import (
 	"context"
-	"fmt"
+	"time"
 
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/engine/access/subscription/tracker"
-
-	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/filter"
+	"github.com/onflow/flow-go/module/executiondatasync/optimistic_sync"
+	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 )
 
 type AccountStatusesResponse struct {
-	BlockID       flow.Identifier
-	Height        uint64
-	AccountEvents map[string]flow.EventsList
+	BlockID        flow.Identifier
+	Height         uint64
+	AccountEvents  map[string]flow.EventsList
+	BlockTimestamp time.Time
 }
 
 // AccountStatusesBackend is a struct representing a backend implementation for subscribing to account statuses changes.
 type AccountStatusesBackend struct {
-	log                 zerolog.Logger
-	subscriptionHandler *subscription.SubscriptionHandler
-
-	executionDataTracker tracker.ExecutionDataTracker
-	eventsProvider       LegacyEventsProvider
+	log                     zerolog.Logger
+	state                   protocol.State
+	headers                 storage.Headers
+	nodeRootBlock           *flow.Header
+	executionDataTracker    tracker.ExecutionDataTracker
+	executionResultProvider optimistic_sync.ExecutionResultInfoProvider
+	executionStateCache     optimistic_sync.ExecutionStateCache
+	subscriptionFactory     *subscription.SubscriptionHandler
 }
 
-// subscribe creates and returns a subscription to receive account status updates starting from the specified height.
-func (b *AccountStatusesBackend) subscribe(
+func NewAccountStatusesBackend(
+	log zerolog.Logger,
+	state protocol.State,
+	headers storage.Headers,
+	nodeRootBlock *flow.Header,
+	executionDataTracker tracker.ExecutionDataTracker,
+	executionResultProvider optimistic_sync.ExecutionResultInfoProvider,
+	executionStateCache optimistic_sync.ExecutionStateCache,
+	subscriptionFactory *subscription.SubscriptionHandler,
+) *AccountStatusesBackend {
+	return &AccountStatusesBackend{
+		log:                     log,
+		state:                   state,
+		headers:                 headers,
+		nodeRootBlock:           nodeRootBlock,
+		executionDataTracker:    executionDataTracker,
+		executionResultProvider: executionResultProvider,
+		executionStateCache:     executionStateCache,
+		subscriptionFactory:     subscriptionFactory,
+	}
+}
+
+// SubscribeAccountStatuses is deprecated and will be removed in a future version.
+// Use SubscribeAccountStatusesFromStartBlockID, SubscribeAccountStatusesFromStartHeight or SubscribeAccountStatusesFromLatestBlock.
+//
+// SubscribeAccountStatuses streams account status changes for all blocks starting at the specified block ID or block height
+// up until the latest available block. Once the latest is
+// reached, the stream will remain open and responses are sent for each new
+// block as it becomes available.
+//
+// Only one of startBlockID and startHeight may be set. If neither startBlockID nor startHeight is provided,
+// the latest sealed block is used.
+//
+// Account statuses within each block are filtered by the provided AccountStatusFilter, and only
+// those that match the filter are returned. If no filter is provided,
+// all account statuses are returned.
+//
+// If invalid parameters are supplied, SubscribeAccountStatuses will return a failed subscription.
+func (b *AccountStatusesBackend) SubscribeAccountStatuses(
 	ctx context.Context,
-	nextHeight uint64,
-	filter state_stream.AccountStatusFilter,
+	startBlockID flow.Identifier,
+	startBlockHeight uint64,
+	statusFilter state_stream.AccountStatusFilter,
+	criteria optimistic_sync.Criteria,
 ) subscription.Subscription {
-	accountProvider := subscription.NewHeightByFuncProvider(nextHeight, b.getAccountStatusResponseFactory(filter))
-	return b.subscriptionHandler.Subscribe(ctx, accountProvider)
+	if startBlockID != flow.ZeroID && startBlockHeight == 0 {
+		return b.SubscribeAccountStatusesFromStartBlockID(ctx, startBlockID, statusFilter, criteria)
+	}
+
+	if startBlockHeight > 0 && startBlockID == flow.ZeroID {
+		return b.SubscribeAccountStatusesFromStartHeight(ctx, startBlockHeight, statusFilter, criteria)
+	}
+
+	return subscription.NewFailedSubscription(nil, "one of start block ID and start block height must be provided")
 }
 
 // SubscribeAccountStatusesFromStartBlockID subscribes to the streaming of account status changes starting from
 // a specific block ID with an optional status filter.
-// Errors:
-// - codes.ErrNotFound if could not get block by start blockID.
-// - codes.Internal if there is an internal error.
+//
+// If invalid parameters are supplied, SubscribeAccountStatusesFromStartBlockID will return a failed subscription.
 func (b *AccountStatusesBackend) SubscribeAccountStatusesFromStartBlockID(
 	ctx context.Context,
 	startBlockID flow.Identifier,
-	filter state_stream.AccountStatusFilter,
+	statusFilter state_stream.AccountStatusFilter,
+	criteria optimistic_sync.Criteria,
 ) subscription.Subscription {
-	nextHeight, err := b.executionDataTracker.GetStartHeightFromBlockID(startBlockID)
+	// check if the block header for the given block ID is available in the storage
+	header, err := b.headers.ByBlockID(startBlockID)
 	if err != nil {
-		return subscription.NewFailedSubscription(err, "could not get start height from block id")
+		return subscription.NewFailedSubscription(err, "could not get header for block height")
 	}
-	return b.subscribe(ctx, nextHeight, filter)
+
+	if header.Height < b.nodeRootBlock.Height {
+		return subscription.NewFailedSubscription(err, "block height is less than the node's root block")
+	}
+
+	availableExecutors, err :=
+		b.state.AtHeight(header.Height).Identities(filter.HasRole[flow.Identity](flow.RoleExecution))
+	if err != nil {
+		return subscription.NewFailedSubscription(err, "could not retrieve available executors")
+	}
+
+	err = criteria.Validate(availableExecutors)
+	if err != nil {
+		return subscription.NewFailedSubscription(err, "criteria validation failed")
+	}
+
+	snapshotBuilder := newExecutionStateSnapshotBuilder(
+		b.headers,
+		b.executionResultProvider,
+		b.executionStateCache,
+	)
+
+	accountStatusesProvider := newAccountStatusProvider(
+		b.log,
+		b.state,
+		snapshotBuilder,
+		criteria,
+		header.Height,
+		statusFilter,
+	)
+
+	return b.subscriptionFactory.Subscribe(ctx, accountStatusesProvider)
 }
 
 // SubscribeAccountStatusesFromStartHeight subscribes to the streaming of account status changes starting from
 // a specific block height, with an optional status filter.
-// Errors:
-// - codes.ErrNotFound if could not get block by start height.
-// - codes.Internal if there is an internal error.
+//
+// If invalid parameters are supplied, SubscribeAccountStatusesFromStartHeight will return a failed subscription.
 func (b *AccountStatusesBackend) SubscribeAccountStatusesFromStartHeight(
 	ctx context.Context,
-	startHeight uint64,
-	filter state_stream.AccountStatusFilter,
+	startBlockHeight uint64,
+	statusFilter state_stream.AccountStatusFilter,
+	criteria optimistic_sync.Criteria,
 ) subscription.Subscription {
-	nextHeight, err := b.executionDataTracker.GetStartHeightFromHeight(startHeight)
-	if err != nil {
-		return subscription.NewFailedSubscription(err, "could not get start height from block height")
+	if startBlockHeight < b.nodeRootBlock.Height {
+		return subscription.NewFailedSubscription(nil,
+			"start height must be greater than or equal to the spork root height")
 	}
-	return b.subscribe(ctx, nextHeight, filter)
+
+	// check if the block header for the given height is available in the storage
+	header, err := b.headers.ByHeight(startBlockHeight)
+	if err != nil {
+		return subscription.NewFailedSubscription(err, "error getting block header by height")
+	}
+
+	availableExecutors, err :=
+		b.state.AtHeight(header.Height).Identities(filter.HasRole[flow.Identity](flow.RoleExecution))
+	if err != nil {
+		return subscription.NewFailedSubscription(err, "could not retrieve available executors")
+	}
+
+	err = criteria.Validate(availableExecutors)
+	if err != nil {
+		return subscription.NewFailedSubscription(err, "criteria validation failed")
+	}
+
+	snapshotBuilder := newExecutionStateSnapshotBuilder(
+		b.headers,
+		b.executionResultProvider,
+		b.executionStateCache,
+	)
+
+	accountStatusesProvider := newAccountStatusProvider(
+		b.log,
+		b.state,
+		snapshotBuilder,
+		criteria,
+		header.Height,
+		statusFilter,
+	)
+
+	return b.subscriptionFactory.Subscribe(ctx, accountStatusesProvider)
 }
 
 // SubscribeAccountStatusesFromLatestBlock subscribes to the streaming of account status changes starting from a
 // latest sealed block, with an optional status filter.
 //
-// No errors are expected during normal operation.
+// If invalid parameters are supplied, SubscribeAccountStatusesFromLatestBlock will return a failed subscription.
 func (b *AccountStatusesBackend) SubscribeAccountStatusesFromLatestBlock(
 	ctx context.Context,
-	filter state_stream.AccountStatusFilter,
+	statusFilter state_stream.AccountStatusFilter,
+	criteria optimistic_sync.Criteria,
 ) subscription.Subscription {
-	nextHeight, err := b.executionDataTracker.GetStartHeightFromLatest(ctx)
+	header, err := b.state.Sealed().Head()
 	if err != nil {
-		return subscription.NewFailedSubscription(err, "could not get start height from latest")
+		// In the RPC engine, if we encounter an error from the protocol state indicating state corruption,
+		// we should halt processing requests
+		err := irrecoverable.NewExceptionf("failed to lookup sealed header: %w", err)
+		irrecoverable.Throw(ctx, err)
+		return subscription.NewFailedSubscription(err, "failed to lookup sealed header")
 	}
-	return b.subscribe(ctx, nextHeight, filter)
-}
 
-// getAccountStatusResponseFactory returns a function that returns the account statuses response for a given height.
-//
-// Errors:
-// - subscription.ErrBlockNotReady: If block header for the specified block height is not found.
-// - error: An error, if any, encountered during getting events from storage or execution data.
-func (b *AccountStatusesBackend) getAccountStatusResponseFactory(
-	filter state_stream.AccountStatusFilter,
-) subscription.GetDataByHeightFunc {
-	return func(ctx context.Context, height uint64) (interface{}, error) {
-		eventsResponse, err := b.eventsProvider.GetAllEventsResponse(ctx, height)
-		if err != nil {
-			if errors.Is(err, storage.ErrNotFound) ||
-				errors.Is(err, storage.ErrHeightNotIndexed) {
-				return nil, fmt.Errorf("block %d is not available yet: %w", height, subscription.ErrBlockNotReady)
-			}
-			return nil, err
-		}
-		filteredProtocolEvents := filter.Filter(eventsResponse.Events)
-		allAccountProtocolEvents := filter.GroupCoreEventsByAccountAddress(filteredProtocolEvents, b.log)
-
-		return &AccountStatusesResponse{
-			BlockID:       eventsResponse.BlockID,
-			Height:        eventsResponse.Height,
-			AccountEvents: allAccountProtocolEvents,
-		}, nil
-	}
+	return b.SubscribeAccountStatusesFromStartHeight(ctx, header.Height, statusFilter, criteria)
 }
