@@ -5,18 +5,18 @@ import (
 	"flag"
 	"fmt"
 	"net"
+	"net/http"
 	"os"
 	"os/signal"
 	"path/filepath"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/rs/zerolog"
 	"go.uber.org/atomic"
 	"google.golang.org/grpc"
 
-	"github.com/onflow/flow-go/admin"
-	executionCommands "github.com/onflow/flow-go/admin/commands/execution"
 	ledgerfactory "github.com/onflow/flow-go/ledger/factory"
 	ledgerpb "github.com/onflow/flow-go/ledger/protobuf"
 	"github.com/onflow/flow-go/ledger/remote"
@@ -228,41 +228,22 @@ func main() {
 		logger.Info().Uint("metrics_port", *metricsPort).Msg("metrics server started")
 	}
 
-	// Set up admin server if admin address is provided
-	var adminRunner *admin.CommandRunner
-	var adminCancel context.CancelFunc
+	// Set up simple HTTP admin server if admin address is provided
+	// This is a lightweight HTTP-only server (no gRPC proxy layer)
+	var adminServer *http.Server
 	if *adminAddr != "" {
-		adminBootstrapper := admin.NewCommandRunnerBootstrapper()
+		adminHandler := newAdminHandler(logger, triggerCheckpointOnNextSegmentFinish)
+		adminServer = &http.Server{
+			Addr:    *adminAddr,
+			Handler: adminHandler,
+		}
 
-		// Register trigger-checkpoint command
-		// Pass empty strings for ledgerServiceAddr and ledgerServiceAdminAddr since the ledger service itself runs locally
-		triggerCheckpointCmd := executionCommands.NewTriggerCheckpointCommand(triggerCheckpointOnNextSegmentFinish, "", "")
-		adminBootstrapper.RegisterHandler("trigger-checkpoint", triggerCheckpointCmd.Handler)
-		adminBootstrapper.RegisterValidator("trigger-checkpoint", triggerCheckpointCmd.Validator)
-
-		// Create admin command runner
-		adminRunner = adminBootstrapper.Bootstrap(logger, *adminAddr)
-
-		// Start admin server in background
-		adminCtx, cancel := context.WithCancel(context.Background())
-		adminCancel = cancel
-
-		signalerCtx, errChan := irrecoverable.WithSignaler(adminCtx)
 		go func() {
-			adminRunner.Start(signalerCtx)
-			// Monitor for irrecoverable errors
-			select {
-			case err := <-errChan:
-				if err != nil {
-					logger.Error().Err(err).Msg("admin server encountered irrecoverable error")
-				}
-			case <-adminCtx.Done():
+			logger.Info().Str("admin_addr", *adminAddr).Msg("starting admin HTTP server")
+			if err := adminServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+				logger.Error().Err(err).Msg("admin HTTP server error")
 			}
 		}()
-
-		// Wait for admin server to be ready
-		<-adminRunner.Ready()
-		logger.Info().Str("admin_addr", *adminAddr).Msg("admin server started")
 	}
 
 	// Start server on all listeners in separate goroutines
@@ -303,12 +284,13 @@ func main() {
 	}
 
 	// Shutdown admin server if it was started
-	if adminRunner != nil && adminCancel != nil {
+	if adminServer != nil {
 		logger.Info().Msg("shutting down admin server...")
-		// Cancel the context to signal shutdown
-		adminCancel()
-		// Wait for admin server to stop
-		<-adminRunner.Done()
+		shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer shutdownCancel()
+		if err := adminServer.Shutdown(shutdownCtx); err != nil {
+			logger.Warn().Err(err).Msg("admin server shutdown error")
+		}
 		logger.Info().Msg("admin server stopped")
 	}
 
