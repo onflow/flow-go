@@ -29,6 +29,7 @@ var (
 	ledgerServiceTCP    = flag.String("ledger-service-tcp", "", "Ledger service TCP listen address (e.g., 0.0.0.0:9000). If provided, server accepts TCP connections.")
 	ledgerServiceSocket = flag.String("ledger-service-socket", "", "Ledger service Unix socket path (e.g., /sockets/ledger.sock). If provided, server accepts Unix socket connections. Can specify multiple sockets separated by comma.")
 	adminAddr           = flag.String("admin-addr", "", "Address to bind on for admin HTTP server (e.g., 0.0.0.0:9002). If provided, enables admin commands.")
+	metricsPort         = flag.Uint("metrics-port", 0, "Port for Prometheus metrics server (e.g., 8080). If 0, metrics server is disabled.")
 	mtrieCacheSize      = flag.Int("mtrie-cache-size", 500, "MTrie cache size (number of tries)")
 	checkpointDist      = flag.Uint("checkpoint-distance", 100, "Checkpoint distance")
 	checkpointsToKeep   = flag.Uint("checkpoints-to-keep", 3, "Number of checkpoints to keep")
@@ -69,15 +70,15 @@ func main() {
 		Str("ledger_service_tcp", *ledgerServiceTCP).
 		Str("ledger_service_socket", *ledgerServiceSocket).
 		Str("admin_addr", *adminAddr).
+		Uint("metrics_port", *metricsPort).
 		Int("mtrie_cache_size", *mtrieCacheSize).
 		Msg("starting ledger service")
 
 	// Create trigger for manual checkpointing (used by admin command)
 	triggerCheckpointOnNextSegmentFinish := atomic.NewBool(false)
 
-	// Create ledger using factory
-	// TODO(leo): to use real metrics collector
-	metricsCollector := &metrics.NoopCollector{}
+	// Create ledger metrics collector
+	metricsCollector := metrics.NewLedgerCollector("", "")
 	result, err := ledgerfactory.NewLedger(ledgerfactory.Config{
 		Triedir:                              *triedir,
 		MTrieCacheSize:                       uint32(*mtrieCacheSize),
@@ -202,6 +203,31 @@ func main() {
 		}
 	}
 
+	// Set up metrics server if metrics port is provided
+	var metricsServer *metrics.Server
+	var metricsCancel context.CancelFunc
+	if *metricsPort > 0 {
+		metricsServer = metrics.NewServer(logger, *metricsPort)
+
+		metricsCtx, cancel := context.WithCancel(context.Background())
+		metricsCancel = cancel
+
+		signalerCtx, errChan := irrecoverable.WithSignaler(metricsCtx)
+		go func() {
+			metricsServer.Start(signalerCtx)
+			select {
+			case err := <-errChan:
+				if err != nil {
+					logger.Error().Err(err).Msg("metrics server encountered irrecoverable error")
+				}
+			case <-metricsCtx.Done():
+			}
+		}()
+
+		<-metricsServer.Ready()
+		logger.Info().Uint("metrics_port", *metricsPort).Msg("metrics server started")
+	}
+
 	// Set up admin server if admin address is provided
 	var adminRunner *admin.CommandRunner
 	var adminCancel context.CancelFunc
@@ -283,6 +309,14 @@ func main() {
 		// Wait for admin server to stop
 		<-adminRunner.Done()
 		logger.Info().Msg("admin server stopped")
+	}
+
+	// Shutdown metrics server if it was started
+	if metricsServer != nil && metricsCancel != nil {
+		logger.Info().Msg("shutting down metrics server...")
+		metricsCancel()
+		<-metricsServer.Done()
+		logger.Info().Msg("metrics server stopped")
 	}
 
 	logger.Info().Msg("waiting for ledger to stop...")
