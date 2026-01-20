@@ -158,11 +158,16 @@ func ReadBytes(buffer []byte, index int) ([]byte, error) {
 	if len(buffer) < index+EncodedUint64Size {
 		return nil, ErrInputDataTooSmall
 	}
+
 	// reading offset (we read into uint64) and adjust index
 	offset, err := ReadUint64(buffer, index)
 	if err != nil {
 		return nil, err
 	}
+	if offset > uint64(len(buffer)) {
+		return nil, ErrInputDataTooSmall
+	}
+
 	index = int(offset)
 	if len(buffer) < index+EncodedUint64Size {
 		return nil, ErrInputDataTooSmall
@@ -172,6 +177,10 @@ func ReadBytes(buffer []byte, index int) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+	if length > uint64(len(buffer)) {
+		return nil, ErrInputDataTooSmall
+	}
+
 	index += EncodedUint64Size
 	if len(buffer) < index+int(length) {
 		return nil, ErrInputDataTooSmall
