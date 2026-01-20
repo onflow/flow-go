@@ -73,7 +73,7 @@ func NewClient(grpcAddr string, logger zerolog.Logger, maxRequestSize, maxRespon
 			break
 		}
 
-		logger.Debug().
+		logger.Warn().
 			Err(err).
 			Dur("retry_delay", retryDelay).
 			Str("address", grpcAddr).
@@ -301,7 +301,7 @@ func (c *Client) Ready() <-chan struct{} {
 			}
 
 			if i < maxRetries-1 {
-				c.logger.Debug().
+				c.logger.Warn().
 					Err(err).
 					Int("attempt", i+1).
 					Dur("retry_delay", retryDelay).
