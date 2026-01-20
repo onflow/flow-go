@@ -16,14 +16,19 @@ else
 	ADX_SUPPORT := 1
 endif
 
-DISABLE_ADX := "-O2 -D__BLST_PORTABLE__"
+# C standard flag to ensure compatibility with GCC 15+ which defaults to C23
+# where 'bool' is a keyword and cannot be redefined via typedef
+C_STD_FLAG := -std=gnu17
+
+# Flags to disable ADX instructions for older CPUs
+DISABLE_ADX := -O2 -D__BLST_PORTABLE__
 
 # Then, set `CRYPTO_FLAG`
 # the crypto package uses BLST source files underneath which may use ADX instructions.
 ifeq ($(ADX_SUPPORT), 1)
-# if ADX instructions are supported on the current machine, default is to use a fast ADX implementation 
-	CRYPTO_FLAG := ""
+# if ADX instructions are supported on the current machine, default is to use a fast ADX implementation
+	CRYPTO_FLAG := "$(C_STD_FLAG)"
 else
-# if ADX instructions aren't supported, this CGO flags uses a slower non-ADX implementation 
-	CRYPTO_FLAG := $(DISABLE_ADX)
+# if ADX instructions aren't supported, this CGO flags uses a slower non-ADX implementation
+	CRYPTO_FLAG := "$(C_STD_FLAG) $(DISABLE_ADX)"
 endif
