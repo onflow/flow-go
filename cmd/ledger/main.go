@@ -28,7 +28,7 @@ var (
 	triedir             = flag.String("triedir", "", "Directory for trie files (required)")
 	ledgerServiceTCP    = flag.String("ledger-service-tcp", "", "Ledger service TCP listen address (e.g., 0.0.0.0:9000). If provided, server accepts TCP connections.")
 	ledgerServiceSocket = flag.String("ledger-service-socket", "", "Ledger service Unix socket path (e.g., /sockets/ledger.sock). If provided, server accepts Unix socket connections. Can specify multiple sockets separated by comma.")
-	adminAddr           = flag.String("admin-addr", "", "Address to bind on for admin HTTP server (e.g., 0.0.0.0:9002). If provided, enables admin commands.")
+	adminAddr           = flag.String("admin-addr", "", "Address to bind on for admin HTTP server (e.g., 0.0.0.0:9003). If provided, enables admin commands. Use a different port than the execution node's admin server (default 9002).")
 	metricsPort         = flag.Uint("metrics-port", 0, "Port for Prometheus metrics server (e.g., 8080). If 0, metrics server is disabled.")
 	mtrieCacheSize      = flag.Int("mtrie-cache-size", 500, "MTrie cache size (number of tries)")
 	checkpointDist      = flag.Uint("checkpoint-distance", 100, "Checkpoint distance")
@@ -235,7 +235,8 @@ func main() {
 		adminBootstrapper := admin.NewCommandRunnerBootstrapper()
 
 		// Register trigger-checkpoint command
-		triggerCheckpointCmd := executionCommands.NewTriggerCheckpointCommand(triggerCheckpointOnNextSegmentFinish)
+		// Pass empty strings for ledgerServiceAddr and ledgerServiceAdminAddr since the ledger service itself runs locally
+		triggerCheckpointCmd := executionCommands.NewTriggerCheckpointCommand(triggerCheckpointOnNextSegmentFinish, "", "")
 		adminBootstrapper.RegisterHandler("trigger-checkpoint", triggerCheckpointCmd.Handler)
 		adminBootstrapper.RegisterValidator("trigger-checkpoint", triggerCheckpointCmd.Validator)
 
