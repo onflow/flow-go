@@ -26,5 +26,5 @@ ifeq ($(ADX_SUPPORT), 1)
 	CRYPTO_FLAG := ""
 else
 # if ADX instructions aren't supported, this CGO flags uses a slower non-ADX implementation
-	CRYPTO_FLAG := "$(DISABLE_ADX)"
+	CRYPTO_FLAG := $(DISABLE_ADX)
 endif
