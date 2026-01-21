@@ -1,6 +1,6 @@
 module github.com/onflow/flow-go
 
-go 1.25.0
+go 1.25.1
 
 require (
 	cloud.google.com/go/compute/metadata v0.9.0
@@ -48,7 +48,7 @@ require (
 	github.com/multiformats/go-multihash v0.2.3
 	github.com/onflow/atree v0.12.0
 	github.com/onflow/cadence v1.9.5
-	github.com/onflow/crypto v0.25.3
+	github.com/onflow/crypto v0.25.4
 	github.com/onflow/flow v0.4.15
 	github.com/onflow/flow-core-contracts/lib/go/contracts v1.9.2
 	github.com/onflow/flow-core-contracts/lib/go/templates v1.9.2

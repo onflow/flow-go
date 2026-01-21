@@ -1,6 +1,6 @@
 module github.com/onflow/flow-go/insecure
 
-go 1.25.0
+go 1.25.1
 
 require (
 	github.com/btcsuite/btcd/chaincfg/chainhash v1.0.2
@@ -10,7 +10,7 @@ require (
 	github.com/libp2p/go-libp2p v0.38.2
 	github.com/libp2p/go-libp2p-pubsub v0.13.0
 	github.com/multiformats/go-multiaddr-dns v0.4.1
-	github.com/onflow/crypto v0.25.3
+	github.com/onflow/crypto v0.25.4
 	github.com/onflow/flow-go v0.36.2-0.20240717162253-d5d2e606ef53
 	github.com/rs/zerolog v1.29.0
 	github.com/spf13/pflag v1.0.6
