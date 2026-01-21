@@ -39,16 +39,20 @@ func NewTriggerCheckpointCommand(trigger *atomic.Bool, ledgerServiceAddr, ledger
 func (s *TriggerCheckpointCommand) Handler(_ context.Context, _ *admin.CommandRequest) (interface{}, error) {
 	// When using remote ledger service, checkpointing is handled by the ledger service
 	if s.ledgerServiceAddr != "" {
-		adminAddr := s.ledgerServiceAdminAddr
-		if adminAddr == "" {
-			adminAddr = "<ledger-service-admin-addr>"
+		if s.ledgerServiceAdminAddr == "" {
+			return nil, fmt.Errorf(
+				"trigger-checkpoint is not available when using remote ledger service (connected to %s). "+
+					"Please use the ledger service's admin endpoint instead. "+
+					"The admin address was not configured - check if the ledger service was started with --admin-addr",
+				s.ledgerServiceAddr,
+			)
 		}
 		return nil, fmt.Errorf(
 			"trigger-checkpoint is not available when using remote ledger service (connected to %s). "+
 				"Please use the ledger service's admin endpoint instead: "+
 				"curl -X POST http://%s/admin/run_command -H 'Content-Type: application/json' -d '{\"commandName\": \"trigger-checkpoint\", \"data\": {}}'",
 			s.ledgerServiceAddr,
-			adminAddr,
+			s.ledgerServiceAdminAddr,
 		)
 	}
 
