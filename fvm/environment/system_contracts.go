@@ -19,14 +19,14 @@ type SystemContracts struct {
 
 	tracer  tracing.TracerSpan
 	logger  *ProgramLogger
-	runtime *Runtime
+	runtime CadenceRuntimeProvider
 }
 
 func NewSystemContracts(
 	chain flow.Chain,
 	tracer tracing.TracerSpan,
 	logger *ProgramLogger,
-	runtime *Runtime,
+	runtime CadenceRuntimeProvider,
 ) *SystemContracts {
 	return &SystemContracts{
 		chain:   chain,
