@@ -40,7 +40,7 @@ func NewBackgroundIndexer(
 	heightsPerSecond uint64,
 ) *BackgroundIndexer {
 	return &BackgroundIndexer{
-		log:              log,
+		log:              log.With().Str("component", "background_indexer").Logger(),
 		provider:         provider,
 		registerStore:    registerStore,
 		state:            state,
