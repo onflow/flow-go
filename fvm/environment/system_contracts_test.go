@@ -71,6 +71,7 @@ func TestSystemContractsInvoke(t *testing.T) {
 				environment.RuntimeParams{
 					ReusableCadenceRuntimePool: runtimePool,
 				},
+				environment.CadenceTransactionRuntime,
 			)
 			invoker := environment.NewSystemContracts(
 				chainID.Chain(),

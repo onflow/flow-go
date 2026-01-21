@@ -12,7 +12,6 @@ import (
 
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/errors"
-	"github.com/onflow/flow-go/fvm/evm"
 	"github.com/onflow/flow-go/fvm/storage"
 	"github.com/onflow/flow-go/fvm/storage/derived"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
@@ -185,18 +184,6 @@ func (executor *transactionExecutor) preprocess() error {
 // infrequently modified and are expensive to compute.  For now this includes
 // reading meter parameter overrides and parsing programs.
 func (executor *transactionExecutor) preprocessTransactionBody() error {
-	chainID := executor.ctx.Chain.ChainID()
-
-	// setup EVM
-	err := evm.SetupEnvironment(
-		chainID,
-		executor.env,
-		executor.cadenceRuntime.CadenceTXEnv(),
-	)
-	if err != nil {
-		return err
-	}
-
 	// get meter parameters
 	executionParameters, executionStateRead, err := getExecutionParameters(
 		executor.env.Logger(),
@@ -252,18 +239,6 @@ func (executor *transactionExecutor) execute() error {
 }
 
 func (executor *transactionExecutor) ExecuteTransactionBody() error {
-	chainID := executor.ctx.Chain.ChainID()
-
-	// setup EVM
-	err := evm.SetupEnvironment(
-		chainID,
-		executor.env,
-		executor.cadenceRuntime.CadenceTXEnv(),
-	)
-	if err != nil {
-		return err
-	}
-
 	var invalidator derived.TransactionInvalidator
 	if !executor.errs.CollectedError() {
 
