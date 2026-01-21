@@ -118,7 +118,7 @@ func (db *testCoordinator) newTransaction(txnIndex uint32) (
 	return db.NewTransaction(
 		newTransactionRequest(
 			collectionInfo{},
-			fvm.NewContext(),
+			fvm.NewContext(flow.Mainnet.Chain()),
 			zerolog.Nop(),
 			txnIndex,
 			&flow.TransactionBody{},

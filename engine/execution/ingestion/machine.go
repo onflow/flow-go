@@ -36,6 +36,7 @@ type Machine struct {
 
 type CollectionRequester interface {
 	module.ReadyDoneAware
+	module.Startable
 	WithHandle(requester.HandleFunc)
 }
 
@@ -46,7 +47,6 @@ func NewMachine(
 	logger zerolog.Logger,
 	protocolEvents *events.Distributor,
 	collectionRequester CollectionRequester,
-
 	collectionFetcher CollectionFetcher,
 	headers storage.Headers,
 	blocks storage.Blocks,
@@ -108,6 +108,8 @@ func NewMachine(
 			e.log.Error().Msgf("invalid entity type (%T)", entity)
 			return
 		}
+		// TODO: this should be a non-blocking handler function. Currently this is the only non-blocking
+		//  handler, which requires the requester engine to spawn a goroutine for each entity response.
 		e.core.OnCollection(collection)
 	})
 

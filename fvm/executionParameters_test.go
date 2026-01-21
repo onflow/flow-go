@@ -19,6 +19,7 @@ import (
 	"github.com/onflow/flow-go/fvm/meter"
 	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
 	"github.com/onflow/flow-go/fvm/runtime/testutil"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 func TestGetExecutionMemoryWeights(t *testing.T) {
@@ -31,12 +32,15 @@ func TestGetExecutionMemoryWeights(t *testing.T) {
 	) (cadence.Value, error)) environment.Environment {
 		envMock := &fvmmock.Environment{}
 		envMock.On("BorrowCadenceRuntime", mock.Anything).Return(
-			reusableRuntime.NewReusableCadenceRuntime(
-				&testutil.TestRuntime{
-					ReadStoredFunc: readStored,
-				},
-				runtime.Config{},
-			),
+			reusableRuntime.ReusableCadenceTransactionRuntime{
+				ReusableCadenceRuntime: reusableRuntime.NewReusableCadenceRuntime(
+					&testutil.TestRuntime{
+						ReadStoredFunc: readStored,
+					},
+					flow.Mainnet.Chain(),
+					runtime.Config{},
+				),
+			},
 		)
 		envMock.On("ReturnCadenceRuntime", mock.Anything).Return()
 		return envMock
@@ -161,12 +165,15 @@ func TestGetExecutionEffortWeights(t *testing.T) {
 	) (cadence.Value, error)) environment.Environment {
 		envMock := &fvmmock.Environment{}
 		envMock.On("BorrowCadenceRuntime", mock.Anything).Return(
-			reusableRuntime.NewReusableCadenceRuntime(
-				&testutil.TestRuntime{
-					ReadStoredFunc: readStored,
-				},
-				runtime.Config{},
-			),
+			reusableRuntime.ReusableCadenceTransactionRuntime{
+				ReusableCadenceRuntime: reusableRuntime.NewReusableCadenceRuntime(
+					&testutil.TestRuntime{
+						ReadStoredFunc: readStored,
+					},
+					flow.Mainnet.Chain(),
+					runtime.Config{},
+				),
+			},
 		)
 		envMock.On("ReturnCadenceRuntime", mock.Anything).Return()
 		return envMock

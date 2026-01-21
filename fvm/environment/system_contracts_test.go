@@ -59,6 +59,7 @@ func TestSystemContractsInvoke(t *testing.T) {
 			tracer := tracing.NewTracerSpan()
 			runtimePool := reusableRuntime.NewCustomReusableCadenceRuntimePool(
 				0,
+				chainID.Chain(),
 				runtime.Config{},
 				func(_ runtime.Config) runtime.Runtime {
 					return &testutil.TestRuntime{
@@ -70,6 +71,7 @@ func TestSystemContractsInvoke(t *testing.T) {
 				environment.RuntimeParams{
 					ReusableCadenceRuntimePool: runtimePool,
 				},
+				environment.CadenceTransactionRuntime,
 			)
 			invoker := environment.NewSystemContracts(
 				chainID.Chain(),

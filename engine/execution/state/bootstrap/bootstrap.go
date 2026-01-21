@@ -48,9 +48,9 @@ func (b *Bootstrapper) BootstrapLedger(
 	vm := fvm.NewVirtualMachine()
 
 	ctx := fvm.NewContext(
+		chain,
 		fvm.WithLogger(b.logger),
 		fvm.WithMaxStateInteractionSize(ledgerIntractionLimitNeededForBootstrapping),
-		fvm.WithChain(chain),
 	)
 
 	bootstrap := fvm.Bootstrap(

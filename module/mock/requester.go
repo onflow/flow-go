@@ -17,14 +17,14 @@ func (_m *Requester) EntityByID(entityID flow.Identifier, selector flow.Identity
 	_m.Called(entityID, selector)
 }
 
+// EntityBySecondaryKey provides a mock function with given fields: queryKey, selector
+func (_m *Requester) EntityBySecondaryKey(queryKey flow.Identifier, selector flow.IdentityFilter[flow.Identity]) {
+	_m.Called(queryKey, selector)
+}
+
 // Force provides a mock function with no fields
 func (_m *Requester) Force() {
 	_m.Called()
-}
-
-// Query provides a mock function with given fields: key, selector
-func (_m *Requester) Query(key flow.Identifier, selector flow.IdentityFilter[flow.Identity]) {
-	_m.Called(key, selector)
 }
 
 // NewRequester creates a new instance of Requester. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.

@@ -90,6 +90,10 @@ func TestOnEntityRequestFull(t *testing.T) {
 
 	me := mockmodule.NewLocal(t)
 	me.On("NodeID").Return(unittest.IdentifierFixture())
+	// CAUTION: the HeroStore fifo queue is NOT BFT. It should be used for messages from trusted sources only!
+	// In the requester engine, the injected fifo queue is used to hold [flow.EntityResponse] messages from other
+	// potentially byzantine peers. In PRODUCTION, you can NOT use a HeroStore here. However, for testing we
+	// use the HeroStore for its better performance (reduced GC load on the maxed-out testing server).
 	requestQueue := queue.NewHeroStore(10, unittest.Logger(), metrics.NewNoopCollector())
 
 	e, err := provider.New(
@@ -184,6 +188,10 @@ func TestOnEntityRequestPartial(t *testing.T) {
 
 	me := mockmodule.NewLocal(t)
 	me.On("NodeID").Return(unittest.IdentifierFixture())
+	// CAUTION: the HeroStore fifo queue is NOT BFT. It should be used for messages from trusted sources only!
+	// In the requester engine, the injected fifo queue is used to hold [flow.EntityResponse] messages from other
+	// potentially byzantine peers. In PRODUCTION, you can NOT use a HeroStore here. However, for testing we
+	// use the HeroStore for its better performance (reduced GC load on the maxed-out testing server).
 	requestQueue := queue.NewHeroStore(10, unittest.Logger(), metrics.NewNoopCollector())
 
 	e, err := provider.New(
@@ -272,6 +280,10 @@ func TestOnEntityRequestDuplicates(t *testing.T) {
 
 	me := mockmodule.NewLocal(t)
 	me.On("NodeID").Return(unittest.IdentifierFixture())
+	// CAUTION: the HeroStore fifo queue is NOT BFT. It should be used for messages from trusted sources only!
+	// In the requester engine, the injected fifo queue is used to hold [flow.EntityResponse] messages from other
+	// potentially byzantine peers. In PRODUCTION, you can NOT use a HeroStore here. However, for testing we
+	// use the HeroStore for its better performance (reduced GC load on the maxed-out testing server).
 	requestQueue := queue.NewHeroStore(10, unittest.Logger(), metrics.NewNoopCollector())
 
 	e, err := provider.New(
@@ -351,6 +363,10 @@ func TestOnEntityRequestEmpty(t *testing.T) {
 
 	me := mockmodule.NewLocal(t)
 	me.On("NodeID").Return(unittest.IdentifierFixture())
+	// CAUTION: the HeroStore fifo queue is NOT BFT. It should be used for messages from trusted sources only!
+	// In the requester engine, the injected fifo queue is used to hold [flow.EntityResponse] messages from other
+	// potentially byzantine peers. In PRODUCTION, you can NOT use a HeroStore here. However, for testing we
+	// use the HeroStore for its better performance (reduced GC load on the maxed-out testing server).
 	requestQueue := queue.NewHeroStore(10, unittest.Logger(), metrics.NewNoopCollector())
 
 	e, err := provider.New(
@@ -425,6 +441,10 @@ func TestOnEntityRequestInvalidOrigin(t *testing.T) {
 	net.On("Register", mock.Anything, mock.Anything).Return(con, nil)
 	me := mockmodule.NewLocal(t)
 	me.On("NodeID").Return(unittest.IdentifierFixture())
+	// CAUTION: the HeroStore fifo queue is NOT BFT. It should be used for messages from trusted sources only!
+	// In the requester engine, the injected fifo queue is used to hold [flow.EntityResponse] messages from other
+	// potentially byzantine peers. In PRODUCTION, you can NOT use a HeroStore here. However, for testing we
+	// use the HeroStore for its better performance (reduced GC load on the maxed-out testing server).
 	requestQueue := queue.NewHeroStore(10, unittest.Logger(), metrics.NewNoopCollector())
 
 	e, err := provider.New(
