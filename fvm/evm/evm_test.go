@@ -4063,7 +4063,7 @@ func TestCadenceArch(t *testing.T) {
 			})
 	})
 
-	t.Run("testing calling Cadence arch - COA ownership proof (buffer overflow)", func(t *testing.T) {
+	t.Run("testing calling Cadence arch - COA ownership proof (index overflow)", func(t *testing.T) {
 		chain := flow.Emulator.Chain()
 		sc := systemcontracts.SystemContractsForChain(chain.ChainID())
 		RunWithNewEnvironment(t,
