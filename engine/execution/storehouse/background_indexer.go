@@ -18,8 +18,8 @@ type RegisterUpdatesProvider interface {
 	RegisterUpdatesByBlockID(ctx context.Context, blockID flow.Identifier) (flow.RegisterEntries, bool, error)
 }
 
-const DefaultHeightsPerSecond = 0       // 0 means no rate limiting by default
-const MaxHeightsPerSecond = 1_000_000   // hard cap to prevent ineffective rate limiting
+const DefaultHeightsPerSecond = 0     // 0 means no rate limiting by default
+const MaxHeightsPerSecond = 1_000_000 // hard cap to prevent ineffective rate limiting
 
 // BackgroundIndexer indexes register updates for finalized and executed blocks.
 // It is passive and runs only when triggered by the BackgroundIndexerEngine.
