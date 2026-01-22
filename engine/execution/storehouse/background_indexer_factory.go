@@ -149,7 +149,7 @@ func LoadBackgroundIndexerEngine(
 	lg := log.With().Str("component", "background_indexer_loader").Logger()
 
 	if !enableBackgroundStorehouseIndexing {
-		lg.Info().Msg("background indexer engine disabled, since --enableBackgroundStorehouseIndexing==false")
+		lg.Info().Msg("background indexer engine disabled, since --enable-background-storehouse-indexing==false")
 		return nil, false, nil
 	}
 

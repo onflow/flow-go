@@ -52,17 +52,19 @@ func (p *ExecutionDataRegisterUpdatesProvider) RegisterUpdatesByBlockID(ctx cont
 
 	for _, chunk := range data.ChunkExecutionDatas {
 		// Collect register updates from this chunk
-		if chunk.TrieUpdate != nil {
-			// Sanity check: there must be a one-to-one mapping between paths and payloads
-			if len(chunk.TrieUpdate.Paths) != len(chunk.TrieUpdate.Payloads) {
-				return nil, false, fmt.Errorf("number of ledger paths (%d) does not match number of ledger payloads (%d)",
-					len(chunk.TrieUpdate.Paths), len(chunk.TrieUpdate.Payloads))
-			}
+		if chunk.TrieUpdate == nil {
+			continue
+		}
 
-			// Collect registers (last update for a path within the block is persisted)
-			for i, path := range chunk.TrieUpdate.Paths {
-				registerUpdates[path] = chunk.TrieUpdate.Payloads[i]
-			}
+		// Sanity check: there must be a one-to-one mapping between paths and payloads
+		if len(chunk.TrieUpdate.Paths) != len(chunk.TrieUpdate.Payloads) {
+			return nil, false, fmt.Errorf("number of ledger paths (%d) does not match number of ledger payloads (%d)",
+				len(chunk.TrieUpdate.Paths), len(chunk.TrieUpdate.Payloads))
+		}
+
+		// Collect registers (last update for a path within the block is persisted)
+		for i, path := range chunk.TrieUpdate.Paths {
+			registerUpdates[path] = chunk.TrieUpdate.Payloads[i]
 		}
 	}
 
