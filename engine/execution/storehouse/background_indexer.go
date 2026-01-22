@@ -18,7 +18,8 @@ type RegisterUpdatesProvider interface {
 	RegisterUpdatesByBlockID(ctx context.Context, blockID flow.Identifier) (flow.RegisterEntries, bool, error)
 }
 
-const DefaultHeightsPerSecond = 0 // 0 means no rate limiting by default
+const DefaultHeightsPerSecond = 0       // 0 means no rate limiting by default
+const MaxHeightsPerSecond = 1_000_000   // hard cap to prevent ineffective rate limiting
 
 // BackgroundIndexer indexes register updates for finalized and executed blocks.
 // It is passive and runs only when triggered by the BackgroundIndexerEngine.
@@ -39,6 +40,11 @@ func NewBackgroundIndexer(
 	headers storage.Headers,
 	heightsPerSecond uint64,
 ) *BackgroundIndexer {
+	// Cap heightsPerSecond to prevent ineffective rate limiting
+	if heightsPerSecond > MaxHeightsPerSecond {
+		heightsPerSecond = MaxHeightsPerSecond
+	}
+
 	return &BackgroundIndexer{
 		log:              log.With().Str("component", "background_indexer").Logger(),
 		provider:         provider,
