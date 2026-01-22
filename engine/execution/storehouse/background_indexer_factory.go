@@ -114,7 +114,7 @@ func LoadRegisterStore(
 
 	registerStore, err := NewRegisterStore(
 		diskStore,
-		nil, // TODO: replace with real WAL
+		nil, // TODO(leo): replace with real WAL in storehouse phase 4
 		reader,
 		log,
 		notifier,

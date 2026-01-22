@@ -92,7 +92,11 @@ func (b *BackgroundIndexerEngine) workerLoop(ctx irrecoverable.SignalerContext, 
 		return
 	}
 	// ensure the register store database is closed when the worker loop exits
-	defer closer.Close()
+	defer func() {
+		if err := closer.Close(); err != nil {
+			ctx.Throw(fmt.Errorf("failed to close register store database: %w", err))
+		}
+	}()
 
 	b.log.Info().Msg("bootstrapping completed, starting background indexer worker loop")
 
