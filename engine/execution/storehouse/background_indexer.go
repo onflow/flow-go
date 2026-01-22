@@ -59,7 +59,7 @@ func (b *BackgroundIndexer) IndexUpToLatestFinalizedAndExecutedHeight(ctx contex
 		return fmt.Errorf("failed to get latest finalized height: %w", err)
 	}
 
-	b.log.Info().
+	b.log.Debug().
 		Uint64("last_indexed_height", lastIndexedHeight).
 		Uint64("latest_finalized_height", latestFinalized.Height).
 		Uint64("heights_per_second", b.heightsPerSecond).
