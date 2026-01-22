@@ -25,8 +25,9 @@ import (
 // However, all FVM fatal errors, will cause a panic and abort the outer Cadence
 // transaction. The reason behind this is that we want to have visibility when
 // such special errors occur. This way, any potential bugs will not go unnoticed.
-// The Cadence runtime recovers any Go crashers (index out of bounds, nil dereferences, etc.)
-// and fails the transaction gracefully, so a panic in the precompiled contract is not indicate a node/runtime crash.
+// The Cadence runtime recovers any Go crashers (index out of bounds, nil
+// dereferences, etc.) and fails the transaction gracefully, so a panic in the
+// precompiled contract is not indicate a node/runtime crash.
 
 func preparePrecompiledContracts(
 	evmContractAddress flow.Address,
