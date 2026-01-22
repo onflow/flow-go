@@ -94,7 +94,7 @@ func (b *BackgroundIndexerEngine) workerLoop(ctx irrecoverable.SignalerContext, 
 	// ensure the register store database is closed when the worker loop exits
 	defer func() {
 		if err := closer.Close(); err != nil {
-			ctx.Throw(fmt.Errorf("failed to close register store database: %w", err))
+			b.log.Error().Err(err).Msg("failed to close register store database")
 		}
 	}()
 
