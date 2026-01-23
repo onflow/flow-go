@@ -1,6 +1,6 @@
 module github.com/onflow/flow-go/integration
 
-go 1.25.0
+go 1.25.1
 
 require (
 	cloud.google.com/go/bigquery v1.72.0
@@ -22,7 +22,7 @@ require (
 	github.com/ipfs/go-ds-pebble v0.5.0
 	github.com/libp2p/go-libp2p v0.38.2
 	github.com/onflow/cadence v1.9.5
-	github.com/onflow/crypto v0.25.3
+	github.com/onflow/crypto v0.25.4
 	github.com/onflow/flow v0.4.15
 	github.com/onflow/flow-core-contracts/lib/go/contracts v1.9.2
 	github.com/onflow/flow-core-contracts/lib/go/templates v1.9.2

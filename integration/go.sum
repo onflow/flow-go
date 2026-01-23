@@ -768,8 +768,8 @@ github.com/onflow/boxo v0.0.0-20240201202436-f2477b92f483 h1:LpiQhTAfM9CAmNVEs0n
 github.com/onflow/boxo v0.0.0-20240201202436-f2477b92f483/go.mod h1:pIZgTWdm3k3pLF9Uq6MB8JEcW07UDwNJjlXW1HELW80=
 github.com/onflow/cadence v1.9.5 h1:m82RsERxvrknL69J9YxzOEKFhiHARBQkvNIFTUATGNk=
 github.com/onflow/cadence v1.9.5/go.mod h1:MlJsCwhCZwdnAUd24XHzcsizZfG7a2leab1PztabUsE=
-github.com/onflow/crypto v0.25.3 h1:XQ3HtLsw8h1+pBN+NQ1JYM9mS2mVXTyg55OldaAIF7U=
-github.com/onflow/crypto v0.25.3/go.mod h1:+1igaXiK6Tjm9wQOBD1EGwW7bYWMUGKtwKJ/2QL/OWs=
+github.com/onflow/crypto v0.25.4 h1:R615PWPdSoA5RATNb/j3cYaloBIZlSXVNgS7BjwHiwM=
+github.com/onflow/crypto v0.25.4/go.mod h1:DlkW/1SPUvLHYvUcjWa9PkLIRgSBKR4EDc3i+ATQKW4=
 github.com/onflow/fixed-point v0.1.1 h1:j0jYZVO8VGyk1476alGudEg7XqCkeTVxb5ElRJRKS90=
 github.com/onflow/fixed-point v0.1.1/go.mod h1:gJdoHqKtToKdOZbvryJvDZfcpzC7d2fyWuo3ZmLtcGY=
 github.com/onflow/flow v0.4.15 h1:MdrhULSE5iSYNyLCihH8DI4uab5VciVZUKDFON6zylY=
