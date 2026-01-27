@@ -177,6 +177,13 @@ func NewMessageHub(log zerolog.Logger,
 		})
 	}
 	hub.ComponentManager = componentBuilder.Build()
+	// ensure we clean up the network Conduit when shutting down
+	go func() {
+		// wait until all other components have shut down
+		<-hub.ComponentManager.Done()
+		// close the network conduit
+		_ = hub.con.Close()
+	}()
 	return hub, nil
 }
 
