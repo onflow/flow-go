@@ -153,6 +153,12 @@ func COAOwnershipProofSignatureCountFromEncoded(data []byte) (int, error) {
 	if err != nil {
 		return 0, err
 	}
+
+	// Ensure at least one element exists before accessing encodedItems[0]
+	if len(encodedItems) == 0 {
+		return 0, ErrEmptyRLPEncodedProof
+	}
+
 	// first encoded item is KeyIndices
 	// so reading number of elements in the key indices
 	// should return the count without the need to fully decode

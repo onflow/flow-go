@@ -3,6 +3,7 @@ package evm_test
 import (
 	"bytes"
 	"encoding/binary"
+	"encoding/hex"
 	"fmt"
 	"math"
 	"math/big"
@@ -4158,6 +4159,101 @@ func TestCadenceArch(t *testing.T) {
 				_, output, err := vm.Run(ctx, tx, snapshot)
 				require.NoError(t, err)
 				require.NoError(t, output.Err)
+			},
+		)
+	})
+
+	t.Run("testing calling Cadence arch - COA ownership proof (empty proof list)", func(t *testing.T) {
+		chain := flow.Emulator.Chain()
+		sc := systemcontracts.SystemContractsForChain(chain.ChainID())
+		RunWithNewEnvironment(t,
+			chain, func(
+				ctx fvm.Context,
+				vm fvm.VM,
+				snapshot snapshot.SnapshotTree,
+				testContract *TestContract,
+				testAccount *EOATestAccount,
+			) {
+				// create a flow account
+				privateKey, err := testutil.GenerateAccountPrivateKey()
+				require.NoError(t, err)
+
+				snapshot, accounts, err := testutil.CreateAccounts(
+					vm,
+					snapshot,
+					[]flow.AccountPrivateKey{privateKey},
+					chain)
+				require.NoError(t, err)
+				flowAccount := accounts[0]
+
+				// create/store/link coa
+				coaAddress, snapshot := setupCOA(
+					t,
+					ctx,
+					vm,
+					snapshot,
+					flowAccount,
+					0,
+				)
+
+				data := RandomCommonHash(t)
+
+				emptyProofList, err := hex.DecodeString("c0") // empty RLP list
+				require.NoError(t, err)
+
+				// create transaction for proof verification
+				code := []byte(fmt.Sprintf(
+					`
+					import EVM from %s
+					access(all)
+					fun main(tx: [UInt8], coinbaseBytes: [UInt8; 20]): EVM.Result {
+						let coinbase = EVM.EVMAddress(bytes: coinbaseBytes)
+						return EVM.run(tx: tx, coinbase: coinbase)
+					}
+					`,
+					sc.EVMContract.Address.HexWithPrefix(),
+				))
+				innerTxBytes := testAccount.PrepareSignAndEncodeTx(t,
+					testContract.DeployedAt.ToCommon(),
+					testContract.MakeCallData(t, "verifyArchCallToVerifyCOAOwnershipProof",
+						true,
+						coaAddress.ToCommon(),
+						data,
+						emptyProofList),
+					big.NewInt(0),
+					uint64(10_000_000),
+					big.NewInt(0),
+				)
+				verifyScript := fvm.Script(code).WithArguments(
+					json.MustEncode(
+						cadence.NewArray(
+							unittest.BytesToCdcUInt8(innerTxBytes),
+						).WithType(
+							stdlib.EVMTransactionBytesCadenceType,
+						)),
+					json.MustEncode(
+						cadence.NewArray(
+							unittest.BytesToCdcUInt8(
+								testAccount.Address().Bytes(),
+							),
+						).WithType(
+							stdlib.EVMAddressBytesCadenceType,
+						),
+					),
+				)
+
+				// run proof transaction
+				_, output, err := vm.Run(ctx, verifyScript, snapshot)
+				require.NoError(t, err)
+				require.NoError(t, output.Err)
+
+				// make sure the error is correct
+				res, err := impl.ResultSummaryFromEVMResultValue(output.Value)
+				require.NoError(t, err)
+
+				revertReason, err := abi.UnpackRevert(res.ReturnedData)
+				require.NoError(t, err)
+				require.Equal(t, "unsuccessful call to arch", revertReason)
 			},
 		)
 	})
