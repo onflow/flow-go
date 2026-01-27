@@ -182,6 +182,8 @@ func (e *Engine) Done() <-chan struct{} {
 		<-e.unit.Done()
 		// wait for request handler shutdown to complete
 		<-requestHandlerDone
+		// close the network conduit
+		_ = e.con.Close()
 	})
 	return e.lm.Stopped()
 }
