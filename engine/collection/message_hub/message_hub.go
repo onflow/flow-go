@@ -182,7 +182,10 @@ func NewMessageHub(log zerolog.Logger,
 		// wait until all other components have shut down
 		<-hub.ComponentManager.Done()
 		// close the network conduit
-		_ = hub.con.Close()
+		err := hub.con.Close()
+		if err != nil {
+			hub.log.Error().Err(err).Msg("could not close network conduit")
+		}
 	}()
 	return hub, nil
 }
