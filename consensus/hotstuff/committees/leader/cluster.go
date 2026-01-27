@@ -27,7 +27,16 @@ func SelectionForCluster(cluster protocol.Cluster, epoch protocol.CommittedEpoch
 	}
 
 	firstView := cluster.RootBlock().View
-	finalView := firstView + EstimatedSixMonthOfViews // TODO what is a good value here?
+	epochFirstView := epoch.FirstView()
+	epochFinalView := epoch.FinalView()
+	// Use the epoch's view range plus a 2-epoch buffer for leader selection.
+	// Clusters only exist for the duration of their epoch, so pre-computing
+	// leader selection far beyond the epoch's final view is wasteful.
+	// The 2-epoch buffer provides safety margin for potential epoch extensions
+	// during Epoch Fallback Mode (EFM), while avoiding the massive memory overhead
+	// of the previous 6-month (EstimatedSixMonthOfViews) pre-computation.
+	epochLength := epochFinalView - epochFirstView
+	finalView := epochFinalView + 2*epochLength
 
 	// ComputeLeaderSelection already handles zero-weight nodes with marginal overhead.
 	leaders, err := ComputeLeaderSelection(
