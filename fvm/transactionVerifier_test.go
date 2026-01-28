@@ -390,6 +390,39 @@ func TestTransactionVerification(t *testing.T) {
 		assert.ErrorContains(t, err, "payer account does not have sufficient signatures", "error should be about insufficient payer weights")
 	})
 
+	t.Run("payer signing the payload only", func(t *testing.T) {
+		payer := address1
+
+		tx := &flow.TransactionBody{
+			ProposalKey: flow.ProposalKey{
+				Address:        payer,
+				KeyIndex:       0,
+				SequenceNumber: 0,
+			},
+			Payer: payer,
+		}
+
+		// assign a valid payload signature
+		hasher, err := crypto.NewPrefixedHashing(hash.SHA3_256, flow.TransactionTagString)
+		require.NoError(t, err)
+
+		validSig, err := privKey1.PrivateKey.Sign(tx.PayloadMessage(), hasher) // valid signature
+		require.NoError(t, err)
+
+		sig := flow.TransactionSignature{
+			Address:     payer,
+			SignerIndex: 0,
+			KeyIndex:    0,
+			Signature:   validSig,
+		}
+
+		tx.PayloadSignatures = []flow.TransactionSignature{sig}
+
+		ctx := newContext()
+		err = run(tx, ctx, txnState)
+		assert.ErrorContains(t, err, "payer account does not have sufficient signatures", "error should be about insufficient payer weights")
+	})
+
 	t.Run("weights are checked before signatures", func(t *testing.T) {
 		// use a key with partial weight and an invalid signature and make sure
 		// the weight error is returned before the signature error
