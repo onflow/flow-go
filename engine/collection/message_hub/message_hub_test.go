@@ -174,7 +174,6 @@ func (s *MessageHubSuite) SetupTest() {
 func (s *MessageHubSuite) TearDownTest() {
 	s.cancel()
 	unittest.RequireCloseBefore(s.T(), s.hub.Done(), time.Second, "hub failed to stop")
-	<-time.After(time.Millisecond) // wait to ensure conduit has time to close
 	select {
 	case err := <-s.errs:
 		assert.NoError(s.T(), err)
