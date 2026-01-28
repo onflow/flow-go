@@ -20,7 +20,7 @@ import (
 // (mathematical principle of vacuous truth) without the implementation needing to worry
 // about unsigned integer underflow.
 //
-// LevelledForest is NOT safe for concurrent use by multiple goroutines.
+// LevelledForest is NOT safe for CONCURRENT use by multiple goroutines.
 type LevelledForest struct {
 	vertices        VertexSet
 	verticesAtLevel map[uint64]VertexList // by convention, `VertexList`s are append-only (and eventually garbage collected, upon pruning)
@@ -131,7 +131,7 @@ func (f *LevelledForest) GetSize() uint64 {
 	return f.size
 }
 
-// GetChildren returns a VertexIterator to iterate over the children
+// GetChildren returns a single-use VertexIterator to iterate over the children.
 // An empty VertexIterator is returned, if no vertices are known whose parent is `id`.
 func (f *LevelledForest) GetChildren(id flow.Identifier) VertexIterator {
 	// if vertex does not exist, container will be nil
@@ -157,7 +157,7 @@ func (f *LevelledForest) GetNumberOfChildren(id flow.Identifier) int {
 	return num
 }
 
-// GetVerticesAtLevel returns a VertexIterator to iterate over the Vertices at the specified level.
+// GetVerticesAtLevel returns a single-use VertexIterator to iterate over the Vertices at the specified level.
 // An empty VertexIterator is returned, if no vertices are known at the specified level.
 // If `level` is already pruned, an empty VertexIterator is returned.
 func (f *LevelledForest) GetVerticesAtLevel(level uint64) VertexIterator {
@@ -169,7 +169,7 @@ func (f *LevelledForest) GetVerticesAtLevel(level uint64) VertexIterator {
 // an empty vertex container represents a vertex that is _referenced_ as parent by
 // one or more full vertices, but has not been added itself to the forest.
 // We only count vertices that have been explicitly added to the forest and not yet
-// pruned. (In comparision, we do _not_ count vertices that are _referenced_ as
+// pruned. (In comparison, we do _not_ count vertices that are _referenced_ as
 // parent by vertices, but have not been added themselves).
 func (f *LevelledForest) GetNumberOfVerticesAtLevel(level uint64) int {
 	num := 0
