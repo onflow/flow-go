@@ -993,9 +993,6 @@ func TestUpdateAccountCode(t *testing.T) {
 			SetProposalKey(serviceAccountAddress, b.ServiceKey().Index, b.ServiceKey().SequenceNumber).
 			SetPayer(serviceAccountAddress)
 
-		err = tx.SignPayload(accountAddressB, 0, signerB)
-		assert.NoError(t, err)
-
 		// invalid authorizer signature
 		tx.AddPayloadSignature(accountAddressB, 0, unittest.SignatureFixtureForTransactions())
 
