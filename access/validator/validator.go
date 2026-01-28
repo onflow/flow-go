@@ -415,6 +415,9 @@ func (v *TransactionValidator) checkAddresses(tx *flow.TransactionBody) error {
 // Checks related to the accounts used in the transaction:
 //   - no duplicate account keys signing
 //   - no unrelated account signatures (from accounts that are neither proposer, payer, nor authorizers)
+//   - at least one payer envelope signature
+//   - at least one proposer signature
+//   - at least one signature per authorizer
 func (v *TransactionValidator) checkAccounts(tx *flow.TransactionBody) error {
 	// check for duplicate account key
 	type uniqueKey struct {
@@ -428,6 +431,34 @@ func (v *TransactionValidator) checkAccounts(tx *flow.TransactionBody) error {
 		}
 		observedSigs[uniqueKey{sig.Address, sig.KeyIndex}] = true
 	}
+	// check for minimum account signatures
+	observedEnvelopeSig := make(map[flow.Address]bool)
+	observedPayloadSig := make(map[flow.Address]bool)
+	for _, sig := range tx.EnvelopeSignatures {
+		observedEnvelopeSig[sig.Address] = true
+	}
+	for _, sig := range tx.PayloadSignatures {
+		observedPayloadSig[sig.Address] = true
+	}
+
+	if !observedEnvelopeSig[tx.Payer] {
+		return MissingSignatureError{Address: tx.Payer, Message: "payer envelope signature is missing"}
+	}
+
+	if !observedEnvelopeSig[tx.ProposalKey.Address] && !observedPayloadSig[tx.ProposalKey.Address] {
+		return MissingSignatureError{Address: tx.ProposalKey.Address, Message: "proposer signature on either payload or envelope is missing"}
+	}
+
+	for _, authorizer := range tx.Authorizers {
+		if authorizer == tx.Payer || authorizer == tx.ProposalKey.Address {
+			// at this point, payer and proposer are guaranteed to have signatures
+			continue
+		}
+		if !observedEnvelopeSig[authorizer] && !observedPayloadSig[authorizer] {
+			return MissingSignatureError{Address: authorizer, Message: "authorizer signature on either payload or envelope is missing"}
+		}
+	}
+
 	// check for unrelated account signatures
 	relatedAccounts := make(map[flow.Address]struct{})
 	relatedAccounts[tx.Payer] = struct{}{}

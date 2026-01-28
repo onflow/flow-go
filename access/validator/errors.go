@@ -77,6 +77,16 @@ func (e DuplicatedSignatureError) Error() string {
 	return fmt.Sprintf("duplicated signature for key (address: %s, index: %d)", e.Address.String(), e.KeyIndex)
 }
 
+// MissingSignatureError indicates that a signature is missing for a payer, proposer, or authorizer.
+type MissingSignatureError struct {
+	Address flow.Address
+	Message string
+}
+
+func (e MissingSignatureError) Error() string {
+	return fmt.Sprintf("%s: missing signature is from account %s", e.Message, e.Address)
+}
+
 // UnrelatedAccountSignatureError indicates that a signature has been provided by an account
 // that is neither the proposer, payer, nor an authorizer of the transaction.
 type UnrelatedAccountSignatureError struct {
