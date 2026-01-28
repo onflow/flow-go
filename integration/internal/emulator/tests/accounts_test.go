@@ -35,6 +35,7 @@ import (
 	fvmerrors "github.com/onflow/flow-go/fvm/errors"
 	emulator "github.com/onflow/flow-go/integration/internal/emulator"
 	flowgo "github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 const testContract = "access(all) contract Test {}"
@@ -996,7 +997,7 @@ func TestUpdateAccountCode(t *testing.T) {
 		assert.NoError(t, err)
 
 		// invalid authorizer signature
-		tx.AddPayloadSignature(accountAddressB, 0, []byte{1, 2, 3})
+		tx.AddPayloadSignature(accountAddressB, 0, unittest.SignatureFixtureForTransactions())
 
 		signer, err := b.ServiceKey().Signer()
 		require.NoError(t, err)

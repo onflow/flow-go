@@ -289,7 +289,7 @@ func (tc *ClusterSwitchoverTestCase) Transaction(opts ...func(*flow.TransactionB
 	tx.EnvelopeSignatures = []flow.TransactionSignature{
 		flow.TransactionSignature{
 			Address:   tc.ServiceAddress(),
-			Signature: unittest.TransactionSignatureFixture().Signature,
+			Signature: unittest.SignatureFixtureForTransactions(),
 		},
 	}
 
