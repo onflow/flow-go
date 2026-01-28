@@ -13,6 +13,22 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
+// The Cadence Arch precompiled contract that is injected in the EVM environment,
+// implements the following functions:
+// - `flowBlockHeight()`
+// - `revertibleRandom()`
+// - `getRandomSource(uint64)`
+// - `verifyCOAOwnershipProof(address,bytes32,bytes)`
+//
+// By design, all errors that are the result of user input, will be propagated
+// in the EVM environment, and can be handled by developers, as they see fit.
+// However, all FVM fatal errors, will cause a panic and abort the outer Cadence
+// transaction. The reason behind this is that we want to have visibility when
+// such special errors occur. This way, any potential bugs will not go unnoticed.
+// The Cadence runtime recovers any Go crashers (index out of bounds, nil
+// dereferences, etc.) and fails the transaction gracefully, so a panic in the
+// precompiled contract does not indicate a node/runtime crash.
+
 func preparePrecompiledContracts(
 	evmContractAddress flow.Address,
 	randomBeaconAddress flow.Address,
@@ -33,7 +49,7 @@ func preparePrecompiledContracts(
 func blockHeightProvider(backend types.Backend) func() (uint64, error) {
 	return func() (uint64, error) {
 		h, err := backend.GetCurrentBlockHeight()
-		if types.IsAFatalError(err) || types.IsABackendError(err) {
+		if types.IsAFatalError(err) {
 			panic(err)
 		}
 		return h, err
@@ -60,7 +76,7 @@ func randomSourceProvider(contractAddress flow.Address, backend types.Backend) f
 			},
 		)
 		if err != nil {
-			if types.IsAFatalError(err) || types.IsABackendError(err) {
+			if types.IsAFatalError(err) {
 				panic(err)
 			}
 			return nil, err
@@ -116,7 +132,7 @@ func coaOwnershipProofValidator(contractAddress flow.Address, backend types.Back
 			proof.ToCadenceValues(),
 		)
 		if err != nil {
-			if types.IsAFatalError(err) || types.IsABackendError(err) {
+			if types.IsAFatalError(err) {
 				panic(err)
 			}
 			return false, err

@@ -116,6 +116,10 @@ var (
 	ErrRestrictedEOA = errors.New(
 		"this account has been restricted by the Community Governance Council in connection to malicious activity, please reach out to security@flowfoundation.com for inquiries",
 	)
+
+	// ErrEmptyRLPEncodedProof is returned when the RLP encoded COA Ownership proof is
+	// an empty list
+	ErrEmptyRLPEncodedProof = errors.New("invalid encoded proof: expected list with key indices, got empty list")
 )
 
 // StateError is a non-fatal error, returned when a state operation

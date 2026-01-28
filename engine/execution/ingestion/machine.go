@@ -23,14 +23,15 @@ import (
 
 // Machine forwards blocks and collections to the core for processing.
 type Machine struct {
-	events.Noop        // satisfy protocol events consumer interface
-	log                zerolog.Logger
-	core               *Core
-	throttle           Throttle
-	broadcaster        provider.ProviderEngine
-	uploader           *uploader.Manager
-	execState          state.ExecutionState
-	computationManager computation.ComputationManager
+	events.Noop           // satisfy protocol events consumer interface
+	log                   zerolog.Logger
+	core                  *Core
+	throttle              Throttle
+	broadcaster           provider.ProviderEngine
+	uploader              *uploader.Manager
+	execState             state.ExecutionState
+	computationManager    computation.ComputationManager
+	blockExecutedCallback BlockExecutedCallback // optional: callback invoked when blocks are executed
 }
 
 type CollectionRequester interface {
@@ -38,6 +39,9 @@ type CollectionRequester interface {
 	module.Startable
 	WithHandle(requester.HandleFunc)
 }
+
+// BlockExecutedCallback is an optional callback function that is invoked when a block has been executed.
+type BlockExecutedCallback func()
 
 func NewMachine(
 	logger zerolog.Logger,
@@ -54,14 +58,16 @@ func NewMachine(
 	broadcaster provider.ProviderEngine,
 	uploader *uploader.Manager,
 	stopControl *stop.StopControl,
+	blockExecutedCallback BlockExecutedCallback, // optional: callback invoked when blocks are executed
 ) (*Machine, *Core, error) {
 
 	e := &Machine{
-		log:                logger.With().Str("engine", "ingestion_machine").Logger(),
-		broadcaster:        broadcaster,
-		uploader:           uploader,
-		execState:          execState,
-		computationManager: computationManager,
+		log:                   logger.With().Str("engine", "ingestion_machine").Logger(),
+		broadcaster:           broadcaster,
+		uploader:              uploader,
+		execState:             execState,
+		computationManager:    computationManager,
+		blockExecutedCallback: blockExecutedCallback,
 	}
 
 	throttle, err := NewBlockThrottle(
@@ -147,6 +153,12 @@ func (e *Machine) OnComputationResultSaved(
 	if err != nil {
 		e.log.Err(err).Msg("critical: failed to broadcast the receipt")
 	}
+
+	// invoke block executed callback if configured
+	if e.blockExecutedCallback != nil {
+		e.blockExecutedCallback()
+	}
+
 	return fmt.Sprintf("broadcasted: %v", broadcasted)
 }
 
