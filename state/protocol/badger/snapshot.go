@@ -336,6 +336,7 @@ func (s *Snapshot) descendants(blockID flow.Identifier) ([]flow.Identifier, erro
 		// By contract of the constructor, the blockID must correspond to a known collection in the database.
 		// A snapshot with s.err == nil is only created for known blocks. Hence, only case 2 is
 		// possible here, and we just return an empty list.
+		return []flow.Identifier{}, nil
 	}
 
 	for _, child := range descendantIDs {
