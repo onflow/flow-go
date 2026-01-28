@@ -86,7 +86,8 @@ func NewFifoQueue(maxCapacity int, options ...ConstructorOption) (*FifoQueue, er
 }
 
 // Push appends the given value to the tail of the queue.
-// If queue capacity is reached, the message is silently dropped.
+// Returns true if and only if the element was added, or false if
+// the element was dropped due the queue being full.
 func (q *FifoQueue) Push(element interface{}) bool {
 	length, pushed := q.push(element)
 
