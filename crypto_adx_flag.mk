@@ -17,7 +17,7 @@ else
 endif
 
 # Flags to disable ADX instructions for older CPUs
-DISABLE_ADX := -O2 -D__BLST_PORTABLE__
+DISABLE_ADX := "-O2 -D__BLST_PORTABLE__"
 
 # Then, set `CRYPTO_FLAG`
 # the crypto package uses BLST source files underneath which may use ADX instructions.
