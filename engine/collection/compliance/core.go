@@ -169,13 +169,13 @@ func (c *Core) OnBlockProposal(proposal flow.Slashable[*cluster.Proposal]) error
 	}
 
 	// ignore proposals that were already processed
-	_, err := c.headers.ByBlockID(blockID)
-	if err == nil {
+	exists, err := c.headers.Exists(blockID)
+	if err != nil {
+		return fmt.Errorf("could not check proposal: %w", err)
+	}
+	if exists {
 		log.Debug().Msg("skipping already processed proposal")
 		return nil
-	}
-	if !errors.Is(err, storage.ErrNotFound) {
-		return fmt.Errorf("could not check proposal: %w", err)
 	}
 
 	// there are two possibilities if the proposal is neither already pending
@@ -202,7 +202,7 @@ func (c *Core) OnBlockProposal(proposal flow.Slashable[*cluster.Proposal]) error
 	// if the proposal is connected to a block that is neither in the cache, nor
 	// in persistent storage, its direct parent is missing; cache the proposal
 	// and request the parent
-	exists, err := c.headers.Exists(block.ParentID)
+	exists, err = c.headers.Exists(block.ParentID)
 	if err != nil {
 		return fmt.Errorf("could not check parent exists: %w", err)
 	}
