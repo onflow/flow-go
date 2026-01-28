@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -166,16 +167,29 @@ func NewMessageHub(log zerolog.Logger,
 	}
 	hub.con = conduit
 
+	var workers sync.WaitGroup
 	componentBuilder := component.NewComponentManagerBuilder()
 	// This implementation tolerates if the networking layer sometimes blocks on send requests.
 	// We use by default 5 go-routines here. This is fine, because outbound messages are temporally sparse
 	// under normal operations. Hence, the go-routines should mostly be asleep waiting for work.
 	for i := 0; i < defaultMessageHubRequestsWorkers; i++ {
+		workers.Add(1)
 		componentBuilder.AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+			defer workers.Done()
 			ready()
 			hub.queuedMessagesProcessingLoop(ctx)
 		})
 	}
+	componentBuilder.AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+		ready()
+		// ensure we clean up the network Conduit when shutting down
+		workers.Wait()
+		// close the network conduit
+		err := hub.con.Close()
+		if err != nil {
+			ctx.Throw(fmt.Errorf("could not close network conduit: %w", err))
+		}
+	})
 	hub.ComponentManager = componentBuilder.Build()
 	return hub, nil
 }
