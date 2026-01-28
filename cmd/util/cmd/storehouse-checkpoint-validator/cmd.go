@@ -9,6 +9,7 @@ import (
 
 	"github.com/onflow/flow-go/engine/execution/storehouse"
 	"github.com/onflow/flow-go/module/metrics"
+	badgerstate "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
 	pebblestorage "github.com/onflow/flow-go/storage/pebble"
 	"github.com/onflow/flow-go/storage/store"
@@ -94,7 +95,14 @@ func runE(*cobra.Command, []string) error {
 
 	// Initialize storage components
 	metricsCollector := &metrics.NoopCollector{}
-	storages := store.InitAll(metricsCollector, protocolDB)
+	chainID, err := badgerstate.GetChainID(protocolDB)
+	if err != nil {
+		return err
+	}
+	storages, err := store.InitAll(metricsCollector, protocolDB, chainID)
+	if err != nil {
+		return err
+	}
 
 	// Validate checkpoint
 	ctx := context.Background()

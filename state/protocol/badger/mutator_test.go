@@ -89,7 +89,8 @@ func TestExtendValid(t *testing.T) {
 		tracer := trace.NewNoopTracer()
 		db := pebbleimpl.ToDB(pdb)
 		log := zerolog.Nop()
-		all := store.InitAll(metrics, db)
+		all, err := store.InitAll(metrics, db, flow.Emulator)
+		require.NoError(t, err)
 
 		distributor := events.NewDistributor()
 		consumer := mockprotocol.NewConsumer(t)
@@ -919,7 +920,8 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 
 		tracer := trace.NewNoopTracer()
 		log := zerolog.Nop()
-		all := store.InitAll(mmetrics.NewNoopCollector(), db)
+		all, err := store.InitAll(mmetrics.NewNoopCollector(), db, flow.Emulator)
+		require.NoError(t, err)
 		protoState, err := protocol.Bootstrap(
 			metrics,
 			db,
@@ -2802,7 +2804,8 @@ func TestExtendInvalidSealsInBlock(t *testing.T) {
 		tracer := trace.NewNoopTracer()
 		log := zerolog.Nop()
 		db := pebbleimpl.ToDB(pdb)
-		all := store.InitAll(metrics, db)
+		all, err := store.InitAll(metrics, db, flow.Emulator)
+		require.NoError(t, err)
 
 		// create a event consumer to test epoch transition events
 		distributor := events.NewDistributor()
@@ -3466,7 +3469,8 @@ func TestHeaderInvalidTimestamp(t *testing.T) {
 		tracer := trace.NewNoopTracer()
 		log := zerolog.Nop()
 		db := pebbleimpl.ToDB(pdb)
-		all := store.InitAll(metrics, db)
+		all, err := store.InitAll(metrics, db, flow.Emulator)
+		require.NoError(t, err)
 
 		// create a event consumer to test epoch transition events
 		distributor := events.NewDistributor()

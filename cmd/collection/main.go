@@ -235,8 +235,8 @@ func main() {
 		}).
 		AdminCommand("read-range-cluster-blocks", func(conf *cmd.NodeConfig) commands.AdminCommand {
 			clusterPayloads := store.NewClusterPayloads(&metrics.NoopCollector{}, conf.ProtocolDB)
-			headers := store.NewHeaders(&metrics.NoopCollector{}, conf.ProtocolDB)
-			return storageCommands.NewReadRangeClusterBlocksCommand(conf.ProtocolDB, headers, clusterPayloads)
+			// defer construction of Headers since the cluster's ChainID is provided by the command
+			return storageCommands.NewReadRangeClusterBlocksCommand(conf.ProtocolDB, clusterPayloads)
 		}).
 		Module("follower distributor", func(node *cmd.NodeConfig) error {
 			followerDistributor = pubsub.NewFollowerDistributor()

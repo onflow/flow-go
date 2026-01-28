@@ -163,7 +163,8 @@ func (s *ExecutionDataPruningSuite) TestHappyPath() {
 	// setup storage objects needed to get the execution data id
 	db, err := accessNode.DB()
 	require.NoError(s.T(), err, "could not open db")
-	anHeaders := store.NewHeaders(metrics, db)
+	anHeaders, err := store.NewHeaders(metrics, db, flow.Localnet)
+	require.NoError(s.T(), err)
 	anResults := store.NewExecutionResults(metrics, db)
 	anSeals := store.NewSeals(metrics, db)
 

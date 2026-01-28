@@ -6,6 +6,7 @@ import (
 	"github.com/jordanschalm/lockctx"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/state/cluster"
 	"github.com/onflow/flow-go/storage/operation"
 	"github.com/onflow/flow-go/storage/operation/dbtest"
 	"github.com/onflow/flow-go/storage/store"
@@ -21,7 +22,8 @@ func TestHeaderStoreRetrieve(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		lockManager := storage.NewTestingLockManager()
 		metrics := metrics.NewNoopCollector()
-		all := store.InitAll(metrics, db)
+		all, err := store.InitAll(metrics, db, flow.Emulator)
+		require.NoError(t, err)
 		headers := all.Headers
 		blocks := all.Blocks
 
@@ -29,7 +31,7 @@ func TestHeaderStoreRetrieve(t *testing.T) {
 		block := proposal.Block
 
 		// store block which will also store header
-		err := unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
+		err = unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
 			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				return blocks.BatchStore(lctx, rw, proposal)
 			})
@@ -48,6 +50,14 @@ func TestHeaderStoreRetrieve(t *testing.T) {
 		actual, err := headers.ByHeight(block.Height)
 		require.NoError(t, err)
 		require.Equal(t, block.ToHeader(), actual)
+		// retrieve by ID
+		actual, err = headers.ByBlockID(block.ID())
+		require.NoError(t, err)
+		require.Equal(t, block.ToHeader(), actual)
+		// retrieve with proposer signature
+		headerProp, err := headers.ProposalByBlockID(block.ID())
+		require.NoError(t, err)
+		require.Equal(t, proposal.ProposalHeader(), headerProp)
 	})
 }
 
@@ -55,7 +65,8 @@ func TestHeaderIndexByViewAndRetrieve(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		lockManager := storage.NewTestingLockManager()
 		metrics := metrics.NewNoopCollector()
-		all := store.InitAll(metrics, db)
+		all, err := store.InitAll(metrics, db, flow.Emulator)
+		require.NoError(t, err)
 		headers := all.Headers
 		blocks := all.Blocks
 
@@ -63,7 +74,7 @@ func TestHeaderIndexByViewAndRetrieve(t *testing.T) {
 		block := proposal.Block
 
 		// store block which will also store header
-		err := unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
+		err = unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
 			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				return blocks.BatchStore(lctx, rw, proposal)
 			})
@@ -82,18 +93,28 @@ func TestHeaderIndexByViewAndRetrieve(t *testing.T) {
 		actual, err := headers.ByView(block.View)
 		require.NoError(t, err)
 		require.Equal(t, block.ToHeader(), actual)
+
+		// verify error sentinel of cluster Headers ByView
+		clusterChainID := cluster.CanonicalClusterID(0, unittest.IdentifierListFixture(1))
+		clusterHeaders, err := store.NewClusterHeaders(metrics, db, clusterChainID)
+		require.NoError(t, err)
+		_, err = clusterHeaders.ByView(block.View)
+		require.ErrorIs(t, err, storage.ErrNotAvailableForClusterConsensus)
+		_, err = clusterHeaders.ByView(block.View + 1)
+		require.ErrorIs(t, err, storage.ErrNotAvailableForClusterConsensus)
 	})
 }
 
 func TestHeaderRetrieveWithoutStore(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		metrics := metrics.NewNoopCollector()
-		headers := store.NewHeaders(metrics, db)
+		headers, err := store.NewHeaders(metrics, db, flow.Emulator)
+		require.NoError(t, err)
 
 		header := unittest.BlockHeaderFixture()
 
 		// retrieve header by height, should err as not store before height
-		_, err := headers.ByHeight(header.Height)
+		_, err = headers.ByHeight(header.Height)
 		require.ErrorIs(t, err, storage.ErrNotFound)
 	})
 }
@@ -102,11 +123,13 @@ func TestHeaderRetrieveWithoutStore(t *testing.T) {
 //  1. a known parent with no children should return an empty list;
 //  2. a known parent with 3 children should return the headers of those children;
 //  3. an unknown parent should return [storage.ErrNotFound].
+//  4. a known parent on a different chain should return [storage.ErrWrongChain].
 func TestHeadersByParentID(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		lockManager := storage.NewTestingLockManager()
 		metrics := metrics.NewNoopCollector()
-		all := store.InitAll(metrics, db)
+		all, err := store.InitAll(metrics, db, flow.Emulator)
+		require.NoError(t, err)
 		headers := all.Headers
 		blocks := all.Blocks
 
@@ -115,7 +138,7 @@ func TestHeadersByParentID(t *testing.T) {
 		parentBlock := parentProposal.Block
 
 		// Store parent block
-		err := unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
+		err = unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
 			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				return blocks.BatchStore(lctx, rw, parentProposal)
 			})
@@ -158,6 +181,17 @@ func TestHeadersByParentID(t *testing.T) {
 		nonExistentParent := unittest.IdentifierFixture()
 		_, err = headers.ByParentID(nonExistentParent)
 		require.ErrorIs(t, err, storage.ErrNotFound)
+
+		// Test case 4: parent on a different chain should return ErrWrongChain
+		clusterBlock := unittest.ClusterBlockFixture()
+		err = unittest.WithLock(t, lockManager, storage.LockInsertOrFinalizeClusterBlock, func(lctx lockctx.Context) error {
+			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return operation.InsertClusterBlock(lctx, rw, unittest.ClusterProposalFromBlock(clusterBlock))
+			})
+		})
+		require.NoError(t, err)
+		_, err = headers.ByParentID(clusterBlock.ID())
+		require.ErrorIs(t, err, storage.ErrWrongChain)
 	})
 }
 
@@ -172,7 +206,8 @@ func TestHeadersByParentIDChainStructure(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		lockManager := storage.NewTestingLockManager()
 		metrics := metrics.NewNoopCollector()
-		all := store.InitAll(metrics, db)
+		all, err := store.InitAll(metrics, db, flow.Emulator)
+		require.NoError(t, err)
 		headers := all.Headers
 		blocks := all.Blocks
 
@@ -209,7 +244,6 @@ func TestHeadersByParentIDChainStructure(t *testing.T) {
 		require.Len(t, children, 1)
 		require.Equal(t, child.ToHeader(), children[0])
 
-		// Test that child1 returns its direct children (grandchild1, grandchild2)
 		// Test that child returns its direct children (grandchild1, grandchild2)
 		grandchildren, err := headers.ByParentID(child.ID())
 		require.NoError(t, err)
@@ -224,5 +258,110 @@ func TestHeadersByParentIDChainStructure(t *testing.T) {
 		children, err = headers.ByParentID(grandchild2.ID())
 		require.NoError(t, err)
 		require.Empty(t, children)
+	})
+}
+
+// TestHeadersStoreWrongChainID tests that attempting to store a block with a different chainID than
+// expected returns the appropriate sentinel error.
+func TestHeadersStoreWrongChainID(t *testing.T) {
+	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
+		lockManager := storage.NewTestingLockManager()
+		metrics := metrics.NewNoopCollector()
+		all, err := store.InitAll(metrics, db, flow.Emulator)
+		require.NoError(t, err)
+		blocks := all.Blocks
+		// the underlying Headers has chainID flow.Emulator
+
+		clusterChain := cluster.CanonicalClusterID(0, unittest.IdentifierListFixture(1))
+		clusterChain2 := cluster.CanonicalClusterID(0, unittest.IdentifierListFixture(1))
+
+		// A [flow.Proposal] with a mismatched chain should not be stored
+		for _, invalidChainID := range []flow.ChainID{clusterChain, clusterChain2, flow.Localnet, flow.Testnet, flow.ChainID("invalid-chain")} {
+			invalidBlock := unittest.BlockFixture()
+			invalidBlock.ChainID = invalidChainID
+			invalidProposal := unittest.ProposalFromBlock(invalidBlock)
+			err := unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
+				return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+					return blocks.BatchStore(lctx, rw, invalidProposal)
+				})
+			})
+			require.ErrorIs(t, err, storage.ErrWrongChain)
+		}
+	})
+}
+
+// TestHeadersRetrieveWrongChainID tests that methods of Headers throw an appropriate sentinel error
+// when attempting to retrieve data that does not match the expected chain.
+func TestHeadersRetrieveWrongChainID(t *testing.T) {
+	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
+		lockManager := storage.NewTestingLockManager()
+		metrics := metrics.NewNoopCollector()
+		all, err := store.InitAll(metrics, db, flow.Emulator)
+		require.NoError(t, err)
+		headers := all.Headers
+		blocks := all.Blocks
+
+		clusterChain := cluster.CanonicalClusterID(0, unittest.IdentifierListFixture(1))
+		clusterChain2 := cluster.CanonicalClusterID(0, unittest.IdentifierListFixture(1))
+		clusterHeaders, err := store.NewClusterHeaders(metrics, db, clusterChain)
+		require.NoError(t, err)
+
+		// Cluster Headers should not be able to retrieve a stored header for a different chain.
+		// 1. store and index a block on main consensus chain
+		proposal := unittest.ProposalFixture()
+		block := proposal.Block
+		err = unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
+			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return blocks.BatchStore(lctx, rw, proposal)
+			})
+		})
+		require.NoError(t, err)
+		err = unittest.WithLock(t, lockManager, storage.LockFinalizeBlock, func(lctx lockctx.Context) error {
+			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return operation.IndexFinalizedBlockByHeight(lctx, rw, block.Height, block.ID())
+			})
+		})
+		require.NoError(t, err)
+
+		// 2. check we can retrieve header by height and ID using the correct header storage instance
+		actual, err := headers.ByHeight(block.Height)
+		require.NoError(t, err)
+		require.Equal(t, block.ToHeader(), actual)
+		actual, err = headers.ByBlockID(block.ID())
+		require.NoError(t, err)
+		require.Equal(t, block.ToHeader(), actual)
+		headerProp, err := headers.ProposalByBlockID(block.ID())
+		require.NoError(t, err)
+		require.Equal(t, proposal.ProposalHeader(), headerProp)
+
+		// 3. clusterHeaders should not be able to retrieve that block by height or ID
+		_, err = clusterHeaders.ByHeight(block.Height)
+		require.ErrorIs(t, err, storage.ErrNotFound) // there are no finalized cluster blocks at any height
+		_, err = clusterHeaders.ByBlockID(block.ID())
+		require.ErrorIs(t, err, storage.ErrWrongChain)
+		_, err = clusterHeaders.ProposalByBlockID(block.ID())
+		require.ErrorIs(t, err, storage.ErrWrongChain)
+
+		// 4. Store a block on a different cluster chain
+		differentClusterBlock := unittest.ClusterBlockFixture()
+		differentClusterBlock.ChainID = clusterChain2
+		err = unittest.WithLock(t, lockManager, storage.LockInsertOrFinalizeClusterBlock, func(lctx lockctx.Context) error {
+			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return operation.InsertClusterBlock(lctx, rw, unittest.ClusterProposalFromBlock(differentClusterBlock))
+			})
+		})
+		require.NoError(t, err)
+
+		// 5. clusterHeaders should not be able to retrieve it, as it is for a different cluster chain
+		_, err = clusterHeaders.ByBlockID(differentClusterBlock.ID())
+		require.ErrorIs(t, err, storage.ErrWrongChain)
+		_, err = clusterHeaders.ProposalByBlockID(differentClusterBlock.ID())
+		require.ErrorIs(t, err, storage.ErrWrongChain)
+
+		// 6. main consensus chain Headers should also not be able to retrieve the cluster header
+		_, err = headers.ByBlockID(differentClusterBlock.ID())
+		require.ErrorIs(t, err, storage.ErrWrongChain)
+		_, err = headers.ProposalByBlockID(differentClusterBlock.ID())
+		require.ErrorIs(t, err, storage.ErrWrongChain)
 	})
 }

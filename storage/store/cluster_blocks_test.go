@@ -52,10 +52,12 @@ func TestClusterBlocks(t *testing.T) {
 			require.NoError(t, err)
 		}
 
+		clusterHeaders, err := NewClusterHeaders(metrics.NewNoopCollector(), db, blocks[0].ChainID)
+		require.NoError(t, err)
 		clusterBlocks := NewClusterBlocks(
 			db,
 			blocks[0].ChainID,
-			NewHeaders(metrics.NewNoopCollector(), db),
+			clusterHeaders,
 			NewClusterPayloads(metrics.NewNoopCollector(), db),
 		)
 

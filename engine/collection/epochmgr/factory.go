@@ -2,6 +2,7 @@ package epochmgr
 
 import (
 	"github.com/onflow/flow-go/consensus/hotstuff"
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/state/cluster"
@@ -18,7 +19,7 @@ type EpochComponentsFactory interface {
 	// a given epoch counter.
 	//
 	// Must return ErrNotAuthorizedForEpoch if this node is not authorized in the epoch.
-	Create(epoch protocol.CommittedEpoch) (
+	Create(epoch protocol.CommittedEpoch, consensusChainID flow.ChainID) (
 		state cluster.State,
 		proposal component.Component,
 		sync module.ReadyDoneAware,
