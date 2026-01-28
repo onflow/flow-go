@@ -15,10 +15,17 @@ endif
 # set `CRYPTO_FLAG` when building natively (not cross-compiling)
 include ../crypto_adx_flag.mk
 
+# Test command 
+ifeq ($(NATIVE_TEST),1)
+	TEST_CMD := CGO_CFLAGS=$(CRYPTO_FLAG) go test $(if $(VERBOSE),-v,)
+else
+	TEST_CMD := CGO_CFLAGS=$(CRYPTO_FLAG) gotestsum --format=pkgname-and-test-fails --format-hide-empty-pkg --
+endif
+
 # runs all unit tests of the insecure module
 .PHONY: test
 test:
-	CGO_CFLAGS=$(CRYPTO_FLAG) go test $(if $(VERBOSE),-v,) -coverprofile=$(COVER_PROFILE) $(RACE_FLAG) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) $(GO_TEST_PACKAGES)
+	$(TEST_CMD) -coverprofile=$(COVER_PROFILE) $(RACE_FLAG) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) $(GO_TEST_PACKAGES)
 
 .PHONY: lint
 lint: tidy
