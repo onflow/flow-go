@@ -198,6 +198,11 @@ func removeExecutionResultsFromHeight(
 	// removing for pending blocks
 	pendings, err := protoState.Final().Descendants()
 	if err != nil {
+		log.Error().
+			Err(err).
+			Bool("is_not_found", errors.Is(err, storage.ErrNotFound)).
+			Str("error_type", fmt.Sprintf("%T", err)).
+			Msg("descendants error details")
 		return nil, fmt.Errorf("could not get pending block: %w", err)
 	}
 

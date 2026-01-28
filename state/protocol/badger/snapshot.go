@@ -314,6 +314,9 @@ func (s *Snapshot) SealingSegment() (*flow.SealingSegment, error) {
 func (s *Snapshot) Descendants() ([]flow.Identifier, error) {
 	descendants, err := s.descendants(s.blockID)
 	if err != nil {
+		if errors.Is(err, storage.ErrNotFound) {
+			return []flow.Identifier{}, nil // no descendants found
+		}
 		return nil, fmt.Errorf("failed to traverse the descendants tree of block %v: %w", s.blockID, err)
 	}
 	return descendants, nil
