@@ -76,6 +76,7 @@ func NewClient(grpcAddr string, logger zerolog.Logger, maxRequestSize, maxRespon
 		logger.Warn().
 			Err(err).
 			Dur("retry_delay", retryDelay).
+			Time("retry_at", time.Now().Add(retryDelay)).
 			Str("address", grpcAddr).
 			Msg("failed to connect to ledger service, retrying...")
 
@@ -306,6 +307,7 @@ func (c *Client) Ready() <-chan struct{} {
 					Err(err).
 					Int("attempt", i+1).
 					Dur("retry_delay", retryDelay).
+					Time("retry_at", time.Now().Add(retryDelay)).
 					Msg("ledger service not ready, retrying...")
 				time.Sleep(retryDelay)
 				retryDelay = time.Duration(float64(retryDelay) * 1.5) // exponential backoff

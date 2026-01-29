@@ -465,7 +465,7 @@ func prepareExecutionService(container testnet.ContainerConfig, i int, n int) Se
 			fmt.Sprintf("%s:/sockets:z", SocketDir),
 		)
 		service.Command = append(service.Command,
-			"--ledger-service-addr=unix:////sockets/ledger.sock",
+			"--ledger-service-addr=unix:///sockets/ledger.sock",
 		)
 		// Execution node depends on ledger service
 		service.DependsOn = append(service.DependsOn, "ledger_service_1")
