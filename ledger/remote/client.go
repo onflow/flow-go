@@ -288,10 +288,11 @@ func (c *Client) Ready() <-chan struct{} {
 		defer close(ready)
 		// Wait for the ledger service to be ready by calling InitialState()
 		// This ensures the service has finished WAL replay and is ready to serve requests
-		// Retry with exponential backoff for up to 30 seconds
+		// Retry with exponential backoff (delay capped at 30s)
 		ctx := context.Background()
 		maxRetries := 30
 		retryDelay := 100 * time.Millisecond
+		maxRetryDelay := 30 * time.Second
 
 		for i := 0; i < maxRetries; i++ {
 			_, err := c.client.InitialState(ctx, &emptypb.Empty{})
@@ -308,6 +309,9 @@ func (c *Client) Ready() <-chan struct{} {
 					Msg("ledger service not ready, retrying...")
 				time.Sleep(retryDelay)
 				retryDelay = time.Duration(float64(retryDelay) * 1.5) // exponential backoff
+				if retryDelay > maxRetryDelay {
+					retryDelay = maxRetryDelay
+				}
 			} else {
 				c.logger.Warn().Err(err).Msg("ledger service not ready after retries, proceeding anyway")
 				// Still close the channel to avoid blocking forever
