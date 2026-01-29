@@ -80,7 +80,7 @@ func (ss *SyncSuite) SetupTest() {
 	)
 
 	// set up the network conduit mock
-	ss.con = &mocknetwork.Conduit{}
+	ss.con = mocknetwork.NewConduit(ss.T())
 
 	// set up the local module mock
 	ss.me = &module.Local{}
@@ -549,6 +549,8 @@ func (ss *SyncSuite) TestSendRequests() {
 func (ss *SyncSuite) TestStartStop() {
 	unittest.AssertReturnsBefore(ss.T(), func() {
 		<-ss.e.Ready()
+		// require the conduit is closed on stop
+		ss.con.On("Close").Return(nil).Once()
 		<-ss.e.Done()
 	}, time.Second)
 }
