@@ -401,6 +401,14 @@ docker-cross-build-execution-ledger-arm:
 		--label "git_commit=${COMMIT}" --label "git_tag=${IMAGE_TAG_ARM}" \
 		-t "$(CONTAINER_REGISTRY)/execution-ledger:$(IMAGE_TAG_ARM)" .
 
+.PHONY: docker-native-build-execution-ledger
+docker-native-build-execution-ledger:
+	docker build -f cmd/Dockerfile --build-arg TARGET=./cmd/ledger --build-arg COMMIT=$(COMMIT) --build-arg VERSION=$(IMAGE_TAG) --build-arg GOARCH=$(GOARCH) --build-arg CGO_FLAG=$(CRYPTO_FLAG) --target production \
+		--secret id=cadence_deploy_key,env=CADENCE_DEPLOY_KEY --build-arg GOPRIVATE=$(GOPRIVATE) \
+		--label "git_commit=${COMMIT}" --label "git_tag=${IMAGE_TAG}" \
+		-t "$(CONTAINER_REGISTRY)/execution-ledger:latest" \
+		-t "$(CONTAINER_REGISTRY)/execution-ledger:$(IMAGE_TAG)" .
+
 .PHONY: docker-native-build-execution-debug
 docker-native-build-execution-debug:
 	docker build -f cmd/Dockerfile  --build-arg TARGET=./cmd/execution --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(IMAGE_TAG) --build-arg GOARCH=$(GOARCH) --build-arg CGO_FLAG=$(CRYPTO_FLAG) --target debug \
@@ -620,7 +628,7 @@ docker-native-build-loader:
 		-t "$(CONTAINER_REGISTRY)/loader:$(IMAGE_TAG)" .
 
 .PHONY: docker-native-build-flow
-docker-native-build-flow: docker-native-build-collection docker-native-build-consensus docker-native-build-execution docker-native-build-verification docker-native-build-access docker-native-build-observer docker-native-build-ghost
+docker-native-build-flow: docker-native-build-collection docker-native-build-consensus docker-native-build-execution docker-native-build-execution-ledger docker-native-build-verification docker-native-build-access docker-native-build-observer docker-native-build-ghost
 
 .PHONY: docker-build-flow-with-adx
 docker-build-flow-with-adx: docker-build-collection-with-adx docker-build-consensus-with-adx docker-build-execution-with-adx docker-build-verification-with-adx docker-build-access-with-adx docker-build-observer-with-adx
