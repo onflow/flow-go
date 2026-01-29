@@ -459,13 +459,9 @@ func prepareExecutionService(container testnet.ContainerConfig, i int, n int) Se
 
 	// Configure ledger service: execution nodes with index < ledgerExecutionCount use remote ledger
 	if i < ledgerExecutionCount {
-		// This execution node uses remote ledger service via Unix domain socket
-		// Mount shared socket directory for Unix domain socket communication
-		service.Volumes = append(service.Volumes,
-			fmt.Sprintf("%s:/sockets:z", SocketDir),
-		)
+		// This execution node uses remote ledger service via TCP (Docker network)
 		service.Command = append(service.Command,
-			"--ledger-service-addr=unix:///sockets/ledger.sock",
+			fmt.Sprintf("--ledger-service-addr=ledger_service_1:%s", testnet.GRPCPort),
 		)
 		// Execution node depends on ledger service
 		service.DependsOn = append(service.DependsOn, "ledger_service_1")
@@ -853,13 +849,14 @@ func prepareLedgerService(dockerServices Services, flowNodeContainerConfigs []te
 	}
 
 	// Create ledger service
-	// Use Unix domain socket for better performance when client and server are on same machine
+	// Listen on TCP so execution nodes can connect via Docker network (ledger_service_1:<port>)
+	ledgerGRPCPort := testnet.GRPCPort
 	service := Service{
 		name:  ledgerServiceName,
 		Image: "localnet-ledger",
 		Command: []string{
 			"--triedir=/trie",
-			"--ledger-service-socket=unix:///sockets/ledger.sock",
+			fmt.Sprintf("--ledger-service-tcp=0.0.0.0:%s", ledgerGRPCPort),
 			"--mtrie-cache-size=100",
 			"--checkpoint-distance=100",
 			"--checkpoints-to-keep=3",
@@ -868,7 +865,6 @@ func prepareLedgerService(dockerServices Services, flowNodeContainerConfigs []te
 		Volumes: []string{
 			fmt.Sprintf("%s:/trie:z", trieDir),
 			fmt.Sprintf("%s:/bootstrap:z", BootstrapDir),
-			fmt.Sprintf("%s:/sockets:z", SocketDir),
 		},
 		Environment: []string{
 			fmt.Sprintf("GOMAXPROCS=%d", DefaultGOMAXPROCS),
