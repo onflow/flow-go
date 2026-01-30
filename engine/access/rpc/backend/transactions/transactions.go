@@ -413,12 +413,12 @@ func (t *Transactions) lookupSubmittedTransactionResult(
 	// 2. lookup the block containing the collection.
 	block, err := t.blocks.ByCollectionID(collectionID)
 	if err != nil {
-        // The txID→collectionID index (checked in step 1) and the guaranteeID→blockID index
-        // (checked here) are built by separate async components: the collection Indexer and
-        // the FinalizedBlockProcessor respectively. During catch-up or under load, the
-        // FinalizedBlockProcessor may lag behind, causing ErrNotFound here even though the
-        // collection is indexed. This is a transient state that resolves once finalization
-        // processing catches up.
+		// The txID → collectionID index (checked in step 1) and the guaranteeID → blockID index
+		// (checked here) are built by separate async components: the collection Indexer and
+		// the FinalizedBlockProcessor respectively. During catch-up or under load, the
+		// FinalizedBlockProcessor may lag behind, causing ErrNotFound here even though the
+		// collection is indexed. This is a transient state that resolves once finalization
+		// processing catches up.
 		if errors.Is(err, storage.ErrNotFound) {
 			return nil, nil, status.Errorf(codes.NotFound, "block not found for collection %v", collectionID)
 		}
