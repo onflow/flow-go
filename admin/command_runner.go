@@ -195,6 +195,13 @@ func (r *CommandRunner) runAdminServer(ctx irrecoverable.SignalerContext) error 
 
 	r.logger.Info().Msg("admin server starting up")
 
+	// Remove stale socket file from previous run (e.g. after container/process restart)
+	if _, err := os.Stat(r.grpcAddress); err == nil {
+		if removeErr := os.Remove(r.grpcAddress); removeErr != nil {
+			r.logger.Warn().Err(removeErr).Str("socket", r.grpcAddress).Msg("failed to remove stale admin socket")
+		}
+	}
+
 	listener, err := net.Listen("unix", r.grpcAddress)
 	if err != nil {
 		return fmt.Errorf("failed to listen on admin server address: %w", err)
