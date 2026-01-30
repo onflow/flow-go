@@ -161,6 +161,7 @@ clean-data:
 	rm -rf ./bootstrap
 	rm -rf ./trie
 	rm -rf ./profiler
+	rm -rf ./sockets
 	rm -f ./targets.nodes.json
 	rm -f ./docker-compose.nodes.yml
 	rm -f ./ports.nodes.json

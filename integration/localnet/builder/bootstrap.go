@@ -32,6 +32,7 @@ const (
 	ProfilerDir               = "./profiler"
 	DataDir                   = "./data"
 	TrieDir                   = "./trie"
+	SocketDir                 = "./sockets"
 	DockerComposeFile         = "./docker-compose.nodes.yml"
 	DockerComposeFileVersion  = "3.7"
 	PrometheusTargetsFile     = "./targets.nodes.json"
@@ -233,7 +234,7 @@ func displayFlowNetworkConf(flowNetworkConf testnet.NetworkConfig) {
 }
 
 func prepareCommonHostFolders() {
-	for _, dir := range []string{BootstrapDir, ProfilerDir, DataDir, TrieDir} {
+	for _, dir := range []string{BootstrapDir, ProfilerDir, DataDir, TrieDir, SocketDir} {
 		if err := os.RemoveAll(dir); err != nil && !errors.Is(err, fs.ErrNotExist) {
 			panic(err)
 		}
@@ -458,9 +459,16 @@ func prepareExecutionService(container testnet.ContainerConfig, i int, n int) Se
 
 	// Configure ledger service: execution nodes with index < ledgerExecutionCount use remote ledger
 	if i < ledgerExecutionCount {
-		// This execution node uses remote ledger service
+		// This execution node uses remote ledger service via Unix socket; mount shared socket dir (absolute path)
+		absSocketDir, err := filepath.Abs(SocketDir)
+		if err != nil {
+			panic(fmt.Errorf("socket dir absolute path: %w", err))
+		}
+		service.Volumes = append(service.Volumes,
+			fmt.Sprintf("%s:/sockets:z", absSocketDir),
+		)
 		service.Command = append(service.Command,
-			fmt.Sprintf("--ledger-service-addr=ledger_service_1:%s", testnet.GRPCPort),
+			"--ledger-service-addr=unix:///sockets/ledger.sock",
 		)
 		// Execution node depends on ledger service
 		service.DependsOn = append(service.DependsOn, "ledger_service_1")
@@ -847,13 +855,20 @@ func prepareLedgerService(dockerServices Services, flowNodeContainerConfigs []te
 		panic(err)
 	}
 
+	// Shared socket directory: use absolute path so Docker mounts the same host dir in all containers
+	absSocketDir, err := filepath.Abs(SocketDir)
+	if err != nil {
+		panic(fmt.Errorf("socket dir absolute path: %w", err))
+	}
+
 	// Create ledger service
+	// Use Unix domain socket; ledger and execution nodes share absSocketDir mounted at /sockets
 	service := Service{
 		name:  ledgerServiceName,
 		Image: "localnet-ledger",
 		Command: []string{
 			"--triedir=/trie",
-			"--ledger-service-addr=unix:///sockets/ledger.sock",
+			"--ledger-service-socket=/sockets/ledger.sock",
 			"--mtrie-cache-size=100",
 			"--checkpoint-distance=100",
 			"--checkpoints-to-keep=3",
@@ -862,6 +877,7 @@ func prepareLedgerService(dockerServices Services, flowNodeContainerConfigs []te
 		Volumes: []string{
 			fmt.Sprintf("%s:/trie:z", trieDir),
 			fmt.Sprintf("%s:/bootstrap:z", BootstrapDir),
+			fmt.Sprintf("%s:/sockets:z", absSocketDir),
 		},
 		Environment: []string{
 			fmt.Sprintf("GOMAXPROCS=%d", DefaultGOMAXPROCS),
@@ -884,8 +900,6 @@ func prepareLedgerService(dockerServices Services, flowNodeContainerConfigs []te
 		},
 		Target: "production",
 	}
-
-	service.AddExposedPorts(testnet.GRPCPort)
 
 	dockerServices[ledgerServiceName] = service
 
