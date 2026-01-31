@@ -61,7 +61,7 @@ func (vt *viewTracker) ProcessQC(qc *flow.QuorumCertificate) (uint64, error) {
 	if qc.View < view {
 		// If the QC is for a past view, our view does not change. Nevertheless, the QC might be
 		// newer than the newest QC we know, since view changes can happen through TCs as well.
-		// While not very likely, is is possible that individual replicas know newer QCs than the
+		// While not very likely, it is possible that individual replicas know newer QCs than the
 		// ones previously included in TCs. E.g. a primary that crashed before it could construct
 		// its block is has rebooted and is now sharing its newest QC as part of a TimeoutObject.
 		err := vt.updateNewestQC(qc)
@@ -92,7 +92,7 @@ func (vt *viewTracker) ProcessTC(tc *flow.TimeoutCertificate) (uint64, error) {
 
 	if tc.View < view {
 		// TC and the embedded QC are for a past view, hence our view does not change. Nevertheless,
-		// the QC might be newer than the newest QC we know. While not very likely, is is possible
+		// the QC might be newer than the newest QC we know. While not very likely, it is possible
 		// that individual replicas know newer QCs than the ones previously included in any TCs.
 		// E.g. a primary that crashed before it could construct its block is has rebooted and
 		// now contributed its newest QC to this TC.
