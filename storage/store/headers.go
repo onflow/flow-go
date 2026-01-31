@@ -234,10 +234,10 @@ func (h *Headers) ByParentID(parentID flow.Identifier) ([]*flow.Header, error) {
 }
 
 // BlockIDByView returns the block ID that is certified at the given view. It is an optimized
-// version of `ByView` that skips retrieving the block. Expected errors during normal operations:
-//   - `[storage.ErrNotFound] if no certified block is known at given view.
+// version of `ByView` that skips retrieving the block.
 //
-// NOTE: this method is not available until next spork (mainnet27) or a migration that builds the index.
+// Expected errors during normal operations:
+//   - [storage.ErrNotFound] if no certified block is known at given view.
 func (h *Headers) BlockIDByView(view uint64) (flow.Identifier, error) {
 	blockID, err := h.viewCache.Get(h.db.Reader(), view)
 	if err != nil {
