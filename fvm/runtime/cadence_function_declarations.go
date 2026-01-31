@@ -55,7 +55,7 @@ func BlockRandomSourceDeclaration(fvmEnv environment.Environment) stdlib.Standar
 }
 
 // transactionIndexFunctionType is the type of the `getTransactionIndex` function.
-// This defines the signature as `func(): UInt32`
+// This defines the signature as `func(): UInt32`.
 var transactionIndexFunctionType = &sema.FunctionType{
 	ReturnTypeAnnotation: sema.NewTypeAnnotation(sema.UInt32Type),
 }
