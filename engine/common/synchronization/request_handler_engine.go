@@ -92,6 +92,7 @@ func NewRequestHandlerEngine(
 		metrics,
 		NewResponseSender(con),
 		me,
+		state,
 		finalizedHeaderCache,
 		blocks,
 		core,

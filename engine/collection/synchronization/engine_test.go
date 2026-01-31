@@ -13,7 +13,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/onflow/flow-go/engine"
 	mockcollection "github.com/onflow/flow-go/engine/collection/mock"
 	clustermodel "github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
@@ -41,6 +40,7 @@ type SyncSuite struct {
 	myID         flow.Identifier
 	participants flow.IdentityList
 	head         *flow.Header
+	qc           *flow.QuorumCertificate
 	heights      map[uint64]*clustermodel.Proposal
 	blockIDs     map[flow.Identifier]*clustermodel.Proposal
 	net          *mocknetwork.EngineRegistry
@@ -64,6 +64,8 @@ func (ss *SyncSuite) SetupTest() {
 	// generate a header for the final state
 	header := unittest.BlockHeaderFixture()
 	ss.head = header
+	// generate a QC certifying the header
+	ss.qc = unittest.CertifyBlock(ss.head)
 
 	// create maps to enable block returns
 	ss.heights = make(map[uint64]*clustermodel.Proposal)
@@ -112,6 +114,12 @@ func (ss *SyncSuite) SetupTest() {
 	ss.snapshot.On("Head").Return(
 		func() *flow.Header {
 			return ss.head
+		},
+		nil,
+	)
+	ss.snapshot.On("QuorumCertificate").Return(
+		func() *flow.QuorumCertificate {
+			return ss.qc
 		},
 		nil,
 	)
@@ -187,8 +195,10 @@ func (ss *SyncSuite) TestOnSyncRequest() {
 	ss.con.On("Unicast", mock.Anything, mock.Anything).Return(nil).Run(
 		func(args mock.Arguments) {
 			res := args.Get(0).(*messages.SyncResponse)
-			assert.Equal(ss.T(), ss.head.Height, res.Height, "response should contain head height")
+			assert.Equal(ss.T(), *ss.head, res.Header, "response should contain header")
 			assert.Equal(ss.T(), req.Nonce, res.Nonce, "response should contain request nonce")
+			assert.Equal(ss.T(), *ss.qc, res.CertifyingQC, "response should contain QC")
+			assert.Equal(ss.T(), res.Header.ID(), res.CertifyingQC.BlockID, "response QC should correspond to response Header")
 			recipientID := args.Get(1).(flow.Identifier)
 			assert.Equal(ss.T(), originID, recipientID, "should send response to original sender")
 		},
@@ -204,13 +214,15 @@ func (ss *SyncSuite) TestOnSyncRequest() {
 func (ss *SyncSuite) TestOnSyncResponse() {
 	// generate origin ID and response message
 	originID := unittest.IdentifierFixture()
+	header := unittest.BlockHeaderFixture(unittest.WithHeaderHeight(rand.Uint64()))
 	res := &flow.SyncResponse{
-		Nonce:  rand.Uint64(),
-		Height: rand.Uint64(),
+		Nonce:        rand.Uint64(),
+		Header:       *header,
+		CertifyingQC: *unittest.CertifyBlock(header),
 	}
 
 	// the height should be handled
-	ss.core.On("HandleHeight", ss.head, res.Height)
+	ss.core.On("HandleHeight", ss.head, res.Header.Height)
 	ss.e.onSyncResponse(originID, res)
 	ss.core.AssertExpectations(ss.T())
 }
@@ -561,11 +573,13 @@ func (ss *SyncSuite) TestProcessingMultipleItems() {
 
 	originID := unittest.IdentifierFixture()
 	for i := 0; i < 5; i++ {
+		header := unittest.BlockHeaderFixture(unittest.WithHeaderHeight(uint64(1000 + i)))
 		msg := &flow.SyncResponse{
-			Nonce:  uint64(i),
-			Height: uint64(1000 + i),
+			Nonce:        uint64(i),
+			Header:       *header,
+			CertifyingQC: *unittest.CertifyBlock(header),
 		}
-		ss.core.On("HandleHeight", mock.Anything, msg.Height).Once()
+		ss.core.On("HandleHeight", mock.Anything, msg.Header.Height).Once()
 		ss.metrics.On("MessageSent", metrics.EngineClusterSynchronization, metrics.MessageSyncResponse).Once()
 		ss.metrics.On("MessageReceived", metrics.EngineClusterSynchronization, metrics.MessageSyncResponse).Once()
 		ss.metrics.On("MessageHandled", metrics.EngineClusterSynchronization, metrics.MessageSyncResponse).Once()
@@ -595,18 +609,14 @@ func (ss *SyncSuite) TestProcessingMultipleItems() {
 	ss.metrics.AssertExpectations(ss.T())
 }
 
-// TestProcessUnsupportedMessageType tests that Process and ProcessLocal correctly handle a case where invalid message type
+// TestProcessUnsupportedMessageType tests that Process correctly handles a case where invalid message type
 // was submitted from network layer.
 func (ss *SyncSuite) TestProcessUnsupportedMessageType() {
 	invalidEvent := uint64(42)
-	engines := []netint.Engine{ss.e, ss.e.requestHandler}
+	engines := []netint.MessageProcessor{ss.e, ss.e.requestHandler}
 	for _, e := range engines {
 		err := e.Process("ch", unittest.IdentifierFixture(), invalidEvent)
 		// shouldn't result in error since byzantine inputs are expected
 		require.NoError(ss.T(), err)
-		// in case of local processing error cannot be consumed since all inputs are trusted
-		err = e.ProcessLocal(invalidEvent)
-		require.Error(ss.T(), err)
-		require.True(ss.T(), engine.IsIncompatibleInputTypeError(err))
 	}
 }

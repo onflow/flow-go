@@ -497,6 +497,10 @@ func (suite *MutatorSuite) TestExtend_WithOrphanedReferenceBlock() {
 	// create a block extending genesis (conflicting with previous) which is finalized
 	finalized := unittest.BlockWithParentProtocolState(suite.protoGenesis)
 	finalized.Payload.Guarantees = nil
+	if finalized.View == orphaned.View {
+		// ensure we don't have two certified blocks in a single view
+		finalized.View = orphaned.View + 1
+	}
 	err = suite.protoState.ExtendCertified(context.Background(), unittest.NewCertifiedBlock(finalized))
 	suite.Require().NoError(err)
 	err = suite.protoState.Finalize(context.Background(), finalized.ID())
