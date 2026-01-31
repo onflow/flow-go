@@ -73,7 +73,7 @@ func (s *MessageHubSuite) SetupTest() {
 		unittest.WithInitialWeight(1000),
 	)
 	s.myID = s.cluster[0].NodeID
-	s.clusterID = "cluster-id"
+	s.clusterID = clusterint.CanonicalClusterID(0, unittest.IdentifierListFixture(1))
 	s.head = unittest.ClusterBlockFixture()
 
 	s.payloads = storage.NewClusterPayloads(s.T())
