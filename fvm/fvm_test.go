@@ -3365,32 +3365,7 @@ func TestVMBridge(t *testing.T) {
 
 			env := sc.AsTemplateEnv()
 
-			bridgeEnv := bridge.Environment{
-				CrossVMNFTAddress:                     env.ServiceAccountAddress,
-				CrossVMTokenAddress:                   env.ServiceAccountAddress,
-				FlowEVMBridgeHandlerInterfacesAddress: env.ServiceAccountAddress,
-				IBridgePermissionsAddress:             env.ServiceAccountAddress,
-				ICrossVMAddress:                       env.ServiceAccountAddress,
-				ICrossVMAssetAddress:                  env.ServiceAccountAddress,
-				IEVMBridgeNFTMinterAddress:            env.ServiceAccountAddress,
-				IEVMBridgeTokenMinterAddress:          env.ServiceAccountAddress,
-				IFlowEVMNFTBridgeAddress:              env.ServiceAccountAddress,
-				IFlowEVMTokenBridgeAddress:            env.ServiceAccountAddress,
-				FlowEVMBridgeAddress:                  env.ServiceAccountAddress,
-				FlowEVMBridgeAccessorAddress:          env.ServiceAccountAddress,
-				FlowEVMBridgeConfigAddress:            env.ServiceAccountAddress,
-				FlowEVMBridgeHandlersAddress:          env.ServiceAccountAddress,
-				FlowEVMBridgeNFTEscrowAddress:         env.ServiceAccountAddress,
-				FlowEVMBridgeResolverAddress:          env.ServiceAccountAddress,
-				FlowEVMBridgeTemplatesAddress:         env.ServiceAccountAddress,
-				FlowEVMBridgeTokenEscrowAddress:       env.ServiceAccountAddress,
-				FlowEVMBridgeUtilsAddress:             env.ServiceAccountAddress,
-				ArrayUtilsAddress:                     env.ServiceAccountAddress,
-				ScopedFTProvidersAddress:              env.ServiceAccountAddress,
-				SerializeAddress:                      env.ServiceAccountAddress,
-				SerializeMetadataAddress:              env.ServiceAccountAddress,
-				StringUtilsAddress:                    env.ServiceAccountAddress,
-			}
+			bridgeEnv := sc.AsBridgeEnv()
 
 			// Create an account private key.
 			privateKey, err := testutil.GenerateAccountPrivateKey()
@@ -3607,32 +3582,7 @@ func TestVMBridge(t *testing.T) {
 
 			env := sc.AsTemplateEnv()
 
-			bridgeEnv := bridge.Environment{
-				CrossVMNFTAddress:                     env.ServiceAccountAddress,
-				CrossVMTokenAddress:                   env.ServiceAccountAddress,
-				FlowEVMBridgeHandlerInterfacesAddress: env.ServiceAccountAddress,
-				IBridgePermissionsAddress:             env.ServiceAccountAddress,
-				ICrossVMAddress:                       env.ServiceAccountAddress,
-				ICrossVMAssetAddress:                  env.ServiceAccountAddress,
-				IEVMBridgeNFTMinterAddress:            env.ServiceAccountAddress,
-				IEVMBridgeTokenMinterAddress:          env.ServiceAccountAddress,
-				IFlowEVMNFTBridgeAddress:              env.ServiceAccountAddress,
-				IFlowEVMTokenBridgeAddress:            env.ServiceAccountAddress,
-				FlowEVMBridgeAddress:                  env.ServiceAccountAddress,
-				FlowEVMBridgeAccessorAddress:          env.ServiceAccountAddress,
-				FlowEVMBridgeConfigAddress:            env.ServiceAccountAddress,
-				FlowEVMBridgeHandlersAddress:          env.ServiceAccountAddress,
-				FlowEVMBridgeNFTEscrowAddress:         env.ServiceAccountAddress,
-				FlowEVMBridgeResolverAddress:          env.ServiceAccountAddress,
-				FlowEVMBridgeTemplatesAddress:         env.ServiceAccountAddress,
-				FlowEVMBridgeTokenEscrowAddress:       env.ServiceAccountAddress,
-				FlowEVMBridgeUtilsAddress:             env.ServiceAccountAddress,
-				ArrayUtilsAddress:                     env.ServiceAccountAddress,
-				ScopedFTProvidersAddress:              env.ServiceAccountAddress,
-				SerializeAddress:                      env.ServiceAccountAddress,
-				SerializeMetadataAddress:              env.ServiceAccountAddress,
-				StringUtilsAddress:                    env.ServiceAccountAddress,
-			}
+			bridgeEnv := sc.AsBridgeEnv()
 
 			// Create an account private key.
 			privateKey, err := testutil.GenerateAccountPrivateKey()

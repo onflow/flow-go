@@ -18,6 +18,7 @@ import (
 
 	"github.com/onflow/cadence/common"
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
+	bridge "github.com/onflow/flow-evm-bridge"
 
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -25,28 +26,52 @@ import (
 const (
 	// Unqualified names of system smart contracts (not including address prefix)
 
-	ContractNameEpoch                      = "FlowEpoch"
-	ContractNameIDTableStaking             = "FlowIDTableStaking"
-	ContractNameClusterQC                  = "FlowClusterQC"
-	ContractNameDKG                        = "FlowDKG"
-	ContractNameServiceAccount             = "FlowServiceAccount"
-	ContractNameFlowFees                   = "FlowFees"
-	ContractNameStorageFees                = "FlowStorageFees"
-	ContractNameFlowCallbackScheduler      = "FlowTransactionScheduler"
-	ContractNameNodeVersionBeacon          = "NodeVersionBeacon"
-	ContractNameRandomBeaconHistory        = "RandomBeaconHistory"
-	ContractNameFungibleToken              = "FungibleToken"
-	ContractNameFlowToken                  = "FlowToken"
-	ContractNameFungibleTokenSwitchboard   = "FungibleTokenSwitchboard"
-	ContractNameFungibleTokenMetadataViews = "FungibleTokenMetadataViews"
-	ContractNameNonFungibleToken           = "NonFungibleToken"
-	ContractNameMetadataViews              = "MetadataViews"
-	ContractNameViewResolver               = "ViewResolver"
-	ContractNameCrossVMMetadataViews       = "CrossVMMetadataViews"
-	ContractNameEVM                        = "EVM"
-	ContractNameBurner                     = "Burner"
-	ContractNameCrypto                     = "Crypto"
-	ContractNameMigration                  = "Migration"
+	ContractNameEpoch                          = "FlowEpoch"
+	ContractNameIDTableStaking                 = "FlowIDTableStaking"
+	ContractNameClusterQC                      = "FlowClusterQC"
+	ContractNameDKG                            = "FlowDKG"
+	ContractNameServiceAccount                 = "FlowServiceAccount"
+	ContractNameFlowFees                       = "FlowFees"
+	ContractNameStorageFees                    = "FlowStorageFees"
+	ContractNameFlowCallbackScheduler          = "FlowTransactionScheduler"
+	ContractNameNodeVersionBeacon              = "NodeVersionBeacon"
+	ContractNameRandomBeaconHistory            = "RandomBeaconHistory"
+	ContractNameFungibleToken                  = "FungibleToken"
+	ContractNameFlowToken                      = "FlowToken"
+	ContractNameFungibleTokenSwitchboard       = "FungibleTokenSwitchboard"
+	ContractNameFungibleTokenMetadataViews     = "FungibleTokenMetadataViews"
+	ContractNameNonFungibleToken               = "NonFungibleToken"
+	ContractNameMetadataViews                  = "MetadataViews"
+	ContractNameViewResolver                   = "ViewResolver"
+	ContractNameCrossVMMetadataViews           = "CrossVMMetadataViews"
+	ContractNameEVM                            = "EVM"
+	ContractNameBurner                         = "Burner"
+	ContractNameCrypto                         = "Crypto"
+	ContractNameMigration                      = "Migration"
+	ContractNameCrossVMNFT                     = "CrossVMNFT"
+	ContractNameCrossVMToken                   = "CrossVMToken"
+	ContractNameFlowEVMBridgeHandlerInterfaces = "FlowEVMBridgeHandlerInterfaces"
+	ContractNameIBridgePermissions             = "IBridgePermissions"
+	ContractNameICrossVM                       = "ICrossVM"
+	ContractNameICrossVMAsset                  = "ICrossVMAsset"
+	ContractNameIEVMBridgeNFTMinter            = "IEVMBridgeNFTMinter"
+	ContractNameIEVMBridgeTokenMinter          = "IEVMBridgeTokenMinter"
+	ContractNameIFlowEVMNFTBridge              = "IFlowEVMNFTBridge"
+	ContractNameIFlowEVMTokenBridge            = "IFlowEVMTokenBridge"
+	ContractNameFlowEVMBridge                  = "FlowEVMBridge"
+	ContractNameFlowEVMBridgeAccessor          = "FlowEVMBridgeAccessor"
+	ContractNameFlowEVMBridgeConfig            = "FlowEVMBridgeConfig"
+	ContractNameFlowEVMBridgeHandlers          = "FlowEVMBridgeHandlers"
+	ContractNameFlowEVMBridgeNFTEscrow         = "FlowEVMBridgeNFTEscrow"
+	ContractNameFlowEVMBridgeResolver          = "FlowEVMBridgeResolver"
+	ContractNameFlowEVMBridgeTemplates         = "FlowEVMBridgeTemplates"
+	ContractNameFlowEVMBridgeTokenEscrow       = "FlowEVMBridgeTokenEscrow"
+	ContractNameFlowEVMBridgeUtils             = "FlowEVMBridgeUtils"
+	ContractNameArrayUtils                     = "ArrayUtils"
+	ContractNameScopedFTProviders              = "ScopedFTProviders"
+	ContractNameSerialize                      = "Serialize"
+	ContractNameSerializeMetadata              = "SerializeMetadata"
+	ContractNameStringUtils                    = "StringUtils"
 
 	// AccountNameEVMStorage is not a contract, but a special account that is used to store EVM state
 	AccountNameEVMStorage = "EVMStorageAccount"
@@ -206,6 +231,32 @@ type SystemContracts struct {
 
 	// Migration contracts
 	Migration SystemContract
+
+	// EVM Bridge related contracts
+	CrossVMNFT                     SystemContract
+	CrossVMToken                   SystemContract
+	FlowEVMBridgeHandlerInterfaces SystemContract
+	IBridgePermissions             SystemContract
+	ICrossVM                       SystemContract
+	ICrossVMAsset                  SystemContract
+	IEVMBridgeNFTMinter            SystemContract
+	IEVMBridgeTokenMinter          SystemContract
+	IFlowEVMNFTBridge              SystemContract
+	IFlowEVMTokenBridge            SystemContract
+	FlowEVMBridge                  SystemContract
+	FlowEVMBridgeAccessor          SystemContract
+	FlowEVMBridgeConfig            SystemContract
+	FlowEVMBridgeHandlers          SystemContract
+	FlowEVMBridgeNFTEscrow         SystemContract
+	FlowEVMBridgeResolver          SystemContract
+	FlowEVMBridgeTemplates         SystemContract
+	FlowEVMBridgeTokenEscrow       SystemContract
+	FlowEVMBridgeUtils             SystemContract
+	ArrayUtils                     SystemContract
+	ScopedFTProviders              SystemContract
+	Serialize                      SystemContract
+	SerializeMetadata              SystemContract
+	StringUtils                    SystemContract
 }
 
 // AsTemplateEnv returns a template environment with all system contracts filled in.
@@ -237,6 +288,36 @@ func (c SystemContracts) AsTemplateEnv() templates.Environment {
 
 		BurnerAddress: c.Burner.Address.Hex(),
 		CryptoAddress: c.Crypto.Address.Hex(),
+	}
+}
+
+func (c SystemContracts) AsBridgeEnv() bridge.Environment {
+	serviceAccountAddress := c.FlowServiceAccount.Address.Hex()
+	return bridge.Environment{
+		CrossVMNFTAddress:                     serviceAccountAddress,
+		CrossVMTokenAddress:                   serviceAccountAddress,
+		FlowEVMBridgeHandlerInterfacesAddress: serviceAccountAddress,
+		IBridgePermissionsAddress:             serviceAccountAddress,
+		ICrossVMAddress:                       serviceAccountAddress,
+		ICrossVMAssetAddress:                  serviceAccountAddress,
+		IEVMBridgeNFTMinterAddress:            serviceAccountAddress,
+		IEVMBridgeTokenMinterAddress:          serviceAccountAddress,
+		IFlowEVMNFTBridgeAddress:              serviceAccountAddress,
+		IFlowEVMTokenBridgeAddress:            serviceAccountAddress,
+		FlowEVMBridgeAddress:                  serviceAccountAddress,
+		FlowEVMBridgeAccessorAddress:          serviceAccountAddress,
+		FlowEVMBridgeConfigAddress:            serviceAccountAddress,
+		FlowEVMBridgeHandlersAddress:          serviceAccountAddress,
+		FlowEVMBridgeNFTEscrowAddress:         serviceAccountAddress,
+		FlowEVMBridgeResolverAddress:          serviceAccountAddress,
+		FlowEVMBridgeTemplatesAddress:         serviceAccountAddress,
+		FlowEVMBridgeTokenEscrowAddress:       serviceAccountAddress,
+		FlowEVMBridgeUtilsAddress:             serviceAccountAddress,
+		ArrayUtilsAddress:                     serviceAccountAddress,
+		ScopedFTProvidersAddress:              serviceAccountAddress,
+		SerializeAddress:                      serviceAccountAddress,
+		SerializeMetadataAddress:              serviceAccountAddress,
+		StringUtilsAddress:                    serviceAccountAddress,
 	}
 }
 
@@ -272,6 +353,31 @@ func (c SystemContracts) All() []SystemContract {
 		c.Crypto,
 
 		c.Migration,
+
+		c.CrossVMNFT,
+		c.CrossVMToken,
+		c.FlowEVMBridgeHandlerInterfaces,
+		c.IBridgePermissions,
+		c.ICrossVM,
+		c.ICrossVMAsset,
+		c.IEVMBridgeNFTMinter,
+		c.IEVMBridgeTokenMinter,
+		c.IFlowEVMNFTBridge,
+		c.IFlowEVMTokenBridge,
+		c.FlowEVMBridge,
+		c.FlowEVMBridgeAccessor,
+		c.FlowEVMBridgeConfig,
+		c.FlowEVMBridgeHandlers,
+		c.FlowEVMBridgeNFTEscrow,
+		c.FlowEVMBridgeResolver,
+		c.FlowEVMBridgeTemplates,
+		c.FlowEVMBridgeTokenEscrow,
+		c.FlowEVMBridgeUtils,
+		c.ArrayUtils,
+		c.ScopedFTProviders,
+		c.Serialize,
+		c.SerializeMetadata,
+		c.StringUtils,
 	}
 }
 
@@ -439,6 +545,31 @@ func init() {
 		ContractNameCrypto: serviceAddressFunc,
 
 		ContractNameMigration: serviceAddressFunc,
+
+		ContractNameCrossVMNFT:                     serviceAddressFunc,
+		ContractNameCrossVMToken:                   serviceAddressFunc,
+		ContractNameFlowEVMBridgeHandlerInterfaces: serviceAddressFunc,
+		ContractNameIBridgePermissions:             serviceAddressFunc,
+		ContractNameICrossVM:                       serviceAddressFunc,
+		ContractNameICrossVMAsset:                  serviceAddressFunc,
+		ContractNameIEVMBridgeNFTMinter:            serviceAddressFunc,
+		ContractNameIEVMBridgeTokenMinter:          serviceAddressFunc,
+		ContractNameIFlowEVMNFTBridge:              serviceAddressFunc,
+		ContractNameIFlowEVMTokenBridge:            serviceAddressFunc,
+		ContractNameFlowEVMBridge:                  serviceAddressFunc,
+		ContractNameFlowEVMBridgeAccessor:          serviceAddressFunc,
+		ContractNameFlowEVMBridgeConfig:            serviceAddressFunc,
+		ContractNameFlowEVMBridgeHandlers:          serviceAddressFunc,
+		ContractNameFlowEVMBridgeNFTEscrow:         serviceAddressFunc,
+		ContractNameFlowEVMBridgeResolver:          serviceAddressFunc,
+		ContractNameFlowEVMBridgeTemplates:         serviceAddressFunc,
+		ContractNameFlowEVMBridgeTokenEscrow:       serviceAddressFunc,
+		ContractNameFlowEVMBridgeUtils:             serviceAddressFunc,
+		ContractNameArrayUtils:                     serviceAddressFunc,
+		ContractNameScopedFTProviders:              serviceAddressFunc,
+		ContractNameSerialize:                      serviceAddressFunc,
+		ContractNameSerializeMetadata:              serviceAddressFunc,
+		ContractNameStringUtils:                    serviceAddressFunc,
 	}
 
 	getSystemContractsForChain := func(chainID flow.ChainID) *SystemContracts {
@@ -502,6 +633,31 @@ func init() {
 			Crypto: addressOfContract(ContractNameCrypto),
 
 			Migration: addressOfContract(ContractNameMigration),
+
+			CrossVMNFT:                     addressOfContract(ContractNameCrossVMNFT),
+			CrossVMToken:                   addressOfContract(ContractNameCrossVMToken),
+			FlowEVMBridgeHandlerInterfaces: addressOfContract(ContractNameFlowEVMBridgeHandlerInterfaces),
+			IBridgePermissions:             addressOfContract(ContractNameIBridgePermissions),
+			ICrossVM:                       addressOfContract(ContractNameICrossVM),
+			ICrossVMAsset:                  addressOfContract(ContractNameICrossVMAsset),
+			IEVMBridgeNFTMinter:            addressOfContract(ContractNameIEVMBridgeNFTMinter),
+			IEVMBridgeTokenMinter:          addressOfContract(ContractNameIEVMBridgeTokenMinter),
+			IFlowEVMNFTBridge:              addressOfContract(ContractNameIFlowEVMNFTBridge),
+			IFlowEVMTokenBridge:            addressOfContract(ContractNameIFlowEVMTokenBridge),
+			FlowEVMBridge:                  addressOfContract(ContractNameFlowEVMBridge),
+			FlowEVMBridgeAccessor:          addressOfContract(ContractNameFlowEVMBridgeAccessor),
+			FlowEVMBridgeConfig:            addressOfContract(ContractNameFlowEVMBridgeConfig),
+			FlowEVMBridgeHandlers:          addressOfContract(ContractNameFlowEVMBridgeHandlers),
+			FlowEVMBridgeNFTEscrow:         addressOfContract(ContractNameFlowEVMBridgeNFTEscrow),
+			FlowEVMBridgeResolver:          addressOfContract(ContractNameFlowEVMBridgeResolver),
+			FlowEVMBridgeTemplates:         addressOfContract(ContractNameFlowEVMBridgeTemplates),
+			FlowEVMBridgeTokenEscrow:       addressOfContract(ContractNameFlowEVMBridgeTokenEscrow),
+			FlowEVMBridgeUtils:             addressOfContract(ContractNameFlowEVMBridgeUtils),
+			ArrayUtils:                     addressOfContract(ContractNameArrayUtils),
+			ScopedFTProviders:              addressOfContract(ContractNameScopedFTProviders),
+			Serialize:                      addressOfContract(ContractNameSerialize),
+			SerializeMetadata:              addressOfContract(ContractNameSerializeMetadata),
+			StringUtils:                    addressOfContract(ContractNameStringUtils),
 		}
 
 		return contracts
