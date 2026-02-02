@@ -5,40 +5,42 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// PendingBlockBuffer defines an interface for a cache of pending blocks that
-// cannot yet be processed because they do not connect to the rest of the chain
-// state. They are indexed by parent ID to enable processing all of a parent's
-// children once the parent is received.
+// GenericPendingBlockBuffer implements a mempool of pending blocks that cannot yet be processed
+// because they do not connect to the rest of the chain state.
+// They are indexed by parent ID to enable processing all of a parent's children once the parent is received.
+// They are also indexed by view to support pruning.
+//
 // Safe for concurrent use.
-type PendingBlockBuffer interface {
-	Add(block flow.Slashable[*flow.Proposal]) bool
+type GenericPendingBlockBuffer[T flow.HashablePayload] interface {
+	// Add adds the input block to the block buffer.
+	// If the block already exists, or is below the finalized view, this is a no-op.
+	// Errors returns:
+	//   - mempool.BeyondActiveRangeError if block.View > finalizedView + activeViewRangeSize (when activeViewRangeSize > 0)
+	Add(block flow.Slashable[*flow.GenericProposal[T]]) error
 
-	ByID(blockID flow.Identifier) (flow.Slashable[*flow.Proposal], bool)
+	// ByID returns the block with the given ID, if it exists.
+	// Otherwise returns (nil, false)
+	ByID(blockID flow.Identifier) (flow.Slashable[*flow.GenericProposal[T]], bool)
 
-	ByParentID(parentID flow.Identifier) ([]flow.Slashable[*flow.Proposal], bool)
+	// ByView returns all stored blocks with the given view.
+	// If none are found an empty array is returned
+	ByView(view uint64) []flow.Slashable[*flow.GenericProposal[T]]
 
-	DropForParent(parentID flow.Identifier)
+	// ByParentID returns all direct children of the given block.
+	// If no children with the given parent exist, returns (nil, false)
+	ByParentID(parentID flow.Identifier) ([]flow.Slashable[*flow.GenericProposal[T]], bool)
 
-	// PruneByView prunes any pending blocks with views less or equal to the given view.
-	PruneByView(view uint64)
+	// PruneByView prunes all pending blocks with views less or equal to the given view.
+	// Errors returns:
+	//   - mempool.BelowPrunedThresholdError if input level is below the lowest retained view (finalized view)
+	PruneByView(view uint64) error
 
+	// Size returns the number of blocks in the buffer.
 	Size() uint
 }
 
-// PendingClusterBlockBuffer is the same thing as PendingBlockBuffer, but for
-// collection node cluster consensus.
-// Safe for concurrent use.
-type PendingClusterBlockBuffer interface {
-	Add(block flow.Slashable[*cluster.Proposal]) bool
+// PendingBlockBuffer is the block buffer for consensus proposals.
+type PendingBlockBuffer GenericPendingBlockBuffer[flow.Payload]
 
-	ByID(blockID flow.Identifier) (flow.Slashable[*cluster.Proposal], bool)
-
-	ByParentID(parentID flow.Identifier) ([]flow.Slashable[*cluster.Proposal], bool)
-
-	DropForParent(parentID flow.Identifier)
-
-	// PruneByView prunes any pending cluster blocks with views less or equal to the given view.
-	PruneByView(view uint64)
-
-	Size() uint
-}
+// PendingClusterBlockBuffer is the block buffer for cluster proposals.
+type PendingClusterBlockBuffer GenericPendingBlockBuffer[cluster.Payload]
