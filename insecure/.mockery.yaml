@@ -1,6 +1,6 @@
 all: true
 dir: '{{.InterfaceDir}}/mock'
-filename: mocks.go
+filename: '{{.InterfaceName | snakecase}}.go'
 include-auto-generated: false
 structname: '{{.InterfaceName}}'
 pkgname: mock
