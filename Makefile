@@ -167,7 +167,7 @@ tidy:
 
 # Builds a custom version of the golangci-lint binary which includes custom plugins
 tools/custom-gcl: tools/structwrite .custom-gcl.yml
-	golangci-lint custom
+	$(shell go env GOPATH)/bin/golangci-lint custom
 
 .PHONY: lint
 lint: tools/custom-gcl

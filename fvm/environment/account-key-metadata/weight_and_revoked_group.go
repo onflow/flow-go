@@ -319,3 +319,40 @@ func parseWeightAndRevokedStatus(b []byte, off int) (revoked bool, weight uint16
 	revoked = (weightAndRevoked & revokedMask) > 0
 	return revoked, weight
 }
+
+// Utility functions for tests and validation
+
+// WeightAndRevokedStatus represents weight and revoked status of an account public key.
+type WeightAndRevokedStatus struct {
+	Weight  uint16
+	Revoked bool
+}
+
+// DecodeWeightAndRevokedStatuses decodes raw bytes of weight and revoked statuses in account key metadata.
+func DecodeWeightAndRevokedStatuses(b []byte) ([]WeightAndRevokedStatus, error) {
+	if len(b)%weightAndRevokedStatusGroupSize != 0 {
+		return nil, errors.NewKeyMetadataUnexpectedLengthError(
+			"failed to decode weight and revoked status",
+			weightAndRevokedStatusGroupSize,
+			len(b),
+		)
+	}
+
+	statuses := make([]WeightAndRevokedStatus, 0, len(b)/weightAndRevokedStatusGroupSize)
+
+	for i := 0; i < len(b); i += weightAndRevokedStatusGroupSize {
+		runLength := parseRunLength(b, i)
+		revoked, weight := parseWeightAndRevokedStatus(b, i+runLengthSize)
+
+		status := WeightAndRevokedStatus{
+			Weight:  weight,
+			Revoked: revoked,
+		}
+
+		for range runLength {
+			statuses = append(statuses, status)
+		}
+	}
+
+	return statuses, nil
+}

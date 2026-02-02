@@ -370,28 +370,6 @@ func runE(*cobra.Command, []string) error {
 			}
 		}
 
-		migs = append(
-			migs,
-			migrations.NamedMigration{
-				Name: "account-public-key-deduplication",
-				Migrate: migrations.NewAccountBasedMigration(
-					log.Logger,
-					flagNWorker,
-					[]migrations.AccountBasedMigration{
-						migrations.NewAccountPublicKeyDeduplicationMigration(
-							chain.ChainID(),
-							flagOutputDir,
-							flagValidate,
-							reporters.NewReportFileWriterFactory(flagOutputDir, log.Logger),
-						),
-						migrations.NewAccountUsageMigration(
-							reporters.NewReportFileWriterFactoryWithFormat(flagOutputDir, log.Logger, reporters.ReportFormatCSV),
-						),
-					},
-				),
-			},
-		)
-
 		migration := newMigration(log.Logger, migs, flagNWorker)
 
 		payloads, err = migration(payloads)

@@ -161,7 +161,6 @@ func NewBasicBlockExecutor(tb testing.TB, chain flow.Chain, logger zerolog.Logge
 	opts := []fvm.Option{
 		fvm.WithTransactionFeesEnabled(true),
 		fvm.WithAccountStorageLimit(true),
-		fvm.WithChain(chain),
 		fvm.WithLogger(logger),
 		fvm.WithMaxStateInteractionSize(interactionLimit),
 		fvm.WithReusableCadenceRuntimePool(
@@ -172,7 +171,7 @@ func NewBasicBlockExecutor(tb testing.TB, chain flow.Chain, logger zerolog.Logge
 			),
 		),
 	}
-	fvmContext := fvm.NewContext(opts...)
+	fvmContext := fvm.NewContext(chain, opts...)
 
 	collector := metrics.NewNoopCollector()
 	tracer := trace.NewNoopTracer()

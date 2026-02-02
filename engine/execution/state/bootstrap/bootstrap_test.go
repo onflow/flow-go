@@ -143,7 +143,7 @@ func TestBootstrapLedger_EmptyTransaction(t *testing.T) {
 		vm := fvm.NewVirtualMachine()
 
 		ctx := fvm.NewContext(
-			fvm.WithChain(chain),
+			chain,
 			fvm.WithTransactionFeesEnabled(true),
 			fvm.WithAccountStorageLimit(true),
 			fvm.WithSequenceNumberCheckAndIncrementEnabled(false),

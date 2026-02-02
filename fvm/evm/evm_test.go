@@ -3,11 +3,13 @@ package evm_test
 import (
 	"bytes"
 	"encoding/binary"
+	"encoding/hex"
 	"fmt"
 	"math"
 	"math/big"
 	"testing"
 
+	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	gethTypes "github.com/ethereum/go-ethereum/core/types"
 	gethParams "github.com/ethereum/go-ethereum/params"
@@ -3862,11 +3864,11 @@ func TestCadenceArch(t *testing.T) {
 					import EVM from %s
 
 					access(all)
-					fun main(tx: [UInt8], coinbaseBytes: [UInt8; 20]) {
+					fun main(tx: [UInt8], coinbaseBytes: [UInt8; 20]): EVM.Result {
 						let coinbase = EVM.EVMAddress(bytes: coinbaseBytes)
-						let res = EVM.run(tx: tx, coinbase: coinbase)
+						return EVM.run(tx: tx, coinbase: coinbase)
 					}
-                    `,
+					`,
 					sc.EVMContract.Address.HexWithPrefix(),
 				))
 
@@ -3899,8 +3901,15 @@ func TestCadenceArch(t *testing.T) {
 					script,
 					snapshot)
 				require.NoError(t, err)
+				require.NoError(t, output.Err)
+
 				// make sure the error is correct
-				require.ErrorContains(t, output.Err, "Source of randomness not yet recorded")
+				res, err := impl.ResultSummaryFromEVMResultValue(output.Value)
+				require.NoError(t, err)
+
+				revertReason, err := abi.UnpackRevert(res.ReturnedData)
+				require.NoError(t, err)
+				require.Equal(t, "unsuccessful call to arch ", revertReason)
 			})
 	})
 
@@ -4053,6 +4062,200 @@ func TestCadenceArch(t *testing.T) {
 				require.NoError(t, err)
 				require.Error(t, output.Err)
 			})
+	})
+
+	t.Run("testing calling Cadence arch - COA ownership proof (index overflow)", func(t *testing.T) {
+		chain := flow.Emulator.Chain()
+		sc := systemcontracts.SystemContractsForChain(chain.ChainID())
+		RunWithNewEnvironment(t,
+			chain, func(
+				ctx fvm.Context,
+				vm fvm.VM,
+				snapshot snapshot.SnapshotTree,
+				testContract *TestContract,
+				testAccount *EOATestAccount,
+			) {
+				code := []byte(fmt.Sprintf(
+					`
+					import EVM from %s
+
+					transaction {
+						let coa: @EVM.CadenceOwnedAccount
+
+						prepare(signer: auth(Storage) &Account) {
+							self.coa <- EVM.createCadenceOwnedAccount()
+						}
+
+						execute {
+							let cadenceArchAddress = EVM.EVMAddress(
+								bytes: [
+									0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+									0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01
+								]
+							)
+
+							var calldata: [UInt8] = []
+
+							// Function selector for verifyCOAOwnershipProof = 0x5ee837e7
+							calldata = calldata.concat([0x5e, 0xe8, 0x37, 0xe7])
+
+							// Address parameter (32 bytes)
+							var i = 0
+							while i < 31 { calldata = calldata.concat([0x00]); i = i + 1 }
+							calldata = calldata.concat([0x01])
+
+							// bytes32 parameter (32 bytes)
+							i = 0
+							while i < 32 { calldata = calldata.concat([0x00]); i = i + 1 }
+
+							// MALICIOUS offset: 0x7FFFFFFFFFFFFFFF (MaxInt64)
+							// When ReadBytes does: index + 32, this overflows to negative
+							// MaxInt64 + 32 = -9223372036854775777 (wraps around)
+							i = 0
+							while i < 24 { calldata = calldata.concat([0x00]); i = i + 1 }
+							calldata = calldata.concat([0x7F]) // High byte = 0x7F
+							calldata = calldata.concat([0xFF])
+							calldata = calldata.concat([0xFF])
+							calldata = calldata.concat([0xFF])
+							calldata = calldata.concat([0xFF])
+							calldata = calldata.concat([0xFF])
+							calldata = calldata.concat([0xFF])
+							calldata = calldata.concat([0xFF]) // = 0x7FFFFFFFFFFFFFFF
+
+							// Length (32 bytes)
+							i = 0
+							while i < 31 { calldata = calldata.concat([0x00]); i = i + 1 }
+							calldata = calldata.concat([0x20])
+
+							// Dummy data (32 bytes)
+							i = 0
+							while i < 32 { calldata = calldata.concat([0x00]); i = i + 1 }
+
+							let result = self.coa.call(
+								to: cadenceArchAddress,
+								data: calldata,
+								gasLimit: 100_000,
+								value: EVM.Balance(attoflow: 0)
+							)
+							assert(result.status == EVM.Status.failed, message: "unexpected status")
+							assert(result.errorMessage == "input data is too small for decoding", message: result.errorMessage)
+
+							destroy self.coa
+						}
+					}
+					`,
+					sc.EVMContract.Address.HexWithPrefix(),
+				))
+
+				txBody, err := flow.NewTransactionBodyBuilder().
+					SetScript(code).
+					SetPayer(sc.FlowServiceAccount.Address).
+					AddAuthorizer(sc.FlowServiceAccount.Address).
+					Build()
+				require.NoError(t, err)
+
+				tx := fvm.Transaction(txBody, 0)
+
+				_, output, err := vm.Run(ctx, tx, snapshot)
+				require.NoError(t, err)
+				require.NoError(t, output.Err)
+			},
+		)
+	})
+
+	t.Run("testing calling Cadence arch - COA ownership proof (empty proof list)", func(t *testing.T) {
+		chain := flow.Emulator.Chain()
+		sc := systemcontracts.SystemContractsForChain(chain.ChainID())
+		RunWithNewEnvironment(t,
+			chain, func(
+				ctx fvm.Context,
+				vm fvm.VM,
+				snapshot snapshot.SnapshotTree,
+				testContract *TestContract,
+				testAccount *EOATestAccount,
+			) {
+				// create a flow account
+				privateKey, err := testutil.GenerateAccountPrivateKey()
+				require.NoError(t, err)
+
+				snapshot, accounts, err := testutil.CreateAccounts(
+					vm,
+					snapshot,
+					[]flow.AccountPrivateKey{privateKey},
+					chain)
+				require.NoError(t, err)
+				flowAccount := accounts[0]
+
+				// create/store/link coa
+				coaAddress, snapshot := setupCOA(
+					t,
+					ctx,
+					vm,
+					snapshot,
+					flowAccount,
+					0,
+				)
+
+				data := RandomCommonHash(t)
+
+				emptyProofList, err := hex.DecodeString("c0") // empty RLP list
+				require.NoError(t, err)
+
+				// create transaction for proof verification
+				code := []byte(fmt.Sprintf(
+					`
+					import EVM from %s
+					access(all)
+					fun main(tx: [UInt8], coinbaseBytes: [UInt8; 20]): EVM.Result {
+						let coinbase = EVM.EVMAddress(bytes: coinbaseBytes)
+						return EVM.run(tx: tx, coinbase: coinbase)
+					}
+					`,
+					sc.EVMContract.Address.HexWithPrefix(),
+				))
+				innerTxBytes := testAccount.PrepareSignAndEncodeTx(t,
+					testContract.DeployedAt.ToCommon(),
+					testContract.MakeCallData(t, "verifyArchCallToVerifyCOAOwnershipProof",
+						true,
+						coaAddress.ToCommon(),
+						data,
+						emptyProofList),
+					big.NewInt(0),
+					uint64(10_000_000),
+					big.NewInt(0),
+				)
+				verifyScript := fvm.Script(code).WithArguments(
+					json.MustEncode(
+						cadence.NewArray(
+							unittest.BytesToCdcUInt8(innerTxBytes),
+						).WithType(
+							stdlib.EVMTransactionBytesCadenceType,
+						)),
+					json.MustEncode(
+						cadence.NewArray(
+							unittest.BytesToCdcUInt8(
+								testAccount.Address().Bytes(),
+							),
+						).WithType(
+							stdlib.EVMAddressBytesCadenceType,
+						),
+					),
+				)
+
+				// run proof transaction
+				_, output, err := vm.Run(ctx, verifyScript, snapshot)
+				require.NoError(t, err)
+				require.NoError(t, output.Err)
+
+				// make sure the error is correct
+				res, err := impl.ResultSummaryFromEVMResultValue(output.Value)
+				require.NoError(t, err)
+
+				revertReason, err := abi.UnpackRevert(res.ReturnedData)
+				require.NoError(t, err)
+				require.Equal(t, "unsuccessful call to arch", revertReason)
+			},
+		)
 	})
 }
 
@@ -4631,7 +4834,6 @@ func RunWithNewEnvironment(
 				).Return(block1.ToHeader(), nil)
 
 				opts := []fvm.Option{
-					fvm.WithChain(chain),
 					fvm.WithBlockHeader(block1.ToHeader()),
 					fvm.WithAuthorizationChecksEnabled(false),
 					fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
@@ -4640,7 +4842,7 @@ func RunWithNewEnvironment(
 					fvm.WithBlocks(blocks),
 					fvm.WithCadenceLogging(true),
 				}
-				ctx := fvm.NewContext(opts...)
+				ctx := fvm.NewContext(chain, opts...)
 
 				vm := fvm.NewVirtualMachine()
 				snapshotTree := snapshot.NewSnapshotTree(backend)
@@ -4691,7 +4893,6 @@ func RunContractWithNewEnvironment(
 				).Return(header1, nil)
 
 				opts := []fvm.Option{
-					fvm.WithChain(chain),
 					fvm.WithBlockHeader(header1),
 					fvm.WithAuthorizationChecksEnabled(false),
 					fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
@@ -4700,7 +4901,7 @@ func RunContractWithNewEnvironment(
 					fvm.WithBlocks(blocks),
 					fvm.WithCadenceLogging(true),
 				}
-				ctx := fvm.NewContext(opts...)
+				ctx := fvm.NewContext(chain, opts...)
 
 				vm := fvm.NewVirtualMachine()
 				snapshotTree := snapshot.NewSnapshotTree(backend)
