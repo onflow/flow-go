@@ -12,19 +12,19 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-func TestAccountTransactionIndex_Initialize(t *testing.T) {
+func TestAccountTransactions_Initialize(t *testing.T) {
 	t.Parallel()
 
 	t.Run("fails on uninitialized database", func(t *testing.T) {
 		db, _ := unittest.TempPebbleDBWithOpts(t, nil)
 		defer db.Close()
 
-		_, err := NewAccountTransactionIndex(db)
+		_, err := NewAccountTransactions(db)
 		require.Error(t, err)
 	})
 
 	t.Run("succeeds on initialized database", func(t *testing.T) {
-		RunWithAccountTxIndex(t, 1, func(idx *AccountTransactionIndex) {
+		RunWithAccountTxIndex(t, 1, func(idx *AccountTransactions) {
 			first, err := idx.FirstIndexedHeight()
 			require.NoError(t, err)
 			assert.Equal(t, uint64(1), first)
@@ -36,11 +36,11 @@ func TestAccountTransactionIndex_Initialize(t *testing.T) {
 	})
 }
 
-func TestAccountTransactionIndex_IndexAndQuery(t *testing.T) {
+func TestAccountTransactions_IndexAndQuery(t *testing.T) {
 	t.Parallel()
 
 	t.Run("index single block with single transaction", func(t *testing.T) {
-		RunWithAccountTxIndex(t, 1, func(idx *AccountTransactionIndex) {
+		RunWithAccountTxIndex(t, 1, func(idx *AccountTransactions) {
 			// Create test data
 			account1 := unittest.RandomAddressFixture()
 			txID := unittest.IdentifierFixture()
@@ -71,7 +71,7 @@ func TestAccountTransactionIndex_IndexAndQuery(t *testing.T) {
 	})
 
 	t.Run("index multiple blocks with multiple transactions", func(t *testing.T) {
-		RunWithAccountTxIndex(t, 1, func(idx *AccountTransactionIndex) {
+		RunWithAccountTxIndex(t, 1, func(idx *AccountTransactions) {
 			account1 := unittest.RandomAddressFixture()
 			account2 := unittest.RandomAddressFixture()
 			require.NotEqual(t, account1, account2, "accounts should be different")
@@ -146,7 +146,7 @@ func TestAccountTransactionIndex_IndexAndQuery(t *testing.T) {
 	})
 
 	t.Run("query with height range filter", func(t *testing.T) {
-		RunWithAccountTxIndex(t, 1, func(idx *AccountTransactionIndex) {
+		RunWithAccountTxIndex(t, 1, func(idx *AccountTransactions) {
 			account := unittest.RandomAddressFixture()
 
 			// Index blocks 2, 3, 4
@@ -178,10 +178,10 @@ func TestAccountTransactionIndex_IndexAndQuery(t *testing.T) {
 	})
 }
 
-func TestAccountTransactionIndex_DescendingOrder(t *testing.T) {
+func TestAccountTransactions_DescendingOrder(t *testing.T) {
 	t.Parallel()
 
-	RunWithAccountTxIndex(t, 1, func(idx *AccountTransactionIndex) {
+	RunWithAccountTxIndex(t, 1, func(idx *AccountTransactions) {
 		account := unittest.RandomAddressFixture()
 
 		// Index 10 blocks
@@ -212,11 +212,11 @@ func TestAccountTransactionIndex_DescendingOrder(t *testing.T) {
 	})
 }
 
-func TestAccountTransactionIndex_ErrorCases(t *testing.T) {
+func TestAccountTransactions_ErrorCases(t *testing.T) {
 	t.Parallel()
 
 	t.Run("query beyond indexed range", func(t *testing.T) {
-		RunWithAccountTxIndex(t, 5, func(idx *AccountTransactionIndex) {
+		RunWithAccountTxIndex(t, 5, func(idx *AccountTransactions) {
 			account := unittest.RandomAddressFixture()
 
 			// Query before first height returns error
@@ -231,7 +231,7 @@ func TestAccountTransactionIndex_ErrorCases(t *testing.T) {
 	})
 
 	t.Run("index non-consecutive height fails", func(t *testing.T) {
-		RunWithAccountTxIndex(t, 1, func(idx *AccountTransactionIndex) {
+		RunWithAccountTxIndex(t, 1, func(idx *AccountTransactions) {
 			// Try to index height 5 when latest is 1
 			err := idx.Store(5, nil)
 			require.Error(t, err)
@@ -239,7 +239,7 @@ func TestAccountTransactionIndex_ErrorCases(t *testing.T) {
 	})
 
 	t.Run("index same height is idempotent", func(t *testing.T) {
-		RunWithAccountTxIndex(t, 1, func(idx *AccountTransactionIndex) {
+		RunWithAccountTxIndex(t, 1, func(idx *AccountTransactions) {
 			// Index height 2
 			err := idx.Store(2, nil)
 			require.NoError(t, err)
@@ -251,7 +251,7 @@ func TestAccountTransactionIndex_ErrorCases(t *testing.T) {
 	})
 
 	t.Run("start height greater than end height", func(t *testing.T) {
-		RunWithAccountTxIndex(t, 1, func(idx *AccountTransactionIndex) {
+		RunWithAccountTxIndex(t, 1, func(idx *AccountTransactions) {
 			account := unittest.RandomAddressFixture()
 
 			_, err := idx.TransactionsByAddress(account, 5, 2)
@@ -260,7 +260,7 @@ func TestAccountTransactionIndex_ErrorCases(t *testing.T) {
 	})
 }
 
-func TestAccountTransactionIndex_KeyEncoding(t *testing.T) {
+func TestAccountTransactions_KeyEncoding(t *testing.T) {
 	t.Parallel()
 
 	t.Run("key encoding and decoding roundtrip", func(t *testing.T) {
@@ -289,10 +289,10 @@ func TestAccountTransactionIndex_KeyEncoding(t *testing.T) {
 	})
 }
 
-func TestAccountTransactionIndex_EmptyResults(t *testing.T) {
+func TestAccountTransactions_EmptyResults(t *testing.T) {
 	t.Parallel()
 
-	RunWithAccountTxIndex(t, 1, func(idx *AccountTransactionIndex) {
+	RunWithAccountTxIndex(t, 1, func(idx *AccountTransactions) {
 		// Query for account that has no transactions
 		account := unittest.RandomAddressFixture()
 
@@ -307,13 +307,13 @@ func TestAccountTransactionIndex_EmptyResults(t *testing.T) {
 }
 
 // RunWithAccountTxIndex creates a temporary Pebble database, initializes the
-// AccountTransactionIndex at the given start height, and runs the provided function.
-func RunWithAccountTxIndex(tb testing.TB, startHeight uint64, f func(idx *AccountTransactionIndex)) {
+// AccountTransactions at the given start height, and runs the provided function.
+func RunWithAccountTxIndex(tb testing.TB, startHeight uint64, f func(idx *AccountTransactions)) {
 	unittest.RunWithTempDir(tb, func(dir string) {
 		db := NewBootstrappedAccountTxIndexForTest(tb, dir, startHeight)
 		defer db.Close()
 
-		idx, err := NewAccountTransactionIndex(db)
+		idx, err := NewAccountTransactions(db)
 		require.NoError(tb, err)
 
 		f(idx)
@@ -326,7 +326,7 @@ func NewBootstrappedAccountTxIndexForTest(tb testing.TB, dir string, startHeight
 	db, err := pebble.Open(dir, &pebble.Options{})
 	require.NoError(tb, err)
 
-	err = InitAccountTransactionIndex(db, startHeight)
+	err = InitAccountTransactions(db, startHeight)
 	require.NoError(tb, err)
 
 	return db

@@ -12,7 +12,7 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
-// AccountTransactionIndex implements storage.AccountTransactionIndex using Pebble.
+// AccountTransactions implements storage.AccountTransactions using Pebble.
 // It provides an index mapping accounts to their transactions, ordered by block height
 // in descending order (newest first).
 //
@@ -27,7 +27,7 @@ import (
 //
 // All read methods are safe for concurrent access. Write methods (Store)
 // must be called sequentially with consecutive heights.
-type AccountTransactionIndex struct {
+type AccountTransactions struct {
 	db           *pebble.DB
 	firstHeight  uint64
 	latestHeight *atomic.Uint64
@@ -53,14 +53,14 @@ var (
 	accountTxFirstHeightKey = []byte{codeAccountTxFirstHeight}
 )
 
-var _ storage.AccountTransactionIndex = (*AccountTransactionIndex)(nil)
+var _ storage.AccountTransactions = (*AccountTransactions)(nil)
 
-// NewAccountTransactionIndex creates a new AccountTransactionIndex backed by the given Pebble database.
+// NewAccountTransactions creates a new AccountTransactions backed by the given Pebble database.
 // The database must have been bootstrapped with first and latest height values.
 //
 // Expected errors during normal operations:
 //   - storage.ErrNotBootstrapped if the database has not been initialized with height values
-func NewAccountTransactionIndex(db *pebble.DB) (*AccountTransactionIndex, error) {
+func NewAccountTransactions(db *pebble.DB) (*AccountTransactions, error) {
 	firstHeight, err := accountTxFirstStoredHeight(db)
 	if err != nil {
 		return nil, fmt.Errorf("could not get first height: %w", err)
@@ -71,18 +71,18 @@ func NewAccountTransactionIndex(db *pebble.DB) (*AccountTransactionIndex, error)
 		return nil, fmt.Errorf("could not get latest height: %w", err)
 	}
 
-	return &AccountTransactionIndex{
+	return &AccountTransactions{
 		db:           db,
 		firstHeight:  firstHeight,
 		latestHeight: atomic.NewUint64(latestHeight),
 	}, nil
 }
 
-// InitAccountTransactionIndex initializes a new AccountTransactionIndex database with the given
+// InitAccountTransactions initializes a new AccountTransactions database with the given
 // starting height. This should only be called once when setting up a new database.
 //
 // No errors are expected during normal operation.
-func InitAccountTransactionIndex(db *pebble.DB, startHeight uint64) error {
+func InitAccountTransactions(db *pebble.DB, startHeight uint64) error {
 	batch := db.NewBatch()
 	defer batch.Close()
 
@@ -108,7 +108,7 @@ func InitAccountTransactionIndex(db *pebble.DB, startHeight uint64) error {
 //
 // Expected errors during normal operations:
 //   - storage.ErrHeightNotIndexed if the requested range extends beyond indexed heights
-func (idx *AccountTransactionIndex) TransactionsByAddress(
+func (idx *AccountTransactions) TransactionsByAddress(
 	account flow.Address,
 	startHeight uint64,
 	endHeight uint64,
@@ -172,7 +172,7 @@ func (idx *AccountTransactionIndex) TransactionsByAddress(
 //
 // Expected errors during normal operations:
 //   - storage.ErrNotBootstrapped if the index has not been initialized
-func (idx *AccountTransactionIndex) LatestIndexedHeight() (uint64, error) {
+func (idx *AccountTransactions) LatestIndexedHeight() (uint64, error) {
 	return idx.latestHeight.Load(), nil
 }
 
@@ -180,7 +180,7 @@ func (idx *AccountTransactionIndex) LatestIndexedHeight() (uint64, error) {
 //
 // Expected errors during normal operations:
 //   - storage.ErrNotBootstrapped if the index has not been initialized
-func (idx *AccountTransactionIndex) FirstIndexedHeight() (uint64, error) {
+func (idx *AccountTransactions) FirstIndexedHeight() (uint64, error) {
 	return idx.firstHeight, nil
 }
 
@@ -190,7 +190,7 @@ func (idx *AccountTransactionIndex) FirstIndexedHeight() (uint64, error) {
 // CAUTION: Not safe for concurrent use.
 //
 // No errors are expected during normal operation.
-func (idx *AccountTransactionIndex) Store(blockHeight uint64, txData []access.AccountTransaction) error {
+func (idx *AccountTransactions) Store(blockHeight uint64, txData []access.AccountTransaction) error {
 	latestHeight := idx.latestHeight.Load()
 
 	// Allow re-indexing the same height (idempotent)

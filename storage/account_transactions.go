@@ -5,12 +5,12 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// AccountTransactionIndexReader provides read access to the account transaction index.
+// AccountTransactionsReader provides read access to the account transaction index.
 // This interface allows querying transactions associated with a specific account
 // within a block height range. Results are returned in descending order (newest first).
 //
 // All methods are safe for concurrent access.
-type AccountTransactionIndexReader interface {
+type AccountTransactionsReader interface {
 	// TransactionsByAddress retrieves transaction references for an account
 	// within the specified inclusive block height range.
 	// Results are returned in descending order (newest first).
@@ -39,11 +39,11 @@ type AccountTransactionIndexReader interface {
 	FirstIndexedHeight() (uint64, error)
 }
 
-// AccountTransactionIndexWriter provides write access to the account transaction index.
+// AccountTransactionsWriter provides write access to the account transaction index.
 //
 // CAUTION: Write operations are not safe for concurrent use. Callers must ensure
 // that Store is called sequentially with consecutive heights.
-type AccountTransactionIndexWriter interface {
+type AccountTransactionsWriter interface {
 	// Store indexes all account-transaction associations for a block.
 	// This should be called once per block, with consecutive heights.
 	//
@@ -53,10 +53,10 @@ type AccountTransactionIndexWriter interface {
 	Store(blockHeight uint64, txData []access.AccountTransaction) error
 }
 
-// AccountTransactionIndex provides both read and write access to the account
-// transaction index. It combines AccountTransactionIndexReader and
-// AccountTransactionIndexWriter interfaces.
-type AccountTransactionIndex interface {
-	AccountTransactionIndexReader
-	AccountTransactionIndexWriter
+// AccountTransactions provides both read and write access to the account
+// transaction index. It combines AccountTransactionsReader and
+// AccountTransactionsWriter interfaces.
+type AccountTransactions interface {
+	AccountTransactionsReader
+	AccountTransactionsWriter
 }
