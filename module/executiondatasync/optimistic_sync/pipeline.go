@@ -3,10 +3,23 @@ package optimistic_sync
 import (
 	"context"
 	"errors"
+
+	"github.com/onflow/flow-go/model/flow"
 )
 
 // ErrInvalidTransition is returned when a state transition is invalid.
 var ErrInvalidTransition = errors.New("invalid state transition")
+
+// PipelineFactory is a factory object for creating new Pipeline instances.
+type PipelineFactory interface {
+	// NewPipeline creates a new pipeline for a given execution result.
+	NewPipeline(result *flow.ExecutionResult) Pipeline
+
+	// NewCompletedPipeline creates a new pipeline for a given execution result that has already
+	// completed processing. This should only be used for the latest persisted sealed result during
+	// bootstrapping.
+	NewCompletedPipeline(result *flow.ExecutionResult) Pipeline
+}
 
 // PipelineStateProvider is an interface that provides a pipeline's state.
 type PipelineStateProvider interface {
@@ -23,7 +36,7 @@ type PipelineStateConsumer interface {
 	OnStateUpdated(newState State)
 }
 
-// Pipeline represents a processing pipelined state machine for a single ExecutionResult.
+// Pipeline represents a pipelined state machine for a processing single ExecutionResult.
 // The state machine is initialized in the Pending state.
 //
 // The state machine is designed to be run in a single goroutine. The Run method must only be called once.
@@ -31,11 +44,10 @@ type Pipeline interface {
 	PipelineStateProvider
 
 	// Run starts the pipeline processing and blocks until completion or context cancellation.
-	// CAUTION: not concurrency safe! Run must only be called once.
+	// NOT CONCURRENCY SAFE! Run must only be called once.
 	//
-	// Expected Errors:
-	//   - context.Canceled: when the context is canceled
-	//   - All other errors are potential indicators of bugs or corrupted internal state (continuation impossible)
+	// Expected error returns during normal operations:
+	//   - [context.Canceled]: when the context is canceled
 	Run(ctx context.Context, core Core, parentState State) error
 
 	// SetSealed marks the pipeline's result as sealed, which enables transitioning from StateWaitingPersist to StatePersisting.

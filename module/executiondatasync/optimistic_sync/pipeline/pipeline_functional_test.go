@@ -572,7 +572,7 @@ func (p *PipelineFunctionalSuite) WithRunningPipeline(
 
 	pipelineStateConsumer := NewMockStateConsumer()
 
-	pipeline := NewPipeline(p.logger, p.executionResult, false, pipelineStateConsumer)
+	pipeline := NewPipeline(p.logger, p.executionResult, pipelineStateConsumer)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
