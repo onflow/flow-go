@@ -11,6 +11,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/state/protocol"
+	badgerstate "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
@@ -59,7 +60,14 @@ func runE(*cobra.Command, []string) error {
 	}
 
 	return common.WithStorage(flagDatadir, func(db storage.DB) error {
-		storages := common.InitStorages(db)
+		chainID, err := badgerstate.GetChainID(db)
+		if err != nil {
+			return err
+		}
+		storages, err := common.InitStorages(db, chainID)
+		if err != nil {
+			return err
+		}
 		state, err := common.OpenProtocolState(lockManager, db, storages)
 		if err != nil {
 			return fmt.Errorf("could not open protocol states: %w", err)
@@ -71,15 +79,14 @@ func runE(*cobra.Command, []string) error {
 		if err != nil {
 			return err
 		}
-		commits := store.NewCommits(metrics, db)
-		results := store.NewExecutionResults(metrics, db)
-		receipts := store.NewExecutionReceipts(metrics, db, results, badger.DefaultCacheSize)
+		commits := storages.Commits
+		results := storages.Results
+		receipts := storages.Receipts
 		myReceipts := store.NewMyExecutionReceipts(metrics, db, receipts)
-		headers := store.NewHeaders(metrics, db)
+		headers := storages.Headers
 		events := store.NewEvents(metrics, db)
 		serviceEvents := store.NewServiceEvents(metrics, db)
-		transactions := store.NewTransactions(metrics, db)
-		collections := store.NewCollections(db, transactions)
+		collections := storages.Collections
 		// require the chunk data pack data must exist before returning the storage module
 		chunkDataPacksPebbleDB, err := storagepebble.ShouldOpenDefaultPebbleDB(
 			log.Logger.With().Str("pebbledb", "cdp").Logger(), flagChunkDataPackDir)

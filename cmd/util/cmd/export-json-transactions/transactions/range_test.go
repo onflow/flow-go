@@ -60,7 +60,8 @@ func TestFindBlockTransactions(t *testing.T) {
 		)
 
 		// prepare dependencies
-		storages := common.InitStorages(db)
+		storages, err := common.InitStorages(db, flow.Emulator)
+		require.NoError(t, err)
 		payloads, collections := storages.Payloads, storages.Collections
 		snap4 := &mock.Snapshot{}
 		snap4.On("Head").Return(b1.ToHeader(), nil)
@@ -73,7 +74,7 @@ func TestFindBlockTransactions(t *testing.T) {
 		// store into database
 		p1 := unittest.ProposalFromBlock(b1)
 		p2 := unittest.ProposalFromBlock(b2)
-		err := unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
+		err = unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
 			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				err := storages.Blocks.BatchStore(lctx, rw, p1)
 				if err != nil {

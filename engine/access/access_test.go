@@ -161,9 +161,9 @@ func (suite *Suite) RunTest(
 ) {
 	unittest.RunWithPebbleDB(suite.T(), func(pdb *pebble.DB) {
 		db := pebbleimpl.ToDB(pdb)
-		all := store.InitAll(metrics.NewNoopCollector(), db)
+		all, err := store.InitAll(metrics.NewNoopCollector(), db, flow.Emulator)
+		require.NoError(suite.T(), err)
 
-		var err error
 		suite.backend, err = backend.New(backend.Params{
 			State:                    suite.state,
 			CollectionRPC:            suite.collClient,
@@ -653,7 +653,8 @@ func (suite *Suite) TestGetSealedTransaction() {
 	unittest.RunWithPebbleDB(suite.T(), func(pdb *pebble.DB) {
 		lockManager := storage.NewTestingLockManager()
 		db := pebbleimpl.ToDB(pdb)
-		all := store.InitAll(metrics.NewNoopCollector(), db)
+		all, err := store.InitAll(metrics.NewNoopCollector(), db, flow.Emulator)
+		require.NoError(suite.T(), err)
 		enIdentities := unittest.IdentityListFixture(2, unittest.WithRole(flow.RoleExecution))
 		enNodeIDs := enIdentities.NodeIDs()
 
@@ -873,7 +874,8 @@ func (suite *Suite) TestGetTransactionResult() {
 	unittest.RunWithPebbleDB(suite.T(), func(pdb *pebble.DB) {
 		lockManager := storage.NewTestingLockManager()
 		db := pebbleimpl.ToDB(pdb)
-		all := store.InitAll(metrics.NewNoopCollector(), db)
+		all, err := store.InitAll(metrics.NewNoopCollector(), db, flow.Emulator)
+		require.NoError(suite.T(), err)
 		originID := unittest.IdentifierFixture()
 
 		*suite.state = protocol.State{}
@@ -896,7 +898,7 @@ func (suite *Suite) TestGetTransactionResult() {
 		// specifically for this test we will consider that sealed block is far behind finalized, so we get EXECUTED status
 		suite.sealedSnapshot.On("Head").Return(sealedBlock, nil)
 
-		err := unittest.WithLocks(suite.T(), suite.lockManager, []string{
+		err = unittest.WithLocks(suite.T(), suite.lockManager, []string{
 			storage.LockInsertBlock,
 			storage.LockFinalizeBlock,
 		}, func(lctx lockctx.Context) error {
@@ -1210,7 +1212,8 @@ func (suite *Suite) TestExecuteScript() {
 	unittest.RunWithPebbleDB(suite.T(), func(pdb *pebble.DB) {
 		lockManager := storage.NewTestingLockManager()
 		db := pebbleimpl.ToDB(pdb)
-		all := store.InitAll(metrics.NewNoopCollector(), db)
+		all, err := store.InitAll(metrics.NewNoopCollector(), db, flow.Emulator)
+		require.NoError(suite.T(), err)
 		identities := unittest.IdentityListFixture(2, unittest.WithRole(flow.RoleExecution))
 		suite.sealedSnapshot.On("Identities", mock.Anything).Return(identities, nil)
 		suite.finalSnapshot.On("Identities", mock.Anything).Return(identities, nil)
@@ -1227,7 +1230,6 @@ func (suite *Suite) TestExecuteScript() {
 			identities.NodeIDs(),
 		)
 
-		var err error
 		suite.backend, err = backend.New(backend.Params{
 			State:                      suite.state,
 			CollectionRPC:              suite.collClient,

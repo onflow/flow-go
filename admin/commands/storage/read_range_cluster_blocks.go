@@ -10,6 +10,7 @@ import (
 	"github.com/onflow/flow-go/admin/commands"
 	"github.com/onflow/flow-go/cmd/util/cmd/read-light-block"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/store"
 )
@@ -22,14 +23,12 @@ const Max_Range_Cluster_Block_Limit = uint64(10001)
 
 type ReadRangeClusterBlocksCommand struct {
 	db       storage.DB
-	headers  *store.Headers
 	payloads *store.ClusterPayloads
 }
 
-func NewReadRangeClusterBlocksCommand(db storage.DB, headers *store.Headers, payloads *store.ClusterPayloads) commands.AdminCommand {
+func NewReadRangeClusterBlocksCommand(db storage.DB, payloads *store.ClusterPayloads) commands.AdminCommand {
 	return &ReadRangeClusterBlocksCommand{
 		db:       db,
-		headers:  headers,
 		payloads: payloads,
 	}
 }
@@ -51,8 +50,12 @@ func (c *ReadRangeClusterBlocksCommand) Handler(ctx context.Context, req *admin.
 		return nil, admin.NewInvalidAdminReqErrorf("getting for more than %v blocks at a time might have an impact to node's performance and is not allowed", Max_Range_Cluster_Block_Limit)
 	}
 
+	clusterHeaders, err := store.NewClusterHeaders(metrics.NewNoopCollector(), c.db, flow.ChainID(chainID))
+	if err != nil {
+		return nil, err
+	}
 	clusterBlocks := store.NewClusterBlocks(
-		c.db, flow.ChainID(chainID), c.headers, c.payloads,
+		c.db, flow.ChainID(chainID), clusterHeaders, c.payloads,
 	)
 
 	lights, err := read.ReadClusterLightBlockByHeightRange(clusterBlocks, reqData.startHeight, reqData.endHeight)

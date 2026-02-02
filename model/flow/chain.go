@@ -98,7 +98,7 @@ type chainImpl interface {
 	chain() ChainID
 }
 
-// monotonicImpl is a simple implementation of adress generation
+// monotonicImpl is a simple implementation of address generation
 // where addresses are simply the index of the account.
 type monotonicImpl struct{}
 

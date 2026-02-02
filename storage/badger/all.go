@@ -3,15 +3,20 @@ package badger
 import (
 	"github.com/dgraph-io/badger/v2"
 
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/operation/badgerimpl"
 	"github.com/onflow/flow-go/storage/store"
 )
 
-func InitAll(metrics module.CacheMetrics, db *badger.DB) *storage.All {
+// deprecated: use [store.InitAll] instead
+func InitAll(metrics module.CacheMetrics, db *badger.DB, chainID flow.ChainID) (*storage.All, error) {
 	sdb := badgerimpl.ToDB(db)
-	headers := store.NewHeaders(metrics, sdb)
+	headers, err := store.NewHeaders(metrics, sdb, chainID)
+	if err != nil {
+		return nil, err
+	}
 	guarantees := store.NewGuarantees(metrics, sdb, DefaultCacheSize, DefaultCacheSize)
 	seals := store.NewSeals(metrics, sdb)
 	index := store.NewIndex(metrics, sdb)
@@ -47,5 +52,5 @@ func InitAll(metrics module.CacheMetrics, db *badger.DB) *storage.All {
 		Receipts:                  receipts,
 		Transactions:              transactions,
 		Collections:               collections,
-	}
+	}, nil
 }

@@ -25,7 +25,7 @@ import (
 
 func TestFinalizer(t *testing.T) {
 	// reference block on the main consensus chain
-	refBlock := unittest.ClusterBlockFixture()
+	refBlock := unittest.BlockFixture()
 	// genesis block for the cluster chain
 	genesis, err := unittest.ClusterBlock.Genesis()
 	require.NoError(t, err)
@@ -40,7 +40,7 @@ func TestFinalizer(t *testing.T) {
 		state, err := cluster.Bootstrap(db, lockManager, stateRoot)
 		require.NoError(t, err)
 
-		err = unittest.WithLock(t, lockManager, storage.LockInsertOrFinalizeClusterBlock, func(lctx lockctx.Context) error {
+		err = unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
 			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				return operation.InsertHeader(lctx, rw, refBlock.ID(), refBlock.ToHeader())
 			})

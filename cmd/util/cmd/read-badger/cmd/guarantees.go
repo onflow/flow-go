@@ -8,7 +8,9 @@ import (
 
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/storage/store"
 )
 
 func init() {
@@ -23,7 +25,7 @@ var guaranteesCmd = &cobra.Command{
 	Short: "get guarantees by collection ID",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return common.WithStorage(flagDatadir, func(db storage.DB) error {
-			storages := common.InitStorages(db)
+			guarantees := store.NewGuarantees(metrics.NewNoopCollector(), db, store.DefaultCacheSize, store.DefaultCacheSize)
 
 			log.Info().Msgf("got flag collection id: %s", flagCollectionID)
 			collectionID, err := flow.HexStringToIdentifier(flagCollectionID)
@@ -32,7 +34,7 @@ var guaranteesCmd = &cobra.Command{
 			}
 
 			log.Info().Msgf("getting guarantee by collection id: %v", collectionID)
-			guarantee, err := storages.Guarantees.ByCollectionID(collectionID)
+			guarantee, err := guarantees.ByCollectionID(collectionID)
 			if err != nil {
 				return fmt.Errorf("could not get guarantee for collection id: %v: %w", collectionID, err)
 			}

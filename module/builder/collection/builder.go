@@ -44,7 +44,13 @@ type Builder struct {
 	bySealingRateLimiterConfig module.ReadonlySealingLagRateLimiterConfig
 	log                        zerolog.Logger
 	clusterEpoch               uint64 // the operating epoch for this cluster
-	// cache of values about the operating epoch which never change
+
+	// cache of values about the operating epoch which never change:
+	// We can't specify the height of the epoch's first consensus block (height ON MAIN CHAIN) during which this cluster is
+	// active, because the builder is typically _instantiated_ before the epoch starts. However, the builder should only be
+	// called once the epoch has started, i.e. consensus has finalized the first block in the epoch. Consequently, we
+	// retrieve the epoch's first height on the first call of the builder, and cache it.
+	epochFirstHeight *uint64
 	epochFinalHeight *uint64          // last height of this cluster's operating epoch (nil if epoch not ended)
 	epochFinalID     *flow.Identifier // ID of last block in this cluster's operating epoch (nil if epoch not ended)
 }
@@ -285,6 +291,28 @@ func (b *Builder) getBlockBuildContext(parentID flow.Identifier) (*blockBuildCon
 	ctx.refChainFinalizedHeight = mainChainFinalizedHeader.Height
 	ctx.refChainFinalizedID = mainChainFinalizedHeader.ID()
 
+	// We can't specify the height of the epoch's first consensus block (height ON MAIN CHAIN) during which this cluster is
+	// active, because the builder is typically _instantiated_ before the epoch starts. However, the builder should only be
+	// called once the epoch has started, i.e. consensus has finalized the first block in the epoch. Consequently, we
+	// retrieve the epoch's first height on the first call of the builder, and cache it for future calls.
+	r := b.db.Reader()
+	if b.epochFirstHeight == nil {
+		var refEpochFirstHeight uint64
+		err = operation.RetrieveEpochFirstHeight(r, b.clusterEpoch, &refEpochFirstHeight)
+		if err != nil {
+			if errors.Is(err, storage.ErrNotFound) {
+				// can be missing if we joined (dynamic bootstrapped) in the middle of an epoch.
+				// 0 means FinalizedAncestryLookup will not be bounded by the epoch start,
+				// but only by which cluster blocks we have available.
+				refEpochFirstHeight = 0
+			} else {
+				return nil, fmt.Errorf("unexpected failure to retrieve first height of operating epoch: %w", err)
+			}
+		}
+		b.epochFirstHeight = &refEpochFirstHeight
+	}
+	ctx.refEpochFirstHeight = *b.epochFirstHeight
+
 	// if the epoch has ended and the final block is cached, use the cached values
 	if b.epochFinalHeight != nil && b.epochFinalID != nil {
 		ctx.refEpochFinalID = b.epochFinalID
@@ -292,13 +320,12 @@ func (b *Builder) getBlockBuildContext(parentID flow.Identifier) (*blockBuildCon
 		return ctx, nil
 	}
 
-	r := b.db.Reader()
-
 	var refEpochFinalHeight uint64
 	var refEpochFinalID flow.Identifier
 
 	err = operation.RetrieveEpochLastHeight(r, b.clusterEpoch, &refEpochFinalHeight)
 	if err != nil {
+		// If the epoch has not yet ended, the final height is not available
 		if errors.Is(err, storage.ErrNotFound) {
 			return ctx, nil
 		}
@@ -379,7 +406,7 @@ func (b *Builder) populateFinalizedAncestryLookup(lctx lockctx.Proof, ctx *block
 
 	// the finalized cluster blocks which could possibly contain any conflicting transactions
 	var clusterBlockIDs []flow.Identifier
-	start, end := findRefHeightSearchRangeForConflictingClusterBlocks(minRefHeight, maxRefHeight)
+	start, end := findRefHeightSearchRangeForConflictingClusterBlocks(minRefHeight, maxRefHeight, ctx)
 	err := operation.LookupClusterBlocksByReferenceHeightRange(lctx, b.db.Reader(), start, end, &clusterBlockIDs)
 	if err != nil {
 		return fmt.Errorf("could not lookup finalized cluster blocks by reference height range [%d,%d]: %w", start, end, err)
@@ -609,19 +636,35 @@ func (b *Builder) buildHeader(
 	}, nil
 }
 
-// findRefHeightSearchRangeForConflictingClusterBlocks computes the range of reference
-// block heights of ancestor blocks which could possibly contain transactions
-// duplicating those in our collection under construction, based on the range of
-// reference heights of transactions in the collection under construction.
+// findRefHeightSearchRangeForConflictingClusterBlocks computes the range of reference block heights of ancestor blocks
+// which could possibly contain transactions duplicating those in our collection under construction, based on the range
+// of reference heights of transactions in the collection under construction.
+// Input range is the (inclusive) range of reference heights of transactions eligible for inclusion in the collection
+// under construction. Output range is the (inclusive) range of reference heights which need to be searched in order to
+// avoid transaction repeats.
 //
-// Input range is the (inclusive) range of reference heights of transactions included
-// in the collection under construction. Output range is the (inclusive) range of
-// reference heights which need to be searched.
-func findRefHeightSearchRangeForConflictingClusterBlocks(minRefHeight, maxRefHeight uint64) (start, end uint64) {
-	start = minRefHeight - flow.DefaultTransactionExpiry + 1
-	if start > minRefHeight {
-		start = 0 // overflow check
+// Within a single epoch, we have argued that for a set of transactions, with `minRefHeight` (`maxRefHeight`) being
+// the smallest (largest) reference block height, we only need to inspect collections with reference block heights
+// c ∈ (minRefHeight-E, maxRefHeight]. Note that the lower bound is exclusive, while the upper bound is inclusive,
+// which we transform to an inclusive range:
+//
+//	   c ∈ (minRefHeight-E, maxRefHeight]
+//	⇔  c ∈ [minRefHeight-E+1, maxRefHeight]
+//
+// In order to take epoch boundaries into account, we note: A collector cluster is only responsible for transactions whose
+// reference blocks are within the cluster's operating epoch. Thus, we can bound the lower end of the search range by the
+// height of the first block in the epoch. Formally, we only need to inspect collections with reference block height
+//
+//	c ∈ [max{minRefHeight-E+1, epochFirstHeight}, maxRefHeight]
+func findRefHeightSearchRangeForConflictingClusterBlocks(minRefHeight, maxRefHeight uint64, ctx *blockBuildContext) (start, end uint64) {
+	// in order to avoid underflow, we rewrite the lower-bound equation entirely without subtraction:
+	//     max{minRefHeight-E+1, epochFirstHeight} == epochFirstHeight
+	//  ⇔  minRefHeight - E + 1 ≤ epochFirstHeight
+	//  ⇔      minRefHeight - E < epochFirstHeight
+	//  ⇔          minRefHeight < epochFirstHeight + E
+	if minRefHeight < ctx.refEpochFirstHeight+flow.DefaultTransactionExpiry {
+		return ctx.refEpochFirstHeight, maxRefHeight
 	}
-	end = maxRefHeight
-	return start, end
+	// We reach the following line only if minRefHeight-E+1 > epochFirstHeight ≥ 0. Hence, an underflow is impossible.
+	return minRefHeight + 1 - flow.DefaultTransactionExpiry, maxRefHeight
 }

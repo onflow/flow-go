@@ -68,7 +68,10 @@ func (suite *MutatorSuite) SetupTest() {
 	metrics := metrics.NewNoopCollector()
 	tracer := trace.NewNoopTracer()
 	log := zerolog.Nop()
-	all := store.InitAll(metrics, suite.db)
+	all, err := store.InitAll(metrics, suite.db, flow.Emulator)
+	require.NoError(suite.T(), err)
+	clusterHeaders, err := store.NewClusterHeaders(metrics, suite.db, suite.chainID)
+	require.NoError(suite.T(), err)
 	colPayloads := store.NewClusterPayloads(metrics, suite.db)
 
 	// just bootstrap with a genesis block, we'll use this as reference
@@ -135,7 +138,7 @@ func (suite *MutatorSuite) SetupTest() {
 	suite.NoError(err)
 	clusterState, err := Bootstrap(suite.db, suite.lockManager, clusterStateRoot)
 	suite.Assert().Nil(err)
-	suite.state, err = NewMutableState(clusterState, suite.lockManager, tracer, all.Headers, colPayloads)
+	suite.state, err = NewMutableState(clusterState, suite.lockManager, tracer, clusterHeaders, colPayloads, all.Headers)
 	suite.Assert().Nil(err)
 }
 
@@ -444,8 +447,6 @@ func (suite *MutatorSuite) TestExtend_WithExpiredReferenceBlock() {
 }
 
 func (suite *MutatorSuite) TestExtend_WithReferenceBlockFromClusterChain() {
-	// TODO skipping as this isn't implemented yet
-	unittest.SkipUnless(suite.T(), unittest.TEST_TODO, "skipping as this isn't implemented yet")
 	// set genesis from cluster chain as reference block
 	proposal := suite.ProposalWithParentAndPayload(suite.genesis, *model.NewEmptyPayload(suite.genesis.ID()))
 	err := suite.state.Extend(&proposal)

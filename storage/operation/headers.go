@@ -13,19 +13,51 @@ import (
 // InsertHeader inserts a block header into the database.
 //
 // CAUTION:
+//   - This function must ONLY be used for storing headers of main consensus, NOT CLUSTER consensus.
 //   - The caller must ensure that headerID is a collision-resistant hash of the provided header!
 //     Otherwise, data corruption may occur.
-//   - The caller must acquire one (but not both) of the following locks and hold it until the database
-//     write has been committed: either [storage.LockInsertBlock] or [storage.LockInsertOrFinalizeClusterBlock].
+//   - The caller must acquire the following lock and hold it until the database
+//     write has been committed: [storage.LockInsertBlock].
 //
 // It returns [storage.ErrAlreadyExists] if the header already exists, i.e. we only insert a new header once.
 // This error allows the caller to detect duplicate inserts. If the header is stored along with other parts
 // of the block in the same batch, similar duplication checks can be skipped for storing other parts of the block.
 // No other error returns are expected during normal operation.
 func InsertHeader(lctx lockctx.Proof, rw storage.ReaderBatchWriter, headerID flow.Identifier, header *flow.Header) error {
-	held := lctx.HoldsLock(storage.LockInsertBlock) || lctx.HoldsLock(storage.LockInsertOrFinalizeClusterBlock)
+	held := lctx.HoldsLock(storage.LockInsertBlock)
 	if !held {
-		return fmt.Errorf("missing required lock: %s or %s", storage.LockInsertBlock, storage.LockInsertOrFinalizeClusterBlock)
+		return fmt.Errorf("missing required lock: %s", storage.LockInsertBlock)
+	}
+
+	key := MakePrefix(codeHeader, headerID)
+	exist, err := KeyExists(rw.GlobalReader(), key)
+	if err != nil {
+		return err
+	}
+	if exist {
+		return fmt.Errorf("header already exists: %w", storage.ErrAlreadyExists)
+	}
+
+	return UpsertByKey(rw.Writer(), key, header)
+}
+
+// InsertClusterHeader inserts a cluster block header into the database.
+//
+// CAUTION:
+//   - This function must ONLY be used for storing headers produced by CLUSTER consensus.
+//   - The caller must ensure that headerID is a collision-resistant hash of the provided header!
+//     Otherwise, data corruption may occur.
+//   - The caller must acquire the following lock and hold it until the database
+//     write has been committed: [storage.LockInsertOrFinalizeClusterBlock].
+//
+// It returns [storage.ErrAlreadyExists] if the header already exists, i.e. we only insert a new header once.
+// This error allows the caller to detect duplicate inserts. If the header is stored along with other parts
+// of the block in the same batch, similar duplication checks can be skipped for storing other parts of the block.
+// No other error returns are expected during normal operation.
+func InsertClusterHeader(lctx lockctx.Proof, rw storage.ReaderBatchWriter, headerID flow.Identifier, header *flow.Header) error {
+	held := lctx.HoldsLock(storage.LockInsertOrFinalizeClusterBlock)
+	if !held {
+		return fmt.Errorf("missing required lock: %s", storage.LockInsertOrFinalizeClusterBlock)
 	}
 
 	key := MakePrefix(codeHeader, headerID)

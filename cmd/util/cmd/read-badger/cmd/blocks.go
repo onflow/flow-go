@@ -9,6 +9,7 @@ import (
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
+	badgerstate "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/store"
 )
@@ -28,8 +29,15 @@ var blocksCmd = &cobra.Command{
 	Short: "get a block by block ID or height",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return common.WithStorage(flagDatadir, func(db storage.DB) error {
-			cacheMetrics := &metrics.NoopCollector{}
-			headers := store.NewHeaders(cacheMetrics, db)
+			chainID, err := badgerstate.GetChainID(db)
+			if err != nil {
+				return err
+			}
+			cacheMetrics := metrics.NewNoopCollector()
+			headers, err := store.NewHeaders(cacheMetrics, db, chainID)
+			if err != nil {
+				return err
+			}
 			index := store.NewIndex(cacheMetrics, db)
 			guarantees := store.NewGuarantees(cacheMetrics, db, store.DefaultCacheSize, store.DefaultCacheSize)
 			seals := store.NewSeals(cacheMetrics, db)
@@ -39,7 +47,6 @@ var blocksCmd = &cobra.Command{
 			blocks := store.NewBlocks(db, headers, payloads)
 
 			var block *flow.Block
-			var err error
 
 			if flagBlockID != "" {
 				log.Info().Msgf("got flag block id: %s", flagBlockID)

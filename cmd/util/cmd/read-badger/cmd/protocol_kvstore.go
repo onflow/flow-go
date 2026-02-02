@@ -10,7 +10,9 @@ import (
 
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/storage/store"
 )
 
 var flagDecodeData bool
@@ -30,7 +32,7 @@ var protocolStateKVStore = &cobra.Command{
 	Short: "get protocol state kvstore by block ID",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return common.WithStorage(flagDatadir, func(db storage.DB) error {
-			storages := common.InitStorages(db)
+			protocolKVStore := store.NewProtocolKVStore(metrics.NewNoopCollector(), db, store.DefaultProtocolKVStoreCacheSize, store.DefaultProtocolKVStoreByBlockIDCacheSize)
 
 			log.Info().Msgf("got flag block id: %s", flagBlockID)
 			blockID, err := flow.HexStringToIdentifier(flagBlockID)
@@ -39,7 +41,7 @@ var protocolStateKVStore = &cobra.Command{
 			}
 
 			log.Info().Msgf("getting protocol state kvstore by block id: %v", blockID)
-			protocolState, err := storages.ProtocolKVStore.ByBlockID(blockID)
+			protocolState, err := protocolKVStore.ByBlockID(blockID)
 			if err != nil {
 				return fmt.Errorf("could not get protocol state kvstore for block id: %v: %w", blockID, err)
 			}

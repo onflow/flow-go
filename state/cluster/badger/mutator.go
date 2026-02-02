@@ -22,21 +22,23 @@ import (
 
 type MutableState struct {
 	*State
-	lockManager lockctx.Manager
-	tracer      module.Tracer
-	headers     storage.Headers
-	payloads    storage.ClusterPayloads
+	lockManager      lockctx.Manager
+	tracer           module.Tracer
+	clusterHeaders   storage.Headers
+	clusterPayloads  storage.ClusterPayloads
+	consensusHeaders storage.Headers
 }
 
 var _ clusterstate.MutableState = (*MutableState)(nil)
 
-func NewMutableState(state *State, lockManager lockctx.Manager, tracer module.Tracer, headers storage.Headers, payloads storage.ClusterPayloads) (*MutableState, error) {
+func NewMutableState(state *State, lockManager lockctx.Manager, tracer module.Tracer, clusterHeaders storage.Headers, clusterPayloads storage.ClusterPayloads, consensusHeaders storage.Headers) (*MutableState, error) {
 	mutableState := &MutableState{
-		State:       state,
-		lockManager: lockManager,
-		tracer:      tracer,
-		headers:     headers,
-		payloads:    payloads,
+		State:            state,
+		lockManager:      lockManager,
+		tracer:           tracer,
+		clusterHeaders:   clusterHeaders,
+		clusterPayloads:  clusterPayloads,
+		consensusHeaders: consensusHeaders,
 	}
 	return mutableState, nil
 }
@@ -165,7 +167,7 @@ func (m *MutableState) checkHeaderValidity(candidate *cluster.Block) error {
 	}
 
 	// get the header of the parent of the new block
-	parent, err := m.headers.ByBlockID(candidate.ParentID)
+	parent, err := m.clusterHeaders.ByBlockID(candidate.ParentID)
 	if err != nil {
 		return irrecoverable.NewExceptionf("could not retrieve latest finalized header: %w", err)
 	}
@@ -196,7 +198,7 @@ func (m *MutableState) checkConnectsToFinalizedState(ctx extendContext) error {
 	// start with the extending block's parent
 	for parentID != finalizedID {
 		// get the parent of current block
-		ancestor, err := m.headers.ByBlockID(parentID)
+		ancestor, err := m.clusterHeaders.ByBlockID(parentID)
 		if err != nil {
 			return irrecoverable.NewExceptionf("could not get parent which must be known (%x): %w", parentID, err)
 		}
@@ -223,8 +225,8 @@ func (m *MutableState) checkConnectsToFinalizedState(ctx extendContext) error {
 func (m *MutableState) checkPayloadReferenceBlock(ctx extendContext) error {
 	payload := ctx.candidate.Payload
 
-	// 1 - the reference block must be known
-	refBlock, err := m.headers.ByBlockID(payload.ReferenceBlockID)
+	// 1 - the reference block must be known, and it must be part of the main consensus chain
+	refBlock, err := m.consensusHeaders.ByBlockID(payload.ReferenceBlockID)
 	if err != nil {
 		if errors.Is(err, storage.ErrNotFound) {
 			return state.NewUnverifiableExtensionError("cluster block references unknown reference block (id=%x)", payload.ReferenceBlockID)
@@ -237,7 +239,7 @@ func (m *MutableState) checkPayloadReferenceBlock(ctx extendContext) error {
 		// a reference block which is above the finalized boundary can't be verified yet
 		return state.NewUnverifiableExtensionError("reference block is above finalized boundary (%d>%d)", refBlock.Height, ctx.finalizedConsensusHeight)
 	} else {
-		storedBlockIDForHeight, err := m.headers.BlockIDByHeight(refBlock.Height)
+		storedBlockIDForHeight, err := m.consensusHeaders.BlockIDByHeight(refBlock.Height)
 		if err != nil {
 			return irrecoverable.NewExceptionf("could not look up block ID for finalized height: %w", err)
 		}
@@ -247,9 +249,6 @@ func (m *MutableState) checkPayloadReferenceBlock(ctx extendContext) error {
 				payload.ReferenceBlockID, refBlock.Height, storedBlockIDForHeight)
 		}
 	}
-
-	// TODO ensure the reference block is part of the main chain https://github.com/onflow/flow-go/issues/4204
-	_ = refBlock
 
 	// 3 - the reference block must be within the cluster's operating epoch
 	if refBlock.Height < ctx.epochFirstHeight {
@@ -291,7 +290,7 @@ func (m *MutableState) checkPayloadTransactions(lctx lockctx.Proof, ctx extendCo
 	minRefHeight := uint64(math.MaxUint64)
 	maxRefHeight := uint64(0)
 	for _, flowTx := range payload.Collection.Transactions {
-		refBlock, err := m.headers.ByBlockID(flowTx.ReferenceBlockID)
+		refBlock, err := m.consensusHeaders.ByBlockID(flowTx.ReferenceBlockID)
 		if errors.Is(err, storage.ErrNotFound) {
 			// Reject collection if it contains a transaction with an unknown reference block, because we cannot verify its validity.
 			return state.NewUnverifiableExtensionError("collection contains tx (tx_id=%x) with unknown reference block (block_id=%x): %w", flowTx.ID(), flowTx.ReferenceBlockID, err)
@@ -385,8 +384,8 @@ func (m *MutableState) checkPayloadTransactions(lctx lockctx.Proof, ctx extendCo
 // No errors are expected during normal operation.
 func (m *MutableState) checkDupeTransactionsInUnfinalizedAncestry(block *cluster.Block, includedTransactions map[flow.Identifier]struct{}, finalHeight uint64) ([]flow.Identifier, error) {
 	var duplicateTxIDs []flow.Identifier
-	err := fork.TraverseBackward(m.headers, block.ParentID, func(ancestor *flow.Header) error {
-		payload, err := m.payloads.ByBlockID(ancestor.ID())
+	err := fork.TraverseBackward(m.clusterHeaders, block.ParentID, func(ancestor *flow.Header) error {
+		payload, err := m.clusterPayloads.ByBlockID(ancestor.ID())
 		if err != nil {
 			return fmt.Errorf("could not retrieve ancestor payload: %w", err)
 		}
@@ -457,7 +456,7 @@ func (m *MutableState) checkDupeTransactionsInFinalizedAncestry(
 
 	for _, blockID := range clusterBlockIDs {
 		// TODO: could add LightByBlockID and retrieve only tx IDs
-		payload, err := m.payloads.ByBlockID(blockID)
+		payload, err := m.clusterPayloads.ByBlockID(blockID)
 		if err != nil {
 			return nil, fmt.Errorf("could not retrieve cluster payload (block_id=%x) to de-duplicate: %w", blockID, err)
 		}
@@ -485,7 +484,7 @@ func (m *MutableState) checkDupeTransactionsInFinalizedAncestry(
 		// extension here. Hence, a higher block may have been finalized just now and returned by the
 		// database search. However, all newer finalized blocks have height > `finalClusterHeight`, i.e.
 		// a height outside the range this function scans.
-		header, err := m.headers.ByBlockID(blockID)
+		header, err := m.clusterHeaders.ByBlockID(blockID)
 		if err != nil {
 			return nil, fmt.Errorf("could not retrieve header by block_id=%x: %w", blockID, err)
 		}

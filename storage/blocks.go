@@ -23,45 +23,40 @@ type Blocks interface {
 	// the subsequent database write in order to prevent accidental state corruption. Therefore, the caller must
 	// acquire [storage.LockInsertBlock] and hold it until the database write has been committed.
 	//
-	// Expected error returns during normal operations:
+	// Expected errors during normal operations:
 	// - [storage.ErrAlreadyExists] if some block with the same ID has already been stored
+	// - [storage.ErrWrongChain] if the block is part of a different chain than this storage was initialized with
 	BatchStore(lctx lockctx.Proof, rw ReaderBatchWriter, proposal *flow.Proposal) error
 
 	// ByID returns the block with the given hash. It is available for all incorporated blocks (validated blocks
 	// that have been appended to any of the known forks) no matter whether the block has been finalized or not.
 	//
-	// Error returns:
-	//   - storage.ErrNotFound if no block with the corresponding ID was found
-	//   - generic error in case of unexpected failure from the database layer, or failure
-	//     to decode an existing database value
+	// Expected errors during normal operations:
+	//   - [storage.ErrNotFound] if no block with the corresponding ID was found
+	//   - [storage.ErrWrongChain] if a block with that ID exists but on a different chain, such as a cluster chain
 	ByID(blockID flow.Identifier) (*flow.Block, error)
 
 	// ProposalByID returns the block with the given ID, along with the proposer's signature on it.
 	// It is available for all incorporated blocks (validated blocks that have been appended to any
 	// of the known forks) no matter whether the block has been finalized or not.
 	//
-	// Error returns:
-	//   - storage.ErrNotFound if no block with the corresponding ID was found
-	//   - generic error in case of unexpected failure from the database layer, or failure
-	//     to decode an existing database value
+	// Expected errors during normal operations:
+	//   - [storage.ErrNotFound] if no block with the corresponding ID was found
+	//   - [storage.ErrWrongChain] if a block with that ID exists but on a different chain, such as a cluster chain
 	ProposalByID(blockID flow.Identifier) (*flow.Proposal, error)
 
 	// ByHeight returns the block at the given height. It is only available
 	// for finalized blocks.
 	//
-	// Error returns:
-	//   - storage.ErrNotFound if no block for the corresponding height was found
-	//   - generic error in case of unexpected failure from the database layer, or failure
-	//     to decode an existing database value
+	// Expected errors during normal operations:
+	//   - [storage.ErrNotFound] if no block for the corresponding height was found
 	ByHeight(height uint64) (*flow.Block, error)
 
 	// ProposalByHeight returns the block at the given height, along with the proposer's
 	// signature on it. It is only available for finalized blocks.
 	//
-	// Error returns:
-	//   - storage.ErrNotFound if no block proposal for the corresponding height was found
-	//   - generic error in case of unexpected failure from the database layer, or failure
-	//     to decode an existing database value
+	// Expected errors during normal operations:
+	//   - [storage.ErrNotFound] if no block proposal for the corresponding height was found
 	ProposalByHeight(height uint64) (*flow.Proposal, error)
 
 	// ByView returns the block with the given view. It is only available for certified blocks.
@@ -70,13 +65,13 @@ type Blocks interface {
 	// even for non-finalized blocks.
 	//
 	// Expected errors during normal operations:
-	//   - `storage.ErrNotFound` if no certified block is known at given view.
+	//   - [storage.ErrNotFound] if no certified block is known at given view.
 	ByView(view uint64) (*flow.Block, error)
 
 	// ProposalByView returns the block proposal with the given view. It is only available for certified blocks.
 	//
 	// Expected errors during normal operations:
-	//   - `storage.ErrNotFound` if no certified block is known at given view.
+	//   - [storage.ErrNotFound] if no certified block is known at given view.
 	ProposalByView(view uint64) (*flow.Proposal, error)
 
 	// ByCollectionID returns the block for the given [flow.CollectionGuarantee] ID.
@@ -86,10 +81,8 @@ type Blocks interface {
 	// finality.
 	// CAUTION: this method is not backed by a cache and therefore comparatively slow!
 	//
-	// Error returns:
-	//   - storage.ErrNotFound if the collection ID was not found
-	//   - generic error in case of unexpected failure from the database layer, or failure
-	//     to decode an existing database value
+	// Expected errors during normal operations:
+	//   - [storage.ErrNotFound] if the collection ID was not found
 	ByCollectionID(collID flow.Identifier) (*flow.Block, error)
 
 	// BlockIDByCollectionID returns the block ID for the finalized block which includes the guarantee for the given collection
@@ -100,10 +93,8 @@ type Blocks interface {
 	// finality.
 	// CAUTION: this method is not backed by a cache and therefore comparatively slow!
 	//
-	// Error returns:
-	//   - storage.ErrNotFound if no FINALIZED block exists containing the expected collection guarantee
-	//   - generic error in case of unexpected failure from the database layer, or failure
-	//     to decode an existing database value
+	// Expected errors during normal operations:
+	//   - [storage.ErrNotFound] if no FINALIZED block exists containing the expected collection guarantee
 	BlockIDByCollectionID(collID flow.Identifier) (flow.Identifier, error)
 
 	// BatchIndexBlockContainingCollectionGuarantees produces mappings from the IDs of [flow.CollectionGuarantee]s to the block ID containing these guarantees.

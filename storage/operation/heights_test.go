@@ -14,6 +14,30 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
+// TestNonBootstrappedRetrieveFinalizedHeight tests that retrieving the finalized height from a non-bootstrapped
+// database returns [operation.IncompleteStateError], which is not a [storage.ErrNotFound]. This separate error
+// avoids accidental confusion with the very common and typically benign sentinel [storage.ErrNotFound].
+func TestNonBootstrappedRetrieveFinalizedHeight(t *testing.T) {
+	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
+		var retrieved uint64
+		err := operation.RetrieveFinalizedHeight(db.Reader(), &retrieved)
+		require.ErrorIs(t, err, operation.IncompleteStateError)
+		require.NotErrorIs(t, err, storage.ErrNotFound)
+	})
+}
+
+// TestNonBootstrappedRetrieveSealedHeight tests that retrieving the sealed height from a non-bootstrapped
+// database returns [operation.IncompleteStateError], which is not a [storage.ErrNotFound]. This separate error
+// avoids accidental confusion with the very common and typically benign sentinel [storage.ErrNotFound].
+func TestNonBootstrappedRetrieveSealedHeight(t *testing.T) {
+	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
+		var retrieved uint64
+		err := operation.RetrieveSealedHeight(db.Reader(), &retrieved)
+		require.ErrorIs(t, err, operation.IncompleteStateError)
+		require.NotErrorIs(t, err, storage.ErrNotFound)
+	})
+}
+
 func TestFinalizedInsertUpdateRetrieve(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		lockManager := storage.NewTestingLockManager()

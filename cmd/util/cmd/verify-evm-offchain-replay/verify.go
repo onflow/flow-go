@@ -16,6 +16,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/blobs"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
+	badgerstate "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/store"
 )
@@ -144,10 +145,17 @@ func initStorages(db storage.DB, executionDataDir string) (
 	io.Closer,
 	error,
 ) {
-	storages := common.InitStorages(db)
+	chainID, err := badgerstate.GetChainID(db)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	storages, err := common.InitStorages(db, chainID)
+	if err != nil {
+		return nil, nil, nil, err
+	}
 
 	datastoreDir := filepath.Join(executionDataDir, "blobstore")
-	err := os.MkdirAll(datastoreDir, 0700)
+	err = os.MkdirAll(datastoreDir, 0700)
 	if err != nil {
 		return nil, nil, nil, err
 	}

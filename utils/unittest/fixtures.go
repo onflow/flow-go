@@ -46,6 +46,7 @@ import (
 	"github.com/onflow/flow-go/network/message"
 	p2pconfig "github.com/onflow/flow-go/network/p2p/config"
 	"github.com/onflow/flow-go/network/p2p/keyutils"
+	clusterstate "github.com/onflow/flow-go/state/cluster"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/inmem"
 	"github.com/onflow/flow-go/state/protocol/protocol_state"
@@ -727,7 +728,7 @@ func CollectionGuaranteeFixture(options ...func(*flow.CollectionGuarantee)) *flo
 	guarantee := &flow.CollectionGuarantee{
 		CollectionID:     IdentifierFixture(),
 		ReferenceBlockID: IdentifierFixture(),
-		ClusterChainID:   flow.ChainID("cluster-1-00000000"),
+		ClusterChainID:   clusterstate.CanonicalClusterID(1, IdentifierListFixture(1)),
 		SignerIndices:    RandomBytes(16),
 		Signature:        SignatureFixture(),
 	}

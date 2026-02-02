@@ -8,7 +8,9 @@ import (
 
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/storage/store"
 )
 
 func init() {
@@ -23,7 +25,7 @@ var transactionsCmd = &cobra.Command{
 	Short: "get transaction by ID",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return common.WithStorage(flagDatadir, func(db storage.DB) error {
-			storages := common.InitStorages(db)
+			transactions := store.NewTransactions(metrics.NewNoopCollector(), db)
 
 			log.Info().Msgf("got flag transaction id: %s", flagTransactionID)
 			transactionID, err := flow.HexStringToIdentifier(flagTransactionID)
@@ -32,7 +34,7 @@ var transactionsCmd = &cobra.Command{
 			}
 
 			log.Info().Msgf("getting transaction by id: %v", transactionID)
-			tx, err := storages.Transactions.ByID(transactionID)
+			tx, err := transactions.ByID(transactionID)
 			if err != nil {
 				return fmt.Errorf("could not get transaction with id: %v: %w", transactionID, err)
 			}

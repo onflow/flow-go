@@ -11,6 +11,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/block_iterator/latest"
 	"github.com/onflow/flow-go/state/protocol"
+	badgerstate "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/storage"
 )
 
@@ -95,7 +96,14 @@ func findFirstMismatch(datadir string, startHeight, endHeight uint64, lockManage
 
 func createStorages(db storage.DB, lockManager lockctx.Manager) (
 	storage.Headers, storage.ExecutionResults, storage.Seals, protocol.State, error) {
-	storages := common.InitStorages(db)
+	chainID, err := badgerstate.GetChainID(db)
+	if err != nil {
+		return nil, nil, nil, nil, err
+	}
+	storages, err := common.InitStorages(db, chainID)
+	if err != nil {
+		return nil, nil, nil, nil, err
+	}
 	state, err := common.OpenProtocolState(lockManager, db, storages)
 	if err != nil {
 		return nil, nil, nil, nil, fmt.Errorf("could not open protocol state: %v", err)

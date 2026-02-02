@@ -11,6 +11,7 @@ import (
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
+	badgerstate "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/storage/store"
 )
 
@@ -48,6 +49,11 @@ func ExportExecutedTransactions(blockID flow.Identifier, dbPath string, outputPa
 	}
 	defer db.Close()
 
+	chainID, err := badgerstate.GetChainID(db)
+	if err != nil {
+		return err
+	}
+
 	cacheMetrics := &metrics.NoopCollector{}
 	index := store.NewIndex(cacheMetrics, db)
 	guarantees := store.NewGuarantees(cacheMetrics, db, store.DefaultCacheSize, store.DefaultCacheSize)
@@ -55,7 +61,10 @@ func ExportExecutedTransactions(blockID flow.Identifier, dbPath string, outputPa
 	results := store.NewExecutionResults(cacheMetrics, db)
 	receipts := store.NewExecutionReceipts(cacheMetrics, db, results, store.DefaultCacheSize)
 	transactions := store.NewTransactions(cacheMetrics, db)
-	headers := store.NewHeaders(cacheMetrics, db)
+	headers, err := store.NewHeaders(cacheMetrics, db, chainID)
+	if err != nil {
+		return err
+	}
 	payloads := store.NewPayloads(db, index, guarantees, seals, receipts, results)
 	blocks := store.NewBlocks(db, headers, payloads)
 	collections := store.NewCollections(db, transactions)
