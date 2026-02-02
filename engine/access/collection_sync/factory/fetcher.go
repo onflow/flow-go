@@ -8,6 +8,7 @@ import (
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/access/collection_sync"
 	"github.com/onflow/flow-go/engine/access/collection_sync/fetcher"
 	"github.com/onflow/flow-go/engine/common/requester"
@@ -53,6 +54,12 @@ func createFetcher(
 	accessMetrics module.AccessMetrics,
 	config CreateFetcherConfig,
 ) (*requester.Engine, collection_sync.Fetcher, error) {
+	// Create message store for the requester engine
+	fifoStore, err := engine.NewFifoMessageStore(requester.DefaultEntityRequestCacheSize)
+	if err != nil {
+		return nil, nil, fmt.Errorf("could not create requester store: %w", err)
+	}
+
 	// Create requester engine for requesting collections
 	requestEng, err := requester.New(
 		log.With().Str("entity", "collection").Logger(),
@@ -60,11 +67,11 @@ func createFetcher(
 		engineRegistry,
 		me,
 		state,
+		fifoStore,
 		channels.RequestCollections,
 		filter.HasRole[flow.Identity](flow.RoleCollection),
 		func() flow.Entity { return new(flow.Collection) },
 		requester.WithBatchInterval(60*time.Second),
-		requester.WithValidateStaking(false),
 		requester.WithRetryMaximum(10*time.Second),
 	)
 	if err != nil {

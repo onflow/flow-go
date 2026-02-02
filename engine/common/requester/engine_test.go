@@ -460,7 +460,7 @@ func TestEntityByIDRetryWithDifferentNode(t *testing.T) {
 	failingNodeID := identities[0].NodeID
 	workingNodeID := identities[1].NodeID
 
-	final := &protocol.Snapshot{}
+	final := protocol.NewSnapshot(t)
 	final.On("Identities", mock.Anything).Return(
 		func(selector flow.IdentityFilter[flow.Identity]) flow.IdentityList {
 			return identities.Filter(selector)
@@ -468,24 +468,18 @@ func TestEntityByIDRetryWithDifferentNode(t *testing.T) {
 		nil,
 	)
 
-	state := &protocol.State{}
-	state.On("Final").Return(final)
+	state := protocol.NewState(t)
+	state.On("Final").Return(final).Maybe()
 
-	// Use short retry intervals for faster test execution
-	cfg := Config{
-		BatchInterval:  50 * time.Millisecond,
-		BatchThreshold: 10,
-		RetryInitial:   50 * time.Millisecond,
-		RetryFunction:  RetryConstant(), // Keep retry interval constant for predictable timing
-		RetryAttempts:  math.MaxUint32,  // Don't give up
-		RetryMaximum:   100 * time.Millisecond,
-	}
+	me := module.NewLocal(t)
+	localID := unittest.IdentifierFixture()
+	me.On("NodeID").Return(localID).Maybe()
 
 	// Track Unicast calls by node ID
 	unicastCalls := make(map[flow.Identifier][]*messages.EntityRequest)
 	var unicastMutex sync.Mutex
 
-	con := &mocknetwork.Conduit{}
+	con := mocknetwork.NewConduit(t)
 	con.On("Unicast", mock.Anything, mock.Anything).Run(
 		func(args mock.Arguments) {
 			req := args.Get(0).(*messages.EntityRequest)
@@ -504,22 +498,32 @@ func TestEntityByIDRetryWithDifferentNode(t *testing.T) {
 		return nil
 	})
 
+	network := mocknetwork.NewEngineRegistry(t)
+	network.On("Register", mock.Anything, mock.Anything).Return(con, nil)
+
+	requestQueue := queue.NewHeroStore(10, unittest.Logger(), metrics.NewNoopCollector())
+
 	entityID := unittest.IdentifierFixture()
 
 	// Create engine with selector that includes both failing and working nodes
-	e := &Engine{
-		unit:                  engine.NewUnit(),
-		metrics:               metrics.NewNoopCollector(),
-		cfg:                   cfg,
-		state:                 state,
-		con:                   con,
-		items:                 make(map[flow.Identifier]*Item),
-		requests:              make(map[uint64]*messages.EntityRequest),
-		selector:              filter.Any, // Allow all nodes
-		create:                func() flow.Entity { return &flow.Collection{} },
-		handle:                func(flow.Identifier, flow.Entity) {}, // No-op handler for this test
-		forcedDispatchOngoing: atomic.NewBool(false),
-	}
+	e, err := New(
+		zerolog.Nop(),
+		metrics.NewNoopCollector(),
+		network,
+		me,
+		state,
+		requestQueue,
+		"",
+		filter.Any, // Allow all nodes
+		func() flow.Entity { return &flow.Collection{} },
+		WithBatchInterval(50*time.Millisecond),
+		WithBatchThreshold(10),
+		WithRetryInitial(50*time.Millisecond),
+		WithRetryFunction(RetryConstant()), // Keep retry interval constant for predictable timing
+		WithRetryAttempts(math.MaxUint32),  // Don't give up
+		WithRetryMaximum(100*time.Millisecond),
+	)
+	require.NoError(t, err)
 
 	// Request entity with selector that includes both nodes
 	selector := filter.Or(
