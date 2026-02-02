@@ -193,7 +193,7 @@ func (s *TransactionStreamSuite) initializeBackend() {
 
 	// this line causes a S1021 lint error because receipts is explicitly declared. this is required
 	// to ensure the mock library handles the response type correctly
-	var receipts flow.ExecutionReceiptList //nolint:gosimple
+	var receipts flow.ExecutionReceiptList //nolint:staticcheck
 	executionNodes := unittest.IdentityListFixture(2, unittest.WithRole(flow.RoleExecution))
 	receipts = unittest.ReceiptsForBlockFixture(s.rootBlock, executionNodes.NodeIDs())
 	s.receipts.On("ByBlockID", mock.AnythingOfType("flow.Identifier")).Return(receipts, nil).Maybe()
