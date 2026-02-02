@@ -30,7 +30,6 @@ import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/collection/epochmgr"
 	"github.com/onflow/flow-go/engine/collection/epochmgr/factories"
-	"github.com/onflow/flow-go/engine/collection/ingest"
 	collectioningest "github.com/onflow/flow-go/engine/collection/ingest"
 	mockcollection "github.com/onflow/flow-go/engine/collection/mock"
 	"github.com/onflow/flow-go/engine/collection/pusher"
@@ -51,7 +50,6 @@ import (
 	"github.com/onflow/flow-go/engine/execution/ingestion/uploader"
 	executionprovider "github.com/onflow/flow-go/engine/execution/provider"
 	executionState "github.com/onflow/flow-go/engine/execution/state"
-	bootstrapexec "github.com/onflow/flow-go/engine/execution/state/bootstrap"
 	esbootstrap "github.com/onflow/flow-go/engine/execution/state/bootstrap"
 	"github.com/onflow/flow-go/engine/execution/storehouse"
 	testmock "github.com/onflow/flow-go/engine/testutil/mock"
@@ -303,7 +301,7 @@ func CollectionNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ro
 	clusterPayloads := store.NewClusterPayloads(node.Metrics, db)
 
 	ingestionEngine, err := collectioningest.New(node.Log, node.Net, node.State, node.Metrics, node.Metrics, node.Metrics, node.Me, node.ChainID.Chain(), pools, collectioningest.DefaultConfig(),
-		ingest.NewAddressRateLimiter(rate.Limit(1), 10)) // 10 tps
+		collectioningest.NewAddressRateLimiter(rate.Limit(1), 10)) // 10 tps
 	require.NoError(t, err)
 
 	selector := filter.HasRole[flow.Identity](flow.RoleAccess, flow.RoleVerification)
@@ -317,6 +315,10 @@ func CollectionNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ro
 		node.Net,
 		node.Me,
 		node.State,
+		// CAUTION: the HeroStore fifo queue is NOT BFT. It should be used for messages from trusted sources only!
+		// In the requester engine, the injected fifo queue is used to hold [flow.EntityResponse] messages from other
+		// potentially byzantine peers. In PRODUCTION, you can NOT use a HeroStore here. However, for testing we
+		// use the HeroStore for its better performance (reduced GC load on the maxed-out testing server).
 		queue.NewHeroStore(uint32(1000), unittest.Logger(), metrics.NewNoopCollector()),
 		uint(1000),
 		channels.ProvideCollections,
@@ -459,8 +461,23 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ide
 	ingestionEngine, err := consensusingest.New(node.Log, node.Metrics, node.Net, node.Me, ingestionCore)
 	require.NoError(t, err)
 
+	// CAUTION: the HeroStore fifo queue is NOT BFT. It should be used for messages from trusted sources only!
+	// In the requester engine, the injected fifo queue is used to hold [flow.EntityResponse] messages from other
+	// potentially byzantine peers. In PRODUCTION, you can NOT use a HeroStore here. However, for testing we
+	// use the HeroStore for its better performance (reduced GC load on the maxed-out testing server).
+	requestQueue := queue.NewHeroStore(10, unittest.Logger(), metrics.NewNoopCollector())
 	// request receipts from execution nodes
-	receiptRequester, err := requester.New(node.Log.With().Str("entity", "receipt").Logger(), node.Metrics, node.Net, node.Me, node.State, channels.RequestReceiptsByBlockID, filter.Any, func() flow.Entity { return new(flow.ExecutionReceipt) })
+	receiptRequester, err := requester.New(
+		node.Log.With().Str("entity", "receipt").Logger(),
+		node.Metrics,
+		node.Net,
+		node.Me,
+		node.State,
+		requestQueue,
+		channels.RequestReceiptsByBlockID,
+		filter.Any,
+		func() flow.Entity { return new(flow.ExecutionReceipt) },
+	)
 	require.NoError(t, err)
 
 	assigner, err := chunks.NewChunkAssigner(flow.DefaultChunkAssignmentAlpha, node.State)
@@ -603,7 +620,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ide
 	genesisHead, err := node.State.Final().Head()
 	require.NoError(t, err)
 
-	bootstrapper := bootstrapexec.NewBootstrapper(node.Log)
+	bootstrapper := esbootstrap.NewBootstrapper(node.Log)
 	commit, err := bootstrapper.BootstrapLedger(
 		ls,
 		unittest.ServiceAccountPublicKey,
@@ -666,8 +683,14 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ide
 		node.LockManager,
 	)
 
+	// CAUTION: the HeroStore fifo queue is NOT BFT. It should be used for messages from trusted sources only!
+	// In the requester engine, the injected fifo queue is used to hold [flow.EntityResponse] messages from other
+	// potentially byzantine peers. In PRODUCTION, you can NOT use a HeroStore here. However, for testing we
+	// use the HeroStore for its better performance (reduced GC load on the maxed-out testing server).
+	requestQueue := queue.NewHeroStore(10, unittest.Logger(), metrics.NewNoopCollector())
 	requestEngine, err := requester.New(
 		node.Log.With().Str("entity", "collection").Logger(), node.Metrics, node.Net, node.Me, node.State,
+		requestQueue,
 		channels.RequestCollections,
 		filter.HasRole[flow.Identity](flow.RoleCollection),
 		func() flow.Entity { return new(flow.Collection) },
@@ -682,6 +705,10 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ide
 		execState,
 		metricsCollector,
 		checkAuthorizedAtBlock,
+		// CAUTION: the HeroStore fifo queue is NOT BFT. It should be used for messages from trusted sources only!
+		// In the requester engine, the injected fifo queue is used to hold [flow.EntityResponse] messages from other
+		// potentially byzantine peers. In PRODUCTION, you can NOT use a HeroStore here. However, for testing we
+		// use the HeroStore for its better performance (reduced GC load on the maxed-out testing server).
 		queue.NewHeroStore(uint32(1000), unittest.Logger(), metrics.NewNoopCollector()),
 		executionprovider.DefaultChunkDataPackRequestWorker,
 		executionprovider.DefaultChunkDataPackQueryTimeout,
@@ -692,8 +719,8 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ide
 	blockFinder := environment.NewBlockFinder(node.Headers)
 
 	vmCtx := fvm.NewContext(
+		node.ChainID.Chain(),
 		fvm.WithLogger(node.Log),
-		fvm.WithChain(node.ChainID.Chain()),
 		fvm.WithBlocks(blockFinder),
 	)
 	committer := committer.NewLedgerViewCommitter(ls, node.Tracer)
@@ -773,6 +800,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ide
 		pusherEngine,
 		uploader,
 		stopControl,
+		nil, // block executed callback not used in test
 	)
 	require.NoError(t, err)
 	node.ProtocolEvents.AddConsumer(stopControl)
@@ -1040,8 +1068,8 @@ func VerificationNode(t testing.TB,
 		blockFinder := environment.NewBlockFinder(node.Headers)
 
 		vmCtx := fvm.NewContext(
+			node.ChainID.Chain(),
 			fvm.WithLogger(node.Log),
-			fvm.WithChain(node.ChainID.Chain()),
 			fvm.WithBlocks(blockFinder),
 		)
 

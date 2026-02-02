@@ -43,9 +43,7 @@ func run(*cobra.Command, []string) {
 
 	log.Info().Msgf("creating payloads for chain %s", chain)
 
-	ctx := fvm.NewContext(
-		fvm.WithChain(chain),
-	)
+	ctx := fvm.NewContext(chain)
 
 	vm := fvm.NewVirtualMachine()
 

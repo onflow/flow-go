@@ -17,15 +17,16 @@ type RestCollector struct {
 	httpRequestsInflight      *prometheus.GaugeVec
 	httpRequestsTotal         *prometheus.GaugeVec
 
-	// urlToRouteMapper is a callback that converts a URL to a route name
-	urlToRouteMapper func(string) (string, error)
+	urlToRouteMapper func(string, string) (string, error) // converts (method, url) to a route name
 }
 
 var _ module.RestMetrics = (*RestCollector)(nil)
 
 // NewRestCollector returns a new metrics RestCollector that implements the RestCollector
 // using Prometheus as the backend.
-func NewRestCollector(urlToRouteMapper func(string) (string, error), registerer prometheus.Registerer) (*RestCollector, error) {
+func NewRestCollector(urlToRouteMapper func(string, string) (string, error),
+	registerer prometheus.Registerer,
+) (*RestCollector, error) {
 	if urlToRouteMapper == nil {
 		return nil, fmt.Errorf("urlToRouteMapper cannot be nil")
 	}
@@ -76,35 +77,35 @@ func NewRestCollector(urlToRouteMapper func(string) (string, error), registerer 
 // ObserveHTTPRequestDuration records the duration of the REST request.
 // This method is called automatically by go-http-metrics/middleware
 func (r *RestCollector) ObserveHTTPRequestDuration(_ context.Context, p httpmetrics.HTTPReqProperties, duration time.Duration) {
-	handler := r.mapURLToRoute(p.ID)
+	handler := r.mapURLToRoute(p.Method, p.ID)
 	r.httpRequestDurHistogram.WithLabelValues(p.Service, handler, p.Method, p.Code).Observe(duration.Seconds())
 }
 
 // ObserveHTTPResponseSize records the response size of the REST request.
 // This method is called automatically by go-http-metrics/middleware
 func (r *RestCollector) ObserveHTTPResponseSize(_ context.Context, p httpmetrics.HTTPReqProperties, sizeBytes int64) {
-	handler := r.mapURLToRoute(p.ID)
+	handler := r.mapURLToRoute(p.Method, p.ID)
 	r.httpResponseSizeHistogram.WithLabelValues(p.Service, handler, p.Method, p.Code).Observe(float64(sizeBytes))
 }
 
 // AddInflightRequests increments and decrements the number of inflight request being processed.
 // This method is called automatically by go-http-metrics/middleware
 func (r *RestCollector) AddInflightRequests(_ context.Context, p httpmetrics.HTTPProperties, quantity int) {
-	handler := r.mapURLToRoute(p.ID)
+	handler := r.mapURLToRoute("", p.ID)
 	r.httpRequestsInflight.WithLabelValues(p.Service, handler).Add(float64(quantity))
 }
 
 // AddTotalRequests records all REST requests
 // This is a custom method called by the REST handler
 func (r *RestCollector) AddTotalRequests(_ context.Context, method, path string) {
-	handler := r.mapURLToRoute(path)
+	handler := r.mapURLToRoute(method, path)
 	r.httpRequestsTotal.WithLabelValues(method, handler).Inc()
 }
 
 // mapURLToRoute uses the urlToRouteMapper callback to convert a URL to a route name
 // This normalizes the URL, removing dynamic information converting it to a static string
-func (r *RestCollector) mapURLToRoute(url string) string {
-	route, err := r.urlToRouteMapper(url)
+func (r *RestCollector) mapURLToRoute(method, url string) string {
+	route, err := r.urlToRouteMapper(method, url)
 	if err != nil {
 		return "unknown"
 	}

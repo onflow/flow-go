@@ -24,7 +24,7 @@ type WrappedEnvironment struct {
 }
 
 // NewWrappedEnvironment constructs a new wrapped environment
-func NewWrappedEnvironment(env environment.Environment) types.Backend {
+func NewWrappedEnvironment(env environment.Environment) *WrappedEnvironment {
 	return &WrappedEnvironment{env}
 }
 
