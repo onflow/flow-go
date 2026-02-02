@@ -23,7 +23,7 @@ import (
 //     inserting the QC after checking that no QC is already stored.
 //
 // Expected error returns:
-//   - [storage.ErrAlreadyExists] if any QuorumCertificate certifying the samn block already exists
+//   - [storage.ErrAlreadyExists] if any QuorumCertificate certifying the same block already exists
 func InsertQuorumCertificate(lctx lockctx.Proof, rw storage.ReaderBatchWriter, qc *flow.QuorumCertificate) error {
 	if !lctx.HoldsLock(storage.LockInsertBlock) {
 		return fmt.Errorf("cannot insert quorum certificate without holding lock %s", storage.LockInsertBlock)

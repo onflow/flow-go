@@ -36,6 +36,7 @@ type SyncSuite struct {
 	myID         flow.Identifier
 	participants flow.IdentityList
 	head         *flow.Header
+	qc           *flow.QuorumCertificate
 	heights      map[uint64]*flow.Proposal
 	blockIDs     map[flow.Identifier]*flow.Proposal
 	net          *mocknetwork.EngineRegistry
@@ -63,6 +64,8 @@ func (ss *SyncSuite) SetupTest() {
 	// generate a header for the final state
 	header := unittest.BlockHeaderFixture()
 	ss.head = header
+	// generate a QC certifying the header
+	ss.qc = unittest.CertifyBlock(ss.head)
 
 	// create maps to enable block returns
 	ss.heights = make(map[uint64]*flow.Proposal)
@@ -110,6 +113,12 @@ func (ss *SyncSuite) SetupTest() {
 	ss.snapshot.On("Head").Return(
 		func() *flow.Header {
 			return ss.head
+		},
+		nil,
+	)
+	ss.snapshot.On("QuorumCertificate").Return(
+		func() *flow.QuorumCertificate {
+			return ss.qc
 		},
 		nil,
 	)

@@ -42,6 +42,10 @@ func (u *Snapshot) Head() (*flow.Header, error) {
 	return nil, u.err
 }
 
+func (u *Snapshot) QuorumCertificate() (*flow.QuorumCertificate, error) {
+	return nil, u.err
+}
+
 func (u *Snapshot) Pending() ([]flow.Identifier, error) {
 	return nil, u.err
 }

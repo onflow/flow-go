@@ -117,7 +117,7 @@ func New(
 		return nil, fmt.Errorf("could not register engine: %w", err)
 	}
 	e.con = con
-	e.requestHandler = NewRequestHandler(log, metrics, NewResponseSender(con), me, finalizedHeaderCache, blocks, core, true)
+	e.requestHandler = NewRequestHandler(log, metrics, NewResponseSender(con), me, state, finalizedHeaderCache, blocks, core, true)
 
 	// set up worker routines
 	builder := component.NewComponentManagerBuilder().
@@ -296,7 +296,12 @@ func (e *Engine) processAvailableResponses(ctx context.Context) {
 func (e *Engine) onSyncResponse(originID flow.Identifier, res *flow.SyncResponse) {
 	e.log.Debug().Str("origin_id", originID.String()).Msg("received sync response")
 	final := e.finalizedHeaderCache.Get()
-	e.core.HandleHeight(final, res.Height)
+	// backwards compatibility - ignore the Header/QC if they are not present, and use Height field instead
+	if res.Header.Height == 0 {
+		e.core.HandleHeight(final, res.Height)
+	} else {
+		e.core.HandleHeight(final, res.Header.Height)
+	}
 }
 
 // onBlockResponse processes a structurally validated block proposal containing a specifically requested block response.

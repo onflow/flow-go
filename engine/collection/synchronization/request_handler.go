@@ -78,29 +78,6 @@ func NewRequestHandlerEngine(
 	return r
 }
 
-// SubmitLocal submits an event originating on the local node.
-func (r *RequestHandlerEngine) SubmitLocal(event interface{}) {
-	err := r.ProcessLocal(event)
-	if err != nil {
-		r.log.Fatal().Err(err).Msg("internal error processing event")
-	}
-}
-
-// Submit submits the given event from the node with the given origin ID
-// for processing in a non-blocking manner. It returns instantly and logs
-// a potential processing error internally when done.
-func (r *RequestHandlerEngine) Submit(channel channels.Channel, originID flow.Identifier, event interface{}) {
-	err := r.Process(channel, originID, event)
-	if err != nil {
-		r.log.Fatal().Err(err).Msg("internal error processing event")
-	}
-}
-
-// ProcessLocal processes an event originating on the local node.
-func (r *RequestHandlerEngine) ProcessLocal(event interface{}) error {
-	return r.process(r.me.NodeID(), event)
-}
-
 // Process processes the given event from the node with the given origin ID in
 // a blocking manner. It returns the potential processing error when done.
 func (r *RequestHandlerEngine) Process(channel channels.Channel, originID flow.Identifier, event interface{}) error {
@@ -171,11 +148,13 @@ func (r *RequestHandlerEngine) setupRequestMessageHandler() {
 // inform the other node of it, so they can organize their block downloads. If
 // we have a lower height, we add the difference to our own download queue.
 func (r *RequestHandlerEngine) onSyncRequest(originID flow.Identifier, req *flow.SyncRequest) error {
-	final, err := r.state.Final().Head()
+	finalizedState := r.state.Final()
+	final, err := finalizedState.Head()
 	if err != nil {
 		return fmt.Errorf("could not get last finalized header: %w", err)
 	}
 
+	// TODO(8173) remove this step and only rely on certified sync responses?
 	// queue any missing heights as needed
 	r.core.HandleHeight(final, req.Height)
 
@@ -185,10 +164,17 @@ func (r *RequestHandlerEngine) onSyncRequest(originID flow.Identifier, req *flow
 		return nil
 	}
 
+	qc, err := finalizedState.QuorumCertificate()
+	if err != nil {
+		return fmt.Errorf("could not get QC for last finalized header: %w", err)
+	}
+
 	// if we're sufficiently ahead of the requester, send a response
 	res := &messages.SyncResponse{
-		Height: final.Height,
-		Nonce:  req.Nonce,
+		Nonce:        req.Nonce,
+		Height:       final.Height,
+		Header:       *final,
+		CertifyingQC: *qc,
 	}
 	err = r.con.Unicast(res, originID)
 	if err != nil {

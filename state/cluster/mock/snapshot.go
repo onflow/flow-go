@@ -102,6 +102,36 @@ func (_m *Snapshot) Pending() ([]flow.Identifier, error) {
 	return r0, r1
 }
 
+// QuorumCertificate provides a mock function with no fields
+func (_m *Snapshot) QuorumCertificate() (*flow.QuorumCertificate, error) {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for QuorumCertificate")
+	}
+
+	var r0 *flow.QuorumCertificate
+	var r1 error
+	if rf, ok := ret.Get(0).(func() (*flow.QuorumCertificate, error)); ok {
+		return rf()
+	}
+	if rf, ok := ret.Get(0).(func() *flow.QuorumCertificate); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*flow.QuorumCertificate)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func() error); ok {
+		r1 = rf()
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // NewSnapshot creates a new instance of Snapshot. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
 // The first argument is typically a *testing.T value.
 func NewSnapshot(t interface {

@@ -17,6 +17,7 @@ import (
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network/channels"
+	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/logging"
 )
@@ -50,6 +51,7 @@ type RequestHandler struct {
 	metrics module.EngineMetrics
 
 	blocks               storage.Blocks
+	state                protocol.State
 	finalizedHeaderCache module.FinalizedHeaderCache
 	core                 module.SyncCore
 	responseSender       ResponseSender
@@ -67,6 +69,7 @@ func NewRequestHandler(
 	metrics module.EngineMetrics,
 	responseSender ResponseSender,
 	me module.Local,
+	state protocol.State,
 	finalizedHeaderCache *events.FinalizedHeaderCache,
 	blocks storage.Blocks,
 	core module.SyncCore,
@@ -76,6 +79,7 @@ func NewRequestHandler(
 		me:                   me,
 		log:                  log.With().Str("engine", "synchronization").Logger(),
 		metrics:              metrics,
+		state:                state,
 		finalizedHeaderCache: finalizedHeaderCache,
 		blocks:               blocks,
 		core:                 core,
@@ -151,7 +155,11 @@ func (r *RequestHandler) setupRequestMessageHandler() {
 // we have a lower height, we add the difference to our own download queue.
 // No errors are expected during normal operation.
 func (r *RequestHandler) onSyncRequest(originID flow.Identifier, req *flow.SyncRequest) error {
-	finalizedHeader := r.finalizedHeaderCache.Get()
+	finalizedState := r.state.Final()
+	finalizedHeader, err := finalizedState.Head()
+	if err != nil {
+		return err
+	}
 
 	logger := r.log.With().Str("origin_id", originID.String()).Logger()
 	logger.Debug().
@@ -160,6 +168,7 @@ func (r *RequestHandler) onSyncRequest(originID flow.Identifier, req *flow.SyncR
 		Msg("received new sync request")
 
 	if r.queueMissingHeights {
+		// TODO(8174) remove this step and only rely on certified sync responses?
 		// queue any missing heights as needed
 		r.core.HandleHeight(finalizedHeader, req.Height)
 	}
@@ -171,11 +180,17 @@ func (r *RequestHandler) onSyncRequest(originID flow.Identifier, req *flow.SyncR
 	}
 
 	// if we're sufficiently ahead of the requester, send a response
-	res := &messages.SyncResponse{
-		Height: finalizedHeader.Height,
-		Nonce:  req.Nonce,
+	qcForFinalizedHeader, err := finalizedState.QuorumCertificate()
+	if err != nil {
+		return err
 	}
-	err := r.responseSender.SendResponse(res, originID)
+	res := &messages.SyncResponse{
+		Nonce:        req.Nonce,
+		Height:       finalizedHeader.Height,
+		Header:       *finalizedHeader,
+		CertifyingQC: *qcForFinalizedHeader,
+	}
+	err = r.responseSender.SendResponse(res, originID)
 	if err != nil {
 		logger.Warn().Err(err).Msg("sending sync response failed")
 		return nil
