@@ -207,6 +207,10 @@ func (c *Client) Set(update *ledger.Update) (ledger.State, *ledger.TrieUpdate, e
 		return ledger.DummyState, nil, fmt.Errorf("failed to set values: %w", err)
 	}
 
+	if resp == nil || resp.NewState == nil {
+		return ledger.DummyState, nil, fmt.Errorf("invalid response: missing new state")
+	}
+
 	var newState ledger.State
 	if len(resp.NewState.Hash) != len(newState) {
 		return ledger.DummyState, nil, fmt.Errorf("invalid new state hash length")
