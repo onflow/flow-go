@@ -6,6 +6,13 @@ import (
 	"github.com/onflow/flow-go/module"
 )
 
+// Default values for ledger configuration.
+const (
+	DefaultMTrieCacheSize     = 500
+	DefaultCheckpointDistance = 20
+	DefaultCheckpointsToKeep  = 5
+)
+
 // CompactorConfig holds configuration for ledger compaction.
 type CompactorConfig struct {
 	CheckpointCapacity                   uint
@@ -18,9 +25,9 @@ type CompactorConfig struct {
 // DefaultCompactorConfig returns default compactor configuration.
 func DefaultCompactorConfig(metrics module.WALMetrics) *CompactorConfig {
 	return &CompactorConfig{
-		CheckpointCapacity:                   100,
-		CheckpointDistance:                   100,
-		CheckpointsToKeep:                    3,
+		CheckpointCapacity:                   DefaultMTrieCacheSize,
+		CheckpointDistance:                   DefaultCheckpointDistance,
+		CheckpointsToKeep:                    DefaultCheckpointsToKeep,
 		TriggerCheckpointOnNextSegmentFinish: atomic.NewBool(false),
 		Metrics:                              metrics,
 	}

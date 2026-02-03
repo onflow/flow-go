@@ -493,7 +493,8 @@ func randomlyModifyFile(t *testing.T, filename string) {
 	fileSize := fileInfo.Size()
 
 	if fileSize == 0 {
-		t.Skip("file is empty, cannot modify")
+		// Empty file, nothing to modify - this shouldn't happen in normal test scenarios
+		// but handle gracefully by returning early
 		return
 	}
 

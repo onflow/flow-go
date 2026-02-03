@@ -457,7 +457,7 @@ func withLedgerPair(t *testing.T, fn func(localLedger, remoteLedger ledger.Ledge
 	metricsCollector := &metrics.NoopCollector{}
 
 	// Create local ledger using factory
-	localResult, err := NewLedger(Config{
+	localLedger, err := NewLedger(Config{
 		Triedir:                              localWalDir,
 		MTrieCacheSize:                       100,
 		CheckpointDistance:                   1000,
@@ -469,18 +469,14 @@ func withLedgerPair(t *testing.T, fn func(localLedger, remoteLedger ledger.Ledge
 		Logger:                               logger,
 	})
 	require.NoError(t, err)
-	require.NotNil(t, localResult)
-	localLedger := localResult.Ledger
 	require.NotNil(t, localLedger)
 
 	// Create remote client using factory
-	remoteResult, err := NewLedger(Config{
+	remoteLedger, err := NewLedger(Config{
 		LedgerServiceAddr: serverAddr,
 		Logger:            logger,
 	})
 	require.NoError(t, err)
-	require.NotNil(t, remoteResult)
-	remoteLedger := remoteResult.Ledger
 	require.NotNil(t, remoteLedger)
 
 	// Wait for both to be ready
@@ -492,10 +488,7 @@ func withLedgerPair(t *testing.T, fn func(localLedger, remoteLedger ledger.Ledge
 		// Stop remote ledger
 		<-remoteLedger.Done()
 
-		// Stop local ledger and WAL
-		if localResult.WAL != nil {
-			<-localResult.WAL.Done()
-		}
+		// Stop local ledger (WAL cleanup is handled internally by the ledger)
 		<-localLedger.Done()
 
 		// Stop server

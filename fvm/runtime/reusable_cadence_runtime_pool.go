@@ -10,7 +10,7 @@ import (
 type CadenceRuntimeConstructor func(config runtime.Config) runtime.Runtime
 
 type ReusableCadenceRuntimePool struct {
-	pool chan environment.ReusableCadenceRuntime
+	pool chan *reusableCadenceRuntime
 
 	runtimeConfig runtime.Config
 
@@ -36,9 +36,9 @@ func newReusableCadenceRuntimePool(
 	config runtime.Config,
 	newCustomRuntime CadenceRuntimeConstructor,
 ) ReusableCadenceRuntimePool {
-	var pool chan environment.ReusableCadenceRuntime
+	var pool chan *reusableCadenceRuntime
 	if poolSize > 0 {
-		pool = make(chan environment.ReusableCadenceRuntime, poolSize)
+		pool = make(chan *reusableCadenceRuntime, poolSize)
 	}
 
 	return ReusableCadenceRuntimePool{
@@ -85,30 +85,55 @@ func (pool ReusableCadenceRuntimePool) newRuntime() runtime.Runtime {
 
 func (pool ReusableCadenceRuntimePool) Borrow(
 	fvmEnv environment.Environment,
+	runtimeType environment.CadenceRuntimeType,
 ) environment.ReusableCadenceRuntime {
-	var reusable environment.ReusableCadenceRuntime
+	var reusable *reusableCadenceRuntime
 	select {
 	case reusable = <-pool.pool:
 		// Do nothing.
 	default:
-		reusable = NewReusableCadenceRuntime(
+		reusable = newReusableCadenceRuntime(
 			WrappedCadenceRuntime{
 				pool.newRuntime(),
 			},
+			pool.chain,
 			pool.runtimeConfig,
 		)
 	}
 
 	reusable.SetFvmEnvironment(fvmEnv)
-	return reusable
+
+	switch runtimeType {
+	case environment.CadenceScriptRuntime:
+		return reusableCadenceScriptRuntime{
+			reusableCadenceRuntime: reusable,
+		}
+	case environment.CadenceTransactionRuntime:
+		return reusableCadenceTransactionRuntime{
+			reusableCadenceRuntime: reusable,
+		}
+	default:
+		panic("unreachable")
+
+	}
 }
 
 func (pool ReusableCadenceRuntimePool) Return(
 	reusable environment.ReusableCadenceRuntime,
 ) {
-	reusable.SetFvmEnvironment(nil)
+	var inner *reusableCadenceRuntime
+	switch v := reusable.(type) {
+	case reusableCadenceScriptRuntime:
+		inner = v.reusableCadenceRuntime
+	case reusableCadenceTransactionRuntime:
+		inner = v.reusableCadenceRuntime
+	default:
+		panic("unreachable")
+	}
+	inner.SetFvmEnvironment(nil)
+
 	select {
-	case pool.pool <- reusable:
+	case pool.pool <- inner:
 		// Do nothing.
 	default:
 		// Do nothing.  Discard the overflow entry.

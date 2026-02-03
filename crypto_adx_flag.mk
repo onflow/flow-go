@@ -16,14 +16,15 @@ else
 	ADX_SUPPORT := 1
 endif
 
+# Flags to disable ADX instructions for older CPUs
 DISABLE_ADX := "-O2 -D__BLST_PORTABLE__"
 
 # Then, set `CRYPTO_FLAG`
 # the crypto package uses BLST source files underneath which may use ADX instructions.
 ifeq ($(ADX_SUPPORT), 1)
-# if ADX instructions are supported on the current machine, default is to use a fast ADX implementation 
+# if ADX instructions are supported on the current machine, default is to use a fast ADX implementation
 	CRYPTO_FLAG := ""
 else
-# if ADX instructions aren't supported, this CGO flags uses a slower non-ADX implementation 
+# if ADX instructions aren't supported, this CGO flags uses a slower non-ADX implementation
 	CRYPTO_FLAG := $(DISABLE_ADX)
 endif

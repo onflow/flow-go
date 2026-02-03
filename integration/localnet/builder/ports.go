@@ -54,7 +54,7 @@ var config = map[string]*portConfig{
 		portCount: 2,
 	},
 	"ledger": {
-		start:     8000, // 8000-8100 => 20 ledger services
+		start:     8000, // 8000-8100 => 50 ledger services
 		end:       8100,
 		portCount: 2,
 	},

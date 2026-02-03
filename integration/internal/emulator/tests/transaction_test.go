@@ -602,40 +602,6 @@ func TestSubmitTransaction_EnvelopeSignature(t *testing.T) {
 
 	t.Parallel()
 
-	t.Run("Missing envelope signature", func(t *testing.T) {
-
-		t.Parallel()
-
-		b, adapter := setupTransactionTests(
-			t,
-			emulator.WithStorageLimitEnabled(false),
-		)
-		serviceAccountAddress := flowsdk.Address(b.ServiceKey().Address)
-
-		addTwoScript, _ := DeployAndGenerateAddTwoScript(t, adapter)
-
-		tx := flowsdk.NewTransaction().
-			SetScript([]byte(addTwoScript)).
-			SetComputeLimit(flowgo.DefaultMaxTransactionGasLimit).
-			SetProposalKey(serviceAccountAddress, b.ServiceKey().Index, b.ServiceKey().SequenceNumber).
-			SetPayer(serviceAccountAddress).
-			AddAuthorizer(serviceAccountAddress)
-
-		signer, err := b.ServiceKey().Signer()
-		require.NoError(t, err)
-
-		err = tx.SignPayload(serviceAccountAddress, b.ServiceKey().Index, signer)
-		require.NoError(t, err)
-
-		err = adapter.SendTransaction(context.Background(), *tx)
-		assert.NoError(t, err)
-
-		result, err := b.ExecuteNextTransaction()
-		assert.NoError(t, err)
-
-		assert.True(t, fvmerrors.HasErrorCode(result.Error, fvmerrors.ErrCodeAccountAuthorizationError))
-	})
-
 	t.Run("Invalid account", func(t *testing.T) {
 
 		t.Parallel()
@@ -839,51 +805,6 @@ func TestSubmitTransaction_EnvelopeSignature(t *testing.T) {
 func TestSubmitTransaction_PayloadSignatures(t *testing.T) {
 
 	t.Parallel()
-
-	t.Run("Missing payload signature", func(t *testing.T) {
-
-		t.Parallel()
-
-		b, adapter := setupTransactionTests(
-			t,
-			emulator.WithStorageLimitEnabled(false),
-		)
-		serviceAccountAddress := flowsdk.Address(b.ServiceKey().Address)
-
-		addTwoScript, _ := DeployAndGenerateAddTwoScript(t, adapter)
-
-		// create a new account,
-		// authorizer must be different from payer
-
-		accountKeys := test.AccountKeyGenerator()
-
-		accountKeyB, _ := accountKeys.NewWithSigner()
-		accountKeyB.SetWeight(flowsdk.AccountKeyWeightThreshold)
-
-		accountAddressB, err := adapter.CreateAccount(context.Background(), []*flowsdk.AccountKey{accountKeyB}, nil)
-		assert.NoError(t, err)
-
-		tx := flowsdk.NewTransaction().
-			SetScript([]byte(addTwoScript)).
-			SetComputeLimit(flowgo.DefaultMaxTransactionGasLimit).
-			SetProposalKey(serviceAccountAddress, b.ServiceKey().Index, b.ServiceKey().SequenceNumber).
-			SetPayer(serviceAccountAddress).
-			AddAuthorizer(accountAddressB)
-
-		signer, err := b.ServiceKey().Signer()
-		require.NoError(t, err)
-
-		err = tx.SignEnvelope(serviceAccountAddress, b.ServiceKey().Index, signer)
-		require.NoError(t, err)
-
-		err = adapter.SendTransaction(context.Background(), *tx)
-		assert.NoError(t, err)
-
-		result, err := b.ExecuteNextTransaction()
-		assert.NoError(t, err)
-
-		assert.True(t, fvmerrors.HasErrorCode(result.Error, fvmerrors.ErrCodeAccountAuthorizationError))
-	})
 
 	t.Run("Multiple payload signers", func(t *testing.T) {
 

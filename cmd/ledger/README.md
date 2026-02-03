@@ -40,10 +40,14 @@ go build -o flow-ledger-service ./cmd/ledger
 ## Flags
 
 - `-triedir`: Directory for trie files (required)
+<<<<<<< HEAD
 - `-ledger-service-tcp`: TCP listen address (e.g., 0.0.0.0:9000). If provided, server accepts TCP connections.
 - `-ledger-service-socket`: Unix socket path (e.g., /sockets/ledger.sock). If provided, server accepts Unix socket connections. Can specify multiple sockets separated by comma.
 - **Note**: At least one of `-ledger-service-tcp` or `-ledger-service-socket` must be provided.
 - `-admin-addr`: Address to bind on for admin HTTP server (e.g., 0.0.0.0:9002). If provided, enables admin commands. Optional.
+=======
+- `-ledger-service-addr`: Ledger service listen address (TCP: ip:port or Unix: unix:///path/to/socket) (default: 0.0.0.0:9000)
+>>>>>>> @{-1}
 - `-mtrie-cache-size`: MTrie cache size - number of tries (default: 500)
 - `-checkpoint-distance`: Checkpoint distance (default: 100)
 - `-checkpoints-to-keep`: Number of checkpoints to keep (default: 3)

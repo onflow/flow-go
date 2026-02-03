@@ -17,8 +17,10 @@ import (
 	exeprovider "github.com/onflow/flow-go/engine/execution/provider"
 	exepruner "github.com/onflow/flow-go/engine/execution/pruner"
 	"github.com/onflow/flow-go/engine/execution/rpc"
+	"github.com/onflow/flow-go/engine/execution/storehouse"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/storage/derived"
+	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/module/mempool"
@@ -69,10 +71,12 @@ type ExecutionConfig struct {
 	// It works around an issue where some collection nodes are not configured with enough
 	// this works around an issue where some collection nodes are not configured with enough
 	// file descriptors causing connection failures.
-	onflowOnlyLNs    bool
-	enableStorehouse bool
-	enableChecker    bool
-	publicAccessID   string
+	onflowOnlyLNs                      bool
+	enableStorehouse                   bool
+	enableBackgroundStorehouseIndexing bool
+	backgroundIndexerHeightsPerSecond  uint64
+	enableChecker                      bool
+	publicAccessID                     string
 
 	pruningConfigThreshold           uint64
 	pruningConfigBatchSize           uint
@@ -98,9 +102,9 @@ func (exeConf *ExecutionConfig) SetupFlags(flags *pflag.FlagSet) {
 	flags.StringVar(&exeConf.triedir, "triedir", filepath.Join(datadir, "trie"), "directory to store the execution State")
 	flags.StringVar(&exeConf.executionDataDir, "execution-data-dir", filepath.Join(datadir, "execution_data"), "directory to use for storing Execution Data")
 	flags.StringVar(&exeConf.registerDir, "register-dir", filepath.Join(datadir, "register"), "directory to use for storing registers Data")
-	flags.Uint32Var(&exeConf.mTrieCacheSize, "mtrie-cache-size", 500, "cache size for MTrie")
-	flags.UintVar(&exeConf.checkpointDistance, "checkpoint-distance", 20, "number of WAL segments between checkpoints")
-	flags.UintVar(&exeConf.checkpointsToKeep, "checkpoints-to-keep", 5, "number of recent checkpoints to keep (0 to keep all)")
+	flags.Uint32Var(&exeConf.mTrieCacheSize, "mtrie-cache-size", ledger.DefaultMTrieCacheSize, "cache size for MTrie")
+	flags.UintVar(&exeConf.checkpointDistance, "checkpoint-distance", ledger.DefaultCheckpointDistance, "number of WAL segments between checkpoints")
+	flags.UintVar(&exeConf.checkpointsToKeep, "checkpoints-to-keep", ledger.DefaultCheckpointsToKeep, "number of recent checkpoints to keep (0 to keep all)")
 	flags.UintVar(&exeConf.computationConfig.DerivedDataCacheSize, "cadence-execution-cache", derived.DefaultDerivedDataCacheSize,
 		"cache size for Cadence execution")
 	flags.BoolVar(&exeConf.computationConfig.ExtensiveTracing, "extensive-tracing", false, "adds high-overhead tracing to execution")
@@ -148,6 +152,8 @@ func (exeConf *ExecutionConfig) SetupFlags(flags *pflag.FlagSet) {
 
 	flags.BoolVar(&exeConf.onflowOnlyLNs, "temp-onflow-only-lns", false, "do not use unless required. forces node to only request collections from onflow collection nodes")
 	flags.BoolVar(&exeConf.enableStorehouse, "enable-storehouse", false, "enable storehouse to store registers on disk, default is false")
+	flags.BoolVar(&exeConf.enableBackgroundStorehouseIndexing, "enable-background-storehouse-indexing", false, "enable background indexing of storehouse data while storehouse is disabled to eliminate downtime when enabling it. default: false.")
+	flags.Uint64Var(&exeConf.backgroundIndexerHeightsPerSecond, "background-indexer-heights-per-second", storehouse.DefaultHeightsPerSecond, fmt.Sprintf("rate limit for background indexer in heights per second. 0 means no rate limiting. default: %v", storehouse.DefaultHeightsPerSecond))
 	flags.BoolVar(&exeConf.enableChecker, "enable-checker", true, "enable checker to check the correctness of the execution result, default is true")
 	flags.BoolVar(&exeConf.scheduleCallbacksEnabled, "scheduled-callbacks-enabled", fvm.DefaultScheduledTransactionsEnabled, "[deprecated] enable execution of scheduled transactions")
 	// deprecated. Retain it to prevent nodes that previously had this configuration from crashing.
@@ -183,6 +189,10 @@ func (exeConf *ExecutionConfig) ValidateFlags() error {
 	}
 	if exeConf.rpcConf.MaxResponseMsgSize == 0 {
 		return errors.New("rpc-max-response-message-size must be greater than 0")
+	}
+	// Explicitly turn off background storehouse indexing when storehouse is enabled
+	if exeConf.enableStorehouse {
+		exeConf.enableBackgroundStorehouseIndexing = false
 	}
 	return nil
 }
