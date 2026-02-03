@@ -3,6 +3,7 @@ package approvals_test
 import (
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/gammazero/workerpool"
 	"github.com/rs/zerolog"
@@ -105,26 +106,20 @@ func (s *AssignmentCollectorStateMachineTestSuite) TestChangeProcessingStatus_Ca
 
 	wg.Wait()
 
-	//// give some time to process on worker pool
-	//time.Sleep(1 * time.Second)
-	//// need to check if collector has processed cached items
-	//verifyingCollector, ok := s.collector.atomicLoadCollector().(*approvals.VerifyingAssignmentCollector)
-	//require.True(s.T(), ok)
-	//
-	//for _, ir := range results {
-	//	verifyingCollector.lock.Lock()
-	//	collector, ok := verifyingCollector.collectors[ir.IncorporatedBlockID]
-	//	verifyingCollector.lock.Unlock()
-	//	require.True(s.T(), ok)
-	//
-	//	for _, approval := range approvals {
-	//		chunkCollector := collector.chunkCollectors[approval.Body.ChunkIndex]
-	//		chunkCollector.lock.Lock()
-	//		signed := chunkCollector.chunkApprovals.HasSigned(approval.Body.ApproverID)
-	//		chunkCollector.lock.Unlock()
-	//		require.True(s.T(), signed)
-	//	}
-	//}
+	// give some time to process on worker pool
+	time.Sleep(1 * time.Second)
+	// need to check if collector has processed cached items
+	verifyingCollector, ok := s.collector.GetCollectorState().(*approvals.VerifyingAssignmentCollector)
+	require.True(s.T(), ok)
+
+	for _, ir := range results {
+		require.True(s.T(), verifyingCollector.HasIncorporatedResult(ir.IncorporatedBlockID))
+
+		for _, approval := range approvs {
+			signed := verifyingCollector.HasApprovalBeenProcessed(ir.IncorporatedBlockID, approval.Body.ChunkIndex, approval.Body.ApproverID)
+			require.True(s.T(), signed)
+		}
+	}
 }
 
 // TestChangeProcessingStatus_InvalidTransition tries to perform transition from caching to verifying status
