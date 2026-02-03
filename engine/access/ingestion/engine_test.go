@@ -221,6 +221,7 @@ func (s *Suite) initEngineAndSyncer() (*Engine, *collections.Syncer, *collection
 		syncer,
 		indexer,
 		s.collectionExecutedMetric,
+		metrics.NewNoopCollector(),
 		nil,
 		s.distributor,
 	)

@@ -941,9 +941,8 @@ type AccessMetrics interface {
 	// UpdateLastFullBlockHeight tracks the height of the last block for which all collections were received
 	UpdateLastFullBlockHeight(height uint64)
 
-	// UpdateLastBlockCollectionIndexedHeight tracks the height of the last block for which
-	// the collection-to-block index has been built
-	UpdateLastBlockCollectionIndexedHeight(height uint64)
+	// UpdateIngestionFinalizedBlockHeight tracks the latest finalized block height processed by ingestion
+	UpdateIngestionFinalizedBlockHeight(height uint64)
 }
 
 type ExecutionResultStats struct {
