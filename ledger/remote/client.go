@@ -24,18 +24,46 @@ type Client struct {
 	once   sync.Once
 }
 
+// clientConfig holds configuration options for the Client.
+type clientConfig struct {
+	maxRequestSize  uint
+	maxResponseSize uint
+}
+
+// defaultClientConfig returns the default configuration.
+func defaultClientConfig() *clientConfig {
+	return &clientConfig{
+		maxRequestSize:  1 << 30, // 1 GiB
+		maxResponseSize: 1 << 30, // 1 GiB
+	}
+}
+
+// ClientOption is a function that configures a Client.
+type ClientOption func(*clientConfig)
+
+// WithMaxRequestSize sets the maximum request message size in bytes.
+func WithMaxRequestSize(size uint) ClientOption {
+	return func(cfg *clientConfig) {
+		cfg.maxRequestSize = size
+	}
+}
+
+// WithMaxResponseSize sets the maximum response message size in bytes.
+func WithMaxResponseSize(size uint) ClientOption {
+	return func(cfg *clientConfig) {
+		cfg.maxResponseSize = size
+	}
+}
+
 // NewClient creates a new remote ledger client.
-// maxRequestSize and maxResponseSize specify the maximum message sizes in bytes.
-// If both are 0, defaults to 1 GiB for both requests and responses.
-func NewClient(grpcAddr string, logger zerolog.Logger, maxRequestSize, maxResponseSize uint) (*Client, error) {
+// Options can be provided to customize the client configuration.
+// By default, max request and response sizes are 1 GiB.
+func NewClient(grpcAddr string, logger zerolog.Logger, opts ...ClientOption) (*Client, error) {
 	logger = logger.With().Str("component", "remote_ledger_client").Logger()
 
-	// Use defaults if not specified
-	if maxRequestSize == 0 {
-		maxRequestSize = 1 << 30 // 1 GiB
-	}
-	if maxResponseSize == 0 {
-		maxResponseSize = 1 << 30 // 1 GiB
+	cfg := defaultClientConfig()
+	for _, opt := range opts {
+		opt(cfg)
 	}
 
 	// Create gRPC connection with max message size configuration.
@@ -46,8 +74,8 @@ func NewClient(grpcAddr string, logger zerolog.Logger, maxRequestSize, maxRespon
 		grpcAddr,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithDefaultCallOptions(
-			grpc.MaxCallRecvMsgSize(int(maxResponseSize)),
-			grpc.MaxCallSendMsgSize(int(maxRequestSize)),
+			grpc.MaxCallRecvMsgSize(int(cfg.maxResponseSize)),
+			grpc.MaxCallSendMsgSize(int(cfg.maxRequestSize)),
 		),
 	)
 	if err != nil {

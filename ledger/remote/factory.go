@@ -31,7 +31,14 @@ func NewRemoteLedgerFactory(
 }
 
 func (f *RemoteLedgerFactory) NewLedger() (ledger.Ledger, error) {
-	client, err := NewClient(f.grpcAddr, f.logger, f.maxRequestSize, f.maxResponseSize)
+	var opts []ClientOption
+	if f.maxRequestSize > 0 {
+		opts = append(opts, WithMaxRequestSize(f.maxRequestSize))
+	}
+	if f.maxResponseSize > 0 {
+		opts = append(opts, WithMaxResponseSize(f.maxResponseSize))
+	}
+	client, err := NewClient(f.grpcAddr, f.logger, opts...)
 	if err != nil {
 		return nil, err
 	}
