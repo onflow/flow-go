@@ -47,8 +47,9 @@ type AccessCollector struct {
 	connectionInvalidated prometheus.Counter
 	connectionUpdated     prometheus.Counter
 	connectionEvicted     prometheus.Counter
-	lastFullBlockHeight   prometheus.Gauge
-	maxReceiptHeight      prometheus.Gauge
+	lastFullBlockHeight                 prometheus.Gauge
+	lastBlockCollectionIndexedHeight    prometheus.Gauge
+	maxReceiptHeight                    prometheus.Gauge
 
 	// used to skip heights that are lower than the current max height
 	maxReceiptHeightValue counters.StrictMonotonicCounter
@@ -106,6 +107,12 @@ func NewAccessCollector(opts ...AccessCollectorOpts) *AccessCollector {
 			Subsystem: subsystemIngestion,
 			Help:      "gauge to track the highest consecutive finalized block height with all collections indexed",
 		}),
+		lastBlockCollectionIndexedHeight: promauto.NewGauge(prometheus.GaugeOpts{
+			Name:      "last_block_collection_indexed_height",
+			Namespace: namespaceAccess,
+			Subsystem: subsystemIngestion,
+			Help:      "gauge to track the highest consecutive finalized block height with collection-to-block index built",
+		}),
 		maxReceiptHeight: promauto.NewGauge(prometheus.GaugeOpts{
 			Name:      "max_receipt_height",
 			Namespace: namespaceAccess,
@@ -153,6 +160,10 @@ func (ac *AccessCollector) ConnectionFromPoolEvicted() {
 
 func (ac *AccessCollector) UpdateLastFullBlockHeight(height uint64) {
 	ac.lastFullBlockHeight.Set(float64(height))
+}
+
+func (ac *AccessCollector) UpdateLastBlockCollectionIndexedHeight(height uint64) {
+	ac.lastBlockCollectionIndexedHeight.Set(float64(height))
 }
 
 func (ac *AccessCollector) UpdateExecutionReceiptMaxHeight(height uint64) {
