@@ -1,0 +1,100 @@
+[
+  {
+    "role": "access",
+    "name": "access1",
+    "node_id": "9860ac3966c3b88043a882baf8e6ca8619ea5f95853753954b7ab49363efde21",
+    "docker_tag": "v0.27.6",
+    "docker_registry": "gcr.io/flow-container-registry"
+  },
+  {
+    "role": "access",
+    "name": "access2",
+    "node_id": "7dd7ad2565841c803d898be0b7723e6ea8348eac44a4d8e4a0b7ebe0d9c8304b",
+    "docker_tag": "v0.27.6",
+    "docker_registry": "gcr.io/flow-container-registry"
+  },
+  {
+    "role": "collection",
+    "name": "collection1",
+    "node_id": "416c65782048656e74736368656c00f2b77702c5b90981bc7ebca02d7e5ac9b3",
+    "docker_tag": "v0.27.6",
+    "docker_registry": "gcr.io/flow-container-registry"
+  },
+  {
+    "role": "collection",
+    "name": "collection2",
+    "node_id": "416e647265772042757269616e004acd8c101a5810f3ca90f68378b11bb69970",
+    "docker_tag": "v0.27.6",
+    "docker_registry": "gcr.io/flow-container-registry"
+  },
+  {
+    "role": "collection",
+    "name": "collection3",
+    "node_id": "4261737469616e204d756c6c65720045611a422bdb73ee6e747fa3ebf43282b6",
+    "docker_tag": "v0.27.6",
+    "docker_registry": "gcr.io/flow-container-registry"
+  },
+  {
+    "role": "collection",
+    "name": "collection4",
+    "node_id": "42656e6a616d696e2056616e204d6574657200336446ef55757e6e21f1f3883a",
+    "docker_tag": "v0.27.6",
+    "docker_registry": "gcr.io/flow-container-registry"
+  },
+  {
+    "role": "collection",
+    "name": "collection5",
+    "node_id": "436173657920417272696e67746f6e008fe686f6bbb502f3b4d0951838ab3add",
+    "docker_tag": "v0.27.6",
+    "docker_registry": "gcr.io/flow-container-registry"
+  },
+  {
+    "role": "collection",
+    "name": "collection6",
+    "node_id": "44696574657220536869726c65790027ed1827d18001945988737745a5c12a2d",
+    "docker_tag": "v0.27.6",
+    "docker_registry": "gcr.io/flow-container-registry"
+  },
+  {
+    "role": "consensus",
+    "name": "consensus1",
+    "node_id": "4a616d65732048756e74657200cc3d5bc0fa89f027ec7e7a1b064cc032f1941f",
+    "docker_tag": "v0.27.6",
+    "docker_registry": "gcr.io/flow-container-registry"
+  },
+  {
+    "role": "consensus",
+    "name": "consensus2",
+    "node_id": "4a65666665727920446f796c6500a7a4692d8b56edd508238b5e8572beeba6b6",
+    "docker_tag": "v0.27.6",
+    "docker_registry": "gcr.io/flow-container-registry"
+  },
+  {
+    "role": "consensus",
+    "name": "consensus3",
+    "node_id": "4a6f7264616e20536368616c6d0059676024fe879d8ffc5ae53adaf00dbd8630",
+    "docker_tag": "v0.27.6",
+    "docker_registry": "gcr.io/flow-container-registry"
+  },
+  {
+    "role": "execution",
+    "name": "execution1",
+    "node_id": "4a6f73682048616e6e616e00a963fb7050b300c024526eee06767b237ccf5349",
+    "docker_tag": "v0.27.6",
+    "docker_registry": "gcr.io/flow-container-registry"
+  },
+  {
+    "role": "execution",
+    "name": "execution2",
+    "node_id": "4b616e205a68616e670075d983e43cd61f1136cda8c8c48887b5654dcfb2db59",
+    "docker_tag": "v0.27.6",
+    "docker_registry": "gcr.io/flow-container-registry"
+  },
+  {
+    "role": "verification",
+    "name": "verification1",
+    "node_id": "4c61796e65204c616672616e636500d8948997c9da4f49de7c997ebcdd44d55e",
+    "docker_tag": "v0.27.6",
+    "docker_registry": "gcr.io/flow-container-registry"
+  }
+]
