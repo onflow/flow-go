@@ -7,6 +7,9 @@ import (
 	"testing"
 
 	"github.com/jordanschalm/lockctx"
+	"github.com/onflow/cadence"
+	"github.com/onflow/cadence/common"
+	"github.com/onflow/cadence/encoding/ccf"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -17,6 +20,7 @@ import (
 	"github.com/onflow/flow-go/fvm/storage/derived"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/ledger"
+	"github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
@@ -44,6 +48,7 @@ type indexCoreTest struct {
 	results               *storagemock.LightTransactionResults
 	headers               *storagemock.Headers
 	scheduledTransactions *storagemock.ScheduledTransactions
+	accountTxIndex        *storagemock.AccountTransactions
 	collectionIndexer     *collectionsmock.CollectionIndexer
 	ctx                   context.Context
 	blocks                []*flow.Block
@@ -192,6 +197,11 @@ func (i *indexCoreTest) useDefaultTransactionResults() *indexCoreTest {
 	return i
 }
 
+func (i *indexCoreTest) useAccountTxIndex() *indexCoreTest {
+	i.accountTxIndex = storagemock.NewAccountTransactions(i.t)
+	return i
+}
+
 func (i *indexCoreTest) initIndexer() *indexCoreTest {
 	lockManager := storage.NewTestingLockManager()
 	pdb, dbDir := unittest.TempPebbleDB(i.t)
@@ -226,6 +236,13 @@ func (i *indexCoreTest) initIndexer() *indexCoreTest {
 	derivedChainData, err := derived.NewDerivedChainData(derived.DefaultDerivedDataCacheSize)
 	require.NoError(i.t, err)
 
+	// Handle Go interface nil gotcha: a typed nil pointer stored in an interface is not nil.
+	// We need to pass an actual nil interface value when accountTxIndex is not configured.
+	var accountTxIndex storage.AccountTransactions
+	if i.accountTxIndex != nil {
+		accountTxIndex = i.accountTxIndex
+	}
+
 	i.indexer = New(
 		log,
 		metrics.NewNoopCollector(),
@@ -242,6 +259,7 @@ func (i *indexCoreTest) initIndexer() *indexCoreTest {
 		i.collectionIndexer,
 		collectionExecutedMetric,
 		lockManager,
+		accountTxIndex,
 	)
 	return i
 }
@@ -373,6 +391,87 @@ func TestExecutionState_IndexBlockData(t *testing.T) {
 		err := test.indexer.IndexBlockData(tf.ExecutionDataEntity())
 		assert.NoError(t, err)
 	})
+
+	// test that account transactions are indexed when accountTxIndex is enabled
+	t.Run("Index account transactions", func(t *testing.T) {
+		test := newIndexCoreTest(t, g, blocks, tf.ExecutionDataEntity()).
+			useAccountTxIndex().
+			initIndexer()
+
+		test.events.
+			On("BatchStore", mocks.MatchLock(storage.LockInsertEvent), blockID, []flow.EventsList{tf.ExpectedEvents}, mock.Anything).
+			Return(nil)
+		test.results.
+			On("BatchStore", mocks.MatchLock(storage.LockInsertLightTransactionResult), mock.Anything, blockID, tf.ExpectedResults).
+			Return(nil)
+		test.registers.
+			On("Store", mock.Anything, tf.Block.Height).
+			Return(nil)
+		test.collectionIndexer.On("IndexCollections", tf.ExpectedCollections).Return(nil).Once()
+		for txID, scheduledTxID := range tf.ExpectedScheduledTransactions {
+			test.scheduledTransactions.
+				On("BatchIndex", mocks.MatchLock(storage.LockIndexScheduledTransaction), blockID, txID, scheduledTxID, mock.Anything).
+				Return(nil)
+		}
+
+		// Expect account transactions to be stored
+		var capturedEntries []access.AccountTransaction
+		test.accountTxIndex.
+			On("Store", tf.Block.Height, mock.AnythingOfType("[]access.AccountTransaction")).
+			Run(func(args mock.Arguments) {
+				capturedEntries = args.Get(1).([]access.AccountTransaction)
+			}).
+			Return(nil).
+			Once()
+
+		err := test.indexer.IndexBlockData(tf.ExecutionDataEntity())
+		require.NoError(t, err)
+
+		// Verify account transactions were captured
+		require.NotEmpty(t, capturedEntries, "expected account transactions to be indexed")
+
+		// Verify entries have correct block height
+		for _, entry := range capturedEntries {
+			assert.Equal(t, tf.Block.Height, entry.BlockHeight)
+		}
+
+		// Verify we have at least some entries with non-empty addresses (from real tx participants)
+		hasNonEmptyAddr := false
+		for _, entry := range capturedEntries {
+			if entry.Address != flow.EmptyAddress {
+				hasNonEmptyAddr = true
+				break
+			}
+		}
+		assert.True(t, hasNonEmptyAddr, "expected at least one entry with non-empty address")
+	})
+
+	// test that account transactions are NOT indexed when accountTxIndex is nil
+	t.Run("Skip account transactions when disabled", func(t *testing.T) {
+		test := newIndexCoreTest(t, g, blocks, tf.ExecutionDataEntity()).
+			initIndexer() // Note: no useAccountTxIndex()
+
+		test.events.
+			On("BatchStore", mocks.MatchLock(storage.LockInsertEvent), blockID, []flow.EventsList{tf.ExpectedEvents}, mock.Anything).
+			Return(nil)
+		test.results.
+			On("BatchStore", mocks.MatchLock(storage.LockInsertLightTransactionResult), mock.Anything, blockID, tf.ExpectedResults).
+			Return(nil)
+		test.registers.
+			On("Store", mock.Anything, tf.Block.Height).
+			Return(nil)
+		test.collectionIndexer.On("IndexCollections", tf.ExpectedCollections).Return(nil).Once()
+		for txID, scheduledTxID := range tf.ExpectedScheduledTransactions {
+			test.scheduledTransactions.
+				On("BatchIndex", mocks.MatchLock(storage.LockIndexScheduledTransaction), blockID, txID, scheduledTxID, mock.Anything).
+				Return(nil)
+		}
+
+		// accountTxIndex.Store should NOT be called since it's nil
+
+		err := test.indexer.IndexBlockData(tf.ExecutionDataEntity())
+		assert.NoError(t, err)
+	})
 }
 
 func TestExecutionState_RegisterValues(t *testing.T) {
@@ -444,6 +543,7 @@ func TestIndexerIntegration_StoreAndGet(t *testing.T) {
 				collectionsmock.NewCollectionIndexer(t),
 				nil,
 				lockManager,
+				nil, // accountTxIndex
 			)
 
 			values := [][]byte{[]byte("1"), []byte("1"), []byte("2"), []byte("3"), []byte("4")}
@@ -480,6 +580,7 @@ func TestIndexerIntegration_StoreAndGet(t *testing.T) {
 				collectionsmock.NewCollectionIndexer(t),
 				nil,
 				lockManager,
+				nil, // accountTxIndex
 			)
 
 			value, err := index.RegisterValue(registerID, 0)
@@ -509,6 +610,7 @@ func TestIndexerIntegration_StoreAndGet(t *testing.T) {
 				collectionsmock.NewCollectionIndexer(t),
 				nil,
 				lockManager,
+				nil, // accountTxIndex
 			)
 
 			storeValues := [][]byte{[]byte("1"), []byte("2")}
@@ -555,6 +657,7 @@ func TestIndexerIntegration_StoreAndGet(t *testing.T) {
 				collectionsmock.NewCollectionIndexer(t),
 				nil,
 				lockManager,
+				nil, // accountTxIndex
 			)
 
 			require.NoError(t, index.indexRegisters(map[ledger.Path]*ledger.Payload{}, 1))
@@ -631,4 +734,885 @@ func TestCollectScheduledTransactions(t *testing.T) {
 func storeRegisterWithValue(indexer *IndexerCore, height uint64, owner string, key string, value []byte) error {
 	payload := LedgerPayloadFixture(owner, key, value)
 	return indexer.indexRegisters(map[ledger.Path]*ledger.Payload{ledger.DummyPath: payload}, height)
+}
+
+// newMinimalIndexerCore creates a minimal IndexerCore for testing buildAccountTxIndexEntries.
+// It only initializes the fields required for the method (chain ID and event types).
+func newMinimalIndexerCore(chainID flow.ChainID) *IndexerCore {
+	sc := systemcontracts.SystemContractsForChain(chainID)
+	ftAddr := sc.FungibleToken.Address.Hex()
+	nftAddr := sc.NonFungibleToken.Address.Hex()
+
+	return &IndexerCore{
+		log:              zerolog.Nop(),
+		chainID:          chainID,
+		ftDepositedType:  flow.EventType(fmt.Sprintf("A.%s.FungibleToken.Deposited", ftAddr)),
+		ftWithdrawnType:  flow.EventType(fmt.Sprintf("A.%s.FungibleToken.Withdrawn", ftAddr)),
+		nftDepositedType: flow.EventType(fmt.Sprintf("A.%s.NonFungibleToken.Deposited", nftAddr)),
+		nftWithdrawnType: flow.EventType(fmt.Sprintf("A.%s.NonFungibleToken.Withdrawn", nftAddr)),
+	}
+}
+
+func TestBuildAccountTxIndexEntries(t *testing.T) {
+	const testHeight = uint64(100)
+	indexer := newMinimalIndexerCore(flow.Testnet)
+
+	t.Run("empty block", func(t *testing.T) {
+		execData := &execution_data.BlockExecutionDataEntity{
+			BlockExecutionData: &execution_data.BlockExecutionData{
+				BlockID: unittest.IdentifierFixture(),
+				ChunkExecutionDatas: []*execution_data.ChunkExecutionData{
+					{Collection: nil}, // system chunk only
+				},
+			},
+		}
+
+		entries, err := indexer.buildAccountTxIndexEntries(testHeight, execData)
+		require.NoError(t, err)
+		assert.Empty(t, entries)
+	})
+
+	t.Run("single transaction with distinct accounts", func(t *testing.T) {
+		payer := unittest.RandomAddressFixture()
+		proposer := unittest.RandomAddressFixture()
+		auth1 := unittest.RandomAddressFixture()
+		auth2 := unittest.RandomAddressFixture()
+
+		tx := unittest.TransactionBodyFixture(
+			func(tb *flow.TransactionBody) {
+				tb.Payer = payer
+				tb.ProposalKey = flow.ProposalKey{Address: proposer}
+				tb.Authorizers = []flow.Address{auth1, auth2}
+			},
+		)
+
+		execData := &execution_data.BlockExecutionDataEntity{
+			BlockExecutionData: &execution_data.BlockExecutionData{
+				BlockID: unittest.IdentifierFixture(),
+				ChunkExecutionDatas: []*execution_data.ChunkExecutionData{
+					{
+						Collection: &flow.Collection{
+							Transactions: []*flow.TransactionBody{&tx},
+						},
+					},
+					{Collection: nil}, // system chunk
+				},
+			},
+		}
+
+		// One entry per (account, transaction) pair = 4 entries for 4 distinct accounts
+		entries, err := indexer.buildAccountTxIndexEntries(testHeight, execData)
+		require.NoError(t, err)
+		require.Len(t, entries, 4)
+
+		// Build map to check results
+		addrMap := toAddressMap(entries)
+		assertAccountEntry(t, addrMap, payer, false)
+		assertAccountEntry(t, addrMap, proposer, false)
+		assertAccountEntry(t, addrMap, auth1, true)
+		assertAccountEntry(t, addrMap, auth2, true)
+	})
+
+	t.Run("payer is also authorizer", func(t *testing.T) {
+		payer := unittest.RandomAddressFixture()
+		proposer := unittest.RandomAddressFixture()
+
+		tx := unittest.TransactionBodyFixture(
+			func(tb *flow.TransactionBody) {
+				tb.Payer = payer
+				tb.ProposalKey = flow.ProposalKey{Address: proposer}
+				tb.Authorizers = []flow.Address{payer} // payer is also authorizer
+			},
+		)
+
+		execData := &execution_data.BlockExecutionDataEntity{
+			BlockExecutionData: &execution_data.BlockExecutionData{
+				BlockID: unittest.IdentifierFixture(),
+				ChunkExecutionDatas: []*execution_data.ChunkExecutionData{
+					{
+						Collection: &flow.Collection{
+							Transactions: []*flow.TransactionBody{&tx},
+						},
+					},
+					{Collection: nil}, // system chunk
+				},
+			},
+		}
+
+		// 2 unique accounts: payer (also authorizer) and proposer
+		entries, err := indexer.buildAccountTxIndexEntries(testHeight, execData)
+		require.NoError(t, err)
+		require.Len(t, entries, 2)
+
+		addrMap := toAddressMap(entries)
+		assertAccountEntry(t, addrMap, payer, true)
+		assertAccountEntry(t, addrMap, proposer, false)
+	})
+
+	t.Run("multiple transactions across multiple chunks", func(t *testing.T) {
+		account1 := unittest.RandomAddressFixture()
+		account2 := unittest.RandomAddressFixture()
+		account3 := unittest.RandomAddressFixture()
+
+		tx1 := unittest.TransactionBodyFixture(
+			func(tb *flow.TransactionBody) {
+				tb.Payer = account1
+				tb.ProposalKey = flow.ProposalKey{Address: account1}
+				tb.Authorizers = []flow.Address{account1}
+			},
+		)
+
+		tx2 := unittest.TransactionBodyFixture(
+			func(tb *flow.TransactionBody) {
+				tb.Payer = account2
+				tb.ProposalKey = flow.ProposalKey{Address: account2}
+				tb.Authorizers = []flow.Address{account2}
+			},
+		)
+
+		tx3 := unittest.TransactionBodyFixture(
+			func(tb *flow.TransactionBody) {
+				tb.Payer = account3
+				tb.ProposalKey = flow.ProposalKey{Address: account3}
+				tb.Authorizers = []flow.Address{account3}
+			},
+		)
+
+		execData := &execution_data.BlockExecutionDataEntity{
+			BlockExecutionData: &execution_data.BlockExecutionData{
+				BlockID: unittest.IdentifierFixture(),
+				ChunkExecutionDatas: []*execution_data.ChunkExecutionData{
+					{
+						Collection: &flow.Collection{
+							Transactions: []*flow.TransactionBody{&tx1, &tx2},
+						},
+					},
+					{
+						Collection: &flow.Collection{
+							Transactions: []*flow.TransactionBody{&tx3},
+						},
+					},
+					{Collection: nil}, // system chunk
+				},
+			},
+		}
+
+		// Each transaction has 1 unique account (payer=proposer=authorizer)
+		// So 3 transactions = 3 entries
+		entries, err := indexer.buildAccountTxIndexEntries(testHeight, execData)
+		require.NoError(t, err)
+		require.Len(t, entries, 3)
+
+		// Group entries by transaction
+		entriesByTx := make(map[flow.Identifier][]access.AccountTransaction)
+		for _, entry := range entries {
+			entriesByTx[entry.TransactionID] = append(entriesByTx[entry.TransactionID], entry)
+		}
+
+		// Verify each transaction has one entry with correct tx index
+		tx1Addrs := toAddressMap(entriesByTx[tx1.ID()])
+		require.Len(t, tx1Addrs, 1)
+		assertAccountEntry(t, tx1Addrs, account1, true)
+
+		tx2Addrs := toAddressMap(entriesByTx[tx2.ID()])
+		require.Len(t, tx2Addrs, 1)
+		assertAccountEntry(t, tx2Addrs, account2, true)
+
+		tx3Addrs := toAddressMap(entriesByTx[tx3.ID()])
+		require.Len(t, tx3Addrs, 1)
+		assertAccountEntry(t, tx3Addrs, account3, true)
+	})
+}
+
+// Helper functions for creating CCF-encoded transfer events
+
+// createFTDepositedEvent creates a CCF-encoded FungibleToken.Deposited event
+func createFTDepositedEvent(t *testing.T, eventType flow.EventType, txIndex uint32, toAddr *flow.Address) flow.Event {
+	// Build the "to" field as optional String (hex address)
+	var toValue cadence.Value
+	if toAddr != nil {
+		addrStr, err := cadence.NewString(toAddr.Hex())
+		require.NoError(t, err)
+		toValue = cadence.NewOptional(addrStr)
+	} else {
+		toValue = cadence.NewOptional(nil)
+	}
+
+	location := common.NewAddressLocation(nil, common.Address{}, "FungibleToken")
+	eventCadenceType := cadence.NewEventType(
+		location,
+		"FungibleToken.Deposited",
+		[]cadence.Field{
+			{Identifier: "type", Type: cadence.StringType},
+			{Identifier: "amount", Type: cadence.UFix64Type},
+			{Identifier: "to", Type: cadence.NewOptionalType(cadence.StringType)},
+			{Identifier: "toUUID", Type: cadence.UInt64Type},
+			{Identifier: "depositedUUID", Type: cadence.UInt64Type},
+			{Identifier: "balanceAfter", Type: cadence.UFix64Type},
+		},
+		nil,
+	)
+
+	event := cadence.NewEvent([]cadence.Value{
+		cadence.String("A.0x1.FlowToken.Vault"),
+		cadence.UFix64(100_00000000), // 100.0
+		toValue,
+		cadence.UInt64(1),
+		cadence.UInt64(2),
+		cadence.UFix64(200_00000000),
+	}).WithType(eventCadenceType)
+
+	payload, err := ccf.Encode(event)
+	require.NoError(t, err)
+
+	return flow.Event{
+		Type:             eventType,
+		TransactionIndex: txIndex,
+		EventIndex:       0,
+		Payload:          payload,
+	}
+}
+
+// createFTWithdrawnEvent creates a CCF-encoded FungibleToken.Withdrawn event
+func createFTWithdrawnEvent(t *testing.T, eventType flow.EventType, txIndex uint32, fromAddr *flow.Address) flow.Event {
+	var fromValue cadence.Value
+	if fromAddr != nil {
+		addrStr, err := cadence.NewString(fromAddr.Hex())
+		require.NoError(t, err)
+		fromValue = cadence.NewOptional(addrStr)
+	} else {
+		fromValue = cadence.NewOptional(nil)
+	}
+
+	location := common.NewAddressLocation(nil, common.Address{}, "FungibleToken")
+	eventCadenceType := cadence.NewEventType(
+		location,
+		"FungibleToken.Withdrawn",
+		[]cadence.Field{
+			{Identifier: "type", Type: cadence.StringType},
+			{Identifier: "amount", Type: cadence.UFix64Type},
+			{Identifier: "from", Type: cadence.NewOptionalType(cadence.StringType)},
+			{Identifier: "fromUUID", Type: cadence.UInt64Type},
+			{Identifier: "withdrawnUUID", Type: cadence.UInt64Type},
+			{Identifier: "balanceAfter", Type: cadence.UFix64Type},
+		},
+		nil,
+	)
+
+	event := cadence.NewEvent([]cadence.Value{
+		cadence.String("A.0x1.FlowToken.Vault"),
+		cadence.UFix64(50_00000000),
+		fromValue,
+		cadence.UInt64(1),
+		cadence.UInt64(3),
+		cadence.UFix64(150_00000000),
+	}).WithType(eventCadenceType)
+
+	payload, err := ccf.Encode(event)
+	require.NoError(t, err)
+
+	return flow.Event{
+		Type:             eventType,
+		TransactionIndex: txIndex,
+		EventIndex:       0,
+		Payload:          payload,
+	}
+}
+
+// createNFTDepositedEvent creates a CCF-encoded NonFungibleToken.Deposited event
+func createNFTDepositedEvent(t *testing.T, eventType flow.EventType, txIndex uint32, toAddr *flow.Address) flow.Event {
+	var toValue cadence.Value
+	if toAddr != nil {
+		addrStr, err := cadence.NewString(toAddr.Hex())
+		require.NoError(t, err)
+		toValue = cadence.NewOptional(addrStr)
+	} else {
+		toValue = cadence.NewOptional(nil)
+	}
+
+	location := common.NewAddressLocation(nil, common.Address{}, "NonFungibleToken")
+	eventCadenceType := cadence.NewEventType(
+		location,
+		"NonFungibleToken.Deposited",
+		[]cadence.Field{
+			{Identifier: "type", Type: cadence.StringType},
+			{Identifier: "id", Type: cadence.UInt64Type},
+			{Identifier: "uuid", Type: cadence.UInt64Type},
+			{Identifier: "to", Type: cadence.NewOptionalType(cadence.StringType)},
+			{Identifier: "collectionUUID", Type: cadence.UInt64Type},
+		},
+		nil,
+	)
+
+	event := cadence.NewEvent([]cadence.Value{
+		cadence.String("A.0x1.TopShot.NFT"),
+		cadence.UInt64(42),
+		cadence.UInt64(100),
+		toValue,
+		cadence.UInt64(5),
+	}).WithType(eventCadenceType)
+
+	payload, err := ccf.Encode(event)
+	require.NoError(t, err)
+
+	return flow.Event{
+		Type:             eventType,
+		TransactionIndex: txIndex,
+		EventIndex:       0,
+		Payload:          payload,
+	}
+}
+
+// createNFTWithdrawnEvent creates a CCF-encoded NonFungibleToken.Withdrawn event
+func createNFTWithdrawnEvent(t *testing.T, eventType flow.EventType, txIndex uint32, fromAddr *flow.Address) flow.Event {
+	var fromValue cadence.Value
+	if fromAddr != nil {
+		addrStr, err := cadence.NewString(fromAddr.Hex())
+		require.NoError(t, err)
+		fromValue = cadence.NewOptional(addrStr)
+	} else {
+		fromValue = cadence.NewOptional(nil)
+	}
+
+	location := common.NewAddressLocation(nil, common.Address{}, "NonFungibleToken")
+	eventCadenceType := cadence.NewEventType(
+		location,
+		"NonFungibleToken.Withdrawn",
+		[]cadence.Field{
+			{Identifier: "type", Type: cadence.StringType},
+			{Identifier: "id", Type: cadence.UInt64Type},
+			{Identifier: "uuid", Type: cadence.UInt64Type},
+			{Identifier: "from", Type: cadence.NewOptionalType(cadence.StringType)},
+			{Identifier: "providerUUID", Type: cadence.UInt64Type},
+		},
+		nil,
+	)
+
+	event := cadence.NewEvent([]cadence.Value{
+		cadence.String("A.0x1.TopShot.NFT"),
+		cadence.UInt64(42),
+		cadence.UInt64(100),
+		fromValue,
+		cadence.UInt64(5),
+	}).WithType(eventCadenceType)
+
+	payload, err := ccf.Encode(event)
+	require.NoError(t, err)
+
+	return flow.Event{
+		Type:             eventType,
+		TransactionIndex: txIndex,
+		EventIndex:       0,
+		Payload:          payload,
+	}
+}
+
+func TestBuildAccountTxIndexEntries_TransferEvents(t *testing.T) {
+	const testHeight = uint64(100)
+	indexer := newMinimalIndexerCore(flow.Testnet)
+
+	t.Run("FT deposited event adds recipient", func(t *testing.T) {
+		payer := unittest.RandomAddressFixture()
+		recipient := unittest.RandomAddressFixture()
+
+		tx := unittest.TransactionBodyFixture(func(tb *flow.TransactionBody) {
+			tb.Payer = payer
+			tb.ProposalKey = flow.ProposalKey{Address: payer}
+			tb.Authorizers = []flow.Address{payer}
+		})
+
+		depositEvent := createFTDepositedEvent(t, indexer.ftDepositedType, 0, &recipient)
+
+		execData := &execution_data.BlockExecutionDataEntity{
+			BlockExecutionData: &execution_data.BlockExecutionData{
+				BlockID: unittest.IdentifierFixture(),
+				ChunkExecutionDatas: []*execution_data.ChunkExecutionData{
+					{
+						Collection: &flow.Collection{Transactions: []*flow.TransactionBody{&tx}},
+						Events:     []flow.Event{depositEvent},
+					},
+					{Collection: nil},
+				},
+			},
+		}
+
+		entries, err := indexer.buildAccountTxIndexEntries(testHeight, execData)
+		require.NoError(t, err)
+		require.Len(t, entries, 2) // payer + recipient
+
+		addrMap := toAddressMap(entries)
+		assertAccountEntry(t, addrMap, payer, true)
+		assertAccountEntry(t, addrMap, recipient, false)
+	})
+
+	t.Run("FT withdrawn event adds sender", func(t *testing.T) {
+		payer := unittest.RandomAddressFixture()
+		sender := unittest.RandomAddressFixture()
+
+		tx := unittest.TransactionBodyFixture(func(tb *flow.TransactionBody) {
+			tb.Payer = payer
+			tb.ProposalKey = flow.ProposalKey{Address: payer}
+			tb.Authorizers = []flow.Address{payer}
+		})
+
+		withdrawEvent := createFTWithdrawnEvent(t, indexer.ftWithdrawnType, 0, &sender)
+
+		execData := &execution_data.BlockExecutionDataEntity{
+			BlockExecutionData: &execution_data.BlockExecutionData{
+				BlockID: unittest.IdentifierFixture(),
+				ChunkExecutionDatas: []*execution_data.ChunkExecutionData{
+					{
+						Collection: &flow.Collection{Transactions: []*flow.TransactionBody{&tx}},
+						Events:     []flow.Event{withdrawEvent},
+					},
+					{Collection: nil},
+				},
+			},
+		}
+
+		entries, err := indexer.buildAccountTxIndexEntries(testHeight, execData)
+		require.NoError(t, err)
+		require.Len(t, entries, 2) // payer + sender
+
+		addrMap := toAddressMap(entries)
+		assertAccountEntry(t, addrMap, payer, true)
+		assertAccountEntry(t, addrMap, sender, false)
+	})
+
+	t.Run("NFT deposited event adds recipient", func(t *testing.T) {
+		payer := unittest.RandomAddressFixture()
+		recipient := unittest.RandomAddressFixture()
+
+		tx := unittest.TransactionBodyFixture(func(tb *flow.TransactionBody) {
+			tb.Payer = payer
+			tb.ProposalKey = flow.ProposalKey{Address: payer}
+			tb.Authorizers = []flow.Address{payer}
+		})
+
+		depositEvent := createNFTDepositedEvent(t, indexer.nftDepositedType, 0, &recipient)
+
+		execData := &execution_data.BlockExecutionDataEntity{
+			BlockExecutionData: &execution_data.BlockExecutionData{
+				BlockID: unittest.IdentifierFixture(),
+				ChunkExecutionDatas: []*execution_data.ChunkExecutionData{
+					{
+						Collection: &flow.Collection{Transactions: []*flow.TransactionBody{&tx}},
+						Events:     []flow.Event{depositEvent},
+					},
+					{Collection: nil},
+				},
+			},
+		}
+
+		entries, err := indexer.buildAccountTxIndexEntries(testHeight, execData)
+		require.NoError(t, err)
+		require.Len(t, entries, 2)
+
+		addrMap := toAddressMap(entries)
+		assertAccountEntry(t, addrMap, payer, true)
+		assertAccountEntry(t, addrMap, recipient, false)
+	})
+
+	t.Run("NFT withdrawn event adds sender", func(t *testing.T) {
+		payer := unittest.RandomAddressFixture()
+		sender := unittest.RandomAddressFixture()
+
+		tx := unittest.TransactionBodyFixture(func(tb *flow.TransactionBody) {
+			tb.Payer = payer
+			tb.ProposalKey = flow.ProposalKey{Address: payer}
+			tb.Authorizers = []flow.Address{payer}
+		})
+
+		withdrawEvent := createNFTWithdrawnEvent(t, indexer.nftWithdrawnType, 0, &sender)
+
+		execData := &execution_data.BlockExecutionDataEntity{
+			BlockExecutionData: &execution_data.BlockExecutionData{
+				BlockID: unittest.IdentifierFixture(),
+				ChunkExecutionDatas: []*execution_data.ChunkExecutionData{
+					{
+						Collection: &flow.Collection{Transactions: []*flow.TransactionBody{&tx}},
+						Events:     []flow.Event{withdrawEvent},
+					},
+					{Collection: nil},
+				},
+			},
+		}
+
+		entries, err := indexer.buildAccountTxIndexEntries(testHeight, execData)
+		require.NoError(t, err)
+		require.Len(t, entries, 2)
+
+		addrMap := toAddressMap(entries)
+		assertAccountEntry(t, addrMap, payer, true)
+		assertAccountEntry(t, addrMap, sender, false)
+	})
+
+	t.Run("transfer event with nil address is skipped", func(t *testing.T) {
+		payer := unittest.RandomAddressFixture()
+
+		tx := unittest.TransactionBodyFixture(func(tb *flow.TransactionBody) {
+			tb.Payer = payer
+			tb.ProposalKey = flow.ProposalKey{Address: payer}
+			tb.Authorizers = []flow.Address{payer}
+		})
+
+		// Create event with nil address
+		depositEvent := createFTDepositedEvent(t, indexer.ftDepositedType, 0, nil)
+
+		execData := &execution_data.BlockExecutionDataEntity{
+			BlockExecutionData: &execution_data.BlockExecutionData{
+				BlockID: unittest.IdentifierFixture(),
+				ChunkExecutionDatas: []*execution_data.ChunkExecutionData{
+					{
+						Collection: &flow.Collection{Transactions: []*flow.TransactionBody{&tx}},
+						Events:     []flow.Event{depositEvent},
+					},
+					{Collection: nil},
+				},
+			},
+		}
+
+		entries, err := indexer.buildAccountTxIndexEntries(testHeight, execData)
+		require.NoError(t, err)
+		require.Len(t, entries, 1) // only payer, no recipient from nil address
+
+		addrMap := toAddressMap(entries)
+		assertAccountEntry(t, addrMap, payer, true)
+	})
+
+	t.Run("transfer recipient same as payer does not duplicate", func(t *testing.T) {
+		payer := unittest.RandomAddressFixture()
+
+		tx := unittest.TransactionBodyFixture(func(tb *flow.TransactionBody) {
+			tb.Payer = payer
+			tb.ProposalKey = flow.ProposalKey{Address: payer}
+			tb.Authorizers = []flow.Address{payer}
+		})
+
+		// Transfer to the same address as payer
+		depositEvent := createFTDepositedEvent(t, indexer.ftDepositedType, 0, &payer)
+
+		execData := &execution_data.BlockExecutionDataEntity{
+			BlockExecutionData: &execution_data.BlockExecutionData{
+				BlockID: unittest.IdentifierFixture(),
+				ChunkExecutionDatas: []*execution_data.ChunkExecutionData{
+					{
+						Collection: &flow.Collection{Transactions: []*flow.TransactionBody{&tx}},
+						Events:     []flow.Event{depositEvent},
+					},
+					{Collection: nil},
+				},
+			},
+		}
+
+		entries, err := indexer.buildAccountTxIndexEntries(testHeight, execData)
+		require.NoError(t, err)
+		require.Len(t, entries, 1) // deduplicated
+		addrMap := toAddressMap(entries)
+		assertAccountEntry(t, addrMap, payer, true)
+	})
+
+	t.Run("transfer sender does not override authorizer status", func(t *testing.T) {
+		payer := unittest.RandomAddressFixture()
+		sender := unittest.RandomAddressFixture()
+
+		tx := unittest.TransactionBodyFixture(func(tb *flow.TransactionBody) {
+			tb.Payer = payer
+			tb.ProposalKey = flow.ProposalKey{Address: payer}
+			tb.Authorizers = []flow.Address{sender} // sender is an authorizer
+		})
+
+		// Transfer event to the authorizer
+		depositEvent := createFTDepositedEvent(t, indexer.ftDepositedType, 0, &sender)
+
+		execData := &execution_data.BlockExecutionDataEntity{
+			BlockExecutionData: &execution_data.BlockExecutionData{
+				BlockID: unittest.IdentifierFixture(),
+				ChunkExecutionDatas: []*execution_data.ChunkExecutionData{
+					{
+						Collection: &flow.Collection{Transactions: []*flow.TransactionBody{&tx}},
+						Events:     []flow.Event{depositEvent},
+					},
+					{Collection: nil},
+				},
+			},
+		}
+
+		entries, err := indexer.buildAccountTxIndexEntries(testHeight, execData)
+		require.NoError(t, err)
+		require.Len(t, entries, 2) // payer + auth
+
+		addrMap := toAddressMap(entries)
+		assertAccountEntry(t, addrMap, sender, true)
+		assertAccountEntry(t, addrMap, payer, false)
+	})
+
+	t.Run("multiple transfer events in same transaction", func(t *testing.T) {
+		payer := unittest.RandomAddressFixture()
+		sender := unittest.RandomAddressFixture()
+		recipient := unittest.RandomAddressFixture()
+
+		tx := unittest.TransactionBodyFixture(func(tb *flow.TransactionBody) {
+			tb.Payer = payer
+			tb.ProposalKey = flow.ProposalKey{Address: payer}
+			tb.Authorizers = []flow.Address{payer}
+		})
+
+		withdrawEvent := createFTWithdrawnEvent(t, indexer.ftWithdrawnType, 0, &sender)
+		depositEvent := createFTDepositedEvent(t, indexer.ftDepositedType, 0, &recipient)
+
+		execData := &execution_data.BlockExecutionDataEntity{
+			BlockExecutionData: &execution_data.BlockExecutionData{
+				BlockID: unittest.IdentifierFixture(),
+				ChunkExecutionDatas: []*execution_data.ChunkExecutionData{
+					{
+						Collection: &flow.Collection{Transactions: []*flow.TransactionBody{&tx}},
+						Events:     []flow.Event{withdrawEvent, depositEvent},
+					},
+					{Collection: nil},
+				},
+			},
+		}
+
+		entries, err := indexer.buildAccountTxIndexEntries(testHeight, execData)
+		require.NoError(t, err)
+		require.Len(t, entries, 3) // payer + sender + recipient
+
+		addrMap := toAddressMap(entries)
+		assertAccountEntry(t, addrMap, payer, true)
+		assertAccountEntry(t, addrMap, sender, false)
+		assertAccountEntry(t, addrMap, recipient, false)
+	})
+
+	t.Run("events across multiple chunks with correct txIndex", func(t *testing.T) {
+		account1 := unittest.RandomAddressFixture()
+		account2 := unittest.RandomAddressFixture()
+		recipient1 := unittest.RandomAddressFixture()
+		recipient2 := unittest.RandomAddressFixture()
+
+		tx1 := unittest.TransactionBodyFixture(func(tb *flow.TransactionBody) {
+			tb.Payer = account1
+			tb.ProposalKey = flow.ProposalKey{Address: account1}
+			tb.Authorizers = []flow.Address{account1}
+		})
+
+		tx2 := unittest.TransactionBodyFixture(func(tb *flow.TransactionBody) {
+			tb.Payer = account2
+			tb.ProposalKey = flow.ProposalKey{Address: account2}
+			tb.Authorizers = []flow.Address{account2}
+		})
+
+		// Event for tx1 (txIndex=0) in chunk 0
+		event1 := createFTDepositedEvent(t, indexer.ftDepositedType, 0, &recipient1)
+		// Event for tx2 (txIndex=1) in chunk 1
+		event2 := createNFTDepositedEvent(t, indexer.nftDepositedType, 1, &recipient2)
+
+		execData := &execution_data.BlockExecutionDataEntity{
+			BlockExecutionData: &execution_data.BlockExecutionData{
+				BlockID: unittest.IdentifierFixture(),
+				ChunkExecutionDatas: []*execution_data.ChunkExecutionData{
+					{
+						Collection: &flow.Collection{Transactions: []*flow.TransactionBody{&tx1}},
+						Events:     []flow.Event{event1},
+					},
+					{
+						Collection: &flow.Collection{Transactions: []*flow.TransactionBody{&tx2}},
+						Events:     []flow.Event{event2},
+					},
+					{Collection: nil},
+				},
+			},
+		}
+
+		entries, err := indexer.buildAccountTxIndexEntries(testHeight, execData)
+		require.NoError(t, err)
+		require.Len(t, entries, 4) // account1+recipient1 + account2+recipient2
+
+		// Group by transaction
+		entriesByTx := make(map[flow.Identifier][]access.AccountTransaction)
+		for _, e := range entries {
+			entriesByTx[e.TransactionID] = append(entriesByTx[e.TransactionID], e)
+		}
+
+		// tx1 entries should have txIndex=0 and include recipient1
+		tx1Addrs := toAddressMap(entriesByTx[tx1.ID()])
+		require.Len(t, tx1Addrs, 2)
+		assertAccountEntry(t, tx1Addrs, account1, true)
+		assertAccountEntry(t, tx1Addrs, recipient1, false)
+
+		// tx2 entries should have txIndex=1 and include recipient2
+		tx2Addrs := toAddressMap(entriesByTx[tx2.ID()])
+		require.Len(t, tx2Addrs, 2)
+		assertAccountEntry(t, tx2Addrs, account2, true)
+		assertAccountEntry(t, tx2Addrs, recipient2, false)
+	})
+
+	t.Run("malformed event payload returns error", func(t *testing.T) {
+		payer := unittest.RandomAddressFixture()
+
+		tx := unittest.TransactionBodyFixture(func(tb *flow.TransactionBody) {
+			tb.Payer = payer
+			tb.ProposalKey = flow.ProposalKey{Address: payer}
+			tb.Authorizers = []flow.Address{payer}
+		})
+
+		// Create event with invalid CCF payload
+		badEvent := flow.Event{
+			Type:             indexer.ftDepositedType,
+			TransactionIndex: 0,
+			EventIndex:       0,
+			Payload:          []byte("not valid ccf"),
+		}
+
+		execData := &execution_data.BlockExecutionDataEntity{
+			BlockExecutionData: &execution_data.BlockExecutionData{
+				BlockID: unittest.IdentifierFixture(),
+				ChunkExecutionDatas: []*execution_data.ChunkExecutionData{
+					{
+						Collection: &flow.Collection{Transactions: []*flow.TransactionBody{&tx}},
+						Events:     []flow.Event{badEvent},
+					},
+					{Collection: nil},
+				},
+			},
+		}
+
+		_, err := indexer.buildAccountTxIndexEntries(testHeight, execData)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to extract address from event")
+	})
+
+	t.Run("non-transfer events are ignored", func(t *testing.T) {
+		payer := unittest.RandomAddressFixture()
+
+		tx := unittest.TransactionBodyFixture(func(tb *flow.TransactionBody) {
+			tb.Payer = payer
+			tb.ProposalKey = flow.ProposalKey{Address: payer}
+			tb.Authorizers = []flow.Address{payer}
+		})
+
+		// Create a random non-transfer event
+		randomEvent := unittest.EventFixture(
+			unittest.Event.WithTransactionIndex(0),
+		)
+
+		execData := &execution_data.BlockExecutionDataEntity{
+			BlockExecutionData: &execution_data.BlockExecutionData{
+				BlockID: unittest.IdentifierFixture(),
+				ChunkExecutionDatas: []*execution_data.ChunkExecutionData{
+					{
+						Collection: &flow.Collection{Transactions: []*flow.TransactionBody{&tx}},
+						Events:     []flow.Event{randomEvent},
+					},
+					{Collection: nil},
+				},
+			},
+		}
+
+		entries, err := indexer.buildAccountTxIndexEntries(testHeight, execData)
+		require.NoError(t, err)
+		require.Len(t, entries, 1) // only payer
+
+		addrMap := toAddressMap(entries)
+		assertAccountEntry(t, addrMap, payer, true)
+	})
+
+	t.Run("transfer events in system chunk (scheduled transactions) are indexed", func(t *testing.T) {
+		// User chunk: 2 transactions
+		userAccount1 := unittest.RandomAddressFixture()
+		userAccount2 := unittest.RandomAddressFixture()
+
+		userTx1 := unittest.TransactionBodyFixture(func(tb *flow.TransactionBody) {
+			tb.Payer = userAccount1
+			tb.ProposalKey = flow.ProposalKey{Address: userAccount1}
+			tb.Authorizers = []flow.Address{userAccount1}
+		})
+		userTx2 := unittest.TransactionBodyFixture(func(tb *flow.TransactionBody) {
+			tb.Payer = userAccount2
+			tb.ProposalKey = flow.ProposalKey{Address: userAccount2}
+			tb.Authorizers = []flow.Address{userAccount2}
+		})
+
+		// System chunk: 1 scheduled transaction (txIndex=2)
+		scheduledTxPayer := unittest.RandomAddressFixture()
+		scheduledTx := unittest.TransactionBodyFixture(func(tb *flow.TransactionBody) {
+			tb.Payer = scheduledTxPayer
+			tb.ProposalKey = flow.ProposalKey{Address: scheduledTxPayer}
+			tb.Authorizers = []flow.Address{scheduledTxPayer}
+		})
+
+		// Transfer event in the scheduled transaction (txIndex=2)
+		scheduledTxRecipient := unittest.RandomAddressFixture()
+		scheduledTxTransferEvent := createFTDepositedEvent(t, indexer.ftDepositedType, 2, &scheduledTxRecipient)
+
+		execData := &execution_data.BlockExecutionDataEntity{
+			BlockExecutionData: &execution_data.BlockExecutionData{
+				BlockID: unittest.IdentifierFixture(),
+				ChunkExecutionDatas: []*execution_data.ChunkExecutionData{
+					// User chunk with 2 transactions
+					{
+						Collection: &flow.Collection{Transactions: []*flow.TransactionBody{&userTx1, &userTx2}},
+						Events:     []flow.Event{},
+					},
+					// System chunk with 1 scheduled transaction and transfer event
+					{
+						Collection: &flow.Collection{Transactions: []*flow.TransactionBody{&scheduledTx}},
+						Events:     []flow.Event{scheduledTxTransferEvent},
+					},
+				},
+			},
+		}
+
+		entries, err := indexer.buildAccountTxIndexEntries(testHeight, execData)
+		require.NoError(t, err)
+
+		// Expected: userAccount1 + userAccount2 + scheduledTxPayer + scheduledTxRecipient = 4 entries
+		require.Len(t, entries, 4)
+
+		// Group by transaction
+		entriesByTx := make(map[flow.Identifier][]access.AccountTransaction)
+		for _, e := range entries {
+			entriesByTx[e.TransactionID] = append(entriesByTx[e.TransactionID], e)
+		}
+
+		// Verify user transactions
+		userTx1Addrs := toAddressMap(entriesByTx[userTx1.ID()])
+		require.Len(t, userTx1Addrs, 1)
+		assertAccountEntry(t, userTx1Addrs, userAccount1, true)
+
+		userTx2Addrs := toAddressMap(entriesByTx[userTx2.ID()])
+		require.Len(t, userTx2Addrs, 1)
+		assertAccountEntry(t, userTx2Addrs, userAccount2, true)
+
+		// Verify scheduled transaction includes both payer AND transfer recipient
+		scheduledTxAddrs := toAddressMap(entriesByTx[scheduledTx.ID()])
+		require.Len(t, scheduledTxAddrs, 2, "scheduled tx should have payer and transfer recipient")
+		assertAccountEntry(t, scheduledTxAddrs, scheduledTxPayer, true)
+		assertAccountEntry(t, scheduledTxAddrs, scheduledTxRecipient, false)
+
+		// Verify transaction indices are correct
+		for _, e := range entriesByTx[userTx1.ID()] {
+			assert.Equal(t, uint32(0), e.TransactionIndex)
+		}
+		for _, e := range entriesByTx[userTx2.ID()] {
+			assert.Equal(t, uint32(1), e.TransactionIndex)
+		}
+		for _, e := range entriesByTx[scheduledTx.ID()] {
+			assert.Equal(t, uint32(2), e.TransactionIndex)
+		}
+	})
+}
+
+func toAddressMap(entries []access.AccountTransaction) map[flow.Address]bool {
+	addrMap := make(map[flow.Address]bool)
+	for _, e := range entries {
+		addrMap[e.Address] = e.IsAuthorizer
+	}
+	return addrMap
+}
+
+func assertAccountEntry(t *testing.T, addrMap map[flow.Address]bool, addr flow.Address, expectedIsAuthorizer bool) {
+	isAuthorizer, ok := addrMap[addr]
+	require.True(t, ok)
+	assert.Equal(t, expectedIsAuthorizer, isAuthorizer)
 }

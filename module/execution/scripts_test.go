@@ -194,6 +194,7 @@ func (s *scriptTestSuite) SetupTest() {
 		nil,
 		nil,
 		lockManager,
+		nil, // accountTxIndex
 	)
 
 	s.scripts = NewScripts(
