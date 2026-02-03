@@ -368,7 +368,8 @@ type FlowAccessNodeBuilder struct {
 	FollowerEng    *followereng.ComplianceEngine
 	StateStreamEng *statestreambackend.Engine
 
-	// for tx status deriver to know about the highest full block (a block with all collections synced)
+	// for tx status deriver to know about the highest full block
+	// (a block with all collections synced)
 	// backed by either collection fetcher to execution data syncing
 	lastFullBlockHeight *collection_syncfactory.ProgressReader
 
