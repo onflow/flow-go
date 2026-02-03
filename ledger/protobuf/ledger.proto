@@ -34,6 +34,7 @@ message State {
 
 // KeyPart represents a part of a hierarchical key
 message KeyPart {
+  // type is actually uint16 but uint16 is not available in proto3
   uint32 type = 1;
   bytes value = 2;
 }
