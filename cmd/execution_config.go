@@ -20,6 +20,7 @@ import (
 	"github.com/onflow/flow-go/engine/execution/storehouse"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/storage/derived"
+	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/module/mempool"
@@ -101,9 +102,9 @@ func (exeConf *ExecutionConfig) SetupFlags(flags *pflag.FlagSet) {
 	flags.StringVar(&exeConf.triedir, "triedir", filepath.Join(datadir, "trie"), "directory to store the execution State")
 	flags.StringVar(&exeConf.executionDataDir, "execution-data-dir", filepath.Join(datadir, "execution_data"), "directory to use for storing Execution Data")
 	flags.StringVar(&exeConf.registerDir, "register-dir", filepath.Join(datadir, "register"), "directory to use for storing registers Data")
-	flags.Uint32Var(&exeConf.mTrieCacheSize, "mtrie-cache-size", 500, "cache size for MTrie")
-	flags.UintVar(&exeConf.checkpointDistance, "checkpoint-distance", 20, "number of WAL segments between checkpoints")
-	flags.UintVar(&exeConf.checkpointsToKeep, "checkpoints-to-keep", 5, "number of recent checkpoints to keep (0 to keep all)")
+	flags.Uint32Var(&exeConf.mTrieCacheSize, "mtrie-cache-size", ledger.DefaultMTrieCacheSize, "cache size for MTrie")
+	flags.UintVar(&exeConf.checkpointDistance, "checkpoint-distance", ledger.DefaultCheckpointDistance, "number of WAL segments between checkpoints")
+	flags.UintVar(&exeConf.checkpointsToKeep, "checkpoints-to-keep", ledger.DefaultCheckpointsToKeep, "number of recent checkpoints to keep (0 to keep all)")
 	flags.UintVar(&exeConf.computationConfig.DerivedDataCacheSize, "cadence-execution-cache", derived.DefaultDerivedDataCacheSize,
 		"cache size for Cadence execution")
 	flags.BoolVar(&exeConf.computationConfig.ExtensiveTracing, "extensive-tracing", false, "adds high-overhead tracing to execution")

@@ -34,16 +34,10 @@ type Config struct {
 	Logger                               zerolog.Logger
 }
 
-// Result holds the result of creating a ledger instance.
-type Result struct {
-	Ledger ledger.Ledger
-	WAL    *wal.DiskWAL // Only set for local ledger, nil for remote
-}
-
 // NewLedger creates a ledger instance based on the configuration.
 // If LedgerServiceAddr is set, it creates a remote ledger client.
 // Otherwise, it creates a local ledger with WAL and compactor.
-func NewLedger(config Config) (*Result, error) {
+func NewLedger(config Config) (ledger.Ledger, error) {
 	var factory ledger.Factory
 	var diskWal wal.LedgerWAL
 
@@ -113,18 +107,5 @@ func NewLedger(config Config) (*Result, error) {
 		return nil, fmt.Errorf("failed to create ledger: %w", err)
 	}
 
-	// Type assert to get the concrete DiskWAL type (only for local ledger)
-	var diskWAL *wal.DiskWAL
-	if diskWal != nil {
-		var ok bool
-		diskWAL, ok = diskWal.(*wal.DiskWAL)
-		if !ok {
-			return nil, fmt.Errorf("expected *wal.DiskWAL but got %T", diskWal)
-		}
-	}
-
-	return &Result{
-		Ledger: ledgerStorage,
-		WAL:    diskWAL,
-	}, nil
+	return ledgerStorage, nil
 }

@@ -60,7 +60,7 @@ func main() {
 
 	// Create ledger using factory
 	metricsCollector := metrics.NewLedgerCollector("ledger", "wal")
-	result, err := ledgerfactory.NewLedger(ledgerfactory.Config{
+	ledgerStorage, err := ledgerfactory.NewLedger(ledgerfactory.Config{
 		Triedir:                              *triedir,
 		MTrieCacheSize:                       uint32(*mtrieCacheSize),
 		CheckpointDistance:                   *checkpointDist,
@@ -74,8 +74,6 @@ func main() {
 	if err != nil {
 		logger.Fatal().Err(err).Msg("failed to create ledger")
 	}
-
-	ledgerStorage := result.Ledger
 
 	// Wait for ledger to be ready (WAL replay)
 	logger.Info().Msg("waiting for ledger initialization...")
