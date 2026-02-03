@@ -1,4 +1,4 @@
-package approvals
+package approvals_test
 
 import (
 	"fmt"
@@ -15,6 +15,8 @@ import (
 	"github.com/onflow/crypto/hash"
 
 	"github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/engine/consensus/approvals"
+	"github.com/onflow/flow-go/engine/consensus/approvals/testutil"
 	"github.com/onflow/flow-go/engine/consensus/approvals/tracker"
 	"github.com/onflow/flow-go/model/chunks"
 	"github.com/onflow/flow-go/model/flow"
@@ -49,20 +51,20 @@ func newVerifyingAssignmentCollector(logger zerolog.Logger,
 	seals realmempool.IncorporatedResultSeals,
 	sigHasher hash.Hasher,
 	approvalConduit network.Conduit,
-	requestTracker *RequestTracker,
+	requestTracker *approvals.RequestTracker,
 	requiredApprovalsForSealConstruction uint,
-) (*VerifyingAssignmentCollector, error) {
-	b, err := NewAssignmentCollectorBase(logger, workerPool, result, state, headers, assigner, seals, sigHasher,
+) (*approvals.VerifyingAssignmentCollector, error) {
+	b, err := approvals.NewAssignmentCollectorBase(logger, workerPool, result, state, headers, assigner, seals, sigHasher,
 		approvalConduit, requestTracker, requiredApprovalsForSealConstruction)
 	if err != nil {
 		return nil, err
 	}
-	return NewVerifyingAssignmentCollector(b)
+	return approvals.NewVerifyingAssignmentCollector(b)
 }
 
 type AssignmentCollectorTestSuite struct {
-	BaseAssignmentCollectorTestSuite
-	collector *VerifyingAssignmentCollector
+	testutil.BaseAssignmentCollectorTestSuite
+	collector *approvals.VerifyingAssignmentCollector
 }
 
 func (s *AssignmentCollectorTestSuite) SetupTest() {
@@ -369,8 +371,9 @@ func (s *AssignmentCollectorTestSuite) TestRequestMissingApprovals() {
 	requestCount, err = s.collector.RequestMissingApprovals(&tracker.NoopSealingTracker{}, lastHeight)
 	s.Require().NoError(err)
 
-	require.Equal(s.T(), int(requestCount), s.Chunks.Len()*len(s.collector.collectors))
-	require.Len(s.T(), requests, s.Chunks.Len()*len(s.collector.collectors))
+	require.NotNil(s.T(), requestCount)
+	require.Equal(s.T(), int(requestCount), s.Chunks.Len()*s.collector.ColectorsLen())
+	require.Len(s.T(), requests, s.Chunks.Len()*s.collector.ColectorsLen())
 
 	result := s.IncorporatedResult.Result
 	for _, chunk := range s.Chunks {
@@ -401,7 +404,7 @@ func (s *AssignmentCollectorTestSuite) TestCheckEmergencySealing() {
 		},
 	).Return(true, nil).Once()
 
-	err = s.collector.CheckEmergencySealing(&tracker.NoopSealingTracker{}, DefaultEmergencySealingThresholdForFinalization+s.IncorporatedBlock.Height)
+	err = s.collector.CheckEmergencySealing(&tracker.NoopSealingTracker{}, approvals.DefaultEmergencySealingThresholdForFinalization+s.IncorporatedBlock.Height)
 	require.NoError(s.T(), err)
 
 	s.SealsPL.AssertExpectations(s.T())
@@ -412,7 +415,7 @@ func (s *AssignmentCollectorTestSuite) TestCheckEmergencySealingNotEnoughFinaliz
 	err := s.collector.ProcessIncorporatedResult(s.IncorporatedResult)
 	require.NoError(s.T(), err)
 
-	err = s.collector.CheckEmergencySealing(&tracker.NoopSealingTracker{}, DefaultEmergencySealingThresholdForVerification+s.IncorporatedBlock.Height)
+	err = s.collector.CheckEmergencySealing(&tracker.NoopSealingTracker{}, approvals.DefaultEmergencySealingThresholdForVerification+s.IncorporatedBlock.Height)
 	require.NoError(s.T(), err)
 
 	// SealsPL.Add is not being called, because there isn't enough finalized blocks to trigger
