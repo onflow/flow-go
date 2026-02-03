@@ -159,7 +159,6 @@ type ExecutionNode struct {
 	scriptsEng             *scripts.Engine
 	followerDistributor    *pubsub.FollowerDistributor
 	checkAuthorizedAtBlock func(blockID flow.Identifier) (bool, error)
-	diskWAL                *wal.DiskWAL
 	blockDataUploader      *uploader.Manager
 	executionDataStore     execution_data.ExecutionDataStore
 	toTriggerCheckpoint    *atomic.Bool      // create the checkpoint trigger to be controlled by admin tool, and listened by the compactor
@@ -912,7 +911,7 @@ func (exeNode *ExecutionNode) LoadExecutionStateLedger(
 	error,
 ) {
 	// Create ledger using factory
-	result, err := ledgerfactory.NewLedger(ledgerfactory.Config{
+	ledgerStorage, err := ledgerfactory.NewLedger(ledgerfactory.Config{
 		LedgerServiceAddr:                    exeNode.exeConf.ledgerServiceAddr,
 		LedgerMaxRequestSize:                 exeNode.exeConf.ledgerMaxRequestSize,
 		LedgerMaxResponseSize:                exeNode.exeConf.ledgerMaxResponseSize,
@@ -930,8 +929,7 @@ func (exeNode *ExecutionNode) LoadExecutionStateLedger(
 		return nil, err
 	}
 
-	exeNode.ledgerStorage = result.Ledger
-	exeNode.diskWAL = result.WAL
+	exeNode.ledgerStorage = ledgerStorage
 
 	return exeNode.ledgerStorage, nil
 }

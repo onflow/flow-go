@@ -63,6 +63,7 @@ func (m *State) GetHash() []byte {
 
 // KeyPart represents a part of a hierarchical key
 type KeyPart struct {
+	// type is actually uint16 but uint16 is not available in proto3
 	Type                 uint32   `protobuf:"varint,1,opt,name=type,proto3" json:"type,omitempty"`
 	Value                []byte   `protobuf:"bytes,2,opt,name=value,proto3" json:"value,omitempty"`
 	XXX_NoUnkeyedLiteral struct{} `json:"-"`

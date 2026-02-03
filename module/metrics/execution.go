@@ -12,8 +12,8 @@ import (
 )
 
 type ExecutionCollector struct {
+	*LedgerCollector
 	tracer                                  module.Tracer
-	ledgerCollector                         *LedgerCollector
 	totalExecutedBlocksCounter              prometheus.Counter
 	totalExecutedCollectionsCounter         prometheus.Counter
 	totalExecutedTransactionsCounter        prometheus.Counter
@@ -411,8 +411,8 @@ func NewExecutionCollector(tracer module.Tracer) *ExecutionCollector {
 	})
 
 	ec := &ExecutionCollector{
+		LedgerCollector:                         ledgerCollector,
 		tracer:                                  tracer,
-		ledgerCollector:                         ledgerCollector,
 		blockExecutionTime:                      blockExecutionTime,
 		blockComputationUsed:                    blockComputationUsed,
 		blockComputationVector:                  blockComputationVector,
@@ -767,11 +767,6 @@ func (ec *ExecutionCollector) ExecutionStorageStateCommitment(bytes int64) {
 	ec.storageStateCommitment.Set(float64(bytes))
 }
 
-// ExecutionCheckpointSize reports the size of a checkpoint in bytes
-func (ec *ExecutionCollector) ExecutionCheckpointSize(bytes uint64) {
-	ec.ledgerCollector.ExecutionCheckpointSize(bytes)
-}
-
 // ExecutionLastExecutedBlockHeight reports last executed block height
 func (ec *ExecutionCollector) ExecutionLastExecutedBlockHeight(height uint64) {
 	ec.lastExecutedBlockHeightGauge.Set(float64(height))
@@ -789,91 +784,6 @@ func (ec *ExecutionCollector) ExecutionLastChunkDataPackPrunedHeight(height uint
 
 func (ec *ExecutionCollector) ExecutionTargetChunkDataPackPrunedHeight(height uint64) {
 	ec.targetChunkDataPackPrunedHeightGauge.Set(float64(height))
-}
-
-// ForestApproxMemorySize records approximate memory usage of forest (all in-memory trees)
-func (ec *ExecutionCollector) ForestApproxMemorySize(bytes uint64) {
-	ec.ledgerCollector.ForestApproxMemorySize(bytes)
-}
-
-// ForestNumberOfTrees current number of trees in a forest (in memory)
-func (ec *ExecutionCollector) ForestNumberOfTrees(number uint64) {
-	ec.ledgerCollector.ForestNumberOfTrees(number)
-}
-
-// LatestTrieRegCount records the number of unique register allocated (the lastest created trie)
-func (ec *ExecutionCollector) LatestTrieRegCount(number uint64) {
-	ec.ledgerCollector.LatestTrieRegCount(number)
-}
-
-// LatestTrieRegCountDiff records the difference between the number of unique register allocated of the latest created trie and parent trie
-func (ec *ExecutionCollector) LatestTrieRegCountDiff(number int64) {
-	ec.ledgerCollector.LatestTrieRegCountDiff(number)
-}
-
-// LatestTrieRegSize records the size of unique register allocated (the lastest created trie)
-func (ec *ExecutionCollector) LatestTrieRegSize(size uint64) {
-	ec.ledgerCollector.LatestTrieRegSize(size)
-}
-
-// LatestTrieRegSizeDiff records the difference between the size of unique register allocated of the latest created trie and parent trie
-func (ec *ExecutionCollector) LatestTrieRegSizeDiff(size int64) {
-	ec.ledgerCollector.LatestTrieRegSizeDiff(size)
-}
-
-// LatestTrieMaxDepthTouched records the maximum depth touched of the last created trie
-func (ec *ExecutionCollector) LatestTrieMaxDepthTouched(maxDepth uint16) {
-	ec.ledgerCollector.LatestTrieMaxDepthTouched(maxDepth)
-}
-
-// UpdateCount increase a counter of performed updates
-func (ec *ExecutionCollector) UpdateCount() {
-	ec.ledgerCollector.UpdateCount()
-}
-
-// ProofSize records a proof size
-func (ec *ExecutionCollector) ProofSize(bytes uint32) {
-	ec.ledgerCollector.ProofSize(bytes)
-}
-
-// UpdateValuesNumber accumulates number of updated values
-func (ec *ExecutionCollector) UpdateValuesNumber(number uint64) {
-	ec.ledgerCollector.UpdateValuesNumber(number)
-}
-
-// UpdateValuesSize total size (in bytes) of updates values
-func (ec *ExecutionCollector) UpdateValuesSize(bytes uint64) {
-	ec.ledgerCollector.UpdateValuesSize(bytes)
-}
-
-// UpdateDuration records absolute time for the update of a trie
-func (ec *ExecutionCollector) UpdateDuration(duration time.Duration) {
-	ec.ledgerCollector.UpdateDuration(duration)
-}
-
-// UpdateDurationPerItem records update time for single value (total duration / number of updated values)
-func (ec *ExecutionCollector) UpdateDurationPerItem(duration time.Duration) {
-	ec.ledgerCollector.UpdateDurationPerItem(duration)
-}
-
-// ReadValuesNumber accumulates number of read values
-func (ec *ExecutionCollector) ReadValuesNumber(number uint64) {
-	ec.ledgerCollector.ReadValuesNumber(number)
-}
-
-// ReadValuesSize total size (in bytes) of read values
-func (ec *ExecutionCollector) ReadValuesSize(bytes uint64) {
-	ec.ledgerCollector.ReadValuesSize(bytes)
-}
-
-// ReadDuration records absolute time for the read from a trie
-func (ec *ExecutionCollector) ReadDuration(duration time.Duration) {
-	ec.ledgerCollector.ReadDuration(duration)
-}
-
-// ReadDurationPerItem records read time for single value (total duration / number of read values)
-func (ec *ExecutionCollector) ReadDurationPerItem(duration time.Duration) {
-	ec.ledgerCollector.ReadDurationPerItem(duration)
 }
 
 func (ec *ExecutionCollector) ExecutionCollectionRequestSent() {

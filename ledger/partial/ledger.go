@@ -174,7 +174,7 @@ func (l *Ledger) StateCount() int {
 // StateByIndex returns the state at the given index
 // Partial ledger only has one state
 func (l *Ledger) StateByIndex(index int) (ledger.State, error) {
-	if index == 0 {
+	if index == 0 || index == -1 {
 		return l.state, nil
 	}
 	return ledger.DummyState, fmt.Errorf("index %d is out of range (partial ledger has 1 state)", index)

@@ -248,8 +248,9 @@ func TestPartialLedger_StateByIndex(t *testing.T) {
 	_, err = pled.StateByIndex(1)
 	require.Error(t, err, "should error for index out of range")
 
-	_, err = pled.StateByIndex(-1)
-	require.Error(t, err, "should error for negative index (partial ledger only supports index 0)")
+	state_1, err := pled.StateByIndex(-1)
+	require.NoError(t, err)
+	assert.Equal(t, newState, state_1, "state at index -1 should match the ledger state")
 
 	_, err = pled.StateByIndex(-2)
 	require.Error(t, err, "should error for negative index out of range")

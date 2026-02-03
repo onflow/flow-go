@@ -25,19 +25,48 @@ type Client struct {
 	once   sync.Once
 }
 
+// clientConfig holds configuration options for the Client.
+type clientConfig struct {
+	maxRequestSize  uint
+	maxResponseSize uint
+}
+
+// defaultClientConfig returns the default configuration.
+func defaultClientConfig() *clientConfig {
+	return &clientConfig{
+		maxRequestSize:  1 << 30, // 1 GiB
+		maxResponseSize: 1 << 30, // 1 GiB
+	}
+}
+
+// ClientOption is a function that configures a Client.
+type ClientOption func(*clientConfig)
+
+// WithMaxRequestSize sets the maximum request message size in bytes.
+func WithMaxRequestSize(size uint) ClientOption {
+	return func(cfg *clientConfig) {
+		cfg.maxRequestSize = size
+	}
+}
+
+// WithMaxResponseSize sets the maximum response message size in bytes.
+func WithMaxResponseSize(size uint) ClientOption {
+	return func(cfg *clientConfig) {
+		cfg.maxResponseSize = size
+	}
+}
+
 // NewClient creates a new remote ledger client.
 // grpcAddr can be either a TCP address (e.g., "localhost:9000") or a Unix domain socket (e.g., "unix:///tmp/ledger.sock").
 // maxRequestSize and maxResponseSize specify the maximum message sizes in bytes.
-// If both are 0, defaults to 1 GiB for both requests and responses.
-func NewClient(grpcAddr string, logger zerolog.Logger, maxRequestSize, maxResponseSize uint) (*Client, error) {
+// Options can be provided to customize the client configuration.
+// By default, max request and response sizes are 1 GiB.
+func NewClient(grpcAddr string, logger zerolog.Logger, opts ...ClientOption) (*Client, error) {
 	logger = logger.With().Str("component", "remote_ledger_client").Logger()
 
-	// Use defaults if not specified
-	if maxRequestSize == 0 {
-		maxRequestSize = 1 << 30 // 1 GiB
-	}
-	if maxResponseSize == 0 {
-		maxResponseSize = 1 << 30 // 1 GiB
+	cfg := defaultClientConfig()
+	for _, opt := range opts {
+		opt(cfg)
 	}
 
 	// Handle Unix domain socket addresses
@@ -64,8 +93,8 @@ func NewClient(grpcAddr string, logger zerolog.Logger, maxRequestSize, maxRespon
 			normalizedAddr,
 			grpc.WithTransportCredentials(insecure.NewCredentials()),
 			grpc.WithDefaultCallOptions(
-				grpc.MaxCallRecvMsgSize(int(maxResponseSize)),
-				grpc.MaxCallSendMsgSize(int(maxRequestSize)),
+				grpc.MaxCallRecvMsgSize(int(cfg.maxResponseSize)),
+				grpc.MaxCallSendMsgSize(int(cfg.maxRequestSize)),
 			),
 		)
 		if err == nil {
@@ -82,10 +111,7 @@ func NewClient(grpcAddr string, logger zerolog.Logger, maxRequestSize, maxRespon
 
 		time.Sleep(retryDelay)
 		// Exponential backoff with max cap
-		retryDelay = time.Duration(float64(retryDelay) * 1.5)
-		if retryDelay > maxRetryDelay {
-			retryDelay = maxRetryDelay
-		}
+		retryDelay = min(maxRetryDelay, time.Duration(float64(retryDelay)*1.5))
 	}
 
 	client := ledgerpb.NewLedgerServiceClient(conn)
@@ -111,7 +137,7 @@ func (c *Client) InitialState() ledger.State {
 	ctx := context.Background()
 	resp, err := c.client.InitialState(ctx, &emptypb.Empty{})
 	if err != nil {
-		c.logger.Error().Err(err).Msg("failed to get initial state")
+		c.logger.Fatal().Err(err).Msg("failed to get initial state")
 		return ledger.DummyState
 	}
 
@@ -239,6 +265,10 @@ func (c *Client) Set(update *ledger.Update) (ledger.State, *ledger.TrieUpdate, e
 	resp, err := c.client.Set(ctx, req)
 	if err != nil {
 		return ledger.DummyState, nil, fmt.Errorf("failed to set values: %w", err)
+	}
+
+	if resp == nil || resp.NewState == nil {
+		return ledger.DummyState, nil, fmt.Errorf("invalid response: missing new state")
 	}
 
 	var newState ledger.State

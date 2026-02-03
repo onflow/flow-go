@@ -77,7 +77,7 @@ unittest-main:
 .PHONY: install-mock-generators
 install-mock-generators:
 	cd ${GOPATH}; \
-    go install github.com/vektra/mockery/v2@v2.53.5;
+    go install github.com/vektra/mockery/v3@v3.6.1;
 
 .PHONY: install-tools
 install-tools: check-go-version install-mock-generators
@@ -145,7 +145,7 @@ generate: generate-proto generate-mocks generate-fvm-env-wrappers
 
 .PHONY: generate-proto
 generate-proto:
-	prototool generate protobuf
+	cd ledger/protobuf && buf generate
 
 .PHONY: generate-fvm-env-wrappers
 generate-fvm-env-wrappers:
@@ -153,8 +153,8 @@ generate-fvm-env-wrappers:
 
 .PHONY: generate-mocks
 generate-mocks: install-mock-generators
-	mockery --config .mockery.yaml
-	cd insecure; mockery --config .mockery.yaml
+	mockery --config .mockery.yaml --log-level warn
+	cd insecure; mockery --config .mockery.yaml --log-level warn
 
 # this ensures there is no unused dependency being added by accident
 .PHONY: tidy
