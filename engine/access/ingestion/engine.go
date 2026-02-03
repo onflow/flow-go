@@ -392,10 +392,10 @@ func (e *Engine) processFinalizedBlock(block *flow.Block) error {
 			return nil
 		})
 	})
-	if err != nil && !errors.Is(err, storage.ErrAlreadyExists) {
-		return fmt.Errorf("could not index block for collections: %w", err)
-	}
-	if errors.Is(err, storage.ErrAlreadyExists) {
+	if err != nil {
+		if !errors.Is(err, storage.ErrAlreadyExists) {
+			return fmt.Errorf("could not index block for collections: %w", err)
+		}
 		// the job queue processed index is updated in a separate db update, so it's possible that the above index
 		// has been built, but the jobqueue index has not been updated yet. In this case, we can safely skip processing.
 		e.log.Warn().
