@@ -13,7 +13,7 @@ import (
 
 type ExecutionCollector struct {
 	*LedgerCollector
-	tracer module.Tracer
+	tracer                                  module.Tracer
 	totalExecutedBlocksCounter              prometheus.Counter
 	totalExecutedCollectionsCounter         prometheus.Counter
 	totalExecutedTransactionsCounter        prometheus.Counter
