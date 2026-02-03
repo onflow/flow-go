@@ -145,7 +145,7 @@ generate: generate-proto generate-mocks generate-fvm-env-wrappers
 
 .PHONY: generate-proto
 generate-proto:
-	prototool generate protobuf
+	cd ledger/protobuf && buf generate
 
 .PHONY: generate-fvm-env-wrappers
 generate-fvm-env-wrappers:
