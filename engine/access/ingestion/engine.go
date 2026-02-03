@@ -230,12 +230,15 @@ func (e *Engine) processFinalizedBlockJob(ctx irrecoverable.SignalerContext, job
 	}
 
 	err = e.processFinalizedBlock(block)
-	if err == nil {
-		done()
+	if err != nil {
+		ctx.Throw(
+			fmt.Errorf(
+				"fatal error when ingestion building col->block index for finalized block (job: %s, height: %v): %w",
+				job.ID(), block.Height, err))
 		return
 	}
 
-	e.log.Fatal().Err(err).Str("job_id", string(job.ID())).Msg("error during finalized block processing job")
+	done()
 }
 
 // processExecutionReceipts is responsible for processing the execution receipts.
