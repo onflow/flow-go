@@ -41,9 +41,10 @@ func (s *ChunkApprovalCollectorTestSuite) SetupTest() {
 // and report status to caller.
 func (s *ChunkApprovalCollectorTestSuite) TestProcessApproval_ValidApproval() {
 	approval := unittest.ResultApprovalFixture(unittest.WithChunk(s.chunk.Index), unittest.WithApproverID(s.VerID))
+	require.Len(s.T(), s.collector.GetMissingSigners(), len(s.chunkAssignment))
 	_, collected := s.collector.ProcessApproval(approval)
 	require.False(s.T(), collected)
-	//require.Equal(s.T(), uint(1), s.collector.chunkApprovals.NumberSignatures())
+	require.Len(s.T(), s.collector.GetMissingSigners(), len(s.chunkAssignment)-1)
 }
 
 // TestProcessApproval_InvalidChunkAssignment tests processing approval with invalid chunk assignment. Expected to
@@ -51,9 +52,10 @@ func (s *ChunkApprovalCollectorTestSuite) TestProcessApproval_ValidApproval() {
 func (s *ChunkApprovalCollectorTestSuite) TestProcessApproval_InvalidChunkAssignment() {
 	approval := unittest.ResultApprovalFixture(unittest.WithChunk(s.chunk.Index), unittest.WithApproverID(s.VerID))
 	delete(s.chunkAssignment, s.VerID)
+	require.Len(s.T(), s.collector.GetMissingSigners(), len(s.chunkAssignment))
 	_, collected := s.collector.ProcessApproval(approval)
 	require.False(s.T(), collected)
-	//require.Equal(s.T(), uint(0), s.collector.chunkApprovals.NumberSignatures())
+	require.Len(s.T(), s.collector.GetMissingSigners(), len(s.chunkAssignment))
 }
 
 // TestGetAggregatedSignature_MultipleApprovals tests processing approvals from different verifiers. Expected to provide a valid
@@ -62,6 +64,7 @@ func (s *ChunkApprovalCollectorTestSuite) TestGetAggregatedSignature_MultipleApp
 	var aggregatedSig flow.AggregatedSignature
 	var collected bool
 	sigCollector := approvals.NewSignatureCollector()
+	require.Len(s.T(), s.collector.GetMissingSigners(), len(s.chunkAssignment))
 	for verID := range s.AuthorizedVerifiers {
 		approval := unittest.ResultApprovalFixture(unittest.WithChunk(s.chunk.Index), unittest.WithApproverID(verID))
 		aggregatedSig, collected = s.collector.ProcessApproval(approval)
@@ -70,7 +73,7 @@ func (s *ChunkApprovalCollectorTestSuite) TestGetAggregatedSignature_MultipleApp
 
 	require.True(s.T(), collected)
 	require.NotNil(s.T(), aggregatedSig)
-	//require.Equal(s.T(), uint(len(s.AuthorizedVerifiers)), s.collector.chunkApprovals.NumberSignatures())
+	require.Empty(s.T(), s.collector.GetMissingSigners())
 	require.Equal(s.T(), sigCollector.ToAggregatedSignature(), aggregatedSig)
 }
 
