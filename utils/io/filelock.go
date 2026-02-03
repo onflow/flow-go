@@ -71,6 +71,11 @@ func (fl *FileLock) Unlock() error {
 	return nil
 }
 
+// Close releases the file lock. Implements io.Closer.
+func (fl *FileLock) Close() error {
+	return fl.Unlock()
+}
+
 // Path returns the path to the lock file.
 func (fl *FileLock) Path() string {
 	return fl.path
