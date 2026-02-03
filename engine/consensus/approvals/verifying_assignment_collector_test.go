@@ -372,8 +372,8 @@ func (s *AssignmentCollectorTestSuite) TestRequestMissingApprovals() {
 	s.Require().NoError(err)
 
 	require.NotNil(s.T(), requestCount)
-	//require.Equal(s.T(), int(requestCount), s.Chunks.Len()*len(s.collector.collectors))
-	//require.Len(s.T(), requests, s.Chunks.Len()*len(s.collector.collectors))
+	require.Equal(s.T(), int(requestCount), s.Chunks.Len()*s.collector.ColectorsLen())
+	require.Len(s.T(), requests, s.Chunks.Len()*s.collector.ColectorsLen())
 
 	result := s.IncorporatedResult.Result
 	for _, chunk := range s.Chunks {

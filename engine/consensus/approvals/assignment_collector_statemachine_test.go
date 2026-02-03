@@ -47,10 +47,6 @@ func (s *AssignmentCollectorStateMachineTestSuite) SetupTest() {
 	require.NoError(s.T(), err)
 
 	s.collector = approvals.NewAssignmentCollectorStateMachine(ac)
-
-	//	executedBlock:                        s.Block,
-	//}
-
 }
 
 // TestChangeProcessingStatus_CachingToVerifying tests that state machine correctly performs transition from CachingApprovals to
@@ -84,21 +80,16 @@ func (s *AssignmentCollectorStateMachineTestSuite) TestChangeProcessingStatus_Ca
 	}
 
 	var wg sync.WaitGroup
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		for _, result := range results {
 			require.NoError(s.T(), s.collector.ProcessIncorporatedResult(result))
 		}
-	}()
-
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	})
+	wg.Go(func() {
 		for _, approval := range approvs {
 			require.NoError(s.T(), s.collector.ProcessApproval(approval))
 		}
-	}()
+	})
 
 	err := s.collector.ChangeProcessingStatus(approvals.CachingApprovals, approvals.VerifyingApprovals)
 	require.NoError(s.T(), err)
