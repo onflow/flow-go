@@ -77,7 +77,7 @@ func (c *Client) InitialState() ledger.State {
 	ctx := context.Background()
 	resp, err := c.client.InitialState(ctx, &emptypb.Empty{})
 	if err != nil {
-		c.logger.Error().Err(err).Msg("failed to get initial state")
+		c.logger.Fatal().Err(err).Msg("failed to get initial state")
 		return ledger.DummyState
 	}
 
