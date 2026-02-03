@@ -17,24 +17,29 @@ import (
 
 // Client implements ledger.Ledger interface using gRPC calls to a remote ledger service.
 type Client struct {
-	conn   *grpc.ClientConn
-	client ledgerpb.LedgerServiceClient
-	logger zerolog.Logger
-	done   chan struct{}
-	once   sync.Once
+	conn        *grpc.ClientConn
+	client      ledgerpb.LedgerServiceClient
+	logger      zerolog.Logger
+	done        chan struct{}
+	once        sync.Once
+	ctx         context.Context
+	cancel      context.CancelFunc
+	callTimeout time.Duration
 }
 
 // clientConfig holds configuration options for the Client.
 type clientConfig struct {
 	maxRequestSize  uint
 	maxResponseSize uint
+	callTimeout     time.Duration
 }
 
 // defaultClientConfig returns the default configuration.
 func defaultClientConfig() *clientConfig {
 	return &clientConfig{
-		maxRequestSize:  1 << 30, // 1 GiB
-		maxResponseSize: 1 << 30, // 1 GiB
+		maxRequestSize:  1 << 30,      // 1 GiB
+		maxResponseSize: 1 << 30,      // 1 GiB
+		callTimeout:     time.Minute,
 	}
 }
 
@@ -52,6 +57,13 @@ func WithMaxRequestSize(size uint) ClientOption {
 func WithMaxResponseSize(size uint) ClientOption {
 	return func(cfg *clientConfig) {
 		cfg.maxResponseSize = size
+	}
+}
+
+// WithCallTimeout sets the timeout for individual gRPC calls.
+func WithCallTimeout(timeout time.Duration) ClientOption {
+	return func(cfg *clientConfig) {
+		cfg.callTimeout = timeout
 	}
 }
 
@@ -84,11 +96,16 @@ func NewClient(grpcAddr string, logger zerolog.Logger, opts ...ClientOption) (*C
 
 	client := ledgerpb.NewLedgerServiceClient(conn)
 
+	ctx, cancel := context.WithCancel(context.Background())
+
 	return &Client{
-		conn:   conn,
-		client: client,
-		logger: logger,
-		done:   make(chan struct{}),
+		conn:        conn,
+		client:      client,
+		logger:      logger,
+		done:        make(chan struct{}),
+		ctx:         ctx,
+		cancel:      cancel,
+		callTimeout: cfg.callTimeout,
 	}, nil
 }
 
@@ -100,9 +117,16 @@ func (c *Client) Close() error {
 	return nil
 }
 
+// callCtx returns a context for gRPC calls with the configured timeout.
+// The context is also cancelled when the client is shut down via Done().
+func (c *Client) callCtx() (context.Context, context.CancelFunc) {
+	return context.WithTimeout(c.ctx, c.callTimeout)
+}
+
 // InitialState returns the initial state of the ledger.
 func (c *Client) InitialState() ledger.State {
-	ctx := context.Background()
+	ctx, cancel := c.callCtx()
+	defer cancel()
 	resp, err := c.client.InitialState(ctx, &emptypb.Empty{})
 	if err != nil {
 		c.logger.Fatal().Err(err).Msg("failed to get initial state")
@@ -123,7 +147,8 @@ func (c *Client) InitialState() ledger.State {
 
 // HasState returns true if the given state exists in the ledger.
 func (c *Client) HasState(state ledger.State) bool {
-	ctx := context.Background()
+	ctx, cancel := c.callCtx()
+	defer cancel()
 	req := &ledgerpb.StateRequest{
 		State: &ledgerpb.State{
 			Hash: state[:],
@@ -141,7 +166,8 @@ func (c *Client) HasState(state ledger.State) bool {
 
 // GetSingleValue returns a single value for a given key at a specific state.
 func (c *Client) GetSingleValue(query *ledger.QuerySingleValue) (ledger.Value, error) {
-	ctx := context.Background()
+	ctx, cancel := c.callCtx()
+	defer cancel()
 	state := query.State()
 	req := &ledgerpb.GetSingleValueRequest{
 		State: &ledgerpb.State{
@@ -168,7 +194,8 @@ func (c *Client) GetSingleValue(query *ledger.QuerySingleValue) (ledger.Value, e
 
 // Get returns values for multiple keys at a specific state.
 func (c *Client) Get(query *ledger.Query) ([]ledger.Value, error) {
-	ctx := context.Background()
+	ctx, cancel := c.callCtx()
+	defer cancel()
 	state := query.State()
 	req := &ledgerpb.GetRequest{
 		State: &ledgerpb.State{
@@ -206,7 +233,8 @@ func (c *Client) Get(query *ledger.Query) ([]ledger.Value, error) {
 
 // Set updates keys with new values at a specific state and returns the new state.
 func (c *Client) Set(update *ledger.Update) (ledger.State, *ledger.TrieUpdate, error) {
-	ctx := context.Background()
+	ctx, cancel := c.callCtx()
+	defer cancel()
 	state := update.State()
 	req := &ledgerpb.SetRequest{
 		State: &ledgerpb.State{
@@ -257,7 +285,8 @@ func (c *Client) Set(update *ledger.Update) (ledger.State, *ledger.TrieUpdate, e
 
 // Prove returns proofs for the given keys at a specific state.
 func (c *Client) Prove(query *ledger.Query) (ledger.Proof, error) {
-	ctx := context.Background()
+	ctx, cancel := c.callCtx()
+	defer cancel()
 	state := query.State()
 	req := &ledgerpb.ProveRequest{
 		State: &ledgerpb.State{
@@ -288,14 +317,21 @@ func (c *Client) Ready() <-chan struct{} {
 		// Wait for the ledger service to be ready by calling InitialState()
 		// This ensures the service has finished WAL replay and is ready to serve requests
 		// Retry with exponential backoff for up to 30 seconds
-		ctx := context.Background()
 		maxRetries := 30
 		retryDelay := 100 * time.Millisecond
 
 		for i := 0; i < maxRetries; i++ {
+			ctx, cancel := c.callCtx()
 			_, err := c.client.InitialState(ctx, &emptypb.Empty{})
+			cancel()
 			if err == nil {
 				c.logger.Info().Msg("ledger service ready")
+				return
+			}
+
+			// Check if the client context was cancelled (shutdown in progress)
+			if c.ctx.Err() != nil {
+				c.logger.Info().Msg("client shutdown during ready check")
 				return
 			}
 
@@ -318,12 +354,14 @@ func (c *Client) Ready() <-chan struct{} {
 }
 
 // Done returns a channel that is closed when the client is done.
-// This closes the gRPC connection. The method is idempotent - multiple calls
-// return the same channel.
+// This cancels any in-flight gRPC calls and closes the connection.
+// The method is idempotent - multiple calls return the same channel.
 func (c *Client) Done() <-chan struct{} {
 	c.once.Do(func() {
 		go func() {
 			defer close(c.done)
+			// Cancel context first to abort any in-flight calls
+			c.cancel()
 			if err := c.Close(); err != nil {
 				c.logger.Error().Err(err).Msg("error closing gRPC connection")
 			}
