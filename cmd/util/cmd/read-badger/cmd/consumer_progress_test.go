@@ -128,3 +128,122 @@ func TestQueryAllConsumerProgress_Empty(t *testing.T) {
 		assert.Equal(t, len(allConsumerProgressIDs), bytes.Count([]byte(output), []byte("not found")))
 	})
 }
+
+func TestSetConsumerProgress_NewEntry(t *testing.T) {
+	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
+		progressID := "test_consumer_progress"
+		height := uint64(12345)
+
+		// Capture stdout
+		old := os.Stdout
+		r, w, _ := os.Pipe()
+		os.Stdout = w
+
+		// Set consumer progress with force flag on a new entry
+		err := setConsumerProgress(db, progressID, height, true)
+		require.NoError(t, err)
+
+		// Restore stdout and read captured output
+		w.Close()
+		os.Stdout = old
+		var buf bytes.Buffer
+		_, _ = buf.ReadFrom(r)
+		output := buf.String()
+
+		assert.Contains(t, output, progressID)
+		assert.Contains(t, output, "12345")
+		assert.NotContains(t, output, "Previous Height")
+
+		// Verify the value was persisted
+		var storedHeight uint64
+		err = operation.RetrieveProcessedIndex(db.Reader(), progressID, &storedHeight)
+		require.NoError(t, err)
+		assert.Equal(t, height, storedHeight)
+	})
+}
+
+func TestSetConsumerProgress_UpdateExisting(t *testing.T) {
+	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
+		progressID := "test_consumer_progress"
+		initialHeight := uint64(100)
+		newHeight := uint64(200)
+
+		// Set up initial consumer progress entry
+		err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			return operation.SetProcessedIndex(rw.Writer(), progressID, initialHeight)
+		})
+		require.NoError(t, err)
+
+		// Capture stdout
+		old := os.Stdout
+		r, w, _ := os.Pipe()
+		os.Stdout = w
+
+		// Update consumer progress with force flag
+		err = setConsumerProgress(db, progressID, newHeight, true)
+		require.NoError(t, err)
+
+		// Restore stdout and read captured output
+		w.Close()
+		os.Stdout = old
+		var buf bytes.Buffer
+		_, _ = buf.ReadFrom(r)
+		output := buf.String()
+
+		assert.Contains(t, output, progressID)
+		assert.Contains(t, output, "Previous Height: 100")
+		assert.Contains(t, output, "Set Processed Height: 200")
+
+		// Verify the value was updated
+		var storedHeight uint64
+		err = operation.RetrieveProcessedIndex(db.Reader(), progressID, &storedHeight)
+		require.NoError(t, err)
+		assert.Equal(t, newHeight, storedHeight)
+	})
+}
+
+func TestSetConsumerProgress_WithoutForce_ExistingEntry(t *testing.T) {
+	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
+		progressID := "test_consumer_progress"
+		initialHeight := uint64(100)
+		newHeight := uint64(200)
+
+		// Set up initial consumer progress entry
+		err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			return operation.SetProcessedIndex(rw.Writer(), progressID, initialHeight)
+		})
+		require.NoError(t, err)
+
+		// Attempt to update without force flag
+		err = setConsumerProgress(db, progressID, newHeight, false)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "existing height 100")
+		assert.Contains(t, err.Error(), "refusing to set")
+		assert.Contains(t, err.Error(), "--force")
+
+		// Verify the original value was not changed
+		var storedHeight uint64
+		err = operation.RetrieveProcessedIndex(db.Reader(), progressID, &storedHeight)
+		require.NoError(t, err)
+		assert.Equal(t, initialHeight, storedHeight)
+	})
+}
+
+func TestSetConsumerProgress_WithoutForce_NewEntry(t *testing.T) {
+	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
+		progressID := "test_consumer_progress"
+		height := uint64(12345)
+
+		// Attempt to set without force flag on non-existent entry
+		err := setConsumerProgress(db, progressID, height, false)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "not found")
+		assert.Contains(t, err.Error(), "refusing to set")
+		assert.Contains(t, err.Error(), "--force")
+
+		// Verify no value was written
+		var storedHeight uint64
+		err = operation.RetrieveProcessedIndex(db.Reader(), progressID, &storedHeight)
+		require.ErrorIs(t, err, storage.ErrNotFound)
+	})
+}
