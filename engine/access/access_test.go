@@ -787,6 +787,7 @@ func (suite *Suite) TestGetSealedTransaction() {
 			collectionSyncer,
 			collectionIndexer,
 			collectionExecutedMetric,
+			suite.metrics,
 			nil,
 			followerDistributor,
 		)
@@ -1052,6 +1053,7 @@ func (suite *Suite) TestGetTransactionResult() {
 			collectionSyncer,
 			collectionIndexer,
 			collectionExecutedMetric,
+			suite.metrics,
 			nil,
 			followerDistributor,
 		)
@@ -1324,6 +1326,7 @@ func (suite *Suite) TestExecuteScript() {
 			collectionSyncer,
 			collectionIndexer,
 			collectionExecutedMetric,
+			suite.metrics,
 			nil,
 			followerDistributor,
 		)
