@@ -20,7 +20,6 @@ import (
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/jobqueue"
 	"github.com/onflow/flow-go/module/state_synchronization"
-	"github.com/onflow/flow-go/module/state_synchronization/requester/jobs"
 	"github.com/onflow/flow-go/module/util"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
@@ -43,7 +42,7 @@ import (
 // The requester listens to block finalization event, and checks if sealed height has been changed,
 // if changed, it create job for each un-downloaded and sealed height.
 //
-// The requester is made up of 3 subcomponents:
+// The requester is made up of 2 subcomponents:
 //
 // * OnBlockFinalized:     receives block finalized events from the finalization registrar and
 //                         forwards them to the blockConsumer.
@@ -51,23 +50,16 @@ import (
 // * blockConsumer:        is a jobqueue that receives block finalization events. On each event,
 //                         it checks for the latest sealed block, then uses a pool of workers to
 //                         download ExecutionData for each block from the network. After each
-//                         successful download, the blockConsumer sends a notification to the
-//                         notificationConsumer that a new ExecutionData is available.
+//                         successful download, the blockConsumer notifies the distributor that a new
+//                         ExecutionData is available.
 //
-// * notificationConsumer: is a jobqueue that receives ExecutionData fetched events. On each event,
-//                         it checks if ExecutionData for the next consecutive block height is
-//                         available, then uses a single worker to send notifications to registered
-//                         consumers.
-//                         the registered consumers are guaranteed to receive each sealed block in
-//                         consecutive height at least once.
-//
-//    +------------------+      +---------------+       +----------------------+
-// -->| OnBlockFinalized |----->| blockConsumer |   +-->| notificationConsumer |
-//    +------------------+      +-------+-------+   |   +-----------+----------+
-//                                      |           |               |
-//                               +------+------+    |        +------+------+
-//                            xN | Worker Pool |----+     x1 | Worker Pool |----> Registered consumers
-//                               +-------------+             +-------------+
+//    +------------------+      +---------------+
+// -->| OnBlockFinalized |----->| blockConsumer |----> Distributor
+//    +------------------+      +-------+-------+
+//                                      |
+//                               +------+------+
+//                            xN | Worker Pool |
+//                               +-------------+
 
 const (
 	// DefaultFetchTimeout is the default initial timeout for fetching ExecutionData from the
@@ -125,14 +117,11 @@ type executionDataRequester struct {
 	// Local db objects
 	headers storage.Headers
 
-	executionDataReader *jobs.ExecutionDataReader
-
 	// Notifiers for queue consumers
 	finalizationNotifier engine.Notifier
 
 	// Job queues
-	blockConsumer        *jobqueue.ComponentConsumer
-	notificationConsumer *jobqueue.ComponentConsumer
+	blockConsumer *jobqueue.ComponentConsumer
 
 	execDataCache *cache.ExecutionDataCache
 	distributor   *ExecutionDataDistributor
@@ -147,7 +136,6 @@ func New(
 	downloader execution_data.Downloader,
 	execDataCache *cache.ExecutionDataCache,
 	processedHeight storage.ConsumerProgressInitializer,
-	processedNotifications storage.ConsumerProgressInitializer,
 	state protocol.State,
 	headers storage.Headers,
 	cfg ExecutionDataConfig,
@@ -165,8 +153,6 @@ func New(
 		distributor:          distributor,
 	}
 
-	executionDataNotifier := engine.NewNotifier()
-
 	// jobqueue Jobs object that tracks sealed blocks by height. This is used by the blockConsumer
 	// to get a sequential list of sealed blocks.
 	sealedBlockReader := jobqueue.NewSealedBlockHeaderReader(state, headers)
@@ -179,8 +165,7 @@ func New(
 	// downloaded, it updates and persists the highest consecutive downloaded height with
 	// `processedHeight`. That way, if the node crashes, it reads the `processedHeight` and resume
 	// from `processedHeight + 1`. If the database is empty, rootHeight will be used to init the
-	// last processed height. Once the execution data is fetched and stored, it notifies
-	// `executionDataNotifier`.
+	// last processed height. Once the execution data is fetched and stored, it notifies the distributor.
 	blockConsumer, err := jobqueue.NewComponentConsumer(
 		e.log.With().Str("module", "block_consumer").Logger(),
 		e.finalizationNotifier.Channel(), // to listen to finalization events to find newly sealed blocks
@@ -196,57 +181,12 @@ func New(
 	}
 	e.blockConsumer = blockConsumer
 
-	// notifies notificationConsumer when new ExecutionData blobs are available
-	// SetPostNotifier will notify executionDataNotifier AFTER e.blockConsumer.LastProcessedIndex is updated.
-	// Even though it doesn't guarantee to notify for every height at least once, the notificationConsumer is
-	// able to guarantee to process every height at least once, because the notificationConsumer finds new jobs
-	// using executionDataReader which finds new heights using e.blockConsumer.LastProcessedIndex
-	e.blockConsumer.SetPostNotifier(func(module.JobID) { executionDataNotifier.Notify() })
-
-	// jobqueue Jobs object tracks downloaded execution data by height. This is used by the
-	// notificationConsumer to get downloaded execution data from storage.
-	e.executionDataReader = jobs.NewExecutionDataReader(
-		e.execDataCache,
-		e.config.FetchTimeout,
-		// method to get highest consecutive height that has downloaded execution data. it is used
-		// here by the notification job consumer to discover new jobs.
-		// Note: we don't want to notify notificationConsumer for a block if it has not downloaded
-		// execution data yet.
-		func() (uint64, error) {
-			return e.blockConsumer.LastProcessedIndex(), nil
-		},
-	)
-
-	// notificationConsumer consumes `OnExecutionDataFetched` events, and ensures its consumer
-	// receives this event in consecutive block height order.
-	// It listens to events from `executionDataNotifier`, which is delivered when
-	// a block's execution data is downloaded and stored, and checks the `executionDataCache` to
-	// find if the next un-processed consecutive height is available.
-	// To know what's the height of the next un-processed consecutive height, it reads the latest
-	// consecutive height in `processedNotifications`. And it's persisted in storage to be crash-resistant.
-	// When a new consecutive height is available, it calls `processNotificationJob` to notify all the
-	// `e.consumers`.
-	// Note: the `e.consumers` will be guaranteed to receive at least one `OnExecutionDataFetched` event
-	// for each sealed block in consecutive block height order.
-	e.notificationConsumer, err = jobqueue.NewComponentConsumer(
-		e.log.With().Str("module", "notification_consumer").Logger(),
-		executionDataNotifier.Channel(), // listen for notifications from the block consumer
-		processedNotifications,          // read and persist the notified height
-		e.executionDataReader,           // read execution data by height
-		e.config.InitialBlockHeight,     // initial "last processed" height for empty db
-		e.processNotificationJob,        // process the job to send notifications for an execution data
-		1,                               // use a single worker to ensure notification is delivered in consecutive order
-		0,                               // search ahead limit controlled by worker count
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create notification consumer: %w", err)
-	}
+	e.blockConsumer.SetPostNotifier(func(module.JobID) { e.distributor.OnExecutionDataReceived() })
 
 	e.metrics.ExecutionDataFetchFinished(0, true, e.blockConsumer.LastProcessedIndex())
 
 	e.Component = component.NewComponentManagerBuilder().
 		AddWorker(e.runBlockConsumer).
-		AddWorker(e.runNotificationConsumer).
 		Build()
 
 	// register callback with finalization registrar
@@ -263,25 +203,13 @@ func (e *executionDataRequester) onBlockFinalized(*model.Block) {
 // HighestConsecutiveHeight returns the highest consecutive block height for which ExecutionData
 // has been received.
 // This method must only be called after the component is Ready. If it is called early, an error is returned.
-func (e *executionDataRequester) HighestConsecutiveHeight() (uint64, error) {
-	select {
-	case <-e.blockConsumer.Ready():
-	default:
-		// LastProcessedIndex is not meaningful until the component has completed startup
-		return 0, fmt.Errorf("HighestConsecutiveHeight must not be called before the component is ready")
-	}
-
-	return e.blockConsumer.LastProcessedIndex(), nil
+func (e *executionDataRequester) HighestConsecutiveHeight() uint64 {
+	return e.blockConsumer.LastProcessedIndex()
 }
 
 // runBlockConsumer runs the blockConsumer component
 func (e *executionDataRequester) runBlockConsumer(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 	err := util.WaitClosed(ctx, e.downloader.Ready())
-	if err != nil {
-		return // context cancelled
-	}
-
-	err = util.WaitClosed(ctx, e.notificationConsumer.Ready())
 	if err != nil {
 		return // context cancelled
 	}
@@ -294,19 +222,6 @@ func (e *executionDataRequester) runBlockConsumer(ctx irrecoverable.SignalerCont
 	}
 
 	<-e.blockConsumer.Done()
-}
-
-// runNotificationConsumer runs the notificationConsumer component
-func (e *executionDataRequester) runNotificationConsumer(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-	e.executionDataReader.AddContext(ctx)
-	e.notificationConsumer.Start(ctx)
-
-	err := util.WaitClosed(ctx, e.notificationConsumer.Ready())
-	if err == nil {
-		ready()
-	}
-
-	<-e.notificationConsumer.Done()
 }
 
 // Fetch Worker Methods
@@ -326,10 +241,13 @@ func (e *executionDataRequester) processBlockJob(ctx irrecoverable.SignalerConte
 		return
 	}
 
-	// errors are thrown as irrecoverable errors except context cancellation, and invalid blobs
-	// invalid blobs are logged, and never completed, which will halt downloads after maxSearchAhead
-	// is reached.
-	e.log.Error().Err(err).Str("job_id", string(job.ID())).Msg("error encountered while processing block job")
+	// errors are thrown as irrecoverable errors except context cancellation, which is usually
+	// triggered by restart, and invalid blobs invalid blobs are logged, and never completed,
+	// which will halt downloads after maxSearchAhead is reached.
+	e.log.Error().Err(err).
+		Hex("block_id", logging.ID(header.ID())).
+		Uint64("height", header.Height).
+		Str("job_id", string(job.ID())).Msg("error encountered while processing block job")
 }
 
 // processSealedHeight downloads ExecutionData for the given block height.
@@ -420,27 +338,6 @@ func (e *executionDataRequester) processFetchRequest(parentCtx irrecoverable.Sig
 		Msg("execution data fetched")
 
 	return nil
-}
-
-// Notification Worker Methods
-
-func (e *executionDataRequester) processNotificationJob(ctx irrecoverable.SignalerContext, job module.Job, jobComplete func()) {
-	// convert job into a block entry
-	entry, err := jobs.JobToBlockEntry(job)
-	if err != nil {
-		ctx.Throw(fmt.Errorf("failed to convert job to entry: %w", err))
-	}
-
-	e.log.Debug().
-		Hex("block_id", logging.ID(entry.BlockID)).
-		Uint64("height", entry.Height).
-		Msgf("notifying for block")
-
-	// send notifications
-	e.distributor.OnExecutionDataReceived(entry.ExecutionData)
-	jobComplete()
-
-	e.metrics.NotificationSent(entry.Height)
 }
 
 func isInvalidBlobError(err error) bool {

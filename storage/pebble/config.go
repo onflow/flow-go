@@ -11,6 +11,7 @@ import (
 // DefaultPebbleOptions returns an optimized set of pebble options.
 // This is mostly copied form pebble's nightly performance benchmark.
 func DefaultPebbleOptions(logger zerolog.Logger, cache *pebble.Cache, comparer *pebble.Comparer) *pebble.Options {
+	eventListener := NewCompactionEventListener(logger)
 	opts := &pebble.Options{
 		Cache:              cache,
 		Comparer:           comparer,
@@ -32,6 +33,10 @@ func DefaultPebbleOptions(logger zerolog.Logger, cache *pebble.Cache, comparer *
 		// The default is 1.
 		MaxConcurrentCompactions: func() int { return 4 },
 		Logger:                   util.NewLogger(logger),
+		EventListener: &pebble.EventListener{
+			CompactionBegin: eventListener.CompactionBegin,
+			CompactionEnd:   eventListener.CompactionEnd,
+		},
 	}
 
 	for i := 0; i < len(opts.Levels); i++ {

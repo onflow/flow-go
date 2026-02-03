@@ -32,6 +32,14 @@ func RetrieveCollection(r storage.Reader, collID flow.Identifier, collection *fl
 	return RetrieveByKey(r, MakePrefix(codeCollection, collID), collection)
 }
 
+// CollectionExists checks whether a collection with the given ID exists in storage.
+// Returns (true, nil) if it exists,
+// Returns (false, nil) if it does not exist.
+// No errors are expected during normal operation.
+func CollectionExists(r storage.Reader, collID flow.Identifier) (bool, error) {
+	return KeyExists(r, MakePrefix(codeCollection, collID))
+}
+
 // RemoveCollection removes a collection from the storage.
 // CAUTION: this is for recovery purposes only, and should not be used during normal operations!
 // It returns nil if the collection does not exist.

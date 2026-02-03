@@ -940,6 +940,10 @@ type AccessMetrics interface {
 
 	// UpdateLastFullBlockHeight tracks the height of the last block for which all collections were received
 	UpdateLastFullBlockHeight(height uint64)
+
+	// UpdateLastBlockCollectionIndexedHeight tracks the height of the last block for which
+	// the collection-to-block index has been built
+	UpdateLastBlockCollectionIndexedHeight(height uint64)
 }
 
 type ExecutionResultStats struct {
@@ -1212,6 +1216,19 @@ type CollectionExecutedMetric interface {
 	BlockFinalized(block *flow.Block)
 	ExecutionReceiptReceived(r *flow.ExecutionReceipt)
 	UpdateLastFullBlockHeight(height uint64)
+}
+
+type CollectionSyncMetrics interface {
+	// CollectionFetchedHeight reports the highest consecutive block height for
+	// which collections have been fetched from collection nodes
+	CollectionFetchedHeight(height uint64)
+
+	// CollectionSyncedHeight reports the highest consecutive block height for
+	// which collections have been synced from execution data
+	CollectionSyncedHeight(height uint64)
+
+	// MissingCollectionQueueSize reports the number of missing collections currently in the queue
+	MissingCollectionQueueSize(size uint)
 }
 
 type MachineAccountMetrics interface {

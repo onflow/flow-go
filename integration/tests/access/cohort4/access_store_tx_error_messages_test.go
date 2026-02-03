@@ -23,8 +23,6 @@ import (
 	"github.com/onflow/flow-go/storage/store"
 )
 
-const maxReceiptHeightMetric = "access_ingestion_max_receipt_height"
-
 func TestAccessStoreTxErrorMessages(t *testing.T) {
 	suite.Run(t, new(AccessStoreTxErrorMessagesSuite))
 }
@@ -112,20 +110,25 @@ func (s *AccessStoreTxErrorMessagesSuite) TestAccessStoreTxErrorMessages() {
 	defer cancel()
 
 	// Create and send a transaction that will result in an error.
+	s.T().Log("Creating and sending transaction that will result in an error...")
 	txResult := s.createAndSendTxWithTxError()
+	s.T().Logf("Transaction sent with ID: %s", txResult.TransactionID.String())
 
 	client, err := s.net.ContainerByName(s.accessContainerName).TestnetClient()
 	s.Require().NoError(err)
 
 	// wait until the node has indexed a few blocks past the transaction block height
+	s.T().Logf("Waiting until access node has indexed up to block height: %d", txResult.BlockHeight+10)
 	err = client.WaitUntilIndexed(ctx, txResult.BlockHeight+10)
 	s.Require().NoError(err)
+	s.T().Logf("Access node has indexed up to block height: %d", txResult.BlockHeight+10)
 
 	// Stop the network containers before checking the results.
 	s.net.StopContainers()
 
 	txResults := []*sdk.TransactionResult{txResult}
 	txErrorMessages := s.fetchTxErrorMessages(txResults, s.accessContainerName)
+	s.T().Logf("Fetched transaction error messages from the database.")
 	s.verifyTxErrorMessage(txResults, txErrorMessages)
 }
 

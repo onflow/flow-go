@@ -22,6 +22,12 @@ type CollectionsReader interface {
 	//   - `storage.ErrNotFound` if no light collection was found.
 	LightByID(collID flow.Identifier) (*flow.LightCollection, error)
 
+	// ExistByID checks whether a collection with the given ID exists in storage.
+	// Returns (true, nil) if it exists,
+	// Returns (false, nil) if it does not exist.
+	// No errors are expected during normal operation.
+	ExistByID(collID flow.Identifier) (bool, error)
+
 	// LightByTransactionID returns a reduced representation of the collection
 	// holding the given transaction ID. The reduced collection references the
 	// constituent transactions by their hashes.
@@ -48,6 +54,7 @@ type Collections interface {
 	// StoreAndIndexByTransaction stores the collection and indexes it by transaction.
 	// This is used by access node storing collections for finalized blocks.
 	//
+	// deprecated, only used by AN ingestion engine, which is deprecated
 	// CAUTION: current approach is NOT BFT and needs to be revised in the future.
 	// Honest clusters ensure a transaction can only belong to one collection. However, in rare
 	// cases, the collector clusters can exceed byzantine thresholds -- making it possible to

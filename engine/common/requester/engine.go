@@ -463,23 +463,12 @@ func (e *Engine) dispatchRequest() (bool, error) {
 			continue
 		}
 
-		// Add item to list and update the retry parameters.
+		// Add item to list (but don't update retry parameters yet - only after successful send)
 		// NOTE: we add the retry interval to the last requested timestamp,
 		// rather than using the current timestamp, in order to conserve a
 		// more even distribution of timestamps over time, which should lead
 		// to a more even distribution of entities over batch requests
 		entityIDs = append(entityIDs, entityID)
-		item.NumAttempts++
-		item.LastRequested = now
-		item.RetryAfter = e.cfg.RetryFunction(item.RetryAfter)
-
-		// make sure the interval is within parameters
-		if item.RetryAfter < e.cfg.RetryInitial {
-			item.RetryAfter = e.cfg.RetryInitial
-		}
-		if item.RetryAfter > e.cfg.RetryMaximum {
-			item.RetryAfter = e.cfg.RetryMaximum
-		}
 
 		// if we reached the maximum size for a batch, bail
 		if uint(len(entityIDs)) >= e.cfg.BatchThreshold {
@@ -516,9 +505,33 @@ func (e *Engine) dispatchRequest() (bool, error) {
 
 	err = e.con.Unicast(req, provider.NodeID)
 	if err != nil {
-		e.log.Error().Err(err).Msgf("could not dispatch requests: could not send request for entities %v", logging.IDs(entityIDs))
-		return false, nil
+		// Unicast failed - don't count this as an attempt, don't update retry state
+		// The item will be retried on the next dispatch cycle
+		return true, fmt.Errorf("could not send request for entities %v: %w", logging.IDs(entityIDs), err)
 	}
+
+	// Unicast succeeded - now update retry state for all items in this batch
+	for _, entityID := range entityIDs {
+		item, exists := e.items[entityID]
+		if !exists {
+			// Item was removed (shouldn't happen, but be safe)
+			continue
+		}
+
+		// Update retry parameters only after successful send
+		item.NumAttempts++
+		item.LastRequested = now
+		item.RetryAfter = e.cfg.RetryFunction(item.RetryAfter)
+
+		// make sure the interval is within parameters
+		if item.RetryAfter < e.cfg.RetryInitial {
+			item.RetryAfter = e.cfg.RetryInitial
+		}
+		if item.RetryAfter > e.cfg.RetryMaximum {
+			item.RetryAfter = e.cfg.RetryMaximum
+		}
+	}
+
 	e.requests[req.Nonce] = req
 
 	// NOTE: we forget about open requests after the default expiry duration; i.e. we purge the set of requests for which

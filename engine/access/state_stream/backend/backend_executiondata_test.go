@@ -29,6 +29,7 @@ import (
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data/cache"
 	"github.com/onflow/flow-go/module/mempool/herocache"
 	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/module/state_synchronization"
 	protocolmock "github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/storage"
 	storagemock "github.com/onflow/flow-go/storage/mock"
@@ -86,6 +87,17 @@ type executionDataTestType struct {
 	startBlockID    flow.Identifier
 	startHeight     uint64
 }
+
+// mockExecutionDataIndexedHeight is a simple implementation of ExecutionDataIndexedHeight for testing
+type mockExecutionDataIndexedHeight struct {
+	height uint64
+}
+
+func (m *mockExecutionDataIndexedHeight) HighestConsecutiveHeight() uint64 {
+	return m.height
+}
+
+var _ state_synchronization.ExecutionDataIndexedHeight = (*mockExecutionDataIndexedHeight)(nil)
 
 func TestBackendExecutionDataSuite(t *testing.T) {
 	suite.Run(t, new(BackendExecutionDataSuite))
@@ -265,13 +277,14 @@ func (s *BackendExecutionDataSuite) SetupBackend(useEventsIndex bool) {
 	require.NoError(s.T(), err)
 
 	// create real execution data tracker to use GetStartHeight from it, instead of mocking
+	highestHeight := &mockExecutionDataIndexedHeight{height: s.rootBlock.Height}
 	s.executionDataTrackerReal = tracker.NewExecutionDataTracker(
 		s.logger,
 		s.state,
 		s.rootBlock.Height,
 		s.headers,
 		s.broadcaster,
-		s.rootBlock.Height,
+		highestHeight,
 		s.eventsIndex,
 		useEventsIndex,
 	)

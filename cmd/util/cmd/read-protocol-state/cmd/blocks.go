@@ -222,6 +222,8 @@ func runE(*cobra.Command, []string) error {
 				return fmt.Errorf("could not get root block: %w", err)
 			}
 
+			log.Info().Msgf("searching executed block between heights %v and %v", root.Height, sealed.Height)
+
 			// find the last executed and sealed block
 			for h := sealed.Height; h >= root.Height; h-- {
 				block, err := reader.GetBlockByHeight(h)
@@ -238,6 +240,8 @@ func runE(*cobra.Command, []string) error {
 					common.PrettyPrintEntity(block)
 					return nil
 				}
+
+				log.Info().Msgf("block at height %v is not executed yet", h)
 			}
 
 			return fmt.Errorf("could not find executed block")

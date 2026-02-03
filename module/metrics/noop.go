@@ -229,6 +229,7 @@ func (nc *NoopCollector) TransactionValidationSkipped()                         
 func (nc *NoopCollector) TransactionSubmissionFailed()                                          {}
 func (nc *NoopCollector) UpdateExecutionReceiptMaxHeight(height uint64)                         {}
 func (nc *NoopCollector) UpdateLastFullBlockHeight(height uint64)                               {}
+func (nc *NoopCollector) UpdateLastBlockCollectionIndexedHeight(height uint64)                  {}
 func (nc *NoopCollector) ChunkDataPackRequestProcessed()                                        {}
 func (nc *NoopCollector) ExecutionSync(syncing bool)                                            {}
 func (nc *NoopCollector) ExecutionBlockDataUploadStarted()                                      {}
@@ -396,6 +397,12 @@ func (nc *NoopCollector) CollectionFinalized(light *flow.LightCollection) {}
 func (nc *NoopCollector) CollectionExecuted(light *flow.LightCollection)  {}
 func (nc *NoopCollector) ExecutionReceiptReceived(r *flow.ExecutionReceipt) {
 }
+
+var _ module.CollectionSyncMetrics = (*NoopCollector)(nil)
+
+func (nc *NoopCollector) CollectionFetchedHeight(height uint64) {}
+func (nc *NoopCollector) CollectionSyncedHeight(height uint64)  {}
+func (nc *NoopCollector) MissingCollectionQueueSize(size uint)  {}
 
 func (nc *NoopCollector) AccountBalance(bal float64)         {}
 func (nc *NoopCollector) RecommendedMinBalance(bal float64)  {}

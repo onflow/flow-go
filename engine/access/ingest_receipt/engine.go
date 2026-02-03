@@ -1,4 +1,4 @@
-// Package ingestion2 implements a modular ingestion engine responsible for
+// Package finalized_indexer implements a modular ingestion engine responsible for
 // orchestrating the processing of finalized blockchain data and receiving
 // execution receipts from the network.
 //
@@ -6,7 +6,7 @@
 //   - Receiving and persisting execution receipts from the network.
 //   - Subscribing to finalized block events.
 //   - Synchronizing collections associated with finalized blocks.
-package ingestion2
+package ingest_receipt
 
 import (
 	"context"
@@ -14,9 +14,7 @@ import (
 
 	"github.com/rs/zerolog"
 
-	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/engine"
-	"github.com/onflow/flow-go/engine/access/ingestion/collections"
 	"github.com/onflow/flow-go/engine/common/fifoqueue"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
@@ -35,9 +33,6 @@ type Engine struct {
 
 	log zerolog.Logger
 
-	finalizedBlockProcessor *FinalizedBlockProcessor
-	collectionSyncer        *collections.Syncer
-
 	messageHandler           *engine.MessageHandler
 	executionReceiptsQueue   *engine.FifoMessageStore
 	receipts                 storage.ExecutionReceipts
@@ -49,8 +44,6 @@ var _ network.MessageProcessor = (*Engine)(nil)
 func New(
 	log zerolog.Logger,
 	net network.EngineRegistry,
-	finalizedBlockProcessor *FinalizedBlockProcessor,
-	collectionSyncer *collections.Syncer,
 	receipts storage.ExecutionReceipts,
 	collectionExecutedMetric module.CollectionExecutedMetric,
 ) (*Engine, error) {
@@ -72,9 +65,7 @@ func New(
 	)
 
 	e := &Engine{
-		log:                      log.With().Str("engine", "ingestion2").Logger(),
-		finalizedBlockProcessor:  finalizedBlockProcessor,
-		collectionSyncer:         collectionSyncer,
+		log:                      log.With().Str("engine", "ingest_receipt").Logger(),
 		messageHandler:           messageHandler,
 		executionReceiptsQueue:   executionReceiptsQueue,
 		receipts:                 receipts,
@@ -84,9 +75,7 @@ func New(
 	// register our workers which are basically consumers of different kinds of data.
 	// engine notifies workers when new data is available so that they can start processing them.
 	builder := component.NewComponentManagerBuilder().
-		AddWorker(e.messageHandlerLoop).
-		AddWorker(e.finalizedBlockProcessor.StartWorkerLoop).
-		AddWorker(e.collectionSyncer.WorkerLoop)
+		AddWorker(e.messageHandlerLoop)
 	e.ComponentManager = builder.Build()
 
 	// engine gets execution receipts from channels.ReceiveReceipts channel
@@ -174,10 +163,4 @@ func (e *Engine) persistExecutionReceipt(receipt *flow.ExecutionReceipt) error {
 
 	e.collectionExecutedMetric.ExecutionReceiptReceived(receipt)
 	return nil
-}
-
-// OnFinalizedBlock is called by the follower engine after a block has been finalized and the state has been updated.
-// Receives block finalized events from the finalization registrar and forwards them to the consumer.
-func (e *Engine) OnFinalizedBlock(_ *model.Block) {
-	e.finalizedBlockProcessor.Notify()
 }

@@ -1,18 +1,18 @@
 package status
 
 import (
+	"github.com/onflow/flow-go/engine/access/collection_sync"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module/counters"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/state/protocol"
 )
 
 type TxStatusDeriver struct {
 	state               protocol.State
-	lastFullBlockHeight *counters.PersistentStrictMonotonicCounter
+	lastFullBlockHeight collection_sync.ProgressReader
 }
 
-func NewTxStatusDeriver(state protocol.State, lastFullBlockHeight *counters.PersistentStrictMonotonicCounter) *TxStatusDeriver {
+func NewTxStatusDeriver(state protocol.State, lastFullBlockHeight collection_sync.ProgressReader) *TxStatusDeriver {
 	return &TxStatusDeriver{
 		state:               state,
 		lastFullBlockHeight: lastFullBlockHeight,
@@ -48,7 +48,7 @@ func (t *TxStatusDeriver) DeriveUnknownTransactionStatus(refBlockID flow.Identif
 
 	// the last full height is the height where we have received all
 	// collections  for all blocks with a lower height
-	fullHeight := t.lastFullBlockHeight.Value()
+	fullHeight := t.lastFullBlockHeight.ProcessedHeight()
 
 	// if we have received collections  for all blocks up to the expiry block, the transaction is expired
 	if isExpired(refHeight, fullHeight) {

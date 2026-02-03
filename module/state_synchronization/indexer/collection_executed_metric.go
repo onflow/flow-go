@@ -89,6 +89,8 @@ func (c *CollectionExecutedMetricImpl) BlockFinalized(block *flow.Block) {
 	now := time.Now().UTC()
 	blockID := block.ID()
 
+	c.accessMetrics.UpdateLastBlockCollectionIndexedHeight(block.Height)
+
 	// mark all transactions as finalized
 	// TODO: sample to reduce performance overhead
 	for _, g := range block.Payload.Guarantees {

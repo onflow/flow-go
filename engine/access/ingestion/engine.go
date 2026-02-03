@@ -235,7 +235,7 @@ func (e *Engine) processFinalizedBlockJob(ctx irrecoverable.SignalerContext, job
 		return
 	}
 
-	e.log.Error().Err(err).Str("job_id", string(job.ID())).Msg("error during finalized block processing job")
+	e.log.Fatal().Err(err).Str("job_id", string(job.ID())).Msg("error during finalized block processing job")
 }
 
 // processExecutionReceipts is responsible for processing the execution receipts.

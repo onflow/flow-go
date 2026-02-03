@@ -38,7 +38,6 @@ import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/access/apiproxy"
 	"github.com/onflow/flow-go/engine/access/index"
-	"github.com/onflow/flow-go/engine/access/ingestion/collections"
 	"github.com/onflow/flow-go/engine/access/rest"
 	restapiproxy "github.com/onflow/flow-go/engine/access/rest/apiproxy"
 	"github.com/onflow/flow-go/engine/access/rest/router"
@@ -70,7 +69,6 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/blobs"
 	"github.com/onflow/flow-go/module/chainsync"
-	"github.com/onflow/flow-go/module/counters"
 	"github.com/onflow/flow-go/module/execution"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	execdatacache "github.com/onflow/flow-go/module/executiondatasync/execution_data/cache"
@@ -1104,7 +1102,6 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 	var ds datastore.Batching
 	var bs network.BlobService
 	var processedBlockHeight storage.ConsumerProgressInitializer
-	var processedNotifications storage.ConsumerProgressInitializer
 	var publicBsDependable *module.ProxiedReadyDoneAware
 	var execDataDistributor *edrequester.ExecutionDataDistributor
 	var execDataCacheBackend *herocache.BlockExecutionData
@@ -1152,14 +1149,6 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 			processedBlockHeight = store.NewConsumerProgress(db, module.ConsumeProgressExecutionDataRequesterBlockHeight)
 			return nil
 		}).
-		Module("processed notifications consumer progress", func(node *cmd.NodeConfig) error {
-			// Note: progress is stored in the datastore's DB since that is where the jobqueue
-			// writes execution data to.
-			db := builder.ExecutionDatastoreManager.DB()
-
-			processedNotifications = store.NewConsumerProgress(db, module.ConsumeProgressExecutionDataRequesterNotification)
-			return nil
-		}).
 		Module("blobservice peer manager dependencies", func(node *cmd.NodeConfig) error {
 			publicBsDependable = module.NewProxiedReadyDoneAware()
 			builder.PeerManagerDependencies.Add(publicBsDependable)
@@ -1198,6 +1187,10 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 						blob.NewTracer(node.Logger.With().Str("public_blob_service", channels.PublicExecutionDataService.String()).Logger()),
 					),
 				),
+			}
+
+			if !builder.BitswapBloomCacheEnabled {
+				opts = append(opts, blob.WithSkipBloomCache(true))
 			}
 
 			var err error
@@ -1292,7 +1285,6 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 				builder.ExecutionDataDownloader,
 				executionDataCache,
 				processedBlockHeight,
-				processedNotifications,
 				builder.State,
 				builder.Storage.Headers,
 				builder.executionDataConfig,
@@ -1438,31 +1430,7 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 				return nil, fmt.Errorf("could not create derived chain data: %w", err)
 			}
 
-			rootBlockHeight := node.State.Params().FinalizedRoot().Height
-			progress, err := store.NewConsumerProgress(builder.ProtocolDB, module.ConsumeProgressLastFullBlockHeight).Initialize(rootBlockHeight)
-			if err != nil {
-				return nil, fmt.Errorf("could not create last full block height consumer progress: %w", err)
-			}
-
-			lastFullBlockHeight, err := counters.NewPersistentStrictMonotonicCounter(progress)
-			if err != nil {
-				return nil, fmt.Errorf("could not create last full block height counter: %w", err)
-			}
-
 			var collectionExecutedMetric module.CollectionExecutedMetric = metrics.NewNoopCollector()
-			collectionIndexer, err := collections.NewIndexer(
-				builder.Logger,
-				builder.ProtocolDB,
-				collectionExecutedMetric,
-				builder.State,
-				builder.Storage.Blocks,
-				builder.Storage.Collections,
-				lastFullBlockHeight,
-				builder.StorageLockMgr,
-			)
-			if err != nil {
-				return nil, fmt.Errorf("could not create collection indexer: %w", err)
-			}
 
 			builder.ExecutionIndexerCore = indexer.New(
 				builder.Logger,
@@ -1477,7 +1445,6 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 				builder.scheduledTransactions,
 				builder.RootChainID,
 				indexerDerivedChainData,
-				collectionIndexer,
 				collectionExecutedMetric,
 				node.StorageLockMgr,
 			)
@@ -1556,10 +1523,6 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 			}
 			builder.stateStreamConf.RpcMetricsEnabled = builder.rpcMetricsEnabled
 
-			highestAvailableHeight, err := builder.ExecutionDataRequester.HighestConsecutiveHeight()
-			if err != nil {
-				return nil, fmt.Errorf("could not get highest consecutive height: %w", err)
-			}
 			broadcaster := engine.NewBroadcaster()
 
 			eventQueryMode, err := query_mode.ParseIndexQueryMode(builder.rpcConf.BackendConfig.EventQueryMode)
@@ -1578,7 +1541,7 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 				builder.executionDataConfig.InitialBlockHeight,
 				node.Storage.Headers,
 				broadcaster,
-				highestAvailableHeight,
+				builder.ExecutionDataRequester,
 				builder.EventsIndex,
 				useIndex,
 			)

@@ -22,6 +22,7 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/onflow/flow-go/cmd/build"
+	"github.com/onflow/flow-go/engine/access/collection_sync"
 	accessmock "github.com/onflow/flow-go/engine/access/mock"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/common"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/events"
@@ -60,6 +61,17 @@ const TEST_MAX_HEIGHT = 100
 var eventEncodingVersions = []entitiesproto.EventEncodingVersion{
 	entitiesproto.EventEncodingVersion_JSON_CDC_V0,
 	entitiesproto.EventEncodingVersion_CCF_V0,
+}
+
+// progressReaderAdapter adapts a PersistentStrictMonotonicCounter to implement collection_sync.ProgressReader
+type progressReaderAdapter struct {
+	counter *counters.PersistentStrictMonotonicCounter
+}
+
+var _ collection_sync.ProgressReader = (*progressReaderAdapter)(nil)
+
+func (p *progressReaderAdapter) ProcessedHeight() uint64 {
+	return p.counter.Value()
 }
 
 type Suite struct {
@@ -2096,7 +2108,7 @@ func (suite *Suite) defaultBackendParams() Params {
 		TxResultQueryMode:    query_mode.IndexQueryModeExecutionNodesOnly,
 		EventQueryMode:       query_mode.IndexQueryModeExecutionNodesOnly,
 		ScriptExecutionMode:  query_mode.IndexQueryModeExecutionNodesOnly,
-		LastFullBlockHeight:  suite.lastFullBlockHeight,
+		LastFullBlockHeight:  &progressReaderAdapter{counter: suite.lastFullBlockHeight},
 		VersionControl:       suite.versionControl,
 		ExecNodeIdentitiesProvider: commonrpc.NewExecutionNodeIdentitiesProvider(
 			suite.log,

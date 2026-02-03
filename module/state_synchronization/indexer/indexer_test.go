@@ -90,8 +90,8 @@ func newIndexerTest(t *testing.T, g *fixtures.GeneratorSuite, blocks []*flow.Blo
 	return test
 }
 
-func (w *indexerTest) latestHeight() (uint64, error) {
-	return w.last().Height, nil
+func (w *indexerTest) latestHeight() uint64 {
+	return w.last().Height
 }
 
 func (w *indexerTest) last() *flow.Block {
@@ -107,7 +107,7 @@ func (w *indexerTest) run(ctx irrecoverable.SignalerContext, reachHeight uint64,
 
 	unittest.RequireComponentsReadyBefore(w.t, testTimeout, w.worker)
 
-	w.worker.OnExecutionData(nil)
+	w.worker.OnExecutionData()
 
 	select {
 	case <-ctx.Done():
@@ -208,7 +208,6 @@ func TestIndexer_Success(t *testing.T) {
 			})
 
 		test.executionData.On("Get", blockID).Return(ed, true).Once()
-		test.indexTest.collectionIndexer.On("IndexCollections", ed.StandardCollections()).Return(nil).Once()
 		test.indexTest.registers.On("Store", flow.RegisterEntries{}, block.Height).Return(nil).Once()
 	}
 
@@ -256,7 +255,6 @@ func TestIndexer_Failure(t *testing.T) {
 			})
 
 		test.executionData.On("Get", blockID).Return(ed, true).Once()
-		test.indexTest.collectionIndexer.On("IndexCollections", ed.StandardCollections()).Return(nil).Once()
 
 		// return an error on the last block to trigger the error path
 		if block.Height == lastHeight {
