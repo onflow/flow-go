@@ -73,6 +73,7 @@ type Engine struct {
 	// TODO: There's still a need for this metric to be in the ingestion engine rather than collection syncer.
 	// Maybe it is a good idea to split it up?
 	collectionExecutedMetric module.CollectionExecutedMetric
+	accessMetrics            module.AccessMetrics
 
 	txErrorMessagesCore *tx_error_messages.TxErrorMessagesCore
 }
@@ -96,6 +97,7 @@ func New(
 	collectionSyncer *collections.Syncer,
 	collectionIndexer *collections.Indexer,
 	collectionExecutedMetric module.CollectionExecutedMetric,
+	accessMetrics module.AccessMetrics,
 	txErrorMessagesCore *tx_error_messages.TxErrorMessagesCore,
 	registrar hotstuff.FinalizationRegistrar,
 ) (*Engine, error) {
@@ -130,6 +132,7 @@ func New(
 		executionReceipts:        executionReceipts,
 		maxReceiptHeight:         0,
 		collectionExecutedMetric: collectionExecutedMetric,
+		accessMetrics:            accessMetrics,
 		finalizedBlockNotifier:   engine.NewNotifier(),
 
 		// queue / notifier for execution receipts
@@ -230,12 +233,15 @@ func (e *Engine) processFinalizedBlockJob(ctx irrecoverable.SignalerContext, job
 	}
 
 	err = e.processFinalizedBlock(block)
-	if err == nil {
-		done()
+	if err != nil {
+		ctx.Throw(
+			fmt.Errorf(
+				"fatal error when ingestion building col->block index for finalized block (job: %s, height: %v): %w",
+				job.ID(), block.Height, err))
 		return
 	}
 
-	e.log.Error().Err(err).Str("job_id", string(job.ID())).Msg("error during finalized block processing job")
+	done()
 }
 
 // processExecutionReceipts is responsible for processing the execution receipts.
@@ -394,6 +400,7 @@ func (e *Engine) processFinalizedBlock(block *flow.Block) error {
 		return fmt.Errorf("could not request collections for block: %w", err)
 	}
 	e.collectionExecutedMetric.BlockFinalized(block)
+	e.accessMetrics.UpdateIngestionFinalizedBlockHeight(block.Height)
 
 	return nil
 }

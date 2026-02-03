@@ -168,6 +168,11 @@ func (_m *AccessMetrics) UpdateExecutionReceiptMaxHeight(height uint64) {
 	_m.Called(height)
 }
 
+// UpdateIngestionFinalizedBlockHeight provides a mock function with given fields: height
+func (_m *AccessMetrics) UpdateIngestionFinalizedBlockHeight(height uint64) {
+	_m.Called(height)
+}
+
 // UpdateLastFullBlockHeight provides a mock function with given fields: height
 func (_m *AccessMetrics) UpdateLastFullBlockHeight(height uint64) {
 	_m.Called(height)
