@@ -40,16 +40,16 @@ type AccessCollector struct {
 	module.TransactionValidationMetrics
 	module.BackendScriptsMetrics
 
-	connectionReused      prometheus.Counter
-	connectionsInPool     *prometheus.GaugeVec
-	connectionAdded       prometheus.Counter
-	connectionEstablished prometheus.Counter
-	connectionInvalidated prometheus.Counter
-	connectionUpdated     prometheus.Counter
-	connectionEvicted     prometheus.Counter
-	lastFullBlockHeight                 prometheus.Gauge
-	lastBlockCollectionIndexedHeight    prometheus.Gauge
-	maxReceiptHeight                    prometheus.Gauge
+	connectionReused                 prometheus.Counter
+	connectionsInPool                *prometheus.GaugeVec
+	connectionAdded                  prometheus.Counter
+	connectionEstablished            prometheus.Counter
+	connectionInvalidated            prometheus.Counter
+	connectionUpdated                prometheus.Counter
+	connectionEvicted                prometheus.Counter
+	lastFullBlockHeight              prometheus.Gauge
+	lastBlockCollectionIndexedHeight prometheus.Gauge
+	maxReceiptHeight                 prometheus.Gauge
 
 	// used to skip heights that are lower than the current max height
 	maxReceiptHeightValue counters.StrictMonotonicCounter
