@@ -2,6 +2,7 @@ package ingestion
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/jordanschalm/lockctx"
@@ -359,10 +360,10 @@ func (e *Engine) onFinalizedBlock(*model.Block) {
 
 // processFinalizedBlock handles an incoming finalized block.
 // It processes the block, indexes it for further processing, and requests missing collections if necessary.
+// If the block is already indexed (storage.ErrAlreadyExists), it logs a warning and continues processing.
 //
 // Expected errors during normal operation:
 //   - storage.ErrNotFound - if last full block height does not exist in the database.
-//   - storage.ErrAlreadyExists - if the collection within block or an execution result ID already exists in the database.
 //   - generic error in case of unexpected failure from the database layer, or failure
 //     to decode an existing database value.
 func (e *Engine) processFinalizedBlock(block *flow.Block) error {
@@ -392,7 +393,15 @@ func (e *Engine) processFinalizedBlock(block *flow.Block) error {
 		})
 	})
 	if err != nil {
-		return fmt.Errorf("could not index block for collections: %w", err)
+		if !errors.Is(err, storage.ErrAlreadyExists) {
+			return fmt.Errorf("could not index block for collections: %w", err)
+		}
+		// the job queue processed index is updated in a separate db update, so it's possible that the above index
+		// has been built, but the jobqueue index has not been updated yet. In this case, we can safely skip processing.
+		e.log.Warn().
+			Uint64("height", block.Height).
+			Str("block_id", block.ID().String()).
+			Msg("block already indexed, skipping indexing")
 	}
 
 	err = e.collectionSyncer.RequestCollectionsForBlock(block.Height, block.Payload.Guarantees)
