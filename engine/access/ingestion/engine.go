@@ -73,6 +73,7 @@ type Engine struct {
 	// TODO: There's still a need for this metric to be in the ingestion engine rather than collection syncer.
 	// Maybe it is a good idea to split it up?
 	collectionExecutedMetric module.CollectionExecutedMetric
+	accessMetrics            module.AccessMetrics
 
 	txErrorMessagesCore *tx_error_messages.TxErrorMessagesCore
 }
@@ -96,6 +97,7 @@ func New(
 	collectionSyncer *collections.Syncer,
 	collectionIndexer *collections.Indexer,
 	collectionExecutedMetric module.CollectionExecutedMetric,
+	accessMetrics module.AccessMetrics,
 	txErrorMessagesCore *tx_error_messages.TxErrorMessagesCore,
 	registrar hotstuff.FinalizationRegistrar,
 ) (*Engine, error) {
@@ -130,6 +132,7 @@ func New(
 		executionReceipts:        executionReceipts,
 		maxReceiptHeight:         0,
 		collectionExecutedMetric: collectionExecutedMetric,
+		accessMetrics:            accessMetrics,
 		finalizedBlockNotifier:   engine.NewNotifier(),
 
 		// queue / notifier for execution receipts
@@ -394,6 +397,7 @@ func (e *Engine) processFinalizedBlock(block *flow.Block) error {
 		return fmt.Errorf("could not request collections for block: %w", err)
 	}
 	e.collectionExecutedMetric.BlockFinalized(block)
+	e.accessMetrics.UpdateIngestionFinalizedBlockHeight(block.Height)
 
 	return nil
 }
