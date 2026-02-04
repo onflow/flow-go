@@ -7,6 +7,7 @@ import (
 
 	"github.com/onflow/cadence/runtime"
 
+	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -14,15 +15,15 @@ func TestReusableCadenceRuntimePoolUnbuffered(t *testing.T) {
 	pool := NewReusableCadenceRuntimePool(0, flow.Mainnet.Chain(), runtime.Config{})
 	require.Nil(t, pool.pool)
 
-	entry := pool.Borrow(nil)
+	entry := pool.Borrow(nil, environment.CadenceTransactionRuntime).(reusableCadenceTransactionRuntime)
 	require.NotNil(t, entry)
 
 	pool.Return(entry)
 
-	entry2 := pool.Borrow(nil)
+	entry2 := pool.Borrow(nil, environment.CadenceTransactionRuntime).(reusableCadenceTransactionRuntime)
 	require.NotNil(t, entry2)
 
-	require.NotSame(t, entry, entry2)
+	require.NotSame(t, entry.reusableCadenceRuntime, entry2.reusableCadenceRuntime)
 }
 
 func TestReusableCadenceRuntimePoolBuffered(t *testing.T) {
@@ -35,7 +36,7 @@ func TestReusableCadenceRuntimePoolBuffered(t *testing.T) {
 	default:
 	}
 
-	entry := pool.Borrow(nil)
+	entry := pool.Borrow(nil, environment.CadenceTransactionRuntime).(reusableCadenceTransactionRuntime)
 	require.NotNil(t, entry)
 
 	select {
@@ -46,10 +47,10 @@ func TestReusableCadenceRuntimePoolBuffered(t *testing.T) {
 
 	pool.Return(entry)
 
-	entry2 := pool.Borrow(nil)
+	entry2 := pool.Borrow(nil, environment.CadenceTransactionRuntime).(reusableCadenceTransactionRuntime)
 	require.NotNil(t, entry2)
 
-	require.Same(t, entry, entry2)
+	require.Same(t, entry.reusableCadenceRuntime, entry2.reusableCadenceRuntime)
 }
 
 func TestReusableCadenceRuntimePoolSharing(t *testing.T) {
@@ -64,7 +65,7 @@ func TestReusableCadenceRuntimePoolSharing(t *testing.T) {
 
 	var otherPool = pool
 
-	entry := otherPool.Borrow(nil)
+	entry := otherPool.Borrow(nil, environment.CadenceTransactionRuntime).(reusableCadenceTransactionRuntime)
 	require.NotNil(t, entry)
 
 	select {
@@ -75,8 +76,8 @@ func TestReusableCadenceRuntimePoolSharing(t *testing.T) {
 
 	otherPool.Return(entry)
 
-	entry2 := pool.Borrow(nil)
+	entry2 := pool.Borrow(nil, environment.CadenceTransactionRuntime).(reusableCadenceTransactionRuntime)
 	require.NotNil(t, entry2)
 
-	require.Same(t, entry, entry2)
+	require.Same(t, entry.reusableCadenceRuntime, entry2.reusableCadenceRuntime)
 }
