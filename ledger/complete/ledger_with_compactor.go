@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/rs/zerolog"
+	"go.uber.org/atomic"
 
 	"github.com/onflow/flow-go/ledger"
 	realWAL "github.com/onflow/flow-go/ledger/complete/wal"
@@ -13,8 +14,9 @@ import (
 // LedgerWithCompactor wraps a Ledger and its internal Compactor,
 // managing both as a single component. This hides the compactor
 // as an implementation detail.
+// Embedding *Ledger allows automatic delegation of Ledger methods.
 type LedgerWithCompactor struct {
-	ledger    *Ledger
+	*Ledger
 	compactor *Compactor
 	logger    zerolog.Logger
 }
@@ -22,10 +24,12 @@ type LedgerWithCompactor struct {
 // NewLedgerWithCompactor creates a new ledger with an internal compactor.
 // The compactor lifecycle is managed by this wrapper.
 // Use Ready() to wait for the ledger and compactor to be ready.
+// triggerCheckpoint is a runtime control signal to trigger checkpoint on next segment finish.
 func NewLedgerWithCompactor(
 	diskWAL realWAL.LedgerWAL,
 	ledgerCapacity int,
 	compactorConfig *ledger.CompactorConfig,
+	triggerCheckpoint *atomic.Bool,
 	metrics module.LedgerMetrics,
 	logger zerolog.Logger,
 	pathFinderVersion uint8,
@@ -46,7 +50,7 @@ func NewLedgerWithCompactor(
 		compactorConfig.CheckpointCapacity,
 		compactorConfig.CheckpointDistance,
 		compactorConfig.CheckpointsToKeep,
-		compactorConfig.TriggerCheckpointOnNextSegmentFinish,
+		triggerCheckpoint,
 		compactorConfig.Metrics,
 	)
 	if err != nil {
@@ -54,57 +58,25 @@ func NewLedgerWithCompactor(
 	}
 
 	return &LedgerWithCompactor{
-		ledger:    l,
+		Ledger:    l,
 		compactor: compactor,
 		logger:    logger,
 	}, nil
 }
 
-// Implement ledger.Ledger interface - delegate to underlying ledger
-func (lwc *LedgerWithCompactor) InitialState() ledger.State {
-	return lwc.ledger.InitialState()
-}
-
-func (lwc *LedgerWithCompactor) HasState(state ledger.State) bool {
-	return lwc.ledger.HasState(state)
-}
-
-func (lwc *LedgerWithCompactor) GetSingleValue(query *ledger.QuerySingleValue) (ledger.Value, error) {
-	return lwc.ledger.GetSingleValue(query)
-}
-
-func (lwc *LedgerWithCompactor) Get(query *ledger.Query) ([]ledger.Value, error) {
-	return lwc.ledger.Get(query)
-}
-
-func (lwc *LedgerWithCompactor) Set(update *ledger.Update) (ledger.State, *ledger.TrieUpdate, error) {
-	return lwc.ledger.Set(update)
-}
-
-func (lwc *LedgerWithCompactor) Prove(query *ledger.Query) (ledger.Proof, error) {
-	return lwc.ledger.Prove(query)
-}
-
-// StateCount returns the number of states (tries) stored in the forest
-func (lwc *LedgerWithCompactor) StateCount() int {
-	return lwc.ledger.StateCount()
-}
-
-// StateByIndex returns the state at the given index
-// -1 is the last index
-func (lwc *LedgerWithCompactor) StateByIndex(index int) (ledger.State, error) {
-	return lwc.ledger.StateByIndex(index)
-}
+// Note: Ledger methods (InitialState, HasState, GetSingleValue, Get, Set, Prove,
+// StateCount, StateByIndex) are automatically delegated via embedding.
 
 // Ready manages lifecycle of both ledger and compactor.
 // Signals when initialization (WAL replay) is complete and compactor is ready.
+// Overrides the embedded Ledger.Ready() to coordinate with the compactor.
 func (lwc *LedgerWithCompactor) Ready() <-chan struct{} {
 	ready := make(chan struct{})
 	go func() {
 		defer close(ready)
 
 		// Wait for ledger initialization (WAL replay) to complete
-		<-lwc.ledger.Ready()
+		<-lwc.Ledger.Ready()
 
 		// Start compactor
 		<-lwc.compactor.Ready()
@@ -115,6 +87,7 @@ func (lwc *LedgerWithCompactor) Ready() <-chan struct{} {
 }
 
 // Done manages shutdown of both ledger and compactor.
+// Overrides the embedded Ledger.Done() to coordinate with the compactor.
 func (lwc *LedgerWithCompactor) Done() <-chan struct{} {
 	done := make(chan struct{})
 	go func() {
@@ -125,8 +98,8 @@ func (lwc *LedgerWithCompactor) Done() <-chan struct{} {
 		// Close the trie update channel first so the compactor can drain it
 		// The compactor's drain loop blocks until the channel is closed.
 		// Use sync.Once to ensure it's only closed once (ledger.Done() also closes it).
-		lwc.ledger.closeTrieUpdateCh.Do(func() {
-			close(lwc.ledger.trieUpdateCh)
+		lwc.closeTrieUpdateCh.Do(func() {
+			close(lwc.trieUpdateCh)
 		})
 
 		// Stop compactor first (it needs to finish WAL writes)
@@ -135,7 +108,7 @@ func (lwc *LedgerWithCompactor) Done() <-chan struct{} {
 		lwc.logger.Info().Msg("stopping ledger ...")
 
 		// Then stop ledger
-		<-lwc.ledger.Done()
+		<-lwc.Ledger.Done()
 
 		lwc.logger.Info().Msg("ledger with compactor stopped")
 	}()

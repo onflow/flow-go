@@ -2281,6 +2281,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				notNil(builder.CollectionSyncer),
 				notNil(builder.CollectionIndexer),
 				notNil(builder.collectionExecutedMetric),
+				builder.AccessMetrics,
 				notNil(builder.TxResultErrorMessagesCore),
 				builder.FollowerDistributor,
 			)

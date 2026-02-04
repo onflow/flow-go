@@ -13,6 +13,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rs/zerolog"
 	"go.uber.org/atomic"
 	"google.golang.org/grpc"
@@ -80,16 +81,15 @@ func main() {
 	// Create ledger using factory
 	metricsCollector := metrics.NewLedgerCollector("ledger", "wal")
 	ledgerStorage, err := ledgerfactory.NewLedger(ledgerfactory.Config{
-		Triedir:                              *triedir,
-		MTrieCacheSize:                       uint32(*mtrieCacheSize),
-		CheckpointDistance:                   *checkpointDist,
-		CheckpointsToKeep:                    *checkpointsToKeep,
-		TriggerCheckpointOnNextSegmentFinish: triggerCheckpointOnNextSegmentFinish,
-		MetricsRegisterer:                    nil,
-		WALMetrics:                           metricsCollector,
-		LedgerMetrics:                        metricsCollector,
-		Logger:                               logger,
-	})
+		Triedir:            *triedir,
+		MTrieCacheSize:     uint32(*mtrieCacheSize),
+		CheckpointDistance: *checkpointDist,
+		CheckpointsToKeep:  *checkpointsToKeep,
+		MetricsRegisterer:  prometheus.DefaultRegisterer,
+		WALMetrics:         metricsCollector,
+		LedgerMetrics:      metricsCollector,
+		Logger:             logger,
+	}, atomic.NewBool(false))
 	if err != nil {
 		logger.Fatal().Err(err).Msg("failed to create ledger")
 	}

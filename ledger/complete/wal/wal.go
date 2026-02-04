@@ -30,7 +30,10 @@ type DiskWAL struct {
 // TODO use real logger and metrics, but that would require passing them to Trie storage
 func NewDiskWAL(logger zerolog.Logger, reg prometheus.Registerer, metrics module.WALMetrics, dir string, forestCapacity int, pathByteSize int, segmentSize int) (*DiskWAL, error) {
 	// Acquire exclusive file lock to ensure only one process can write to this WAL directory
-	fileLock := utilsio.NewFileLock(dir)
+	fileLock, err := utilsio.NewFileLock(dir)
+	if err != nil {
+		panic(fmt.Sprintf("failed to create file lock for WAL directory %s: %v", dir, err))
+	}
 	if err := fileLock.Lock(); err != nil {
 		// The Lock() method returns a complete error message that distinguishes between
 		// permission denied and lock conflicts. This is a fatal error - the process should crash.

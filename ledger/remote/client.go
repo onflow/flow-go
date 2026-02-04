@@ -144,7 +144,9 @@ func NewClient(grpcAddr string, logger zerolog.Logger, opts ...ClientOption) (*C
 // Close closes the gRPC connection.
 func (c *Client) Close() error {
 	if c.conn != nil {
-		return c.conn.Close()
+		err := c.conn.Close()
+		c.conn = nil
+		return err
 	}
 	return nil
 }
@@ -221,7 +223,8 @@ func (c *Client) GetSingleValue(query *ledger.QuerySingleValue) (ledger.Value, e
 		}
 		return ledger.Value([]byte{}), nil
 	}
-	return ledger.Value(resp.Value.Data), nil
+	// Copy the data to avoid holding reference to the gRPC response buffer
+	return ledger.Value(append([]byte{}, resp.Value.Data...)), nil
 }
 
 // Get returns values for multiple keys at a specific state.
@@ -256,7 +259,8 @@ func (c *Client) Get(query *ledger.Query) ([]ledger.Value, error) {
 				values[i] = ledger.Value([]byte{})
 			}
 		} else {
-			values[i] = ledger.Value(protoValue.Data)
+			// Copy the data to avoid holding reference to the gRPC response buffer
+			values[i] = ledger.Value(append([]byte{}, protoValue.Data...))
 		}
 	}
 
@@ -336,7 +340,8 @@ func (c *Client) Prove(query *ledger.Query) (ledger.Proof, error) {
 		return nil, fmt.Errorf("failed to generate proof: %w", err)
 	}
 
-	return ledger.Proof(resp.Proof), nil
+	// Copy the proof to avoid holding reference to the gRPC response buffer
+	return ledger.Proof(append([]byte{}, resp.Proof...)), nil
 }
 
 // Ready returns a channel that is closed when the client is ready.

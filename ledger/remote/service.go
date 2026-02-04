@@ -63,7 +63,7 @@ func (s *Service) GetSingleValue(ctx context.Context, req *ledgerpb.GetSingleVal
 
 	key, err := protoKeyToLedgerKey(req.Key)
 	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, err.Error())
+		return nil, err // protoKeyToLedgerKey already returns status.Error
 	}
 
 	query, err := ledger.NewQuerySingleValue(state, key)
@@ -90,6 +90,10 @@ func (s *Service) Get(ctx context.Context, req *ledgerpb.GetRequest) (*ledgerpb.
 		return nil, status.Error(codes.InvalidArgument, "invalid state")
 	}
 
+	if len(req.Keys) == 0 {
+		return nil, status.Error(codes.InvalidArgument, "keys cannot be empty")
+	}
+
 	var state ledger.State
 	copy(state[:], req.State.Hash)
 
@@ -97,7 +101,7 @@ func (s *Service) Get(ctx context.Context, req *ledgerpb.GetRequest) (*ledgerpb.
 	for i, protoKey := range req.Keys {
 		key, err := protoKeyToLedgerKey(protoKey)
 		if err != nil {
-			return nil, status.Error(codes.InvalidArgument, err.Error())
+			return nil, err // protoKeyToLedgerKey already returns status.Error
 		}
 		keys[i] = key
 	}
@@ -131,6 +135,10 @@ func (s *Service) Set(ctx context.Context, req *ledgerpb.SetRequest) (*ledgerpb.
 		return nil, status.Error(codes.InvalidArgument, "invalid state")
 	}
 
+	if len(req.Keys) == 0 {
+		return nil, status.Error(codes.InvalidArgument, "keys cannot be empty")
+	}
+
 	if len(req.Keys) != len(req.Values) {
 		return nil, status.Error(codes.InvalidArgument, "keys and values length mismatch")
 	}
@@ -142,7 +150,7 @@ func (s *Service) Set(ctx context.Context, req *ledgerpb.SetRequest) (*ledgerpb.
 	for i, protoKey := range req.Keys {
 		key, err := protoKeyToLedgerKey(protoKey)
 		if err != nil {
-			return nil, status.Error(codes.InvalidArgument, err.Error())
+			return nil, err // protoKeyToLedgerKey already returns status.Error
 		}
 		keys[i] = key
 	}
@@ -195,6 +203,10 @@ func (s *Service) Prove(ctx context.Context, req *ledgerpb.ProveRequest) (*ledge
 		return nil, status.Error(codes.InvalidArgument, "invalid state")
 	}
 
+	if len(req.Keys) == 0 {
+		return nil, status.Error(codes.InvalidArgument, "keys cannot be empty")
+	}
+
 	var state ledger.State
 	copy(state[:], req.State.Hash)
 
@@ -202,7 +214,7 @@ func (s *Service) Prove(ctx context.Context, req *ledgerpb.ProveRequest) (*ledge
 	for i, protoKey := range req.Keys {
 		key, err := protoKeyToLedgerKey(protoKey)
 		if err != nil {
-			return nil, status.Error(codes.InvalidArgument, err.Error())
+			return nil, err // protoKeyToLedgerKey already returns status.Error
 		}
 		keys[i] = key
 	}
