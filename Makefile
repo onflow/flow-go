@@ -171,7 +171,6 @@ tools/custom-gcl: tools/structwrite .custom-gcl.yml
 
 .PHONY: lint
 lint: tools/custom-gcl
-	# revive -config revive.toml -exclude storage/ledger/trie ./...
 	./tools/custom-gcl run -v $(or $(LINT_PATH),./...)
 
 .PHONY: lint-new
@@ -180,7 +179,6 @@ lint-new: tools/custom-gcl
 
 .PHONY: fix-lint
 fix-lint: tools/custom-gcl
-	# revive -config revive.toml -exclude storage/ledger/trie ./...
 	./tools/custom-gcl run -v --fix $(or $(LINT_PATH),./...)
 
 .PHONY: fix-lint-new
