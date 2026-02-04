@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/rs/zerolog"
+	"go.uber.org/atomic"
 
 	"github.com/onflow/flow-go/ledger"
 	realWAL "github.com/onflow/flow-go/ledger/complete/wal"
@@ -22,10 +23,12 @@ type LedgerWithCompactor struct {
 // NewLedgerWithCompactor creates a new ledger with an internal compactor.
 // The compactor lifecycle is managed by this wrapper.
 // Use Ready() to wait for the ledger and compactor to be ready.
+// triggerCheckpoint is a runtime control signal to trigger checkpoint on next segment finish.
 func NewLedgerWithCompactor(
 	diskWAL realWAL.LedgerWAL,
 	ledgerCapacity int,
 	compactorConfig *ledger.CompactorConfig,
+	triggerCheckpoint *atomic.Bool,
 	metrics module.LedgerMetrics,
 	logger zerolog.Logger,
 	pathFinderVersion uint8,
@@ -46,7 +49,7 @@ func NewLedgerWithCompactor(
 		compactorConfig.CheckpointCapacity,
 		compactorConfig.CheckpointDistance,
 		compactorConfig.CheckpointsToKeep,
-		compactorConfig.TriggerCheckpointOnNextSegmentFinish,
+		triggerCheckpoint,
 		compactorConfig.Metrics,
 	)
 	if err != nil {

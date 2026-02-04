@@ -912,19 +912,18 @@ func (exeNode *ExecutionNode) LoadExecutionStateLedger(
 ) {
 	// Create ledger using factory
 	ledgerStorage, err := ledgerfactory.NewLedger(ledgerfactory.Config{
-		LedgerServiceAddr:                    exeNode.exeConf.ledgerServiceAddr,
-		LedgerMaxRequestSize:                 exeNode.exeConf.ledgerMaxRequestSize,
-		LedgerMaxResponseSize:                exeNode.exeConf.ledgerMaxResponseSize,
-		Triedir:                              exeNode.exeConf.triedir,
-		MTrieCacheSize:                       exeNode.exeConf.mTrieCacheSize,
-		CheckpointDistance:                   exeNode.exeConf.checkpointDistance,
-		CheckpointsToKeep:                    exeNode.exeConf.checkpointsToKeep,
-		TriggerCheckpointOnNextSegmentFinish: exeNode.toTriggerCheckpoint,
-		MetricsRegisterer:                    node.MetricsRegisterer,
-		WALMetrics:                           exeNode.collector,
-		LedgerMetrics:                        exeNode.collector,
-		Logger:                               node.Logger,
-	})
+		LedgerServiceAddr:     exeNode.exeConf.ledgerServiceAddr,
+		LedgerMaxRequestSize:  exeNode.exeConf.ledgerMaxRequestSize,
+		LedgerMaxResponseSize: exeNode.exeConf.ledgerMaxResponseSize,
+		Triedir:               exeNode.exeConf.triedir,
+		MTrieCacheSize:        exeNode.exeConf.mTrieCacheSize,
+		CheckpointDistance:    exeNode.exeConf.checkpointDistance,
+		CheckpointsToKeep:     exeNode.exeConf.checkpointsToKeep,
+		MetricsRegisterer:     node.MetricsRegisterer,
+		WALMetrics:            exeNode.collector,
+		LedgerMetrics:         exeNode.collector,
+		Logger:                node.Logger,
+	}, exeNode.toTriggerCheckpoint)
 	if err != nil {
 		return nil, err
 	}

@@ -23,21 +23,21 @@ type Config struct {
 	LedgerMaxResponseSize uint   // Maximum response message size in bytes for remote ledger client (0 = default 1 GiB)
 
 	// Local ledger configuration
-	Triedir                              string
-	MTrieCacheSize                       uint32
-	CheckpointDistance                   uint
-	CheckpointsToKeep                    uint
-	TriggerCheckpointOnNextSegmentFinish *atomic.Bool
-	MetricsRegisterer                    prometheus.Registerer
-	WALMetrics                           module.WALMetrics
-	LedgerMetrics                        module.LedgerMetrics
-	Logger                               zerolog.Logger
+	Triedir           string
+	MTrieCacheSize    uint32
+	CheckpointDistance uint
+	CheckpointsToKeep uint
+	MetricsRegisterer prometheus.Registerer
+	WALMetrics        module.WALMetrics
+	LedgerMetrics     module.LedgerMetrics
+	Logger            zerolog.Logger
 }
 
 // NewLedger creates a ledger instance based on the configuration.
 // If LedgerServiceAddr is set, it creates a remote ledger client.
 // Otherwise, it creates a local ledger with WAL and compactor.
-func NewLedger(config Config) (ledger.Ledger, error) {
+// triggerCheckpoint is a runtime control signal to trigger checkpoint on next segment finish (can be nil for remote ledger).
+func NewLedger(config Config, triggerCheckpoint *atomic.Bool) (ledger.Ledger, error) {
 	var factory ledger.Factory
 	var diskWal wal.LedgerWAL
 
@@ -84,11 +84,10 @@ func NewLedger(config Config) (ledger.Ledger, error) {
 
 		// Create compactor config
 		compactorConfig := &ledger.CompactorConfig{
-			CheckpointCapacity:                   uint(config.MTrieCacheSize),
-			CheckpointDistance:                   config.CheckpointDistance,
-			CheckpointsToKeep:                    config.CheckpointsToKeep,
-			TriggerCheckpointOnNextSegmentFinish: config.TriggerCheckpointOnNextSegmentFinish,
-			Metrics:                              config.WALMetrics,
+			CheckpointCapacity: uint(config.MTrieCacheSize),
+			CheckpointDistance: config.CheckpointDistance,
+			CheckpointsToKeep:  config.CheckpointsToKeep,
+			Metrics:            config.WALMetrics,
 		}
 
 		// Use factory to create ledger with internal compactor
@@ -96,6 +95,7 @@ func NewLedger(config Config) (ledger.Ledger, error) {
 			diskWal,
 			int(config.MTrieCacheSize),
 			compactorConfig,
+			triggerCheckpoint,
 			config.LedgerMetrics,
 			config.Logger.With().Str("subcomponent", "ledger").Logger(),
 			complete.DefaultPathFinderVersion,

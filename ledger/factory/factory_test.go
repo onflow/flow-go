@@ -392,6 +392,7 @@ func startLedgerServer(t *testing.T, walDir string) (string, func()) {
 		diskWal,
 		100,
 		compactorConfig,
+		atomic.NewBool(false), // trigger checkpoint signal
 		metricsCollector,
 		logger,
 		complete.DefaultPathFinderVersion,
@@ -461,16 +462,15 @@ func withLedgerPair(t *testing.T, fn func(localLedger, remoteLedger ledger.Ledge
 
 	// Create local ledger using factory
 	localLedger, err := NewLedger(Config{
-		Triedir:                              localWalDir,
-		MTrieCacheSize:                       100,
-		CheckpointDistance:                   1000,
-		CheckpointsToKeep:                    10,
-		TriggerCheckpointOnNextSegmentFinish: atomic.NewBool(false),
-		MetricsRegisterer:                    nil,
-		WALMetrics:                           metricsCollector,
-		LedgerMetrics:                        metricsCollector,
-		Logger:                               logger,
-	})
+		Triedir:           localWalDir,
+		MTrieCacheSize:    100,
+		CheckpointDistance: 1000,
+		CheckpointsToKeep: 10,
+		MetricsRegisterer: nil,
+		WALMetrics:        metricsCollector,
+		LedgerMetrics:     metricsCollector,
+		Logger:            logger,
+	}, atomic.NewBool(false))
 	require.NoError(t, err)
 	require.NotNil(t, localLedger)
 
@@ -478,7 +478,7 @@ func withLedgerPair(t *testing.T, fn func(localLedger, remoteLedger ledger.Ledge
 	remoteLedger, err := NewLedger(Config{
 		LedgerServiceAddr: serverAddr,
 		Logger:            logger,
-	})
+	}, nil)
 	require.NoError(t, err)
 	require.NotNil(t, remoteLedger)
 

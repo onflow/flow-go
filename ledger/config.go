@@ -1,8 +1,6 @@
 package ledger
 
 import (
-	"go.uber.org/atomic"
-
 	"github.com/onflow/flow-go/module"
 )
 
@@ -15,20 +13,18 @@ const (
 
 // CompactorConfig holds configuration for ledger compaction.
 type CompactorConfig struct {
-	CheckpointCapacity                   uint
-	CheckpointDistance                   uint
-	CheckpointsToKeep                    uint
-	TriggerCheckpointOnNextSegmentFinish *atomic.Bool
-	Metrics                              module.WALMetrics
+	CheckpointCapacity uint
+	CheckpointDistance uint
+	CheckpointsToKeep  uint
+	Metrics            module.WALMetrics
 }
 
 // DefaultCompactorConfig returns default compactor configuration.
 func DefaultCompactorConfig(metrics module.WALMetrics) *CompactorConfig {
 	return &CompactorConfig{
-		CheckpointCapacity:                   DefaultMTrieCacheSize,
-		CheckpointDistance:                   DefaultCheckpointDistance,
-		CheckpointsToKeep:                    DefaultCheckpointsToKeep,
-		TriggerCheckpointOnNextSegmentFinish: atomic.NewBool(false),
-		Metrics:                              metrics,
+		CheckpointCapacity: DefaultMTrieCacheSize,
+		CheckpointDistance: DefaultCheckpointDistance,
+		CheckpointsToKeep:  DefaultCheckpointsToKeep,
+		Metrics:            metrics,
 	}
 }
