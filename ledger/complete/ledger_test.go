@@ -936,6 +936,7 @@ func TestLedgerWithCompactor_StateCountAndStateByIndex(t *testing.T) {
 			diskWal,
 			100,
 			compactorConfig,
+			atomic.NewBool(false),
 			metricsCollector,
 			zerolog.Nop(),
 			complete.DefaultPathFinderVersion,
