@@ -183,7 +183,7 @@ func (c *Client) InitialState() ledger.State {
 
 	var state ledger.State
 	if len(resp.State.Hash) != len(state) {
-		c.logger.Error().
+		c.logger.Fatal().
 			Int("expected", len(state)).
 			Int("got", len(resp.State.Hash)).
 			Msg("invalid state hash length")
