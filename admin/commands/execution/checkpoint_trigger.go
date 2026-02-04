@@ -2,7 +2,6 @@ package execution
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/rs/zerolog/log"
 	"go.uber.org/atomic"
@@ -37,25 +36,6 @@ func NewTriggerCheckpointCommand(trigger *atomic.Bool, ledgerServiceAddr, ledger
 }
 
 func (s *TriggerCheckpointCommand) Handler(_ context.Context, _ *admin.CommandRequest) (interface{}, error) {
-	// When using remote ledger service, checkpointing is handled by the ledger service
-	if s.ledgerServiceAddr != "" {
-		if s.ledgerServiceAdminAddr == "" {
-			return nil, fmt.Errorf(
-				"trigger-checkpoint is not available when using remote ledger service (connected to %s). "+
-					"Please use the ledger service's admin endpoint instead. "+
-					"The admin address was not configured - check if the ledger service was started with --admin-addr",
-				s.ledgerServiceAddr,
-			)
-		}
-		return nil, fmt.Errorf(
-			"trigger-checkpoint is not available when using remote ledger service (connected to %s). "+
-				"Please use the ledger service's admin endpoint instead: "+
-				"curl -X POST http://%s/admin/run_command -H 'Content-Type: application/json' -d '{\"commandName\": \"trigger-checkpoint\", \"data\": {}}'",
-			s.ledgerServiceAddr,
-			s.ledgerServiceAdminAddr,
-		)
-	}
-
 	if s.trigger.CompareAndSwap(false, true) {
 		log.Info().Msgf("admintool: trigger checkpoint as soon as finishing writing the current segment file. you can find log about 'compactor' to check the checkpointing progress")
 	} else {
@@ -66,5 +46,23 @@ func (s *TriggerCheckpointCommand) Handler(_ context.Context, _ *admin.CommandRe
 }
 
 func (s *TriggerCheckpointCommand) Validator(_ *admin.CommandRequest) error {
+	// When using remote ledger service, checkpointing is handled by the ledger service
+	if s.ledgerServiceAddr != "" {
+		if s.ledgerServiceAdminAddr == "" {
+			return admin.NewInvalidAdminReqErrorf(
+				"trigger-checkpoint is not available when using remote ledger service (connected to %s). "+
+					"Please use the ledger service's admin endpoint instead. "+
+					"The admin address was not configured - check if the ledger service was started with --admin-addr",
+				s.ledgerServiceAddr,
+			)
+		}
+		return admin.NewInvalidAdminReqErrorf(
+			"trigger-checkpoint is not available when using remote ledger service (connected to %s). "+
+				"Please use the ledger service's admin endpoint instead: "+
+				"curl -X POST http://%s/admin/run_command -H 'Content-Type: application/json' -d '{\"commandName\": \"trigger-checkpoint\", \"data\": {}}'",
+			s.ledgerServiceAddr,
+			s.ledgerServiceAdminAddr,
+		)
+	}
 	return nil
 }

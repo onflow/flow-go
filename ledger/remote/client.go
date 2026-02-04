@@ -84,9 +84,7 @@ func NewClient(grpcAddr string, logger zerolog.Logger, opts ...ClientOption) (*C
 	// Handle Unix domain socket addresses
 	// gRPC client accepts "unix:///absolute/path" or "unix://relative/path" format
 	// If address starts with unix://, use it as-is (gRPC handles the format)
-	normalizedAddr := grpcAddr
-	isUnixSocket := strings.HasPrefix(grpcAddr, "unix://")
-	if isUnixSocket {
+	if strings.HasPrefix(grpcAddr, "unix://") {
 		logger.Debug().Str("address", grpcAddr).Msg("using Unix domain socket")
 	}
 
@@ -102,7 +100,7 @@ func NewClient(grpcAddr string, logger zerolog.Logger, opts ...ClientOption) (*C
 	for {
 		var err error
 		conn, err = grpc.NewClient(
-			normalizedAddr,
+			grpcAddr,
 			grpc.WithTransportCredentials(insecure.NewCredentials()),
 			grpc.WithDefaultCallOptions(
 				grpc.MaxCallRecvMsgSize(int(cfg.maxResponseSize)),
@@ -381,10 +379,7 @@ func (c *Client) Ready() <-chan struct{} {
 					Time("retry_at", time.Now().Add(retryDelay)).
 					Msg("ledger service not ready, retrying...")
 				time.Sleep(retryDelay)
-				retryDelay = time.Duration(float64(retryDelay) * 1.5) // exponential backoff
-				if retryDelay > maxRetryDelay {
-					retryDelay = maxRetryDelay
-				}
+				retryDelay = min(time.Duration(float64(retryDelay)*1.5), maxRetryDelay)
 			} else {
 				c.logger.Warn().Err(err).Msg("ledger service not ready after retries, proceeding anyway")
 				// Still close the channel to avoid blocking forever

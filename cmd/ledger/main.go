@@ -62,8 +62,7 @@ func main() {
 
 	// Validate that at least one address is provided
 	if *ledgerServiceTCP == "" && *ledgerServiceSocket == "" {
-		fmt.Fprintf(os.Stderr, "error: at least one of --ledger-service-tcp or --ledger-service-socket must be provided\n")
-		os.Exit(1)
+		logger.Fatal().Msg("at least one of --ledger-service-tcp or --ledger-service-socket must be provided")
 	}
 
 	logger.Info().

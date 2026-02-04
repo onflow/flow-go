@@ -67,24 +67,28 @@ When `-admin-addr` is provided, the service exposes an HTTP admin API for managi
 ### Available Commands
 
 - `trigger-checkpoint`: Triggers a checkpoint to be created as soon as the current WAL segment file is finished writing. This is useful for manually creating checkpoints without waiting for the automatic checkpoint distance.
+- `ping`: Simple health check command to verify the admin server is responsive.
+- `list-commands`: Lists all available admin commands.
 
-**Example:**
+**Examples:**
 ```bash
+# Trigger a checkpoint
 curl -X POST http://localhost:9003/admin/run_command \
   -H "Content-Type: application/json" \
   -d '{"commandName": "trigger-checkpoint", "data": {}}'
-```
 
-**Note:** When running an execution node with a remote ledger service (using `--ledger-service-addr`), the `trigger-checkpoint` command on the execution node is disabled. You must use the ledger service's admin endpoint to trigger checkpoints.
+# Ping the admin server
+curl -X POST http://localhost:9003/admin/run_command \
+  -H "Content-Type: application/json" \
+  -d '{"commandName": "ping", "data": {}}'
 
-### List Commands
-
-To see all available admin commands:
-```bash
+# List all available commands
 curl -X POST http://localhost:9003/admin/run_command \
   -H "Content-Type: application/json" \
   -d '{"commandName": "list-commands", "data": {}}'
 ```
+
+**Note:** When running an execution node with a remote ledger service (using `--ledger-service-addr`), the `trigger-checkpoint` command on the execution node is disabled. You must use the ledger service's admin endpoint to trigger checkpoints.
 
 ## API
 
