@@ -61,14 +61,14 @@ func main() {
 	// Create ledger using factory
 	metricsCollector := metrics.NewLedgerCollector("ledger", "wal")
 	ledgerStorage, err := ledgerfactory.NewLedger(ledgerfactory.Config{
-		Triedir:           *triedir,
-		MTrieCacheSize:    uint32(*mtrieCacheSize),
+		Triedir:            *triedir,
+		MTrieCacheSize:     uint32(*mtrieCacheSize),
 		CheckpointDistance: *checkpointDist,
-		CheckpointsToKeep: *checkpointsToKeep,
-		MetricsRegisterer: prometheus.DefaultRegisterer,
-		WALMetrics:        metricsCollector,
-		LedgerMetrics:     metricsCollector,
-		Logger:            logger,
+		CheckpointsToKeep:  *checkpointsToKeep,
+		MetricsRegisterer:  prometheus.DefaultRegisterer,
+		WALMetrics:         metricsCollector,
+		LedgerMetrics:      metricsCollector,
+		Logger:             logger,
 	}, atomic.NewBool(false))
 	if err != nil {
 		logger.Fatal().Err(err).Msg("failed to create ledger")

@@ -11,13 +11,13 @@ import (
 
 // LocalLedgerFactory creates in-process ledger instances with compactor.
 type LocalLedgerFactory struct {
-	wal                wal.LedgerWAL
-	capacity           int
-	compactorConfig    *ledger.CompactorConfig
-	triggerCheckpoint  *atomic.Bool
-	metrics            module.LedgerMetrics
-	logger             zerolog.Logger
-	pathFinderVersion  uint8
+	wal               wal.LedgerWAL
+	capacity          int
+	compactorConfig   *ledger.CompactorConfig
+	triggerCheckpoint *atomic.Bool
+	metrics           module.LedgerMetrics
+	logger            zerolog.Logger
+	pathFinderVersion uint8
 }
 
 // NewLocalLedgerFactory creates a new factory for local ledger instances.
