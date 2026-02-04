@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"sort"
 
+	"github.com/hashicorp/go-multierror"
 	prometheusWAL "github.com/onflow/wal/wal"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rs/zerolog"
@@ -43,8 +44,11 @@ func NewDiskWAL(logger zerolog.Logger, reg prometheus.Registerer, metrics module
 	w, err := prometheusWAL.NewSize(logger, reg, dir, segmentSize, false)
 	if err != nil {
 		// Release the lock if WAL creation fails
-		_ = fileLock.Unlock()
-		return nil, fmt.Errorf("could not create disk wal from dir %v, segmentSize %v: %w", dir, segmentSize, err)
+		err = fmt.Errorf("could not create disk wal from dir %v, segmentSize %v: %w", dir, segmentSize, err)
+		if unlockErr := fileLock.Unlock(); unlockErr != nil {
+			err = multierror.Append(err, fmt.Errorf("failed to release file lock: %w", unlockErr))
+		}
+		return nil, err
 	}
 
 	log := logger.With().Str("ledger_mod", "diskwal").Logger()
