@@ -69,8 +69,9 @@ func WithCallTimeout(timeout time.Duration) ClientOption {
 }
 
 // NewClient creates a new remote ledger client.
-// grpcAddr can be either a TCP address (e.g., "localhost:9000") or a Unix domain socket (e.g., "unix:///tmp/ledger.sock").
-// maxRequestSize and maxResponseSize specify the maximum message sizes in bytes.
+// grpcAddr can be either a TCP address (e.g., "localhost:9000") or a Unix domain socket.
+// For Unix sockets, you can use either the full gRPC format (e.g., "unix:///tmp/ledger.sock")
+// or just the absolute path (e.g., "/tmp/ledger.sock") - the unix:// prefix will be added automatically.
 // Options can be provided to customize the client configuration.
 // By default, max request and response sizes are 1 GiB.
 func NewClient(grpcAddr string, logger zerolog.Logger, opts ...ClientOption) (*Client, error) {
@@ -83,8 +84,11 @@ func NewClient(grpcAddr string, logger zerolog.Logger, opts ...ClientOption) (*C
 
 	// Handle Unix domain socket addresses
 	// gRPC client accepts "unix:///absolute/path" or "unix://relative/path" format
-	// If address starts with unix://, use it as-is (gRPC handles the format)
-	if strings.HasPrefix(grpcAddr, "unix://") {
+	// For convenience, if an absolute path is provided (starts with /), automatically add the unix:// prefix
+	if strings.HasPrefix(grpcAddr, "/") {
+		grpcAddr = "unix://" + grpcAddr
+		logger.Debug().Str("address", grpcAddr).Msg("using Unix domain socket (auto-prefixed)")
+	} else if strings.HasPrefix(grpcAddr, "unix://") {
 		logger.Debug().Str("address", grpcAddr).Msg("using Unix domain socket")
 	}
 
