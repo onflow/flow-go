@@ -93,11 +93,13 @@ func NewClient(grpcAddr string, logger zerolog.Logger, opts ...ClientOption) (*C
 	// This was increased to fix "grpc: received message larger than max" errors when generating
 	// proofs for blocks with many state changes.
 	// Retry connection with exponential backoff until the service becomes available.
+	// After approximately 40 minutes of retrying (90 attempts), the client will give up and crash.
 	var conn *grpc.ClientConn
 	retryDelay := 100 * time.Millisecond
 	maxRetryDelay := 30 * time.Second
+	maxRetries := 90 // ~40 minutes total wait time with exponential backoff capped at 30s
 
-	for {
+	for attempt := 0; ; attempt++ {
 		var err error
 		conn, err = grpc.NewClient(
 			grpcAddr,
@@ -112,8 +114,18 @@ func NewClient(grpcAddr string, logger zerolog.Logger, opts ...ClientOption) (*C
 			break
 		}
 
+		if attempt >= maxRetries {
+			logger.Fatal().
+				Err(err).
+				Int("attempts", attempt).
+				Str("address", grpcAddr).
+				Msg("failed to connect to ledger service after maximum retries, crashing node")
+		}
+
 		logger.Warn().
 			Err(err).
+			Int("attempt", attempt+1).
+			Int("max_attempts", maxRetries).
 			Dur("retry_delay", retryDelay).
 			Time("retry_at", time.Now().Add(retryDelay)).
 			Str("address", grpcAddr).
