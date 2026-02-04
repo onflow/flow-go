@@ -37,8 +37,8 @@ type clientConfig struct {
 // defaultClientConfig returns the default configuration.
 func defaultClientConfig() *clientConfig {
 	return &clientConfig{
-		maxRequestSize:  1 << 30,      // 1 GiB
-		maxResponseSize: 1 << 30,      // 1 GiB
+		maxRequestSize:  1 << 30, // 1 GiB
+		maxResponseSize: 1 << 30, // 1 GiB
 		callTimeout:     time.Minute,
 	}
 }
