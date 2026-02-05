@@ -213,6 +213,103 @@ func TestEVMRun(t *testing.T) {
 			})
 	})
 
+	t.Run("testing EVM.store and EVM.load (happy case)", func(t *testing.T) {
+		t.Parallel()
+
+		RunWithNewEnvironment(t,
+			chain, func(
+				ctx fvm.Context,
+				vm fvm.VM,
+				snapshot snapshot.SnapshotTree,
+				testContract *TestContract,
+				testAccount *EOATestAccount,
+			) {
+				sc := systemcontracts.SystemContractsForChain(chain.ChainID())
+				code := []byte(fmt.Sprintf(
+					`
+					import EVM from %s
+
+					transaction(tx: [UInt8], target: String, coinbaseBytes: [UInt8; 20]){
+						prepare(account: &Account) {
+							let targetAddr = EVM.addressFromString(target)
+							let slotValue = "00000000000000000000000000000000000000000000000000000000000003e8"
+							EVM.store(
+								target: targetAddr,
+								slot: "0x0000000000000000000000000000000000000000000000000000000000000000",
+								value: slotValue
+							)
+							let coinbase = EVM.EVMAddress(bytes: coinbaseBytes)
+							let res = EVM.dryRun(tx: tx, from: coinbase)
+
+							assert(res.status == EVM.Status.successful, message: "unexpected status")
+							assert(res.errorCode == 0, message: "unexpected error code")
+							assert(res.deployedContract == nil, message: "unexpected deployed contract")
+
+							let values = EVM.decodeABI(types: [Type<UInt256>()], data: res.data)
+							assert(values.length == 1)
+
+							let number = values[0] as! UInt256
+							assert(number == 1000, message: String.encodeHex(res.data))
+
+							let stateValue = EVM.load(
+								target: targetAddr,
+								slot: "0x0000000000000000000000000000000000000000000000000000000000000000"
+							)
+							assert(String.encodeHex(stateValue) == slotValue, message: slotValue)
+						}
+					}
+					`,
+					sc.EVMContract.Address.HexWithPrefix(),
+				))
+
+				coinbaseAddr := types.Address{1, 2, 3}
+				coinbaseBalance := getEVMAccountBalance(t, ctx, vm, snapshot, coinbaseAddr)
+				require.Zero(t, types.BalanceToBigInt(coinbaseBalance).Uint64())
+
+				evmTx := gethTypes.NewTransaction(
+					0,
+					testContract.DeployedAt.ToCommon(),
+					big.NewInt(0),
+					uint64(100_000),
+					big.NewInt(0),
+					testContract.MakeCallData(t, "retrieve"),
+				)
+				innerTxBytes, err := evmTx.MarshalBinary()
+				require.NoError(t, err)
+
+				innerTx := cadence.NewArray(
+					unittest.BytesToCdcUInt8(innerTxBytes),
+				).WithType(stdlib.EVMTransactionBytesCadenceType)
+
+				coinbase := cadence.NewArray(
+					unittest.BytesToCdcUInt8(coinbaseAddr.Bytes()),
+				).WithType(stdlib.EVMAddressBytesCadenceType)
+				target, err := cadence.NewString(testContract.DeployedAt.String())
+				require.NoError(t, err)
+
+				txBody, err := flow.NewTransactionBodyBuilder().
+					SetScript(code).
+					SetPayer(sc.FlowServiceAccount.Address).
+					AddAuthorizer(sc.FlowServiceAccount.Address).
+					AddArgument(json.MustEncode(innerTx)).
+					AddArgument(json.MustEncode(target)).
+					AddArgument(json.MustEncode(coinbase)).
+					Build()
+				require.NoError(t, err)
+
+				tx := fvm.Transaction(txBody, 0)
+
+				state, output, err := vm.Run(
+					ctx,
+					tx,
+					snapshot,
+				)
+				require.NoError(t, err)
+				require.NoError(t, output.Err)
+				require.NotEmpty(t, state.WriteSet)
+			})
+	})
+
 	t.Run("testing EVM.run (failed)", func(t *testing.T) {
 		t.Parallel()
 		RunWithNewEnvironment(t,

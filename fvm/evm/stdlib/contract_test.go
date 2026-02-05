@@ -144,6 +144,21 @@ func (t *testContractHandler) CommitBlockProposal() {
 	t.commitBlockProposal()
 }
 
+func (t *testContractHandler) SetState(
+	address gethCommon.Address,
+	slot gethCommon.Hash,
+	value gethCommon.Hash,
+) gethCommon.Hash {
+	panic("unexpected SetState")
+}
+
+func (t *testContractHandler) GetState(
+	address gethCommon.Address,
+	slot gethCommon.Hash,
+) gethCommon.Hash {
+	panic("unexpected GetState")
+}
+
 type testFlowAccount struct {
 	address  types.Address
 	balance  func() types.Balance
