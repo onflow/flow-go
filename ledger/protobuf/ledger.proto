@@ -1,0 +1,118 @@
+syntax = "proto3";
+
+package ledger;
+
+option go_package = "github.com/onflow/flow-go/ledger/protobuf";
+
+import "google/protobuf/empty.proto";
+
+// LedgerService provides remote access to ledger operations
+service LedgerService {
+  // InitialState returns the initial state of the ledger
+  rpc InitialState(google.protobuf.Empty) returns (StateResponse);
+
+  // HasState checks if the given state exists in the ledger
+  rpc HasState(StateRequest) returns (HasStateResponse);
+
+  // GetSingleValue returns a single value for a given key at a specific state
+  rpc GetSingleValue(GetSingleValueRequest) returns (ValueResponse);
+
+  // Get returns values for multiple keys at a specific state
+  rpc Get(GetRequest) returns (GetResponse);
+
+  // Set updates keys with new values at a specific state and returns the new state
+  rpc Set(SetRequest) returns (SetResponse);
+
+  // Prove returns proofs for the given keys at a specific state
+  rpc Prove(ProveRequest) returns (ProofResponse);
+}
+
+// State represents a ledger state (32-byte hash)
+message State {
+  bytes hash = 1; // 32 bytes
+}
+
+// KeyPart represents a part of a hierarchical key
+message KeyPart {
+  // type is actually uint16 but uint16 is not available in proto3
+  uint32 type = 1;
+  bytes value = 2;
+}
+
+// Key represents a hierarchical ledger key
+message Key {
+  repeated KeyPart parts = 1;
+}
+
+// Value represents a ledger value
+message Value {
+  bytes data = 1;
+  // is_nil distinguishes between nil and []byte{} (empty slice).
+  // When data is nil or empty:
+  //   - is_nil=true means the original value was nil
+  //   - is_nil=false means the original value was []byte{} (empty slice)
+  // When data is non-empty, is_nil is ignored (should be false).
+  bool is_nil = 2;
+}
+
+// StateRequest contains a state to query
+message StateRequest {
+  State state = 1;
+}
+
+// StateResponse contains a state
+message StateResponse {
+  State state = 1;
+}
+
+// HasStateResponse indicates if a state exists
+message HasStateResponse {
+  bool has_state = 1;
+}
+
+// GetSingleValueRequest contains a query for a single value
+message GetSingleValueRequest {
+  State state = 1;
+  Key key = 2;
+}
+
+// ValueResponse contains a single value
+message ValueResponse {
+  Value value = 1;
+}
+
+// GetRequest contains a query for multiple values
+message GetRequest {
+  State state = 1;
+  repeated Key keys = 2;
+}
+
+// GetResponse contains multiple values
+message GetResponse {
+  repeated Value values = 1;
+}
+
+// SetRequest contains an update operation
+message SetRequest {
+  State state = 1;
+  repeated Key keys = 2;
+  repeated Value values = 3;
+}
+
+// SetResponse contains the new state after an update
+message SetResponse {
+  State new_state = 1;
+  bytes trie_update = 2; // Encoded TrieUpdate (opaque to gRPC)
+}
+
+// ProveRequest contains a proof query
+message ProveRequest {
+  State state = 1;
+  repeated Key keys = 2;
+}
+
+// ProofResponse contains a proof
+message ProofResponse {
+  bytes proof = 1; // Encoded Proof (opaque to gRPC)
+}
+
