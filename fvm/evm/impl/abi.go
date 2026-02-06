@@ -516,6 +516,7 @@ func gethABIType(
 }
 
 func goType(
+	context abiEncodingContext,
 	staticType interpreter.StaticType,
 	evmTypeIDs *evmSpecialTypeIDs,
 ) (reflect.Type, bool) {
@@ -558,7 +559,7 @@ func goType(
 
 	switch staticType := staticType.(type) {
 	case *interpreter.ConstantSizedStaticType:
-		elementType, ok := goType(staticType.ElementType(), evmTypeIDs)
+		elementType, ok := goType(context, staticType.ElementType(), evmTypeIDs)
 		if !ok {
 			break
 		}
@@ -566,7 +567,7 @@ func goType(
 		return reflect.ArrayOf(int(staticType.Size), elementType), true
 
 	case *interpreter.VariableSizedStaticType:
-		elementType, ok := goType(staticType.ElementType(), evmTypeIDs)
+		elementType, ok := goType(context, staticType.ElementType(), evmTypeIDs)
 		if !ok {
 			break
 		}
@@ -583,6 +584,22 @@ func goType(
 		return reflect.ArrayOf(stdlib.EVMBytes4Length, reflect.TypeOf(byte(0))), true
 	case evmTypeIDs.Bytes32TypeID:
 		return reflect.ArrayOf(stdlib.EVMBytes32Length, reflect.TypeOf(byte(0))), true
+	}
+
+	gethABIType, ok := gethABIType(
+		context,
+		staticType,
+		evmTypeIDs,
+	)
+	// All user-defined Cadence structs, are ABI encoded/decoded as Solidity tuples.
+	// Except for the structs defined in the EVM system contract:
+	// - `EVM.EVMAddress`
+	// - `EVM.EVMBytes`
+	// - `EVM.EVMBytes4`
+	// - `EVM.EVMBytes32`
+	// These have their own ABI encoding/decoding format.
+	if ok && gethABIType.T == gethABI.TupleTy {
+		return gethABIType.TupleType, true
 	}
 
 	return nil, false
@@ -793,7 +810,7 @@ func encodeABI(
 
 		elementStaticType := arrayStaticType.ElementType()
 
-		elementGoType, ok := goType(elementStaticType, evmTypeIDs)
+		elementGoType, ok := goType(context, elementStaticType, evmTypeIDs)
 		if !ok {
 			break
 		}
@@ -810,6 +827,9 @@ func encodeABI(
 			result = reflect.MakeSlice(reflect.SliceOf(elementGoType), size, size)
 		}
 
+		semaType := interpreter.MustConvertStaticToSemaType(elementStaticType, context)
+		isTuple := asTupleEncodableCompositeType(semaType) != nil
+
 		var index int
 		value.Iterate(
 			context,
@@ -825,7 +845,16 @@ func encodeABI(
 					panic(err)
 				}
 
-				result.Index(index).Set(reflect.ValueOf(arrayElement))
+				if isTuple {
+					// For tuples, the underlying `arrayElement` is a value of
+					// type *struct { X,Y,Z fields }, so we need to indirect
+					// the pointer
+					result.Index(index).Set(
+						reflect.Indirect(reflect.ValueOf(arrayElement)),
+					)
+				} else {
+					result.Index(index).Set(reflect.ValueOf(arrayElement))
+				}
 
 				index++
 
