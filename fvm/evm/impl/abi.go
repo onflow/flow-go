@@ -586,24 +586,20 @@ func goType(
 		return reflect.ArrayOf(stdlib.EVMBytes32Length, reflect.TypeOf(byte(0))), true
 	}
 
-	// This check for Cadence structs, has to be after the above checks,
-	// which are also structs defined in the EVM system contract:
+	gethABIType, ok := gethABIType(
+		context,
+		staticType,
+		evmTypeIDs,
+	)
+	// All user-defined Cadence structs, are ABI encoded/decoded as Solidity tuples.
+	// Except for the structs defined in the EVM system contract:
 	// - `EVM.EVMAddress`
 	// - `EVM.EVMBytes`
 	// - `EVM.EVMBytes4`
 	// - `EVM.EVMBytes32`
-	semaType := interpreter.MustConvertStaticToSemaType(staticType, context)
-	if compositeType := asTupleEncodableCompositeType(semaType); compositeType != nil {
-		tupleGethABIType, ok := gethABIType(
-			context,
-			staticType,
-			evmTypeIDs,
-		)
-		if !ok {
-			return nil, false
-		}
-
-		return tupleGethABIType.TupleType, true
+	// These have their own ABI encoding/decoding format.
+	if ok && gethABIType.T == gethABI.TupleTy {
+		return gethABIType.TupleType, true
 	}
 
 	return nil, false
