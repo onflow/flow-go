@@ -283,6 +283,19 @@ func (c *Client) Get(query *ledger.Query) ([]ledger.Value, error) {
 
 // Set updates keys with new values at a specific state and returns the new state.
 func (c *Client) Set(update *ledger.Update) (ledger.State, *ledger.TrieUpdate, error) {
+	// Handle empty updates locally without RPC call.
+	// This matches the behavior of the local ledger implementations which return
+	// the same state when there are no keys to update.
+	if update.Size() == 0 {
+		return update.State(),
+			&ledger.TrieUpdate{
+				RootHash: ledger.RootHash(update.State()),
+				Paths:    []ledger.Path{},
+				Payloads: []*ledger.Payload{},
+			},
+			nil
+	}
+
 	ctx, cancel := c.callCtx()
 	defer cancel()
 	state := update.State()
