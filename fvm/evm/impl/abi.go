@@ -515,6 +515,24 @@ func gethABIType(
 	return gethABI.Type{}, false
 }
 
+var (
+	goStringType    = reflect.TypeFor[string]()
+	goBoolType      = reflect.TypeFor[bool]()
+	goUint8Type     = reflect.TypeFor[uint8]()
+	goUint16Type    = reflect.TypeFor[uint16]()
+	goUint32Type    = reflect.TypeFor[uint32]()
+	goUint64Type    = reflect.TypeFor[uint64]()
+	goInt8Type      = reflect.TypeFor[int8]()
+	goInt16Type     = reflect.TypeFor[int16]()
+	goInt32Type     = reflect.TypeFor[int32]()
+	goInt64Type     = reflect.TypeFor[int64]()
+	goBigIntType    = reflect.TypeFor[*big.Int]()
+	gethAddressType = reflect.TypeFor[gethCommon.Address]()
+	goByteSliceType = reflect.TypeFor[[]byte]()
+	evmBytes4Type   = reflect.TypeFor[[stdlib.EVMBytes4Length]byte]()
+	evmBytes32Type  = reflect.TypeFor[[stdlib.EVMBytes32Length]byte]()
+)
+
 func goType(
 	context abiEncodingContext,
 	staticType interpreter.StaticType,
@@ -522,39 +540,39 @@ func goType(
 ) (reflect.Type, bool) {
 	switch staticType {
 	case interpreter.PrimitiveStaticTypeString:
-		return reflect.TypeOf(""), true
+		return goStringType, true
 	case interpreter.PrimitiveStaticTypeBool:
-		return reflect.TypeOf(true), true
+		return goBoolType, true
 	case interpreter.PrimitiveStaticTypeUInt:
-		return reflect.TypeOf((*big.Int)(nil)), true
+		return goBigIntType, true
 	case interpreter.PrimitiveStaticTypeUInt8:
-		return reflect.TypeOf(uint8(0)), true
+		return goUint8Type, true
 	case interpreter.PrimitiveStaticTypeUInt16:
-		return reflect.TypeOf(uint16(0)), true
+		return goUint16Type, true
 	case interpreter.PrimitiveStaticTypeUInt32:
-		return reflect.TypeOf(uint32(0)), true
+		return goUint32Type, true
 	case interpreter.PrimitiveStaticTypeUInt64:
-		return reflect.TypeOf(uint64(0)), true
+		return goUint64Type, true
 	case interpreter.PrimitiveStaticTypeUInt128:
-		return reflect.TypeOf((*big.Int)(nil)), true
+		return goBigIntType, true
 	case interpreter.PrimitiveStaticTypeUInt256:
-		return reflect.TypeOf((*big.Int)(nil)), true
+		return goBigIntType, true
 	case interpreter.PrimitiveStaticTypeInt:
-		return reflect.TypeOf((*big.Int)(nil)), true
+		return goBigIntType, true
 	case interpreter.PrimitiveStaticTypeInt8:
-		return reflect.TypeOf(int8(0)), true
+		return goInt8Type, true
 	case interpreter.PrimitiveStaticTypeInt16:
-		return reflect.TypeOf(int16(0)), true
+		return goInt16Type, true
 	case interpreter.PrimitiveStaticTypeInt32:
-		return reflect.TypeOf(int32(0)), true
+		return goInt32Type, true
 	case interpreter.PrimitiveStaticTypeInt64:
-		return reflect.TypeOf(int64(0)), true
+		return goInt64Type, true
 	case interpreter.PrimitiveStaticTypeInt128:
-		return reflect.TypeOf((*big.Int)(nil)), true
+		return goBigIntType, true
 	case interpreter.PrimitiveStaticTypeInt256:
-		return reflect.TypeOf((*big.Int)(nil)), true
+		return goBigIntType, true
 	case interpreter.PrimitiveStaticTypeAddress:
-		return reflect.TypeOf((*big.Int)(nil)), true
+		return goBigIntType, true
 	}
 
 	switch staticType := staticType.(type) {
@@ -577,13 +595,13 @@ func goType(
 
 	switch staticType.ID() {
 	case evmTypeIDs.AddressTypeID:
-		return reflect.TypeOf(gethCommon.Address{}), true
+		return gethAddressType, true
 	case evmTypeIDs.BytesTypeID:
-		return reflect.SliceOf(reflect.TypeOf(byte(0))), true
+		return goByteSliceType, true
 	case evmTypeIDs.Bytes4TypeID:
-		return reflect.ArrayOf(stdlib.EVMBytes4Length, reflect.TypeOf(byte(0))), true
+		return evmBytes4Type, true
 	case evmTypeIDs.Bytes32TypeID:
-		return reflect.ArrayOf(stdlib.EVMBytes32Length, reflect.TypeOf(byte(0))), true
+		return evmBytes32Type, true
 	}
 
 	gethABIType, ok := gethABIType(
