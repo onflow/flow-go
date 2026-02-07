@@ -59,10 +59,10 @@ language/tools/vscode-extension/out/*
 # Mock generation
 **/gomock_reflect*/*
 
-# command line tool
-read-badger
-read-protocol-state
-remove-execution-fork
+# command line tool binaries
+/read-badger
+/read-protocol-state
+/remove-execution-fork
 
 # generated key
 integration/localnet/observer-network-key
