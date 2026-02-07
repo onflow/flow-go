@@ -3,6 +3,7 @@ package remote
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -68,6 +69,9 @@ func WithCallTimeout(timeout time.Duration) ClientOption {
 }
 
 // NewClient creates a new remote ledger client.
+// grpcAddr can be either a TCP address (e.g., "localhost:9000") or a Unix domain socket.
+// For Unix sockets, you can use either the full gRPC format (e.g., "unix:///tmp/ledger.sock")
+// or just the absolute path (e.g., "/tmp/ledger.sock") - the unix:// prefix will be added automatically.
 // Options can be provided to customize the client configuration.
 // By default, max request and response sizes are 1 GiB.
 func NewClient(grpcAddr string, logger zerolog.Logger, opts ...ClientOption) (*Client, error) {
@@ -78,20 +82,62 @@ func NewClient(grpcAddr string, logger zerolog.Logger, opts ...ClientOption) (*C
 		opt(cfg)
 	}
 
+	// Handle Unix domain socket addresses
+	// gRPC client accepts "unix:///absolute/path" or "unix://relative/path" format
+	// For convenience, if an absolute path is provided (starts with /), automatically add the unix:// prefix
+	if strings.HasPrefix(grpcAddr, "/") {
+		grpcAddr = "unix://" + grpcAddr
+		logger.Debug().Str("address", grpcAddr).Msg("using Unix domain socket (auto-prefixed)")
+	} else if strings.HasPrefix(grpcAddr, "unix://") {
+		logger.Debug().Str("address", grpcAddr).Msg("using Unix domain socket")
+	}
+
 	// Create gRPC connection with max message size configuration.
 	// Default to 1 GiB (instead of standard 4 MiB) to handle large proofs that can exceed 4MB.
 	// This was increased to fix "grpc: received message larger than max" errors when generating
 	// proofs for blocks with many state changes.
-	conn, err := grpc.NewClient(
-		grpcAddr,
-		grpc.WithTransportCredentials(insecure.NewCredentials()),
-		grpc.WithDefaultCallOptions(
-			grpc.MaxCallRecvMsgSize(int(cfg.maxResponseSize)),
-			grpc.MaxCallSendMsgSize(int(cfg.maxRequestSize)),
-		),
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to connect to ledger service: %w", err)
+	// Retry connection with exponential backoff until the service becomes available.
+	// After approximately 40 minutes of retrying (90 attempts), the client will give up and crash.
+	var conn *grpc.ClientConn
+	retryDelay := 100 * time.Millisecond
+	maxRetryDelay := 30 * time.Second
+	maxRetries := 90 // ~40 minutes total wait time with exponential backoff capped at 30s
+
+	for attempt := 0; ; attempt++ {
+		var err error
+		conn, err = grpc.NewClient(
+			grpcAddr,
+			grpc.WithTransportCredentials(insecure.NewCredentials()),
+			grpc.WithDefaultCallOptions(
+				grpc.MaxCallRecvMsgSize(int(cfg.maxResponseSize)),
+				grpc.MaxCallSendMsgSize(int(cfg.maxRequestSize)),
+			),
+		)
+		if err == nil {
+			logger.Info().Str("address", grpcAddr).Msg("successfully connected to ledger service")
+			break
+		}
+
+		if attempt >= maxRetries {
+			logger.Fatal().
+				Err(err).
+				Int("attempts", attempt).
+				Str("address", grpcAddr).
+				Msg("failed to connect to ledger service after maximum retries, crashing node")
+		}
+
+		logger.Warn().
+			Err(err).
+			Int("attempt", attempt+1).
+			Int("max_attempts", maxRetries).
+			Dur("retry_delay", retryDelay).
+			Time("retry_at", time.Now().Add(retryDelay)).
+			Str("address", grpcAddr).
+			Msg("failed to connect to ledger service, retrying...")
+
+		time.Sleep(retryDelay)
+		// Exponential backoff with max cap
+		retryDelay = min(maxRetryDelay, time.Duration(float64(retryDelay)*1.5))
 	}
 
 	client := ledgerpb.NewLedgerServiceClient(conn)
@@ -237,6 +283,19 @@ func (c *Client) Get(query *ledger.Query) ([]ledger.Value, error) {
 
 // Set updates keys with new values at a specific state and returns the new state.
 func (c *Client) Set(update *ledger.Update) (ledger.State, *ledger.TrieUpdate, error) {
+	// Handle empty updates locally without RPC call.
+	// This matches the behavior of the local ledger implementations which return
+	// the same state when there are no keys to update.
+	if update.Size() == 0 {
+		return update.State(),
+			&ledger.TrieUpdate{
+				RootHash: ledger.RootHash(update.State()),
+				Paths:    []ledger.Path{},
+				Payloads: []*ledger.Payload{},
+			},
+			nil
+	}
+
 	ctx, cancel := c.callCtx()
 	defer cancel()
 	state := update.State()
@@ -321,9 +380,10 @@ func (c *Client) Ready() <-chan struct{} {
 		defer close(ready)
 		// Wait for the ledger service to be ready by calling InitialState()
 		// This ensures the service has finished WAL replay and is ready to serve requests
-		// Retry with exponential backoff for up to 30 seconds
+		// Retry with exponential backoff (delay capped at 30s)
 		maxRetries := 30
 		retryDelay := 100 * time.Millisecond
+		maxRetryDelay := 30 * time.Second
 
 		for i := 0; i < maxRetries; i++ {
 			ctx, cancel := c.callCtx()
@@ -345,9 +405,10 @@ func (c *Client) Ready() <-chan struct{} {
 					Err(err).
 					Int("attempt", i+1).
 					Dur("retry_delay", retryDelay).
+					Time("retry_at", time.Now().Add(retryDelay)).
 					Msg("ledger service not ready, retrying...")
 				time.Sleep(retryDelay)
-				retryDelay = time.Duration(float64(retryDelay) * 1.5) // exponential backoff
+				retryDelay = min(time.Duration(float64(retryDelay)*1.5), maxRetryDelay)
 			} else {
 				c.logger.Warn().Err(err).Msg("ledger service not ready after retries, proceeding anyway")
 				// Still close the channel to avoid blocking forever

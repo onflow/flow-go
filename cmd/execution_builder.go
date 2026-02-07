@@ -193,7 +193,7 @@ func (builder *ExecutionNodeBuilder) LoadComponentsAndModules() {
 			return stateSyncCommands.NewReadExecutionDataCommand(exeNode.executionDataStore)
 		}).
 		AdminCommand("trigger-checkpoint", func(config *NodeConfig) commands.AdminCommand {
-			return executionCommands.NewTriggerCheckpointCommand(exeNode.toTriggerCheckpoint)
+			return executionCommands.NewTriggerCheckpointCommand(exeNode.toTriggerCheckpoint, exeNode.exeConf.ledgerServiceAddr, exeNode.exeConf.ledgerServiceAdminAddr)
 		}).
 		AdminCommand("stop-at-height", func(config *NodeConfig) commands.AdminCommand {
 			return executionCommands.NewStopAtHeightCommand(exeNode.stopControl)
