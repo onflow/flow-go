@@ -88,7 +88,7 @@ func main() {
 		WALMetrics:         metricsCollector,
 		LedgerMetrics:      metricsCollector,
 		Logger:             logger,
-	}, atomic.NewBool(false))
+	}, triggerCheckpointOnNextSegmentFinish)
 	if err != nil {
 		logger.Fatal().Err(err).Msg("failed to create ledger")
 	}
