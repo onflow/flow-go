@@ -33,10 +33,6 @@ UNAME := $(shell uname)
 # Used when building within docker
 GOARCH := $(shell go env GOARCH)
 
-# The location of the k8s YAML files
-K8S_YAMLS_LOCATION_STAGING=./k8s/staging
-
-
 # docker container registry
 export CONTAINER_REGISTRY := gcr.io/flow-container-registry
 export DOCKER_BUILDKIT := 1
@@ -900,39 +896,3 @@ check-go-version:
 			exit 1; \
 		fi; \
 		'
-
-#----------------------------------------------------------------------
-# CD COMMANDS
-#----------------------------------------------------------------------
-
-.PHONY: deploy-staging
-deploy-staging: update-deployment-image-name-staging apply-staging-files monitor-rollout
-
-# Staging YAMLs must have 'staging' in their name.
-.PHONY: apply-staging-files
-apply-staging-files:
-	kconfig=$$(uuidgen); \
-	echo "$$KUBECONFIG_STAGING" > $$kconfig; \
-	files=$$(find ${K8S_YAMLS_LOCATION_STAGING} -type f \( --name "*.yml" -or --name "*.yaml" \)); \
-	echo "$$files" | xargs -I {} kubectl --kubeconfig=$$kconfig apply -f {}
-
-# Deployment YAMLs must have 'deployment' in their name.
-.PHONY: update-deployment-image-name-staging
-update-deployment-image-name-staging: CONTAINER=flow-test-net
-update-deployment-image-name-staging:
-	@files=$$(find ${K8S_YAMLS_LOCATION_STAGING} -type f \( --name "*.yml" -or --name "*.yaml" \) | grep deployment); \
-	for file in $$files; do \
-		patched=`openssl rand -hex 8`; \
-		node=`echo "$$file" | grep -oP 'flow-\K\w+(?=-node-deployment.yml)'`; \
-		kubectl patch -f $$file -p '{"spec":{"template":{"spec":{"containers":[{"name":"${CONTAINER}","image":"$(CONTAINER_REGISTRY)/'"$$node"':${IMAGE_TAG}"}]}}}}`' --local -o yaml > $$patched; \
-		mv -f $$patched $$file; \
-	done
-
-.PHONY: monitor-rollout
-monitor-rollout:
-	kconfig=$$(uuidgen); \
-	echo "$$KUBECONFIG_STAGING" > $$kconfig; \
-	kubectl --kubeconfig=$$kconfig rollout status statefulsets.apps flow-collection-node-v1; \
-	kubectl --kubeconfig=$$kconfig rollout status statefulsets.apps flow-consensus-node-v1; \
-	kubectl --kubeconfig=$$kconfig rollout status statefulsets.apps flow-execution-node-v1; \
-	kubectl --kubeconfig=$$kconfig rollout status statefulsets.apps flow-verification-node-v1
