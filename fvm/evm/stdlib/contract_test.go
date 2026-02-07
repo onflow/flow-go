@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	gethCommon "github.com/ethereum/go-ethereum/common"
 	gethTypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/onflow/cadence"
@@ -132,6 +133,21 @@ func (t *testContractHandler) CommitBlockProposal() {
 		panic("unexpected CommitBlockProposal")
 	}
 	t.commitBlockProposal()
+}
+
+func (t *testContractHandler) SetState(
+	address gethCommon.Address,
+	slot gethCommon.Hash,
+	value gethCommon.Hash,
+) gethCommon.Hash {
+	panic("unexpected SetState")
+}
+
+func (t *testContractHandler) GetState(
+	address gethCommon.Address,
+	slot gethCommon.Hash,
+) gethCommon.Hash {
+	panic("unexpected GetState")
 }
 
 type testFlowAccount struct {

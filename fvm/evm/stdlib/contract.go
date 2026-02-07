@@ -442,6 +442,46 @@ var InternalEVMTypeGetLatestBlockFunctionType = &sema.FunctionType{
 	ReturnTypeAnnotation: sema.NewTypeAnnotation(sema.AnyStructType),
 }
 
+// InternalEVM.store
+
+const InternalEVMTypeStoreFunctionName = "store"
+
+var InternalEVMTypeStoreFunctionType = &sema.FunctionType{
+	Parameters: []sema.Parameter{
+		{
+			Label:          "target",
+			TypeAnnotation: sema.NewTypeAnnotation(EVMAddressBytesType),
+		},
+		{
+			Label:          "slot",
+			TypeAnnotation: sema.NewTypeAnnotation(sema.StringType),
+		},
+		{
+			Label:          "value",
+			TypeAnnotation: sema.NewTypeAnnotation(sema.StringType),
+		},
+	},
+	ReturnTypeAnnotation: sema.NewTypeAnnotation(sema.VoidType),
+}
+
+// InternalEVM.load
+
+const InternalEVMTypeLoadFunctionName = "load"
+
+var InternalEVMTypeLoadFunctionType = &sema.FunctionType{
+	Parameters: []sema.Parameter{
+		{
+			Label:          "target",
+			TypeAnnotation: sema.NewTypeAnnotation(EVMAddressBytesType),
+		},
+		{
+			Label:          "slot",
+			TypeAnnotation: sema.NewTypeAnnotation(sema.StringType),
+		},
+	},
+	ReturnTypeAnnotation: sema.NewTypeAnnotation(sema.ByteArrayType),
+}
+
 // InternalEVM
 
 const InternalEVMContractName = "InternalEVM"
@@ -565,6 +605,18 @@ var InternalEVMContractType = func() *sema.CompositeType {
 			ty,
 			InternalEVMTypeCommitBlockProposalFunctionName,
 			InternalEVMTypeCommitBlockProposalFunctionType,
+			"",
+		),
+		sema.NewUnmeteredPublicFunctionMember(
+			ty,
+			InternalEVMTypeStoreFunctionName,
+			InternalEVMTypeStoreFunctionType,
+			"",
+		),
+		sema.NewUnmeteredPublicFunctionMember(
+			ty,
+			InternalEVMTypeLoadFunctionName,
+			InternalEVMTypeLoadFunctionType,
 			"",
 		),
 	})
