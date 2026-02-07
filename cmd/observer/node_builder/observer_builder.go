@@ -1480,6 +1480,7 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 				collectionIndexer,
 				collectionExecutedMetric,
 				node.StorageLockMgr,
+				nil, // accountTxIndex - TODO: wire in when account data API is enabled
 			)
 
 			// execution state worker uses a jobqueue to process new execution data and indexes it by using the indexer.

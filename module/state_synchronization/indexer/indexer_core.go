@@ -6,6 +6,8 @@ import (
 	"time"
 
 	"github.com/jordanschalm/lockctx"
+	"github.com/onflow/cadence"
+	"github.com/onflow/cadence/encoding/ccf"
 	"github.com/rs/zerolog"
 	"golang.org/x/sync/errgroup"
 
@@ -17,6 +19,7 @@ import (
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/convert"
+	"github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/access/systemcollection"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
@@ -42,10 +45,17 @@ type IndexerCore struct {
 	results               storage.LightTransactionResults
 	scheduledTransactions storage.ScheduledTransactions
 	protocolDB            storage.DB
+	accountTxIndex        storage.AccountTransactions // optional, nil if account data API disabled
 
 	derivedChainData *derived.DerivedChainData
 	serviceAddress   flow.Address
 	lockManager      lockctx.Manager
+
+	// Transfer event types for account indexing (resolved from chain's system contracts)
+	ftDepositedType  flow.EventType
+	ftWithdrawnType  flow.EventType
+	nftDepositedType flow.EventType
+	nftWithdrawnType flow.EventType
 }
 
 // New execution state indexer used to ingest block execution data and index it by height.
@@ -67,6 +77,7 @@ func New(
 	collectionIndexer collections.CollectionIndexer,
 	collectionExecutedMetric module.CollectionExecutedMetric,
 	lockManager lockctx.Manager,
+	accountTxIndex storage.AccountTransactions, // optional, nil if account data API disabled
 ) *IndexerCore {
 	log = log.With().Str("component", "execution_indexer").Logger()
 	metrics.InitializeLatestHeight(registers.LatestHeight())
@@ -76,7 +87,12 @@ func New(
 		Uint64("latest_height", registers.LatestHeight()).
 		Msg("indexer initialized")
 
-	fvmEnv := systemcontracts.SystemContractsForChain(chainID).AsTemplateEnv()
+	sc := systemcontracts.SystemContractsForChain(chainID)
+	fvmEnv := sc.AsTemplateEnv()
+
+	// Resolve FT/NFT contract addresses for transfer event matching
+	ftAddr := sc.FungibleToken.Address.Hex()
+	nftAddr := sc.NonFungibleToken.Address.Hex()
 
 	return &IndexerCore{
 		log:                   log,
@@ -97,6 +113,12 @@ func New(
 		collectionIndexer:        collectionIndexer,
 		collectionExecutedMetric: collectionExecutedMetric,
 		lockManager:              lockManager,
+		accountTxIndex:           accountTxIndex,
+
+		ftDepositedType:  flow.EventType(fmt.Sprintf("A.%s.FungibleToken.Deposited", ftAddr)),
+		ftWithdrawnType:  flow.EventType(fmt.Sprintf("A.%s.FungibleToken.Withdrawn", ftAddr)),
+		nftDepositedType: flow.EventType(fmt.Sprintf("A.%s.NonFungibleToken.Deposited", nftAddr)),
+		nftWithdrawnType: flow.EventType(fmt.Sprintf("A.%s.NonFungibleToken.Withdrawn", nftAddr)),
 	}
 }
 
@@ -246,6 +268,28 @@ func (c *IndexerCore) IndexBlockData(data *execution_data.BlockExecutionDataEnti
 
 		return nil
 	})
+
+	// Index account transactions if enabled
+	if c.accountTxIndex != nil {
+		g.Go(func() error {
+			start := time.Now()
+
+			txData, err := c.buildAccountTxIndexEntries(header.Height, data)
+			if err != nil {
+				return fmt.Errorf("could not build account tx index entries at height %d: %w", header.Height, err)
+			}
+			if err := c.accountTxIndex.Store(header.Height, txData); err != nil {
+				return fmt.Errorf("could not index account transactions at height %d: %w", header.Height, err)
+			}
+
+			lg.Debug().
+				Int("account_tx_entries", len(txData)).
+				Dur("duration_ms", time.Since(start)).
+				Msg("indexed account transactions")
+
+			return nil
+		})
+	}
 
 	g.Go(func() error {
 		start := time.Now()
@@ -461,4 +505,201 @@ func (c *IndexerCore) indexRegisters(registers map[ledger.Path]*ledger.Payload, 
 	}
 
 	return c.registers.Store(regEntries, height)
+}
+
+// buildAccountTxIndexEntries builds account transaction index entries from block execution data.
+// For each transaction, it creates an entry for each unique account involved:
+//   - Payer, Proposer, Authorizers (from transaction body)
+//   - Senders/receivers of FT/NFT transfers (from Deposit/Withdraw events)
+//
+// No errors are expected during normal operation.
+func (c *IndexerCore) buildAccountTxIndexEntries(height uint64, data *execution_data.BlockExecutionDataEntity) ([]access.AccountTransaction, error) {
+	var entries []access.AccountTransaction
+
+	// Track global transaction index across all chunks (excluding system chunk)
+	txIndex := uint32(0)
+
+	markAddress := func(accounts map[flow.Address]bool, addr flow.Address, isAuthorizer bool) {
+		if _, exists := accounts[addr]; !exists || isAuthorizer {
+			accounts[addr] = isAuthorizer
+		}
+	}
+
+	// Process all chunks since transfer events may exist in the system chunk
+	for _, chunk := range data.ChunkExecutionDatas {
+		if chunk.Collection == nil {
+			continue
+		}
+
+		// Build event lookup by transaction index within this chunk
+		eventsByTxIndex := make(map[uint32][]flow.Event)
+		for _, event := range chunk.Events {
+			eventsByTxIndex[event.TransactionIndex] = append(eventsByTxIndex[event.TransactionIndex], event)
+		}
+
+		for _, tx := range chunk.Collection.Transactions {
+			txID := tx.ID()
+
+			// Collect all involved accounts with their authorizer status
+			accounts := make(map[flow.Address]bool)
+
+			markAddress(accounts, tx.Payer, false)
+			markAddress(accounts, tx.ProposalKey.Address, false)
+			for _, auth := range tx.Authorizers {
+				markAddress(accounts, auth, true)
+			}
+
+			// Extract addresses from FT/NFT transfer events
+			for _, event := range eventsByTxIndex[txIndex] {
+				addr, found, err := c.extractAddressFromTransferEvent(event)
+				if err != nil {
+					return nil, fmt.Errorf("failed to extract address from event %s in tx %s: %w", event.Type, txID, err)
+				}
+				if found {
+					markAddress(accounts, addr, false)
+				}
+			}
+
+			for addr, isAuth := range accounts {
+				entries = append(entries, access.AccountTransaction{
+					Address:          addr,
+					BlockHeight:      height,
+					TransactionID:    txID,
+					TransactionIndex: txIndex,
+					IsAuthorizer:     isAuth,
+				})
+			}
+
+			txIndex++
+		}
+	}
+
+	return entries, nil
+}
+
+// extractAddressFromTransferEvent checks if the event is a FT/NFT transfer event
+// and extracts the relevant address (from for withdrawals, to for deposits).
+//
+// Returns:
+//   - (addr, true, nil)  → Transfer event with address found
+//   - (_, false, nil)    → Not a transfer event, or address field was nil/empty
+//   - (_, false, error)  → Transfer event but CCF decoding failed
+func (c *IndexerCore) extractAddressFromTransferEvent(event flow.Event) (flow.Address, bool, error) {
+	switch event.Type {
+	case c.ftDepositedType:
+		return c.decodeFTDeposited(event.Payload)
+	case c.ftWithdrawnType:
+		return c.decodeFTWithdrawn(event.Payload)
+	case c.nftDepositedType:
+		return c.decodeNFTDeposited(event.Payload)
+	case c.nftWithdrawnType:
+		return c.decodeNFTWithdrawn(event.Payload)
+	default:
+		return flow.EmptyAddress, false, nil // Not a transfer event
+	}
+}
+
+// Event field structs for CCF decoding using cadence.DecodeFields
+
+// ftDepositedFields matches FungibleToken.Deposited event structure
+type ftDepositedFields struct {
+	Type          string  `cadence:"type"`
+	Amount        uint64  `cadence:"amount"`
+	To            *string `cadence:"to"`
+	ToUUID        uint64  `cadence:"toUUID"`
+	DepositedUUID uint64  `cadence:"depositedUUID"`
+	BalanceAfter  uint64  `cadence:"balanceAfter"`
+}
+
+// ftWithdrawnFields matches FungibleToken.Withdrawn event structure
+type ftWithdrawnFields struct {
+	Type          string  `cadence:"type"`
+	Amount        uint64  `cadence:"amount"`
+	From          *string `cadence:"from"`
+	FromUUID      uint64  `cadence:"fromUUID"`
+	WithdrawnUUID uint64  `cadence:"withdrawnUUID"`
+	BalanceAfter  uint64  `cadence:"balanceAfter"`
+}
+
+// nftDepositedFields matches NonFungibleToken.Deposited event structure
+type nftDepositedFields struct {
+	Type           string  `cadence:"type"`
+	ID             uint64  `cadence:"id"`
+	UUID           uint64  `cadence:"uuid"`
+	To             *string `cadence:"to"`
+	CollectionUUID uint64  `cadence:"collectionUUID"`
+}
+
+// nftWithdrawnFields matches NonFungibleToken.Withdrawn event structure
+type nftWithdrawnFields struct {
+	Type         string  `cadence:"type"`
+	ID           uint64  `cadence:"id"`
+	UUID         uint64  `cadence:"uuid"`
+	From         *string `cadence:"from"`
+	ProviderUUID uint64  `cadence:"providerUUID"`
+}
+
+func (c *IndexerCore) decodeFTDeposited(payload []byte) (flow.Address, bool, error) {
+	var fields ftDepositedFields
+	if err := decodeEventPayload(payload, &fields); err != nil {
+		return flow.EmptyAddress, false, err
+	}
+	return parseOptionalAddress(fields.To)
+}
+
+func (c *IndexerCore) decodeFTWithdrawn(payload []byte) (flow.Address, bool, error) {
+	var fields ftWithdrawnFields
+	if err := decodeEventPayload(payload, &fields); err != nil {
+		return flow.EmptyAddress, false, err
+	}
+	return parseOptionalAddress(fields.From)
+}
+
+func (c *IndexerCore) decodeNFTDeposited(payload []byte) (flow.Address, bool, error) {
+	var fields nftDepositedFields
+	if err := decodeEventPayload(payload, &fields); err != nil {
+		return flow.EmptyAddress, false, err
+	}
+	return parseOptionalAddress(fields.To)
+}
+
+func (c *IndexerCore) decodeNFTWithdrawn(payload []byte) (flow.Address, bool, error) {
+	var fields nftWithdrawnFields
+	if err := decodeEventPayload(payload, &fields); err != nil {
+		return flow.EmptyAddress, false, err
+	}
+	return parseOptionalAddress(fields.From)
+}
+
+// decodeEventPayload decodes a CCF-encoded event payload into the target struct.
+//
+// No errors are expected during normal operation.
+func decodeEventPayload(payload []byte, target any) error {
+	value, err := ccf.Decode(nil, payload)
+	if err != nil {
+		return fmt.Errorf("CCF decode failed: %w", err)
+	}
+
+	event, ok := value.(cadence.Event)
+	if !ok {
+		return fmt.Errorf("expected cadence.Event, got %T", value)
+	}
+
+	return cadence.DecodeFields(event, target)
+}
+
+// parseOptionalAddress converts an optional hex address string to a flow.Address.
+// Returns (addr, true, nil) if address is present, (empty, false, nil) if nil/empty.
+//
+// No errors are expected during normal operation.
+func parseOptionalAddress(addr *string) (flow.Address, bool, error) {
+	if addr == nil || *addr == "" {
+		return flow.EmptyAddress, false, nil
+	}
+
+	address, err := flow.StringToAddress(*addr)
+	if err != nil {
+		return flow.EmptyAddress, false, err
+	}
+	return address, true, nil
 }
