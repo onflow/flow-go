@@ -27,8 +27,7 @@ type BlockConsumer struct {
 	metrics  module.VerificationMetrics
 }
 
-// NewBlockConsumer creates a new consumer and returns the default processed
-// index for initializing the processed index in storage.
+// NewBlockConsumer creates a new consumer
 func NewBlockConsumer(log zerolog.Logger,
 	metrics module.VerificationMetrics,
 	processedHeight storage.ConsumerProgress,
