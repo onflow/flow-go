@@ -1,6 +1,6 @@
 # Go Documentation Rule
 
-## CRITICIAL REQUIREMENTS
+## CRITICAL REQUIREMENTS
 - **NEVER** modify logic. All changes must be documentation only.
 - **NEVER** change existing documentation that states no errors are expected. ONLY formatting changes are permitted.
 
@@ -11,7 +11,7 @@
 - Use complete sentences.
 - Wrap comment lines that exceed 100 characters.
 - **ALL** methods that return an error **MUST** document expected error conditions!
-- When updating existing code, if godocs exist, keep the existing content and improve formating/expand with additional details to conform with these rules.
+- When updating existing code, if godocs exist, keep the existing content and improve formatting/expand with additional details to conform with these rules.
 - If any details are unclear, **DO NOT make something up**. Add a TODO to fill in the missing details or ask the user for clarification.
 - Include an empty comment line with no trailing spaces between each section.
 - Wrap types mentioned within comments within brackets (e.g. `[storage.ErrNotFound] if no block header with the given ID exists`)
@@ -192,7 +192,7 @@ Example 4: Method with context-dependent error handling
 - Private methods should still be documented
 - Can use more technical language
 - Focus on implementation details
-- MUST include error documention for any method that returns an error
+- MUST include error documentation for any method that returns an error
 
 ## Examples
 
