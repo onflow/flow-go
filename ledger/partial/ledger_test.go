@@ -169,3 +169,89 @@ func TestEmptyLedger(t *testing.T) {
 	require.True(t, trieUpdate.IsEmpty())
 	require.Equal(t, u.State(), newState)
 }
+
+func TestPartialLedger_StateCount(t *testing.T) {
+	w := &fixtures.NoopWAL{}
+
+	l, err := complete.NewLedger(w, 100, &metrics.NoopCollector{}, zerolog.Logger{}, complete.DefaultPathFinderVersion)
+	require.NoError(t, err)
+
+	compactor := fixtures.NewNoopCompactor(l)
+	<-compactor.Ready()
+
+	defer func() {
+		<-l.Done()
+		<-compactor.Done()
+	}()
+
+	// create update and get proof
+	state := l.InitialState()
+	keys := testutils.RandomUniqueKeys(2, 2, 2, 4)
+	values := testutils.RandomValues(2, 1, 32)
+	update, err := ledger.NewUpdate(state, keys, values)
+	require.NoError(t, err)
+
+	newState, _, err := l.Set(update)
+	require.NoError(t, err)
+
+	query, err := ledger.NewQuery(newState, keys)
+	require.NoError(t, err)
+	proof, err := l.Prove(query)
+	require.NoError(t, err)
+
+	pled, err := partial.NewLedger(proof, newState, partial.DefaultPathFinderVersion)
+	require.NoError(t, err)
+
+	// Partial ledger should always have exactly one state
+	stateCount := pled.StateCount()
+	assert.Equal(t, 1, stateCount, "partial ledger should have exactly one state")
+}
+
+func TestPartialLedger_StateByIndex(t *testing.T) {
+	w := &fixtures.NoopWAL{}
+
+	l, err := complete.NewLedger(w, 100, &metrics.NoopCollector{}, zerolog.Logger{}, complete.DefaultPathFinderVersion)
+	require.NoError(t, err)
+
+	compactor := fixtures.NewNoopCompactor(l)
+	<-compactor.Ready()
+
+	defer func() {
+		<-l.Done()
+		<-compactor.Done()
+	}()
+
+	// create update and get proof
+	state := l.InitialState()
+	keys := testutils.RandomUniqueKeys(2, 2, 2, 4)
+	values := testutils.RandomValues(2, 1, 32)
+	update, err := ledger.NewUpdate(state, keys, values)
+	require.NoError(t, err)
+
+	newState, _, err := l.Set(update)
+	require.NoError(t, err)
+
+	query, err := ledger.NewQuery(newState, keys)
+	require.NoError(t, err)
+	proof, err := l.Prove(query)
+	require.NoError(t, err)
+
+	pled, err := partial.NewLedger(proof, newState, partial.DefaultPathFinderVersion)
+	require.NoError(t, err)
+
+	// Test getting state at index 0 (only valid index for partial ledger)
+	state0, err := pled.StateByIndex(0)
+	require.NoError(t, err)
+	assert.Equal(t, newState, state0, "state at index 0 should match the ledger state")
+
+	// Test that other indices fail
+	_, err = pled.StateByIndex(1)
+	require.Error(t, err, "should error for index out of range")
+
+	state_1, err := pled.StateByIndex(-1)
+	require.NoError(t, err)
+	assert.Equal(t, newState, state_1, "state at index -1 should match the ledger state")
+
+	_, err = pled.StateByIndex(-2)
+	require.Error(t, err, "should error for negative index out of range")
+}

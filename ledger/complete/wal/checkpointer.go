@@ -15,7 +15,6 @@ import (
 
 	"github.com/docker/go-units"
 	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/onflow/flow-go/ledger"
@@ -439,7 +438,7 @@ func StoreCheckpointV5(dir string, fileName string, logger zerolog.Logger, tries
 		// Index 0 is a special case with nil node.
 		traversedSubtrieNodes[nil] = 0
 
-		logging := logProgress(fmt.Sprintf("storing %v-th sub trie roots", i), estimatedSubtrieNodeCount, log.Logger)
+		logging := logProgress(fmt.Sprintf("storing %v-th sub trie roots", i), estimatedSubtrieNodeCount, logger)
 		for _, root := range subTrieRoot {
 			// Empty trie is always added to forest as starting point and
 			// empty trie's root is nil. It remains in the forest until evicted
@@ -1110,7 +1109,37 @@ func SoftlinkCheckpointFile(filename string, from string, to string) ([]string, 
 		newPath := filepath.Join(to, partfile)
 		newPaths[i] = newPath
 
-		err := os.Symlink(match, newPath)
+		// Check if symlink already exists and points to the correct target
+		if fi, err := os.Lstat(newPath); err == nil {
+			if fi.Mode()&os.ModeSymlink != 0 {
+				// Symlink exists, check if it points to the correct target
+				target, err := os.Readlink(newPath)
+				if err != nil {
+					return nil, fmt.Errorf("cannot read existing symlink %v: %w", newPath, err)
+				}
+				// Calculate expected relative target for comparison
+				symlinkDir := filepath.Dir(newPath)
+				expectedRelTarget, _ := filepath.Rel(symlinkDir, match)
+				if target == expectedRelTarget || target == match {
+					// Symlink already exists and points to correct target, skip creation
+					continue
+				}
+				// Symlink exists but points to different target, this is an error
+				return nil, fmt.Errorf("symlink %v already exists but points to %v instead of %v", newPath, target, match)
+			}
+			// Path exists but is not a symlink, this is an error
+			return nil, fmt.Errorf("path %v already exists but is not a symlink", newPath)
+		}
+
+		// Create symlink with relative path from newPath to match
+		// This ensures the symlink works in both host and container contexts
+		symlinkDir := filepath.Dir(newPath)
+		relTarget, err := filepath.Rel(symlinkDir, match)
+		if err != nil {
+			// If relative path calculation fails, use match as-is
+			relTarget = match
+		}
+		err = os.Symlink(relTarget, newPath)
 		if err != nil {
 			return nil, fmt.Errorf("cannot link file from %v to %v: %w", match, newPath, err)
 		}

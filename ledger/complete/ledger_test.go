@@ -813,3 +813,171 @@ func migrationByKey(p []ledger.Payload) ([]ledger.Payload, error) {
 
 	return ret, nil
 }
+
+func TestLedger_StateCount(t *testing.T) {
+	wal := &fixtures.NoopWAL{}
+	l, err := complete.NewLedger(wal, 100, &metrics.NoopCollector{}, zerolog.Logger{}, complete.DefaultPathFinderVersion)
+	require.NoError(t, err)
+
+	compactor := fixtures.NewNoopCompactor(l)
+	<-compactor.Ready()
+	defer func() {
+		<-l.Done()
+		<-compactor.Done()
+	}()
+
+	// Initially should have at least the empty trie
+	initialCount := l.StateCount()
+	assert.GreaterOrEqual(t, initialCount, 1, "should have at least one state (empty trie)")
+
+	// Create some updates to add more states
+	state := l.InitialState()
+	keys := testutils.RandomUniqueKeys(3, 2, 2, 4)
+	values := testutils.RandomValues(3, 1, 32)
+
+	// First update
+	update1, err := ledger.NewUpdate(state, keys[0:1], values[0:1])
+	require.NoError(t, err)
+	newState1, _, err := l.Set(update1)
+	require.NoError(t, err)
+
+	// Second update from the first new state
+	update2, err := ledger.NewUpdate(newState1, keys[1:2], values[1:2])
+	require.NoError(t, err)
+	newState2, _, err := l.Set(update2)
+	require.NoError(t, err)
+
+	// State count should have increased
+	finalCount := l.StateCount()
+	assert.Greater(t, finalCount, initialCount, "state count should increase after updates")
+	_ = newState2 // avoid unused variable
+}
+
+func TestLedger_StateByIndex(t *testing.T) {
+	wal := &fixtures.NoopWAL{}
+	l, err := complete.NewLedger(wal, 100, &metrics.NoopCollector{}, zerolog.Logger{}, complete.DefaultPathFinderVersion)
+	require.NoError(t, err)
+
+	compactor := fixtures.NewNoopCompactor(l)
+	<-compactor.Ready()
+	defer func() {
+		<-l.Done()
+		<-compactor.Done()
+	}()
+
+	// Get initial state
+	initialState := l.InitialState()
+	stateCount := l.StateCount()
+	require.Greater(t, stateCount, 0, "should have at least one state")
+
+	// Test getting state at index 0
+	state0, err := l.StateByIndex(0)
+	require.NoError(t, err)
+	assert.NotEqual(t, ledger.DummyState, state0, "state at index 0 should not be dummy state")
+
+	// Test getting last state using -1
+	lastState, err := l.StateByIndex(-1)
+	require.NoError(t, err)
+	assert.NotEqual(t, ledger.DummyState, lastState, "last state should not be dummy state")
+
+	// Create some updates to add more states
+	state := initialState
+	keys := testutils.RandomUniqueKeys(3, 2, 2, 4)
+	values := testutils.RandomValues(3, 1, 32)
+
+	// Create multiple updates
+	for i := 0; i < 3; i++ {
+		update, err := ledger.NewUpdate(state, keys[i:i+1], values[i:i+1])
+		require.NoError(t, err)
+		newState, _, err := l.Set(update)
+		require.NoError(t, err)
+		state = newState
+	}
+
+	// Verify we can get states by index
+	finalCount := l.StateCount()
+	require.GreaterOrEqual(t, finalCount, 1, "should have at least one state")
+
+	// Test getting first state
+	firstState, err := l.StateByIndex(0)
+	require.NoError(t, err)
+	assert.NotEqual(t, ledger.DummyState, firstState)
+
+	// Test getting last state with -1
+	lastStateAfterUpdates, err := l.StateByIndex(-1)
+	require.NoError(t, err)
+	assert.NotEqual(t, ledger.DummyState, lastStateAfterUpdates)
+
+	// Test getting last state with positive index
+	if finalCount > 0 {
+		lastStateByIndex, err := l.StateByIndex(finalCount - 1)
+		require.NoError(t, err)
+		assert.NotEqual(t, ledger.DummyState, lastStateByIndex)
+		// Last state by index should match last state by -1
+		assert.Equal(t, lastStateAfterUpdates, lastStateByIndex, "last state by -1 should match last state by positive index")
+	}
+
+	// Test out of range indices
+	_, err = l.StateByIndex(finalCount)
+	require.Error(t, err, "should error for index out of range")
+
+	_, err = l.StateByIndex(-finalCount - 1)
+	require.Error(t, err, "should error for negative index out of range")
+}
+
+func TestLedgerWithCompactor_StateCountAndStateByIndex(t *testing.T) {
+	unittest.RunWithTempDir(t, func(dir string) {
+		metricsCollector := &metrics.NoopCollector{}
+		diskWal, err := wal.NewDiskWAL(zerolog.Nop(), nil, metricsCollector, dir, 100, pathfinder.PathByteSize, wal.SegmentSize)
+		require.NoError(t, err)
+
+		compactorConfig := ledger.DefaultCompactorConfig(metricsCollector)
+		lwc, err := complete.NewLedgerWithCompactor(
+			diskWal,
+			100,
+			compactorConfig,
+			atomic.NewBool(false),
+			metricsCollector,
+			zerolog.Nop(),
+			complete.DefaultPathFinderVersion,
+		)
+		require.NoError(t, err)
+
+		<-lwc.Ready()
+		defer func() {
+			<-lwc.Done()
+		}()
+
+		// Test StateCount
+		initialCount := lwc.StateCount()
+		assert.GreaterOrEqual(t, initialCount, 1, "should have at least one state")
+
+		// Test StateByIndex
+		state0, err := lwc.StateByIndex(0)
+		require.NoError(t, err)
+		assert.NotEqual(t, ledger.DummyState, state0)
+
+		lastState, err := lwc.StateByIndex(-1)
+		require.NoError(t, err)
+		assert.NotEqual(t, ledger.DummyState, lastState)
+
+		// Create some updates
+		state := lwc.InitialState()
+		keys := testutils.RandomUniqueKeys(2, 2, 2, 4)
+		values := testutils.RandomValues(2, 1, 32)
+
+		update, err := ledger.NewUpdate(state, keys, values)
+		require.NoError(t, err)
+		newState, _, err := lwc.Set(update)
+		require.NoError(t, err)
+
+		// Verify StateCount increased
+		finalCount := lwc.StateCount()
+		assert.Greater(t, finalCount, initialCount, "state count should increase after update")
+
+		// Verify we can get the new state
+		lastStateAfterUpdate, err := lwc.StateByIndex(-1)
+		require.NoError(t, err)
+		assert.Equal(t, ledger.State(newState), lastStateAfterUpdate, "last state should match the new state")
+	})
+}

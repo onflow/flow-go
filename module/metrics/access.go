@@ -40,15 +40,16 @@ type AccessCollector struct {
 	module.TransactionValidationMetrics
 	module.BackendScriptsMetrics
 
-	connectionReused      prometheus.Counter
-	connectionsInPool     *prometheus.GaugeVec
-	connectionAdded       prometheus.Counter
-	connectionEstablished prometheus.Counter
-	connectionInvalidated prometheus.Counter
-	connectionUpdated     prometheus.Counter
-	connectionEvicted     prometheus.Counter
-	lastFullBlockHeight   prometheus.Gauge
-	maxReceiptHeight      prometheus.Gauge
+	connectionReused              prometheus.Counter
+	connectionsInPool             *prometheus.GaugeVec
+	connectionAdded               prometheus.Counter
+	connectionEstablished         prometheus.Counter
+	connectionInvalidated         prometheus.Counter
+	connectionUpdated             prometheus.Counter
+	connectionEvicted             prometheus.Counter
+	lastFullBlockHeight           prometheus.Gauge
+	ingestionFinalizedBlockHeight prometheus.Gauge
+	maxReceiptHeight              prometheus.Gauge
 
 	// used to skip heights that are lower than the current max height
 	maxReceiptHeightValue counters.StrictMonotonicCounter
@@ -106,6 +107,12 @@ func NewAccessCollector(opts ...AccessCollectorOpts) *AccessCollector {
 			Subsystem: subsystemIngestion,
 			Help:      "gauge to track the highest consecutive finalized block height with all collections indexed",
 		}),
+		ingestionFinalizedBlockHeight: promauto.NewGauge(prometheus.GaugeOpts{
+			Name:      "ingestion_finalized_block_height",
+			Namespace: namespaceAccess,
+			Subsystem: subsystemIngestion,
+			Help:      "gauge to track the latest finalized block height processed by ingestion",
+		}),
 		maxReceiptHeight: promauto.NewGauge(prometheus.GaugeOpts{
 			Name:      "max_receipt_height",
 			Namespace: namespaceAccess,
@@ -153,6 +160,10 @@ func (ac *AccessCollector) ConnectionFromPoolEvicted() {
 
 func (ac *AccessCollector) UpdateLastFullBlockHeight(height uint64) {
 	ac.lastFullBlockHeight.Set(float64(height))
+}
+
+func (ac *AccessCollector) UpdateIngestionFinalizedBlockHeight(height uint64) {
+	ac.ingestionFinalizedBlockHeight.Set(float64(height))
 }
 
 func (ac *AccessCollector) UpdateExecutionReceiptMaxHeight(height uint64) {

@@ -229,6 +229,7 @@ func (nc *NoopCollector) TransactionValidationSkipped()                         
 func (nc *NoopCollector) TransactionSubmissionFailed()                                          {}
 func (nc *NoopCollector) UpdateExecutionReceiptMaxHeight(height uint64)                         {}
 func (nc *NoopCollector) UpdateLastFullBlockHeight(height uint64)                               {}
+func (nc *NoopCollector) UpdateIngestionFinalizedBlockHeight(height uint64)                     {}
 func (nc *NoopCollector) ChunkDataPackRequestProcessed()                                        {}
 func (nc *NoopCollector) ExecutionSync(syncing bool)                                            {}
 func (nc *NoopCollector) ExecutionBlockDataUploadStarted()                                      {}
