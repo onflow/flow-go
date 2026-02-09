@@ -37,4 +37,3 @@ Don't invent changes other than what's explicitly requested.
 - Don't remove unrelated code or functionalities.
 - Don't suggest updates or changes to files when there are no actual modifications needed.
 - Don't suggest whitespace changes.
-
