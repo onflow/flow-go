@@ -53,6 +53,7 @@ func (a *AccountTransactions) LatestIndexedHeight() (uint64, error) {
 }
 
 // IndexBlockData indexes the block data for the given height.
+// Reindexing the last processed height is a no-op.
 //
 // Expected error returns during normal operations:
 //   - [ErrAlreadyIndexed]: if the data is already indexed for the height.
@@ -72,49 +73,41 @@ func (a *AccountTransactions) IndexBlockData(lctx lockctx.Proof, data BlockData,
 		return nil
 	}
 
-	entries := make([]access.AccountTransaction, 0)
 	chain := a.chainID.Chain()
 
+	entries := make([]access.AccountTransaction, 0)
 	for i, tx := range data.Transactions {
 		txIndex := uint32(i)
-		addrMap := make(map[flow.Address]bool)
-		addAddress := func(addr flow.Address, isAuthorizer bool) {
-			if !chain.IsValid(addr) {
-				return
-			}
-			if existing, ok := addrMap[addr]; ok {
-				if !existing && isAuthorizer {
-					addrMap[addr] = true
-				}
-				return
-			}
-			addrMap[addr] = isAuthorizer
-		}
+		addresses := make(map[flow.Address]bool)
+		authorized := make(map[flow.Address]bool)
 
-		addAddress(tx.Payer, false)
-		addAddress(tx.ProposalKey.Address, false)
+		addresses[tx.Payer] = true
+		addresses[tx.ProposalKey.Address] = true
 		for _, auth := range tx.Authorizers {
-			addAddress(auth, true)
+			addresses[auth] = true
+			authorized[auth] = true
 		}
 
 		for _, event := range data.Events[txIndex] {
-			addresses, err := a.extractAddresses(event)
+			eventAddresses, err := a.extractAddresses(event)
 			if err != nil {
 				return fmt.Errorf("failed to extract addresses from event: %w", err)
 			}
-			for _, addr := range addresses {
-				addAddress(addr, false)
+			for _, addr := range eventAddresses {
+				addresses[addr] = true
 			}
 		}
 
-		for addr, isAuthorizer := range addrMap {
-			entries = append(entries, access.AccountTransaction{
-				Address:          addr,
-				BlockHeight:      data.Header.Height,
-				TransactionID:    tx.ID(),
-				TransactionIndex: txIndex,
-				IsAuthorizer:     isAuthorizer,
-			})
+		for addr := range addresses {
+			if chain.IsValid(addr) {
+				entries = append(entries, access.AccountTransaction{
+					Address:          addr,
+					BlockHeight:      data.Header.Height,
+					TransactionID:    tx.ID(),
+					TransactionIndex: txIndex,
+					IsAuthorizer:     authorized[addr],
+				})
+			}
 		}
 	}
 
@@ -126,6 +119,8 @@ func (a *AccountTransactions) IndexBlockData(lctx lockctx.Proof, data BlockData,
 }
 
 // extractAddresses extracts all addresses referenced in a flow event.
+//
+// No error returns are expected during normal operation.
 func (a *AccountTransactions) extractAddresses(event flow.Event) ([]flow.Address, error) {
 	cadenceEvent, err := decodeEventPayload(event.Payload)
 	if err != nil {
@@ -156,6 +151,8 @@ func (a *AccountTransactions) extractAddresses(event flow.Event) ([]flow.Address
 }
 
 // decodeEventPayload decodes CCF-encoded event payload.
+//
+// Any error indicates that the event payload is malformed.
 func decodeEventPayload(payload []byte) (cadence.Event, error) {
 	value, err := ccf.Decode(nil, payload)
 	if err != nil {

@@ -171,7 +171,8 @@ func (idx *AccountTransactions) TransactionsByAddress(
 
 // Store indexes all account-transaction associations for a block.
 // Must be called sequentially with consecutive heights (latestHeight + 1).
-// The caller is responsible for committing the provided batch.
+// Calling with the last height is a no-op.
+// The caller must hold the [storage.LockIndexAccountTransactions] lock until the batch is committed.
 //
 // Expected error returns during normal operations:
 //   - [storage.ErrAlreadyExists] if the block height is already indexed
@@ -204,7 +205,15 @@ func (idx *AccountTransactions) Store(lctx lockctx.Proof, rw storage.ReaderBatch
 	return nil
 }
 
+// lookupAccountTransactions retrieves all account transactions for a given address within the specified
+// block height range (inclusive). Results are returned in descending order (newest first).
+// Returns an empty slice and no error if no transactions are found.
+//
+// No error returns are expected during normal operation.
 func (idx *AccountTransactions) lookupAccountTransactions(address flow.Address, startHeight uint64, endHeight uint64) ([]access.AccountTransaction, error) {
+	// TODO(peter): I wil be revisiting this logic when implementing the API integration. instead
+	// of using a start/end height range, we'll use a pagination cursor and limit.
+
 	// Create iterator bounds (inclusive)
 	// Lower bound: prefix + address + ~endHeight (one's complement makes this the lower bound for descending)
 	// Upper bound: prefix + address + ~startHeight
@@ -242,6 +251,11 @@ func (idx *AccountTransactions) lookupAccountTransactions(address flow.Address, 
 	return results, nil
 }
 
+// indexAccountTransactions indexes all account-transaction associations for a block.
+// The caller must hold the [storage.LockIndexAccountTransactions] lock until the batch is committed.
+//
+// Expected error returns during normal operations:
+//   - [storage.ErrAlreadyExists] if the block height is already indexed
 func (idx *AccountTransactions) indexAccountTransactions(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockHeight uint64, txData []access.AccountTransaction) error {
 	if !lctx.HoldsLock(storage.LockIndexAccountTransactions) {
 		return fmt.Errorf("missing required lock: %s", storage.LockIndexAccountTransactions)
@@ -255,6 +269,15 @@ func (idx *AccountTransactions) indexAccountTransactions(lctx lockctx.Proof, rw 
 		}
 
 		key := makeAccountTxKey(entry.Address, entry.BlockHeight, entry.TransactionIndex)
+
+		exists, err := operation.KeyExists(rw.GlobalReader(), key)
+		if err != nil {
+			return fmt.Errorf("could not check if key exists: %w", err)
+		}
+		if exists {
+			return storage.ErrAlreadyExists
+		}
+
 		stored := storedAccountTransaction{
 			TransactionID: entry.TransactionID,
 			IsAuthorizer:  entry.IsAuthorizer,

@@ -265,6 +265,47 @@ func TestAccountTransactions_ErrorCases(t *testing.T) {
 		})
 	})
 
+	t.Run("duplicate key in committed DB returns ErrAlreadyExists", func(t *testing.T) {
+		unittest.RunWithTempDir(t, func(dir string) {
+			db := NewBootstrappedAccountTxIndexForTest(t, dir, 1)
+			defer db.Close()
+
+			account := unittest.RandomAddressFixture()
+			txID := unittest.IdentifierFixture()
+			txData := []access.AccountTransaction{
+				{
+					Address:          account,
+					BlockHeight:      2,
+					TransactionID:    txID,
+					TransactionIndex: 0,
+					IsAuthorizer:     true,
+				},
+			}
+
+			// Store at height 2 and commit
+			idx, err := NewAccountTransactions(db, 1)
+			require.NoError(t, err)
+			err = storeAccountTransactions(t, idx, 2, txData)
+			require.NoError(t, err)
+
+			// Simulate restart: re-create index from same DB but with latestHeight
+			// rolled back by 1 (as if the OnCommitSucceed callback didn't fire).
+			// This forces indexAccountTransactions to run for the same data again.
+			idx2, err := NewAccountTransactions(db, 1)
+			require.NoError(t, err)
+
+			// latestHeight should be 2 from the DB, so storing height 2 is a no-op via Store.
+			// Instead, call indexAccountTransactions directly to exercise the KeyExists check.
+			lockManager := storage.NewTestingLockManager()
+			err = unittest.WithLock(t, lockManager, storage.LockIndexAccountTransactions, func(lctx lockctx.Context) error {
+				return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+					return idx2.indexAccountTransactions(lctx, rw, 2, txData)
+				})
+			})
+			require.ErrorIs(t, err, storage.ErrAlreadyExists)
+		})
+	})
+
 	t.Run("block height mismatch in entry fails", func(t *testing.T) {
 		RunWithAccountTxIndex(t, 1, func(idx *AccountTransactions) {
 			account := unittest.RandomAddressFixture()

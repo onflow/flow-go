@@ -971,6 +971,39 @@ func TestAccountTransactionsIndexer_EventAddresses(t *testing.T) {
 		assertAccountTx(t, store, testHeight, recipient, txID, false)
 	})
 
+	// --- Invalid address filtering ---
+
+	t.Run("event address invalid for chain is ignored", func(t *testing.T) {
+		header := unittest.BlockHeaderFixtureOnChain(flow.Testnet, unittest.WithHeaderHeight(testHeight))
+		indexer, store, lm, db := newAccountTxIndexerForTest(t, flow.Testnet, testHeight-1)
+
+		payer := unittest.RandomAddressFixture()
+		tx := simpleTx(payer)
+
+		// Use an address that is invalid for testnet's linear code address scheme.
+		invalidAddr := flow.BytesToAddress([]byte{0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF})
+		require.False(t, flow.Testnet.Chain().IsValid(invalidAddr), "test requires an invalid address")
+
+		event := createTestEvent(t, 0, "SomeEvent",
+			[]cadence.Field{
+				{Identifier: "account", Type: cadence.AddressType},
+			},
+			[]cadence.Value{
+				cadence.NewAddress(invalidAddr),
+			},
+		)
+
+		indexBlock(t, indexer, lm, db, BlockData{
+			Header:       header,
+			Transactions: []*flow.TransactionBody{&tx},
+			Events:       map[uint32][]flow.Event{0: {event}},
+		})
+
+		txID := tx.ID()
+		assertAccountTx(t, store, testHeight, payer, txID, true)
+		assertNoTransactions(t, store, testHeight, invalidAddr)
+	})
+
 	// --- Error tests ---
 
 	t.Run("malformed event payload returns error", func(t *testing.T) {

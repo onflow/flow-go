@@ -21,7 +21,7 @@ type AccountTransactionsReader interface {
 	// the latest indexed height will be used.
 	//
 	// Expected error returns during normal operations:
-	//   - ErrHeightNotIndexed if the requested range extends beyond indexed heights
+	//   - [storage.ErrHeightNotIndexed] if the requested range extends beyond indexed heights
 	TransactionsByAddress(
 		account flow.Address,
 		startHeight uint64,
@@ -48,11 +48,10 @@ type AccountTransactions interface {
 	AccountTransactionsReader
 
 	// Store indexes all account-transaction associations for a block.
-	// This should be called once per block, with consecutive heights.
+	// Must be called sequentially with consecutive heights (latestHeight + 1).
+	// The caller must hold the [storage.LockIndexAccountTransactions] lock until the batch is committed.
 	//
-	// CAUTION: Must be called sequentially with consecutive heights (latestHeight + 1).
-	// The caller is responsible for committing the provided batch.
-	//
-	// No errors are expected during normal operation.
+	// Expected error returns during normal operations:
+	//   - [storage.ErrAlreadyExists] if the block height is already indexed
 	Store(lctx lockctx.Proof, rw ReaderBatchWriter, blockHeight uint64, txData []accessmodel.AccountTransaction) error
 }
