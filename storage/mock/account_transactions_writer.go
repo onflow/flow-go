@@ -4,6 +4,7 @@ package mock
 
 import (
 	access "github.com/onflow/flow-go/model/access"
+	storage "github.com/onflow/flow-go/storage"
 	mock "github.com/stretchr/testify/mock"
 )
 
@@ -12,17 +13,17 @@ type AccountTransactionsWriter struct {
 	mock.Mock
 }
 
-// Store provides a mock function with given fields: blockHeight, txData
-func (_m *AccountTransactionsWriter) Store(blockHeight uint64, txData []access.AccountTransaction) error {
-	ret := _m.Called(blockHeight, txData)
+// Store provides a mock function with given fields: blockHeight, txData, batch
+func (_m *AccountTransactionsWriter) Store(blockHeight uint64, txData []access.AccountTransaction, batch storage.Batch) error {
+	ret := _m.Called(blockHeight, txData, batch)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Store")
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(uint64, []access.AccountTransaction) error); ok {
-		r0 = rf(blockHeight, txData)
+	if rf, ok := ret.Get(0).(func(uint64, []access.AccountTransaction, storage.Batch) error); ok {
+		r0 = rf(blockHeight, txData, batch)
 	} else {
 		r0 = ret.Error(0)
 	}

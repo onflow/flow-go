@@ -377,6 +377,11 @@ func (nc *NoopCollector) BlockIndexed(uint64, time.Duration, int, int, int) {}
 func (nc *NoopCollector) BlockReindexed()                                   {}
 func (nc *NoopCollector) InitializeLatestHeight(height uint64)              {}
 
+var _ module.ExtendedIndexingMetrics = (*NoopCollector)(nil)
+
+func (nc *NoopCollector) BlockIndexedExtended(string, uint64)           {}
+func (nc *NoopCollector) InitializeLatestHeightExtended(string, uint64) {}
+
 var _ module.TransactionErrorMessagesMetrics = (*NoopCollector)(nil)
 
 func (nc *NoopCollector) TxErrorsInitialHeight(uint64)                      {}

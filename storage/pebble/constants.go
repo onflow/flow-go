@@ -36,13 +36,4 @@ const (
 	// codeFirstBlockHeight and codeLatestBlockHeight are keys for the range of block heights in the register store
 	codeFirstBlockHeight  byte = 3
 	codeLatestBlockHeight byte = 4
-
-	// Account transaction index prefixes (starting at 10 to leave room for register-related codes)
-	// codeAccountTxIndex is the prefix for account transaction index entries
-	// Key format: [prefix][address][~block_height][tx_id][tx_index]
-	codeAccountTxIndex byte = 10
-	// codeAccountTxFirstHeight stores the first (oldest) indexed block height for account transactions
-	codeAccountTxFirstHeight byte = 11
-	// codeAccountTxLatestHeight stores the latest indexed block height for account transactions
-	codeAccountTxLatestHeight byte = 12
 )

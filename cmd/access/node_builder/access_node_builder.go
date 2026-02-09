@@ -91,6 +91,7 @@ import (
 	"github.com/onflow/flow-go/module/metrics/unstaked"
 	"github.com/onflow/flow-go/module/state_synchronization"
 	"github.com/onflow/flow-go/module/state_synchronization/indexer"
+	"github.com/onflow/flow-go/module/state_synchronization/indexer/extended"
 	edrequester "github.com/onflow/flow-go/module/state_synchronization/requester"
 	"github.com/onflow/flow-go/network"
 	alspmgr "github.com/onflow/flow-go/network/alsp/manager"
@@ -119,6 +120,8 @@ import (
 	statedatastore "github.com/onflow/flow-go/state/protocol/datastore"
 	"github.com/onflow/flow-go/storage"
 	bstorage "github.com/onflow/flow-go/storage/badger"
+	"github.com/onflow/flow-go/storage/indexes"
+	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
 	pstorage "github.com/onflow/flow-go/storage/pebble"
 	"github.com/onflow/flow-go/storage/store"
 	"github.com/onflow/flow-go/utils/grpcutils"
@@ -169,6 +172,10 @@ type AccessNodeConfig struct {
 	PublicNetworkConfig                  PublicNetworkConfig
 	TxResultCacheSize                    uint
 	executionDataIndexingEnabled         bool
+	extendedIndexingEnabled              bool
+	extendedIndexingDBPath               string
+	extendedIndexingBackfillDelay        time.Duration
+	extendedIndexingBackfillWorkers      int
 	registersDBPath                      string
 	checkpointFile                       string
 	scriptExecutorConfig                 query.QueryConfig
@@ -194,6 +201,7 @@ type PublicNetworkConfig struct {
 // DefaultAccessNodeConfig defines all the default values for the AccessNodeConfig
 func DefaultAccessNodeConfig() *AccessNodeConfig {
 	homedir, _ := os.UserHomeDir()
+	defaultDatadir := filepath.Join(homedir, ".flow")
 	return &AccessNodeConfig{
 		supportsObserver: false,
 		rpcConf: rpc.Config{
@@ -262,7 +270,7 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 		},
 		executionDataSyncEnabled:          true,
 		publicNetworkExecutionDataEnabled: false,
-		executionDataDir:                  filepath.Join(homedir, ".flow", "execution_data"),
+		executionDataDir:                  filepath.Join(defaultDatadir, "execution_data"),
 		executionDataStartHeight:          0,
 		executionDataConfig: edrequester.ExecutionDataConfig{
 			InitialBlockHeight: 0,
@@ -273,10 +281,14 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 			MaxRetryDelay:      edrequester.DefaultMaxRetryDelay,
 		},
 		executionDataIndexingEnabled:         false,
+		extendedIndexingEnabled:              false,
+		extendedIndexingBackfillDelay:        extended.DefaultBackfillDelay,
+		extendedIndexingBackfillWorkers:      extended.DefaultBackfillMaxWorkers,
 		executionDataPrunerHeightRangeTarget: 0,
 		executionDataPrunerThreshold:         pruner.DefaultThreshold,
 		executionDataPruningInterval:         pruner.DefaultPruningInterval,
-		registersDBPath:                      filepath.Join(homedir, ".flow", "execution_state"),
+		registersDBPath:                      filepath.Join(defaultDatadir, "execution_state"),
+		extendedIndexingDBPath:               filepath.Join(defaultDatadir, "indexer"),
 		checkpointFile:                       cmd.NotSet,
 		scriptExecutorConfig:                 query.NewDefaultConfig(),
 		scriptExecMinBlock:                   0,
@@ -328,6 +340,7 @@ type FlowAccessNodeBuilder struct {
 	ExecutionDataCache           *execdatacache.ExecutionDataCache
 	ExecutionIndexer             *indexer.Indexer
 	ExecutionIndexerCore         *indexer.IndexerCore
+	ExtendedIndexer              *extended.ExtendedIndexer
 	CollectionIndexer            *collections.Indexer
 	CollectionSyncer             *collections.Syncer
 	ScriptExecutor               *backend.ScriptExecutor
@@ -933,6 +946,70 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 					builder.Storage.RegisterIndex = registers
 				}
 
+				if builder.extendedIndexingEnabled {
+					indexerDB, err := pstorage.SafeOpen(
+						node.Logger.With().Str("pebbledb", "indexer").Logger(),
+						builder.extendedIndexingDBPath,
+					)
+					if err != nil {
+						return nil, fmt.Errorf("could not open indexer db: %w", err)
+					}
+					builder.ShutdownFunc(func() error {
+						if err := indexerDB.Close(); err != nil {
+							return fmt.Errorf("error closing indexer db: %w", err)
+						}
+						return nil
+					})
+
+					indexerStorageDB := pebbleimpl.ToDB(indexerDB)
+					accountTxStore, err := indexes.NewAccountTransactions(
+						indexerStorageDB,
+						builder.SealedRootBlock.Height,
+					)
+					if err != nil {
+						return nil, fmt.Errorf("could not create account transactions index: %w", err)
+					}
+
+					extendedIndexers := []extended.Indexer{
+						extended.NewAccountTransactions(
+							builder.Logger,
+							accountTxStore,
+							builder.RootChainID,
+							node.StorageLockMgr,
+						),
+					}
+
+					// TODO: indexedBlockHeight is also initialized by the indexer. update so it is only initialized once.
+					// Needs https://github.com/onflow/flow-go/pull/8404
+					progress, err := indexedBlockHeight.Initialize(registers.FirstHeight())
+					if err != nil {
+						return nil, fmt.Errorf("could not initialize indexed block height consumer progress: %w", err)
+					}
+					startHeight, err := progress.ProcessedIndex()
+					if err != nil {
+						return nil, fmt.Errorf("could not read indexed block height: %w", err)
+					}
+					extendedIndexer, err := extended.NewExtendedIndexer(
+						builder.Logger,
+						indexerStorageDB,
+						extendedIndexers,
+						metrics.NewExtendedIndexingCollector(),
+						builder.extendedIndexingBackfillDelay,
+						builder.extendedIndexingBackfillWorkers,
+						builder.RootChainID,
+						notNil(builder.Storage.Blocks),
+						notNil(builder.collections),
+						notNil(builder.events),
+						startHeight,
+						node.StorageLockMgr,
+					)
+					if err != nil {
+						return nil, fmt.Errorf("could not create extended indexer: %w", err)
+					}
+
+					builder.ExtendedIndexer = extendedIndexer
+				}
+
 				indexerDerivedChainData, queryDerivedChainData, err := builder.buildDerivedChainData()
 				if err != nil {
 					return nil, fmt.Errorf("could not create derived chain data: %w", err)
@@ -954,7 +1031,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 					notNil(builder.CollectionIndexer),
 					notNil(builder.collectionExecutedMetric),
 					node.StorageLockMgr,
-					nil, // accountTxIndex - TODO: wire in when account data API is enabled
+					builder.ExtendedIndexer,
 				)
 
 				// execution state worker uses a jobqueue to process new execution data and indexes it by using the indexer.
@@ -1013,6 +1090,18 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 
 				return builder.ExecutionIndexer, nil
 			}, builder.IndexerDependencies)
+
+		if builder.extendedIndexingEnabled {
+			builder.Component("extended indexer", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+				// The extended indexer needs to be initialized within the execution data indexer component
+				// since it depends on the first height in the execution state database.
+				// TODO: refactor initialization of these components to improve dependency management.
+				if builder.ExtendedIndexer == nil {
+					return nil, fmt.Errorf("extended indexer not initialized")
+				}
+				return builder.ExtendedIndexer, nil
+			})
+		}
 	}
 
 	if builder.stateStreamConf.ListenAddr != "" {
@@ -1408,6 +1497,25 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 			"whether to enable the execution data indexing")
 		flags.StringVar(&builder.registersDBPath, "execution-state-dir", defaultConfig.registersDBPath, "directory to use for execution-state database")
 		flags.StringVar(&builder.checkpointFile, "execution-state-checkpoint", defaultConfig.checkpointFile, "execution-state checkpoint file")
+
+		// Extended Indexing
+		flags.BoolVar(&builder.extendedIndexingEnabled,
+			"extended-indexing-enabled",
+			defaultConfig.extendedIndexingEnabled,
+			"whether to enable account data indexing")
+		flags.DurationVar(&builder.extendedIndexingBackfillDelay,
+			"extended-indexing-backfill-delay",
+			defaultConfig.extendedIndexingBackfillDelay,
+			"minimum delay between backfilled heights per extended indexer")
+		flags.IntVar(&builder.extendedIndexingBackfillWorkers,
+			"extended-indexing-backfill-workers",
+			defaultConfig.extendedIndexingBackfillWorkers,
+			"number of concurrent workers to use for backfilling extended indexing")
+		flags.StringVar(&builder.extendedIndexingDBPath,
+			"extended-indexing-db-dir",
+			defaultConfig.extendedIndexingDBPath,
+			"directory to use for extended indexing database",
+		)
 
 		flags.StringVar(&builder.rpcConf.BackendConfig.EventQueryMode,
 			"event-query-mode",

@@ -1,26 +1,39 @@
-package pebble
+package indexes
 
 import (
 	"testing"
 
 	"github.com/cockroachdb/pebble/v2"
+	"github.com/jordanschalm/lockctx"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/vmihailenco/msgpack/v4"
 
 	"github.com/onflow/flow-go/model/access"
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func TestAccountTransactions_Initialize(t *testing.T) {
 	t.Parallel()
 
-	t.Run("fails on uninitialized database", func(t *testing.T) {
+	t.Run("initializes uninitialized database", func(t *testing.T) {
 		db, _ := unittest.TempPebbleDBWithOpts(t, nil)
 		defer db.Close()
 
-		_, err := NewAccountTransactions(db)
-		require.Error(t, err)
+		storageDB := pebbleimpl.ToDB(db)
+		idx, err := NewAccountTransactions(storageDB, 1)
+		require.NoError(t, err)
+
+		first, err := idx.FirstIndexedHeight()
+		require.NoError(t, err)
+		assert.Equal(t, uint64(1), first)
+
+		latest, err := idx.LatestIndexedHeight()
+		require.NoError(t, err)
+		assert.Equal(t, uint64(1), latest)
 	})
 
 	t.Run("succeeds on initialized database", func(t *testing.T) {
@@ -56,7 +69,7 @@ func TestAccountTransactions_IndexAndQuery(t *testing.T) {
 			}
 
 			// Index block at height 2
-			err := idx.Store(2, txData)
+			err := storeAccountTransactions(t, idx, 2, txData)
 			require.NoError(t, err)
 
 			// Query should return the transaction
@@ -78,7 +91,7 @@ func TestAccountTransactions_IndexAndQuery(t *testing.T) {
 
 			// Block 2: one tx involving account1
 			txID1 := unittest.IdentifierFixture()
-			err := idx.Store(2, []access.AccountTransaction{
+			err := storeAccountTransactions(t, idx, 2, []access.AccountTransaction{
 				{
 					Address:          account1,
 					BlockHeight:      2,
@@ -92,7 +105,7 @@ func TestAccountTransactions_IndexAndQuery(t *testing.T) {
 			// Block 3: two txs, one involving both accounts
 			txID2 := unittest.IdentifierFixture()
 			txID3 := unittest.IdentifierFixture()
-			err = idx.Store(3, []access.AccountTransaction{
+			err = storeAccountTransactions(t, idx, 3, []access.AccountTransaction{
 				// tx2 involves both account1 and account2
 				{
 					Address:          account1,
@@ -122,7 +135,6 @@ func TestAccountTransactions_IndexAndQuery(t *testing.T) {
 			// Query account1 (should have 2 txs)
 			results, err := idx.TransactionsByAddress(account1, 2, 3)
 			require.NoError(t, err)
-			t.Logf("Results for account1: %+v", results)
 			require.Len(t, results, 2)
 
 			// Results should be in descending order (newest first)
@@ -139,9 +151,10 @@ func TestAccountTransactions_IndexAndQuery(t *testing.T) {
 			require.NoError(t, err)
 			require.Len(t, results, 2)
 
-			// Both in block 3, ordered by txIndex descending
+			// Both in block 3, ordered by txIndex ascending
 			assert.Equal(t, uint64(3), results[0].BlockHeight)
 			assert.Equal(t, uint64(3), results[1].BlockHeight)
+			assert.Less(t, results[0].TransactionIndex, results[1].TransactionIndex)
 		})
 	})
 
@@ -152,7 +165,7 @@ func TestAccountTransactions_IndexAndQuery(t *testing.T) {
 			// Index blocks 2, 3, 4
 			for height := uint64(2); height <= 4; height++ {
 				txID := unittest.IdentifierFixture()
-				err := idx.Store(height, []access.AccountTransaction{
+				err := storeAccountTransactions(t, idx, height, []access.AccountTransaction{
 					{
 						Address:          account,
 						BlockHeight:      height,
@@ -187,7 +200,7 @@ func TestAccountTransactions_DescendingOrder(t *testing.T) {
 		// Index 10 blocks
 		for height := uint64(2); height <= 11; height++ {
 			txID := unittest.IdentifierFixture()
-			err := idx.Store(height, []access.AccountTransaction{
+			err := storeAccountTransactions(t, idx, height, []access.AccountTransaction{
 				{
 					Address:          account,
 					BlockHeight:      height,
@@ -233,7 +246,7 @@ func TestAccountTransactions_ErrorCases(t *testing.T) {
 	t.Run("index non-consecutive height fails", func(t *testing.T) {
 		RunWithAccountTxIndex(t, 1, func(idx *AccountTransactions) {
 			// Try to index height 5 when latest is 1
-			err := idx.Store(5, nil)
+			err := storeAccountTransactions(t, idx, 5, nil)
 			require.Error(t, err)
 		})
 	})
@@ -241,11 +254,11 @@ func TestAccountTransactions_ErrorCases(t *testing.T) {
 	t.Run("index same height is idempotent", func(t *testing.T) {
 		RunWithAccountTxIndex(t, 1, func(idx *AccountTransactions) {
 			// Index height 2
-			err := idx.Store(2, nil)
+			err := storeAccountTransactions(t, idx, 2, nil)
 			require.NoError(t, err)
 
 			// Index height 2 again (should succeed)
-			err = idx.Store(2, nil)
+			err = storeAccountTransactions(t, idx, 2, nil)
 			require.NoError(t, err)
 		})
 	})
@@ -269,23 +282,47 @@ func TestAccountTransactions_KeyEncoding(t *testing.T) {
 		txID := unittest.IdentifierFixture()
 		txIndex := uint32(42)
 
-		key := makeAccountTxKey(address, height, txID, txIndex)
-		value := encodeAccountTxValue(true)
+		key := makeAccountTxKey(address, height, txIndex)
+		value := encodeAccountTxValue(txID, true)
 
-		decoded, err := decodeAccountTxKey(key, value)
+		// Decode the key
+		decodedAddress, decodedHeight, decodedTxIndex, err := decodeAccountTxKey(key)
 		require.NoError(t, err)
+		assert.Equal(t, address, decodedAddress)
+		assert.Equal(t, height, decodedHeight)
+		assert.Equal(t, txIndex, decodedTxIndex)
 
-		assert.Equal(t, height, decoded.BlockHeight)
-		assert.Equal(t, txID, decoded.TransactionID)
-		assert.Equal(t, txIndex, decoded.TransactionIndex)
-		assert.True(t, decoded.IsAuthorizer)
+		// Decode the value (msgpack-encoded storedAccountTransaction)
+		var stored storedAccountTransaction
+		err = msgpack.Unmarshal(value, &stored)
+		require.NoError(t, err)
+		assert.Equal(t, txID, stored.TransactionID)
+		assert.True(t, stored.IsAuthorizer)
 	})
 
 	t.Run("value encoding", func(t *testing.T) {
-		assert.True(t, decodeAccountTxValue(encodeAccountTxValue(true)))
-		assert.False(t, decodeAccountTxValue(encodeAccountTxValue(false)))
-		assert.False(t, decodeAccountTxValue(nil))
-		assert.False(t, decodeAccountTxValue([]byte{}))
+		txID := unittest.IdentifierFixture()
+
+		// Test encoding and decoding true
+		encoded := encodeAccountTxValue(txID, true)
+		var stored storedAccountTransaction
+		err := msgpack.Unmarshal(encoded, &stored)
+		require.NoError(t, err)
+		assert.Equal(t, txID, stored.TransactionID)
+		assert.True(t, stored.IsAuthorizer)
+
+		// Test encoding and decoding false
+		encoded = encodeAccountTxValue(txID, false)
+		err = msgpack.Unmarshal(encoded, &stored)
+		require.NoError(t, err)
+		assert.Equal(t, txID, stored.TransactionID)
+		assert.False(t, stored.IsAuthorizer)
+
+		// Test error cases
+		err = msgpack.Unmarshal(nil, &stored)
+		require.Error(t, err)
+		err = msgpack.Unmarshal([]byte{}, &stored)
+		require.Error(t, err)
 	})
 }
 
@@ -297,12 +334,21 @@ func TestAccountTransactions_EmptyResults(t *testing.T) {
 		account := unittest.RandomAddressFixture()
 
 		// First index some data so we have indexed heights
-		err := idx.Store(2, nil)
+		err := storeAccountTransactions(t, idx, 2, nil)
 		require.NoError(t, err)
 
 		results, err := idx.TransactionsByAddress(account, 1, 2)
 		require.NoError(t, err)
 		assert.Empty(t, results)
+	})
+}
+
+func storeAccountTransactions(tb testing.TB, idx *AccountTransactions, height uint64, txData []access.AccountTransaction) error {
+	lockManager := storage.NewTestingLockManager()
+	return unittest.WithLock(tb, lockManager, storage.LockIndexAccountTransactions, func(lctx lockctx.Context) error {
+		return idx.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			return idx.Store(lctx, rw, height, txData)
+		})
 	})
 }
 
@@ -313,7 +359,7 @@ func RunWithAccountTxIndex(tb testing.TB, startHeight uint64, f func(idx *Accoun
 		db := NewBootstrappedAccountTxIndexForTest(tb, dir, startHeight)
 		defer db.Close()
 
-		idx, err := NewAccountTransactions(db)
+		idx, err := NewAccountTransactions(db, startHeight)
 		require.NoError(tb, err)
 
 		f(idx)
@@ -322,12 +368,25 @@ func RunWithAccountTxIndex(tb testing.TB, startHeight uint64, f func(idx *Accoun
 
 // NewBootstrappedAccountTxIndexForTest creates a new Pebble database and initializes it
 // for account transaction indexing at the given start height.
-func NewBootstrappedAccountTxIndexForTest(tb testing.TB, dir string, startHeight uint64) *pebble.DB {
+func NewBootstrappedAccountTxIndexForTest(tb testing.TB, dir string, startHeight uint64) storage.DB {
 	db, err := pebble.Open(dir, &pebble.Options{})
 	require.NoError(tb, err)
 
-	err = InitAccountTransactions(db, startHeight)
-	require.NoError(tb, err)
+	// NewAccountTransactions will initialize the database if needed
+	return pebbleimpl.ToDB(db)
+}
 
-	return db
+// encodeAccountTxValue encodes a transaction ID and authorizer flag using msgpack.
+// This matches the encoding used in the implementation.
+func encodeAccountTxValue(txID flow.Identifier, isAuthorizer bool) []byte {
+	type storedAccountTransaction struct {
+		TransactionID flow.Identifier
+		IsAuthorizer  bool
+	}
+	stored := storedAccountTransaction{
+		TransactionID: txID,
+		IsAuthorizer:  isAuthorizer,
+	}
+	data, _ := msgpack.Marshal(&stored)
+	return data
 }
