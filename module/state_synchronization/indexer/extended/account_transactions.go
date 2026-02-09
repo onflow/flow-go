@@ -8,7 +8,6 @@ import (
 
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/encoding/ccf"
-	"github.com/onflow/flow-go/engine/access/account_data/transfers"
 	"github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
@@ -18,11 +17,10 @@ const accountTransactionsIndexerName = "account_transactions"
 
 // AccountTransactions indexes account-transaction associations for a block.
 type AccountTransactions struct {
-	log            zerolog.Logger
-	store          storage.AccountTransactions
-	chainID        flow.ChainID
-	transferParser *transfers.Parser
-	lockManager    storage.LockManager
+	log         zerolog.Logger
+	store       storage.AccountTransactions
+	chainID     flow.ChainID
+	lockManager storage.LockManager
 }
 
 var _ Indexer = (*AccountTransactions)(nil)
@@ -34,11 +32,10 @@ func NewAccountTransactions(
 	lockManager storage.LockManager,
 ) *AccountTransactions {
 	return &AccountTransactions{
-		log:            log.With().Str("component", "account_transactions_indexer").Logger(),
-		store:          store,
-		chainID:        chainID,
-		transferParser: transfers.NewParser(),
-		lockManager:    lockManager,
+		log:         log.With().Str("component", "account_transactions_indexer").Logger(),
+		store:       store,
+		chainID:     chainID,
+		lockManager: lockManager,
 	}
 }
 
