@@ -579,6 +579,10 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 	var execDataDistributor *edrequester.ExecutionDataDistributor
 	var execDataCacheBackend *herocache.BlockExecutionData
 
+	extendedIndexingDependencies := cmd.NewDependencyList()
+	executionStateIndexerDependable := module.NewProxiedReadyDoneAware()
+	extendedIndexingDependencies.Add(executionStateIndexerDependable)
+
 	// setup dependency chain to ensure indexer starts after the requester
 	requesterDependable := module.NewProxiedReadyDoneAware()
 	builder.IndexerDependencies.Add(requesterDependable)
@@ -1088,11 +1092,13 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 					builder.StopControl.RegisterHeightRecorder(builder.ExecutionIndexer)
 				}
 
+				executionStateIndexerDependable.Init(builder.ExecutionIndexer)
+
 				return builder.ExecutionIndexer, nil
 			}, builder.IndexerDependencies)
 
 		if builder.extendedIndexingEnabled {
-			builder.Component("extended indexer", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			builder.DependableComponent("extended indexer", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 				// The extended indexer needs to be initialized within the execution data indexer component
 				// since it depends on the first height in the execution state database.
 				// TODO: refactor initialization of these components to improve dependency management.
@@ -1100,7 +1106,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 					return nil, fmt.Errorf("extended indexer not initialized")
 				}
 				return builder.ExtendedIndexer, nil
-			})
+			}, extendedIndexingDependencies)
 		}
 	}
 
@@ -1709,6 +1715,10 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 		}
 		if builder.rpcConf.BackendConfig.ExecutionConfig.MaxResponseMsgSize <= 0 {
 			return errors.New("rpc-max-execution-response-message-size must be greater than 0")
+		}
+
+		if builder.extendedIndexingEnabled && builder.extendedIndexingBackfillWorkers <= 0 {
+			return errors.New("extended-indexing-backfill-workers must be greater than 0")
 		}
 
 		// indexing tx error messages is only supported when tx results are also indexed

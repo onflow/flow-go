@@ -938,6 +938,10 @@ func (builder *ObserverServiceBuilder) extraFlags() {
 			}
 		}
 
+		if builder.extendedIndexingEnabled && builder.extendedIndexingBackfillWorkers <= 0 {
+			return errors.New("extended-indexing-backfill-workers must be greater than 0")
+		}
+
 		if builder.rpcConf.RestConfig.MaxRequestSize <= 0 {
 			return errors.New("rest-max-request-size must be greater than 0")
 		}
@@ -1140,6 +1144,10 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 	var execDataDistributor *edrequester.ExecutionDataDistributor
 	var execDataCacheBackend *herocache.BlockExecutionData
 	var executionDataStoreCache *execdatacache.ExecutionDataCache
+
+	extendedIndexingDependencies := cmd.NewDependencyList()
+	executionStateIndexerDependable := module.NewProxiedReadyDoneAware()
+	extendedIndexingDependencies.Add(executionStateIndexerDependable)
 
 	// setup dependency chain to ensure indexer starts after the requester
 	requesterDependable := module.NewProxiedReadyDoneAware()
@@ -1628,11 +1636,13 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 				builder.StopControl.RegisterHeightRecorder(builder.ExecutionIndexer)
 			}
 
+			executionStateIndexerDependable.Init(builder.ExecutionIndexer)
+
 			return builder.ExecutionIndexer, nil
 		}, builder.IndexerDependencies)
 
 		if builder.extendedIndexingEnabled {
-			builder.Component("extended indexer", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			builder.DependableComponent("extended indexer", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 				// The extended indexer needs to be initialized within the execution data indexer component
 				// since it depends on the first height in the execution state database.
 				// TODO: refactor initialization of these components to improve dependency management.
@@ -1640,7 +1650,7 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 					return nil, fmt.Errorf("extended indexer not initialized")
 				}
 				return builder.ExtendedIndexer, nil
-			})
+			}, extendedIndexingDependencies)
 		}
 	}
 
