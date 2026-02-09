@@ -2,10 +2,10 @@ package indexer
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"testing"
-	"time"
 
 	"github.com/jordanschalm/lockctx"
 	"github.com/rs/zerolog"
@@ -398,7 +398,8 @@ func TestExecutionState_IndexBlockData(t *testing.T) {
 			test.indexer.protocolDB,
 			[]extended.Indexer{stub},
 			metrics.NewNoopCollector(),
-			10*time.Millisecond,
+			extended.DefaultBackfillDelay,
+			extended.DefaultBackfillMaxWorkers,
 			test.indexer.chainID,
 			nil,
 			test.collections,
@@ -457,6 +458,57 @@ func TestExecutionState_IndexBlockData(t *testing.T) {
 
 		err := test.indexer.IndexBlockData(tf.ExecutionDataEntity())
 		assert.NoError(t, err)
+	})
+
+	// test that errors from the extended indexer are propagated
+	t.Run("Account transactions error propagation", func(t *testing.T) {
+		test := newIndexCoreTest(t, g, blocks, tf.ExecutionDataEntity()).initIndexer()
+
+		startHeight := tf.Block.Height - 1
+		expectedErr := errors.New("indexer failure")
+		stub := &testExtendedIndexer{
+			name:         "test",
+			latestHeight: startHeight,
+			indexBlockFn: func(data extended.BlockData) error {
+				return expectedErr
+			},
+		}
+		accountIndexer, err := extended.NewExtendedIndexer(
+			test.indexer.log,
+			test.indexer.protocolDB,
+			[]extended.Indexer{stub},
+			metrics.NewNoopCollector(),
+			extended.DefaultBackfillDelay,
+			extended.DefaultBackfillMaxWorkers,
+			test.indexer.chainID,
+			nil,
+			test.collections,
+			test.events,
+			startHeight,
+			storage.NewTestingLockManager(),
+		)
+		require.NoError(t, err)
+		test.indexer.accountIndexer = accountIndexer
+
+		test.events.
+			On("BatchStore", mocks.MatchLock(storage.LockInsertEvent), blockID, []flow.EventsList{tf.ExpectedEvents}, mock.Anything).
+			Return(nil)
+		test.results.
+			On("BatchStore", mocks.MatchLock(storage.LockInsertLightTransactionResult), mock.Anything, blockID, tf.ExpectedResults).
+			Return(nil)
+		test.registers.
+			On("Store", mock.Anything, tf.Block.Height).
+			Return(nil)
+		test.collectionIndexer.On("IndexCollections", tf.ExpectedCollections).Return(nil).Once()
+		for txID, scheduledTxID := range tf.ExpectedScheduledTransactions {
+			test.scheduledTransactions.
+				On("BatchIndex", mocks.MatchLock(storage.LockIndexScheduledTransaction), blockID, txID, scheduledTxID, mock.Anything).
+				Return(nil)
+		}
+
+		err = test.indexer.IndexBlockData(tf.ExecutionDataEntity())
+		assert.Error(t, err)
+		assert.ErrorIs(t, err, expectedErr)
 	})
 }
 
@@ -730,7 +782,7 @@ type testExtendedIndexer struct {
 
 func (t *testExtendedIndexer) Name() string { return t.name }
 
-func (t *testExtendedIndexer) IndexBlockData(data extended.BlockData, _ storage.Batch) error {
+func (t *testExtendedIndexer) IndexBlockData(_ lockctx.Proof, data extended.BlockData, _ storage.ReaderBatchWriter) error {
 	if t.indexBlockFn != nil {
 		return t.indexBlockFn(data)
 	}

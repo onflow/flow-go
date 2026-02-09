@@ -251,6 +251,40 @@ func TestAccountTransactions_ErrorCases(t *testing.T) {
 		})
 	})
 
+	t.Run("store below latest returns ErrAlreadyExists", func(t *testing.T) {
+		RunWithAccountTxIndex(t, 1, func(idx *AccountTransactions) {
+			// Index height 2 and 3
+			err := storeAccountTransactions(t, idx, 2, nil)
+			require.NoError(t, err)
+			err = storeAccountTransactions(t, idx, 3, nil)
+			require.NoError(t, err)
+
+			// Try to store height 1 (below latest=3)
+			err = storeAccountTransactions(t, idx, 1, nil)
+			require.ErrorIs(t, err, storage.ErrAlreadyExists)
+		})
+	})
+
+	t.Run("block height mismatch in entry fails", func(t *testing.T) {
+		RunWithAccountTxIndex(t, 1, func(idx *AccountTransactions) {
+			account := unittest.RandomAddressFixture()
+			txID := unittest.IdentifierFixture()
+
+			// Entry claims height 5 but we're indexing height 2
+			err := storeAccountTransactions(t, idx, 2, []access.AccountTransaction{
+				{
+					Address:          account,
+					BlockHeight:      5, // mismatch with height 2
+					TransactionID:    txID,
+					TransactionIndex: 0,
+					IsAuthorizer:     true,
+				},
+			})
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), "block height mismatch")
+		})
+	})
+
 	t.Run("index same height is idempotent", func(t *testing.T) {
 		RunWithAccountTxIndex(t, 1, func(idx *AccountTransactions) {
 			// Index height 2

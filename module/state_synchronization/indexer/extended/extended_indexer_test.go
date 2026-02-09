@@ -68,22 +68,24 @@ func TestExtendedIndexer_AllLive(t *testing.T) {
 	idx1.On("LatestIndexedHeight").Return(startHeight, nil).Once()
 	idx2.On("LatestIndexedHeight").Return(startHeight+5, nil).Once()
 
-	idx1.On("IndexBlockData", mock.MatchedBy(func(data extended.BlockData) bool {
+	idx1.On("IndexBlockData", mock.Anything, mock.MatchedBy(func(data extended.BlockData) bool {
 		return data.Header.Height == startHeight+1
 	}), mock.Anything).Return(nil).Once()
-	idx2.On("IndexBlockData", mock.MatchedBy(func(data extended.BlockData) bool {
+	idx2.On("IndexBlockData", mock.Anything, mock.MatchedBy(func(data extended.BlockData) bool {
 		return data.Header.Height == startHeight+1
 	}), mock.Anything).Return(nil).Once()
 
-	idx1.On("Name").Return("a").Once()
-	idx2.On("Name").Return("b").Once()
+	// 1 constructor + 1 live IndexBlockData = 2
+	idx1.On("Name").Return("a")
+	idx2.On("Name").Return("b")
 
 	ext, err := extended.NewExtendedIndexer(
 		zerolog.Nop(),
 		db,
 		[]extended.Indexer{idx1, idx2},
 		metrics.NewNoopCollector(),
-		10*time.Millisecond,
+		extended.DefaultBackfillDelay,
+		extended.DefaultBackfillMaxWorkers,
 		flow.Testnet,
 		blocks,
 		collections,
@@ -124,42 +126,44 @@ func TestExtendedIndexer_AllBackfilling(t *testing.T) {
 	idx2.On("LatestIndexedHeight").Return(uint64(4), nil).Once()
 	idx2.On("LatestIndexedHeight").Return(uint64(5), nil).Once()
 
-	idx1.On("IndexBlockData", mock.MatchedBy(func(data extended.BlockData) bool {
+	idx1.On("IndexBlockData", mock.Anything, mock.MatchedBy(func(data extended.BlockData) bool {
 		return data.Header.Height == 2
 	}), mock.Anything).Return(nil).Once()
-	idx1.On("IndexBlockData", mock.MatchedBy(func(data extended.BlockData) bool {
+	idx1.On("IndexBlockData", mock.Anything, mock.MatchedBy(func(data extended.BlockData) bool {
 		return data.Header.Height == 3
 	}), mock.Anything).Return(nil).Once()
-	idx1.On("IndexBlockData", mock.MatchedBy(func(data extended.BlockData) bool {
+	idx1.On("IndexBlockData", mock.Anything, mock.MatchedBy(func(data extended.BlockData) bool {
 		return data.Header.Height == 4
 	}), mock.Anything).Return(nil).Once()
-	idx1.On("IndexBlockData", mock.MatchedBy(func(data extended.BlockData) bool {
+	idx1.On("IndexBlockData", mock.Anything, mock.MatchedBy(func(data extended.BlockData) bool {
 		return data.Header.Height == 5
 	}), mock.Anything).Return(nil).Once()
-	idx1.On("IndexBlockData", mock.MatchedBy(func(data extended.BlockData) bool {
+	idx1.On("IndexBlockData", mock.Anything, mock.MatchedBy(func(data extended.BlockData) bool {
 		return data.Header.Height == startHeight+1
 	}), mock.Anything).Return(nil).Once()
 
-	idx2.On("IndexBlockData", mock.MatchedBy(func(data extended.BlockData) bool {
+	idx2.On("IndexBlockData", mock.Anything, mock.MatchedBy(func(data extended.BlockData) bool {
 		return data.Header.Height == 4
 	}), mock.Anything).Return(nil).Once()
-	idx2.On("IndexBlockData", mock.MatchedBy(func(data extended.BlockData) bool {
+	idx2.On("IndexBlockData", mock.Anything, mock.MatchedBy(func(data extended.BlockData) bool {
 		return data.Header.Height == 5
 	}), mock.Anything).Return(nil).Once()
-	idx2.On("IndexBlockData", mock.MatchedBy(func(data extended.BlockData) bool {
+	idx2.On("IndexBlockData", mock.Anything, mock.MatchedBy(func(data extended.BlockData) bool {
 		return data.Header.Height == startHeight+1
 	}), mock.Anything).Return(nil).Once()
 
-	// once for each indexed block for metrics
-	idx1.On("Name").Return("a").Times(5)
-	idx2.On("Name").Return("b").Times(3)
+	// 1 constructor + 4 backfill blocks + 1 live IndexBlockData = 6
+	idx1.On("Name").Return("a")
+	// 1 constructor + 2 backfill blocks + 1 live IndexBlockData = 4
+	idx2.On("Name").Return("b")
 
 	ext, err := extended.NewExtendedIndexer(
 		zerolog.Nop(),
 		db,
 		[]extended.Indexer{idx1, idx2},
 		metrics.NewNoopCollector(),
-		10*time.Millisecond,
+		extended.DefaultBackfillDelay,
+		extended.DefaultBackfillMaxWorkers,
 		flow.Testnet,
 		blocks,
 		collections,
@@ -197,44 +201,47 @@ func TestExtendedIndexer_SplitLiveAndBackfill(t *testing.T) {
 	backfill.On("LatestIndexedHeight").Return(uint64(7), nil).Once()
 	backfill.On("LatestIndexedHeight").Return(uint64(8), nil).Once()
 
-	live.On("IndexBlockData", mock.MatchedBy(func(data extended.BlockData) bool {
+	live.On("IndexBlockData", mock.Anything, mock.MatchedBy(func(data extended.BlockData) bool {
 		return data.Header.Height == startHeight+1
 	}), mock.Anything).Return(nil).Once()
-	live.On("IndexBlockData", mock.MatchedBy(func(data extended.BlockData) bool {
+	live.On("IndexBlockData", mock.Anything, mock.MatchedBy(func(data extended.BlockData) bool {
 		return data.Header.Height == startHeight+2
 	}), mock.Anything).Return(nil).Once()
 
-	backfill.On("IndexBlockData", mock.MatchedBy(func(data extended.BlockData) bool {
+	backfill.On("IndexBlockData", mock.Anything, mock.MatchedBy(func(data extended.BlockData) bool {
 		return data.Header.Height == 3
 	}), mock.Anything).Return(nil).Once()
-	backfill.On("IndexBlockData", mock.MatchedBy(func(data extended.BlockData) bool {
+	backfill.On("IndexBlockData", mock.Anything, mock.MatchedBy(func(data extended.BlockData) bool {
 		return data.Header.Height == 4
 	}), mock.Anything).Return(nil).Once()
-	backfill.On("IndexBlockData", mock.MatchedBy(func(data extended.BlockData) bool {
+	backfill.On("IndexBlockData", mock.Anything, mock.MatchedBy(func(data extended.BlockData) bool {
 		return data.Header.Height == 5
 	}), mock.Anything).Return(nil).Once()
-	backfill.On("IndexBlockData", mock.MatchedBy(func(data extended.BlockData) bool {
+	backfill.On("IndexBlockData", mock.Anything, mock.MatchedBy(func(data extended.BlockData) bool {
 		return data.Header.Height == 6
 	}), mock.Anything).Return(nil).Once()
-	backfill.On("IndexBlockData", mock.MatchedBy(func(data extended.BlockData) bool {
+	backfill.On("IndexBlockData", mock.Anything, mock.MatchedBy(func(data extended.BlockData) bool {
 		return data.Header.Height == 7
 	}), mock.Anything).Return(nil).Once()
-	backfill.On("IndexBlockData", mock.MatchedBy(func(data extended.BlockData) bool {
+	backfill.On("IndexBlockData", mock.Anything, mock.MatchedBy(func(data extended.BlockData) bool {
 		return data.Header.Height == 8
 	}), mock.Anything).Return(nil).Once()
-	backfill.On("IndexBlockData", mock.MatchedBy(func(data extended.BlockData) bool {
+	backfill.On("IndexBlockData", mock.Anything, mock.MatchedBy(func(data extended.BlockData) bool {
 		return data.Header.Height == startHeight+2
 	}), mock.Anything).Return(nil).Once()
 
-	live.On("Name").Return("live").Times(2)
-	backfill.On("Name").Return("backfill").Times(7)
+	// 1 constructor + 2 live IndexBlockData = 3
+	live.On("Name").Return("live")
+	// 1 constructor + 6 backfill blocks + 1 live IndexBlockData (after promotion) = 8
+	backfill.On("Name").Return("backfill")
 
 	ext, err := extended.NewExtendedIndexer(
 		zerolog.Nop(),
 		db,
 		[]extended.Indexer{live, backfill},
 		metrics.NewNoopCollector(),
-		10*time.Millisecond,
+		extended.DefaultBackfillDelay,
+		extended.DefaultBackfillMaxWorkers,
 		flow.Testnet,
 		blocks,
 		collections,
@@ -271,27 +278,29 @@ func TestExtendedIndexer_BackfillPromotion(t *testing.T) {
 	idx.On("LatestIndexedHeight").Return(uint64(3), nil).Once()
 	idx.On("LatestIndexedHeight").Return(uint64(4), nil).Once()
 
-	idx.On("IndexBlockData", mock.MatchedBy(func(data extended.BlockData) bool {
+	idx.On("IndexBlockData", mock.Anything, mock.MatchedBy(func(data extended.BlockData) bool {
 		return data.Header.Height == 2
 	}), mock.Anything).Return(nil).Once()
-	idx.On("IndexBlockData", mock.MatchedBy(func(data extended.BlockData) bool {
+	idx.On("IndexBlockData", mock.Anything, mock.MatchedBy(func(data extended.BlockData) bool {
 		return data.Header.Height == 3
 	}), mock.Anything).Return(nil).Once()
-	idx.On("IndexBlockData", mock.MatchedBy(func(data extended.BlockData) bool {
+	idx.On("IndexBlockData", mock.Anything, mock.MatchedBy(func(data extended.BlockData) bool {
 		return data.Header.Height == 4
 	}), mock.Anything).Return(nil).Once()
-	idx.On("IndexBlockData", mock.MatchedBy(func(data extended.BlockData) bool {
+	idx.On("IndexBlockData", mock.Anything, mock.MatchedBy(func(data extended.BlockData) bool {
 		return data.Header.Height == startHeight+1 // handled by the live indexer
 	}), mock.Anything).Return(nil).Once()
 
-	idx.On("Name").Return("b").Times(4)
+	// 1 constructor + 3 backfill blocks + 1 live IndexBlockData (after promotion) = 5
+	idx.On("Name").Return("b")
 
 	ext, err := extended.NewExtendedIndexer(
 		zerolog.Nop(),
 		db,
 		[]extended.Indexer{idx},
 		metrics.NewNoopCollector(),
-		10*time.Millisecond,
+		extended.DefaultBackfillDelay,
+		extended.DefaultBackfillMaxWorkers,
 		flow.Testnet,
 		blocks,
 		collections,
@@ -324,8 +333,12 @@ func TestExtendedIndexer_ErrorCases(t *testing.T) {
 	idx1.On("LatestIndexedHeight").Return(startHeight, nil).Once()
 	idx2.On("LatestIndexedHeight").Return(startHeight, nil).Once()
 
+	// 1 constructor only (IndexBlockData errors before Name is called)
+	idx1.On("Name").Return("a")
+	idx2.On("Name").Return("b")
+
 	indexerFailureError := errors.New("indexer failed")
-	idx1.On("IndexBlockData", mock.MatchedBy(func(data extended.BlockData) bool {
+	idx1.On("IndexBlockData", mock.Anything, mock.MatchedBy(func(data extended.BlockData) bool {
 		return data.Header.Height == startHeight+1
 	}), mock.Anything).Return(indexerFailureError).Once()
 
@@ -334,7 +347,8 @@ func TestExtendedIndexer_ErrorCases(t *testing.T) {
 		db,
 		[]extended.Indexer{idx1, idx2},
 		metrics.NewNoopCollector(),
-		10*time.Millisecond,
+		extended.DefaultBackfillDelay,
+		extended.DefaultBackfillMaxWorkers,
 		flow.Testnet,
 		blocks,
 		collections,
@@ -365,8 +379,11 @@ func TestExtendedIndexer_BackfillErrors(t *testing.T) {
 	idx.On("LatestIndexedHeight").Return(uint64(2), nil).Once()
 	idx.On("LatestIndexedHeight").Return(uint64(2), nil).Once()
 
+	// 1 constructor only (backfill errors before Name is called for metrics)
+	idx.On("Name").Return("a")
+
 	indexerFailureError := errors.New("backfill failed")
-	idx.On("IndexBlockData", mock.MatchedBy(func(data extended.BlockData) bool {
+	idx.On("IndexBlockData", mock.Anything, mock.MatchedBy(func(data extended.BlockData) bool {
 		return data.Header.Height == 3
 	}), mock.Anything).Return(indexerFailureError).Once()
 
@@ -375,7 +392,8 @@ func TestExtendedIndexer_BackfillErrors(t *testing.T) {
 		db,
 		[]extended.Indexer{idx},
 		metrics.NewNoopCollector(),
-		10*time.Millisecond,
+		extended.DefaultBackfillDelay,
+		extended.DefaultBackfillMaxWorkers,
 		flow.Testnet,
 		blocks,
 		collections,
@@ -405,27 +423,29 @@ func TestExtendedIndexer_BackfillAlreadyExists(t *testing.T) {
 	idx.On("LatestIndexedHeight").Return(uint64(3), nil).Once()
 	idx.On("LatestIndexedHeight").Return(uint64(4), nil).Once()
 
-	idx.On("IndexBlockData", mock.MatchedBy(func(data extended.BlockData) bool {
+	idx.On("IndexBlockData", mock.Anything, mock.MatchedBy(func(data extended.BlockData) bool {
 		return data.Header.Height == 2
-	}), mock.Anything).Return(storage.ErrAlreadyExists).Once()
-	idx.On("IndexBlockData", mock.MatchedBy(func(data extended.BlockData) bool {
+	}), mock.Anything).Return(extended.ErrAlreadyIndexed).Once()
+	idx.On("IndexBlockData", mock.Anything, mock.MatchedBy(func(data extended.BlockData) bool {
 		return data.Header.Height == 3
 	}), mock.Anything).Return(nil).Once()
-	idx.On("IndexBlockData", mock.MatchedBy(func(data extended.BlockData) bool {
+	idx.On("IndexBlockData", mock.Anything, mock.MatchedBy(func(data extended.BlockData) bool {
 		return data.Header.Height == 4
 	}), mock.Anything).Return(nil).Once()
-	idx.On("IndexBlockData", mock.MatchedBy(func(data extended.BlockData) bool {
+	idx.On("IndexBlockData", mock.Anything, mock.MatchedBy(func(data extended.BlockData) bool {
 		return data.Header.Height == startHeight+1
 	}), mock.Anything).Return(nil).Once()
 
-	idx.On("Name").Return("a").Times(4)
+	// 1 constructor + 3 backfill blocks (including ErrAlreadyIndexed) + 1 live IndexBlockData = 5
+	idx.On("Name").Return("a")
 
 	ext, err := extended.NewExtendedIndexer(
 		zerolog.Nop(),
 		db,
 		[]extended.Indexer{idx},
 		metrics.NewNoopCollector(),
-		10*time.Millisecond,
+		extended.DefaultBackfillDelay,
+		extended.DefaultBackfillMaxWorkers,
 		flow.Testnet,
 		blocks,
 		collections,
@@ -452,13 +472,16 @@ func TestExtendedIndexer_FutureHeight(t *testing.T) {
 	idx := extendedmock.NewIndexer(t)
 
 	idx.On("LatestIndexedHeight").Return(startHeight, nil).Once()
+	// 1 constructor only (future height check fails before reaching indexers)
+	idx.On("Name").Return("a")
 
 	ext, err := extended.NewExtendedIndexer(
 		zerolog.Nop(),
 		db,
 		[]extended.Indexer{idx},
 		metrics.NewNoopCollector(),
-		10*time.Millisecond,
+		extended.DefaultBackfillDelay,
+		extended.DefaultBackfillMaxWorkers,
 		flow.Testnet,
 		blocks,
 		collections,

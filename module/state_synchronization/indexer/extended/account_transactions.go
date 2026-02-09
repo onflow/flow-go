@@ -6,6 +6,8 @@ import (
 	"github.com/jordanschalm/lockctx"
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/cadence"
+	"github.com/onflow/cadence/encoding/ccf"
 	"github.com/onflow/flow-go/engine/access/account_data/transfers"
 	"github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
@@ -63,11 +65,14 @@ func (a *AccountTransactions) IndexBlockData(lctx lockctx.Proof, data BlockData,
 	if err != nil {
 		return fmt.Errorf("failed to get latest indexed height: %w", err)
 	}
-	if data.Header.Height >= latest+1 {
+	if data.Header.Height > latest+1 {
 		return ErrFutureHeight
 	}
-	if data.Header.Height <= latest {
+	if data.Header.Height < latest {
 		return ErrAlreadyIndexed
+	}
+	if data.Header.Height == latest {
+		return nil
 	}
 
 	entries := make([]access.AccountTransaction, 0)
@@ -96,18 +101,12 @@ func (a *AccountTransactions) IndexBlockData(lctx lockctx.Proof, data BlockData,
 		}
 
 		for _, event := range data.Events[txIndex] {
-			info, err := a.transferParser.ParseTransferEvent(event)
+			addresses, err := a.extractAddresses(event)
 			if err != nil {
 				return fmt.Errorf("failed to extract addresses from event: %w", err)
 			}
-			if info == nil {
-				continue
-			}
-			if info.From != nil {
-				addAddress(*info.From, false)
-			}
-			if info.To != nil {
-				addAddress(*info.To, false)
+			for _, addr := range addresses {
+				addAddress(addr, false)
 			}
 		}
 
@@ -127,4 +126,49 @@ func (a *AccountTransactions) IndexBlockData(lctx lockctx.Proof, data BlockData,
 	}
 
 	return nil
+}
+
+// extractAddresses extracts all addresses referenced in a flow event.
+func (a *AccountTransactions) extractAddresses(event flow.Event) ([]flow.Address, error) {
+	cadenceEvent, err := decodeEventPayload(event.Payload)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode event payload: %w", err)
+	}
+
+	addresses := make([]flow.Address, 0)
+
+	fields := cadence.FieldsMappedByName(cadenceEvent)
+	for _, field := range fields {
+		switch v := field.(type) {
+		case cadence.Address:
+			addresses = append(addresses, flow.Address(v))
+		case cadence.Optional:
+			if v.Value == nil {
+				continue
+			}
+
+			addr, ok := v.Value.(cadence.Address)
+			if !ok {
+				continue
+			}
+
+			addresses = append(addresses, flow.Address(addr))
+		}
+	}
+	return addresses, nil
+}
+
+// decodeEventPayload decodes CCF-encoded event payload.
+func decodeEventPayload(payload []byte) (cadence.Event, error) {
+	value, err := ccf.Decode(nil, payload)
+	if err != nil {
+		return cadence.Event{}, fmt.Errorf("failed to decode CCF payload: %w", err)
+	}
+
+	event, ok := value.(cadence.Event)
+	if !ok {
+		return cadence.Event{}, fmt.Errorf("decoded value is not an event: %T", value)
+	}
+
+	return event, nil
 }
