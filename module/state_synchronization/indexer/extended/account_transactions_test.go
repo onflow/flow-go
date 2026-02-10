@@ -9,7 +9,6 @@ import (
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/common"
 	"github.com/onflow/cadence/encoding/ccf"
-	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -20,6 +19,640 @@ import (
 	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
 	"github.com/onflow/flow-go/utils/unittest"
 )
+
+// ===== Basic Indexing Tests =====
+
+func TestAccountTransactionsIndexer(t *testing.T) {
+	const testHeight = uint64(100)
+
+	t.Run("empty block", func(t *testing.T) {
+		header := unittest.BlockHeaderFixtureOnChain(flow.Testnet, unittest.WithHeaderHeight(testHeight))
+		indexer, store, lm, db := newAccountTxIndexerForTest(t, flow.Testnet, testHeight)
+
+		indexBlock(t, indexer, lm, db, BlockData{
+			Header:       header,
+			Transactions: nil,
+			Events:       map[uint32][]flow.Event{},
+		})
+
+		// Verify height was updated
+		latest, err := store.LatestIndexedHeight()
+		require.NoError(t, err)
+		assert.Equal(t, testHeight, latest)
+
+		// No transactions for any address
+		assertTransactionCount(t, store, testHeight, unittest.RandomAddressFixture(), 0)
+	})
+
+	t.Run("single transaction with distinct accounts", func(t *testing.T) {
+		header := unittest.BlockHeaderFixtureOnChain(flow.Testnet, unittest.WithHeaderHeight(testHeight))
+		indexer, store, lm, db := newAccountTxIndexerForTest(t, flow.Testnet, testHeight)
+
+		payer := unittest.RandomAddressFixture()
+		proposer := unittest.RandomAddressFixture()
+		auth1 := unittest.RandomAddressFixture()
+		auth2 := unittest.RandomAddressFixture()
+
+		tx := unittest.TransactionBodyFixture(
+			func(tb *flow.TransactionBody) {
+				tb.Payer = payer
+				tb.ProposalKey = flow.ProposalKey{Address: proposer}
+				tb.Authorizers = []flow.Address{auth1, auth2}
+			},
+		)
+
+		indexBlock(t, indexer, lm, db, BlockData{
+			Header:       header,
+			Transactions: []*flow.TransactionBody{&tx},
+			Events:       map[uint32][]flow.Event{},
+		})
+
+		txID := tx.ID()
+		assertAccountTx(t, store, testHeight, payer, txID, false)
+		assertAccountTx(t, store, testHeight, proposer, txID, false)
+		assertAccountTx(t, store, testHeight, auth1, txID, true)
+		assertAccountTx(t, store, testHeight, auth2, txID, true)
+	})
+
+	t.Run("payer is also authorizer", func(t *testing.T) {
+		header := unittest.BlockHeaderFixtureOnChain(flow.Testnet, unittest.WithHeaderHeight(testHeight))
+		indexer, store, lm, db := newAccountTxIndexerForTest(t, flow.Testnet, testHeight)
+
+		payer := unittest.RandomAddressFixture()
+		proposer := unittest.RandomAddressFixture()
+
+		tx := unittest.TransactionBodyFixture(
+			func(tb *flow.TransactionBody) {
+				tb.Payer = payer
+				tb.ProposalKey = flow.ProposalKey{Address: proposer}
+				tb.Authorizers = []flow.Address{payer}
+			},
+		)
+
+		indexBlock(t, indexer, lm, db, BlockData{
+			Header:       header,
+			Transactions: []*flow.TransactionBody{&tx},
+			Events:       map[uint32][]flow.Event{},
+		})
+
+		txID := tx.ID()
+		assertAccountTx(t, store, testHeight, payer, txID, true)
+		assertAccountTx(t, store, testHeight, proposer, txID, false)
+		// payer should be deduplicated to one entry
+		assertTransactionCount(t, store, testHeight, payer, 1)
+	})
+
+	t.Run("payer is all roles", func(t *testing.T) {
+		header := unittest.BlockHeaderFixtureOnChain(flow.Testnet, unittest.WithHeaderHeight(testHeight))
+		indexer, store, lm, db := newAccountTxIndexerForTest(t, flow.Testnet, testHeight)
+
+		payer := unittest.RandomAddressFixture()
+
+		tx := unittest.TransactionBodyFixture(
+			func(tb *flow.TransactionBody) {
+				tb.Payer = payer
+				tb.ProposalKey = flow.ProposalKey{Address: payer}
+				tb.Authorizers = []flow.Address{payer}
+			},
+		)
+
+		indexBlock(t, indexer, lm, db, BlockData{
+			Header:       header,
+			Transactions: []*flow.TransactionBody{&tx},
+			Events:       map[uint32][]flow.Event{},
+		})
+
+		txID := tx.ID()
+		assertAccountTx(t, store, testHeight, payer, txID, true)
+		assertTransactionCount(t, store, testHeight, payer, 1)
+	})
+
+	t.Run("multiple transactions", func(t *testing.T) {
+		header := unittest.BlockHeaderFixtureOnChain(flow.Testnet, unittest.WithHeaderHeight(testHeight))
+		indexer, store, lm, db := newAccountTxIndexerForTest(t, flow.Testnet, testHeight)
+
+		account1 := unittest.RandomAddressFixture()
+		account2 := unittest.RandomAddressFixture()
+		account3 := unittest.RandomAddressFixture()
+
+		tx1 := unittest.TransactionBodyFixture(
+			func(tb *flow.TransactionBody) {
+				tb.Payer = account1
+				tb.ProposalKey = flow.ProposalKey{Address: account1}
+				tb.Authorizers = []flow.Address{account1}
+			},
+		)
+
+		tx2 := unittest.TransactionBodyFixture(
+			func(tb *flow.TransactionBody) {
+				tb.Payer = account2
+				tb.ProposalKey = flow.ProposalKey{Address: account2}
+				tb.Authorizers = []flow.Address{account2}
+			},
+		)
+
+		tx3 := unittest.TransactionBodyFixture(
+			func(tb *flow.TransactionBody) {
+				tb.Payer = account3
+				tb.ProposalKey = flow.ProposalKey{Address: account3}
+				tb.Authorizers = []flow.Address{account3}
+			},
+		)
+
+		indexBlock(t, indexer, lm, db, BlockData{
+			Header:       header,
+			Transactions: []*flow.TransactionBody{&tx1, &tx2, &tx3},
+			Events:       map[uint32][]flow.Event{},
+		})
+
+		assertAccountTx(t, store, testHeight, account1, tx1.ID(), true)
+		assertAccountTx(t, store, testHeight, account2, tx2.ID(), true)
+		assertAccountTx(t, store, testHeight, account3, tx3.ID(), true)
+
+		// Each account should only have 1 transaction
+		assertTransactionCount(t, store, testHeight, account1, 1)
+		assertTransactionCount(t, store, testHeight, account2, 1)
+		assertTransactionCount(t, store, testHeight, account3, 1)
+	})
+}
+
+// ===== Event Address Extraction Tests =====
+
+func TestAccountTransactionsIndexer_EventAddresses(t *testing.T) {
+	const testHeight = uint64(100)
+
+	simpleTx := func(payer flow.Address) flow.TransactionBody {
+		return unittest.TransactionBodyFixture(func(tb *flow.TransactionBody) {
+			tb.Payer = payer
+			tb.ProposalKey = flow.ProposalKey{Address: payer}
+			tb.Authorizers = []flow.Address{payer}
+		})
+	}
+
+	// --- Generic event address extraction ---
+	// Tests that extractAddresses handles all cadence field types correctly in a single event:
+	// Address fields are extracted, Optional<Address> (non-nil) are extracted,
+	// Optional<Address> (nil) are skipped, and non-address fields are ignored.
+
+	t.Run("extracts addresses from mixed event field types", func(t *testing.T) {
+		header := unittest.BlockHeaderFixtureOnChain(flow.Testnet, unittest.WithHeaderHeight(testHeight))
+		indexer, store, lm, db := newAccountTxIndexerForTest(t, flow.Testnet, testHeight)
+
+		payer := unittest.RandomAddressFixture()
+		directAddr := unittest.RandomAddressFixture()
+		optionalAddr := unittest.RandomAddressFixture()
+		tx := simpleTx(payer)
+
+		event := createTestEvent(t, 0, "ComplexEvent",
+			[]cadence.Field{
+				{Identifier: "name", Type: cadence.StringType},                              // non-address: ignored
+				{Identifier: "creator", Type: cadence.AddressType},                           // Address: extracted
+				{Identifier: "amount", Type: cadence.UFix64Type},                             // non-address: ignored
+				{Identifier: "recipient", Type: cadence.NewOptionalType(cadence.AddressType)}, // Optional<Address> non-nil: extracted
+				{Identifier: "nilAddr", Type: cadence.NewOptionalType(cadence.AddressType)},   // Optional<Address> nil: skipped
+				{Identifier: "optNum", Type: cadence.NewOptionalType(cadence.UInt64Type)},     // Optional<UInt64>: ignored
+				{Identifier: "count", Type: cadence.UInt64Type},                               // non-address: ignored
+			},
+			[]cadence.Value{
+				cadence.String("test"),
+				cadence.NewAddress(directAddr),
+				cadence.UFix64(100_00000000),
+				cadence.NewOptional(cadence.NewAddress(optionalAddr)),
+				cadence.NewOptional(nil),
+				cadence.NewOptional(cadence.UInt64(42)),
+				cadence.UInt64(5),
+			},
+		)
+
+		indexBlock(t, indexer, lm, db, BlockData{
+			Header:       header,
+			Transactions: []*flow.TransactionBody{&tx},
+			Events:       map[uint32][]flow.Event{0: {event}},
+		})
+
+		txID := tx.ID()
+		assertAccountTx(t, store, testHeight, payer, txID, true)
+		assertAccountTx(t, store, testHeight, directAddr, txID, false)
+		assertAccountTx(t, store, testHeight, optionalAddr, txID, false)
+		// payer + 2 event addresses = 3 total entries for this tx
+		assertTransactionCount(t, store, testHeight, payer, 1)
+		assertTransactionCount(t, store, testHeight, directAddr, 1)
+		assertTransactionCount(t, store, testHeight, optionalAddr, 1)
+	})
+
+	// --- FT/NFT event tests ---
+
+	sc := systemcontracts.SystemContractsForChain(flow.Testnet)
+	ftAddr := sc.FungibleToken.Address.Hex()
+	nftAddr := sc.NonFungibleToken.Address.Hex()
+	ftDepositedType := flow.EventType(fmt.Sprintf("A.%s.FungibleToken.Deposited", ftAddr))
+	ftWithdrawnType := flow.EventType(fmt.Sprintf("A.%s.FungibleToken.Withdrawn", ftAddr))
+	nftDepositedType := flow.EventType(fmt.Sprintf("A.%s.NonFungibleToken.Deposited", nftAddr))
+	nftWithdrawnType := flow.EventType(fmt.Sprintf("A.%s.NonFungibleToken.Withdrawn", nftAddr))
+
+	t.Run("FT deposited event adds recipient", func(t *testing.T) {
+		header := unittest.BlockHeaderFixtureOnChain(flow.Testnet, unittest.WithHeaderHeight(testHeight))
+		indexer, store, lm, db := newAccountTxIndexerForTest(t, flow.Testnet, testHeight)
+
+		payer := unittest.RandomAddressFixture()
+		recipient := unittest.RandomAddressFixture()
+		tx := simpleTx(payer)
+		depositEvent := createFTDepositedEvent(t, ftDepositedType, 0, &recipient)
+
+		indexBlock(t, indexer, lm, db, BlockData{
+			Header:       header,
+			Transactions: []*flow.TransactionBody{&tx},
+			Events:       map[uint32][]flow.Event{0: {depositEvent}},
+		})
+
+		txID := tx.ID()
+		assertAccountTx(t, store, testHeight, payer, txID, true)
+		assertAccountTx(t, store, testHeight, recipient, txID, false)
+	})
+
+	t.Run("FT withdrawn event adds sender", func(t *testing.T) {
+		header := unittest.BlockHeaderFixtureOnChain(flow.Testnet, unittest.WithHeaderHeight(testHeight))
+		indexer, store, lm, db := newAccountTxIndexerForTest(t, flow.Testnet, testHeight)
+
+		payer := unittest.RandomAddressFixture()
+		sender := unittest.RandomAddressFixture()
+		tx := simpleTx(payer)
+		withdrawEvent := createFTWithdrawnEvent(t, ftWithdrawnType, 0, &sender)
+
+		indexBlock(t, indexer, lm, db, BlockData{
+			Header:       header,
+			Transactions: []*flow.TransactionBody{&tx},
+			Events:       map[uint32][]flow.Event{0: {withdrawEvent}},
+		})
+
+		txID := tx.ID()
+		assertAccountTx(t, store, testHeight, payer, txID, true)
+		assertAccountTx(t, store, testHeight, sender, txID, false)
+	})
+
+	t.Run("NFT deposited event adds recipient", func(t *testing.T) {
+		header := unittest.BlockHeaderFixtureOnChain(flow.Testnet, unittest.WithHeaderHeight(testHeight))
+		indexer, store, lm, db := newAccountTxIndexerForTest(t, flow.Testnet, testHeight)
+
+		payer := unittest.RandomAddressFixture()
+		recipient := unittest.RandomAddressFixture()
+		tx := simpleTx(payer)
+		depositEvent := createNFTDepositedEvent(t, nftDepositedType, 0, &recipient)
+
+		indexBlock(t, indexer, lm, db, BlockData{
+			Header:       header,
+			Transactions: []*flow.TransactionBody{&tx},
+			Events:       map[uint32][]flow.Event{0: {depositEvent}},
+		})
+
+		txID := tx.ID()
+		assertAccountTx(t, store, testHeight, payer, txID, true)
+		assertAccountTx(t, store, testHeight, recipient, txID, false)
+	})
+
+	t.Run("NFT withdrawn event adds sender", func(t *testing.T) {
+		header := unittest.BlockHeaderFixtureOnChain(flow.Testnet, unittest.WithHeaderHeight(testHeight))
+		indexer, store, lm, db := newAccountTxIndexerForTest(t, flow.Testnet, testHeight)
+
+		payer := unittest.RandomAddressFixture()
+		sender := unittest.RandomAddressFixture()
+		tx := simpleTx(payer)
+		withdrawEvent := createNFTWithdrawnEvent(t, nftWithdrawnType, 0, &sender)
+
+		indexBlock(t, indexer, lm, db, BlockData{
+			Header:       header,
+			Transactions: []*flow.TransactionBody{&tx},
+			Events:       map[uint32][]flow.Event{0: {withdrawEvent}},
+		})
+
+		txID := tx.ID()
+		assertAccountTx(t, store, testHeight, payer, txID, true)
+		assertAccountTx(t, store, testHeight, sender, txID, false)
+	})
+
+	t.Run("FT event with nil address is skipped", func(t *testing.T) {
+		header := unittest.BlockHeaderFixtureOnChain(flow.Testnet, unittest.WithHeaderHeight(testHeight))
+		indexer, store, lm, db := newAccountTxIndexerForTest(t, flow.Testnet, testHeight)
+
+		payer := unittest.RandomAddressFixture()
+		tx := simpleTx(payer)
+		depositEvent := createFTDepositedEvent(t, ftDepositedType, 0, nil)
+
+		indexBlock(t, indexer, lm, db, BlockData{
+			Header:       header,
+			Transactions: []*flow.TransactionBody{&tx},
+			Events:       map[uint32][]flow.Event{0: {depositEvent}},
+		})
+
+		txID := tx.ID()
+		assertAccountTx(t, store, testHeight, payer, txID, true)
+		assertTransactionCount(t, store, testHeight, payer, 1)
+	})
+
+	// --- Deduplication tests ---
+
+	t.Run("event address same as payer does not duplicate", func(t *testing.T) {
+		header := unittest.BlockHeaderFixtureOnChain(flow.Testnet, unittest.WithHeaderHeight(testHeight))
+		indexer, store, lm, db := newAccountTxIndexerForTest(t, flow.Testnet, testHeight)
+
+		payer := unittest.RandomAddressFixture()
+		tx := simpleTx(payer)
+
+		event := createTestEvent(t, 0, "AccountCreated",
+			[]cadence.Field{
+				{Identifier: "address", Type: cadence.AddressType},
+			},
+			[]cadence.Value{
+				cadence.NewAddress(payer),
+			},
+		)
+
+		indexBlock(t, indexer, lm, db, BlockData{
+			Header:       header,
+			Transactions: []*flow.TransactionBody{&tx},
+			Events:       map[uint32][]flow.Event{0: {event}},
+		})
+
+		// Payer should appear exactly once despite also being in the event
+		assertTransactionCount(t, store, testHeight, payer, 1)
+		assertAccountTx(t, store, testHeight, payer, tx.ID(), true)
+	})
+
+	t.Run("event address does not override authorizer status", func(t *testing.T) {
+		header := unittest.BlockHeaderFixtureOnChain(flow.Testnet, unittest.WithHeaderHeight(testHeight))
+		indexer, store, lm, db := newAccountTxIndexerForTest(t, flow.Testnet, testHeight)
+
+		payer := unittest.RandomAddressFixture()
+		recipient := unittest.RandomAddressFixture()
+
+		// recipient is an authorizer on the transaction
+		tx := unittest.TransactionBodyFixture(func(tb *flow.TransactionBody) {
+			tb.Payer = payer
+			tb.ProposalKey = flow.ProposalKey{Address: payer}
+			tb.Authorizers = []flow.Address{recipient}
+		})
+
+		// event also references recipient (as non-authorizer), should not downgrade
+		event := createTestEvent(t, 0, "Transfer",
+			[]cadence.Field{
+				{Identifier: "to", Type: cadence.AddressType},
+			},
+			[]cadence.Value{
+				cadence.NewAddress(recipient),
+			},
+		)
+
+		indexBlock(t, indexer, lm, db, BlockData{
+			Header:       header,
+			Transactions: []*flow.TransactionBody{&tx},
+			Events:       map[uint32][]flow.Event{0: {event}},
+		})
+
+		txID := tx.ID()
+		assertAccountTx(t, store, testHeight, recipient, txID, true) // authorizer status preserved
+		assertAccountTx(t, store, testHeight, payer, txID, false)
+		assertTransactionCount(t, store, testHeight, recipient, 1)
+	})
+
+	// --- Multi-event / multi-transaction tests ---
+
+	t.Run("multiple events in same transaction", func(t *testing.T) {
+		header := unittest.BlockHeaderFixtureOnChain(flow.Testnet, unittest.WithHeaderHeight(testHeight))
+		indexer, store, lm, db := newAccountTxIndexerForTest(t, flow.Testnet, testHeight)
+
+		payer := unittest.RandomAddressFixture()
+		sender := unittest.RandomAddressFixture()
+		recipient := unittest.RandomAddressFixture()
+		tx := simpleTx(payer)
+
+		withdrawEvent := createFTWithdrawnEvent(t, ftWithdrawnType, 0, &sender)
+		depositEvent := createFTDepositedEvent(t, ftDepositedType, 0, &recipient)
+
+		indexBlock(t, indexer, lm, db, BlockData{
+			Header:       header,
+			Transactions: []*flow.TransactionBody{&tx},
+			Events:       map[uint32][]flow.Event{0: {withdrawEvent, depositEvent}},
+		})
+
+		txID := tx.ID()
+		assertAccountTx(t, store, testHeight, payer, txID, true)
+		assertAccountTx(t, store, testHeight, sender, txID, false)
+		assertAccountTx(t, store, testHeight, recipient, txID, false)
+	})
+
+	t.Run("events across multiple transactions with correct txIndex", func(t *testing.T) {
+		header := unittest.BlockHeaderFixtureOnChain(flow.Testnet, unittest.WithHeaderHeight(testHeight))
+		indexer, store, lm, db := newAccountTxIndexerForTest(t, flow.Testnet, testHeight)
+
+		account1 := unittest.RandomAddressFixture()
+		account2 := unittest.RandomAddressFixture()
+		recipient1 := unittest.RandomAddressFixture()
+		recipient2 := unittest.RandomAddressFixture()
+
+		tx1 := simpleTx(account1)
+		tx2 := simpleTx(account2)
+
+		event1 := createFTDepositedEvent(t, ftDepositedType, 0, &recipient1)
+		event2 := createNFTDepositedEvent(t, nftDepositedType, 1, &recipient2)
+
+		indexBlock(t, indexer, lm, db, BlockData{
+			Header:       header,
+			Transactions: []*flow.TransactionBody{&tx1, &tx2},
+			Events: map[uint32][]flow.Event{
+				0: {event1},
+				1: {event2},
+			},
+		})
+
+		// tx1: account1 (authorizer) + recipient1 (from FT event)
+		assertAccountTx(t, store, testHeight, account1, tx1.ID(), true)
+		assertAccountTx(t, store, testHeight, recipient1, tx1.ID(), false)
+
+		// tx2: account2 (authorizer) + recipient2 (from NFT event)
+		assertAccountTx(t, store, testHeight, account2, tx2.ID(), true)
+		assertAccountTx(t, store, testHeight, recipient2, tx2.ID(), false)
+
+		// recipients should only be associated with their respective transactions
+		assertTransactionCount(t, store, testHeight, recipient1, 1)
+		assertTransactionCount(t, store, testHeight, recipient2, 1)
+	})
+
+	t.Run("mixed generic and FT events in same block", func(t *testing.T) {
+		header := unittest.BlockHeaderFixtureOnChain(flow.Testnet, unittest.WithHeaderHeight(testHeight))
+		indexer, store, lm, db := newAccountTxIndexerForTest(t, flow.Testnet, testHeight)
+
+		payer := unittest.RandomAddressFixture()
+		createdAddr := unittest.RandomAddressFixture()
+		recipient := unittest.RandomAddressFixture()
+		tx := simpleTx(payer)
+
+		accountCreatedEvent := createTestEvent(t, 0, "AccountCreated",
+			[]cadence.Field{
+				{Identifier: "address", Type: cadence.AddressType},
+			},
+			[]cadence.Value{
+				cadence.NewAddress(createdAddr),
+			},
+		)
+		ftDepositEvent := createFTDepositedEvent(t, ftDepositedType, 0, &recipient)
+
+		indexBlock(t, indexer, lm, db, BlockData{
+			Header:       header,
+			Transactions: []*flow.TransactionBody{&tx},
+			Events:       map[uint32][]flow.Event{0: {accountCreatedEvent, ftDepositEvent}},
+		})
+
+		txID := tx.ID()
+		assertAccountTx(t, store, testHeight, payer, txID, true)
+		assertAccountTx(t, store, testHeight, createdAddr, txID, false)
+		assertAccountTx(t, store, testHeight, recipient, txID, false)
+	})
+
+	// --- Invalid address filtering ---
+
+	t.Run("event address invalid for chain is ignored", func(t *testing.T) {
+		header := unittest.BlockHeaderFixtureOnChain(flow.Testnet, unittest.WithHeaderHeight(testHeight))
+		indexer, store, lm, db := newAccountTxIndexerForTest(t, flow.Testnet, testHeight)
+
+		payer := unittest.RandomAddressFixture()
+		tx := simpleTx(payer)
+
+		// Use an address that is invalid for testnet's linear code address scheme.
+		invalidAddr := flow.BytesToAddress([]byte{0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF})
+		require.False(t, flow.Testnet.Chain().IsValid(invalidAddr), "test requires an invalid address")
+
+		event := createTestEvent(t, 0, "SomeEvent",
+			[]cadence.Field{
+				{Identifier: "account", Type: cadence.AddressType},
+			},
+			[]cadence.Value{
+				cadence.NewAddress(invalidAddr),
+			},
+		)
+
+		indexBlock(t, indexer, lm, db, BlockData{
+			Header:       header,
+			Transactions: []*flow.TransactionBody{&tx},
+			Events:       map[uint32][]flow.Event{0: {event}},
+		})
+
+		txID := tx.ID()
+		assertAccountTx(t, store, testHeight, payer, txID, true)
+		assertTransactionCount(t, store, testHeight, invalidAddr, 0)
+	})
+
+	// --- Error tests ---
+
+	t.Run("malformed event payload returns error", func(t *testing.T) {
+		header := unittest.BlockHeaderFixtureOnChain(flow.Testnet, unittest.WithHeaderHeight(testHeight))
+		indexer, store, lm, db := newAccountTxIndexerForTest(t, flow.Testnet, testHeight)
+
+		payer := unittest.RandomAddressFixture()
+		tx := simpleTx(payer)
+
+		badEvent := flow.Event{
+			Type:             ftDepositedType,
+			TransactionIndex: 0,
+			EventIndex:       0,
+			Payload:          []byte("not valid ccf"),
+		}
+
+		err := indexBlockExpectError(t, indexer, lm, db, BlockData{
+			Header:       header,
+			Transactions: []*flow.TransactionBody{&tx},
+			Events: map[uint32][]flow.Event{
+				0: {badEvent},
+			},
+		})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to extract addresses from event")
+
+		// Store should not have been initialized
+		_, err = store.LatestIndexedHeight()
+		require.ErrorIs(t, err, storage.ErrNotBootstrapped)
+	})
+}
+
+// ===== Height Validation Tests =====
+
+func TestAccountTransactionsIndexer_HeightValidation(t *testing.T) {
+	const testHeight = uint64(100)
+
+	t.Run("uninitialized indexer accepts first expected height", func(t *testing.T) {
+		header := unittest.BlockHeaderFixtureOnChain(flow.Testnet, unittest.WithHeaderHeight(testHeight))
+		indexer, store, lm, db := newAccountTxIndexerForTest(t, flow.Testnet, testHeight)
+
+		indexBlock(t, indexer, lm, db, BlockData{
+			Header: header,
+		})
+
+		latest, err := store.LatestIndexedHeight()
+		require.NoError(t, err)
+		assert.Equal(t, testHeight, latest)
+	})
+
+	t.Run("uninitialized indexer returns ErrFutureHeight for wrong height", func(t *testing.T) {
+		header := unittest.BlockHeaderFixtureOnChain(flow.Testnet, unittest.WithHeaderHeight(testHeight+10))
+		indexer, _, lm, db := newAccountTxIndexerForTest(t, flow.Testnet, testHeight)
+
+		err := indexBlockExpectError(t, indexer, lm, db, BlockData{
+			Header: header,
+		})
+		require.ErrorIs(t, err, ErrFutureHeight)
+	})
+
+	t.Run("uninitialized indexer returns ErrAlreadyIndexed for height below first", func(t *testing.T) {
+		header := unittest.BlockHeaderFixtureOnChain(flow.Testnet, unittest.WithHeaderHeight(testHeight-5))
+		indexer, _, lm, db := newAccountTxIndexerForTest(t, flow.Testnet, testHeight)
+
+		err := indexBlockExpectError(t, indexer, lm, db, BlockData{
+			Header: header,
+		})
+		require.ErrorIs(t, err, ErrAlreadyIndexed)
+	})
+
+	t.Run("initialized indexer accepts next sequential height", func(t *testing.T) {
+		indexer, store, lm, db := newAccountTxIndexerForTest(t, flow.Testnet, testHeight)
+
+		// Initialize by indexing the first block
+		header1 := unittest.BlockHeaderFixtureOnChain(flow.Testnet, unittest.WithHeaderHeight(testHeight))
+		indexBlock(t, indexer, lm, db, BlockData{Header: header1})
+
+		// Index the next sequential block
+		header2 := unittest.BlockHeaderFixtureOnChain(flow.Testnet, unittest.WithHeaderHeight(testHeight+1))
+		indexBlock(t, indexer, lm, db, BlockData{Header: header2})
+
+		latest, err := store.LatestIndexedHeight()
+		require.NoError(t, err)
+		assert.Equal(t, testHeight+1, latest)
+	})
+
+	t.Run("initialized indexer returns ErrFutureHeight for non-sequential height", func(t *testing.T) {
+		indexer, _, lm, db := newAccountTxIndexerForTest(t, flow.Testnet, testHeight)
+
+		// Initialize
+		header1 := unittest.BlockHeaderFixtureOnChain(flow.Testnet, unittest.WithHeaderHeight(testHeight))
+		indexBlock(t, indexer, lm, db, BlockData{Header: header1})
+
+		// Skip a height
+		header3 := unittest.BlockHeaderFixtureOnChain(flow.Testnet, unittest.WithHeaderHeight(testHeight+5))
+		err := indexBlockExpectError(t, indexer, lm, db, BlockData{Header: header3})
+		require.ErrorIs(t, err, ErrFutureHeight)
+	})
+
+	t.Run("initialized indexer returns ErrAlreadyIndexed for past height", func(t *testing.T) {
+		indexer, _, lm, db := newAccountTxIndexerForTest(t, flow.Testnet, testHeight)
+
+		// Initialize
+		header1 := unittest.BlockHeaderFixtureOnChain(flow.Testnet, unittest.WithHeaderHeight(testHeight))
+		indexBlock(t, indexer, lm, db, BlockData{Header: header1})
+
+		// Try to re-index the same height
+		header2 := unittest.BlockHeaderFixtureOnChain(flow.Testnet, unittest.WithHeaderHeight(testHeight))
+		err := indexBlockExpectError(t, indexer, lm, db, BlockData{Header: header2})
+		require.ErrorIs(t, err, ErrAlreadyIndexed)
+	})
+}
 
 // ===== Test Setup Helpers =====
 
@@ -36,10 +669,10 @@ func newAccountTxIndexerForTest(
 	})
 
 	lm := storage.NewTestingLockManager()
-	store, err := indexes.NewAccountTransactions(db, latestHeight)
+	store, err := indexes.NewAccountTransactions(db, lm, latestHeight)
 	require.NoError(t, err)
 
-	return NewAccountTransactions(zerolog.Nop(), store, chainID, lm), store, lm, db
+	return NewAccountTransactions(unittest.Logger(), store, chainID, lm), store, lm, db
 }
 
 // createTestEvent creates a CCF-encoded flow event with arbitrary cadence fields.
@@ -133,173 +766,6 @@ func assertTransactionCount(
 	require.NoError(t, err)
 	require.Len(t, results, expectedCount,
 		"expected %d transactions for address %s at height %d", expectedCount, addr, height)
-}
-
-// assertNoTransactions verifies that no transactions are indexed for the given address.
-func assertNoTransactions(
-	t *testing.T,
-	store *indexes.AccountTransactions,
-	height uint64,
-	addr flow.Address,
-) {
-	t.Helper()
-	assertTransactionCount(t, store, height, addr, 0)
-}
-
-// ===== Basic Indexing Tests =====
-
-func TestAccountTransactionsIndexer(t *testing.T) {
-	const testHeight = uint64(100)
-
-	t.Run("empty block", func(t *testing.T) {
-		header := unittest.BlockHeaderFixtureOnChain(flow.Testnet, unittest.WithHeaderHeight(testHeight))
-		indexer, store, lm, db := newAccountTxIndexerForTest(t, flow.Testnet, testHeight-1)
-
-		indexBlock(t, indexer, lm, db, BlockData{
-			Header:       header,
-			Transactions: nil,
-			Events:       map[uint32][]flow.Event{},
-		})
-
-		// Verify height was updated
-		latest, err := store.LatestIndexedHeight()
-		require.NoError(t, err)
-		assert.Equal(t, testHeight, latest)
-
-		// No transactions for any address
-		assertNoTransactions(t, store, testHeight, unittest.RandomAddressFixture())
-	})
-
-	t.Run("single transaction with distinct accounts", func(t *testing.T) {
-		header := unittest.BlockHeaderFixtureOnChain(flow.Testnet, unittest.WithHeaderHeight(testHeight))
-		indexer, store, lm, db := newAccountTxIndexerForTest(t, flow.Testnet, testHeight-1)
-
-		payer := unittest.RandomAddressFixture()
-		proposer := unittest.RandomAddressFixture()
-		auth1 := unittest.RandomAddressFixture()
-		auth2 := unittest.RandomAddressFixture()
-
-		tx := unittest.TransactionBodyFixture(
-			func(tb *flow.TransactionBody) {
-				tb.Payer = payer
-				tb.ProposalKey = flow.ProposalKey{Address: proposer}
-				tb.Authorizers = []flow.Address{auth1, auth2}
-			},
-		)
-
-		indexBlock(t, indexer, lm, db, BlockData{
-			Header:       header,
-			Transactions: []*flow.TransactionBody{&tx},
-			Events:       map[uint32][]flow.Event{},
-		})
-
-		txID := tx.ID()
-		assertAccountTx(t, store, testHeight, payer, txID, false)
-		assertAccountTx(t, store, testHeight, proposer, txID, false)
-		assertAccountTx(t, store, testHeight, auth1, txID, true)
-		assertAccountTx(t, store, testHeight, auth2, txID, true)
-	})
-
-	t.Run("payer is also authorizer", func(t *testing.T) {
-		header := unittest.BlockHeaderFixtureOnChain(flow.Testnet, unittest.WithHeaderHeight(testHeight))
-		indexer, store, lm, db := newAccountTxIndexerForTest(t, flow.Testnet, testHeight-1)
-
-		payer := unittest.RandomAddressFixture()
-		proposer := unittest.RandomAddressFixture()
-
-		tx := unittest.TransactionBodyFixture(
-			func(tb *flow.TransactionBody) {
-				tb.Payer = payer
-				tb.ProposalKey = flow.ProposalKey{Address: proposer}
-				tb.Authorizers = []flow.Address{payer}
-			},
-		)
-
-		indexBlock(t, indexer, lm, db, BlockData{
-			Header:       header,
-			Transactions: []*flow.TransactionBody{&tx},
-			Events:       map[uint32][]flow.Event{},
-		})
-
-		txID := tx.ID()
-		assertAccountTx(t, store, testHeight, payer, txID, true)
-		assertAccountTx(t, store, testHeight, proposer, txID, false)
-		// payer should be deduplicated to one entry
-		assertTransactionCount(t, store, testHeight, payer, 1)
-	})
-
-	t.Run("payer is all roles", func(t *testing.T) {
-		header := unittest.BlockHeaderFixtureOnChain(flow.Testnet, unittest.WithHeaderHeight(testHeight))
-		indexer, store, lm, db := newAccountTxIndexerForTest(t, flow.Testnet, testHeight-1)
-
-		payer := unittest.RandomAddressFixture()
-
-		tx := unittest.TransactionBodyFixture(
-			func(tb *flow.TransactionBody) {
-				tb.Payer = payer
-				tb.ProposalKey = flow.ProposalKey{Address: payer}
-				tb.Authorizers = []flow.Address{payer}
-			},
-		)
-
-		indexBlock(t, indexer, lm, db, BlockData{
-			Header:       header,
-			Transactions: []*flow.TransactionBody{&tx},
-			Events:       map[uint32][]flow.Event{},
-		})
-
-		txID := tx.ID()
-		assertAccountTx(t, store, testHeight, payer, txID, true)
-		assertTransactionCount(t, store, testHeight, payer, 1)
-	})
-
-	t.Run("multiple transactions", func(t *testing.T) {
-		header := unittest.BlockHeaderFixtureOnChain(flow.Testnet, unittest.WithHeaderHeight(testHeight))
-		indexer, store, lm, db := newAccountTxIndexerForTest(t, flow.Testnet, testHeight-1)
-
-		account1 := unittest.RandomAddressFixture()
-		account2 := unittest.RandomAddressFixture()
-		account3 := unittest.RandomAddressFixture()
-
-		tx1 := unittest.TransactionBodyFixture(
-			func(tb *flow.TransactionBody) {
-				tb.Payer = account1
-				tb.ProposalKey = flow.ProposalKey{Address: account1}
-				tb.Authorizers = []flow.Address{account1}
-			},
-		)
-
-		tx2 := unittest.TransactionBodyFixture(
-			func(tb *flow.TransactionBody) {
-				tb.Payer = account2
-				tb.ProposalKey = flow.ProposalKey{Address: account2}
-				tb.Authorizers = []flow.Address{account2}
-			},
-		)
-
-		tx3 := unittest.TransactionBodyFixture(
-			func(tb *flow.TransactionBody) {
-				tb.Payer = account3
-				tb.ProposalKey = flow.ProposalKey{Address: account3}
-				tb.Authorizers = []flow.Address{account3}
-			},
-		)
-
-		indexBlock(t, indexer, lm, db, BlockData{
-			Header:       header,
-			Transactions: []*flow.TransactionBody{&tx1, &tx2, &tx3},
-			Events:       map[uint32][]flow.Event{},
-		})
-
-		assertAccountTx(t, store, testHeight, account1, tx1.ID(), true)
-		assertAccountTx(t, store, testHeight, account2, tx2.ID(), true)
-		assertAccountTx(t, store, testHeight, account3, tx3.ID(), true)
-
-		// Each account should only have 1 transaction
-		assertTransactionCount(t, store, testHeight, account1, 1)
-		assertTransactionCount(t, store, testHeight, account2, 1)
-		assertTransactionCount(t, store, testHeight, account3, 1)
-	})
 }
 
 // ===== CCF Event Creation Helpers =====
@@ -474,606 +940,4 @@ func createNFTWithdrawnEvent(t *testing.T, eventType flow.EventType, txIndex uin
 		EventIndex:       0,
 		Payload:          payload,
 	}
-}
-
-// ===== Event Address Extraction Tests =====
-
-func TestAccountTransactionsIndexer_EventAddresses(t *testing.T) {
-	const testHeight = uint64(100)
-
-	simpleTx := func(payer flow.Address) flow.TransactionBody {
-		return unittest.TransactionBodyFixture(func(tb *flow.TransactionBody) {
-			tb.Payer = payer
-			tb.ProposalKey = flow.ProposalKey{Address: payer}
-			tb.Authorizers = []flow.Address{payer}
-		})
-	}
-
-	// --- Generic event field type tests ---
-
-	t.Run("event with direct Address field", func(t *testing.T) {
-		header := unittest.BlockHeaderFixtureOnChain(flow.Testnet, unittest.WithHeaderHeight(testHeight))
-		indexer, store, lm, db := newAccountTxIndexerForTest(t, flow.Testnet, testHeight-1)
-
-		payer := unittest.RandomAddressFixture()
-		eventAddr := unittest.RandomAddressFixture()
-		tx := simpleTx(payer)
-
-		event := createTestEvent(t, 0, "AccountCreated",
-			[]cadence.Field{
-				{Identifier: "address", Type: cadence.AddressType},
-			},
-			[]cadence.Value{
-				cadence.NewAddress(eventAddr),
-			},
-		)
-
-		indexBlock(t, indexer, lm, db, BlockData{
-			Header:       header,
-			Transactions: []*flow.TransactionBody{&tx},
-			Events:       map[uint32][]flow.Event{0: {event}},
-		})
-
-		txID := tx.ID()
-		assertAccountTx(t, store, testHeight, payer, txID, true)
-		assertAccountTx(t, store, testHeight, eventAddr, txID, false)
-	})
-
-	t.Run("event with Optional Address field non-nil", func(t *testing.T) {
-		header := unittest.BlockHeaderFixtureOnChain(flow.Testnet, unittest.WithHeaderHeight(testHeight))
-		indexer, store, lm, db := newAccountTxIndexerForTest(t, flow.Testnet, testHeight-1)
-
-		payer := unittest.RandomAddressFixture()
-		optAddr := unittest.RandomAddressFixture()
-		tx := simpleTx(payer)
-
-		event := createTestEvent(t, 0, "Transfer",
-			[]cadence.Field{
-				{Identifier: "to", Type: cadence.NewOptionalType(cadence.AddressType)},
-			},
-			[]cadence.Value{
-				cadence.NewOptional(cadence.NewAddress(optAddr)),
-			},
-		)
-
-		indexBlock(t, indexer, lm, db, BlockData{
-			Header:       header,
-			Transactions: []*flow.TransactionBody{&tx},
-			Events:       map[uint32][]flow.Event{0: {event}},
-		})
-
-		txID := tx.ID()
-		assertAccountTx(t, store, testHeight, payer, txID, true)
-		assertAccountTx(t, store, testHeight, optAddr, txID, false)
-	})
-
-	t.Run("event with Optional Address field nil", func(t *testing.T) {
-		header := unittest.BlockHeaderFixtureOnChain(flow.Testnet, unittest.WithHeaderHeight(testHeight))
-		indexer, store, lm, db := newAccountTxIndexerForTest(t, flow.Testnet, testHeight-1)
-
-		payer := unittest.RandomAddressFixture()
-		tx := simpleTx(payer)
-
-		event := createTestEvent(t, 0, "Transfer",
-			[]cadence.Field{
-				{Identifier: "to", Type: cadence.NewOptionalType(cadence.AddressType)},
-			},
-			[]cadence.Value{
-				cadence.NewOptional(nil),
-			},
-		)
-
-		indexBlock(t, indexer, lm, db, BlockData{
-			Header:       header,
-			Transactions: []*flow.TransactionBody{&tx},
-			Events:       map[uint32][]flow.Event{0: {event}},
-		})
-
-		txID := tx.ID()
-		assertAccountTx(t, store, testHeight, payer, txID, true)
-		assertTransactionCount(t, store, testHeight, payer, 1)
-	})
-
-	t.Run("event with multiple Address fields", func(t *testing.T) {
-		header := unittest.BlockHeaderFixtureOnChain(flow.Testnet, unittest.WithHeaderHeight(testHeight))
-		indexer, store, lm, db := newAccountTxIndexerForTest(t, flow.Testnet, testHeight-1)
-
-		payer := unittest.RandomAddressFixture()
-		addr1 := unittest.RandomAddressFixture()
-		addr2 := unittest.RandomAddressFixture()
-		tx := simpleTx(payer)
-
-		event := createTestEvent(t, 0, "MultiTransfer",
-			[]cadence.Field{
-				{Identifier: "from", Type: cadence.AddressType},
-				{Identifier: "to", Type: cadence.AddressType},
-			},
-			[]cadence.Value{
-				cadence.NewAddress(addr1),
-				cadence.NewAddress(addr2),
-			},
-		)
-
-		indexBlock(t, indexer, lm, db, BlockData{
-			Header:       header,
-			Transactions: []*flow.TransactionBody{&tx},
-			Events:       map[uint32][]flow.Event{0: {event}},
-		})
-
-		txID := tx.ID()
-		assertAccountTx(t, store, testHeight, payer, txID, true)
-		assertAccountTx(t, store, testHeight, addr1, txID, false)
-		assertAccountTx(t, store, testHeight, addr2, txID, false)
-	})
-
-	t.Run("event with mixed Address and Optional Address fields", func(t *testing.T) {
-		header := unittest.BlockHeaderFixtureOnChain(flow.Testnet, unittest.WithHeaderHeight(testHeight))
-		indexer, store, lm, db := newAccountTxIndexerForTest(t, flow.Testnet, testHeight-1)
-
-		payer := unittest.RandomAddressFixture()
-		directAddr := unittest.RandomAddressFixture()
-		optionalAddr := unittest.RandomAddressFixture()
-		tx := simpleTx(payer)
-
-		event := createTestEvent(t, 0, "ComplexEvent",
-			[]cadence.Field{
-				{Identifier: "name", Type: cadence.StringType},
-				{Identifier: "creator", Type: cadence.AddressType},
-				{Identifier: "amount", Type: cadence.UFix64Type},
-				{Identifier: "recipient", Type: cadence.NewOptionalType(cadence.AddressType)},
-				{Identifier: "count", Type: cadence.UInt64Type},
-			},
-			[]cadence.Value{
-				cadence.String("test"),
-				cadence.NewAddress(directAddr),
-				cadence.UFix64(100_00000000),
-				cadence.NewOptional(cadence.NewAddress(optionalAddr)),
-				cadence.UInt64(5),
-			},
-		)
-
-		indexBlock(t, indexer, lm, db, BlockData{
-			Header:       header,
-			Transactions: []*flow.TransactionBody{&tx},
-			Events:       map[uint32][]flow.Event{0: {event}},
-		})
-
-		txID := tx.ID()
-		assertAccountTx(t, store, testHeight, payer, txID, true)
-		assertAccountTx(t, store, testHeight, directAddr, txID, false)
-		assertAccountTx(t, store, testHeight, optionalAddr, txID, false)
-	})
-
-	t.Run("event with no address fields", func(t *testing.T) {
-		header := unittest.BlockHeaderFixtureOnChain(flow.Testnet, unittest.WithHeaderHeight(testHeight))
-		indexer, store, lm, db := newAccountTxIndexerForTest(t, flow.Testnet, testHeight-1)
-
-		payer := unittest.RandomAddressFixture()
-		tx := simpleTx(payer)
-
-		event := createTestEvent(t, 0, "AmountUpdated",
-			[]cadence.Field{
-				{Identifier: "amount", Type: cadence.UFix64Type},
-				{Identifier: "name", Type: cadence.StringType},
-			},
-			[]cadence.Value{
-				cadence.UFix64(100_00000000),
-				cadence.String("test"),
-			},
-		)
-
-		indexBlock(t, indexer, lm, db, BlockData{
-			Header:       header,
-			Transactions: []*flow.TransactionBody{&tx},
-			Events:       map[uint32][]flow.Event{0: {event}},
-		})
-
-		txID := tx.ID()
-		assertAccountTx(t, store, testHeight, payer, txID, true)
-		assertTransactionCount(t, store, testHeight, payer, 1)
-		assertNoTransactions(t, store, testHeight, unittest.RandomAddressFixture())
-	})
-
-	t.Run("event with Optional non-address is ignored", func(t *testing.T) {
-		header := unittest.BlockHeaderFixtureOnChain(flow.Testnet, unittest.WithHeaderHeight(testHeight))
-		indexer, store, lm, db := newAccountTxIndexerForTest(t, flow.Testnet, testHeight-1)
-
-		payer := unittest.RandomAddressFixture()
-		tx := simpleTx(payer)
-
-		event := createTestEvent(t, 0, "ValueChanged",
-			[]cadence.Field{
-				{Identifier: "value", Type: cadence.NewOptionalType(cadence.UInt64Type)},
-				{Identifier: "label", Type: cadence.NewOptionalType(cadence.StringType)},
-			},
-			[]cadence.Value{
-				cadence.NewOptional(cadence.UInt64(42)),
-				cadence.NewOptional(cadence.String("test")),
-			},
-		)
-
-		indexBlock(t, indexer, lm, db, BlockData{
-			Header:       header,
-			Transactions: []*flow.TransactionBody{&tx},
-			Events:       map[uint32][]flow.Event{0: {event}},
-		})
-
-		txID := tx.ID()
-		assertAccountTx(t, store, testHeight, payer, txID, true)
-		assertTransactionCount(t, store, testHeight, payer, 1)
-	})
-
-	// --- FT/NFT event tests ---
-
-	sc := systemcontracts.SystemContractsForChain(flow.Testnet)
-	ftAddr := sc.FungibleToken.Address.Hex()
-	nftAddr := sc.NonFungibleToken.Address.Hex()
-	ftDepositedType := flow.EventType(fmt.Sprintf("A.%s.FungibleToken.Deposited", ftAddr))
-	ftWithdrawnType := flow.EventType(fmt.Sprintf("A.%s.FungibleToken.Withdrawn", ftAddr))
-	nftDepositedType := flow.EventType(fmt.Sprintf("A.%s.NonFungibleToken.Deposited", nftAddr))
-	nftWithdrawnType := flow.EventType(fmt.Sprintf("A.%s.NonFungibleToken.Withdrawn", nftAddr))
-
-	t.Run("FT deposited event adds recipient", func(t *testing.T) {
-		header := unittest.BlockHeaderFixtureOnChain(flow.Testnet, unittest.WithHeaderHeight(testHeight))
-		indexer, store, lm, db := newAccountTxIndexerForTest(t, flow.Testnet, testHeight-1)
-
-		payer := unittest.RandomAddressFixture()
-		recipient := unittest.RandomAddressFixture()
-		tx := simpleTx(payer)
-		depositEvent := createFTDepositedEvent(t, ftDepositedType, 0, &recipient)
-
-		indexBlock(t, indexer, lm, db, BlockData{
-			Header:       header,
-			Transactions: []*flow.TransactionBody{&tx},
-			Events:       map[uint32][]flow.Event{0: {depositEvent}},
-		})
-
-		txID := tx.ID()
-		assertAccountTx(t, store, testHeight, payer, txID, true)
-		assertAccountTx(t, store, testHeight, recipient, txID, false)
-	})
-
-	t.Run("FT withdrawn event adds sender", func(t *testing.T) {
-		header := unittest.BlockHeaderFixtureOnChain(flow.Testnet, unittest.WithHeaderHeight(testHeight))
-		indexer, store, lm, db := newAccountTxIndexerForTest(t, flow.Testnet, testHeight-1)
-
-		payer := unittest.RandomAddressFixture()
-		sender := unittest.RandomAddressFixture()
-		tx := simpleTx(payer)
-		withdrawEvent := createFTWithdrawnEvent(t, ftWithdrawnType, 0, &sender)
-
-		indexBlock(t, indexer, lm, db, BlockData{
-			Header:       header,
-			Transactions: []*flow.TransactionBody{&tx},
-			Events:       map[uint32][]flow.Event{0: {withdrawEvent}},
-		})
-
-		txID := tx.ID()
-		assertAccountTx(t, store, testHeight, payer, txID, true)
-		assertAccountTx(t, store, testHeight, sender, txID, false)
-	})
-
-	t.Run("NFT deposited event adds recipient", func(t *testing.T) {
-		header := unittest.BlockHeaderFixtureOnChain(flow.Testnet, unittest.WithHeaderHeight(testHeight))
-		indexer, store, lm, db := newAccountTxIndexerForTest(t, flow.Testnet, testHeight-1)
-
-		payer := unittest.RandomAddressFixture()
-		recipient := unittest.RandomAddressFixture()
-		tx := simpleTx(payer)
-		depositEvent := createNFTDepositedEvent(t, nftDepositedType, 0, &recipient)
-
-		indexBlock(t, indexer, lm, db, BlockData{
-			Header:       header,
-			Transactions: []*flow.TransactionBody{&tx},
-			Events:       map[uint32][]flow.Event{0: {depositEvent}},
-		})
-
-		txID := tx.ID()
-		assertAccountTx(t, store, testHeight, payer, txID, true)
-		assertAccountTx(t, store, testHeight, recipient, txID, false)
-	})
-
-	t.Run("NFT withdrawn event adds sender", func(t *testing.T) {
-		header := unittest.BlockHeaderFixtureOnChain(flow.Testnet, unittest.WithHeaderHeight(testHeight))
-		indexer, store, lm, db := newAccountTxIndexerForTest(t, flow.Testnet, testHeight-1)
-
-		payer := unittest.RandomAddressFixture()
-		sender := unittest.RandomAddressFixture()
-		tx := simpleTx(payer)
-		withdrawEvent := createNFTWithdrawnEvent(t, nftWithdrawnType, 0, &sender)
-
-		indexBlock(t, indexer, lm, db, BlockData{
-			Header:       header,
-			Transactions: []*flow.TransactionBody{&tx},
-			Events:       map[uint32][]flow.Event{0: {withdrawEvent}},
-		})
-
-		txID := tx.ID()
-		assertAccountTx(t, store, testHeight, payer, txID, true)
-		assertAccountTx(t, store, testHeight, sender, txID, false)
-	})
-
-	t.Run("FT event with nil address is skipped", func(t *testing.T) {
-		header := unittest.BlockHeaderFixtureOnChain(flow.Testnet, unittest.WithHeaderHeight(testHeight))
-		indexer, store, lm, db := newAccountTxIndexerForTest(t, flow.Testnet, testHeight-1)
-
-		payer := unittest.RandomAddressFixture()
-		tx := simpleTx(payer)
-		depositEvent := createFTDepositedEvent(t, ftDepositedType, 0, nil)
-
-		indexBlock(t, indexer, lm, db, BlockData{
-			Header:       header,
-			Transactions: []*flow.TransactionBody{&tx},
-			Events:       map[uint32][]flow.Event{0: {depositEvent}},
-		})
-
-		txID := tx.ID()
-		assertAccountTx(t, store, testHeight, payer, txID, true)
-		assertTransactionCount(t, store, testHeight, payer, 1)
-	})
-
-	// --- Deduplication tests ---
-
-	t.Run("event address same as payer does not duplicate", func(t *testing.T) {
-		header := unittest.BlockHeaderFixtureOnChain(flow.Testnet, unittest.WithHeaderHeight(testHeight))
-		indexer, store, lm, db := newAccountTxIndexerForTest(t, flow.Testnet, testHeight-1)
-
-		payer := unittest.RandomAddressFixture()
-		tx := simpleTx(payer)
-
-		event := createTestEvent(t, 0, "AccountCreated",
-			[]cadence.Field{
-				{Identifier: "address", Type: cadence.AddressType},
-			},
-			[]cadence.Value{
-				cadence.NewAddress(payer),
-			},
-		)
-
-		indexBlock(t, indexer, lm, db, BlockData{
-			Header:       header,
-			Transactions: []*flow.TransactionBody{&tx},
-			Events:       map[uint32][]flow.Event{0: {event}},
-		})
-
-		// Payer should appear exactly once despite also being in the event
-		assertTransactionCount(t, store, testHeight, payer, 1)
-		assertAccountTx(t, store, testHeight, payer, tx.ID(), true)
-	})
-
-	t.Run("event address does not override authorizer status", func(t *testing.T) {
-		header := unittest.BlockHeaderFixtureOnChain(flow.Testnet, unittest.WithHeaderHeight(testHeight))
-		indexer, store, lm, db := newAccountTxIndexerForTest(t, flow.Testnet, testHeight-1)
-
-		payer := unittest.RandomAddressFixture()
-		recipient := unittest.RandomAddressFixture()
-
-		// recipient is an authorizer on the transaction
-		tx := unittest.TransactionBodyFixture(func(tb *flow.TransactionBody) {
-			tb.Payer = payer
-			tb.ProposalKey = flow.ProposalKey{Address: payer}
-			tb.Authorizers = []flow.Address{recipient}
-		})
-
-		// event also references recipient (as non-authorizer), should not downgrade
-		event := createTestEvent(t, 0, "Transfer",
-			[]cadence.Field{
-				{Identifier: "to", Type: cadence.AddressType},
-			},
-			[]cadence.Value{
-				cadence.NewAddress(recipient),
-			},
-		)
-
-		indexBlock(t, indexer, lm, db, BlockData{
-			Header:       header,
-			Transactions: []*flow.TransactionBody{&tx},
-			Events:       map[uint32][]flow.Event{0: {event}},
-		})
-
-		txID := tx.ID()
-		assertAccountTx(t, store, testHeight, recipient, txID, true) // authorizer status preserved
-		assertAccountTx(t, store, testHeight, payer, txID, false)
-		assertTransactionCount(t, store, testHeight, recipient, 1)
-	})
-
-	// --- Multi-event / multi-transaction tests ---
-
-	t.Run("multiple events in same transaction", func(t *testing.T) {
-		header := unittest.BlockHeaderFixtureOnChain(flow.Testnet, unittest.WithHeaderHeight(testHeight))
-		indexer, store, lm, db := newAccountTxIndexerForTest(t, flow.Testnet, testHeight-1)
-
-		payer := unittest.RandomAddressFixture()
-		sender := unittest.RandomAddressFixture()
-		recipient := unittest.RandomAddressFixture()
-		tx := simpleTx(payer)
-
-		withdrawEvent := createFTWithdrawnEvent(t, ftWithdrawnType, 0, &sender)
-		depositEvent := createFTDepositedEvent(t, ftDepositedType, 0, &recipient)
-
-		indexBlock(t, indexer, lm, db, BlockData{
-			Header:       header,
-			Transactions: []*flow.TransactionBody{&tx},
-			Events:       map[uint32][]flow.Event{0: {withdrawEvent, depositEvent}},
-		})
-
-		txID := tx.ID()
-		assertAccountTx(t, store, testHeight, payer, txID, true)
-		assertAccountTx(t, store, testHeight, sender, txID, false)
-		assertAccountTx(t, store, testHeight, recipient, txID, false)
-	})
-
-	t.Run("events across multiple transactions with correct txIndex", func(t *testing.T) {
-		header := unittest.BlockHeaderFixtureOnChain(flow.Testnet, unittest.WithHeaderHeight(testHeight))
-		indexer, store, lm, db := newAccountTxIndexerForTest(t, flow.Testnet, testHeight-1)
-
-		account1 := unittest.RandomAddressFixture()
-		account2 := unittest.RandomAddressFixture()
-		recipient1 := unittest.RandomAddressFixture()
-		recipient2 := unittest.RandomAddressFixture()
-
-		tx1 := simpleTx(account1)
-		tx2 := simpleTx(account2)
-
-		event1 := createFTDepositedEvent(t, ftDepositedType, 0, &recipient1)
-		event2 := createNFTDepositedEvent(t, nftDepositedType, 1, &recipient2)
-
-		indexBlock(t, indexer, lm, db, BlockData{
-			Header:       header,
-			Transactions: []*flow.TransactionBody{&tx1, &tx2},
-			Events: map[uint32][]flow.Event{
-				0: {event1},
-				1: {event2},
-			},
-		})
-
-		// tx1: account1 (authorizer) + recipient1 (from FT event)
-		assertAccountTx(t, store, testHeight, account1, tx1.ID(), true)
-		assertAccountTx(t, store, testHeight, recipient1, tx1.ID(), false)
-
-		// tx2: account2 (authorizer) + recipient2 (from NFT event)
-		assertAccountTx(t, store, testHeight, account2, tx2.ID(), true)
-		assertAccountTx(t, store, testHeight, recipient2, tx2.ID(), false)
-
-		// recipients should only be associated with their respective transactions
-		assertTransactionCount(t, store, testHeight, recipient1, 1)
-		assertTransactionCount(t, store, testHeight, recipient2, 1)
-	})
-
-	t.Run("mixed generic and FT events in same block", func(t *testing.T) {
-		header := unittest.BlockHeaderFixtureOnChain(flow.Testnet, unittest.WithHeaderHeight(testHeight))
-		indexer, store, lm, db := newAccountTxIndexerForTest(t, flow.Testnet, testHeight-1)
-
-		payer := unittest.RandomAddressFixture()
-		createdAddr := unittest.RandomAddressFixture()
-		recipient := unittest.RandomAddressFixture()
-		tx := simpleTx(payer)
-
-		accountCreatedEvent := createTestEvent(t, 0, "AccountCreated",
-			[]cadence.Field{
-				{Identifier: "address", Type: cadence.AddressType},
-			},
-			[]cadence.Value{
-				cadence.NewAddress(createdAddr),
-			},
-		)
-		ftDepositEvent := createFTDepositedEvent(t, ftDepositedType, 0, &recipient)
-
-		indexBlock(t, indexer, lm, db, BlockData{
-			Header:       header,
-			Transactions: []*flow.TransactionBody{&tx},
-			Events:       map[uint32][]flow.Event{0: {accountCreatedEvent, ftDepositEvent}},
-		})
-
-		txID := tx.ID()
-		assertAccountTx(t, store, testHeight, payer, txID, true)
-		assertAccountTx(t, store, testHeight, createdAddr, txID, false)
-		assertAccountTx(t, store, testHeight, recipient, txID, false)
-	})
-
-	// --- Invalid address filtering ---
-
-	t.Run("event address invalid for chain is ignored", func(t *testing.T) {
-		header := unittest.BlockHeaderFixtureOnChain(flow.Testnet, unittest.WithHeaderHeight(testHeight))
-		indexer, store, lm, db := newAccountTxIndexerForTest(t, flow.Testnet, testHeight-1)
-
-		payer := unittest.RandomAddressFixture()
-		tx := simpleTx(payer)
-
-		// Use an address that is invalid for testnet's linear code address scheme.
-		invalidAddr := flow.BytesToAddress([]byte{0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF})
-		require.False(t, flow.Testnet.Chain().IsValid(invalidAddr), "test requires an invalid address")
-
-		event := createTestEvent(t, 0, "SomeEvent",
-			[]cadence.Field{
-				{Identifier: "account", Type: cadence.AddressType},
-			},
-			[]cadence.Value{
-				cadence.NewAddress(invalidAddr),
-			},
-		)
-
-		indexBlock(t, indexer, lm, db, BlockData{
-			Header:       header,
-			Transactions: []*flow.TransactionBody{&tx},
-			Events:       map[uint32][]flow.Event{0: {event}},
-		})
-
-		txID := tx.ID()
-		assertAccountTx(t, store, testHeight, payer, txID, true)
-		assertNoTransactions(t, store, testHeight, invalidAddr)
-	})
-
-	// --- Error tests ---
-
-	t.Run("malformed event payload returns error", func(t *testing.T) {
-		header := unittest.BlockHeaderFixtureOnChain(flow.Testnet, unittest.WithHeaderHeight(testHeight))
-		indexer, store, lm, db := newAccountTxIndexerForTest(t, flow.Testnet, testHeight-1)
-
-		payer := unittest.RandomAddressFixture()
-		tx := simpleTx(payer)
-
-		badEvent := flow.Event{
-			Type:             ftDepositedType,
-			TransactionIndex: 0,
-			EventIndex:       0,
-			Payload:          []byte("not valid ccf"),
-		}
-
-		err := indexBlockExpectError(t, indexer, lm, db, BlockData{
-			Header:       header,
-			Transactions: []*flow.TransactionBody{&tx},
-			Events: map[uint32][]flow.Event{
-				0: {badEvent},
-			},
-		})
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "failed to extract addresses from event")
-
-		// Height should not have been updated
-		latest, err := store.LatestIndexedHeight()
-		require.NoError(t, err)
-		assert.Equal(t, testHeight-1, latest)
-	})
-}
-
-// ===== Sentinel Error Tests =====
-
-func TestAccountTransactionsIndexer_SentinelErrors(t *testing.T) {
-	const testHeight = uint64(100)
-
-	t.Run("returns ErrFutureHeight for height beyond latest+1", func(t *testing.T) {
-		header := unittest.BlockHeaderFixtureOnChain(flow.Testnet, unittest.WithHeaderHeight(testHeight+10))
-		indexer, _, lm, db := newAccountTxIndexerForTest(t, flow.Testnet, testHeight-1)
-
-		err := indexBlockExpectError(t, indexer, lm, db, BlockData{
-			Header: header,
-		})
-		require.ErrorIs(t, err, ErrFutureHeight)
-	})
-
-	t.Run("returns ErrAlreadyIndexed for height below latest", func(t *testing.T) {
-		header := unittest.BlockHeaderFixtureOnChain(flow.Testnet, unittest.WithHeaderHeight(testHeight-5))
-		indexer, _, lm, db := newAccountTxIndexerForTest(t, flow.Testnet, testHeight-1)
-
-		err := indexBlockExpectError(t, indexer, lm, db, BlockData{
-			Header: header,
-		})
-		require.ErrorIs(t, err, ErrAlreadyIndexed)
-	})
-
-	t.Run("same height as latest is a noop", func(t *testing.T) {
-		header := unittest.BlockHeaderFixtureOnChain(flow.Testnet, unittest.WithHeaderHeight(testHeight-1))
-		indexer, store, lm, db := newAccountTxIndexerForTest(t, flow.Testnet, testHeight-1)
-
-		err := indexBlockExpectError(t, indexer, lm, db, BlockData{
-			Header: header,
-		})
-		require.NoError(t, err)
-
-		// Height should not have changed
-		latest, err := store.LatestIndexedHeight()
-		require.NoError(t, err)
-		assert.Equal(t, testHeight-1, latest)
-	})
 }

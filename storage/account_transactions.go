@@ -39,6 +39,11 @@ type AccountTransactionsReader interface {
 	// Expected error returns during normal operations:
 	//   - [ErrNotFound]: if the index has not been initialized
 	FirstIndexedHeight() (uint64, error)
+
+	// UninitializedFirstHeight returns the height the index will accept as the first height, and a boolean
+	// indicating if the index is initialized.
+	// If the index is not initialized, the first call to `Store` must include data for this height.
+	UninitializedFirstHeight() (uint64, bool)
 }
 
 // AccountTransactions provides both read and write access to the account

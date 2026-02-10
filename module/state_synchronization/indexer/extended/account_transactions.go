@@ -1,6 +1,7 @@
 package extended
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/jordanschalm/lockctx"
@@ -44,33 +45,46 @@ func (a *AccountTransactions) Name() string {
 	return accountTransactionsIndexerName
 }
 
-// LatestIndexedHeight returns the latest indexed height for the indexer.
+// NextHeight returns the next height that the indexer will index.
 //
-// Expected error returns during normal operations:
-//   - [storage.ErrNotFound]: if the index has not been initialized
-func (a *AccountTransactions) LatestIndexedHeight() (uint64, error) {
-	return a.store.LatestIndexedHeight()
+// No error returns are expected during normal operation.
+func (a *AccountTransactions) NextHeight() (uint64, error) {
+	height, err := a.store.LatestIndexedHeight()
+	if err == nil {
+		return height + 1, nil
+	}
+
+	if !errors.Is(err, storage.ErrNotBootstrapped) {
+		return 0, fmt.Errorf("failed to get latest indexed height: %w", err)
+	}
+
+	firstHeight, isInitialized := a.store.UninitializedFirstHeight()
+	if isInitialized {
+		// this shouldn't happen and would indicate a bug or inconsistent state.
+		return 0, fmt.Errorf("failed to get latest indexed height, but index is initialized: %w", err)
+	}
+
+	return firstHeight, nil
 }
 
 // IndexBlockData indexes the block data for the given height.
-// Reindexing the last processed height is a no-op.
+// The caller must hold the [storage.LockIndexAccountTransactions] lock until the batch is committed.
+//
+// Not safe for concurrent use.
 //
 // Expected error returns during normal operations:
 //   - [ErrAlreadyIndexed]: if the data is already indexed for the height.
 //   - [ErrFutureHeight]: if the data is for a future height.
 func (a *AccountTransactions) IndexBlockData(lctx lockctx.Proof, data BlockData, batch storage.ReaderBatchWriter) error {
-	latest, err := a.LatestIndexedHeight()
+	expectedHeight, err := a.NextHeight()
 	if err != nil {
 		return fmt.Errorf("failed to get latest indexed height: %w", err)
 	}
-	if data.Header.Height > latest+1 {
+	if data.Header.Height > expectedHeight {
 		return ErrFutureHeight
 	}
-	if data.Header.Height < latest {
+	if data.Header.Height < expectedHeight {
 		return ErrAlreadyIndexed
-	}
-	if data.Header.Height == latest {
-		return nil
 	}
 
 	chain := a.chainID.Chain()
@@ -79,13 +93,13 @@ func (a *AccountTransactions) IndexBlockData(lctx lockctx.Proof, data BlockData,
 	for i, tx := range data.Transactions {
 		txIndex := uint32(i)
 		addresses := make(map[flow.Address]bool)
-		authorized := make(map[flow.Address]bool)
+		authorizers := make(map[flow.Address]bool)
 
 		addresses[tx.Payer] = true
 		addresses[tx.ProposalKey.Address] = true
 		for _, auth := range tx.Authorizers {
 			addresses[auth] = true
-			authorized[auth] = true
+			authorizers[auth] = true
 		}
 
 		for _, event := range data.Events[txIndex] {
@@ -105,13 +119,15 @@ func (a *AccountTransactions) IndexBlockData(lctx lockctx.Proof, data BlockData,
 					BlockHeight:      data.Header.Height,
 					TransactionID:    tx.ID(),
 					TransactionIndex: txIndex,
-					IsAuthorizer:     authorized[addr],
+					IsAuthorizer:     authorizers[addr],
 				})
 			}
 		}
 	}
 
 	if err := a.store.Store(lctx, batch, data.Header.Height, entries); err != nil {
+		// since we have already checked that the height is not already indexed, no errors are expected
+		// here and indicate concurrent indexing which is not supported.
 		return fmt.Errorf("failed to store account transactions: %w", err)
 	}
 

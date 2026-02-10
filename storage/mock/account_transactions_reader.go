@@ -216,3 +216,56 @@ func (_c *AccountTransactionsReader_TransactionsByAddress_Call) RunAndReturn(run
 	_c.Call.Return(run)
 	return _c
 }
+
+// UninitializedFirstHeight provides a mock function for the type AccountTransactionsReader
+func (_mock *AccountTransactionsReader) UninitializedFirstHeight() (uint64, bool) {
+	ret := _mock.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for UninitializedFirstHeight")
+	}
+
+	var r0 uint64
+	var r1 bool
+	if returnFunc, ok := ret.Get(0).(func() (uint64, bool)); ok {
+		return returnFunc()
+	}
+	if returnFunc, ok := ret.Get(0).(func() uint64); ok {
+		r0 = returnFunc()
+	} else {
+		r0 = ret.Get(0).(uint64)
+	}
+	if returnFunc, ok := ret.Get(1).(func() bool); ok {
+		r1 = returnFunc()
+	} else {
+		r1 = ret.Get(1).(bool)
+	}
+	return r0, r1
+}
+
+// AccountTransactionsReader_UninitializedFirstHeight_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'UninitializedFirstHeight'
+type AccountTransactionsReader_UninitializedFirstHeight_Call struct {
+	*mock.Call
+}
+
+// UninitializedFirstHeight is a helper method to define mock.On call
+func (_e *AccountTransactionsReader_Expecter) UninitializedFirstHeight() *AccountTransactionsReader_UninitializedFirstHeight_Call {
+	return &AccountTransactionsReader_UninitializedFirstHeight_Call{Call: _e.mock.On("UninitializedFirstHeight")}
+}
+
+func (_c *AccountTransactionsReader_UninitializedFirstHeight_Call) Run(run func()) *AccountTransactionsReader_UninitializedFirstHeight_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *AccountTransactionsReader_UninitializedFirstHeight_Call) Return(v uint64, b bool) *AccountTransactionsReader_UninitializedFirstHeight_Call {
+	_c.Call.Return(v, b)
+	return _c
+}
+
+func (_c *AccountTransactionsReader_UninitializedFirstHeight_Call) RunAndReturn(run func() (uint64, bool)) *AccountTransactionsReader_UninitializedFirstHeight_Call {
+	_c.Call.Return(run)
+	return _c
+}

@@ -395,17 +395,15 @@ func TestExecutionState_IndexBlockData(t *testing.T) {
 		}
 		accountIndexer, err := extended.NewExtendedIndexer(
 			test.indexer.log,
-			test.indexer.protocolDB,
-			[]extended.Indexer{stub},
 			metrics.NewNoopCollector(),
-			extended.DefaultBackfillDelay,
-			extended.DefaultBackfillMaxWorkers,
-			test.indexer.chainID,
+			test.indexer.protocolDB,
+			storage.NewTestingLockManager(),
 			nil,
 			test.collections,
 			test.events,
-			startHeight,
-			storage.NewTestingLockManager(),
+			[]extended.Indexer{stub},
+			test.indexer.chainID,
+			extended.DefaultBackfillDelay,
 		)
 		require.NoError(t, err)
 		test.indexer.accountIndexer = accountIndexer
@@ -475,17 +473,15 @@ func TestExecutionState_IndexBlockData(t *testing.T) {
 		}
 		accountIndexer, err := extended.NewExtendedIndexer(
 			test.indexer.log,
-			test.indexer.protocolDB,
-			[]extended.Indexer{stub},
 			metrics.NewNoopCollector(),
-			extended.DefaultBackfillDelay,
-			extended.DefaultBackfillMaxWorkers,
-			test.indexer.chainID,
+			test.indexer.protocolDB,
+			storage.NewTestingLockManager(),
 			nil,
 			test.collections,
 			test.events,
-			startHeight,
-			storage.NewTestingLockManager(),
+			[]extended.Indexer{stub},
+			test.indexer.chainID,
+			extended.DefaultBackfillDelay,
 		)
 		require.NoError(t, err)
 		test.indexer.accountIndexer = accountIndexer
@@ -789,6 +785,6 @@ func (t *testExtendedIndexer) IndexBlockData(_ lockctx.Proof, data extended.Bloc
 	return nil
 }
 
-func (t *testExtendedIndexer) LatestIndexedHeight() (uint64, error) {
-	return t.latestHeight, nil
+func (t *testExtendedIndexer) NextHeight() (uint64, error) {
+	return t.latestHeight + 1, nil
 }

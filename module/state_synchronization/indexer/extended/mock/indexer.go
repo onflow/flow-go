@@ -101,59 +101,6 @@ func (_c *Indexer_IndexBlockData_Call) RunAndReturn(run func(lctx lockctx.Proof,
 	return _c
 }
 
-// LatestIndexedHeight provides a mock function for the type Indexer
-func (_mock *Indexer) LatestIndexedHeight() (uint64, error) {
-	ret := _mock.Called()
-
-	if len(ret) == 0 {
-		panic("no return value specified for LatestIndexedHeight")
-	}
-
-	var r0 uint64
-	var r1 error
-	if returnFunc, ok := ret.Get(0).(func() (uint64, error)); ok {
-		return returnFunc()
-	}
-	if returnFunc, ok := ret.Get(0).(func() uint64); ok {
-		r0 = returnFunc()
-	} else {
-		r0 = ret.Get(0).(uint64)
-	}
-	if returnFunc, ok := ret.Get(1).(func() error); ok {
-		r1 = returnFunc()
-	} else {
-		r1 = ret.Error(1)
-	}
-	return r0, r1
-}
-
-// Indexer_LatestIndexedHeight_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'LatestIndexedHeight'
-type Indexer_LatestIndexedHeight_Call struct {
-	*mock.Call
-}
-
-// LatestIndexedHeight is a helper method to define mock.On call
-func (_e *Indexer_Expecter) LatestIndexedHeight() *Indexer_LatestIndexedHeight_Call {
-	return &Indexer_LatestIndexedHeight_Call{Call: _e.mock.On("LatestIndexedHeight")}
-}
-
-func (_c *Indexer_LatestIndexedHeight_Call) Run(run func()) *Indexer_LatestIndexedHeight_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run()
-	})
-	return _c
-}
-
-func (_c *Indexer_LatestIndexedHeight_Call) Return(v uint64, err error) *Indexer_LatestIndexedHeight_Call {
-	_c.Call.Return(v, err)
-	return _c
-}
-
-func (_c *Indexer_LatestIndexedHeight_Call) RunAndReturn(run func() (uint64, error)) *Indexer_LatestIndexedHeight_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
 // Name provides a mock function for the type Indexer
 func (_mock *Indexer) Name() string {
 	ret := _mock.Called()
@@ -194,6 +141,59 @@ func (_c *Indexer_Name_Call) Return(s string) *Indexer_Name_Call {
 }
 
 func (_c *Indexer_Name_Call) RunAndReturn(run func() string) *Indexer_Name_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// NextHeight provides a mock function for the type Indexer
+func (_mock *Indexer) NextHeight() (uint64, error) {
+	ret := _mock.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for NextHeight")
+	}
+
+	var r0 uint64
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func() (uint64, error)); ok {
+		return returnFunc()
+	}
+	if returnFunc, ok := ret.Get(0).(func() uint64); ok {
+		r0 = returnFunc()
+	} else {
+		r0 = ret.Get(0).(uint64)
+	}
+	if returnFunc, ok := ret.Get(1).(func() error); ok {
+		r1 = returnFunc()
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// Indexer_NextHeight_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'NextHeight'
+type Indexer_NextHeight_Call struct {
+	*mock.Call
+}
+
+// NextHeight is a helper method to define mock.On call
+func (_e *Indexer_Expecter) NextHeight() *Indexer_NextHeight_Call {
+	return &Indexer_NextHeight_Call{Call: _e.mock.On("NextHeight")}
+}
+
+func (_c *Indexer_NextHeight_Call) Run(run func()) *Indexer_NextHeight_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *Indexer_NextHeight_Call) Return(v uint64, err error) *Indexer_NextHeight_Call {
+	_c.Call.Return(v, err)
+	return _c
+}
+
+func (_c *Indexer_NextHeight_Call) RunAndReturn(run func() (uint64, error)) *Indexer_NextHeight_Call {
 	_c.Call.Return(run)
 	return _c
 }

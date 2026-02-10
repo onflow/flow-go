@@ -132,7 +132,7 @@ var LockGroupProtocolStateBootstrap = []string{
 	LockInsertLivenessData,
 }
 
-var LockGroupAccessIndexers = []string{
+var LockGroupAccessExtendedIndexers = []string{
 	LockIndexAccountTransactions,
 }
 
@@ -168,7 +168,7 @@ func makeLockPolicy() lockctx.Policy {
 	addLocks(builder, LockGroupExecutionSaveExecutionResult)
 	addLocks(builder, LockGroupCollectionBootstrapClusterState)
 	addLocks(builder, LockGroupProtocolStateBootstrap)
-	addLocks(builder, LockGroupAccessIndexers)
+	addLocks(builder, LockGroupAccessExtendedIndexers)
 
 	return builder.Build()
 }

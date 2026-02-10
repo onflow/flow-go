@@ -26,7 +26,7 @@ func NewExtendedIndexingCollector() module.ExtendedIndexingMetrics {
 	}
 }
 
-// InitializeLatestHeight records the latest height that has been indexed.
+// InitializeLatestHeightExtended records the latest height that has been indexed.
 // This should only be used during startup. After startup, use BlockIndexedExtended to record newly
 // indexed heights.
 func (c *ExtendedIndexingCollector) InitializeLatestHeightExtended(indexer string, height uint64) {

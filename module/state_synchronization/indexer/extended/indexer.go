@@ -59,9 +59,8 @@ type Indexer interface {
 	//   - [ErrFutureHeight]: if the data is for a future height.
 	IndexBlockData(lctx lockctx.Proof, data BlockData, batch storage.ReaderBatchWriter) error
 
-	// LatestIndexedHeight returns the latest indexed height for the indexer.
+	// NextHeight returns the next height that the indexer will index.
 	//
-	// Expected error returns during normal operations:
-	//   - [storage.ErrNotFound]: if the index has not been initialized
-	LatestIndexedHeight() (uint64, error)
+	// No error returns are expected during normal operation.
+	NextHeight() (uint64, error)
 }

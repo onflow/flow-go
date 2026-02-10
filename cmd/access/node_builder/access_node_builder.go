@@ -175,7 +175,6 @@ type AccessNodeConfig struct {
 	extendedIndexingEnabled              bool
 	extendedIndexingDBPath               string
 	extendedIndexingBackfillDelay        time.Duration
-	extendedIndexingBackfillWorkers      int
 	registersDBPath                      string
 	checkpointFile                       string
 	scriptExecutorConfig                 query.QueryConfig
@@ -283,7 +282,6 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 		executionDataIndexingEnabled:         false,
 		extendedIndexingEnabled:              false,
 		extendedIndexingBackfillDelay:        extended.DefaultBackfillDelay,
-		extendedIndexingBackfillWorkers:      extended.DefaultBackfillMaxWorkers,
 		executionDataPrunerHeightRangeTarget: 0,
 		executionDataPrunerThreshold:         pruner.DefaultThreshold,
 		executionDataPruningInterval:         pruner.DefaultPruningInterval,
@@ -968,6 +966,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 					indexerStorageDB := pebbleimpl.ToDB(indexerDB)
 					accountTxStore, err := indexes.NewAccountTransactions(
 						indexerStorageDB,
+						node.StorageLockMgr,
 						builder.SealedRootBlock.Height,
 					)
 					if err != nil {
@@ -983,29 +982,17 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 						),
 					}
 
-					// TODO: indexedBlockHeight is also initialized by the indexer. update so it is only initialized once.
-					// Needs https://github.com/onflow/flow-go/pull/8404
-					progress, err := indexedBlockHeight.Initialize(registers.FirstHeight())
-					if err != nil {
-						return nil, fmt.Errorf("could not initialize indexed block height consumer progress: %w", err)
-					}
-					startHeight, err := progress.ProcessedIndex()
-					if err != nil {
-						return nil, fmt.Errorf("could not read indexed block height: %w", err)
-					}
 					extendedIndexer, err := extended.NewExtendedIndexer(
 						builder.Logger,
-						indexerStorageDB,
-						extendedIndexers,
 						metrics.NewExtendedIndexingCollector(),
-						builder.extendedIndexingBackfillDelay,
-						builder.extendedIndexingBackfillWorkers,
-						builder.RootChainID,
+						indexerStorageDB,
+						node.StorageLockMgr,
 						notNil(builder.Storage.Blocks),
 						notNil(builder.collections),
 						notNil(builder.events),
-						startHeight,
-						node.StorageLockMgr,
+						extendedIndexers,
+						builder.RootChainID,
+						builder.extendedIndexingBackfillDelay,
 					)
 					if err != nil {
 						return nil, fmt.Errorf("could not create extended indexer: %w", err)
@@ -1513,10 +1500,6 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 			"extended-indexing-backfill-delay",
 			defaultConfig.extendedIndexingBackfillDelay,
 			"minimum delay between backfilled heights per extended indexer")
-		flags.IntVar(&builder.extendedIndexingBackfillWorkers,
-			"extended-indexing-backfill-workers",
-			defaultConfig.extendedIndexingBackfillWorkers,
-			"number of concurrent workers to use for backfilling extended indexing")
 		flags.StringVar(&builder.extendedIndexingDBPath,
 			"extended-indexing-db-dir",
 			defaultConfig.extendedIndexingDBPath,
@@ -1715,10 +1698,6 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 		}
 		if builder.rpcConf.BackendConfig.ExecutionConfig.MaxResponseMsgSize <= 0 {
 			return errors.New("rpc-max-execution-response-message-size must be greater than 0")
-		}
-
-		if builder.extendedIndexingEnabled && builder.extendedIndexingBackfillWorkers <= 0 {
-			return errors.New("extended-indexing-backfill-workers must be greater than 0")
 		}
 
 		// indexing tx error messages is only supported when tx results are also indexed

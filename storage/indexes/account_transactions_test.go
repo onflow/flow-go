@@ -12,6 +12,7 @@ import (
 	"github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/storage/operation"
 	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -19,12 +20,36 @@ import (
 func TestAccountTransactions_Initialize(t *testing.T) {
 	t.Parallel()
 
-	t.Run("initializes uninitialized database", func(t *testing.T) {
+	t.Run("uninitialized database returns ErrNotBootstrapped", func(t *testing.T) {
 		db, _ := unittest.TempPebbleDBWithOpts(t, nil)
 		defer db.Close()
 
 		storageDB := pebbleimpl.ToDB(db)
-		idx, err := NewAccountTransactions(storageDB, 1)
+		lockManager := storage.NewTestingLockManager()
+		idx, err := NewAccountTransactions(storageDB, lockManager, 1)
+		require.NoError(t, err)
+
+		_, err = idx.FirstIndexedHeight()
+		require.ErrorIs(t, err, storage.ErrNotBootstrapped)
+
+		_, err = idx.LatestIndexedHeight()
+		require.ErrorIs(t, err, storage.ErrNotBootstrapped)
+
+		firstHeight, initialized := idx.UninitializedFirstHeight()
+		assert.Equal(t, uint64(1), firstHeight)
+		assert.False(t, initialized)
+	})
+
+	t.Run("first store initializes the index", func(t *testing.T) {
+		db, _ := unittest.TempPebbleDBWithOpts(t, nil)
+		defer db.Close()
+
+		storageDB := pebbleimpl.ToDB(db)
+		lockManager := storage.NewTestingLockManager()
+		idx, err := NewAccountTransactions(storageDB, lockManager, 1)
+		require.NoError(t, err)
+
+		err = storeAccountTransactions(t, idx, 1, nil)
 		require.NoError(t, err)
 
 		first, err := idx.FirstIndexedHeight()
@@ -282,24 +307,30 @@ func TestAccountTransactions_ErrorCases(t *testing.T) {
 				},
 			}
 
-			// Store at height 2 and commit
-			idx, err := NewAccountTransactions(db, 1)
+			lockManager := storage.NewTestingLockManager()
+			idx, err := NewAccountTransactions(db, lockManager, 1)
+			require.NoError(t, err)
+
+			// Bootstrap at height 1 and store txData at height 2
+			err = storeAccountTransactions(t, idx, 1, nil)
 			require.NoError(t, err)
 			err = storeAccountTransactions(t, idx, 2, txData)
 			require.NoError(t, err)
 
-			// Simulate restart: re-create index from same DB but with latestHeight
-			// rolled back by 1 (as if the OnCommitSucceed callback didn't fire).
-			// This forces indexAccountTransactions to run for the same data again.
-			idx2, err := NewAccountTransactions(db, 1)
+			// Simulate a partial write scenario: roll back the latest height marker
+			// in the DB from 2 to 1, as if the tx keys were committed but the
+			// height marker update was lost (e.g. crash between writes).
+			err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return operation.UpsertByKey(rw.Writer(), accountTxLatestHeightKey, uint64(1))
+			})
 			require.NoError(t, err)
 
-			// latestHeight should be 2 from the DB, so storing height 2 is a no-op via Store.
-			// Instead, call indexAccountTransactions directly to exercise the KeyExists check.
-			lockManager := storage.NewTestingLockManager()
-			err = unittest.WithLock(t, lockManager, storage.LockIndexAccountTransactions, func(lctx lockctx.Context) error {
+			// Now indexAccountTransactions at height 2 passes the consecutive check
+			// (2 == 1+1) but finds the already-committed keys.
+			lockManager2 := storage.NewTestingLockManager()
+			err = unittest.WithLock(t, lockManager2, storage.LockIndexAccountTransactions, func(lctx lockctx.Context) error {
 				return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-					return idx2.indexAccountTransactions(lctx, rw, 2, txData)
+					return idx.indexAccountTransactions(lctx, rw, 2, txData)
 				})
 			})
 			require.ErrorIs(t, err, storage.ErrAlreadyExists)
@@ -429,12 +460,18 @@ func storeAccountTransactions(tb testing.TB, idx *AccountTransactions, height ui
 
 // RunWithAccountTxIndex creates a temporary Pebble database, initializes the
 // AccountTransactions at the given start height, and runs the provided function.
+// The index is bootstrapped by storing empty data at startHeight before calling f.
 func RunWithAccountTxIndex(tb testing.TB, startHeight uint64, f func(idx *AccountTransactions)) {
 	unittest.RunWithTempDir(tb, func(dir string) {
 		db := NewBootstrappedAccountTxIndexForTest(tb, dir, startHeight)
 		defer db.Close()
 
-		idx, err := NewAccountTransactions(db, startHeight)
+		lockManager := storage.NewTestingLockManager()
+		idx, err := NewAccountTransactions(db, lockManager, startHeight)
+		require.NoError(tb, err)
+
+		// Bootstrap the index by storing at startHeight
+		err = storeAccountTransactions(tb, idx, startHeight, nil)
 		require.NoError(tb, err)
 
 		f(idx)

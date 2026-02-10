@@ -161,7 +161,6 @@ type ObserverServiceConfig struct {
 	executionDataIndexingEnabled         bool
 	extendedIndexingEnabled              bool
 	extendedIndexingBackfillDelay        time.Duration
-	extendedIndexingBackfillWorkers      int
 	extendedIndexingDBPath               string
 	executionDataPrunerHeightRangeTarget uint64
 	executionDataPrunerThreshold         uint64
@@ -244,7 +243,6 @@ func DefaultObserverServiceConfig() *ObserverServiceConfig {
 		executionDataIndexingEnabled:         false,
 		extendedIndexingEnabled:              false,
 		extendedIndexingBackfillDelay:        extended.DefaultBackfillDelay,
-		extendedIndexingBackfillWorkers:      extended.DefaultBackfillMaxWorkers,
 		executionDataPrunerHeightRangeTarget: 0,
 		executionDataPrunerThreshold:         pruner.DefaultThreshold,
 		executionDataPruningInterval:         pruner.DefaultPruningInterval,
@@ -737,10 +735,6 @@ func (builder *ObserverServiceBuilder) extraFlags() {
 			"extended-indexing-backfill-delay",
 			defaultConfig.extendedIndexingBackfillDelay,
 			"minimum delay between backfilled heights per extended indexer")
-		flags.IntVar(&builder.extendedIndexingBackfillWorkers,
-			"extended-indexing-backfill-workers",
-			defaultConfig.extendedIndexingBackfillWorkers,
-			"number of concurrent workers to use for backfilling extended indexing")
 		flags.StringVar(&builder.extendedIndexingDBPath,
 			"extended-indexing-db-dir",
 			defaultConfig.extendedIndexingDBPath,
@@ -936,10 +930,6 @@ func (builder *ObserverServiceBuilder) extraFlags() {
 			if builder.stateStreamConf.RegisterIDsRequestLimit <= 0 {
 				return errors.New("state-stream-max-register-values must be greater than 0")
 			}
-		}
-
-		if builder.extendedIndexingEnabled && builder.extendedIndexingBackfillWorkers <= 0 {
-			return errors.New("extended-indexing-backfill-workers must be greater than 0")
 		}
 
 		if builder.rpcConf.RestConfig.MaxRequestSize <= 0 {
@@ -1490,6 +1480,7 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 				indexerStorageDB := pebbleimpl.ToDB(indexerDB)
 				accountTxStore, err := indexes.NewAccountTransactions(
 					indexerStorageDB,
+					node.StorageLockMgr,
 					builder.SealedRootBlock.Height,
 				)
 				if err != nil {
@@ -1503,27 +1494,17 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 					node.StorageLockMgr,
 				)
 
-				progress, err := indexedBlockHeight.Initialize(registers.FirstHeight())
-				if err != nil {
-					return nil, fmt.Errorf("could not initialize indexed block height consumer progress: %w", err)
-				}
-				startHeight, err := progress.ProcessedIndex()
-				if err != nil {
-					return nil, fmt.Errorf("could not read indexed block height: %w", err)
-				}
 				extendedIndexer, err := extended.NewExtendedIndexer(
 					builder.Logger,
-					indexerStorageDB,
-					[]extended.Indexer{accountTxIndexer},
 					metrics.NewExtendedIndexingCollector(),
-					builder.extendedIndexingBackfillDelay,
-					builder.extendedIndexingBackfillWorkers,
-					builder.RootChainID,
+					indexerStorageDB,
+					node.StorageLockMgr,
 					builder.Storage.Blocks,
 					builder.Storage.Collections,
 					builder.events,
-					startHeight,
-					node.StorageLockMgr,
+					[]extended.Indexer{accountTxIndexer},
+					builder.RootChainID,
+					builder.extendedIndexingBackfillDelay,
 				)
 				if err != nil {
 					return nil, fmt.Errorf("could not create extended indexer: %w", err)
