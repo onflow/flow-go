@@ -76,16 +76,20 @@ unittest-main:
 
 .PHONY: install-mock-generators
 install-mock-generators:
+ifndef FLOW_GO_SKIP_TOOL_INSTALL
 	cd ${GOPATH}; \
-    go install github.com/vektra/mockery/v3@v3.6.1;
+	go install github.com/vektra/mockery/v3@v3.6.1;
+endif
 
 .PHONY: install-tools
 install-tools: check-go-version install-mock-generators
+ifndef FLOW_GO_SKIP_TOOL_INSTALL
 	cd ${GOPATH}; \
 	go install github.com/golang/protobuf/protoc-gen-go@v1.3.2; \
 	go install github.com/uber/prototool/cmd/prototool@v1.9.0; \
 	go install github.com/gogo/protobuf/protoc-gen-gofast@latest; \
 	go install golang.org/x/tools/cmd/stringer@master;
+endif
 
 .PHONY: verify-mocks
 verify-mocks: tidy generate-mocks
