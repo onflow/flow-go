@@ -262,21 +262,6 @@ func newInternalEVMTypeEncodeABIFunction(
 				panic(errors.NewUnreachableError())
 			}
 
-			reportArrayABIEncodingComputation(
-				context,
-				valuesArray,
-				evmSpecialTypeIDs,
-				func(intensity uint64) {
-					common.UseComputation(
-						context,
-						common.ComputationUsage{
-							Kind:      environment.ComputationKindEVMEncodeABI,
-							Intensity: intensity,
-						},
-					)
-				},
-			)
-
 			size := valuesArray.Count()
 
 			values := make([]any, 0, size)
@@ -285,6 +270,22 @@ func newInternalEVMTypeEncodeABIFunction(
 			valuesArray.Iterate(
 				context,
 				func(element interpreter.Value) (resume bool) {
+
+					reportABIEncodingComputation(
+						context,
+						element,
+						evmSpecialTypeIDs,
+						func(intensity uint64) {
+							common.UseComputation(
+								context,
+								common.ComputationUsage{
+									Kind:      environment.ComputationKindEVMEncodeABI,
+									Intensity: intensity,
+								},
+							)
+						},
+					)
+
 					value, ty, err := encodeABI(
 						context,
 						element,
