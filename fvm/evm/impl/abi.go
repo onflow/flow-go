@@ -926,7 +926,8 @@ func newInternalEVMTypeDecodeABIFunction(
 				panic(err)
 			}
 
-			var arguments gethABI.Arguments
+			arguments := make(gethABI.Arguments, 0, typesArray.Count())
+			staticTypes := make([]interpreter.StaticType, 0, typesArray.Count())
 			typesArray.Iterate(
 				context,
 				func(element interpreter.Value) (resume bool) {
@@ -955,6 +956,8 @@ func newInternalEVMTypeDecodeABIFunction(
 						},
 					)
 
+					staticTypes = append(staticTypes, staticType)
+
 					// continue iteration
 					return true
 				},
@@ -966,39 +969,22 @@ func newInternalEVMTypeDecodeABIFunction(
 				panic(abiDecodingError{})
 			}
 
-			var index int
 			values := make([]interpreter.Value, 0, len(decodedValues))
 
-			typesArray.Iterate(
-				context,
-				func(element interpreter.Value) (resume bool) {
-					typeValue, ok := element.(interpreter.TypeValue)
-					if !ok {
-						panic(errors.NewUnreachableError())
-					}
+			for i, staticType := range staticTypes {
+				value, err := decodeABI(
+					context,
+					decodedValues[i],
+					staticType,
+					location,
+					evmSpecialTypeIDs,
+				)
+				if err != nil {
+					panic(err)
+				}
 
-					staticType := typeValue.Type
-
-					value, err := decodeABI(
-						context,
-						decodedValues[index],
-						staticType,
-						location,
-						evmSpecialTypeIDs,
-					)
-					if err != nil {
-						panic(err)
-					}
-
-					index++
-
-					values = append(values, value)
-
-					// continue iteration
-					return true
-				},
-				false,
-			)
+				values = append(values, value)
+			}
 
 			arrayType := interpreter.NewVariableSizedStaticType(
 				context,
