@@ -20,34 +20,30 @@ import (
 func TestCachedClientShutdown(t *testing.T) {
 	// Test that a completely uninitialized client can be closed without panics
 	t.Run("uninitialized client", func(t *testing.T) {
-		client := &CachedClient{
-			closeRequested: atomic.NewBool(false),
-		}
+		client := &CachedClient{}
 		client.Close()
-		assert.True(t, client.closeRequested.Load())
+		assert.True(t, client.CloseRequested())
 	})
 
 	// Test closing a client with no outstanding requests
 	// Close() should return quickly
 	t.Run("with no outstanding requests", func(t *testing.T) {
 		client := &CachedClient{
-			closeRequested: atomic.NewBool(false),
-			conn:           setupGRPCServer(t),
+			conn: setupGRPCServer(t),
 		}
 
 		unittest.RequireReturnsBefore(t, func() {
 			client.Close()
 		}, 100*time.Millisecond, "client timed out closing connection")
 
-		assert.True(t, client.closeRequested.Load())
+		assert.True(t, client.CloseRequested())
 	})
 
 	// Test closing a client with outstanding requests waits for requests to complete
 	// Close() should block until the request completes
 	t.Run("with some outstanding requests", func(t *testing.T) {
 		client := &CachedClient{
-			closeRequested: atomic.NewBool(false),
-			conn:           setupGRPCServer(t),
+			conn: setupGRPCServer(t),
 		}
 		done := client.AddRequest()
 
@@ -62,7 +58,7 @@ func TestCachedClientShutdown(t *testing.T) {
 			client.Close()
 		}, 100*time.Millisecond, "client timed out closing connection")
 
-		assert.True(t, client.closeRequested.Load())
+		assert.True(t, client.CloseRequested())
 		assert.True(t, doneCalled.Load())
 	})
 
@@ -70,9 +66,9 @@ func TestCachedClientShutdown(t *testing.T) {
 	// Close() should return immediately
 	t.Run("already closing", func(t *testing.T) {
 		client := &CachedClient{
-			closeRequested: atomic.NewBool(true), // close already requested
-			conn:           setupGRPCServer(t),
+			conn: setupGRPCServer(t),
 		}
+		client.Close()
 		done := client.AddRequest()
 
 		doneCalled := atomic.NewBool(false)
@@ -89,23 +85,21 @@ func TestCachedClientShutdown(t *testing.T) {
 			client.Close()
 		}, 10*time.Millisecond, "client timed out closing connection")
 
-		assert.True(t, client.closeRequested.Load())
+		assert.True(t, client.CloseRequested())
 		assert.False(t, doneCalled.Load())
 	})
 
 	// Test closing a client that is locked during connection setup
 	// Close() should wait for the lock before shutting down
 	t.Run("connection setting up", func(t *testing.T) {
-		client := &CachedClient{
-			closeRequested: atomic.NewBool(false),
-		}
+		client := &CachedClient{}
 
 		// simulate an in-progress connection setup
-		client.mu.Lock()
+		client.connMu.Lock()
 
 		go func() {
 			// unlock after setting up the connection
-			defer client.mu.Unlock()
+			defer client.connMu.Unlock()
 
 			// pause before setting the connection to cause client.Close() to block
 			time.Sleep(100 * time.Millisecond)
@@ -117,7 +111,7 @@ func TestCachedClientShutdown(t *testing.T) {
 			client.Close()
 		}, 500*time.Millisecond, "client timed out closing connection")
 
-		assert.True(t, client.closeRequested.Load())
+		assert.True(t, client.CloseRequested())
 		assert.NotNil(t, client.conn)
 	})
 }

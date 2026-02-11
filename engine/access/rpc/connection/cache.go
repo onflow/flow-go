@@ -7,7 +7,6 @@ import (
 	lru "github.com/hashicorp/golang-lru/v2"
 	"github.com/onflow/crypto"
 	"github.com/rs/zerolog"
-	"go.uber.org/atomic"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/connectivity"
 
@@ -16,20 +15,25 @@ import (
 
 // CachedClient represents a gRPC client connection that is cached for reuse.
 type CachedClient struct {
-	conn    *grpc.ClientConn
 	address string
 	cfg     Config
 
-	cache          *Cache
-	closeRequested *atomic.Bool
-	wg             sync.WaitGroup
-	mu             sync.RWMutex
+	cache *Cache
+
+	connMu sync.RWMutex
+	conn   *grpc.ClientConn
+
+	closeRequested bool
+	// wgMu mutex is needed to protect the workgroup from being added to
+	// if we are in a closeRequested state.
+	wgMu sync.RWMutex
+	wg   sync.WaitGroup
 }
 
 // ClientConn returns the underlying gRPC client connection.
 func (cc *CachedClient) ClientConn() *grpc.ClientConn {
-	cc.mu.RLock()
-	defer cc.mu.RUnlock()
+	cc.connMu.RLock()
+	defer cc.connMu.RUnlock()
 	return cc.conn
 }
 
@@ -40,12 +44,22 @@ func (cc *CachedClient) Address() string {
 
 // CloseRequested returns true if the CachedClient has been marked for closure.
 func (cc *CachedClient) CloseRequested() bool {
-	return cc.closeRequested.Load()
+	cc.wgMu.RLock()
+	defer cc.wgMu.RUnlock()
+
+	return cc.closeRequested
 }
 
 // AddRequest increments the in-flight request counter for the CachedClient.
 // It returns a function that should be called when the request completes to decrement the counter
 func (cc *CachedClient) AddRequest() func() {
+	cc.wgMu.RLock()
+	defer cc.wgMu.RUnlock()
+
+	// if close is requested, cc.wg might already be done
+	if cc.closeRequested {
+		return func() {}
+	}
 	cc.wg.Add(1)
 	return cc.wg.Done
 }
@@ -61,15 +75,16 @@ func (cc *CachedClient) Invalidate() {
 // Close closes the CachedClient connection. It marks the connection for closure and waits asynchronously for ongoing
 // requests to complete before closing the connection.
 func (cc *CachedClient) Close() {
-	// Mark the connection for closure
-	if !cc.closeRequested.CompareAndSwap(false, true) {
-		return
-	}
+	func() {
+		cc.wgMu.Lock()
+		defer cc.wgMu.Unlock()
+		cc.closeRequested = true
+	}()
 
 	// Obtain the lock to ensure that any connection attempts have completed
-	cc.mu.RLock()
+	cc.connMu.RLock()
 	conn := cc.conn
-	cc.mu.RUnlock()
+	cc.connMu.RUnlock()
 
 	// If the initial connection attempt failed, conn will be nil
 	if conn == nil {
@@ -127,10 +142,9 @@ func (c *Cache) GetConnected(
 	connectFn func(string, Config, crypto.PublicKey, *CachedClient) (*grpc.ClientConn, error),
 ) (*CachedClient, error) {
 	client := &CachedClient{
-		address:        address,
-		cfg:            cfg,
-		closeRequested: atomic.NewBool(false),
-		cache:          c,
+		address: address,
+		cfg:     cfg,
+		cache:   c,
 	}
 
 	// Note: PeekOrAdd does not "visit" the existing entry, so we need to call Get explicitly
@@ -145,8 +159,8 @@ func (c *Cache) GetConnected(
 		c.metrics.ConnectionAddedToPool()
 	}
 
-	client.mu.Lock()
-	defer client.mu.Unlock()
+	client.connMu.Lock()
+	defer client.connMu.Unlock()
 
 	// after getting the lock, check if the connection is still active
 	if client.conn != nil && client.conn.GetState() != connectivity.Shutdown {
