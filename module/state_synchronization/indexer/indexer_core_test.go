@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/jordanschalm/lockctx"
 	"github.com/rs/zerolog"
@@ -22,6 +23,7 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/module/executiondatasync/testutil"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/state_synchronization/indexer/extended"
@@ -382,14 +384,14 @@ func TestExecutionState_IndexBlockData(t *testing.T) {
 		test := newIndexCoreTest(t, g, blocks, tf.ExecutionDataEntity()).initIndexer()
 
 		startHeight := tf.Block.Height - 1
-		called := false
+		done := make(chan struct{})
 		var gotHeight uint64
 		stub := &testExtendedIndexer{
 			name:         "test",
 			latestHeight: startHeight,
 			indexBlockFn: func(data extended.BlockData) error {
-				called = true
 				gotHeight = data.Header.Height
+				close(done)
 				return nil
 			},
 		}
@@ -406,6 +408,17 @@ func TestExecutionState_IndexBlockData(t *testing.T) {
 			extended.DefaultBackfillDelay,
 		)
 		require.NoError(t, err)
+
+		// Start the ExtendedIndexer component so its ingest loop can process data
+		ctx, cancel := context.WithCancel(context.Background())
+		signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
+		accountIndexer.Start(signalerCtx)
+		unittest.RequireComponentsReadyBefore(t, 5*time.Second, accountIndexer)
+		t.Cleanup(func() {
+			cancel()
+			unittest.RequireCloseBefore(t, accountIndexer.Done(), 5*time.Second, "timeout waiting for shutdown")
+		})
+
 		test.indexer.accountIndexer = accountIndexer
 
 		test.events.
@@ -427,7 +440,8 @@ func TestExecutionState_IndexBlockData(t *testing.T) {
 		err = test.indexer.IndexBlockData(tf.ExecutionDataEntity())
 		require.NoError(t, err)
 
-		assert.True(t, called, "expected extended indexer to be called")
+		// Wait for the async extended indexer to process the block
+		unittest.RequireCloseBefore(t, done, 5*time.Second, "timeout waiting for extended indexer")
 		assert.Equal(t, tf.Block.Height, gotHeight)
 	})
 
@@ -458,7 +472,7 @@ func TestExecutionState_IndexBlockData(t *testing.T) {
 		assert.NoError(t, err)
 	})
 
-	// test that errors from the extended indexer are propagated
+	// test that errors from the extended indexer are propagated via irrecoverable context
 	t.Run("Account transactions error propagation", func(t *testing.T) {
 		test := newIndexCoreTest(t, g, blocks, tf.ExecutionDataEntity()).initIndexer()
 
@@ -484,6 +498,20 @@ func TestExecutionState_IndexBlockData(t *testing.T) {
 			extended.DefaultBackfillDelay,
 		)
 		require.NoError(t, err)
+
+		// Start the ExtendedIndexer with an error callback to capture thrown errors
+		thrown := make(chan error, 1)
+		ctx, cancel := context.WithCancel(context.Background())
+		signalerCtx := irrecoverable.NewMockSignalerContextWithCallback(t, ctx, func(err error) {
+			thrown <- err
+			cancel()
+		})
+		accountIndexer.Start(signalerCtx)
+		unittest.RequireComponentsReadyBefore(t, 5*time.Second, accountIndexer)
+		t.Cleanup(func() {
+			cancel()
+		})
+
 		test.indexer.accountIndexer = accountIndexer
 
 		test.events.
@@ -503,8 +531,16 @@ func TestExecutionState_IndexBlockData(t *testing.T) {
 		}
 
 		err = test.indexer.IndexBlockData(tf.ExecutionDataEntity())
-		assert.Error(t, err)
-		assert.ErrorIs(t, err, expectedErr)
+		// IndexBlockData itself succeeds - the error is thrown asynchronously by the extended indexer
+		require.NoError(t, err)
+
+		// Wait for the error to be thrown via irrecoverable context
+		select {
+		case err := <-thrown:
+			assert.ErrorIs(t, err, expectedErr)
+		case <-time.After(5 * time.Second):
+			t.Fatal("timeout waiting for error propagation")
+		}
 	})
 }
 
