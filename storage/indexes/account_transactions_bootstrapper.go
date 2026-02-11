@@ -25,22 +25,22 @@ type AccountTransactionsBootstrapper struct {
 	store *atomic.Pointer[AccountTransactions]
 }
 
-var _ storage.AccountTransactions = (*AccountTransactionsBootstrapper)(nil)
+var _ storage.AccountTransactionsBootstrapper = (*AccountTransactionsBootstrapper)(nil)
 
-func NewAccountTransactionsBootstrapper(db storage.DB, initialStartHeight uint64) (storage.AccountTransactions, error) {
+func NewAccountTransactionsBootstrapper(db storage.DB, initialStartHeight uint64) (*AccountTransactionsBootstrapper, error) {
 	store, err := NewAccountTransactions(db)
-	if err == nil {
-		return store, nil
-	}
-
-	if !errors.Is(err, storage.ErrNotBootstrapped) {
-		return nil, fmt.Errorf("could not create account transactions: %w", err)
+	if err != nil {
+		if !errors.Is(err, storage.ErrNotBootstrapped) {
+			return nil, fmt.Errorf("could not create account transactions: %w", err)
+		}
+		// make sure it's nil
+		store = nil
 	}
 
 	return &AccountTransactionsBootstrapper{
 		db:                 db,
 		initialStartHeight: initialStartHeight,
-		store:              atomic.NewPointer[AccountTransactions](nil),
+		store:              atomic.NewPointer[AccountTransactions](store),
 	}, nil
 }
 
@@ -53,7 +53,7 @@ func (b *AccountTransactionsBootstrapper) FirstIndexedHeight() (uint64, error) {
 	if store == nil {
 		return 0, storage.ErrNotBootstrapped
 	}
-	return store.FirstIndexedHeight()
+	return store.FirstIndexedHeight(), nil
 }
 
 // LatestIndexedHeight returns the latest block height that has been indexed.
@@ -65,7 +65,7 @@ func (b *AccountTransactionsBootstrapper) LatestIndexedHeight() (uint64, error) 
 	if store == nil {
 		return 0, storage.ErrNotBootstrapped
 	}
-	return store.LatestIndexedHeight()
+	return store.LatestIndexedHeight(), nil
 }
 
 // UninitializedFirstHeight returns the height the index will accept as the first height, and a boolean
@@ -76,7 +76,7 @@ func (b *AccountTransactionsBootstrapper) UninitializedFirstHeight() (uint64, bo
 	if store == nil {
 		return b.initialStartHeight, false
 	}
-	return store.UninitializedFirstHeight()
+	return store.FirstIndexedHeight(), true
 }
 
 // TransactionsByAddress retrieves transaction references for an account within the specified

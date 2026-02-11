@@ -17,7 +17,7 @@ import (
 func TestBootstrapper_Constructor(t *testing.T) {
 	t.Parallel()
 
-	t.Run("returns bootstrapper wrapper on uninitialized DB", func(t *testing.T) {
+	t.Run("uninitialized DB returns ErrNotBootstrapped", func(t *testing.T) {
 		db, _ := unittest.TempPebbleDBWithOpts(t, nil)
 		defer db.Close()
 
@@ -25,12 +25,12 @@ func TestBootstrapper_Constructor(t *testing.T) {
 		store, err := NewAccountTransactionsBootstrapper(storageDB, 10)
 		require.NoError(t, err)
 
-		// Should return the bootstrapper wrapper, not the concrete type
-		_, isBootstrapper := store.(*AccountTransactionsBootstrapper)
-		assert.True(t, isBootstrapper, "expected bootstrapper wrapper on uninitialized DB")
+		// Inner store should be nil, so height methods return ErrNotBootstrapped
+		_, err = store.FirstIndexedHeight()
+		require.ErrorIs(t, err, storage.ErrNotBootstrapped)
 	})
 
-	t.Run("returns concrete store on already-bootstrapped DB", func(t *testing.T) {
+	t.Run("already-bootstrapped DB is immediately usable", func(t *testing.T) {
 		unittest.RunWithTempDir(t, func(dir string) {
 			db := NewBootstrappedAccountTxIndexForTest(t, dir, 5)
 			defer db.Close()
@@ -38,9 +38,10 @@ func TestBootstrapper_Constructor(t *testing.T) {
 			store, err := NewAccountTransactionsBootstrapper(db, 5)
 			require.NoError(t, err)
 
-			// Should return the concrete AccountTransactions, not the wrapper
-			_, isConcrete := store.(*AccountTransactions)
-			assert.True(t, isConcrete, "expected concrete store on bootstrapped DB")
+			// Inner store should be loaded, so height methods work
+			first, err := store.FirstIndexedHeight()
+			require.NoError(t, err)
+			assert.Equal(t, uint64(5), first)
 		})
 	})
 }
@@ -232,8 +233,8 @@ func TestBootstrapper_PersistenceAcrossRestart(t *testing.T) {
 			require.NoError(t, err)
 
 			// Should be uninitialized
-			_, isBootstrapper := store.(*AccountTransactionsBootstrapper)
-			require.True(t, isBootstrapper)
+			_, err = store.FirstIndexedHeight()
+			require.ErrorIs(t, err, storage.ErrNotBootstrapped)
 
 			err = storeBootstrapperTx(t, store, db, 100, []access.AccountTransaction{
 				{
@@ -253,10 +254,6 @@ func TestBootstrapper_PersistenceAcrossRestart(t *testing.T) {
 
 		store, err := NewAccountTransactionsBootstrapper(db, 100)
 		require.NoError(t, err)
-
-		// Should now return the concrete type since DB is bootstrapped
-		_, isConcrete := store.(*AccountTransactions)
-		assert.True(t, isConcrete, "expected concrete store after DB reopen")
 
 		// Data should be persisted
 		first, err := store.FirstIndexedHeight()
@@ -295,7 +292,7 @@ func TestBootstrapper_DoubleBootstrapProtection(t *testing.T) {
 // concrete type's db field, this helper accepts the DB explicitly.
 func storeBootstrapperTx(
 	tb testing.TB,
-	store storage.AccountTransactions,
+	store storage.AccountTransactionsBootstrapper,
 	db storage.DB,
 	height uint64,
 	txData []access.AccountTransaction,

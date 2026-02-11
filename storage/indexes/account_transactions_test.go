@@ -46,23 +46,19 @@ func TestAccountTransactions_Initialize(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		first, err := idx.FirstIndexedHeight()
-		require.NoError(t, err)
+		first := idx.FirstIndexedHeight()
 		assert.Equal(t, uint64(1), first)
 
-		latest, err := idx.LatestIndexedHeight()
-		require.NoError(t, err)
+		latest := idx.LatestIndexedHeight()
 		assert.Equal(t, uint64(1), latest)
 	})
 
 	t.Run("succeeds on initialized database", func(t *testing.T) {
 		RunWithAccountTxIndex(t, 1, func(idx *AccountTransactions) {
-			first, err := idx.FirstIndexedHeight()
-			require.NoError(t, err)
+			first := idx.FirstIndexedHeight()
 			assert.Equal(t, uint64(1), first)
 
-			latest, err := idx.LatestIndexedHeight()
-			require.NoError(t, err)
+			latest := idx.LatestIndexedHeight()
 			assert.Equal(t, uint64(1), latest)
 		})
 	})

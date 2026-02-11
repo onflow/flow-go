@@ -19,7 +19,7 @@ const accountTransactionsIndexerName = "account_transactions"
 // AccountTransactions indexes account-transaction associations for a block.
 type AccountTransactions struct {
 	log         zerolog.Logger
-	store       storage.AccountTransactions
+	store       storage.AccountTransactionsBootstrapper
 	chainID     flow.ChainID
 	lockManager storage.LockManager
 }
@@ -28,7 +28,7 @@ var _ Indexer = (*AccountTransactions)(nil)
 
 func NewAccountTransactions(
 	log zerolog.Logger,
-	store storage.AccountTransactions,
+	store storage.AccountTransactionsBootstrapper,
 	chainID flow.ChainID,
 	lockManager storage.LockManager,
 ) *AccountTransactions {

@@ -108,24 +108,13 @@ func BootstrapAccountTransactions(lctx lockctx.Proof, rw storage.ReaderBatchWrit
 }
 
 // FirstIndexedHeight returns the first (oldest) block height that has been indexed.
-//
-// No error returns are expected during normal operation.
-func (idx *AccountTransactions) FirstIndexedHeight() (uint64, error) {
-	return idx.firstHeight, nil
+func (idx *AccountTransactions) FirstIndexedHeight() uint64 {
+	return idx.firstHeight
 }
 
 // LatestIndexedHeight returns the latest block height that has been indexed.
-//
-// No error returns are expected during normal operation.
-func (idx *AccountTransactions) LatestIndexedHeight() (uint64, error) {
-	return idx.latestHeight.Load(), nil
-}
-
-// UninitializedFirstHeight returns the height the index will accept as the first height, and a boolean
-// indicating if the index is initialized.
-// If the index is not initialized, the first call to `Store` must include data for this height.
-func (idx *AccountTransactions) UninitializedFirstHeight() (uint64, bool) {
-	return idx.firstHeight, true
+func (idx *AccountTransactions) LatestIndexedHeight() uint64 {
+	return idx.latestHeight.Load()
 }
 
 // TransactionsByAddress retrieves transaction references for an account within the specified
