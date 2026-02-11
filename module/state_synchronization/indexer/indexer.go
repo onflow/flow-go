@@ -72,12 +72,16 @@ func NewIndexer(
 	executionDataLatestHeight func() (uint64, error),
 	processedHeight storage.ConsumerProgress,
 ) (*Indexer, error) {
+	lastProcessedHeight, err := processedHeight.ProcessedIndex()
+	if err != nil {
+		return nil, fmt.Errorf("could not get last processed height: %w", err)
+	}
 
 	r := &Indexer{
 		log:                     log.With().Str("module", "execution_indexer").Logger(),
 		exeDataNotifier:         engine.NewNotifier(),
 		blockIndexedNotifier:    engine.NewNotifier(),
-		lastProcessedHeight:     atomic.NewUint64(initHeight), // TODO(peter): I think this should be processedHeight.ProcessedIndex(), not initHeight
+		lastProcessedHeight:     atomic.NewUint64(lastProcessedHeight),
 		indexer:                 indexer,
 		registers:               registers,
 		ProcessedHeightRecorder: execution_data.NewProcessedHeightRecorderManager(initHeight),
