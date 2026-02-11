@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/cockroachdb/pebble/v2"
+	"github.com/jordanschalm/lockctx"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -39,20 +40,21 @@ func TestLoopPruneExecutionDataFromRootToLatestSealed(t *testing.T) {
 
 		transactions := store.NewTransactions(metrics, db)
 		collections := store.NewCollections(db, transactions)
-		chunkDataPacks := store.NewChunkDataPacks(metrics, pebbleimpl.ToDB(pdb), collections, 1000)
+		storedChunkDataPacks := store.NewStoredChunkDataPacks(metrics, db, 1000)
+		chunkDataPacks := store.NewChunkDataPacks(metrics, db, storedChunkDataPacks, collections, 1000)
 
 		lastSealedHeight := 30
 		lastFinalizedHeight := lastSealedHeight + 2 // 2 finalized but unsealed
 		// indexed by height
 		chunks := make([]*verification.VerifiableChunkData, lastFinalizedHeight+2)
 		parentID := genesis.ID()
-		lctxGenesis := lockManager.NewContext()
-		require.NoError(t, lctxGenesis.AcquireLock(storage.LockInsertBlock))
-		require.NoError(t, db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			// By convention, root block has no proposer signature - implementation has to handle this edge case
-			return blockstore.BatchStore(lctxGenesis, rw, &flow.Proposal{Block: *genesis, ProposerSigData: nil})
-		}))
-		lctxGenesis.Release()
+		err := unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
+			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				// By convention, root block has no proposer signature - implementation has to handle this edge case
+				return blockstore.BatchStore(lctx, rw, &flow.Proposal{Block: *genesis, ProposerSigData: nil})
+			})
+		})
+		require.NoError(t, err)
 
 		for i := 1; i <= lastFinalizedHeight; i++ {
 			chunk, block := unittest.VerifiableChunkDataFixture(0, func(headerBody *flow.HeaderBody) {
@@ -60,21 +62,38 @@ func TestLoopPruneExecutionDataFromRootToLatestSealed(t *testing.T) {
 				headerBody.ParentID = parentID
 			})
 			chunks[i] = chunk // index by height
-			lctxBlock := lockManager.NewContext()
-			require.NoError(t, lctxBlock.AcquireLock(storage.LockInsertBlock))
-			require.NoError(t, db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-				return blockstore.BatchStore(lctxBlock, rw, unittest.ProposalFromBlock(block))
+			err := unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
+				return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+					return blockstore.BatchStore(lctx, rw, unittest.ProposalFromBlock(block))
+				})
+			})
+			require.NoError(t, err)
+			err = unittest.WithLock(t, lockManager, storage.LockFinalizeBlock, func(lctx lockctx.Context) error {
+				return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+					return operation.IndexFinalizedBlockByHeight(lctx, rw, chunk.Header.Height, chunk.Header.ID())
+				})
+			})
+			require.NoError(t, err)
+			err = unittest.WithLock(t, lockManager, storage.LockIndexExecutionResult, func(lctx lockctx.Context) error {
+				return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+					err := results.BatchStore(chunk.Result, rw)
+					require.NoError(t, err)
+
+					err = results.BatchIndex(lctx, rw, chunk.Result.BlockID, chunk.Result.ID())
+					require.NoError(t, err)
+					return nil
+				})
+			})
+			require.NoError(t, err)
+			require.NoError(t, unittest.WithLock(t, lockManager, storage.LockIndexChunkDataPackByChunkID, func(lctx lockctx.Context) error {
+				storeFunc, err := chunkDataPacks.Store([]*flow.ChunkDataPack{chunk.ChunkDataPack})
+				if err != nil {
+					return err
+				}
+				return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+					return storeFunc(lctx, rw)
+				})
 			}))
-			lctxBlock.Release()
-			lctxFinality := lockManager.NewContext()
-			require.NoError(t, lctxFinality.AcquireLock(storage.LockFinalizeBlock))
-			require.NoError(t, db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-				return operation.IndexFinalizedBlockByHeight(lctxFinality, rw, chunk.Header.Height, chunk.Header.ID())
-			}))
-			lctxFinality.Release()
-			require.NoError(t, results.Store(chunk.Result))
-			require.NoError(t, results.Index(chunk.Result.BlockID, chunk.Result.ID()))
-			require.NoError(t, chunkDataPacks.Store([]*flow.ChunkDataPack{chunk.ChunkDataPack}))
 			_, storeErr := collections.Store(chunk.ChunkDataPack.Collection)
 			require.NoError(t, storeErr)
 			// verify that chunk data pack fixture can be found by the result
@@ -85,7 +104,7 @@ func TestLoopPruneExecutionDataFromRootToLatestSealed(t *testing.T) {
 				require.NoError(t, err)
 			}
 			// verify the result can be found by block
-			_, err := results.ByBlockID(chunk.Header.ID())
+			_, err = results.ByBlockID(chunk.Header.ID())
 			require.NoError(t, err)
 
 			// Finalize block

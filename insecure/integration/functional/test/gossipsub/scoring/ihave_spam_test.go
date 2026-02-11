@@ -6,7 +6,6 @@ import (
 	"testing"
 	"time"
 
-	corrupt "github.com/libp2p/go-libp2p-pubsub"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	pb "github.com/libp2p/go-libp2p-pubsub/pb"
 	"github.com/libp2p/go-libp2p/core/peer"
@@ -15,6 +14,7 @@ import (
 	"github.com/onflow/flow-go/config"
 	"github.com/onflow/flow-go/insecure/corruptlibp2p"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/p2p"
@@ -39,7 +39,7 @@ func TestGossipSubIHaveBrokenPromises_Below_Threshold(t *testing.T) {
 
 	receivedIWants := concurrentmap.New[string, struct{}]()
 	idProvider := unittest.NewUpdatableIDProvider(flow.IdentityList{})
-	spammer := corruptlibp2p.NewGossipSubRouterSpammerWithRpcInspector(t, sporkId, role, idProvider, func(id peer.ID, rpc *corrupt.RPC) error {
+	spammer := corruptlibp2p.NewGossipSubRouterSpammerWithRpcInspector(t, sporkId, role, idProvider, func(id peer.ID, rpc *pubsub.RPC) error {
 		// override rpc inspector of the spammer node to keep track of the iwants it has received.
 		if rpc.RPC.Control == nil || rpc.RPC.Control.Iwant == nil {
 			return nil
@@ -107,7 +107,7 @@ func TestGossipSubIHaveBrokenPromises_Below_Threshold(t *testing.T) {
 
 	// checks end-to-end message delivery works on GossipSub
 	p2ptest.EnsurePubsubMessageExchange(t, ctx, nodes, blockTopic, 1, func() interface{} {
-		return (*flow.UntrustedProposal)(unittest.ProposalFixture())
+		return (*messages.Proposal)(unittest.ProposalFixture())
 	})
 
 	// creates 10 RPCs each with 10 iHave messages, each iHave message has 50 message ids, hence overall, we have 5000 iHave message ids.
@@ -172,7 +172,7 @@ func TestGossipSubIHaveBrokenPromises_Below_Threshold(t *testing.T) {
 
 	// since spammer stays below the threshold, it should be able to exchange messages with the victim node over pubsub.
 	p2ptest.EnsurePubsubMessageExchange(t, ctx, nodes, blockTopic, 1, func() interface{} {
-		return (*flow.UntrustedProposal)(unittest.ProposalFixture())
+		return (*messages.Proposal)(unittest.ProposalFixture())
 	})
 }
 
@@ -191,7 +191,7 @@ func TestGossipSubIHaveBrokenPromises_Above_Threshold(t *testing.T) {
 
 	receivedIWants := concurrentmap.New[string, struct{}]()
 	idProvider := unittest.NewUpdatableIDProvider(flow.IdentityList{})
-	spammer := corruptlibp2p.NewGossipSubRouterSpammerWithRpcInspector(t, sporkId, role, idProvider, func(id peer.ID, rpc *corrupt.RPC) error {
+	spammer := corruptlibp2p.NewGossipSubRouterSpammerWithRpcInspector(t, sporkId, role, idProvider, func(id peer.ID, rpc *pubsub.RPC) error {
 		// override rpc inspector of the spammer node to keep track of the iwants it has received.
 		if rpc.RPC.Control == nil || rpc.RPC.Control.Iwant == nil {
 			return nil
@@ -269,7 +269,7 @@ func TestGossipSubIHaveBrokenPromises_Above_Threshold(t *testing.T) {
 
 	// checks end-to-end message delivery works on GossipSub
 	p2ptest.EnsurePubsubMessageExchange(t, ctx, nodes, blockTopic, 1, func() interface{} {
-		return (*flow.UntrustedProposal)(unittest.ProposalFixture())
+		return (*messages.Proposal)(unittest.ProposalFixture())
 	})
 
 	initScore, ok := victimNode.PeerScoreExposer().GetScore(spammer.SpammerNode.ID())
@@ -359,7 +359,7 @@ func TestGossipSubIHaveBrokenPromises_Above_Threshold(t *testing.T) {
 
 	// since the spammer score is above the gossip, graylist and publish thresholds, it should be still able to exchange messages with victim.
 	p2ptest.EnsurePubsubMessageExchange(t, ctx, nodes, blockTopic, 1, func() interface{} {
-		return (*flow.UntrustedProposal)(unittest.ProposalFixture())
+		return (*messages.Proposal)(unittest.ProposalFixture())
 	})
 
 	// THIRD ROUND OF ATTACK: spammer sends 10 RPCs to the victim node, each containing 500 iHave messages, we expect spammer to be graylisted.
@@ -417,7 +417,7 @@ func TestGossipSubIHaveBrokenPromises_Above_Threshold(t *testing.T) {
 		blockTopic,
 		1,
 		func() interface{} {
-			return (*flow.UntrustedProposal)(unittest.ProposalFixture())
+			return (*messages.Proposal)(unittest.ProposalFixture())
 		})
 }
 

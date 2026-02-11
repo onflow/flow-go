@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math/big"
 
+	"github.com/holiman/uint256"
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/common"
 	"github.com/onflow/cadence/errors"
@@ -71,7 +72,6 @@ func newInternalEVMTypeGetLatestBlockFunction(
 		stdlib.InternalEVMTypeGetLatestBlockFunctionType,
 		func(invocation interpreter.Invocation) interpreter.Value {
 			context := invocation.InvocationContext
-			locationRange := invocation.LocationRange
 
 			latestBlock := handler.LastExecutedBlock()
 
@@ -79,7 +79,6 @@ func newInternalEVMTypeGetLatestBlockFunction(
 				handler,
 				gauge,
 				context,
-				locationRange,
 				latestBlock,
 			)
 		},
@@ -90,7 +89,6 @@ func NewEVMBlockValue(
 	handler types.ContractHandler,
 	gauge common.MemoryGauge,
 	context interpreter.MemberAccessibleContext,
-	locationRange interpreter.LocationRange,
 	block *types.Block,
 ) *interpreter.CompositeValue {
 	loc := common.NewAddressLocation(gauge, handler.EVMContractAddress(), stdlib.ContractName)
@@ -101,7 +99,6 @@ func NewEVMBlockValue(
 
 	return interpreter.NewCompositeValue(
 		context,
-		locationRange,
 		loc,
 		stdlib.EVMBlockTypeQualifiedIdentifier,
 		common.CompositeKindStructure,
@@ -141,13 +138,11 @@ func NewEVMBlockValue(
 
 func NewEVMAddress(
 	context interpreter.MemberAccessibleContext,
-	locationRange interpreter.LocationRange,
 	location common.AddressLocation,
 	address types.Address,
 ) *interpreter.CompositeValue {
 	return interpreter.NewCompositeValue(
 		context,
-		locationRange,
 		location,
 		stdlib.EVMAddressTypeQualifiedIdentifier,
 		common.CompositeKindStructure,
@@ -163,13 +158,11 @@ func NewEVMAddress(
 
 func NewEVMBytes(
 	context memberAccessibleArrayCreationContext,
-	locationRange interpreter.LocationRange,
 	location common.AddressLocation,
 	bytes []byte,
 ) *interpreter.CompositeValue {
 	return interpreter.NewCompositeValue(
 		context,
-		locationRange,
 		location,
 		stdlib.EVMBytesTypeQualifiedIdentifier,
 		common.CompositeKindStructure,
@@ -185,13 +178,11 @@ func NewEVMBytes(
 
 func NewEVMBytes4(
 	context memberAccessibleArrayCreationContext,
-	locationRange interpreter.LocationRange,
 	location common.AddressLocation,
 	bytes [4]byte,
 ) *interpreter.CompositeValue {
 	return interpreter.NewCompositeValue(
 		context,
-		locationRange,
 		location,
 		stdlib.EVMBytes4TypeQualifiedIdentifier,
 		common.CompositeKindStructure,
@@ -207,13 +198,11 @@ func NewEVMBytes4(
 
 func NewEVMBytes32(
 	context memberAccessibleArrayCreationContext,
-	locationRange interpreter.LocationRange,
 	location common.AddressLocation,
 	bytes [32]byte,
 ) *interpreter.CompositeValue {
 	return interpreter.NewCompositeValue(
 		context,
-		locationRange,
 		location,
 		stdlib.EVMBytes32TypeQualifiedIdentifier,
 		common.CompositeKindStructure,
@@ -229,7 +218,6 @@ func NewEVMBytes32(
 
 func AddressBytesArrayValueToEVMAddress(
 	context interpreter.ContainerMutationContext,
-	locationRange interpreter.LocationRange,
 	addressBytesValue *interpreter.ArrayValue,
 ) (
 	result types.Address,
@@ -238,11 +226,7 @@ func AddressBytesArrayValueToEVMAddress(
 	// Convert
 
 	var bytes []byte
-	bytes, err = interpreter.ByteArrayValueToByteSlice(
-		context,
-		addressBytesValue,
-		locationRange,
-	)
+	bytes, err = interpreter.ByteArrayValueToByteSlice(context, addressBytesValue)
 	if err != nil {
 		return result, err
 	}
@@ -388,14 +372,13 @@ func newInternalEVMTypeCodeFunction(
 		stdlib.InternalEVMTypeCodeFunctionType,
 		func(invocation interpreter.Invocation) interpreter.Value {
 			context := invocation.InvocationContext
-			locationRange := invocation.LocationRange
 
 			addressValue, ok := invocation.Arguments[0].(*interpreter.ArrayValue)
 			if !ok {
 				panic(errors.NewUnreachableError())
 			}
 
-			address, err := AddressBytesArrayValueToEVMAddress(context, locationRange, addressValue)
+			address, err := AddressBytesArrayValueToEVMAddress(context, addressValue)
 			if err != nil {
 				panic(err)
 			}
@@ -418,14 +401,13 @@ func newInternalEVMTypeNonceFunction(
 		stdlib.InternalEVMTypeNonceFunctionType,
 		func(invocation interpreter.Invocation) interpreter.Value {
 			context := invocation.InvocationContext
-			locationRange := invocation.LocationRange
 
 			addressValue, ok := invocation.Arguments[0].(*interpreter.ArrayValue)
 			if !ok {
 				panic(errors.NewUnreachableError())
 			}
 
-			address, err := AddressBytesArrayValueToEVMAddress(context, locationRange, addressValue)
+			address, err := AddressBytesArrayValueToEVMAddress(context, addressValue)
 			if err != nil {
 				panic(err)
 			}
@@ -447,7 +429,6 @@ func newInternalEVMTypeCallFunction(
 		stdlib.InternalEVMTypeCallFunctionType,
 		func(invocation interpreter.Invocation) interpreter.Value {
 			context := invocation.InvocationContext
-			locationRange := invocation.LocationRange
 
 			callArgs, err := parseCallArguments(invocation)
 			if err != nil {
@@ -464,7 +445,6 @@ func newInternalEVMTypeCallFunction(
 				handler,
 				gauge,
 				context,
-				locationRange,
 				result,
 			)
 		},
@@ -480,7 +460,6 @@ func newInternalEVMTypeDryCallFunction(
 		stdlib.InternalEVMTypeDryCallFunctionType,
 		func(invocation interpreter.Invocation) interpreter.Value {
 			context := invocation.InvocationContext
-			locationRange := invocation.LocationRange
 
 			callArgs, err := parseCallArguments(invocation)
 			if err != nil {
@@ -488,24 +467,19 @@ func newInternalEVMTypeDryCallFunction(
 			}
 			to := callArgs.to.ToCommon()
 
-			tx := gethTypes.NewTx(&gethTypes.LegacyTx{
+			txData := &gethTypes.LegacyTx{
 				Nonce:    0,
 				To:       &to,
 				Gas:      uint64(callArgs.gasLimit),
 				Data:     callArgs.data,
 				GasPrice: big.NewInt(0),
 				Value:    callArgs.balance,
-			})
-
-			txPayload, err := tx.MarshalBinary()
-			if err != nil {
-				panic(err)
 			}
 
 			// call contract function
 
-			res := handler.DryRun(txPayload, callArgs.from)
-			return NewResultValue(handler, gauge, context, locationRange, res)
+			res := handler.DryRunWithTxData(txData, callArgs.from)
+			return NewResultValue(handler, gauge, context, res)
 		},
 	)
 }
@@ -521,7 +495,6 @@ func newInternalEVMTypeDepositFunction(
 		stdlib.InternalEVMTypeDepositFunctionType,
 		func(invocation interpreter.Invocation) interpreter.Value {
 			context := invocation.InvocationContext
-			locationRange := invocation.LocationRange
 
 			// Get from vault
 
@@ -547,7 +520,7 @@ func newInternalEVMTypeDepositFunction(
 				panic(errors.NewUnreachableError())
 			}
 
-			toAddress, err := AddressBytesArrayValueToEVMAddress(context, locationRange, toAddressValue)
+			toAddress, err := AddressBytesArrayValueToEVMAddress(context, toAddressValue)
 			if err != nil {
 				panic(err)
 			}
@@ -578,14 +551,13 @@ func newInternalEVMTypeBalanceFunction(
 		stdlib.InternalEVMTypeBalanceFunctionType,
 		func(invocation interpreter.Invocation) interpreter.Value {
 			context := invocation.InvocationContext
-			locationRange := invocation.LocationRange
 
 			addressValue, ok := invocation.Arguments[0].(*interpreter.ArrayValue)
 			if !ok {
 				panic(errors.NewUnreachableError())
 			}
 
-			address, err := AddressBytesArrayValueToEVMAddress(context, locationRange, addressValue)
+			address, err := AddressBytesArrayValueToEVMAddress(context, addressValue)
 			if err != nil {
 				panic(err)
 			}
@@ -608,14 +580,13 @@ func newInternalEVMTypeCodeHashFunction(
 		stdlib.InternalEVMTypeCodeHashFunctionType,
 		func(invocation interpreter.Invocation) interpreter.Value {
 			context := invocation.InvocationContext
-			locationRange := invocation.LocationRange
 
 			addressValue, ok := invocation.Arguments[0].(*interpreter.ArrayValue)
 			if !ok {
 				panic(errors.NewUnreachableError())
 			}
 
-			address, err := AddressBytesArrayValueToEVMAddress(context, locationRange, addressValue)
+			address, err := AddressBytesArrayValueToEVMAddress(context, addressValue)
 			if err != nil {
 				panic(err)
 			}
@@ -637,7 +608,6 @@ func newInternalEVMTypeWithdrawFunction(
 		stdlib.InternalEVMTypeWithdrawFunctionType,
 		func(invocation interpreter.Invocation) interpreter.Value {
 			context := invocation.InvocationContext
-			locationRange := invocation.LocationRange
 
 			// Get from address
 
@@ -646,7 +616,7 @@ func newInternalEVMTypeWithdrawFunction(
 				panic(errors.NewUnreachableError())
 			}
 
-			fromAddress, err := AddressBytesArrayValueToEVMAddress(context, locationRange, fromAddressValue)
+			fromAddress, err := AddressBytesArrayValueToEVMAddress(context, fromAddressValue)
 			if err != nil {
 				panic(err)
 			}
@@ -658,7 +628,19 @@ func newInternalEVMTypeWithdrawFunction(
 				panic(errors.NewUnreachableError())
 			}
 
-			amount := types.NewBalance(amountValue.BigInt)
+			_, overflow := uint256.FromBig(amountValue.BigInt)
+			if overflow {
+				panic(types.ErrInvalidBalance)
+			}
+
+			// check balance is not prone to rounding error
+			if !types.AttoFlowBalanceIsValidForFlowVault(amountValue.BigInt) {
+				panic(types.ErrWithdrawBalanceRounding)
+			}
+
+			// this is where rounding from Atto scale to UFix scale happens.
+			value := new(big.Int).Div(amountValue.BigInt, types.UFixToAttoConversionMultiplier)
+			amount := types.NewBalanceFromUFix64(cadence.UFix64(value.Uint64()))
 
 			// Withdraw
 
@@ -670,6 +652,8 @@ func newInternalEVMTypeWithdrawFunction(
 			if err != nil {
 				panic(err)
 			}
+			// We have already truncated the remainder above, but we still leave
+			// the rounding check in as a redundancy.
 			if roundedOff {
 				panic(types.ErrWithdrawBalanceRounding)
 			}
@@ -677,7 +661,6 @@ func newInternalEVMTypeWithdrawFunction(
 			// TODO: improve: maybe call actual constructor
 			return interpreter.NewCompositeValue(
 				context,
-				locationRange,
 				common.NewAddressLocation(gauge, handler.FlowTokenAddress(), "FlowToken"),
 				"FlowToken.Vault",
 				common.CompositeKindResource,
@@ -710,7 +693,6 @@ func newInternalEVMTypeDeployFunction(
 		stdlib.InternalEVMTypeDeployFunctionType,
 		func(invocation interpreter.Invocation) interpreter.Value {
 			context := invocation.InvocationContext
-			locationRange := invocation.LocationRange
 
 			// Get from address
 
@@ -719,7 +701,7 @@ func newInternalEVMTypeDeployFunction(
 				panic(errors.NewUnreachableError())
 			}
 
-			fromAddress, err := AddressBytesArrayValueToEVMAddress(context, locationRange, fromAddressValue)
+			fromAddress, err := AddressBytesArrayValueToEVMAddress(context, fromAddressValue)
 			if err != nil {
 				panic(err)
 			}
@@ -731,7 +713,7 @@ func newInternalEVMTypeDeployFunction(
 				panic(errors.NewUnreachableError())
 			}
 
-			code, err := interpreter.ByteArrayValueToByteSlice(context, codeValue, locationRange)
+			code, err := interpreter.ByteArrayValueToByteSlice(context, codeValue)
 			if err != nil {
 				panic(err)
 			}
@@ -760,8 +742,12 @@ func newInternalEVMTypeDeployFunction(
 			account := handler.AccountByAddress(fromAddress, isAuthorized)
 			result := account.Deploy(code, gasLimit, amount)
 
-			res := NewResultValue(handler, gauge, context, locationRange, result)
-			return res
+			return NewResultValue(
+				handler,
+				gauge,
+				context,
+				result,
+			)
 		},
 	)
 }
@@ -830,7 +816,6 @@ func newInternalEVMTypeRunFunction(
 		stdlib.InternalEVMTypeRunFunctionType,
 		func(invocation interpreter.Invocation) interpreter.Value {
 			context := invocation.InvocationContext
-			locationRange := invocation.LocationRange
 
 			// Get transaction argument
 
@@ -839,7 +824,7 @@ func newInternalEVMTypeRunFunction(
 				panic(errors.NewUnreachableError())
 			}
 
-			transaction, err := interpreter.ByteArrayValueToByteSlice(context, transactionValue, locationRange)
+			transaction, err := interpreter.ByteArrayValueToByteSlice(context, transactionValue)
 			if err != nil {
 				panic(err)
 			}
@@ -851,7 +836,7 @@ func newInternalEVMTypeRunFunction(
 				panic(errors.NewUnreachableError())
 			}
 
-			gasFeeCollector, err := interpreter.ByteArrayValueToByteSlice(context, gasFeeCollectorValue, locationRange)
+			gasFeeCollector, err := interpreter.ByteArrayValueToByteSlice(context, gasFeeCollectorValue)
 			if err != nil {
 				panic(err)
 			}
@@ -859,7 +844,12 @@ func newInternalEVMTypeRunFunction(
 			// run transaction
 			result := handler.Run(transaction, types.NewAddressFromBytes(gasFeeCollector))
 
-			return NewResultValue(handler, gauge, context, locationRange, result)
+			return NewResultValue(
+				handler,
+				gauge,
+				context,
+				result,
+			)
 		},
 	)
 }
@@ -873,7 +863,6 @@ func newInternalEVMTypeDryRunFunction(
 		stdlib.InternalEVMTypeDryRunFunctionType,
 		func(invocation interpreter.Invocation) interpreter.Value {
 			context := invocation.InvocationContext
-			locationRange := invocation.LocationRange
 
 			// Get transaction argument
 
@@ -882,7 +871,7 @@ func newInternalEVMTypeDryRunFunction(
 				panic(errors.NewUnreachableError())
 			}
 
-			transaction, err := interpreter.ByteArrayValueToByteSlice(context, transactionValue, locationRange)
+			transaction, err := interpreter.ByteArrayValueToByteSlice(context, transactionValue)
 			if err != nil {
 				panic(err)
 			}
@@ -894,7 +883,7 @@ func newInternalEVMTypeDryRunFunction(
 				panic(errors.NewUnreachableError())
 			}
 
-			from, err := interpreter.ByteArrayValueToByteSlice(context, fromValue, locationRange)
+			from, err := interpreter.ByteArrayValueToByteSlice(context, fromValue)
 			if err != nil {
 				panic(err)
 			}
@@ -902,7 +891,12 @@ func newInternalEVMTypeDryRunFunction(
 			// call estimate
 
 			res := handler.DryRun(transaction, types.NewAddressFromBytes(from))
-			return NewResultValue(handler, gauge, context, locationRange, res)
+			return NewResultValue(
+				handler,
+				gauge,
+				context,
+				res,
+			)
 		},
 	)
 }
@@ -916,7 +910,6 @@ func newInternalEVMTypeBatchRunFunction(
 		stdlib.InternalEVMTypeBatchRunFunctionType,
 		func(invocation interpreter.Invocation) interpreter.Value {
 			context := invocation.InvocationContext
-			locationRange := invocation.LocationRange
 
 			// Get transactions batch argument
 			transactionsBatchValue, ok := invocation.Arguments[0].(*interpreter.ArrayValue)
@@ -929,15 +922,19 @@ func newInternalEVMTypeBatchRunFunction(
 			if batchCount > 0 {
 				transactionBatch = make([][]byte, batchCount)
 				i := 0
-				transactionsBatchValue.Iterate(context, func(transactionValue interpreter.Value) (resume bool) {
-					t, err := interpreter.ByteArrayValueToByteSlice(context, transactionValue, locationRange)
-					if err != nil {
-						panic(err)
-					}
-					transactionBatch[i] = t
-					i++
-					return true
-				}, false, locationRange)
+				transactionsBatchValue.Iterate(
+					context,
+					func(transactionValue interpreter.Value) (resume bool) {
+						t, err := interpreter.ByteArrayValueToByteSlice(context, transactionValue)
+						if err != nil {
+							panic(err)
+						}
+						transactionBatch[i] = t
+						i++
+						return true
+					},
+					false,
+				)
 			}
 
 			// Get gas fee collector argument
@@ -946,7 +943,7 @@ func newInternalEVMTypeBatchRunFunction(
 				panic(errors.NewUnreachableError())
 			}
 
-			gasFeeCollector, err := interpreter.ByteArrayValueToByteSlice(context, gasFeeCollectorValue, locationRange)
+			gasFeeCollector, err := interpreter.ByteArrayValueToByteSlice(context, gasFeeCollectorValue)
 			if err != nil {
 				panic(err)
 			}
@@ -954,7 +951,7 @@ func newInternalEVMTypeBatchRunFunction(
 			// Batch run
 			batchResults := handler.BatchRun(transactionBatch, types.NewAddressFromBytes(gasFeeCollector))
 
-			values := newResultValues(handler, gauge, context, locationRange, batchResults)
+			values := newResultValues(handler, gauge, context, batchResults)
 
 			loc := common.NewAddressLocation(gauge, handler.EVMContractAddress(), stdlib.ContractName)
 			evmResultType := interpreter.NewVariableSizedStaticType(
@@ -973,7 +970,6 @@ func newInternalEVMTypeBatchRunFunction(
 
 			return interpreter.NewArrayValue(
 				context,
-				locationRange,
 				evmResultType,
 				common.ZeroAddress,
 				values...,
@@ -987,7 +983,6 @@ func newResultValues(
 	handler types.ContractHandler,
 	gauge common.MemoryGauge,
 	context interpreter.MemberAccessibleContext,
-	locationRange interpreter.LocationRange,
 	results []*types.ResultSummary,
 ) []interpreter.Value {
 	var values []interpreter.Value
@@ -998,7 +993,6 @@ func newResultValues(
 				handler,
 				gauge,
 				context,
-				locationRange,
 				result,
 			)
 			values = append(values, res)
@@ -1011,7 +1005,6 @@ func NewResultValue(
 	handler types.ContractHandler,
 	gauge common.MemoryGauge,
 	context interpreter.MemberAccessibleContext,
-	locationRange interpreter.LocationRange,
 	result *types.ResultSummary,
 ) *interpreter.CompositeValue {
 
@@ -1028,7 +1021,6 @@ func NewResultValue(
 			context,
 			NewEVMAddress(
 				context,
-				locationRange,
 				evmContractLocation,
 				*deployedContractAddress,
 			),
@@ -1040,7 +1032,6 @@ func NewResultValue(
 			Name: "status",
 			Value: interpreter.NewEnumCaseValue(
 				context,
-				locationRange,
 				&sema.CompositeType{
 					Location:   evmContractLocation,
 					Identifier: stdlib.EVMStatusTypeQualifiedIdentifier,
@@ -1086,7 +1077,6 @@ func NewResultValue(
 
 	return interpreter.NewCompositeValue(
 		context,
-		locationRange,
 		evmContractLocation,
 		stdlib.EVMResultTypeQualifiedIdentifier,
 		common.CompositeKindStructure,
@@ -1178,6 +1168,7 @@ func ResultSummaryFromEVMResultValue(val cadence.Value) (*types.ResultSummary, e
 		ErrorCode:               types.ErrorCode(errorCode),
 		ErrorMessage:            string(errorMsg),
 		GasConsumed:             uint64(gasUsed),
+		MaxGasConsumed:          uint64(gasUsed),
 		ReturnedData:            convertedData,
 		DeployedContractAddress: convertedDeployedAddress,
 	}, nil
@@ -1197,7 +1188,6 @@ func parseCallArguments(invocation interpreter.Invocation) (
 	error,
 ) {
 	context := invocation.InvocationContext
-	locationRange := invocation.LocationRange
 
 	// Get from address
 
@@ -1206,7 +1196,7 @@ func parseCallArguments(invocation interpreter.Invocation) (
 		return nil, errors.NewUnreachableError()
 	}
 
-	fromAddress, err := AddressBytesArrayValueToEVMAddress(context, locationRange, fromAddressValue)
+	fromAddress, err := AddressBytesArrayValueToEVMAddress(context, fromAddressValue)
 	if err != nil {
 		return nil, err
 	}
@@ -1218,7 +1208,7 @@ func parseCallArguments(invocation interpreter.Invocation) (
 		return nil, errors.NewUnreachableError()
 	}
 
-	toAddress, err := AddressBytesArrayValueToEVMAddress(context, locationRange, toAddressValue)
+	toAddress, err := AddressBytesArrayValueToEVMAddress(context, toAddressValue)
 	if err != nil {
 		return nil, err
 	}
@@ -1230,7 +1220,7 @@ func parseCallArguments(invocation interpreter.Invocation) (
 		return nil, errors.NewUnreachableError()
 	}
 
-	data, err := interpreter.ByteArrayValueToByteSlice(context, dataValue, locationRange)
+	data, err := interpreter.ByteArrayValueToByteSlice(context, dataValue)
 	if err != nil {
 		return nil, err
 	}

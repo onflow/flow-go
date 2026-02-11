@@ -19,7 +19,7 @@ var _ Environment = &facadeEnvironment{}
 
 // facadeEnvironment exposes various fvm business logic as a single interface.
 type facadeEnvironment struct {
-	*Runtime
+	CadenceRuntimeProvider
 
 	tracing.TracerSpan
 	Meter
@@ -61,10 +61,10 @@ func newFacadeEnvironment(
 	params EnvironmentParams,
 	txnState storage.TransactionPreparer,
 	meter Meter,
+	runtime CadenceRuntimeProvider,
 ) *facadeEnvironment {
 	accounts := NewAccounts(txnState)
 	logger := NewProgramLogger(tracer, params.ProgramLoggerParams)
-	runtime := NewRuntime(params.RuntimeParams)
 	chain := params.Chain
 	systemContracts := NewSystemContracts(
 		chain,
@@ -75,7 +75,7 @@ func newFacadeEnvironment(
 	sc := systemcontracts.SystemContractsForChain(chain.ChainID())
 
 	env := &facadeEnvironment{
-		Runtime: runtime,
+		CadenceRuntimeProvider: runtime,
 
 		TracerSpan: tracer,
 		Meter:      meter,
@@ -152,7 +152,7 @@ func newFacadeEnvironment(
 		txnState: txnState,
 	}
 
-	env.Runtime.SetEnvironment(env)
+	env.CadenceRuntimeProvider.SetEnvironment(env)
 
 	return env
 }
@@ -178,11 +178,14 @@ func NewScriptEnv(
 	params EnvironmentParams,
 	txnState storage.TransactionPreparer,
 ) *facadeEnvironment {
+	cadenceRuntime := NewRuntime(params.RuntimeParams, CadenceScriptRuntime)
+
 	env := newFacadeEnvironment(
 		tracer,
 		params,
 		txnState,
-		NewCancellableMeter(ctx, txnState))
+		NewCancellableMeter(ctx, txnState),
+		cadenceRuntime)
 	env.RandomGenerator = NewRandomGenerator(
 		tracer,
 		params.EntropyProvider,
@@ -197,11 +200,13 @@ func NewTransactionEnvironment(
 	params EnvironmentParams,
 	txnState storage.TransactionPreparer,
 ) *facadeEnvironment {
+	cadenceRuntime := NewRuntime(params.RuntimeParams, CadenceTransactionRuntime)
 	env := newFacadeEnvironment(
 		tracer,
 		params,
 		txnState,
 		NewMeter(txnState),
+		cadenceRuntime,
 	)
 
 	env.TransactionInfo = NewTransactionInfo(
@@ -235,7 +240,7 @@ func NewTransactionEnvironment(
 		params.ContractUpdaterParams,
 		env.ProgramLogger,
 		env.SystemContracts,
-		env.Runtime)
+		cadenceRuntime)
 
 	env.AccountKeyUpdater = NewAccountKeyUpdater(
 		tracer,
@@ -348,7 +353,6 @@ func (env *facadeEnvironment) RecoverProgram(program *ast.Program, location comm
 
 func (env *facadeEnvironment) ValidateAccountCapabilitiesGet(
 	_ interpreter.AccountCapabilityGetValidationContext,
-	_ interpreter.LocationRange,
 	_ interpreter.AddressValue,
 	_ interpreter.PathValue,
 	wantedBorrowType *sema.ReferenceType,
@@ -357,9 +361,7 @@ func (env *facadeEnvironment) ValidateAccountCapabilitiesGet(
 	_, hasEntitlements := wantedBorrowType.Authorization.(sema.EntitlementSetAccess)
 	if hasEntitlements {
 		// TODO: maybe abort
-		//return false, interpreter.GetCapabilityError{
-		//	LocationRange: locationRange,
-		//}
+		//return false, &interpreter.GetCapabilityError{}
 		return false, nil
 	}
 	return true, nil
@@ -367,7 +369,6 @@ func (env *facadeEnvironment) ValidateAccountCapabilitiesGet(
 
 func (env *facadeEnvironment) ValidateAccountCapabilitiesPublish(
 	_ interpreter.AccountCapabilityPublishValidationContext,
-	_ interpreter.LocationRange,
 	_ interpreter.AddressValue,
 	_ interpreter.PathValue,
 	capabilityBorrowType *interpreter.ReferenceStaticType,

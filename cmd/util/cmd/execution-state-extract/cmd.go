@@ -23,6 +23,7 @@ import (
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/store"
 )
 
@@ -51,7 +52,7 @@ var (
 var Cmd = &cobra.Command{
 	Use:   "execution-state-extract",
 	Short: "Reads WAL files and generates the checkpoint containing state commitment for given block hash",
-	Run:   run,
+	RunE:  runE,
 }
 
 func init() {
@@ -72,8 +73,7 @@ func init() {
 	Cmd.Flags().StringVar(&flagBlockHash, "block-hash", "",
 		"Block hash (hex-encoded, 64 characters)")
 
-	Cmd.Flags().StringVar(&flagDatadir, "datadir", "",
-		"directory that stores the protocol state")
+	common.InitDataDirFlag(Cmd, &flagDatadir)
 
 	Cmd.Flags().BoolVar(&flagNoMigration, "no-migration", false,
 		"don't migrate the state")
@@ -134,16 +134,16 @@ func init() {
 		"validate migrated account public keys")
 }
 
-func run(*cobra.Command, []string) {
+func runE(*cobra.Command, []string) error {
 	if flagCPUProfile != "" {
 		f, err := os.Create(flagCPUProfile)
 		if err != nil {
-			log.Fatal().Err(err).Msg("could not create CPU profile")
+			return fmt.Errorf("could not create CPU profile: %w", err)
 		}
 
 		err = pprof.StartCPUProfile(f)
 		if err != nil {
-			log.Fatal().Err(err).Msg("could not start CPU profile")
+			return fmt.Errorf("could not start CPU profile: %w", err)
 		}
 
 		defer pprof.StopCPUProfile()
@@ -151,30 +151,28 @@ func run(*cobra.Command, []string) {
 
 	err := os.MkdirAll(flagOutputDir, 0755)
 	if err != nil {
-		log.Fatal().Err(err).Msgf("cannot create output directory %s", flagOutputDir)
+		return fmt.Errorf("cannot create output directory %s: %w", flagOutputDir, err)
 	}
 
 	if flagNoMigration && flagZeroMigration {
-		log.Fatal().Msg("cannot run the command with both --no-migration and --estimate-migration-duration flags, one of them or none of them should be provided")
-		return
+		return fmt.Errorf("cannot run the command with both --no-migration and --estimate-migration-duration flags, one of them or none of them should be provided")
 	}
 
 	if len(flagBlockHash) > 0 && len(flagStateCommitment) > 0 {
-		log.Fatal().Msg("cannot run the command with both block hash and state commitment as inputs, only one of them should be provided")
-		return
+		return fmt.Errorf("cannot run the command with both block hash and state commitment as inputs, only one of them should be provided")
 	}
 
 	if len(flagBlockHash) == 0 && len(flagStateCommitment) == 0 && len(flagInputPayloadFileName) == 0 {
-		log.Fatal().Msg("--block-hash or --state-commitment or --input-payload-filename must be specified")
+		return fmt.Errorf("--block-hash or --state-commitment or --input-payload-filename must be specified")
 	}
 
 	if len(flagInputPayloadFileName) > 0 && (len(flagBlockHash) > 0 || len(flagStateCommitment) > 0) {
-		log.Fatal().Msg("--input-payload-filename cannot be used with --block-hash or --state-commitment")
+		return fmt.Errorf("--input-payload-filename cannot be used with --block-hash or --state-commitment")
 	}
 
 	// When flagOutputPayloadByAddresses is specified, flagOutputPayloadFileName is required.
 	if len(flagOutputPayloadFileName) == 0 && len(flagOutputPayloadByAddresses) > 0 {
-		log.Fatal().Msg("--extract-payloads-by-address requires --output-payload-filename to be specified")
+		return fmt.Errorf("--extract-payloads-by-address requires --output-payload-filename to be specified")
 	}
 
 	var stateCommitment flow.StateCommitment
@@ -182,23 +180,23 @@ func run(*cobra.Command, []string) {
 	if len(flagBlockHash) > 0 {
 		blockID, err := flow.HexStringToIdentifier(flagBlockHash)
 		if err != nil {
-			log.Fatal().Err(err).Msg("malformed block hash")
+			return fmt.Errorf("malformed block hash: %w", err)
 		}
 
 		log.Info().Msgf("extracting state by block ID: %v", blockID)
 
-		db, err := common.InitStorage(flagDatadir)
-		if err != nil {
-			log.Fatal().Err(err).Msgf("cannot initialize storage with datadir %s", flagDatadir)
-		}
-		defer db.Close()
+		err = common.WithStorage(flagDatadir, func(db storage.DB) error {
+			cache := &metrics.NoopCollector{}
+			commits := store.NewCommits(cache, db)
 
-		cache := &metrics.NoopCollector{}
-		commits := store.NewCommits(cache, db)
-
-		stateCommitment, err = commits.ByBlockID(blockID)
+			stateCommitment, err = commits.ByBlockID(blockID)
+			if err != nil {
+				return fmt.Errorf("cannot get state commitment for block %v: %w", blockID, err)
+			}
+			return nil
+		})
 		if err != nil {
-			log.Fatal().Err(err).Msgf("cannot get state commitment for block %v", blockID)
+			return fmt.Errorf("cannot initialize storage with datadir %s: %w", flagDatadir, err)
 		}
 	}
 
@@ -206,11 +204,11 @@ func run(*cobra.Command, []string) {
 		var err error
 		stateCommitmentBytes, err := hex.DecodeString(flagStateCommitment)
 		if err != nil {
-			log.Fatal().Err(err).Msg("cannot get decode the state commitment")
+			return fmt.Errorf("cannot decode the state commitment: %w", err)
 		}
 		stateCommitment, err = flow.ToStateCommitment(stateCommitmentBytes)
 		if err != nil {
-			log.Fatal().Err(err).Msg("invalid state commitment length")
+			return fmt.Errorf("invalid state commitment length: %w", err)
 		}
 
 		log.Info().Msgf("extracting state by state commitment: %x", stateCommitment)
@@ -218,17 +216,17 @@ func run(*cobra.Command, []string) {
 
 	if len(flagInputPayloadFileName) > 0 {
 		if _, err := os.Stat(flagInputPayloadFileName); os.IsNotExist(err) {
-			log.Fatal().Msgf("payload input file %s doesn't exist", flagInputPayloadFileName)
+			return fmt.Errorf("payload input file %s doesn't exist", flagInputPayloadFileName)
 		}
 
 		partialState, err := util.IsPayloadFilePartialState(flagInputPayloadFileName)
 		if err != nil {
-			log.Fatal().Err(err).Msgf("cannot get flag from payload input file %s", flagInputPayloadFileName)
+			return fmt.Errorf("cannot get flag from payload input file %s: %w", flagInputPayloadFileName, err)
 		}
 
 		// Check if payload file contains partial state and is allowed by --allow-partial-state-from-payload-file.
 		if !flagAllowPartialStateFromPayloads && partialState {
-			log.Fatal().Msgf("payload input file %s contains partial state, please specify --allow-partial-state-from-payload-file", flagInputPayloadFileName)
+			return fmt.Errorf("payload input file %s contains partial state, please specify --allow-partial-state-from-payload-file", flagInputPayloadFileName)
 		}
 
 		msg := "input payloads represent "
@@ -247,7 +245,7 @@ func run(*cobra.Command, []string) {
 
 	if len(flagOutputPayloadFileName) > 0 {
 		if _, err := os.Stat(flagOutputPayloadFileName); os.IsExist(err) {
-			log.Fatal().Msgf("payload output file %s exists", flagOutputPayloadFileName)
+			return fmt.Errorf("payload output file %s exists", flagOutputPayloadFileName)
 		}
 	}
 
@@ -257,7 +255,7 @@ func run(*cobra.Command, []string) {
 		var err error
 		exportPayloadsForOwners, err = common2.ParseOwners(strings.Split(flagOutputPayloadByAddresses, ","))
 		if err != nil {
-			log.Fatal().Err(err).Msgf("failed to parse addresses")
+			return fmt.Errorf("failed to parse addresses: %w", err)
 		}
 	}
 
@@ -320,11 +318,11 @@ func run(*cobra.Command, []string) {
 			flagOutputDir,
 			stateCommitment)
 		if err != nil {
-			log.Fatal().Err(err).Msgf("error extracting state for commitment %s", stateCommitment)
+			return fmt.Errorf("error extracting state for commitment %s: %w", stateCommitment, err)
 		}
 
 		reportExtraction(stateCommitment, exportedState)
-		return
+		return nil
 	}
 
 	if flagZeroMigration {
@@ -334,12 +332,12 @@ func run(*cobra.Command, []string) {
 			flagOutputDir,
 			stateCommitment)
 		if err != nil {
-			log.Fatal().Err(err).Msgf("error extracting state for commitment %s", stateCommitment)
+			return fmt.Errorf("error extracting state for commitment %s: %w", stateCommitment, err)
 		}
 		if stateCommitment != flow.StateCommitment(newStateCommitment) {
-			log.Fatal().Err(err).Msgf("empty migration failed: state commitments are different: %v != %s", stateCommitment, newStateCommitment)
+			return fmt.Errorf("empty migration failed: state commitments are different: %v != %s", stateCommitment, newStateCommitment)
 		}
-		return
+		return nil
 	}
 
 	var extractor extractor
@@ -353,7 +351,7 @@ func run(*cobra.Command, []string) {
 
 	payloadsFromPartialState, payloads, err := extractor.extract()
 	if err != nil {
-		log.Fatal().Err(err).Msgf("error extracting payloads: %s", err.Error())
+		return fmt.Errorf("error extracting payloads: %w", err)
 	}
 
 	log.Info().Msgf("extracted %d payloads", len(payloads))
@@ -368,37 +366,15 @@ func run(*cobra.Command, []string) {
 			case "add-migrationmainnet-keys":
 				migs = append(migs, addMigrationMainnetKeysMigration(log.Logger, flagOutputDir, flagNWorker, chain.ChainID())...)
 			default:
-				log.Fatal().Msgf("unknown migration: %s", flagMigration)
+				return fmt.Errorf("unknown migration: %s", flagMigration)
 			}
 		}
-
-		migs = append(
-			migs,
-			migrations.NamedMigration{
-				Name: "account-public-key-deduplication",
-				Migrate: migrations.NewAccountBasedMigration(
-					log.Logger,
-					flagNWorker,
-					[]migrations.AccountBasedMigration{
-						migrations.NewAccountPublicKeyDeduplicationMigration(
-							chain.ChainID(),
-							flagOutputDir,
-							flagValidate,
-							reporters.NewReportFileWriterFactory(flagOutputDir, log.Logger),
-						),
-						migrations.NewAccountUsageMigration(
-							reporters.NewReportFileWriterFactoryWithFormat(flagOutputDir, log.Logger, reporters.ReportFormatCSV),
-						),
-					},
-				),
-			},
-		)
 
 		migration := newMigration(log.Logger, migs, flagNWorker)
 
 		payloads, err = migration(payloads)
 		if err != nil {
-			log.Fatal().Err(err).Msgf("error migrating payloads: %s", err.Error())
+			return fmt.Errorf("error migrating payloads: %w", err)
 		}
 
 		log.Info().Msgf("migrated %d payloads", len(payloads))
@@ -426,12 +402,13 @@ func run(*cobra.Command, []string) {
 
 	exportedState, err := exporter.export(payloadsFromPartialState, payloads)
 	if err != nil {
-		log.Fatal().Err(err).Msgf("error exporting migrated payloads: %s", err.Error())
+		return fmt.Errorf("error exporting migrated payloads: %w", err)
 	}
 
 	log.Info().Msgf("exported %d payloads", len(payloads))
 
 	reportExtraction(stateCommitment, exportedState)
+	return nil
 }
 
 func reportExtraction(loadedState flow.StateCommitment, exportedState ledger.State) {

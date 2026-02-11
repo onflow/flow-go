@@ -164,7 +164,7 @@ type contractUpdaterStubsImpl struct {
 
 	logger          *ProgramLogger
 	systemContracts *SystemContracts
-	runtime         *Runtime
+	runtime         CadenceRuntimeProvider
 }
 
 func (impl *contractUpdaterStubsImpl) RestrictedDeploymentEnabled() bool {
@@ -191,7 +191,7 @@ func (impl *contractUpdaterStubsImpl) getIsContractDeploymentRestricted() (
 	defer impl.runtime.ReturnCadenceRuntime(runtime)
 
 	value, err := runtime.ReadStored(
-		common.MustBytesToAddress(service.Bytes()),
+		common.Address(service),
 		blueprints.IsContractDeploymentRestrictedPath)
 	if err != nil {
 		impl.logger.
@@ -238,7 +238,7 @@ func (impl *contractUpdaterStubsImpl) GetAuthorizedAccounts(
 	defer impl.runtime.ReturnCadenceRuntime(runtime)
 
 	value, err := runtime.ReadStored(
-		common.MustBytesToAddress(service.Bytes()),
+		common.Address(service),
 		path)
 
 	const warningMsg = "failed to read contract authorized accounts from " +
@@ -296,7 +296,7 @@ func NewContractUpdater(
 	params ContractUpdaterParams,
 	logger *ProgramLogger,
 	systemContracts *SystemContracts,
-	runtime *Runtime,
+	runtime CadenceRuntimeProvider,
 ) *ContractUpdaterImpl {
 	updater := &ContractUpdaterImpl{
 		tracer:          tracer,
@@ -378,7 +378,7 @@ func (updater *ContractUpdaterImpl) SetContract(
 	// Initial contract deployments must be authorized by signing accounts.
 	//
 	// Contract updates are always allowed.
-	exists, err := updater.accounts.ContractExists(location.Name, flow.ConvertAddress(location.Address))
+	exists, err := updater.accounts.ContractExists(location.Name, flow.Address(location.Address))
 	if err != nil {
 		return err
 	}
@@ -433,7 +433,7 @@ func (updater *ContractUpdaterImpl) Commit() (ContractUpdates, error) {
 	var err error
 	for _, v := range updateList {
 		var currentlyExists bool
-		currentlyExists, err = updater.accounts.ContractExists(v.Location.Name, flow.ConvertAddress(v.Location.Address))
+		currentlyExists, err = updater.accounts.ContractExists(v.Location.Name, flow.Address(v.Location.Address))
 		if err != nil {
 			return ContractUpdates{}, err
 		}
@@ -442,7 +442,7 @@ func (updater *ContractUpdaterImpl) Commit() (ContractUpdates, error) {
 		if shouldDelete {
 			// this is a removal
 			contractUpdates.Deletions = append(contractUpdates.Deletions, v.Location)
-			err = updater.accounts.DeleteContract(v.Location.Name, flow.ConvertAddress(v.Location.Address))
+			err = updater.accounts.DeleteContract(v.Location.Name, flow.Address(v.Location.Address))
 			if err != nil {
 				return ContractUpdates{}, err
 			}
@@ -455,7 +455,11 @@ func (updater *ContractUpdaterImpl) Commit() (ContractUpdates, error) {
 				contractUpdates.Updates = append(contractUpdates.Updates, v.Location)
 			}
 
-			err = updater.accounts.SetContract(v.Location.Name, flow.ConvertAddress(v.Location.Address), v.Code)
+			err = updater.accounts.SetContract(
+				v.Location.Name,
+				flow.Address(v.Location.Address),
+				v.Code,
+			)
 			if err != nil {
 				return ContractUpdates{}, err
 			}
@@ -541,7 +545,7 @@ func cadenceValueToAddressSlice(value cadence.Value) (
 		if !ok {
 			return nil, false
 		}
-		addresses = append(addresses, flow.ConvertAddress(a))
+		addresses = append(addresses, flow.Address(a))
 	}
 	return addresses, true
 }

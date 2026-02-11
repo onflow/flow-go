@@ -5,7 +5,12 @@ import (
 	"math/big"
 	"testing"
 
+	"github.com/holiman/uint256"
 	"github.com/stretchr/testify/require"
+
+	"github.com/ethereum/go-ethereum/common"
+	gethTypes "github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/params"
 
 	"github.com/onflow/flow-go/fvm/evm/handler"
 	"github.com/onflow/flow-go/fvm/evm/offchain/blocks"
@@ -13,6 +18,7 @@ import (
 	"github.com/onflow/flow-go/fvm/evm/offchain/storage"
 	"github.com/onflow/flow-go/fvm/evm/precompiles"
 	. "github.com/onflow/flow-go/fvm/evm/testutils"
+	"github.com/onflow/flow-go/fvm/evm/testutils/contracts"
 	"github.com/onflow/flow-go/fvm/evm/types"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -31,7 +37,7 @@ func TestView(t *testing.T) {
 						blks, err := blocks.NewBlocks(chainID, rootAddr, backend)
 						require.NoError(t, err)
 
-						maxCallGasLimit := uint64(5_000_000)
+						maxCallGasLimit := params.MaxTxGas + 10_000_000
 						view := query.NewView(
 							chainID,
 							rootAddr,
@@ -87,6 +93,7 @@ func TestView(t *testing.T) {
 							testAccount.Address().ToCommon(),
 							testContract.DeployedAt.ToCommon(),
 							testContract.MakeCallData(t, "verifyArchCallToFlowBlockHeight", expectedFlowHeight),
+							[]gethTypes.SetCodeAuthorization{},
 							big.NewInt(0),
 							uint64(1_000_000),
 							query.WithExtraPrecompiledContracts(
@@ -96,7 +103,7 @@ func TestView(t *testing.T) {
 						require.NoError(t, res.ValidationError)
 						require.NoError(t, res.VMError)
 
-						// test dry call with overrides
+						// test dry call with balance state overrides
 						newBalance := big.NewInt(3000)
 						res, err = view.DryCall(
 							testAccount.Address().ToCommon(),
@@ -104,7 +111,9 @@ func TestView(t *testing.T) {
 							testContract.MakeCallData(t,
 								"checkBalance",
 								testAccount.Address().ToCommon(),
-								newBalance),
+								newBalance,
+							),
+							[]gethTypes.SetCodeAuthorization{},
 							big.NewInt(0),
 							uint64(1_000_000),
 							query.WithStateOverrideBalance(
@@ -116,18 +125,329 @@ func TestView(t *testing.T) {
 						require.NoError(t, res.ValidationError)
 						require.NoError(t, res.VMError)
 
-						// test max gas limit
+						// test we can go above the EIP-7825 max tx gas
 						_, err = view.DryCall(
 							testAccount.Address().ToCommon(),
 							testContract.DeployedAt.ToCommon(),
 							testContract.MakeCallData(t,
 								"store",
-								big.NewInt(2)),
+								big.NewInt(2),
+							),
+							[]gethTypes.SetCodeAuthorization{},
+							big.NewInt(0),
+							params.MaxTxGas+1_000,
+						)
+						require.NoError(t, err)
+
+						// test we cannot go above the configured `maxCallGasLimit`
+						_, err = view.DryCall(
+							testAccount.Address().ToCommon(),
+							testContract.DeployedAt.ToCommon(),
+							testContract.MakeCallData(t,
+								"store",
+								big.NewInt(2),
+							),
+							[]gethTypes.SetCodeAuthorization{},
 							big.NewInt(0),
 							maxCallGasLimit+1,
 						)
 						require.Error(t, err)
+						require.ErrorContains(
+							t,
+							err,
+							"gas limit is bigger than max gas limit allowed 26777217 > 26777216",
+						)
 
+						// test non-empty SetCode authorization list
+						_, err = view.DryCall(
+							testAccount.Address().ToCommon(),
+							testContract.DeployedAt.ToCommon(),
+							testContract.MakeCallData(t,
+								"store",
+								big.NewInt(2),
+							),
+							[]gethTypes.SetCodeAuthorization{
+								gethTypes.SetCodeAuthorization{
+									ChainID: *uint256.NewInt(747),
+									Address: common.HexToAddress("0xD370975A6257fE8CeF93101799D602D30838BAad"),
+									Nonce:   1,
+									V:       28,
+									R:       *RandomUint256Int(15_000_000),
+									S:       *RandomUint256Int(15_000_000),
+								},
+							},
+							big.NewInt(0),
+							maxCallGasLimit,
+						)
+						require.NoError(t, err)
+					})
+				})
+		})
+	})
+}
+
+func TestViewStateOverrides(t *testing.T) {
+
+	const chainID = flow.Emulator
+	RunWithTestBackend(t, func(backend *TestBackend) {
+		RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
+			RunWithDeployedContract(t,
+				GetStorageTestContract(t), backend, rootAddr, func(testContract *TestContract) {
+					RunWithEOATestAccount(t, backend, rootAddr, func(testAccount *EOATestAccount) {
+
+						t.Run("DryCall with WithStateOverrideState for existing account", func(t *testing.T) {
+							blks, err := blocks.NewBlocks(chainID, rootAddr, backend)
+							require.NoError(t, err)
+
+							maxCallGasLimit := uint64(5_000_000)
+							view := query.NewView(
+								chainID,
+								rootAddr,
+								storage.NewEphemeralStorage(
+									backend,
+								),
+								blks,
+								maxCallGasLimit,
+							)
+
+							newNumberValue := common.HexToHash("0x32") // 50 in hex
+							res, err := view.DryCall(
+								testAccount.Address().ToCommon(),
+								testContract.DeployedAt.ToCommon(),
+								testContract.MakeCallData(t, "retrieve"),
+								nil,
+								big.NewInt(0),
+								uint64(1_000_000),
+								query.WithStateOverrideState(
+									testContract.DeployedAt.ToCommon(),
+									map[common.Hash]common.Hash{
+										{0x0}: newNumberValue,
+									},
+								),
+							)
+							require.NoError(t, err)
+							require.NoError(t, res.ValidationError)
+							require.NoError(t, res.VMError)
+							require.Equal(
+								t,
+								newNumberValue,
+								common.BytesToHash(res.ReturnedData),
+							)
+						})
+
+						t.Run("DryCall with WithStateOverrideStateDiff for existing account", func(t *testing.T) {
+							blks, err := blocks.NewBlocks(chainID, rootAddr, backend)
+							require.NoError(t, err)
+
+							maxCallGasLimit := uint64(5_000_000)
+							view := query.NewView(
+								chainID,
+								rootAddr,
+								storage.NewEphemeralStorage(
+									backend,
+								),
+								blks,
+								maxCallGasLimit,
+							)
+
+							newNumberValue := common.HexToHash("0x64") // 100 in hex
+							res, err := view.DryCall(
+								testAccount.Address().ToCommon(),
+								testContract.DeployedAt.ToCommon(),
+								testContract.MakeCallData(t, "retrieve"),
+								nil,
+								big.NewInt(0),
+								uint64(1_000_000),
+								query.WithStateOverrideStateDiff(
+									testContract.DeployedAt.ToCommon(),
+									map[common.Hash]common.Hash{
+										{0x0}: newNumberValue,
+									},
+								),
+							)
+							require.NoError(t, err)
+							require.NoError(t, res.ValidationError)
+							require.NoError(t, res.VMError)
+							require.Equal(
+								t,
+								newNumberValue,
+								common.BytesToHash(res.ReturnedData),
+							)
+						})
+
+						t.Run("DryCall with WithStateOverrideState for non-existing account", func(t *testing.T) {
+							blks, err := blocks.NewBlocks(chainID, rootAddr, backend)
+							require.NoError(t, err)
+
+							maxCallGasLimit := uint64(5_000_000)
+							view := query.NewView(
+								chainID,
+								rootAddr,
+								storage.NewEphemeralStorage(
+									backend,
+								),
+								blks,
+								maxCallGasLimit,
+							)
+
+							newNumberValue := common.HexToHash("0x32") // 50 in hex
+							res, err := view.DryCall(
+								testAccount.Address().ToCommon(),
+								testContract.DeployedAt.ToCommon(),
+								testContract.MakeCallData(t, "retrieve"),
+								nil,
+								big.NewInt(0),
+								uint64(1_000_000),
+								query.WithStateOverrideState(
+									// this is a random address, without any code in it
+									common.HexToAddress("0xD370975A6257fE8CeF93101799D602D30838BAad"),
+									map[common.Hash]common.Hash{
+										{0x0}: newNumberValue,
+									},
+								),
+							)
+							require.NoError(t, err)
+							require.NoError(t, res.ValidationError)
+							require.NoError(t, res.VMError)
+							require.Equal(
+								t,
+								common.Hash{0x0},
+								common.BytesToHash(res.ReturnedData),
+							)
+						})
+
+						t.Run("DryCall with WithStateOverrideStateDiff for existing account", func(t *testing.T) {
+							blks, err := blocks.NewBlocks(chainID, rootAddr, backend)
+							require.NoError(t, err)
+
+							maxCallGasLimit := uint64(5_000_000)
+							view := query.NewView(
+								chainID,
+								rootAddr,
+								storage.NewEphemeralStorage(
+									backend,
+								),
+								blks,
+								maxCallGasLimit,
+							)
+
+							newNumberValue := common.HexToHash("0x64") // 100 in hex
+							res, err := view.DryCall(
+								testAccount.Address().ToCommon(),
+								testContract.DeployedAt.ToCommon(),
+								testContract.MakeCallData(t, "retrieve"),
+								nil,
+								big.NewInt(0),
+								uint64(1_000_000),
+								query.WithStateOverrideStateDiff(
+									// this is a random address, without any code in it
+									common.HexToAddress("0xCebE1e78Db8C757fe18E7EdfE5a3D99B5ca45c8d"),
+									map[common.Hash]common.Hash{
+										{0x0}: newNumberValue,
+									},
+								),
+							)
+							require.NoError(t, err)
+							require.NoError(t, res.ValidationError)
+							require.NoError(t, res.VMError)
+							require.Equal(
+								t,
+								common.Hash{0x0},
+								common.BytesToHash(res.ReturnedData),
+							)
+						})
+
+						t.Run("DryCall with WithStateOverrideCode and WithStateOverrideState for non-existing account", func(t *testing.T) {
+							blks, err := blocks.NewBlocks(chainID, rootAddr, backend)
+							require.NoError(t, err)
+
+							maxCallGasLimit := uint64(5_000_000)
+							view := query.NewView(
+								chainID,
+								rootAddr,
+								storage.NewEphemeralStorage(
+									backend,
+								),
+								blks,
+								maxCallGasLimit,
+							)
+
+							newContractAddress := common.HexToAddress("0xD370975A6257fE8CeF93101799D602D30838BAad")
+
+							newNumberValue := common.HexToHash("0x32") // 50 in hex
+							res, err := view.DryCall(
+								testAccount.Address().ToCommon(),
+								newContractAddress,
+								testContract.MakeCallData(t, "retrieve"),
+								nil,
+								big.NewInt(0),
+								uint64(1_000_000),
+								query.WithStateOverrideCode(
+									newContractAddress,
+									contracts.TestContractBytes[17:], // we need the deployed byte-code
+								),
+								query.WithStateOverrideState(
+									newContractAddress,
+									map[common.Hash]common.Hash{
+										{0x0}: newNumberValue,
+									},
+								),
+							)
+							require.NoError(t, err)
+							require.NoError(t, res.ValidationError)
+							require.NoError(t, res.VMError)
+							require.Equal(
+								t,
+								newNumberValue,
+								common.BytesToHash(res.ReturnedData),
+							)
+						})
+
+						t.Run("DryCall with WithStateOverrideCode and WithStateOverrideStateDiff for non-existing account", func(t *testing.T) {
+							blks, err := blocks.NewBlocks(chainID, rootAddr, backend)
+							require.NoError(t, err)
+
+							maxCallGasLimit := uint64(5_000_000)
+							view := query.NewView(
+								chainID,
+								rootAddr,
+								storage.NewEphemeralStorage(
+									backend,
+								),
+								blks,
+								maxCallGasLimit,
+							)
+
+							newContractAddress := common.HexToAddress("0xD370975A6257fE8CeF93101799D602D30838BAad")
+
+							newNumberValue := common.HexToHash("0x332") // 818 in hex
+							res, err := view.DryCall(
+								testAccount.Address().ToCommon(),
+								newContractAddress,
+								testContract.MakeCallData(t, "retrieve"),
+								nil,
+								big.NewInt(0),
+								uint64(1_000_000),
+								query.WithStateOverrideCode(
+									newContractAddress,
+									contracts.TestContractBytes[17:], // we need the deployed byte-code
+								),
+								query.WithStateOverrideStateDiff(
+									newContractAddress,
+									map[common.Hash]common.Hash{
+										{0x0}: newNumberValue,
+									},
+								),
+							)
+							require.NoError(t, err)
+							require.NoError(t, res.ValidationError)
+							require.NoError(t, res.VMError)
+							require.Equal(
+								t,
+								newNumberValue,
+								common.BytesToHash(res.ReturnedData),
+							)
+						})
 					})
 				})
 		})

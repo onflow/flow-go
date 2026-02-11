@@ -56,6 +56,9 @@ var chain = flow.Emulator.Chain()
 // This is not relevant to the test, as only the non-system transactions are tested.
 
 func Test_ExecutionMatchesVerification(t *testing.T) {
+
+	t.Parallel()
+
 	t.Run("empty block", func(t *testing.T) {
 		executeBlockAndVerify(t,
 			[][]*flow.TransactionBody{},
@@ -279,7 +282,7 @@ func Test_ExecutionMatchesVerification(t *testing.T) {
 					}
 					log(i)
 				}
-			}`)).SetComputeLimit(800000)
+			}`)).SetComputeLimit(1000000)
 
 		err = testutil.SignTransaction(spamTxBuilder, accountAddress, accountPrivKey, 0)
 		require.NoError(t, err)
@@ -339,6 +342,7 @@ func Test_ExecutionMatchesVerification(t *testing.T) {
 }
 
 func TestTransactionFeeDeduction(t *testing.T) {
+	t.Parallel()
 
 	type testCase struct {
 		name          string
@@ -742,14 +746,11 @@ func executeBlockAndVerifyWithParameters(t *testing.T,
 
 	logger := zerolog.Nop()
 
-	opts = append(opts, fvm.WithChain(chain))
 	opts = append(opts, fvm.WithLogger(logger))
 	opts = append(opts, fvm.WithBlocks(&environment.NoopBlockFinder{}))
 
 	fvmContext :=
-		fvm.NewContext(
-			opts...,
-		)
+		fvm.NewContext(chain, opts...)
 
 	collector := metrics.NewNoopCollector()
 	tracer := trace.NewNoopTracer()
@@ -813,7 +814,6 @@ func executeBlockAndVerifyWithParameters(t *testing.T,
 		ledgerCommiter,
 		me,
 		prov,
-		nil,
 		stateForRandomSource,
 		testVerifyMaxConcurrency)
 	require.NoError(t, err)

@@ -2,13 +2,16 @@ package ingestion
 
 import (
 	"context"
+	"errors"
 	"fmt"
-	"time"
 
+	"github.com/jordanschalm/lockctx"
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/engine/access/ingestion/collections"
 	"github.com/onflow/flow-go/engine/access/ingestion/tx_error_messages"
 	"github.com/onflow/flow-go/engine/common/fifoqueue"
 	"github.com/onflow/flow-go/model/flow"
@@ -24,26 +27,6 @@ import (
 )
 
 const (
-	// time to wait for the all the missing collections to be received at node startup
-	collectionCatchupTimeout = 30 * time.Second
-
-	// time to poll the storage to check if missing collections have been received
-	collectionCatchupDBPollInterval = 10 * time.Millisecond
-
-	// time to update the FullBlockHeight index
-	fullBlockRefreshInterval = 1 * time.Second
-
-	// time to request missing collections from the network
-	missingCollsRequestInterval = 1 * time.Minute
-
-	// a threshold of number of blocks with missing collections beyond which collections should be re-requested
-	// this is to prevent spamming the collection nodes with request
-	missingCollsForBlockThreshold = 100
-
-	// a threshold of block height beyond which collections should be re-requested (regardless of the number of blocks for which collection are missing)
-	// this is to ensure that if a collection is missing for a long time (in terms of block height) it is eventually re-requested
-	missingCollsForAgeThreshold = 100
-
 	// default queue capacity
 	defaultQueueCapacity = 10_000
 
@@ -78,15 +61,20 @@ type Engine struct {
 
 	// storage
 	// FIX: remove direct DB access by substituting indexer module
+	db                storage.DB
+	lockManager       storage.LockManager
 	blocks            storage.Blocks
 	executionReceipts storage.ExecutionReceipts
 	maxReceiptHeight  uint64
 	executionResults  storage.ExecutionResults
 
-	collectionSyncer *CollectionSyncer
+	collectionSyncer  *collections.Syncer
+	collectionIndexer *collections.Indexer
+
 	// TODO: There's still a need for this metric to be in the ingestion engine rather than collection syncer.
 	// Maybe it is a good idea to split it up?
 	collectionExecutedMetric module.CollectionExecutedMetric
+	accessMetrics            module.AccessMetrics
 
 	txErrorMessagesCore *tx_error_messages.TxErrorMessagesCore
 }
@@ -101,13 +89,18 @@ func New(
 	net network.EngineRegistry,
 	state protocol.State,
 	me module.Local,
+	lockManager storage.LockManager,
+	db storage.DB,
 	blocks storage.Blocks,
 	executionResults storage.ExecutionResults,
 	executionReceipts storage.ExecutionReceipts,
 	finalizedProcessedHeight storage.ConsumerProgressInitializer,
-	collectionSyncer *CollectionSyncer,
+	collectionSyncer *collections.Syncer,
+	collectionIndexer *collections.Indexer,
 	collectionExecutedMetric module.CollectionExecutedMetric,
+	accessMetrics module.AccessMetrics,
 	txErrorMessagesCore *tx_error_messages.TxErrorMessagesCore,
+	registrar hotstuff.FinalizationRegistrar,
 ) (*Engine, error) {
 	executionReceiptsRawQueue, err := fifoqueue.NewFifoQueue(defaultQueueCapacity)
 	if err != nil {
@@ -133,11 +126,14 @@ func New(
 		log:                      log.With().Str("engine", "ingestion").Logger(),
 		state:                    state,
 		me:                       me,
+		lockManager:              lockManager,
+		db:                       db,
 		blocks:                   blocks,
 		executionResults:         executionResults,
 		executionReceipts:        executionReceipts,
 		maxReceiptHeight:         0,
 		collectionExecutedMetric: collectionExecutedMetric,
+		accessMetrics:            accessMetrics,
 		finalizedBlockNotifier:   engine.NewNotifier(),
 
 		// queue / notifier for execution receipts
@@ -147,6 +143,7 @@ func New(
 		messageHandler:            messageHandler,
 		txErrorMessagesCore:       txErrorMessagesCore,
 		collectionSyncer:          collectionSyncer,
+		collectionIndexer:         collectionIndexer,
 	}
 
 	// jobqueue Jobs object that tracks finalized blocks by height. This is used by the finalizedBlockConsumer
@@ -176,11 +173,10 @@ func New(
 
 	// Add workers
 	builder := component.NewComponentManagerBuilder().
-		AddWorker(e.collectionSyncer.RequestCollections).
+		AddWorker(e.collectionSyncer.WorkerLoop).
+		AddWorker(e.collectionIndexer.WorkerLoop).
 		AddWorker(e.processExecutionReceipts).
 		AddWorker(e.runFinalizedBlockConsumer)
-
-	//TODO: should I add a check for nil ptr for collection syncer ? (as done below)
 
 	// If txErrorMessagesCore is provided, add a worker responsible for processing
 	// transaction result error messages by receipts. This worker listens for blocks
@@ -197,6 +193,8 @@ func New(
 	if err != nil {
 		return nil, fmt.Errorf("could not register for results: %w", err)
 	}
+
+	registrar.AddOnBlockFinalizedConsumer(e.onFinalizedBlock)
 
 	return e, nil
 }
@@ -236,12 +234,15 @@ func (e *Engine) processFinalizedBlockJob(ctx irrecoverable.SignalerContext, job
 	}
 
 	err = e.processFinalizedBlock(block)
-	if err == nil {
-		done()
+	if err != nil {
+		ctx.Throw(
+			fmt.Errorf(
+				"fatal error when ingestion building col->block index for finalized block (job: %s, height: %v): %w",
+				job.ID(), block.Height, err))
 		return
 	}
 
-	e.log.Error().Err(err).Str("job_id", string(job.ID())).Msg("error during finalized block processing job")
+	done()
 }
 
 // processExecutionReceipts is responsible for processing the execution receipts.
@@ -351,18 +352,18 @@ func (e *Engine) Process(_ channels.Channel, originID flow.Identifier, event int
 	return e.process(originID, event)
 }
 
-// OnFinalizedBlock is called by the follower engine after a block has been finalized and the state has been updated.
-// Receives block finalized events from the finalization distributor and forwards them to the finalizedBlockConsumer.
-func (e *Engine) OnFinalizedBlock(*model.Block) {
+// onFinalizedBlock is called by the follower engine after a block has been finalized and the state has been updated.
+// Receives block finalized events from the finalization registrar and forwards them to the finalizedBlockConsumer.
+func (e *Engine) onFinalizedBlock(*model.Block) {
 	e.finalizedBlockNotifier.Notify()
 }
 
 // processFinalizedBlock handles an incoming finalized block.
 // It processes the block, indexes it for further processing, and requests missing collections if necessary.
+// If the block is already indexed (storage.ErrAlreadyExists), it logs a warning and continues processing.
 //
 // Expected errors during normal operation:
 //   - storage.ErrNotFound - if last full block height does not exist in the database.
-//   - storage.ErrAlreadyExists - if the collection within block or an execution result ID already exists in the database.
 //   - generic error in case of unexpected failure from the database layer, or failure
 //     to decode an existing database value.
 func (e *Engine) processFinalizedBlock(block *flow.Block) error {
@@ -372,21 +373,43 @@ func (e *Engine) processFinalizedBlock(block *flow.Block) error {
 	// TODO: substitute an indexer module as layer between engine and storage
 
 	// index the block storage with each of the collection guarantee
-	err := e.blocks.IndexBlockContainingCollectionGuarantees(block.ID(), flow.GetIDs(block.Payload.Guarantees))
+	err := storage.WithLocks(e.lockManager, storage.LockGroupAccessFinalizingBlock, func(lctx lockctx.Context) error {
+		return e.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			// requires [storage.LockIndexBlockByPayloadGuarantees] lock
+			err := e.blocks.BatchIndexBlockContainingCollectionGuarantees(lctx, rw, block.ID(), flow.GetIDs(block.Payload.Guarantees))
+			if err != nil {
+				return fmt.Errorf("could not index block for collections: %w", err)
+			}
+
+			// loop through seals and index ID -> result ID
+			for _, seal := range block.Payload.Seals {
+				// requires [storage.LockIndexExecutionResult] lock
+				err := e.executionResults.BatchIndex(lctx, rw, seal.BlockID, seal.ResultID)
+				if err != nil {
+					return fmt.Errorf("could not index block for execution result: %w", err)
+				}
+			}
+			return nil
+		})
+	})
 	if err != nil {
-		return fmt.Errorf("could not index block for collections: %w", err)
-	}
-
-	// loop through seals and index ID -> result ID
-	for _, seal := range block.Payload.Seals {
-		err := e.executionResults.Index(seal.BlockID, seal.ResultID)
-		if err != nil {
-			return fmt.Errorf("could not index block for execution result: %w", err)
+		if !errors.Is(err, storage.ErrAlreadyExists) {
+			return fmt.Errorf("could not index block for collections: %w", err)
 		}
+		// the job queue processed index is updated in a separate db update, so it's possible that the above index
+		// has been built, but the jobqueue index has not been updated yet. In this case, we can safely skip processing.
+		e.log.Warn().
+			Uint64("height", block.Height).
+			Str("block_id", block.ID().String()).
+			Msg("block already indexed, skipping indexing")
 	}
 
-	e.collectionSyncer.RequestCollectionsForBlock(block.Height, block.Payload.Guarantees)
+	err = e.collectionSyncer.RequestCollectionsForBlock(block.Height, block.Payload.Guarantees)
+	if err != nil {
+		return fmt.Errorf("could not request collections for block: %w", err)
+	}
 	e.collectionExecutedMetric.BlockFinalized(block)
+	e.accessMetrics.UpdateIngestionFinalizedBlockHeight(block.Height)
 
 	return nil
 }

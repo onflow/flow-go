@@ -12,14 +12,16 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	followermock "github.com/onflow/flow-go/engine/common/follower/mock"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module/compliance"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	module "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/network/channels"
-	"github.com/onflow/flow-go/network/mocknetwork"
+	mocknetwork "github.com/onflow/flow-go/network/mock"
 	storage "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -33,21 +35,22 @@ type EngineSuite struct {
 	suite.Suite
 
 	finalized *flow.Header
-	net       *mocknetwork.Network
+	net       *mocknetwork.EngineRegistry
 	con       *mocknetwork.Conduit
 	me        *module.Local
 	headers   *storage.Headers
 	core      *followermock.ComplianceCore
 
-	ctx    irrecoverable.SignalerContext
-	cancel context.CancelFunc
-	errs   <-chan error
-	engine *ComplianceEngine
+	ctx                 irrecoverable.SignalerContext
+	cancel              context.CancelFunc
+	errs                <-chan error
+	engine              *ComplianceEngine
+	followerDistributor *pubsub.FollowerDistributor
 }
 
 func (s *EngineSuite) SetupTest() {
 
-	s.net = mocknetwork.NewNetwork(s.T())
+	s.net = mocknetwork.NewEngineRegistry(s.T())
 	s.con = mocknetwork.NewConduit(s.T())
 	s.me = module.NewLocal(s.T())
 	s.headers = storage.NewHeaders(s.T())
@@ -63,6 +66,7 @@ func (s *EngineSuite) SetupTest() {
 
 	metrics := metrics.NewNoopCollector()
 	s.finalized = unittest.BlockHeaderFixture()
+	s.followerDistributor = pubsub.NewFollowerDistributor()
 	eng, err := NewComplianceLayer(
 		unittest.Logger(),
 		s.net,
@@ -71,6 +75,7 @@ func (s *EngineSuite) SetupTest() {
 		s.headers,
 		s.finalized,
 		s.core,
+		s.followerDistributor,
 		compliance.DefaultConfig())
 	require.NoError(s.T(), err)
 
@@ -121,7 +126,7 @@ func (s *EngineSuite) TestProcessGossipedValidBlock() {
 		close(done)
 	}).Once()
 
-	err := s.engine.Process(channels.ReceiveBlocks, originID, (*flow.UntrustedProposal)(proposal))
+	err := s.engine.Process(channels.ReceiveBlocks, originID, proposal)
 	require.NoError(s.T(), err)
 
 	unittest.AssertClosesBefore(s.T(), done, time.Second)
@@ -135,7 +140,7 @@ func (s *EngineSuite) TestProcessGossipedInvalidBlock() {
 
 	originID := unittest.IdentifierFixture()
 
-	err := s.engine.Process(channels.ReceiveBlocks, originID, (*flow.UntrustedProposal)(proposal))
+	err := s.engine.Process(channels.ReceiveBlocks, originID, (*messages.Proposal)(proposal))
 	require.NoError(s.T(), err)
 
 	// OnBlockRange should NOT be called for invalid proposal
@@ -202,7 +207,7 @@ func (s *EngineSuite) TestProcessFinalizedBlock() {
 	}).Return(nil).Once()
 	s.headers.On("ByBlockID", newFinalizedBlock.ID()).Return(newFinalizedBlock, nil).Once()
 
-	s.engine.OnFinalizedBlock(model.BlockFromFlow(newFinalizedBlock))
+	s.followerDistributor.OnFinalizedBlock(model.BlockFromFlow(newFinalizedBlock))
 	unittest.RequireCloseBefore(s.T(), done, time.Millisecond*500, "expect to close before timeout")
 
 	// check if batch gets filtered out since it's lower than finalized view

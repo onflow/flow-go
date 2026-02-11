@@ -98,7 +98,7 @@ func TestBlockContext_ExecuteTransaction(t *testing.T) {
 	chain, vm := createChainAndVm(flow.Testnet)
 
 	ctx := fvm.NewContext(
-		fvm.WithChain(chain),
+		chain,
 		fvm.WithCadenceLogging(true),
 	)
 
@@ -221,7 +221,7 @@ func TestBlockContext_DeployContract(t *testing.T) {
 	chain, vm := createChainAndVm(flow.Mainnet)
 
 	ctx := fvm.NewContext(
-		fvm.WithChain(chain),
+		chain,
 		fvm.WithCadenceLogging(true),
 	)
 
@@ -477,7 +477,7 @@ func TestBlockContext_DeployContract(t *testing.T) {
 
 	t.Run("account update with set code fails if not signed by service account if dis-allowed in the state", func(t *testing.T) {
 		ctx := fvm.NewContext(
-			fvm.WithChain(chain),
+			chain,
 			fvm.WithCadenceLogging(true),
 			fvm.WithContractDeploymentRestricted(false),
 		)
@@ -811,7 +811,7 @@ func TestBlockContext_ExecuteTransaction_WithArguments(t *testing.T) {
 	chain, vm := createChainAndVm(flow.Mainnet)
 
 	ctx := fvm.NewContext(
-		fvm.WithChain(chain),
+		chain,
 		fvm.WithCadenceLogging(true),
 	)
 
@@ -920,7 +920,7 @@ func TestBlockContext_ExecuteTransaction_GasLimit(t *testing.T) {
 	chain, vm := createChainAndVm(flow.Mainnet)
 
 	ctx := fvm.NewContext(
-		fvm.WithChain(chain),
+		chain,
 		fvm.WithCadenceLogging(true),
 	)
 
@@ -1343,7 +1343,7 @@ func TestBlockContext_ExecuteScript(t *testing.T) {
 	chain, vm := createChainAndVm(flow.Mainnet)
 
 	ctx := fvm.NewContext(
-		fvm.WithChain(chain),
+		chain,
 		fvm.WithCadenceLogging(true),
 	)
 
@@ -1491,7 +1491,7 @@ func TestBlockContext_GetBlockInfo(t *testing.T) {
 	chain, vm := createChainAndVm(flow.Mainnet)
 
 	ctx := fvm.NewContext(
-		fvm.WithChain(chain),
+		chain,
 		fvm.WithCadenceLogging(true),
 	)
 
@@ -1652,7 +1652,7 @@ func TestBlockContext_GetAccount(t *testing.T) {
 	chain, vm := createChainAndVm(flow.Mainnet)
 
 	ctx := fvm.NewContext(
-		fvm.WithChain(chain),
+		chain,
 		fvm.WithCadenceLogging(true),
 	)
 
@@ -1700,7 +1700,7 @@ func TestBlockContext_GetAccount(t *testing.T) {
 		data, err := ccf.Decode(nil, accountCreatedEvents[0].Payload)
 		require.NoError(t, err)
 
-		address := flow.ConvertAddress(
+		address := flow.Address(
 			cadence.SearchFieldByName(
 				data.(cadence.Event),
 				stdlib.AccountEventAddressParameter.Identifier,
@@ -1751,15 +1751,12 @@ func TestBlockContext_GetAccount(t *testing.T) {
 }
 
 func TestBlockContext_Random(t *testing.T) {
+	t.Parallel()
+
 	chain, vm := createChainAndVm(flow.Mainnet)
 	header := &flow.Header{HeaderBody: flow.HeaderBody{Height: 42}}
 	source := testutil.EntropyProviderFixture(nil)
-	ctx := fvm.NewContext(
-		fvm.WithChain(chain),
-		fvm.WithBlockHeader(header),
-		fvm.WithEntropyProvider(source),
-		fvm.WithCadenceLogging(true),
-	)
+	ctx := fvm.NewContext(chain, fvm.WithBlockHeader(header), fvm.WithEntropyProvider(source), fvm.WithCadenceLogging(true))
 
 	txCode := []byte(`
 	transaction {
@@ -1866,9 +1863,7 @@ func TestBlockContext_ExecuteTransaction_CreateAccount_WithMonotonicAddresses(t 
 
 	chain, vm := createChainAndVm(flow.MonotonicEmulator)
 
-	ctx := fvm.NewContext(
-		fvm.WithChain(chain),
-	)
+	ctx := fvm.NewContext(chain)
 
 	txBodyBuilder := flow.NewTransactionBodyBuilder().
 		SetScript(createAccountScript).
@@ -1893,7 +1888,7 @@ func TestBlockContext_ExecuteTransaction_CreateAccount_WithMonotonicAddresses(t 
 	data, err := ccf.Decode(nil, accountCreatedEvents[0].Payload)
 	require.NoError(t, err)
 
-	address := flow.ConvertAddress(
+	address := flow.Address(
 		cadence.SearchFieldByName(
 			data.(cadence.Event),
 			stdlib.AccountEventAddressParameter.Identifier,
@@ -1906,6 +1901,8 @@ func TestBlockContext_ExecuteTransaction_CreateAccount_WithMonotonicAddresses(t 
 }
 
 func TestBlockContext_ExecuteTransaction_FailingTransactions(t *testing.T) {
+	t.Parallel()
+
 	getBalance := func(
 		vm fvm.VM,
 		chain flow.Chain,

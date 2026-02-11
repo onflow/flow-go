@@ -60,9 +60,9 @@ var id0 = flow.NewRegisterID(unittest.RandomAddressFixture(), "")
 var id5 = flow.NewRegisterID(unittest.RandomAddressFixture(), "")
 
 // the chain we use for this test suite
-var testChain = flow.Emulator
-var epochSetupEvent, _ = unittest.EpochSetupFixtureByChainID(testChain)
-var epochCommitEvent, _ = unittest.EpochCommitFixtureByChainID(testChain)
+var testChainID = flow.Emulator
+var epochSetupEvent, _ = unittest.EpochSetupFixtureByChainID(testChainID)
+var epochCommitEvent, _ = unittest.EpochCommitFixtureByChainID(testChainID)
 
 // serviceEventsList is the list of service events emitted by default.
 var serviceEventsList = []flow.Event{
@@ -92,8 +92,8 @@ type ChunkVerifierTestSuite struct {
 // SetupTest is executed prior to each individual test in this test suite
 func (s *ChunkVerifierTestSuite) SetupSuite() {
 	vmCtx := fvm.NewContext(
-		fvm.WithChain(testChain.Chain()),
-		fvm.WithScheduleCallbacksEnabled(true),
+		testChainID.Chain(),
+		fvm.WithScheduledTransactionsEnabled(true),
 	)
 	vmMock := fvmmock.NewVM(s.T())
 
@@ -135,11 +135,11 @@ func (s *ChunkVerifierTestSuite) SetupSuite() {
 
 	s.verifier = chunks.NewChunkVerifier(vmMock, vmCtx, zerolog.Nop())
 
-	txBody, err := blueprints.SystemChunkTransaction(testChain.Chain())
+	txBody, err := blueprints.SystemChunkTransaction(testChainID.Chain())
 	require.NoError(s.T(), err)
 	serviceTxBody = txBody
 
-	processTxBody, err = blueprints.ProcessCallbacksTransaction(testChain.Chain())
+	processTxBody, err = blueprints.ProcessCallbacksTransaction(testChainID.Chain())
 	require.NoError(s.T(), err)
 }
 
@@ -276,7 +276,7 @@ func (s *ChunkVerifierTestSuite) TestServiceEventsMismatch_SystemChunk() {
 
 	// modify the list of service events produced by FVM
 	// EpochSetup event is expected, but we emit EpochCommit here resulting in a chunk fault
-	epochCommitServiceEvent, err := convert.ServiceEvent(testChain, epochCommitEvent)
+	epochCommitServiceEvent, err := convert.ServiceEvent(testChainID, epochCommitEvent)
 	require.NoError(s.T(), err)
 
 	s.snapshots[string(serviceTxBody.Script)] = &snapshot.ExecutionSnapshot{}
@@ -287,7 +287,7 @@ func (s *ChunkVerifierTestSuite) TestServiceEventsMismatch_SystemChunk() {
 		Events:                 meta.ChunkEvents,
 	}
 
-	processTxBody, err := blueprints.ProcessCallbacksTransaction(testChain.Chain())
+	processTxBody, err := blueprints.ProcessCallbacksTransaction(testChainID.Chain())
 	require.NoError(s.T(), err)
 
 	s.snapshots[string(processTxBody.Script)] = &snapshot.ExecutionSnapshot{}
@@ -326,7 +326,7 @@ func (s *ChunkVerifierTestSuite) TestServiceEventsMismatch_NonSystemChunk() {
 
 	// modify the list of service events produced by FVM
 	// EpochSetup event is expected, but we emit EpochCommit here resulting in a chunk fault
-	epochCommitServiceEvent, err := convert.ServiceEvent(testChain, epochCommitEvent)
+	epochCommitServiceEvent, err := convert.ServiceEvent(testChainID, epochCommitEvent)
 	require.NoError(s.T(), err)
 
 	s.snapshots[script] = &snapshot.ExecutionSnapshot{}
@@ -456,13 +456,13 @@ func (s *ChunkVerifierTestSuite) TestExecutionDataIdMismatch() {
 	assert.IsType(s.T(), &chunksmodels.CFInvalidExecutionDataID{}, err)
 }
 
-func (s *ChunkVerifierTestSuite) TestSystemChunkWithScheduledCallbackReturningEvent() {
-	systemContracts := systemcontracts.SystemContractsForChain(testChain)
+func (s *ChunkVerifierTestSuite) TestSystemChunkWithScheduledTransactionsReturningEvent() {
+	systemContracts := systemcontracts.SystemContractsForChain(testChainID)
 
 	// create the event returned for processed callback
 	processedEventName := fmt.Sprintf(
 		"A.%s.FlowTransactionScheduler.PendingExecution",
-		systemContracts.FlowCallbackScheduler.Address,
+		systemContracts.FlowTransactionScheduler.Address,
 	)
 	callbackEventPayload, err := ccf.Encode(cadence.NewEvent(
 		[]cadence.Value{
@@ -495,7 +495,7 @@ func (s *ChunkVerifierTestSuite) TestSystemChunkWithScheduledCallbackReturningEv
 	}
 
 	// Create execute callback transaction body
-	executeCallbackTxs, err := blueprints.ExecuteCallbacksTransactions(testChain.Chain(), flow.EventsList{processEvent})
+	executeCallbackTxs, err := blueprints.ExecuteCallbacksTransactions(testChainID.Chain(), flow.EventsList{processEvent})
 	require.NoError(s.T(), err)
 	require.Len(s.T(), executeCallbackTxs, 1)
 
@@ -507,7 +507,7 @@ func (s *ChunkVerifierTestSuite) TestSystemChunkWithScheduledCallbackReturningEv
 	}
 
 	// Setup system transaction output
-	epochSetupServiceEvent, err := convert.ServiceEvent(testChain, epochSetupEvent)
+	epochSetupServiceEvent, err := convert.ServiceEvent(testChainID, epochSetupEvent)
 	require.NoError(s.T(), err)
 
 	s.outputs[string(serviceTxBody.Script)] = fvm.ProcedureOutput{
@@ -545,9 +545,9 @@ func (s *ChunkVerifierTestSuite) TestSystemChunkWithScheduledCallbackReturningEv
 	assert.NoError(s.T(), err)
 }
 
-// TestSystemChunkWithNoScheduledCallbacks tests verification of system chunks
-// when scheduled callbacks are enabled but no callbacks are actually scheduled
-func (s *ChunkVerifierTestSuite) TestSystemChunkWithNoScheduledCallbacks() {
+// TestSystemChunkWithNoScheduledTransactions tests verification of system chunks
+// when scheduled transactions are enabled but no transactions are actually scheduled
+func (s *ChunkVerifierTestSuite) TestSystemChunkWithNoScheduledTransactions() {
 	// Setup mock outputs for process callback transaction with no events
 	s.outputs[string(processTxBody.Script)] = fvm.ProcedureOutput{
 		ComputationUsed: computationUsed,
@@ -555,7 +555,7 @@ func (s *ChunkVerifierTestSuite) TestSystemChunkWithNoScheduledCallbacks() {
 	}
 
 	// Setup system transaction output
-	epochSetupServiceEvent, err := convert.ServiceEvent(testChain, epochSetupEvent)
+	epochSetupServiceEvent, err := convert.ServiceEvent(testChainID, epochSetupEvent)
 	require.NoError(s.T(), err)
 
 	s.outputs[string(serviceTxBody.Script)] = fvm.ProcedureOutput{
@@ -672,7 +672,7 @@ func generateEvents(t *testing.T, collection *flow.Collection, includeServiceEve
 	if includeServiceEvent {
 		for _, e := range serviceEventsList {
 			e := e
-			event, err := convert.ServiceEvent(testChain, e)
+			event, err := convert.ServiceEvent(testChainID, e)
 			require.NoError(t, err)
 
 			serviceEvents = append(serviceEvents, *event)

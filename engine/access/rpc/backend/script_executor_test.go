@@ -115,7 +115,7 @@ func (s *ScriptExecutorSuite) SetupTest() {
 	s.snapshot = snapshot.NewSnapshotTree(nil)
 	s.vm = fvm.NewVirtualMachine()
 	s.vmCtx = fvm.NewContext(
-		fvm.WithChain(s.chain),
+		s.chain,
 		fvm.WithAuthorizationChecksEnabled(false),
 		fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
 	)
@@ -129,7 +129,7 @@ func (s *ScriptExecutorSuite) SetupTest() {
 	derivedChainData, err := derived.NewDerivedChainData(derived.DefaultDerivedDataCacheSize)
 	s.Require().NoError(err)
 
-	indexerCore, err := indexer.New(
+	indexerCore := indexer.New(
 		s.log,
 		module.ExecutionStateIndexerMetrics(metrics.NewNoopCollector()),
 		nil,
@@ -139,12 +139,13 @@ func (s *ScriptExecutorSuite) SetupTest() {
 		nil,
 		nil,
 		nil,
-		s.chain,
+		nil,
+		s.chain.ChainID(),
 		derivedChainData,
-		module.CollectionExecutedMetric(metrics.NewNoopCollector()),
+		nil,
+		metrics.NewNoopCollector(),
 		lockManager,
 	)
-	s.Require().NoError(err)
 
 	s.scripts = execution.NewScripts(
 		s.log,

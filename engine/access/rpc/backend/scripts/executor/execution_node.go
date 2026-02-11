@@ -12,7 +12,6 @@ import (
 
 	"github.com/onflow/flow-go/engine/access/rpc/backend/node_communicator"
 	"github.com/onflow/flow-go/engine/access/rpc/connection"
-	"github.com/onflow/flow-go/engine/common/rpc"
 	commonrpc "github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
@@ -40,7 +39,7 @@ func NewENScriptExecutor(
 	scriptCache *LoggedScriptCache,
 ) *ENScriptExecutor {
 	return &ENScriptExecutor{
-		log:              zerolog.New(log).With().Str("script_executor", "execution_node").Logger(),
+		log:              log.With().Str("script_executor", "execution_node").Logger(),
 		metrics:          metrics,
 		nodeProvider:     nodeProvider,
 		nodeCommunicator: nodeCommunicator,
@@ -96,7 +95,7 @@ func (e *ENScriptExecutor) Execute(ctx context.Context, request *Request) ([]byt
 			e.metrics.ScriptExecutionErrorOnExecutionNode()
 			e.log.Error().Err(errToReturn).Msg("script execution failed for execution node internal reasons")
 		}
-		return nil, execDuration, rpc.ConvertError(errToReturn, "failed to execute script on execution nodes", codes.Internal)
+		return nil, execDuration, commonrpc.ConvertError(errToReturn, "failed to execute script on execution nodes", codes.Internal)
 	}
 
 	return result, execDuration, nil

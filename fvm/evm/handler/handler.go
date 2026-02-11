@@ -204,13 +204,12 @@ func (h *ContractHandler) BatchRun(rlpEncodedTxs [][]byte, gasFeeCollector types
 }
 
 func (h *ContractHandler) batchRun(rlpEncodedTxs [][]byte) ([]*types.Result, error) {
-	// step 1 - transaction decoding and compute total gas needed
-	// This is safe to be done before checking the gas
-	// as it has its own metering
-	var totalGasLimit types.GasLimit
+	// step 1 - transaction decoding and check that enough evm gas is available in the FVM transaction
+
+	// remainingGasLimit is the remaining EVM gas available in hte FVM transaction
+	remainingGasLimit := h.backend.ComputationRemaining(environment.ComputationKindEVMGasUsage)
 	batchLen := len(rlpEncodedTxs)
 	txs := make([]*gethTypes.Transaction, batchLen)
-
 	for i, rlpEncodedTx := range rlpEncodedTxs {
 		tx, err := h.decodeTransaction(rlpEncodedTx)
 		// if any tx fails decoding revert the batch
@@ -219,18 +218,22 @@ func (h *ContractHandler) batchRun(rlpEncodedTxs [][]byte) ([]*types.Result, err
 		}
 
 		txs[i] = tx
-		totalGasLimit += types.GasLimit(tx.Gas())
+
+		// step 2 - check if enough computation is available
+		txGasLimit := tx.Gas()
+		if remainingGasLimit < txGasLimit {
+			return nil, types.ErrInsufficientComputation
+		}
+		remainingGasLimit -= txGasLimit
 	}
 
-	// step 2 - check if enough computation is available
-	// for the whole batch
-	err := h.checkGasLimit(totalGasLimit)
+	// step 3 - prepare block context
+	bp, err := h.getBlockProposal()
 	if err != nil {
 		return nil, err
 	}
 
-	// step 3 - prepare block context
-	ctx, err := h.getBlockContext()
+	ctx, err := h.getBlockContext(bp)
 	if err != nil {
 		return nil, err
 	}
@@ -276,12 +279,6 @@ func (h *ContractHandler) batchRun(rlpEncodedTxs [][]byte) ([]*types.Result, err
 	// skip the rest of steps
 	if !hasAtLeastOneValid {
 		return res, nil
-	}
-
-	// load block proposal
-	bp, err := h.blockStore.BlockProposal()
-	if err != nil {
-		return nil, err
 	}
 
 	// for valid transactions
@@ -378,7 +375,13 @@ func (h *ContractHandler) run(rlpEncodedTx []byte) (*types.Result, error) {
 	}
 
 	// step 3 - prepare block context
-	ctx, err := h.getBlockContext()
+	// load block proposal
+	bp, err := h.getBlockProposal()
+	if err != nil {
+		return nil, err
+	}
+
+	ctx, err := h.getBlockContext(bp)
 	if err != nil {
 		return nil, err
 	}
@@ -414,10 +417,6 @@ func (h *ContractHandler) run(rlpEncodedTx []byte) (*types.Result, error) {
 	}
 
 	// step 8 - update the block proposal
-	bp, err := h.blockStore.BlockProposal()
-	if err != nil {
-		return nil, err
-	}
 	bp.AppendTransaction(res)
 	err = h.blockStore.UpdateBlockProposal(bp)
 	if err != nil {
@@ -477,7 +476,18 @@ func (h *ContractHandler) dryRun(
 		return nil, err
 	}
 
-	ctx, err := h.getBlockContext()
+	return h.dryRunTx(&tx, from)
+}
+
+func (h *ContractHandler) dryRunTx(
+	tx *gethTypes.Transaction,
+	from types.Address,
+) (*types.Result, error) {
+	bp, err := h.getBlockProposal()
+	if err != nil {
+		return nil, err
+	}
+	ctx, err := h.getBlockContext(bp)
 	if err != nil {
 		return nil, err
 	}
@@ -487,7 +497,7 @@ func (h *ContractHandler) dryRun(
 		return nil, err
 	}
 
-	res, err := blk.DryRunTransaction(&tx, from.ToCommon())
+	res, err := blk.DryRunTransaction(tx, from.ToCommon())
 	if err != nil {
 		return nil, err
 	}
@@ -496,6 +506,27 @@ func (h *ContractHandler) dryRun(
 	}
 
 	return res, nil
+}
+
+// DryRunWithTxData simulates execution of the provided transaction data.
+// The from address is required since the transaction is unsigned.
+// The function should not have any persisted changes made to the state.
+func (h *ContractHandler) DryRunWithTxData(
+	txData gethTypes.TxData,
+	from types.Address,
+) *types.ResultSummary {
+	if txData == nil {
+		panicOnError(types.ErrUnexpectedEmptyTransactionData)
+	}
+
+	defer h.backend.StartChildSpan(trace.FVMEVMDryRun).End()
+
+	tx := gethTypes.NewTx(txData)
+
+	res, err := h.dryRunTx(tx, from)
+	panicOnError(err)
+
+	return res.ResultSummary()
 }
 
 // checkGasLimit checks if enough computation is left in the environment
@@ -547,12 +578,10 @@ func (h *ContractHandler) emitEvent(event *events.Event) error {
 	return h.backend.EmitEvent(ev)
 }
 
-func (h *ContractHandler) getBlockContext() (types.BlockContext, error) {
-	bp, err := h.blockStore.BlockProposal()
-	if err != nil {
-		return types.BlockContext{}, err
-	}
-
+func (h *ContractHandler) getBlockContext(bp *types.BlockProposal) (
+	types.BlockContext,
+	error,
+) {
 	return types.BlockContext{
 		ChainID:                types.EVMChainIDFromFlowChainID(h.flowChainID),
 		BlockNumber:            bp.Height,
@@ -571,6 +600,10 @@ func (h *ContractHandler) getBlockContext() (types.BlockContext, error) {
 	}, nil
 }
 
+func (h *ContractHandler) getBlockProposal() (*types.BlockProposal, error) {
+	return h.blockStore.BlockProposal()
+}
+
 func (h *ContractHandler) executeAndHandleCall(
 	call *types.DirectCall,
 	totalSupplyDiff *big.Int,
@@ -582,7 +615,12 @@ func (h *ContractHandler) executeAndHandleCall(
 	}
 
 	// step 2 - prepare the block context
-	ctx, err := h.getBlockContext()
+	// load the block proposal
+	bp, err := h.getBlockProposal()
+	if err != nil {
+		return nil, err
+	}
+	ctx, err := h.getBlockContext(bp)
 	if err != nil {
 		return nil, err
 	}
@@ -619,11 +657,6 @@ func (h *ContractHandler) executeAndHandleCall(
 	}
 
 	// step 7 - update block proposal
-	bp, err := h.blockStore.BlockProposal()
-	if err != nil {
-		return nil, err
-	}
-
 	// append transaction to the block proposal
 	bp.AppendTransaction(res)
 
@@ -704,7 +737,11 @@ func (a *Account) Nonce() uint64 {
 }
 
 func (a *Account) nonce() (uint64, error) {
-	ctx, err := a.fch.getBlockContext()
+	bp, err := a.fch.getBlockProposal()
+	if err != nil {
+		return 0, err
+	}
+	ctx, err := a.fch.getBlockContext(bp)
 	if err != nil {
 		return 0, err
 	}
@@ -728,7 +765,12 @@ func (a *Account) Balance() types.Balance {
 }
 
 func (a *Account) balance() (types.Balance, error) {
-	ctx, err := a.fch.getBlockContext()
+	bp, err := a.fch.getBlockProposal()
+	if err != nil {
+		return nil, err
+	}
+
+	ctx, err := a.fch.getBlockContext(bp)
 	if err != nil {
 		return nil, err
 	}
@@ -753,7 +795,12 @@ func (a *Account) Code() types.Code {
 }
 
 func (a *Account) code() (types.Code, error) {
-	ctx, err := a.fch.getBlockContext()
+	bp, err := a.fch.getBlockProposal()
+	if err != nil {
+		return nil, err
+	}
+
+	ctx, err := a.fch.getBlockContext(bp)
 	if err != nil {
 		return nil, err
 	}
@@ -776,7 +823,12 @@ func (a *Account) CodeHash() []byte {
 }
 
 func (a *Account) codeHash() ([]byte, error) {
-	ctx, err := a.fch.getBlockContext()
+	bp, err := a.fch.getBlockProposal()
+	if err != nil {
+		return nil, err
+	}
+
+	ctx, err := a.fch.getBlockContext(bp)
 	if err != nil {
 		return nil, err
 	}

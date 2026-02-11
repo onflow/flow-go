@@ -47,17 +47,17 @@ type ResultSummary struct {
 	ErrorCode               ErrorCode
 	ErrorMessage            string
 	GasConsumed             uint64
-	GasRefund               uint64
+	MaxGasConsumed          uint64
 	DeployedContractAddress *Address
 	ReturnedData            Data
 }
 
 // NewInvalidResult creates a new result that hold transaction validation
 // error as well as the defined gas cost for validation.
-func NewInvalidResult(tx *gethTypes.Transaction, err error) *Result {
+func NewInvalidResult(txType uint8, txHash gethCommon.Hash, err error) *Result {
 	return &Result{
-		TxType:          tx.Type(),
-		TxHash:          tx.Hash(),
+		TxType:          txType,
+		TxHash:          txHash,
 		ValidationError: err,
 		GasConsumed:     InvalidTransactionGasCost,
 	}
@@ -78,12 +78,12 @@ type Result struct {
 	// type of transaction defined by the evm package
 	// see DirectCallTxType as extra type we added type for direct calls.
 	TxType uint8
-	// total gas consumed during execution
+	// total gas consumed during execution, not including the refunded gas
 	GasConsumed uint64
+	// maximum gas consumed during execution, excluding gas refunds
+	MaxGasConsumed uint64
 	// total gas used by the block after this tx execution
 	CumulativeGasUsed uint64
-	// total gas refunds after transaction execution
-	GasRefund uint64
 	// the address where the contract is deployed (if any)
 	DeployedContractAddress *Address
 	// returned data from a function call
@@ -280,7 +280,7 @@ func (res *Result) LightReceipt() *LightReceipt {
 func (res *Result) ResultSummary() *ResultSummary {
 	rs := &ResultSummary{
 		GasConsumed:             res.GasConsumed,
-		GasRefund:               res.GasRefund,
+		MaxGasConsumed:          res.MaxGasConsumed,
 		DeployedContractAddress: res.DeployedContractAddress,
 		ReturnedData:            res.ReturnedData,
 		Status:                  StatusSuccessful,

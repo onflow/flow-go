@@ -223,7 +223,11 @@ func (db *StateDB) GetCodeSize(addr gethCommon.Address) int {
 
 // SetCode sets the code for the given address, and returns the
 // previous code located at the given address, if any.
-func (db *StateDB) SetCode(addr gethCommon.Address, code []byte) (prev []byte) {
+func (db *StateDB) SetCode(
+	addr gethCommon.Address,
+	code []byte,
+	reason gethTracing.CodeChangeReason,
+) (prev []byte) {
 	prev = db.GetCode(addr)
 	err := db.latestView().SetCode(addr, code)
 	db.handleError(err)

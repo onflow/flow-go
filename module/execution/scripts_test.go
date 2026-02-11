@@ -163,7 +163,7 @@ func (s *scriptTestSuite) SetupTest() {
 	s.snapshot = snapshot.NewSnapshotTree(nil)
 	s.vm = fvm.NewVirtualMachine()
 	s.vmCtx = fvm.NewContext(
-		fvm.WithChain(s.chain),
+		s.chain,
 		fvm.WithAuthorizationChecksEnabled(false),
 		fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
 	)
@@ -178,7 +178,7 @@ func (s *scriptTestSuite) SetupTest() {
 	derivedChainData, err := derived.NewDerivedChainData(derived.DefaultDerivedDataCacheSize)
 	s.Require().NoError(err)
 
-	index, err := indexer.New(
+	index := indexer.New(
 		logger,
 		metrics.NewNoopCollector(),
 		nil,
@@ -188,12 +188,13 @@ func (s *scriptTestSuite) SetupTest() {
 		nil,
 		nil,
 		nil,
-		flow.Testnet.Chain(),
+		nil,
+		flow.Testnet,
 		derivedChainData,
+		nil,
 		nil,
 		lockManager,
 	)
-	s.Require().NoError(err)
 
 	s.scripts = NewScripts(
 		logger,
@@ -276,7 +277,7 @@ func (s *scriptTestSuite) createAccount() flow.Address {
 	data, err := ccf.Decode(nil, accountCreatedEvents[0].Payload)
 	s.Require().NoError(err)
 
-	return flow.ConvertAddress(
+	return flow.Address(
 		cadence.SearchFieldByName(
 			data.(cadence.Event),
 			stdlib.AccountEventAddressParameter.Identifier,

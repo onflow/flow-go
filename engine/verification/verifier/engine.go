@@ -142,7 +142,7 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	switch resource := event.(type) {
 	case *verification.VerifiableChunkData:
 		err = e.verifiableChunkHandler(originID, resource)
-	case *messages.ApprovalRequest:
+	case *flow.ApprovalRequest:
 		err = e.approvalRequestHandler(originID, resource)
 	default:
 		return fmt.Errorf("invalid event type (%T)", event)
@@ -304,7 +304,7 @@ func (e *Engine) verify(ctx context.Context, originID flow.Identifier,
 	}
 
 	// broadcast result approval to the consensus nodes
-	err = e.pushConduit.Publish(approval, consensusNodes.NodeIDs()...)
+	err = e.pushConduit.Publish((*messages.ResultApproval)(approval), consensusNodes.NodeIDs()...)
 	if err != nil {
 		// TODO this error needs more advance handling after MVP
 		return fmt.Errorf("could not submit result approval: %w", err)
@@ -425,7 +425,7 @@ func (e *Engine) verifiableChunkHandler(originID flow.Identifier, ch *verificati
 	return nil
 }
 
-func (e *Engine) approvalRequestHandler(originID flow.Identifier, req *messages.ApprovalRequest) error {
+func (e *Engine) approvalRequestHandler(originID flow.Identifier, req *flow.ApprovalRequest) error {
 
 	log := e.log.With().
 		Hex("origin_id", logging.ID(originID)).
@@ -452,7 +452,7 @@ func (e *Engine) approvalRequestHandler(originID flow.Identifier, req *messages.
 
 	response := &messages.ApprovalResponse{
 		Nonce:    req.Nonce,
-		Approval: *approval,
+		Approval: flow.UntrustedResultApproval(*approval),
 	}
 
 	err = e.pullConduit.Unicast(response, originID)

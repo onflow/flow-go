@@ -30,7 +30,6 @@ import (
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/operation"
 	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
-	"github.com/onflow/flow-go/storage/procedure"
 	"github.com/onflow/flow-go/storage/store"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -202,15 +201,14 @@ func (suite *MutatorSuite) FinalizeBlock(block model.Block) {
 	err := operation.RetrieveHeader(suite.db.Reader(), block.Payload.ReferenceBlockID, &refBlock)
 	suite.Require().Nil(err)
 
-	lctx := suite.lockManager.NewContext()
-	defer lctx.Release()
-	require.NoError(suite.T(), lctx.AcquireLock(storage.LockInsertOrFinalizeClusterBlock))
-	err = suite.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-		err = procedure.FinalizeClusterBlock(lctx, rw, block.ID())
-		if err != nil {
-			return err
-		}
-		return operation.IndexClusterBlockByReferenceHeight(lctx, rw.Writer(), refBlock.Height, block.ID())
+	err = unittest.WithLock(suite.T(), suite.lockManager, storage.LockInsertOrFinalizeClusterBlock, func(lctx lockctx.Context) error {
+		return suite.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			err := operation.FinalizeClusterBlock(lctx, rw, block.ID())
+			if err != nil {
+				return err
+			}
+			return operation.IndexClusterBlockByReferenceHeight(lctx, rw.Writer(), refBlock.Height, block.ID())
+		})
 	})
 	suite.Assert().NoError(err)
 }
@@ -384,13 +382,13 @@ func (suite *MutatorSuite) TestExtend_Success() {
 	// should be able to retrieve the block
 	r := suite.db.Reader()
 	var extended model.Block
-	err = procedure.RetrieveClusterBlock(r, proposal.Block.ID(), &extended)
+	err = operation.RetrieveClusterBlock(r, proposal.Block.ID(), &extended)
 	suite.Assert().Nil(err)
 	suite.Assert().Equal(proposal.Block.Payload, extended.Payload)
 
 	// the block should be indexed by its parent
 	var childIDs flow.IdentifierList
-	err = procedure.LookupBlockChildren(r, suite.genesis.ID(), &childIDs)
+	err = operation.RetrieveBlockChildren(r, suite.genesis.ID(), &childIDs)
 	suite.Assert().Nil(err)
 	suite.Require().Len(childIDs, 1)
 	suite.Assert().Equal(proposal.Block.ID(), childIDs[0])
@@ -555,6 +553,42 @@ func (suite *MutatorSuite) TestExtend_FinalizedBlockWithDupeTx() {
 	suite.Assert().True(state.IsInvalidExtensionError(err))
 }
 
+// TestExtend_RaceCondition_FinalizedForkWithDupeTx tests the case where an extending
+// block conflicts with a block on another fork, and that fork is finalized.
+// Usually the extending block would be rejected because it is orphaned, however
+// concurrent finalization and extension can allow this scenario to occur.
+//
+//	  ↙ B(tx1)  [tentatively withheld by byzantine proposer to force a fork]
+//	A
+//	  ↖ C(tx1) ← D ← E [E finalizes C]
+func (suite *MutatorSuite) TestExtend_RaceCondition_FinalizedForkWithDupeTx() {
+	tx1 := suite.Tx()
+
+	// create a block extending genesis containing tx1
+	B := suite.ProposalWithParentAndPayload(suite.genesis, suite.Payload(&tx1))
+	// create a conflicting block C, which will be finalized concurrently with inserting B
+	C := suite.ProposalWithParentAndPayload(suite.genesis, suite.Payload(&tx1))
+
+	// should be able to extend block C
+	err := suite.state.Extend(&C)
+	suite.Assert().NoError(err)
+
+	// We want to replicate a race condition where block C is finalized concurrently with
+	// block B being inserted. To accomplish this, we skip actually inserting D/E (although
+	// they would be need in practice). Instead, we manually insert the reference block to
+	// transaction lookup for C which would be inserted during finalization.
+	err = unittest.WithLock(suite.T(), suite.lockManager, storage.LockInsertOrFinalizeClusterBlock, func(lctx lockctx.Context) error {
+		return suite.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			return operation.IndexClusterBlockByReferenceHeight(lctx, rw.Writer(), suite.genesis.Height, C.Block.ID())
+		})
+	})
+	require.NoError(suite.T(), err)
+
+	// we should be able to extend B, because C is on a fork.
+	err = suite.state.Extend(&B)
+	suite.Assert().NoError(err)
+}
+
 func (suite *MutatorSuite) TestExtend_ConflictingForkWithDupeTx() {
 	tx1 := suite.Tx()
 
@@ -609,7 +643,7 @@ func (suite *MutatorSuite) TestExtend_LargeHistory() {
 		// conflicting fork, build on the parent of the head
 		parent := *head
 		if conflicting {
-			err = procedure.RetrieveClusterBlock(suite.db.Reader(), parent.ParentID, &parent)
+			err = operation.RetrieveClusterBlock(suite.db.Reader(), parent.ParentID, &parent)
 			assert.NoError(t, err)
 			// add the transaction to the invalidated list
 			invalidatedTransactions = append(invalidatedTransactions, &tx)

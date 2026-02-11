@@ -1,6 +1,7 @@
 package convert
 
 import (
+	"bytes"
 	"strings"
 
 	"google.golang.org/grpc/codes"
@@ -24,6 +25,12 @@ func Address(rawAddress []byte, chain flow.Chain) (flow.Address, error) {
 	}
 
 	return address, nil
+}
+
+// IsNonEmptyAddress returns true if the address is the correct length and not the empty address.
+// Does not convert or check the validity of the address.
+func IsNonEmptyAddress(address []byte) bool {
+	return len(address) == flow.AddressLength && !bytes.Equal(address, flow.EmptyAddress.Bytes())
 }
 
 func HexToAddress(hexAddress string, chain flow.Chain) (flow.Address, error) {

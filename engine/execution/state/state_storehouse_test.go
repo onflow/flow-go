@@ -6,6 +6,7 @@ import (
 
 	"github.com/cockroachdb/pebble/v2"
 	"github.com/ipfs/go-cid"
+	"github.com/jordanschalm/lockctx"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -54,17 +55,17 @@ func prepareStorehouseTest(f func(t *testing.T, es state.ExecutionState, l *ledg
 			headers := storagemock.NewHeaders(t)
 			blocks := storagemock.NewBlocks(t)
 			events := storagemock.NewEvents(t)
-			events.On("BatchStore", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+			events.On("BatchStore", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 			serviceEvents := storagemock.NewServiceEvents(t)
-			serviceEvents.On("BatchStore", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+			serviceEvents.On("BatchStore", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 			txResults := storagemock.NewTransactionResults(t)
-			txResults.On("BatchStore", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+			txResults.On("BatchStore", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 			chunkDataPacks := storagemock.NewChunkDataPacks(t)
-			chunkDataPacks.On("Store", mock.Anything).Return(nil)
+			chunkDataPacks.On("Store", mock.Anything).Return(func(lockctx.Proof, storage.ReaderBatchWriter) error { return nil }, nil)
 			results := storagemock.NewExecutionResults(t)
-			results.On("BatchIndex", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+			results.On("BatchIndex", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 			myReceipts := storagemock.NewMyExecutionReceipts(t)
-			myReceipts.On("BatchStoreMyReceipt", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+			myReceipts.On("BatchStoreMyReceipt", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 
 			withRegisterStore(t, func(t *testing.T,
 				rs *storehouse.RegisterStore,
@@ -83,12 +84,12 @@ func prepareStorehouseTest(f func(t *testing.T, es state.ExecutionState, l *ledg
 					return operation.UpdateExecutedBlock(rw.Writer(), rootID)
 				}))
 
-				lctx := lockManager.NewContext()
-				require.NoError(t, lctx.AcquireLock(storage.LockInsertBlock))
-				require.NoError(t, pebbleimpl.ToDB(pebbleDB).WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-					return operation.InsertHeader(lctx, rw, finalizedHeaders[10].ID(), finalizedHeaders[10])
-				}))
-				lctx.Release()
+				err = unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
+					return pebbleimpl.ToDB(pebbleDB).WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+						return operation.InsertHeader(lctx, rw, finalizedHeaders[10].ID(), finalizedHeaders[10])
+					})
+				})
+				require.NoError(t, err)
 
 				getLatestFinalized := func() (uint64, error) {
 					return rootHeight, nil

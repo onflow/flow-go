@@ -77,7 +77,7 @@ func (c CompleteExecutionReceiptList) ChunkDataResponseOf(t *testing.T, chunkID 
 
 	// publishes the chunk data pack response to the network
 	res := &messages.ChunkDataResponse{
-		ChunkDataPack: *receiptData.ChunkDataPacks[chunkIndex],
+		ChunkDataPack: flow.UntrustedChunkDataPack(*receiptData.ChunkDataPacks[chunkIndex]),
 		Nonce:         rand.Uint64(),
 	}
 
@@ -267,11 +267,7 @@ func ExecutionResultFixture(t *testing.T,
 
 		blocks := new(envMock.Blocks)
 
-		execCtx := fvm.NewContext(
-			fvm.WithLogger(log),
-			fvm.WithChain(chain),
-			fvm.WithBlocks(blocks),
-		)
+		execCtx := fvm.NewContext(chain, fvm.WithLogger(log), fvm.WithBlocks(blocks))
 
 		// create state.View
 		snapshot := exstate.NewLedgerStorageSnapshot(
@@ -308,7 +304,6 @@ func ExecutionResultFixture(t *testing.T,
 			committer,
 			me,
 			prov,
-			nil,
 			protocolState,
 			testMaxConcurrency)
 		require.NoError(t, err)

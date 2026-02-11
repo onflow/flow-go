@@ -6,6 +6,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/jordanschalm/lockctx"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -252,28 +253,30 @@ func (bs *BuilderSuite) SetupTest() {
 	bs.dir = dir
 
 	lockManager := storage.NewTestingLockManager()
-	lctx := lockManager.NewContext()
-	require.NoError(bs.T(), lctx.AcquireLock(storage.LockFinalizeBlock))
-	require.NoError(bs.T(), lctx.AcquireLock(storage.LockBootstrapping))
-	defer lctx.Release()
 
-	// insert finalized height and root height
+	// Insert finalized height and root height:
+	// Currently, we need locks [storage.LockInsertInstanceParams] and [storage.LockFinalizeBlock]. However, the lock policy only permits the locking
+	// order [storage.LockInsertInstanceParams] → [storage.LockIndexExecutionResult] → [storage.LockInsertBlock] → [storage.LockFinalizeBlock]. Hence,
+	// we acquire all 4 locks in that order.
 	db := bs.db
-	require.NoError(bs.T(), db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-		enc, err := datastore.NewVersionedInstanceParams(
-			datastore.DefaultInstanceParamsVersion,
-			unittest.IdentifierFixture(),
-			unittest.IdentifierFixture(),
-			unittest.IdentifierFixture(),
-		)
-		require.NoError(bs.T(), err)
-		require.NoError(bs.T(), operation.InsertInstanceParams(lctx, rw, *enc))
-		require.NoError(bs.T(), operation.UpsertFinalizedHeight(lctx, rw.Writer(), final.Height))
-		require.NoError(bs.T(), operation.IndexFinalizedBlockByHeight(lctx, rw, final.Height, bs.finalID))
-		require.NoError(bs.T(), operation.UpsertSealedHeight(lctx, rw.Writer(), first.Height))
-		require.NoError(bs.T(), operation.IndexFinalizedBlockByHeight(lctx, rw, first.Height, first.ID()))
-		return nil
-	}))
+	err := unittest.WithLocks(bs.T(), lockManager, []string{storage.LockInsertInstanceParams, storage.LockIndexExecutionResult, storage.LockInsertBlock, storage.LockFinalizeBlock}, func(lctx lockctx.Context) error {
+		return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			enc, err := datastore.NewVersionedInstanceParams(
+				datastore.DefaultInstanceParamsVersion,
+				unittest.IdentifierFixture(),
+				unittest.IdentifierFixture(),
+				unittest.IdentifierFixture(),
+			)
+			require.NoError(bs.T(), err)
+			require.NoError(bs.T(), operation.InsertInstanceParams(lctx, rw, *enc))
+			require.NoError(bs.T(), operation.UpsertFinalizedHeight(lctx, rw.Writer(), final.Height))
+			require.NoError(bs.T(), operation.IndexFinalizedBlockByHeight(lctx, rw, final.Height, bs.finalID))
+			require.NoError(bs.T(), operation.UpsertSealedHeight(lctx, rw.Writer(), first.Height))
+			require.NoError(bs.T(), operation.IndexFinalizedBlockByHeight(lctx, rw, first.Height, first.ID()))
+			return nil
+		})
+	})
+	require.NoError(bs.T(), err)
 
 	bs.sentinel = 1337
 	bs.setter = func(h *flow.HeaderBodyBuilder) error {
@@ -447,7 +450,6 @@ func (bs *BuilderSuite) SetupTest() {
 	bs.stateMutator.On("EvolveState", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(unittest.IdentifierFixture(), nil).Maybe()
 
 	// initialize the builder
-	var err error
 	bs.build, err = NewBuilder(
 		noopMetrics,
 		bs.state,

@@ -63,11 +63,9 @@ import (
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
-	ledgerpkg "github.com/onflow/flow-go/ledger"
-	"github.com/onflow/flow-go/ledger/common/pathfinder"
-	ledger "github.com/onflow/flow-go/ledger/complete"
+	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/complete/wal"
-	bootstrapFilenames "github.com/onflow/flow-go/model/bootstrap"
+	ledgerfactory "github.com/onflow/flow-go/ledger/factory"
 	modelbootstrap "github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
@@ -78,9 +76,7 @@ import (
 	exedataprovider "github.com/onflow/flow-go/module/executiondatasync/provider"
 	"github.com/onflow/flow-go/module/executiondatasync/pruner"
 	edstorage "github.com/onflow/flow-go/module/executiondatasync/storage"
-	execdatastorage "github.com/onflow/flow-go/module/executiondatasync/storage"
 	"github.com/onflow/flow-go/module/executiondatasync/tracker"
-	"github.com/onflow/flow-go/module/finalizedreader"
 	finalizer "github.com/onflow/flow-go/module/finalizer/consensus"
 	"github.com/onflow/flow-go/module/mempool/queue"
 	"github.com/onflow/flow-go/module/metrics"
@@ -133,7 +129,7 @@ type ExecutionNode struct {
 	executionState state.ExecutionState
 	followerState  protocol.FollowerState
 	committee      hotstuff.DynamicCommittee
-	ledgerStorage  *ledger.Ledger
+	ledgerStorage  ledger.Ledger
 	registerStore  *storehouse.RegisterStore
 
 	// storage
@@ -163,18 +159,24 @@ type ExecutionNode struct {
 	scriptsEng             *scripts.Engine
 	followerDistributor    *pubsub.FollowerDistributor
 	checkAuthorizedAtBlock func(blockID flow.Identifier) (bool, error)
-	diskWAL                *wal.DiskWAL
 	blockDataUploader      *uploader.Manager
 	executionDataStore     execution_data.ExecutionDataStore
 	toTriggerCheckpoint    *atomic.Bool      // create the checkpoint trigger to be controlled by admin tool, and listened by the compactor
 	stopControl            *stop.StopControl // stop the node at given block height
-	executionDataDatastore execdatastorage.DatastoreManager
+	executionDataDatastore edstorage.DatastoreManager
 	executionDataPruner    *pruner.Pruner
 	executionDataBlobstore blobs.Blobstore
 	executionDataTracker   tracker.Storage
 	blobService            network.BlobService
 	blobserviceDependable  *module.ProxiedReadyDoneAware
 	metricsProvider        txmetrics.TransactionExecutionMetricsProvider
+
+	// used by ingestion engine to notify executed block, and
+	// used by background indexer engine to trigger indexing
+	blockExecutedNotifier *ingestion.BlockExecutedNotifier
+
+	// save register updates in storehouse when it is not enabled
+	backgroundIndexerEngine *storehouse.BackgroundIndexerEngine
 }
 
 func (builder *ExecutionNodeBuilder) LoadComponentsAndModules() {
@@ -191,7 +193,7 @@ func (builder *ExecutionNodeBuilder) LoadComponentsAndModules() {
 			return stateSyncCommands.NewReadExecutionDataCommand(exeNode.executionDataStore)
 		}).
 		AdminCommand("trigger-checkpoint", func(config *NodeConfig) commands.AdminCommand {
-			return executionCommands.NewTriggerCheckpointCommand(exeNode.toTriggerCheckpoint)
+			return executionCommands.NewTriggerCheckpointCommand(exeNode.toTriggerCheckpoint, exeNode.exeConf.ledgerServiceAddr, exeNode.exeConf.ledgerServiceAdminAddr)
 		}).
 		AdminCommand("stop-at-height", func(config *NodeConfig) commands.AdminCommand {
 			return executionCommands.NewStopAtHeightCommand(exeNode.stopControl)
@@ -215,6 +217,7 @@ func (builder *ExecutionNodeBuilder) LoadComponentsAndModules() {
 		Module("sync core", exeNode.LoadSyncCore).
 		Module("execution storage", exeNode.LoadExecutionStorage).
 		Module("follower distributor", exeNode.LoadFollowerDistributor).
+		Module("block executed notifier", exeNode.LoadBlockExecutedNotifier).
 		Module("authorization checking function", exeNode.LoadAuthorizationCheckingFunction).
 		Module("execution data datastore", exeNode.LoadExecutionDataDatastore).
 		Module("execution data getter", exeNode.LoadExecutionDataGetter).
@@ -239,7 +242,6 @@ func (builder *ExecutionNodeBuilder) LoadComponentsAndModules() {
 				"chunk_data_pack", exeNode.chunkDataPackDB)
 		}).
 		Component("stop control", exeNode.LoadStopControl).
-		Component("execution state ledger WAL compactor", exeNode.LoadExecutionStateLedgerWALCompactor).
 		// disable execution data pruner for now, since storehouse is going to need the execution data
 		// for recovery,
 		// TODO: will re-visit this once storehouse has implemented new WAL for checkpoint file of
@@ -262,6 +264,11 @@ func (builder *ExecutionNodeBuilder) LoadComponentsAndModules() {
 		Component("receipt provider engine", exeNode.LoadReceiptProviderEngine).
 		Component("synchronization engine", exeNode.LoadSynchronizationEngine).
 		Component("grpc server", exeNode.LoadGrpcServer)
+
+	// Only load background indexer engine when both flags indicate it should be enabled
+	if !exeNode.exeConf.enableStorehouse && exeNode.exeConf.enableBackgroundStorehouseIndexing {
+		builder.FlowNodeBuilder.Component("background indexer engine", exeNode.LoadBackgroundIndexerEngine)
+	}
 }
 
 func (exeNode *ExecutionNode) LoadCollections(node *NodeConfig) error {
@@ -334,6 +341,7 @@ func (exeNode *ExecutionNode) LoadSyncCore(node *NodeConfig) error {
 func (exeNode *ExecutionNode) LoadExecutionStorage(
 	node *NodeConfig,
 ) error {
+	var err error
 	db := node.ProtocolDB
 
 	exeNode.events = store.NewEvents(node.Metrics.Cache, db)
@@ -342,7 +350,10 @@ func (exeNode *ExecutionNode) LoadExecutionStorage(
 	exeNode.results = store.NewExecutionResults(node.Metrics.Cache, db)
 	exeNode.receipts = store.NewExecutionReceipts(node.Metrics.Cache, db, exeNode.results, storage.DefaultCacheSize)
 	exeNode.myReceipts = store.NewMyExecutionReceipts(node.Metrics.Cache, db, exeNode.receipts)
-	exeNode.txResults = store.NewTransactionResults(node.Metrics.Cache, db, exeNode.exeConf.transactionResultsCacheSize)
+	exeNode.txResults, err = store.NewTransactionResults(node.Metrics.Cache, db, exeNode.exeConf.transactionResultsCacheSize)
+	if err != nil {
+		return err
+	}
 	exeNode.eventsReader = exeNode.events
 	exeNode.commitsReader = exeNode.commits
 	exeNode.resultsReader = exeNode.results
@@ -353,6 +364,18 @@ func (exeNode *ExecutionNode) LoadExecutionStorage(
 func (exeNode *ExecutionNode) LoadFollowerDistributor(node *NodeConfig) error {
 	exeNode.followerDistributor = pubsub.NewFollowerDistributor()
 	exeNode.followerDistributor.AddProposalViolationConsumer(notifications.NewSlashingViolationsConsumer(node.Logger))
+	return nil
+}
+
+func (exeNode *ExecutionNode) LoadBlockExecutedNotifier(node *NodeConfig) error {
+	// background storehouse indexing is the only consumer of this notifier,
+	// only create the notifier when background storehouse indexing is enabled
+	if !exeNode.exeConf.enableBackgroundStorehouseIndexing {
+		return nil
+	}
+
+	exeNode.blockExecutedNotifier = ingestion.NewBlockExecutedNotifier()
+
 	return nil
 }
 
@@ -579,7 +602,7 @@ func (exeNode *ExecutionNode) LoadProviderEngine(
 		)...,
 	)
 
-	vmCtx := fvm.NewContext(opts...)
+	vmCtx := fvm.NewContext(node.RootChainID.Chain(), opts...)
 
 	var collector module.ExecutionMetrics
 	collector = exeNode.collector
@@ -652,14 +675,8 @@ func (exeNode *ExecutionNode) LoadProviderEngine(
 
 	blockSnapshot, _, err := exeNode.executionState.CreateStorageSnapshot(blockID)
 	if err != nil {
-		tries, _ := exeNode.ledgerStorage.Tries()
-		trieInfo := "empty"
-		if len(tries) > 0 {
-			trieInfo = fmt.Sprintf("length: %v, 1st: %v, last: %v", len(tries), tries[0].RootHash(), tries[len(tries)-1].RootHash())
-		}
-
-		return nil, fmt.Errorf("cannot create a storage snapshot at block %v at height %v, trie: %s: %w", blockID,
-			height, trieInfo, err)
+		return nil, fmt.Errorf("cannot create a storage snapshot at block %v at height %v : %w", blockID,
+			height, err)
 	}
 
 	// Get the epoch counter from the smart contract at the last executed block.
@@ -716,7 +733,7 @@ func (exeNode *ExecutionNode) LoadExecutionDataDatastore(
 	node *NodeConfig,
 ) (err error) {
 	exeNode.executionDataDatastore, err = edstorage.CreateDatastoreManager(
-		node.Logger, exeNode.exeConf.executionDataDir, exeNode.exeConf.executionDataDBMode)
+		node.Logger, exeNode.exeConf.executionDataDir)
 	if err != nil {
 		return fmt.Errorf("could not create execution data datastore manager: %w", err)
 	}
@@ -758,8 +775,12 @@ func (exeNode *ExecutionNode) LoadExecutionState(
 		}
 		return nil
 	})
+
+	chunkDB := pebbleimpl.ToDB(chunkDataPackDB)
+	storedChunkDataPacks := store.NewStoredChunkDataPacks(
+		node.Metrics.Cache, chunkDB, exeNode.exeConf.chunkDataPackCacheSize)
 	chunkDataPacks := store.NewChunkDataPacks(node.Metrics.Cache,
-		pebbleimpl.ToDB(chunkDataPackDB), exeNode.collections, exeNode.exeConf.chunkDataPackCacheSize)
+		node.ProtocolDB, storedChunkDataPacks, exeNode.collections, exeNode.exeConf.chunkDataPackCacheSize)
 
 	getLatestFinalized := func() (uint64, error) {
 		final, err := node.State.Final().Head()
@@ -855,75 +876,28 @@ func (exeNode *ExecutionNode) LoadRegisterStore(
 ) error {
 	if !exeNode.exeConf.enableStorehouse {
 		node.Logger.Info().Msg("register store disabled")
+		exeNode.registerStore = nil
 		return nil
 	}
 
-	node.Logger.Info().
-		Str("pebble_db_path", exeNode.exeConf.registerDir).
-		Msg("register store enabled")
-	pebbledb, err := storagepebble.OpenRegisterPebbleDB(
-		node.Logger.With().Str("pebbledb", "registers").Logger(),
-		exeNode.exeConf.registerDir)
-
-	if err != nil {
-		return fmt.Errorf("could not create disk register store: %w", err)
-	}
-
-	// close pebble db on shut down
-	exeNode.builder.ShutdownFunc(func() error {
-		err := pebbledb.Close()
-		if err != nil {
-			return fmt.Errorf("could not close register store: %w", err)
-		}
-		return nil
-	})
-
-	bootstrapped, err := storagepebble.IsBootstrapped(pebbledb)
-	if err != nil {
-		return fmt.Errorf("could not check if registers db is bootstrapped: %w", err)
-	}
-
-	node.Logger.Info().Msgf("register store bootstrapped: %v", bootstrapped)
-
-	if !bootstrapped {
-		checkpointFile := path.Join(exeNode.exeConf.triedir, modelbootstrap.FilenameWALRootCheckpoint)
-		sealedRoot := node.State.Params().SealedRoot()
-
-		rootSeal := node.State.Params().Seal()
-
-		if sealedRoot.ID() != rootSeal.BlockID {
-			return fmt.Errorf("mismatching root seal and sealed root: %v != %v", sealedRoot.ID(), rootSeal.BlockID)
-		}
-
-		checkpointHeight := sealedRoot.Height
-		rootHash := ledgerpkg.RootHash(rootSeal.FinalState)
-
-		err = bootstrap.ImportRegistersFromCheckpoint(node.Logger, checkpointFile, checkpointHeight, rootHash, pebbledb, exeNode.exeConf.importCheckpointWorkerCount)
-		if err != nil {
-			return fmt.Errorf("could not import registers from checkpoint: %w", err)
-		}
-	}
-	diskStore, err := storagepebble.NewRegisters(pebbledb, storagepebble.PruningDisabled)
-	if err != nil {
-		return fmt.Errorf("could not create registers storage: %w", err)
-	}
-
-	reader := finalizedreader.NewFinalizedReader(node.Storage.Headers, node.LastFinalizedHeader.Height)
-	node.ProtocolEvents.AddConsumer(reader)
-	notifier := storehouse.NewRegisterStoreMetrics(exeNode.collector)
-
-	// report latest finalized and executed height as metrics
-	notifier.OnFinalizedAndExecutedHeightUpdated(diskStore.LatestHeight())
-
-	registerStore, err := storehouse.NewRegisterStore(
-		diskStore,
-		nil, // TODO: replace with real WAL
-		reader,
+	registerStore, closer, err := storehouse.LoadRegisterStore(
 		node.Logger,
-		notifier,
+		node.State,
+		node.Storage.Headers,
+		node.ProtocolEvents,
+		node.LastFinalizedHeader.Height,
+		exeNode.collector,
+		exeNode.exeConf.registerDir,
+		exeNode.exeConf.triedir,
+		exeNode.exeConf.importCheckpointWorkerCount,
+		bootstrap.ImportRegistersFromCheckpoint,
 	)
 	if err != nil {
 		return err
+	}
+
+	if closer != nil {
+		exeNode.builder.ShutdownFunc(closer.Close)
 	}
 
 	exeNode.registerStore = registerStore
@@ -936,36 +910,27 @@ func (exeNode *ExecutionNode) LoadExecutionStateLedger(
 	module.ReadyDoneAware,
 	error,
 ) {
-	// DiskWal is a dependent component because we need to ensure
-	// that all WAL updates are completed before closing opened WAL segment.
-	var err error
-	exeNode.diskWAL, err = wal.NewDiskWAL(node.Logger.With().Str("subcomponent", "wal").Logger(),
-		node.MetricsRegisterer, exeNode.collector, exeNode.exeConf.triedir, int(exeNode.exeConf.mTrieCacheSize), pathfinder.PathByteSize, wal.SegmentSize)
+	// Create ledger using factory
+	ledgerStorage, err := ledgerfactory.NewLedger(ledgerfactory.Config{
+		LedgerServiceAddr:     exeNode.exeConf.ledgerServiceAddr,
+		LedgerMaxRequestSize:  exeNode.exeConf.ledgerMaxRequestSize,
+		LedgerMaxResponseSize: exeNode.exeConf.ledgerMaxResponseSize,
+		Triedir:               exeNode.exeConf.triedir,
+		MTrieCacheSize:        exeNode.exeConf.mTrieCacheSize,
+		CheckpointDistance:    exeNode.exeConf.checkpointDistance,
+		CheckpointsToKeep:     exeNode.exeConf.checkpointsToKeep,
+		MetricsRegisterer:     node.MetricsRegisterer,
+		WALMetrics:            exeNode.collector,
+		LedgerMetrics:         exeNode.collector,
+		Logger:                node.Logger,
+	}, exeNode.toTriggerCheckpoint)
 	if err != nil {
-		return nil, fmt.Errorf("failed to initialize wal: %w", err)
+		return nil, err
 	}
 
-	exeNode.ledgerStorage, err = ledger.NewLedger(exeNode.diskWAL, int(exeNode.exeConf.mTrieCacheSize), exeNode.collector, node.Logger.With().Str("subcomponent",
-		"ledger").Logger(), ledger.DefaultPathFinderVersion)
-	return exeNode.ledgerStorage, err
-}
+	exeNode.ledgerStorage = ledgerStorage
 
-func (exeNode *ExecutionNode) LoadExecutionStateLedgerWALCompactor(
-	node *NodeConfig,
-) (
-	module.ReadyDoneAware,
-	error,
-) {
-	return ledger.NewCompactor(
-		exeNode.ledgerStorage,
-		exeNode.diskWAL,
-		node.Logger.With().Str("subcomponent", "checkpointer").Logger(),
-		uint(exeNode.exeConf.mTrieCacheSize),
-		exeNode.exeConf.checkpointDistance,
-		exeNode.exeConf.checkpointsToKeep,
-		exeNode.toTriggerCheckpoint, // compactor will listen to the signal from admin tool for force triggering checkpointing
-		exeNode.collector,
-	)
+	return exeNode.ledgerStorage, nil
 }
 
 func (exeNode *ExecutionNode) LoadExecutionDataPruner(
@@ -1094,15 +1059,17 @@ func (exeNode *ExecutionNode) LoadIngestionEngine(
 		colFetcher = accessFetcher
 		exeNode.collectionRequester = accessFetcher
 	} else {
+		fifoStore, err := engine.NewFifoMessageStore(requester.DefaultEntityRequestCacheSize)
+		if err != nil {
+			return nil, fmt.Errorf("could not create requester store: %w", err)
+		}
 		reqEng, err := requester.New(node.Logger.With().Str("entity", "collection").Logger(), node.Metrics.Engine, node.EngineRegistry, node.Me, node.State,
+			fifoStore,
 			channels.RequestCollections,
 			filter.Any,
 			func() flow.Entity { return new(flow.Collection) },
 			// we are manually triggering batches in execution, but lets still send off a batch once a minute, as a safety net for the sake of retries
 			requester.WithBatchInterval(exeNode.exeConf.requestInterval),
-			// consistency of collection can be checked by checking hash, and hash comes from trusted source (blocks from consensus follower)
-			// hence we not need to check origin
-			requester.WithValidateStaking(false),
 			// we have observed execution nodes occasionally fail to retrieve collections using this engine, which can cause temporary execution halts
 			// setting a retry maximum of 10s results in a much faster recovery from these faults (default is 2m)
 			requester.WithRetryMaximum(10*time.Second),
@@ -1114,6 +1081,11 @@ func (exeNode *ExecutionNode) LoadIngestionEngine(
 
 		colFetcher = fetcher.NewCollectionFetcher(node.Logger, reqEng, node.State, exeNode.exeConf.onflowOnlyLNs)
 		exeNode.collectionRequester = reqEng
+	}
+
+	var blockExecutedCallback ingestion.BlockExecutedCallback
+	if exeNode.blockExecutedNotifier != nil {
+		blockExecutedCallback = exeNode.blockExecutedNotifier.OnExecuted
 	}
 
 	_, core, err := ingestion.NewMachine(
@@ -1131,6 +1103,7 @@ func (exeNode *ExecutionNode) LoadIngestionEngine(
 		exeNode.providerEngine,
 		exeNode.blockDataUploader,
 		exeNode.stopControl,
+		blockExecutedCallback,
 	)
 
 	return core, err
@@ -1259,12 +1232,12 @@ func (exeNode *ExecutionNode) LoadFollowerEngine(
 		node.Storage.Headers,
 		node.LastFinalizedHeader,
 		core,
+		exeNode.followerDistributor,
 		node.ComplianceConfig,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("could not create follower engine: %w", err)
 	}
-	exeNode.followerDistributor.AddOnBlockFinalizedConsumer(exeNode.followerEng.OnFinalizedBlock)
 
 	return exeNode.followerEng, nil
 }
@@ -1342,11 +1315,11 @@ func (exeNode *ExecutionNode) LoadSynchronizationEngine(
 		exeNode.syncCore,
 		node.SyncEngineIdentifierProvider,
 		spamConfig,
+		exeNode.followerDistributor,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize synchronization engine: %w", err)
 	}
-	exeNode.followerDistributor.AddFinalizationConsumer(exeNode.syncEngine)
 
 	return exeNode.syncEngine, nil
 }
@@ -1381,6 +1354,42 @@ func (exeNode *ExecutionNode) LoadGrpcServer(
 	), nil
 }
 
+func (exeNode *ExecutionNode) LoadBackgroundIndexerEngine(
+	node *NodeConfig,
+) (
+	module.ReadyDoneAware,
+	error,
+) {
+	engine, created, err := storehouse.LoadBackgroundIndexerEngine(
+		node.Logger,
+		exeNode.exeConf.enableBackgroundStorehouseIndexing,
+		node.State,
+		node.Storage.Headers,
+		node.ProtocolEvents,
+		node.LastFinalizedHeader.Height,
+		exeNode.collector,
+		exeNode.exeConf.registerDir,
+		exeNode.exeConf.triedir,
+		exeNode.exeConf.importCheckpointWorkerCount,
+		bootstrap.ImportRegistersFromCheckpoint,
+		exeNode.executionDataStore,
+		exeNode.resultsReader,
+		exeNode.blockExecutedNotifier,
+		exeNode.followerDistributor,
+		exeNode.exeConf.backgroundIndexerHeightsPerSecond,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	if !created {
+		return &module.NoopReadyDoneAware{}, nil
+	}
+
+	exeNode.backgroundIndexerEngine = engine
+	return engine, nil
+}
+
 func (exeNode *ExecutionNode) LoadBootstrapper(node *NodeConfig) error {
 
 	// check if the execution database already exists
@@ -1401,9 +1410,9 @@ func (exeNode *ExecutionNode) LoadBootstrapper(node *NodeConfig) error {
 
 		err := wal.CheckpointHasRootHash(
 			node.Logger,
-			path.Join(node.BootstrapDir, bootstrapFilenames.DirnameExecutionState),
-			bootstrapFilenames.FilenameWALRootCheckpoint,
-			ledgerpkg.RootHash(node.RootSeal.FinalState),
+			path.Join(node.BootstrapDir, modelbootstrap.DirnameExecutionState),
+			modelbootstrap.FilenameWALRootCheckpoint,
+			ledger.RootHash(node.RootSeal.FinalState),
 		)
 		if err != nil {
 			return err
@@ -1480,18 +1489,18 @@ func copyBootstrapState(dir, trie string) error {
 	firstCheckpointFilename := "00000000"
 
 	fileExists := func(fileName string) bool {
-		_, err := os.Stat(filepath.Join(dir, bootstrapFilenames.DirnameExecutionState, fileName))
+		_, err := os.Stat(filepath.Join(dir, modelbootstrap.DirnameExecutionState, fileName))
 		return err == nil
 	}
 
 	// if there is a root checkpoint file, then copy that file over
-	if fileExists(bootstrapFilenames.FilenameWALRootCheckpoint) {
-		filename = bootstrapFilenames.FilenameWALRootCheckpoint
+	if fileExists(modelbootstrap.FilenameWALRootCheckpoint) {
+		filename = modelbootstrap.FilenameWALRootCheckpoint
 	} else if fileExists(firstCheckpointFilename) {
 		// else if there is a checkpoint file, then copy that file over
 		filename = firstCheckpointFilename
 	} else {
-		filePath := filepath.Join(dir, bootstrapFilenames.DirnameExecutionState, firstCheckpointFilename)
+		filePath := filepath.Join(dir, modelbootstrap.DirnameExecutionState, firstCheckpointFilename)
 
 		// include absolute path of the missing file in the error message
 		absPath, err := filepath.Abs(filePath)
@@ -1503,7 +1512,7 @@ func copyBootstrapState(dir, trie string) error {
 	}
 
 	// copy from the bootstrap folder to the execution state folder
-	from, to := path.Join(dir, bootstrapFilenames.DirnameExecutionState), trie
+	from, to := path.Join(dir, modelbootstrap.DirnameExecutionState), trie
 
 	log.Info().Str("dir", dir).Str("trie", trie).
 		Msgf("linking checkpoint file %v from directory: %v, to: %v", filename, from, to)

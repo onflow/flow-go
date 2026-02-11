@@ -40,9 +40,11 @@ const (
 )
 
 func TestPrograms_TestContractUpdates(t *testing.T) {
+	t.Parallel()
+
 	chain := flow.Mainnet.Chain()
 	vm := fvm.NewVirtualMachine()
-	execCtx := fvm.NewContext(fvm.WithChain(chain))
+	execCtx := fvm.NewContext(chain)
 
 	privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
 	require.NoError(t, err)
@@ -149,7 +151,6 @@ func TestPrograms_TestContractUpdates(t *testing.T) {
 		committer.NewNoopViewCommitter(),
 		me,
 		prov,
-		nil,
 		testutil.ProtocolStateWithSourceFixture(nil),
 		testMaxConcurrency)
 	require.NoError(t, err)
@@ -215,14 +216,16 @@ func (b blockProvider) ByHeightFrom(height uint64, _ *flow.Header) (*flow.Header
 //	        -> Block121 (emit event - version should be 2)
 //	            -> Block1211 (emit event - version should be 2)
 func TestPrograms_TestBlockForks(t *testing.T) {
+	t.Parallel()
+
 	block := unittest.BlockFixture()
 	chain := flow.Emulator.Chain()
 	vm := fvm.NewVirtualMachine()
 	execCtx := fvm.NewContext(
-		fvm.WithEVMEnabled(true),
+		chain,
 		fvm.WithBlockHeader(block.ToHeader()),
 		fvm.WithBlocks(blockProvider{map[uint64]*flow.Block{0: block}}),
-		fvm.WithChain(chain))
+	)
 	privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
 	require.NoError(t, err)
 	snapshotTree, accounts, err := testutil.CreateAccounts(
@@ -261,7 +264,6 @@ func TestPrograms_TestBlockForks(t *testing.T) {
 		committer.NewNoopViewCommitter(),
 		me,
 		prov,
-		nil,
 		testutil.ProtocolStateWithSourceFixture(nil),
 		testMaxConcurrency)
 	require.NoError(t, err)

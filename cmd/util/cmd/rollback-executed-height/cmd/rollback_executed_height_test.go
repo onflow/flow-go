@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/cockroachdb/pebble/v2"
@@ -41,16 +42,18 @@ func TestReExecuteBlock(t *testing.T) {
 		all := store.InitAll(metrics, db)
 		headers := all.Headers
 		blocks := all.Blocks
-		txResults := store.NewTransactionResults(metrics, db, store.DefaultCacheSize)
+		txResults, err := store.NewTransactionResults(metrics, db, store.DefaultCacheSize)
+		require.NoError(t, err)
 		commits := store.NewCommits(metrics, db)
-		chunkDataPacks := store.NewChunkDataPacks(metrics, pebbleimpl.ToDB(pdb), store.NewCollections(db, store.NewTransactions(metrics, db)), store.DefaultCacheSize)
+		storedChunkDataPacks := store.NewStoredChunkDataPacks(metrics, pebbleimpl.ToDB(pdb), store.DefaultCacheSize)
+		chunkDataPacks := store.NewChunkDataPacks(metrics, pebbleimpl.ToDB(pdb), storedChunkDataPacks, store.NewCollections(db, store.NewTransactions(metrics, db)), store.DefaultCacheSize)
 		results := all.Results
 		receipts := all.Receipts
 		myReceipts := store.NewMyExecutionReceipts(metrics, db, receipts)
 		events := store.NewEvents(metrics, db)
 		serviceEvents := store.NewServiceEvents(metrics, db)
 
-		unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
+		err = unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
 			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				// By convention, root block has no proposer signature - implementation has to handle this edge case
 				return blocks.BatchStore(lctx, rw, &flow.Proposal{Block: *genesis, ProposerSigData: nil})
@@ -86,12 +89,11 @@ func TestReExecuteBlock(t *testing.T) {
 		computationResult := testutil.ComputationResultFixture(t)
 		header := computationResult.Block.ToHeader()
 
-		lctx2 := lockManager.NewContext()
-		require.NoError(t, lctx2.AcquireLock(storage.LockInsertBlock))
-		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return blocks.BatchStore(lctx2, rw, unittest.ProposalFromBlock(computationResult.Block))
+		err = unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
+			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return blocks.BatchStore(lctx, rw, unittest.ProposalFromBlock(computationResult.Block))
+			})
 		})
-		lctx2.Release()
 		require.NoError(t, err)
 
 		// save execution results
@@ -101,13 +103,10 @@ func TestReExecuteBlock(t *testing.T) {
 		batch := db.NewBatch()
 		defer batch.Close()
 
-		chunkBatch := pebbleimpl.ToDB(pdb).NewBatch()
-		defer chunkBatch.Close()
-
 		// remove execution results
-		err = removeForBlockID(
+		var cdpIDs []flow.Identifier
+		cdpIDs, err = removeForBlockID(
 			batch,
-			chunkBatch,
 			commits,
 			txResults,
 			results,
@@ -121,9 +120,8 @@ func TestReExecuteBlock(t *testing.T) {
 		require.NoError(t, err)
 
 		// remove again, to make sure missing entires are handled properly
-		err = removeForBlockID(
+		additionalCdpIDs, err := removeForBlockID(
 			batch,
-			chunkBatch,
 			commits,
 			txResults,
 			results,
@@ -135,21 +133,26 @@ func TestReExecuteBlock(t *testing.T) {
 		)
 
 		require.NoError(t, err)
-		require.NoError(t, chunkBatch.Commit())
+		// combine chunk data pack IDs from both calls
+		cdpIDs = append(cdpIDs, additionalCdpIDs...)
+		require.NoError(t, storedChunkDataPacks.Remove(cdpIDs))
 		err2 := batch.Commit()
 
 		require.NoError(t, err2)
 
+		// verify that chunk data packs are no longer in stored chunk data pack database
+		for _, cdpID := range cdpIDs {
+			_, err := storedChunkDataPacks.ByID(cdpID)
+			require.Error(t, err)
+			require.True(t, errors.Is(err, storage.ErrNotFound))
+		}
+
 		batch = db.NewBatch()
 		defer batch.Close()
 
-		chunkBatch = pebbleimpl.ToDB(pdb).NewBatch()
-		defer chunkBatch.Close()
-
 		// remove again after flushing
-		err = removeForBlockID(
+		cdpIDs, err = removeForBlockID(
 			batch,
-			chunkBatch,
 			commits,
 			txResults,
 			results,
@@ -160,11 +163,17 @@ func TestReExecuteBlock(t *testing.T) {
 			header.ID(),
 		)
 		require.NoError(t, err)
-
-		require.NoError(t, chunkBatch.Commit())
+		require.NoError(t, storedChunkDataPacks.Remove(cdpIDs))
 		err2 = batch.Commit()
 
 		require.NoError(t, err2)
+
+		// verify that chunk data packs are no longer in stored chunk data pack database
+		for _, cdpID := range cdpIDs {
+			_, err := storedChunkDataPacks.ByID(cdpID)
+			require.Error(t, err)
+			require.True(t, errors.Is(err, storage.ErrNotFound))
+		}
 
 		// re execute result
 		err = es.SaveExecutionResults(context.Background(), computationResult)
@@ -201,15 +210,18 @@ func TestReExecuteBlockWithDifferentResult(t *testing.T) {
 		serviceEvents := store.NewServiceEvents(metrics, db)
 		transactions := store.NewTransactions(metrics, db)
 		collections := store.NewCollections(db, transactions)
-		chunkDataPacks := store.NewChunkDataPacks(metrics, pebbleimpl.ToDB(pdb), collections, bstorage.DefaultCacheSize)
-		txResults := store.NewTransactionResults(metrics, db, bstorage.DefaultCacheSize)
+		storedChunkDataPacks := store.NewStoredChunkDataPacks(metrics, pebbleimpl.ToDB(pdb), bstorage.DefaultCacheSize)
+		chunkDataPacks := store.NewChunkDataPacks(metrics, pebbleimpl.ToDB(pdb), storedChunkDataPacks, collections, bstorage.DefaultCacheSize)
+		txResults, err := store.NewTransactionResults(metrics, db, bstorage.DefaultCacheSize)
+		require.NoError(t, err)
 
-		unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
+		err = unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
 			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				// By convention, root block has no proposer signature - implementation has to handle this edge case
 				return blocks.BatchStore(lctx, rw, &flow.Proposal{Block: *genesis, ProposerSigData: nil})
 			})
 		})
+		require.NoError(t, err)
 
 		getLatestFinalized := func() (uint64, error) {
 			return genesis.Height, nil
@@ -242,11 +254,12 @@ func TestReExecuteBlockWithDifferentResult(t *testing.T) {
 			&unittest.GenesisStateCommitment)
 		blockID := executableBlock.Block.ID()
 
-		unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
+		err = unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
 			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				return blocks.BatchStore(lctx, rw, unittest.ProposalFromBlock(executableBlock.Block))
 			})
 		})
+		require.NoError(t, err)
 
 		computationResult := testutil.ComputationResultFixture(t)
 		computationResult.ExecutableBlock = executableBlock
@@ -259,13 +272,9 @@ func TestReExecuteBlockWithDifferentResult(t *testing.T) {
 		batch := db.NewBatch()
 		defer batch.Close()
 
-		chunkBatch := db.NewBatch()
-		defer chunkBatch.Close()
-
 		// remove execution results
-		err = removeForBlockID(
+		cdpIDs, err := removeForBlockID(
 			batch,
-			chunkBatch,
 			commits,
 			txResults,
 			results,
@@ -277,20 +286,23 @@ func TestReExecuteBlockWithDifferentResult(t *testing.T) {
 		)
 
 		require.NoError(t, err)
-		require.NoError(t, chunkBatch.Commit())
+		require.NoError(t, storedChunkDataPacks.Remove(cdpIDs))
 		err2 := batch.Commit()
 		require.NoError(t, err2)
+
+		// verify that chunk data packs are no longer in stored chunk data pack database
+		for _, cdpID := range cdpIDs {
+			_, err := storedChunkDataPacks.ByID(cdpID)
+			require.Error(t, err)
+			require.True(t, errors.Is(err, storage.ErrNotFound))
+		}
 
 		batch = db.NewBatch()
 		defer batch.Close()
 
-		chunkBatch = db.NewBatch()
-		defer chunkBatch.Close()
-
 		// remove again to test for duplicates handling
-		err = removeForBlockID(
+		additionalCdpIDs, err := removeForBlockID(
 			batch,
-			chunkBatch,
 			commits,
 			txResults,
 			results,
@@ -302,10 +314,19 @@ func TestReExecuteBlockWithDifferentResult(t *testing.T) {
 		)
 
 		require.NoError(t, err)
-		require.NoError(t, chunkBatch.Commit())
+		// combine chunk data pack IDs from both calls
+		cdpIDs = append(cdpIDs, additionalCdpIDs...)
+		require.NoError(t, storedChunkDataPacks.Remove(cdpIDs))
 
 		err2 = batch.Commit()
 		require.NoError(t, err2)
+
+		// verify that chunk data packs are no longer in stored chunk data pack database
+		for _, cdpID := range cdpIDs {
+			_, err := storedChunkDataPacks.ByID(cdpID)
+			require.Error(t, err)
+			require.True(t, errors.Is(err, storage.ErrNotFound))
+		}
 
 		computationResult2 := testutil.ComputationResultFixture(t)
 		computationResult2.ExecutableBlock = executableBlock

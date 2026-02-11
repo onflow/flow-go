@@ -6,18 +6,21 @@ import (
 	"os"
 	"testing"
 
+	"github.com/jordanschalm/lockctx"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
-	mocks "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	collectionsmock "github.com/onflow/flow-go/engine/access/ingestion/collections/mock"
+	rpcconvert "github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/fvm/storage/derived"
+	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/ledger"
-	"github.com/onflow/flow-go/ledger/common/convert"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
+	"github.com/onflow/flow-go/module/executiondatasync/testutil"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/module/metrics"
 	synctest "github.com/onflow/flow-go/module/state_synchronization/requester/unittest"
@@ -26,54 +29,58 @@ import (
 	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
 	pebbleStorage "github.com/onflow/flow-go/storage/pebble"
 	"github.com/onflow/flow-go/utils/unittest"
+	"github.com/onflow/flow-go/utils/unittest/fixtures"
+	"github.com/onflow/flow-go/utils/unittest/mocks"
 )
 
 type indexCoreTest struct {
-	t                *testing.T
-	indexer          *IndexerCore
-	registers        *storagemock.RegisterIndex
-	events           *storagemock.Events
-	collection       *flow.Collection
-	collections      *storagemock.Collections
-	transactions     *storagemock.Transactions
-	results          *storagemock.LightTransactionResults
-	headers          *storagemock.Headers
-	ctx              context.Context
-	blocks           []*flow.Block
-	data             *execution_data.BlockExecutionDataEntity
-	lastHeightStore  func(t *testing.T) uint64
-	firstHeightStore func(t *testing.T) uint64
-	registersStore   func(t *testing.T, entries flow.RegisterEntries, height uint64) error
-	eventsStore      func(t *testing.T, ID flow.Identifier, events []flow.EventsList) error
-	registersGet     func(t *testing.T, IDs flow.RegisterID, height uint64) (flow.RegisterValue, error)
+	t                     *testing.T
+	g                     *fixtures.GeneratorSuite
+	indexer               *IndexerCore
+	registers             *storagemock.RegisterIndex
+	events                *storagemock.Events
+	collections           *storagemock.Collections
+	transactions          *storagemock.Transactions
+	results               *storagemock.LightTransactionResults
+	headers               *storagemock.Headers
+	scheduledTransactions *storagemock.ScheduledTransactions
+	collectionIndexer     *collectionsmock.CollectionIndexer
+	ctx                   context.Context
+	blocks                []*flow.Block
+	data                  *execution_data.BlockExecutionDataEntity
+	lastHeightStore       func(t *testing.T) uint64
+	firstHeightStore      func(t *testing.T) uint64
+	registersStore        func(t *testing.T, entries flow.RegisterEntries, height uint64) error
+	eventsStore           func(t *testing.T, ID flow.Identifier, events []flow.EventsList) error
+	registersGet          func(t *testing.T, IDs flow.RegisterID, height uint64) (flow.RegisterValue, error)
 }
 
 func newIndexCoreTest(
 	t *testing.T,
+	g *fixtures.GeneratorSuite,
 	blocks []*flow.Block,
 	exeData *execution_data.BlockExecutionDataEntity,
 ) *indexCoreTest {
-
-	collection := unittest.CollectionFixture(0)
-
 	return &indexCoreTest{
-		t:            t,
-		registers:    storagemock.NewRegisterIndex(t),
-		events:       storagemock.NewEvents(t),
-		collection:   &collection,
-		results:      storagemock.NewLightTransactionResults(t),
-		collections:  storagemock.NewCollections(t),
-		transactions: storagemock.NewTransactions(t),
-		blocks:       blocks,
-		ctx:          context.Background(),
-		data:         exeData,
-		headers:      newBlockHeadersStorage(blocks).(*storagemock.Headers), // convert it back to mock type for tests,
+		t:                     t,
+		g:                     g,
+		registers:             storagemock.NewRegisterIndex(t),
+		events:                storagemock.NewEvents(t),
+		results:               storagemock.NewLightTransactionResults(t),
+		collections:           storagemock.NewCollections(t),
+		transactions:          storagemock.NewTransactions(t),
+		scheduledTransactions: storagemock.NewScheduledTransactions(t),
+		collectionIndexer:     collectionsmock.NewCollectionIndexer(t),
+		blocks:                blocks,
+		ctx:                   context.Background(),
+		data:                  exeData,
+		headers:               newBlockHeadersStorage(blocks).(*storagemock.Headers), // convert it back to mock type for tests,
 	}
 }
 
 func (i *indexCoreTest) useDefaultBlockByHeight() *indexCoreTest {
 	i.headers.
-		On("BlockIDByHeight", mocks.AnythingOfType("uint64")).
+		On("BlockIDByHeight", mock.AnythingOfType("uint64")).
 		Return(func(height uint64) (flow.Identifier, error) {
 			for _, b := range i.blocks {
 				if b.Height == height {
@@ -84,7 +91,7 @@ func (i *indexCoreTest) useDefaultBlockByHeight() *indexCoreTest {
 		})
 
 	i.headers.
-		On("ByHeight", mocks.AnythingOfType("uint64")).
+		On("ByHeight", mock.AnythingOfType("uint64")).
 		Return(func(height uint64) (*flow.Header, error) {
 			for _, b := range i.blocks {
 				if b.Height == height {
@@ -131,8 +138,10 @@ func (i *indexCoreTest) setStoreRegisters(f func(t *testing.T, entries flow.Regi
 
 func (i *indexCoreTest) setStoreEvents(f func(*testing.T, flow.Identifier, []flow.EventsList) error) *indexCoreTest {
 	i.events.
-		On("BatchStore", mock.AnythingOfType("flow.Identifier"), mock.AnythingOfType("[]flow.EventsList"), mock.Anything).
-		Return(func(blockID flow.Identifier, events []flow.EventsList, batch storage.ReaderBatchWriter) error {
+		On("BatchStore",
+			mock.MatchedBy(func(lctx lockctx.Proof) bool { return lctx.HoldsLock(storage.LockInsertEvent) }),
+			mock.AnythingOfType("flow.Identifier"), mock.AnythingOfType("[]flow.EventsList"), mock.Anything).
+		Return(func(lctx lockctx.Proof, blockID flow.Identifier, events []flow.EventsList, batch storage.ReaderBatchWriter) error {
 			require.NotNil(i.t, batch)
 			return f(i.t, blockID, events)
 		})
@@ -141,8 +150,11 @@ func (i *indexCoreTest) setStoreEvents(f func(*testing.T, flow.Identifier, []flo
 
 func (i *indexCoreTest) setStoreTransactionResults(f func(*testing.T, flow.Identifier, []flow.LightTransactionResult) error) *indexCoreTest {
 	i.results.
-		On("BatchStore", mock.AnythingOfType("flow.Identifier"), mock.AnythingOfType("[]flow.LightTransactionResult"), mock.Anything).
-		Return(func(blockID flow.Identifier, results []flow.LightTransactionResult, batch storage.ReaderBatchWriter) error {
+		On("BatchStore",
+			mock.MatchedBy(func(lctx lockctx.Proof) bool { return lctx.HoldsLock(storage.LockInsertLightTransactionResult) }),
+			mock.Anything, mock.AnythingOfType("flow.Identifier"), mock.AnythingOfType("[]flow.LightTransactionResult")).
+		Return(func(lctx lockctx.Proof, batch storage.ReaderBatchWriter, blockID flow.Identifier, results []flow.LightTransactionResult) error {
+			require.True(i.t, lctx.HoldsLock(storage.LockInsertLightTransactionResult))
 			require.NotNil(i.t, batch)
 			return f(i.t, blockID, results)
 		})
@@ -158,25 +170,25 @@ func (i *indexCoreTest) setGetRegisters(f func(t *testing.T, ID flow.RegisterID,
 	return i
 }
 
-func (i *indexCoreTest) useDefaultStorageMocks() *indexCoreTest {
-
-	i.collections.On("StoreAndIndexByTransaction", mock.Anything, mock.AnythingOfType("*flow.Collection")).Return(&flow.LightCollection{}, nil).Maybe()
-	i.transactions.On("Store", mock.AnythingOfType("*flow.TransactionBody")).Return(nil).Maybe()
-
-	return i
-}
-
 func (i *indexCoreTest) useDefaultEvents() *indexCoreTest {
 	i.events.
-		On("BatchStore", mock.AnythingOfType("flow.Identifier"), mock.AnythingOfType("[]flow.EventsList"), mock.Anything).
+		On("BatchStore",
+			mock.MatchedBy(func(lctx lockctx.Proof) bool { return lctx.HoldsLock(storage.LockInsertEvent) }),
+			mock.AnythingOfType("flow.Identifier"), mock.AnythingOfType("[]flow.EventsList"), mock.Anything).
 		Return(nil)
 	return i
 }
 
 func (i *indexCoreTest) useDefaultTransactionResults() *indexCoreTest {
 	i.results.
-		On("BatchStore", mock.AnythingOfType("flow.Identifier"), mock.AnythingOfType("[]flow.LightTransactionResult"), mock.Anything).
-		Return(nil)
+		On("BatchStore",
+			mock.MatchedBy(func(lctx lockctx.Proof) bool { return lctx.HoldsLock(storage.LockInsertLightTransactionResult) }),
+			mock.Anything, mock.AnythingOfType("flow.Identifier"), mock.AnythingOfType("[]flow.LightTransactionResult")).
+		Return(func(lctx lockctx.Proof, batch storage.ReaderBatchWriter, _ flow.Identifier, _ []flow.LightTransactionResult) error {
+			require.True(i.t, lctx.HoldsLock(storage.LockInsertLightTransactionResult))
+			require.NotNil(i.t, batch)
+			return nil
+		})
 	return i
 }
 
@@ -196,7 +208,7 @@ func (i *indexCoreTest) initIndexer() *indexCoreTest {
 	blocksToMarkExecuted := stdmap.NewTimes(100)
 	blockTransactions := stdmap.NewIdentifierMap(100)
 
-	log := zerolog.New(os.Stdout)
+	log := unittest.Logger()
 	blocks := storagemock.NewBlocks(i.t)
 
 	collectionExecutedMetric, err := NewCollectionExecutedMetricImpl(
@@ -214,7 +226,7 @@ func (i *indexCoreTest) initIndexer() *indexCoreTest {
 	derivedChainData, err := derived.NewDerivedChainData(derived.DefaultDerivedDataCacheSize)
 	require.NoError(i.t, err)
 
-	indexer, err := New(
+	i.indexer = New(
 		log,
 		metrics.NewNoopCollector(),
 		db,
@@ -224,13 +236,13 @@ func (i *indexCoreTest) initIndexer() *indexCoreTest {
 		i.collections,
 		i.transactions,
 		i.results,
-		flow.Testnet.Chain(),
+		i.scheduledTransactions,
+		i.g.ChainID(),
 		derivedChainData,
+		i.collectionIndexer,
 		collectionExecutedMetric,
 		lockManager,
 	)
-	require.NoError(i.t, err)
-	i.indexer = indexer
 	return i
 }
 
@@ -245,291 +257,51 @@ func (i *indexCoreTest) runGetRegister(ID flow.RegisterID, height uint64) (flow.
 }
 
 func TestExecutionState_IndexBlockData(t *testing.T) {
-	blocks := unittest.BlockchainFixture(5)
-	block := blocks[len(blocks)-1]
-	collection := unittest.CollectionFixture(0)
+	g := fixtures.NewGeneratorSuite()
+	blocks := g.Blocks().List(4)
 
-	// this test makes sure the index block data is correctly calling store register with the
-	// same entries we create as a block execution data test, and correctly converts the registers
-	t.Run("Index Single Chunk and Single Register", func(t *testing.T) {
-		trie := TrieUpdateRandomLedgerPayloadsFixture(t)
-		ed := &execution_data.BlockExecutionData{
-			BlockID: block.ID(),
-			ChunkExecutionDatas: []*execution_data.ChunkExecutionData{
-				{
-					Collection: &collection,
-					TrieUpdate: trie,
-				},
-			},
-		}
-		execData := execution_data.NewBlockExecutionDataEntity(block.ID(), ed)
+	tf := testutil.CompleteFixture(t, g, blocks[len(blocks)-1])
+	blockID := tf.Block.ID()
 
-		err := newIndexCoreTest(t, blocks, execData).
-			initIndexer().
-			useDefaultEvents().
-			useDefaultTransactionResults().
-			// make sure update registers match in length and are same as block data ledger payloads
-			setStoreRegisters(func(t *testing.T, entries flow.RegisterEntries, height uint64) error {
-				assert.Equal(t, height, block.Height)
-				assert.Len(t, trie.Payloads, entries.Len())
-
-				// make sure all the registers from the execution data have been stored as well the value matches
-				trieRegistersPayloadComparer(t, trie.Payloads, entries)
-				return nil
-			}).
-			runIndexBlockData()
-
-		assert.NoError(t, err)
-	})
-
-	// this test makes sure that if we have multiple trie updates in a single block data
-	// and some of those trie updates are for same register but have different values,
-	// we only update that register once with the latest value, so this makes sure merging of
-	// registers is done correctly.
-	t.Run("Index Multiple Chunks and Merge Same Register Updates", func(t *testing.T) {
-		tries := []*ledger.TrieUpdate{TrieUpdateRandomLedgerPayloadsFixture(t), TrieUpdateRandomLedgerPayloadsFixture(t)}
-		// make sure we have two register updates that are updating the same value, so we can check
-		// if the value from the second update is being persisted instead of first
-		tries[1].Paths[0] = tries[0].Paths[0]
-		testValue := tries[1].Payloads[0]
-		key, err := testValue.Key()
-		require.NoError(t, err)
-		testRegisterID, err := convert.LedgerKeyToRegisterID(key)
-		require.NoError(t, err)
-
-		ed := &execution_data.BlockExecutionData{
-			BlockID: block.ID(),
-			ChunkExecutionDatas: []*execution_data.ChunkExecutionData{
-				{
-					Collection: &collection,
-					TrieUpdate: tries[0],
-				},
-				{
-					Collection: &collection,
-					TrieUpdate: tries[1],
-				},
-			},
-		}
-		execData := execution_data.NewBlockExecutionDataEntity(block.ID(), ed)
-
-		testRegisterFound := false
-		err = newIndexCoreTest(t, blocks, execData).
-			initIndexer().
-			useDefaultEvents().
-			useDefaultStorageMocks().
-			useDefaultTransactionResults().
-			// make sure update registers match in length and are same as block data ledger payloads
-			setStoreRegisters(func(t *testing.T, entries flow.RegisterEntries, height uint64) error {
-				for _, entry := range entries {
-					if entry.Key.String() == testRegisterID.String() {
-						testRegisterFound = true
-						assert.True(t, testValue.Value().Equals(entry.Value))
-					}
-				}
-				// we should make sure the register updates are equal to both payloads' length -1 since we don't
-				// duplicate the same register
-				assert.Equal(t, len(tries[0].Payloads)+len(tries[1].Payloads)-1, len(entries))
-				return nil
-			}).
-			runIndexBlockData()
-
-		assert.NoError(t, err)
-		assert.True(t, testRegisterFound)
-	})
-
-	t.Run("Index Events", func(t *testing.T) {
-		expectedEvents := unittest.EventsFixture(20)
-		ed := &execution_data.BlockExecutionData{
-			BlockID: block.ID(),
-			ChunkExecutionDatas: []*execution_data.ChunkExecutionData{
-				// split events into 2 chunks
-				{
-					Collection: &collection,
-					Events:     expectedEvents[:10],
-				},
-				{
-					Collection: &collection,
-					Events:     expectedEvents[10:],
-				},
-			},
-		}
-		execData := execution_data.NewBlockExecutionDataEntity(block.ID(), ed)
-
-		err := newIndexCoreTest(t, blocks, execData).
-			initIndexer().
-			useDefaultStorageMocks().
-			// make sure all events are stored at once in order
-			setStoreEvents(func(t *testing.T, actualBlockID flow.Identifier, actualEvents []flow.EventsList) error {
-				assert.Equal(t, block.ID(), actualBlockID)
-				require.Len(t, actualEvents, 1)
-				require.Len(t, actualEvents[0], len(expectedEvents))
-				for i, expected := range expectedEvents {
-					assert.Equal(t, expected, actualEvents[0][i])
-				}
-				return nil
-			}).
-			// make sure an empty set of transaction results were stored
-			setStoreTransactionResults(func(t *testing.T, actualBlockID flow.Identifier, actualResults []flow.LightTransactionResult) error {
-				assert.Equal(t, block.ID(), actualBlockID)
-				require.Len(t, actualResults, 0)
-				return nil
-			}).
-			// make sure an empty set of register entries was stored
-			setStoreRegisters(func(t *testing.T, entries flow.RegisterEntries, height uint64) error {
-				assert.Equal(t, height, block.Height)
-				assert.Equal(t, 0, entries.Len())
-				return nil
-			}).
-			runIndexBlockData()
-
-		assert.NoError(t, err)
-	})
-
-	t.Run("Index Tx Results", func(t *testing.T) {
-		expectedResults := unittest.LightTransactionResultsFixture(20)
-		ed := &execution_data.BlockExecutionData{
-			BlockID: block.ID(),
-			ChunkExecutionDatas: []*execution_data.ChunkExecutionData{
-				// split events into 2 chunks
-				{
-					Collection:         &collection,
-					TransactionResults: expectedResults[:10],
-				},
-				{
-					Collection:         &collection,
-					TransactionResults: expectedResults[10:],
-				},
-			},
-		}
-		execData := execution_data.NewBlockExecutionDataEntity(block.ID(), ed)
-
-		err := newIndexCoreTest(t, blocks, execData).
-			initIndexer().
-			useDefaultStorageMocks().
-			// make sure an empty set of events were stored
-			setStoreEvents(func(t *testing.T, actualBlockID flow.Identifier, actualEvents []flow.EventsList) error {
-				assert.Equal(t, block.ID(), actualBlockID)
-				require.Len(t, actualEvents, 1)
-				require.Len(t, actualEvents[0], 0)
-				return nil
-			}).
-			// make sure all results are stored at once in order
-			setStoreTransactionResults(func(t *testing.T, actualBlockID flow.Identifier, actualResults []flow.LightTransactionResult) error {
-				assert.Equal(t, block.ID(), actualBlockID)
-				require.Len(t, actualResults, len(expectedResults))
-				for i, expected := range expectedResults {
-					assert.Equal(t, expected, actualResults[i])
-				}
-				return nil
-			}).
-			// make sure an empty set of register entries was stored
-			setStoreRegisters(func(t *testing.T, entries flow.RegisterEntries, height uint64) error {
-				assert.Equal(t, height, block.Height)
-				assert.Equal(t, 0, entries.Len())
-				return nil
-			}).
-			runIndexBlockData()
-
-		assert.NoError(t, err)
-	})
-
-	t.Run("Index Collections", func(t *testing.T) {
-		expectedCollections := unittest.CollectionListFixture(2)
-		ed := &execution_data.BlockExecutionData{
-			BlockID: block.ID(),
-			ChunkExecutionDatas: []*execution_data.ChunkExecutionData{
-				{Collection: expectedCollections[0]},
-				{Collection: expectedCollections[1]},
-			},
-		}
-		execData := execution_data.NewBlockExecutionDataEntity(block.ID(), ed)
-		err := newIndexCoreTest(t, blocks, execData).
-			initIndexer().
-			useDefaultStorageMocks().
-			// make sure an empty set of events were stored
-			setStoreEvents(func(t *testing.T, actualBlockID flow.Identifier, actualEvents []flow.EventsList) error {
-				assert.Equal(t, block.ID(), actualBlockID)
-				require.Len(t, actualEvents, 1)
-				require.Len(t, actualEvents[0], 0)
-				return nil
-			}).
-			// make sure an empty set of transaction results were stored
-			setStoreTransactionResults(func(t *testing.T, actualBlockID flow.Identifier, actualResults []flow.LightTransactionResult) error {
-				assert.Equal(t, block.ID(), actualBlockID)
-				require.Len(t, actualResults, 0)
-				return nil
-			}).
-			// make sure an empty set of register entries was stored
-			setStoreRegisters(func(t *testing.T, entries flow.RegisterEntries, height uint64) error {
-				assert.Equal(t, height, block.Height)
-				assert.Equal(t, 0, entries.Len())
-				return nil
-			}).
-			runIndexBlockData()
-
-		assert.NoError(t, err)
-	})
+	blocks = append(blocks, tf.Block)
 
 	t.Run("Index AllTheThings", func(t *testing.T) {
-		expectedEvents := unittest.EventsFixture(20)
-		expectedResults := unittest.LightTransactionResultsFixture(20)
-		expectedCollections := unittest.CollectionListFixture(2)
-		expectedTries := []*ledger.TrieUpdate{TrieUpdateRandomLedgerPayloadsFixture(t), TrieUpdateRandomLedgerPayloadsFixture(t)}
-		expectedPayloads := make([]*ledger.Payload, 0)
-		for _, trie := range expectedTries {
-			expectedPayloads = append(expectedPayloads, trie.Payloads...)
+		test := newIndexCoreTest(t, g, blocks, tf.ExecutionDataEntity()).initIndexer()
+
+		test.events.
+			On("BatchStore", mocks.MatchLock(storage.LockInsertEvent), blockID, []flow.EventsList{tf.ExpectedEvents}, mock.Anything).
+			Return(func(lctx lockctx.Proof, blockID flow.Identifier, events []flow.EventsList, batch storage.ReaderBatchWriter) error {
+				require.True(t, lctx.HoldsLock(storage.LockInsertEvent))
+				require.NotNil(t, batch)
+				return nil
+			})
+		test.results.
+			On("BatchStore", mocks.MatchLock(storage.LockInsertLightTransactionResult), mock.Anything, blockID, tf.ExpectedResults).
+			Return(func(lctx lockctx.Proof, batch storage.ReaderBatchWriter, blockID flow.Identifier, results []flow.LightTransactionResult) error {
+				require.True(t, lctx.HoldsLock(storage.LockInsertLightTransactionResult))
+				require.NotNil(t, batch)
+				return nil
+			})
+		test.registers.
+			On("Store", mock.Anything, tf.Block.Height).
+			Run(func(args mock.Arguments) {
+				// registers collected with a map, so will be in random order
+				entries := args[0].(flow.RegisterEntries)
+				assert.ElementsMatch(t, tf.ExpectedRegisterEntries, entries)
+			}).
+			Return(nil)
+		test.collectionIndexer.On("IndexCollections", tf.ExpectedCollections).Return(nil).Once()
+		for txID, scheduledTxID := range tf.ExpectedScheduledTransactions {
+			test.scheduledTransactions.
+				On("BatchIndex", mocks.MatchLock(storage.LockIndexScheduledTransaction), blockID, txID, scheduledTxID, mock.Anything).
+				Return(func(lctx lockctx.Proof, blockID flow.Identifier, txID flow.Identifier, scheduledTxID uint64, batch storage.ReaderBatchWriter) error {
+					require.True(t, lctx.HoldsLock(storage.LockIndexScheduledTransaction))
+					require.NotNil(t, batch)
+					return nil
+				})
 		}
 
-		ed := &execution_data.BlockExecutionData{
-			BlockID: block.ID(),
-			ChunkExecutionDatas: []*execution_data.ChunkExecutionData{
-				{
-					Collection:         expectedCollections[0],
-					Events:             expectedEvents[:10],
-					TransactionResults: expectedResults[:10],
-					TrieUpdate:         expectedTries[0],
-				},
-				{
-					Collection:         expectedCollections[1],
-					TransactionResults: expectedResults[10:],
-					Events:             expectedEvents[10:],
-					TrieUpdate:         expectedTries[1],
-				},
-			},
-		}
-		execData := execution_data.NewBlockExecutionDataEntity(block.ID(), ed)
-		err := newIndexCoreTest(t, blocks, execData).
-			initIndexer().
-			useDefaultStorageMocks().
-			// make sure all events are stored at once in order
-			setStoreEvents(func(t *testing.T, actualBlockID flow.Identifier, actualEvents []flow.EventsList) error {
-				assert.Equal(t, block.ID(), actualBlockID)
-				require.Len(t, actualEvents, 1)
-				require.Len(t, actualEvents[0], len(expectedEvents))
-				for i, expected := range expectedEvents {
-					assert.Equal(t, expected, actualEvents[0][i])
-				}
-				return nil
-			}).
-			// make sure all results are stored at once in order
-			setStoreTransactionResults(func(t *testing.T, actualBlockID flow.Identifier, actualResults []flow.LightTransactionResult) error {
-				assert.Equal(t, block.ID(), actualBlockID)
-				require.Len(t, actualResults, len(expectedResults))
-				for i, expected := range expectedResults {
-					assert.Equal(t, expected, actualResults[i])
-				}
-				return nil
-			}).
-			// make sure update registers match in length and are same as block data ledger payloads
-			setStoreRegisters(func(t *testing.T, entries flow.RegisterEntries, actualHeight uint64) error {
-				assert.Equal(t, actualHeight, block.Height)
-				assert.Equal(t, entries.Len(), len(expectedPayloads))
-
-				// make sure all the registers from the execution data have been stored as well the value matches
-				trieRegistersPayloadComparer(t, expectedPayloads, entries)
-				return nil
-			}).
-			runIndexBlockData()
+		err := test.indexer.IndexBlockData(tf.ExecutionDataEntity())
 
 		assert.NoError(t, err)
 	})
@@ -544,7 +316,7 @@ func TestExecutionState_IndexBlockData(t *testing.T) {
 		execData := execution_data.NewBlockExecutionDataEntity(last.ID(), ed)
 		latestHeight := blocks[len(blocks)-3].Height
 
-		err := newIndexCoreTest(t, blocks, execData).
+		err := newIndexCoreTest(t, g, blocks, execData).
 			// return a height one smaller than the latest block in storage
 			setLastHeight(func(t *testing.T) uint64 {
 				return latestHeight
@@ -563,16 +335,50 @@ func TestExecutionState_IndexBlockData(t *testing.T) {
 		}
 		execData := execution_data.NewBlockExecutionDataEntity(unknownBlock.ID(), ed)
 
-		err := newIndexCoreTest(t, blocks, execData).runIndexBlockData()
+		err := newIndexCoreTest(t, g, blocks, execData).runIndexBlockData()
 
 		assert.ErrorIs(t, err, storage.ErrNotFound)
 	})
 
+	// test that reindexing the last block does not return an error and does not write any data
+	t.Run("Reindexing last block", func(t *testing.T) {
+		test := newIndexCoreTest(t, g, blocks, tf.ExecutionDataEntity()).
+			initIndexer().
+			setLastHeight(func(t *testing.T) uint64 {
+				return tf.Block.Height
+			})
+
+		// reset all mocks to avoid false positives
+		test.events.On("BatchStore", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Unset()
+		test.results.On("BatchStore", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Unset()
+		test.scheduledTransactions.On("BatchIndex", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Unset()
+		test.registers.On("Store", mock.Anything, mock.Anything).Unset()
+		test.collectionIndexer.On("IndexCollections", mock.Anything).Unset()
+
+		// setup mocks to behave as they would if the block was already indexed.
+		// tx results and scheduled transactions will not be called since events returned an error.
+		test.events.
+			On("BatchStore", mocks.MatchLock(storage.LockInsertEvent), blockID, []flow.EventsList{tf.ExpectedEvents}, mock.Anything).
+			Return(storage.ErrAlreadyExists).
+			Once()
+		test.collectionIndexer.
+			On("IndexCollections", tf.ExpectedCollections).
+			Return(nil).
+			Once()
+		test.registers.
+			On("Store", mock.Anything, tf.Block.Height).
+			Return(nil).
+			Once()
+
+		err := test.indexer.IndexBlockData(tf.ExecutionDataEntity())
+		assert.NoError(t, err)
+	})
 }
 
 func TestExecutionState_RegisterValues(t *testing.T) {
+	g := fixtures.NewGeneratorSuite()
 	t.Run("Get value for single register", func(t *testing.T) {
-		blocks := unittest.BlockchainFixture(5)
+		blocks := g.Blocks().List(5)
 		height := blocks[1].Height
 		id := flow.RegisterID{
 			Owner: "1",
@@ -580,7 +386,7 @@ func TestExecutionState_RegisterValues(t *testing.T) {
 		}
 		val := flow.RegisterValue("0x1")
 
-		values, err := newIndexCoreTest(t, blocks, nil).
+		values, err := newIndexCoreTest(t, g, blocks, nil).
 			initIndexer().
 			setGetRegisters(func(t *testing.T, ID flow.RegisterID, height uint64) (flow.RegisterValue, error) {
 				return val, nil
@@ -599,26 +405,6 @@ func newBlockHeadersStorage(blocks []*flow.Block) storage.Headers {
 	}
 
 	return synctest.MockBlockHeaderStorage(synctest.WithByID(blocksByID))
-}
-
-// trieRegistersPayloadComparer checks that trie payloads and register payloads are same, used for testing.
-func trieRegistersPayloadComparer(t *testing.T, triePayloads []*ledger.Payload, registerPayloads flow.RegisterEntries) {
-	assert.Equal(t, len(triePayloads), len(registerPayloads.Values()), "registers length should equal")
-
-	// crate a lookup map that matches flow register ID to index in the payloads slice
-	payloadRegID := make(map[flow.RegisterID]int)
-	for i, p := range triePayloads {
-		k, _ := p.Key()
-		regKey, _ := convert.LedgerKeyToRegisterID(k)
-		payloadRegID[regKey] = i
-	}
-
-	for _, entry := range registerPayloads {
-		index, ok := payloadRegID[entry.Key]
-		assert.True(t, ok, fmt.Sprintf("register entry not found for key %s", entry.Key.String()))
-		val := triePayloads[index].Value()
-		assert.True(t, val.Equals(entry.Value), fmt.Sprintf("payload values not same %s - %s", val, entry.Value))
-	}
 }
 
 func TestIndexerIntegration_StoreAndGet(t *testing.T) {
@@ -642,7 +428,7 @@ func TestIndexerIntegration_StoreAndGet(t *testing.T) {
 	// this test makes sure index values for a single register are correctly updated and always last value is returned
 	t.Run("Single Index Value Changes", func(t *testing.T) {
 		pebbleStorage.RunWithRegistersStorageAtInitialHeights(t, 0, 0, func(registers *pebbleStorage.Registers) {
-			index, err := New(
+			index := New(
 				logger,
 				module.ExecutionStateIndexerMetrics(metrics),
 				pebbleimpl.ToDB(pdb),
@@ -652,12 +438,13 @@ func TestIndexerIntegration_StoreAndGet(t *testing.T) {
 				nil,
 				nil,
 				nil,
-				flow.Testnet.Chain(),
+				nil,
+				flow.Testnet,
 				derivedChainData,
+				collectionsmock.NewCollectionIndexer(t),
 				nil,
 				lockManager,
 			)
-			require.NoError(t, err)
 
 			values := [][]byte{[]byte("1"), []byte("1"), []byte("2"), []byte("3"), []byte("4")}
 			for i, val := range values {
@@ -677,7 +464,7 @@ func TestIndexerIntegration_StoreAndGet(t *testing.T) {
 	// up to the specification script executor requires
 	t.Run("Missing Register", func(t *testing.T) {
 		pebbleStorage.RunWithRegistersStorageAtInitialHeights(t, 0, 0, func(registers *pebbleStorage.Registers) {
-			index, err := New(
+			index := New(
 				logger,
 				module.ExecutionStateIndexerMetrics(metrics),
 				pebbleimpl.ToDB(pdb),
@@ -687,12 +474,13 @@ func TestIndexerIntegration_StoreAndGet(t *testing.T) {
 				nil,
 				nil,
 				nil,
-				flow.Testnet.Chain(),
+				nil,
+				flow.Testnet,
 				derivedChainData,
+				collectionsmock.NewCollectionIndexer(t),
 				nil,
 				lockManager,
 			)
-			require.NoError(t, err)
 
 			value, err := index.RegisterValue(registerID, 0)
 			require.Nil(t, value)
@@ -705,7 +493,7 @@ func TestIndexerIntegration_StoreAndGet(t *testing.T) {
 	// e.g. we index A{h(1) -> X}, A{h(2) -> Y}, when we request h(4) we get value Y
 	t.Run("Single Index Value At Later Heights", func(t *testing.T) {
 		pebbleStorage.RunWithRegistersStorageAtInitialHeights(t, 0, 0, func(registers *pebbleStorage.Registers) {
-			index, err := New(
+			index := New(
 				logger,
 				module.ExecutionStateIndexerMetrics(metrics),
 				pebbleimpl.ToDB(pdb),
@@ -715,12 +503,13 @@ func TestIndexerIntegration_StoreAndGet(t *testing.T) {
 				nil,
 				nil,
 				nil,
-				flow.Testnet.Chain(),
+				nil,
+				flow.Testnet,
 				derivedChainData,
+				collectionsmock.NewCollectionIndexer(t),
 				nil,
 				lockManager,
 			)
-			require.NoError(t, err)
 
 			storeValues := [][]byte{[]byte("1"), []byte("2")}
 
@@ -750,7 +539,7 @@ func TestIndexerIntegration_StoreAndGet(t *testing.T) {
 	// this test makes sure we correctly handle weird payloads
 	t.Run("Empty and Nil Payloads", func(t *testing.T) {
 		pebbleStorage.RunWithRegistersStorageAtInitialHeights(t, 0, 0, func(registers *pebbleStorage.Registers) {
-			index, err := New(
+			index := New(
 				logger,
 				module.ExecutionStateIndexerMetrics(metrics),
 				pebbleimpl.ToDB(pdb),
@@ -760,17 +549,81 @@ func TestIndexerIntegration_StoreAndGet(t *testing.T) {
 				nil,
 				nil,
 				nil,
-				flow.Testnet.Chain(),
+				nil,
+				flow.Testnet,
 				derivedChainData,
+				collectionsmock.NewCollectionIndexer(t),
 				nil,
 				lockManager,
 			)
-			require.NoError(t, err)
 
 			require.NoError(t, index.indexRegisters(map[ledger.Path]*ledger.Payload{}, 1))
 			require.NoError(t, index.indexRegisters(map[ledger.Path]*ledger.Payload{}, 1))
 			require.NoError(t, index.indexRegisters(nil, 2))
 		})
+	})
+}
+
+func TestCollectScheduledTransactions(t *testing.T) {
+	g := fixtures.NewGeneratorSuite()
+	blocks := g.Blocks().List(5)
+	tf := testutil.CompleteFixture(t, g, blocks[len(blocks)-1])
+
+	chainID := g.ChainID()
+	fvmEnv := systemcontracts.SystemContractsForChain(chainID).AsTemplateEnv()
+
+	systemChunk := tf.ExecutionData.ChunkExecutionDatas[len(tf.ExecutionData.ChunkExecutionDatas)-1]
+	systemResults := systemChunk.TransactionResults
+	pendingExecutionEvents := systemChunk.Events
+
+	t.Run("happy path - with scheduled transactions", func(t *testing.T) {
+		actual, err := collectScheduledTransactions(fvmEnv, chainID, tf.Block.Height, systemResults, pendingExecutionEvents)
+		require.NoError(t, err)
+		require.Equal(t, tf.ExpectedScheduledTransactions, actual)
+	})
+
+	t.Run("happy path - no scheduled transactions", func(t *testing.T) {
+		defaultSystemResults := append([]flow.LightTransactionResult{systemResults[0]}, systemResults[len(systemResults)-1])
+		actual, err := collectScheduledTransactions(fvmEnv, chainID, tf.Block.Height, defaultSystemResults, nil)
+		require.NoError(t, err)
+		require.Empty(t, actual)
+	})
+
+	t.Run("empty system chunk returns error", func(t *testing.T) {
+		actual, err := collectScheduledTransactions(fvmEnv, chainID, tf.Block.Height, []flow.LightTransactionResult{}, []flow.Event{})
+		require.ErrorContains(t, err, "system chunk contained 0 transaction results")
+		require.Nil(t, actual)
+	})
+
+	t.Run("error parsing system events", func(t *testing.T) {
+		events, err := rpcconvert.CcfEventsToJsonEvents(pendingExecutionEvents)
+		require.NoError(t, err)
+
+		actual, err := collectScheduledTransactions(fvmEnv, chainID, tf.Block.Height, systemResults, events)
+		require.ErrorContains(t, err, "could not get callback details from event")
+		require.Nil(t, actual)
+	})
+
+	t.Run("no scheduled transactions and incorrect number of results", func(t *testing.T) {
+		actual, err := collectScheduledTransactions(fvmEnv, chainID, tf.Block.Height, systemResults, []flow.Event{})
+		require.ErrorContains(t, err, "system chunk contained 7 results, and 0 scheduled transactions")
+		require.Nil(t, actual)
+	})
+
+	t.Run("incorrect number of results", func(t *testing.T) {
+		invalidSystemResults := append(systemResults, g.LightTransactionResults().Fixture())
+		actual, err := collectScheduledTransactions(fvmEnv, chainID, tf.Block.Height, invalidSystemResults, pendingExecutionEvents)
+		require.ErrorContains(t, err, "system chunk contained 8 results, but found 5 scheduled transactions")
+		require.Nil(t, actual)
+	})
+
+	t.Run("out of order system collection results", func(t *testing.T) {
+		invalidSystemResults := make([]flow.LightTransactionResult, len(systemResults))
+		copy(invalidSystemResults, systemResults)
+		invalidSystemResults[0], invalidSystemResults[1] = invalidSystemResults[1], invalidSystemResults[0]
+		actual, err := collectScheduledTransactions(fvmEnv, chainID, tf.Block.Height, invalidSystemResults, pendingExecutionEvents)
+		require.ErrorContains(t, err, "system chunk result at index 0 does not match expected.")
+		require.Nil(t, actual)
 	})
 }
 

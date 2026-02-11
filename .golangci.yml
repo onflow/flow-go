@@ -1,65 +1,89 @@
-run:
-  timeout: 10m
-
-linters-settings:
-  goimports:
-    # put imports beginning with prefix after 3rd-party packages;
-    # it's a comma-separated list of prefixes
-    local-prefixes: github.com/onflow/flow-go/
-
-  gosec:
-    # To select a subset of rules to run.
-    # Available rules: https://github.com/securego/gosec#available-rules
-    includes:
-      - G401
-      - G402
-      - G501
-      - G502
-      - G503
-      - G505
-
-  staticcheck:
-    # Disable SA1019 to allow use of deprecated label
-    checks: ["all", "-SA1019"]
-
-  custom:
-    structwrite:
-      type: module
-      description: "disallow struct field writes outside constructor"
-      original-url: "github.com/onflow/flow-go/tools/structwrite"
-
+version: "2"
 linters:
   enable:
-    - goimports
     - gosec
     - structwrite
+  settings:
+    gosec:
+      includes:
+        - G401
+        - G402
+        - G501
+        - G502
+        - G503
+        - G505
+    staticcheck:
+      checks:
+        - all
+        - -SA1019
 
-issues:
-  exclude-rules:
-    - path: _test\.go # disable some linters on test files
-      linters:
-        - unused
-        - structwrite
-    - path: 'consensus/hotstuff/helper/*' # disable some linters on test helper files
-      linters:
-        - structwrite
-    - path: 'utils/unittest/*' # disable some linters on test files
-      linters:
-        - structwrite
-    - path: 'consensus/hotstuff/helper/*' # disable some linters on test files
-      linters:
-        - structwrite
-    - path: 'engine/execution/testutil/*' # disable some linters on test files
-      linters:
-        - structwrite
-    # typecheck currently not handling the way we do function inheritance well
-    # disabling for now
-    - path: 'cmd/access/node_build/*'
-      linters:
-        - typecheck
-    - path: 'cmd/observer/node_builder/*'
-      linters:
-        - typecheck
-    - path: 'follower/*'
-      linters:
-        - typecheck
+        # TODO: these were added to allow updating to the latest version of the linter.
+        # Update the code to remove these issues instead of suppressing them.
+        - -QF1001 # could apply De Morgan's law" were hidden
+        - -QF1003 # could use tagged switch on chainID (staticcheck)
+        - -QF1006 # could lift into loop condition (staticcheck)
+        - -QF1008 # could remove embedded field \"BaseConfig\" from selector" were hidden
+        - -QF1011 # could omit type flow.IdentifierList from declaration; it will be inferred from the right-hand side" were hidden
+        - -QF1012 # Use fmt.Fprintf(...) instead of Write([]byte(fmt.Sprintf(...))) (staticcheck)
+        - -S1021 # should merge variable declaration with assignment on next line (staticcheck)
+        - -ST1003 # should not use underscores in package names" were hidden
+        - -ST1005 # error strings should not be capitalized" were hidden
+        - -ST1006 # receiver name should not be an underscore, omit the name if it is unused (staticcheck)
+        - -ST1008 # error should be returned as the last argument" were hidden
+        - -ST1012 # error var factoryError should have name of the form errFoo" were hidden
+        - -ST1016 # methods on the same type should have the same receiver name (seen 45x "db", 4x "s") (staticcheck)
+        - -ST1017 # don't use Yoda conditions" were hidden
+        - -ST1023 # should omit type flow.IdentifierList from declaration; it will be inferred from the right-hand side" were hidden
+    custom:
+      structwrite:
+        type: module
+        description: disallow struct field writes outside constructor
+        original-url: github.com/onflow/flow-go/tools/structwrite
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
+    rules:
+      - linters:
+          - structwrite
+          - unused
+        path: _test\.go
+      - linters:
+          - structwrite
+        path: consensus/hotstuff/helper/*
+      - linters:
+          - structwrite
+        path: utils/unittest/*
+      - linters:
+          - structwrite
+        path: consensus/hotstuff/helper/*
+      - linters:
+          - structwrite
+        path: engine/execution/testutil/*
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
+formatters:
+  enable:
+    - goimports
+  settings:
+    gci:
+      sections:
+        - standard
+        - default
+        - prefix(github.com/onflow/)
+        - prefix(github.com/onflow/flow-go/)
+      custom-order: true
+    goimports:
+      local-prefixes:
+        - github.com/onflow/flow-go/
+  exclusions:
+    generated: lax
+    paths:
+      - third_party$
+      - builtin$
+      - examples$

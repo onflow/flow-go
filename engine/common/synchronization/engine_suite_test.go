@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
+	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	mockconsensus "github.com/onflow/flow-go/engine/consensus/mock"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
@@ -16,7 +17,7 @@ import (
 	module "github.com/onflow/flow-go/module/mock"
 	netint "github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
-	"github.com/onflow/flow-go/network/mocknetwork"
+	mocknetwork "github.com/onflow/flow-go/network/mock"
 	"github.com/onflow/flow-go/network/p2p/cache"
 	protocolint "github.com/onflow/flow-go/state/protocol"
 	protocolEvents "github.com/onflow/flow-go/state/protocol/events"
@@ -37,7 +38,7 @@ type SyncSuite struct {
 	head         *flow.Header
 	heights      map[uint64]*flow.Proposal
 	blockIDs     map[flow.Identifier]*flow.Proposal
-	net          *mocknetwork.Network
+	net          *mocknetwork.EngineRegistry
 	con          *mocknetwork.Conduit
 	me           *module.Local
 	state        *protocol.State
@@ -68,7 +69,7 @@ func (ss *SyncSuite) SetupTest() {
 	ss.blockIDs = make(map[flow.Identifier]*flow.Proposal)
 
 	// set up the network module mock
-	ss.net = &mocknetwork.Network{}
+	ss.net = &mocknetwork.EngineRegistry{}
 	ss.net.On("Register", mock.Anything, mock.Anything).Return(
 		func(channel channels.Channel, engine netint.MessageProcessor) netint.Conduit {
 			return ss.con
@@ -153,6 +154,7 @@ func (ss *SyncSuite) SetupTest() {
 	require.NoError(ss.T(), err, "could not create protocol state identity cache")
 	spamConfig, err := NewSpamDetectionConfig()
 	require.NoError(ss.T(), err, "could not create spam detection config")
+	followerDistributor := pubsub.NewFollowerDistributor()
 	e, err := New(log, ss.metrics, ss.net, ss.me, ss.state, ss.blocks, ss.comp, ss.core,
 		id.NewIdentityFilterIdentifierProvider(
 			filter.And(
@@ -161,7 +163,8 @@ func (ss *SyncSuite) SetupTest() {
 			),
 			idCache,
 		),
-		spamConfig)
+		spamConfig,
+		followerDistributor)
 	require.NoError(ss.T(), err, "should pass engine initialization")
 	ss.e = e
 }

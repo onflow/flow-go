@@ -18,7 +18,7 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/util"
 	"github.com/onflow/flow-go/network/channels"
-	"github.com/onflow/flow-go/network/mocknetwork"
+	mocknetwork "github.com/onflow/flow-go/network/mock"
 	"github.com/onflow/flow-go/network/stub"
 	"github.com/onflow/flow-go/state/cluster"
 	bcluster "github.com/onflow/flow-go/state/cluster/badger"
@@ -173,7 +173,7 @@ func NewClusterSwitchoverTestCase(t *testing.T, conf ClusterSwitchoverTestConf) 
 			}
 
 			// generate root cluster block
-			rootClusterBlock, err := cluster.CanonicalRootBlock(commit.Counter, model.ToIdentityList(signers).ToSkeleton())
+			rootClusterBlock, err := cluster.CanonicalRootBlock(commit.Counter, clusterQC.VoterIDs)
 			require.NoError(tc.T(), err)
 			// generate cluster root qc
 			qc, err := run.GenerateClusterRootQC(signers, model.ToIdentityList(signers).ToSkeleton(), rootClusterBlock)
@@ -275,13 +275,23 @@ func (tc *ClusterSwitchoverTestCase) ServiceAddress() flow.Address {
 // Transaction returns a transaction which is valid for ingestion by a
 // collection node in this test suite.
 func (tc *ClusterSwitchoverTestCase) Transaction(opts ...func(*flow.TransactionBody)) *flow.TransactionBody {
+
 	tx, err := flow.NewTransactionBodyBuilder().
 		AddAuthorizer(tc.ServiceAddress()).
 		SetPayer(tc.ServiceAddress()).
+		SetProposalKey(tc.ServiceAddress(), 0, 0).
 		SetScript(unittest.NoopTxScript()).
 		SetReferenceBlockID(tc.RootBlock().ID()).
 		Build()
 	require.NoError(tc.T(), err)
+
+	// add an envelope signature to pass access transaction sanity validation for payer proposer and authorizers
+	tx.EnvelopeSignatures = []flow.TransactionSignature{
+		flow.TransactionSignature{
+			Address:   tc.ServiceAddress(),
+			Signature: unittest.SignatureFixtureForTransactions(),
+		},
+	}
 
 	for _, apply := range opts {
 		apply(tx)

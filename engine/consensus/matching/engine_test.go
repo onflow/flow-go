@@ -11,13 +11,14 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	mockconsensus "github.com/onflow/flow-go/engine/consensus/mock"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	mockmodule "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/network/channels"
-	"github.com/onflow/flow-go/network/mocknetwork"
+	mocknetwork "github.com/onflow/flow-go/network/mock"
 	mockprotocol "github.com/onflow/flow-go/state/protocol/mock"
 	mockstorage "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -36,14 +37,15 @@ type MatchingEngineSuite struct {
 	state    *mockprotocol.State
 
 	// Matching Engine
-	engine *Engine
-	cancel context.CancelFunc
+	engine      *Engine
+	distributor *pubsub.FollowerDistributor
+	cancel      context.CancelFunc
 }
 
 func (s *MatchingEngineSuite) SetupTest() {
 	metrics := metrics.NewNoopCollector()
 	me := &mockmodule.Local{}
-	net := &mocknetwork.Network{}
+	net := &mocknetwork.EngineRegistry{}
 	s.core = &mockconsensus.MatchingCore{}
 	s.index = &mockstorage.Index{}
 	s.receipts = &mockstorage.ExecutionReceipts{}
@@ -55,8 +57,9 @@ func (s *MatchingEngineSuite) SetupTest() {
 	con := &mocknetwork.Conduit{}
 	net.On("Register", mock.Anything, mock.Anything).Return(con, nil).Once()
 
+	s.distributor = pubsub.NewFollowerDistributor()
 	var err error
-	s.engine, err = NewEngine(unittest.Logger(), net, me, metrics, metrics, s.state, s.receipts, s.index, s.core)
+	s.engine, err = NewEngine(unittest.Logger(), net, me, metrics, metrics, s.state, s.receipts, s.index, s.core, s.distributor)
 	require.NoError(s.T(), err)
 
 	ctx, cancel := irrecoverable.NewMockSignalerContextWithCancel(s.T(), context.Background())
@@ -79,7 +82,7 @@ func (s *MatchingEngineSuite) TestOnFinalizedBlock() {
 	finalizedBlock := unittest.BlockHeaderFixture()
 	s.state.On("Final").Return(unittest.StateSnapshotForKnownBlock(finalizedBlock, nil))
 	s.core.On("OnBlockFinalization").Return(nil).Once()
-	s.engine.OnFinalizedBlock(model.BlockFromFlow(finalizedBlock))
+	s.distributor.OnFinalizedBlock(model.BlockFromFlow(finalizedBlock))
 
 	// matching engine has at least 100ms ticks for processing events
 	time.Sleep(1 * time.Second)
@@ -106,7 +109,7 @@ func (s *MatchingEngineSuite) TestOnBlockIncorporated() {
 	}
 	s.index.On("ByBlockID", incorporatedBlockID).Return(index, nil)
 
-	s.engine.OnBlockIncorporated(model.BlockFromFlow(incorporatedBlock))
+	s.distributor.OnBlockIncorporated(model.BlockFromFlow(incorporatedBlock))
 
 	// matching engine has at least 100ms ticks for processing events
 	time.Sleep(1 * time.Second)

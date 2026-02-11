@@ -2,6 +2,7 @@ package emulator
 
 import (
 	"errors"
+	"fmt"
 	"math/big"
 
 	gethCommon "github.com/ethereum/go-ethereum/common"
@@ -53,6 +54,7 @@ func newConfig(ctx types.BlockContext) *Config {
 		WithTransactionTracer(ctx.Tracer),
 		WithBlockTotalGasUsedSoFar(ctx.TotalGasUsedSoFar),
 		WithBlockTxCountSoFar(ctx.TxCountSoFar),
+		WithRestrictedEOAs(RestrictedEOAs),
 	)
 }
 
@@ -119,6 +121,22 @@ func (bl *BlockView) DirectCall(call *types.DirectCall) (res *types.Result, err 
 	// Set the nonce for the call (needed for some operations like deployment)
 	call.Nonce = proc.state.GetNonce(call.From.ToCommon())
 
+	if !call.ValidEIP7825GasLimit(proc.config.ChainRules()) {
+		res := &types.Result{
+			TxType: call.Type,
+			TxHash: call.Hash(),
+		}
+		res.SetValidationError(
+			fmt.Errorf(
+				"%w (cap: %d, tx: %d)",
+				gethCore.ErrGasLimitTooHigh,
+				gethParams.MaxTxGas,
+				call.GasLimit,
+			),
+		)
+		return res, nil
+	}
+
 	// Call tx tracer
 	if proc.evm.Config.Tracer != nil && proc.evm.Config.Tracer.OnTxStart != nil {
 		proc.evm.Config.Tracer.OnTxStart(proc.evm.GetVMContext(), call.Transaction(), call.From.ToCommon())
@@ -172,7 +190,11 @@ func (bl *BlockView) RunTransaction(
 	if err != nil {
 		// this is not a fatal error (e.g. due to bad signature)
 		// not a valid transaction
-		return types.NewInvalidResult(tx, err), nil
+		return types.NewInvalidResult(tx.Type(), tx.Hash(), err), nil
+	}
+
+	if bl.config.IsRestrictedEOA(msg.From) {
+		return types.NewInvalidResult(tx.Type(), tx.Hash(), types.ErrRestrictedEOA), nil
 	}
 
 	// call tracer
@@ -227,7 +249,12 @@ func (bl *BlockView) BatchRunTransactions(txs []*gethTypes.Transaction) ([]*type
 			GetSigner(bl.config),
 			proc.config.BlockContext.BaseFee)
 		if err != nil {
-			batchResults[i] = types.NewInvalidResult(tx, err)
+			batchResults[i] = types.NewInvalidResult(tx.Type(), tx.Hash(), err)
+			continue
+		}
+
+		if bl.config.IsRestrictedEOA(msg.From) {
+			batchResults[i] = types.NewInvalidResult(tx.Type(), tx.Hash(), types.ErrRestrictedEOA)
 			continue
 		}
 
@@ -304,9 +331,9 @@ func (bl *BlockView) DryRunTransaction(
 
 	// use the from as the signer
 	msg.From = from
-	// we need to skip nonce/eoa check for dry run
+	// we need to skip nonce/transaction checks for dry run
 	msg.SkipNonceChecks = true
-	msg.SkipFromEOACheck = true
+	msg.SkipTransactionChecks = true
 
 	// run and return without committing the state changes
 	return proc.run(msg, tx.Hash(), tx.Type())
@@ -364,12 +391,14 @@ func (proc *procedure) commit(finalize bool) (hash.Hash, error) {
 func (proc *procedure) mintTo(
 	call *types.DirectCall,
 ) (*types.Result, error) {
-	// convert and check value
-	isValid, value := convertAndCheckValue(call.Value)
+	// check and convert value
+	value, isValid := checkAndConvertValue(call.Value)
 	if !isValid {
 		return types.NewInvalidResult(
-			call.Transaction(),
-			types.ErrInvalidBalance), nil
+			call.Type,
+			call.Hash(),
+			types.ErrInvalidBalance,
+		), nil
 	}
 
 	// create bridge account if not exist
@@ -408,19 +437,23 @@ func (proc *procedure) mintTo(
 func (proc *procedure) withdrawFrom(
 	call *types.DirectCall,
 ) (*types.Result, error) {
-	// convert and check value
-	isValid, value := convertAndCheckValue(call.Value)
+	// check and convert value
+	value, isValid := checkAndConvertValue(call.Value)
 	if !isValid {
 		return types.NewInvalidResult(
-			call.Transaction(),
-			types.ErrInvalidBalance), nil
+			call.Type,
+			call.Hash(),
+			types.ErrInvalidBalance,
+		), nil
 	}
 
 	// check balance is not prone to rounding error
-	if types.BalanceConversionToUFix64ProneToRoundingError(call.Value) {
+	if !types.AttoFlowBalanceIsValidForFlowVault(call.Value) {
 		return types.NewInvalidResult(
-			call.Transaction(),
-			types.ErrWithdrawBalanceRounding), nil
+			call.Type,
+			call.Hash(),
+			types.ErrWithdrawBalanceRounding,
+		), nil
 	}
 
 	// create bridge account if not exist
@@ -462,12 +495,14 @@ func (proc *procedure) withdrawFrom(
 func (proc *procedure) deployAt(
 	call *types.DirectCall,
 ) (*types.Result, error) {
-	// convert and check value
-	isValid, castedValue := convertAndCheckValue(call.Value)
+	// check and convert value
+	castedValue, isValid := checkAndConvertValue(call.Value)
 	if !isValid {
 		return types.NewInvalidResult(
-			call.Transaction(),
-			types.ErrInvalidBalance), nil
+			call.Type,
+			call.Hash(),
+			types.ErrInvalidBalance,
+		), nil
 	}
 
 	txHash := call.Hash()
@@ -595,7 +630,7 @@ func (proc *procedure) deployAt(
 	res.DeployedContractAddress = &call.To
 	res.CumulativeGasUsed = proc.config.BlockTotalGasUsedSoFar + res.GasConsumed
 
-	proc.state.SetCode(addr, ret)
+	proc.state.SetCode(addr, ret, gethTracing.CodeChangeContractCreation)
 	res.StateChangeCommitment, err = proc.commit(true)
 	return res, err
 }
@@ -675,7 +710,7 @@ func (proc *procedure) run(
 	// if pre-checks are passed, the exec result won't be nil
 	if execResult != nil {
 		res.GasConsumed = execResult.UsedGas
-		res.GasRefund = proc.state.GetRefund()
+		res.MaxGasConsumed = execResult.MaxUsedGas
 		res.Index = uint16(txIndex)
 		res.CumulativeGasUsed = execResult.UsedGas + proc.config.BlockTotalGasUsedSoFar
 		res.PrecompiledCalls, err = proc.config.PCTracker.CapturedCalls()
@@ -712,15 +747,15 @@ func (proc *procedure) run(
 	return &res, nil
 }
 
-func convertAndCheckValue(input *big.Int) (isValid bool, converted *uint256.Int) {
+func checkAndConvertValue(input *big.Int) (converted *uint256.Int, isValid bool) {
 	// check for negative input
 	if input.Sign() < 0 {
-		return false, nil
+		return nil, false
 	}
 	// convert value into uint256
 	value, overflow := uint256.FromBig(input)
 	if overflow {
-		return true, nil
+		return nil, false
 	}
-	return true, value
+	return value, true
 }

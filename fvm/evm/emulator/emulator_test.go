@@ -3,7 +3,6 @@ package emulator_test
 import (
 	"encoding/hex"
 	"fmt"
-	"math"
 	"math/big"
 	"strings"
 	"testing"
@@ -153,10 +152,73 @@ func TestNativeTokenBridging(t *testing.T) {
 			t.Run("tokens withdraw that results in rounding error", func(t *testing.T) {
 				RunWithNewEmulator(t, backend, rootAddr, func(env *emulator.Emulator) {
 					RunWithNewBlockView(t, env, func(blk types.BlockView) {
-						call := types.NewWithdrawCall(bridgeAccount, testAccount, big.NewInt(1000), testAccountNonce)
+						// Happy path, withdraw amount fits in Flow vault
+						call := types.NewWithdrawCall(bridgeAccount, testAccount, types.OneFlow(), testAccountNonce)
+						res, err := blk.DirectCall(call)
+						requireSuccessfulExecution(t, err, res)
+						require.Equal(t, defaultCtx.DirectCallBaseGasUsage, res.GasConsumed)
+						require.Equal(t, call.Hash(), res.TxHash)
+						testAccountNonce += 1
+					})
+				})
+				RunWithNewEmulator(t, backend, rootAddr, func(env *emulator.Emulator) {
+					RunWithNewBlockView(t, env, func(blk types.BlockView) {
+						// Unhappy path, withdraw amount is 1e9, less than the minimum
+						// of 1e10.
+						call := types.NewWithdrawCall(bridgeAccount, testAccount, big.NewInt(1000000000), testAccountNonce)
 						res, err := blk.DirectCall(call)
 						require.NoError(t, err)
-						require.Equal(t, res.ValidationError, types.ErrWithdrawBalanceRounding)
+						require.ErrorContains(
+							t,
+							res.ValidationError,
+							types.ErrWithdrawBalanceRounding.Error(),
+						)
+						testAccountNonce += 1
+					})
+				})
+				RunWithNewEmulator(t, backend, rootAddr, func(env *emulator.Emulator) {
+					RunWithNewBlockView(t, env, func(blk types.BlockView) {
+						// Happy path, withdraw amount is 1e10, equal to the minimum
+						// of 1e10.
+						call := types.NewWithdrawCall(bridgeAccount, testAccount, big.NewInt(10000000000), testAccountNonce)
+						res, err := blk.DirectCall(call)
+						requireSuccessfulExecution(t, err, res)
+						require.Equal(t, defaultCtx.DirectCallBaseGasUsage, res.GasConsumed)
+						require.Equal(t, call.Hash(), res.TxHash)
+						testAccountNonce += 1
+					})
+				})
+				RunWithNewEmulator(t, backend, rootAddr, func(env *emulator.Emulator) {
+					RunWithNewBlockView(t, env, func(blk types.BlockView) {
+						// Test withdraw amounts that overflow the UInt256 range
+						amount := big.NewInt(1)
+						amount.Lsh(amount, 256)
+
+						call := types.NewWithdrawCall(bridgeAccount, testAccount, amount, testAccountNonce)
+						res, err := blk.DirectCall(call)
+						require.NoError(t, err)
+						require.ErrorContains(
+							t,
+							res.ValidationError,
+							"invalid amount for transfer or balance change",
+						)
+						testAccountNonce += 1
+					})
+				})
+				RunWithNewEmulator(t, backend, rootAddr, func(env *emulator.Emulator) {
+					RunWithNewBlockView(t, env, func(blk types.BlockView) {
+						// Test withdraw amounts within the max range of UInt256
+						amount := big.NewInt(1)
+						amount.Lsh(amount, 255)
+
+						call := types.NewWithdrawCall(bridgeAccount, testAccount, amount, testAccountNonce)
+						res, err := blk.DirectCall(call)
+						require.NoError(t, err)
+						require.ErrorContains(
+							t,
+							res.ValidationError,
+							"insufficient funds for gas * price + value",
+						)
 						testAccountNonce += 1
 					})
 				})
@@ -211,7 +273,7 @@ func TestContractInteraction(t *testing.T) {
 						call := types.NewDeployCall(
 							testAccount,
 							testContract.ByteCode,
-							math.MaxUint64,
+							gethParams.MaxTxGas,
 							amountToBeTransfered,
 							testAccountNonce)
 						res, err := blk.DirectCall(call)
@@ -599,7 +661,7 @@ func TestDeployAtFunctionality(t *testing.T) {
 								testAccount,
 								target,
 								testContract.ByteCode,
-								math.MaxUint64,
+								gethParams.MaxTxGas,
 								amountToBeTransfered,
 								0,
 							),
@@ -629,7 +691,7 @@ func TestDeployAtFunctionality(t *testing.T) {
 								testAccount,
 								target,
 								testContract.ByteCode,
-								math.MaxUint64,
+								gethParams.MaxTxGas,
 								amountToBeTransfered,
 								0),
 						)
@@ -687,7 +749,7 @@ func TestSelfdestruct(t *testing.T) {
 							types.NewDeployCall(
 								testAddress,
 								testContract.ByteCode,
-								math.MaxUint64,
+								gethParams.MaxTxGas,
 								deployBalance,
 								0),
 						)
@@ -768,7 +830,7 @@ func TestFactoryPatterns(t *testing.T) {
 							types.NewDeployCall(
 								factoryDeployer,
 								factoryContract.ByteCode,
-								math.MaxUint64,
+								gethParams.MaxTxGas,
 								factoryBalance,
 								0),
 						)

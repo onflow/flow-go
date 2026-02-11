@@ -30,6 +30,7 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
 	"github.com/onflow/flow-go/consensus/hotstuff/votecollector"
 	recovery "github.com/onflow/flow-go/consensus/recovery/protocol"
+	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/common/requester"
 	synceng "github.com/onflow/flow-go/engine/common/synchronization"
 	"github.com/onflow/flow-go/engine/consensus/approvals/tracker"
@@ -396,6 +397,7 @@ func main() {
 				multipleReceiptsFilterMempool,
 				consensusMempools.LogForkAndCrash(node.Logger),
 				node.ProtocolDB,
+				node.StorageLockMgr,
 				node.Logger,
 			)
 			if err != nil {
@@ -477,24 +479,26 @@ func main() {
 				chunkAssigner,
 				seals,
 				getSealingConfigs,
+				followerDistributor,
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize sealing engine: %w", err)
 			}
 
-			// subscribe for finalization events from hotstuff
-			followerDistributor.AddOnBlockFinalizedConsumer(e.OnFinalizedBlock)
-			followerDistributor.AddOnBlockIncorporatedConsumer(e.OnBlockIncorporated)
-
 			return e, err
 		}).
 		Component("matching engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			fifoStore, err := engine.NewFifoMessageStore(requester.DefaultEntityRequestCacheSize)
+			if err != nil {
+				return nil, fmt.Errorf("could not create requester store: %w", err)
+			}
 			receiptRequester, err = requester.New(
 				node.Logger.With().Str("entity", "receipt").Logger(),
 				node.Metrics.Engine,
 				node.EngineRegistry,
 				node.Me,
 				node.State,
+				fifoStore,
 				channels.RequestReceiptsByBlockID,
 				filter.HasRole[flow.Identity](flow.RoleExecution),
 				func() flow.Entity { return new(flow.ExecutionReceipt) },
@@ -531,6 +535,7 @@ func main() {
 				node.Storage.Receipts,
 				node.Storage.Index,
 				core,
+				followerDistributor,
 			)
 			if err != nil {
 				return nil, err
@@ -538,8 +543,6 @@ func main() {
 
 			// subscribe engine to inputs from other node-internal components
 			receiptRequester.WithHandle(e.HandleReceipt)
-			followerDistributor.AddOnBlockFinalizedConsumer(e.OnFinalizedBlock)
-			followerDistributor.AddOnBlockIncorporatedConsumer(e.OnBlockIncorporated)
 
 			return e, err
 		}).
@@ -605,7 +608,6 @@ func main() {
 			// create consensus logger
 			logger := createLogger(node.Logger, node.RootChainID)
 
-			telemetryConsumer := notifications.NewTelemetryConsumer(logger)
 			slashingViolationConsumer := notifications.NewSlashingViolationsConsumer(nodeBuilder.Logger)
 			followerDistributor.AddProposalViolationConsumer(slashingViolationConsumer)
 
@@ -615,13 +617,15 @@ func main() {
 				mainMetrics,
 			)
 
+			telemetryConsumer := notifications.NewTelemetryConsumer(logger, notifier)
+
+			// TODO(leo): move these to NewTelemetryConsumer
 			notifier.AddParticipantConsumer(telemetryConsumer)
 			notifier.AddCommunicatorConsumer(telemetryConsumer)
-			notifier.AddFinalizationConsumer(telemetryConsumer)
 			notifier.AddFollowerConsumer(followerDistributor)
 
 			// initialize the persister
-			persist, err := persister.New(node.ProtocolDB, node.RootChainID)
+			persist, err := persister.New(node.ProtocolDB, node.RootChainID, node.StorageLockMgr)
 			if err != nil {
 				return nil, err
 			}
@@ -710,12 +714,11 @@ func main() {
 			if err != nil {
 				return nil, fmt.Errorf("could not load liveness data: %w", err)
 			}
-			ctl, err := cruisectl.NewBlockTimeController(node.Logger, metrics.NewCruiseCtlMetrics(), cruiseCtlConfig, node.State, livenessData.CurrentView)
+			ctl, err := cruisectl.NewBlockTimeController(node.Logger, metrics.NewCruiseCtlMetrics(), cruiseCtlConfig, node.State, livenessData.CurrentView, hotstuffModules.Notifier)
 			if err != nil {
 				return nil, err
 			}
 			proposalDurProvider = ctl
-			hotstuffModules.Notifier.AddOnBlockIncorporatedConsumer(ctl.OnBlockIncorporated)
 			node.ProtocolEvents.AddConsumer(ctl)
 
 			// set up admin commands for dynamically updating configs
@@ -839,11 +842,11 @@ func main() {
 				logger,
 				node.Me,
 				complianceCore,
+				followerDistributor,
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize compliance engine: %w", err)
 			}
-			followerDistributor.AddOnBlockFinalizedConsumer(comp.OnFinalizedBlock)
 
 			return comp, nil
 		}).
@@ -883,11 +886,11 @@ func main() {
 				syncCore,
 				node.SyncEngineIdentifierProvider,
 				spamConfig,
+				followerDistributor,
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize synchronization engine: %w", err)
 			}
-			followerDistributor.AddFinalizationConsumer(sync)
 
 			return sync, nil
 		}).

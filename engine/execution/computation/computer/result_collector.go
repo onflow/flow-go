@@ -11,7 +11,6 @@ import (
 	otelTrace "go.opentelemetry.io/otel/trace"
 
 	"github.com/onflow/flow-go/engine/execution"
-	"github.com/onflow/flow-go/engine/execution/computation/result"
 	"github.com/onflow/flow-go/engine/execution/storehouse"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/meter"
@@ -72,8 +71,7 @@ type resultCollector struct {
 
 	parentBlockExecutionResultID flow.Identifier
 
-	result    *execution.ComputationResult
-	consumers []result.ExecutedCollectionConsumer
+	result *execution.ComputationResult
 
 	spockSignatures []crypto.Signature
 
@@ -99,7 +97,6 @@ func newResultCollector(
 	parentBlockExecutionResultID flow.Identifier,
 	block *entity.ExecutableBlock,
 	inputChannelSize int,
-	consumers []result.ExecutedCollectionConsumer,
 	previousBlockSnapshot snapshot.StorageSnapshot,
 ) *resultCollector {
 	numCollections := len(block.Collections()) + 1
@@ -117,7 +114,6 @@ func newResultCollector(
 		executionDataProvider:        executionDataProvider,
 		parentBlockExecutionResultID: parentBlockExecutionResultID,
 		result:                       execution.NewEmptyComputationResult(block),
-		consumers:                    consumers,
 		spockSignatures:              make([]crypto.Signature, 0, numCollections),
 		blockStartTime:               now,
 		blockMeter:                   meter.NewMeter(meter.DefaultParameters()),
@@ -209,13 +205,6 @@ func (collector *resultCollector) commitCollection(
 	collector.currentCollectionState = state.NewExecutionState(nil, state.DefaultParameters())
 	collector.currentCollectionStats = module.CollectionExecutionResultStats{}
 
-	for _, consumer := range collector.consumers {
-		err = consumer.OnExecutedCollection(collector.result.CollectionExecutionResultAt(collection.collectionIndex))
-		if err != nil {
-			return fmt.Errorf("consumer failed: %w", err)
-		}
-	}
-
 	return nil
 }
 
@@ -240,14 +229,11 @@ func (collector *resultCollector) processTransactionResult(
 			Logger()
 		logger.Info().Msg("transaction execution failed")
 
-		if txn.isSystemTransaction {
+		if txn.transactionType == ComputerTransactionTypeSystem {
 			// This log is used as the data source for an alert on grafana.
-			// The system_chunk_error field must not be changed without adding
+			// The critical_error field must not be changed without adding
 			// the corresponding changes in grafana.
-			// https://github.com/dapperlabs/flow-internal/issues/1546
 			logger.Error().
-				Bool("system_chunk_error", true).
-				Bool("system_transaction_error", true).
 				Bool("critical_error", true).
 				Msg("error executing system chunk transaction")
 		}
@@ -314,7 +300,8 @@ func (collector *resultCollector) handleTransactionExecutionMetrics(
 		ComputationIntensities:     output.ComputationIntensities,
 		NumberOfTxnConflictRetries: numConflictRetries,
 		Failed:                     output.Err != nil,
-		SystemTransaction:          txn.isSystemTransaction,
+		ScheduledTransaction:       txn.transactionType == ComputerTransactionTypeScheduled,
+		SystemTransaction:          txn.transactionType == ComputerTransactionTypeSystem,
 	}
 	for _, entry := range txnExecutionSnapshot.UpdatedRegisters() {
 		transactionExecutionStats.NumberOfBytesWrittenToRegisters += len(entry.Value)

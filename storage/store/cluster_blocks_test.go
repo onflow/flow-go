@@ -3,13 +3,13 @@ package store
 import (
 	"testing"
 
+	"github.com/jordanschalm/lockctx"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/operation"
 	"github.com/onflow/flow-go/storage/operation/dbtest"
-	"github.com/onflow/flow-go/storage/procedure"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -21,38 +21,35 @@ func TestClusterBlocks(t *testing.T) {
 		parent, blocks := chain[0], chain[1:]
 
 		// add parent and mark its height as the latest finalized block
-		lctx := lockManager.NewContext()
-		require.NoError(t, lctx.AcquireLock(storage.LockInsertOrFinalizeClusterBlock))
-		err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return operation.IndexClusterBlockHeight(lctx, rw.Writer(), parent.ChainID, parent.Height, parent.ID())
-		})
-		require.NoError(t, err)
+		err := unittest.WithLock(t, lockManager, storage.LockInsertOrFinalizeClusterBlock, func(lctx lockctx.Context) error {
+			err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return operation.IndexClusterBlockHeight(lctx, rw, parent.ChainID, parent.Height, parent.ID())
+			})
+			require.NoError(t, err)
 
-		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return operation.UpsertClusterFinalizedHeight(lctx, rw.Writer(), parent.ChainID, parent.Height)
+			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return operation.BootstrapClusterFinalizedHeight(lctx, rw, parent.ChainID, parent.Height)
+			})
 		})
 		require.NoError(t, err)
-		lctx.Release()
 
 		// store chain of descending blocks
 		for _, block := range blocks {
 			// InsertClusterBlock only needs LockInsertOrFinalizeClusterBlock
-			lctx2 := lockManager.NewContext()
-			require.NoError(t, lctx2.AcquireLock(storage.LockInsertOrFinalizeClusterBlock))
-			err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-				return procedure.InsertClusterBlock(lctx2, rw, unittest.ClusterProposalFromBlock(block))
+			err := unittest.WithLock(t, lockManager, storage.LockInsertOrFinalizeClusterBlock, func(lctx2 lockctx.Context) error {
+				return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+					return operation.InsertClusterBlock(lctx2, rw, unittest.ClusterProposalFromBlock(block))
+				})
 			})
 			require.NoError(t, err)
-			lctx2.Release()
 
 			// FinalizeClusterBlock only needs LockInsertOrFinalizeClusterBlock
-			lctx2 = lockManager.NewContext()
-			require.NoError(t, lctx2.AcquireLock(storage.LockInsertOrFinalizeClusterBlock))
-			err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-				return procedure.FinalizeClusterBlock(lctx2, rw, block.ID())
+			err = unittest.WithLock(t, lockManager, storage.LockInsertOrFinalizeClusterBlock, func(lctx2 lockctx.Context) error {
+				return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+					return operation.FinalizeClusterBlock(lctx2, rw, block.ID())
+				})
 			})
 			require.NoError(t, err)
-			lctx2.Release()
 		}
 
 		clusterBlocks := NewClusterBlocks(

@@ -55,20 +55,12 @@ jobs:
           path: tools/custom-gcl # path defined in .custom-gcl.yml
           lookup-only: 'true'    # if already cached, don't download here
       # We install the non-custom golangci-lint binary using the golangci-lint action.
-      # The action is set up to always install and run the linter - there isn't a way to only install.
-      # We provide args to disable all linters which results in the step immediately failing.
       - name: Install golangci-lint
         if: steps.cache-linter.outputs.cache-hit != 'true'
-        uses: golangci/golangci-lint-action@v6
-        continue-on-error: true # after installation (what we care about), this step will fail - this line allows workflow to continue
+        uses: golangci/golangci-lint-action@v9
         with:
-          # Required: the version of golangci-lint is required and must be specified without patch version: we always use the latest patch version.
-          version: v1.63
-          args: "--no-config --disable-all" # set args so that no linters are actually run
-      - name: Build custom linter binary
-        if: steps.cache-linter.outputs.cache-hit != 'true'
-        run: |
-          golangci-lint custom
+          install-only: true
+          version: v2.7.1
 
   golangci:
     strategy:
@@ -114,7 +106,7 @@ jobs:
     - name: Add custom linter binary to path
       run: echo "$(pwd)/tools" >> $GITHUB_PATH
     - name: Run golangci-lint
-      uses: golangci/golangci-lint-action@v6
+      uses: golangci/golangci-lint-action@v9
       with:
         install-mode: 'none' # looks for binary in path rather than downloading
         args: "-v"
@@ -239,7 +231,7 @@ jobs:
       timeout-minutes: 1
       continue-on-error: true
       with:
-        file: ./coverage.txt
+        files: ./coverage.txt
         flags: unittests
         name: codecov-umbrella
         token: ${{ secrets.CODECOV_TOKEN }}
@@ -285,7 +277,7 @@ jobs:
         timeout-minutes: 1
         continue-on-error: true
         with:
-          file: ./coverage.txt
+          files: ./coverage.txt
           flags: unittests
           name: codecov-umbrella
           token: ${{ secrets.CODECOV_TOKEN }}
@@ -321,6 +313,8 @@ jobs:
           username: ${{ vars.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
         if: ${{ (github.event_name == 'merge_group' || (github.event.pull_request && (github.event.pull_request.author_association == 'MEMBER' || github.event.pull_request.author_association == 'COLLABORATOR'))) }}
+        # this docker auth is exclusively for higher rate limits. continue unauthenticated if it fails
+        continue-on-error: true
 
 
       - name: Docker build
@@ -334,6 +328,7 @@ jobs:
           gcr.io/flow-container-registry/collection:latest \
           gcr.io/flow-container-registry/consensus:latest \
           gcr.io/flow-container-registry/execution:latest \
+          gcr.io/flow-container-registry/execution-ledger:latest \
           gcr.io/flow-container-registry/ghost:latest \
           gcr.io/flow-container-registry/observer:latest \
           gcr.io/flow-container-registry/verification:latest \
@@ -389,7 +384,7 @@ jobs:
         timeout-minutes: 1
         continue-on-error: true
         with:
-          file: ./coverage.txt
+          files: ./coverage.txt
           flags: unittests
           name: codecov-umbrella
           token: ${{ secrets.CODECOV_TOKEN }}

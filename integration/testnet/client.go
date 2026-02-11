@@ -19,6 +19,7 @@ import (
 	client "github.com/onflow/flow-go-sdk/access/grpc"
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
 	"github.com/onflow/flow-go-sdk/templates"
+	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
 
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/fvm/crypto"
@@ -197,7 +198,7 @@ func (c *Client) validWebAuthnExtensionData(transactionMessage []byte) ([]byte, 
 		return nil, nil, err
 	}
 	authNChallenge := hasher.ComputeHash(transactionMessage)
-	authNChallengeBase64Url := base64.URLEncoding.EncodeToString(authNChallenge)
+	authNChallengeBase64Url := base64.RawURLEncoding.EncodeToString(authNChallenge)
 	validUserFlag := byte(0x01)
 	validClientDataOrigin := "https://testing.com"
 	rpIDHash := unittest.RandomBytes(32)
@@ -306,6 +307,22 @@ func (c *Client) WaitForSealed(ctx context.Context, id sdk.Identifier) (*sdk.Tra
 // WaitForExecuted waits for the transaction to be executed, then returns the result.
 func (c *Client) WaitForExecuted(ctx context.Context, id sdk.Identifier) (*sdk.TransactionResult, error) {
 	return c.waitForStatus(ctx, id, sdk.TransactionStatusExecuted)
+}
+
+// WaitUntilIndexed blocks until the node has indexed the given height.
+func (c *Client) WaitUntilIndexed(ctx context.Context, height uint64) error {
+	for {
+		resp, err := c.client.RPCClient().GetLatestBlockHeader(ctx, &accessproto.GetLatestBlockHeaderRequest{
+			IsSealed: true,
+		})
+		if err != nil {
+			return fmt.Errorf("could not get metadata response: %w", err)
+		}
+		if resp.GetMetadata().GetHighestIndexedHeight() >= height {
+			return nil
+		}
+		time.Sleep(250 * time.Millisecond)
+	}
 }
 
 // waitForStatus waits for the transaction to be in a certain status, then returns the result.

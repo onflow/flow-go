@@ -28,7 +28,7 @@ func NewSnapshotTree(base StorageSnapshot) SnapshotTree {
 }
 
 // Append returns a new tree with updates from the execution snapshot "applied"
-// to the original original tree.
+// to the original tree.
 func (tree SnapshotTree) Append(
 	update *ExecutionSnapshot,
 ) SnapshotTree {

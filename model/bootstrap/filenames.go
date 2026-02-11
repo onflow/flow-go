@@ -23,6 +23,7 @@ var (
 	DirnameRootBlockVotes     = filepath.Join(DirnamePublicBootstrap, "root-block-votes")
 	FileNamePartnerWeights    = "partner-weights.json"
 
+	PathClusteringData                = filepath.Join(DirnamePublicBootstrap, "root-clustering.json")
 	PathRootBlockData                 = filepath.Join(DirnamePublicBootstrap, "root-block.json")
 	PathIntermediaryBootstrappingData = filepath.Join(DirnamePublicBootstrap, "intermediary-bootstrapping-data.json")
 	PathRootProtocolStateSnapshot     = filepath.Join(DirnamePublicBootstrap, "root-protocol-state-snapshot.json")
@@ -36,12 +37,15 @@ var (
 	FilenameSecretsEncryptionKey     = "secretsdb-key"
 	PathPrivNodeInfoPrefix           = "node-info.priv."
 	FilenameRootBlockVotePrefix      = "root-block-vote."
+	FilenameClusterBlockVotePrefix   = "root-cluster-block-vote."
 	PathRootDKGData                  = filepath.Join(DirPrivateRoot, "root-dkg-data.priv.json")
 	PathNodeInfoPriv                 = filepath.Join(DirPrivateRoot, "private-node-info_%v", "node-info.priv.json")                 // %v will be replaced by NodeID
 	PathNodeMachineAccountPrivateKey = filepath.Join(DirPrivateRoot, "private-node-info_%v", "node-machine-account-key.priv.json")  // %v will be replaced by NodeID
 	PathNodeMachineAccountInfoPriv   = filepath.Join(DirPrivateRoot, "private-node-info_%v", "node-machine-account-info.priv.json") // %v will be replaced by NodeID
 	PathRandomBeaconPriv             = filepath.Join(DirPrivateRoot, "private-node-info_%v", FilenameRandomBeaconPriv)              // %v will be replaced by NodeID
 	PathNodeRootBlockVote            = filepath.Join(DirPrivateRoot, "private-node-info_%v", "root-block-vote.json")
+	PathNodeRootClusterBlockVote     = filepath.Join(DirPrivateRoot, "private-node-info_%v", "root-cluster-block-vote.json") // %v will be replaced by NodeID
 	FilenameRootBlockVote            = FilenameRootBlockVotePrefix + "%v.json"
+	FilenameRootClusterBlockVote     = FilenameClusterBlockVotePrefix + "%v.json"
 	PathSecretsEncryptionKey         = filepath.Join(DirPrivateRoot, "private-node-info_%v", FilenameSecretsEncryptionKey) // %v will be replaced by NodeID
 )

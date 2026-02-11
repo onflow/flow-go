@@ -24,8 +24,11 @@ var transactionResultsCmd = &cobra.Command{
 	Use:   "transaction-results",
 	Short: "get transaction-result by block ID",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		return WithStorage(func(db storage.DB) error {
-			transactionResults := store.NewTransactionResults(metrics.NewNoopCollector(), db, 1)
+		return common.WithStorage(flagDatadir, func(db storage.DB) error {
+			transactionResults, err := store.NewTransactionResults(metrics.NewNoopCollector(), db, 1)
+			if err != nil {
+				return err
+			}
 			storages := common.InitStorages(db)
 			log.Info().Msgf("got flag block id: %s", flagBlockID)
 			blockID, err := flow.HexStringToIdentifier(flagBlockID)

@@ -25,21 +25,21 @@ var (
 	addressC = flow.HexToAddress("0c")
 
 	contractALocation = common.AddressLocation{
-		Address: common.MustBytesToAddress(addressA.Bytes()),
+		Address: common.Address(addressA),
 		Name:    "A",
 	}
 	contractA2Location = common.AddressLocation{
-		Address: common.MustBytesToAddress(addressA.Bytes()),
+		Address: common.Address(addressA),
 		Name:    "A2",
 	}
 
 	contractBLocation = common.AddressLocation{
-		Address: common.MustBytesToAddress(addressB.Bytes()),
+		Address: common.Address(addressB),
 		Name:    "B",
 	}
 
 	contractCLocation = common.AddressLocation{
-		Address: common.MustBytesToAddress(addressC.Bytes()),
+		Address: common.Address(addressC),
 		Name:    "C",
 	}
 
@@ -141,23 +141,27 @@ func getTestContract(
 	error,
 ) {
 	env := environment.NewScriptEnvironmentFromStorageSnapshot(
-		environment.DefaultEnvironmentParams(),
+		fvm.DefaultEnvironmentParams(flow.Mainnet.Chain()),
 		snapshot)
 	return env.GetAccountContractCode(location)
 }
 
 func Test_Programs(t *testing.T) {
+	t.Parallel()
+
 	vm := fvm.NewVirtualMachine()
 	derivedBlockData := derived.NewEmptyDerivedBlockData(0)
 
 	mainSnapshot := setupProgramsTest(t)
 
 	context := fvm.NewContext(
+		flow.Mainnet.Chain(),
 		fvm.WithContractDeploymentRestricted(false),
 		fvm.WithAuthorizationChecksEnabled(false),
 		fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
 		fvm.WithCadenceLogging(true),
-		fvm.WithDerivedBlockData(derivedBlockData))
+		fvm.WithDerivedBlockData(derivedBlockData),
+	)
 
 	var contractASnapshot *snapshot.ExecutionSnapshot
 	var contractBSnapshot *snapshot.ExecutionSnapshot
@@ -633,12 +637,14 @@ func Test_ProgramsDoubleCounting(t *testing.T) {
 
 	metrics := &metricsReporter{}
 	context := fvm.NewContext(
+		flow.Mainnet.Chain(),
 		fvm.WithContractDeploymentRestricted(false),
 		fvm.WithAuthorizationChecksEnabled(false),
 		fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
 		fvm.WithCadenceLogging(true),
 		fvm.WithDerivedBlockData(derivedBlockData),
-		fvm.WithMetricsReporter(metrics))
+		fvm.WithMetricsReporter(metrics),
+	)
 
 	t.Run("deploy contracts and ensure cache is empty", func(t *testing.T) {
 		// deploy contract A

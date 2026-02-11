@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/cockroachdb/pebble/v2"
+	"github.com/jordanschalm/lockctx"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -66,43 +67,40 @@ func TestMakeFinalValidChain(t *testing.T) {
 	unittest.RunWithPebbleDB(t, func(pdb *pebble.DB) {
 		// set up lock context
 		lockManager := storage.NewTestingLockManager()
-		lctx := lockManager.NewContext()
-		err := lctx.AcquireLock(storage.LockFinalizeBlock)
-		require.NoError(t, err)
-		defer lctx.Release()
-
 		dbImpl := pebbleimpl.ToDB(pdb)
 
-		// insert the latest finalized height
-		err = dbImpl.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return operation.UpsertFinalizedHeight(lctx, rw.Writer(), final.Height)
-		})
-		require.NoError(t, err)
+		err := unittest.WithLock(t, lockManager, storage.LockFinalizeBlock, func(lctx lockctx.Context) error {
+			// insert the latest finalized height
+			err := dbImpl.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return operation.UpsertFinalizedHeight(lctx, rw.Writer(), final.Height)
+			})
+			require.NoError(t, err)
 
-		// map the finalized height to the finalized block ID
-		err = dbImpl.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return operation.IndexFinalizedBlockByHeight(lctx, rw, final.Height, final.ID())
+			// map the finalized height to the finalized block ID
+			err = dbImpl.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return operation.IndexFinalizedBlockByHeight(lctx, rw, final.Height, final.ID())
+			})
+			require.NoError(t, err)
+			return nil
 		})
 		require.NoError(t, err)
 
 		// insert the finalized block header into the DB
-		insertLctx := lockManager.NewContext()
-		require.NoError(t, insertLctx.AcquireLock(storage.LockInsertBlock))
-		err = dbImpl.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return operation.InsertHeader(insertLctx, rw, final.ID(), final)
+		err = unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
+			return dbImpl.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return operation.InsertHeader(lctx, rw, final.ID(), final)
+			})
 		})
 		require.NoError(t, err)
-		insertLctx.Release()
 
 		// insert all of the pending blocks into the DB
 		for _, header := range pending {
-			insertLctx2 := lockManager.NewContext()
-			require.NoError(t, insertLctx2.AcquireLock(storage.LockInsertBlock))
-			err = dbImpl.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-				return operation.InsertHeader(insertLctx2, rw, header.ID(), header)
+			err := unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
+				return dbImpl.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+					return operation.InsertHeader(lctx, rw, header.ID(), header)
+				})
 			})
 			require.NoError(t, err)
-			insertLctx2.Release()
 		}
 
 		// initialize the finalizer with the dependencies and make the call
@@ -148,39 +146,32 @@ func TestMakeFinalInvalidHeight(t *testing.T) {
 		lockManager := storage.NewTestingLockManager()
 
 		// Insert the latest finalized height and map the finalized height to the finalized block ID.
-		lctx := lockManager.NewContext()
-		require.NoError(t, lctx.AcquireLock(storage.LockFinalizeBlock))
-		err := dbImpl.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			err := operation.IndexFinalizedBlockByHeight(lctx, rw, final.Height, final.ID())
-			if err != nil {
-				return err
-			}
-			return operation.UpsertFinalizedHeight(lctx, rw.Writer(), final.Height)
+		err := unittest.WithLock(t, lockManager, storage.LockFinalizeBlock, func(lctx lockctx.Context) error {
+			return dbImpl.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				err := operation.IndexFinalizedBlockByHeight(lctx, rw, final.Height, final.ID())
+				if err != nil {
+					return err
+				}
+				return operation.UpsertFinalizedHeight(lctx, rw.Writer(), final.Height)
+			})
 		})
 		require.NoError(t, err)
-		// NOTE: must release lock here - do not deferr! Reason:
-		// The business logic we are testing here should not be expected to do anything regarding finalization when
-		// somebody else is still holding the lock `LockFinalizeBlock`. However, we want to verify that finalizing
-		// another block at the same height is rejected. Hence, we should not be holding the lock anymore.
-		lctx.Release()
 
-		// Insert the latest finalized height and map the finalized height to the finalized block ID.
-		insertLctx := lockManager.NewContext()
-		require.NoError(t, insertLctx.AcquireLock(storage.LockInsertBlock))
-		err = dbImpl.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return operation.InsertHeader(insertLctx, rw, final.ID(), final)
+		// insert the finalized block header into the DB
+		err = unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(insertLctx lockctx.Context) error {
+			return dbImpl.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return operation.InsertHeader(insertLctx, rw, final.ID(), final)
+			})
 		})
 		require.NoError(t, err)
-		insertLctx.Release()
 
-		// insert all of the pending header into DB
-		insertLctx = lockManager.NewContext()
-		require.NoError(t, insertLctx.AcquireLock(storage.LockInsertBlock))
-		err = dbImpl.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return operation.InsertHeader(insertLctx, rw, pending.ID(), pending)
+		// insert pending header into DB, which has the same height as the finalized header
+		err = unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(insertLctx lockctx.Context) error {
+			return dbImpl.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return operation.InsertHeader(insertLctx, rw, pending.ID(), pending)
+			})
 		})
 		require.NoError(t, err)
-		insertLctx.Release()
 
 		// initialize the finalizer with the dependencies and make the call
 		metrics := metrics.NewNoopCollector()
@@ -221,31 +212,25 @@ func TestMakeFinalDuplicate(t *testing.T) {
 		dbImpl := pebbleimpl.ToDB(pdb)
 
 		// insert the latest finalized height
-		lctx := lockManager.NewContext()
-		require.NoError(t, lctx.AcquireLock(storage.LockFinalizeBlock))
-		err := dbImpl.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			err := operation.UpsertFinalizedHeight(lctx, rw.Writer(), final.Height)
-			if err != nil {
-				return err
-			}
+		err := unittest.WithLock(t, lockManager, storage.LockFinalizeBlock, func(lctx lockctx.Context) error {
+			return dbImpl.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				err := operation.UpsertFinalizedHeight(lctx, rw.Writer(), final.Height)
+				if err != nil {
+					return err
+				}
 
-			return operation.IndexFinalizedBlockByHeight(lctx, rw, final.Height, final.ID())
+				return operation.IndexFinalizedBlockByHeight(lctx, rw, final.Height, final.ID())
+			})
 		})
 		require.NoError(t, err)
-		// NOTE: must release lock here - do not deferr! Reason:
-		// The business logic we are testing here should not be expected to do anything regarding finalization when
-		// somebody else is still holding the lock `LockFinalizeBlock`. However, we want to verify that finalizing
-		// the same block again is a no-op. Hence, we should not be holding the lock anymore.
-		lctx.Release()
 
 		// insert the finalized block header into the DB
-		insertLctx := lockManager.NewContext()
-		require.NoError(t, insertLctx.AcquireLock(storage.LockInsertBlock))
-		err = dbImpl.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return operation.InsertHeader(insertLctx, rw, final.ID(), final)
+		err = unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(insertLctx lockctx.Context) error {
+			return dbImpl.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return operation.InsertHeader(insertLctx, rw, final.ID(), final)
+			})
 		})
 		require.NoError(t, err)
-		insertLctx.Release()
 
 		// initialize the finalizer with the dependencies and make the call
 		metrics := metrics.NewNoopCollector()

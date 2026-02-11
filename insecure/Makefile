@@ -22,8 +22,7 @@ test:
 
 .PHONY: lint
 lint: tidy
-	# revive -config revive.toml -exclude storage/ledger/trie ./...
-	golangci-lint run -v
+	../tools/custom-gcl run -v
 
 # this ensures there is no unused dependency being added by accident
 .PHONY: tidy
@@ -31,6 +30,5 @@ tidy:
 	go mod tidy -v
 	cd integration; go mod tidy -v
 	cd crypto; go mod tidy -v
-	cd cmd/testclient; go mod tidy -v
 	cd insecure; go mod tidy -v
 	git diff --exit-code

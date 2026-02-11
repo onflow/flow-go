@@ -23,7 +23,6 @@ import (
 	"github.com/dapperlabs/testingdock"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
-	dockercontainer "github.com/docker/docker/api/types/container"
 	dockerclient "github.com/docker/docker/client"
 	io_prometheus_client "github.com/prometheus/client_model/go"
 	"github.com/prometheus/common/expfmt"
@@ -76,8 +75,6 @@ const (
 	DefaultFlowDataDir = "/data"
 	// DefaultFlowDBDir is the default directory for the node database.
 	DefaultFlowDBDir = "/data/protocol"
-	// DefaultFlowPebbleDBDir is the default directory for the pebble database.
-	DefaultFlowPebbleDBDir = "/data/protocol-pebble"
 	// DefaultFlowSecretsDBDir is the default directory for secrets database.
 	DefaultFlowSecretsDBDir = "/data/secrets"
 	// DefaultExecutionRootDir is the default directory for the execution node state database.
@@ -137,7 +134,8 @@ const (
 )
 
 func init() {
-	testingdock.Verbose = true
+	// Set to true to turn on logs from docker containers (logs will be prefixed with "DOCK:")
+	testingdock.Verbose = false
 }
 
 // FlowNetwork represents a test network of Flow nodes running in Docker containers.
@@ -673,9 +671,9 @@ func (net *FlowNetwork) addConsensusFollower(t *testing.T, rootProtocolSnapshotP
 	tmpdir := makeTempSubDir(t, net.baseTempdir, "flow-consensus-follower")
 
 	// create a directory for the follower database
-	pebbleDir := makeDir(t, tmpdir, DefaultFlowPebbleDBDir)
+	dataDir := makeDir(t, tmpdir, DefaultFlowDBDir)
 
-	pebbleDB, _, err := database.InitPebbleDB(net.log, pebbleDir)
+	pebbleDB, _, err := database.InitPebbleDB(net.log, dataDir)
 	require.NoError(t, err)
 
 	// create a follower-specific directory for the bootstrap files
@@ -724,11 +722,11 @@ func (net *FlowNetwork) addConsensusFollower(t *testing.T, rootProtocolSnapshotP
 }
 
 func (net *FlowNetwork) StopContainerByName(ctx context.Context, containerName string) error {
-	container := net.ContainerByName(containerName)
-	if container == nil {
+	c := net.ContainerByName(containerName)
+	if c == nil {
 		return fmt.Errorf("%s container not found", containerName)
 	}
-	return net.cli.ContainerStop(ctx, container.ID, dockercontainer.StopOptions{})
+	return net.cli.ContainerStop(ctx, c.ID, container.StopOptions{})
 }
 
 type ObserverConfig struct {
@@ -1421,7 +1419,7 @@ func setupClusterGenesisBlockQCs(nClusters uint, epochCounter uint64, confs []Co
 	participants := participantsUnsorted.Sort(flow.Canonical[flow.Identity])
 	collectors := participants.Filter(filter.HasRole[flow.Identity](flow.RoleCollection)).ToSkeleton()
 	assignments := unittest.ClusterAssignment(nClusters, collectors)
-	clusters, err := factory.NewClusterList(assignments, collectors)
+	_, err := factory.NewClusterList(assignments, collectors)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("could not create cluster list: %w", err)
 	}
@@ -1429,27 +1427,27 @@ func setupClusterGenesisBlockQCs(nClusters uint, epochCounter uint64, confs []Co
 	rootBlocks := make([]*cluster.Block, 0, nClusters)
 	qcs := make([]*flow.QuorumCertificate, 0, nClusters)
 
-	for _, cluster := range clusters {
+	for _, assignment := range assignments {
 		// generate root cluster block
-		block, err := clusterstate.CanonicalRootBlock(epochCounter, cluster)
+		block, err := clusterstate.CanonicalRootBlock(epochCounter, assignment)
 		if err != nil {
 			return nil, nil, nil, fmt.Errorf("failed to generate canonical root block: %w", err)
 		}
 
 		lookup := make(map[flow.Identifier]struct{})
-		for _, node := range cluster {
-			lookup[node.NodeID] = struct{}{}
+		for _, nodeID := range assignment {
+			lookup[nodeID] = struct{}{}
 		}
 
 		// gather cluster participants
-		clusterNodeInfos := make([]bootstrap.NodeInfo, 0, len(cluster))
+		clusterNodeInfos := make([]bootstrap.NodeInfo, 0, len(assignment))
 		for _, conf := range confs {
 			_, exists := lookup[conf.NodeID]
 			if exists {
 				clusterNodeInfos = append(clusterNodeInfos, conf.NodeInfo)
 			}
 		}
-		if len(cluster) != len(clusterNodeInfos) { // sanity check
+		if len(assignment) != len(clusterNodeInfos) { // sanity check
 			return nil, nil, nil, fmt.Errorf("requiring a node info for each cluster participant")
 		}
 

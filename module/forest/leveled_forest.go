@@ -23,7 +23,7 @@ import (
 // LevelledForest is NOT safe for concurrent use by multiple goroutines.
 type LevelledForest struct {
 	vertices        VertexSet
-	verticesAtLevel map[uint64]VertexList
+	verticesAtLevel map[uint64]VertexList // by convention, `VertexList`s are append-only (and eventually garbage collected, upon pruning)
 	size            uint64
 	LowestLevel     uint64
 }
@@ -41,7 +41,7 @@ type VertexSet map[flow.Identifier]*vertexContainer
 type vertexContainer struct {
 	id       flow.Identifier
 	level    uint64
-	children VertexList
+	children VertexList // by convention, append only
 
 	// the following are only set if the block is actually known
 	vertex Vertex
@@ -136,14 +136,18 @@ func (f *LevelledForest) GetSize() uint64 {
 func (f *LevelledForest) GetChildren(id flow.Identifier) VertexIterator {
 	// if vertex does not exist, container will be nil
 	if container, ok := f.vertices[id]; ok {
+		// by design, the list of children is append-only.
 		return newVertexIterator(container.children)
 	}
 	return newVertexIterator(nil) // VertexIterator gracefully handles nil slices
 }
 
-// GetNumberOfChildren returns number of children of given vertex
+// GetNumberOfChildren returns the number of children of the given vertex that exist in the forest.
 func (f *LevelledForest) GetNumberOfChildren(id flow.Identifier) int {
-	container := f.vertices[id] // if vertex does not exist, container is the default zero value for vertexContainer, which contains a nil-slice for its children
+	container, ok := f.vertices[id]
+	if !ok {
+		return 0
+	}
 	num := 0
 	for _, child := range container.children {
 		if child.vertex != nil {

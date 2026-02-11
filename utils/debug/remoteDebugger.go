@@ -28,17 +28,13 @@ func NewRemoteDebugger(
 	// no signature processor here
 	// TODO Maybe we add fee-deduction step as well
 
-	ctx := fvm.NewContext(
-		append(
-			[]fvm.Option{
-				fvm.WithLogger(logger),
-				fvm.WithChain(chain),
-				fvm.WithAuthorizationChecksEnabled(false),
-				fvm.WithEVMEnabled(true),
-			},
-			options...,
-		)...,
-	)
+	ctx := fvm.NewContext(chain, append(
+		[]fvm.Option{
+			fvm.WithLogger(logger),
+			fvm.WithAuthorizationChecksEnabled(false),
+		},
+		options...,
+	)...)
 
 	return &RemoteDebugger{
 		ctx: ctx,

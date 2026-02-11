@@ -216,7 +216,7 @@ func createNodes(t *testing.T, participants *ConsensusParticipants, rootSnapshot
 			}
 		})
 
-	hub = NewNetworkHub()
+	hub = NewNetworkHub(unittest.Logger())
 	nodes = make([]*Node, 0, len(consensus))
 	for i, identity := range consensus {
 		consensusParticipant := participants.Lookup(identity.NodeID)
@@ -563,7 +563,7 @@ func createNode(
 
 	signer := verification.NewCombinedSigner(me, beaconKeyStore)
 
-	persist, err := persister.New(db, rootHeader.ChainID)
+	persist, err := persister.New(db, rootHeader.ChainID, lockManager)
 	require.NoError(t, err)
 
 	livenessData, err := persist.GetLivenessData()
@@ -668,7 +668,7 @@ func createNode(
 	)
 	require.NoError(t, err)
 
-	comp, err := compliance.NewEngine(log, me, compCore)
+	comp, err := compliance.NewEngine(log, me, compCore, hotstuffDistributor)
 	require.NoError(t, err)
 
 	identities, err := state.Final().Identities(filter.And(
@@ -681,6 +681,7 @@ func createNode(
 	spamConfig, err := synceng.NewSpamDetectionConfig()
 	require.NoError(t, err, "could not initialize spam detection config")
 
+	followerDistributor := pubsub.NewFollowerDistributor()
 	// initialize the synchronization engine
 	sync, err := synceng.New(
 		log,
@@ -693,6 +694,7 @@ func createNode(
 		syncCore,
 		idProvider,
 		spamConfig,
+		followerDistributor,
 		func(cfg *synceng.Config) {
 			// use a small pool and scan interval for sync engine
 			cfg.ScanInterval = 500 * time.Millisecond

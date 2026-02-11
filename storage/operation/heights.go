@@ -41,7 +41,7 @@ func RetrieveSealedHeight(r storage.Reader, height *uint64) error {
 // The first block of an epoch E is the finalized block with view >= E.FirstView.
 // Although we don't store the final height of an epoch, it can be inferred from this index.
 // The caller must hold [storage.LockFinalizeBlock]. This function enforces each index is written exactly once.
-// Returns storage.ErrAlreadyExists if the height has already been indexed.
+// Returns [storage.ErrAlreadyExists] if the height has already been indexed.
 func InsertEpochFirstHeight(lctx lockctx.Proof, rw storage.ReaderBatchWriter, epoch, height uint64) error {
 	if !lctx.HoldsLock(storage.LockFinalizeBlock) {
 		return fmt.Errorf("missing required lock: %s", storage.LockFinalizeBlock)

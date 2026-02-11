@@ -3,6 +3,7 @@ package operation_test
 import (
 	"testing"
 
+	"github.com/jordanschalm/lockctx"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -17,15 +18,16 @@ func TestStateCommitments(t *testing.T) {
 		lockManager := storage.NewTestingLockManager()
 		expected := unittest.StateCommitmentFixture()
 		id := unittest.IdentifierFixture()
-		lctx := lockManager.NewContext()
-		defer lctx.Release()
-		require.NoError(t, lctx.AcquireLock(storage.LockInsertOwnReceipt))
-		require.NoError(t, db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return operation.IndexStateCommitment(lctx, rw, id, expected)
-		}))
+
+		err := unittest.WithLock(t, lockManager, storage.LockIndexStateCommitment, func(lctx lockctx.Context) error {
+			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return operation.IndexStateCommitment(lctx, rw, id, expected)
+			})
+		})
+		require.NoError(t, err)
 
 		var actual flow.StateCommitment
-		err := operation.LookupStateCommitment(db.Reader(), id, &actual)
+		err = operation.LookupStateCommitment(db.Reader(), id, &actual)
 		require.Nil(t, err)
 		require.Equal(t, expected, actual)
 	})

@@ -31,13 +31,11 @@ func TestHeaderInsertCheckRetrieve(t *testing.T) {
 		blockID := expected.ID()
 
 		lockManager := storage.NewTestingLockManager()
-		lctx := lockManager.NewContext()
-		err := lctx.AcquireLock(storage.LockInsertBlock)
-		require.NoError(t, err)
-		defer lctx.Release()
 
-		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return operation.InsertHeader(lctx, rw, expected.ID(), expected)
+		err := unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
+			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return operation.InsertHeader(lctx, rw, expected.ID(), expected)
+			})
 		})
 		require.NoError(t, err)
 
@@ -55,8 +53,12 @@ func TestHeaderIDIndexByCollectionID(t *testing.T) {
 		headerID := unittest.IdentifierFixture()
 		collectionGuaranteeID := unittest.IdentifierFixture()
 
-		err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return operation.IndexBlockContainingCollectionGuarantee(rw.Writer(), collectionGuaranteeID, headerID)
+		lockManager := storage.NewTestingLockManager()
+
+		err := unittest.WithLock(t, lockManager, storage.LockIndexBlockByPayloadGuarantees, func(lctx lockctx.Context) error {
+			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return operation.BatchIndexBlockContainingCollectionGuarantees(lctx, rw, headerID, []flow.Identifier{collectionGuaranteeID})
+			})
 		})
 		require.NoError(t, err)
 
@@ -74,13 +76,11 @@ func TestBlockHeightIndexLookup(t *testing.T) {
 		expected := flow.Identifier{0x01, 0x02, 0x03}
 
 		lockManager := storage.NewTestingLockManager()
-		lctx := lockManager.NewContext()
-		err := lctx.AcquireLock(storage.LockFinalizeBlock)
-		require.NoError(t, err)
-		defer lctx.Release()
 
-		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return operation.IndexFinalizedBlockByHeight(lctx, rw, height, expected)
+		err := unittest.WithLock(t, lockManager, storage.LockFinalizeBlock, func(lctx lockctx.Context) error {
+			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return operation.IndexFinalizedBlockByHeight(lctx, rw, height, expected)
+			})
 		})
 		require.NoError(t, err)
 
@@ -100,14 +100,15 @@ func TestBlockViewIndexLookup(t *testing.T) {
 
 		lockManager := storage.NewTestingLockManager()
 
-		unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
+		err := unittest.WithLock(t, lockManager, storage.LockInsertBlock, func(lctx lockctx.Context) error {
 			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				return operation.IndexCertifiedBlockByView(lctx, rw, view, expected)
 			})
 		})
+		require.NoError(t, err)
 
 		var actual flow.Identifier
-		err := operation.LookupCertifiedBlockByView(db.Reader(), view, &actual)
+		err = operation.LookupCertifiedBlockByView(db.Reader(), view, &actual)
 		require.NoError(t, err)
 
 		assert.Equal(t, expected, actual)

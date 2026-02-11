@@ -17,6 +17,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/factory"
 	"github.com/onflow/flow-go/model/flow/filter"
+	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/mempool"
@@ -25,7 +26,7 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	module "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/network"
-	"github.com/onflow/flow-go/network/mocknetwork"
+	mocknetwork "github.com/onflow/flow-go/network/mock"
 	realprotocol "github.com/onflow/flow-go/state/protocol"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/storage"
@@ -73,7 +74,7 @@ func (suite *Suite) SetupTest() {
 	log := zerolog.New(io.Discard)
 	metrics := metrics.NewNoopCollector()
 
-	net := new(mocknetwork.Network)
+	net := new(mocknetwork.EngineRegistry)
 	suite.conduit = new(mocknetwork.Conduit)
 	net.On("Register", mock.Anything, mock.Anything).Return(suite.conduit, nil).Once()
 
@@ -256,6 +257,83 @@ func (suite *Suite) TestInvalidTransaction() {
 			suite.Assert().Error(err)
 			suite.Assert().True(errors.As(err, &validator.DuplicatedSignatureError{}))
 		})
+
+		suite.Run("missing payer signature", func() {
+			tx := unittest.TransactionBodyFixture()
+			tx.ReferenceBlockID = suite.root.ID()
+			tx.Payer = unittest.RandomAddressFixture()
+			tx.ProposalKey.Address = signer
+			tx.Authorizers = []flow.Address{signer}
+
+			tx.EnvelopeSignatures = []flow.TransactionSignature{sig1}
+
+			err := suite.engine.ProcessTransaction(&tx)
+
+			suite.Assert().True(errors.As(err, &validator.MissingSignatureError{}))
+			suite.Assert().Contains(err.Error(), "payer envelope signature is missing")
+		})
+
+		suite.Run("missing proposal signature", func() {
+			tx := unittest.TransactionBodyFixture()
+			tx.ReferenceBlockID = suite.root.ID()
+			tx.Payer = signer
+			tx.ProposalKey.Address = unittest.RandomAddressFixture()
+			tx.Authorizers = []flow.Address{signer}
+
+			tx.EnvelopeSignatures = []flow.TransactionSignature{sig1}
+
+			err := suite.engine.ProcessTransaction(&tx)
+
+			suite.Assert().True(errors.As(err, &validator.MissingSignatureError{}))
+			suite.Assert().Contains(err.Error(), "proposer signature on either payload or envelope is missing")
+		})
+
+		suite.Run("missing authorizer signature", func() {
+			tx := unittest.TransactionBodyFixture()
+			tx.ReferenceBlockID = suite.root.ID()
+			tx.Payer = signer
+			tx.ProposalKey.Address = signer
+			tx.Authorizers = []flow.Address{signer, unittest.RandomAddressFixture()}
+
+			tx.EnvelopeSignatures = []flow.TransactionSignature{sig1}
+
+			err := suite.engine.ProcessTransaction(&tx)
+
+			suite.Assert().True(errors.As(err, &validator.MissingSignatureError{}))
+			suite.Assert().Contains(err.Error(), "authorizer signature on either payload or envelope is missing")
+		})
+
+		suite.Run("unrelated signature (envelope only)", func() {
+			tx := unittest.TransactionBodyFixture()
+			tx.ReferenceBlockID = suite.root.ID()
+			tx.Payer = signer
+			tx.ProposalKey.Address = signer
+			tx.Authorizers = []flow.Address{signer}
+
+			unrelatedSig := unittest.TransactionSignatureFixture()
+			unrelatedSig.Address = unittest.RandomAddressFixture() // unrelated address
+			tx.EnvelopeSignatures = []flow.TransactionSignature{sig1, unrelatedSig}
+
+			err := suite.engine.ProcessTransaction(&tx)
+			suite.Assert().Error(err)
+			suite.Assert().True(errors.As(err, &validator.UnrelatedAccountSignatureError{}))
+		})
+
+		suite.Run("unrelated signature (payload only)", func() {
+			tx := unittest.TransactionBodyFixture()
+			tx.ReferenceBlockID = suite.root.ID()
+			tx.Payer = signer
+			tx.ProposalKey.Address = signer
+			tx.Authorizers = []flow.Address{signer}
+
+			unrelatedSig := unittest.TransactionSignatureFixture()
+			unrelatedSig.Address = unittest.RandomAddressFixture() // unrelated address
+			tx.PayloadSignatures = []flow.TransactionSignature{sig1, unrelatedSig}
+
+			err := suite.engine.ProcessTransaction(&tx)
+			suite.Assert().Error(err)
+			suite.Assert().True(errors.As(err, &validator.UnrelatedAccountSignatureError{}))
+		})
 	})
 
 	suite.Run("invalid signature", func() {
@@ -320,7 +398,7 @@ func (suite *Suite) TestRoutingLocalCluster() {
 
 	// should route to local cluster
 	suite.conduit.
-		On("Multicast", &tx, suite.conf.PropagationRedundancy+1, local.NodeIDs()[0], local.NodeIDs()[1]).
+		On("Multicast", (*messages.TransactionBody)(&tx), suite.conf.PropagationRedundancy+1, local.NodeIDs()[0], local.NodeIDs()[1]).
 		Return(nil)
 
 	err := suite.engine.ProcessTransaction(&tx)
@@ -350,7 +428,7 @@ func (suite *Suite) TestRoutingRemoteCluster() {
 
 	// should route to remote cluster
 	suite.conduit.
-		On("Multicast", &tx, suite.conf.PropagationRedundancy+1, remote[0].NodeID, remote[1].NodeID).
+		On("Multicast", (*messages.TransactionBody)(&tx), suite.conf.PropagationRedundancy+1, remote[0].NodeID, remote[1].NodeID).
 		Return(nil)
 
 	err := suite.engine.ProcessTransaction(&tx)
@@ -383,7 +461,7 @@ func (suite *Suite) TestRoutingToRemoteClusterWithNoNodes() {
 
 	// should attempt route to remote cluster without providing any node ids
 	suite.conduit.
-		On("Multicast", &tx, suite.conf.PropagationRedundancy+1).
+		On("Multicast", (*messages.TransactionBody)(&tx), suite.conf.PropagationRedundancy+1).
 		Return(network.EmptyTargetList)
 
 	err := suite.engine.ProcessTransaction(&tx)
@@ -479,7 +557,7 @@ func (suite *Suite) TestRouting_ClusterAssignmentChanged() {
 	tx = unittest.AlterTransactionForCluster(tx, epoch2Clusters, epoch2Local, func(transaction *flow.TransactionBody) {})
 
 	// should route to local cluster
-	suite.conduit.On("Multicast", &tx, suite.conf.PropagationRedundancy+1, epoch2Local.NodeIDs()[0], epoch2Local.NodeIDs()[1]).Return(nil).Once()
+	suite.conduit.On("Multicast", (*messages.TransactionBody)(&tx), suite.conf.PropagationRedundancy+1, epoch2Local.NodeIDs()[0], epoch2Local.NodeIDs()[1]).Return(nil).Once()
 
 	err := suite.engine.ProcessTransaction(&tx)
 	suite.Assert().NoError(err)
@@ -586,7 +664,7 @@ func (suite *Suite) TestRouting_ClusterAssignmentAdded() {
 	tx = unittest.AlterTransactionForCluster(tx, epoch3Clusters, epoch3Local, func(transaction *flow.TransactionBody) {})
 
 	// should route to local cluster
-	suite.conduit.On("Multicast", &tx, suite.conf.PropagationRedundancy+1, epoch3Local.NodeIDs()[0], epoch3Local.NodeIDs()[1]).Return(nil).Once()
+	suite.conduit.On("Multicast", (*messages.TransactionBody)(&tx), suite.conf.PropagationRedundancy+1, epoch3Local.NodeIDs()[0], epoch3Local.NodeIDs()[1]).Return(nil).Once()
 
 	err = suite.engine.ProcessTransaction(&tx)
 	suite.Assert().NoError(err)

@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
-	_ "github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
@@ -20,7 +19,7 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/network/channels"
-	"github.com/onflow/flow-go/network/mocknetwork"
+	mocknetwork "github.com/onflow/flow-go/network/mock"
 	mockprotocol "github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -28,7 +27,7 @@ import (
 func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 
 	t.Run("non-existent chunk", func(t *testing.T) {
-		net := mocknetwork.NewNetwork(t)
+		net := mocknetwork.NewEngineRegistry(t)
 		chunkConduit := mocknetwork.NewConduit(t)
 		net.On("Register", channels.PushReceipts, mock.Anything).Return(&mocknetwork.Conduit{}, nil)
 		net.On("Register", channels.ProvideChunks, mock.Anything).Return(chunkConduit, nil)
@@ -40,7 +39,7 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 
 		chunkID := unittest.IdentifierFixture()
 
-		req := &messages.ChunkDataRequest{
+		req := &flow.ChunkDataRequest{
 			ChunkID: chunkID,
 			Nonce:   rand.Uint64(),
 		}
@@ -66,7 +65,7 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 	})
 
 	t.Run("success", func(t *testing.T) {
-		net := mocknetwork.NewNetwork(t)
+		net := mocknetwork.NewEngineRegistry(t)
 		chunkConduit := &mocknetwork.Conduit{}
 		net.On("Register", channels.PushReceipts, mock.Anything).Return(&mocknetwork.Conduit{}, nil)
 		net.On("Register", channels.ProvideChunks, mock.Anything).Return(chunkConduit, nil)
@@ -89,7 +88,7 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 
 		es.On("ChunkDataPackByChunkID", chunkID).Return(chunkDataPack, nil)
 
-		req := &messages.ChunkDataRequest{
+		req := &flow.ChunkDataRequest{
 			ChunkID: chunkID,
 			Nonce:   rand.Uint64(),
 		}
@@ -115,7 +114,7 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 
 func TestProviderEngine_BroadcastExecutionReceipt(t *testing.T) {
 	// prepare
-	net := mocknetwork.NewNetwork(t)
+	net := mocknetwork.NewEngineRegistry(t)
 	chunkConduit := mocknetwork.NewConduit(t)
 	receiptConduit := mocknetwork.NewConduit(t)
 	net.On("Register", channels.PushReceipts, mock.Anything).Return(receiptConduit, nil)
@@ -135,7 +134,8 @@ func TestProviderEngine_BroadcastExecutionReceipt(t *testing.T) {
 
 	// verify that above the sealed height will be broadcasted
 	receipt1 := unittest.ExecutionReceiptFixture()
-	receiptConduit.On("Publish", receipt1, receivers.NodeIDs()[0]).Return(nil)
+	receipt1Msg := (*messages.ExecutionReceipt)(receipt1)
+	receiptConduit.On("Publish", receipt1Msg, receivers.NodeIDs()[0]).Return(nil)
 
 	broadcasted, err := e.BroadcastExecutionReceipt(context.Background(), sealedHeight+1, receipt1)
 	require.NoError(t, err)
@@ -154,7 +154,7 @@ func TestProviderEngine_BroadcastExecutionReceipt(t *testing.T) {
 }
 
 func TestProviderEngine_BroadcastExecutionUnauthorized(t *testing.T) {
-	net := mocknetwork.NewNetwork(t)
+	net := mocknetwork.NewEngineRegistry(t)
 	chunkConduit := mocknetwork.NewConduit(t)
 	receiptConduit := mocknetwork.NewConduit(t)
 	net.On("Register", channels.PushReceipts, mock.Anything).Return(receiptConduit, nil)
@@ -176,7 +176,7 @@ func TestProviderEngine_BroadcastExecutionUnauthorized(t *testing.T) {
 	require.False(t, broadcasted)
 }
 
-func newTestEngine(t *testing.T, net *mocknetwork.Network, authorized bool) (
+func newTestEngine(t *testing.T, net *mocknetwork.EngineRegistry, authorized bool) (
 	*Engine,
 	*mockprotocol.State,
 	*state.ExecutionState,
@@ -184,6 +184,10 @@ func newTestEngine(t *testing.T, net *mocknetwork.Network, authorized bool) (
 ) {
 	ps := mockprotocol.NewState(t)
 	execState := state.NewExecutionState(t)
+	// CAUTION: the HeroStore fifo queue is NOT BFT. It should be used for messages from trusted sources only!
+	// In the requester engine, the injected fifo queue is used to hold [flow.EntityResponse] messages from other
+	// potentially byzantine peers. In PRODUCTION, you can NOT use a HeroStore here. However, for testing we
+	// use the HeroStore for its better performance (reduced GC load on the maxed-out testing server).
 	requestQueue := queue.NewHeroStore(10, unittest.Logger(), metrics.NewNoopCollector())
 
 	e, err := New(

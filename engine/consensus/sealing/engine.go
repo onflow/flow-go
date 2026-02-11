@@ -6,12 +6,12 @@ import (
 	"github.com/gammazero/workerpool"
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/common/fifoqueue"
 	"github.com/onflow/flow-go/engine/consensus"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
@@ -106,6 +106,7 @@ func NewEngine(log zerolog.Logger,
 	assigner module.ChunkAssigner,
 	sealsMempool mempool.IncorporatedResultSeals,
 	requiredApprovalsForSealConstructionGetter module.SealingConfigsGetter,
+	registrar hotstuff.FinalizationRegistrar,
 ) (*Engine, error) {
 	rootHeader := state.Params().FinalizedRoot()
 
@@ -157,6 +158,10 @@ func NewEngine(log zerolog.Logger,
 		return nil, fmt.Errorf("could not repopulate assignment collectors tree: %w", err)
 	}
 	e.core = core
+
+	registrar.AddOnBlockFinalizedConsumer(e.onFinalizedBlock)
+
+	registrar.AddOnBlockIncorporatedConsumer(e.onBlockIncorporated)
 
 	return e, nil
 }
@@ -256,7 +261,7 @@ func (e *Engine) setupMessageHandler(getSealingConfigs module.SealingConfigsGett
 		},
 		engine.Pattern{
 			Match: func(msg *engine.Message) bool {
-				_, ok := msg.Payload.(*messages.ApprovalResponse)
+				_, ok := msg.Payload.(*flow.ApprovalResponse)
 				if ok {
 					e.engineMetrics.MessageReceived(metrics.EngineSealing, metrics.MessageResultApproval)
 				}
@@ -268,7 +273,7 @@ func (e *Engine) setupMessageHandler(getSealingConfigs module.SealingConfigsGett
 					return nil, false
 				}
 
-				approval := msg.Payload.(*messages.ApprovalResponse).Approval
+				approval := msg.Payload.(*flow.ApprovalResponse).Approval
 				return &engine.Message{
 					OriginID: msg.OriginID,
 					Payload:  &approval,
@@ -329,7 +334,11 @@ func (e *Engine) processAvailableMessages(ctx irrecoverable.SignalerContext) err
 		if ok {
 			e.log.Debug().Msg("got new result approval")
 
-			err := e.onApproval(msg.OriginID, msg.Payload.(*flow.ResultApproval))
+			ra, ok := msg.Payload.(*flow.ResultApproval)
+			if !ok {
+				return irrecoverable.NewExceptionf("unexpected approval payload type %T; expected *flow.ResultApproval", msg.Payload)
+			}
+			err := e.onApproval(msg.OriginID, ra)
 			if err != nil {
 				return fmt.Errorf("could not process result approval: %w", err)
 			}
@@ -428,21 +437,21 @@ func (e *Engine) onApproval(originID flow.Identifier, approval *flow.ResultAppro
 	return nil
 }
 
-// OnFinalizedBlock implements the `OnFinalizedBlock` callback from the `hotstuff.FinalizationConsumer`
+// onFinalizedBlock implements the `OnFinalizedBlock` callback from the `hotstuff.FinalizationConsumer`
 // It informs sealing.Core about finalization of respective block.
 //
 // CAUTION: the input to this callback is treated as trusted; precautions should be taken that messages
 // from external nodes cannot be considered as inputs to this function
-func (e *Engine) OnFinalizedBlock(*model.Block) {
+func (e *Engine) onFinalizedBlock(*model.Block) {
 	e.finalizationEventsNotifier.Notify()
 }
 
-// OnBlockIncorporated implements `OnBlockIncorporated` from the `hotstuff.FinalizationConsumer`
+// onBlockIncorporated implements `OnBlockIncorporated` from the `hotstuff.FinalizationConsumer`
 // It processes all execution results that were incorporated in parent block payload.
 //
 // CAUTION: the input to this callback is treated as trusted; precautions should be taken that messages
 // from external nodes cannot be considered as inputs to this function
-func (e *Engine) OnBlockIncorporated(incorporatedBlock *model.Block) {
+func (e *Engine) onBlockIncorporated(incorporatedBlock *model.Block) {
 	added := e.pendingIncorporatedBlocks.Push(incorporatedBlock.BlockID)
 	if !added {
 		// Not being able to queue an incorporated block is a fatal edge case. It might happen, if the

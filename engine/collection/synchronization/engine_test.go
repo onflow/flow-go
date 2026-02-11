@@ -20,12 +20,11 @@ import (
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module/chainsync"
-	synccore "github.com/onflow/flow-go/module/chainsync"
 	"github.com/onflow/flow-go/module/metrics"
 	module "github.com/onflow/flow-go/module/mock"
 	netint "github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
-	"github.com/onflow/flow-go/network/mocknetwork"
+	mocknetwork "github.com/onflow/flow-go/network/mock"
 	clusterint "github.com/onflow/flow-go/state/cluster"
 	cluster "github.com/onflow/flow-go/state/cluster/mock"
 	storerr "github.com/onflow/flow-go/storage"
@@ -44,7 +43,7 @@ type SyncSuite struct {
 	head         *flow.Header
 	heights      map[uint64]*clustermodel.Proposal
 	blockIDs     map[flow.Identifier]*clustermodel.Proposal
-	net          *mocknetwork.Network
+	net          *mocknetwork.EngineRegistry
 	con          *mocknetwork.Conduit
 	me           *module.Local
 	state        *cluster.State
@@ -72,7 +71,7 @@ func (ss *SyncSuite) SetupTest() {
 	clusterID := header.ChainID
 
 	// set up the network module mock
-	ss.net = &mocknetwork.Network{}
+	ss.net = &mocknetwork.EngineRegistry{}
 	ss.net.On("Register", channels.SyncCluster(clusterID), mock.Anything).Return(
 		func(network channels.Channel, engine netint.MessageProcessor) netint.Conduit {
 			return ss.con
@@ -81,7 +80,7 @@ func (ss *SyncSuite) SetupTest() {
 	)
 
 	// set up the network conduit mock
-	ss.con = &mocknetwork.Conduit{}
+	ss.con = mocknetwork.NewConduit(ss.T())
 
 	// set up the local module mock
 	ss.me = &module.Local{}
@@ -161,7 +160,7 @@ func (ss *SyncSuite) SetupTest() {
 func (ss *SyncSuite) TestOnSyncRequest() {
 	// generate origin and request message
 	originID := unittest.IdentifierFixture()
-	req := &messages.SyncRequest{
+	req := &flow.SyncRequest{
 		Nonce:  rand.Uint64(),
 		Height: 0,
 	}
@@ -205,7 +204,7 @@ func (ss *SyncSuite) TestOnSyncRequest() {
 func (ss *SyncSuite) TestOnSyncResponse() {
 	// generate origin ID and response message
 	originID := unittest.IdentifierFixture()
-	res := &messages.SyncResponse{
+	res := &flow.SyncResponse{
 		Nonce:  rand.Uint64(),
 		Height: rand.Uint64(),
 	}
@@ -219,7 +218,7 @@ func (ss *SyncSuite) TestOnSyncResponse() {
 func (ss *SyncSuite) TestOnRangeRequest() {
 	// generate originID and range request
 	originID := unittest.IdentifierFixture()
-	req := &messages.RangeRequest{
+	req := &flow.RangeRequest{
 		Nonce:      rand.Uint64(),
 		FromHeight: 0,
 		ToHeight:   0,
@@ -281,10 +280,12 @@ func (ss *SyncSuite) TestOnRangeRequest() {
 		ss.con.On("Unicast", mock.Anything, mock.Anything).Return(nil).Once().Run(
 			func(args mock.Arguments) {
 				res := args.Get(0).(*messages.ClusterBlockResponse)
-				expected := []*clustermodel.Proposal{ss.heights[ref-2], ss.heights[ref-1], ss.heights[ref]}
-				actual, err := res.BlocksInternal()
+				expected := []clustermodel.Proposal{*ss.heights[ref-2], *ss.heights[ref-1], *ss.heights[ref]}
+				internal, err := res.ToInternal()
 				require.NoError(t, err)
-				assert.ElementsMatch(ss.T(), expected, actual, "response should contain right blocks")
+				actual, ok := internal.(*clustermodel.BlockResponse)
+				require.True(t, ok)
+				assert.ElementsMatch(ss.T(), expected, actual.Blocks, "response should contain right blocks")
 				assert.Equal(ss.T(), req.Nonce, res.Nonce, "response should contain request nonce")
 				recipientID := args.Get(1).(flow.Identifier)
 				assert.Equal(ss.T(), originID, recipientID, "should send response to original requester")
@@ -303,10 +304,12 @@ func (ss *SyncSuite) TestOnRangeRequest() {
 		ss.con.On("Unicast", mock.Anything, mock.Anything).Return(nil).Once().Run(
 			func(args mock.Arguments) {
 				res := args.Get(0).(*messages.ClusterBlockResponse)
-				expected := []*clustermodel.Proposal{ss.heights[ref-2], ss.heights[ref-1], ss.heights[ref]}
-				actual, err := res.BlocksInternal()
+				expected := []clustermodel.Proposal{*ss.heights[ref-2], *ss.heights[ref-1], *ss.heights[ref]}
+				internal, err := res.ToInternal()
 				require.NoError(t, err)
-				assert.ElementsMatch(ss.T(), expected, actual, "response should contain right blocks")
+				actual, ok := internal.(*clustermodel.BlockResponse)
+				require.True(t, ok)
+				assert.ElementsMatch(ss.T(), expected, actual.Blocks, "response should contain right blocks")
 				assert.Equal(ss.T(), req.Nonce, res.Nonce, "response should contain request nonce")
 				recipientID := args.Get(1).(flow.Identifier)
 				assert.Equal(ss.T(), originID, recipientID, "should send response to original requester")
@@ -327,10 +330,12 @@ func (ss *SyncSuite) TestOnRangeRequest() {
 		ss.con.On("Unicast", mock.Anything, mock.Anything).Return(nil).Once().Run(
 			func(args mock.Arguments) {
 				res := args.Get(0).(*messages.ClusterBlockResponse)
-				expected := []*clustermodel.Proposal{ss.heights[ref-4], ss.heights[ref-3], ss.heights[ref-2]}
-				actual, err := res.BlocksInternal()
+				expected := []clustermodel.Proposal{*ss.heights[ref-4], *ss.heights[ref-3], *ss.heights[ref-2]}
+				internal, err := res.ToInternal()
 				require.NoError(t, err)
-				assert.ElementsMatch(ss.T(), expected, actual, "response should contain right blocks")
+				actual, ok := internal.(*clustermodel.BlockResponse)
+				require.True(t, ok)
+				assert.ElementsMatch(ss.T(), expected, actual.Blocks, "response should contain right blocks")
 				assert.Equal(ss.T(), req.Nonce, res.Nonce, "response should contain request nonce")
 				recipientID := args.Get(1).(flow.Identifier)
 				assert.Equal(ss.T(), originID, recipientID, "should send response to original requester")
@@ -355,7 +360,7 @@ func (ss *SyncSuite) TestOnRangeRequest() {
 func (ss *SyncSuite) TestOnBatchRequest() {
 	// generate origin ID and batch request
 	originID := unittest.IdentifierFixture()
-	req := &messages.BatchRequest{
+	req := &flow.BatchRequest{
 		Nonce:    rand.Uint64(),
 		BlockIDs: nil,
 	}
@@ -414,9 +419,11 @@ func (ss *SyncSuite) TestOnBatchRequest() {
 		ss.con.On("Unicast", mock.Anything, mock.Anything).Return(nil).Once().Run(
 			func(args mock.Arguments) {
 				res := args.Get(0).(*messages.ClusterBlockResponse)
-				proposals, err := res.BlocksInternal()
+				internal, err := res.ToInternal()
 				require.NoError(t, err)
-				assert.ElementsMatch(ss.T(), []*clustermodel.Proposal{ss.blockIDs[req.BlockIDs[0]], ss.blockIDs[req.BlockIDs[1]]}, proposals, "response should contain right block")
+				proposals, ok := internal.(*clustermodel.BlockResponse)
+				require.True(t, ok)
+				assert.ElementsMatch(ss.T(), []clustermodel.Proposal{*ss.blockIDs[req.BlockIDs[0]], *ss.blockIDs[req.BlockIDs[1]]}, proposals.Blocks, "response should contain right block")
 				assert.Equal(ss.T(), req.Nonce, res.Nonce, "response should contain request nonce")
 				recipientID := args.Get(1).(flow.Identifier)
 				assert.Equal(ss.T(), originID, recipientID, "response should be send to original requester")
@@ -439,20 +446,17 @@ func (ss *SyncSuite) TestOnBatchRequest() {
 }
 
 func (ss *SyncSuite) TestOnBlockResponse() {
-
 	// generate origin and block response
 	originID := unittest.IdentifierFixture()
-	var res []*clustermodel.Proposal
 
+	response := unittest.ClusterBlockResponseFixture(2)
 	// add one block that should be processed
-	processable := unittest.ClusterProposalFixture()
+	processable := response.Blocks[0]
 	ss.core.On("HandleBlock", processable.Block.ToHeader()).Return(true)
-	res = append(res, processable)
 
 	// add one block that should not be processed
-	unprocessable := unittest.ClusterProposalFixture()
+	unprocessable := response.Blocks[1]
 	ss.core.On("HandleBlock", unprocessable.Block.ToHeader()).Return(false)
-	res = append(res, unprocessable)
 
 	ss.comp.On("OnSyncedClusterBlock", mock.Anything).Run(func(args mock.Arguments) {
 		res := args.Get(0).(flow.Slashable[*clustermodel.Proposal])
@@ -461,7 +465,7 @@ func (ss *SyncSuite) TestOnBlockResponse() {
 		ss.Assert().Equal(originID, res.OriginID)
 	}).Return(nil)
 
-	ss.e.onBlockResponse(originID, res)
+	ss.e.onBlockResponse(originID, response)
 	ss.comp.AssertExpectations(ss.T())
 	ss.core.AssertExpectations(ss.T())
 }
@@ -475,9 +479,9 @@ func (ss *SyncSuite) TestOnInvalidBlockResponse() {
 	proposal := unittest.ClusterProposalFixture()
 	proposal.ProposerSigData = nil // invalid value
 
-	req := &messages.ClusterBlockResponse{
+	req := &clustermodel.BlockResponse{
 		Nonce:  0,
-		Blocks: []clustermodel.UntrustedProposal{clustermodel.UntrustedProposal(*proposal)},
+		Blocks: []clustermodel.Proposal{*proposal},
 	}
 
 	// Expect metrics to track message receipt and message drop for invalid block proposal
@@ -497,7 +501,7 @@ func (ss *SyncSuite) TestPollHeight() {
 
 	// check that we send to three nodes from our total list
 	others := ss.participants.Filter(filter.HasNodeID[flow.Identity](ss.participants[1:].NodeIDs()...))
-	ss.con.On("Multicast", mock.Anything, synccore.DefaultPollNodes, others[0].NodeID, others[1].NodeID).Return(nil).Run(
+	ss.con.On("Multicast", mock.Anything, chainsync.DefaultPollNodes, others[0].NodeID, others[1].NodeID).Return(nil).Run(
 		func(args mock.Arguments) {
 			req := args.Get(0).(*messages.SyncRequest)
 			require.Equal(ss.T(), ss.head.Height, req.Height, "request should contain finalized height")
@@ -515,7 +519,7 @@ func (ss *SyncSuite) TestSendRequests() {
 	batches := unittest.BatchListFixture(1)
 
 	// should submit and mark requested all ranges
-	ss.con.On("Multicast", mock.AnythingOfType("*messages.RangeRequest"), synccore.DefaultBlockRequestNodes, mock.Anything, mock.Anything).Return(nil).Run(
+	ss.con.On("Multicast", mock.AnythingOfType("*messages.RangeRequest"), chainsync.DefaultBlockRequestNodes, mock.Anything, mock.Anything).Return(nil).Run(
 		func(args mock.Arguments) {
 			req := args.Get(0).(*messages.RangeRequest)
 			ss.Assert().Equal(ranges[0].From, req.FromHeight)
@@ -525,7 +529,7 @@ func (ss *SyncSuite) TestSendRequests() {
 	ss.core.On("RangeRequested", ranges[0])
 
 	// should submit and mark requested all batches
-	ss.con.On("Multicast", mock.AnythingOfType("*messages.BatchRequest"), synccore.DefaultBlockRequestNodes, mock.Anything, mock.Anything, mock.Anything).Return(nil).Run(
+	ss.con.On("Multicast", mock.AnythingOfType("*messages.BatchRequest"), chainsync.DefaultBlockRequestNodes, mock.Anything, mock.Anything, mock.Anything).Return(nil).Run(
 		func(args mock.Arguments) {
 			req := args.Get(0).(*messages.BatchRequest)
 			ss.Assert().Equal(batches[0].BlockIDs, req.BlockIDs)
@@ -545,6 +549,8 @@ func (ss *SyncSuite) TestSendRequests() {
 func (ss *SyncSuite) TestStartStop() {
 	unittest.AssertReturnsBefore(ss.T(), func() {
 		<-ss.e.Ready()
+		// require the conduit is closed on stop
+		ss.con.On("Close").Return(nil).Once()
 		<-ss.e.Done()
 	}, time.Second)
 }
@@ -555,7 +561,7 @@ func (ss *SyncSuite) TestProcessingMultipleItems() {
 
 	originID := unittest.IdentifierFixture()
 	for i := 0; i < 5; i++ {
-		msg := &messages.SyncResponse{
+		msg := &flow.SyncResponse{
 			Nonce:  uint64(i),
 			Height: uint64(1000 + i),
 		}
@@ -568,7 +574,7 @@ func (ss *SyncSuite) TestProcessingMultipleItems() {
 
 	finalHeight := ss.head.Height
 	for i := 0; i < 5; i++ {
-		msg := &messages.SyncRequest{
+		msg := &flow.SyncRequest{
 			Nonce:  uint64(i),
 			Height: finalHeight - 100,
 		}

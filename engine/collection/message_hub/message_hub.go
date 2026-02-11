@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -166,16 +167,29 @@ func NewMessageHub(log zerolog.Logger,
 	}
 	hub.con = conduit
 
+	var workers sync.WaitGroup
 	componentBuilder := component.NewComponentManagerBuilder()
 	// This implementation tolerates if the networking layer sometimes blocks on send requests.
 	// We use by default 5 go-routines here. This is fine, because outbound messages are temporally sparse
 	// under normal operations. Hence, the go-routines should mostly be asleep waiting for work.
 	for i := 0; i < defaultMessageHubRequestsWorkers; i++ {
+		workers.Add(1)
 		componentBuilder.AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+			defer workers.Done()
 			ready()
 			hub.queuedMessagesProcessingLoop(ctx)
 		})
 	}
+	componentBuilder.AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+		ready()
+		// ensure we clean up the network Conduit when shutting down
+		workers.Wait()
+		// close the network conduit
+		err := hub.con.Close()
+		if err != nil {
+			ctx.Throw(fmt.Errorf("could not close network conduit: %w", err))
+		}
+	})
 	hub.ComponentManager = componentBuilder.Build()
 	return hub, nil
 }
@@ -255,13 +269,7 @@ func (h *MessageHub) sendOwnTimeout(timeout *model.TimeoutObject) error {
 		return fmt.Errorf("could not get cluster members for broadcasting timeout: %w", err)
 	}
 	// create the timeout message
-	msg := &messages.ClusterTimeoutObject{
-		View:        timeout.View,
-		NewestQC:    timeout.NewestQC,
-		LastViewTC:  timeout.LastViewTC,
-		SigData:     timeout.SigData,
-		TimeoutTick: timeout.TimeoutTick,
-	}
+	msg := (*messages.ClusterTimeoutObject)(timeout)
 
 	err = h.con.Publish(msg, recipients.NodeIDs()...)
 	if err != nil {
@@ -343,16 +351,17 @@ func (h *MessageHub) sendOwnProposal(proposal *flow.ProposalHeader) error {
 	}
 
 	// create the proposal message for the collection
-	proposalMsg := &cluster.UntrustedProposal{
+	blockProposal := &cluster.UntrustedProposal{
 		Block:           *block,
 		ProposerSigData: proposal.ProposerSigData,
 	}
-	if _, err = cluster.NewProposal(*proposalMsg); err != nil {
+	if _, err = cluster.NewProposal(*blockProposal); err != nil {
 		return fmt.Errorf("could not build cluster proposal: %w", err)
 	}
 
+	message := (*messages.ClusterProposal)(blockProposal)
 	// broadcast the proposal to consensus nodes
-	err = h.con.Publish(proposalMsg, recipients.NodeIDs()...)
+	err = h.con.Publish(message, recipients.NodeIDs()...)
 	if err != nil {
 		if !errors.Is(err, network.EmptyTargetList) {
 			log.Err(err).Msg("could not send proposal message")
@@ -442,23 +451,12 @@ func (h *MessageHub) OnOwnProposal(proposal *flow.ProposalHeader, targetPublicat
 // messages. These cases must be logged and routed to a dedicated violation reporting consumer.
 func (h *MessageHub) Process(channel channels.Channel, originID flow.Identifier, message interface{}) error {
 	switch msg := message.(type) {
-	case *cluster.UntrustedProposal:
-		proposal, err := cluster.NewProposal(*msg)
-		if err != nil {
-			// TODO(BFT, #7620): Replace this log statement with a call to the protocol violation consumer.
-			h.log.Warn().
-				Hex("origin_id", originID[:]).
-				Hex("block_id", logging.ID(msg.Block.ID())).
-				Uint64("block_height", msg.Block.Height).
-				Uint64("block_view", msg.Block.View).
-				Err(err).Msgf("received invalid cluster proposal message")
-			return nil
-		}
+	case *cluster.Proposal:
 		h.compliance.OnClusterBlockProposal(flow.Slashable[*cluster.Proposal]{
 			OriginID: originID,
-			Message:  proposal,
+			Message:  msg,
 		})
-	case *messages.ClusterBlockVote:
+	case *flow.BlockVote:
 		vote, err := model.NewVote(model.UntrustedVote{
 			View:     msg.View,
 			BlockID:  msg.BlockID,
@@ -476,32 +474,8 @@ func (h *MessageHub) Process(channel channels.Channel, originID flow.Identifier,
 		}
 
 		h.forwardToOwnVoteAggregator(vote)
-	case *messages.ClusterTimeoutObject:
-		t, err := model.NewTimeoutObject(
-			model.UntrustedTimeoutObject{
-				View:        msg.View,
-				NewestQC:    msg.NewestQC,
-				LastViewTC:  msg.LastViewTC,
-				SignerID:    originID,
-				SigData:     msg.SigData,
-				TimeoutTick: msg.TimeoutTick,
-			},
-		)
-		if err != nil {
-			// TODO(BFT, #7620): Replace this log statement with a call to the protocol violation consumer.
-			h.log.Warn().
-				Hex("origin_id", originID[:]).
-				Uint64("view", msg.View).
-				Uint64("newest_qc_view", msg.NewestQC.View).
-				Hex("newest_qc_block_id", logging.ID(msg.NewestQC.BlockID)).
-				Uint64("last_view_tc_view", msg.LastViewTC.View).
-				Uint64("last_view_tc_newest_qc_view", msg.LastViewTC.NewestQC.View).
-				Hex("last_view_tc_newest_qc_block_id", logging.ID(msg.LastViewTC.NewestQC.BlockID)).
-				Uint64("timeout_tick", msg.TimeoutTick).
-				Err(err).Msgf("received invalid cluster timeout object message")
-			return nil
-		}
-		h.forwardToOwnTimeoutAggregator(t)
+	case *model.TimeoutObject:
+		h.forwardToOwnTimeoutAggregator(msg)
 	default:
 		h.log.Warn().
 			Bool(logging.KeySuspicious, true).
