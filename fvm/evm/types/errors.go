@@ -120,6 +120,10 @@ var (
 	// ErrEmptyRLPEncodedProof is returned when the RLP encoded COA Ownership proof is
 	// an empty list
 	ErrEmptyRLPEncodedProof = errors.New("invalid encoded proof: expected list with key indices, got empty list")
+
+	// ErrUnexpectedEmptyTransactionData is returned when empty transaction data is received.
+	// This should never happen and is a safety error.
+	ErrUnexpectedEmptyTransactionData = errors.New("unexpected empty transaction data has been received")
 )
 
 // StateError is a non-fatal error, returned when a state operation
