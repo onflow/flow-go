@@ -170,6 +170,10 @@ This codebase implements a production blockchain protocol with high security and
 
 ## Relevant External Repos
 
+Flow Protobuf: https://github.com/onflow/flow/protobuf/go/flow
+OpenAPI Specs: https://github.com/onflow/flow/openapi
+Flow SDK: https://github.com/onflow/flow-go-sdk
 Flow Core Contracts: https://github.com/onflow/flow-core-contracts
 FungibleToken Contracts: https://github.com/onflow/flow-ft
 NonFungibleToken Contracts: https://github.com/onflow/flow-nft
+Cadence: https://github.com/onflow/cadence
