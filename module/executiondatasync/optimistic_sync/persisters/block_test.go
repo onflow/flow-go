@@ -46,12 +46,18 @@ func (p *PersisterSuite) SetupTest() {
 	p.header = block.ToHeader()
 	p.executionResult = g.ExecutionResults().Fixture(fixtures.ExecutionResult.WithBlock(block))
 
+	scheduledTransactions := make(map[flow.Identifier]uint64, 5)
+	for range 5 {
+		scheduledTransactions[g.Identifiers().Fixture()] = g.Random().Uint64()
+	}
+
 	p.indexerData = &indexer.IndexerData{
-		Events:       g.Events().List(5),
-		Collections:  g.Collections().List(2),
-		Transactions: g.Transactions().List(2),
-		Results:      g.LightTransactionResults().List(4),
-		Registers:    g.RegisterEntries().List(3),
+		Events:                g.Events().List(5),
+		Collections:           g.Collections().List(2),
+		Transactions:          g.Transactions().List(2),
+		Results:               g.LightTransactionResults().List(4),
+		Registers:             g.RegisterEntries().List(3),
+		ScheduledTransactions: scheduledTransactions,
 	}
 
 	for txIndex := range p.indexerData.Results {
@@ -95,6 +101,7 @@ func (p *PersisterSuite) testWithDatabase() {
 		transactions := store.NewTransactions(metrics, db)
 		collections := store.NewCollections(db, transactions)
 		txResultErrMsg := store.NewTransactionResultErrorMessages(metrics, db, store.DefaultCacheSize)
+		scheduledTransactions := store.NewScheduledTransactions(metrics, db, store.DefaultCacheSize)
 
 		progress, err := store.NewConsumerProgress(db, "test_consumer").Initialize(p.header.Height)
 		p.Require().NoError(err)
@@ -113,6 +120,7 @@ func (p *PersisterSuite) testWithDatabase() {
 				stores.NewCollectionsStore(p.indexerData.Collections, collections),
 				stores.NewTxResultErrMsgStore(p.txErrMsgs, txResultErrMsg, p.executionResult.BlockID, lockManager),
 				stores.NewLatestSealedResultStore(latestPersistedSealedResult, p.executionResult.ID(), p.header.Height),
+				stores.NewScheduledTransactionsStore(p.indexerData.ScheduledTransactions, scheduledTransactions, p.executionResult.BlockID),
 			},
 		)
 
@@ -150,6 +158,16 @@ func (p *PersisterSuite) testWithDatabase() {
 		blockTxResultErrMsgs, err := txResultErrMsg.ByBlockID(p.executionResult.BlockID)
 		p.Require().NoError(err)
 		require.Equal(p.T(), p.txErrMsgs, blockTxResultErrMsgs)
+
+		for txID, scheduledTxID := range p.indexerData.ScheduledTransactions {
+			actualTxID, err := scheduledTransactions.TransactionIDByID(scheduledTxID)
+			p.Require().NoError(err)
+			p.Require().Equal(txID, actualTxID)
+
+			actualBlockID, err := scheduledTransactions.BlockIDByTransactionID(txID)
+			p.Require().NoError(err)
+			p.Require().Equal(p.executionResult.BlockID, actualBlockID)
+		}
 
 		resultID, height := latestPersistedSealedResult.Latest()
 		p.Require().Equal(p.executionResult.ID(), resultID)
