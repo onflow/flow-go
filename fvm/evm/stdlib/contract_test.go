@@ -63,6 +63,7 @@ type testContractHandler struct {
 	batchRun             func(txs [][]byte, coinbase types.Address) []*types.ResultSummary
 	generateResourceUUID func() uint64
 	dryRun               func(tx []byte, from types.Address) *types.ResultSummary
+	dryRunWithTxData     func(txData gethTypes.TxData, from types.Address) *types.ResultSummary
 	commitBlockProposal  func()
 }
 
@@ -111,6 +112,13 @@ func (t *testContractHandler) DryRun(tx []byte, from types.Address) *types.Resul
 		panic("unexpected DryRun")
 	}
 	return t.dryRun(tx, from)
+}
+
+func (t *testContractHandler) DryRunWithTxData(txData gethTypes.TxData, from types.Address) *types.ResultSummary {
+	if t.dryRunWithTxData == nil {
+		panic("unexpected DryRunWithTxData")
+	}
+	return t.dryRunWithTxData(txData, from)
 }
 
 func (t *testContractHandler) BatchRun(txs [][]byte, coinbase types.Address) []*types.ResultSummary {
@@ -4311,12 +4319,9 @@ func TestEVMDryCall(t *testing.T) {
 	contractsAddress := flow.BytesToAddress([]byte{0x1})
 	handler := &testContractHandler{
 		evmContractAddress: common.Address(contractsAddress),
-		dryRun: func(tx []byte, from types.Address) *types.ResultSummary {
+		dryRunWithTxData: func(txData gethTypes.TxData, from types.Address) *types.ResultSummary {
 			dryCallCalled = true
-			gethTx := &gethTypes.Transaction{}
-			if err := gethTx.UnmarshalBinary(tx); err != nil {
-				require.Fail(t, err.Error())
-			}
+			gethTx := gethTypes.NewTx(txData)
 
 			require.NotNil(t, gethTx.To())
 
@@ -4821,12 +4826,9 @@ func TestCadenceOwnedAccountDryCall(t *testing.T) {
 
 	handler := &testContractHandler{
 		evmContractAddress: common.Address(contractsAddress),
-		dryRun: func(tx []byte, from types.Address) *types.ResultSummary {
+		dryRunWithTxData: func(txData gethTypes.TxData, from types.Address) *types.ResultSummary {
 			dryCallCalled = true
-			gethTx := &gethTypes.Transaction{}
-			if err := gethTx.UnmarshalBinary(tx); err != nil {
-				require.Fail(t, err.Error())
-			}
+			gethTx := gethTypes.NewTx(txData)
 
 			require.NotNil(t, gethTx.To())
 

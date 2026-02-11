@@ -27,7 +27,6 @@ import (
 	"github.com/onflow/flow-go/fvm/environment"
 	envMock "github.com/onflow/flow-go/fvm/environment/mock"
 	"github.com/onflow/flow-go/fvm/evm"
-	"github.com/onflow/flow-go/fvm/evm/emulator"
 	"github.com/onflow/flow-go/fvm/evm/events"
 	"github.com/onflow/flow-go/fvm/evm/impl"
 	"github.com/onflow/flow-go/fvm/evm/stdlib"
@@ -325,87 +324,6 @@ func TestEVMRun(t *testing.T) {
 				require.Equal(t, types.ErrCodeNoError, res.ErrorCode)
 				require.Empty(t, res.ErrorMessage)
 				require.Equal(t, int64(0), new(big.Int).SetBytes(res.ReturnedData).Int64())
-			})
-	})
-
-	t.Run("testing EVM.run (with restricted EOA)", func(t *testing.T) {
-		t.Parallel()
-		RunWithNewEnvironment(t,
-			chain, func(
-				ctx fvm.Context,
-				vm fvm.VM,
-				snapshot snapshot.SnapshotTree,
-				testContract *TestContract,
-				testAccount *EOATestAccount,
-			) {
-				sc := systemcontracts.SystemContractsForChain(chain.ChainID())
-				code := []byte(fmt.Sprintf(
-					`
-					import EVM from %s
-					transaction(tx: [UInt8], coinbaseBytes: [UInt8; 20]){
-						prepare(account: &Account) {
-							let coinbase = EVM.EVMAddress(bytes: coinbaseBytes)
-							let res = EVM.run(tx: tx, coinbase: coinbase)
-							assert(res.status == EVM.Status.successful, message: res.errorMessage)
-						}
-					}
-					`,
-					sc.EVMContract.Address.HexWithPrefix(),
-				))
-
-				// This is only a test EOA, used during tests
-				// address: 0xad7cBF4b6edAd1A4Bc08Fa74741445918B3C54f4
-				restrictedEOA := GetTestEOAAccount(t, RestrictedEOATestAccount1KeyHex)
-				restrictedEOAs := make([]common.Address, len(emulator.RestrictedEOAs))
-				copy(restrictedEOAs, emulator.RestrictedEOAs)
-				emulator.RestrictedEOAs = append(
-					emulator.RestrictedEOAs,
-					restrictedEOA.Address().ToCommon(),
-				)
-				defer func() {
-					emulator.RestrictedEOAs = restrictedEOAs
-				}()
-
-				num := int64(12)
-				innerTxBytes := restrictedEOA.PrepareSignAndEncodeTx(t,
-					testContract.DeployedAt.ToCommon(),
-					testContract.MakeCallData(t, "store", big.NewInt(num)),
-					big.NewInt(0),
-					uint64(100_000),
-					big.NewInt(0),
-				)
-
-				innerTx := cadence.NewArray(
-					unittest.BytesToCdcUInt8(innerTxBytes),
-				).WithType(stdlib.EVMTransactionBytesCadenceType)
-
-				coinbase := cadence.NewArray(
-					unittest.BytesToCdcUInt8(testAccount.Address().Bytes()),
-				).WithType(stdlib.EVMAddressBytesCadenceType)
-
-				txBody, err := flow.NewTransactionBodyBuilder().
-					SetScript(code).
-					SetPayer(sc.FlowServiceAccount.Address).
-					AddAuthorizer(sc.FlowServiceAccount.Address).
-					AddArgument(json.MustEncode(innerTx)).
-					AddArgument(json.MustEncode(coinbase)).
-					Build()
-				require.NoError(t, err)
-
-				tx := fvm.Transaction(txBody, 0)
-
-				_, output, err := vm.Run(
-					ctx,
-					tx,
-					snapshot,
-				)
-				require.NoError(t, err)
-				require.Error(t, output.Err)
-				require.ErrorContains(
-					t,
-					output.Err,
-					types.ErrRestrictedEOA.Error(),
-				)
 			})
 	})
 
@@ -1327,101 +1245,6 @@ func TestEVMBatchRun(t *testing.T) {
 				require.Equal(t, types.StatusSuccessful, res.Status)
 				require.Empty(t, res.ErrorMessage)
 				require.Equal(t, num, new(big.Int).SetBytes(res.ReturnedData).Int64())
-			})
-	})
-
-	t.Run("Batch run with with transactions from restricted EOA", func(t *testing.T) {
-		t.Parallel()
-		RunWithNewEnvironment(t,
-			chain, func(
-				ctx fvm.Context,
-				vm fvm.VM,
-				snapshot snapshot.SnapshotTree,
-				testContract *TestContract,
-				testAccount *EOATestAccount,
-			) {
-				sc := systemcontracts.SystemContractsForChain(chain.ChainID())
-				batchRunCode := []byte(fmt.Sprintf(
-					`
-					import EVM from %s
-					transaction(txs: [[UInt8]], coinbaseBytes: [UInt8; 20]) {
-						execute {
-							let coinbase = EVM.EVMAddress(bytes: coinbaseBytes)
-							let batchResults = EVM.batchRun(txs: txs, coinbase: coinbase)
-							log("results")
-							log(batchResults)
-							assert(batchResults.length == txs.length, message: "invalid result length")
-							for i, res in batchResults {
-								assert(res.status == EVM.Status.successful, message: res.errorMessage)
-							}
-						}
-					}
-					`,
-					sc.EVMContract.Address.HexWithPrefix(),
-				))
-
-				// This is only a test EOA, used during tests
-				// address: 0xad7cBF4b6edAd1A4Bc08Fa74741445918B3C54f4
-				restrictedEOA := GetTestEOAAccount(t, RestrictedEOATestAccount1KeyHex)
-				restrictedEOAs := make([]common.Address, len(emulator.RestrictedEOAs))
-				copy(restrictedEOAs, emulator.RestrictedEOAs)
-				emulator.RestrictedEOAs = append(
-					emulator.RestrictedEOAs,
-					restrictedEOA.Address().ToCommon(),
-				)
-				defer func() {
-					emulator.RestrictedEOAs = restrictedEOAs
-				}()
-
-				batchCount := 6
-				var num int64
-				txBytes := make([]cadence.Value, batchCount)
-				for i := 0; i < batchCount; i++ {
-					num = int64(i)
-
-					// prepare batch of transaction payloads
-					tx := restrictedEOA.PrepareSignAndEncodeTx(t,
-						testContract.DeployedAt.ToCommon(),
-						testContract.MakeCallData(t, "store", big.NewInt(num)),
-						big.NewInt(0),
-						100_000,
-						big.NewInt(0),
-					)
-
-					// build txs argument
-					txBytes[i] = cadence.NewArray(
-						unittest.BytesToCdcUInt8(tx),
-					).WithType(stdlib.EVMTransactionBytesCadenceType)
-				}
-
-				coinbase := cadence.NewArray(
-					unittest.BytesToCdcUInt8(testAccount.Address().Bytes()),
-				).WithType(stdlib.EVMAddressBytesCadenceType)
-
-				txs := cadence.NewArray(txBytes).
-					WithType(cadence.NewVariableSizedArrayType(
-						stdlib.EVMTransactionBytesCadenceType,
-					))
-
-				txBody, err := flow.NewTransactionBodyBuilder().
-					SetScript(batchRunCode).
-					SetPayer(sc.FlowServiceAccount.Address).
-					AddArgument(json.MustEncode(txs)).
-					AddArgument(json.MustEncode(coinbase)).
-					Build()
-				require.NoError(t, err)
-
-				tx := fvm.Transaction(txBody, 0)
-
-				_, output, err := vm.Run(ctx, tx, snapshot)
-
-				require.NoError(t, err)
-				require.Error(t, output.Err)
-				require.ErrorContains(
-					t,
-					output.Err,
-					types.ErrRestrictedEOA.Error(),
-				)
 			})
 	})
 

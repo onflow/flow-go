@@ -20,13 +20,8 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-const (
-	// address:  658bdf435d810c91414ec09147daa6db62406379
-	EOATestAccount1KeyHex = "9c647b8b7c4e7c3490668fb6c11473619db80c93704c70893d3813af4090c39c"
-
-	// address: ad7cBF4b6edAd1A4Bc08Fa74741445918B3C54f4
-	RestrictedEOATestAccount1KeyHex = "3d66d9a0e6aac64c0d25ef36d0389b57785d418a067ff3c2d95d952b890de41e"
-)
+// address:  658bdf435d810c91414ec09147daa6db62406379
+const EOATestAccount1KeyHex = "9c647b8b7c4e7c3490668fb6c11473619db80c93704c70893d3813af4090c39c"
 
 type EOATestAccount struct {
 	address gethCommon.Address
