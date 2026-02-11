@@ -40,7 +40,7 @@ func (_m *AccountTransactions) EXPECT() *AccountTransactions_Expecter {
 }
 
 // FirstIndexedHeight provides a mock function for the type AccountTransactions
-func (_mock *AccountTransactions) FirstIndexedHeight() (uint64, error) {
+func (_mock *AccountTransactions) FirstIndexedHeight() uint64 {
 	ret := _mock.Called()
 
 	if len(ret) == 0 {
@@ -48,21 +48,12 @@ func (_mock *AccountTransactions) FirstIndexedHeight() (uint64, error) {
 	}
 
 	var r0 uint64
-	var r1 error
-	if returnFunc, ok := ret.Get(0).(func() (uint64, error)); ok {
-		return returnFunc()
-	}
 	if returnFunc, ok := ret.Get(0).(func() uint64); ok {
 		r0 = returnFunc()
 	} else {
 		r0 = ret.Get(0).(uint64)
 	}
-	if returnFunc, ok := ret.Get(1).(func() error); ok {
-		r1 = returnFunc()
-	} else {
-		r1 = ret.Error(1)
-	}
-	return r0, r1
+	return r0
 }
 
 // AccountTransactions_FirstIndexedHeight_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'FirstIndexedHeight'
@@ -82,18 +73,18 @@ func (_c *AccountTransactions_FirstIndexedHeight_Call) Run(run func()) *AccountT
 	return _c
 }
 
-func (_c *AccountTransactions_FirstIndexedHeight_Call) Return(v uint64, err error) *AccountTransactions_FirstIndexedHeight_Call {
-	_c.Call.Return(v, err)
+func (_c *AccountTransactions_FirstIndexedHeight_Call) Return(v uint64) *AccountTransactions_FirstIndexedHeight_Call {
+	_c.Call.Return(v)
 	return _c
 }
 
-func (_c *AccountTransactions_FirstIndexedHeight_Call) RunAndReturn(run func() (uint64, error)) *AccountTransactions_FirstIndexedHeight_Call {
+func (_c *AccountTransactions_FirstIndexedHeight_Call) RunAndReturn(run func() uint64) *AccountTransactions_FirstIndexedHeight_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // LatestIndexedHeight provides a mock function for the type AccountTransactions
-func (_mock *AccountTransactions) LatestIndexedHeight() (uint64, error) {
+func (_mock *AccountTransactions) LatestIndexedHeight() uint64 {
 	ret := _mock.Called()
 
 	if len(ret) == 0 {
@@ -101,21 +92,12 @@ func (_mock *AccountTransactions) LatestIndexedHeight() (uint64, error) {
 	}
 
 	var r0 uint64
-	var r1 error
-	if returnFunc, ok := ret.Get(0).(func() (uint64, error)); ok {
-		return returnFunc()
-	}
 	if returnFunc, ok := ret.Get(0).(func() uint64); ok {
 		r0 = returnFunc()
 	} else {
 		r0 = ret.Get(0).(uint64)
 	}
-	if returnFunc, ok := ret.Get(1).(func() error); ok {
-		r1 = returnFunc()
-	} else {
-		r1 = ret.Error(1)
-	}
-	return r0, r1
+	return r0
 }
 
 // AccountTransactions_LatestIndexedHeight_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'LatestIndexedHeight'
@@ -135,12 +117,12 @@ func (_c *AccountTransactions_LatestIndexedHeight_Call) Run(run func()) *Account
 	return _c
 }
 
-func (_c *AccountTransactions_LatestIndexedHeight_Call) Return(v uint64, err error) *AccountTransactions_LatestIndexedHeight_Call {
-	_c.Call.Return(v, err)
+func (_c *AccountTransactions_LatestIndexedHeight_Call) Return(v uint64) *AccountTransactions_LatestIndexedHeight_Call {
+	_c.Call.Return(v)
 	return _c
 }
 
-func (_c *AccountTransactions_LatestIndexedHeight_Call) RunAndReturn(run func() (uint64, error)) *AccountTransactions_LatestIndexedHeight_Call {
+func (_c *AccountTransactions_LatestIndexedHeight_Call) RunAndReturn(run func() uint64) *AccountTransactions_LatestIndexedHeight_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -284,59 +266,6 @@ func (_c *AccountTransactions_TransactionsByAddress_Call) Return(accountTransact
 }
 
 func (_c *AccountTransactions_TransactionsByAddress_Call) RunAndReturn(run func(account flow.Address, startHeight uint64, endHeight uint64) ([]access.AccountTransaction, error)) *AccountTransactions_TransactionsByAddress_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// UninitializedFirstHeight provides a mock function for the type AccountTransactions
-func (_mock *AccountTransactions) UninitializedFirstHeight() (uint64, bool) {
-	ret := _mock.Called()
-
-	if len(ret) == 0 {
-		panic("no return value specified for UninitializedFirstHeight")
-	}
-
-	var r0 uint64
-	var r1 bool
-	if returnFunc, ok := ret.Get(0).(func() (uint64, bool)); ok {
-		return returnFunc()
-	}
-	if returnFunc, ok := ret.Get(0).(func() uint64); ok {
-		r0 = returnFunc()
-	} else {
-		r0 = ret.Get(0).(uint64)
-	}
-	if returnFunc, ok := ret.Get(1).(func() bool); ok {
-		r1 = returnFunc()
-	} else {
-		r1 = ret.Get(1).(bool)
-	}
-	return r0, r1
-}
-
-// AccountTransactions_UninitializedFirstHeight_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'UninitializedFirstHeight'
-type AccountTransactions_UninitializedFirstHeight_Call struct {
-	*mock.Call
-}
-
-// UninitializedFirstHeight is a helper method to define mock.On call
-func (_e *AccountTransactions_Expecter) UninitializedFirstHeight() *AccountTransactions_UninitializedFirstHeight_Call {
-	return &AccountTransactions_UninitializedFirstHeight_Call{Call: _e.mock.On("UninitializedFirstHeight")}
-}
-
-func (_c *AccountTransactions_UninitializedFirstHeight_Call) Run(run func()) *AccountTransactions_UninitializedFirstHeight_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run()
-	})
-	return _c
-}
-
-func (_c *AccountTransactions_UninitializedFirstHeight_Call) Return(v uint64, b bool) *AccountTransactions_UninitializedFirstHeight_Call {
-	_c.Call.Return(v, b)
-	return _c
-}
-
-func (_c *AccountTransactions_UninitializedFirstHeight_Call) RunAndReturn(run func() (uint64, bool)) *AccountTransactions_UninitializedFirstHeight_Call {
 	_c.Call.Return(run)
 	return _c
 }
