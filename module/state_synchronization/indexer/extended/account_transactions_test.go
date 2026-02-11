@@ -205,9 +205,9 @@ func TestAccountTransactionsIndexer_EventAddresses(t *testing.T) {
 
 		event := createTestEvent(t, 0, "ComplexEvent",
 			[]cadence.Field{
-				{Identifier: "name", Type: cadence.StringType},                              // non-address: ignored
-				{Identifier: "creator", Type: cadence.AddressType},                           // Address: extracted
-				{Identifier: "amount", Type: cadence.UFix64Type},                             // non-address: ignored
+				{Identifier: "name", Type: cadence.StringType},                                // non-address: ignored
+				{Identifier: "creator", Type: cadence.AddressType},                            // Address: extracted
+				{Identifier: "amount", Type: cadence.UFix64Type},                              // non-address: ignored
 				{Identifier: "recipient", Type: cadence.NewOptionalType(cadence.AddressType)}, // Optional<Address> non-nil: extracted
 				{Identifier: "nilAddr", Type: cadence.NewOptionalType(cadence.AddressType)},   // Optional<Address> nil: skipped
 				{Identifier: "optNum", Type: cadence.NewOptionalType(cadence.UInt64Type)},     // Optional<UInt64>: ignored

@@ -32,7 +32,6 @@ import (
 // must be called sequentially with consecutive heights.
 type AccountTransactions struct {
 	db           storage.DB
-	lockManager  storage.LockManager
 	firstHeight  uint64
 	latestHeight *atomic.Uint64
 }
