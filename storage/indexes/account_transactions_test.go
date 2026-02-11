@@ -25,31 +25,25 @@ func TestAccountTransactions_Initialize(t *testing.T) {
 		defer db.Close()
 
 		storageDB := pebbleimpl.ToDB(db)
-		lockManager := storage.NewTestingLockManager()
-		idx, err := NewAccountTransactions(storageDB, lockManager, 1)
-		require.NoError(t, err)
-
-		_, err = idx.FirstIndexedHeight()
+		_, err := NewAccountTransactions(storageDB)
 		require.ErrorIs(t, err, storage.ErrNotBootstrapped)
-
-		_, err = idx.LatestIndexedHeight()
-		require.ErrorIs(t, err, storage.ErrNotBootstrapped)
-
-		firstHeight, initialized := idx.UninitializedFirstHeight()
-		assert.Equal(t, uint64(1), firstHeight)
-		assert.False(t, initialized)
 	})
 
-	t.Run("first store initializes the index", func(t *testing.T) {
+	t.Run("bootstrap initializes the index", func(t *testing.T) {
 		db, _ := unittest.TempPebbleDBWithOpts(t, nil)
 		defer db.Close()
 
 		storageDB := pebbleimpl.ToDB(db)
 		lockManager := storage.NewTestingLockManager()
-		idx, err := NewAccountTransactions(storageDB, lockManager, 1)
-		require.NoError(t, err)
 
-		err = storeAccountTransactions(t, idx, 1, nil)
+		var idx *AccountTransactions
+		err := unittest.WithLock(t, lockManager, storage.LockIndexAccountTransactions, func(lctx lockctx.Context) error {
+			return storageDB.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				var bootstrapErr error
+				idx, bootstrapErr = BootstrapAccountTransactions(lctx, rw, storageDB, 1, nil)
+				return bootstrapErr
+			})
+		})
 		require.NoError(t, err)
 
 		first, err := idx.FirstIndexedHeight()
@@ -307,13 +301,10 @@ func TestAccountTransactions_ErrorCases(t *testing.T) {
 				},
 			}
 
-			lockManager := storage.NewTestingLockManager()
-			idx, err := NewAccountTransactions(db, lockManager, 1)
+			idx, err := NewAccountTransactions(db)
 			require.NoError(t, err)
 
-			// Bootstrap at height 1 and store txData at height 2
-			err = storeAccountTransactions(t, idx, 1, nil)
-			require.NoError(t, err)
+			// Store txData at height 2
 			err = storeAccountTransactions(t, idx, 2, txData)
 			require.NoError(t, err)
 
@@ -327,10 +318,10 @@ func TestAccountTransactions_ErrorCases(t *testing.T) {
 
 			// Now indexAccountTransactions at height 2 passes the consecutive check
 			// (2 == 1+1) but finds the already-committed keys.
-			lockManager2 := storage.NewTestingLockManager()
-			err = unittest.WithLock(t, lockManager2, storage.LockIndexAccountTransactions, func(lctx lockctx.Context) error {
+			lockManager := storage.NewTestingLockManager()
+			err = unittest.WithLock(t, lockManager, storage.LockIndexAccountTransactions, func(lctx lockctx.Context) error {
 				return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-					return idx.indexAccountTransactions(lctx, rw, 2, txData)
+					return indexAccountTransactions(lctx, rw, 2, txData)
 				})
 			})
 			require.ErrorIs(t, err, storage.ErrAlreadyExists)
@@ -458,34 +449,38 @@ func storeAccountTransactions(tb testing.TB, idx *AccountTransactions, height ui
 	})
 }
 
-// RunWithAccountTxIndex creates a temporary Pebble database, initializes the
+// RunWithAccountTxIndex creates a temporary Pebble database, bootstraps the
 // AccountTransactions at the given start height, and runs the provided function.
-// The index is bootstrapped by storing empty data at startHeight before calling f.
 func RunWithAccountTxIndex(tb testing.TB, startHeight uint64, f func(idx *AccountTransactions)) {
 	unittest.RunWithTempDir(tb, func(dir string) {
 		db := NewBootstrappedAccountTxIndexForTest(tb, dir, startHeight)
 		defer db.Close()
 
-		lockManager := storage.NewTestingLockManager()
-		idx, err := NewAccountTransactions(db, lockManager, startHeight)
-		require.NoError(tb, err)
-
-		// Bootstrap the index by storing at startHeight
-		err = storeAccountTransactions(tb, idx, startHeight, nil)
+		idx, err := NewAccountTransactions(db)
 		require.NoError(tb, err)
 
 		f(idx)
 	})
 }
 
-// NewBootstrappedAccountTxIndexForTest creates a new Pebble database and initializes it
+// NewBootstrappedAccountTxIndexForTest creates a new Pebble database and bootstraps it
 // for account transaction indexing at the given start height.
 func NewBootstrappedAccountTxIndexForTest(tb testing.TB, dir string, startHeight uint64) storage.DB {
 	db, err := pebble.Open(dir, &pebble.Options{})
 	require.NoError(tb, err)
 
-	// NewAccountTransactions will initialize the database if needed
-	return pebbleimpl.ToDB(db)
+	storageDB := pebbleimpl.ToDB(db)
+
+	lockManager := storage.NewTestingLockManager()
+	err = unittest.WithLock(tb, lockManager, storage.LockIndexAccountTransactions, func(lctx lockctx.Context) error {
+		return storageDB.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			_, bootstrapErr := BootstrapAccountTransactions(lctx, rw, storageDB, startHeight, nil)
+			return bootstrapErr
+		})
+	})
+	require.NoError(tb, err)
+
+	return storageDB
 }
 
 // encodeAccountTxValue encodes a transaction ID and authorizer flag using msgpack.

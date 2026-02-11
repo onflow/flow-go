@@ -28,17 +28,17 @@ type AccountTransactionsReader interface {
 		endHeight uint64,
 	) ([]accessmodel.AccountTransaction, error)
 
-	// LatestIndexedHeight returns the latest block height that has been indexed.
-	//
-	// Expected error returns during normal operations:
-	//   - [ErrNotFound]: if the index has not been initialized
-	LatestIndexedHeight() (uint64, error)
-
 	// FirstIndexedHeight returns the first (oldest) block height that has been indexed.
 	//
 	// Expected error returns during normal operations:
 	//   - [ErrNotFound]: if the index has not been initialized
 	FirstIndexedHeight() (uint64, error)
+
+	// LatestIndexedHeight returns the latest block height that has been indexed.
+	//
+	// Expected error returns during normal operations:
+	//   - [ErrNotFound]: if the index has not been initialized
+	LatestIndexedHeight() (uint64, error)
 
 	// UninitializedFirstHeight returns the height the index will accept as the first height, and a boolean
 	// indicating if the index is initialized.

@@ -31,11 +31,10 @@ import (
 // All read methods are safe for concurrent access. Write methods (Store)
 // must be called sequentially with consecutive heights.
 type AccountTransactions struct {
-	db            storage.DB
-	lockManager   storage.LockManager
-	firstHeight   uint64
-	latestHeight  *atomic.Uint64
-	isInitialized *atomic.Bool
+	db           storage.DB
+	lockManager  storage.LockManager
+	firstHeight  uint64
+	latestHeight *atomic.Uint64
 }
 
 type storedAccountTransaction struct {
@@ -65,85 +64,80 @@ var (
 
 var _ storage.AccountTransactions = (*AccountTransactions)(nil)
 
-// NewAccountTransactions creates a new AccountTransactions backed by the given Pebble database.
-// If the dataset has not been initialized, it is bootstrapped at initialStartHeight. If it already
-// exists, initialStartHeight is ignored and the persisted heights are used.
+// NewAccountTransactions creates a new AccountTransactions backed by the given database.
 //
-// No error returns are expected during normal operation.
-func NewAccountTransactions(db storage.DB, lockManager storage.LockManager, initialStartHeight uint64) (*AccountTransactions, error) {
-	firstHeight, err := accountTxFirstStoredHeight(db)
+// If the index has not been initialized, constuction will fail with [storage.ErrNotBootstrapped].
+// The caller should retry with `BootstrapAccountTransactions` passing the required initialization data.
+//
+// Expected error returns during normal operations:
+//   - [storage.ErrNotBootstrapped] if the index has not been initialized
+func NewAccountTransactions(db storage.DB) (*AccountTransactions, error) {
+	firstHeight, err := accountTxFirstStoredHeight(db.Reader())
 	if err != nil {
-		if !errors.Is(err, storage.ErrNotFound) {
-			return nil, fmt.Errorf("could not get first height: %w", err)
+		if errors.Is(err, storage.ErrNotFound) {
+			return nil, storage.ErrNotBootstrapped
 		}
-		return &AccountTransactions{
-			db:            db,
-			lockManager:   lockManager,
-			firstHeight:   initialStartHeight,
-			latestHeight:  atomic.NewUint64(0),
-			isInitialized: atomic.NewBool(false),
-		}, nil
+		return nil, fmt.Errorf("could not get first height: %w", err)
 	}
 
-	persistedLatestHeight, err := accountTxLatestStoredHeight(db)
+	persistedLatestHeight, err := accountTxLatestStoredHeight(db.Reader())
 	if err != nil {
-		// if `firstHeight` is set, then `latestHeight` must be set as well
+		// if `firstHeight` is set, then `latestHeight` must be set as well, otherwise the database
+		// is in a corrupted state.
 		return nil, fmt.Errorf("could not get latest height: %w", err)
 	}
 
 	return &AccountTransactions{
-		db:            db,
-		lockManager:   lockManager,
-		firstHeight:   firstHeight,
-		latestHeight:  atomic.NewUint64(persistedLatestHeight),
-		isInitialized: atomic.NewBool(true),
+		db:           db,
+		firstHeight:  firstHeight,
+		latestHeight: atomic.NewUint64(persistedLatestHeight),
 	}, nil
 }
 
-// LatestIndexedHeight returns the latest block height that has been indexed.
-//
-// Expected error returns during normal operations:
-//   - [storage.ErrNotBootstrapped] if the index has not been initialized
-func (idx *AccountTransactions) LatestIndexedHeight() (uint64, error) {
-	if !idx.isInitialized.Load() {
-		return 0, storage.ErrNotBootstrapped
+func BootstrapAccountTransactions(lctx lockctx.Proof, rw storage.ReaderBatchWriter, db storage.DB, initialStartHeight uint64, txData []access.AccountTransaction) (*AccountTransactions, error) {
+	err := initialize(lctx, rw, initialStartHeight, txData)
+	if err != nil {
+		return nil, fmt.Errorf("could not bootstrap account transactions: %w", err)
 	}
-	return idx.latestHeight.Load(), nil
+
+	return &AccountTransactions{
+		db:           db,
+		firstHeight:  initialStartHeight,
+		latestHeight: atomic.NewUint64(initialStartHeight),
+	}, nil
 }
 
 // FirstIndexedHeight returns the first (oldest) block height that has been indexed.
 //
-// Expected error returns during normal operations:
-//   - [storage.ErrNotBootstrapped] if the index has not been initialized
+// No error returns are expected during normal operation.
 func (idx *AccountTransactions) FirstIndexedHeight() (uint64, error) {
-	if !idx.isInitialized.Load() {
-		return 0, storage.ErrNotBootstrapped
-	}
 	return idx.firstHeight, nil
+}
+
+// LatestIndexedHeight returns the latest block height that has been indexed.
+//
+// No error returns are expected during normal operation.
+func (idx *AccountTransactions) LatestIndexedHeight() (uint64, error) {
+	return idx.latestHeight.Load(), nil
 }
 
 // UninitializedFirstHeight returns the height the index will accept as the first height, and a boolean
 // indicating if the index is initialized.
 // If the index is not initialized, the first call to `Store` must include data for this height.
 func (idx *AccountTransactions) UninitializedFirstHeight() (uint64, bool) {
-	return idx.firstHeight, idx.isInitialized.Load()
+	return idx.firstHeight, true
 }
 
 // TransactionsByAddress retrieves transaction references for an account within the specified
 // block height range (inclusive). Results are returned in descending order (newest first).
 //
 // Expected error returns during normal operations:
-//   - [storage.ErrNotBootstrapped] if the index has not been initialized
 //   - [storage.ErrHeightNotIndexed] if the requested range extends beyond indexed heights
 func (idx *AccountTransactions) TransactionsByAddress(
 	account flow.Address,
 	startHeight uint64,
 	endHeight uint64,
 ) ([]access.AccountTransaction, error) {
-	if !idx.isInitialized.Load() {
-		return nil, storage.ErrNotBootstrapped
-	}
-
 	latestHeight := idx.latestHeight.Load()
 	if startHeight > latestHeight {
 		return nil, fmt.Errorf("start height %d is greater than latest indexed height %d: %w",
@@ -163,7 +157,7 @@ func (idx *AccountTransactions) TransactionsByAddress(
 		return nil, fmt.Errorf("start height %d is greater than end height %d", startHeight, endHeight)
 	}
 
-	results, err := idx.lookupAccountTransactions(account, startHeight, endHeight)
+	results, err := lookupAccountTransactions(idx.db.Reader(), account, startHeight, endHeight)
 	if err != nil {
 		return nil, fmt.Errorf("could not lookup account transactions: %w", err)
 	}
@@ -177,23 +171,8 @@ func (idx *AccountTransactions) TransactionsByAddress(
 // The caller must hold the [storage.LockIndexAccountTransactions] lock until the batch is committed.
 //
 // Expected error returns during normal operations:
-//   - [storage.ErrNotBootstrapped] if the index is not initialized and the block height is not the first indexed height
 //   - [storage.ErrAlreadyExists] if the block height is already indexed
 func (idx *AccountTransactions) Store(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockHeight uint64, txData []access.AccountTransaction) error {
-	if !idx.isInitialized.Load() {
-		if blockHeight != idx.firstHeight {
-			return fmt.Errorf("expected first indexed height %d, got %d: %w", idx.firstHeight, blockHeight, storage.ErrNotBootstrapped)
-		}
-		if err := idx.initialize(lctx, rw, blockHeight, txData); err != nil {
-			return fmt.Errorf("could not initialize account transactions: %w", err)
-		}
-		storage.OnCommitSucceed(rw, func() {
-			idx.latestHeight.Store(blockHeight)
-			idx.isInitialized.Store(true)
-		})
-		return nil
-	}
-
 	latestHeight := idx.latestHeight.Load()
 
 	if blockHeight < latestHeight {
@@ -210,7 +189,7 @@ func (idx *AccountTransactions) Store(lctx lockctx.Proof, rw storage.ReaderBatch
 		return fmt.Errorf("must index consecutive heights: expected %d, got %d", expectedHeight, blockHeight)
 	}
 
-	err := idx.indexAccountTransactions(lctx, rw, blockHeight, txData)
+	err := indexAccountTransactions(lctx, rw, blockHeight, txData)
 	if err != nil {
 		return fmt.Errorf("could not index account transactions: %w", err)
 	}
@@ -227,8 +206,8 @@ func (idx *AccountTransactions) Store(lctx lockctx.Proof, rw storage.ReaderBatch
 // Returns an empty slice and no error if no transactions are found.
 //
 // No error returns are expected during normal operation.
-func (idx *AccountTransactions) lookupAccountTransactions(address flow.Address, startHeight uint64, endHeight uint64) ([]access.AccountTransaction, error) {
-	// TODO(peter): I wil be revisiting this logic when implementing the API integration. instead
+func lookupAccountTransactions(reader storage.Reader, address flow.Address, startHeight uint64, endHeight uint64) ([]access.AccountTransaction, error) {
+	// TODO(peter): I will be revisiting this logic when implementing the API integration. instead
 	// of using a start/end height range, we'll use a pagination cursor and limit.
 
 	// Create iterator bounds (inclusive)
@@ -238,7 +217,7 @@ func (idx *AccountTransactions) lookupAccountTransactions(address flow.Address, 
 	upperBound := makeAccountTxKeyPrefix(address, startHeight)
 
 	var results []access.AccountTransaction
-	err := operation.IterateKeys(idx.db.Reader(), lowerBound, upperBound,
+	err := operation.IterateKeys(reader, lowerBound, upperBound,
 		func(keyCopy []byte, getValue func(any) error) (bail bool, err error) {
 			var stored storedAccountTransaction
 			if err := getValue(&stored); err != nil {
@@ -273,12 +252,12 @@ func (idx *AccountTransactions) lookupAccountTransactions(address flow.Address, 
 //
 // Expected error returns during normal operations:
 //   - [storage.ErrAlreadyExists] if the block height is already indexed
-func (idx *AccountTransactions) indexAccountTransactions(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockHeight uint64, txData []access.AccountTransaction) error {
+func indexAccountTransactions(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockHeight uint64, txData []access.AccountTransaction) error {
 	if !lctx.HoldsLock(storage.LockIndexAccountTransactions) {
 		return fmt.Errorf("missing required lock: %s", storage.LockIndexAccountTransactions)
 	}
 
-	latestHeight, err := accountTxLatestStoredHeight(idx.db)
+	latestHeight, err := accountTxLatestStoredHeight(rw.GlobalReader())
 	if err != nil {
 		return fmt.Errorf("could not get latest indexed height: %w", err)
 	}
@@ -325,7 +304,7 @@ func (idx *AccountTransactions) indexAccountTransactions(lctx lockctx.Proof, rw 
 //
 // Expected error returns during normal operations:
 //   - [storage.ErrAlreadyExists] if any data is found for while initializing
-func (idx *AccountTransactions) initialize(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockHeight uint64, txData []access.AccountTransaction) error {
+func initialize(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockHeight uint64, txData []access.AccountTransaction) error {
 	if !lctx.HoldsLock(storage.LockIndexAccountTransactions) {
 		return fmt.Errorf("missing required lock: %s", storage.LockIndexAccountTransactions)
 	}
@@ -451,25 +430,25 @@ func decodeAccountTxKey(key []byte) (flow.Address, uint64, uint32, error) {
 //
 // Expected error returns during normal operations:
 //   - [storage.ErrNotFound] if the height is not found
-func accountTxFirstStoredHeight(db storage.DB) (uint64, error) {
-	return accountTxHeightLookup(db, accountTxFirstHeightKey)
+func accountTxFirstStoredHeight(reader storage.Reader) (uint64, error) {
+	return accountTxHeightLookup(reader, accountTxFirstHeightKey)
 }
 
 // accountTxLatestStoredHeight reads the latest indexed height from the database.
 //
 // Expected error returns during normal operations:
 //   - [storage.ErrNotFound] if the height is not found
-func accountTxLatestStoredHeight(db storage.DB) (uint64, error) {
-	return accountTxHeightLookup(db, accountTxLatestHeightKey)
+func accountTxLatestStoredHeight(reader storage.Reader) (uint64, error) {
+	return accountTxHeightLookup(reader, accountTxLatestHeightKey)
 }
 
 // accountTxHeightLookup reads a height value from the database.
 //
 // Expected error returns during normal operations:
 //   - [storage.ErrNotFound] if the height is not found
-func accountTxHeightLookup(db storage.DB, key []byte) (uint64, error) {
+func accountTxHeightLookup(reader storage.Reader, key []byte) (uint64, error) {
 	var height uint64
-	if err := operation.RetrieveByKey(db.Reader(), key, &height); err != nil {
+	if err := operation.RetrieveByKey(reader, key, &height); err != nil {
 		return 0, err
 	}
 	return height, nil

@@ -660,7 +660,7 @@ func newAccountTxIndexerForTest(
 	t *testing.T,
 	chainID flow.ChainID,
 	latestHeight uint64,
-) (*AccountTransactions, *indexes.AccountTransactions, storage.LockManager, storage.DB) {
+) (*AccountTransactions, storage.AccountTransactions, storage.LockManager, storage.DB) {
 	pdb, dbDir := unittest.TempPebbleDB(t)
 	db := pebbleimpl.ToDB(pdb)
 	t.Cleanup(func() {
@@ -669,7 +669,7 @@ func newAccountTxIndexerForTest(
 	})
 
 	lm := storage.NewTestingLockManager()
-	store, err := indexes.NewAccountTransactions(db, lm, latestHeight)
+	store, err := indexes.NewAccountTransactionsBootstrapper(db, latestHeight)
 	require.NoError(t, err)
 
 	return NewAccountTransactions(unittest.Logger(), store, chainID, lm), store, lm, db
@@ -733,7 +733,7 @@ func indexBlockExpectError(
 // with the expected authorizer status.
 func assertAccountTx(
 	t *testing.T,
-	store *indexes.AccountTransactions,
+	store storage.AccountTransactions,
 	height uint64,
 	addr flow.Address,
 	txID flow.Identifier,
@@ -756,7 +756,7 @@ func assertAccountTx(
 // assertTransactionCount verifies the total number of transactions for an address at a height.
 func assertTransactionCount(
 	t *testing.T,
-	store *indexes.AccountTransactions,
+	store storage.AccountTransactions,
 	height uint64,
 	addr flow.Address,
 	expectedCount int,

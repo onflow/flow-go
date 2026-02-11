@@ -964,9 +964,8 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 					})
 
 					indexerStorageDB := pebbleimpl.ToDB(indexerDB)
-					accountTxStore, err := indexes.NewAccountTransactions(
+					accountTxStore, err := indexes.NewAccountTransactionsBootstrapper(
 						indexerStorageDB,
-						node.StorageLockMgr,
 						builder.SealedRootBlock.Height,
 					)
 					if err != nil {
