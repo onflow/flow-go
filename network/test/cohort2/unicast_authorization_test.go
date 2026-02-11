@@ -464,8 +464,8 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_ReceiverHasNoSu
 		Text: string("hello"),
 	}, u.receiverID.NodeID)
 	if err != nil {
-		// It can happen that the receiver resets before the sender closes.
-		// in which case the error will be "strem reset"
+		// It can happen that the receiver resets before the sender closes,
+		// in which case the error will be "stream reset"
 		require.ErrorContains(u.T(), err, "stream reset", "expected stream-related error when receiver has no subscription")
 	}
 
