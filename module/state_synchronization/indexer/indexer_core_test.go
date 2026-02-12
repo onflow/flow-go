@@ -27,8 +27,8 @@ import (
 	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/state_synchronization/indexer/extended"
-	protocolmock "github.com/onflow/flow-go/state/protocol/mock"
 	synctest "github.com/onflow/flow-go/module/state_synchronization/requester/unittest"
+	protocolmock "github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/storage"
 	storagemock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
@@ -396,12 +396,14 @@ func TestExecutionState_IndexBlockData(t *testing.T) {
 				return nil
 			},
 		}
-		accountIndexer, err := extended.NewExtendedIndexer(
+
+		mockState := newMockStateForBlock(t, tf.Block)
+		extendedIndexer, err := extended.NewExtendedIndexer(
 			test.indexer.log,
 			metrics.NewNoopCollector(),
 			test.indexer.protocolDB,
 			storage.NewTestingLockManager(),
-			protocolmock.NewState(t),
+			mockState,
 			storagemock.NewBlocks(t),
 			test.collections,
 			test.events,
@@ -415,14 +417,14 @@ func TestExecutionState_IndexBlockData(t *testing.T) {
 		// Start the ExtendedIndexer component so its ingest loop can process data
 		ctx, cancel := context.WithCancel(context.Background())
 		signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
-		accountIndexer.Start(signalerCtx)
-		unittest.RequireComponentsReadyBefore(t, 5*time.Second, accountIndexer)
+		extendedIndexer.Start(signalerCtx)
+		unittest.RequireComponentsReadyBefore(t, 5*time.Second, extendedIndexer)
 		t.Cleanup(func() {
 			cancel()
-			unittest.RequireCloseBefore(t, accountIndexer.Done(), 5*time.Second, "timeout waiting for shutdown")
+			unittest.RequireCloseBefore(t, extendedIndexer.Done(), 5*time.Second, "timeout waiting for shutdown")
 		})
 
-		test.indexer.accountIndexer = accountIndexer
+		test.indexer.extendedIndexer = extendedIndexer
 
 		test.events.
 			On("BatchStore", mocks.MatchLock(storage.LockInsertEvent), blockID, []flow.EventsList{tf.ExpectedEvents}, mock.Anything).
@@ -488,12 +490,14 @@ func TestExecutionState_IndexBlockData(t *testing.T) {
 				return expectedErr
 			},
 		}
-		accountIndexer, err := extended.NewExtendedIndexer(
+
+		mockState := newMockStateForBlock(t, tf.Block)
+		extendedIndexer, err := extended.NewExtendedIndexer(
 			test.indexer.log,
 			metrics.NewNoopCollector(),
 			test.indexer.protocolDB,
 			storage.NewTestingLockManager(),
-			protocolmock.NewState(t),
+			mockState,
 			storagemock.NewBlocks(t),
 			test.collections,
 			test.events,
@@ -511,13 +515,13 @@ func TestExecutionState_IndexBlockData(t *testing.T) {
 			thrown <- err
 			cancel()
 		})
-		accountIndexer.Start(signalerCtx)
-		unittest.RequireComponentsReadyBefore(t, 5*time.Second, accountIndexer)
+		extendedIndexer.Start(signalerCtx)
+		unittest.RequireComponentsReadyBefore(t, 5*time.Second, extendedIndexer)
 		t.Cleanup(func() {
 			cancel()
 		})
 
-		test.indexer.accountIndexer = accountIndexer
+		test.indexer.extendedIndexer = extendedIndexer
 
 		test.events.
 			On("BatchStore", mocks.MatchLock(storage.LockInsertEvent), blockID, []flow.EventsList{tf.ExpectedEvents}, mock.Anything).
@@ -809,6 +813,17 @@ func TestCollectScheduledTransactions(t *testing.T) {
 func storeRegisterWithValue(indexer *IndexerCore, height uint64, owner string, key string, value []byte) error {
 	payload := LedgerPayloadFixture(owner, key, value)
 	return indexer.indexRegisters(map[ledger.Path]*ledger.Payload{ledger.DummyPath: payload}, height)
+}
+
+// newMockStateForBlock returns a mock protocol.State configured so that
+// AtBlockID returns the block's header.
+func newMockStateForBlock(t *testing.T, block *flow.Block) *protocolmock.State {
+	snapshot := protocolmock.NewSnapshot(t)
+	snapshot.On("Head").Return(block.ToHeader(), nil)
+
+	state := protocolmock.NewState(t)
+	state.On("AtBlockID", block.ID()).Return(snapshot)
+	return state
 }
 
 type testExtendedIndexer struct {

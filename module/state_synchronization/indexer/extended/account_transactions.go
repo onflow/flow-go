@@ -68,6 +68,8 @@ func (a *AccountTransactions) NextHeight() (uint64, error) {
 }
 
 // IndexBlockData indexes the block data for the given height.
+// If the header in `data` does not match the expected height, an error is returned.
+//
 // The caller must hold the [storage.LockIndexAccountTransactions] lock until the batch is committed.
 //
 // Not safe for concurrent use.
@@ -87,8 +89,22 @@ func (a *AccountTransactions) IndexBlockData(lctx lockctx.Proof, data BlockData,
 		return ErrAlreadyIndexed
 	}
 
-	chain := a.chainID.Chain()
+	entries, err := a.buildAccountTransactionsFromBlockData(data)
+	if err != nil {
+		return fmt.Errorf("failed to build account transactions from block data: %w", err)
+	}
 
+	if err := a.store.Store(lctx, batch, data.Header.Height, entries); err != nil {
+		// since we have already checked that the height is not already indexed, no errors are expected
+		// here and indicate concurrent indexing which is not supported.
+		return fmt.Errorf("failed to store account transactions: %w", err)
+	}
+
+	return nil
+}
+
+func (a *AccountTransactions) buildAccountTransactionsFromBlockData(data BlockData) ([]access.AccountTransaction, error) {
+	chain := a.chainID.Chain()
 	entries := make([]access.AccountTransaction, 0)
 	for i, tx := range data.Transactions {
 		txIndex := uint32(i)
@@ -105,7 +121,7 @@ func (a *AccountTransactions) IndexBlockData(lctx lockctx.Proof, data BlockData,
 		for _, event := range data.Events[txIndex] {
 			eventAddresses, err := a.extractAddresses(event)
 			if err != nil {
-				return fmt.Errorf("failed to extract addresses from event: %w", err)
+				return nil, fmt.Errorf("failed to extract addresses from event: %w", err)
 			}
 			for _, addr := range eventAddresses {
 				addresses[addr] = true
@@ -113,6 +129,9 @@ func (a *AccountTransactions) IndexBlockData(lctx lockctx.Proof, data BlockData,
 		}
 
 		for addr := range addresses {
+			// since `extractAddresses` returns all [cadence.Address] fields in the event, it's possible
+			// that the event contains invalid addresses, or addresses from a different chain.
+			// Only index addresses that are actually valid for the current chain.
 			if chain.IsValid(addr) {
 				entries = append(entries, access.AccountTransaction{
 					Address:          addr,
@@ -124,14 +143,7 @@ func (a *AccountTransactions) IndexBlockData(lctx lockctx.Proof, data BlockData,
 			}
 		}
 	}
-
-	if err := a.store.Store(lctx, batch, data.Header.Height, entries); err != nil {
-		// since we have already checked that the height is not already indexed, no errors are expected
-		// here and indicate concurrent indexing which is not supported.
-		return fmt.Errorf("failed to store account transactions: %w", err)
-	}
-
-	return nil
+	return entries, nil
 }
 
 // extractAddresses extracts all addresses referenced in a flow event.

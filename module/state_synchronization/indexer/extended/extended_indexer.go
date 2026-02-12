@@ -15,6 +15,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
+	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/util"
 	"github.com/onflow/flow-go/state/protocol"
@@ -58,6 +59,8 @@ type ExtendedIndexer struct {
 	mu              sync.RWMutex
 	latestBlockData *BlockData
 }
+
+var _ IndexerManager = (*ExtendedIndexer)(nil)
 
 func NewExtendedIndexer(
 	log zerolog.Logger,
@@ -115,6 +118,25 @@ func NewExtendedIndexer(
 // IndexBlockData captures the block data and makes it available to the indexers.
 //
 // No error returns are expected during normal operation.
+func (c *ExtendedIndexer) IndexBlockExecutionData(
+	data *execution_data.BlockExecutionDataEntity,
+) error {
+	header, err := c.state.AtBlockID(data.BlockID).Head()
+	if err != nil {
+		return fmt.Errorf("failed to get block by id: %w", err)
+	}
+
+	txs, events, err := c.extractDataFromExecutionData(header.Height, data)
+	if err != nil {
+		return fmt.Errorf("failed to extract data from execution data: %w", err)
+	}
+
+	return c.IndexBlockData(header, txs, events)
+}
+
+// IndexBlockData captures the block data and makes it available to the indexers.
+//
+// No error returns are expected during normal operation.
 func (c *ExtendedIndexer) IndexBlockData(
 	header *flow.Header,
 	transactions []*flow.TransactionBody,
@@ -123,8 +145,13 @@ func (c *ExtendedIndexer) IndexBlockData(
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	if c.latestBlockData != nil && header.Height != c.latestBlockData.Header.Height+1 {
-		return fmt.Errorf("expected height %d, but got %d", c.latestBlockData.Header.Height+1, header.Height)
+	if c.latestBlockData != nil {
+		if header.Height > c.latestBlockData.Header.Height+1 {
+			return fmt.Errorf("indexing block skipped: expected height %d, got %d", c.latestBlockData.Header.Height+1, header.Height)
+		}
+		if header.Height <= c.latestBlockData.Header.Height {
+			return nil
+		}
 	}
 
 	eventsByTxIndex := make(map[uint32][]flow.Event)
@@ -208,7 +235,7 @@ func (c *ExtendedIndexer) indexNextHeights() error {
 				if latestBlockData != nil && height == latestBlockData.Header.Height {
 					data = *latestBlockData
 				} else {
-					data, err = c.blockData(height)
+					data, err = c.blockDataFromStorage(height)
 					if err != nil {
 						if errors.Is(err, storage.ErrNotFound) {
 							continue // skip group for this iteration
@@ -250,11 +277,11 @@ func (c *ExtendedIndexer) indexNextHeights() error {
 	return nil
 }
 
-// blockData loads the block data for the given height.
+// blockDataFromStorage loads the block data for the given height.
 //
 // Expected error returns during normal operation:
 //   - [storage.ErrNotFound]: if any data is not available for the height.
-func (c *ExtendedIndexer) blockData(height uint64) (BlockData, error) {
+func (c *ExtendedIndexer) blockDataFromStorage(height uint64) (BlockData, error) {
 	// special handling for the spork root block which has no transactions or events.
 	if height == c.state.Params().SporkRootBlockHeight() {
 		return BlockData{
@@ -282,6 +309,8 @@ func (c *ExtendedIndexer) blockData(height uint64) (BlockData, error) {
 	// getting events returns an empty slice and no error if no events are found. In this case, also
 	// check if there were any transaction results. All blocks should have at least one system tx.
 	// if not, then assume the block is not indexed yet.
+	// Note: we need to check both because it's possible the system transaction failed and did not
+	// produce any events.
 	if len(events) == 0 {
 		results, err := c.results.ByBlockID(block.ID())
 		if err != nil {
@@ -320,6 +349,34 @@ func (c *ExtendedIndexer) blockData(height uint64) (BlockData, error) {
 		Transactions: transactions,
 		Events:       eventsByTxIndex,
 	}, nil
+}
+
+func (c *ExtendedIndexer) extractDataFromExecutionData(height uint64, data *execution_data.BlockExecutionDataEntity) ([]*flow.TransactionBody, []flow.Event, error) {
+	// NOTE: FVM assigns TransactionIndex globally across the whole block (all user txs in
+	// collection order, then system/scheduled txs). Flattening chunks in order keeps txIndex
+	// alignment with events.
+	txs := make([]*flow.TransactionBody, 0)
+	events := make([]flow.Event, 0)
+	for i, chunk := range data.ChunkExecutionDatas {
+		if chunk.Collection != nil {
+			txs = append(txs, chunk.Collection.Transactions...)
+		} else {
+			// system collection
+			if i != len(data.ChunkExecutionDatas)-1 {
+				return nil, nil, fmt.Errorf("chunk collection is nil but not the last chunk")
+			}
+			versionedCollection := systemcollection.Default(c.chainID)
+			systemCollection, err := versionedCollection.
+				ByHeight(height).
+				SystemCollection(c.chainID.Chain(), access.StaticEventProvider(chunk.Events))
+			if err != nil {
+				return nil, nil, fmt.Errorf("could not get system collection: %w", err)
+			}
+			txs = append(txs, systemCollection.Transactions...)
+		}
+		events = append(events, chunk.Events...)
+	}
+	return txs, events, nil
 }
 
 func buildGroupLookup(indexers []Indexer) (map[uint64][]Indexer, error) {

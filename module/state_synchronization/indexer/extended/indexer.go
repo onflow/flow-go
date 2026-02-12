@@ -6,6 +6,7 @@ import (
 	"github.com/jordanschalm/lockctx"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/storage"
 )
 
@@ -53,6 +54,9 @@ type Indexer interface {
 	Name() string
 
 	// IndexBlockData indexes the block data for the given height.
+	// If the header in `data` does not match the expected height, an error is returned.
+	//
+	// Not safe for concurrent use.
 	//
 	// Expected error returns during normal operations:
 	//   - [ErrAlreadyIndexed]: if the data is already indexed for the height.
@@ -63,4 +67,28 @@ type Indexer interface {
 	//
 	// No error returns are expected during normal operation.
 	NextHeight() (uint64, error)
+}
+
+// IndexerManager orchestrates indexing for all extended indexers. It handles both indexing from the
+// latest block submitted via the Index methods, and backfilling from storage.
+type IndexerManager interface {
+	// IndexBlockExecutionData indexes the block data for the given height.
+	// If the header in `data` does not match the expected height, an error is returned.
+	//
+	// Not safe for concurrent use.
+	//
+	// Expected error returns during normal operations:
+	//   - [ErrAlreadyIndexed]: if the data is already indexed for the height.
+	//   - [ErrFutureHeight]: if the data is for a future height.
+	IndexBlockExecutionData(data *execution_data.BlockExecutionDataEntity) error
+
+	// IndexBlockData indexes the block data for the given height.
+	// If the header in `data` does not match the expected height, an error is returned.
+	//
+	// Not safe for concurrent use.
+	//
+	// Expected error returns during normal operations:
+	//   - [ErrAlreadyIndexed]: if the data is already indexed for the height.
+	//   - [ErrFutureHeight]: if the data is for a future height.
+	IndexBlockData(header *flow.Header, transactions []*flow.TransactionBody, events []flow.Event) error
 }

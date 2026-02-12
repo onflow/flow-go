@@ -308,7 +308,7 @@ func TestAccountTransactions_ErrorCases(t *testing.T) {
 			// in the DB from 2 to 1, as if the tx keys were committed but the
 			// height marker update was lost (e.g. crash between writes).
 			err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-				return operation.UpsertByKey(rw.Writer(), accountTxLatestHeightKey, uint64(1))
+				return operation.UpsertByKey(rw.Writer(), keyAccountTransactionLatestHeightKey, uint64(1))
 			})
 			require.NoError(t, err)
 

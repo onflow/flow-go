@@ -451,5 +451,5 @@ func TestExtendedIndexer_NonSequentialHeight(t *testing.T) {
 	header := unittest.BlockHeaderFixtureOnChain(flow.Testnet, unittest.WithHeaderHeight(13))
 	err := ext.IndexBlockData(header, nil, nil)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), fmt.Sprintf("expected height %d, but got %d", 12, 13))
+	assert.Contains(t, err.Error(), fmt.Sprintf("indexing block skipped: expected height %d, got %d", 12, 13))
 }

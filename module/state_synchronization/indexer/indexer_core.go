@@ -17,7 +17,6 @@ import (
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/convert"
-	"github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/access/systemcollection"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
@@ -45,7 +44,7 @@ type IndexerCore struct {
 	scheduledTransactions storage.ScheduledTransactions
 	protocolDB            storage.DB
 
-	accountIndexer *extended.ExtendedIndexer
+	extendedIndexer extended.IndexerManager
 
 	derivedChainData *derived.DerivedChainData
 	serviceAddress   flow.Address
@@ -71,7 +70,7 @@ func New(
 	collectionIndexer collections.CollectionIndexer,
 	collectionExecutedMetric module.CollectionExecutedMetric,
 	lockManager lockctx.Manager,
-	accountIndexer *extended.ExtendedIndexer,
+	extendedIndexer extended.IndexerManager,
 ) *IndexerCore {
 	log = log.With().Str("component", "execution_indexer").Logger()
 	metrics.InitializeLatestHeight(registers.LatestHeight())
@@ -100,10 +99,10 @@ func New(
 		serviceAddress:        chainID.Chain().ServiceAddress(),
 		derivedChainData:      derivedChainData,
 
+		extendedIndexer:          extendedIndexer,
 		collectionIndexer:        collectionIndexer,
 		collectionExecutedMetric: collectionExecutedMetric,
 		lockManager:              lockManager,
-		accountIndexer:           accountIndexer,
 	}
 }
 
@@ -255,36 +254,11 @@ func (c *IndexerCore) IndexBlockData(data *execution_data.BlockExecutionDataEnti
 	})
 
 	// Index account transactions if enabled
-	if c.accountIndexer != nil {
+	if c.extendedIndexer != nil {
 		g.Go(func() error {
-			// NOTE: FVM assigns TransactionIndex globally across the whole block (all user txs in
-			// collection order, then system/scheduled txs). Flattening chunks in order keeps txIndex
-			// alignment with events.
-			txs := make([]*flow.TransactionBody, 0)
-			events := make([]flow.Event, 0)
-			for i, chunk := range data.ChunkExecutionDatas {
-				if chunk.Collection != nil {
-					txs = append(txs, chunk.Collection.Transactions...)
-				} else {
-					// system collection
-					if i != len(data.ChunkExecutionDatas)-1 {
-						return fmt.Errorf("chunk collection is nil but not the last chunk")
-					}
-					versionedCollection := systemcollection.Default(c.chainID)
-					systemCollection, err := versionedCollection.
-						ByHeight(header.Height).
-						SystemCollection(c.chainID.Chain(), access.StaticEventProvider(chunk.Events))
-					if err != nil {
-						return fmt.Errorf("could not get system collection: %w", err)
-					}
-					txs = append(txs, systemCollection.Transactions...)
-				}
-				events = append(events, chunk.Events...)
-			}
-
-			err := c.accountIndexer.IndexBlockData(header, txs, events)
+			err := c.extendedIndexer.IndexBlockExecutionData(data)
 			if err != nil {
-				return fmt.Errorf("could not index account data at height %d: %w", header.Height, err)
+				return fmt.Errorf("could not build block data from execution data: %w", err)
 			}
 
 			return nil

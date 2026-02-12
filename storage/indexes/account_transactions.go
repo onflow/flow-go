@@ -53,14 +53,6 @@ const (
 	accountTxPrefixWithHeightLen = accountTxPrefixLen + 8
 )
 
-var (
-	// accountTxLatestHeightKey stores the latest indexed height for account transactions
-	accountTxLatestHeightKey = []byte{codeIndexProcessedHeightUpperBound, codeAccountTransactions}
-
-	// accountTxFirstHeightKey stores the first indexed height for account transactions
-	accountTxFirstHeightKey = []byte{codeIndexProcessedHeightLowerBound, codeAccountTransactions}
-)
-
 var _ storage.AccountTransactions = (*AccountTransactions)(nil)
 
 // NewAccountTransactions creates a new AccountTransactions backed by the given database.
@@ -71,7 +63,7 @@ var _ storage.AccountTransactions = (*AccountTransactions)(nil)
 // Expected error returns during normal operations:
 //   - [storage.ErrNotBootstrapped] if the index has not been initialized
 func NewAccountTransactions(db storage.DB) (*AccountTransactions, error) {
-	firstHeight, err := accountTxFirstStoredHeight(db.Reader())
+	firstHeight, err := accountTxHeightLookup(db.Reader(), keyAccountTransactionFirstHeightKey)
 	if err != nil {
 		if errors.Is(err, storage.ErrNotFound) {
 			return nil, storage.ErrNotBootstrapped
@@ -79,7 +71,7 @@ func NewAccountTransactions(db storage.DB) (*AccountTransactions, error) {
 		return nil, fmt.Errorf("could not get first height: %w", err)
 	}
 
-	persistedLatestHeight, err := accountTxLatestStoredHeight(db.Reader())
+	persistedLatestHeight, err := accountTxHeightLookup(db.Reader(), keyAccountTransactionLatestHeightKey)
 	if err != nil {
 		// if `firstHeight` is set, then `latestHeight` must be set as well, otherwise the database
 		// is in a corrupted state.
@@ -245,7 +237,7 @@ func indexAccountTransactions(lctx lockctx.Proof, rw storage.ReaderBatchWriter, 
 		return fmt.Errorf("missing required lock: %s", storage.LockIndexAccountTransactions)
 	}
 
-	latestHeight, err := accountTxLatestStoredHeight(rw.GlobalReader())
+	latestHeight, err := accountTxHeightLookup(rw.GlobalReader(), keyAccountTransactionLatestHeightKey)
 	if err != nil {
 		return fmt.Errorf("could not get latest indexed height: %w", err)
 	}
@@ -280,7 +272,7 @@ func indexAccountTransactions(lctx lockctx.Proof, rw storage.ReaderBatchWriter, 
 	}
 
 	// Update latest height
-	if err := operation.UpsertByKey(writer, accountTxLatestHeightKey, blockHeight); err != nil {
+	if err := operation.UpsertByKey(writer, keyAccountTransactionLatestHeightKey, blockHeight); err != nil {
 		return fmt.Errorf("could not update latest height: %w", err)
 	}
 
@@ -298,7 +290,7 @@ func initialize(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockHeight ui
 	}
 
 	// double check the first/latest heights are not already stored
-	exists, err := operation.KeyExists(rw.GlobalReader(), accountTxFirstHeightKey)
+	exists, err := operation.KeyExists(rw.GlobalReader(), keyAccountTransactionFirstHeightKey)
 	if err != nil {
 		return fmt.Errorf("could not check if first height key exists: %w", err)
 	}
@@ -306,7 +298,7 @@ func initialize(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockHeight ui
 		return fmt.Errorf("first height key already exists: %w", storage.ErrAlreadyExists)
 	}
 
-	exists, err = operation.KeyExists(rw.GlobalReader(), accountTxLatestHeightKey)
+	exists, err = operation.KeyExists(rw.GlobalReader(), keyAccountTransactionLatestHeightKey)
 	if err != nil {
 		return fmt.Errorf("could not check if latest height key exists: %w", err)
 	}
@@ -340,10 +332,10 @@ func initialize(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockHeight ui
 		}
 	}
 
-	if err := operation.UpsertByKey(writer, accountTxFirstHeightKey, blockHeight); err != nil {
+	if err := operation.UpsertByKey(writer, keyAccountTransactionFirstHeightKey, blockHeight); err != nil {
 		return fmt.Errorf("could not update first height: %w", err)
 	}
-	if err := operation.UpsertByKey(writer, accountTxLatestHeightKey, blockHeight); err != nil {
+	if err := operation.UpsertByKey(writer, keyAccountTransactionLatestHeightKey, blockHeight); err != nil {
 		return fmt.Errorf("could not update latest height: %w", err)
 	}
 
@@ -412,22 +404,6 @@ func decodeAccountTxKey(key []byte) (flow.Address, uint64, uint32, error) {
 	txIndex := binary.BigEndian.Uint32(key[offset:])
 
 	return address, height, txIndex, nil
-}
-
-// accountTxFirstStoredHeight reads the first indexed height from the database.
-//
-// Expected error returns during normal operations:
-//   - [storage.ErrNotFound] if the height is not found
-func accountTxFirstStoredHeight(reader storage.Reader) (uint64, error) {
-	return accountTxHeightLookup(reader, accountTxFirstHeightKey)
-}
-
-// accountTxLatestStoredHeight reads the latest indexed height from the database.
-//
-// Expected error returns during normal operations:
-//   - [storage.ErrNotFound] if the height is not found
-func accountTxLatestStoredHeight(reader storage.Reader) (uint64, error) {
-	return accountTxHeightLookup(reader, accountTxLatestHeightKey)
 }
 
 // accountTxHeightLookup reads a height value from the database.
