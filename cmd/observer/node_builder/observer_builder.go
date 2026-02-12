@@ -1128,8 +1128,8 @@ func (builder *ObserverServiceBuilder) Build() (cmd.Node, error) {
 func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverServiceBuilder {
 	var ds datastore.Batching
 	var bs network.BlobService
-	var processedBlockHeight storage.ConsumerProgressInitializer
-	var processedNotifications storage.ConsumerProgressInitializer
+	var processedBlockHeightInitializer storage.ConsumerProgressInitializer
+	var processedNotificationsInitializer storage.ConsumerProgressInitializer
 	var publicBsDependable *module.ProxiedReadyDoneAware
 	var execDataDistributor *edrequester.ExecutionDataDistributor
 	var execDataCacheBackend *herocache.BlockExecutionData
@@ -1178,7 +1178,7 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 			// writes execution data to.
 			db := builder.ExecutionDatastoreManager.DB()
 
-			processedBlockHeight = store.NewConsumerProgress(db, module.ConsumeProgressExecutionDataRequesterBlockHeight)
+			processedBlockHeightInitializer = store.NewConsumerProgress(db, module.ConsumeProgressExecutionDataRequesterBlockHeight)
 			return nil
 		}).
 		Module("processed notifications consumer progress", func(node *cmd.NodeConfig) error {
@@ -1186,7 +1186,7 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 			// writes execution data to.
 			db := builder.ExecutionDatastoreManager.DB()
 
-			processedNotifications = store.NewConsumerProgress(db, module.ConsumeProgressExecutionDataRequesterNotification)
+			processedNotificationsInitializer = store.NewConsumerProgress(db, module.ConsumeProgressExecutionDataRequesterNotification)
 			return nil
 		}).
 		Module("blobservice peer manager dependencies", func(node *cmd.NodeConfig) error {
@@ -1315,6 +1315,16 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 				execDataCacheBackend,
 			)
 
+			// start processing from the initial block height resolved from the execution data config
+			processedBlockHeight, err := processedBlockHeightInitializer.Initialize(builder.executionDataConfig.InitialBlockHeight)
+			if err != nil {
+				return nil, fmt.Errorf("could not initialize processed block height: %w", err)
+			}
+			processedNotifications, err := processedNotificationsInitializer.Initialize(builder.executionDataConfig.InitialBlockHeight)
+			if err != nil {
+				return nil, fmt.Errorf("could not initialize processed notifications: %w", err)
+			}
+
 			r, err := edrequester.New(
 				builder.Logger,
 				metrics.NewExecutionDataRequesterCollector(),
@@ -1370,11 +1380,11 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 			return builder.ExecutionDataPruner, nil
 		})
 	if builder.executionDataIndexingEnabled {
-		var indexedBlockHeight storage.ConsumerProgressInitializer
+		var indexedBlockHeightInitializer storage.ConsumerProgressInitializer
 
 		builder.Module("indexed block height consumer progress", func(node *cmd.NodeConfig) error {
 			// Note: progress is stored in the MAIN db since that is where indexed execution data is stored.
-			indexedBlockHeight = store.NewConsumerProgress(builder.ProtocolDB, module.ConsumeProgressExecutionDataIndexerBlockHeight)
+			indexedBlockHeightInitializer = store.NewConsumerProgress(builder.ProtocolDB, module.ConsumeProgressExecutionDataIndexerBlockHeight)
 			return nil
 		}).Module("transaction results storage", func(node *cmd.NodeConfig) error {
 			builder.lightTransactionResults = store.NewLightTransactionResults(node.Metrics.Cache, node.ProtocolDB, bstorage.DefaultCacheSize)
@@ -1561,6 +1571,13 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 				node.StorageLockMgr,
 				builder.ExtendedIndexer,
 			)
+
+			// start processing from the first height of the registers db, which is initialized from
+			// the checkpoint. this ensures a consistent starting point for the indexed data.
+			indexedBlockHeight, err := indexedBlockHeightInitializer.Initialize(registers.FirstHeight())
+			if err != nil {
+				return nil, fmt.Errorf("could not initialize indexed block height: %w", err)
+			}
 
 			// execution state worker uses a jobqueue to process new execution data and indexes it by using the indexer.
 			builder.ExecutionIndexer, err = indexer.NewIndexer(

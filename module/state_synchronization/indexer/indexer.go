@@ -70,13 +70,18 @@ func NewIndexer(
 	indexer *IndexerCore,
 	executionCache *cache.ExecutionDataCache,
 	executionDataLatestHeight func() (uint64, error),
-	processedHeightInitializer storage.ConsumerProgressInitializer,
+	processedHeight storage.ConsumerProgress,
 ) (*Indexer, error) {
+	lastProcessedHeight, err := processedHeight.ProcessedIndex()
+	if err != nil {
+		return nil, fmt.Errorf("could not get last processed height: %w", err)
+	}
+
 	r := &Indexer{
 		log:                     log.With().Str("module", "execution_indexer").Logger(),
 		exeDataNotifier:         engine.NewNotifier(),
 		blockIndexedNotifier:    engine.NewNotifier(),
-		lastProcessedHeight:     atomic.NewUint64(initHeight),
+		lastProcessedHeight:     atomic.NewUint64(lastProcessedHeight),
 		indexer:                 indexer,
 		registers:               registers,
 		ProcessedHeightRecorder: execution_data.NewProcessedHeightRecorderManager(initHeight),
@@ -89,9 +94,8 @@ func NewIndexer(
 	jobConsumer, err := jobqueue.NewComponentConsumer(
 		r.log,
 		r.exeDataNotifier.Channel(),
-		processedHeightInitializer,
+		processedHeight,
 		r.exeDataReader,
-		initHeight,
 		r.processExecutionData,
 		workersCount,
 		searchAhead,
