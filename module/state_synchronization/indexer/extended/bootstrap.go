@@ -5,13 +5,14 @@ import (
 	"io"
 	"time"
 
+	"github.com/rs/zerolog"
+
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/indexes"
 	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
 	pstorage "github.com/onflow/flow-go/storage/pebble"
-	"github.com/rs/zerolog"
 )
 
 // BootstrapExtendedIndexes bootstraps the extended index database, and instantiates the extended indexer.
