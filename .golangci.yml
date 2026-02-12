@@ -67,9 +67,10 @@ linters:
       - third_party$
       - builtin$
       - examples$
+
 formatters:
   enable:
-    - goimports
+    - gci
   settings:
     gci:
       sections:
@@ -78,12 +79,11 @@ formatters:
         - prefix(github.com/onflow/)
         - prefix(github.com/onflow/flow-go/)
       custom-order: true
-    goimports:
-      local-prefixes:
-        - github.com/onflow/flow-go/
   exclusions:
     generated: lax
     paths:
       - third_party$
       - builtin$
       - examples$
+      - mocks$
+      - mock$

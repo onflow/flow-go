@@ -15,13 +15,14 @@ import (
 	"github.com/ipfs/go-cid"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/routing"
-	"github.com/onflow/crypto"
-	"github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/rs/zerolog"
 	"github.com/spf13/pflag"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
+
+	"github.com/onflow/crypto"
+	"github.com/onflow/flow/protobuf/go/flow/access"
 
 	txvalidator "github.com/onflow/flow-go/access/validator"
 	"github.com/onflow/flow-go/admin/commands"

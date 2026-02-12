@@ -6,12 +6,13 @@ import (
 	"testing"
 
 	"github.com/jordanschalm/lockctx"
-	"github.com/onflow/cadence"
-	"github.com/onflow/cadence/common"
-	"github.com/onflow/cadence/encoding/ccf"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+
+	"github.com/onflow/cadence"
+	"github.com/onflow/cadence/common"
+	"github.com/onflow/cadence/encoding/ccf"
 
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/access"

@@ -4,12 +4,11 @@ import (
 	"context"
 	"time"
 
-	"google.golang.org/grpc/codes"
-
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/protocol"
 	httpmetrics "github.com/slok/go-http-metrics/metrics"
+	"google.golang.org/grpc/codes"
 
 	"github.com/onflow/flow-go/model/chainsync"
 	"github.com/onflow/flow-go/model/cluster"
