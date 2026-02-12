@@ -122,7 +122,7 @@ func (b *AccountTransactionsBootstrapper) Store(lctx lockctx.Proof, rw storage.R
 		// successfully initialized `store` since we checked the value above. since the bootstrap
 		// operation is protected by the lock and it performs sanity checks to ensure the table
 		// is actually empty, the bootstrap operation should fail if there was concurrent access.
-		return fmt.Errorf("account transactions initialized during bootstrap: %w", storage.ErrAlreadyExists)
+		return fmt.Errorf("account transactions initialized during bootstrap")
 	}
 
 	return nil

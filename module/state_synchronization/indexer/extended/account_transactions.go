@@ -33,7 +33,7 @@ func NewAccountTransactions(
 	lockManager storage.LockManager,
 ) *AccountTransactions {
 	return &AccountTransactions{
-		log:         log.With().Str("component", "account_transactions_indexer").Logger(),
+		log:         log.With().Str("component", "account_tx_indexer").Logger(),
 		store:       store,
 		chainID:     chainID,
 		lockManager: lockManager,

@@ -111,10 +111,9 @@ import (
 	"github.com/onflow/flow-go/state/protocol/events/gadgets"
 	"github.com/onflow/flow-go/storage"
 	bstorage "github.com/onflow/flow-go/storage/badger"
-	"github.com/onflow/flow-go/storage/indexes"
-	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
 	pstorage "github.com/onflow/flow-go/storage/pebble"
 	"github.com/onflow/flow-go/storage/store"
+	"github.com/onflow/flow-go/utils"
 	"github.com/onflow/flow-go/utils/grpcutils"
 	"github.com/onflow/flow-go/utils/io"
 )
@@ -1473,53 +1472,28 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 			}
 
 			if builder.extendedIndexingEnabled {
-				indexerDB, err := pstorage.SafeOpen(
-					node.Logger.With().Str("pebbledb", "indexer").Logger(),
+				extendedIndexer, indexerDB, err := extended.BootstrapExtendedIndexes(
+					node.Logger,
+					utils.NotNil(builder.State),
+					utils.NotNil(builder.Storage.Blocks),
+					utils.NotNil(builder.Storage.Collections),
+					utils.NotNil(builder.events),
+					utils.NotNil(builder.lightTransactionResults),
+					utils.NotNil(builder.StorageLockMgr),
 					builder.extendedIndexingDBPath,
+					builder.extendedIndexingBackfillDelay,
 				)
+
 				if err != nil {
-					return nil, fmt.Errorf("could not open indexer db: %w", err)
+					return nil, fmt.Errorf("could not bootstrap extended indexer: %w", err)
 				}
+
 				builder.ShutdownFunc(func() error {
 					if err := indexerDB.Close(); err != nil {
 						return fmt.Errorf("error closing indexer db: %w", err)
 					}
 					return nil
 				})
-
-				indexerStorageDB := pebbleimpl.ToDB(indexerDB)
-				accountTxStore, err := indexes.NewAccountTransactionsBootstrapper(
-					indexerStorageDB,
-					builder.SealedRootBlock.Height,
-				)
-				if err != nil {
-					return nil, fmt.Errorf("could not create account transactions index: %w", err)
-				}
-
-				accountTxIndexer := extended.NewAccountTransactions(
-					builder.Logger,
-					accountTxStore,
-					builder.RootChainID,
-					node.StorageLockMgr,
-				)
-
-				extendedIndexer, err := extended.NewExtendedIndexer(
-					builder.Logger,
-					metrics.NewExtendedIndexingCollector(),
-					indexerStorageDB,
-					node.StorageLockMgr,
-					builder.State,
-					builder.Storage.Blocks,
-					builder.Storage.Collections,
-					builder.events,
-					builder.lightTransactionResults,
-					[]extended.Indexer{accountTxIndexer},
-					builder.RootChainID,
-					builder.extendedIndexingBackfillDelay,
-				)
-				if err != nil {
-					return nil, fmt.Errorf("could not create extended indexer: %w", err)
-				}
 
 				builder.ExtendedIndexer = extendedIndexer
 			}

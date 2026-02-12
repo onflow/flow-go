@@ -85,6 +85,12 @@ func NewAccountTransactions(db storage.DB) (*AccountTransactions, error) {
 	}, nil
 }
 
+// BootstrapAccountTransactions initializes the account transactions index with data from the first block,
+// and returns a new [AccountTransactions] instance.
+// The caller must hold the [storage.LockIndexAccountTransactions] lock until the batch is committed.
+//
+// Expected error returns during normal operations:
+//   - [storage.ErrAlreadyExists] if any data is found for while initializing
 func BootstrapAccountTransactions(lctx lockctx.Proof, rw storage.ReaderBatchWriter, db storage.DB, initialStartHeight uint64, txData []access.AccountTransaction) (*AccountTransactions, error) {
 	err := initialize(lctx, rw, initialStartHeight, txData)
 	if err != nil {

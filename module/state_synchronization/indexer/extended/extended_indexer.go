@@ -88,7 +88,7 @@ func NewExtendedIndexer(
 
 	log = log.With().Str("component", "extended_indexer").Logger()
 	c := &ExtendedIndexer{
-		log:           log,
+		log:           log.With().Str("component", "extended_indexer").Logger(),
 		db:            db,
 		lockManager:   lockManager,
 		metrics:       metrics,

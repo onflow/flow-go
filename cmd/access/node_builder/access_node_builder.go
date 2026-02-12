@@ -120,10 +120,9 @@ import (
 	statedatastore "github.com/onflow/flow-go/state/protocol/datastore"
 	"github.com/onflow/flow-go/storage"
 	bstorage "github.com/onflow/flow-go/storage/badger"
-	"github.com/onflow/flow-go/storage/indexes"
-	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
 	pstorage "github.com/onflow/flow-go/storage/pebble"
 	"github.com/onflow/flow-go/storage/store"
+	"github.com/onflow/flow-go/utils"
 	"github.com/onflow/flow-go/utils/grpcutils"
 )
 
@@ -959,55 +958,27 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				}
 
 				if builder.extendedIndexingEnabled {
-					indexerDB, err := pstorage.SafeOpen(
-						node.Logger.With().Str("pebbledb", "indexer").Logger(),
+					extendedIndexer, indexerDB, err := extended.BootstrapExtendedIndexes(
+						node.Logger,
+						utils.NotNil(builder.State),
+						utils.NotNil(builder.Storage.Blocks),
+						utils.NotNil(builder.Storage.Collections),
+						utils.NotNil(builder.events),
+						utils.NotNil(builder.lightTransactionResults),
+						utils.NotNil(builder.StorageLockMgr),
 						builder.extendedIndexingDBPath,
+						builder.extendedIndexingBackfillDelay,
 					)
 					if err != nil {
-						return nil, fmt.Errorf("could not open indexer db: %w", err)
+						return nil, fmt.Errorf("could not bootstrap extended indexer: %w", err)
 					}
+
 					builder.ShutdownFunc(func() error {
 						if err := indexerDB.Close(); err != nil {
 							return fmt.Errorf("error closing indexer db: %w", err)
 						}
 						return nil
 					})
-
-					indexerStorageDB := pebbleimpl.ToDB(indexerDB)
-					accountTxStore, err := indexes.NewAccountTransactionsBootstrapper(
-						indexerStorageDB,
-						builder.SealedRootBlock.Height,
-					)
-					if err != nil {
-						return nil, fmt.Errorf("could not create account transactions index: %w", err)
-					}
-
-					extendedIndexers := []extended.Indexer{
-						extended.NewAccountTransactions(
-							builder.Logger,
-							accountTxStore,
-							builder.RootChainID,
-							node.StorageLockMgr,
-						),
-					}
-
-					extendedIndexer, err := extended.NewExtendedIndexer(
-						builder.Logger,
-						metrics.NewExtendedIndexingCollector(),
-						indexerStorageDB,
-						node.StorageLockMgr,
-						notNil(builder.State),
-						notNil(builder.Storage.Blocks),
-						notNil(builder.collections),
-						notNil(builder.events),
-						notNil(builder.lightTransactionResults),
-						extendedIndexers,
-						builder.RootChainID,
-						builder.extendedIndexingBackfillDelay,
-					)
-					if err != nil {
-						return nil, fmt.Errorf("could not create extended indexer: %w", err)
-					}
 
 					builder.ExtendedIndexer = extendedIndexer
 				}
@@ -1020,18 +991,18 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				builder.ExecutionIndexerCore = indexer.New(
 					builder.Logger,
 					metrics.NewExecutionStateIndexerCollector(),
-					notNil(builder.ProtocolDB),
-					notNil(builder.Storage.RegisterIndex),
-					notNil(builder.Storage.Headers),
-					notNil(builder.events),
-					notNil(builder.collections),
-					notNil(builder.transactions),
-					notNil(builder.lightTransactionResults),
-					notNil(builder.scheduledTransactions),
+					utils.NotNil(builder.ProtocolDB),
+					utils.NotNil(builder.Storage.RegisterIndex),
+					utils.NotNil(builder.Storage.Headers),
+					utils.NotNil(builder.events),
+					utils.NotNil(builder.collections),
+					utils.NotNil(builder.transactions),
+					utils.NotNil(builder.lightTransactionResults),
+					utils.NotNil(builder.scheduledTransactions),
 					builder.RootChainID,
 					indexerDerivedChainData,
-					notNil(builder.CollectionIndexer),
-					notNil(builder.collectionExecutedMetric),
+					utils.NotNil(builder.CollectionIndexer),
+					utils.NotNil(builder.collectionExecutedMetric),
 					node.StorageLockMgr,
 					builder.ExtendedIndexer,
 				)
@@ -1049,7 +1020,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 					registers.FirstHeight(),
 					registers,
 					builder.ExecutionIndexerCore,
-					notNil(builder.ExecutionDataCache),
+					utils.NotNil(builder.ExecutionDataCache),
 					builder.ExecutionDataRequester.HighestConsecutiveHeight,
 					indexedBlockHeight,
 				)
@@ -1165,7 +1136,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				node.Storage.Seals,
 				node.Storage.Results,
 				builder.ExecutionDataStore,
-				notNil(builder.ExecutionDataCache),
+				utils.NotNil(builder.ExecutionDataCache),
 				builder.RegistersAsyncStore,
 				builder.EventsIndex,
 				useIndex,
@@ -1186,7 +1157,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 			stateStreamEng, err := statestreambackend.NewEng(
 				node.Logger,
 				builder.stateStreamConf,
-				notNil(builder.ExecutionDataCache),
+				utils.NotNil(builder.ExecutionDataCache),
 				node.Storage.Headers,
 				node.RootChainID,
 				builder.stateStreamGrpcServer,
@@ -1794,7 +1765,7 @@ func (builder *FlowAccessNodeBuilder) Initialize() error {
 	builder.EnqueueNetworkInit()
 
 	builder.AdminCommand("get-transactions", func(conf *cmd.NodeConfig) commands.AdminCommand {
-		return storageCommands.NewGetTransactionsCommand(conf.State, conf.Storage.Payloads, notNil(builder.collections))
+		return storageCommands.NewGetTransactionsCommand(conf.State, conf.Storage.Payloads, utils.NotNil(builder.collections))
 	})
 
 	// if this is an access node that supports public followers, enqueue the public network
@@ -2225,34 +2196,34 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			builder.txResultErrorMessageProvider = error_messages.NewTxErrorMessageProvider(
 				node.Logger,
 				builder.transactionResultErrorMessages, // might be nil
-				notNil(builder.TxResultsIndex),
+				utils.NotNil(builder.TxResultsIndex),
 				connFactory,
 				nodeCommunicator,
-				notNil(builder.ExecNodeIdentitiesProvider),
+				utils.NotNil(builder.ExecNodeIdentitiesProvider),
 			)
 
 			builder.nodeBackend, err = backend.New(backend.Params{
 				State:                 node.State,
 				CollectionRPC:         builder.CollectionRPC, // might be nil
-				HistoricalAccessNodes: notNil(builder.HistoricalAccessRPCs),
+				HistoricalAccessNodes: utils.NotNil(builder.HistoricalAccessRPCs),
 				Blocks:                node.Storage.Blocks,
 				Headers:               node.Storage.Headers,
-				Collections:           notNil(builder.collections),
-				Transactions:          notNil(builder.transactions),
+				Collections:           utils.NotNil(builder.collections),
+				Transactions:          utils.NotNil(builder.transactions),
 				ExecutionReceipts:     node.Storage.Receipts,
 				ExecutionResults:      node.Storage.Results,
 				Seals:                 node.Storage.Seals,
 				TxResultErrorMessages: builder.transactionResultErrorMessages, // might be nil
 				ScheduledTransactions: builder.scheduledTransactions,          // might be nil
 				ChainID:               node.RootChainID,
-				AccessMetrics:         notNil(builder.AccessMetrics),
+				AccessMetrics:         utils.NotNil(builder.AccessMetrics),
 				ConnFactory:           connFactory,
 				MaxHeightRange:        backendConfig.MaxHeightRange,
 				Log:                   node.Logger,
 				SnapshotHistoryLimit:  backend.DefaultSnapshotHistoryLimit,
 				Communicator:          nodeCommunicator,
 				TxResultCacheSize:     builder.TxResultCacheSize,
-				ScriptExecutor:        notNil(builder.ScriptExecutor),
+				ScriptExecutor:        utils.NotNil(builder.ScriptExecutor),
 				ScriptExecutionMode:   scriptExecMode,
 				CheckPayerBalanceMode: checkPayerBalanceMode,
 				EventQueryMode:        eventQueryMode,
@@ -2264,14 +2235,14 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 					builder.stateStreamConf.ResponseLimit,
 					builder.stateStreamConf.ClientSendBufferSize,
 				),
-				EventsIndex:                notNil(builder.EventsIndex),
+				EventsIndex:                utils.NotNil(builder.EventsIndex),
 				TxResultQueryMode:          txResultQueryMode,
-				TxResultsIndex:             notNil(builder.TxResultsIndex),
+				TxResultsIndex:             utils.NotNil(builder.TxResultsIndex),
 				LastFullBlockHeight:        lastFullBlockHeight,
 				IndexReporter:              indexReporter,
-				VersionControl:             notNil(builder.VersionControl),
-				ExecNodeIdentitiesProvider: notNil(builder.ExecNodeIdentitiesProvider),
-				TxErrorMessageProvider:     notNil(builder.txResultErrorMessageProvider),
+				VersionControl:             utils.NotNil(builder.VersionControl),
+				ExecNodeIdentitiesProvider: utils.NotNil(builder.ExecNodeIdentitiesProvider),
+				TxErrorMessageProvider:     utils.NotNil(builder.txResultErrorMessageProvider),
 				MaxScriptAndArgumentSize:   config.BackendConfig.AccessConfig.MaxRequestMsgSize,
 			})
 			if err != nil {
@@ -2283,14 +2254,14 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				node.State,
 				config,
 				node.RootChainID,
-				notNil(builder.AccessMetrics),
+				utils.NotNil(builder.AccessMetrics),
 				builder.rpcMetricsEnabled,
-				notNil(builder.Me),
-				notNil(builder.nodeBackend),
-				notNil(builder.nodeBackend),
-				notNil(builder.secureGrpcServer),
-				notNil(builder.unsecureGrpcServer),
-				notNil(builder.stateStreamBackend),
+				utils.NotNil(builder.Me),
+				utils.NotNil(builder.nodeBackend),
+				utils.NotNil(builder.nodeBackend),
+				utils.NotNil(builder.secureGrpcServer),
+				utils.NotNil(builder.unsecureGrpcServer),
+				utils.NotNil(builder.stateStreamBackend),
 				builder.stateStreamConf,
 				indexReporter,
 				builder.FollowerDistributor,
@@ -2333,10 +2304,10 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			collectionIndexer, err := collections.NewIndexer(
 				node.Logger,
 				builder.ProtocolDB,
-				notNil(builder.collectionExecutedMetric),
+				utils.NotNil(builder.collectionExecutedMetric),
 				node.State,
 				node.Storage.Blocks,
-				notNil(builder.collections),
+				utils.NotNil(builder.collections),
 				lastFullBlockHeight,
 				node.StorageLockMgr,
 			)
@@ -2352,7 +2323,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			if builder.executionDataSyncEnabled && !builder.executionDataIndexingEnabled {
 				executionDataSyncer = collections.NewExecutionDataSyncer(
 					node.Logger,
-					notNil(builder.ExecutionDataCache),
+					utils.NotNil(builder.ExecutionDataCache),
 					collectionIndexer,
 				)
 			}
@@ -2361,7 +2332,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				node.Logger,
 				builder.RequestEng,
 				node.State,
-				notNil(builder.collections),
+				utils.NotNil(builder.collections),
 				lastFullBlockHeight,
 				collectionIndexer,
 				executionDataSyncer,
@@ -2376,9 +2347,9 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			if builder.storeTxResultErrorMessages {
 				builder.TxResultErrorMessagesCore = tx_error_messages.NewTxErrorMessagesCore(
 					node.Logger,
-					notNil(builder.txResultErrorMessageProvider),
+					utils.NotNil(builder.txResultErrorMessageProvider),
 					builder.transactionResultErrorMessages,
-					notNil(builder.ExecNodeIdentitiesProvider),
+					utils.NotNil(builder.ExecNodeIdentitiesProvider),
 					node.StorageLockMgr,
 				)
 			}
@@ -2400,11 +2371,11 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				node.Storage.Results,
 				node.Storage.Receipts,
 				processedFinalizedBlockHeight,
-				notNil(builder.CollectionSyncer),
-				notNil(builder.CollectionIndexer),
-				notNil(builder.collectionExecutedMetric),
+				utils.NotNil(builder.CollectionSyncer),
+				utils.NotNil(builder.CollectionIndexer),
+				utils.NotNil(builder.collectionExecutedMetric),
 				builder.AccessMetrics,
-				notNil(builder.TxResultErrorMessagesCore),
+				utils.NotNil(builder.TxResultErrorMessagesCore),
 				builder.FollowerDistributor,
 			)
 			if err != nil {
@@ -2655,16 +2626,4 @@ func (builder *FlowAccessNodeBuilder) initPublicLibp2pNode(networkKey crypto.Pri
 	}
 
 	return libp2pNode, nil
-}
-
-// notNil ensures that the input is not nil and returns it
-// the usage is to ensure the dependencies are initialized before initializing a module.
-// for instance, the IngestionEngine depends on storage.Collections, which is initialized in a
-// different function, so we need to ensure that the storage.Collections is initialized before
-// creating the IngestionEngine.
-func notNil[T any](dep T) T {
-	if any(dep) == nil {
-		panic("dependency is nil")
-	}
-	return dep
 }
