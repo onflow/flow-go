@@ -45,7 +45,7 @@ var (
 type BlockData struct {
 	Header       *flow.Header
 	Transactions []*flow.TransactionBody
-	Events       map[uint32][]flow.Event
+	Events       map[uint32][]flow.Event // grouped by transaction index
 }
 
 type Indexer interface {
