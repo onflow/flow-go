@@ -44,7 +44,7 @@ type IndexerCore struct {
 	scheduledTransactions storage.ScheduledTransactions
 	protocolDB            storage.DB
 
-	extendedIndexer extended.IndexerManager
+	extendedIndexer *extended.ExtendedIndexer
 
 	derivedChainData *derived.DerivedChainData
 	serviceAddress   flow.Address
@@ -70,7 +70,7 @@ func New(
 	collectionIndexer collections.CollectionIndexer,
 	collectionExecutedMetric module.CollectionExecutedMetric,
 	lockManager lockctx.Manager,
-	extendedIndexer extended.IndexerManager,
+	extendedIndexer *extended.ExtendedIndexer,
 ) *IndexerCore {
 	log = log.With().Str("component", "execution_indexer").Logger()
 	metrics.InitializeLatestHeight(registers.LatestHeight())

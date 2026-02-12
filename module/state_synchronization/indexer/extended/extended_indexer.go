@@ -40,11 +40,11 @@ type ExtendedIndexer struct {
 	log           zerolog.Logger
 	db            storage.DB
 	lockManager   storage.LockManager
-	state         protocol.State
 	metrics       module.ExtendedIndexingMetrics
 	backfillDelay time.Duration
 
 	chainID           flow.ChainID
+	state             protocol.State
 	blocks            storage.Blocks
 	collections       storage.Collections
 	events            storage.Events
@@ -169,6 +169,10 @@ func (c *ExtendedIndexer) IndexBlockData(
 	return nil
 }
 
+// ingestLoop is the main ingestion loop for the extended indexer.
+// It indexes the next heights for all indexers, and handles backfilling from storage.
+//
+// NOT CONCURRENCY SAFE! Only one instance may be run at a time.
 func (c *ExtendedIndexer) ingestLoop(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 	ready()
 
@@ -187,6 +191,8 @@ func (c *ExtendedIndexer) ingestLoop(ctx irrecoverable.SignalerContext, ready co
 			return
 		}
 
+		// once all indexers are caught up with the live height, stop resetting the backfill timer
+		// so the only notification will be for new live blocks.
 		if c.hasBackfillingIndexers() {
 			timer.Reset(c.backfillDelay)
 		}

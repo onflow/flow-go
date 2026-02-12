@@ -2204,8 +2204,8 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 
 			builder.nodeBackend, err = backend.New(backend.Params{
 				State:                 node.State,
-				CollectionRPC:         builder.CollectionRPC, // might be nil
-				HistoricalAccessNodes: utils.NotNil(builder.HistoricalAccessRPCs),
+				CollectionRPC:         builder.CollectionRPC,        // might be nil
+				HistoricalAccessNodes: builder.HistoricalAccessRPCs, // might be nil
 				Blocks:                node.Storage.Blocks,
 				Headers:               node.Storage.Headers,
 				Collections:           utils.NotNil(builder.collections),
@@ -2375,7 +2375,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				utils.NotNil(builder.CollectionIndexer),
 				utils.NotNil(builder.collectionExecutedMetric),
 				builder.AccessMetrics,
-				utils.NotNil(builder.TxResultErrorMessagesCore),
+				builder.TxResultErrorMessagesCore, // will be nil if `storeTxResultErrorMessages` is false
 				builder.FollowerDistributor,
 			)
 			if err != nil {
