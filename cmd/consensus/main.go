@@ -102,8 +102,8 @@ func main() {
 		startupTime                           time.Time
 
 		// DKG contract client
-		machineAccountInfo *bootstrap.NodeMachineAccountInfo
-		flowClientConfigs  []*grpcclient.FlowClientConfig
+		machineAccountInfo        *bootstrap.NodeMachineAccountInfo
+		flowClientConfigs         []*grpcclient.FlowClientConfig
 		insecureAccessAPI         bool
 		accessNodeIDS             []string
 		requireBeaconKeyOnStartup bool
@@ -378,6 +378,7 @@ func main() {
 		}).
 		Module("beacon key verification", func(node *cmd.NodeConfig) error {
 			if !requireBeaconKeyOnStartup {
+				node.Logger.Info().Msg("beacon key verification on startup is disabled, skipping verification of beacon key for current epoch")
 				return nil
 			}
 			return dkgmodule.VerifyBeaconKeyForEpoch(node.Logger, node.NodeID, node.State, myBeaconKeyStateMachine)
