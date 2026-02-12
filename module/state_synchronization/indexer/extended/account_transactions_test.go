@@ -10,12 +10,15 @@ import (
 	"github.com/onflow/cadence/common"
 	"github.com/onflow/cadence/encoding/ccf"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/fvm/systemcontracts"
+	"github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/indexes"
+	storagemock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -23,6 +26,7 @@ import (
 // ===== Basic Indexing Tests =====
 
 func TestAccountTransactionsIndexer(t *testing.T) {
+	t.Parallel()
 	const testHeight = uint64(100)
 
 	t.Run("empty block", func(t *testing.T) {
@@ -68,10 +72,10 @@ func TestAccountTransactionsIndexer(t *testing.T) {
 		})
 
 		txID := tx.ID()
-		assertAccountTx(t, store, testHeight, payer, txID, false)
-		assertAccountTx(t, store, testHeight, proposer, txID, false)
-		assertAccountTx(t, store, testHeight, auth1, txID, true)
-		assertAccountTx(t, store, testHeight, auth2, txID, true)
+		assertAccountTxRoles(t, store, testHeight, payer, txID, []access.TransactionRole{access.TransactionRolePayer})
+		assertAccountTxRoles(t, store, testHeight, proposer, txID, []access.TransactionRole{access.TransactionRoleProposer})
+		assertAccountTxRoles(t, store, testHeight, auth1, txID, []access.TransactionRole{access.TransactionRoleAuthorizer})
+		assertAccountTxRoles(t, store, testHeight, auth2, txID, []access.TransactionRole{access.TransactionRoleAuthorizer})
 	})
 
 	t.Run("payer is also authorizer", func(t *testing.T) {
@@ -96,8 +100,8 @@ func TestAccountTransactionsIndexer(t *testing.T) {
 		})
 
 		txID := tx.ID()
-		assertAccountTx(t, store, testHeight, payer, txID, true)
-		assertAccountTx(t, store, testHeight, proposer, txID, false)
+		assertAccountTxRoles(t, store, testHeight, payer, txID, []access.TransactionRole{access.TransactionRoleAuthorizer, access.TransactionRolePayer})
+		assertAccountTxRoles(t, store, testHeight, proposer, txID, []access.TransactionRole{access.TransactionRoleProposer})
 		// payer should be deduplicated to one entry
 		assertTransactionCount(t, store, testHeight, payer, 1)
 	})
@@ -123,7 +127,7 @@ func TestAccountTransactionsIndexer(t *testing.T) {
 		})
 
 		txID := tx.ID()
-		assertAccountTx(t, store, testHeight, payer, txID, true)
+		assertAccountTxRoles(t, store, testHeight, payer, txID, []access.TransactionRole{access.TransactionRoleAuthorizer, access.TransactionRolePayer, access.TransactionRoleProposer})
 		assertTransactionCount(t, store, testHeight, payer, 1)
 	})
 
@@ -165,9 +169,10 @@ func TestAccountTransactionsIndexer(t *testing.T) {
 			Events:       map[uint32][]flow.Event{},
 		})
 
-		assertAccountTx(t, store, testHeight, account1, tx1.ID(), true)
-		assertAccountTx(t, store, testHeight, account2, tx2.ID(), true)
-		assertAccountTx(t, store, testHeight, account3, tx3.ID(), true)
+		allRoles := []access.TransactionRole{access.TransactionRoleAuthorizer, access.TransactionRolePayer, access.TransactionRoleProposer}
+		assertAccountTxRoles(t, store, testHeight, account1, tx1.ID(), allRoles)
+		assertAccountTxRoles(t, store, testHeight, account2, tx2.ID(), allRoles)
+		assertAccountTxRoles(t, store, testHeight, account3, tx3.ID(), allRoles)
 
 		// Each account should only have 1 transaction
 		assertTransactionCount(t, store, testHeight, account1, 1)
@@ -179,6 +184,7 @@ func TestAccountTransactionsIndexer(t *testing.T) {
 // ===== Event Address Extraction Tests =====
 
 func TestAccountTransactionsIndexer_EventAddresses(t *testing.T) {
+	t.Parallel()
 	const testHeight = uint64(100)
 
 	simpleTx := func(payer flow.Address) flow.TransactionBody {
@@ -188,6 +194,10 @@ func TestAccountTransactionsIndexer_EventAddresses(t *testing.T) {
 			tb.Authorizers = []flow.Address{payer}
 		})
 	}
+
+	// Common role sets for simpleTx (payer=proposer=authorizer) and event-only addresses
+	simpleTxRoles := []access.TransactionRole{access.TransactionRoleAuthorizer, access.TransactionRolePayer, access.TransactionRoleProposer}
+	interactionRoles := []access.TransactionRole{access.TransactionRoleInteraction}
 
 	// --- Generic event address extraction ---
 	// Tests that extractAddresses handles all cadence field types correctly in a single event:
@@ -231,9 +241,9 @@ func TestAccountTransactionsIndexer_EventAddresses(t *testing.T) {
 		})
 
 		txID := tx.ID()
-		assertAccountTx(t, store, testHeight, payer, txID, true)
-		assertAccountTx(t, store, testHeight, directAddr, txID, false)
-		assertAccountTx(t, store, testHeight, optionalAddr, txID, false)
+		assertAccountTxRoles(t, store, testHeight, payer, txID, simpleTxRoles)
+		assertAccountTxRoles(t, store, testHeight, directAddr, txID, interactionRoles)
+		assertAccountTxRoles(t, store, testHeight, optionalAddr, txID, interactionRoles)
 		// payer + 2 event addresses = 3 total entries for this tx
 		assertTransactionCount(t, store, testHeight, payer, 1)
 		assertTransactionCount(t, store, testHeight, directAddr, 1)
@@ -266,8 +276,8 @@ func TestAccountTransactionsIndexer_EventAddresses(t *testing.T) {
 		})
 
 		txID := tx.ID()
-		assertAccountTx(t, store, testHeight, payer, txID, true)
-		assertAccountTx(t, store, testHeight, recipient, txID, false)
+		assertAccountTxRoles(t, store, testHeight, payer, txID, simpleTxRoles)
+		assertAccountTxRoles(t, store, testHeight, recipient, txID, interactionRoles)
 	})
 
 	t.Run("FT withdrawn event adds sender", func(t *testing.T) {
@@ -286,8 +296,8 @@ func TestAccountTransactionsIndexer_EventAddresses(t *testing.T) {
 		})
 
 		txID := tx.ID()
-		assertAccountTx(t, store, testHeight, payer, txID, true)
-		assertAccountTx(t, store, testHeight, sender, txID, false)
+		assertAccountTxRoles(t, store, testHeight, payer, txID, simpleTxRoles)
+		assertAccountTxRoles(t, store, testHeight, sender, txID, interactionRoles)
 	})
 
 	t.Run("NFT deposited event adds recipient", func(t *testing.T) {
@@ -306,8 +316,8 @@ func TestAccountTransactionsIndexer_EventAddresses(t *testing.T) {
 		})
 
 		txID := tx.ID()
-		assertAccountTx(t, store, testHeight, payer, txID, true)
-		assertAccountTx(t, store, testHeight, recipient, txID, false)
+		assertAccountTxRoles(t, store, testHeight, payer, txID, simpleTxRoles)
+		assertAccountTxRoles(t, store, testHeight, recipient, txID, interactionRoles)
 	})
 
 	t.Run("NFT withdrawn event adds sender", func(t *testing.T) {
@@ -326,8 +336,8 @@ func TestAccountTransactionsIndexer_EventAddresses(t *testing.T) {
 		})
 
 		txID := tx.ID()
-		assertAccountTx(t, store, testHeight, payer, txID, true)
-		assertAccountTx(t, store, testHeight, sender, txID, false)
+		assertAccountTxRoles(t, store, testHeight, payer, txID, simpleTxRoles)
+		assertAccountTxRoles(t, store, testHeight, sender, txID, interactionRoles)
 	})
 
 	t.Run("FT event with nil address is skipped", func(t *testing.T) {
@@ -345,7 +355,7 @@ func TestAccountTransactionsIndexer_EventAddresses(t *testing.T) {
 		})
 
 		txID := tx.ID()
-		assertAccountTx(t, store, testHeight, payer, txID, true)
+		assertAccountTxRoles(t, store, testHeight, payer, txID, simpleTxRoles)
 		assertTransactionCount(t, store, testHeight, payer, 1)
 	})
 
@@ -375,7 +385,48 @@ func TestAccountTransactionsIndexer_EventAddresses(t *testing.T) {
 
 		// Payer should appear exactly once despite also being in the event
 		assertTransactionCount(t, store, testHeight, payer, 1)
-		assertAccountTx(t, store, testHeight, payer, tx.ID(), true)
+		// Payer has all simpleTx roles plus Interaction from the event
+		simpleTxPlusInteraction := []access.TransactionRole{
+			access.TransactionRoleAuthorizer, access.TransactionRolePayer, access.TransactionRoleProposer, access.TransactionRoleInteraction,
+		}
+		assertAccountTxRoles(t, store, testHeight, payer, tx.ID(), simpleTxPlusInteraction)
+	})
+
+	t.Run("duplicate event addresses in same transaction are deduplicated", func(t *testing.T) {
+		header := unittest.BlockHeaderFixtureOnChain(flow.Testnet, unittest.WithHeaderHeight(testHeight))
+		indexer, store, lm, db := newAccountTxIndexerForTest(t, flow.Testnet, testHeight)
+
+		payer := unittest.RandomAddressFixture()
+		eventAddr := unittest.RandomAddressFixture()
+		tx := simpleTx(payer)
+
+		// Two different events both referencing the same address
+		event1 := createTestEvent(t, 0, "Transfer",
+			[]cadence.Field{
+				{Identifier: "to", Type: cadence.AddressType},
+			},
+			[]cadence.Value{
+				cadence.NewAddress(eventAddr),
+			},
+		)
+		event2 := createTestEvent(t, 0, "Approval",
+			[]cadence.Field{
+				{Identifier: "from", Type: cadence.AddressType},
+			},
+			[]cadence.Value{
+				cadence.NewAddress(eventAddr),
+			},
+		)
+
+		indexBlock(t, indexer, lm, db, BlockData{
+			Header:       header,
+			Transactions: []*flow.TransactionBody{&tx},
+			Events:       map[uint32][]flow.Event{0: {event1, event2}},
+		})
+
+		// eventAddr should appear exactly once with a single Interaction role
+		assertTransactionCount(t, store, testHeight, eventAddr, 1)
+		assertAccountTxRoles(t, store, testHeight, eventAddr, tx.ID(), interactionRoles)
 	})
 
 	t.Run("event address does not override authorizer status", func(t *testing.T) {
@@ -409,8 +460,10 @@ func TestAccountTransactionsIndexer_EventAddresses(t *testing.T) {
 		})
 
 		txID := tx.ID()
-		assertAccountTx(t, store, testHeight, recipient, txID, true) // authorizer status preserved
-		assertAccountTx(t, store, testHeight, payer, txID, false)
+		// recipient is authorizer and also referenced in event → both roles preserved
+		assertAccountTxRoles(t, store, testHeight, recipient, txID, []access.TransactionRole{access.TransactionRoleAuthorizer, access.TransactionRoleInteraction})
+		// payer is payer + proposer (not authorizer in this test)
+		assertAccountTxRoles(t, store, testHeight, payer, txID, []access.TransactionRole{access.TransactionRolePayer, access.TransactionRoleProposer})
 		assertTransactionCount(t, store, testHeight, recipient, 1)
 	})
 
@@ -435,9 +488,9 @@ func TestAccountTransactionsIndexer_EventAddresses(t *testing.T) {
 		})
 
 		txID := tx.ID()
-		assertAccountTx(t, store, testHeight, payer, txID, true)
-		assertAccountTx(t, store, testHeight, sender, txID, false)
-		assertAccountTx(t, store, testHeight, recipient, txID, false)
+		assertAccountTxRoles(t, store, testHeight, payer, txID, simpleTxRoles)
+		assertAccountTxRoles(t, store, testHeight, sender, txID, interactionRoles)
+		assertAccountTxRoles(t, store, testHeight, recipient, txID, interactionRoles)
 	})
 
 	t.Run("events across multiple transactions with correct txIndex", func(t *testing.T) {
@@ -464,13 +517,13 @@ func TestAccountTransactionsIndexer_EventAddresses(t *testing.T) {
 			},
 		})
 
-		// tx1: account1 (authorizer) + recipient1 (from FT event)
-		assertAccountTx(t, store, testHeight, account1, tx1.ID(), true)
-		assertAccountTx(t, store, testHeight, recipient1, tx1.ID(), false)
+		// tx1: account1 (payer+proposer+authorizer) + recipient1 (from FT event)
+		assertAccountTxRoles(t, store, testHeight, account1, tx1.ID(), simpleTxRoles)
+		assertAccountTxRoles(t, store, testHeight, recipient1, tx1.ID(), interactionRoles)
 
-		// tx2: account2 (authorizer) + recipient2 (from NFT event)
-		assertAccountTx(t, store, testHeight, account2, tx2.ID(), true)
-		assertAccountTx(t, store, testHeight, recipient2, tx2.ID(), false)
+		// tx2: account2 (payer+proposer+authorizer) + recipient2 (from NFT event)
+		assertAccountTxRoles(t, store, testHeight, account2, tx2.ID(), simpleTxRoles)
+		assertAccountTxRoles(t, store, testHeight, recipient2, tx2.ID(), interactionRoles)
 
 		// recipients should only be associated with their respective transactions
 		assertTransactionCount(t, store, testHeight, recipient1, 1)
@@ -503,9 +556,9 @@ func TestAccountTransactionsIndexer_EventAddresses(t *testing.T) {
 		})
 
 		txID := tx.ID()
-		assertAccountTx(t, store, testHeight, payer, txID, true)
-		assertAccountTx(t, store, testHeight, createdAddr, txID, false)
-		assertAccountTx(t, store, testHeight, recipient, txID, false)
+		assertAccountTxRoles(t, store, testHeight, payer, txID, simpleTxRoles)
+		assertAccountTxRoles(t, store, testHeight, createdAddr, txID, interactionRoles)
+		assertAccountTxRoles(t, store, testHeight, recipient, txID, interactionRoles)
 	})
 
 	// --- Invalid address filtering ---
@@ -537,7 +590,7 @@ func TestAccountTransactionsIndexer_EventAddresses(t *testing.T) {
 		})
 
 		txID := tx.ID()
-		assertAccountTx(t, store, testHeight, payer, txID, true)
+		assertAccountTxRoles(t, store, testHeight, payer, txID, simpleTxRoles)
 		assertTransactionCount(t, store, testHeight, invalidAddr, 0)
 	})
 
@@ -576,6 +629,7 @@ func TestAccountTransactionsIndexer_EventAddresses(t *testing.T) {
 // ===== Height Validation Tests =====
 
 func TestAccountTransactionsIndexer_HeightValidation(t *testing.T) {
+	t.Parallel()
 	const testHeight = uint64(100)
 
 	t.Run("uninitialized indexer accepts first expected height", func(t *testing.T) {
@@ -654,6 +708,63 @@ func TestAccountTransactionsIndexer_HeightValidation(t *testing.T) {
 	})
 }
 
+// ===== Mock-Based Error Path Tests =====
+
+func TestAccountTransactionsIndexer_NextHeight(t *testing.T) {
+	t.Parallel()
+
+	t.Run("unexpected error from LatestIndexedHeight propagates", func(t *testing.T) {
+		mockStore := storagemock.NewAccountTransactionsBootstrapper(t)
+		unexpectedErr := fmt.Errorf("disk I/O error")
+		mockStore.On("LatestIndexedHeight").Return(uint64(0), unexpectedErr)
+
+		lm := storage.NewTestingLockManager()
+		indexer := NewAccountTransactions(unittest.Logger(), mockStore, flow.Testnet, lm)
+
+		_, err := indexer.NextHeight()
+		require.Error(t, err)
+		require.ErrorIs(t, err, unexpectedErr)
+	})
+
+	t.Run("inconsistent state: not bootstrapped but initialized", func(t *testing.T) {
+		mockStore := storagemock.NewAccountTransactionsBootstrapper(t)
+		mockStore.On("LatestIndexedHeight").Return(uint64(0), storage.ErrNotBootstrapped)
+		mockStore.On("UninitializedFirstHeight").Return(uint64(42), true)
+
+		lm := storage.NewTestingLockManager()
+		indexer := NewAccountTransactions(unittest.Logger(), mockStore, flow.Testnet, lm)
+
+		_, err := indexer.NextHeight()
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "but index is initialized")
+	})
+}
+
+func TestAccountTransactionsIndexer_StoreErrorPropagation(t *testing.T) {
+	t.Parallel()
+
+	const testHeight = uint64(100)
+
+	mockStore := storagemock.NewAccountTransactionsBootstrapper(t)
+	// NextHeight() calls LatestIndexedHeight -> returns 99 -> NextHeight = 100
+	mockStore.On("LatestIndexedHeight").Return(testHeight-1, nil)
+
+	storeErr := fmt.Errorf("unexpected storage error")
+	mockStore.On("Store", mock.Anything, mock.Anything, testHeight, mock.Anything).Return(storeErr)
+
+	lm := storage.NewTestingLockManager()
+	indexer := NewAccountTransactions(unittest.Logger(), mockStore, flow.Testnet, lm)
+
+	header := unittest.BlockHeaderFixtureOnChain(flow.Testnet, unittest.WithHeaderHeight(testHeight))
+
+	// Call IndexBlockData directly with nil batch since the mock Store doesn't use it
+	err := unittest.WithLock(t, lm, storage.LockIndexAccountTransactions, func(lctx lockctx.Context) error {
+		return indexer.IndexBlockData(lctx, BlockData{Header: header}, nil)
+	})
+	require.Error(t, err)
+	require.ErrorIs(t, err, storeErr)
+}
+
 // ===== Test Setup Helpers =====
 
 func newAccountTxIndexerForTest(
@@ -729,15 +840,15 @@ func indexBlockExpectError(
 	})
 }
 
-// assertAccountTx verifies that a specific transaction is indexed for the given address
-// with the expected authorizer status.
-func assertAccountTx(
+// assertAccountTxRoles verifies that a specific transaction is indexed for the given address
+// with the expected roles.
+func assertAccountTxRoles(
 	t *testing.T,
 	store storage.AccountTransactionsReader,
 	height uint64,
 	addr flow.Address,
 	txID flow.Identifier,
-	expectedIsAuth bool,
+	expectedRoles []access.TransactionRole,
 ) {
 	t.Helper()
 	results, err := store.TransactionsByAddress(addr, height, height)
@@ -745,8 +856,8 @@ func assertAccountTx(
 
 	for _, r := range results {
 		if r.TransactionID == txID {
-			assert.Equal(t, expectedIsAuth, r.IsAuthorizer,
-				"address %s tx %s: expected isAuthorizer=%v", addr, txID, expectedIsAuth)
+			assert.Equal(t, expectedRoles, r.Roles,
+				"address %s tx %s: expected roles=%v, got roles=%v", addr, txID, expectedRoles, r.Roles)
 			return
 		}
 	}

@@ -3,6 +3,7 @@ package extended
 import (
 	"errors"
 	"fmt"
+	"slices"
 
 	"github.com/jordanschalm/lockctx"
 	"github.com/onflow/cadence"
@@ -106,41 +107,57 @@ func (a *AccountTransactions) IndexBlockData(lctx lockctx.Proof, data BlockData,
 func (a *AccountTransactions) buildAccountTransactionsFromBlockData(data BlockData) ([]access.AccountTransaction, error) {
 	chain := a.chainID.Chain()
 	entries := make([]access.AccountTransaction, 0)
+
+	addRole := func(addrRoles map[flow.Address][]access.TransactionRole, addr flow.Address, role access.TransactionRole) {
+		if _, ok := addrRoles[addr]; !ok {
+			addrRoles[addr] = make([]access.TransactionRole, 0)
+		}
+		addrRoles[addr] = append(addrRoles[addr], role)
+	}
+
 	for i, tx := range data.Transactions {
 		txIndex := uint32(i)
-		addresses := make(map[flow.Address]bool)
-		authorizers := make(map[flow.Address]bool)
 
-		addresses[tx.Payer] = true
-		addresses[tx.ProposalKey.Address] = true
+		// Track roles per address. An address can have multiple roles (e.g., payer AND authorizer).
+		addrRoles := make(map[flow.Address][]access.TransactionRole)
+
+		addRole(addrRoles, tx.Payer, access.TransactionRolePayer)
+		addRole(addrRoles, tx.ProposalKey.Address, access.TransactionRoleProposer)
 		for _, auth := range tx.Authorizers {
-			addresses[auth] = true
-			authorizers[auth] = true
+			addRole(addrRoles, auth, access.TransactionRoleAuthorizer)
 		}
 
+		seen := make(map[flow.Address]struct{})
 		for _, event := range data.Events[txIndex] {
 			eventAddresses, err := a.extractAddresses(event)
 			if err != nil {
 				return nil, fmt.Errorf("failed to extract addresses from event: %w", err)
 			}
 			for _, addr := range eventAddresses {
-				addresses[addr] = true
+				// only add the role once for an address per transaction
+				if _, ok := seen[addr]; ok {
+					continue
+				}
+				seen[addr] = struct{}{}
+
+				// since `extractAddresses` returns all [cadence.Address] fields in the event, it's possible
+				// that the event contains invalid addresses, or addresses from a different chain.
+				// Only index addresses that are actually valid for the current chain.
+				if chain.IsValid(addr) {
+					addRole(addrRoles, addr, access.TransactionRoleInteraction)
+				}
 			}
 		}
 
-		for addr := range addresses {
-			// since `extractAddresses` returns all [cadence.Address] fields in the event, it's possible
-			// that the event contains invalid addresses, or addresses from a different chain.
-			// Only index addresses that are actually valid for the current chain.
-			if chain.IsValid(addr) {
-				entries = append(entries, access.AccountTransaction{
-					Address:          addr,
-					BlockHeight:      data.Header.Height,
-					TransactionID:    tx.ID(),
-					TransactionIndex: txIndex,
-					IsAuthorizer:     authorizers[addr],
-				})
-			}
+		for addr, roles := range addrRoles {
+			slices.Sort(roles) // sort roles in ascending order
+			entries = append(entries, access.AccountTransaction{
+				Address:          addr,
+				BlockHeight:      data.Header.Height,
+				TransactionID:    tx.ID(),
+				TransactionIndex: txIndex,
+				Roles:            roles,
+			})
 		}
 	}
 	return entries, nil

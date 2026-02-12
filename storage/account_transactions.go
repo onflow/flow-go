@@ -19,7 +19,8 @@ type AccountTransactionsReader interface {
 	// the latest indexed height will be used.
 	//
 	// Expected error returns during normal operations:
-	//   - [storage.ErrHeightNotIndexed] if the requested range extends beyond indexed heights
+	//   - [ErrHeightNotIndexed] if the requested range extends beyond indexed heights
+	//   - [ErrInvalidQuery] if the query parameters are invalid (e.g., startHeight > endHeight)
 	TransactionsByAddress(
 		account flow.Address,
 		startHeight uint64,

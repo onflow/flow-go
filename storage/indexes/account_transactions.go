@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"slices"
 
 	"github.com/jordanschalm/lockctx"
 	"go.uber.org/atomic"
@@ -24,9 +25,9 @@ import (
 // - ~block_height: 8 bytes (one's complement for descending sort)
 // - tx_index: 4 bytes (uint32, big-endian)
 //
-// Value format: [tx_id][is_authorizer]
+// Value format: storedAccountTransaction
 // - tx_id: 32 bytes (flow.Identifier)
-// - is_authorizer: 1 byte boolean
+// - roles: variable length ([]access.TransactionRole)
 //
 // All read methods are safe for concurrent access. Write methods (Store)
 // must be called sequentially with consecutive heights.
@@ -38,7 +39,7 @@ type AccountTransactions struct {
 
 type storedAccountTransaction struct {
 	TransactionID flow.Identifier
-	IsAuthorizer  bool
+	Roles         []access.TransactionRole
 }
 
 const (
@@ -90,7 +91,7 @@ func NewAccountTransactions(db storage.DB) (*AccountTransactions, error) {
 // The caller must hold the [storage.LockIndexAccountTransactions] lock until the batch is committed.
 //
 // Expected error returns during normal operations:
-//   - [storage.ErrAlreadyExists] if any data is found for while initializing
+//   - [storage.ErrAlreadyExists] if data is found for while initializing
 func BootstrapAccountTransactions(lctx lockctx.Proof, rw storage.ReaderBatchWriter, db storage.DB, initialStartHeight uint64, txData []access.AccountTransaction) (*AccountTransactions, error) {
 	err := initialize(lctx, rw, initialStartHeight, txData)
 	if err != nil {
@@ -117,8 +118,11 @@ func (idx *AccountTransactions) LatestIndexedHeight() uint64 {
 // TransactionsByAddress retrieves transaction references for an account within the specified
 // block height range (inclusive). Results are returned in descending order (newest first).
 //
+// If `endHeight` is greater than the latest indexed height, the latest indexed height will be used.
+//
 // Expected error returns during normal operations:
 //   - [storage.ErrHeightNotIndexed] if the requested range extends beyond indexed heights
+//   - [storage.ErrInvalidQuery] if the query is invalid
 func (idx *AccountTransactions) TransactionsByAddress(
 	account flow.Address,
 	startHeight uint64,
@@ -140,7 +144,7 @@ func (idx *AccountTransactions) TransactionsByAddress(
 	}
 
 	if startHeight > endHeight {
-		return nil, fmt.Errorf("start height %d is greater than end height %d", startHeight, endHeight)
+		return nil, fmt.Errorf("start height %d is greater than end height %d: %w", startHeight, endHeight, storage.ErrInvalidQuery)
 	}
 
 	results, err := lookupAccountTransactions(idx.db.Reader(), account, startHeight, endHeight)
@@ -152,8 +156,8 @@ func (idx *AccountTransactions) TransactionsByAddress(
 }
 
 // Store indexes all account-transaction associations for a block.
+// Repeated calls at the latest height are a no-op.
 // Must be called sequentially with consecutive heights (latestHeight + 1).
-// Calling with the last height is a no-op.
 // The caller must hold the [storage.LockIndexAccountTransactions] lock until the batch is committed.
 //
 // Expected error returns during normal operations:
@@ -220,7 +224,7 @@ func lookupAccountTransactions(reader storage.Reader, address flow.Address, star
 				BlockHeight:      height,
 				TransactionID:    stored.TransactionID,
 				TransactionIndex: txIndex,
-				IsAuthorizer:     stored.IsAuthorizer,
+				Roles:            stored.Roles,
 			})
 
 			return false, nil
@@ -265,14 +269,14 @@ func indexAccountTransactions(lctx lockctx.Proof, rw storage.ReaderBatchWriter, 
 			return fmt.Errorf("could not check if key exists: %w", err)
 		}
 		if exists {
-			return fmt.Errorf("account transaction %s at height %d already indexed: %w", entry.Address, entry.BlockHeight, storage.ErrAlreadyExists)
+			// since the block height was already checked to be exactly the next expected height, there
+			// should not be any data in the db for this height. if there is, the db is in an inconsistent
+			// state.
+			return fmt.Errorf("account transaction %s at height %d already indexed", entry.Address, entry.BlockHeight)
 		}
 
-		stored := storedAccountTransaction{
-			TransactionID: entry.TransactionID,
-			IsAuthorizer:  entry.IsAuthorizer,
-		}
-		if err := operation.UpsertByKey(writer, key, stored); err != nil {
+		value := makeAccountTxValue(entry)
+		if err := operation.UpsertByKey(writer, key, value); err != nil {
 			return fmt.Errorf("could not set key for account %s, tx %s: %w", entry.Address, entry.TransactionID, err)
 		}
 	}
@@ -289,7 +293,7 @@ func indexAccountTransactions(lctx lockctx.Proof, rw storage.ReaderBatchWriter, 
 // The caller must hold the [storage.LockIndexAccountTransactions] lock until the batch is committed.
 //
 // Expected error returns during normal operations:
-//   - [storage.ErrAlreadyExists] if any data is found for while initializing
+//   - [storage.ErrAlreadyExists] if the bounds keys already exist
 func initialize(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockHeight uint64, txData []access.AccountTransaction) error {
 	if !lctx.HoldsLock(storage.LockIndexAccountTransactions) {
 		return fmt.Errorf("missing required lock: %s", storage.LockIndexAccountTransactions)
@@ -326,14 +330,13 @@ func initialize(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockHeight ui
 			return fmt.Errorf("could not check if key exists: %w", err)
 		}
 		if exists {
-			return fmt.Errorf("account transaction %s at height %d already indexed: %w", entry.Address, entry.BlockHeight, storage.ErrAlreadyExists)
+			// since the bounds keys were already confirmed to not exist, there should not be any data
+			// in the db for this height. if there is, the db is in an inconsistent state.
+			return fmt.Errorf("account transaction %s at height %d already indexed", entry.Address, entry.BlockHeight)
 		}
 
-		stored := storedAccountTransaction{
-			TransactionID: entry.TransactionID,
-			IsAuthorizer:  entry.IsAuthorizer,
-		}
-		if err := operation.UpsertByKey(writer, key, stored); err != nil {
+		value := makeAccountTxValue(entry)
+		if err := operation.UpsertByKey(writer, key, value); err != nil {
 			return fmt.Errorf("could not set key for account %s, tx %s: %w", entry.Address, entry.TransactionID, err)
 		}
 	}
@@ -346,6 +349,20 @@ func initialize(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockHeight ui
 	}
 
 	return nil
+}
+
+// makeAccountTxValue builds the value for an account transaction index entry.
+func makeAccountTxValue(entry access.AccountTransaction) storedAccountTransaction {
+	// enforce that stored roles are sorted in ascending order
+	slices.Sort(entry.Roles)
+
+	// deduplicate roles
+	entry.Roles = slices.Compact(entry.Roles)
+
+	return storedAccountTransaction{
+		TransactionID: entry.TransactionID,
+		Roles:         entry.Roles,
+	}
 }
 
 // makeAccountTxKey creates a full key for an account transaction index entry.

@@ -19,6 +19,7 @@ import (
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/integration/testnet"
 	"github.com/onflow/flow-go/integration/tests/lib"
+	"github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage/indexes"
 	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
@@ -250,7 +251,9 @@ func (s *ExtendedIndexingSuite) TestAccountTransactionIndexing() {
 	for _, entry := range serviceAccountTxs {
 		if entry.TransactionID == transferTxID {
 			foundTransferForService = true
-			s.True(entry.IsAuthorizer, "service account should be authorizer for transfer tx")
+			s.Contains(entry.Roles, access.TransactionRoleAuthorizer, "service account should be authorizer for transfer tx")
+			s.Contains(entry.Roles, access.TransactionRolePayer, "service account should be payer for transfer tx")
+			s.Contains(entry.Roles, access.TransactionRoleProposer, "service account should be proposer for transfer tx")
 			s.Equal(transferTxResult.BlockHeight, entry.BlockHeight)
 			break
 		}
@@ -276,10 +279,16 @@ func (s *ExtendedIndexingSuite) TestAccountTransactionIndexing() {
 		if entry.TransactionID == noopTxID {
 			foundNoopForNewAccount = true
 			s.Equal(noopTxResult.BlockHeight, entry.BlockHeight)
+			s.NotContains(entry.Roles, access.TransactionRoleAuthorizer, "new account should not be authorizer for noop tx")
+			s.Contains(entry.Roles, access.TransactionRoleProposer, "new account should be proposer for noop tx")
+			s.Contains(entry.Roles, access.TransactionRolePayer, "new account should be payer for noop tx")
 		}
 		if entry.TransactionID == transferTxID {
 			foundTransferForNewAccount = true
-			s.False(entry.IsAuthorizer, "new account should not be authorizer for transfer tx")
+			s.NotContains(entry.Roles, access.TransactionRoleAuthorizer, "new account should not be authorizer for transfer tx")
+			s.NotContains(entry.Roles, access.TransactionRoleProposer, "new account should not be proposer for transfer tx")
+			s.NotContains(entry.Roles, access.TransactionRolePayer, "new account should not be payer for transfer tx")
+			s.Contains(entry.Roles, access.TransactionRoleInteraction, "new account should be interaction for transfer tx")
 			s.Equal(transferTxResult.BlockHeight, entry.BlockHeight)
 		}
 	}
