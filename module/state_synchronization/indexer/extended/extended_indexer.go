@@ -17,6 +17,7 @@ import (
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/util"
+	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 )
 
@@ -38,6 +39,7 @@ type ExtendedIndexer struct {
 	log           zerolog.Logger
 	db            storage.DB
 	lockManager   storage.LockManager
+	state         protocol.State
 	metrics       module.ExtendedIndexingMetrics
 	backfillDelay time.Duration
 
@@ -45,6 +47,7 @@ type ExtendedIndexer struct {
 	blocks            storage.Blocks
 	collections       storage.Collections
 	events            storage.Events
+	results           storage.LightTransactionResults
 	systemCollections *access.Versioned[access.SystemCollectionBuilder]
 
 	indexers        []Indexer
@@ -61,9 +64,11 @@ func NewExtendedIndexer(
 	metrics module.ExtendedIndexingMetrics,
 	db storage.DB,
 	lockManager storage.LockManager,
+	state protocol.State,
 	blocks storage.Blocks,
 	collections storage.Collections,
 	events storage.Events,
+	results storage.LightTransactionResults,
 	indexers []Indexer,
 	chainID flow.ChainID,
 	backfillDelay time.Duration,
@@ -92,9 +97,11 @@ func NewExtendedIndexer(
 		progressManager: newProgressManager(log),
 
 		chainID:           chainID,
+		state:             state,
 		blocks:            blocks,
 		collections:       collections,
 		events:            events,
+		results:           results,
 		systemCollections: systemcollection.Default(chainID),
 	}
 
@@ -248,6 +255,20 @@ func (c *ExtendedIndexer) indexNextHeights() error {
 // Expected error returns during normal operation:
 //   - [storage.ErrNotFound]: if any data is not available for the height.
 func (c *ExtendedIndexer) blockData(height uint64) (BlockData, error) {
+	// special handling for the spork root block which has no transactions or events.
+	if height == c.state.Params().SporkRootBlockHeight() {
+		return BlockData{
+			Header: c.state.Params().SporkRootBlock().ToHeader(),
+		}, nil
+	}
+
+	// `latestBlockData` is considered the "live" block, so don't allow backfilling for higher heights.
+	// if we haven't seen the live block yet and the data isn't indexed into the db, the events check
+	// below will fail and return a not found error.
+	if c.latestBlockData != nil && height > c.latestBlockData.Header.Height {
+		return BlockData{}, fmt.Errorf("block %d not indexed yet: %w", height, storage.ErrNotFound)
+	}
+
 	block, err := c.blocks.ByHeight(height)
 	if err != nil {
 		return BlockData{}, fmt.Errorf("failed to get header by height: %w", err)
@@ -256,6 +277,20 @@ func (c *ExtendedIndexer) blockData(height uint64) (BlockData, error) {
 	events, err := c.events.ByBlockID(block.ID())
 	if err != nil {
 		return BlockData{}, fmt.Errorf("failed to get events by block id: %w", err)
+	}
+
+	// getting events returns an empty slice and no error if no events are found. In this case, also
+	// check if there were any transaction results. All blocks should have at least one system tx.
+	// if not, then assume the block is not indexed yet.
+	if len(events) == 0 {
+		results, err := c.results.ByBlockID(block.ID())
+		if err != nil {
+			return BlockData{}, fmt.Errorf("failed to get results by block id: %w", err)
+		}
+
+		if len(results) == 0 {
+			return BlockData{}, fmt.Errorf("results for block %d not indexed yet: %w", block.Height, storage.ErrNotFound)
+		}
 	}
 
 	eventsByTxIndex := make(map[uint32][]flow.Event)

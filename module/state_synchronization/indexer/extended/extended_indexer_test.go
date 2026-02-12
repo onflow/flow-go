@@ -20,6 +20,8 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/state_synchronization/indexer/extended"
 	extendedmock "github.com/onflow/flow-go/module/state_synchronization/indexer/extended/mock"
+	"github.com/onflow/flow-go/state/protocol"
+	protocolmock "github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/storage"
 	storagemock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
@@ -38,31 +40,6 @@ func newTestDB(t *testing.T) storage.DB {
 		require.NoError(t, os.RemoveAll(dbDir))
 	})
 	return db
-}
-
-// newBackfillStores returns storage mocks that return block fixtures for any height.
-func newBackfillStores(t *testing.T) (*storagemock.Blocks, *storagemock.Collections, *storagemock.Events) {
-	blocks := storagemock.NewBlocks(t)
-	collections := storagemock.NewCollections(t)
-	events := storagemock.NewEvents(t)
-
-	blocks.
-		On("ByHeight", mock.AnythingOfType("uint64")).
-		Return(func(height uint64) (*flow.Block, error) {
-			block := unittest.BlockFixture(func(b *flow.Block) {
-				b.Height = height
-				b.Payload.Guarantees = nil
-			})
-			return block, nil
-		}).
-		Maybe()
-
-	events.
-		On("ByBlockID", mock.AnythingOfType("flow.Identifier")).
-		Return([]flow.Event{}, nil).
-		Maybe()
-
-	return blocks, collections, events
 }
 
 // mockIndexer wraps the mock with atomic state tracking.
@@ -86,12 +63,12 @@ func newMockIndexer(
 	done := make(chan struct{})
 	var doneOnce sync.Once
 
-	idx.On("Name").Return(name).Maybe()
+	idx.On("Name").Return(name)
 
 	idx.On("NextHeight").Return(
 		func() uint64 { return nextHeight.Load() },
 		func() error { return nil },
-	).Maybe()
+	)
 
 	idx.On("IndexBlockData", mock.Anything, mock.Anything, mock.Anything).
 		Run(func(args mock.Arguments) {
@@ -101,10 +78,19 @@ func newMockIndexer(
 				doneOnce.Do(func() { close(done) })
 			}
 		}).
-		Return(nil).
-		Maybe()
+		Return(nil)
 
 	return &mockIndexer{Indexer: idx, nextHeight: nextHeight, done: done}
+}
+
+// newMockState returns a mock protocol.State where Params().SporkRootBlockHeight() returns 0.
+func newMockState(t *testing.T) protocol.State {
+	params := protocolmock.NewParams(t)
+	params.On("SporkRootBlockHeight").Return(uint64(0))
+
+	state := protocolmock.NewState(t)
+	state.On("Params").Return(params)
+	return state
 }
 
 type testSetup struct {
@@ -112,20 +98,40 @@ type testSetup struct {
 	blocks      *storagemock.Blocks
 	collections *storagemock.Collections
 	events      *storagemock.Events
+	results     *storagemock.LightTransactionResults
 }
 
 func newTestSetup(t *testing.T) *testSetup {
-	blocks, collections, events := newBackfillStores(t)
 	return &testSetup{
 		db:          newTestDB(t),
-		blocks:      blocks,
-		collections: collections,
-		events:      events,
+		blocks:      storagemock.NewBlocks(t),
+		collections: storagemock.NewCollections(t),
+		events:      storagemock.NewEvents(t),
+		results:     storagemock.NewLightTransactionResults(t),
 	}
+}
+
+// configureBackfill sets up storage mock expectations for backfill scenarios.
+// blocks.ByHeight returns block fixtures, events.ByBlockID returns a single event.
+func (s *testSetup) configureBackfill() {
+	s.blocks.
+		On("ByHeight", mock.AnythingOfType("uint64")).
+		Return(func(height uint64) (*flow.Block, error) {
+			block := unittest.BlockFixture(func(b *flow.Block) {
+				b.Height = height
+				b.Payload.Guarantees = nil
+			})
+			return block, nil
+		})
+
+	s.events.
+		On("ByBlockID", mock.AnythingOfType("flow.Identifier")).
+		Return([]flow.Event{unittest.EventFixture()}, nil)
 }
 
 func (s *testSetup) newExtendedIndexer(
 	t *testing.T,
+	state protocol.State,
 	indexers []extended.Indexer,
 	backfillDelay time.Duration,
 ) *extended.ExtendedIndexer {
@@ -134,9 +140,11 @@ func (s *testSetup) newExtendedIndexer(
 		metrics.NewNoopCollector(),
 		s.db,
 		storage.NewTestingLockManager(),
+		state,
 		s.blocks,
 		s.collections,
 		s.events,
+		s.results,
 		indexers,
 		flow.Testnet,
 		backfillDelay,
@@ -187,7 +195,7 @@ func TestExtendedIndexer_AllLive(t *testing.T) {
 	idx1 := newMockIndexer(t, "a", liveHeight, liveHeight)
 	idx2 := newMockIndexer(t, "b", liveHeight, liveHeight)
 
-	ext := setup.newExtendedIndexer(t, []extended.Indexer{idx1, idx2}, time.Hour)
+	ext := setup.newExtendedIndexer(t, protocolmock.NewState(t), []extended.Indexer{idx1, idx2}, time.Hour)
 	startComponent(t, ext)
 
 	provideBlock(t, ext, liveHeight)
@@ -204,12 +212,13 @@ func TestExtendedIndexer_AllLive(t *testing.T) {
 // loop fetches data from storage and processes each indexer independently until they reach a target.
 func TestExtendedIndexer_AllBackfilling(t *testing.T) {
 	setup := newTestSetup(t)
+	setup.configureBackfill()
 
 	// idx1 starts at 2, idx2 starts at 4 — both backfill from storage
 	idx1 := newMockIndexer(t, "a", 2, 6)
 	idx2 := newMockIndexer(t, "b", 4, 6)
 
-	ext := setup.newExtendedIndexer(t, []extended.Indexer{idx1, idx2}, time.Millisecond)
+	ext := setup.newExtendedIndexer(t, newMockState(t), []extended.Indexer{idx1, idx2}, time.Millisecond)
 	startComponent(t, ext)
 
 	// No IndexBlockData call — backfill is driven entirely by the timer and storage
@@ -221,6 +230,7 @@ func TestExtendedIndexer_AllBackfilling(t *testing.T) {
 // while another backfills from storage concurrently in the same iteration loop.
 func TestExtendedIndexer_SplitLiveAndBackfill(t *testing.T) {
 	setup := newTestSetup(t)
+	setup.configureBackfill()
 	liveHeight := uint64(8)
 
 	// live indexer already at liveHeight
@@ -229,7 +239,7 @@ func TestExtendedIndexer_SplitLiveAndBackfill(t *testing.T) {
 	// backfill indexer needs to catch up from height 3 to liveHeight
 	backfillIdx := newMockIndexer(t, "backfill", 3, liveHeight)
 
-	ext := setup.newExtendedIndexer(t, []extended.Indexer{liveIdx, backfillIdx}, time.Millisecond)
+	ext := setup.newExtendedIndexer(t, newMockState(t), []extended.Indexer{liveIdx, backfillIdx}, time.Millisecond)
 	startComponent(t, ext)
 
 	provideBlock(t, ext, liveHeight)
@@ -242,12 +252,13 @@ func TestExtendedIndexer_SplitLiveAndBackfill(t *testing.T) {
 // catches up to the live height, and then processes subsequent live blocks via IndexBlockData.
 func TestExtendedIndexer_CatchUpAndContinueLive(t *testing.T) {
 	setup := newTestSetup(t)
+	setup.configureBackfill()
 	liveHeight := uint64(5)
 
 	// idx starts at height 2, needs to backfill 2..5, then process live block at 6
 	idx := newMockIndexer(t, "a", 2, liveHeight+1)
 
-	ext := setup.newExtendedIndexer(t, []extended.Indexer{idx}, time.Millisecond)
+	ext := setup.newExtendedIndexer(t, newMockState(t), []extended.Indexer{idx}, time.Millisecond)
 	startComponent(t, ext)
 
 	// Give backfill some time to make progress from storage
@@ -264,11 +275,12 @@ func TestExtendedIndexer_CatchUpAndContinueLive(t *testing.T) {
 // This covers the case where latestBlockData is nil but storage has data available.
 func TestExtendedIndexer_UninitializedBeforeLiveData(t *testing.T) {
 	setup := newTestSetup(t)
+	setup.configureBackfill()
 
 	// Indexer starts at height 5 — storage has data, but no live block provided
 	idx := newMockIndexer(t, "a", 5, 8)
 
-	ext := setup.newExtendedIndexer(t, []extended.Indexer{idx}, time.Millisecond)
+	ext := setup.newExtendedIndexer(t, newMockState(t), []extended.Indexer{idx}, time.Millisecond)
 	startComponent(t, ext)
 
 	// No IndexBlockData call. hasBackfillingIndexers returns true when latestBlockData==nil,
@@ -299,13 +311,11 @@ func TestExtendedIndexer_UninitializedNotFoundThenCatchUp(t *testing.T) {
 				b.Payload.Guarantees = nil
 			})
 			return block, nil
-		}).
-		Maybe()
+		})
 
 	events.
 		On("ByBlockID", mock.AnythingOfType("flow.Identifier")).
-		Return([]flow.Event{}, nil).
-		Maybe()
+		Return([]flow.Event{unittest.EventFixture()}, nil)
 
 	idx := newMockIndexer(t, "a", 5, 5)
 
@@ -314,7 +324,9 @@ func TestExtendedIndexer_UninitializedNotFoundThenCatchUp(t *testing.T) {
 		metrics.NewNoopCollector(),
 		db,
 		storage.NewTestingLockManager(),
+		newMockState(t),
 		blocks, collections, events,
+		storagemock.NewLightTransactionResults(t),
 		[]extended.Indexer{idx},
 		flow.Testnet,
 		time.Millisecond,
@@ -343,11 +355,11 @@ func TestExtendedIndexer_IndexerError(t *testing.T) {
 	indexerErr := errors.New("indexer failed")
 
 	idx := extendedmock.NewIndexer(t)
-	idx.On("Name").Return("a").Maybe()
-	idx.On("NextHeight").Return(liveHeight, nil).Maybe()
+	idx.On("Name").Return("a")
+	idx.On("NextHeight").Return(liveHeight, nil)
 	idx.On("IndexBlockData", mock.Anything, mock.Anything, mock.Anything).Return(indexerErr).Once()
 
-	ext := setup.newExtendedIndexer(t, []extended.Indexer{idx}, time.Hour)
+	ext := setup.newExtendedIndexer(t, protocolmock.NewState(t), []extended.Indexer{idx}, time.Hour)
 
 	thrown := make(chan error, 1)
 	cancel := startComponentWithCallback(t, ext, func(err error) {
@@ -369,14 +381,15 @@ func TestExtendedIndexer_IndexerError(t *testing.T) {
 // via the irrecoverable context.
 func TestExtendedIndexer_BackfillError(t *testing.T) {
 	setup := newTestSetup(t)
+	setup.configureBackfill()
 	backfillErr := errors.New("backfill failed")
 
 	idx := extendedmock.NewIndexer(t)
-	idx.On("Name").Return("a").Maybe()
-	idx.On("NextHeight").Return(uint64(3), nil).Maybe()
+	idx.On("Name").Return("a")
+	idx.On("NextHeight").Return(uint64(3), nil)
 	idx.On("IndexBlockData", mock.Anything, mock.Anything, mock.Anything).Return(backfillErr).Once()
 
-	ext := setup.newExtendedIndexer(t, []extended.Indexer{idx}, time.Millisecond)
+	ext := setup.newExtendedIndexer(t, newMockState(t), []extended.Indexer{idx}, time.Millisecond)
 
 	thrown := make(chan error, 1)
 	cancel := startComponentWithCallback(t, ext, func(err error) {
@@ -400,11 +413,9 @@ func TestExtendedIndexer_AlreadyIndexedSkipped(t *testing.T) {
 
 	idx1 := extendedmock.NewIndexer(t)
 	idx2 := extendedmock.NewIndexer(t)
-	idx1.On("Name").Return("a").Maybe()
-	idx2.On("Name").Return("b").Maybe()
-	idx1.On("NextHeight").Return(liveHeight, nil).Maybe()
-	idx2.On("NextHeight").Return(liveHeight, nil).Maybe()
-
+	idx2.On("Name").Return("b")
+	idx1.On("NextHeight").Return(liveHeight, nil)
+	idx2.On("NextHeight").Return(liveHeight, nil)
 	// idx1 returns ErrAlreadyIndexed — should be skipped without error
 	idx1.On("IndexBlockData", mock.Anything, mock.Anything, mock.Anything).
 		Return(extended.ErrAlreadyIndexed).Once()
@@ -416,7 +427,7 @@ func TestExtendedIndexer_AlreadyIndexedSkipped(t *testing.T) {
 		close(done)
 	})
 
-	ext := setup.newExtendedIndexer(t, []extended.Indexer{idx1, idx2}, time.Hour)
+	ext := setup.newExtendedIndexer(t, protocolmock.NewState(t), []extended.Indexer{idx1, idx2}, time.Hour)
 	startComponent(t, ext)
 
 	provideBlock(t, ext, liveHeight)
@@ -430,7 +441,7 @@ func TestExtendedIndexer_NonSequentialHeight(t *testing.T) {
 	setup := newTestSetup(t)
 
 	idx := newMockIndexer(t, "a", 11, 0)
-	ext := setup.newExtendedIndexer(t, []extended.Indexer{idx}, time.Hour)
+	ext := setup.newExtendedIndexer(t, protocolmock.NewState(t), []extended.Indexer{idx}, time.Hour)
 	startComponent(t, ext)
 
 	// First call succeeds

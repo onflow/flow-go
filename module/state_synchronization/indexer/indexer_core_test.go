@@ -27,6 +27,7 @@ import (
 	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/state_synchronization/indexer/extended"
+	protocolmock "github.com/onflow/flow-go/state/protocol/mock"
 	synctest "github.com/onflow/flow-go/module/state_synchronization/requester/unittest"
 	"github.com/onflow/flow-go/storage"
 	storagemock "github.com/onflow/flow-go/storage/mock"
@@ -400,9 +401,11 @@ func TestExecutionState_IndexBlockData(t *testing.T) {
 			metrics.NewNoopCollector(),
 			test.indexer.protocolDB,
 			storage.NewTestingLockManager(),
-			nil,
+			protocolmock.NewState(t),
+			storagemock.NewBlocks(t),
 			test.collections,
 			test.events,
+			test.results,
 			[]extended.Indexer{stub},
 			test.indexer.chainID,
 			extended.DefaultBackfillDelay,
@@ -490,9 +493,11 @@ func TestExecutionState_IndexBlockData(t *testing.T) {
 			metrics.NewNoopCollector(),
 			test.indexer.protocolDB,
 			storage.NewTestingLockManager(),
-			nil,
+			protocolmock.NewState(t),
+			storagemock.NewBlocks(t),
 			test.collections,
 			test.events,
+			test.results,
 			[]extended.Indexer{stub},
 			test.indexer.chainID,
 			extended.DefaultBackfillDelay,
