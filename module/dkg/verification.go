@@ -62,7 +62,7 @@ func VerifyBeaconKeyForEpoch(
 	// Verify beacon key exists and is safe
 	key, safe, err := beaconKeys.RetrieveMyBeaconPrivateKey(epochCounter)
 	if err != nil {
-		return fmt.Errorf("beacon key for epoch %d not found in secrets database - cannot participate in consensus: %w", epochCounter, err)
+		return fmt.Errorf("could not retrieve beacon key for epoch %d from secrets database - cannot participate in consensus: %w", epochCounter, err)
 	}
 	if !safe {
 		return fmt.Errorf("beacon key for epoch %d exists but is marked unsafe - cannot participate in consensus", epochCounter)
