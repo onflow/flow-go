@@ -92,7 +92,7 @@ func (s *VerifyBeaconKeyForEpochSuite) TestBeaconKeyNotFound() {
 	err := VerifyBeaconKeyForEpoch(unittest.Logger(), s.nodeID, s.state, s.beaconKeys)
 	require.Error(s.T(), err)
 	require.ErrorIs(s.T(), err, storage.ErrNotFound)
-	require.Contains(s.T(), err.Error(), "not found in secrets database")
+	require.Contains(s.T(), err.Error(), "could not retrieve beacon key")
 }
 
 // TestBeaconKeyUnsafe tests a scenario where:
