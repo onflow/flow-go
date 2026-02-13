@@ -102,10 +102,11 @@ func main() {
 		startupTime                           time.Time
 
 		// DKG contract client
-		machineAccountInfo *bootstrap.NodeMachineAccountInfo
-		flowClientConfigs  []*grpcclient.FlowClientConfig
-		insecureAccessAPI  bool
-		accessNodeIDS      []string
+		machineAccountInfo        *bootstrap.NodeMachineAccountInfo
+		flowClientConfigs         []*grpcclient.FlowClientConfig
+		insecureAccessAPI         bool
+		accessNodeIDS             []string
+		requireBeaconKeyOnStartup bool
 
 		err                     error
 		mutableState            protocol.ParticipantState
@@ -161,6 +162,7 @@ func main() {
 		flags.BoolVar(&emergencySealing, "emergency-sealing-active", flow.DefaultEmergencySealingActive, "(de)activation of emergency sealing")
 		flags.BoolVar(&insecureAccessAPI, "insecure-access-api", false, "required if insecure GRPC connection should be used")
 		flags.StringSliceVar(&accessNodeIDS, "access-node-ids", []string{}, fmt.Sprintf("array of access node IDs sorted in priority order where the first ID in this array will get the first connection attempt and each subsequent ID after serves as a fallback. Minimum length %d. Use '*' for all IDs in protocol state.", common.DefaultAccessNodeIDSMinimum))
+		flags.BoolVar(&requireBeaconKeyOnStartup, "require-beacon-key", false, "if true, the node will fail to start if the beacon key for the current epoch is missing or invalid")
 		flags.DurationVar(&dkgMessagingEngineConfig.RetryBaseWait, "dkg-messaging-engine-retry-base-wait", dkgMessagingEngineConfig.RetryBaseWait, "the inter-attempt wait time for the first attempt (base of exponential retry)")
 		flags.Uint64Var(&dkgMessagingEngineConfig.RetryMax, "dkg-messaging-engine-retry-max", dkgMessagingEngineConfig.RetryMax, "the maximum number of retry attempts for an outbound DKG message")
 		flags.Uint64Var(&dkgMessagingEngineConfig.RetryJitterPercent, "dkg-messaging-engine-retry-jitter-percent", dkgMessagingEngineConfig.RetryJitterPercent, "the percentage of jitter to apply to each inter-attempt wait time")
@@ -373,6 +375,13 @@ func main() {
 			// subscribe for protocol events to handle exiting EFM
 			node.ProtocolEvents.AddConsumer(myBeaconKeyRecovery)
 			return nil
+		}).
+		Module("beacon key verification", func(node *cmd.NodeConfig) error {
+			if !requireBeaconKeyOnStartup {
+				node.Logger.Info().Msg("beacon key verification on startup is disabled, skipping verification of beacon key for current epoch")
+				return nil
+			}
+			return dkgmodule.VerifyBeaconKeyForEpoch(node.Logger, node.NodeID, node.State, myBeaconKeyStateMachine)
 		}).
 		Module("collection guarantees mempool", func(node *cmd.NodeConfig) error {
 			guarantees = stdmap.NewGuarantees(guaranteeLimit)
