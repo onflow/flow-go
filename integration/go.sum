@@ -786,8 +786,8 @@ github.com/onflow/nft-storefront/lib/go/contracts v1.0.0 h1:sxyWLqGm/p4EKT6DUlQE
 github.com/onflow/nft-storefront/lib/go/contracts v1.0.0/go.mod h1:kMeq9zUwCrgrSojEbTUTTJpZ4WwacVm2pA7LVFr+glk=
 github.com/onflow/sdks v0.6.0-preview.1 h1:mb/cUezuqWEP1gFZNAgUI4boBltudv4nlfxke1KBp9k=
 github.com/onflow/sdks v0.6.0-preview.1/go.mod h1:F0dj0EyHC55kknLkeD10js4mo14yTdMotnWMslPirrU=
-github.com/onflow/testingdock v0.0.0-20260213152245-c970468b4187 h1:3iba7xqcK+H1fBWhMgWIPAstUYOCUdjl3xO0lxfHXxQ=
-github.com/onflow/testingdock v0.0.0-20260213152245-c970468b4187/go.mod h1:r3G3ZrdWnZIa4yF+P7qJGz9vrWEBXgesUg2IwBZ2TZs=
+github.com/onflow/testingdock v0.5.0 h1:lg8BOxtQZd7aCX/aJDU64hZ9yyZajjNGtmX863i1lrc=
+github.com/onflow/testingdock v0.5.0/go.mod h1:r3G3ZrdWnZIa4yF+P7qJGz9vrWEBXgesUg2IwBZ2TZs=
 github.com/onflow/wal v1.0.2 h1:5bgsJVf2O3cfMNK12fiiTyYZ8cOrUiELt3heBJfHOhc=
 github.com/onflow/wal v1.0.2/go.mod h1:iMC8gkLqu4nkbkAla5HkSBb+FGyQOZiWz3DYm2wSXCk=
 github.com/onsi/ginkgo v1.6.0/go.mod h1:lLunBs/Ym6LB5Z9jYTR76FiuTmxDTDusOGeTQH+WWjE=
