@@ -185,13 +185,13 @@ fix-lint: tools/custom-gcl
 fix-lint-new: tools/custom-gcl
 	./tools/custom-gcl run -v --fix --new-from-rev=master
 
-.PHONY: fmt
-fmt: tools/custom-gcl
-	./tools/custom-gcl fmt -v
+.PHONY: fix-imports
+fix-imports: tools/custom-gcl
+	./tools/custom-gcl run --enable-only=gci --fix $(or $(LINT_PATH),./...)
 
-.PHONY: fmt-new
-fmt-new: tools/custom-gcl
-	git diff --name-only "$(git merge-base HEAD origin/master)" -- '*.go' | xargs -r ./tools/custom-gcl fmt --new-from-rev=master -v
+.PHONY: fix-imports-new
+fix-imports-new: tools/custom-gcl
+	./tools/custom-gcl run --enable-only=gci --fix --new-from-rev=master
 
 .PHONY: vet
 vet: tools/custom-gcl
