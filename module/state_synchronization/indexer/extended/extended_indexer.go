@@ -133,7 +133,24 @@ func (c *ExtendedIndexer) IndexBlockExecutionData(
 	return c.IndexBlockData(header, txs, events)
 }
 
-// IndexBlockData captures the block data and makes it available to the indexers.
+// IndexBlockData stores block data and exposes it to the indexers.
+// It must be called sequentially, with blocks provided in strictly
+// increasing height order.
+//
+// Typically, this method is invoked when the latest block is received.
+// If the indexer is fully caught up, this latest block will be the next
+// one to process, and indexing it will advance the indexed height.
+//
+// If the indexer is still catching up, however, the latest block is not
+// immediately needed because the indexer must first process older blocks.
+//
+// For this reason, we do not index the latest block right away. Instead,
+// we cache it and notify the worker to proceed with the next job.
+//
+// If the next job is to process the latest block, the cached
+// c.latestBlockData will be used. Otherwise, if the job is to process
+// older blocks, the cache is ignored and the worker fetches the required
+// block data for indexing.
 //
 // No error returns are expected during normal operation.
 func (c *ExtendedIndexer) IndexBlockData(
