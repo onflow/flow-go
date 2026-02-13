@@ -145,11 +145,12 @@ func (c *ContainerConfig) ImageName() string {
 // Container represents a test Docker container for a generic Flow node.
 type Container struct {
 	*testingdock.Container
-	Config  ContainerConfig
-	Ports   map[string]string // port mapping
-	datadir string            // host directory bound to container's database
-	net     *FlowNetwork      // reference to the network we are a part of
-	opts    *testingdock.ContainerOpts
+	Config        ContainerConfig
+	Ports         map[string]string // port mapping
+	portsResolved bool              // true after host ports have been resolved from the running container
+	datadir       string            // host directory bound to container's database
+	net           *FlowNetwork      // reference to the network we are a part of
+	opts          *testingdock.ContainerOpts
 }
 
 // Addr returns the host-accessible listening address of the container for the given container port.
@@ -165,16 +166,67 @@ func (c *Container) ContainerAddr(containerPort string) string {
 }
 
 // Port returns the container's host port for the given container port.
-// Panics if the port was not exposed.
+// If the host port was auto-allocated by Docker (i.e. not pre-assigned), the actual
+// port is resolved lazily by inspecting the running container.
+// Panics if the port was not exposed or if resolution fails.
 func (c *Container) Port(containerPort string) string {
 	port, ok := c.Ports[containerPort]
 	if !ok {
 		panic(fmt.Sprintf("port %s is not registered for %s", containerPort, c.Config.ContainerName))
 	}
+	if port == "" {
+		c.resolveHostPorts()
+		port = c.Ports[containerPort]
+		if port == "" {
+			panic(fmt.Sprintf("could not resolve host port for container port %s on %s", containerPort, c.Config.ContainerName))
+		}
+	}
 	return port
 }
 
+// resolveHostPorts inspects the running Docker container to discover the actual
+// host ports assigned by Docker for auto-allocated port bindings.
+func (c *Container) resolveHostPorts() {
+	if c.portsResolved {
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), checkContainerTimeout)
+	defer cancel()
+
+	info, err := c.net.cli.ContainerInspect(ctx, c.Container.ID)
+	if err != nil {
+		panic(fmt.Sprintf("could not inspect container %s to resolve ports: %v", c.Config.ContainerName, err))
+	}
+
+	for containerPort := range c.Ports {
+		if c.Ports[containerPort] != "" {
+			continue // already resolved or pre-assigned
+		}
+		natPort := nat.Port(fmt.Sprintf("%s/tcp", containerPort))
+		bindings, ok := info.NetworkSettings.Ports[natPort]
+		if !ok || len(bindings) == 0 {
+			continue
+		}
+		c.Ports[containerPort] = bindings[0].HostPort
+	}
+	c.portsResolved = true
+}
+
+// resetHostPorts clears cached host port values so they will be re-resolved
+// on the next call to Port(). This must be called before restarting a container
+// because Docker may assign different host ports for auto-allocated bindings.
+func (c *Container) resetHostPorts() {
+	c.portsResolved = false
+	for k := range c.Ports {
+		c.Ports[k] = ""
+	}
+}
+
 // exposePort exposes the given container port and binds it to the given host port.
+// If hostPort is empty, Docker will auto-allocate an available host port when the
+// container starts. The actual port can be retrieved via Port() after the container
+// is running.
 // If no protocol is specified, assumes TCP.
 func (c *Container) exposePort(containerPort, hostPort string) {
 	// keep track of port mapping for easy lookups
@@ -310,6 +362,10 @@ func (c *Container) Start() error {
 
 	ctx, cancel := context.WithTimeout(context.Background(), checkContainerTimeout)
 	defer cancel()
+
+	// Reset cached port resolution state. Docker may assign different host ports
+	// when restarting a container with auto-allocated ports.
+	c.resetHostPorts()
 
 	err := c.net.cli.ContainerStart(ctx, c.ID, container.StartOptions{})
 	if err != nil {
