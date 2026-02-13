@@ -17,7 +17,6 @@ import (
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/module/irrecoverable"
-	"github.com/onflow/flow-go/module/util"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 )
@@ -57,9 +56,8 @@ type ExtendedIndexer struct {
 	results           storage.LightTransactionResults
 	systemCollections *access.Versioned[access.SystemCollectionBuilder]
 
-	indexers        []Indexer
-	notifier        engine.Notifier
-	progressManager *progressManager
+	indexers []Indexer
+	notifier engine.Notifier
 
 	mu              sync.RWMutex
 	latestBlockData *BlockData
@@ -93,10 +91,8 @@ func NewExtendedIndexer(
 		lockManager:   lockManager,
 		metrics:       metrics,
 		backfillDelay: backfillDelay,
-
-		indexers:        indexers,
-		notifier:        engine.NewNotifier(),
-		progressManager: newProgressManager(log),
+		indexers:      indexers,
+		notifier:      engine.NewNotifier(),
 
 		chainID:           chainID,
 		state:             state,
@@ -158,18 +154,6 @@ func (c *ExtendedIndexer) IndexBlockData(
 	transactions []*flow.TransactionBody,
 	events []flow.Event,
 ) error {
-	c.mu.RLock()
-	latestBlockData := c.latestBlockData
-	c.mu.RUnlock()
-
-	// do this first outside of the lock to reduce contention with the indexing loop.
-	eventsByTxIndex := make(map[uint32][]flow.Event)
-	if latestBlockData == nil || header.Height == latestBlockData.Header.Height+1 {
-		for _, event := range events {
-			eventsByTxIndex[event.TransactionIndex] = append(eventsByTxIndex[event.TransactionIndex], event)
-		}
-	}
-
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -180,6 +164,11 @@ func (c *ExtendedIndexer) IndexBlockData(
 		if header.Height <= c.latestBlockData.Header.Height {
 			return nil
 		}
+	}
+
+	eventsByTxIndex := make(map[uint32][]flow.Event)
+	for _, event := range events {
+		eventsByTxIndex[event.TransactionIndex] = append(eventsByTxIndex[event.TransactionIndex], event)
 	}
 
 	c.latestBlockData = &BlockData{
@@ -288,10 +277,6 @@ func (c *ExtendedIndexer) runIndexers(indexers []Indexer, data *BlockData, lates
 				}
 
 				c.metrics.BlockIndexedExtended(indexer.Name(), height)
-				if latestBlockData != nil {
-					// we will skip logging progress until data for the first live block is received.
-					c.progressManager.track(indexer.Name(), height, latestBlockData.Header.Height)
-				}
 			}
 
 			return nil
@@ -426,47 +411,4 @@ func buildGroupLookup(indexers []Indexer, latestBlockData *BlockData) ([]Indexer
 	}
 
 	return liveGroup, groupLookup, nil
-}
-
-type progressTracker struct {
-	progressFn   func(uint64)
-	targetHeight uint64
-}
-
-func (t *progressTracker) track(height uint64) {
-	if height <= t.targetHeight {
-		t.progressFn(1)
-	}
-}
-
-type progressManager struct {
-	log      zerolog.Logger
-	trackers map[string]*progressTracker
-}
-
-func newProgressManager(log zerolog.Logger) *progressManager {
-	return &progressManager{
-		log:      log,
-		trackers: make(map[string]*progressTracker),
-	}
-}
-
-func (m *progressManager) track(name string, height, targetHeight uint64) {
-	tracker, ok := m.trackers[name]
-	if !ok {
-		if height >= targetHeight {
-			return
-		}
-
-		tracker = &progressTracker{
-			targetHeight: targetHeight,
-			progressFn: util.LogProgress(m.log, util.DefaultLogProgressConfig(
-				fmt.Sprintf("extended indexer backfill (%s)", name),
-				targetHeight-height,
-			)),
-		}
-		m.trackers[name] = tracker
-	}
-
-	tracker.track(height)
 }
