@@ -9,8 +9,6 @@ import (
 	"time"
 
 	"github.com/cockroachdb/pebble/v2"
-	"github.com/dapperlabs/testingdock"
-	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/go-connections/nat"
 	"github.com/onflow/crypto"
@@ -21,6 +19,7 @@ import (
 
 	sdk "github.com/onflow/flow-go-sdk"
 	sdkclient "github.com/onflow/flow-go-sdk/access/grpc"
+	"github.com/onflow/testingdock"
 
 	"github.com/onflow/flow-go/cmd/bootstrap/utils"
 	ghostclient "github.com/onflow/flow-go/engine/ghost/client"
@@ -312,7 +311,7 @@ func (c *Container) Start() error {
 	ctx, cancel := context.WithTimeout(context.Background(), checkContainerTimeout)
 	defer cancel()
 
-	err := c.net.cli.ContainerStart(ctx, c.ID, types.ContainerStartOptions{})
+	err := c.net.cli.ContainerStart(ctx, c.ID, container.StartOptions{})
 	if err != nil {
 		return fmt.Errorf("could not start container: %w", err)
 	}
@@ -419,30 +418,30 @@ func (c *Container) OpenState() (*state.State, error) {
 }
 
 // containerStopped returns true if the container is not running.
-func containerStopped(state *types.ContainerJSON) bool {
+func containerStopped(state *container.InspectResponse) bool {
 	return !state.State.Running
 }
 
 // containerRunning returns true if the container is running.
-func containerRunning(state *types.ContainerJSON) bool {
+func containerRunning(state *container.InspectResponse) bool {
 	return state.State.Running
 }
 
 // containerDisconnected returns true if the container is not connected to a
 // network.
-func containerDisconnected(state *types.ContainerJSON) bool {
+func containerDisconnected(state *container.InspectResponse) bool {
 	return len(state.NetworkSettings.Networks) == 0
 }
 
 // containerConnected returns true if the container is connected to a network.
-func containerConnected(state *types.ContainerJSON) bool {
+func containerConnected(state *container.InspectResponse) bool {
 	return len(state.NetworkSettings.Networks) == 1
 }
 
 // waitForCondition waits for the given condition to be true, checking the
 // condition with an exponential backoff. Returns an error if inspecting fails
 // or when the context expires. Returns nil when the condition is true.
-func (c *Container) waitForCondition(ctx context.Context, condition func(*types.ContainerJSON) bool) error {
+func (c *Container) waitForCondition(ctx context.Context, condition func(*container.InspectResponse) bool) error {
 
 	retryAfter := checkContainerPeriod
 	for {

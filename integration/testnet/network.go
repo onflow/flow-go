@@ -15,13 +15,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/onflow/flow-go/follower/database"
-	"github.com/onflow/flow-go/state/protocol/datastore"
-	"github.com/onflow/flow-go/state/protocol/protocol_state"
-	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
-
-	"github.com/dapperlabs/testingdock"
-	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	dockerclient "github.com/docker/docker/client"
 	io_prometheus_client "github.com/prometheus/client_model/go"
@@ -31,13 +24,14 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/cadence"
-
 	"github.com/onflow/flow-go-sdk/crypto"
+	"github.com/onflow/testingdock"
 
 	"github.com/onflow/flow-go/cmd/bootstrap/dkg"
 	"github.com/onflow/flow-go/cmd/bootstrap/run"
 	"github.com/onflow/flow-go/cmd/bootstrap/utils"
 	consensus_follower "github.com/onflow/flow-go/follower"
+	"github.com/onflow/flow-go/follower/database"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/insecure/cmd"
 	"github.com/onflow/flow-go/model/bootstrap"
@@ -52,9 +46,12 @@ import (
 	"github.com/onflow/flow-go/network/p2p/keyutils"
 	"github.com/onflow/flow-go/network/p2p/translator"
 	clusterstate "github.com/onflow/flow-go/state/cluster"
+	"github.com/onflow/flow-go/state/protocol/datastore"
 	"github.com/onflow/flow-go/state/protocol/inmem"
+	"github.com/onflow/flow-go/state/protocol/protocol_state"
 	"github.com/onflow/flow-go/state/protocol/protocol_state/kvstore"
 	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
 	"github.com/onflow/flow-go/utils/io"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -228,7 +225,7 @@ func (net *FlowNetwork) Start(ctx context.Context) {
 	cli, err := dockerclient.NewClientWithOpts(dockerclient.FromEnv, dockerclient.WithAPIVersionNegotiation())
 	require.NoError(net.t, err)
 
-	containers, err := cli.ContainerList(ctx, types.ContainerListOptions{})
+	containers, err := cli.ContainerList(ctx, container.ListOptions{})
 	require.NoError(net.t, err)
 
 	t := net.t
@@ -241,7 +238,7 @@ func (net *FlowNetwork) Start(ctx context.Context) {
 	t.Log("starting flow network")
 	net.suite.Start(ctx)
 
-	containers, err = cli.ContainerList(ctx, types.ContainerListOptions{})
+	containers, err = cli.ContainerList(ctx, container.ListOptions{})
 	require.NoError(net.t, err)
 
 	t.Logf("%v (%v) after starting flow network, found %d docker containers", time.Now().UTC(), t.Name(), len(containers))
