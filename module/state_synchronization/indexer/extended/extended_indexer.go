@@ -158,6 +158,18 @@ func (c *ExtendedIndexer) IndexBlockData(
 	transactions []*flow.TransactionBody,
 	events []flow.Event,
 ) error {
+	c.mu.RLock()
+	latestBlockData := c.latestBlockData
+	c.mu.RUnlock()
+
+	// do this first outside of the lock to reduce contention with the indexing loop.
+	eventsByTxIndex := make(map[uint32][]flow.Event)
+	if latestBlockData == nil || header.Height == latestBlockData.Header.Height+1 {
+		for _, event := range events {
+			eventsByTxIndex[event.TransactionIndex] = append(eventsByTxIndex[event.TransactionIndex], event)
+		}
+	}
+
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -168,11 +180,6 @@ func (c *ExtendedIndexer) IndexBlockData(
 		if header.Height <= c.latestBlockData.Header.Height {
 			return nil
 		}
-	}
-
-	eventsByTxIndex := make(map[uint32][]flow.Event)
-	for _, event := range events {
-		eventsByTxIndex[event.TransactionIndex] = append(eventsByTxIndex[event.TransactionIndex], event)
 	}
 
 	c.latestBlockData = &BlockData{
@@ -229,69 +236,67 @@ func (c *ExtendedIndexer) indexNextHeights() (bool, error) {
 	latestBlockData := c.latestBlockData
 	c.mu.RUnlock()
 
-	// group indexers by their next height to allow sharing data.
-	nextHeightGroups, err := buildGroupLookup(c.indexers)
+	// group indexers by their next height to allow the indexers to share input data.
+	liveGroup, backfillGroups, err := buildGroupLookup(c.indexers, latestBlockData)
 	if err != nil {
 		return false, fmt.Errorf("failed to build group lookup: %w", err)
 	}
 
+	if len(liveGroup) > 0 {
+		err = c.runIndexers(liveGroup, latestBlockData, latestBlockData)
+		if err != nil {
+			return false, fmt.Errorf("failed to index live indexers: %w", err)
+		}
+	}
+
 	// this is a trailing indicator. this method will return true if any indexer was backfilled in this iteration.
 	// if all indexers catch up, it will take one more iteration to register as all caught up.
-	hasBackfillingIndexers := false
+	hasBackfillingIndexers := len(backfillGroups) > 0
 
-	// iterate over groups of indexers by their next height. For each group, get the data for that next block,
-	// and index the data for all indexers in the group. Each indexer adds its data into the shared batch.
-	// The batch is then committed at the end of the iteration. This means the batch may contain data from
-	// multiple blocks. Since indexers manage their own progress, it is OK if a failure in one index blocks
-	// persisting in all others. After recovery, indexers will all resume indexing from where they left off.
-	err = storage.WithLocks(c.lockManager, storage.LockGroupAccessExtendedIndexers, func(lctx lockctx.Context) error {
-		return c.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			for height, group := range nextHeightGroups {
-				var data BlockData
-				var err error
-
-				// get the data for the height
-				// latestBlockData may be nil if the indexer just started. in this case, fall back to fetching data
-				// from storage. If the node has not indexed any data yet, its possible storage will also be missing
-				// the data.
-				if latestBlockData != nil && height == latestBlockData.Header.Height {
-					data = *latestBlockData
-				} else {
-					hasBackfillingIndexers = true
-
-					data, err = c.blockDataFromStorage(height)
-					if err != nil {
-						if errors.Is(err, storage.ErrNotFound) {
-							continue // skip group for this iteration
-						}
-						return fmt.Errorf("failed to get block data for height %d: %w", height, err)
-					}
-				}
-
-				// index the data for all indexers in the group
-				for _, indexer := range group {
-					if err := indexer.IndexBlockData(lctx, data, rw); err != nil {
-						if errors.Is(err, ErrAlreadyIndexed) {
-							continue
-						}
-						return fmt.Errorf("failed to index block data for %s at height %d: %w", indexer.Name(), height, err)
-					}
-
-					c.metrics.BlockIndexedExtended(indexer.Name(), height)
-					if latestBlockData != nil {
-						// we will skip logging progress until data for the first live block is received.
-						c.progressManager.track(indexer.Name(), height, latestBlockData.Header.Height)
-					}
-				}
+	for height, group := range backfillGroups {
+		data, err := c.blockDataFromStorage(height)
+		if err != nil {
+			if errors.Is(err, storage.ErrNotFound) {
+				continue // skip group for this iteration
 			}
-			return nil
-		})
-	})
-	if err != nil {
-		return false, fmt.Errorf("failed to index block data: %w", err)
+			return false, fmt.Errorf("failed to get block data for height %d: %w", height, err)
+		}
+
+		err = c.runIndexers(group, &data, latestBlockData)
+		if err != nil {
+			return false, fmt.Errorf("failed to index backfill indexers: %w", err)
+		}
 	}
 
 	return hasBackfillingIndexers, nil
+}
+
+// runIndexers indexes the data for all indexers in the group.
+//
+// No error returns are expected during normal operation.
+func (c *ExtendedIndexer) runIndexers(indexers []Indexer, data *BlockData, latestBlockData *BlockData) error {
+	height := data.Header.Height
+	return storage.WithLocks(c.lockManager, storage.LockGroupAccessExtendedIndexers, func(lctx lockctx.Context) error {
+		return c.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			// index the data for all indexers in the group
+			for _, indexer := range indexers {
+				if err := indexer.IndexBlockData(lctx, *data, rw); err != nil {
+					if errors.Is(err, ErrAlreadyIndexed) {
+						continue
+					}
+					return fmt.Errorf("failed to index block data for %s at height %d: %w", indexer.Name(), height, err)
+				}
+
+				c.metrics.BlockIndexedExtended(indexer.Name(), height)
+				if latestBlockData != nil {
+					// we will skip logging progress until data for the first live block is received.
+					c.progressManager.track(indexer.Name(), height, latestBlockData.Header.Height)
+				}
+			}
+
+			return nil
+		})
+	})
 }
 
 // blockDataFromStorage loads the block data for the given height.
@@ -398,16 +403,29 @@ func (c *ExtendedIndexer) extractDataFromExecutionData(height uint64, data *exec
 
 // buildGroupLookup builds a map of indexers by their next height to index.
 // This allows the indexing loop to lookup data for a height once, and pass it to all indexers in the group.
-func buildGroupLookup(indexers []Indexer) (map[uint64][]Indexer, error) {
+// If `latestBlockData` is not nil, it will also return the group of indexers at the "live" height.
+// All indexers that are ahead of the live block will be skipped.
+func buildGroupLookup(indexers []Indexer, latestBlockData *BlockData) ([]Indexer, map[uint64][]Indexer, error) {
 	groupLookup := make(map[uint64][]Indexer)
+	liveGroup := make([]Indexer, 0)
 	for _, indexer := range indexers {
 		nextHeight, err := indexer.NextHeight()
 		if err != nil {
-			return nil, fmt.Errorf("failed to get next height for indexer %s: %w", indexer.Name(), err)
+			return nil, nil, fmt.Errorf("failed to get next height for indexer %s: %w", indexer.Name(), err)
+		}
+		if latestBlockData != nil {
+			if nextHeight > latestBlockData.Header.Height {
+				continue // skip all indexers that are ahead of the live block
+			}
+			if nextHeight == latestBlockData.Header.Height {
+				liveGroup = append(liveGroup, indexer)
+				continue
+			}
 		}
 		groupLookup[nextHeight] = append(groupLookup[nextHeight], indexer)
 	}
-	return groupLookup, nil
+
+	return liveGroup, groupLookup, nil
 }
 
 type progressTracker struct {
