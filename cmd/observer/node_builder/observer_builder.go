@@ -1921,7 +1921,7 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 		accessMetrics := builder.AccessMetrics
 		config := builder.rpcConf
 		backendConfig := config.BackendConfig
-		cacheSize := int(backendConfig.ConnectionPoolSize)
+		cacheSize := backendConfig.ConnectionPoolSize
 
 		var connBackendCache *rpcConnection.Cache
 		var err error

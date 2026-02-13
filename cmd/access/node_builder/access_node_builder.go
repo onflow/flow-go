@@ -2033,7 +2033,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			config := builder.rpcConf
 			backendConfig := config.BackendConfig
 			accessMetrics := builder.AccessMetrics
-			cacheSize := int(backendConfig.ConnectionPoolSize)
+			cacheSize := backendConfig.ConnectionPoolSize
 
 			var connBackendCache *rpcConnection.Cache
 			var err error
