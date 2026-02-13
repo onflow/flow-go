@@ -177,6 +177,13 @@ func IndexLatestSealAtBlock(lctx lockctx.Proof, w storage.Writer, blockID flow.I
 	return UpsertByKey(w, MakePrefix(codeBlockIDToLatestSealID, blockID), sealID)
 }
 
+func IndexLatestSealAtBlockFunctor(blockID flow.Identifier, sealID flow.Identifier) Functor {
+	return BindFunctors(
+		CheckHoldsLockFunctor(storage.LockInsertBlock),
+		UpsertFunctor(MakePrefix(codeBlockIDToLatestSealID, blockID), sealID),
+	)
+}
+
 // LookupLatestSealAtBlock finds the highest seal that was included in the fork up to (and including) blockID.
 // Frequently, the highest seal included in this block's payload. However, if there are no seals in
 // this block, sealID should reference the highest seal in blockID's ancestors.

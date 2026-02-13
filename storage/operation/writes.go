@@ -30,24 +30,6 @@ func UpsertByKey(w storage.Writer, key []byte, val interface{}) error {
 	return nil
 }
 
-// Upserting returns a functor, whose execution will append the given key-value-pair to the provided
-// storage writer (typically a pending batch of database writes).
-func Upserting(key []byte, val interface{}) func(storage.Writer) error {
-	value, err := msgpack.Marshal(val)
-	return func(w storage.Writer) error {
-		if err != nil {
-			return irrecoverable.NewExceptionf("failed to encode value: %w", err)
-		}
-
-		err = w.Set(key, value)
-		if err != nil {
-			return irrecoverable.NewExceptionf("failed to store data: %w", err)
-		}
-
-		return nil
-	}
-}
-
 // RemoveByKey removes the entity with the given key, if it exists. If it doesn't
 // exist, this is a no-op.
 // Error returns:

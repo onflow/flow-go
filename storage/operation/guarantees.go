@@ -10,6 +10,45 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
+// InsertAndIndexGuarantee creates a functor that atomically inserts a collection guarantee
+// and creates an index mapping from collection ID to guarantee ID.
+// Caller must ensure guaranteeID equals to guarantee.ID()
+// Caller must acquire the [storage.LockInsertBlock] lock
+// It returns [storage.ErrDataMismatch] if a different guarantee is already indexed for the collection
+func InsertAndIndexGuarantee(guaranteeID flow.Identifier, guarantee *flow.CollectionGuarantee) Functor {
+	errmsg := fmt.Sprintf("InsertAndIndexGuarantee failed with guaranteeID %v, collectionID %v",
+		guaranteeID, guarantee.CollectionID)
+	return WrapError(errmsg, BindFunctors(
+		CheckHoldsLockFunctor(storage.LockInsertBlock),
+		UpsertFunctor(MakePrefix(codeGuarantee, guaranteeID), guarantee),
+		InsertingWithMismatchCheck(MakePrefix(codeGuaranteeByCollectionID, guarantee.CollectionID), guaranteeID),
+	))
+}
+
+type CollectionGuaranteeWithID struct {
+	GuaranteeID flow.Identifier
+	*flow.CollectionGuarantee
+}
+
+func InsertAndIndexGuarantees(guaranteesWithID []*CollectionGuaranteeWithID) Functor {
+	guaranteeIDKeys, guarantees := make([][]byte, 0, len(guaranteesWithID)), make([]any, 0, len(guaranteesWithID))
+	collectionIDKeys, guaranteeIDs := make([][]byte, 0, len(guaranteesWithID)), make([]any, 0, len(guaranteesWithID))
+
+	for _, g := range guaranteesWithID {
+		guaranteeIDKeys = append(guaranteeIDKeys, MakePrefix(codeGuarantee, g.GuaranteeID))
+		guarantees = append(guarantees, g.CollectionGuarantee)
+
+		collectionIDKeys = append(collectionIDKeys, MakePrefix(codeGuaranteeByCollectionID, g.CollectionID))
+		guaranteeIDs = append(guaranteeIDs, g.GuaranteeID)
+	}
+
+	return WrapError("InsertAndIndexGuarantees failed", BindFunctors(
+		CheckHoldsLockFunctor(storage.LockInsertBlock),
+		WrapError("insert guarantee failed", UpsertMulFunctor(guaranteeIDKeys, guarantees)),
+		WrapError("index guarantee failed", InsertingMulWithMismatchCheck(collectionIDKeys, guaranteeIDs)),
+	))
+}
+
 // InsertGuarantee inserts a collection guarantee by ID.
 //
 // CAUTION: The caller must ensure guaranteeID is a collision-resistant hash of the provided

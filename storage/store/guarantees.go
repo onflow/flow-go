@@ -3,8 +3,6 @@ package store
 import (
 	"fmt"
 
-	"github.com/jordanschalm/lockctx"
-
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
@@ -34,23 +32,11 @@ func NewGuarantees(
 	byCollectionIDCacheSize uint,
 ) *Guarantees {
 
-	storeByGuaranteeIDWithLock := func(rw storage.ReaderBatchWriter, guaranteeID flow.Identifier, guarantee *flow.CollectionGuarantee) error {
-		return operation.InsertGuarantee(rw.Writer(), guaranteeID, guarantee)
-	}
-
 	retrieveByGuaranteeID := func(r storage.Reader, guaranteeID flow.Identifier) (*flow.CollectionGuarantee, error) {
 		var guarantee flow.CollectionGuarantee
 		err := operation.RetrieveGuarantee(r, guaranteeID, &guarantee)
 		return &guarantee, err
 	}
-
-	// While a collection guarantee can only be present once in the finalized chain,
-	// across different consensus forks we may encounter the same guarantee multiple times.
-	// On the happy path there is a 1:1 correspondence between CollectionGuarantees and Collections.
-	// However, the finalization status of guarantees is not yet verified by consensus nodes,
-	// nor is the possibility of byzantine collection nodes dealt with, so we check here that
-	// there are no conflicting guarantees for the same collection.
-	indexByCollectionID := operation.IndexGuarantee
 
 	lookupByCollectionID := func(r storage.Reader, collID flow.Identifier) (flow.Identifier, error) {
 		var guaranteeID flow.Identifier
@@ -65,32 +51,55 @@ func NewGuarantees(
 		db: db,
 		cache: newCache(collector, metrics.ResourceGuarantee,
 			withLimit[flow.Identifier, *flow.CollectionGuarantee](cacheSize),
-			withStore(storeByGuaranteeIDWithLock),
 			withRetrieve(retrieveByGuaranteeID)),
 		byCollectionIdCache: newCache[flow.Identifier, flow.Identifier](collector, metrics.ResourceGuaranteeByCollectionID,
 			withLimit[flow.Identifier, flow.Identifier](byCollectionIDCacheSize),
-			withStoreWithLock(indexByCollectionID),
 			withRetrieve(lookupByCollectionID)),
 	}
 
 	return g
 }
 
-func (g *Guarantees) storeTx(lctx lockctx.Proof, rw storage.ReaderBatchWriter, guarantee *flow.CollectionGuarantee) error {
-	guaranteeID := guarantee.ID()
-	err := g.cache.PutTx(rw, guaranteeID, guarantee)
-	if err != nil {
-		return err
+func (g *Guarantees) storeGuarantees(guarantees []*flow.CollectionGuarantee) operation.Functor {
+	if len(guarantees) == 0 {
+		return operation.NoOpFunctor()
 	}
 
-	err = g.byCollectionIdCache.PutWithLockTx(lctx, rw, guarantee.CollectionID, guaranteeID)
-	if err != nil {
-		return fmt.Errorf("could not index guarantee %x under collection %x: %w",
-			guaranteeID, guarantee.CollectionID[:], err)
+	guaranteesWithID := make([]*operation.CollectionGuaranteeWithID, 0, len(guarantees))
+	for _, guarantee := range guarantees {
+		guaranteesWithID = append(guaranteesWithID, &operation.CollectionGuaranteeWithID{
+			GuaranteeID:         guarantee.ID(),
+			CollectionGuarantee: guarantee,
+		})
 	}
 
-	return nil
+	// While a collection guarantee can only be present once in the finalized chain,
+	// across different consensus forks we may encounter the same guarantee multiple times.
+	// On the happy path there is a 1:1 correspondence between CollectionGuarantees and Collections.
+	// However, the finalization status of guarantees is not yet verified by consensus nodes,
+	// nor is the possibility of byzantine collection nodes dealt with, so we check here that
+	// there are no conflicting guarantees for the same collection.
+	return operation.BindFunctors(
+		operation.InsertAndIndexGuarantees(guaranteesWithID),
+		operation.OnCommitSucceedFunctor(func() {
+			for _, gd := range guaranteesWithID {
+				g.cache.Insert(gd.GuaranteeID, gd.CollectionGuarantee)
+				g.byCollectionIdCache.Insert(gd.CollectionGuarantee.CollectionID, gd.GuaranteeID)
+			}
+		}),
+	)
 }
+
+// func (g *Guarantees) storeGuarantee(guarantee *flow.CollectionGuarantee) operation.Functor {
+// 	guaranteeID := guarantee.ID()
+// 	return operation.BindFunctors(
+// 		operation.InsertAndIndexGuarantee(guaranteeID, guarantee),
+// 		operation.OnCommitSucceedFunctor(func() {
+// 			g.cache.Insert(guaranteeID, guarantee)
+// 			g.byCollectionIdCache.Insert(guarantee.CollectionID, guaranteeID)
+// 		}),
+// 	)
+// }
 
 func (g *Guarantees) retrieveTx(guaranteeID flow.Identifier) (*flow.CollectionGuarantee, error) {
 	val, err := g.cache.Get(g.db.Reader(), guaranteeID)

@@ -70,10 +70,6 @@ func (r *ResultApprovals) StoreMyApproval(approval *flow.ResultApproval) func(lc
 	storing := operation.InsertAndIndexResultApproval(approval)
 
 	return func(lctx lockctx.Proof) error {
-		if !lctx.HoldsLock(storage.LockIndexResultApproval) {
-			return fmt.Errorf("missing lock for index result approval")
-		}
-
 		return r.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 			storage.OnCommitSucceed(rw, func() {
 				// the success callback is called after the lock is released, so
