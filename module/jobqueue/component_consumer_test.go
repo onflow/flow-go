@@ -87,15 +87,11 @@ func (suite *ComponentConsumerSuite) prepareTest(
 	progress.On("ProcessedIndex").Return(suite.defaultIndex, nil)
 	progress.On("SetProcessedIndex", mock.AnythingOfType("uint64")).Return(nil)
 
-	progressInitializer := new(storagemock.ConsumerProgressInitializer)
-	progressInitializer.On("Initialize", mock.AnythingOfType("uint64")).Return(progress, nil)
-
 	consumer, err := NewComponentConsumer(
 		unittest.Logger(),
 		workSignal,
-		progressInitializer,
+		progress,
 		jobs,
-		suite.defaultIndex,
 		processor,
 		suite.maxProcessing,
 		suite.maxSearchAhead,

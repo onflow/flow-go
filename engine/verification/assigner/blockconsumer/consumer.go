@@ -27,28 +27,16 @@ type BlockConsumer struct {
 	metrics  module.VerificationMetrics
 }
 
-// defaultProcessedIndex returns the last sealed block height from the protocol state.
-//
-// The BlockConsumer utilizes this return height to fetch and consume block jobs from
-// jobs queue the first time it initializes.
-func defaultProcessedIndex(state protocol.State) (uint64, error) {
-	final, err := state.Sealed().Head()
-	if err != nil {
-		return 0, fmt.Errorf("could not get finalized height: %w", err)
-	}
-	return final.Height, nil
-}
-
-// NewBlockConsumer creates a new consumer and returns the default processed
-// index for initializing the processed index in storage.
+// NewBlockConsumer creates a new consumer
 func NewBlockConsumer(log zerolog.Logger,
 	metrics module.VerificationMetrics,
-	processedHeight storage.ConsumerProgressInitializer,
+	processedHeight storage.ConsumerProgress,
 	blocks storage.Blocks,
 	state protocol.State,
 	blockProcessor assigner.FinalizedBlockProcessor,
 	maxProcessing uint64,
-	finalizationRegistrar hotstuff.FinalizationRegistrar) (*BlockConsumer, uint64, error) {
+	finalizationRegistrar hotstuff.FinalizationRegistrar,
+) (*BlockConsumer, error) {
 
 	lg := log.With().Str("module", "block_consumer").Logger()
 
@@ -60,14 +48,9 @@ func NewBlockConsumer(log zerolog.Logger,
 	// the block reader is where the consumer reads new finalized blocks from (i.e., jobs).
 	jobs := jobqueue.NewFinalizedBlockReader(state, blocks)
 
-	defaultIndex, err := defaultProcessedIndex(state)
+	consumer, err := jobqueue.NewConsumer(lg, jobs, processedHeight, worker, maxProcessing, 0)
 	if err != nil {
-		return nil, 0, fmt.Errorf("could not read default processed index: %w", err)
-	}
-
-	consumer, err := jobqueue.NewConsumer(lg, jobs, processedHeight, worker, maxProcessing, 0, defaultIndex)
-	if err != nil {
-		return nil, 0, fmt.Errorf("could not create block consumer: %w", err)
+		return nil, fmt.Errorf("could not create block consumer: %w", err)
 	}
 
 	blockConsumer := &BlockConsumer{
@@ -80,7 +63,7 @@ func NewBlockConsumer(log zerolog.Logger,
 	// register callback with finalization registrar
 	finalizationRegistrar.AddOnBlockFinalizedConsumer(blockConsumer.onFinalizedBlock)
 
-	return blockConsumer, defaultIndex, nil
+	return blockConsumer, nil
 }
 
 // NotifyJobIsDone is invoked by the worker to let the consumer know that it is done

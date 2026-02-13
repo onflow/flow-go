@@ -123,7 +123,6 @@ func withConsumer(
 	unittest.RunWithPebbleDB(t, func(pdb *pebble.DB) {
 		maxProcessing := uint64(workerCount)
 
-		processedHeight := store.NewConsumerProgress(pebbleimpl.ToDB(pdb), module.ConsumeProgressVerificationBlockHeight)
 		collector := &metrics.NoopCollector{}
 		tracer := trace.NewNoopTracer()
 		log := unittest.Logger()
@@ -135,8 +134,14 @@ func withConsumer(
 			process: process,
 		}
 
+		sealedHead, err := s.State.Sealed().Head()
+		require.NoError(t, err)
+
+		processedHeight, err := store.NewConsumerProgress(pebbleimpl.ToDB(pdb), module.ConsumeProgressVerificationBlockHeight).Initialize(sealedHead.Height)
+		require.NoError(t, err)
+
 		followerDistributor := pubsub.NewFollowerDistributor()
-		consumer, _, err := blockconsumer.NewBlockConsumer(
+		consumer, err := blockconsumer.NewBlockConsumer(
 			unittest.Logger(),
 			collector,
 			processedHeight,

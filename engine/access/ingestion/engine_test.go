@@ -177,7 +177,8 @@ func (s *Suite) SetupTest() {
 // initEngineAndSyncer create new instance of ingestion engine and collection syncer.
 // It waits until the ingestion engine starts.
 func (s *Suite) initEngineAndSyncer() (*Engine, *collections.Syncer, *collections.Indexer) {
-	processedHeightInitializer := store.NewConsumerProgress(s.db, module.ConsumeProgressIngestionEngineBlockHeight)
+	processedHeight, err := store.NewConsumerProgress(s.db, module.ConsumeProgressIngestionEngineBlockHeight).Initialize(s.finalizedBlock.Height)
+	require.NoError(s.T(), err)
 	lastFullBlockHeight, err := store.NewConsumerProgress(s.db, module.ConsumeProgressLastFullBlockHeight).Initialize(s.finalizedBlock.Height)
 	require.NoError(s.T(), err)
 
@@ -217,7 +218,7 @@ func (s *Suite) initEngineAndSyncer() (*Engine, *collections.Syncer, *collection
 		s.blocks,
 		s.results,
 		s.receipts,
-		processedHeightInitializer,
+		processedHeight,
 		syncer,
 		indexer,
 		s.collectionExecutedMetric,
@@ -273,8 +274,8 @@ func (s *Suite) TestOnFinalizedBlockSingle() {
 	snap := new(protocolmock.Snapshot)
 
 	finalSnapshot := protocolmock.NewSnapshot(s.T())
-	finalSnapshot.On("Head").Return(s.finalizedBlock, nil).Twice()
-	s.proto.state.On("Final").Return(finalSnapshot, nil).Twice()
+	finalSnapshot.On("Head").Return(s.finalizedBlock, nil).Once()
+	s.proto.state.On("Final").Return(finalSnapshot, nil).Once()
 
 	epoch.On("ClusterByChainID", mock.Anything).Return(cluster, nil)
 	epochs.On("Current").Return(epoch, nil)
@@ -339,8 +340,8 @@ func (s *Suite) TestOnFinalizedBlockSeveralBlocksAhead() {
 	snap := new(protocolmock.Snapshot)
 
 	finalSnapshot := protocolmock.NewSnapshot(s.T())
-	finalSnapshot.On("Head").Return(s.finalizedBlock, nil).Twice()
-	s.proto.state.On("Final").Return(finalSnapshot, nil).Twice()
+	finalSnapshot.On("Head").Return(s.finalizedBlock, nil).Once()
+	s.proto.state.On("Final").Return(finalSnapshot, nil).Once()
 
 	epoch.On("ClusterByChainID", mock.Anything).Return(cluster, nil)
 	epochs.On("Current").Return(epoch, nil)
@@ -416,10 +417,6 @@ func (s *Suite) TestOnFinalizedBlockSeveralBlocksAhead() {
 
 // TestExecutionReceiptsAreIndexed checks that execution receipts are properly indexed
 func (s *Suite) TestExecutionReceiptsAreIndexed() {
-	finalSnapshot := protocolmock.NewSnapshot(s.T())
-	finalSnapshot.On("Head").Return(s.finalizedBlock, nil).Once()
-	s.proto.state.On("Final").Return(finalSnapshot, nil).Once()
-
 	eng, _, _ := s.initEngineAndSyncer()
 
 	originID := unittest.IdentifierFixture()
@@ -579,8 +576,8 @@ func (s *Suite) TestOnFinalizedBlockAlreadyIndexed() {
 	snap := new(protocolmock.Snapshot)
 
 	finalSnapshot := protocolmock.NewSnapshot(s.T())
-	finalSnapshot.On("Head").Return(s.finalizedBlock, nil).Twice()
-	s.proto.state.On("Final").Return(finalSnapshot, nil).Twice()
+	finalSnapshot.On("Head").Return(s.finalizedBlock, nil).Once()
+	s.proto.state.On("Final").Return(finalSnapshot, nil).Once()
 
 	epoch.On("ClusterByChainID", mock.Anything).Return(cluster, nil)
 	epochs.On("Current").Return(epoch, nil)
