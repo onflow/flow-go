@@ -23,7 +23,13 @@ import (
 )
 
 const (
-	// DefaultBackfillDelay is the delay between backfill attempts.
+	// DefaultBackfillDelay defines the delay between consecutive backfill attempts.
+	// With the default value of 10ms, the maximum catch-up rate is approximately
+	// 100 blocks per second (1000ms / 10ms).
+	//
+	// The delay should be carefully tuned: setting it too low may overwhelm
+	// the system, while setting it too high will significantly slow down
+	// the catch-up process.
 	DefaultBackfillDelay = 10 * time.Millisecond
 )
 
