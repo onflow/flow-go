@@ -52,7 +52,6 @@ type ExtendedIndexer struct {
 	systemCollections *access.Versioned[access.SystemCollectionBuilder]
 
 	indexers        []Indexer
-	groupLookup     map[uint64][]Indexer
 	notifier        engine.Notifier
 	progressManager *progressManager
 
@@ -81,11 +80,6 @@ func NewExtendedIndexer(
 		return nil, fmt.Errorf("metrics cannot be nil. use a no-op metrics collector instead")
 	}
 
-	groupLookup, err := buildGroupLookup(indexers)
-	if err != nil {
-		return nil, fmt.Errorf("failed to build group lookup: %w", err)
-	}
-
 	log = log.With().Str("component", "extended_indexer").Logger()
 	c := &ExtendedIndexer{
 		log:           log.With().Str("component", "extended_indexer").Logger(),
@@ -95,7 +89,6 @@ func NewExtendedIndexer(
 		backfillDelay: backfillDelay,
 
 		indexers:        indexers,
-		groupLookup:     groupLookup,
 		notifier:        engine.NewNotifier(),
 		progressManager: newProgressManager(log),
 
@@ -186,33 +179,18 @@ func (c *ExtendedIndexer) ingestLoop(ctx irrecoverable.SignalerContext, ready co
 		}
 		// TODO: do we need to enforce a minimum delay?
 
-		if err := c.indexNextHeights(); err != nil {
+		hasBackfillingIndexers, err := c.indexNextHeights()
+		if err != nil {
 			ctx.Throw(fmt.Errorf("failed to check all: %w", err))
 			return
 		}
 
 		// once all indexers are caught up with the live height, stop resetting the backfill timer
 		// so the only notification will be for new live blocks.
-		if c.hasBackfillingIndexers() {
+		if hasBackfillingIndexers {
 			timer.Reset(c.backfillDelay)
 		}
 	}
-}
-
-func (c *ExtendedIndexer) hasBackfillingIndexers() bool {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-	if c.latestBlockData == nil {
-		return true
-	}
-
-	liveHeight := c.latestBlockData.Header.Height + 1
-	for height := range c.groupLookup {
-		if height < liveHeight {
-			return true
-		}
-	}
-	return false
 }
 
 // indexNextHeights indexes the next heights for all indexers.
@@ -223,14 +201,29 @@ func (c *ExtendedIndexer) hasBackfillingIndexers() bool {
 // NOT CONCURRENCY SAFE.
 //
 // No error returns are expected during normal operation.
-func (c *ExtendedIndexer) indexNextHeights() error {
+func (c *ExtendedIndexer) indexNextHeights() (bool, error) {
 	c.mu.RLock()
 	latestBlockData := c.latestBlockData
 	c.mu.RUnlock()
 
-	err := storage.WithLocks(c.lockManager, storage.LockGroupAccessExtendedIndexers, func(lctx lockctx.Context) error {
+	// group indexers by their next height to allow sharing data.
+	nextHeightGroups, err := buildGroupLookup(c.indexers)
+	if err != nil {
+		return false, fmt.Errorf("failed to build group lookup: %w", err)
+	}
+
+	// this is a trailing indicator. this method will return true if any indexer was backfilled in this iteration.
+	// if all indexers catch up, it will take one more iteration to register as all caught up.
+	hasBackfillingIndexers := false
+
+	// iterate over groups of indexers by their next height. For each group, get the data for that next block,
+	// and index the data for all indexers in the group. Each indexer adds its data into the shared batch.
+	// The batch is then committed at the end of the iteration. This means the batch may contain data from
+	// multiple blocks. Since indexers manage their own progress, it is OK if a failure in one index blocks
+	// persisting in all others. After recovery, indexers will all resume indexing from where they left off.
+	err = storage.WithLocks(c.lockManager, storage.LockGroupAccessExtendedIndexers, func(lctx lockctx.Context) error {
 		return c.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			for height, group := range c.groupLookup {
+			for height, group := range nextHeightGroups {
 				var data BlockData
 				var err error
 
@@ -241,6 +234,8 @@ func (c *ExtendedIndexer) indexNextHeights() error {
 				if latestBlockData != nil && height == latestBlockData.Header.Height {
 					data = *latestBlockData
 				} else {
+					hasBackfillingIndexers = true
+
 					data, err = c.blockDataFromStorage(height)
 					if err != nil {
 						if errors.Is(err, storage.ErrNotFound) {
@@ -270,17 +265,10 @@ func (c *ExtendedIndexer) indexNextHeights() error {
 		})
 	})
 	if err != nil {
-		return fmt.Errorf("failed to index block data: %w", err)
+		return false, fmt.Errorf("failed to index block data: %w", err)
 	}
 
-	// after the batch is committed, get the new next height for each indexer and refresh groups
-	newGroups, err := buildGroupLookup(c.indexers)
-	if err != nil {
-		return fmt.Errorf("failed to build group lookup: %w", err)
-	}
-	c.groupLookup = newGroups
-
-	return nil
+	return hasBackfillingIndexers, nil
 }
 
 // blockDataFromStorage loads the block data for the given height.
@@ -385,6 +373,8 @@ func (c *ExtendedIndexer) extractDataFromExecutionData(height uint64, data *exec
 	return txs, events, nil
 }
 
+// buildGroupLookup builds a map of indexers by their next height to index.
+// This allows the indexing loop to lookup data for a height once, and pass it to all indexers in the group.
 func buildGroupLookup(indexers []Indexer) (map[uint64][]Indexer, error) {
 	groupLookup := make(map[uint64][]Indexer)
 	for _, indexer := range indexers {
