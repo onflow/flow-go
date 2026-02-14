@@ -463,7 +463,11 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_ReceiverHasNoSu
 	err = senderCon.Unicast(&libp2pmessage.TestMessage{
 		Text: string("hello"),
 	}, u.receiverID.NodeID)
-	require.NoError(u.T(), err)
+	if err != nil {
+		// It can happen that the receiver resets before the sender closes,
+		// in which case the error will be "stream reset"
+		require.ErrorContains(u.T(), err, "stream reset", "expected stream-related error when receiver has no subscription")
+	}
 
 	// wait for slashing violations consumer mock to invoke run func and close ch if expected method call happens
 	unittest.RequireCloseBefore(u.T(), u.waitCh, u.channelCloseDuration, "could close ch on time")
