@@ -169,10 +169,6 @@ func (fnb *FlowNodeBuilder) BaseFlags() {
 	fnb.flags.StringVarP(&fnb.BaseConfig.BootstrapDir, "bootstrapdir", "b", defaultConfig.BootstrapDir, "path to the bootstrap directory")
 	fnb.flags.StringVarP(&fnb.BaseConfig.datadir, "datadir", "d", defaultConfig.datadir, "directory to store the protocol database")
 
-	var rejectPebbleDir rejectPebbleDirValue
-	fnb.flags.VarP(rejectPebbleDir, "pebble-dir", "", "DEPRECATED")
-	_ = fnb.flags.MarkHidden("pebble-dir")
-
 	fnb.flags.StringVar(&fnb.BaseConfig.pebbleCheckpointsDir, "pebble-checkpoints-dir", defaultConfig.pebbleCheckpointsDir, "directory to store the checkpoints for the public pebble database (protocol state)")
 	fnb.flags.StringVar(&fnb.BaseConfig.secretsdir, "secretsdir", defaultConfig.secretsdir, "directory to store private database (secrets)")
 	fnb.flags.StringVarP(&fnb.BaseConfig.level, "loglevel", "l", defaultConfig.level, "level for logging output")
@@ -284,17 +280,6 @@ func (fnb *FlowNodeBuilder) BaseFlags() {
 		false,
 		"Disables calling the transaction fee deduction. This is only for testing purposes. To disable fees on a network it is better to set the fee price to 0.0 .")
 }
-
-// TODO: remove after mainnet27 spork
-// this struct is to reject the deprecated --pebble-dir flag
-type rejectPebbleDirValue struct{}
-
-func (rejectPebbleDirValue) String() string { return "" }
-func (rejectPebbleDirValue) Set(string) error {
-	return fmt.Errorf("the --pebble-dir flag is deprecated. Please remove the flag.  " +
-		"Database will be stored in the location pointed by the --datadir flag which defaults to /data/protocol if not specified.")
-}
-func (rejectPebbleDirValue) Type() string { return "string" }
 
 func (fnb *FlowNodeBuilder) EnqueuePingService() {
 	fnb.Component("ping service", func(node *NodeConfig) (module.ReadyDoneAware, error) {
