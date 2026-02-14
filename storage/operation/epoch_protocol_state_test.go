@@ -14,7 +14,7 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-// TestInsertProtocolState tests if basic badger operations on EpochProtocolState work as expected.
+// TestInsertEpochProtocolState tests if basic badger operations on EpochProtocolState work as expected.
 func TestInsertEpochProtocolState(t *testing.T) {
 	lockManager := storage.NewTestingLockManager()
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
