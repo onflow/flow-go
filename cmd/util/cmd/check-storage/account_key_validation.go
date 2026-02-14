@@ -122,8 +122,8 @@ func validateAccountStatusRegister(
 	accountPublicKeyCount = accountStatus.AccountPublicKeyCount()
 
 	if accountPublicKeyCount <= 1 {
-		if len(encodedAccountStatus) != environment.AccountStatusMinSizeV4 {
-			err = fmt.Errorf("account status register size is %d, expect %d bytes", len(encodedAccountStatus), environment.AccountStatusMinSizeV4)
+		if len(encodedAccountStatus) != environment.AccountStatusMinSize {
+			err = fmt.Errorf("account status register size is %d, expect %d bytes", len(encodedAccountStatus), environment.AccountStatusMinSize)
 			return
 		}
 		storedKeyCount = accountPublicKeyCount
@@ -131,11 +131,11 @@ func validateAccountStatusRegister(
 	}
 
 	weightAndRevokedStatus, startKeyIndexForMapping, accountPublicKeyMappings, startKeyIndexForDigests, digests, err := accountkeymetadata.DecodeKeyMetadata(
-		encodedAccountStatus[environment.AccountStatusMinSizeV4:],
+		encodedAccountStatus[environment.AccountStatusMinSize:],
 		deduplicated,
 	)
 	if err != nil {
-		err = fmt.Errorf("failed to parse key metadata %x: %s", encodedAccountStatus[environment.AccountStatusMinSizeV4:], err)
+		err = fmt.Errorf("failed to parse key metadata %x: %s", encodedAccountStatus[environment.AccountStatusMinSize:], err)
 		return
 	}
 
