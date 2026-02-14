@@ -15,6 +15,7 @@ import (
 	"github.com/onflow/flow-go/fvm/evm/types"
 	"github.com/onflow/flow-go/model/flow"
 
+	gethCommon "github.com/ethereum/go-ethereum/common"
 	gethTypes "github.com/ethereum/go-ethereum/core/types"
 )
 
@@ -55,6 +56,8 @@ func NewInternalEVMContractValue(
 			stdlib.InternalEVMTypeDryRunFunctionName:                    newInternalEVMTypeDryRunFunction(gauge, handler),
 			stdlib.InternalEVMTypeDryCallFunctionName:                   newInternalEVMTypeDryCallFunction(gauge, handler),
 			stdlib.InternalEVMTypeCommitBlockProposalFunctionName:       newInternalEVMTypeCommitBlockProposalFunction(gauge, handler),
+			stdlib.InternalEVMTypeStoreFunctionName:                     newInternalEVMTypeStoreFunction(gauge, handler),
+			stdlib.InternalEVMTypeLoadFunctionName:                      newInternalEVMTypeLoadFunction(gauge, handler),
 		},
 		nil,
 		nil,
@@ -802,6 +805,89 @@ func newInternalEVMTypeCommitBlockProposalFunction(
 		stdlib.InternalEVMTypeCommitBlockProposalFunctionType,
 		func(invocation interpreter.Invocation) interpreter.Value {
 			handler.CommitBlockProposal()
+			return interpreter.Void
+		},
+	)
+}
+
+func newInternalEVMTypeLoadFunction(
+	gauge common.MemoryGauge,
+	handler types.ContractHandler,
+) *interpreter.HostFunctionValue {
+	return interpreter.NewStaticHostFunctionValue(
+		gauge,
+		stdlib.InternalEVMTypeLoadFunctionType,
+		func(invocation interpreter.Invocation) interpreter.Value {
+			context := invocation.InvocationContext
+
+			// Get target argument
+			targetValue, ok := invocation.Arguments[0].(*interpreter.ArrayValue)
+			if !ok {
+				panic(errors.NewUnreachableError())
+			}
+
+			target, err := interpreter.ByteArrayValueToByteSlice(context, targetValue)
+			if err != nil {
+				panic(err)
+			}
+
+			// Get slot argument
+			slotValue, ok := invocation.Arguments[1].(*interpreter.StringValue)
+			if !ok {
+				panic(errors.NewUnreachableError())
+			}
+
+			slot := gethCommon.HexToHash(slotValue.Str)
+
+			addr := types.NewAddressFromBytes(target)
+
+			value := handler.GetState(addr.ToCommon(), slot)
+			return interpreter.ByteSliceToByteArrayValue(context, value.Bytes())
+		},
+	)
+}
+
+func newInternalEVMTypeStoreFunction(
+	gauge common.MemoryGauge,
+	handler types.ContractHandler,
+) *interpreter.HostFunctionValue {
+	return interpreter.NewStaticHostFunctionValue(
+		gauge,
+		stdlib.InternalEVMTypeStoreFunctionType,
+		func(invocation interpreter.Invocation) interpreter.Value {
+			context := invocation.InvocationContext
+
+			// Get target argument
+			targetValue, ok := invocation.Arguments[0].(*interpreter.ArrayValue)
+			if !ok {
+				panic(errors.NewUnreachableError())
+			}
+
+			target, err := interpreter.ByteArrayValueToByteSlice(context, targetValue)
+			if err != nil {
+				panic(err)
+			}
+
+			// Get slot argument
+			slotValue, ok := invocation.Arguments[1].(*interpreter.StringValue)
+			if !ok {
+				panic(errors.NewUnreachableError())
+			}
+
+			slot := gethCommon.HexToHash(slotValue.Str)
+
+			// Get value argument
+			valueValue, ok := invocation.Arguments[2].(*interpreter.StringValue)
+			if !ok {
+				panic(errors.NewUnreachableError())
+			}
+
+			value := gethCommon.HexToHash(valueValue.Str)
+
+			addr := types.NewAddressFromBytes(target)
+
+			handler.SetState(addr.ToCommon(), slot, value)
+
 			return interpreter.Void
 		},
 	)

@@ -64,6 +64,9 @@ type ContractHandler interface {
 
 	// Constructs and commits a new block from the block proposal
 	CommitBlockProposal()
+
+	SetState(gethCommon.Address, gethCommon.Hash, gethCommon.Hash) gethCommon.Hash
+	GetState(gethCommon.Address, gethCommon.Hash) gethCommon.Hash
 }
 
 // AddressAllocator allocates addresses, used by the handler

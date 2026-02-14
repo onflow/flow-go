@@ -11,6 +11,8 @@ import (
 
 	"github.com/onflow/flow-go/fvm/environment"
 	fvmErrors "github.com/onflow/flow-go/fvm/errors"
+	"github.com/onflow/flow-go/fvm/evm"
+	"github.com/onflow/flow-go/fvm/evm/emulator/state"
 	"github.com/onflow/flow-go/fvm/evm/events"
 	"github.com/onflow/flow-go/fvm/evm/handler/coa"
 	"github.com/onflow/flow-go/fvm/evm/types"
@@ -69,6 +71,37 @@ func (h *ContractHandler) FlowTokenAddress() common.Address {
 // EVMContractAddress returns the address where EVM contract is deployed
 func (h *ContractHandler) EVMContractAddress() common.Address {
 	return common.Address(h.evmContractAddress)
+}
+
+func (h *ContractHandler) SetState(
+	address gethCommon.Address,
+	slot gethCommon.Hash,
+	value gethCommon.Hash,
+) gethCommon.Hash {
+	execState, err := state.NewStateDB(h.backend, evm.StorageAccountAddress(h.flowChainID))
+	if err != nil {
+		return gethCommon.Hash{}
+	}
+
+	prevValue := execState.SetState(address, slot, value)
+	_, err = execState.Commit(true)
+	if err != nil {
+		return gethCommon.Hash{}
+	}
+
+	return prevValue
+}
+
+func (h *ContractHandler) GetState(
+	address gethCommon.Address,
+	slot gethCommon.Hash,
+) gethCommon.Hash {
+	execState, err := state.NewStateDB(h.backend, evm.StorageAccountAddress(h.flowChainID))
+	if err != nil {
+		return gethCommon.Hash{}
+	}
+
+	return execState.GetState(address, slot)
 }
 
 // DeployCOA deploys a cadence-owned-account and returns the address
