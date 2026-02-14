@@ -4353,6 +4353,418 @@ func TestEVMFileSystemContract(t *testing.T) {
 	})
 }
 
+func TestEVMPauseFunctionality(t *testing.T) {
+	t.Parallel()
+
+	chain := flow.Emulator.Chain()
+	sc := systemcontracts.SystemContractsForChain(chain.ChainID())
+
+	code := []byte(fmt.Sprintf(
+		`
+		import EVM from %s
+
+		transaction(){
+			prepare(account: auth(Storage) &Account) {
+				account.storage.save(true, to: /storage/evmOperationsPaused)
+			}
+		}
+		`,
+		sc.EVMContract.Address.HexWithPrefix(),
+	))
+
+	txBody, err := flow.NewTransactionBodyBuilder().
+		SetScript(code).
+		SetPayer(sc.FlowServiceAccount.Address).
+		AddAuthorizer(sc.FlowServiceAccount.Address).
+		Build()
+
+	require.NoError(t, err)
+
+	tx := fvm.Transaction(txBody, 0)
+
+	RunWithNewEnvironment(
+		t,
+		chain,
+		func(
+			ctx fvm.Context,
+			vm fvm.VM,
+			snapshot snapshot.SnapshotTree,
+			testContract *TestContract,
+			testAccount *EOATestAccount,
+		) {
+			state, output, err := vm.Run(ctx, tx, snapshot)
+			require.NoError(t, err)
+			require.NoError(t, output.Err)
+			// append the state
+			snapshot = snapshot.Append(state)
+
+			t.Run("testing EOA deposit when EVM is paused", func(t *testing.T) {
+				code = []byte(fmt.Sprintf(
+					`
+					import EVM from %s
+					import FlowToken from %s
+
+					transaction(addr: [UInt8; 20]) {
+						prepare(account: auth(BorrowValue) &Account) {
+							let admin = account.storage
+								.borrow<&FlowToken.Administrator>(from: /storage/flowTokenAdmin)!
+
+							let minter <- admin.createNewMinter(allowedAmount: 1.0)
+							let vault <- minter.mintTokens(amount: 1.0)
+							destroy minter
+
+							let address = EVM.EVMAddress(bytes: addr)
+							address.deposit(from: <-vault)
+						}
+					}
+					`,
+					sc.EVMContract.Address.HexWithPrefix(),
+					sc.FlowToken.Address.HexWithPrefix(),
+				))
+
+				addr := RandomAddress(t)
+				txBody, err = flow.NewTransactionBodyBuilder().
+					SetScript(code).
+					SetPayer(sc.FlowServiceAccount.Address).
+					AddAuthorizer(sc.FlowServiceAccount.Address).
+					AddArgument(json.MustEncode(cadence.NewArray(
+						unittest.BytesToCdcUInt8(addr.Bytes()),
+					).WithType(stdlib.EVMAddressBytesCadenceType))).
+					Build()
+				require.NoError(t, err)
+
+				tx = fvm.Transaction(txBody, 0)
+				_, output, err = vm.Run(ctx, tx, snapshot)
+				require.NoError(t, err)
+				require.Error(t, output.Err)
+				require.ErrorContains(
+					t,
+					output.Err,
+					"EVM operations are temporarily paused",
+				)
+			})
+
+			t.Run("testing EVM.run when EVM is paused", func(t *testing.T) {
+				code = []byte(fmt.Sprintf(
+					`
+					import EVM from %s
+
+					transaction(tx: [UInt8], coinbaseBytes: [UInt8; 20]){
+						prepare(account: &Account) {
+							let coinbase = EVM.EVMAddress(bytes: coinbaseBytes)
+							let res = EVM.run(tx: tx, coinbase: coinbase)
+
+							assert(res.status == EVM.Status.successful, message: "unexpected status")
+							assert(res.errorCode == 0, message: "unexpected error code")
+							assert(res.deployedContract == nil, message: "unexpected deployed contract")
+						}
+					}
+					`,
+					sc.EVMContract.Address.HexWithPrefix(),
+				))
+
+				coinbaseAddr := types.Address{1, 2, 3}
+				coinbaseBalance := getEVMAccountBalance(t, ctx, vm, snapshot, coinbaseAddr)
+				require.Zero(t, types.BalanceToBigInt(coinbaseBalance).Uint64())
+
+				num := int64(12)
+				innerTxBytes := testAccount.PrepareSignAndEncodeTx(t,
+					testContract.DeployedAt.ToCommon(),
+					testContract.MakeCallData(t, "store", big.NewInt(num)),
+					big.NewInt(0),
+					uint64(100_000),
+					big.NewInt(1),
+				)
+
+				innerTx := cadence.NewArray(
+					unittest.BytesToCdcUInt8(innerTxBytes),
+				).WithType(stdlib.EVMTransactionBytesCadenceType)
+
+				coinbase := cadence.NewArray(
+					unittest.BytesToCdcUInt8(coinbaseAddr.Bytes()),
+				).WithType(stdlib.EVMAddressBytesCadenceType)
+
+				txBody, err = flow.NewTransactionBodyBuilder().
+					SetScript(code).
+					SetPayer(sc.FlowServiceAccount.Address).
+					AddAuthorizer(sc.FlowServiceAccount.Address).
+					AddArgument(json.MustEncode(innerTx)).
+					AddArgument(json.MustEncode(coinbase)).
+					Build()
+				require.NoError(t, err)
+
+				tx = fvm.Transaction(txBody, 0)
+				_, output, err = vm.Run(ctx, tx, snapshot)
+				require.NoError(t, err)
+				require.Error(t, output.Err)
+				require.ErrorContains(
+					t,
+					output.Err,
+					"EVM operations are temporarily paused",
+				)
+			})
+
+			t.Run("testing EVM.batchRun when EVM is paused", func(t *testing.T) {
+				batchRunCode := []byte(fmt.Sprintf(
+					`
+					import EVM from %s
+
+					transaction(txs: [[UInt8]], coinbaseBytes: [UInt8; 20]) {
+						prepare(account: &Account) {
+							let coinbase = EVM.EVMAddress(bytes: coinbaseBytes)
+							let batchResults = EVM.batchRun(txs: txs, coinbase: coinbase)
+
+							assert(batchResults.length == txs.length, message: "invalid result length")
+							for res in batchResults {
+								assert(res.status == EVM.Status.successful, message: "unexpected status")
+								assert(res.errorCode == 0, message: "unexpected error code")
+							}
+						}
+					}
+					`,
+					sc.EVMContract.Address.HexWithPrefix(),
+				))
+
+				coinbaseAddr := types.Address{1, 2, 3}
+				coinbaseBalance := getEVMAccountBalance(t, ctx, vm, snapshot, coinbaseAddr)
+				require.Zero(t, types.BalanceToBigInt(coinbaseBalance).Uint64())
+
+				batchCount := 5
+				txBytes := make([]cadence.Value, batchCount)
+				for i := 0; i < batchCount; i++ {
+					num := int64(i)
+					// prepare batch of transaction payloads
+					tx := testAccount.PrepareSignAndEncodeTx(t,
+						testContract.DeployedAt.ToCommon(),
+						testContract.MakeCallData(t, "storeWithLog", big.NewInt(num)),
+						big.NewInt(0),
+						uint64(100_000),
+						big.NewInt(1),
+					)
+
+					// build txs argument
+					txBytes[i] = cadence.NewArray(
+						unittest.BytesToCdcUInt8(tx),
+					).WithType(stdlib.EVMTransactionBytesCadenceType)
+				}
+
+				coinbase := cadence.NewArray(
+					unittest.BytesToCdcUInt8(coinbaseAddr.Bytes()),
+				).WithType(stdlib.EVMAddressBytesCadenceType)
+
+				txs := cadence.NewArray(txBytes).
+					WithType(cadence.NewVariableSizedArrayType(
+						stdlib.EVMTransactionBytesCadenceType,
+					))
+
+				txBody, err = flow.NewTransactionBodyBuilder().
+					SetScript(batchRunCode).
+					SetPayer(sc.FlowServiceAccount.Address).
+					AddAuthorizer(sc.FlowServiceAccount.Address).
+					AddArgument(json.MustEncode(txs)).
+					AddArgument(json.MustEncode(coinbase)).
+					Build()
+				require.NoError(t, err)
+
+				tx = fvm.Transaction(txBody, 0)
+				_, output, err = vm.Run(ctx, tx, snapshot)
+				require.NoError(t, err)
+				require.Error(t, output.Err)
+				require.ErrorContains(
+					t,
+					output.Err,
+					"EVM operations are temporarily paused",
+				)
+			})
+
+			t.Run("testing CadenceOwnedAccount.deploy when EVM is paused", func(t *testing.T) {
+				code = []byte(fmt.Sprintf(
+					`
+					import EVM from %s
+
+					transaction(code: [UInt8]){
+						prepare(account: &Account) {
+							let cadenceOwnedAccount <- EVM.createCadenceOwnedAccount()
+							let res = cadenceOwnedAccount.deploy(
+								code: code,
+								gasLimit: 16_777_216,
+								value: EVM.Balance(attoflow: 1230000000000000000)
+							)
+							destroy cadenceOwnedAccount
+						}
+					}
+					`,
+					sc.EVMContract.Address.HexWithPrefix(),
+				))
+
+				coinbaseAddr := types.Address{1, 2, 3}
+				coinbaseBalance := getEVMAccountBalance(t, ctx, vm, snapshot, coinbaseAddr)
+				require.Zero(t, types.BalanceToBigInt(coinbaseBalance).Uint64())
+
+				contractCode := json.MustEncode(
+					cadence.NewArray(
+						unittest.BytesToCdcUInt8(testContract.ByteCode),
+					).WithType(cadence.NewVariableSizedArrayType(cadence.UInt8Type)),
+				)
+
+				txBody, err = flow.NewTransactionBodyBuilder().
+					SetScript(code).
+					SetPayer(sc.FlowServiceAccount.Address).
+					AddAuthorizer(sc.FlowServiceAccount.Address).
+					AddArgument(contractCode).
+					Build()
+				require.NoError(t, err)
+
+				tx = fvm.Transaction(txBody, 0)
+				_, output, err = vm.Run(ctx, tx, snapshot)
+				require.NoError(t, err)
+				require.Error(t, output.Err)
+				require.ErrorContains(
+					t,
+					output.Err,
+					"EVM operations are temporarily paused",
+				)
+			})
+
+			t.Run("testing CadenceOwnedAccount.call when EVM is paused", func(t *testing.T) {
+				code = []byte(fmt.Sprintf(
+					`
+					import EVM from %s
+
+					transaction(data: [UInt8], to: String, gasLimit: UInt64, value: UInt){
+						prepare(account: auth(Storage) &Account) {
+							let coa <- EVM.createCadenceOwnedAccount()
+							let res = coa.call(
+								to: EVM.addressFromString(to),
+								data: data,
+								gasLimit: gasLimit,
+								value: EVM.Balance(attoflow: value)
+							)
+
+							assert(res.status == EVM.Status.successful, message: "unexpected status")
+							assert(res.errorCode == 0, message: "unexpected error code")
+							destroy <- coa
+						}
+					}
+					`,
+					sc.EVMContract.Address.HexWithPrefix(),
+				))
+
+				data := json.MustEncode(
+					cadence.NewArray(
+						unittest.BytesToCdcUInt8(testContract.MakeCallData(t, "retrieve")),
+					).WithType(stdlib.EVMTransactionBytesCadenceType),
+				)
+				toAddress, err := cadence.NewString(testContract.DeployedAt.ToCommon().Hex())
+				require.NoError(t, err)
+				to := json.MustEncode(toAddress)
+
+				txBody, err = flow.NewTransactionBodyBuilder().
+					SetScript(code).
+					SetPayer(sc.FlowServiceAccount.Address).
+					AddAuthorizer(sc.FlowServiceAccount.Address).
+					AddArgument(data).
+					AddArgument(to).
+					AddArgument(json.MustEncode(cadence.NewUInt64(50_000))).
+					AddArgument(json.MustEncode(cadence.NewUInt(0))).
+					Build()
+				require.NoError(t, err)
+
+				tx = fvm.Transaction(txBody, 0)
+				_, output, err = vm.Run(ctx, tx, snapshot)
+				require.NoError(t, err)
+				require.Error(t, output.Err)
+				require.ErrorContains(
+					t,
+					output.Err,
+					"EVM operations are temporarily paused",
+				)
+			})
+
+			t.Run("testing CadenceOwnedAccount.deposit when EVM is paused", func(t *testing.T) {
+				code = []byte(fmt.Sprintf(
+					`
+					import EVM from %s
+					import FlowToken from %s
+
+					transaction {
+						prepare(account: auth(Storage) &Account) {
+							let admin = account
+								.storage.borrow<&FlowToken.Administrator>(from: /storage/flowTokenAdmin)!
+							let minter <- admin.createNewMinter(allowedAmount: 2.34)
+							let vault <- minter.mintTokens(amount: 2.34)
+							destroy minter
+
+							let coa <- EVM.createCadenceOwnedAccount()
+							coa.deposit(from: <-vault)
+							destroy <- coa
+						}
+					}
+					`,
+					sc.EVMContract.Address.HexWithPrefix(),
+					sc.FlowToken.Address.HexWithPrefix(),
+				))
+
+				txBody, err = flow.NewTransactionBodyBuilder().
+					SetScript(code).
+					SetPayer(sc.FlowServiceAccount.Address).
+					AddAuthorizer(sc.FlowServiceAccount.Address).
+					Build()
+				require.NoError(t, err)
+
+				tx = fvm.Transaction(txBody, 0)
+				_, output, err = vm.Run(ctx, tx, snapshot)
+				require.NoError(t, err)
+				require.Error(t, output.Err)
+				require.ErrorContains(
+					t,
+					output.Err,
+					"EVM operations are temporarily paused",
+				)
+			})
+
+			t.Run("testing CadenceOwnedAccount.withdraw when EVM is paused", func(t *testing.T) {
+				code = []byte(fmt.Sprintf(
+					`
+					import EVM from %s
+					import FlowToken from %s
+
+					transaction {
+						prepare(account: auth(Storage) &Account) {
+							let bal = EVM.Balance(attoflow: 0)
+							bal.setFLOW(flow: 1.23)
+							let coa <- EVM.createCadenceOwnedAccount()
+							let vault2 <- coa.withdraw(balance: bal)
+							destroy <- coa
+							destroy <- vault2
+						}
+					}
+					`,
+					sc.EVMContract.Address.HexWithPrefix(),
+					sc.FlowToken.Address.HexWithPrefix(),
+				))
+
+				txBody, err = flow.NewTransactionBodyBuilder().
+					SetScript(code).
+					SetPayer(sc.FlowServiceAccount.Address).
+					AddAuthorizer(sc.FlowServiceAccount.Address).
+					Build()
+				require.NoError(t, err)
+
+				tx = fvm.Transaction(txBody, 0)
+				_, output, err = vm.Run(ctx, tx, snapshot)
+				require.NoError(t, err)
+				require.Error(t, output.Err)
+				require.ErrorContains(
+					t,
+					output.Err,
+					"EVM operations are temporarily paused",
+				)
+			})
+		},
+	)
+}
+
 func createAndFundFlowAccount(
 	t *testing.T,
 	ctx fvm.Context,
