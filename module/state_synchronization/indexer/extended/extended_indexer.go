@@ -59,7 +59,11 @@ type ExtendedIndexer struct {
 	indexers []Indexer
 	notifier engine.Notifier
 
-	mu              sync.RWMutex
+	// mu protects the latestBlockData field which is written in another goroutine via IndexBlockData.
+	mu sync.RWMutex
+
+	// latestBlockData is the latest block data received via IndexBlockData.
+	// This represents the "live" block data that is being indexed.
 	latestBlockData *BlockData
 }
 
@@ -243,7 +247,7 @@ func (c *ExtendedIndexer) indexNextHeights() (bool, error) {
 	hasBackfillingIndexers := len(backfillGroups) > 0
 
 	for height, group := range backfillGroups {
-		data, err := c.blockDataFromStorage(height)
+		data, err := c.blockDataFromStorage(height, latestBlockData)
 		if err != nil {
 			if errors.Is(err, storage.ErrNotFound) {
 				continue // skip group for this iteration
@@ -288,7 +292,7 @@ func (c *ExtendedIndexer) runIndexers(indexers []Indexer, data *BlockData, lates
 //
 // Expected error returns during normal operation:
 //   - [storage.ErrNotFound]: if any data is not available for the height.
-func (c *ExtendedIndexer) blockDataFromStorage(height uint64) (BlockData, error) {
+func (c *ExtendedIndexer) blockDataFromStorage(height uint64, latestBlockData *BlockData) (BlockData, error) {
 	// special handling for the spork root block which has no transactions or events.
 	if height == c.state.Params().SporkRootBlockHeight() {
 		return BlockData{
@@ -299,7 +303,7 @@ func (c *ExtendedIndexer) blockDataFromStorage(height uint64) (BlockData, error)
 	// `latestBlockData` is considered the "live" block, so don't allow backfilling for higher heights.
 	// if we haven't seen the live block yet and the data isn't indexed into the db, the events check
 	// below will fail and return a not found error.
-	if c.latestBlockData != nil && height > c.latestBlockData.Header.Height {
+	if latestBlockData != nil && height > latestBlockData.Header.Height {
 		return BlockData{}, fmt.Errorf("block %d not indexed yet: %w", height, storage.ErrNotFound)
 	}
 
