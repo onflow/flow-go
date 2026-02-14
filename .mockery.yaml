@@ -76,6 +76,7 @@ packages:
     config:
       dir: module/mempool/consensus/mock
   github.com/onflow/flow-go/module/state_synchronization: { }
+  github.com/onflow/flow-go/module/state_synchronization/indexer/extended: { }
   github.com/onflow/flow-go/module/state_synchronization/requester: { }
   github.com/onflow/crypto:
     config:

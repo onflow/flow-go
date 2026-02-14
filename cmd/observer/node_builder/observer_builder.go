@@ -17,10 +17,11 @@ import (
 	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-datastore"
 	"github.com/libp2p/go-libp2p/core/peer"
-	"github.com/onflow/crypto"
 	"github.com/rs/zerolog"
 	"github.com/spf13/pflag"
 	"google.golang.org/grpc/credentials"
+
+	"github.com/onflow/crypto"
 
 	"github.com/onflow/flow-go/admin/commands"
 	stateSyncCommands "github.com/onflow/flow-go/admin/commands/state_synchronization"
@@ -86,6 +87,7 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/state_synchronization"
 	"github.com/onflow/flow-go/module/state_synchronization/indexer"
+	"github.com/onflow/flow-go/module/state_synchronization/indexer/extended"
 	edrequester "github.com/onflow/flow-go/module/state_synchronization/requester"
 	consensus_follower "github.com/onflow/flow-go/module/upstream"
 	"github.com/onflow/flow-go/network"
@@ -112,6 +114,7 @@ import (
 	bstorage "github.com/onflow/flow-go/storage/badger"
 	pstorage "github.com/onflow/flow-go/storage/pebble"
 	"github.com/onflow/flow-go/storage/store"
+	"github.com/onflow/flow-go/utils"
 	"github.com/onflow/flow-go/utils/grpcutils"
 	"github.com/onflow/flow-go/utils/io"
 )
@@ -156,6 +159,9 @@ type ObserverServiceConfig struct {
 	logTxTimeToSealed                    bool
 	executionDataSyncEnabled             bool
 	executionDataIndexingEnabled         bool
+	extendedIndexingEnabled              bool
+	extendedIndexingBackfillDelay        time.Duration
+	extendedIndexingDBPath               string
 	executionDataPrunerHeightRangeTarget uint64
 	executionDataPrunerThreshold         uint64
 	executionDataPruningInterval         time.Duration
@@ -235,6 +241,8 @@ func DefaultObserverServiceConfig() *ObserverServiceConfig {
 		logTxTimeToSealed:                    false,
 		executionDataSyncEnabled:             false,
 		executionDataIndexingEnabled:         false,
+		extendedIndexingEnabled:              false,
+		extendedIndexingBackfillDelay:        extended.DefaultBackfillDelay,
 		executionDataPrunerHeightRangeTarget: 0,
 		executionDataPrunerThreshold:         pruner.DefaultThreshold,
 		executionDataPruningInterval:         pruner.DefaultPruningInterval,
@@ -242,6 +250,7 @@ func DefaultObserverServiceConfig() *ObserverServiceConfig {
 		versionControlEnabled:                true,
 		stopControlEnabled:                   false,
 		executionDataDir:                     filepath.Join(homedir, ".flow", "execution_data"),
+		extendedIndexingDBPath:               filepath.Join(homedir, ".flow", "indexer"),
 		executionDataStartHeight:             0,
 		executionDataConfig: edrequester.ExecutionDataConfig{
 			InitialBlockHeight: 0,
@@ -280,6 +289,7 @@ type ObserverServiceBuilder struct {
 	FollowerCore         module.HotStuffFollower
 	ExecutionIndexer     *indexer.Indexer
 	ExecutionIndexerCore *indexer.IndexerCore
+	ExtendedIndexer      *extended.ExtendedIndexer
 	TxResultsIndex       *index.TransactionResultsIndex
 	IndexerDependencies  *cmd.DependencyList
 	VersionControl       *version.VersionControl
@@ -716,6 +726,21 @@ func (builder *ObserverServiceBuilder) extraFlags() {
 		var builderExecutionDataDBMode string
 		flags.StringVar(&builderExecutionDataDBMode, "execution-data-db", "pebble", "[deprecated] the DB type for execution datastore.")
 
+		// Extended Indexing
+		flags.BoolVar(&builder.extendedIndexingEnabled,
+			"extended-indexing-enabled",
+			defaultConfig.extendedIndexingEnabled,
+			"whether to enable account data indexing")
+		flags.DurationVar(&builder.extendedIndexingBackfillDelay,
+			"extended-indexing-backfill-delay",
+			defaultConfig.extendedIndexingBackfillDelay,
+			"minimum delay between backfilled heights per extended indexer")
+		flags.StringVar(&builder.extendedIndexingDBPath,
+			"extended-indexing-db-dir",
+			defaultConfig.extendedIndexingDBPath,
+			"directory to use for extended indexing database",
+		)
+
 		// Execution data pruner
 		flags.Uint64Var(&builder.executionDataPrunerHeightRangeTarget,
 			"execution-data-height-range-target",
@@ -1110,6 +1135,10 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 	var execDataCacheBackend *herocache.BlockExecutionData
 	var executionDataStoreCache *execdatacache.ExecutionDataCache
 
+	extendedIndexingDependencies := cmd.NewDependencyList()
+	executionStateIndexerDependable := module.NewProxiedReadyDoneAware()
+	extendedIndexingDependencies.Add(executionStateIndexerDependable)
+
 	// setup dependency chain to ensure indexer starts after the requester
 	requesterDependable := module.NewProxiedReadyDoneAware()
 	builder.IndexerDependencies.Add(requesterDependable)
@@ -1443,6 +1472,33 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 				builder.Storage.RegisterIndex = registers
 			}
 
+			if builder.extendedIndexingEnabled {
+				extendedIndexer, indexerDB, err := extended.BootstrapExtendedIndexes(
+					node.Logger,
+					utils.NotNil(builder.State),
+					utils.NotNil(builder.Storage.Blocks),
+					utils.NotNil(builder.Storage.Collections),
+					utils.NotNil(builder.events),
+					utils.NotNil(builder.lightTransactionResults),
+					utils.NotNil(builder.StorageLockMgr),
+					builder.extendedIndexingDBPath,
+					builder.extendedIndexingBackfillDelay,
+				)
+
+				if err != nil {
+					return nil, fmt.Errorf("could not bootstrap extended indexer: %w", err)
+				}
+
+				builder.ShutdownFunc(func() error {
+					if err := indexerDB.Close(); err != nil {
+						return fmt.Errorf("error closing indexer db: %w", err)
+					}
+					return nil
+				})
+
+				builder.ExtendedIndexer = extendedIndexer
+			}
+
 			indexerDerivedChainData, queryDerivedChainData, err := builder.buildDerivedChainData()
 			if err != nil {
 				return nil, fmt.Errorf("could not create derived chain data: %w", err)
@@ -1490,6 +1546,7 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 				collectionIndexer,
 				collectionExecutedMetric,
 				node.StorageLockMgr,
+				builder.ExtendedIndexer,
 			)
 
 			// start processing from the first height of the registers db, which is initialized from
@@ -1553,8 +1610,22 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 				builder.StopControl.RegisterHeightRecorder(builder.ExecutionIndexer)
 			}
 
+			executionStateIndexerDependable.Init(builder.ExecutionIndexer)
+
 			return builder.ExecutionIndexer, nil
 		}, builder.IndexerDependencies)
+
+		if builder.extendedIndexingEnabled {
+			builder.DependableComponent("extended indexer", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+				// The extended indexer needs to be initialized within the execution data indexer component
+				// since it depends on the first height in the execution state database.
+				// TODO: refactor initialization of these components to improve dependency management.
+				if builder.ExtendedIndexer == nil {
+					return nil, fmt.Errorf("extended indexer not initialized")
+				}
+				return builder.ExtendedIndexer, nil
+			}, extendedIndexingDependencies)
+		}
 	}
 
 	if builder.stateStreamConf.ListenAddr != "" {
