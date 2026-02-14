@@ -185,6 +185,58 @@ func TestSnapshot_Descendants(t *testing.T) {
 	})
 }
 
+// TestSnapshot_DescendantsWithLeafNodes tests that Descendants() correctly handles
+// pending blocks that have no children (leaf nodes). This is a regression test for
+// a bug where the descendants() helper method would not return early when a block
+// had no children, potentially causing incorrect behavior.
+//
+// Test structure:
+//
+//	              ↙ B (no children)
+//	A (finalized)
+//	              ↖ C (no children)
+//
+// snapshot.Descendants has to return [B, C].
+func TestSnapshot_DescendantsWithLeafNodes(t *testing.T) {
+	participants := unittest.IdentityListFixture(5, unittest.WithAllRoles())
+	rootSnapshot := unittest.RootSnapshotFixture(participants)
+	rootProtocolStateID := getRootProtocolStateID(t, rootSnapshot)
+	head, err := rootSnapshot.Head()
+	require.NoError(t, err)
+	util.RunWithFullProtocolState(t, rootSnapshot, func(db storage.DB, state *bprotocol.ParticipantState) {
+		// Track used views to prevent byzantine scenarios
+		usedViews := make(map[uint64]struct{})
+		usedViews[head.View] = struct{}{}
+
+		// Create two pending blocks (B and C) as direct children of the finalized block A.
+		// Neither B nor C have any children, making them leaf nodes.
+		// This tests that descendants() correctly returns an empty list when
+		// RetrieveBlockChildren returns storage.ErrNotFound for these leaf blocks.
+		blockB := unittest.BlockWithParentAndPayloadAndUniqueView(
+			head,
+			unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)),
+			usedViews,
+		)
+		err := state.Extend(context.Background(), unittest.ProposalFromBlock(blockB))
+		require.NoError(t, err)
+
+		blockC := unittest.BlockWithParentAndPayloadAndUniqueView(
+			head,
+			unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)),
+			usedViews,
+		)
+		err = state.Extend(context.Background(), unittest.ProposalFromBlock(blockC))
+		require.NoError(t, err)
+
+		expectedBlocks := []flow.Identifier{blockB.ID(), blockC.ID()}
+
+		// Query descendants of the finalized block
+		pendingBlocks, err := state.AtBlockID(head.ID()).Descendants()
+		require.NoError(t, err)
+		require.ElementsMatch(t, expectedBlocks, pendingBlocks)
+	})
+}
+
 func TestIdentities(t *testing.T) {
 	identities := unittest.IdentityListFixture(5, unittest.WithAllRoles())
 	rootSnapshot := unittest.RootSnapshotFixture(identities)

@@ -326,16 +326,17 @@ func (s *Snapshot) descendants(blockID flow.Identifier) ([]flow.Identifier, erro
 	var descendantIDs flow.IdentifierList
 	err := operation.RetrieveBlockChildren(s.state.db.Reader(), blockID, &descendantIDs)
 	if err != nil {
-		if !errors.Is(err, storage.ErrNotFound) {
-			return nil, fmt.Errorf("could not get children of block %v: %w", blockID, err)
+		if errors.Is(err, storage.ErrNotFound) {
+			// The low-level storage returns `storage.ErrNotFound` in two cases:
+			// 1. the block/collection is unknown
+			// 2. the block/collection is known but no children have been indexed yet
+			// By contract of the constructor, the blockID must correspond to a known collection in the database.
+			// A snapshot with s.err == nil is only created for known blocks. Hence, only case 2 is
+			// possible here, and we just return an empty list.
+			return []flow.Identifier{}, nil
 		}
 
-		// The low-level storage returns `storage.ErrNotFound` in two cases:
-		// 1. the block/collection is unknown
-		// 2. the block/collection is known but no children have been indexed yet
-		// By contract of the constructor, the blockID must correspond to a known collection in the database.
-		// A snapshot with s.err == nil is only created for known blocks. Hence, only case 2 is
-		// possible here, and we just return an empty list.
+		return nil, fmt.Errorf("could not get children of block %v: %w", blockID, err)
 	}
 
 	for _, child := range descendantIDs {
