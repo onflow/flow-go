@@ -236,7 +236,7 @@ func (c *ExtendedIndexer) indexNextHeights() (bool, error) {
 	}
 
 	if len(liveGroup) > 0 {
-		err = c.runIndexers(liveGroup, latestBlockData, latestBlockData)
+		err = c.runIndexers(liveGroup, latestBlockData)
 		if err != nil {
 			return false, fmt.Errorf("failed to index live indexers: %w", err)
 		}
@@ -255,7 +255,7 @@ func (c *ExtendedIndexer) indexNextHeights() (bool, error) {
 			return false, fmt.Errorf("failed to get block data for height %d: %w", height, err)
 		}
 
-		err = c.runIndexers(group, &data, latestBlockData)
+		err = c.runIndexers(group, &data)
 		if err != nil {
 			return false, fmt.Errorf("failed to index backfill indexers: %w", err)
 		}
@@ -267,7 +267,7 @@ func (c *ExtendedIndexer) indexNextHeights() (bool, error) {
 // runIndexers indexes the data for all indexers in the group.
 //
 // No error returns are expected during normal operation.
-func (c *ExtendedIndexer) runIndexers(indexers []Indexer, data *BlockData, latestBlockData *BlockData) error {
+func (c *ExtendedIndexer) runIndexers(indexers []Indexer, data *BlockData) error {
 	height := data.Header.Height
 	return storage.WithLocks(c.lockManager, storage.LockGroupAccessExtendedIndexers, func(lctx lockctx.Context) error {
 		return c.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
@@ -277,6 +277,8 @@ func (c *ExtendedIndexer) runIndexers(indexers []Indexer, data *BlockData, lates
 					if errors.Is(err, ErrAlreadyIndexed) {
 						continue
 					}
+					// ErrFutureHeight is not expected since we have already checked that `data`'s height
+					// is the next height. If it is not, there is a bug.
 					return fmt.Errorf("failed to index block data for %s at height %d: %w", indexer.Name(), height, err)
 				}
 
@@ -304,7 +306,7 @@ func (c *ExtendedIndexer) blockDataFromStorage(height uint64, latestBlockData *B
 	// if we haven't seen the live block yet and the data isn't indexed into the db, the events check
 	// below will fail and return a not found error.
 	if latestBlockData != nil && height > latestBlockData.Header.Height {
-		return BlockData{}, fmt.Errorf("block %d not indexed yet: %w", height, storage.ErrNotFound)
+		return BlockData{}, fmt.Errorf("data for block %d not available yet: %w", height, storage.ErrNotFound)
 	}
 
 	block, err := c.blocks.ByHeight(height)
