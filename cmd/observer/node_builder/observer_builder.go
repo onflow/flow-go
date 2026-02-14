@@ -1660,7 +1660,7 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 
 				builder.ExtendedIndexer = extendedIndexer
 				return builder.ExtendedIndexer, nil
-			}, nil)
+			}, cmd.NewDependencyList())
 		}
 	}
 

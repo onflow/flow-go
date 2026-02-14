@@ -1123,7 +1123,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				extendedIndexerDependable.Init(builder.ExtendedIndexer)
 
 				return builder.ExtendedIndexer, nil
-			}, nil)
+			}, cmd.NewDependencyList())
 		}
 	}
 
