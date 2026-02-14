@@ -13,6 +13,7 @@ packages:
     interfaces:
       Client: { }
   github.com/onflow/flow-go/access:
+  github.com/onflow/flow-go/access/backends/extended:
   github.com/onflow/flow-go/access/validator:
     config:
       all: true

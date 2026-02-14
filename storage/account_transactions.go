@@ -7,25 +7,36 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
+// IndexFilter is a function that filters data entries to include in query responses.
+// It takes a single entry and returns true if the entry should be included in the response.
+type IndexFilter[T any] func(T) bool
+
 // AccountTransactionsReader provides read access to the account transaction index.
 //
 // All methods are safe for concurrent access.
 type AccountTransactionsReader interface {
-	// TransactionsByAddress retrieves transaction references for an account within the specified
-	// inclusive block height range.
+	// TransactionsByAddress retrieves transaction references for an account using cursor-based pagination.
 	// Results are returned in descending order (newest first).
 	//
-	// startHeight and endHeight are inclusive. If endHeight is greater than the latest indexed height,
-	// the latest indexed height will be used.
+	// `limit` specifies the maximum number of results to return per page.
+	//
+	// `cursor` is a pointer to an [access.AccountTransactionCursor]:
+	//   - nil means start from the latest indexed height (first page)
+	//   - non-nil means resume after the cursor position (subsequent pages)
+	//
+	// `filter` is an optional filter to apply to the results. If nil, all transactions will be returned.
+	// The filter is applied before calculating the limit. For pagination, to work correctly, the same
+	// filter must be applied to all pages.
 	//
 	// Expected error returns during normal operations:
-	//   - [ErrHeightNotIndexed] if the requested range extends beyond indexed heights
-	//   - [ErrInvalidQuery] if the query parameters are invalid (e.g., startHeight > endHeight)
+	//   - [ErrNotBootstrapped] if the index has not been initialized
+	//   - [storage.ErrHeightNotIndexed] if the cursor height extends beyond indexed heights
 	TransactionsByAddress(
 		account flow.Address,
-		startHeight uint64,
-		endHeight uint64,
-	) ([]accessmodel.AccountTransaction, error)
+		limit uint32,
+		cursor *accessmodel.AccountTransactionCursor,
+		filter IndexFilter[*accessmodel.AccountTransaction],
+	) (accessmodel.AccountTransactionsPage, error)
 }
 
 // AccountTransactionsRangeReader provides access to the range of available indexed heights.

@@ -258,7 +258,7 @@ func (c *IndexerCore) IndexBlockData(data *execution_data.BlockExecutionDataEnti
 		g.Go(func() error {
 			err := c.extendedIndexer.IndexBlockExecutionData(data)
 			if err != nil {
-				return fmt.Errorf("could not build block data from execution data: %w", err)
+				return fmt.Errorf("could not index extended block data: %w", err)
 			}
 
 			return nil

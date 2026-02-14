@@ -16,7 +16,7 @@ type routeMatcher struct {
 var matchers []routeMatcher
 
 func init() {
-	matchers = make([]routeMatcher, 0, len(Routes)+len(WSLegacyRoutes))
+	matchers = make([]routeMatcher, 0, len(Routes)+len(WSLegacyRoutes)+len(ExperimentalRoutes))
 
 	add := func(method, pattern, name string) {
 		regexPattern := "^" + patternToRegex(pattern) + "$"
@@ -31,6 +31,9 @@ func init() {
 		add(r.Method, r.Pattern, r.Name)
 	}
 	for _, r := range WSLegacyRoutes {
+		add(r.Method, r.Pattern, r.Name)
+	}
+	for _, r := range ExperimentalRoutes {
 		add(r.Method, r.Pattern, r.Name)
 	}
 }
@@ -52,6 +55,7 @@ func patternToRegex(pattern string) string {
 // MethodURLToRoute matches (method, url) against compiled route regexes and returns the route name.
 func MethodURLToRoute(method, url string) (string, error) {
 	path := strings.TrimPrefix(url, "/v1")
+	path = strings.TrimPrefix(path, "/experimental/v1")
 
 	if method == "" {
 		for _, m := range matchers {

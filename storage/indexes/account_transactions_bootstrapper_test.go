@@ -35,7 +35,6 @@ func TestBootstrapper_Constructor(t *testing.T) {
 			store, err := NewAccountTransactionsBootstrapper(db, 5)
 			require.NoError(t, err)
 
-			// Inner store should be loaded, so height methods work
 			first, err := store.FirstIndexedHeight()
 			require.NoError(t, err)
 			assert.Equal(t, uint64(5), first)
@@ -70,7 +69,7 @@ func TestBootstrapper_PreBootstrapState(t *testing.T) {
 		})
 
 		t.Run("TransactionsByAddress returns ErrNotBootstrapped", func(t *testing.T) {
-			_, err := store.TransactionsByAddress(unittest.RandomAddressFixture(), 42, 42)
+			_, err := store.TransactionsByAddress(unittest.RandomAddressFixture(), 10, nil, nil)
 			require.ErrorIs(t, err, storage.ErrNotBootstrapped)
 		})
 	})
@@ -88,7 +87,6 @@ func TestBootstrapper_StoreTriggersBootstrap(t *testing.T) {
 			err = storeBootstrapperTx(t, store, storageDB, 10, nil)
 			require.NoError(t, err)
 
-			// After bootstrap, height methods should work
 			first, err := store.FirstIndexedHeight()
 			require.NoError(t, err)
 			assert.Equal(t, uint64(10), first)
@@ -109,11 +107,9 @@ func TestBootstrapper_StoreTriggersBootstrap(t *testing.T) {
 			store, err := NewAccountTransactionsBootstrapper(storageDB, 10)
 			require.NoError(t, err)
 
-			// Store at height 11 (not the initialStartHeight of 10)
 			err = storeBootstrapperTx(t, store, storageDB, 11, nil)
 			require.ErrorIs(t, err, storage.ErrNotBootstrapped)
 
-			// Store at height 9 (below initialStartHeight)
 			err = storeBootstrapperTx(t, store, storageDB, 9, nil)
 			require.ErrorIs(t, err, storage.ErrNotBootstrapped)
 		})
@@ -144,18 +140,16 @@ func TestBootstrapper_BootstrapWithData(t *testing.T) {
 				},
 			}
 
-			// Bootstrap with data
 			err = storeBootstrapperTx(t, store, storageDB, firstHeight, txData)
 			require.NoError(t, err)
 
-			// Data should be queryable
-			results, err := store.TransactionsByAddress(account, firstHeight, firstHeight)
+			page, err := store.TransactionsByAddress(account, 100, nil, nil)
 			require.NoError(t, err)
-			require.Len(t, results, 1)
-			assert.Equal(t, txID, results[0].TransactionID)
-			assert.Equal(t, uint64(5), results[0].BlockHeight)
-			assert.Equal(t, uint32(0), results[0].TransactionIndex)
-			assert.Equal(t, []access.TransactionRole{access.TransactionRoleAuthorizer}, results[0].Roles)
+			require.Len(t, page.Transactions, 1)
+			assert.Equal(t, txID, page.Transactions[0].TransactionID)
+			assert.Equal(t, uint64(5), page.Transactions[0].BlockHeight)
+			assert.Equal(t, uint32(0), page.Transactions[0].TransactionIndex)
+			assert.Equal(t, []access.TransactionRole{access.TransactionRoleAuthorizer}, page.Transactions[0].Roles)
 		})
 	})
 
@@ -169,7 +163,6 @@ func TestBootstrapper_BootstrapWithData(t *testing.T) {
 			txID1 := unittest.IdentifierFixture()
 			txID2 := unittest.IdentifierFixture()
 
-			// Bootstrap at height 1 with first tx
 			err = storeBootstrapperTx(t, store, storageDB, 1, []access.AccountTransaction{
 				{
 					Address:          account,
@@ -181,33 +174,30 @@ func TestBootstrapper_BootstrapWithData(t *testing.T) {
 			})
 			require.NoError(t, err)
 
-			// Store at height 2
 			err = storeBootstrapperTx(t, store, storageDB, 2, []access.AccountTransaction{
 				{
 					Address:          account,
 					BlockHeight:      2,
 					TransactionID:    txID2,
 					TransactionIndex: 0,
-					Roles:            []access.TransactionRole{access.TransactionRoleInteraction},
+					Roles:            []access.TransactionRole{access.TransactionRoleInteracted},
 				},
 			})
 			require.NoError(t, err)
 
-			// Query both heights
-			results, err := store.TransactionsByAddress(account, 1, 2)
+			page, err := store.TransactionsByAddress(account, 100, nil, nil)
 			require.NoError(t, err)
-			require.Len(t, results, 2)
+			require.Len(t, page.Transactions, 2)
 
 			// Descending order: height 2 first, then height 1
-			assert.Equal(t, txID2, results[0].TransactionID)
-			assert.Equal(t, uint64(2), results[0].BlockHeight)
-			assert.Equal(t, []access.TransactionRole{access.TransactionRoleInteraction}, results[0].Roles)
+			assert.Equal(t, txID2, page.Transactions[0].TransactionID)
+			assert.Equal(t, uint64(2), page.Transactions[0].BlockHeight)
+			assert.Equal(t, []access.TransactionRole{access.TransactionRoleInteracted}, page.Transactions[0].Roles)
 
-			assert.Equal(t, txID1, results[1].TransactionID)
-			assert.Equal(t, uint64(1), results[1].BlockHeight)
-			assert.Equal(t, []access.TransactionRole{access.TransactionRoleAuthorizer}, results[1].Roles)
+			assert.Equal(t, txID1, page.Transactions[1].TransactionID)
+			assert.Equal(t, uint64(1), page.Transactions[1].BlockHeight)
+			assert.Equal(t, []access.TransactionRole{access.TransactionRoleAuthorizer}, page.Transactions[1].Roles)
 
-			// Latest height should reflect both stores
 			latest, err := store.LatestIndexedHeight()
 			require.NoError(t, err)
 			assert.Equal(t, uint64(2), latest)
@@ -242,7 +232,6 @@ func TestBootstrapper_PersistenceAcrossRestart(t *testing.T) {
 		account := unittest.RandomAddressFixture()
 		txID := unittest.IdentifierFixture()
 
-		// Phase 1: bootstrap via the bootstrapper
 		func() {
 			db := openPebbleDB(t, dir)
 			defer db.Close()
@@ -250,7 +239,6 @@ func TestBootstrapper_PersistenceAcrossRestart(t *testing.T) {
 			store, err := NewAccountTransactionsBootstrapper(db, 100)
 			require.NoError(t, err)
 
-			// Should be uninitialized
 			_, err = store.FirstIndexedHeight()
 			require.ErrorIs(t, err, storage.ErrNotBootstrapped)
 
@@ -266,22 +254,20 @@ func TestBootstrapper_PersistenceAcrossRestart(t *testing.T) {
 			require.NoError(t, err)
 		}()
 
-		// Phase 2: reopen DB and verify bootstrapper returns concrete store
 		db := openPebbleDB(t, dir)
 		defer db.Close()
 
 		store, err := NewAccountTransactionsBootstrapper(db, 100)
 		require.NoError(t, err)
 
-		// Data should be persisted
 		first, err := store.FirstIndexedHeight()
 		require.NoError(t, err)
 		assert.Equal(t, uint64(100), first)
 
-		results, err := store.TransactionsByAddress(account, 100, 100)
+		page, err := store.TransactionsByAddress(account, 100, nil, nil)
 		require.NoError(t, err)
-		require.Len(t, results, 1)
-		assert.Equal(t, txID, results[0].TransactionID)
+		require.Len(t, page.Transactions, 1)
+		assert.Equal(t, txID, page.Transactions[0].TransactionID)
 	})
 }
 
@@ -310,9 +296,6 @@ func TestBootstrapper_DoubleBootstrapProtection(t *testing.T) {
 	})
 }
 
-// storeBootstrapperTx is a test helper that stores account transactions through the
-// storage.AccountTransactions interface. Unlike storeAccountTransactions which uses the
-// concrete type's db field, this helper accepts the DB explicitly.
 func storeBootstrapperTx(
 	tb testing.TB,
 	store storage.AccountTransactionsBootstrapper,
@@ -329,7 +312,6 @@ func storeBootstrapperTx(
 	})
 }
 
-// openPebbleDB opens a Pebble database at the given directory and wraps it as a storage.DB.
 func openPebbleDB(tb testing.TB, dir string) storage.DB {
 	tb.Helper()
 	pdb, err := pebble.Open(dir, &pebble.Options{})

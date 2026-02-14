@@ -11,7 +11,9 @@ import (
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/encoding/ccf"
 
+	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/access"
+	"github.com/onflow/flow-go/model/access/systemcollection"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
 )
@@ -20,10 +22,13 @@ const accountTransactionsIndexerName = "account_transactions"
 
 // AccountTransactions indexes account-transaction associations for a block.
 type AccountTransactions struct {
-	log         zerolog.Logger
-	store       storage.AccountTransactionsBootstrapper
-	chainID     flow.ChainID
-	lockManager storage.LockManager
+	log                      zerolog.Logger
+	store                    storage.AccountTransactionsBootstrapper
+	chainID                  flow.ChainID
+	lockManager              storage.LockManager
+	serviceAccount           flow.Address
+	scheduledExecutorAccount flow.Address
+	systemCollections        *systemcollection.Versioned
 }
 
 var _ Indexer = (*AccountTransactions)(nil)
@@ -33,13 +38,22 @@ func NewAccountTransactions(
 	store storage.AccountTransactionsBootstrapper,
 	chainID flow.ChainID,
 	lockManager storage.LockManager,
-) *AccountTransactions {
-	return &AccountTransactions{
-		log:         log.With().Str("component", "account_tx_indexer").Logger(),
-		store:       store,
-		chainID:     chainID,
-		lockManager: lockManager,
+) (*AccountTransactions, error) {
+	sc := systemcontracts.SystemContractsForChain(chainID)
+	systemCollections, err := systemcollection.NewVersioned(chainID.Chain(), systemcollection.Default(chainID))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create system collection set: %w", err)
 	}
+
+	return &AccountTransactions{
+		log:                      log.With().Str("component", "account_tx_indexer").Logger(),
+		store:                    store,
+		chainID:                  chainID,
+		lockManager:              lockManager,
+		serviceAccount:           sc.FlowServiceAccount.Address,
+		scheduledExecutorAccount: sc.ScheduledTransactionExecutor.Address,
+		systemCollections:        systemCollections,
+	}, nil
 }
 
 // Name returns the name of the indexer.
@@ -116,8 +130,13 @@ func (a *AccountTransactions) buildAccountTransactionsFromBlockData(data BlockDa
 		addrRoles[addr] = append(addrRoles[addr], role)
 	}
 
+	isSystemChunk := false
 	for i, tx := range data.Transactions {
 		txIndex := uint32(i)
+		txID := tx.ID()
+		_, isSystemTx := a.systemCollections.SearchAll(txID)
+		// all tx after the first system tx are in the system chunk
+		isSystemChunk = isSystemChunk || isSystemTx
 
 		// Track roles per address. An address can have multiple roles (e.g., payer AND authorizer).
 		addrRoles := make(map[flow.Address][]access.TransactionRole)
@@ -125,6 +144,14 @@ func (a *AccountTransactions) buildAccountTransactionsFromBlockData(data BlockDa
 		addRole(addrRoles, tx.Payer, access.TransactionRolePayer)
 		addRole(addrRoles, tx.ProposalKey.Address, access.TransactionRoleProposer)
 		for _, auth := range tx.Authorizers {
+			// the service account authorizes all system transactions, and the scheduled tx executor
+			// account authorizes all scheduled transactions. skip indexing since we can derive them
+			// as needed.
+			if isSystemTx || isSystemChunk {
+				if auth == a.serviceAccount || auth == a.scheduledExecutorAccount {
+					continue
+				}
+			}
 			addRole(addrRoles, auth, access.TransactionRoleAuthorizer)
 		}
 
@@ -145,7 +172,7 @@ func (a *AccountTransactions) buildAccountTransactionsFromBlockData(data BlockDa
 				// that the event contains invalid addresses, or addresses from a different chain.
 				// Only index addresses that are actually valid for the current chain.
 				if chain.IsValid(addr) {
-					addRole(addrRoles, addr, access.TransactionRoleInteraction)
+					addRole(addrRoles, addr, access.TransactionRoleInteracted)
 				}
 			}
 		}
@@ -155,7 +182,7 @@ func (a *AccountTransactions) buildAccountTransactionsFromBlockData(data BlockDa
 			entries = append(entries, access.AccountTransaction{
 				Address:          addr,
 				BlockHeight:      data.Header.Height,
-				TransactionID:    tx.ID(),
+				TransactionID:    txID,
 				TransactionIndex: txIndex,
 				Roles:            roles,
 			})

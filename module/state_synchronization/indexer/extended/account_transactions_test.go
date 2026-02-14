@@ -198,7 +198,7 @@ func TestAccountTransactionsIndexer_EventAddresses(t *testing.T) {
 
 	// Common role sets for simpleTx (payer=proposer=authorizer) and event-only addresses
 	simpleTxRoles := []access.TransactionRole{access.TransactionRoleAuthorizer, access.TransactionRolePayer, access.TransactionRoleProposer}
-	interactionRoles := []access.TransactionRole{access.TransactionRoleInteraction}
+	interactionRoles := []access.TransactionRole{access.TransactionRoleInteracted}
 
 	// --- Generic event address extraction ---
 	// Tests that extractAddresses handles all cadence field types correctly in a single event:
@@ -388,7 +388,7 @@ func TestAccountTransactionsIndexer_EventAddresses(t *testing.T) {
 		assertTransactionCount(t, store, testHeight, payer, 1)
 		// Payer has all simpleTx roles plus Interaction from the event
 		simpleTxPlusInteraction := []access.TransactionRole{
-			access.TransactionRoleAuthorizer, access.TransactionRolePayer, access.TransactionRoleProposer, access.TransactionRoleInteraction,
+			access.TransactionRoleAuthorizer, access.TransactionRolePayer, access.TransactionRoleProposer, access.TransactionRoleInteracted,
 		}
 		assertAccountTxRoles(t, store, testHeight, payer, tx.ID(), simpleTxPlusInteraction)
 	})
@@ -462,7 +462,7 @@ func TestAccountTransactionsIndexer_EventAddresses(t *testing.T) {
 
 		txID := tx.ID()
 		// recipient is authorizer and also referenced in event → both roles preserved
-		assertAccountTxRoles(t, store, testHeight, recipient, txID, []access.TransactionRole{access.TransactionRoleAuthorizer, access.TransactionRoleInteraction})
+		assertAccountTxRoles(t, store, testHeight, recipient, txID, []access.TransactionRole{access.TransactionRoleAuthorizer, access.TransactionRoleInteracted})
 		// payer is payer + proposer (not authorizer in this test)
 		assertAccountTxRoles(t, store, testHeight, payer, txID, []access.TransactionRole{access.TransactionRolePayer, access.TransactionRoleProposer})
 		assertTransactionCount(t, store, testHeight, recipient, 1)
@@ -720,9 +720,10 @@ func TestAccountTransactionsIndexer_NextHeight(t *testing.T) {
 		mockStore.On("LatestIndexedHeight").Return(uint64(0), unexpectedErr)
 
 		lm := storage.NewTestingLockManager()
-		indexer := NewAccountTransactions(unittest.Logger(), mockStore, flow.Testnet, lm)
+		indexer, err := NewAccountTransactions(unittest.Logger(), mockStore, flow.Testnet, lm)
+		require.NoError(t, err)
 
-		_, err := indexer.NextHeight()
+		_, err = indexer.NextHeight()
 		require.Error(t, err)
 		require.ErrorIs(t, err, unexpectedErr)
 	})
@@ -733,9 +734,10 @@ func TestAccountTransactionsIndexer_NextHeight(t *testing.T) {
 		mockStore.On("UninitializedFirstHeight").Return(uint64(42), true)
 
 		lm := storage.NewTestingLockManager()
-		indexer := NewAccountTransactions(unittest.Logger(), mockStore, flow.Testnet, lm)
+		indexer, err := NewAccountTransactions(unittest.Logger(), mockStore, flow.Testnet, lm)
+		require.NoError(t, err)
 
-		_, err := indexer.NextHeight()
+		_, err = indexer.NextHeight()
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "but index is initialized")
 	})
@@ -754,12 +756,13 @@ func TestAccountTransactionsIndexer_StoreErrorPropagation(t *testing.T) {
 	mockStore.On("Store", mock.Anything, mock.Anything, testHeight, mock.Anything).Return(storeErr)
 
 	lm := storage.NewTestingLockManager()
-	indexer := NewAccountTransactions(unittest.Logger(), mockStore, flow.Testnet, lm)
+	indexer, err := NewAccountTransactions(unittest.Logger(), mockStore, flow.Testnet, lm)
+	require.NoError(t, err)
 
 	header := unittest.BlockHeaderFixtureOnChain(flow.Testnet, unittest.WithHeaderHeight(testHeight))
 
 	// Call IndexBlockData directly with nil batch since the mock Store doesn't use it
-	err := unittest.WithLock(t, lm, storage.LockIndexAccountTransactions, func(lctx lockctx.Context) error {
+	err = unittest.WithLock(t, lm, storage.LockIndexAccountTransactions, func(lctx lockctx.Context) error {
 		return indexer.IndexBlockData(lctx, BlockData{Header: header}, nil)
 	})
 	require.Error(t, err)
@@ -784,7 +787,9 @@ func newAccountTxIndexerForTest(
 	store, err := indexes.NewAccountTransactionsBootstrapper(db, latestHeight)
 	require.NoError(t, err)
 
-	return NewAccountTransactions(unittest.Logger(), store, chainID, lm), store, lm, db
+	indexer, err := NewAccountTransactions(unittest.Logger(), store, chainID, lm)
+	require.NoError(t, err)
+	return indexer, store, lm, db
 }
 
 // createTestEvent creates a CCF-encoded flow event with arbitrary cadence fields.
@@ -852,11 +857,11 @@ func assertAccountTxRoles(
 	expectedRoles []access.TransactionRole,
 ) {
 	t.Helper()
-	results, err := store.TransactionsByAddress(addr, height, height)
+	page, err := store.TransactionsByAddress(addr, 1000, nil, nil)
 	require.NoError(t, err)
 
-	for _, r := range results {
-		if r.TransactionID == txID {
+	for _, r := range page.Transactions {
+		if r.TransactionID == txID && r.BlockHeight == height {
 			assert.Equal(t, expectedRoles, r.Roles,
 				"address %s tx %s: expected roles=%v, got roles=%v", addr, txID, expectedRoles, r.Roles)
 			return
@@ -874,9 +879,16 @@ func assertTransactionCount(
 	expectedCount int,
 ) {
 	t.Helper()
-	results, err := store.TransactionsByAddress(addr, height, height)
+	page, err := store.TransactionsByAddress(addr, 1000, nil, nil)
 	require.NoError(t, err)
-	require.Len(t, results, expectedCount,
+
+	var count int
+	for _, r := range page.Transactions {
+		if r.BlockHeight == height {
+			count++
+		}
+	}
+	require.Equal(t, expectedCount, count,
 		"expected %d transactions for address %s at height %d", expectedCount, addr, height)
 }
 

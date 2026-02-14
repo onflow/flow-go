@@ -8,6 +8,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/access"
+	"github.com/onflow/flow-go/access/backends/extended"
 	"github.com/onflow/flow-go/engine/access/rest/router"
 	"github.com/onflow/flow-go/engine/access/rest/websockets"
 	dp "github.com/onflow/flow-go/engine/access/rest/websockets/data_providers"
@@ -38,7 +39,7 @@ type Config struct {
 	MaxResponseSize int64
 }
 
-// NewServer returns an HTTP server initialized with the REST API handler
+// NewServer returns an HTTP server initialized with the REST API handler.
 func NewServer(
 	ctx irrecoverable.SignalerContext,
 	serverAPI access.API,
@@ -50,6 +51,7 @@ func NewServer(
 	stateStreamConfig backend.Config,
 	enableNewWebsocketsStreamAPI bool,
 	wsConfig websockets.Config,
+	extendedBackend extended.API,
 ) (*http.Server, error) {
 	builder := router.NewRouterBuilder(logger, restCollector).AddRestRoutes(serverAPI, chain, config.MaxRequestSize, config.MaxResponseSize)
 	if stateStreamApi != nil {
@@ -68,6 +70,10 @@ func NewServer(
 
 	if enableNewWebsocketsStreamAPI {
 		builder.AddWebsocketsRoute(ctx, chain, wsConfig, config.MaxRequestSize, config.MaxResponseSize, dataProviderFactory)
+	}
+
+	if extendedBackend != nil {
+		builder.AddExperimentalRoutes(extendedBackend, chain, config.MaxRequestSize, config.MaxResponseSize)
 	}
 
 	c := cors.New(cors.Options{

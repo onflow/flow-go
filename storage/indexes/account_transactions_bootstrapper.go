@@ -27,6 +27,9 @@ type AccountTransactionsBootstrapper struct {
 
 var _ storage.AccountTransactionsBootstrapper = (*AccountTransactionsBootstrapper)(nil)
 
+// NewAccountTransactionsBootstrapper creates a new account transactions bootstrapper.
+//
+// No error returns are expected during normal operation.
 func NewAccountTransactionsBootstrapper(db storage.DB, initialStartHeight uint64) (*AccountTransactionsBootstrapper, error) {
 	store, err := NewAccountTransactions(db)
 	if err != nil {
@@ -79,18 +82,33 @@ func (b *AccountTransactionsBootstrapper) UninitializedFirstHeight() (uint64, bo
 	return store.FirstIndexedHeight(), true
 }
 
-// TransactionsByAddress retrieves transaction references for an account within the specified
-// block height range (inclusive). Results are returned in descending order (newest first).
+// TransactionsByAddress retrieves transaction references for an account using cursor-based pagination.
+// Results are returned in descending order (newest first).
+//
+// `limit` specifies the maximum number of results to return per page.
+//
+// `cursor` is a pointer to an [access.AccountTransactionCursor]:
+//   - nil means start from the latest indexed height (first page)
+//   - non-nil means resume after the cursor position (subsequent pages)
+//
+// `filter` is an optional filter to apply to the results. If nil, all transactions will be returned.
+// The filter is applied before calculating the limit. For pagination, to work correctly, the same
+// filter must be applied to all pages.
 //
 // Expected error returns during normal operations:
-//   - [storage.ErrNotBootstrapped] if the index has not been initialized
-//   - [storage.ErrHeightNotIndexed] if the requested range extends beyond indexed heights
-func (b *AccountTransactionsBootstrapper) TransactionsByAddress(account flow.Address, startHeight uint64, endHeight uint64) ([]access.AccountTransaction, error) {
+//   - [ErrNotBootstrapped] if the index has not been initialized
+//   - [storage.ErrHeightNotIndexed] if the cursor height extends beyond indexed heights
+func (b *AccountTransactionsBootstrapper) TransactionsByAddress(
+	account flow.Address,
+	limit uint32,
+	cursor *access.AccountTransactionCursor,
+	filter storage.IndexFilter[*access.AccountTransaction],
+) (access.AccountTransactionsPage, error) {
 	store := b.store.Load()
 	if store == nil {
-		return nil, storage.ErrNotBootstrapped
+		return access.AccountTransactionsPage{}, storage.ErrNotBootstrapped
 	}
-	return store.TransactionsByAddress(account, startHeight, endHeight)
+	return store.TransactionsByAddress(account, limit, cursor, filter)
 }
 
 // Store indexes all account-transaction associations for a block.

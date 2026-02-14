@@ -77,9 +77,7 @@ type IndexerManager interface {
 	//
 	// Not safe for concurrent use.
 	//
-	// Expected error returns during normal operations:
-	//   - [ErrAlreadyIndexed]: if the data is already indexed for the height.
-	//   - [ErrFutureHeight]: if the data is for a future height.
+	// No error returns are expected during normal operation.
 	IndexBlockExecutionData(data *execution_data.BlockExecutionDataEntity) error
 
 	// IndexBlockData indexes the block data for the given height.
@@ -87,8 +85,6 @@ type IndexerManager interface {
 	//
 	// Not safe for concurrent use.
 	//
-	// Expected error returns during normal operations:
-	//   - [ErrAlreadyIndexed]: if the data is already indexed for the height.
-	//   - [ErrFutureHeight]: if the data is for a future height.
+	// No error returns are expected during normal operation.
 	IndexBlockData(header *flow.Header, transactions []*flow.TransactionBody, events []flow.Event) error
 }

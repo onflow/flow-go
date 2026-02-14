@@ -202,6 +202,7 @@ func (suite *RateLimitTestSuite) SetupTest() {
 		stateStreamConfig,
 		nil,
 		followerDistributor,
+		nil,
 	)
 	require.NoError(suite.T(), err)
 	suite.rpcEng, err = rpcEngBuilder.WithLegacy().Build()

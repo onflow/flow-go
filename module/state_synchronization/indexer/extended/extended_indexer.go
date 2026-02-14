@@ -48,12 +48,13 @@ type ExtendedIndexer struct {
 	metrics       module.ExtendedIndexingMetrics
 	backfillDelay time.Duration
 
-	chainID           flow.ChainID
-	state             protocol.State
-	blocks            storage.Blocks
-	collections       storage.Collections
-	events            storage.Events
-	results           storage.LightTransactionResults
+	chainID     flow.ChainID
+	state       protocol.State
+	blocks      storage.Blocks
+	collections storage.Collections
+	events      storage.Events
+	results     storage.LightTransactionResults
+
 	systemCollections *access.Versioned[access.SystemCollectionBuilder]
 
 	indexers []Indexer
@@ -90,7 +91,7 @@ func NewExtendedIndexer(
 
 	log = log.With().Str("component", "extended_indexer").Logger()
 	c := &ExtendedIndexer{
-		log:           log.With().Str("component", "extended_indexer").Logger(),
+		log:           log,
 		db:            db,
 		lockManager:   lockManager,
 		metrics:       metrics,
@@ -378,8 +379,8 @@ func (c *ExtendedIndexer) extractDataFromExecutionData(height uint64, data *exec
 			if i != len(data.ChunkExecutionDatas)-1 {
 				return nil, nil, fmt.Errorf("chunk collection is nil but not the last chunk")
 			}
-			versionedCollection := systemcollection.Default(c.chainID)
-			systemCollection, err := versionedCollection.
+
+			systemCollection, err := c.systemCollections.
 				ByHeight(height).
 				SystemCollection(c.chainID.Chain(), access.StaticEventProvider(chunk.Events))
 			if err != nil {

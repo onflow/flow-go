@@ -285,7 +285,7 @@ func (s *GrpcStateStreamSuite) generateEvents(client *testnet.Client, txCount in
 
 	for i := 0; i < txCount; i++ {
 		accountKey := test.AccountKeyGenerator().New()
-		address, err := client.CreateAccount(s.ctx, accountKey, sdk.HexToID(refBlockID.String()))
+		address, _, err := client.CreateAccount(s.ctx, accountKey, sdk.HexToID(refBlockID.String()))
 		if err != nil {
 			i--
 			continue

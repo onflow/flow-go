@@ -2,73 +2,53 @@ package extended
 
 import (
 	"fmt"
-	"io"
-	"time"
 
 	"github.com/rs/zerolog"
 
-	"github.com/onflow/flow-go/module/metrics"
-	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/indexes"
 	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
 	pstorage "github.com/onflow/flow-go/storage/pebble"
 )
 
-// BootstrapExtendedIndexes bootstraps the extended index database, and instantiates the extended indexer.
+type Storage struct {
+	DB                              storage.DB
+	AccountTransactionsBootstrapper storage.AccountTransactionsBootstrapper
+}
+
+// OpenExtendedIndexDB opens the pebble database for extended indexes and creates the account
+// transactions bootstrapper store. This must run synchronously during node initialization so
+// that the store is available for consumers (e.g. the ExtendedBackend) before async components
+// start.
 //
 // No error returns are expected during normal operation.
-func BootstrapExtendedIndexes(
+func OpenExtendedIndexDB(
 	log zerolog.Logger,
-	state protocol.State,
-	blocks storage.Blocks,
-	collections storage.Collections,
-	events storage.Events,
-	lightTransactionResults storage.LightTransactionResults,
-	lockManager storage.LockManager,
 	dbPath string,
-	backfillDelay time.Duration,
-) (*ExtendedIndexer, io.Closer, error) {
+	sealedRootHeight uint64,
+) (Storage, error) {
 	indexerDB, err := pstorage.SafeOpen(
 		log.With().Str("pebbledb", "indexer").Logger(),
 		dbPath,
 	)
 	if err != nil {
-		return nil, nil, fmt.Errorf("could not open indexer db: %w", err)
+		return Storage{}, fmt.Errorf("could not open indexer db: %w", err)
 	}
-
-	chainID := state.Params().ChainID()
 
 	indexerStorageDB := pebbleimpl.ToDB(indexerDB)
 	accountTxStore, err := indexes.NewAccountTransactionsBootstrapper(
 		indexerStorageDB,
-		state.Params().SealedRoot().Height,
+		sealedRootHeight,
 	)
 	if err != nil {
-		return nil, nil, fmt.Errorf("could not create account transactions index: %w", err)
+		if closeErr := indexerDB.Close(); closeErr != nil {
+			log.Error().Err(closeErr).Msg("error closing indexer db")
+		}
+		return Storage{}, fmt.Errorf("could not create account transactions index: %w", err)
 	}
 
-	extendedIndexers := []Indexer{
-		NewAccountTransactions(log, accountTxStore, chainID, lockManager),
-	}
-
-	extendedIndexer, err := NewExtendedIndexer(
-		log,
-		metrics.NewExtendedIndexingCollector(),
-		indexerStorageDB,
-		lockManager,
-		state,
-		blocks,
-		collections,
-		events,
-		lightTransactionResults,
-		extendedIndexers,
-		chainID,
-		backfillDelay,
-	)
-	if err != nil {
-		return nil, nil, fmt.Errorf("could not create extended indexer: %w", err)
-	}
-
-	return extendedIndexer, indexerDB, nil
+	return Storage{
+		DB:                              indexerStorageDB,
+		AccountTransactionsBootstrapper: accountTxStore,
+	}, nil
 }
