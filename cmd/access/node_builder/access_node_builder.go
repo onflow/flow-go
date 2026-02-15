@@ -1085,7 +1085,9 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				return builder.ExecutionIndexer, nil
 			}, builder.IndexerDependencies)
 
-		if builder.extendedIndexingEnabled {
+		if !builder.extendedIndexingEnabled {
+			extendedIndexerDependable.Init(&module.NoopReadyDoneAware{})
+		} else {
 			builder.DependableComponent("extended indexer", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 				accountTransactions, err := extended.NewAccountTransactions(
 					node.Logger,

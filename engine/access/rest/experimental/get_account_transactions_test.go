@@ -269,8 +269,8 @@ func TestGetAccountTransactions(t *testing.T) {
 
 		rr := router.ExecuteExperimentalRequest(req, backend)
 
-		assert.Equal(t, http.StatusServiceUnavailable, rr.Code)
-		assert.Contains(t, rr.Body.String(), "Service not ready")
+		assert.Equal(t, http.StatusNotFound, rr.Code)
+		assert.Contains(t, rr.Body.String(), "Precondition failed")
 	})
 
 	t.Run("invalid limit", func(t *testing.T) {
