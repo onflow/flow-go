@@ -15,6 +15,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/access"
+	"github.com/onflow/flow-go/access/backends/extended"
 	"github.com/onflow/flow-go/access/mock"
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/engine/access/state_stream/backend"
@@ -157,6 +158,23 @@ func ExecuteLegacyWsRequest(req *http.Request, stateStreamApi state_stream.API, 
 
 func AssertOKResponse(t *testing.T, req *http.Request, expectedRespBody string, backend *mock.API) {
 	AssertResponse(t, req, http.StatusOK, expectedRespBody, backend)
+}
+
+// ExecuteExperimentalRequest builds a router with experimental routes and executes the given request.
+func ExecuteExperimentalRequest(req *http.Request, backend extended.API) *httptest.ResponseRecorder {
+	router := NewRouterBuilder(
+		unittest.Logger(),
+		metrics.NewNoopCollector(),
+	).AddExperimentalRoutes(
+		backend,
+		flow.Testnet.Chain(),
+		commonrpc.DefaultAccessMaxRequestSize,
+		commonrpc.DefaultAccessMaxResponseSize,
+	).Build()
+
+	rr := httptest.NewRecorder()
+	router.ServeHTTP(rr, req)
+	return rr
 }
 
 func AssertResponse(t *testing.T, req *http.Request, status int, expectedRespBody string, backend *mock.API) {

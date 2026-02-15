@@ -826,6 +826,11 @@ type ExecutionStateIndexerMetrics interface {
 	InitializeLatestHeight(height uint64)
 }
 
+type ExtendedIndexingMetrics interface {
+	// BlockIndexedExtended records the latest processed height for a given extended indexer.
+	BlockIndexedExtended(indexer string, height uint64)
+}
+
 type TransactionErrorMessagesMetrics interface {
 	// TxErrorsInitialHeight records the initial height of the transaction error messages.
 	TxErrorsInitialHeight(height uint64)

@@ -150,6 +150,12 @@ func testCases() []testCase {
 			url:      "/v1/subscribe_events",
 			expected: "subscribeEvents",
 		},
+		{
+			method:   http.MethodGet,
+			name:     "/experimental/v1/accounts/{address}/transactions",
+			url:      "/experimental/v1/accounts/6a587be304c1224c/transactions",
+			expected: "getAccountTransactions",
+		},
 	}
 }
 
@@ -167,7 +173,7 @@ func TestBenchmarkURLToRoute(t *testing.T) {
 	for _, tt := range testCases() {
 		t.Run(tt.method+" "+tt.name, func(t *testing.T) {
 			start := time.Now()
-			for i := 0; i < 100_000; i++ {
+			for range 100_000 {
 				_, _ = MethodURLToRoute(tt.method, tt.url)
 			}
 			t.Logf("%s %s: %v", tt.method, tt.name, time.Since(start)/100_000)

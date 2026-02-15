@@ -22,7 +22,7 @@ require (
 	github.com/libp2p/go-libp2p v0.38.2
 	github.com/onflow/cadence v1.9.9
 	github.com/onflow/crypto v0.25.4
-	github.com/onflow/flow v0.4.15
+	github.com/onflow/flow v0.4.20-0.20260214160309-cf4461323391
 	github.com/onflow/flow-core-contracts/lib/go/contracts v1.9.2
 	github.com/onflow/flow-core-contracts/lib/go/templates v1.9.2
 	github.com/onflow/flow-go v0.38.0-preview.0.0.20241021221952-af9cd6e99de1

@@ -43,6 +43,9 @@ flowdb
 .idea
 .vscode
 *.code-workspace
+*.worktrees
+.claude/
+.local/
 # ignore all files in the .cursor directory, except for the rules directory
 .cursor/*
 !.cursor/rules/
