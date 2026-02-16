@@ -63,6 +63,7 @@ type testContractHandler struct {
 	batchRun             func(txs [][]byte, coinbase types.Address) []*types.ResultSummary
 	generateResourceUUID func() uint64
 	dryRun               func(tx []byte, from types.Address) *types.ResultSummary
+	dryRunWithTxData     func(txData gethTypes.TxData, from types.Address) *types.ResultSummary
 	commitBlockProposal  func()
 }
 
@@ -111,6 +112,13 @@ func (t *testContractHandler) DryRun(tx []byte, from types.Address) *types.Resul
 		panic("unexpected DryRun")
 	}
 	return t.dryRun(tx, from)
+}
+
+func (t *testContractHandler) DryRunWithTxData(txData gethTypes.TxData, from types.Address) *types.ResultSummary {
+	if t.dryRunWithTxData == nil {
+		panic("unexpected DryRunWithTxData")
+	}
+	return t.dryRunWithTxData(txData, from)
 }
 
 func (t *testContractHandler) BatchRun(txs [][]byte, coinbase types.Address) []*types.ResultSummary {
@@ -1288,6 +1296,74 @@ func TestEVMEncodeABIBytesRoundtrip(t *testing.T) {
 		require.NoError(t, err)
 
 		assert.Equal(t, uint64(64), gauge.TotalComputationUsed())
+	})
+
+	t.Run("ABI encode array of structs into tuple Solidity type", func(t *testing.T) {
+		script := []byte(`
+          import EVM from 0x1
+
+          access(all)
+          struct S {
+              access(all) let x: UInt8
+              access(all) let y: Int16
+
+              init(x: UInt8, y: Int16) {
+                  self.x = x
+                  self.y = y
+              }
+
+              access(all) fun toString(): String {
+                  return "S(x: \(self.x), y: \(self.y))"
+              }
+          }
+
+          access(all)
+          fun main() {
+              let s1 = S(x: 4, y: 2)
+              let s2 = S(x: 5, y: 9)
+              let structArray = [s1, s2]
+              let encodedData = EVM.encodeABI([structArray])
+              assert(encodedData == [
+                  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x20,
+                  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x2,
+                  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x4,
+                  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x2,
+                  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x5,
+                  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x9
+              ], message: String.encodeHex(encodedData))
+
+              let values = EVM.decodeABI(types: [Type<[S]>()], data: encodedData)
+              assert(values.length == 1)
+              let decodedStructArray = values[0] as! [S]
+              assert(decodedStructArray.length == 2)
+
+              assert(decodedStructArray[0].x == 4)
+              assert(decodedStructArray[0].y == 2)
+              assert(decodedStructArray[1].x == 5)
+              assert(decodedStructArray[1].y == 9)
+          }
+		`)
+
+		gauge := meter.NewMeter(meter.DefaultParameters().WithComputationWeights(meter.ExecutionEffortWeights{
+			environment.ComputationKindEVMEncodeABI: 1 << meter.MeterExecutionInternalPrecisionBytes,
+		}))
+
+		// Run script
+		_, err := rt.ExecuteScript(
+			runtime.Script{
+				Source: script,
+			},
+			runtime.Context{
+				Interface:        runtimeInterface,
+				Environment:      scriptEnvironment,
+				Location:         nextScriptLocation(),
+				MemoryGauge:      gauge,
+				ComputationGauge: gauge,
+			},
+		)
+		require.NoError(t, err)
+
+		assert.Equal(t, uint64(192), gauge.TotalComputationUsed())
 	})
 }
 
@@ -4243,12 +4319,9 @@ func TestEVMDryCall(t *testing.T) {
 	contractsAddress := flow.BytesToAddress([]byte{0x1})
 	handler := &testContractHandler{
 		evmContractAddress: common.Address(contractsAddress),
-		dryRun: func(tx []byte, from types.Address) *types.ResultSummary {
+		dryRunWithTxData: func(txData gethTypes.TxData, from types.Address) *types.ResultSummary {
 			dryCallCalled = true
-			gethTx := &gethTypes.Transaction{}
-			if err := gethTx.UnmarshalBinary(tx); err != nil {
-				require.Fail(t, err.Error())
-			}
+			gethTx := gethTypes.NewTx(txData)
 
 			require.NotNil(t, gethTx.To())
 
@@ -4753,12 +4826,9 @@ func TestCadenceOwnedAccountDryCall(t *testing.T) {
 
 	handler := &testContractHandler{
 		evmContractAddress: common.Address(contractsAddress),
-		dryRun: func(tx []byte, from types.Address) *types.ResultSummary {
+		dryRunWithTxData: func(txData gethTypes.TxData, from types.Address) *types.ResultSummary {
 			dryCallCalled = true
-			gethTx := &gethTypes.Transaction{}
-			if err := gethTx.UnmarshalBinary(tx); err != nil {
-				require.Fail(t, err.Error())
-			}
+			gethTx := gethTypes.NewTx(txData)
 
 			require.NotNil(t, gethTx.To())
 

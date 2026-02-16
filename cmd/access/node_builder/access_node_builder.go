@@ -560,8 +560,8 @@ func (builder *FlowAccessNodeBuilder) BuildConsensusFollower() *FlowAccessNodeBu
 
 func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccessNodeBuilder {
 	var bs network.BlobService
-	var processedBlockHeight storage.ConsumerProgressInitializer
-	var processedNotifications storage.ConsumerProgressInitializer
+	var processedBlockHeightInitializer storage.ConsumerProgressInitializer
+	var processedNotificationsInitializer storage.ConsumerProgressInitializer
 	var bsDependable *module.ProxiedReadyDoneAware
 	var execDataDistributor *edrequester.ExecutionDataDistributor
 	var execDataCacheBackend *herocache.BlockExecutionData
@@ -601,14 +601,14 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 			// writes execution data to.
 			db := builder.ExecutionDatastoreManager.DB()
 
-			processedBlockHeight = store.NewConsumerProgress(db, module.ConsumeProgressExecutionDataRequesterBlockHeight)
+			processedBlockHeightInitializer = store.NewConsumerProgress(db, module.ConsumeProgressExecutionDataRequesterBlockHeight)
 			return nil
 		}).
 		Module("processed notifications consumer progress", func(node *cmd.NodeConfig) error {
 			// Note: progress is stored in the datastore's DB since that is where the jobqueue
 			// writes execution data to.
 			db := builder.ExecutionDatastoreManager.DB()
-			processedNotifications = store.NewConsumerProgress(db, module.ConsumeProgressExecutionDataRequesterNotification)
+			processedNotificationsInitializer = store.NewConsumerProgress(db, module.ConsumeProgressExecutionDataRequesterNotification)
 			return nil
 		}).
 		Module("blobservice peer manager dependencies", func(node *cmd.NodeConfig) error {
@@ -744,6 +744,16 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				execDataCacheBackend,
 			)
 
+			// start processing from the initial block height resolved from the execution data config
+			processedBlockHeight, err := processedBlockHeightInitializer.Initialize(builder.executionDataConfig.InitialBlockHeight)
+			if err != nil {
+				return nil, fmt.Errorf("could not initialize processed block height: %w", err)
+			}
+			processedNotifications, err := processedNotificationsInitializer.Initialize(builder.executionDataConfig.InitialBlockHeight)
+			if err != nil {
+				return nil, fmt.Errorf("could not initialize processed notifications: %w", err)
+			}
+
 			r, err := edrequester.New(
 				builder.Logger,
 				metrics.NewExecutionDataRequesterCollector(),
@@ -834,7 +844,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 	}
 
 	if builder.executionDataIndexingEnabled {
-		var indexedBlockHeight storage.ConsumerProgressInitializer
+		var indexedBlockHeightInitializer storage.ConsumerProgressInitializer
 
 		builder.
 			AdminCommand("execute-script", func(config *cmd.NodeConfig) commands.AdminCommand {
@@ -842,7 +852,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 			}).
 			Module("indexed block height consumer progress", func(node *cmd.NodeConfig) error {
 				// Note: progress is stored in the MAIN db since that is where indexed execution data is stored.
-				indexedBlockHeight = store.NewConsumerProgress(builder.ProtocolDB, module.ConsumeProgressExecutionDataIndexerBlockHeight)
+				indexedBlockHeightInitializer = store.NewConsumerProgress(builder.ProtocolDB, module.ConsumeProgressExecutionDataIndexerBlockHeight)
 				return nil
 			}).
 			Module("transaction results storage", func(node *cmd.NodeConfig) error {
@@ -955,6 +965,13 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 					notNil(builder.collectionExecutedMetric),
 					node.StorageLockMgr,
 				)
+
+				// start processing from the first height of the registers db, which is initialized from
+				// the checkpoint. this ensures a consistent starting point for the indexed data.
+				indexedBlockHeight, err := indexedBlockHeightInitializer.Initialize(registers.FirstHeight())
+				if err != nil {
+					return nil, fmt.Errorf("could not initialize indexed block height: %w", err)
+				}
 
 				// execution state worker uses a jobqueue to process new execution data and indexes it by using the indexer.
 				builder.ExecutionIndexer, err = indexer.NewIndexer(
@@ -1718,8 +1735,8 @@ func (builder *FlowAccessNodeBuilder) enqueueRelayNetwork() {
 }
 
 func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
-	var processedFinalizedBlockHeight storage.ConsumerProgressInitializer
-	var processedTxErrorMessagesBlockHeight storage.ConsumerProgressInitializer
+	var processedFinalizedBlockHeightInitializer storage.ConsumerProgressInitializer
+	var processedTxErrorMessagesBlockHeightInitializer storage.ConsumerProgressInitializer
 
 	if builder.executionDataSyncEnabled {
 		builder.BuildExecutionSyncComponents()
@@ -1944,7 +1961,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			return nil
 		}).
 		Module("processed finalized block height consumer progress", func(node *cmd.NodeConfig) error {
-			processedFinalizedBlockHeight = store.NewConsumerProgress(builder.ProtocolDB, module.ConsumeProgressIngestionEngineBlockHeight)
+			processedFinalizedBlockHeightInitializer = store.NewConsumerProgress(builder.ProtocolDB, module.ConsumeProgressIngestionEngineBlockHeight)
 			return nil
 		}).
 		Module("processed last full block height monotonic consumer progress", func(node *cmd.NodeConfig) error {
@@ -2267,6 +2284,12 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				)
 			}
 
+			// start ingesting finalized block from the earliest block in storage (sealed root block height)
+			processedFinalizedBlockHeight, err := processedFinalizedBlockHeightInitializer.Initialize(node.SealedRootBlock.Height)
+			if err != nil {
+				return nil, fmt.Errorf("could not initialize processed finalized block height: %w", err)
+			}
+
 			ingestEng, err := ingestion.New(
 				node.Logger,
 				node.EngineRegistry,
@@ -2281,6 +2304,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				notNil(builder.CollectionSyncer),
 				notNil(builder.CollectionIndexer),
 				notNil(builder.collectionExecutedMetric),
+				builder.AccessMetrics,
 				notNil(builder.TxResultErrorMessagesCore),
 				builder.FollowerDistributor,
 			)
@@ -2312,13 +2336,19 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				return nil
 			}).
 			Module("processed error messages block height consumer progress", func(node *cmd.NodeConfig) error {
-				processedTxErrorMessagesBlockHeight = store.NewConsumerProgress(
+				processedTxErrorMessagesBlockHeightInitializer = store.NewConsumerProgress(
 					builder.ProtocolDB,
 					module.ConsumeProgressEngineTxErrorMessagesBlockHeight,
 				)
 				return nil
 			}).
 			Component("transaction result error messages engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+				// start processing from the earliest block in storage (sealed root block height)
+				processedTxErrorMessagesBlockHeight, err := processedTxErrorMessagesBlockHeightInitializer.Initialize(node.SealedRootBlock.Height)
+				if err != nil {
+					return nil, fmt.Errorf("could not initialize processed tx error messages block height: %w", err)
+				}
+
 				engine, err := tx_error_messages.New(
 					node.Logger,
 					metrics.NewTransactionErrorMessagesCollector(),

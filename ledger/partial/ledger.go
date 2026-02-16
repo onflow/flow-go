@@ -164,3 +164,18 @@ func (l *Ledger) Set(update *ledger.Update) (newState ledger.State, trieUpdate *
 func (l *Ledger) Prove(query *ledger.Query) (proof ledger.Proof, err error) {
 	return nil, err
 }
+
+// StateCount returns the number of states in the partial ledger
+// Partial ledger only has one state
+func (l *Ledger) StateCount() int {
+	return 1
+}
+
+// StateByIndex returns the state at the given index
+// Partial ledger only has one state
+func (l *Ledger) StateByIndex(index int) (ledger.State, error) {
+	if index == 0 || index == -1 {
+		return l.state, nil
+	}
+	return ledger.DummyState, fmt.Errorf("index %d is out of range (partial ledger has 1 state)", index)
+}

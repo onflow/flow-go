@@ -10,7 +10,7 @@ import (
 	"github.com/onflow/flow-go/engine/execution/state/bootstrap"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
-	ledger "github.com/onflow/flow-go/ledger/complete"
+	"github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
 	"github.com/onflow/flow-go/ledger/complete/wal"
 	bootstrapFilenames "github.com/onflow/flow-go/model/bootstrap"
@@ -37,12 +37,12 @@ func GenerateExecutionState(
 		return flow.DummyStateCommitment, err
 	}
 
-	ledgerStorage, err := ledger.NewLedger(diskWal, capacity, metricsCollector, zerolog.Nop(), ledger.DefaultPathFinderVersion)
+	ledgerStorage, err := complete.NewLedger(diskWal, capacity, metricsCollector, zerolog.Nop(), complete.DefaultPathFinderVersion)
 	if err != nil {
 		return flow.DummyStateCommitment, err
 	}
 
-	compactor, err := ledger.NewCompactor(ledgerStorage, diskWal, zerolog.Nop(), capacity, checkpointDistance, checkpointsToKeep, atomic.NewBool(false), metricsCollector)
+	compactor, err := complete.NewCompactor(ledgerStorage, diskWal, zerolog.Nop(), capacity, checkpointDistance, checkpointsToKeep, atomic.NewBool(false), metricsCollector)
 	if err != nil {
 		return flow.DummyStateCommitment, err
 	}

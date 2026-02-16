@@ -136,10 +136,7 @@ func (s *TxErrorMessagesEngineSuite) SetupTest() {
 	).Maybe()
 
 	s.proto.state.On("Params").Return(s.proto.params)
-
-	// Mock the finalized and sealed root block header with height 0.
 	s.proto.params.On("FinalizedRoot").Return(s.rootBlock.ToHeader(), nil)
-	s.proto.params.On("SealedRoot").Return(s.rootBlock.ToHeader(), nil)
 
 	s.proto.snapshot.On("Head").Return(
 		func() *flow.Header {
@@ -158,10 +155,8 @@ func (s *TxErrorMessagesEngineSuite) SetupTest() {
 // initEngine creates a new instance of the transaction error messages engine
 // and waits for it to start. It initializes the engine with mocked components and state.
 func (s *TxErrorMessagesEngineSuite) initEngine(ctx irrecoverable.SignalerContext) *Engine {
-	processedTxErrorMessagesBlockHeight := store.NewConsumerProgress(
-		s.db,
-		module.ConsumeProgressEngineTxErrorMessagesBlockHeight,
-	)
+	processedTxErrorMessagesBlockHeight, err := store.NewConsumerProgress(s.db, module.ConsumeProgressEngineTxErrorMessagesBlockHeight).Initialize(s.rootBlock.Height)
+	require.NoError(s.T(), err)
 
 	execNodeIdentitiesProvider := commonrpc.NewExecutionNodeIdentitiesProvider(
 		s.log,

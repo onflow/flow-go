@@ -476,6 +476,13 @@ func (h *ContractHandler) dryRun(
 		return nil, err
 	}
 
+	return h.dryRunTx(&tx, from)
+}
+
+func (h *ContractHandler) dryRunTx(
+	tx *gethTypes.Transaction,
+	from types.Address,
+) (*types.Result, error) {
 	bp, err := h.getBlockProposal()
 	if err != nil {
 		return nil, err
@@ -490,7 +497,7 @@ func (h *ContractHandler) dryRun(
 		return nil, err
 	}
 
-	res, err := blk.DryRunTransaction(&tx, from.ToCommon())
+	res, err := blk.DryRunTransaction(tx, from.ToCommon())
 	if err != nil {
 		return nil, err
 	}
@@ -499,6 +506,27 @@ func (h *ContractHandler) dryRun(
 	}
 
 	return res, nil
+}
+
+// DryRunWithTxData simulates execution of the provided transaction data.
+// The from address is required since the transaction is unsigned.
+// The function should not have any persisted changes made to the state.
+func (h *ContractHandler) DryRunWithTxData(
+	txData gethTypes.TxData,
+	from types.Address,
+) *types.ResultSummary {
+	if txData == nil {
+		panicOnError(types.ErrUnexpectedEmptyTransactionData)
+	}
+
+	defer h.backend.StartChildSpan(trace.FVMEVMDryRun).End()
+
+	tx := gethTypes.NewTx(txData)
+
+	res, err := h.dryRunTx(tx, from)
+	panicOnError(err)
+
+	return res.ResultSummary()
 }
 
 // checkGasLimit checks if enough computation is left in the environment

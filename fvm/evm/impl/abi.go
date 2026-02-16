@@ -262,21 +262,6 @@ func newInternalEVMTypeEncodeABIFunction(
 				panic(errors.NewUnreachableError())
 			}
 
-			reportArrayABIEncodingComputation(
-				context,
-				valuesArray,
-				evmSpecialTypeIDs,
-				func(intensity uint64) {
-					common.UseComputation(
-						context,
-						common.ComputationUsage{
-							Kind:      environment.ComputationKindEVMEncodeABI,
-							Intensity: intensity,
-						},
-					)
-				},
-			)
-
 			size := valuesArray.Count()
 
 			values := make([]any, 0, size)
@@ -285,6 +270,22 @@ func newInternalEVMTypeEncodeABIFunction(
 			valuesArray.Iterate(
 				context,
 				func(element interpreter.Value) (resume bool) {
+
+					reportABIEncodingComputation(
+						context,
+						element,
+						evmSpecialTypeIDs,
+						func(intensity uint64) {
+							common.UseComputation(
+								context,
+								common.ComputationUsage{
+									Kind:      environment.ComputationKindEVMEncodeABI,
+									Intensity: intensity,
+								},
+							)
+						},
+					)
+
 					value, ty, err := encodeABI(
 						context,
 						element,
@@ -515,50 +516,69 @@ func gethABIType(
 	return gethABI.Type{}, false
 }
 
+var (
+	goStringType    = reflect.TypeFor[string]()
+	goBoolType      = reflect.TypeFor[bool]()
+	goUint8Type     = reflect.TypeFor[uint8]()
+	goUint16Type    = reflect.TypeFor[uint16]()
+	goUint32Type    = reflect.TypeFor[uint32]()
+	goUint64Type    = reflect.TypeFor[uint64]()
+	goInt8Type      = reflect.TypeFor[int8]()
+	goInt16Type     = reflect.TypeFor[int16]()
+	goInt32Type     = reflect.TypeFor[int32]()
+	goInt64Type     = reflect.TypeFor[int64]()
+	goBigIntType    = reflect.TypeFor[*big.Int]()
+	gethAddressType = reflect.TypeFor[gethCommon.Address]()
+	goByteSliceType = reflect.TypeFor[[]byte]()
+	evmBytes4Type   = reflect.TypeFor[[stdlib.EVMBytes4Length]byte]()
+	evmBytes32Type  = reflect.TypeFor[[stdlib.EVMBytes32Length]byte]()
+)
+
 func goType(
+	context abiEncodingContext,
 	staticType interpreter.StaticType,
 	evmTypeIDs *evmSpecialTypeIDs,
 ) (reflect.Type, bool) {
 	switch staticType {
 	case interpreter.PrimitiveStaticTypeString:
-		return reflect.TypeOf(""), true
+		return goStringType, true
 	case interpreter.PrimitiveStaticTypeBool:
-		return reflect.TypeOf(true), true
+		return goBoolType, true
 	case interpreter.PrimitiveStaticTypeUInt:
-		return reflect.TypeOf((*big.Int)(nil)), true
+		return goBigIntType, true
 	case interpreter.PrimitiveStaticTypeUInt8:
-		return reflect.TypeOf(uint8(0)), true
+		return goUint8Type, true
 	case interpreter.PrimitiveStaticTypeUInt16:
-		return reflect.TypeOf(uint16(0)), true
+		return goUint16Type, true
 	case interpreter.PrimitiveStaticTypeUInt32:
-		return reflect.TypeOf(uint32(0)), true
+		return goUint32Type, true
 	case interpreter.PrimitiveStaticTypeUInt64:
-		return reflect.TypeOf(uint64(0)), true
+		return goUint64Type, true
 	case interpreter.PrimitiveStaticTypeUInt128:
-		return reflect.TypeOf((*big.Int)(nil)), true
+		return goBigIntType, true
 	case interpreter.PrimitiveStaticTypeUInt256:
-		return reflect.TypeOf((*big.Int)(nil)), true
+		return goBigIntType, true
 	case interpreter.PrimitiveStaticTypeInt:
-		return reflect.TypeOf((*big.Int)(nil)), true
+		return goBigIntType, true
 	case interpreter.PrimitiveStaticTypeInt8:
-		return reflect.TypeOf(int8(0)), true
+		return goInt8Type, true
 	case interpreter.PrimitiveStaticTypeInt16:
-		return reflect.TypeOf(int16(0)), true
+		return goInt16Type, true
 	case interpreter.PrimitiveStaticTypeInt32:
-		return reflect.TypeOf(int32(0)), true
+		return goInt32Type, true
 	case interpreter.PrimitiveStaticTypeInt64:
-		return reflect.TypeOf(int64(0)), true
+		return goInt64Type, true
 	case interpreter.PrimitiveStaticTypeInt128:
-		return reflect.TypeOf((*big.Int)(nil)), true
+		return goBigIntType, true
 	case interpreter.PrimitiveStaticTypeInt256:
-		return reflect.TypeOf((*big.Int)(nil)), true
+		return goBigIntType, true
 	case interpreter.PrimitiveStaticTypeAddress:
-		return reflect.TypeOf((*big.Int)(nil)), true
+		return goBigIntType, true
 	}
 
 	switch staticType := staticType.(type) {
 	case *interpreter.ConstantSizedStaticType:
-		elementType, ok := goType(staticType.ElementType(), evmTypeIDs)
+		elementType, ok := goType(context, staticType.ElementType(), evmTypeIDs)
 		if !ok {
 			break
 		}
@@ -566,7 +586,7 @@ func goType(
 		return reflect.ArrayOf(int(staticType.Size), elementType), true
 
 	case *interpreter.VariableSizedStaticType:
-		elementType, ok := goType(staticType.ElementType(), evmTypeIDs)
+		elementType, ok := goType(context, staticType.ElementType(), evmTypeIDs)
 		if !ok {
 			break
 		}
@@ -576,13 +596,29 @@ func goType(
 
 	switch staticType.ID() {
 	case evmTypeIDs.AddressTypeID:
-		return reflect.TypeOf(gethCommon.Address{}), true
+		return gethAddressType, true
 	case evmTypeIDs.BytesTypeID:
-		return reflect.SliceOf(reflect.TypeOf(byte(0))), true
+		return goByteSliceType, true
 	case evmTypeIDs.Bytes4TypeID:
-		return reflect.ArrayOf(stdlib.EVMBytes4Length, reflect.TypeOf(byte(0))), true
+		return evmBytes4Type, true
 	case evmTypeIDs.Bytes32TypeID:
-		return reflect.ArrayOf(stdlib.EVMBytes32Length, reflect.TypeOf(byte(0))), true
+		return evmBytes32Type, true
+	}
+
+	gethABIType, ok := gethABIType(
+		context,
+		staticType,
+		evmTypeIDs,
+	)
+	// All user-defined Cadence structs, are ABI encoded/decoded as Solidity tuples.
+	// Except for the structs defined in the EVM system contract:
+	// - `EVM.EVMAddress`
+	// - `EVM.EVMBytes`
+	// - `EVM.EVMBytes4`
+	// - `EVM.EVMBytes32`
+	// These have their own ABI encoding/decoding format.
+	if ok && gethABIType.T == gethABI.TupleTy {
+		return gethABIType.TupleType, true
 	}
 
 	return nil, false
@@ -793,7 +829,7 @@ func encodeABI(
 
 		elementStaticType := arrayStaticType.ElementType()
 
-		elementGoType, ok := goType(elementStaticType, evmTypeIDs)
+		elementGoType, ok := goType(context, elementStaticType, evmTypeIDs)
 		if !ok {
 			break
 		}
@@ -810,6 +846,9 @@ func encodeABI(
 			result = reflect.MakeSlice(reflect.SliceOf(elementGoType), size, size)
 		}
 
+		semaType := interpreter.MustConvertStaticToSemaType(elementStaticType, context)
+		isTuple := asTupleEncodableCompositeType(semaType) != nil
+
 		var index int
 		value.Iterate(
 			context,
@@ -825,7 +864,16 @@ func encodeABI(
 					panic(err)
 				}
 
-				result.Index(index).Set(reflect.ValueOf(arrayElement))
+				if isTuple {
+					// For tuples, the underlying `arrayElement` is a value of
+					// type *struct { X,Y,Z fields }, so we need to indirect
+					// the pointer
+					result.Index(index).Set(
+						reflect.Indirect(reflect.ValueOf(arrayElement)),
+					)
+				} else {
+					result.Index(index).Set(reflect.ValueOf(arrayElement))
+				}
 
 				index++
 
@@ -897,7 +945,8 @@ func newInternalEVMTypeDecodeABIFunction(
 				panic(err)
 			}
 
-			var arguments gethABI.Arguments
+			arguments := make(gethABI.Arguments, 0, typesArray.Count())
+			staticTypes := make([]interpreter.StaticType, 0, typesArray.Count())
 			typesArray.Iterate(
 				context,
 				func(element interpreter.Value) (resume bool) {
@@ -926,6 +975,8 @@ func newInternalEVMTypeDecodeABIFunction(
 						},
 					)
 
+					staticTypes = append(staticTypes, staticType)
+
 					// continue iteration
 					return true
 				},
@@ -937,39 +988,22 @@ func newInternalEVMTypeDecodeABIFunction(
 				panic(abiDecodingError{})
 			}
 
-			var index int
 			values := make([]interpreter.Value, 0, len(decodedValues))
 
-			typesArray.Iterate(
-				context,
-				func(element interpreter.Value) (resume bool) {
-					typeValue, ok := element.(interpreter.TypeValue)
-					if !ok {
-						panic(errors.NewUnreachableError())
-					}
+			for i, staticType := range staticTypes {
+				value, err := decodeABI(
+					context,
+					decodedValues[i],
+					staticType,
+					location,
+					evmSpecialTypeIDs,
+				)
+				if err != nil {
+					panic(err)
+				}
 
-					staticType := typeValue.Type
-
-					value, err := decodeABI(
-						context,
-						decodedValues[index],
-						staticType,
-						location,
-						evmSpecialTypeIDs,
-					)
-					if err != nil {
-						panic(err)
-					}
-
-					index++
-
-					values = append(values, value)
-
-					// continue iteration
-					return true
-				},
-				false,
-			)
+				values = append(values, value)
+			}
 
 			arrayType := interpreter.NewVariableSizedStaticType(
 				context,

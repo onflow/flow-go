@@ -467,23 +467,18 @@ func newInternalEVMTypeDryCallFunction(
 			}
 			to := callArgs.to.ToCommon()
 
-			tx := gethTypes.NewTx(&gethTypes.LegacyTx{
+			txData := &gethTypes.LegacyTx{
 				Nonce:    0,
 				To:       &to,
 				Gas:      uint64(callArgs.gasLimit),
 				Data:     callArgs.data,
 				GasPrice: big.NewInt(0),
 				Value:    callArgs.balance,
-			})
-
-			txPayload, err := tx.MarshalBinary()
-			if err != nil {
-				panic(err)
 			}
 
 			// call contract function
 
-			res := handler.DryRun(txPayload, callArgs.from)
+			res := handler.DryRunWithTxData(txData, callArgs.from)
 			return NewResultValue(handler, gauge, context, res)
 		},
 	)

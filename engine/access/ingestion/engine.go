@@ -2,6 +2,7 @@ package ingestion
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/jordanschalm/lockctx"
@@ -73,6 +74,7 @@ type Engine struct {
 	// TODO: There's still a need for this metric to be in the ingestion engine rather than collection syncer.
 	// Maybe it is a good idea to split it up?
 	collectionExecutedMetric module.CollectionExecutedMetric
+	accessMetrics            module.AccessMetrics
 
 	txErrorMessagesCore *tx_error_messages.TxErrorMessagesCore
 }
@@ -92,10 +94,11 @@ func New(
 	blocks storage.Blocks,
 	executionResults storage.ExecutionResults,
 	executionReceipts storage.ExecutionReceipts,
-	finalizedProcessedHeight storage.ConsumerProgressInitializer,
+	finalizedProcessedHeight storage.ConsumerProgress,
 	collectionSyncer *collections.Syncer,
 	collectionIndexer *collections.Indexer,
 	collectionExecutedMetric module.CollectionExecutedMetric,
+	accessMetrics module.AccessMetrics,
 	txErrorMessagesCore *tx_error_messages.TxErrorMessagesCore,
 	registrar hotstuff.FinalizationRegistrar,
 ) (*Engine, error) {
@@ -130,6 +133,7 @@ func New(
 		executionReceipts:        executionReceipts,
 		maxReceiptHeight:         0,
 		collectionExecutedMetric: collectionExecutedMetric,
+		accessMetrics:            accessMetrics,
 		finalizedBlockNotifier:   engine.NewNotifier(),
 
 		// queue / notifier for execution receipts
@@ -146,11 +150,6 @@ func New(
 	// to get a sequential list of finalized blocks.
 	finalizedBlockReader := jobqueue.NewFinalizedBlockReader(state, blocks)
 
-	defaultIndex, err := e.defaultProcessedIndex()
-	if err != nil {
-		return nil, fmt.Errorf("could not read default finalized processed index: %w", err)
-	}
-
 	// create a jobqueue that will process new available finalized block. The `finalizedBlockNotifier` is used to
 	// signal new work, which is being triggered on the `processFinalizedBlockJob` handler.
 	e.finalizedBlockConsumer, err = jobqueue.NewComponentConsumer(
@@ -158,7 +157,6 @@ func New(
 		e.finalizedBlockNotifier.Channel(),
 		finalizedProcessedHeight,
 		finalizedBlockReader,
-		defaultIndex,
 		e.processFinalizedBlockJob,
 		processFinalizedBlocksWorkersCount,
 		searchAhead,
@@ -195,20 +193,6 @@ func New(
 	return e, nil
 }
 
-// defaultProcessedIndex returns the last finalized block height from the protocol state.
-//
-// The finalizedBlockConsumer utilizes this return height to fetch and consume block jobs from
-// jobs queue the first time it initializes.
-//
-// No errors are expected during normal operation.
-func (e *Engine) defaultProcessedIndex() (uint64, error) {
-	final, err := e.state.Final().Head()
-	if err != nil {
-		return 0, fmt.Errorf("could not get finalized height: %w", err)
-	}
-	return final.Height, nil
-}
-
 // runFinalizedBlockConsumer runs the finalizedBlockConsumer component
 func (e *Engine) runFinalizedBlockConsumer(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 	e.finalizedBlockConsumer.Start(ctx)
@@ -230,12 +214,15 @@ func (e *Engine) processFinalizedBlockJob(ctx irrecoverable.SignalerContext, job
 	}
 
 	err = e.processFinalizedBlock(block)
-	if err == nil {
-		done()
+	if err != nil {
+		ctx.Throw(
+			fmt.Errorf(
+				"fatal error when ingestion building col->block index for finalized block (job: %s, height: %v): %w",
+				job.ID(), block.Height, err))
 		return
 	}
 
-	e.log.Error().Err(err).Str("job_id", string(job.ID())).Msg("error during finalized block processing job")
+	done()
 }
 
 // processExecutionReceipts is responsible for processing the execution receipts.
@@ -353,10 +340,10 @@ func (e *Engine) onFinalizedBlock(*model.Block) {
 
 // processFinalizedBlock handles an incoming finalized block.
 // It processes the block, indexes it for further processing, and requests missing collections if necessary.
+// If the block is already indexed (storage.ErrAlreadyExists), it logs a warning and continues processing.
 //
 // Expected errors during normal operation:
 //   - storage.ErrNotFound - if last full block height does not exist in the database.
-//   - storage.ErrAlreadyExists - if the collection within block or an execution result ID already exists in the database.
 //   - generic error in case of unexpected failure from the database layer, or failure
 //     to decode an existing database value.
 func (e *Engine) processFinalizedBlock(block *flow.Block) error {
@@ -386,7 +373,15 @@ func (e *Engine) processFinalizedBlock(block *flow.Block) error {
 		})
 	})
 	if err != nil {
-		return fmt.Errorf("could not index block for collections: %w", err)
+		if !errors.Is(err, storage.ErrAlreadyExists) {
+			return fmt.Errorf("could not index block for collections: %w", err)
+		}
+		// the job queue processed index is updated in a separate db update, so it's possible that the above index
+		// has been built, but the jobqueue index has not been updated yet. In this case, we can safely skip processing.
+		e.log.Warn().
+			Uint64("height", block.Height).
+			Str("block_id", block.ID().String()).
+			Msg("block already indexed, skipping indexing")
 	}
 
 	err = e.collectionSyncer.RequestCollectionsForBlock(block.Height, block.Payload.Guarantees)
@@ -394,6 +389,7 @@ func (e *Engine) processFinalizedBlock(block *flow.Block) error {
 		return fmt.Errorf("could not request collections for block: %w", err)
 	}
 	e.collectionExecutedMetric.BlockFinalized(block)
+	e.accessMetrics.UpdateIngestionFinalizedBlockHeight(block.Height)
 
 	return nil
 }
