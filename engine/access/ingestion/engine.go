@@ -94,7 +94,7 @@ func New(
 	blocks storage.Blocks,
 	executionResults storage.ExecutionResults,
 	executionReceipts storage.ExecutionReceipts,
-	finalizedProcessedHeight storage.ConsumerProgressInitializer,
+	finalizedProcessedHeight storage.ConsumerProgress,
 	collectionSyncer *collections.Syncer,
 	collectionIndexer *collections.Indexer,
 	collectionExecutedMetric module.CollectionExecutedMetric,
@@ -150,11 +150,6 @@ func New(
 	// to get a sequential list of finalized blocks.
 	finalizedBlockReader := jobqueue.NewFinalizedBlockReader(state, blocks)
 
-	defaultIndex, err := e.defaultProcessedIndex()
-	if err != nil {
-		return nil, fmt.Errorf("could not read default finalized processed index: %w", err)
-	}
-
 	// create a jobqueue that will process new available finalized block. The `finalizedBlockNotifier` is used to
 	// signal new work, which is being triggered on the `processFinalizedBlockJob` handler.
 	e.finalizedBlockConsumer, err = jobqueue.NewComponentConsumer(
@@ -162,7 +157,6 @@ func New(
 		e.finalizedBlockNotifier.Channel(),
 		finalizedProcessedHeight,
 		finalizedBlockReader,
-		defaultIndex,
 		e.processFinalizedBlockJob,
 		processFinalizedBlocksWorkersCount,
 		searchAhead,
@@ -197,20 +191,6 @@ func New(
 	registrar.AddOnBlockFinalizedConsumer(e.onFinalizedBlock)
 
 	return e, nil
-}
-
-// defaultProcessedIndex returns the last finalized block height from the protocol state.
-//
-// The finalizedBlockConsumer utilizes this return height to fetch and consume block jobs from
-// jobs queue the first time it initializes.
-//
-// No errors are expected during normal operation.
-func (e *Engine) defaultProcessedIndex() (uint64, error) {
-	final, err := e.state.Final().Head()
-	if err != nil {
-		return 0, fmt.Errorf("could not get finalized height: %w", err)
-	}
-	return final.Height, nil
 }
 
 // runFinalizedBlockConsumer runs the finalizedBlockConsumer component

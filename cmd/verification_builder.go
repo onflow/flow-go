@@ -90,11 +90,11 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 	var (
 		followerState protocol.FollowerState
 
-		chunkStatuses        *stdmap.ChunkStatuses               // used in fetcher engine
-		chunkRequests        *stdmap.ChunkRequests               // used in requester engine
-		processedChunkIndex  storage.ConsumerProgressInitializer // used in chunk consumer
-		processedBlockHeight storage.ConsumerProgressInitializer // used in block consumer
-		chunkQueue           storage.ChunksQueue                 // used in chunk consumer
+		chunkStatuses                   *stdmap.ChunkStatuses               // used in fetcher engine
+		chunkRequests                   *stdmap.ChunkRequests               // used in requester engine
+		processedChunkIndexInitializer  storage.ConsumerProgressInitializer // used in chunk consumer
+		processedBlockHeightInitializer storage.ConsumerProgressInitializer // used in block consumer
+		chunkQueue                      storage.ChunksQueue                 // used in chunk consumer
 
 		syncCore            *chainsync.Core   // used in follower engine
 		assignerEngine      *assigner.Engine  // the assigner engine
@@ -157,11 +157,11 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 			return nil
 		}).
 		Module("processed chunk index consumer progress", func(node *NodeConfig) error {
-			processedChunkIndex = store.NewConsumerProgress(node.ProtocolDB, module.ConsumeProgressVerificationChunkIndex)
+			processedChunkIndexInitializer = store.NewConsumerProgress(node.ProtocolDB, module.ConsumeProgressVerificationChunkIndex)
 			return nil
 		}).
 		Module("processed block height consumer progress", func(node *NodeConfig) error {
-			processedBlockHeight = store.NewConsumerProgress(node.ProtocolDB, module.ConsumeProgressVerificationBlockHeight)
+			processedBlockHeightInitializer = store.NewConsumerProgress(node.ProtocolDB, module.ConsumeProgressVerificationBlockHeight)
 			return nil
 		}).
 		Module("chunks queue", func(node *NodeConfig) error {
@@ -268,6 +268,11 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 				requesterEngine,
 				v.verConf.stopAtHeight)
 
+			processedChunkIndex, err := processedChunkIndexInitializer.Initialize(chunkconsumer.DefaultJobIndex)
+			if err != nil {
+				return nil, fmt.Errorf("could not initialize processed index: %w", err)
+			}
+
 			// requester and fetcher engines are started by chunk consumer
 			chunkConsumer, err = chunkconsumer.NewChunkConsumer(
 				node.Logger,
@@ -311,10 +316,17 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 			return assignerEngine, nil
 		}).
 		Component("block consumer", func(node *NodeConfig) (module.ReadyDoneAware, error) {
-			var initBlockHeight uint64
-			var err error
+			sealedHead, err := node.State.Sealed().Head()
+			if err != nil {
+				return nil, fmt.Errorf("could not get sealed head: %w", err)
+			}
 
-			blockConsumer, initBlockHeight, err = blockconsumer.NewBlockConsumer(
+			processedBlockHeight, err := processedBlockHeightInitializer.Initialize(sealedHead.Height)
+			if err != nil {
+				return nil, fmt.Errorf("could not initialize processed block height index: %w", err)
+			}
+
+			blockConsumer, err = blockconsumer.NewBlockConsumer(
 				node.Logger,
 				collector,
 				processedBlockHeight,
@@ -335,7 +347,7 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 
 			node.Logger.Info().
 				Str("component", "node-builder").
-				Uint64("init_height", initBlockHeight).
+				Uint64("init_height", sealedHead.Height).
 				Msg("block consumer initialized")
 
 			return blockConsumer, nil

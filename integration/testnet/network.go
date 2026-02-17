@@ -15,13 +15,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/onflow/flow-go/follower/database"
-	"github.com/onflow/flow-go/state/protocol/datastore"
-	"github.com/onflow/flow-go/state/protocol/protocol_state"
-	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
-
-	"github.com/dapperlabs/testingdock"
-	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	dockerclient "github.com/docker/docker/client"
 	io_prometheus_client "github.com/prometheus/client_model/go"
@@ -31,13 +24,14 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/cadence"
-
 	"github.com/onflow/flow-go-sdk/crypto"
+	"github.com/onflow/testingdock"
 
 	"github.com/onflow/flow-go/cmd/bootstrap/dkg"
 	"github.com/onflow/flow-go/cmd/bootstrap/run"
 	"github.com/onflow/flow-go/cmd/bootstrap/utils"
 	consensus_follower "github.com/onflow/flow-go/follower"
+	"github.com/onflow/flow-go/follower/database"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/insecure/cmd"
 	"github.com/onflow/flow-go/model/bootstrap"
@@ -52,9 +46,12 @@ import (
 	"github.com/onflow/flow-go/network/p2p/keyutils"
 	"github.com/onflow/flow-go/network/p2p/translator"
 	clusterstate "github.com/onflow/flow-go/state/cluster"
+	"github.com/onflow/flow-go/state/protocol/datastore"
 	"github.com/onflow/flow-go/state/protocol/inmem"
+	"github.com/onflow/flow-go/state/protocol/protocol_state"
 	"github.com/onflow/flow-go/state/protocol/protocol_state/kvstore"
 	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
 	"github.com/onflow/flow-go/utils/io"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -159,6 +156,19 @@ type FlowNetwork struct {
 	BootstrapDir      string
 	BootstrapSnapshot *inmem.Snapshot
 	BootstrapData     *BootstrapData
+
+	// deferredFollowerConfigs holds consensus follower configurations that must be
+	// initialized after the network starts. Initialization is deferred because the
+	// follower setup requires resolving Docker-allocated host ports, which are only
+	// available after containers are running.
+	deferredFollowerConfigs []deferredFollowerConfig
+}
+
+// deferredFollowerConfig stores the data needed to initialize a consensus follower
+// after the network has started and container ports are available.
+type deferredFollowerConfig struct {
+	rootProtocolSnapshotPath string
+	followerConf             ConsensusFollowerConfig
 }
 
 // CorruptedIdentities returns the identities of corrupted nodes in testnet (for BFT testing).
@@ -228,7 +238,7 @@ func (net *FlowNetwork) Start(ctx context.Context) {
 	cli, err := dockerclient.NewClientWithOpts(dockerclient.FromEnv, dockerclient.WithAPIVersionNegotiation())
 	require.NoError(net.t, err)
 
-	containers, err := cli.ContainerList(ctx, types.ContainerListOptions{})
+	containers, err := cli.ContainerList(ctx, container.ListOptions{})
 	require.NoError(net.t, err)
 
 	t := net.t
@@ -241,7 +251,22 @@ func (net *FlowNetwork) Start(ctx context.Context) {
 	t.Log("starting flow network")
 	net.suite.Start(ctx)
 
-	containers, err = cli.ContainerList(ctx, types.ContainerListOptions{})
+	// populate corrupted port mapping after containers have started and Docker has
+	// auto-allocated the host ports
+	for _, c := range net.Containers {
+		if c.Config.Corrupted {
+			net.CorruptedPortMapping[c.Config.NodeID] = c.Port(cmd.CorruptNetworkPort)
+		}
+	}
+
+	// initialize consensus followers now that containers are running and host ports
+	// can be resolved
+	for _, dc := range net.deferredFollowerConfigs {
+		net.addConsensusFollower(t, dc.rootProtocolSnapshotPath, dc.followerConf)
+	}
+	net.deferredFollowerConfigs = nil
+
+	containers, err = cli.ContainerList(ctx, container.ListOptions{})
 	require.NoError(net.t, err)
 
 	t.Logf("%v (%v) after starting flow network, found %d docker containers", time.Now().UTC(), t.Name(), len(containers))
@@ -656,10 +681,14 @@ func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig, chainID flow.Ch
 
 	rootProtocolSnapshotPath := filepath.Join(bootstrapDir, bootstrap.PathRootProtocolStateSnapshot)
 
-	// add each follower to the network
+	// defer consensus follower initialization until Start(), because followers need
+	// to resolve Docker-allocated host ports which are only available after containers start.
 	for _, followerConf := range networkConf.ConsensusFollowers {
 		t.Logf("add consensus follower %v", followerConf.NodeID)
-		flowNetwork.addConsensusFollower(t, rootProtocolSnapshotPath, followerConf, confs)
+		flowNetwork.deferredFollowerConfigs = append(flowNetwork.deferredFollowerConfigs, deferredFollowerConfig{
+			rootProtocolSnapshotPath: rootProtocolSnapshotPath,
+			followerConf:             followerConf,
+		})
 	}
 
 	t.Logf("%v finish preparing flow network for %v", time.Now().UTC(), t.Name())
@@ -667,7 +696,7 @@ func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig, chainID flow.Ch
 	return flowNetwork
 }
 
-func (net *FlowNetwork) addConsensusFollower(t *testing.T, rootProtocolSnapshotPath string, followerConf ConsensusFollowerConfig, _ []ContainerConfig) {
+func (net *FlowNetwork) addConsensusFollower(t *testing.T, rootProtocolSnapshotPath string, followerConf ConsensusFollowerConfig) {
 	tmpdir := makeTempSubDir(t, net.baseTempdir, "flow-consensus-follower")
 
 	// create a directory for the follower database
@@ -801,20 +830,20 @@ func (net *FlowNetwork) AddObserver(t *testing.T, conf ObserverConfig) *Containe
 		opts:    &containerOpts,
 	}
 
-	nodeContainer.exposePort(GRPCPort, testingdock.RandomPort(t))
+	nodeContainer.exposePort(GRPCPort, "")
 	nodeContainer.AddFlag("rpc-addr", nodeContainer.ContainerAddr(GRPCPort))
 	nodeContainer.AddFlag("state-stream-addr", nodeContainer.ContainerAddr(GRPCPort))
 
-	nodeContainer.exposePort(GRPCSecurePort, testingdock.RandomPort(t))
+	nodeContainer.exposePort(GRPCSecurePort, "")
 	nodeContainer.AddFlag("secure-rpc-addr", nodeContainer.ContainerAddr(GRPCSecurePort))
 
-	nodeContainer.exposePort(GRPCWebPort, testingdock.RandomPort(t))
+	nodeContainer.exposePort(GRPCWebPort, "")
 	nodeContainer.AddFlag("http-addr", nodeContainer.ContainerAddr(GRPCWebPort))
 
-	nodeContainer.exposePort(AdminPort, testingdock.RandomPort(t))
+	nodeContainer.exposePort(AdminPort, "")
 	nodeContainer.AddFlag("admin-addr", nodeContainer.ContainerAddr(AdminPort))
 
-	nodeContainer.exposePort(RESTPort, testingdock.RandomPort(t))
+	nodeContainer.exposePort(RESTPort, "")
 	nodeContainer.AddFlag("rest-addr", nodeContainer.ContainerAddr(RESTPort))
 
 	nodeContainer.opts.HealthCheck = testingdock.HealthCheckCustom(nodeContainer.HealthcheckCallback())
@@ -894,7 +923,7 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 	if !nodeConf.Ghost {
 		switch nodeConf.Role {
 		case flow.RoleCollection:
-			nodeContainer.exposePort(GRPCPort, testingdock.RandomPort(t))
+			nodeContainer.exposePort(GRPCPort, "")
 			nodeContainer.AddFlag("ingress-addr", nodeContainer.ContainerAddr(GRPCPort))
 
 			// set a low timeout so that all nodes agree on the current view more quickly
@@ -903,7 +932,7 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 			t.Logf("%v hotstuff startup time will be in 8 seconds: %v", time.Now().UTC(), hotstuffStartupTime)
 
 		case flow.RoleExecution:
-			nodeContainer.exposePort(GRPCPort, testingdock.RandomPort(t))
+			nodeContainer.exposePort(GRPCPort, "")
 			nodeContainer.AddFlag("rpc-addr", nodeContainer.ContainerAddr(GRPCPort))
 
 			nodeContainer.AddFlag("triedir", DefaultExecutionRootDir)
@@ -912,17 +941,17 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 			nodeContainer.AddFlag("register-dir", DefaultRegisterDir)
 
 		case flow.RoleAccess:
-			nodeContainer.exposePort(GRPCPort, testingdock.RandomPort(t))
+			nodeContainer.exposePort(GRPCPort, "")
 			nodeContainer.AddFlag("rpc-addr", nodeContainer.ContainerAddr(GRPCPort))
 			nodeContainer.AddFlag("state-stream-addr", nodeContainer.ContainerAddr(GRPCPort))
 
-			nodeContainer.exposePort(GRPCSecurePort, testingdock.RandomPort(t))
+			nodeContainer.exposePort(GRPCSecurePort, "")
 			nodeContainer.AddFlag("secure-rpc-addr", nodeContainer.ContainerAddr(GRPCSecurePort))
 
-			nodeContainer.exposePort(GRPCWebPort, testingdock.RandomPort(t))
+			nodeContainer.exposePort(GRPCWebPort, "")
 			nodeContainer.AddFlag("http-addr", nodeContainer.ContainerAddr(GRPCWebPort))
 
-			nodeContainer.exposePort(RESTPort, testingdock.RandomPort(t))
+			nodeContainer.exposePort(RESTPort, "")
 			nodeContainer.AddFlag("rest-addr", nodeContainer.ContainerAddr(RESTPort))
 
 			// uncomment line below to point the access node exclusively to a single collection node
@@ -930,7 +959,7 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 			nodeContainer.AddFlag("collection-ingress-port", GRPCPort)
 
 			if nodeContainer.IsFlagSet("supports-observer") {
-				nodeContainer.exposePort(PublicNetworkPort, testingdock.RandomPort(t))
+				nodeContainer.exposePort(PublicNetworkPort, "")
 				nodeContainer.AddFlag("public-network-address", nodeContainer.ContainerAddr(PublicNetworkPort))
 			}
 
@@ -960,17 +989,17 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 		}
 
 		// enable Admin server for all real nodes
-		nodeContainer.exposePort(AdminPort, testingdock.RandomPort(t))
+		nodeContainer.exposePort(AdminPort, "")
 		nodeContainer.AddFlag("admin-addr", nodeContainer.ContainerAddr(AdminPort))
 
 		// enable healthchecks for all nodes (via admin server)
 		nodeContainer.opts.HealthCheck = testingdock.HealthCheckCustom(nodeContainer.HealthcheckCallback())
 
 		if nodeConf.EnableMetricsServer {
-			nodeContainer.exposePort(MetricsPort, testingdock.RandomPort(t))
+			nodeContainer.exposePort(MetricsPort, "")
 		}
 	} else {
-		nodeContainer.exposePort(GRPCPort, testingdock.RandomPort(t))
+		nodeContainer.exposePort(GRPCPort, "")
 		nodeContainer.AddFlag("rpc-addr", nodeContainer.ContainerAddr(GRPCPort))
 
 		if nodeContainer.IsFlagSet("supports-observer") {
@@ -990,9 +1019,8 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 	if nodeConf.Corrupted {
 		// corrupted nodes are running with a Corrupted Conduit Factory (CCF), hence need to bind their
 		// CCF port to local host, so they can be accessible by the orchestrator network.
-		hostPort := testingdock.RandomPort(t)
-		nodeContainer.exposePort(cmd.CorruptNetworkPort, hostPort)
-		net.CorruptedPortMapping[nodeConf.NodeID] = hostPort
+		// The host port is auto-allocated by Docker and resolved after the network starts.
+		nodeContainer.exposePort(cmd.CorruptNetworkPort, "")
 	}
 
 	suiteContainer := net.suite.Container(*opts)
