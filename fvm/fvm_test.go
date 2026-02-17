@@ -11,9 +11,14 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/onflow/atree"
 	"github.com/stretchr/testify/assert"
 	mockery "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+
+	"github.com/onflow/flow-go/cmd/util/ledger/util/registers"
+
+	"github.com/onflow/flow-go/cmd/util/ledger/util"
 
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/common"
@@ -4401,4 +4406,367 @@ func TestTransactionIndexCall(t *testing.T) {
 				},
 			),
 	)
+}
+
+// TODO: cleanup duplicate code
+type executionSnapshotLedgers struct {
+	snapshot.StorageSnapshot
+	*snapshot.ExecutionSnapshot
+}
+
+type executionSnapshotLedgersOld struct {
+	executionSnapshotLedgers
+}
+
+func (o executionSnapshotLedgersOld) Get(owner string, key string) ([]byte, error) {
+	return o.GetValue([]byte(owner), []byte(key))
+}
+
+func (o executionSnapshotLedgersOld) Set(owner string, key string, value []byte) error {
+	return o.SetValue([]byte(owner), []byte(key), value)
+}
+
+func (o executionSnapshotLedgersOld) ForEach(f registers.ForEachCallback) error {
+	for key, _ := range o.ExecutionSnapshot.ReadSet {
+		id := flow.NewRegisterID(flow.BytesToAddress([]byte(key.Owner)), key.Key)
+
+		v, err := o.StorageSnapshot.Get(id)
+		if err != nil {
+			return err
+		}
+
+		err = f(key.Owner, key.Key, v)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (o executionSnapshotLedgersOld) Count() int {
+	return len(o.ExecutionSnapshot.ReadSet)
+}
+
+func (n executionSnapshotLedgersNew) Get(owner string, key string) ([]byte, error) {
+	return n.GetValue([]byte(owner), []byte(key))
+}
+
+func (n executionSnapshotLedgersNew) Set(owner string, key string, value []byte) error {
+	return n.SetValue([]byte(owner), []byte(key), value)
+}
+
+func (n executionSnapshotLedgersNew) ForEach(f registers.ForEachCallback) error {
+	for key, _ := range n.fullSet() {
+		v, err := n.GetValue([]byte(key.Owner), []byte(key.Key))
+		if err != nil {
+			return err
+		}
+
+		err = f(key.Owner, key.Key, v)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (n executionSnapshotLedgersNew) Count() int {
+	return len(n.fullSet())
+}
+
+func (n executionSnapshotLedgersNew) fullSet() map[flow.RegisterID]struct{} {
+	fullSet := make(map[flow.RegisterID]struct{})
+	for key, _ := range n.ExecutionSnapshot.ReadSet {
+		fullSet[flow.NewRegisterID(flow.BytesToAddress([]byte(key.Owner)), key.Key)] = struct{}{}
+	}
+	for key, _ := range n.ExecutionSnapshot.WriteSet {
+		fullSet[flow.NewRegisterID(flow.BytesToAddress([]byte(key.Owner)), key.Key)] = struct{}{}
+	}
+	return fullSet
+}
+
+type executionSnapshotLedgersNew struct {
+	executionSnapshotLedgers
+}
+
+func (l executionSnapshotLedgers) OldValuesLedger() executionSnapshotLedgersOld {
+	return executionSnapshotLedgersOld{l}
+}
+
+func (l executionSnapshotLedgers) NewValuesLedger() executionSnapshotLedgersNew {
+	return executionSnapshotLedgersNew{l}
+}
+
+var _ registers.Registers = &executionSnapshotLedgersOld{}
+
+func (o executionSnapshotLedgersOld) GetValue(owner, key []byte) (value []byte, err error) {
+	id := flow.NewRegisterID(flow.BytesToAddress(owner), string(key))
+	_, ok := o.ExecutionSnapshot.ReadSet[id]
+	if !ok {
+		return nil, nil
+	}
+
+	v, err := o.StorageSnapshot.Get(id)
+	return v, err
+}
+
+func (o executionSnapshotLedgersOld) ValueExists(owner, key []byte) (exists bool, err error) {
+	v, err := o.GetValue(owner, key)
+	return len(v) > 0, err
+}
+
+func (n executionSnapshotLedgersNew) GetValue(owner, key []byte) (value []byte, err error) {
+	id := flow.NewRegisterID(flow.BytesToAddress(owner), string(key))
+
+	v, ok := n.ExecutionSnapshot.WriteSet[id]
+
+	if ok {
+		return v, nil
+	}
+
+	_, ok = n.ExecutionSnapshot.ReadSet[id]
+	if !ok {
+		return nil, nil
+	}
+
+	v, err = n.StorageSnapshot.Get(id)
+	return v, err
+}
+
+func (n executionSnapshotLedgersNew) ValueExists(owner, key []byte) (exists bool, err error) {
+	v, err := n.GetValue(owner, key)
+	return len(v) > 0, err
+}
+
+func (l executionSnapshotLedgers) SetValue(owner, key, value []byte) (err error) {
+	panic("unexpected call of SetValue")
+}
+
+func (l executionSnapshotLedgers) AllocateSlabIndex(owner []byte) (atree.SlabIndex, error) {
+	panic("unexpected call of AllocateSlabIndex")
+}
+
+type readonlyStorageRuntime struct {
+	Interpreter  *interpreter.Interpreter
+	Storage      *runtime.Storage
+	PayloadCount int
+}
+
+func newReadonlyStorageRuntimeWithStorage(storage *runtime.Storage, payloadCount int) (*readonlyStorageRuntime, error) {
+	inter, err := interpreter.NewInterpreter(
+		nil,
+		nil,
+		&interpreter.Config{
+			Storage: storage,
+		},
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	return &readonlyStorageRuntime{
+		Interpreter:  inter,
+		Storage:      storage,
+		PayloadCount: payloadCount,
+	}, nil
+}
+
+func getStorageMapKeys(storageMap *interpreter.DomainStorageMap) []any {
+	keys := make([]any, 0, storageMap.Count())
+
+	iter := storageMap.Iterator()
+	for {
+		key := iter.NextKey(nil)
+		if key == nil {
+			break
+		}
+		keys = append(keys, key)
+	}
+
+	return keys
+}
+
+type SearchToken struct {
+	ID         string
+	getBalance func(value *interpreter.CompositeValue) uint64
+}
+
+// TestFlowTokenTransferTracking proof of concept to track all fungible token transfers in a transaction
+func TestFlowTokenTransferTracking(t *testing.T) {
+	t.Parallel()
+
+	tokens := map[string]SearchToken{
+		"A.7e60df042a9c0868.FlowToken.Vault": {
+			ID: "A.7e60df042a9c0868.FlowToken.Vault",
+			getBalance: func(value *interpreter.CompositeValue) uint64 {
+				return uint64(value.GetField(nil, "balance").(interpreter.UFix64Value).UFix64Value)
+			},
+		},
+	}
+
+	visitor := interpreter.EmptyVisitor{
+		CompositeValueVisitor: func(context interpreter.ValueVisitContext, value *interpreter.CompositeValue) bool {
+			fmt.Println(value.TypeID())
+			t, ok := tokens[string(value.TypeID())]
+			if !ok {
+				// descend
+				return true
+			}
+			fmt.Printf("Id: %s, balance: %d \n", t.ID, t.getBalance(value))
+			return false
+		},
+	}
+
+	getTokenDiff := func(t *testing.T, currentValues snapshot.StorageSnapshot, diff *snapshot.ExecutionSnapshot, address flow.Address) {
+		executionSnapshotLedgers := executionSnapshotLedgers{currentValues, diff}
+
+		oldRegistersLedger := executionSnapshotLedgers.OldValuesLedger()
+		newValuesRegister := executionSnapshotLedgers.NewValuesLedger()
+		oldStorage := runtime.NewStorage(oldRegistersLedger, nil, nil, runtime.StorageConfig{})
+		newStorage := runtime.NewStorage(newValuesRegister, nil, nil, runtime.StorageConfig{})
+
+		err := util.LoadAtreeSlabsInStorage(oldStorage, oldRegistersLedger, 1)
+		require.NoError(t, err)
+		err = util.LoadAtreeSlabsInStorage(newStorage, newValuesRegister, 1)
+		require.NoError(t, err)
+
+		oldRuntime, err := newReadonlyStorageRuntimeWithStorage(oldStorage, oldStorage.Count())
+		require.NoError(t, err)
+		newRuntime, err := newReadonlyStorageRuntimeWithStorage(newStorage, newStorage.Count())
+		require.NoError(t, err)
+
+		oldStorageMap := oldRuntime.Storage.GetDomainStorageMap(oldRuntime.Interpreter, common.Address(address), common.StorageDomainPathStorage, false)
+		newStorageMap := newRuntime.Storage.GetDomainStorageMap(newRuntime.Interpreter, common.Address(address), common.StorageDomainPathStorage, false)
+
+		oldKeys := getStorageMapKeys(oldStorageMap)
+		newKeys := getStorageMapKeys(newStorageMap)
+
+		require.Len(t, oldKeys, 1)
+		require.Len(t, newKeys, 1)
+		require.Equal(t, oldKeys[0], newKeys[0])
+
+		getValues := func(key any) (interpreter.Value, interpreter.Value, *util.Trace, bool) {
+
+			trace := util.NewTrace(fmt.Sprintf("%s[%v]", common.StorageDomainPathStorage.Identifier(), key))
+
+			var mapKey interpreter.StorageMapKey
+
+			switch key := key.(type) {
+			case interpreter.StringAtreeValue:
+				mapKey = interpreter.StringStorageMapKey(key)
+
+			case interpreter.Uint64AtreeValue:
+				mapKey = interpreter.Uint64StorageMapKey(key)
+
+			case interpreter.StringStorageMapKey:
+				mapKey = key
+
+			case interpreter.Uint64StorageMapKey:
+				mapKey = key
+
+			default:
+				panic("TODO")
+				return nil, nil, nil, false
+			}
+
+			oldValue := oldStorageMap.ReadValue(nil, mapKey)
+
+			newValue := newStorageMap.ReadValue(nil, mapKey)
+
+			return oldValue, newValue, trace, true
+		}
+
+		oldValue, newValue, _, _ := getValues(oldKeys[0])
+
+		oldValue.Accept(nil, visitor)
+		newValue.Accept(nil, visitor)
+	}
+
+	testFN := func(
+		t *testing.T,
+		vm fvm.VM,
+		chain flow.Chain,
+		ctx fvm.Context,
+		snapshotTree snapshot.SnapshotTree,
+	) {
+		t.Run("in transactions",
+			newVMTest().
+				withBootstrapProcedureOptions(
+					fvm.WithTransactionFee(fvm.DefaultTransactionFees),
+					fvm.WithStorageMBPerFLOW(fvm.DefaultStorageMBPerFLOW),
+					fvm.WithMinimumStorageReservation(fvm.DefaultMinimumStorageReservation),
+					fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
+					fvm.WithExecutionMemoryLimit(math.MaxUint64),
+					fvm.WithExecutionEffortWeights(environment.MainnetExecutionEffortWeights),
+					fvm.WithExecutionMemoryWeights(meter.DefaultMemoryWeights),
+				).
+				withContextOptions(
+					fvm.WithTransactionFeesEnabled(true),
+					fvm.WithAccountStorageLimit(true),
+				).
+				run(
+					func(
+						t *testing.T,
+						vm fvm.VM,
+						chain flow.Chain,
+						ctx fvm.Context,
+						snapshotTree snapshot.SnapshotTree,
+					) {
+						t.Parallel()
+						sc := systemcontracts.SystemContractsForChain(chain.ChainID())
+
+						env := sc.AsTemplateEnv()
+
+						// Create an account private key.
+						privateKey, err := testutil.GenerateAccountPrivateKey()
+						require.NoError(t, err)
+
+						// Create accounts with the provided private
+						// key and the root account.
+						snapshotTree, accounts, err := testutil.CreateAccounts(
+							vm,
+							snapshotTree,
+							[]flow.AccountPrivateKey{privateKey},
+							chain)
+						require.NoError(t, err)
+
+						txBodyBuilder := blueprints.TransferFlowTokenTransaction(env, chain.ServiceAddress(), accounts[0], "2.0")
+
+						err = testutil.SignTransactionAsServiceAccount(txBodyBuilder, 0, chain)
+						require.NoError(t, err)
+
+						txBody, err := txBodyBuilder.Build()
+						require.NoError(t, err)
+
+						executionSnapshot, output, err := vm.Run(
+							ctx,
+							fvm.Transaction(txBody, 0),
+							snapshotTree)
+
+						require.NoError(t, err)
+						require.NoError(t, output.Err)
+
+						getTokenDiff(t, snapshotTree, executionSnapshot, accounts[0])
+					},
+				),
+		)
+	}
+
+	t.Run("in scripts",
+		newVMTest().
+			run(testFN),
+	)
+}
+
+// BalanceTrackerOutput
+// Output per transaction
+// TODO: fix types
+type BalanceTrackerOutput struct {
+	TransactionID  string
+	AccountChanges map[flow.Address]AccountChange
+}
+
+type AccountChange struct {
+	Address flow.Address
+	Tokens  map[string]int64
 }
