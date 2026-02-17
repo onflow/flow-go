@@ -4,7 +4,7 @@
 // and resource-heavy, we split them into several cohorts, which can be run in parallel.
 //
 // If a new cohort is added in the future, it must be added to:
-//   - ci.yml, flaky-test-monitor.yml, bors.toml (ensure new cohort of tests is run)
+//   - ci.yml, flaky-test-monitor.yml (ensure new cohort of tests is run)
 //   - Makefile (include new cohort in integration-test directive, etc.)
 package epochs
 

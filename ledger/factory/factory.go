@@ -56,10 +56,6 @@ func newRemoteLedger(config Config) (ledger.Ledger, error) {
 		config.LedgerMaxRequestSize,
 		config.LedgerMaxResponseSize,
 	)
-	// TODO(leo): handle ping/retry logic for remote ledger client
-	// TODO(leo): add admin tool to trigger checkpointing
-	// TODO(leo): when both storehouse is enabled, it should not be in the remote ledger,
-	//            but in the local ledger service. the remote ledger will only be used for generating proof
 
 	ledgerStorage, err := factory.NewLedger()
 	if err != nil {
