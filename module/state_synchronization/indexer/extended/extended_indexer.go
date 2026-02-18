@@ -133,7 +133,7 @@ func (c *ExtendedIndexer) IndexBlockExecutionData(
 		return fmt.Errorf("failed to get block by id: %w", err)
 	}
 
-	txs, events, err := c.extractDataFromExecutionData(header.Height, data)
+	txs, events, err := c.extractDataFromExecutionData(data)
 	if err != nil {
 		return fmt.Errorf("failed to extract data from execution data: %w", err)
 	}
@@ -379,7 +379,7 @@ func (c *ExtendedIndexer) blockDataFromStorage(_ context.Context, height uint64,
 // extractDataFromExecutionData extracts the transaction and event data from the execution data.
 //
 // No error returns are expected during normal operation.
-func (c *ExtendedIndexer) extractDataFromExecutionData(height uint64, data *execution_data.BlockExecutionDataEntity) ([]*flow.TransactionBody, []flow.Event, error) {
+func (c *ExtendedIndexer) extractDataFromExecutionData(data *execution_data.BlockExecutionDataEntity) ([]*flow.TransactionBody, []flow.Event, error) {
 	txs := make([]*flow.TransactionBody, 0)
 	events := make([]flow.Event, 0)
 	for i, chunk := range data.ChunkExecutionDatas {
