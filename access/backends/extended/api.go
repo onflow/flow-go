@@ -9,7 +9,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// API defines the extended access API for querying account transaction history.
+// API defines the extended access API for querying account transaction and transfer history.
 type API interface {
 	// GetAccountTransactions returns a paginated list of transactions for the given account address.
 	// Results are ordered descending by block height (newest first).
@@ -29,4 +29,44 @@ type API interface {
 		expandResults bool,
 		encodingVersion entities.EventEncodingVersion,
 	) (*accessmodel.AccountTransactionsPage, error)
+
+	// GetAccountFungibleTokenTransfers returns a paginated list of fungible token transfers for
+	// the given account address. Results are ordered descending by block height (newest first).
+	//
+	// If the account has no transfers, the response will include an empty array and no error.
+	//
+	// Expected error returns during normal operations:
+	//   - [codes.FailedPrecondition] if the fungible token transfer index has not been initialized
+	//   - [codes.OutOfRange] if the cursor references a height outside the indexed range
+	//   - [codes.InvalidArgument] if the query parameters are invalid
+	//   - [codes.Internal] if there is an unexpected error
+	GetAccountFungibleTokenTransfers(
+		ctx context.Context,
+		address flow.Address,
+		limit uint32,
+		cursor *accessmodel.TransferCursor,
+		filter AccountFTTransferFilter,
+		expandResults bool,
+		encodingVersion entities.EventEncodingVersion,
+	) (*accessmodel.FungibleTokenTransfersPage, error)
+
+	// GetAccountNonFungibleTokenTransfers returns a paginated list of non-fungible token transfers
+	// for the given account address. Results are ordered descending by block height (newest first).
+	//
+	// If the account has no transfers, the response will include an empty array and no error.
+	//
+	// Expected error returns during normal operations:
+	//   - [codes.FailedPrecondition] if the non-fungible token transfer index has not been initialized
+	//   - [codes.OutOfRange] if the cursor references a height outside the indexed range
+	//   - [codes.InvalidArgument] if the query parameters are invalid
+	//   - [codes.Internal] if there is an unexpected error
+	GetAccountNonFungibleTokenTransfers(
+		ctx context.Context,
+		address flow.Address,
+		limit uint32,
+		cursor *accessmodel.TransferCursor,
+		filter AccountNFTTransferFilter,
+		expandResults bool,
+		encodingVersion entities.EventEncodingVersion,
+	) (*accessmodel.NonFungibleTokenTransfersPage, error)
 }

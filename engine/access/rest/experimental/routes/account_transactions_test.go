@@ -1,4 +1,4 @@
-package experimental_test
+package routes_test
 
 import (
 	"encoding/base64"
@@ -99,13 +99,15 @@ func TestGetAccountTransactions(t *testing.T) {
 					"block_height": "1000",
 					"transaction_id": "%s",
 					"transaction_index": "3",
-					"roles": ["authorizer"]
+					"roles": ["authorizer"],
+					"_expandable": {"transaction": "transaction", "result": "result"}
 				},
 				{
 					"block_height": "999",
 					"transaction_id": "%s",
 					"transaction_index": "0",
-					"roles": ["interacted"]
+					"roles": ["interacted"],
+					"_expandable": {"transaction": "transaction", "result": "result"}
 				}
 			],
 			"next_cursor": "%s"
@@ -154,7 +156,8 @@ func TestGetAccountTransactions(t *testing.T) {
 					"block_height": "500",
 					"transaction_id": "%s",
 					"transaction_index": "1",
-					"roles": ["authorizer"]
+					"roles": ["authorizer"],
+					"_expandable": {"transaction": "transaction", "result": "result"}
 				}
 			]
 		}`, txID1.String())
@@ -269,8 +272,8 @@ func TestGetAccountTransactions(t *testing.T) {
 
 		rr := router.ExecuteExperimentalRequest(req, backend)
 
-		assert.Equal(t, http.StatusServiceUnavailable, rr.Code)
-		assert.Contains(t, rr.Body.String(), "Service not ready")
+		assert.Equal(t, http.StatusNotFound, rr.Code)
+		assert.Contains(t, rr.Body.String(), "Precondition failed")
 	})
 
 	t.Run("invalid limit", func(t *testing.T) {

@@ -43,7 +43,7 @@ func NewAccountTransactionsBootstrapper(db storage.DB, initialStartHeight uint64
 	return &AccountTransactionsBootstrapper{
 		db:                 db,
 		initialStartHeight: initialStartHeight,
-		store:              atomic.NewPointer[AccountTransactions](store),
+		store:              atomic.NewPointer(store),
 	}, nil
 }
 

@@ -2177,6 +2177,8 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 				extendedbackend.DefaultConfig(),
 				node.RootChainID,
 				builder.ExtendedStorage.AccountTransactionsBootstrapper,
+				builder.ExtendedStorage.FungibleTokenTransfersBootstrapper,
+				builder.ExtendedStorage.NonFungibleTokenTransfersBootstrapper,
 				utils.NotNil(node.State),
 				utils.NotNil(node.Storage.Blocks),
 				utils.NotNil(node.Storage.Headers),

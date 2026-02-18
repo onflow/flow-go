@@ -8,7 +8,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/index"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/error_messages"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/provider"
-	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/status"
+	txstatus "github.com/onflow/flow-go/engine/access/rpc/backend/transactions/status"
 	"github.com/onflow/flow-go/model/access/systemcollection"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol"
@@ -29,9 +29,10 @@ func DefaultConfig() Config {
 	}
 }
 
-// Backend implements the extended API for querying account transactions.
+// Backend implements the extended API for querying account transactions and token transfers.
 type Backend struct {
 	*AccountTransactionsBackend
+	*AccountTransfersBackend
 
 	log zerolog.Logger
 }
@@ -44,6 +45,8 @@ func New(
 	config Config,
 	chainID flow.ChainID,
 	store storage.AccountTransactionsReader,
+	ftStore storage.FungibleTokenTransfersBootstrapper,
+	nftStore storage.NonFungibleTokenTransfersBootstrapper,
 	state protocol.State,
 	blocks storage.Blocks,
 	headers storage.Headers,
@@ -53,7 +56,7 @@ func New(
 	collections storage.CollectionsReader,
 	transactions storage.TransactionsReader,
 	scheduledTransactions storage.ScheduledTransactionsReader,
-	txStatusDeriver *status.TxStatusDeriver,
+	txStatusDeriver *txstatus.TxStatusDeriver,
 ) (*Backend, error) {
 	log = log.With().Str("component", "extended_backend").Logger()
 
@@ -74,19 +77,19 @@ func New(
 		chainID,
 	)
 
+	base := &backendBase{
+		config:                config,
+		headers:               headers,
+		collections:           collections,
+		transactions:          transactions,
+		scheduledTransactions: scheduledTransactions,
+		systemCollections:     systemCollections,
+		transactionsProvider:  transactionsProvider,
+	}
+
 	return &Backend{
-		log: log,
-		AccountTransactionsBackend: NewAccountTransactionsBackend(
-			log,
-			config,
-			chainID,
-			store,
-			headers,
-			collections,
-			transactions,
-			scheduledTransactions,
-			systemCollections,
-			transactionsProvider,
-		),
+		log:                        log,
+		AccountTransactionsBackend: NewAccountTransactionsBackend(log, base, store),
+		AccountTransfersBackend:    NewAccountTransfersBackend(log, base, ftStore, nftStore),
 	}, nil
 }
