@@ -1085,7 +1085,9 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				return builder.ExecutionIndexer, nil
 			}, builder.IndexerDependencies)
 
-		if builder.extendedIndexingEnabled {
+		if !builder.extendedIndexingEnabled {
+			extendedIndexerDependable.Init(&module.NoopReadyDoneAware{})
+		} else {
 			builder.DependableComponent("extended indexer", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 				accountTransactions, err := extended.NewAccountTransactions(
 					node.Logger,
@@ -1115,7 +1117,9 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 					builder.ExtendedStorage.DB,
 					utils.NotNil(builder.StorageLockMgr),
 					utils.NotNil(builder.State),
-					utils.NotNil(builder.Storage.Blocks),
+					utils.NotNil(builder.Storage.Index),
+					utils.NotNil(builder.Storage.Headers),
+					utils.NotNil(builder.Storage.Guarantees),
 					utils.NotNil(builder.Storage.Collections),
 					utils.NotNil(builder.events),
 					utils.NotNil(builder.lightTransactionResults),

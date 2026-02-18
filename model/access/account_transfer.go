@@ -18,6 +18,7 @@ const (
 type FungibleTokenTransfer struct {
 	TransactionID    flow.Identifier // Transaction that produced the transfer event
 	BlockHeight      uint64          // Block height where the transaction was included
+	BlockTimestamp   uint64          // Block timestamp where the transaction was included
 	TransactionIndex uint32          // Index of the transaction within the block
 	EventIndices     []uint32        // Index of the event within the transaction
 	TokenType        string          // Fully qualified token type identifier (e.g., "A.0x1654653399040a61.FlowToken")
@@ -35,6 +36,7 @@ type FungibleTokenTransfer struct {
 type NonFungibleTokenTransfer struct {
 	TransactionID    flow.Identifier // Transaction that produced the transfer event
 	BlockHeight      uint64          // Block height where the transaction was included
+	BlockTimestamp   uint64          // Block timestamp where the transaction was included
 	TransactionIndex uint32          // Index of the transaction within the block
 	EventIndices     []uint32        // Index of the event within the transaction
 	TokenType        string          // Fully qualified type of NFT collection (e.g., "A.0x1654653399040a61.MyNFT")

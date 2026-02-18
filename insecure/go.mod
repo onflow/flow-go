@@ -218,8 +218,8 @@ require (
 	github.com/onflow/atree v0.12.1 // indirect
 	github.com/onflow/cadence v1.9.9 // indirect
 	github.com/onflow/fixed-point v0.1.1 // indirect
-	github.com/onflow/flow-core-contracts/lib/go/contracts v1.9.2 // indirect
-	github.com/onflow/flow-core-contracts/lib/go/templates v1.9.2 // indirect
+	github.com/onflow/flow-core-contracts/lib/go/contracts v1.9.3 // indirect
+	github.com/onflow/flow-core-contracts/lib/go/templates v1.9.3 // indirect
 	github.com/onflow/flow-evm-bridge v0.1.0 // indirect
 	github.com/onflow/flow-ft/lib/go/contracts v1.0.1 // indirect
 	github.com/onflow/flow-ft/lib/go/templates v1.0.1 // indirect

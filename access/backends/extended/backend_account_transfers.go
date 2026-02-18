@@ -127,9 +127,20 @@ func (b *AccountTransfersBackend) GetAccountFungibleTokenTransfers(
 
 	for i := range page.Transfers {
 		t := &page.Transfers[i]
-		txBody, result, err := b.lookupTransactionDetails(ctx, t.TransactionID, t.BlockHeight, encodingVersion)
+
+		header, err := b.headers.ByHeight(t.BlockHeight)
 		if err != nil {
-			return nil, status.Errorf(codes.Internal, "failed to populate details for transfer transaction %s: %v", t.TransactionID, err)
+			return nil, status.Errorf(codes.Internal, "failed to retrieve block header for transfer transaction %s: %v", t.TransactionID, err)
+		}
+		t.BlockTimestamp = header.Timestamp
+
+		if !expandResults {
+			continue
+		}
+
+		txBody, result, err := b.lookupTransactionDetails(ctx, t.TransactionID, header, encodingVersion)
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "failed to retrieve transaction details for transfer transaction %s: %v", t.TransactionID, err)
 		}
 		t.Transaction = txBody
 		t.Result = result
@@ -169,7 +180,18 @@ func (b *AccountTransfersBackend) GetAccountNonFungibleTokenTransfers(
 
 	for i := range page.Transfers {
 		t := &page.Transfers[i]
-		txBody, result, err := b.lookupTransactionDetails(ctx, t.TransactionID, t.BlockHeight, encodingVersion)
+
+		header, err := b.headers.ByHeight(t.BlockHeight)
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "failed to retrieve block header for transfer transaction %s: %v", t.TransactionID, err)
+		}
+		t.BlockTimestamp = header.Timestamp
+
+		if !expandResults {
+			continue
+		}
+
+		txBody, result, err := b.lookupTransactionDetails(ctx, t.TransactionID, header, encodingVersion)
 		if err != nil {
 			return nil, status.Errorf(codes.Internal, "failed to populate details for transfer transaction %s: %v", t.TransactionID, err)
 		}

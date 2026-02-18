@@ -65,14 +65,9 @@ func (b *backendBase) mapReadError(ctx context.Context, label string, err error)
 func (b *backendBase) lookupTransactionDetails(
 	ctx context.Context,
 	txID flow.Identifier,
-	blockHeight uint64,
+	header *flow.Header,
 	encodingVersion entities.EventEncodingVersion,
 ) (*flow.TransactionBody, *accessmodel.TransactionResult, error) {
-	header, err := b.headers.ByHeight(blockHeight)
-	if err != nil {
-		return nil, nil, fmt.Errorf("could not retrieve block header: %w", err)
-	}
-
 	txBody, isSystemChunkTx, err := b.getTransactionBody(ctx, header, txID)
 	if err != nil {
 		return nil, nil, fmt.Errorf("could not retrieve transaction body: %w", err)

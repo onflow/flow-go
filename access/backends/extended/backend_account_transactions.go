@@ -90,18 +90,25 @@ func (b *AccountTransactionsBackend) GetAccountTransactions(
 		return nil, b.mapReadError(ctx, "account transactions", err)
 	}
 
-	if !expandResults {
-		return &page, nil
-	}
-
 	// enrich the transactions with additional details requested by the client
 	// Note: if no transactions are found, the response will include an empty array and no error.
 	for i := range page.Transactions {
 		tx := &page.Transactions[i]
-		txBody, result, err := b.lookupTransactionDetails(ctx, tx.TransactionID, tx.BlockHeight, encodingVersion)
+		header, err := b.headers.ByHeight(tx.BlockHeight)
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "failed to retrieve block header for transaction %s: %v", tx.TransactionID, err)
+		}
+		tx.BlockTimestamp = header.Timestamp
+
+		if !expandResults {
+			continue
+		}
+
+		txBody, result, err := b.lookupTransactionDetails(ctx, tx.TransactionID, header, encodingVersion)
 		if err != nil {
 			return nil, status.Errorf(codes.Internal, "failed to populate details for transaction %s: %v", tx.TransactionID, err)
 		}
+
 		tx.Transaction = txBody
 		tx.Result = result
 	}
