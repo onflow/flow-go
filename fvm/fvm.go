@@ -6,6 +6,9 @@ import (
 
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/common"
+	"github.com/rs/zerolog"
+
+	"github.com/onflow/flow-go/fvm/inspection"
 
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/errors"
@@ -35,6 +38,7 @@ type ProcedureOutput struct {
 	ComputationIntensities meter.MeteredComputationIntensities
 	MemoryEstimate         uint64
 	Err                    errors.CodedError
+	InspectionResults      []inspection.Result
 
 	// Output only by script.
 	Value cadence.Value
@@ -198,7 +202,43 @@ func (vm *VirtualMachine) Run(
 		return nil, ProcedureOutput{}, err
 	}
 
-	return executionSnapshot, executor.Output(), nil
+	// This is of informative nature right now so this placement is ok
+	// In the future we will need to move this inside the procedure if we want it to affect execution
+	output := executor.Output()
+	inspectionResults := vm.inspectProcedureResults(ctx.Logger, ctx, proc, storageSnapshot, executionSnapshot, output)
+	output.InspectionResults = inspectionResults
+
+	return executionSnapshot, output, nil
+}
+
+func (vm *VirtualMachine) inspectProcedureResults(
+	logger zerolog.Logger,
+	context Context,
+	proc Procedure,
+	storageSnapshot snapshot.StorageSnapshot,
+	executionSnapshot *snapshot.ExecutionSnapshot,
+	output ProcedureOutput,
+) []inspection.Result {
+	// TODO: this should be decided by the inspector
+	if proc.Type() != TransactionProcedureType {
+		return nil
+	}
+
+	// TODO: imspector should be able to receive ProcedureOutput directly
+	evts := make([]flow.Event, 0, len(output.Events)+len(output.ServiceEvents))
+	evts = append(evts, output.Events...)
+	evts = append(evts, output.ServiceEvents...)
+
+	inspectionResults := make([]inspection.Result, len(context.Inspectors))
+	var err error
+	for i, inspector := range context.Inspectors {
+		inspectionResults[i], err = inspector.Inspect(storageSnapshot, executionSnapshot, evts)
+		if err != nil {
+			logger.Warn().Err(err).Msg("failed to inspect procedure results")
+		}
+	}
+
+	return inspectionResults
 }
 
 // GetAccount returns an account by address or an error if none exists.
