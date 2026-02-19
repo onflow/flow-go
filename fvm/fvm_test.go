@@ -4406,7 +4406,7 @@ func TestTransactionIndexCall(t *testing.T) {
 	)
 }
 
-func TestFlowTokenDiff(t *testing.T) {
+func TestFlowTokenChangesInspector(t *testing.T) {
 	t.Parallel()
 
 	type testCase struct {
@@ -4453,7 +4453,7 @@ func TestFlowTokenDiff(t *testing.T) {
 				return txBody
 			},
 			resultChecker: func(t *testing.T, result inspection.TokenDiffResult) {
-				require.Len(t, result.UnaccountedTokens(), 0, "no  tokens were created or destroyed")
+				require.Len(t, result.UnaccountedTokens(), 0, "no tokens were created or destroyed")
 				require.Len(t, result.Changes, 3, "change should be on 3 addresses: sender, receiver, fees")
 			},
 		},
@@ -4531,7 +4531,7 @@ func TestFlowTokenDiff(t *testing.T) {
 			},
 			resultChecker: func(t *testing.T, result inspection.TokenDiffResult) {
 				unaccounted := result.UnaccountedTokens()
-				require.Len(t, unaccounted, 0, "expectation: all tokens were unaccounted for")
+				require.Len(t, unaccounted, 0, "expectation: all tokens were accounted for")
 				require.Len(t, result.Changes, 3, "change should be on 3 addresses: sender, receiver, fees")
 			},
 		},
@@ -4559,7 +4559,26 @@ func TestFlowTokenDiff(t *testing.T) {
 			},
 			resultChecker: func(t *testing.T, result inspection.TokenDiffResult) {
 				unaccounted := result.UnaccountedTokens()
-				require.Len(t, unaccounted, 0, "expectation: all tokens were unaccounted for")
+				require.Len(t, unaccounted, 0, "expectation: all tokens were accounted for")
+				require.Len(t, result.Changes, 3, "change should be on 3 addresses: sender, receiver, fees")
+			},
+		}, {
+			name:             "create account",
+			tokenDefinitions: inspection.DefaultTokenDiffSearchTokens(flow.Testnet.Chain()),
+			txBody: func(t *testing.T, chain flow.Chain, accounts []flow.Address) *flow.TransactionBody {
+				_, txBodyBuilder := testutil.CreateAccountCreationTransaction(t, chain)
+
+				err := testutil.SignTransactionAsServiceAccount(txBodyBuilder, 0, chain)
+				require.NoError(t, err)
+
+				txBody, err := txBodyBuilder.Build()
+				require.NoError(t, err)
+
+				return txBody
+			},
+			resultChecker: func(t *testing.T, result inspection.TokenDiffResult) {
+				unaccounted := result.UnaccountedTokens()
+				require.Len(t, unaccounted, 0, "no tokens were created or destroyed")
 				require.Len(t, result.Changes, 3, "change should be on 3 addresses: sender, receiver, fees")
 			},
 		},
@@ -4591,7 +4610,7 @@ func TestFlowTokenDiff(t *testing.T) {
 				) {
 					t.Parallel()
 
-					differ := inspection.NewTokenDiff(tc.tokenDefinitions)
+					differ := inspection.NewTokenChangesInspector(tc.tokenDefinitions)
 
 					// Create an account private key.
 					privateKey, err := testutil.GenerateAccountPrivateKey()
