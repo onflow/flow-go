@@ -58,13 +58,15 @@ const (
 
 	EVMBytes32TypeQualifiedIdentifier = "EVM.EVMBytes32"
 
-	EVMResultTypeQualifiedIdentifier       = "EVM.Result"
-	EVMResultTypeStatusFieldName           = "status"
-	EVMResultTypeErrorCodeFieldName        = "errorCode"
-	EVMResultTypeErrorMessageFieldName     = "errorMessage"
-	EVMResultTypeGasUsedFieldName          = "gasUsed"
-	EVMResultTypeDataFieldName             = "data"
-	EVMResultTypeDeployedContractFieldName = "deployedContract"
+	EVMResultTypeQualifiedIdentifier        = "EVM.Result"
+	EVMResultDecodedTypeQualifiedIdentifier = "EVM.ResultDecoded"
+	EVMResultTypeStatusFieldName            = "status"
+	EVMResultTypeErrorCodeFieldName         = "errorCode"
+	EVMResultTypeErrorMessageFieldName      = "errorMessage"
+	EVMResultTypeGasUsedFieldName           = "gasUsed"
+	EVMResultTypeResultsFieldName           = "results"
+	EVMResultTypeDataFieldName              = "data"
+	EVMResultTypeDeployedContractFieldName  = "deployedContract"
 
 	EVMStatusTypeQualifiedIdentifier = "EVM.Status"
 
@@ -228,6 +230,50 @@ var InternalEVMTypeCallFunctionType = &sema.FunctionType{
 	ReturnTypeAnnotation: sema.NewTypeAnnotation(sema.AnyStructType),
 }
 
+// InternalEVM.callWithSigAndArgs
+
+const InternalEVMTypeCallWithSigAndArgsFunctionName = "callWithSigAndArgs"
+
+var InternalEVMTypeCallWithSigAndArgsFunctionType = &sema.FunctionType{
+	Parameters: []sema.Parameter{
+		{
+			Label:          "from",
+			TypeAnnotation: sema.NewTypeAnnotation(EVMAddressBytesType),
+		},
+		{
+			Label:          "to",
+			TypeAnnotation: sema.NewTypeAnnotation(EVMAddressBytesType),
+		},
+		{
+			Label:          "signature",
+			TypeAnnotation: sema.NewTypeAnnotation(sema.StringType),
+		},
+		{
+			Label:          "args",
+			TypeAnnotation: sema.NewTypeAnnotation(sema.NewVariableSizedType(nil, sema.AnyStructType)),
+		},
+		{
+			Label:          "gasLimit",
+			TypeAnnotation: sema.NewTypeAnnotation(sema.UInt64Type),
+		},
+		{
+			Label:          "value",
+			TypeAnnotation: sema.NewTypeAnnotation(sema.UIntType),
+		},
+		{
+			Label: "resultTypes",
+			TypeAnnotation: sema.NewTypeAnnotation(
+				sema.NewOptionalType(
+					nil,
+					sema.NewVariableSizedType(nil, sema.MetaType),
+				),
+			),
+		},
+	},
+	// Actually EVM.ResultDecoded, but cannot refer to it here
+	ReturnTypeAnnotation: sema.NewTypeAnnotation(sema.AnyStructType),
+}
+
 // InternalEVM.dryCall
 
 const InternalEVMTypeDryCallFunctionName = "dryCall"
@@ -256,6 +302,50 @@ var InternalEVMTypeDryCallFunctionType = &sema.FunctionType{
 		},
 	},
 	// Actually EVM.Result, but cannot refer to it here
+	ReturnTypeAnnotation: sema.NewTypeAnnotation(sema.AnyStructType),
+}
+
+// InternalEVM.dryCallWithSigAndArgs
+
+const InternalEVMTypeDryCallWithSigAndArgsFunctionName = "dryCallWithSigAndArgs"
+
+var InternalEVMTypeDryCallWithSigAndArgsFunctionType = &sema.FunctionType{
+	Parameters: []sema.Parameter{
+		{
+			Label:          "from",
+			TypeAnnotation: sema.NewTypeAnnotation(EVMAddressBytesType),
+		},
+		{
+			Label:          "to",
+			TypeAnnotation: sema.NewTypeAnnotation(EVMAddressBytesType),
+		},
+		{
+			Label:          "signature",
+			TypeAnnotation: sema.NewTypeAnnotation(sema.StringType),
+		},
+		{
+			Label:          "args",
+			TypeAnnotation: sema.NewTypeAnnotation(sema.NewVariableSizedType(nil, sema.AnyStructType)),
+		},
+		{
+			Label:          "gasLimit",
+			TypeAnnotation: sema.NewTypeAnnotation(sema.UInt64Type),
+		},
+		{
+			Label:          "value",
+			TypeAnnotation: sema.NewTypeAnnotation(sema.UIntType),
+		},
+		{
+			Label: "resultTypes",
+			TypeAnnotation: sema.NewTypeAnnotation(
+				sema.NewOptionalType(
+					nil,
+					sema.NewVariableSizedType(nil, sema.MetaType),
+				),
+			),
+		},
+	},
+	// Actually EVM.ResultDecoded, but cannot refer to it here
 	ReturnTypeAnnotation: sema.NewTypeAnnotation(sema.AnyStructType),
 }
 
@@ -485,8 +575,20 @@ var InternalEVMContractType = func() *sema.CompositeType {
 		),
 		sema.NewUnmeteredPublicFunctionMember(
 			ty,
+			InternalEVMTypeCallWithSigAndArgsFunctionName,
+			InternalEVMTypeCallWithSigAndArgsFunctionType,
+			"",
+		),
+		sema.NewUnmeteredPublicFunctionMember(
+			ty,
 			InternalEVMTypeDryCallFunctionName,
 			InternalEVMTypeDryCallFunctionType,
+			"",
+		),
+		sema.NewUnmeteredPublicFunctionMember(
+			ty,
+			InternalEVMTypeDryCallWithSigAndArgsFunctionName,
+			InternalEVMTypeDryCallWithSigAndArgsFunctionType,
 			"",
 		),
 		sema.NewUnmeteredPublicFunctionMember(

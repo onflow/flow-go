@@ -249,9 +249,8 @@ func lookupAccountTransactions(
 
 			// Skip entries at or before the cursor position (it was the last item of the previous page).
 			if skipFirst {
-				if height > cursor.BlockHeight {
-					return false, nil
-				}
+				// no need to check height > cursor.BlockHeight since the iterator bounds already
+				// omit heights outside of the range.
 				if height == cursor.BlockHeight && txIndex <= cursor.TransactionIndex {
 					return false, nil
 				}
@@ -497,7 +496,7 @@ func decodeAccountTxKey(key []byte) (flow.Address, uint64, uint32, error) {
 	return address, height, txIndex, nil
 }
 
-// accountTxHeightLookup reads a height value from the database.
+// accountTxHeightLookup reads a height boundary (first/last) for the account transactions index from the database.
 //
 // Expected error returns during normal operations:
 //   - [storage.ErrNotFound] if the height is not found

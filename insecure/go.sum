@@ -674,8 +674,8 @@ github.com/jmespath/go-jmespath v0.0.0-20180206201540-c2b33e8439af/go.mod h1:Nht
 github.com/jmespath/go-jmespath v0.4.0/go.mod h1:T8mJZnbsbmF+m6zOOFylbeCJqk5+pHWvzYPziyZiYoo=
 github.com/jmespath/go-jmespath/internal/testify v1.5.1/go.mod h1:L3OGu8Wl2/fWfCI6z80xFu9LTZmf1ZRjMHUOPmWr69U=
 github.com/jonboulle/clockwork v0.1.0/go.mod h1:Ii8DK3G1RaLaWxj9trq07+26W01tbo22gdxWY5EU2bo=
-github.com/jordanschalm/lockctx v0.0.0-20250412215529-226f85c10956 h1:4iii8SOozVG1lpkdPELRsjPEBhU4DeFPz2r2Fjj3UDU=
-github.com/jordanschalm/lockctx v0.0.0-20250412215529-226f85c10956/go.mod h1:qsnXMryYP9X7JbzskIn0+N40sE6XNXLr9kYRRP6rwXU=
+github.com/jordanschalm/lockctx v0.1.0 h1:2ZziSl5zejl5VSRUjl+UtYV94QPFQgO9bekqWPOKUQw=
+github.com/jordanschalm/lockctx v0.1.0/go.mod h1:qsnXMryYP9X7JbzskIn0+N40sE6XNXLr9kYRRP6rwXU=
 github.com/jpillora/backoff v1.0.0/go.mod h1:J/6gKK9jxlEcS3zixgDgUAsiuZ7yrSoa/FX5e0EB2j4=
 github.com/json-iterator/go v1.1.6/go.mod h1:+SdeFBvtyEkXs7REEP0seUULqWtbJapLOCVDaaPEHmU=
 github.com/json-iterator/go v1.1.7/go.mod h1:KdQUCv79m/52Kvf8AW2vK1V8akMuk1QjK/uOdHXbAo4=

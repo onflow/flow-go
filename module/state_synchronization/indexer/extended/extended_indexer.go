@@ -1,7 +1,6 @@
 package extended
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"sync"
@@ -24,20 +23,17 @@ import (
 
 const (
 	// DefaultBackfillDelay defines the delay between consecutive backfill attempts.
-	// With the default value of 10ms, the maximum catch-up rate is approximately
-	// 100 blocks per second (1000ms / 10ms).
-	//
-	// The delay should be carefully tuned: setting it too low may overwhelm
-	// the system, while setting it too high will significantly slow down
-	// the catch-up process.
-	DefaultBackfillDelay = 10 * time.Millisecond
+	// Set carefully to avoid overwhelming the system.
+	// With the default value of 5ms, the maximum catch-up rate is approximately
+	// 200 blocks per second.
+	DefaultBackfillDelay = 5 * time.Millisecond
 )
 
 // ExtendedIndexer orchestrates indexing for all extended indexers.
 //
 // Indexing is performed in a single-threaded loop, where each iteration indexes the next height for
 // all indexers. Indexers are grouped by their next height to reduce database lookups. All data for
-// each iteration is written to a batch and committed at once.
+// each height is written to a batch and committed at once.
 //
 // NOT CONCURRENCY SAFE.
 type ExtendedIndexer struct {
@@ -122,7 +118,7 @@ func NewExtendedIndexer(
 	return c, nil
 }
 
-// IndexBlockData captures the block data and makes it available to the indexers.
+// IndexBlockExecutionData captures the block data and makes it available to the indexers.
 //
 // No error returns are expected during normal operation.
 func (c *ExtendedIndexer) IndexBlockExecutionData(
@@ -171,7 +167,7 @@ func (c *ExtendedIndexer) IndexBlockData(
 
 	if c.latestBlockData != nil {
 		if header.Height > c.latestBlockData.Header.Height+1 {
-			return fmt.Errorf("indexing block skipped: expected height %d, got %d", c.latestBlockData.Header.Height+1, header.Height)
+			return fmt.Errorf("unexpected block received: expected height %d, got %d", c.latestBlockData.Header.Height+1, header.Height)
 		}
 		if header.Height <= c.latestBlockData.Header.Height {
 			return nil
@@ -203,9 +199,8 @@ func (c *ExtendedIndexer) ingestLoop(ctx irrecoverable.SignalerContext, ready co
 		case <-c.notifier.Channel():
 		case <-timer.C:
 		}
-		// TODO: do we need to enforce a minimum delay?
 
-		hasBackfillingIndexers, err := c.indexNextHeights(ctx)
+		hasBackfillingIndexers, err := c.indexNextHeights()
 		if err != nil {
 			ctx.Throw(fmt.Errorf("failed to check all: %w", err))
 			return
@@ -227,7 +222,7 @@ func (c *ExtendedIndexer) ingestLoop(ctx irrecoverable.SignalerContext, ready co
 // NOT CONCURRENCY SAFE.
 //
 // No error returns are expected during normal operation.
-func (c *ExtendedIndexer) indexNextHeights(ctx context.Context) (bool, error) {
+func (c *ExtendedIndexer) indexNextHeights() (bool, error) {
 	c.mu.RLock()
 	latestBlockData := c.latestBlockData
 	c.mu.RUnlock()
@@ -245,17 +240,29 @@ func (c *ExtendedIndexer) indexNextHeights(ctx context.Context) (bool, error) {
 		}
 	}
 
-	// this is a trailing indicator. this method will return true if any indexer was backfilled in this iteration.
+	// this is a trailing indicator. this will be true if any indexer was backfilled in this iteration.
 	// if all indexers catch up, it will take one more iteration to register as all caught up.
 	hasBackfillingIndexers := len(backfillGroups) > 0
 
 	for height, group := range backfillGroups {
-		data, err := c.blockDataFromStorage(ctx, height, latestBlockData)
+		data, err := c.blockDataFromStorage(height)
 		if err != nil {
-			if errors.Is(err, storage.ErrNotFound) {
-				continue // skip group for this iteration
+			if !errors.Is(err, storage.ErrNotFound) {
+				return false, fmt.Errorf("failed to get block data for height %d: %w", height, err)
 			}
-			return false, fmt.Errorf("failed to get block data for height %d: %w", height, err)
+
+			// on startup, it's possible that indexers are already caught up, but the live block has
+			// not been provided yet. in this case, skip the group until the live block is known.
+			// this check will ensure backfilling progresses if and only if the live block is also
+			// progressing.
+			if latestBlockData == nil {
+				continue
+			}
+
+			// if the live block is known, it must have all data available since this height is below
+			// the `latestBlockData` height. otherwise the database is in an inconsistent state.
+			return false, fmt.Errorf("failed to get block data for height %d when latest block %d is known: %w",
+				height, latestBlockData.Header.Height, err)
 		}
 
 		err = c.runIndexers(group, &data)
@@ -297,19 +304,12 @@ func (c *ExtendedIndexer) runIndexers(indexers []Indexer, data *BlockData) error
 //
 // Expected error returns during normal operation:
 //   - [storage.ErrNotFound]: if any data is not available for the height.
-func (c *ExtendedIndexer) blockDataFromStorage(_ context.Context, height uint64, latestBlockData *BlockData) (BlockData, error) {
+func (c *ExtendedIndexer) blockDataFromStorage(height uint64) (BlockData, error) {
 	// special handling for the spork root block which has no transactions or events.
 	if height == c.state.Params().SporkRootBlockHeight() {
 		return BlockData{
 			Header: c.state.Params().SporkRootBlock().ToHeader(),
 		}, nil
-	}
-
-	// `latestBlockData` is considered the "live" block, so don't allow backfilling for higher heights.
-	// if we haven't seen the live block yet and the data isn't indexed into the db, the events check
-	// below will fail and return a not found error.
-	if latestBlockData != nil && height > latestBlockData.Header.Height {
-		return BlockData{}, fmt.Errorf("data for block %d not available yet: %w", height, storage.ErrNotFound)
 	}
 
 	blockID, err := c.headers.BlockIDByHeight(height)
@@ -322,6 +322,8 @@ func (c *ExtendedIndexer) blockDataFromStorage(_ context.Context, height uint64,
 		return BlockData{}, fmt.Errorf("failed to get header by id: %w", err)
 	}
 
+	// all we need are the guarantees for the block, so use the index to avoid loading unnecessary
+	// execution payload data.
 	blockIndex, err := c.index.ByBlockID(blockID)
 	if err != nil {
 		return BlockData{}, fmt.Errorf("failed to get block index by block id: %w", err)
@@ -332,17 +334,21 @@ func (c *ExtendedIndexer) blockDataFromStorage(_ context.Context, height uint64,
 		return BlockData{}, fmt.Errorf("failed to get events by block id: %w", err)
 	}
 
-	// getting events returns an empty slice and no error if no events are found. In this case, also
+	// getting events returns an empty slice and no error if no events are found. This could mean
+	// either that the block has no events, or that they have not been indexed yet. In this case, also
 	// check if there were any transaction results. All blocks should have at least one system tx.
 	// if not, then assume the block is not indexed yet.
 	// Note: we need to check both because it's possible the system transaction failed and did not
-	// produce any events.
+	// produce any events. It is very uncommon for a block to have no events, so this logic will
+	// rarely be run.
 	if len(events) == 0 {
 		results, err := c.results.ByBlockID(blockID)
 		if err != nil {
 			return BlockData{}, fmt.Errorf("failed to get results by block id: %w", err)
 		}
 
+		// results will similarly return an empty slice and no error if no results are found
+		// or if the block's execution data is not indexed yet.
 		if len(results) == 0 {
 			return BlockData{}, fmt.Errorf("results for block %d not indexed yet: %w", height, storage.ErrNotFound)
 		}
@@ -361,6 +367,7 @@ func (c *ExtendedIndexer) blockDataFromStorage(_ context.Context, height uint64,
 		transactions = append(transactions, collection.Transactions...)
 	}
 
+	// the system collection is not indexed, so construct it.
 	sysCollection, err := c.systemCollections.
 		ByHeight(height).
 		SystemCollection(c.chainID.Chain(), access.StaticEventProvider(events))
@@ -383,6 +390,7 @@ func (c *ExtendedIndexer) extractDataFromExecutionData(data *execution_data.Bloc
 	txs := make([]*flow.TransactionBody, 0)
 	events := make([]flow.Event, 0)
 	for i, chunk := range data.ChunkExecutionDatas {
+		// block execution data should include collections for ALL chunks, including the system chunk.
 		if chunk.Collection == nil {
 			return nil, nil, fmt.Errorf("chunk %d collection is nil", i)
 		}
@@ -396,8 +404,10 @@ func (c *ExtendedIndexer) extractDataFromExecutionData(data *execution_data.Bloc
 // This allows the indexing loop to lookup data for a height once, and pass it to all indexers in the group.
 // If `latestBlockData` is not nil, it will also return the group of indexers at the "live" height.
 // All indexers that are ahead of the live block will be skipped.
+//
+// No error returns are expected during normal operation.
 func buildGroupLookup(indexers []Indexer, latestBlockData *BlockData) ([]Indexer, map[uint64][]Indexer, error) {
-	groupLookup := make(map[uint64][]Indexer)
+	backfillGroups := make(map[uint64][]Indexer)
 	liveGroup := make([]Indexer, 0)
 	for _, indexer := range indexers {
 		nextHeight, err := indexer.NextHeight()
@@ -413,8 +423,8 @@ func buildGroupLookup(indexers []Indexer, latestBlockData *BlockData) ([]Indexer
 				continue
 			}
 		}
-		groupLookup[nextHeight] = append(groupLookup[nextHeight], indexer)
+		backfillGroups[nextHeight] = append(backfillGroups[nextHeight], indexer)
 	}
 
-	return liveGroup, groupLookup, nil
+	return liveGroup, backfillGroups, nil
 }

@@ -384,10 +384,39 @@ func (s *ExtendedIndexerSuite) TestUninitializedBeforeLiveData() {
 	}
 }
 
-// TestUninitializedNotFoundThenCatchUp verifies that when the component starts,
-// storage initially returns ErrNotFound, and the indexer retries on subsequent timer ticks.
-// Once storage has data, the indexer processes it successfully.
-func (s *ExtendedIndexerSuite) TestUninitializedNotFoundThenCatchUp() {
+// TestBackfillStorageNotFound verifies that when a live block has been received and storage
+// returns ErrNotFound for a backfill height below the live height, the error is thrown via
+// the irrecoverable context. Once a live block is known, all prior heights must be present
+// in storage; a missing block indicates database inconsistency.
+func (s *ExtendedIndexerSuite) TestBackfillStorageNotFound() {
+	s.headers.On("BlockIDByHeight", uint64(3)).Return(flow.ZeroID, storage.ErrNotFound)
+
+	idx := extendedmock.NewIndexer(s.T())
+	idx.On("NextHeight").Return(uint64(3), nil)
+
+	s.newExtendedIndexer(newMockState(s.T()), []extended.Indexer{idx}, time.Millisecond)
+
+	// Provide a live block at height 5 before starting so latestBlockData is set from the
+	// first iteration. Height 3 is below the live height and must be in storage.
+	s.provideBlock(5)
+
+	thrown := make(chan error, 1)
+	s.startComponentWithCallback(func(err error) {
+		thrown <- err
+	})
+
+	select {
+	case err := <-thrown:
+		assert.ErrorIs(s.T(), err, storage.ErrNotFound)
+	case <-time.After(testTimeout):
+		s.T().Fatal("timeout waiting for thrown error")
+	}
+}
+
+// TestBackfillRetryOnNotFound verifies that when no live block has been received yet and
+// storage returns ErrNotFound, the indexer retries on subsequent timer ticks rather than
+// treating it as a fatal error. Once storage has the data, the indexer processes it successfully.
+func (s *ExtendedIndexerSuite) TestBackfillRetryOnNotFound() {
 	block := generateBlockFixtures(s.T(), s.g, 5)
 	blockID := block.Header.ID()
 
@@ -402,7 +431,7 @@ func (s *ExtendedIndexerSuite) TestUninitializedNotFoundThenCatchUp() {
 			return blockID, nil
 		})
 
-	// Remaining storage mocks use exact fixture data (only called after available=true).
+	// Remaining storage mocks are only called after available=true.
 	s.headers.On("ByBlockID", blockID).Return(block.Header, nil)
 	s.index.On("ByBlockID", blockID).Return(block.Index, nil)
 	s.events.On("ByBlockID", blockID).Return(block.Events, nil)
@@ -418,7 +447,7 @@ func (s *ExtendedIndexerSuite) TestUninitializedNotFoundThenCatchUp() {
 	s.newExtendedIndexer(newMockState(s.T()), []extended.Indexer{idx}, time.Millisecond)
 	s.startComponent()
 
-	// Let a few timer iterations pass with ErrNotFound -- indexer should not have been called.
+	// Let a few timer iterations pass with ErrNotFound -- indexer should not have advanced.
 	require.Never(s.T(), func() bool {
 		return idx.nextHeight.Load() > 5 // startHeight
 	}, 50*time.Millisecond, time.Millisecond, "indexer should not have advanced")
@@ -532,7 +561,7 @@ func (s *ExtendedIndexerSuite) TestNonSequentialHeight() {
 	header := unittest.BlockHeaderFixtureOnChain(flow.Testnet, unittest.WithHeaderHeight(13))
 	err := s.ext.IndexBlockData(header, nil, nil)
 	s.Assert().Error(err)
-	s.Assert().Contains(err.Error(), fmt.Sprintf("indexing block skipped: expected height %d, got %d", 12, 13))
+	s.Assert().Contains(err.Error(), fmt.Sprintf("unexpected block received: expected height %d, got %d", 12, 13))
 }
 
 // mockIndexer wraps the mock with atomic state tracking.
@@ -649,4 +678,3 @@ func generateBlockFixtures(t *testing.T, g *fixtures.GeneratorSuite, height uint
 		SystemCollection: systemCollection,
 	}
 }
-

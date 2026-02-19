@@ -14,6 +14,7 @@ import (
 	"github.com/onflow/flow/protobuf/go/flow/entities"
 
 	accessmodel "github.com/onflow/flow-go/model/access"
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/storage"
 	storagemock "github.com/onflow/flow-go/storage/mock"
@@ -32,12 +33,13 @@ func TestBackend_GetAccountTransactions(t *testing.T) {
 
 		addr := unittest.RandomAddressFixture()
 		txID := unittest.IdentifierFixture()
+		blockHeader := unittest.BlockHeaderFixture()
 
 		expectedPage := accessmodel.AccountTransactionsPage{
 			Transactions: []accessmodel.AccountTransaction{
 				{
 					Address:          addr,
-					BlockHeight:      100,
+					BlockHeight:      blockHeader.Height,
 					TransactionID:    txID,
 					TransactionIndex: 0,
 					Roles:            []accessmodel.TransactionRole{accessmodel.TransactionRoleAuthorizer},
@@ -55,6 +57,7 @@ func TestBackend_GetAccountTransactions(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, page.Transactions, 1)
 		assert.Equal(t, txID, page.Transactions[0].TransactionID)
+		assert.Equal(t, blockHeader.Timestamp, page.Transactions[0].BlockTimestamp)
 		assert.Nil(t, page.NextCursor)
 	})
 
@@ -64,10 +67,11 @@ func TestBackend_GetAccountTransactions(t *testing.T) {
 		backend := NewAccountTransactionsBackend(unittest.Logger(), &backendBase{config: DefaultConfig(), headers: mockHeaders}, mockStore)
 
 		addr := unittest.RandomAddressFixture()
+		blockHeader := unittest.BlockHeaderFixture()
 
 		nonEmptyPage := accessmodel.AccountTransactionsPage{
 			Transactions: []accessmodel.AccountTransaction{
-				{Address: addr, BlockHeight: 1, TransactionID: unittest.IdentifierFixture()},
+				{Address: addr, BlockHeight: blockHeader.Height, TransactionID: unittest.IdentifierFixture()},
 			},
 		}
 
@@ -87,10 +91,11 @@ func TestBackend_GetAccountTransactions(t *testing.T) {
 		backend := NewAccountTransactionsBackend(unittest.Logger(), &backendBase{config: DefaultConfig(), headers: mockHeaders}, mockStore)
 
 		addr := unittest.RandomAddressFixture()
+		blockHeader := unittest.BlockHeaderFixture()
 
 		nonEmptyPage := accessmodel.AccountTransactionsPage{
 			Transactions: []accessmodel.AccountTransaction{
-				{Address: addr, BlockHeight: 1, TransactionID: unittest.IdentifierFixture()},
+				{Address: addr, BlockHeight: blockHeader.Height, TransactionID: unittest.IdentifierFixture()},
 			},
 		}
 
@@ -111,6 +116,7 @@ func TestBackend_GetAccountTransactions(t *testing.T) {
 
 		addr := unittest.RandomAddressFixture()
 		cursor := &accessmodel.AccountTransactionCursor{BlockHeight: 50, TransactionIndex: 3}
+		blockHeader := unittest.BlockHeaderFixture(func(h *flow.Header) { h.Height = 50 })
 
 		nonEmptyPage := accessmodel.AccountTransactionsPage{
 			Transactions: []accessmodel.AccountTransaction{

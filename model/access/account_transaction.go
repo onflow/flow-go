@@ -61,7 +61,7 @@ func ParseTransactionRole(s string) (TransactionRole, error) {
 type AccountTransaction struct {
 	Address          flow.Address          // Account address
 	BlockHeight      uint64                // Block height where transaction was included
-	BlockTimestamp   uint64                // Block timestamp where transaction was included
+	BlockTimestamp   uint64                // Block timestamp where transaction was included, in Unix milliseconds
 	TransactionID    flow.Identifier       // Transaction identifier
 	TransactionIndex uint32                // Index of transaction within the block
 	Roles            []TransactionRole     // Roles of the account in the transaction

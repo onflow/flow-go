@@ -1146,6 +1146,9 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 	registerStorageDependable := module.NewProxiedReadyDoneAware()
 	builder.IndexerDependencies.Add(registerStorageDependable)
 
+	extendedIndexerDependable := module.NewProxiedReadyDoneAware()
+	builder.IndexerDependencies.Add(extendedIndexerDependable)
+
 	executionDataPrunerEnabled := builder.executionDataPrunerHeightRangeTarget != 0
 
 	builder.
@@ -1624,7 +1627,9 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 			return builder.ExecutionIndexer, nil
 		}, builder.IndexerDependencies)
 
-		if builder.extendedIndexingEnabled {
+		if !builder.extendedIndexingEnabled {
+			extendedIndexerDependable.Init(&module.NoopReadyDoneAware{})
+		} else {
 			builder.DependableComponent("extended indexer", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 				accountTransactions, err := extended.NewAccountTransactions(
 					node.Logger,
@@ -1661,6 +1666,8 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 				}
 
 				builder.ExtendedIndexer = extendedIndexer
+				extendedIndexerDependable.Init(builder.ExtendedIndexer)
+
 				return builder.ExtendedIndexer, nil
 			}, cmd.NewDependencyList())
 		}

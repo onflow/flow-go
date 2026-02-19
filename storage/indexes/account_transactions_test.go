@@ -300,6 +300,82 @@ func TestAccountTransactions_Pagination(t *testing.T) {
 	})
 }
 
+func TestAccountTransactions_PaginationWithFilter(t *testing.T) {
+	t.Parallel()
+
+	// Index 6 blocks (heights 2-7), each with 2 txs for the same account:
+	//   - txIndex 0: TransactionRoleAuthorizer
+	//   - txIndex 1: TransactionRolePayer
+	//
+	// With a filter for authorizer-only, 6 transactions match. Paginating with limit=2 should
+	// yield 3 pages of 2, with no duplicates or gaps across pages.
+	t.Run("pagination with active filter produces correct pages without duplicates", func(t *testing.T) {
+		RunWithBootstrappedAccountTxIndex(t, 1, nil, func(_ storage.DB, lm storage.LockManager, idx *AccountTransactions) {
+			account := unittest.RandomAddressFixture()
+
+			for height := uint64(2); height <= 7; height++ {
+				err := storeAccountTransactions(t, lm, idx, height, []access.AccountTransaction{
+					{
+						Address:          account,
+						BlockHeight:      height,
+						TransactionID:    unittest.IdentifierFixture(),
+						TransactionIndex: 0,
+						Roles:            []access.TransactionRole{access.TransactionRoleAuthorizer},
+					},
+					{
+						Address:          account,
+						BlockHeight:      height,
+						TransactionID:    unittest.IdentifierFixture(),
+						TransactionIndex: 1,
+						Roles:            []access.TransactionRole{access.TransactionRolePayer},
+					},
+				})
+				require.NoError(t, err)
+			}
+
+			authorizerOnly := func(tx *access.AccountTransaction) bool {
+				for _, r := range tx.Roles {
+					if r == access.TransactionRoleAuthorizer {
+						return true
+					}
+				}
+				return false
+			}
+
+			// Collect all results across pages and verify no duplicates or gaps.
+			var allTxIDs []flow.Identifier
+			var cursor *access.AccountTransactionCursor
+
+			for page := range 3 {
+				result, err := idx.TransactionsByAddress(account, 2, cursor, authorizerOnly)
+				require.NoError(t, err)
+				require.Len(t, result.Transactions, 2, "page %d should have 2 results", page)
+
+				for _, tx := range result.Transactions {
+					assert.Equal(t, access.TransactionRoleAuthorizer, tx.Roles[0], "only authorizer txs should be returned")
+					allTxIDs = append(allTxIDs, tx.TransactionID)
+				}
+
+				if page < 2 {
+					require.NotNil(t, result.NextCursor, "page %d should have a next cursor", page)
+				} else {
+					assert.Nil(t, result.NextCursor, "last page should have no cursor")
+				}
+				cursor = result.NextCursor
+			}
+
+			// All 6 authorizer txs should be present with no duplicates.
+			require.Len(t, allTxIDs, 6)
+			seen := make(map[flow.Identifier]struct{}, len(allTxIDs))
+			for _, id := range allTxIDs {
+				_, dup := seen[id]
+				assert.False(t, dup, "duplicate tx ID %s", id)
+				seen[id] = struct{}{}
+			}
+		})
+	})
+}
+
 func TestAccountTransactions_DescendingOrder(t *testing.T) {
 	t.Parallel()
 

@@ -130,6 +130,9 @@ func (a *AccountTransactions) buildAccountTransactionsFromBlockData(data BlockDa
 		addrRoles[addr] = append(addrRoles[addr], role)
 	}
 
+	// By the Flow protocol, system chunk transactions always appear after all user transactions
+	// in a block. Once the first system transaction is encountered, all subsequent transactions
+	// are also part of the system chunk.
 	isSystemChunk := false
 	for i, tx := range data.Transactions {
 		txIndex := uint32(i)

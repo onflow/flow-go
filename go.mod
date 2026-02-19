@@ -102,7 +102,7 @@ require (
 	github.com/holiman/uint256 v1.3.2
 	github.com/huandu/go-clone/generic v1.7.2
 	github.com/ipfs/boxo v0.17.1-0.20240131173518-89bceff34bf1
-	github.com/jordanschalm/lockctx v0.0.0-20250412215529-226f85c10956
+	github.com/jordanschalm/lockctx v0.1.0
 	github.com/libp2p/go-libp2p-routing-helpers v0.7.4
 	github.com/mitchellh/mapstructure v1.5.0
 	github.com/onflow/flow-evm-bridge v0.1.0
