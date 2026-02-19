@@ -12,8 +12,9 @@ import (
 )
 
 const (
-	ftDepositedSuffix = "FungibleToken.Deposited"
-	ftWithdrawnSuffix = "FungibleToken.Withdrawn"
+	ftWithdrawnFormat = "A.%s.FungibleToken.Withdrawn"
+	ftDepositedFormat = "A.%s.FungibleToken.Deposited"
+	flowFeesFormat    = "A.%s.FlowFees.FeesDeducted"
 )
 
 // ftPairedResult holds a matched withdrawal/deposit pair, or an unpaired event.
@@ -24,6 +25,7 @@ type ftPairedResult struct {
 	sourceEvents []flow.Event      // the flow.Event(s) that produced this result
 	withdrawal   *ftWithdrawnEvent // nil for deposit-only (mint)
 	deposit      *ftDepositedEvent // nil for withdrawal-only (burn)
+	isFlowFees   bool              // true if the result is a flow fees deposit
 }
 
 // FTParser decodes FungibleToken transfer events from CCF-encoded payloads and converts them
@@ -33,14 +35,20 @@ type ftPairedResult struct {
 type FTParser struct {
 	withdrawnEventType flow.EventType
 	depositedEventType flow.EventType
+	flowFeesEventType  flow.EventType
+	flowFeesAddress    flow.Address
+	omitFlowFees       bool
 }
 
 // NewFTParser creates a new fungible token transfer event parser.
-func NewFTParser(chainID flow.ChainID) *FTParser {
+func NewFTParser(chainID flow.ChainID, omitFlowFees bool) *FTParser {
 	sc := systemcontracts.SystemContractsForChain(chainID)
 	return &FTParser{
-		withdrawnEventType: flow.EventType(fmt.Sprintf("A.%s.%s", sc.FungibleToken.Address, ftWithdrawnSuffix)),
-		depositedEventType: flow.EventType(fmt.Sprintf("A.%s.%s", sc.FungibleToken.Address, ftDepositedSuffix)),
+		withdrawnEventType: flow.EventType(fmt.Sprintf(ftWithdrawnFormat, sc.FungibleToken.Address)),
+		depositedEventType: flow.EventType(fmt.Sprintf(ftDepositedFormat, sc.FungibleToken.Address)),
+		flowFeesEventType:  flow.EventType(fmt.Sprintf(flowFeesFormat, sc.FlowFees.Address)),
+		flowFeesAddress:    sc.FlowFees.Address,
+		omitFlowFees:       omitFlowFees,
 	}
 }
 
@@ -80,7 +88,7 @@ func (p *FTParser) filterAndDecodeFT(events []flow.Event) (map[uint32]*ftTxEvent
 	ensureGroup := func(txIndex uint32) *ftTxEventGroup {
 		g, ok := txEventGroups[txIndex]
 		if !ok {
-			g = newFTTxEventGroup()
+			g = newFTTxEventGroup(p.flowFeesAddress)
 			txEventGroups[txIndex] = g
 		}
 		return g
@@ -89,7 +97,7 @@ func (p *FTParser) filterAndDecodeFT(events []flow.Event) (map[uint32]*ftTxEvent
 	for _, event := range events {
 		switch event.Type {
 		case p.withdrawnEventType:
-			cadenceEvent, err := decodeEvent(event)
+			cadenceEvent, err := DecodeEvent(event)
 			if err != nil {
 				return nil, fmt.Errorf("failed to decode event %d in transaction %d: %w", event.EventIndex, event.TransactionIndex, err)
 			}
@@ -104,7 +112,7 @@ func (p *FTParser) filterAndDecodeFT(events []flow.Event) (map[uint32]*ftTxEvent
 			}
 
 		case p.depositedEventType:
-			cadenceEvent, err := decodeEvent(event)
+			cadenceEvent, err := DecodeEvent(event)
 			if err != nil {
 				return nil, fmt.Errorf("failed to decode event %d in transaction %d: %w", event.EventIndex, event.TransactionIndex, err)
 			}
@@ -117,6 +125,21 @@ func (p *FTParser) filterAndDecodeFT(events []flow.Event) (map[uint32]*ftTxEvent
 			if err != nil {
 				return nil, fmt.Errorf("failed to add deposit event %d in transaction %d: %w", event.EventIndex, event.TransactionIndex, err)
 			}
+
+		case p.flowFeesEventType:
+			cadenceEvent, err := DecodeEvent(event)
+			if err != nil {
+				return nil, fmt.Errorf("failed to decode event %d in transaction %d: %w", event.EventIndex, event.TransactionIndex, err)
+			}
+			decoded, err := decodeFlowFees(cadenceEvent)
+			if err != nil {
+				return nil, fmt.Errorf("failed to decode flow fees event %d in transaction %d: %w", event.EventIndex, event.TransactionIndex, err)
+			}
+			g := ensureGroup(event.TransactionIndex)
+			err = g.addFlowFees(decoded)
+			if err != nil {
+				return nil, fmt.Errorf("failed to add flow fees event %d in transaction %d: %w", event.EventIndex, event.TransactionIndex, err)
+			}
 		}
 	}
 
@@ -128,14 +151,18 @@ func (p *FTParser) filterAndDecodeFT(events []flow.Event) (map[uint32]*ftTxEvent
 // No error returns are expected during normal operation.
 func (p *FTParser) buildTransfers(paired []ftPairedResult, blockHeight uint64) ([]access.FungibleTokenTransfer, error) {
 	transfers := make([]access.FungibleTokenTransfer, 0, len(paired))
-	for _, pair := range paired {
+	for i, pair := range paired {
 		if len(pair.sourceEvents) == 0 {
 			return nil, fmt.Errorf("paired result has no source events")
 		}
 		if pair.withdrawal == nil && pair.deposit == nil {
 			return nil, fmt.Errorf("paired result has neither withdrawal nor deposit (events=%v)", pair.sourceEvents)
 		}
+		if pair.isFlowFees && p.omitFlowFees {
+			continue
+		}
 
+		// make sure all events have the same core details.
 		txID := pair.sourceEvents[0].TransactionID
 		txIndex := pair.sourceEvents[0].TransactionIndex
 		eventIndices := make([]uint32, len(pair.sourceEvents))
@@ -152,6 +179,11 @@ func (p *FTParser) buildTransfers(paired []ftPairedResult, blockHeight uint64) (
 				return nil, fmt.Errorf("transaction index mismatch for source event: %d != %d (tx=%d, evtIdx=%s)",
 					txIndex, event.TransactionIndex, txIndex, strings.Join(eventIndicesStr, ","))
 			}
+		}
+
+		// all transfers must have at least one event!
+		if len(eventIndices) == 0 {
+			return nil, fmt.Errorf("no event indices for source events (tx=%s, pairIdx=%d)", txID, i)
 		}
 
 		transfer := access.FungibleTokenTransfer{
@@ -174,14 +206,12 @@ func (p *FTParser) buildTransfers(paired []ftPairedResult, blockHeight uint64) (
 			transfer.RecipientAddress = pair.deposit.To
 		}
 
+		// sanity check: token type and amount of are required.
 		if transfer.TokenType == "" {
-			return nil, fmt.Errorf("token type is empty for transfer (tx=%s, evtIdx=%s)",
-				txID, strings.Join(eventIndicesStr, ","))
+			return nil, fmt.Errorf("token type is empty for transfer (tx=%s, evtIdxs=%s)", txID, strings.Join(eventIndicesStr, ","))
 		}
-
 		if transfer.Amount == nil {
-			return nil, fmt.Errorf("amount is empty for transfer (tx=%s, evtIdx=%s)",
-				txID, strings.Join(eventIndicesStr, ","))
+			return nil, fmt.Errorf("amount is empty for transfer (tx=%s, evtIdxs=%s)", txID, strings.Join(eventIndicesStr, ","))
 		}
 
 		transfers = append(transfers, transfer)

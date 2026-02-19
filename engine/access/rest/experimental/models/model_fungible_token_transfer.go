@@ -14,6 +14,8 @@ type FungibleTokenTransfer struct {
 	TransactionId string `json:"transaction_id"`
 	// Block height where the transfer was included.
 	BlockHeight string `json:"block_height"`
+	// Block timestamp where the transfer was included, in RFC3339Nano format.
+	BlockTimestamp string `json:"timestamp"`
 	// Index of the transaction within the block.
 	TransactionIndex string `json:"transaction_index"`
 	// Indices of the events within the transaction that represent this transfer.

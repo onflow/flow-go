@@ -121,10 +121,6 @@ func (b *AccountTransfersBackend) GetAccountFungibleTokenTransfers(
 		return nil, b.mapReadError(ctx, "fungible token transfers", err)
 	}
 
-	if !expandResults {
-		return &page, nil
-	}
-
 	for i := range page.Transfers {
 		t := &page.Transfers[i]
 
@@ -172,10 +168,6 @@ func (b *AccountTransfersBackend) GetAccountNonFungibleTokenTransfers(
 	page, err := b.nftStore.TransfersByAddress(address, limit, cursor, filter.Filter())
 	if err != nil {
 		return nil, b.mapReadError(ctx, "non-fungible token transfers", err)
-	}
-
-	if !expandResults {
-		return &page, nil
 	}
 
 	for i := range page.Transfers {

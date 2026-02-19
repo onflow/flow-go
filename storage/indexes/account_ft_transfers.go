@@ -148,7 +148,7 @@ func (idx *FungibleTokenTransfers) TransfersByAddress(
 	filter storage.IndexFilter[*access.FungibleTokenTransfer],
 ) (access.FungibleTokenTransfersPage, error) {
 	if limit == 0 {
-		return access.FungibleTokenTransfersPage{}, fmt.Errorf("limit must be greater than 0")
+		return access.FungibleTokenTransfersPage{}, fmt.Errorf("%w: limit must be greater than 0", storage.ErrInvalidQuery)
 	}
 
 	latestHeight := idx.latestHeight.Load()
@@ -342,6 +342,10 @@ func indexFTTransfers(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockHei
 	for _, entry := range transfers {
 		if entry.BlockHeight != blockHeight {
 			return fmt.Errorf("block height mismatch: expected %d, got %d", blockHeight, entry.BlockHeight)
+		}
+
+		if len(entry.EventIndices) == 0 {
+			return fmt.Errorf("transfer must have at least one event index (tx=%s)", entry.TransactionID)
 		}
 
 		value := makeFTTransferValue(entry)

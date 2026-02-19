@@ -2,6 +2,7 @@ package models
 
 import (
 	"strconv"
+	"time"
 
 	commonmodels "github.com/onflow/flow-go/engine/access/rest/common/models"
 	accessmodel "github.com/onflow/flow-go/model/access"
@@ -19,6 +20,7 @@ func (t *FungibleTokenTransfer) Build(
 	}
 
 	t.BlockHeight = strconv.FormatUint(transfer.BlockHeight, 10)
+	t.BlockTimestamp = time.UnixMilli(int64(transfer.BlockTimestamp)).UTC().Format(time.RFC3339Nano)
 	t.TransactionId = transfer.TransactionID.String()
 	t.TransactionIndex = strconv.FormatUint(uint64(transfer.TransactionIndex), 10)
 	t.EventIndices = eventIndices

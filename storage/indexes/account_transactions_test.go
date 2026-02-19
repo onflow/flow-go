@@ -406,6 +406,14 @@ func TestAccountTransactions_ErrorCases(t *testing.T) {
 		})
 	})
 
+	t.Run("limit zero returns ErrInvalidQuery", func(t *testing.T) {
+		RunWithBootstrappedAccountTxIndex(t, 5, nil, func(_ storage.DB, _ storage.LockManager, idx *AccountTransactions) {
+			account := unittest.RandomAddressFixture()
+			_, err := idx.TransactionsByAddress(account, 0, nil, nil)
+			require.ErrorIs(t, err, storage.ErrInvalidQuery)
+		})
+	})
+
 	t.Run("nil cursor returns empty for account with no transactions", func(t *testing.T) {
 		RunWithBootstrappedAccountTxIndex(t, 5, nil, func(_ storage.DB, _ storage.LockManager, idx *AccountTransactions) {
 			account := unittest.RandomAddressFixture()

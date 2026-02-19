@@ -471,11 +471,11 @@ func TestNFTTransfers_RangeQueries(t *testing.T) {
 		})
 	})
 
-	t.Run("limit zero returns error", func(t *testing.T) {
+	t.Run("limit zero returns ErrInvalidQuery", func(t *testing.T) {
 		RunWithBootstrappedNFTTransferIndex(t, 5, nil, func(_ storage.DB, lm storage.LockManager, idx *NonFungibleTokenTransfers) {
 			account := unittest.RandomAddressFixture()
 			_, err := idx.TransfersByAddress(account, 0, nil, nil)
-			require.Error(t, err)
+			require.ErrorIs(t, err, storage.ErrInvalidQuery)
 		})
 	})
 

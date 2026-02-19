@@ -505,7 +505,7 @@ func TestFTTransfers_RangeQueries(t *testing.T) {
 		RunWithBootstrappedFTTransferIndex(t, 5, nil, func(_ storage.DB, _ storage.LockManager, idx *FungibleTokenTransfers) {
 			account := unittest.RandomAddressFixture()
 			_, err := idx.TransfersByAddress(account, 0, nil, nil)
-			require.Error(t, err)
+			require.ErrorIs(t, err, storage.ErrInvalidQuery)
 		})
 	})
 

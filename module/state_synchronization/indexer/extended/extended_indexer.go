@@ -418,12 +418,3 @@ func buildGroupLookup(indexers []Indexer, latestBlockData *BlockData) ([]Indexer
 
 	return liveGroup, groupLookup, nil
 }
-
-// groupEventsByTxIndex returns a map of events grouped by transaction index in the original event order.
-func groupEventsByTxIndex(events []flow.Event) map[uint32][]flow.Event {
-	eventsByTxIndex := make(map[uint32][]flow.Event)
-	for _, event := range events {
-		eventsByTxIndex[event.TransactionIndex] = append(eventsByTxIndex[event.TransactionIndex], event)
-	}
-	return eventsByTxIndex
-}

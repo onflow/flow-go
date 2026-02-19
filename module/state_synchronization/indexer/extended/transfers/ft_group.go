@@ -23,17 +23,21 @@ type ftDecodedDeposit struct {
 type ftTxEventGroup struct {
 	withdrawals []*ftDecodedWithdrawal
 	deposits    []*ftDecodedDeposit
+	flowFees    *flowFeesEvent
 
 	withdrawalByUUID map[uint64]int
 	matchedDeposits  map[uint64]struct{}
 
 	pairedResults []ftPairedResult
+
+	flowFeesAddress flow.Address
 }
 
-func newFTTxEventGroup() *ftTxEventGroup {
+func newFTTxEventGroup(flowFeesAddress flow.Address) *ftTxEventGroup {
 	return &ftTxEventGroup{
 		withdrawalByUUID: make(map[uint64]int),
 		matchedDeposits:  make(map[uint64]struct{}),
+		flowFeesAddress:  flowFeesAddress,
 	}
 }
 
@@ -42,13 +46,13 @@ func newFTTxEventGroup() *ftTxEventGroup {
 // No error returns are expected during normal operation.
 func (g *ftTxEventGroup) addWithdrawal(event flow.Event, decoded *ftWithdrawnEvent) error {
 	w := &ftDecodedWithdrawal{source: event, decoded: *decoded}
-	g.withdrawals = append(g.withdrawals, w)
 
-	// 1. build a mapping of withdrawn vault UUID to the withdrawal index in the `withdrawals` slice.
+	// 1. build a mapping of withdrawn vault UUID to the index in the `withdrawals` slice.
 	// this is used to identify the parent when there is a chain of withdrawals.
 	if _, exists := g.withdrawalByUUID[decoded.WithdrawnUUID]; exists {
 		return fmt.Errorf("duplicate withdrawal resource UUID %d in transaction %d", decoded.WithdrawnUUID, event.TransactionIndex)
 	}
+	g.withdrawals = append(g.withdrawals, w)
 	g.withdrawalByUUID[decoded.WithdrawnUUID] = len(g.withdrawals) - 1
 
 	// 2. check if withdrawal is from a stored vault or another withdrawn vault
@@ -124,10 +128,38 @@ func (g *ftTxEventGroup) addDeposit(event flow.Event, decoded *ftDepositedEvent)
 	return nil
 }
 
+// addFlowFees adds a flow fees event to the event group.
+//
+// No error returns are expected during normal operation.
+func (g *ftTxEventGroup) addFlowFees(decoded *flowFeesEvent) error {
+	g.flowFees = decoded
+
+	// a flow fees deposit always comes after the withdrawal and deposit events, so it will always have a pair.
+	// walk backwards to find the first pair that matches the flow fees deposit, since the flow fees
+	// event is always immediately following the withdrawal and deposit events.
+	// this ensures that if there was another transfer to the flow fees address for the same amount
+	// in the same transaction, it will be treated as a regular transfer.
+	for i := len(g.pairedResults) - 1; i >= 0; i-- {
+		pair := g.pairedResults[i]
+		if pair.deposit != nil && pair.deposit.To == g.flowFeesAddress && pair.deposit.Amount == decoded.Amount {
+			g.pairedResults[i].isFlowFees = true
+			return nil
+		}
+	}
+
+	// if we didn't find the fees transfer pair, then there is a bug in the event parsing logic.
+	return fmt.Errorf("flow fees deposit not found for amount %s", decoded.Amount.String())
+}
+
+// ResolvePairs returns all paired results.
 func (g *ftTxEventGroup) ResolvePairs() []ftPairedResult {
 	// find all unmatched withdrawals
 	for uuid, wIdx := range g.withdrawalByUUID {
 		if _, ok := g.matchedDeposits[uuid]; ok {
+			continue
+		}
+		if g.withdrawals[wIdx].decoded.Amount == 0 {
+			// ignore fully consumed withdrawals (full amount was withdrawn into a child vault)
 			continue
 		}
 		// Unmatched withdrawal -- treat as burn.

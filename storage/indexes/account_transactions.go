@@ -143,7 +143,7 @@ func (idx *AccountTransactions) TransactionsByAddress(
 	filter storage.IndexFilter[*access.AccountTransaction],
 ) (access.AccountTransactionsPage, error) {
 	if limit == 0 {
-		return access.AccountTransactionsPage{}, fmt.Errorf("limit must be greater than 0")
+		return access.AccountTransactionsPage{}, fmt.Errorf("%w: limit must be greater than 0", storage.ErrInvalidQuery)
 	}
 
 	latestHeight := idx.latestHeight.Load()

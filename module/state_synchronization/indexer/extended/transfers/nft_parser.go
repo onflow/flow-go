@@ -2,6 +2,7 @@ package transfers
 
 import (
 	"fmt"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -11,18 +12,20 @@ import (
 )
 
 const (
-	nftDepositedSuffix = "NonFungibleToken.Deposited"
-	nftWithdrawnSuffix = "NonFungibleToken.Withdrawn"
+	nftWithdrawnFormat = "A.%s.NonFungibleToken.Withdrawn"
+	nftDepositedFormat = "A.%s.NonFungibleToken.Deposited"
 )
 
 // nftPairedResult holds a matched withdrawal/deposit pair, or an unpaired event.
 // For paired events, both withdrawal and deposit are set.
 // For mints (deposit-only), withdrawal is nil.
-// For burns (withdrawal-only), deposit is nil.
+// For burns (withdrawal-only), deposit is nil and recipientAddress is zero.
+// For intermediate transfers (multi-layer collections), deposit is nil and recipientAddress is set.
 type nftPairedResult struct {
-	sourceEvents []flow.Event       // the flow.Event(s) that produced this result
-	withdrawal   *nftWithdrawnEvent // nil for deposit-only (mint)
-	deposit      *nftDepositedEvent // nil for withdrawal-only (burn)
+	sourceEvents     []flow.Event       // the flow.Event(s) that produced this result
+	withdrawal       *nftWithdrawnEvent // nil for deposit-only (mint)
+	deposit          *nftDepositedEvent // nil for withdrawal-only (burn or intermediate transfer)
+	recipientAddress flow.Address       // used for intermediate transfers when deposit is nil
 }
 
 // NFTParser decodes NonFungibleToken transfer events from CCF-encoded payloads and converts them
@@ -38,8 +41,8 @@ type NFTParser struct {
 func NewNFTParser(chainID flow.ChainID) *NFTParser {
 	sc := systemcontracts.SystemContractsForChain(chainID)
 	return &NFTParser{
-		withdrawnEventType: flow.EventType(fmt.Sprintf("A.%s.%s", sc.NonFungibleToken.Address, nftWithdrawnSuffix)),
-		depositedEventType: flow.EventType(fmt.Sprintf("A.%s.%s", sc.NonFungibleToken.Address, nftDepositedSuffix)),
+		withdrawnEventType: flow.EventType(fmt.Sprintf(nftWithdrawnFormat, sc.NonFungibleToken.Address)),
+		depositedEventType: flow.EventType(fmt.Sprintf(nftDepositedFormat, sc.NonFungibleToken.Address)),
 	}
 }
 
@@ -85,7 +88,7 @@ func (p *NFTParser) filterAndDecodeNFT(events []flow.Event) (map[uint32]*nftTxEv
 	for _, event := range events {
 		switch event.Type {
 		case p.withdrawnEventType:
-			cadenceEvent, err := decodeEvent(event)
+			cadenceEvent, err := DecodeEvent(event)
 			if err != nil {
 				return nil, fmt.Errorf("failed to decode event %d in transaction %d: %w", event.EventIndex, event.TransactionIndex, err)
 			}
@@ -100,7 +103,7 @@ func (p *NFTParser) filterAndDecodeNFT(events []flow.Event) (map[uint32]*nftTxEv
 			}
 
 		case p.depositedEventType:
-			cadenceEvent, err := decodeEvent(event)
+			cadenceEvent, err := DecodeEvent(event)
 			if err != nil {
 				return nil, fmt.Errorf("failed to decode event %d in transaction %d: %w", event.EventIndex, event.TransactionIndex, err)
 			}
@@ -124,7 +127,7 @@ func (p *NFTParser) filterAndDecodeNFT(events []flow.Event) (map[uint32]*nftTxEv
 // No error returns are expected during normal operation.
 func (p *NFTParser) buildTransfers(paired []nftPairedResult, blockHeight uint64) ([]access.NonFungibleTokenTransfer, error) {
 	transfers := make([]access.NonFungibleTokenTransfer, 0, len(paired))
-	for _, pair := range paired {
+	for i, pair := range paired {
 		if len(pair.sourceEvents) == 0 {
 			return nil, fmt.Errorf("paired result has no source events")
 		}
@@ -150,6 +153,10 @@ func (p *NFTParser) buildTransfers(paired []nftPairedResult, blockHeight uint64)
 			}
 		}
 
+		if len(eventIndices) == 0 {
+			return nil, fmt.Errorf("no event indices for source events (tx=%s, pairIdx=%d)", txID, i)
+		}
+
 		transfer := access.NonFungibleTokenTransfer{
 			BlockHeight:      blockHeight,
 			TransactionID:    txID,
@@ -167,6 +174,8 @@ func (p *NFTParser) buildTransfers(paired []nftPairedResult, blockHeight uint64)
 			transfer.TokenType = pair.deposit.Type
 			transfer.ID = pair.deposit.ID
 			transfer.RecipientAddress = pair.deposit.To
+		} else {
+			transfer.RecipientAddress = pair.recipientAddress
 		}
 
 		if transfer.TokenType == "" {
@@ -176,5 +185,13 @@ func (p *NFTParser) buildTransfers(paired []nftPairedResult, blockHeight uint64)
 
 		transfers = append(transfers, transfer)
 	}
+	// sort ascending. for transfers in the same transaction, sort ascending by the last event index,
+	// which is either the deposit event, or the withdrawal placeholder event.
+	sort.Slice(transfers, func(i, j int) bool {
+		if transfers[i].TransactionIndex == transfers[j].TransactionIndex {
+			return transfers[i].EventIndices[len(transfers[i].EventIndices)-1] < transfers[j].EventIndices[len(transfers[j].EventIndices)-1]
+		}
+		return transfers[i].TransactionIndex < transfers[j].TransactionIndex
+	})
 	return transfers, nil
 }

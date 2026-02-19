@@ -12,7 +12,9 @@ import commonmodels "github.com/onflow/flow-go/engine/access/rest/common/models"
 
 type AccountTransaction struct {
 	// Block height where the transaction was included.
-	BlockHeight   string `json:"block_height"`
+	BlockHeight string `json:"block_height"`
+	// Block timestamp where the transaction was included, in RFC3339Nano format.
+	Timestamp     string `json:"timestamp"`
 	TransactionId string `json:"transaction_id"`
 	// Index of the transaction within the block.
 	TransactionIndex string                          `json:"transaction_index"`

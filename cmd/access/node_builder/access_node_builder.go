@@ -861,7 +861,9 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 		})
 	}
 
-	if builder.executionDataIndexingEnabled {
+	if !builder.executionDataIndexingEnabled {
+		builder.IndexerDependencies.Add(&module.NoopReadyDoneAware{})
+	} else {
 		var indexedBlockHeightInitializer storage.ConsumerProgressInitializer
 		extendedIndexerDependable := module.NewProxiedReadyDoneAware()
 		builder.IndexerDependencies.Add(extendedIndexerDependable)
@@ -1099,16 +1101,22 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 					return nil, fmt.Errorf("could not create account transactions indexer: %w", err)
 				}
 
-				accountTransfers := extended.NewAccountTransfers(
+				ftTransfers := extended.NewFungibleTokenTransfers(
 					node.Logger,
 					node.RootChainID,
 					builder.ExtendedStorage.FungibleTokenTransfersBootstrapper,
+				)
+
+				nftTransfers := extended.NewNonFungibleTokenTransfers(
+					node.Logger,
+					node.RootChainID,
 					builder.ExtendedStorage.NonFungibleTokenTransfersBootstrapper,
 				)
 
 				extendedIndexers := []extended.Indexer{
 					accountTransactions,
-					accountTransfers,
+					ftTransfers,
+					nftTransfers,
 				}
 
 				extendedIndexer, err := extended.NewExtendedIndexer(

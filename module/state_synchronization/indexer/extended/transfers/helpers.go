@@ -8,10 +8,10 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// decodeEvent decodes the CCF payload of a [flow.Event] into a [cadence.Event].
+// DecodeEvent decodes the CCF payload of a [flow.Event] into a [cadence.Event].
 //
 // Any error indicates that the event payload is malformed.
-func decodeEvent(event flow.Event) (cadence.Event, error) {
+func DecodeEvent(event flow.Event) (cadence.Event, error) {
 	value, err := ccf.Decode(nil, event.Payload)
 	if err != nil {
 		return cadence.Event{}, fmt.Errorf("failed to decode CCF payload for %s: %w", event.Type, err)

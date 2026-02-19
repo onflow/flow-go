@@ -26,6 +26,7 @@ func TestBackend_GetAccountFungibleTokenTransfers(t *testing.T) {
 	t.Parallel()
 
 	defaultEncoding := entities.EventEncodingVersion_JSON_CDC_V0
+	defaultConfig := DefaultConfig()
 
 	t.Run("happy path returns page from storage", func(t *testing.T) {
 		ftStore := storagemock.NewFungibleTokenTransfersBootstrapper(t)
@@ -41,7 +42,7 @@ func TestBackend_GetAccountFungibleTokenTransfers(t *testing.T) {
 					TransactionID:    txID,
 					BlockHeight:      100,
 					TransactionIndex: 0,
-					TokenType:        "A.0x1654653399040a61.FlowToken",
+					TokenType:        "A.1654653399040a61.FlowToken",
 					Amount:           big.NewInt(1000),
 					SourceAddress:    addr,
 					RecipientAddress: unittest.RandomAddressFixture(),
@@ -50,9 +51,8 @@ func TestBackend_GetAccountFungibleTokenTransfers(t *testing.T) {
 			NextCursor: nil,
 		}
 
-		ftStore.On("TransfersByAddress",
-			addr, uint32(50), (*accessmodel.TransferCursor)(nil), mocktestify.Anything,
-		).Return(expectedPage, nil)
+		ftStore.On("TransfersByAddress", addr, uint32(50), (*accessmodel.TransferCursor)(nil), mocktestify.Anything).
+			Return(expectedPage, nil)
 
 		page, err := backend.GetAccountFungibleTokenTransfers(
 			context.Background(), addr, 0, nil, AccountFTTransferFilter{}, false, defaultEncoding,
@@ -66,7 +66,7 @@ func TestBackend_GetAccountFungibleTokenTransfers(t *testing.T) {
 	t.Run("default limit applied when limit is 0", func(t *testing.T) {
 		ftStore := storagemock.NewFungibleTokenTransfersBootstrapper(t)
 		nftStore := storagemock.NewNonFungibleTokenTransfersBootstrapper(t)
-		backend := NewAccountTransfersBackend(unittest.Logger(), &backendBase{config: DefaultConfig()}, ftStore, nftStore)
+		backend := NewAccountTransfersBackend(unittest.Logger(), &backendBase{config: defaultConfig}, ftStore, nftStore)
 
 		addr := unittest.RandomAddressFixture()
 
@@ -77,9 +77,8 @@ func TestBackend_GetAccountFungibleTokenTransfers(t *testing.T) {
 		}
 
 		// Expect the default page size (50)
-		ftStore.On("TransfersByAddress",
-			addr, uint32(50), (*accessmodel.TransferCursor)(nil), mocktestify.Anything,
-		).Return(nonEmptyPage, nil)
+		ftStore.On("TransfersByAddress", addr, defaultConfig.DefaultPageSize, (*accessmodel.TransferCursor)(nil), mocktestify.Anything).
+			Return(nonEmptyPage, nil)
 
 		_, err := backend.GetAccountFungibleTokenTransfers(
 			context.Background(), addr, 0, nil, AccountFTTransferFilter{}, false, defaultEncoding,
@@ -90,7 +89,7 @@ func TestBackend_GetAccountFungibleTokenTransfers(t *testing.T) {
 	t.Run("max limit cap applied", func(t *testing.T) {
 		ftStore := storagemock.NewFungibleTokenTransfersBootstrapper(t)
 		nftStore := storagemock.NewNonFungibleTokenTransfersBootstrapper(t)
-		backend := NewAccountTransfersBackend(unittest.Logger(), &backendBase{config: DefaultConfig()}, ftStore, nftStore)
+		backend := NewAccountTransfersBackend(unittest.Logger(), &backendBase{config: defaultConfig}, ftStore, nftStore)
 
 		addr := unittest.RandomAddressFixture()
 
@@ -101,9 +100,7 @@ func TestBackend_GetAccountFungibleTokenTransfers(t *testing.T) {
 		}
 
 		// Request 500, expect capped to 200
-		ftStore.On("TransfersByAddress",
-			addr, uint32(200), (*accessmodel.TransferCursor)(nil), mocktestify.Anything,
-		).Return(nonEmptyPage, nil)
+		ftStore.On("TransfersByAddress", addr, defaultConfig.MaxPageSize, (*accessmodel.TransferCursor)(nil), mocktestify.Anything).Return(nonEmptyPage, nil)
 
 		_, err := backend.GetAccountFungibleTokenTransfers(
 			context.Background(), addr, 500, nil, AccountFTTransferFilter{}, false, defaultEncoding,
@@ -114,7 +111,7 @@ func TestBackend_GetAccountFungibleTokenTransfers(t *testing.T) {
 	t.Run("cursor is forwarded to storage", func(t *testing.T) {
 		ftStore := storagemock.NewFungibleTokenTransfersBootstrapper(t)
 		nftStore := storagemock.NewNonFungibleTokenTransfersBootstrapper(t)
-		backend := NewAccountTransfersBackend(unittest.Logger(), &backendBase{config: DefaultConfig()}, ftStore, nftStore)
+		backend := NewAccountTransfersBackend(unittest.Logger(), &backendBase{config: defaultConfig}, ftStore, nftStore)
 
 		addr := unittest.RandomAddressFixture()
 		cursor := &accessmodel.TransferCursor{BlockHeight: 50, TransactionIndex: 3, EventIndex: 1}
@@ -125,9 +122,8 @@ func TestBackend_GetAccountFungibleTokenTransfers(t *testing.T) {
 			},
 		}
 
-		ftStore.On("TransfersByAddress",
-			addr, uint32(10), cursor, mocktestify.Anything,
-		).Return(nonEmptyPage, nil)
+		ftStore.On("TransfersByAddress", addr, uint32(10), cursor, mocktestify.Anything).
+			Return(nonEmptyPage, nil)
 
 		_, err := backend.GetAccountFungibleTokenTransfers(
 			context.Background(), addr, 10, cursor, AccountFTTransferFilter{}, false, defaultEncoding,
@@ -138,13 +134,12 @@ func TestBackend_GetAccountFungibleTokenTransfers(t *testing.T) {
 	t.Run("ErrNotBootstrapped maps to FailedPrecondition", func(t *testing.T) {
 		ftStore := storagemock.NewFungibleTokenTransfersBootstrapper(t)
 		nftStore := storagemock.NewNonFungibleTokenTransfersBootstrapper(t)
-		backend := NewAccountTransfersBackend(unittest.Logger(), &backendBase{config: DefaultConfig()}, ftStore, nftStore)
+		backend := NewAccountTransfersBackend(unittest.Logger(), &backendBase{config: defaultConfig}, ftStore, nftStore)
 
 		addr := unittest.RandomAddressFixture()
 
-		ftStore.On("TransfersByAddress",
-			addr, uint32(50), (*accessmodel.TransferCursor)(nil), mocktestify.Anything,
-		).Return(accessmodel.FungibleTokenTransfersPage{}, storage.ErrNotBootstrapped)
+		ftStore.On("TransfersByAddress", addr, uint32(50), (*accessmodel.TransferCursor)(nil), mocktestify.Anything).
+			Return(accessmodel.FungibleTokenTransfersPage{}, storage.ErrNotBootstrapped)
 
 		_, err := backend.GetAccountFungibleTokenTransfers(
 			context.Background(), addr, 0, nil, AccountFTTransferFilter{}, false, defaultEncoding,
@@ -158,14 +153,13 @@ func TestBackend_GetAccountFungibleTokenTransfers(t *testing.T) {
 	t.Run("ErrHeightNotIndexed maps to OutOfRange", func(t *testing.T) {
 		ftStore := storagemock.NewFungibleTokenTransfersBootstrapper(t)
 		nftStore := storagemock.NewNonFungibleTokenTransfersBootstrapper(t)
-		backend := NewAccountTransfersBackend(unittest.Logger(), &backendBase{config: DefaultConfig()}, ftStore, nftStore)
+		backend := NewAccountTransfersBackend(unittest.Logger(), &backendBase{config: defaultConfig}, ftStore, nftStore)
 
 		addr := unittest.RandomAddressFixture()
 		cursor := &accessmodel.TransferCursor{BlockHeight: 999, TransactionIndex: 0, EventIndex: 0}
 
-		ftStore.On("TransfersByAddress",
-			addr, uint32(10), cursor, mocktestify.Anything,
-		).Return(accessmodel.FungibleTokenTransfersPage{}, fmt.Errorf("wrapped: %w", storage.ErrHeightNotIndexed))
+		ftStore.On("TransfersByAddress", addr, uint32(10), cursor, mocktestify.Anything).
+			Return(accessmodel.FungibleTokenTransfersPage{}, fmt.Errorf("wrapped: %w", storage.ErrHeightNotIndexed))
 
 		_, err := backend.GetAccountFungibleTokenTransfers(
 			context.Background(), addr, 10, cursor, AccountFTTransferFilter{}, false, defaultEncoding,
@@ -179,14 +173,13 @@ func TestBackend_GetAccountFungibleTokenTransfers(t *testing.T) {
 	t.Run("unexpected error triggers irrecoverable", func(t *testing.T) {
 		ftStore := storagemock.NewFungibleTokenTransfersBootstrapper(t)
 		nftStore := storagemock.NewNonFungibleTokenTransfersBootstrapper(t)
-		backend := NewAccountTransfersBackend(unittest.Logger(), &backendBase{config: DefaultConfig()}, ftStore, nftStore)
+		backend := NewAccountTransfersBackend(unittest.Logger(), &backendBase{config: defaultConfig}, ftStore, nftStore)
 
 		addr := unittest.RandomAddressFixture()
 		storageErr := fmt.Errorf("unexpected storage failure")
 
-		ftStore.On("TransfersByAddress",
-			addr, uint32(50), (*accessmodel.TransferCursor)(nil), mocktestify.Anything,
-		).Return(accessmodel.FungibleTokenTransfersPage{}, storageErr)
+		ftStore.On("TransfersByAddress", addr, uint32(50), (*accessmodel.TransferCursor)(nil), mocktestify.Anything).
+			Return(accessmodel.FungibleTokenTransfersPage{}, storageErr)
 
 		expectedErr := fmt.Errorf("failed to get fungible token transfers: %w", storageErr)
 		signalerCtx := irrecoverable.WithSignalerContext(context.Background(),
@@ -203,11 +196,12 @@ func TestBackend_GetAccountNonFungibleTokenTransfers(t *testing.T) {
 	t.Parallel()
 
 	defaultEncoding := entities.EventEncodingVersion_JSON_CDC_V0
+	defaultConfig := DefaultConfig()
 
 	t.Run("happy path returns page from storage", func(t *testing.T) {
 		ftStore := storagemock.NewFungibleTokenTransfersBootstrapper(t)
 		nftStore := storagemock.NewNonFungibleTokenTransfersBootstrapper(t)
-		backend := NewAccountTransfersBackend(unittest.Logger(), &backendBase{config: DefaultConfig()}, ftStore, nftStore)
+		backend := NewAccountTransfersBackend(unittest.Logger(), &backendBase{config: defaultConfig}, ftStore, nftStore)
 
 		addr := unittest.RandomAddressFixture()
 		txID := unittest.IdentifierFixture()
@@ -218,7 +212,7 @@ func TestBackend_GetAccountNonFungibleTokenTransfers(t *testing.T) {
 					TransactionID:    txID,
 					BlockHeight:      100,
 					TransactionIndex: 0,
-					TokenType:        "A.0x1654653399040a61.MyNFT",
+					TokenType:        "A.1654653399040a61.MyNFT",
 					ID:               42,
 					SourceAddress:    addr,
 					RecipientAddress: unittest.RandomAddressFixture(),
@@ -227,9 +221,8 @@ func TestBackend_GetAccountNonFungibleTokenTransfers(t *testing.T) {
 			NextCursor: nil,
 		}
 
-		nftStore.On("TransfersByAddress",
-			addr, uint32(50), (*accessmodel.TransferCursor)(nil), mocktestify.Anything,
-		).Return(expectedPage, nil)
+		nftStore.On("TransfersByAddress", addr, uint32(50), (*accessmodel.TransferCursor)(nil), mocktestify.Anything).
+			Return(expectedPage, nil)
 
 		page, err := backend.GetAccountNonFungibleTokenTransfers(
 			context.Background(), addr, 0, nil, AccountNFTTransferFilter{}, false, defaultEncoding,
@@ -243,7 +236,7 @@ func TestBackend_GetAccountNonFungibleTokenTransfers(t *testing.T) {
 	t.Run("default limit applied when limit is 0", func(t *testing.T) {
 		ftStore := storagemock.NewFungibleTokenTransfersBootstrapper(t)
 		nftStore := storagemock.NewNonFungibleTokenTransfersBootstrapper(t)
-		backend := NewAccountTransfersBackend(unittest.Logger(), &backendBase{config: DefaultConfig()}, ftStore, nftStore)
+		backend := NewAccountTransfersBackend(unittest.Logger(), &backendBase{config: defaultConfig}, ftStore, nftStore)
 
 		addr := unittest.RandomAddressFixture()
 
@@ -253,9 +246,8 @@ func TestBackend_GetAccountNonFungibleTokenTransfers(t *testing.T) {
 			},
 		}
 
-		nftStore.On("TransfersByAddress",
-			addr, uint32(50), (*accessmodel.TransferCursor)(nil), mocktestify.Anything,
-		).Return(nonEmptyPage, nil)
+		nftStore.On("TransfersByAddress", addr, defaultConfig.DefaultPageSize, (*accessmodel.TransferCursor)(nil), mocktestify.Anything).
+			Return(nonEmptyPage, nil)
 
 		_, err := backend.GetAccountNonFungibleTokenTransfers(
 			context.Background(), addr, 0, nil, AccountNFTTransferFilter{}, false, defaultEncoding,
@@ -266,7 +258,7 @@ func TestBackend_GetAccountNonFungibleTokenTransfers(t *testing.T) {
 	t.Run("max limit cap applied", func(t *testing.T) {
 		ftStore := storagemock.NewFungibleTokenTransfersBootstrapper(t)
 		nftStore := storagemock.NewNonFungibleTokenTransfersBootstrapper(t)
-		backend := NewAccountTransfersBackend(unittest.Logger(), &backendBase{config: DefaultConfig()}, ftStore, nftStore)
+		backend := NewAccountTransfersBackend(unittest.Logger(), &backendBase{config: defaultConfig}, ftStore, nftStore)
 
 		addr := unittest.RandomAddressFixture()
 
@@ -277,9 +269,8 @@ func TestBackend_GetAccountNonFungibleTokenTransfers(t *testing.T) {
 		}
 
 		// Request 500, expect capped to 200
-		nftStore.On("TransfersByAddress",
-			addr, uint32(200), (*accessmodel.TransferCursor)(nil), mocktestify.Anything,
-		).Return(nonEmptyPage, nil)
+		nftStore.On("TransfersByAddress", addr, defaultConfig.MaxPageSize, (*accessmodel.TransferCursor)(nil), mocktestify.Anything).
+			Return(nonEmptyPage, nil)
 
 		_, err := backend.GetAccountNonFungibleTokenTransfers(
 			context.Background(), addr, 500, nil, AccountNFTTransferFilter{}, false, defaultEncoding,
@@ -290,7 +281,7 @@ func TestBackend_GetAccountNonFungibleTokenTransfers(t *testing.T) {
 	t.Run("cursor is forwarded to storage", func(t *testing.T) {
 		ftStore := storagemock.NewFungibleTokenTransfersBootstrapper(t)
 		nftStore := storagemock.NewNonFungibleTokenTransfersBootstrapper(t)
-		backend := NewAccountTransfersBackend(unittest.Logger(), &backendBase{config: DefaultConfig()}, ftStore, nftStore)
+		backend := NewAccountTransfersBackend(unittest.Logger(), &backendBase{config: defaultConfig}, ftStore, nftStore)
 
 		addr := unittest.RandomAddressFixture()
 		cursor := &accessmodel.TransferCursor{BlockHeight: 50, TransactionIndex: 3, EventIndex: 1}
@@ -301,9 +292,8 @@ func TestBackend_GetAccountNonFungibleTokenTransfers(t *testing.T) {
 			},
 		}
 
-		nftStore.On("TransfersByAddress",
-			addr, uint32(10), cursor, mocktestify.Anything,
-		).Return(nonEmptyPage, nil)
+		nftStore.On("TransfersByAddress", addr, uint32(10), cursor, mocktestify.Anything).
+			Return(nonEmptyPage, nil)
 
 		_, err := backend.GetAccountNonFungibleTokenTransfers(
 			context.Background(), addr, 10, cursor, AccountNFTTransferFilter{}, false, defaultEncoding,
@@ -314,13 +304,12 @@ func TestBackend_GetAccountNonFungibleTokenTransfers(t *testing.T) {
 	t.Run("ErrNotBootstrapped maps to FailedPrecondition", func(t *testing.T) {
 		ftStore := storagemock.NewFungibleTokenTransfersBootstrapper(t)
 		nftStore := storagemock.NewNonFungibleTokenTransfersBootstrapper(t)
-		backend := NewAccountTransfersBackend(unittest.Logger(), &backendBase{config: DefaultConfig()}, ftStore, nftStore)
+		backend := NewAccountTransfersBackend(unittest.Logger(), &backendBase{config: defaultConfig}, ftStore, nftStore)
 
 		addr := unittest.RandomAddressFixture()
 
-		nftStore.On("TransfersByAddress",
-			addr, uint32(50), (*accessmodel.TransferCursor)(nil), mocktestify.Anything,
-		).Return(accessmodel.NonFungibleTokenTransfersPage{}, storage.ErrNotBootstrapped)
+		nftStore.On("TransfersByAddress", addr, uint32(50), (*accessmodel.TransferCursor)(nil), mocktestify.Anything).
+			Return(accessmodel.NonFungibleTokenTransfersPage{}, storage.ErrNotBootstrapped)
 
 		_, err := backend.GetAccountNonFungibleTokenTransfers(
 			context.Background(), addr, 0, nil, AccountNFTTransferFilter{}, false, defaultEncoding,
@@ -334,14 +323,13 @@ func TestBackend_GetAccountNonFungibleTokenTransfers(t *testing.T) {
 	t.Run("ErrHeightNotIndexed maps to OutOfRange", func(t *testing.T) {
 		ftStore := storagemock.NewFungibleTokenTransfersBootstrapper(t)
 		nftStore := storagemock.NewNonFungibleTokenTransfersBootstrapper(t)
-		backend := NewAccountTransfersBackend(unittest.Logger(), &backendBase{config: DefaultConfig()}, ftStore, nftStore)
+		backend := NewAccountTransfersBackend(unittest.Logger(), &backendBase{config: defaultConfig}, ftStore, nftStore)
 
 		addr := unittest.RandomAddressFixture()
 		cursor := &accessmodel.TransferCursor{BlockHeight: 999, TransactionIndex: 0, EventIndex: 0}
 
-		nftStore.On("TransfersByAddress",
-			addr, uint32(10), cursor, mocktestify.Anything,
-		).Return(accessmodel.NonFungibleTokenTransfersPage{}, fmt.Errorf("wrapped: %w", storage.ErrHeightNotIndexed))
+		nftStore.On("TransfersByAddress", addr, uint32(10), cursor, mocktestify.Anything).
+			Return(accessmodel.NonFungibleTokenTransfersPage{}, fmt.Errorf("wrapped: %w", storage.ErrHeightNotIndexed))
 
 		_, err := backend.GetAccountNonFungibleTokenTransfers(
 			context.Background(), addr, 10, cursor, AccountNFTTransferFilter{}, false, defaultEncoding,
@@ -355,14 +343,13 @@ func TestBackend_GetAccountNonFungibleTokenTransfers(t *testing.T) {
 	t.Run("unexpected error triggers irrecoverable", func(t *testing.T) {
 		ftStore := storagemock.NewFungibleTokenTransfersBootstrapper(t)
 		nftStore := storagemock.NewNonFungibleTokenTransfersBootstrapper(t)
-		backend := NewAccountTransfersBackend(unittest.Logger(), &backendBase{config: DefaultConfig()}, ftStore, nftStore)
+		backend := NewAccountTransfersBackend(unittest.Logger(), &backendBase{config: defaultConfig}, ftStore, nftStore)
 
 		addr := unittest.RandomAddressFixture()
 		storageErr := fmt.Errorf("unexpected storage failure")
 
-		nftStore.On("TransfersByAddress",
-			addr, uint32(50), (*accessmodel.TransferCursor)(nil), mocktestify.Anything,
-		).Return(accessmodel.NonFungibleTokenTransfersPage{}, storageErr)
+		nftStore.On("TransfersByAddress", addr, uint32(50), (*accessmodel.TransferCursor)(nil), mocktestify.Anything).
+			Return(accessmodel.NonFungibleTokenTransfersPage{}, storageErr)
 
 		expectedErr := fmt.Errorf("failed to get non-fungible token transfers: %w", storageErr)
 		signalerCtx := irrecoverable.WithSignalerContext(context.Background(),
@@ -383,7 +370,7 @@ func TestAccountFTTransferFilter(t *testing.T) {
 	otherAddr := unittest.RandomAddressFixture()
 
 	transfer := &accessmodel.FungibleTokenTransfer{
-		TokenType:        "A.0x1654653399040a61.FlowToken",
+		TokenType:        "A.1654653399040a61.FlowToken",
 		SourceAddress:    senderAddr,
 		RecipientAddress: recipientAddr,
 	}
@@ -394,7 +381,7 @@ func TestAccountFTTransferFilter(t *testing.T) {
 	})
 
 	t.Run("token type filter matches", func(t *testing.T) {
-		filter := AccountFTTransferFilter{TokenType: "A.0x1654653399040a61.FlowToken"}
+		filter := AccountFTTransferFilter{TokenType: "A.1654653399040a61.FlowToken"}
 		assert.True(t, filter.Filter()(transfer))
 	})
 
@@ -458,7 +445,7 @@ func TestAccountFTTransferFilter(t *testing.T) {
 	t.Run("combined filters all match", func(t *testing.T) {
 		filter := AccountFTTransferFilter{
 			AccountAddress:   senderAddr,
-			TokenType:        "A.0x1654653399040a61.FlowToken",
+			TokenType:        "A.1654653399040a61.FlowToken",
 			SourceAddress:    senderAddr,
 			RecipientAddress: recipientAddr,
 			TransferRole:     accessmodel.TransferRoleSender,
@@ -469,7 +456,7 @@ func TestAccountFTTransferFilter(t *testing.T) {
 	t.Run("combined filters reject on first mismatch", func(t *testing.T) {
 		filter := AccountFTTransferFilter{
 			TokenType:     "A.0xOther.USDC", // mismatch
-			SourceAddress: senderAddr,        // match
+			SourceAddress: senderAddr,       // match
 		}
 		assert.False(t, filter.Filter()(transfer))
 	})
@@ -491,7 +478,7 @@ func TestAccountNFTTransferFilter(t *testing.T) {
 	otherAddr := unittest.RandomAddressFixture()
 
 	transfer := &accessmodel.NonFungibleTokenTransfer{
-		TokenType:        "A.0x1654653399040a61.MyNFT",
+		TokenType:        "A.1654653399040a61.MyNFT",
 		SourceAddress:    senderAddr,
 		RecipientAddress: recipientAddr,
 	}
@@ -502,7 +489,7 @@ func TestAccountNFTTransferFilter(t *testing.T) {
 	})
 
 	t.Run("token type filter matches", func(t *testing.T) {
-		filter := AccountNFTTransferFilter{TokenType: "A.0x1654653399040a61.MyNFT"}
+		filter := AccountNFTTransferFilter{TokenType: "A.1654653399040a61.MyNFT"}
 		assert.True(t, filter.Filter()(transfer))
 	})
 
@@ -566,7 +553,7 @@ func TestAccountNFTTransferFilter(t *testing.T) {
 	t.Run("combined filters all match", func(t *testing.T) {
 		filter := AccountNFTTransferFilter{
 			AccountAddress:   senderAddr,
-			TokenType:        "A.0x1654653399040a61.MyNFT",
+			TokenType:        "A.1654653399040a61.MyNFT",
 			SourceAddress:    senderAddr,
 			RecipientAddress: recipientAddr,
 			TransferRole:     accessmodel.TransferRoleSender,
@@ -577,7 +564,7 @@ func TestAccountNFTTransferFilter(t *testing.T) {
 	t.Run("combined filters reject on first mismatch", func(t *testing.T) {
 		filter := AccountNFTTransferFilter{
 			TokenType:     "A.0xOther.OtherNFT", // mismatch
-			SourceAddress: senderAddr,            // match
+			SourceAddress: senderAddr,           // match
 		}
 		assert.False(t, filter.Filter()(transfer))
 	})

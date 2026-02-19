@@ -101,6 +101,9 @@ func (h *HttpHandler) ErrorHandler(w http.ResponseWriter, err error, errorLogger
 		case codes.FailedPrecondition:
 			// indicates the system wasn't in a state to handle the request but may be in the future
 			// there's no direct translation into HTTP status code, but NotFound is the closest match
+			// some systems will return 400 in this case (e.g. grpc-gateway), however, 404 is most
+			// consistent with the behavior for other data types, which will return 404 if the data
+			// is not available, even when it may be in the future (e.g. a transaction result).
 			msg := fmt.Sprintf("Precondition failed: %s", se.Message())
 			h.errorResponse(w, http.StatusNotFound, msg, errorLogger)
 			return

@@ -139,7 +139,7 @@ func (idx *NonFungibleTokenTransfers) TransfersByAddress(
 	filter storage.IndexFilter[*access.NonFungibleTokenTransfer],
 ) (access.NonFungibleTokenTransfersPage, error) {
 	if limit == 0 {
-		return access.NonFungibleTokenTransfersPage{}, fmt.Errorf("limit must be greater than 0")
+		return access.NonFungibleTokenTransfersPage{}, fmt.Errorf("%w: limit must be greater than 0", storage.ErrInvalidQuery)
 	}
 
 	latestHeight := idx.latestHeight.Load()
@@ -290,7 +290,7 @@ func lookupNFTTransfers(
 		page.NextCursor = &access.TransferCursor{
 			BlockHeight:      last.BlockHeight,
 			TransactionIndex: last.TransactionIndex,
-			EventIndex:       last.EventIndices[0],
+			EventIndex:       nftTransferEventIndex(last),
 		}
 	} else {
 		page.Transfers = collected

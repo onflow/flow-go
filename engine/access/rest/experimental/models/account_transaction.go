@@ -2,6 +2,7 @@ package models
 
 import (
 	"strconv"
+	"time"
 
 	commonmodels "github.com/onflow/flow-go/engine/access/rest/common/models"
 	accessmodel "github.com/onflow/flow-go/model/access"
@@ -24,6 +25,7 @@ func (t *AccountTransaction) Build(
 	}
 
 	t.BlockHeight = strconv.FormatUint(tx.BlockHeight, 10)
+	t.Timestamp = time.UnixMilli(int64(tx.BlockTimestamp)).UTC().Format(time.RFC3339Nano)
 	t.TransactionId = tx.TransactionID.String()
 	t.TransactionIndex = strconv.FormatUint(uint64(tx.TransactionIndex), 10)
 	t.Roles = roles
