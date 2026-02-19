@@ -2,6 +2,7 @@ package inspection
 
 import (
 	"fmt"
+	"math"
 	"sync"
 
 	"github.com/onflow/atree"
@@ -19,24 +20,27 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-type TokenDiff struct {
+type TokenChanges struct {
 	// searchedTokens holds a reference to the map of tokens to search
-	// its copied from whatever is specified from the outside, so that the locking
-	// works properly
-	searchedTokens   TokenDiffSearchTokens
+	// its shallow copied from whatever is specified from the outside, so that the locking
+	// should work properly
+	searchedTokens   TokenChangesSearchTokens
 	searchedTokensMu sync.RWMutex
 }
 
-var _ Inspector = (*TokenDiff)(nil)
+var _ Inspector = (*TokenChanges)(nil)
 
-func NewTokenDiff(searchedTokens TokenDiffSearchTokens) *TokenDiff {
-	return &TokenDiff{searchedTokens: searchedTokens}
+// NewTokenChangesInspector return a TokenChanges inspector, that will be run
+// after transaction execution and analyze if any unaccounted tokens were created or
+// destroy.
+func NewTokenChangesInspector(searchedTokens TokenChangesSearchTokens) *TokenChanges {
+	return &TokenChanges{searchedTokens: searchedTokens}
 }
 
 // SetSearchedTokens are safe to replace whenever.
 // The change will not affect the inspections already in progress.
 // TODO: this can be tied into the admin commands
-func (td *TokenDiff) SetSearchedTokens(searchedTokens TokenDiffSearchTokens) {
+func (td *TokenChanges) SetSearchedTokens(searchedTokens TokenChangesSearchTokens) {
 	// copy the map in case the user tries to modify the map
 	st := make(map[string]SearchToken, len(searchedTokens))
 	for k, v := range searchedTokens {
@@ -47,7 +51,7 @@ func (td *TokenDiff) SetSearchedTokens(searchedTokens TokenDiffSearchTokens) {
 	td.searchedTokens = st
 }
 
-func (td *TokenDiff) getSearchedTokensRef() TokenDiffSearchTokens {
+func (td *TokenChanges) getSearchedTokensRef() TokenChangesSearchTokens {
 	td.searchedTokensMu.RLock()
 	defer td.searchedTokensMu.RUnlock()
 	return td.searchedTokens
@@ -55,19 +59,19 @@ func (td *TokenDiff) getSearchedTokensRef() TokenDiffSearchTokens {
 
 // Inspect gets the token diff from a state diff
 // - thread safe
-// - not deterministic! So it should not be used to affect execution!
+// - not deterministic (iterates over maps)! So it should not be used to affect execution!
 // - will not panic
 // - might return an error, but it is safe to ignore since this for information/reporting
-func (td *TokenDiff) Inspect(storage snapshot.StorageSnapshot, executionSnapshot *snapshot.ExecutionSnapshot, events []flow.Event) (diff Result, err error) {
+//
+// Inspect could technically be run on chunk data packs.
+func (td *TokenChanges) Inspect(
+	storage snapshot.StorageSnapshot,
+	executionSnapshot *snapshot.ExecutionSnapshot,
+	events []flow.Event,
+) (diff Result, err error) {
 	defer func() {
 		if r := recover(); r != nil {
-			var ok bool
-			err, ok = r.(error)
-			if !ok {
-				err = fmt.Errorf("panic: %v", r)
-			} else {
-				err = fmt.Errorf("panic: %w", err)
-			}
+			err = fmt.Errorf("panic: %v", r)
 		}
 
 		if err != nil {
@@ -79,8 +83,16 @@ func (td *TokenDiff) Inspect(storage snapshot.StorageSnapshot, executionSnapshot
 	return
 }
 
-func (td *TokenDiff) getTokenDiff(storage snapshot.StorageSnapshot, executionSnapshot *snapshot.ExecutionSnapshot, events []flow.Event, searchedTokens map[string]SearchToken) (TokenDiffResult, error) {
-	executionSnapshotLedgers := executionSnapshotLedgers{storage, executionSnapshot}
+func (td *TokenChanges) getTokenDiff(
+	storage snapshot.StorageSnapshot,
+	executionSnapshot *snapshot.ExecutionSnapshot,
+	events []flow.Event,
+	searchedTokens map[string]SearchToken,
+) (TokenDiffResult, error) {
+	executionSnapshotLedgers := executionSnapshotLedgers{
+		StorageSnapshot:   storage,
+		ExecutionSnapshot: executionSnapshot,
+	}
 
 	// get all distinct addresses
 	addresses := make(map[common.Address]struct{})
@@ -106,7 +118,7 @@ func (td *TokenDiff) getTokenDiff(storage snapshot.StorageSnapshot, executionSna
 		return TokenDiffResult{}, fmt.Errorf("failed to get tokens after: %w", err)
 	}
 
-	typicalDiffSize := 4 // from, to, payer, fees
+	typicalDiffSize := 4 // from, to, payer and fees
 	tokenDiffResult := TokenDiffResult{
 		Changes: make(map[flow.Address]AccountChange, typicalDiffSize),
 	}
@@ -128,7 +140,7 @@ func (td *TokenDiff) getTokenDiff(storage snapshot.StorageSnapshot, executionSna
 	return tokenDiffResult, nil
 }
 
-func (td *TokenDiff) getTokens(
+func (td *TokenChanges) getTokens(
 	storage ledgerSnapshot,
 	addresses map[common.Address]struct{},
 	domains []common.StorageDomain,
@@ -139,7 +151,7 @@ func (td *TokenDiff) getTokens(
 
 	// without this the tokens are not properly detected!
 	// TODO: choose a good number for the workers
-	err := LoadAtreeSlabsInStorage(runtimeStorage, storage, 1)
+	err := loadAtreeSlabsInStorage(runtimeStorage, storage, 1)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load atree slabs: %w", err)
 	}
@@ -153,9 +165,9 @@ func (td *TokenDiff) getTokens(
 	for a := range addresses {
 		tkns := make(accountTokens, len(searchedTokens))
 		for _, d := range domains {
-
+			// We are making the assumption that if a register was changed, the registers read to make that change
+			// are enough to read that register before the change (if it existed)
 			storageMap := storageRuntime.Storage.GetDomainStorageMap(storageRuntime.Interpreter, a, d, false)
-
 			if storageMap == nil {
 				continue
 			}
@@ -185,7 +197,13 @@ func (td *TokenDiff) getTokens(
 	return tokens, nil
 }
 
-func walkLoaded(value interpreter.Value, searchedTokens map[string]SearchToken, tkns accountTokens) {
+func walkLoaded(
+	value interpreter.Value,
+	searchedTokens map[string]SearchToken,
+	tkns accountTokens,
+) {
+	// The context is not needed for the walk,
+	// but a context of nil produces an error.
 	c := &vm.Context{
 		Config: &vm.Config{},
 	}
@@ -216,15 +234,14 @@ func walkLoaded(value interpreter.Value, searchedTokens map[string]SearchToken, 
 				return true
 			})
 		default:
-			// this assumes all other types cannot be partially loaded
-			// TODO: check
+			// This assumes all other types cannot be partially loaded.
 			v.Walk(c, f)
 		}
 	}
 	f(value)
 }
 
-func (td *TokenDiff) getValues(storageMap *interpreter.DomainStorageMap, key any) (interpreter.Value, error) {
+func (td *TokenChanges) getValues(storageMap *interpreter.DomainStorageMap, key any) (interpreter.Value, error) {
 	var mapKey interpreter.StorageMapKey
 
 	switch key := key.(type) {
@@ -250,7 +267,7 @@ func (td *TokenDiff) getValues(storageMap *interpreter.DomainStorageMap, key any
 	return oldValue, nil
 }
 
-func (td *TokenDiff) findSourcesSinks(events []flow.Event, tokens map[string]SearchToken) (map[string]int64, error) {
+func (td *TokenChanges) findSourcesSinks(events []flow.Event, tokens map[string]SearchToken) (map[string]int64, error) {
 	// create a map of all sinks and sources
 	// TODO: could be created once
 	type tokenSourceSink struct {
@@ -345,7 +362,7 @@ func (o executionSnapshotLedgersOld) Set(owner string, key string, value []byte)
 	return o.SetValue([]byte(owner), []byte(key), value)
 }
 
-func (o executionSnapshotLedgersOld) ForEach(f ForEachCallback) error {
+func (o executionSnapshotLedgersOld) ForEach(f forEachCallback) error {
 	for key := range o.ExecutionSnapshot.ReadSet {
 		id := flow.NewRegisterID(flow.BytesToAddress([]byte(key.Owner)), key.Key)
 
@@ -374,7 +391,7 @@ func (n executionSnapshotLedgersNew) Set(owner string, key string, value []byte)
 	return n.SetValue([]byte(owner), []byte(key), value)
 }
 
-func (n executionSnapshotLedgersNew) ForEach(f ForEachCallback) error {
+func (n executionSnapshotLedgersNew) ForEach(f forEachCallback) error {
 	for key := range n.allTouchedRegisters() {
 		v, err := n.GetValue([]byte(key.Owner), []byte(key.Key))
 		if err != nil {
@@ -407,7 +424,7 @@ func (l executionSnapshotLedgers) allTouchedRegisters() map[flow.RegisterID]stru
 
 type ledgerSnapshot interface {
 	atree.Ledger
-	Registers
+	registers
 }
 
 type executionSnapshotLedgersNew struct {
@@ -422,7 +439,7 @@ func (l executionSnapshotLedgers) NewValuesLedger() ledgerSnapshot {
 	return executionSnapshotLedgersNew{l}
 }
 
-var _ Registers = &executionSnapshotLedgersOld{}
+var _ registers = &executionSnapshotLedgersOld{}
 
 func (o executionSnapshotLedgersOld) GetValue(owner, key []byte) (value []byte, err error) {
 	id := flow.NewRegisterID(flow.BytesToAddress(owner), string(key))
@@ -476,11 +493,14 @@ type SearchToken struct {
 	SinksSources map[string]func(flow.Event) (int64, error)
 }
 
-// TokenDiffResult
+// TokenDiffResult is the result of the inspection
 type TokenDiffResult struct {
+	// Changes in token balances per account
+	// parsed from the state changes
 	Changes map[flow.Address]AccountChange
+
 	// KnownSourcesSinks is a map (by token id) of
-	// know mints/burns for the token
+	// know mints/burns for the token parsed from predetermined events
 	KnownSourcesSinks map[string]int64
 }
 
@@ -489,20 +509,23 @@ var _ Result = TokenDiffResult{}
 func (r TokenDiffResult) AsLogEvent() (zerolog.Level, func(e *zerolog.Event)) {
 	sum := r.UnaccountedTokens()
 	if len(sum) == 0 {
-		return zerolog.NoLevel, nil
+		// everything is ok: log no issues with debug logging
+		return zerolog.DebugLevel, func(e *zerolog.Event) { e.Str("token_diff", "no issues") }
 	}
 
-	allNegative := true
+	anyPositive := false
 	for _, v := range sum {
 		if v > 0 {
-			allNegative = false
+			anyPositive = true
 			break
 		}
 	}
 
 	level := zerolog.WarnLevel
-	if allNegative {
-		level = zerolog.InfoLevel
+	if anyPositive {
+		// if any tracked token increase in supply
+		// log at error level
+		level = zerolog.ErrorLevel
 	}
 
 	return level, func(e *zerolog.Event) {
@@ -574,18 +597,18 @@ func diffAccountTokens(before accountTokens, after accountTokens) AccountChange 
 	return change
 }
 
-type ForEachCallback func(owner string, key string, value []byte) error
+type forEachCallback func(owner string, key string, value []byte) error
 
-type Registers interface {
+type registers interface {
 	Get(owner string, key string) ([]byte, error)
 	Set(owner string, key string, value []byte) error
-	ForEach(f ForEachCallback) error
+	ForEach(f forEachCallback) error
 	Count() int
 }
 
-func LoadAtreeSlabsInStorage(
+func loadAtreeSlabsInStorage(
 	storage *runtime.Storage,
-	registers Registers,
+	registers registers,
 	nWorkers int,
 ) error {
 
@@ -597,11 +620,10 @@ func LoadAtreeSlabsInStorage(
 	return storage.PersistentSlabStorage.BatchPreload(storageIDs, nWorkers)
 }
 
-func getSlabIDsFromRegisters(registers Registers) ([]atree.SlabID, error) {
+func getSlabIDsFromRegisters(registers registers) ([]atree.SlabID, error) {
 	storageIDs := make([]atree.SlabID, 0, registers.Count())
 
 	err := registers.ForEach(func(owner string, key string, _ []byte) error {
-
 		if !flow.IsSlabIndexKey(key) {
 			return nil
 		}
@@ -631,9 +653,9 @@ var tokenDiffSearchDomains = []common.StorageDomain{
 	// do we need any other? TODO: check
 }
 
-type TokenDiffSearchTokens map[string]SearchToken
+type TokenChangesSearchTokens map[string]SearchToken
 
-func DefaultTokenDiffSearchTokens(chain flow.Chain) TokenDiffSearchTokens {
+func DefaultTokenDiffSearchTokens(chain flow.Chain) TokenChangesSearchTokens {
 	sc := systemcontracts.SystemContractsForChain(chain.ChainID())
 	flowTokenID := fmt.Sprintf("A.%s.FlowToken.Vault", sc.FlowToken.Address.Hex())
 	flowTokenMintedEventID := fmt.Sprintf("A.%s.FlowToken.TokensMinted", sc.FlowToken.Address.Hex())
@@ -646,6 +668,8 @@ func DefaultTokenDiffSearchTokens(chain flow.Chain) TokenDiffSearchTokens {
 			},
 			SinksSources: map[string]func(flow.Event) (int64, error){
 				flowTokenMintedEventID: func(evt flow.Event) (int64, error) {
+					// this decoding will only happen for the specified event (in the case of FlowToken.TokensMinted it
+					// is extremely rare).
 					payload, err := ccf.Decode(nil, evt.Payload)
 					if err != nil {
 						return 0, err
@@ -658,6 +682,12 @@ func DefaultTokenDiffSearchTokens(chain flow.Chain) TokenDiffSearchTokens {
 					ufix, ok := payload.(cadence.Event).SearchFieldByName("amount").(cadence.UFix64)
 					if !ok {
 						return 0, fmt.Errorf("amount field is not a cadence.UFix64")
+					}
+
+					if ufix > math.MaxInt64 {
+						// this is very unlikely
+						// but in case it happens, it will get logged
+						return 0, fmt.Errorf("amount field is too large")
 					}
 
 					return int64(ufix), nil
