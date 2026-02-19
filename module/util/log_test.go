@@ -26,7 +26,7 @@ func TestLogProgress40(t *testing.T) {
 			total,
 		),
 	)
-	for i := 0; i < total; i++ {
+	for range total {
 		logger(1)
 	}
 
@@ -99,7 +99,7 @@ func TestLogProgress43B(t *testing.T) {
 			total,
 		),
 	)
-	for i := 0; i < total; i++ {
+	for range total {
 		logger(1)
 	}
 
@@ -231,7 +231,7 @@ func TestLogProgressWhenTotalIs0(t *testing.T) {
 		),
 	)
 
-	for i := 0; i < 10; i++ {
+	for range 10 {
 		logger(1)
 	}
 
@@ -261,7 +261,7 @@ func TestLogProgressMoreTicksThenTotal(t *testing.T) {
 		),
 	)
 
-	for i := 0; i < 5; i++ {
+	for range 5 {
 		logger(1)
 	}
 
@@ -291,7 +291,7 @@ func TestLogProgressContinueLoggingAfter100(t *testing.T) {
 		),
 	)
 
-	for i := 0; i < 15; i++ {
+	for range 15 {
 		logger(10)
 	}
 
@@ -327,7 +327,7 @@ func TestLogProgressNoDataForAWhile(t *testing.T) {
 		),
 	)
 
-	for i := 0; i < total; i++ {
+	for i := range total {
 		// somewhere in the middle pause for a bit
 		if i == 13 {
 			<-time.After(3 * time.Millisecond)
@@ -365,11 +365,11 @@ func TestLogProgressMultipleGoroutines(t *testing.T) {
 	)
 
 	wg := sync.WaitGroup{}
-	for i := 0; i < 10; i++ {
+	for range 10 {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			for j := 0; j < 100; j++ {
+			for range 100 {
 				logger(1)
 			}
 		}()

@@ -248,7 +248,7 @@ func ByteSlicesToIds(b [][]byte) (IdentifierList, error) {
 	total := len(b)
 	ids := make(IdentifierList, total)
 
-	for i := 0; i < total; i++ {
+	for i := range total {
 		id, err := ByteSliceToId(b[i])
 		if err != nil {
 			return nil, err

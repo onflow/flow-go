@@ -109,7 +109,7 @@ func (il GenericIdentityList[T]) Map(f IdentityMapFunc[T]) GenericIdentityList[T
 func (il GenericIdentityList[T]) Copy() GenericIdentityList[T] {
 	dup := make(GenericIdentityList[T], 0, len(il))
 	lenList := len(il)
-	for i := 0; i < lenList; i++ { // performance tests show this is faster than 'range'
+	for i := range lenList { // performance tests show this is faster than 'range'
 		next := *(il[i]) // copy the object
 		dup = append(dup, &next)
 	}

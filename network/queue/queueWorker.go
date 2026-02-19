@@ -25,7 +25,7 @@ func worker(ctx context.Context, queue network.MessageQueue, callback func(any))
 
 // CreateQueueWorkers creates queue workers to read from the queue
 func CreateQueueWorkers(ctx context.Context, numWorks uint64, queue network.MessageQueue, callback func(any)) {
-	for i := uint64(0); i < numWorks; i++ {
+	for range numWorks {
 		go worker(ctx, queue, callback)
 	}
 }

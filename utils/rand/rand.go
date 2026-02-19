@@ -161,7 +161,7 @@ func Samples(n uint, m uint, swap func(i, j uint)) error {
 	if n < m {
 		return fmt.Errorf("sample size (%d) cannot be larger than entire population (%d)", m, n)
 	}
-	for i := uint(0); i < m; i++ {
+	for i := range m {
 		j, err := Uintn(n - i)
 		if err != nil {
 			return err

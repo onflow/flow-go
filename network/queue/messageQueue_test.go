@@ -71,13 +71,13 @@ func TestConcurrentQueueAccess(t *testing.T) {
 	}
 
 	// kick off writers
-	for i := 0; i < writerCnt; i++ {
+	for range writerCnt {
 		writeWg.Add(1)
 		go write()
 	}
 
 	// kick off readers
-	for i := 0; i < readerCnt; i++ {
+	for range readerCnt {
 		go read()
 	}
 
@@ -205,7 +205,7 @@ func createMessages(messageCnt int, priorityFunc queue.MessagePriorityFunc) map[
 	// create a map of messages -> priority
 	messages := make(map[string]queue.Priority, messageCnt)
 
-	for i := 0; i < messageCnt; i++ {
+	for i := range messageCnt {
 		// choose a random priority
 		p, _ := priorityFunc(nil)
 		// create a message

@@ -62,7 +62,7 @@ func testWorkers(t *testing.T, maxPriority int, messageCnt int, workerCnt int) {
 	// each message is an int which is also its priority
 	// messages are inserted in increasing order of priority
 	// e.g. 1,2,3...10,1,2,3,..10,....messagecnt
-	for i := 0; i < messageCnt; i++ {
+	for i := range messageCnt {
 		priority := (i % maxPriority) + 1
 		err := q.Insert(priority)
 		assert.NoError(t, err)

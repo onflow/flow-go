@@ -134,7 +134,7 @@ func New(
 
 	cm := component.NewComponentManagerBuilder()
 	cm.AddWorker(e.processQueuedRequestsShovellerWorker)
-	for i := uint(0); i < requestWorkers; i++ {
+	for range requestWorkers {
 		cm.AddWorker(e.processEntityRequestWorker)
 	}
 

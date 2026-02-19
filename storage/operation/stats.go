@@ -42,7 +42,7 @@ func SummarizeKeysByFirstByteConcurrent(log zerolog.Logger, r storage.Reader, nW
 	defer cancel()
 
 	// Start nWorker goroutines.
-	for i := 0; i < nWorker; i++ {
+	for range nWorker {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
@@ -77,7 +77,7 @@ func SummarizeKeysByFirstByteConcurrent(log zerolog.Logger, r storage.Reader, nW
 		))
 
 	// Send all prefixes [0..255] to taskChan.
-	for p := 0; p < 256; p++ {
+	for p := range 256 {
 		taskChan <- byte(p)
 	}
 	close(taskChan)
