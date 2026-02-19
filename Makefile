@@ -101,8 +101,15 @@ go-math-rand-check:
        echo "[Error] Go production code should not use math/rand package"; exit 1; \
     fi
 
+.SILENT: go-fix
+go-fix:
+	# fix go code style issues
+	go fix ./...
+	git diff --exit-code
+
+
 .PHONY: code-sanity-check
-code-sanity-check: go-math-rand-check
+code-sanity-check: go-fix go-math-rand-check
 
 .PHONY: fuzz-fvm
 fuzz-fvm:
