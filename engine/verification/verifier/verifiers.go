@@ -351,6 +351,7 @@ func makeVerifier(
 			chainID,
 			false,
 			scheduledTransactionsEnabled,
+			false,
 		)...,
 	)
 	vmCtx := fvm.NewContext(chainID.Chain(), fvmOptions...)

@@ -599,6 +599,7 @@ func (exeNode *ExecutionNode) LoadProviderEngine(
 			node.RootChainID,
 			exeNode.exeConf.computationConfig.ExtensiveTracing,
 			exeNode.exeConf.scheduleCallbacksEnabled,
+			exeNode.exeConf.tokenTrackingEnabled,
 		)...,
 	)
 
