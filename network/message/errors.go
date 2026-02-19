@@ -14,7 +14,7 @@ var (
 
 // UnknownMsgTypeErr indicates that no message auth configured for the message type v
 type UnknownMsgTypeErr struct {
-	MsgType interface{}
+	MsgType any
 }
 
 func (e UnknownMsgTypeErr) Error() string {
@@ -22,7 +22,7 @@ func (e UnknownMsgTypeErr) Error() string {
 }
 
 // NewUnknownMsgTypeErr returns a new ErrUnknownMsgType
-func NewUnknownMsgTypeErr(msgType interface{}) UnknownMsgTypeErr {
+func NewUnknownMsgTypeErr(msgType any) UnknownMsgTypeErr {
 	return UnknownMsgTypeErr{MsgType: msgType}
 }
 

@@ -91,7 +91,7 @@ func NewReportFileWriter(fileName string, log zerolog.Logger, format ReportForma
 
 // ReportWriter writes data from reports
 type ReportWriter interface {
-	Write(dataPoint interface{})
+	Write(dataPoint any)
 	Close()
 }
 
@@ -103,7 +103,7 @@ type ReportNilWriter struct {
 
 var _ ReportWriter = &ReportNilWriter{}
 
-func (r ReportNilWriter) Write(_ interface{}) {
+func (r ReportNilWriter) Write(_ any) {
 }
 
 func (r ReportNilWriter) Close() {
@@ -115,7 +115,7 @@ type JSONReportFileWriter struct {
 	f          *os.File
 	fileName   string
 	wg         *sync.WaitGroup
-	writeChan  chan interface{}
+	writeChan  chan any
 	writer     *bufio.Writer
 	log        zerolog.Logger
 	format     ReportFormat
@@ -162,7 +162,7 @@ func NewJSONReportFileWriter(fileName string, log zerolog.Logger, format ReportF
 		writer:     writer,
 		log:        log,
 		firstWrite: true,
-		writeChan:  make(chan interface{}, reportFileWriteBufferSize),
+		writeChan:  make(chan any, reportFileWriteBufferSize),
 		wg:         &sync.WaitGroup{},
 		format:     format,
 	}
@@ -179,11 +179,11 @@ func NewJSONReportFileWriter(fileName string, log zerolog.Logger, format ReportF
 	return fw
 }
 
-func (r *JSONReportFileWriter) Write(dataPoint interface{}) {
+func (r *JSONReportFileWriter) Write(dataPoint any) {
 	r.writeChan <- dataPoint
 }
 
-func (r *JSONReportFileWriter) write(dataPoint interface{}) {
+func (r *JSONReportFileWriter) write(dataPoint any) {
 	if r.faulty {
 		return
 	}
@@ -294,7 +294,7 @@ func NewCSVReportFileWriter(fileName string, log zerolog.Logger) ReportWriter {
 	return fw
 }
 
-func (r *CSVReportFileWriter) Write(dataPoint interface{}) {
+func (r *CSVReportFileWriter) Write(dataPoint any) {
 	record, ok := dataPoint.([]string)
 	if !ok {
 		r.log.Warn().Msgf("cannot write %T to csv, skip this record", dataPoint)

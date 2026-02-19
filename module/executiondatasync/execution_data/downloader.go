@@ -262,7 +262,7 @@ func (d *downloader) trackBlobs(blockID flow.Identifier, cids []cid.Cid) error {
 // - BlobNotFoundError if the root blob could not be found from the blob service
 // - MalformedDataError if the root blob cannot be properly deserialized
 // - BlobSizeLimitExceededError if the root blob exceeds the maximum allowed size
-func (d *downloader) getBlobs(ctx context.Context, blobGetter network.BlobGetter, cids []cid.Cid) (interface{}, error) {
+func (d *downloader) getBlobs(ctx context.Context, blobGetter network.BlobGetter, cids []cid.Cid) (any, error) {
 	// this uses an optimization to deserialize the data in a streaming fashion as it is received
 	// from the network, reducing the amount of memory required to deserialize large objects.
 	blobCh, errCh := d.retrieveBlobs(ctx, blobGetter, cids)

@@ -305,7 +305,7 @@ func (p *ExecutionDataCIDProvider) addChunkExecutionData(
 }
 
 // addBlobs serializes the given object, splits the serialized data into blobs, and sends them to the given channel.
-func (p *ExecutionDataCIDProvider) addBlobs(v interface{}, blobCh chan<- blobs.Blob) ([]cid.Cid, error) {
+func (p *ExecutionDataCIDProvider) addBlobs(v any, blobCh chan<- blobs.Blob) ([]cid.Cid, error) {
 	bcw := blobs.NewBlobChannelWriter(blobCh, p.maxBlobSize)
 	defer bcw.Close()
 

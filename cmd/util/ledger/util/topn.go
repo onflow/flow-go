@@ -35,11 +35,11 @@ func (h *TopN[T]) Swap(i, j int) {
 		h.Tree[j], h.Tree[i]
 }
 
-func (h *TopN[T]) Push(x interface{}) {
+func (h *TopN[T]) Push(x any) {
 	h.Tree = append(h.Tree, x.(T))
 }
 
-func (h *TopN[T]) Pop() interface{} {
+func (h *TopN[T]) Pop() any {
 	tree := h.Tree
 	count := len(tree)
 	lastIndex := count - 1

@@ -35,7 +35,7 @@ func testWorkers(t *testing.T, maxPriority int, messageCnt int, workerCnt int) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	// the priority function just returns the message as the priority itself (message = priority)
-	var q network.MessageQueue = queue.NewMessageQueue(ctx, func(m interface{}) (queue.Priority, error) {
+	var q network.MessageQueue = queue.NewMessageQueue(ctx, func(m any) (queue.Priority, error) {
 		i, ok := m.(int)
 		assert.True(t, ok)
 		return queue.Priority(i), nil
@@ -47,7 +47,7 @@ func testWorkers(t *testing.T, maxPriority int, messageCnt int, workerCnt int) {
 	expectedPriority := maxPriority - 1             // when dequeing, the priority can be the current highest priority or one less
 	var callbackCnt int64                           //count the number of times the callback gets called
 	// callback checks if message is of expected priority
-	callback := func(data interface{}) {
+	callback := func(data any) {
 		actual := data.(int)
 		l.Lock()
 		assert.LessOrEqual(t, expectedPriority, actual)

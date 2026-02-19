@@ -596,7 +596,7 @@ func (n *Network) processNetworkMessage(msg network.IncomingMessageScope) error 
 // UnicastOnChannel sends the message in a reliable way to the given recipient.
 // It uses 1-1 direct messaging over the underlying network to deliver the message.
 // It returns an error if unicasting fails.
-func (n *Network) UnicastOnChannel(channel channels.Channel, payload interface{}, targetID flow.Identifier) error {
+func (n *Network) UnicastOnChannel(channel channels.Channel, payload any, targetID flow.Identifier) error {
 	if targetID == n.me.NodeID() {
 		n.logger.Debug().Msg("network skips self unicasting")
 		return nil
@@ -672,7 +672,7 @@ func (n *Network) UnicastOnChannel(channel channels.Channel, payload interface{}
 // In this context, unreliable means that the message is published over a libp2p pub-sub
 // channel and can be read by any node subscribed to that channel.
 // The selector could be used to optimize or restrict delivery.
-func (n *Network) PublishOnChannel(channel channels.Channel, message interface{}, targetIDs ...flow.Identifier) error {
+func (n *Network) PublishOnChannel(channel channels.Channel, message any, targetIDs ...flow.Identifier) error {
 	filteredIDs := flow.IdentifierList(targetIDs).Filter(n.removeSelfFilter())
 
 	if len(filteredIDs) == 0 {
@@ -690,7 +690,7 @@ func (n *Network) PublishOnChannel(channel channels.Channel, message interface{}
 
 // MulticastOnChannel unreliably sends the specified event over the channel to randomly selected 'num' number of recipients
 // selected from the specified targetIDs.
-func (n *Network) MulticastOnChannel(channel channels.Channel, message interface{}, num uint, targetIDs ...flow.Identifier) error {
+func (n *Network) MulticastOnChannel(channel channels.Channel, message any, num uint, targetIDs ...flow.Identifier) error {
 	selectedIDs, err := flow.IdentifierList(targetIDs).Filter(n.removeSelfFilter()).Sample(num)
 	if err != nil {
 		return fmt.Errorf("sampling failed: %w", err)
@@ -718,7 +718,7 @@ func (n *Network) removeSelfFilter() flow.IdentifierFilter {
 }
 
 // sendOnChannel sends the message on channel to targets.
-func (n *Network) sendOnChannel(channel channels.Channel, msg interface{}, targetIDs []flow.Identifier) error {
+func (n *Network) sendOnChannel(channel channels.Channel, msg any, targetIDs []flow.Identifier) error {
 	n.logger.Debug().
 		Interface("message", msg).
 		Str("channel", channel.String()).
@@ -750,7 +750,7 @@ func (n *Network) sendOnChannel(channel channels.Channel, msg interface{}, targe
 
 // queueSubmitFunc submits the message to the engine synchronously. It is the callback for the queue worker
 // when it gets a message from the queue
-func (n *Network) queueSubmitFunc(message interface{}) {
+func (n *Network) queueSubmitFunc(message any) {
 	qm := message.(queue.QMessage)
 
 	logger := n.logger.With().
