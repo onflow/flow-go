@@ -216,16 +216,14 @@ func (r *CommandRunner) runAdminServer(ctx irrecoverable.SignalerContext) error 
 	pb.RegisterAdminServer(grpcServer, NewAdminServer(r))
 
 	r.workersStarted.Add(1)
-	r.workersFinished.Add(1)
-	go func() {
-		defer r.workersFinished.Done()
+	r.workersFinished.Go(func() {
 		r.workersStarted.Done()
 
 		if err := grpcServer.Serve(listener); err != nil {
 			r.logger.Err(err).Msg("gRPC server encountered fatal error")
 			ctx.Throw(err)
 		}
-	}()
+	})
 
 	// Initialize gRPC and HTTP muxers
 	gwmux := runtime.NewServeMux()
@@ -256,9 +254,7 @@ func (r *CommandRunner) runAdminServer(ctx irrecoverable.SignalerContext) error 
 	}
 
 	r.workersStarted.Add(1)
-	r.workersFinished.Add(1)
-	go func() {
-		defer r.workersFinished.Done()
+	r.workersFinished.Go(func() {
 		r.workersStarted.Done()
 
 		// Start HTTP server (and proxy calls to gRPC server endpoint)
@@ -273,12 +269,10 @@ func (r *CommandRunner) runAdminServer(ctx irrecoverable.SignalerContext) error 
 			r.logger.Err(err).Msg("HTTP server encountered error")
 			ctx.Throw(err)
 		}
-	}()
+	})
 
 	r.workersStarted.Add(1)
-	r.workersFinished.Add(1)
-	go func() {
-		defer r.workersFinished.Done()
+	r.workersFinished.Go(func() {
 		r.workersStarted.Done()
 
 		<-ctx.Done()
@@ -303,7 +297,7 @@ func (r *CommandRunner) runAdminServer(ctx irrecoverable.SignalerContext) error 
 				}
 			}
 		}
-	}()
+	})
 
 	return nil
 }

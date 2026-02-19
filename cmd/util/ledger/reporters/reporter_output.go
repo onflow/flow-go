@@ -167,14 +167,12 @@ func NewJSONReportFileWriter(fileName string, log zerolog.Logger, format ReportF
 		format:     format,
 	}
 
-	fw.wg.Add(1)
-	go func() {
+	fw.wg.Go(func() {
 
 		for d := range fw.writeChan {
 			fw.write(d)
 		}
-		fw.wg.Done()
-	}()
+	})
 
 	return fw
 }
@@ -282,14 +280,12 @@ func NewCSVReportFileWriter(fileName string, log zerolog.Logger) ReportWriter {
 		wg:        &sync.WaitGroup{},
 	}
 
-	fw.wg.Add(1)
-	go func() {
+	fw.wg.Go(func() {
 
 		for d := range fw.writeChan {
 			fw.write(d)
 		}
-		fw.wg.Done()
-	}()
+	})
 
 	return fw
 }

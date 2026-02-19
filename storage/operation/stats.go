@@ -43,9 +43,7 @@ func SummarizeKeysByFirstByteConcurrent(log zerolog.Logger, r storage.Reader, nW
 
 	// Start nWorker goroutines.
 	for range nWorker {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			for {
 				select {
 				case <-ctx.Done():
@@ -67,7 +65,7 @@ func SummarizeKeysByFirstByteConcurrent(log zerolog.Logger, r storage.Reader, nW
 					}
 				}
 			}
-		}()
+		})
 	}
 
 	progress := util.LogProgress(log,

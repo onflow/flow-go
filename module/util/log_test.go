@@ -366,13 +366,11 @@ func TestLogProgressMultipleGoroutines(t *testing.T) {
 
 	wg := sync.WaitGroup{}
 	for range 10 {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			for range 100 {
 				logger(1)
 			}
-		}()
+		})
 	}
 
 	wg.Wait()

@@ -1038,11 +1038,9 @@ func (n *Network) handleIncomingStream(s libp2pnet.Stream) {
 			return
 		}
 
-		n.wg.Add(1)
-		go func() {
-			defer n.wg.Done()
+		n.wg.Go(func() {
 			n.processUnicastStreamMessage(remotePeer, &msg)
-		}()
+		})
 	}
 
 	success = true
@@ -1076,13 +1074,11 @@ func (n *Network) Subscribe(channel channels.Channel) error {
 
 	// create a new readSubscription with the context of the network
 	rs := internal.NewReadSubscription(s, n.processPubSubMessages, n.logger)
-	n.wg.Add(1)
 
 	// kick off the receive loop to continuously receive messages
-	go func() {
-		defer n.wg.Done()
+	n.wg.Go(func() {
 		rs.ReceiveLoop(n.ctx)
-	}()
+	})
 
 	// update peers to add some nodes interested in the same topic as direct peers
 	n.libP2PNode.RequestPeerUpdate()
