@@ -101,6 +101,37 @@ func TestABIEncodingDecodingFunctions(t *testing.T) {
 		require.Equal(t, encodedData, buffer)
 	})
 
+	t.Run("test encode bytes (buffer too small)", func(t *testing.T) {
+		encodedData, err := hex.DecodeString("e27d73dc3adb81aeea2e5bd35b863fe3f234e1a603fd3bdbaf657c179e67871d")
+		require.NoError(t, err)
+
+		bufferSize := precompiles.SizeNeededForBytesEncoding(encodedData)
+		require.Equal(t, 3*32, bufferSize)
+
+		buffer := make([]byte, bufferSize-5)
+		err = precompiles.EncodeBytes(encodedData, buffer, 0, precompiles.EncodedUint64Size)
+		require.Error(t, err)
+		require.ErrorContains(t, err, "buffer too small for encoding")
+	})
+
+	t.Run("test encode bytes (multiple chunks)", func(t *testing.T) {
+		// The following data needs more than a 32-byte chunk to fit in.
+		encodedData, err := hex.DecodeString("e27d73dc3adb81aeea2e5bd35b863fe3f234e1a603fd3bdbaf657c179e67871df1")
+		require.NoError(t, err)
+		require.Len(t, encodedData, 33)
+
+		bufferSize := precompiles.SizeNeededForBytesEncoding(encodedData)
+		require.Equal(t, 4*32, bufferSize)
+
+		buffer := make([]byte, bufferSize)
+		err = precompiles.EncodeBytes(encodedData, buffer, 0, precompiles.EncodedUint64Size)
+		require.NoError(t, err)
+
+		expectedData, err := hex.DecodeString("00000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000021e27d73dc3adb81aeea2e5bd35b863fe3f234e1a603fd3bdbaf657c179e67871df100000000000000000000000000000000000000000000000000000000000000")
+		require.NoError(t, err)
+		require.Equal(t, expectedData, buffer)
+	})
+
 	t.Run("test size needed for encoding bytes", func(t *testing.T) {
 		// len zero
 		data := []byte{}
