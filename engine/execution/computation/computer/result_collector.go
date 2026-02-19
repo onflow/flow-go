@@ -8,6 +8,7 @@ import (
 
 	"github.com/onflow/crypto"
 	"github.com/onflow/crypto/hash"
+	"github.com/rs/zerolog"
 	otelTrace "go.opentelemetry.io/otel/trace"
 
 	"github.com/onflow/flow-go/engine/execution"
@@ -239,6 +240,28 @@ func (collector *resultCollector) processTransactionResult(
 		}
 	} else {
 		logger.Info().Msg("transaction executed successfully")
+	}
+
+	if len(output.InspectionResults) != 0 {
+		logEvents := make([]func(e *zerolog.Event), 0, len(output.InspectionResults))
+		logLevel := zerolog.InfoLevel
+		for _, inspectionResult := range output.InspectionResults {
+			lvl, evt := inspectionResult.AsLogEvent()
+			if lvl > logLevel {
+				logLevel = lvl
+			}
+			if evt != nil {
+				logEvents = append(logEvents, evt)
+			}
+		}
+
+		if len(logEvents) > 0 {
+			evt := logger.WithLevel(logLevel)
+			for _, logEvent := range logEvents {
+				logEvent(evt)
+			}
+			evt.Msg("Inspection results")
+		}
 	}
 
 	collector.handleTransactionExecutionMetrics(
