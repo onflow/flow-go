@@ -43,7 +43,6 @@ func BenchmarkStartBlockSpan(b *testing.B) {
 		{name: "cacheHit", n: 100},
 		{name: "cacheMiss", n: 100000},
 	} {
-		t := t
 		b.Run(t.name, func(b *testing.B) {
 			randomIDs := make([]flow.Identifier, 0, t.n)
 			for i := 0; i < t.n; i++ {
