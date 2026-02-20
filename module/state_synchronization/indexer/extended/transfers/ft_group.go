@@ -94,6 +94,12 @@ func (g *ftTxEventGroup) addDeposit(event flow.Event, decoded *ftDepositedEvent)
 
 	uuid := decoded.DepositedUUID
 
+	// If the destination vault (toUUID) is a tracked withdrawal vault, the minted tokens are flowing
+	// into it and must be reflected in its tracked amount.
+	if destIdx, destOk := g.withdrawalByUUID[decoded.ToUUID]; destOk {
+		g.withdrawals[destIdx].decoded.Amount += decoded.Amount
+	}
+
 	// 1. check if the deposit is a vault withdrawn in this transaction.
 	wIdx, ok := g.withdrawalByUUID[uuid]
 	if !ok {

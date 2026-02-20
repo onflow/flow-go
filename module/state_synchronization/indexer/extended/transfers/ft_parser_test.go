@@ -43,7 +43,7 @@ func TestParseFTTransfers_PairedTransfer(t *testing.T) {
 	amount := cadence.UFix64(50_00000000)
 	events := []flow.Event{
 		testutil.MakeFTWithdrawnEvent(t, flow.Testnet, &sender, txID, 0, 0, 1, uuid, amount),
-		testutil.MakeFTDepositedEvent(t, flow.Testnet, &recipient, txID, 0, 1, uuid, amount),
+		testutil.MakeFTDepositedEvent(t, flow.Testnet, &recipient, txID, 0, 1, 1, uuid, amount),
 	}
 
 	expected := []access.FungibleTokenTransfer{
@@ -68,7 +68,7 @@ func TestParseFTTransfers_AmountMismatch(t *testing.T) {
 	uuid := uint64(42)
 	events := []flow.Event{
 		testutil.MakeFTWithdrawnEvent(t, flow.Testnet, &sender, txID, 0, 0, 1, uuid, cadence.UFix64(100_00000000)),
-		testutil.MakeFTDepositedEvent(t, flow.Testnet, &recipient, txID, 0, 1, uuid, cadence.UFix64(40_00000000)),
+		testutil.MakeFTDepositedEvent(t, flow.Testnet, &recipient, txID, 0, 1, 1, uuid, cadence.UFix64(40_00000000)),
 	}
 
 	transfers, err := parser.Parse(events, testBlockHeight)
@@ -105,9 +105,9 @@ func TestParseFTTransfers_WithdrawalChainResolution(t *testing.T) {
 		// Sub-withdraw from temp vault 50 → temp vault UUID=52
 		testutil.MakeFTWithdrawnEvent(t, flow.Testnet, nil, txID, 0, 2, 50, 52, cadence.UFix64(25_00000000)),
 		// Deposits
-		testutil.MakeFTDepositedEvent(t, flow.Testnet, &bob, txID, 0, 3, 51, cadence.UFix64(40_00000000)),
-		testutil.MakeFTDepositedEvent(t, flow.Testnet, &carol, txID, 0, 4, 52, cadence.UFix64(25_00000000)),
-		testutil.MakeFTDepositedEvent(t, flow.Testnet, &dave, txID, 0, 5, 50, cadence.UFix64(35_00000000)),
+		testutil.MakeFTDepositedEvent(t, flow.Testnet, &bob, txID, 0, 3, 1, 51, cadence.UFix64(40_00000000)),
+		testutil.MakeFTDepositedEvent(t, flow.Testnet, &carol, txID, 0, 4, 1, 52, cadence.UFix64(25_00000000)),
+		testutil.MakeFTDepositedEvent(t, flow.Testnet, &dave, txID, 0, 5, 1, 50, cadence.UFix64(35_00000000)),
 	}
 
 	expected := []access.FungibleTokenTransfer{
@@ -137,7 +137,7 @@ func TestParseFTTransfers_DeepWithdrawalChain(t *testing.T) {
 		// temp vault 51 → temp vault 52
 		testutil.MakeFTWithdrawnEvent(t, flow.Testnet, nil, txID, 0, 2, 51, 52, cadence.UFix64(30_00000000)),
 		// Deposit the deepest vault
-		testutil.MakeFTDepositedEvent(t, flow.Testnet, &recipient, txID, 0, 3, 52, cadence.UFix64(30_00000000)),
+		testutil.MakeFTDepositedEvent(t, flow.Testnet, &recipient, txID, 0, 3, 1, 52, cadence.UFix64(30_00000000)),
 	}
 
 	expected := []access.FungibleTokenTransfer{
@@ -172,7 +172,7 @@ func TestParseFTTransfers_FullyConsumedParent(t *testing.T) {
 	events := []flow.Event{
 		testutil.MakeFTWithdrawnEvent(t, flow.Testnet, &alice, txID, 0, 0, 1, 50, cadence.UFix64(100_00000000)),
 		testutil.MakeFTWithdrawnEvent(t, flow.Testnet, nil, txID, 0, 1, 50, 51, cadence.UFix64(100_00000000)),
-		testutil.MakeFTDepositedEvent(t, flow.Testnet, &bob, txID, 0, 2, 51, cadence.UFix64(100_00000000)),
+		testutil.MakeFTDepositedEvent(t, flow.Testnet, &bob, txID, 0, 2, 1, 51, cadence.UFix64(100_00000000)),
 	}
 
 	expected := []access.FungibleTokenTransfer{
@@ -206,8 +206,8 @@ func TestParseFTTransfers_FullyConsumedByMultipleChildren(t *testing.T) {
 		testutil.MakeFTWithdrawnEvent(t, flow.Testnet, &alice, txID, 0, 0, 1, 50, cadence.UFix64(100_00000000)),
 		testutil.MakeFTWithdrawnEvent(t, flow.Testnet, nil, txID, 0, 1, 50, 51, cadence.UFix64(60_00000000)),
 		testutil.MakeFTWithdrawnEvent(t, flow.Testnet, nil, txID, 0, 2, 50, 52, cadence.UFix64(40_00000000)),
-		testutil.MakeFTDepositedEvent(t, flow.Testnet, &bob, txID, 0, 3, 51, cadence.UFix64(60_00000000)),
-		testutil.MakeFTDepositedEvent(t, flow.Testnet, &carol, txID, 0, 4, 52, cadence.UFix64(40_00000000)),
+		testutil.MakeFTDepositedEvent(t, flow.Testnet, &bob, txID, 0, 3, 1, 51, cadence.UFix64(60_00000000)),
+		testutil.MakeFTDepositedEvent(t, flow.Testnet, &carol, txID, 0, 4, 1, 52, cadence.UFix64(40_00000000)),
 	}
 
 	// Parent vault 50 is fully consumed by children 51 and 52, so no burn record is produced.
@@ -229,7 +229,7 @@ func TestParseFTTransfers_UnpairedDeposit(t *testing.T) {
 
 	amount := cadence.UFix64(100_00000000)
 	events := []flow.Event{
-		testutil.MakeFTDepositedEvent(t, flow.Testnet, &recipient, txID, 0, 3, 99, amount),
+		testutil.MakeFTDepositedEvent(t, flow.Testnet, &recipient, txID, 0, 3, 1, 99, amount),
 	}
 
 	expected := []access.FungibleTokenTransfer{
@@ -269,7 +269,7 @@ func TestParseFTTransfers_NilOptionalAddresses(t *testing.T) {
 	amount := cadence.UFix64(1_00000000)
 	events := []flow.Event{
 		testutil.MakeFTWithdrawnEvent(t, flow.Testnet, nil, txID, 0, 0, 1, uuid, amount),
-		testutil.MakeFTDepositedEvent(t, flow.Testnet, nil, txID, 0, 1, uuid, amount),
+		testutil.MakeFTDepositedEvent(t, flow.Testnet, nil, txID, 0, 1, 1, uuid, amount),
 	}
 
 	expected := []access.FungibleTokenTransfer{
@@ -295,9 +295,9 @@ func TestParseFTTransfers_MultiplePairsInSameTx(t *testing.T) {
 
 	events := []flow.Event{
 		testutil.MakeFTWithdrawnEvent(t, flow.Testnet, &sender1, txID, 0, 0, 1, 10, amount1),
-		testutil.MakeFTDepositedEvent(t, flow.Testnet, &recipient1, txID, 0, 1, 10, amount1),
+		testutil.MakeFTDepositedEvent(t, flow.Testnet, &recipient1, txID, 0, 1, 1, 10, amount1),
 		testutil.MakeFTWithdrawnEvent(t, flow.Testnet, &sender2, txID, 0, 2, 1, 20, amount2),
-		testutil.MakeFTDepositedEvent(t, flow.Testnet, &recipient2, txID, 0, 3, 20, amount2),
+		testutil.MakeFTDepositedEvent(t, flow.Testnet, &recipient2, txID, 0, 3, 1, 20, amount2),
 	}
 
 	expected := []access.FungibleTokenTransfer{
@@ -324,9 +324,9 @@ func TestParseFTTransfers_MixedPairedAndUnpaired(t *testing.T) {
 	events := []flow.Event{
 		// Paired transfer
 		testutil.MakeFTWithdrawnEvent(t, flow.Testnet, &sender, txID, 0, 0, 1, 100, amount),
-		testutil.MakeFTDepositedEvent(t, flow.Testnet, &recipient, txID, 0, 1, 100, amount),
+		testutil.MakeFTDepositedEvent(t, flow.Testnet, &recipient, txID, 0, 1, 1, 100, amount),
 		// Unpaired deposit (mint)
-		testutil.MakeFTDepositedEvent(t, flow.Testnet, &mintRecipient, txID, 0, 2, 200, amount),
+		testutil.MakeFTDepositedEvent(t, flow.Testnet, &mintRecipient, txID, 0, 2, 1, 200, amount),
 		// Unpaired withdrawal (burn)
 		testutil.MakeFTWithdrawnEvent(t, flow.Testnet, &burnSender, txID, 0, 3, 1, 300, amount),
 	}
@@ -355,7 +355,7 @@ func TestParseFTTransfers_EventsAcrossTransactionsDoNotPair(t *testing.T) {
 	amount := cadence.UFix64(10_00000000)
 	events := []flow.Event{
 		testutil.MakeFTWithdrawnEvent(t, flow.Testnet, &sender, txID1, 0, 0, 1, sharedUUID, amount),
-		testutil.MakeFTDepositedEvent(t, flow.Testnet, &recipient, txID2, 1, 0, sharedUUID, amount),
+		testutil.MakeFTDepositedEvent(t, flow.Testnet, &recipient, txID2, 1, 0, 1, sharedUUID, amount),
 	}
 
 	expected := []access.FungibleTokenTransfer{
@@ -383,7 +383,7 @@ func TestParseFTTransfers_DepositBeforeWithdrawal(t *testing.T) {
 
 	// Deposit appears before withdrawal in the event list.
 	events := []flow.Event{
-		testutil.MakeFTDepositedEvent(t, flow.Testnet, &recipient, txID, 0, 0, uuid, amount),
+		testutil.MakeFTDepositedEvent(t, flow.Testnet, &recipient, txID, 0, 0, 1, uuid, amount),
 		testutil.MakeFTWithdrawnEvent(t, flow.Testnet, &sender, txID, 0, 1, 1, uuid, amount),
 	}
 
@@ -468,6 +468,60 @@ func TestParseFTTransfers_DuplicateWithdrawalUUID(t *testing.T) {
 	assert.Contains(t, err.Error(), "duplicate withdrawal resource UUID")
 }
 
+// TestParseFTTransfers_MintDepositedIntoWithdrawalVault verifies that when a minted vault
+// is deposited into an intermediate vault that was itself created by a withdrawal, the
+// intermediate vault's tracked amount is updated to include the minted tokens. This allows
+// subsequent child withdrawals from the intermediate vault to exceed its original withdrawal
+// amount without error, as long as they don't exceed the updated tracked amount.
+//
+// This models the Flow staking rewards distribution pattern, where a small fee withdrawal
+// creates an intermediate vault, a large mint is deposited into it, and rewards are then
+// distributed to many stakers via child withdrawals from the same vault.
+//
+// Scenario:
+//
+//	Withdraw 40 from Alice's stored vault → intermediate vault UUID=50 (tracked amount=40)
+//	Mint 100 tokens → new vault UUID=51 (no prior withdrawal)
+//	Deposit vault 51 (mint, depositedUUID=51) into vault 50 (toUUID=50) → vault 50 tracked amount=140
+//	Withdraw 80 from vault 50 → vault UUID=52; 80 ≤ 140, vault 50 remaining=60
+//	Deposit vault 52 into Bob
+//	Deposit vault 50 (remaining 60) into Carol
+func TestParseFTTransfers_MintDepositedIntoWithdrawalVault(t *testing.T) {
+	parser := NewFTParser(flow.Testnet, false)
+	alice := unittest.RandomAddressFixture()
+	bob := unittest.RandomAddressFixture()
+	carol := unittest.RandomAddressFixture()
+	txID := unittest.IdentifierFixture()
+
+	events := []flow.Event{
+		// Withdraw 40 from Alice's stored vault (fromUUID=1) → temp vault UUID=50
+		testutil.MakeFTWithdrawnEvent(t, flow.Testnet, &alice, txID, 0, 0, 1, 50, cadence.UFix64(40_00000000)),
+		// Mint 100 tokens (vault UUID=51) and deposit into vault 50 (toUUID=50).
+		// depositedUUID=51 has no prior withdrawal → treated as mint, but toUUID=50
+		// is a tracked withdrawal vault so vault 50's tracked amount increases to 140.
+		testutil.MakeFTDepositedEvent(t, flow.Testnet, nil, txID, 0, 1, 50, 51, cadence.UFix64(100_00000000)),
+		// Withdraw 80 from vault 50 (fromUUID=50) → vault UUID=52; 80 ≤ 140 ✓, vault 50 remaining=60
+		testutil.MakeFTWithdrawnEvent(t, flow.Testnet, nil, txID, 0, 2, 50, 52, cadence.UFix64(80_00000000)),
+		// Deposit vault 52 into Bob
+		testutil.MakeFTDepositedEvent(t, flow.Testnet, &bob, txID, 0, 3, 1, 52, cadence.UFix64(80_00000000)),
+		// Deposit vault 50 (remaining 60) into Carol
+		testutil.MakeFTDepositedEvent(t, flow.Testnet, &carol, txID, 0, 4, 1, 50, cadence.UFix64(60_00000000)),
+	}
+
+	expected := []access.FungibleTokenTransfer{
+		// Mint: vault 51 deposited into vault 50 (no sender, no recipient address for temp vault)
+		testutil.MakeFTTransfer(testBlockHeight, txID, 0, flow.Address{}, flow.Address{}, cadence.UFix64(100_00000000), 1),
+		// Alice → Bob via vault 50→52 chain
+		testutil.MakeFTTransfer(testBlockHeight, txID, 0, alice, bob, cadence.UFix64(80_00000000), 0, 2, 3),
+		// Alice → Carol: vault 50 remainder
+		testutil.MakeFTTransfer(testBlockHeight, txID, 0, alice, carol, cadence.UFix64(60_00000000), 0, 4),
+	}
+
+	transfers, err := parser.Parse(events, testBlockHeight)
+	require.NoError(t, err)
+	assert.ElementsMatch(t, expected, transfers)
+}
+
 // TestParseFTTransfers_ChildExceedsParentAmount verifies that a child withdrawal with an
 // amount larger than the parent's remaining balance produces an error.
 func TestParseFTTransfers_ChildExceedsParentAmount(t *testing.T) {
@@ -502,9 +556,9 @@ func TestParseFTTransfers_MultipleTransactionsInBlock(t *testing.T) {
 
 	events := []flow.Event{
 		testutil.MakeFTWithdrawnEvent(t, flow.Testnet, &sender1, txID1, 0, 0, 1, 10, amount1),
-		testutil.MakeFTDepositedEvent(t, flow.Testnet, &recipient1, txID1, 0, 1, 10, amount1),
+		testutil.MakeFTDepositedEvent(t, flow.Testnet, &recipient1, txID1, 0, 1, 1, 10, amount1),
 		testutil.MakeFTWithdrawnEvent(t, flow.Testnet, &sender2, txID2, 1, 0, 1, 20, amount2),
-		testutil.MakeFTDepositedEvent(t, flow.Testnet, &recipient2, txID2, 1, 1, 20, amount2),
+		testutil.MakeFTDepositedEvent(t, flow.Testnet, &recipient2, txID2, 1, 1, 1, 20, amount2),
 	}
 
 	expected := []access.FungibleTokenTransfer{
@@ -528,7 +582,7 @@ func TestParseFTTransfers_FlowFees(t *testing.T) {
 	feeAmount := cadence.UFix64(1_00000000)
 	events := []flow.Event{
 		testutil.MakeFTWithdrawnEvent(t, flow.Testnet, &payer, txID, 0, 2, 1, 50, feeAmount),
-		testutil.MakeFTDepositedEvent(t, flow.Testnet, &flowFeesAddress, txID, 0, 3, 50, feeAmount),
+		testutil.MakeFTDepositedEvent(t, flow.Testnet, &flowFeesAddress, txID, 0, 3, 1, 50, feeAmount),
 		testutil.MakeFlowFeesEvent(t, flow.Testnet, txID, 0, 2, feeAmount),
 	}
 
@@ -559,7 +613,7 @@ func TestParseFTTransfers_FlowFees(t *testing.T) {
 		// this should be treated as a regular transfer, and the correct events should be ignored.
 		events := append([]flow.Event{
 			testutil.MakeFTWithdrawnEvent(t, flow.Testnet, &payer, txID, 0, 0, 1, 49, feeAmount),
-			testutil.MakeFTDepositedEvent(t, flow.Testnet, &flowFeesAddress, txID, 0, 1, 49, feeAmount),
+			testutil.MakeFTDepositedEvent(t, flow.Testnet, &flowFeesAddress, txID, 0, 1, 1, 49, feeAmount),
 		}, events...)
 
 		expected := []access.FungibleTokenTransfer{
@@ -587,10 +641,10 @@ func TestParseFTTransfers_FlowFees_MixedTransfers(t *testing.T) {
 	events := []flow.Event{
 		// Regular transfer: alice → bob (fromUUID=1, withdrawnUUID=10)
 		testutil.MakeFTWithdrawnEvent(t, flow.Testnet, &alice, txID, 0, 0, 1, 10, transferAmount),
-		testutil.MakeFTDepositedEvent(t, flow.Testnet, &bob, txID, 0, 1, 10, transferAmount),
+		testutil.MakeFTDepositedEvent(t, flow.Testnet, &bob, txID, 0, 1, 1, 10, transferAmount),
 		// Fee payment: alice → FlowFees contract (fromUUID=1, withdrawnUUID=50)
 		testutil.MakeFTWithdrawnEvent(t, flow.Testnet, &alice, txID, 0, 2, 1, 50, feeAmount),
-		testutil.MakeFTDepositedEvent(t, flow.Testnet, &flowFeesAddress, txID, 0, 3, 50, feeAmount),
+		testutil.MakeFTDepositedEvent(t, flow.Testnet, &flowFeesAddress, txID, 0, 3, 1, 50, feeAmount),
 		testutil.MakeFlowFeesEvent(t, flow.Testnet, txID, 0, 4, feeAmount),
 	}
 

@@ -132,6 +132,7 @@ func MakeFTDepositedEvent(
 	toAddr *flow.Address,
 	txID flow.Identifier,
 	txIndex, eventIndex uint32,
+	toUUID uint64,
 	depositedUUID uint64,
 	amount cadence.UFix64,
 ) flow.Event {
@@ -159,7 +160,7 @@ func MakeFTDepositedEvent(
 		cadence.String(FTTokenType),
 		amount,
 		toValue,
-		cadence.UInt64(1),
+		cadence.UInt64(toUUID),
 		cadence.UInt64(depositedUUID),
 		cadence.UFix64(200_00000000),
 	}).WithType(cadenceType)

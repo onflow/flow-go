@@ -272,7 +272,7 @@ func TestFungibleTokenTransfers_IndexBlockData(t *testing.T) {
 			Header: unittest.BlockHeaderFixture(unittest.WithHeaderHeight(100)),
 			Events: []flow.Event{
 				testutil.MakeFTWithdrawnEvent(t, flow.Testnet, &payer, txID, 0, 0, 1, 50, feeAmount),
-				testutil.MakeFTDepositedEvent(t, flow.Testnet, &flowFeesAddress, txID, 0, 1, 50, feeAmount),
+				testutil.MakeFTDepositedEvent(t, flow.Testnet, &flowFeesAddress, txID, 0, 1, 1, 50, feeAmount),
 				testutil.MakeFlowFeesEvent(t, flow.Testnet, txID, 0, 2, feeAmount),
 			},
 		}
@@ -298,7 +298,7 @@ func TestFungibleTokenTransfers_IndexBlockData(t *testing.T) {
 			Header: unittest.BlockHeaderFixture(unittest.WithHeaderHeight(100)),
 			Events: []flow.Event{
 				testutil.MakeFTWithdrawnEvent(t, flow.Testnet, &payer, txID, 0, 0, 1, 50, amount),
-				testutil.MakeFTDepositedEvent(t, flow.Testnet, &flowFeesAddress, txID, 0, 1, 50, amount),
+				testutil.MakeFTDepositedEvent(t, flow.Testnet, &flowFeesAddress, txID, 0, 1, 1, 50, amount),
 				// No FeesDeducted event — treated as a regular transfer.
 			},
 		}
