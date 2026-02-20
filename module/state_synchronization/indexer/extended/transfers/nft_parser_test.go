@@ -1,33 +1,16 @@
 package transfers
 
 import (
-	"fmt"
 	"testing"
 
-	"github.com/onflow/cadence"
-	"github.com/onflow/cadence/common"
-	"github.com/onflow/cadence/encoding/ccf"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/state_synchronization/indexer/extended/transfers/testutil"
 	"github.com/onflow/flow-go/utils/unittest"
 )
-
-const testNFTTokenType = "A.0000000000000002.TopShot.NFT"
-
-var (
-	testNFTDepositedType flow.EventType
-	testNFTWithdrawnType flow.EventType
-)
-
-func init() {
-	sc := systemcontracts.SystemContractsForChain(flow.Testnet)
-	testNFTDepositedType = flow.EventType(fmt.Sprintf(nftDepositedFormat, sc.NonFungibleToken.Address))
-	testNFTWithdrawnType = flow.EventType(fmt.Sprintf(nftWithdrawnFormat, sc.NonFungibleToken.Address))
-}
 
 // ==========================================================================
 // NFT Transfer Tests
@@ -42,12 +25,12 @@ func TestParseNFTTransfers_PairedTransfer(t *testing.T) {
 	nftUUID := uint64(100)
 	nftID := uint64(42)
 	events := []flow.Event{
-		makeNFTWithdrawnEvent(t, &sender, txID, 0, 0, nftUUID, nftID),
-		makeNFTDepositedEvent(t, &recipient, txID, 0, 1, nftUUID, nftID),
+		testutil.MakeNFTWithdrawnEvent(t, flow.Testnet, &sender, txID, 0, 0, nftUUID, nftID),
+		testutil.MakeNFTDepositedEvent(t, flow.Testnet, &recipient, txID, 0, 1, nftUUID, nftID),
 	}
 
 	expected := []access.NonFungibleTokenTransfer{
-		getNFTTransfer(testBlockHeight, txID, 0, sender, recipient, nftID, 0, 1),
+		testutil.MakeNFTTransfer(testBlockHeight, txID, 0, sender, recipient, nftID, 0, 1),
 	}
 
 	transfers, err := parser.Parse(events, testBlockHeight)
@@ -62,11 +45,11 @@ func TestParseNFTTransfers_UnpairedDeposit(t *testing.T) {
 
 	nftID := uint64(7)
 	events := []flow.Event{
-		makeNFTDepositedEvent(t, &recipient, txID, 0, 0, 999, nftID),
+		testutil.MakeNFTDepositedEvent(t, flow.Testnet, &recipient, txID, 0, 0, 999, nftID),
 	}
 
 	expected := []access.NonFungibleTokenTransfer{
-		getNFTTransfer(testBlockHeight, txID, 0, flow.Address{}, recipient, nftID, 0),
+		testutil.MakeNFTTransfer(testBlockHeight, txID, 0, flow.Address{}, recipient, nftID, 0),
 	}
 
 	transfers, err := parser.Parse(events, testBlockHeight)
@@ -81,11 +64,11 @@ func TestParseNFTTransfers_UnpairedWithdrawal(t *testing.T) {
 
 	nftID := uint64(13)
 	events := []flow.Event{
-		makeNFTWithdrawnEvent(t, &sender, txID, 0, 0, 888, nftID),
+		testutil.MakeNFTWithdrawnEvent(t, flow.Testnet, &sender, txID, 0, 0, 888, nftID),
 	}
 
 	expected := []access.NonFungibleTokenTransfer{
-		getNFTTransfer(testBlockHeight, txID, 0, sender, flow.Address{}, nftID, 0),
+		testutil.MakeNFTTransfer(testBlockHeight, txID, 0, sender, flow.Address{}, nftID, 0),
 	}
 
 	transfers, err := parser.Parse(events, testBlockHeight)
@@ -99,12 +82,12 @@ func TestParseNFTTransfers_NilOptionalAddresses(t *testing.T) {
 
 	uuid := uint64(50)
 	events := []flow.Event{
-		makeNFTWithdrawnEvent(t, nil, txID, 0, 0, uuid, 1),
-		makeNFTDepositedEvent(t, nil, txID, 0, 1, uuid, 1),
+		testutil.MakeNFTWithdrawnEvent(t, flow.Testnet, nil, txID, 0, 0, uuid, 1),
+		testutil.MakeNFTDepositedEvent(t, flow.Testnet, nil, txID, 0, 1, uuid, 1),
 	}
 
 	expected := []access.NonFungibleTokenTransfer{
-		getNFTTransfer(testBlockHeight, txID, 0, flow.Address{}, flow.Address{}, 1, 0, 1),
+		testutil.MakeNFTTransfer(testBlockHeight, txID, 0, flow.Address{}, flow.Address{}, 1, 0, 1),
 	}
 
 	transfers, err := parser.Parse(events, testBlockHeight)
@@ -122,15 +105,15 @@ func TestParseNFTTransfers_MultiplePairsInSameTx(t *testing.T) {
 	recipient2 := unittest.RandomAddressFixture()
 
 	events := []flow.Event{
-		makeNFTWithdrawnEvent(t, &sender1, txID, 0, 0, 10, 1),
-		makeNFTDepositedEvent(t, &recipient1, txID, 0, 1, 10, 1),
-		makeNFTWithdrawnEvent(t, &sender2, txID, 0, 2, 20, 2),
-		makeNFTDepositedEvent(t, &recipient2, txID, 0, 3, 20, 2),
+		testutil.MakeNFTWithdrawnEvent(t, flow.Testnet, &sender1, txID, 0, 0, 10, 1),
+		testutil.MakeNFTDepositedEvent(t, flow.Testnet, &recipient1, txID, 0, 1, 10, 1),
+		testutil.MakeNFTWithdrawnEvent(t, flow.Testnet, &sender2, txID, 0, 2, 20, 2),
+		testutil.MakeNFTDepositedEvent(t, flow.Testnet, &recipient2, txID, 0, 3, 20, 2),
 	}
 
 	expected := []access.NonFungibleTokenTransfer{
-		getNFTTransfer(testBlockHeight, txID, 0, sender1, recipient1, 1, 0, 1),
-		getNFTTransfer(testBlockHeight, txID, 0, sender2, recipient2, 2, 2, 3),
+		testutil.MakeNFTTransfer(testBlockHeight, txID, 0, sender1, recipient1, 1, 0, 1),
+		testutil.MakeNFTTransfer(testBlockHeight, txID, 0, sender2, recipient2, 2, 2, 3),
 	}
 
 	transfers, err := parser.Parse(events, testBlockHeight)
@@ -149,12 +132,12 @@ func TestParseNFTTransfers_PairedUsesDepositEventIndex(t *testing.T) {
 	uuid := uint64(1)
 	nftID := uint64(111)
 	events := []flow.Event{
-		makeNFTWithdrawnEvent(t, &sender, txID, 0, 0, uuid, nftID),
-		makeNFTDepositedEvent(t, &recipient, txID, 0, 5, uuid, nftID),
+		testutil.MakeNFTWithdrawnEvent(t, flow.Testnet, &sender, txID, 0, 0, uuid, nftID),
+		testutil.MakeNFTDepositedEvent(t, flow.Testnet, &recipient, txID, 0, 5, uuid, nftID),
 	}
 
 	expected := []access.NonFungibleTokenTransfer{
-		getNFTTransfer(testBlockHeight, txID, 0, sender, recipient, nftID, 0, 5),
+		testutil.MakeNFTTransfer(testBlockHeight, txID, 0, sender, recipient, nftID, 0, 5),
 	}
 
 	transfers, err := parser.Parse(events, testBlockHeight)
@@ -168,7 +151,7 @@ func TestParseNFTTransfers_MalformedPayload(t *testing.T) {
 	t.Run("malformed withdrawn event", func(t *testing.T) {
 		events := []flow.Event{
 			{
-				Type:    testNFTWithdrawnType,
+				Type:    testutil.NFTWithdrawnEventType(flow.Testnet),
 				Payload: []byte("not valid ccf"),
 			},
 		}
@@ -180,7 +163,7 @@ func TestParseNFTTransfers_MalformedPayload(t *testing.T) {
 	t.Run("malformed deposited event", func(t *testing.T) {
 		events := []flow.Event{
 			{
-				Type:    testNFTDepositedType,
+				Type:    testutil.NFTDepositedEventType(flow.Testnet),
 				Payload: []byte("not valid ccf"),
 			},
 		}
@@ -202,13 +185,13 @@ func TestParseNFTTransfers_EventsAcrossTransactionsDoNotPair(t *testing.T) {
 	sharedUUID := uint64(42)
 	nftID := uint64(7)
 	events := []flow.Event{
-		makeNFTWithdrawnEvent(t, &sender, txID1, 0, 0, sharedUUID, nftID),
-		makeNFTDepositedEvent(t, &recipient, txID2, 1, 0, sharedUUID, nftID),
+		testutil.MakeNFTWithdrawnEvent(t, flow.Testnet, &sender, txID1, 0, 0, sharedUUID, nftID),
+		testutil.MakeNFTDepositedEvent(t, flow.Testnet, &recipient, txID2, 1, 0, sharedUUID, nftID),
 	}
 
 	expected := []access.NonFungibleTokenTransfer{
-		getNFTTransfer(testBlockHeight, txID1, 0, sender, flow.Address{}, nftID, 0),
-		getNFTTransfer(testBlockHeight, txID2, 1, flow.Address{}, recipient, nftID, 0),
+		testutil.MakeNFTTransfer(testBlockHeight, txID1, 0, sender, flow.Address{}, nftID, 0),
+		testutil.MakeNFTTransfer(testBlockHeight, txID2, 1, flow.Address{}, recipient, nftID, 0),
 	}
 
 	transfers, err := parser.Parse(events, testBlockHeight)
@@ -228,13 +211,13 @@ func TestParseNFTTransfers_DepositBeforeWithdrawal(t *testing.T) {
 	uuid := uint64(55)
 	nftID := uint64(42)
 	events := []flow.Event{
-		makeNFTDepositedEvent(t, &recipient, txID, 0, 0, uuid, nftID),
-		makeNFTWithdrawnEvent(t, &sender, txID, 0, 1, uuid, nftID),
+		testutil.MakeNFTDepositedEvent(t, flow.Testnet, &recipient, txID, 0, 0, uuid, nftID),
+		testutil.MakeNFTWithdrawnEvent(t, flow.Testnet, &sender, txID, 0, 1, uuid, nftID),
 	}
 
 	expected := []access.NonFungibleTokenTransfer{
-		getNFTTransfer(testBlockHeight, txID, 0, flow.Address{}, recipient, nftID, 0),
-		getNFTTransfer(testBlockHeight, txID, 0, sender, flow.Address{}, nftID, 1),
+		testutil.MakeNFTTransfer(testBlockHeight, txID, 0, flow.Address{}, recipient, nftID, 0),
+		testutil.MakeNFTTransfer(testBlockHeight, txID, 0, sender, flow.Address{}, nftID, 1),
 	}
 
 	transfers, err := parser.Parse(events, testBlockHeight)
@@ -278,18 +261,18 @@ func TestParseNFTTransfers_MixedPairedAndUnpaired(t *testing.T) {
 
 	events := []flow.Event{
 		// Paired transfer
-		makeNFTWithdrawnEvent(t, &sender, txID, 0, 0, 100, 1),
-		makeNFTDepositedEvent(t, &recipient, txID, 0, 1, 100, 1),
+		testutil.MakeNFTWithdrawnEvent(t, flow.Testnet, &sender, txID, 0, 0, 100, 1),
+		testutil.MakeNFTDepositedEvent(t, flow.Testnet, &recipient, txID, 0, 1, 100, 1),
 		// Unpaired deposit (mint)
-		makeNFTDepositedEvent(t, &mintRecipient, txID, 0, 2, 200, 2),
+		testutil.MakeNFTDepositedEvent(t, flow.Testnet, &mintRecipient, txID, 0, 2, 200, 2),
 		// Unpaired withdrawal (burn)
-		makeNFTWithdrawnEvent(t, &burnSender, txID, 0, 3, 300, 3),
+		testutil.MakeNFTWithdrawnEvent(t, flow.Testnet, &burnSender, txID, 0, 3, 300, 3),
 	}
 
 	expected := []access.NonFungibleTokenTransfer{
-		getNFTTransfer(testBlockHeight, txID, 0, sender, recipient, 1, 0, 1),
-		getNFTTransfer(testBlockHeight, txID, 0, flow.Address{}, mintRecipient, 2, 2),
-		getNFTTransfer(testBlockHeight, txID, 0, burnSender, flow.Address{}, 3, 3),
+		testutil.MakeNFTTransfer(testBlockHeight, txID, 0, sender, recipient, 1, 0, 1),
+		testutil.MakeNFTTransfer(testBlockHeight, txID, 0, flow.Address{}, mintRecipient, 2, 2),
+		testutil.MakeNFTTransfer(testBlockHeight, txID, 0, burnSender, flow.Address{}, 3, 3),
 	}
 
 	transfers, err := parser.Parse(events, testBlockHeight)
@@ -309,13 +292,13 @@ func TestParseNFTTransfers_MultipleWithdrawalsBeforeDeposit(t *testing.T) {
 	nftUUID := uint64(100)
 	nftID := uint64(42)
 	events := []flow.Event{
-		makeNFTWithdrawnEvent(t, &sender, txID, 0, 0, nftUUID, nftID),
-		makeNFTWithdrawnEvent(t, &sender, txID, 0, 1, nftUUID, nftID),
-		makeNFTDepositedEvent(t, &recipient, txID, 0, 2, nftUUID, nftID),
+		testutil.MakeNFTWithdrawnEvent(t, flow.Testnet, &sender, txID, 0, 0, nftUUID, nftID),
+		testutil.MakeNFTWithdrawnEvent(t, flow.Testnet, &sender, txID, 0, 1, nftUUID, nftID),
+		testutil.MakeNFTDepositedEvent(t, flow.Testnet, &recipient, txID, 0, 2, nftUUID, nftID),
 	}
 
 	expected := []access.NonFungibleTokenTransfer{
-		getNFTTransfer(testBlockHeight, txID, 0, sender, recipient, nftID, 0, 1, 2),
+		testutil.MakeNFTTransfer(testBlockHeight, txID, 0, sender, recipient, nftID, 0, 1, 2),
 	}
 
 	transfers, err := parser.Parse(events, testBlockHeight)
@@ -335,15 +318,15 @@ func TestParseNFTTransfers_MultiHopTransfer(t *testing.T) {
 	nftUUID := uint64(100)
 	nftID := uint64(42)
 	events := []flow.Event{
-		makeNFTWithdrawnEvent(t, &alice, txID, 0, 0, nftUUID, nftID), // A → out
-		makeNFTDepositedEvent(t, &bob, txID, 0, 1, nftUUID, nftID),   // → B
-		makeNFTWithdrawnEvent(t, &bob, txID, 0, 2, nftUUID, nftID),   // B → out
-		makeNFTDepositedEvent(t, &carol, txID, 0, 3, nftUUID, nftID), // → C
+		testutil.MakeNFTWithdrawnEvent(t, flow.Testnet, &alice, txID, 0, 0, nftUUID, nftID), // A → out
+		testutil.MakeNFTDepositedEvent(t, flow.Testnet, &bob, txID, 0, 1, nftUUID, nftID),   // → B
+		testutil.MakeNFTWithdrawnEvent(t, flow.Testnet, &bob, txID, 0, 2, nftUUID, nftID),   // B → out
+		testutil.MakeNFTDepositedEvent(t, flow.Testnet, &carol, txID, 0, 3, nftUUID, nftID), // → C
 	}
 
 	expected := []access.NonFungibleTokenTransfer{
-		getNFTTransfer(testBlockHeight, txID, 0, alice, bob, nftID, 0, 1),
-		getNFTTransfer(testBlockHeight, txID, 0, bob, carol, nftID, 2, 3),
+		testutil.MakeNFTTransfer(testBlockHeight, txID, 0, alice, bob, nftID, 0, 1),
+		testutil.MakeNFTTransfer(testBlockHeight, txID, 0, bob, carol, nftID, 2, 3),
 	}
 
 	transfers, err := parser.Parse(events, testBlockHeight)
@@ -375,17 +358,17 @@ func TestParseNFTTransfers_MultiLayerCollectionTransfer(t *testing.T) {
 	nftUUID := uint64(100)
 	nftID := uint64(42)
 	events := []flow.Event{
-		makeNFTWithdrawnEvent(t, &addr1, txID, 0, 0, nftUUID, nftID),
-		makeNFTWithdrawnEvent(t, &addr1, txID, 0, 1, nftUUID, nftID),
-		makeNFTWithdrawnEvent(t, &addr2, txID, 0, 2, nftUUID, nftID),
-		makeNFTWithdrawnEvent(t, &addr3, txID, 0, 3, nftUUID, nftID),
-		makeNFTDepositedEvent(t, &addr4, txID, 0, 4, nftUUID, nftID),
+		testutil.MakeNFTWithdrawnEvent(t, flow.Testnet, &addr1, txID, 0, 0, nftUUID, nftID),
+		testutil.MakeNFTWithdrawnEvent(t, flow.Testnet, &addr1, txID, 0, 1, nftUUID, nftID),
+		testutil.MakeNFTWithdrawnEvent(t, flow.Testnet, &addr2, txID, 0, 2, nftUUID, nftID),
+		testutil.MakeNFTWithdrawnEvent(t, flow.Testnet, &addr3, txID, 0, 3, nftUUID, nftID),
+		testutil.MakeNFTDepositedEvent(t, flow.Testnet, &addr4, txID, 0, 4, nftUUID, nftID),
 	}
 
 	expected := []access.NonFungibleTokenTransfer{
-		getNFTTransfer(testBlockHeight, txID, 0, addr1, addr4, nftID, 0, 1, 4), // innermost → deposit
-		getNFTTransfer(testBlockHeight, txID, 0, addr2, addr1, nftID, 1, 2),    // G1 → G0
-		getNFTTransfer(testBlockHeight, txID, 0, addr3, addr2, nftID, 2, 3),    // G2 → G1
+		testutil.MakeNFTTransfer(testBlockHeight, txID, 0, addr1, addr4, nftID, 0, 1, 4), // innermost → deposit
+		testutil.MakeNFTTransfer(testBlockHeight, txID, 0, addr2, addr1, nftID, 1, 2),    // G1 → G0
+		testutil.MakeNFTTransfer(testBlockHeight, txID, 0, addr3, addr2, nftID, 2, 3),    // G2 → G1
 	}
 
 	transfers, err := parser.Parse(events, testBlockHeight)
@@ -416,15 +399,15 @@ func TestParseNFTTransfers_MultiLayerBurn(t *testing.T) {
 	nftUUID := uint64(100)
 	nftID := uint64(42)
 	events := []flow.Event{
-		makeNFTWithdrawnEvent(t, &addr1, txID, 0, 0, nftUUID, nftID),
-		makeNFTWithdrawnEvent(t, &addr2, txID, 0, 1, nftUUID, nftID),
-		makeNFTWithdrawnEvent(t, &addr3, txID, 0, 2, nftUUID, nftID),
+		testutil.MakeNFTWithdrawnEvent(t, flow.Testnet, &addr1, txID, 0, 0, nftUUID, nftID),
+		testutil.MakeNFTWithdrawnEvent(t, flow.Testnet, &addr2, txID, 0, 1, nftUUID, nftID),
+		testutil.MakeNFTWithdrawnEvent(t, flow.Testnet, &addr3, txID, 0, 2, nftUUID, nftID),
 	}
 
 	expected := []access.NonFungibleTokenTransfer{
-		getNFTTransfer(testBlockHeight, txID, 0, addr1, flow.Address{}, nftID, 0), // burn
-		getNFTTransfer(testBlockHeight, txID, 0, addr2, addr1, nftID, 0, 1),       // G1 → G0
-		getNFTTransfer(testBlockHeight, txID, 0, addr3, addr2, nftID, 1, 2),       // G2 → G1
+		testutil.MakeNFTTransfer(testBlockHeight, txID, 0, addr1, flow.Address{}, nftID, 0), // burn
+		testutil.MakeNFTTransfer(testBlockHeight, txID, 0, addr2, addr1, nftID, 0, 1),       // G1 → G0
+		testutil.MakeNFTTransfer(testBlockHeight, txID, 0, addr3, addr2, nftID, 1, 2),       // G2 → G1
 	}
 
 	transfers, err := parser.Parse(events, testBlockHeight)
@@ -445,131 +428,18 @@ func TestParseNFTTransfers_MultipleTransactionsInBlock(t *testing.T) {
 	recipient2 := unittest.RandomAddressFixture()
 
 	events := []flow.Event{
-		makeNFTWithdrawnEvent(t, &sender1, txID1, 0, 0, 10, 1),
-		makeNFTDepositedEvent(t, &recipient1, txID1, 0, 1, 10, 1),
-		makeNFTWithdrawnEvent(t, &sender2, txID2, 1, 0, 20, 2),
-		makeNFTDepositedEvent(t, &recipient2, txID2, 1, 1, 20, 2),
+		testutil.MakeNFTWithdrawnEvent(t, flow.Testnet, &sender1, txID1, 0, 0, 10, 1),
+		testutil.MakeNFTDepositedEvent(t, flow.Testnet, &recipient1, txID1, 0, 1, 10, 1),
+		testutil.MakeNFTWithdrawnEvent(t, flow.Testnet, &sender2, txID2, 1, 0, 20, 2),
+		testutil.MakeNFTDepositedEvent(t, flow.Testnet, &recipient2, txID2, 1, 1, 20, 2),
 	}
 
 	expected := []access.NonFungibleTokenTransfer{
-		getNFTTransfer(testBlockHeight, txID1, 0, sender1, recipient1, 1, 0, 1),
-		getNFTTransfer(testBlockHeight, txID2, 1, sender2, recipient2, 2, 0, 1),
+		testutil.MakeNFTTransfer(testBlockHeight, txID1, 0, sender1, recipient1, 1, 0, 1),
+		testutil.MakeNFTTransfer(testBlockHeight, txID2, 1, sender2, recipient2, 2, 0, 1),
 	}
 
 	transfers, err := parser.Parse(events, testBlockHeight)
 	require.NoError(t, err)
 	assert.ElementsMatch(t, expected, transfers)
-}
-
-// ==========================================================================
-// NFT Test Helpers
-// ==========================================================================
-
-func getNFTTransfer(blockHeight uint64, txID flow.Identifier, txIndex uint32, source, recipient flow.Address, nftID uint64, eventIndices ...uint32) access.NonFungibleTokenTransfer {
-	return access.NonFungibleTokenTransfer{
-		TransactionID:    txID,
-		BlockHeight:      blockHeight,
-		TransactionIndex: txIndex,
-		EventIndices:     eventIndices,
-		TokenType:        testNFTTokenType,
-		ID:               nftID,
-		SourceAddress:    source,
-		RecipientAddress: recipient,
-	}
-}
-
-func makeNFTDepositedEvent(
-	t *testing.T,
-	toAddr *flow.Address,
-	txID flow.Identifier,
-	txIndex, eventIndex uint32,
-	uuid, nftID uint64,
-) flow.Event {
-	var toValue cadence.Value
-	if toAddr != nil {
-		toValue = cadence.NewOptional(cadence.NewAddress(*toAddr))
-	} else {
-		toValue = cadence.NewOptional(nil)
-	}
-
-	location := common.NewAddressLocation(nil, common.Address{}, "NonFungibleToken")
-	eventType := cadence.NewEventType(
-		location,
-		"NonFungibleToken.Deposited",
-		[]cadence.Field{
-			{Identifier: "type", Type: cadence.StringType},
-			{Identifier: "id", Type: cadence.UInt64Type},
-			{Identifier: "uuid", Type: cadence.UInt64Type},
-			{Identifier: "to", Type: cadence.NewOptionalType(cadence.AddressType)},
-			{Identifier: "collectionUUID", Type: cadence.UInt64Type},
-		},
-		nil,
-	)
-
-	event := cadence.NewEvent([]cadence.Value{
-		cadence.String(testNFTTokenType),
-		cadence.UInt64(nftID),
-		cadence.UInt64(uuid),
-		toValue,
-		cadence.UInt64(5),
-	}).WithType(eventType)
-
-	payload, err := ccf.Encode(event)
-	require.NoError(t, err)
-
-	return flow.Event{
-		Type:             testNFTDepositedType,
-		TransactionID:    txID,
-		TransactionIndex: txIndex,
-		EventIndex:       eventIndex,
-		Payload:          payload,
-	}
-}
-
-func makeNFTWithdrawnEvent(
-	t *testing.T,
-	fromAddr *flow.Address,
-	txID flow.Identifier,
-	txIndex, eventIndex uint32,
-	uuid, nftID uint64,
-) flow.Event {
-	var fromValue cadence.Value
-	if fromAddr != nil {
-		fromValue = cadence.NewOptional(cadence.NewAddress(*fromAddr))
-	} else {
-		fromValue = cadence.NewOptional(nil)
-	}
-
-	location := common.NewAddressLocation(nil, common.Address{}, "NonFungibleToken")
-	eventType := cadence.NewEventType(
-		location,
-		"NonFungibleToken.Withdrawn",
-		[]cadence.Field{
-			{Identifier: "type", Type: cadence.StringType},
-			{Identifier: "id", Type: cadence.UInt64Type},
-			{Identifier: "uuid", Type: cadence.UInt64Type},
-			{Identifier: "from", Type: cadence.NewOptionalType(cadence.AddressType)},
-			{Identifier: "providerUUID", Type: cadence.UInt64Type},
-		},
-		nil,
-	)
-
-	event := cadence.NewEvent([]cadence.Value{
-		cadence.String(testNFTTokenType),
-		cadence.UInt64(nftID),
-		cadence.UInt64(uuid),
-		fromValue,
-		cadence.UInt64(5),
-	}).WithType(eventType)
-
-	payload, err := ccf.Encode(event)
-	require.NoError(t, err)
-
-	return flow.Event{
-		Type:             testNFTWithdrawnType,
-		TransactionID:    txID,
-		TransactionIndex: txIndex,
-		EventIndex:       eventIndex,
-		Payload:          payload,
-	}
 }

@@ -6,12 +6,14 @@ import (
 	"testing"
 
 	"github.com/jordanschalm/lockctx"
+	"github.com/onflow/cadence"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/state_synchronization/indexer/extended/transfers/testutil"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -57,42 +59,18 @@ func (m *mockFTBootstrapper) Store(_ lockctx.Proof, _ storage.ReaderBatchWriter,
 func TestFilterFTTransfers(t *testing.T) {
 	t.Parallel()
 
-	sc := systemcontracts.SystemContractsForChain(flow.Testnet)
-	flowFeesAddress := sc.FlowFees.Address
-
-	a := &FungibleTokenTransfers{
-		flowFeesAddress: flowFeesAddress,
-	}
+	a := &FungibleTokenTransfers{}
 
 	t.Run("empty input returns empty output", func(t *testing.T) {
 		result := a.filterFTTransfers(nil)
 		assert.Empty(t, result)
 	})
 
-	t.Run("filters out transfers to flow fees address", func(t *testing.T) {
-		otherAddress := flow.HexToAddress("0x1234567890abcdef")
+	t.Run("filters out zero-amount transfers", func(t *testing.T) {
+		addr := flow.HexToAddress("0x1234567890abcdef")
 		transfers := []access.FungibleTokenTransfer{
 			{
-				RecipientAddress: flowFeesAddress,
-				Amount:           big.NewInt(100),
-				TokenType:        "A.0x1.FlowToken",
-			},
-			{
-				RecipientAddress: otherAddress,
-				Amount:           big.NewInt(100),
-				TokenType:        "A.0x1.FlowToken",
-			},
-		}
-
-		result := a.filterFTTransfers(transfers)
-		require.Len(t, result, 1)
-		assert.Equal(t, otherAddress, result[0].RecipientAddress)
-	})
-
-	t.Run("filters out zero-amount transfers to flow fees address", func(t *testing.T) {
-		transfers := []access.FungibleTokenTransfer{
-			{
-				RecipientAddress: flowFeesAddress,
+				RecipientAddress: addr,
 				Amount:           big.NewInt(0),
 				TokenType:        "A.0x1.FlowToken",
 			},
@@ -102,36 +80,43 @@ func TestFilterFTTransfers(t *testing.T) {
 		assert.Empty(t, result)
 	})
 
-	t.Run("mixed transfers: only non-zero amount transfers not to flow fees address are kept", func(t *testing.T) {
+	t.Run("non-zero amount transfers are kept regardless of recipient", func(t *testing.T) {
+		sc := systemcontracts.SystemContractsForChain(flow.Testnet)
+		flowFeesAddress := sc.FlowFees.Address
 		otherAddress := flow.HexToAddress("0x1234567890abcdef")
+
 		transfers := []access.FungibleTokenTransfer{
 			{
-				// filtered: to flow fees address
 				RecipientAddress: flowFeesAddress,
-				Amount:           big.NewInt(500),
+				Amount:           big.NewInt(100),
 				TokenType:        "A.0x1.FlowToken",
 			},
 			{
-				// kept: not to flow fees, non-zero amount
 				RecipientAddress: otherAddress,
 				Amount:           big.NewInt(200),
 				TokenType:        "A.0x1.FlowToken",
 			},
+		}
+
+		result := a.filterFTTransfers(transfers)
+		require.Len(t, result, 2)
+	})
+
+	t.Run("mixed: only non-zero amount transfers are kept", func(t *testing.T) {
+		addr := flow.HexToAddress("0x1234567890abcdef")
+		transfers := []access.FungibleTokenTransfer{
 			{
-				// filtered: to flow fees address
-				RecipientAddress: flowFeesAddress,
+				RecipientAddress: addr,
+				Amount:           big.NewInt(200),
+				TokenType:        "A.0x1.FlowToken",
+			},
+			{
+				RecipientAddress: addr,
 				Amount:           big.NewInt(0),
 				TokenType:        "A.0x1.FlowToken",
 			},
 			{
-				// filtered: to flow fees address
-				RecipientAddress: flowFeesAddress,
-				Amount:           big.NewInt(1),
-				TokenType:        "A.0x1.FlowToken",
-			},
-			{
-				// kept: not to flow fees, non-zero amount
-				RecipientAddress: otherAddress,
+				RecipientAddress: addr,
 				Amount:           big.NewInt(999),
 				TokenType:        "A.0x2.USDC",
 			},
@@ -270,5 +255,61 @@ func TestFungibleTokenTransfers_IndexBlockData(t *testing.T) {
 		err := a.IndexBlockData(nil, data, nil)
 		require.Error(t, err)
 		assert.ErrorIs(t, err, storeErr)
+	})
+
+	// Tests that the flow fees transfer is excluded by the parser when a FeesDeducted event
+	// is present, since the indexer is created with omitFlowFees=true.
+	t.Run("flow fees transfer omitted when FeesDeducted event is present", func(t *testing.T) {
+		ftStore := &mockFTBootstrapper{latestHeight: 99}
+		a := NewFungibleTokenTransfers(unittest.Logger(), flow.Testnet, ftStore)
+
+		payer := unittest.RandomAddressFixture()
+		txID := unittest.IdentifierFixture()
+		flowFeesAddress := testutil.FlowFeesAddress(flow.Testnet)
+		feeAmount := cadence.UFix64(1_00000000)
+
+		data := BlockData{
+			Header: unittest.BlockHeaderFixture(unittest.WithHeaderHeight(100)),
+			Events: map[uint32][]flow.Event{
+				0: {
+					testutil.MakeFTWithdrawnEvent(t, flow.Testnet, &payer, txID, 0, 0, 1, 50, feeAmount),
+					testutil.MakeFTDepositedEvent(t, flow.Testnet, &flowFeesAddress, txID, 0, 1, 50, feeAmount),
+					testutil.MakeFlowFeesEvent(t, flow.Testnet, txID, 0, 2, feeAmount),
+				},
+			},
+		}
+
+		err := a.IndexBlockData(nil, data, nil)
+		require.NoError(t, err)
+		assert.Equal(t, uint64(100), ftStore.storedHeight)
+		assert.Empty(t, ftStore.storedTransfers)
+	})
+
+	// Tests that a regular transfer to the flow fees address (no FeesDeducted event) is indexed.
+	// The parser only omits transfers that are paired with a FeesDeducted event.
+	t.Run("transfer to flow fees address without FeesDeducted event is indexed", func(t *testing.T) {
+		ftStore := &mockFTBootstrapper{latestHeight: 99}
+		a := NewFungibleTokenTransfers(unittest.Logger(), flow.Testnet, ftStore)
+
+		payer := unittest.RandomAddressFixture()
+		txID := unittest.IdentifierFixture()
+		flowFeesAddress := testutil.FlowFeesAddress(flow.Testnet)
+		amount := cadence.UFix64(5_00000000)
+
+		data := BlockData{
+			Header: unittest.BlockHeaderFixture(unittest.WithHeaderHeight(100)),
+			Events: map[uint32][]flow.Event{
+				0: {
+					testutil.MakeFTWithdrawnEvent(t, flow.Testnet, &payer, txID, 0, 0, 1, 50, amount),
+					testutil.MakeFTDepositedEvent(t, flow.Testnet, &flowFeesAddress, txID, 0, 1, 50, amount),
+					// No FeesDeducted event — treated as a regular transfer.
+				},
+			},
+		}
+
+		err := a.IndexBlockData(nil, data, nil)
+		require.NoError(t, err)
+		assert.Equal(t, uint64(100), ftStore.storedHeight)
+		require.Len(t, ftStore.storedTransfers, 1)
 	})
 }

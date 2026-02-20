@@ -7,7 +7,6 @@ import (
 	"github.com/jordanschalm/lockctx"
 	"github.com/rs/zerolog"
 
-	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/state_synchronization/indexer/extended/transfers"
@@ -25,10 +24,9 @@ var bigZero = new(big.Int)
 
 // FungibleTokenTransfers indexes fungible token transfer events for a block.
 type FungibleTokenTransfers struct {
-	log             zerolog.Logger
-	ftParser        *transfers.FTParser
-	ftStore         storage.FungibleTokenTransfersBootstrapper
-	flowFeesAddress flow.Address
+	log      zerolog.Logger
+	ftParser *transfers.FTParser
+	ftStore  storage.FungibleTokenTransfersBootstrapper
 }
 
 var _ Indexer = (*FungibleTokenTransfers)(nil)
@@ -39,12 +37,10 @@ func NewFungibleTokenTransfers(
 	chainID flow.ChainID,
 	ftStore storage.FungibleTokenTransfersBootstrapper,
 ) *FungibleTokenTransfers {
-	sc := systemcontracts.SystemContractsForChain(chainID)
 	return &FungibleTokenTransfers{
-		log:             log.With().Str("component", "account_ft_transfers_indexer").Logger(),
-		ftParser:        transfers.NewFTParser(chainID, omitFlowFees),
-		ftStore:         ftStore,
-		flowFeesAddress: sc.FlowFees.Address,
+		log:      log.With().Str("component", "account_ft_transfers_indexer").Logger(),
+		ftParser: transfers.NewFTParser(chainID, omitFlowFees),
+		ftStore:  ftStore,
 	}
 }
 
@@ -99,10 +95,6 @@ func (a *FungibleTokenTransfers) filterFTTransfers(transfers []access.FungibleTo
 	for _, transfer := range transfers {
 		// skip zero amount transfers
 		if transfer.Amount.Cmp(bigZero) == 0 {
-			continue
-		}
-		// skip transfers to the flow fees address
-		if transfer.RecipientAddress == a.flowFeesAddress {
 			continue
 		}
 		filtered = append(filtered, transfer)
