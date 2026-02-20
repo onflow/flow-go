@@ -491,7 +491,7 @@ func (c *Client) CreateAccount(
 	payer := c.SDKServiceAddress()
 	tx, err := templates.CreateAccount([]*sdk.AccountKey{accountKey}, nil, payer)
 	if err != nil {
-		return sdk.Address{}, nil, fmt.Errorf("failed cusnctruct create account transaction %w", err)
+		return sdk.Address{}, nil, fmt.Errorf("failed to construct create account transaction: %w", err)
 	}
 	tx.SetComputeLimit(1000).
 		SetReferenceBlockID(latestBlockID).

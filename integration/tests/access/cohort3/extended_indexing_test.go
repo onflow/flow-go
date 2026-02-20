@@ -271,6 +271,7 @@ func (s *ExtendedIndexingSuite) verifyPagination(address string) {
 	// Paginating through all results should yield the same count as a single unpaginated request
 	allUnpaginated := s.fetchAccountTransactions(address, nil)
 	allPaginated := s.collectAllPages(address, 1, nil, nil)
+	s.Require().Len(allUnpaginated.Transactions, len(allPaginated), "unpaginated and paginated transactions should have the same length")
 
 	for i, unpagedTx := range allUnpaginated.Transactions {
 		pagedTx := allPaginated[i]

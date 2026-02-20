@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"math"
 	"slices"
 
 	"github.com/jordanschalm/lockctx"
@@ -208,6 +209,7 @@ func (idx *AccountTransactions) Store(lctx lockctx.Proof, rw storage.ReaderBatch
 //
 // The function collects up to `limit` entries, then peeks one more to determine whether a
 // NextCursor should be set in the returned page.
+// `limit` must be in the exclusive range (0, math.MaxUint32).
 //
 // No error returns are expected during normal operation.
 func lookupAccountTransactions(
@@ -219,8 +221,8 @@ func lookupAccountTransactions(
 	cursor *access.AccountTransactionCursor,
 	filter storage.IndexFilter[*access.AccountTransaction],
 ) (access.AccountTransactionsPage, error) {
-	if limit == 0 {
-		return access.AccountTransactionsPage{}, nil
+	if limit == 0 || limit == math.MaxUint32 {
+		return access.AccountTransactionsPage{}, fmt.Errorf("limit must be greater than 0 and less than %d: %w", math.MaxUint32, storage.ErrInvalidQuery)
 	}
 
 	// Start from the latest height (prefix covers all tx indexes at that height).

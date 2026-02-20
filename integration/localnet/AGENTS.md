@@ -1,10 +1,10 @@
 # AGENTS.md
 
-### Localnet (Local Network Testing)
+## Localnet (Local Network Testing)
 
 A Docker-based local Flow network for manual end-to-end testing. Located in `integration/localnet/`. Particularly useful for API development and testing against a fully running network.
 
-#### Quick Start
+### Quick Start
 
 All commands run from `integration/localnet/`:
 
@@ -12,9 +12,9 @@ All commands run from `integration/localnet/`:
 - `make start` - Build images and start all nodes + metrics stack
 - `make start-cached` - Start without rebuilding (faster iteration)
 - `make stop` - Stop all services
-- `make clean-data` - Remove all generated data and bootstrap files
+- `make clean-data` - Remove all generated data and bootstrap filest
 
-#### Network Configuration
+### Network Configuration
 
 Node counts are configured via env vars during bootstrap:
 
@@ -24,7 +24,7 @@ Node counts are configured via env vars during bootstrap:
   - `make bootstrap-light` - Minimal network
   - `make bootstrap-short-epochs` - Short epochs for epoch testing
 
-#### Accessing the Access Node API
+### Accessing the Access Node API
 
 Default ports for `access_1`:
 
@@ -34,31 +34,31 @@ Default ports for `access_1`:
 - Admin tool: `localhost:4000`
 - Full port mappings: `integration/localnet/ports.nodes.json`
 
-#### Testing Endpoints
+### Testing Endpoints
 
 REST API:
-```
+```sh
 curl -s http://localhost:4004/v1/blocks?height=latest
 ```
 
 gRPC (via grpcurl):
-```
+```sh
 grpcurl -plaintext localhost:4001 list
 ```
 
-#### Flow CLI
+### Flow CLI
 
 Connect using network name `localnet` (config at `integration/localnet/client/flow-localnet.json`):
 
 - Service account address: `f8d6e0586b0a20c7`
 - Example: `flow -n localnet accounts get f8d6e0586b0a20c7`
 
-#### Observability
+### Observability
 
 - Grafana: `http://localhost:3000/` (no login required)
 - Prometheus: `http://localhost:9090`
 
-#### Development Iteration Workflow
+### Development Iteration Workflow
 
 1. Make code changes
 2. `make stop`
@@ -69,7 +69,7 @@ For single-node rebuild:
 docker-compose -f docker-compose.nodes.yml build access_1 && docker-compose -f docker-compose.nodes.yml up -d access_1
 ```
 
-#### Viewing Logs
+### Viewing Logs
 
 - All nodes: `make logs`
 - Specific node: `docker-compose -f docker-compose.nodes.yml logs -f access_1`
