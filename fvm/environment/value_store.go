@@ -2,10 +2,13 @@ package environment
 
 import (
 	"bytes"
+	"encoding/binary"
+	"encoding/hex"
 	"fmt"
 
 	"github.com/onflow/atree"
 	"github.com/onflow/cadence/common"
+	"go.opentelemetry.io/otel/attribute"
 
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/storage/state"
@@ -123,7 +126,14 @@ func (store *valueStore) GetValue(
 	[]byte,
 	error,
 ) {
-	defer store.tracer.StartChildSpan(trace.FVMEnvGetValue).End()
+	span := store.tracer.StartChildSpan(trace.FVMEnvGetValue)
+	if span.Tracer != nil {
+		span.SetAttributes(
+			attribute.String("owner", hex.EncodeToString(owner)),
+			attribute.String("key", hex.EncodeToString(keyBytes)),
+		)
+	}
+	defer span.End()
 
 	id := flow.CadenceRegisterID(owner, keyBytes)
 	if id.IsInternalState() {
@@ -152,7 +162,15 @@ func (store *valueStore) SetValue(
 	keyBytes []byte,
 	value []byte,
 ) error {
-	defer store.tracer.StartChildSpan(trace.FVMEnvSetValue).End()
+	span := store.tracer.StartChildSpan(trace.FVMEnvSetValue)
+	if span.Tracer != nil {
+		span.SetAttributes(
+			attribute.String("owner", hex.EncodeToString(owner)),
+			attribute.String("key", hex.EncodeToString(keyBytes)),
+			attribute.String("value", hex.EncodeToString(value)),
+		)
+	}
+	defer span.End()
 
 	id := flow.CadenceRegisterID(owner, keyBytes)
 	if id.IsInternalState() {
@@ -217,12 +235,21 @@ func (store *valueStore) ValueExists(
 func (store *valueStore) AllocateSlabIndex(
 	owner []byte,
 ) (
-	atree.SlabIndex,
-	error,
+	slabIndex atree.SlabIndex,
+	err error,
 ) {
-	defer store.tracer.StartChildSpan(trace.FVMEnvAllocateSlabIndex).End()
+	address := flow.BytesToAddress(owner)
 
-	err := store.meter.MeterComputation(
+	span := store.tracer.StartChildSpan(trace.FVMEnvAllocateSlabIndex)
+	if span.Tracer != nil {
+		span.SetAttributes(
+			attribute.String("owner", address.String()),
+			attribute.String("index", fmt.Sprint(binary.BigEndian.Uint64(slabIndex[:]))),
+		)
+	}
+	defer span.End()
+
+	err = store.meter.MeterComputation(
 		common.ComputationUsage{
 			Kind:      ComputationKindAllocateSlabIndex,
 			Intensity: 1,
@@ -231,14 +258,17 @@ func (store *valueStore) AllocateSlabIndex(
 	if err != nil {
 		return atree.SlabIndex{}, fmt.Errorf(
 			"allocate storage index failed: %w",
-			err)
+			err,
+		)
 	}
 
-	v, err := store.accounts.AllocateSlabIndex(flow.BytesToAddress(owner))
+	slabIndex, err = store.accounts.AllocateSlabIndex(address)
 	if err != nil {
 		return atree.SlabIndex{}, fmt.Errorf(
 			"storage address allocation failed: %w",
-			err)
+			err,
+		)
 	}
-	return v, nil
+
+	return slabIndex, nil
 }

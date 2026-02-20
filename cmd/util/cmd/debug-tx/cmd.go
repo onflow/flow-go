@@ -1,27 +1,17 @@
 package debug_tx
 
 import (
-	"cmp"
 	"context"
-	"encoding/csv"
-	"encoding/hex"
-	"fmt"
 	"os"
 
+	sdk "github.com/onflow/flow-go-sdk"
 	client "github.com/onflow/flow-go-sdk/access/grpc"
-	"github.com/onflow/flow/protobuf/go/flow/execution"
-	"github.com/onflow/flow/protobuf/go/flow/executiondata"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 	"go.opentelemetry.io/otel/exporters/stdout/stdouttrace"
-	"golang.org/x/exp/slices"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
-
-	sdk "github.com/onflow/flow-go-sdk"
+	otelTrace "go.opentelemetry.io/otel/sdk/trace"
 
 	"github.com/onflow/flow-go/fvm"
-	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/grpcclient"
 	"github.com/onflow/flow-go/module/trace"
@@ -36,10 +26,13 @@ var (
 	flagExecutionAddress    string
 	flagChain               string
 	flagComputeLimit        uint64
-	flagProposalKeySeq      uint64
 	flagUseExecutionDataAPI bool
-	flagDumpRegisters       bool
+	flagShowResult          bool
+	flagBlockID             string
 	flagTracePath           string
+	flagLogTraces           bool
+	flagOnlyTraceCadence    bool
+	flagEntropyProvider     string
 )
 
 var Cmd = &cobra.Command{
@@ -61,23 +54,26 @@ func init() {
 	Cmd.Flags().StringVar(&flagAccessAddress, "access-address", "", "address of the access node")
 	_ = Cmd.MarkFlagRequired("access-address")
 
-	Cmd.Flags().StringVar(&flagExecutionAddress, "execution-address", "", "address of the execution node")
-	_ = Cmd.MarkFlagRequired("execution-address")
+	Cmd.Flags().StringVar(&flagExecutionAddress, "execution-address", "", "address of the execution node (required if --use-execution-data-api is false)")
 
-	Cmd.Flags().Uint64Var(&flagComputeLimit, "compute-limit", 9999, "transaction compute limit")
+	Cmd.Flags().Uint64Var(&flagComputeLimit, "compute-limit", flow.DefaultMaxTransactionGasLimit, "transaction compute limit")
 
-	Cmd.Flags().Uint64Var(&flagProposalKeySeq, "proposal-key-seq", 0, "proposal key sequence number")
+	Cmd.Flags().BoolVar(&flagUseExecutionDataAPI, "use-execution-data-api", true, "use the execution data API (default: true)")
 
-	Cmd.Flags().BoolVar(&flagUseExecutionDataAPI, "use-execution-data-api", false, "use the execution data API")
+	Cmd.Flags().BoolVar(&flagShowResult, "show-result", false, "show result (default: false)")
 
-	Cmd.Flags().BoolVar(&flagDumpRegisters, "dump-registers", false, "dump registers")
+	Cmd.Flags().StringVar(&flagBlockID, "block-id", "", "block ID")
 
 	Cmd.Flags().StringVar(&flagTracePath, "trace", "", "enable tracing to given path")
+
+	Cmd.Flags().BoolVar(&flagLogTraces, "log-cadence-traces", false, "log Cadence traces. requires --trace and --only-trace-cadence to be set (default: false)")
+
+	Cmd.Flags().BoolVar(&flagOnlyTraceCadence, "only-trace-cadence", false, "when tracing, only include spans related to Cadence execution (default: false)")
+
+	Cmd.Flags().StringVar(&flagEntropyProvider, "entropy-provider", "none", "entropy provider to use (default: none; options: none, block-hash)")
 }
 
 func run(_ *cobra.Command, args []string) {
-
-	log.Info().Msgf("Starting transaction debugger ... %v", args)
 
 	chainID := flow.ChainID(flagChain)
 	chain := chainID.Chain()
@@ -92,17 +88,161 @@ func run(_ *cobra.Command, args []string) {
 		log.Fatal().Err(err).Msg("failed to create client")
 	}
 
-	for _, rawTxID := range args {
-		txID, err := flow.HexStringToIdentifier(rawTxID)
+	var remoteClient debug.RemoteClient
+	if flagUseExecutionDataAPI {
+		remoteClient, err = debug.NewExecutionDataRemoteClient(flagAccessAddress, chain)
+	} else if flagExecutionAddress != "" {
+		remoteClient, err = debug.NewExecutionNodeRemoteClient(flagExecutionAddress)
+	} else {
+		log.Fatal().Msg("either --use-execution-data-api or --execution-address must be provided")
+	}
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to remote client")
+	}
+	defer remoteClient.Close()
+
+	var traceFile *os.File
+	if flagTracePath == "-" {
+		traceFile = os.Stdout
+	} else if flagTracePath != "" {
+		traceFile, err = os.Create(flagTracePath)
 		if err != nil {
-			log.Fatal().Err(err).Msg("failed to parse transaction ID")
+			log.Fatal().Err(err).Msg("failed to create trace file")
+		}
+		defer traceFile.Close()
+	}
+
+	var spanExporter otelTrace.SpanExporter
+	if traceFile != nil {
+		if flagOnlyTraceCadence {
+			cadenceSpanExporter := &debug.InterestingCadenceSpanExporter{
+				Log: flagLogTraces,
+			}
+			defer func() {
+				err = cadenceSpanExporter.WriteSpans(traceFile)
+				if err != nil {
+					log.Fatal().Err(err).Msg("failed to write spans")
+				}
+			}()
+			spanExporter = cadenceSpanExporter
+		} else {
+			spanExporter, err = stdouttrace.New(
+				stdouttrace.WithWriter(traceFile),
+				stdouttrace.WithoutTimestamps(),
+			)
+			if err != nil {
+				log.Fatal().Err(err).Msg("failed to create trace exporter")
+			}
+		}
+	}
+
+	if flagBlockID != "" {
+
+		if len(args) != 0 {
+			log.Fatal().Msg("cannot provide both block ID and transaction IDs")
 		}
 
-		runTransactionID(txID, flowClient, chain)
+		// Block ID provided, fetch the block and its transaction IDs
+
+		blockID, err := flow.HexStringToIdentifier(flagBlockID)
+		if err != nil {
+			log.Fatal().Err(err).Str("ID", flagBlockID).Msg("failed to parse block ID")
+		}
+
+		header := FetchBlockHeader(blockID, flowClient)
+		blockTransactions, systemTxID := FetchBlockTransactions(blockID, flowClient)
+
+		log.Info().Msgf("Running all transactions in block %s (height %d) ...", blockID, header.Height)
+
+		var newSpanExporter func(flow.Identifier) otelTrace.SpanExporter
+		if spanExporter != nil {
+			newSpanExporter = func(_ flow.Identifier) otelTrace.SpanExporter {
+				return spanExporter
+			}
+		}
+
+		blockSnapshot := NewBlockSnapshot(remoteClient, header)
+
+		results := RunBlock(
+			blockSnapshot,
+			header,
+			blockTransactions,
+			flow.ZeroID,
+			systemTxID,
+			chain,
+			nil,
+			newSpanExporter,
+			flagComputeLimit,
+			fvmOptions(blockID),
+		)
+
+		if flagShowResult {
+			for i, blockTx := range blockTransactions {
+				// Skip system transaction
+				if blockTx.ID() == systemTxID {
+					continue
+				}
+
+				debug.WriteResult(
+					os.Stdout,
+					flow.Identifier(blockTx.ID()),
+					results[i],
+				)
+			}
+		}
+
+	} else {
+		// No block ID provided, proceed with transaction IDs from args
+
+		for _, rawTxID := range args {
+			txID, err := flow.HexStringToIdentifier(rawTxID)
+			if err != nil {
+				log.Fatal().Err(err).Str("ID", rawTxID).Msg("failed to parse transaction ID")
+			}
+
+			result := RunSingleTransaction(
+				remoteClient,
+				txID,
+				flowClient,
+				chain,
+				spanExporter,
+				flagComputeLimit,
+			)
+			if flagShowResult {
+				debug.WriteResult(
+					os.Stdout,
+					txID,
+					result,
+				)
+			}
+		}
 	}
 }
 
-func runTransactionID(txID flow.Identifier, flowClient *client.Client, chain flow.Chain) {
+func fvmOptions(blockID flow.Identifier) []fvm.Option {
+	var options []fvm.Option
+
+	switch flagEntropyProvider {
+	case "block-hash":
+		options = append(
+			options,
+			fvm.WithEntropyProvider(BlockHashEntropyProvider{
+				BlockHash: blockID,
+			}),
+		)
+	}
+
+	return options
+}
+
+func RunSingleTransaction(
+	remoteClient debug.RemoteClient,
+	txID flow.Identifier,
+	flowClient *client.Client,
+	chain flow.Chain,
+	spanExporter otelTrace.SpanExporter,
+	computeLimit uint64,
+) debug.Result {
 	log.Info().Msgf("Fetching transaction result for %s ...", txID)
 
 	txResult, err := flowClient.GetTransactionResult(context.Background(), sdk.Identifier(txID))
@@ -120,104 +260,254 @@ func runTransactionID(txID flow.Identifier, flowClient *client.Client, chain flo
 		blockHeight,
 	)
 
-	log.Info().Msg("Fetching transactions of block ...")
+	// Fetch block info
+	header := FetchBlockHeader(blockID, flowClient)
+	blockTransactions, systemTxID := FetchBlockTransactions(blockID, flowClient)
 
-	txsResult, err := flowClient.GetTransactionsByBlockID(context.Background(), sdk.Identifier(blockID))
+	var newSpanExporter func(blockTxID flow.Identifier) otelTrace.SpanExporter
+	if spanExporter != nil {
+		newSpanExporter = func(blockTxID flow.Identifier) otelTrace.SpanExporter {
+			if blockTxID == txID {
+				return spanExporter
+			}
+			return nil
+		}
+	}
+
+	blockSnapshot := NewBlockSnapshot(remoteClient, header)
+
+	results := RunBlock(
+		blockSnapshot,
+		header,
+		blockTransactions,
+		txID,
+		systemTxID,
+		chain,
+		nil,
+		newSpanExporter,
+		computeLimit,
+		fvmOptions(blockID),
+	)
+
+	for i, blockTx := range blockTransactions {
+		if flow.Identifier(blockTx.ID()) == txID {
+			return results[i]
+		}
+	}
+
+	log.Fatal().Msg("transaction not found in block transactions")
+
+	return debug.Result{}
+}
+
+func NewBlockSnapshot(
+	remoteClient debug.RemoteClient,
+	blockHeader *flow.Header,
+) *debug.CachingStorageSnapshot {
+
+	remoteSnapshot, err := remoteClient.StorageSnapshot(blockHeader.Height, blockHeader.ID())
 	if err != nil {
-		log.Fatal().Err(err).Msg("failed to fetch transactions of block")
+		log.Fatal().Err(err).Msg("failed to create storage snapshot")
 	}
 
-	for _, blockTx := range txsResult {
-		log.Info().Msgf("Block transaction: %s", blockTx.ID())
-	}
+	return debug.NewCachingStorageSnapshot(remoteSnapshot)
+}
 
+func FetchBlockHeader(
+	blockID flow.Identifier,
+	flowClient *client.Client,
+) (header *flow.Header) {
 	log.Info().Msg("Fetching block header ...")
 
-	header, err := debug.GetAccessAPIBlockHeader(flowClient.RPCClient(), context.Background(), blockID)
+	var err error
+	header, err = debug.GetAccessAPIBlockHeader(context.Background(), flowClient.RPCClient(), blockID)
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to fetch block header")
 	}
 
 	log.Info().Msgf(
-		"Fetched block header: %s (height %d)",
-		header.ID(),
+		"Fetched block header: %s is at height %d",
+		blockID,
 		header.Height,
 	)
 
-	var remoteSnapshot snapshot.StorageSnapshot
+	return
+}
 
-	if flagUseExecutionDataAPI {
-		accessConn, err := grpc.NewClient(
-			flagAccessAddress,
-			grpc.WithTransportCredentials(insecure.NewCredentials()),
+func SubscribeBlockHeadersFromStartBlockID(
+	flowClient *client.Client,
+	startBlockID flow.Identifier,
+	blockStatus flow.BlockStatus,
+) (get func() (*flow.Header, error)) {
+	log.Info().Msg("Subscribing to block headers ...")
+
+	var err error
+	get, err = debug.SubscribeAccessAPIBlockHeadersFromStartBlockID(
+		context.Background(),
+		flowClient.RPCClient(),
+		startBlockID,
+		blockStatus,
+	)
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to subscribe to block headers")
+	}
+
+	log.Info().Msg("Subscribed to block headers")
+
+	return
+}
+
+func SubscribeBlockHeadersFromLatest(
+	flowClient *client.Client,
+	blockStatus flow.BlockStatus,
+) (get func() (*flow.Header, error)) {
+	log.Info().Msg("Subscribing to block headers ...")
+
+	var err error
+	get, err = debug.SubscribeAccessAPIBlockHeadersFromLatest(
+		context.Background(),
+		flowClient.RPCClient(),
+		blockStatus,
+	)
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to subscribe to block headers")
+	}
+
+	log.Info().Msg("Subscribed to block headers")
+
+	return
+}
+
+func FetchBlockTransactions(
+	blockID flow.Identifier,
+	flowClient *client.Client,
+) (
+	blockTransactions []*sdk.Transaction,
+	systemTxID sdk.Identifier,
+) {
+	var err error
+
+	log.Info().Msgf("Fetching transactions of block %s ...", blockID)
+
+	blockTransactions, err = flowClient.GetTransactionsByBlockID(context.Background(), sdk.Identifier(blockID))
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to fetch transactions of block")
+	}
+
+	for _, blockTx := range blockTransactions {
+		log.Info().Msgf("Block transaction: %s", blockTx.ID())
+	}
+
+	log.Info().Msg("Fetching system transaction ...")
+
+	systemTx, err := flowClient.GetSystemTransaction(context.Background(), sdk.Identifier(blockID))
+	if err != nil {
+		log.Fatal().Err(err).Msg("Failed to fetch system transaction")
+	}
+
+	systemTxID = systemTx.ID()
+	log.Info().Msgf("Fetched system transaction: %s", systemTxID)
+
+	return
+}
+
+func RunBlock(
+	blockSnapshot debug.UpdatableStorageSnapshot,
+	blockHeader *flow.Header,
+	blockTransactions []*sdk.Transaction,
+	debuggedTxID flow.Identifier,
+	systemTxID sdk.Identifier,
+	chain flow.Chain,
+	wrapTxSnapshot func(blockTxID flow.Identifier, snapshot debug.UpdatableStorageSnapshot) debug.UpdatableStorageSnapshot,
+	newSpanExporter func(blockTxID flow.Identifier) otelTrace.SpanExporter,
+	computeLimit uint64,
+	additionalFVMOptions []fvm.Option,
+) (
+	results []debug.Result,
+) {
+	for _, blockTx := range blockTransactions {
+
+		// TODO: add support for executing system transactions
+		if blockTx.ID() == systemTxID {
+			log.Info().Msg("Skipping system transaction")
+			continue
+		}
+
+		blockTxID := flow.Identifier(blockTx.ID())
+
+		var spanExporter otelTrace.SpanExporter
+		if newSpanExporter != nil {
+			spanExporter = newSpanExporter(blockTxID)
+		}
+
+		txSnapshot := blockSnapshot
+		if wrapTxSnapshot != nil {
+			txSnapshot = wrapTxSnapshot(blockTxID, blockSnapshot)
+		}
+
+		result := RunTransaction(
+			blockTx,
+			txSnapshot,
+			blockHeader,
+			chain,
+			spanExporter,
+			computeLimit,
+			additionalFVMOptions,
 		)
-		if err != nil {
-			log.Fatal().Err(err).Msg("failed to create access connection")
+
+		updatedRegisters := result.Snapshot.UpdatedRegisters()
+		for _, updatedRegister := range updatedRegisters {
+			txSnapshot.Set(
+				updatedRegister.Key,
+				updatedRegister.Value,
+			)
 		}
-		defer accessConn.Close()
 
-		executionDataClient := executiondata.NewExecutionDataAPIClient(accessConn)
+		results = append(results, result)
 
-		// The execution data API provides the *resulting* data,
-		// so fetch the data for the parent block for the *initial* data.
-		remoteSnapshot, err = debug.NewExecutionDataStorageSnapshot(executionDataClient, nil, blockHeight-1)
-		if err != nil {
-			log.Fatal().Err(err).Msg("failed to create storage snapshot")
-		}
-	} else {
-		executionConn, err := grpc.NewClient(
-			flagExecutionAddress,
-			grpc.WithTransportCredentials(insecure.NewCredentials()),
-		)
-		if err != nil {
-			log.Fatal().Err(err).Msg("failed to create execution connection")
-		}
-		defer executionConn.Close()
-
-		executionClient := execution.NewExecutionAPIClient(executionConn)
-
-		remoteSnapshot, err = debug.NewExecutionNodeStorageSnapshot(executionClient, nil, blockID)
-		if err != nil {
-			log.Fatal().Err(err).Msg("failed to create storage snapshot")
+		// Ignore remaining transactions if a specific transaction is being debugged
+		if blockTxID == debuggedTxID {
+			break
 		}
 	}
 
-	blockSnapshot := newBlockSnapshot(remoteSnapshot)
+	return
+}
 
-	var fvmOptions []fvm.Option
+func RunTransaction(
+	tx *sdk.Transaction,
+	snapshot debug.StorageSnapshot,
+	header *flow.Header,
+	chain flow.Chain,
+	spanExporter otelTrace.SpanExporter,
+	computeLimit uint64,
+	additionalFVMOptions []fvm.Option,
+) debug.Result {
 
-	if flagTracePath != "" {
+	log := log.With().
+		Str("tx", tx.ID().String()).
+		Logger()
 
-		var traceFile *os.File
-		if flagTracePath == "-" {
-			traceFile = os.Stdout
-		} else {
-			traceFile, err = os.Create(flagTracePath)
-			if err != nil {
-				log.Fatal().Err(err).Msg("failed to create trace file")
-			}
-			defer traceFile.Close()
-		}
+	fvmOptions := []fvm.Option{
+		fvm.WithComputationLimit(computeLimit),
+	}
 
-		exporter, err := stdouttrace.New(
-			stdouttrace.WithWriter(traceFile),
-		)
-		if err != nil {
-			log.Fatal().Err(err).Msg("failed to create trace exporter")
-		}
+	if spanExporter != nil {
 
+		const sync = true
 		tracer, err := trace.NewTracerWithExporter(
-			log.Logger,
+			log,
 			"debug-tx",
-			flagChain,
+			string(chain.ChainID()),
 			trace.SensitivityCaptureAll,
-			exporter,
+			spanExporter,
+			sync,
 		)
 		if err != nil {
 			log.Fatal().Err(err).Msg("failed to create tracer")
 		}
 
-		span, _ := tracer.StartTransactionSpan(context.TODO(), txID, "")
+		span, _ := tracer.StartTransactionSpan(context.TODO(), flow.Identifier(tx.ID()), "")
 		defer span.End()
 
 		fvmOptions = append(
@@ -227,212 +517,40 @@ func runTransactionID(txID flow.Identifier, flowClient *client.Client, chain flo
 		)
 	}
 
+	fvmOptions = append(fvmOptions, additionalFVMOptions...)
+
 	debugger := debug.NewRemoteDebugger(
 		chain,
-		log.Logger,
+		log,
 		fvmOptions...,
 	)
 
-	for _, blockTx := range txsResult {
-		blockTxID := flow.Identifier(blockTx.ID())
+	log.Info().Msgf("Running transaction ...")
 
-		isDebuggedTx := blockTxID == txID
-
-		dumpRegisters := flagDumpRegisters && isDebuggedTx
-
-		runTransaction(
-			debugger,
-			blockTxID,
-			flowClient,
-			blockSnapshot,
-			header,
-			dumpRegisters,
-		)
-
-		if isDebuggedTx {
-			break
-		}
-	}
-}
-
-func runTransaction(
-	debugger *debug.RemoteDebugger,
-	txID flow.Identifier,
-	flowClient *client.Client,
-	blockSnapshot *blockSnapshot,
-	header *flow.Header,
-	dumpRegisters bool,
-) {
-
-	log.Info().Msgf("Fetching transaction %s ...", txID)
-
-	tx, err := flowClient.GetTransaction(context.Background(), sdk.Identifier(txID))
-	if err != nil {
-		log.Fatal().Err(err).Msg("Failed to fetch transaction")
-	}
-
-	log.Info().Msgf("Fetched transaction: %s", tx.ID())
-
-	log.Info().Msgf("Debugging transaction %s ...", tx.ID())
-
-	txBodyBuilder := flow.NewTransactionBodyBuilder().
-		SetScript(tx.Script).
-		SetComputeLimit(flagComputeLimit).
-		SetPayer(flow.Address(tx.Payer))
-
-	for _, argument := range tx.Arguments {
-		txBodyBuilder.AddArgument(argument)
-	}
-
-	for _, authorizer := range tx.Authorizers {
-		txBodyBuilder.AddAuthorizer(flow.Address(authorizer))
-	}
-
-	proposalKeySequenceNumber := tx.ProposalKey.SequenceNumber
-	if flagProposalKeySeq != 0 {
-		proposalKeySequenceNumber = flagProposalKeySeq
-	}
-
-	txBodyBuilder.SetProposalKey(
-		flow.Address(tx.ProposalKey.Address),
-		tx.ProposalKey.KeyIndex,
-		proposalKeySequenceNumber,
-	)
-
-	txBody, err := txBodyBuilder.Build()
-	if err != nil {
-		log.Fatal().Err(err).Msg("Failed to build transaction body")
-	}
-
-	resultSnapshot, txErr, processErr := debugger.RunTransaction(
-		txBody,
-		blockSnapshot,
+	result, err := debugger.RunSDKTransaction(
+		tx,
+		snapshot,
 		header,
 	)
-	if processErr != nil {
-		log.Fatal().Err(processErr).Msg("Failed to process transaction")
+	if err != nil {
+		log.Fatal().Err(err).Msg("Transaction execution failed")
 	}
 
-	if txErr != nil {
-		log.Err(txErr).Msg("Transaction failed")
-	} else {
+	// TransactionInvoker already logs error
+	if result.Output.Err == nil {
 		log.Info().Msg("Transaction succeeded")
 	}
 
-	updatedRegisters := resultSnapshot.UpdatedRegisters()
-	for _, updatedRegister := range updatedRegisters {
-		blockSnapshot.Set(
-			updatedRegister.Key,
-			updatedRegister.Value,
-		)
-	}
-
-	if dumpRegisters {
-		dumpReadRegisters(txID, resultSnapshot.ReadRegisterIDs())
-		dumpUpdatedRegisters(txID, updatedRegisters)
-	}
+	return result
 }
 
-func dumpReadRegisters(txID flow.Identifier, readRegisterIDs []flow.RegisterID) {
-	filename := fmt.Sprintf("%s.reads.csv", txID)
-	file, err := os.Create(filename)
-	if err != nil {
-		log.Fatal().Err(err).Msgf("Failed to create reads file: %s", filename)
-	}
-	defer file.Close()
-
-	sortRegisterIDs(readRegisterIDs)
-
-	writer := csv.NewWriter(file)
-	defer writer.Flush()
-
-	err = writer.Write([]string{"RegisterID"})
-	if err != nil {
-		log.Fatal().Err(err).Msg("Failed to write header")
-	}
-
-	for _, readRegisterID := range readRegisterIDs {
-		err = writer.Write([]string{
-			readRegisterID.String(),
-		})
-		if err != nil {
-			log.Fatal().Err(err).Msgf("Failed to write read register: %s", readRegisterID)
-		}
-	}
+// BlockHashEntropyProvider implements environment.EntropyProvider
+// which provides a source of entropy to fvm context (required for Cadence's randomness),
+// by using the given block hash.
+type BlockHashEntropyProvider struct {
+	BlockHash flow.Identifier
 }
 
-func dumpUpdatedRegisters(txID flow.Identifier, updatedRegisters []flow.RegisterEntry) {
-	filename := fmt.Sprintf("%s.updates.csv", txID)
-	file, err := os.Create(filename)
-	if err != nil {
-		log.Fatal().Err(err).Msgf("Failed to create writes file: %s", filename)
-	}
-	defer file.Close()
-
-	sortRegisterEntries(updatedRegisters)
-
-	writer := csv.NewWriter(file)
-	defer writer.Flush()
-
-	err = writer.Write([]string{"RegisterID", "Value"})
-	if err != nil {
-		log.Fatal().Err(err).Msg("Failed to write header")
-	}
-
-	for _, updatedRegister := range updatedRegisters {
-		err = writer.Write([]string{
-			updatedRegister.Key.String(),
-			hex.EncodeToString(updatedRegister.Value),
-		})
-		if err != nil {
-			log.Fatal().Err(err).Msgf("Failed to write updated register: %s", updatedRegister)
-		}
-	}
-}
-
-func compareRegisterIDs(a flow.RegisterID, b flow.RegisterID) int {
-	return cmp.Or(
-		cmp.Compare(a.Owner, b.Owner),
-		cmp.Compare(a.Key, b.Key),
-	)
-}
-
-func sortRegisterIDs(registerIDs []flow.RegisterID) {
-	slices.SortFunc(registerIDs, func(a, b flow.RegisterID) int {
-		return compareRegisterIDs(a, b)
-	})
-}
-
-func sortRegisterEntries(registerEntries []flow.RegisterEntry) {
-	slices.SortFunc(registerEntries, func(a, b flow.RegisterEntry) int {
-		return compareRegisterIDs(a.Key, b.Key)
-	})
-}
-
-type blockSnapshot struct {
-	cache   *debug.InMemoryRegisterCache
-	backing snapshot.StorageSnapshot
-}
-
-var _ snapshot.StorageSnapshot = (*blockSnapshot)(nil)
-
-func newBlockSnapshot(backing snapshot.StorageSnapshot) *blockSnapshot {
-	cache := debug.NewInMemoryRegisterCache()
-	return &blockSnapshot{
-		cache:   cache,
-		backing: backing,
-	}
-}
-
-func (s *blockSnapshot) Get(id flow.RegisterID) (flow.RegisterValue, error) {
-	data, found := s.cache.Get(id.Key, id.Owner)
-	if found {
-		return data, nil
-	}
-
-	return s.backing.Get(id)
-}
-
-func (s *blockSnapshot) Set(id flow.RegisterID, value flow.RegisterValue) {
-	s.cache.Set(id.Key, id.Owner, value)
+func (p BlockHashEntropyProvider) RandomSource() ([]byte, error) {
+	return p.BlockHash[:], nil
 }
