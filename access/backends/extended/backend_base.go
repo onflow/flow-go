@@ -50,6 +50,10 @@ func (b *backendBase) mapReadError(ctx context.Context, label string, err error)
 		return status.Errorf(codes.FailedPrecondition, "%s index not initialized: %v", label, err)
 	case errors.Is(err, storage.ErrHeightNotIndexed):
 		return status.Errorf(codes.OutOfRange, "requested height not indexed: %v", err)
+	case errors.Is(err, storage.ErrInvalidQuery):
+		return status.Errorf(codes.InvalidArgument, "invalid query: %v", err)
+	case errors.Is(err, storage.ErrNotFound):
+		return status.Errorf(codes.NotFound, "not found: %v", err)
 	default:
 		irrecoverable.Throw(ctx, fmt.Errorf("failed to get %s: %w", label, err))
 		return err
@@ -61,7 +65,8 @@ func (b *backendBase) mapReadError(ctx context.Context, label string, err error)
 // Since the extended indexer only indexes sealed data, all transaction and result data should exist
 // in storage for the given height.
 //
-// No error returns are expected during normal operation.
+// Expected error returns during normal operation:
+//   - [storage.ErrNotFound] if the transaction is not found
 func (b *backendBase) lookupTransactionDetails(
 	ctx context.Context,
 	txID flow.Identifier,
@@ -74,17 +79,12 @@ func (b *backendBase) lookupTransactionDetails(
 	}
 
 	var collectionID flow.Identifier
-	collection, err := b.collections.LightByTransactionID(txID)
-	if err != nil {
-		if !errors.Is(err, storage.ErrNotFound) {
+	// the system collection is not indexed and uses the zero ID by convention.
+	if !isSystemChunkTx {
+		collection, err := b.collections.LightByTransactionID(txID)
+		if err != nil {
 			return nil, nil, fmt.Errorf("could not retrieve collection: %w", err)
 		}
-		if !isSystemChunkTx {
-			return nil, nil, fmt.Errorf("could not retrieve collection: %w", err)
-		}
-		// for system chunk transactions, use the zero ID
-		collectionID = flow.ZeroID
-	} else {
 		collectionID = collection.ID()
 	}
 
@@ -99,7 +99,8 @@ func (b *backendBase) lookupTransactionDetails(
 // getTransactionBody retrieves the transaction body for the given transaction ID.
 // It checks submitted transactions, system transactions, and scheduled transactions in order.
 //
-// No error returns are expected during normal operation.
+// Expected error returns during normal operation:
+//   - [storage.ErrNotFound] if the transaction is not found
 func (b *backendBase) getTransactionBody(ctx context.Context, header *flow.Header, txID flow.Identifier) (*flow.TransactionBody, bool, error) {
 	// first, check if it's a submitted transaction since that's the most common
 	txBody, err := b.transactions.ByID(txID)
@@ -120,7 +121,6 @@ func (b *backendBase) getTransactionBody(ctx context.Context, header *flow.Heade
 	blockID, err := b.scheduledTransactions.BlockIDByTransactionID(txID)
 	if err != nil {
 		if errors.Is(err, storage.ErrNotFound) {
-			// TODO: throw irrecoverable error?
 			return nil, false, fmt.Errorf("transaction not found: %w", err)
 		}
 		return nil, false, fmt.Errorf("could not retrieve scheduled transaction block ID: %w", err)
@@ -130,9 +130,7 @@ func (b *backendBase) getTransactionBody(ctx context.Context, header *flow.Heade
 	// if the transaction is a scheduled transaction, it must match the block ID indexed for the
 	// scheduled transaction, otherwise the node is in an inconsistent state.
 	if blockID != header.ID() {
-		err := fmt.Errorf("scheduled transaction found in block %s, but %s was provided", blockID, header.ID())
-		irrecoverable.Throw(ctx, err)
-		return nil, false, err
+		return nil, false, fmt.Errorf("scheduled transaction found in block %s, but %s was provided", blockID, header.ID())
 	}
 
 	allScheduledTxs, err := b.transactionsProvider.ScheduledTransactionsByBlockID(ctx, header)
@@ -149,7 +147,5 @@ func (b *backendBase) getTransactionBody(ctx context.Context, header *flow.Heade
 	// at this point, the transaction is not known to the node.
 	// this is unexpected. if the account transaction was indexed, then the transaction should be found
 	// somewhere in storage.
-	err = fmt.Errorf("indexed transaction not found")
-	irrecoverable.Throw(ctx, err)
-	return nil, false, err
+	return nil, false, fmt.Errorf("indexed transaction not found: %w", storage.ErrNotFound)
 }

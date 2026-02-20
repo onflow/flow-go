@@ -17,9 +17,10 @@ type API interface {
 	// If the account is found but has no transactions, the response will include an empty array and no error.
 	//
 	// Expected error returns during normal operations:
+	//   - [codes.NotFound] if the account is found but has no transactions
 	//   - [codes.FailedPrecondition] if the account transaction index has not been initialized
 	//   - [codes.OutOfRange] if the cursor references a height outside the indexed range
-	//   - [codes.Internal] if there is an unexpected error
+	//   - [codes.InvalidArgument] if the query parameters are invalid
 	GetAccountTransactions(
 		ctx context.Context,
 		address flow.Address,
@@ -36,10 +37,10 @@ type API interface {
 	// If the account has no transfers, the response will include an empty array and no error.
 	//
 	// Expected error returns during normal operations:
+	//   - [codes.NotFound] if the account is found but has no transfers
 	//   - [codes.FailedPrecondition] if the fungible token transfer index has not been initialized
 	//   - [codes.OutOfRange] if the cursor references a height outside the indexed range
 	//   - [codes.InvalidArgument] if the query parameters are invalid
-	//   - [codes.Internal] if there is an unexpected error
 	GetAccountFungibleTokenTransfers(
 		ctx context.Context,
 		address flow.Address,
@@ -56,10 +57,10 @@ type API interface {
 	// If the account has no transfers, the response will include an empty array and no error.
 	//
 	// Expected error returns during normal operations:
+	//   - [codes.NotFound] if the account is found but has no transfers
 	//   - [codes.FailedPrecondition] if the non-fungible token transfer index has not been initialized
 	//   - [codes.OutOfRange] if the cursor references a height outside the indexed range
 	//   - [codes.InvalidArgument] if the query parameters are invalid
-	//   - [codes.Internal] if there is an unexpected error
 	GetAccountNonFungibleTokenTransfers(
 		ctx context.Context,
 		address flow.Address,

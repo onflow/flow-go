@@ -2,6 +2,7 @@ package extended
 
 import (
 	"context"
+	"fmt"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -10,6 +11,7 @@ import (
 
 	accessmodel "github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow/protobuf/go/flow/entities"
 )
@@ -102,9 +104,10 @@ func NewAccountTransfersBackend(
 // If the account has no transfers, the response will include an empty array and no error.
 //
 // Expected error returns during normal operations:
+//   - [codes.NotFound] if the account is found but has no transfers
 //   - [codes.FailedPrecondition] if the fungible token transfer index has not been initialized
 //   - [codes.OutOfRange] if the cursor references a height outside the indexed range
-//   - [codes.Internal] if there is an unexpected error
+//   - [codes.InvalidArgument] if the query parameters are invalid
 func (b *AccountTransfersBackend) GetAccountFungibleTokenTransfers(
 	ctx context.Context,
 	address flow.Address,
@@ -121,12 +124,19 @@ func (b *AccountTransfersBackend) GetAccountFungibleTokenTransfers(
 		return nil, b.mapReadError(ctx, "fungible token transfers", err)
 	}
 
+	// storage will return an empty page and no error if the account has no transfers indexed.
+	if len(page.Transfers) == 0 && cursor != nil {
+		return nil, status.Errorf(codes.NotFound, "no fungible token transfers found for account %s", address)
+	}
+
 	for i := range page.Transfers {
 		t := &page.Transfers[i]
 
 		header, err := b.headers.ByHeight(t.BlockHeight)
 		if err != nil {
-			return nil, status.Errorf(codes.Internal, "failed to retrieve block header for transfer transaction %s: %v", t.TransactionID, err)
+			err = fmt.Errorf("failed to retrieve block header for transfer transaction %s: %w", t.TransactionID, err)
+			irrecoverable.Throw(ctx, err)
+			return nil, err
 		}
 		t.BlockTimestamp = header.Timestamp
 
@@ -136,7 +146,9 @@ func (b *AccountTransfersBackend) GetAccountFungibleTokenTransfers(
 
 		txBody, result, err := b.lookupTransactionDetails(ctx, t.TransactionID, header, encodingVersion)
 		if err != nil {
-			return nil, status.Errorf(codes.Internal, "failed to retrieve transaction details for transfer transaction %s: %v", t.TransactionID, err)
+			err = fmt.Errorf("failed to populate details for transfer transaction %s: %w", t.TransactionID, err)
+			irrecoverable.Throw(ctx, err)
+			return nil, err
 		}
 		t.Transaction = txBody
 		t.Result = result
@@ -151,9 +163,10 @@ func (b *AccountTransfersBackend) GetAccountFungibleTokenTransfers(
 // If the account has no transfers, the response will include an empty array and no error.
 //
 // Expected error returns during normal operations:
+//   - [codes.NotFound] if the account is found but has no transfers
 //   - [codes.FailedPrecondition] if the non-fungible token transfer index has not been initialized
 //   - [codes.OutOfRange] if the cursor references a height outside the indexed range
-//   - [codes.Internal] if there is an unexpected error
+//   - [codes.InvalidArgument] if the query parameters are invalid
 func (b *AccountTransfersBackend) GetAccountNonFungibleTokenTransfers(
 	ctx context.Context,
 	address flow.Address,
@@ -170,12 +183,19 @@ func (b *AccountTransfersBackend) GetAccountNonFungibleTokenTransfers(
 		return nil, b.mapReadError(ctx, "non-fungible token transfers", err)
 	}
 
+	// storage will return an empty page and no error if the account has no transfers indexed.
+	if len(page.Transfers) == 0 && cursor != nil {
+		return nil, status.Errorf(codes.NotFound, "no non-fungible token transfers found for account %s", address)
+	}
+
 	for i := range page.Transfers {
 		t := &page.Transfers[i]
 
 		header, err := b.headers.ByHeight(t.BlockHeight)
 		if err != nil {
-			return nil, status.Errorf(codes.Internal, "failed to retrieve block header for transfer transaction %s: %v", t.TransactionID, err)
+			err = fmt.Errorf("failed to retrieve block header for transfer transaction %s: %w", t.TransactionID, err)
+			irrecoverable.Throw(ctx, err)
+			return nil, err
 		}
 		t.BlockTimestamp = header.Timestamp
 
@@ -185,7 +205,9 @@ func (b *AccountTransfersBackend) GetAccountNonFungibleTokenTransfers(
 
 		txBody, result, err := b.lookupTransactionDetails(ctx, t.TransactionID, header, encodingVersion)
 		if err != nil {
-			return nil, status.Errorf(codes.Internal, "failed to populate details for transfer transaction %s: %v", t.TransactionID, err)
+			err = fmt.Errorf("failed to populate details for transfer transaction %s: %w", t.TransactionID, err)
+			irrecoverable.Throw(ctx, err)
+			return nil, err
 		}
 		t.Transaction = txBody
 		t.Result = result

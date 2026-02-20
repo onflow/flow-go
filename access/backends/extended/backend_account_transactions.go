@@ -2,15 +2,16 @@ package extended
 
 import (
 	"context"
-
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
+	"fmt"
 
 	"github.com/onflow/flow/protobuf/go/flow/entities"
 	"github.com/rs/zerolog"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	accessmodel "github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/storage"
 )
 
@@ -71,9 +72,10 @@ func NewAccountTransactionsBackend(
 // If the account is found but has no transactions, the response will include an empty array and no error.
 //
 // Expected error returns during normal operations:
+//   - [codes.NotFound] if the account is found but has no transactions
 //   - [codes.FailedPrecondition] if the account transaction index has not been initialized
 //   - [codes.OutOfRange] if the cursor references a height outside the indexed range
-//   - [codes.Internal] if there is an unexpected error
+//   - [codes.InvalidArgument] if the query parameters are invalid
 func (b *AccountTransactionsBackend) GetAccountTransactions(
 	ctx context.Context,
 	address flow.Address,
@@ -90,13 +92,20 @@ func (b *AccountTransactionsBackend) GetAccountTransactions(
 		return nil, b.mapReadError(ctx, "account transactions", err)
 	}
 
+	// storage will return an empty page and no error if the account has no transfers indexed.
+	if len(page.Transactions) == 0 && cursor != nil {
+		return nil, status.Errorf(codes.NotFound, "no account transactions found for account %s", address)
+	}
+
 	// enrich the transactions with additional details requested by the client
 	// Note: if no transactions are found, the response will include an empty array and no error.
 	for i := range page.Transactions {
 		tx := &page.Transactions[i]
 		header, err := b.headers.ByHeight(tx.BlockHeight)
 		if err != nil {
-			return nil, status.Errorf(codes.Internal, "failed to retrieve block header for transaction %s: %v", tx.TransactionID, err)
+			err = fmt.Errorf("failed to retrieve block header for transaction %s: %w", tx.TransactionID, err)
+			irrecoverable.Throw(ctx, err)
+			return nil, err
 		}
 		tx.BlockTimestamp = header.Timestamp
 
@@ -106,7 +115,9 @@ func (b *AccountTransactionsBackend) GetAccountTransactions(
 
 		txBody, result, err := b.lookupTransactionDetails(ctx, tx.TransactionID, header, encodingVersion)
 		if err != nil {
-			return nil, status.Errorf(codes.Internal, "failed to populate details for transaction %s: %v", tx.TransactionID, err)
+			err = fmt.Errorf("failed to populate details for transaction %s: %w", tx.TransactionID, err)
+			irrecoverable.Throw(ctx, err)
+			return nil, err
 		}
 
 		tx.Transaction = txBody
