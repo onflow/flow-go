@@ -29,7 +29,7 @@ func (t *AccountTransaction) Build(
 	t.TransactionId = tx.TransactionID.String()
 	t.TransactionIndex = strconv.FormatUint(uint64(tx.TransactionIndex), 10)
 	t.Roles = roles
-	t.Expandable = &AccountTransactionExpandable{}
+	t.Expandable = new(AccountTransactionExpandable)
 
 	if expand[expandableTransaction] && tx.Transaction != nil {
 		t.Transaction = new(commonmodels.Transaction)

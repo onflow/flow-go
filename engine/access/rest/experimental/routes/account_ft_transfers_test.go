@@ -16,33 +16,49 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	"github.com/onflow/flow/protobuf/go/flow/entities"
+
+	"github.com/onflow/flow-go/access/backends/extended"
 	extendedmock "github.com/onflow/flow-go/access/backends/extended/mock"
 	"github.com/onflow/flow-go/engine/access/rest/router"
 	accessmodel "github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-func accountFTTransfersURL(t *testing.T, address, limit, cursor, tokenType, sourceAddr, recipientAddr, role string) string {
+type ftTransfersURLParams struct {
+	limit         string
+	cursor        string
+	tokenType     string
+	sourceAddr    string
+	recipientAddr string
+	role          string
+	expand        string
+}
+
+func accountFTTransfersURL(t *testing.T, address string, params ftTransfersURLParams) string {
 	u, err := url.ParseRequestURI(fmt.Sprintf("/experimental/v1/accounts/%s/ft/transfers", address))
 	require.NoError(t, err)
 	q := u.Query()
-	if limit != "" {
-		q.Add("limit", limit)
+	if params.limit != "" {
+		q.Add("limit", params.limit)
 	}
-	if cursor != "" {
-		q.Add("cursor", cursor)
+	if params.cursor != "" {
+		q.Add("cursor", params.cursor)
 	}
-	if tokenType != "" {
-		q.Add("token_type", tokenType)
+	if params.tokenType != "" {
+		q.Add("token_type", params.tokenType)
 	}
-	if sourceAddr != "" {
-		q.Add("source_address", sourceAddr)
+	if params.sourceAddr != "" {
+		q.Add("source_address", params.sourceAddr)
 	}
-	if recipientAddr != "" {
-		q.Add("recipient_address", recipientAddr)
+	if params.recipientAddr != "" {
+		q.Add("recipient_address", params.recipientAddr)
 	}
-	if role != "" {
-		q.Add("role", role)
+	if params.role != "" {
+		q.Add("role", params.role)
+	}
+	if params.expand != "" {
+		q.Add("expand", params.expand)
 	}
 	u.RawQuery = q.Encode()
 	return u.String()
@@ -50,12 +66,13 @@ func accountFTTransfersURL(t *testing.T, address, limit, cursor, tokenType, sour
 
 // testEncodeTransferCursor encodes a transfer cursor the same way the handler does, for use in
 // test assertions and inputs.
-func testEncodeTransferCursor(height uint64, txIndex uint32, eventIndex uint32) string {
-	data, _ := json.Marshal(struct {
+func testEncodeTransferCursor(t *testing.T, height uint64, txIndex uint32, eventIndex uint32) string {
+	data, err := json.Marshal(struct {
 		BlockHeight      uint64 `json:"h"`
 		TransactionIndex uint32 `json:"i"`
 		EventIndex       uint32 `json:"e"`
 	}{height, txIndex, eventIndex})
+	require.NoError(t, err)
 	return base64.RawURLEncoding.EncodeToString(data)
 }
 
@@ -94,12 +111,12 @@ func TestGetAccountFungibleTokenTransfers(t *testing.T) {
 			address,
 			uint32(0),
 			(*accessmodel.TransferCursor)(nil),
-			mocktestify.Anything,
-			mocktestify.Anything,
-			mocktestify.Anything,
+			extended.AccountFTTransferFilter{AccountAddress: address},
+			false,
+			entities.EventEncodingVersion_JSON_CDC_V0,
 		).Return(page, nil)
 
-		reqURL := accountFTTransfersURL(t, address.String(), "", "", "", "", "", "")
+		reqURL := accountFTTransfersURL(t, address.String(), ftTransfersURLParams{})
 		req, err := http.NewRequest(http.MethodGet, reqURL, nil)
 		require.NoError(t, err)
 
@@ -108,7 +125,7 @@ func TestGetAccountFungibleTokenTransfers(t *testing.T) {
 		assert.Equal(t, http.StatusOK, rr.Code)
 
 		ts := time.UnixMilli(1700000000000).UTC().Format(time.RFC3339Nano)
-		expectedCursorStr := testEncodeTransferCursor(999, 0, 2)
+		expectedCursorStr := testEncodeTransferCursor(t, 999, 0, 2)
 		expected := fmt.Sprintf(`{
 			"transfers": [
 				{
@@ -155,12 +172,12 @@ func TestGetAccountFungibleTokenTransfers(t *testing.T) {
 			address,
 			uint32(10),
 			(*accessmodel.TransferCursor)(nil),
-			mocktestify.Anything,
-			mocktestify.Anything,
-			mocktestify.Anything,
+			extended.AccountFTTransferFilter{AccountAddress: address},
+			false,
+			entities.EventEncodingVersion_JSON_CDC_V0,
 		).Return(page, nil)
 
-		reqURL := accountFTTransfersURL(t, address.String(), "10", "", "", "", "", "")
+		reqURL := accountFTTransfersURL(t, address.String(), ftTransfersURLParams{limit: "10"})
 		req, err := http.NewRequest(http.MethodGet, reqURL, nil)
 		require.NoError(t, err)
 
@@ -213,18 +230,19 @@ func TestGetAccountFungibleTokenTransfers(t *testing.T) {
 			TransactionIndex: 3,
 			EventIndex:       5,
 		}
+		encodedCursor := testEncodeTransferCursor(t, expectedCursor.BlockHeight, expectedCursor.TransactionIndex, expectedCursor.EventIndex)
 
 		backend.On("GetAccountFungibleTokenTransfers",
 			mocktestify.Anything,
 			address,
 			uint32(0),
 			expectedCursor,
-			mocktestify.Anything,
-			mocktestify.Anything,
-			mocktestify.Anything,
+			extended.AccountFTTransferFilter{AccountAddress: address},
+			false,
+			entities.EventEncodingVersion_JSON_CDC_V0,
 		).Return(page, nil)
 
-		reqURL := accountFTTransfersURL(t, address.String(), "", testEncodeTransferCursor(1000, 3, 5), "", "", "", "")
+		reqURL := accountFTTransfersURL(t, address.String(), ftTransfersURLParams{cursor: encodedCursor})
 		req, err := http.NewRequest(http.MethodGet, reqURL, nil)
 		require.NoError(t, err)
 
@@ -240,17 +258,22 @@ func TestGetAccountFungibleTokenTransfers(t *testing.T) {
 			Transfers: []accessmodel.FungibleTokenTransfer{},
 		}
 
+		expectedFilter := extended.AccountFTTransferFilter{
+			AccountAddress: address,
+			TokenType:      "A.1654653399040a61.FlowToken",
+		}
+
 		backend.On("GetAccountFungibleTokenTransfers",
 			mocktestify.Anything,
 			address,
 			uint32(0),
 			(*accessmodel.TransferCursor)(nil),
-			mocktestify.Anything,
-			mocktestify.Anything,
-			mocktestify.Anything,
+			expectedFilter,
+			false,
+			entities.EventEncodingVersion_JSON_CDC_V0,
 		).Return(page, nil)
 
-		reqURL := accountFTTransfersURL(t, address.String(), "", "", "A.1654653399040a61.FlowToken", "", "", "")
+		reqURL := accountFTTransfersURL(t, address.String(), ftTransfersURLParams{tokenType: "A.1654653399040a61.FlowToken"})
 		req, err := http.NewRequest(http.MethodGet, reqURL, nil)
 		require.NoError(t, err)
 
@@ -266,17 +289,22 @@ func TestGetAccountFungibleTokenTransfers(t *testing.T) {
 			Transfers: []accessmodel.FungibleTokenTransfer{},
 		}
 
+		expectedFilter := extended.AccountFTTransferFilter{
+			AccountAddress: address,
+			SourceAddress:  sourceAddr,
+		}
+
 		backend.On("GetAccountFungibleTokenTransfers",
 			mocktestify.Anything,
 			address,
 			uint32(0),
 			(*accessmodel.TransferCursor)(nil),
-			mocktestify.Anything,
-			mocktestify.Anything,
-			mocktestify.Anything,
+			expectedFilter,
+			false,
+			entities.EventEncodingVersion_JSON_CDC_V0,
 		).Return(page, nil)
 
-		reqURL := accountFTTransfersURL(t, address.String(), "", "", "", sourceAddr.String(), "", "")
+		reqURL := accountFTTransfersURL(t, address.String(), ftTransfersURLParams{sourceAddr: sourceAddr.String()})
 		req, err := http.NewRequest(http.MethodGet, reqURL, nil)
 		require.NoError(t, err)
 
@@ -292,17 +320,22 @@ func TestGetAccountFungibleTokenTransfers(t *testing.T) {
 			Transfers: []accessmodel.FungibleTokenTransfer{},
 		}
 
+		expectedFilter := extended.AccountFTTransferFilter{
+			AccountAddress:   address,
+			RecipientAddress: recipientAddr,
+		}
+
 		backend.On("GetAccountFungibleTokenTransfers",
 			mocktestify.Anything,
 			address,
 			uint32(0),
 			(*accessmodel.TransferCursor)(nil),
-			mocktestify.Anything,
-			mocktestify.Anything,
-			mocktestify.Anything,
+			expectedFilter,
+			false,
+			entities.EventEncodingVersion_JSON_CDC_V0,
 		).Return(page, nil)
 
-		reqURL := accountFTTransfersURL(t, address.String(), "", "", "", "", recipientAddr.String(), "")
+		reqURL := accountFTTransfersURL(t, address.String(), ftTransfersURLParams{recipientAddr: recipientAddr.String()})
 		req, err := http.NewRequest(http.MethodGet, reqURL, nil)
 		require.NoError(t, err)
 
@@ -318,17 +351,22 @@ func TestGetAccountFungibleTokenTransfers(t *testing.T) {
 			Transfers: []accessmodel.FungibleTokenTransfer{},
 		}
 
+		expectedFilter := extended.AccountFTTransferFilter{
+			AccountAddress: address,
+			TransferRole:   accessmodel.TransferRoleSender,
+		}
+
 		backend.On("GetAccountFungibleTokenTransfers",
 			mocktestify.Anything,
 			address,
 			uint32(0),
 			(*accessmodel.TransferCursor)(nil),
-			mocktestify.Anything,
-			mocktestify.Anything,
-			mocktestify.Anything,
+			expectedFilter,
+			false,
+			entities.EventEncodingVersion_JSON_CDC_V0,
 		).Return(page, nil)
 
-		reqURL := accountFTTransfersURL(t, address.String(), "", "", "", "", "", "sender")
+		reqURL := accountFTTransfersURL(t, address.String(), ftTransfersURLParams{role: "sender"})
 		req, err := http.NewRequest(http.MethodGet, reqURL, nil)
 		require.NoError(t, err)
 
@@ -344,17 +382,74 @@ func TestGetAccountFungibleTokenTransfers(t *testing.T) {
 			Transfers: []accessmodel.FungibleTokenTransfer{},
 		}
 
+		expectedFilter := extended.AccountFTTransferFilter{
+			AccountAddress: address,
+			TransferRole:   accessmodel.TransferRoleRecipient,
+		}
+
 		backend.On("GetAccountFungibleTokenTransfers",
 			mocktestify.Anything,
 			address,
 			uint32(0),
 			(*accessmodel.TransferCursor)(nil),
-			mocktestify.Anything,
-			mocktestify.Anything,
-			mocktestify.Anything,
+			expectedFilter,
+			false,
+			entities.EventEncodingVersion_JSON_CDC_V0,
 		).Return(page, nil)
 
-		reqURL := accountFTTransfersURL(t, address.String(), "", "", "", "", "", "recipient")
+		reqURL := accountFTTransfersURL(t, address.String(), ftTransfersURLParams{role: "recipient"})
+		req, err := http.NewRequest(http.MethodGet, reqURL, nil)
+		require.NoError(t, err)
+
+		rr := router.ExecuteExperimentalRequest(req, backend)
+
+		assert.Equal(t, http.StatusOK, rr.Code)
+	})
+
+	t.Run("with expand=transaction", func(t *testing.T) {
+		backend := extendedmock.NewAPI(t)
+
+		page := &accessmodel.FungibleTokenTransfersPage{
+			Transfers: []accessmodel.FungibleTokenTransfer{},
+		}
+
+		backend.On("GetAccountFungibleTokenTransfers",
+			mocktestify.Anything,
+			address,
+			uint32(0),
+			(*accessmodel.TransferCursor)(nil),
+			extended.AccountFTTransferFilter{AccountAddress: address},
+			true,
+			entities.EventEncodingVersion_JSON_CDC_V0,
+		).Return(page, nil)
+
+		reqURL := accountFTTransfersURL(t, address.String(), ftTransfersURLParams{expand: "transaction"})
+		req, err := http.NewRequest(http.MethodGet, reqURL, nil)
+		require.NoError(t, err)
+
+		rr := router.ExecuteExperimentalRequest(req, backend)
+
+		assert.Equal(t, http.StatusOK, rr.Code)
+	})
+
+	t.Run("with expand=result", func(t *testing.T) {
+		backend := extendedmock.NewAPI(t)
+
+		page := &accessmodel.FungibleTokenTransfersPage{
+			Transfers: []accessmodel.FungibleTokenTransfer{},
+		}
+
+		backend.On("GetAccountFungibleTokenTransfers",
+			mocktestify.Anything,
+			address,
+			uint32(0),
+			(*accessmodel.TransferCursor)(nil),
+			extended.AccountFTTransferFilter{AccountAddress: address},
+			true,
+			entities.EventEncodingVersion_JSON_CDC_V0,
+		).Return(page, nil)
+
+		reqURL := accountFTTransfersURL(t, address.String(), ftTransfersURLParams{expand: "result"})
 		req, err := http.NewRequest(http.MethodGet, reqURL, nil)
 		require.NoError(t, err)
 
@@ -366,7 +461,7 @@ func TestGetAccountFungibleTokenTransfers(t *testing.T) {
 	t.Run("invalid address", func(t *testing.T) {
 		backend := extendedmock.NewAPI(t)
 
-		reqURL := accountFTTransfersURL(t, "invalid", "", "", "", "", "", "")
+		reqURL := accountFTTransfersURL(t, "invalid", ftTransfersURLParams{})
 		req, err := http.NewRequest(http.MethodGet, reqURL, nil)
 		require.NoError(t, err)
 
@@ -379,7 +474,7 @@ func TestGetAccountFungibleTokenTransfers(t *testing.T) {
 	t.Run("invalid cursor format", func(t *testing.T) {
 		backend := extendedmock.NewAPI(t)
 
-		reqURL := accountFTTransfersURL(t, address.String(), "", "badcursor", "", "", "", "")
+		reqURL := accountFTTransfersURL(t, address.String(), ftTransfersURLParams{cursor: "badcursor"})
 		req, err := http.NewRequest(http.MethodGet, reqURL, nil)
 		require.NoError(t, err)
 
@@ -392,7 +487,7 @@ func TestGetAccountFungibleTokenTransfers(t *testing.T) {
 	t.Run("invalid limit", func(t *testing.T) {
 		backend := extendedmock.NewAPI(t)
 
-		reqURL := accountFTTransfersURL(t, address.String(), "abc", "", "", "", "", "")
+		reqURL := accountFTTransfersURL(t, address.String(), ftTransfersURLParams{limit: "abc"})
 		req, err := http.NewRequest(http.MethodGet, reqURL, nil)
 		require.NoError(t, err)
 
@@ -405,7 +500,7 @@ func TestGetAccountFungibleTokenTransfers(t *testing.T) {
 	t.Run("invalid role", func(t *testing.T) {
 		backend := extendedmock.NewAPI(t)
 
-		reqURL := accountFTTransfersURL(t, address.String(), "", "", "", "", "", "invalidrole")
+		reqURL := accountFTTransfersURL(t, address.String(), ftTransfersURLParams{role: "invalidrole"})
 		req, err := http.NewRequest(http.MethodGet, reqURL, nil)
 		require.NoError(t, err)
 
@@ -418,7 +513,7 @@ func TestGetAccountFungibleTokenTransfers(t *testing.T) {
 	t.Run("invalid source_address", func(t *testing.T) {
 		backend := extendedmock.NewAPI(t)
 
-		reqURL := accountFTTransfersURL(t, address.String(), "", "", "", "not-an-address", "", "")
+		reqURL := accountFTTransfersURL(t, address.String(), ftTransfersURLParams{sourceAddr: "not-an-address"})
 		req, err := http.NewRequest(http.MethodGet, reqURL, nil)
 		require.NoError(t, err)
 
@@ -436,12 +531,12 @@ func TestGetAccountFungibleTokenTransfers(t *testing.T) {
 			address,
 			uint32(0),
 			(*accessmodel.TransferCursor)(nil),
-			mocktestify.Anything,
-			mocktestify.Anything,
-			mocktestify.Anything,
+			extended.AccountFTTransferFilter{AccountAddress: address},
+			false,
+			entities.EventEncodingVersion_JSON_CDC_V0,
 		).Return(nil, status.Errorf(codes.NotFound, "no transfers found for account %s", address))
 
-		reqURL := accountFTTransfersURL(t, address.String(), "", "", "", "", "", "")
+		reqURL := accountFTTransfersURL(t, address.String(), ftTransfersURLParams{})
 		req, err := http.NewRequest(http.MethodGet, reqURL, nil)
 		require.NoError(t, err)
 
@@ -458,12 +553,12 @@ func TestGetAccountFungibleTokenTransfers(t *testing.T) {
 			address,
 			uint32(0),
 			(*accessmodel.TransferCursor)(nil),
-			mocktestify.Anything,
-			mocktestify.Anything,
-			mocktestify.Anything,
+			extended.AccountFTTransferFilter{AccountAddress: address},
+			false,
+			entities.EventEncodingVersion_JSON_CDC_V0,
 		).Return(nil, status.Errorf(codes.FailedPrecondition, "index not initialized"))
 
-		reqURL := accountFTTransfersURL(t, address.String(), "", "", "", "", "", "")
+		reqURL := accountFTTransfersURL(t, address.String(), ftTransfersURLParams{})
 		req, err := http.NewRequest(http.MethodGet, reqURL, nil)
 		require.NoError(t, err)
 
@@ -496,12 +591,12 @@ func TestGetAccountFungibleTokenTransfers(t *testing.T) {
 			address,
 			uint32(0),
 			(*accessmodel.TransferCursor)(nil),
-			mocktestify.Anything,
-			mocktestify.Anything,
-			mocktestify.Anything,
+			extended.AccountFTTransferFilter{AccountAddress: address},
+			false,
+			entities.EventEncodingVersion_JSON_CDC_V0,
 		).Return(page, nil)
 
-		reqURL := accountFTTransfersURL(t, "0x"+address.String(), "", "", "", "", "", "")
+		reqURL := accountFTTransfersURL(t, "0x"+address.String(), ftTransfersURLParams{})
 		req, err := http.NewRequest(http.MethodGet, reqURL, nil)
 		require.NoError(t, err)
 

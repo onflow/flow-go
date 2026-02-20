@@ -28,7 +28,7 @@ func (t *NonFungibleTokenTransfer) Build(
 	t.NftId = strconv.FormatUint(transfer.ID, 10)
 	t.SourceAddress = transfer.SourceAddress.Hex()
 	t.RecipientAddress = transfer.RecipientAddress.Hex()
-	t.Expandable = &AccountTransactionExpandable{}
+	t.Expandable = new(AccountTransactionExpandable)
 
 	if expand[expandableTransaction] && transfer.Transaction != nil {
 		t.Transaction = new(commonmodels.Transaction)

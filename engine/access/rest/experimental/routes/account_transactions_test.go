@@ -15,21 +15,37 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	"github.com/onflow/flow/protobuf/go/flow/entities"
+
+	"github.com/onflow/flow-go/access/backends/extended"
 	extendedmock "github.com/onflow/flow-go/access/backends/extended/mock"
 	"github.com/onflow/flow-go/engine/access/rest/router"
 	accessmodel "github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-func accountTransactionsURL(t *testing.T, address string, limit string, cursor string) string {
+type accountTransactionsURLParams struct {
+	limit  string
+	cursor string
+	roles  string
+	expand string
+}
+
+func accountTransactionsURL(t *testing.T, address string, params accountTransactionsURLParams) string {
 	u, err := url.ParseRequestURI(fmt.Sprintf("/experimental/v1/accounts/%s/transactions", address))
 	require.NoError(t, err)
 	q := u.Query()
-	if limit != "" {
-		q.Add("limit", limit)
+	if params.limit != "" {
+		q.Add("limit", params.limit)
 	}
-	if cursor != "" {
-		q.Add("cursor", cursor)
+	if params.cursor != "" {
+		q.Add("cursor", params.cursor)
+	}
+	if params.roles != "" {
+		q.Add("roles", params.roles)
+	}
+	if params.expand != "" {
+		q.Add("expand", params.expand)
 	}
 	u.RawQuery = q.Encode()
 	return u.String()
@@ -82,12 +98,12 @@ func TestGetAccountTransactions(t *testing.T) {
 			address,
 			uint32(0),
 			(*accessmodel.AccountTransactionCursor)(nil),
-			mocktestify.Anything,
-			mocktestify.Anything,
-			mocktestify.Anything,
+			extended.AccountTransactionFilter{},
+			false,
+			entities.EventEncodingVersion_JSON_CDC_V0,
 		).Return(page, nil)
 
-		reqURL := accountTransactionsURL(t, address.String(), "", "")
+		reqURL := accountTransactionsURL(t, address.String(), accountTransactionsURLParams{})
 		req, err := http.NewRequest(http.MethodGet, reqURL, nil)
 		require.NoError(t, err)
 
@@ -145,12 +161,12 @@ func TestGetAccountTransactions(t *testing.T) {
 			address,
 			uint32(10),
 			(*accessmodel.AccountTransactionCursor)(nil),
-			mocktestify.Anything,
-			mocktestify.Anything,
-			mocktestify.Anything,
+			extended.AccountTransactionFilter{},
+			false,
+			entities.EventEncodingVersion_JSON_CDC_V0,
 		).Return(page, nil)
 
-		reqURL := accountTransactionsURL(t, address.String(), "10", "")
+		reqURL := accountTransactionsURL(t, address.String(), accountTransactionsURLParams{limit: "10"})
 		req, err := http.NewRequest(http.MethodGet, reqURL, nil)
 		require.NoError(t, err)
 
@@ -201,12 +217,64 @@ func TestGetAccountTransactions(t *testing.T) {
 			address,
 			uint32(0),
 			expectedCursor,
-			mocktestify.Anything,
-			mocktestify.Anything,
-			mocktestify.Anything,
+			extended.AccountTransactionFilter{},
+			false,
+			entities.EventEncodingVersion_JSON_CDC_V0,
 		).Return(page, nil)
 
-		reqURL := accountTransactionsURL(t, address.String(), "", testEncodeCursor(1000, 3))
+		reqURL := accountTransactionsURL(t, address.String(), accountTransactionsURLParams{cursor: testEncodeCursor(1000, 3)})
+		req, err := http.NewRequest(http.MethodGet, reqURL, nil)
+		require.NoError(t, err)
+
+		rr := router.ExecuteExperimentalRequest(req, backend)
+
+		assert.Equal(t, http.StatusOK, rr.Code)
+	})
+
+	t.Run("with expand=transaction", func(t *testing.T) {
+		backend := extendedmock.NewAPI(t)
+
+		page := &accessmodel.AccountTransactionsPage{
+			Transactions: []accessmodel.AccountTransaction{},
+		}
+
+		backend.On("GetAccountTransactions",
+			mocktestify.Anything,
+			address,
+			uint32(0),
+			(*accessmodel.AccountTransactionCursor)(nil),
+			extended.AccountTransactionFilter{},
+			true,
+			entities.EventEncodingVersion_JSON_CDC_V0,
+		).Return(page, nil)
+
+		reqURL := accountTransactionsURL(t, address.String(), accountTransactionsURLParams{expand: "transaction"})
+		req, err := http.NewRequest(http.MethodGet, reqURL, nil)
+		require.NoError(t, err)
+
+		rr := router.ExecuteExperimentalRequest(req, backend)
+
+		assert.Equal(t, http.StatusOK, rr.Code)
+	})
+
+	t.Run("with expand=result", func(t *testing.T) {
+		backend := extendedmock.NewAPI(t)
+
+		page := &accessmodel.AccountTransactionsPage{
+			Transactions: []accessmodel.AccountTransaction{},
+		}
+
+		backend.On("GetAccountTransactions",
+			mocktestify.Anything,
+			address,
+			uint32(0),
+			(*accessmodel.AccountTransactionCursor)(nil),
+			extended.AccountTransactionFilter{},
+			true,
+			entities.EventEncodingVersion_JSON_CDC_V0,
+		).Return(page, nil)
+
+		reqURL := accountTransactionsURL(t, address.String(), accountTransactionsURLParams{expand: "result"})
 		req, err := http.NewRequest(http.MethodGet, reqURL, nil)
 		require.NoError(t, err)
 
@@ -218,7 +286,7 @@ func TestGetAccountTransactions(t *testing.T) {
 	t.Run("invalid address", func(t *testing.T) {
 		backend := extendedmock.NewAPI(t)
 
-		reqURL := accountTransactionsURL(t, "invalid", "", "")
+		reqURL := accountTransactionsURL(t, "invalid", accountTransactionsURLParams{})
 		req, err := http.NewRequest(http.MethodGet, reqURL, nil)
 		require.NoError(t, err)
 
@@ -231,7 +299,7 @@ func TestGetAccountTransactions(t *testing.T) {
 	t.Run("invalid cursor format", func(t *testing.T) {
 		backend := extendedmock.NewAPI(t)
 
-		reqURL := accountTransactionsURL(t, address.String(), "", "badcursor")
+		reqURL := accountTransactionsURL(t, address.String(), accountTransactionsURLParams{cursor: "badcursor"})
 		req, err := http.NewRequest(http.MethodGet, reqURL, nil)
 		require.NoError(t, err)
 
@@ -249,12 +317,12 @@ func TestGetAccountTransactions(t *testing.T) {
 			address,
 			uint32(0),
 			(*accessmodel.AccountTransactionCursor)(nil),
-			mocktestify.Anything,
-			mocktestify.Anything,
-			mocktestify.Anything,
+			extended.AccountTransactionFilter{},
+			false,
+			entities.EventEncodingVersion_JSON_CDC_V0,
 		).Return(nil, status.Errorf(codes.NotFound, "no transactions found for account %s", address))
 
-		reqURL := accountTransactionsURL(t, address.String(), "", "")
+		reqURL := accountTransactionsURL(t, address.String(), accountTransactionsURLParams{})
 		req, err := http.NewRequest(http.MethodGet, reqURL, nil)
 		require.NoError(t, err)
 
@@ -271,12 +339,12 @@ func TestGetAccountTransactions(t *testing.T) {
 			address,
 			uint32(0),
 			(*accessmodel.AccountTransactionCursor)(nil),
-			mocktestify.Anything,
-			mocktestify.Anything,
-			mocktestify.Anything,
+			extended.AccountTransactionFilter{},
+			false,
+			entities.EventEncodingVersion_JSON_CDC_V0,
 		).Return(nil, status.Errorf(codes.FailedPrecondition, "index not initialized"))
 
-		reqURL := accountTransactionsURL(t, address.String(), "", "")
+		reqURL := accountTransactionsURL(t, address.String(), accountTransactionsURLParams{})
 		req, err := http.NewRequest(http.MethodGet, reqURL, nil)
 		require.NoError(t, err)
 
@@ -289,7 +357,7 @@ func TestGetAccountTransactions(t *testing.T) {
 	t.Run("invalid limit", func(t *testing.T) {
 		backend := extendedmock.NewAPI(t)
 
-		reqURL := accountTransactionsURL(t, address.String(), "abc", "")
+		reqURL := accountTransactionsURL(t, address.String(), accountTransactionsURLParams{limit: "abc"})
 		req, err := http.NewRequest(http.MethodGet, reqURL, nil)
 		require.NoError(t, err)
 
@@ -324,13 +392,12 @@ func TestParseCursorRoundtrip(t *testing.T) {
 			address,
 			uint32(0),
 			(*accessmodel.AccountTransactionCursor)(nil),
-			mocktestify.Anything,
-			mocktestify.Anything,
-			mocktestify.Anything,
+			extended.AccountTransactionFilter{},
+			false,
+			entities.EventEncodingVersion_JSON_CDC_V0,
 		).Return(page, nil)
 
-		// Use 0x prefix
-		reqURL := accountTransactionsURL(t, "0x"+address.String(), "", "")
+		reqURL := accountTransactionsURL(t, "0x"+address.String(), accountTransactionsURLParams{})
 		req, err := http.NewRequest(http.MethodGet, reqURL, nil)
 		require.NoError(t, err)
 
