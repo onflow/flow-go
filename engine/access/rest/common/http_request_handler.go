@@ -105,7 +105,7 @@ func (h *HttpHandler) ErrorHandler(w http.ResponseWriter, err error, errorLogger
 			// consistent with the behavior for other data types, which will return 404 if the data
 			// is not available, even when it may be in the future (e.g. a transaction result).
 			msg := fmt.Sprintf("Precondition failed: %s", se.Message())
-			h.errorResponse(w, http.StatusNotFound, msg, errorLogger)
+			h.errorResponse(w, http.StatusBadRequest, msg, errorLogger)
 			return
 		case codes.OutOfRange:
 			msg := fmt.Sprintf("Out of range: %s", se.Message())
