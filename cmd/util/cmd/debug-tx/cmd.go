@@ -80,12 +80,12 @@ func run(_ *cobra.Command, args []string) {
 
 	config, err := grpcclient.NewFlowClientConfig(flagAccessAddress, "", flow.ZeroID, true)
 	if err != nil {
-		log.Fatal().Err(err).Msg("failed to create flow client config")
+		log.Fatal().Err(err).Msg("Failed to create flow client config")
 	}
 
 	flowClient, err := grpcclient.FlowClient(config)
 	if err != nil {
-		log.Fatal().Err(err).Msg("failed to create client")
+		log.Fatal().Err(err).Msg("Failed to create client")
 	}
 
 	var remoteClient debug.RemoteClient
@@ -94,10 +94,10 @@ func run(_ *cobra.Command, args []string) {
 	} else if flagExecutionAddress != "" {
 		remoteClient, err = debug.NewExecutionNodeRemoteClient(flagExecutionAddress)
 	} else {
-		log.Fatal().Msg("either --use-execution-data-api or --execution-address must be provided")
+		log.Fatal().Msg("Either --use-execution-data-api or --execution-address must be provided")
 	}
 	if err != nil {
-		log.Fatal().Err(err).Msg("failed to remote client")
+		log.Fatal().Err(err).Msg("Failed to remote client")
 	}
 	defer remoteClient.Close()
 
@@ -107,7 +107,7 @@ func run(_ *cobra.Command, args []string) {
 	} else if flagTracePath != "" {
 		traceFile, err = os.Create(flagTracePath)
 		if err != nil {
-			log.Fatal().Err(err).Msg("failed to create trace file")
+			log.Fatal().Err(err).Msg("Failed to create trace file")
 		}
 		defer traceFile.Close()
 	}
@@ -121,7 +121,7 @@ func run(_ *cobra.Command, args []string) {
 			defer func() {
 				err = cadenceSpanExporter.WriteSpans(traceFile)
 				if err != nil {
-					log.Fatal().Err(err).Msg("failed to write spans")
+					log.Fatal().Err(err).Msg("Failed to write spans")
 				}
 			}()
 			spanExporter = cadenceSpanExporter
@@ -131,7 +131,7 @@ func run(_ *cobra.Command, args []string) {
 				stdouttrace.WithoutTimestamps(),
 			)
 			if err != nil {
-				log.Fatal().Err(err).Msg("failed to create trace exporter")
+				log.Fatal().Err(err).Msg("Failed to create trace exporter")
 			}
 		}
 	}
@@ -139,14 +139,14 @@ func run(_ *cobra.Command, args []string) {
 	if flagBlockID != "" {
 
 		if len(args) != 0 {
-			log.Fatal().Msg("cannot provide both block ID and transaction IDs")
+			log.Fatal().Msg("Cannot provide both block ID and transaction IDs")
 		}
 
 		// Block ID provided, fetch the block and its transaction IDs
 
 		blockID, err := flow.HexStringToIdentifier(flagBlockID)
 		if err != nil {
-			log.Fatal().Err(err).Str("ID", flagBlockID).Msg("failed to parse block ID")
+			log.Fatal().Err(err).Str("ID", flagBlockID).Msg("Failed to parse block ID")
 		}
 
 		header := FetchBlockHeader(blockID, flowClient)
@@ -197,7 +197,7 @@ func run(_ *cobra.Command, args []string) {
 		for _, rawTxID := range args {
 			txID, err := flow.HexStringToIdentifier(rawTxID)
 			if err != nil {
-				log.Fatal().Err(err).Str("ID", rawTxID).Msg("failed to parse transaction ID")
+				log.Fatal().Err(err).Str("ID", rawTxID).Msg("Failed to parse transaction ID")
 			}
 
 			result := RunSingleTransaction(
@@ -247,7 +247,7 @@ func RunSingleTransaction(
 
 	txResult, err := flowClient.GetTransactionResult(context.Background(), sdk.Identifier(txID))
 	if err != nil {
-		log.Fatal().Err(err).Msg("failed to fetch transaction result")
+		log.Fatal().Err(err).Msg("Failed to fetch transaction result")
 	}
 
 	blockID := flow.Identifier(txResult.BlockID)
@@ -295,7 +295,7 @@ func RunSingleTransaction(
 		}
 	}
 
-	log.Fatal().Msg("transaction not found in block transactions")
+	log.Fatal().Msg("Transaction not found in block transactions")
 
 	return debug.Result{}
 }
@@ -307,7 +307,7 @@ func NewBlockSnapshot(
 
 	remoteSnapshot, err := remoteClient.StorageSnapshot(blockHeader.Height, blockHeader.ID())
 	if err != nil {
-		log.Fatal().Err(err).Msg("failed to create storage snapshot")
+		log.Fatal().Err(err).Msg("Failed to create storage snapshot")
 	}
 
 	return debug.NewCachingStorageSnapshot(remoteSnapshot)
@@ -322,7 +322,7 @@ func FetchBlockHeader(
 	var err error
 	header, err = debug.GetAccessAPIBlockHeader(context.Background(), flowClient.RPCClient(), blockID)
 	if err != nil {
-		log.Fatal().Err(err).Msg("failed to fetch block header")
+		log.Fatal().Err(err).Msg("Failed to fetch block header")
 	}
 
 	log.Info().Msgf(
@@ -349,7 +349,7 @@ func SubscribeBlockHeadersFromStartBlockID(
 		blockStatus,
 	)
 	if err != nil {
-		log.Fatal().Err(err).Msg("failed to subscribe to block headers")
+		log.Fatal().Err(err).Msg("Failed to subscribe to block headers")
 	}
 
 	log.Info().Msg("Subscribed to block headers")
@@ -370,7 +370,7 @@ func SubscribeBlockHeadersFromLatest(
 		blockStatus,
 	)
 	if err != nil {
-		log.Fatal().Err(err).Msg("failed to subscribe to block headers")
+		log.Fatal().Err(err).Msg("Failed to subscribe to block headers")
 	}
 
 	log.Info().Msg("Subscribed to block headers")
@@ -391,7 +391,7 @@ func FetchBlockTransactions(
 
 	blockTransactions, err = flowClient.GetTransactionsByBlockID(context.Background(), sdk.Identifier(blockID))
 	if err != nil {
-		log.Fatal().Err(err).Msg("failed to fetch transactions of block")
+		log.Fatal().Err(err).Msg("Failed to fetch transactions of block")
 	}
 
 	for _, blockTx := range blockTransactions {
@@ -504,7 +504,7 @@ func RunTransaction(
 			sync,
 		)
 		if err != nil {
-			log.Fatal().Err(err).Msg("failed to create tracer")
+			log.Fatal().Err(err).Msg("Failed to create tracer")
 		}
 
 		span, _ := tracer.StartTransactionSpan(context.TODO(), flow.Identifier(tx.ID()), "")
@@ -539,6 +539,8 @@ func RunTransaction(
 	// TransactionInvoker already logs error
 	if result.Output.Err == nil {
 		log.Info().Msg("Transaction succeeded")
+	} else {
+		log.Err(result.Output.Err).Msgf("Transaction failed")
 	}
 
 	return result
