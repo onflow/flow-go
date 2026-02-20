@@ -50,15 +50,30 @@ func NewRemoteDebugger(
 // RunTransaction runs the transaction using the given storage snapshot.
 func (d *RemoteDebugger) RunTransaction(
 	txBody *flow.TransactionBody,
+	isSystemTransaction bool,
 	snapshot StorageSnapshot,
 	blockHeader *flow.Header,
 ) (
 	Result,
 	error,
 ) {
+	opts := []fvm.Option{
+		fvm.WithBlockHeader(blockHeader),
+	}
+
+	if isSystemTransaction {
+		opts = append(
+			opts,
+			fvm.WithAuthorizationChecksEnabled(false),
+			fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
+			fvm.WithRandomSourceHistoryCallAllowed(true),
+			fvm.WithAccountStorageLimit(false),
+		)
+	}
+
 	blockCtx := fvm.NewContextFromParent(
 		d.ctx,
-		fvm.WithBlockHeader(blockHeader),
+		opts...,
 	)
 
 	tx := fvm.Transaction(txBody, 0)
@@ -108,9 +123,14 @@ func (d *RemoteDebugger) RunSDKTransaction(
 
 	return d.RunTransaction(
 		txBody,
+		isSystemTransaction(tx),
 		snapshot,
 		header,
 	)
+}
+
+func isSystemTransaction(tx *sdk.Transaction) bool {
+	return tx.Payer == sdk.EmptyAddress
 }
 
 // RunScript runs the script using the given storage snapshot.

@@ -150,7 +150,7 @@ func run(_ *cobra.Command, args []string) {
 		}
 
 		header := FetchBlockHeader(blockID, flowClient)
-		blockTransactions, systemTxID := FetchBlockTransactions(blockID, flowClient)
+		blockTransactions := FetchBlockTransactions(blockID, flowClient)
 
 		log.Info().Msgf("Running all transactions in block %s (height %d) ...", blockID, header.Height)
 
@@ -168,7 +168,6 @@ func run(_ *cobra.Command, args []string) {
 			header,
 			blockTransactions,
 			flow.ZeroID,
-			systemTxID,
 			chain,
 			nil,
 			newSpanExporter,
@@ -178,11 +177,6 @@ func run(_ *cobra.Command, args []string) {
 
 		if flagShowResult {
 			for i, blockTx := range blockTransactions {
-				// Skip system transaction
-				if blockTx.ID() == systemTxID {
-					continue
-				}
-
 				debug.WriteResult(
 					os.Stdout,
 					flow.Identifier(blockTx.ID()),
@@ -262,7 +256,7 @@ func RunSingleTransaction(
 
 	// Fetch block info
 	header := FetchBlockHeader(blockID, flowClient)
-	blockTransactions, systemTxID := FetchBlockTransactions(blockID, flowClient)
+	blockTransactions := FetchBlockTransactions(blockID, flowClient)
 
 	var newSpanExporter func(blockTxID flow.Identifier) otelTrace.SpanExporter
 	if spanExporter != nil {
@@ -281,7 +275,6 @@ func RunSingleTransaction(
 		header,
 		blockTransactions,
 		txID,
-		systemTxID,
 		chain,
 		nil,
 		newSpanExporter,
@@ -381,15 +374,12 @@ func SubscribeBlockHeadersFromLatest(
 func FetchBlockTransactions(
 	blockID flow.Identifier,
 	flowClient *client.Client,
-) (
-	blockTransactions []*sdk.Transaction,
-	systemTxID sdk.Identifier,
-) {
+) []*sdk.Transaction {
 	var err error
 
 	log.Info().Msgf("Fetching transactions of block %s ...", blockID)
 
-	blockTransactions, err = flowClient.GetTransactionsByBlockID(context.Background(), sdk.Identifier(blockID))
+	blockTransactions, err := flowClient.GetTransactionsByBlockID(context.Background(), sdk.Identifier(blockID))
 	if err != nil {
 		log.Fatal().Err(err).Msg("Failed to fetch transactions of block")
 	}
@@ -398,17 +388,7 @@ func FetchBlockTransactions(
 		log.Info().Msgf("Block transaction: %s", blockTx.ID())
 	}
 
-	log.Info().Msg("Fetching system transaction ...")
-
-	systemTx, err := flowClient.GetSystemTransaction(context.Background(), sdk.Identifier(blockID))
-	if err != nil {
-		log.Fatal().Err(err).Msg("Failed to fetch system transaction")
-	}
-
-	systemTxID = systemTx.ID()
-	log.Info().Msgf("Fetched system transaction: %s", systemTxID)
-
-	return
+	return blockTransactions
 }
 
 func RunBlock(
@@ -416,7 +396,6 @@ func RunBlock(
 	blockHeader *flow.Header,
 	blockTransactions []*sdk.Transaction,
 	debuggedTxID flow.Identifier,
-	systemTxID sdk.Identifier,
 	chain flow.Chain,
 	wrapTxSnapshot func(blockTxID flow.Identifier, snapshot debug.UpdatableStorageSnapshot) debug.UpdatableStorageSnapshot,
 	newSpanExporter func(blockTxID flow.Identifier) otelTrace.SpanExporter,
@@ -426,12 +405,6 @@ func RunBlock(
 	results []debug.Result,
 ) {
 	for _, blockTx := range blockTransactions {
-
-		// TODO: add support for executing system transactions
-		if blockTx.ID() == systemTxID {
-			log.Info().Msg("Skipping system transaction")
-			continue
-		}
 
 		blockTxID := flow.Identifier(blockTx.ID())
 
