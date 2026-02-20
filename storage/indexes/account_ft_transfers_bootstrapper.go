@@ -105,7 +105,6 @@ func (b *FungibleTokenTransfersBootstrapper) ByAddress(
 
 // Store indexes all fungible token transfers for a block.
 // Must be called sequentially with consecutive heights (latestHeight + 1).
-// Calling with the last height is a no-op.
 // The caller must hold the [storage.LockIndexFungibleTokenTransfers] lock until the batch is committed.
 //
 // Expected error returns during normal operations:

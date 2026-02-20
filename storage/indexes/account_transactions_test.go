@@ -583,45 +583,15 @@ func TestAccountTransactions_ErrorCases(t *testing.T) {
 		})
 	})
 
-	t.Run("repeated store at latest height is a no-op", func(t *testing.T) {
+	t.Run("repeated store at latest height returns ErrAlreadyExists", func(t *testing.T) {
 		RunWithBootstrappedAccountTxIndex(t, 1, nil, func(_ storage.DB, lm storage.LockManager, idx *AccountTransactions) {
-			account := unittest.RandomAddressFixture()
-			txID := unittest.IdentifierFixture()
-
-			txData := []access.AccountTransaction{
-				{
-					Address:          account,
-					BlockHeight:      2,
-					TransactionID:    txID,
-					TransactionIndex: 0,
-					Roles:            []access.TransactionRole{access.TransactionRoleAuthorizer},
-				},
-			}
-
-			// Index height 2 with actual data
-			err := storeAccountTransactions(t, lm, idx, 2, txData)
+			// Index height 2
+			err := storeAccountTransactions(t, lm, idx, 2, nil)
 			require.NoError(t, err)
 
-			// Re-indexing height 2 with different data should be a no-op (original data retained)
-			differentTxID := unittest.IdentifierFixture()
-			differentTxData := []access.AccountTransaction{
-				{
-					Address:          account,
-					BlockHeight:      2,
-					TransactionID:    differentTxID,
-					TransactionIndex: 0,
-					Roles:            []access.TransactionRole{access.TransactionRolePayer},
-				},
-			}
-			err = storeAccountTransactions(t, lm, idx, 2, differentTxData)
-			require.NoError(t, err)
-
-			// Verify original data is retained, not replaced
-			page, err := idx.ByAddress(account, 100, nil, nil)
-			require.NoError(t, err)
-			require.Len(t, page.Transactions, 1)
-			assert.Equal(t, txID, page.Transactions[0].TransactionID)
-			assert.Equal(t, []access.TransactionRole{access.TransactionRoleAuthorizer}, page.Transactions[0].Roles)
+			// Re-indexing height 2 should return ErrAlreadyExists
+			err = storeAccountTransactions(t, lm, idx, 2, nil)
+			require.ErrorIs(t, err, storage.ErrAlreadyExists)
 		})
 	})
 }

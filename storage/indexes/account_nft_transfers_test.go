@@ -336,48 +336,15 @@ func TestNFTTransfers_StoreAndQuery(t *testing.T) {
 func TestNFTTransfers_HeightValidation(t *testing.T) {
 	t.Parallel()
 
-	t.Run("repeated store at latest height is a no-op", func(t *testing.T) {
+	t.Run("repeated store at latest height returns ErrAlreadyExists", func(t *testing.T) {
 		RunWithBootstrappedNFTTransferIndex(t, 1, nil, func(_ storage.DB, lm storage.LockManager, idx *NonFungibleTokenTransfers) {
-			source := unittest.RandomAddressFixture()
-			recipient := unittest.RandomAddressFixture()
-			txID := unittest.IdentifierFixture()
-
-			transfers := []access.NonFungibleTokenTransfer{
-				{
-					TransactionID:    txID,
-					BlockHeight:      2,
-					TransactionIndex: 0,
-					EventIndices:     []uint32{0},
-					SourceAddress:    source,
-					RecipientAddress: recipient,
-					ID:               5,
-				},
-			}
-
-			err := storeNFTTransfers(t, lm, idx, 2, transfers)
+			// Index height 2
+			err := storeNFTTransfers(t, lm, idx, 2, nil)
 			require.NoError(t, err)
 
-			// Re-indexing height 2 with different data should be a no-op
-			differentTxID := unittest.IdentifierFixture()
-			err = storeNFTTransfers(t, lm, idx, 2, []access.NonFungibleTokenTransfer{
-				{
-					TransactionID:    differentTxID,
-					BlockHeight:      2,
-					TransactionIndex: 0,
-					EventIndices:     []uint32{0},
-					SourceAddress:    source,
-					RecipientAddress: recipient,
-					ID:               99,
-				},
-			})
-			require.NoError(t, err)
-
-			// Original data should be retained
-			page, err := idx.ByAddress(source, 100, nil, nil)
-			require.NoError(t, err)
-			require.Len(t, page.Transfers, 1)
-			assert.Equal(t, txID, page.Transfers[0].TransactionID)
-			assert.Equal(t, uint64(5), page.Transfers[0].ID)
+			// Re-indexing height 2 should return ErrAlreadyExists
+			err = storeNFTTransfers(t, lm, idx, 2, nil)
+			require.ErrorIs(t, err, storage.ErrAlreadyExists)
 		})
 	})
 

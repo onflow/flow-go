@@ -171,7 +171,6 @@ func (idx *AccountTransactions) ByAddress(
 }
 
 // Store indexes all account-transaction associations for a block.
-// Repeated calls at the latest height are a no-op.
 // Must be called sequentially with consecutive heights (latestHeight + 1).
 // The caller must hold the [storage.LockIndexAccountTransactions] lock until the batch is committed.
 //
@@ -180,13 +179,8 @@ func (idx *AccountTransactions) ByAddress(
 func (idx *AccountTransactions) Store(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockHeight uint64, txData []access.AccountTransaction) error {
 	latestHeight := idx.latestHeight.Load()
 
-	if blockHeight < latestHeight {
+	if blockHeight <= latestHeight {
 		return storage.ErrAlreadyExists
-	}
-
-	// Reindexing the latest height is a no-op
-	if blockHeight == latestHeight {
-		return nil
 	}
 
 	expectedHeight := latestHeight + 1

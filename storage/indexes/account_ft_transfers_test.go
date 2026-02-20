@@ -381,28 +381,16 @@ func TestFTTransfers_StoreAndQuery(t *testing.T) {
 func TestFTTransfers_HeightValidation(t *testing.T) {
 	t.Parallel()
 
-	t.Run("store at latestHeight is a no-op", func(t *testing.T) {
+	t.Run("store at latestHeight returns ErrAlreadyExists", func(t *testing.T) {
 		t.Parallel()
 		RunWithBootstrappedFTTransferIndex(t, 1, nil, func(_ storage.DB, lm storage.LockManager, idx *FungibleTokenTransfers) {
-			source := unittest.RandomAddressFixture()
-			recipient := unittest.RandomAddressFixture()
-
 			// Index height 2
-			transfer := makeTestTransfer(source, recipient, 2, 0, 0, "A.FlowToken", big.NewInt(100))
-			err := storeFTTransfers(t, lm, idx, 2, []access.FungibleTokenTransfer{transfer})
+			err := storeFTTransfers(t, lm, idx, 2, nil)
 			require.NoError(t, err)
 
-			// Re-store at height 2 with different data (should be a no-op)
-			differentTransfer := makeTestTransfer(source, recipient, 2, 0, 0, "A.DifferentToken", big.NewInt(999))
-			err = storeFTTransfers(t, lm, idx, 2, []access.FungibleTokenTransfer{differentTransfer})
-			require.NoError(t, err)
-
-			// Verify original data is retained
-			page, err := idx.ByAddress(source, 100, nil, nil)
-			require.NoError(t, err)
-			require.Len(t, page.Transfers, 1)
-			assert.Equal(t, transfer.TransactionID, page.Transfers[0].TransactionID)
-			assert.Equal(t, "A.FlowToken", page.Transfers[0].TokenType)
+			// Re-store at height 2 should return ErrAlreadyExists
+			err = storeFTTransfers(t, lm, idx, 2, nil)
+			require.ErrorIs(t, err, storage.ErrAlreadyExists)
 		})
 	})
 

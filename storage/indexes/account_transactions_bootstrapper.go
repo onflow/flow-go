@@ -113,7 +113,6 @@ func (b *AccountTransactionsBootstrapper) ByAddress(
 
 // Store indexes all account-transaction associations for a block.
 // Must be called sequentially with consecutive heights (latestHeight + 1).
-// Calling with the last height is a no-op.
 // The caller must hold the [storage.LockIndexAccountTransactions] lock until the batch is committed.
 //
 // Expected error returns during normal operations:

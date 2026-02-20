@@ -236,13 +236,9 @@ func TestFTBootstrapper_StoreAtSameHeight(t *testing.T) {
 		err = storeFTBootstrapperTransfers(t, store, storageDB, 5, nil)
 		require.NoError(t, err)
 
-		// Store at height 5 again (no-op)
+		// Store at height 5 again returns ErrAlreadyExists
 		err = storeFTBootstrapperTransfers(t, store, storageDB, 5, nil)
-		require.NoError(t, err)
-
-		latest, err := store.LatestIndexedHeight()
-		require.NoError(t, err)
-		assert.Equal(t, uint64(5), latest)
+		require.ErrorIs(t, err, storage.ErrAlreadyExists)
 	})
 }
 

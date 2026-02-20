@@ -176,7 +176,6 @@ func (idx *FungibleTokenTransfers) ByAddress(
 
 // Store indexes all fungible token transfers for a block.
 // Each transfer is indexed under both the source and recipient addresses.
-// Repeated calls at the latest height are a no-op.
 // Must be called sequentially with consecutive heights (latestHeight + 1).
 // The caller must hold the [storage.LockIndexFungibleTokenTransfers] lock until the batch is committed.
 //
@@ -185,13 +184,8 @@ func (idx *FungibleTokenTransfers) ByAddress(
 func (idx *FungibleTokenTransfers) Store(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockHeight uint64, transfers []access.FungibleTokenTransfer) error {
 	latestHeight := idx.latestHeight.Load()
 
-	if blockHeight < latestHeight {
+	if blockHeight <= latestHeight {
 		return storage.ErrAlreadyExists
-	}
-
-	// Reindexing the latest height is a no-op
-	if blockHeight == latestHeight {
-		return nil
 	}
 
 	expectedHeight := latestHeight + 1

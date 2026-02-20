@@ -105,7 +105,6 @@ func (b *NonFungibleTokenTransfersBootstrapper) ByAddress(
 
 // Store indexes all non-fungible token transfers for a block.
 // Must be called sequentially with consecutive heights (latestHeight + 1).
-// Calling with the last height is a no-op.
 // The caller must hold the [storage.LockIndexNonFungibleTokenTransfers] lock until the batch is committed.
 //
 // Expected error returns during normal operations:
