@@ -22,7 +22,7 @@ import (
 // using a large limit and no cursor or filter.
 func queryAllNFTTransfers(t *testing.T, idx *NonFungibleTokenTransfers, account flow.Address) []access.NonFungibleTokenTransfer {
 	t.Helper()
-	page, err := idx.TransfersByAddress(account, 100, nil, nil)
+	page, err := idx.ByAddress(account, 100, nil, nil)
 	require.NoError(t, err)
 	return page.Transfers
 }
@@ -89,7 +89,7 @@ func TestNFTTransfers_Initialize(t *testing.T) {
 			assert.Equal(t, uint64(1), latest)
 
 			// Query by source
-			page, err := idx.TransfersByAddress(source, 100, nil, nil)
+			page, err := idx.ByAddress(source, 100, nil, nil)
 			require.NoError(t, err)
 			require.Len(t, page.Transfers, 1)
 			assert.Equal(t, txID, page.Transfers[0].TransactionID)
@@ -101,7 +101,7 @@ func TestNFTTransfers_Initialize(t *testing.T) {
 			assert.Equal(t, uint64(42), page.Transfers[0].ID)
 
 			// Query by recipient
-			page, err = idx.TransfersByAddress(recipient, 100, nil, nil)
+			page, err = idx.ByAddress(recipient, 100, nil, nil)
 			require.NoError(t, err)
 			require.Len(t, page.Transfers, 1)
 			assert.Equal(t, txID, page.Transfers[0].TransactionID)
@@ -132,7 +132,7 @@ func TestNFTTransfers_Initialize(t *testing.T) {
 
 			assert.Equal(t, uint64(1), idx.LatestIndexedHeight())
 
-			page, err := idx.TransfersByAddress(source, 100, nil, nil)
+			page, err := idx.ByAddress(source, 100, nil, nil)
 			require.NoError(t, err)
 			require.Len(t, page.Transfers, 1)
 			assert.Equal(t, txID, page.Transfers[0].TransactionID)
@@ -164,7 +164,7 @@ func TestNFTTransfers_StoreAndQuery(t *testing.T) {
 			err := storeNFTTransfers(t, lm, idx, 2, transfers)
 			require.NoError(t, err)
 
-			page, err := idx.TransfersByAddress(source, 100, nil, nil)
+			page, err := idx.ByAddress(source, 100, nil, nil)
 			require.NoError(t, err)
 			require.Len(t, page.Transfers, 1)
 			assert.Equal(t, txID, page.Transfers[0].TransactionID)
@@ -373,7 +373,7 @@ func TestNFTTransfers_HeightValidation(t *testing.T) {
 			require.NoError(t, err)
 
 			// Original data should be retained
-			page, err := idx.TransfersByAddress(source, 100, nil, nil)
+			page, err := idx.ByAddress(source, 100, nil, nil)
 			require.NoError(t, err)
 			require.Len(t, page.Transfers, 1)
 			assert.Equal(t, txID, page.Transfers[0].TransactionID)
@@ -431,7 +431,7 @@ func TestNFTTransfers_RangeQueries(t *testing.T) {
 		RunWithBootstrappedNFTTransferIndex(t, 5, nil, func(_ storage.DB, _ storage.LockManager, idx *NonFungibleTokenTransfers) {
 			account := unittest.RandomAddressFixture()
 			cursor := &access.TransferCursor{BlockHeight: 100}
-			_, err := idx.TransfersByAddress(account, 10, cursor, nil)
+			_, err := idx.ByAddress(account, 10, cursor, nil)
 			require.ErrorIs(t, err, storage.ErrHeightNotIndexed)
 		})
 	})
@@ -440,7 +440,7 @@ func TestNFTTransfers_RangeQueries(t *testing.T) {
 		RunWithBootstrappedNFTTransferIndex(t, 5, nil, func(_ storage.DB, _ storage.LockManager, idx *NonFungibleTokenTransfers) {
 			account := unittest.RandomAddressFixture()
 			cursor := &access.TransferCursor{BlockHeight: 1}
-			_, err := idx.TransfersByAddress(account, 10, cursor, nil)
+			_, err := idx.ByAddress(account, 10, cursor, nil)
 			require.ErrorIs(t, err, storage.ErrHeightNotIndexed)
 		})
 	})
@@ -464,7 +464,7 @@ func TestNFTTransfers_RangeQueries(t *testing.T) {
 			require.NoError(t, err)
 
 			// nil cursor should query from latest
-			page, err := idx.TransfersByAddress(account, 100, nil, nil)
+			page, err := idx.ByAddress(account, 100, nil, nil)
 			require.NoError(t, err)
 			require.Len(t, page.Transfers, 1)
 			assert.Equal(t, txID, page.Transfers[0].TransactionID)
@@ -474,7 +474,7 @@ func TestNFTTransfers_RangeQueries(t *testing.T) {
 	t.Run("limit zero returns ErrInvalidQuery", func(t *testing.T) {
 		RunWithBootstrappedNFTTransferIndex(t, 5, nil, func(_ storage.DB, lm storage.LockManager, idx *NonFungibleTokenTransfers) {
 			account := unittest.RandomAddressFixture()
-			_, err := idx.TransfersByAddress(account, 0, nil, nil)
+			_, err := idx.ByAddress(account, 0, nil, nil)
 			require.ErrorIs(t, err, storage.ErrInvalidQuery)
 		})
 	})

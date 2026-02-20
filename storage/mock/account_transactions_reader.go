@@ -38,12 +38,12 @@ func (_m *AccountTransactionsReader) EXPECT() *AccountTransactionsReader_Expecte
 	return &AccountTransactionsReader_Expecter{mock: &_m.Mock}
 }
 
-// TransactionsByAddress provides a mock function for the type AccountTransactionsReader
-func (_mock *AccountTransactionsReader) TransactionsByAddress(account flow.Address, limit uint32, cursor *access.AccountTransactionCursor, filter storage.IndexFilter[*access.AccountTransaction]) (access.AccountTransactionsPage, error) {
+// ByAddress provides a mock function for the type AccountTransactionsReader
+func (_mock *AccountTransactionsReader) ByAddress(account flow.Address, limit uint32, cursor *access.AccountTransactionCursor, filter storage.IndexFilter[*access.AccountTransaction]) (access.AccountTransactionsPage, error) {
 	ret := _mock.Called(account, limit, cursor, filter)
 
 	if len(ret) == 0 {
-		panic("no return value specified for TransactionsByAddress")
+		panic("no return value specified for ByAddress")
 	}
 
 	var r0 access.AccountTransactionsPage
@@ -64,21 +64,21 @@ func (_mock *AccountTransactionsReader) TransactionsByAddress(account flow.Addre
 	return r0, r1
 }
 
-// AccountTransactionsReader_TransactionsByAddress_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'TransactionsByAddress'
-type AccountTransactionsReader_TransactionsByAddress_Call struct {
+// AccountTransactionsReader_ByAddress_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ByAddress'
+type AccountTransactionsReader_ByAddress_Call struct {
 	*mock.Call
 }
 
-// TransactionsByAddress is a helper method to define mock.On call
+// ByAddress is a helper method to define mock.On call
 //   - account flow.Address
 //   - limit uint32
 //   - cursor *access.AccountTransactionCursor
 //   - filter storage.IndexFilter[*access.AccountTransaction]
-func (_e *AccountTransactionsReader_Expecter) TransactionsByAddress(account interface{}, limit interface{}, cursor interface{}, filter interface{}) *AccountTransactionsReader_TransactionsByAddress_Call {
-	return &AccountTransactionsReader_TransactionsByAddress_Call{Call: _e.mock.On("TransactionsByAddress", account, limit, cursor, filter)}
+func (_e *AccountTransactionsReader_Expecter) ByAddress(account interface{}, limit interface{}, cursor interface{}, filter interface{}) *AccountTransactionsReader_ByAddress_Call {
+	return &AccountTransactionsReader_ByAddress_Call{Call: _e.mock.On("ByAddress", account, limit, cursor, filter)}
 }
 
-func (_c *AccountTransactionsReader_TransactionsByAddress_Call) Run(run func(account flow.Address, limit uint32, cursor *access.AccountTransactionCursor, filter storage.IndexFilter[*access.AccountTransaction])) *AccountTransactionsReader_TransactionsByAddress_Call {
+func (_c *AccountTransactionsReader_ByAddress_Call) Run(run func(account flow.Address, limit uint32, cursor *access.AccountTransactionCursor, filter storage.IndexFilter[*access.AccountTransaction])) *AccountTransactionsReader_ByAddress_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 flow.Address
 		if args[0] != nil {
@@ -106,12 +106,12 @@ func (_c *AccountTransactionsReader_TransactionsByAddress_Call) Run(run func(acc
 	return _c
 }
 
-func (_c *AccountTransactionsReader_TransactionsByAddress_Call) Return(accountTransactionsPage access.AccountTransactionsPage, err error) *AccountTransactionsReader_TransactionsByAddress_Call {
+func (_c *AccountTransactionsReader_ByAddress_Call) Return(accountTransactionsPage access.AccountTransactionsPage, err error) *AccountTransactionsReader_ByAddress_Call {
 	_c.Call.Return(accountTransactionsPage, err)
 	return _c
 }
 
-func (_c *AccountTransactionsReader_TransactionsByAddress_Call) RunAndReturn(run func(account flow.Address, limit uint32, cursor *access.AccountTransactionCursor, filter storage.IndexFilter[*access.AccountTransaction]) (access.AccountTransactionsPage, error)) *AccountTransactionsReader_TransactionsByAddress_Call {
+func (_c *AccountTransactionsReader_ByAddress_Call) RunAndReturn(run func(account flow.Address, limit uint32, cursor *access.AccountTransactionCursor, filter storage.IndexFilter[*access.AccountTransaction]) (access.AccountTransactionsPage, error)) *AccountTransactionsReader_ByAddress_Call {
 	_c.Call.Return(run)
 	return _c
 }

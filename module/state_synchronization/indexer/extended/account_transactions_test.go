@@ -857,7 +857,7 @@ func assertAccountTxRoles(
 	expectedRoles []access.TransactionRole,
 ) {
 	t.Helper()
-	page, err := store.TransactionsByAddress(addr, 1000, nil, nil)
+	page, err := store.ByAddress(addr, 1000, nil, nil)
 	require.NoError(t, err)
 
 	for _, r := range page.Transactions {
@@ -879,7 +879,7 @@ func assertTransactionCount(
 	expectedCount int,
 ) {
 	t.Helper()
-	page, err := store.TransactionsByAddress(addr, 1000, nil, nil)
+	page, err := store.ByAddress(addr, 1000, nil, nil)
 	require.NoError(t, err)
 
 	var count int

@@ -196,12 +196,12 @@ func (_c *FungibleTokenTransfers_Store_Call) RunAndReturn(run func(lctx lockctx.
 	return _c
 }
 
-// TransfersByAddress provides a mock function for the type FungibleTokenTransfers
-func (_mock *FungibleTokenTransfers) TransfersByAddress(account flow.Address, limit uint32, cursor *access.TransferCursor, filter storage.IndexFilter[*access.FungibleTokenTransfer]) (access.FungibleTokenTransfersPage, error) {
+// ByAddress provides a mock function for the type FungibleTokenTransfers
+func (_mock *FungibleTokenTransfers) ByAddress(account flow.Address, limit uint32, cursor *access.TransferCursor, filter storage.IndexFilter[*access.FungibleTokenTransfer]) (access.FungibleTokenTransfersPage, error) {
 	ret := _mock.Called(account, limit, cursor, filter)
 
 	if len(ret) == 0 {
-		panic("no return value specified for TransfersByAddress")
+		panic("no return value specified for ByAddress")
 	}
 
 	var r0 access.FungibleTokenTransfersPage
@@ -222,21 +222,21 @@ func (_mock *FungibleTokenTransfers) TransfersByAddress(account flow.Address, li
 	return r0, r1
 }
 
-// FungibleTokenTransfers_TransfersByAddress_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'TransfersByAddress'
-type FungibleTokenTransfers_TransfersByAddress_Call struct {
+// FungibleTokenTransfers_ByAddress_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ByAddress'
+type FungibleTokenTransfers_ByAddress_Call struct {
 	*mock.Call
 }
 
-// TransfersByAddress is a helper method to define mock.On call
+// ByAddress is a helper method to define mock.On call
 //   - account flow.Address
 //   - limit uint32
 //   - cursor *access.TransferCursor
 //   - filter storage.IndexFilter[*access.FungibleTokenTransfer]
-func (_e *FungibleTokenTransfers_Expecter) TransfersByAddress(account interface{}, limit interface{}, cursor interface{}, filter interface{}) *FungibleTokenTransfers_TransfersByAddress_Call {
-	return &FungibleTokenTransfers_TransfersByAddress_Call{Call: _e.mock.On("TransfersByAddress", account, limit, cursor, filter)}
+func (_e *FungibleTokenTransfers_Expecter) ByAddress(account interface{}, limit interface{}, cursor interface{}, filter interface{}) *FungibleTokenTransfers_ByAddress_Call {
+	return &FungibleTokenTransfers_ByAddress_Call{Call: _e.mock.On("ByAddress", account, limit, cursor, filter)}
 }
 
-func (_c *FungibleTokenTransfers_TransfersByAddress_Call) Run(run func(account flow.Address, limit uint32, cursor *access.TransferCursor, filter storage.IndexFilter[*access.FungibleTokenTransfer])) *FungibleTokenTransfers_TransfersByAddress_Call {
+func (_c *FungibleTokenTransfers_ByAddress_Call) Run(run func(account flow.Address, limit uint32, cursor *access.TransferCursor, filter storage.IndexFilter[*access.FungibleTokenTransfer])) *FungibleTokenTransfers_ByAddress_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 flow.Address
 		if args[0] != nil {
@@ -264,12 +264,12 @@ func (_c *FungibleTokenTransfers_TransfersByAddress_Call) Run(run func(account f
 	return _c
 }
 
-func (_c *FungibleTokenTransfers_TransfersByAddress_Call) Return(fungibleTokenTransfersPage access.FungibleTokenTransfersPage, err error) *FungibleTokenTransfers_TransfersByAddress_Call {
+func (_c *FungibleTokenTransfers_ByAddress_Call) Return(fungibleTokenTransfersPage access.FungibleTokenTransfersPage, err error) *FungibleTokenTransfers_ByAddress_Call {
 	_c.Call.Return(fungibleTokenTransfersPage, err)
 	return _c
 }
 
-func (_c *FungibleTokenTransfers_TransfersByAddress_Call) RunAndReturn(run func(account flow.Address, limit uint32, cursor *access.TransferCursor, filter storage.IndexFilter[*access.FungibleTokenTransfer]) (access.FungibleTokenTransfersPage, error)) *FungibleTokenTransfers_TransfersByAddress_Call {
+func (_c *FungibleTokenTransfers_ByAddress_Call) RunAndReturn(run func(account flow.Address, limit uint32, cursor *access.TransferCursor, filter storage.IndexFilter[*access.FungibleTokenTransfer]) (access.FungibleTokenTransfersPage, error)) *FungibleTokenTransfers_ByAddress_Call {
 	_c.Call.Return(run)
 	return _c
 }

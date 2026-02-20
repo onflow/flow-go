@@ -133,7 +133,7 @@ func TestFTTransfers_Initialize(t *testing.T) {
 			assert.Equal(t, uint64(5), idx.LatestIndexedHeight())
 
 			// Query by source
-			page, err := idx.TransfersByAddress(source, 100, nil, nil)
+			page, err := idx.ByAddress(source, 100, nil, nil)
 			require.NoError(t, err)
 			require.Len(t, page.Transfers, 1)
 			assert.Equal(t, initialData[0].TransactionID, page.Transfers[0].TransactionID)
@@ -146,7 +146,7 @@ func TestFTTransfers_Initialize(t *testing.T) {
 			assert.Equal(t, 0, amount.Cmp(page.Transfers[0].Amount))
 
 			// Query by recipient
-			page, err = idx.TransfersByAddress(recipient, 100, nil, nil)
+			page, err = idx.ByAddress(recipient, 100, nil, nil)
 			require.NoError(t, err)
 			require.Len(t, page.Transfers, 1)
 			assert.Equal(t, initialData[0].TransactionID, page.Transfers[0].TransactionID)
@@ -168,7 +168,7 @@ func TestFTTransfers_Initialize(t *testing.T) {
 			require.NoError(t, err)
 			assert.Equal(t, uint64(1), idx.LatestIndexedHeight())
 
-			page, err := idx.TransfersByAddress(source, 100, nil, nil)
+			page, err := idx.ByAddress(source, 100, nil, nil)
 			require.NoError(t, err)
 			require.Len(t, page.Transfers, 1)
 			assert.Equal(t, transfer.TransactionID, page.Transfers[0].TransactionID)
@@ -199,7 +199,7 @@ func TestFTTransfers_StoreAndQuery(t *testing.T) {
 			err := storeFTTransfers(t, lm, idx, 2, []access.FungibleTokenTransfer{transfer})
 			require.NoError(t, err)
 
-			page, err := idx.TransfersByAddress(source, 100, nil, nil)
+			page, err := idx.ByAddress(source, 100, nil, nil)
 			require.NoError(t, err)
 			require.Len(t, page.Transfers, 1)
 			assert.Equal(t, transfer.TransactionID, page.Transfers[0].TransactionID)
@@ -229,17 +229,17 @@ func TestFTTransfers_StoreAndQuery(t *testing.T) {
 			require.NoError(t, err)
 
 			// Alice: 1 transfer (as source)
-			page, err := idx.TransfersByAddress(alice, 100, nil, nil)
+			page, err := idx.ByAddress(alice, 100, nil, nil)
 			require.NoError(t, err)
 			assert.Len(t, page.Transfers, 1)
 
 			// Bob: 2 transfers (as recipient of first, source of second)
-			page, err = idx.TransfersByAddress(bob, 100, nil, nil)
+			page, err = idx.ByAddress(bob, 100, nil, nil)
 			require.NoError(t, err)
 			assert.Len(t, page.Transfers, 2)
 
 			// Charlie: 1 transfer (as recipient)
-			page, err = idx.TransfersByAddress(charlie, 100, nil, nil)
+			page, err = idx.ByAddress(charlie, 100, nil, nil)
 			require.NoError(t, err)
 			assert.Len(t, page.Transfers, 1)
 		})
@@ -262,12 +262,12 @@ func TestFTTransfers_StoreAndQuery(t *testing.T) {
 			require.NoError(t, err)
 
 			// Alice should see both transfers (source in block 2, recipient in block 3)
-			page, err := idx.TransfersByAddress(alice, 100, nil, nil)
+			page, err := idx.ByAddress(alice, 100, nil, nil)
 			require.NoError(t, err)
 			require.Len(t, page.Transfers, 2)
 
 			// Bob should see both transfers (recipient in block 2, source in block 3)
-			page, err = idx.TransfersByAddress(bob, 100, nil, nil)
+			page, err = idx.ByAddress(bob, 100, nil, nil)
 			require.NoError(t, err)
 			assert.Len(t, page.Transfers, 2)
 		})
@@ -295,13 +295,13 @@ func TestFTTransfers_StoreAndQuery(t *testing.T) {
 			require.NoError(t, err)
 
 			// Query by source address
-			sourcePage, err := idx.TransfersByAddress(source, 100, nil, nil)
+			sourcePage, err := idx.ByAddress(source, 100, nil, nil)
 			require.NoError(t, err)
 			require.Len(t, sourcePage.Transfers, 1)
 			assert.Equal(t, txID, sourcePage.Transfers[0].TransactionID)
 
 			// Query by recipient address
-			recipientPage, err := idx.TransfersByAddress(recipient, 100, nil, nil)
+			recipientPage, err := idx.ByAddress(recipient, 100, nil, nil)
 			require.NoError(t, err)
 			require.Len(t, recipientPage.Transfers, 1)
 			assert.Equal(t, txID, recipientPage.Transfers[0].TransactionID)
@@ -326,7 +326,7 @@ func TestFTTransfers_StoreAndQuery(t *testing.T) {
 				require.NoError(t, err)
 			}
 
-			page, err := idx.TransfersByAddress(account, 100, nil, nil)
+			page, err := idx.ByAddress(account, 100, nil, nil)
 			require.NoError(t, err)
 			require.Len(t, page.Transfers, 10)
 
@@ -355,7 +355,7 @@ func TestFTTransfers_StoreAndQuery(t *testing.T) {
 			err := storeFTTransfers(t, lm, idx, 2, transfers)
 			require.NoError(t, err)
 
-			page, err := idx.TransfersByAddress(account, 100, nil, nil)
+			page, err := idx.ByAddress(account, 100, nil, nil)
 			require.NoError(t, err)
 			require.Len(t, page.Transfers, 5)
 
@@ -398,7 +398,7 @@ func TestFTTransfers_HeightValidation(t *testing.T) {
 			require.NoError(t, err)
 
 			// Verify original data is retained
-			page, err := idx.TransfersByAddress(source, 100, nil, nil)
+			page, err := idx.ByAddress(source, 100, nil, nil)
 			require.NoError(t, err)
 			require.Len(t, page.Transfers, 1)
 			assert.Equal(t, transfer.TransactionID, page.Transfers[0].TransactionID)
@@ -464,7 +464,7 @@ func TestFTTransfers_RangeQueries(t *testing.T) {
 		RunWithBootstrappedFTTransferIndex(t, 5, nil, func(_ storage.DB, _ storage.LockManager, idx *FungibleTokenTransfers) {
 			account := unittest.RandomAddressFixture()
 			cursor := &access.TransferCursor{BlockHeight: 100}
-			_, err := idx.TransfersByAddress(account, 10, cursor, nil)
+			_, err := idx.ByAddress(account, 10, cursor, nil)
 			require.ErrorIs(t, err, storage.ErrHeightNotIndexed)
 		})
 	})
@@ -474,7 +474,7 @@ func TestFTTransfers_RangeQueries(t *testing.T) {
 		RunWithBootstrappedFTTransferIndex(t, 5, nil, func(_ storage.DB, _ storage.LockManager, idx *FungibleTokenTransfers) {
 			account := unittest.RandomAddressFixture()
 			cursor := &access.TransferCursor{BlockHeight: 1}
-			_, err := idx.TransfersByAddress(account, 10, cursor, nil)
+			_, err := idx.ByAddress(account, 10, cursor, nil)
 			require.ErrorIs(t, err, storage.ErrHeightNotIndexed)
 		})
 	})
@@ -494,7 +494,7 @@ func TestFTTransfers_RangeQueries(t *testing.T) {
 			require.NoError(t, err)
 
 			// nil cursor returns all data
-			page, err := idx.TransfersByAddress(source, 100, nil, nil)
+			page, err := idx.ByAddress(source, 100, nil, nil)
 			require.NoError(t, err)
 			assert.Len(t, page.Transfers, 2)
 		})
@@ -504,7 +504,7 @@ func TestFTTransfers_RangeQueries(t *testing.T) {
 		t.Parallel()
 		RunWithBootstrappedFTTransferIndex(t, 5, nil, func(_ storage.DB, _ storage.LockManager, idx *FungibleTokenTransfers) {
 			account := unittest.RandomAddressFixture()
-			_, err := idx.TransfersByAddress(account, 0, nil, nil)
+			_, err := idx.ByAddress(account, 0, nil, nil)
 			require.ErrorIs(t, err, storage.ErrInvalidQuery)
 		})
 	})
@@ -517,7 +517,7 @@ func TestFTTransfers_RangeQueries(t *testing.T) {
 			require.NoError(t, err)
 
 			noTransfersAccount := unittest.RandomAddressFixture()
-			page, err := idx.TransfersByAddress(noTransfersAccount, 100, nil, nil)
+			page, err := idx.ByAddress(noTransfersAccount, 100, nil, nil)
 			require.NoError(t, err)
 			assert.Empty(t, page.Transfers)
 		})
@@ -756,7 +756,7 @@ func TestFTTransfers_SelfTransfer(t *testing.T) {
 		err := storeFTTransfers(t, lm, idx, 2, []access.FungibleTokenTransfer{transfer})
 		require.NoError(t, err)
 
-		page, err := idx.TransfersByAddress(account, 100, nil, nil)
+		page, err := idx.ByAddress(account, 100, nil, nil)
 		require.NoError(t, err)
 		assert.Len(t, page.Transfers, 1, "self-transfer should produce exactly one entry per address")
 		assert.Equal(t, transfer.TransactionID, page.Transfers[0].TransactionID)
@@ -788,7 +788,7 @@ func TestFTTransfers_LargeAmount(t *testing.T) {
 		err := storeFTTransfers(t, lm, idx, 2, []access.FungibleTokenTransfer{transfer})
 		require.NoError(t, err)
 
-		page, err := idx.TransfersByAddress(source, 100, nil, nil)
+		page, err := idx.ByAddress(source, 100, nil, nil)
 		require.NoError(t, err)
 		require.Len(t, page.Transfers, 1)
 		assert.Equal(t, 0, largeAmount.Cmp(page.Transfers[0].Amount),
@@ -817,7 +817,7 @@ func TestFTTransfers_NilAmount(t *testing.T) {
 		err := storeFTTransfers(t, lm, idx, 2, []access.FungibleTokenTransfer{transfer})
 		require.NoError(t, err)
 
-		page, err := idx.TransfersByAddress(source, 100, nil, nil)
+		page, err := idx.ByAddress(source, 100, nil, nil)
 		require.NoError(t, err)
 		require.Len(t, page.Transfers, 1)
 		// nil amount stored as empty bytes, then SetBytes on empty produces 0

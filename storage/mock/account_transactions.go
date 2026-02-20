@@ -196,12 +196,12 @@ func (_c *AccountTransactions_Store_Call) RunAndReturn(run func(lctx lockctx.Pro
 	return _c
 }
 
-// TransactionsByAddress provides a mock function for the type AccountTransactions
-func (_mock *AccountTransactions) TransactionsByAddress(account flow.Address, limit uint32, cursor *access.AccountTransactionCursor, filter storage.IndexFilter[*access.AccountTransaction]) (access.AccountTransactionsPage, error) {
+// ByAddress provides a mock function for the type AccountTransactions
+func (_mock *AccountTransactions) ByAddress(account flow.Address, limit uint32, cursor *access.AccountTransactionCursor, filter storage.IndexFilter[*access.AccountTransaction]) (access.AccountTransactionsPage, error) {
 	ret := _mock.Called(account, limit, cursor, filter)
 
 	if len(ret) == 0 {
-		panic("no return value specified for TransactionsByAddress")
+		panic("no return value specified for ByAddress")
 	}
 
 	var r0 access.AccountTransactionsPage
@@ -222,21 +222,21 @@ func (_mock *AccountTransactions) TransactionsByAddress(account flow.Address, li
 	return r0, r1
 }
 
-// AccountTransactions_TransactionsByAddress_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'TransactionsByAddress'
-type AccountTransactions_TransactionsByAddress_Call struct {
+// AccountTransactions_ByAddress_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ByAddress'
+type AccountTransactions_ByAddress_Call struct {
 	*mock.Call
 }
 
-// TransactionsByAddress is a helper method to define mock.On call
+// ByAddress is a helper method to define mock.On call
 //   - account flow.Address
 //   - limit uint32
 //   - cursor *access.AccountTransactionCursor
 //   - filter storage.IndexFilter[*access.AccountTransaction]
-func (_e *AccountTransactions_Expecter) TransactionsByAddress(account interface{}, limit interface{}, cursor interface{}, filter interface{}) *AccountTransactions_TransactionsByAddress_Call {
-	return &AccountTransactions_TransactionsByAddress_Call{Call: _e.mock.On("TransactionsByAddress", account, limit, cursor, filter)}
+func (_e *AccountTransactions_Expecter) ByAddress(account interface{}, limit interface{}, cursor interface{}, filter interface{}) *AccountTransactions_ByAddress_Call {
+	return &AccountTransactions_ByAddress_Call{Call: _e.mock.On("ByAddress", account, limit, cursor, filter)}
 }
 
-func (_c *AccountTransactions_TransactionsByAddress_Call) Run(run func(account flow.Address, limit uint32, cursor *access.AccountTransactionCursor, filter storage.IndexFilter[*access.AccountTransaction])) *AccountTransactions_TransactionsByAddress_Call {
+func (_c *AccountTransactions_ByAddress_Call) Run(run func(account flow.Address, limit uint32, cursor *access.AccountTransactionCursor, filter storage.IndexFilter[*access.AccountTransaction])) *AccountTransactions_ByAddress_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 flow.Address
 		if args[0] != nil {
@@ -264,12 +264,12 @@ func (_c *AccountTransactions_TransactionsByAddress_Call) Run(run func(account f
 	return _c
 }
 
-func (_c *AccountTransactions_TransactionsByAddress_Call) Return(accountTransactionsPage access.AccountTransactionsPage, err error) *AccountTransactions_TransactionsByAddress_Call {
+func (_c *AccountTransactions_ByAddress_Call) Return(accountTransactionsPage access.AccountTransactionsPage, err error) *AccountTransactions_ByAddress_Call {
 	_c.Call.Return(accountTransactionsPage, err)
 	return _c
 }
 
-func (_c *AccountTransactions_TransactionsByAddress_Call) RunAndReturn(run func(account flow.Address, limit uint32, cursor *access.AccountTransactionCursor, filter storage.IndexFilter[*access.AccountTransaction]) (access.AccountTransactionsPage, error)) *AccountTransactions_TransactionsByAddress_Call {
+func (_c *AccountTransactions_ByAddress_Call) RunAndReturn(run func(account flow.Address, limit uint32, cursor *access.AccountTransactionCursor, filter storage.IndexFilter[*access.AccountTransaction]) (access.AccountTransactionsPage, error)) *AccountTransactions_ByAddress_Call {
 	_c.Call.Return(run)
 	return _c
 }

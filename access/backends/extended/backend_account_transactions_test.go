@@ -48,7 +48,7 @@ func TestBackend_GetAccountTransactions(t *testing.T) {
 			NextCursor: nil,
 		}
 
-		mockStore.On("TransactionsByAddress",
+		mockStore.On("ByAddress",
 			addr, uint32(50), (*accessmodel.AccountTransactionCursor)(nil), mocktestify.Anything,
 		).Return(expectedPage, nil)
 		mockHeaders.On("ByHeight", uint64(100)).Return(unittest.BlockHeaderFixture(), nil)
@@ -76,7 +76,7 @@ func TestBackend_GetAccountTransactions(t *testing.T) {
 		}
 
 		// Expect the default page size (50)
-		mockStore.On("TransactionsByAddress",
+		mockStore.On("ByAddress",
 			addr, uint32(50), (*accessmodel.AccountTransactionCursor)(nil), mocktestify.Anything,
 		).Return(nonEmptyPage, nil)
 		mockHeaders.On("ByHeight", uint64(1)).Return(unittest.BlockHeaderFixture(), nil)
@@ -100,7 +100,7 @@ func TestBackend_GetAccountTransactions(t *testing.T) {
 		}
 
 		// Request 500, expect capped to 200
-		mockStore.On("TransactionsByAddress",
+		mockStore.On("ByAddress",
 			addr, uint32(200), (*accessmodel.AccountTransactionCursor)(nil), mocktestify.Anything,
 		).Return(nonEmptyPage, nil)
 		mockHeaders.On("ByHeight", uint64(1)).Return(unittest.BlockHeaderFixture(), nil)
@@ -124,7 +124,7 @@ func TestBackend_GetAccountTransactions(t *testing.T) {
 			},
 		}
 
-		mockStore.On("TransactionsByAddress",
+		mockStore.On("ByAddress",
 			addr, uint32(10), cursor, mocktestify.Anything,
 		).Return(nonEmptyPage, nil)
 		mockHeaders.On("ByHeight", uint64(50)).Return(blockHeader, nil)
@@ -139,7 +139,7 @@ func TestBackend_GetAccountTransactions(t *testing.T) {
 
 		addr := unittest.RandomAddressFixture()
 
-		mockStore.On("TransactionsByAddress",
+		mockStore.On("ByAddress",
 			addr, uint32(50), (*accessmodel.AccountTransactionCursor)(nil), mocktestify.Anything,
 		).Return(accessmodel.AccountTransactionsPage{}, storage.ErrNotBootstrapped)
 
@@ -157,7 +157,7 @@ func TestBackend_GetAccountTransactions(t *testing.T) {
 		addr := unittest.RandomAddressFixture()
 		cursor := &accessmodel.AccountTransactionCursor{BlockHeight: 999, TransactionIndex: 0}
 
-		mockStore.On("TransactionsByAddress",
+		mockStore.On("ByAddress",
 			addr, uint32(10), cursor, mocktestify.Anything,
 		).Return(accessmodel.AccountTransactionsPage{}, fmt.Errorf("wrapped: %w", storage.ErrHeightNotIndexed))
 
@@ -175,7 +175,7 @@ func TestBackend_GetAccountTransactions(t *testing.T) {
 		addr := unittest.RandomAddressFixture()
 		storageErr := fmt.Errorf("unexpected storage failure")
 
-		mockStore.On("TransactionsByAddress",
+		mockStore.On("ByAddress",
 			addr, uint32(50), (*accessmodel.AccountTransactionCursor)(nil), mocktestify.Anything,
 		).Return(accessmodel.AccountTransactionsPage{}, storageErr)
 

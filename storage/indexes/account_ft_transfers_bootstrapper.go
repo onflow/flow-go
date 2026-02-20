@@ -84,13 +84,13 @@ func (b *FungibleTokenTransfersBootstrapper) UninitializedFirstHeight() (uint64,
 	return store.FirstIndexedHeight(), true
 }
 
-// TransfersByAddress retrieves fungible token transfers involving the given account using
+// ByAddress retrieves fungible token transfers involving the given account using
 // cursor-based pagination. Results are returned in descending order (newest first).
 //
 // Expected error returns during normal operations:
 //   - [storage.ErrNotBootstrapped] if the index has not been initialized
 //   - [storage.ErrHeightNotIndexed] if the cursor height extends beyond indexed heights
-func (b *FungibleTokenTransfersBootstrapper) TransfersByAddress(
+func (b *FungibleTokenTransfersBootstrapper) ByAddress(
 	account flow.Address,
 	limit uint32,
 	cursor *access.TransferCursor,
@@ -100,7 +100,7 @@ func (b *FungibleTokenTransfersBootstrapper) TransfersByAddress(
 	if store == nil {
 		return access.FungibleTokenTransfersPage{}, storage.ErrNotBootstrapped
 	}
-	return store.TransfersByAddress(account, limit, cursor, filter)
+	return store.ByAddress(account, limit, cursor, filter)
 }
 
 // Store indexes all fungible token transfers for a block.

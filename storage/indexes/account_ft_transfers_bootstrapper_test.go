@@ -69,8 +69,8 @@ func TestFTBootstrapper_PreBootstrapState(t *testing.T) {
 			assert.Equal(t, uint64(0), height)
 		})
 
-		t.Run("TransfersByAddress returns ErrNotBootstrapped", func(t *testing.T) {
-			_, err := store.TransfersByAddress(unittest.RandomAddressFixture(), 100, nil, nil)
+		t.Run("ByAddress returns ErrNotBootstrapped", func(t *testing.T) {
+			_, err := store.ByAddress(unittest.RandomAddressFixture(), 100, nil, nil)
 			require.ErrorIs(t, err, storage.ErrNotBootstrapped)
 		})
 
@@ -154,7 +154,7 @@ func TestFTBootstrapper_BootstrapWithData(t *testing.T) {
 			err = storeFTBootstrapperTransfers(t, store, storageDB, firstHeight, transfers)
 			require.NoError(t, err)
 
-			page, err := store.TransfersByAddress(source, 100, nil, nil)
+			page, err := store.ByAddress(source, 100, nil, nil)
 			require.NoError(t, err)
 			require.Len(t, page.Transfers, 1)
 			assert.Equal(t, txID, page.Transfers[0].TransactionID)
@@ -206,7 +206,7 @@ func TestFTBootstrapper_BootstrapWithData(t *testing.T) {
 			})
 			require.NoError(t, err)
 
-			page, err := store.TransfersByAddress(source, 100, nil, nil)
+			page, err := store.ByAddress(source, 100, nil, nil)
 			require.NoError(t, err)
 			require.Len(t, page.Transfers, 2)
 
@@ -356,7 +356,7 @@ func TestFTBootstrapper_PersistenceAcrossRestart(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, uint64(100), first)
 
-		page, err := store.TransfersByAddress(source, 100, nil, nil)
+		page, err := store.ByAddress(source, 100, nil, nil)
 		require.NoError(t, err)
 		require.Len(t, page.Transfers, 1)
 		assert.Equal(t, txID, page.Transfers[0].TransactionID)

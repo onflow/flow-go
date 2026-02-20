@@ -68,8 +68,8 @@ func TestBootstrapper_PreBootstrapState(t *testing.T) {
 			assert.False(t, initialized)
 		})
 
-		t.Run("TransactionsByAddress returns ErrNotBootstrapped", func(t *testing.T) {
-			_, err := store.TransactionsByAddress(unittest.RandomAddressFixture(), 10, nil, nil)
+		t.Run("ByAddress returns ErrNotBootstrapped", func(t *testing.T) {
+			_, err := store.ByAddress(unittest.RandomAddressFixture(), 10, nil, nil)
 			require.ErrorIs(t, err, storage.ErrNotBootstrapped)
 		})
 	})
@@ -143,7 +143,7 @@ func TestBootstrapper_BootstrapWithData(t *testing.T) {
 			err = storeBootstrapperTx(t, store, storageDB, firstHeight, txData)
 			require.NoError(t, err)
 
-			page, err := store.TransactionsByAddress(account, 100, nil, nil)
+			page, err := store.ByAddress(account, 100, nil, nil)
 			require.NoError(t, err)
 			require.Len(t, page.Transactions, 1)
 			assert.Equal(t, txID, page.Transactions[0].TransactionID)
@@ -185,7 +185,7 @@ func TestBootstrapper_BootstrapWithData(t *testing.T) {
 			})
 			require.NoError(t, err)
 
-			page, err := store.TransactionsByAddress(account, 100, nil, nil)
+			page, err := store.ByAddress(account, 100, nil, nil)
 			require.NoError(t, err)
 			require.Len(t, page.Transactions, 2)
 
@@ -264,7 +264,7 @@ func TestBootstrapper_PersistenceAcrossRestart(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, uint64(100), first)
 
-		page, err := store.TransactionsByAddress(account, 100, nil, nil)
+		page, err := store.ByAddress(account, 100, nil, nil)
 		require.NoError(t, err)
 		require.Len(t, page.Transactions, 1)
 		assert.Equal(t, txID, page.Transactions[0].TransactionID)

@@ -121,8 +121,9 @@ func (idx *AccountTransactions) LatestIndexedHeight() uint64 {
 	return idx.latestHeight.Load()
 }
 
-// TransactionsByAddress retrieves transaction references for an account using cursor-based pagination.
+// ByAddress retrieves transaction references for an account using cursor-based pagination.
 // Results are returned in descending order (newest first).
+// Returns an empty page and no error if the account
 //
 // `limit` specifies the maximum number of results to return per page.
 //
@@ -136,7 +137,7 @@ func (idx *AccountTransactions) LatestIndexedHeight() uint64 {
 //
 // Expected error returns during normal operations:
 //   - [storage.ErrHeightNotIndexed] if the cursor height extends beyond indexed heights
-func (idx *AccountTransactions) TransactionsByAddress(
+func (idx *AccountTransactions) ByAddress(
 	account flow.Address,
 	limit uint32,
 	cursor *access.AccountTransactionCursor,

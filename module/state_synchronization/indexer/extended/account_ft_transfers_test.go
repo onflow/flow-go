@@ -27,7 +27,7 @@ type mockFTBootstrapper struct {
 	storedTransfers []access.FungibleTokenTransfer
 }
 
-func (m *mockFTBootstrapper) TransfersByAddress(flow.Address, uint32, *access.TransferCursor, storage.IndexFilter[*access.FungibleTokenTransfer]) (access.FungibleTokenTransfersPage, error) {
+func (m *mockFTBootstrapper) ByAddress(flow.Address, uint32, *access.TransferCursor, storage.IndexFilter[*access.FungibleTokenTransfer]) (access.FungibleTokenTransfersPage, error) {
 	return access.FungibleTokenTransfersPage{}, nil
 }
 

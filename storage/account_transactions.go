@@ -15,8 +15,9 @@ type IndexFilter[T any] func(T) bool
 //
 // All methods are safe for concurrent access.
 type AccountTransactionsReader interface {
-	// TransactionsByAddress retrieves transaction references for an account using cursor-based pagination.
+	// ByAddress retrieves transaction references for an account using cursor-based pagination.
 	// Results are returned in descending order (newest first).
+	// Returns an empty page and no error if the account has no transactions indexed.
 	//
 	// `limit` specifies the maximum number of results to return per page.
 	//
@@ -31,7 +32,7 @@ type AccountTransactionsReader interface {
 	// Expected error returns during normal operations:
 	//   - [ErrNotBootstrapped] if the index has not been initialized
 	//   - [storage.ErrHeightNotIndexed] if the cursor height extends beyond indexed heights
-	TransactionsByAddress(
+	ByAddress(
 		account flow.Address,
 		limit uint32,
 		cursor *accessmodel.AccountTransactionCursor,

@@ -124,7 +124,7 @@ func (idx *NonFungibleTokenTransfers) LatestIndexedHeight() uint64 {
 	return idx.latestHeight.Load()
 }
 
-// TransfersByAddress retrieves non-fungible token transfers involving the given account,
+// ByAddress retrieves non-fungible token transfers involving the given account,
 // using cursor-based pagination. Results are returned in descending order (newest first).
 //
 // If `cursor` is nil, the query starts from the latest indexed height.
@@ -132,7 +132,7 @@ func (idx *NonFungibleTokenTransfers) LatestIndexedHeight() uint64 {
 //
 // Expected error returns during normal operations:
 //   - [storage.ErrHeightNotIndexed] if the cursor height is outside of the indexed range
-func (idx *NonFungibleTokenTransfers) TransfersByAddress(
+func (idx *NonFungibleTokenTransfers) ByAddress(
 	account flow.Address,
 	limit uint32,
 	cursor *access.TransferCursor,

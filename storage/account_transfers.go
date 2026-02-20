@@ -11,10 +11,11 @@ import (
 //
 // All methods are safe for concurrent access.
 type FungibleTokenTransfersReader interface {
-	// TransfersByAddress retrieves fungible token transfers involving the given account using
+	// ByAddress retrieves fungible token transfers involving the given account using
 	// cursor-based pagination. This includes transfers where the account is either the sender
 	// or recipient.
 	// Results are returned in descending order (newest first).
+	// Returns an empty page and no error if the account has no transfers indexed.
 	//
 	// `limit` specifies the maximum number of results to return per page.
 	//
@@ -28,7 +29,7 @@ type FungibleTokenTransfersReader interface {
 	//
 	// Expected error returns during normal operations:
 	//   - [ErrHeightNotIndexed] if the cursor height extends beyond indexed heights
-	TransfersByAddress(
+	ByAddress(
 		account flow.Address,
 		limit uint32,
 		cursor *accessmodel.TransferCursor,
@@ -101,10 +102,11 @@ type FungibleTokenTransfersBootstrapper interface {
 //
 // All methods are safe for concurrent access.
 type NonFungibleTokenTransfersReader interface {
-	// TransfersByAddress retrieves non-fungible token transfers involving the given account using
+	// ByAddress retrieves non-fungible token transfers involving the given account using
 	// cursor-based pagination. This includes transfers where the account is either the sender
 	// or recipient.
 	// Results are returned in descending order (newest first).
+	// Returns an empty page and no error if the account has no transfers indexed.
 	//
 	// `limit` specifies the maximum number of results to return per page.
 	//
@@ -118,7 +120,7 @@ type NonFungibleTokenTransfersReader interface {
 	//
 	// Expected error returns during normal operations:
 	//   - [ErrHeightNotIndexed] if the cursor height extends beyond indexed heights
-	TransfersByAddress(
+	ByAddress(
 		account flow.Address,
 		limit uint32,
 		cursor *accessmodel.TransferCursor,

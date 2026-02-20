@@ -119,7 +119,7 @@ func (b *AccountTransfersBackend) GetAccountFungibleTokenTransfers(
 ) (*accessmodel.FungibleTokenTransfersPage, error) {
 	limit = b.normalizeLimit(limit)
 
-	page, err := b.ftStore.TransfersByAddress(address, limit, cursor, filter.Filter())
+	page, err := b.ftStore.ByAddress(address, limit, cursor, filter.Filter())
 	if err != nil {
 		return nil, b.mapReadError(ctx, "fungible token transfers", err)
 	}
@@ -178,7 +178,7 @@ func (b *AccountTransfersBackend) GetAccountNonFungibleTokenTransfers(
 ) (*accessmodel.NonFungibleTokenTransfersPage, error) {
 	limit = b.normalizeLimit(limit)
 
-	page, err := b.nftStore.TransfersByAddress(address, limit, cursor, filter.Filter())
+	page, err := b.nftStore.ByAddress(address, limit, cursor, filter.Filter())
 	if err != nil {
 		return nil, b.mapReadError(ctx, "non-fungible token transfers", err)
 	}

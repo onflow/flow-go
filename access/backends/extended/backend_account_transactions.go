@@ -87,7 +87,7 @@ func (b *AccountTransactionsBackend) GetAccountTransactions(
 ) (*accessmodel.AccountTransactionsPage, error) {
 	limit = b.normalizeLimit(limit)
 
-	page, err := b.store.TransactionsByAddress(address, limit, cursor, filter.Filter())
+	page, err := b.store.ByAddress(address, limit, cursor, filter.Filter())
 	if err != nil {
 		return nil, b.mapReadError(ctx, "account transactions", err)
 	}

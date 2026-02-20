@@ -73,7 +73,7 @@ func TestAccountTransactions_Initialize(t *testing.T) {
 			latest := idx.LatestIndexedHeight()
 			assert.Equal(t, uint64(1), latest)
 
-			page, err := idx.TransactionsByAddress(initialData[0].Address, 100, nil, nil)
+			page, err := idx.ByAddress(initialData[0].Address, 100, nil, nil)
 			require.NoError(t, err)
 			require.Len(t, page.Transactions, 1)
 			assert.Equal(t, initialData[0].BlockHeight, page.Transactions[0].BlockHeight)
@@ -104,7 +104,7 @@ func TestAccountTransactions_Initialize(t *testing.T) {
 
 			assert.Equal(t, uint64(1), idx.LatestIndexedHeight())
 
-			page, err := idx.TransactionsByAddress(account, 100, nil, nil)
+			page, err := idx.ByAddress(account, 100, nil, nil)
 			require.NoError(t, err)
 			require.Len(t, page.Transactions, 1)
 			assert.Equal(t, txID, page.Transactions[0].TransactionID)
@@ -133,7 +133,7 @@ func TestAccountTransactions_IndexAndQuery(t *testing.T) {
 			err := storeAccountTransactions(t, lm, idx, 2, txData)
 			require.NoError(t, err)
 
-			page, err := idx.TransactionsByAddress(account1, 100, nil, nil)
+			page, err := idx.ByAddress(account1, 100, nil, nil)
 			require.NoError(t, err)
 			require.Len(t, page.Transactions, 1)
 			assert.Equal(t, txID, page.Transactions[0].TransactionID)
@@ -192,7 +192,7 @@ func TestAccountTransactions_IndexAndQuery(t *testing.T) {
 			require.NoError(t, err)
 
 			// Query account1 (should have 2 txs)
-			page, err := idx.TransactionsByAddress(account1, 100, nil, nil)
+			page, err := idx.ByAddress(account1, 100, nil, nil)
 			require.NoError(t, err)
 			require.Len(t, page.Transactions, 2)
 
@@ -206,7 +206,7 @@ func TestAccountTransactions_IndexAndQuery(t *testing.T) {
 			assert.Equal(t, []access.TransactionRole{access.TransactionRoleAuthorizer}, page.Transactions[1].Roles)
 
 			// Query account2 (should have 2 txs, both in block 3)
-			page, err = idx.TransactionsByAddress(account2, 100, nil, nil)
+			page, err = idx.ByAddress(account2, 100, nil, nil)
 			require.NoError(t, err)
 			require.Len(t, page.Transactions, 2)
 
@@ -241,7 +241,7 @@ func TestAccountTransactions_Pagination(t *testing.T) {
 			}
 
 			// First page: limit 2
-			page1, err := idx.TransactionsByAddress(account, 2, nil, nil)
+			page1, err := idx.ByAddress(account, 2, nil, nil)
 			require.NoError(t, err)
 			require.Len(t, page1.Transactions, 2)
 			require.NotNil(t, page1.NextCursor, "should have next cursor")
@@ -250,7 +250,7 @@ func TestAccountTransactions_Pagination(t *testing.T) {
 			assert.Equal(t, uint64(5), page1.Transactions[1].BlockHeight)
 
 			// Second page: use cursor from first page
-			page2, err := idx.TransactionsByAddress(account, 2, page1.NextCursor, nil)
+			page2, err := idx.ByAddress(account, 2, page1.NextCursor, nil)
 			require.NoError(t, err)
 			require.Len(t, page2.Transactions, 2)
 			require.NotNil(t, page2.NextCursor, "should have next cursor")
@@ -259,7 +259,7 @@ func TestAccountTransactions_Pagination(t *testing.T) {
 			assert.Equal(t, uint64(3), page2.Transactions[1].BlockHeight)
 
 			// Third page: only 1 remaining
-			page3, err := idx.TransactionsByAddress(account, 2, page2.NextCursor, nil)
+			page3, err := idx.ByAddress(account, 2, page2.NextCursor, nil)
 			require.NoError(t, err)
 			require.Len(t, page3.Transactions, 1)
 			assert.Nil(t, page3.NextCursor, "no more results")
@@ -283,7 +283,7 @@ func TestAccountTransactions_Pagination(t *testing.T) {
 			require.NoError(t, err)
 
 			// Page 1: limit 2
-			page1, err := idx.TransactionsByAddress(account, 2, nil, nil)
+			page1, err := idx.ByAddress(account, 2, nil, nil)
 			require.NoError(t, err)
 			require.Len(t, page1.Transactions, 2)
 			require.NotNil(t, page1.NextCursor)
@@ -291,7 +291,7 @@ func TestAccountTransactions_Pagination(t *testing.T) {
 			assert.Equal(t, uint32(1), page1.Transactions[1].TransactionIndex)
 
 			// Page 2: remaining 1
-			page2, err := idx.TransactionsByAddress(account, 2, page1.NextCursor, nil)
+			page2, err := idx.ByAddress(account, 2, page1.NextCursor, nil)
 			require.NoError(t, err)
 			require.Len(t, page2.Transactions, 1)
 			assert.Nil(t, page2.NextCursor)
@@ -347,7 +347,7 @@ func TestAccountTransactions_PaginationWithFilter(t *testing.T) {
 			var cursor *access.AccountTransactionCursor
 
 			for page := range 3 {
-				result, err := idx.TransactionsByAddress(account, 2, cursor, authorizerOnly)
+				result, err := idx.ByAddress(account, 2, cursor, authorizerOnly)
 				require.NoError(t, err)
 				require.Len(t, result.Transactions, 2, "page %d should have 2 results", page)
 
@@ -397,7 +397,7 @@ func TestAccountTransactions_DescendingOrder(t *testing.T) {
 		}
 
 		// Query all
-		page, err := idx.TransactionsByAddress(account, 100, nil, nil)
+		page, err := idx.ByAddress(account, 100, nil, nil)
 		require.NoError(t, err)
 		require.Len(t, page.Transactions, 10)
 
@@ -445,7 +445,7 @@ func TestAccountTransactions_MultiTxSameHeightOrdering(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		page, err := idx.TransactionsByAddress(account, 100, nil, nil)
+		page, err := idx.ByAddress(account, 100, nil, nil)
 		require.NoError(t, err)
 		require.Len(t, page.Transactions, 3)
 
@@ -467,7 +467,7 @@ func TestAccountTransactions_ErrorCases(t *testing.T) {
 			account := unittest.RandomAddressFixture()
 
 			cursor := &access.AccountTransactionCursor{BlockHeight: 3, TransactionIndex: 0}
-			_, err := idx.TransactionsByAddress(account, 10, cursor, nil)
+			_, err := idx.ByAddress(account, 10, cursor, nil)
 			require.ErrorIs(t, err, storage.ErrHeightNotIndexed)
 		})
 	})
@@ -477,7 +477,7 @@ func TestAccountTransactions_ErrorCases(t *testing.T) {
 			account := unittest.RandomAddressFixture()
 
 			cursor := &access.AccountTransactionCursor{BlockHeight: 100, TransactionIndex: 0}
-			_, err := idx.TransactionsByAddress(account, 10, cursor, nil)
+			_, err := idx.ByAddress(account, 10, cursor, nil)
 			require.ErrorIs(t, err, storage.ErrHeightNotIndexed)
 		})
 	})
@@ -485,7 +485,7 @@ func TestAccountTransactions_ErrorCases(t *testing.T) {
 	t.Run("limit zero returns ErrInvalidQuery", func(t *testing.T) {
 		RunWithBootstrappedAccountTxIndex(t, 5, nil, func(_ storage.DB, _ storage.LockManager, idx *AccountTransactions) {
 			account := unittest.RandomAddressFixture()
-			_, err := idx.TransactionsByAddress(account, 0, nil, nil)
+			_, err := idx.ByAddress(account, 0, nil, nil)
 			require.ErrorIs(t, err, storage.ErrInvalidQuery)
 		})
 	})
@@ -494,7 +494,7 @@ func TestAccountTransactions_ErrorCases(t *testing.T) {
 		RunWithBootstrappedAccountTxIndex(t, 5, nil, func(_ storage.DB, _ storage.LockManager, idx *AccountTransactions) {
 			account := unittest.RandomAddressFixture()
 
-			page, err := idx.TransactionsByAddress(account, 10, nil, nil)
+			page, err := idx.ByAddress(account, 10, nil, nil)
 			require.NoError(t, err)
 			assert.Empty(t, page.Transactions)
 		})
@@ -617,7 +617,7 @@ func TestAccountTransactions_ErrorCases(t *testing.T) {
 			require.NoError(t, err)
 
 			// Verify original data is retained, not replaced
-			page, err := idx.TransactionsByAddress(account, 100, nil, nil)
+			page, err := idx.ByAddress(account, 100, nil, nil)
 			require.NoError(t, err)
 			require.Len(t, page.Transactions, 1)
 			assert.Equal(t, txID, page.Transactions[0].TransactionID)
@@ -739,7 +739,7 @@ func TestAccountTransactions_EmptyResults(t *testing.T) {
 		err := storeAccountTransactions(t, lm, idx, 2, nil)
 		require.NoError(t, err)
 
-		page, err := idx.TransactionsByAddress(account, 100, nil, nil)
+		page, err := idx.ByAddress(account, 100, nil, nil)
 		require.NoError(t, err)
 		assert.Empty(t, page.Transactions)
 	})
@@ -848,7 +848,7 @@ func TestAccountTransactions_RolesRoundTrip(t *testing.T) {
 				err := storeAccountTransactions(t, lm, idx, 2, txData)
 				require.NoError(t, err)
 
-				page, err := idx.TransactionsByAddress(account, 100, nil, nil)
+				page, err := idx.ByAddress(account, 100, nil, nil)
 				require.NoError(t, err)
 				require.Len(t, page.Transactions, 1)
 				assert.Equal(t, txID, page.Transactions[0].TransactionID)

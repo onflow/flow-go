@@ -214,12 +214,12 @@ func (_c *AccountTransactionsBootstrapper_Store_Call) RunAndReturn(run func(lctx
 	return _c
 }
 
-// TransactionsByAddress provides a mock function for the type AccountTransactionsBootstrapper
-func (_mock *AccountTransactionsBootstrapper) TransactionsByAddress(account flow.Address, limit uint32, cursor *access.AccountTransactionCursor, filter storage.IndexFilter[*access.AccountTransaction]) (access.AccountTransactionsPage, error) {
+// ByAddress provides a mock function for the type AccountTransactionsBootstrapper
+func (_mock *AccountTransactionsBootstrapper) ByAddress(account flow.Address, limit uint32, cursor *access.AccountTransactionCursor, filter storage.IndexFilter[*access.AccountTransaction]) (access.AccountTransactionsPage, error) {
 	ret := _mock.Called(account, limit, cursor, filter)
 
 	if len(ret) == 0 {
-		panic("no return value specified for TransactionsByAddress")
+		panic("no return value specified for ByAddress")
 	}
 
 	var r0 access.AccountTransactionsPage
@@ -240,21 +240,21 @@ func (_mock *AccountTransactionsBootstrapper) TransactionsByAddress(account flow
 	return r0, r1
 }
 
-// AccountTransactionsBootstrapper_TransactionsByAddress_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'TransactionsByAddress'
-type AccountTransactionsBootstrapper_TransactionsByAddress_Call struct {
+// AccountTransactionsBootstrapper_ByAddress_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ByAddress'
+type AccountTransactionsBootstrapper_ByAddress_Call struct {
 	*mock.Call
 }
 
-// TransactionsByAddress is a helper method to define mock.On call
+// ByAddress is a helper method to define mock.On call
 //   - account flow.Address
 //   - limit uint32
 //   - cursor *access.AccountTransactionCursor
 //   - filter storage.IndexFilter[*access.AccountTransaction]
-func (_e *AccountTransactionsBootstrapper_Expecter) TransactionsByAddress(account interface{}, limit interface{}, cursor interface{}, filter interface{}) *AccountTransactionsBootstrapper_TransactionsByAddress_Call {
-	return &AccountTransactionsBootstrapper_TransactionsByAddress_Call{Call: _e.mock.On("TransactionsByAddress", account, limit, cursor, filter)}
+func (_e *AccountTransactionsBootstrapper_Expecter) ByAddress(account interface{}, limit interface{}, cursor interface{}, filter interface{}) *AccountTransactionsBootstrapper_ByAddress_Call {
+	return &AccountTransactionsBootstrapper_ByAddress_Call{Call: _e.mock.On("ByAddress", account, limit, cursor, filter)}
 }
 
-func (_c *AccountTransactionsBootstrapper_TransactionsByAddress_Call) Run(run func(account flow.Address, limit uint32, cursor *access.AccountTransactionCursor, filter storage.IndexFilter[*access.AccountTransaction])) *AccountTransactionsBootstrapper_TransactionsByAddress_Call {
+func (_c *AccountTransactionsBootstrapper_ByAddress_Call) Run(run func(account flow.Address, limit uint32, cursor *access.AccountTransactionCursor, filter storage.IndexFilter[*access.AccountTransaction])) *AccountTransactionsBootstrapper_ByAddress_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 flow.Address
 		if args[0] != nil {
@@ -282,12 +282,12 @@ func (_c *AccountTransactionsBootstrapper_TransactionsByAddress_Call) Run(run fu
 	return _c
 }
 
-func (_c *AccountTransactionsBootstrapper_TransactionsByAddress_Call) Return(accountTransactionsPage access.AccountTransactionsPage, err error) *AccountTransactionsBootstrapper_TransactionsByAddress_Call {
+func (_c *AccountTransactionsBootstrapper_ByAddress_Call) Return(accountTransactionsPage access.AccountTransactionsPage, err error) *AccountTransactionsBootstrapper_ByAddress_Call {
 	_c.Call.Return(accountTransactionsPage, err)
 	return _c
 }
 
-func (_c *AccountTransactionsBootstrapper_TransactionsByAddress_Call) RunAndReturn(run func(account flow.Address, limit uint32, cursor *access.AccountTransactionCursor, filter storage.IndexFilter[*access.AccountTransaction]) (access.AccountTransactionsPage, error)) *AccountTransactionsBootstrapper_TransactionsByAddress_Call {
+func (_c *AccountTransactionsBootstrapper_ByAddress_Call) RunAndReturn(run func(account flow.Address, limit uint32, cursor *access.AccountTransactionCursor, filter storage.IndexFilter[*access.AccountTransaction]) (access.AccountTransactionsPage, error)) *AccountTransactionsBootstrapper_ByAddress_Call {
 	_c.Call.Return(run)
 	return _c
 }

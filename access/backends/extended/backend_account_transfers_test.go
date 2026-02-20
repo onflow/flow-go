@@ -51,7 +51,7 @@ func TestBackend_GetAccountFungibleTokenTransfers(t *testing.T) {
 			NextCursor: nil,
 		}
 
-		ftStore.On("TransfersByAddress", addr, uint32(50), (*accessmodel.TransferCursor)(nil), mocktestify.Anything).
+		ftStore.On("ByAddress", addr, uint32(50), (*accessmodel.TransferCursor)(nil), mocktestify.Anything).
 			Return(expectedPage, nil)
 
 		page, err := backend.GetAccountFungibleTokenTransfers(
@@ -77,7 +77,7 @@ func TestBackend_GetAccountFungibleTokenTransfers(t *testing.T) {
 		}
 
 		// Expect the default page size (50)
-		ftStore.On("TransfersByAddress", addr, defaultConfig.DefaultPageSize, (*accessmodel.TransferCursor)(nil), mocktestify.Anything).
+		ftStore.On("ByAddress", addr, defaultConfig.DefaultPageSize, (*accessmodel.TransferCursor)(nil), mocktestify.Anything).
 			Return(nonEmptyPage, nil)
 
 		_, err := backend.GetAccountFungibleTokenTransfers(
@@ -100,7 +100,7 @@ func TestBackend_GetAccountFungibleTokenTransfers(t *testing.T) {
 		}
 
 		// Request 500, expect capped to 200
-		ftStore.On("TransfersByAddress", addr, defaultConfig.MaxPageSize, (*accessmodel.TransferCursor)(nil), mocktestify.Anything).Return(nonEmptyPage, nil)
+		ftStore.On("ByAddress", addr, defaultConfig.MaxPageSize, (*accessmodel.TransferCursor)(nil), mocktestify.Anything).Return(nonEmptyPage, nil)
 
 		_, err := backend.GetAccountFungibleTokenTransfers(
 			context.Background(), addr, 500, nil, AccountFTTransferFilter{}, false, defaultEncoding,
@@ -122,7 +122,7 @@ func TestBackend_GetAccountFungibleTokenTransfers(t *testing.T) {
 			},
 		}
 
-		ftStore.On("TransfersByAddress", addr, uint32(10), cursor, mocktestify.Anything).
+		ftStore.On("ByAddress", addr, uint32(10), cursor, mocktestify.Anything).
 			Return(nonEmptyPage, nil)
 
 		_, err := backend.GetAccountFungibleTokenTransfers(
@@ -138,7 +138,7 @@ func TestBackend_GetAccountFungibleTokenTransfers(t *testing.T) {
 
 		addr := unittest.RandomAddressFixture()
 
-		ftStore.On("TransfersByAddress", addr, uint32(50), (*accessmodel.TransferCursor)(nil), mocktestify.Anything).
+		ftStore.On("ByAddress", addr, uint32(50), (*accessmodel.TransferCursor)(nil), mocktestify.Anything).
 			Return(accessmodel.FungibleTokenTransfersPage{}, storage.ErrNotBootstrapped)
 
 		_, err := backend.GetAccountFungibleTokenTransfers(
@@ -158,7 +158,7 @@ func TestBackend_GetAccountFungibleTokenTransfers(t *testing.T) {
 		addr := unittest.RandomAddressFixture()
 		cursor := &accessmodel.TransferCursor{BlockHeight: 999, TransactionIndex: 0, EventIndex: 0}
 
-		ftStore.On("TransfersByAddress", addr, uint32(10), cursor, mocktestify.Anything).
+		ftStore.On("ByAddress", addr, uint32(10), cursor, mocktestify.Anything).
 			Return(accessmodel.FungibleTokenTransfersPage{}, fmt.Errorf("wrapped: %w", storage.ErrHeightNotIndexed))
 
 		_, err := backend.GetAccountFungibleTokenTransfers(
@@ -178,7 +178,7 @@ func TestBackend_GetAccountFungibleTokenTransfers(t *testing.T) {
 		addr := unittest.RandomAddressFixture()
 		storageErr := fmt.Errorf("unexpected storage failure")
 
-		ftStore.On("TransfersByAddress", addr, uint32(50), (*accessmodel.TransferCursor)(nil), mocktestify.Anything).
+		ftStore.On("ByAddress", addr, uint32(50), (*accessmodel.TransferCursor)(nil), mocktestify.Anything).
 			Return(accessmodel.FungibleTokenTransfersPage{}, storageErr)
 
 		expectedErr := fmt.Errorf("failed to get fungible token transfers: %w", storageErr)
@@ -221,7 +221,7 @@ func TestBackend_GetAccountNonFungibleTokenTransfers(t *testing.T) {
 			NextCursor: nil,
 		}
 
-		nftStore.On("TransfersByAddress", addr, uint32(50), (*accessmodel.TransferCursor)(nil), mocktestify.Anything).
+		nftStore.On("ByAddress", addr, uint32(50), (*accessmodel.TransferCursor)(nil), mocktestify.Anything).
 			Return(expectedPage, nil)
 
 		page, err := backend.GetAccountNonFungibleTokenTransfers(
@@ -246,7 +246,7 @@ func TestBackend_GetAccountNonFungibleTokenTransfers(t *testing.T) {
 			},
 		}
 
-		nftStore.On("TransfersByAddress", addr, defaultConfig.DefaultPageSize, (*accessmodel.TransferCursor)(nil), mocktestify.Anything).
+		nftStore.On("ByAddress", addr, defaultConfig.DefaultPageSize, (*accessmodel.TransferCursor)(nil), mocktestify.Anything).
 			Return(nonEmptyPage, nil)
 
 		_, err := backend.GetAccountNonFungibleTokenTransfers(
@@ -269,7 +269,7 @@ func TestBackend_GetAccountNonFungibleTokenTransfers(t *testing.T) {
 		}
 
 		// Request 500, expect capped to 200
-		nftStore.On("TransfersByAddress", addr, defaultConfig.MaxPageSize, (*accessmodel.TransferCursor)(nil), mocktestify.Anything).
+		nftStore.On("ByAddress", addr, defaultConfig.MaxPageSize, (*accessmodel.TransferCursor)(nil), mocktestify.Anything).
 			Return(nonEmptyPage, nil)
 
 		_, err := backend.GetAccountNonFungibleTokenTransfers(
@@ -292,7 +292,7 @@ func TestBackend_GetAccountNonFungibleTokenTransfers(t *testing.T) {
 			},
 		}
 
-		nftStore.On("TransfersByAddress", addr, uint32(10), cursor, mocktestify.Anything).
+		nftStore.On("ByAddress", addr, uint32(10), cursor, mocktestify.Anything).
 			Return(nonEmptyPage, nil)
 
 		_, err := backend.GetAccountNonFungibleTokenTransfers(
@@ -308,7 +308,7 @@ func TestBackend_GetAccountNonFungibleTokenTransfers(t *testing.T) {
 
 		addr := unittest.RandomAddressFixture()
 
-		nftStore.On("TransfersByAddress", addr, uint32(50), (*accessmodel.TransferCursor)(nil), mocktestify.Anything).
+		nftStore.On("ByAddress", addr, uint32(50), (*accessmodel.TransferCursor)(nil), mocktestify.Anything).
 			Return(accessmodel.NonFungibleTokenTransfersPage{}, storage.ErrNotBootstrapped)
 
 		_, err := backend.GetAccountNonFungibleTokenTransfers(
@@ -328,7 +328,7 @@ func TestBackend_GetAccountNonFungibleTokenTransfers(t *testing.T) {
 		addr := unittest.RandomAddressFixture()
 		cursor := &accessmodel.TransferCursor{BlockHeight: 999, TransactionIndex: 0, EventIndex: 0}
 
-		nftStore.On("TransfersByAddress", addr, uint32(10), cursor, mocktestify.Anything).
+		nftStore.On("ByAddress", addr, uint32(10), cursor, mocktestify.Anything).
 			Return(accessmodel.NonFungibleTokenTransfersPage{}, fmt.Errorf("wrapped: %w", storage.ErrHeightNotIndexed))
 
 		_, err := backend.GetAccountNonFungibleTokenTransfers(
@@ -348,7 +348,7 @@ func TestBackend_GetAccountNonFungibleTokenTransfers(t *testing.T) {
 		addr := unittest.RandomAddressFixture()
 		storageErr := fmt.Errorf("unexpected storage failure")
 
-		nftStore.On("TransfersByAddress", addr, uint32(50), (*accessmodel.TransferCursor)(nil), mocktestify.Anything).
+		nftStore.On("ByAddress", addr, uint32(50), (*accessmodel.TransferCursor)(nil), mocktestify.Anything).
 			Return(accessmodel.NonFungibleTokenTransfersPage{}, storageErr)
 
 		expectedErr := fmt.Errorf("failed to get non-fungible token transfers: %w", storageErr)

@@ -214,12 +214,12 @@ func (_c *FungibleTokenTransfersBootstrapper_Store_Call) RunAndReturn(run func(l
 	return _c
 }
 
-// TransfersByAddress provides a mock function for the type FungibleTokenTransfersBootstrapper
-func (_mock *FungibleTokenTransfersBootstrapper) TransfersByAddress(account flow.Address, limit uint32, cursor *access.TransferCursor, filter storage.IndexFilter[*access.FungibleTokenTransfer]) (access.FungibleTokenTransfersPage, error) {
+// ByAddress provides a mock function for the type FungibleTokenTransfersBootstrapper
+func (_mock *FungibleTokenTransfersBootstrapper) ByAddress(account flow.Address, limit uint32, cursor *access.TransferCursor, filter storage.IndexFilter[*access.FungibleTokenTransfer]) (access.FungibleTokenTransfersPage, error) {
 	ret := _mock.Called(account, limit, cursor, filter)
 
 	if len(ret) == 0 {
-		panic("no return value specified for TransfersByAddress")
+		panic("no return value specified for ByAddress")
 	}
 
 	var r0 access.FungibleTokenTransfersPage
@@ -240,21 +240,21 @@ func (_mock *FungibleTokenTransfersBootstrapper) TransfersByAddress(account flow
 	return r0, r1
 }
 
-// FungibleTokenTransfersBootstrapper_TransfersByAddress_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'TransfersByAddress'
-type FungibleTokenTransfersBootstrapper_TransfersByAddress_Call struct {
+// FungibleTokenTransfersBootstrapper_ByAddress_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ByAddress'
+type FungibleTokenTransfersBootstrapper_ByAddress_Call struct {
 	*mock.Call
 }
 
-// TransfersByAddress is a helper method to define mock.On call
+// ByAddress is a helper method to define mock.On call
 //   - account flow.Address
 //   - limit uint32
 //   - cursor *access.TransferCursor
 //   - filter storage.IndexFilter[*access.FungibleTokenTransfer]
-func (_e *FungibleTokenTransfersBootstrapper_Expecter) TransfersByAddress(account interface{}, limit interface{}, cursor interface{}, filter interface{}) *FungibleTokenTransfersBootstrapper_TransfersByAddress_Call {
-	return &FungibleTokenTransfersBootstrapper_TransfersByAddress_Call{Call: _e.mock.On("TransfersByAddress", account, limit, cursor, filter)}
+func (_e *FungibleTokenTransfersBootstrapper_Expecter) ByAddress(account interface{}, limit interface{}, cursor interface{}, filter interface{}) *FungibleTokenTransfersBootstrapper_ByAddress_Call {
+	return &FungibleTokenTransfersBootstrapper_ByAddress_Call{Call: _e.mock.On("ByAddress", account, limit, cursor, filter)}
 }
 
-func (_c *FungibleTokenTransfersBootstrapper_TransfersByAddress_Call) Run(run func(account flow.Address, limit uint32, cursor *access.TransferCursor, filter storage.IndexFilter[*access.FungibleTokenTransfer])) *FungibleTokenTransfersBootstrapper_TransfersByAddress_Call {
+func (_c *FungibleTokenTransfersBootstrapper_ByAddress_Call) Run(run func(account flow.Address, limit uint32, cursor *access.TransferCursor, filter storage.IndexFilter[*access.FungibleTokenTransfer])) *FungibleTokenTransfersBootstrapper_ByAddress_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 flow.Address
 		if args[0] != nil {
@@ -282,12 +282,12 @@ func (_c *FungibleTokenTransfersBootstrapper_TransfersByAddress_Call) Run(run fu
 	return _c
 }
 
-func (_c *FungibleTokenTransfersBootstrapper_TransfersByAddress_Call) Return(fungibleTokenTransfersPage access.FungibleTokenTransfersPage, err error) *FungibleTokenTransfersBootstrapper_TransfersByAddress_Call {
+func (_c *FungibleTokenTransfersBootstrapper_ByAddress_Call) Return(fungibleTokenTransfersPage access.FungibleTokenTransfersPage, err error) *FungibleTokenTransfersBootstrapper_ByAddress_Call {
 	_c.Call.Return(fungibleTokenTransfersPage, err)
 	return _c
 }
 
-func (_c *FungibleTokenTransfersBootstrapper_TransfersByAddress_Call) RunAndReturn(run func(account flow.Address, limit uint32, cursor *access.TransferCursor, filter storage.IndexFilter[*access.FungibleTokenTransfer]) (access.FungibleTokenTransfersPage, error)) *FungibleTokenTransfersBootstrapper_TransfersByAddress_Call {
+func (_c *FungibleTokenTransfersBootstrapper_ByAddress_Call) RunAndReturn(run func(account flow.Address, limit uint32, cursor *access.TransferCursor, filter storage.IndexFilter[*access.FungibleTokenTransfer]) (access.FungibleTokenTransfersPage, error)) *FungibleTokenTransfersBootstrapper_ByAddress_Call {
 	_c.Call.Return(run)
 	return _c
 }

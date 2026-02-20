@@ -196,12 +196,12 @@ func (_c *NonFungibleTokenTransfers_Store_Call) RunAndReturn(run func(lctx lockc
 	return _c
 }
 
-// TransfersByAddress provides a mock function for the type NonFungibleTokenTransfers
-func (_mock *NonFungibleTokenTransfers) TransfersByAddress(account flow.Address, limit uint32, cursor *access.TransferCursor, filter storage.IndexFilter[*access.NonFungibleTokenTransfer]) (access.NonFungibleTokenTransfersPage, error) {
+// ByAddress provides a mock function for the type NonFungibleTokenTransfers
+func (_mock *NonFungibleTokenTransfers) ByAddress(account flow.Address, limit uint32, cursor *access.TransferCursor, filter storage.IndexFilter[*access.NonFungibleTokenTransfer]) (access.NonFungibleTokenTransfersPage, error) {
 	ret := _mock.Called(account, limit, cursor, filter)
 
 	if len(ret) == 0 {
-		panic("no return value specified for TransfersByAddress")
+		panic("no return value specified for ByAddress")
 	}
 
 	var r0 access.NonFungibleTokenTransfersPage
@@ -222,21 +222,21 @@ func (_mock *NonFungibleTokenTransfers) TransfersByAddress(account flow.Address,
 	return r0, r1
 }
 
-// NonFungibleTokenTransfers_TransfersByAddress_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'TransfersByAddress'
-type NonFungibleTokenTransfers_TransfersByAddress_Call struct {
+// NonFungibleTokenTransfers_ByAddress_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ByAddress'
+type NonFungibleTokenTransfers_ByAddress_Call struct {
 	*mock.Call
 }
 
-// TransfersByAddress is a helper method to define mock.On call
+// ByAddress is a helper method to define mock.On call
 //   - account flow.Address
 //   - limit uint32
 //   - cursor *access.TransferCursor
 //   - filter storage.IndexFilter[*access.NonFungibleTokenTransfer]
-func (_e *NonFungibleTokenTransfers_Expecter) TransfersByAddress(account interface{}, limit interface{}, cursor interface{}, filter interface{}) *NonFungibleTokenTransfers_TransfersByAddress_Call {
-	return &NonFungibleTokenTransfers_TransfersByAddress_Call{Call: _e.mock.On("TransfersByAddress", account, limit, cursor, filter)}
+func (_e *NonFungibleTokenTransfers_Expecter) ByAddress(account interface{}, limit interface{}, cursor interface{}, filter interface{}) *NonFungibleTokenTransfers_ByAddress_Call {
+	return &NonFungibleTokenTransfers_ByAddress_Call{Call: _e.mock.On("ByAddress", account, limit, cursor, filter)}
 }
 
-func (_c *NonFungibleTokenTransfers_TransfersByAddress_Call) Run(run func(account flow.Address, limit uint32, cursor *access.TransferCursor, filter storage.IndexFilter[*access.NonFungibleTokenTransfer])) *NonFungibleTokenTransfers_TransfersByAddress_Call {
+func (_c *NonFungibleTokenTransfers_ByAddress_Call) Run(run func(account flow.Address, limit uint32, cursor *access.TransferCursor, filter storage.IndexFilter[*access.NonFungibleTokenTransfer])) *NonFungibleTokenTransfers_ByAddress_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 flow.Address
 		if args[0] != nil {
@@ -264,12 +264,12 @@ func (_c *NonFungibleTokenTransfers_TransfersByAddress_Call) Run(run func(accoun
 	return _c
 }
 
-func (_c *NonFungibleTokenTransfers_TransfersByAddress_Call) Return(nonFungibleTokenTransfersPage access.NonFungibleTokenTransfersPage, err error) *NonFungibleTokenTransfers_TransfersByAddress_Call {
+func (_c *NonFungibleTokenTransfers_ByAddress_Call) Return(nonFungibleTokenTransfersPage access.NonFungibleTokenTransfersPage, err error) *NonFungibleTokenTransfers_ByAddress_Call {
 	_c.Call.Return(nonFungibleTokenTransfersPage, err)
 	return _c
 }
 
-func (_c *NonFungibleTokenTransfers_TransfersByAddress_Call) RunAndReturn(run func(account flow.Address, limit uint32, cursor *access.TransferCursor, filter storage.IndexFilter[*access.NonFungibleTokenTransfer]) (access.NonFungibleTokenTransfersPage, error)) *NonFungibleTokenTransfers_TransfersByAddress_Call {
+func (_c *NonFungibleTokenTransfers_ByAddress_Call) RunAndReturn(run func(account flow.Address, limit uint32, cursor *access.TransferCursor, filter storage.IndexFilter[*access.NonFungibleTokenTransfer]) (access.NonFungibleTokenTransfersPage, error)) *NonFungibleTokenTransfers_ByAddress_Call {
 	_c.Call.Return(run)
 	return _c
 }

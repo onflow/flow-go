@@ -126,7 +126,7 @@ func (idx *FungibleTokenTransfers) LatestIndexedHeight() uint64 {
 	return idx.latestHeight.Load()
 }
 
-// TransfersByAddress retrieves fungible token transfers involving the given account using cursor-based
+// ByAddress retrieves fungible token transfers involving the given account using cursor-based
 // pagination. Results are returned in descending order (newest first).
 //
 // `limit` specifies the maximum number of results to return per page.
@@ -141,7 +141,7 @@ func (idx *FungibleTokenTransfers) LatestIndexedHeight() uint64 {
 //
 // Expected error returns during normal operations:
 //   - [storage.ErrHeightNotIndexed] if the cursor height extends beyond indexed heights
-func (idx *FungibleTokenTransfers) TransfersByAddress(
+func (idx *FungibleTokenTransfers) ByAddress(
 	account flow.Address,
 	limit uint32,
 	cursor *access.TransferCursor,
