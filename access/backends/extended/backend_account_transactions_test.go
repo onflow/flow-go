@@ -127,7 +127,7 @@ func TestBackend_GetAccountTransactions(t *testing.T) {
 		mockStore.On("TransactionsByAddress",
 			addr, uint32(10), cursor, mocktestify.Anything,
 		).Return(nonEmptyPage, nil)
-		mockHeaders.On("ByHeight", uint64(50)).Return(unittest.BlockHeaderFixture(), nil)
+		mockHeaders.On("ByHeight", uint64(50)).Return(blockHeader, nil)
 
 		_, err := backend.GetAccountTransactions(context.Background(), addr, 10, cursor, AccountTransactionFilter{}, false, defaultEncoding)
 		require.NoError(t, err)
