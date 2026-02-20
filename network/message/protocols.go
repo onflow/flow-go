@@ -1,5 +1,7 @@
 package message
 
+import "slices"
+
 const (
 	// ProtocolTypeUnicast is protocol type for unicast messages.
 	ProtocolTypeUnicast ProtocolType = "unicast"
@@ -20,11 +22,5 @@ type Protocols []ProtocolType
 
 // Contains returns true if the protocol is in the list of Protocols.
 func (pr Protocols) Contains(protocol ProtocolType) bool {
-	for _, p := range pr {
-		if p == protocol {
-			return true
-		}
-	}
-
-	return false
+	return slices.Contains(pr, protocol)
 }
