@@ -29,7 +29,7 @@ func TestBackend_GetAccountTransactions(t *testing.T) {
 	t.Run("happy path returns page from storage", func(t *testing.T) {
 		mockStore := storagemock.NewAccountTransactionsReader(t)
 		mockHeaders := storagemock.NewHeaders(t)
-		backend := NewAccountTransactionsBackend(unittest.Logger(), &backendBase{config: DefaultConfig(), headers: mockHeaders}, mockStore)
+		backend := NewAccountTransactionsBackend(unittest.Logger(), &backendBase{config: DefaultConfig(), headers: mockHeaders}, mockStore, flow.Testnet.Chain())
 
 		addr := unittest.RandomAddressFixture()
 		txID := unittest.IdentifierFixture()
@@ -51,7 +51,7 @@ func TestBackend_GetAccountTransactions(t *testing.T) {
 		mockStore.On("ByAddress",
 			addr, uint32(50), (*accessmodel.AccountTransactionCursor)(nil), mocktestify.Anything,
 		).Return(expectedPage, nil)
-		mockHeaders.On("ByHeight", uint64(100)).Return(unittest.BlockHeaderFixture(), nil)
+		mockHeaders.On("ByHeight", blockHeader.Height).Return(blockHeader, nil)
 
 		page, err := backend.GetAccountTransactions(context.Background(), addr, 0, nil, AccountTransactionFilter{}, false, defaultEncoding)
 		require.NoError(t, err)
@@ -64,7 +64,7 @@ func TestBackend_GetAccountTransactions(t *testing.T) {
 	t.Run("default limit applied when limit is 0", func(t *testing.T) {
 		mockStore := storagemock.NewAccountTransactionsReader(t)
 		mockHeaders := storagemock.NewHeaders(t)
-		backend := NewAccountTransactionsBackend(unittest.Logger(), &backendBase{config: DefaultConfig(), headers: mockHeaders}, mockStore)
+		backend := NewAccountTransactionsBackend(unittest.Logger(), &backendBase{config: DefaultConfig(), headers: mockHeaders}, mockStore, flow.Testnet.Chain())
 
 		addr := unittest.RandomAddressFixture()
 		blockHeader := unittest.BlockHeaderFixture()
@@ -79,40 +79,29 @@ func TestBackend_GetAccountTransactions(t *testing.T) {
 		mockStore.On("ByAddress",
 			addr, uint32(50), (*accessmodel.AccountTransactionCursor)(nil), mocktestify.Anything,
 		).Return(nonEmptyPage, nil)
-		mockHeaders.On("ByHeight", uint64(1)).Return(unittest.BlockHeaderFixture(), nil)
+		mockHeaders.On("ByHeight", blockHeader.Height).Return(unittest.BlockHeaderFixture(), nil)
 
 		_, err := backend.GetAccountTransactions(context.Background(), addr, 0, nil, AccountTransactionFilter{}, false, defaultEncoding)
 		require.NoError(t, err)
 	})
 
-	t.Run("max limit cap applied", func(t *testing.T) {
+	t.Run("limit exceeding max returns InvalidArgument", func(t *testing.T) {
 		mockStore := storagemock.NewAccountTransactionsReader(t)
-		mockHeaders := storagemock.NewHeaders(t)
-		backend := NewAccountTransactionsBackend(unittest.Logger(), &backendBase{config: DefaultConfig(), headers: mockHeaders}, mockStore)
+		backend := NewAccountTransactionsBackend(unittest.Logger(), &backendBase{config: DefaultConfig()}, mockStore, flow.Testnet.Chain())
 
 		addr := unittest.RandomAddressFixture()
-		blockHeader := unittest.BlockHeaderFixture()
-
-		nonEmptyPage := accessmodel.AccountTransactionsPage{
-			Transactions: []accessmodel.AccountTransaction{
-				{Address: addr, BlockHeight: blockHeader.Height, TransactionID: unittest.IdentifierFixture()},
-			},
-		}
-
-		// Request 500, expect capped to 200
-		mockStore.On("ByAddress",
-			addr, uint32(200), (*accessmodel.AccountTransactionCursor)(nil), mocktestify.Anything,
-		).Return(nonEmptyPage, nil)
-		mockHeaders.On("ByHeight", uint64(1)).Return(unittest.BlockHeaderFixture(), nil)
 
 		_, err := backend.GetAccountTransactions(context.Background(), addr, 500, nil, AccountTransactionFilter{}, false, defaultEncoding)
-		require.NoError(t, err)
+		require.Error(t, err)
+		st, ok := status.FromError(err)
+		require.True(t, ok)
+		assert.Equal(t, codes.InvalidArgument, st.Code())
 	})
 
 	t.Run("cursor is forwarded to storage", func(t *testing.T) {
 		mockStore := storagemock.NewAccountTransactionsReader(t)
 		mockHeaders := storagemock.NewHeaders(t)
-		backend := NewAccountTransactionsBackend(unittest.Logger(), &backendBase{config: DefaultConfig(), headers: mockHeaders}, mockStore)
+		backend := NewAccountTransactionsBackend(unittest.Logger(), &backendBase{config: DefaultConfig(), headers: mockHeaders}, mockStore, flow.Testnet.Chain())
 
 		addr := unittest.RandomAddressFixture()
 		cursor := &accessmodel.AccountTransactionCursor{BlockHeight: 50, TransactionIndex: 3}
@@ -133,9 +122,37 @@ func TestBackend_GetAccountTransactions(t *testing.T) {
 		require.NoError(t, err)
 	})
 
+	t.Run("invalid address returns NotFound", func(t *testing.T) {
+		mockStore := storagemock.NewAccountTransactionsReader(t)
+		backend := NewAccountTransactionsBackend(unittest.Logger(), &backendBase{config: DefaultConfig()}, mockStore, flow.Testnet.Chain())
+
+		addr := unittest.InvalidAddressFixture()
+
+		_, err := backend.GetAccountTransactions(context.Background(), addr, 0, nil, AccountTransactionFilter{}, false, defaultEncoding)
+		require.Error(t, err)
+		st, ok := status.FromError(err)
+		require.True(t, ok)
+		assert.Equal(t, codes.NotFound, st.Code())
+	})
+
+	t.Run("empty results with valid address returns empty page", func(t *testing.T) {
+		mockStore := storagemock.NewAccountTransactionsReader(t)
+		backend := NewAccountTransactionsBackend(unittest.Logger(), &backendBase{config: DefaultConfig()}, mockStore, flow.Testnet.Chain())
+
+		addr := unittest.RandomAddressFixture()
+
+		mockStore.On("ByAddress",
+			addr, uint32(50), (*accessmodel.AccountTransactionCursor)(nil), mocktestify.Anything,
+		).Return(accessmodel.AccountTransactionsPage{}, nil)
+
+		page, err := backend.GetAccountTransactions(context.Background(), addr, 0, nil, AccountTransactionFilter{}, false, defaultEncoding)
+		require.NoError(t, err)
+		assert.Empty(t, page.Transactions)
+	})
+
 	t.Run("ErrNotBootstrapped maps to FailedPrecondition", func(t *testing.T) {
 		mockStore := storagemock.NewAccountTransactionsReader(t)
-		backend := NewAccountTransactionsBackend(unittest.Logger(), &backendBase{config: DefaultConfig()}, mockStore)
+		backend := NewAccountTransactionsBackend(unittest.Logger(), &backendBase{config: DefaultConfig()}, mockStore, flow.Testnet.Chain())
 
 		addr := unittest.RandomAddressFixture()
 
@@ -152,7 +169,7 @@ func TestBackend_GetAccountTransactions(t *testing.T) {
 
 	t.Run("ErrHeightNotIndexed maps to OutOfRange", func(t *testing.T) {
 		mockStore := storagemock.NewAccountTransactionsReader(t)
-		backend := NewAccountTransactionsBackend(unittest.Logger(), &backendBase{config: DefaultConfig()}, mockStore)
+		backend := NewAccountTransactionsBackend(unittest.Logger(), &backendBase{config: DefaultConfig()}, mockStore, flow.Testnet.Chain())
 
 		addr := unittest.RandomAddressFixture()
 		cursor := &accessmodel.AccountTransactionCursor{BlockHeight: 999, TransactionIndex: 0}
@@ -170,7 +187,7 @@ func TestBackend_GetAccountTransactions(t *testing.T) {
 
 	t.Run("unexpected error triggers irrecoverable", func(t *testing.T) {
 		mockStore := storagemock.NewAccountTransactionsReader(t)
-		backend := NewAccountTransactionsBackend(unittest.Logger(), &backendBase{config: DefaultConfig()}, mockStore)
+		backend := NewAccountTransactionsBackend(unittest.Logger(), &backendBase{config: DefaultConfig()}, mockStore, flow.Testnet.Chain())
 
 		addr := unittest.RandomAddressFixture()
 		storageErr := fmt.Errorf("unexpected storage failure")
