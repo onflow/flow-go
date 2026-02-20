@@ -64,7 +64,7 @@ func run(*cobra.Command, []string) {
 
 	code, err := os.ReadFile(flagScript)
 	if err != nil {
-		log.Fatal().Err(err).Msgf("failed to read script from file %s", flagScript)
+		log.Fatal().Err(err).Msgf("Failed to read script from file %s", flagScript)
 	}
 
 	accessConn, err := grpc.NewClient(
@@ -72,7 +72,7 @@ func run(*cobra.Command, []string) {
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 	)
 	if err != nil {
-		log.Fatal().Err(err).Msg("failed to create access connection")
+		log.Fatal().Err(err).Msg("Failed to create access connection")
 	}
 	defer accessConn.Close()
 
@@ -80,14 +80,14 @@ func run(*cobra.Command, []string) {
 
 	blockID, err := flow.HexStringToIdentifier(flagBlockID)
 	if err != nil {
-		log.Fatal().Err(err).Msg("failed to parse block ID")
+		log.Fatal().Err(err).Msg("Failed to parse block ID")
 	}
 
 	log.Info().Msgf("Fetching block header for %s ...", blockID)
 
 	blockHeader, err := debug.GetAccessAPIBlockHeader(context.Background(), accessClient, blockID)
 	if err != nil {
-		log.Fatal().Err(err).Msg("failed to fetch block header")
+		log.Fatal().Err(err).Msg("Failed to fetch block header")
 	}
 
 	log.Info().Msgf(
@@ -102,16 +102,16 @@ func run(*cobra.Command, []string) {
 	} else if flagExecutionAddress != "" {
 		remoteClient, err = debug.NewExecutionNodeRemoteClient(flagExecutionAddress)
 	} else {
-		log.Fatal().Msg("either --use-execution-data-api or --execution-address must be provided")
+		log.Fatal().Msg("Either --use-execution-data-api or --execution-address must be provided")
 	}
 	if err != nil {
-		log.Fatal().Err(err).Msg("failed to remote client")
+		log.Fatal().Err(err).Msg("Failed to create remote client")
 	}
 	defer remoteClient.Close()
 
 	remoteSnapshot, err := remoteClient.StorageSnapshot(blockHeader.Height, blockID)
 	if err != nil {
-		log.Fatal().Err(err).Msg("failed to create storage snapshot")
+		log.Fatal().Err(err).Msg("Failed to create storage snapshot")
 	}
 
 	blockSnapshot := debug.NewCachingStorageSnapshot(remoteSnapshot)
@@ -126,11 +126,13 @@ func run(*cobra.Command, []string) {
 
 	result, err := debugger.RunScript(code, arguments, blockSnapshot, blockHeader)
 	if err != nil {
-		log.Fatal().Err(err).Msg("failed to run script")
+		log.Fatal().Err(err).Msg("Failed to run script")
 	}
 
 	if result.Output.Err != nil {
-		log.Fatal().Err(result.Output.Err).Msg("script execution failed")
+		log.Fatal().Err(result.Output.Err).Msg("Script execution failed")
+	} else {
+		log.Info().Msg("Script executed successfully")
 	}
 
 	log.Info().Msgf("Result: %s", result.Output.Value)
