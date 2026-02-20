@@ -177,7 +177,7 @@ func (c *ExtendedIndexer) IndexBlockData(
 	c.latestBlockData = &BlockData{
 		Header:       header,
 		Transactions: transactions,
-		Events:       groupEventsByTxIndex(events),
+		Events:       events,
 	}
 	c.notifier.Notify()
 
@@ -379,7 +379,7 @@ func (c *ExtendedIndexer) blockDataFromStorage(height uint64) (BlockData, error)
 	return BlockData{
 		Header:       header,
 		Transactions: transactions,
-		Events:       groupEventsByTxIndex(events),
+		Events:       events,
 	}, nil
 }
 

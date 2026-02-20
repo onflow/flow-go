@@ -67,7 +67,7 @@ func (a *NonFungibleTokenTransfers) IndexBlockData(lctx lockctx.Proof, data Bloc
 		return ErrAlreadyIndexed
 	}
 
-	nftEntries, err := a.nftParser.Parse(flattenEvents(data.Events), data.Header.Height)
+	nftEntries, err := a.nftParser.Parse(data.Events, data.Header.Height)
 	if err != nil {
 		return fmt.Errorf("failed to parse non-fungible token transfers: %w", err)
 	}

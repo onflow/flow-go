@@ -130,6 +130,8 @@ func (a *AccountTransactions) buildAccountTransactionsFromBlockData(data BlockDa
 		addrRoles[addr] = append(addrRoles[addr], role)
 	}
 
+	eventsByTxIndex := groupEventsByTxIndex(data.Events)
+
 	// By the Flow protocol, system chunk transactions always appear after all user transactions
 	// in a block. Once the first system transaction is encountered, all subsequent transactions
 	// are also part of the system chunk.
@@ -159,7 +161,7 @@ func (a *AccountTransactions) buildAccountTransactionsFromBlockData(data BlockDa
 		}
 
 		seen := make(map[flow.Address]struct{})
-		for _, event := range data.Events[txIndex] {
+		for _, event := range eventsByTxIndex[txIndex] {
 			eventAddresses, err := a.extractAddresses(event)
 			if err != nil {
 				return nil, fmt.Errorf("failed to extract addresses from event: %w", err)

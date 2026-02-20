@@ -76,7 +76,7 @@ func (a *FungibleTokenTransfers) IndexBlockData(lctx lockctx.Proof, data BlockDa
 		return ErrAlreadyIndexed
 	}
 
-	ftEntries, err := a.ftParser.Parse(flattenEvents(data.Events), data.Header.Height)
+	ftEntries, err := a.ftParser.Parse(data.Events, data.Header.Height)
 	if err != nil {
 		return fmt.Errorf("failed to parse fungible token transfers: %w", err)
 	}

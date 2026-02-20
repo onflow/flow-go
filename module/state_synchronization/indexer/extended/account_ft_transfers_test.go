@@ -192,7 +192,7 @@ func TestFungibleTokenTransfers_IndexBlockData(t *testing.T) {
 
 		data := BlockData{
 			Header: unittest.BlockHeaderFixture(unittest.WithHeaderHeight(100)),
-			Events: map[uint32][]flow.Event{},
+			Events: []flow.Event{},
 		}
 
 		err := a.IndexBlockData(nil, data, nil)
@@ -207,7 +207,7 @@ func TestFungibleTokenTransfers_IndexBlockData(t *testing.T) {
 
 		data := BlockData{
 			Header: unittest.BlockHeaderFixture(unittest.WithHeaderHeight(101)), // next expected is 100
-			Events: map[uint32][]flow.Event{},
+			Events: []flow.Event{},
 		}
 
 		err := a.IndexBlockData(nil, data, nil)
@@ -220,7 +220,7 @@ func TestFungibleTokenTransfers_IndexBlockData(t *testing.T) {
 
 		data := BlockData{
 			Header: unittest.BlockHeaderFixture(unittest.WithHeaderHeight(99)), // next expected is 100
-			Events: map[uint32][]flow.Event{},
+			Events: []flow.Event{},
 		}
 
 		err := a.IndexBlockData(nil, data, nil)
@@ -234,7 +234,7 @@ func TestFungibleTokenTransfers_IndexBlockData(t *testing.T) {
 
 		data := BlockData{
 			Header: unittest.BlockHeaderFixture(unittest.WithHeaderHeight(100)),
-			Events: map[uint32][]flow.Event{},
+			Events: []flow.Event{},
 		}
 
 		err := a.IndexBlockData(nil, data, nil)
@@ -249,7 +249,7 @@ func TestFungibleTokenTransfers_IndexBlockData(t *testing.T) {
 
 		data := BlockData{
 			Header: unittest.BlockHeaderFixture(unittest.WithHeaderHeight(100)),
-			Events: map[uint32][]flow.Event{},
+			Events: []flow.Event{},
 		}
 
 		err := a.IndexBlockData(nil, data, nil)
@@ -270,12 +270,10 @@ func TestFungibleTokenTransfers_IndexBlockData(t *testing.T) {
 
 		data := BlockData{
 			Header: unittest.BlockHeaderFixture(unittest.WithHeaderHeight(100)),
-			Events: map[uint32][]flow.Event{
-				0: {
-					testutil.MakeFTWithdrawnEvent(t, flow.Testnet, &payer, txID, 0, 0, 1, 50, feeAmount),
-					testutil.MakeFTDepositedEvent(t, flow.Testnet, &flowFeesAddress, txID, 0, 1, 50, feeAmount),
-					testutil.MakeFlowFeesEvent(t, flow.Testnet, txID, 0, 2, feeAmount),
-				},
+			Events: []flow.Event{
+				testutil.MakeFTWithdrawnEvent(t, flow.Testnet, &payer, txID, 0, 0, 1, 50, feeAmount),
+				testutil.MakeFTDepositedEvent(t, flow.Testnet, &flowFeesAddress, txID, 0, 1, 50, feeAmount),
+				testutil.MakeFlowFeesEvent(t, flow.Testnet, txID, 0, 2, feeAmount),
 			},
 		}
 
@@ -298,12 +296,10 @@ func TestFungibleTokenTransfers_IndexBlockData(t *testing.T) {
 
 		data := BlockData{
 			Header: unittest.BlockHeaderFixture(unittest.WithHeaderHeight(100)),
-			Events: map[uint32][]flow.Event{
-				0: {
-					testutil.MakeFTWithdrawnEvent(t, flow.Testnet, &payer, txID, 0, 0, 1, 50, amount),
-					testutil.MakeFTDepositedEvent(t, flow.Testnet, &flowFeesAddress, txID, 0, 1, 50, amount),
-					// No FeesDeducted event — treated as a regular transfer.
-				},
+			Events: []flow.Event{
+				testutil.MakeFTWithdrawnEvent(t, flow.Testnet, &payer, txID, 0, 0, 1, 50, amount),
+				testutil.MakeFTDepositedEvent(t, flow.Testnet, &flowFeesAddress, txID, 0, 1, 50, amount),
+				// No FeesDeducted event — treated as a regular transfer.
 			},
 		}
 

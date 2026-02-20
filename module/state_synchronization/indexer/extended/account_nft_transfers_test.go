@@ -113,7 +113,7 @@ func TestNonFungibleTokenTransfers_IndexBlockData(t *testing.T) {
 
 		data := BlockData{
 			Header: unittest.BlockHeaderFixture(unittest.WithHeaderHeight(100)),
-			Events: map[uint32][]flow.Event{},
+			Events: []flow.Event{},
 		}
 
 		err := a.IndexBlockData(nil, data, nil)
@@ -128,7 +128,7 @@ func TestNonFungibleTokenTransfers_IndexBlockData(t *testing.T) {
 
 		data := BlockData{
 			Header: unittest.BlockHeaderFixture(unittest.WithHeaderHeight(101)), // next expected is 100
-			Events: map[uint32][]flow.Event{},
+			Events: []flow.Event{},
 		}
 
 		err := a.IndexBlockData(nil, data, nil)
@@ -141,7 +141,7 @@ func TestNonFungibleTokenTransfers_IndexBlockData(t *testing.T) {
 
 		data := BlockData{
 			Header: unittest.BlockHeaderFixture(unittest.WithHeaderHeight(99)), // next expected is 100
-			Events: map[uint32][]flow.Event{},
+			Events: []flow.Event{},
 		}
 
 		err := a.IndexBlockData(nil, data, nil)
@@ -155,7 +155,7 @@ func TestNonFungibleTokenTransfers_IndexBlockData(t *testing.T) {
 
 		data := BlockData{
 			Header: unittest.BlockHeaderFixture(unittest.WithHeaderHeight(100)),
-			Events: map[uint32][]flow.Event{},
+			Events: []flow.Event{},
 		}
 
 		err := a.IndexBlockData(nil, data, nil)
@@ -170,7 +170,7 @@ func TestNonFungibleTokenTransfers_IndexBlockData(t *testing.T) {
 
 		data := BlockData{
 			Header: unittest.BlockHeaderFixture(unittest.WithHeaderHeight(100)),
-			Events: map[uint32][]flow.Event{},
+			Events: []flow.Event{},
 		}
 
 		err := a.IndexBlockData(nil, data, nil)
