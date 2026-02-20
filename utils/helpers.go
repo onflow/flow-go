@@ -4,7 +4,7 @@ import "reflect"
 
 // IsNil checks if the input is nil, and works for any type including interfaces.
 // This method uses reflection. Avoid use in performance-critical code.
-func IsNil(v interface{}) bool {
+func IsNil(v any) bool {
 	if v == nil {
 		return true
 	}

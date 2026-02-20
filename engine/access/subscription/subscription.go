@@ -39,7 +39,7 @@ const (
 // - storage.ErrNotFound
 // - execution_data.BlobNotFoundError
 // All other errors are considered exceptions
-type GetDataByHeightFunc func(ctx context.Context, height uint64) (interface{}, error)
+type GetDataByHeightFunc func(ctx context.Context, height uint64) (any, error)
 
 // Subscription represents a streaming request, and handles the communication between the grpc handler
 // and the backend implementation.
@@ -48,7 +48,7 @@ type Subscription interface {
 	ID() string
 
 	// Channel returns the channel from which subscription data can be read
-	Channel() <-chan interface{}
+	Channel() <-chan any
 
 	// Err returns the error that caused the subscription to fail
 	Err() error
@@ -67,9 +67,9 @@ type Streamable interface {
 	// Expected errors:
 	// - context.DeadlineExceeded if send timed out
 	// - context.Canceled if the client disconnected
-	Send(context.Context, interface{}, time.Duration) error
+	Send(context.Context, any, time.Duration) error
 	// Next returns the value for the next height from the subscription
-	Next(context.Context) (interface{}, error)
+	Next(context.Context) (any, error)
 }
 
 var _ Subscription = (*SubscriptionImpl)(nil)
@@ -78,7 +78,7 @@ type SubscriptionImpl struct {
 	id string
 
 	// ch is the channel used to pass data to the receiver
-	ch chan interface{}
+	ch chan any
 
 	// err is the error that caused the subscription to fail
 	err error
@@ -93,7 +93,7 @@ type SubscriptionImpl struct {
 func NewSubscription(bufferSize int) *SubscriptionImpl {
 	return &SubscriptionImpl{
 		id: uuid.New().String(),
-		ch: make(chan interface{}, bufferSize),
+		ch: make(chan any, bufferSize),
 	}
 }
 
@@ -104,7 +104,7 @@ func (sub *SubscriptionImpl) ID() string {
 }
 
 // Channel returns the channel from which subscription data can be read
-func (sub *SubscriptionImpl) Channel() <-chan interface{} {
+func (sub *SubscriptionImpl) Channel() <-chan any {
 	return sub.ch
 }
 
@@ -131,7 +131,7 @@ func (sub *SubscriptionImpl) Close() {
 // Expected errors:
 // - context.DeadlineExceeded if send timed out
 // - context.Canceled if the client disconnected
-func (sub *SubscriptionImpl) Send(ctx context.Context, v interface{}, timeout time.Duration) error {
+func (sub *SubscriptionImpl) Send(ctx context.Context, v any, timeout time.Duration) error {
 	if sub.closed {
 		return fmt.Errorf("subscription closed")
 	}
@@ -182,7 +182,7 @@ func NewHeightBasedSubscription(bufferSize int, firstHeight uint64, getData GetD
 }
 
 // Next returns the value for the next height from the subscription
-func (s *HeightBasedSubscription) Next(ctx context.Context) (interface{}, error) {
+func (s *HeightBasedSubscription) Next(ctx context.Context) (any, error) {
 	v, err := s.getData(ctx, s.nextHeight)
 	if err != nil {
 		return nil, fmt.Errorf("could not get data for height %d: %w", s.nextHeight, err)

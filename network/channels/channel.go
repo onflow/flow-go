@@ -2,6 +2,7 @@ package channels
 
 import (
 	"regexp"
+	"slices"
 )
 
 // Channel specifies a virtual and isolated communication medium.
@@ -35,12 +36,7 @@ func (cl ChannelList) Swap(i, j int) {
 
 // Contains returns true if the ChannelList contains the given channel.
 func (cl ChannelList) Contains(channel Channel) bool {
-	for _, c := range cl {
-		if c == channel {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(cl, channel)
 }
 
 // ExcludeChannels returns list of channels that are in the ChannelList but not in the other list.

@@ -121,7 +121,7 @@ func (h *HttpHandler) ErrorHandler(w http.ResponseWriter, err error, errorLogger
 }
 
 // JsonResponse builds a JSON response and send it to the client
-func (h *HttpHandler) JsonResponse(w http.ResponseWriter, code int, response interface{}, errLogger zerolog.Logger) {
+func (h *HttpHandler) JsonResponse(w http.ResponseWriter, code int, response any, errLogger zerolog.Logger) {
 	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
 
 	// serialize response to JSON and handler errors

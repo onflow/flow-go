@@ -737,16 +737,7 @@ func (a *Account) Nonce() uint64 {
 }
 
 func (a *Account) nonce() (uint64, error) {
-	bp, err := a.fch.getBlockProposal()
-	if err != nil {
-		return 0, err
-	}
-	ctx, err := a.fch.getBlockContext(bp)
-	if err != nil {
-		return 0, err
-	}
-
-	blk, err := a.fch.emulator.NewReadOnlyBlockView(ctx)
+	blk, err := a.fch.emulator.NewReadOnlyBlockView()
 	if err != nil {
 		return 0, err
 	}
@@ -765,17 +756,7 @@ func (a *Account) Balance() types.Balance {
 }
 
 func (a *Account) balance() (types.Balance, error) {
-	bp, err := a.fch.getBlockProposal()
-	if err != nil {
-		return nil, err
-	}
-
-	ctx, err := a.fch.getBlockContext(bp)
-	if err != nil {
-		return nil, err
-	}
-
-	blk, err := a.fch.emulator.NewReadOnlyBlockView(ctx)
+	blk, err := a.fch.emulator.NewReadOnlyBlockView()
 	if err != nil {
 		return nil, err
 	}
@@ -795,17 +776,7 @@ func (a *Account) Code() types.Code {
 }
 
 func (a *Account) code() (types.Code, error) {
-	bp, err := a.fch.getBlockProposal()
-	if err != nil {
-		return nil, err
-	}
-
-	ctx, err := a.fch.getBlockContext(bp)
-	if err != nil {
-		return nil, err
-	}
-
-	blk, err := a.fch.emulator.NewReadOnlyBlockView(ctx)
+	blk, err := a.fch.emulator.NewReadOnlyBlockView()
 	if err != nil {
 		return nil, err
 	}
@@ -823,17 +794,7 @@ func (a *Account) CodeHash() []byte {
 }
 
 func (a *Account) codeHash() ([]byte, error) {
-	bp, err := a.fch.getBlockProposal()
-	if err != nil {
-		return nil, err
-	}
-
-	ctx, err := a.fch.getBlockContext(bp)
-	if err != nil {
-		return nil, err
-	}
-
-	blk, err := a.fch.emulator.NewReadOnlyBlockView(ctx)
+	blk, err := a.fch.emulator.NewReadOnlyBlockView()
 	if err != nil {
 		return nil, err
 	}

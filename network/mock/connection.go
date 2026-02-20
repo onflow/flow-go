@@ -36,23 +36,23 @@ func (_m *Connection) EXPECT() *Connection_Expecter {
 }
 
 // Receive provides a mock function for the type Connection
-func (_mock *Connection) Receive() (interface{}, error) {
+func (_mock *Connection) Receive() (any, error) {
 	ret := _mock.Called()
 
 	if len(ret) == 0 {
 		panic("no return value specified for Receive")
 	}
 
-	var r0 interface{}
+	var r0 any
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func() (interface{}, error)); ok {
+	if returnFunc, ok := ret.Get(0).(func() (any, error)); ok {
 		return returnFunc()
 	}
-	if returnFunc, ok := ret.Get(0).(func() interface{}); ok {
+	if returnFunc, ok := ret.Get(0).(func() any); ok {
 		r0 = returnFunc()
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(interface{})
+			r0 = ret.Get(0).(any)
 		}
 	}
 	if returnFunc, ok := ret.Get(1).(func() error); ok {
@@ -80,18 +80,18 @@ func (_c *Connection_Receive_Call) Run(run func()) *Connection_Receive_Call {
 	return _c
 }
 
-func (_c *Connection_Receive_Call) Return(ifaceVal interface{}, err error) *Connection_Receive_Call {
-	_c.Call.Return(ifaceVal, err)
+func (_c *Connection_Receive_Call) Return(v any, err error) *Connection_Receive_Call {
+	_c.Call.Return(v, err)
 	return _c
 }
 
-func (_c *Connection_Receive_Call) RunAndReturn(run func() (interface{}, error)) *Connection_Receive_Call {
+func (_c *Connection_Receive_Call) RunAndReturn(run func() (any, error)) *Connection_Receive_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // Send provides a mock function for the type Connection
-func (_mock *Connection) Send(msg interface{}) error {
+func (_mock *Connection) Send(msg any) error {
 	ret := _mock.Called(msg)
 
 	if len(ret) == 0 {
@@ -99,7 +99,7 @@ func (_mock *Connection) Send(msg interface{}) error {
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(interface{}) error); ok {
+	if returnFunc, ok := ret.Get(0).(func(any) error); ok {
 		r0 = returnFunc(msg)
 	} else {
 		r0 = ret.Error(0)
@@ -113,16 +113,16 @@ type Connection_Send_Call struct {
 }
 
 // Send is a helper method to define mock.On call
-//   - msg interface{}
+//   - msg any
 func (_e *Connection_Expecter) Send(msg interface{}) *Connection_Send_Call {
 	return &Connection_Send_Call{Call: _e.mock.On("Send", msg)}
 }
 
-func (_c *Connection_Send_Call) Run(run func(msg interface{})) *Connection_Send_Call {
+func (_c *Connection_Send_Call) Run(run func(msg any)) *Connection_Send_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 interface{}
+		var arg0 any
 		if args[0] != nil {
-			arg0 = args[0].(interface{})
+			arg0 = args[0].(any)
 		}
 		run(
 			arg0,
@@ -136,7 +136,7 @@ func (_c *Connection_Send_Call) Return(err error) *Connection_Send_Call {
 	return _c
 }
 
-func (_c *Connection_Send_Call) RunAndReturn(run func(msg interface{}) error) *Connection_Send_Call {
+func (_c *Connection_Send_Call) RunAndReturn(run func(msg any) error) *Connection_Send_Call {
 	_c.Call.Return(run)
 	return _c
 }

@@ -105,7 +105,7 @@ func (b *ByAccount) DestructIntoPayloads(nWorker int) []*ledger.Payload {
 		}
 	}
 
-	for i := 0; i < nWorker; i++ {
+	for range nWorker {
 		wg.Add(1)
 		go worker()
 	}
