@@ -512,7 +512,7 @@ func TestAccountTransactionsIndexer_EventAddresses(t *testing.T) {
 		indexBlock(t, indexer, lm, db, BlockData{
 			Header:       header,
 			Transactions: []*flow.TransactionBody{&tx1, &tx2},
-			Events: []flow.Event{event1, event2},
+			Events:       []flow.Event{event1, event2},
 		})
 
 		// tx1: account1 (payer+proposer+authorizer) + recipient1 (from FT event)
@@ -611,7 +611,7 @@ func TestAccountTransactionsIndexer_EventAddresses(t *testing.T) {
 		err := indexBlockExpectError(t, indexer, lm, db, BlockData{
 			Header:       header,
 			Transactions: []*flow.TransactionBody{&tx},
-			Events: []flow.Event{badEvent},
+			Events:       []flow.Event{badEvent},
 		})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to extract addresses from event")

@@ -9,11 +9,12 @@ import (
 
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow/protobuf/go/flow/entities"
+
 	accessmodel "github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/storage"
-	"github.com/onflow/flow/protobuf/go/flow/entities"
 )
 
 type AccountFTTransferFilter struct {

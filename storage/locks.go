@@ -51,9 +51,9 @@ const (
 	// LockIndexScheduledTransaction protects the indexing of scheduled transactions.
 	LockIndexScheduledTransaction = "lock_index_scheduled_transaction"
 
-	LockIndexAccountTransactions         = "lock_index_account_transactions"
-	LockIndexFungibleTokenTransfers      = "lock_index_fungible_token_transfers"
-	LockIndexNonFungibleTokenTransfers   = "lock_index_non_fungible_token_transfers"
+	LockIndexAccountTransactions       = "lock_index_account_transactions"
+	LockIndexFungibleTokenTransfers    = "lock_index_fungible_token_transfers"
+	LockIndexNonFungibleTokenTransfers = "lock_index_non_fungible_token_transfers"
 )
 
 // Locks returns a list of all named locks used by the storage layer.
