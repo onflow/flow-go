@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"math"
 	"math/big"
 
 	"github.com/jordanschalm/lockctx"
@@ -147,8 +148,8 @@ func (idx *FungibleTokenTransfers) ByAddress(
 	cursor *access.TransferCursor,
 	filter storage.IndexFilter[*access.FungibleTokenTransfer],
 ) (access.FungibleTokenTransfersPage, error) {
-	if limit == 0 {
-		return access.FungibleTokenTransfersPage{}, fmt.Errorf("%w: limit must be greater than 0", storage.ErrInvalidQuery)
+	if limit == 0 || limit == math.MaxUint32 {
+		return access.FungibleTokenTransfersPage{}, fmt.Errorf("limit must be greater than 0 and less than %d: %w", math.MaxUint32, storage.ErrInvalidQuery)
 	}
 
 	latestHeight := idx.latestHeight.Load()
@@ -224,10 +225,6 @@ func lookupFTTransfers(
 	cursor *access.TransferCursor,
 	filter storage.IndexFilter[*access.FungibleTokenTransfer],
 ) (access.FungibleTokenTransfersPage, error) {
-	if limit == 0 {
-		return access.FungibleTokenTransfersPage{}, nil
-	}
-
 	// Start from the latest height (prefix covers all tx/event indexes at that height).
 	startKey := makeFTTransferKeyPrefix(address, highestHeight)
 
