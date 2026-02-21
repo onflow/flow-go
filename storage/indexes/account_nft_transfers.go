@@ -4,7 +4,6 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"math"
 
 	"github.com/jordanschalm/lockctx"
 	"go.uber.org/atomic"
@@ -139,8 +138,8 @@ func (idx *NonFungibleTokenTransfers) ByAddress(
 	cursor *access.TransferCursor,
 	filter storage.IndexFilter[*access.NonFungibleTokenTransfer],
 ) (access.NonFungibleTokenTransfersPage, error) {
-	if limit == 0 || limit == math.MaxUint32 {
-		return access.NonFungibleTokenTransfersPage{}, fmt.Errorf("limit must be greater than 0 and less than %d: %w", math.MaxUint32, storage.ErrInvalidQuery)
+	if err := validateLimit(limit); err != nil {
+		return access.NonFungibleTokenTransfersPage{}, errors.Join(storage.ErrInvalidQuery, err)
 	}
 
 	latestHeight := idx.latestHeight.Load()
