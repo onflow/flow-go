@@ -136,8 +136,8 @@ func (b *AccountTransfersBackend) GetAccountFungibleTokenTransfers(
 	}
 
 	// storage will return an empty page and no error if the account has no transfers indexed.
+	// TODO: check if account exists for the chain
 	if len(page.Transfers) == 0 {
-		// TODO: check if account exists for the chain
 		return &page, nil
 	}
 
@@ -203,8 +203,8 @@ func (b *AccountTransfersBackend) GetAccountNonFungibleTokenTransfers(
 	}
 
 	// storage will return an empty page and no error if the account has no transfers indexed.
+	// TODO: check if account exists for the chain
 	if len(page.Transfers) == 0 {
-		// TODO: check if account exists for the chain
 		return &page, nil
 	}
 

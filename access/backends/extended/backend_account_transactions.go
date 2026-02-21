@@ -104,8 +104,8 @@ func (b *AccountTransactionsBackend) GetAccountTransactions(
 	}
 
 	// storage will return an empty page and no error if the account has no transfers indexed.
+	// TODO: check if account exists for the chain
 	if len(page.Transactions) == 0 {
-		// TODO: check if account exists for the chain
 		return &page, nil
 	}
 

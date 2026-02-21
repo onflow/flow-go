@@ -205,13 +205,7 @@ func (s *ExtendedIndexingSuite) TestAccountTransfers() {
 	nftMintResult := s.sendMintNFTTx(ctx, serviceClient, newAccountAddress, contracts)
 
 	// Step 6: Wait for the extended indexer to catch up.
-	maxHeight := nftMintResult.BlockHeight
-	if flowTransferResult.BlockHeight > maxHeight {
-		maxHeight = flowTransferResult.BlockHeight
-	}
-	if exampleTokenTransferResult.BlockHeight > maxHeight {
-		maxHeight = exampleTokenTransferResult.BlockHeight
-	}
+	maxHeight := max(nftMintResult.BlockHeight, flowTransferResult.BlockHeight, exampleTokenTransferResult.BlockHeight)
 
 	waitCtx, waitCancel := context.WithTimeout(ctx, 120*time.Second)
 	defer waitCancel()

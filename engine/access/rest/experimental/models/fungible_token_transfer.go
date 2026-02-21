@@ -26,8 +26,8 @@ func (t *FungibleTokenTransfer) Build(
 	t.EventIndices = eventIndices
 	t.TokenType = transfer.TokenType
 	t.Amount = transfer.Amount.String()
-	t.SourceAddress = transfer.SourceAddress.Hex()
-	t.RecipientAddress = transfer.RecipientAddress.Hex()
+	t.SourceAddress = addressHex(transfer.SourceAddress)
+	t.RecipientAddress = addressHex(transfer.RecipientAddress)
 	t.Expandable = new(AccountTransactionExpandable)
 
 	if expand[expandableTransaction] && transfer.Transaction != nil {

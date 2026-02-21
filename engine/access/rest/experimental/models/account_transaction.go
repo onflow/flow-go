@@ -6,7 +6,17 @@ import (
 
 	commonmodels "github.com/onflow/flow-go/engine/access/rest/common/models"
 	accessmodel "github.com/onflow/flow-go/model/access"
+	"github.com/onflow/flow-go/model/flow"
 )
+
+// addressHex returns the hex representation of addr, or an empty string if addr
+// is the zero address (flow.EmptyAddress), which indicates a mint or burn.
+func addressHex(addr flow.Address) string {
+	if addr == flow.EmptyAddress {
+		return ""
+	}
+	return addr.Hex()
+}
 
 const (
 	expandableTransaction = "transaction"
