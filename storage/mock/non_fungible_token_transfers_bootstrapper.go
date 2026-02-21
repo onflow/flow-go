@@ -39,6 +39,84 @@ func (_m *NonFungibleTokenTransfersBootstrapper) EXPECT() *NonFungibleTokenTrans
 	return &NonFungibleTokenTransfersBootstrapper_Expecter{mock: &_m.Mock}
 }
 
+// ByAddress provides a mock function for the type NonFungibleTokenTransfersBootstrapper
+func (_mock *NonFungibleTokenTransfersBootstrapper) ByAddress(account flow.Address, limit uint32, cursor *access.TransferCursor, filter storage.IndexFilter[*access.NonFungibleTokenTransfer]) (access.NonFungibleTokenTransfersPage, error) {
+	ret := _mock.Called(account, limit, cursor, filter)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ByAddress")
+	}
+
+	var r0 access.NonFungibleTokenTransfersPage
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(flow.Address, uint32, *access.TransferCursor, storage.IndexFilter[*access.NonFungibleTokenTransfer]) (access.NonFungibleTokenTransfersPage, error)); ok {
+		return returnFunc(account, limit, cursor, filter)
+	}
+	if returnFunc, ok := ret.Get(0).(func(flow.Address, uint32, *access.TransferCursor, storage.IndexFilter[*access.NonFungibleTokenTransfer]) access.NonFungibleTokenTransfersPage); ok {
+		r0 = returnFunc(account, limit, cursor, filter)
+	} else {
+		r0 = ret.Get(0).(access.NonFungibleTokenTransfersPage)
+	}
+	if returnFunc, ok := ret.Get(1).(func(flow.Address, uint32, *access.TransferCursor, storage.IndexFilter[*access.NonFungibleTokenTransfer]) error); ok {
+		r1 = returnFunc(account, limit, cursor, filter)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// NonFungibleTokenTransfersBootstrapper_ByAddress_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ByAddress'
+type NonFungibleTokenTransfersBootstrapper_ByAddress_Call struct {
+	*mock.Call
+}
+
+// ByAddress is a helper method to define mock.On call
+//   - account flow.Address
+//   - limit uint32
+//   - cursor *access.TransferCursor
+//   - filter storage.IndexFilter[*access.NonFungibleTokenTransfer]
+func (_e *NonFungibleTokenTransfersBootstrapper_Expecter) ByAddress(account interface{}, limit interface{}, cursor interface{}, filter interface{}) *NonFungibleTokenTransfersBootstrapper_ByAddress_Call {
+	return &NonFungibleTokenTransfersBootstrapper_ByAddress_Call{Call: _e.mock.On("ByAddress", account, limit, cursor, filter)}
+}
+
+func (_c *NonFungibleTokenTransfersBootstrapper_ByAddress_Call) Run(run func(account flow.Address, limit uint32, cursor *access.TransferCursor, filter storage.IndexFilter[*access.NonFungibleTokenTransfer])) *NonFungibleTokenTransfersBootstrapper_ByAddress_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 flow.Address
+		if args[0] != nil {
+			arg0 = args[0].(flow.Address)
+		}
+		var arg1 uint32
+		if args[1] != nil {
+			arg1 = args[1].(uint32)
+		}
+		var arg2 *access.TransferCursor
+		if args[2] != nil {
+			arg2 = args[2].(*access.TransferCursor)
+		}
+		var arg3 storage.IndexFilter[*access.NonFungibleTokenTransfer]
+		if args[3] != nil {
+			arg3 = args[3].(storage.IndexFilter[*access.NonFungibleTokenTransfer])
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+			arg3,
+		)
+	})
+	return _c
+}
+
+func (_c *NonFungibleTokenTransfersBootstrapper_ByAddress_Call) Return(nonFungibleTokenTransfersPage access.NonFungibleTokenTransfersPage, err error) *NonFungibleTokenTransfersBootstrapper_ByAddress_Call {
+	_c.Call.Return(nonFungibleTokenTransfersPage, err)
+	return _c
+}
+
+func (_c *NonFungibleTokenTransfersBootstrapper_ByAddress_Call) RunAndReturn(run func(account flow.Address, limit uint32, cursor *access.TransferCursor, filter storage.IndexFilter[*access.NonFungibleTokenTransfer]) (access.NonFungibleTokenTransfersPage, error)) *NonFungibleTokenTransfersBootstrapper_ByAddress_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // FirstIndexedHeight provides a mock function for the type NonFungibleTokenTransfersBootstrapper
 func (_mock *NonFungibleTokenTransfersBootstrapper) FirstIndexedHeight() (uint64, error) {
 	ret := _mock.Called()
@@ -210,84 +288,6 @@ func (_c *NonFungibleTokenTransfersBootstrapper_Store_Call) Return(err error) *N
 }
 
 func (_c *NonFungibleTokenTransfersBootstrapper_Store_Call) RunAndReturn(run func(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockHeight uint64, transfers []access.NonFungibleTokenTransfer) error) *NonFungibleTokenTransfersBootstrapper_Store_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// ByAddress provides a mock function for the type NonFungibleTokenTransfersBootstrapper
-func (_mock *NonFungibleTokenTransfersBootstrapper) ByAddress(account flow.Address, limit uint32, cursor *access.TransferCursor, filter storage.IndexFilter[*access.NonFungibleTokenTransfer]) (access.NonFungibleTokenTransfersPage, error) {
-	ret := _mock.Called(account, limit, cursor, filter)
-
-	if len(ret) == 0 {
-		panic("no return value specified for ByAddress")
-	}
-
-	var r0 access.NonFungibleTokenTransfersPage
-	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(flow.Address, uint32, *access.TransferCursor, storage.IndexFilter[*access.NonFungibleTokenTransfer]) (access.NonFungibleTokenTransfersPage, error)); ok {
-		return returnFunc(account, limit, cursor, filter)
-	}
-	if returnFunc, ok := ret.Get(0).(func(flow.Address, uint32, *access.TransferCursor, storage.IndexFilter[*access.NonFungibleTokenTransfer]) access.NonFungibleTokenTransfersPage); ok {
-		r0 = returnFunc(account, limit, cursor, filter)
-	} else {
-		r0 = ret.Get(0).(access.NonFungibleTokenTransfersPage)
-	}
-	if returnFunc, ok := ret.Get(1).(func(flow.Address, uint32, *access.TransferCursor, storage.IndexFilter[*access.NonFungibleTokenTransfer]) error); ok {
-		r1 = returnFunc(account, limit, cursor, filter)
-	} else {
-		r1 = ret.Error(1)
-	}
-	return r0, r1
-}
-
-// NonFungibleTokenTransfersBootstrapper_ByAddress_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ByAddress'
-type NonFungibleTokenTransfersBootstrapper_ByAddress_Call struct {
-	*mock.Call
-}
-
-// ByAddress is a helper method to define mock.On call
-//   - account flow.Address
-//   - limit uint32
-//   - cursor *access.TransferCursor
-//   - filter storage.IndexFilter[*access.NonFungibleTokenTransfer]
-func (_e *NonFungibleTokenTransfersBootstrapper_Expecter) ByAddress(account interface{}, limit interface{}, cursor interface{}, filter interface{}) *NonFungibleTokenTransfersBootstrapper_ByAddress_Call {
-	return &NonFungibleTokenTransfersBootstrapper_ByAddress_Call{Call: _e.mock.On("ByAddress", account, limit, cursor, filter)}
-}
-
-func (_c *NonFungibleTokenTransfersBootstrapper_ByAddress_Call) Run(run func(account flow.Address, limit uint32, cursor *access.TransferCursor, filter storage.IndexFilter[*access.NonFungibleTokenTransfer])) *NonFungibleTokenTransfersBootstrapper_ByAddress_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 flow.Address
-		if args[0] != nil {
-			arg0 = args[0].(flow.Address)
-		}
-		var arg1 uint32
-		if args[1] != nil {
-			arg1 = args[1].(uint32)
-		}
-		var arg2 *access.TransferCursor
-		if args[2] != nil {
-			arg2 = args[2].(*access.TransferCursor)
-		}
-		var arg3 storage.IndexFilter[*access.NonFungibleTokenTransfer]
-		if args[3] != nil {
-			arg3 = args[3].(storage.IndexFilter[*access.NonFungibleTokenTransfer])
-		}
-		run(
-			arg0,
-			arg1,
-			arg2,
-			arg3,
-		)
-	})
-	return _c
-}
-
-func (_c *NonFungibleTokenTransfersBootstrapper_ByAddress_Call) Return(nonFungibleTokenTransfersPage access.NonFungibleTokenTransfersPage, err error) *NonFungibleTokenTransfersBootstrapper_ByAddress_Call {
-	_c.Call.Return(nonFungibleTokenTransfersPage, err)
-	return _c
-}
-
-func (_c *NonFungibleTokenTransfersBootstrapper_ByAddress_Call) RunAndReturn(run func(account flow.Address, limit uint32, cursor *access.TransferCursor, filter storage.IndexFilter[*access.NonFungibleTokenTransfer]) (access.NonFungibleTokenTransfersPage, error)) *NonFungibleTokenTransfersBootstrapper_ByAddress_Call {
 	_c.Call.Return(run)
 	return _c
 }

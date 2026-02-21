@@ -4,7 +4,6 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"math"
 	"slices"
 
 	"github.com/jordanschalm/lockctx"
@@ -144,8 +143,8 @@ func (idx *AccountTransactions) ByAddress(
 	cursor *access.AccountTransactionCursor,
 	filter storage.IndexFilter[*access.AccountTransaction],
 ) (access.AccountTransactionsPage, error) {
-	if limit == 0 {
-		return access.AccountTransactionsPage{}, fmt.Errorf("%w: limit must be greater than 0", storage.ErrInvalidQuery)
+	if err := validateLimit(limit); err != nil {
+		return access.AccountTransactionsPage{}, errors.Join(storage.ErrInvalidQuery, err)
 	}
 
 	latestHeight := idx.latestHeight.Load()
@@ -221,10 +220,6 @@ func lookupAccountTransactions(
 	cursor *access.AccountTransactionCursor,
 	filter storage.IndexFilter[*access.AccountTransaction],
 ) (access.AccountTransactionsPage, error) {
-	if limit == 0 || limit == math.MaxUint32 {
-		return access.AccountTransactionsPage{}, fmt.Errorf("limit must be greater than 0 and less than %d: %w", math.MaxUint32, storage.ErrInvalidQuery)
-	}
-
 	// Start from the latest height (prefix covers all tx indexes at that height).
 	startKey := makeAccountTxKeyPrefix(address, highestHeight)
 

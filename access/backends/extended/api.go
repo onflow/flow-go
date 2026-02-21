@@ -17,7 +17,7 @@ type API interface {
 	// If the account is found but has no transactions, the response will include an empty array and no error.
 	//
 	// Expected error returns during normal operations:
-	//   - [codes.NotFound] if the account is found but has no transactions
+	//   - [codes.NotFound] if the account is not found
 	//   - [codes.FailedPrecondition] if the account transaction index has not been initialized
 	//   - [codes.OutOfRange] if the cursor references a height outside the indexed range
 	//   - [codes.InvalidArgument] if the query parameters are invalid
@@ -37,7 +37,7 @@ type API interface {
 	// If the account has no transfers, the response will include an empty array and no error.
 	//
 	// Expected error returns during normal operations:
-	//   - [codes.NotFound] if the account is found but has no transfers
+	//   - [codes.NotFound] if the account is not found
 	//   - [codes.FailedPrecondition] if the fungible token transfer index has not been initialized
 	//   - [codes.OutOfRange] if the cursor references a height outside the indexed range
 	//   - [codes.InvalidArgument] if the query parameters are invalid
@@ -57,7 +57,7 @@ type API interface {
 	// If the account has no transfers, the response will include an empty array and no error.
 	//
 	// Expected error returns during normal operations:
-	//   - [codes.NotFound] if the account is found but has no transfers
+	//   - [codes.NotFound] if the account is not found
 	//   - [codes.FailedPrecondition] if the non-fungible token transfer index has not been initialized
 	//   - [codes.OutOfRange] if the cursor references a height outside the indexed range
 	//   - [codes.InvalidArgument] if the query parameters are invalid

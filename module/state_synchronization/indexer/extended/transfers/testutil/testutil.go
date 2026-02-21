@@ -116,13 +116,15 @@ func MakeFTWithdrawnEvent(
 	payload, err := ccf.Encode(event)
 	require.NoError(t, err)
 
-	return flow.Event{
+	flowEvent, err := flow.NewEvent(flow.UntrustedEvent{
 		Type:             eventType,
 		TransactionID:    txID,
 		TransactionIndex: txIndex,
 		EventIndex:       eventIndex,
 		Payload:          payload,
-	}
+	})
+	require.NoError(t, err)
+	return *flowEvent
 }
 
 // MakeFTDepositedEvent creates a CCF-encoded FungibleToken.Deposited event.
@@ -168,13 +170,15 @@ func MakeFTDepositedEvent(
 	payload, err := ccf.Encode(event)
 	require.NoError(t, err)
 
-	return flow.Event{
+	flowEvent, err := flow.NewEvent(flow.UntrustedEvent{
 		Type:             eventType,
 		TransactionID:    txID,
 		TransactionIndex: txIndex,
 		EventIndex:       eventIndex,
 		Payload:          payload,
-	}
+	})
+	require.NoError(t, err)
+	return *flowEvent
 }
 
 // NFTWithdrawnEventType returns the NonFungibleToken.Withdrawn event type for the given chain.
@@ -249,13 +253,15 @@ func MakeNFTWithdrawnEvent(
 	payload, err := ccf.Encode(event)
 	require.NoError(t, err)
 
-	return flow.Event{
+	flowEvent, err := flow.NewEvent(flow.UntrustedEvent{
 		Type:             eventType,
 		TransactionID:    txID,
 		TransactionIndex: txIndex,
 		EventIndex:       eventIndex,
 		Payload:          payload,
-	}
+	})
+	require.NoError(t, err)
+	return *flowEvent
 }
 
 // MakeNFTDepositedEvent creates a CCF-encoded NonFungibleToken.Deposited event.
@@ -297,13 +303,15 @@ func MakeNFTDepositedEvent(
 	payload, err := ccf.Encode(event)
 	require.NoError(t, err)
 
-	return flow.Event{
+	flowEvent, err := flow.NewEvent(flow.UntrustedEvent{
 		Type:             eventType,
 		TransactionID:    txID,
 		TransactionIndex: txIndex,
 		EventIndex:       eventIndex,
 		Payload:          payload,
-	}
+	})
+	require.NoError(t, err)
+	return *flowEvent
 }
 
 // MakeFlowFeesEvent creates a CCF-encoded FlowFees.FeesDeducted event.
@@ -333,11 +341,13 @@ func MakeFlowFeesEvent(
 	payload, err := ccf.Encode(event)
 	require.NoError(t, err)
 
-	return flow.Event{
+	flowEvent, err := flow.NewEvent(flow.UntrustedEvent{
 		Type:             eventType,
 		TransactionID:    txID,
 		TransactionIndex: txIndex,
 		EventIndex:       eventIndex,
 		Payload:          payload,
-	}
+	})
+	require.NoError(t, err)
+	return *flowEvent
 }

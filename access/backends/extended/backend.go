@@ -87,9 +87,10 @@ func New(
 		transactionsProvider:  transactionsProvider,
 	}
 
+	chain := chainID.Chain()
 	return &Backend{
 		log:                        log,
-		AccountTransactionsBackend: NewAccountTransactionsBackend(log, base, store),
-		AccountTransfersBackend:    NewAccountTransfersBackend(log, base, ftStore, nftStore),
+		AccountTransactionsBackend: NewAccountTransactionsBackend(log, base, store, chain),
+		AccountTransfersBackend:    NewAccountTransfersBackend(log, base, ftStore, nftStore, chain),
 	}, nil
 }

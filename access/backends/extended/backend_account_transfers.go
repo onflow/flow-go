@@ -4,16 +4,16 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/rs/zerolog"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	"github.com/rs/zerolog"
+	"github.com/onflow/flow/protobuf/go/flow/entities"
 
 	accessmodel "github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/storage"
-	"github.com/onflow/flow/protobuf/go/flow/entities"
 )
 
 type AccountFTTransferFilter struct {
@@ -81,6 +81,8 @@ type AccountTransfersBackend struct {
 	log      zerolog.Logger
 	ftStore  storage.FungibleTokenTransfersBootstrapper
 	nftStore storage.NonFungibleTokenTransfersBootstrapper
+
+	chain flow.Chain
 }
 
 // NewAccountTransfersBackend creates a new AccountTransfersBackend instance.
@@ -89,12 +91,14 @@ func NewAccountTransfersBackend(
 	base *backendBase,
 	ftStore storage.FungibleTokenTransfersBootstrapper,
 	nftStore storage.NonFungibleTokenTransfersBootstrapper,
+	chain flow.Chain,
 ) *AccountTransfersBackend {
 	return &AccountTransfersBackend{
 		backendBase: base,
 		log:         log,
 		ftStore:     ftStore,
 		nftStore:    nftStore,
+		chain:       chain,
 	}
 }
 
@@ -104,7 +108,7 @@ func NewAccountTransfersBackend(
 // If the account has no transfers, the response will include an empty array and no error.
 //
 // Expected error returns during normal operations:
-//   - [codes.NotFound] if the account is found but has no transfers
+//   - [codes.NotFound] if the account is not found
 //   - [codes.FailedPrecondition] if the fungible token transfer index has not been initialized
 //   - [codes.OutOfRange] if the cursor references a height outside the indexed range
 //   - [codes.InvalidArgument] if the query parameters are invalid
@@ -117,7 +121,14 @@ func (b *AccountTransfersBackend) GetAccountFungibleTokenTransfers(
 	expandResults bool,
 	encodingVersion entities.EventEncodingVersion,
 ) (*accessmodel.FungibleTokenTransfersPage, error) {
-	limit = b.normalizeLimit(limit)
+	limit, err := b.normalizeLimit(limit)
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "invalid limit: %v", err)
+	}
+
+	if !b.chain.IsValid(address) {
+		return nil, status.Errorf(codes.NotFound, "account %s is not valid on chain %s", address, b.chain.ChainID())
+	}
 
 	page, err := b.ftStore.ByAddress(address, limit, cursor, filter.Filter())
 	if err != nil {
@@ -125,8 +136,9 @@ func (b *AccountTransfersBackend) GetAccountFungibleTokenTransfers(
 	}
 
 	// storage will return an empty page and no error if the account has no transfers indexed.
-	if len(page.Transfers) == 0 && cursor != nil {
-		return nil, status.Errorf(codes.NotFound, "no fungible token transfers found for account %s", address)
+	// TODO: check if account exists for the chain
+	if len(page.Transfers) == 0 {
+		return &page, nil
 	}
 
 	for i := range page.Transfers {
@@ -163,7 +175,7 @@ func (b *AccountTransfersBackend) GetAccountFungibleTokenTransfers(
 // If the account has no transfers, the response will include an empty array and no error.
 //
 // Expected error returns during normal operations:
-//   - [codes.NotFound] if the account is found but has no transfers
+//   - [codes.NotFound] if the account is not found
 //   - [codes.FailedPrecondition] if the non-fungible token transfer index has not been initialized
 //   - [codes.OutOfRange] if the cursor references a height outside the indexed range
 //   - [codes.InvalidArgument] if the query parameters are invalid
@@ -176,7 +188,14 @@ func (b *AccountTransfersBackend) GetAccountNonFungibleTokenTransfers(
 	expandResults bool,
 	encodingVersion entities.EventEncodingVersion,
 ) (*accessmodel.NonFungibleTokenTransfersPage, error) {
-	limit = b.normalizeLimit(limit)
+	limit, err := b.normalizeLimit(limit)
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "invalid limit: %v", err)
+	}
+
+	if !b.chain.IsValid(address) {
+		return nil, status.Errorf(codes.NotFound, "account %s is not valid on chain %s", address, b.chain.ChainID())
+	}
 
 	page, err := b.nftStore.ByAddress(address, limit, cursor, filter.Filter())
 	if err != nil {
@@ -184,8 +203,9 @@ func (b *AccountTransfersBackend) GetAccountNonFungibleTokenTransfers(
 	}
 
 	// storage will return an empty page and no error if the account has no transfers indexed.
-	if len(page.Transfers) == 0 && cursor != nil {
-		return nil, status.Errorf(codes.NotFound, "no non-fungible token transfers found for account %s", address)
+	// TODO: check if account exists for the chain
+	if len(page.Transfers) == 0 {
+		return &page, nil
 	}
 
 	for i := range page.Transfers {

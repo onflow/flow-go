@@ -32,15 +32,18 @@ type backendBase struct {
 	systemCollections    *systemcollection.Versioned
 }
 
-// normalizeLimit applies default and maximum page size constraints to the given limit.
-func (b *backendBase) normalizeLimit(limit uint32) uint32 {
+// normalizeLimit applies default page size when limit is 0, and returns an error if the limit
+// exceeds the configured maximum.
+//
+// Any error indicates the limit is invalid.
+func (b *backendBase) normalizeLimit(limit uint32) (uint32, error) {
 	if limit == 0 {
-		return b.config.DefaultPageSize
+		return b.config.DefaultPageSize, nil
 	}
 	if limit > b.config.MaxPageSize {
-		return b.config.MaxPageSize
+		return 0, fmt.Errorf("limit exceeds maximum: %d > %d", limit, b.config.MaxPageSize)
 	}
-	return limit
+	return limit, nil
 }
 
 // mapReadError converts storage read errors to appropriate gRPC status errors.
