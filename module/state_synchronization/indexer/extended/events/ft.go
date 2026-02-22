@@ -1,4 +1,4 @@
-package transfers
+package events
 
 import (
 	"fmt"
@@ -9,29 +9,29 @@ import (
 )
 
 // ftWithdrawnEvent represents a decoded FungibleToken.Withdrawn event.
-type ftWithdrawnEvent struct {
-	Type          string // Token type identifier (e.g., "A.f233dcee88fe0abe.FlowToken.Vault")
-	Amount        cadence.UFix64
-	From          flow.Address
-	FromUUID      uint64
-	WithdrawnUUID uint64
-	BalanceAfter  cadence.UFix64
+type FTWithdrawnEvent struct {
+	Type          string         // Token type identifier (e.g., "A.f233dcee88fe0abe.FlowToken.Vault")
+	Amount        cadence.UFix64 // Amount in UFix64 (Cadence-side denomination)
+	From          flow.Address   // Address the tokens were withdrawn from
+	FromUUID      uint64         // UUID of the source vault
+	WithdrawnUUID uint64         // UUID of the withdrawn vault
+	BalanceAfter  cadence.UFix64 // Balance after the tokens were withdrawn (in UFix64)
 }
 
 // ftDepositedEvent represents a decoded FungibleToken.Deposited event.
-type ftDepositedEvent struct {
-	Type          string
-	Amount        cadence.UFix64
-	To            flow.Address
-	ToUUID        uint64
-	DepositedUUID uint64
-	BalanceAfter  cadence.UFix64
+type FTDepositedEvent struct {
+	Type          string         // Token type identifier (e.g., "A.f233dcee88fe0abe.FlowToken.Vault")
+	Amount        cadence.UFix64 // Amount in UFix64 (Cadence-side denomination)
+	To            flow.Address   // Address the tokens were deposited to
+	ToUUID        uint64         // UUID of the destination vault
+	DepositedUUID uint64         // UUID of the deposited vault
+	BalanceAfter  cadence.UFix64 // Balance after the tokens were deposited (in UFix64)
 }
 
-// decodeFTDeposited extracts fields from a FungibleToken.Deposited event.
+// DecodeFTDeposited extracts fields from a FungibleToken.Deposited event.
 //
 // Any error indicates that the event is malformed.
-func decodeFTDeposited(event cadence.Event) (*ftDepositedEvent, error) {
+func DecodeFTDeposited(event cadence.Event) (*FTDepositedEvent, error) {
 	type ftDepositedEventRaw struct {
 		Type          string           `cadence:"type"`
 		Amount        cadence.UFix64   `cadence:"amount"`
@@ -46,12 +46,12 @@ func decodeFTDeposited(event cadence.Event) (*ftDepositedEvent, error) {
 		return nil, fmt.Errorf("failed to decode FT deposited event: %w", err)
 	}
 
-	to, err := addressFromOptional(raw.To)
+	to, err := AddressFromOptional(raw.To)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode FT deposited 'to' field: %w", err)
 	}
 
-	return &ftDepositedEvent{
+	return &FTDepositedEvent{
 		Type:          raw.Type,
 		Amount:        raw.Amount,
 		To:            to,
@@ -61,10 +61,10 @@ func decodeFTDeposited(event cadence.Event) (*ftDepositedEvent, error) {
 	}, nil
 }
 
-// decodeFTWithdrawn extracts fields from a FungibleToken.Withdrawn event.
+// DecodeFTWithdrawn extracts fields from a FungibleToken.Withdrawn event.
 //
 // Any error indicates that the event is malformed.
-func decodeFTWithdrawn(event cadence.Event) (*ftWithdrawnEvent, error) {
+func DecodeFTWithdrawn(event cadence.Event) (*FTWithdrawnEvent, error) {
 	type ftWithdrawnEventRaw struct {
 		Type          string           `cadence:"type"`
 		Amount        cadence.UFix64   `cadence:"amount"`
@@ -79,12 +79,12 @@ func decodeFTWithdrawn(event cadence.Event) (*ftWithdrawnEvent, error) {
 		return nil, fmt.Errorf("failed to decode FT withdrawn event: %w", err)
 	}
 
-	from, err := addressFromOptional(raw.From)
+	from, err := AddressFromOptional(raw.From)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode FT withdrawn 'from' field: %w", err)
 	}
 
-	return &ftWithdrawnEvent{
+	return &FTWithdrawnEvent{
 		Type:          raw.Type,
 		Amount:        raw.Amount,
 		From:          from,
@@ -95,16 +95,16 @@ func decodeFTWithdrawn(event cadence.Event) (*ftWithdrawnEvent, error) {
 }
 
 // flowFeesEvent represents a decoded FlowFees.FeesDeducted event.
-type flowFeesEvent struct {
+type FlowFeesEvent struct {
 	Amount          cadence.UFix64
 	ExecutionEffort uint64
 	InclusionEffort uint64
 }
 
-// decodeFlowFees extracts fields from a FlowFees.FeesDeducted event.
+// DecodeFlowFees extracts fields from a FlowFees.FeesDeducted event.
 //
 // Any error indicates that the event is malformed.
-func decodeFlowFees(event cadence.Event) (*flowFeesEvent, error) {
+func DecodeFlowFees(event cadence.Event) (*FlowFeesEvent, error) {
 	type flowFeesEventRaw struct {
 		Amount          cadence.UFix64 `cadence:"amount"`
 		ExecutionEffort uint64         `cadence:"executionEffort"`
@@ -116,7 +116,7 @@ func decodeFlowFees(event cadence.Event) (*flowFeesEvent, error) {
 		return nil, fmt.Errorf("failed to decode FlowFees.FeesDeducted event: %w", err)
 	}
 
-	return &flowFeesEvent{
+	return &FlowFeesEvent{
 		Amount:          raw.Amount,
 		ExecutionEffort: raw.ExecutionEffort,
 		InclusionEffort: raw.InclusionEffort,

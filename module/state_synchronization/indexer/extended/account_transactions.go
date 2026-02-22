@@ -9,12 +9,12 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/cadence"
-	"github.com/onflow/cadence/encoding/ccf"
 
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/access/systemcollection"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/state_synchronization/indexer/extended/events"
 	"github.com/onflow/flow-go/storage"
 )
 
@@ -200,7 +200,7 @@ func (a *AccountTransactions) buildAccountTransactionsFromBlockData(data BlockDa
 //
 // No error returns are expected during normal operation.
 func (a *AccountTransactions) extractAddresses(event flow.Event) ([]flow.Address, error) {
-	cadenceEvent, err := decodeEventPayload(event.Payload)
+	cadenceEvent, err := events.DecodePayload(event)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode event payload: %w", err)
 	}
@@ -228,19 +228,3 @@ func (a *AccountTransactions) extractAddresses(event flow.Event) ([]flow.Address
 	return addresses, nil
 }
 
-// decodeEventPayload decodes CCF-encoded event payload.
-//
-// Any error indicates that the event payload is malformed.
-func decodeEventPayload(payload []byte) (cadence.Event, error) {
-	value, err := ccf.Decode(nil, payload)
-	if err != nil {
-		return cadence.Event{}, fmt.Errorf("failed to decode CCF payload: %w", err)
-	}
-
-	event, ok := value.(cadence.Event)
-	if !ok {
-		return cadence.Event{}, fmt.Errorf("decoded value is not an event: %T", value)
-	}
-
-	return event, nil
-}
