@@ -25,14 +25,11 @@ func NewEvents(collector module.CacheMetrics, db storage.DB) *Events {
 		var events []flow.Event
 		err := operation.LookupEventsByBlockID(r, blockID, &events)
 
-		// events are stored ordered by [blockID, txID, txIndex, eventIndex]
-		// sort them into execution order
-		sort.Slice(events, func(i, j int) bool {
-			if events[i].TransactionIndex == events[j].TransactionIndex {
-				return events[i].EventIndex < events[j].EventIndex
-			}
-			return events[i].TransactionIndex < events[j].TransactionIndex
-		})
+		// We want events sorted by [txIndex, eventIndex] (execution order).
+		// Events are keyed by [blockID, txID, txIndex, eventIndex], so reading by txID
+		// returns them in the correct order. However, reading by blockID returns events
+		// sorted by txID (a hash) first, which is unpredictable. We must re-sort here.
+		sortEventsExecutionOrder(events)
 
 		return events, err
 	}
@@ -52,6 +49,7 @@ func NewEvents(collector module.CacheMetrics, db storage.DB) *Events {
 
 // BatchStore will store events for the given block ID in a given batch
 // It requires the caller to hold [storage.LockInsertEvent]
+//
 // Expected error returns:
 //   - [storage.ErrAlreadyExists] if events for the block already exist.
 func (e *Events) BatchStore(lctx lockctx.Proof, blockID flow.Identifier, blockEvents []flow.EventsList, batch storage.ReaderBatchWriter) error {
@@ -82,29 +80,28 @@ func (e *Events) BatchStore(lctx lockctx.Proof, blockID flow.Identifier, blockEv
 	return nil
 }
 
-// ByBlockID returns the events for the given block ID.
-// Note: This method will return an empty slice and no error if no entries for the blockID are found.
+// ByBlockID returns the events for the given block ID
+// Note: This method will return an empty slice and no error if no entries for the blockID are found
+//
+// CAUTION: The returned slice and events cannot be safely modified. Make a copy first.
 //
 // No error returns are expected during normal operation.
 func (e *Events) ByBlockID(blockID flow.Identifier) ([]flow.Event, error) {
-	events, err := e.cache.Get(e.db.Reader(), blockID)
+	val, err := e.cache.Get(e.db.Reader(), blockID)
 	if err != nil {
 		return nil, err
 	}
-
-	result := make([]flow.Event, len(events))
-	for i, event := range events {
-		result[i] = copyEvent(event)
-	}
-	return result, nil
+	return val, nil
 }
 
 // ByBlockIDTransactionID returns the events for the given block ID and transaction ID
 // Note: This method will return an empty slice and no error if no entries for the blockID are found
 //
+// CAUTION: The returned events cannot be safely modified. Make a copy first.
+//
 // No error returns are expected during normal operation.
 func (e *Events) ByBlockIDTransactionID(blockID flow.Identifier, txID flow.Identifier) ([]flow.Event, error) {
-	events, err := e.cache.Get(e.db.Reader(), blockID)
+	events, err := e.ByBlockID(blockID)
 	if err != nil {
 		return nil, err
 	}
@@ -112,7 +109,7 @@ func (e *Events) ByBlockIDTransactionID(blockID flow.Identifier, txID flow.Ident
 	var matched []flow.Event
 	for _, event := range events {
 		if event.TransactionID == txID {
-			matched = append(matched, copyEvent(event))
+			matched = append(matched, event)
 		}
 	}
 	return matched, nil
@@ -121,9 +118,11 @@ func (e *Events) ByBlockIDTransactionID(blockID flow.Identifier, txID flow.Ident
 // ByBlockIDTransactionIndex returns the events for the given block ID and transaction index
 // Note: This method will return an empty slice and no error if no entries for the blockID are found
 //
+// CAUTION: The returned events cannot be safely modified. Make a copy first.
+//
 // No error returns are expected during normal operation.
 func (e *Events) ByBlockIDTransactionIndex(blockID flow.Identifier, txIndex uint32) ([]flow.Event, error) {
-	events, err := e.cache.Get(e.db.Reader(), blockID)
+	events, err := e.ByBlockID(blockID)
 	if err != nil {
 		return nil, err
 	}
@@ -131,7 +130,7 @@ func (e *Events) ByBlockIDTransactionIndex(blockID flow.Identifier, txIndex uint
 	var matched []flow.Event
 	for _, event := range events {
 		if event.TransactionIndex == txIndex {
-			matched = append(matched, copyEvent(event))
+			matched = append(matched, event)
 		}
 	}
 	return matched, nil
@@ -140,9 +139,11 @@ func (e *Events) ByBlockIDTransactionIndex(blockID flow.Identifier, txIndex uint
 // ByBlockIDEventType returns the events for the given block ID and event type
 // Note: This method will return an empty slice and no error if no entries for the blockID are found
 //
+// CAUTION: The returned events cannot be safely modified. Make a copy first.
+//
 // No error returns are expected during normal operation.
 func (e *Events) ByBlockIDEventType(blockID flow.Identifier, eventType flow.EventType) ([]flow.Event, error) {
-	events, err := e.cache.Get(e.db.Reader(), blockID)
+	events, err := e.ByBlockID(blockID)
 	if err != nil {
 		return nil, err
 	}
@@ -150,18 +151,10 @@ func (e *Events) ByBlockIDEventType(blockID flow.Identifier, eventType flow.Even
 	var matched []flow.Event
 	for _, event := range events {
 		if event.Type == eventType {
-			matched = append(matched, copyEvent(event))
+			matched = append(matched, event)
 		}
 	}
 	return matched, nil
-}
-
-// copyEvent returns a copy of the event with a deep copy of the payload.
-func copyEvent(event flow.Event) flow.Event {
-	payload := make([]byte, len(event.Payload))
-	copy(payload, event.Payload)
-	event.Payload = payload
-	return event
 }
 
 // RemoveByBlockID removes events by block ID
@@ -172,6 +165,7 @@ func (e *Events) RemoveByBlockID(blockID flow.Identifier) error {
 }
 
 // BatchRemoveByBlockID removes events keyed by a blockID in provided batch
+//
 // No errors are expected during normal operation, even if no entries are matched.
 func (e *Events) BatchRemoveByBlockID(blockID flow.Identifier, rw storage.ReaderBatchWriter) error {
 	return e.cache.RemoveTx(rw, blockID)
@@ -187,14 +181,11 @@ func NewServiceEvents(collector module.CacheMetrics, db storage.DB) *ServiceEven
 		var events []flow.Event
 		err := operation.LookupServiceEventsByBlockID(r, blockID, &events)
 
-		// events are stored ordered by [blockID, txID, txIndex, eventIndex]
-		// sort them into execution order
-		sort.Slice(events, func(i, j int) bool {
-			if events[i].TransactionIndex == events[j].TransactionIndex {
-				return events[i].EventIndex < events[j].EventIndex
-			}
-			return events[i].TransactionIndex < events[j].TransactionIndex
-		})
+		// We want events sorted by [txIndex, eventIndex] (execution order).
+		// Events are keyed by [blockID, txID, txIndex, eventIndex], so reading by txID
+		// returns them in the correct order. However, reading by blockID returns events
+		// sorted by txID (a hash) first, which is unpredictable. We must re-sort here.
+		sortEventsExecutionOrder(events)
 
 		return events, err
 	}
@@ -235,18 +226,17 @@ func (e *ServiceEvents) BatchStore(lctx lockctx.Proof, blockID flow.Identifier, 
 }
 
 // ByBlockID returns the events for the given block ID
+// Note: This method will return an empty slice and no error if no entries for the blockID are found
+//
+// CAUTION: The returned slice and events cannot be safely modified. Make a copy first.
+//
+// No error returns are expected during normal operation.
 func (e *ServiceEvents) ByBlockID(blockID flow.Identifier) ([]flow.Event, error) {
-	events, err := e.cache.Get(e.db.Reader(), blockID)
+	val, err := e.cache.Get(e.db.Reader(), blockID)
 	if err != nil {
 		return nil, err
 	}
-
-	result := make([]flow.Event, len(events))
-	for i, event := range events {
-		result[i] = copyEvent(event)
-	}
-
-	return result, nil
+	return val, nil
 }
 
 // RemoveByBlockID removes service events by block ID
@@ -257,7 +247,18 @@ func (e *ServiceEvents) RemoveByBlockID(blockID flow.Identifier) error {
 }
 
 // BatchRemoveByBlockID removes service events keyed by a blockID in provided batch
+//
 // No errors are expected during normal operation, even if no entries are matched.
 func (e *ServiceEvents) BatchRemoveByBlockID(blockID flow.Identifier, rw storage.ReaderBatchWriter) error {
 	return e.cache.RemoveTx(rw, blockID)
+}
+
+// sortEventsExecutionOrder sorts events by [txIndex, eventIndex] (execution order).
+func sortEventsExecutionOrder(events []flow.Event) {
+	sort.Slice(events, func(i, j int) bool {
+		if events[i].TransactionIndex == events[j].TransactionIndex {
+			return events[i].EventIndex < events[j].EventIndex
+		}
+		return events[i].TransactionIndex < events[j].TransactionIndex
+	})
 }
