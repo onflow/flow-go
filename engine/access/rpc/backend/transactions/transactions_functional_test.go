@@ -599,7 +599,9 @@ func (s *TransactionsFunctionalSuite) TestTransactionResult_ExecutionNode() {
 		Events:               accessResponse.Events,
 		EventEncodingVersion: entities.EventEncodingVersion_CCF_V0,
 	}
+	// The EN gRPC response does not include per-transaction ComputationUsed.
 	expectedResult := s.expectedResultForIndex(1, entities.EventEncodingVersion_JSON_CDC_V0)
+	expectedResult.ComputationUsed = 0
 
 	expectedRequest := &execproto.GetTransactionResultRequest{
 		BlockId:       blockID[:],
@@ -629,7 +631,9 @@ func (s *TransactionsFunctionalSuite) TestTransactionResultByIndex_ExecutionNode
 		Events:               accessResponse.Events,
 		EventEncodingVersion: entities.EventEncodingVersion_CCF_V0,
 	}
+	// The EN gRPC response does not include per-transaction ComputationUsed.
 	expectedResult := s.expectedResultForIndex(1, entities.EventEncodingVersion_JSON_CDC_V0)
+	expectedResult.ComputationUsed = 0
 
 	expectedRequest := &execproto.GetTransactionByIndexRequest{
 		BlockId: blockID[:],
@@ -688,7 +692,9 @@ func (s *TransactionsFunctionalSuite) TestTransactionResultsByBlockID_ExecutionN
 			ErrorMessage: accessResponse.ErrorMessage,
 			Events:       accessResponse.Events,
 		}
+		// The EN gRPC response does not include per-transaction ComputationUsed.
 		expectedResults[i] = s.expectedResultForIndex(i, entities.EventEncodingVersion_JSON_CDC_V0)
+		expectedResults[i].ComputationUsed = 0
 	}
 
 	nodeResponse := &execproto.GetTransactionResultsResponse{
