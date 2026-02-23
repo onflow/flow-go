@@ -122,14 +122,13 @@ func (b *ScheduledTransactionsBackend) GetScheduledTransaction(
 		return &tx, nil
 	}
 
-	txSlice := []accessmodel.ScheduledTransaction{tx}
-	if err := b.expand(ctx, txSlice, expandOptions, encodingVersion); err != nil {
+	if err := b.expand(ctx, &tx, expandOptions, encodingVersion); err != nil {
 		err = fmt.Errorf("failed to expand scheduled transaction %d: %w", tx.ID, err)
 		irrecoverable.Throw(ctx, err)
 		return nil, err
 	}
 
-	return &txSlice[0], nil
+	return &tx, nil
 }
 
 // GetScheduledTransactions returns a paginated list of scheduled transactions.
@@ -160,10 +159,12 @@ func (b *ScheduledTransactionsBackend) GetScheduledTransactions(
 		return &page, nil
 	}
 
-	if err := b.expand(ctx, page.Transactions, expandOptions, encodingVersion); err != nil {
-		err = fmt.Errorf("failed to expand scheduled transactions: %w", err)
-		irrecoverable.Throw(ctx, err)
-		return nil, err
+	for _, tx := range page.Transactions {
+		if err := b.expand(ctx, &tx, expandOptions, encodingVersion); err != nil {
+			err = fmt.Errorf("failed to expand scheduled transaction %d: %w", tx.ID, err)
+			irrecoverable.Throw(ctx, err)
+			return nil, err
+		}
 	}
 
 	return &page, nil
@@ -197,10 +198,12 @@ func (b *ScheduledTransactionsBackend) GetScheduledTransactionsByAddress(
 		return &page, nil
 	}
 
-	if err := b.expand(ctx, page.Transactions, expandOptions, encodingVersion); err != nil {
-		err = fmt.Errorf("failed to expand scheduled transactions: %w", err)
-		irrecoverable.Throw(ctx, err)
-		return nil, err
+	for _, tx := range page.Transactions {
+		if err := b.expand(ctx, &tx, expandOptions, encodingVersion); err != nil {
+			err = fmt.Errorf("failed to expand scheduled transaction %d: %w", tx.ID, err)
+			irrecoverable.Throw(ctx, err)
+			return nil, err
+		}
 	}
 
 	return &page, nil
@@ -212,75 +215,65 @@ func (b *ScheduledTransactionsBackend) GetScheduledTransactionsByAddress(
 // No error returns are expected during normal operation.
 func (b *ScheduledTransactionsBackend) expand(
 	ctx context.Context,
-	txs []accessmodel.ScheduledTransaction,
+	tx *accessmodel.ScheduledTransaction,
 	expandOptions ScheduledTransactionExpandOptions,
 	encodingVersion entities.EventEncodingVersion,
 ) error {
-	scheduledTxBodies := make(map[flow.Identifier][]*flow.TransactionBody)
-
-	for i := range txs {
-		tx := &txs[i]
-		if expandOptions.HandlerContract {
-			err := b.expandHandlerContract(ctx, tx)
-			if err != nil {
-				return fmt.Errorf("failed to expand handler contract for scheduled tx %d: %w", tx.ID, err)
-			}
-		}
-
-		if !expandOptions.Transaction && !expandOptions.Result {
-			continue
-		}
-
-		// if the transaction was not executed, there's nothing to expand.
-		if tx.Status != accessmodel.ScheduledTxStatusExecuted && tx.Status != accessmodel.ScheduledTxStatusFailed {
-			continue
-		}
-
-		txID, err := b.scheduledTxLookup.TransactionIDByID(tx.ID)
+	if expandOptions.HandlerContract {
+		err := b.expandHandlerContract(ctx, tx)
 		if err != nil {
-			// the transaction is marked as executed, so it must exist in storage.
-			return fmt.Errorf("failed to lookup transaction ID for scheduled tx %d: %w", tx.ID, err)
+			return fmt.Errorf("failed to expand handler contract for scheduled tx %d: %w", tx.ID, err)
 		}
+	}
 
-		blockID, err := b.scheduledTxLookup.BlockIDByTransactionID(txID)
+	if !expandOptions.Transaction && !expandOptions.Result {
+		return nil
+	}
+
+	// if the transaction was not executed, there's nothing to expand.
+	if tx.Status != accessmodel.ScheduledTxStatusExecuted && tx.Status != accessmodel.ScheduledTxStatusFailed {
+		continue
+	}
+
+	txID, err := b.scheduledTxLookup.TransactionIDByID(tx.ID)
+	if err != nil {
+		// the transaction is marked as executed, so it must exist in storage.
+		return fmt.Errorf("failed to lookup transaction ID for scheduled tx %d: %w", tx.ID, err)
+	}
+
+	blockID, err := b.scheduledTxLookup.BlockIDByTransactionID(txID)
+	if err != nil {
+		return fmt.Errorf("failed to lookup block ID for tx %s: %w", txID, err)
+	}
+
+	header, err := b.headers.ByBlockID(blockID)
+	if err != nil {
+		return fmt.Errorf("failed to get header for block %s: %w", blockID, err)
+	}
+
+	if expandOptions.Transaction {
+		allScheduledTxs, err := b.transactionsProvider.ScheduledTransactionsByBlockID(ctx, header)
 		if err != nil {
-			return fmt.Errorf("failed to lookup block ID for tx %s: %w", txID, err)
+			return fmt.Errorf("could not retrieve all scheduled transactions: %w", err)
 		}
 
-		header, err := b.headers.ByBlockID(blockID)
+		for _, scheduledTx := range allScheduledTxs {
+			if scheduledTx.ID() == txID {
+				tx.Transaction = scheduledTx
+				break
+			}
+		}
+		if tx.Transaction == nil {
+			return fmt.Errorf("scheduled transaction %s not found in block %s", txID, blockID)
+		}
+	}
+
+	if expandOptions.Result {
+		result, err := b.lookupTransactionResult(ctx, txID, header, true, encodingVersion)
 		if err != nil {
-			return fmt.Errorf("failed to get header for block %s: %w", blockID, err)
+			return fmt.Errorf("failed to get transaction result for tx %s: %w", txID, err)
 		}
-
-		if expandOptions.Transaction {
-			// cache the scheduled tx lookup since it is expensive.
-			allScheduledTxs, ok := scheduledTxBodies[blockID]
-			if !ok {
-				allScheduledTxs, err = b.transactionsProvider.ScheduledTransactionsByBlockID(ctx, header)
-				if err != nil {
-					return fmt.Errorf("could not retrieve all scheduled transactions: %w", err)
-				}
-				scheduledTxBodies[blockID] = allScheduledTxs
-			}
-
-			for _, scheduledTx := range allScheduledTxs {
-				if scheduledTx.ID() == txID {
-					tx.Transaction = scheduledTx
-					break
-				}
-			}
-			if tx.Transaction == nil {
-				return fmt.Errorf("scheduled transaction %s not found in block %s", txID, blockID)
-			}
-		}
-
-		if expandOptions.Result {
-			result, err := b.lookupTransactionResult(ctx, txID, header, true, encodingVersion)
-			if err != nil {
-				return fmt.Errorf("failed to get transaction result for tx %s: %w", txID, err)
-			}
-			tx.Result = result
-		}
+		tx.Result = result
 	}
 
 	return nil
