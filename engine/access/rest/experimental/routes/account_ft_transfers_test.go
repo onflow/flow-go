@@ -69,7 +69,7 @@ func accountFTTransfersURL(t *testing.T, address string, params ftTransfersURLPa
 func testEncodeTransferCursor(t *testing.T, height uint64, txIndex uint32, eventIndex uint32) string {
 	data, err := json.Marshal(struct {
 		BlockHeight      uint64 `json:"h"`
-		TransactionIndex uint32 `json:"i"`
+		TransactionIndex uint32 `json:"t"`
 		EventIndex       uint32 `json:"e"`
 	}{height, txIndex, eventIndex})
 	require.NoError(t, err)
@@ -564,7 +564,7 @@ func TestGetAccountFungibleTokenTransfers(t *testing.T) {
 
 		rr := router.ExecuteExperimentalRequest(req, backend)
 
-		assert.Equal(t, http.StatusNotFound, rr.Code)
+		assert.Equal(t, http.StatusBadRequest, rr.Code)
 		assert.Contains(t, rr.Body.String(), "Precondition failed")
 	})
 

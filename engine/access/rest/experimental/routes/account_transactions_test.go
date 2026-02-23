@@ -55,7 +55,7 @@ func accountTransactionsURL(t *testing.T, address string, params accountTransact
 func testEncodeCursor(height uint64, txIndex uint32) string {
 	data, _ := json.Marshal(struct {
 		BlockHeight      uint64 `json:"h"`
-		TransactionIndex uint32 `json:"i"`
+		TransactionIndex uint32 `json:"t"`
 	}{height, txIndex})
 	return base64.RawURLEncoding.EncodeToString(data)
 }

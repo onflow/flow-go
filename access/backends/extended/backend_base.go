@@ -81,22 +81,44 @@ func (b *backendBase) lookupTransactionDetails(
 		return nil, nil, fmt.Errorf("could not retrieve transaction body: %w", err)
 	}
 
+	result, err := b.lookupTransactionResult(ctx, txID, header, isSystemChunkTx, encodingVersion)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return txBody, result, nil
+}
+
+// lookupTransactionDetails retrieves the transaction body and result for a given transaction.
+//
+// Since the extended indexer only indexes sealed data, all transaction and result data should exist
+// in storage for the given height.
+//
+// Expected error returns during normal operation:
+//   - [storage.ErrNotFound] if the transaction is not found
+func (b *backendBase) lookupTransactionResult(
+	ctx context.Context,
+	txID flow.Identifier,
+	header *flow.Header,
+	isSystemChunkTx bool,
+	encodingVersion entities.EventEncodingVersion,
+) (*accessmodel.TransactionResult, error) {
 	var collectionID flow.Identifier
 	// the system collection is not indexed and uses the zero ID by convention.
 	if !isSystemChunkTx {
 		collection, err := b.collections.LightByTransactionID(txID)
 		if err != nil {
-			return nil, nil, fmt.Errorf("could not retrieve collection: %w", err)
+			return nil, fmt.Errorf("could not retrieve collection: %w", err)
 		}
 		collectionID = collection.ID()
 	}
 
 	result, err := b.transactionsProvider.TransactionResult(ctx, header, txID, collectionID, encodingVersion)
 	if err != nil {
-		return nil, nil, fmt.Errorf("could not retrieve transaction result: %w", err)
+		return nil, fmt.Errorf("could not retrieve transaction result: %w", err)
 	}
 
-	return txBody, result, nil
+	return result, nil
 }
 
 // getTransactionBody retrieves the transaction body for the given transaction ID.

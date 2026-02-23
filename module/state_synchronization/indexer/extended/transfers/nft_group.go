@@ -4,19 +4,20 @@ import (
 	"fmt"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/state_synchronization/indexer/extended/events"
 )
 
 // nftDecodedWithdrawal wraps a decoded NFT withdrawal event with its source [flow.Event] metadata.
 type nftDecodedWithdrawal struct {
 	source         flow.Event
-	decoded        nftWithdrawnEvent
+	decoded        events.NFTWithdrawnEvent
 	ancestorEvents []flow.Event // events from parent withdrawals in the ProviderUUID chain
 }
 
 // nftDecodedDeposit wraps a decoded NFT deposit event with its source [flow.Event] metadata.
 type nftDecodedDeposit struct {
 	source  flow.Event
-	decoded nftDepositedEvent
+	decoded events.NFTDepositedEvent
 }
 
 // nftWithdrawalRun groups consecutive Withdrawn events with the same source address.
@@ -46,7 +47,7 @@ func newNFTTxEventGroup() *nftTxEventGroup {
 // addWithdrawal adds a withdrawal event to the event group.
 //
 // No error returns are expected during normal operation.
-func (g *nftTxEventGroup) addWithdrawal(event flow.Event, decoded *nftWithdrawnEvent) error {
+func (g *nftTxEventGroup) addWithdrawal(event flow.Event, decoded *events.NFTWithdrawnEvent) error {
 	w := &nftDecodedWithdrawal{source: event, decoded: *decoded}
 
 	existing := g.pendingWithdrawals[decoded.UUID]
@@ -77,7 +78,7 @@ func (g *nftTxEventGroup) addWithdrawal(event flow.Event, decoded *nftWithdrawnE
 // addDeposit adds a deposit event to the event group.
 //
 // No error returns are expected during normal operation.
-func (g *nftTxEventGroup) addDeposit(event flow.Event, decoded *nftDepositedEvent) error {
+func (g *nftTxEventGroup) addDeposit(event flow.Event, decoded *events.NFTDepositedEvent) error {
 	d := &nftDecodedDeposit{source: event, decoded: *decoded}
 	uuid := decoded.UUID
 

@@ -28,7 +28,6 @@ type FungibleTokenTransfer struct {
 	RecipientAddress string                          `json:"recipient_address"`
 	Transaction      *commonmodels.Transaction       `json:"transaction,omitempty"`
 	Result           *commonmodels.TransactionResult `json:"result,omitempty"`
-	Events           []commonmodels.Event            `json:"events,omitempty"`
 	Expandable       *AccountTransactionExpandable   `json:"_expandable"`
 	Links            *commonmodels.Links             `json:"_links,omitempty"`
 }

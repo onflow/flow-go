@@ -1,0 +1,595 @@
+package routes_test
+
+import (
+	"fmt"
+	"net/http"
+	"net/url"
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+	mocktestify "github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+
+	"github.com/onflow/flow/protobuf/go/flow/entities"
+
+	"github.com/onflow/flow-go/access/backends/extended"
+	extendedmock "github.com/onflow/flow-go/access/backends/extended/mock"
+	"github.com/onflow/flow-go/engine/access/rest/experimental/request"
+	"github.com/onflow/flow-go/engine/access/rest/router"
+	accessmodel "github.com/onflow/flow-go/model/access"
+	"github.com/onflow/flow-go/utils/unittest"
+)
+
+type scheduledTxURLParams struct {
+	limit  string
+	cursor string
+	status string
+	expand string
+}
+
+func scheduledTxsURL(t *testing.T, params scheduledTxURLParams) string {
+	u, err := url.ParseRequestURI("/experimental/v1/scheduled")
+	require.NoError(t, err)
+	q := u.Query()
+	if params.limit != "" {
+		q.Add("limit", params.limit)
+	}
+	if params.cursor != "" {
+		q.Add("cursor", params.cursor)
+	}
+	if params.status != "" {
+		q.Add("status", params.status)
+	}
+	if params.expand != "" {
+		q.Add("expand", params.expand)
+	}
+	u.RawQuery = q.Encode()
+	return u.String()
+}
+
+func scheduledTxByIDURL(t *testing.T, id uint64, params scheduledTxURLParams) string {
+	u, err := url.ParseRequestURI(fmt.Sprintf("/experimental/v1/scheduled/transaction/%d", id))
+	require.NoError(t, err)
+	if params.expand != "" {
+		q := u.Query()
+		q.Add("expand", params.expand)
+		u.RawQuery = q.Encode()
+	}
+	return u.String()
+}
+
+func scheduledTxsByAddrURL(t *testing.T, address string, params scheduledTxURLParams) string {
+	u, err := url.ParseRequestURI(fmt.Sprintf("/experimental/v1/scheduled/account/%s", address))
+	require.NoError(t, err)
+	q := u.Query()
+	if params.limit != "" {
+		q.Add("limit", params.limit)
+	}
+	if params.cursor != "" {
+		q.Add("cursor", params.cursor)
+	}
+	if params.status != "" {
+		q.Add("status", params.status)
+	}
+	if params.expand != "" {
+		q.Add("expand", params.expand)
+	}
+	u.RawQuery = q.Encode()
+	return u.String()
+}
+
+// testEncodeScheduledTxCursor encodes a cursor the same way the handler does, for use in
+// test assertions and inputs.
+func testEncodeScheduledTxCursor(t *testing.T, id uint64) string {
+	data, err := request.EncodeScheduledTxCursor(&accessmodel.ScheduledTransactionCursor{ID: id})
+	require.NoError(t, err)
+	return data
+}
+
+func TestGetScheduledTransactions(t *testing.T) {
+	handlerOwner := unittest.AddressFixture()
+
+	tx1 := accessmodel.ScheduledTransaction{
+		ID:                               100,
+		Priority:                         0, // high
+		Timestamp:                        1000000,
+		ExecutionEffort:                  500,
+		Fees:                             250,
+		TransactionHandlerOwner:          handlerOwner,
+		TransactionHandlerTypeIdentifier: "A.0000.MyScheduler.Handler",
+		TransactionHandlerUUID:           7,
+		Status:                           accessmodel.ScheduledTxStatusScheduled,
+	}
+	tx2 := accessmodel.ScheduledTransaction{
+		ID:                               99,
+		Priority:                         1, // medium
+		Timestamp:                        999000,
+		ExecutionEffort:                  200,
+		Fees:                             100,
+		TransactionHandlerOwner:          handlerOwner,
+		TransactionHandlerTypeIdentifier: "A.0000.MyScheduler.Handler",
+		TransactionHandlerUUID:           8,
+		Status:                           accessmodel.ScheduledTxStatusExecuted,
+	}
+
+	t.Run("happy path with next cursor", func(t *testing.T) {
+		backend := extendedmock.NewAPI(t)
+
+		page := &accessmodel.ScheduledTransactionsPage{
+			Transactions: []accessmodel.ScheduledTransaction{tx1, tx2},
+			NextCursor:   &accessmodel.ScheduledTransactionCursor{ID: 99},
+		}
+
+		backend.On("GetScheduledTransactions",
+			mocktestify.Anything,
+			uint32(0),
+			(*accessmodel.ScheduledTransactionCursor)(nil),
+			extended.ScheduledTransactionFilter{},
+			extended.ScheduledTransactionExpandOptions{},
+			entities.EventEncodingVersion_JSON_CDC_V0,
+		).Return(page, nil)
+
+		req, err := http.NewRequest(http.MethodGet, scheduledTxsURL(t, scheduledTxURLParams{}), nil)
+		require.NoError(t, err)
+
+		rr := router.ExecuteExperimentalRequest(req, backend)
+
+		assert.Equal(t, http.StatusOK, rr.Code)
+
+		expectedNextCursor := testEncodeScheduledTxCursor(t, 99)
+		expected := fmt.Sprintf(`{
+			"scheduled_transactions": [
+				{
+					"id": "100",
+					"status": "scheduled",
+					"priority": "high",
+					"timestamp": "1000000",
+					"execution_effort": "500",
+					"fees": "250",
+					"transaction_handler_owner": "%s",
+					"transaction_handler_type_identifier": "A.0000.MyScheduler.Handler",
+					"transaction_handler_uuid": "7",
+					"_expandable": {
+						"transaction": "transaction",
+						"result": "result",
+						"handler_contract": "handler_contract"
+					}
+				},
+				{
+					"id": "99",
+					"status": "executed",
+					"priority": "medium",
+					"timestamp": "999000",
+					"execution_effort": "200",
+					"fees": "100",
+					"transaction_handler_owner": "%s",
+					"transaction_handler_type_identifier": "A.0000.MyScheduler.Handler",
+					"transaction_handler_uuid": "8",
+					"_expandable": {
+						"transaction": "transaction",
+						"result": "result",
+						"handler_contract": "handler_contract"
+					}
+				}
+			],
+			"next_cursor": "%s"
+		}`, handlerOwner.String(), handlerOwner.String(), expectedNextCursor)
+
+		assert.JSONEq(t, expected, rr.Body.String())
+	})
+
+	t.Run("last page without next cursor", func(t *testing.T) {
+		backend := extendedmock.NewAPI(t)
+
+		page := &accessmodel.ScheduledTransactionsPage{
+			Transactions: []accessmodel.ScheduledTransaction{tx1},
+		}
+
+		backend.On("GetScheduledTransactions",
+			mocktestify.Anything,
+			uint32(10),
+			(*accessmodel.ScheduledTransactionCursor)(nil),
+			extended.ScheduledTransactionFilter{},
+			extended.ScheduledTransactionExpandOptions{},
+			entities.EventEncodingVersion_JSON_CDC_V0,
+		).Return(page, nil)
+
+		req, err := http.NewRequest(http.MethodGet, scheduledTxsURL(t, scheduledTxURLParams{limit: "10"}), nil)
+		require.NoError(t, err)
+
+		rr := router.ExecuteExperimentalRequest(req, backend)
+
+		assert.Equal(t, http.StatusOK, rr.Code)
+		assert.NotContains(t, rr.Body.String(), "next_cursor")
+	})
+
+	t.Run("with cursor parameter", func(t *testing.T) {
+		backend := extendedmock.NewAPI(t)
+
+		page := &accessmodel.ScheduledTransactionsPage{
+			Transactions: []accessmodel.ScheduledTransaction{tx2},
+		}
+
+		backend.On("GetScheduledTransactions",
+			mocktestify.Anything,
+			uint32(0),
+			&accessmodel.ScheduledTransactionCursor{ID: 100},
+			extended.ScheduledTransactionFilter{},
+			extended.ScheduledTransactionExpandOptions{},
+			entities.EventEncodingVersion_JSON_CDC_V0,
+		).Return(page, nil)
+
+		req, err := http.NewRequest(http.MethodGet, scheduledTxsURL(t, scheduledTxURLParams{
+			cursor: testEncodeScheduledTxCursor(t, 100),
+		}), nil)
+		require.NoError(t, err)
+
+		rr := router.ExecuteExperimentalRequest(req, backend)
+		assert.Equal(t, http.StatusOK, rr.Code)
+	})
+
+	t.Run("with status filter", func(t *testing.T) {
+		backend := extendedmock.NewAPI(t)
+
+		page := &accessmodel.ScheduledTransactionsPage{
+			Transactions: []accessmodel.ScheduledTransaction{},
+		}
+
+		backend.On("GetScheduledTransactions",
+			mocktestify.Anything,
+			uint32(0),
+			(*accessmodel.ScheduledTransactionCursor)(nil),
+			extended.ScheduledTransactionFilter{
+				Statuses: []accessmodel.ScheduledTxStatus{accessmodel.ScheduledTxStatusScheduled},
+			},
+			extended.ScheduledTransactionExpandOptions{},
+			entities.EventEncodingVersion_JSON_CDC_V0,
+		).Return(page, nil)
+
+		req, err := http.NewRequest(http.MethodGet, scheduledTxsURL(t, scheduledTxURLParams{status: "scheduled"}), nil)
+		require.NoError(t, err)
+
+		rr := router.ExecuteExperimentalRequest(req, backend)
+		assert.Equal(t, http.StatusOK, rr.Code)
+	})
+
+	t.Run("invalid limit", func(t *testing.T) {
+		backend := extendedmock.NewAPI(t)
+
+		req, err := http.NewRequest(http.MethodGet, scheduledTxsURL(t, scheduledTxURLParams{limit: "abc"}), nil)
+		require.NoError(t, err)
+
+		rr := router.ExecuteExperimentalRequest(req, backend)
+
+		assert.Equal(t, http.StatusBadRequest, rr.Code)
+		assert.Contains(t, rr.Body.String(), "invalid limit")
+	})
+
+	t.Run("invalid cursor", func(t *testing.T) {
+		backend := extendedmock.NewAPI(t)
+
+		req, err := http.NewRequest(http.MethodGet, scheduledTxsURL(t, scheduledTxURLParams{cursor: "!notbase64!"}), nil)
+		require.NoError(t, err)
+
+		rr := router.ExecuteExperimentalRequest(req, backend)
+
+		assert.Equal(t, http.StatusBadRequest, rr.Code)
+		assert.Contains(t, rr.Body.String(), "invalid cursor encoding")
+	})
+
+	t.Run("invalid status", func(t *testing.T) {
+		backend := extendedmock.NewAPI(t)
+
+		req, err := http.NewRequest(http.MethodGet, scheduledTxsURL(t, scheduledTxURLParams{status: "unknown"}), nil)
+		require.NoError(t, err)
+
+		rr := router.ExecuteExperimentalRequest(req, backend)
+
+		assert.Equal(t, http.StatusBadRequest, rr.Code)
+		assert.Contains(t, rr.Body.String(), "invalid status")
+	})
+
+	t.Run("backend returns failed precondition", func(t *testing.T) {
+		backend := extendedmock.NewAPI(t)
+
+		backend.On("GetScheduledTransactions",
+			mocktestify.Anything,
+			uint32(0),
+			(*accessmodel.ScheduledTransactionCursor)(nil),
+			extended.ScheduledTransactionFilter{},
+			extended.ScheduledTransactionExpandOptions{},
+			entities.EventEncodingVersion_JSON_CDC_V0,
+		).Return(nil, status.Errorf(codes.FailedPrecondition, "index not initialized"))
+
+		req, err := http.NewRequest(http.MethodGet, scheduledTxsURL(t, scheduledTxURLParams{}), nil)
+		require.NoError(t, err)
+
+		rr := router.ExecuteExperimentalRequest(req, backend)
+
+		assert.Equal(t, http.StatusBadRequest, rr.Code)
+		assert.Contains(t, rr.Body.String(), "Precondition failed")
+	})
+}
+
+func TestGetScheduledTransaction(t *testing.T) {
+	handlerOwner := unittest.AddressFixture()
+
+	tx := &accessmodel.ScheduledTransaction{
+		ID:                               42,
+		Priority:                         0, // high
+		Timestamp:                        2000000,
+		ExecutionEffort:                  750,
+		Fees:                             300,
+		TransactionHandlerOwner:          handlerOwner,
+		TransactionHandlerTypeIdentifier: "A.0000.MyScheduler.Handler",
+		TransactionHandlerUUID:           3,
+		Status:                           accessmodel.ScheduledTxStatusScheduled,
+	}
+
+	t.Run("happy path", func(t *testing.T) {
+		backend := extendedmock.NewAPI(t)
+
+		backend.On("GetScheduledTransaction",
+			mocktestify.Anything,
+			uint64(42),
+			extended.ScheduledTransactionExpandOptions{},
+			entities.EventEncodingVersion_JSON_CDC_V0,
+		).Return(tx, nil)
+
+		req, err := http.NewRequest(http.MethodGet, scheduledTxByIDURL(t, 42, scheduledTxURLParams{}), nil)
+		require.NoError(t, err)
+
+		rr := router.ExecuteExperimentalRequest(req, backend)
+
+		assert.Equal(t, http.StatusOK, rr.Code)
+
+		expected := fmt.Sprintf(`{
+			"id": "42",
+			"status": "scheduled",
+			"priority": "high",
+			"timestamp": "2000000",
+			"execution_effort": "750",
+			"fees": "300",
+			"transaction_handler_owner": "%s",
+			"transaction_handler_type_identifier": "A.0000.MyScheduler.Handler",
+			"transaction_handler_uuid": "3",
+			"_expandable": {
+				"transaction": "transaction",
+				"result": "result",
+				"handler_contract": "handler_contract"
+			}
+		}`, handlerOwner.String())
+
+		assert.JSONEq(t, expected, rr.Body.String())
+	})
+
+	t.Run("invalid ID - non-numeric", func(t *testing.T) {
+		backend := extendedmock.NewAPI(t)
+
+		req, err := http.NewRequest(http.MethodGet, "/experimental/v1/scheduled/transaction/notanumber", nil)
+		require.NoError(t, err)
+
+		rr := router.ExecuteExperimentalRequest(req, backend)
+
+		assert.Equal(t, http.StatusBadRequest, rr.Code)
+		assert.Contains(t, rr.Body.String(), "invalid scheduled transaction ID")
+	})
+
+	t.Run("backend returns not found", func(t *testing.T) {
+		backend := extendedmock.NewAPI(t)
+
+		backend.On("GetScheduledTransaction",
+			mocktestify.Anything,
+			uint64(999),
+			extended.ScheduledTransactionExpandOptions{},
+			entities.EventEncodingVersion_JSON_CDC_V0,
+		).Return(nil, status.Errorf(codes.NotFound, "scheduled transaction 999 not found"))
+
+		req, err := http.NewRequest(http.MethodGet, scheduledTxByIDURL(t, 999, scheduledTxURLParams{}), nil)
+		require.NoError(t, err)
+
+		rr := router.ExecuteExperimentalRequest(req, backend)
+
+		assert.Equal(t, http.StatusNotFound, rr.Code)
+	})
+}
+
+func TestGetScheduledTransactionsByAddress(t *testing.T) {
+	address := unittest.AddressFixture()
+	handlerOwner := unittest.AddressFixture()
+
+	tx1 := accessmodel.ScheduledTransaction{
+		ID:                               50,
+		Priority:                         0, // high
+		Timestamp:                        5000000,
+		ExecutionEffort:                  300,
+		Fees:                             150,
+		TransactionHandlerOwner:          handlerOwner,
+		TransactionHandlerTypeIdentifier: "A.0000.MyScheduler.Handler",
+		TransactionHandlerUUID:           5,
+		Status:                           accessmodel.ScheduledTxStatusScheduled,
+	}
+	tx2 := accessmodel.ScheduledTransaction{
+		ID:                               49,
+		Priority:                         2, // low
+		Timestamp:                        4500000,
+		ExecutionEffort:                  100,
+		Fees:                             50,
+		TransactionHandlerOwner:          handlerOwner,
+		TransactionHandlerTypeIdentifier: "A.0000.MyScheduler.Handler",
+		TransactionHandlerUUID:           6,
+		Status:                           accessmodel.ScheduledTxStatusCancelled,
+	}
+
+	t.Run("happy path with next cursor", func(t *testing.T) {
+		backend := extendedmock.NewAPI(t)
+
+		page := &accessmodel.ScheduledTransactionsPage{
+			Transactions: []accessmodel.ScheduledTransaction{tx1, tx2},
+			NextCursor:   &accessmodel.ScheduledTransactionCursor{ID: 49},
+		}
+
+		backend.On("GetScheduledTransactionsByAddress",
+			mocktestify.Anything,
+			address,
+			uint32(0),
+			(*accessmodel.ScheduledTransactionCursor)(nil),
+			extended.ScheduledTransactionFilter{},
+			extended.ScheduledTransactionExpandOptions{},
+			entities.EventEncodingVersion_JSON_CDC_V0,
+		).Return(page, nil)
+
+		req, err := http.NewRequest(http.MethodGet, scheduledTxsByAddrURL(t, address.String(), scheduledTxURLParams{}), nil)
+		require.NoError(t, err)
+
+		rr := router.ExecuteExperimentalRequest(req, backend)
+
+		assert.Equal(t, http.StatusOK, rr.Code)
+		assert.Contains(t, rr.Body.String(), testEncodeScheduledTxCursor(t, 49))
+	})
+
+	t.Run("last page without next cursor", func(t *testing.T) {
+		backend := extendedmock.NewAPI(t)
+
+		page := &accessmodel.ScheduledTransactionsPage{
+			Transactions: []accessmodel.ScheduledTransaction{tx1},
+		}
+
+		backend.On("GetScheduledTransactionsByAddress",
+			mocktestify.Anything,
+			address,
+			uint32(5),
+			(*accessmodel.ScheduledTransactionCursor)(nil),
+			extended.ScheduledTransactionFilter{},
+			extended.ScheduledTransactionExpandOptions{},
+			entities.EventEncodingVersion_JSON_CDC_V0,
+		).Return(page, nil)
+
+		req, err := http.NewRequest(http.MethodGet, scheduledTxsByAddrURL(t, address.String(), scheduledTxURLParams{limit: "5"}), nil)
+		require.NoError(t, err)
+
+		rr := router.ExecuteExperimentalRequest(req, backend)
+
+		assert.Equal(t, http.StatusOK, rr.Code)
+		assert.NotContains(t, rr.Body.String(), "next_cursor")
+	})
+
+	t.Run("with cursor parameter", func(t *testing.T) {
+		backend := extendedmock.NewAPI(t)
+
+		page := &accessmodel.ScheduledTransactionsPage{
+			Transactions: []accessmodel.ScheduledTransaction{tx2},
+		}
+
+		backend.On("GetScheduledTransactionsByAddress",
+			mocktestify.Anything,
+			address,
+			uint32(0),
+			&accessmodel.ScheduledTransactionCursor{ID: 50},
+			extended.ScheduledTransactionFilter{},
+			extended.ScheduledTransactionExpandOptions{},
+			entities.EventEncodingVersion_JSON_CDC_V0,
+		).Return(page, nil)
+
+		req, err := http.NewRequest(http.MethodGet, scheduledTxsByAddrURL(t, address.String(), scheduledTxURLParams{
+			cursor: testEncodeScheduledTxCursor(t, 50),
+		}), nil)
+		require.NoError(t, err)
+
+		rr := router.ExecuteExperimentalRequest(req, backend)
+		assert.Equal(t, http.StatusOK, rr.Code)
+	})
+
+	t.Run("address with 0x prefix", func(t *testing.T) {
+		backend := extendedmock.NewAPI(t)
+
+		page := &accessmodel.ScheduledTransactionsPage{
+			Transactions: []accessmodel.ScheduledTransaction{tx1},
+		}
+
+		backend.On("GetScheduledTransactionsByAddress",
+			mocktestify.Anything,
+			address,
+			uint32(0),
+			(*accessmodel.ScheduledTransactionCursor)(nil),
+			extended.ScheduledTransactionFilter{},
+			extended.ScheduledTransactionExpandOptions{},
+			entities.EventEncodingVersion_JSON_CDC_V0,
+		).Return(page, nil)
+
+		req, err := http.NewRequest(http.MethodGet, scheduledTxsByAddrURL(t, "0x"+address.String(), scheduledTxURLParams{}), nil)
+		require.NoError(t, err)
+
+		rr := router.ExecuteExperimentalRequest(req, backend)
+		assert.Equal(t, http.StatusOK, rr.Code)
+	})
+
+	t.Run("invalid address", func(t *testing.T) {
+		backend := extendedmock.NewAPI(t)
+
+		req, err := http.NewRequest(http.MethodGet, scheduledTxsByAddrURL(t, "invalid", scheduledTxURLParams{}), nil)
+		require.NoError(t, err)
+
+		rr := router.ExecuteExperimentalRequest(req, backend)
+
+		assert.Equal(t, http.StatusBadRequest, rr.Code)
+		assert.Contains(t, rr.Body.String(), "invalid address")
+	})
+
+	t.Run("invalid cursor", func(t *testing.T) {
+		backend := extendedmock.NewAPI(t)
+
+		req, err := http.NewRequest(http.MethodGet, scheduledTxsByAddrURL(t, address.String(), scheduledTxURLParams{cursor: "badcursor"}), nil)
+		require.NoError(t, err)
+
+		rr := router.ExecuteExperimentalRequest(req, backend)
+
+		assert.Equal(t, http.StatusBadRequest, rr.Code)
+		assert.Contains(t, rr.Body.String(), "invalid cursor encoding")
+	})
+
+	t.Run("backend returns not found", func(t *testing.T) {
+		backend := extendedmock.NewAPI(t)
+
+		backend.On("GetScheduledTransactionsByAddress",
+			mocktestify.Anything,
+			address,
+			uint32(0),
+			(*accessmodel.ScheduledTransactionCursor)(nil),
+			extended.ScheduledTransactionFilter{},
+			extended.ScheduledTransactionExpandOptions{},
+			entities.EventEncodingVersion_JSON_CDC_V0,
+		).Return(nil, status.Errorf(codes.NotFound, "no transactions for address %s", address))
+
+		req, err := http.NewRequest(http.MethodGet, scheduledTxsByAddrURL(t, address.String(), scheduledTxURLParams{}), nil)
+		require.NoError(t, err)
+
+		rr := router.ExecuteExperimentalRequest(req, backend)
+
+		assert.Equal(t, http.StatusNotFound, rr.Code)
+	})
+
+	t.Run("backend returns failed precondition", func(t *testing.T) {
+		backend := extendedmock.NewAPI(t)
+
+		backend.On("GetScheduledTransactionsByAddress",
+			mocktestify.Anything,
+			address,
+			uint32(0),
+			(*accessmodel.ScheduledTransactionCursor)(nil),
+			extended.ScheduledTransactionFilter{},
+			extended.ScheduledTransactionExpandOptions{},
+			entities.EventEncodingVersion_JSON_CDC_V0,
+		).Return(nil, status.Errorf(codes.FailedPrecondition, "index not initialized"))
+
+		req, err := http.NewRequest(http.MethodGet, scheduledTxsByAddrURL(t, address.String(), scheduledTxURLParams{}), nil)
+		require.NoError(t, err)
+
+		rr := router.ExecuteExperimentalRequest(req, backend)
+
+		assert.Equal(t, http.StatusBadRequest, rr.Code)
+		assert.Contains(t, rr.Body.String(), "Precondition failed")
+	})
+}

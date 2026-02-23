@@ -71,7 +71,7 @@ var _ storage.FungibleTokenTransfers = (*FungibleTokenTransfers)(nil)
 // Expected error returns during normal operations:
 //   - [storage.ErrNotBootstrapped] if the index has not been initialized
 func NewFungibleTokenTransfers(db storage.DB) (*FungibleTokenTransfers, error) {
-	firstHeight, err := heightLookup(db.Reader(), keyAccountFTTransferFirstHeightKey)
+	firstHeight, err := readHeight(db.Reader(), keyAccountFTTransferFirstHeightKey)
 	if err != nil {
 		if errors.Is(err, storage.ErrNotFound) {
 			return nil, storage.ErrNotBootstrapped
@@ -79,7 +79,7 @@ func NewFungibleTokenTransfers(db storage.DB) (*FungibleTokenTransfers, error) {
 		return nil, fmt.Errorf("could not get first height: %w", err)
 	}
 
-	persistedLatestHeight, err := heightLookup(db.Reader(), keyAccountFTTransferLatestHeightKey)
+	persistedLatestHeight, err := readHeight(db.Reader(), keyAccountFTTransferLatestHeightKey)
 	if err != nil {
 		return nil, fmt.Errorf("could not get latest height: %w", err)
 	}
@@ -153,15 +153,8 @@ func (idx *FungibleTokenTransfers) ByAddress(
 
 	latestHeight := idx.latestHeight.Load()
 	if cursor != nil {
-		if cursor.BlockHeight > latestHeight {
-			return access.FungibleTokenTransfersPage{}, fmt.Errorf(
-				"cursor height %d is greater than latest indexed height %d: %w",
-				cursor.BlockHeight, latestHeight, storage.ErrHeightNotIndexed)
-		}
-		if cursor.BlockHeight < idx.firstHeight {
-			return access.FungibleTokenTransfersPage{}, fmt.Errorf(
-				"cursor height %d is before first indexed height %d: %w",
-				cursor.BlockHeight, idx.firstHeight, storage.ErrHeightNotIndexed)
+		if err := validateCursorHeight(cursor.BlockHeight, idx.firstHeight, latestHeight); err != nil {
+			return access.FungibleTokenTransfersPage{}, err
 		}
 		latestHeight = cursor.BlockHeight
 	}
@@ -183,14 +176,8 @@ func (idx *FungibleTokenTransfers) ByAddress(
 //   - [storage.ErrAlreadyExists] if the block height is already indexed
 func (idx *FungibleTokenTransfers) Store(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockHeight uint64, transfers []access.FungibleTokenTransfer) error {
 	latestHeight := idx.latestHeight.Load()
-
-	if blockHeight <= latestHeight {
-		return storage.ErrAlreadyExists
-	}
-
-	expectedHeight := latestHeight + 1
-	if blockHeight != expectedHeight {
-		return fmt.Errorf("must index consecutive heights: expected %d, got %d", expectedHeight, blockHeight)
+	if err := validateStoreHeight(blockHeight, latestHeight); err != nil {
+		return err
 	}
 
 	err := indexFTTransfers(lctx, rw, blockHeight, transfers)
@@ -319,7 +306,7 @@ func indexFTTransfers(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockHei
 		return fmt.Errorf("missing required lock: %s", storage.LockIndexFungibleTokenTransfers)
 	}
 
-	latestHeight, err := heightLookup(rw.GlobalReader(), keyAccountFTTransferLatestHeightKey)
+	latestHeight, err := readHeight(rw.GlobalReader(), keyAccountFTTransferLatestHeightKey)
 	if err != nil {
 		return fmt.Errorf("could not get latest indexed height: %w", err)
 	}
@@ -501,16 +488,4 @@ func decodeFTTransferKey(key []byte) (flow.Address, uint64, uint32, uint32, erro
 	eventIndex := binary.BigEndian.Uint32(key[offset:])
 
 	return address, height, txIndex, eventIndex, nil
-}
-
-// heightLookup reads a height value from the database.
-//
-// Expected error returns during normal operations:
-//   - [storage.ErrNotFound] if the height is not found
-func heightLookup(reader storage.Reader, key []byte) (uint64, error) {
-	var height uint64
-	if err := operation.RetrieveByKey(reader, key, &height); err != nil {
-		return 0, err
-	}
-	return height, nil
 }

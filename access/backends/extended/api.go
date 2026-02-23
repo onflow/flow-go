@@ -70,4 +70,45 @@ type API interface {
 		expandResults bool,
 		encodingVersion entities.EventEncodingVersion,
 	) (*accessmodel.NonFungibleTokenTransfersPage, error)
+
+	// GetScheduledTransaction returns a single scheduled transaction by its scheduler-assigned ID.
+	//
+	// Expected error returns during normal operations:
+	//   - [codes.NotFound]: if no transaction with the given ID exists
+	//   - [codes.FailedPrecondition]: if the index has not been initialized
+	GetScheduledTransaction(
+		ctx context.Context,
+		id uint64,
+		expandOptions ScheduledTransactionExpandOptions,
+		encodingVersion entities.EventEncodingVersion,
+	) (*accessmodel.ScheduledTransaction, error)
+
+	// GetScheduledTransactions returns a paginated list of scheduled transactions.
+	//
+	// Expected error returns during normal operations:
+	//   - [codes.FailedPrecondition]: if the index has not been initialized
+	//   - [codes.InvalidArgument]: if the query parameters are invalid
+	GetScheduledTransactions(
+		ctx context.Context,
+		limit uint32,
+		cursor *accessmodel.ScheduledTransactionCursor,
+		filter ScheduledTransactionFilter,
+		expandOptions ScheduledTransactionExpandOptions,
+		encodingVersion entities.EventEncodingVersion,
+	) (*accessmodel.ScheduledTransactionsPage, error)
+
+	// GetScheduledTransactionsByAddress returns a paginated list of scheduled transactions for the given address.
+	//
+	// Expected error returns during normal operations:
+	//   - [codes.FailedPrecondition]: if the index has not been initialized
+	//   - [codes.InvalidArgument]: if the query parameters are invalid
+	GetScheduledTransactionsByAddress(
+		ctx context.Context,
+		address flow.Address,
+		limit uint32,
+		cursor *accessmodel.ScheduledTransactionCursor,
+		filter ScheduledTransactionFilter,
+		expandOptions ScheduledTransactionExpandOptions,
+		encodingVersion entities.EventEncodingVersion,
+	) (*accessmodel.ScheduledTransactionsPage, error)
 }

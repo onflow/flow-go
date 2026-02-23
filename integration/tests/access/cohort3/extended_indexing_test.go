@@ -63,14 +63,16 @@ func TestExtendedIndexing(t *testing.T) {
 	suite.Run(t, new(ExtendedIndexingSuite))
 }
 
-// ExtendedIndexingSuite verifies that the extended indexer (account_transactions) correctly indexes
-// data when enabled on an access node. It uses the gRPC API to confirm that block heights are
-// being processed through the full pipeline:
+// ExtendedIndexingSuite verifies that the extended indexer correctly indexes data when enabled
+// on an access node. It tests the full pipeline:
 //
 //	block production → execution data sync → execution state indexing → extended indexing
+//
+// It covers account transactions, FT/NFT transfers, and scheduled transactions.
 type ExtendedIndexingSuite struct {
 	suite.Suite
 	net         *testnet.FlowNetwork
+	ctx         context.Context
 	cancel      context.CancelFunc
 	apiClient   *testnet.ExperimentalAPIClient
 	restBaseURL string
@@ -82,6 +84,12 @@ func (s *ExtendedIndexingSuite) SetupTest() {
 		testnet.WithAdditionalFlagf("--required-verification-seal-approvals=%d", 1),
 		testnet.WithAdditionalFlagf("--required-construction-seal-approvals=%d", 1),
 		testnet.WithLogLevel(zerolog.FatalLevel),
+	}
+
+	executionConfigs := []func(config *testnet.NodeConfig){
+		testnet.WithLogLevel(zerolog.FatalLevel),
+		// Enable scheduled transaction execution so PendingExecution/Executed events are emitted.
+		testnet.WithAdditionalFlag("--scheduled-callbacks-enabled=true"),
 	}
 
 	// Access node with execution data sync, execution data indexing, and extended indexing enabled.
@@ -98,8 +106,8 @@ func (s *ExtendedIndexingSuite) SetupTest() {
 	nodeConfigs := []testnet.NodeConfig{
 		testnet.NewNodeConfig(flow.RoleCollection, testnet.WithLogLevel(zerolog.FatalLevel)),
 		testnet.NewNodeConfig(flow.RoleCollection, testnet.WithLogLevel(zerolog.FatalLevel)),
-		testnet.NewNodeConfig(flow.RoleExecution, testnet.WithLogLevel(zerolog.FatalLevel)),
-		testnet.NewNodeConfig(flow.RoleExecution, testnet.WithLogLevel(zerolog.FatalLevel)),
+		testnet.NewNodeConfig(flow.RoleExecution, executionConfigs...),
+		testnet.NewNodeConfig(flow.RoleExecution, executionConfigs...),
 		testnet.NewNodeConfig(flow.RoleConsensus, consensusConfigs...),
 		testnet.NewNodeConfig(flow.RoleConsensus, consensusConfigs...),
 		testnet.NewNodeConfig(flow.RoleConsensus, consensusConfigs...),
@@ -107,10 +115,14 @@ func (s *ExtendedIndexingSuite) SetupTest() {
 		testnet.NewNodeConfig(flow.RoleAccess, accessNodeOpts...),
 	}
 
-	conf := testnet.NewNetworkConfig("access_extended_indexing_test", nodeConfigs)
+	conf := testnet.NewNetworkConfig("access_extended_indexing_test", nodeConfigs,
+		testnet.WithViewsInStakingAuction(10_000),
+		testnet.WithViewsInEpoch(100_000),
+	)
 	s.net = testnet.PrepareFlowNetwork(s.T(), conf, flow.Localnet)
 
 	ctx, cancel := context.WithCancel(context.Background())
+	s.ctx = ctx
 	s.cancel = cancel
 	s.net.Start(ctx)
 

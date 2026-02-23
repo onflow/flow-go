@@ -34,6 +34,14 @@ var (
 
 	// ErrInvalidQuery is returned when parameters passed to a read query are invalid (e.g., startHeight > endHeight).
 	ErrInvalidQuery = errors.New("invalid query")
+
+	// ErrScheduledTxFieldMismatch is returned when a scheduled transaction already exists
+	// with different field values during Store.
+	ErrScheduledTxFieldMismatch = errors.New("scheduled transaction field mismatch")
+
+	// ErrInvalidStatusTransition is returned when a status update is not valid for the
+	// current state (e.g. executing an already-cancelled transaction).
+	ErrInvalidStatusTransition = errors.New("invalid scheduled transaction status transition")
 )
 
 // InvalidDKGStateTransitionError is a sentinel error that is returned in case an invalid state transition is attempted.

@@ -92,7 +92,7 @@ func (h *HttpHandler) ErrorHandler(w http.ResponseWriter, err error, errorLogger
 			return
 		case codes.Internal:
 			msg := fmt.Sprintf("Invalid Flow request: %s", se.Message())
-			h.errorResponse(w, http.StatusBadRequest, msg, errorLogger)
+			h.errorResponse(w, http.StatusInternalServerError, msg, errorLogger)
 			return
 		case codes.Unavailable:
 			msg := fmt.Sprintf("Failed to process request: %s", se.Message())

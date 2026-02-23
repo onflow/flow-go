@@ -16,6 +16,7 @@ type Storage struct {
 	AccountTransactionsBootstrapper       storage.AccountTransactionsBootstrapper
 	FungibleTokenTransfersBootstrapper    storage.FungibleTokenTransfersBootstrapper
 	NonFungibleTokenTransfersBootstrapper storage.NonFungibleTokenTransfersBootstrapper
+	ScheduledTransactionsBootstrapper     storage.ScheduledTransactionsIndexBootstrapper
 }
 
 // OpenExtendedIndexDB opens the pebble database for extended indexes and creates the account
@@ -62,10 +63,19 @@ func OpenExtendedIndexDB(
 		return Storage{}, fmt.Errorf("could not create non-fungible token transfers index: %w", err)
 	}
 
+	scheduledTxStore, err := indexes.NewScheduledTransactionsBootstrapper(indexerStorageDB, sealedRootHeight)
+	if err != nil {
+		if closeErr := indexerDB.Close(); closeErr != nil {
+			log.Error().Err(closeErr).Msg("error closing indexer db")
+		}
+		return Storage{}, fmt.Errorf("could not create scheduled transactions index: %w", err)
+	}
+
 	return Storage{
 		DB:                                    indexerStorageDB,
 		AccountTransactionsBootstrapper:       accountTxStore,
 		FungibleTokenTransfersBootstrapper:    ftStore,
 		NonFungibleTokenTransfersBootstrapper: nftStore,
+		ScheduledTransactionsBootstrapper:     scheduledTxStore,
 	}, nil
 }

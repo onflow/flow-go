@@ -4,26 +4,27 @@ import (
 	"fmt"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/state_synchronization/indexer/extended/events"
 )
 
 // ftDecodedWithdrawal wraps a decoded FT withdrawal event with its source [flow.Event] metadata.
 type ftDecodedWithdrawal struct {
 	source         flow.Event
-	decoded        ftWithdrawnEvent
+	decoded        events.FTWithdrawnEvent
 	ancestorEvents []flow.Event // events from removed parent withdrawals in the event chain
 }
 
 // ftDecodedDeposit wraps a decoded FT deposit event with its source [flow.Event] metadata.
 type ftDecodedDeposit struct {
 	source  flow.Event
-	decoded ftDepositedEvent
+	decoded events.FTDepositedEvent
 }
 
 // ftTxEventGroup holds decoded withdrawal and deposit events for a single transaction.
 type ftTxEventGroup struct {
 	withdrawals []*ftDecodedWithdrawal
 	deposits    []*ftDecodedDeposit
-	flowFees    *flowFeesEvent
+	flowFees    *events.FlowFeesEvent
 
 	withdrawalByUUID map[uint64]int
 	matchedDeposits  map[uint64]struct{}
@@ -44,7 +45,7 @@ func newFTTxEventGroup(flowFeesAddress flow.Address) *ftTxEventGroup {
 // addWithdrawal adds a withdrawal event to the event group.
 //
 // No error returns are expected during normal operation.
-func (g *ftTxEventGroup) addWithdrawal(event flow.Event, decoded *ftWithdrawnEvent) error {
+func (g *ftTxEventGroup) addWithdrawal(event flow.Event, decoded *events.FTWithdrawnEvent) error {
 	w := &ftDecodedWithdrawal{source: event, decoded: *decoded}
 
 	// 1. build a mapping of withdrawn vault UUID to the index in the `withdrawals` slice.
@@ -88,7 +89,7 @@ func (g *ftTxEventGroup) addWithdrawal(event flow.Event, decoded *ftWithdrawnEve
 // addDeposit adds a deposit event to the event group.
 //
 // No error returns are expected during normal operation.
-func (g *ftTxEventGroup) addDeposit(event flow.Event, decoded *ftDepositedEvent) error {
+func (g *ftTxEventGroup) addDeposit(event flow.Event, decoded *events.FTDepositedEvent) error {
 	d := &ftDecodedDeposit{source: event, decoded: *decoded}
 	g.deposits = append(g.deposits, d)
 
@@ -137,7 +138,7 @@ func (g *ftTxEventGroup) addDeposit(event flow.Event, decoded *ftDepositedEvent)
 // addFlowFees adds a flow fees event to the event group.
 //
 // No error returns are expected during normal operation.
-func (g *ftTxEventGroup) addFlowFees(decoded *flowFeesEvent) error {
+func (g *ftTxEventGroup) addFlowFees(decoded *events.FlowFeesEvent) error {
 	g.flowFees = decoded
 
 	// a flow fees deposit always comes after the withdrawal and deposit events, so it will always have a pair.

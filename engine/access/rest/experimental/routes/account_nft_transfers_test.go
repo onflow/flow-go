@@ -456,7 +456,7 @@ func TestGetAccountNonFungibleTokenTransfers(t *testing.T) {
 
 		rr := router.ExecuteExperimentalRequest(req, backend)
 
-		assert.Equal(t, http.StatusNotFound, rr.Code)
+		assert.Equal(t, http.StatusBadRequest, rr.Code)
 		assert.Contains(t, rr.Body.String(), "Precondition failed")
 	})
 

@@ -9,6 +9,7 @@ import (
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/state_synchronization/indexer/extended/events"
 )
 
 const (
@@ -22,9 +23,9 @@ const (
 // For mints (deposit-only), withdrawal is nil.
 // For burns (withdrawal-only), deposit is nil.
 type ftPairedResult struct {
-	sourceEvents []flow.Event      // the flow.Event(s) that produced this result
-	withdrawal   *ftWithdrawnEvent // nil for deposit-only (mint)
-	deposit      *ftDepositedEvent // nil for withdrawal-only (burn)
+	sourceEvents []flow.Event               // the flow.Event(s) that produced this result
+	withdrawal   *events.FTWithdrawnEvent   // nil for deposit-only (mint)
+	deposit      *events.FTDepositedEvent   // nil for withdrawal-only (burn)
 	isFlowFees   bool              // true if the result is a flow fees deposit
 }
 
@@ -82,7 +83,7 @@ func (p *FTParser) Parse(events []flow.Event, blockHeight uint64) ([]access.Fung
 // and groups the results by transaction index.
 //
 // No error returns are expected during normal operation.
-func (p *FTParser) filterAndDecodeFT(events []flow.Event) (map[uint32]*ftTxEventGroup, error) {
+func (p *FTParser) filterAndDecodeFT(blockEvents []flow.Event) (map[uint32]*ftTxEventGroup, error) {
 	txEventGroups := make(map[uint32]*ftTxEventGroup)
 
 	ensureGroup := func(txIndex uint32) *ftTxEventGroup {
@@ -94,14 +95,14 @@ func (p *FTParser) filterAndDecodeFT(events []flow.Event) (map[uint32]*ftTxEvent
 		return g
 	}
 
-	for _, event := range events {
+	for _, event := range blockEvents {
 		switch event.Type {
 		case p.withdrawnEventType:
-			cadenceEvent, err := DecodeEvent(event)
+			cadenceEvent, err := events.DecodePayload(event)
 			if err != nil {
 				return nil, fmt.Errorf("failed to decode event %d in transaction %d: %w", event.EventIndex, event.TransactionIndex, err)
 			}
-			decoded, err := decodeFTWithdrawn(cadenceEvent)
+			decoded, err := events.DecodeFTWithdrawn(cadenceEvent)
 			if err != nil {
 				return nil, fmt.Errorf("failed to decode withdrawn event %d in transaction %d: %w", event.EventIndex, event.TransactionIndex, err)
 			}
@@ -112,11 +113,11 @@ func (p *FTParser) filterAndDecodeFT(events []flow.Event) (map[uint32]*ftTxEvent
 			}
 
 		case p.depositedEventType:
-			cadenceEvent, err := DecodeEvent(event)
+			cadenceEvent, err := events.DecodePayload(event)
 			if err != nil {
 				return nil, fmt.Errorf("failed to decode event %d in transaction %d: %w", event.EventIndex, event.TransactionIndex, err)
 			}
-			decoded, err := decodeFTDeposited(cadenceEvent)
+			decoded, err := events.DecodeFTDeposited(cadenceEvent)
 			if err != nil {
 				return nil, fmt.Errorf("failed to decode deposited event %d in transaction %d: %w", event.EventIndex, event.TransactionIndex, err)
 			}
@@ -127,11 +128,11 @@ func (p *FTParser) filterAndDecodeFT(events []flow.Event) (map[uint32]*ftTxEvent
 			}
 
 		case p.flowFeesEventType:
-			cadenceEvent, err := DecodeEvent(event)
+			cadenceEvent, err := events.DecodePayload(event)
 			if err != nil {
 				return nil, fmt.Errorf("failed to decode event %d in transaction %d: %w", event.EventIndex, event.TransactionIndex, err)
 			}
-			decoded, err := decodeFlowFees(cadenceEvent)
+			decoded, err := events.DecodeFlowFees(cadenceEvent)
 			if err != nil {
 				return nil, fmt.Errorf("failed to decode flow fees event %d in transaction %d: %w", event.EventIndex, event.TransactionIndex, err)
 			}

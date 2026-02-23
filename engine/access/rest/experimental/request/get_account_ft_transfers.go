@@ -42,7 +42,7 @@ func NewGetAccountFTTransfers(r *common.Request) (GetAccountFTTransfers, error) 
 	}
 
 	if raw := r.GetQueryParam("cursor"); raw != "" {
-		c, err := ParseTransferCursor(raw)
+		c, err := parseTransferCursor(raw)
 		if err != nil {
 			return req, err
 		}
@@ -78,4 +78,17 @@ func NewGetAccountFTTransfers(r *common.Request) (GetAccountFTTransfers, error) 
 	}
 
 	return req, nil
+}
+
+// ParseTransferRole parses a role query parameter value into a TransferRole.
+//
+// All errors indicate the role is invalid.
+func ParseTransferRole(raw string) (accessmodel.TransferRole, error) {
+	role := accessmodel.TransferRole(raw)
+	switch role {
+	case accessmodel.TransferRoleSender, accessmodel.TransferRoleRecipient:
+		return role, nil
+	default:
+		return "", fmt.Errorf("invalid role %q: must be \"sender\" or \"recipient\"", raw)
+	}
 }

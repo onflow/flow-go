@@ -1,4 +1,4 @@
-package transfers
+package events
 
 import (
 	"fmt"
@@ -8,8 +8,8 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// nftWithdrawnEvent represents a decoded NonFungibleToken.Withdrawn event.
-type nftWithdrawnEvent struct {
+// NFTWithdrawnEvent represents a decoded NonFungibleToken.Withdrawn event.
+type NFTWithdrawnEvent struct {
 	Type         string
 	ID           uint64 // NFT ID
 	UUID         uint64
@@ -17,8 +17,8 @@ type nftWithdrawnEvent struct {
 	ProviderUUID uint64
 }
 
-// nftDepositedEvent represents a decoded NonFungibleToken.Deposited event.
-type nftDepositedEvent struct {
+// NFTDepositedEvent represents a decoded NonFungibleToken.Deposited event.
+type NFTDepositedEvent struct {
 	Type           string
 	ID             uint64 // NFT ID
 	UUID           uint64
@@ -26,10 +26,10 @@ type nftDepositedEvent struct {
 	CollectionUUID uint64
 }
 
-// decodeNFTDeposited extracts fields from a NonFungibleToken.Deposited event.
+// DecodeNFTDeposited extracts fields from a NonFungibleToken.Deposited event.
 //
 // Any error indicates that the event is malformed.
-func decodeNFTDeposited(event cadence.Event) (*nftDepositedEvent, error) {
+func DecodeNFTDeposited(event cadence.Event) (*NFTDepositedEvent, error) {
 	type nftDepositedEventRaw struct {
 		Type           string           `cadence:"type"`
 		ID             uint64           `cadence:"id"`
@@ -43,12 +43,12 @@ func decodeNFTDeposited(event cadence.Event) (*nftDepositedEvent, error) {
 		return nil, fmt.Errorf("failed to decode NFT deposited event: %w", err)
 	}
 
-	to, err := addressFromOptional(raw.To)
+	to, err := AddressFromOptional(raw.To)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode NFT deposited 'to' field: %w", err)
 	}
 
-	return &nftDepositedEvent{
+	return &NFTDepositedEvent{
 		Type:           raw.Type,
 		ID:             raw.ID,
 		UUID:           raw.UUID,
@@ -57,10 +57,10 @@ func decodeNFTDeposited(event cadence.Event) (*nftDepositedEvent, error) {
 	}, nil
 }
 
-// decodeNFTWithdrawn extracts fields from a NonFungibleToken.Withdrawn event.
+// DecodeNFTWithdrawn extracts fields from a NonFungibleToken.Withdrawn event.
 //
 // Any error indicates that the event is malformed.
-func decodeNFTWithdrawn(event cadence.Event) (*nftWithdrawnEvent, error) {
+func DecodeNFTWithdrawn(event cadence.Event) (*NFTWithdrawnEvent, error) {
 	type nftWithdrawnEventRaw struct {
 		Type         string           `cadence:"type"`
 		ID           uint64           `cadence:"id"`
@@ -74,12 +74,12 @@ func decodeNFTWithdrawn(event cadence.Event) (*nftWithdrawnEvent, error) {
 		return nil, fmt.Errorf("failed to decode NFT withdrawn event: %w", err)
 	}
 
-	from, err := addressFromOptional(raw.From)
+	from, err := AddressFromOptional(raw.From)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode NFT withdrawn 'from' field: %w", err)
 	}
 
-	return &nftWithdrawnEvent{
+	return &NFTWithdrawnEvent{
 		Type:         raw.Type,
 		ID:           raw.ID,
 		UUID:         raw.UUID,

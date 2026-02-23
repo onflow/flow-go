@@ -1,8 +1,12 @@
 package access
 
-import "github.com/onflow/flow-go/model/flow"
+import (
+	"fmt"
 
-type ScheduledTxStatus int
+	"github.com/onflow/flow-go/model/flow"
+)
+
+type ScheduledTxStatus int8
 
 const (
 	ScheduledTxStatusScheduled ScheduledTxStatus = iota
@@ -10,6 +14,21 @@ const (
 	ScheduledTxStatusCancelled
 	ScheduledTxStatusFailed
 )
+
+func (s ScheduledTxStatus) String() string {
+	switch s {
+	case ScheduledTxStatusScheduled:
+		return "scheduled"
+	case ScheduledTxStatusExecuted:
+		return "executed"
+	case ScheduledTxStatusCancelled:
+		return "cancelled"
+	case ScheduledTxStatusFailed:
+		return "failed"
+	default:
+		panic(fmt.Sprintf("unknown scheduled transaction status: %d", s))
+	}
+}
 
 type ScheduledTransaction struct {
 	ID              uint64
@@ -25,12 +44,18 @@ type ScheduledTransaction struct {
 
 	Status ScheduledTxStatus
 
-	CreatedTransactionID   flow.Identifier
+	ScheduledTransactionID flow.Identifier
 	ExecutedTransactionID  flow.Identifier
 	CancelledTransactionID flow.Identifier
+	FailedTransactionID    flow.Identifier
 
 	FeesReturned uint64
 	FeesDeducted uint64
+
+	// Expansion fields populated when expandResults is true. Never persisted.
+	Transaction     *flow.TransactionBody `msgpack:"-"` // Transaction body (nil unless expanded)
+	Result          *TransactionResult    `msgpack:"-"` // Transaction result (nil unless expanded)
+	HandlerContract *Contract             `msgpack:"-"` // Handler contract (nil unless expanded)
 }
 
 // query by id ([code][id] -> ScheduledTransaction)

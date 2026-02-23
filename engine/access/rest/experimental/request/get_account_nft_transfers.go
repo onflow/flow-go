@@ -42,7 +42,7 @@ func NewGetAccountNFTTransfers(r *common.Request) (GetAccountNFTTransfers, error
 	}
 
 	if raw := r.GetQueryParam("cursor"); raw != "" {
-		c, err := ParseTransferCursor(raw)
+		c, err := parseTransferCursor(raw)
 		if err != nil {
 			return req, err
 		}

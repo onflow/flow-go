@@ -12,14 +12,14 @@ import (
 // Encoded as base64 in query params and responses to keep the format opaque to clients.
 type transferCursor struct {
 	BlockHeight      uint64 `json:"h"`
-	TransactionIndex uint32 `json:"i"`
+	TransactionIndex uint32 `json:"t"`
 	EventIndex       uint32 `json:"e"`
 }
 
-// ParseTransferCursor decodes a base64-encoded JSON transfer cursor string.
+// parseTransferCursor decodes a base64-encoded JSON transfer cursor string.
 //
 // All errors indicate the cursor is invalid.
-func ParseTransferCursor(raw string) (*accessmodel.TransferCursor, error) {
+func parseTransferCursor(raw string) (*accessmodel.TransferCursor, error) {
 	data, err := base64.RawURLEncoding.DecodeString(raw)
 	if err != nil {
 		return nil, fmt.Errorf("invalid cursor encoding: %w", err)
@@ -51,15 +51,4 @@ func EncodeTransferCursor(cursor *accessmodel.TransferCursor) (string, error) {
 		return "", fmt.Errorf("failed to marshal transfer cursor: %w", err)
 	}
 	return base64.RawURLEncoding.EncodeToString(data), nil
-}
-
-// ParseTransferRole parses a role query parameter value into a TransferRole.
-func ParseTransferRole(raw string) (accessmodel.TransferRole, error) {
-	role := accessmodel.TransferRole(raw)
-	switch role {
-	case accessmodel.TransferRoleSender, accessmodel.TransferRoleRecipient:
-		return role, nil
-	default:
-		return "", fmt.Errorf("invalid role %q: must be \"sender\" or \"recipient\"", raw)
-	}
 }

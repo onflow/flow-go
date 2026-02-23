@@ -69,7 +69,7 @@ var _ storage.NonFungibleTokenTransfers = (*NonFungibleTokenTransfers)(nil)
 // Expected error returns during normal operations:
 //   - [storage.ErrNotBootstrapped] if the index has not been initialized
 func NewNonFungibleTokenTransfers(db storage.DB) (*NonFungibleTokenTransfers, error) {
-	firstHeight, err := heightLookup(db.Reader(), keyAccountNFTTransferFirstHeightKey)
+	firstHeight, err := readHeight(db.Reader(), keyAccountNFTTransferFirstHeightKey)
 	if err != nil {
 		if errors.Is(err, storage.ErrNotFound) {
 			return nil, storage.ErrNotBootstrapped
@@ -77,7 +77,7 @@ func NewNonFungibleTokenTransfers(db storage.DB) (*NonFungibleTokenTransfers, er
 		return nil, fmt.Errorf("could not get first height: %w", err)
 	}
 
-	persistedLatestHeight, err := heightLookup(db.Reader(), keyAccountNFTTransferLatestHeightKey)
+	persistedLatestHeight, err := readHeight(db.Reader(), keyAccountNFTTransferLatestHeightKey)
 	if err != nil {
 		return nil, fmt.Errorf("could not get latest height: %w", err)
 	}
@@ -144,15 +144,8 @@ func (idx *NonFungibleTokenTransfers) ByAddress(
 
 	latestHeight := idx.latestHeight.Load()
 	if cursor != nil {
-		if cursor.BlockHeight > latestHeight {
-			return access.NonFungibleTokenTransfersPage{}, fmt.Errorf(
-				"cursor height %d is greater than latest indexed height %d: %w",
-				cursor.BlockHeight, latestHeight, storage.ErrHeightNotIndexed)
-		}
-		if cursor.BlockHeight < idx.firstHeight {
-			return access.NonFungibleTokenTransfersPage{}, fmt.Errorf(
-				"cursor height %d is before first indexed height %d: %w",
-				cursor.BlockHeight, idx.firstHeight, storage.ErrHeightNotIndexed)
+		if err := validateCursorHeight(cursor.BlockHeight, idx.firstHeight, latestHeight); err != nil {
+			return access.NonFungibleTokenTransfersPage{}, err
 		}
 		latestHeight = cursor.BlockHeight
 	}
@@ -174,14 +167,8 @@ func (idx *NonFungibleTokenTransfers) ByAddress(
 //   - [storage.ErrAlreadyExists] if the block height is already indexed
 func (idx *NonFungibleTokenTransfers) Store(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockHeight uint64, transfers []access.NonFungibleTokenTransfer) error {
 	latestHeight := idx.latestHeight.Load()
-
-	if blockHeight <= latestHeight {
-		return storage.ErrAlreadyExists
-	}
-
-	expectedHeight := latestHeight + 1
-	if blockHeight != expectedHeight {
-		return fmt.Errorf("must index consecutive heights: expected %d, got %d", expectedHeight, blockHeight)
+	if err := validateStoreHeight(blockHeight, latestHeight); err != nil {
+		return err
 	}
 
 	err := indexNFTTransfers(lctx, rw, blockHeight, transfers)
@@ -299,7 +286,7 @@ func indexNFTTransfers(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockHe
 		return fmt.Errorf("missing required lock: %s", storage.LockIndexNonFungibleTokenTransfers)
 	}
 
-	latestHeight, err := heightLookup(rw.GlobalReader(), keyAccountNFTTransferLatestHeightKey)
+	latestHeight, err := readHeight(rw.GlobalReader(), keyAccountNFTTransferLatestHeightKey)
 	if err != nil {
 		return fmt.Errorf("could not get latest indexed height: %w", err)
 	}

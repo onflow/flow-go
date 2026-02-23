@@ -168,6 +168,24 @@ func testCases() []testCase {
 			url:      "/experimental/v1/accounts/6a587be304c1224c/nft/transfers",
 			expected: "getAccountNonFungibleTokenTransfers",
 		},
+		{
+			method:   http.MethodGet,
+			name:     "/experimental/v1/scheduled",
+			url:      "/experimental/v1/scheduled",
+			expected: "getScheduledTransactions",
+		},
+		{
+			method:   http.MethodGet,
+			name:     "/experimental/v1/scheduled/transaction/{id}",
+			url:      "/experimental/v1/scheduled/transaction/12345678",
+			expected: "getScheduledTransaction",
+		},
+		{
+			method:   http.MethodGet,
+			name:     "/experimental/v1/scheduled/account/{address}",
+			url:      "/experimental/v1/scheduled/account/6a587be304c1224c",
+			expected: "getScheduledTransactionsByAddress",
+		},
 	}
 }
 

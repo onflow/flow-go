@@ -1641,8 +1641,15 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 					return nil, fmt.Errorf("could not create account transactions indexer: %w", err)
 				}
 
+				scheduledTxIndexer := extended.NewScheduledTransactions(
+					node.Logger,
+					builder.ExtendedStorage.ScheduledTransactionsBootstrapper,
+					node.RootChainID,
+				)
+
 				extendedIndexers := []extended.Indexer{
 					accountTransactions,
+					scheduledTxIndexer,
 				}
 
 				extendedIndexer, err := extended.NewExtendedIndexer(
@@ -2197,7 +2204,9 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 				utils.NotNil(node.Storage.Collections),
 				utils.NotNil(node.Storage.Transactions),
 				builder.scheduledTransactions,
+				builder.ExtendedStorage.ScheduledTransactionsBootstrapper,
 				txstatus.NewTxStatusDeriver(node.State, builder.lastFullBlockHeight),
+				builder.ScriptExecutor,
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize extended backend: %w", err)
