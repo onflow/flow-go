@@ -273,6 +273,193 @@ func TestByBlockIDConcurrentMutationIsRaceFree(t *testing.T) {
 	})
 }
 
+// TestByBlockID_SortsEventsByExecutionOrder verifies that events loaded from the
+// database (cache miss path) are returned sorted by (TransactionIndex,
+// EventIndex) regardless of the order imposed by the storage key, which is
+// [blockID, txID, txIndex, eventIndex].  When two transactions have txIDs whose
+// byte order differs from their execution order the DB iteration would return
+// them in txID order; the retrieve function must re-sort them.
+func TestByBlockID_SortsEventsByExecutionOrder(t *testing.T) {
+	lockManager := storage.NewTestingLockManager()
+	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
+		m := metrics.NewNoopCollector()
+		eventsStore := store.NewEvents(m, db)
+
+		blockID := unittest.IdentifierFixture()
+
+		// txIDLow sorts before txIDHigh in byte (DB key) order, but its
+		// TransactionIndex is higher, so in execution order it comes second.
+		var txIDLow, txIDHigh flow.Identifier
+		txIDLow[0] = 0x00  // first in DB key order
+		txIDHigh[0] = 0xFF // second in DB key order
+
+		// execution tx 0 uses txIDHigh; execution tx 1 uses txIDLow
+		evtTx0 := unittest.EventFixture(
+			unittest.Event.WithTransactionID(txIDHigh),
+			unittest.Event.WithTransactionIndex(0),
+			unittest.Event.WithEventIndex(0),
+		)
+		evtTx1A := unittest.EventFixture(
+			unittest.Event.WithTransactionID(txIDLow),
+			unittest.Event.WithTransactionIndex(1),
+			unittest.Event.WithEventIndex(0),
+		)
+		evtTx1B := unittest.EventFixture(
+			unittest.Event.WithTransactionID(txIDLow),
+			unittest.Event.WithTransactionIndex(1),
+			unittest.Event.WithEventIndex(1),
+		)
+
+		err := unittest.WithLock(t, lockManager, storage.LockInsertEvent, func(lctx lockctx.Context) error {
+			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return eventsStore.BatchStore(lctx, blockID, []flow.EventsList{{evtTx0}, {evtTx1A, evtTx1B}}, rw)
+			})
+		})
+		require.NoError(t, err)
+
+		// Use a fresh store to force a DB load (bypasses the cache populated by BatchStore).
+		freshStore := store.NewEvents(m, db)
+		got, err := freshStore.ByBlockID(blockID)
+		require.NoError(t, err)
+		require.Len(t, got, 3)
+
+		// Events must come back in execution order: txIndex 0, then 1 (eventIndex 0, 1).
+		require.Equal(t, uint32(0), got[0].TransactionIndex)
+		require.Equal(t, uint32(0), got[0].EventIndex)
+		require.Equal(t, uint32(1), got[1].TransactionIndex)
+		require.Equal(t, uint32(0), got[1].EventIndex)
+		require.Equal(t, uint32(1), got[2].TransactionIndex)
+		require.Equal(t, uint32(1), got[2].EventIndex)
+	})
+}
+
+// TestByBlockIDTransactionID_ReturnsCopy verifies that mutating the payload of
+// an event returned by ByBlockIDTransactionID does not corrupt the cached value
+// for subsequent callers.
+func TestByBlockIDTransactionID_ReturnsCopy(t *testing.T) {
+	lockManager := storage.NewTestingLockManager()
+	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
+		m := metrics.NewNoopCollector()
+		eventsStore := store.NewEvents(m, db)
+
+		blockID := unittest.IdentifierFixture()
+		txID := unittest.IdentifierFixture()
+		originalPayload := []byte{1, 2, 3}
+
+		evt := unittest.EventFixture(
+			unittest.Event.WithTransactionID(txID),
+			unittest.Event.WithTransactionIndex(0),
+			unittest.Event.WithEventIndex(0),
+			unittest.Event.WithPayload(originalPayload),
+		)
+
+		err := unittest.WithLock(t, lockManager, storage.LockInsertEvent, func(lctx lockctx.Context) error {
+			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return eventsStore.BatchStore(lctx, blockID, []flow.EventsList{{evt}}, rw)
+			})
+		})
+		require.NoError(t, err)
+
+		got1, err := eventsStore.ByBlockIDTransactionID(blockID, txID)
+		require.NoError(t, err)
+		require.Len(t, got1, 1)
+
+		// Mutate the returned payload.
+		got1[0].Payload[0] = 0xFF
+
+		// A second call must return the original payload, not the mutated one.
+		got2, err := eventsStore.ByBlockIDTransactionID(blockID, txID)
+		require.NoError(t, err)
+		require.Len(t, got2, 1)
+		require.Equal(t, originalPayload, got2[0].Payload)
+	})
+}
+
+// TestByBlockIDTransactionIndex_ReturnsCopy verifies that mutating the payload
+// of an event returned by ByBlockIDTransactionIndex does not corrupt the cached
+// value for subsequent callers.
+func TestByBlockIDTransactionIndex_ReturnsCopy(t *testing.T) {
+	lockManager := storage.NewTestingLockManager()
+	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
+		m := metrics.NewNoopCollector()
+		eventsStore := store.NewEvents(m, db)
+
+		blockID := unittest.IdentifierFixture()
+		txID := unittest.IdentifierFixture()
+		originalPayload := []byte{4, 5, 6}
+
+		evt := unittest.EventFixture(
+			unittest.Event.WithTransactionID(txID),
+			unittest.Event.WithTransactionIndex(0),
+			unittest.Event.WithEventIndex(0),
+			unittest.Event.WithPayload(originalPayload),
+		)
+
+		err := unittest.WithLock(t, lockManager, storage.LockInsertEvent, func(lctx lockctx.Context) error {
+			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return eventsStore.BatchStore(lctx, blockID, []flow.EventsList{{evt}}, rw)
+			})
+		})
+		require.NoError(t, err)
+
+		got1, err := eventsStore.ByBlockIDTransactionIndex(blockID, 0)
+		require.NoError(t, err)
+		require.Len(t, got1, 1)
+
+		// Mutate the returned payload.
+		got1[0].Payload[0] = 0xFF
+
+		// A second call must return the original payload.
+		got2, err := eventsStore.ByBlockIDTransactionIndex(blockID, 0)
+		require.NoError(t, err)
+		require.Len(t, got2, 1)
+		require.Equal(t, originalPayload, got2[0].Payload)
+	})
+}
+
+// TestByBlockIDEventType_ReturnsCopy verifies that mutating the payload of an
+// event returned by ByBlockIDEventType does not corrupt the cached value for
+// subsequent callers.
+func TestByBlockIDEventType_ReturnsCopy(t *testing.T) {
+	lockManager := storage.NewTestingLockManager()
+	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
+		m := metrics.NewNoopCollector()
+		eventsStore := store.NewEvents(m, db)
+
+		blockID := unittest.IdentifierFixture()
+		txID := unittest.IdentifierFixture()
+		originalPayload := []byte{7, 8, 9}
+
+		evt := unittest.EventFixture(
+			unittest.Event.WithTransactionID(txID),
+			unittest.Event.WithTransactionIndex(0),
+			unittest.Event.WithEventIndex(0),
+			unittest.Event.WithEventType(flow.EventAccountCreated),
+			unittest.Event.WithPayload(originalPayload),
+		)
+
+		err := unittest.WithLock(t, lockManager, storage.LockInsertEvent, func(lctx lockctx.Context) error {
+			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return eventsStore.BatchStore(lctx, blockID, []flow.EventsList{{evt}}, rw)
+			})
+		})
+		require.NoError(t, err)
+
+		got1, err := eventsStore.ByBlockIDEventType(blockID, flow.EventAccountCreated)
+		require.NoError(t, err)
+		require.Len(t, got1, 1)
+
+		// Mutate the returned payload.
+		got1[0].Payload[0] = 0xFF
+
+		// A second call must return the original payload.
+		got2, err := eventsStore.ByBlockIDEventType(blockID, flow.EventAccountCreated)
+		require.NoError(t, err)
+		require.Len(t, got2, 1)
+		require.Equal(t, originalPayload, got2[0].Payload)
+	})
+}
+
 func TestEventStoreAndRemove(t *testing.T) {
 	lockManager := storage.NewTestingLockManager()
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {

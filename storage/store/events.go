@@ -2,6 +2,7 @@ package store
 
 import (
 	"fmt"
+	"sort"
 
 	"github.com/jordanschalm/lockctx"
 
@@ -23,6 +24,16 @@ func NewEvents(collector module.CacheMetrics, db storage.DB) *Events {
 	retrieve := func(r storage.Reader, blockID flow.Identifier) ([]flow.Event, error) {
 		var events []flow.Event
 		err := operation.LookupEventsByBlockID(r, blockID, &events)
+
+		// events are stored orderd by [blockID, txID, txIndex, eventIndex]
+		// sort them into execution order
+		sort.Slice(events, func(i, j int) bool {
+			if events[i].TransactionIndex == events[j].TransactionIndex {
+				return events[i].EventIndex < events[j].EventIndex
+			}
+			return events[i].TransactionIndex < events[j].TransactionIndex
+		})
+
 		return events, err
 	}
 
@@ -74,33 +85,26 @@ func (e *Events) BatchStore(lctx lockctx.Proof, blockID flow.Identifier, blockEv
 // ByBlockID returns the events for the given block ID.
 // Note: This method will return an empty slice and no error if no entries for the blockID are found.
 //
-// The returned slice is a copy of the cached data. Callers may sort or otherwise
-// mutate it without affecting subsequent calls or concurrent readers.
+// No error returns are expected during normal operation.
 func (e *Events) ByBlockID(blockID flow.Identifier) ([]flow.Event, error) {
-	val, err := e.cache.Get(e.db.Reader(), blockID)
+	events, err := e.cache.Get(e.db.Reader(), blockID)
 	if err != nil {
 		return nil, err
 	}
 
-	// each caller should get their own copy of the events to prevent mutation of the cached list.
-	// this is important to prevent race conditions if callers use sort methods.
-	result := make([]flow.Event, len(val))
-	copy(result, val)
-
-	// callers may also convert the payload from ccf to jsoncdc, so make an explicit copy of the payload
-	// to avoid accidentally modifying the cached value.
-	for i, event := range result {
-		payload := make([]byte, len(event.Payload))
-		copy(payload, event.Payload)
-		result[i].Payload = payload
+	result := make([]flow.Event, len(events))
+	for i, event := range events {
+		result[i] = copyEvent(event)
 	}
 	return result, nil
 }
 
 // ByBlockIDTransactionID returns the events for the given block ID and transaction ID
 // Note: This method will return an empty slice and no error if no entries for the blockID are found
+//
+// No error returns are expected during normal operation.
 func (e *Events) ByBlockIDTransactionID(blockID flow.Identifier, txID flow.Identifier) ([]flow.Event, error) {
-	events, err := e.ByBlockID(blockID)
+	events, err := e.cache.Get(e.db.Reader(), blockID)
 	if err != nil {
 		return nil, err
 	}
@@ -108,7 +112,7 @@ func (e *Events) ByBlockIDTransactionID(blockID flow.Identifier, txID flow.Ident
 	var matched []flow.Event
 	for _, event := range events {
 		if event.TransactionID == txID {
-			matched = append(matched, event)
+			matched = append(matched, copyEvent(event))
 		}
 	}
 	return matched, nil
@@ -116,8 +120,10 @@ func (e *Events) ByBlockIDTransactionID(blockID flow.Identifier, txID flow.Ident
 
 // ByBlockIDTransactionIndex returns the events for the given block ID and transaction index
 // Note: This method will return an empty slice and no error if no entries for the blockID are found
+//
+// No error returns are expected during normal operation.
 func (e *Events) ByBlockIDTransactionIndex(blockID flow.Identifier, txIndex uint32) ([]flow.Event, error) {
-	events, err := e.ByBlockID(blockID)
+	events, err := e.cache.Get(e.db.Reader(), blockID)
 	if err != nil {
 		return nil, err
 	}
@@ -125,7 +131,7 @@ func (e *Events) ByBlockIDTransactionIndex(blockID flow.Identifier, txIndex uint
 	var matched []flow.Event
 	for _, event := range events {
 		if event.TransactionIndex == txIndex {
-			matched = append(matched, event)
+			matched = append(matched, copyEvent(event))
 		}
 	}
 	return matched, nil
@@ -133,8 +139,10 @@ func (e *Events) ByBlockIDTransactionIndex(blockID flow.Identifier, txIndex uint
 
 // ByBlockIDEventType returns the events for the given block ID and event type
 // Note: This method will return an empty slice and no error if no entries for the blockID are found
+//
+// No error returns are expected during normal operation.
 func (e *Events) ByBlockIDEventType(blockID flow.Identifier, eventType flow.EventType) ([]flow.Event, error) {
-	events, err := e.ByBlockID(blockID)
+	events, err := e.cache.Get(e.db.Reader(), blockID)
 	if err != nil {
 		return nil, err
 	}
@@ -142,10 +150,18 @@ func (e *Events) ByBlockIDEventType(blockID flow.Identifier, eventType flow.Even
 	var matched []flow.Event
 	for _, event := range events {
 		if event.Type == eventType {
-			matched = append(matched, event)
+			matched = append(matched, copyEvent(event))
 		}
 	}
 	return matched, nil
+}
+
+// copyEvent returns a copy of the event with a deep copy of the payload.
+func copyEvent(event flow.Event) flow.Event {
+	payload := make([]byte, len(event.Payload))
+	copy(payload, event.Payload)
+	event.Payload = payload
+	return event
 }
 
 // RemoveByBlockID removes events by block ID
