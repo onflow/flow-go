@@ -402,14 +402,15 @@ func (s *TransactionsFunctionalSuite) expectedResultForIndex(index int, encoding
 	}
 
 	return &accessmodel.TransactionResult{
-		TransactionID: txID,
-		Status:        flow.TransactionStatusExecuted,
-		StatusCode:    statusCode,
-		Events:        events,
-		ErrorMessage:  errorMessage,
-		BlockID:       blockID,
-		BlockHeight:   block.Height,
-		CollectionID:  collectionID,
+		TransactionID:   txID,
+		Status:          flow.TransactionStatusExecuted,
+		StatusCode:      statusCode,
+		Events:          events,
+		ErrorMessage:    errorMessage,
+		BlockID:         blockID,
+		BlockHeight:     block.Height,
+		CollectionID:    collectionID,
+		ComputationUsed: txResult.ComputationUsed,
 	}
 }
 
