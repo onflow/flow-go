@@ -228,12 +228,12 @@ func (b *ScheduledTransactionsBackend) expand(
 		}
 
 		if !expandOptions.Transaction && !expandOptions.Result {
-			return nil
+			continue
 		}
 
 		// if the transaction was not executed, there's nothing to expand.
 		if tx.Status != accessmodel.ScheduledTxStatusExecuted && tx.Status != accessmodel.ScheduledTxStatusFailed {
-			return nil
+			continue
 		}
 
 		txID, err := b.scheduledTxLookup.TransactionIDByID(tx.ID)

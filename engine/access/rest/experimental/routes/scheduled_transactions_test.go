@@ -377,6 +377,62 @@ func TestGetScheduledTransaction(t *testing.T) {
 		assert.Contains(t, rr.Body.String(), "invalid scheduled transaction ID")
 	})
 
+	t.Run("with handler_contract expand", func(t *testing.T) {
+		backend := extendedmock.NewAPI(t)
+
+		txWithContract := &accessmodel.ScheduledTransaction{
+			ID:                               42,
+			Priority:                         0,
+			Timestamp:                        2000000,
+			ExecutionEffort:                  750,
+			Fees:                             300,
+			TransactionHandlerOwner:          handlerOwner,
+			TransactionHandlerTypeIdentifier: "A.0000.MyScheduler.Handler",
+			TransactionHandlerUUID:           3,
+			Status:                           accessmodel.ScheduledTxStatusScheduled,
+			HandlerContract: &accessmodel.Contract{
+				Identifier: "A.0000.MyScheduler",
+				Body:       "pub contract MyScheduler {}",
+			},
+		}
+
+		backend.On("GetScheduledTransaction",
+			mocktestify.Anything,
+			uint64(42),
+			extended.ScheduledTransactionExpandOptions{HandlerContract: true},
+			entities.EventEncodingVersion_JSON_CDC_V0,
+		).Return(txWithContract, nil)
+
+		req, err := http.NewRequest(http.MethodGet, scheduledTxByIDURL(t, 42, scheduledTxURLParams{expand: "handler_contract"}), nil)
+		require.NoError(t, err)
+
+		rr := router.ExecuteExperimentalRequest(req, backend)
+
+		assert.Equal(t, http.StatusOK, rr.Code)
+
+		expected := fmt.Sprintf(`{
+			"id": "42",
+			"status": "scheduled",
+			"priority": "high",
+			"timestamp": "2000000",
+			"execution_effort": "750",
+			"fees": "300",
+			"transaction_handler_owner": "%s",
+			"transaction_handler_type_identifier": "A.0000.MyScheduler.Handler",
+			"transaction_handler_uuid": "3",
+			"handler_contract": {
+				"identifier": "A.0000.MyScheduler",
+				"body": "pub contract MyScheduler {}"
+			},
+			"_expandable": {
+				"transaction": "transaction",
+				"result": "result"
+			}
+		}`, handlerOwner.String())
+
+		assert.JSONEq(t, expected, rr.Body.String())
+	})
+
 	t.Run("backend returns not found", func(t *testing.T) {
 		backend := extendedmock.NewAPI(t)
 

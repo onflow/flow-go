@@ -64,8 +64,12 @@ func (t *ScheduledTransaction) Build(
 		t.Expandable.Result = expandableResult
 	}
 
-	// HandlerContract expansion is not yet supported by the domain model.
-	t.Expandable.HandlerContract = expandableHandlerContract
+	if expand[expandableHandlerContract] && tx.HandlerContract != nil {
+		t.HandlerContract = new(Contract)
+		t.HandlerContract.Build(tx.HandlerContract)
+	} else {
+		t.Expandable.HandlerContract = expandableHandlerContract
+	}
 }
 
 // scheduledTxStatus returns the [ScheduledTransactionStatus] for a domain status value.
