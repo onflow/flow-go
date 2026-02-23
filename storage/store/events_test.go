@@ -2,6 +2,8 @@ package store_test
 
 import (
 	"math/rand"
+	"sort"
+	"sync"
 	"testing"
 
 	"github.com/jordanschalm/lockctx"
@@ -137,6 +139,137 @@ func TestEventRetrieveWithoutStore(t *testing.T) {
 		require.NoError(t, err)
 		require.True(t, len(evts) == 0)
 
+	})
+}
+
+// TestByBlockIDReturnsCopy verifies that ByBlockID returns a copy of the cached
+// slice. Mutating the returned slice must not affect subsequent calls.
+//
+// Without this guarantee, callers that sort the returned slice (such as
+// EventsIndex.ByBlockID) corrupt the cached ordering for every future reader of
+// the same block.
+func TestByBlockIDReturnsCopy(t *testing.T) {
+	lockManager := storage.NewTestingLockManager()
+	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
+		m := metrics.NewNoopCollector()
+		eventsStore := store.NewEvents(m, db)
+
+		blockID := unittest.IdentifierFixture()
+		txID := unittest.IdentifierFixture()
+
+		// Store three events with EventIndex 0, 1, 2 in that order.
+		evts := flow.EventsList{
+			unittest.EventFixture(
+				unittest.Event.WithTransactionID(txID),
+				unittest.Event.WithTransactionIndex(0),
+				unittest.Event.WithEventIndex(0),
+				unittest.Event.WithPayload([]byte{1, 2, 3}),
+			),
+			unittest.EventFixture(
+				unittest.Event.WithTransactionID(txID),
+				unittest.Event.WithTransactionIndex(0),
+				unittest.Event.WithEventIndex(1),
+			),
+			unittest.EventFixture(
+				unittest.Event.WithTransactionID(txID),
+				unittest.Event.WithTransactionIndex(0),
+				unittest.Event.WithEventIndex(2),
+			),
+		}
+
+		err := unittest.WithLock(t, lockManager, storage.LockInsertEvent, func(lctx lockctx.Context) error {
+			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return eventsStore.BatchStore(lctx, blockID, []flow.EventsList{evts}, rw)
+			})
+		})
+		require.NoError(t, err)
+
+		// First retrieval.
+		got1, err := eventsStore.ByBlockID(blockID)
+		require.NoError(t, err)
+		require.Len(t, got1, 3)
+
+		// Mutate the payload of the first event, and make sure the original is not modified.
+		got1[0].Payload[0] = 3
+		require.Equal(t, []byte{3, 2, 3}, got1[0].Payload)
+
+		// Mutate the returned slice in-place (sort descending by EventIndex),
+		// simulating what EventsIndex.ByBlockID does.
+		sort.Slice(got1, func(i, j int) bool {
+			return got1[i].EventIndex > got1[j].EventIndex
+		})
+		require.Equal(t, uint32(2), got1[0].EventIndex) // sanity: slice is reversed
+
+		// Second retrieval must return events in the original stored order,
+		// unaffected by the mutation above.
+		got2, err := eventsStore.ByBlockID(blockID)
+		require.NoError(t, err)
+		require.Len(t, got2, 3)
+		require.Equal(t, uint32(0), got2[0].EventIndex)
+		require.Equal(t, uint32(1), got2[1].EventIndex)
+		require.Equal(t, uint32(2), got2[2].EventIndex)
+
+		// make sure the payload of the first event is not modified
+		require.Equal(t, []byte{1, 2, 3}, got2[0].Payload)
+	})
+}
+
+// TestByBlockIDConcurrentMutationIsRaceFree verifies there is no data race when
+// multiple goroutines retrieve and sort the events for the same block
+// concurrently. Run with -race to exercise the detector.
+func TestByBlockIDConcurrentMutationIsRaceFree(t *testing.T) {
+	lockManager := storage.NewTestingLockManager()
+	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
+		m := metrics.NewNoopCollector()
+		eventsStore := store.NewEvents(m, db)
+
+		blockID := unittest.IdentifierFixture()
+		txID := unittest.IdentifierFixture()
+
+		evts := flow.EventsList{
+			unittest.EventFixture(
+				unittest.Event.WithTransactionID(txID),
+				unittest.Event.WithTransactionIndex(0),
+				unittest.Event.WithEventIndex(0),
+			),
+			unittest.EventFixture(
+				unittest.Event.WithTransactionID(txID),
+				unittest.Event.WithTransactionIndex(0),
+				unittest.Event.WithEventIndex(1),
+			),
+			unittest.EventFixture(
+				unittest.Event.WithTransactionID(txID),
+				unittest.Event.WithTransactionIndex(0),
+				unittest.Event.WithEventIndex(2),
+			),
+		}
+
+		err := unittest.WithLock(t, lockManager, storage.LockInsertEvent, func(lctx lockctx.Context) error {
+			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return eventsStore.BatchStore(lctx, blockID, []flow.EventsList{evts}, rw)
+			})
+		})
+		require.NoError(t, err)
+
+		var wg sync.WaitGroup
+		for range 10 {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				got, err := eventsStore.ByBlockID(blockID)
+				if err != nil {
+					return
+				}
+				// Simulate the in-place sort performed by EventsIndex.ByBlockID.
+				sort.Slice(got, func(i, j int) bool {
+					if got[i].TransactionIndex == got[j].TransactionIndex {
+						return got[i].EventIndex < got[j].EventIndex
+					}
+					return got[i].TransactionIndex < got[j].TransactionIndex
+				})
+			}()
+		}
+		wg.Wait()
 	})
 }
 

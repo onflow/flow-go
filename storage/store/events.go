@@ -71,14 +71,30 @@ func (e *Events) BatchStore(lctx lockctx.Proof, blockID flow.Identifier, blockEv
 	return nil
 }
 
-// ByBlockID returns the events for the given block ID
-// Note: This method will return an empty slice and no error if no entries for the blockID are found
+// ByBlockID returns the events for the given block ID.
+// Note: This method will return an empty slice and no error if no entries for the blockID are found.
+//
+// The returned slice is a copy of the cached data. Callers may sort or otherwise
+// mutate it without affecting subsequent calls or concurrent readers.
 func (e *Events) ByBlockID(blockID flow.Identifier) ([]flow.Event, error) {
 	val, err := e.cache.Get(e.db.Reader(), blockID)
 	if err != nil {
 		return nil, err
 	}
-	return val, nil
+
+	// each caller should get their own copy of the events to prevent mutation of the cached list.
+	// this is important to prevent race conditions if callers use sort methods.
+	result := make([]flow.Event, len(val))
+	copy(result, val)
+
+	// callers may also convert the payload from ccf to jsoncdc, so make an explicit copy of the payload
+	// to avoid accidentally modifying the cached value.
+	for i, event := range result {
+		payload := make([]byte, len(event.Payload))
+		copy(payload, event.Payload)
+		result[i].Payload = payload
+	}
+	return result, nil
 }
 
 // ByBlockIDTransactionID returns the events for the given block ID and transaction ID
