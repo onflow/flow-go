@@ -41,6 +41,7 @@ func validateCursorHeight(blockHeight uint64, firstHeight uint64, latestHeight u
 	return nil
 }
 
+
 // validateLimit validates the limit parameter for the index is within the valid exclusive range (0, math.MaxUint32)
 //
 // Any error indicates the limit is invalid.

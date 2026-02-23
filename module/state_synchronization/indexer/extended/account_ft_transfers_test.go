@@ -127,6 +127,70 @@ func TestFilterFTTransfers(t *testing.T) {
 		assert.Equal(t, big.NewInt(200), result[0].Amount)
 		assert.Equal(t, big.NewInt(999), result[1].Amount)
 	})
+
+	t.Run("filters out self-transfers", func(t *testing.T) {
+		addr := flow.HexToAddress("0x1234567890abcdef")
+		transfers := []access.FungibleTokenTransfer{
+			{
+				SourceAddress:    addr,
+				RecipientAddress: addr,
+				Amount:           big.NewInt(100),
+				TokenType:        "A.0x1.FlowToken",
+			},
+		}
+
+		result := a.filterFTTransfers(transfers)
+		assert.Empty(t, result)
+	})
+
+	t.Run("filters out zero-address self-transfer", func(t *testing.T) {
+		// Both source and recipient are the zero address (e.g. a mint with no from/to).
+		transfers := []access.FungibleTokenTransfer{
+			{
+				SourceAddress:    flow.Address{},
+				RecipientAddress: flow.Address{},
+				Amount:           big.NewInt(100),
+				TokenType:        "A.0x1.FlowToken",
+			},
+		}
+
+		result := a.filterFTTransfers(transfers)
+		assert.Empty(t, result)
+	})
+
+	t.Run("keeps transfer with distinct source and recipient", func(t *testing.T) {
+		src := flow.HexToAddress("0x0000000000000001")
+		dst := flow.HexToAddress("0x0000000000000002")
+		transfers := []access.FungibleTokenTransfer{
+			{
+				SourceAddress:    src,
+				RecipientAddress: dst,
+				Amount:           big.NewInt(100),
+				TokenType:        "A.0x1.FlowToken",
+			},
+		}
+
+		result := a.filterFTTransfers(transfers)
+		require.Len(t, result, 1)
+		assert.Equal(t, src, result[0].SourceAddress)
+		assert.Equal(t, dst, result[0].RecipientAddress)
+	})
+
+	t.Run("mixed: self-transfers filtered, regular transfers kept", func(t *testing.T) {
+		addrA := flow.HexToAddress("0x0000000000000001")
+		addrB := flow.HexToAddress("0x0000000000000002")
+		transfers := []access.FungibleTokenTransfer{
+			{SourceAddress: addrA, RecipientAddress: addrA, Amount: big.NewInt(100), TokenType: "A.0x1.FlowToken"},
+			{SourceAddress: addrA, RecipientAddress: addrB, Amount: big.NewInt(200), TokenType: "A.0x1.FlowToken"},
+			{SourceAddress: addrB, RecipientAddress: addrB, Amount: big.NewInt(300), TokenType: "A.0x1.FlowToken"},
+		}
+
+		result := a.filterFTTransfers(transfers)
+		require.Len(t, result, 1)
+		assert.Equal(t, addrA, result[0].SourceAddress)
+		assert.Equal(t, addrB, result[0].RecipientAddress)
+		assert.Equal(t, big.NewInt(200), result[0].Amount)
+	})
 }
 
 // ===== TestFungibleTokenTransfers_NextHeight =====
@@ -274,6 +338,29 @@ func TestFungibleTokenTransfers_IndexBlockData(t *testing.T) {
 				testutil.MakeFTWithdrawnEvent(t, flow.Testnet, &payer, txID, 0, 0, 1, 50, feeAmount),
 				testutil.MakeFTDepositedEvent(t, flow.Testnet, &flowFeesAddress, txID, 0, 1, 1, 50, feeAmount),
 				testutil.MakeFlowFeesEvent(t, flow.Testnet, txID, 0, 2, feeAmount),
+			},
+		}
+
+		err := a.IndexBlockData(nil, data, nil)
+		require.NoError(t, err)
+		assert.Equal(t, uint64(100), ftStore.storedHeight)
+		assert.Empty(t, ftStore.storedTransfers)
+	})
+
+	// Tests that a self-transfer (same source and recipient address) is not stored.
+	t.Run("self-transfer is not stored", func(t *testing.T) {
+		ftStore := &mockFTBootstrapper{latestHeight: 99}
+		a := NewFungibleTokenTransfers(unittest.Logger(), flow.Testnet, ftStore)
+
+		addr := unittest.RandomAddressFixture()
+		txID := unittest.IdentifierFixture()
+		amount := cadence.UFix64(5_00000000)
+
+		data := BlockData{
+			Header: unittest.BlockHeaderFixture(unittest.WithHeaderHeight(100)),
+			Events: []flow.Event{
+				testutil.MakeFTWithdrawnEvent(t, flow.Testnet, &addr, txID, 0, 0, 1, 50, amount),
+				testutil.MakeFTDepositedEvent(t, flow.Testnet, &addr, txID, 0, 1, 1, 50, amount),
 			},
 		}
 

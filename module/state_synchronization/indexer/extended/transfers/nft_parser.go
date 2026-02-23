@@ -23,10 +23,10 @@ const (
 // For burns (withdrawal-only), deposit is nil and recipientAddress is zero.
 // For intermediate transfers (multi-layer collections), deposit is nil and recipientAddress is set.
 type nftPairedResult struct {
-	sourceEvents     []flow.Event                // the flow.Event(s) that produced this result
-	withdrawal       *events.NFTWithdrawnEvent   // nil for deposit-only (mint)
-	deposit          *events.NFTDepositedEvent   // nil for withdrawal-only (burn or intermediate transfer)
-	recipientAddress flow.Address       // used for intermediate transfers when deposit is nil
+	sourceEvents     []flow.Event               // the flow.Event(s) that produced this result
+	withdrawal       *events.NFTWithdrawnEvent  // nil for deposit-only (mint)
+	deposit          *events.NFTDepositedEvent  // nil for withdrawal-only (burn or intermediate transfer)
+	recipientAddress flow.Address               // used for intermediate transfers when deposit is nil
 }
 
 // NFTParser decodes NonFungibleToken transfer events from CCF-encoded payloads and converts them
@@ -56,8 +56,8 @@ func NewNFTParser(chainID flow.ChainID) *NFTParser {
 // Unpaired events produce records with a zero address for the missing side.
 //
 // No error returns are expected during normal operation.
-func (p *NFTParser) Parse(events []flow.Event, blockHeight uint64) ([]access.NonFungibleTokenTransfer, error) {
-	groups, err := p.filterAndDecodeNFT(events)
+func (p *NFTParser) Parse(evts []flow.Event, blockHeight uint64) ([]access.NonFungibleTokenTransfer, error) {
+	groups, err := p.filterAndDecodeNFT(evts)
 	if err != nil {
 		return nil, err
 	}
@@ -74,7 +74,7 @@ func (p *NFTParser) Parse(events []flow.Event, blockHeight uint64) ([]access.Non
 // and groups the results by transaction index.
 //
 // No error returns are expected during normal operation.
-func (p *NFTParser) filterAndDecodeNFT(blockEvents []flow.Event) (map[uint32]*nftTxEventGroup, error) {
+func (p *NFTParser) filterAndDecodeNFT(evts []flow.Event) (map[uint32]*nftTxEventGroup, error) {
 	txEventGroups := make(map[uint32]*nftTxEventGroup)
 
 	ensureGroup := func(txIndex uint32) *nftTxEventGroup {
@@ -86,7 +86,7 @@ func (p *NFTParser) filterAndDecodeNFT(blockEvents []flow.Event) (map[uint32]*nf
 		return g
 	}
 
-	for _, event := range blockEvents {
+	for _, event := range evts {
 		switch event.Type {
 		case p.withdrawnEventType:
 			cadenceEvent, err := events.DecodePayload(event)

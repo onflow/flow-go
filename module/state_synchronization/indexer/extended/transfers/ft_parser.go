@@ -23,10 +23,10 @@ const (
 // For mints (deposit-only), withdrawal is nil.
 // For burns (withdrawal-only), deposit is nil.
 type ftPairedResult struct {
-	sourceEvents []flow.Event               // the flow.Event(s) that produced this result
-	withdrawal   *events.FTWithdrawnEvent   // nil for deposit-only (mint)
-	deposit      *events.FTDepositedEvent   // nil for withdrawal-only (burn)
-	isFlowFees   bool              // true if the result is a flow fees deposit
+	sourceEvents []flow.Event             // the flow.Event(s) that produced this result
+	withdrawal   *events.FTWithdrawnEvent // nil for deposit-only (mint)
+	deposit      *events.FTDepositedEvent // nil for withdrawal-only (burn)
+	isFlowFees   bool                     // true if the result is a flow fees deposit
 }
 
 // FTParser decodes FungibleToken transfer events from CCF-encoded payloads and converts them
@@ -65,8 +65,8 @@ func NewFTParser(chainID flow.ChainID, omitFlowFees bool) *FTParser {
 // for the missing side.
 //
 // No error returns are expected during normal operation.
-func (p *FTParser) Parse(events []flow.Event, blockHeight uint64) ([]access.FungibleTokenTransfer, error) {
-	groups, err := p.filterAndDecodeFT(events)
+func (p *FTParser) Parse(evts []flow.Event, blockHeight uint64) ([]access.FungibleTokenTransfer, error) {
+	groups, err := p.filterAndDecodeFT(evts)
 	if err != nil {
 		return nil, err
 	}
@@ -83,7 +83,7 @@ func (p *FTParser) Parse(events []flow.Event, blockHeight uint64) ([]access.Fung
 // and groups the results by transaction index.
 //
 // No error returns are expected during normal operation.
-func (p *FTParser) filterAndDecodeFT(blockEvents []flow.Event) (map[uint32]*ftTxEventGroup, error) {
+func (p *FTParser) filterAndDecodeFT(evts []flow.Event) (map[uint32]*ftTxEventGroup, error) {
 	txEventGroups := make(map[uint32]*ftTxEventGroup)
 
 	ensureGroup := func(txIndex uint32) *ftTxEventGroup {
@@ -95,7 +95,7 @@ func (p *FTParser) filterAndDecodeFT(blockEvents []flow.Event) (map[uint32]*ftTx
 		return g
 	}
 
-	for _, event := range blockEvents {
+	for _, event := range evts {
 		switch event.Type {
 		case p.withdrawnEventType:
 			cadenceEvent, err := events.DecodePayload(event)

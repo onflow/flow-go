@@ -97,6 +97,10 @@ func (a *FungibleTokenTransfers) filterFTTransfers(transfers []access.FungibleTo
 		if transfer.Amount.Cmp(bigZero) == 0 {
 			continue
 		}
+		// skip self transfers
+		if transfer.SourceAddress == transfer.RecipientAddress {
+			continue
+		}
 		filtered = append(filtered, transfer)
 	}
 	return filtered

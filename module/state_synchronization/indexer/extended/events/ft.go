@@ -10,22 +10,22 @@ import (
 
 // ftWithdrawnEvent represents a decoded FungibleToken.Withdrawn event.
 type FTWithdrawnEvent struct {
-	Type          string // Token type identifier (e.g., "A.f233dcee88fe0abe.FlowToken.Vault")
-	Amount        cadence.UFix64
-	From          flow.Address
-	FromUUID      uint64
-	WithdrawnUUID uint64
-	BalanceAfter  cadence.UFix64
+	Type          string         // Token type identifier (e.g., "A.f233dcee88fe0abe.FlowToken.Vault")
+	Amount        cadence.UFix64 // Amount in UFix64 (Cadence-side denomination)
+	From          flow.Address   // Address the tokens were withdrawn from
+	FromUUID      uint64         // UUID of the source vault
+	WithdrawnUUID uint64         // UUID of the withdrawn vault
+	BalanceAfter  cadence.UFix64 // Balance after the tokens were withdrawn (in UFix64)
 }
 
 // ftDepositedEvent represents a decoded FungibleToken.Deposited event.
 type FTDepositedEvent struct {
-	Type          string
-	Amount        cadence.UFix64
-	To            flow.Address
-	ToUUID        uint64
-	DepositedUUID uint64
-	BalanceAfter  cadence.UFix64
+	Type          string         // Token type identifier (e.g., "A.f233dcee88fe0abe.FlowToken.Vault")
+	Amount        cadence.UFix64 // Amount in UFix64 (Cadence-side denomination)
+	To            flow.Address   // Address the tokens were deposited to
+	ToUUID        uint64         // UUID of the destination vault
+	DepositedUUID uint64         // UUID of the deposited vault
+	BalanceAfter  cadence.UFix64 // Balance after the tokens were deposited (in UFix64)
 }
 
 // DecodeFTDeposited extracts fields from a FungibleToken.Deposited event.

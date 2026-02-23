@@ -1,8 +1,10 @@
 package events
 
 import (
+	"encoding/hex"
 	"fmt"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/encoding/ccf"
 	"github.com/onflow/flow-go/model/flow"
@@ -55,4 +57,20 @@ func PathFromOptional(opt cadence.Optional) (string, error) {
 		return "", fmt.Errorf("unexpected type in optional path field: %T", opt.Value)
 	}
 	return path.Domain.Identifier() + "/" + path.Identifier, nil
+}
+
+// HexToEVMAddress decodes a hex string to an EVM address.
+// This is the same logic as `common.HexToAddress`, except it returns an error if the hex string is
+// not valid hex or an incorrect length.
+//
+// Any error indicates that the hex string is malformed.
+func HexToEVMAddress(hexStr string) (common.Address, error) {
+	addrBytes, err := hex.DecodeString(hexStr)
+	if err != nil {
+		return common.Address{}, fmt.Errorf("invalid hex string: %w", err)
+	}
+	if len(addrBytes) != common.AddressLength {
+		return common.Address{}, fmt.Errorf("invalid EVM address length: %d", len(addrBytes))
+	}
+	return common.BytesToAddress(addrBytes), nil
 }
