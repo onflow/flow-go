@@ -25,7 +25,7 @@ func NewEvents(collector module.CacheMetrics, db storage.DB) *Events {
 		var events []flow.Event
 		err := operation.LookupEventsByBlockID(r, blockID, &events)
 
-		// events are stored orderd by [blockID, txID, txIndex, eventIndex]
+		// events are stored ordered by [blockID, txID, txIndex, eventIndex]
 		// sort them into execution order
 		sort.Slice(events, func(i, j int) bool {
 			if events[i].TransactionIndex == events[j].TransactionIndex {
@@ -186,6 +186,16 @@ func NewServiceEvents(collector module.CacheMetrics, db storage.DB) *ServiceEven
 	retrieve := func(r storage.Reader, blockID flow.Identifier) ([]flow.Event, error) {
 		var events []flow.Event
 		err := operation.LookupServiceEventsByBlockID(r, blockID, &events)
+
+		// events are stored ordered by [blockID, txID, txIndex, eventIndex]
+		// sort them into execution order
+		sort.Slice(events, func(i, j int) bool {
+			if events[i].TransactionIndex == events[j].TransactionIndex {
+				return events[i].EventIndex < events[j].EventIndex
+			}
+			return events[i].TransactionIndex < events[j].TransactionIndex
+		})
+
 		return events, err
 	}
 
@@ -226,11 +236,17 @@ func (e *ServiceEvents) BatchStore(lctx lockctx.Proof, blockID flow.Identifier, 
 
 // ByBlockID returns the events for the given block ID
 func (e *ServiceEvents) ByBlockID(blockID flow.Identifier) ([]flow.Event, error) {
-	val, err := e.cache.Get(e.db.Reader(), blockID)
+	events, err := e.cache.Get(e.db.Reader(), blockID)
 	if err != nil {
 		return nil, err
 	}
-	return val, nil
+
+	result := make([]flow.Event, len(events))
+	for i, event := range events {
+		result[i] = copyEvent(event)
+	}
+
+	return result, nil
 }
 
 // RemoveByBlockID removes service events by block ID
