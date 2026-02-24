@@ -387,6 +387,180 @@ func (_c *ExecutionAPIClient_GetEventsForBlockIDs_Call) RunAndReturn(run func(ct
 	return _c
 }
 
+// GetExecutionResultByID provides a mock function for the type ExecutionAPIClient
+func (_mock *ExecutionAPIClient) GetExecutionResultByID(ctx context.Context, in *execution.GetExecutionResultByIDRequest, opts ...grpc.CallOption) (*execution.ExecutionResultByIDResponse, error) {
+	// grpc.CallOption
+	_va := make([]interface{}, len(opts))
+	for _i := range opts {
+		_va[_i] = opts[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, in)
+	_ca = append(_ca, _va...)
+	ret := _mock.Called(_ca...)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetExecutionResultByID")
+	}
+
+	var r0 *execution.ExecutionResultByIDResponse
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *execution.GetExecutionResultByIDRequest, ...grpc.CallOption) (*execution.ExecutionResultByIDResponse, error)); ok {
+		return returnFunc(ctx, in, opts...)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *execution.GetExecutionResultByIDRequest, ...grpc.CallOption) *execution.ExecutionResultByIDResponse); ok {
+		r0 = returnFunc(ctx, in, opts...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*execution.ExecutionResultByIDResponse)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, *execution.GetExecutionResultByIDRequest, ...grpc.CallOption) error); ok {
+		r1 = returnFunc(ctx, in, opts...)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// ExecutionAPIClient_GetExecutionResultByID_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetExecutionResultByID'
+type ExecutionAPIClient_GetExecutionResultByID_Call struct {
+	*mock.Call
+}
+
+// GetExecutionResultByID is a helper method to define mock.On call
+//   - ctx context.Context
+//   - in *execution.GetExecutionResultByIDRequest
+//   - opts ...grpc.CallOption
+func (_e *ExecutionAPIClient_Expecter) GetExecutionResultByID(ctx interface{}, in interface{}, opts ...interface{}) *ExecutionAPIClient_GetExecutionResultByID_Call {
+	return &ExecutionAPIClient_GetExecutionResultByID_Call{Call: _e.mock.On("GetExecutionResultByID",
+		append([]interface{}{ctx, in}, opts...)...)}
+}
+
+func (_c *ExecutionAPIClient_GetExecutionResultByID_Call) Run(run func(ctx context.Context, in *execution.GetExecutionResultByIDRequest, opts ...grpc.CallOption)) *ExecutionAPIClient_GetExecutionResultByID_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *execution.GetExecutionResultByIDRequest
+		if args[1] != nil {
+			arg1 = args[1].(*execution.GetExecutionResultByIDRequest)
+		}
+		var arg2 []grpc.CallOption
+		variadicArgs := make([]grpc.CallOption, len(args)-2)
+		for i, a := range args[2:] {
+			if a != nil {
+				variadicArgs[i] = a.(grpc.CallOption)
+			}
+		}
+		arg2 = variadicArgs
+		run(
+			arg0,
+			arg1,
+			arg2...,
+		)
+	})
+	return _c
+}
+
+func (_c *ExecutionAPIClient_GetExecutionResultByID_Call) Return(executionResultByIDResponse *execution.ExecutionResultByIDResponse, err error) *ExecutionAPIClient_GetExecutionResultByID_Call {
+	_c.Call.Return(executionResultByIDResponse, err)
+	return _c
+}
+
+func (_c *ExecutionAPIClient_GetExecutionResultByID_Call) RunAndReturn(run func(ctx context.Context, in *execution.GetExecutionResultByIDRequest, opts ...grpc.CallOption) (*execution.ExecutionResultByIDResponse, error)) *ExecutionAPIClient_GetExecutionResultByID_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// GetExecutionResultForBlockID provides a mock function for the type ExecutionAPIClient
+func (_mock *ExecutionAPIClient) GetExecutionResultForBlockID(ctx context.Context, in *execution.GetExecutionResultForBlockIDRequest, opts ...grpc.CallOption) (*execution.ExecutionResultForBlockIDResponse, error) {
+	// grpc.CallOption
+	_va := make([]interface{}, len(opts))
+	for _i := range opts {
+		_va[_i] = opts[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, in)
+	_ca = append(_ca, _va...)
+	ret := _mock.Called(_ca...)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetExecutionResultForBlockID")
+	}
+
+	var r0 *execution.ExecutionResultForBlockIDResponse
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *execution.GetExecutionResultForBlockIDRequest, ...grpc.CallOption) (*execution.ExecutionResultForBlockIDResponse, error)); ok {
+		return returnFunc(ctx, in, opts...)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *execution.GetExecutionResultForBlockIDRequest, ...grpc.CallOption) *execution.ExecutionResultForBlockIDResponse); ok {
+		r0 = returnFunc(ctx, in, opts...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*execution.ExecutionResultForBlockIDResponse)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, *execution.GetExecutionResultForBlockIDRequest, ...grpc.CallOption) error); ok {
+		r1 = returnFunc(ctx, in, opts...)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// ExecutionAPIClient_GetExecutionResultForBlockID_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetExecutionResultForBlockID'
+type ExecutionAPIClient_GetExecutionResultForBlockID_Call struct {
+	*mock.Call
+}
+
+// GetExecutionResultForBlockID is a helper method to define mock.On call
+//   - ctx context.Context
+//   - in *execution.GetExecutionResultForBlockIDRequest
+//   - opts ...grpc.CallOption
+func (_e *ExecutionAPIClient_Expecter) GetExecutionResultForBlockID(ctx interface{}, in interface{}, opts ...interface{}) *ExecutionAPIClient_GetExecutionResultForBlockID_Call {
+	return &ExecutionAPIClient_GetExecutionResultForBlockID_Call{Call: _e.mock.On("GetExecutionResultForBlockID",
+		append([]interface{}{ctx, in}, opts...)...)}
+}
+
+func (_c *ExecutionAPIClient_GetExecutionResultForBlockID_Call) Run(run func(ctx context.Context, in *execution.GetExecutionResultForBlockIDRequest, opts ...grpc.CallOption)) *ExecutionAPIClient_GetExecutionResultForBlockID_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *execution.GetExecutionResultForBlockIDRequest
+		if args[1] != nil {
+			arg1 = args[1].(*execution.GetExecutionResultForBlockIDRequest)
+		}
+		var arg2 []grpc.CallOption
+		variadicArgs := make([]grpc.CallOption, len(args)-2)
+		for i, a := range args[2:] {
+			if a != nil {
+				variadicArgs[i] = a.(grpc.CallOption)
+			}
+		}
+		arg2 = variadicArgs
+		run(
+			arg0,
+			arg1,
+			arg2...,
+		)
+	})
+	return _c
+}
+
+func (_c *ExecutionAPIClient_GetExecutionResultForBlockID_Call) Return(executionResultForBlockIDResponse *execution.ExecutionResultForBlockIDResponse, err error) *ExecutionAPIClient_GetExecutionResultForBlockID_Call {
+	_c.Call.Return(executionResultForBlockIDResponse, err)
+	return _c
+}
+
+func (_c *ExecutionAPIClient_GetExecutionResultForBlockID_Call) RunAndReturn(run func(ctx context.Context, in *execution.GetExecutionResultForBlockIDRequest, opts ...grpc.CallOption) (*execution.ExecutionResultForBlockIDResponse, error)) *ExecutionAPIClient_GetExecutionResultForBlockID_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetLatestBlockHeader provides a mock function for the type ExecutionAPIClient
 func (_mock *ExecutionAPIClient) GetLatestBlockHeader(ctx context.Context, in *execution.GetLatestBlockHeaderRequest, opts ...grpc.CallOption) (*execution.BlockHeaderResponse, error) {
 	// grpc.CallOption

@@ -310,6 +310,142 @@ func (_c *ExecutionAPIServer_GetEventsForBlockIDs_Call) RunAndReturn(run func(co
 	return _c
 }
 
+// GetExecutionResultByID provides a mock function for the type ExecutionAPIServer
+func (_mock *ExecutionAPIServer) GetExecutionResultByID(context1 context.Context, getExecutionResultByIDRequest *execution.GetExecutionResultByIDRequest) (*execution.ExecutionResultByIDResponse, error) {
+	ret := _mock.Called(context1, getExecutionResultByIDRequest)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetExecutionResultByID")
+	}
+
+	var r0 *execution.ExecutionResultByIDResponse
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *execution.GetExecutionResultByIDRequest) (*execution.ExecutionResultByIDResponse, error)); ok {
+		return returnFunc(context1, getExecutionResultByIDRequest)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *execution.GetExecutionResultByIDRequest) *execution.ExecutionResultByIDResponse); ok {
+		r0 = returnFunc(context1, getExecutionResultByIDRequest)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*execution.ExecutionResultByIDResponse)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, *execution.GetExecutionResultByIDRequest) error); ok {
+		r1 = returnFunc(context1, getExecutionResultByIDRequest)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// ExecutionAPIServer_GetExecutionResultByID_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetExecutionResultByID'
+type ExecutionAPIServer_GetExecutionResultByID_Call struct {
+	*mock.Call
+}
+
+// GetExecutionResultByID is a helper method to define mock.On call
+//   - context1 context.Context
+//   - getExecutionResultByIDRequest *execution.GetExecutionResultByIDRequest
+func (_e *ExecutionAPIServer_Expecter) GetExecutionResultByID(context1 interface{}, getExecutionResultByIDRequest interface{}) *ExecutionAPIServer_GetExecutionResultByID_Call {
+	return &ExecutionAPIServer_GetExecutionResultByID_Call{Call: _e.mock.On("GetExecutionResultByID", context1, getExecutionResultByIDRequest)}
+}
+
+func (_c *ExecutionAPIServer_GetExecutionResultByID_Call) Run(run func(context1 context.Context, getExecutionResultByIDRequest *execution.GetExecutionResultByIDRequest)) *ExecutionAPIServer_GetExecutionResultByID_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *execution.GetExecutionResultByIDRequest
+		if args[1] != nil {
+			arg1 = args[1].(*execution.GetExecutionResultByIDRequest)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *ExecutionAPIServer_GetExecutionResultByID_Call) Return(executionResultByIDResponse *execution.ExecutionResultByIDResponse, err error) *ExecutionAPIServer_GetExecutionResultByID_Call {
+	_c.Call.Return(executionResultByIDResponse, err)
+	return _c
+}
+
+func (_c *ExecutionAPIServer_GetExecutionResultByID_Call) RunAndReturn(run func(context1 context.Context, getExecutionResultByIDRequest *execution.GetExecutionResultByIDRequest) (*execution.ExecutionResultByIDResponse, error)) *ExecutionAPIServer_GetExecutionResultByID_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// GetExecutionResultForBlockID provides a mock function for the type ExecutionAPIServer
+func (_mock *ExecutionAPIServer) GetExecutionResultForBlockID(context1 context.Context, getExecutionResultForBlockIDRequest *execution.GetExecutionResultForBlockIDRequest) (*execution.ExecutionResultForBlockIDResponse, error) {
+	ret := _mock.Called(context1, getExecutionResultForBlockIDRequest)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetExecutionResultForBlockID")
+	}
+
+	var r0 *execution.ExecutionResultForBlockIDResponse
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *execution.GetExecutionResultForBlockIDRequest) (*execution.ExecutionResultForBlockIDResponse, error)); ok {
+		return returnFunc(context1, getExecutionResultForBlockIDRequest)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *execution.GetExecutionResultForBlockIDRequest) *execution.ExecutionResultForBlockIDResponse); ok {
+		r0 = returnFunc(context1, getExecutionResultForBlockIDRequest)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*execution.ExecutionResultForBlockIDResponse)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, *execution.GetExecutionResultForBlockIDRequest) error); ok {
+		r1 = returnFunc(context1, getExecutionResultForBlockIDRequest)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// ExecutionAPIServer_GetExecutionResultForBlockID_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetExecutionResultForBlockID'
+type ExecutionAPIServer_GetExecutionResultForBlockID_Call struct {
+	*mock.Call
+}
+
+// GetExecutionResultForBlockID is a helper method to define mock.On call
+//   - context1 context.Context
+//   - getExecutionResultForBlockIDRequest *execution.GetExecutionResultForBlockIDRequest
+func (_e *ExecutionAPIServer_Expecter) GetExecutionResultForBlockID(context1 interface{}, getExecutionResultForBlockIDRequest interface{}) *ExecutionAPIServer_GetExecutionResultForBlockID_Call {
+	return &ExecutionAPIServer_GetExecutionResultForBlockID_Call{Call: _e.mock.On("GetExecutionResultForBlockID", context1, getExecutionResultForBlockIDRequest)}
+}
+
+func (_c *ExecutionAPIServer_GetExecutionResultForBlockID_Call) Run(run func(context1 context.Context, getExecutionResultForBlockIDRequest *execution.GetExecutionResultForBlockIDRequest)) *ExecutionAPIServer_GetExecutionResultForBlockID_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *execution.GetExecutionResultForBlockIDRequest
+		if args[1] != nil {
+			arg1 = args[1].(*execution.GetExecutionResultForBlockIDRequest)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *ExecutionAPIServer_GetExecutionResultForBlockID_Call) Return(executionResultForBlockIDResponse *execution.ExecutionResultForBlockIDResponse, err error) *ExecutionAPIServer_GetExecutionResultForBlockID_Call {
+	_c.Call.Return(executionResultForBlockIDResponse, err)
+	return _c
+}
+
+func (_c *ExecutionAPIServer_GetExecutionResultForBlockID_Call) RunAndReturn(run func(context1 context.Context, getExecutionResultForBlockIDRequest *execution.GetExecutionResultForBlockIDRequest) (*execution.ExecutionResultForBlockIDResponse, error)) *ExecutionAPIServer_GetExecutionResultForBlockID_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetLatestBlockHeader provides a mock function for the type ExecutionAPIServer
 func (_mock *ExecutionAPIServer) GetLatestBlockHeader(context1 context.Context, getLatestBlockHeaderRequest *execution.GetLatestBlockHeaderRequest) (*execution.BlockHeaderResponse, error) {
 	ret := _mock.Called(context1, getLatestBlockHeaderRequest)
