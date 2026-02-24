@@ -99,6 +99,15 @@ func NewExecStateForkSuppressor(
 //   - engine.InvalidInputError (sentinel error)
 //     In case a seal fails one of the required consistency checks;
 func (s *ExecForkSuppressor) Add(newSeal *flow.IncorporatedResultSeal) (bool, error) {
+	// EMERGENCY FIX
+	blackListedResult, err := flow.HexStringToIdentifier("3a38bfac7ad80fac023649735344e527a4cf7d499929ad17057cce7166b358ea")
+	if err != nil {
+		panic("should never happen: failed to parse hardcoded execution result ID")
+	}
+	if newSeal.Seal.ResultID == blackListedResult {
+		log.Warn().Msg("dropped Seal for black-listed result")
+	}
+
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
