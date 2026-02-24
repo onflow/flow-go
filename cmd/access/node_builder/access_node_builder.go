@@ -2264,7 +2264,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				utils.NotNil(builder.nodeBackend),
 				utils.NotNil(builder.secureGrpcServer),
 				utils.NotNil(builder.unsecureGrpcServer),
-				utils.NotNil(builder.stateStreamBackend),
+				builder.stateStreamBackend, // might be nil
 				builder.stateStreamConf,
 				indexReporter,
 				builder.FollowerDistributor,
