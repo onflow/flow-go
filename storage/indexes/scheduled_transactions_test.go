@@ -65,12 +65,11 @@ func executeTx(
 	idx *indexes.ScheduledTransactionsIndex,
 	db storage.DB,
 	id uint64,
-	effort uint64,
 	transactionID flow.Identifier,
 ) error {
 	return unittest.WithLock(tb, lm, storage.LockIndexScheduledTransactionsIndex, func(lctx lockctx.Context) error {
 		return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return idx.Executed(lctx, rw, id, effort, transactionID)
+			return idx.Executed(lctx, rw, id, transactionID)
 		})
 	})
 }
@@ -159,13 +158,12 @@ func TestScheduledTransactionsIndex_Executed_Happy(t *testing.T) {
 		err := storeScheduledTxs(t, lm, idx, db, 2, []access.ScheduledTransaction{tx})
 		require.NoError(t, err)
 
-		err = executeTx(t, lm, idx, db, 400, 1234, executedTxID)
+		err = executeTx(t, lm, idx, db, 400, executedTxID)
 		require.NoError(t, err)
 
 		got, err := idx.ByID(400)
 		require.NoError(t, err)
 		assert.Equal(t, access.ScheduledTxStatusExecuted, got.Status)
-		assert.Equal(t, uint64(1234), got.ExecutionEffort)
 		assert.Equal(t, executedTxID, got.ExecutedTransactionID)
 	})
 }
@@ -174,7 +172,7 @@ func TestScheduledTransactionsIndex_Executed_NotFound(t *testing.T) {
 	t.Parallel()
 
 	RunWithBootstrappedScheduledTxIndex(t, 1, func(db storage.DB, lm storage.LockManager, idx *indexes.ScheduledTransactionsIndex) {
-		err := executeTx(t, lm, idx, db, 9999, 0, unittest.IdentifierFixture())
+		err := executeTx(t, lm, idx, db, 9999, unittest.IdentifierFixture())
 		require.ErrorIs(t, err, storage.ErrNotFound)
 	})
 }
@@ -189,11 +187,11 @@ func TestScheduledTransactionsIndex_Executed_AlreadyTerminal(t *testing.T) {
 		err := storeScheduledTxs(t, lm, idx, db, 2, []access.ScheduledTransaction{tx})
 		require.NoError(t, err)
 
-		err = executeTx(t, lm, idx, db, 500, 100, unittest.IdentifierFixture())
+		err = executeTx(t, lm, idx, db, 500, unittest.IdentifierFixture())
 		require.NoError(t, err)
 
 		// Second call should fail.
-		err = executeTx(t, lm, idx, db, 500, 200, unittest.IdentifierFixture())
+		err = executeTx(t, lm, idx, db, 500, unittest.IdentifierFixture())
 		require.ErrorIs(t, err, storage.ErrInvalidStatusTransition)
 	})
 }
@@ -250,7 +248,7 @@ func TestScheduledTransactionsIndex_ExecutedThenCancelled(t *testing.T) {
 		err := storeScheduledTxs(t, lm, idx, db, 2, []access.ScheduledTransaction{tx})
 		require.NoError(t, err)
 
-		err = executeTx(t, lm, idx, db, 800, 100, unittest.IdentifierFixture())
+		err = executeTx(t, lm, idx, db, 800, unittest.IdentifierFixture())
 		require.NoError(t, err)
 
 		// Cancelling an executed tx should fail.
@@ -371,7 +369,7 @@ func TestScheduledTransactionsIndex_All_Filter(t *testing.T) {
 		}
 
 		// Execute tx with ID=2.
-		err := executeTx(t, lm, idx, db, 2, 999, unittest.IdentifierFixture())
+		err := executeTx(t, lm, idx, db, 2, unittest.IdentifierFixture())
 		require.NoError(t, err)
 
 		// Filter to only Executed txs — should return exactly tx with ID=2.

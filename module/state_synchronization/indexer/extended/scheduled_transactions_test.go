@@ -85,7 +85,7 @@ func TestScheduledTransactionsIndexer_ScheduledEvent(t *testing.T) {
 	tx, err := store.ByID(1)
 	require.NoError(t, err)
 	assert.Equal(t, uint64(1), tx.ID)
-	assert.Equal(t, uint8(3), tx.Priority)
+	assert.Equal(t, access.ScheduledTransactionPriority(3), tx.Priority)
 	assert.Equal(t, uint64(1000), tx.Timestamp)
 	assert.Equal(t, uint64(500), tx.ExecutionEffort)
 	assert.Equal(t, uint64(200), tx.Fees)
@@ -94,7 +94,7 @@ func TestScheduledTransactionsIndexer_ScheduledEvent(t *testing.T) {
 	assert.Equal(t, uint64(42), tx.TransactionHandlerUUID)
 	assert.Equal(t, "", tx.TransactionHandlerPublicPath)
 	assert.Equal(t, access.ScheduledTxStatusScheduled, tx.Status)
-	assert.Equal(t, schedulingTxID, tx.ScheduledTransactionID)
+	assert.Equal(t, schedulingTxID, tx.CreatedTransactionID)
 }
 
 // TestScheduledTransactionsIndexer_ScheduledEventPublicPath verifies that the optional
@@ -196,7 +196,7 @@ func TestScheduledTransactionsIndexer_CanceledEvent(t *testing.T) {
 
 // TestScheduledTransactionsIndexer_FailedTransaction verifies that a scheduled tx with a
 // PendingExecution event but no Executed event is marked as Failed when a corresponding
-// executor transaction is present in the block. Verifies FailedTransactionID is set.
+// executor transaction is present in the block. Verifies ExecutedTransactionID is set.
 func TestScheduledTransactionsIndexer_FailedTransaction(t *testing.T) {
 	t.Parallel()
 
@@ -227,7 +227,7 @@ func TestScheduledTransactionsIndexer_FailedTransaction(t *testing.T) {
 	tx, err := store.ByID(42)
 	require.NoError(t, err)
 	assert.Equal(t, access.ScheduledTxStatusFailed, tx.Status)
-	assert.Equal(t, executorTx.ID(), tx.FailedTransactionID)
+	assert.Equal(t, executorTx.ID(), tx.ExecutedTransactionID)
 }
 
 // TestScheduledTransactionsIndexer_PendingWithoutExecuted verifies that a PendingExecution event
@@ -268,6 +268,99 @@ func TestScheduledTransactionsIndexer_ExecutedWithoutPending(t *testing.T) {
 	})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "protocol invariant violated")
+}
+
+// TestScheduledTransactionsIndexer_DuplicateID verifies that having the same scheduled
+// transaction ID appear more than once in a block (across Scheduled, Executed, or Canceled
+// events) returns an error.
+func TestScheduledTransactionsIndexer_DuplicateID(t *testing.T) {
+	t.Parallel()
+
+	sc := systemcontracts.SystemContractsForChain(flow.Testnet)
+	owner := unittest.RandomAddressFixture()
+
+	t.Run("duplicate Scheduled events", func(t *testing.T) {
+		t.Parallel()
+		indexer, _, lm, db := newScheduledTxIndexerForTest(t, flow.Testnet, scheduledTestHeight)
+		header := unittest.BlockHeaderFixtureOnChain(flow.Testnet, unittest.WithHeaderHeight(scheduledTestHeight))
+
+		evt1 := createScheduledEvent(t, sc, 5, 1, 1000, 100, 50, owner, "A.abc.Contract.Handler", 1, "")
+		evt2 := createScheduledEvent(t, sc, 5, 1, 1000, 100, 50, owner, "A.abc.Contract.Handler", 2, "")
+
+		err := indexScheduledBlockExpectError(t, indexer, lm, db, BlockData{
+			Header: header,
+			Events: []flow.Event{evt1, evt2},
+		})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "appears more than once")
+	})
+
+	t.Run("duplicate Executed events", func(t *testing.T) {
+		t.Parallel()
+		indexer, _, lm, db := newScheduledTxIndexerForTest(t, flow.Testnet, scheduledTestHeight)
+		header := unittest.BlockHeaderFixtureOnChain(flow.Testnet, unittest.WithHeaderHeight(scheduledTestHeight))
+
+		// One PendingExecution event allows the first Executed to pass the pendingIDs check.
+		// The second Executed with the same ID is caught by seenIDs before reaching pendingIDs.
+		pendingEvt := createPendingExecutionEvent(t, sc, 5, 1, 100, 50, owner, "A.abc.Contract.Handler")
+		executedEvt1 := createExecutedEvent(t, sc, 5, 1, 100, owner, "A.abc.Contract.Handler", 1, "")
+		executedEvt2 := createExecutedEvent(t, sc, 5, 1, 100, owner, "A.abc.Contract.Handler", 1, "")
+
+		err := indexScheduledBlockExpectError(t, indexer, lm, db, BlockData{
+			Header: header,
+			Events: []flow.Event{pendingEvt, executedEvt1, executedEvt2},
+		})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "appears more than once")
+	})
+
+	t.Run("duplicate Canceled events", func(t *testing.T) {
+		t.Parallel()
+		indexer, _, lm, db := newScheduledTxIndexerForTest(t, flow.Testnet, scheduledTestHeight)
+		header := unittest.BlockHeaderFixtureOnChain(flow.Testnet, unittest.WithHeaderHeight(scheduledTestHeight))
+
+		canceledEvt1 := createCanceledEvent(t, sc, 5, 1, 100, 50, owner, "A.abc.Contract.Handler")
+		canceledEvt2 := createCanceledEvent(t, sc, 5, 1, 100, 50, owner, "A.abc.Contract.Handler")
+
+		err := indexScheduledBlockExpectError(t, indexer, lm, db, BlockData{
+			Header: header,
+			Events: []flow.Event{canceledEvt1, canceledEvt2},
+		})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "appears more than once")
+	})
+
+	t.Run("Scheduled then Executed in same block", func(t *testing.T) {
+		t.Parallel()
+		indexer, _, lm, db := newScheduledTxIndexerForTest(t, flow.Testnet, scheduledTestHeight)
+		header := unittest.BlockHeaderFixtureOnChain(flow.Testnet, unittest.WithHeaderHeight(scheduledTestHeight))
+
+		scheduledEvt := createScheduledEvent(t, sc, 5, 1, 1000, 100, 50, owner, "A.abc.Contract.Handler", 1, "")
+		executedEvt := createExecutedEvent(t, sc, 5, 1, 100, owner, "A.abc.Contract.Handler", 1, "")
+
+		err := indexScheduledBlockExpectError(t, indexer, lm, db, BlockData{
+			Header: header,
+			Events: []flow.Event{scheduledEvt, executedEvt},
+		})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "appears more than once")
+	})
+
+	t.Run("Scheduled then Canceled in same block", func(t *testing.T) {
+		t.Parallel()
+		indexer, _, lm, db := newScheduledTxIndexerForTest(t, flow.Testnet, scheduledTestHeight)
+		header := unittest.BlockHeaderFixtureOnChain(flow.Testnet, unittest.WithHeaderHeight(scheduledTestHeight))
+
+		scheduledEvt := createScheduledEvent(t, sc, 5, 1, 1000, 100, 50, owner, "A.abc.Contract.Handler", 1, "")
+		canceledEvt := createCanceledEvent(t, sc, 5, 1, 100, 50, owner, "A.abc.Contract.Handler")
+
+		err := indexScheduledBlockExpectError(t, indexer, lm, db, BlockData{
+			Header: header,
+			Events: []flow.Event{scheduledEvt, canceledEvt},
+		})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "appears more than once")
+	})
 }
 
 // TestScheduledTransactionsIndexer_AlreadyIndexed verifies that indexing the same height twice
@@ -332,15 +425,15 @@ func TestScheduledTransactionsIndexer_MultipleScheduledInOneBlock(t *testing.T) 
 
 	tx1, err := store.ByID(1)
 	require.NoError(t, err)
-	assert.Equal(t, uint8(1), tx1.Priority)
+	assert.Equal(t, access.ScheduledTransactionPriority(1), tx1.Priority)
 
 	tx2, err := store.ByID(2)
 	require.NoError(t, err)
-	assert.Equal(t, uint8(2), tx2.Priority)
+	assert.Equal(t, access.ScheduledTransactionPriority(2), tx2.Priority)
 
 	tx3, err := store.ByID(3)
 	require.NoError(t, err)
-	assert.Equal(t, uint8(3), tx3.Priority)
+	assert.Equal(t, access.ScheduledTransactionPriority(3), tx3.Priority)
 }
 
 // TestScheduledTransactionsIndexer_MultiplePendingExecuted verifies that multiple scheduled txs
@@ -420,7 +513,7 @@ func TestScheduledTransactionsIndexer_MixedFailedAndExecuted(t *testing.T) {
 	tx21, err := store.ByID(21)
 	require.NoError(t, err)
 	assert.Equal(t, access.ScheduledTxStatusFailed, tx21.Status)
-	assert.Equal(t, executorTx21.ID(), tx21.FailedTransactionID)
+	assert.Equal(t, executorTx21.ID(), tx21.ExecutedTransactionID)
 }
 
 // TestScheduledTransactionsIndexer_NonExecutorTxSkipped verifies that non-executor transactions
@@ -460,7 +553,7 @@ func TestScheduledTransactionsIndexer_NonExecutorTxSkipped(t *testing.T) {
 	tx, err := store.ByID(30)
 	require.NoError(t, err)
 	assert.Equal(t, access.ScheduledTxStatusFailed, tx.Status)
-	assert.Equal(t, executorTx.ID(), tx.FailedTransactionID)
+	assert.Equal(t, executorTx.ID(), tx.ExecutedTransactionID)
 }
 
 // TestScheduledTransactionsIndexer_ExecutorTxNoArguments verifies that an executor transaction

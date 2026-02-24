@@ -190,8 +190,8 @@ func (b *ScheduledTransactionsBootstrapper) Store(
 	return nil
 }
 
-// Executed updates the scheduled transaction's status to Executed and records the
-// final execution effort and the ID of the transaction that emitted the Executed event.
+// Executed updates the scheduled transaction's status to Executed and records the ID of the transaction
+// that emitted the Executed event.
 // The caller must hold the [storage.LockIndexScheduledTransactionsIndex] lock until the batch
 // is committed.
 //
@@ -203,14 +203,13 @@ func (b *ScheduledTransactionsBootstrapper) Executed(
 	lctx lockctx.Proof,
 	rw storage.ReaderBatchWriter,
 	scheduledTxID uint64,
-	executionEffort uint64,
 	transactionID flow.Identifier,
 ) error {
 	store := b.store.Load()
 	if store == nil {
 		return storage.ErrNotBootstrapped
 	}
-	return store.Executed(lctx, rw, scheduledTxID, executionEffort, transactionID)
+	return store.Executed(lctx, rw, scheduledTxID, transactionID)
 }
 
 // Cancelled updates the scheduled transaction's status to Cancelled and records the

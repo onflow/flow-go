@@ -247,8 +247,8 @@ func (idx *ScheduledTransactionsIndex) Store(
 	return nil
 }
 
-// Executed updates the transaction's status to Executed and sets the final execution effort
-// and the ID of the transaction that emitted the Executed event.
+// Executed updates the transaction's status to Executed and records the ID of the
+// transaction that emitted the Executed event.
 // The caller must hold the [storage.LockIndexScheduledTransactionsIndex] lock until committed.
 //
 // Expected error returns during normal operation:
@@ -258,7 +258,6 @@ func (idx *ScheduledTransactionsIndex) Executed(
 	lctx lockctx.Proof,
 	rw storage.ReaderBatchWriter,
 	scheduledTxID uint64,
-	executionEffort uint64,
 	transactionID flow.Identifier,
 ) error {
 	if !lctx.HoldsLock(storage.LockIndexScheduledTransactionsIndex) {
@@ -275,7 +274,6 @@ func (idx *ScheduledTransactionsIndex) Executed(
 	}
 
 	tx.Status = access.ScheduledTxStatusExecuted
-	tx.ExecutionEffort = executionEffort
 	tx.ExecutedTransactionID = transactionID
 
 	if err := operation.UpsertByKey(rw.Writer(), key, tx); err != nil {
@@ -351,7 +349,7 @@ func (idx *ScheduledTransactionsIndex) Failed(
 	}
 
 	tx.Status = access.ScheduledTxStatusFailed
-	tx.FailedTransactionID = transactionID
+	tx.ExecutedTransactionID = transactionID
 
 	if err := operation.UpsertByKey(rw.Writer(), key, tx); err != nil {
 		return fmt.Errorf("could not update scheduled transaction %d: %w", scheduledTxID, err)

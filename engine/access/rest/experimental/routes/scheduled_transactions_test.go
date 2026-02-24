@@ -91,6 +91,7 @@ func testEncodeScheduledTxCursor(t *testing.T, id uint64) string {
 func TestGetScheduledTransactions(t *testing.T) {
 	handlerOwner := unittest.AddressFixture()
 
+	tx1CreatedID := unittest.IdentifierFixture()
 	tx1 := accessmodel.ScheduledTransaction{
 		ID:                               100,
 		Priority:                         0, // high
@@ -101,7 +102,10 @@ func TestGetScheduledTransactions(t *testing.T) {
 		TransactionHandlerTypeIdentifier: "A.0000.MyScheduler.Handler",
 		TransactionHandlerUUID:           7,
 		Status:                           accessmodel.ScheduledTxStatusScheduled,
+		CreatedTransactionID:             tx1CreatedID,
 	}
+	tx2CreatedID := unittest.IdentifierFixture()
+	tx2ExecutedID := unittest.IdentifierFixture()
 	tx2 := accessmodel.ScheduledTransaction{
 		ID:                               99,
 		Priority:                         1, // medium
@@ -112,6 +116,8 @@ func TestGetScheduledTransactions(t *testing.T) {
 		TransactionHandlerTypeIdentifier: "A.0000.MyScheduler.Handler",
 		TransactionHandlerUUID:           8,
 		Status:                           accessmodel.ScheduledTxStatusExecuted,
+		CreatedTransactionID:             tx2CreatedID,
+		ExecutedTransactionID:            tx2ExecutedID,
 	}
 
 	t.Run("happy path with next cursor", func(t *testing.T) {
@@ -151,6 +157,7 @@ func TestGetScheduledTransactions(t *testing.T) {
 					"transaction_handler_owner": "%s",
 					"transaction_handler_type_identifier": "A.0000.MyScheduler.Handler",
 					"transaction_handler_uuid": "7",
+					"created_transaction_id": "%s",
 					"_expandable": {
 						"transaction": "transaction",
 						"result": "result",
@@ -167,6 +174,8 @@ func TestGetScheduledTransactions(t *testing.T) {
 					"transaction_handler_owner": "%s",
 					"transaction_handler_type_identifier": "A.0000.MyScheduler.Handler",
 					"transaction_handler_uuid": "8",
+					"created_transaction_id": "%s",
+					"executed_transaction_id": "%s",
 					"_expandable": {
 						"transaction": "transaction",
 						"result": "result",
@@ -175,7 +184,7 @@ func TestGetScheduledTransactions(t *testing.T) {
 				}
 			],
 			"next_cursor": "%s"
-		}`, handlerOwner.String(), handlerOwner.String(), expectedNextCursor)
+		}`, handlerOwner.String(), tx1CreatedID.String(), handlerOwner.String(), tx2CreatedID.String(), tx2ExecutedID.String(), expectedNextCursor)
 
 		assert.JSONEq(t, expected, rr.Body.String())
 	})
@@ -242,7 +251,7 @@ func TestGetScheduledTransactions(t *testing.T) {
 			uint32(0),
 			(*accessmodel.ScheduledTransactionCursor)(nil),
 			extended.ScheduledTransactionFilter{
-				Statuses: []accessmodel.ScheduledTxStatus{accessmodel.ScheduledTxStatusScheduled},
+				Statuses: []accessmodel.ScheduledTransactionStatus{accessmodel.ScheduledTxStatusScheduled},
 			},
 			extended.ScheduledTransactionExpandOptions{},
 			entities.EventEncodingVersion_JSON_CDC_V0,
@@ -316,6 +325,7 @@ func TestGetScheduledTransactions(t *testing.T) {
 func TestGetScheduledTransaction(t *testing.T) {
 	handlerOwner := unittest.AddressFixture()
 
+	txCreatedID := unittest.IdentifierFixture()
 	tx := &accessmodel.ScheduledTransaction{
 		ID:                               42,
 		Priority:                         0, // high
@@ -326,6 +336,7 @@ func TestGetScheduledTransaction(t *testing.T) {
 		TransactionHandlerTypeIdentifier: "A.0000.MyScheduler.Handler",
 		TransactionHandlerUUID:           3,
 		Status:                           accessmodel.ScheduledTxStatusScheduled,
+		CreatedTransactionID:             txCreatedID,
 	}
 
 	t.Run("happy path", func(t *testing.T) {
@@ -355,12 +366,13 @@ func TestGetScheduledTransaction(t *testing.T) {
 			"transaction_handler_owner": "%s",
 			"transaction_handler_type_identifier": "A.0000.MyScheduler.Handler",
 			"transaction_handler_uuid": "3",
+			"created_transaction_id": "%s",
 			"_expandable": {
 				"transaction": "transaction",
 				"result": "result",
 				"handler_contract": "handler_contract"
 			}
-		}`, handlerOwner.String())
+		}`, handlerOwner.String(), txCreatedID.String())
 
 		assert.JSONEq(t, expected, rr.Body.String())
 	})
@@ -390,6 +402,7 @@ func TestGetScheduledTransaction(t *testing.T) {
 			TransactionHandlerTypeIdentifier: "A.0000.MyScheduler.Handler",
 			TransactionHandlerUUID:           3,
 			Status:                           accessmodel.ScheduledTxStatusScheduled,
+			CreatedTransactionID:             txCreatedID,
 			HandlerContract: &accessmodel.Contract{
 				Identifier: "A.0000.MyScheduler",
 				Body:       "pub contract MyScheduler {}",
@@ -420,6 +433,7 @@ func TestGetScheduledTransaction(t *testing.T) {
 			"transaction_handler_owner": "%s",
 			"transaction_handler_type_identifier": "A.0000.MyScheduler.Handler",
 			"transaction_handler_uuid": "3",
+			"created_transaction_id": "%s",
 			"handler_contract": {
 				"identifier": "A.0000.MyScheduler",
 				"body": "pub contract MyScheduler {}"
@@ -428,7 +442,7 @@ func TestGetScheduledTransaction(t *testing.T) {
 				"transaction": "transaction",
 				"result": "result"
 			}
-		}`, handlerOwner.String())
+		}`, handlerOwner.String(), txCreatedID.String())
 
 		assert.JSONEq(t, expected, rr.Body.String())
 	})
@@ -456,6 +470,7 @@ func TestGetScheduledTransactionsByAddress(t *testing.T) {
 	address := unittest.AddressFixture()
 	handlerOwner := unittest.AddressFixture()
 
+	tx1CreatedID := unittest.IdentifierFixture()
 	tx1 := accessmodel.ScheduledTransaction{
 		ID:                               50,
 		Priority:                         0, // high
@@ -466,7 +481,10 @@ func TestGetScheduledTransactionsByAddress(t *testing.T) {
 		TransactionHandlerTypeIdentifier: "A.0000.MyScheduler.Handler",
 		TransactionHandlerUUID:           5,
 		Status:                           accessmodel.ScheduledTxStatusScheduled,
+		CreatedTransactionID:             tx1CreatedID,
 	}
+	tx2CreatedID := unittest.IdentifierFixture()
+	tx2CancelledID := unittest.IdentifierFixture()
 	tx2 := accessmodel.ScheduledTransaction{
 		ID:                               49,
 		Priority:                         2, // low
@@ -477,6 +495,8 @@ func TestGetScheduledTransactionsByAddress(t *testing.T) {
 		TransactionHandlerTypeIdentifier: "A.0000.MyScheduler.Handler",
 		TransactionHandlerUUID:           6,
 		Status:                           accessmodel.ScheduledTxStatusCancelled,
+		CreatedTransactionID:             tx2CreatedID,
+		CancelledTransactionID:           tx2CancelledID,
 	}
 
 	t.Run("happy path with next cursor", func(t *testing.T) {

@@ -121,16 +121,16 @@ func (_c *ScheduledTransactionsIndexWriter_Cancelled_Call) RunAndReturn(run func
 }
 
 // Executed provides a mock function for the type ScheduledTransactionsIndexWriter
-func (_mock *ScheduledTransactionsIndexWriter) Executed(lctx lockctx.Proof, rw storage.ReaderBatchWriter, scheduledTxID uint64, executionEffort uint64, transactionID flow.Identifier) error {
-	ret := _mock.Called(lctx, rw, scheduledTxID, executionEffort, transactionID)
+func (_mock *ScheduledTransactionsIndexWriter) Executed(lctx lockctx.Proof, rw storage.ReaderBatchWriter, scheduledTxID uint64, transactionID flow.Identifier) error {
+	ret := _mock.Called(lctx, rw, scheduledTxID, transactionID)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Executed")
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(lockctx.Proof, storage.ReaderBatchWriter, uint64, uint64, flow.Identifier) error); ok {
-		r0 = returnFunc(lctx, rw, scheduledTxID, executionEffort, transactionID)
+	if returnFunc, ok := ret.Get(0).(func(lockctx.Proof, storage.ReaderBatchWriter, uint64, flow.Identifier) error); ok {
+		r0 = returnFunc(lctx, rw, scheduledTxID, transactionID)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -146,13 +146,12 @@ type ScheduledTransactionsIndexWriter_Executed_Call struct {
 //   - lctx lockctx.Proof
 //   - rw storage.ReaderBatchWriter
 //   - scheduledTxID uint64
-//   - executionEffort uint64
 //   - transactionID flow.Identifier
-func (_e *ScheduledTransactionsIndexWriter_Expecter) Executed(lctx interface{}, rw interface{}, scheduledTxID interface{}, executionEffort interface{}, transactionID interface{}) *ScheduledTransactionsIndexWriter_Executed_Call {
-	return &ScheduledTransactionsIndexWriter_Executed_Call{Call: _e.mock.On("Executed", lctx, rw, scheduledTxID, executionEffort, transactionID)}
+func (_e *ScheduledTransactionsIndexWriter_Expecter) Executed(lctx interface{}, rw interface{}, scheduledTxID interface{}, transactionID interface{}) *ScheduledTransactionsIndexWriter_Executed_Call {
+	return &ScheduledTransactionsIndexWriter_Executed_Call{Call: _e.mock.On("Executed", lctx, rw, scheduledTxID, transactionID)}
 }
 
-func (_c *ScheduledTransactionsIndexWriter_Executed_Call) Run(run func(lctx lockctx.Proof, rw storage.ReaderBatchWriter, scheduledTxID uint64, executionEffort uint64, transactionID flow.Identifier)) *ScheduledTransactionsIndexWriter_Executed_Call {
+func (_c *ScheduledTransactionsIndexWriter_Executed_Call) Run(run func(lctx lockctx.Proof, rw storage.ReaderBatchWriter, scheduledTxID uint64, transactionID flow.Identifier)) *ScheduledTransactionsIndexWriter_Executed_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 lockctx.Proof
 		if args[0] != nil {
@@ -166,20 +165,15 @@ func (_c *ScheduledTransactionsIndexWriter_Executed_Call) Run(run func(lctx lock
 		if args[2] != nil {
 			arg2 = args[2].(uint64)
 		}
-		var arg3 uint64
+		var arg3 flow.Identifier
 		if args[3] != nil {
-			arg3 = args[3].(uint64)
-		}
-		var arg4 flow.Identifier
-		if args[4] != nil {
-			arg4 = args[4].(flow.Identifier)
+			arg3 = args[3].(flow.Identifier)
 		}
 		run(
 			arg0,
 			arg1,
 			arg2,
 			arg3,
-			arg4,
 		)
 	})
 	return _c
@@ -190,7 +184,7 @@ func (_c *ScheduledTransactionsIndexWriter_Executed_Call) Return(err error) *Sch
 	return _c
 }
 
-func (_c *ScheduledTransactionsIndexWriter_Executed_Call) RunAndReturn(run func(lctx lockctx.Proof, rw storage.ReaderBatchWriter, scheduledTxID uint64, executionEffort uint64, transactionID flow.Identifier) error) *ScheduledTransactionsIndexWriter_Executed_Call {
+func (_c *ScheduledTransactionsIndexWriter_Executed_Call) RunAndReturn(run func(lctx lockctx.Proof, rw storage.ReaderBatchWriter, scheduledTxID uint64, transactionID flow.Identifier) error) *ScheduledTransactionsIndexWriter_Executed_Call {
 	_c.Call.Return(run)
 	return _c
 }

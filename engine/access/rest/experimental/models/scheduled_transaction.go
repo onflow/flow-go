@@ -17,9 +17,11 @@ func (t *ScheduledTransaction) Build(
 	expand map[string]bool,
 ) {
 	t.Id = strconv.FormatUint(tx.ID, 10)
-	priority := scheduledTxPriority(tx.Priority)
+	var priority ScheduledTransactionPriority
+	priority.Build(tx.Priority)
 	t.Priority = &priority
-	status := scheduledTxStatus(tx.Status)
+	var status ScheduledTransactionStatus
+	status.Build(tx.Status)
 	t.Status = &status
 	t.Timestamp = strconv.FormatUint(tx.Timestamp, 10)
 	t.ExecutionEffort = strconv.FormatUint(tx.ExecutionEffort, 10)
@@ -35,17 +37,14 @@ func (t *ScheduledTransaction) Build(
 	if tx.FeesDeducted > 0 {
 		t.FeesDeducted = strconv.FormatUint(tx.FeesDeducted, 10)
 	}
-	if tx.ScheduledTransactionID != flow.ZeroID {
-		t.ScheduledTransactionId = tx.ScheduledTransactionID.String()
+	if tx.CreatedTransactionID != flow.ZeroID {
+		t.CreatedTransactionId = tx.CreatedTransactionID.String()
 	}
 	if tx.ExecutedTransactionID != flow.ZeroID {
 		t.ExecutedTransactionId = tx.ExecutedTransactionID.String()
 	}
 	if tx.CancelledTransactionID != flow.ZeroID {
 		t.CancelledTransactionId = tx.CancelledTransactionID.String()
-	}
-	if tx.FailedTransactionID != flow.ZeroID {
-		t.FailedTransactionId = tx.FailedTransactionID.String()
 	}
 
 	t.Expandable = new(ScheduledTransactionExpandable)
@@ -72,31 +71,31 @@ func (t *ScheduledTransaction) Build(
 	}
 }
 
-// scheduledTxStatus returns the [ScheduledTransactionStatus] for a domain status value.
-func scheduledTxStatus(s accessmodel.ScheduledTxStatus) ScheduledTransactionStatus {
-	switch s {
+// Build sets the [ScheduledTransactionStatus] from a domain status value.
+func (s *ScheduledTransactionStatus) Build(status accessmodel.ScheduledTransactionStatus) {
+	switch status {
 	case accessmodel.ScheduledTxStatusScheduled:
-		return SCHEDULED_ScheduledTransactionStatus
+		*s = SCHEDULED_ScheduledTransactionStatus
 	case accessmodel.ScheduledTxStatusExecuted:
-		return EXECUTED_ScheduledTransactionStatus
+		*s = EXECUTED_ScheduledTransactionStatus
 	case accessmodel.ScheduledTxStatusCancelled:
-		return CANCELLED_ScheduledTransactionStatus
+		*s = CANCELLED_ScheduledTransactionStatus
 	case accessmodel.ScheduledTxStatusFailed:
-		return FAILED_ScheduledTransactionStatus
+		*s = FAILED_ScheduledTransactionStatus
 	default:
-		return "unknown"
+		*s = ""
 	}
 }
 
-// scheduledTxPriority returns the [ScheduledTransactionPriority] for a domain priority value.
+// Build sets the [ScheduledTransactionPriority] from a domain priority value.
 // The contract encodes priority as: 0 = high, 1 = medium, 2 = low.
-func scheduledTxPriority(p uint8) ScheduledTransactionPriority {
-	switch p {
-	case 0:
-		return HIGH_ScheduledTransactionPriority
-	case 1:
-		return MEDIUM_ScheduledTransactionPriority
+func (p *ScheduledTransactionPriority) Build(priority accessmodel.ScheduledTransactionPriority) {
+	switch priority {
+	case accessmodel.ScheduledTxPriorityHigh:
+		*p = HIGH_ScheduledTransactionPriority
+	case accessmodel.ScheduledTxPriorityMedium:
+		*p = MEDIUM_ScheduledTransactionPriority
 	default:
-		return LOW_ScheduledTransactionPriority
+		*p = LOW_ScheduledTransactionPriority
 	}
 }

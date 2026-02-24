@@ -115,28 +115,28 @@ func TestScheduledTransactionFilter(t *testing.T) {
 		TransactionHandlerUUID:           99,
 	}
 
-	t.Run("empty filter matches all", func(t *testing.T) {
+	t.Run("empty filter returns nil", func(t *testing.T) {
 		filter := ScheduledTransactionFilter{}
-		assert.True(t, filter.Filter()(tx))
+		assert.Nil(t, filter.Filter())
 	})
 
 	t.Run("status filter matches", func(t *testing.T) {
 		filter := ScheduledTransactionFilter{
-			Statuses: []accessmodel.ScheduledTxStatus{accessmodel.ScheduledTxStatusScheduled},
+			Statuses: []accessmodel.ScheduledTransactionStatus{accessmodel.ScheduledTxStatusScheduled},
 		}
 		assert.True(t, filter.Filter()(tx))
 	})
 
 	t.Run("status filter rejects mismatch", func(t *testing.T) {
 		filter := ScheduledTransactionFilter{
-			Statuses: []accessmodel.ScheduledTxStatus{accessmodel.ScheduledTxStatusExecuted},
+			Statuses: []accessmodel.ScheduledTransactionStatus{accessmodel.ScheduledTxStatusExecuted},
 		}
 		assert.False(t, filter.Filter()(tx))
 	})
 
 	t.Run("status filter matches when one of multiple statuses matches", func(t *testing.T) {
 		filter := ScheduledTransactionFilter{
-			Statuses: []accessmodel.ScheduledTxStatus{
+			Statuses: []accessmodel.ScheduledTransactionStatus{
 				accessmodel.ScheduledTxStatusExecuted,
 				accessmodel.ScheduledTxStatusScheduled,
 			},
@@ -145,13 +145,13 @@ func TestScheduledTransactionFilter(t *testing.T) {
 	})
 
 	t.Run("priority filter matches", func(t *testing.T) {
-		p := uint8(5)
+		p := accessmodel.ScheduledTransactionPriority(5)
 		filter := ScheduledTransactionFilter{Priority: &p}
 		assert.True(t, filter.Filter()(tx))
 	})
 
 	t.Run("priority filter rejects mismatch", func(t *testing.T) {
-		p := uint8(10)
+		p := accessmodel.ScheduledTransactionPriority(10)
 		filter := ScheduledTransactionFilter{Priority: &p}
 		assert.False(t, filter.Filter()(tx))
 	})
@@ -220,12 +220,12 @@ func TestScheduledTransactionFilter(t *testing.T) {
 	})
 
 	t.Run("combined filters all match", func(t *testing.T) {
-		p := uint8(5)
+		p := accessmodel.ScheduledTransactionPriority(5)
 		start := uint64(1000)
 		end := uint64(1000)
 		uuid := uint64(99)
 		filter := ScheduledTransactionFilter{
-			Statuses:                 []accessmodel.ScheduledTxStatus{accessmodel.ScheduledTxStatusScheduled},
+			Statuses:                 []accessmodel.ScheduledTransactionStatus{accessmodel.ScheduledTxStatusScheduled},
 			Priority:                 &p,
 			StartTime:                &start,
 			EndTime:                  &end,
@@ -237,7 +237,7 @@ func TestScheduledTransactionFilter(t *testing.T) {
 	})
 
 	t.Run("combined filters reject on single mismatch", func(t *testing.T) {
-		p := uint8(5)
+		p := accessmodel.ScheduledTransactionPriority(5)
 		wrongUUID := uint64(100) // mismatch
 		filter := ScheduledTransactionFilter{
 			Priority:               &p,
@@ -332,49 +332,32 @@ func TestScheduledTransactionsBackend_GetScheduledTransaction(t *testing.T) {
 		require.Error(t, err)
 	})
 
-	t.Run("expand is no-op for scheduled status", func(t *testing.T) {
-		store := storagemock.NewScheduledTransactionsIndexReader(t)
-		backend := NewScheduledTransactionsBackend(
-			unittest.Logger(), &backendBase{config: defaultConfig},
-			store, nil, nil, nil,
-		)
+	// expand is no-op for scheduled and cancelled statuses
+	for _, status := range []accessmodel.ScheduledTransactionStatus{accessmodel.ScheduledTxStatusScheduled, accessmodel.ScheduledTxStatusCancelled} {
+		t.Run(fmt.Sprintf("expand is no-op for %s status", status), func(t *testing.T) {
+			store := storagemock.NewScheduledTransactionsIndexReader(t)
+			backend := NewScheduledTransactionsBackend(
+				unittest.Logger(), &backendBase{config: defaultConfig},
+				store, nil, nil, nil,
+			)
 
-		tx := accessmodel.ScheduledTransaction{ID: 1, Status: accessmodel.ScheduledTxStatusScheduled}
-		store.On("ByID", uint64(1)).Return(tx, nil).Once()
+			tx := accessmodel.ScheduledTransaction{ID: 1, Status: status}
+			store.On("ByID", uint64(1)).Return(tx, nil).Once()
 
-		// expand options set but status is Scheduled: no storage lookups expected
-		result, err := backend.GetScheduledTransaction(
-			context.Background(), 1,
-			ScheduledTransactionExpandOptions{Result: true, Transaction: true},
-			defaultEncoding,
-		)
-		require.NoError(t, err)
-		assert.Nil(t, result.Transaction)
-		assert.Nil(t, result.Result)
-	})
-
-	t.Run("expand is no-op for cancelled status", func(t *testing.T) {
-		store := storagemock.NewScheduledTransactionsIndexReader(t)
-		backend := NewScheduledTransactionsBackend(
-			unittest.Logger(), &backendBase{config: defaultConfig},
-			store, nil, nil, nil,
-		)
-
-		tx := accessmodel.ScheduledTransaction{ID: 1, Status: accessmodel.ScheduledTxStatusCancelled}
-		store.On("ByID", uint64(1)).Return(tx, nil).Once()
-
-		result, err := backend.GetScheduledTransaction(
-			context.Background(), 1,
-			ScheduledTransactionExpandOptions{Result: true, Transaction: true},
-			defaultEncoding,
-		)
-		require.NoError(t, err)
-		assert.Nil(t, result.Transaction)
-		assert.Nil(t, result.Result)
-	})
+			// expand options set but status is Scheduled: no storage lookups expected
+			result, err := backend.GetScheduledTransaction(
+				context.Background(), 1,
+				ScheduledTransactionExpandOptions{Result: true, Transaction: true},
+				defaultEncoding,
+			)
+			require.NoError(t, err)
+			assert.Nil(t, result.Transaction)
+			assert.Nil(t, result.Result)
+		})
+	}
 
 	// expand result works for executed and failed transactions
-	for _, status := range []accessmodel.ScheduledTxStatus{accessmodel.ScheduledTxStatusExecuted, accessmodel.ScheduledTxStatusFailed} {
+	for _, status := range []accessmodel.ScheduledTransactionStatus{accessmodel.ScheduledTxStatusExecuted, accessmodel.ScheduledTxStatusFailed} {
 		t.Run(fmt.Sprintf("expand result on %s transaction", status), func(t *testing.T) {
 			store := storagemock.NewScheduledTransactionsIndexReader(t)
 			scheduledTxLookup := storagemock.NewScheduledTransactionsReader(t)
@@ -422,7 +405,7 @@ func TestScheduledTransactionsBackend_GetScheduledTransaction(t *testing.T) {
 	}
 
 	// expand tx body works for executed and failed transactions
-	for _, status := range []accessmodel.ScheduledTxStatus{accessmodel.ScheduledTxStatusExecuted, accessmodel.ScheduledTxStatusFailed} {
+	for _, status := range []accessmodel.ScheduledTransactionStatus{accessmodel.ScheduledTxStatusExecuted, accessmodel.ScheduledTxStatusFailed} {
 		t.Run(fmt.Sprintf("expand transaction body on %s transaction", status), func(t *testing.T) {
 			store := storagemock.NewScheduledTransactionsIndexReader(t)
 			scheduledTxLookup := storagemock.NewScheduledTransactionsReader(t)

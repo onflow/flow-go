@@ -9,11 +9,12 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
+var addressRegex = regexp.MustCompile(`^[0-9a-fA-F]{16}$`)
+
 func ParseAddress(raw string, chain flow.Chain) (flow.Address, error) {
 	raw = strings.TrimPrefix(raw, "0x") // remove 0x prefix
 
-	valid, _ := regexp.MatchString(`^[0-9a-fA-F]{16}$`, raw)
-	if !valid {
+	if !addressRegex.MatchString(raw) {
 		return flow.EmptyAddress, fmt.Errorf("invalid address")
 	}
 

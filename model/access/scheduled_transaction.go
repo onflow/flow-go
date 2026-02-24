@@ -2,38 +2,87 @@ package access
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/onflow/flow-go/model/flow"
 )
 
-type ScheduledTxStatus int8
+type ScheduledTransactionStatus int8
 
 const (
-	ScheduledTxStatusScheduled ScheduledTxStatus = iota
+	ScheduledTxStatusScheduled ScheduledTransactionStatus = iota
 	ScheduledTxStatusExecuted
 	ScheduledTxStatusCancelled
 	ScheduledTxStatusFailed
 )
 
-func (s ScheduledTxStatus) String() string {
-	switch s {
-	case ScheduledTxStatusScheduled:
-		return "scheduled"
-	case ScheduledTxStatusExecuted:
-		return "executed"
-	case ScheduledTxStatusCancelled:
-		return "cancelled"
-	case ScheduledTxStatusFailed:
-		return "failed"
+var scheduledTransactionStatusStrings = map[ScheduledTransactionStatus]string{
+	ScheduledTxStatusScheduled: "scheduled",
+	ScheduledTxStatusExecuted:  "executed",
+	ScheduledTxStatusCancelled: "cancelled",
+	ScheduledTxStatusFailed:    "failed",
+}
+
+func (s ScheduledTransactionStatus) String() string {
+	if str, ok := scheduledTransactionStatusStrings[s]; ok {
+		return str
+	}
+	panic(fmt.Sprintf("unknown scheduled transaction status: %d", s))
+}
+
+func ParseScheduledTransactionStatus(s string) (ScheduledTransactionStatus, error) {
+	switch strings.ToLower(s) {
+	case scheduledTransactionStatusStrings[ScheduledTxStatusScheduled]:
+		return ScheduledTxStatusScheduled, nil
+	case scheduledTransactionStatusStrings[ScheduledTxStatusExecuted]:
+		return ScheduledTxStatusExecuted, nil
+	case scheduledTransactionStatusStrings[ScheduledTxStatusCancelled]:
+		return ScheduledTxStatusCancelled, nil
+	case scheduledTransactionStatusStrings[ScheduledTxStatusFailed]:
+		return ScheduledTxStatusFailed, nil
 	default:
-		panic(fmt.Sprintf("unknown scheduled transaction status: %d", s))
+		return 0, fmt.Errorf("unknown scheduled transaction status: %s", s)
+	}
+}
+
+type ScheduledTransactionPriority uint8
+
+const (
+	ScheduledTxPriorityHigh   ScheduledTransactionPriority = 0
+	ScheduledTxPriorityMedium ScheduledTransactionPriority = 1
+	ScheduledTxPriorityLow    ScheduledTransactionPriority = 2
+)
+
+var scheduledTransactionPriorityStrings = map[ScheduledTransactionPriority]string{
+	ScheduledTxPriorityHigh:   "high",
+	ScheduledTxPriorityMedium: "medium",
+	ScheduledTxPriorityLow:    "low",
+}
+
+func (p ScheduledTransactionPriority) String() string {
+	if str, ok := scheduledTransactionPriorityStrings[p]; ok {
+		return str
+	}
+	panic(fmt.Sprintf("unknown scheduled transaction priority: %d", p))
+}
+
+func ParseScheduledTransactionPriority(s string) (ScheduledTransactionPriority, error) {
+	switch strings.ToLower(s) {
+	case scheduledTransactionPriorityStrings[ScheduledTxPriorityHigh]:
+		return ScheduledTxPriorityHigh, nil
+	case scheduledTransactionPriorityStrings[ScheduledTxPriorityMedium]:
+		return ScheduledTxPriorityMedium, nil
+	case scheduledTransactionPriorityStrings[ScheduledTxPriorityLow]:
+		return ScheduledTxPriorityLow, nil
+	default:
+		return 0, fmt.Errorf("unknown scheduled transaction priority: %s", s)
 	}
 }
 
 type ScheduledTransaction struct {
 	ID              uint64
-	Priority        uint8
-	Timestamp       uint64 // TODO: this is stored as a UFix64 in the contract, how to convert to a timestamp?
+	Priority        ScheduledTransactionPriority
+	Timestamp       uint64 // stored by the contract as a UFix64 with the fractional zeroed out
 	ExecutionEffort uint64
 	Fees            uint64
 
@@ -42,12 +91,11 @@ type ScheduledTransaction struct {
 	TransactionHandlerUUID           uint64
 	TransactionHandlerPublicPath     string
 
-	Status ScheduledTxStatus
+	Status ScheduledTransactionStatus
 
-	ScheduledTransactionID flow.Identifier
+	CreatedTransactionID   flow.Identifier
 	ExecutedTransactionID  flow.Identifier
 	CancelledTransactionID flow.Identifier
-	FailedTransactionID    flow.Identifier
 
 	FeesReturned uint64
 	FeesDeducted uint64

@@ -32,10 +32,9 @@ type ScheduledTransaction struct {
 	FeesReturned string `json:"fees_returned,omitempty"`
 	// Fees deducted on cancellation, as a UFix64 decimal string.
 	FeesDeducted           string                          `json:"fees_deducted,omitempty"`
-	ScheduledTransactionId string                          `json:"scheduled_transaction_id,omitempty"`
+	CreatedTransactionId   string                          `json:"created_transaction_id"`
 	ExecutedTransactionId  string                          `json:"executed_transaction_id,omitempty"`
 	CancelledTransactionId string                          `json:"cancelled_transaction_id,omitempty"`
-	FailedTransactionId    string                          `json:"failed_transaction_id,omitempty"`
 	Transaction            *commonmodels.Transaction       `json:"transaction,omitempty"`
 	Result                 *commonmodels.TransactionResult `json:"result,omitempty"`
 	HandlerContract        *Contract                       `json:"handler_contract,omitempty"`

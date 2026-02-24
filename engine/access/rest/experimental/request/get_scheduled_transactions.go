@@ -3,6 +3,7 @@ package request
 import (
 	"fmt"
 	"strconv"
+	"strings"
 
 	"github.com/onflow/flow-go/access/backends/extended"
 	"github.com/onflow/flow-go/engine/access/rest/common"
@@ -104,20 +105,22 @@ func NewGetScheduledTransaction(r *common.Request) (GetScheduledTransaction, err
 // All errors indicate an invalid request.
 func parseScheduledTxFilter(r *common.Request, filter *extended.ScheduledTransactionFilter) error {
 	if raw := r.GetQueryParam("status"); raw != "" {
-		s, err := parseScheduledTxStatus(raw)
-		if err != nil {
-			return fmt.Errorf("invalid status: %w", err)
+		rawStatuses := strings.Split(raw, ",")
+		for _, rawStatus := range rawStatuses {
+			s, err := accessmodel.ParseScheduledTransactionStatus(rawStatus)
+			if err != nil {
+				return fmt.Errorf("invalid status: %w", err)
+			}
+			filter.Statuses = append(filter.Statuses, s)
 		}
-		filter.Statuses = []accessmodel.ScheduledTxStatus{s}
 	}
 
 	if raw := r.GetQueryParam("priority"); raw != "" {
-		p, err := strconv.ParseUint(raw, 10, 8)
+		p, err := accessmodel.ParseScheduledTransactionPriority(raw)
 		if err != nil {
 			return fmt.Errorf("invalid priority: %w", err)
 		}
-		v := uint8(p)
-		filter.Priority = &v
+		filter.Priority = &p
 	}
 
 	if raw := r.GetQueryParam("start_time"); raw != "" {
@@ -157,24 +160,6 @@ func parseScheduledTxFilter(r *common.Request, filter *extended.ScheduledTransac
 	}
 
 	return nil
-}
-
-// parseScheduledTxStatus parses a status string to a ScheduledTxStatus value.
-//
-// All errors indicate an invalid status string.
-func parseScheduledTxStatus(s string) (accessmodel.ScheduledTxStatus, error) {
-	switch s {
-	case "scheduled":
-		return accessmodel.ScheduledTxStatusScheduled, nil
-	case "executed":
-		return accessmodel.ScheduledTxStatusExecuted, nil
-	case "cancelled":
-		return accessmodel.ScheduledTxStatusCancelled, nil
-	case "failed":
-		return accessmodel.ScheduledTxStatusFailed, nil
-	default:
-		return 0, fmt.Errorf("unknown status %q: expected one of scheduled, executed, cancelled, failed", s)
-	}
 }
 
 // parseExpandOptions parses the expand options from the request.

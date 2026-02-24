@@ -90,8 +90,8 @@ type ScheduledTransactionsIndexWriter interface {
 		scheduledTxs []accessmodel.ScheduledTransaction,
 	) error
 
-	// Executed updates the scheduled transaction's status to Executed and records the
-	// final execution effort and the ID of the transaction that emitted the Executed event.
+	// Executed updates the scheduled transaction's status to Executed and records the ID of the
+	// transaction that emitted the Executed event.
 	// The caller must hold the [LockIndexScheduledTransactionsIndex] lock until the batch
 	// is committed.
 	//
@@ -102,7 +102,6 @@ type ScheduledTransactionsIndexWriter interface {
 		lctx lockctx.Proof,
 		rw ReaderBatchWriter,
 		scheduledTxID uint64,
-		executionEffort uint64,
 		transactionID flow.Identifier,
 	) error
 

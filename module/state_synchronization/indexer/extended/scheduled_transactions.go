@@ -137,7 +137,7 @@ func (s *ScheduledTransactions) IndexBlockData(lctx lockctx.Proof, data BlockDat
 		}
 	}
 	for _, entry := range collected.executedEntries {
-		if err := s.store.Executed(lctx, rw, entry.event.ID, entry.event.ExecutionEffort, entry.transactionID); err != nil {
+		if err := s.store.Executed(lctx, rw, entry.event.ID, entry.transactionID); err != nil {
 			return fmt.Errorf("failed to mark tx %d executed: %w", entry.event.ID, err)
 		}
 	}
@@ -155,6 +155,9 @@ func (s *ScheduledTransactions) IndexBlockData(lctx lockctx.Proof, data BlockDat
 	return nil
 }
 
+// collectScheduledTransactionData collects the scheduled transaction data from the block events.
+//
+// No error returns are expected during normal operation.
 func (s *ScheduledTransactions) collectScheduledTransactionData(data BlockData) (*scheduledTransactionData, error) {
 	var newTxs []access.ScheduledTransaction
 	var executedEntries []executedEntry
@@ -165,7 +168,22 @@ func (s *ScheduledTransactions) collectScheduledTransactionData(data BlockData) 
 	// This is the system transaction that added the scheduled transactions into the system collection.
 	var pendingEventTxIndex *uint32
 
+	// pendingIDs tracks the IDs that appear in PendingExecution events so we can match them with Executed events.
+	// Any missing IDs are considered failed.
 	pendingIDs := make(map[uint64]struct{})
+
+	// track which IDs have Scheduled, Canceled, and Executed events to ensure an ID doesn't show up
+	// more than once in the same block. This should not happen, and the indexer does not handle it.
+	seenIDs := make(map[uint64]uint32)
+	checkDuplicate := func(id uint64, eventIndex uint32) error {
+		if lastID, ok := seenIDs[id]; ok {
+			return fmt.Errorf("scheduled transaction ID %d appears more than once in block %d (txs %d and %d)",
+				id, data.Header.Height, lastID, eventIndex)
+		}
+		seenIDs[id] = eventIndex
+		return nil
+	}
+
 	for _, event := range data.Events {
 		switch event.Type {
 		case s.scheduledEventType:
@@ -177,9 +195,14 @@ func (s *ScheduledTransactions) collectScheduledTransactionData(data BlockData) 
 			if err != nil {
 				return nil, fmt.Errorf("failed to decode Scheduled event: %w", err)
 			}
+
+			if err := checkDuplicate(e.ID, event.TransactionIndex); err != nil {
+				return nil, err
+			}
+
 			newTxs = append(newTxs, access.ScheduledTransaction{
 				ID:                               e.ID,
-				Priority:                         e.Priority,
+				Priority:                         access.ScheduledTransactionPriority(e.Priority),
 				Timestamp:                        uint64(e.Timestamp),
 				ExecutionEffort:                  e.ExecutionEffort,
 				Fees:                             uint64(e.Fees),
@@ -188,7 +211,7 @@ func (s *ScheduledTransactions) collectScheduledTransactionData(data BlockData) 
 				TransactionHandlerUUID:           e.TransactionHandlerUUID,
 				TransactionHandlerPublicPath:     e.TransactionHandlerPublicPath,
 				Status:                           access.ScheduledTxStatusScheduled,
-				ScheduledTransactionID:           event.TransactionID,
+				CreatedTransactionID:             event.TransactionID,
 			})
 
 		case s.pendingExecutionType:
@@ -214,6 +237,11 @@ func (s *ScheduledTransactions) collectScheduledTransactionData(data BlockData) 
 			if err != nil {
 				return nil, fmt.Errorf("failed to decode Executed event: %w", err)
 			}
+
+			if err := checkDuplicate(e.ID, event.TransactionIndex); err != nil {
+				return nil, err
+			}
+
 			executedEntries = append(executedEntries, executedEntry{event: e, transactionID: event.TransactionID})
 
 			// sanity check: every Executed event must have a corresponding PendingExecution event.
@@ -233,6 +261,11 @@ func (s *ScheduledTransactions) collectScheduledTransactionData(data BlockData) 
 			if err != nil {
 				return nil, fmt.Errorf("failed to decode Canceled event: %w", err)
 			}
+
+			if err := checkDuplicate(e.ID, event.TransactionIndex); err != nil {
+				return nil, err
+			}
+
 			canceledEntries = append(canceledEntries, canceledEntry{event: e, transactionID: event.TransactionID})
 		}
 	}

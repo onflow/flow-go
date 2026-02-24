@@ -78,7 +78,7 @@ func (b *backendBase) getTransactionResult(
 	// the system collection is not indexed and uses the zero ID by convention.
 	var collectionID flow.Identifier
 
-	if !isSystemChunkTx || !expandTransaction {
+	if !isSystemChunkTx {
 		collection, err := b.collections.LightByTransactionID(txID)
 		if err != nil {
 			if !errors.Is(err, storage.ErrNotFound) {
@@ -91,10 +91,11 @@ func (b *backendBase) getTransactionResult(
 			if expandTransaction {
 				return nil, fmt.Errorf("could not retrieve collection for standard transaction: %w", err)
 			}
-			// system chunk transactions are not indexed by collection, so they will not exist.
-			// if the collection is not found, then this is a system chunk tx.
+			// if the collection is not found and we're not expanding the transaction,
+			// proceed with zero collectionID.
+		} else {
+			collectionID = collection.ID()
 		}
-		collectionID = collection.ID()
 	}
 
 	result, err := b.transactionsProvider.TransactionResult(ctx, header, txID, collectionID, encodingVersion)

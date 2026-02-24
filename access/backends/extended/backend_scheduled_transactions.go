@@ -3,7 +3,6 @@ package extended
 import (
 	"context"
 	"fmt"
-	"slices"
 	"strings"
 
 	"github.com/onflow/flow/protobuf/go/flow/entities"
@@ -32,8 +31,8 @@ func (o *ScheduledTransactionExpandOptions) HasExpand() bool {
 // ScheduledTransactionFilter specifies optional filter criteria for scheduled transaction queries.
 // All fields are optional; nil/zero fields are ignored.
 type ScheduledTransactionFilter struct {
-	Statuses                 []accessmodel.ScheduledTxStatus
-	Priority                 *uint8
+	Statuses                 []accessmodel.ScheduledTransactionStatus
+	Priority                 *accessmodel.ScheduledTransactionPriority
 	StartTime                *uint64 // inclusive UFix64 timestamp lower bound
 	EndTime                  *uint64 // inclusive UFix64 timestamp upper bound
 	TransactionHandlerOwner  *flow.Address
@@ -41,15 +40,38 @@ type ScheduledTransactionFilter struct {
 	TransactionHandlerUUID   *uint64
 }
 
+func (f *ScheduledTransactionFilter) IsEmpty() bool {
+	if f == nil {
+		return true
+	}
+	if len(f.Statuses) == 0 &&
+		f.Priority == nil &&
+		f.StartTime == nil &&
+		f.EndTime == nil &&
+		f.TransactionHandlerOwner == nil &&
+		f.TransactionHandlerTypeID == nil &&
+		f.TransactionHandlerUUID == nil {
+		return true
+	}
+	return false
+}
+
 // Filter builds a [storage.IndexFilter] from the non-nil filter fields.
 func (f *ScheduledTransactionFilter) Filter() storage.IndexFilter[*accessmodel.ScheduledTransaction] {
+	if f.IsEmpty() {
+		return nil
+	}
+
+	statuses := make(map[accessmodel.ScheduledTransactionStatus]bool)
+	for _, status := range f.Statuses {
+		statuses[status] = true
+	}
+
 	return func(tx *accessmodel.ScheduledTransaction) bool {
-		if len(f.Statuses) > 0 {
-			// TODO: use a map for faster lookup.
-			if !slices.Contains(f.Statuses, tx.Status) {
-				return false
-			}
+		if len(statuses) > 0 && !statuses[tx.Status] {
+			return false
 		}
+
 		if f.Priority != nil && tx.Priority != *f.Priority {
 			return false
 		}
@@ -313,8 +335,9 @@ func (b *ScheduledTransactionsBackend) expandHandlerContract(
 
 // transactionHandlerContract extracts the contract ID from a transaction handler type identifier.
 // The handler type identifier is a fully qualified Cadence type identifier of the transaction handler,
-// e.g. A.1654653399040a61.MyScheduler.Handler -> A.1654653399040a61.MyScheduler
-// The contract ID is the part before the last dot.
+// e.g.
+//
+//	A.1654653399040a61.MyScheduler.Handler -> A.1654653399040a61.MyScheduler
 func transactionHandlerContract(handlerTypeIdentifier string) (string, error) {
 	parts := strings.Split(handlerTypeIdentifier, ".")
 	if len(parts) < 3 {

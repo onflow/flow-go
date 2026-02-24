@@ -12,14 +12,15 @@ const MaxIDsLength = 50
 
 type ID flow.Identifier
 
+var idRegex = regexp.MustCompile(`^[0-9a-fA-F]{64}$`)
+
 func (i *ID) Parse(raw string) error {
 	if raw == "" { // allow empty
 		*i = ID(flow.ZeroID)
 		return nil
 	}
 
-	valid, _ := regexp.MatchString(`^[0-9a-fA-F]{64}$`, raw)
-	if !valid {
+	if !idRegex.MatchString(raw) {
 		return errors.New("invalid ID format")
 	}
 
