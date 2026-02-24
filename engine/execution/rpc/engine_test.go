@@ -1356,6 +1356,100 @@ func (suite *Suite) TestGetTransactionErrorMessagesByBlockID() {
 	})
 }
 
+// TestGetExecutionResultByID tests the GetExecutionResultByID API call
+func (suite *Suite) TestGetExecutionResultByID() {
+	result := unittest.ExecutionResultFixture()
+	resultID := result.ID()
+
+	handler, _ := suite.defaultHandler()
+
+	buildRequest := func(id []byte) *execution.GetExecutionResultByIDRequest {
+		return &execution.GetExecutionResultByIDRequest{Id: id}
+	}
+
+	suite.Run("happy path", func() {
+		suite.exeResults.On("ByID", resultID).Return(result, nil).Once()
+
+		resp, err := handler.GetExecutionResultByID(context.Background(), buildRequest(resultID[:]))
+		suite.Require().NoError(err)
+
+		actual, err := convert.MessageToExecutionResult(resp.GetExecutionResult())
+		suite.Require().NoError(err)
+
+		suite.Require().Equal(resultID, actual.ID(), "result ID should match")
+	})
+
+	suite.Run("nil result ID", func() {
+		_, err := handler.GetExecutionResultByID(context.Background(), buildRequest(nil))
+		suite.Require().Error(err)
+		suite.Require().Equal(codes.InvalidArgument, status.Code(err))
+	})
+
+	suite.Run("result not found", func() {
+		suite.exeResults.On("ByID", resultID).Return(nil, realstorage.ErrNotFound).Once()
+
+		_, err := handler.GetExecutionResultByID(context.Background(), buildRequest(resultID[:]))
+		suite.Require().Error(err)
+		suite.Require().Equal(codes.NotFound, status.Code(err))
+	})
+
+	suite.Run("unexpected storage error", func() {
+		suite.exeResults.On("ByID", resultID).Return(nil, errors.New("internal-error")).Once()
+
+		_, err := handler.GetExecutionResultByID(context.Background(), buildRequest(resultID[:]))
+		suite.Require().Error(err)
+		suite.Require().Equal(codes.Internal, status.Code(err))
+	})
+}
+
+// TestGetExecutionResultForBlockID tests the GetExecutionResultForBlockID API call
+func (suite *Suite) TestGetExecutionResultForBlockID() {
+	block := unittest.BlockFixture()
+	bID := block.ID()
+	result := unittest.ExecutionResultFixture(unittest.WithExecutionResultBlockID(bID))
+	resultID := result.ID()
+
+	handler, _ := suite.defaultHandler()
+
+	buildRequest := func(id []byte) *execution.GetExecutionResultForBlockIDRequest {
+		return &execution.GetExecutionResultForBlockIDRequest{BlockId: id}
+	}
+
+	suite.Run("happy path", func() {
+		suite.exeResults.On("ByBlockID", bID).Return(result, nil).Once()
+
+		resp, err := handler.GetExecutionResultForBlockID(context.Background(), buildRequest(bID[:]))
+		suite.Require().NoError(err)
+
+		actual, err := convert.MessageToExecutionResult(resp.GetExecutionResult())
+		suite.Require().NoError(err)
+
+		suite.Require().Equal(resultID, actual.ID(), "result ID should match")
+	})
+
+	suite.Run("nil block ID", func() {
+		_, err := handler.GetExecutionResultForBlockID(context.Background(), buildRequest(nil))
+		suite.Require().Error(err)
+		suite.Require().Equal(codes.InvalidArgument, status.Code(err))
+	})
+
+	suite.Run("result not found for block", func() {
+		suite.exeResults.On("ByBlockID", bID).Return(nil, realstorage.ErrNotFound).Once()
+
+		_, err := handler.GetExecutionResultForBlockID(context.Background(), buildRequest(bID[:]))
+		suite.Require().Error(err)
+		suite.Require().Equal(codes.NotFound, status.Code(err))
+	})
+
+	suite.Run("unexpected storage error", func() {
+		suite.exeResults.On("ByBlockID", bID).Return(nil, errors.New("internal-error")).Once()
+
+		_, err := handler.GetExecutionResultForBlockID(context.Background(), buildRequest(bID[:]))
+		suite.Require().Error(err)
+		suite.Require().Equal(codes.Internal, status.Code(err))
+	})
+}
+
 func (suite *Suite) defaultHandler() (*handler, *mockEng.ScriptExecutor) {
 	mockEngine := mockEng.NewScriptExecutor(suite.T())
 	return &handler{

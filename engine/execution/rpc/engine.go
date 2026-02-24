@@ -378,6 +378,7 @@ func (h *handler) GetTransactionResult(
 		ErrorMessage:         errMsg,
 		Events:               events,
 		EventEncodingVersion: entities.EventEncodingVersion_CCF_V0,
+		ComputationUsage:     txResult.ComputationUsed,
 	}, nil
 }
 
@@ -437,6 +438,7 @@ func (h *handler) GetTransactionResultByIndex(
 		ErrorMessage:         errMsg,
 		Events:               events,
 		EventEncodingVersion: entities.EventEncodingVersion_CCF_V0,
+		ComputationUsage:     txResult.ComputationUsed,
 	}, nil
 }
 
@@ -513,9 +515,10 @@ func (h *handler) GetTransactionResultsByBlockID(
 		events := convert.EventsToMessages(eventsByTxIndex[txIndex])
 
 		responseTxResults[index] = &execution.GetTransactionResultResponse{
-			StatusCode:   statusCode,
-			ErrorMessage: errMsg,
-			Events:       events,
+			StatusCode:       statusCode,
+			ErrorMessage:     errMsg,
+			Events:           events,
+			ComputationUsage: txResult.ComputationUsed,
 		}
 	}
 
@@ -819,6 +822,60 @@ func (h *handler) blockHeaderResponse(header *flow.Header) (*execution.BlockHead
 
 	return &execution.BlockHeaderResponse{
 		Block: msg,
+	}, nil
+}
+
+func (h *handler) GetExecutionResultByID(
+	_ context.Context,
+	req *execution.GetExecutionResultByIDRequest,
+) (*execution.ExecutionResultByIDResponse, error) {
+	id, err := convert.BlockID(req.GetId())
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "invalid execution result ID: %v", err)
+	}
+
+	result, err := h.exeResults.ByID(id)
+	if err != nil {
+		if errors.Is(err, storage.ErrNotFound) {
+			return nil, status.Errorf(codes.NotFound, "execution result not found for ID %s", id)
+		}
+		return nil, status.Errorf(codes.Internal, "failed to get execution result by ID %s: %v", id, err)
+	}
+
+	msg, err := convert.ExecutionResultToMessage(result)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to convert execution result: %v", err)
+	}
+
+	return &execution.ExecutionResultByIDResponse{
+		ExecutionResult: msg,
+	}, nil
+}
+
+func (h *handler) GetExecutionResultForBlockID(
+	_ context.Context,
+	req *execution.GetExecutionResultForBlockIDRequest,
+) (*execution.ExecutionResultForBlockIDResponse, error) {
+	blockID, err := convert.BlockID(req.GetBlockId())
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "invalid blockID: %v", err)
+	}
+
+	result, err := h.exeResults.ByBlockID(blockID)
+	if err != nil {
+		if errors.Is(err, storage.ErrNotFound) {
+			return nil, status.Errorf(codes.NotFound, "execution result not found for block %s", blockID)
+		}
+		return nil, status.Errorf(codes.Internal, "failed to get execution result for block %s: %v", blockID, err)
+	}
+
+	msg, err := convert.ExecutionResultToMessage(result)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to convert execution result: %v", err)
+	}
+
+	return &execution.ExecutionResultForBlockIDResponse{
+		ExecutionResult: msg,
 	}, nil
 }
 
