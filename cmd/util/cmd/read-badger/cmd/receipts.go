@@ -48,7 +48,11 @@ var receiptsCmd = &cobra.Command{
 					return nil
 				}
 
-				common.PrettyPrintEntity(recs[0])
+				log.Info().Msgf("found %d receipt(s)", len(recs))
+				for i, rec := range recs {
+					log.Info().Msgf("receipt %d:", i+1)
+					common.PrettyPrintEntity(rec)
+				}
 				return nil
 			}
 
