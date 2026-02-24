@@ -233,7 +233,8 @@ func lookupAccountTransactions(
 
 			// the cursor is the next entry to return. skip all entries before it.
 			if cursor != nil {
-				if height > cursor.BlockHeight { // heights are descending
+				// heights are descending (stored as one's complement), and transaction indexes are ascending.
+				if height > cursor.BlockHeight {
 					return false, nil
 				}
 				if height == cursor.BlockHeight && txIndex < cursor.TransactionIndex {
