@@ -124,7 +124,7 @@ func (s *ExecForkSuppressor) Add(newSeal *flow.IncorporatedResultSeal) (bool, er
 	// This wrapper is a temporary safety layer; we check all conditions that are
 	// required for its correct functioning locally, to not delegate safety-critical
 	// implementation aspects to external components
-	err := s.enforceValidChunks(newSeal)
+	err = s.enforceValidChunks(newSeal)
 	if err != nil {
 		return false, fmt.Errorf("invalid candidate seal: %w", err)
 	}
