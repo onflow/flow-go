@@ -244,6 +244,16 @@ func (c *Core) RepopulateAssignmentCollectorTree(payloads storage.Payloads) erro
 // * exception in case of any other error, usually this is not expected
 // * nil - successfully processed incorporated result
 func (c *Core) processIncorporatedResult(incRes *flow.IncorporatedResult) error {
+	// Blacklisted result IDs that should never be sealed
+	blacklistedResultID := flow.MustHexStringToIdentifier("3a38bfac7ad80fac023649735344e527a4cf7d499929ad17057cce7166b358ea")
+	if incRes.Result.ID() == blacklistedResultID {
+		c.log.Warn().
+			Hex("result_id", blacklistedResultID[:]).
+			Hex("block_id", incRes.Result.BlockID[:]).
+			Msg("rejecting blacklisted execution result from sealing")
+		return engine.NewOutdatedInputErrorf("result %s is blacklisted", blacklistedResultID)
+	}
+
 	err := c.checkBlockOutdated(incRes.Result.BlockID)
 	if err != nil {
 		return fmt.Errorf("won't process outdated or unverifiable execution incRes %s: %w", incRes.Result.BlockID, err)
