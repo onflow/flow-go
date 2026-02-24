@@ -12,6 +12,7 @@ import (
 
 	"github.com/onflow/flow-go/cmd/util/cmd/addresses"
 	"github.com/onflow/flow-go/cmd/util/cmd/atree_inlined_status"
+	chunk_assignments "github.com/onflow/flow-go/cmd/util/cmd/chunk-assignments"
 	bootstrap_execution_state_payloads "github.com/onflow/flow-go/cmd/util/cmd/bootstrap-execution-state-payloads"
 	check_storage "github.com/onflow/flow-go/cmd/util/cmd/check-storage"
 	checkpoint_collect_stats "github.com/onflow/flow-go/cmd/util/cmd/checkpoint-collect-stats"
@@ -99,6 +100,7 @@ func init() {
 
 func addCommands() {
 	rootCmd.AddCommand(version.Cmd)
+	rootCmd.AddCommand(chunk_assignments.Cmd)
 	rootCmd.AddCommand(extract.Cmd)
 	rootCmd.AddCommand(export.Cmd)
 	rootCmd.AddCommand(checkpoint_list_tries.Cmd)
