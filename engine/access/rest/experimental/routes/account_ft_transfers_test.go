@@ -112,7 +112,7 @@ func TestGetAccountFungibleTokenTransfers(t *testing.T) {
 			uint32(0),
 			(*accessmodel.TransferCursor)(nil),
 			extended.AccountFTTransferFilter{AccountAddress: address},
-			false,
+			extended.AccountTransferExpandOptions{},
 			entities.EventEncodingVersion_JSON_CDC_V0,
 		).Return(page, nil)
 
@@ -173,7 +173,7 @@ func TestGetAccountFungibleTokenTransfers(t *testing.T) {
 			uint32(10),
 			(*accessmodel.TransferCursor)(nil),
 			extended.AccountFTTransferFilter{AccountAddress: address},
-			false,
+			extended.AccountTransferExpandOptions{},
 			entities.EventEncodingVersion_JSON_CDC_V0,
 		).Return(page, nil)
 
@@ -238,7 +238,7 @@ func TestGetAccountFungibleTokenTransfers(t *testing.T) {
 			uint32(0),
 			expectedCursor,
 			extended.AccountFTTransferFilter{AccountAddress: address},
-			false,
+			extended.AccountTransferExpandOptions{},
 			entities.EventEncodingVersion_JSON_CDC_V0,
 		).Return(page, nil)
 
@@ -269,7 +269,7 @@ func TestGetAccountFungibleTokenTransfers(t *testing.T) {
 			uint32(0),
 			(*accessmodel.TransferCursor)(nil),
 			expectedFilter,
-			false,
+			extended.AccountTransferExpandOptions{},
 			entities.EventEncodingVersion_JSON_CDC_V0,
 		).Return(page, nil)
 
@@ -300,7 +300,7 @@ func TestGetAccountFungibleTokenTransfers(t *testing.T) {
 			uint32(0),
 			(*accessmodel.TransferCursor)(nil),
 			expectedFilter,
-			false,
+			extended.AccountTransferExpandOptions{},
 			entities.EventEncodingVersion_JSON_CDC_V0,
 		).Return(page, nil)
 
@@ -331,7 +331,7 @@ func TestGetAccountFungibleTokenTransfers(t *testing.T) {
 			uint32(0),
 			(*accessmodel.TransferCursor)(nil),
 			expectedFilter,
-			false,
+			extended.AccountTransferExpandOptions{},
 			entities.EventEncodingVersion_JSON_CDC_V0,
 		).Return(page, nil)
 
@@ -362,7 +362,7 @@ func TestGetAccountFungibleTokenTransfers(t *testing.T) {
 			uint32(0),
 			(*accessmodel.TransferCursor)(nil),
 			expectedFilter,
-			false,
+			extended.AccountTransferExpandOptions{},
 			entities.EventEncodingVersion_JSON_CDC_V0,
 		).Return(page, nil)
 
@@ -393,7 +393,7 @@ func TestGetAccountFungibleTokenTransfers(t *testing.T) {
 			uint32(0),
 			(*accessmodel.TransferCursor)(nil),
 			expectedFilter,
-			false,
+			extended.AccountTransferExpandOptions{},
 			entities.EventEncodingVersion_JSON_CDC_V0,
 		).Return(page, nil)
 
@@ -419,7 +419,7 @@ func TestGetAccountFungibleTokenTransfers(t *testing.T) {
 			uint32(0),
 			(*accessmodel.TransferCursor)(nil),
 			extended.AccountFTTransferFilter{AccountAddress: address},
-			true,
+			extended.AccountTransferExpandOptions{Transaction: true},
 			entities.EventEncodingVersion_JSON_CDC_V0,
 		).Return(page, nil)
 
@@ -445,7 +445,7 @@ func TestGetAccountFungibleTokenTransfers(t *testing.T) {
 			uint32(0),
 			(*accessmodel.TransferCursor)(nil),
 			extended.AccountFTTransferFilter{AccountAddress: address},
-			true,
+			extended.AccountTransferExpandOptions{Result: true},
 			entities.EventEncodingVersion_JSON_CDC_V0,
 		).Return(page, nil)
 
@@ -532,7 +532,7 @@ func TestGetAccountFungibleTokenTransfers(t *testing.T) {
 			uint32(0),
 			(*accessmodel.TransferCursor)(nil),
 			extended.AccountFTTransferFilter{AccountAddress: address},
-			false,
+			extended.AccountTransferExpandOptions{},
 			entities.EventEncodingVersion_JSON_CDC_V0,
 		).Return(nil, status.Errorf(codes.NotFound, "no transfers found for account %s", address))
 
@@ -554,7 +554,7 @@ func TestGetAccountFungibleTokenTransfers(t *testing.T) {
 			uint32(0),
 			(*accessmodel.TransferCursor)(nil),
 			extended.AccountFTTransferFilter{AccountAddress: address},
-			false,
+			extended.AccountTransferExpandOptions{},
 			entities.EventEncodingVersion_JSON_CDC_V0,
 		).Return(nil, status.Errorf(codes.FailedPrecondition, "index not initialized"))
 
@@ -592,7 +592,7 @@ func TestGetAccountFungibleTokenTransfers(t *testing.T) {
 			uint32(0),
 			(*accessmodel.TransferCursor)(nil),
 			extended.AccountFTTransferFilter{AccountAddress: address},
-			false,
+			extended.AccountTransferExpandOptions{},
 			entities.EventEncodingVersion_JSON_CDC_V0,
 		).Return(page, nil)
 

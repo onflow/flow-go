@@ -19,9 +19,12 @@ func GetAccountFungibleTokenTransfers(r *common.Request, backend extended.API, l
 		return nil, common.NewBadRequestError(err)
 	}
 
-	expandFields := r.Expands("transaction") || r.Expands("result")
+	expandOptions := extended.AccountTransferExpandOptions{
+		Transaction: r.Expands("transaction"),
+		Result:      r.Expands("result"),
+	}
 
-	page, err := backend.GetAccountFungibleTokenTransfers(r.Context(), req.Address, req.Limit, req.Cursor, req.Filter, expandFields, entities.EventEncodingVersion_JSON_CDC_V0)
+	page, err := backend.GetAccountFungibleTokenTransfers(r.Context(), req.Address, req.Limit, req.Cursor, req.Filter, expandOptions, entities.EventEncodingVersion_JSON_CDC_V0)
 	if err != nil {
 		return nil, err
 	}

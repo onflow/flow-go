@@ -269,7 +269,7 @@ func (b *ScheduledTransactionsBackend) expand(
 	}
 
 	if expandOptions.Result {
-		result, err := b.lookupTransactionResult(ctx, txID, header, true, encodingVersion)
+		result, err := b.getTransactionResult(ctx, txID, header, true, expandOptions.Transaction, encodingVersion)
 		if err != nil {
 			return fmt.Errorf("failed to get transaction result for tx %s: %w", txID, err)
 		}

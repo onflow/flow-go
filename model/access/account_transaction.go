@@ -16,24 +16,26 @@ const (
 	TransactionRoleInteracted TransactionRole = 3 // Account is referenced by an event in the transaction
 )
 
+var (
+	transactionRoles = map[TransactionRole]string{
+		TransactionRoleAuthorizer: "authorizer",
+		TransactionRolePayer:      "payer",
+		TransactionRoleProposer:   "proposer",
+		TransactionRoleInteracted: "interacted",
+	}
+)
+
 // String returns the string representation of a [TransactionRole] matching the OpenAPI spec
 // enum values: "authorizer", "payer", "proposer", "interacted".
 //
 // Panics on unknown values since roles are stored in the database and unknown values indicate
 // data corruption.
 func (r TransactionRole) String() string {
-	switch r {
-	case TransactionRoleAuthorizer:
-		return "authorizer"
-	case TransactionRolePayer:
-		return "payer"
-	case TransactionRoleProposer:
-		return "proposer"
-	case TransactionRoleInteracted:
-		return "interacted"
-	default:
+	role, ok := transactionRoles[r]
+	if !ok {
 		panic(fmt.Sprintf("unknown TransactionRole: %d", int(r)))
 	}
+	return role
 }
 
 // ParseTransactionRole parses a string into a [TransactionRole]. Accepted values match the
@@ -42,13 +44,13 @@ func (r TransactionRole) String() string {
 // Returns an error when the input string does not match any known role name.
 func ParseTransactionRole(s string) (TransactionRole, error) {
 	switch s {
-	case TransactionRoleAuthorizer.String():
+	case transactionRoles[TransactionRoleAuthorizer]:
 		return TransactionRoleAuthorizer, nil
-	case TransactionRolePayer.String():
+	case transactionRoles[TransactionRolePayer]:
 		return TransactionRolePayer, nil
-	case TransactionRoleProposer.String():
+	case transactionRoles[TransactionRoleProposer]:
 		return TransactionRoleProposer, nil
-	case TransactionRoleInteracted.String():
+	case transactionRoles[TransactionRoleInteracted]:
 		return TransactionRoleInteracted, nil
 	default:
 		return 0, fmt.Errorf("unknown transaction role: %q", s)

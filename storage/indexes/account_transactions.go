@@ -217,7 +217,6 @@ func lookupAccountTransactions(
 	fetchLimit := limit + 1
 
 	var collected []access.AccountTransaction
-	skipFirst := cursor != nil // skip the entry at the exact cursor position
 
 	err := operation.IterateKeys(reader, startKey, endKey,
 		func(keyCopy []byte, getValue func(any) error) (bail bool, err error) {
@@ -226,15 +225,14 @@ func lookupAccountTransactions(
 				return true, fmt.Errorf("could not decode key: %w", err)
 			}
 
-			// Skip entries at or before the cursor position (it was the last item of the previous page).
-			if skipFirst {
-				// no need to check height > cursor.BlockHeight since the iterator bounds already
-				// omit heights outside of the range.
-				if height == cursor.BlockHeight && txIndex <= cursor.TransactionIndex {
+			// the cursor is the next entry to return. skip all entries before it.
+			if cursor != nil {
+				if height > cursor.BlockHeight { // heights are descending
 					return false, nil
 				}
-				// Past the cursor position. Stop skipping.
-				skipFirst = false
+				if height == cursor.BlockHeight && txIndex < cursor.TransactionIndex {
+					return false, nil
+				}
 			}
 
 			var stored storedAccountTransaction
@@ -267,21 +265,21 @@ func lookupAccountTransactions(
 		return access.AccountTransactionsPage{}, fmt.Errorf("could not iterate keys: %w", err)
 	}
 
-	page := access.AccountTransactionsPage{}
-
-	if uint32(len(collected)) > limit {
-		// The extra entry tells us there are more results.
-		page.Transactions = collected[:limit]
-		last := collected[limit-1]
-		page.NextCursor = &access.AccountTransactionCursor{
-			BlockHeight:      last.BlockHeight,
-			TransactionIndex: last.TransactionIndex,
-		}
-	} else {
-		page.Transactions = collected
+	if uint32(len(collected)) <= limit {
+		return access.AccountTransactionsPage{
+			Transactions: collected,
+		}, nil
 	}
 
-	return page, nil
+	// we fetched one extra entry to check if there are more results. use it as the next cursor.
+	nextEntry := collected[limit]
+	return access.AccountTransactionsPage{
+		Transactions: collected[:limit],
+		NextCursor: &access.AccountTransactionCursor{
+			BlockHeight:      nextEntry.BlockHeight,
+			TransactionIndex: nextEntry.TransactionIndex,
+		},
+	}, nil
 }
 
 // indexAccountTransactions indexes all account-transaction associations for a block.

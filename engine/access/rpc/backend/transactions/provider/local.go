@@ -134,14 +134,15 @@ func (t *LocalTransactionProvider) TransactionResult(
 	}
 
 	return &accessmodel.TransactionResult{
-		TransactionID: txResult.TransactionID,
-		Status:        txStatus,
-		StatusCode:    txStatusCode,
-		Events:        events,
-		ErrorMessage:  txErrorMessage,
-		BlockID:       blockID,
-		BlockHeight:   header.Height,
-		CollectionID:  collectionID,
+		TransactionID:   txResult.TransactionID,
+		Status:          txStatus,
+		StatusCode:      txStatusCode,
+		Events:          events,
+		ErrorMessage:    txErrorMessage,
+		BlockID:         blockID,
+		BlockHeight:     header.Height,
+		CollectionID:    collectionID,
+		ComputationUsed: txResult.ComputationUsed,
 	}, nil
 }
 
@@ -208,14 +209,15 @@ func (t *LocalTransactionProvider) TransactionResultByIndex(
 	}
 
 	return &accessmodel.TransactionResult{
-		TransactionID: txResult.TransactionID,
-		Status:        txStatus,
-		StatusCode:    txStatusCode,
-		Events:        events,
-		ErrorMessage:  txErrorMessage,
-		BlockID:       blockID,
-		BlockHeight:   block.Height,
-		CollectionID:  collectionID,
+		TransactionID:   txResult.TransactionID,
+		Status:          txStatus,
+		StatusCode:      txStatusCode,
+		Events:          events,
+		ErrorMessage:    txErrorMessage,
+		BlockID:         blockID,
+		BlockHeight:     block.Height,
+		CollectionID:    collectionID,
+		ComputationUsed: txResult.ComputationUsed,
 	}, nil
 }
 
@@ -344,14 +346,15 @@ func (t *LocalTransactionProvider) TransactionResultsByBlockID(
 		}
 
 		results = append(results, &accessmodel.TransactionResult{
-			Status:        txStatus,
-			StatusCode:    txStatusCode,
-			Events:        events,
-			ErrorMessage:  txErrorMessage,
-			BlockID:       blockID,
-			TransactionID: txID,
-			CollectionID:  collectionID,
-			BlockHeight:   block.Height,
+			Status:          txStatus,
+			StatusCode:      txStatusCode,
+			Events:          events,
+			ErrorMessage:    txErrorMessage,
+			BlockID:         blockID,
+			TransactionID:   txID,
+			CollectionID:    collectionID,
+			BlockHeight:     block.Height,
+			ComputationUsed: txResult.ComputationUsed,
 		})
 	}
 

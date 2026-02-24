@@ -462,6 +462,24 @@ func TestAccountTransactions_MultiTxSameHeightOrdering(t *testing.T) {
 func TestAccountTransactions_ErrorCases(t *testing.T) {
 	t.Parallel()
 
+	t.Run("limit of zero returns ErrInvalidQuery", func(t *testing.T) {
+		RunWithBootstrappedAccountTxIndex(t, 1, nil, func(_ storage.DB, _ storage.LockManager, idx *AccountTransactions) {
+			account := unittest.RandomAddressFixture()
+
+			_, err := idx.ByAddress(account, 0, nil, nil)
+			require.ErrorIs(t, err, storage.ErrInvalidQuery)
+		})
+	})
+
+	t.Run("limit of math.MaxUint32 returns ErrInvalidQuery", func(t *testing.T) {
+		RunWithBootstrappedAccountTxIndex(t, 1, nil, func(_ storage.DB, _ storage.LockManager, idx *AccountTransactions) {
+			account := unittest.RandomAddressFixture()
+
+			_, err := idx.ByAddress(account, math.MaxUint32, nil, nil)
+			require.ErrorIs(t, err, storage.ErrInvalidQuery)
+		})
+	})
+
 	t.Run("cursor before first indexed height returns error", func(t *testing.T) {
 		RunWithBootstrappedAccountTxIndex(t, 5, nil, func(_ storage.DB, _ storage.LockManager, idx *AccountTransactions) {
 			account := unittest.RandomAddressFixture()

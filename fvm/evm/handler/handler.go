@@ -483,6 +483,12 @@ func (h *ContractHandler) dryRunTx(
 	tx *gethTypes.Transaction,
 	from types.Address,
 ) (*types.Result, error) {
+	// check if enough computation is available
+	err := h.checkGasLimit(types.GasLimit(tx.Gas()))
+	if err != nil {
+		return nil, err
+	}
+
 	bp, err := h.getBlockProposal()
 	if err != nil {
 		return nil, err
@@ -497,12 +503,23 @@ func (h *ContractHandler) dryRunTx(
 		return nil, err
 	}
 
-	res, err := blk.DryRunTransaction(tx, from.ToCommon())
+	var res *types.Result
+	// just like with EVM.run / EVM.batchRun / COA.call, we disable metering
+	// so we can fully meter the gas usage in the next step, even in case
+	// of unhandled errors/exceptions.
+	h.backend.RunWithMeteringDisabled(func() {
+		res, err = blk.DryRunTransaction(tx, from.ToCommon())
+	})
 	if err != nil {
 		return nil, err
 	}
 	if res == nil { // safety check for result
 		return nil, types.ErrUnexpectedEmptyResult
+	}
+
+	// gas meter even invalid or failed status
+	if err = h.meterGasUsage(res); err != nil {
+		return nil, err
 	}
 
 	return res, nil

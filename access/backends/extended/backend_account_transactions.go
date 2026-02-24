@@ -12,25 +12,16 @@ import (
 
 	accessmodel "github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/storage"
 )
 
-type TransactionFilter storage.IndexFilter[*accessmodel.AccountTransaction]
+type AccountTransactionExpandOptions struct {
+	Result      bool
+	Transaction bool
+}
 
-func HasRoles(roles ...accessmodel.TransactionRole) TransactionFilter {
-	searchRoles := make(map[accessmodel.TransactionRole]struct{}, len(roles))
-	for _, role := range roles {
-		searchRoles[role] = struct{}{}
-	}
-	return func(tx *accessmodel.AccountTransaction) bool {
-		for _, role := range tx.Roles {
-			if _, ok := searchRoles[role]; ok {
-				return true
-			}
-		}
-		return false
-	}
+func (o *AccountTransactionExpandOptions) HasExpand() bool {
+	return o.Result || o.Transaction
 }
 
 type AccountTransactionFilter struct {
@@ -38,11 +29,22 @@ type AccountTransactionFilter struct {
 }
 
 func (f *AccountTransactionFilter) Filter() storage.IndexFilter[*accessmodel.AccountTransaction] {
+	if len(f.Roles) == 0 {
+		return nil
+	}
+
+	rolesMap := make(map[accessmodel.TransactionRole]bool, len(f.Roles))
+	for _, role := range f.Roles {
+		rolesMap[role] = true
+	}
+
 	return func(tx *accessmodel.AccountTransaction) bool {
-		if len(f.Roles) > 0 {
-			return HasRoles(f.Roles...)(tx)
+		for _, role := range tx.Roles {
+			if rolesMap[role] {
+				return true
+			}
 		}
-		return true
+		return false
 	}
 }
 
@@ -86,7 +88,7 @@ func (b *AccountTransactionsBackend) GetAccountTransactions(
 	limit uint32,
 	cursor *accessmodel.AccountTransactionCursor,
 	filter AccountTransactionFilter,
-	expandResults bool,
+	expandOptions AccountTransactionExpandOptions,
 	encodingVersion entities.EventEncodingVersion,
 ) (*accessmodel.AccountTransactionsPage, error) {
 	limit, err := b.normalizeLimit(limit)
@@ -97,6 +99,7 @@ func (b *AccountTransactionsBackend) GetAccountTransactions(
 	if !b.chain.IsValid(address) {
 		return nil, status.Errorf(codes.NotFound, "account %s is not valid on chain %s", address, b.chain.ChainID())
 	}
+	// TODO: check if account exists for the chain
 
 	page, err := b.store.ByAddress(address, limit, cursor, filter.Filter())
 	if err != nil {
@@ -104,7 +107,6 @@ func (b *AccountTransactionsBackend) GetAccountTransactions(
 	}
 
 	// storage will return an empty page and no error if the account has no transfers indexed.
-	// TODO: check if account exists for the chain
 	if len(page.Transactions) == 0 {
 		return &page, nil
 	}
@@ -113,28 +115,56 @@ func (b *AccountTransactionsBackend) GetAccountTransactions(
 	// Note: if no transactions are found, the response will include an empty array and no error.
 	for i := range page.Transactions {
 		tx := &page.Transactions[i]
-		header, err := b.headers.ByHeight(tx.BlockHeight)
-		if err != nil {
-			err = fmt.Errorf("failed to retrieve block header for transaction %s: %w", tx.TransactionID, err)
-			irrecoverable.Throw(ctx, err)
-			return nil, err
+		if err := b.expand(ctx, tx, expandOptions, encodingVersion); err != nil {
+			return nil, fmt.Errorf("failed to enrich transaction: %w", err)
 		}
-		tx.BlockTimestamp = header.Timestamp
-
-		if !expandResults {
-			continue
-		}
-
-		txBody, result, err := b.lookupTransactionDetails(ctx, tx.TransactionID, header, encodingVersion)
-		if err != nil {
-			err = fmt.Errorf("failed to populate details for transaction %s: %w", tx.TransactionID, err)
-			irrecoverable.Throw(ctx, err)
-			return nil, err
-		}
-
-		tx.Transaction = txBody
-		tx.Result = result
 	}
 
 	return &page, nil
+}
+
+// expand adds additional details to the transaction.
+//
+// Since the extended indexer only indexes sealed data, all transaction and result data should exist
+// in storage for the given height.
+//
+// No error returns are expected during normal operation.
+func (b *AccountTransactionsBackend) expand(
+	ctx context.Context,
+	tx *accessmodel.AccountTransaction,
+	expandOptions AccountTransactionExpandOptions,
+	encodingVersion entities.EventEncodingVersion,
+) error {
+	header, err := b.headers.ByHeight(tx.BlockHeight)
+	if err != nil {
+		return fmt.Errorf("could not retrieve block header: %w", err)
+	}
+
+	// always add the block timestamp
+	tx.BlockTimestamp = header.Timestamp
+
+	// only add the transaction body and result if requested
+	if !expandOptions.HasExpand() {
+		return nil
+	}
+
+	var isSystemChunkTx bool
+	if expandOptions.Transaction {
+		var txBody *flow.TransactionBody
+		txBody, isSystemChunkTx, err = b.getTransactionBody(ctx, header, tx.TransactionID)
+		if err != nil {
+			return fmt.Errorf("could not retrieve transaction body: %w", err)
+		}
+		tx.Transaction = txBody
+	}
+
+	if expandOptions.Result {
+		result, err := b.getTransactionResult(ctx, tx.TransactionID, header, isSystemChunkTx, expandOptions.Transaction, encodingVersion)
+		if err != nil {
+			return fmt.Errorf("could not retrieve transaction result: %w", err)
+		}
+		tx.Result = result
+	}
+
+	return nil
 }
