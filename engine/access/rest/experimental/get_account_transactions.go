@@ -60,7 +60,7 @@ func GetAccountTransactions(r *common.Request, backend extended.API, link common
 		if err != nil {
 			return nil, common.NewBadRequestError(err)
 		}
-		if c.BlockHeight != 0 && c.TransactionIndex != 0 {
+		if c.BlockHeight != 0 || c.TransactionIndex != 0 {
 			cursor = c
 		}
 	}
