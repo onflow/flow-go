@@ -16,6 +16,15 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
+type AccountTransferExpandOptions struct {
+	Transaction bool
+	Result      bool
+}
+
+func (o *AccountTransferExpandOptions) HasExpand() bool {
+	return o.Transaction || o.Result
+}
+
 type AccountFTTransferFilter struct {
 	AccountAddress   flow.Address
 	TokenType        string
@@ -118,7 +127,7 @@ func (b *AccountTransfersBackend) GetAccountFungibleTokenTransfers(
 	limit uint32,
 	cursor *accessmodel.TransferCursor,
 	filter AccountFTTransferFilter,
-	expandResults bool,
+	expandOptions AccountTransferExpandOptions,
 	encodingVersion entities.EventEncodingVersion,
 ) (*accessmodel.FungibleTokenTransfersPage, error) {
 	limit, err := b.normalizeLimit(limit)
@@ -144,24 +153,15 @@ func (b *AccountTransfersBackend) GetAccountFungibleTokenTransfers(
 	for i := range page.Transfers {
 		t := &page.Transfers[i]
 
-		header, err := b.headers.ByHeight(t.BlockHeight)
-		if err != nil {
-			err = fmt.Errorf("failed to retrieve block header for transfer transaction %s: %w", t.TransactionID, err)
-			irrecoverable.Throw(ctx, err)
-			return nil, err
-		}
-		t.BlockTimestamp = header.Timestamp
-
-		if !expandResults {
-			continue
-		}
-
-		txBody, result, err := b.lookupTransactionDetails(ctx, t.TransactionID, header, encodingVersion)
+		header, txBody, result, err := b.expand(ctx, t.BlockHeight, t.TransactionID, expandOptions, encodingVersion)
 		if err != nil {
 			err = fmt.Errorf("failed to populate details for transfer transaction %s: %w", t.TransactionID, err)
 			irrecoverable.Throw(ctx, err)
 			return nil, err
 		}
+
+		// only the expended options will be populated
+		t.BlockTimestamp = header.Timestamp
 		t.Transaction = txBody
 		t.Result = result
 	}
@@ -185,7 +185,7 @@ func (b *AccountTransfersBackend) GetAccountNonFungibleTokenTransfers(
 	limit uint32,
 	cursor *accessmodel.TransferCursor,
 	filter AccountNFTTransferFilter,
-	expandResults bool,
+	expandOptions AccountTransferExpandOptions,
 	encodingVersion entities.EventEncodingVersion,
 ) (*accessmodel.NonFungibleTokenTransfersPage, error) {
 	limit, err := b.normalizeLimit(limit)
@@ -211,27 +211,66 @@ func (b *AccountTransfersBackend) GetAccountNonFungibleTokenTransfers(
 	for i := range page.Transfers {
 		t := &page.Transfers[i]
 
-		header, err := b.headers.ByHeight(t.BlockHeight)
-		if err != nil {
-			err = fmt.Errorf("failed to retrieve block header for transfer transaction %s: %w", t.TransactionID, err)
-			irrecoverable.Throw(ctx, err)
-			return nil, err
-		}
-		t.BlockTimestamp = header.Timestamp
-
-		if !expandResults {
-			continue
-		}
-
-		txBody, result, err := b.lookupTransactionDetails(ctx, t.TransactionID, header, encodingVersion)
+		header, txBody, result, err := b.expand(ctx, t.BlockHeight, t.TransactionID, expandOptions, encodingVersion)
 		if err != nil {
 			err = fmt.Errorf("failed to populate details for transfer transaction %s: %w", t.TransactionID, err)
 			irrecoverable.Throw(ctx, err)
 			return nil, err
 		}
+
+		// only the expended options will be populated
+		t.BlockTimestamp = header.Timestamp
 		t.Transaction = txBody
 		t.Result = result
 	}
 
 	return &page, nil
+}
+
+// expand adds additional details to the transaction.
+//
+// Since the extended indexer only indexes sealed data, all transaction and result data should exist
+// in storage for the given height.
+//
+// No error returns are expected during normal operation.
+func (b *AccountTransfersBackend) expand(
+	ctx context.Context,
+	blockHeight uint64,
+	transactionID flow.Identifier,
+	expandOptions AccountTransferExpandOptions,
+	encodingVersion entities.EventEncodingVersion,
+) (*flow.Header, *flow.TransactionBody, *accessmodel.TransactionResult, error) {
+	blockID, err := b.headers.BlockIDByHeight(blockHeight)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("could not retrieve block ID: %w", err)
+	}
+
+	header, err := b.headers.ByBlockID(blockID)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("could not retrieve block header: %w", err)
+	}
+
+	// only add the transaction body and result if requested
+	if !expandOptions.HasExpand() {
+		return header, nil, nil, nil
+	}
+
+	var txBody *flow.TransactionBody
+	var isSystemChunkTx bool
+	if expandOptions.Transaction {
+		txBody, isSystemChunkTx, err = b.getTransactionBody(ctx, header, transactionID)
+		if err != nil {
+			return nil, nil, nil, fmt.Errorf("could not retrieve transaction body: %w", err)
+		}
+	}
+
+	var result *accessmodel.TransactionResult
+	if expandOptions.Result {
+		result, err = b.getTransactionResult(ctx, transactionID, header, isSystemChunkTx, expandOptions.Transaction, encodingVersion)
+		if err != nil {
+			return nil, nil, nil, fmt.Errorf("could not retrieve transaction result: %w", err)
+		}
+	}
+
+	return header, txBody, result, nil
 }

@@ -53,7 +53,7 @@ func TestBackend_GetAccountTransactions(t *testing.T) {
 		).Return(expectedPage, nil)
 		mockHeaders.On("ByHeight", blockHeader.Height).Return(blockHeader, nil)
 
-		page, err := backend.GetAccountTransactions(context.Background(), addr, 0, nil, AccountTransactionFilter{}, false, defaultEncoding)
+		page, err := backend.GetAccountTransactions(context.Background(), addr, 0, nil, AccountTransactionFilter{}, AccountTransactionExpandOptions{}, defaultEncoding)
 		require.NoError(t, err)
 		require.Len(t, page.Transactions, 1)
 		assert.Equal(t, txID, page.Transactions[0].TransactionID)
@@ -81,7 +81,7 @@ func TestBackend_GetAccountTransactions(t *testing.T) {
 		).Return(nonEmptyPage, nil)
 		mockHeaders.On("ByHeight", blockHeader.Height).Return(unittest.BlockHeaderFixture(), nil)
 
-		_, err := backend.GetAccountTransactions(context.Background(), addr, 0, nil, AccountTransactionFilter{}, false, defaultEncoding)
+		_, err := backend.GetAccountTransactions(context.Background(), addr, 0, nil, AccountTransactionFilter{}, AccountTransactionExpandOptions{}, defaultEncoding)
 		require.NoError(t, err)
 	})
 
@@ -91,7 +91,7 @@ func TestBackend_GetAccountTransactions(t *testing.T) {
 
 		addr := unittest.RandomAddressFixture()
 
-		_, err := backend.GetAccountTransactions(context.Background(), addr, 500, nil, AccountTransactionFilter{}, false, defaultEncoding)
+		_, err := backend.GetAccountTransactions(context.Background(), addr, 500, nil, AccountTransactionFilter{}, AccountTransactionExpandOptions{}, defaultEncoding)
 		require.Error(t, err)
 		st, ok := status.FromError(err)
 		require.True(t, ok)
@@ -118,17 +118,71 @@ func TestBackend_GetAccountTransactions(t *testing.T) {
 		).Return(nonEmptyPage, nil)
 		mockHeaders.On("ByHeight", uint64(50)).Return(blockHeader, nil)
 
-		_, err := backend.GetAccountTransactions(context.Background(), addr, 10, cursor, AccountTransactionFilter{}, false, defaultEncoding)
+		_, err := backend.GetAccountTransactions(context.Background(), addr, 10, cursor, AccountTransactionFilter{}, AccountTransactionExpandOptions{}, defaultEncoding)
 		require.NoError(t, err)
 	})
 
-	t.Run("invalid address returns NotFound", func(t *testing.T) {
+	t.Run("non-empty filter forwards non-nil filter function to storage", func(t *testing.T) {
+		mockStore := storagemock.NewAccountTransactionsReader(t)
+		mockHeaders := storagemock.NewHeaders(t)
+		backend := NewAccountTransactionsBackend(unittest.Logger(), &backendBase{config: DefaultConfig(), headers: mockHeaders}, mockStore, flow.Testnet.Chain())
+
+		addr := unittest.RandomAddressFixture()
+		blockHeader := unittest.BlockHeaderFixture()
+		filter := AccountTransactionFilter{Roles: []accessmodel.TransactionRole{accessmodel.TransactionRoleAuthorizer}}
+
+		page := accessmodel.AccountTransactionsPage{
+			Transactions: []accessmodel.AccountTransaction{
+				{Address: addr, BlockHeight: blockHeader.Height, TransactionID: unittest.IdentifierFixture()},
+			},
+		}
+
+		mockStore.On("ByAddress",
+			addr, uint32(50), (*accessmodel.AccountTransactionCursor)(nil),
+			mocktestify.MatchedBy(func(f storage.IndexFilter[*accessmodel.AccountTransaction]) bool {
+				return f != nil
+			}),
+		).Return(page, nil)
+		mockHeaders.On("ByHeight", blockHeader.Height).Return(blockHeader, nil)
+
+		_, err := backend.GetAccountTransactions(context.Background(), addr, 0, nil, filter, AccountTransactionExpandOptions{}, defaultEncoding)
+		require.NoError(t, err)
+	})
+
+	t.Run("next cursor from storage page is returned to caller", func(t *testing.T) {
+		mockStore := storagemock.NewAccountTransactionsReader(t)
+		mockHeaders := storagemock.NewHeaders(t)
+		backend := NewAccountTransactionsBackend(unittest.Logger(), &backendBase{config: DefaultConfig(), headers: mockHeaders}, mockStore, flow.Testnet.Chain())
+
+		addr := unittest.RandomAddressFixture()
+		blockHeader := unittest.BlockHeaderFixture()
+		nextCursor := &accessmodel.AccountTransactionCursor{BlockHeight: 99, TransactionIndex: 2}
+
+		expectedPage := accessmodel.AccountTransactionsPage{
+			Transactions: []accessmodel.AccountTransaction{
+				{Address: addr, BlockHeight: blockHeader.Height, TransactionID: unittest.IdentifierFixture()},
+			},
+			NextCursor: nextCursor,
+		}
+
+		mockStore.On("ByAddress",
+			addr, uint32(50), (*accessmodel.AccountTransactionCursor)(nil), mocktestify.Anything,
+		).Return(expectedPage, nil)
+		mockHeaders.On("ByHeight", blockHeader.Height).Return(blockHeader, nil)
+
+		page, err := backend.GetAccountTransactions(context.Background(), addr, 0, nil, AccountTransactionFilter{}, AccountTransactionExpandOptions{}, defaultEncoding)
+		require.NoError(t, err)
+		require.NotNil(t, page.NextCursor)
+		assert.Equal(t, nextCursor, page.NextCursor)
+	})
+
+	t.Run("ErrNotBootstrapped maps to FailedPrecondition", func(t *testing.T) {
 		mockStore := storagemock.NewAccountTransactionsReader(t)
 		backend := NewAccountTransactionsBackend(unittest.Logger(), &backendBase{config: DefaultConfig()}, mockStore, flow.Testnet.Chain())
 
 		addr := unittest.InvalidAddressFixture()
 
-		_, err := backend.GetAccountTransactions(context.Background(), addr, 0, nil, AccountTransactionFilter{}, false, defaultEncoding)
+		_, err := backend.GetAccountTransactions(context.Background(), addr, 0, nil, AccountTransactionFilter{}, AccountTransactionExpandOptions{}, defaultEncoding)
 		require.Error(t, err)
 		st, ok := status.FromError(err)
 		require.True(t, ok)
@@ -145,7 +199,7 @@ func TestBackend_GetAccountTransactions(t *testing.T) {
 			addr, uint32(50), (*accessmodel.AccountTransactionCursor)(nil), mocktestify.Anything,
 		).Return(accessmodel.AccountTransactionsPage{}, nil)
 
-		page, err := backend.GetAccountTransactions(context.Background(), addr, 0, nil, AccountTransactionFilter{}, false, defaultEncoding)
+		page, err := backend.GetAccountTransactions(context.Background(), addr, 0, nil, AccountTransactionFilter{}, AccountTransactionExpandOptions{}, defaultEncoding)
 		require.NoError(t, err)
 		assert.Empty(t, page.Transactions)
 	})
@@ -160,7 +214,7 @@ func TestBackend_GetAccountTransactions(t *testing.T) {
 			addr, uint32(50), (*accessmodel.AccountTransactionCursor)(nil), mocktestify.Anything,
 		).Return(accessmodel.AccountTransactionsPage{}, storage.ErrNotBootstrapped)
 
-		_, err := backend.GetAccountTransactions(context.Background(), addr, 0, nil, AccountTransactionFilter{}, false, defaultEncoding)
+		_, err := backend.GetAccountTransactions(context.Background(), addr, 0, nil, AccountTransactionFilter{}, AccountTransactionExpandOptions{}, defaultEncoding)
 		require.Error(t, err)
 		st, ok := status.FromError(err)
 		require.True(t, ok)
@@ -178,7 +232,7 @@ func TestBackend_GetAccountTransactions(t *testing.T) {
 			addr, uint32(10), cursor, mocktestify.Anything,
 		).Return(accessmodel.AccountTransactionsPage{}, fmt.Errorf("wrapped: %w", storage.ErrHeightNotIndexed))
 
-		_, err := backend.GetAccountTransactions(context.Background(), addr, 10, cursor, AccountTransactionFilter{}, false, defaultEncoding)
+		_, err := backend.GetAccountTransactions(context.Background(), addr, 10, cursor, AccountTransactionFilter{}, AccountTransactionExpandOptions{}, defaultEncoding)
 		require.Error(t, err)
 		st, ok := status.FromError(err)
 		require.True(t, ok)
@@ -200,7 +254,7 @@ func TestBackend_GetAccountTransactions(t *testing.T) {
 		signalerCtx := irrecoverable.WithSignalerContext(context.Background(),
 			irrecoverable.NewMockSignalerContextExpectError(t, context.Background(), expectedErr))
 
-		_, err := backend.GetAccountTransactions(signalerCtx, addr, 0, nil, AccountTransactionFilter{}, false, defaultEncoding)
+		_, err := backend.GetAccountTransactions(signalerCtx, addr, 0, nil, AccountTransactionFilter{}, AccountTransactionExpandOptions{}, defaultEncoding)
 		require.Error(t, err)
 	})
 }

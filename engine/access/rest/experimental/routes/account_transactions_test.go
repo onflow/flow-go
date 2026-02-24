@@ -99,7 +99,7 @@ func TestGetAccountTransactions(t *testing.T) {
 			uint32(0),
 			(*accessmodel.AccountTransactionCursor)(nil),
 			extended.AccountTransactionFilter{},
-			false,
+			extended.AccountTransactionExpandOptions{},
 			entities.EventEncodingVersion_JSON_CDC_V0,
 		).Return(page, nil)
 
@@ -162,7 +162,7 @@ func TestGetAccountTransactions(t *testing.T) {
 			uint32(10),
 			(*accessmodel.AccountTransactionCursor)(nil),
 			extended.AccountTransactionFilter{},
-			false,
+			extended.AccountTransactionExpandOptions{},
 			entities.EventEncodingVersion_JSON_CDC_V0,
 		).Return(page, nil)
 
@@ -218,7 +218,7 @@ func TestGetAccountTransactions(t *testing.T) {
 			uint32(0),
 			expectedCursor,
 			extended.AccountTransactionFilter{},
-			false,
+			extended.AccountTransactionExpandOptions{},
 			entities.EventEncodingVersion_JSON_CDC_V0,
 		).Return(page, nil)
 
@@ -244,7 +244,7 @@ func TestGetAccountTransactions(t *testing.T) {
 			uint32(0),
 			(*accessmodel.AccountTransactionCursor)(nil),
 			extended.AccountTransactionFilter{},
-			true,
+			extended.AccountTransactionExpandOptions{Transaction: true},
 			entities.EventEncodingVersion_JSON_CDC_V0,
 		).Return(page, nil)
 
@@ -270,7 +270,7 @@ func TestGetAccountTransactions(t *testing.T) {
 			uint32(0),
 			(*accessmodel.AccountTransactionCursor)(nil),
 			extended.AccountTransactionFilter{},
-			true,
+			extended.AccountTransactionExpandOptions{Result: true},
 			entities.EventEncodingVersion_JSON_CDC_V0,
 		).Return(page, nil)
 
@@ -318,7 +318,7 @@ func TestGetAccountTransactions(t *testing.T) {
 			uint32(0),
 			(*accessmodel.AccountTransactionCursor)(nil),
 			extended.AccountTransactionFilter{},
-			false,
+			extended.AccountTransactionExpandOptions{},
 			entities.EventEncodingVersion_JSON_CDC_V0,
 		).Return(nil, status.Errorf(codes.NotFound, "no transactions found for account %s", address))
 
@@ -340,7 +340,7 @@ func TestGetAccountTransactions(t *testing.T) {
 			uint32(0),
 			(*accessmodel.AccountTransactionCursor)(nil),
 			extended.AccountTransactionFilter{},
-			false,
+			extended.AccountTransactionExpandOptions{},
 			entities.EventEncodingVersion_JSON_CDC_V0,
 		).Return(nil, status.Errorf(codes.FailedPrecondition, "index not initialized"))
 
@@ -393,7 +393,7 @@ func TestParseCursorRoundtrip(t *testing.T) {
 			uint32(0),
 			(*accessmodel.AccountTransactionCursor)(nil),
 			extended.AccountTransactionFilter{},
-			false,
+			extended.AccountTransactionExpandOptions{},
 			entities.EventEncodingVersion_JSON_CDC_V0,
 		).Return(page, nil)
 

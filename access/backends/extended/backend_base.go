@@ -63,40 +63,46 @@ func (b *backendBase) mapReadError(ctx context.Context, label string, err error)
 	}
 }
 
-// lookupTransactionDetails retrieves the transaction body and result for a given transaction.
-//
-// Since the extended indexer only indexes sealed data, all transaction and result data should exist
-// in storage for the given height.
+// getTransactionResult retrieves the transaction result for a given transaction.
 //
 // Expected error returns during normal operation:
 //   - [storage.ErrNotFound] if the transaction is not found
-func (b *backendBase) lookupTransactionDetails(
+func (b *backendBase) getTransactionResult(
 	ctx context.Context,
 	txID flow.Identifier,
 	header *flow.Header,
+	isSystemChunkTx bool,
+	expandTransaction bool,
 	encodingVersion entities.EventEncodingVersion,
-) (*flow.TransactionBody, *accessmodel.TransactionResult, error) {
-	txBody, isSystemChunkTx, err := b.getTransactionBody(ctx, header, txID)
-	if err != nil {
-		return nil, nil, fmt.Errorf("could not retrieve transaction body: %w", err)
-	}
-
-	var collectionID flow.Identifier
+) (*accessmodel.TransactionResult, error) {
 	// the system collection is not indexed and uses the zero ID by convention.
-	if !isSystemChunkTx {
+	var collectionID flow.Identifier
+
+	if !isSystemChunkTx || !expandTransaction {
 		collection, err := b.collections.LightByTransactionID(txID)
 		if err != nil {
-			return nil, nil, fmt.Errorf("could not retrieve collection: %w", err)
+			if !errors.Is(err, storage.ErrNotFound) {
+				return nil, fmt.Errorf("could not retrieve collection: %w", err)
+			}
+			// if we have already looked up the transaction and confirmed it is NOT a system chunk tx,
+			// then there should be an entry in the tx/collection index. however, the collection/tx
+			// index is built asynchronously with the extended indexer and may not be available yet.
+			// return an error, but don't throw an irrecoverable error.
+			if expandTransaction {
+				return nil, fmt.Errorf("could not retrieve collection for standard transaction: %w", err)
+			}
+			// system chunk transactions are not indexed by collection, so they will not exist.
+			// if the collection is not found, then this is a system chunk tx.
 		}
 		collectionID = collection.ID()
 	}
 
 	result, err := b.transactionsProvider.TransactionResult(ctx, header, txID, collectionID, encodingVersion)
 	if err != nil {
-		return nil, nil, fmt.Errorf("could not retrieve transaction result: %w", err)
+		return nil, fmt.Errorf("could not retrieve transaction result: %w", err)
 	}
 
-	return txBody, result, nil
+	return result, nil
 }
 
 // getTransactionBody retrieves the transaction body for the given transaction ID.

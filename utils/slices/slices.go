@@ -53,6 +53,8 @@ func Fill[T any](val T, n int) []T {
 }
 
 // AreStringSlicesEqual returns true if the two string slices are equal.
+//
+// CAUTION: this function performs inplace sorts of the input slices.
 func AreStringSlicesEqual(a, b []string) bool {
 	if len(a) != len(b) {
 		return false

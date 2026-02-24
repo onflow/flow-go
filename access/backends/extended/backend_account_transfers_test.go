@@ -52,12 +52,14 @@ func TestBackend_GetAccountFungibleTokenTransfers(t *testing.T) {
 			NextCursor: nil,
 		}
 
+		blockID := unittest.IdentifierFixture()
 		ftStore.On("ByAddress", addr, uint32(50), (*accessmodel.TransferCursor)(nil), mocktestify.Anything).
 			Return(expectedPage, nil)
-		mockHeaders.On("ByHeight", uint64(100)).Return(unittest.BlockHeaderFixture(), nil)
+		mockHeaders.On("BlockIDByHeight", uint64(100)).Return(blockID, nil)
+		mockHeaders.On("ByBlockID", blockID).Return(unittest.BlockHeaderFixture(), nil)
 
 		page, err := backend.GetAccountFungibleTokenTransfers(
-			context.Background(), addr, 0, nil, AccountFTTransferFilter{}, false, defaultEncoding,
+			context.Background(), addr, 0, nil, AccountFTTransferFilter{}, AccountTransferExpandOptions{}, defaultEncoding,
 		)
 		require.NoError(t, err)
 		require.Len(t, page.Transfers, 1)
@@ -79,13 +81,15 @@ func TestBackend_GetAccountFungibleTokenTransfers(t *testing.T) {
 			},
 		}
 
+		blockID := unittest.IdentifierFixture()
 		// Expect the default page size (50)
 		ftStore.On("ByAddress", addr, defaultConfig.DefaultPageSize, (*accessmodel.TransferCursor)(nil), mocktestify.Anything).
 			Return(nonEmptyPage, nil)
-		mockHeaders.On("ByHeight", uint64(1)).Return(unittest.BlockHeaderFixture(), nil)
+		mockHeaders.On("BlockIDByHeight", uint64(1)).Return(blockID, nil)
+		mockHeaders.On("ByBlockID", blockID).Return(unittest.BlockHeaderFixture(), nil)
 
 		_, err := backend.GetAccountFungibleTokenTransfers(
-			context.Background(), addr, 0, nil, AccountFTTransferFilter{}, false, defaultEncoding,
+			context.Background(), addr, 0, nil, AccountFTTransferFilter{}, AccountTransferExpandOptions{}, defaultEncoding,
 		)
 		require.NoError(t, err)
 	})
@@ -98,7 +102,7 @@ func TestBackend_GetAccountFungibleTokenTransfers(t *testing.T) {
 		addr := unittest.RandomAddressFixture()
 
 		_, err := backend.GetAccountFungibleTokenTransfers(
-			context.Background(), addr, 500, nil, AccountFTTransferFilter{}, false, defaultEncoding,
+			context.Background(), addr, 500, nil, AccountFTTransferFilter{}, AccountTransferExpandOptions{}, defaultEncoding,
 		)
 		require.Error(t, err)
 		st, ok := status.FromError(err)
@@ -121,12 +125,14 @@ func TestBackend_GetAccountFungibleTokenTransfers(t *testing.T) {
 			},
 		}
 
+		blockID := unittest.IdentifierFixture()
 		ftStore.On("ByAddress", addr, uint32(10), cursor, mocktestify.Anything).
 			Return(nonEmptyPage, nil)
-		mockHeaders.On("ByHeight", uint64(50)).Return(unittest.BlockHeaderFixture(), nil)
+		mockHeaders.On("BlockIDByHeight", uint64(50)).Return(blockID, nil)
+		mockHeaders.On("ByBlockID", blockID).Return(unittest.BlockHeaderFixture(), nil)
 
 		_, err := backend.GetAccountFungibleTokenTransfers(
-			context.Background(), addr, 10, cursor, AccountFTTransferFilter{}, false, defaultEncoding,
+			context.Background(), addr, 10, cursor, AccountFTTransferFilter{}, AccountTransferExpandOptions{}, defaultEncoding,
 		)
 		require.NoError(t, err)
 	})
@@ -139,7 +145,7 @@ func TestBackend_GetAccountFungibleTokenTransfers(t *testing.T) {
 		addr := unittest.InvalidAddressFixture()
 
 		_, err := backend.GetAccountFungibleTokenTransfers(
-			context.Background(), addr, 0, nil, AccountFTTransferFilter{}, false, defaultEncoding,
+			context.Background(), addr, 0, nil, AccountFTTransferFilter{}, AccountTransferExpandOptions{}, defaultEncoding,
 		)
 		require.Error(t, err)
 		st, ok := status.FromError(err)
@@ -158,7 +164,7 @@ func TestBackend_GetAccountFungibleTokenTransfers(t *testing.T) {
 			Return(accessmodel.FungibleTokenTransfersPage{}, nil)
 
 		page, err := backend.GetAccountFungibleTokenTransfers(
-			context.Background(), addr, 0, nil, AccountFTTransferFilter{}, false, defaultEncoding,
+			context.Background(), addr, 0, nil, AccountFTTransferFilter{}, AccountTransferExpandOptions{}, defaultEncoding,
 		)
 		require.NoError(t, err)
 		assert.Empty(t, page.Transfers)
@@ -175,7 +181,7 @@ func TestBackend_GetAccountFungibleTokenTransfers(t *testing.T) {
 			Return(accessmodel.FungibleTokenTransfersPage{}, storage.ErrNotBootstrapped)
 
 		_, err := backend.GetAccountFungibleTokenTransfers(
-			context.Background(), addr, 0, nil, AccountFTTransferFilter{}, false, defaultEncoding,
+			context.Background(), addr, 0, nil, AccountFTTransferFilter{}, AccountTransferExpandOptions{}, defaultEncoding,
 		)
 		require.Error(t, err)
 		st, ok := status.FromError(err)
@@ -195,7 +201,7 @@ func TestBackend_GetAccountFungibleTokenTransfers(t *testing.T) {
 			Return(accessmodel.FungibleTokenTransfersPage{}, fmt.Errorf("wrapped: %w", storage.ErrHeightNotIndexed))
 
 		_, err := backend.GetAccountFungibleTokenTransfers(
-			context.Background(), addr, 10, cursor, AccountFTTransferFilter{}, false, defaultEncoding,
+			context.Background(), addr, 10, cursor, AccountFTTransferFilter{}, AccountTransferExpandOptions{}, defaultEncoding,
 		)
 		require.Error(t, err)
 		st, ok := status.FromError(err)
@@ -219,7 +225,7 @@ func TestBackend_GetAccountFungibleTokenTransfers(t *testing.T) {
 			irrecoverable.NewMockSignalerContextExpectError(t, context.Background(), expectedErr))
 
 		_, err := backend.GetAccountFungibleTokenTransfers(
-			signalerCtx, addr, 0, nil, AccountFTTransferFilter{}, false, defaultEncoding,
+			signalerCtx, addr, 0, nil, AccountFTTransferFilter{}, AccountTransferExpandOptions{}, defaultEncoding,
 		)
 		require.Error(t, err)
 	})
@@ -255,12 +261,14 @@ func TestBackend_GetAccountNonFungibleTokenTransfers(t *testing.T) {
 			NextCursor: nil,
 		}
 
+		blockID := unittest.IdentifierFixture()
 		nftStore.On("ByAddress", addr, uint32(50), (*accessmodel.TransferCursor)(nil), mocktestify.Anything).
 			Return(expectedPage, nil)
-		mockHeaders.On("ByHeight", uint64(100)).Return(unittest.BlockHeaderFixture(), nil)
+		mockHeaders.On("BlockIDByHeight", uint64(100)).Return(blockID, nil)
+		mockHeaders.On("ByBlockID", blockID).Return(unittest.BlockHeaderFixture(), nil)
 
 		page, err := backend.GetAccountNonFungibleTokenTransfers(
-			context.Background(), addr, 0, nil, AccountNFTTransferFilter{}, false, defaultEncoding,
+			context.Background(), addr, 0, nil, AccountNFTTransferFilter{}, AccountTransferExpandOptions{}, defaultEncoding,
 		)
 		require.NoError(t, err)
 		require.Len(t, page.Transfers, 1)
@@ -282,12 +290,14 @@ func TestBackend_GetAccountNonFungibleTokenTransfers(t *testing.T) {
 			},
 		}
 
+		blockID := unittest.IdentifierFixture()
 		nftStore.On("ByAddress", addr, defaultConfig.DefaultPageSize, (*accessmodel.TransferCursor)(nil), mocktestify.Anything).
 			Return(nonEmptyPage, nil)
-		mockHeaders.On("ByHeight", uint64(1)).Return(unittest.BlockHeaderFixture(), nil)
+		mockHeaders.On("BlockIDByHeight", uint64(1)).Return(blockID, nil)
+		mockHeaders.On("ByBlockID", blockID).Return(unittest.BlockHeaderFixture(), nil)
 
 		_, err := backend.GetAccountNonFungibleTokenTransfers(
-			context.Background(), addr, 0, nil, AccountNFTTransferFilter{}, false, defaultEncoding,
+			context.Background(), addr, 0, nil, AccountNFTTransferFilter{}, AccountTransferExpandOptions{}, defaultEncoding,
 		)
 		require.NoError(t, err)
 	})
@@ -300,7 +310,7 @@ func TestBackend_GetAccountNonFungibleTokenTransfers(t *testing.T) {
 		addr := unittest.RandomAddressFixture()
 
 		_, err := backend.GetAccountNonFungibleTokenTransfers(
-			context.Background(), addr, 500, nil, AccountNFTTransferFilter{}, false, defaultEncoding,
+			context.Background(), addr, 500, nil, AccountNFTTransferFilter{}, AccountTransferExpandOptions{}, defaultEncoding,
 		)
 		require.Error(t, err)
 		st, ok := status.FromError(err)
@@ -323,12 +333,14 @@ func TestBackend_GetAccountNonFungibleTokenTransfers(t *testing.T) {
 			},
 		}
 
+		blockID := unittest.IdentifierFixture()
 		nftStore.On("ByAddress", addr, uint32(10), cursor, mocktestify.Anything).
 			Return(nonEmptyPage, nil)
-		mockHeaders.On("ByHeight", uint64(50)).Return(unittest.BlockHeaderFixture(), nil)
+		mockHeaders.On("BlockIDByHeight", uint64(50)).Return(blockID, nil)
+		mockHeaders.On("ByBlockID", blockID).Return(unittest.BlockHeaderFixture(), nil)
 
 		_, err := backend.GetAccountNonFungibleTokenTransfers(
-			context.Background(), addr, 10, cursor, AccountNFTTransferFilter{}, false, defaultEncoding,
+			context.Background(), addr, 10, cursor, AccountNFTTransferFilter{}, AccountTransferExpandOptions{}, defaultEncoding,
 		)
 		require.NoError(t, err)
 	})
@@ -341,7 +353,7 @@ func TestBackend_GetAccountNonFungibleTokenTransfers(t *testing.T) {
 		addr := unittest.InvalidAddressFixture()
 
 		_, err := backend.GetAccountNonFungibleTokenTransfers(
-			context.Background(), addr, 0, nil, AccountNFTTransferFilter{}, false, defaultEncoding,
+			context.Background(), addr, 0, nil, AccountNFTTransferFilter{}, AccountTransferExpandOptions{}, defaultEncoding,
 		)
 		require.Error(t, err)
 		st, ok := status.FromError(err)
@@ -360,7 +372,7 @@ func TestBackend_GetAccountNonFungibleTokenTransfers(t *testing.T) {
 			Return(accessmodel.NonFungibleTokenTransfersPage{}, nil)
 
 		page, err := backend.GetAccountNonFungibleTokenTransfers(
-			context.Background(), addr, 0, nil, AccountNFTTransferFilter{}, false, defaultEncoding,
+			context.Background(), addr, 0, nil, AccountNFTTransferFilter{}, AccountTransferExpandOptions{}, defaultEncoding,
 		)
 		require.NoError(t, err)
 		assert.Empty(t, page.Transfers)
@@ -377,7 +389,7 @@ func TestBackend_GetAccountNonFungibleTokenTransfers(t *testing.T) {
 			Return(accessmodel.NonFungibleTokenTransfersPage{}, storage.ErrNotBootstrapped)
 
 		_, err := backend.GetAccountNonFungibleTokenTransfers(
-			context.Background(), addr, 0, nil, AccountNFTTransferFilter{}, false, defaultEncoding,
+			context.Background(), addr, 0, nil, AccountNFTTransferFilter{}, AccountTransferExpandOptions{}, defaultEncoding,
 		)
 		require.Error(t, err)
 		st, ok := status.FromError(err)
@@ -397,7 +409,7 @@ func TestBackend_GetAccountNonFungibleTokenTransfers(t *testing.T) {
 			Return(accessmodel.NonFungibleTokenTransfersPage{}, fmt.Errorf("wrapped: %w", storage.ErrHeightNotIndexed))
 
 		_, err := backend.GetAccountNonFungibleTokenTransfers(
-			context.Background(), addr, 10, cursor, AccountNFTTransferFilter{}, false, defaultEncoding,
+			context.Background(), addr, 10, cursor, AccountNFTTransferFilter{}, AccountTransferExpandOptions{}, defaultEncoding,
 		)
 		require.Error(t, err)
 		st, ok := status.FromError(err)
@@ -421,7 +433,7 @@ func TestBackend_GetAccountNonFungibleTokenTransfers(t *testing.T) {
 			irrecoverable.NewMockSignalerContextExpectError(t, context.Background(), expectedErr))
 
 		_, err := backend.GetAccountNonFungibleTokenTransfers(
-			signalerCtx, addr, 0, nil, AccountNFTTransferFilter{}, false, defaultEncoding,
+			signalerCtx, addr, 0, nil, AccountNFTTransferFilter{}, AccountTransferExpandOptions{}, defaultEncoding,
 		)
 		require.Error(t, err)
 	})

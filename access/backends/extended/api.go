@@ -27,7 +27,7 @@ type API interface {
 		limit uint32,
 		cursor *accessmodel.AccountTransactionCursor,
 		filter AccountTransactionFilter,
-		expandResults bool,
+		expandOptions AccountTransactionExpandOptions,
 		encodingVersion entities.EventEncodingVersion,
 	) (*accessmodel.AccountTransactionsPage, error)
 
@@ -47,7 +47,7 @@ type API interface {
 		limit uint32,
 		cursor *accessmodel.TransferCursor,
 		filter AccountFTTransferFilter,
-		expandResults bool,
+		expandOptions AccountTransferExpandOptions,
 		encodingVersion entities.EventEncodingVersion,
 	) (*accessmodel.FungibleTokenTransfersPage, error)
 
@@ -67,7 +67,7 @@ type API interface {
 		limit uint32,
 		cursor *accessmodel.TransferCursor,
 		filter AccountNFTTransferFilter,
-		expandResults bool,
+		expandOptions AccountTransferExpandOptions,
 		encodingVersion entities.EventEncodingVersion,
 	) (*accessmodel.NonFungibleTokenTransfersPage, error)
 }

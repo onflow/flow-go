@@ -54,8 +54,11 @@ func patternToRegex(pattern string) string {
 
 // MethodURLToRoute matches (method, url) against compiled route regexes and returns the route name.
 func MethodURLToRoute(method, url string) (string, error) {
-	path := strings.TrimPrefix(url, "/v1")
-	path = strings.TrimPrefix(path, "/experimental/v1")
+
+	path, found := strings.CutPrefix(url, "/v1")
+	if !found {
+		path = strings.TrimPrefix(url, "/experimental/v1")
+	}
 
 	if method == "" {
 		for _, m := range matchers {

@@ -64,7 +64,7 @@ var _ storage.AccountTransactions = (*AccountTransactions)(nil)
 // Expected error returns during normal operations:
 //   - [storage.ErrNotBootstrapped] if the index has not been initialized
 func NewAccountTransactions(db storage.DB) (*AccountTransactions, error) {
-	firstHeight, err := accountTxHeightLookup(db.Reader(), keyAccountTransactionFirstHeightKey)
+	firstHeight, err := readHeight(db.Reader(), keyAccountTransactionFirstHeightKey)
 	if err != nil {
 		if errors.Is(err, storage.ErrNotFound) {
 			return nil, storage.ErrNotBootstrapped
@@ -72,7 +72,7 @@ func NewAccountTransactions(db storage.DB) (*AccountTransactions, error) {
 		return nil, fmt.Errorf("could not get first height: %w", err)
 	}
 
-	persistedLatestHeight, err := accountTxHeightLookup(db.Reader(), keyAccountTransactionLatestHeightKey)
+	persistedLatestHeight, err := readHeight(db.Reader(), keyAccountTransactionLatestHeightKey)
 	if err != nil {
 		// if `firstHeight` is set, then `latestHeight` must be set as well, otherwise the database
 		// is in a corrupted state.
@@ -149,15 +149,8 @@ func (idx *AccountTransactions) ByAddress(
 
 	latestHeight := idx.latestHeight.Load()
 	if cursor != nil {
-		if cursor.BlockHeight > latestHeight {
-			return access.AccountTransactionsPage{}, fmt.Errorf(
-				"cursor height %d is greater than latest indexed height %d: %w",
-				cursor.BlockHeight, latestHeight, storage.ErrHeightNotIndexed)
-		}
-		if cursor.BlockHeight < idx.firstHeight {
-			return access.AccountTransactionsPage{}, fmt.Errorf(
-				"cursor height %d is before first indexed height %d: %w",
-				cursor.BlockHeight, idx.firstHeight, storage.ErrHeightNotIndexed)
+		if err := validateCursorHeight(cursor.BlockHeight, idx.firstHeight, latestHeight); err != nil {
+			return access.AccountTransactionsPage{}, err
 		}
 		latestHeight = cursor.BlockHeight
 	}
@@ -230,7 +223,6 @@ func lookupAccountTransactions(
 	fetchLimit := limit + 1
 
 	var collected []access.AccountTransaction
-	skipFirst := cursor != nil // skip the entry at the exact cursor position
 
 	err := operation.IterateKeys(reader, startKey, endKey,
 		func(keyCopy []byte, getValue func(any) error) (bail bool, err error) {
@@ -239,15 +231,14 @@ func lookupAccountTransactions(
 				return true, fmt.Errorf("could not decode key: %w", err)
 			}
 
-			// Skip entries at or before the cursor position (it was the last item of the previous page).
-			if skipFirst {
-				// no need to check height > cursor.BlockHeight since the iterator bounds already
-				// omit heights outside of the range.
-				if height == cursor.BlockHeight && txIndex <= cursor.TransactionIndex {
+			// the cursor is the next entry to return. skip all entries before it.
+			if cursor != nil {
+				if height > cursor.BlockHeight { // heights are descending
 					return false, nil
 				}
-				// Past the cursor position. Stop skipping.
-				skipFirst = false
+				if height == cursor.BlockHeight && txIndex < cursor.TransactionIndex {
+					return false, nil
+				}
 			}
 
 			var stored storedAccountTransaction
@@ -280,21 +271,21 @@ func lookupAccountTransactions(
 		return access.AccountTransactionsPage{}, fmt.Errorf("could not iterate keys: %w", err)
 	}
 
-	page := access.AccountTransactionsPage{}
-
-	if uint32(len(collected)) > limit {
-		// The extra entry tells us there are more results.
-		page.Transactions = collected[:limit]
-		last := collected[limit-1]
-		page.NextCursor = &access.AccountTransactionCursor{
-			BlockHeight:      last.BlockHeight,
-			TransactionIndex: last.TransactionIndex,
-		}
-	} else {
-		page.Transactions = collected
+	if uint32(len(collected)) <= limit {
+		return access.AccountTransactionsPage{
+			Transactions: collected,
+		}, nil
 	}
 
-	return page, nil
+	// we fetched one extra entry to check if there are more results. use it as the next cursor.
+	nextEntry := collected[limit]
+	return access.AccountTransactionsPage{
+		Transactions: collected[:limit],
+		NextCursor: &access.AccountTransactionCursor{
+			BlockHeight:      nextEntry.BlockHeight,
+			TransactionIndex: nextEntry.TransactionIndex,
+		},
+	}, nil
 }
 
 // indexAccountTransactions indexes all account-transaction associations for a block.
@@ -306,7 +297,7 @@ func indexAccountTransactions(lctx lockctx.Proof, rw storage.ReaderBatchWriter, 
 		return fmt.Errorf("missing required lock: %s", storage.LockIndexAccountTransactions)
 	}
 
-	latestHeight, err := accountTxHeightLookup(rw.GlobalReader(), keyAccountTransactionLatestHeightKey)
+	latestHeight, err := readHeight(rw.GlobalReader(), keyAccountTransactionLatestHeightKey)
 	if err != nil {
 		return fmt.Errorf("could not get latest indexed height: %w", err)
 	}
@@ -486,16 +477,4 @@ func decodeAccountTxKey(key []byte) (flow.Address, uint64, uint32, error) {
 	txIndex := binary.BigEndian.Uint32(key[offset:])
 
 	return address, height, txIndex, nil
-}
-
-// accountTxHeightLookup reads a height boundary (first/last) for the account transactions index from the database.
-//
-// Expected error returns during normal operations:
-//   - [storage.ErrNotFound] if the height is not found
-func accountTxHeightLookup(reader storage.Reader, key []byte) (uint64, error) {
-	var height uint64
-	if err := operation.RetrieveByKey(reader, key, &height); err != nil {
-		return 0, err
-	}
-	return height, nil
 }
