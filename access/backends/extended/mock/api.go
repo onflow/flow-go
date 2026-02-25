@@ -79,7 +79,7 @@ type API_GetAccountFungibleTokenTransfers_Call struct {
 //   - address flow.Address
 //   - limit uint32
 //   - cursor *access.TransferCursor
-//   - filter extended.AccountFTTransferFilter
+//   - filter extended.AccountTransferFilter
 //   - expandOptions extended.AccountTransferExpandOptions
 //   - encodingVersion entities.EventEncodingVersion
 func (_e *API_Expecter) GetAccountFungibleTokenTransfers(ctx interface{}, address interface{}, limit interface{}, cursor interface{}, filter interface{}, expandOptions interface{}, encodingVersion interface{}) *API_GetAccountFungibleTokenTransfers_Call {
