@@ -515,12 +515,12 @@ func TestFTTransfers_KeyEncoding(t *testing.T) {
 
 		key := makeFTTransferKey(address, height, txIndex, eventIndex)
 
-		decodedAddress, decodedHeight, decodedTxIndex, decodedEventIndex, err := decodeFTTransferKey(key)
+		cursor, err := decodeFTTransferKey(key)
 		require.NoError(t, err)
-		assert.Equal(t, address, decodedAddress)
-		assert.Equal(t, height, decodedHeight)
-		assert.Equal(t, txIndex, decodedTxIndex)
-		assert.Equal(t, eventIndex, decodedEventIndex)
+		assert.Equal(t, address, cursor.Address)
+		assert.Equal(t, height, cursor.BlockHeight)
+		assert.Equal(t, txIndex, cursor.TransactionIndex)
+		assert.Equal(t, eventIndex, cursor.EventIndex)
 	})
 
 	t.Run("boundary values: height 0, txIndex 0, eventIndex 0", func(t *testing.T) {
@@ -528,12 +528,12 @@ func TestFTTransfers_KeyEncoding(t *testing.T) {
 		address := unittest.RandomAddressFixture()
 
 		key := makeFTTransferKey(address, 0, 0, 0)
-		decodedAddress, decodedHeight, decodedTxIndex, decodedEventIndex, err := decodeFTTransferKey(key)
+		cursor, err := decodeFTTransferKey(key)
 		require.NoError(t, err)
-		assert.Equal(t, address, decodedAddress)
-		assert.Equal(t, uint64(0), decodedHeight)
-		assert.Equal(t, uint32(0), decodedTxIndex)
-		assert.Equal(t, uint32(0), decodedEventIndex)
+		assert.Equal(t, address, cursor.Address)
+		assert.Equal(t, uint64(0), cursor.BlockHeight)
+		assert.Equal(t, uint32(0), cursor.TransactionIndex)
+		assert.Equal(t, uint32(0), cursor.EventIndex)
 	})
 
 	t.Run("boundary values: max height, max txIndex, max eventIndex", func(t *testing.T) {
@@ -541,12 +541,12 @@ func TestFTTransfers_KeyEncoding(t *testing.T) {
 		address := unittest.RandomAddressFixture()
 
 		key := makeFTTransferKey(address, math.MaxUint64, math.MaxUint32, math.MaxUint32)
-		decodedAddress, decodedHeight, decodedTxIndex, decodedEventIndex, err := decodeFTTransferKey(key)
+		cursor, err := decodeFTTransferKey(key)
 		require.NoError(t, err)
-		assert.Equal(t, address, decodedAddress)
-		assert.Equal(t, uint64(math.MaxUint64), decodedHeight)
-		assert.Equal(t, uint32(math.MaxUint32), decodedTxIndex)
-		assert.Equal(t, uint32(math.MaxUint32), decodedEventIndex)
+		assert.Equal(t, address, cursor.Address)
+		assert.Equal(t, uint64(math.MaxUint64), cursor.BlockHeight)
+		assert.Equal(t, uint32(math.MaxUint32), cursor.TransactionIndex)
+		assert.Equal(t, uint32(math.MaxUint32), cursor.EventIndex)
 	})
 
 	t.Run("boundary values: zero address", func(t *testing.T) {
@@ -557,12 +557,12 @@ func TestFTTransfers_KeyEncoding(t *testing.T) {
 		eventIndex := uint32(7)
 
 		key := makeFTTransferKey(address, height, txIndex, eventIndex)
-		decodedAddress, decodedHeight, decodedTxIndex, decodedEventIndex, err := decodeFTTransferKey(key)
+		cursor, err := decodeFTTransferKey(key)
 		require.NoError(t, err)
-		assert.Equal(t, address, decodedAddress)
-		assert.Equal(t, height, decodedHeight)
-		assert.Equal(t, txIndex, decodedTxIndex)
-		assert.Equal(t, eventIndex, decodedEventIndex)
+		assert.Equal(t, address, cursor.Address)
+		assert.Equal(t, height, cursor.BlockHeight)
+		assert.Equal(t, txIndex, cursor.TransactionIndex)
+		assert.Equal(t, eventIndex, cursor.EventIndex)
 	})
 
 	t.Run("ones complement ensures descending order", func(t *testing.T) {
@@ -585,14 +585,14 @@ func TestFTTransfers_KeyDecoding_Errors(t *testing.T) {
 
 	t.Run("key too short", func(t *testing.T) {
 		t.Parallel()
-		_, _, _, _, err := decodeFTTransferKey(make([]byte, 10))
+		_, err := decodeFTTransferKey(make([]byte, 10))
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid key length")
 	})
 
 	t.Run("key too long", func(t *testing.T) {
 		t.Parallel()
-		_, _, _, _, err := decodeFTTransferKey(make([]byte, 30))
+		_, err := decodeFTTransferKey(make([]byte, 30))
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid key length")
 	})
@@ -601,7 +601,7 @@ func TestFTTransfers_KeyDecoding_Errors(t *testing.T) {
 		t.Parallel()
 		key := make([]byte, ftTransferKeyLen)
 		key[0] = 0xFF // wrong prefix
-		_, _, _, _, err := decodeFTTransferKey(key)
+		_, err := decodeFTTransferKey(key)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid prefix")
 	})

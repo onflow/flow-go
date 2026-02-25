@@ -149,7 +149,7 @@ func (idx *FungibleTokenTransfers) ByAddress(
 		return nil, fmt.Errorf("could not create iterator: %w", err)
 	}
 
-	return iterator.Build(iter, decodeFTTransferKeyCursor, reconstructFTTransfer), nil
+	return iterator.Build(iter, decodeFTTransferKey, reconstructFTTransfer), nil
 }
 
 // Store indexes all fungible token transfers for a block.
@@ -165,42 +165,6 @@ func (idx *FungibleTokenTransfers) Store(lctx lockctx.Proof, rw storage.ReaderBa
 	}
 
 	return storeAllFTTransfers(rw, blockHeight, transfers)
-}
-
-// decodeFTTransferKeyCursor decodes a fungible token transfer key into a [access.TransferCursor].
-//
-// Any error indicates the key is not valid.
-func decodeFTTransferKeyCursor(key []byte) (access.TransferCursor, error) {
-	_, height, txIndex, eventIndex, err := decodeFTTransferKey(key)
-	if err != nil {
-		return access.TransferCursor{}, err
-	}
-	return access.TransferCursor{
-		BlockHeight:      height,
-		TransactionIndex: txIndex,
-		EventIndex:       eventIndex,
-	}, nil
-}
-
-// reconstructFTTransfer decodes a stored value into an [access.FungibleTokenTransfer].
-//
-// Any error indicates the value is not valid.
-func reconstructFTTransfer(cursor access.TransferCursor, value []byte, dest *access.FungibleTokenTransfer) error {
-	var stored storedFungibleTokenTransfer
-	if err := msgpack.Unmarshal(value, &stored); err != nil {
-		return fmt.Errorf("could not decode value: %w", err)
-	}
-	*dest = access.FungibleTokenTransfer{
-		TransactionID:    stored.TransactionID,
-		BlockHeight:      cursor.BlockHeight,
-		TransactionIndex: cursor.TransactionIndex,
-		EventIndices:     stored.EventIndices,
-		SourceAddress:    stored.SourceAddress,
-		RecipientAddress: stored.RecipientAddress,
-		TokenType:        stored.TokenType,
-		Amount:           new(big.Int).SetBytes(stored.Amount),
-	}
-	return nil
 }
 
 // storeAllFTTransfers writes all fungible token transfer entries for a block.
@@ -240,6 +204,27 @@ func ftEventIndex(entry access.FungibleTokenTransfer) uint32 {
 	// use the last event index. this is either the deposit event or the last withdrawal event
 	// if the vault was destroyed.
 	return entry.EventIndices[len(entry.EventIndices)-1]
+}
+
+// reconstructFTTransfer decodes a stored value into an [access.FungibleTokenTransfer].
+//
+// Any error indicates the value is not valid.
+func reconstructFTTransfer(cursor access.TransferCursor, value []byte, dest *access.FungibleTokenTransfer) error {
+	var stored storedFungibleTokenTransfer
+	if err := msgpack.Unmarshal(value, &stored); err != nil {
+		return fmt.Errorf("could not decode value: %w", err)
+	}
+	*dest = access.FungibleTokenTransfer{
+		TransactionID:    stored.TransactionID,
+		BlockHeight:      cursor.BlockHeight,
+		TransactionIndex: cursor.TransactionIndex,
+		EventIndices:     stored.EventIndices,
+		SourceAddress:    stored.SourceAddress,
+		RecipientAddress: stored.RecipientAddress,
+		TokenType:        stored.TokenType,
+		Amount:           new(big.Int).SetBytes(stored.Amount),
+	}
+	return nil
 }
 
 // makeFTTransferValue builds the stored value for a fungible token transfer index entry.
@@ -290,14 +275,14 @@ func makeFTTransferKeyPrefix(address flow.Address, height uint64) []byte {
 // decodeFTTransferKey decodes a fungible token transfer key into its components.
 //
 // Any error indicates the key is not valid.
-func decodeFTTransferKey(key []byte) (flow.Address, uint64, uint32, uint32, error) {
+func decodeFTTransferKey(key []byte) (access.TransferCursor, error) {
 	if len(key) != ftTransferKeyLen {
-		return flow.Address{}, 0, 0, 0, fmt.Errorf("invalid key length: expected %d, got %d",
+		return access.TransferCursor{}, fmt.Errorf("invalid key length: expected %d, got %d",
 			ftTransferKeyLen, len(key))
 	}
 
 	if key[0] != codeAccountFungibleTokenTransfers {
-		return flow.Address{}, 0, 0, 0, fmt.Errorf("invalid prefix: expected %d, got %d",
+		return access.TransferCursor{}, fmt.Errorf("invalid prefix: expected %d, got %d",
 			codeAccountFungibleTokenTransfers, key[0])
 	}
 
@@ -314,7 +299,12 @@ func decodeFTTransferKey(key []byte) (flow.Address, uint64, uint32, uint32, erro
 
 	eventIndex := binary.BigEndian.Uint32(key[offset:])
 
-	return address, height, txIndex, eventIndex, nil
+	return access.TransferCursor{
+		Address:          address,
+		BlockHeight:      height,
+		TransactionIndex: txIndex,
+		EventIndex:       eventIndex,
+	}, nil
 }
 
 // validateFTTransfer validates the fungible token transfer is valid.

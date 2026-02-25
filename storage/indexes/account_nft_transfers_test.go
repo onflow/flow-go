@@ -464,45 +464,45 @@ func TestNFTTransfers_KeyEncoding(t *testing.T) {
 
 		key := makeNFTTransferKey(address, height, txIndex, eventIndex)
 
-		decodedAddress, decodedHeight, decodedTxIndex, decodedEventIndex, err := decodeNFTTransferKey(key)
+		cursor, err := decodeNFTTransferKey(key)
 		require.NoError(t, err)
-		assert.Equal(t, address, decodedAddress)
-		assert.Equal(t, height, decodedHeight)
-		assert.Equal(t, txIndex, decodedTxIndex)
-		assert.Equal(t, eventIndex, decodedEventIndex)
+		assert.Equal(t, address, cursor.Address)
+		assert.Equal(t, height, cursor.BlockHeight)
+		assert.Equal(t, txIndex, cursor.TransactionIndex)
+		assert.Equal(t, eventIndex, cursor.EventIndex)
 	})
 
 	t.Run("boundary values: height 0, txIndex 0, eventIndex 0", func(t *testing.T) {
 		address := unittest.RandomAddressFixture()
 		key := makeNFTTransferKey(address, 0, 0, 0)
-		decodedAddress, decodedHeight, decodedTxIndex, decodedEventIndex, err := decodeNFTTransferKey(key)
+		cursor, err := decodeNFTTransferKey(key)
 		require.NoError(t, err)
-		assert.Equal(t, address, decodedAddress)
-		assert.Equal(t, uint64(0), decodedHeight)
-		assert.Equal(t, uint32(0), decodedTxIndex)
-		assert.Equal(t, uint32(0), decodedEventIndex)
+		assert.Equal(t, address, cursor.Address)
+		assert.Equal(t, uint64(0), cursor.BlockHeight)
+		assert.Equal(t, uint32(0), cursor.TransactionIndex)
+		assert.Equal(t, uint32(0), cursor.EventIndex)
 	})
 
 	t.Run("boundary values: max height, max txIndex, max eventIndex", func(t *testing.T) {
 		address := unittest.RandomAddressFixture()
 		key := makeNFTTransferKey(address, math.MaxUint64, math.MaxUint32, math.MaxUint32)
-		decodedAddress, decodedHeight, decodedTxIndex, decodedEventIndex, err := decodeNFTTransferKey(key)
+		cursor, err := decodeNFTTransferKey(key)
 		require.NoError(t, err)
-		assert.Equal(t, address, decodedAddress)
-		assert.Equal(t, uint64(math.MaxUint64), decodedHeight)
-		assert.Equal(t, uint32(math.MaxUint32), decodedTxIndex)
-		assert.Equal(t, uint32(math.MaxUint32), decodedEventIndex)
+		assert.Equal(t, address, cursor.Address)
+		assert.Equal(t, uint64(math.MaxUint64), cursor.BlockHeight)
+		assert.Equal(t, uint32(math.MaxUint32), cursor.TransactionIndex)
+		assert.Equal(t, uint32(math.MaxUint32), cursor.EventIndex)
 	})
 
 	t.Run("boundary values: zero address", func(t *testing.T) {
 		address := flow.Address{}
 		key := makeNFTTransferKey(address, 12345, 42, 7)
-		decodedAddress, decodedHeight, decodedTxIndex, decodedEventIndex, err := decodeNFTTransferKey(key)
+		cursor, err := decodeNFTTransferKey(key)
 		require.NoError(t, err)
-		assert.Equal(t, address, decodedAddress)
-		assert.Equal(t, uint64(12345), decodedHeight)
-		assert.Equal(t, uint32(42), decodedTxIndex)
-		assert.Equal(t, uint32(7), decodedEventIndex)
+		assert.Equal(t, address, cursor.Address)
+		assert.Equal(t, uint64(12345), cursor.BlockHeight)
+		assert.Equal(t, uint32(42), cursor.TransactionIndex)
+		assert.Equal(t, uint32(7), cursor.EventIndex)
 	})
 }
 
@@ -510,13 +510,13 @@ func TestNFTTransfers_KeyDecoding_Errors(t *testing.T) {
 	t.Parallel()
 
 	t.Run("key too short", func(t *testing.T) {
-		_, _, _, _, err := decodeNFTTransferKey(make([]byte, 10))
+		_, err := decodeNFTTransferKey(make([]byte, 10))
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid key length")
 	})
 
 	t.Run("key too long", func(t *testing.T) {
-		_, _, _, _, err := decodeNFTTransferKey(make([]byte, 30))
+		_, err := decodeNFTTransferKey(make([]byte, 30))
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid key length")
 	})
@@ -524,7 +524,7 @@ func TestNFTTransfers_KeyDecoding_Errors(t *testing.T) {
 	t.Run("invalid prefix", func(t *testing.T) {
 		key := make([]byte, nftTransferKeyLen)
 		key[0] = 0xFF // wrong prefix
-		_, _, _, _, err := decodeNFTTransferKey(key)
+		_, err := decodeNFTTransferKey(key)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid prefix")
 	})

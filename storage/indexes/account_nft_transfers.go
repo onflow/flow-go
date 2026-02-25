@@ -144,7 +144,7 @@ func (idx *NonFungibleTokenTransfers) ByAddress(
 		return nil, fmt.Errorf("could not create iterator: %w", err)
 	}
 
-	return iterator.Build(iter, decodeNFTTransferKeyCursor, reconstructNFTTransfer), nil
+	return iterator.Build(iter, decodeNFTTransferKey, reconstructNFTTransfer), nil
 }
 
 // Store indexes all non-fungible token transfers for a block.
@@ -160,42 +160,6 @@ func (idx *NonFungibleTokenTransfers) Store(lctx lockctx.Proof, rw storage.Reade
 	}
 
 	return storeAllNFTTransfers(rw, blockHeight, transfers)
-}
-
-// decodeNFTTransferKeyCursor decodes a non-fungible token transfer key into a [access.TransferCursor].
-//
-// Any error indicates the key is not valid.
-func decodeNFTTransferKeyCursor(key []byte) (access.TransferCursor, error) {
-	_, height, txIndex, eventIndex, err := decodeNFTTransferKey(key)
-	if err != nil {
-		return access.TransferCursor{}, err
-	}
-	return access.TransferCursor{
-		BlockHeight:      height,
-		TransactionIndex: txIndex,
-		EventIndex:       eventIndex,
-	}, nil
-}
-
-// reconstructNFTTransfer decodes a stored value into an [access.NonFungibleTokenTransfer].
-//
-// Any error indicates the value is not valid.
-func reconstructNFTTransfer(cursor access.TransferCursor, value []byte, dest *access.NonFungibleTokenTransfer) error {
-	var stored storedNonFungibleTokenTransfer
-	if err := msgpack.Unmarshal(value, &stored); err != nil {
-		return fmt.Errorf("could not decode value: %w", err)
-	}
-	*dest = access.NonFungibleTokenTransfer{
-		TransactionID:    stored.TransactionID,
-		BlockHeight:      cursor.BlockHeight,
-		TransactionIndex: cursor.TransactionIndex,
-		EventIndices:     stored.EventIndices,
-		SourceAddress:    stored.SourceAddress,
-		RecipientAddress: stored.RecipientAddress,
-		TokenType:        stored.TokenType,
-		ID:               stored.ID,
-	}
-	return nil
 }
 
 // storeAllNFTTransfers writes all non-fungible token transfer entries for a block.
@@ -235,6 +199,27 @@ func nftTransferEventIndex(entry access.NonFungibleTokenTransfer) uint32 {
 	// use the last event index. this is either the deposit event or the last withdrawal event
 	// if the vault was destroyed.
 	return entry.EventIndices[len(entry.EventIndices)-1]
+}
+
+// reconstructNFTTransfer decodes a stored value into an [access.NonFungibleTokenTransfer].
+//
+// Any error indicates the value is not valid.
+func reconstructNFTTransfer(cursor access.TransferCursor, value []byte, dest *access.NonFungibleTokenTransfer) error {
+	var stored storedNonFungibleTokenTransfer
+	if err := msgpack.Unmarshal(value, &stored); err != nil {
+		return fmt.Errorf("could not decode value: %w", err)
+	}
+	*dest = access.NonFungibleTokenTransfer{
+		TransactionID:    stored.TransactionID,
+		BlockHeight:      cursor.BlockHeight,
+		TransactionIndex: cursor.TransactionIndex,
+		EventIndices:     stored.EventIndices,
+		SourceAddress:    stored.SourceAddress,
+		RecipientAddress: stored.RecipientAddress,
+		TokenType:        stored.TokenType,
+		ID:               stored.ID,
+	}
+	return nil
 }
 
 // makeNFTTransferValue builds the stored value for a non-fungible token transfer index entry.
@@ -280,14 +265,14 @@ func makeNFTTransferKeyPrefix(address flow.Address, height uint64) []byte {
 // decodeNFTTransferKey decodes a non-fungible token transfer key into its components.
 //
 // Any error indicates the key is not valid.
-func decodeNFTTransferKey(key []byte) (flow.Address, uint64, uint32, uint32, error) {
+func decodeNFTTransferKey(key []byte) (access.TransferCursor, error) {
 	if len(key) != nftTransferKeyLen {
-		return flow.Address{}, 0, 0, 0, fmt.Errorf("invalid key length: expected %d, got %d",
+		return access.TransferCursor{}, fmt.Errorf("invalid key length: expected %d, got %d",
 			nftTransferKeyLen, len(key))
 	}
 
 	if key[0] != codeAccountNonFungibleTokenTransfers {
-		return flow.Address{}, 0, 0, 0, fmt.Errorf("invalid prefix: expected %d, got %d",
+		return access.TransferCursor{}, fmt.Errorf("invalid prefix: expected %d, got %d",
 			codeAccountNonFungibleTokenTransfers, key[0])
 	}
 
@@ -304,5 +289,10 @@ func decodeNFTTransferKey(key []byte) (flow.Address, uint64, uint32, uint32, err
 
 	eventIndex := binary.BigEndian.Uint32(key[offset:])
 
-	return address, height, txIndex, eventIndex, nil
+	return access.TransferCursor{
+		Address:          address,
+		BlockHeight:      height,
+		TransactionIndex: txIndex,
+		EventIndex:       eventIndex,
+	}, nil
 }
