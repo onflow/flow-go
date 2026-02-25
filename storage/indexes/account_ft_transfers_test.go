@@ -484,6 +484,26 @@ func TestFTTransfers_HeightValidation(t *testing.T) {
 			assert.Contains(t, err.Error(), "at least one event index")
 		})
 	})
+
+	t.Run("store with nil Amount fails", func(t *testing.T) {
+		t.Parallel()
+		RunWithBootstrappedFTTransferIndex(t, 1, nil, func(_ storage.DB, lm storage.LockManager, idx *FungibleTokenTransfers) {
+			transfer := access.FungibleTokenTransfer{
+				TransactionID:    unittest.IdentifierFixture(),
+				BlockHeight:      2,
+				TransactionIndex: 0,
+				EventIndices:     []uint32{0},
+				SourceAddress:    unittest.RandomAddressFixture(),
+				RecipientAddress: unittest.RandomAddressFixture(),
+				TokenType:        "A.FlowToken",
+				Amount:           nil, // invalid: amount must not be nil
+			}
+
+			err := storeFTTransfers(t, lm, idx, 2, []access.FungibleTokenTransfer{transfer})
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), "transfer amount is nil")
+		})
+	})
 }
 
 func TestFTTransfers_RangeQueries(t *testing.T) {

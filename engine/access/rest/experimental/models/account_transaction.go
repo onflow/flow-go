@@ -19,11 +19,6 @@ func addressHex(addr flow.Address) string {
 	return addr.Hex()
 }
 
-const (
-	expandableTransaction = "transaction"
-	expandableResult      = "result"
-)
-
 // Build populates the AccountTransaction from a domain model.
 func (t *AccountTransaction) Build(
 	tx *accessmodel.AccountTransaction,

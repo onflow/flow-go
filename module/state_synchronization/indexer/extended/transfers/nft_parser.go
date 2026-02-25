@@ -23,10 +23,10 @@ const (
 // For burns (withdrawal-only), deposit is nil and recipientAddress is zero.
 // For intermediate transfers (multi-layer collections), deposit is nil and recipientAddress is set.
 type nftPairedResult struct {
-	sourceEvents     []flow.Event               // the flow.Event(s) that produced this result
-	withdrawal       *events.NFTWithdrawnEvent  // nil for deposit-only (mint)
-	deposit          *events.NFTDepositedEvent  // nil for withdrawal-only (burn or intermediate transfer)
-	recipientAddress flow.Address               // used for intermediate transfers when deposit is nil
+	sourceEvents     []flow.Event              // the flow.Event(s) that produced this result
+	withdrawal       *events.NFTWithdrawnEvent // nil for deposit-only (mint)
+	deposit          *events.NFTDepositedEvent // nil for withdrawal-only (burn or intermediate transfer)
+	recipientAddress flow.Address              // used for intermediate transfers when deposit is nil
 }
 
 // NFTParser decodes NonFungibleToken transfer events from CCF-encoded payloads and converts them
