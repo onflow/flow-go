@@ -52,9 +52,10 @@ type NonFungibleTokenTransfer struct {
 // TransferCursor identifies a position in the token transfer index for cursor-based pagination.
 // It corresponds to the last entry returned in a previous page.
 type TransferCursor struct {
-	BlockHeight      uint64 // Block height of the last returned entry
-	TransactionIndex uint32 // Transaction index within the block of the last returned entry
-	EventIndex       uint32 // Event index within the transaction of the last returned entry
+	Address          flow.Address // Account address
+	BlockHeight      uint64       // Block height of the last returned entry
+	TransactionIndex uint32       // Transaction index within the block of the last returned entry
+	EventIndex       uint32       // Event index within the transaction of the last returned entry
 }
 
 // FungibleTokenTransfersPage represents a single page of fungible token transfer results.

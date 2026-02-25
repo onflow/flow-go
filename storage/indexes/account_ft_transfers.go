@@ -2,15 +2,16 @@ package indexes
 
 import (
 	"encoding/binary"
-	"errors"
 	"fmt"
 	"math/big"
 
 	"github.com/jordanschalm/lockctx"
+	"github.com/vmihailenco/msgpack/v4"
 
 	"github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/storage/indexes/iterator"
 	"github.com/onflow/flow-go/storage/operation"
 )
 
@@ -116,45 +117,39 @@ func BootstrapFungibleTokenTransfers(
 	return &FungibleTokenTransfers{IndexState: state}, nil
 }
 
-// ByAddress retrieves fungible token transfers involving the given account using cursor-based
-// pagination. Results are returned in descending order (newest first).
-//
-// `limit` specifies the maximum number of results to return per page.
+// ByAddress returns an iterator over fungible token transfers involving the given account,
+// ordered in descending block height (newest first), with ascending transaction and event
+// index within each block. Returns an exhausted iterator and no error if the account has
+// no transfers.
 //
 // `cursor` is a pointer to an [access.TransferCursor]:
-//   - nil means start from the latest indexed height (first page)
-//   - non-nil means resume after the cursor position (subsequent pages)
-//
-// `filter` is an optional filter to apply to the results. If nil, all transfers will be returned.
-// The filter is applied before calculating the limit. For pagination to work correctly, the same
-// filter must be applied to all pages.
+//   - nil means start from the latest indexed height
+//   - non-nil means start at the cursor position (inclusive)
 //
 // Expected error returns during normal operations:
 //   - [storage.ErrHeightNotIndexed] if the cursor height extends beyond indexed heights
 func (idx *FungibleTokenTransfers) ByAddress(
 	account flow.Address,
-	limit uint32,
 	cursor *access.TransferCursor,
-	filter storage.IndexFilter[*access.FungibleTokenTransfer],
-) (access.FungibleTokenTransfersPage, error) {
-	if err := validateLimit(limit); err != nil {
-		return access.FungibleTokenTransfersPage{}, errors.Join(storage.ErrInvalidQuery, err)
-	}
-
+) (storage.IndexIterator[access.FungibleTokenTransfer, access.TransferCursor], error) {
 	latestHeight := idx.latestHeight.Load()
+	startKey := makeFTTransferKeyPrefix(account, latestHeight)
+
 	if cursor != nil {
 		if err := validateCursorHeight(cursor.BlockHeight, idx.firstHeight, latestHeight); err != nil {
-			return access.FungibleTokenTransfersPage{}, err
+			return nil, err
 		}
-		latestHeight = cursor.BlockHeight
+		startKey = makeFTTransferKey(account, cursor.BlockHeight, cursor.TransactionIndex, cursor.EventIndex)
 	}
 
-	page, err := lookupFTTransfers(idx.db.Reader(), account, idx.firstHeight, latestHeight, limit, cursor, filter)
+	endKey := makeFTTransferKeyPrefix(account, idx.firstHeight)
+
+	iter, err := idx.db.Reader().NewIter(startKey, endKey, storage.DefaultIteratorOptions())
 	if err != nil {
-		return access.FungibleTokenTransfersPage{}, fmt.Errorf("could not lookup fungible token transfers: %w", err)
+		return nil, fmt.Errorf("could not create iterator: %w", err)
 	}
 
-	return page, nil
+	return iterator.Build(iter, decodeFTTransferKey, reconstructFTTransfer), nil
 }
 
 // Store indexes all fungible token transfers for a block.
@@ -170,110 +165,6 @@ func (idx *FungibleTokenTransfers) Store(lctx lockctx.Proof, rw storage.ReaderBa
 	}
 
 	return storeAllFTTransfers(rw, blockHeight, transfers)
-}
-
-// lookupFTTransfers retrieves fungible token transfers for a given address using cursor-based
-// pagination. Results are returned in descending order (newest first).
-//
-// If `cursor` is nil, iteration starts from highestHeight. If non-nil, iteration starts after the
-// cursor position (the entry at the exact cursor position is skipped).
-//
-// The function collects up to `limit` entries, then peeks one more to determine whether a
-// NextCursor should be set in the returned page.
-//
-// No error returns are expected during normal operation.
-func lookupFTTransfers(
-	reader storage.Reader,
-	address flow.Address,
-	lowestHeight uint64,
-	highestHeight uint64,
-	limit uint32,
-	cursor *access.TransferCursor,
-	filter storage.IndexFilter[*access.FungibleTokenTransfer],
-) (access.FungibleTokenTransfersPage, error) {
-	// Start from the latest height (prefix covers all tx/event indexes at that height).
-	startKey := makeFTTransferKeyPrefix(address, highestHeight)
-
-	// End bound: first indexed height (inclusive via prefix).
-	endKey := makeFTTransferKeyPrefix(address, lowestHeight)
-
-	// We fetch limit+1 to determine if there are more results beyond this page.
-	// use uint64 to avoid overflows if limit is math.MaxUint32
-	fetchLimit := uint64(limit) + 1
-
-	var collected []access.FungibleTokenTransfer
-
-	// TODO: construct the key, and use SeekGE to skip to the cursor position.
-	err := operation.IterateKeys(reader, startKey, endKey,
-		func(keyCopy []byte, getValue func(any) error) (bail bool, err error) {
-			_, height, txIndex, eventIndex, err := decodeFTTransferKey(keyCopy)
-			if err != nil {
-				return true, fmt.Errorf("could not decode key: %w", err)
-			}
-
-			// the cursor is the next entry to return. skip all entries before it.
-			if cursor != nil {
-				// heights are descending (stored as one's complement); transaction and event indexes are ascending.
-				if height > cursor.BlockHeight {
-					return false, nil
-				}
-				if height == cursor.BlockHeight && txIndex < cursor.TransactionIndex {
-					return false, nil
-				}
-				if height == cursor.BlockHeight && txIndex == cursor.TransactionIndex && eventIndex < cursor.EventIndex {
-					return false, nil
-				}
-			}
-
-			var stored storedFungibleTokenTransfer
-			if err := getValue(&stored); err != nil {
-				return true, fmt.Errorf("could not unmarshal value: %w", err)
-			}
-
-			transfer := access.FungibleTokenTransfer{
-				TransactionID:    stored.TransactionID,
-				BlockHeight:      height,
-				TransactionIndex: txIndex,
-				EventIndices:     stored.EventIndices,
-				SourceAddress:    stored.SourceAddress,
-				RecipientAddress: stored.RecipientAddress,
-				TokenType:        stored.TokenType,
-				Amount:           new(big.Int).SetBytes(stored.Amount),
-			}
-
-			if filter != nil && !filter(&transfer) {
-				return false, nil
-			}
-
-			collected = append(collected, transfer)
-
-			if uint64(len(collected)) >= fetchLimit {
-				return true, nil // bail after collecting enough
-			}
-
-			return false, nil
-		}, storage.DefaultIteratorOptions())
-
-	if err != nil {
-		return access.FungibleTokenTransfersPage{}, fmt.Errorf("could not iterate keys: %w", err)
-	}
-
-	if uint32(len(collected)) <= limit {
-		return access.FungibleTokenTransfersPage{
-			Transfers: collected,
-		}, nil
-	}
-
-	// we fetched one extra entry to check if there are more results. use it as the next cursor.
-	nextEntry := collected[limit]
-	return access.FungibleTokenTransfersPage{
-		Transfers: collected[:limit],
-		NextCursor: &access.TransferCursor{
-			BlockHeight:      nextEntry.BlockHeight,
-			TransactionIndex: nextEntry.TransactionIndex,
-			EventIndex:       ftEventIndex(nextEntry),
-		},
-	}, nil
 }
 
 // storeAllFTTransfers writes all fungible token transfer entries for a block.
@@ -313,6 +204,27 @@ func ftEventIndex(entry access.FungibleTokenTransfer) uint32 {
 	// use the last event index. this is either the deposit event or the last withdrawal event
 	// if the vault was destroyed.
 	return entry.EventIndices[len(entry.EventIndices)-1]
+}
+
+// reconstructFTTransfer decodes a stored value into an [access.FungibleTokenTransfer].
+//
+// Any error indicates the value is not valid.
+func reconstructFTTransfer(cursor access.TransferCursor, value []byte, dest *access.FungibleTokenTransfer) error {
+	var stored storedFungibleTokenTransfer
+	if err := msgpack.Unmarshal(value, &stored); err != nil {
+		return fmt.Errorf("could not decode value: %w", err)
+	}
+	*dest = access.FungibleTokenTransfer{
+		TransactionID:    stored.TransactionID,
+		BlockHeight:      cursor.BlockHeight,
+		TransactionIndex: cursor.TransactionIndex,
+		EventIndices:     stored.EventIndices,
+		SourceAddress:    stored.SourceAddress,
+		RecipientAddress: stored.RecipientAddress,
+		TokenType:        stored.TokenType,
+		Amount:           new(big.Int).SetBytes(stored.Amount),
+	}
+	return nil
 }
 
 // makeFTTransferValue builds the stored value for a fungible token transfer index entry.
@@ -363,14 +275,14 @@ func makeFTTransferKeyPrefix(address flow.Address, height uint64) []byte {
 // decodeFTTransferKey decodes a fungible token transfer key into its components.
 //
 // Any error indicates the key is not valid.
-func decodeFTTransferKey(key []byte) (flow.Address, uint64, uint32, uint32, error) {
+func decodeFTTransferKey(key []byte) (access.TransferCursor, error) {
 	if len(key) != ftTransferKeyLen {
-		return flow.Address{}, 0, 0, 0, fmt.Errorf("invalid key length: expected %d, got %d",
+		return access.TransferCursor{}, fmt.Errorf("invalid key length: expected %d, got %d",
 			ftTransferKeyLen, len(key))
 	}
 
 	if key[0] != codeAccountFungibleTokenTransfers {
-		return flow.Address{}, 0, 0, 0, fmt.Errorf("invalid prefix: expected %d, got %d",
+		return access.TransferCursor{}, fmt.Errorf("invalid prefix: expected %d, got %d",
 			codeAccountFungibleTokenTransfers, key[0])
 	}
 
@@ -387,7 +299,12 @@ func decodeFTTransferKey(key []byte) (flow.Address, uint64, uint32, uint32, erro
 
 	eventIndex := binary.BigEndian.Uint32(key[offset:])
 
-	return address, height, txIndex, eventIndex, nil
+	return access.TransferCursor{
+		Address:          address,
+		BlockHeight:      height,
+		TransactionIndex: txIndex,
+		EventIndex:       eventIndex,
+	}, nil
 }
 
 // validateFTTransfer validates the fungible token transfer is valid.

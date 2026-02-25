@@ -7,37 +7,29 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// IndexFilter is a function that filters data entries to include in query responses.
-// It takes a single entry and returns true if the entry should be included in the response.
-type IndexFilter[T any] func(T) bool
+// AccountTransactionIterator is an iterator over account transactions ordered by descending
+// block height, then ascending transaction index within each block.
+type AccountTransactionIterator = IndexIterator[accessmodel.AccountTransaction, accessmodel.AccountTransactionCursor]
 
 // AccountTransactionsReader provides read access to the account transaction index.
 //
 // All methods are safe for concurrent access.
 type AccountTransactionsReader interface {
-	// ByAddress retrieves transaction references for an account using cursor-based pagination.
-	// Results are returned in descending order (newest first).
-	// Returns an empty page and no error if the account has no transactions indexed.
+	// ByAddress returns an iterator over transactions for the given account, ordered
+	// in descending block height (newest first), with ascending transaction index within
+	// each block. Returns an exhausted iterator and no error if the account has no transactions.
 	//
-	// `limit` specifies the maximum number of results to return per page.
-	//
-	// `cursor` is a pointer to an [access.AccountTransactionCursor]:
-	//   - nil means start from the latest indexed height (first page)
-	//   - non-nil means resume after the cursor position (subsequent pages)
-	//
-	// `filter` is an optional filter to apply to the results. If nil, all transactions will be returned.
-	// The filter is applied before calculating the limit. For pagination, to work correctly, the same
-	// filter must be applied to all pages.
+	// `cursor` is a pointer to an [accessmodel.AccountTransactionCursor]:
+	//   - nil means start from the latest indexed height
+	//   - non-nil means start at the cursor position (inclusive)
 	//
 	// Expected error returns during normal operations:
 	//   - [ErrNotBootstrapped] if the index has not been initialized
-	//   - [storage.ErrHeightNotIndexed] if the cursor height extends beyond indexed heights
+	//   - [ErrHeightNotIndexed] if the cursor height extends beyond indexed heights
 	ByAddress(
 		account flow.Address,
-		limit uint32,
 		cursor *accessmodel.AccountTransactionCursor,
-		filter IndexFilter[*accessmodel.AccountTransaction],
-	) (accessmodel.AccountTransactionsPage, error)
+	) (AccountTransactionIterator, error)
 }
 
 // AccountTransactionsRangeReader provides access to the range of available indexed heights.
@@ -95,6 +87,6 @@ type AccountTransactionsBootstrapper interface {
 
 	// UninitializedFirstHeight returns the height the index will accept as the first height, and a boolean
 	// indicating if the index is initialized.
-	// If the index is not initialized, the first call to `Store` must include data for this height.
+	// If the index is not initialized, the first call to Store must include data for this height.
 	UninitializedFirstHeight() (uint64, bool)
 }

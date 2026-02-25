@@ -69,7 +69,7 @@ func TestNFTBootstrapper_PreBootstrapState(t *testing.T) {
 		})
 
 		t.Run("ByAddress returns ErrNotBootstrapped", func(t *testing.T) {
-			_, err := store.ByAddress(unittest.RandomAddressFixture(), 100, nil, nil)
+			_, err := store.ByAddress(unittest.RandomAddressFixture(), nil)
 			require.ErrorIs(t, err, storage.ErrNotBootstrapped)
 		})
 
@@ -152,15 +152,21 @@ func TestNFTBootstrapper_BootstrapWithData(t *testing.T) {
 			err = storeNFTBootstrapperTransfers(t, store, storageDB, firstHeight, transfers)
 			require.NoError(t, err)
 
-			page, err := store.ByAddress(source, 100, nil, nil)
+			iter, err := store.ByAddress(source, nil)
 			require.NoError(t, err)
-			require.Len(t, page.Transfers, 1)
-			assert.Equal(t, txID, page.Transfers[0].TransactionID)
-			assert.Equal(t, uint64(5), page.Transfers[0].BlockHeight)
-			assert.Equal(t, uint32(0), page.Transfers[0].TransactionIndex)
-			assert.Equal(t, source, page.Transfers[0].SourceAddress)
-			assert.Equal(t, recipient, page.Transfers[0].RecipientAddress)
-			assert.Equal(t, uint64(42), page.Transfers[0].ID)
+			var sourceTransfers []access.NonFungibleTokenTransfer
+			for item := range iter {
+				tr, iterErr := item.Value()
+				require.NoError(t, iterErr)
+				sourceTransfers = append(sourceTransfers, tr)
+			}
+			require.Len(t, sourceTransfers, 1)
+			assert.Equal(t, txID, sourceTransfers[0].TransactionID)
+			assert.Equal(t, uint64(5), sourceTransfers[0].BlockHeight)
+			assert.Equal(t, uint32(0), sourceTransfers[0].TransactionIndex)
+			assert.Equal(t, source, sourceTransfers[0].SourceAddress)
+			assert.Equal(t, recipient, sourceTransfers[0].RecipientAddress)
+			assert.Equal(t, uint64(42), sourceTransfers[0].ID)
 		})
 	})
 
@@ -201,18 +207,24 @@ func TestNFTBootstrapper_BootstrapWithData(t *testing.T) {
 			})
 			require.NoError(t, err)
 
-			page, err := store.ByAddress(source, 100, nil, nil)
+			iter, err := store.ByAddress(source, nil)
 			require.NoError(t, err)
-			require.Len(t, page.Transfers, 2)
+			var transfers []access.NonFungibleTokenTransfer
+			for item := range iter {
+				tr, iterErr := item.Value()
+				require.NoError(t, iterErr)
+				transfers = append(transfers, tr)
+			}
+			require.Len(t, transfers, 2)
 
 			// Descending order: height 2 first, then height 1
-			assert.Equal(t, txID2, page.Transfers[0].TransactionID)
-			assert.Equal(t, uint64(2), page.Transfers[0].BlockHeight)
-			assert.Equal(t, uint64(2), page.Transfers[0].ID)
+			assert.Equal(t, txID2, transfers[0].TransactionID)
+			assert.Equal(t, uint64(2), transfers[0].BlockHeight)
+			assert.Equal(t, uint64(2), transfers[0].ID)
 
-			assert.Equal(t, txID1, page.Transfers[1].TransactionID)
-			assert.Equal(t, uint64(1), page.Transfers[1].BlockHeight)
-			assert.Equal(t, uint64(1), page.Transfers[1].ID)
+			assert.Equal(t, txID1, transfers[1].TransactionID)
+			assert.Equal(t, uint64(1), transfers[1].BlockHeight)
+			assert.Equal(t, uint64(1), transfers[1].ID)
 
 			latest, err := store.LatestIndexedHeight()
 			require.NoError(t, err)
@@ -348,11 +360,17 @@ func TestNFTBootstrapper_PersistenceAcrossRestart(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, uint64(100), first)
 
-		page, err := store.ByAddress(source, 100, nil, nil)
+		iter, err := store.ByAddress(source, nil)
 		require.NoError(t, err)
-		require.Len(t, page.Transfers, 1)
-		assert.Equal(t, txID, page.Transfers[0].TransactionID)
-		assert.Equal(t, uint64(77), page.Transfers[0].ID)
+		var transfers []access.NonFungibleTokenTransfer
+		for item := range iter {
+			tr, iterErr := item.Value()
+			require.NoError(t, iterErr)
+			transfers = append(transfers, tr)
+		}
+		require.Len(t, transfers, 1)
+		assert.Equal(t, txID, transfers[0].TransactionID)
+		assert.Equal(t, uint64(77), transfers[0].ID)
 	})
 }
 
