@@ -20,8 +20,10 @@ func CollectResults[T any, C any](iter storage.IndexIterator[T, C], limit uint32
 	for item := range iter {
 		// stop once we've collected `limit` results
 		// go one extra iteration to check if there are more results and build the next cursor
+		// if there is no extra item, then the cursor will be nil
 		if uint32(len(collected)) >= limit {
-			nextCursor, err := item.Cursor()
+			nextItem := item
+			nextCursor, err := nextItem.Cursor()
 			if err != nil {
 				return nil, nil, fmt.Errorf("could not get key for next cursor: %w", err)
 			}
