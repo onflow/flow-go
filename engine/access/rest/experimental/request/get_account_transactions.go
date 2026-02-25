@@ -82,6 +82,10 @@ func parseAccountTransactionCursor(raw string) (*accessmodel.AccountTransactionC
 		return nil, fmt.Errorf("invalid cursor format: %w", err)
 	}
 
+	if c.BlockHeight == 0 && c.TransactionIndex == 0 {
+		return nil, nil
+	}
+
 	return &accessmodel.AccountTransactionCursor{
 		BlockHeight:      c.BlockHeight,
 		TransactionIndex: c.TransactionIndex,

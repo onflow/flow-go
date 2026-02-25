@@ -30,6 +30,10 @@ func ParseTransferCursor(raw string) (*accessmodel.TransferCursor, error) {
 		return nil, fmt.Errorf("invalid cursor format: %w", err)
 	}
 
+	if c.BlockHeight == 0 && c.TransactionIndex == 0 && c.EventIndex == 0 {
+		return nil, nil
+	}
+
 	return &accessmodel.TransferCursor{
 		BlockHeight:      c.BlockHeight,
 		TransactionIndex: c.TransactionIndex,
