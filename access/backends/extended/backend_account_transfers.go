@@ -33,32 +33,27 @@ type AccountTransferFilter struct {
 
 func (f *AccountTransferFilter) FTFilter() storage.IndexFilter[*accessmodel.FungibleTokenTransfer] {
 	return func(transfer *accessmodel.FungibleTokenTransfer) bool {
-		if f.TokenType != "" && transfer.TokenType != f.TokenType {
-			return false
-		}
-		if f.SourceAddress != flow.EmptyAddress && transfer.SourceAddress != f.SourceAddress {
-			return false
-		}
-		if f.RecipientAddress != flow.EmptyAddress && transfer.RecipientAddress != f.RecipientAddress {
-			return false
-		}
-		return true
+		return f.filter(transfer.TokenType, transfer.SourceAddress, transfer.RecipientAddress)
 	}
 }
 
 func (f *AccountTransferFilter) NFTFilter() storage.IndexFilter[*accessmodel.NonFungibleTokenTransfer] {
 	return func(transfer *accessmodel.NonFungibleTokenTransfer) bool {
-		if f.TokenType != "" && transfer.TokenType != f.TokenType {
-			return false
-		}
-		if f.SourceAddress != flow.EmptyAddress && transfer.SourceAddress != f.SourceAddress {
-			return false
-		}
-		if f.RecipientAddress != flow.EmptyAddress && transfer.RecipientAddress != f.RecipientAddress {
-			return false
-		}
-		return true
+		return f.filter(transfer.TokenType, transfer.SourceAddress, transfer.RecipientAddress)
 	}
+}
+
+func (f *AccountTransferFilter) filter(tokenType string, sourceAddress flow.Address, recipientAddress flow.Address) bool {
+	if f.TokenType != "" && tokenType != f.TokenType {
+		return false
+	}
+	if f.SourceAddress != flow.EmptyAddress && sourceAddress != f.SourceAddress {
+		return false
+	}
+	if f.RecipientAddress != flow.EmptyAddress && recipientAddress != f.RecipientAddress {
+		return false
+	}
+	return true
 }
 
 // AccountTransfersBackend implements the extended API for querying account token transfers.
