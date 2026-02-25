@@ -25,8 +25,8 @@ type mockNFTBootstrapper struct {
 	storedTransfers []access.NonFungibleTokenTransfer
 }
 
-func (m *mockNFTBootstrapper) ByAddress(flow.Address, uint32, *access.TransferCursor, storage.IndexFilter[*access.NonFungibleTokenTransfer]) (access.NonFungibleTokenTransfersPage, error) {
-	return access.NonFungibleTokenTransfersPage{}, nil
+func (m *mockNFTBootstrapper) ByAddress(_ flow.Address, _ *access.TransferCursor) (storage.NonFungibleTokenTransferIterator, error) {
+	return nil, nil
 }
 
 func (m *mockNFTBootstrapper) LatestIndexedHeight() (uint64, error) {

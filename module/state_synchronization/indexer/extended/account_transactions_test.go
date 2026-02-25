@@ -852,10 +852,12 @@ func assertAccountTxRoles(
 	expectedRoles []access.TransactionRole,
 ) {
 	t.Helper()
-	page, err := store.ByAddress(addr, 1000, nil, nil)
+	iter, err := store.ByAddress(addr, nil)
 	require.NoError(t, err)
 
-	for _, r := range page.Transactions {
+	for entry := range iter {
+		r, err := entry.Value()
+		require.NoError(t, err)
 		if r.TransactionID == txID && r.BlockHeight == height {
 			assert.Equal(t, expectedRoles, r.Roles,
 				"address %s tx %s: expected roles=%v, got roles=%v", addr, txID, expectedRoles, r.Roles)
@@ -874,11 +876,13 @@ func assertTransactionCount(
 	expectedCount int,
 ) {
 	t.Helper()
-	page, err := store.ByAddress(addr, 1000, nil, nil)
+	iter, err := store.ByAddress(addr, nil)
 	require.NoError(t, err)
 
 	var count int
-	for _, r := range page.Transactions {
+	for entry := range iter {
+		r, err := entry.Value()
+		require.NoError(t, err)
 		if r.BlockHeight == height {
 			count++
 		}

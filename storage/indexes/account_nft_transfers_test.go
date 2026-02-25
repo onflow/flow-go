@@ -19,12 +19,18 @@ import (
 )
 
 // queryAllNFTTransfers is a test helper that queries all transfers for the given account
-// using a large limit and no cursor or filter.
+// using a nil cursor.
 func queryAllNFTTransfers(t *testing.T, idx *NonFungibleTokenTransfers, account flow.Address) []access.NonFungibleTokenTransfer {
 	t.Helper()
-	page, err := idx.ByAddress(account, 100, nil, nil)
+	iter, err := idx.ByAddress(account, nil)
 	require.NoError(t, err)
-	return page.Transfers
+	var transfers []access.NonFungibleTokenTransfer
+	for item := range iter {
+		tr, err := item.Value()
+		require.NoError(t, err)
+		transfers = append(transfers, tr)
+	}
+	return transfers
 }
 
 func TestNFTTransfers_Initialize(t *testing.T) {
@@ -89,22 +95,20 @@ func TestNFTTransfers_Initialize(t *testing.T) {
 			assert.Equal(t, uint64(1), latest)
 
 			// Query by source
-			page, err := idx.ByAddress(source, 100, nil, nil)
-			require.NoError(t, err)
-			require.Len(t, page.Transfers, 1)
-			assert.Equal(t, txID, page.Transfers[0].TransactionID)
-			assert.Equal(t, uint64(1), page.Transfers[0].BlockHeight)
-			assert.Equal(t, uint32(0), page.Transfers[0].TransactionIndex)
-			assert.Equal(t, uint32(0), page.Transfers[0].EventIndices[0])
-			assert.Equal(t, source, page.Transfers[0].SourceAddress)
-			assert.Equal(t, recipient, page.Transfers[0].RecipientAddress)
-			assert.Equal(t, uint64(42), page.Transfers[0].ID)
+			sourceTransfers := queryAllNFTTransfers(t, idx, source)
+			require.Len(t, sourceTransfers, 1)
+			assert.Equal(t, txID, sourceTransfers[0].TransactionID)
+			assert.Equal(t, uint64(1), sourceTransfers[0].BlockHeight)
+			assert.Equal(t, uint32(0), sourceTransfers[0].TransactionIndex)
+			assert.Equal(t, uint32(0), sourceTransfers[0].EventIndices[0])
+			assert.Equal(t, source, sourceTransfers[0].SourceAddress)
+			assert.Equal(t, recipient, sourceTransfers[0].RecipientAddress)
+			assert.Equal(t, uint64(42), sourceTransfers[0].ID)
 
 			// Query by recipient
-			page, err = idx.ByAddress(recipient, 100, nil, nil)
-			require.NoError(t, err)
-			require.Len(t, page.Transfers, 1)
-			assert.Equal(t, txID, page.Transfers[0].TransactionID)
+			recipientTransfers := queryAllNFTTransfers(t, idx, recipient)
+			require.Len(t, recipientTransfers, 1)
+			assert.Equal(t, txID, recipientTransfers[0].TransactionID)
 		})
 	})
 
@@ -132,10 +136,9 @@ func TestNFTTransfers_Initialize(t *testing.T) {
 
 			assert.Equal(t, uint64(1), idx.LatestIndexedHeight())
 
-			page, err := idx.ByAddress(source, 100, nil, nil)
-			require.NoError(t, err)
-			require.Len(t, page.Transfers, 1)
-			assert.Equal(t, txID, page.Transfers[0].TransactionID)
+			results := queryAllNFTTransfers(t, idx, source)
+			require.Len(t, results, 1)
+			assert.Equal(t, txID, results[0].TransactionID)
 		})
 	})
 }
@@ -164,16 +167,15 @@ func TestNFTTransfers_StoreAndQuery(t *testing.T) {
 			err := storeNFTTransfers(t, lm, idx, 2, transfers)
 			require.NoError(t, err)
 
-			page, err := idx.ByAddress(source, 100, nil, nil)
-			require.NoError(t, err)
-			require.Len(t, page.Transfers, 1)
-			assert.Equal(t, txID, page.Transfers[0].TransactionID)
-			assert.Equal(t, uint64(2), page.Transfers[0].BlockHeight)
-			assert.Equal(t, uint32(0), page.Transfers[0].TransactionIndex)
-			assert.Equal(t, uint32(0), page.Transfers[0].EventIndices[0])
-			assert.Equal(t, source, page.Transfers[0].SourceAddress)
-			assert.Equal(t, recipient, page.Transfers[0].RecipientAddress)
-			assert.Equal(t, uint64(100), page.Transfers[0].ID)
+			results := queryAllNFTTransfers(t, idx, source)
+			require.Len(t, results, 1)
+			assert.Equal(t, txID, results[0].TransactionID)
+			assert.Equal(t, uint64(2), results[0].BlockHeight)
+			assert.Equal(t, uint32(0), results[0].TransactionIndex)
+			assert.Equal(t, uint32(0), results[0].EventIndices[0])
+			assert.Equal(t, source, results[0].SourceAddress)
+			assert.Equal(t, recipient, results[0].RecipientAddress)
+			assert.Equal(t, uint64(100), results[0].ID)
 		})
 	})
 
@@ -398,7 +400,7 @@ func TestNFTTransfers_RangeQueries(t *testing.T) {
 		RunWithBootstrappedNFTTransferIndex(t, 5, nil, func(_ storage.DB, _ storage.LockManager, idx *NonFungibleTokenTransfers) {
 			account := unittest.RandomAddressFixture()
 			cursor := &access.TransferCursor{BlockHeight: 100}
-			_, err := idx.ByAddress(account, 10, cursor, nil)
+			_, err := idx.ByAddress(account, cursor)
 			require.ErrorIs(t, err, storage.ErrHeightNotIndexed)
 		})
 	})
@@ -407,7 +409,7 @@ func TestNFTTransfers_RangeQueries(t *testing.T) {
 		RunWithBootstrappedNFTTransferIndex(t, 5, nil, func(_ storage.DB, _ storage.LockManager, idx *NonFungibleTokenTransfers) {
 			account := unittest.RandomAddressFixture()
 			cursor := &access.TransferCursor{BlockHeight: 1}
-			_, err := idx.ByAddress(account, 10, cursor, nil)
+			_, err := idx.ByAddress(account, cursor)
 			require.ErrorIs(t, err, storage.ErrHeightNotIndexed)
 		})
 	})
@@ -431,18 +433,9 @@ func TestNFTTransfers_RangeQueries(t *testing.T) {
 			require.NoError(t, err)
 
 			// nil cursor should query from latest
-			page, err := idx.ByAddress(account, 100, nil, nil)
-			require.NoError(t, err)
-			require.Len(t, page.Transfers, 1)
-			assert.Equal(t, txID, page.Transfers[0].TransactionID)
-		})
-	})
-
-	t.Run("limit zero returns ErrInvalidQuery", func(t *testing.T) {
-		RunWithBootstrappedNFTTransferIndex(t, 5, nil, func(_ storage.DB, lm storage.LockManager, idx *NonFungibleTokenTransfers) {
-			account := unittest.RandomAddressFixture()
-			_, err := idx.ByAddress(account, 0, nil, nil)
-			require.ErrorIs(t, err, storage.ErrInvalidQuery)
+			results := queryAllNFTTransfers(t, idx, account)
+			require.Len(t, results, 1)
+			assert.Equal(t, txID, results[0].TransactionID)
 		})
 	})
 

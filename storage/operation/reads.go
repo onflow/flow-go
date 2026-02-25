@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"iter"
 	"slices"
 
 	"github.com/vmihailenco/msgpack/v4"
@@ -212,4 +213,36 @@ func CommonPrefix(startPrefix, endPrefix []byte) []byte {
 		return nil
 	}
 	return slices.Clone(startPrefix[:commonPrefixLength])
+}
+
+type IteratorHelper struct {
+	keyCopy  []byte
+	getValue func(any) error
+}
+
+func (h *IteratorHelper) Key() []byte {
+	return h.keyCopy
+}
+
+func (h *IteratorHelper) Value(destVal any) error {
+	return h.getValue(destVal)
+}
+
+func SeqIterator(r storage.Reader, startPrefix, endPrefix []byte) iter.Seq2[*IteratorHelper, error] {
+	return func(yield func(*IteratorHelper, error) bool) {
+		err := IterateKeys(r, startPrefix, endPrefix, func(keyCopy []byte, getValue func(any) error) (bool, error) {
+			helper := &IteratorHelper{
+				keyCopy:  keyCopy,
+				getValue: getValue,
+			}
+			if !yield(helper, nil) {
+				return true, nil
+			}
+			return false, nil
+		}, storage.DefaultIteratorOptions())
+
+		if err != nil {
+			yield(nil, err)
+		}
+	}
 }

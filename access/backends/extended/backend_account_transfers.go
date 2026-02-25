@@ -112,17 +112,24 @@ func (b *AccountTransfersBackend) GetAccountFungibleTokenTransfers(
 		return nil, status.Errorf(codes.NotFound, "account %s is not valid on chain %s", address, b.chain.ChainID())
 	}
 
-	page, err := b.ftStore.ByAddress(address, limit, cursor, filter.FTFilter())
+	iter, err := b.ftStore.ByAddress(address, cursor)
 	if err != nil {
-		return nil, b.mapReadError(ctx, "fungible token transfers", err)
+		return nil, mapReadError(ctx, "fungible token transfers", err)
 	}
 
-	// storage will return an empty page and no error if the account has no transfers indexed.
+	collected, nextCursor, err := collectResults(iter, limit, filter.FTFilter())
+	if err != nil {
+		err = fmt.Errorf("error collecting fungible token transfers: %w", err)
+		irrecoverable.Throw(ctx, err)
+		return nil, err
+	}
+
+	page := accessmodel.FungibleTokenTransfersPage{
+		Transfers:  collected,
+		NextCursor: nextCursor,
+	}
+
 	// TODO: check if account exists for the chain
-	if len(page.Transfers) == 0 {
-		return &page, nil
-	}
-
 	for i := range page.Transfers {
 		t := &page.Transfers[i]
 
@@ -133,7 +140,7 @@ func (b *AccountTransfersBackend) GetAccountFungibleTokenTransfers(
 			return nil, err
 		}
 
-		// only the expended options will be populated
+		// only the expanded options will be populated
 		t.BlockTimestamp = header.Timestamp
 		t.Transaction = txBody
 		t.Result = result
@@ -170,17 +177,24 @@ func (b *AccountTransfersBackend) GetAccountNonFungibleTokenTransfers(
 		return nil, status.Errorf(codes.NotFound, "account %s is not valid on chain %s", address, b.chain.ChainID())
 	}
 
-	page, err := b.nftStore.ByAddress(address, limit, cursor, filter.NFTFilter())
+	iter, err := b.nftStore.ByAddress(address, cursor)
 	if err != nil {
-		return nil, b.mapReadError(ctx, "non-fungible token transfers", err)
+		return nil, mapReadError(ctx, "non-fungible token transfers", err)
 	}
 
-	// storage will return an empty page and no error if the account has no transfers indexed.
+	collected, nextCursor, err := collectResults(iter, limit, filter.NFTFilter())
+	if err != nil {
+		err = fmt.Errorf("error collecting non-fungible token transfers: %w", err)
+		irrecoverable.Throw(ctx, err)
+		return nil, err
+	}
+
+	page := accessmodel.NonFungibleTokenTransfersPage{
+		Transfers:  collected,
+		NextCursor: nextCursor,
+	}
+
 	// TODO: check if account exists for the chain
-	if len(page.Transfers) == 0 {
-		return &page, nil
-	}
-
 	for i := range page.Transfers {
 		t := &page.Transfers[i]
 
@@ -191,7 +205,7 @@ func (b *AccountTransfersBackend) GetAccountNonFungibleTokenTransfers(
 			return nil, err
 		}
 
-		// only the expended options will be populated
+		// only the expanded options will be populated
 		t.BlockTimestamp = header.Timestamp
 		t.Transaction = txBody
 		t.Result = result

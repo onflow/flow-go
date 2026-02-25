@@ -70,7 +70,7 @@ func TestFTBootstrapper_PreBootstrapState(t *testing.T) {
 		})
 
 		t.Run("ByAddress returns ErrNotBootstrapped", func(t *testing.T) {
-			_, err := store.ByAddress(unittest.RandomAddressFixture(), 100, nil, nil)
+			_, err := store.ByAddress(unittest.RandomAddressFixture(), nil)
 			require.ErrorIs(t, err, storage.ErrNotBootstrapped)
 		})
 
@@ -154,16 +154,15 @@ func TestFTBootstrapper_BootstrapWithData(t *testing.T) {
 			err = storeFTBootstrapperTransfers(t, store, storageDB, firstHeight, transfers)
 			require.NoError(t, err)
 
-			page, err := store.ByAddress(source, 100, nil, nil)
-			require.NoError(t, err)
-			require.Len(t, page.Transfers, 1)
-			assert.Equal(t, txID, page.Transfers[0].TransactionID)
-			assert.Equal(t, uint64(5), page.Transfers[0].BlockHeight)
-			assert.Equal(t, uint32(0), page.Transfers[0].TransactionIndex)
-			assert.Equal(t, source, page.Transfers[0].SourceAddress)
-			assert.Equal(t, recipient, page.Transfers[0].RecipientAddress)
-			assert.Equal(t, "A.0x1654653399040a61.FlowToken", page.Transfers[0].TokenType)
-			assert.Equal(t, 0, big.NewInt(1000).Cmp(page.Transfers[0].Amount))
+			results := allFTTransfers(t, store, source)
+			require.Len(t, results, 1)
+			assert.Equal(t, txID, results[0].TransactionID)
+			assert.Equal(t, uint64(5), results[0].BlockHeight)
+			assert.Equal(t, uint32(0), results[0].TransactionIndex)
+			assert.Equal(t, source, results[0].SourceAddress)
+			assert.Equal(t, recipient, results[0].RecipientAddress)
+			assert.Equal(t, "A.0x1654653399040a61.FlowToken", results[0].TokenType)
+			assert.Equal(t, 0, big.NewInt(1000).Cmp(results[0].Amount))
 		})
 	})
 
@@ -206,16 +205,15 @@ func TestFTBootstrapper_BootstrapWithData(t *testing.T) {
 			})
 			require.NoError(t, err)
 
-			page, err := store.ByAddress(source, 100, nil, nil)
-			require.NoError(t, err)
-			require.Len(t, page.Transfers, 2)
+			transfers := allFTTransfers(t, store, source)
+			require.Len(t, transfers, 2)
 
 			// Descending order: height 2 first, then height 1
-			assert.Equal(t, txID2, page.Transfers[0].TransactionID)
-			assert.Equal(t, uint64(2), page.Transfers[0].BlockHeight)
+			assert.Equal(t, txID2, transfers[0].TransactionID)
+			assert.Equal(t, uint64(2), transfers[0].BlockHeight)
 
-			assert.Equal(t, txID1, page.Transfers[1].TransactionID)
-			assert.Equal(t, uint64(1), page.Transfers[1].BlockHeight)
+			assert.Equal(t, txID1, transfers[1].TransactionID)
+			assert.Equal(t, uint64(1), transfers[1].BlockHeight)
 
 			latest, err := store.LatestIndexedHeight()
 			require.NoError(t, err)
@@ -352,10 +350,9 @@ func TestFTBootstrapper_PersistenceAcrossRestart(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, uint64(100), first)
 
-		page, err := store.ByAddress(source, 100, nil, nil)
-		require.NoError(t, err)
-		require.Len(t, page.Transfers, 1)
-		assert.Equal(t, txID, page.Transfers[0].TransactionID)
+		transfers := allFTTransfers(t, store, source)
+		require.Len(t, transfers, 1)
+		assert.Equal(t, txID, transfers[0].TransactionID)
 	})
 }
 

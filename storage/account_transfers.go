@@ -7,34 +7,30 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
+// FungibleTokenTransferIterator is an iterator over fungible token transfers ordered by
+// descending block height, then ascending transaction and event index within each block.
+type FungibleTokenTransferIterator = IndexIterator[accessmodel.FungibleTokenTransfer, accessmodel.TransferCursor]
+
 // FungibleTokenTransfersReader provides read access to the fungible token transfer index.
 //
 // All methods are safe for concurrent access.
 type FungibleTokenTransfersReader interface {
-	// ByAddress retrieves fungible token transfers involving the given account using
-	// cursor-based pagination. This includes transfers where the account is either the sender
-	// or recipient.
-	// Results are returned in descending order (newest first).
-	// Returns an empty page and no error if the account has no transfers indexed.
+	// ByAddress returns an iterator over fungible token transfers involving the given account,
+	// ordered in descending block height (newest first), with ascending transaction and event
+	// index within each block. This includes transfers where the account is either the sender
+	// or recipient. Returns an exhausted iterator and no error if the account has no transfers.
 	//
-	// `limit` specifies the maximum number of results to return per page.
-	//
-	// `cursor` is a pointer to an [access.TransferCursor]:
-	//   - nil means start from the latest indexed height (first page)
-	//   - non-nil means resume after the cursor position (subsequent pages)
-	//
-	// `filter` is an optional filter to apply to the results. If nil, all transfers will be returned.
-	// The filter is applied before calculating the limit. For pagination to work correctly, the same
-	// filter must be applied to all pages.
+	// `cursor` is a pointer to an [accessmodel.TransferCursor]:
+	//   - nil means start from the latest indexed height
+	//   - non-nil means start at the cursor position (inclusive)
 	//
 	// Expected error returns during normal operations:
+	//   - [ErrNotBootstrapped] if the index has not been initialized
 	//   - [ErrHeightNotIndexed] if the cursor height extends beyond indexed heights
 	ByAddress(
 		account flow.Address,
-		limit uint32,
 		cursor *accessmodel.TransferCursor,
-		filter IndexFilter[*accessmodel.FungibleTokenTransfer],
-	) (accessmodel.FungibleTokenTransfersPage, error)
+	) (FungibleTokenTransferIterator, error)
 }
 
 // FungibleTokenTransfersRangeReader provides access to the range of available indexed heights.
@@ -98,34 +94,30 @@ type FungibleTokenTransfersBootstrapper interface {
 	UninitializedFirstHeight() (uint64, bool)
 }
 
+// NonFungibleTokenTransferIterator is an iterator over non-fungible token transfers ordered by
+// descending block height, then ascending transaction and event index within each block.
+type NonFungibleTokenTransferIterator = IndexIterator[accessmodel.NonFungibleTokenTransfer, accessmodel.TransferCursor]
+
 // NonFungibleTokenTransfersReader provides read access to the non-fungible token transfer index.
 //
 // All methods are safe for concurrent access.
 type NonFungibleTokenTransfersReader interface {
-	// ByAddress retrieves non-fungible token transfers involving the given account using
-	// cursor-based pagination. This includes transfers where the account is either the sender
-	// or recipient.
-	// Results are returned in descending order (newest first).
-	// Returns an empty page and no error if the account has no transfers indexed.
+	// ByAddress returns an iterator over non-fungible token transfers involving the given account,
+	// ordered in descending block height (newest first), with ascending transaction and event
+	// index within each block. This includes transfers where the account is either the sender
+	// or recipient. Returns an exhausted iterator and no error if the account has no transfers.
 	//
-	// `limit` specifies the maximum number of results to return per page.
-	//
-	// `cursor` is a pointer to an [access.TransferCursor]:
-	//   - nil means start from the latest indexed height (first page)
-	//   - non-nil means resume after the cursor position (subsequent pages)
-	//
-	// `filter` is an optional filter to apply to the results. If nil, all transfers will be returned.
-	// The filter is applied before calculating the limit. For pagination to work correctly, the same
-	// filter must be applied to all pages.
+	// `cursor` is a pointer to an [accessmodel.TransferCursor]:
+	//   - nil means start from the latest indexed height
+	//   - non-nil means start at the cursor position (inclusive)
 	//
 	// Expected error returns during normal operations:
+	//   - [ErrNotBootstrapped] if the index has not been initialized
 	//   - [ErrHeightNotIndexed] if the cursor height extends beyond indexed heights
 	ByAddress(
 		account flow.Address,
-		limit uint32,
 		cursor *accessmodel.TransferCursor,
-		filter IndexFilter[*accessmodel.NonFungibleTokenTransfer],
-	) (accessmodel.NonFungibleTokenTransfersPage, error)
+	) (NonFungibleTokenTransferIterator, error)
 }
 
 // NonFungibleTokenTransfersRangeReader provides access to the range of available indexed heights.

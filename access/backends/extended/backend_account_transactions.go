@@ -12,6 +12,7 @@ import (
 
 	accessmodel "github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/storage"
 )
 
@@ -101,22 +102,29 @@ func (b *AccountTransactionsBackend) GetAccountTransactions(
 	}
 	// TODO: check if account exists for the chain
 
-	page, err := b.store.ByAddress(address, limit, cursor, filter.Filter())
+	iter, err := b.store.ByAddress(address, cursor)
 	if err != nil {
-		return nil, b.mapReadError(ctx, "account transactions", err)
+		return nil, mapReadError(ctx, "account transactions", err)
 	}
 
-	// storage will return an empty page and no error if the account has no transfers indexed.
-	if len(page.Transactions) == 0 {
-		return &page, nil
+	collected, nextCursor, err := collectResults(iter, limit, filter.Filter())
+	if err != nil {
+		err = fmt.Errorf("error collecting transactions: %w", err)
+		irrecoverable.Throw(ctx, err)
+		return nil, err
 	}
 
-	// expand the transactions with additional details requested by the client
-	// Note: if no transactions are found, the response will include an empty array and no error.
+	page := accessmodel.AccountTransactionsPage{
+		Transactions: collected,
+		NextCursor:   nextCursor,
+	}
+
 	for i := range page.Transactions {
 		tx := &page.Transactions[i]
 		if err := b.expand(ctx, tx, expandOptions, encodingVersion); err != nil {
-			return nil, fmt.Errorf("failed to expand transaction: %w", err)
+			err = fmt.Errorf("unexpected error expanding transaction: %w", err)
+			irrecoverable.Throw(ctx, err)
+			return nil, err
 		}
 	}
 

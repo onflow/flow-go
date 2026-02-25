@@ -1,9 +1,13 @@
 package extended
 
 import (
+	"context"
+	"errors"
 	"fmt"
 
 	"github.com/rs/zerolog"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	"github.com/onflow/flow-go/engine/access/index"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/error_messages"
@@ -11,6 +15,7 @@ import (
 	txstatus "github.com/onflow/flow-go/engine/access/rpc/backend/transactions/status"
 	"github.com/onflow/flow-go/model/access/systemcollection"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 )
@@ -93,4 +98,52 @@ func New(
 		AccountTransactionsBackend: NewAccountTransactionsBackend(log, base, store, chain),
 		AccountTransfersBackend:    NewAccountTransfersBackend(log, base, ftStore, nftStore, chain),
 	}, nil
+}
+
+// mapReadError converts storage read errors to appropriate gRPC status errors.
+func mapReadError(ctx context.Context, label string, err error) error {
+	switch {
+	case errors.Is(err, storage.ErrNotBootstrapped):
+		return status.Errorf(codes.FailedPrecondition, "%s index not initialized: %v", label, err)
+	case errors.Is(err, storage.ErrHeightNotIndexed):
+		return status.Errorf(codes.OutOfRange, "requested height not indexed: %v", err)
+	case errors.Is(err, storage.ErrInvalidQuery):
+		return status.Errorf(codes.InvalidArgument, "invalid query: %v", err)
+	case errors.Is(err, storage.ErrNotFound):
+		return status.Errorf(codes.NotFound, "not found: %v", err)
+	default:
+		err = fmt.Errorf("failed to get %s: %w", label, err)
+		irrecoverable.Throw(ctx, err)
+		return err
+	}
+}
+
+// collectResults iterates over the storage iterator and collects results that match the filter.
+// It returns when it reaches the limit or the iterator is exhausted.
+// Returns the results matching the filter and the next cursor.
+//
+// No error returns are expected during normal operation.
+func collectResults[T any, C any](iter storage.IndexIterator[T, C], limit uint32, filter storage.IndexFilter[*T]) ([]T, *C, error) {
+	var collected []T
+	for item := range iter {
+		// stop once we've collected `limit` results
+		// go one extra iteration to check if there are more results and build the next cursor
+		if uint32(len(collected)) >= limit {
+			nextCursor, err := item.Cursor()
+			if err != nil {
+				return nil, nil, fmt.Errorf("could not get key for next cursor: %w", err)
+			}
+			return collected, &nextCursor, nil
+		}
+
+		tx, err := item.Value()
+		if err != nil {
+			return nil, nil, fmt.Errorf("could not get transaction: %w", err)
+		}
+		if filter != nil && !filter(&tx) {
+			continue
+		}
+		collected = append(collected, tx)
+	}
+	return collected, nil, nil
 }

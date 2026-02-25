@@ -82,33 +82,21 @@ func (b *AccountTransactionsBootstrapper) UninitializedFirstHeight() (uint64, bo
 	return store.FirstIndexedHeight(), true
 }
 
-// ByAddress retrieves transaction references for an account using cursor-based pagination.
-// Results are returned in descending order (newest first).
-//
-// `limit` specifies the maximum number of results to return per page.
-//
-// `cursor` is a pointer to an [access.AccountTransactionCursor]:
-//   - nil means start from the latest indexed height (first page)
-//   - non-nil means resume after the cursor position (subsequent pages)
-//
-// `filter` is an optional filter to apply to the results. If nil, all transactions will be returned.
-// The filter is applied before calculating the limit. For pagination, to work correctly, the same
-// filter must be applied to all pages.
+// ByAddress returns an iterator over transactions for the given account.
+// See [AccountTransactions.ByAddress] for full documentation.
 //
 // Expected error returns during normal operations:
-//   - [ErrNotBootstrapped] if the index has not been initialized
+//   - [storage.ErrNotBootstrapped] if the index has not been initialized
 //   - [storage.ErrHeightNotIndexed] if the cursor height extends beyond indexed heights
 func (b *AccountTransactionsBootstrapper) ByAddress(
 	account flow.Address,
-	limit uint32,
 	cursor *access.AccountTransactionCursor,
-	filter storage.IndexFilter[*access.AccountTransaction],
-) (access.AccountTransactionsPage, error) {
+) (storage.IndexIterator[access.AccountTransaction, access.AccountTransactionCursor], error) {
 	store := b.store.Load()
 	if store == nil {
-		return access.AccountTransactionsPage{}, storage.ErrNotBootstrapped
+		return nil, storage.ErrNotBootstrapped
 	}
-	return store.ByAddress(account, limit, cursor, filter)
+	return store.ByAddress(account, cursor)
 }
 
 // Store indexes all account-transaction associations for a block.

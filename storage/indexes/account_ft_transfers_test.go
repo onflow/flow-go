@@ -19,6 +19,21 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
+// allFTTransfers is a test helper that queries all transfers for the given account using
+// ByAddress with no cursor, and collects all results.
+func allFTTransfers(tb testing.TB, idx storage.FungibleTokenTransfersReader, account flow.Address) []access.FungibleTokenTransfer {
+	tb.Helper()
+	iter, err := idx.ByAddress(account, nil)
+	require.NoError(tb, err)
+	var transfers []access.FungibleTokenTransfer
+	for item := range iter {
+		t, err := item.Value()
+		require.NoError(tb, err)
+		transfers = append(transfers, t)
+	}
+	return transfers
+}
+
 // RunWithBootstrappedFTTransferIndex creates a new Pebble database and bootstraps it
 // for fungible token transfer indexing at the given start height. The callback receives a shared
 // lock manager that should be passed to storeFTTransfers for consistent lock usage.
@@ -133,23 +148,21 @@ func TestFTTransfers_Initialize(t *testing.T) {
 			assert.Equal(t, uint64(5), idx.LatestIndexedHeight())
 
 			// Query by source
-			page, err := idx.ByAddress(source, 100, nil, nil)
-			require.NoError(t, err)
-			require.Len(t, page.Transfers, 1)
-			assert.Equal(t, initialData[0].TransactionID, page.Transfers[0].TransactionID)
-			assert.Equal(t, initialData[0].BlockHeight, page.Transfers[0].BlockHeight)
-			assert.Equal(t, initialData[0].TransactionIndex, page.Transfers[0].TransactionIndex)
-			assert.Equal(t, initialData[0].EventIndices[0], page.Transfers[0].EventIndices[0])
-			assert.Equal(t, source, page.Transfers[0].SourceAddress)
-			assert.Equal(t, recipient, page.Transfers[0].RecipientAddress)
-			assert.Equal(t, initialData[0].TokenType, page.Transfers[0].TokenType)
-			assert.Equal(t, 0, amount.Cmp(page.Transfers[0].Amount))
+			transfers := allFTTransfers(t, idx, source)
+			require.Len(t, transfers, 1)
+			assert.Equal(t, initialData[0].TransactionID, transfers[0].TransactionID)
+			assert.Equal(t, initialData[0].BlockHeight, transfers[0].BlockHeight)
+			assert.Equal(t, initialData[0].TransactionIndex, transfers[0].TransactionIndex)
+			assert.Equal(t, initialData[0].EventIndices[0], transfers[0].EventIndices[0])
+			assert.Equal(t, source, transfers[0].SourceAddress)
+			assert.Equal(t, recipient, transfers[0].RecipientAddress)
+			assert.Equal(t, initialData[0].TokenType, transfers[0].TokenType)
+			assert.Equal(t, 0, amount.Cmp(transfers[0].Amount))
 
 			// Query by recipient
-			page, err = idx.ByAddress(recipient, 100, nil, nil)
-			require.NoError(t, err)
-			require.Len(t, page.Transfers, 1)
-			assert.Equal(t, initialData[0].TransactionID, page.Transfers[0].TransactionID)
+			recipientTransfers := allFTTransfers(t, idx, recipient)
+			require.Len(t, recipientTransfers, 1)
+			assert.Equal(t, initialData[0].TransactionID, recipientTransfers[0].TransactionID)
 		})
 	})
 
@@ -168,10 +181,9 @@ func TestFTTransfers_Initialize(t *testing.T) {
 			require.NoError(t, err)
 			assert.Equal(t, uint64(1), idx.LatestIndexedHeight())
 
-			page, err := idx.ByAddress(source, 100, nil, nil)
-			require.NoError(t, err)
-			require.Len(t, page.Transfers, 1)
-			assert.Equal(t, transfer.TransactionID, page.Transfers[0].TransactionID)
+			transfers := allFTTransfers(t, idx, source)
+			require.Len(t, transfers, 1)
+			assert.Equal(t, transfer.TransactionID, transfers[0].TransactionID)
 		})
 	})
 }
@@ -199,17 +211,16 @@ func TestFTTransfers_StoreAndQuery(t *testing.T) {
 			err := storeFTTransfers(t, lm, idx, 2, []access.FungibleTokenTransfer{transfer})
 			require.NoError(t, err)
 
-			page, err := idx.ByAddress(source, 100, nil, nil)
-			require.NoError(t, err)
-			require.Len(t, page.Transfers, 1)
-			assert.Equal(t, transfer.TransactionID, page.Transfers[0].TransactionID)
-			assert.Equal(t, uint64(2), page.Transfers[0].BlockHeight)
-			assert.Equal(t, uint32(0), page.Transfers[0].TransactionIndex)
-			assert.Equal(t, uint32(0), page.Transfers[0].EventIndices[0])
-			assert.Equal(t, source, page.Transfers[0].SourceAddress)
-			assert.Equal(t, recipient, page.Transfers[0].RecipientAddress)
-			assert.Equal(t, "A.FlowToken", page.Transfers[0].TokenType)
-			assert.Equal(t, 0, amount.Cmp(page.Transfers[0].Amount))
+			transfers := allFTTransfers(t, idx, source)
+			require.Len(t, transfers, 1)
+			assert.Equal(t, transfer.TransactionID, transfers[0].TransactionID)
+			assert.Equal(t, uint64(2), transfers[0].BlockHeight)
+			assert.Equal(t, uint32(0), transfers[0].TransactionIndex)
+			assert.Equal(t, uint32(0), transfers[0].EventIndices[0])
+			assert.Equal(t, source, transfers[0].SourceAddress)
+			assert.Equal(t, recipient, transfers[0].RecipientAddress)
+			assert.Equal(t, "A.FlowToken", transfers[0].TokenType)
+			assert.Equal(t, 0, amount.Cmp(transfers[0].Amount))
 		})
 	})
 
@@ -229,19 +240,16 @@ func TestFTTransfers_StoreAndQuery(t *testing.T) {
 			require.NoError(t, err)
 
 			// Alice: 1 transfer (as source)
-			page, err := idx.ByAddress(alice, 100, nil, nil)
-			require.NoError(t, err)
-			assert.Len(t, page.Transfers, 1)
+			aliceTransfers := allFTTransfers(t, idx, alice)
+			assert.Len(t, aliceTransfers, 1)
 
 			// Bob: 2 transfers (as recipient of first, source of second)
-			page, err = idx.ByAddress(bob, 100, nil, nil)
-			require.NoError(t, err)
-			assert.Len(t, page.Transfers, 2)
+			bobTransfers := allFTTransfers(t, idx, bob)
+			assert.Len(t, bobTransfers, 2)
 
 			// Charlie: 1 transfer (as recipient)
-			page, err = idx.ByAddress(charlie, 100, nil, nil)
-			require.NoError(t, err)
-			assert.Len(t, page.Transfers, 1)
+			charlieTransfers := allFTTransfers(t, idx, charlie)
+			assert.Len(t, charlieTransfers, 1)
 		})
 	})
 
@@ -262,14 +270,12 @@ func TestFTTransfers_StoreAndQuery(t *testing.T) {
 			require.NoError(t, err)
 
 			// Alice should see both transfers (source in block 2, recipient in block 3)
-			page, err := idx.ByAddress(alice, 100, nil, nil)
-			require.NoError(t, err)
-			require.Len(t, page.Transfers, 2)
+			aliceTransfers := allFTTransfers(t, idx, alice)
+			require.Len(t, aliceTransfers, 2)
 
 			// Bob should see both transfers (recipient in block 2, source in block 3)
-			page, err = idx.ByAddress(bob, 100, nil, nil)
-			require.NoError(t, err)
-			assert.Len(t, page.Transfers, 2)
+			bobTransfers := allFTTransfers(t, idx, bob)
+			assert.Len(t, bobTransfers, 2)
 		})
 	})
 
@@ -295,21 +301,19 @@ func TestFTTransfers_StoreAndQuery(t *testing.T) {
 			require.NoError(t, err)
 
 			// Query by source address
-			sourcePage, err := idx.ByAddress(source, 100, nil, nil)
-			require.NoError(t, err)
-			require.Len(t, sourcePage.Transfers, 1)
-			assert.Equal(t, txID, sourcePage.Transfers[0].TransactionID)
+			sourceTransfers := allFTTransfers(t, idx, source)
+			require.Len(t, sourceTransfers, 1)
+			assert.Equal(t, txID, sourceTransfers[0].TransactionID)
 
 			// Query by recipient address
-			recipientPage, err := idx.ByAddress(recipient, 100, nil, nil)
-			require.NoError(t, err)
-			require.Len(t, recipientPage.Transfers, 1)
-			assert.Equal(t, txID, recipientPage.Transfers[0].TransactionID)
+			recipientTransfers := allFTTransfers(t, idx, recipient)
+			require.Len(t, recipientTransfers, 1)
+			assert.Equal(t, txID, recipientTransfers[0].TransactionID)
 
 			// Both should contain the same transfer data
-			assert.Equal(t, sourcePage.Transfers[0].SourceAddress, recipientPage.Transfers[0].SourceAddress)
-			assert.Equal(t, sourcePage.Transfers[0].RecipientAddress, recipientPage.Transfers[0].RecipientAddress)
-			assert.Equal(t, sourcePage.Transfers[0].TokenType, recipientPage.Transfers[0].TokenType)
+			assert.Equal(t, sourceTransfers[0].SourceAddress, recipientTransfers[0].SourceAddress)
+			assert.Equal(t, sourceTransfers[0].RecipientAddress, recipientTransfers[0].RecipientAddress)
+			assert.Equal(t, sourceTransfers[0].TokenType, recipientTransfers[0].TokenType)
 		})
 	})
 
@@ -326,13 +330,12 @@ func TestFTTransfers_StoreAndQuery(t *testing.T) {
 				require.NoError(t, err)
 			}
 
-			page, err := idx.ByAddress(account, 100, nil, nil)
-			require.NoError(t, err)
-			require.Len(t, page.Transfers, 10)
+			transfers := allFTTransfers(t, idx, account)
+			require.Len(t, transfers, 10)
 
 			// Verify descending order by height
-			for i := 0; i < len(page.Transfers)-1; i++ {
-				assert.Greater(t, page.Transfers[i].BlockHeight, page.Transfers[i+1].BlockHeight,
+			for i := 0; i < len(transfers)-1; i++ {
+				assert.Greater(t, transfers[i].BlockHeight, transfers[i+1].BlockHeight,
 					"results should be in descending order by height")
 			}
 		})
@@ -355,25 +358,24 @@ func TestFTTransfers_StoreAndQuery(t *testing.T) {
 			err := storeFTTransfers(t, lm, idx, 2, transfers)
 			require.NoError(t, err)
 
-			page, err := idx.ByAddress(account, 100, nil, nil)
-			require.NoError(t, err)
-			require.Len(t, page.Transfers, 5)
+			results := allFTTransfers(t, idx, account)
+			require.Len(t, results, 5)
 
 			// Within same height, should be ordered by txIndex ascending, then eventIndex ascending
-			assert.Equal(t, uint32(0), page.Transfers[0].TransactionIndex)
-			assert.Equal(t, uint32(0), page.Transfers[0].EventIndices[0])
+			assert.Equal(t, uint32(0), results[0].TransactionIndex)
+			assert.Equal(t, uint32(0), results[0].EventIndices[0])
 
-			assert.Equal(t, uint32(0), page.Transfers[1].TransactionIndex)
-			assert.Equal(t, uint32(1), page.Transfers[1].EventIndices[0])
+			assert.Equal(t, uint32(0), results[1].TransactionIndex)
+			assert.Equal(t, uint32(1), results[1].EventIndices[0])
 
-			assert.Equal(t, uint32(1), page.Transfers[2].TransactionIndex)
-			assert.Equal(t, uint32(0), page.Transfers[2].EventIndices[0])
+			assert.Equal(t, uint32(1), results[2].TransactionIndex)
+			assert.Equal(t, uint32(0), results[2].EventIndices[0])
 
-			assert.Equal(t, uint32(1), page.Transfers[3].TransactionIndex)
-			assert.Equal(t, uint32(2), page.Transfers[3].EventIndices[0])
+			assert.Equal(t, uint32(1), results[3].TransactionIndex)
+			assert.Equal(t, uint32(2), results[3].EventIndices[0])
 
-			assert.Equal(t, uint32(2), page.Transfers[4].TransactionIndex)
-			assert.Equal(t, uint32(0), page.Transfers[4].EventIndices[0])
+			assert.Equal(t, uint32(2), results[4].TransactionIndex)
+			assert.Equal(t, uint32(0), results[4].EventIndices[0])
 		})
 	})
 }
@@ -452,7 +454,7 @@ func TestFTTransfers_RangeQueries(t *testing.T) {
 		RunWithBootstrappedFTTransferIndex(t, 5, nil, func(_ storage.DB, _ storage.LockManager, idx *FungibleTokenTransfers) {
 			account := unittest.RandomAddressFixture()
 			cursor := &access.TransferCursor{BlockHeight: 100}
-			_, err := idx.ByAddress(account, 10, cursor, nil)
+			_, err := idx.ByAddress(account, cursor)
 			require.ErrorIs(t, err, storage.ErrHeightNotIndexed)
 		})
 	})
@@ -462,7 +464,7 @@ func TestFTTransfers_RangeQueries(t *testing.T) {
 		RunWithBootstrappedFTTransferIndex(t, 5, nil, func(_ storage.DB, _ storage.LockManager, idx *FungibleTokenTransfers) {
 			account := unittest.RandomAddressFixture()
 			cursor := &access.TransferCursor{BlockHeight: 1}
-			_, err := idx.ByAddress(account, 10, cursor, nil)
+			_, err := idx.ByAddress(account, cursor)
 			require.ErrorIs(t, err, storage.ErrHeightNotIndexed)
 		})
 	})
@@ -482,18 +484,8 @@ func TestFTTransfers_RangeQueries(t *testing.T) {
 			require.NoError(t, err)
 
 			// nil cursor returns all data
-			page, err := idx.ByAddress(source, 100, nil, nil)
-			require.NoError(t, err)
-			assert.Len(t, page.Transfers, 2)
-		})
-	})
-
-	t.Run("limit must be greater than 0", func(t *testing.T) {
-		t.Parallel()
-		RunWithBootstrappedFTTransferIndex(t, 5, nil, func(_ storage.DB, _ storage.LockManager, idx *FungibleTokenTransfers) {
-			account := unittest.RandomAddressFixture()
-			_, err := idx.ByAddress(account, 0, nil, nil)
-			require.ErrorIs(t, err, storage.ErrInvalidQuery)
+			transfers := allFTTransfers(t, idx, source)
+			assert.Len(t, transfers, 2)
 		})
 	})
 
@@ -505,9 +497,8 @@ func TestFTTransfers_RangeQueries(t *testing.T) {
 			require.NoError(t, err)
 
 			noTransfersAccount := unittest.RandomAddressFixture()
-			page, err := idx.ByAddress(noTransfersAccount, 100, nil, nil)
-			require.NoError(t, err)
-			assert.Empty(t, page.Transfers)
+			transfers := allFTTransfers(t, idx, noTransfersAccount)
+			assert.Empty(t, transfers)
 		})
 	})
 }
@@ -744,10 +735,9 @@ func TestFTTransfers_SelfTransfer(t *testing.T) {
 		err := storeFTTransfers(t, lm, idx, 2, []access.FungibleTokenTransfer{transfer})
 		require.NoError(t, err)
 
-		page, err := idx.ByAddress(account, 100, nil, nil)
-		require.NoError(t, err)
-		assert.Len(t, page.Transfers, 1, "self-transfer should produce exactly one entry per address")
-		assert.Equal(t, transfer.TransactionID, page.Transfers[0].TransactionID)
+		transfers := allFTTransfers(t, idx, account)
+		assert.Len(t, transfers, 1, "self-transfer should produce exactly one entry per address")
+		assert.Equal(t, transfer.TransactionID, transfers[0].TransactionID)
 	})
 }
 
@@ -776,10 +766,9 @@ func TestFTTransfers_LargeAmount(t *testing.T) {
 		err := storeFTTransfers(t, lm, idx, 2, []access.FungibleTokenTransfer{transfer})
 		require.NoError(t, err)
 
-		page, err := idx.ByAddress(source, 100, nil, nil)
-		require.NoError(t, err)
-		require.Len(t, page.Transfers, 1)
-		assert.Equal(t, 0, largeAmount.Cmp(page.Transfers[0].Amount),
+		transfers := allFTTransfers(t, idx, source)
+		require.Len(t, transfers, 1)
+		assert.Equal(t, 0, largeAmount.Cmp(transfers[0].Amount),
 			"large amount should roundtrip correctly")
 	})
 }
@@ -805,11 +794,10 @@ func TestFTTransfers_NilAmount(t *testing.T) {
 		err := storeFTTransfers(t, lm, idx, 2, []access.FungibleTokenTransfer{transfer})
 		require.NoError(t, err)
 
-		page, err := idx.ByAddress(source, 100, nil, nil)
-		require.NoError(t, err)
-		require.Len(t, page.Transfers, 1)
+		transfers := allFTTransfers(t, idx, source)
+		require.Len(t, transfers, 1)
 		// nil amount stored as empty bytes, then SetBytes on empty produces 0
-		assert.Equal(t, 0, page.Transfers[0].Amount.Cmp(big.NewInt(0)),
+		assert.Equal(t, 0, transfers[0].Amount.Cmp(big.NewInt(0)),
 			"nil amount should roundtrip as zero")
 	})
 }

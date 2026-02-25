@@ -2,14 +2,15 @@ package indexes
 
 import (
 	"encoding/binary"
-	"errors"
 	"fmt"
 
 	"github.com/jordanschalm/lockctx"
+	"github.com/vmihailenco/msgpack/v4"
 
 	"github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/storage/indexes/iterator"
 	"github.com/onflow/flow-go/storage/operation"
 )
 
@@ -111,38 +112,39 @@ func BootstrapNonFungibleTokenTransfers(
 	return &NonFungibleTokenTransfers{IndexState: state}, nil
 }
 
-// ByAddress retrieves non-fungible token transfers involving the given account,
-// using cursor-based pagination. Results are returned in descending order (newest first).
+// ByAddress returns an iterator over non-fungible token transfers involving the given account,
+// ordered in descending block height (newest first), with ascending transaction and event
+// index within each block. Returns an exhausted iterator and no error if the account has
+// no transfers.
 //
-// If `cursor` is nil, the query starts from the latest indexed height.
-// If `cursor` is provided, the query resumes from the cursor position.
+// `cursor` is a pointer to an [access.TransferCursor]:
+//   - nil means start from the latest indexed height
+//   - non-nil means start at the cursor position (inclusive)
 //
 // Expected error returns during normal operations:
 //   - [storage.ErrHeightNotIndexed] if the cursor height is outside of the indexed range
 func (idx *NonFungibleTokenTransfers) ByAddress(
 	account flow.Address,
-	limit uint32,
 	cursor *access.TransferCursor,
-	filter storage.IndexFilter[*access.NonFungibleTokenTransfer],
-) (access.NonFungibleTokenTransfersPage, error) {
-	if err := validateLimit(limit); err != nil {
-		return access.NonFungibleTokenTransfersPage{}, errors.Join(storage.ErrInvalidQuery, err)
-	}
-
+) (storage.IndexIterator[access.NonFungibleTokenTransfer, access.TransferCursor], error) {
 	latestHeight := idx.latestHeight.Load()
+	startKey := makeNFTTransferKeyPrefix(account, latestHeight)
+
 	if cursor != nil {
 		if err := validateCursorHeight(cursor.BlockHeight, idx.firstHeight, latestHeight); err != nil {
-			return access.NonFungibleTokenTransfersPage{}, err
+			return nil, err
 		}
-		latestHeight = cursor.BlockHeight
+		startKey = makeNFTTransferKey(account, cursor.BlockHeight, cursor.TransactionIndex, cursor.EventIndex)
 	}
 
-	page, err := lookupNFTTransfers(idx.db.Reader(), account, idx.firstHeight, latestHeight, limit, cursor, filter)
+	endKey := makeNFTTransferKeyPrefix(account, idx.firstHeight)
+
+	iter, err := idx.db.Reader().NewIter(startKey, endKey, storage.DefaultIteratorOptions())
 	if err != nil {
-		return access.NonFungibleTokenTransfersPage{}, fmt.Errorf("could not lookup non-fungible token transfers: %w", err)
+		return nil, fmt.Errorf("could not create iterator: %w", err)
 	}
 
-	return page, nil
+	return iterator.Build(iter, decodeNFTTransferKeyCursor, reconstructNFTTransfer), nil
 }
 
 // Store indexes all non-fungible token transfers for a block.
@@ -160,100 +162,40 @@ func (idx *NonFungibleTokenTransfers) Store(lctx lockctx.Proof, rw storage.Reade
 	return storeAllNFTTransfers(rw, blockHeight, transfers)
 }
 
-// lookupNFTTransfers retrieves non-fungible token transfers for a given address within the specified
-// block height range (inclusive), using cursor-based pagination. Results are returned in descending
-// order (newest first). Returns an empty page if no transfers are found.
+// decodeNFTTransferKeyCursor decodes a non-fungible token transfer key into a [access.TransferCursor].
 //
-// No error returns are expected during normal operation.
-func lookupNFTTransfers(
-	reader storage.Reader,
-	address flow.Address,
-	lowestHeight uint64,
-	highestHeight uint64,
-	limit uint32,
-	cursor *access.TransferCursor,
-	filter storage.IndexFilter[*access.NonFungibleTokenTransfer],
-) (access.NonFungibleTokenTransfersPage, error) {
-	startKey := makeNFTTransferKeyPrefix(address, highestHeight)
-	endKey := makeNFTTransferKeyPrefix(address, lowestHeight)
-
-	// We fetch limit+1 to determine if there are more results beyond this page.
-	// use uint64 to avoid overflows if limit is math.MaxUint32
-	fetchLimit := uint64(limit) + 1
-
-	var collected []access.NonFungibleTokenTransfer
-
-	// TODO: construct the key, and use SeekGE to skip to the cursor position.
-	err := operation.IterateKeys(reader, startKey, endKey,
-		func(keyCopy []byte, getValue func(any) error) (bail bool, err error) {
-			_, height, txIndex, eventIndex, err := decodeNFTTransferKey(keyCopy)
-			if err != nil {
-				return true, fmt.Errorf("could not decode key: %w", err)
-			}
-
-			// the cursor is the next entry to return. skip all entries before it.
-			if cursor != nil {
-				// heights are descending (stored as one's complement); transaction and event indexes are ascending.
-				if height > cursor.BlockHeight {
-					return false, nil
-				}
-				if height == cursor.BlockHeight && txIndex < cursor.TransactionIndex {
-					return false, nil
-				}
-				if height == cursor.BlockHeight && txIndex == cursor.TransactionIndex && eventIndex < cursor.EventIndex {
-					return false, nil
-				}
-			}
-
-			var stored storedNonFungibleTokenTransfer
-			if err := getValue(&stored); err != nil {
-				return true, fmt.Errorf("could not unmarshal value: %w", err)
-			}
-
-			transfer := access.NonFungibleTokenTransfer{
-				TransactionID:    stored.TransactionID,
-				BlockHeight:      height,
-				TransactionIndex: txIndex,
-				EventIndices:     stored.EventIndices,
-				SourceAddress:    stored.SourceAddress,
-				RecipientAddress: stored.RecipientAddress,
-				TokenType:        stored.TokenType,
-				ID:               stored.ID,
-			}
-
-			if filter != nil && !filter(&transfer) {
-				return false, nil
-			}
-
-			collected = append(collected, transfer)
-
-			if uint64(len(collected)) >= fetchLimit {
-				return true, nil
-			}
-
-			return false, nil
-		}, storage.DefaultIteratorOptions())
-
+// Any error indicates the key is not valid.
+func decodeNFTTransferKeyCursor(key []byte) (access.TransferCursor, error) {
+	_, height, txIndex, eventIndex, err := decodeNFTTransferKey(key)
 	if err != nil {
-		return access.NonFungibleTokenTransfersPage{}, fmt.Errorf("could not iterate keys: %w", err)
+		return access.TransferCursor{}, err
 	}
-
-	if uint32(len(collected)) <= limit {
-		return access.NonFungibleTokenTransfersPage{
-			Transfers: collected,
-		}, nil
-	}
-
-	// we fetched one extra entry to check if there are more results. use it as the next cursor.
-	nextEntry := collected[limit]
-	return access.NonFungibleTokenTransfersPage{
-		Transfers: collected[:limit],
-		NextCursor: &access.TransferCursor{
-			BlockHeight:      nextEntry.BlockHeight,
-			TransactionIndex: nextEntry.TransactionIndex,
-			EventIndex:       nftTransferEventIndex(nextEntry),
-		},
+	return access.TransferCursor{
+		BlockHeight:      height,
+		TransactionIndex: txIndex,
+		EventIndex:       eventIndex,
 	}, nil
+}
+
+// reconstructNFTTransfer decodes a stored value into an [access.NonFungibleTokenTransfer].
+//
+// Any error indicates the value is not valid.
+func reconstructNFTTransfer(cursor access.TransferCursor, value []byte, dest *access.NonFungibleTokenTransfer) error {
+	var stored storedNonFungibleTokenTransfer
+	if err := msgpack.Unmarshal(value, &stored); err != nil {
+		return fmt.Errorf("could not decode value: %w", err)
+	}
+	*dest = access.NonFungibleTokenTransfer{
+		TransactionID:    stored.TransactionID,
+		BlockHeight:      cursor.BlockHeight,
+		TransactionIndex: cursor.TransactionIndex,
+		EventIndices:     stored.EventIndices,
+		SourceAddress:    stored.SourceAddress,
+		RecipientAddress: stored.RecipientAddress,
+		TokenType:        stored.TokenType,
+		ID:               stored.ID,
+	}
+	return nil
 }
 
 // storeAllNFTTransfers writes all non-fungible token transfer entries for a block.
