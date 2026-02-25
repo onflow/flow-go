@@ -122,7 +122,7 @@ func TestGetAccountTransactions(t *testing.T) {
 					"transaction_id": "%s",
 					"transaction_index": "3",
 					"roles": ["authorizer"],
-					"_expandable": {"transaction": "transaction", "result": "result"}
+					"_expandable": {"transaction": "/v1/transactions/%s", "result": "/v1/transaction_results/%s"}
 				},
 				{
 					"block_height": "999",
@@ -130,11 +130,11 @@ func TestGetAccountTransactions(t *testing.T) {
 					"transaction_id": "%s",
 					"transaction_index": "0",
 					"roles": ["interacted"],
-					"_expandable": {"transaction": "transaction", "result": "result"}
+					"_expandable": {"transaction": "/v1/transactions/%s", "result": "/v1/transaction_results/%s"}
 				}
 			],
 			"next_cursor": "%s"
-		}`, ts1, txID1.String(), ts2, txID2.String(), expectedCursorStr)
+		}`, ts1, txID1.String(), txID1.String(), txID1.String(), ts2, txID2.String(), txID2.String(), txID2.String(), expectedCursorStr)
 
 		assert.JSONEq(t, expected, rr.Body.String())
 	})
@@ -183,10 +183,10 @@ func TestGetAccountTransactions(t *testing.T) {
 					"transaction_id": "%s",
 					"transaction_index": "1",
 					"roles": ["authorizer"],
-					"_expandable": {"transaction": "transaction", "result": "result"}
+					"_expandable": {"transaction": "/v1/transactions/%s", "result": "/v1/transaction_results/%s"}
 				}
 			]
-		}`, ts, txID1.String())
+		}`, ts, txID1.String(), txID1.String(), txID1.String())
 
 		assert.JSONEq(t, expected, rr.Body.String())
 	})

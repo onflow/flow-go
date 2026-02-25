@@ -138,11 +138,11 @@ func TestGetAccountFungibleTokenTransfers(t *testing.T) {
 					"amount": "1000000000",
 					"source_address": "%s",
 					"recipient_address": "%s",
-					"_expandable": {"transaction": "transaction", "result": "result"}
+					"_expandable": {"transaction": "/v1/transactions/%s", "result": "/v1/transaction_results/%s"}
 				}
 			],
 			"next_cursor": "%s"
-		}`, txID.String(), ts, sourceAddr.Hex(), recipientAddr.Hex(), expectedCursorStr)
+		}`, txID.String(), ts, sourceAddr.Hex(), recipientAddr.Hex(), txID.String(), txID.String(), expectedCursorStr)
 
 		assert.JSONEq(t, expected, rr.Body.String())
 	})
@@ -198,10 +198,10 @@ func TestGetAccountFungibleTokenTransfers(t *testing.T) {
 					"amount": "500",
 					"source_address": "%s",
 					"recipient_address": "%s",
-					"_expandable": {"transaction": "transaction", "result": "result"}
+					"_expandable": {"transaction": "/v1/transactions/%s", "result": "/v1/transaction_results/%s"}
 				}
 			]
-		}`, txID.String(), ts, sourceAddr.Hex(), recipientAddr.Hex())
+		}`, txID.String(), ts, sourceAddr.Hex(), recipientAddr.Hex(), txID.String(), txID.String())
 
 		assert.JSONEq(t, expected, rr.Body.String())
 	})

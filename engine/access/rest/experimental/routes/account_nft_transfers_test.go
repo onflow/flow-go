@@ -123,11 +123,11 @@ func TestGetAccountNonFungibleTokenTransfers(t *testing.T) {
 					"nft_id": "42",
 					"source_address": "%s",
 					"recipient_address": "%s",
-					"_expandable": {"transaction": "transaction", "result": "result"}
+					"_expandable": {"transaction": "/v1/transactions/%s", "result": "/v1/transaction_results/%s"}
 				}
 			],
 			"next_cursor": "%s"
-		}`, txID.String(), ts, sourceAddr.Hex(), recipientAddr.Hex(), expectedCursorStr)
+		}`, txID.String(), ts, sourceAddr.Hex(), recipientAddr.Hex(), txID.String(), txID.String(), expectedCursorStr)
 
 		assert.JSONEq(t, expected, rr.Body.String())
 	})
@@ -183,10 +183,10 @@ func TestGetAccountNonFungibleTokenTransfers(t *testing.T) {
 					"nft_id": "7",
 					"source_address": "%s",
 					"recipient_address": "%s",
-					"_expandable": {"transaction": "transaction", "result": "result"}
+					"_expandable": {"transaction": "/v1/transactions/%s", "result": "/v1/transaction_results/%s"}
 				}
 			]
-		}`, txID.String(), ts, sourceAddr.Hex(), recipientAddr.Hex())
+		}`, txID.String(), ts, sourceAddr.Hex(), recipientAddr.Hex(), txID.String(), txID.String())
 
 		assert.JSONEq(t, expected, rr.Body.String())
 	})

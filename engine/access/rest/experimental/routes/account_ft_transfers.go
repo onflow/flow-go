@@ -33,7 +33,10 @@ func GetAccountFungibleTokenTransfers(r *common.Request, backend extended.API, l
 		Transfers: make([]models.FungibleTokenTransfer, len(page.Transfers)),
 	}
 	for i := range page.Transfers {
-		resp.Transfers[i].Build(&page.Transfers[i], link, r.ExpandFields)
+		err := resp.Transfers[i].Build(&page.Transfers[i], link)
+		if err != nil {
+			return nil, common.NewRestError(http.StatusInternalServerError, "failed to build transfer", err)
+		}
 	}
 	if page.NextCursor != nil {
 		resp.NextCursor, err = request.EncodeTransferCursor(page.NextCursor)

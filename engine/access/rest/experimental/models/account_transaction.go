@@ -1,6 +1,7 @@
 package models
 
 import (
+	"fmt"
 	"strconv"
 	"time"
 
@@ -27,8 +28,7 @@ const (
 func (t *AccountTransaction) Build(
 	tx *accessmodel.AccountTransaction,
 	link commonmodels.LinkGenerator,
-	expand map[string]bool,
-) {
+) error {
 	roles := make([]string, len(tx.Roles))
 	for i, role := range tx.Roles {
 		roles[i] = role.String()
@@ -41,17 +41,29 @@ func (t *AccountTransaction) Build(
 	t.Roles = roles
 	t.Expandable = new(AccountTransactionExpandable)
 
-	if expand[expandableTransaction] && tx.Transaction != nil {
+	if tx.Transaction != nil {
 		t.Transaction = new(commonmodels.Transaction)
 		t.Transaction.Build(tx.Transaction, nil, link)
 	} else {
 		t.Expandable.Transaction = expandableTransaction
+		transactionLink, err := link.TransactionLink(tx.TransactionID)
+		if err != nil {
+			return fmt.Errorf("failed to generate transaction link: %w", err)
+		}
+		t.Expandable.Transaction = transactionLink
 	}
 
-	if expand[expandableResult] && tx.Result != nil {
+	if tx.Result != nil {
 		t.Result = new(commonmodels.TransactionResult)
 		t.Result.Build(tx.Result, tx.TransactionID, link)
 	} else {
 		t.Expandable.Result = expandableResult
+		resultLink, err := link.TransactionResultLink(tx.TransactionID)
+		if err != nil {
+			return fmt.Errorf("failed to generate result link: %w", err)
+		}
+		t.Expandable.Result = resultLink
 	}
+
+	return nil
 }

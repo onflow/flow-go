@@ -1,6 +1,7 @@
 package models
 
 import (
+	"fmt"
 	"strconv"
 	"time"
 
@@ -12,8 +13,7 @@ import (
 func (t *FungibleTokenTransfer) Build(
 	transfer *accessmodel.FungibleTokenTransfer,
 	link commonmodels.LinkGenerator,
-	expand map[string]bool,
-) {
+) error {
 	eventIndices := make([]string, len(transfer.EventIndices))
 	for i, idx := range transfer.EventIndices {
 		eventIndices[i] = strconv.FormatUint(uint64(idx), 10)
@@ -30,17 +30,29 @@ func (t *FungibleTokenTransfer) Build(
 	t.RecipientAddress = addressHex(transfer.RecipientAddress)
 	t.Expandable = new(AccountTransactionExpandable)
 
-	if expand[expandableTransaction] && transfer.Transaction != nil {
+	if transfer.Transaction != nil {
 		t.Transaction = new(commonmodels.Transaction)
 		t.Transaction.Build(transfer.Transaction, nil, link)
 	} else {
 		t.Expandable.Transaction = expandableTransaction
+		transactionLink, err := link.TransactionLink(transfer.TransactionID)
+		if err != nil {
+			return fmt.Errorf("failed to generate transaction link: %w", err)
+		}
+		t.Expandable.Transaction = transactionLink
 	}
 
-	if expand[expandableResult] && transfer.Result != nil {
+	if transfer.Result != nil {
 		t.Result = new(commonmodels.TransactionResult)
 		t.Result.Build(transfer.Result, transfer.TransactionID, link)
 	} else {
 		t.Expandable.Result = expandableResult
+		resultLink, err := link.TransactionResultLink(transfer.TransactionID)
+		if err != nil {
+			return fmt.Errorf("failed to generate result link: %w", err)
+		}
+		t.Expandable.Result = resultLink
 	}
+
+	return nil
 }

@@ -33,7 +33,10 @@ func GetAccountTransactions(r *common.Request, backend extended.API, link common
 		Transactions: make([]models.AccountTransaction, len(page.Transactions)),
 	}
 	for i := range page.Transactions {
-		resp.Transactions[i].Build(&page.Transactions[i], link, r.ExpandFields)
+		err := resp.Transactions[i].Build(&page.Transactions[i], link)
+		if err != nil {
+			return nil, common.NewRestError(http.StatusInternalServerError, "failed to build transaction", err)
+		}
 	}
 	if page.NextCursor != nil {
 		resp.NextCursor, err = request.EncodeAccountTransactionCursor(page.NextCursor)
