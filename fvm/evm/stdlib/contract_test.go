@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	gethABI "github.com/ethereum/go-ethereum/accounts/abi"
+	gethCommon "github.com/ethereum/go-ethereum/common"
 	gethTypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/onflow/cadence"
@@ -3691,6 +3692,108 @@ func TestEVMDecodeABIWithSignatureMismatch(t *testing.T) {
 	assert.ErrorContains(t, err, "EVM.decodeABIWithSignature(): Cannot decode! The signature does not match the provided data.")
 }
 
+func TestEVMDecodeABIWithInsufficientData(t *testing.T) {
+
+	t.Parallel()
+
+	handler := &testContractHandler{}
+
+	contractsAddress := flow.BytesToAddress([]byte{0x1})
+
+	transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
+	scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
+
+	rt := runtime.NewRuntime(runtime.Config{})
+
+	script := []byte(`
+      import EVM from 0x1
+
+      access(all)
+      fun main(data: [UInt8]) {
+        // We are passing less than 4 bytes, which is the minimum bytes needed
+        // for the function selector.
+        let values = EVM.decodeABIWithSignature(
+          "deposit(uint256, address)",
+          types: [Type<UInt256>(), Type<EVM.EVMAddress>()],
+          data: data
+        )
+      }
+	`)
+
+	accountCodes := map[common.Location][]byte{}
+	var events []cadence.Event
+
+	runtimeInterface := &TestRuntimeInterface{
+		Storage: NewTestLedger(nil, nil),
+		OnGetSigningAccounts: func() ([]runtime.Address, error) {
+			return []runtime.Address{runtime.Address(contractsAddress)}, nil
+		},
+		OnResolveLocation: newLocationResolver(contractsAddress),
+		OnUpdateAccountContractCode: func(location common.AddressLocation, code []byte) error {
+			accountCodes[location] = code
+			return nil
+		},
+		OnGetAccountContractCode: func(location common.AddressLocation) (code []byte, err error) {
+			code = accountCodes[location]
+			return code, nil
+		},
+		OnEmitEvent: func(event cadence.Event) error {
+			events = append(events, event)
+			return nil
+		},
+		OnDecodeArgument: func(b []byte, t cadence.Type) (cadence.Value, error) {
+			return json.Decode(nil, b)
+		},
+		OnHash: func(
+			data []byte,
+			tag string,
+			hashAlgorithm runtime.HashAlgorithm,
+		) ([]byte, error) {
+			return crypto.Keccak256(data), nil
+		},
+	}
+
+	nextTransactionLocation := NewTransactionLocationGenerator()
+	nextScriptLocation := NewScriptLocationGenerator()
+
+	// Deploy contracts
+
+	deployContracts(
+		t,
+		rt,
+		contractsAddress,
+		runtimeInterface,
+		transactionEnvironment,
+		nextTransactionLocation,
+	)
+
+	// Run script
+	abiBytes := []byte{0xf3, 0xfe, 0xa3}
+	cdcBytes := make([]cadence.Value, 0)
+	for _, bt := range abiBytes {
+		cdcBytes = append(cdcBytes, cadence.UInt8(bt))
+	}
+	encodedABI := cadence.NewArray(
+		cdcBytes,
+	).WithType(cadence.NewVariableSizedArrayType(cadence.UInt8Type))
+
+	_, err := rt.ExecuteScript(
+		runtime.Script{
+			Source: script,
+			Arguments: EncodeArgs([]cadence.Value{
+				encodedABI,
+			}),
+		},
+		runtime.Context{
+			Interface:   runtimeInterface,
+			Environment: scriptEnvironment,
+			Location:    nextScriptLocation(),
+		},
+	)
+	require.Error(t, err)
+	assert.ErrorContains(t, err, "EVM.decodeABIWithSignature(): Cannot decode! The provided data does not contain a signature.")
+}
+
 func TestEVMAddressConstructionAndReturn(t *testing.T) {
 
 	t.Parallel()
@@ -7110,9 +7213,13 @@ func TestEVMAccountCodeHash(t *testing.T) {
 	t.Parallel()
 
 	contractsAddress := flow.BytesToAddress([]byte{0x1})
-	expectedCodeHashRaw := []byte{1, 2, 3}
+	expectedCodeHashRaw := gethCommon.HexToHash("0x5edac053e2bb5dc30d05a4dcdc5a31e0717212966cb1e8225daa4105f1dabf9c")
+	byteValues := []cadence.Value{}
+	for _, val := range expectedCodeHashRaw.Bytes() {
+		byteValues = append(byteValues, cadence.NewUInt8(val))
+	}
 	expectedCodeHashValue := cadence.NewArray(
-		[]cadence.Value{cadence.UInt8(1), cadence.UInt8(2), cadence.UInt8(3)},
+		byteValues,
 	).WithType(cadence.NewVariableSizedArrayType(cadence.UInt8Type))
 
 	handler := &testContractHandler{
@@ -7125,7 +7232,7 @@ func TestEVMAccountCodeHash(t *testing.T) {
 			return &testFlowAccount{
 				address: fromAddress,
 				codeHash: func() []byte {
-					return expectedCodeHashRaw
+					return expectedCodeHashRaw.Bytes()
 				},
 			}
 		},

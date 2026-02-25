@@ -175,7 +175,7 @@ access(all) contract EVM {
 
         /// Nonce of the address
         access(all)
-        fun nonce(): UInt64 {
+        view fun nonce(): UInt64 {
             return InternalEVM.nonce(
                 address: self.bytes
             )
@@ -183,7 +183,7 @@ access(all) contract EVM {
 
         /// Code of the address
         access(all)
-        fun code(): [UInt8] {
+        view fun code(): [UInt8] {
             return InternalEVM.code(
                 address: self.bytes
             )
@@ -191,7 +191,7 @@ access(all) contract EVM {
 
         /// CodeHash of the address
         access(all)
-        fun codeHash(): [UInt8] {
+        view fun codeHash(): [UInt8] {
             return InternalEVM.codeHash(
                 address: self.bytes
             )
@@ -918,6 +918,9 @@ access(all) contract EVM {
         types: [Type],
         data: [UInt8]
     ): [AnyStruct] {
+        pre {
+            data.length >= 4: "EVM.decodeABIWithSignature(): Cannot decode! The provided data does not contain a signature."
+        }
         let methodID = HashAlgorithm.KECCAK_256.hash(
             signature.utf8
         ).slice(from: 0, upTo: 4)

@@ -598,10 +598,9 @@ func (s *TransactionsFunctionalSuite) TestTransactionResult_ExecutionNode() {
 		ErrorMessage:         accessResponse.ErrorMessage,
 		Events:               accessResponse.Events,
 		EventEncodingVersion: entities.EventEncodingVersion_CCF_V0,
+		ComputationUsage:     accessResponse.ComputationUsage,
 	}
-	// The EN gRPC response does not include per-transaction ComputationUsed.
 	expectedResult := s.expectedResultForIndex(1, entities.EventEncodingVersion_JSON_CDC_V0)
-	expectedResult.ComputationUsed = 0
 
 	expectedRequest := &execproto.GetTransactionResultRequest{
 		BlockId:       blockID[:],
@@ -630,10 +629,9 @@ func (s *TransactionsFunctionalSuite) TestTransactionResultByIndex_ExecutionNode
 		ErrorMessage:         accessResponse.ErrorMessage,
 		Events:               accessResponse.Events,
 		EventEncodingVersion: entities.EventEncodingVersion_CCF_V0,
+		ComputationUsage:     accessResponse.ComputationUsage,
 	}
-	// The EN gRPC response does not include per-transaction ComputationUsed.
 	expectedResult := s.expectedResultForIndex(1, entities.EventEncodingVersion_JSON_CDC_V0)
-	expectedResult.ComputationUsed = 0
 
 	expectedRequest := &execproto.GetTransactionByIndexRequest{
 		BlockId: blockID[:],
@@ -688,13 +686,12 @@ func (s *TransactionsFunctionalSuite) TestTransactionResultsByBlockID_ExecutionN
 	for i := range s.tf.ExpectedResults {
 		accessResponse := convert.TransactionResultToMessage(s.expectedResultForIndex(i, entities.EventEncodingVersion_CCF_V0))
 		nodeResults[i] = &execproto.GetTransactionResultResponse{
-			StatusCode:   accessResponse.StatusCode,
-			ErrorMessage: accessResponse.ErrorMessage,
-			Events:       accessResponse.Events,
+			StatusCode:       accessResponse.StatusCode,
+			ErrorMessage:     accessResponse.ErrorMessage,
+			Events:           accessResponse.Events,
+			ComputationUsage: accessResponse.ComputationUsage,
 		}
-		// The EN gRPC response does not include per-transaction ComputationUsed.
 		expectedResults[i] = s.expectedResultForIndex(i, entities.EventEncodingVersion_JSON_CDC_V0)
-		expectedResults[i].ComputationUsed = 0
 	}
 
 	nodeResponse := &execproto.GetTransactionResultsResponse{
