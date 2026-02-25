@@ -7,10 +7,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// IndexFilter is a function that filters data entries to include in query responses.
-// It takes a single entry and returns true if the entry should be included in the response.
-type IndexFilter[T any] func(T) bool
-
 // AccountTransactionIterator is an iterator over account transactions ordered by descending
 // block height, then ascending transaction index within each block.
 type AccountTransactionIterator = IndexIterator[accessmodel.AccountTransaction, accessmodel.AccountTransactionCursor]
