@@ -485,25 +485,6 @@ func TestFTTransfers_HeightValidation(t *testing.T) {
 		})
 	})
 
-	t.Run("store with nil Amount fails", func(t *testing.T) {
-		t.Parallel()
-		RunWithBootstrappedFTTransferIndex(t, 1, nil, func(_ storage.DB, lm storage.LockManager, idx *FungibleTokenTransfers) {
-			transfer := access.FungibleTokenTransfer{
-				TransactionID:    unittest.IdentifierFixture(),
-				BlockHeight:      2,
-				TransactionIndex: 0,
-				EventIndices:     []uint32{0},
-				SourceAddress:    unittest.RandomAddressFixture(),
-				RecipientAddress: unittest.RandomAddressFixture(),
-				TokenType:        "A.FlowToken",
-				Amount:           nil, // invalid: amount must not be nil
-			}
-
-			err := storeFTTransfers(t, lm, idx, 2, []access.FungibleTokenTransfer{transfer})
-			require.Error(t, err)
-			assert.Contains(t, err.Error(), "transfer amount is nil")
-		})
-	})
 }
 
 func TestFTTransfers_RangeQueries(t *testing.T) {
@@ -877,16 +858,11 @@ func TestFTTransfers_NilAmount(t *testing.T) {
 			SourceAddress:    source,
 			RecipientAddress: recipient,
 			TokenType:        "A.FlowToken",
-			Amount:           nil, // nil amount
+			Amount:           nil,
 		}
 
 		err := storeFTTransfers(t, lm, idx, 2, []access.FungibleTokenTransfer{transfer})
-		require.NoError(t, err)
-
-		transfers := allFTTransfers(t, idx, source)
-		require.Len(t, transfers, 1)
-		// nil amount stored as empty bytes, then SetBytes on empty produces 0
-		assert.Equal(t, 0, transfers[0].Amount.Cmp(big.NewInt(0)),
-			"nil amount should roundtrip as zero")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "transfer amount is nil")
 	})
 }
