@@ -1,30 +1,32 @@
 package iterator
 
-// type Entry[T any, K any] struct {
-// 	key       []byte
-// 	decodeKey storage.DecodeKeyFunc[K]
-// 	getValue  func(K, *T) error
-// }
+import "github.com/onflow/flow-go/storage"
 
-// func NewEntry[T any, K any](key []byte, decodeKey storage.DecodeKeyFunc[K], getValue func(K, *T) error) Entry[T, K] {
-// 	return Entry[T, K]{
-// 		key:       key,
-// 		decodeKey: decodeKey,
-// 		getValue:  getValue,
-// 	}
-// }
+type Entry[T any, C any] struct {
+	key       []byte
+	decodeKey storage.DecodeKeyFunc[C]
+	getValue  func(C, *T) error
+}
 
-// func (i Entry[T, K]) KeyParts() (K, error) {
-// 	return i.decodeKey(i.key)
-// }
+func NewEntry[T any, C any](key []byte, decodeKey storage.DecodeKeyFunc[C], getValue func(C, *T) error) Entry[T, C] {
+	return Entry[T, C]{
+		key:       key,
+		decodeKey: decodeKey,
+		getValue:  getValue,
+	}
+}
 
-// func (i Entry[T, K]) Value() (T, error) {
-// 	var v T
-// 	decodedKey, err := i.decodeKey(i.key)
-// 	if err != nil {
-// 		return v, err
-// 	}
+func (i Entry[T, C]) Cursor() (C, error) {
+	return i.decodeKey(i.key)
+}
 
-// 	err = i.getValue(decodedKey, &v)
-// 	return v, err
-// }
+func (i Entry[T, C]) Value() (T, error) {
+	var v T
+	decodedKey, err := i.decodeKey(i.key) // TODO: avoid duplicate decoding
+	if err != nil {
+		return v, err
+	}
+
+	err = i.getValue(decodedKey, &v)
+	return v, err
+}
