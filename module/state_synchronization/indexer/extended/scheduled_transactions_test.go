@@ -18,6 +18,7 @@ import (
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
+	executionmock "github.com/onflow/flow-go/module/execution/mock"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/indexes"
 	storagemock "github.com/onflow/flow-go/storage/mock"
@@ -621,7 +622,7 @@ func TestScheduledTransactionsIndexer_NextHeight_MockErrors(t *testing.T) {
 		unexpectedErr := fmt.Errorf("disk I/O failure")
 		mockStore.On("LatestIndexedHeight").Return(uint64(0), unexpectedErr)
 
-		indexer := NewScheduledTransactions(unittest.Logger(), mockStore, flow.Testnet)
+		indexer := NewScheduledTransactions(unittest.Logger(), mockStore, nil, flow.Testnet)
 
 		_, err := indexer.NextHeight()
 		require.Error(t, err)
@@ -633,7 +634,7 @@ func TestScheduledTransactionsIndexer_NextHeight_MockErrors(t *testing.T) {
 		mockStore.On("LatestIndexedHeight").Return(uint64(0), storage.ErrNotBootstrapped)
 		mockStore.On("UninitializedFirstHeight").Return(uint64(42), true)
 
-		indexer := NewScheduledTransactions(unittest.Logger(), mockStore, flow.Testnet)
+		indexer := NewScheduledTransactions(unittest.Logger(), mockStore, nil, flow.Testnet)
 
 		_, err := indexer.NextHeight()
 		require.Error(t, err)
@@ -649,7 +650,7 @@ func TestScheduledTransactionsIndexer_NextHeight_MockErrors(t *testing.T) {
 		mockStore.On("Store", mock.Anything, mock.Anything, testHeight, mock.Anything).Return(storeErr)
 
 		lm := storage.NewTestingLockManager()
-		indexer := NewScheduledTransactions(unittest.Logger(), mockStore, flow.Testnet)
+		indexer := NewScheduledTransactions(unittest.Logger(), mockStore, nil, flow.Testnet)
 		header := unittest.BlockHeaderFixtureOnChain(flow.Testnet, unittest.WithHeaderHeight(testHeight))
 
 		err := unittest.WithLock(t, lm, storage.LockIndexScheduledTransactionsIndex, func(lctx lockctx.Context) error {
@@ -679,7 +680,7 @@ func newScheduledTxIndexerForTest(
 	store, err := indexes.NewScheduledTransactionsBootstrapper(db, firstHeight)
 	require.NoError(t, err)
 
-	indexer := NewScheduledTransactions(unittest.Logger(), store, chainID)
+	indexer := NewScheduledTransactions(unittest.Logger(), store, nil, chainID)
 	return indexer, store, lm, db
 }
 
@@ -712,6 +713,74 @@ func indexScheduledBlockExpectError(
 			return indexer.IndexBlockData(lctx, data, rw)
 		})
 	})
+}
+
+// ===== JIT Lookup Integration Test =====
+
+// TestScheduledTransactionsIndexer_JITLookup verifies the end-to-end JIT path: when
+// IndexBlockData encounters an unknown transaction (storage returns ErrNotFound), it
+// delegates to the requester, and the result is written to storage.
+// The script execution details are covered by TestScheduledTransactionRequester_* tests.
+func TestScheduledTransactionsIndexer_JITLookup(t *testing.T) {
+	t.Parallel()
+
+	sc := systemcontracts.SystemContractsForChain(flow.Testnet)
+	owner := unittest.RandomAddressFixture()
+
+	scriptExecutor := executionmock.NewScriptExecutor(t)
+	indexer, store, lm, db := newScheduledTxIndexerWithScriptExecutor(t, flow.Testnet, scheduledTestHeight, scriptExecutor)
+
+	// Bootstrap so Executed/Cancelled/Failed return ErrNotFound on the next block,
+	// triggering the JIT path.
+	bootstrapHeader := unittest.BlockHeaderFixtureOnChain(flow.Testnet, unittest.WithHeaderHeight(scheduledTestHeight))
+	indexScheduledBlock(t, indexer, lm, db, BlockData{Header: bootstrapHeader, Events: []flow.Event{}})
+
+	executedTxID := unittest.IdentifierFixture()
+	header := unittest.BlockHeaderFixtureOnChain(flow.Testnet, unittest.WithHeaderHeight(scheduledTestHeight+1))
+	pendingEvt := createPendingExecutionEvent(t, sc, 5, 1, 300, 100, owner, "A.abc.Contract.Handler")
+	executedEvt := createExecutedEvent(t, sc, 5, 1, 300, owner, "A.abc.Contract.Handler", 99, "")
+	executedEvt.TransactionID = executedTxID
+
+	scriptHeight := header.Height - 1
+	comp := MakeTransactionDataComposite(sc, 5, 1, 1000, 300, 100, owner, "A.abc.Contract.Handler", 99)
+	scriptExecutor.On("ExecuteAtBlockHeight",
+		mock.Anything, mock.Anything, mock.Anything, scriptHeight,
+	).Return(MakeJITScriptResponse(t, comp), nil).Once()
+
+	indexScheduledBlock(t, indexer, lm, db, BlockData{
+		Header: header,
+		Events: []flow.Event{pendingEvt, executedEvt},
+	})
+
+	tx, err := store.ByID(5)
+	require.NoError(t, err)
+	assert.Equal(t, access.ScheduledTxStatusExecuted, tx.Status)
+	assert.Equal(t, executedTxID, tx.ExecutedTransactionID)
+}
+
+// ===== JIT Lookup Helpers =====
+
+// newScheduledTxIndexerWithScriptExecutor creates an indexer backed by a real pebble DB
+// with the given script executor.
+func newScheduledTxIndexerWithScriptExecutor(
+	t *testing.T,
+	chainID flow.ChainID,
+	firstHeight uint64,
+	scriptExecutor *executionmock.ScriptExecutor,
+) (*ScheduledTransactions, storage.ScheduledTransactionsIndexBootstrapper, storage.LockManager, storage.DB) {
+	pdb, dbDir := unittest.TempPebbleDB(t)
+	db := pebbleimpl.ToDB(pdb)
+	t.Cleanup(func() {
+		require.NoError(t, db.Close())
+		require.NoError(t, os.RemoveAll(dbDir))
+	})
+
+	lm := storage.NewTestingLockManager()
+	store, err := indexes.NewScheduledTransactionsBootstrapper(db, firstHeight)
+	require.NoError(t, err)
+
+	indexer := NewScheduledTransactions(unittest.Logger(), store, scriptExecutor, chainID)
+	return indexer, store, lm, db
 }
 
 // makeExecutorTransactionBody creates a transaction body that matches the executor transaction

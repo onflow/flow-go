@@ -1,7 +1,6 @@
 package indexer
 
 import (
-	"errors"
 	"fmt"
 	"time"
 
@@ -30,12 +29,6 @@ const (
 	// here since the data is in a local db.
 	fetchTimeout = 30 * time.Second
 )
-
-// ErrIndexNotInitialized is returned when the indexer is not initialized
-//
-// This generally indicates that the index databases are still being initialized, and trying again
-// later may succeed
-var ErrIndexNotInitialized = errors.New("index not initialized")
 
 var _ state_synchronization.IndexReporter = (*Indexer)(nil)
 var _ execution_data.ProcessedHeightRecorder = (*Indexer)(nil)

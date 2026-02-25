@@ -27,7 +27,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/irrecoverable"
-	"github.com/onflow/flow-go/module/state_synchronization/indexer"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 )
@@ -449,7 +448,7 @@ func (t *Transactions) lookupSubmittedTransactionResult(
 	if err != nil {
 		switch {
 		case errors.Is(err, storage.ErrNotFound):
-		case errors.Is(err, indexer.ErrIndexNotInitialized):
+		case errors.Is(err, storage.ErrIndexNotInitialized):
 		case errors.Is(err, storage.ErrHeightNotIndexed):
 		case status.Code(err) == codes.NotFound:
 		default:

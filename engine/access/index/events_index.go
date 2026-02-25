@@ -21,7 +21,7 @@ func NewEventsIndex(reporter *Reporter, events storage.Events) *EventsIndex {
 
 // ByBlockID checks data availability and returns events for a block
 // Expected errors:
-//   - indexer.ErrIndexNotInitialized if the `EventsIndex` has not been initialized
+//   - storage.ErrIndexNotInitialized if the `EventsIndex` has not been initialized
 //   - storage.ErrHeightNotIndexed when data is unavailable
 //   - codes.NotFound if result cannot be provided by storage due to the absence of data.
 func (e *EventsIndex) ByBlockID(blockID flow.Identifier, height uint64) ([]flow.Event, error) {
@@ -39,7 +39,7 @@ func (e *EventsIndex) ByBlockID(blockID flow.Identifier, height uint64) ([]flow.
 
 // ByBlockIDTransactionID checks data availability and return events for the given block ID and transaction ID
 // Expected errors:
-//   - indexer.ErrIndexNotInitialized if the `EventsIndex` has not been initialized
+//   - storage.ErrIndexNotInitialized if the `EventsIndex` has not been initialized
 //   - storage.ErrHeightNotIndexed when data is unavailable
 //   - codes.NotFound if result cannot be provided by storage due to the absence of data.
 func (e *EventsIndex) ByBlockIDTransactionID(blockID flow.Identifier, height uint64, transactionID flow.Identifier) ([]flow.Event, error) {
@@ -52,7 +52,7 @@ func (e *EventsIndex) ByBlockIDTransactionID(blockID flow.Identifier, height uin
 
 // ByBlockIDTransactionIndex checks data availability and return events for the transaction at given index in a given block
 // Expected errors:
-//   - indexer.ErrIndexNotInitialized if the `EventsIndex` has not been initialized
+//   - storage.ErrIndexNotInitialized if the `EventsIndex` has not been initialized
 //   - storage.ErrHeightNotIndexed when data is unavailable
 //   - codes.NotFound if result cannot be provided by storage due to the absence of data.
 func (e *EventsIndex) ByBlockIDTransactionIndex(blockID flow.Identifier, height uint64, txIndex uint32) ([]flow.Event, error) {

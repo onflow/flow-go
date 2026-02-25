@@ -5,10 +5,8 @@ import (
 
 	"go.uber.org/atomic"
 
-	"github.com/onflow/flow-go/module/state_synchronization/indexer"
-	"github.com/onflow/flow-go/storage"
-
 	"github.com/onflow/flow-go/module/state_synchronization"
+	"github.com/onflow/flow-go/storage"
 )
 
 var _ state_synchronization.IndexReporter = (*Reporter)(nil)
@@ -18,7 +16,7 @@ var _ state_synchronization.IndexReporter = (*Reporter)(nil)
 // When the index is initially bootstrapped, the indexer needs to load an execution state checkpoint from
 // disk and index all the data. This process can take more than 1 hour on some systems. Consequently, the Initialize
 // pattern is implemented to enable the Access API to start up and serve queries before the index is fully ready. During
-// the initialization phase, all calls to retrieve data from this struct should return indexer.ErrIndexNotInitialized.
+// the initialization phase, all calls to retrieve data from this struct should return storage.ErrIndexNotInitialized.
 // The caller is responsible for handling this error appropriately for the method.
 type Reporter struct {
 	reporter *atomic.Pointer[state_synchronization.IndexReporter]
@@ -41,7 +39,7 @@ func (s *Reporter) Initialize(indexReporter state_synchronization.IndexReporter)
 
 // LowestIndexedHeight returns the lowest height indexed by the execution state indexer.
 // Expected errors:
-// - indexer.ErrIndexNotInitialized if the IndexReporter has not been initialized
+// - storage.ErrIndexNotInitialized if the IndexReporter has not been initialized
 func (s *Reporter) LowestIndexedHeight() (uint64, error) {
 	reporter, err := s.getReporter()
 	if err != nil {
@@ -53,7 +51,7 @@ func (s *Reporter) LowestIndexedHeight() (uint64, error) {
 
 // HighestIndexedHeight returns the highest height indexed by the execution state indexer.
 // Expected errors:
-// - indexer.ErrIndexNotInitialized if the IndexReporter has not been initialized
+// - storage.ErrIndexNotInitialized if the IndexReporter has not been initialized
 func (s *Reporter) HighestIndexedHeight() (uint64, error) {
 	reporter, err := s.getReporter()
 	if err != nil {
@@ -66,7 +64,7 @@ func (s *Reporter) HighestIndexedHeight() (uint64, error) {
 // checkDataAvailability checks the availability of data at the given height by comparing it with the highest and lowest
 // indexed heights. If the height is beyond the indexed range, an error is returned.
 // Expected errors:
-//   - indexer.ErrIndexNotInitialized if the `IndexReporter` has not been initialized
+//   - storage.ErrIndexNotInitialized if the `IndexReporter` has not been initialized
 //   - storage.ErrHeightNotIndexed if the block at the provided height is not indexed yet
 //   - all other errors are unexpected
 func (s *Reporter) checkDataAvailability(height uint64) error {
@@ -96,11 +94,11 @@ func (s *Reporter) checkDataAvailability(height uint64) error {
 
 // getReporter retrieves the current index reporter instance from the atomic pointer.
 // Expected errors:
-//   - indexer.ErrIndexNotInitialized if the reporter is not initialized
+//   - storage.ErrIndexNotInitialized if the reporter is not initialized
 func (s *Reporter) getReporter() (state_synchronization.IndexReporter, error) {
 	reporter := s.reporter.Load()
 	if reporter == nil {
-		return nil, indexer.ErrIndexNotInitialized
+		return nil, storage.ErrIndexNotInitialized
 	}
 	return *reporter, nil
 }

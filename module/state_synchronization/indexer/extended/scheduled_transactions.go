@@ -1,6 +1,7 @@
 package extended
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"strconv"
@@ -33,6 +34,18 @@ const scheduledTransactionsIndexerName = "scheduled_transactions"
 // that was submitted by the scheduled executor account is identified by its authorizer
 // (the scheduled executor account) and an empty payer address.
 //
+// This indexer will automatically backfill any scheduled transactions that are executed or cancelled
+// which did were scheduled before the indexer was initialized. This is done by executing scripts
+// when an unknown transaction is executed or cancelled within a block. There are a couple important
+// considerations to keep in mind:
+//  1. If there are many unknown transactions with a block, the script execution may be slow and block
+//     the indexing process until it completes. Since the extended indexers are run in a batch, this
+//     will block all other indexers that are indexing the same block. In general, there should be
+//     relatively few unknown transactions executed. However, if this becomes a problem, we will need
+//     to consider a more efficient way to backfill the index.
+//  2. Since script executions are required to backfill the index, the indexer must be started after
+//     the registers db is initialized.
+//
 // Not safe for concurrent use.
 type ScheduledTransactions struct {
 	log   zerolog.Logger
@@ -44,6 +57,8 @@ type ScheduledTransactions struct {
 	pendingExecutionType flow.EventType
 	executedEventType    flow.EventType
 	canceledEventType    flow.EventType
+
+	requester *ScheduledTransactionRequester
 }
 
 var _ Indexer = (*ScheduledTransactions)(nil)
@@ -81,6 +96,7 @@ type failedEntry struct {
 func NewScheduledTransactions(
 	log zerolog.Logger,
 	store storage.ScheduledTransactionsIndexBootstrapper,
+	scriptExecutor scriptExecutor,
 	chainID flow.ChainID,
 ) *ScheduledTransactions {
 	sc := systemcontracts.SystemContractsForChain(chainID)
@@ -90,6 +106,7 @@ func NewScheduledTransactions(
 	return &ScheduledTransactions{
 		log:                   log.With().Str("component", "scheduled_tx_indexer").Logger(),
 		store:                 store,
+		requester:             NewScheduledTransactionRequester(scriptExecutor, chainID),
 		scheduledExecutorAddr: sc.ScheduledTransactionExecutor.Address,
 		scheduledEventType:    flow.EventType(prefix + "Scheduled"),
 		pendingExecutionType:  flow.EventType(prefix + "PendingExecution"),
@@ -131,24 +148,64 @@ func (s *ScheduledTransactions) IndexBlockData(lctx lockctx.Proof, data BlockDat
 		return fmt.Errorf("failed to collect scheduled transaction data: %w", err)
 	}
 
-	if err := s.store.Store(lctx, rw, data.Header.Height, collected.newTxs); err != nil {
-		if !errors.Is(err, storage.ErrAlreadyExists) {
-			return fmt.Errorf("failed to store new scheduled transactions: %w", err)
-		}
-	}
+	// when a node is bootstrapped after a scheduled transaction was first scheduled, it will not exist
+	// in the local index. In this case, calls to Executed, Cancelled, and Failed will fail because the
+	// entry doesn't exist in the db. In practice, this is 100% of nodes since the indexes are reset
+	// at the beginning of each spork.
+	//
+	// The contract doesn't provide a way to query all unexecuted transactions, so we need to find their
+	// ID first, then query their data. This means it's not possible to backfill the index on startup
+	// without iterating all possible IDs.
+	//
+	// To work around this, the logic that follows performs a just-in-time lookup of the data for each
+	// unknown transaction that is executed or cancelled within a block. This is one in 3 steps:
+	// 1. Collect the IDs of all transactions that are not found when attempting to update.
+	// 2. Execute a script to lookup the data for each ID, and populate the executed/cancelled/failed updates
+	// 3. Store the updated transactions in the index./
+	var lookupIDs []uint64
+
 	for _, entry := range collected.executedEntries {
 		if err := s.store.Executed(lctx, rw, entry.event.ID, entry.transactionID); err != nil {
-			return fmt.Errorf("failed to mark tx %d executed: %w", entry.event.ID, err)
+			if !errors.Is(err, storage.ErrNotFound) {
+				return fmt.Errorf("failed to mark tx %d executed: %w", entry.event.ID, err)
+			}
+			lookupIDs = append(lookupIDs, entry.event.ID)
 		}
 	}
 	for _, entry := range collected.canceledEntries {
 		if err := s.store.Cancelled(lctx, rw, entry.event.ID, uint64(entry.event.FeesReturned), uint64(entry.event.FeesDeducted), entry.transactionID); err != nil {
-			return fmt.Errorf("failed to mark tx %d cancelled: %w", entry.event.ID, err)
+			if !errors.Is(err, storage.ErrNotFound) {
+				return fmt.Errorf("failed to mark tx %d cancelled: %w", entry.event.ID, err)
+			}
+			lookupIDs = append(lookupIDs, entry.event.ID)
 		}
 	}
 	for _, entry := range collected.failedEntries {
 		if err := s.store.Failed(lctx, rw, entry.scheduledTxID, entry.transactionID); err != nil {
-			return fmt.Errorf("failed to mark tx %d failed: %w", entry.scheduledTxID, err)
+			if !errors.Is(err, storage.ErrNotFound) {
+				return fmt.Errorf("failed to mark tx %d failed: %w", entry.scheduledTxID, err)
+			}
+			lookupIDs = append(lookupIDs, entry.scheduledTxID)
+		}
+	}
+
+	newTxs := collected.newTxs
+	if len(lookupIDs) > 0 {
+		// scripts are executed against end of the block state, so the height must be before the current block,
+		// otherwise the executed/canceled events may not be found. Use one block before the current block.
+		// This is safe for genesis/spork root blocks because the root block will never have and scheduled
+		// transaction events, so the block here will always be after the root block.
+		missingTxs, err := s.requester.Fetch(context.TODO(), lookupIDs, data.Header.Height-1, collected)
+		if err != nil {
+			return fmt.Errorf("failed to fetch scheduled transaction data from state: %w", err)
+		}
+
+		newTxs = append(newTxs, missingTxs...)
+	}
+
+	if err := s.store.Store(lctx, rw, data.Header.Height, newTxs); err != nil {
+		if !errors.Is(err, storage.ErrAlreadyExists) {
+			return fmt.Errorf("failed to store new scheduled transactions: %w", err)
 		}
 	}
 

@@ -15,7 +15,6 @@ import (
 	"github.com/onflow/flow-go/module/counters"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/module/state_synchronization"
-	"github.com/onflow/flow-go/module/state_synchronization/indexer"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/logging"
@@ -296,7 +295,7 @@ func (e *ExecutionDataTrackerImpl) checkStartHeight(height uint64) (uint64, erro
 func (e *ExecutionDataTrackerImpl) getIndexedHeightBound() (uint64, uint64, error) {
 	lowestHeight, err := e.indexReporter.LowestIndexedHeight()
 	if err != nil {
-		if errors.Is(err, storage.ErrHeightNotIndexed) || errors.Is(err, indexer.ErrIndexNotInitialized) {
+		if errors.Is(err, storage.ErrHeightNotIndexed) || errors.Is(err, storage.ErrIndexNotInitialized) {
 			// the index is not ready yet, but likely will be eventually
 			return 0, 0, status.Errorf(codes.FailedPrecondition, "failed to get lowest indexed height: %v", err)
 		}
@@ -305,7 +304,7 @@ func (e *ExecutionDataTrackerImpl) getIndexedHeightBound() (uint64, uint64, erro
 
 	highestHeight, err := e.indexReporter.HighestIndexedHeight()
 	if err != nil {
-		if errors.Is(err, storage.ErrHeightNotIndexed) || errors.Is(err, indexer.ErrIndexNotInitialized) {
+		if errors.Is(err, storage.ErrHeightNotIndexed) || errors.Is(err, storage.ErrIndexNotInitialized) {
 			// the index is not ready yet, but likely will be eventually
 			return 0, 0, status.Errorf(codes.FailedPrecondition, "failed to get highest indexed height: %v", err)
 		}

@@ -6,7 +6,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module/state_synchronization/indexer"
 	"github.com/onflow/flow-go/storage"
 	storagemock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -74,7 +73,7 @@ func TestRegisterValuesDataUnAvailable(t *testing.T) {
 	// registerDB not bootstrapped, correct error returned
 	registerID := unittest.RegisterIDFixture()
 	_, err := registersAsync.RegisterValues([]flow.RegisterID{registerID}, rootBlockHeight)
-	require.ErrorIs(t, err, indexer.ErrIndexNotInitialized)
+	require.ErrorIs(t, err, storage.ErrIndexNotInitialized)
 }
 
 func TestInitDataRepeatedCalls(t *testing.T) {

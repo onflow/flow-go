@@ -6,7 +6,6 @@ import (
 	"go.uber.org/atomic"
 
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module/state_synchronization/indexer"
 	"github.com/onflow/flow-go/storage"
 )
 
@@ -34,7 +33,7 @@ func (r *RegistersAsyncStore) Initialize(registers storage.RegisterIndex) error 
 
 // RegisterValues gets the register values from the underlying storage.RegisterIndex
 // Expected errors:
-//   - indexer.ErrIndexNotInitialized if the store is still bootstrapping
+//   - storage.ErrIndexNotInitialized if the store is still bootstrapping
 //   - storage.ErrHeightNotIndexed if the values at the height is not indexed yet
 //   - storage.ErrNotFound if the register does not exist at the height
 func (r *RegistersAsyncStore) RegisterValues(ids flow.RegisterIDs, height uint64) ([]flow.RegisterValue, error) {
@@ -61,7 +60,7 @@ func (r *RegistersAsyncStore) RegisterValues(ids flow.RegisterIDs, height uint64
 func (r *RegistersAsyncStore) getRegisterStore() (storage.RegisterIndex, error) {
 	registerStore := r.registerIndex.Load()
 	if registerStore == nil {
-		return nil, indexer.ErrIndexNotInitialized
+		return nil, storage.ErrIndexNotInitialized
 	}
 
 	return *registerStore, nil

@@ -35,6 +35,12 @@ var (
 	// ErrInvalidQuery is returned when parameters passed to a read query are invalid (e.g., startHeight > endHeight).
 	ErrInvalidQuery = errors.New("invalid query")
 
+	// ErrIndexNotInitialized is returned when an index database has not been initialized yet.
+	//
+	// This generally indicates that the index databases are still being bootstrapped, and
+	// trying again later may succeed.
+	ErrIndexNotInitialized = errors.New("index not initialized")
+
 	// ErrScheduledTxFieldMismatch is returned when a scheduled transaction already exists
 	// with different field values during Store.
 	ErrScheduledTxFieldMismatch = errors.New("scheduled transaction field mismatch")

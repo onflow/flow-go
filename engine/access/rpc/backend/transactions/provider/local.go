@@ -70,7 +70,7 @@ func NewLocalTransactionProvider(
 // Expected errors during normal operation:
 //   - codes.NotFound when result cannot be provided by storage due to the absence of data.
 //   - codes.Internal if event payload conversion failed.
-//   - indexer.ErrIndexNotInitialized when txResultsIndex not initialized
+//   - storage.ErrIndexNotInitialized when txResultsIndex not initialized
 //   - storage.ErrHeightNotIndexed when data is unavailable
 //
 // All other errors are considered as state corruption (fatal) or internal errors in the transaction error message
@@ -150,7 +150,7 @@ func (t *LocalTransactionProvider) TransactionResult(
 // Expected errors during normal operation:
 //   - codes.NotFound if result cannot be provided by storage due to the absence of data.
 //   - codes.Internal when event payload conversion failed.
-//   - indexer.ErrIndexNotInitialized when txResultsIndex not initialized
+//   - storage.ErrIndexNotInitialized when txResultsIndex not initialized
 //   - storage.ErrHeightNotIndexed when data is unavailable
 //
 // All other errors are considered as state corruption (fatal) or internal errors in the transaction error message
@@ -225,7 +225,7 @@ func (t *LocalTransactionProvider) TransactionResultByIndex(
 // Expected errors during normal operation:
 //   - codes.NotFound if result cannot be provided by storage due to the absence of data.
 //   - codes.Internal when event payload conversion failed.
-//   - indexer.ErrIndexNotInitialized when txResultsIndex not initialized
+//   - storage.ErrIndexNotInitialized when txResultsIndex not initialized
 //   - storage.ErrHeightNotIndexed when data is unavailable
 //
 // All other errors are considered as state corruption (fatal) or internal errors in the transaction error message
@@ -265,7 +265,7 @@ func (t *LocalTransactionProvider) TransactionsByBlockID(
 // Expected errors during normal operation:
 //   - codes.NotFound if result cannot be provided by storage due to the absence of data.
 //   - codes.Internal when event payload conversion failed.
-//   - indexer.ErrIndexNotInitialized when txResultsIndex not initialized
+//   - storage.ErrIndexNotInitialized when txResultsIndex not initialized
 //   - storage.ErrHeightNotIndexed when data is unavailable
 func (t *LocalTransactionProvider) TransactionResultsByBlockID(
 	ctx context.Context,

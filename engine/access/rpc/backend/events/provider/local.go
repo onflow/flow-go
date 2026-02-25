@@ -13,7 +13,6 @@ import (
 	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module/state_synchronization/indexer"
 	"github.com/onflow/flow-go/storage"
 )
 
@@ -47,7 +46,7 @@ func (l *LocalEventProvider) Events(
 		if err != nil {
 			if errors.Is(err, storage.ErrNotFound) ||
 				errors.Is(err, storage.ErrHeightNotIndexed) ||
-				errors.Is(err, indexer.ErrIndexNotInitialized) {
+				errors.Is(err, storage.ErrIndexNotInitialized) {
 				missing = append(missing, blockInfo)
 				continue
 			}

@@ -1644,6 +1644,7 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 				scheduledTxIndexer := extended.NewScheduledTransactions(
 					node.Logger,
 					builder.ExtendedStorage.ScheduledTransactionsBootstrapper,
+					builder.ScriptExecutor,
 					node.RootChainID,
 				)
 

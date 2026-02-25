@@ -8,7 +8,6 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	"github.com/onflow/flow-go/module/state_synchronization/indexer"
 	"github.com/onflow/flow-go/storage"
 )
 
@@ -78,7 +77,7 @@ func ConvertIndexError(err error, height uint64, defaultMsg string) error {
 		return nil
 	}
 
-	if errors.Is(err, indexer.ErrIndexNotInitialized) {
+	if errors.Is(err, storage.ErrIndexNotInitialized) {
 		return status.Errorf(codes.FailedPrecondition, "data for block is not available: %v", err)
 	}
 

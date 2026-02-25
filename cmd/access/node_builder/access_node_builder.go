@@ -1116,6 +1116,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				scheduledTxIndexer := extended.NewScheduledTransactions(
 					node.Logger,
 					builder.ExtendedStorage.ScheduledTransactionsBootstrapper,
+					builder.ScriptExecutor,
 					node.RootChainID,
 				)
 

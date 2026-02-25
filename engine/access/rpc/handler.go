@@ -22,7 +22,7 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/counters"
 	"github.com/onflow/flow-go/module/state_synchronization"
-	"github.com/onflow/flow-go/module/state_synchronization/indexer"
+	"github.com/onflow/flow-go/storage"
 )
 
 type Handler struct {
@@ -1581,7 +1581,7 @@ func (h *Handler) buildMetadataResponse() (*entities.Metadata, error) {
 	if h.indexReporter != nil {
 		highestIndexedHeight, err := h.indexReporter.HighestIndexedHeight()
 		if err != nil {
-			if !errors.Is(err, indexer.ErrIndexNotInitialized) {
+			if !errors.Is(err, storage.ErrIndexNotInitialized) {
 				return nil, rpc.ConvertIndexError(err, lastFinalizedHeader.Height, "could not get highest indexed height")
 			}
 			highestIndexedHeight = 0

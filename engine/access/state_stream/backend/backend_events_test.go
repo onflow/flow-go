@@ -17,8 +17,8 @@ import (
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module/state_synchronization/indexer"
 	syncmock "github.com/onflow/flow-go/module/state_synchronization/mock"
+	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/unittest"
 	"github.com/onflow/flow-go/utils/unittest/mocks"
 )
@@ -623,7 +623,7 @@ func (s *BackendExecutionDataSuite) TestSubscribeEventsHandlesErrors() {
 		defer subCancel()
 
 		s.executionDataTracker.On("GetStartHeight", subCtx, flow.ZeroID, uint64(0)).
-			Return(uint64(0), status.Errorf(codes.FailedPrecondition, "failed to get lowest indexed height: %v", indexer.ErrIndexNotInitialized)).
+			Return(uint64(0), status.Errorf(codes.FailedPrecondition, "failed to get lowest indexed height: %v", storage.ErrIndexNotInitialized)).
 			Once()
 
 		// Note: eventIndex.Initialize() is not called in this test
@@ -698,7 +698,7 @@ func (s *BackendExecutionDataSuite) TestSubscribeEventsFromStartBlockIDHandlesEr
 		defer subCancel()
 
 		s.executionDataTracker.On("GetStartHeightFromBlockID", flow.ZeroID).
-			Return(uint64(0), status.Errorf(codes.FailedPrecondition, "failed to get lowest indexed height: %v", indexer.ErrIndexNotInitialized)).
+			Return(uint64(0), status.Errorf(codes.FailedPrecondition, "failed to get lowest indexed height: %v", storage.ErrIndexNotInitialized)).
 			Once()
 
 		// Note: eventIndex.Initialize() is not called in this test
@@ -787,7 +787,7 @@ func (s *BackendExecutionDataSuite) TestSubscribeEventsFromStartHeightHandlesErr
 		defer subCancel()
 
 		s.executionDataTracker.On("GetStartHeightFromHeight", s.blocks[0].Height).
-			Return(uint64(0), status.Errorf(codes.FailedPrecondition, "failed to get lowest indexed height: %v", indexer.ErrIndexNotInitialized)).
+			Return(uint64(0), status.Errorf(codes.FailedPrecondition, "failed to get lowest indexed height: %v", storage.ErrIndexNotInitialized)).
 			Once()
 
 		// Note: eventIndex.Initialize() is not called in this test
