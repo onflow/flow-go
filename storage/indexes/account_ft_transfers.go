@@ -7,7 +7,6 @@ import (
 	"math/big"
 
 	"github.com/jordanschalm/lockctx"
-	"go.uber.org/atomic"
 
 	"github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
@@ -33,9 +32,7 @@ import (
 // All read methods are safe for concurrent access. Write methods (Store)
 // must be called sequentially with consecutive heights.
 type FungibleTokenTransfers struct {
-	db           storage.DB
-	firstHeight  uint64
-	latestHeight *atomic.Uint64
+	*IndexState
 }
 
 // storedFungibleTokenTransfer is the internal value stored in the database for each FT transfer entry.
@@ -46,7 +43,10 @@ type storedFungibleTokenTransfer struct {
 	SourceAddress    flow.Address
 	RecipientAddress flow.Address
 	TokenType        string
-	Amount           []byte // big.Int.Bytes() representation
+
+	// Amount is the token amount transferred.
+	// Stored as []byte (big.Int) instead of uint64 to allow storing both UFix64 and EVM UInt256 values.
+	Amount []byte
 }
 
 const (
@@ -71,24 +71,16 @@ var _ storage.FungibleTokenTransfers = (*FungibleTokenTransfers)(nil)
 // Expected error returns during normal operations:
 //   - [storage.ErrNotBootstrapped] if the index has not been initialized
 func NewFungibleTokenTransfers(db storage.DB) (*FungibleTokenTransfers, error) {
-	firstHeight, err := readHeight(db.Reader(), keyAccountFTTransferFirstHeightKey)
+	state, err := NewIndexState(
+		db,
+		storage.LockIndexFungibleTokenTransfers,
+		keyAccountFTTransferFirstHeightKey,
+		keyAccountFTTransferLatestHeightKey,
+	)
 	if err != nil {
-		if errors.Is(err, storage.ErrNotFound) {
-			return nil, storage.ErrNotBootstrapped
-		}
-		return nil, fmt.Errorf("could not get first height: %w", err)
+		return nil, fmt.Errorf("could not create index state: %w", err)
 	}
-
-	persistedLatestHeight, err := readHeight(db.Reader(), keyAccountFTTransferLatestHeightKey)
-	if err != nil {
-		return nil, fmt.Errorf("could not get latest height: %w", err)
-	}
-
-	return &FungibleTokenTransfers{
-		db:           db,
-		firstHeight:  firstHeight,
-		latestHeight: atomic.NewUint64(persistedLatestHeight),
-	}, nil
+	return &FungibleTokenTransfers{IndexState: state}, nil
 }
 
 // BootstrapFungibleTokenTransfers initializes the fungible token transfer index with data from the first block,
@@ -104,26 +96,24 @@ func BootstrapFungibleTokenTransfers(
 	initialStartHeight uint64,
 	transfers []access.FungibleTokenTransfer,
 ) (*FungibleTokenTransfers, error) {
-	err := initializeFTTransfers(lctx, rw, initialStartHeight, transfers)
+	state, err := BootstrapIndexState(
+		lctx,
+		rw,
+		db,
+		storage.LockIndexFungibleTokenTransfers,
+		keyAccountFTTransferFirstHeightKey,
+		keyAccountFTTransferLatestHeightKey,
+		initialStartHeight,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("could not bootstrap fungible token transfers: %w", err)
 	}
 
-	return &FungibleTokenTransfers{
-		db:           db,
-		firstHeight:  initialStartHeight,
-		latestHeight: atomic.NewUint64(initialStartHeight),
-	}, nil
-}
+	if err := storeAllFTTransfers(rw, initialStartHeight, transfers); err != nil {
+		return nil, fmt.Errorf("could not store fungible token transfers: %w", err)
+	}
 
-// FirstIndexedHeight returns the first (oldest) block height that has been indexed.
-func (idx *FungibleTokenTransfers) FirstIndexedHeight() uint64 {
-	return idx.firstHeight
-}
-
-// LatestIndexedHeight returns the latest block height that has been indexed.
-func (idx *FungibleTokenTransfers) LatestIndexedHeight() uint64 {
-	return idx.latestHeight.Load()
+	return &FungibleTokenTransfers{IndexState: state}, nil
 }
 
 // ByAddress retrieves fungible token transfers involving the given account using cursor-based
@@ -153,15 +143,8 @@ func (idx *FungibleTokenTransfers) ByAddress(
 
 	latestHeight := idx.latestHeight.Load()
 	if cursor != nil {
-		if cursor.BlockHeight > latestHeight {
-			return access.FungibleTokenTransfersPage{}, fmt.Errorf(
-				"cursor height %d is greater than latest indexed height %d: %w",
-				cursor.BlockHeight, latestHeight, storage.ErrHeightNotIndexed)
-		}
-		if cursor.BlockHeight < idx.firstHeight {
-			return access.FungibleTokenTransfersPage{}, fmt.Errorf(
-				"cursor height %d is before first indexed height %d: %w",
-				cursor.BlockHeight, idx.firstHeight, storage.ErrHeightNotIndexed)
+		if err := validateCursorHeight(cursor.BlockHeight, idx.firstHeight, latestHeight); err != nil {
+			return access.FungibleTokenTransfersPage{}, err
 		}
 		latestHeight = cursor.BlockHeight
 	}
@@ -182,27 +165,11 @@ func (idx *FungibleTokenTransfers) ByAddress(
 // Expected error returns during normal operations:
 //   - [storage.ErrAlreadyExists] if the block height is already indexed
 func (idx *FungibleTokenTransfers) Store(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockHeight uint64, transfers []access.FungibleTokenTransfer) error {
-	latestHeight := idx.latestHeight.Load()
-
-	if blockHeight <= latestHeight {
-		return storage.ErrAlreadyExists
+	if err := idx.PrepareStore(lctx, rw, blockHeight); err != nil {
+		return fmt.Errorf("could not prepare store for block %d: %w", blockHeight, err)
 	}
 
-	expectedHeight := latestHeight + 1
-	if blockHeight != expectedHeight {
-		return fmt.Errorf("must index consecutive heights: expected %d, got %d", expectedHeight, blockHeight)
-	}
-
-	err := indexFTTransfers(lctx, rw, blockHeight, transfers)
-	if err != nil {
-		return fmt.Errorf("could not index fungible token transfers: %w", err)
-	}
-
-	storage.OnCommitSucceed(rw, func() {
-		idx.latestHeight.Store(blockHeight)
-	})
-
-	return nil
+	return storeAllFTTransfers(rw, blockHeight, transfers)
 }
 
 // lookupFTTransfers retrieves fungible token transfers for a given address using cursor-based
@@ -231,11 +198,12 @@ func lookupFTTransfers(
 	endKey := makeFTTransferKeyPrefix(address, lowestHeight)
 
 	// We fetch limit+1 to determine if there are more results beyond this page.
-	fetchLimit := limit + 1
+	// use uint64 to avoid overflows if limit is math.MaxUint32
+	fetchLimit := uint64(limit) + 1
 
 	var collected []access.FungibleTokenTransfer
-	skipFirst := cursor != nil // skip the entry at the exact cursor position
 
+	// TODO: construct the key, and use SeekGE to skip to the cursor position.
 	err := operation.IterateKeys(reader, startKey, endKey,
 		func(keyCopy []byte, getValue func(any) error) (bail bool, err error) {
 			_, height, txIndex, eventIndex, err := decodeFTTransferKey(keyCopy)
@@ -243,19 +211,18 @@ func lookupFTTransfers(
 				return true, fmt.Errorf("could not decode key: %w", err)
 			}
 
-			// Skip entries at or before the cursor position (it was the last item of the previous page).
-			if skipFirst {
+			// the cursor is the next entry to return. skip all entries before it.
+			if cursor != nil {
+				// heights are descending (stored as one's complement); transaction and event indexes are ascending.
 				if height > cursor.BlockHeight {
 					return false, nil
 				}
 				if height == cursor.BlockHeight && txIndex < cursor.TransactionIndex {
 					return false, nil
 				}
-				if height == cursor.BlockHeight && txIndex == cursor.TransactionIndex && eventIndex <= cursor.EventIndex {
+				if height == cursor.BlockHeight && txIndex == cursor.TransactionIndex && eventIndex < cursor.EventIndex {
 					return false, nil
 				}
-				// Past the cursor position. Stop skipping.
-				skipFirst = false
 			}
 
 			var stored storedFungibleTokenTransfer
@@ -280,7 +247,7 @@ func lookupFTTransfers(
 
 			collected = append(collected, transfer)
 
-			if uint32(len(collected)) >= fetchLimit {
+			if uint64(len(collected)) >= fetchLimit {
 				return true, nil // bail after collecting enough
 			}
 
@@ -291,51 +258,35 @@ func lookupFTTransfers(
 		return access.FungibleTokenTransfersPage{}, fmt.Errorf("could not iterate keys: %w", err)
 	}
 
-	page := access.FungibleTokenTransfersPage{}
-
-	if uint32(len(collected)) > limit {
-		// The extra entry tells us there are more results.
-		page.Transfers = collected[:limit]
-		last := collected[limit-1]
-		page.NextCursor = &access.TransferCursor{
-			BlockHeight:      last.BlockHeight,
-			TransactionIndex: last.TransactionIndex,
-			EventIndex:       ftEventIndex(last),
-		}
-	} else {
-		page.Transfers = collected
+	if uint32(len(collected)) <= limit {
+		return access.FungibleTokenTransfersPage{
+			Transfers: collected,
+		}, nil
 	}
 
-	return page, nil
+	// we fetched one extra entry to check if there are more results. use it as the next cursor.
+	nextEntry := collected[limit]
+	return access.FungibleTokenTransfersPage{
+		Transfers: collected[:limit],
+		NextCursor: &access.TransferCursor{
+			BlockHeight:      nextEntry.BlockHeight,
+			TransactionIndex: nextEntry.TransactionIndex,
+			EventIndex:       ftEventIndex(nextEntry),
+		},
+	}, nil
 }
 
-// indexFTTransfers indexes all fungible token transfers for a block.
+// storeAllFTTransfers writes all fungible token transfer entries for a block.
 // Each transfer produces two entries: one keyed by source address and one keyed by recipient address.
 // The caller must hold the [storage.LockIndexFungibleTokenTransfers] lock until the batch is committed.
 //
 // No error returns are expected during normal operation.
-func indexFTTransfers(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockHeight uint64, transfers []access.FungibleTokenTransfer) error {
-	if !lctx.HoldsLock(storage.LockIndexFungibleTokenTransfers) {
-		return fmt.Errorf("missing required lock: %s", storage.LockIndexFungibleTokenTransfers)
-	}
-
-	latestHeight, err := readHeight(rw.GlobalReader(), keyAccountFTTransferLatestHeightKey)
-	if err != nil {
-		return fmt.Errorf("could not get latest indexed height: %w", err)
-	}
-	if blockHeight != latestHeight+1 {
-		return fmt.Errorf("must index consecutive heights: expected %d, got %d", latestHeight+1, blockHeight)
-	}
-
+func storeAllFTTransfers(rw storage.ReaderBatchWriter, blockHeight uint64, transfers []access.FungibleTokenTransfer) error {
 	writer := rw.Writer()
 
 	for _, entry := range transfers {
-		if entry.BlockHeight != blockHeight {
-			return fmt.Errorf("block height mismatch: expected %d, got %d", blockHeight, entry.BlockHeight)
-		}
-
-		if len(entry.EventIndices) == 0 {
-			return fmt.Errorf("transfer must have at least one event index (tx=%s)", entry.TransactionID)
+		if err := validateFTTransfer(blockHeight, entry); err != nil {
+			return fmt.Errorf("invalid fungible token transfer: %w", err)
 		}
 
 		value := makeFTTransferValue(entry)
@@ -353,70 +304,6 @@ func indexFTTransfers(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockHei
 		if err := operation.UpsertByKey(writer, recipientKey, value); err != nil {
 			return fmt.Errorf("could not set key for recipient %s, tx %s: %w", entry.RecipientAddress, entry.TransactionID, err)
 		}
-	}
-
-	// Update latest height
-	if err := operation.UpsertByKey(writer, keyAccountFTTransferLatestHeightKey, blockHeight); err != nil {
-		return fmt.Errorf("could not update latest height: %w", err)
-	}
-
-	return nil
-}
-
-// initializeFTTransfers initializes the fungible token transfer index with data from the first block.
-// The caller must hold the [storage.LockIndexFungibleTokenTransfers] lock until the batch is committed.
-//
-// Expected error returns during normal operations:
-//   - [storage.ErrAlreadyExists] if the bounds keys already exist
-func initializeFTTransfers(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockHeight uint64, transfers []access.FungibleTokenTransfer) error {
-	if !lctx.HoldsLock(storage.LockIndexFungibleTokenTransfers) {
-		return fmt.Errorf("missing required lock: %s", storage.LockIndexFungibleTokenTransfers)
-	}
-
-	exists, err := operation.KeyExists(rw.GlobalReader(), keyAccountFTTransferFirstHeightKey)
-	if err != nil {
-		return fmt.Errorf("could not check if first height key exists: %w", err)
-	}
-	if exists {
-		return fmt.Errorf("first height key already exists: %w", storage.ErrAlreadyExists)
-	}
-
-	exists, err = operation.KeyExists(rw.GlobalReader(), keyAccountFTTransferLatestHeightKey)
-	if err != nil {
-		return fmt.Errorf("could not check if latest height key exists: %w", err)
-	}
-	if exists {
-		return fmt.Errorf("latest height key already exists: %w", storage.ErrAlreadyExists)
-	}
-
-	writer := rw.Writer()
-
-	for _, entry := range transfers {
-		if entry.BlockHeight != blockHeight {
-			return fmt.Errorf("block height mismatch: expected %d, got %d", blockHeight, entry.BlockHeight)
-		}
-
-		value := makeFTTransferValue(entry)
-		eventIndex := ftEventIndex(entry)
-
-		// Index under source address
-		sourceKey := makeFTTransferKey(entry.SourceAddress, entry.BlockHeight, entry.TransactionIndex, eventIndex)
-		if err := operation.UpsertByKey(writer, sourceKey, value); err != nil {
-			return fmt.Errorf("could not set key for source %s, tx %s: %w", entry.SourceAddress, entry.TransactionID, err)
-		}
-
-		// Index under recipient address
-		recipientKey := makeFTTransferKey(entry.RecipientAddress, entry.BlockHeight, entry.TransactionIndex, eventIndex)
-		if err := operation.UpsertByKey(writer, recipientKey, value); err != nil {
-			return fmt.Errorf("could not set key for recipient %s, tx %s: %w", entry.RecipientAddress, entry.TransactionID, err)
-		}
-	}
-
-	if err := operation.UpsertByKey(writer, keyAccountFTTransferFirstHeightKey, blockHeight); err != nil {
-		return fmt.Errorf("could not update first height: %w", err)
-	}
-	if err := operation.UpsertByKey(writer, keyAccountFTTransferLatestHeightKey, blockHeight); err != nil {
-		return fmt.Errorf("could not update latest height: %w", err)
 	}
 
 	return nil
@@ -501,4 +388,17 @@ func decodeFTTransferKey(key []byte) (flow.Address, uint64, uint32, uint32, erro
 	eventIndex := binary.BigEndian.Uint32(key[offset:])
 
 	return address, height, txIndex, eventIndex, nil
+}
+
+// validateFTTransfer validates the fungible token transfer is valid.
+//
+// Any error indicates the transfer is invalid.
+func validateFTTransfer(blockHeight uint64, transfer access.FungibleTokenTransfer) error {
+	if transfer.BlockHeight != blockHeight {
+		return fmt.Errorf("block height mismatch: expected %d, got %d", blockHeight, transfer.BlockHeight)
+	}
+	if len(transfer.EventIndices) == 0 {
+		return fmt.Errorf("transfer must have at least one event index (tx=%s)", transfer.TransactionID)
+	}
+	return nil
 }

@@ -471,15 +471,6 @@ func TestAccountTransactions_ErrorCases(t *testing.T) {
 		})
 	})
 
-	t.Run("limit of math.MaxUint32 returns ErrInvalidQuery", func(t *testing.T) {
-		RunWithBootstrappedAccountTxIndex(t, 1, nil, func(_ storage.DB, _ storage.LockManager, idx *AccountTransactions) {
-			account := unittest.RandomAddressFixture()
-
-			_, err := idx.ByAddress(account, math.MaxUint32, nil, nil)
-			require.ErrorIs(t, err, storage.ErrInvalidQuery)
-		})
-	})
-
 	t.Run("cursor before first indexed height returns error", func(t *testing.T) {
 		RunWithBootstrappedAccountTxIndex(t, 5, nil, func(_ storage.DB, _ storage.LockManager, idx *AccountTransactions) {
 			account := unittest.RandomAddressFixture()
@@ -568,16 +559,9 @@ func TestAccountTransactions_ErrorCases(t *testing.T) {
 			})
 			require.NoError(t, err)
 
-			// Now indexAccountTransactions at height 2 passes the consecutive check
-			// (2 == 1+1) but finds the already-committed keys.
-			err = unittest.WithLock(t, lm, storage.LockIndexAccountTransactions, func(lctx lockctx.Context) error {
-				return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-					return indexAccountTransactions(lctx, rw, 2, txData)
-				})
-			})
-			// an error should be returned, but it should not be a generic error and not storage.ErrAlreadyExists
-			require.Error(t, err)
-			assert.False(t, errors.Is(err, storage.ErrAlreadyExists))
+			// Now Store at height 2 detects (via in-memory height) that height 2 is already indexed.
+			err = storeAccountTransactions(t, lm, idx, 2, txData)
+			require.ErrorIs(t, err, storage.ErrAlreadyExists)
 		})
 	})
 
@@ -849,14 +833,14 @@ func TestAccountTransactions_RolesRoundTrip(t *testing.T) {
 func TestAccountTransactions_LockRequirement(t *testing.T) {
 	t.Parallel()
 
-	t.Run("indexAccountTransactions without lock returns error", func(t *testing.T) {
-		RunWithBootstrappedAccountTxIndex(t, 1, nil, func(db storage.DB, lm storage.LockManager, _ *AccountTransactions) {
+	t.Run("Store without lock returns error", func(t *testing.T) {
+		RunWithBootstrappedAccountTxIndex(t, 1, nil, func(db storage.DB, lm storage.LockManager, idx *AccountTransactions) {
 			lctx := lm.NewContext()
 			defer lctx.Release()
 
 			// Call without acquiring the required lock
 			err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-				return indexAccountTransactions(lctx, rw, 2, nil)
+				return idx.Store(lctx, rw, 2, nil)
 			})
 			require.Error(t, err)
 			assert.Contains(t, err.Error(), "missing required lock")

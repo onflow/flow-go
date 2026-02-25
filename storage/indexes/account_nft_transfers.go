@@ -6,7 +6,6 @@ import (
 	"fmt"
 
 	"github.com/jordanschalm/lockctx"
-	"go.uber.org/atomic"
 
 	"github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
@@ -32,9 +31,7 @@ import (
 // All read methods are safe for concurrent access. Write methods (Store)
 // must be called sequentially with consecutive heights.
 type NonFungibleTokenTransfers struct {
-	db           storage.DB
-	firstHeight  uint64
-	latestHeight *atomic.Uint64
+	*IndexState
 }
 
 // storedNonFungibleTokenTransfer is the internal value stored in the database for each NFT transfer entry.
@@ -69,24 +66,16 @@ var _ storage.NonFungibleTokenTransfers = (*NonFungibleTokenTransfers)(nil)
 // Expected error returns during normal operations:
 //   - [storage.ErrNotBootstrapped] if the index has not been initialized
 func NewNonFungibleTokenTransfers(db storage.DB) (*NonFungibleTokenTransfers, error) {
-	firstHeight, err := readHeight(db.Reader(), keyAccountNFTTransferFirstHeightKey)
+	state, err := NewIndexState(
+		db,
+		storage.LockIndexNonFungibleTokenTransfers,
+		keyAccountNFTTransferFirstHeightKey,
+		keyAccountNFTTransferLatestHeightKey,
+	)
 	if err != nil {
-		if errors.Is(err, storage.ErrNotFound) {
-			return nil, storage.ErrNotBootstrapped
-		}
-		return nil, fmt.Errorf("could not get first height: %w", err)
+		return nil, fmt.Errorf("could not create index state: %w", err)
 	}
-
-	persistedLatestHeight, err := readHeight(db.Reader(), keyAccountNFTTransferLatestHeightKey)
-	if err != nil {
-		return nil, fmt.Errorf("could not get latest height: %w", err)
-	}
-
-	return &NonFungibleTokenTransfers{
-		db:           db,
-		firstHeight:  firstHeight,
-		latestHeight: atomic.NewUint64(persistedLatestHeight),
-	}, nil
+	return &NonFungibleTokenTransfers{IndexState: state}, nil
 }
 
 // BootstrapNonFungibleTokenTransfers initializes the non-fungible token transfer index with data from the
@@ -102,26 +91,24 @@ func BootstrapNonFungibleTokenTransfers(
 	initialStartHeight uint64,
 	transfers []access.NonFungibleTokenTransfer,
 ) (*NonFungibleTokenTransfers, error) {
-	err := initializeNFTTransfers(lctx, rw, initialStartHeight, transfers)
+	state, err := BootstrapIndexState(
+		lctx,
+		rw,
+		db,
+		storage.LockIndexNonFungibleTokenTransfers,
+		keyAccountNFTTransferFirstHeightKey,
+		keyAccountNFTTransferLatestHeightKey,
+		initialStartHeight,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("could not bootstrap non-fungible token transfers: %w", err)
 	}
 
-	return &NonFungibleTokenTransfers{
-		db:           db,
-		firstHeight:  initialStartHeight,
-		latestHeight: atomic.NewUint64(initialStartHeight),
-	}, nil
-}
+	if err := storeAllNFTTransfers(rw, initialStartHeight, transfers); err != nil {
+		return nil, fmt.Errorf("could not store non-fungible token transfers: %w", err)
+	}
 
-// FirstIndexedHeight returns the first (oldest) block height that has been indexed.
-func (idx *NonFungibleTokenTransfers) FirstIndexedHeight() uint64 {
-	return idx.firstHeight
-}
-
-// LatestIndexedHeight returns the latest block height that has been indexed.
-func (idx *NonFungibleTokenTransfers) LatestIndexedHeight() uint64 {
-	return idx.latestHeight.Load()
+	return &NonFungibleTokenTransfers{IndexState: state}, nil
 }
 
 // ByAddress retrieves non-fungible token transfers involving the given account,
@@ -144,15 +131,8 @@ func (idx *NonFungibleTokenTransfers) ByAddress(
 
 	latestHeight := idx.latestHeight.Load()
 	if cursor != nil {
-		if cursor.BlockHeight > latestHeight {
-			return access.NonFungibleTokenTransfersPage{}, fmt.Errorf(
-				"cursor height %d is greater than latest indexed height %d: %w",
-				cursor.BlockHeight, latestHeight, storage.ErrHeightNotIndexed)
-		}
-		if cursor.BlockHeight < idx.firstHeight {
-			return access.NonFungibleTokenTransfersPage{}, fmt.Errorf(
-				"cursor height %d is before first indexed height %d: %w",
-				cursor.BlockHeight, idx.firstHeight, storage.ErrHeightNotIndexed)
+		if err := validateCursorHeight(cursor.BlockHeight, idx.firstHeight, latestHeight); err != nil {
+			return access.NonFungibleTokenTransfersPage{}, err
 		}
 		latestHeight = cursor.BlockHeight
 	}
@@ -173,27 +153,11 @@ func (idx *NonFungibleTokenTransfers) ByAddress(
 // Expected error returns during normal operations:
 //   - [storage.ErrAlreadyExists] if the block height is already indexed
 func (idx *NonFungibleTokenTransfers) Store(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockHeight uint64, transfers []access.NonFungibleTokenTransfer) error {
-	latestHeight := idx.latestHeight.Load()
-
-	if blockHeight <= latestHeight {
-		return storage.ErrAlreadyExists
+	if err := idx.PrepareStore(lctx, rw, blockHeight); err != nil {
+		return fmt.Errorf("could not prepare store for block %d: %w", blockHeight, err)
 	}
 
-	expectedHeight := latestHeight + 1
-	if blockHeight != expectedHeight {
-		return fmt.Errorf("must index consecutive heights: expected %d, got %d", expectedHeight, blockHeight)
-	}
-
-	err := indexNFTTransfers(lctx, rw, blockHeight, transfers)
-	if err != nil {
-		return fmt.Errorf("could not index non-fungible token transfers: %w", err)
-	}
-
-	storage.OnCommitSucceed(rw, func() {
-		idx.latestHeight.Store(blockHeight)
-	})
-
-	return nil
+	return storeAllNFTTransfers(rw, blockHeight, transfers)
 }
 
 // lookupNFTTransfers retrieves non-fungible token transfers for a given address within the specified
@@ -213,11 +177,13 @@ func lookupNFTTransfers(
 	startKey := makeNFTTransferKeyPrefix(address, highestHeight)
 	endKey := makeNFTTransferKeyPrefix(address, lowestHeight)
 
-	fetchLimit := limit + 1
+	// We fetch limit+1 to determine if there are more results beyond this page.
+	// use uint64 to avoid overflows if limit is math.MaxUint32
+	fetchLimit := uint64(limit) + 1
 
 	var collected []access.NonFungibleTokenTransfer
-	skipFirst := cursor != nil
 
+	// TODO: construct the key, and use SeekGE to skip to the cursor position.
 	err := operation.IterateKeys(reader, startKey, endKey,
 		func(keyCopy []byte, getValue func(any) error) (bail bool, err error) {
 			_, height, txIndex, eventIndex, err := decodeNFTTransferKey(keyCopy)
@@ -225,18 +191,18 @@ func lookupNFTTransfers(
 				return true, fmt.Errorf("could not decode key: %w", err)
 			}
 
-			// Skip entries at or before the cursor position
-			if skipFirst {
+			// the cursor is the next entry to return. skip all entries before it.
+			if cursor != nil {
+				// heights are descending (stored as one's complement); transaction and event indexes are ascending.
 				if height > cursor.BlockHeight {
 					return false, nil
 				}
 				if height == cursor.BlockHeight && txIndex < cursor.TransactionIndex {
 					return false, nil
 				}
-				if height == cursor.BlockHeight && txIndex == cursor.TransactionIndex && eventIndex <= cursor.EventIndex {
+				if height == cursor.BlockHeight && txIndex == cursor.TransactionIndex && eventIndex < cursor.EventIndex {
 					return false, nil
 				}
-				skipFirst = false
 			}
 
 			var stored storedNonFungibleTokenTransfer
@@ -261,7 +227,7 @@ func lookupNFTTransfers(
 
 			collected = append(collected, transfer)
 
-			if uint32(len(collected)) >= fetchLimit {
+			if uint64(len(collected)) >= fetchLimit {
 				return true, nil
 			}
 
@@ -272,41 +238,30 @@ func lookupNFTTransfers(
 		return access.NonFungibleTokenTransfersPage{}, fmt.Errorf("could not iterate keys: %w", err)
 	}
 
-	page := access.NonFungibleTokenTransfersPage{}
-
-	if uint32(len(collected)) > limit {
-		page.Transfers = collected[:limit]
-		last := collected[limit-1]
-		page.NextCursor = &access.TransferCursor{
-			BlockHeight:      last.BlockHeight,
-			TransactionIndex: last.TransactionIndex,
-			EventIndex:       nftTransferEventIndex(last),
-		}
-	} else {
-		page.Transfers = collected
+	if uint32(len(collected)) <= limit {
+		return access.NonFungibleTokenTransfersPage{
+			Transfers: collected,
+		}, nil
 	}
 
-	return page, nil
+	// we fetched one extra entry to check if there are more results. use it as the next cursor.
+	nextEntry := collected[limit]
+	return access.NonFungibleTokenTransfersPage{
+		Transfers: collected[:limit],
+		NextCursor: &access.TransferCursor{
+			BlockHeight:      nextEntry.BlockHeight,
+			TransactionIndex: nextEntry.TransactionIndex,
+			EventIndex:       nftTransferEventIndex(nextEntry),
+		},
+	}, nil
 }
 
-// indexNFTTransfers indexes all non-fungible token transfers for a block.
+// storeAllNFTTransfers writes all non-fungible token transfer entries for a block.
 // Each transfer produces two entries: one keyed by source address and one keyed by recipient address.
 // The caller must hold the [storage.LockIndexNonFungibleTokenTransfers] lock until the batch is committed.
 //
 // No error returns are expected during normal operation.
-func indexNFTTransfers(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockHeight uint64, transfers []access.NonFungibleTokenTransfer) error {
-	if !lctx.HoldsLock(storage.LockIndexNonFungibleTokenTransfers) {
-		return fmt.Errorf("missing required lock: %s", storage.LockIndexNonFungibleTokenTransfers)
-	}
-
-	latestHeight, err := readHeight(rw.GlobalReader(), keyAccountNFTTransferLatestHeightKey)
-	if err != nil {
-		return fmt.Errorf("could not get latest indexed height: %w", err)
-	}
-	if blockHeight != latestHeight+1 {
-		return fmt.Errorf("must index consecutive heights: expected %d, got %d", latestHeight+1, blockHeight)
-	}
-
+func storeAllNFTTransfers(rw storage.ReaderBatchWriter, blockHeight uint64, transfers []access.NonFungibleTokenTransfer) error {
 	writer := rw.Writer()
 
 	for _, entry := range transfers {
@@ -329,71 +284,6 @@ func indexNFTTransfers(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockHe
 		if err := operation.UpsertByKey(writer, recipientKey, value); err != nil {
 			return fmt.Errorf("could not set key for recipient %s, tx %s: %w", entry.RecipientAddress, entry.TransactionID, err)
 		}
-	}
-
-	// Update latest height
-	if err := operation.UpsertByKey(writer, keyAccountNFTTransferLatestHeightKey, blockHeight); err != nil {
-		return fmt.Errorf("could not update latest height: %w", err)
-	}
-
-	return nil
-}
-
-// initializeNFTTransfers initializes the non-fungible token transfer index with data from the first block.
-// The caller must hold the [storage.LockIndexNonFungibleTokenTransfers] lock until the batch is committed.
-//
-// Expected error returns during normal operations:
-//   - [storage.ErrAlreadyExists] if the bounds keys already exist
-func initializeNFTTransfers(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockHeight uint64, transfers []access.NonFungibleTokenTransfer) error {
-	if !lctx.HoldsLock(storage.LockIndexNonFungibleTokenTransfers) {
-		return fmt.Errorf("missing required lock: %s", storage.LockIndexNonFungibleTokenTransfers)
-	}
-
-	exists, err := operation.KeyExists(rw.GlobalReader(), keyAccountNFTTransferFirstHeightKey)
-	if err != nil {
-		return fmt.Errorf("could not check if first height key exists: %w", err)
-	}
-	if exists {
-		return fmt.Errorf("first height key already exists: %w", storage.ErrAlreadyExists)
-	}
-
-	exists, err = operation.KeyExists(rw.GlobalReader(), keyAccountNFTTransferLatestHeightKey)
-	if err != nil {
-		return fmt.Errorf("could not check if latest height key exists: %w", err)
-	}
-	if exists {
-		return fmt.Errorf("latest height key already exists: %w", storage.ErrAlreadyExists)
-	}
-
-	writer := rw.Writer()
-
-	for _, entry := range transfers {
-		if entry.BlockHeight != blockHeight {
-			return fmt.Errorf("block height mismatch: expected %d, got %d", blockHeight, entry.BlockHeight)
-		}
-
-		value := makeNFTTransferValue(entry)
-
-		eventIndex := nftTransferEventIndex(entry)
-
-		// Index under source address
-		sourceKey := makeNFTTransferKey(entry.SourceAddress, entry.BlockHeight, entry.TransactionIndex, eventIndex)
-		if err := operation.UpsertByKey(writer, sourceKey, value); err != nil {
-			return fmt.Errorf("could not set key for source %s, tx %s: %w", entry.SourceAddress, entry.TransactionID, err)
-		}
-
-		// Index under recipient address
-		recipientKey := makeNFTTransferKey(entry.RecipientAddress, entry.BlockHeight, entry.TransactionIndex, eventIndex)
-		if err := operation.UpsertByKey(writer, recipientKey, value); err != nil {
-			return fmt.Errorf("could not set key for recipient %s, tx %s: %w", entry.RecipientAddress, entry.TransactionID, err)
-		}
-	}
-
-	if err := operation.UpsertByKey(writer, keyAccountNFTTransferFirstHeightKey, blockHeight); err != nil {
-		return fmt.Errorf("could not update first height: %w", err)
-	}
-	if err := operation.UpsertByKey(writer, keyAccountNFTTransferLatestHeightKey, blockHeight); err != nil {
-		return fmt.Errorf("could not update latest height: %w", err)
 	}
 
 	return nil

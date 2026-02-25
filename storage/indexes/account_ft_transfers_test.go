@@ -619,15 +619,15 @@ func TestFTTransfers_KeyDecoding_Errors(t *testing.T) {
 func TestFTTransfers_LockRequirement(t *testing.T) {
 	t.Parallel()
 
-	t.Run("indexFTTransfers without lock returns error", func(t *testing.T) {
+	t.Run("Store without lock returns error", func(t *testing.T) {
 		t.Parallel()
-		RunWithBootstrappedFTTransferIndex(t, 1, nil, func(db storage.DB, lm storage.LockManager, _ *FungibleTokenTransfers) {
+		RunWithBootstrappedFTTransferIndex(t, 1, nil, func(db storage.DB, lm storage.LockManager, idx *FungibleTokenTransfers) {
 			lctx := lm.NewContext()
 			defer lctx.Release()
 
 			// Call without acquiring the required lock
 			err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-				return indexFTTransfers(lctx, rw, 2, nil)
+				return idx.Store(lctx, rw, 2, nil)
 			})
 			require.Error(t, err)
 			assert.Contains(t, err.Error(), "missing required lock")

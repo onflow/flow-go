@@ -540,14 +540,14 @@ func TestNFTTransfers_KeyDecoding_Errors(t *testing.T) {
 func TestNFTTransfers_LockRequirement(t *testing.T) {
 	t.Parallel()
 
-	t.Run("indexNFTTransfers without lock returns error", func(t *testing.T) {
-		RunWithBootstrappedNFTTransferIndex(t, 1, nil, func(db storage.DB, lm storage.LockManager, _ *NonFungibleTokenTransfers) {
+	t.Run("Store without lock returns error", func(t *testing.T) {
+		RunWithBootstrappedNFTTransferIndex(t, 1, nil, func(db storage.DB, lm storage.LockManager, idx *NonFungibleTokenTransfers) {
 			lctx := lm.NewContext()
 			defer lctx.Release()
 
 			// Call without acquiring the required lock
 			err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-				return indexNFTTransfers(lctx, rw, 2, nil)
+				return idx.Store(lctx, rw, 2, nil)
 			})
 			require.Error(t, err)
 			assert.Contains(t, err.Error(), "missing required lock")
