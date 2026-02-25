@@ -13,6 +13,7 @@ import (
 
 	"github.com/onflow/flow/protobuf/go/flow/entities"
 
+	providermock "github.com/onflow/flow-go/engine/access/rpc/backend/transactions/provider/mock"
 	accessmodel "github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
@@ -237,6 +238,53 @@ func TestBackend_GetAccountTransactions(t *testing.T) {
 		st, ok := status.FromError(err)
 		require.True(t, ok)
 		assert.Equal(t, codes.OutOfRange, st.Code())
+	})
+
+	t.Run("expand result without expand transaction succeeds when collection not indexed", func(t *testing.T) {
+		// Regression test: when expandOptions.Result=true and expandOptions.Transaction=false,
+		// getTransactionResult is called with isSystemChunkTx=false (since getTransactionBody is
+		// skipped). If LightByTransactionID returns ErrNotFound (e.g. asynchronous index not yet
+		// available), the old code called collection.ID() on a nil pointer, causing a panic.
+		// The fixed code skips the assignment and uses a zero collectionID instead.
+		mockStore := storagemock.NewAccountTransactionsReader(t)
+		mockHeaders := storagemock.NewHeaders(t)
+		mockCollections := storagemock.NewCollectionsReader(t)
+		mockProvider := providermock.NewTransactionProvider(t)
+		backend := NewAccountTransactionsBackend(
+			unittest.Logger(),
+			&backendBase{
+				config:               DefaultConfig(),
+				headers:              mockHeaders,
+				collections:          mockCollections,
+				transactionsProvider: mockProvider,
+			},
+			mockStore,
+			flow.Testnet.Chain(),
+		)
+
+		addr := unittest.RandomAddressFixture()
+		txID := unittest.IdentifierFixture()
+		blockHeader := unittest.BlockHeaderFixture()
+		expectedResult := &accessmodel.TransactionResult{}
+
+		storedPage := accessmodel.AccountTransactionsPage{
+			Transactions: []accessmodel.AccountTransaction{
+				{Address: addr, BlockHeight: blockHeader.Height, TransactionID: txID},
+			},
+		}
+
+		mockStore.On("ByAddress", addr, uint32(50), (*accessmodel.AccountTransactionCursor)(nil), mocktestify.Anything).Return(storedPage, nil)
+		mockHeaders.On("ByHeight", blockHeader.Height).Return(blockHeader, nil)
+		// Collection is not yet indexed; LightByTransactionID returns ErrNotFound.
+		mockCollections.On("LightByTransactionID", txID).Return((*flow.LightCollection)(nil), storage.ErrNotFound).Once()
+		// Expects zero collectionID since the collection lookup returned ErrNotFound.
+		mockProvider.On("TransactionResult", mocktestify.Anything, blockHeader, txID, flow.ZeroID, defaultEncoding).Return(expectedResult, nil).Once()
+
+		expandOptions := AccountTransactionExpandOptions{Result: true, Transaction: false}
+		page, err := backend.GetAccountTransactions(context.Background(), addr, 0, nil, AccountTransactionFilter{}, expandOptions, defaultEncoding)
+		require.NoError(t, err)
+		require.Len(t, page.Transactions, 1)
+		assert.Equal(t, expectedResult, page.Transactions[0].Result)
 	})
 
 	t.Run("unexpected error triggers irrecoverable", func(t *testing.T) {

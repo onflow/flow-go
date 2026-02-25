@@ -139,9 +139,11 @@ func (a *AccountTransactions) buildAccountTransactionsFromBlockData(data BlockDa
 	for i, tx := range data.Transactions {
 		txIndex := uint32(i)
 		txID := tx.ID()
-		_, isSystemTx := a.systemCollections.SearchAll(txID)
+
 		// all tx after the first system tx are in the system chunk
-		isSystemChunk = isSystemChunk || isSystemTx
+		if !isSystemChunk {
+			_, isSystemChunk = a.systemCollections.SearchAll(txID)
+		}
 
 		// Track roles per address. An address can have multiple roles (e.g., payer AND authorizer).
 		addrRoles := make(map[flow.Address][]access.TransactionRole)
@@ -152,7 +154,7 @@ func (a *AccountTransactions) buildAccountTransactionsFromBlockData(data BlockDa
 			// the service account authorizes all system transactions, and the scheduled tx executor
 			// account authorizes all scheduled transactions. skip indexing since we can derive them
 			// as needed.
-			if isSystemTx || isSystemChunk {
+			if isSystemChunk {
 				if auth == a.serviceAccount || auth == a.scheduledExecutorAccount {
 					continue
 				}

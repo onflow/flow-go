@@ -489,43 +489,37 @@ func TestAccountFTTransferFilter(t *testing.T) {
 
 	t.Run("sender role matches when account is source", func(t *testing.T) {
 		filter := AccountFTTransferFilter{
-			AccountAddress: senderAddr,
-			TransferRole:   accessmodel.TransferRoleSender,
+			SourceAddress: senderAddr,
 		}
 		assert.True(t, filter.Filter()(transfer))
 	})
 
 	t.Run("sender role rejects when account is not source", func(t *testing.T) {
 		filter := AccountFTTransferFilter{
-			AccountAddress: recipientAddr,
-			TransferRole:   accessmodel.TransferRoleSender,
+			SourceAddress: recipientAddr,
 		}
 		assert.False(t, filter.Filter()(transfer))
 	})
 
 	t.Run("recipient role matches when account is recipient", func(t *testing.T) {
 		filter := AccountFTTransferFilter{
-			AccountAddress: recipientAddr,
-			TransferRole:   accessmodel.TransferRoleRecipient,
+			RecipientAddress: recipientAddr,
 		}
 		assert.True(t, filter.Filter()(transfer))
 	})
 
 	t.Run("recipient role rejects when account is not recipient", func(t *testing.T) {
 		filter := AccountFTTransferFilter{
-			AccountAddress: senderAddr,
-			TransferRole:   accessmodel.TransferRoleRecipient,
+			RecipientAddress: senderAddr,
 		}
 		assert.False(t, filter.Filter()(transfer))
 	})
 
 	t.Run("combined filters all match", func(t *testing.T) {
 		filter := AccountFTTransferFilter{
-			AccountAddress:   senderAddr,
 			TokenType:        "A.1654653399040a61.FlowToken",
 			SourceAddress:    senderAddr,
 			RecipientAddress: recipientAddr,
-			TransferRole:     accessmodel.TransferRoleSender,
 		}
 		assert.True(t, filter.Filter()(transfer))
 	})
@@ -597,43 +591,37 @@ func TestAccountNFTTransferFilter(t *testing.T) {
 
 	t.Run("sender role matches when account is source", func(t *testing.T) {
 		filter := AccountNFTTransferFilter{
-			AccountAddress: senderAddr,
-			TransferRole:   accessmodel.TransferRoleSender,
+			SourceAddress: senderAddr,
 		}
 		assert.True(t, filter.Filter()(transfer))
 	})
 
 	t.Run("sender role rejects when account is not source", func(t *testing.T) {
 		filter := AccountNFTTransferFilter{
-			AccountAddress: recipientAddr,
-			TransferRole:   accessmodel.TransferRoleSender,
+			SourceAddress: recipientAddr,
 		}
 		assert.False(t, filter.Filter()(transfer))
 	})
 
 	t.Run("recipient role matches when account is recipient", func(t *testing.T) {
 		filter := AccountNFTTransferFilter{
-			AccountAddress: recipientAddr,
-			TransferRole:   accessmodel.TransferRoleRecipient,
+			RecipientAddress: recipientAddr,
 		}
 		assert.True(t, filter.Filter()(transfer))
 	})
 
 	t.Run("recipient role rejects when account is not recipient", func(t *testing.T) {
 		filter := AccountNFTTransferFilter{
-			AccountAddress: senderAddr,
-			TransferRole:   accessmodel.TransferRoleRecipient,
+			RecipientAddress: senderAddr,
 		}
 		assert.False(t, filter.Filter()(transfer))
 	})
 
 	t.Run("combined filters all match", func(t *testing.T) {
 		filter := AccountNFTTransferFilter{
-			AccountAddress:   senderAddr,
 			TokenType:        "A.1654653399040a61.MyNFT",
 			SourceAddress:    senderAddr,
 			RecipientAddress: recipientAddr,
-			TransferRole:     accessmodel.TransferRoleSender,
 		}
 		assert.True(t, filter.Filter()(transfer))
 	})

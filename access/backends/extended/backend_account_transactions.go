@@ -111,12 +111,12 @@ func (b *AccountTransactionsBackend) GetAccountTransactions(
 		return &page, nil
 	}
 
-	// enrich the transactions with additional details requested by the client
+	// expand the transactions with additional details requested by the client
 	// Note: if no transactions are found, the response will include an empty array and no error.
 	for i := range page.Transactions {
 		tx := &page.Transactions[i]
 		if err := b.expand(ctx, tx, expandOptions, encodingVersion); err != nil {
-			return nil, fmt.Errorf("failed to enrich transaction: %w", err)
+			return nil, fmt.Errorf("failed to expand transaction: %w", err)
 		}
 	}
 
