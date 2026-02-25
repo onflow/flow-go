@@ -18,11 +18,15 @@ func NewEntry[T any, C any](key []byte, decodeKey storage.DecodeKeyFunc[C], getV
 }
 
 // Cursor returns the cursor for the entry, which includes all data included in the storage key.
+//
+// Any error indicates the storage key cannot be decoded into a cursor.
 func (i Entry[T, C]) Cursor() (C, error) {
 	return i.decodeKey(i.key)
 }
 
 // Value returns the fully reconstructed value for the entry.
+//
+// Any error indicates the value cannot be reconstructed from the storage value.
 func (i Entry[T, C]) Value() (T, error) {
 	var v T
 	decodedKey, err := i.decodeKey(i.key) // TODO: avoid duplicate decoding

@@ -16,8 +16,12 @@ type DecodeKeyFunc[C any] func([]byte) (C, error)
 // It provides access to the cursor and value for the entry.
 type IteratorEntry[T any, C any] interface {
 	// Cursor returns the cursor for the entry, which includes all data included in the storage key.
+	//
+	// Any error indicates the storage key cannot be decoded into a cursor.
 	Cursor() (C, error)
 
 	// Value returns the fully reconstructed value for the entry.
+	//
+	// Any error indicates the value cannot be reconstructed from the storage value.
 	Value() (T, error)
 }
