@@ -69,7 +69,7 @@ var _ storage.NonFungibleTokenTransfers = (*NonFungibleTokenTransfers)(nil)
 // Expected error returns during normal operations:
 //   - [storage.ErrNotBootstrapped] if the index has not been initialized
 func NewNonFungibleTokenTransfers(db storage.DB) (*NonFungibleTokenTransfers, error) {
-	firstHeight, err := heightLookup(db.Reader(), keyAccountNFTTransferFirstHeightKey)
+	firstHeight, err := readHeight(db.Reader(), keyAccountNFTTransferFirstHeightKey)
 	if err != nil {
 		if errors.Is(err, storage.ErrNotFound) {
 			return nil, storage.ErrNotBootstrapped
@@ -77,7 +77,7 @@ func NewNonFungibleTokenTransfers(db storage.DB) (*NonFungibleTokenTransfers, er
 		return nil, fmt.Errorf("could not get first height: %w", err)
 	}
 
-	persistedLatestHeight, err := heightLookup(db.Reader(), keyAccountNFTTransferLatestHeightKey)
+	persistedLatestHeight, err := readHeight(db.Reader(), keyAccountNFTTransferLatestHeightKey)
 	if err != nil {
 		return nil, fmt.Errorf("could not get latest height: %w", err)
 	}
@@ -299,7 +299,7 @@ func indexNFTTransfers(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockHe
 		return fmt.Errorf("missing required lock: %s", storage.LockIndexNonFungibleTokenTransfers)
 	}
 
-	latestHeight, err := heightLookup(rw.GlobalReader(), keyAccountNFTTransferLatestHeightKey)
+	latestHeight, err := readHeight(rw.GlobalReader(), keyAccountNFTTransferLatestHeightKey)
 	if err != nil {
 		return fmt.Errorf("could not get latest indexed height: %w", err)
 	}
