@@ -328,6 +328,7 @@ jobs:
           gcr.io/flow-container-registry/collection:latest \
           gcr.io/flow-container-registry/consensus:latest \
           gcr.io/flow-container-registry/execution:latest \
+          gcr.io/flow-container-registry/execution-ledger:latest \
           gcr.io/flow-container-registry/ghost:latest \
           gcr.io/flow-container-registry/observer:latest \
           gcr.io/flow-container-registry/verification:latest \

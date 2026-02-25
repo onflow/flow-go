@@ -1,4 +1,4 @@
-package approvals
+package approvals_test
 
 import (
 	"sync"
@@ -6,10 +6,13 @@ import (
 	"time"
 
 	"github.com/gammazero/workerpool"
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
+	"github.com/onflow/flow-go/engine/consensus/approvals"
+	"github.com/onflow/flow-go/engine/consensus/approvals/testutil"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -17,8 +20,8 @@ import (
 // AssignmentCollectorStateMachineTestSuite is a test suite for testing AssignmentCollectorStateMachine. Contains a minimal set of
 // helper mocks to test the behavior.
 type AssignmentCollectorStateMachineTestSuite struct {
-	BaseAssignmentCollectorTestSuite
-	collector *AssignmentCollectorStateMachine
+	testutil.BaseAssignmentCollectorTestSuite
+	collector *approvals.AssignmentCollectorStateMachine
 }
 
 func TestAssignmentCollectorStateMachine(t *testing.T) {
@@ -28,26 +31,28 @@ func TestAssignmentCollectorStateMachine(t *testing.T) {
 func (s *AssignmentCollectorStateMachineTestSuite) SetupTest() {
 	s.BaseAssignmentCollectorTestSuite.SetupTest()
 
-	s.collector = NewAssignmentCollectorStateMachine(AssignmentCollectorBase{
-		workerPool:                           workerpool.New(4),
-		assigner:                             s.Assigner,
-		state:                                s.State,
-		headers:                              s.Headers,
-		sigHasher:                            s.SigHasher,
-		seals:                                s.SealsPL,
-		approvalConduit:                      s.Conduit,
-		requestTracker:                       s.RequestTracker,
-		requiredApprovalsForSealConstruction: 5,
-		executedBlock:                        s.Block,
-		result:                               s.IncorporatedResult.Result,
-		resultID:                             s.IncorporatedResult.Result.ID(),
-	})
+	ac, err := approvals.NewAssignmentCollectorBase(
+		zerolog.Nop(),
+		workerpool.New(4),
+		s.IncorporatedResult.Result,
+		s.State,
+		s.Headers,
+		s.Assigner,
+		s.SealsPL,
+		s.SigHasher,
+		s.Conduit,
+		s.RequestTracker,
+		5,
+	)
+	require.NoError(s.T(), err)
+
+	s.collector = approvals.NewAssignmentCollectorStateMachine(ac)
 }
 
 // TestChangeProcessingStatus_CachingToVerifying tests that state machine correctly performs transition from CachingApprovals to
 // VerifyingApprovals state. After transition all caches approvals and results need to be applied to new state.
 func (s *AssignmentCollectorStateMachineTestSuite) TestChangeProcessingStatus_CachingToVerifying() {
-	require.Equal(s.T(), CachingApprovals, s.collector.ProcessingStatus())
+	require.Equal(s.T(), approvals.CachingApprovals, s.collector.ProcessingStatus())
 	results := make([]*flow.IncorporatedResult, 3)
 
 	s.PublicKey.On("Verify", mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
@@ -62,58 +67,47 @@ func (s *AssignmentCollectorStateMachineTestSuite) TestChangeProcessingStatus_Ca
 		results[i] = result
 	}
 
-	approvals := make([]*flow.ResultApproval, s.Chunks.Len())
+	approvs := make([]*flow.ResultApproval, s.Chunks.Len())
 
-	for i := range approvals {
+	for i := range approvs {
 		approval := unittest.ResultApprovalFixture(
 			unittest.WithExecutionResultID(s.IncorporatedResult.Result.ID()),
 			unittest.WithChunk(uint64(i)),
 			unittest.WithApproverID(s.VerID),
 			unittest.WithBlockID(s.Block.ID()),
 		)
-		approvals[i] = approval
+		approvs[i] = approval
 	}
 
 	var wg sync.WaitGroup
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		for _, result := range results {
 			require.NoError(s.T(), s.collector.ProcessIncorporatedResult(result))
 		}
-	}()
-
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		for _, approval := range approvals {
+	})
+	wg.Go(func() {
+		for _, approval := range approvs {
 			require.NoError(s.T(), s.collector.ProcessApproval(approval))
 		}
-	}()
+	})
 
-	err := s.collector.ChangeProcessingStatus(CachingApprovals, VerifyingApprovals)
+	err := s.collector.ChangeProcessingStatus(approvals.CachingApprovals, approvals.VerifyingApprovals)
 	require.NoError(s.T(), err)
-	require.Equal(s.T(), VerifyingApprovals, s.collector.ProcessingStatus())
+	require.Equal(s.T(), approvals.VerifyingApprovals, s.collector.ProcessingStatus())
 
 	wg.Wait()
 
 	// give some time to process on worker pool
 	time.Sleep(1 * time.Second)
 	// need to check if collector has processed cached items
-	verifyingCollector, ok := s.collector.atomicLoadCollector().(*VerifyingAssignmentCollector)
+	verifyingCollector, ok := s.collector.GetCollectorState().(*approvals.VerifyingAssignmentCollector)
 	require.True(s.T(), ok)
 
 	for _, ir := range results {
-		verifyingCollector.lock.Lock()
-		collector, ok := verifyingCollector.collectors[ir.IncorporatedBlockID]
-		verifyingCollector.lock.Unlock()
-		require.True(s.T(), ok)
+		require.True(s.T(), verifyingCollector.HasIncorporatedResult(ir.IncorporatedBlockID))
 
-		for _, approval := range approvals {
-			chunkCollector := collector.chunkCollectors[approval.Body.ChunkIndex]
-			chunkCollector.lock.Lock()
-			signed := chunkCollector.chunkApprovals.HasSigned(approval.Body.ApproverID)
-			chunkCollector.lock.Unlock()
+		for _, approval := range approvs {
+			signed := verifyingCollector.HasApprovalBeenProcessed(ir.IncorporatedBlockID, approval.Body.ChunkIndex, approval.Body.ApproverID)
 			require.True(s.T(), signed)
 		}
 	}
@@ -123,10 +117,10 @@ func (s *AssignmentCollectorStateMachineTestSuite) TestChangeProcessingStatus_Ca
 // but with underlying orphan status. This should result in sentinel error ErrInvalidCollectorStateTransition.
 func (s *AssignmentCollectorStateMachineTestSuite) TestChangeProcessingStatus_InvalidTransition() {
 	// first change status to orphan
-	err := s.collector.ChangeProcessingStatus(CachingApprovals, Orphaned)
+	err := s.collector.ChangeProcessingStatus(approvals.CachingApprovals, approvals.Orphaned)
 	require.NoError(s.T(), err)
-	require.Equal(s.T(), Orphaned, s.collector.ProcessingStatus())
+	require.Equal(s.T(), approvals.Orphaned, s.collector.ProcessingStatus())
 	// then try to perform transition from caching to verifying
-	err = s.collector.ChangeProcessingStatus(CachingApprovals, VerifyingApprovals)
-	require.ErrorIs(s.T(), err, ErrDifferentCollectorState)
+	err = s.collector.ChangeProcessingStatus(approvals.CachingApprovals, approvals.VerifyingApprovals)
+	require.ErrorIs(s.T(), err, approvals.ErrDifferentCollectorState)
 }

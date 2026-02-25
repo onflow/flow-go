@@ -228,6 +228,7 @@ func (suite *SameGRPCPortTestSuite) SetupTest() {
 		stateStreamConfig,
 		nil,
 		followerDistributor,
+		nil,
 	)
 	assert.NoError(suite.T(), err)
 	suite.rpcEng, err = rpcEngBuilder.WithLegacy().Build()

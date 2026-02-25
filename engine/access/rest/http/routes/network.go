@@ -8,7 +8,7 @@ import (
 )
 
 // GetNetworkParameters returns network-wide parameters of the blockchain
-func GetNetworkParameters(r *common.Request, backend access.API, _ commonmodels.LinkGenerator) (interface{}, error) {
+func GetNetworkParameters(r *common.Request, backend access.API, _ commonmodels.LinkGenerator) (any, error) {
 	params := backend.GetNetworkParameters(r.Context())
 
 	var response models.NetworkParameters

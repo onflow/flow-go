@@ -1,6 +1,7 @@
 package slices
 
 import (
+	"slices"
 	"sort"
 
 	"golang.org/x/exp/constraints"
@@ -45,13 +46,15 @@ func MakeRange[T constraints.Integer](min, max T) []T {
 // Fill constructs a slice of type T with length n. The slice is then filled with input "val".
 func Fill[T any](val T, n int) []T {
 	arr := make([]T, n)
-	for i := 0; i < n; i++ {
+	for i := range n {
 		arr[i] = val
 	}
 	return arr
 }
 
 // AreStringSlicesEqual returns true if the two string slices are equal.
+//
+// CAUTION: this function performs inplace sorts of the input slices.
 func AreStringSlicesEqual(a, b []string) bool {
 	if len(a) != len(b) {
 		return false
@@ -60,7 +63,7 @@ func AreStringSlicesEqual(a, b []string) bool {
 	sort.Strings(a)
 	sort.Strings(b)
 
-	for i := 0; i < len(a); i++ {
+	for i := range a {
 		if a[i] != b[i] {
 			return false
 		}
@@ -71,11 +74,5 @@ func AreStringSlicesEqual(a, b []string) bool {
 
 // StringSliceContainsElement returns true if the string slice contains the element.
 func StringSliceContainsElement(a []string, v string) bool {
-	for _, x := range a {
-		if x == v {
-			return true
-		}
-	}
-
-	return false
+	return slices.Contains(a, v)
 }

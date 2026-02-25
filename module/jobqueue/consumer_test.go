@@ -160,10 +160,11 @@ func TestProcessedIndexDeletion(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		log := unittest.Logger().With().Str("module", "consumer").Logger()
 		jobs := NewMockJobs()
-		progressInitializer := store.NewConsumerProgress(db, "consumer")
+		progress, err := store.NewConsumerProgress(db, "consumer").Initialize(0)
+		require.NoError(t, err)
 		worker := newMockWorker()
 		maxProcessing := uint64(3)
-		c, err := NewConsumer(log, jobs, progressInitializer, worker, maxProcessing, 0, 0)
+		c, err := NewConsumer(log, jobs, progress, worker, maxProcessing, 0)
 		require.NoError(t, err)
 		worker.WithConsumer(c)
 
@@ -200,11 +201,10 @@ func TestCheckBeforeStartIsNoop(t *testing.T) {
 		c, err := NewConsumer(
 			unittest.Logger(),
 			NewMockJobs(),
-			progressInitializer,
+			progress,
 			worker,
 			uint64(3),
 			0,
-			10, // default index is before the stored processedIndex
 		)
 		require.NoError(t, err)
 		worker.WithConsumer(c)

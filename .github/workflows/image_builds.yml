@@ -1,4 +1,4 @@
-name: Build & Promote Docker Images to Public Registry 
+name: Build & Promote Docker Images to Public Registry
 on:
   workflow_dispatch:
     inputs:
@@ -25,53 +25,59 @@ jobs:
   # The environment is set to 'container builds' that provides the necessary secrets for pushing to the pirvate registry.
   public-build:
     if: ${{ github.event.inputs.secure-build == 'false' }}
-    name: Execute public repo build & push to private artifact registry 
+    name: Execute public repo build & push to private artifact registry
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        # We specify all of the potential build commands for each role. 
+        # We specify all of the potential build commands for each role.
         # This allows us to build and push all images in parallel, reducing the overall build time.
         # The matrix is defined to include all roles & image types that we want to build and push.
         # These commands are targets defined in the Makefile of the repository.
         build_command:
           # access Build Commands
-          - docker-build-access-with-adx docker-push-access-with-adx 
-          - docker-build-access-without-adx docker-push-access-without-adx 
-          - docker-build-access-without-netgo-without-adx docker-push-access-without-netgo-without-adx 
-          - docker-cross-build-access-arm docker-push-access-arm 
+          - docker-build-access-with-adx docker-push-access-with-adx
+          - docker-build-access-without-adx docker-push-access-without-adx
+          - docker-build-access-without-netgo-without-adx docker-push-access-without-netgo-without-adx
+          - docker-cross-build-access-arm docker-push-access-arm
 
           # collection Build Commands
-          - docker-build-collection-with-adx docker-push-collection-with-adx 
-          - docker-build-collection-without-adx docker-push-collection-without-adx 
-          - docker-build-collection-without-netgo-without-adx docker-push-collection-without-netgo-without-adx 
-          - docker-cross-build-collection-arm docker-push-collection-arm 
+          - docker-build-collection-with-adx docker-push-collection-with-adx
+          - docker-build-collection-without-adx docker-push-collection-without-adx
+          - docker-build-collection-without-netgo-without-adx docker-push-collection-without-netgo-without-adx
+          - docker-cross-build-collection-arm docker-push-collection-arm
 
           # consensus Build Commands
-          - docker-build-consensus-with-adx docker-push-consensus-with-adx 
-          - docker-build-consensus-without-adx docker-push-consensus-without-adx 
-          - docker-build-consensus-without-netgo-without-adx docker-push-consensus-without-netgo-without-adx 
-          - docker-cross-build-consensus-arm docker-push-consensus-arm 
+          - docker-build-consensus-with-adx docker-push-consensus-with-adx
+          - docker-build-consensus-without-adx docker-push-consensus-without-adx
+          - docker-build-consensus-without-netgo-without-adx docker-push-consensus-without-netgo-without-adx
+          - docker-cross-build-consensus-arm docker-push-consensus-arm
 
           # execution Build Commands
-          - docker-build-execution-with-adx docker-push-execution-with-adx 
-          - docker-build-execution-without-adx docker-push-execution-without-adx 
-          - docker-build-execution-without-netgo-without-adx docker-push-execution-without-netgo-without-adx 
-          - docker-cross-build-execution-arm docker-push-execution-arm 
+          - docker-build-execution-with-adx docker-push-execution-with-adx
+          - docker-build-execution-without-adx docker-push-execution-without-adx
+          - docker-build-execution-without-netgo-without-adx docker-push-execution-without-netgo-without-adx
+          - docker-cross-build-execution-arm docker-push-execution-arm
+
+          # execution Ledger Service Build Commands
+          - docker-build-execution-ledger-with-adx docker-push-execution-ledger-with-adx
+          - docker-build-execution-ledger-without-adx docker-push-execution-ledger-without-adx
+          - docker-build-execution-ledger-without-netgo-without-adx docker-push-execution-ledger-without-netgo-without-adx
+          - docker-cross-build-execution-ledger-arm docker-push-execution-ledger-arm
 
           # observer Build Commands
-          - docker-build-observer-with-adx docker-push-observer-with-adx 
-          - docker-build-observer-without-adx docker-push-observer-without-adx 
-          - docker-build-observer-without-netgo-without-adx docker-push-observer-without-netgo-without-adx 
-          - docker-cross-build-observer-arm docker-push-observer-arm 
+          - docker-build-observer-with-adx docker-push-observer-with-adx
+          - docker-build-observer-without-adx docker-push-observer-without-adx
+          - docker-build-observer-without-netgo-without-adx docker-push-observer-without-netgo-without-adx
+          - docker-cross-build-observer-arm docker-push-observer-arm
 
           # verification Build Commands
-          - docker-build-verification-with-adx docker-push-verification-with-adx 
-          - docker-build-verification-without-adx docker-push-verification-without-adx 
-          - docker-build-verification-without-netgo-without-adx docker-push-verification-without-netgo-without-adx 
-          - docker-cross-build-verification-arm docker-push-verification-arm 
+          - docker-build-verification-with-adx docker-push-verification-with-adx
+          - docker-build-verification-without-adx docker-push-verification-without-adx
+          - docker-build-verification-without-netgo-without-adx docker-push-verification-without-netgo-without-adx
+          - docker-cross-build-verification-arm docker-push-verification-arm
 
-    environment: container builds 
+    environment: container builds
     steps:
       - name: Setup Go
         uses: actions/setup-go@v4
@@ -119,7 +125,7 @@ jobs:
       fail-fast: false
       matrix:
         role: [access, collection, consensus, execution, observer, verification]
-    environment: secure builds 
+    environment: secure builds
     steps:
       - uses: actions/create-github-app-token@v2
         id: app-token
@@ -133,8 +139,8 @@ jobs:
           client_payload: '{"role": "${{ matrix.role }}", "tag": "${{ inputs.tag }}"}'
           github_token: ${{ steps.app-token.outputs.token }}
           owner: 'onflow'
-          repo: ${{ secrets.SECURE_BUILDS_REPO }}  
-          ref: master-private 
+          repo: ${{ secrets.SECURE_BUILDS_REPO }}
+          ref: master-private
           workflow_file_name: 'secure_build.yml'
 
   promote-to-partner-registry:
@@ -155,19 +161,19 @@ jobs:
       fail-fast: false
       matrix:
         role: [access]
-    environment: ${{ matrix.role }} image promotion to partner registry 
+    environment: ${{ matrix.role }} image promotion to partner registry
     steps:
       - name: Checkout repo
         uses: actions/checkout@v3
 
-      - name: Promote ${{ matrix.role }} 
+      - name: Promote ${{ matrix.role }}
         uses: ./actions/promote-images
         with:
           gcp_credentials: ${{ secrets.PARTNER_REGISTRY_PROMOTION_SECRET }}
           private_registry: ${{ vars.PRIVATE_REGISTRY }}
           private_registry_host: ${{ env.PRIVATE_REGISTRY_HOST }}
           promotion_registry: ${{ vars.PARTNER_REGISTRY }}
-          role: ${{ matrix.role }} 
+          role: ${{ matrix.role }}
           tags: "${{ inputs.tag }},${{ inputs.tag }}-without-adx,${{ inputs.tag }}-without-netgo-without-adx,${{ inputs.tag }}-arm"
 
   promote-to-public-registry:
@@ -187,18 +193,18 @@ jobs:
       fail-fast: false
       matrix:
         role: [access, collection, consensus, execution, observer, verification]
-    environment: ${{ matrix.role }} image promotion to public registry 
+    environment: ${{ matrix.role }} image promotion to public registry
     steps:
       - name: Checkout repo
         uses: actions/checkout@v3
 
-      - name: Promote ${{ matrix.role }} 
+      - name: Promote ${{ matrix.role }}
         uses: ./actions/promote-images
         with:
           gcp_credentials: ${{ secrets.PUBLIC_REGISTRY_PROMOTION_SECRET }}
           private_registry: ${{ vars.PRIVATE_REGISTRY }}
           private_registry_host: ${{ env.PRIVATE_REGISTRY_HOST }}
           promotion_registry: ${{ vars.PUBLIC_REGISTRY }}
-          role: ${{ matrix.role }} 
+          role: ${{ matrix.role }}
           tags: "${{ inputs.tag }},${{ inputs.tag }}-without-adx,${{ inputs.tag }}-without-netgo-without-adx,${{ inputs.tag }}-arm"
 

@@ -20,7 +20,7 @@ type Relayer struct {
 // ignored. If a usecase arises, we should implement a mechanism to forward these messages to a handler.
 type noopProcessor struct{}
 
-func (n *noopProcessor) Process(channel channels.Channel, originID flow.Identifier, event interface{}) error {
+func (n *noopProcessor) Process(channel channels.Channel, originID flow.Identifier, event any) error {
 	return nil
 }
 
@@ -40,7 +40,7 @@ func NewRelayer(destinationNetwork network.EngineRegistry, channel channels.Chan
 
 }
 
-func (r *Relayer) Process(channel channels.Channel, originID flow.Identifier, event interface{}) error {
+func (r *Relayer) Process(channel channels.Channel, originID flow.Identifier, event any) error {
 	g := new(errgroup.Group)
 
 	g.Go(func() error {

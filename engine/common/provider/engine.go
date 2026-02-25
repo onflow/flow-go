@@ -134,7 +134,7 @@ func New(
 
 	cm := component.NewComponentManagerBuilder()
 	cm.AddWorker(e.processQueuedRequestsShovellerWorker)
-	for i := uint(0); i < requestWorkers; i++ {
+	for range requestWorkers {
 		cm.AddWorker(e.processEntityRequestWorker)
 	}
 
@@ -146,7 +146,7 @@ func New(
 
 // Process processes the given message from the node with the given origin ID in
 // a blocking manner. It returns the potential processing error when done.
-func (e *Engine) Process(channel channels.Channel, originID flow.Identifier, event interface{}) error {
+func (e *Engine) Process(channel channels.Channel, originID flow.Identifier, event any) error {
 	select {
 	case <-e.cm.ShutdownSignal():
 		e.log.Warn().

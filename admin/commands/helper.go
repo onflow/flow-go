@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 )
 
-func ConvertToInterfaceList(list interface{}) ([]interface{}, error) {
-	var resultList []interface{}
+func ConvertToInterfaceList(list any) ([]any, error) {
+	var resultList []any
 	bytes, err := json.Marshal(list)
 	if err != nil {
 		return nil, err
@@ -14,8 +14,8 @@ func ConvertToInterfaceList(list interface{}) ([]interface{}, error) {
 	return resultList, err
 }
 
-func ConvertToMap(object interface{}) (map[string]interface{}, error) {
-	var result map[string]interface{}
+func ConvertToMap(object any) (map[string]any, error) {
+	var result map[string]any
 	bytes, err := json.Marshal(object)
 	if err != nil {
 		return nil, err

@@ -742,13 +742,14 @@ func (suite *Suite) TestGetSealedTransaction() {
 		)
 		require.NoError(suite.T(), err)
 
-		progress, err := store.NewConsumerProgress(db, module.ConsumeProgressLastFullBlockHeight).Initialize(suite.rootBlock.Height)
+		progress, err := store.NewConsumerProgress(db, module.ConsumeProgressLastFullBlockHeight).Initialize(suite.finalizedBlock.Height)
 		require.NoError(suite.T(), err)
 		lastFullBlockHeight, err := counters.NewPersistentStrictMonotonicCounter(progress)
 		require.NoError(suite.T(), err)
 
 		// create the ingest engine
-		processedHeight := store.NewConsumerProgress(db, module.ConsumeProgressIngestionEngineBlockHeight)
+		processedHeight, err := store.NewConsumerProgress(db, module.ConsumeProgressIngestionEngineBlockHeight).Initialize(suite.finalizedBlock.Height)
+		require.NoError(suite.T(), err)
 
 		collectionIndexer, err := ingestioncollections.NewIndexer(
 			suite.log,
@@ -787,6 +788,7 @@ func (suite *Suite) TestGetSealedTransaction() {
 			collectionSyncer,
 			collectionIndexer,
 			collectionExecutedMetric,
+			suite.metrics,
 			nil,
 			followerDistributor,
 		)
@@ -1006,10 +1008,12 @@ func (suite *Suite) TestGetTransactionResult() {
 		)
 		require.NoError(suite.T(), err)
 
-		processedHeightInitializer := store.NewConsumerProgress(db, module.ConsumeProgressIngestionEngineBlockHeight)
+		processedHeight, err := store.NewConsumerProgress(db, module.ConsumeProgressIngestionEngineBlockHeight).
+			Initialize(suite.finalizedBlock.Height)
+		require.NoError(suite.T(), err)
 
 		lastFullBlockHeightProgress, err := store.NewConsumerProgress(db, module.ConsumeProgressLastFullBlockHeight).
-			Initialize(suite.rootBlock.Height)
+			Initialize(suite.finalizedBlock.Height)
 		require.NoError(suite.T(), err)
 
 		lastFullBlockHeight, err := counters.NewPersistentStrictMonotonicCounter(lastFullBlockHeightProgress)
@@ -1048,10 +1052,11 @@ func (suite *Suite) TestGetTransactionResult() {
 			all.Blocks,
 			all.Results,
 			all.Receipts,
-			processedHeightInitializer,
+			processedHeight,
 			collectionSyncer,
 			collectionIndexer,
 			collectionExecutedMetric,
+			suite.metrics,
 			nil,
 			followerDistributor,
 		)
@@ -1279,9 +1284,11 @@ func (suite *Suite) TestExecuteScript() {
 			Once()
 
 		processedHeightInitializer := store.NewConsumerProgress(db, module.ConsumeProgressIngestionEngineBlockHeight)
+		processedHeight, err := processedHeightInitializer.Initialize(suite.finalizedBlock.Height)
+		require.NoError(suite.T(), err)
 
 		lastFullBlockHeightInitializer := store.NewConsumerProgress(db, module.ConsumeProgressLastFullBlockHeight)
-		lastFullBlockHeightProgress, err := lastFullBlockHeightInitializer.Initialize(suite.rootBlock.Height)
+		lastFullBlockHeightProgress, err := lastFullBlockHeightInitializer.Initialize(suite.finalizedBlock.Height)
 		require.NoError(suite.T(), err)
 
 		lastFullBlockHeight, err := counters.NewPersistentStrictMonotonicCounter(lastFullBlockHeightProgress)
@@ -1320,10 +1327,11 @@ func (suite *Suite) TestExecuteScript() {
 			all.Blocks,
 			all.Results,
 			all.Receipts,
-			processedHeightInitializer,
+			processedHeight,
 			collectionSyncer,
 			collectionIndexer,
 			collectionExecutedMetric,
+			suite.metrics,
 			nil,
 			followerDistributor,
 		)

@@ -4,12 +4,11 @@ import (
 	"context"
 	"time"
 
-	"google.golang.org/grpc/codes"
-
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/protocol"
 	httpmetrics "github.com/slok/go-http-metrics/metrics"
+	"google.golang.org/grpc/codes"
 
 	"github.com/onflow/flow-go/model/chainsync"
 	"github.com/onflow/flow-go/model/cluster"
@@ -229,6 +228,7 @@ func (nc *NoopCollector) TransactionValidationSkipped()                         
 func (nc *NoopCollector) TransactionSubmissionFailed()                                          {}
 func (nc *NoopCollector) UpdateExecutionReceiptMaxHeight(height uint64)                         {}
 func (nc *NoopCollector) UpdateLastFullBlockHeight(height uint64)                               {}
+func (nc *NoopCollector) UpdateIngestionFinalizedBlockHeight(height uint64)                     {}
 func (nc *NoopCollector) ChunkDataPackRequestProcessed()                                        {}
 func (nc *NoopCollector) ExecutionSync(syncing bool)                                            {}
 func (nc *NoopCollector) ExecutionBlockDataUploadStarted()                                      {}
@@ -376,6 +376,10 @@ var _ module.ExecutionStateIndexerMetrics = (*NoopCollector)(nil)
 func (nc *NoopCollector) BlockIndexed(uint64, time.Duration, int, int, int) {}
 func (nc *NoopCollector) BlockReindexed()                                   {}
 func (nc *NoopCollector) InitializeLatestHeight(height uint64)              {}
+
+var _ module.ExtendedIndexingMetrics = (*NoopCollector)(nil)
+
+func (nc *NoopCollector) BlockIndexedExtended(string, uint64) {}
 
 var _ module.TransactionErrorMessagesMetrics = (*NoopCollector)(nil)
 

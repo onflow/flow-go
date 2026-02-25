@@ -9,7 +9,7 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
-type Rec map[string]interface{}
+type Rec map[string]any
 
 // SealingRecord is a record of the sealing status for a specific
 // incorporated result. It holds information whether the result is sealable,
@@ -33,9 +33,9 @@ func (r *SealingRecord) ApprovalsMissing(chunksWithMissingApprovals map[uint64]f
 	sufficientApprovals := len(chunksWithMissingApprovals) == 0
 	r.entries["sufficient_approvals_for_sealing"] = sufficientApprovals
 	if !sufficientApprovals {
-		chunksInfo := make([]map[string]interface{}, 0, len(chunksWithMissingApprovals))
+		chunksInfo := make([]map[string]any, 0, len(chunksWithMissingApprovals))
 		for i, list := range chunksWithMissingApprovals {
-			chunk := make(map[string]interface{})
+			chunk := make(map[string]any)
 			chunk["chunk_index"] = i
 			chunk["missing_approvals_from_verifiers"] = list
 			chunksInfo = append(chunksInfo, chunk)

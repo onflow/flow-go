@@ -374,7 +374,7 @@ func (v *TransactionVerifier) verifySignatures(
 	close(toVerifyChan)
 
 	foundError := false
-	for i := 0; i < len(signatures); i++ {
+	for range signatures {
 		entry := <-verifiedChan
 
 		if !entry.invokedVerify {

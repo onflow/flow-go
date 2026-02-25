@@ -578,7 +578,7 @@ func (ll DynamicIdentityEntryList) ByNodeID(nodeID Identifier) (*DynamicIdentity
 func (ll DynamicIdentityEntryList) Copy() DynamicIdentityEntryList {
 	lenList := len(ll)
 	dup := make(DynamicIdentityEntryList, 0, lenList)
-	for i := 0; i < lenList; i++ {
+	for i := range lenList {
 		// copy the object
 		next := *(ll[i])
 		dup = append(dup, &next)

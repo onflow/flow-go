@@ -39,7 +39,7 @@ func TxtIPFixture() string {
 
 func IpLookupFixture(count int) map[string]*IpLookupTestCase {
 	tt := make(map[string]*IpLookupTestCase)
-	for i := 0; i < count; i++ {
+	for i := range count {
 		ipTestCase := &IpLookupTestCase{
 			Domain: fmt.Sprintf("example%d.com", i),
 			Result: []net.IPAddr{ // resolves each domain to 4 addresses.
@@ -60,7 +60,7 @@ func IpLookupFixture(count int) map[string]*IpLookupTestCase {
 func TxtLookupFixture(count int) map[string]*TxtLookupTestCase {
 	tt := make(map[string]*TxtLookupTestCase)
 
-	for i := 0; i < count; i++ {
+	for i := range count {
 		ttTestCase := &TxtLookupTestCase{
 			Txt: fmt.Sprintf("_dnsaddr.example%d.com", i),
 			Records: []string{ // resolves each txt to 4 addresses.
@@ -80,7 +80,7 @@ func TxtLookupFixture(count int) map[string]*TxtLookupTestCase {
 
 func IpLookupListFixture(count int) []*IpLookupTestCase {
 	tt := make([]*IpLookupTestCase, 0)
-	for i := 0; i < count; i++ {
+	for i := range count {
 		ipTestCase := &IpLookupTestCase{
 			Domain: fmt.Sprintf("example%d.com", i),
 			Result: []net.IPAddr{ // resolves each domain to 4 addresses.
@@ -101,7 +101,7 @@ func IpLookupListFixture(count int) []*IpLookupTestCase {
 func TxtLookupListFixture(count int) []*TxtLookupTestCase {
 	tt := make([]*TxtLookupTestCase, 0)
 
-	for i := 0; i < count; i++ {
+	for i := range count {
 		ttTestCase := &TxtLookupTestCase{
 			Txt: fmt.Sprintf("_dnsaddr.example%d.com", i),
 			Records: []string{ // resolves each txt to 4 addresses.

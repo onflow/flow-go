@@ -46,15 +46,15 @@ var UnsafeDecMode, _ = cbor.DecOptions{}.DecMode()
 // target (struct we are unmarshalling into), which prevents some classes of resource exhaustion attacks.
 var DefaultDecMode, _ = cbor.DecOptions{ExtraReturnErrors: cbor.ExtraDecErrorUnknownField}.DecMode()
 
-func (m *Marshaler) Marshal(val interface{}) ([]byte, error) {
+func (m *Marshaler) Marshal(val any) ([]byte, error) {
 	return EncMode.Marshal(val)
 }
 
-func (m *Marshaler) Unmarshal(b []byte, val interface{}) error {
+func (m *Marshaler) Unmarshal(b []byte, val any) error {
 	return cbor.Unmarshal(b, val)
 }
 
-func (m *Marshaler) MustMarshal(val interface{}) []byte {
+func (m *Marshaler) MustMarshal(val any) []byte {
 	b, err := m.Marshal(val)
 	if err != nil {
 		panic(err)
@@ -63,7 +63,7 @@ func (m *Marshaler) MustMarshal(val interface{}) []byte {
 	return b
 }
 
-func (m *Marshaler) MustUnmarshal(b []byte, val interface{}) {
+func (m *Marshaler) MustUnmarshal(b []byte, val any) {
 	err := m.Unmarshal(b, val)
 	if err != nil {
 		panic(err)

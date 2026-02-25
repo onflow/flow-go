@@ -31,6 +31,9 @@ var (
 
 	// ErrNotBootstrapped is returned when the database has not been bootstrapped.
 	ErrNotBootstrapped = errors.New("pebble database not bootstrapped")
+
+	// ErrInvalidQuery is returned when parameters passed to a read query are invalid (e.g., startHeight > endHeight).
+	ErrInvalidQuery = errors.New("invalid query")
 )
 
 // InvalidDKGStateTransitionError is a sentinel error that is returned in case an invalid state transition is attempted.

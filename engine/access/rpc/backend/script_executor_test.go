@@ -145,6 +145,7 @@ func (s *ScriptExecutorSuite) SetupTest() {
 		nil,
 		metrics.NewNoopCollector(),
 		lockManager,
+		nil, // accountTxIndex
 	)
 
 	s.scripts = execution.NewScripts(

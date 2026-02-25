@@ -16,15 +16,15 @@ var _ network.Conduit = (*NoopConduit)(nil)
 
 func (n *NoopConduit) ReportMisbehavior(network.MisbehaviorReport) {}
 
-func (n *NoopConduit) Publish(event interface{}, targetIDs ...flow.Identifier) error {
+func (n *NoopConduit) Publish(event any, targetIDs ...flow.Identifier) error {
 	return nil
 }
 
-func (n *NoopConduit) Unicast(event interface{}, targetID flow.Identifier) error {
+func (n *NoopConduit) Unicast(event any, targetID flow.Identifier) error {
 	return nil
 }
 
-func (n *NoopConduit) Multicast(event interface{}, num uint, targetIDs ...flow.Identifier) error {
+func (n *NoopConduit) Multicast(event any, num uint, targetIDs ...flow.Identifier) error {
 	return nil
 }
 

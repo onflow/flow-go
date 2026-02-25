@@ -84,7 +84,7 @@ func DeployContract(t testing.TB, caller types.Address, tc *TestContract, led at
 
 	ctx := types.NewDefaultBlockContext(2)
 
-	bl, err := e.NewReadOnlyBlockView(ctx)
+	bl, err := e.NewReadOnlyBlockView()
 	require.NoError(t, err)
 
 	nonce, err := bl.NonceOf(caller)

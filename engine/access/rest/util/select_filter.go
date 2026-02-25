@@ -7,7 +7,7 @@ import (
 
 // SelectFilter selects the specified keys from the given object. The keys are in the json dot notation and must refer
 // to leaf elements e.g. payload.collection_guarantees.signer_ids
-func SelectFilter(object interface{}, selectKeys []string) (interface{}, error) {
+func SelectFilter(object any, selectKeys []string) (any, error) {
 	// avoid doing any work if no select keys provided
 	if len(selectKeys) == 0 {
 		return object, nil
@@ -18,7 +18,7 @@ func SelectFilter(object interface{}, selectKeys []string) (interface{}, error) 
 		return nil, err
 	}
 
-	var outputMap = new(interface{})
+	var outputMap = new(any)
 	err = json.Unmarshal(marshalled, outputMap)
 	if err != nil {
 		return nil, err
@@ -26,10 +26,10 @@ func SelectFilter(object interface{}, selectKeys []string) (interface{}, error) 
 
 	filter := sliceToMap(selectKeys)
 	switch itemAsType := (*outputMap).(type) {
-	case []interface{}:
+	case []any:
 		filteredSlice, _ := filterSlice(itemAsType, "", filter)
 		*outputMap = filteredSlice
-	case map[string]interface{}:
+	case map[string]any:
 		filterObject(itemAsType, "", filter)
 	}
 	return *outputMap, nil
@@ -37,7 +37,7 @@ func SelectFilter(object interface{}, selectKeys []string) (interface{}, error) 
 
 // filterObject filters a json struct. Prefix is the key prefix to use to find keys from the filterMap
 // Leaf elements whose keys are not found in the filter map will be removed
-func filterObject(jsonStruct map[string]interface{}, prefix string, filterMap map[string]bool) {
+func filterObject(jsonStruct map[string]any, prefix string, filterMap map[string]bool) {
 	for key, item := range jsonStruct {
 		newPrefix := jsonPath(prefix, key)
 		// if the leaf object is the key, go to others
@@ -45,7 +45,7 @@ func filterObject(jsonStruct map[string]interface{}, prefix string, filterMap ma
 			continue
 		}
 		switch itemAsType := item.(type) {
-		case []interface{}:
+		case []any:
 			// if the value of a key is a list, call filterSlice
 			// e.g. { a : [ {b:1}, {b:2}...]
 			itemAsType, simpleSlice := filterSlice(itemAsType, newPrefix, filterMap)
@@ -60,7 +60,7 @@ func filterObject(jsonStruct map[string]interface{}, prefix string, filterMap ma
 			if len(itemAsType) == 0 {
 				delete(jsonStruct, key)
 			}
-		case map[string]interface{}:
+		case map[string]any:
 			// if the value of a key is an object, then recurse
 			// e.g.  { a :  { b: 1 } }
 			filterObject(itemAsType, newPrefix, filterMap)
@@ -80,10 +80,10 @@ func filterObject(jsonStruct map[string]interface{}, prefix string, filterMap ma
 // filterSlice filters a json slice. Prefix is the key prefix to use to find keys from the filterMap
 // Leaf elements whose keys are not found in the filter map will be removed
 // The function returns the modified slice and true if the slice only contains simple non-struct, non-list elements
-func filterSlice(jsonSlice []interface{}, prefix string, filterMap map[string]bool) ([]interface{}, bool) {
+func filterSlice(jsonSlice []any, prefix string, filterMap map[string]bool) ([]any, bool) {
 	for _, item := range jsonSlice {
 		switch itemAsType := item.(type) {
-		case []interface{}:
+		case []any:
 			// if the slice has other slice as elements, recurse
 			// e.g [[{b:1}, {b:2}...]]
 			var sliceType bool
@@ -91,16 +91,16 @@ func filterSlice(jsonSlice []interface{}, prefix string, filterMap map[string]bo
 			if len(itemAsType) == 0 {
 				// since all elements of the slice are the same, if one sub-slice has been filtered out, we can safely
 				// remove all sub-slices and return (instead of iterating all slice elements)
-				return make([]interface{}, 0), sliceType
+				return make([]any, 0), sliceType
 			}
-		case map[string]interface{}:
+		case map[string]any:
 			// if the slice has structs as elements, call filterObject
 			// e.g. [{a:1, b:2}, {a:3, b:4}]
 			filterObject(itemAsType, prefix, filterMap)
 			if len(itemAsType) == 0 {
 				// since all elements of the slice are the same, if one struct element has been filtered out, we can safely
 				// remove all struct elements and return (instead of iterating all slice elements)
-				return make([]interface{}, 0), false
+				return make([]any, 0), false
 			}
 		default:
 			// if the elements are neither a slice nor a struct, then return the slice and true to indicate the slice has

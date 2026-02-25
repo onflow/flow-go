@@ -81,24 +81,30 @@ func (h *HttpHandler) ErrorHandler(w http.ResponseWriter, err error, errorLogger
 
 	// handle grpc status error returned from the backend calls, we are forwarding the message to the client
 	if se, ok := status.FromError(err); ok {
-		if se.Code() == codes.NotFound {
+		switch se.Code() {
+		case codes.NotFound:
 			msg := fmt.Sprintf("Flow resource not found: %s", se.Message())
 			h.errorResponse(w, http.StatusNotFound, msg, errorLogger)
 			return
-		}
-		if se.Code() == codes.InvalidArgument {
+		case codes.InvalidArgument:
 			msg := fmt.Sprintf("Invalid Flow argument: %s", se.Message())
 			h.errorResponse(w, http.StatusBadRequest, msg, errorLogger)
 			return
-		}
-		if se.Code() == codes.Internal {
+		case codes.Internal:
 			msg := fmt.Sprintf("Invalid Flow request: %s", se.Message())
-			h.errorResponse(w, http.StatusBadRequest, msg, errorLogger)
+			h.errorResponse(w, http.StatusInternalServerError, msg, errorLogger)
 			return
-		}
-		if se.Code() == codes.Unavailable {
+		case codes.Unavailable:
 			msg := fmt.Sprintf("Failed to process request: %s", se.Message())
 			h.errorResponse(w, http.StatusServiceUnavailable, msg, errorLogger)
+			return
+		case codes.FailedPrecondition:
+			msg := fmt.Sprintf("Precondition failed: %s", se.Message())
+			h.errorResponse(w, http.StatusBadRequest, msg, errorLogger)
+			return
+		case codes.OutOfRange:
+			msg := fmt.Sprintf("Out of range: %s", se.Message())
+			h.errorResponse(w, http.StatusBadRequest, msg, errorLogger)
 			return
 		}
 	}
@@ -110,7 +116,7 @@ func (h *HttpHandler) ErrorHandler(w http.ResponseWriter, err error, errorLogger
 }
 
 // JsonResponse builds a JSON response and send it to the client
-func (h *HttpHandler) JsonResponse(w http.ResponseWriter, code int, response interface{}, errLogger zerolog.Logger) {
+func (h *HttpHandler) JsonResponse(w http.ResponseWriter, code int, response any, errLogger zerolog.Logger) {
 	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
 
 	// serialize response to JSON and handler errors

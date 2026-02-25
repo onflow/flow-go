@@ -15,7 +15,7 @@ import (
 // TODO(JanezP): unexport all types in this file
 // They are just used by some test
 
-// ReusableCadenceRuntime is a wrapper around cadence Runtime and cadence Environment
+// reusableCadenceRuntime is a wrapper around cadence Runtime and cadence Environment
 // with pre-injected cadence context for: EVM, getTransactionIndex, ...
 // it can be reused by changing the fvmEnv. The reuse happens accross blocks and between scripts and transactions
 //
@@ -26,9 +26,9 @@ import (
 // - evm emulator (and related objects)
 //
 // because the cadence environment differs between scripts and transactions there are 2
-// wrapper structs for ReusableCadenceRuntime that change what env ReadStored
+// wrapper structs for reusableCadenceRuntime that change what env ReadStored
 // and InvokeContractFunction use.
-type ReusableCadenceRuntime struct {
+type reusableCadenceRuntime struct {
 	runtime.Runtime
 
 	chain flow.Chain
@@ -45,12 +45,12 @@ type SwappableEnvironment struct {
 	environment.Environment
 }
 
-func NewReusableCadenceRuntime(
+func newReusableCadenceRuntime(
 	rt runtime.Runtime,
 	chain flow.Chain,
 	config runtime.Config,
-) *ReusableCadenceRuntime {
-	reusable := &ReusableCadenceRuntime{
+) *reusableCadenceRuntime {
+	reusable := &reusableCadenceRuntime{
 		Runtime:          rt,
 		chain:            chain,
 		TxRuntimeEnv:     runtime.NewBaseInterpreterEnvironment(config),
@@ -63,7 +63,7 @@ func NewReusableCadenceRuntime(
 	return reusable
 }
 
-func (reusable *ReusableCadenceRuntime) declareStandardLibraryFunctions() {
+func (reusable *reusableCadenceRuntime) declareStandardLibraryFunctions() {
 	// random source for transactions
 	declaration := BlockRandomSourceDeclaration(reusable.fvmEnv)
 	reusable.TxRuntimeEnv.DeclareValue(declaration, nil)
@@ -89,19 +89,19 @@ func (reusable *ReusableCadenceRuntime) declareStandardLibraryFunctions() {
 	)
 }
 
-func (reusable *ReusableCadenceRuntime) SetFvmEnvironment(fvmEnv environment.Environment) {
+func (reusable *reusableCadenceRuntime) SetFvmEnvironment(fvmEnv environment.Environment) {
 	reusable.fvmEnv.Environment = fvmEnv
 }
 
-func (reusable *ReusableCadenceRuntime) CadenceTXEnv() runtime.Environment {
+func (reusable *reusableCadenceRuntime) CadenceTXEnv() runtime.Environment {
 	return reusable.TxRuntimeEnv
 }
 
-func (reusable *ReusableCadenceRuntime) CadenceScriptEnv() runtime.Environment {
+func (reusable *reusableCadenceRuntime) CadenceScriptEnv() runtime.Environment {
 	return reusable.ScriptRuntimeEnv
 }
 
-func (reusable *ReusableCadenceRuntime) NewTransactionExecutor(
+func (reusable *reusableCadenceRuntime) NewTransactionExecutor(
 	script runtime.Script,
 	location common.Location,
 ) runtime.Executor {
@@ -117,7 +117,7 @@ func (reusable *ReusableCadenceRuntime) NewTransactionExecutor(
 	)
 }
 
-func (reusable *ReusableCadenceRuntime) ExecuteScript(
+func (reusable *reusableCadenceRuntime) ExecuteScript(
 	script runtime.Script,
 	location common.Location,
 ) (
@@ -136,16 +136,16 @@ func (reusable *ReusableCadenceRuntime) ExecuteScript(
 	)
 }
 
-// ReusableCadenceTransactionRuntime is a wrapper around ReusableCadenceRuntime
+// reusableCadenceTransactionRuntime is a wrapper around reusableCadenceRuntime
 // that is meant to be used in transactions.
-// see: ReusableCadenceRuntime
-type ReusableCadenceTransactionRuntime struct {
-	*ReusableCadenceRuntime
+// see: reusableCadenceRuntime
+type reusableCadenceTransactionRuntime struct {
+	*reusableCadenceRuntime
 }
 
-var _ environment.ReusableCadenceRuntime = ReusableCadenceTransactionRuntime{}
+var _ environment.ReusableCadenceRuntime = reusableCadenceTransactionRuntime{}
 
-func (reusable ReusableCadenceTransactionRuntime) ReadStored(
+func (reusable reusableCadenceTransactionRuntime) ReadStored(
 	address common.Address,
 	path cadence.Path,
 ) (
@@ -164,7 +164,7 @@ func (reusable ReusableCadenceTransactionRuntime) ReadStored(
 	)
 }
 
-func (reusable ReusableCadenceTransactionRuntime) InvokeContractFunction(
+func (reusable reusableCadenceTransactionRuntime) InvokeContractFunction(
 	contractLocation common.AddressLocation,
 	functionName string,
 	arguments []cadence.Value,
@@ -187,16 +187,16 @@ func (reusable ReusableCadenceTransactionRuntime) InvokeContractFunction(
 	)
 }
 
-// ReusableCadenceScriptRuntime is a wrapper around ReusableCadenceRuntime
+// reusableCadenceScriptRuntime is a wrapper around reusableCadenceRuntime
 // that is meant to be used in scripts.
-// see: ReusableCadenceRuntime
-type ReusableCadenceScriptRuntime struct {
-	*ReusableCadenceRuntime
+// see: reusableCadenceRuntime
+type reusableCadenceScriptRuntime struct {
+	*reusableCadenceRuntime
 }
 
-var _ environment.ReusableCadenceRuntime = ReusableCadenceScriptRuntime{}
+var _ environment.ReusableCadenceRuntime = reusableCadenceScriptRuntime{}
 
-func (reusable ReusableCadenceScriptRuntime) ReadStored(
+func (reusable reusableCadenceScriptRuntime) ReadStored(
 	address common.Address,
 	path cadence.Path,
 ) (
@@ -215,7 +215,7 @@ func (reusable ReusableCadenceScriptRuntime) ReadStored(
 	)
 }
 
-func (reusable ReusableCadenceScriptRuntime) InvokeContractFunction(
+func (reusable reusableCadenceScriptRuntime) InvokeContractFunction(
 	contractLocation common.AddressLocation,
 	functionName string,
 	arguments []cadence.Value,
