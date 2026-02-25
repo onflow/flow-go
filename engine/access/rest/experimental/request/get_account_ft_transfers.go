@@ -16,7 +16,7 @@ type GetAccountFTTransfers struct {
 	Address flow.Address
 	Limit   uint32
 	Cursor  *accessmodel.TransferCursor
-	Filter  extended.AccountFTTransferFilter
+	Filter  extended.AccountTransferFilter
 }
 
 // NewGetAccountFTTransfers parses and validates the HTTP request for the

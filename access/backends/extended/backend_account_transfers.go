@@ -25,13 +25,13 @@ func (o *AccountTransferExpandOptions) HasExpand() bool {
 	return o.Transaction || o.Result
 }
 
-type AccountFTTransferFilter struct {
+type AccountTransferFilter struct {
 	TokenType        string
 	SourceAddress    flow.Address
 	RecipientAddress flow.Address
 }
 
-func (f *AccountFTTransferFilter) Filter() storage.IndexFilter[*accessmodel.FungibleTokenTransfer] {
+func (f *AccountTransferFilter) FTFilter() storage.IndexFilter[*accessmodel.FungibleTokenTransfer] {
 	return func(transfer *accessmodel.FungibleTokenTransfer) bool {
 		if f.TokenType != "" && transfer.TokenType != f.TokenType {
 			return false
@@ -46,13 +46,7 @@ func (f *AccountFTTransferFilter) Filter() storage.IndexFilter[*accessmodel.Fung
 	}
 }
 
-type AccountNFTTransferFilter struct {
-	TokenType        string
-	SourceAddress    flow.Address
-	RecipientAddress flow.Address
-}
-
-func (f *AccountNFTTransferFilter) Filter() storage.IndexFilter[*accessmodel.NonFungibleTokenTransfer] {
+func (f *AccountTransferFilter) NFTFilter() storage.IndexFilter[*accessmodel.NonFungibleTokenTransfer] {
 	return func(transfer *accessmodel.NonFungibleTokenTransfer) bool {
 		if f.TokenType != "" && transfer.TokenType != f.TokenType {
 			return false
@@ -110,7 +104,7 @@ func (b *AccountTransfersBackend) GetAccountFungibleTokenTransfers(
 	address flow.Address,
 	limit uint32,
 	cursor *accessmodel.TransferCursor,
-	filter AccountFTTransferFilter,
+	filter AccountTransferFilter,
 	expandOptions AccountTransferExpandOptions,
 	encodingVersion entities.EventEncodingVersion,
 ) (*accessmodel.FungibleTokenTransfersPage, error) {
@@ -123,7 +117,7 @@ func (b *AccountTransfersBackend) GetAccountFungibleTokenTransfers(
 		return nil, status.Errorf(codes.NotFound, "account %s is not valid on chain %s", address, b.chain.ChainID())
 	}
 
-	page, err := b.ftStore.ByAddress(address, limit, cursor, filter.Filter())
+	page, err := b.ftStore.ByAddress(address, limit, cursor, filter.FTFilter())
 	if err != nil {
 		return nil, b.mapReadError(ctx, "fungible token transfers", err)
 	}
@@ -168,7 +162,7 @@ func (b *AccountTransfersBackend) GetAccountNonFungibleTokenTransfers(
 	address flow.Address,
 	limit uint32,
 	cursor *accessmodel.TransferCursor,
-	filter AccountNFTTransferFilter,
+	filter AccountTransferFilter,
 	expandOptions AccountTransferExpandOptions,
 	encodingVersion entities.EventEncodingVersion,
 ) (*accessmodel.NonFungibleTokenTransfersPage, error) {
@@ -181,7 +175,7 @@ func (b *AccountTransfersBackend) GetAccountNonFungibleTokenTransfers(
 		return nil, status.Errorf(codes.NotFound, "account %s is not valid on chain %s", address, b.chain.ChainID())
 	}
 
-	page, err := b.nftStore.ByAddress(address, limit, cursor, filter.Filter())
+	page, err := b.nftStore.ByAddress(address, limit, cursor, filter.NFTFilter())
 	if err != nil {
 		return nil, b.mapReadError(ctx, "non-fungible token transfers", err)
 	}

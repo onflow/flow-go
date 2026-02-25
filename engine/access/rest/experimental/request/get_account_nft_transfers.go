@@ -16,7 +16,7 @@ type GetAccountNFTTransfers struct {
 	Address flow.Address
 	Limit   uint32
 	Cursor  *accessmodel.TransferCursor
-	Filter  extended.AccountNFTTransferFilter
+	Filter  extended.AccountTransferFilter
 }
 
 // NewGetAccountNFTTransfers parses and validates the HTTP request for the

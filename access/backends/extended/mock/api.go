@@ -42,7 +42,7 @@ func (_m *API) EXPECT() *API_Expecter {
 }
 
 // GetAccountFungibleTokenTransfers provides a mock function for the type API
-func (_mock *API) GetAccountFungibleTokenTransfers(ctx context.Context, address flow.Address, limit uint32, cursor *access.TransferCursor, filter extended.AccountFTTransferFilter, expandOptions extended.AccountTransferExpandOptions, encodingVersion entities.EventEncodingVersion) (*access.FungibleTokenTransfersPage, error) {
+func (_mock *API) GetAccountFungibleTokenTransfers(ctx context.Context, address flow.Address, limit uint32, cursor *access.TransferCursor, filter extended.AccountTransferFilter, expandOptions extended.AccountTransferExpandOptions, encodingVersion entities.EventEncodingVersion) (*access.FungibleTokenTransfersPage, error) {
 	ret := _mock.Called(ctx, address, limit, cursor, filter, expandOptions, encodingVersion)
 
 	if len(ret) == 0 {
@@ -51,17 +51,17 @@ func (_mock *API) GetAccountFungibleTokenTransfers(ctx context.Context, address 
 
 	var r0 *access.FungibleTokenTransfersPage
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, flow.Address, uint32, *access.TransferCursor, extended.AccountFTTransferFilter, extended.AccountTransferExpandOptions, entities.EventEncodingVersion) (*access.FungibleTokenTransfersPage, error)); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, flow.Address, uint32, *access.TransferCursor, extended.AccountTransferFilter, extended.AccountTransferExpandOptions, entities.EventEncodingVersion) (*access.FungibleTokenTransfersPage, error)); ok {
 		return returnFunc(ctx, address, limit, cursor, filter, expandOptions, encodingVersion)
 	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, flow.Address, uint32, *access.TransferCursor, extended.AccountFTTransferFilter, extended.AccountTransferExpandOptions, entities.EventEncodingVersion) *access.FungibleTokenTransfersPage); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, flow.Address, uint32, *access.TransferCursor, extended.AccountTransferFilter, extended.AccountTransferExpandOptions, entities.EventEncodingVersion) *access.FungibleTokenTransfersPage); ok {
 		r0 = returnFunc(ctx, address, limit, cursor, filter, expandOptions, encodingVersion)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*access.FungibleTokenTransfersPage)
 		}
 	}
-	if returnFunc, ok := ret.Get(1).(func(context.Context, flow.Address, uint32, *access.TransferCursor, extended.AccountFTTransferFilter, extended.AccountTransferExpandOptions, entities.EventEncodingVersion) error); ok {
+	if returnFunc, ok := ret.Get(1).(func(context.Context, flow.Address, uint32, *access.TransferCursor, extended.AccountTransferFilter, extended.AccountTransferExpandOptions, entities.EventEncodingVersion) error); ok {
 		r1 = returnFunc(ctx, address, limit, cursor, filter, expandOptions, encodingVersion)
 	} else {
 		r1 = ret.Error(1)
@@ -86,7 +86,7 @@ func (_e *API_Expecter) GetAccountFungibleTokenTransfers(ctx interface{}, addres
 	return &API_GetAccountFungibleTokenTransfers_Call{Call: _e.mock.On("GetAccountFungibleTokenTransfers", ctx, address, limit, cursor, filter, expandOptions, encodingVersion)}
 }
 
-func (_c *API_GetAccountFungibleTokenTransfers_Call) Run(run func(ctx context.Context, address flow.Address, limit uint32, cursor *access.TransferCursor, filter extended.AccountFTTransferFilter, expandOptions extended.AccountTransferExpandOptions, encodingVersion entities.EventEncodingVersion)) *API_GetAccountFungibleTokenTransfers_Call {
+func (_c *API_GetAccountFungibleTokenTransfers_Call) Run(run func(ctx context.Context, address flow.Address, limit uint32, cursor *access.TransferCursor, filter extended.AccountTransferFilter, expandOptions extended.AccountTransferExpandOptions, encodingVersion entities.EventEncodingVersion)) *API_GetAccountFungibleTokenTransfers_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
@@ -104,9 +104,9 @@ func (_c *API_GetAccountFungibleTokenTransfers_Call) Run(run func(ctx context.Co
 		if args[3] != nil {
 			arg3 = args[3].(*access.TransferCursor)
 		}
-		var arg4 extended.AccountFTTransferFilter
+		var arg4 extended.AccountTransferFilter
 		if args[4] != nil {
-			arg4 = args[4].(extended.AccountFTTransferFilter)
+			arg4 = args[4].(extended.AccountTransferFilter)
 		}
 		var arg5 extended.AccountTransferExpandOptions
 		if args[5] != nil {
@@ -134,13 +134,13 @@ func (_c *API_GetAccountFungibleTokenTransfers_Call) Return(fungibleTokenTransfe
 	return _c
 }
 
-func (_c *API_GetAccountFungibleTokenTransfers_Call) RunAndReturn(run func(ctx context.Context, address flow.Address, limit uint32, cursor *access.TransferCursor, filter extended.AccountFTTransferFilter, expandOptions extended.AccountTransferExpandOptions, encodingVersion entities.EventEncodingVersion) (*access.FungibleTokenTransfersPage, error)) *API_GetAccountFungibleTokenTransfers_Call {
+func (_c *API_GetAccountFungibleTokenTransfers_Call) RunAndReturn(run func(ctx context.Context, address flow.Address, limit uint32, cursor *access.TransferCursor, filter extended.AccountTransferFilter, expandOptions extended.AccountTransferExpandOptions, encodingVersion entities.EventEncodingVersion) (*access.FungibleTokenTransfersPage, error)) *API_GetAccountFungibleTokenTransfers_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // GetAccountNonFungibleTokenTransfers provides a mock function for the type API
-func (_mock *API) GetAccountNonFungibleTokenTransfers(ctx context.Context, address flow.Address, limit uint32, cursor *access.TransferCursor, filter extended.AccountNFTTransferFilter, expandOptions extended.AccountTransferExpandOptions, encodingVersion entities.EventEncodingVersion) (*access.NonFungibleTokenTransfersPage, error) {
+func (_mock *API) GetAccountNonFungibleTokenTransfers(ctx context.Context, address flow.Address, limit uint32, cursor *access.TransferCursor, filter extended.AccountTransferFilter, expandOptions extended.AccountTransferExpandOptions, encodingVersion entities.EventEncodingVersion) (*access.NonFungibleTokenTransfersPage, error) {
 	ret := _mock.Called(ctx, address, limit, cursor, filter, expandOptions, encodingVersion)
 
 	if len(ret) == 0 {
@@ -149,17 +149,17 @@ func (_mock *API) GetAccountNonFungibleTokenTransfers(ctx context.Context, addre
 
 	var r0 *access.NonFungibleTokenTransfersPage
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, flow.Address, uint32, *access.TransferCursor, extended.AccountNFTTransferFilter, extended.AccountTransferExpandOptions, entities.EventEncodingVersion) (*access.NonFungibleTokenTransfersPage, error)); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, flow.Address, uint32, *access.TransferCursor, extended.AccountTransferFilter, extended.AccountTransferExpandOptions, entities.EventEncodingVersion) (*access.NonFungibleTokenTransfersPage, error)); ok {
 		return returnFunc(ctx, address, limit, cursor, filter, expandOptions, encodingVersion)
 	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, flow.Address, uint32, *access.TransferCursor, extended.AccountNFTTransferFilter, extended.AccountTransferExpandOptions, entities.EventEncodingVersion) *access.NonFungibleTokenTransfersPage); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, flow.Address, uint32, *access.TransferCursor, extended.AccountTransferFilter, extended.AccountTransferExpandOptions, entities.EventEncodingVersion) *access.NonFungibleTokenTransfersPage); ok {
 		r0 = returnFunc(ctx, address, limit, cursor, filter, expandOptions, encodingVersion)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*access.NonFungibleTokenTransfersPage)
 		}
 	}
-	if returnFunc, ok := ret.Get(1).(func(context.Context, flow.Address, uint32, *access.TransferCursor, extended.AccountNFTTransferFilter, extended.AccountTransferExpandOptions, entities.EventEncodingVersion) error); ok {
+	if returnFunc, ok := ret.Get(1).(func(context.Context, flow.Address, uint32, *access.TransferCursor, extended.AccountTransferFilter, extended.AccountTransferExpandOptions, entities.EventEncodingVersion) error); ok {
 		r1 = returnFunc(ctx, address, limit, cursor, filter, expandOptions, encodingVersion)
 	} else {
 		r1 = ret.Error(1)
@@ -177,14 +177,14 @@ type API_GetAccountNonFungibleTokenTransfers_Call struct {
 //   - address flow.Address
 //   - limit uint32
 //   - cursor *access.TransferCursor
-//   - filter extended.AccountNFTTransferFilter
+//   - filter extended.AccountTransferFilter
 //   - expandOptions extended.AccountTransferExpandOptions
 //   - encodingVersion entities.EventEncodingVersion
 func (_e *API_Expecter) GetAccountNonFungibleTokenTransfers(ctx interface{}, address interface{}, limit interface{}, cursor interface{}, filter interface{}, expandOptions interface{}, encodingVersion interface{}) *API_GetAccountNonFungibleTokenTransfers_Call {
 	return &API_GetAccountNonFungibleTokenTransfers_Call{Call: _e.mock.On("GetAccountNonFungibleTokenTransfers", ctx, address, limit, cursor, filter, expandOptions, encodingVersion)}
 }
 
-func (_c *API_GetAccountNonFungibleTokenTransfers_Call) Run(run func(ctx context.Context, address flow.Address, limit uint32, cursor *access.TransferCursor, filter extended.AccountNFTTransferFilter, expandOptions extended.AccountTransferExpandOptions, encodingVersion entities.EventEncodingVersion)) *API_GetAccountNonFungibleTokenTransfers_Call {
+func (_c *API_GetAccountNonFungibleTokenTransfers_Call) Run(run func(ctx context.Context, address flow.Address, limit uint32, cursor *access.TransferCursor, filter extended.AccountTransferFilter, expandOptions extended.AccountTransferExpandOptions, encodingVersion entities.EventEncodingVersion)) *API_GetAccountNonFungibleTokenTransfers_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
@@ -202,9 +202,9 @@ func (_c *API_GetAccountNonFungibleTokenTransfers_Call) Run(run func(ctx context
 		if args[3] != nil {
 			arg3 = args[3].(*access.TransferCursor)
 		}
-		var arg4 extended.AccountNFTTransferFilter
+		var arg4 extended.AccountTransferFilter
 		if args[4] != nil {
-			arg4 = args[4].(extended.AccountNFTTransferFilter)
+			arg4 = args[4].(extended.AccountTransferFilter)
 		}
 		var arg5 extended.AccountTransferExpandOptions
 		if args[5] != nil {
@@ -232,7 +232,7 @@ func (_c *API_GetAccountNonFungibleTokenTransfers_Call) Return(nonFungibleTokenT
 	return _c
 }
 
-func (_c *API_GetAccountNonFungibleTokenTransfers_Call) RunAndReturn(run func(ctx context.Context, address flow.Address, limit uint32, cursor *access.TransferCursor, filter extended.AccountNFTTransferFilter, expandOptions extended.AccountTransferExpandOptions, encodingVersion entities.EventEncodingVersion) (*access.NonFungibleTokenTransfersPage, error)) *API_GetAccountNonFungibleTokenTransfers_Call {
+func (_c *API_GetAccountNonFungibleTokenTransfers_Call) RunAndReturn(run func(ctx context.Context, address flow.Address, limit uint32, cursor *access.TransferCursor, filter extended.AccountTransferFilter, expandOptions extended.AccountTransferExpandOptions, encodingVersion entities.EventEncodingVersion) (*access.NonFungibleTokenTransfersPage, error)) *API_GetAccountNonFungibleTokenTransfers_Call {
 	_c.Call.Return(run)
 	return _c
 }

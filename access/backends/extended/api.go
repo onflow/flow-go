@@ -46,7 +46,7 @@ type API interface {
 		address flow.Address,
 		limit uint32,
 		cursor *accessmodel.TransferCursor,
-		filter AccountFTTransferFilter,
+		filter AccountTransferFilter,
 		expandOptions AccountTransferExpandOptions,
 		encodingVersion entities.EventEncodingVersion,
 	) (*accessmodel.FungibleTokenTransfersPage, error)
@@ -66,7 +66,7 @@ type API interface {
 		address flow.Address,
 		limit uint32,
 		cursor *accessmodel.TransferCursor,
-		filter AccountNFTTransferFilter,
+		filter AccountTransferFilter,
 		expandOptions AccountTransferExpandOptions,
 		encodingVersion entities.EventEncodingVersion,
 	) (*accessmodel.NonFungibleTokenTransfersPage, error)

@@ -111,7 +111,7 @@ func TestGetAccountFungibleTokenTransfers(t *testing.T) {
 			address,
 			uint32(0),
 			(*accessmodel.TransferCursor)(nil),
-			extended.AccountFTTransferFilter{},
+			extended.AccountTransferFilter{},
 			extended.AccountTransferExpandOptions{},
 			entities.EventEncodingVersion_JSON_CDC_V0,
 		).Return(page, nil)
@@ -172,7 +172,7 @@ func TestGetAccountFungibleTokenTransfers(t *testing.T) {
 			address,
 			uint32(10),
 			(*accessmodel.TransferCursor)(nil),
-			extended.AccountFTTransferFilter{},
+			extended.AccountTransferFilter{},
 			extended.AccountTransferExpandOptions{},
 			entities.EventEncodingVersion_JSON_CDC_V0,
 		).Return(page, nil)
@@ -237,7 +237,7 @@ func TestGetAccountFungibleTokenTransfers(t *testing.T) {
 			address,
 			uint32(0),
 			expectedCursor,
-			extended.AccountFTTransferFilter{},
+			extended.AccountTransferFilter{},
 			extended.AccountTransferExpandOptions{},
 			entities.EventEncodingVersion_JSON_CDC_V0,
 		).Return(page, nil)
@@ -258,7 +258,7 @@ func TestGetAccountFungibleTokenTransfers(t *testing.T) {
 			Transfers: []accessmodel.FungibleTokenTransfer{},
 		}
 
-		expectedFilter := extended.AccountFTTransferFilter{
+		expectedFilter := extended.AccountTransferFilter{
 			TokenType: "A.1654653399040a61.FlowToken",
 		}
 
@@ -288,7 +288,7 @@ func TestGetAccountFungibleTokenTransfers(t *testing.T) {
 			Transfers: []accessmodel.FungibleTokenTransfer{},
 		}
 
-		expectedFilter := extended.AccountFTTransferFilter{
+		expectedFilter := extended.AccountTransferFilter{
 			SourceAddress: sourceAddr,
 		}
 
@@ -318,7 +318,7 @@ func TestGetAccountFungibleTokenTransfers(t *testing.T) {
 			Transfers: []accessmodel.FungibleTokenTransfer{},
 		}
 
-		expectedFilter := extended.AccountFTTransferFilter{
+		expectedFilter := extended.AccountTransferFilter{
 			RecipientAddress: recipientAddr,
 		}
 
@@ -348,7 +348,7 @@ func TestGetAccountFungibleTokenTransfers(t *testing.T) {
 			Transfers: []accessmodel.FungibleTokenTransfer{},
 		}
 
-		expectedFilter := extended.AccountFTTransferFilter{
+		expectedFilter := extended.AccountTransferFilter{
 			SourceAddress: address,
 		}
 
@@ -378,7 +378,7 @@ func TestGetAccountFungibleTokenTransfers(t *testing.T) {
 			Transfers: []accessmodel.FungibleTokenTransfer{},
 		}
 
-		expectedFilter := extended.AccountFTTransferFilter{
+		expectedFilter := extended.AccountTransferFilter{
 			RecipientAddress: address,
 		}
 
@@ -413,7 +413,7 @@ func TestGetAccountFungibleTokenTransfers(t *testing.T) {
 			address,
 			uint32(0),
 			(*accessmodel.TransferCursor)(nil),
-			extended.AccountFTTransferFilter{},
+			extended.AccountTransferFilter{},
 			extended.AccountTransferExpandOptions{Transaction: true},
 			entities.EventEncodingVersion_JSON_CDC_V0,
 		).Return(page, nil)
@@ -439,7 +439,7 @@ func TestGetAccountFungibleTokenTransfers(t *testing.T) {
 			address,
 			uint32(0),
 			(*accessmodel.TransferCursor)(nil),
-			extended.AccountFTTransferFilter{},
+			extended.AccountTransferFilter{},
 			extended.AccountTransferExpandOptions{Result: true},
 			entities.EventEncodingVersion_JSON_CDC_V0,
 		).Return(page, nil)
@@ -526,7 +526,7 @@ func TestGetAccountFungibleTokenTransfers(t *testing.T) {
 			address,
 			uint32(0),
 			(*accessmodel.TransferCursor)(nil),
-			extended.AccountFTTransferFilter{},
+			extended.AccountTransferFilter{},
 			extended.AccountTransferExpandOptions{},
 			entities.EventEncodingVersion_JSON_CDC_V0,
 		).Return(nil, status.Errorf(codes.NotFound, "no transfers found for account %s", address))
@@ -548,7 +548,7 @@ func TestGetAccountFungibleTokenTransfers(t *testing.T) {
 			address,
 			uint32(0),
 			(*accessmodel.TransferCursor)(nil),
-			extended.AccountFTTransferFilter{},
+			extended.AccountTransferFilter{},
 			extended.AccountTransferExpandOptions{},
 			entities.EventEncodingVersion_JSON_CDC_V0,
 		).Return(nil, status.Errorf(codes.FailedPrecondition, "index not initialized"))
@@ -586,7 +586,7 @@ func TestGetAccountFungibleTokenTransfers(t *testing.T) {
 			address,
 			uint32(0),
 			(*accessmodel.TransferCursor)(nil),
-			extended.AccountFTTransferFilter{},
+			extended.AccountTransferFilter{},
 			extended.AccountTransferExpandOptions{},
 			entities.EventEncodingVersion_JSON_CDC_V0,
 		).Return(page, nil)

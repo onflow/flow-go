@@ -96,7 +96,7 @@ func TestGetAccountNonFungibleTokenTransfers(t *testing.T) {
 			address,
 			uint32(0),
 			(*accessmodel.TransferCursor)(nil),
-			extended.AccountNFTTransferFilter{},
+			extended.AccountTransferFilter{},
 			extended.AccountTransferExpandOptions{},
 			entities.EventEncodingVersion_JSON_CDC_V0,
 		).Return(page, nil)
@@ -157,7 +157,7 @@ func TestGetAccountNonFungibleTokenTransfers(t *testing.T) {
 			address,
 			uint32(10),
 			(*accessmodel.TransferCursor)(nil),
-			extended.AccountNFTTransferFilter{},
+			extended.AccountTransferFilter{},
 			extended.AccountTransferExpandOptions{},
 			entities.EventEncodingVersion_JSON_CDC_V0,
 		).Return(page, nil)
@@ -221,7 +221,7 @@ func TestGetAccountNonFungibleTokenTransfers(t *testing.T) {
 			address,
 			uint32(0),
 			expectedCursor,
-			extended.AccountNFTTransferFilter{},
+			extended.AccountTransferFilter{},
 			extended.AccountTransferExpandOptions{},
 			entities.EventEncodingVersion_JSON_CDC_V0,
 		).Return(page, nil)
@@ -243,7 +243,7 @@ func TestGetAccountNonFungibleTokenTransfers(t *testing.T) {
 			Transfers: []accessmodel.NonFungibleTokenTransfer{},
 		}
 
-		expectedFilter := extended.AccountNFTTransferFilter{
+		expectedFilter := extended.AccountTransferFilter{
 			TokenType: "A.1654653399040a61.MyNFT",
 		}
 
@@ -273,7 +273,7 @@ func TestGetAccountNonFungibleTokenTransfers(t *testing.T) {
 			Transfers: []accessmodel.NonFungibleTokenTransfer{},
 		}
 
-		expectedFilter := extended.AccountNFTTransferFilter{
+		expectedFilter := extended.AccountTransferFilter{
 			SourceAddress: address,
 		}
 
@@ -308,7 +308,7 @@ func TestGetAccountNonFungibleTokenTransfers(t *testing.T) {
 			address,
 			uint32(0),
 			(*accessmodel.TransferCursor)(nil),
-			extended.AccountNFTTransferFilter{},
+			extended.AccountTransferFilter{},
 			extended.AccountTransferExpandOptions{Transaction: true},
 			entities.EventEncodingVersion_JSON_CDC_V0,
 		).Return(page, nil)
@@ -334,7 +334,7 @@ func TestGetAccountNonFungibleTokenTransfers(t *testing.T) {
 			address,
 			uint32(0),
 			(*accessmodel.TransferCursor)(nil),
-			extended.AccountNFTTransferFilter{},
+			extended.AccountTransferFilter{},
 			extended.AccountTransferExpandOptions{Result: true},
 			entities.EventEncodingVersion_JSON_CDC_V0,
 		).Return(page, nil)
@@ -421,7 +421,7 @@ func TestGetAccountNonFungibleTokenTransfers(t *testing.T) {
 			address,
 			uint32(0),
 			(*accessmodel.TransferCursor)(nil),
-			extended.AccountNFTTransferFilter{},
+			extended.AccountTransferFilter{},
 			extended.AccountTransferExpandOptions{},
 			entities.EventEncodingVersion_JSON_CDC_V0,
 		).Return(nil, status.Errorf(codes.NotFound, "no transfers found for account %s", address))
@@ -443,7 +443,7 @@ func TestGetAccountNonFungibleTokenTransfers(t *testing.T) {
 			address,
 			uint32(0),
 			(*accessmodel.TransferCursor)(nil),
-			extended.AccountNFTTransferFilter{},
+			extended.AccountTransferFilter{},
 			extended.AccountTransferExpandOptions{},
 			entities.EventEncodingVersion_JSON_CDC_V0,
 		).Return(nil, status.Errorf(codes.FailedPrecondition, "index not initialized"))
@@ -481,7 +481,7 @@ func TestGetAccountNonFungibleTokenTransfers(t *testing.T) {
 			address,
 			uint32(0),
 			(*accessmodel.TransferCursor)(nil),
-			extended.AccountNFTTransferFilter{},
+			extended.AccountTransferFilter{},
 			extended.AccountTransferExpandOptions{},
 			entities.EventEncodingVersion_JSON_CDC_V0,
 		).Return(page, nil)

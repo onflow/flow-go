@@ -59,7 +59,7 @@ func TestBackend_GetAccountFungibleTokenTransfers(t *testing.T) {
 		mockHeaders.On("ByBlockID", blockID).Return(unittest.BlockHeaderFixture(), nil)
 
 		page, err := backend.GetAccountFungibleTokenTransfers(
-			context.Background(), addr, 0, nil, AccountFTTransferFilter{}, AccountTransferExpandOptions{}, defaultEncoding,
+			context.Background(), addr, 0, nil, AccountTransferFilter{}, AccountTransferExpandOptions{}, defaultEncoding,
 		)
 		require.NoError(t, err)
 		require.Len(t, page.Transfers, 1)
@@ -89,7 +89,7 @@ func TestBackend_GetAccountFungibleTokenTransfers(t *testing.T) {
 		mockHeaders.On("ByBlockID", blockID).Return(unittest.BlockHeaderFixture(), nil)
 
 		_, err := backend.GetAccountFungibleTokenTransfers(
-			context.Background(), addr, 0, nil, AccountFTTransferFilter{}, AccountTransferExpandOptions{}, defaultEncoding,
+			context.Background(), addr, 0, nil, AccountTransferFilter{}, AccountTransferExpandOptions{}, defaultEncoding,
 		)
 		require.NoError(t, err)
 	})
@@ -102,7 +102,7 @@ func TestBackend_GetAccountFungibleTokenTransfers(t *testing.T) {
 		addr := unittest.RandomAddressFixture()
 
 		_, err := backend.GetAccountFungibleTokenTransfers(
-			context.Background(), addr, 500, nil, AccountFTTransferFilter{}, AccountTransferExpandOptions{}, defaultEncoding,
+			context.Background(), addr, 500, nil, AccountTransferFilter{}, AccountTransferExpandOptions{}, defaultEncoding,
 		)
 		require.Error(t, err)
 		st, ok := status.FromError(err)
@@ -132,7 +132,7 @@ func TestBackend_GetAccountFungibleTokenTransfers(t *testing.T) {
 		mockHeaders.On("ByBlockID", blockID).Return(unittest.BlockHeaderFixture(), nil)
 
 		_, err := backend.GetAccountFungibleTokenTransfers(
-			context.Background(), addr, 10, cursor, AccountFTTransferFilter{}, AccountTransferExpandOptions{}, defaultEncoding,
+			context.Background(), addr, 10, cursor, AccountTransferFilter{}, AccountTransferExpandOptions{}, defaultEncoding,
 		)
 		require.NoError(t, err)
 	})
@@ -145,7 +145,7 @@ func TestBackend_GetAccountFungibleTokenTransfers(t *testing.T) {
 		addr := unittest.InvalidAddressFixture()
 
 		_, err := backend.GetAccountFungibleTokenTransfers(
-			context.Background(), addr, 0, nil, AccountFTTransferFilter{}, AccountTransferExpandOptions{}, defaultEncoding,
+			context.Background(), addr, 0, nil, AccountTransferFilter{}, AccountTransferExpandOptions{}, defaultEncoding,
 		)
 		require.Error(t, err)
 		st, ok := status.FromError(err)
@@ -164,7 +164,7 @@ func TestBackend_GetAccountFungibleTokenTransfers(t *testing.T) {
 			Return(accessmodel.FungibleTokenTransfersPage{}, nil)
 
 		page, err := backend.GetAccountFungibleTokenTransfers(
-			context.Background(), addr, 0, nil, AccountFTTransferFilter{}, AccountTransferExpandOptions{}, defaultEncoding,
+			context.Background(), addr, 0, nil, AccountTransferFilter{}, AccountTransferExpandOptions{}, defaultEncoding,
 		)
 		require.NoError(t, err)
 		assert.Empty(t, page.Transfers)
@@ -181,7 +181,7 @@ func TestBackend_GetAccountFungibleTokenTransfers(t *testing.T) {
 			Return(accessmodel.FungibleTokenTransfersPage{}, storage.ErrNotBootstrapped)
 
 		_, err := backend.GetAccountFungibleTokenTransfers(
-			context.Background(), addr, 0, nil, AccountFTTransferFilter{}, AccountTransferExpandOptions{}, defaultEncoding,
+			context.Background(), addr, 0, nil, AccountTransferFilter{}, AccountTransferExpandOptions{}, defaultEncoding,
 		)
 		require.Error(t, err)
 		st, ok := status.FromError(err)
@@ -201,7 +201,7 @@ func TestBackend_GetAccountFungibleTokenTransfers(t *testing.T) {
 			Return(accessmodel.FungibleTokenTransfersPage{}, fmt.Errorf("wrapped: %w", storage.ErrHeightNotIndexed))
 
 		_, err := backend.GetAccountFungibleTokenTransfers(
-			context.Background(), addr, 10, cursor, AccountFTTransferFilter{}, AccountTransferExpandOptions{}, defaultEncoding,
+			context.Background(), addr, 10, cursor, AccountTransferFilter{}, AccountTransferExpandOptions{}, defaultEncoding,
 		)
 		require.Error(t, err)
 		st, ok := status.FromError(err)
@@ -225,7 +225,7 @@ func TestBackend_GetAccountFungibleTokenTransfers(t *testing.T) {
 			irrecoverable.NewMockSignalerContextExpectError(t, context.Background(), expectedErr))
 
 		_, err := backend.GetAccountFungibleTokenTransfers(
-			signalerCtx, addr, 0, nil, AccountFTTransferFilter{}, AccountTransferExpandOptions{}, defaultEncoding,
+			signalerCtx, addr, 0, nil, AccountTransferFilter{}, AccountTransferExpandOptions{}, defaultEncoding,
 		)
 		require.Error(t, err)
 	})
@@ -268,7 +268,7 @@ func TestBackend_GetAccountNonFungibleTokenTransfers(t *testing.T) {
 		mockHeaders.On("ByBlockID", blockID).Return(unittest.BlockHeaderFixture(), nil)
 
 		page, err := backend.GetAccountNonFungibleTokenTransfers(
-			context.Background(), addr, 0, nil, AccountNFTTransferFilter{}, AccountTransferExpandOptions{}, defaultEncoding,
+			context.Background(), addr, 0, nil, AccountTransferFilter{}, AccountTransferExpandOptions{}, defaultEncoding,
 		)
 		require.NoError(t, err)
 		require.Len(t, page.Transfers, 1)
@@ -297,7 +297,7 @@ func TestBackend_GetAccountNonFungibleTokenTransfers(t *testing.T) {
 		mockHeaders.On("ByBlockID", blockID).Return(unittest.BlockHeaderFixture(), nil)
 
 		_, err := backend.GetAccountNonFungibleTokenTransfers(
-			context.Background(), addr, 0, nil, AccountNFTTransferFilter{}, AccountTransferExpandOptions{}, defaultEncoding,
+			context.Background(), addr, 0, nil, AccountTransferFilter{}, AccountTransferExpandOptions{}, defaultEncoding,
 		)
 		require.NoError(t, err)
 	})
@@ -310,7 +310,7 @@ func TestBackend_GetAccountNonFungibleTokenTransfers(t *testing.T) {
 		addr := unittest.RandomAddressFixture()
 
 		_, err := backend.GetAccountNonFungibleTokenTransfers(
-			context.Background(), addr, 500, nil, AccountNFTTransferFilter{}, AccountTransferExpandOptions{}, defaultEncoding,
+			context.Background(), addr, 500, nil, AccountTransferFilter{}, AccountTransferExpandOptions{}, defaultEncoding,
 		)
 		require.Error(t, err)
 		st, ok := status.FromError(err)
@@ -340,7 +340,7 @@ func TestBackend_GetAccountNonFungibleTokenTransfers(t *testing.T) {
 		mockHeaders.On("ByBlockID", blockID).Return(unittest.BlockHeaderFixture(), nil)
 
 		_, err := backend.GetAccountNonFungibleTokenTransfers(
-			context.Background(), addr, 10, cursor, AccountNFTTransferFilter{}, AccountTransferExpandOptions{}, defaultEncoding,
+			context.Background(), addr, 10, cursor, AccountTransferFilter{}, AccountTransferExpandOptions{}, defaultEncoding,
 		)
 		require.NoError(t, err)
 	})
@@ -353,7 +353,7 @@ func TestBackend_GetAccountNonFungibleTokenTransfers(t *testing.T) {
 		addr := unittest.InvalidAddressFixture()
 
 		_, err := backend.GetAccountNonFungibleTokenTransfers(
-			context.Background(), addr, 0, nil, AccountNFTTransferFilter{}, AccountTransferExpandOptions{}, defaultEncoding,
+			context.Background(), addr, 0, nil, AccountTransferFilter{}, AccountTransferExpandOptions{}, defaultEncoding,
 		)
 		require.Error(t, err)
 		st, ok := status.FromError(err)
@@ -372,7 +372,7 @@ func TestBackend_GetAccountNonFungibleTokenTransfers(t *testing.T) {
 			Return(accessmodel.NonFungibleTokenTransfersPage{}, nil)
 
 		page, err := backend.GetAccountNonFungibleTokenTransfers(
-			context.Background(), addr, 0, nil, AccountNFTTransferFilter{}, AccountTransferExpandOptions{}, defaultEncoding,
+			context.Background(), addr, 0, nil, AccountTransferFilter{}, AccountTransferExpandOptions{}, defaultEncoding,
 		)
 		require.NoError(t, err)
 		assert.Empty(t, page.Transfers)
@@ -389,7 +389,7 @@ func TestBackend_GetAccountNonFungibleTokenTransfers(t *testing.T) {
 			Return(accessmodel.NonFungibleTokenTransfersPage{}, storage.ErrNotBootstrapped)
 
 		_, err := backend.GetAccountNonFungibleTokenTransfers(
-			context.Background(), addr, 0, nil, AccountNFTTransferFilter{}, AccountTransferExpandOptions{}, defaultEncoding,
+			context.Background(), addr, 0, nil, AccountTransferFilter{}, AccountTransferExpandOptions{}, defaultEncoding,
 		)
 		require.Error(t, err)
 		st, ok := status.FromError(err)
@@ -409,7 +409,7 @@ func TestBackend_GetAccountNonFungibleTokenTransfers(t *testing.T) {
 			Return(accessmodel.NonFungibleTokenTransfersPage{}, fmt.Errorf("wrapped: %w", storage.ErrHeightNotIndexed))
 
 		_, err := backend.GetAccountNonFungibleTokenTransfers(
-			context.Background(), addr, 10, cursor, AccountNFTTransferFilter{}, AccountTransferExpandOptions{}, defaultEncoding,
+			context.Background(), addr, 10, cursor, AccountTransferFilter{}, AccountTransferExpandOptions{}, defaultEncoding,
 		)
 		require.Error(t, err)
 		st, ok := status.FromError(err)
@@ -433,7 +433,7 @@ func TestBackend_GetAccountNonFungibleTokenTransfers(t *testing.T) {
 			irrecoverable.NewMockSignalerContextExpectError(t, context.Background(), expectedErr))
 
 		_, err := backend.GetAccountNonFungibleTokenTransfers(
-			signalerCtx, addr, 0, nil, AccountNFTTransferFilter{}, AccountTransferExpandOptions{}, defaultEncoding,
+			signalerCtx, addr, 0, nil, AccountTransferFilter{}, AccountTransferExpandOptions{}, defaultEncoding,
 		)
 		require.Error(t, err)
 	})
@@ -453,95 +453,95 @@ func TestAccountFTTransferFilter(t *testing.T) {
 	}
 
 	t.Run("empty filter matches all", func(t *testing.T) {
-		filter := AccountFTTransferFilter{}
-		assert.True(t, filter.Filter()(transfer))
+		filter := AccountTransferFilter{}
+		assert.True(t, filter.FTFilter()(transfer))
 	})
 
 	t.Run("token type filter matches", func(t *testing.T) {
-		filter := AccountFTTransferFilter{TokenType: "A.1654653399040a61.FlowToken"}
-		assert.True(t, filter.Filter()(transfer))
+		filter := AccountTransferFilter{TokenType: "A.1654653399040a61.FlowToken"}
+		assert.True(t, filter.FTFilter()(transfer))
 	})
 
 	t.Run("token type filter rejects mismatch", func(t *testing.T) {
-		filter := AccountFTTransferFilter{TokenType: "A.0xOther.USDC"}
-		assert.False(t, filter.Filter()(transfer))
+		filter := AccountTransferFilter{TokenType: "A.0xOther.USDC"}
+		assert.False(t, filter.FTFilter()(transfer))
 	})
 
 	t.Run("source address filter matches", func(t *testing.T) {
-		filter := AccountFTTransferFilter{SourceAddress: senderAddr}
-		assert.True(t, filter.Filter()(transfer))
+		filter := AccountTransferFilter{SourceAddress: senderAddr}
+		assert.True(t, filter.FTFilter()(transfer))
 	})
 
 	t.Run("source address filter rejects mismatch", func(t *testing.T) {
-		filter := AccountFTTransferFilter{SourceAddress: otherAddr}
-		assert.False(t, filter.Filter()(transfer))
+		filter := AccountTransferFilter{SourceAddress: otherAddr}
+		assert.False(t, filter.FTFilter()(transfer))
 	})
 
 	t.Run("recipient address filter matches", func(t *testing.T) {
-		filter := AccountFTTransferFilter{RecipientAddress: recipientAddr}
-		assert.True(t, filter.Filter()(transfer))
+		filter := AccountTransferFilter{RecipientAddress: recipientAddr}
+		assert.True(t, filter.FTFilter()(transfer))
 	})
 
 	t.Run("recipient address filter rejects mismatch", func(t *testing.T) {
-		filter := AccountFTTransferFilter{RecipientAddress: otherAddr}
-		assert.False(t, filter.Filter()(transfer))
+		filter := AccountTransferFilter{RecipientAddress: otherAddr}
+		assert.False(t, filter.FTFilter()(transfer))
 	})
 
 	t.Run("sender role matches when account is source", func(t *testing.T) {
-		filter := AccountFTTransferFilter{
+		filter := AccountTransferFilter{
 			SourceAddress: senderAddr,
 		}
-		assert.True(t, filter.Filter()(transfer))
+		assert.True(t, filter.FTFilter()(transfer))
 	})
 
 	t.Run("sender role rejects when account is not source", func(t *testing.T) {
-		filter := AccountFTTransferFilter{
+		filter := AccountTransferFilter{
 			SourceAddress: recipientAddr,
 		}
-		assert.False(t, filter.Filter()(transfer))
+		assert.False(t, filter.FTFilter()(transfer))
 	})
 
 	t.Run("recipient role matches when account is recipient", func(t *testing.T) {
-		filter := AccountFTTransferFilter{
+		filter := AccountTransferFilter{
 			RecipientAddress: recipientAddr,
 		}
-		assert.True(t, filter.Filter()(transfer))
+		assert.True(t, filter.FTFilter()(transfer))
 	})
 
 	t.Run("recipient role rejects when account is not recipient", func(t *testing.T) {
-		filter := AccountFTTransferFilter{
+		filter := AccountTransferFilter{
 			RecipientAddress: senderAddr,
 		}
-		assert.False(t, filter.Filter()(transfer))
+		assert.False(t, filter.FTFilter()(transfer))
 	})
 
 	t.Run("combined filters all match", func(t *testing.T) {
-		filter := AccountFTTransferFilter{
+		filter := AccountTransferFilter{
 			TokenType:        "A.1654653399040a61.FlowToken",
 			SourceAddress:    senderAddr,
 			RecipientAddress: recipientAddr,
 		}
-		assert.True(t, filter.Filter()(transfer))
+		assert.True(t, filter.FTFilter()(transfer))
 	})
 
 	t.Run("combined filters reject on first mismatch", func(t *testing.T) {
-		filter := AccountFTTransferFilter{
+		filter := AccountTransferFilter{
 			TokenType:     "A.0xOther.USDC", // mismatch
 			SourceAddress: senderAddr,       // match
 		}
-		assert.False(t, filter.Filter()(transfer))
+		assert.False(t, filter.FTFilter()(transfer))
 	})
 
 	t.Run("empty address fields are ignored", func(t *testing.T) {
-		filter := AccountFTTransferFilter{
+		filter := AccountTransferFilter{
 			SourceAddress:    flow.EmptyAddress,
 			RecipientAddress: flow.EmptyAddress,
 		}
-		assert.True(t, filter.Filter()(transfer))
+		assert.True(t, filter.FTFilter()(transfer))
 	})
 }
 
-func TestAccountNFTTransferFilter(t *testing.T) {
+func TestAccountTransferFilter(t *testing.T) {
 	t.Parallel()
 
 	senderAddr := unittest.RandomAddressFixture()
@@ -555,90 +555,90 @@ func TestAccountNFTTransferFilter(t *testing.T) {
 	}
 
 	t.Run("empty filter matches all", func(t *testing.T) {
-		filter := AccountNFTTransferFilter{}
-		assert.True(t, filter.Filter()(transfer))
+		filter := AccountTransferFilter{}
+		assert.True(t, filter.NFTFilter()(transfer))
 	})
 
 	t.Run("token type filter matches", func(t *testing.T) {
-		filter := AccountNFTTransferFilter{TokenType: "A.1654653399040a61.MyNFT"}
-		assert.True(t, filter.Filter()(transfer))
+		filter := AccountTransferFilter{TokenType: "A.1654653399040a61.MyNFT"}
+		assert.True(t, filter.NFTFilter()(transfer))
 	})
 
 	t.Run("token type filter rejects mismatch", func(t *testing.T) {
-		filter := AccountNFTTransferFilter{TokenType: "A.0xOther.OtherNFT"}
-		assert.False(t, filter.Filter()(transfer))
+		filter := AccountTransferFilter{TokenType: "A.0xOther.OtherNFT"}
+		assert.False(t, filter.NFTFilter()(transfer))
 	})
 
 	t.Run("source address filter matches", func(t *testing.T) {
-		filter := AccountNFTTransferFilter{SourceAddress: senderAddr}
-		assert.True(t, filter.Filter()(transfer))
+		filter := AccountTransferFilter{SourceAddress: senderAddr}
+		assert.True(t, filter.NFTFilter()(transfer))
 	})
 
 	t.Run("source address filter rejects mismatch", func(t *testing.T) {
-		filter := AccountNFTTransferFilter{SourceAddress: otherAddr}
-		assert.False(t, filter.Filter()(transfer))
+		filter := AccountTransferFilter{SourceAddress: otherAddr}
+		assert.False(t, filter.NFTFilter()(transfer))
 	})
 
 	t.Run("recipient address filter matches", func(t *testing.T) {
-		filter := AccountNFTTransferFilter{RecipientAddress: recipientAddr}
-		assert.True(t, filter.Filter()(transfer))
+		filter := AccountTransferFilter{RecipientAddress: recipientAddr}
+		assert.True(t, filter.NFTFilter()(transfer))
 	})
 
 	t.Run("recipient address filter rejects mismatch", func(t *testing.T) {
-		filter := AccountNFTTransferFilter{RecipientAddress: otherAddr}
-		assert.False(t, filter.Filter()(transfer))
+		filter := AccountTransferFilter{RecipientAddress: otherAddr}
+		assert.False(t, filter.NFTFilter()(transfer))
 	})
 
 	t.Run("sender role matches when account is source", func(t *testing.T) {
-		filter := AccountNFTTransferFilter{
+		filter := AccountTransferFilter{
 			SourceAddress: senderAddr,
 		}
-		assert.True(t, filter.Filter()(transfer))
+		assert.True(t, filter.NFTFilter()(transfer))
 	})
 
 	t.Run("sender role rejects when account is not source", func(t *testing.T) {
-		filter := AccountNFTTransferFilter{
+		filter := AccountTransferFilter{
 			SourceAddress: recipientAddr,
 		}
-		assert.False(t, filter.Filter()(transfer))
+		assert.False(t, filter.NFTFilter()(transfer))
 	})
 
 	t.Run("recipient role matches when account is recipient", func(t *testing.T) {
-		filter := AccountNFTTransferFilter{
+		filter := AccountTransferFilter{
 			RecipientAddress: recipientAddr,
 		}
-		assert.True(t, filter.Filter()(transfer))
+		assert.True(t, filter.NFTFilter()(transfer))
 	})
 
 	t.Run("recipient role rejects when account is not recipient", func(t *testing.T) {
-		filter := AccountNFTTransferFilter{
+		filter := AccountTransferFilter{
 			RecipientAddress: senderAddr,
 		}
-		assert.False(t, filter.Filter()(transfer))
+		assert.False(t, filter.NFTFilter()(transfer))
 	})
 
 	t.Run("combined filters all match", func(t *testing.T) {
-		filter := AccountNFTTransferFilter{
+		filter := AccountTransferFilter{
 			TokenType:        "A.1654653399040a61.MyNFT",
 			SourceAddress:    senderAddr,
 			RecipientAddress: recipientAddr,
 		}
-		assert.True(t, filter.Filter()(transfer))
+		assert.True(t, filter.NFTFilter()(transfer))
 	})
 
 	t.Run("combined filters reject on first mismatch", func(t *testing.T) {
-		filter := AccountNFTTransferFilter{
+		filter := AccountTransferFilter{
 			TokenType:     "A.0xOther.OtherNFT", // mismatch
 			SourceAddress: senderAddr,           // match
 		}
-		assert.False(t, filter.Filter()(transfer))
+		assert.False(t, filter.NFTFilter()(transfer))
 	})
 
 	t.Run("empty address fields are ignored", func(t *testing.T) {
-		filter := AccountNFTTransferFilter{
+		filter := AccountTransferFilter{
 			SourceAddress:    flow.EmptyAddress,
 			RecipientAddress: flow.EmptyAddress,
 		}
-		assert.True(t, filter.Filter()(transfer))
+		assert.True(t, filter.NFTFilter()(transfer))
 	})
 }
