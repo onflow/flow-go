@@ -229,4 +229,3 @@ func (a *AccountTransactions) extractAddresses(event flow.Event) ([]flow.Address
 	}
 	return addresses, nil
 }
-
