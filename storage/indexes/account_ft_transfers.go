@@ -400,5 +400,8 @@ func validateFTTransfer(blockHeight uint64, transfer access.FungibleTokenTransfe
 	if len(transfer.EventIndices) == 0 {
 		return fmt.Errorf("transfer must have at least one event index (tx=%s)", transfer.TransactionID)
 	}
+	if transfer.Amount == nil {
+		return fmt.Errorf("transfer amount is nil (tx=%s)", transfer.TransactionID)
+	}
 	return nil
 }
