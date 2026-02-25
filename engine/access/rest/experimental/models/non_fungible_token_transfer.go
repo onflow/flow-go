@@ -34,7 +34,6 @@ func (t *NonFungibleTokenTransfer) Build(
 		t.Transaction = new(commonmodels.Transaction)
 		t.Transaction.Build(transfer.Transaction, nil, link)
 	} else {
-		t.Expandable.Transaction = expandableTransaction
 		transactionLink, err := link.TransactionLink(transfer.TransactionID)
 		if err != nil {
 			return fmt.Errorf("failed to generate transaction link: %w", err)
@@ -46,7 +45,6 @@ func (t *NonFungibleTokenTransfer) Build(
 		t.Result = new(commonmodels.TransactionResult)
 		t.Result.Build(transfer.Result, transfer.TransactionID, link)
 	} else {
-		t.Expandable.Result = expandableResult
 		resultLink, err := link.TransactionResultLink(transfer.TransactionID)
 		if err != nil {
 			return fmt.Errorf("failed to generate result link: %w", err)
