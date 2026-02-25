@@ -26,11 +26,9 @@ func (o *AccountTransferExpandOptions) HasExpand() bool {
 }
 
 type AccountFTTransferFilter struct {
-	AccountAddress   flow.Address
 	TokenType        string
 	SourceAddress    flow.Address
 	RecipientAddress flow.Address
-	TransferRole     accessmodel.TransferRole
 }
 
 func (f *AccountFTTransferFilter) Filter() storage.IndexFilter[*accessmodel.FungibleTokenTransfer] {
@@ -44,22 +42,14 @@ func (f *AccountFTTransferFilter) Filter() storage.IndexFilter[*accessmodel.Fung
 		if f.RecipientAddress != flow.EmptyAddress && transfer.RecipientAddress != f.RecipientAddress {
 			return false
 		}
-		if f.TransferRole == accessmodel.TransferRoleSender && f.AccountAddress != transfer.SourceAddress {
-			return false
-		}
-		if f.TransferRole == accessmodel.TransferRoleRecipient && f.AccountAddress != transfer.RecipientAddress {
-			return false
-		}
 		return true
 	}
 }
 
 type AccountNFTTransferFilter struct {
-	AccountAddress   flow.Address
 	TokenType        string
 	SourceAddress    flow.Address
 	RecipientAddress flow.Address
-	TransferRole     accessmodel.TransferRole
 }
 
 func (f *AccountNFTTransferFilter) Filter() storage.IndexFilter[*accessmodel.NonFungibleTokenTransfer] {
@@ -71,12 +61,6 @@ func (f *AccountNFTTransferFilter) Filter() storage.IndexFilter[*accessmodel.Non
 			return false
 		}
 		if f.RecipientAddress != flow.EmptyAddress && transfer.RecipientAddress != f.RecipientAddress {
-			return false
-		}
-		if f.TransferRole == accessmodel.TransferRoleSender && f.AccountAddress != transfer.SourceAddress {
-			return false
-		}
-		if f.TransferRole == accessmodel.TransferRoleRecipient && f.AccountAddress != transfer.RecipientAddress {
 			return false
 		}
 		return true

@@ -31,7 +31,6 @@ func NewGetAccountNFTTransfers(r *common.Request) (GetAccountNFTTransfers, error
 		return req, err
 	}
 	req.Address = address
-	req.Filter.AccountAddress = address
 
 	if raw := r.GetQueryParam("limit"); raw != "" {
 		parsed, err := strconv.ParseUint(raw, 10, 32)
@@ -74,7 +73,12 @@ func NewGetAccountNFTTransfers(r *common.Request) (GetAccountNFTTransfers, error
 		if err != nil {
 			return req, err
 		}
-		req.Filter.TransferRole = role
+		switch role {
+		case accessmodel.TransferRoleSender:
+			req.Filter.SourceAddress = address
+		case accessmodel.TransferRoleRecipient:
+			req.Filter.RecipientAddress = address
+		}
 	}
 
 	return req, nil
