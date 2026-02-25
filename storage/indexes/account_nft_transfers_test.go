@@ -391,6 +391,42 @@ func TestNFTTransfers_HeightValidation(t *testing.T) {
 			assert.Contains(t, err.Error(), "block height mismatch")
 		})
 	})
+
+	t.Run("store with nil EventIndices fails", func(t *testing.T) {
+		RunWithBootstrappedNFTTransferIndex(t, 1, nil, func(_ storage.DB, lm storage.LockManager, idx *NonFungibleTokenTransfers) {
+			err := storeNFTTransfers(t, lm, idx, 2, []access.NonFungibleTokenTransfer{
+				{
+					TransactionID:    unittest.IdentifierFixture(),
+					BlockHeight:      2,
+					TransactionIndex: 0,
+					EventIndices:     nil, // invalid: must have at least one event index
+					SourceAddress:    unittest.RandomAddressFixture(),
+					RecipientAddress: unittest.RandomAddressFixture(),
+					ID:               1,
+				},
+			})
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), "at least one event index")
+		})
+	})
+
+	t.Run("store with empty EventIndices fails", func(t *testing.T) {
+		RunWithBootstrappedNFTTransferIndex(t, 1, nil, func(_ storage.DB, lm storage.LockManager, idx *NonFungibleTokenTransfers) {
+			err := storeNFTTransfers(t, lm, idx, 2, []access.NonFungibleTokenTransfer{
+				{
+					TransactionID:    unittest.IdentifierFixture(),
+					BlockHeight:      2,
+					TransactionIndex: 0,
+					EventIndices:     []uint32{}, // invalid: must have at least one event index
+					SourceAddress:    unittest.RandomAddressFixture(),
+					RecipientAddress: unittest.RandomAddressFixture(),
+					ID:               1,
+				},
+			})
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), "at least one event index")
+		})
+	})
 }
 
 func TestNFTTransfers_RangeQueries(t *testing.T) {
@@ -625,6 +661,34 @@ func TestNFTTransfers_BootstrapHeightMismatch(t *testing.T) {
 		})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "block height mismatch")
+	})
+}
+
+func TestNFTTransfers_BootstrapEmptyEventIndices(t *testing.T) {
+	t.Parallel()
+
+	unittest.RunWithPebbleDB(t, func(db *pebble.DB) {
+		storageDB := pebbleimpl.ToDB(db)
+		lm := storage.NewTestingLockManager()
+
+		err := unittest.WithLock(t, lm, storage.LockIndexNonFungibleTokenTransfers, func(lctx lockctx.Context) error {
+			return storageDB.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				_, bootstrapErr := BootstrapNonFungibleTokenTransfers(lctx, rw, storageDB, 5, []access.NonFungibleTokenTransfer{
+					{
+						TransactionID:    unittest.IdentifierFixture(),
+						BlockHeight:      5,
+						TransactionIndex: 0,
+						EventIndices:     nil, // invalid: must have at least one event index
+						SourceAddress:    unittest.RandomAddressFixture(),
+						RecipientAddress: unittest.RandomAddressFixture(),
+						ID:               1,
+					},
+				})
+				return bootstrapErr
+			})
+		})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "at least one event index")
 	})
 }
 

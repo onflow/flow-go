@@ -45,7 +45,6 @@ func (t *AccountTransaction) Build(
 		t.Transaction = new(commonmodels.Transaction)
 		t.Transaction.Build(tx.Transaction, nil, link)
 	} else {
-		t.Expandable.Transaction = expandableTransaction
 		transactionLink, err := link.TransactionLink(tx.TransactionID)
 		if err != nil {
 			return fmt.Errorf("failed to generate transaction link: %w", err)
@@ -57,7 +56,6 @@ func (t *AccountTransaction) Build(
 		t.Result = new(commonmodels.TransactionResult)
 		t.Result.Build(tx.Result, tx.TransactionID, link)
 	} else {
-		t.Expandable.Result = expandableResult
 		resultLink, err := link.TransactionResultLink(tx.TransactionID)
 		if err != nil {
 			return fmt.Errorf("failed to generate result link: %w", err)

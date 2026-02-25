@@ -171,8 +171,8 @@ func storeAllNFTTransfers(rw storage.ReaderBatchWriter, blockHeight uint64, tran
 	writer := rw.Writer()
 
 	for _, entry := range transfers {
-		if entry.BlockHeight != blockHeight {
-			return fmt.Errorf("block height mismatch: expected %d, got %d", blockHeight, entry.BlockHeight)
+		if err := validateNFTTransfer(blockHeight, entry); err != nil {
+			return fmt.Errorf("invalid non-fungible token transfer: %w", err)
 		}
 
 		value := makeNFTTransferValue(entry)
@@ -295,4 +295,17 @@ func decodeNFTTransferKey(key []byte) (access.TransferCursor, error) {
 		TransactionIndex: txIndex,
 		EventIndex:       eventIndex,
 	}, nil
+}
+
+// validateNFTTransfer validates the non-fungible token transfer is valid.
+//
+// Any error indicates the transfer is invalid.
+func validateNFTTransfer(blockHeight uint64, transfer access.NonFungibleTokenTransfer) error {
+	if transfer.BlockHeight != blockHeight {
+		return fmt.Errorf("block height mismatch: expected %d, got %d", blockHeight, transfer.BlockHeight)
+	}
+	if len(transfer.EventIndices) == 0 {
+		return fmt.Errorf("transfer must have at least one event index (tx=%s)", transfer.TransactionID)
+	}
+	return nil
 }

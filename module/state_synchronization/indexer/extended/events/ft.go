@@ -94,7 +94,7 @@ func DecodeFTWithdrawn(event cadence.Event) (*FTWithdrawnEvent, error) {
 	}, nil
 }
 
-// flowFeesEvent represents a decoded FlowFees.FeesDeducted event.
+// FlowFeesEvent represents a decoded FlowFees.FeesDeducted event.
 type FlowFeesEvent struct {
 	Amount          cadence.UFix64
 	ExecutionEffort uint64
