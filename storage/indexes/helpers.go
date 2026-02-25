@@ -7,16 +7,6 @@ import (
 	"github.com/onflow/flow-go/storage/operation"
 )
 
-// validateLimit validates the limit parameter is greater than 0.
-//
-// Any error indicates the limit is invalid.
-func validateLimit(limit uint32) error {
-	if limit == 0 {
-		return fmt.Errorf("limit must be greater than 0")
-	}
-	return nil
-}
-
 // validateCursorHeight validates the block height for the cursor is within the valid range (firstHeight, latestHeight)
 //
 // Expected error returns during normal operations:

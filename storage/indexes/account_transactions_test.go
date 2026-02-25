@@ -242,10 +242,8 @@ func TestAccountTransactions_CursorPositioning(t *testing.T) {
 			account := unittest.RandomAddressFixture()
 
 			// Index 5 blocks (heights 2-6), each with 1 tx
-			var txIDs []flow.Identifier
 			for height := uint64(2); height <= 6; height++ {
 				txID := unittest.IdentifierFixture()
-				txIDs = append(txIDs, txID)
 				err := storeAccountTransactions(t, lm, idx, height, []access.AccountTransaction{
 					{
 						Address:          account,

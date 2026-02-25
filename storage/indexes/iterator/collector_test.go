@@ -17,13 +17,13 @@ type testEntry struct {
 	cursor int
 }
 
-func (e testEntry) Cursor() (int, error) { return e.cursor, nil }
+func (e testEntry) Cursor() (int, error)   { return e.cursor, nil }
 func (e testEntry) Value() (string, error) { return e.value, nil }
 
 // errEntry is an IteratorEntry that always returns an error.
 type errEntry struct{ err error }
 
-func (e errEntry) Cursor() (int, error)  { return 0, e.err }
+func (e errEntry) Cursor() (int, error)   { return 0, e.err }
 func (e errEntry) Value() (string, error) { return "", e.err }
 
 func newIter(entries ...storage.IteratorEntry[string, int]) storage.IndexIterator[string, int] {

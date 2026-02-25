@@ -49,7 +49,6 @@ func newSliceIter(txs []accessmodel.AccountTransaction) storage.AccountTransacti
 	}
 }
 
-
 func TestBackend_GetAccountTransactions(t *testing.T) {
 	t.Parallel()
 
