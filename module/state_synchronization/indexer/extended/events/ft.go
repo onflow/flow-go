@@ -8,7 +8,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// ftWithdrawnEvent represents a decoded FungibleToken.Withdrawn event.
+// FTWithdrawnEvent represents a decoded FungibleToken.Withdrawn event.
 type FTWithdrawnEvent struct {
 	Type          string         // Token type identifier (e.g., "A.f233dcee88fe0abe.FlowToken.Vault")
 	Amount        cadence.UFix64 // Amount in UFix64 (Cadence-side denomination)
@@ -18,7 +18,7 @@ type FTWithdrawnEvent struct {
 	BalanceAfter  cadence.UFix64 // Balance after the tokens were withdrawn (in UFix64)
 }
 
-// ftDepositedEvent represents a decoded FungibleToken.Deposited event.
+// FTDepositedEvent represents a decoded FungibleToken.Deposited event.
 type FTDepositedEvent struct {
 	Type          string         // Token type identifier (e.g., "A.f233dcee88fe0abe.FlowToken.Vault")
 	Amount        cadence.UFix64 // Amount in UFix64 (Cadence-side denomination)

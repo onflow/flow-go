@@ -60,6 +60,6 @@ func ParseTransferRole(raw string) (accessmodel.TransferRole, error) {
 	case accessmodel.TransferRoleSender, accessmodel.TransferRoleRecipient:
 		return role, nil
 	default:
-		return "", fmt.Errorf("invalid role %q: must be \"sender\" or \"recipient\"", raw)
+		return "", fmt.Errorf("invalid role %q: must be %q or %q", raw, accessmodel.TransferRoleSender, accessmodel.TransferRoleRecipient)
 	}
 }
