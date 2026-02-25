@@ -14,6 +14,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/storage/indexes/iterator"
 )
 
 type AccountTransactionExpandOptions struct {
@@ -107,7 +108,7 @@ func (b *AccountTransactionsBackend) GetAccountTransactions(
 		return nil, mapReadError(ctx, "account transactions", err)
 	}
 
-	collected, nextCursor, err := collectResults(iter, limit, filter.Filter())
+	collected, nextCursor, err := iterator.CollectResults(iter, limit, filter.Filter())
 	if err != nil {
 		err = fmt.Errorf("error collecting transactions: %w", err)
 		irrecoverable.Throw(ctx, err)

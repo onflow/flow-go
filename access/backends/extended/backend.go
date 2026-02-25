@@ -117,33 +117,3 @@ func mapReadError(ctx context.Context, label string, err error) error {
 		return err
 	}
 }
-
-// collectResults iterates over the storage iterator and collects results that match the filter.
-// It returns when it reaches the limit or the iterator is exhausted.
-// Returns the results matching the filter and the next cursor.
-//
-// No error returns are expected during normal operation.
-func collectResults[T any, C any](iter storage.IndexIterator[T, C], limit uint32, filter storage.IndexFilter[*T]) ([]T, *C, error) {
-	var collected []T
-	for item := range iter {
-		// stop once we've collected `limit` results
-		// go one extra iteration to check if there are more results and build the next cursor
-		if uint32(len(collected)) >= limit {
-			nextCursor, err := item.Cursor()
-			if err != nil {
-				return nil, nil, fmt.Errorf("could not get key for next cursor: %w", err)
-			}
-			return collected, &nextCursor, nil
-		}
-
-		tx, err := item.Value()
-		if err != nil {
-			return nil, nil, fmt.Errorf("could not get transaction: %w", err)
-		}
-		if filter != nil && !filter(&tx) {
-			continue
-		}
-		collected = append(collected, tx)
-	}
-	return collected, nil, nil
-}

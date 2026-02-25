@@ -49,24 +49,6 @@ func newSliceIter(txs []accessmodel.AccountTransaction) storage.AccountTransacti
 	}
 }
 
-// errTxEntry is a test entry that always returns an error.
-type errTxEntry struct {
-	err error
-}
-
-func (e errTxEntry) Cursor() (accessmodel.AccountTransactionCursor, error) {
-	return accessmodel.AccountTransactionCursor{}, e.err
-}
-
-func (e errTxEntry) Value() (accessmodel.AccountTransaction, error) {
-	return accessmodel.AccountTransaction{}, e.err
-}
-
-func newErrIter(err error) storage.AccountTransactionIterator {
-	return func(yield func(storage.IteratorEntry[accessmodel.AccountTransaction, accessmodel.AccountTransactionCursor]) bool) {
-		yield(errTxEntry{err: err})
-	}
-}
 
 func TestBackend_GetAccountTransactions(t *testing.T) {
 	t.Parallel()

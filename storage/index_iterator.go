@@ -2,6 +2,10 @@ package storage
 
 import "iter"
 
+// IndexFilter is a function that filters data entries to include in query responses.
+// It takes a single entry and returns true if the entry should be included in the response.
+type IndexFilter[T any] func(T) bool
+
 // IndexIterator is an iterator over index entries.
 // This is intended to be used with the `indexes` package to allow clients to collect filtered results.
 type IndexIterator[T any, C any] iter.Seq[IteratorEntry[T, C]]

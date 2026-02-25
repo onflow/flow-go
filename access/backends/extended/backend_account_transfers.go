@@ -14,6 +14,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/storage/indexes/iterator"
 )
 
 type AccountTransferExpandOptions struct {
@@ -117,7 +118,7 @@ func (b *AccountTransfersBackend) GetAccountFungibleTokenTransfers(
 		return nil, mapReadError(ctx, "fungible token transfers", err)
 	}
 
-	collected, nextCursor, err := collectResults(iter, limit, filter.FTFilter())
+	collected, nextCursor, err := iterator.CollectResults(iter, limit, filter.FTFilter())
 	if err != nil {
 		err = fmt.Errorf("error collecting fungible token transfers: %w", err)
 		irrecoverable.Throw(ctx, err)
@@ -182,7 +183,7 @@ func (b *AccountTransfersBackend) GetAccountNonFungibleTokenTransfers(
 		return nil, mapReadError(ctx, "non-fungible token transfers", err)
 	}
 
-	collected, nextCursor, err := collectResults(iter, limit, filter.NFTFilter())
+	collected, nextCursor, err := iterator.CollectResults(iter, limit, filter.NFTFilter())
 	if err != nil {
 		err = fmt.Errorf("error collecting non-fungible token transfers: %w", err)
 		irrecoverable.Throw(ctx, err)
