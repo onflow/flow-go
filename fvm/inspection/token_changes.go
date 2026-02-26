@@ -172,21 +172,12 @@ func (td *TokenChanges) getTokens(
 				continue
 			}
 
-			keys, err := getStorageMapKeys(storageMap)
-			if err != nil {
-				return nil, fmt.Errorf("failed to get storage map keys: %w", err)
-			}
-			if len(keys) == 0 {
-				continue
-			}
+			iter := storageMap.ReadOnlyLoadedValueIterator()
+			for {
+				interpreterValue := iter.NextValue(nil)
 
-			for _, k := range keys {
-				interpreterValue, err := td.getValues(storageMap, k)
-				if err != nil {
-					return nil, fmt.Errorf("failed to get value for key %v: %w", k, err)
-				}
 				if interpreterValue == nil {
-					continue
+					break
 				}
 
 				walkLoaded(interpreterValue, searchedTokens, tkns)
@@ -241,32 +232,6 @@ func walkLoaded(
 	f(value)
 }
 
-func (td *TokenChanges) getValues(storageMap *interpreter.DomainStorageMap, key any) (interpreter.Value, error) {
-	var mapKey interpreter.StorageMapKey
-
-	switch key := key.(type) {
-	case interpreter.StringAtreeValue:
-		mapKey = interpreter.StringStorageMapKey(key)
-
-	case interpreter.Uint64AtreeValue:
-		mapKey = interpreter.Uint64StorageMapKey(key)
-
-	case interpreter.StringStorageMapKey:
-		mapKey = key
-
-	case interpreter.Uint64StorageMapKey:
-		mapKey = key
-
-	default:
-
-		return nil, fmt.Errorf("unsupported key type: %T", key)
-	}
-
-	oldValue := storageMap.ReadValue(nil, mapKey)
-
-	return oldValue, nil
-}
-
 func (td *TokenChanges) findSourcesSinks(events []flow.Event, tokens map[string]SearchToken) (map[string]int64, error) {
 	// create a map of all sinks and sources
 	// TODO: could be created once
@@ -313,28 +278,6 @@ func newReadonlyStorageRuntimeWithStorage(storage *runtime.Storage, payloadCount
 		Storage:      storage,
 		PayloadCount: payloadCount,
 	}, nil
-}
-
-func getStorageMapKeys(storageMap *interpreter.DomainStorageMap) ([]any, error) {
-	keys := make([]any, 0, storageMap.Count())
-
-	iter, err := storageMap.ReadOnlyLoadedValueIterator()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get storage map keys: %w", err)
-	}
-	var key atree.Value
-	for {
-		key, _, err = iter.Next()
-		if err != nil {
-			return nil, fmt.Errorf("failed to get next storage map key: %w", err)
-		}
-		if key == nil {
-			break
-		}
-		keys = append(keys, key)
-	}
-
-	return keys, nil
 }
 
 type executionSnapshotLedgers struct {
