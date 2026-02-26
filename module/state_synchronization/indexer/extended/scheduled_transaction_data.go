@@ -101,7 +101,7 @@ func DecodeTransactionDataResults(response []byte, ids []uint64) (map[uint64]*ac
 func decodeTransactionData(value cadence.Value) (access.ScheduledTransaction, error) {
 	type transactionDataRaw struct {
 		ID                               uint64           `cadence:"id"`
-		Priority                         uint8            `cadence:"priority"`
+		Priority                         cadence.Enum     `cadence:"priority"`
 		Timestamp                        cadence.UFix64   `cadence:"timestamp"`
 		ExecutionEffort                  uint64           `cadence:"executionEffort"`
 		Fees                             cadence.UFix64   `cadence:"fees"`
@@ -121,6 +121,11 @@ func decodeTransactionData(value cadence.Value) (access.ScheduledTransaction, er
 		return access.ScheduledTransaction{}, fmt.Errorf("failed to decode TransactionData fields: %w", err)
 	}
 
+	priorityRaw, err := events.EnumToType[cadence.UInt8](raw.Priority)
+	if err != nil {
+		return access.ScheduledTransaction{}, fmt.Errorf("failed to decode TransactionData 'priority' field: %w", err)
+	}
+
 	publicPath, err := events.PathFromOptional(raw.TransactionHandlerPublicPath)
 	if err != nil {
 		return access.ScheduledTransaction{}, fmt.Errorf("failed to decode 'transactionHandlerPublicPath' field: %w", err)
@@ -128,7 +133,7 @@ func decodeTransactionData(value cadence.Value) (access.ScheduledTransaction, er
 
 	return access.ScheduledTransaction{
 		ID:                               raw.ID,
-		Priority:                         access.ScheduledTransactionPriority(raw.Priority),
+		Priority:                         access.ScheduledTransactionPriority(priorityRaw),
 		Timestamp:                        uint64(raw.Timestamp),
 		ExecutionEffort:                  raw.ExecutionEffort,
 		Fees:                             uint64(raw.Fees),

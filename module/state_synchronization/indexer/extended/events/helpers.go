@@ -60,6 +60,23 @@ func PathFromOptional(opt cadence.Optional) (string, error) {
 	return path.String(), nil
 }
 
+// EnumToType extracts the raw value from a Cadence enum and converts it to T.
+// Cadence enums encode their raw value in a field named "rawValue".
+//
+// Any error indicates that the enum is malformed or the rawValue is not convertible to T.
+func EnumToType[T any](enum cadence.Enum) (T, error) {
+	var zero T
+	raw := enum.SearchFieldByName("rawValue")
+	if raw == nil {
+		return zero, fmt.Errorf("enum has no rawValue field")
+	}
+	v, ok := raw.(T)
+	if !ok {
+		return zero, fmt.Errorf("expected %T rawValue, got %T", zero, raw)
+	}
+	return v, nil
+}
+
 // HexToEVMAddress decodes a hex string to an EVM address.
 // This is the same logic as `common.HexToAddress`, except it returns an error if the hex string is
 // not valid hex or an incorrect length.

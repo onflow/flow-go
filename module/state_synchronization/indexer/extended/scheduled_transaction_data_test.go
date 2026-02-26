@@ -213,12 +213,22 @@ func makeDecodeTransactionDataOptional(
 ) cadence.Value {
 	addr := common.Address(sc.FlowTransactionScheduler.Address)
 	loc := common.NewAddressLocation(nil, addr, sc.FlowTransactionScheduler.Name)
+
+	priorityEnumType := cadence.NewEnumType(
+		loc,
+		"Priority",
+		cadence.UInt8Type,
+		[]cadence.Field{{Identifier: "rawValue", Type: cadence.UInt8Type}},
+		nil,
+	)
+	priorityEnum := cadence.NewEnum([]cadence.Value{cadence.UInt8(priority)}).WithType(priorityEnumType)
+
 	typ := cadence.NewStructType(
 		loc,
 		"TransactionData",
 		[]cadence.Field{
 			{Identifier: "id", Type: cadence.UInt64Type},
-			{Identifier: "priority", Type: cadence.UInt8Type},
+			{Identifier: "priority", Type: priorityEnumType},
 			{Identifier: "timestamp", Type: cadence.UFix64Type},
 			{Identifier: "executionEffort", Type: cadence.UInt64Type},
 			{Identifier: "fees", Type: cadence.UFix64Type},
@@ -231,7 +241,7 @@ func makeDecodeTransactionDataOptional(
 	)
 	comp := cadence.NewStruct([]cadence.Value{
 		cadence.UInt64(id),
-		cadence.UInt8(priority),
+		priorityEnum,
 		cadence.UFix64(timestamp),
 		cadence.UInt64(executionEffort),
 		cadence.UFix64(fees),
