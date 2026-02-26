@@ -15,6 +15,7 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	executionmock "github.com/onflow/flow-go/module/execution/mock"
+	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/indexes"
 	storagemock "github.com/onflow/flow-go/storage/mock"
@@ -516,7 +517,7 @@ func TestContractsIndexer_NextHeight_MockErrors(t *testing.T) {
 		unexpectedErr := fmt.Errorf("disk I/O failure")
 		mockStore.On("LatestIndexedHeight").Return(uint64(0), unexpectedErr)
 
-		indexer := NewContracts(unittest.Logger(), flow.Testnet.Chain(), mockStore, nil)
+		indexer := NewContracts(unittest.Logger(), flow.Testnet.Chain(), mockStore, nil, &metrics.NoopCollector{})
 
 		_, err := indexer.NextHeight()
 		require.Error(t, err)
@@ -530,7 +531,7 @@ func TestContractsIndexer_NextHeight_MockErrors(t *testing.T) {
 		mockStore.On("LatestIndexedHeight").Return(uint64(0), storage.ErrNotBootstrapped)
 		mockStore.On("UninitializedFirstHeight").Return(uint64(42), true)
 
-		indexer := NewContracts(unittest.Logger(), flow.Testnet.Chain(), mockStore, nil)
+		indexer := NewContracts(unittest.Logger(), flow.Testnet.Chain(), mockStore, nil, &metrics.NoopCollector{})
 
 		_, err := indexer.NextHeight()
 		require.Error(t, err)
@@ -548,7 +549,7 @@ func TestContractsIndexer_NextHeight_MockErrors(t *testing.T) {
 		mockStore.On("Store", mock.Anything, mock.Anything, testHeight, mock.Anything).Return(storeErr)
 
 		lm := storage.NewTestingLockManager()
-		indexer := NewContracts(unittest.Logger(), flow.Testnet.Chain(), mockStore, nil)
+		indexer := NewContracts(unittest.Logger(), flow.Testnet.Chain(), mockStore, nil, &metrics.NoopCollector{})
 		header := unittest.BlockHeaderFixtureOnChain(flow.Testnet, unittest.WithHeaderHeight(testHeight))
 
 		err := unittest.WithLock(t, lm, storage.LockIndexContractDeployments, func(lctx lockctx.Context) error {
@@ -590,7 +591,7 @@ func newContractsIndexerWithScriptExecutor(
 	store, err := indexes.NewContractDeploymentsBootstrapper(db, firstHeight)
 	require.NoError(t, err)
 
-	indexer := NewContracts(unittest.Logger(), chainID.Chain(), store, scriptExecutor)
+	indexer := NewContracts(unittest.Logger(), chainID.Chain(), store, scriptExecutor, &metrics.NoopCollector{})
 	return indexer, store, lm, db
 }
 

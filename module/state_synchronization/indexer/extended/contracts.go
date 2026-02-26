@@ -2,7 +2,6 @@ package extended
 
 import (
 	"bytes"
-	"context"
 	"crypto/sha3"
 	"errors"
 	"fmt"
@@ -10,8 +9,12 @@ import (
 	"github.com/jordanschalm/lockctx"
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/fvm/environment"
+	"github.com/onflow/flow-go/fvm/storage/snapshot"
+	"github.com/onflow/flow-go/fvm/storage/state"
 	"github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/state_synchronization/indexer/extended/events"
 	"github.com/onflow/flow-go/storage"
 )
@@ -24,25 +27,22 @@ const (
 	flowAccountContractRemoved flow.EventType = "flow.AccountContractRemoved"
 )
 
-// contractScriptExecutor is the subset of execution.ScriptExecutor used by the Contracts indexer.
-type contractScriptExecutor interface {
-	GetAccountAtBlockHeight(ctx context.Context, address flow.Address, height uint64) (*flow.Account, error)
+// snapshotProvider is the subset of execution.ScriptExecutor used by the Contracts indexer.
+type snapshotProvider interface {
+	GetStorageSnapshot(height uint64) (snapshot.StorageSnapshot, error)
 }
 
 // Contracts indexes contract deployment lifecycle events and writes to the contract deployments
 // index. Handles [flow.AccountContractAdded] and [flow.AccountContractUpdated] events.
-// [flow.AccountContractRemoved] is not currently supported; encountering one returns an error.
-//
-// Code retrieval via the script executor is best-effort. If code cannot be fetched (e.g. because
-// the execution state is not yet synced for a block height), the deployment is stored without code
-// bytes but with the code hash from the event, which is always authoritative.
+// [flow.AccountContractRemoved] is not currently permitted; encountering one returns an error.
 //
 // Not safe for concurrent use.
 type Contracts struct {
 	log            zerolog.Logger
 	chain          flow.Chain
+	metrics        module.ExtendedIndexingMetrics
 	store          storage.ContractDeploymentsIndexBootstrapper
-	scriptExecutor contractScriptExecutor
+	scriptExecutor snapshotProvider
 }
 
 var _ Indexer = (*Contracts)(nil)
@@ -52,11 +52,13 @@ func NewContracts(
 	log zerolog.Logger,
 	chain flow.Chain,
 	store storage.ContractDeploymentsIndexBootstrapper,
-	scriptExecutor contractScriptExecutor,
+	scriptExecutor snapshotProvider,
+	metrics module.ExtendedIndexingMetrics,
 ) *Contracts {
 	return &Contracts{
 		log:            log.With().Str("component", "contracts_indexer").Logger(),
 		chain:          chain,
+		metrics:        metrics,
 		store:          store,
 		scriptExecutor: scriptExecutor,
 	}
@@ -78,43 +80,61 @@ func (c *Contracts) NextHeight() (uint64, error) {
 // Expected error returns during normal operations:
 //   - [ErrAlreadyIndexed]: if the data is already indexed for the height
 func (c *Contracts) IndexBlockData(lctx lockctx.Proof, data BlockData, rw storage.ReaderBatchWriter) error {
-	deployments, err := c.collectDeployments(data)
+	deployments, created, updated, err := c.collectDeployments(data)
 	if err != nil {
 		return fmt.Errorf("failed to collect contract deployments for block %s: %w", data.Header.ID(), err)
 	}
+
+	// if storage is not bootstrapped yet, do an initial load of all deployed contracts and include it in
+	// the initial store operation.
+	if bootstrapHeight, isInitialized := c.store.UninitializedFirstHeight(); !isInitialized {
+		bootstrapContracts, err := c.loadDeployedContracts(bootstrapHeight)
+		if err != nil {
+			return fmt.Errorf("failed to load deployed contracts: %w", err)
+		}
+		deployments = append(deployments, bootstrapContracts...)
+	}
+
 	if err := c.store.Store(lctx, rw, data.Header.Height, deployments); err != nil {
 		if errors.Is(err, storage.ErrAlreadyExists) {
 			return ErrAlreadyIndexed
 		}
 		return fmt.Errorf("failed to store contract deployments for block %s: %w", data.Header.ID(), err)
 	}
+	c.metrics.ContractDeploymentIndexed(created, updated)
 	return nil
 }
 
 // collectDeployments iterates the block events and builds a [access.ContractDeployment] for
-// each AccountContractAdded or AccountContractUpdated event found.
-//
-// Code retrieval is best-effort: failures are logged as warnings and the deployment is stored
-// without code bytes (Code field is nil). The CodeHash from the event is always stored.
+// each AccountContractAdded or AccountContractUpdated event found. Returns the deployments
+// and the counts of created and updated contracts.
 //
 // No error returns are expected during normal operation.
-func (c *Contracts) collectDeployments(data BlockData) ([]access.ContractDeployment, error) {
-	retriever := newContractCodeRetriever(c.scriptExecutor, data.Header.Height)
+func (c *Contracts) collectDeployments(data BlockData) (deployments []access.ContractDeployment, created, updated int, err error) {
+	retriever := newContractRetriever(c.scriptExecutor, data.Header.Height)
 
-	var deployments []access.ContractDeployment
 	for _, event := range data.Events {
 		switch event.Type {
 		case flowAccountContractAdded:
 			cadenceEvent, err := events.DecodePayload(event)
 			if err != nil {
-				return nil, fmt.Errorf("failed to decode %s event payload: %w", event.Type, err)
+				return nil, 0, 0, fmt.Errorf("failed to decode %s event payload: %w", event.Type, err)
 			}
 			e, err := events.DecodeAccountContractAdded(cadenceEvent)
 			if err != nil {
-				return nil, fmt.Errorf("failed to decode %s event: %w", event.Type, err)
+				return nil, 0, 0, fmt.Errorf("failed to decode %s event: %w", event.Type, err)
 			}
 
-			code := c.fetchCodeBestEffort(retriever, e.Address, e.ContractName, e.CodeHash, event.Type)
+			// script executor gets data at the end of the block, so code here should be the updated version
+			code, err := retriever.contractCode(e.Address, e.ContractName, data.Header.Height)
+			if err != nil {
+				return nil, 0, 0, fmt.Errorf("failed to get contract code: %w", err)
+			}
+
+			// make sure the hash of the code fetched from state matches the hash in the event
+			if !bytes.Equal(e.CodeHash, cadenceCodeToHash(code)) {
+				return nil, 0, 0, fmt.Errorf("code hash mismatch for %s event: %s", event.Type, e.ContractName)
+			}
 
 			deployments = append(deployments, access.ContractDeployment{
 				ContractID:    events.ContractIDFromAddress(e.Address, e.ContractName),
@@ -126,18 +146,28 @@ func (c *Contracts) collectDeployments(data BlockData) ([]access.ContractDeploym
 				Code:          code,
 				CodeHash:      e.CodeHash,
 			})
+			created++
 
 		case flowAccountContractUpdated:
 			cadenceEvent, err := events.DecodePayload(event)
 			if err != nil {
-				return nil, fmt.Errorf("failed to decode %s event payload: %w", event.Type, err)
+				return nil, 0, 0, fmt.Errorf("failed to decode %s event payload: %w", event.Type, err)
 			}
 			e, err := events.DecodeAccountContractUpdated(cadenceEvent)
 			if err != nil {
-				return nil, fmt.Errorf("failed to decode %s event: %w", event.Type, err)
+				return nil, 0, 0, fmt.Errorf("failed to decode %s event: %w", event.Type, err)
 			}
 
-			code := c.fetchCodeBestEffort(retriever, e.Address, e.ContractName, e.CodeHash, event.Type)
+			// script executor gets data at the end of the block, so code here should be the updated version
+			code, err := retriever.contractCode(e.Address, e.ContractName, data.Header.Height)
+			if err != nil {
+				return nil, 0, 0, fmt.Errorf("failed to get account code: %w", err)
+			}
+
+			// make sure the hash of the code fetched from state matches the hash in the event
+			if !bytes.Equal(e.CodeHash, cadenceCodeToHash(code)) {
+				return nil, 0, 0, fmt.Errorf("code hash mismatch for %s event: %s", event.Type, e.ContractName)
+			}
 
 			deployments = append(deployments, access.ContractDeployment{
 				ContractID:    events.ContractIDFromAddress(e.Address, e.ContractName),
@@ -149,51 +179,75 @@ func (c *Contracts) collectDeployments(data BlockData) ([]access.ContractDeploym
 				Code:          code,
 				CodeHash:      e.CodeHash,
 			})
+			updated++
 
 		case flowAccountContractRemoved:
 			// contract removal is not currently supported. returning an error here will cause the
 			// indexer to crash, signalling that implementation is needed.
-			return nil, fmt.Errorf("unexpected %s event in block %s tx %s: not supported",
+			return nil, 0, 0, fmt.Errorf("unexpected %s event in block %s tx %s: not supported",
 				event.Type, data.Header.ID(), event.TransactionID)
 		}
 	}
 
-	return deployments, nil
+	return deployments, created, updated, nil
 }
 
-// fetchCodeBestEffort attempts to retrieve the contract code from the execution state. If
-// retrieval fails for any reason (e.g. execution state not yet synced), a warning is logged
-// and nil is returned so the deployment can be stored with just the code hash from the event.
-func (c *Contracts) fetchCodeBestEffort(
-	retriever *contractCodeRetriever,
-	address flow.Address,
-	contractName string,
-	expectedHash []byte,
-	eventType flow.EventType,
-) []byte {
-	if c.scriptExecutor == nil {
-		return nil
-	}
-
-	code, err := retriever.contractCode(address, contractName)
+// loadDeployedContracts loads all deployed contracts from storage at the given height and returns a
+// list of access.ContractDeployment records.
+//
+// No error returns are expected during normal operation.
+func (c *Contracts) loadDeployedContracts(height uint64) ([]access.ContractDeployment, error) {
+	snapshot, err := c.scriptExecutor.GetStorageSnapshot(height)
 	if err != nil {
-		c.log.Warn().Err(err).
-			Str("contract", events.ContractIDFromAddress(address, contractName)).
-			Str("event", string(eventType)).
-			Msg("could not retrieve contract code; storing deployment without code body")
-		return nil
+		return nil, fmt.Errorf("failed to get storage snapshot: %w", err)
 	}
 
-	// Sanity check: verify the retrieved code matches the hash in the event.
-	if !bytes.Equal(expectedHash, cadenceCodeToHash(code)) {
-		c.log.Warn().
-			Str("contract", events.ContractIDFromAddress(address, contractName)).
-			Str("event", string(eventType)).
-			Msg("contract code hash mismatch between execution state and event; storing deployment without code body")
-		return nil
+	txnState := state.NewTransactionState(snapshot, state.DefaultParameters())
+	accounts := environment.NewAccounts(txnState)
+
+	generator := c.chain.NewAddressGenerator()
+
+	var deployments []access.ContractDeployment
+
+	for {
+		address, err := generator.NextAddress()
+		if err != nil {
+			return nil, fmt.Errorf("cannot get address: %w", err)
+		}
+
+		exists, err := accounts.Exists(address)
+		if err != nil {
+			return nil, fmt.Errorf("error while checking if account exists: %w", err)
+		}
+
+		// iterate until we find the first account that does not exist in the snapshot.
+		if !exists {
+			break
+		}
+
+		contractNames, err := accounts.GetContractNames(address)
+		if err != nil {
+			return nil, fmt.Errorf("error while getting contract names: %w", err)
+		}
+
+		for _, contractName := range contractNames {
+			code, err := accounts.GetContract(contractName, address)
+			if err != nil {
+				return nil, fmt.Errorf("error while getting contract: %w", err)
+			}
+
+			deployments = append(deployments, access.ContractDeployment{
+				ContractID: events.ContractIDFromAddress(address, contractName),
+				Address:    address,
+				Code:       code,
+				CodeHash:   cadenceCodeToHash(code),
+				// all other fields are omitted because we do not do not know the actual deployment details
+				IsPlaceholder: true,
+			})
+		}
 	}
 
-	return code
+	return deployments, nil
 }
 
 // cadenceCodeToHash calculates the hash of the provided code using the same algorithm as cadence.
@@ -205,44 +259,48 @@ func cadenceCodeToHash(code []byte) []byte {
 	return codeHash[:]
 }
 
-// contractCodeRetriever lazily fetches and caches contract code per account address for a
-// single block height.
-//
-// CAUTION: Not safe for concurrent use.
-type contractCodeRetriever struct {
-	scriptExecutor contractScriptExecutor
+type contractRetriever struct {
 	height         uint64
-	accounts       map[flow.Address]*flow.Account
+	accounts       environment.Accounts
+	scriptExecutor snapshotProvider
 }
 
-func newContractCodeRetriever(scriptExecutor contractScriptExecutor, height uint64) *contractCodeRetriever {
-	return &contractCodeRetriever{
-		scriptExecutor: scriptExecutor,
+func newContractRetriever(scriptExecutor snapshotProvider, height uint64) *contractRetriever {
+	return &contractRetriever{
 		height:         height,
-		accounts:       make(map[flow.Address]*flow.Account),
+		scriptExecutor: scriptExecutor,
 	}
 }
 
-// contractCode returns the code for the given contract on the given account, fetching the account
-// state once per address and caching it for subsequent calls within the same block.
+// contractCode returns the code for the given contract at the given height.
 //
 // CAUTION: Not safe for concurrent use.
 //
 // No error returns are expected during normal operation.
-func (c *contractCodeRetriever) contractCode(address flow.Address, contractName string) ([]byte, error) {
-	account, ok := c.accounts[address]
-	if !ok {
-		var err error
-		account, err = c.scriptExecutor.GetAccountAtBlockHeight(context.TODO(), address, c.height)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get account %s at height %d: %w", address.Hex(), c.height, err)
-		}
-		c.accounts[address] = account
+func (c *contractRetriever) contractCode(
+	address flow.Address,
+	contractName string,
+	height uint64,
+) ([]byte, error) {
+	if c.height != height {
+		return nil, fmt.Errorf("height mismatch: %d != %d", c.height, height)
 	}
 
-	code, ok := account.Contracts[contractName]
-	if !ok {
-		return nil, fmt.Errorf("contract %q not found on account %s at height %d", contractName, address.Hex(), c.height)
+	// lazily setup accounts since many blocks will not have any contract updates.
+	if c.accounts == nil {
+		snapshot, err := c.scriptExecutor.GetStorageSnapshot(height)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get storage snapshot: %w", err)
+		}
+
+		txnState := state.NewTransactionState(snapshot, state.DefaultParameters())
+		c.accounts = environment.NewAccounts(txnState)
 	}
+
+	code, err := c.accounts.GetContract(contractName, address)
+	if err != nil {
+		return nil, fmt.Errorf("error while getting contract: %w", err)
+	}
+
 	return code, nil
 }

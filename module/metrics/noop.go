@@ -383,6 +383,7 @@ func (nc *NoopCollector) BlockIndexedExtended(string, uint64)               {}
 func (nc *NoopCollector) ScheduledTransactionIndexed(int, int, int, int, int) {}
 func (nc *NoopCollector) FTTransferIndexed(int)                               {}
 func (nc *NoopCollector) NFTTransferIndexed(int)                              {}
+func (nc *NoopCollector) ContractDeploymentIndexed(int, int)                  {}
 
 var _ module.TransactionErrorMessagesMetrics = (*NoopCollector)(nil)
 

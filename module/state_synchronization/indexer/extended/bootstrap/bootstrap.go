@@ -151,6 +151,7 @@ func BootstrapIndexers(
 		chainID.Chain(),
 		extendedStorage.ContractDeploymentsBootstrapper,
 		scriptExecutor,
+		extendedMetrics,
 	)
 
 	extendedIndexers := []extended.Indexer{

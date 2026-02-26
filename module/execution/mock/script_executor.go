@@ -7,6 +7,7 @@ package mock
 import (
 	"context"
 
+	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/model/flow"
 	mock "github.com/stretchr/testify/mock"
 )
@@ -486,6 +487,136 @@ func (_c *ScriptExecutor_GetAccountKeys_Call) Return(accountPublicKeys []flow.Ac
 }
 
 func (_c *ScriptExecutor_GetAccountKeys_Call) RunAndReturn(run func(ctx context.Context, address flow.Address, height uint64) ([]flow.AccountPublicKey, error)) *ScriptExecutor_GetAccountKeys_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// GetStorageSnapshot provides a mock function for the type ScriptExecutor
+func (_mock *ScriptExecutor) GetStorageSnapshot(height uint64) (snapshot.StorageSnapshot, error) {
+	ret := _mock.Called(height)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetStorageSnapshot")
+	}
+
+	var r0 snapshot.StorageSnapshot
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(uint64) (snapshot.StorageSnapshot, error)); ok {
+		return returnFunc(height)
+	}
+	if returnFunc, ok := ret.Get(0).(func(uint64) snapshot.StorageSnapshot); ok {
+		r0 = returnFunc(height)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(snapshot.StorageSnapshot)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(uint64) error); ok {
+		r1 = returnFunc(height)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// ScriptExecutor_GetStorageSnapshot_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetStorageSnapshot'
+type ScriptExecutor_GetStorageSnapshot_Call struct {
+	*mock.Call
+}
+
+// GetStorageSnapshot is a helper method to define mock.On call
+//   - height uint64
+func (_e *ScriptExecutor_Expecter) GetStorageSnapshot(height interface{}) *ScriptExecutor_GetStorageSnapshot_Call {
+	return &ScriptExecutor_GetStorageSnapshot_Call{Call: _e.mock.On("GetStorageSnapshot", height)}
+}
+
+func (_c *ScriptExecutor_GetStorageSnapshot_Call) Run(run func(height uint64)) *ScriptExecutor_GetStorageSnapshot_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 uint64
+		if args[0] != nil {
+			arg0 = args[0].(uint64)
+		}
+		run(
+			arg0,
+		)
+	})
+	return _c
+}
+
+func (_c *ScriptExecutor_GetStorageSnapshot_Call) Return(storageSnapshot snapshot.StorageSnapshot, err error) *ScriptExecutor_GetStorageSnapshot_Call {
+	_c.Call.Return(storageSnapshot, err)
+	return _c
+}
+
+func (_c *ScriptExecutor_GetStorageSnapshot_Call) RunAndReturn(run func(height uint64) (snapshot.StorageSnapshot, error)) *ScriptExecutor_GetStorageSnapshot_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// RegisterValue provides a mock function for the type ScriptExecutor
+func (_mock *ScriptExecutor) RegisterValue(ID flow.RegisterID, height uint64) (flow.RegisterValue, error) {
+	ret := _mock.Called(ID, height)
+
+	if len(ret) == 0 {
+		panic("no return value specified for RegisterValue")
+	}
+
+	var r0 flow.RegisterValue
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(flow.RegisterID, uint64) (flow.RegisterValue, error)); ok {
+		return returnFunc(ID, height)
+	}
+	if returnFunc, ok := ret.Get(0).(func(flow.RegisterID, uint64) flow.RegisterValue); ok {
+		r0 = returnFunc(ID, height)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(flow.RegisterValue)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(flow.RegisterID, uint64) error); ok {
+		r1 = returnFunc(ID, height)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// ScriptExecutor_RegisterValue_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'RegisterValue'
+type ScriptExecutor_RegisterValue_Call struct {
+	*mock.Call
+}
+
+// RegisterValue is a helper method to define mock.On call
+//   - ID flow.RegisterID
+//   - height uint64
+func (_e *ScriptExecutor_Expecter) RegisterValue(ID interface{}, height interface{}) *ScriptExecutor_RegisterValue_Call {
+	return &ScriptExecutor_RegisterValue_Call{Call: _e.mock.On("RegisterValue", ID, height)}
+}
+
+func (_c *ScriptExecutor_RegisterValue_Call) Run(run func(ID flow.RegisterID, height uint64)) *ScriptExecutor_RegisterValue_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 flow.RegisterID
+		if args[0] != nil {
+			arg0 = args[0].(flow.RegisterID)
+		}
+		var arg1 uint64
+		if args[1] != nil {
+			arg1 = args[1].(uint64)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *ScriptExecutor_RegisterValue_Call) Return(v flow.RegisterValue, err error) *ScriptExecutor_RegisterValue_Call {
+	_c.Call.Return(v, err)
+	return _c
+}
+
+func (_c *ScriptExecutor_RegisterValue_Call) RunAndReturn(run func(ID flow.RegisterID, height uint64) (flow.RegisterValue, error)) *ScriptExecutor_RegisterValue_Call {
 	_c.Call.Return(run)
 	return _c
 }
