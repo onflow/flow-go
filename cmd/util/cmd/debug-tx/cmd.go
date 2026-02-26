@@ -30,7 +30,7 @@ var (
 	flagShowResult          bool
 	flagBlockID             string
 	flagTracePath           string
-	flagLogTraces           bool
+	flagLogCadenceTraces    bool
 	flagOnlyTraceCadence    bool
 	flagEntropyProvider     string
 )
@@ -66,7 +66,7 @@ func init() {
 
 	Cmd.Flags().StringVar(&flagTracePath, "trace", "", "enable tracing to given path")
 
-	Cmd.Flags().BoolVar(&flagLogTraces, "log-cadence-traces", false, "log Cadence traces. requires --trace and --only-trace-cadence to be set (default: false)")
+	Cmd.Flags().BoolVar(&flagLogCadenceTraces, "log-cadence-traces", false, "log Cadence traces. requires --trace and --only-trace-cadence to be set (default: false)")
 
 	Cmd.Flags().BoolVar(&flagOnlyTraceCadence, "only-trace-cadence", false, "when tracing, only include spans related to Cadence execution (default: false)")
 
@@ -113,11 +113,15 @@ func run(cmd *cobra.Command, args []string) {
 		defer traceFile.Close()
 	}
 
+	if flagLogCadenceTraces && (flagTracePath == "" || !flagOnlyTraceCadence) {
+		log.Fatal().Msg("--log-cadence-traces requires both --trace and --only-trace-cadence")
+	}
+
 	var spanExporter otelTrace.SpanExporter
 	if traceFile != nil {
 		if flagOnlyTraceCadence {
 			cadenceSpanExporter := &debug.InterestingCadenceSpanExporter{
-				Log: flagLogTraces,
+				Log: flagLogCadenceTraces,
 			}
 			defer func() {
 				err = cadenceSpanExporter.WriteSpans(traceFile)
