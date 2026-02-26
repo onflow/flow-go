@@ -134,3 +134,79 @@ func (_c *ExtendedIndexingMetrics_ScheduledTransactionIndexed_Call) RunAndReturn
 	_c.Run(run)
 	return _c
 }
+
+// FTTransferIndexed provides a mock function for the type ExtendedIndexingMetrics
+func (_mock *ExtendedIndexingMetrics) FTTransferIndexed(count int) {
+	_mock.Called(count)
+	return
+}
+
+// ExtendedIndexingMetrics_FTTransferIndexed_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'FTTransferIndexed'
+type ExtendedIndexingMetrics_FTTransferIndexed_Call struct {
+	*mock.Call
+}
+
+// FTTransferIndexed is a helper method to define mock.On call
+//   - count int
+func (_e *ExtendedIndexingMetrics_Expecter) FTTransferIndexed(count interface{}) *ExtendedIndexingMetrics_FTTransferIndexed_Call {
+	return &ExtendedIndexingMetrics_FTTransferIndexed_Call{Call: _e.mock.On("FTTransferIndexed", count)}
+}
+
+func (_c *ExtendedIndexingMetrics_FTTransferIndexed_Call) Run(run func(count int)) *ExtendedIndexingMetrics_FTTransferIndexed_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 int
+		if args[0] != nil {
+			arg0 = args[0].(int)
+		}
+		run(arg0)
+	})
+	return _c
+}
+
+func (_c *ExtendedIndexingMetrics_FTTransferIndexed_Call) Return() *ExtendedIndexingMetrics_FTTransferIndexed_Call {
+	_c.Call.Return()
+	return _c
+}
+
+func (_c *ExtendedIndexingMetrics_FTTransferIndexed_Call) RunAndReturn(run func(int)) *ExtendedIndexingMetrics_FTTransferIndexed_Call {
+	_c.Run(run)
+	return _c
+}
+
+// NFTTransferIndexed provides a mock function for the type ExtendedIndexingMetrics
+func (_mock *ExtendedIndexingMetrics) NFTTransferIndexed(count int) {
+	_mock.Called(count)
+	return
+}
+
+// ExtendedIndexingMetrics_NFTTransferIndexed_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'NFTTransferIndexed'
+type ExtendedIndexingMetrics_NFTTransferIndexed_Call struct {
+	*mock.Call
+}
+
+// NFTTransferIndexed is a helper method to define mock.On call
+//   - count int
+func (_e *ExtendedIndexingMetrics_Expecter) NFTTransferIndexed(count interface{}) *ExtendedIndexingMetrics_NFTTransferIndexed_Call {
+	return &ExtendedIndexingMetrics_NFTTransferIndexed_Call{Call: _e.mock.On("NFTTransferIndexed", count)}
+}
+
+func (_c *ExtendedIndexingMetrics_NFTTransferIndexed_Call) Run(run func(count int)) *ExtendedIndexingMetrics_NFTTransferIndexed_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 int
+		if args[0] != nil {
+			arg0 = args[0].(int)
+		}
+		run(arg0)
+	})
+	return _c
+}
+
+func (_c *ExtendedIndexingMetrics_NFTTransferIndexed_Call) Return() *ExtendedIndexingMetrics_NFTTransferIndexed_Call {
+	_c.Call.Return()
+	return _c
+}
+
+func (_c *ExtendedIndexingMetrics_NFTTransferIndexed_Call) RunAndReturn(run func(int)) *ExtendedIndexingMetrics_NFTTransferIndexed_Call {
+	_c.Run(run)
+	return _c
+}

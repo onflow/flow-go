@@ -112,19 +112,21 @@ func BootstrapIndexers(
 		return nil, fmt.Errorf("could not create account transactions indexer: %w", err)
 	}
 
+	extendedMetrics := metrics.NewExtendedIndexingCollector()
+
 	ftTransfers := extended.NewFungibleTokenTransfers(
 		log,
 		chainID,
 		extendedStorage.FungibleTokenTransfersBootstrapper,
+		extendedMetrics,
 	)
 
 	nftTransfers := extended.NewNonFungibleTokenTransfers(
 		log,
 		chainID,
 		extendedStorage.NonFungibleTokenTransfersBootstrapper,
+		extendedMetrics,
 	)
-
-	extendedMetrics := metrics.NewExtendedIndexingCollector()
 
 	scheduledTransactions := extended.NewScheduledTransactions(
 		log,

@@ -837,6 +837,12 @@ type ExtendedIndexingMetrics interface {
 	// canceled is the number marked as canceled.
 	// backfilled is the number fetched from state because they were unknown to the local index.
 	ScheduledTransactionIndexed(scheduled, executed, failed, canceled, backfilled int)
+
+	// FTTransferIndexed records the number of fungible token transfers indexed for a single block.
+	FTTransferIndexed(count int)
+
+	// NFTTransferIndexed records the number of non-fungible token transfers indexed for a single block.
+	NFTTransferIndexed(count int)
 }
 
 type TransactionErrorMessagesMetrics interface {

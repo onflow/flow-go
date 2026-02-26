@@ -13,6 +13,8 @@ type ExtendedIndexingCollector struct {
 	indexedHeight            *prometheus.GaugeVec
 	scheduledTxCount         *prometheus.CounterVec
 	scheduledTxBackfillCount prometheus.Counter
+	ftTransferCount          prometheus.Counter
+	nftTransferCount         prometheus.Counter
 }
 
 func NewExtendedIndexingCollector() module.ExtendedIndexingMetrics {
@@ -37,10 +39,26 @@ func NewExtendedIndexingCollector() module.ExtendedIndexingMetrics {
 		Help:      "total number of scheduled transactions backfilled from state",
 	})
 
+	ftTransferCount := promauto.NewCounter(prometheus.CounterOpts{
+		Namespace: namespaceAccess,
+		Subsystem: subsystemExtendedIndexing,
+		Name:      "ft_transfers_total",
+		Help:      "total number of fungible token transfers indexed",
+	})
+
+	nftTransferCount := promauto.NewCounter(prometheus.CounterOpts{
+		Namespace: namespaceAccess,
+		Subsystem: subsystemExtendedIndexing,
+		Name:      "nft_transfers_total",
+		Help:      "total number of non-fungible token transfers indexed",
+	})
+
 	return &ExtendedIndexingCollector{
 		indexedHeight:            indexedHeight,
 		scheduledTxCount:         scheduledTxCount,
 		scheduledTxBackfillCount: scheduledTxBackfillCount,
+		ftTransferCount:          ftTransferCount,
+		nftTransferCount:         nftTransferCount,
 	}
 }
 
@@ -56,4 +74,14 @@ func (c *ExtendedIndexingCollector) ScheduledTransactionIndexed(scheduled, execu
 	c.scheduledTxCount.WithLabelValues("failed").Add(float64(failed))
 	c.scheduledTxCount.WithLabelValues("canceled").Add(float64(canceled))
 	c.scheduledTxBackfillCount.Add(float64(backfilled))
+}
+
+// FTTransferIndexed records the number of fungible token transfers indexed for a single block.
+func (c *ExtendedIndexingCollector) FTTransferIndexed(count int) {
+	c.ftTransferCount.Add(float64(count))
+}
+
+// NFTTransferIndexed records the number of non-fungible token transfers indexed for a single block.
+func (c *ExtendedIndexingCollector) NFTTransferIndexed(count int) {
+	c.nftTransferCount.Add(float64(count))
 }
