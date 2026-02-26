@@ -57,13 +57,32 @@ func MakeTransactionDataComposite(
 	}).WithType(typ)
 }
 
-// MakeJITScriptResponse encodes a slice of TransactionData composites as a JSON-CDC array,
-// the format returned by a getTransactionData script execution.
+// MakeJITScriptResponse encodes a slice of TransactionData composites as a JSON-CDC array
+// of optionals, matching the [FlowTransactionScheduler.TransactionData?] return type of the
+// getTransactionData script.
 func MakeJITScriptResponse(t *testing.T, composites ...cadence.Composite) []byte {
 	t.Helper()
 	values := make([]cadence.Value, len(composites))
 	for i, c := range composites {
-		values[i] = c
+		values[i] = cadence.NewOptional(c)
+	}
+	encoded, err := jsoncdc.Encode(cadence.NewArray(values))
+	require.NoError(t, err)
+	return encoded
+}
+
+// MakeJITScriptResponseWithNils encodes a mix of TransactionData composites and nil optionals
+// as a JSON-CDC array of optionals. nils[i] == true means that slot is a nil optional.
+func MakeJITScriptResponseWithNils(t *testing.T, composites []cadence.Composite, nils []bool) []byte {
+	t.Helper()
+	require.Equal(t, len(composites), len(nils), "composites and nils must have the same length")
+	values := make([]cadence.Value, len(composites))
+	for i, c := range composites {
+		if nils[i] {
+			values[i] = cadence.NewOptional(nil)
+		} else {
+			values[i] = cadence.NewOptional(c)
+		}
 	}
 	encoded, err := jsoncdc.Encode(cadence.NewArray(values))
 	require.NoError(t, err)

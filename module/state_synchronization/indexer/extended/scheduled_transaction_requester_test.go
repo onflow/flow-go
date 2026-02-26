@@ -126,6 +126,41 @@ func TestScheduledTransactionRequester_FailedEntry(t *testing.T) {
 	assert.Equal(t, executorTxID, txs[0].ExecutedTransactionID)
 }
 
+// TestScheduledTransactionRequester_NilOptional verifies that when the script returns a nil
+// optional for an ID (transaction not found on-chain), Fetch returns an error.
+func TestScheduledTransactionRequester_NilOptional(t *testing.T) {
+	t.Parallel()
+
+	sc := systemcontracts.SystemContractsForChain(flow.Testnet)
+	owner := unittest.RandomAddressFixture()
+	executorMock := executionmock.NewScriptExecutor(t)
+	requester := NewScheduledTransactionRequester(executorMock, flow.Testnet)
+
+	// ID 10 exists on-chain; ID 11 does not (nil optional).
+	comp := MakeTransactionDataComposite(sc, 10, 1, 1000, 300, 100, owner, "A.abc.Contract.Handler", 10)
+	response := MakeJITScriptResponseWithNils(
+		t,
+		[]cadence.Composite{comp, comp}, // second entry is a nil optional; value is ignored
+		[]bool{false, true},
+	)
+	executorMock.On("ExecuteAtBlockHeight",
+		mock.Anything,
+		getTransactionDataScript(flow.Testnet),
+		encodeUInt64Args(t, 10, 11),
+		requesterTestHeight,
+	).Return(response, nil).Once()
+
+	data := &scheduledTransactionData{
+		executedEntries: []executedEntry{
+			{event: &events.TransactionSchedulerExecutedEvent{ID: 10}, transactionID: unittest.IdentifierFixture()},
+			{event: &events.TransactionSchedulerExecutedEvent{ID: 11}, transactionID: unittest.IdentifierFixture()},
+		},
+	}
+	_, err := requester.Fetch(context.Background(), []uint64{10, 11}, requesterTestHeight, data)
+	require.Error(t, err)
+	require.ErrorContains(t, err, "is not found on-chain")
+}
+
 // TestScheduledTransactionRequester_ScriptError verifies that an error from the script
 // executor is propagated from Fetch.
 func TestScheduledTransactionRequester_ScriptError(t *testing.T) {
