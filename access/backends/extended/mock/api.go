@@ -604,3 +604,291 @@ func (_c *API_GetScheduledTransactionsByAddress_Call) RunAndReturn(run func(ctx 
 	_c.Call.Return(run)
 	return _c
 }
+
+// GetContract provides a mock function for the type API
+func (_mock *API) GetContract(ctx context.Context, id string, filter extended.ContractDeploymentFilter) (*access.ContractDeployment, error) {
+	ret := _mock.Called(ctx, id, filter)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetContract")
+	}
+
+	var r0 *access.ContractDeployment
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, extended.ContractDeploymentFilter) (*access.ContractDeployment, error)); ok {
+		return returnFunc(ctx, id, filter)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, extended.ContractDeploymentFilter) *access.ContractDeployment); ok {
+		r0 = returnFunc(ctx, id, filter)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*access.ContractDeployment)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, string, extended.ContractDeploymentFilter) error); ok {
+		r1 = returnFunc(ctx, id, filter)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// API_GetContract_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetContract'
+type API_GetContract_Call struct {
+	*mock.Call
+}
+
+// GetContract is a helper method to define mock.On call
+func (_e *API_Expecter) GetContract(ctx interface{}, id interface{}, filter interface{}) *API_GetContract_Call {
+	return &API_GetContract_Call{Call: _e.mock.On("GetContract", ctx, id, filter)}
+}
+
+func (_c *API_GetContract_Call) Run(run func(ctx context.Context, id string, filter extended.ContractDeploymentFilter)) *API_GetContract_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		var arg2 extended.ContractDeploymentFilter
+		if args[2] != nil {
+			arg2 = args[2].(extended.ContractDeploymentFilter)
+		}
+		run(arg0, arg1, arg2)
+	})
+	return _c
+}
+
+func (_c *API_GetContract_Call) Return(deployment *access.ContractDeployment, err error) *API_GetContract_Call {
+	_c.Call.Return(deployment, err)
+	return _c
+}
+
+func (_c *API_GetContract_Call) RunAndReturn(run func(ctx context.Context, id string, filter extended.ContractDeploymentFilter) (*access.ContractDeployment, error)) *API_GetContract_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// GetContractDeployments provides a mock function for the type API
+func (_mock *API) GetContractDeployments(ctx context.Context, id string, limit uint32, cursor *access.ContractDeploymentCursor, filter extended.ContractDeploymentFilter) (*access.ContractDeploymentPage, error) {
+	ret := _mock.Called(ctx, id, limit, cursor, filter)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetContractDeployments")
+	}
+
+	var r0 *access.ContractDeploymentPage
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, uint32, *access.ContractDeploymentCursor, extended.ContractDeploymentFilter) (*access.ContractDeploymentPage, error)); ok {
+		return returnFunc(ctx, id, limit, cursor, filter)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, uint32, *access.ContractDeploymentCursor, extended.ContractDeploymentFilter) *access.ContractDeploymentPage); ok {
+		r0 = returnFunc(ctx, id, limit, cursor, filter)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*access.ContractDeploymentPage)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, string, uint32, *access.ContractDeploymentCursor, extended.ContractDeploymentFilter) error); ok {
+		r1 = returnFunc(ctx, id, limit, cursor, filter)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// API_GetContractDeployments_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetContractDeployments'
+type API_GetContractDeployments_Call struct {
+	*mock.Call
+}
+
+// GetContractDeployments is a helper method to define mock.On call
+func (_e *API_Expecter) GetContractDeployments(ctx interface{}, id interface{}, limit interface{}, cursor interface{}, filter interface{}) *API_GetContractDeployments_Call {
+	return &API_GetContractDeployments_Call{Call: _e.mock.On("GetContractDeployments", ctx, id, limit, cursor, filter)}
+}
+
+func (_c *API_GetContractDeployments_Call) Run(run func(ctx context.Context, id string, limit uint32, cursor *access.ContractDeploymentCursor, filter extended.ContractDeploymentFilter)) *API_GetContractDeployments_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		var arg2 uint32
+		if args[2] != nil {
+			arg2 = args[2].(uint32)
+		}
+		var arg3 *access.ContractDeploymentCursor
+		if args[3] != nil {
+			arg3 = args[3].(*access.ContractDeploymentCursor)
+		}
+		var arg4 extended.ContractDeploymentFilter
+		if args[4] != nil {
+			arg4 = args[4].(extended.ContractDeploymentFilter)
+		}
+		run(arg0, arg1, arg2, arg3, arg4)
+	})
+	return _c
+}
+
+func (_c *API_GetContractDeployments_Call) Return(page *access.ContractDeploymentPage, err error) *API_GetContractDeployments_Call {
+	_c.Call.Return(page, err)
+	return _c
+}
+
+func (_c *API_GetContractDeployments_Call) RunAndReturn(run func(ctx context.Context, id string, limit uint32, cursor *access.ContractDeploymentCursor, filter extended.ContractDeploymentFilter) (*access.ContractDeploymentPage, error)) *API_GetContractDeployments_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// GetContracts provides a mock function for the type API
+func (_mock *API) GetContracts(ctx context.Context, limit uint32, cursor *access.ContractDeploymentCursor, filter extended.ContractDeploymentFilter) (*access.ContractDeploymentPage, error) {
+	ret := _mock.Called(ctx, limit, cursor, filter)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetContracts")
+	}
+
+	var r0 *access.ContractDeploymentPage
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, uint32, *access.ContractDeploymentCursor, extended.ContractDeploymentFilter) (*access.ContractDeploymentPage, error)); ok {
+		return returnFunc(ctx, limit, cursor, filter)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, uint32, *access.ContractDeploymentCursor, extended.ContractDeploymentFilter) *access.ContractDeploymentPage); ok {
+		r0 = returnFunc(ctx, limit, cursor, filter)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*access.ContractDeploymentPage)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, uint32, *access.ContractDeploymentCursor, extended.ContractDeploymentFilter) error); ok {
+		r1 = returnFunc(ctx, limit, cursor, filter)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// API_GetContracts_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetContracts'
+type API_GetContracts_Call struct {
+	*mock.Call
+}
+
+// GetContracts is a helper method to define mock.On call
+func (_e *API_Expecter) GetContracts(ctx interface{}, limit interface{}, cursor interface{}, filter interface{}) *API_GetContracts_Call {
+	return &API_GetContracts_Call{Call: _e.mock.On("GetContracts", ctx, limit, cursor, filter)}
+}
+
+func (_c *API_GetContracts_Call) Run(run func(ctx context.Context, limit uint32, cursor *access.ContractDeploymentCursor, filter extended.ContractDeploymentFilter)) *API_GetContracts_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 uint32
+		if args[1] != nil {
+			arg1 = args[1].(uint32)
+		}
+		var arg2 *access.ContractDeploymentCursor
+		if args[2] != nil {
+			arg2 = args[2].(*access.ContractDeploymentCursor)
+		}
+		var arg3 extended.ContractDeploymentFilter
+		if args[3] != nil {
+			arg3 = args[3].(extended.ContractDeploymentFilter)
+		}
+		run(arg0, arg1, arg2, arg3)
+	})
+	return _c
+}
+
+func (_c *API_GetContracts_Call) Return(page *access.ContractDeploymentPage, err error) *API_GetContracts_Call {
+	_c.Call.Return(page, err)
+	return _c
+}
+
+func (_c *API_GetContracts_Call) RunAndReturn(run func(ctx context.Context, limit uint32, cursor *access.ContractDeploymentCursor, filter extended.ContractDeploymentFilter) (*access.ContractDeploymentPage, error)) *API_GetContracts_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// GetContractsByAddress provides a mock function for the type API
+func (_mock *API) GetContractsByAddress(ctx context.Context, address flow.Address, limit uint32, cursor *access.ContractDeploymentCursor, filter extended.ContractDeploymentFilter) (*access.ContractDeploymentPage, error) {
+	ret := _mock.Called(ctx, address, limit, cursor, filter)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetContractsByAddress")
+	}
+
+	var r0 *access.ContractDeploymentPage
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, flow.Address, uint32, *access.ContractDeploymentCursor, extended.ContractDeploymentFilter) (*access.ContractDeploymentPage, error)); ok {
+		return returnFunc(ctx, address, limit, cursor, filter)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, flow.Address, uint32, *access.ContractDeploymentCursor, extended.ContractDeploymentFilter) *access.ContractDeploymentPage); ok {
+		r0 = returnFunc(ctx, address, limit, cursor, filter)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*access.ContractDeploymentPage)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, flow.Address, uint32, *access.ContractDeploymentCursor, extended.ContractDeploymentFilter) error); ok {
+		r1 = returnFunc(ctx, address, limit, cursor, filter)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// API_GetContractsByAddress_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetContractsByAddress'
+type API_GetContractsByAddress_Call struct {
+	*mock.Call
+}
+
+// GetContractsByAddress is a helper method to define mock.On call
+func (_e *API_Expecter) GetContractsByAddress(ctx interface{}, address interface{}, limit interface{}, cursor interface{}, filter interface{}) *API_GetContractsByAddress_Call {
+	return &API_GetContractsByAddress_Call{Call: _e.mock.On("GetContractsByAddress", ctx, address, limit, cursor, filter)}
+}
+
+func (_c *API_GetContractsByAddress_Call) Run(run func(ctx context.Context, address flow.Address, limit uint32, cursor *access.ContractDeploymentCursor, filter extended.ContractDeploymentFilter)) *API_GetContractsByAddress_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 flow.Address
+		if args[1] != nil {
+			arg1 = args[1].(flow.Address)
+		}
+		var arg2 uint32
+		if args[2] != nil {
+			arg2 = args[2].(uint32)
+		}
+		var arg3 *access.ContractDeploymentCursor
+		if args[3] != nil {
+			arg3 = args[3].(*access.ContractDeploymentCursor)
+		}
+		var arg4 extended.ContractDeploymentFilter
+		if args[4] != nil {
+			arg4 = args[4].(extended.ContractDeploymentFilter)
+		}
+		run(arg0, arg1, arg2, arg3, arg4)
+	})
+	return _c
+}
+
+func (_c *API_GetContractsByAddress_Call) Return(page *access.ContractDeploymentPage, err error) *API_GetContractsByAddress_Call {
+	_c.Call.Return(page, err)
+	return _c
+}
+
+func (_c *API_GetContractsByAddress_Call) RunAndReturn(run func(ctx context.Context, address flow.Address, limit uint32, cursor *access.ContractDeploymentCursor, filter extended.ContractDeploymentFilter) (*access.ContractDeploymentPage, error)) *API_GetContractsByAddress_Call {
+	_c.Call.Return(run)
+	return _c
+}

@@ -111,4 +111,52 @@ type API interface {
 		expandOptions ScheduledTransactionExpandOptions,
 		encodingVersion entities.EventEncodingVersion,
 	) (*accessmodel.ScheduledTransactionsPage, error)
+
+	// GetContract returns the most recent deployment of the given contract.
+	//
+	// Expected error returns during normal operations:
+	//   - [codes.NotFound]: if no contract with the given identifier exists
+	//   - [codes.FailedPrecondition]: if the index has not been initialized
+	GetContract(ctx context.Context, id string, filter ContractDeploymentFilter) (*accessmodel.ContractDeployment, error)
+
+	// GetContractDeployments returns a paginated list of all deployments of the given contract,
+	// most recent first.
+	//
+	// Expected error returns during normal operations:
+	//   - [codes.NotFound]: if no contract with the given identifier exists
+	//   - [codes.FailedPrecondition]: if the index has not been initialized
+	//   - [codes.InvalidArgument]: if query parameters are invalid
+	GetContractDeployments(
+		ctx context.Context,
+		id string,
+		limit uint32,
+		cursor *accessmodel.ContractDeploymentCursor,
+		filter ContractDeploymentFilter,
+	) (*accessmodel.ContractDeploymentPage, error)
+
+	// GetContracts returns a paginated list of contracts at their latest deployment.
+	//
+	// Expected error returns during normal operations:
+	//   - [codes.FailedPrecondition]: if the index has not been initialized
+	//   - [codes.InvalidArgument]: if query parameters are invalid
+	GetContracts(
+		ctx context.Context,
+		limit uint32,
+		cursor *accessmodel.ContractDeploymentCursor,
+		filter ContractDeploymentFilter,
+	) (*accessmodel.ContractDeploymentPage, error)
+
+	// GetContractsByAddress returns a paginated list of contracts at their latest deployment for
+	// the given address.
+	//
+	// Expected error returns during normal operations:
+	//   - [codes.FailedPrecondition]: if the index has not been initialized
+	//   - [codes.InvalidArgument]: if query parameters are invalid
+	GetContractsByAddress(
+		ctx context.Context,
+		address flow.Address,
+		limit uint32,
+		cursor *accessmodel.ContractDeploymentCursor,
+		filter ContractDeploymentFilter,
+	) (*accessmodel.ContractDeploymentPage, error)
 }

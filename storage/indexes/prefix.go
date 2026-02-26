@@ -16,6 +16,7 @@ const (
 	codeAccountNonFungibleTokenTransfers byte = 12 // Account non-fungible token transfers index
 	codeScheduledTransaction             byte = 13 // Scheduled transaction index
 	codeScheduledTransactionByAddress    byte = 14 // Scheduled transaction by address
+	codeContractDeployment               byte = 15 // Contract deployment index
 
 	// reserved as extension byte for future use
 	_ byte = 255
@@ -39,4 +40,8 @@ var (
 	// Upper and lower bound keys for scheduled transactions
 	keyScheduledTxLatestHeightKey = []byte{codeIndexProcessedHeightUpperBound, codeScheduledTransaction}
 	keyScheduledTxFirstHeightKey  = []byte{codeIndexProcessedHeightLowerBound, codeScheduledTransaction}
+
+	// Upper and lower bound keys for contract deployments
+	keyContractDeploymentLatestHeightKey = []byte{codeIndexProcessedHeightUpperBound, codeContractDeployment}
+	keyContractDeploymentFirstHeightKey  = []byte{codeIndexProcessedHeightLowerBound, codeContractDeployment}
 )

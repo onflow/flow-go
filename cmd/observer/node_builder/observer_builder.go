@@ -1660,11 +1660,19 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 					node.RootChainID,
 				)
 
+				contracts := extended.NewContracts(
+					node.Logger,
+					node.RootChainID.Chain(),
+					builder.ExtendedStorage.ContractDeploymentsBootstrapper,
+					builder.ScriptExecutor,
+				)
+
 				extendedIndexers := []extended.Indexer{
 					accountTransactions,
 					ftTransfers,
 					nftTransfers,
 					scheduledTransactions,
+					contracts,
 				}
 
 				extendedIndexer, err := extended.NewExtendedIndexer(
@@ -2220,6 +2228,7 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 				utils.NotNil(node.Storage.Transactions),
 				builder.scheduledTransactions,
 				builder.ExtendedStorage.ScheduledTransactionsBootstrapper,
+				builder.ExtendedStorage.ContractDeploymentsBootstrapper,
 				txstatus.NewTxStatusDeriver(node.State, builder.lastFullBlockHeight),
 				builder.ScriptExecutor,
 			)

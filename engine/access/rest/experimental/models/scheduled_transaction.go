@@ -9,8 +9,8 @@ import (
 )
 
 const (
-	expandableTransaction   = "transaction"
-	expandableResult        = "result"
+	expandableTransaction     = "transaction"
+	expandableResult          = "result"
 	expandableHandlerContract = "handler_contract"
 )
 

@@ -1120,11 +1120,19 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 					node.RootChainID,
 				)
 
+				contracts := extended.NewContracts(
+					node.Logger,
+					node.RootChainID.Chain(),
+					builder.ExtendedStorage.ContractDeploymentsBootstrapper,
+					builder.ScriptExecutor,
+				)
+
 				extendedIndexers := []extended.Indexer{
 					accountTransactions,
 					ftTransfers,
 					nftTransfers,
 					scheduledTransactions,
+					contracts,
 				}
 
 				extendedIndexer, err := extended.NewExtendedIndexer(
@@ -2336,6 +2344,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 					utils.NotNil(node.Storage.Transactions),
 					builder.scheduledTransactions,
 					builder.ExtendedStorage.ScheduledTransactionsBootstrapper,
+					builder.ExtendedStorage.ContractDeploymentsBootstrapper,
 					txstatus.NewTxStatusDeriver(node.State, lastFullBlockHeight),
 					utils.NotNil(builder.ScriptExecutor),
 				)
