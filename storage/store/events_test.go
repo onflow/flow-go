@@ -34,14 +34,14 @@ func TestEventStoreRetrieve(t *testing.T) {
 		evt1_2 := unittest.EventFixture(
 			unittest.Event.WithEventType(flow.EventAccountCreated),
 			unittest.Event.WithTransactionIndex(1),
-			unittest.Event.WithEventIndex(1),
+			unittest.Event.WithEventIndex(0), // first event of tx1 must be 0
 			unittest.Event.WithTransactionID(tx2ID),
 		)
 
 		evt2_1 := unittest.EventFixture(
 			unittest.Event.WithEventType(flow.EventAccountUpdated),
 			unittest.Event.WithTransactionIndex(2),
-			unittest.Event.WithEventIndex(2),
+			unittest.Event.WithEventIndex(0), // first event of tx2 must be 0
 			unittest.Event.WithTransactionID(tx2ID),
 		)
 
@@ -322,14 +322,14 @@ func TestEventStoreAndRemove(t *testing.T) {
 		evt1_2 := unittest.EventFixture(
 			unittest.Event.WithEventType(flow.EventAccountCreated),
 			unittest.Event.WithTransactionIndex(1),
-			unittest.Event.WithEventIndex(1),
+			unittest.Event.WithEventIndex(0), // fixed
 			unittest.Event.WithTransactionID(tx2ID),
 		)
 
 		evt2_1 := unittest.EventFixture(
 			unittest.Event.WithEventType(flow.EventAccountUpdated),
 			unittest.Event.WithTransactionIndex(2),
-			unittest.Event.WithEventIndex(2),
+			unittest.Event.WithEventIndex(0), // fixed
 			unittest.Event.WithTransactionID(tx2ID),
 		)
 
@@ -361,5 +361,129 @@ func TestEventStoreAndRemove(t *testing.T) {
 		event, err = store.ByBlockID(blockID)
 		require.NoError(t, err)
 		require.Len(t, event, 0)
+	})
+}
+
+// TestValidateEventOrder verifies that validateEventOrder correctly accepts valid
+// event sequences and rejects all invalid orderings.
+func TestValidateEventOrder(t *testing.T) {
+	lockManager := storage.NewTestingLockManager()
+
+	// helper to build a minimal event with just the index fields set
+	makeEvent := func(txIndex, eventIndex uint32) flow.Event {
+		return flow.Event{
+			TransactionIndex: txIndex,
+			EventIndex:       eventIndex,
+		}
+	}
+
+	t.Run("empty slice is valid", func(t *testing.T) {
+		dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
+			s := store.NewEvents(metrics.NewNoopCollector(), db)
+			blockID := unittest.IdentifierFixture()
+			err := unittest.WithLock(t, lockManager, storage.LockInsertEvent, func(lctx lockctx.Context) error {
+				return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+					return s.BatchStore(lctx, blockID, []flow.EventsList{}, rw)
+				})
+			})
+			require.NoError(t, err)
+		})
+	})
+
+	t.Run("valid single transaction", func(t *testing.T) {
+		dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
+			s := store.NewEvents(metrics.NewNoopCollector(), db)
+			blockID := unittest.IdentifierFixture()
+			events := []flow.EventsList{{makeEvent(0, 0), makeEvent(0, 1), makeEvent(0, 2)}}
+			err := unittest.WithLock(t, lockManager, storage.LockInsertEvent, func(lctx lockctx.Context) error {
+				return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+					return s.BatchStore(lctx, blockID, events, rw)
+				})
+			})
+			require.NoError(t, err)
+		})
+	})
+
+	t.Run("valid with skipped transaction indices", func(t *testing.T) {
+		dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
+			s := store.NewEvents(metrics.NewNoopCollector(), db)
+			blockID := unittest.IdentifierFixture()
+			// tx 0 and tx 5 have events; tx 1,2,3,4 emitted nothing — valid skip
+			events := []flow.EventsList{
+				{makeEvent(0, 0), makeEvent(0, 1)},
+				{makeEvent(5, 0), makeEvent(5, 1)},
+			}
+			err := unittest.WithLock(t, lockManager, storage.LockInsertEvent, func(lctx lockctx.Context) error {
+				return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+					return s.BatchStore(lctx, blockID, events, rw)
+				})
+			})
+			require.NoError(t, err)
+		})
+	})
+
+	t.Run("invalid: first event has EventIndex != 0", func(t *testing.T) {
+		dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
+			s := store.NewEvents(metrics.NewNoopCollector(), db)
+			blockID := unittest.IdentifierFixture()
+			events := []flow.EventsList{{makeEvent(0, 1)}} // starts at 1, not 0
+			err := unittest.WithLock(t, lockManager, storage.LockInsertEvent, func(lctx lockctx.Context) error {
+				return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+					return s.BatchStore(lctx, blockID, events, rw)
+				})
+			})
+			require.Error(t, err)
+		})
+	})
+
+	t.Run("invalid: non-contiguous EventIndex within same transaction", func(t *testing.T) {
+		dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
+			s := store.NewEvents(metrics.NewNoopCollector(), db)
+			blockID := unittest.IdentifierFixture()
+			// jumps from EventIndex 0 to 2, skipping 1
+			events := []flow.EventsList{{makeEvent(0, 0), makeEvent(0, 2)}}
+			err := unittest.WithLock(t, lockManager, storage.LockInsertEvent, func(lctx lockctx.Context) error {
+				return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+					return s.BatchStore(lctx, blockID, events, rw)
+				})
+			})
+			require.Error(t, err)
+		})
+	})
+
+	t.Run("invalid: new transaction starts with EventIndex != 0", func(t *testing.T) {
+		dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
+			s := store.NewEvents(metrics.NewNoopCollector(), db)
+			blockID := unittest.IdentifierFixture()
+			// tx 1 starts at EventIndex 1 instead of 0
+			events := []flow.EventsList{
+				{makeEvent(0, 0)},
+				{makeEvent(1, 1)},
+			}
+			err := unittest.WithLock(t, lockManager, storage.LockInsertEvent, func(lctx lockctx.Context) error {
+				return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+					return s.BatchStore(lctx, blockID, events, rw)
+				})
+			})
+			require.Error(t, err)
+		})
+	})
+
+	t.Run("invalid: decreasing TransactionIndex", func(t *testing.T) {
+		dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
+			s := store.NewEvents(metrics.NewNoopCollector(), db)
+			blockID := unittest.IdentifierFixture()
+			// tx 3 appears after tx 5 — goes backwards
+			events := []flow.EventsList{
+				{makeEvent(5, 0)},
+				{makeEvent(3, 0)},
+			}
+			err := unittest.WithLock(t, lockManager, storage.LockInsertEvent, func(lctx lockctx.Context) error {
+				return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+					return s.BatchStore(lctx, blockID, events, rw)
+				})
+			})
+			require.Error(t, err)
+		})
 	})
 }
