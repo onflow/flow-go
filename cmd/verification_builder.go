@@ -212,6 +212,7 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 					node.RootChainID,
 					false,
 					v.verConf.scheduledCallbacksEnabled,
+					false,
 				)...,
 			)
 			vmCtx := fvm.NewContext(fvmOptions...)

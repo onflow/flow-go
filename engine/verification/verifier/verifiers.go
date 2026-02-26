@@ -351,6 +351,7 @@ func makeVerifier(
 			chainID,
 			false,
 			scheduledCallbacksEnabled,
+			false,
 		)...,
 	)
 	vmCtx := fvm.NewContext(fvmOptions...)

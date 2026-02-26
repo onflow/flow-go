@@ -7,6 +7,8 @@ import (
 	"github.com/onflow/cadence/runtime"
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/fvm/inspection"
+
 	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/engine/execution/computation/computer"
 	"github.com/onflow/flow-go/engine/execution/computation/query"
@@ -223,7 +225,7 @@ func (e *Manager) QueryExecutor() query.Executor {
 	return e.queryExecutor
 }
 
-func DefaultFVMOptions(chainID flow.ChainID, extensiveTracing bool, scheduleCallbacksEnabled bool) []fvm.Option {
+func DefaultFVMOptions(chainID flow.ChainID, extensiveTracing, scheduleCallbacksEnabled, tokenTracking bool) []fvm.Option {
 	options := []fvm.Option{
 		fvm.WithChain(chainID.Chain()),
 		fvm.WithReusableCadenceRuntimePool(
@@ -238,6 +240,12 @@ func DefaultFVMOptions(chainID flow.ChainID, extensiveTracing bool, scheduleCall
 
 	if extensiveTracing {
 		options = append(options, fvm.WithExtensiveTracing())
+	}
+
+	if tokenTracking {
+		options = append(options, fvm.WithInspectors([]inspection.Inspector{
+			inspection.NewTokenChangesInspector(inspection.DefaultTokenDiffSearchTokens(chainID.Chain())),
+		}))
 	}
 
 	return options

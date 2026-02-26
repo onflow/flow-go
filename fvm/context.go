@@ -6,6 +6,8 @@ import (
 	"github.com/rs/zerolog"
 	otelTrace "go.opentelemetry.io/otel/trace"
 
+	"github.com/onflow/flow-go/fvm/inspection"
+
 	"github.com/onflow/flow-go/fvm/environment"
 	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
 	"github.com/onflow/flow-go/fvm/storage/derived"
@@ -52,6 +54,8 @@ type Context struct {
 	// AllowProgramCacheWritesInScripts determines if the program cache can be written to in scripts
 	// By default, the program cache is only updated by transactions.
 	AllowProgramCacheWritesInScripts bool
+
+	Inspectors []inspection.Inspector
 }
 
 // NewContext initializes a new execution context with the provided options.
@@ -413,6 +417,13 @@ func WithProtocolStateSnapshot(snapshot protocol.SnapshotExecutionSubset) Option
 func WithScheduleCallbacksEnabled(enabled bool) Option {
 	return func(ctx Context) Context {
 		ctx.ScheduleCallbacksEnabled = enabled
+		return ctx
+	}
+}
+
+func WithInspectors(inspectors []inspection.Inspector) Option {
+	return func(ctx Context) Context {
+		ctx.Inspectors = inspectors
 		return ctx
 	}
 }
