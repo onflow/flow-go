@@ -195,10 +195,14 @@ func (s *ExecForkSuppressor) Get(identifier flow.Identifier) (*flow.Incorporated
 		s.mutex.RUnlock()
 		return seal, true
 	}
-	// convert map into list
+	// Filter to only inclusion candidates: a seal is an inclusion candidate only if the wrapped
+	// pool returns it (i.e. it has 2+ distinct executor receipts attesting to the same result).
+	// This ensures we only check for conflicts among seals that could actually be included.
 	var sealsPerBlock sealsList
-	for _, otherSeal := range sealsForBlock {
-		sealsPerBlock = append(sealsPerBlock, otherSeal)
+	for id := range sealsForBlock {
+		if candidateSeal, ok := s.seals.Get(id); ok {
+			sealsPerBlock = append(sealsPerBlock, candidateSeal)
+		}
 	}
 	s.mutex.RUnlock()
 
