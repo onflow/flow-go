@@ -1,14 +1,21 @@
-package extended
+package bootstrap
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/execution"
+	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/module/state_synchronization/indexer/extended"
+	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/indexes"
 	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
 	pstorage "github.com/onflow/flow-go/storage/pebble"
+	"github.com/onflow/flow-go/utils"
 )
 
 type Storage struct {
@@ -88,4 +95,86 @@ func OpenExtendedIndexDB(
 		ScheduledTransactionsBootstrapper:     scheduledTxStore,
 		ContractDeploymentsBootstrapper:       contractDeploymentsStore,
 	}, nil
+}
+
+func BootstrapIndexers(
+	log zerolog.Logger,
+	chainID flow.ChainID,
+	extendedStorage Storage,
+	lockManager storage.LockManager,
+	state protocol.State,
+	index storage.Index,
+	headers storage.Headers,
+	guarantees storage.Guarantees,
+	collections storage.Collections,
+	events storage.Events,
+	results storage.LightTransactionResults,
+	scriptExecutor execution.ScriptExecutor,
+	backfillDelay time.Duration,
+) (*extended.ExtendedIndexer, error) {
+	accountTransactions, err := extended.NewAccountTransactions(
+		log,
+		extendedStorage.AccountTransactionsBootstrapper,
+		chainID,
+		utils.NotNil(lockManager),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("could not create account transactions indexer: %w", err)
+	}
+
+	ftTransfers := extended.NewFungibleTokenTransfers(
+		log,
+		chainID,
+		extendedStorage.FungibleTokenTransfersBootstrapper,
+	)
+
+	nftTransfers := extended.NewNonFungibleTokenTransfers(
+		log,
+		chainID,
+		extendedStorage.NonFungibleTokenTransfersBootstrapper,
+	)
+
+	scheduledTransactions := extended.NewScheduledTransactions(
+		log,
+		extendedStorage.ScheduledTransactionsBootstrapper,
+		scriptExecutor,
+		chainID,
+	)
+
+	contracts := extended.NewContracts(
+		log,
+		chainID.Chain(),
+		extendedStorage.ContractDeploymentsBootstrapper,
+		scriptExecutor,
+	)
+
+	extendedIndexers := []extended.Indexer{
+		accountTransactions,
+		ftTransfers,
+		nftTransfers,
+		scheduledTransactions,
+		contracts,
+	}
+
+	extendedIndexer, err := extended.NewExtendedIndexer(
+		log,
+		metrics.NewExtendedIndexingCollector(),
+		extendedStorage.DB,
+		lockManager,
+		state,
+		index,
+		headers,
+		guarantees,
+		collections,
+		events,
+		results,
+		extendedIndexers,
+		chainID,
+		backfillDelay,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("could not create extended indexer: %w", err)
+	}
+
+	return extendedIndexer, nil
 }

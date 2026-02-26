@@ -45,8 +45,8 @@ func AddressFromOptional(opt cadence.Optional) (flow.Address, error) {
 	return flow.BytesToAddress(addr.Bytes()), nil
 }
 
-// PathFromOptional extracts a path string ("domain/identifier") from a [cadence.Optional]
-// containing a [cadence.Path]. Returns "" if the optional is empty.
+// PathFromOptional extracts a path string from a [cadence.Optional] containing a [cadence.Path].
+// Returns the path string (e.g "/public/identifier"), or "" if the optional is empty.
 //
 // Any error indicates that the optional value is not a valid path.
 func PathFromOptional(opt cadence.Optional) (string, error) {
