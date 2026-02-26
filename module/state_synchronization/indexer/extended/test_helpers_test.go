@@ -19,41 +19,46 @@ func MakeTransactionDataComposite(
 	sc *systemcontracts.SystemContracts,
 	id uint64,
 	priority uint8,
-	timestamp uint64,
+	scheduledTimestamp uint64,
 	executionEffort uint64,
 	fees uint64,
 	owner flow.Address,
 	typeIdentifier string,
-	uuid uint64,
 ) cadence.Composite {
 	addr := common.Address(sc.FlowTransactionScheduler.Address)
 	loc := common.NewAddressLocation(nil, addr, sc.FlowTransactionScheduler.Name)
+
+	priorityEnumType := cadence.NewEnumType(
+		loc,
+		"Priority",
+		cadence.UInt8Type,
+		[]cadence.Field{{Identifier: "rawValue", Type: cadence.UInt8Type}},
+		nil,
+	)
+	priorityEnum := cadence.NewEnum([]cadence.Value{cadence.UInt8(priority)}).WithType(priorityEnumType)
+
 	typ := cadence.NewStructType(
 		loc,
 		"TransactionData",
 		[]cadence.Field{
 			{Identifier: "id", Type: cadence.UInt64Type},
-			{Identifier: "priority", Type: cadence.UInt8Type},
-			{Identifier: "timestamp", Type: cadence.UFix64Type},
+			{Identifier: "priority", Type: priorityEnumType},
+			{Identifier: "scheduledTimestamp", Type: cadence.UFix64Type},
 			{Identifier: "executionEffort", Type: cadence.UInt64Type},
 			{Identifier: "fees", Type: cadence.UFix64Type},
-			{Identifier: "transactionHandlerOwner", Type: cadence.AddressType},
-			{Identifier: "transactionHandlerTypeIdentifier", Type: cadence.StringType},
-			{Identifier: "transactionHandlerUUID", Type: cadence.UInt64Type},
-			{Identifier: "transactionHandlerPublicPath", Type: cadence.NewOptionalType(cadence.PublicPathType)},
+			{Identifier: "handlerAddress", Type: cadence.AddressType},
+			{Identifier: "handlerTypeIdentifier", Type: cadence.StringType},
 		},
 		nil,
 	)
 	return cadence.NewStruct([]cadence.Value{
 		cadence.UInt64(id),
-		cadence.UInt8(priority),
-		cadence.UFix64(timestamp),
+		priorityEnum,
+		cadence.UFix64(scheduledTimestamp),
 		cadence.UInt64(executionEffort),
 		cadence.UFix64(fees),
 		cadence.NewAddress(owner),
 		cadence.String(typeIdentifier),
-		cadence.UInt64(uuid),
-		cadence.NewOptional(nil),
 	}).WithType(typ)
 }
 

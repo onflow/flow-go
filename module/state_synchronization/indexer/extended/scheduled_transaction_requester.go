@@ -129,7 +129,7 @@ func (r *ScheduledTransactionRequester) fetchMissingTxs(
 			}
 			decoded, err := decodeTransactionData(opt.Value)
 			if err != nil {
-				return nil, fmt.Errorf("failed to decode scheduled transaction: %w", err)
+				return nil, fmt.Errorf("failed to decode scheduled transaction %d: %w", batch[i], err)
 			}
 			missingTxs[decoded.ID] = decoded
 		}

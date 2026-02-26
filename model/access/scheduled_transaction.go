@@ -114,7 +114,8 @@ type ScheduledTransaction struct {
 	// IsPlaceholder is true if the scheduled transaction was created based on the current chain state,
 	// and not based on a protocol event. This happens when the index is bootstrapped after the original
 	// transaction where the scheduled transaction was first created.
-	// When true, the `CreatedTransactionID` field is undefined.
+	// When true, the `CreatedTransactionID`, `TransactionHandlerUUID`, and `TransactionHandlerPublicPath`
+	// fields are undefined.
 	IsPlaceholder bool
 
 	// Expansion fields populated when expandResults is true. Never persisted.
