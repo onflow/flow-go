@@ -217,6 +217,8 @@ func fvmOptions(blockID flow.Identifier) []fvm.Option {
 	var options []fvm.Option
 
 	switch flagEntropyProvider {
+	case "none":
+		// no entropy provider
 	case "block-hash":
 		options = append(
 			options,
@@ -224,6 +226,10 @@ func fvmOptions(blockID flow.Identifier) []fvm.Option {
 				BlockHash: blockID,
 			}),
 		)
+	default:
+		log.Fatal().
+			Str("entropy-provider", flagEntropyProvider).
+			Msg("Invalid --entropy-provider value, must be one of: none, block-hash")
 	}
 
 	return options
