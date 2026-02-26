@@ -19,7 +19,7 @@ type TransactionSchedulerScheduledEvent struct {
 	TransactionHandlerOwner          flow.Address
 	TransactionHandlerTypeIdentifier string
 	TransactionHandlerUUID           uint64
-	TransactionHandlerPublicPath     string // "domain/identifier", or "" if absent
+	TransactionHandlerPublicPath     string
 }
 
 // TransactionSchedulerPendingExecutionEvent represents a decoded FlowTransactionScheduler.PendingExecution event,
@@ -42,7 +42,7 @@ type TransactionSchedulerExecutedEvent struct {
 	TransactionHandlerOwner          flow.Address
 	TransactionHandlerTypeIdentifier string
 	TransactionHandlerUUID           uint64
-	TransactionHandlerPublicPath     string // "domain/identifier", or "" if absent
+	TransactionHandlerPublicPath     string
 }
 
 // TransactionSchedulerCanceledEvent represents a decoded FlowTransactionScheduler.Canceled event,

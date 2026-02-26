@@ -120,7 +120,7 @@ func TestScheduledTransactionsIndexer_ScheduledEventPublicPath(t *testing.T) {
 
 	tx, err := store.ByID(1)
 	require.NoError(t, err)
-	assert.Equal(t, "public/handlerCapability", tx.TransactionHandlerPublicPath)
+	assert.Equal(t, "/public/handlerCapability", tx.TransactionHandlerPublicPath)
 }
 
 // TestScheduledTransactionsIndexer_ExecutedWithPending verifies that a tx scheduled at height 1

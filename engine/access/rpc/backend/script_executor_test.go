@@ -12,7 +12,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/onflow/flow-go/engine/access/index"
 	"github.com/onflow/flow-go/engine/common/version"
 	"github.com/onflow/flow-go/engine/execution/computation/query"
 	"github.com/onflow/flow-go/engine/execution/testutil"
@@ -20,12 +19,9 @@ import (
 	"github.com/onflow/flow-go/fvm/storage/derived"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/execution"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
-	"github.com/onflow/flow-go/module/state_synchronization/indexer"
-	syncmock "github.com/onflow/flow-go/module/state_synchronization/mock"
 	synctest "github.com/onflow/flow-go/module/state_synchronization/requester/unittest"
 	"github.com/onflow/flow-go/storage"
 	storageMock "github.com/onflow/flow-go/storage/mock"
@@ -42,8 +38,6 @@ type ScriptExecutorSuite struct {
 	log            zerolog.Logger
 	registerIndex  storage.RegisterIndex
 	versionControl *version.VersionControl
-	reporter       *syncmock.IndexReporter
-	indexReporter  *index.Reporter
 	scripts        *execution.Scripts
 	chain          flow.Chain
 	dbDir          string
@@ -97,14 +91,8 @@ func (s *ScriptExecutorSuite) bootstrap() {
 // SetupTest sets up the test environment for each test in the suite.
 // This includes initializing various components and mock objects needed for the tests.
 func (s *ScriptExecutorSuite) SetupTest() {
-	lockManager := storage.NewTestingLockManager()
 	s.log = unittest.Logger()
 	s.chain = flow.Emulator.Chain()
-
-	s.reporter = syncmock.NewIndexReporter(s.T())
-	s.indexReporter = index.NewReporter()
-	err := s.indexReporter.Initialize(s.reporter)
-	require.NoError(s.T(), err)
 
 	blockchain := unittest.BlockchainFixture(10)
 	s.headers = newBlockHeadersStorage(blockchain)
@@ -129,32 +117,13 @@ func (s *ScriptExecutorSuite) SetupTest() {
 	derivedChainData, err := derived.NewDerivedChainData(derived.DefaultDerivedDataCacheSize)
 	s.Require().NoError(err)
 
-	indexerCore := indexer.New(
-		s.log,
-		module.ExecutionStateIndexerMetrics(metrics.NewNoopCollector()),
-		nil,
-		s.registerIndex,
-		s.headers,
-		nil,
-		nil,
-		nil,
-		nil,
-		nil,
-		s.chain.ChainID(),
-		derivedChainData,
-		nil,
-		metrics.NewNoopCollector(),
-		lockManager,
-		nil, // accountTxIndex
-	)
-
 	s.scripts = execution.NewScripts(
 		s.log,
 		metrics.NewNoopCollector(),
 		s.chain.ChainID(),
 		protocolState,
 		s.headers,
-		indexerCore.RegisterValue,
+		s.registerIndex.Get,
 		query.NewDefaultConfig(),
 		derivedChainData,
 		true,
@@ -177,16 +146,13 @@ func (s *ScriptExecutorSuite) TestExecuteAtBlockHeight() {
 	var scriptArgs [][]byte
 	var expectedResult = []byte("{\"type\":\"Void\"}\n")
 
-	s.reporter.On("LowestIndexedHeight").Return(s.height, nil)
-
 	// This test simulates the behavior when the version beacon is not set in the script executor,
 	// but it should still work by omitting the version control checks.
 	s.Run("test script execution without version control", func() {
 		scriptExec := NewScriptExecutor(s.log, uint64(0), math.MaxUint64)
-		s.reporter.On("HighestIndexedHeight").Return(s.height+1, nil).Once()
 
 		// Initialize the script executor without version control
-		err := scriptExec.Initialize(s.indexReporter, s.scripts, nil)
+		err := scriptExec.Initialize(s.registerIndex, s.scripts, nil)
 		s.Require().NoError(err)
 
 		// Execute the script at the specified block height
@@ -236,9 +202,8 @@ func (s *ScriptExecutorSuite) TestExecuteAtBlockHeight() {
 
 		// Initialize the script executor with version control
 		scriptExec := NewScriptExecutor(s.log, uint64(0), math.MaxUint64)
-		s.reporter.On("HighestIndexedHeight").Return(s.height+1, nil)
 
-		err = scriptExec.Initialize(s.indexReporter, s.scripts, s.versionControl)
+		err = scriptExec.Initialize(s.registerIndex, s.scripts, s.versionControl)
 		s.Require().NoError(err)
 
 		// Execute the script at the specified block height
@@ -288,9 +253,8 @@ func (s *ScriptExecutorSuite) TestExecuteAtBlockHeight() {
 
 		// Initialize the script executor with version control
 		scriptExec := NewScriptExecutor(s.log, uint64(0), math.MaxUint64)
-		s.reporter.On("HighestIndexedHeight").Return(s.height+1, nil)
 
-		err = scriptExec.Initialize(s.indexReporter, s.scripts, s.versionControl)
+		err = scriptExec.Initialize(s.registerIndex, s.scripts, s.versionControl)
 		s.Require().NoError(err)
 
 		// Execute the script at the specified block height

@@ -2,6 +2,7 @@ package execution
 
 import (
 	"context"
+	"errors"
 
 	"github.com/rs/zerolog"
 
@@ -202,6 +203,15 @@ func (s *Scripts) GetAccountKey(ctx context.Context, address flow.Address, keyIn
 	return s.executor.GetAccountKey(ctx, address, keyIndex, header, snap)
 }
 
+// RegisterValue retrieves register values by the register IDs at the provided block height.
+//
+// Expected error returns during normal operation:
+//   - [storage.ErrNotFound]: if the register is not found at the given height.
+//   - [storage.ErrHeightNotIndexed]: if the given height was not indexed yet or lower than the first indexed height.
+func (s *Scripts) RegisterValue(ID flow.RegisterID, height uint64) (flow.RegisterValue, error) {
+	return s.registerAtHeight(ID, height)
+}
+
 // snapshotWithBlock is a common function for executing scripts and get account functionality.
 // It creates a storage snapshot that is needed by the FVM to execute scripts.
 func (s *Scripts) snapshotWithBlock(height uint64) (snapshot.StorageSnapshot, *flow.Header, error) {
@@ -211,7 +221,16 @@ func (s *Scripts) snapshotWithBlock(height uint64) (snapshot.StorageSnapshot, *f
 	}
 
 	storageSnapshot := snapshot.NewReadFuncStorageSnapshot(func(ID flow.RegisterID) (flow.RegisterValue, error) {
-		return s.registerAtHeight(ID, height)
+		value, err := s.registerAtHeight(ID, height)
+		if err != nil {
+			// the storage snapshot consumer expects the snapshot to return nil if the register is not found
+			// instead of an error.
+			if errors.Is(err, storage.ErrNotFound) {
+				return nil, nil
+			}
+			return nil, err
+		}
+		return value, nil
 	})
 
 	return storageSnapshot, header, nil
