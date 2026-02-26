@@ -32,10 +32,10 @@ func TestScheduledTransactionRequester_ExecutedEntry(t *testing.T) {
 	requester := NewScheduledTransactionRequester(executorMock, flow.Testnet)
 
 	executedTxID := unittest.IdentifierFixture()
-	comp := MakeTransactionDataComposite(sc, 5, 1, 1000, 300, 100, owner, "A.abc.Contract.Handler", 99)
+	comp := MakeTransactionDataComposite(sc, 5, 1, 1000, 300, 100, owner, "A.abc.Contract.Handler")
 	executorMock.On("ExecuteAtBlockHeight",
 		mock.Anything,
-		getTransactionDataScript(flow.Testnet),
+		GetTransactionDataScript(flow.Testnet),
 		encodeUInt64Args(t, 5),
 		requesterTestHeight,
 	).Return(MakeJITScriptResponse(t, comp), nil).Once()
@@ -54,7 +54,6 @@ func TestScheduledTransactionRequester_ExecutedEntry(t *testing.T) {
 	assert.Equal(t, uint64(5), txs[0].ID)
 	assert.Equal(t, access.ScheduledTxStatusExecuted, txs[0].Status)
 	assert.Equal(t, executedTxID, txs[0].ExecutedTransactionID)
-	assert.Equal(t, uint64(99), txs[0].TransactionHandlerUUID)
 }
 
 // TestScheduledTransactionRequester_CancelledEntry verifies that Fetch correctly applies
@@ -68,10 +67,10 @@ func TestScheduledTransactionRequester_CancelledEntry(t *testing.T) {
 	requester := NewScheduledTransactionRequester(executorMock, flow.Testnet)
 
 	cancelTxID := unittest.IdentifierFixture()
-	comp := MakeTransactionDataComposite(sc, 7, 2, 2000, 400, 150, owner, "A.def.Contract.Handler", 77)
+	comp := MakeTransactionDataComposite(sc, 7, 2, 2000, 400, 150, owner, "A.def.Contract.Handler")
 	executorMock.On("ExecuteAtBlockHeight",
 		mock.Anything,
-		getTransactionDataScript(flow.Testnet),
+		GetTransactionDataScript(flow.Testnet),
 		encodeUInt64Args(t, 7),
 		requesterTestHeight,
 	).Return(MakeJITScriptResponse(t, comp), nil).Once()
@@ -105,10 +104,10 @@ func TestScheduledTransactionRequester_FailedEntry(t *testing.T) {
 	requester := NewScheduledTransactionRequester(executorMock, flow.Testnet)
 
 	executorTxID := unittest.IdentifierFixture()
-	comp := MakeTransactionDataComposite(sc, 42, 1, 3000, 200, 80, owner, "A.xyz.Contract.Handler", 15)
+	comp := MakeTransactionDataComposite(sc, 42, 1, 3000, 200, 80, owner, "A.xyz.Contract.Handler")
 	executorMock.On("ExecuteAtBlockHeight",
 		mock.Anything,
-		getTransactionDataScript(flow.Testnet),
+		GetTransactionDataScript(flow.Testnet),
 		encodeUInt64Args(t, 42),
 		requesterTestHeight,
 	).Return(MakeJITScriptResponse(t, comp), nil).Once()
@@ -137,7 +136,7 @@ func TestScheduledTransactionRequester_NilOptional(t *testing.T) {
 	requester := NewScheduledTransactionRequester(executorMock, flow.Testnet)
 
 	// ID 10 exists on-chain; ID 11 does not (nil optional).
-	comp := MakeTransactionDataComposite(sc, 10, 1, 1000, 300, 100, owner, "A.abc.Contract.Handler", 10)
+	comp := MakeTransactionDataComposite(sc, 10, 1, 1000, 300, 100, owner, "A.abc.Contract.Handler")
 	response := MakeJITScriptResponseWithNils(
 		t,
 		[]cadence.Composite{comp, comp}, // second entry is a nil optional; value is ignored
@@ -145,7 +144,7 @@ func TestScheduledTransactionRequester_NilOptional(t *testing.T) {
 	)
 	executorMock.On("ExecuteAtBlockHeight",
 		mock.Anything,
-		getTransactionDataScript(flow.Testnet),
+		GetTransactionDataScript(flow.Testnet),
 		encodeUInt64Args(t, 10, 11),
 		requesterTestHeight,
 	).Return(response, nil).Once()
@@ -172,7 +171,7 @@ func TestScheduledTransactionRequester_ScriptError(t *testing.T) {
 	scriptErr := fmt.Errorf("script execution failed")
 	executorMock.On("ExecuteAtBlockHeight",
 		mock.Anything,
-		getTransactionDataScript(flow.Testnet),
+		GetTransactionDataScript(flow.Testnet),
 		encodeUInt64Args(t, 9),
 		requesterTestHeight,
 	).Return([]byte(nil), scriptErr).Once()
@@ -202,9 +201,9 @@ func TestScheduledTransactionRequester_Batching(t *testing.T) {
 
 	var batch1Composites []cadence.Composite
 	for i := range 50 {
-		batch1Composites = append(batch1Composites, MakeTransactionDataComposite(sc, uint64(i+1), 1, 1000, 100, 50, owner, "A.abc.Contract.Handler", uint64(i+1)))
+		batch1Composites = append(batch1Composites, MakeTransactionDataComposite(sc, uint64(i+1), 1, 1000, 100, 50, owner, "A.abc.Contract.Handler"))
 	}
-	batch2Composite := MakeTransactionDataComposite(sc, 51, 1, 1000, 100, 50, owner, "A.abc.Contract.Handler", 51)
+	batch2Composite := MakeTransactionDataComposite(sc, 51, 1, 1000, 100, 50, owner, "A.abc.Contract.Handler")
 
 	batch1IDs := make([]uint64, 50)
 	for i := range 50 {
@@ -212,13 +211,13 @@ func TestScheduledTransactionRequester_Batching(t *testing.T) {
 	}
 	executorMock.On("ExecuteAtBlockHeight",
 		mock.Anything,
-		getTransactionDataScript(flow.Testnet),
+		GetTransactionDataScript(flow.Testnet),
 		encodeUInt64Args(t, batch1IDs...),
 		requesterTestHeight,
 	).Return(MakeJITScriptResponse(t, batch1Composites...), nil).Once()
 	executorMock.On("ExecuteAtBlockHeight",
 		mock.Anything,
-		getTransactionDataScript(flow.Testnet),
+		GetTransactionDataScript(flow.Testnet),
 		encodeUInt64Args(t, 51),
 		requesterTestHeight,
 	).Return(MakeJITScriptResponse(t, batch2Composite), nil).Once()

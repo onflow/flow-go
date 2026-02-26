@@ -34,7 +34,7 @@ type ScheduledTransactionRequester struct {
 func NewScheduledTransactionRequester(executor scriptExecutor, chainID flow.ChainID) *ScheduledTransactionRequester {
 	return &ScheduledTransactionRequester{
 		executor: executor,
-		script:   getTransactionDataScript(chainID),
+		script:   GetTransactionDataScript(chainID),
 	}
 }
 
@@ -129,7 +129,7 @@ func (r *ScheduledTransactionRequester) fetchMissingTxs(
 			}
 			decoded, err := decodeTransactionData(opt.Value)
 			if err != nil {
-				return nil, fmt.Errorf("failed to decode scheduled transaction: %w", err)
+				return nil, fmt.Errorf("failed to decode scheduled transaction %d: %w", batch[i], err)
 			}
 			missingTxs[decoded.ID] = decoded
 		}
@@ -138,9 +138,9 @@ func (r *ScheduledTransactionRequester) fetchMissingTxs(
 	return missingTxs, nil
 }
 
-// getTransactionDataScript returns the Cadence script used for JIT scheduled transaction
+// GetTransactionDataScript returns the Cadence script used for JIT scheduled transaction
 // lookups on the given chain. Exposed for testing.
-func getTransactionDataScript(chainID flow.ChainID) []byte {
+func GetTransactionDataScript(chainID flow.ChainID) []byte {
 	sc := systemcontracts.SystemContractsForChain(chainID)
 	return []byte(fmt.Sprintf(getTransactionDataScriptTemplate, sc.FlowTransactionScheduler.Address.Hex()))
 }

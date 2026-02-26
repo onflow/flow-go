@@ -747,7 +747,7 @@ func TestScheduledTransactionsIndexer_JITLookup(t *testing.T) {
 	executedEvt.TransactionID = executedTxID
 
 	scriptHeight := header.Height - 1
-	comp := MakeTransactionDataComposite(sc, 5, 1, 1000, 300, 100, owner, "A.abc.Contract.Handler", 99)
+	comp := MakeTransactionDataComposite(sc, 5, 1, 1000, 300, 100, owner, "A.abc.Contract.Handler")
 	scriptExecutor.On("ExecuteAtBlockHeight",
 		mock.Anything, mock.Anything, mock.Anything, scriptHeight,
 	).Return(MakeJITScriptResponse(t, comp), nil).Once()

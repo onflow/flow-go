@@ -100,15 +100,13 @@ func DecodeTransactionDataResults(response []byte, ids []uint64) (map[uint64]*ac
 // Any error indicates that the value is malformed.
 func decodeTransactionData(value cadence.Value) (access.ScheduledTransaction, error) {
 	type transactionDataRaw struct {
-		ID                               uint64           `cadence:"id"`
-		Priority                         uint8            `cadence:"priority"`
-		Timestamp                        cadence.UFix64   `cadence:"timestamp"`
-		ExecutionEffort                  uint64           `cadence:"executionEffort"`
-		Fees                             cadence.UFix64   `cadence:"fees"`
-		TransactionHandlerOwner          cadence.Address  `cadence:"transactionHandlerOwner"`
-		TransactionHandlerTypeIdentifier string           `cadence:"transactionHandlerTypeIdentifier"`
-		TransactionHandlerUUID           uint64           `cadence:"transactionHandlerUUID"`
-		TransactionHandlerPublicPath     cadence.Optional `cadence:"transactionHandlerPublicPath"`
+		ID                               uint64          `cadence:"id"`
+		Priority                         cadence.Enum    `cadence:"priority"`
+		Timestamp                        cadence.UFix64  `cadence:"scheduledTimestamp"`
+		ExecutionEffort                  uint64          `cadence:"executionEffort"`
+		Fees                             cadence.UFix64  `cadence:"fees"`
+		TransactionHandlerOwner          cadence.Address `cadence:"handlerAddress"`
+		TransactionHandlerTypeIdentifier string          `cadence:"handlerTypeIdentifier"`
 	}
 
 	composite, ok := value.(cadence.Composite)
@@ -121,21 +119,19 @@ func decodeTransactionData(value cadence.Value) (access.ScheduledTransaction, er
 		return access.ScheduledTransaction{}, fmt.Errorf("failed to decode TransactionData fields: %w", err)
 	}
 
-	publicPath, err := events.PathFromOptional(raw.TransactionHandlerPublicPath)
+	priorityRaw, err := events.EnumToType[cadence.UInt8](raw.Priority)
 	if err != nil {
-		return access.ScheduledTransaction{}, fmt.Errorf("failed to decode 'transactionHandlerPublicPath' field: %w", err)
+		return access.ScheduledTransaction{}, fmt.Errorf("failed to decode TransactionData 'priority' field: %w", err)
 	}
 
 	return access.ScheduledTransaction{
 		ID:                               raw.ID,
-		Priority:                         access.ScheduledTransactionPriority(raw.Priority),
+		Priority:                         access.ScheduledTransactionPriority(priorityRaw),
 		Timestamp:                        uint64(raw.Timestamp),
 		ExecutionEffort:                  raw.ExecutionEffort,
 		Fees:                             uint64(raw.Fees),
 		TransactionHandlerOwner:          flow.Address(raw.TransactionHandlerOwner),
 		TransactionHandlerTypeIdentifier: raw.TransactionHandlerTypeIdentifier,
-		TransactionHandlerUUID:           raw.TransactionHandlerUUID,
-		TransactionHandlerPublicPath:     publicPath,
 		Status:                           access.ScheduledTxStatusScheduled,
 	}, nil
 }

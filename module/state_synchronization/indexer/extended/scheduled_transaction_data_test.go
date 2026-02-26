@@ -70,8 +70,8 @@ func TestDecodeTransactionDataResults_AllFound(t *testing.T) {
 	owner := unittest.RandomAddressFixture()
 
 	ids := []uint64{5, 7}
-	comp5 := makeDecodeTransactionDataOptional(sc, 5, 1, 1000, 300, 100, owner, "A.abc.Contract.Handler", 55)
-	comp7 := makeDecodeTransactionDataOptional(sc, 7, 2, 2000, 400, 150, owner, "A.def.Contract.Handler", 77)
+	comp5 := makeDecodeTransactionDataOptional(sc, 5, 1, 1000, 300, 100, owner, "A.abc.Contract.Handler")
+	comp7 := makeDecodeTransactionDataOptional(sc, 7, 2, 2000, 400, 150, owner, "A.def.Contract.Handler")
 
 	response := encodeOptionalArray(t, comp5, comp7)
 
@@ -83,12 +83,9 @@ func TestDecodeTransactionDataResults_AllFound(t *testing.T) {
 	require.True(t, ok)
 	assert.Equal(t, uint64(5), tx5.ID)
 	assert.Equal(t, access.ScheduledTxStatusScheduled, tx5.Status)
-	assert.Equal(t, uint64(55), tx5.TransactionHandlerUUID)
-
 	tx7, ok := results[7]
 	require.True(t, ok)
 	assert.Equal(t, uint64(7), tx7.ID)
-	assert.Equal(t, uint64(77), tx7.TransactionHandlerUUID)
 }
 
 // TestDecodeTransactionDataResults_SomeNil verifies that nil Optional elements are omitted
@@ -100,9 +97,9 @@ func TestDecodeTransactionDataResults_SomeNil(t *testing.T) {
 	owner := unittest.RandomAddressFixture()
 
 	ids := []uint64{1, 2, 3}
-	comp1 := makeDecodeTransactionDataOptional(sc, 1, 1, 1000, 100, 50, owner, "A.abc.Contract.Handler", 1)
+	comp1 := makeDecodeTransactionDataOptional(sc, 1, 1, 1000, 100, 50, owner, "A.abc.Contract.Handler")
 	nilOpt := cadence.NewOptional(nil)
-	comp3 := makeDecodeTransactionDataOptional(sc, 3, 1, 1000, 100, 50, owner, "A.abc.Contract.Handler", 3)
+	comp3 := makeDecodeTransactionDataOptional(sc, 3, 1, 1000, 100, 50, owner, "A.abc.Contract.Handler")
 
 	response := encodeOptionalArray(t, comp1, nilOpt, comp3)
 
@@ -129,7 +126,7 @@ func TestDecodeTransactionDataResults_WrongCount(t *testing.T) {
 
 	ids := []uint64{1, 2}
 	// Only one element in the response instead of two.
-	comp1 := makeDecodeTransactionDataOptional(sc, 1, 1, 1000, 100, 50, owner, "A.abc.Contract.Handler", 1)
+	comp1 := makeDecodeTransactionDataOptional(sc, 1, 1, 1000, 100, 50, owner, "A.abc.Contract.Handler")
 	response := encodeOptionalArray(t, comp1)
 
 	_, err := DecodeTransactionDataResults(response, ids)
@@ -204,41 +201,46 @@ func makeDecodeTransactionDataOptional(
 	sc *systemcontracts.SystemContracts,
 	id uint64,
 	priority uint8,
-	timestamp uint64,
+	scheduledTimestamp uint64,
 	executionEffort uint64,
 	fees uint64,
 	owner flow.Address,
 	typeIdentifier string,
-	uuid uint64,
 ) cadence.Value {
 	addr := common.Address(sc.FlowTransactionScheduler.Address)
 	loc := common.NewAddressLocation(nil, addr, sc.FlowTransactionScheduler.Name)
+
+	priorityEnumType := cadence.NewEnumType(
+		loc,
+		"Priority",
+		cadence.UInt8Type,
+		[]cadence.Field{{Identifier: "rawValue", Type: cadence.UInt8Type}},
+		nil,
+	)
+	priorityEnum := cadence.NewEnum([]cadence.Value{cadence.UInt8(priority)}).WithType(priorityEnumType)
+
 	typ := cadence.NewStructType(
 		loc,
 		"TransactionData",
 		[]cadence.Field{
 			{Identifier: "id", Type: cadence.UInt64Type},
-			{Identifier: "priority", Type: cadence.UInt8Type},
-			{Identifier: "timestamp", Type: cadence.UFix64Type},
+			{Identifier: "priority", Type: priorityEnumType},
+			{Identifier: "scheduledTimestamp", Type: cadence.UFix64Type},
 			{Identifier: "executionEffort", Type: cadence.UInt64Type},
 			{Identifier: "fees", Type: cadence.UFix64Type},
-			{Identifier: "transactionHandlerOwner", Type: cadence.AddressType},
-			{Identifier: "transactionHandlerTypeIdentifier", Type: cadence.StringType},
-			{Identifier: "transactionHandlerUUID", Type: cadence.UInt64Type},
-			{Identifier: "transactionHandlerPublicPath", Type: cadence.NewOptionalType(cadence.PublicPathType)},
+			{Identifier: "handlerAddress", Type: cadence.AddressType},
+			{Identifier: "handlerTypeIdentifier", Type: cadence.StringType},
 		},
 		nil,
 	)
 	comp := cadence.NewStruct([]cadence.Value{
 		cadence.UInt64(id),
-		cadence.UInt8(priority),
-		cadence.UFix64(timestamp),
+		priorityEnum,
+		cadence.UFix64(scheduledTimestamp),
 		cadence.UInt64(executionEffort),
 		cadence.UFix64(fees),
 		cadence.NewAddress(owner),
 		cadence.String(typeIdentifier),
-		cadence.UInt64(uuid),
-		cadence.NewOptional(nil),
 	}).WithType(typ)
 	return cadence.NewOptional(comp)
 }
