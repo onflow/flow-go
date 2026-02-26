@@ -136,6 +136,10 @@ func run(_ *cobra.Command, args []string) {
 		}
 	}
 
+	if flagBlockID == "" && len(args) == 0 {
+		log.Fatal().Msg("Must provide either --block-id or one or more transaction IDs")
+	}
+
 	if flagBlockID != "" {
 
 		if len(args) != 0 {
