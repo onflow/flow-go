@@ -11,7 +11,7 @@ import (
 
 type Message struct {
 	OriginID flow.Identifier
-	Payload  interface{}
+	Payload  any
 }
 
 // MessageStore is the interface to abstract how messages are buffered in memory
@@ -73,7 +73,7 @@ func NewMessageHandler(log zerolog.Logger, notifier Notifier, patterns ...Patter
 // Returns
 //   - IncompatibleInputTypeError if no matching processor was found
 //   - All other errors are potential symptoms of internal state corruption or bugs (fatal).
-func (e *MessageHandler) Process(originID flow.Identifier, payload interface{}) error {
+func (e *MessageHandler) Process(originID flow.Identifier, payload any) error {
 	msg := &Message{
 		OriginID: originID,
 		Payload:  payload,

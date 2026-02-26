@@ -90,7 +90,7 @@ func EncodeBool(bitSet bool, buffer []byte, index int) error {
 		return ErrBufferTooSmall
 	}
 	// bit set with left padding
-	for i := 0; i < EncodedBoolSize; i++ {
+	for i := range EncodedBoolSize {
 		buffer[index+i] = 0
 	}
 	if bitSet {

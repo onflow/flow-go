@@ -13,7 +13,7 @@ var (
 type Chunk struct {
 	indentLevel int
 	format      string
-	args        []interface{}
+	args        []any
 }
 
 func (chunk *Chunk) WriteTo(writer io.Writer) (int64, error) {
@@ -68,13 +68,13 @@ func (content *FileContent) PopIndent() {
 	}
 }
 
-func (content *FileContent) Line(format string, args ...interface{}) {
+func (content *FileContent) Line(format string, args ...any) {
 	content.chunks = append(
 		content.chunks,
 		&Chunk{content.indentLevel, format, args})
 }
 
-func (content *FileContent) Section(format string, args ...interface{}) {
+func (content *FileContent) Section(format string, args ...any) {
 	content.chunks = append(content.chunks, &Chunk{0, format, args})
 }
 

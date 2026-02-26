@@ -13,10 +13,10 @@ packages:
     interfaces:
       Client: { }
   github.com/onflow/flow-go/access:
+  github.com/onflow/flow-go/access/backends/extended:
   github.com/onflow/flow-go/access/validator:
     config:
       all: true
-      generate: true
   github.com/onflow/flow-go/consensus/hotstuff:
     config:
       dir: consensus/hotstuff/mocks
@@ -34,9 +34,6 @@ packages:
   github.com/onflow/flow-go/engine/access/wrapper:
     config:
       dir: engine/access/mock
-  github.com/onflow/flow-go/engine/access/rpc/connection:
-    config:
-      generate: false
   github.com/onflow/flow-go/engine/collection: { }
   github.com/onflow/flow-go/engine/collection/epochmgr: { }
   github.com/onflow/flow-go/engine/collection/rpc: { }
@@ -47,9 +44,6 @@ packages:
           structname: '{{.InterfaceName | firstUpper}}'
   github.com/onflow/flow-go/engine/common/follower/cache: { }
   github.com/onflow/flow-go/engine/consensus: { }
-  github.com/onflow/flow-go/engine/consensus/approvals:
-    config:
-      generate: false
   github.com/onflow/flow-go/engine/execution: { }
   github.com/onflow/flow-go/engine/execution/computation/computer: { }
   github.com/onflow/flow-go/engine/execution/ingestion/uploader: { }
@@ -76,6 +70,7 @@ packages:
     config:
       dir: module/mempool/consensus/mock
   github.com/onflow/flow-go/module/state_synchronization: { }
+  github.com/onflow/flow-go/module/state_synchronization/indexer/extended: { }
   github.com/onflow/flow-go/module/state_synchronization/requester: { }
   github.com/onflow/crypto:
     config:

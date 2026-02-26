@@ -36,7 +36,7 @@ func NewProtocolPeerCache(logger zerolog.Logger, h host.Host, protocols []protoc
 	}
 
 	sub, err := h.EventBus().
-		Subscribe([]interface{}{new(event.EvtPeerIdentificationCompleted), new(event.EvtPeerProtocolsUpdated)})
+		Subscribe([]any{new(event.EvtPeerIdentificationCompleted), new(event.EvtPeerProtocolsUpdated)})
 	if err != nil {
 		return nil, fmt.Errorf("could not subscribe to peer protocol update events: %w", err)
 	}

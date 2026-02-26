@@ -34,7 +34,7 @@ func IsNoVoteError(err error) bool {
 	return errors.As(err, &e)
 }
 
-func NewNoVoteErrorf(msg string, args ...interface{}) error {
+func NewNoVoteErrorf(msg string, args ...any) error {
 	return NoVoteError{Err: fmt.Errorf(msg, args...)}
 }
 
@@ -57,7 +57,7 @@ func IsNoTimeoutError(err error) bool {
 	return errors.As(err, &e)
 }
 
-func NewNoTimeoutErrorf(msg string, args ...interface{}) error {
+func NewNoTimeoutErrorf(msg string, args ...any) error {
 	return NoTimeoutError{Err: fmt.Errorf(msg, args...)}
 }
 
@@ -70,7 +70,7 @@ func NewInvalidFormatError(err error) error {
 	return InvalidFormatError{err}
 }
 
-func NewInvalidFormatErrorf(msg string, args ...interface{}) error {
+func NewInvalidFormatErrorf(msg string, args ...any) error {
 	return InvalidFormatError{fmt.Errorf(msg, args...)}
 }
 
@@ -93,7 +93,7 @@ func NewConfigurationError(err error) error {
 	return ConfigurationError{err}
 }
 
-func NewConfigurationErrorf(msg string, args ...interface{}) error {
+func NewConfigurationErrorf(msg string, args ...any) error {
 	return ConfigurationError{fmt.Errorf(msg, args...)}
 }
 
@@ -169,7 +169,7 @@ type InvalidProposalError struct {
 	Err             error
 }
 
-func NewInvalidProposalErrorf(proposal *SignedProposal, msg string, args ...interface{}) error {
+func NewInvalidProposalErrorf(proposal *SignedProposal, msg string, args ...any) error {
 	return InvalidProposalError{
 		InvalidProposal: proposal,
 		Err:             fmt.Errorf(msg, args...),
@@ -212,7 +212,7 @@ type InvalidBlockError struct {
 	Err          error
 }
 
-func NewInvalidBlockErrorf(block *Block, msg string, args ...interface{}) error {
+func NewInvalidBlockErrorf(block *Block, msg string, args ...any) error {
 	return InvalidBlockError{
 		InvalidBlock: block,
 		Err:          fmt.Errorf(msg, args...),
@@ -255,7 +255,7 @@ type InvalidVoteError struct {
 	Err  error
 }
 
-func NewInvalidVoteErrorf(vote *Vote, msg string, args ...interface{}) error {
+func NewInvalidVoteErrorf(vote *Vote, msg string, args ...any) error {
 	return InvalidVoteError{
 		Vote: vote,
 		Err:  fmt.Errorf(msg, args...),
@@ -344,7 +344,7 @@ func (e DoubleVoteError) Unwrap() error {
 // NewDoubleVoteErrorf creates an error signalling that a consensus replica has voted for two different
 // blocks in the same view, or has provided two semantically different votes for the same block.
 // This is a PROTOCOL VIOLATION (slashable equivocation attack).
-func NewDoubleVoteErrorf(firstVote, conflictingVote *Vote, msg string, args ...interface{}) error {
+func NewDoubleVoteErrorf(firstVote, conflictingVote *Vote, msg string, args ...any) error {
 	return DoubleVoteError{
 		FirstVote:       firstVote,
 		ConflictingVote: conflictingVote,
@@ -361,7 +361,7 @@ func NewDuplicatedSignerError(err error) error {
 	return DuplicatedSignerError{err}
 }
 
-func NewDuplicatedSignerErrorf(msg string, args ...interface{}) error {
+func NewDuplicatedSignerErrorf(msg string, args ...any) error {
 	return DuplicatedSignerError{err: fmt.Errorf(msg, args...)}
 }
 
@@ -383,7 +383,7 @@ func NewInvalidSignatureIncludedError(err error) error {
 	return InvalidSignatureIncludedError{err}
 }
 
-func NewInvalidSignatureIncludedErrorf(msg string, args ...interface{}) error {
+func NewInvalidSignatureIncludedErrorf(msg string, args ...any) error {
 	return InvalidSignatureIncludedError{fmt.Errorf(msg, args...)}
 }
 
@@ -406,7 +406,7 @@ func NewInvalidAggregatedKeyError(err error) error {
 	return InvalidAggregatedKeyError{err}
 }
 
-func NewInvalidAggregatedKeyErrorf(msg string, args ...interface{}) error {
+func NewInvalidAggregatedKeyErrorf(msg string, args ...any) error {
 	return InvalidAggregatedKeyError{fmt.Errorf(msg, args...)}
 }
 
@@ -427,7 +427,7 @@ func NewInsufficientSignaturesError(err error) error {
 	return InsufficientSignaturesError{err}
 }
 
-func NewInsufficientSignaturesErrorf(msg string, args ...interface{}) error {
+func NewInsufficientSignaturesErrorf(msg string, args ...any) error {
 	return InsufficientSignaturesError{fmt.Errorf(msg, args...)}
 }
 
@@ -449,7 +449,7 @@ func NewInvalidSignerError(err error) error {
 	return InvalidSignerError{err}
 }
 
-func NewInvalidSignerErrorf(msg string, args ...interface{}) error {
+func NewInvalidSignerErrorf(msg string, args ...any) error {
 	return InvalidSignerError{fmt.Errorf(msg, args...)}
 }
 
@@ -495,7 +495,7 @@ func (e DoubleTimeoutError) Unwrap() error {
 	return e.err
 }
 
-func NewDoubleTimeoutErrorf(firstTimeout, conflictingTimeout *TimeoutObject, msg string, args ...interface{}) error {
+func NewDoubleTimeoutErrorf(firstTimeout, conflictingTimeout *TimeoutObject, msg string, args ...any) error {
 	return DoubleTimeoutError{
 		FirstTimeout:       firstTimeout,
 		ConflictingTimeout: conflictingTimeout,
@@ -509,7 +509,7 @@ type InvalidTimeoutError struct {
 	Err     error
 }
 
-func NewInvalidTimeoutErrorf(timeout *TimeoutObject, msg string, args ...interface{}) error {
+func NewInvalidTimeoutErrorf(timeout *TimeoutObject, msg string, args ...any) error {
 	return InvalidTimeoutError{
 		Timeout: timeout,
 		Err:     fmt.Errorf(msg, args...),

@@ -511,6 +511,8 @@ func prepareAccessService(container testnet.ContainerConfig, i int, n int) Servi
 		"--event-query-mode=execution-nodes-only",
 		"--tx-result-query-mode=execution-nodes-only",
 		"--scheduled-callbacks-enabled=true",
+		"--extended-indexing-enabled=true",
+		"--extended-indexing-db-dir=/data/extended-index",
 	)
 
 	service.AddExposedPorts(

@@ -68,7 +68,7 @@ func (r *AtreeReporter) Report(payloads []ledger.Payload, commit ledger.State) e
 	}
 
 	// produce jobs for workers to process
-	for i := 0; i < len(payloads); i++ {
+	for i := range payloads {
 		jobs <- &payloads[i]
 
 		err := progress.Add(1)

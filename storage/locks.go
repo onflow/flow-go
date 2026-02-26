@@ -50,6 +50,8 @@ const (
 	LockInsertLivenessData          = "lock_insert_liveness_data"
 	// LockIndexScheduledTransaction protects the indexing of scheduled transactions.
 	LockIndexScheduledTransaction = "lock_index_scheduled_transaction"
+
+	LockIndexAccountTransactions = "lock_index_account_transactions"
 )
 
 // Locks returns a list of all named locks used by the storage layer.
@@ -76,6 +78,7 @@ func Locks() []string {
 		LockInsertSafetyData,
 		LockInsertLivenessData,
 		LockIndexScheduledTransaction,
+		LockIndexAccountTransactions,
 	}
 }
 
@@ -129,6 +132,10 @@ var LockGroupProtocolStateBootstrap = []string{
 	LockInsertLivenessData,
 }
 
+var LockGroupAccessExtendedIndexers = []string{
+	LockIndexAccountTransactions,
+}
+
 // addLocks adds a chain of locks to the builder in the order they appear in the locks slice.
 // This creates a directed acyclic graph where each lock can be acquired after the previous one.
 func addLocks(builder lockctx.DAGPolicyBuilder, locks []string) {
@@ -161,6 +168,7 @@ func makeLockPolicy() lockctx.Policy {
 	addLocks(builder, LockGroupExecutionSaveExecutionResult)
 	addLocks(builder, LockGroupCollectionBootstrapClusterState)
 	addLocks(builder, LockGroupProtocolStateBootstrap)
+	addLocks(builder, LockGroupAccessExtendedIndexers)
 
 	return builder.Build()
 }

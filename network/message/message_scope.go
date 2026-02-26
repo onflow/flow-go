@@ -35,7 +35,7 @@ func EventId(channel channels.Channel, payload []byte) (hash.Hash, error) {
 }
 
 // MessageType returns the type of the message payload.
-func MessageType(decodedPayload interface{}) string {
+func MessageType(decodedPayload any) string {
 	return strings.TrimLeft(fmt.Sprintf("%T", decodedPayload), "*")
 }
 
@@ -45,7 +45,7 @@ type IncomingMessageScope struct {
 	targetIds      flow.IdentifierList // the target node IDs (i.e., intended recipients).
 	eventId        hash.Hash           // hash of the payload and channel.
 	msg            *Message            // the raw message received.
-	decodedPayload interface{}         // decoded payload of the message.
+	decodedPayload any                 // decoded payload of the message.
 	protocol       ProtocolType        // the type of protocol used to receive the message.
 }
 
@@ -54,7 +54,7 @@ type IncomingMessageScope struct {
 // safe to crash the node when receiving a message.
 // It errors if event id (i.e., hash of the payload and channel) cannot be computed, or if it fails to
 // convert the target IDs from bytes slice to a flow.IdentifierList.
-func NewIncomingScope(originId flow.Identifier, protocol ProtocolType, msg *Message, decodedPayload interface{}) (*IncomingMessageScope, error) {
+func NewIncomingScope(originId flow.Identifier, protocol ProtocolType, msg *Message, decodedPayload any) (*IncomingMessageScope, error) {
 	eventId, err := EventId(channels.Channel(msg.ChannelID), msg.Payload)
 	if err != nil {
 		return nil, fmt.Errorf("could not compute event id: %w", err)
@@ -82,7 +82,7 @@ func (m IncomingMessageScope) Proto() *Message {
 	return m.msg
 }
 
-func (m IncomingMessageScope) DecodedPayload() interface{} {
+func (m IncomingMessageScope) DecodedPayload() any {
 	return m.decodedPayload
 }
 
@@ -112,12 +112,12 @@ func (m IncomingMessageScope) PayloadType() string {
 
 // OutgoingMessageScope captures the context around an outgoing message that is about to be sent.
 type OutgoingMessageScope struct {
-	targetIds flow.IdentifierList               // the target node IDs.
-	topic     channels.Topic                    // the topic, i.e., channel-id/spork-id.
-	payload   interface{}                       // the payload to be sent.
-	encoder   func(interface{}) ([]byte, error) // the encoder to encode the payload.
-	msg       *Message                          // raw proto message sent on wire.
-	protocol  ProtocolType                      // the type of protocol used to send the message.
+	targetIds flow.IdentifierList       // the target node IDs.
+	topic     channels.Topic            // the topic, i.e., channel-id/spork-id.
+	payload   any                       // the payload to be sent.
+	encoder   func(any) ([]byte, error) // the encoder to encode the payload.
+	msg       *Message                  // raw proto message sent on wire.
+	protocol  ProtocolType              // the type of protocol used to send the message.
 }
 
 // NewOutgoingScope creates a new outgoing message scope.
@@ -128,8 +128,8 @@ type OutgoingMessageScope struct {
 func NewOutgoingScope(
 	targetIds flow.IdentifierList,
 	topic channels.Topic,
-	payload interface{},
-	encoder func(interface{}) ([]byte, error),
+	payload any,
+	encoder func(any) ([]byte, error),
 	protocolType ProtocolType) (*OutgoingMessageScope, error) {
 	scope := &OutgoingMessageScope{
 		targetIds: targetIds,

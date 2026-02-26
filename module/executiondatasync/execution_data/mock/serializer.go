@@ -38,23 +38,23 @@ func (_m *Serializer) EXPECT() *Serializer_Expecter {
 }
 
 // Deserialize provides a mock function for the type Serializer
-func (_mock *Serializer) Deserialize(reader io.Reader) (interface{}, error) {
+func (_mock *Serializer) Deserialize(reader io.Reader) (any, error) {
 	ret := _mock.Called(reader)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Deserialize")
 	}
 
-	var r0 interface{}
+	var r0 any
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(io.Reader) (interface{}, error)); ok {
+	if returnFunc, ok := ret.Get(0).(func(io.Reader) (any, error)); ok {
 		return returnFunc(reader)
 	}
-	if returnFunc, ok := ret.Get(0).(func(io.Reader) interface{}); ok {
+	if returnFunc, ok := ret.Get(0).(func(io.Reader) any); ok {
 		r0 = returnFunc(reader)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(interface{})
+			r0 = ret.Get(0).(any)
 		}
 	}
 	if returnFunc, ok := ret.Get(1).(func(io.Reader) error); ok {
@@ -89,27 +89,27 @@ func (_c *Serializer_Deserialize_Call) Run(run func(reader io.Reader)) *Serializ
 	return _c
 }
 
-func (_c *Serializer_Deserialize_Call) Return(ifaceVal interface{}, err error) *Serializer_Deserialize_Call {
-	_c.Call.Return(ifaceVal, err)
+func (_c *Serializer_Deserialize_Call) Return(v any, err error) *Serializer_Deserialize_Call {
+	_c.Call.Return(v, err)
 	return _c
 }
 
-func (_c *Serializer_Deserialize_Call) RunAndReturn(run func(reader io.Reader) (interface{}, error)) *Serializer_Deserialize_Call {
+func (_c *Serializer_Deserialize_Call) RunAndReturn(run func(reader io.Reader) (any, error)) *Serializer_Deserialize_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // Serialize provides a mock function for the type Serializer
-func (_mock *Serializer) Serialize(writer io.Writer, ifaceVal interface{}) error {
-	ret := _mock.Called(writer, ifaceVal)
+func (_mock *Serializer) Serialize(writer io.Writer, v any) error {
+	ret := _mock.Called(writer, v)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Serialize")
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(io.Writer, interface{}) error); ok {
-		r0 = returnFunc(writer, ifaceVal)
+	if returnFunc, ok := ret.Get(0).(func(io.Writer, any) error); ok {
+		r0 = returnFunc(writer, v)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -123,20 +123,20 @@ type Serializer_Serialize_Call struct {
 
 // Serialize is a helper method to define mock.On call
 //   - writer io.Writer
-//   - ifaceVal interface{}
-func (_e *Serializer_Expecter) Serialize(writer interface{}, ifaceVal interface{}) *Serializer_Serialize_Call {
-	return &Serializer_Serialize_Call{Call: _e.mock.On("Serialize", writer, ifaceVal)}
+//   - v any
+func (_e *Serializer_Expecter) Serialize(writer interface{}, v interface{}) *Serializer_Serialize_Call {
+	return &Serializer_Serialize_Call{Call: _e.mock.On("Serialize", writer, v)}
 }
 
-func (_c *Serializer_Serialize_Call) Run(run func(writer io.Writer, ifaceVal interface{})) *Serializer_Serialize_Call {
+func (_c *Serializer_Serialize_Call) Run(run func(writer io.Writer, v any)) *Serializer_Serialize_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 io.Writer
 		if args[0] != nil {
 			arg0 = args[0].(io.Writer)
 		}
-		var arg1 interface{}
+		var arg1 any
 		if args[1] != nil {
-			arg1 = args[1].(interface{})
+			arg1 = args[1].(any)
 		}
 		run(
 			arg0,
@@ -151,7 +151,7 @@ func (_c *Serializer_Serialize_Call) Return(err error) *Serializer_Serialize_Cal
 	return _c
 }
 
-func (_c *Serializer_Serialize_Call) RunAndReturn(run func(writer io.Writer, ifaceVal interface{}) error) *Serializer_Serialize_Call {
+func (_c *Serializer_Serialize_Call) RunAndReturn(run func(writer io.Writer, v any) error) *Serializer_Serialize_Call {
 	_c.Call.Return(run)
 	return _c
 }

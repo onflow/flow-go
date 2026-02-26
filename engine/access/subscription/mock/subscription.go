@@ -36,19 +36,19 @@ func (_m *Subscription) EXPECT() *Subscription_Expecter {
 }
 
 // Channel provides a mock function for the type Subscription
-func (_mock *Subscription) Channel() <-chan interface{} {
+func (_mock *Subscription) Channel() <-chan any {
 	ret := _mock.Called()
 
 	if len(ret) == 0 {
 		panic("no return value specified for Channel")
 	}
 
-	var r0 <-chan interface{}
-	if returnFunc, ok := ret.Get(0).(func() <-chan interface{}); ok {
+	var r0 <-chan any
+	if returnFunc, ok := ret.Get(0).(func() <-chan any); ok {
 		r0 = returnFunc()
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(<-chan interface{})
+			r0 = ret.Get(0).(<-chan any)
 		}
 	}
 	return r0
@@ -71,12 +71,12 @@ func (_c *Subscription_Channel_Call) Run(run func()) *Subscription_Channel_Call 
 	return _c
 }
 
-func (_c *Subscription_Channel_Call) Return(ifaceValCh <-chan interface{}) *Subscription_Channel_Call {
-	_c.Call.Return(ifaceValCh)
+func (_c *Subscription_Channel_Call) Return(vCh <-chan any) *Subscription_Channel_Call {
+	_c.Call.Return(vCh)
 	return _c
 }
 
-func (_c *Subscription_Channel_Call) RunAndReturn(run func() <-chan interface{}) *Subscription_Channel_Call {
+func (_c *Subscription_Channel_Call) RunAndReturn(run func() <-chan any) *Subscription_Channel_Call {
 	_c.Call.Return(run)
 	return _c
 }

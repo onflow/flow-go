@@ -84,7 +84,7 @@ func (_c *Engine_Done_Call) RunAndReturn(run func() <-chan struct{}) *Engine_Don
 }
 
 // Process provides a mock function for the type Engine
-func (_mock *Engine) Process(channel channels.Channel, originID flow.Identifier, event interface{}) error {
+func (_mock *Engine) Process(channel channels.Channel, originID flow.Identifier, event any) error {
 	ret := _mock.Called(channel, originID, event)
 
 	if len(ret) == 0 {
@@ -92,7 +92,7 @@ func (_mock *Engine) Process(channel channels.Channel, originID flow.Identifier,
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(channels.Channel, flow.Identifier, interface{}) error); ok {
+	if returnFunc, ok := ret.Get(0).(func(channels.Channel, flow.Identifier, any) error); ok {
 		r0 = returnFunc(channel, originID, event)
 	} else {
 		r0 = ret.Error(0)
@@ -108,12 +108,12 @@ type Engine_Process_Call struct {
 // Process is a helper method to define mock.On call
 //   - channel channels.Channel
 //   - originID flow.Identifier
-//   - event interface{}
+//   - event any
 func (_e *Engine_Expecter) Process(channel interface{}, originID interface{}, event interface{}) *Engine_Process_Call {
 	return &Engine_Process_Call{Call: _e.mock.On("Process", channel, originID, event)}
 }
 
-func (_c *Engine_Process_Call) Run(run func(channel channels.Channel, originID flow.Identifier, event interface{})) *Engine_Process_Call {
+func (_c *Engine_Process_Call) Run(run func(channel channels.Channel, originID flow.Identifier, event any)) *Engine_Process_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 channels.Channel
 		if args[0] != nil {
@@ -123,9 +123,9 @@ func (_c *Engine_Process_Call) Run(run func(channel channels.Channel, originID f
 		if args[1] != nil {
 			arg1 = args[1].(flow.Identifier)
 		}
-		var arg2 interface{}
+		var arg2 any
 		if args[2] != nil {
-			arg2 = args[2].(interface{})
+			arg2 = args[2].(any)
 		}
 		run(
 			arg0,
@@ -141,13 +141,13 @@ func (_c *Engine_Process_Call) Return(err error) *Engine_Process_Call {
 	return _c
 }
 
-func (_c *Engine_Process_Call) RunAndReturn(run func(channel channels.Channel, originID flow.Identifier, event interface{}) error) *Engine_Process_Call {
+func (_c *Engine_Process_Call) RunAndReturn(run func(channel channels.Channel, originID flow.Identifier, event any) error) *Engine_Process_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // ProcessLocal provides a mock function for the type Engine
-func (_mock *Engine) ProcessLocal(event interface{}) error {
+func (_mock *Engine) ProcessLocal(event any) error {
 	ret := _mock.Called(event)
 
 	if len(ret) == 0 {
@@ -155,7 +155,7 @@ func (_mock *Engine) ProcessLocal(event interface{}) error {
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(interface{}) error); ok {
+	if returnFunc, ok := ret.Get(0).(func(any) error); ok {
 		r0 = returnFunc(event)
 	} else {
 		r0 = ret.Error(0)
@@ -169,16 +169,16 @@ type Engine_ProcessLocal_Call struct {
 }
 
 // ProcessLocal is a helper method to define mock.On call
-//   - event interface{}
+//   - event any
 func (_e *Engine_Expecter) ProcessLocal(event interface{}) *Engine_ProcessLocal_Call {
 	return &Engine_ProcessLocal_Call{Call: _e.mock.On("ProcessLocal", event)}
 }
 
-func (_c *Engine_ProcessLocal_Call) Run(run func(event interface{})) *Engine_ProcessLocal_Call {
+func (_c *Engine_ProcessLocal_Call) Run(run func(event any)) *Engine_ProcessLocal_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 interface{}
+		var arg0 any
 		if args[0] != nil {
-			arg0 = args[0].(interface{})
+			arg0 = args[0].(any)
 		}
 		run(
 			arg0,
@@ -192,7 +192,7 @@ func (_c *Engine_ProcessLocal_Call) Return(err error) *Engine_ProcessLocal_Call 
 	return _c
 }
 
-func (_c *Engine_ProcessLocal_Call) RunAndReturn(run func(event interface{}) error) *Engine_ProcessLocal_Call {
+func (_c *Engine_ProcessLocal_Call) RunAndReturn(run func(event any) error) *Engine_ProcessLocal_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -244,7 +244,7 @@ func (_c *Engine_Ready_Call) RunAndReturn(run func() <-chan struct{}) *Engine_Re
 }
 
 // Submit provides a mock function for the type Engine
-func (_mock *Engine) Submit(channel channels.Channel, originID flow.Identifier, event interface{}) {
+func (_mock *Engine) Submit(channel channels.Channel, originID flow.Identifier, event any) {
 	_mock.Called(channel, originID, event)
 	return
 }
@@ -257,12 +257,12 @@ type Engine_Submit_Call struct {
 // Submit is a helper method to define mock.On call
 //   - channel channels.Channel
 //   - originID flow.Identifier
-//   - event interface{}
+//   - event any
 func (_e *Engine_Expecter) Submit(channel interface{}, originID interface{}, event interface{}) *Engine_Submit_Call {
 	return &Engine_Submit_Call{Call: _e.mock.On("Submit", channel, originID, event)}
 }
 
-func (_c *Engine_Submit_Call) Run(run func(channel channels.Channel, originID flow.Identifier, event interface{})) *Engine_Submit_Call {
+func (_c *Engine_Submit_Call) Run(run func(channel channels.Channel, originID flow.Identifier, event any)) *Engine_Submit_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 channels.Channel
 		if args[0] != nil {
@@ -272,9 +272,9 @@ func (_c *Engine_Submit_Call) Run(run func(channel channels.Channel, originID fl
 		if args[1] != nil {
 			arg1 = args[1].(flow.Identifier)
 		}
-		var arg2 interface{}
+		var arg2 any
 		if args[2] != nil {
-			arg2 = args[2].(interface{})
+			arg2 = args[2].(any)
 		}
 		run(
 			arg0,
@@ -290,13 +290,13 @@ func (_c *Engine_Submit_Call) Return() *Engine_Submit_Call {
 	return _c
 }
 
-func (_c *Engine_Submit_Call) RunAndReturn(run func(channel channels.Channel, originID flow.Identifier, event interface{})) *Engine_Submit_Call {
+func (_c *Engine_Submit_Call) RunAndReturn(run func(channel channels.Channel, originID flow.Identifier, event any)) *Engine_Submit_Call {
 	_c.Run(run)
 	return _c
 }
 
 // SubmitLocal provides a mock function for the type Engine
-func (_mock *Engine) SubmitLocal(event interface{}) {
+func (_mock *Engine) SubmitLocal(event any) {
 	_mock.Called(event)
 	return
 }
@@ -307,16 +307,16 @@ type Engine_SubmitLocal_Call struct {
 }
 
 // SubmitLocal is a helper method to define mock.On call
-//   - event interface{}
+//   - event any
 func (_e *Engine_Expecter) SubmitLocal(event interface{}) *Engine_SubmitLocal_Call {
 	return &Engine_SubmitLocal_Call{Call: _e.mock.On("SubmitLocal", event)}
 }
 
-func (_c *Engine_SubmitLocal_Call) Run(run func(event interface{})) *Engine_SubmitLocal_Call {
+func (_c *Engine_SubmitLocal_Call) Run(run func(event any)) *Engine_SubmitLocal_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 interface{}
+		var arg0 any
 		if args[0] != nil {
-			arg0 = args[0].(interface{})
+			arg0 = args[0].(any)
 		}
 		run(
 			arg0,
@@ -330,7 +330,7 @@ func (_c *Engine_SubmitLocal_Call) Return() *Engine_SubmitLocal_Call {
 	return _c
 }
 
-func (_c *Engine_SubmitLocal_Call) RunAndReturn(run func(event interface{})) *Engine_SubmitLocal_Call {
+func (_c *Engine_SubmitLocal_Call) RunAndReturn(run func(event any)) *Engine_SubmitLocal_Call {
 	_c.Run(run)
 	return _c
 }

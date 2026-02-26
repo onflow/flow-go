@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 	"time"
@@ -102,10 +103,11 @@ func main() {
 		startupTime                           time.Time
 
 		// DKG contract client
-		machineAccountInfo *bootstrap.NodeMachineAccountInfo
-		flowClientConfigs  []*grpcclient.FlowClientConfig
-		insecureAccessAPI  bool
-		accessNodeIDS      []string
+		machineAccountInfo        *bootstrap.NodeMachineAccountInfo
+		flowClientConfigs         []*grpcclient.FlowClientConfig
+		insecureAccessAPI         bool
+		accessNodeIDS             []string
+		requireBeaconKeyOnStartup bool
 
 		err                     error
 		mutableState            protocol.ParticipantState
@@ -161,6 +163,7 @@ func main() {
 		flags.BoolVar(&emergencySealing, "emergency-sealing-active", flow.DefaultEmergencySealingActive, "(de)activation of emergency sealing")
 		flags.BoolVar(&insecureAccessAPI, "insecure-access-api", false, "required if insecure GRPC connection should be used")
 		flags.StringSliceVar(&accessNodeIDS, "access-node-ids", []string{}, fmt.Sprintf("array of access node IDs sorted in priority order where the first ID in this array will get the first connection attempt and each subsequent ID after serves as a fallback. Minimum length %d. Use '*' for all IDs in protocol state.", common.DefaultAccessNodeIDSMinimum))
+		flags.BoolVar(&requireBeaconKeyOnStartup, "require-beacon-key", true, "if true, the node will fail to start if the beacon key for the current epoch is missing or invalid. The purpose of this flag is to notify an operator if they start a node with expected keys missing (typically if they are using Dynamic Bootstrap to reclaim disk space). ")
 		flags.DurationVar(&dkgMessagingEngineConfig.RetryBaseWait, "dkg-messaging-engine-retry-base-wait", dkgMessagingEngineConfig.RetryBaseWait, "the inter-attempt wait time for the first attempt (base of exponential retry)")
 		flags.Uint64Var(&dkgMessagingEngineConfig.RetryMax, "dkg-messaging-engine-retry-max", dkgMessagingEngineConfig.RetryMax, "the maximum number of retry attempts for an outbound DKG message")
 		flags.Uint64Var(&dkgMessagingEngineConfig.RetryJitterPercent, "dkg-messaging-engine-retry-jitter-percent", dkgMessagingEngineConfig.RetryJitterPercent, "the percentage of jitter to apply to each inter-attempt wait time")
@@ -372,6 +375,16 @@ func main() {
 			}
 			// subscribe for protocol events to handle exiting EFM
 			node.ProtocolEvents.AddConsumer(myBeaconKeyRecovery)
+			return nil
+		}).
+		Module("beacon key verification", func(node *cmd.NodeConfig) error {
+			err := dkgmodule.VerifyBeaconKeyForEpoch(node.Logger, node.NodeID, node.State, myBeaconKeyStateMachine, requireBeaconKeyOnStartup)
+			if err != nil {
+				log.Fatal("This node is configured with --require-beacon-key=true (default), but failed to find a valid beacon key for the " +
+					"current epoch on startup. This default check is used as a safety precaution to prevent many Consensus nodes from being " +
+					"started up, all without valid beacon keys, as this can compromise liveness on the network. If you operate more than one " +
+					"Flow Consensus node, contact Flow Foundation operator support for guidance on how to proceed.")
+			}
 			return nil
 		}).
 		Module("collection guarantees mempool", func(node *cmd.NodeConfig) error {

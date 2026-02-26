@@ -38,7 +38,7 @@ func (_m *MessageProcessor) EXPECT() *MessageProcessor_Expecter {
 }
 
 // Process provides a mock function for the type MessageProcessor
-func (_mock *MessageProcessor) Process(channel channels.Channel, originID flow.Identifier, message interface{}) error {
+func (_mock *MessageProcessor) Process(channel channels.Channel, originID flow.Identifier, message any) error {
 	ret := _mock.Called(channel, originID, message)
 
 	if len(ret) == 0 {
@@ -46,7 +46,7 @@ func (_mock *MessageProcessor) Process(channel channels.Channel, originID flow.I
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(channels.Channel, flow.Identifier, interface{}) error); ok {
+	if returnFunc, ok := ret.Get(0).(func(channels.Channel, flow.Identifier, any) error); ok {
 		r0 = returnFunc(channel, originID, message)
 	} else {
 		r0 = ret.Error(0)
@@ -62,12 +62,12 @@ type MessageProcessor_Process_Call struct {
 // Process is a helper method to define mock.On call
 //   - channel channels.Channel
 //   - originID flow.Identifier
-//   - message interface{}
+//   - message any
 func (_e *MessageProcessor_Expecter) Process(channel interface{}, originID interface{}, message interface{}) *MessageProcessor_Process_Call {
 	return &MessageProcessor_Process_Call{Call: _e.mock.On("Process", channel, originID, message)}
 }
 
-func (_c *MessageProcessor_Process_Call) Run(run func(channel channels.Channel, originID flow.Identifier, message interface{})) *MessageProcessor_Process_Call {
+func (_c *MessageProcessor_Process_Call) Run(run func(channel channels.Channel, originID flow.Identifier, message any)) *MessageProcessor_Process_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 channels.Channel
 		if args[0] != nil {
@@ -77,9 +77,9 @@ func (_c *MessageProcessor_Process_Call) Run(run func(channel channels.Channel, 
 		if args[1] != nil {
 			arg1 = args[1].(flow.Identifier)
 		}
-		var arg2 interface{}
+		var arg2 any
 		if args[2] != nil {
-			arg2 = args[2].(interface{})
+			arg2 = args[2].(any)
 		}
 		run(
 			arg0,
@@ -95,7 +95,7 @@ func (_c *MessageProcessor_Process_Call) Return(err error) *MessageProcessor_Pro
 	return _c
 }
 
-func (_c *MessageProcessor_Process_Call) RunAndReturn(run func(channel channels.Channel, originID flow.Identifier, message interface{}) error) *MessageProcessor_Process_Call {
+func (_c *MessageProcessor_Process_Call) RunAndReturn(run func(channel channels.Channel, originID flow.Identifier, message any) error) *MessageProcessor_Process_Call {
 	_c.Call.Return(run)
 	return _c
 }

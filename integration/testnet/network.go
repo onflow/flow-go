@@ -82,6 +82,8 @@ const (
 	DefaultExecutionDataServiceDir = "/data/execution_data"
 	// DefaultExecutionStateDir for the execution data service blobstore.
 	DefaultExecutionStateDir = "/data/execution_state"
+	// DefaultExtendedIndexingDir for the extended indexing database.
+	DefaultExtendedIndexingDir = "/data/extended_index"
 	// DefaultChunkDataPackDir for the chunk data packs
 	DefaultChunkDataPackDir = "/data/chunk_data_pack"
 	// DefaultProfilerDir is the default directory for the profiler

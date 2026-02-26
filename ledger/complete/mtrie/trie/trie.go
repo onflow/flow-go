@@ -188,11 +188,9 @@ func valueSizes(sizes []int, paths []ledger.Path, head *node.Node) {
 	} else {
 		// concurrent read of left and right subtree
 		wg := sync.WaitGroup{}
-		wg.Add(1)
-		go func() {
+		wg.Go(func() {
 			valueSizes(lsizes, lpaths, head.LeftChild())
-			wg.Done()
-		}()
+		})
 		valueSizes(rsizes, rpaths, head.RightChild())
 		wg.Wait() // wait for all threads
 	}
@@ -301,11 +299,9 @@ func read(payloads []*ledger.Payload, paths []ledger.Path, head *node.Node) {
 	} else {
 		// concurrent read of left and right subtree
 		wg := sync.WaitGroup{}
-		wg.Add(1)
-		go func() {
+		wg.Go(func() {
 			read(lpayloads, lpaths, head.LeftChild())
-			wg.Done()
-		}()
+		})
 		read(rpayloads, rpaths, head.RightChild())
 		wg.Wait() // wait for all threads
 	}
@@ -647,12 +643,10 @@ func prove(head *node.Node, paths []ledger.Path, proofs []*ledger.TrieProof) {
 		prove(head.RightChild(), rpaths, rproofs)
 	} else {
 		wg := sync.WaitGroup{}
-		wg.Add(1)
-		go func() {
+		wg.Go(func() {
 			addSiblingTrieHashToProofs(head.RightChild(), depth, lproofs)
 			prove(head.LeftChild(), lpaths, lproofs)
-			wg.Done()
-		}()
+		})
 
 		addSiblingTrieHashToProofs(head.LeftChild(), depth, rproofs)
 		prove(head.RightChild(), rpaths, rproofs)
