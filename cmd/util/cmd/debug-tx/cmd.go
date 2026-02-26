@@ -97,7 +97,7 @@ func run(_ *cobra.Command, args []string) {
 		log.Fatal().Msg("Either --use-execution-data-api or --execution-address must be provided")
 	}
 	if err != nil {
-		log.Fatal().Err(err).Msg("Failed to remote client")
+		log.Fatal().Err(err).Msg("Failed to create remote client")
 	}
 	defer remoteClient.Close()
 
