@@ -119,8 +119,15 @@ func (r *ScheduledTransactionRequester) fetchMissingTxs(
 			return nil, fmt.Errorf("expected Array result, got %T", results)
 		}
 
-		for _, result := range array.Values {
-			decoded, err := decodeTransactionData(result)
+		for i, result := range array.Values {
+			opt, ok := result.(cadence.Optional)
+			if !ok {
+				return nil, fmt.Errorf("expected Optional at index %d, got %T", i, result)
+			}
+			if opt.Value == nil {
+				return nil, fmt.Errorf("scheduled transaction %d had event, but is not found on-chain", batch[i])
+			}
+			decoded, err := decodeTransactionData(opt.Value)
 			if err != nil {
 				return nil, fmt.Errorf("failed to decode scheduled transaction: %w", err)
 			}
