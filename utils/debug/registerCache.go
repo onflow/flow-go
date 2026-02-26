@@ -56,6 +56,12 @@ func NewFileRegisterCache(filePath string) (*FileRegisterCache, error) {
 
 	f, err := os.Open(filePath)
 	if err != nil {
+		if os.IsNotExist(err) {
+			return &FileRegisterCache{
+				filePath: filePath,
+				data:     data,
+			}, nil
+		}
 		return nil, err
 	}
 	defer f.Close()
