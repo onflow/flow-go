@@ -83,17 +83,12 @@ func NewFileRegisterCache(filePath string) (*FileRegisterCache, error) {
 				return nil, err
 			}
 
-			owner, err := hex.DecodeString(d.Key.Owner)
-			if err != nil {
-				return nil, err
-			}
-
 			keyCopy, err := hex.DecodeString(d.Key.Key)
 			if err != nil {
 				return nil, err
 			}
 
-			data[newRegisterKey(string(owner), string(keyCopy))] = d
+			data[newRegisterKey(d.Key.Owner, string(keyCopy))] = d
 		}
 	}
 
