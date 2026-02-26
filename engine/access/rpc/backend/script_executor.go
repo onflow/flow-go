@@ -181,6 +181,20 @@ func (s *ScriptExecutor) GetAccountKey(ctx context.Context, address flow.Address
 	return s.scriptExecutor.GetAccountKey(ctx, address, keyIndex, height)
 }
 
+// GetAccountCode returns a Flow account code by the provided address, contract name and block height.
+// Expected errors:
+//   - Script execution related errors
+//   - [storage.ErrHeightNotIndexed] if the ScriptExecutor is not initialized, or if the height is not indexed yet,
+//     or if the height is before the lowest indexed height.
+//   - [ErrIncompatibleNodeVersion] if the block height is not compatible with the node version.
+func (s *ScriptExecutor) GetAccountCode(ctx context.Context, address flow.Address, contractName string, height uint64) ([]byte, error) {
+	if err := s.checkHeight(height); err != nil {
+		return nil, err
+	}
+
+	return s.scriptExecutor.GetAccountCode(ctx, address, contractName, height)
+}
+
 // RegisterValue returns the register value for the given register ID at the provided block height.
 //
 // Expected errors:

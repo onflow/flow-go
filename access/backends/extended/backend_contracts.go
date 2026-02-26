@@ -30,14 +30,17 @@ type ContractDeploymentFilter struct {
 
 // Filter builds a [storage.IndexFilter] from the non-nil filter fields.
 func (f *ContractDeploymentFilter) Filter() storage.IndexFilter[*accessmodel.ContractDeployment] {
+	searchSuffix := "." + f.ContractName
 	return func(d *accessmodel.ContractDeployment) bool {
-		if f.ContractName != "" {
-			parts := strings.Split(d.ContractID, ".")
-			if len(parts) < 3 || !strings.Contains(parts[2], f.ContractName) {
-				return false
-			}
+		if f.ContractName != "" && strings.HasSuffix(d.ContractID, searchSuffix) {
+			return true
 		}
-		// TODO: StartBlock and EndBlock filters are not yet implemented.
+		if f.StartBlock != nil && d.BlockHeight < *f.StartBlock {
+			return false
+		}
+		if f.EndBlock != nil && d.BlockHeight > *f.EndBlock {
+			return false
+		}
 		return true
 	}
 }

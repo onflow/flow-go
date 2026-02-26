@@ -71,6 +71,12 @@ type ScriptExecutor interface {
 	//   - [storage.ErrHeightNotIndexed] if the data for the block height is not available
 	GetAccountKey(ctx context.Context, address flow.Address, keyIndex uint32, height uint64) (*flow.AccountPublicKey, error)
 
+	// GetAccountCode returns a Flow account code by the provided address, contract name and block height.
+	//
+	// Expected error returns during normal operation:
+	//   - [storage.ErrHeightNotIndexed] if the data for the block height is not available
+	GetAccountCode(ctx context.Context, address flow.Address, contractName string, height uint64) ([]byte, error)
+
 	// RegisterValue retrieves register values by the register IDs at the provided block height.
 	//
 	// Expected error returns during normal operation

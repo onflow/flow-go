@@ -1,0 +1,1087 @@
+package indexes
+
+import (
+	"strings"
+	"testing"
+
+	"github.com/cockroachdb/pebble/v2"
+	"github.com/jordanschalm/lockctx"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	"github.com/onflow/flow-go/model/access"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/storage/operation"
+	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
+	"github.com/onflow/flow-go/utils/unittest"
+)
+
+// RunWithBootstrappedContractDeploymentsIndex creates a fresh Pebble database and bootstraps
+// it for contract deployment indexing at the given start height with the given initial
+// deployments. The callback receives the shared storage DB, lock manager, and the index.
+func RunWithBootstrappedContractDeploymentsIndex(
+	tb testing.TB,
+	startHeight uint64,
+	deployments []access.ContractDeployment,
+	f func(db storage.DB, lockManager storage.LockManager, idx *ContractDeploymentsIndex),
+) {
+	unittest.RunWithPebbleDB(tb, func(db *pebble.DB) {
+		lockManager := storage.NewTestingLockManager()
+		var idx *ContractDeploymentsIndex
+		storageDB := pebbleimpl.ToDB(db)
+		err := unittest.WithLock(tb, lockManager, storage.LockIndexContractDeployments, func(lctx lockctx.Context) error {
+			return storageDB.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				var bootstrapErr error
+				idx, bootstrapErr = BootstrapContractDeployments(lctx, rw, storageDB, startHeight, deployments)
+				return bootstrapErr
+			})
+		})
+		require.NoError(tb, err)
+		f(storageDB, lockManager, idx)
+	})
+}
+
+// storeContractDeployments stores a block of contract deployments at the given height using the
+// provided index and lock manager.
+func storeContractDeployments(
+	tb testing.TB,
+	lm storage.LockManager,
+	idx *ContractDeploymentsIndex,
+	height uint64,
+	deployments []access.ContractDeployment,
+) error {
+	return unittest.WithLock(tb, lm, storage.LockIndexContractDeployments, func(lctx lockctx.Context) error {
+		return idx.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			return idx.Store(lctx, rw, height, deployments)
+		})
+	})
+}
+
+// makeDeployment builds a minimal access.ContractDeployment for use in tests.
+func makeDeployment(contractID string, height uint64, txIndex, eventIndex uint32) access.ContractDeployment {
+	parts := strings.Split(contractID, ".")
+	var addr flow.Address
+	if len(parts) >= 2 {
+		parsed, err := flow.StringToAddress(parts[1])
+		if err == nil {
+			addr = parsed
+		}
+	}
+	return access.ContractDeployment{
+		ContractID:    contractID,
+		Address:       addr,
+		BlockHeight:   height,
+		TransactionID: unittest.IdentifierFixture(),
+		TxIndex:       txIndex,
+		EventIndex:    eventIndex,
+		Code:          []byte("access(all) contract MyContract {}"),
+		CodeHash:      []byte("fakehash12345678901234567890123456"),
+	}
+}
+
+// ----------------------------------------------------------------------------
+// NewContractDeploymentsIndex
+// ----------------------------------------------------------------------------
+
+func TestContractDeployments_NewIndex(t *testing.T) {
+	t.Parallel()
+
+	t.Run("uninitialized database returns ErrNotBootstrapped", func(t *testing.T) {
+		t.Parallel()
+		unittest.RunWithPebbleDB(t, func(db *pebble.DB) {
+			storageDB := pebbleimpl.ToDB(db)
+			_, err := NewContractDeploymentsIndex(storageDB)
+			require.ErrorIs(t, err, storage.ErrNotBootstrapped)
+		})
+	})
+
+	t.Run("corrupted DB with only first height key returns exception", func(t *testing.T) {
+		t.Parallel()
+		unittest.RunWithPebbleDB(t, func(db *pebble.DB) {
+			storageDB := pebbleimpl.ToDB(db)
+
+			// Write only the firstHeight key, simulating a corrupted state.
+			err := storageDB.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return operation.UpsertByKey(rw.Writer(), keyContractDeploymentFirstHeightKey, uint64(10))
+			})
+			require.NoError(t, err)
+
+			_, err = NewContractDeploymentsIndex(storageDB)
+			require.Error(t, err)
+			assert.False(t, isNotBootstrapped(err),
+				"corrupted state should not return ErrNotBootstrapped")
+		})
+	})
+
+	t.Run("already bootstrapped loads correctly", func(t *testing.T) {
+		t.Parallel()
+		RunWithBootstrappedContractDeploymentsIndex(t, 5, nil, func(db storage.DB, _ storage.LockManager, _ *ContractDeploymentsIndex) {
+			// Open the index again from the same DB — should succeed.
+			idx2, err := NewContractDeploymentsIndex(db)
+			require.NoError(t, err)
+			assert.Equal(t, uint64(5), idx2.FirstIndexedHeight())
+			assert.Equal(t, uint64(5), idx2.LatestIndexedHeight())
+		})
+	})
+}
+
+// isNotBootstrapped is a helper to avoid importing errors in the test body.
+func isNotBootstrapped(err error) bool {
+	return err != nil && strings.Contains(err.Error(), storage.ErrNotBootstrapped.Error())
+}
+
+// ----------------------------------------------------------------------------
+// BootstrapContractDeployments
+// ----------------------------------------------------------------------------
+
+func TestContractDeployments_Bootstrap(t *testing.T) {
+	t.Parallel()
+
+	t.Run("bootstrap initializes height markers", func(t *testing.T) {
+		t.Parallel()
+		RunWithBootstrappedContractDeploymentsIndex(t, 10, nil, func(_ storage.DB, _ storage.LockManager, idx *ContractDeploymentsIndex) {
+			assert.Equal(t, uint64(10), idx.FirstIndexedHeight())
+			assert.Equal(t, uint64(10), idx.LatestIndexedHeight())
+		})
+	})
+
+	t.Run("bootstrap at height 0", func(t *testing.T) {
+		t.Parallel()
+		RunWithBootstrappedContractDeploymentsIndex(t, 0, nil, func(_ storage.DB, _ storage.LockManager, idx *ContractDeploymentsIndex) {
+			assert.Equal(t, uint64(0), idx.FirstIndexedHeight())
+			assert.Equal(t, uint64(0), idx.LatestIndexedHeight())
+		})
+	})
+
+	t.Run("bootstrap with initial deployments stores them", func(t *testing.T) {
+		t.Parallel()
+		d := makeDeployment("A.1234567890abcdef.MyContract", 5, 0, 0)
+		RunWithBootstrappedContractDeploymentsIndex(t, 5, []access.ContractDeployment{d}, func(_ storage.DB, _ storage.LockManager, idx *ContractDeploymentsIndex) {
+			result, err := idx.ByContractID(d.ContractID)
+			require.NoError(t, err)
+			assert.Equal(t, d.ContractID, result.ContractID)
+			assert.Equal(t, d.BlockHeight, result.BlockHeight)
+			assert.Equal(t, d.TxIndex, result.TxIndex)
+			assert.Equal(t, d.EventIndex, result.EventIndex)
+		})
+	})
+
+	t.Run("short contractID returns error during bootstrap", func(t *testing.T) {
+		t.Parallel()
+		unittest.RunWithPebbleDB(t, func(db *pebble.DB) {
+			storageDB := pebbleimpl.ToDB(db)
+			lm := storage.NewTestingLockManager()
+
+			shortID := access.ContractDeployment{
+				ContractID:  "A.short",
+				BlockHeight: 1,
+			}
+
+			err := unittest.WithLock(t, lm, storage.LockIndexContractDeployments, func(lctx lockctx.Context) error {
+				return storageDB.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+					_, err := BootstrapContractDeployments(lctx, rw, storageDB, 1, []access.ContractDeployment{shortID})
+					return err
+				})
+			})
+			require.Error(t, err)
+		})
+	})
+
+	t.Run("double-bootstrap returns ErrAlreadyExists", func(t *testing.T) {
+		t.Parallel()
+		RunWithBootstrappedContractDeploymentsIndex(t, 1, nil, func(db storage.DB, lm storage.LockManager, _ *ContractDeploymentsIndex) {
+			err := unittest.WithLock(t, lm, storage.LockIndexContractDeployments, func(lctx lockctx.Context) error {
+				return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+					_, bootstrapErr := BootstrapContractDeployments(lctx, rw, db, 1, nil)
+					return bootstrapErr
+				})
+			})
+			require.ErrorIs(t, err, storage.ErrAlreadyExists)
+		})
+	})
+}
+
+// ----------------------------------------------------------------------------
+// ByContractID
+// ----------------------------------------------------------------------------
+
+func TestContractDeployments_ByContractID(t *testing.T) {
+	t.Parallel()
+
+	t.Run("not found returns ErrNotFound", func(t *testing.T) {
+		t.Parallel()
+		RunWithBootstrappedContractDeploymentsIndex(t, 1, nil, func(_ storage.DB, _ storage.LockManager, idx *ContractDeploymentsIndex) {
+			_, err := idx.ByContractID("A.1234567890abcdef.NoSuchContract")
+			require.ErrorIs(t, err, storage.ErrNotFound)
+		})
+	})
+
+	t.Run("returns most recent deployment when multiple exist", func(t *testing.T) {
+		t.Parallel()
+		contractID := "A.1234567890abcdef.MyContract"
+		d1 := makeDeployment(contractID, 2, 0, 0)
+		d2 := makeDeployment(contractID, 3, 0, 0)
+
+		RunWithBootstrappedContractDeploymentsIndex(t, 1, nil, func(_ storage.DB, lm storage.LockManager, idx *ContractDeploymentsIndex) {
+			require.NoError(t, storeContractDeployments(t, lm, idx, 2, []access.ContractDeployment{d1}))
+			require.NoError(t, storeContractDeployments(t, lm, idx, 3, []access.ContractDeployment{d2}))
+
+			result, err := idx.ByContractID(contractID)
+			require.NoError(t, err)
+			// Most recent is height 3
+			assert.Equal(t, uint64(3), result.BlockHeight)
+		})
+	})
+
+	t.Run("returns single deployment correctly", func(t *testing.T) {
+		t.Parallel()
+		contractID := "A.1234567890abcdef.MyContract"
+		d := makeDeployment(contractID, 2, 1, 2)
+
+		RunWithBootstrappedContractDeploymentsIndex(t, 1, nil, func(_ storage.DB, lm storage.LockManager, idx *ContractDeploymentsIndex) {
+			require.NoError(t, storeContractDeployments(t, lm, idx, 2, []access.ContractDeployment{d}))
+
+			result, err := idx.ByContractID(contractID)
+			require.NoError(t, err)
+			assert.Equal(t, contractID, result.ContractID)
+			assert.Equal(t, uint64(2), result.BlockHeight)
+			assert.Equal(t, uint32(1), result.TxIndex)
+			assert.Equal(t, uint32(2), result.EventIndex)
+			assert.Equal(t, d.TransactionID, result.TransactionID)
+		})
+	})
+}
+
+// ----------------------------------------------------------------------------
+// DeploymentsByContractID
+// ----------------------------------------------------------------------------
+
+func TestContractDeployments_DeploymentsByContractID(t *testing.T) {
+	t.Parallel()
+
+	t.Run("zero limit returns ErrInvalidQuery", func(t *testing.T) {
+		t.Parallel()
+		RunWithBootstrappedContractDeploymentsIndex(t, 1, nil, func(_ storage.DB, _ storage.LockManager, idx *ContractDeploymentsIndex) {
+			_, err := idx.DeploymentsByContractID("A.1234567890abcdef.MyContract", 0, nil, nil)
+			require.ErrorIs(t, err, storage.ErrInvalidQuery)
+		})
+	})
+
+	t.Run("no deployments for contract returns empty page", func(t *testing.T) {
+		t.Parallel()
+		RunWithBootstrappedContractDeploymentsIndex(t, 1, nil, func(_ storage.DB, _ storage.LockManager, idx *ContractDeploymentsIndex) {
+			page, err := idx.DeploymentsByContractID("A.1234567890abcdef.NoSuchContract", 10, nil, nil)
+			require.NoError(t, err)
+			assert.Empty(t, page.Deployments)
+			assert.Nil(t, page.NextCursor)
+		})
+	})
+
+	t.Run("first page returns deployments in descending order", func(t *testing.T) {
+		t.Parallel()
+		contractID := "A.1234567890abcdef.MyContract"
+		d1 := makeDeployment(contractID, 2, 0, 0)
+		d2 := makeDeployment(contractID, 3, 0, 0)
+		d3 := makeDeployment(contractID, 4, 0, 0)
+
+		RunWithBootstrappedContractDeploymentsIndex(t, 1, nil, func(_ storage.DB, lm storage.LockManager, idx *ContractDeploymentsIndex) {
+			require.NoError(t, storeContractDeployments(t, lm, idx, 2, []access.ContractDeployment{d1}))
+			require.NoError(t, storeContractDeployments(t, lm, idx, 3, []access.ContractDeployment{d2}))
+			require.NoError(t, storeContractDeployments(t, lm, idx, 4, []access.ContractDeployment{d3}))
+
+			page, err := idx.DeploymentsByContractID(contractID, 10, nil, nil)
+			require.NoError(t, err)
+			require.Len(t, page.Deployments, 3)
+			// Descending order: height 4, 3, 2
+			assert.Equal(t, uint64(4), page.Deployments[0].BlockHeight)
+			assert.Equal(t, uint64(3), page.Deployments[1].BlockHeight)
+			assert.Equal(t, uint64(2), page.Deployments[2].BlockHeight)
+			assert.Nil(t, page.NextCursor)
+		})
+	})
+
+	t.Run("has-more sets NextCursor", func(t *testing.T) {
+		t.Parallel()
+		contractID := "A.1234567890abcdef.MyContract"
+
+		RunWithBootstrappedContractDeploymentsIndex(t, 1, nil, func(_ storage.DB, lm storage.LockManager, idx *ContractDeploymentsIndex) {
+			// Store 3 deployments
+			for h := uint64(2); h <= 4; h++ {
+				d := makeDeployment(contractID, h, 0, 0)
+				require.NoError(t, storeContractDeployments(t, lm, idx, h, []access.ContractDeployment{d}))
+			}
+
+			// Request page of 2 when 3 exist: should set NextCursor
+			page, err := idx.DeploymentsByContractID(contractID, 2, nil, nil)
+			require.NoError(t, err)
+			require.Len(t, page.Deployments, 2)
+			require.NotNil(t, page.NextCursor)
+			// The cursor should reflect the last returned entry (height 3, index 0/0)
+			assert.Equal(t, uint64(3), page.NextCursor.Height)
+		})
+	})
+
+	t.Run("with cursor resumes from last returned entry", func(t *testing.T) {
+		t.Parallel()
+		contractID := "A.1234567890abcdef.MyContract"
+
+		RunWithBootstrappedContractDeploymentsIndex(t, 1, nil, func(_ storage.DB, lm storage.LockManager, idx *ContractDeploymentsIndex) {
+			// Store 4 deployments at heights 2-5
+			for h := uint64(2); h <= 5; h++ {
+				d := makeDeployment(contractID, h, 0, 0)
+				require.NoError(t, storeContractDeployments(t, lm, idx, h, []access.ContractDeployment{d}))
+			}
+
+			// First page: limit=2, no cursor
+			page1, err := idx.DeploymentsByContractID(contractID, 2, nil, nil)
+			require.NoError(t, err)
+			require.Len(t, page1.Deployments, 2)
+			require.NotNil(t, page1.NextCursor)
+
+			// Second page: resume from cursor
+			page2, err := idx.DeploymentsByContractID(contractID, 2, page1.NextCursor, nil)
+			require.NoError(t, err)
+			require.Len(t, page2.Deployments, 2)
+
+			// Heights across both pages must be distinct and descending
+			allHeights := []uint64{
+				page1.Deployments[0].BlockHeight,
+				page1.Deployments[1].BlockHeight,
+				page2.Deployments[0].BlockHeight,
+				page2.Deployments[1].BlockHeight,
+			}
+			assert.Equal(t, []uint64{5, 4, 3, 2}, allHeights)
+		})
+	})
+}
+
+// ----------------------------------------------------------------------------
+// All
+// ----------------------------------------------------------------------------
+
+func TestContractDeployments_All(t *testing.T) {
+	t.Parallel()
+
+	t.Run("zero limit returns ErrInvalidQuery", func(t *testing.T) {
+		t.Parallel()
+		RunWithBootstrappedContractDeploymentsIndex(t, 1, nil, func(_ storage.DB, _ storage.LockManager, idx *ContractDeploymentsIndex) {
+			_, err := idx.All(0, nil, nil)
+			require.ErrorIs(t, err, storage.ErrInvalidQuery)
+		})
+	})
+
+	t.Run("empty index returns empty page", func(t *testing.T) {
+		t.Parallel()
+		RunWithBootstrappedContractDeploymentsIndex(t, 1, nil, func(_ storage.DB, _ storage.LockManager, idx *ContractDeploymentsIndex) {
+			page, err := idx.All(10, nil, nil)
+			require.NoError(t, err)
+			assert.Empty(t, page.Deployments)
+			assert.Nil(t, page.NextCursor)
+		})
+	})
+
+	t.Run("returns latest per contract in ascending contract ID order", func(t *testing.T) {
+		t.Parallel()
+		// Use contractIDs with different names so lexicographic order is predictable
+		contractA := "A.1234567890abcdef.AContract"
+		contractB := "A.1234567890abcdef.BContract"
+		contractC := "A.1234567890abcdef.CContract"
+
+		RunWithBootstrappedContractDeploymentsIndex(t, 1, nil, func(_ storage.DB, lm storage.LockManager, idx *ContractDeploymentsIndex) {
+			dA1 := makeDeployment(contractA, 2, 0, 0)
+			dA2 := makeDeployment(contractA, 3, 0, 0) // later update
+			dB := makeDeployment(contractB, 2, 1, 0)
+			dC := makeDeployment(contractC, 2, 2, 0)
+
+			require.NoError(t, storeContractDeployments(t, lm, idx, 2, []access.ContractDeployment{dA1, dB, dC}))
+			require.NoError(t, storeContractDeployments(t, lm, idx, 3, []access.ContractDeployment{dA2}))
+
+			page, err := idx.All(10, nil, nil)
+			require.NoError(t, err)
+			require.Len(t, page.Deployments, 3)
+
+			// Ascending contractID order
+			assert.Equal(t, contractA, page.Deployments[0].ContractID)
+			assert.Equal(t, contractB, page.Deployments[1].ContractID)
+			assert.Equal(t, contractC, page.Deployments[2].ContractID)
+
+			// contractA shows the most recent deployment (height 3)
+			assert.Equal(t, uint64(3), page.Deployments[0].BlockHeight)
+		})
+	})
+
+	t.Run("has-more sets NextCursor with ContractID", func(t *testing.T) {
+		t.Parallel()
+		contractA := "A.1234567890abcdef.AContract"
+		contractB := "A.1234567890abcdef.BContract"
+		contractC := "A.1234567890abcdef.CContract"
+
+		RunWithBootstrappedContractDeploymentsIndex(t, 1, nil, func(_ storage.DB, lm storage.LockManager, idx *ContractDeploymentsIndex) {
+			dA := makeDeployment(contractA, 2, 0, 0)
+			dB := makeDeployment(contractB, 2, 1, 0)
+			dC := makeDeployment(contractC, 2, 2, 0)
+			require.NoError(t, storeContractDeployments(t, lm, idx, 2, []access.ContractDeployment{dA, dB, dC}))
+
+			page, err := idx.All(2, nil, nil)
+			require.NoError(t, err)
+			require.Len(t, page.Deployments, 2)
+			require.NotNil(t, page.NextCursor)
+			assert.Equal(t, contractB, page.NextCursor.ContractID)
+		})
+	})
+
+	t.Run("with cursor resumes from last returned contract", func(t *testing.T) {
+		t.Parallel()
+		contractA := "A.1234567890abcdef.AContract"
+		contractB := "A.1234567890abcdef.BContract"
+		contractC := "A.1234567890abcdef.CContract"
+		contractD := "A.1234567890abcdef.DContract"
+
+		RunWithBootstrappedContractDeploymentsIndex(t, 1, nil, func(_ storage.DB, lm storage.LockManager, idx *ContractDeploymentsIndex) {
+			dA := makeDeployment(contractA, 2, 0, 0)
+			dB := makeDeployment(contractB, 2, 1, 0)
+			dC := makeDeployment(contractC, 2, 2, 0)
+			dD := makeDeployment(contractD, 2, 3, 0)
+			require.NoError(t, storeContractDeployments(t, lm, idx, 2, []access.ContractDeployment{dA, dB, dC, dD}))
+
+			// First page
+			page1, err := idx.All(2, nil, nil)
+			require.NoError(t, err)
+			require.Len(t, page1.Deployments, 2)
+			require.NotNil(t, page1.NextCursor)
+
+			// Second page
+			page2, err := idx.All(2, page1.NextCursor, nil)
+			require.NoError(t, err)
+			require.Len(t, page2.Deployments, 2)
+
+			ids := []string{
+				page1.Deployments[0].ContractID,
+				page1.Deployments[1].ContractID,
+				page2.Deployments[0].ContractID,
+				page2.Deployments[1].ContractID,
+			}
+			assert.Equal(t, []string{contractA, contractB, contractC, contractD}, ids)
+		})
+	})
+
+	t.Run("filter applied to results", func(t *testing.T) {
+		t.Parallel()
+		contractA := "A.1234567890abcdef.AContract"
+		contractB := "A.1234567890abcdef.BContract"
+
+		RunWithBootstrappedContractDeploymentsIndex(t, 1, nil, func(_ storage.DB, lm storage.LockManager, idx *ContractDeploymentsIndex) {
+			dA := makeDeployment(contractA, 2, 0, 0)
+			dB := makeDeployment(contractB, 2, 1, 0)
+			require.NoError(t, storeContractDeployments(t, lm, idx, 2, []access.ContractDeployment{dA, dB}))
+
+			// Filter that only accepts contractA
+			filter := func(d *access.ContractDeployment) bool {
+				return d.ContractID == contractA
+			}
+
+			page, err := idx.All(10, nil, filter)
+			require.NoError(t, err)
+			require.Len(t, page.Deployments, 1)
+			assert.Equal(t, contractA, page.Deployments[0].ContractID)
+		})
+	})
+}
+
+// ----------------------------------------------------------------------------
+// ByAddress
+// ----------------------------------------------------------------------------
+
+func TestContractDeployments_ByAddress(t *testing.T) {
+	t.Parallel()
+
+	t.Run("zero limit returns ErrInvalidQuery", func(t *testing.T) {
+		t.Parallel()
+		RunWithBootstrappedContractDeploymentsIndex(t, 1, nil, func(_ storage.DB, _ storage.LockManager, idx *ContractDeploymentsIndex) {
+			addr := unittest.RandomAddressFixture()
+			_, err := idx.ByAddress(addr, 0, nil, nil)
+			require.ErrorIs(t, err, storage.ErrInvalidQuery)
+		})
+	})
+
+	t.Run("returns only contracts for that address", func(t *testing.T) {
+		t.Parallel()
+		// Two different address hex values
+		addrHex1 := "1234567890abcdef"
+		addrHex2 := "fedcba0987654321"
+
+		contractA := "A." + addrHex1 + ".ContractA"
+		contractB := "A." + addrHex1 + ".ContractB"
+		contractC := "A." + addrHex2 + ".ContractC"
+
+		addr1, err := flow.StringToAddress(addrHex1)
+		require.NoError(t, err)
+		addr2, err := flow.StringToAddress(addrHex2)
+		require.NoError(t, err)
+
+		RunWithBootstrappedContractDeploymentsIndex(t, 1, nil, func(_ storage.DB, lm storage.LockManager, idx *ContractDeploymentsIndex) {
+			dA := makeDeployment(contractA, 2, 0, 0)
+			dB := makeDeployment(contractB, 2, 1, 0)
+			dC := makeDeployment(contractC, 2, 2, 0)
+			require.NoError(t, storeContractDeployments(t, lm, idx, 2, []access.ContractDeployment{dA, dB, dC}))
+
+			// Query addr1 - should get ContractA and ContractB only
+			page1, err := idx.ByAddress(addr1, 10, nil, nil)
+			require.NoError(t, err)
+			require.Len(t, page1.Deployments, 2)
+			for _, d := range page1.Deployments {
+				assert.True(t, strings.Contains(d.ContractID, addrHex1),
+					"deployment %s should belong to addr1", d.ContractID)
+			}
+
+			// Query addr2 - should get ContractC only
+			page2, err := idx.ByAddress(addr2, 10, nil, nil)
+			require.NoError(t, err)
+			require.Len(t, page2.Deployments, 1)
+			assert.Equal(t, contractC, page2.Deployments[0].ContractID)
+		})
+	})
+
+	t.Run("returns empty when address has no contracts", func(t *testing.T) {
+		t.Parallel()
+		RunWithBootstrappedContractDeploymentsIndex(t, 1, nil, func(_ storage.DB, _ storage.LockManager, idx *ContractDeploymentsIndex) {
+			addr := unittest.RandomAddressFixture()
+			page, err := idx.ByAddress(addr, 10, nil, nil)
+			require.NoError(t, err)
+			assert.Empty(t, page.Deployments)
+			assert.Nil(t, page.NextCursor)
+		})
+	})
+
+	t.Run("has-more sets NextCursor with ContractID", func(t *testing.T) {
+		t.Parallel()
+		addrHex := "1234567890abcdef"
+		contractA := "A." + addrHex + ".ContractA"
+		contractB := "A." + addrHex + ".ContractB"
+		contractC := "A." + addrHex + ".ContractC"
+
+		addr, err := flow.StringToAddress(addrHex)
+		require.NoError(t, err)
+
+		RunWithBootstrappedContractDeploymentsIndex(t, 1, nil, func(_ storage.DB, lm storage.LockManager, idx *ContractDeploymentsIndex) {
+			dA := makeDeployment(contractA, 2, 0, 0)
+			dB := makeDeployment(contractB, 2, 1, 0)
+			dC := makeDeployment(contractC, 2, 2, 0)
+			require.NoError(t, storeContractDeployments(t, lm, idx, 2, []access.ContractDeployment{dA, dB, dC}))
+
+			page, err := idx.ByAddress(addr, 2, nil, nil)
+			require.NoError(t, err)
+			require.Len(t, page.Deployments, 2)
+			require.NotNil(t, page.NextCursor)
+			assert.Equal(t, contractB, page.NextCursor.ContractID)
+		})
+	})
+
+	t.Run("with cursor resumes correctly", func(t *testing.T) {
+		t.Parallel()
+		addrHex := "1234567890abcdef"
+		contractA := "A." + addrHex + ".ContractA"
+		contractB := "A." + addrHex + ".ContractB"
+		contractC := "A." + addrHex + ".ContractC"
+		contractD := "A." + addrHex + ".ContractD"
+
+		addr, err := flow.StringToAddress(addrHex)
+		require.NoError(t, err)
+
+		RunWithBootstrappedContractDeploymentsIndex(t, 1, nil, func(_ storage.DB, lm storage.LockManager, idx *ContractDeploymentsIndex) {
+			dA := makeDeployment(contractA, 2, 0, 0)
+			dB := makeDeployment(contractB, 2, 1, 0)
+			dC := makeDeployment(contractC, 2, 2, 0)
+			dD := makeDeployment(contractD, 2, 3, 0)
+			require.NoError(t, storeContractDeployments(t, lm, idx, 2, []access.ContractDeployment{dA, dB, dC, dD}))
+
+			// First page
+			page1, err := idx.ByAddress(addr, 2, nil, nil)
+			require.NoError(t, err)
+			require.Len(t, page1.Deployments, 2)
+			require.NotNil(t, page1.NextCursor)
+
+			// Second page
+			page2, err := idx.ByAddress(addr, 2, page1.NextCursor, nil)
+			require.NoError(t, err)
+			require.Len(t, page2.Deployments, 2)
+
+			ids := []string{
+				page1.Deployments[0].ContractID,
+				page1.Deployments[1].ContractID,
+				page2.Deployments[0].ContractID,
+				page2.Deployments[1].ContractID,
+			}
+			assert.Equal(t, []string{contractA, contractB, contractC, contractD}, ids)
+		})
+	})
+}
+
+// ----------------------------------------------------------------------------
+// Store
+// ----------------------------------------------------------------------------
+
+func TestContractDeployments_Store(t *testing.T) {
+	t.Parallel()
+
+	t.Run("stores consecutive heights successfully", func(t *testing.T) {
+		t.Parallel()
+		contractID := "A.1234567890abcdef.MyContract"
+
+		RunWithBootstrappedContractDeploymentsIndex(t, 1, nil, func(_ storage.DB, lm storage.LockManager, idx *ContractDeploymentsIndex) {
+			d2 := makeDeployment(contractID, 2, 0, 0)
+			d3 := makeDeployment(contractID, 3, 0, 0)
+
+			require.NoError(t, storeContractDeployments(t, lm, idx, 2, []access.ContractDeployment{d2}))
+			assert.Equal(t, uint64(2), idx.LatestIndexedHeight())
+
+			require.NoError(t, storeContractDeployments(t, lm, idx, 3, []access.ContractDeployment{d3}))
+			assert.Equal(t, uint64(3), idx.LatestIndexedHeight())
+		})
+	})
+
+	t.Run("duplicate height returns ErrAlreadyExists", func(t *testing.T) {
+		t.Parallel()
+		RunWithBootstrappedContractDeploymentsIndex(t, 1, nil, func(_ storage.DB, lm storage.LockManager, idx *ContractDeploymentsIndex) {
+			require.NoError(t, storeContractDeployments(t, lm, idx, 2, nil))
+
+			err := storeContractDeployments(t, lm, idx, 2, nil)
+			require.ErrorIs(t, err, storage.ErrAlreadyExists)
+		})
+	})
+
+	t.Run("non-consecutive height returns error", func(t *testing.T) {
+		t.Parallel()
+		RunWithBootstrappedContractDeploymentsIndex(t, 1, nil, func(_ storage.DB, lm storage.LockManager, idx *ContractDeploymentsIndex) {
+			err := storeContractDeployments(t, lm, idx, 5, nil)
+			require.Error(t, err)
+			assert.False(t, err == storage.ErrAlreadyExists,
+				"non-consecutive height should not return ErrAlreadyExists")
+		})
+	})
+
+	t.Run("short contractID in batch returns error", func(t *testing.T) {
+		t.Parallel()
+		RunWithBootstrappedContractDeploymentsIndex(t, 1, nil, func(_ storage.DB, lm storage.LockManager, idx *ContractDeploymentsIndex) {
+			bad := access.ContractDeployment{
+				ContractID:  "A.short",
+				BlockHeight: 2,
+			}
+			err := storeContractDeployments(t, lm, idx, 2, []access.ContractDeployment{bad})
+			require.Error(t, err)
+		})
+	})
+
+	t.Run("store without lock returns error", func(t *testing.T) {
+		t.Parallel()
+		RunWithBootstrappedContractDeploymentsIndex(t, 1, nil, func(db storage.DB, lm storage.LockManager, idx *ContractDeploymentsIndex) {
+			lctx := lm.NewContext()
+			defer lctx.Release()
+
+			// lctx does not hold the required lock
+			err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return idx.Store(lctx, rw, 2, nil)
+			})
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), "missing required lock")
+		})
+	})
+
+	t.Run("uncommitted batch does not advance latestHeight", func(t *testing.T) {
+		t.Parallel()
+		RunWithBootstrappedContractDeploymentsIndex(t, 1, nil, func(db storage.DB, lm storage.LockManager, idx *ContractDeploymentsIndex) {
+			require.Equal(t, uint64(1), idx.LatestIndexedHeight())
+
+			batch := db.NewBatch()
+			err := unittest.WithLock(t, lm, storage.LockIndexContractDeployments, func(lctx lockctx.Context) error {
+				return idx.Store(lctx, batch, 2, nil)
+			})
+			require.NoError(t, err)
+
+			// Close without committing
+			require.NoError(t, batch.Close())
+
+			assert.Equal(t, uint64(1), idx.LatestIndexedHeight(),
+				"latestHeight must not advance when batch is not committed")
+		})
+	})
+}
+
+// ----------------------------------------------------------------------------
+// Key codec
+// ----------------------------------------------------------------------------
+
+func TestContractDeployments_KeyCodec(t *testing.T) {
+	t.Parallel()
+
+	t.Run("roundtrip: makeContractDeploymentKey then decodeContractDeploymentKey", func(t *testing.T) {
+		t.Parallel()
+		contractID := "A.1234567890abcdef.MyContract"
+		height := uint64(12345)
+		txIndex := uint32(42)
+		eventIndex := uint32(7)
+
+		key := makeContractDeploymentKey(contractID, height, txIndex, eventIndex)
+		gotContractID, gotHeight, gotTxIndex, gotEventIndex, err := decodeContractDeploymentKey(key)
+		require.NoError(t, err)
+		assert.Equal(t, contractID, gotContractID)
+		assert.Equal(t, height, gotHeight)
+		assert.Equal(t, txIndex, gotTxIndex)
+		assert.Equal(t, eventIndex, gotEventIndex)
+	})
+
+	t.Run("ones complement ensures descending height order", func(t *testing.T) {
+		t.Parallel()
+		contractID := "A.1234567890abcdef.MyContract"
+
+		keyLow := makeContractDeploymentKey(contractID, 100, 0, 0)
+		keyHigh := makeContractDeploymentKey(contractID, 200, 0, 0)
+
+		// Higher height => smaller key (descending iteration)
+		assert.True(t, string(keyHigh) < string(keyLow),
+			"key for higher height should sort before key for lower height")
+	})
+
+	t.Run("malformed key too short returns error", func(t *testing.T) {
+		t.Parallel()
+		_, _, _, _, err := decodeContractDeploymentKey(make([]byte, 5))
+		require.Error(t, err)
+	})
+
+	t.Run("malformed key with wrong prefix byte returns error", func(t *testing.T) {
+		t.Parallel()
+		contractID := "A.1234567890abcdef.MyContract"
+		key := makeContractDeploymentKey(contractID, 1, 0, 0)
+		key[0] = 0xFF
+		_, _, _, _, err := decodeContractDeploymentKey(key)
+		require.Error(t, err)
+	})
+
+	t.Run("addressFromContractID parses valid ID", func(t *testing.T) {
+		t.Parallel()
+		addrHex := "1234567890abcdef"
+		contractID := "A." + addrHex + ".MyContract"
+		expected, err := flow.StringToAddress(addrHex)
+		require.NoError(t, err)
+
+		got, err := addressFromContractID(contractID)
+		require.NoError(t, err)
+		assert.Equal(t, expected, got)
+	})
+
+	t.Run("addressFromContractID rejects missing A. prefix", func(t *testing.T) {
+		t.Parallel()
+		_, err := addressFromContractID("1234567890abcdef.MyContract")
+		require.Error(t, err)
+	})
+
+	t.Run("addressFromContractID rejects missing second dot", func(t *testing.T) {
+		t.Parallel()
+		_, err := addressFromContractID("A.1234567890abcdef")
+		require.Error(t, err)
+	})
+
+	t.Run("addressFromContractID rejects invalid hex address", func(t *testing.T) {
+		t.Parallel()
+		_, err := addressFromContractID("A.ZZZZZZZZZZZZZZZZ.MyContract")
+		require.Error(t, err)
+	})
+}
+
+// ----------------------------------------------------------------------------
+// buildContractDeploymentPageByID
+// ----------------------------------------------------------------------------
+
+func TestContractDeployments_BuildPageByID(t *testing.T) {
+	t.Parallel()
+
+	t.Run("exactly limit returns no cursor", func(t *testing.T) {
+		t.Parallel()
+		collected := []access.ContractDeployment{
+			makeDeployment("A.1234567890abcdef.A", 1, 0, 0),
+			makeDeployment("A.1234567890abcdef.B", 1, 1, 0),
+		}
+		page := buildContractDeploymentPageByID(collected, 2)
+		assert.Len(t, page.Deployments, 2)
+		assert.Nil(t, page.NextCursor)
+	})
+
+	t.Run("more than limit sets cursor to last returned contract", func(t *testing.T) {
+		t.Parallel()
+		contractA := "A.1234567890abcdef.AContract"
+		contractB := "A.1234567890abcdef.BContract"
+		contractC := "A.1234567890abcdef.CContract"
+
+		collected := []access.ContractDeployment{
+			makeDeployment(contractA, 1, 0, 0),
+			makeDeployment(contractB, 1, 1, 0),
+			makeDeployment(contractC, 1, 2, 0), // extra sentinel
+		}
+		page := buildContractDeploymentPageByID(collected, 2)
+		require.Len(t, page.Deployments, 2)
+		require.NotNil(t, page.NextCursor)
+		// Cursor should be the ContractID of the last *returned* entry (index limit-1).
+		assert.Equal(t, contractB, page.NextCursor.ContractID)
+	})
+}
+
+// ----------------------------------------------------------------------------
+// buildDeploymentPageByPosition
+// ----------------------------------------------------------------------------
+
+func TestContractDeployments_BuildPageByPosition(t *testing.T) {
+	t.Parallel()
+
+	t.Run("exactly limit returns no cursor", func(t *testing.T) {
+		t.Parallel()
+		contractID := "A.1234567890abcdef.MyContract"
+		collected := []access.ContractDeployment{
+			makeDeployment(contractID, 3, 0, 0),
+			makeDeployment(contractID, 2, 0, 0),
+		}
+		page := buildDeploymentPageByPosition(collected, 2)
+		assert.Len(t, page.Deployments, 2)
+		assert.Nil(t, page.NextCursor)
+	})
+
+	t.Run("more than limit sets cursor to position of last returned", func(t *testing.T) {
+		t.Parallel()
+		contractID := "A.1234567890abcdef.MyContract"
+		collected := []access.ContractDeployment{
+			makeDeployment(contractID, 4, 0, 0),
+			makeDeployment(contractID, 3, 1, 2), // last to be returned
+			makeDeployment(contractID, 2, 0, 0), // sentinel
+		}
+		page := buildDeploymentPageByPosition(collected, 2)
+		require.Len(t, page.Deployments, 2)
+		require.NotNil(t, page.NextCursor)
+		// Cursor position should reflect the last returned entry (height 3, txIndex 1, eventIndex 2)
+		assert.Equal(t, uint64(3), page.NextCursor.Height)
+		assert.Equal(t, uint32(1), page.NextCursor.TxIndex)
+		assert.Equal(t, uint32(2), page.NextCursor.EventIndex)
+	})
+}
+
+// ----------------------------------------------------------------------------
+// ContractDeploymentsBootstrapper
+// ----------------------------------------------------------------------------
+
+func TestContractDeploymentsBootstrapper_Constructor(t *testing.T) {
+	t.Parallel()
+
+	t.Run("nil store when not bootstrapped", func(t *testing.T) {
+		t.Parallel()
+		unittest.RunWithPebbleDB(t, func(db *pebble.DB) {
+			storageDB := pebbleimpl.ToDB(db)
+			b, err := NewContractDeploymentsBootstrapper(storageDB, 5)
+			require.NoError(t, err)
+			// Store is nil: read operations return ErrNotBootstrapped
+			_, err = b.ByContractID("A.1234567890abcdef.Foo")
+			require.ErrorIs(t, err, storage.ErrNotBootstrapped)
+		})
+	})
+
+	t.Run("loads existing bootstrapped index", func(t *testing.T) {
+		t.Parallel()
+		RunWithBootstrappedContractDeploymentsIndex(t, 7, nil, func(db storage.DB, _ storage.LockManager, _ *ContractDeploymentsIndex) {
+			b, err := NewContractDeploymentsBootstrapper(db, 7)
+			require.NoError(t, err)
+
+			first, err := b.FirstIndexedHeight()
+			require.NoError(t, err)
+			assert.Equal(t, uint64(7), first)
+
+			latest, err := b.LatestIndexedHeight()
+			require.NoError(t, err)
+			assert.Equal(t, uint64(7), latest)
+		})
+	})
+}
+
+func TestContractDeploymentsBootstrapper_BeforeBootstrap(t *testing.T) {
+	t.Parallel()
+
+	// A bootstrapper created from an empty DB: all read methods return ErrNotBootstrapped.
+	unittest.RunWithPebbleDB(t, func(db *pebble.DB) {
+		storageDB := pebbleimpl.ToDB(db)
+		b, err := NewContractDeploymentsBootstrapper(storageDB, 5)
+		require.NoError(t, err)
+
+		t.Run("FirstIndexedHeight returns ErrNotBootstrapped", func(t *testing.T) {
+			_, err := b.FirstIndexedHeight()
+			require.ErrorIs(t, err, storage.ErrNotBootstrapped)
+		})
+
+		t.Run("LatestIndexedHeight returns ErrNotBootstrapped", func(t *testing.T) {
+			_, err := b.LatestIndexedHeight()
+			require.ErrorIs(t, err, storage.ErrNotBootstrapped)
+		})
+
+		t.Run("ByContractID returns ErrNotBootstrapped", func(t *testing.T) {
+			_, err := b.ByContractID("A.1234567890abcdef.Foo")
+			require.ErrorIs(t, err, storage.ErrNotBootstrapped)
+		})
+
+		t.Run("DeploymentsByContractID returns ErrNotBootstrapped", func(t *testing.T) {
+			_, err := b.DeploymentsByContractID("A.1234567890abcdef.Foo", 10, nil, nil)
+			require.ErrorIs(t, err, storage.ErrNotBootstrapped)
+		})
+
+		t.Run("ByAddress returns ErrNotBootstrapped", func(t *testing.T) {
+			_, err := b.ByAddress(unittest.RandomAddressFixture(), 10, nil, nil)
+			require.ErrorIs(t, err, storage.ErrNotBootstrapped)
+		})
+
+		t.Run("All returns ErrNotBootstrapped", func(t *testing.T) {
+			_, err := b.All(10, nil, nil)
+			require.ErrorIs(t, err, storage.ErrNotBootstrapped)
+		})
+	})
+}
+
+func TestContractDeploymentsBootstrapper_UninitializedFirstHeight(t *testing.T) {
+	t.Parallel()
+
+	t.Run("returns (initialStartHeight, false) before bootstrap", func(t *testing.T) {
+		t.Parallel()
+		unittest.RunWithPebbleDB(t, func(db *pebble.DB) {
+			storageDB := pebbleimpl.ToDB(db)
+			b, err := NewContractDeploymentsBootstrapper(storageDB, 42)
+			require.NoError(t, err)
+
+			h, initialized := b.UninitializedFirstHeight()
+			assert.Equal(t, uint64(42), h)
+			assert.False(t, initialized)
+		})
+	})
+
+	t.Run("returns (firstHeight, true) after bootstrap", func(t *testing.T) {
+		t.Parallel()
+		unittest.RunWithPebbleDB(t, func(db *pebble.DB) {
+			storageDB := pebbleimpl.ToDB(db)
+			lm := storage.NewTestingLockManager()
+
+			b, err := NewContractDeploymentsBootstrapper(storageDB, 10)
+			require.NoError(t, err)
+
+			// Bootstrap by calling Store at the initial height.
+			err = unittest.WithLock(t, lm, storage.LockIndexContractDeployments, func(lctx lockctx.Context) error {
+				return storageDB.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+					return b.Store(lctx, rw, 10, nil)
+				})
+			})
+			require.NoError(t, err)
+
+			h, initialized := b.UninitializedFirstHeight()
+			assert.Equal(t, uint64(10), h)
+			assert.True(t, initialized)
+		})
+	})
+}
+
+func TestContractDeploymentsBootstrapper_Store(t *testing.T) {
+	t.Parallel()
+
+	t.Run("store at wrong height before bootstrap returns ErrNotBootstrapped", func(t *testing.T) {
+		t.Parallel()
+		unittest.RunWithPebbleDB(t, func(db *pebble.DB) {
+			storageDB := pebbleimpl.ToDB(db)
+			lm := storage.NewTestingLockManager()
+
+			b, err := NewContractDeploymentsBootstrapper(storageDB, 10)
+			require.NoError(t, err)
+
+			// Store at height 5 when initialStartHeight is 10
+			err = unittest.WithLock(t, lm, storage.LockIndexContractDeployments, func(lctx lockctx.Context) error {
+				return storageDB.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+					return b.Store(lctx, rw, 5, nil)
+				})
+			})
+			require.ErrorIs(t, err, storage.ErrNotBootstrapped)
+		})
+	})
+
+	t.Run("store at correct height bootstraps index", func(t *testing.T) {
+		t.Parallel()
+		unittest.RunWithPebbleDB(t, func(db *pebble.DB) {
+			storageDB := pebbleimpl.ToDB(db)
+			lm := storage.NewTestingLockManager()
+
+			b, err := NewContractDeploymentsBootstrapper(storageDB, 10)
+			require.NoError(t, err)
+
+			err = unittest.WithLock(t, lm, storage.LockIndexContractDeployments, func(lctx lockctx.Context) error {
+				return storageDB.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+					return b.Store(lctx, rw, 10, nil)
+				})
+			})
+			require.NoError(t, err)
+
+			// After bootstrapping, read operations should succeed.
+			first, err := b.FirstIndexedHeight()
+			require.NoError(t, err)
+			assert.Equal(t, uint64(10), first)
+		})
+	})
+
+	t.Run("subsequent heights work normally after bootstrap", func(t *testing.T) {
+		t.Parallel()
+		unittest.RunWithPebbleDB(t, func(db *pebble.DB) {
+			storageDB := pebbleimpl.ToDB(db)
+			lm := storage.NewTestingLockManager()
+
+			b, err := NewContractDeploymentsBootstrapper(storageDB, 10)
+			require.NoError(t, err)
+
+			// Bootstrap at height 10
+			err = unittest.WithLock(t, lm, storage.LockIndexContractDeployments, func(lctx lockctx.Context) error {
+				return storageDB.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+					return b.Store(lctx, rw, 10, nil)
+				})
+			})
+			require.NoError(t, err)
+
+			// Store at height 11 should work
+			contractID := "A.1234567890abcdef.MyContract"
+			d := makeDeployment(contractID, 11, 0, 0)
+			err = unittest.WithLock(t, lm, storage.LockIndexContractDeployments, func(lctx lockctx.Context) error {
+				return storageDB.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+					return b.Store(lctx, rw, 11, []access.ContractDeployment{d})
+				})
+			})
+			require.NoError(t, err)
+
+			// Verify the deployment is queryable
+			result, err := b.ByContractID(contractID)
+			require.NoError(t, err)
+			assert.Equal(t, uint64(11), result.BlockHeight)
+		})
+	})
+
+	t.Run("store with initial deployments at bootstrap height", func(t *testing.T) {
+		t.Parallel()
+		unittest.RunWithPebbleDB(t, func(db *pebble.DB) {
+			storageDB := pebbleimpl.ToDB(db)
+			lm := storage.NewTestingLockManager()
+
+			b, err := NewContractDeploymentsBootstrapper(storageDB, 5)
+			require.NoError(t, err)
+
+			contractID := "A.1234567890abcdef.MyContract"
+			d := makeDeployment(contractID, 5, 0, 0)
+
+			err = unittest.WithLock(t, lm, storage.LockIndexContractDeployments, func(lctx lockctx.Context) error {
+				return storageDB.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+					return b.Store(lctx, rw, 5, []access.ContractDeployment{d})
+				})
+			})
+			require.NoError(t, err)
+
+			result, err := b.ByContractID(contractID)
+			require.NoError(t, err)
+			assert.Equal(t, contractID, result.ContractID)
+			assert.Equal(t, uint64(5), result.BlockHeight)
+		})
+	})
+}

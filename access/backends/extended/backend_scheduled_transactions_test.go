@@ -79,25 +79,33 @@ func TestTransactionHandlerContract(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name        string
-		input       string
-		expected    string
-		expectedErr bool
+		name             string
+		input            string
+		expectedID       string
+		expectedAddrHex  string
+		expectedContract string
+		expectedErr      bool
 	}{
 		{
-			name:     "standard type identifier",
-			input:    "A.1654653399040a61.MyScheduler.Handler",
-			expected: "A.1654653399040a61.MyScheduler",
+			name:             "standard type identifier",
+			input:            "A.1654653399040a61.MyScheduler.Handler",
+			expectedID:       "A.1654653399040a61.MyScheduler",
+			expectedAddrHex:  "1654653399040a61",
+			expectedContract: "MyScheduler",
 		},
 		{
-			name:     "deeply nested type identifier returns A.address.Contract prefix only",
-			input:    "A.1654653399040a61.MyScheduler.SubModule.Handler",
-			expected: "A.1654653399040a61.MyScheduler",
+			name:             "deeply nested type identifier returns A.address.Contract prefix only",
+			input:            "A.1654653399040a61.MyScheduler.SubModule.Handler",
+			expectedID:       "A.1654653399040a61.MyScheduler",
+			expectedAddrHex:  "1654653399040a61",
+			expectedContract: "MyScheduler",
 		},
 		{
-			name:     "exactly three parts is valid",
-			input:    "A.1654653399040a61.MyScheduler",
-			expected: "A.1654653399040a61.MyScheduler",
+			name:             "exactly three parts is valid",
+			input:            "A.1654653399040a61.MyScheduler",
+			expectedID:       "A.1654653399040a61.MyScheduler",
+			expectedAddrHex:  "1654653399040a61",
+			expectedContract: "MyScheduler",
 		},
 		{
 			name:        "fewer than three parts returns error",
@@ -107,13 +115,15 @@ func TestTransactionHandlerContract(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			contractID, err := transactionHandlerContract(tt.input)
+			contractID, addr, contractName, err := transactionHandlerContract(tt.input)
 			if tt.expectedErr {
 				require.Error(t, err)
 				return
 			}
 			require.NoError(t, err)
-			assert.Equal(t, tt.expected, contractID)
+			assert.Equal(t, tt.expectedID, contractID)
+			assert.Equal(t, tt.expectedAddrHex, addr.Hex())
+			assert.Equal(t, tt.expectedContract, contractName)
 		})
 	}
 }
@@ -283,7 +293,7 @@ func TestScheduledTransactionsBackend_GetScheduledTransaction(t *testing.T) {
 		store := storagemock.NewScheduledTransactionsIndexReader(t)
 		backend := NewScheduledTransactionsBackend(
 			unittest.Logger(), &backendBase{config: defaultConfig},
-			store, nil, nil, nil,
+			store, nil, nil, nil, nil,
 		)
 
 		expectedTx := accessmodel.ScheduledTransaction{ID: 1, Status: accessmodel.ScheduledTxStatusScheduled}
@@ -304,7 +314,7 @@ func TestScheduledTransactionsBackend_GetScheduledTransaction(t *testing.T) {
 		store := storagemock.NewScheduledTransactionsIndexReader(t)
 		backend := NewScheduledTransactionsBackend(
 			unittest.Logger(), &backendBase{config: defaultConfig},
-			store, nil, nil, nil,
+			store, nil, nil, nil, nil,
 		)
 
 		store.On("ByID", uint64(99)).Return(accessmodel.ScheduledTransaction{}, storage.ErrNotFound).Once()
@@ -322,7 +332,7 @@ func TestScheduledTransactionsBackend_GetScheduledTransaction(t *testing.T) {
 		store := storagemock.NewScheduledTransactionsIndexReader(t)
 		backend := NewScheduledTransactionsBackend(
 			unittest.Logger(), &backendBase{config: defaultConfig},
-			store, nil, nil, nil,
+			store, nil, nil, nil, nil,
 		)
 
 		store.On("ByID", uint64(1)).Return(accessmodel.ScheduledTransaction{}, storage.ErrNotBootstrapped).Once()
@@ -340,7 +350,7 @@ func TestScheduledTransactionsBackend_GetScheduledTransaction(t *testing.T) {
 		store := storagemock.NewScheduledTransactionsIndexReader(t)
 		backend := NewScheduledTransactionsBackend(
 			unittest.Logger(), &backendBase{config: defaultConfig},
-			store, nil, nil, nil,
+			store, nil, nil, nil, nil,
 		)
 
 		storageErr := fmt.Errorf("unexpected disk failure")
@@ -362,7 +372,7 @@ func TestScheduledTransactionsBackend_GetScheduledTransaction(t *testing.T) {
 			store := storagemock.NewScheduledTransactionsIndexReader(t)
 			backend := NewScheduledTransactionsBackend(
 				unittest.Logger(), &backendBase{config: defaultConfig},
-				store, nil, nil, nil,
+				store, nil, nil, nil, nil,
 			)
 
 			tx := accessmodel.ScheduledTransaction{ID: 1, Status: status}
@@ -395,7 +405,7 @@ func TestScheduledTransactionsBackend_GetScheduledTransaction(t *testing.T) {
 					headers:              mockHeaders,
 					transactionsProvider: mockProvider,
 				},
-				store, scheduledTxLookup, nil, nil,
+				store, nil, scheduledTxLookup, nil, nil,
 			)
 
 			txID := unittest.IdentifierFixture()
@@ -443,7 +453,7 @@ func TestScheduledTransactionsBackend_GetScheduledTransaction(t *testing.T) {
 					headers:              mockHeaders,
 					transactionsProvider: mockProvider,
 				},
-				store, scheduledTxLookup, nil, nil,
+				store, nil, scheduledTxLookup, nil, nil,
 			)
 
 			txBody := unittest.TransactionBodyFixture()
@@ -474,35 +484,28 @@ func TestScheduledTransactionsBackend_GetScheduledTransaction(t *testing.T) {
 
 	t.Run("expand handler contract", func(t *testing.T) {
 		store := storagemock.NewScheduledTransactionsIndexReader(t)
-		mockState := protocolmock.NewState(t)
-		mockSnapshot := protocolmock.NewSnapshot(t)
-		mockScriptExecutor := executionmock.NewScriptExecutor(t)
+		mockContracts := storagemock.NewContractDeploymentsIndexReader(t)
 
 		backend := NewScheduledTransactionsBackend(
 			unittest.Logger(), &backendBase{config: defaultConfig},
-			store, nil, mockState, mockScriptExecutor,
+			store, mockContracts, nil, nil, nil,
 		)
 
-		handlerOwner := unittest.RandomAddressFixture()
 		handlerTypeID := "A.1654653399040a61.MyScheduler.Handler"
 		contractID := "A.1654653399040a61.MyScheduler"
 		contractBody := []byte("pub contract MyScheduler {}")
-		sealedHeader := unittest.BlockHeaderFixture()
 
 		storedTx := accessmodel.ScheduledTransaction{
 			ID:                               1,
 			Status:                           accessmodel.ScheduledTxStatusScheduled,
-			TransactionHandlerOwner:          handlerOwner,
 			TransactionHandlerTypeIdentifier: handlerTypeID,
 		}
 
 		store.On("ByID", uint64(1)).Return(storedTx, nil).Once()
-		mockState.On("Sealed").Return(mockSnapshot).Once()
-		mockSnapshot.On("Head").Return(sealedHeader, nil).Once()
-		mockScriptExecutor.On("GetAccountAtBlockHeight", mocktestify.Anything, handlerOwner, sealedHeader.Height).
-			Return(&flow.Account{
-				Contracts: map[string][]byte{contractID: contractBody},
-			}, nil).Once()
+		mockContracts.On("ByContractID", contractID).Return(
+			accessmodel.ContractDeployment{ContractID: contractID, Code: contractBody},
+			nil,
+		).Once()
 
 		result, err := backend.GetScheduledTransaction(
 			context.Background(), 1,
@@ -521,7 +524,7 @@ func TestScheduledTransactionsBackend_GetScheduledTransaction(t *testing.T) {
 
 		backend := NewScheduledTransactionsBackend(
 			unittest.Logger(), &backendBase{config: defaultConfig},
-			store, scheduledTxLookup, nil, nil,
+			store, nil, scheduledTxLookup, nil, nil,
 		)
 
 		storedTx := accessmodel.ScheduledTransaction{ID: 1, Status: accessmodel.ScheduledTxStatusExecuted}
@@ -545,7 +548,7 @@ func TestScheduledTransactionsBackend_GetScheduledTransaction(t *testing.T) {
 
 		backend := NewScheduledTransactionsBackend(
 			unittest.Logger(), &backendBase{config: defaultConfig},
-			store, scheduledTxLookup, nil, nil,
+			store, nil, scheduledTxLookup, nil, nil,
 		)
 
 		txID := unittest.IdentifierFixture()
@@ -572,7 +575,7 @@ func TestScheduledTransactionsBackend_GetScheduledTransaction(t *testing.T) {
 
 		backend := NewScheduledTransactionsBackend(
 			unittest.Logger(), &backendBase{config: defaultConfig, headers: mockHeaders},
-			store, scheduledTxLookup, nil, nil,
+			store, nil, scheduledTxLookup, nil, nil,
 		)
 
 		txID := unittest.IdentifierFixture()
@@ -607,7 +610,7 @@ func TestScheduledTransactionsBackend_GetScheduledTransaction(t *testing.T) {
 				headers:              mockHeaders,
 				transactionsProvider: mockProvider,
 			},
-			store, scheduledTxLookup, nil, nil,
+			store, nil, scheduledTxLookup, nil, nil,
 		)
 
 		txID := unittest.IdentifierFixture()
@@ -645,7 +648,7 @@ func TestScheduledTransactionsBackend_GetScheduledTransaction(t *testing.T) {
 				headers:              mockHeaders,
 				transactionsProvider: mockProvider,
 			},
-			store, scheduledTxLookup, nil, nil,
+			store, nil, scheduledTxLookup, nil, nil,
 		)
 
 		// txID that does NOT match the tx body returned by the provider.
@@ -685,7 +688,7 @@ func TestScheduledTransactionsBackend_GetScheduledTransaction(t *testing.T) {
 				headers:              mockHeaders,
 				transactionsProvider: mockProvider,
 			},
-			store, scheduledTxLookup, nil, nil,
+			store, nil, scheduledTxLookup, nil, nil,
 		)
 
 		txID := unittest.IdentifierFixture()
@@ -710,27 +713,26 @@ func TestScheduledTransactionsBackend_GetScheduledTransaction(t *testing.T) {
 		verifyThrown()
 	})
 
-	t.Run("expandHandlerContract: state.Sealed().Head() error triggers irrecoverable", func(t *testing.T) {
+	t.Run("expandHandlerContract: ByContractID error triggers irrecoverable", func(t *testing.T) {
 		store := storagemock.NewScheduledTransactionsIndexReader(t)
-		mockState := protocolmock.NewState(t)
-		mockSnapshot := protocolmock.NewSnapshot(t)
+		mockContracts := storagemock.NewContractDeploymentsIndexReader(t)
 
 		backend := NewScheduledTransactionsBackend(
 			unittest.Logger(), &backendBase{config: defaultConfig},
-			store, nil, mockState, nil,
+			store, mockContracts, nil, nil, nil,
 		)
 
 		storedTx := accessmodel.ScheduledTransaction{
 			ID:                               1,
 			Status:                           accessmodel.ScheduledTxStatusScheduled,
-			TransactionHandlerOwner:          unittest.RandomAddressFixture(),
 			TransactionHandlerTypeIdentifier: "A.1654653399040a61.MyScheduler.Handler",
 		}
-		headErr := fmt.Errorf("sealed head error")
+		contractErr := fmt.Errorf("contract read error")
 
 		store.On("ByID", uint64(1)).Return(storedTx, nil).Once()
-		mockState.On("Sealed").Return(mockSnapshot).Once()
-		mockSnapshot.On("Head").Return((*flow.Header)(nil), headErr).Once()
+		mockContracts.On("ByContractID", "A.1654653399040a61.MyScheduler").Return(
+			accessmodel.ContractDeployment{}, contractErr,
+		).Once()
 
 		signalerCtx, verifyThrown := signalerCtxExpectingThrow(t)
 
@@ -743,33 +745,74 @@ func TestScheduledTransactionsBackend_GetScheduledTransaction(t *testing.T) {
 		verifyThrown()
 	})
 
-	t.Run("expandHandlerContract: scriptExecutor error triggers irrecoverable", func(t *testing.T) {
+	t.Run("expandHandlerContract: ErrNotFound falls back to state, returns contract", func(t *testing.T) {
 		store := storagemock.NewScheduledTransactionsIndexReader(t)
+		mockContracts := storagemock.NewContractDeploymentsIndexReader(t)
 		mockState := protocolmock.NewState(t)
 		mockSnapshot := protocolmock.NewSnapshot(t)
-		mockScriptExecutor := executionmock.NewScriptExecutor(t)
+		mockExecutor := executionmock.NewScriptExecutor(t)
 
 		backend := NewScheduledTransactionsBackend(
 			unittest.Logger(), &backendBase{config: defaultConfig},
-			store, nil, mockState, mockScriptExecutor,
+			store, mockContracts, nil, mockState, mockExecutor,
 		)
 
-		handlerOwner := unittest.RandomAddressFixture()
 		sealedHeader := unittest.BlockHeaderFixture()
-		execErr := fmt.Errorf("script executor error")
+		handlerAddr, err := flow.StringToAddress("1654653399040a61")
+		require.NoError(t, err)
+		contractCode := []byte("access(all) contract MyScheduler {}")
 
 		storedTx := accessmodel.ScheduledTransaction{
 			ID:                               1,
 			Status:                           accessmodel.ScheduledTxStatusScheduled,
-			TransactionHandlerOwner:          handlerOwner,
 			TransactionHandlerTypeIdentifier: "A.1654653399040a61.MyScheduler.Handler",
 		}
 
 		store.On("ByID", uint64(1)).Return(storedTx, nil).Once()
+		mockContracts.On("ByContractID", "A.1654653399040a61.MyScheduler").Return(
+			accessmodel.ContractDeployment{}, storage.ErrNotFound,
+		).Once()
 		mockState.On("Sealed").Return(mockSnapshot).Once()
 		mockSnapshot.On("Head").Return(sealedHeader, nil).Once()
-		mockScriptExecutor.On("GetAccountAtBlockHeight", mocktestify.Anything, handlerOwner, sealedHeader.Height).
-			Return(nil, execErr).Once()
+		mockExecutor.On("GetAccountCode", mocktestify.Anything, handlerAddr, "MyScheduler", sealedHeader.Height).
+			Return(contractCode, nil).Once()
+
+		signalerCtx, _ := irrecoverable.NewMockSignalerContextWithCancel(t, context.Background())
+
+		tx, err := backend.GetScheduledTransaction(
+			signalerCtx, 1,
+			ScheduledTransactionExpandOptions{HandlerContract: true},
+			defaultEncoding,
+		)
+		require.NoError(t, err)
+		require.NotNil(t, tx.HandlerContract)
+		assert.Equal(t, "A.1654653399040a61.MyScheduler", tx.HandlerContract.Identifier)
+		assert.Equal(t, string(contractCode), tx.HandlerContract.Body)
+	})
+
+	t.Run("expandHandlerContract: ErrNotFound and state.Sealed fails triggers irrecoverable", func(t *testing.T) {
+		store := storagemock.NewScheduledTransactionsIndexReader(t)
+		mockContracts := storagemock.NewContractDeploymentsIndexReader(t)
+		mockState := protocolmock.NewState(t)
+		mockSnapshot := protocolmock.NewSnapshot(t)
+
+		backend := NewScheduledTransactionsBackend(
+			unittest.Logger(), &backendBase{config: defaultConfig},
+			store, mockContracts, nil, mockState, nil,
+		)
+
+		storedTx := accessmodel.ScheduledTransaction{
+			ID:                               1,
+			Status:                           accessmodel.ScheduledTxStatusScheduled,
+			TransactionHandlerTypeIdentifier: "A.1654653399040a61.MyScheduler.Handler",
+		}
+
+		store.On("ByID", uint64(1)).Return(storedTx, nil).Once()
+		mockContracts.On("ByContractID", "A.1654653399040a61.MyScheduler").Return(
+			accessmodel.ContractDeployment{}, storage.ErrNotFound,
+		).Once()
+		mockState.On("Sealed").Return(mockSnapshot).Once()
+		mockSnapshot.On("Head").Return(nil, fmt.Errorf("state error")).Once()
 
 		signalerCtx, verifyThrown := signalerCtxExpectingThrow(t)
 
@@ -782,33 +825,64 @@ func TestScheduledTransactionsBackend_GetScheduledTransaction(t *testing.T) {
 		verifyThrown()
 	})
 
-	t.Run("expandHandlerContract: contract not found in account triggers irrecoverable", func(t *testing.T) {
+	t.Run("expandHandlerContract: ErrNotFound and GetAccountCode fails triggers irrecoverable", func(t *testing.T) {
 		store := storagemock.NewScheduledTransactionsIndexReader(t)
+		mockContracts := storagemock.NewContractDeploymentsIndexReader(t)
 		mockState := protocolmock.NewState(t)
 		mockSnapshot := protocolmock.NewSnapshot(t)
-		mockScriptExecutor := executionmock.NewScriptExecutor(t)
+		mockExecutor := executionmock.NewScriptExecutor(t)
 
 		backend := NewScheduledTransactionsBackend(
 			unittest.Logger(), &backendBase{config: defaultConfig},
-			store, nil, mockState, mockScriptExecutor,
+			store, mockContracts, nil, mockState, mockExecutor,
 		)
 
-		handlerOwner := unittest.RandomAddressFixture()
 		sealedHeader := unittest.BlockHeaderFixture()
+		handlerAddr, err := flow.StringToAddress("1654653399040a61")
+		require.NoError(t, err)
 
 		storedTx := accessmodel.ScheduledTransaction{
 			ID:                               1,
 			Status:                           accessmodel.ScheduledTxStatusScheduled,
-			TransactionHandlerOwner:          handlerOwner,
 			TransactionHandlerTypeIdentifier: "A.1654653399040a61.MyScheduler.Handler",
 		}
 
 		store.On("ByID", uint64(1)).Return(storedTx, nil).Once()
+		mockContracts.On("ByContractID", "A.1654653399040a61.MyScheduler").Return(
+			accessmodel.ContractDeployment{}, storage.ErrNotFound,
+		).Once()
 		mockState.On("Sealed").Return(mockSnapshot).Once()
 		mockSnapshot.On("Head").Return(sealedHeader, nil).Once()
-		// Account exists but does not have the expected contract.
-		mockScriptExecutor.On("GetAccountAtBlockHeight", mocktestify.Anything, handlerOwner, sealedHeader.Height).
-			Return(&flow.Account{Contracts: map[string][]byte{}}, nil).Once()
+		mockExecutor.On("GetAccountCode", mocktestify.Anything, handlerAddr, "MyScheduler", sealedHeader.Height).
+			Return(nil, fmt.Errorf("executor error")).Once()
+
+		signalerCtx, verifyThrown := signalerCtxExpectingThrow(t)
+
+		_, err = backend.GetScheduledTransaction(
+			signalerCtx, 1,
+			ScheduledTransactionExpandOptions{HandlerContract: true},
+			defaultEncoding,
+		)
+		require.Error(t, err)
+		verifyThrown()
+	})
+
+	t.Run("expandHandlerContract: invalid type identifier triggers irrecoverable", func(t *testing.T) {
+		store := storagemock.NewScheduledTransactionsIndexReader(t)
+
+		backend := NewScheduledTransactionsBackend(
+			unittest.Logger(), &backendBase{config: defaultConfig},
+			store, nil, nil, nil, nil,
+		)
+
+		storedTx := accessmodel.ScheduledTransaction{
+			ID:     1,
+			Status: accessmodel.ScheduledTxStatusScheduled,
+			// Too few parts to extract a contract ID (requires at least 3 dot-separated segments).
+			TransactionHandlerTypeIdentifier: "invalid",
+		}
+
+		store.On("ByID", uint64(1)).Return(storedTx, nil).Once()
 
 		signalerCtx, verifyThrown := signalerCtxExpectingThrow(t)
 
@@ -834,7 +908,7 @@ func TestScheduledTransactionsBackend_GetScheduledTransactions(t *testing.T) {
 		store := storagemock.NewScheduledTransactionsIndexReader(t)
 		backend := NewScheduledTransactionsBackend(
 			unittest.Logger(), &backendBase{config: defaultConfig},
-			store, nil, nil, nil,
+			store, nil, nil, nil, nil,
 		)
 
 		txs := []accessmodel.ScheduledTransaction{
@@ -859,7 +933,7 @@ func TestScheduledTransactionsBackend_GetScheduledTransactions(t *testing.T) {
 		store := storagemock.NewScheduledTransactionsIndexReader(t)
 		backend := NewScheduledTransactionsBackend(
 			unittest.Logger(), &backendBase{config: defaultConfig},
-			store, nil, nil, nil,
+			store, nil, nil, nil, nil,
 		)
 
 		// limit=2, provide 3 items: CollectResults collects 2, then peeks at item 3 to build cursor
@@ -887,7 +961,7 @@ func TestScheduledTransactionsBackend_GetScheduledTransactions(t *testing.T) {
 		store := storagemock.NewScheduledTransactionsIndexReader(t)
 		backend := NewScheduledTransactionsBackend(
 			unittest.Logger(), &backendBase{config: defaultConfig},
-			store, nil, nil, nil,
+			store, nil, nil, nil, nil,
 		)
 
 		store.On("All", (*accessmodel.ScheduledTransactionCursor)(nil)).
@@ -905,7 +979,7 @@ func TestScheduledTransactionsBackend_GetScheduledTransactions(t *testing.T) {
 		store := storagemock.NewScheduledTransactionsIndexReader(t)
 		backend := NewScheduledTransactionsBackend(
 			unittest.Logger(), &backendBase{config: defaultConfig},
-			store, nil, nil, nil,
+			store, nil, nil, nil, nil,
 		)
 
 		store.On("All", (*accessmodel.ScheduledTransactionCursor)(nil)).
@@ -923,7 +997,7 @@ func TestScheduledTransactionsBackend_GetScheduledTransactions(t *testing.T) {
 		store := storagemock.NewScheduledTransactionsIndexReader(t)
 		backend := NewScheduledTransactionsBackend(
 			unittest.Logger(), &backendBase{config: defaultConfig},
-			store, nil, nil, nil,
+			store, nil, nil, nil, nil,
 		)
 
 		_, err := backend.GetScheduledTransactions(
@@ -941,7 +1015,7 @@ func TestScheduledTransactionsBackend_GetScheduledTransactions(t *testing.T) {
 		store := storagemock.NewScheduledTransactionsIndexReader(t)
 		backend := NewScheduledTransactionsBackend(
 			unittest.Logger(), &backendBase{config: defaultConfig},
-			store, nil, nil, nil,
+			store, nil, nil, nil, nil,
 		)
 
 		cursor := &accessmodel.ScheduledTransactionCursor{ID: 100}
@@ -960,7 +1034,7 @@ func TestScheduledTransactionsBackend_GetScheduledTransactions(t *testing.T) {
 		store := storagemock.NewScheduledTransactionsIndexReader(t)
 		backend := NewScheduledTransactionsBackend(
 			unittest.Logger(), &backendBase{config: defaultConfig},
-			store, nil, nil, nil,
+			store, nil, nil, nil, nil,
 		)
 
 		store.On("All", (*accessmodel.ScheduledTransactionCursor)(nil)).
@@ -980,7 +1054,7 @@ func TestScheduledTransactionsBackend_GetScheduledTransactions(t *testing.T) {
 		store := storagemock.NewScheduledTransactionsIndexReader(t)
 		backend := NewScheduledTransactionsBackend(
 			unittest.Logger(), &backendBase{config: defaultConfig},
-			store, nil, nil, nil,
+			store, nil, nil, nil, nil,
 		)
 
 		store.On("All", (*accessmodel.ScheduledTransactionCursor)(nil)).
@@ -1001,7 +1075,7 @@ func TestScheduledTransactionsBackend_GetScheduledTransactions(t *testing.T) {
 		store := storagemock.NewScheduledTransactionsIndexReader(t)
 		backend := NewScheduledTransactionsBackend(
 			unittest.Logger(), &backendBase{config: defaultConfig},
-			store, nil, nil, nil,
+			store, nil, nil, nil, nil,
 		)
 
 		storageErr := fmt.Errorf("unexpected disk failure")
@@ -1026,7 +1100,7 @@ func TestScheduledTransactionsBackend_GetScheduledTransactions(t *testing.T) {
 
 		backend := NewScheduledTransactionsBackend(
 			unittest.Logger(), &backendBase{config: defaultConfig},
-			store, scheduledTxLookup, nil, nil,
+			store, nil, scheduledTxLookup, nil, nil,
 		)
 
 		txs := []accessmodel.ScheduledTransaction{
@@ -1062,7 +1136,7 @@ func TestScheduledTransactionsBackend_GetScheduledTransactionsByAddress(t *testi
 		store := storagemock.NewScheduledTransactionsIndexReader(t)
 		backend := NewScheduledTransactionsBackend(
 			unittest.Logger(), &backendBase{config: defaultConfig},
-			store, nil, nil, nil,
+			store, nil, nil, nil, nil,
 		)
 
 		addr := unittest.RandomAddressFixture()
@@ -1088,7 +1162,7 @@ func TestScheduledTransactionsBackend_GetScheduledTransactionsByAddress(t *testi
 		store := storagemock.NewScheduledTransactionsIndexReader(t)
 		backend := NewScheduledTransactionsBackend(
 			unittest.Logger(), &backendBase{config: defaultConfig},
-			store, nil, nil, nil,
+			store, nil, nil, nil, nil,
 		)
 
 		addr := unittest.RandomAddressFixture()
@@ -1107,7 +1181,7 @@ func TestScheduledTransactionsBackend_GetScheduledTransactionsByAddress(t *testi
 		store := storagemock.NewScheduledTransactionsIndexReader(t)
 		backend := NewScheduledTransactionsBackend(
 			unittest.Logger(), &backendBase{config: defaultConfig},
-			store, nil, nil, nil,
+			store, nil, nil, nil, nil,
 		)
 
 		addr := unittest.RandomAddressFixture()
@@ -1127,7 +1201,7 @@ func TestScheduledTransactionsBackend_GetScheduledTransactionsByAddress(t *testi
 		store := storagemock.NewScheduledTransactionsIndexReader(t)
 		backend := NewScheduledTransactionsBackend(
 			unittest.Logger(), &backendBase{config: defaultConfig},
-			store, nil, nil, nil,
+			store, nil, nil, nil, nil,
 		)
 
 		addr := unittest.RandomAddressFixture()
@@ -1147,7 +1221,7 @@ func TestScheduledTransactionsBackend_GetScheduledTransactionsByAddress(t *testi
 		store := storagemock.NewScheduledTransactionsIndexReader(t)
 		backend := NewScheduledTransactionsBackend(
 			unittest.Logger(), &backendBase{config: defaultConfig},
-			store, nil, nil, nil,
+			store, nil, nil, nil, nil,
 		)
 
 		addr := unittest.RandomAddressFixture()
@@ -1168,7 +1242,7 @@ func TestScheduledTransactionsBackend_GetScheduledTransactionsByAddress(t *testi
 		store := storagemock.NewScheduledTransactionsIndexReader(t)
 		backend := NewScheduledTransactionsBackend(
 			unittest.Logger(), &backendBase{config: defaultConfig},
-			store, nil, nil, nil,
+			store, nil, nil, nil, nil,
 		)
 
 		addr := unittest.RandomAddressFixture()
@@ -1190,7 +1264,7 @@ func TestScheduledTransactionsBackend_GetScheduledTransactionsByAddress(t *testi
 		store := storagemock.NewScheduledTransactionsIndexReader(t)
 		backend := NewScheduledTransactionsBackend(
 			unittest.Logger(), &backendBase{config: defaultConfig},
-			store, nil, nil, nil,
+			store, nil, nil, nil, nil,
 		)
 
 		addr := unittest.RandomAddressFixture()
@@ -1216,7 +1290,7 @@ func TestScheduledTransactionsBackend_GetScheduledTransactionsByAddress(t *testi
 
 		backend := NewScheduledTransactionsBackend(
 			unittest.Logger(), &backendBase{config: defaultConfig},
-			store, scheduledTxLookup, nil, nil,
+			store, nil, scheduledTxLookup, nil, nil,
 		)
 
 		addr := unittest.RandomAddressFixture()
