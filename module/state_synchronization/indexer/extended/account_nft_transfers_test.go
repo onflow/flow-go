@@ -10,6 +10,7 @@ import (
 
 	"github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -109,7 +110,7 @@ func TestNonFungibleTokenTransfers_IndexBlockData(t *testing.T) {
 
 	t.Run("empty block stores empty transfer slice", func(t *testing.T) {
 		nftStore := &mockNFTBootstrapper{latestHeight: 99}
-		a := NewNonFungibleTokenTransfers(unittest.Logger(), flow.Testnet, nftStore)
+		a := NewNonFungibleTokenTransfers(unittest.Logger(), flow.Testnet, nftStore, metrics.NewNoopCollector())
 
 		data := BlockData{
 			Header: unittest.BlockHeaderFixture(unittest.WithHeaderHeight(100)),
@@ -124,7 +125,7 @@ func TestNonFungibleTokenTransfers_IndexBlockData(t *testing.T) {
 
 	t.Run("future height returns ErrFutureHeight", func(t *testing.T) {
 		nftStore := &mockNFTBootstrapper{latestHeight: 99}
-		a := NewNonFungibleTokenTransfers(unittest.Logger(), flow.Testnet, nftStore)
+		a := NewNonFungibleTokenTransfers(unittest.Logger(), flow.Testnet, nftStore, metrics.NewNoopCollector())
 
 		data := BlockData{
 			Header: unittest.BlockHeaderFixture(unittest.WithHeaderHeight(101)), // next expected is 100
@@ -137,7 +138,7 @@ func TestNonFungibleTokenTransfers_IndexBlockData(t *testing.T) {
 
 	t.Run("already indexed returns ErrAlreadyIndexed", func(t *testing.T) {
 		nftStore := &mockNFTBootstrapper{latestHeight: 99}
-		a := NewNonFungibleTokenTransfers(unittest.Logger(), flow.Testnet, nftStore)
+		a := NewNonFungibleTokenTransfers(unittest.Logger(), flow.Testnet, nftStore, metrics.NewNoopCollector())
 
 		data := BlockData{
 			Header: unittest.BlockHeaderFixture(unittest.WithHeaderHeight(99)), // next expected is 100
@@ -151,7 +152,7 @@ func TestNonFungibleTokenTransfers_IndexBlockData(t *testing.T) {
 	t.Run("NextHeight error propagates", func(t *testing.T) {
 		nextHeightErr := fmt.Errorf("next height failure")
 		nftStore := &mockNFTBootstrapper{latestHeightErr: nextHeightErr}
-		a := NewNonFungibleTokenTransfers(unittest.Logger(), flow.Testnet, nftStore)
+		a := NewNonFungibleTokenTransfers(unittest.Logger(), flow.Testnet, nftStore, metrics.NewNoopCollector())
 
 		data := BlockData{
 			Header: unittest.BlockHeaderFixture(unittest.WithHeaderHeight(100)),
@@ -166,7 +167,7 @@ func TestNonFungibleTokenTransfers_IndexBlockData(t *testing.T) {
 	t.Run("store error propagates", func(t *testing.T) {
 		storeErr := fmt.Errorf("NFT storage failure")
 		nftStore := &mockNFTBootstrapper{latestHeight: 99, storeErr: storeErr}
-		a := NewNonFungibleTokenTransfers(unittest.Logger(), flow.Testnet, nftStore)
+		a := NewNonFungibleTokenTransfers(unittest.Logger(), flow.Testnet, nftStore, metrics.NewNoopCollector())
 
 		data := BlockData{
 			Header: unittest.BlockHeaderFixture(unittest.WithHeaderHeight(100)),

@@ -17,6 +17,7 @@ import (
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/state_synchronization/indexer/extended/events"
 	"github.com/onflow/flow-go/storage"
 )
@@ -48,8 +49,9 @@ const scheduledTransactionsIndexerName = "scheduled_transactions"
 //
 // Not safe for concurrent use.
 type ScheduledTransactions struct {
-	log   zerolog.Logger
-	store storage.ScheduledTransactionsIndexBootstrapper
+	log     zerolog.Logger
+	store   storage.ScheduledTransactionsIndexBootstrapper
+	metrics module.ExtendedIndexingMetrics
 
 	scheduledExecutorAddr flow.Address
 
@@ -97,6 +99,7 @@ func NewScheduledTransactions(
 	log zerolog.Logger,
 	store storage.ScheduledTransactionsIndexBootstrapper,
 	scriptExecutor scriptExecutor,
+	metrics module.ExtendedIndexingMetrics,
 	chainID flow.ChainID,
 ) *ScheduledTransactions {
 	sc := systemcontracts.SystemContractsForChain(chainID)
@@ -106,6 +109,7 @@ func NewScheduledTransactions(
 	return &ScheduledTransactions{
 		log:                   log.With().Str("component", "scheduled_tx_indexer").Logger(),
 		store:                 store,
+		metrics:               metrics,
 		requester:             NewScheduledTransactionRequester(scriptExecutor, chainID),
 		scheduledExecutorAddr: sc.ScheduledTransactionExecutor.Address,
 		scheduledEventType:    flow.EventType(prefix + "Scheduled"),
@@ -210,6 +214,14 @@ func (s *ScheduledTransactions) IndexBlockData(lctx lockctx.Proof, data BlockDat
 			return fmt.Errorf("failed to store new scheduled transactions: %w", err)
 		}
 	}
+
+	s.metrics.ScheduledTransactionIndexed(
+		len(collected.newTxs)-len(missingIDs),
+		len(collected.executedEntries),
+		len(collected.failedEntries),
+		len(collected.canceledEntries),
+		len(missingIDs),
+	)
 
 	return nil
 }

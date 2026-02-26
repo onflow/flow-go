@@ -7,6 +7,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/state_synchronization/indexer/extended/transfers"
 	"github.com/onflow/flow-go/storage"
 )
@@ -18,6 +19,7 @@ type NonFungibleTokenTransfers struct {
 	log       zerolog.Logger
 	nftParser *transfers.NFTParser
 	nftStore  storage.NonFungibleTokenTransfersBootstrapper
+	metrics   module.ExtendedIndexingMetrics
 }
 
 var _ Indexer = (*NonFungibleTokenTransfers)(nil)
@@ -27,11 +29,13 @@ func NewNonFungibleTokenTransfers(
 	log zerolog.Logger,
 	chainID flow.ChainID,
 	nftStore storage.NonFungibleTokenTransfersBootstrapper,
+	metrics module.ExtendedIndexingMetrics,
 ) *NonFungibleTokenTransfers {
 	return &NonFungibleTokenTransfers{
 		log:       log.With().Str("component", "account_nft_transfers_indexer").Logger(),
 		nftParser: transfers.NewNFTParser(chainID),
 		nftStore:  nftStore,
+		metrics:   metrics,
 	}
 }
 
@@ -75,6 +79,8 @@ func (a *NonFungibleTokenTransfers) IndexBlockData(lctx lockctx.Proof, data Bloc
 	if err := a.nftStore.Store(lctx, batch, data.Header.Height, nftEntries); err != nil {
 		return fmt.Errorf("failed to store non-fungible token transfers: %w", err)
 	}
+
+	a.metrics.NFTTransferIndexed(len(nftEntries))
 
 	return nil
 }
