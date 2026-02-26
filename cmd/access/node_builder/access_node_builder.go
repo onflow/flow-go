@@ -1113,10 +1113,18 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 					builder.ExtendedStorage.NonFungibleTokenTransfersBootstrapper,
 				)
 
+				scheduledTransactions := extended.NewScheduledTransactions(
+					node.Logger,
+					builder.ExtendedStorage.ScheduledTransactionsBootstrapper,
+					builder.ScriptExecutor,
+					node.RootChainID,
+				)
+
 				extendedIndexers := []extended.Indexer{
 					accountTransactions,
 					ftTransfers,
 					nftTransfers,
+					scheduledTransactions,
 				}
 
 				extendedIndexer, err := extended.NewExtendedIndexer(
@@ -2327,7 +2335,9 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 					utils.NotNil(node.Storage.Collections),
 					utils.NotNil(node.Storage.Transactions),
 					builder.scheduledTransactions,
+					builder.ExtendedStorage.ScheduledTransactionsBootstrapper,
 					txstatus.NewTxStatusDeriver(node.State, lastFullBlockHeight),
+					utils.NotNil(builder.ScriptExecutor),
 				)
 				if err != nil {
 					return nil, fmt.Errorf("could not initialize extended backend: %w", err)

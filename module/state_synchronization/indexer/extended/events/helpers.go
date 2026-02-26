@@ -45,6 +45,21 @@ func AddressFromOptional(opt cadence.Optional) (flow.Address, error) {
 	return flow.BytesToAddress(addr.Bytes()), nil
 }
 
+// PathFromOptional extracts a path string ("domain/identifier") from a [cadence.Optional]
+// containing a [cadence.Path]. Returns "" if the optional is empty.
+//
+// Any error indicates that the optional value is not a valid path.
+func PathFromOptional(opt cadence.Optional) (string, error) {
+	if opt.Value == nil {
+		return "", nil
+	}
+	path, ok := opt.Value.(cadence.Path)
+	if !ok {
+		return "", fmt.Errorf("unexpected type in optional path field: %T", opt.Value)
+	}
+	return path.String(), nil
+}
+
 // HexToEVMAddress decodes a hex string to an EVM address.
 // This is the same logic as `common.HexToAddress`, except it returns an error if the hex string is
 // not valid hex or an incorrect length.
