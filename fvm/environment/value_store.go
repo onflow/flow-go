@@ -241,13 +241,15 @@ func (store *valueStore) AllocateSlabIndex(
 	address := flow.BytesToAddress(owner)
 
 	span := store.tracer.StartChildSpan(trace.FVMEnvAllocateSlabIndex)
-	if span.Tracer != nil {
-		span.SetAttributes(
-			attribute.String("owner", address.String()),
-			attribute.String("index", fmt.Sprint(binary.BigEndian.Uint64(slabIndex[:]))),
-		)
-	}
-	defer span.End()
+	defer func() {
+		if span.Tracer != nil {
+			span.SetAttributes(
+				attribute.String("owner", address.String()),
+				attribute.String("index", fmt.Sprint(binary.BigEndian.Uint64(slabIndex[:]))),
+			)
+		}
+		span.End()
+	}()
 
 	err = store.meter.MeterComputation(
 		common.ComputationUsage{
