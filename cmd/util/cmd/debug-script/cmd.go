@@ -1,7 +1,6 @@
 package debug_tx
 
 import (
-	"context"
 	"os"
 
 	"github.com/onflow/flow/protobuf/go/flow/access"
@@ -57,7 +56,8 @@ func init() {
 	Cmd.Flags().BoolVar(&flagUseExecutionDataAPI, "use-execution-data-api", true, "use the execution data API (default: true)")
 }
 
-func run(*cobra.Command, []string) {
+func run(cmd *cobra.Command, _ []string) {
+	ctx := cmd.Context()
 
 	chainID := flow.ChainID(flagChain)
 	chain := chainID.Chain()
@@ -85,7 +85,7 @@ func run(*cobra.Command, []string) {
 
 	log.Info().Msgf("Fetching block header for %s ...", blockID)
 
-	blockHeader, err := debug.GetAccessAPIBlockHeader(context.Background(), accessClient, blockID)
+	blockHeader, err := debug.GetAccessAPIBlockHeader(ctx, accessClient, blockID)
 	if err != nil {
 		log.Fatal().Err(err).Msg("Failed to fetch block header")
 	}
