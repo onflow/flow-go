@@ -73,7 +73,8 @@ func init() {
 	Cmd.Flags().StringVar(&flagEntropyProvider, "entropy-provider", "none", "entropy provider to use (default: none; options: none, block-hash)")
 }
 
-func run(_ *cobra.Command, args []string) {
+func run(cmd *cobra.Command, args []string) {
+	ctx := cmd.Context()
 
 	chainID := flow.ChainID(flagChain)
 	chain := chainID.Chain()
@@ -153,8 +154,8 @@ func run(_ *cobra.Command, args []string) {
 			log.Fatal().Err(err).Str("ID", flagBlockID).Msg("Failed to parse block ID")
 		}
 
-		header := FetchBlockHeader(blockID, flowClient)
-		blockTransactions := FetchBlockTransactions(blockID, flowClient)
+		header := FetchBlockHeader(ctx, blockID, flowClient)
+		blockTransactions := FetchBlockTransactions(ctx, blockID, flowClient)
 
 		log.Info().Msgf("Running all transactions in block %s (height %d) ...", blockID, header.Height)
 
@@ -199,6 +200,7 @@ func run(_ *cobra.Command, args []string) {
 			}
 
 			result := RunSingleTransaction(
+				ctx,
 				remoteClient,
 				txID,
 				flowClient,
@@ -240,6 +242,7 @@ func fvmOptions(blockID flow.Identifier) []fvm.Option {
 }
 
 func RunSingleTransaction(
+	ctx context.Context,
 	remoteClient debug.RemoteClient,
 	txID flow.Identifier,
 	flowClient *client.Client,
@@ -249,7 +252,7 @@ func RunSingleTransaction(
 ) debug.Result {
 	log.Info().Msgf("Fetching transaction result for %s ...", txID)
 
-	txResult, err := flowClient.GetTransactionResult(context.Background(), sdk.Identifier(txID))
+	txResult, err := flowClient.GetTransactionResult(ctx, sdk.Identifier(txID))
 	if err != nil {
 		log.Fatal().Err(err).Msg("Failed to fetch transaction result")
 	}
@@ -265,8 +268,8 @@ func RunSingleTransaction(
 	)
 
 	// Fetch block info
-	header := FetchBlockHeader(blockID, flowClient)
-	blockTransactions := FetchBlockTransactions(blockID, flowClient)
+	header := FetchBlockHeader(ctx, blockID, flowClient)
+	blockTransactions := FetchBlockTransactions(ctx, blockID, flowClient)
 
 	var newSpanExporter func(blockTxID flow.Identifier) otelTrace.SpanExporter
 	if spanExporter != nil {
@@ -317,13 +320,14 @@ func NewBlockSnapshot(
 }
 
 func FetchBlockHeader(
+	ctx context.Context,
 	blockID flow.Identifier,
 	flowClient *client.Client,
 ) (header *flow.Header) {
 	log.Info().Msg("Fetching block header ...")
 
 	var err error
-	header, err = debug.GetAccessAPIBlockHeader(context.Background(), flowClient.RPCClient(), blockID)
+	header, err = debug.GetAccessAPIBlockHeader(ctx, flowClient.RPCClient(), blockID)
 	if err != nil {
 		log.Fatal().Err(err).Msg("Failed to fetch block header")
 	}
@@ -338,6 +342,7 @@ func FetchBlockHeader(
 }
 
 func SubscribeBlockHeadersFromStartBlockID(
+	ctx context.Context,
 	flowClient *client.Client,
 	startBlockID flow.Identifier,
 	blockStatus flow.BlockStatus,
@@ -346,7 +351,7 @@ func SubscribeBlockHeadersFromStartBlockID(
 
 	var err error
 	get, err = debug.SubscribeAccessAPIBlockHeadersFromStartBlockID(
-		context.Background(),
+		ctx,
 		flowClient.RPCClient(),
 		startBlockID,
 		blockStatus,
@@ -361,6 +366,7 @@ func SubscribeBlockHeadersFromStartBlockID(
 }
 
 func SubscribeBlockHeadersFromLatest(
+	ctx context.Context,
 	flowClient *client.Client,
 	blockStatus flow.BlockStatus,
 ) (get func() (*flow.Header, error)) {
@@ -368,7 +374,7 @@ func SubscribeBlockHeadersFromLatest(
 
 	var err error
 	get, err = debug.SubscribeAccessAPIBlockHeadersFromLatest(
-		context.Background(),
+		ctx,
 		flowClient.RPCClient(),
 		blockStatus,
 	)
@@ -382,6 +388,7 @@ func SubscribeBlockHeadersFromLatest(
 }
 
 func FetchBlockTransactions(
+	ctx context.Context,
 	blockID flow.Identifier,
 	flowClient *client.Client,
 ) []*sdk.Transaction {
@@ -389,7 +396,7 @@ func FetchBlockTransactions(
 
 	log.Info().Msgf("Fetching transactions of block %s ...", blockID)
 
-	blockTransactions, err := flowClient.GetTransactionsByBlockID(context.Background(), sdk.Identifier(blockID))
+	blockTransactions, err := flowClient.GetTransactionsByBlockID(ctx, sdk.Identifier(blockID))
 	if err != nil {
 		log.Fatal().Err(err).Msg("Failed to fetch transactions of block")
 	}
