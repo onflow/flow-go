@@ -80,3 +80,57 @@ func (_c *ExtendedIndexingMetrics_BlockIndexedExtended_Call) RunAndReturn(run fu
 	_c.Run(run)
 	return _c
 }
+
+// ScheduledTransactionIndexed provides a mock function for the type ExtendedIndexingMetrics
+func (_mock *ExtendedIndexingMetrics) ScheduledTransactionIndexed(scheduled int, executed int, failed int, canceled int, backfilled int) {
+	_mock.Called(scheduled, executed, failed, canceled, backfilled)
+	return
+}
+
+// ExtendedIndexingMetrics_ScheduledTransactionIndexed_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ScheduledTransactionIndexed'
+type ExtendedIndexingMetrics_ScheduledTransactionIndexed_Call struct {
+	*mock.Call
+}
+
+// ScheduledTransactionIndexed is a helper method to define mock.On call
+//   - scheduled int
+//   - executed int
+//   - failed int
+//   - canceled int
+//   - backfilled int
+func (_e *ExtendedIndexingMetrics_Expecter) ScheduledTransactionIndexed(scheduled interface{}, executed interface{}, failed interface{}, canceled interface{}, backfilled interface{}) *ExtendedIndexingMetrics_ScheduledTransactionIndexed_Call {
+	return &ExtendedIndexingMetrics_ScheduledTransactionIndexed_Call{Call: _e.mock.On("ScheduledTransactionIndexed", scheduled, executed, failed, canceled, backfilled)}
+}
+
+func (_c *ExtendedIndexingMetrics_ScheduledTransactionIndexed_Call) Run(run func(scheduled int, executed int, failed int, canceled int, backfilled int)) *ExtendedIndexingMetrics_ScheduledTransactionIndexed_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0, arg1, arg2, arg3, arg4 int
+		if args[0] != nil {
+			arg0 = args[0].(int)
+		}
+		if args[1] != nil {
+			arg1 = args[1].(int)
+		}
+		if args[2] != nil {
+			arg2 = args[2].(int)
+		}
+		if args[3] != nil {
+			arg3 = args[3].(int)
+		}
+		if args[4] != nil {
+			arg4 = args[4].(int)
+		}
+		run(arg0, arg1, arg2, arg3, arg4)
+	})
+	return _c
+}
+
+func (_c *ExtendedIndexingMetrics_ScheduledTransactionIndexed_Call) Return() *ExtendedIndexingMetrics_ScheduledTransactionIndexed_Call {
+	_c.Call.Return()
+	return _c
+}
+
+func (_c *ExtendedIndexingMetrics_ScheduledTransactionIndexed_Call) RunAndReturn(run func(int, int, int, int, int)) *ExtendedIndexingMetrics_ScheduledTransactionIndexed_Call {
+	_c.Run(run)
+	return _c
+}

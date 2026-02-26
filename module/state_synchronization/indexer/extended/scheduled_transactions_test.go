@@ -19,6 +19,7 @@ import (
 	"github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
 	executionmock "github.com/onflow/flow-go/module/execution/mock"
+	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/indexes"
 	"github.com/onflow/flow-go/storage/indexes/iterator"
@@ -627,7 +628,7 @@ func TestScheduledTransactionsIndexer_NextHeight_MockErrors(t *testing.T) {
 		unexpectedErr := fmt.Errorf("disk I/O failure")
 		mockStore.On("LatestIndexedHeight").Return(uint64(0), unexpectedErr)
 
-		indexer := NewScheduledTransactions(unittest.Logger(), mockStore, nil, flow.Testnet)
+		indexer := NewScheduledTransactions(unittest.Logger(), mockStore, nil, metrics.NewNoopCollector(), flow.Testnet)
 
 		_, err := indexer.NextHeight()
 		require.Error(t, err)
@@ -639,7 +640,7 @@ func TestScheduledTransactionsIndexer_NextHeight_MockErrors(t *testing.T) {
 		mockStore.On("LatestIndexedHeight").Return(uint64(0), storage.ErrNotBootstrapped)
 		mockStore.On("UninitializedFirstHeight").Return(uint64(42), true)
 
-		indexer := NewScheduledTransactions(unittest.Logger(), mockStore, nil, flow.Testnet)
+		indexer := NewScheduledTransactions(unittest.Logger(), mockStore, nil, metrics.NewNoopCollector(), flow.Testnet)
 
 		_, err := indexer.NextHeight()
 		require.Error(t, err)
@@ -655,7 +656,7 @@ func TestScheduledTransactionsIndexer_NextHeight_MockErrors(t *testing.T) {
 		mockStore.On("Store", mock.Anything, mock.Anything, testHeight, mock.Anything).Return(storeErr)
 
 		lm := storage.NewTestingLockManager()
-		indexer := NewScheduledTransactions(unittest.Logger(), mockStore, nil, flow.Testnet)
+		indexer := NewScheduledTransactions(unittest.Logger(), mockStore, nil, metrics.NewNoopCollector(), flow.Testnet)
 		header := unittest.BlockHeaderFixtureOnChain(flow.Testnet, unittest.WithHeaderHeight(testHeight))
 
 		err := unittest.WithLock(t, lm, storage.LockIndexScheduledTransactionsIndex, func(lctx lockctx.Context) error {
@@ -685,7 +686,7 @@ func newScheduledTxIndexerForTest(
 	store, err := indexes.NewScheduledTransactionsBootstrapper(db, firstHeight)
 	require.NoError(t, err)
 
-	indexer := NewScheduledTransactions(unittest.Logger(), store, nil, chainID)
+	indexer := NewScheduledTransactions(unittest.Logger(), store, nil, metrics.NewNoopCollector(), chainID)
 	return indexer, store, lm, db
 }
 
@@ -784,7 +785,7 @@ func newScheduledTxIndexerWithScriptExecutor(
 	store, err := indexes.NewScheduledTransactionsBootstrapper(db, firstHeight)
 	require.NoError(t, err)
 
-	indexer := NewScheduledTransactions(unittest.Logger(), store, scriptExecutor, chainID)
+	indexer := NewScheduledTransactions(unittest.Logger(), store, scriptExecutor, metrics.NewNoopCollector(), chainID)
 	return indexer, store, lm, db
 }
 

@@ -124,10 +124,13 @@ func BootstrapIndexers(
 		extendedStorage.NonFungibleTokenTransfersBootstrapper,
 	)
 
+	extendedMetrics := metrics.NewExtendedIndexingCollector()
+
 	scheduledTransactions := extended.NewScheduledTransactions(
 		log,
 		extendedStorage.ScheduledTransactionsBootstrapper,
 		scriptExecutor,
+		extendedMetrics,
 		chainID,
 	)
 
@@ -140,7 +143,7 @@ func BootstrapIndexers(
 
 	extendedIndexer, err := extended.NewExtendedIndexer(
 		log,
-		metrics.NewExtendedIndexingCollector(),
+		extendedMetrics,
 		extendedStorage.DB,
 		lockManager,
 		state,

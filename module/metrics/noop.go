@@ -379,7 +379,8 @@ func (nc *NoopCollector) InitializeLatestHeight(height uint64)              {}
 
 var _ module.ExtendedIndexingMetrics = (*NoopCollector)(nil)
 
-func (nc *NoopCollector) BlockIndexedExtended(string, uint64) {}
+func (nc *NoopCollector) BlockIndexedExtended(string, uint64)             {}
+func (nc *NoopCollector) ScheduledTransactionIndexed(int, int, int, int, int) {}
 
 var _ module.TransactionErrorMessagesMetrics = (*NoopCollector)(nil)
 
