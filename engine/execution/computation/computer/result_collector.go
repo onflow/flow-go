@@ -318,7 +318,7 @@ func (collector *resultCollector) logInspectionResults(
 		return
 	}
 
-	evt := log.WithLevel(logLevel)
+	evt := log.WithLevel(logLevel).Str("module", "tc-inspector")
 	for _, logEvent := range logEvents {
 		logEvent(evt)
 	}
