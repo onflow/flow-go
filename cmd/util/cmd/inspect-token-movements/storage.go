@@ -224,7 +224,7 @@ func (ci *chunkInspector) inspectChunk(
 		events = append(events, output.ServiceEvents...)
 
 		// Run the inspector
-		result, err := ci.inspector.Inspect(snapshotTree, executionSnapshot, events)
+		result, err := ci.inspector.Inspect(ci.logger, snapshotTree, executionSnapshot, events)
 		if err != nil {
 			ci.logger.Warn().
 				Err(err).

@@ -16,6 +16,7 @@ type Inspector interface {
 	// - executionSnapshot is the reads and writes of the procedure
 	// - events are all of the events the procedure is emitting
 	Inspect(
+		logger zerolog.Logger,
 		storage snapshot.StorageSnapshot,
 		executionSnapshot *snapshot.ExecutionSnapshot,
 		events []flow.Event,

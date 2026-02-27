@@ -3,6 +3,7 @@ package inspection
 import (
 	"fmt"
 	"math"
+	"runtime/debug"
 	"sync"
 
 	"github.com/onflow/atree"
@@ -65,12 +66,14 @@ func (td *TokenChanges) getSearchedTokensRef() TokenChangesSearchTokens {
 //
 // Inspect could technically be run on chunk data packs.
 func (td *TokenChanges) Inspect(
+	logger zerolog.Logger,
 	storage snapshot.StorageSnapshot,
 	executionSnapshot *snapshot.ExecutionSnapshot,
 	events []flow.Event,
 ) (diff Result, err error) {
 	defer func() {
 		if r := recover(); r != nil {
+			logger.Warn().Str("module", "tc-inspector").Msgf("trace=%s", string(debug.Stack()))
 			err = fmt.Errorf("panic: %v", r)
 		}
 
