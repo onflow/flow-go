@@ -21,11 +21,20 @@ var contractCode string
 //go:embed contract_minimal.cdc
 var ContractMinimalCode string
 
+//go:embed contract_test_helpers.cdc
+var contractTestHelpers string
+
 var nftImportPattern = regexp.MustCompile(`(?m)^import "NonFungibleToken"`)
 var fungibleTokenImportPattern = regexp.MustCompile(`(?m)^import "FungibleToken"`)
 var flowTokenImportPattern = regexp.MustCompile(`(?m)^import "FlowToken"`)
+var loadTestHelpersPattern = regexp.MustCompile(`(?m)\/\/ #loadTestHelpers`)
 
-func ContractCode(nonFungibleTokenAddress, fungibleTokenAddress, flowTokenAddress flow.Address) []byte {
+func ContractCode(
+	chainID flow.ChainID,
+	nonFungibleTokenAddress,
+	fungibleTokenAddress,
+	flowTokenAddress flow.Address,
+) []byte {
 	evmContract := nftImportPattern.ReplaceAllString(
 		contractCode,
 		fmt.Sprintf("import NonFungibleToken from %s", nonFungibleTokenAddress.HexWithPrefix()),
@@ -38,6 +47,16 @@ func ContractCode(nonFungibleTokenAddress, fungibleTokenAddress, flowTokenAddres
 		evmContract,
 		fmt.Sprintf("import FlowToken from %s", flowTokenAddress.HexWithPrefix()),
 	)
+
+	// Inject the contract_test_helpers.cdc code, only if we are
+	// bootstrapping the Flow Emulator chain.
+	if chainID == flow.Emulator {
+		evmContract = loadTestHelpersPattern.ReplaceAllString(
+			evmContract,
+			contractTestHelpers,
+		)
+	}
+
 	return []byte(evmContract)
 }
 

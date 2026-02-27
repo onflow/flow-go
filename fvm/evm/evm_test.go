@@ -213,6 +213,105 @@ func TestEVMRun(t *testing.T) {
 			})
 	})
 
+	t.Run("testing EVM.runTxAs (happy case)", func(t *testing.T) {
+		t.Parallel()
+
+		RunWithNewEnvironment(t,
+			chain, func(
+				ctx fvm.Context,
+				vm fvm.VM,
+				snapshot snapshot.SnapshotTree,
+				testContract *TestContract,
+				testAccount *EOATestAccount,
+			) {
+				sc := systemcontracts.SystemContractsForChain(chain.ChainID())
+				code := []byte(fmt.Sprintf(
+					`
+					import EVM from %s
+
+					transaction(from: String, to: String, data: [UInt8]){
+						prepare(account: &Account) {
+							let res = EVM.runTxAs(
+								from: EVM.addressFromString(from),
+								to: EVM.addressFromString(to),
+								data: data,
+								gasLimit: 100_000,
+								value: EVM.Balance(attoflow: 0)
+							)
+
+							assert(res.status == EVM.Status.successful, message: "unexpected status")
+							assert(res.errorCode == 0, message: "unexpected error code")
+							assert(res.deployedContract == nil, message: "unexpected deployed contract")
+						}
+					}
+					`,
+					sc.EVMContract.Address.HexWithPrefix(),
+				))
+
+				num := int64(42)
+				callData := cadence.NewArray(
+					unittest.BytesToCdcUInt8(
+						testContract.MakeCallData(t, "store", big.NewInt(num)),
+					),
+				).WithType(stdlib.EVMTransactionBytesCadenceType)
+
+				fromAddress := "0xF376A6849184571fEEdD246a1Ba2D331cfe56c8c"
+				from, err := cadence.NewString(fromAddress)
+				require.NoError(t, err)
+
+				to, err := cadence.NewString(testContract.DeployedAt.String())
+				require.NoError(t, err)
+
+				txBody, err := flow.NewTransactionBodyBuilder().
+					SetScript(code).
+					SetPayer(sc.FlowServiceAccount.Address).
+					AddAuthorizer(sc.FlowServiceAccount.Address).
+					AddArgument(json.MustEncode(from)).
+					AddArgument(json.MustEncode(to)).
+					AddArgument(json.MustEncode(callData)).
+					Build()
+				require.NoError(t, err)
+
+				tx := fvm.Transaction(txBody, 0)
+
+				state, output, err := vm.Run(ctx, tx, snapshot)
+				require.NoError(t, err)
+				require.NoError(t, output.Err)
+				require.NotEmpty(t, state.WriteSet)
+				snapshot = snapshot.Append(state)
+
+				// assert event fields are correct
+				require.Len(t, output.Events, 1)
+				txEvent := output.Events[0]
+				txEventPayload := TxEventToPayload(t, txEvent, sc.EVMContract.Address)
+				require.NoError(t, err)
+
+				// commit block
+				blockEventPayload, snapshot := callEVMHeartBeat(t,
+					ctx,
+					vm,
+					snapshot,
+				)
+
+				require.NotEmpty(t, blockEventPayload.Hash)
+				require.Equal(t, uint64(43785), blockEventPayload.TotalGasUsed)
+				require.NotEmpty(t, blockEventPayload.Hash)
+
+				require.Equal(t, uint16(types.ErrCodeNoError), txEventPayload.ErrorCode)
+				require.Equal(t, uint16(0), txEventPayload.Index)
+				require.Equal(t, blockEventPayload.Height, txEventPayload.BlockHeight)
+				require.Empty(t, txEventPayload.ContractAddress)
+
+				directCall, err := types.DirectCallFromEncoded(txEventPayload.Payload)
+				require.NoError(t, err)
+
+				require.Equal(t, fromAddress, directCall.From.String())
+				require.Equal(t, testContract.DeployedAt.String(), directCall.To.String())
+				require.Equal(t, uint64(100_000), directCall.GasLimit)
+			},
+		)
+	})
+
 	t.Run("testing EVM.store and EVM.load (happy case)", func(t *testing.T) {
 		t.Parallel()
 
