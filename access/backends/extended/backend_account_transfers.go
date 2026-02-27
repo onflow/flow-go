@@ -32,13 +32,26 @@ type AccountTransferFilter struct {
 	RecipientAddress flow.Address
 }
 
+func (f *AccountTransferFilter) isEmpty() bool {
+	return f == nil ||
+		(f.TokenType == "" &&
+			f.SourceAddress == flow.EmptyAddress &&
+			f.RecipientAddress == flow.EmptyAddress)
+}
+
 func (f *AccountTransferFilter) FTFilter() storage.IndexFilter[*accessmodel.FungibleTokenTransfer] {
+	if f.isEmpty() {
+		return nil
+	}
 	return func(transfer *accessmodel.FungibleTokenTransfer) bool {
 		return f.filter(transfer.TokenType, transfer.SourceAddress, transfer.RecipientAddress)
 	}
 }
 
 func (f *AccountTransferFilter) NFTFilter() storage.IndexFilter[*accessmodel.NonFungibleTokenTransfer] {
+	if f.isEmpty() {
+		return nil
+	}
 	return func(transfer *accessmodel.NonFungibleTokenTransfer) bool {
 		return f.filter(transfer.TokenType, transfer.SourceAddress, transfer.RecipientAddress)
 	}
