@@ -53,13 +53,13 @@ type storedFungibleTokenTransfer struct {
 const (
 	// ftTransferKeyLen is the total length of a fungible token transfer index key
 	// 1 (prefix) + 8 (address) + 8 (height) + 4 (txIndex) + 4 (eventIndex) = 25
-	ftTransferKeyLen = 1 + flow.AddressLength + 8 + 4 + 4
+	ftTransferKeyLen = 1 + flow.AddressLength + heightLen + txIndexLen + eventIndexLen
 
 	// ftTransferPrefixLen is the length of the prefix used for iteration (prefix + address)
 	ftTransferPrefixLen = 1 + flow.AddressLength
 
 	// ftTransferPrefixWithHeightLen includes the height for range queries
-	ftTransferPrefixWithHeightLen = ftTransferPrefixLen + 8
+	ftTransferPrefixWithHeightLen = ftTransferPrefixLen + heightLen
 )
 
 var _ storage.FungibleTokenTransfers = (*FungibleTokenTransfers)(nil)

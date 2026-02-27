@@ -43,13 +43,13 @@ type storedAccountTransaction struct {
 const (
 	// accountTxKeyLen is the total length of an account transaction index key
 	// 1 (prefix) + 8 (address) + 8 (height) + 4 (txIndex) = 21
-	accountTxKeyLen = 1 + flow.AddressLength + 8 + 4
+	accountTxKeyLen = 1 + flow.AddressLength + heightLen + txIndexLen
 
 	// accountTxPrefixLen is the length of the prefix used for iteration (prefix + address)
 	accountTxPrefixLen = 1 + flow.AddressLength
 
 	// accountTxPrefixWithHeightLen includes the height for range queries
-	accountTxPrefixWithHeightLen = accountTxPrefixLen + 8
+	accountTxPrefixWithHeightLen = accountTxPrefixLen + heightLen
 )
 
 var _ storage.AccountTransactions = (*AccountTransactions)(nil)

@@ -48,13 +48,13 @@ type storedNonFungibleTokenTransfer struct {
 const (
 	// nftTransferKeyLen is the total length of a non-fungible token transfer index key
 	// 1 (prefix) + 8 (address) + 8 (height) + 4 (txIndex) + 4 (eventIndex) = 25
-	nftTransferKeyLen = 1 + flow.AddressLength + 8 + 4 + 4
+	nftTransferKeyLen = 1 + flow.AddressLength + heightLen + txIndexLen + eventIndexLen
 
 	// nftTransferPrefixLen is the length of the prefix used for iteration (prefix + address)
 	nftTransferPrefixLen = 1 + flow.AddressLength
 
 	// nftTransferPrefixWithHeightLen includes the height for range queries
-	nftTransferPrefixWithHeightLen = nftTransferPrefixLen + 8
+	nftTransferPrefixWithHeightLen = nftTransferPrefixLen + heightLen
 )
 
 var _ storage.NonFungibleTokenTransfers = (*NonFungibleTokenTransfers)(nil)
