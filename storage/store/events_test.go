@@ -140,6 +140,169 @@ func TestEventRetrieveWithoutStore(t *testing.T) {
 	})
 }
 
+// TestByBlockID_SortsEventsByExecutionOrder verifies that events loaded from the
+// database (cache miss path) are returned sorted by (TransactionIndex,
+// EventIndex) regardless of the order imposed by the storage key, which is
+// [blockID, txID, txIndex, eventIndex].  When two transactions have txIDs whose
+// byte order differs from their execution order the DB iteration would return
+// them in txID order; the retrieve function must re-sort them.
+func TestByBlockID_SortsEventsByExecutionOrder(t *testing.T) {
+	lockManager := storage.NewTestingLockManager()
+	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
+		m := metrics.NewNoopCollector()
+		eventsStore := store.NewEvents(m, db)
+
+		blockID := unittest.IdentifierFixture()
+
+		// txIDLow sorts before txIDHigh in byte (DB key) order, but its
+		// TransactionIndex is higher, so in execution order it comes second.
+		var txIDLow, txIDHigh flow.Identifier
+		txIDLow[0] = 0x00  // first in DB key order
+		txIDHigh[0] = 0xFF // second in DB key order
+
+		// execution tx 0 uses txIDHigh; execution tx 1 uses txIDLow
+		evtTx0 := unittest.EventFixture(
+			unittest.Event.WithTransactionID(txIDHigh),
+			unittest.Event.WithTransactionIndex(0),
+			unittest.Event.WithEventIndex(0),
+		)
+		evtTx1A := unittest.EventFixture(
+			unittest.Event.WithTransactionID(txIDLow),
+			unittest.Event.WithTransactionIndex(1),
+			unittest.Event.WithEventIndex(0),
+		)
+		evtTx1B := unittest.EventFixture(
+			unittest.Event.WithTransactionID(txIDLow),
+			unittest.Event.WithTransactionIndex(1),
+			unittest.Event.WithEventIndex(1),
+		)
+
+		err := unittest.WithLock(t, lockManager, storage.LockInsertEvent, func(lctx lockctx.Context) error {
+			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return eventsStore.BatchStore(lctx, blockID, []flow.EventsList{{evtTx0}, {evtTx1A, evtTx1B}}, rw)
+			})
+		})
+		require.NoError(t, err)
+
+		// Use a fresh store to force a DB load (bypasses the cache populated by BatchStore).
+		freshStore := store.NewEvents(m, db)
+		got, err := freshStore.ByBlockID(blockID)
+		require.NoError(t, err)
+		require.Len(t, got, 3)
+
+		// Events must come back in execution order: txIndex 0, then 1 (eventIndex 0, 1).
+		require.Equal(t, uint32(0), got[0].TransactionIndex)
+		require.Equal(t, uint32(0), got[0].EventIndex)
+		require.Equal(t, uint32(1), got[1].TransactionIndex)
+		require.Equal(t, uint32(0), got[1].EventIndex)
+		require.Equal(t, uint32(1), got[2].TransactionIndex)
+		require.Equal(t, uint32(1), got[2].EventIndex)
+	})
+}
+
+// TestServiceEventStoreRetrieve verifies basic store and retrieval for ServiceEvents.
+func TestServiceEventStoreRetrieve(t *testing.T) {
+	lockManager := storage.NewTestingLockManager()
+	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
+		m := metrics.NewNoopCollector()
+		svcEventsStore := store.NewServiceEvents(m, db)
+
+		blockID := unittest.IdentifierFixture()
+		txID := unittest.IdentifierFixture()
+
+		evt1 := unittest.EventFixture(
+			unittest.Event.WithTransactionID(txID),
+			unittest.Event.WithTransactionIndex(0),
+			unittest.Event.WithEventIndex(0),
+		)
+		evt2 := unittest.EventFixture(
+			unittest.Event.WithTransactionID(txID),
+			unittest.Event.WithTransactionIndex(1),
+			unittest.Event.WithEventIndex(0),
+		)
+
+		err := unittest.WithLock(t, lockManager, storage.LockInsertServiceEvent, func(lctx lockctx.Context) error {
+			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return svcEventsStore.BatchStore(lctx, blockID, []flow.Event{evt1, evt2}, rw)
+			})
+		})
+		require.NoError(t, err)
+
+		got, err := svcEventsStore.ByBlockID(blockID)
+		require.NoError(t, err)
+		require.Len(t, got, 2)
+		require.Contains(t, got, evt1)
+		require.Contains(t, got, evt2)
+
+		// Test loading from database (cache miss path).
+		freshStore := store.NewServiceEvents(m, db)
+		got, err = freshStore.ByBlockID(blockID)
+		require.NoError(t, err)
+		require.Len(t, got, 2)
+		require.Contains(t, got, evt1)
+		require.Contains(t, got, evt2)
+	})
+}
+
+// TestServiceEventByBlockID_SortsEventsByExecutionOrder verifies that service events
+// loaded from the database (cache miss path) are returned sorted by (TransactionIndex,
+// EventIndex) regardless of the DB key order, which is keyed by txID byte order.
+// Before the fix, the sort was missing for ServiceEvents (unlike Events which already
+// had it), causing events to be returned in DB key order on a cache miss.
+func TestServiceEventByBlockID_SortsEventsByExecutionOrder(t *testing.T) {
+	lockManager := storage.NewTestingLockManager()
+	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
+		m := metrics.NewNoopCollector()
+		svcEventsStore := store.NewServiceEvents(m, db)
+
+		blockID := unittest.IdentifierFixture()
+
+		// txIDLow sorts before txIDHigh in byte (DB key) order, but its
+		// TransactionIndex is higher, so in execution order it comes second.
+		var txIDLow, txIDHigh flow.Identifier
+		txIDLow[0] = 0x00  // first in DB key order
+		txIDHigh[0] = 0xFF // second in DB key order
+
+		// execution tx 0 uses txIDHigh; execution tx 1 uses txIDLow
+		evtTx0 := unittest.EventFixture(
+			unittest.Event.WithTransactionID(txIDHigh),
+			unittest.Event.WithTransactionIndex(0),
+			unittest.Event.WithEventIndex(0),
+		)
+		evtTx1A := unittest.EventFixture(
+			unittest.Event.WithTransactionID(txIDLow),
+			unittest.Event.WithTransactionIndex(1),
+			unittest.Event.WithEventIndex(0),
+		)
+		evtTx1B := unittest.EventFixture(
+			unittest.Event.WithTransactionID(txIDLow),
+			unittest.Event.WithTransactionIndex(1),
+			unittest.Event.WithEventIndex(1),
+		)
+
+		err := unittest.WithLock(t, lockManager, storage.LockInsertServiceEvent, func(lctx lockctx.Context) error {
+			return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return svcEventsStore.BatchStore(lctx, blockID, []flow.Event{evtTx0, evtTx1A, evtTx1B}, rw)
+			})
+		})
+		require.NoError(t, err)
+
+		// Use a fresh store to force a DB load (bypasses the cache populated by BatchStore).
+		freshStore := store.NewServiceEvents(m, db)
+		got, err := freshStore.ByBlockID(blockID)
+		require.NoError(t, err)
+		require.Len(t, got, 3)
+
+		// Events must come back in execution order: txIndex 0, then 1 (eventIndex 0, 1).
+		require.Equal(t, uint32(0), got[0].TransactionIndex)
+		require.Equal(t, uint32(0), got[0].EventIndex)
+		require.Equal(t, uint32(1), got[1].TransactionIndex)
+		require.Equal(t, uint32(0), got[1].EventIndex)
+		require.Equal(t, uint32(1), got[2].TransactionIndex)
+		require.Equal(t, uint32(1), got[2].EventIndex)
+	})
+}
+
 func TestEventStoreAndRemove(t *testing.T) {
 	lockManager := storage.NewTestingLockManager()
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {

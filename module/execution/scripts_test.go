@@ -6,13 +6,14 @@ import (
 	"os"
 	"testing"
 
+	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/suite"
+
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/encoding/ccf"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/cadence/stdlib"
-	"github.com/rs/zerolog"
-	"github.com/stretchr/testify/require"
-	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/engine/execution/computation/query"
 	"github.com/onflow/flow-go/engine/execution/testutil"
@@ -194,6 +195,7 @@ func (s *scriptTestSuite) SetupTest() {
 		nil,
 		nil,
 		lockManager,
+		nil, // accountTxIndex
 	)
 
 	s.scripts = NewScripts(

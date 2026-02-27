@@ -1,6 +1,8 @@
 package flow
 
 import (
+	"slices"
+
 	"github.com/onflow/crypto"
 )
 
@@ -22,10 +24,5 @@ func (a *AggregatedSignature) CardinalitySignerSet() int {
 
 // HasSigner returns true if and only if signer's signature is part of this aggregated signature
 func (a *AggregatedSignature) HasSigner(signerID Identifier) bool {
-	for _, id := range a.SignerIDs {
-		if id == signerID {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(a.SignerIDs, signerID)
 }

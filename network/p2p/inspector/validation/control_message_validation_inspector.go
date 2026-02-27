@@ -2,6 +2,7 @@ package validation
 
 import (
 	"fmt"
+	"slices"
 	"time"
 
 	"github.com/go-playground/validator/v10"
@@ -648,12 +649,7 @@ func (c *ControlMsgValidationInspector) inspectRpcPublishMessages(from peer.ID, 
 
 	subscribedTopics := c.topicOracle().GetTopics()
 	hasSubscription := func(topic string) bool {
-		for _, subscribedTopic := range subscribedTopics {
-			if topic == subscribedTopic {
-				return true
-			}
-		}
-		return false
+		return slices.Contains(subscribedTopics, topic)
 	}
 	var errs *multierror.Error
 	invalidTopicIdsCount := 0

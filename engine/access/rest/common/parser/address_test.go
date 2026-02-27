@@ -19,6 +19,7 @@ func TestAddress_InvalidParse(t *testing.T) {
 		"foo",
 		"1",
 		"@",
+		"0x0x0b807ae5da6210df",
 		"ead892083b3e2c61222", // too long
 	}
 

@@ -402,14 +402,15 @@ func (s *TransactionsFunctionalSuite) expectedResultForIndex(index int, encoding
 	}
 
 	return &accessmodel.TransactionResult{
-		TransactionID: txID,
-		Status:        flow.TransactionStatusExecuted,
-		StatusCode:    statusCode,
-		Events:        events,
-		ErrorMessage:  errorMessage,
-		BlockID:       blockID,
-		BlockHeight:   block.Height,
-		CollectionID:  collectionID,
+		TransactionID:   txID,
+		Status:          flow.TransactionStatusExecuted,
+		StatusCode:      statusCode,
+		Events:          events,
+		ErrorMessage:    errorMessage,
+		BlockID:         blockID,
+		BlockHeight:     block.Height,
+		CollectionID:    collectionID,
+		ComputationUsed: txResult.ComputationUsed,
 	}
 }
 
@@ -597,6 +598,7 @@ func (s *TransactionsFunctionalSuite) TestTransactionResult_ExecutionNode() {
 		ErrorMessage:         accessResponse.ErrorMessage,
 		Events:               accessResponse.Events,
 		EventEncodingVersion: entities.EventEncodingVersion_CCF_V0,
+		ComputationUsage:     accessResponse.ComputationUsage,
 	}
 	expectedResult := s.expectedResultForIndex(1, entities.EventEncodingVersion_JSON_CDC_V0)
 
@@ -627,6 +629,7 @@ func (s *TransactionsFunctionalSuite) TestTransactionResultByIndex_ExecutionNode
 		ErrorMessage:         accessResponse.ErrorMessage,
 		Events:               accessResponse.Events,
 		EventEncodingVersion: entities.EventEncodingVersion_CCF_V0,
+		ComputationUsage:     accessResponse.ComputationUsage,
 	}
 	expectedResult := s.expectedResultForIndex(1, entities.EventEncodingVersion_JSON_CDC_V0)
 
@@ -683,9 +686,10 @@ func (s *TransactionsFunctionalSuite) TestTransactionResultsByBlockID_ExecutionN
 	for i := range s.tf.ExpectedResults {
 		accessResponse := convert.TransactionResultToMessage(s.expectedResultForIndex(i, entities.EventEncodingVersion_CCF_V0))
 		nodeResults[i] = &execproto.GetTransactionResultResponse{
-			StatusCode:   accessResponse.StatusCode,
-			ErrorMessage: accessResponse.ErrorMessage,
-			Events:       accessResponse.Events,
+			StatusCode:       accessResponse.StatusCode,
+			ErrorMessage:     accessResponse.ErrorMessage,
+			Events:           accessResponse.Events,
+			ComputationUsage: accessResponse.ComputationUsage,
 		}
 		expectedResults[i] = s.expectedResultForIndex(i, entities.EventEncodingVersion_JSON_CDC_V0)
 	}

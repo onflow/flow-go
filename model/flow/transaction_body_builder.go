@@ -118,7 +118,7 @@ func (tb *TransactionBodyBuilder) payloadMessage() []byte {
 	return fingerprint.Fingerprint(tb.payloadCanonicalForm())
 }
 
-func (tb *TransactionBodyBuilder) payloadCanonicalForm() interface{} {
+func (tb *TransactionBodyBuilder) payloadCanonicalForm() any {
 	authorizers := make([][]byte, len(tb.u.Authorizers))
 	for i, auth := range tb.u.Authorizers {
 		authorizers[i] = auth.Bytes()
@@ -154,10 +154,10 @@ func (tb *TransactionBodyBuilder) EnvelopeMessage() []byte {
 	return fingerprint.Fingerprint(tb.envelopeCanonicalForm())
 }
 
-func (tb *TransactionBodyBuilder) envelopeCanonicalForm() interface{} {
+func (tb *TransactionBodyBuilder) envelopeCanonicalForm() any {
 	return struct {
-		Payload           interface{}
-		PayloadSignatures interface{}
+		Payload           any
+		PayloadSignatures any
 	}{
 		tb.payloadCanonicalForm(),
 		signaturesList(tb.u.PayloadSignatures).canonicalForm(),

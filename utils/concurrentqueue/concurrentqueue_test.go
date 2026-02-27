@@ -19,7 +19,7 @@ func TestSafeQueue(t *testing.T) {
 	samples := 100
 	wg := sync.WaitGroup{}
 	wg.Add(workers)
-	for i := 0; i < workers; i++ {
+	for i := range workers {
 		go func(worker int) {
 			for i := 1; i <= samples; i++ {
 				q.Push(testEntry{

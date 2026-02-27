@@ -22,7 +22,7 @@ func TestHash(t *testing.T) {
 	t.Run("HashLeaf", func(t *testing.T) {
 		var path hash.Hash
 
-		for i := 0; i < 5000; i++ {
+		for i := range 5000 {
 			value := make([]byte, i)
 			_, err := rand.Read(path[:])
 			require.NoError(t, err)
@@ -41,7 +41,7 @@ func TestHash(t *testing.T) {
 	t.Run("HashInterNode", func(t *testing.T) {
 		var h1, h2 hash.Hash
 
-		for i := 0; i < 5000; i++ {
+		for range 5000 {
 			_, err := rand.Read(h1[:])
 			require.NoError(t, err)
 			_, err = rand.Read(h2[:])

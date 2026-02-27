@@ -16,6 +16,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 
 	gethTypes "github.com/ethereum/go-ethereum/core/types"
+	gethCrypto "github.com/ethereum/go-ethereum/crypto"
 )
 
 var internalEVMContractStaticType = interpreter.ConvertSemaCompositeTypeToStaticCompositeType(
@@ -40,6 +41,7 @@ func NewInternalEVMContractValue(
 			stdlib.InternalEVMTypeBatchRunFunctionName:                  newInternalEVMTypeBatchRunFunction(gauge, handler),
 			stdlib.InternalEVMTypeCreateCadenceOwnedAccountFunctionName: newInternalEVMTypeCreateCadenceOwnedAccountFunction(gauge, handler),
 			stdlib.InternalEVMTypeCallFunctionName:                      newInternalEVMTypeCallFunction(gauge, handler),
+			stdlib.InternalEVMTypeCallWithSigAndArgsFunctionName:        newInternalEVMTypeCallWithSigAndArgsFunction(gauge, handler, location),
 			stdlib.InternalEVMTypeDepositFunctionName:                   newInternalEVMTypeDepositFunction(gauge, handler),
 			stdlib.InternalEVMTypeWithdrawFunctionName:                  newInternalEVMTypeWithdrawFunction(gauge, handler),
 			stdlib.InternalEVMTypeDeployFunctionName:                    newInternalEVMTypeDeployFunction(gauge, handler),
@@ -54,6 +56,7 @@ func NewInternalEVMContractValue(
 			stdlib.InternalEVMTypeGetLatestBlockFunctionName:            newInternalEVMTypeGetLatestBlockFunction(gauge, handler),
 			stdlib.InternalEVMTypeDryRunFunctionName:                    newInternalEVMTypeDryRunFunction(gauge, handler),
 			stdlib.InternalEVMTypeDryCallFunctionName:                   newInternalEVMTypeDryCallFunction(gauge, handler),
+			stdlib.InternalEVMTypeDryCallWithSigAndArgsFunctionName:     newInternalEVMTypeDryCallWithSigAndArgsFunction(gauge, handler, location),
 			stdlib.InternalEVMTypeCommitBlockProposalFunctionName:       newInternalEVMTypeCommitBlockProposalFunction(gauge, handler),
 		},
 		nil,
@@ -451,6 +454,52 @@ func newInternalEVMTypeCallFunction(
 	)
 }
 
+func newInternalEVMTypeCallWithSigAndArgsFunction(
+	gauge common.MemoryGauge,
+	handler types.ContractHandler,
+	location common.AddressLocation,
+) *interpreter.HostFunctionValue {
+	evmSpecialTypeIDs := NewEVMSpecialTypeIDs(gauge, location)
+
+	return interpreter.NewStaticHostFunctionValue(
+		gauge,
+		stdlib.InternalEVMTypeCallWithSigAndArgsFunctionType,
+		func(invocation interpreter.Invocation) interpreter.Value {
+			context := invocation.InvocationContext
+
+			// Parse arguments
+
+			callArgs, err := parseCallArgumentsWithSigAndArgs(invocation)
+			if err != nil {
+				panic(err)
+			}
+
+			// Encode signature and arguments
+
+			data, err := encodeABIWithSigAndArgs(context, evmSpecialTypeIDs, callArgs.signature, callArgs.args)
+			if err != nil {
+				panic(err)
+			}
+
+			// Call
+
+			const isAuthorized = true
+			account := handler.AccountByAddress(callArgs.from, isAuthorized)
+			result := account.Call(callArgs.to, data, callArgs.gasLimit, callArgs.value)
+
+			return NewResultDecodedValue(
+				handler,
+				gauge,
+				context,
+				location,
+				evmSpecialTypeIDs,
+				callArgs.resultTypes,
+				result,
+			)
+		},
+	)
+}
+
 func newInternalEVMTypeDryCallFunction(
 	gauge common.MemoryGauge,
 	handler types.ContractHandler,
@@ -480,6 +529,57 @@ func newInternalEVMTypeDryCallFunction(
 
 			res := handler.DryRunWithTxData(txData, callArgs.from)
 			return NewResultValue(handler, gauge, context, res)
+		},
+	)
+}
+
+func newInternalEVMTypeDryCallWithSigAndArgsFunction(
+	gauge common.MemoryGauge,
+	handler types.ContractHandler,
+	location common.AddressLocation,
+) *interpreter.HostFunctionValue {
+	evmSpecialTypeIDs := NewEVMSpecialTypeIDs(gauge, location)
+
+	return interpreter.NewStaticHostFunctionValue(
+		gauge,
+		stdlib.InternalEVMTypeDryCallWithSigAndArgsFunctionType,
+		func(invocation interpreter.Invocation) interpreter.Value {
+			context := invocation.InvocationContext
+
+			// Parse arguments
+
+			callArgs, err := parseCallArgumentsWithSigAndArgs(invocation)
+			if err != nil {
+				panic(err)
+			}
+			to := callArgs.to.ToCommon()
+
+			data, err := encodeABIWithSigAndArgs(context, evmSpecialTypeIDs, callArgs.signature, callArgs.args)
+			if err != nil {
+				panic(err)
+			}
+
+			txData := &gethTypes.LegacyTx{
+				Nonce:    0,
+				To:       &to,
+				Gas:      uint64(callArgs.gasLimit),
+				Data:     data,
+				GasPrice: big.NewInt(0),
+				Value:    callArgs.value,
+			}
+
+			// Call contract function
+
+			res := handler.DryRunWithTxData(txData, callArgs.from)
+			return NewResultDecodedValue(
+				handler,
+				gauge,
+				context,
+				location,
+				evmSpecialTypeIDs,
+				callArgs.resultTypes,
+				res,
+			)
 		},
 	)
 }
@@ -1085,6 +1185,115 @@ func NewResultValue(
 	)
 }
 
+func NewResultDecodedValue(
+	handler types.ContractHandler,
+	gauge common.MemoryGauge,
+	context interpreter.InvocationContext,
+	location common.AddressLocation,
+	evmSpecialTypeIDs *evmSpecialTypeIDs,
+	resultTypes *interpreter.ArrayValue,
+	result *types.ResultSummary,
+) *interpreter.CompositeValue {
+
+	evmContractLocation := common.NewAddressLocation(
+		gauge,
+		handler.EVMContractAddress(),
+		stdlib.ContractName,
+	)
+
+	deployedContractAddress := result.DeployedContractAddress
+	deployedContractValue := interpreter.NilOptionalValue
+	if deployedContractAddress != nil {
+		deployedContractValue = interpreter.NewSomeValueNonCopying(
+			context,
+			NewEVMAddress(
+				context,
+				evmContractLocation,
+				*deployedContractAddress,
+			),
+		)
+	}
+
+	results, err := decodeResultData(context, location, evmSpecialTypeIDs, resultTypes, result)
+	if err != nil {
+		panic(err)
+	}
+
+	fields := []interpreter.CompositeField{
+		{
+			Name: "status",
+			Value: interpreter.NewEnumCaseValue(
+				context,
+				&sema.CompositeType{
+					Location:   evmContractLocation,
+					Identifier: stdlib.EVMStatusTypeQualifiedIdentifier,
+					Kind:       common.CompositeKindEnum,
+				},
+				interpreter.NewUInt8Value(gauge, func() uint8 {
+					return uint8(result.Status)
+				}),
+				nil,
+			),
+		},
+		{
+			Name: "errorCode",
+			Value: interpreter.NewUInt64Value(gauge, func() uint64 {
+				return uint64(result.ErrorCode)
+			}),
+		},
+		{
+			Name: "errorMessage",
+			Value: interpreter.NewStringValue(
+				context,
+				common.NewStringMemoryUsage(len(result.ErrorMessage)),
+				func() string {
+					return result.ErrorMessage
+				},
+			),
+		},
+		{
+			Name: "gasUsed",
+			Value: interpreter.NewUInt64Value(gauge, func() uint64 {
+				return result.GasConsumed
+			}),
+		},
+		{
+			Name:  "results",
+			Value: results,
+		},
+		{
+			Name:  "deployedContract",
+			Value: deployedContractValue,
+		},
+	}
+
+	return interpreter.NewCompositeValue(
+		context,
+		evmContractLocation,
+		stdlib.EVMResultDecodedTypeQualifiedIdentifier,
+		common.CompositeKindStructure,
+		fields,
+		common.ZeroAddress,
+	)
+}
+
+func decodeResultData(
+	context interpreter.InvocationContext,
+	location common.AddressLocation,
+	evmSpecialTypeIDs *evmSpecialTypeIDs,
+	resultTypes *interpreter.ArrayValue,
+	result *types.ResultSummary,
+) (interpreter.Value, error) {
+
+	if result.Status != types.StatusSuccessful || resultTypes == nil || resultTypes.Count() == 0 {
+		resultValue := interpreter.ByteSliceToByteArrayValue(context, result.ReturnedData)
+		return resultValue, nil
+	}
+
+	resultValue := decodeABIs(context, location, evmSpecialTypeIDs, resultTypes, result.ReturnedData)
+	return resultValue, nil
+}
+
 func ResultSummaryFromEVMResultValue(val cadence.Value) (*types.ResultSummary, error) {
 	str, ok := val.(cadence.Struct)
 	if !ok {
@@ -1229,7 +1438,7 @@ func parseCallArguments(invocation interpreter.Invocation) (
 
 	gasLimitValue, ok := invocation.Arguments[3].(interpreter.UInt64Value)
 	if !ok {
-		panic(errors.NewUnreachableError())
+		return nil, errors.NewUnreachableError()
 	}
 
 	gasLimit := types.GasLimit(gasLimitValue)
@@ -1250,4 +1459,129 @@ func parseCallArguments(invocation interpreter.Invocation) (
 		gasLimit: gasLimit,
 		balance:  balance,
 	}, nil
+}
+
+type callArgumentsWithSigAndArgs struct {
+	from        types.Address
+	to          types.Address
+	signature   string
+	args        *interpreter.ArrayValue
+	gasLimit    types.GasLimit
+	value       types.Balance
+	resultTypes *interpreter.ArrayValue
+}
+
+func parseCallArgumentsWithSigAndArgs(invocation interpreter.Invocation) (*callArgumentsWithSigAndArgs, error) {
+	context := invocation.InvocationContext
+
+	// Get from address
+
+	fromAddressValue, ok := invocation.Arguments[0].(*interpreter.ArrayValue)
+	if !ok {
+		return nil, errors.NewUnreachableError()
+	}
+
+	fromAddress, err := AddressBytesArrayValueToEVMAddress(context, fromAddressValue)
+	if err != nil {
+		return nil, err
+	}
+
+	// Get to address
+
+	toAddressValue, ok := invocation.Arguments[1].(*interpreter.ArrayValue)
+	if !ok {
+		return nil, errors.NewUnreachableError()
+	}
+
+	toAddress, err := AddressBytesArrayValueToEVMAddress(context, toAddressValue)
+	if err != nil {
+		return nil, err
+	}
+
+	// Get signature
+
+	signature, ok := invocation.Arguments[2].(*interpreter.StringValue)
+	if !ok {
+		return nil, errors.NewUnreachableError()
+	}
+
+	// Get arguments
+
+	args, ok := invocation.Arguments[3].(*interpreter.ArrayValue)
+	if !ok {
+		return nil, errors.NewUnreachableError()
+	}
+
+	// Get gas limit
+
+	gasLimitValue, ok := invocation.Arguments[4].(interpreter.UInt64Value)
+	if !ok {
+		return nil, errors.NewUnreachableError()
+	}
+
+	gasLimit := types.GasLimit(gasLimitValue)
+
+	// Get value
+
+	valueValue, ok := invocation.Arguments[5].(interpreter.UIntValue)
+	if !ok {
+		return nil, errors.NewUnreachableError()
+	}
+
+	value := types.NewBalance(valueValue.BigInt)
+
+	// Get resultTypes
+
+	var resultTypes *interpreter.ArrayValue
+	switch resultTypesField := invocation.Arguments[6].(type) {
+	case *interpreter.SomeValue:
+		if types := resultTypesField.InnerValue(); types != nil {
+			resultTypes, ok = types.(*interpreter.ArrayValue)
+			if !ok {
+				return nil, errors.NewUnreachableError()
+			}
+		} else {
+			return nil, errors.NewUnreachableError()
+		}
+	case interpreter.NilValue:
+	default:
+		return nil, errors.NewUnreachableError()
+	}
+
+	return &callArgumentsWithSigAndArgs{
+		from:        fromAddress,
+		to:          toAddress,
+		signature:   signature.Str,
+		args:        args,
+		gasLimit:    gasLimit,
+		value:       value,
+		resultTypes: resultTypes,
+	}, nil
+}
+
+func encodeABIWithSigAndArgs(
+	context interpreter.InvocationContext,
+	evmSpecialTypeIDs *evmSpecialTypeIDs,
+	signature string,
+	args *interpreter.ArrayValue,
+) ([]byte, error) {
+	sig := gethCrypto.Keccak256([]byte(signature))
+
+	if len(sig) < 4 {
+		return nil, errors.NewUnreachableError()
+	}
+
+	sig = sig[:4]
+
+	if args.Count() == 0 {
+		return sig, nil
+	}
+
+	encodedArguments := encodeABIs(context, evmSpecialTypeIDs, args)
+
+	data := make([]byte, len(sig)+len(encodedArguments))
+	n := copy(data, sig)
+	copy(data[n:], encodedArguments)
+
+	return data, nil
 }

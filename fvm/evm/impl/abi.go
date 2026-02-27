@@ -262,61 +262,71 @@ func newInternalEVMTypeEncodeABIFunction(
 				panic(errors.NewUnreachableError())
 			}
 
-			size := valuesArray.Count()
-
-			values := make([]any, 0, size)
-			arguments := make(gethABI.Arguments, 0, size)
-
-			valuesArray.Iterate(
-				context,
-				func(element interpreter.Value) (resume bool) {
-
-					reportABIEncodingComputation(
-						context,
-						element,
-						evmSpecialTypeIDs,
-						func(intensity uint64) {
-							common.UseComputation(
-								context,
-								common.ComputationUsage{
-									Kind:      environment.ComputationKindEVMEncodeABI,
-									Intensity: intensity,
-								},
-							)
-						},
-					)
-
-					value, ty, err := encodeABI(
-						context,
-						element,
-						element.StaticType(context),
-						evmSpecialTypeIDs,
-					)
-					if err != nil {
-						panic(err)
-					}
-
-					values = append(values, value)
-					arguments = append(arguments, gethABI.Argument{Type: ty})
-
-					// continue iteration
-					return true
-				},
-				false,
-			)
-
-			encodedValues, err := arguments.Pack(values...)
-			if err != nil {
-				panic(
-					abiEncodingError{
-						Message: err.Error(),
-					},
-				)
-			}
+			encodedValues := encodeABIs(context, evmSpecialTypeIDs, valuesArray)
 
 			return interpreter.ByteSliceToByteArrayValue(context, encodedValues)
 		},
 	)
+}
+
+func encodeABIs(
+	context interpreter.InvocationContext,
+	evmSpecialTypeIDs *evmSpecialTypeIDs,
+	valuesArray *interpreter.ArrayValue,
+) []byte {
+	size := valuesArray.Count()
+
+	values := make([]any, 0, size)
+	arguments := make(gethABI.Arguments, 0, size)
+
+	valuesArray.Iterate(
+		context,
+		func(element interpreter.Value) (resume bool) {
+
+			reportABIEncodingComputation(
+				context,
+				element,
+				evmSpecialTypeIDs,
+				func(intensity uint64) {
+					common.UseComputation(
+						context,
+						common.ComputationUsage{
+							Kind:      environment.ComputationKindEVMEncodeABI,
+							Intensity: intensity,
+						},
+					)
+				},
+			)
+
+			value, ty, err := encodeABI(
+				context,
+				element,
+				element.StaticType(context),
+				evmSpecialTypeIDs,
+			)
+			if err != nil {
+				panic(err)
+			}
+
+			values = append(values, value)
+			arguments = append(arguments, gethABI.Argument{Type: ty})
+
+			// continue iteration
+			return true
+		},
+		false,
+	)
+
+	encodedValues, err := arguments.Pack(values...)
+	if err != nil {
+		panic(
+			abiEncodingError{
+				Message: err.Error(),
+			},
+		)
+	}
+
+	return encodedValues
 }
 
 var gethTypeString = gethABI.Type{T: gethABI.StringTy}
@@ -932,94 +942,104 @@ func newInternalEVMTypeDecodeABIFunction(
 				panic(errors.NewUnreachableError())
 			}
 
-			common.UseComputation(
-				context,
-				common.ComputationUsage{
-					Kind:      environment.ComputationKindEVMDecodeABI,
-					Intensity: uint64(dataValue.Count()),
-				},
-			)
-
 			data, err := interpreter.ByteArrayValueToByteSlice(context, dataValue)
 			if err != nil {
 				panic(err)
 			}
 
-			arguments := make(gethABI.Arguments, 0, typesArray.Count())
-			staticTypes := make([]interpreter.StaticType, 0, typesArray.Count())
-			typesArray.Iterate(
-				context,
-				func(element interpreter.Value) (resume bool) {
-					typeValue, ok := element.(interpreter.TypeValue)
-					if !ok {
-						panic(errors.NewUnreachableError())
-					}
-
-					staticType := typeValue.Type
-
-					gethABITy, ok := gethABIType(
-						context,
-						staticType,
-						evmSpecialTypeIDs,
-					)
-					if !ok {
-						panic(abiDecodingError{
-							Type: staticType,
-						})
-					}
-
-					arguments = append(
-						arguments,
-						gethABI.Argument{
-							Type: gethABITy,
-						},
-					)
-
-					staticTypes = append(staticTypes, staticType)
-
-					// continue iteration
-					return true
-				},
-				false,
-			)
-
-			decodedValues, err := arguments.Unpack(data)
-			if err != nil {
-				panic(abiDecodingError{})
-			}
-
-			values := make([]interpreter.Value, 0, len(decodedValues))
-
-			for i, staticType := range staticTypes {
-				value, err := decodeABI(
-					context,
-					decodedValues[i],
-					staticType,
-					location,
-					evmSpecialTypeIDs,
-				)
-				if err != nil {
-					panic(err)
-				}
-
-				values = append(values, value)
-			}
-
-			arrayType := interpreter.NewVariableSizedStaticType(
-				context,
-				interpreter.NewPrimitiveStaticType(
-					context,
-					interpreter.PrimitiveStaticTypeAnyStruct,
-				),
-			)
-
-			return interpreter.NewArrayValue(
-				context,
-				arrayType,
-				common.ZeroAddress,
-				values...,
-			)
+			return decodeABIs(context, location, evmSpecialTypeIDs, typesArray, data)
 		},
+	)
+}
+
+func decodeABIs(
+	context interpreter.InvocationContext,
+	location common.AddressLocation,
+	evmSpecialTypeIDs *evmSpecialTypeIDs,
+	typesArray *interpreter.ArrayValue,
+	data []byte,
+) interpreter.Value {
+	common.UseComputation(
+		context,
+		common.ComputationUsage{
+			Kind:      environment.ComputationKindEVMDecodeABI,
+			Intensity: uint64(len(data)),
+		},
+	)
+
+	arguments := make(gethABI.Arguments, 0, typesArray.Count())
+	staticTypes := make([]interpreter.StaticType, 0, typesArray.Count())
+	typesArray.Iterate(
+		context,
+		func(element interpreter.Value) (resume bool) {
+			typeValue, ok := element.(interpreter.TypeValue)
+			if !ok {
+				panic(errors.NewUnreachableError())
+			}
+
+			staticType := typeValue.Type
+
+			gethABITy, ok := gethABIType(
+				context,
+				staticType,
+				evmSpecialTypeIDs,
+			)
+			if !ok {
+				panic(abiDecodingError{
+					Type: staticType,
+				})
+			}
+
+			arguments = append(
+				arguments,
+				gethABI.Argument{
+					Type: gethABITy,
+				},
+			)
+
+			staticTypes = append(staticTypes, staticType)
+
+			// continue iteration
+			return true
+		},
+		false,
+	)
+
+	decodedValues, err := arguments.Unpack(data)
+	if err != nil {
+		panic(abiDecodingError{Message: err.Error()})
+	}
+
+	values := make([]interpreter.Value, 0, len(decodedValues))
+
+	for i, staticType := range staticTypes {
+		value, err := decodeABI(
+			context,
+			decodedValues[i],
+			staticType,
+			location,
+			evmSpecialTypeIDs,
+		)
+		if err != nil {
+			panic(err)
+		}
+
+		values = append(values, value)
+	}
+
+	arrayType := interpreter.NewVariableSizedStaticType(
+		context,
+		interpreter.NewPrimitiveStaticType(
+			context,
+			interpreter.PrimitiveStaticTypeAnyStruct,
+		),
+	)
+
+	return interpreter.NewArrayValue(
+		context,
+		arrayType,
+		common.ZeroAddress,
+		values...,
 	)
 }
 

@@ -10,7 +10,7 @@ import (
 type Codec interface {
 	NewEncoder(w io.Writer) Encoder
 	NewDecoder(r io.Reader) Decoder
-	Encode(v interface{}) ([]byte, error)
+	Encode(v any) ([]byte, error)
 
 	// Decode decodes a message.
 	// Expected error returns during normal operations:
@@ -22,7 +22,7 @@ type Codec interface {
 
 // Encoder encodes the given message into the underlying writer.
 type Encoder interface {
-	Encode(v interface{}) error
+	Encode(v any) error
 }
 
 // Decoder decodes from the underlying reader into the given message.

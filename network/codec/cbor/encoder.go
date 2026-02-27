@@ -18,7 +18,7 @@ type Encoder struct {
 
 // Encode will convert the given message into CBOR and write it to the
 // underlying encoder, followed by a new line.
-func (e *Encoder) Encode(v interface{}) error {
+func (e *Encoder) Encode(v any) error {
 	// encode the value
 	code, what, err := codec.MessageCodeFromInterface(v)
 	if err != nil {

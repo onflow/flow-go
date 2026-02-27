@@ -410,7 +410,7 @@ func getRegisterStats(valueSizesByType sizesByType) []RegisterStatsByTypes {
 	return statsByTypes
 }
 
-func writeStats(reportName string, stats interface{}) {
+func writeStats(reportName string, stats any) {
 	rw := reporters.NewReportFileWriterFactory(flagOutputDir, log.Logger).
 		ReportWriter(reportName)
 	defer rw.Close()

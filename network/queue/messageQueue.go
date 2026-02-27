@@ -17,7 +17,7 @@ const MediumPriority = Priority(5)
 const HighPriority = Priority(10)
 
 // MessagePriorityFunc - the callback function to derive priority of a message
-type MessagePriorityFunc func(message interface{}) (Priority, error)
+type MessagePriorityFunc func(message any) (Priority, error)
 
 // MessageQueue is the heap based priority queue implementation of the MessageQueue implementation
 type MessageQueue struct {
@@ -28,7 +28,7 @@ type MessageQueue struct {
 	metrics      module.NetworkInboundQueueMetrics
 }
 
-func (mq *MessageQueue) Insert(message interface{}) error {
+func (mq *MessageQueue) Insert(message any) error {
 
 	if err := mq.ctx.Err(); err != nil {
 		return err
@@ -65,7 +65,7 @@ func (mq *MessageQueue) Insert(message interface{}) error {
 	return nil
 }
 
-func (mq *MessageQueue) Remove() interface{} {
+func (mq *MessageQueue) Remove() any {
 	mq.cond.L.Lock()
 	defer mq.cond.L.Unlock()
 	for mq.pq.Len() == 0 {

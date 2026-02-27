@@ -53,7 +53,7 @@ func (err TransientError) Unwrap() error {
 	return err.Err
 }
 
-func NewTransientErrorf(msg string, args ...interface{}) TransientError {
+func NewTransientErrorf(msg string, args ...any) TransientError {
 	return TransientError{
 		Err: fmt.Errorf(msg, args...),
 	}

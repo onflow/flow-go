@@ -2350,6 +2350,157 @@ func TestCadenceOwnedAccountFunctionalities(t *testing.T) {
 			})
 	})
 
+	t.Run("test coa dryCallWithSigAndArgs", func(t *testing.T) {
+		RunWithNewEnvironment(t,
+			chain, func(
+				ctx fvm.Context,
+				vm fvm.VM,
+				snapshot snapshot.SnapshotTree,
+				testContract *TestContract,
+				testAccount *EOATestAccount,
+			) {
+				sc := systemcontracts.SystemContractsForChain(chain.ChainID())
+				code := []byte(fmt.Sprintf(
+					`
+					import EVM from %s
+
+					transaction(tx: [UInt8], coinbaseBytes: [UInt8; 20]){
+						prepare(account: auth(Storage) &Account ) {
+							let cadenceOwnedAccount <- EVM.createCadenceOwnedAccount()
+							account.storage.save(<- cadenceOwnedAccount, to: /storage/evmCOA)
+
+							let coinbase = EVM.EVMAddress(bytes: coinbaseBytes)
+							let res = EVM.run(tx: tx, coinbase: coinbase)
+
+							assert(res.status == EVM.Status.successful, message: "unexpected status")
+							assert(res.errorCode == 0, message: "unexpected error code")
+						}
+					}
+					`,
+					sc.EVMContract.Address.HexWithPrefix(),
+				))
+
+				num := int64(42)
+				innerTxBytes := testAccount.PrepareSignAndEncodeTx(t,
+					testContract.DeployedAt.ToCommon(),
+					testContract.MakeCallData(t, "store", big.NewInt(num)),
+					big.NewInt(0),
+					uint64(50_000),
+					big.NewInt(0),
+				)
+
+				innerTx := cadence.NewArray(
+					unittest.BytesToCdcUInt8(innerTxBytes),
+				).WithType(stdlib.EVMTransactionBytesCadenceType)
+
+				coinbase := cadence.NewArray(
+					unittest.BytesToCdcUInt8(testAccount.Address().Bytes()),
+				).WithType(stdlib.EVMAddressBytesCadenceType)
+
+				txBody, err := flow.NewTransactionBodyBuilder().
+					SetScript(code).
+					SetPayer(sc.FlowServiceAccount.Address).
+					AddAuthorizer(sc.FlowServiceAccount.Address).
+					AddArgument(json.MustEncode(innerTx)).
+					AddArgument(json.MustEncode(coinbase)).
+					Build()
+				require.NoError(t, err)
+
+				tx := fvm.Transaction(txBody, 0)
+
+				state, output, err := vm.Run(
+					ctx,
+					tx,
+					snapshot,
+				)
+				require.NoError(t, err)
+				require.NoError(t, output.Err)
+				assert.Len(t, output.Events, 3)
+				assert.Len(t, state.UpdatedRegisterIDs(), 13)
+				assert.Equal(
+					t,
+					flow.EventType("A.f8d6e0586b0a20c7.EVM.TransactionExecuted"),
+					output.Events[0].Type,
+				)
+				assert.Equal(
+					t,
+					flow.EventType("A.f8d6e0586b0a20c7.EVM.CadenceOwnedAccountCreated"),
+					output.Events[1].Type,
+				)
+				assert.Equal(
+					t,
+					flow.EventType("A.f8d6e0586b0a20c7.EVM.TransactionExecuted"),
+					output.Events[2].Type,
+				)
+				snapshot = snapshot.Append(state)
+
+				code = []byte(fmt.Sprintf(
+					`
+					import EVM from %s
+
+					transaction(signature: String, args: [AnyStruct], to: String, gasLimit: UInt64, value: UInt){
+						prepare(account: auth(Storage) &Account) {
+							let coa = account.storage.borrow<&EVM.CadenceOwnedAccount>(
+								from: /storage/evmCOA
+							) ?? panic("could not borrow COA reference!")
+							let res = coa.dryCallWithSigAndArgs(
+								to: EVM.addressFromString(to),
+								signature: signature,
+								args: args,
+								gasLimit: gasLimit,
+								value: value,
+								resultTypes: [Type<UInt256>()],
+							)
+
+							assert(res.status == EVM.Status.successful, message: "unexpected status")
+							assert(res.errorCode == 0, message: "unexpected error code")
+
+							assert(res.results!.length == 1)
+
+							let number = res.results![0] as! UInt256
+							assert(number == 42, message: number.toString())
+						}
+					}
+					`,
+					sc.EVMContract.Address.HexWithPrefix(),
+				))
+
+				signatureValue, err := cadence.NewString("retrieve()")
+				require.NoError(t, err)
+				signature := json.MustEncode(signatureValue)
+
+				args := json.MustEncode(cadence.NewArray(nil))
+
+				toAddress, err := cadence.NewString(testContract.DeployedAt.ToCommon().Hex())
+				require.NoError(t, err)
+				to := json.MustEncode(toAddress)
+
+				txBody, err = flow.NewTransactionBodyBuilder().
+					SetScript(code).
+					SetPayer(sc.FlowServiceAccount.Address).
+					AddAuthorizer(sc.FlowServiceAccount.Address).
+					AddArgument(signature).
+					AddArgument(args).
+					AddArgument(to).
+					AddArgument(json.MustEncode(cadence.NewUInt64(50_000))).
+					AddArgument(json.MustEncode(cadence.NewUInt(0))).
+					Build()
+				require.NoError(t, err)
+
+				tx = fvm.Transaction(txBody, 0)
+
+				state, output, err = vm.Run(
+					ctx,
+					tx,
+					snapshot,
+				)
+				require.NoError(t, err)
+				require.NoError(t, output.Err)
+				assert.Len(t, output.Events, 0)
+				assert.Len(t, state.UpdatedRegisterIDs(), 0)
+			})
+	})
+
 	t.Run("test coa deploy with max gas limit cap", func(t *testing.T) {
 		RunWithNewEnvironment(t,
 			chain, func(
@@ -3033,6 +3184,166 @@ func TestDryRun(t *testing.T) {
 				assert.Equal(t, types.InvalidTransactionGasCost, int(result.GasConsumed))
 			})
 	})
+
+	t.Run("test EVM.dryRun with insufficient computation limit", func(t *testing.T) {
+		RunWithNewEnvironment(t,
+			chain, func(
+				ctx fvm.Context,
+				vm fvm.VM,
+				snapshot snapshot.SnapshotTree,
+				testContract *TestContract,
+				testAccount *EOATestAccount,
+			) {
+				sc := systemcontracts.SystemContractsForChain(chain.ChainID())
+				code := []byte(fmt.Sprintf(
+					`
+					import EVM from %s
+
+					transaction(tx: [UInt8], fromBytes: [UInt8; 20]) {
+						prepare(account: &Account) {
+							let from = EVM.EVMAddress(bytes: fromBytes)
+							let res = EVM.dryRun(tx: tx, from: from)
+
+							assert(res.status == EVM.Status.successful, message: "unexpected status")
+							assert(res.errorCode == 0, message: "unexpected error code")
+						}
+					}
+					`,
+					sc.EVMContract.Address.HexWithPrefix(),
+				))
+
+				num := int64(100)
+				evmTx := gethTypes.NewTransaction(
+					0,
+					testContract.DeployedAt.ToCommon(),
+					big.NewInt(0),
+					uint64(25_000_000),
+					big.NewInt(0),
+					testContract.MakeCallData(t, "store", big.NewInt(num)),
+				)
+				innerTxBytes, err := evmTx.MarshalBinary()
+				require.NoError(t, err)
+
+				innerTx := cadence.NewArray(
+					unittest.BytesToCdcUInt8(innerTxBytes),
+				).WithType(stdlib.EVMTransactionBytesCadenceType)
+
+				from := cadence.NewArray(
+					unittest.BytesToCdcUInt8(testAccount.Address().Bytes()),
+				).WithType(stdlib.EVMAddressBytesCadenceType)
+
+				txBody, err := flow.NewTransactionBodyBuilder().
+					SetScript(code).
+					SetPayer(sc.FlowServiceAccount.Address).
+					AddAuthorizer(sc.FlowServiceAccount.Address).
+					AddArgument(json.MustEncode(innerTx)).
+					AddArgument(json.MustEncode(from)).
+					SetComputeLimit(250).
+					Build()
+				require.NoError(t, err)
+
+				tx := fvm.Transaction(txBody, 0)
+				_, output, err := vm.Run(ctx, tx, snapshot)
+
+				require.NoError(t, err)
+				require.Error(t, output.Err)
+				require.ErrorContains(t, output.Err, "insufficient computation")
+			},
+		)
+	})
+
+	t.Run("test EVM.dryRun is properly metered", func(t *testing.T) {
+		RunWithNewEnvironment(t,
+			chain, func(
+				ctx fvm.Context,
+				vm fvm.VM,
+				snapshot snapshot.SnapshotTree,
+				testContract *TestContract,
+				testAccount *EOATestAccount,
+			) {
+				sc := systemcontracts.SystemContractsForChain(chain.ChainID())
+				code := []byte(fmt.Sprintf(
+					`
+					import EVM from %s
+
+					transaction(tx: [UInt8], fromBytes: [UInt8; 20], iterations: UInt) {
+						prepare(account: &Account) {
+							let from = EVM.EVMAddress(bytes: fromBytes)
+							var i = UInt(0)
+							while i < iterations {
+								let res = EVM.dryRun(tx: tx, from: from)
+								assert(res.status == EVM.Status.successful, message: "unexpected status")
+								assert(res.errorCode == 0, message: "unexpected error code")
+								i = i + 1
+							}
+						}
+					}
+					`,
+					sc.EVMContract.Address.HexWithPrefix(),
+				))
+
+				num := int64(100)
+				evmTx := gethTypes.NewTransaction(
+					0,
+					testContract.DeployedAt.ToCommon(),
+					big.NewInt(0),
+					uint64(50_000),
+					big.NewInt(0),
+					testContract.MakeCallData(t, "store", big.NewInt(num)),
+				)
+				innerTxBytes, err := evmTx.MarshalBinary()
+				require.NoError(t, err)
+
+				innerTx := cadence.NewArray(
+					unittest.BytesToCdcUInt8(innerTxBytes),
+				).WithType(stdlib.EVMTransactionBytesCadenceType)
+
+				from := cadence.NewArray(
+					unittest.BytesToCdcUInt8(testAccount.Address().Bytes()),
+				).WithType(stdlib.EVMAddressBytesCadenceType)
+
+				iterations := cadence.NewUInt(5)
+
+				txBody, err := flow.NewTransactionBodyBuilder().
+					SetScript(code).
+					SetPayer(sc.FlowServiceAccount.Address).
+					AddAuthorizer(sc.FlowServiceAccount.Address).
+					AddArgument(json.MustEncode(innerTx)).
+					AddArgument(json.MustEncode(from)).
+					AddArgument(json.MustEncode(iterations)).
+					SetComputeLimit(1_000).
+					Build()
+				require.NoError(t, err)
+
+				tx := fvm.Transaction(txBody, 0)
+				_, output, err := vm.Run(ctx, tx, snapshot)
+
+				require.NoError(t, err)
+				require.NoError(t, output.Err)
+				assert.Equal(t, uint64(33), output.ComputationUsed)
+
+				// Increase call count of EVM.dryRun to 15
+				iterations = cadence.NewUInt(15)
+				txBody, err = flow.NewTransactionBodyBuilder().
+					SetScript(code).
+					SetPayer(sc.FlowServiceAccount.Address).
+					AddAuthorizer(sc.FlowServiceAccount.Address).
+					AddArgument(json.MustEncode(innerTx)).
+					AddArgument(json.MustEncode(from)).
+					AddArgument(json.MustEncode(iterations)).
+					SetComputeLimit(1_000).
+					Build()
+				require.NoError(t, err)
+
+				tx = fvm.Transaction(txBody, 0)
+				_, output, err = vm.Run(ctx, tx, snapshot)
+
+				require.NoError(t, err)
+				require.NoError(t, output.Err)
+				assert.Equal(t, uint64(96), output.ComputationUsed)
+			},
+		)
+	})
 }
 
 func TestDryCall(t *testing.T) {
@@ -3403,6 +3714,591 @@ func TestDryCall(t *testing.T) {
 				)
 
 				result, _ = dryCall(t, tx, ctx, vm, snapshot)
+				assert.Equal(t, types.ExecutionErrCodeExecutionReverted, result.ErrorCode)
+				assert.Equal(t, types.StatusFailed, result.Status)
+				assert.Equal(t, uint64(21331), result.GasConsumed)
+			})
+	})
+
+	t.Run("test EVM.dryCall with insufficient computation limit", func(t *testing.T) {
+		RunWithNewEnvironment(t,
+			chain, func(
+				ctx fvm.Context,
+				vm fvm.VM,
+				snapshot snapshot.SnapshotTree,
+				testContract *TestContract,
+				testAccount *EOATestAccount,
+			) {
+				sc := systemcontracts.SystemContractsForChain(chain.ChainID())
+				code := []byte(fmt.Sprintf(
+					`
+					import EVM from %s
+
+					transaction(data: [UInt8], to: String, gasLimit: UInt64, value: UInt) {
+						prepare(account: &Account) {
+							let res = EVM.dryCall(
+								from: EVM.EVMAddress(bytes: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 0, 0, 0, 0, 0, 0, 0, 0, 15]),
+								to: EVM.addressFromString(to),
+								data: data,
+								gasLimit: gasLimit,
+								value: EVM.Balance(attoflow: value)
+							)
+
+							assert(res.status == EVM.Status.successful, message: "unexpected status")
+							assert(res.errorCode == 0, message: "unexpected error code")
+						}
+					}
+					`,
+					sc.EVMContract.Address.HexWithPrefix(),
+				))
+
+				num := int64(100)
+				evmTx := gethTypes.NewTransaction(
+					0,
+					testContract.DeployedAt.ToCommon(),
+					big.NewInt(0),
+					uint64(25_000_000),
+					big.NewInt(0),
+					testContract.MakeCallData(t, "store", big.NewInt(num)),
+				)
+
+				toAddress, err := cadence.NewString(evmTx.To().Hex())
+				require.NoError(t, err)
+
+				callData := cadence.NewArray(
+					unittest.BytesToCdcUInt8(evmTx.Data()),
+				).WithType(stdlib.EVMTransactionBytesCadenceType)
+
+				txBody, err := flow.NewTransactionBodyBuilder().
+					SetScript(code).
+					SetPayer(sc.FlowServiceAccount.Address).
+					AddAuthorizer(sc.FlowServiceAccount.Address).
+					AddArgument(json.MustEncode(callData)).
+					AddArgument(json.MustEncode(toAddress)).
+					AddArgument(json.MustEncode(cadence.NewUInt64(evmTx.Gas()))).
+					AddArgument(json.MustEncode(cadence.NewUInt(uint(evmTx.Value().Uint64())))).
+					SetComputeLimit(250).
+					Build()
+				require.NoError(t, err)
+
+				tx := fvm.Transaction(txBody, 0)
+				_, output, err := vm.Run(ctx, tx, snapshot)
+
+				require.NoError(t, err)
+				require.Error(t, output.Err)
+				require.ErrorContains(t, output.Err, "insufficient computation")
+			},
+		)
+	})
+
+	t.Run("test EVM.dryCall is properly metered", func(t *testing.T) {
+		RunWithNewEnvironment(t,
+			chain, func(
+				ctx fvm.Context,
+				vm fvm.VM,
+				snapshot snapshot.SnapshotTree,
+				testContract *TestContract,
+				testAccount *EOATestAccount,
+			) {
+				sc := systemcontracts.SystemContractsForChain(chain.ChainID())
+				code := []byte(fmt.Sprintf(
+					`
+					import EVM from %s
+
+					transaction(data: [UInt8], to: String, gasLimit: UInt64, value: UInt, iterations: UInt) {
+						prepare(account: &Account) {
+							var i = UInt(0)
+							while i < iterations {
+								let res = EVM.dryCall(
+									from: EVM.EVMAddress(bytes: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 0, 0, 0, 0, 0, 0, 0, 0, 15]),
+									to: EVM.addressFromString(to),
+									data: data,
+									gasLimit: gasLimit,
+									value: EVM.Balance(attoflow: value)
+								)
+								assert(res.status == EVM.Status.successful, message: "unexpected status")
+								assert(res.errorCode == 0, message: "unexpected error code")
+								i = i + 1
+							}
+						}
+					}
+					`,
+					sc.EVMContract.Address.HexWithPrefix(),
+				))
+
+				num := int64(100)
+				evmTx := gethTypes.NewTransaction(
+					0,
+					testContract.DeployedAt.ToCommon(),
+					big.NewInt(0),
+					uint64(50_000),
+					big.NewInt(0),
+					testContract.MakeCallData(t, "store", big.NewInt(num)),
+				)
+
+				toAddress, err := cadence.NewString(evmTx.To().Hex())
+				require.NoError(t, err)
+
+				callData := cadence.NewArray(
+					unittest.BytesToCdcUInt8(evmTx.Data()),
+				).WithType(stdlib.EVMTransactionBytesCadenceType)
+
+				iterations := cadence.NewUInt(5)
+
+				txBody, err := flow.NewTransactionBodyBuilder().
+					SetScript(code).
+					SetPayer(sc.FlowServiceAccount.Address).
+					AddAuthorizer(sc.FlowServiceAccount.Address).
+					AddArgument(json.MustEncode(callData)).
+					AddArgument(json.MustEncode(toAddress)).
+					AddArgument(json.MustEncode(cadence.NewUInt64(evmTx.Gas()))).
+					AddArgument(json.MustEncode(cadence.NewUInt(uint(evmTx.Value().Uint64())))).
+					AddArgument(json.MustEncode(iterations)).
+					SetComputeLimit(1_000).
+					Build()
+				require.NoError(t, err)
+
+				tx := fvm.Transaction(txBody, 0)
+				_, output, err := vm.Run(ctx, tx, snapshot)
+
+				require.NoError(t, err)
+				require.NoError(t, output.Err)
+				assert.Equal(t, uint64(44), output.ComputationUsed)
+
+				// Increase call count of EVM.dryCall to 15
+				iterations = cadence.NewUInt(15)
+				txBody, err = flow.NewTransactionBodyBuilder().
+					SetScript(code).
+					SetPayer(sc.FlowServiceAccount.Address).
+					AddAuthorizer(sc.FlowServiceAccount.Address).
+					AddArgument(json.MustEncode(callData)).
+					AddArgument(json.MustEncode(toAddress)).
+					AddArgument(json.MustEncode(cadence.NewUInt64(evmTx.Gas()))).
+					AddArgument(json.MustEncode(cadence.NewUInt(uint(evmTx.Value().Uint64())))).
+					AddArgument(json.MustEncode(iterations)).
+					SetComputeLimit(1_000).
+					Build()
+				require.NoError(t, err)
+
+				tx = fvm.Transaction(txBody, 0)
+				_, output, err = vm.Run(ctx, tx, snapshot)
+
+				require.NoError(t, err)
+				require.NoError(t, output.Err)
+				assert.Equal(t, uint64(130), output.ComputationUsed)
+			},
+		)
+	})
+}
+
+func TestDryCallWithSigAndArgs(t *testing.T) {
+	t.Parallel()
+
+	chain := flow.Emulator.Chain()
+	sc := systemcontracts.SystemContractsForChain(chain.ChainID())
+	evmAddress := sc.EVMContract.Address.HexWithPrefix()
+
+	dryCallWithSigAndArgs := func(
+		t *testing.T,
+		signature string,
+		args []cadence.Value,
+		to common.Address,
+		gas uint64,
+		value uint,
+		ctx fvm.Context,
+		vm fvm.VM,
+		snapshot snapshot.SnapshotTree,
+	) (*ResultDecoded, *snapshot.ExecutionSnapshot) {
+		code := []byte(fmt.Sprintf(`
+				import EVM from %s
+
+				access(all)
+				fun main(signature: String, args: [AnyStruct], to: String, gasLimit: UInt64, value: UInt): EVM.ResultDecoded {
+					return EVM.dryCallWithSigAndArgs(
+						from: EVM.EVMAddress(bytes: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 0, 0, 0, 0, 0, 0, 0, 0, 15]),
+						to: EVM.addressFromString(to),
+						signature: signature,
+						args: args,
+						gasLimit: gasLimit,
+						value: value,
+						resultTypes: nil,
+					)
+				}`,
+			evmAddress,
+		))
+
+		toAddress, err := cadence.NewString(to.Hex())
+		require.NoError(t, err)
+
+		signatureValue, err := cadence.NewString(signature)
+		require.NoError(t, err)
+
+		argsValue := cadence.NewArray(
+			args,
+		).WithType(cadence.NewVariableSizedArrayType(cadence.AnyStructType))
+
+		script := fvm.Script(code).WithArguments(
+			json.MustEncode(signatureValue),
+			json.MustEncode(argsValue),
+			json.MustEncode(toAddress),
+			json.MustEncode(cadence.NewUInt64(gas)),
+			json.MustEncode(cadence.NewUInt(value)),
+		)
+
+		execSnapshot, output, err := vm.Run(
+			ctx,
+			script,
+			snapshot,
+		)
+		require.NoError(t, err)
+		require.NoError(t, output.Err)
+		require.Len(t, output.Events, 0)
+
+		result, err := ResultDecodedFromEVMResultValue(output.Value)
+		require.NoError(t, err)
+		return result, execSnapshot
+	}
+
+	// This test checks that gas limit is correctly used and gas usage correctly reported.
+	t.Run("test dryCallWithSigAndArgs with different gas limits", func(t *testing.T) {
+		RunWithNewEnvironment(t,
+			chain, func(
+				ctx fvm.Context,
+				vm fvm.VM,
+				snapshot snapshot.SnapshotTree,
+				testContract *TestContract,
+				testAccount *EOATestAccount,
+			) {
+				signature := "store(uint256)"
+				args := []cadence.Value{
+					cadence.NewUInt256(1337),
+				}
+
+				limit := uint64(50_000)
+
+				result, _ := dryCallWithSigAndArgs(
+					t,
+					signature,
+					args,
+					testContract.DeployedAt.ToCommon(),
+					limit,
+					0,
+					ctx,
+					vm,
+					snapshot,
+				)
+				require.Equal(t, types.ErrCodeNoError, result.ErrorCode)
+				require.Equal(t, types.StatusSuccessful, result.Status)
+				require.Greater(t, result.GasConsumed, uint64(0))
+				require.Less(t, result.GasConsumed, limit)
+				require.True(t, len(result.Results) == 0)
+
+				// gas limit too low, but still bigger than intrinsic gas value
+				limit = uint64(24_216)
+
+				result, _ = dryCallWithSigAndArgs(
+					t,
+					signature,
+					args,
+					testContract.DeployedAt.ToCommon(),
+					limit,
+					0,
+					ctx,
+					vm,
+					snapshot,
+				)
+				require.Equal(t, types.ExecutionErrCodeOutOfGas, result.ErrorCode)
+				require.Equal(t, types.StatusFailed, result.Status)
+				require.Equal(t, result.GasConsumed, limit)
+				require.True(t, len(result.Results) == 0)
+
+				// EVM.dryCall must not be limited to `gethParams.MaxTxGas`
+				limit = gethParams.MaxTxGas + 1_000
+
+				result, _ = dryCallWithSigAndArgs(
+					t,
+					signature,
+					args,
+					testContract.DeployedAt.ToCommon(),
+					limit,
+					0,
+					ctx,
+					vm,
+					snapshot,
+				)
+				require.Equal(t, types.ErrCodeNoError, result.ErrorCode)
+				require.Equal(t, types.StatusSuccessful, result.Status)
+				require.Greater(t, result.GasConsumed, uint64(0))
+				require.Less(t, result.GasConsumed, limit)
+				require.True(t, len(result.Results) == 0)
+			})
+	})
+
+	t.Run("test dryCallWithSigAndArgs does not form EVM transactions", func(t *testing.T) {
+		RunWithNewEnvironment(t,
+			chain, func(
+				ctx fvm.Context,
+				vm fvm.VM,
+				snapshot snapshot.SnapshotTree,
+				testContract *TestContract,
+				testAccount *EOATestAccount,
+			) {
+				sc := systemcontracts.SystemContractsForChain(chain.ChainID())
+				code := []byte(fmt.Sprintf(
+					`
+							import EVM from %s
+
+							transaction(tx: [UInt8], coinbaseBytes: [UInt8; 20]){
+								prepare(account: &Account) {
+									let coinbase = EVM.EVMAddress(bytes: coinbaseBytes)
+									let res = EVM.run(tx: tx, coinbase: coinbase)
+
+									assert(res.status == EVM.Status.successful, message: "unexpected status")
+									assert(res.errorCode == 0, message: "unexpected error code")
+								}
+							}
+							`,
+					sc.EVMContract.Address.HexWithPrefix(),
+				))
+
+				num := int64(42)
+				innerTxBytes := testAccount.PrepareSignAndEncodeTx(t,
+					testContract.DeployedAt.ToCommon(),
+					testContract.MakeCallData(t, "store", big.NewInt(num)),
+					big.NewInt(0),
+					uint64(50_000),
+					big.NewInt(0),
+				)
+
+				innerTx := cadence.NewArray(
+					unittest.BytesToCdcUInt8(innerTxBytes),
+				).WithType(stdlib.EVMTransactionBytesCadenceType)
+
+				coinbase := cadence.NewArray(
+					unittest.BytesToCdcUInt8(testAccount.Address().Bytes()),
+				).WithType(stdlib.EVMAddressBytesCadenceType)
+
+				txBody, err := flow.NewTransactionBodyBuilder().
+					SetScript(code).
+					SetPayer(sc.FlowServiceAccount.Address).
+					AddAuthorizer(sc.FlowServiceAccount.Address).
+					AddArgument(json.MustEncode(innerTx)).
+					AddArgument(json.MustEncode(coinbase)).
+					Build()
+				require.NoError(t, err)
+
+				tx := fvm.Transaction(txBody, 0)
+
+				state, output, err := vm.Run(
+					ctx,
+					tx,
+					snapshot,
+				)
+				require.NoError(t, err)
+				require.NoError(t, output.Err)
+				assert.Len(t, output.Events, 1)
+				assert.Len(t, state.UpdatedRegisterIDs(), 4)
+				assert.Equal(
+					t,
+					flow.EventType("A.f8d6e0586b0a20c7.EVM.TransactionExecuted"),
+					output.Events[0].Type,
+				)
+				snapshot = snapshot.Append(state)
+
+				code = []byte(fmt.Sprintf(
+					`
+							import EVM from %s
+
+							transaction(signature: String, args: [AnyStruct], to: String, gasLimit: UInt64, value: UInt){
+								prepare(account: &Account) {
+									let res = EVM.dryCallWithSigAndArgs(
+										from: EVM.EVMAddress(bytes: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 0, 0, 0, 0, 0, 0, 0, 0, 15]),
+										to: EVM.addressFromString(to),
+										signature: signature,
+										args: args,
+										gasLimit: gasLimit,
+										value: value,
+										resultTypes: [Type<UInt256>()],
+									)
+
+									assert(res.status == EVM.Status.successful, message: "unexpected status")
+									assert(res.errorCode == 0, message: "unexpected error code")
+
+									assert(res.results!.length == 1)
+
+									let number = res.results![0] as! UInt256
+									assert(number == 42, message: number.toString())
+								}
+							}
+							`,
+					sc.EVMContract.Address.HexWithPrefix(),
+				))
+
+				signatureValue, err := cadence.NewString("retrieve()")
+				require.NoError(t, err)
+
+				argsValue := cadence.NewArray(nil).WithType(cadence.NewVariableSizedArrayType(cadence.AnyStructType))
+
+				toAddress, err := cadence.NewString(testContract.DeployedAt.ToCommon().Hex())
+				require.NoError(t, err)
+				to := json.MustEncode(toAddress)
+
+				txBody, err = flow.NewTransactionBodyBuilder().
+					SetScript(code).
+					SetPayer(sc.FlowServiceAccount.Address).
+					AddAuthorizer(sc.FlowServiceAccount.Address).
+					AddArgument(json.MustEncode(signatureValue)).
+					AddArgument(json.MustEncode(argsValue)).
+					AddArgument(to).
+					AddArgument(json.MustEncode(cadence.NewUInt64(50_000))).
+					AddArgument(json.MustEncode(cadence.NewUInt(0))).
+					Build()
+				require.NoError(t, err)
+
+				tx = fvm.Transaction(txBody, 0)
+
+				state, output, err = vm.Run(
+					ctx,
+					tx,
+					snapshot,
+				)
+				require.NoError(t, err)
+				require.NoError(t, output.Err)
+				assert.Len(t, output.Events, 0)
+				assert.Len(t, state.UpdatedRegisterIDs(), 0)
+			})
+	})
+
+	// this test makes sure the dryCallWithSigAndArgs that updates the value on the contract
+	// doesn't persist the change, and after when the value is read it isn't updated.
+	t.Run("test dryCallWithSigAndArgs has no side-effects", func(t *testing.T) {
+		RunWithNewEnvironment(t,
+			chain, func(
+				ctx fvm.Context,
+				vm fvm.VM,
+				snapshot snapshot.SnapshotTree,
+				testContract *TestContract,
+				testAccount *EOATestAccount,
+			) {
+				updatedValue := int64(1337)
+
+				signature := "store(uint256)"
+				args := []cadence.Value{
+					cadence.NewUInt256(1337),
+				}
+
+				result, state := dryCallWithSigAndArgs(
+					t,
+					signature,
+					args,
+					testContract.DeployedAt.ToCommon(),
+					1000000,
+					0,
+					ctx,
+					vm,
+					snapshot,
+				)
+				require.Len(t, state.UpdatedRegisterIDs(), 0)
+				require.Equal(t, types.ErrCodeNoError, result.ErrorCode)
+				require.Equal(t, types.StatusSuccessful, result.Status)
+				require.Greater(t, result.GasConsumed, uint64(0))
+
+				// query the value make sure it's not updated
+				code := []byte(fmt.Sprintf(
+					`
+							import EVM from %s
+							access(all)
+							fun main(tx: [UInt8], coinbaseBytes: [UInt8; 20]): EVM.Result {
+								let coinbase = EVM.EVMAddress(bytes: coinbaseBytes)
+								return EVM.run(tx: tx, coinbase: coinbase)
+							}
+							`,
+					evmAddress,
+				))
+
+				innerTxBytes := testAccount.PrepareSignAndEncodeTx(t,
+					testContract.DeployedAt.ToCommon(),
+					testContract.MakeCallData(t, "retrieve"),
+					big.NewInt(0),
+					uint64(100_000),
+					big.NewInt(0),
+				)
+
+				innerTx := cadence.NewArray(
+					unittest.BytesToCdcUInt8(innerTxBytes),
+				).WithType(stdlib.EVMTransactionBytesCadenceType)
+
+				coinbase := cadence.NewArray(
+					unittest.BytesToCdcUInt8(testAccount.Address().Bytes()),
+				).WithType(stdlib.EVMAddressBytesCadenceType)
+
+				script := fvm.Script(code).WithArguments(
+					json.MustEncode(innerTx),
+					json.MustEncode(coinbase),
+				)
+
+				state, output, err := vm.Run(
+					ctx,
+					script,
+					snapshot,
+				)
+				require.NoError(t, err)
+				require.NoError(t, output.Err)
+				require.Len(t, state.UpdatedRegisterIDs(), 0)
+
+				res, err := impl.ResultSummaryFromEVMResultValue(output.Value)
+				require.NoError(t, err)
+				require.Equal(t, types.StatusSuccessful, res.Status)
+				require.Equal(t, types.ErrCodeNoError, res.ErrorCode)
+				// make sure the value we used in the dryCallWithSigAndArgs is not the same as the value stored in contract
+				require.NotEqual(t, updatedValue, new(big.Int).SetBytes(res.ReturnedData).Int64())
+			})
+	})
+
+	t.Run("test dryCallWithSigAndArgs validation error", func(t *testing.T) {
+		RunWithNewEnvironment(t,
+			chain, func(
+				ctx fvm.Context,
+				vm fvm.VM,
+				snapshot snapshot.SnapshotTree,
+				testContract *TestContract,
+				testAccount *EOATestAccount,
+			) {
+				signature := "store(uint256)"
+				args := []cadence.Value{
+					cadence.NewUInt256(10337),
+				}
+
+				result, _ := dryCallWithSigAndArgs(
+					t,
+					signature,
+					args,
+					testContract.DeployedAt.ToCommon(),
+					35_000,
+					1000,
+					ctx,
+					vm,
+					snapshot,
+				)
+				assert.Equal(t, types.ValidationErrCodeInsufficientFunds, result.ErrorCode)
+				assert.Equal(t, types.StatusInvalid, result.Status)
+				assert.Equal(t, types.InvalidTransactionGasCost, int(result.GasConsumed))
+
+				// random function selector
+				signature = "test()"
+				args = []cadence.Value{}
+
+				result, _ = dryCallWithSigAndArgs(
+					t,
+					signature,
+					args,
+					testContract.DeployedAt.ToCommon(),
+					25_000,
+					0,
+					ctx,
+					vm,
+					snapshot,
+				)
 				assert.Equal(t, types.ExecutionErrCodeExecutionReverted, result.ErrorCode)
 				assert.Equal(t, types.StatusFailed, result.Status)
 				assert.Equal(t, uint64(21331), result.GasConsumed)
@@ -4353,6 +5249,233 @@ func TestEVMFileSystemContract(t *testing.T) {
 	})
 }
 
+func TestEVMaddressFromString(t *testing.T) {
+	t.Parallel()
+
+	chain := flow.Emulator.Chain()
+	sc := systemcontracts.SystemContractsForChain(chain.ChainID())
+
+	t.Run("valid EVM address without prefix", func(t *testing.T) {
+		RunWithNewEnvironment(t,
+			chain, func(
+				ctx fvm.Context,
+				vm fvm.VM,
+				snapshot snapshot.SnapshotTree,
+				testContract *TestContract,
+				testAccount *EOATestAccount,
+			) {
+				code := []byte(fmt.Sprintf(
+					`
+					import EVM from %s
+
+					access(all)
+					fun main(): Bool {
+						let address = EVM.addressFromString("E62340807933BCFC3b89FE121dDC0ae5DA9599a0")
+						assert(
+							address.toString() == "e62340807933bcfc3b89fe121ddc0ae5da9599a0",
+							message: "unexpected EVM address"
+						)
+						return true
+					}
+					`,
+					sc.EVMContract.Address.HexWithPrefix(),
+				))
+
+				script := fvm.Script(code)
+				_, output, err := vm.Run(ctx, script, snapshot)
+				require.NoError(t, err)
+				require.NoError(t, output.Err)
+			},
+		)
+	})
+
+	t.Run("valid EVM address with prefix", func(t *testing.T) {
+		RunWithNewEnvironment(t,
+			chain, func(
+				ctx fvm.Context,
+				vm fvm.VM,
+				snapshot snapshot.SnapshotTree,
+				testContract *TestContract,
+				testAccount *EOATestAccount,
+			) {
+				code := []byte(fmt.Sprintf(
+					`
+					import EVM from %s
+
+					access(all)
+					fun main(): Bool {
+						let address = EVM.addressFromString("0xE62340807933BCFC3b89FE121dDC0ae5DA9599a0")
+						assert(
+							address.toString() == "e62340807933bcfc3b89fe121ddc0ae5da9599a0",
+							message: "unexpected EVM address"
+						)
+						return true
+					}
+					`,
+					sc.EVMContract.Address.HexWithPrefix(),
+				))
+
+				script := fvm.Script(code)
+				_, output, err := vm.Run(ctx, script, snapshot)
+				require.NoError(t, err)
+				require.NoError(t, output.Err)
+			},
+		)
+	})
+
+	t.Run("invalid EVM address with non-hex prefix", func(t *testing.T) {
+		RunWithNewEnvironment(t,
+			chain, func(
+				ctx fvm.Context,
+				vm fvm.VM,
+				snapshot snapshot.SnapshotTree,
+				testContract *TestContract,
+				testAccount *EOATestAccount,
+			) {
+				code := []byte(fmt.Sprintf(
+					`
+					import EVM from %s
+
+					access(all)
+					fun main(): Bool {
+						let address = EVM.addressFromString("2xE62340807933BCFC3b89FE121dDC0ae5DA9599a0")
+						assert(
+							address.toString() == "e62340807933bcfc3b89fe121ddc0ae5da9599a0",
+							message: "unexpected EVM address"
+						)
+						return true
+					}
+					`,
+					sc.EVMContract.Address.HexWithPrefix(),
+				))
+
+				script := fvm.Script(code)
+				_, output, err := vm.Run(ctx, script, snapshot)
+				require.NoError(t, err)
+				require.Error(t, output.Err)
+				require.ErrorContains(
+					t,
+					output.Err,
+					"EVM.addressFromString(): The 42-character EVM address string must have a '0x' prefix",
+				)
+			},
+		)
+	})
+
+	t.Run("invalid EVM address with non-hex characters", func(t *testing.T) {
+		RunWithNewEnvironment(t,
+			chain, func(
+				ctx fvm.Context,
+				vm fvm.VM,
+				snapshot snapshot.SnapshotTree,
+				testContract *TestContract,
+				testAccount *EOATestAccount,
+			) {
+				code := []byte(fmt.Sprintf(
+					`
+					import EVM from %s
+
+					access(all)
+					fun main(): Bool {
+						let address = EVM.addressFromString("0xGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGG")
+						return false
+					}
+					`,
+					sc.EVMContract.Address.HexWithPrefix(),
+				))
+
+				script := fvm.Script(code)
+				_, output, err := vm.Run(ctx, script, snapshot)
+				require.NoError(t, err)
+				require.Error(t, output.Err)
+				require.ErrorContains(
+					t,
+					output.Err,
+					"invalid byte in hex string: 47",
+				)
+			},
+		)
+	})
+
+	t.Run("invalid EVM address with insufficient length", func(t *testing.T) {
+		RunWithNewEnvironment(t,
+			chain, func(
+				ctx fvm.Context,
+				vm fvm.VM,
+				snapshot snapshot.SnapshotTree,
+				testContract *TestContract,
+				testAccount *EOATestAccount,
+			) {
+				code := []byte(fmt.Sprintf(
+					`
+					import EVM from %s
+
+					access(all)
+					fun main(): Bool {
+						let address = EVM.addressFromString("0xE62340807933BCFC3b89FE121dDC0ae5DA95")
+						assert(
+							address.toString() == "e62340807933bcfc3b89fe121ddc0ae5da95",
+							message: "unexpected EVM address"
+						)
+						return true
+					}
+					`,
+					sc.EVMContract.Address.HexWithPrefix(),
+				))
+
+				script := fvm.Script(code)
+				_, output, err := vm.Run(ctx, script, snapshot)
+				require.NoError(t, err)
+				require.Error(t, output.Err)
+				require.ErrorContains(
+					t,
+					output.Err,
+					"Invalid hex string length for an EVM address. The provided string is 38, but the length must be 40 or 42",
+				)
+			},
+		)
+	})
+
+	t.Run("invalid EVM address with superfluous length", func(t *testing.T) {
+		RunWithNewEnvironment(t,
+			chain, func(
+				ctx fvm.Context,
+				vm fvm.VM,
+				snapshot snapshot.SnapshotTree,
+				testContract *TestContract,
+				testAccount *EOATestAccount,
+			) {
+				code := []byte(fmt.Sprintf(
+					`
+					import EVM from %s
+
+					access(all)
+					fun main(): Bool {
+						let address = EVM.addressFromString("0xE62340807933BCFC3b89FE121dDC0ae5DA9599a0a1")
+						assert(
+							address.toString() == "e62340807933bcfc3b89fe121ddc0ae5da9599a0a1",
+							message: "unexpected EVM address"
+						)
+						return true
+					}
+					`,
+					sc.EVMContract.Address.HexWithPrefix(),
+				))
+
+				script := fvm.Script(code)
+				_, output, err := vm.Run(ctx, script, snapshot)
+				require.NoError(t, err)
+				require.Error(t, output.Err)
+				require.ErrorContains(
+					t,
+					output.Err,
+					"Invalid hex string length for an EVM address. The provided string is 44, but the length must be 40 or 42",
+				)
+			},
+		)
+	})
+}
+
 func createAndFundFlowAccount(
 	t *testing.T,
 	ctx fvm.Context,
@@ -4672,6 +5795,9 @@ func RunWithNewEnvironment(
 
 				baseBootstrapOpts := []fvm.BootstrapProcedureOption{
 					fvm.WithInitialTokenSupply(unittest.GenesisTokenSupply),
+					fvm.WithExecutionEffortWeights(
+						environment.MainnetExecutionEffortWeights,
+					),
 				}
 
 				executionSnapshot, _, err := vm.Run(

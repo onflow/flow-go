@@ -29,8 +29,6 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 //go:build (amd64 || 386 || ppc64le) && !purego
-// +build amd64 386 ppc64le
-// +build !purego
 
 package hash
 

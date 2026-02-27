@@ -409,7 +409,7 @@ func TestPayloadJSONSerialization(t *testing.T) {
 		require.NoError(t, err)
 
 		// Reset b to make sure that p2 doesn't share underlying data with JSON-encoded data.
-		for i := 0; i < len(b); i++ {
+		for i := range b {
 			b[i] = 0
 		}
 
@@ -443,7 +443,7 @@ func TestPayloadJSONSerialization(t *testing.T) {
 		require.NoError(t, err)
 
 		// Reset b to make sure that p2 doesn't share underlying data with JSON-encoded data.
-		for i := 0; i < len(b); i++ {
+		for i := range b {
 			b[i] = 0
 		}
 
@@ -472,7 +472,7 @@ func TestPayloadJSONSerialization(t *testing.T) {
 		require.NoError(t, err)
 
 		// Reset b to make sure that p2 doesn't share underlying data with JSON-encoded data.
-		for i := 0; i < len(b); i++ {
+		for i := range b {
 			b[i] = 0
 		}
 
@@ -501,7 +501,7 @@ func TestPayloadJSONSerialization(t *testing.T) {
 		require.NoError(t, err)
 
 		// Reset b to make sure that p2 doesn't share underlying data with JSON-encoded data.
-		for i := 0; i < len(b); i++ {
+		for i := range b {
 			b[i] = 0
 		}
 
@@ -556,7 +556,7 @@ func TestPayloadCBORSerialization(t *testing.T) {
 		require.NoError(t, err)
 
 		// Reset b to make sure that p2 doesn't share underlying data with CBOR-encoded data.
-		for i := 0; i < len(b); i++ {
+		for i := range b {
 			b[i] = 0
 		}
 
@@ -602,7 +602,7 @@ func TestPayloadCBORSerialization(t *testing.T) {
 		require.NoError(t, err)
 
 		// Reset b to make sure that p2 doesn't share underlying data with CBOR-encoded data.
-		for i := 0; i < len(b); i++ {
+		for i := range b {
 			b[i] = 0
 		}
 
@@ -650,7 +650,7 @@ func TestPayloadCBORSerialization(t *testing.T) {
 		require.NoError(t, err)
 
 		// Reset b to make sure that p2 doesn't share underlying data with CBOR-encoded data.
-		for i := 0; i < len(b); i++ {
+		for i := range b {
 			b[i] = 0
 		}
 
@@ -699,7 +699,7 @@ func TestPayloadCBORSerialization(t *testing.T) {
 		require.NoError(t, err)
 
 		// Reset b to make sure that p2 doesn't share underlying data with CBOR-encoded data.
-		for i := 0; i < len(b); i++ {
+		for i := range b {
 			b[i] = 0
 		}
 
