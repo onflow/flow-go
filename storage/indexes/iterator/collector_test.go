@@ -17,22 +17,28 @@ type testEntry struct {
 	cursor int
 }
 
-func (e testEntry) Cursor() (int, error)   { return e.cursor, nil }
+func (e testEntry) Cursor() int            { return e.cursor }
 func (e testEntry) Value() (string, error) { return e.value, nil }
 
-// errEntry is an IteratorEntry that always returns an error.
+// errEntry is an IteratorEntry whose Value always returns an error.
 type errEntry struct{ err error }
 
-func (e errEntry) Cursor() (int, error)   { return 0, e.err }
+func (e errEntry) Cursor() int            { return 0 }
 func (e errEntry) Value() (string, error) { return "", e.err }
 
 func newIter(entries ...storage.IteratorEntry[string, int]) storage.IndexIterator[string, int] {
-	return func(yield func(storage.IteratorEntry[string, int]) bool) {
+	return func(yield func(storage.IteratorEntry[string, int], error) bool) {
 		for _, e := range entries {
-			if !yield(e) {
+			if !yield(e, nil) {
 				return
 			}
 		}
+	}
+}
+
+func newErrIter(err error) storage.IndexIterator[string, int] {
+	return func(yield func(storage.IteratorEntry[string, int], error) bool) {
+		yield(nil, err)
 	}
 }
 
@@ -111,6 +117,15 @@ func TestCollectResults(t *testing.T) {
 		assert.Nil(t, cursor)
 	})
 
+	t.Run("error from iterator yield propagates", func(t *testing.T) {
+		iterErr := errors.New("iterator error")
+		iter := newErrIter(iterErr)
+
+		_, _, err := iterator.CollectResults(iter, 10, nil)
+		require.Error(t, err)
+		assert.ErrorIs(t, err, iterErr)
+	})
+
 	t.Run("error from Value propagates", func(t *testing.T) {
 		valErr := errors.New("value error")
 		iter := newIter(errEntry{err: valErr})
@@ -118,18 +133,6 @@ func TestCollectResults(t *testing.T) {
 		_, _, err := iterator.CollectResults(iter, 10, nil)
 		require.Error(t, err)
 		assert.ErrorIs(t, err, valErr)
-	})
-
-	t.Run("error from Cursor propagates when building next cursor", func(t *testing.T) {
-		cursorErr := errors.New("cursor error")
-		iter := newIter(
-			testEntry{value: "a", cursor: 1},
-			errEntry{err: cursorErr},
-		)
-
-		_, _, err := iterator.CollectResults(iter, 1, nil)
-		require.Error(t, err)
-		assert.ErrorIs(t, err, cursorErr)
 	})
 
 	t.Run("empty iterator returns nil results and nil cursor", func(t *testing.T) {

@@ -56,14 +56,3 @@ func EncodeTransferCursor(cursor *accessmodel.TransferCursor) (string, error) {
 	}
 	return base64.RawURLEncoding.EncodeToString(data), nil
 }
-
-// ParseTransferRole parses a role query parameter value into a TransferRole.
-func ParseTransferRole(raw string) (accessmodel.TransferRole, error) {
-	role := accessmodel.TransferRole(raw)
-	switch role {
-	case accessmodel.TransferRoleSender, accessmodel.TransferRoleRecipient:
-		return role, nil
-	default:
-		return "", fmt.Errorf("invalid role %q: must be %q or %q", raw, accessmodel.TransferRoleSender, accessmodel.TransferRoleRecipient)
-	}
-}

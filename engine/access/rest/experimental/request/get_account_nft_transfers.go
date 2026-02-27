@@ -68,18 +68,5 @@ func NewGetAccountNFTTransfers(r *common.Request) (GetAccountNFTTransfers, error
 		req.Filter.RecipientAddress = addr
 	}
 
-	if raw := r.GetQueryParam("role"); raw != "" {
-		role, err := ParseTransferRole(raw)
-		if err != nil {
-			return req, err
-		}
-		switch role {
-		case accessmodel.TransferRoleSender:
-			req.Filter.SourceAddress = address
-		case accessmodel.TransferRoleRecipient:
-			req.Filter.RecipientAddress = address
-		}
-	}
-
 	return req, nil
 }

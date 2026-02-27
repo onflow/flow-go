@@ -43,13 +43,13 @@ type storedAccountTransaction struct {
 const (
 	// accountTxKeyLen is the total length of an account transaction index key
 	// 1 (prefix) + 8 (address) + 8 (height) + 4 (txIndex) = 21
-	accountTxKeyLen = 1 + flow.AddressLength + 8 + 4
+	accountTxKeyLen = 1 + flow.AddressLength + heightLen + txIndexLen
 
 	// accountTxPrefixLen is the length of the prefix used for iteration (prefix + address)
 	accountTxPrefixLen = 1 + flow.AddressLength
 
 	// accountTxPrefixWithHeightLen includes the height for range queries
-	accountTxPrefixWithHeightLen = accountTxPrefixLen + 8
+	accountTxPrefixWithHeightLen = accountTxPrefixLen + heightLen
 )
 
 var _ storage.AccountTransactions = (*AccountTransactions)(nil)
@@ -187,21 +187,18 @@ func storeAllAccountTransactions(rw storage.ReaderBatchWriter, blockHeight uint6
 	return nil
 }
 
-func reconstructAccountTransaction(key access.AccountTransactionCursor, value []byte, dest *access.AccountTransaction) error {
+func reconstructAccountTransaction(key access.AccountTransactionCursor, value []byte) (*access.AccountTransaction, error) {
 	var stored storedAccountTransaction
-	err := msgpack.Unmarshal(value, &stored)
-	if err != nil {
-		return fmt.Errorf("could not decode value: %w", err)
+	if err := msgpack.Unmarshal(value, &stored); err != nil {
+		return nil, fmt.Errorf("could not decode value: %w", err)
 	}
-
-	*dest = access.AccountTransaction{
+	return &access.AccountTransaction{
 		Address:          key.Address,
 		BlockHeight:      key.BlockHeight,
 		TransactionID:    stored.TransactionID,
 		TransactionIndex: key.TransactionIndex,
 		Roles:            stored.Roles,
-	}
-	return nil
+	}, nil
 }
 
 // makeAccountTxValue builds the value for an account transaction index entry.

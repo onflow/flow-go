@@ -100,7 +100,7 @@ func (a *FungibleTokenTransfers) filterFTTransfers(transfers []access.FungibleTo
 	filtered := make([]access.FungibleTokenTransfer, 0)
 	for _, transfer := range transfers {
 		// skip zero amount transfers
-		if transfer.Amount.Cmp(bigZero) == 0 {
+		if transfer.Amount == nil || transfer.Amount.Cmp(bigZero) == 0 {
 			continue
 		}
 		// skip self transfers

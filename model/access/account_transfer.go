@@ -6,13 +6,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-type TransferRole string
-
-const (
-	TransferRoleSender    TransferRole = "sender"
-	TransferRoleRecipient TransferRole = "recipient"
-)
-
 // FungibleTokenTransfer represents a fungible token transfer event extracted from block execution data.
 // Each transfer is identified by its position within the block (TransactionIndex, EventIndex).
 type FungibleTokenTransfer struct {

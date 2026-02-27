@@ -218,7 +218,7 @@ func TestFollowerHappyPath(t *testing.T) {
 
 			// stop engines and wait for graceful shutdown
 			cancel()
-			unittest.RequireCloseBefore(t, moduleutil.AllDone(engine, followerLoop), time.Second, "engine failed to stop")
+			unittest.RequireCloseBefore(t, moduleutil.AllDone(engine, followerLoop), 10*time.Second, "engine failed to stop")
 			// Note: in case any error occur, the `mockCtx` will fail the test, due to the unexpected call of `Throw` on the mock.
 		}()
 

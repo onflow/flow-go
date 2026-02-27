@@ -28,7 +28,6 @@ type nftTransfersURLParams struct {
 	tokenType     string
 	sourceAddr    string
 	recipientAddr string
-	role          string
 	expand        string
 }
 
@@ -50,9 +49,6 @@ func accountNFTTransfersURL(t *testing.T, address string, params nftTransfersURL
 	}
 	if params.recipientAddr != "" {
 		q.Add("recipient_address", params.recipientAddr)
-	}
-	if params.role != "" {
-		q.Add("role", params.role)
 	}
 	if params.expand != "" {
 		q.Add("expand", params.expand)
@@ -266,36 +262,6 @@ func TestGetAccountNonFungibleTokenTransfers(t *testing.T) {
 		assert.Equal(t, http.StatusOK, rr.Code)
 	})
 
-	t.Run("with role=sender filter", func(t *testing.T) {
-		backend := extendedmock.NewAPI(t)
-
-		page := &accessmodel.NonFungibleTokenTransfersPage{
-			Transfers: []accessmodel.NonFungibleTokenTransfer{},
-		}
-
-		expectedFilter := extended.AccountTransferFilter{
-			SourceAddress: address,
-		}
-
-		backend.On("GetAccountNonFungibleTokenTransfers",
-			mocktestify.Anything,
-			address,
-			uint32(0),
-			(*accessmodel.TransferCursor)(nil),
-			expectedFilter,
-			extended.AccountTransferExpandOptions{},
-			entities.EventEncodingVersion_JSON_CDC_V0,
-		).Return(page, nil)
-
-		reqURL := accountNFTTransfersURL(t, address.String(), nftTransfersURLParams{role: "sender"})
-		req, err := http.NewRequest(http.MethodGet, reqURL, nil)
-		require.NoError(t, err)
-
-		rr := router.ExecuteExperimentalRequest(req, backend)
-
-		assert.Equal(t, http.StatusOK, rr.Code)
-	})
-
 	t.Run("with expand=transaction", func(t *testing.T) {
 		backend := extendedmock.NewAPI(t)
 
@@ -385,19 +351,6 @@ func TestGetAccountNonFungibleTokenTransfers(t *testing.T) {
 
 		assert.Equal(t, http.StatusBadRequest, rr.Code)
 		assert.Contains(t, rr.Body.String(), "invalid limit")
-	})
-
-	t.Run("invalid role", func(t *testing.T) {
-		backend := extendedmock.NewAPI(t)
-
-		reqURL := accountNFTTransfersURL(t, address.String(), nftTransfersURLParams{role: "invalidrole"})
-		req, err := http.NewRequest(http.MethodGet, reqURL, nil)
-		require.NoError(t, err)
-
-		rr := router.ExecuteExperimentalRequest(req, backend)
-
-		assert.Equal(t, http.StatusBadRequest, rr.Code)
-		assert.Contains(t, rr.Body.String(), "invalid role")
 	})
 
 	t.Run("invalid recipient_address", func(t *testing.T) {
