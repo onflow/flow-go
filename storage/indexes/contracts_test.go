@@ -12,6 +12,7 @@ import (
 	"github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/storage/indexes/iterator"
 	"github.com/onflow/flow-go/storage/operation"
 	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -56,6 +57,59 @@ func storeContractDeployments(
 			return idx.Store(lctx, rw, height, deployments)
 		})
 	})
+}
+
+// collectContractDeployments is a test helper that creates a DeploymentsByContractID iterator
+// and collects results via CollectResults.
+func collectContractDeployments(
+	tb testing.TB,
+	idx *ContractDeploymentsIndex,
+	id string,
+	limit uint32,
+	cursor *access.ContractDeploymentCursor,
+	filter storage.IndexFilter[*access.ContractDeployment],
+) ([]access.ContractDeployment, *access.ContractDeploymentCursor) {
+	tb.Helper()
+	iter, err := idx.DeploymentsByContractID(id, cursor)
+	require.NoError(tb, err)
+	collected, nextCursor, err := iterator.CollectResults(iter, limit, filter)
+	require.NoError(tb, err)
+	return collected, nextCursor
+}
+
+// collectAllContracts is a test helper that creates an All iterator and collects results
+// via CollectResults.
+func collectAllContracts(
+	tb testing.TB,
+	idx *ContractDeploymentsIndex,
+	limit uint32,
+	cursor *access.ContractDeploymentCursor,
+	filter storage.IndexFilter[*access.ContractDeployment],
+) ([]access.ContractDeployment, *access.ContractDeploymentCursor) {
+	tb.Helper()
+	iter, err := idx.All(cursor)
+	require.NoError(tb, err)
+	collected, nextCursor, err := iterator.CollectResults(iter, limit, filter)
+	require.NoError(tb, err)
+	return collected, nextCursor
+}
+
+// collectContractsByAddress is a test helper that creates a ByAddress iterator and collects
+// results via CollectResults.
+func collectContractsByAddress(
+	tb testing.TB,
+	idx *ContractDeploymentsIndex,
+	addr flow.Address,
+	limit uint32,
+	cursor *access.ContractDeploymentCursor,
+	filter storage.IndexFilter[*access.ContractDeployment],
+) ([]access.ContractDeployment, *access.ContractDeploymentCursor) {
+	tb.Helper()
+	iter, err := idx.ByAddress(addr, cursor)
+	require.NoError(tb, err)
+	collected, nextCursor, err := iterator.CollectResults(iter, limit, filter)
+	require.NoError(tb, err)
+	return collected, nextCursor
 }
 
 // makeDeployment builds a minimal access.ContractDeployment for use in tests.
@@ -260,21 +314,12 @@ func TestContractDeployments_ByContractID(t *testing.T) {
 func TestContractDeployments_DeploymentsByContractID(t *testing.T) {
 	t.Parallel()
 
-	t.Run("zero limit returns ErrInvalidQuery", func(t *testing.T) {
+	t.Run("no deployments for contract returns empty results", func(t *testing.T) {
 		t.Parallel()
 		RunWithBootstrappedContractDeploymentsIndex(t, 1, nil, func(_ storage.DB, _ storage.LockManager, idx *ContractDeploymentsIndex) {
-			_, err := idx.DeploymentsByContractID("A.1234567890abcdef.MyContract", 0, nil, nil)
-			require.ErrorIs(t, err, storage.ErrInvalidQuery)
-		})
-	})
-
-	t.Run("no deployments for contract returns empty page", func(t *testing.T) {
-		t.Parallel()
-		RunWithBootstrappedContractDeploymentsIndex(t, 1, nil, func(_ storage.DB, _ storage.LockManager, idx *ContractDeploymentsIndex) {
-			page, err := idx.DeploymentsByContractID("A.1234567890abcdef.NoSuchContract", 10, nil, nil)
-			require.NoError(t, err)
-			assert.Empty(t, page.Deployments)
-			assert.Nil(t, page.NextCursor)
+			collected, nextCursor := collectContractDeployments(t, idx, "A.1234567890abcdef.NoSuchContract", 10, nil, nil)
+			assert.Empty(t, collected)
+			assert.Nil(t, nextCursor)
 		})
 	})
 
@@ -290,39 +335,36 @@ func TestContractDeployments_DeploymentsByContractID(t *testing.T) {
 			require.NoError(t, storeContractDeployments(t, lm, idx, 3, []access.ContractDeployment{d2}))
 			require.NoError(t, storeContractDeployments(t, lm, idx, 4, []access.ContractDeployment{d3}))
 
-			page, err := idx.DeploymentsByContractID(contractID, 10, nil, nil)
-			require.NoError(t, err)
-			require.Len(t, page.Deployments, 3)
+			collected, nextCursor := collectContractDeployments(t, idx, contractID, 10, nil, nil)
+			require.Len(t, collected, 3)
 			// Descending order: height 4, 3, 2
-			assert.Equal(t, uint64(4), page.Deployments[0].BlockHeight)
-			assert.Equal(t, uint64(3), page.Deployments[1].BlockHeight)
-			assert.Equal(t, uint64(2), page.Deployments[2].BlockHeight)
-			assert.Nil(t, page.NextCursor)
+			assert.Equal(t, uint64(4), collected[0].BlockHeight)
+			assert.Equal(t, uint64(3), collected[1].BlockHeight)
+			assert.Equal(t, uint64(2), collected[2].BlockHeight)
+			assert.Nil(t, nextCursor)
 		})
 	})
 
-	t.Run("has-more sets NextCursor", func(t *testing.T) {
+	t.Run("has-more sets NextCursor pointing to first item of next page", func(t *testing.T) {
 		t.Parallel()
 		contractID := "A.1234567890abcdef.MyContract"
 
 		RunWithBootstrappedContractDeploymentsIndex(t, 1, nil, func(_ storage.DB, lm storage.LockManager, idx *ContractDeploymentsIndex) {
-			// Store 3 deployments
+			// Store 3 deployments at heights 2, 3, 4
 			for h := uint64(2); h <= 4; h++ {
 				d := makeDeployment(contractID, h, 0, 0)
 				require.NoError(t, storeContractDeployments(t, lm, idx, h, []access.ContractDeployment{d}))
 			}
 
-			// Request page of 2 when 3 exist: should set NextCursor
-			page, err := idx.DeploymentsByContractID(contractID, 2, nil, nil)
-			require.NoError(t, err)
-			require.Len(t, page.Deployments, 2)
-			require.NotNil(t, page.NextCursor)
-			// The cursor should reflect the last returned entry (height 3, index 0/0)
-			assert.Equal(t, uint64(3), page.NextCursor.Height)
+			// Request page of 2 when 3 exist: returns [h=4, h=3], cursor points to h=2 (next page).
+			collected, nextCursor := collectContractDeployments(t, idx, contractID, 2, nil, nil)
+			require.Len(t, collected, 2)
+			require.NotNil(t, nextCursor)
+			assert.Equal(t, uint64(2), nextCursor.Height)
 		})
 	})
 
-	t.Run("with cursor resumes from last returned entry", func(t *testing.T) {
+	t.Run("with cursor resumes from cursor position (inclusive)", func(t *testing.T) {
 		t.Parallel()
 		contractID := "A.1234567890abcdef.MyContract"
 
@@ -333,23 +375,21 @@ func TestContractDeployments_DeploymentsByContractID(t *testing.T) {
 				require.NoError(t, storeContractDeployments(t, lm, idx, h, []access.ContractDeployment{d}))
 			}
 
-			// First page: limit=2, no cursor
-			page1, err := idx.DeploymentsByContractID(contractID, 2, nil, nil)
-			require.NoError(t, err)
-			require.Len(t, page1.Deployments, 2)
-			require.NotNil(t, page1.NextCursor)
+			// First page: limit=2, no cursor → [h=5, h=4], cursor → h=3
+			collected1, nextCursor := collectContractDeployments(t, idx, contractID, 2, nil, nil)
+			require.Len(t, collected1, 2)
+			require.NotNil(t, nextCursor)
 
-			// Second page: resume from cursor
-			page2, err := idx.DeploymentsByContractID(contractID, 2, page1.NextCursor, nil)
-			require.NoError(t, err)
-			require.Len(t, page2.Deployments, 2)
+			// Second page: resume from cursor → [h=3, h=2]
+			collected2, _ := collectContractDeployments(t, idx, contractID, 2, nextCursor, nil)
+			require.Len(t, collected2, 2)
 
 			// Heights across both pages must be distinct and descending
 			allHeights := []uint64{
-				page1.Deployments[0].BlockHeight,
-				page1.Deployments[1].BlockHeight,
-				page2.Deployments[0].BlockHeight,
-				page2.Deployments[1].BlockHeight,
+				collected1[0].BlockHeight,
+				collected1[1].BlockHeight,
+				collected2[0].BlockHeight,
+				collected2[1].BlockHeight,
 			}
 			assert.Equal(t, []uint64{5, 4, 3, 2}, allHeights)
 		})
@@ -363,21 +403,12 @@ func TestContractDeployments_DeploymentsByContractID(t *testing.T) {
 func TestContractDeployments_All(t *testing.T) {
 	t.Parallel()
 
-	t.Run("zero limit returns ErrInvalidQuery", func(t *testing.T) {
+	t.Run("empty index returns empty results", func(t *testing.T) {
 		t.Parallel()
 		RunWithBootstrappedContractDeploymentsIndex(t, 1, nil, func(_ storage.DB, _ storage.LockManager, idx *ContractDeploymentsIndex) {
-			_, err := idx.All(0, nil, nil)
-			require.ErrorIs(t, err, storage.ErrInvalidQuery)
-		})
-	})
-
-	t.Run("empty index returns empty page", func(t *testing.T) {
-		t.Parallel()
-		RunWithBootstrappedContractDeploymentsIndex(t, 1, nil, func(_ storage.DB, _ storage.LockManager, idx *ContractDeploymentsIndex) {
-			page, err := idx.All(10, nil, nil)
-			require.NoError(t, err)
-			assert.Empty(t, page.Deployments)
-			assert.Nil(t, page.NextCursor)
+			collected, nextCursor := collectAllContracts(t, idx, 10, nil, nil)
+			assert.Empty(t, collected)
+			assert.Nil(t, nextCursor)
 		})
 	})
 
@@ -397,21 +428,20 @@ func TestContractDeployments_All(t *testing.T) {
 			require.NoError(t, storeContractDeployments(t, lm, idx, 2, []access.ContractDeployment{dA1, dB, dC}))
 			require.NoError(t, storeContractDeployments(t, lm, idx, 3, []access.ContractDeployment{dA2}))
 
-			page, err := idx.All(10, nil, nil)
-			require.NoError(t, err)
-			require.Len(t, page.Deployments, 3)
+			collected, _ := collectAllContracts(t, idx, 10, nil, nil)
+			require.Len(t, collected, 3)
 
 			// Ascending contractID order
-			assert.Equal(t, contractA, page.Deployments[0].ContractID)
-			assert.Equal(t, contractB, page.Deployments[1].ContractID)
-			assert.Equal(t, contractC, page.Deployments[2].ContractID)
+			assert.Equal(t, contractA, collected[0].ContractID)
+			assert.Equal(t, contractB, collected[1].ContractID)
+			assert.Equal(t, contractC, collected[2].ContractID)
 
 			// contractA shows the most recent deployment (height 3)
-			assert.Equal(t, uint64(3), page.Deployments[0].BlockHeight)
+			assert.Equal(t, uint64(3), collected[0].BlockHeight)
 		})
 	})
 
-	t.Run("has-more sets NextCursor with ContractID", func(t *testing.T) {
+	t.Run("has-more sets NextCursor pointing to first item of next page", func(t *testing.T) {
 		t.Parallel()
 		contractA := "A.1234567890abcdef.AContract"
 		contractB := "A.1234567890abcdef.BContract"
@@ -423,15 +453,15 @@ func TestContractDeployments_All(t *testing.T) {
 			dC := makeDeployment(contractC, 2, 2, 0)
 			require.NoError(t, storeContractDeployments(t, lm, idx, 2, []access.ContractDeployment{dA, dB, dC}))
 
-			page, err := idx.All(2, nil, nil)
-			require.NoError(t, err)
-			require.Len(t, page.Deployments, 2)
-			require.NotNil(t, page.NextCursor)
-			assert.Equal(t, contractB, page.NextCursor.ContractID)
+			// limit=2, 3 exist: returns [A, B], cursor → C (first of next page)
+			collected, nextCursor := collectAllContracts(t, idx, 2, nil, nil)
+			require.Len(t, collected, 2)
+			require.NotNil(t, nextCursor)
+			assert.Equal(t, contractC, nextCursor.ContractID)
 		})
 	})
 
-	t.Run("with cursor resumes from last returned contract", func(t *testing.T) {
+	t.Run("with cursor resumes from cursor position (inclusive)", func(t *testing.T) {
 		t.Parallel()
 		contractA := "A.1234567890abcdef.AContract"
 		contractB := "A.1234567890abcdef.BContract"
@@ -445,22 +475,20 @@ func TestContractDeployments_All(t *testing.T) {
 			dD := makeDeployment(contractD, 2, 3, 0)
 			require.NoError(t, storeContractDeployments(t, lm, idx, 2, []access.ContractDeployment{dA, dB, dC, dD}))
 
-			// First page
-			page1, err := idx.All(2, nil, nil)
-			require.NoError(t, err)
-			require.Len(t, page1.Deployments, 2)
-			require.NotNil(t, page1.NextCursor)
+			// First page: [A, B], cursor → C
+			collected1, nextCursor := collectAllContracts(t, idx, 2, nil, nil)
+			require.Len(t, collected1, 2)
+			require.NotNil(t, nextCursor)
 
-			// Second page
-			page2, err := idx.All(2, page1.NextCursor, nil)
-			require.NoError(t, err)
-			require.Len(t, page2.Deployments, 2)
+			// Second page: resume from cursor → [C, D]
+			collected2, _ := collectAllContracts(t, idx, 2, nextCursor, nil)
+			require.Len(t, collected2, 2)
 
 			ids := []string{
-				page1.Deployments[0].ContractID,
-				page1.Deployments[1].ContractID,
-				page2.Deployments[0].ContractID,
-				page2.Deployments[1].ContractID,
+				collected1[0].ContractID,
+				collected1[1].ContractID,
+				collected2[0].ContractID,
+				collected2[1].ContractID,
 			}
 			assert.Equal(t, []string{contractA, contractB, contractC, contractD}, ids)
 		})
@@ -481,10 +509,9 @@ func TestContractDeployments_All(t *testing.T) {
 				return d.ContractID == contractA
 			}
 
-			page, err := idx.All(10, nil, filter)
-			require.NoError(t, err)
-			require.Len(t, page.Deployments, 1)
-			assert.Equal(t, contractA, page.Deployments[0].ContractID)
+			collected, _ := collectAllContracts(t, idx, 10, nil, filter)
+			require.Len(t, collected, 1)
+			assert.Equal(t, contractA, collected[0].ContractID)
 		})
 	})
 }
@@ -495,15 +522,6 @@ func TestContractDeployments_All(t *testing.T) {
 
 func TestContractDeployments_ByAddress(t *testing.T) {
 	t.Parallel()
-
-	t.Run("zero limit returns ErrInvalidQuery", func(t *testing.T) {
-		t.Parallel()
-		RunWithBootstrappedContractDeploymentsIndex(t, 1, nil, func(_ storage.DB, _ storage.LockManager, idx *ContractDeploymentsIndex) {
-			addr := unittest.RandomAddressFixture()
-			_, err := idx.ByAddress(addr, 0, nil, nil)
-			require.ErrorIs(t, err, storage.ErrInvalidQuery)
-		})
-	})
 
 	t.Run("returns only contracts for that address", func(t *testing.T) {
 		t.Parallel()
@@ -527,19 +545,17 @@ func TestContractDeployments_ByAddress(t *testing.T) {
 			require.NoError(t, storeContractDeployments(t, lm, idx, 2, []access.ContractDeployment{dA, dB, dC}))
 
 			// Query addr1 - should get ContractA and ContractB only
-			page1, err := idx.ByAddress(addr1, 10, nil, nil)
-			require.NoError(t, err)
-			require.Len(t, page1.Deployments, 2)
-			for _, d := range page1.Deployments {
+			collected1, _ := collectContractsByAddress(t, idx, addr1, 10, nil, nil)
+			require.Len(t, collected1, 2)
+			for _, d := range collected1 {
 				assert.True(t, strings.Contains(d.ContractID, addrHex1),
 					"deployment %s should belong to addr1", d.ContractID)
 			}
 
 			// Query addr2 - should get ContractC only
-			page2, err := idx.ByAddress(addr2, 10, nil, nil)
-			require.NoError(t, err)
-			require.Len(t, page2.Deployments, 1)
-			assert.Equal(t, contractC, page2.Deployments[0].ContractID)
+			collected2, _ := collectContractsByAddress(t, idx, addr2, 10, nil, nil)
+			require.Len(t, collected2, 1)
+			assert.Equal(t, contractC, collected2[0].ContractID)
 		})
 	})
 
@@ -547,14 +563,13 @@ func TestContractDeployments_ByAddress(t *testing.T) {
 		t.Parallel()
 		RunWithBootstrappedContractDeploymentsIndex(t, 1, nil, func(_ storage.DB, _ storage.LockManager, idx *ContractDeploymentsIndex) {
 			addr := unittest.RandomAddressFixture()
-			page, err := idx.ByAddress(addr, 10, nil, nil)
-			require.NoError(t, err)
-			assert.Empty(t, page.Deployments)
-			assert.Nil(t, page.NextCursor)
+			collected, nextCursor := collectContractsByAddress(t, idx, addr, 10, nil, nil)
+			assert.Empty(t, collected)
+			assert.Nil(t, nextCursor)
 		})
 	})
 
-	t.Run("has-more sets NextCursor with ContractID", func(t *testing.T) {
+	t.Run("has-more sets NextCursor pointing to first item of next page", func(t *testing.T) {
 		t.Parallel()
 		addrHex := "1234567890abcdef"
 		contractA := "A." + addrHex + ".ContractA"
@@ -570,15 +585,15 @@ func TestContractDeployments_ByAddress(t *testing.T) {
 			dC := makeDeployment(contractC, 2, 2, 0)
 			require.NoError(t, storeContractDeployments(t, lm, idx, 2, []access.ContractDeployment{dA, dB, dC}))
 
-			page, err := idx.ByAddress(addr, 2, nil, nil)
-			require.NoError(t, err)
-			require.Len(t, page.Deployments, 2)
-			require.NotNil(t, page.NextCursor)
-			assert.Equal(t, contractB, page.NextCursor.ContractID)
+			// limit=2, 3 exist: returns [A, B], cursor → C (first of next page)
+			collected, nextCursor := collectContractsByAddress(t, idx, addr, 2, nil, nil)
+			require.Len(t, collected, 2)
+			require.NotNil(t, nextCursor)
+			assert.Equal(t, contractC, nextCursor.ContractID)
 		})
 	})
 
-	t.Run("with cursor resumes correctly", func(t *testing.T) {
+	t.Run("with cursor resumes from cursor position (inclusive)", func(t *testing.T) {
 		t.Parallel()
 		addrHex := "1234567890abcdef"
 		contractA := "A." + addrHex + ".ContractA"
@@ -596,22 +611,20 @@ func TestContractDeployments_ByAddress(t *testing.T) {
 			dD := makeDeployment(contractD, 2, 3, 0)
 			require.NoError(t, storeContractDeployments(t, lm, idx, 2, []access.ContractDeployment{dA, dB, dC, dD}))
 
-			// First page
-			page1, err := idx.ByAddress(addr, 2, nil, nil)
-			require.NoError(t, err)
-			require.Len(t, page1.Deployments, 2)
-			require.NotNil(t, page1.NextCursor)
+			// First page: [A, B], cursor → C
+			collected1, nextCursor := collectContractsByAddress(t, idx, addr, 2, nil, nil)
+			require.Len(t, collected1, 2)
+			require.NotNil(t, nextCursor)
 
-			// Second page
-			page2, err := idx.ByAddress(addr, 2, page1.NextCursor, nil)
-			require.NoError(t, err)
-			require.Len(t, page2.Deployments, 2)
+			// Second page: resume from cursor → [C, D]
+			collected2, _ := collectContractsByAddress(t, idx, addr, 2, nextCursor, nil)
+			require.Len(t, collected2, 2)
 
 			ids := []string{
-				page1.Deployments[0].ContractID,
-				page1.Deployments[1].ContractID,
-				page2.Deployments[0].ContractID,
-				page2.Deployments[1].ContractID,
+				collected1[0].ContractID,
+				collected1[1].ContractID,
+				collected2[0].ContractID,
+				collected2[1].ContractID,
 			}
 			assert.Equal(t, []string{contractA, contractB, contractC, contractD}, ids)
 		})
@@ -790,80 +803,6 @@ func TestContractDeployments_KeyCodec(t *testing.T) {
 }
 
 // ----------------------------------------------------------------------------
-// buildContractDeploymentPageByID
-// ----------------------------------------------------------------------------
-
-func TestContractDeployments_BuildPageByID(t *testing.T) {
-	t.Parallel()
-
-	t.Run("exactly limit returns no cursor", func(t *testing.T) {
-		t.Parallel()
-		collected := []access.ContractDeployment{
-			makeDeployment("A.1234567890abcdef.A", 1, 0, 0),
-			makeDeployment("A.1234567890abcdef.B", 1, 1, 0),
-		}
-		page := buildContractDeploymentPageByID(collected, 2)
-		assert.Len(t, page.Deployments, 2)
-		assert.Nil(t, page.NextCursor)
-	})
-
-	t.Run("more than limit sets cursor to last returned contract", func(t *testing.T) {
-		t.Parallel()
-		contractA := "A.1234567890abcdef.AContract"
-		contractB := "A.1234567890abcdef.BContract"
-		contractC := "A.1234567890abcdef.CContract"
-
-		collected := []access.ContractDeployment{
-			makeDeployment(contractA, 1, 0, 0),
-			makeDeployment(contractB, 1, 1, 0),
-			makeDeployment(contractC, 1, 2, 0), // extra sentinel
-		}
-		page := buildContractDeploymentPageByID(collected, 2)
-		require.Len(t, page.Deployments, 2)
-		require.NotNil(t, page.NextCursor)
-		// Cursor should be the ContractID of the last *returned* entry (index limit-1).
-		assert.Equal(t, contractB, page.NextCursor.ContractID)
-	})
-}
-
-// ----------------------------------------------------------------------------
-// buildDeploymentPageByPosition
-// ----------------------------------------------------------------------------
-
-func TestContractDeployments_BuildPageByPosition(t *testing.T) {
-	t.Parallel()
-
-	t.Run("exactly limit returns no cursor", func(t *testing.T) {
-		t.Parallel()
-		contractID := "A.1234567890abcdef.MyContract"
-		collected := []access.ContractDeployment{
-			makeDeployment(contractID, 3, 0, 0),
-			makeDeployment(contractID, 2, 0, 0),
-		}
-		page := buildDeploymentPageByPosition(collected, 2)
-		assert.Len(t, page.Deployments, 2)
-		assert.Nil(t, page.NextCursor)
-	})
-
-	t.Run("more than limit sets cursor to position of last returned", func(t *testing.T) {
-		t.Parallel()
-		contractID := "A.1234567890abcdef.MyContract"
-		collected := []access.ContractDeployment{
-			makeDeployment(contractID, 4, 0, 0),
-			makeDeployment(contractID, 3, 1, 2), // last to be returned
-			makeDeployment(contractID, 2, 0, 0), // sentinel
-		}
-		page := buildDeploymentPageByPosition(collected, 2)
-		require.Len(t, page.Deployments, 2)
-		require.NotNil(t, page.NextCursor)
-		// Cursor position should reflect the last returned entry (height 3, txIndex 1, eventIndex 2)
-		assert.Equal(t, uint64(3), page.NextCursor.Height)
-		assert.Equal(t, uint32(1), page.NextCursor.TxIndex)
-		assert.Equal(t, uint32(2), page.NextCursor.EventIndex)
-	})
-}
-
-// ----------------------------------------------------------------------------
 // ContractDeploymentsBootstrapper
 // ----------------------------------------------------------------------------
 
@@ -924,17 +863,17 @@ func TestContractDeploymentsBootstrapper_BeforeBootstrap(t *testing.T) {
 		})
 
 		t.Run("DeploymentsByContractID returns ErrNotBootstrapped", func(t *testing.T) {
-			_, err := b.DeploymentsByContractID("A.1234567890abcdef.Foo", 10, nil, nil)
+			_, err := b.DeploymentsByContractID("A.1234567890abcdef.Foo", nil)
 			require.ErrorIs(t, err, storage.ErrNotBootstrapped)
 		})
 
 		t.Run("ByAddress returns ErrNotBootstrapped", func(t *testing.T) {
-			_, err := b.ByAddress(unittest.RandomAddressFixture(), 10, nil, nil)
+			_, err := b.ByAddress(unittest.RandomAddressFixture(), nil)
 			require.ErrorIs(t, err, storage.ErrNotBootstrapped)
 		})
 
 		t.Run("All returns ErrNotBootstrapped", func(t *testing.T) {
-			_, err := b.All(10, nil, nil)
+			_, err := b.All(nil)
 			require.ErrorIs(t, err, storage.ErrNotBootstrapped)
 		})
 	})

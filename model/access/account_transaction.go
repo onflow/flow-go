@@ -69,8 +69,8 @@ type AccountTransaction struct {
 	Roles            []TransactionRole // Roles of the account in the transaction
 
 	// Expansion fields populated when expandResults is true.
-	Transaction *flow.TransactionBody // Transaction body
-	Result      *TransactionResult    // Transaction result
+	Transaction *flow.TransactionBody `msgpack:"-"` // Transaction body (nil unless expanded)
+	Result      *TransactionResult    `msgpack:"-"` // Transaction result (nil unless expanded)
 }
 
 // AccountTransactionCursor identifies a position in the account transaction index for

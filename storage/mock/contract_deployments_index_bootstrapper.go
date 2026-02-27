@@ -40,25 +40,27 @@ func (_m *ContractDeploymentsIndexBootstrapper) EXPECT() *ContractDeploymentsInd
 }
 
 // All provides a mock function for the type ContractDeploymentsIndexBootstrapper
-func (_mock *ContractDeploymentsIndexBootstrapper) All(limit uint32, cursor *access.ContractDeploymentCursor, filter storage.IndexFilter[*access.ContractDeployment]) (access.ContractDeploymentPage, error) {
-	ret := _mock.Called(limit, cursor, filter)
+func (_mock *ContractDeploymentsIndexBootstrapper) All(cursor *access.ContractDeploymentCursor) (storage.ContractDeploymentIterator, error) {
+	ret := _mock.Called(cursor)
 
 	if len(ret) == 0 {
 		panic("no return value specified for All")
 	}
 
-	var r0 access.ContractDeploymentPage
+	var r0 storage.ContractDeploymentIterator
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(uint32, *access.ContractDeploymentCursor, storage.IndexFilter[*access.ContractDeployment]) (access.ContractDeploymentPage, error)); ok {
-		return returnFunc(limit, cursor, filter)
+	if returnFunc, ok := ret.Get(0).(func(*access.ContractDeploymentCursor) (storage.ContractDeploymentIterator, error)); ok {
+		return returnFunc(cursor)
 	}
-	if returnFunc, ok := ret.Get(0).(func(uint32, *access.ContractDeploymentCursor, storage.IndexFilter[*access.ContractDeployment]) access.ContractDeploymentPage); ok {
-		r0 = returnFunc(limit, cursor, filter)
+	if returnFunc, ok := ret.Get(0).(func(*access.ContractDeploymentCursor) storage.ContractDeploymentIterator); ok {
+		r0 = returnFunc(cursor)
 	} else {
-		r0 = ret.Get(0).(access.ContractDeploymentPage)
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(storage.ContractDeploymentIterator)
+		}
 	}
-	if returnFunc, ok := ret.Get(1).(func(uint32, *access.ContractDeploymentCursor, storage.IndexFilter[*access.ContractDeployment]) error); ok {
-		r1 = returnFunc(limit, cursor, filter)
+	if returnFunc, ok := ret.Get(1).(func(*access.ContractDeploymentCursor) error); ok {
+		r1 = returnFunc(cursor)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -71,66 +73,54 @@ type ContractDeploymentsIndexBootstrapper_All_Call struct {
 }
 
 // All is a helper method to define mock.On call
-//   - limit uint32
 //   - cursor *access.ContractDeploymentCursor
-//   - filter storage.IndexFilter[*access.ContractDeployment]
-func (_e *ContractDeploymentsIndexBootstrapper_Expecter) All(limit interface{}, cursor interface{}, filter interface{}) *ContractDeploymentsIndexBootstrapper_All_Call {
-	return &ContractDeploymentsIndexBootstrapper_All_Call{Call: _e.mock.On("All", limit, cursor, filter)}
+func (_e *ContractDeploymentsIndexBootstrapper_Expecter) All(cursor interface{}) *ContractDeploymentsIndexBootstrapper_All_Call {
+	return &ContractDeploymentsIndexBootstrapper_All_Call{Call: _e.mock.On("All", cursor)}
 }
 
-func (_c *ContractDeploymentsIndexBootstrapper_All_Call) Run(run func(limit uint32, cursor *access.ContractDeploymentCursor, filter storage.IndexFilter[*access.ContractDeployment])) *ContractDeploymentsIndexBootstrapper_All_Call {
+func (_c *ContractDeploymentsIndexBootstrapper_All_Call) Run(run func(cursor *access.ContractDeploymentCursor)) *ContractDeploymentsIndexBootstrapper_All_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 uint32
+		var arg0 *access.ContractDeploymentCursor
 		if args[0] != nil {
-			arg0 = args[0].(uint32)
+			arg0 = args[0].(*access.ContractDeploymentCursor)
 		}
-		var arg1 *access.ContractDeploymentCursor
-		if args[1] != nil {
-			arg1 = args[1].(*access.ContractDeploymentCursor)
-		}
-		var arg2 storage.IndexFilter[*access.ContractDeployment]
-		if args[2] != nil {
-			arg2 = args[2].(storage.IndexFilter[*access.ContractDeployment])
-		}
-		run(
-			arg0,
-			arg1,
-			arg2,
-		)
+		run(arg0)
 	})
 	return _c
 }
 
-func (_c *ContractDeploymentsIndexBootstrapper_All_Call) Return(contractDeploymentPage access.ContractDeploymentPage, err error) *ContractDeploymentsIndexBootstrapper_All_Call {
-	_c.Call.Return(contractDeploymentPage, err)
+func (_c *ContractDeploymentsIndexBootstrapper_All_Call) Return(v storage.ContractDeploymentIterator, err error) *ContractDeploymentsIndexBootstrapper_All_Call {
+	_c.Call.Return(v, err)
 	return _c
 }
 
-func (_c *ContractDeploymentsIndexBootstrapper_All_Call) RunAndReturn(run func(limit uint32, cursor *access.ContractDeploymentCursor, filter storage.IndexFilter[*access.ContractDeployment]) (access.ContractDeploymentPage, error)) *ContractDeploymentsIndexBootstrapper_All_Call {
+func (_c *ContractDeploymentsIndexBootstrapper_All_Call) RunAndReturn(run func(cursor *access.ContractDeploymentCursor) (storage.ContractDeploymentIterator, error)) *ContractDeploymentsIndexBootstrapper_All_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // ByAddress provides a mock function for the type ContractDeploymentsIndexBootstrapper
-func (_mock *ContractDeploymentsIndexBootstrapper) ByAddress(account flow.Address, limit uint32, cursor *access.ContractDeploymentCursor, filter storage.IndexFilter[*access.ContractDeployment]) (access.ContractDeploymentPage, error) {
-	ret := _mock.Called(account, limit, cursor, filter)
+func (_mock *ContractDeploymentsIndexBootstrapper) ByAddress(account flow.Address, cursor *access.ContractDeploymentCursor) (storage.ContractDeploymentIterator, error) {
+	ret := _mock.Called(account, cursor)
 
 	if len(ret) == 0 {
 		panic("no return value specified for ByAddress")
 	}
 
-	var r0 access.ContractDeploymentPage
+	var r0 storage.ContractDeploymentIterator
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(flow.Address, uint32, *access.ContractDeploymentCursor, storage.IndexFilter[*access.ContractDeployment]) (access.ContractDeploymentPage, error)); ok {
-		return returnFunc(account, limit, cursor, filter)
+	if returnFunc, ok := ret.Get(0).(func(flow.Address, *access.ContractDeploymentCursor) (storage.ContractDeploymentIterator, error)); ok {
+		return returnFunc(account, cursor)
 	}
-	if returnFunc, ok := ret.Get(0).(func(flow.Address, uint32, *access.ContractDeploymentCursor, storage.IndexFilter[*access.ContractDeployment]) access.ContractDeploymentPage); ok {
-		r0 = returnFunc(account, limit, cursor, filter)
+	if returnFunc, ok := ret.Get(0).(func(flow.Address, *access.ContractDeploymentCursor) storage.ContractDeploymentIterator); ok {
+		r0 = returnFunc(account, cursor)
 	} else {
-		r0 = ret.Get(0).(access.ContractDeploymentPage)
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(storage.ContractDeploymentIterator)
+		}
 	}
-	if returnFunc, ok := ret.Get(1).(func(flow.Address, uint32, *access.ContractDeploymentCursor, storage.IndexFilter[*access.ContractDeployment]) error); ok {
-		r1 = returnFunc(account, limit, cursor, filter)
+	if returnFunc, ok := ret.Get(1).(func(flow.Address, *access.ContractDeploymentCursor) error); ok {
+		r1 = returnFunc(account, cursor)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -144,47 +134,32 @@ type ContractDeploymentsIndexBootstrapper_ByAddress_Call struct {
 
 // ByAddress is a helper method to define mock.On call
 //   - account flow.Address
-//   - limit uint32
 //   - cursor *access.ContractDeploymentCursor
-//   - filter storage.IndexFilter[*access.ContractDeployment]
-func (_e *ContractDeploymentsIndexBootstrapper_Expecter) ByAddress(account interface{}, limit interface{}, cursor interface{}, filter interface{}) *ContractDeploymentsIndexBootstrapper_ByAddress_Call {
-	return &ContractDeploymentsIndexBootstrapper_ByAddress_Call{Call: _e.mock.On("ByAddress", account, limit, cursor, filter)}
+func (_e *ContractDeploymentsIndexBootstrapper_Expecter) ByAddress(account interface{}, cursor interface{}) *ContractDeploymentsIndexBootstrapper_ByAddress_Call {
+	return &ContractDeploymentsIndexBootstrapper_ByAddress_Call{Call: _e.mock.On("ByAddress", account, cursor)}
 }
 
-func (_c *ContractDeploymentsIndexBootstrapper_ByAddress_Call) Run(run func(account flow.Address, limit uint32, cursor *access.ContractDeploymentCursor, filter storage.IndexFilter[*access.ContractDeployment])) *ContractDeploymentsIndexBootstrapper_ByAddress_Call {
+func (_c *ContractDeploymentsIndexBootstrapper_ByAddress_Call) Run(run func(account flow.Address, cursor *access.ContractDeploymentCursor)) *ContractDeploymentsIndexBootstrapper_ByAddress_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 flow.Address
 		if args[0] != nil {
 			arg0 = args[0].(flow.Address)
 		}
-		var arg1 uint32
+		var arg1 *access.ContractDeploymentCursor
 		if args[1] != nil {
-			arg1 = args[1].(uint32)
+			arg1 = args[1].(*access.ContractDeploymentCursor)
 		}
-		var arg2 *access.ContractDeploymentCursor
-		if args[2] != nil {
-			arg2 = args[2].(*access.ContractDeploymentCursor)
-		}
-		var arg3 storage.IndexFilter[*access.ContractDeployment]
-		if args[3] != nil {
-			arg3 = args[3].(storage.IndexFilter[*access.ContractDeployment])
-		}
-		run(
-			arg0,
-			arg1,
-			arg2,
-			arg3,
-		)
+		run(arg0, arg1)
 	})
 	return _c
 }
 
-func (_c *ContractDeploymentsIndexBootstrapper_ByAddress_Call) Return(contractDeploymentPage access.ContractDeploymentPage, err error) *ContractDeploymentsIndexBootstrapper_ByAddress_Call {
-	_c.Call.Return(contractDeploymentPage, err)
+func (_c *ContractDeploymentsIndexBootstrapper_ByAddress_Call) Return(v storage.ContractDeploymentIterator, err error) *ContractDeploymentsIndexBootstrapper_ByAddress_Call {
+	_c.Call.Return(v, err)
 	return _c
 }
 
-func (_c *ContractDeploymentsIndexBootstrapper_ByAddress_Call) RunAndReturn(run func(account flow.Address, limit uint32, cursor *access.ContractDeploymentCursor, filter storage.IndexFilter[*access.ContractDeployment]) (access.ContractDeploymentPage, error)) *ContractDeploymentsIndexBootstrapper_ByAddress_Call {
+func (_c *ContractDeploymentsIndexBootstrapper_ByAddress_Call) RunAndReturn(run func(account flow.Address, cursor *access.ContractDeploymentCursor) (storage.ContractDeploymentIterator, error)) *ContractDeploymentsIndexBootstrapper_ByAddress_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -250,25 +225,27 @@ func (_c *ContractDeploymentsIndexBootstrapper_ByContractID_Call) RunAndReturn(r
 }
 
 // DeploymentsByContractID provides a mock function for the type ContractDeploymentsIndexBootstrapper
-func (_mock *ContractDeploymentsIndexBootstrapper) DeploymentsByContractID(id string, limit uint32, cursor *access.ContractDeploymentCursor, filter storage.IndexFilter[*access.ContractDeployment]) (access.ContractDeploymentPage, error) {
-	ret := _mock.Called(id, limit, cursor, filter)
+func (_mock *ContractDeploymentsIndexBootstrapper) DeploymentsByContractID(id string, cursor *access.ContractDeploymentCursor) (storage.ContractDeploymentIterator, error) {
+	ret := _mock.Called(id, cursor)
 
 	if len(ret) == 0 {
 		panic("no return value specified for DeploymentsByContractID")
 	}
 
-	var r0 access.ContractDeploymentPage
+	var r0 storage.ContractDeploymentIterator
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(string, uint32, *access.ContractDeploymentCursor, storage.IndexFilter[*access.ContractDeployment]) (access.ContractDeploymentPage, error)); ok {
-		return returnFunc(id, limit, cursor, filter)
+	if returnFunc, ok := ret.Get(0).(func(string, *access.ContractDeploymentCursor) (storage.ContractDeploymentIterator, error)); ok {
+		return returnFunc(id, cursor)
 	}
-	if returnFunc, ok := ret.Get(0).(func(string, uint32, *access.ContractDeploymentCursor, storage.IndexFilter[*access.ContractDeployment]) access.ContractDeploymentPage); ok {
-		r0 = returnFunc(id, limit, cursor, filter)
+	if returnFunc, ok := ret.Get(0).(func(string, *access.ContractDeploymentCursor) storage.ContractDeploymentIterator); ok {
+		r0 = returnFunc(id, cursor)
 	} else {
-		r0 = ret.Get(0).(access.ContractDeploymentPage)
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(storage.ContractDeploymentIterator)
+		}
 	}
-	if returnFunc, ok := ret.Get(1).(func(string, uint32, *access.ContractDeploymentCursor, storage.IndexFilter[*access.ContractDeployment]) error); ok {
-		r1 = returnFunc(id, limit, cursor, filter)
+	if returnFunc, ok := ret.Get(1).(func(string, *access.ContractDeploymentCursor) error); ok {
+		r1 = returnFunc(id, cursor)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -282,47 +259,32 @@ type ContractDeploymentsIndexBootstrapper_DeploymentsByContractID_Call struct {
 
 // DeploymentsByContractID is a helper method to define mock.On call
 //   - id string
-//   - limit uint32
 //   - cursor *access.ContractDeploymentCursor
-//   - filter storage.IndexFilter[*access.ContractDeployment]
-func (_e *ContractDeploymentsIndexBootstrapper_Expecter) DeploymentsByContractID(id interface{}, limit interface{}, cursor interface{}, filter interface{}) *ContractDeploymentsIndexBootstrapper_DeploymentsByContractID_Call {
-	return &ContractDeploymentsIndexBootstrapper_DeploymentsByContractID_Call{Call: _e.mock.On("DeploymentsByContractID", id, limit, cursor, filter)}
+func (_e *ContractDeploymentsIndexBootstrapper_Expecter) DeploymentsByContractID(id interface{}, cursor interface{}) *ContractDeploymentsIndexBootstrapper_DeploymentsByContractID_Call {
+	return &ContractDeploymentsIndexBootstrapper_DeploymentsByContractID_Call{Call: _e.mock.On("DeploymentsByContractID", id, cursor)}
 }
 
-func (_c *ContractDeploymentsIndexBootstrapper_DeploymentsByContractID_Call) Run(run func(id string, limit uint32, cursor *access.ContractDeploymentCursor, filter storage.IndexFilter[*access.ContractDeployment])) *ContractDeploymentsIndexBootstrapper_DeploymentsByContractID_Call {
+func (_c *ContractDeploymentsIndexBootstrapper_DeploymentsByContractID_Call) Run(run func(id string, cursor *access.ContractDeploymentCursor)) *ContractDeploymentsIndexBootstrapper_DeploymentsByContractID_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 string
 		if args[0] != nil {
 			arg0 = args[0].(string)
 		}
-		var arg1 uint32
+		var arg1 *access.ContractDeploymentCursor
 		if args[1] != nil {
-			arg1 = args[1].(uint32)
+			arg1 = args[1].(*access.ContractDeploymentCursor)
 		}
-		var arg2 *access.ContractDeploymentCursor
-		if args[2] != nil {
-			arg2 = args[2].(*access.ContractDeploymentCursor)
-		}
-		var arg3 storage.IndexFilter[*access.ContractDeployment]
-		if args[3] != nil {
-			arg3 = args[3].(storage.IndexFilter[*access.ContractDeployment])
-		}
-		run(
-			arg0,
-			arg1,
-			arg2,
-			arg3,
-		)
+		run(arg0, arg1)
 	})
 	return _c
 }
 
-func (_c *ContractDeploymentsIndexBootstrapper_DeploymentsByContractID_Call) Return(contractDeploymentPage access.ContractDeploymentPage, err error) *ContractDeploymentsIndexBootstrapper_DeploymentsByContractID_Call {
-	_c.Call.Return(contractDeploymentPage, err)
+func (_c *ContractDeploymentsIndexBootstrapper_DeploymentsByContractID_Call) Return(v storage.ContractDeploymentIterator, err error) *ContractDeploymentsIndexBootstrapper_DeploymentsByContractID_Call {
+	_c.Call.Return(v, err)
 	return _c
 }
 
-func (_c *ContractDeploymentsIndexBootstrapper_DeploymentsByContractID_Call) RunAndReturn(run func(id string, limit uint32, cursor *access.ContractDeploymentCursor, filter storage.IndexFilter[*access.ContractDeployment]) (access.ContractDeploymentPage, error)) *ContractDeploymentsIndexBootstrapper_DeploymentsByContractID_Call {
+func (_c *ContractDeploymentsIndexBootstrapper_DeploymentsByContractID_Call) RunAndReturn(run func(id string, cursor *access.ContractDeploymentCursor) (storage.ContractDeploymentIterator, error)) *ContractDeploymentsIndexBootstrapper_DeploymentsByContractID_Call {
 	_c.Call.Return(run)
 	return _c
 }

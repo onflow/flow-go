@@ -128,7 +128,7 @@ func (s *ExtendedIndexingSuite) SetupSuite() {
 	s.apiClient = apiClient
 }
 
-func (s *ExtendedIndexingSuite) TearDownTest() {
+func (s *ExtendedIndexingSuite) TearDownSuite() {
 	if s.net != nil {
 		s.net.Remove()
 		s.net = nil

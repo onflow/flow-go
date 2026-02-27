@@ -117,7 +117,13 @@ type API interface {
 	// Expected error returns during normal operations:
 	//   - [codes.NotFound]: if no contract with the given identifier exists
 	//   - [codes.FailedPrecondition]: if the index has not been initialized
-	GetContract(ctx context.Context, id string, filter ContractDeploymentFilter) (*accessmodel.ContractDeployment, error)
+	GetContract(
+		ctx context.Context,
+		id string,
+		filter ContractDeploymentFilter,
+		expandOptions ContractDeploymentExpandOptions,
+		encodingVersion entities.EventEncodingVersion,
+	) (*accessmodel.ContractDeployment, error)
 
 	// GetContractDeployments returns a paginated list of all deployments of the given contract,
 	// most recent first.
@@ -132,6 +138,8 @@ type API interface {
 		limit uint32,
 		cursor *accessmodel.ContractDeploymentCursor,
 		filter ContractDeploymentFilter,
+		expandOptions ContractDeploymentExpandOptions,
+		encodingVersion entities.EventEncodingVersion,
 	) (*accessmodel.ContractDeploymentPage, error)
 
 	// GetContracts returns a paginated list of contracts at their latest deployment.
@@ -144,6 +152,8 @@ type API interface {
 		limit uint32,
 		cursor *accessmodel.ContractDeploymentCursor,
 		filter ContractDeploymentFilter,
+		expandOptions ContractDeploymentExpandOptions,
+		encodingVersion entities.EventEncodingVersion,
 	) (*accessmodel.ContractDeploymentPage, error)
 
 	// GetContractsByAddress returns a paginated list of contracts at their latest deployment for
@@ -158,5 +168,7 @@ type API interface {
 		limit uint32,
 		cursor *accessmodel.ContractDeploymentCursor,
 		filter ContractDeploymentFilter,
+		expandOptions ContractDeploymentExpandOptions,
+		encodingVersion entities.EventEncodingVersion,
 	) (*accessmodel.ContractDeploymentPage, error)
 }

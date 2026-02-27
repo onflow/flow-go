@@ -6,12 +6,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// Contract represents a Cadence smart contract as returned by the extended API.
-type Contract struct {
-	Identifier string
-	Body       string
-}
-
 // ContractDeployment is a point-in-time snapshot of a contract on-chain.
 // Each deployment (add or update) produces a distinct ContractDeployment record.
 type ContractDeployment struct {
@@ -39,8 +33,9 @@ type ContractDeployment struct {
 	// When true, the BlockHeight, TransactionID, TxIndex, and EventIndex fields are undefined.
 	IsPlaceholder bool
 
-	// Transaction is the transaction that applied this deployment.
-	Transaction *flow.TransactionBody
+	// Expansion fields populated when expandResults is true. Never persisted.
+	Transaction *flow.TransactionBody `msgpack:"-"` // Transaction body (nil unless expanded)
+	Result      *TransactionResult    `msgpack:"-"` // Transaction result (nil unless expanded)
 }
 
 // CadenceCodeHash calculates the SHA3-256 hash of the provided code using the same algorithm as Cadence.

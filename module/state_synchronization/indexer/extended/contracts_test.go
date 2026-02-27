@@ -22,6 +22,7 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/indexes"
+	iterutil "github.com/onflow/flow-go/storage/indexes/iterator"
 	storagemock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -36,6 +37,15 @@ const contractsBootstrapHeight = uint64(100)
 // contractsEventHeight is the height of the block that contains contract events.
 // Events at this height are processed AFTER the index is bootstrapped.
 const contractsEventHeight = uint64(101)
+
+// collectContractPage is a test helper that creates an iterator from the store and collects
+// results via CollectResults, returning the deployments slice. No filter or cursor is applied.
+func collectContractPage(t *testing.T, iter storage.ContractDeploymentIterator, limit uint32) []access.ContractDeployment {
+	t.Helper()
+	collected, _, err := iterutil.CollectResults(iter, limit, nil)
+	require.NoError(t, err)
+	return collected
+}
 
 // ===== Happy-path tests =====
 
@@ -61,9 +71,10 @@ func TestContractsIndexer_NoEvents(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, contractsBootstrapHeight, latest)
 
-	page, err := store.All(1, nil, nil)
+	iter, err := store.All(nil)
 	require.NoError(t, err)
-	assert.Empty(t, page.Deployments)
+	deployments := collectContractPage(t, iter, 1)
+	assert.Empty(t, deployments)
 }
 
 // TestContractsIndexer_NextHeight_NotBootstrapped verifies that NextHeight returns the
@@ -172,11 +183,12 @@ func TestContractsIndexer_ContractUpdated(t *testing.T) {
 	assert.Equal(t, updateTxID, latest.TransactionID)
 
 	// DeploymentsByContractID returns both deployments, most recent first.
-	page, err := store.DeploymentsByContractID(contractID, 10, nil, nil)
+	depIter, err := store.DeploymentsByContractID(contractID, nil)
 	require.NoError(t, err)
-	require.Len(t, page.Deployments, 2)
-	assert.Equal(t, contractsEventHeight+1, page.Deployments[0].BlockHeight)
-	assert.Equal(t, contractsEventHeight, page.Deployments[1].BlockHeight)
+	deployments := collectContractPage(t, depIter, 10)
+	require.Len(t, deployments, 2)
+	assert.Equal(t, contractsEventHeight+1, deployments[0].BlockHeight)
+	assert.Equal(t, contractsEventHeight, deployments[1].BlockHeight)
 }
 
 // TestContractsIndexer_MultipleContractsInOneBlock verifies that multiple AccountContractAdded
@@ -230,9 +242,9 @@ func TestContractsIndexer_MultipleContractsInOneBlock(t *testing.T) {
 	assert.Equal(t, code2, d2.Code)
 
 	// All() returns both contracts (latest deployment of each).
-	page, err := store.All(10, nil, nil)
+	allIter, err := store.All(nil)
 	require.NoError(t, err)
-	assert.Len(t, page.Deployments, 2)
+	assert.Len(t, collectContractPage(t, allIter, 10), 2)
 }
 
 // TestContractsIndexer_SameAccountCached verifies that when one block deploys two contracts
@@ -268,9 +280,9 @@ func TestContractsIndexer_SameAccountCached(t *testing.T) {
 		Events: []flow.Event{eventA, eventB},
 	})
 
-	page, err := store.ByAddress(address, 10, nil, nil)
+	byAddrIter, err := store.ByAddress(address, nil)
 	require.NoError(t, err)
-	assert.Len(t, page.Deployments, 2)
+	assert.Len(t, collectContractPage(t, byAddrIter, 10), 2)
 }
 
 // TestContractsIndexer_ByAddress verifies that ByAddress returns only contracts for the
@@ -313,16 +325,18 @@ func TestContractsIndexer_ByAddress(t *testing.T) {
 	})
 
 	// ByAddress(addr1) returns only Foo.
-	page1, err := store.ByAddress(addr1, 10, nil, nil)
+	iter1, err := store.ByAddress(addr1, nil)
 	require.NoError(t, err)
-	require.Len(t, page1.Deployments, 1)
-	assert.Equal(t, fmt.Sprintf("A.%s.Foo", addr1.Hex()), page1.Deployments[0].ContractID)
+	deps1 := collectContractPage(t, iter1, 10)
+	require.Len(t, deps1, 1)
+	assert.Equal(t, fmt.Sprintf("A.%s.Foo", addr1.Hex()), deps1[0].ContractID)
 
 	// ByAddress(addr2) returns only Bar.
-	page2, err := store.ByAddress(addr2, 10, nil, nil)
+	iter2, err := store.ByAddress(addr2, nil)
 	require.NoError(t, err)
-	require.Len(t, page2.Deployments, 1)
-	assert.Equal(t, fmt.Sprintf("A.%s.Bar", addr2.Hex()), page2.Deployments[0].ContractID)
+	deps2 := collectContractPage(t, iter2, 10)
+	require.Len(t, deps2, 1)
+	assert.Equal(t, fmt.Sprintf("A.%s.Bar", addr2.Hex()), deps2[0].ContractID)
 }
 
 // ===== Backfill tests =====
@@ -390,12 +404,13 @@ func TestContractsIndexer_Backfill(t *testing.T) {
 	assert.Equal(t, updateTxID, d.TransactionID)
 
 	// DeploymentsByContractID returns both deployments ordered most recent first.
-	page, err := store.DeploymentsByContractID(contractID, 10, nil, nil)
+	depIter, err := store.DeploymentsByContractID(contractID, nil)
 	require.NoError(t, err)
-	require.Len(t, page.Deployments, 2)
-	assert.Equal(t, firstHeight+2, page.Deployments[0].BlockHeight)
-	assert.Equal(t, firstHeight+1, page.Deployments[1].BlockHeight)
-	assert.Equal(t, addTxID, page.Deployments[1].TransactionID)
+	deps := collectContractPage(t, depIter, 10)
+	require.Len(t, deps, 2)
+	assert.Equal(t, firstHeight+2, deps[0].BlockHeight)
+	assert.Equal(t, firstHeight+1, deps[1].BlockHeight)
+	assert.Equal(t, addTxID, deps[1].TransactionID)
 }
 
 // TestContractsIndexer_BackfillMultipleBlocks verifies that starting the index at a root
@@ -441,9 +456,9 @@ func TestContractsIndexer_BackfillMultipleBlocks(t *testing.T) {
 	assert.Equal(t, firstHeight+3, latest)
 
 	// All() returns all three contracts.
-	page, err := store.All(10, nil, nil)
+	allIter, err := store.All(nil)
 	require.NoError(t, err)
-	assert.Len(t, page.Deployments, 3)
+	assert.Len(t, collectContractPage(t, allIter, 10), 3)
 }
 
 // ===== Error and edge-case tests =====

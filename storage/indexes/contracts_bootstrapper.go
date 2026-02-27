@@ -95,58 +95,51 @@ func (b *ContractDeploymentsBootstrapper) ByContractID(id string) (accessmodel.C
 	return store.ByContractID(id)
 }
 
-// DeploymentsByContractID returns a paginated list of all recorded deployments for the given contract.
+// DeploymentsByContractID returns an iterator over all recorded deployments for the given contract,
+// ordered from most recent to oldest. See [ContractDeploymentsIndex.DeploymentsByContractID].
 //
 // Expected error returns during normal operations:
 //   - [storage.ErrNotBootstrapped] if the index has not been initialized
-//   - [storage.ErrInvalidQuery] if limit is invalid
 func (b *ContractDeploymentsBootstrapper) DeploymentsByContractID(
 	id string,
-	limit uint32,
 	cursor *accessmodel.ContractDeploymentCursor,
-	filter storage.IndexFilter[*accessmodel.ContractDeployment],
-) (accessmodel.ContractDeploymentPage, error) {
+) (storage.ContractDeploymentIterator, error) {
 	store := b.store.Load()
 	if store == nil {
-		return accessmodel.ContractDeploymentPage{}, storage.ErrNotBootstrapped
+		return nil, storage.ErrNotBootstrapped
 	}
-	return store.DeploymentsByContractID(id, limit, cursor, filter)
+	return store.DeploymentsByContractID(id, cursor)
 }
 
-// ByAddress returns the latest deployment for each contract deployed by the given address,
-// using cursor-based pagination.
+// ByAddress returns an iterator over the latest deployment for each contract deployed by the
+// given address. See [ContractDeploymentsIndex.ByAddress].
 //
 // Expected error returns during normal operations:
 //   - [storage.ErrNotBootstrapped] if the index has not been initialized
-//   - [storage.ErrInvalidQuery] if limit is invalid
 func (b *ContractDeploymentsBootstrapper) ByAddress(
 	account flow.Address,
-	limit uint32,
 	cursor *accessmodel.ContractDeploymentCursor,
-	filter storage.IndexFilter[*accessmodel.ContractDeployment],
-) (accessmodel.ContractDeploymentPage, error) {
+) (storage.ContractDeploymentIterator, error) {
 	store := b.store.Load()
 	if store == nil {
-		return accessmodel.ContractDeploymentPage{}, storage.ErrNotBootstrapped
+		return nil, storage.ErrNotBootstrapped
 	}
-	return store.ByAddress(account, limit, cursor, filter)
+	return store.ByAddress(account, cursor)
 }
 
-// All returns the latest deployment for each indexed contract, using cursor-based pagination.
+// All returns an iterator over the latest deployment for each indexed contract.
+// See [ContractDeploymentsIndex.All].
 //
 // Expected error returns during normal operations:
 //   - [storage.ErrNotBootstrapped] if the index has not been initialized
-//   - [storage.ErrInvalidQuery] if limit is invalid
 func (b *ContractDeploymentsBootstrapper) All(
-	limit uint32,
 	cursor *accessmodel.ContractDeploymentCursor,
-	filter storage.IndexFilter[*accessmodel.ContractDeployment],
-) (accessmodel.ContractDeploymentPage, error) {
+) (storage.ContractDeploymentIterator, error) {
 	store := b.store.Load()
 	if store == nil {
-		return accessmodel.ContractDeploymentPage{}, storage.ErrNotBootstrapped
+		return nil, storage.ErrNotBootstrapped
 	}
-	return store.All(limit, cursor, filter)
+	return store.All(cursor)
 }
 
 // Store indexes all contract deployments from the given block and advances the latest indexed

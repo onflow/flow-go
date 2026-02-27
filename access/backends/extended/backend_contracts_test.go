@@ -6,10 +6,11 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	mocktestify "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+
+	"github.com/onflow/flow/protobuf/go/flow/entities"
 
 	accessmodel "github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
@@ -29,6 +30,33 @@ func makeContractDeployment(contractID string, height uint64) accessmodel.Contra
 		TransactionID: unittest.IdentifierFixture(),
 		Code:          []byte("access(all) contract Foo {}"),
 		CodeHash:      make([]byte, 32),
+	}
+}
+
+// testContractDeploymentEntry is a simple storage.IteratorEntry implementation for tests.
+type testContractDeploymentEntry struct {
+	d accessmodel.ContractDeployment
+}
+
+func (e testContractDeploymentEntry) Cursor() (accessmodel.ContractDeploymentCursor, error) {
+	return accessmodel.ContractDeploymentCursor{
+		ContractID: e.d.ContractID,
+		Height:     e.d.BlockHeight,
+	}, nil
+}
+
+func (e testContractDeploymentEntry) Value() (accessmodel.ContractDeployment, error) {
+	return e.d, nil
+}
+
+// makeContractDeploymentIter builds a storage.ContractDeploymentIterator from a slice of deployments.
+func makeContractDeploymentIter(deployments []accessmodel.ContractDeployment) storage.ContractDeploymentIterator {
+	return func(yield func(storage.IteratorEntry[accessmodel.ContractDeployment, accessmodel.ContractDeploymentCursor]) bool) {
+		for _, d := range deployments {
+			if !yield(testContractDeploymentEntry{d: d}) {
+				return
+			}
+		}
 	}
 }
 
@@ -69,7 +97,7 @@ func TestContractsBackend_GetContract(t *testing.T) {
 
 		mockStore.On("ByContractID", contractID).Return(deployment, nil).Once()
 
-		result, err := backend.GetContract(context.Background(), contractID, ContractDeploymentFilter{})
+		result, err := backend.GetContract(context.Background(), contractID, ContractDeploymentFilter{}, ContractDeploymentExpandOptions{}, entities.EventEncodingVersion_JSON_CDC_V0)
 		require.NoError(t, err)
 		require.NotNil(t, result)
 		assert.Equal(t, contractID, result.ContractID)
@@ -83,7 +111,7 @@ func TestContractsBackend_GetContract(t *testing.T) {
 
 		mockStore.On("ByContractID", contractID).Return(accessmodel.ContractDeployment{}, storage.ErrNotFound).Once()
 
-		_, err := backend.GetContract(context.Background(), contractID, ContractDeploymentFilter{})
+		_, err := backend.GetContract(context.Background(), contractID, ContractDeploymentFilter{}, ContractDeploymentExpandOptions{}, entities.EventEncodingVersion_JSON_CDC_V0)
 		require.Error(t, err)
 		st, ok := status.FromError(err)
 		require.True(t, ok)
@@ -97,7 +125,7 @@ func TestContractsBackend_GetContract(t *testing.T) {
 
 		mockStore.On("ByContractID", contractID).Return(accessmodel.ContractDeployment{}, storage.ErrNotBootstrapped).Once()
 
-		_, err := backend.GetContract(context.Background(), contractID, ContractDeploymentFilter{})
+		_, err := backend.GetContract(context.Background(), contractID, ContractDeploymentFilter{}, ContractDeploymentExpandOptions{}, entities.EventEncodingVersion_JSON_CDC_V0)
 		require.Error(t, err)
 		st, ok := status.FromError(err)
 		require.True(t, ok)
@@ -113,7 +141,7 @@ func TestContractsBackend_GetContract(t *testing.T) {
 		mockStore.On("ByContractID", contractID).Return(accessmodel.ContractDeployment{}, unexpectedErr).Once()
 
 		signalerCtx, verifyThrown := contractSignalerCtxExpectingThrow(t)
-		_, err := backend.GetContract(signalerCtx, contractID, ContractDeploymentFilter{})
+		_, err := backend.GetContract(signalerCtx, contractID, ContractDeploymentFilter{}, ContractDeploymentExpandOptions{}, entities.EventEncodingVersion_JSON_CDC_V0)
 		require.Error(t, err)
 		verifyThrown()
 	})
@@ -134,12 +162,10 @@ func TestContractsBackend_GetContractDeployments(t *testing.T) {
 			makeContractDeployment(contractID, 50),
 			makeContractDeployment(contractID, 30),
 		}
-		page := accessmodel.ContractDeploymentPage{Deployments: deployments}
-		mockStore.On("DeploymentsByContractID", contractID, uint32(DefaultConfig().DefaultPageSize),
-			(*accessmodel.ContractDeploymentCursor)(nil), mocktestify.Anything).
-			Return(page, nil).Once()
+		mockStore.On("DeploymentsByContractID", contractID, (*accessmodel.ContractDeploymentCursor)(nil)).
+			Return(makeContractDeploymentIter(deployments), nil).Once()
 
-		result, err := backend.GetContractDeployments(context.Background(), contractID, 0, nil, ContractDeploymentFilter{})
+		result, err := backend.GetContractDeployments(context.Background(), contractID, 0, nil, ContractDeploymentFilter{}, ContractDeploymentExpandOptions{}, entities.EventEncodingVersion_JSON_CDC_V0)
 		require.NoError(t, err)
 		require.NotNil(t, result)
 		assert.Len(t, result.Deployments, 2)
@@ -151,16 +177,15 @@ func TestContractsBackend_GetContractDeployments(t *testing.T) {
 		mockStore := storagemock.NewContractDeploymentsIndexReader(t)
 		backend := NewContractsBackend(unittest.Logger(), &backendBase{config: DefaultConfig()}, mockStore)
 
-		cursor := &accessmodel.ContractDeploymentCursor{Height: 30, TxIndex: 0, EventIndex: 0}
-		page := accessmodel.ContractDeploymentPage{
-			Deployments: []accessmodel.ContractDeployment{makeContractDeployment(contractID, 50)},
-			NextCursor:  cursor,
+		// Provide 2 items for limit=1: first is returned, second becomes the cursor.
+		deployments := []accessmodel.ContractDeployment{
+			makeContractDeployment(contractID, 50),
+			makeContractDeployment(contractID, 30), // cursor item (first of next page)
 		}
-		mockStore.On("DeploymentsByContractID", contractID, uint32(1),
-			(*accessmodel.ContractDeploymentCursor)(nil), mocktestify.Anything).
-			Return(page, nil).Once()
+		mockStore.On("DeploymentsByContractID", contractID, (*accessmodel.ContractDeploymentCursor)(nil)).
+			Return(makeContractDeploymentIter(deployments), nil).Once()
 
-		result, err := backend.GetContractDeployments(context.Background(), contractID, 1, nil, ContractDeploymentFilter{})
+		result, err := backend.GetContractDeployments(context.Background(), contractID, 1, nil, ContractDeploymentFilter{}, ContractDeploymentExpandOptions{}, entities.EventEncodingVersion_JSON_CDC_V0)
 		require.NoError(t, err)
 		require.NotNil(t, result.NextCursor)
 		assert.Equal(t, uint64(30), result.NextCursor.Height)
@@ -172,11 +197,10 @@ func TestContractsBackend_GetContractDeployments(t *testing.T) {
 		backend := NewContractsBackend(unittest.Logger(), &backendBase{config: DefaultConfig()}, mockStore)
 
 		cursor := &accessmodel.ContractDeploymentCursor{Height: 30, TxIndex: 1, EventIndex: 2}
-		page := accessmodel.ContractDeploymentPage{}
-		mockStore.On("DeploymentsByContractID", contractID, uint32(10), cursor, mocktestify.Anything).
-			Return(page, nil).Once()
+		mockStore.On("DeploymentsByContractID", contractID, cursor).
+			Return(makeContractDeploymentIter(nil), nil).Once()
 
-		_, err := backend.GetContractDeployments(context.Background(), contractID, 10, cursor, ContractDeploymentFilter{})
+		_, err := backend.GetContractDeployments(context.Background(), contractID, 10, cursor, ContractDeploymentFilter{}, ContractDeploymentExpandOptions{}, entities.EventEncodingVersion_JSON_CDC_V0)
 		require.NoError(t, err)
 	})
 
@@ -185,7 +209,7 @@ func TestContractsBackend_GetContractDeployments(t *testing.T) {
 		mockStore := storagemock.NewContractDeploymentsIndexReader(t)
 		backend := NewContractsBackend(unittest.Logger(), &backendBase{config: DefaultConfig()}, mockStore)
 
-		_, err := backend.GetContractDeployments(context.Background(), contractID, DefaultConfig().MaxPageSize+1, nil, ContractDeploymentFilter{})
+		_, err := backend.GetContractDeployments(context.Background(), contractID, DefaultConfig().MaxPageSize+1, nil, ContractDeploymentFilter{}, ContractDeploymentExpandOptions{}, entities.EventEncodingVersion_JSON_CDC_V0)
 		require.Error(t, err)
 		st, ok := status.FromError(err)
 		require.True(t, ok)
@@ -197,11 +221,10 @@ func TestContractsBackend_GetContractDeployments(t *testing.T) {
 		mockStore := storagemock.NewContractDeploymentsIndexReader(t)
 		backend := NewContractsBackend(unittest.Logger(), &backendBase{config: DefaultConfig()}, mockStore)
 
-		mockStore.On("DeploymentsByContractID", contractID, uint32(DefaultConfig().DefaultPageSize),
-			(*accessmodel.ContractDeploymentCursor)(nil), mocktestify.Anything).
-			Return(accessmodel.ContractDeploymentPage{}, storage.ErrNotBootstrapped).Once()
+		mockStore.On("DeploymentsByContractID", contractID, (*accessmodel.ContractDeploymentCursor)(nil)).
+			Return(nil, storage.ErrNotBootstrapped).Once()
 
-		_, err := backend.GetContractDeployments(context.Background(), contractID, 0, nil, ContractDeploymentFilter{})
+		_, err := backend.GetContractDeployments(context.Background(), contractID, 0, nil, ContractDeploymentFilter{}, ContractDeploymentExpandOptions{}, entities.EventEncodingVersion_JSON_CDC_V0)
 		require.Error(t, err)
 		st, ok := status.FromError(err)
 		require.True(t, ok)
@@ -214,12 +237,11 @@ func TestContractsBackend_GetContractDeployments(t *testing.T) {
 		backend := NewContractsBackend(unittest.Logger(), &backendBase{config: DefaultConfig()}, mockStore)
 
 		unexpectedErr := fmt.Errorf("disk failure")
-		mockStore.On("DeploymentsByContractID", contractID, uint32(DefaultConfig().DefaultPageSize),
-			(*accessmodel.ContractDeploymentCursor)(nil), mocktestify.Anything).
-			Return(accessmodel.ContractDeploymentPage{}, unexpectedErr).Once()
+		mockStore.On("DeploymentsByContractID", contractID, (*accessmodel.ContractDeploymentCursor)(nil)).
+			Return(nil, unexpectedErr).Once()
 
 		signalerCtx, verifyThrown := contractSignalerCtxExpectingThrow(t)
-		_, err := backend.GetContractDeployments(signalerCtx, contractID, 0, nil, ContractDeploymentFilter{})
+		_, err := backend.GetContractDeployments(signalerCtx, contractID, 0, nil, ContractDeploymentFilter{}, ContractDeploymentExpandOptions{}, entities.EventEncodingVersion_JSON_CDC_V0)
 		require.Error(t, err)
 		verifyThrown()
 	})
@@ -238,12 +260,10 @@ func TestContractsBackend_GetContracts(t *testing.T) {
 			makeContractDeployment("A.0000000000000001.FungibleToken", 10),
 			makeContractDeployment("A.0000000000000002.FlowToken", 11),
 		}
-		page := accessmodel.ContractDeploymentPage{Deployments: deployments}
-		mockStore.On("All", uint32(DefaultConfig().DefaultPageSize),
-			(*accessmodel.ContractDeploymentCursor)(nil), mocktestify.Anything).
-			Return(page, nil).Once()
+		mockStore.On("All", (*accessmodel.ContractDeploymentCursor)(nil)).
+			Return(makeContractDeploymentIter(deployments), nil).Once()
 
-		result, err := backend.GetContracts(context.Background(), 0, nil, ContractDeploymentFilter{})
+		result, err := backend.GetContracts(context.Background(), 0, nil, ContractDeploymentFilter{}, ContractDeploymentExpandOptions{}, entities.EventEncodingVersion_JSON_CDC_V0)
 		require.NoError(t, err)
 		require.NotNil(t, result)
 		assert.Len(t, result.Deployments, 2)
@@ -255,18 +275,18 @@ func TestContractsBackend_GetContracts(t *testing.T) {
 		mockStore := storagemock.NewContractDeploymentsIndexReader(t)
 		backend := NewContractsBackend(unittest.Logger(), &backendBase{config: DefaultConfig()}, mockStore)
 
-		cursor := &accessmodel.ContractDeploymentCursor{ContractID: "A.0000000000000001.FungibleToken"}
-		page := accessmodel.ContractDeploymentPage{
-			Deployments: []accessmodel.ContractDeployment{makeContractDeployment("A.0000000000000001.FungibleToken", 10)},
-			NextCursor:  cursor,
+		// Provide 2 items for limit=1: first is returned, second becomes the cursor.
+		deployments := []accessmodel.ContractDeployment{
+			makeContractDeployment("A.0000000000000001.FungibleToken", 10),
+			makeContractDeployment("A.0000000000000002.FlowToken", 11), // cursor item
 		}
-		mockStore.On("All", uint32(1), (*accessmodel.ContractDeploymentCursor)(nil), mocktestify.Anything).
-			Return(page, nil).Once()
+		mockStore.On("All", (*accessmodel.ContractDeploymentCursor)(nil)).
+			Return(makeContractDeploymentIter(deployments), nil).Once()
 
-		result, err := backend.GetContracts(context.Background(), 1, nil, ContractDeploymentFilter{})
+		result, err := backend.GetContracts(context.Background(), 1, nil, ContractDeploymentFilter{}, ContractDeploymentExpandOptions{}, entities.EventEncodingVersion_JSON_CDC_V0)
 		require.NoError(t, err)
 		require.NotNil(t, result.NextCursor)
-		assert.Equal(t, "A.0000000000000001.FungibleToken", result.NextCursor.ContractID)
+		assert.Equal(t, "A.0000000000000002.FlowToken", result.NextCursor.ContractID)
 	})
 
 	t.Run("cursor forwarded to store", func(t *testing.T) {
@@ -275,10 +295,10 @@ func TestContractsBackend_GetContracts(t *testing.T) {
 		backend := NewContractsBackend(unittest.Logger(), &backendBase{config: DefaultConfig()}, mockStore)
 
 		cursor := &accessmodel.ContractDeploymentCursor{ContractID: "A.0000000000000001.FungibleToken"}
-		mockStore.On("All", uint32(5), cursor, mocktestify.Anything).
-			Return(accessmodel.ContractDeploymentPage{}, nil).Once()
+		mockStore.On("All", cursor).
+			Return(makeContractDeploymentIter(nil), nil).Once()
 
-		_, err := backend.GetContracts(context.Background(), 5, cursor, ContractDeploymentFilter{})
+		_, err := backend.GetContracts(context.Background(), 5, cursor, ContractDeploymentFilter{}, ContractDeploymentExpandOptions{}, entities.EventEncodingVersion_JSON_CDC_V0)
 		require.NoError(t, err)
 	})
 
@@ -287,7 +307,7 @@ func TestContractsBackend_GetContracts(t *testing.T) {
 		mockStore := storagemock.NewContractDeploymentsIndexReader(t)
 		backend := NewContractsBackend(unittest.Logger(), &backendBase{config: DefaultConfig()}, mockStore)
 
-		_, err := backend.GetContracts(context.Background(), DefaultConfig().MaxPageSize+1, nil, ContractDeploymentFilter{})
+		_, err := backend.GetContracts(context.Background(), DefaultConfig().MaxPageSize+1, nil, ContractDeploymentFilter{}, ContractDeploymentExpandOptions{}, entities.EventEncodingVersion_JSON_CDC_V0)
 		require.Error(t, err)
 		st, ok := status.FromError(err)
 		require.True(t, ok)
@@ -299,11 +319,10 @@ func TestContractsBackend_GetContracts(t *testing.T) {
 		mockStore := storagemock.NewContractDeploymentsIndexReader(t)
 		backend := NewContractsBackend(unittest.Logger(), &backendBase{config: DefaultConfig()}, mockStore)
 
-		mockStore.On("All", uint32(DefaultConfig().DefaultPageSize),
-			(*accessmodel.ContractDeploymentCursor)(nil), mocktestify.Anything).
-			Return(accessmodel.ContractDeploymentPage{}, storage.ErrNotBootstrapped).Once()
+		mockStore.On("All", (*accessmodel.ContractDeploymentCursor)(nil)).
+			Return(nil, storage.ErrNotBootstrapped).Once()
 
-		_, err := backend.GetContracts(context.Background(), 0, nil, ContractDeploymentFilter{})
+		_, err := backend.GetContracts(context.Background(), 0, nil, ContractDeploymentFilter{}, ContractDeploymentExpandOptions{}, entities.EventEncodingVersion_JSON_CDC_V0)
 		require.Error(t, err)
 		st, ok := status.FromError(err)
 		require.True(t, ok)
@@ -316,12 +335,11 @@ func TestContractsBackend_GetContracts(t *testing.T) {
 		backend := NewContractsBackend(unittest.Logger(), &backendBase{config: DefaultConfig()}, mockStore)
 
 		unexpectedErr := fmt.Errorf("disk failure")
-		mockStore.On("All", uint32(DefaultConfig().DefaultPageSize),
-			(*accessmodel.ContractDeploymentCursor)(nil), mocktestify.Anything).
-			Return(accessmodel.ContractDeploymentPage{}, unexpectedErr).Once()
+		mockStore.On("All", (*accessmodel.ContractDeploymentCursor)(nil)).
+			Return(nil, unexpectedErr).Once()
 
 		signalerCtx, verifyThrown := contractSignalerCtxExpectingThrow(t)
-		_, err := backend.GetContracts(signalerCtx, 0, nil, ContractDeploymentFilter{})
+		_, err := backend.GetContracts(signalerCtx, 0, nil, ContractDeploymentFilter{}, ContractDeploymentExpandOptions{}, entities.EventEncodingVersion_JSON_CDC_V0)
 		require.Error(t, err)
 		verifyThrown()
 	})
@@ -339,14 +357,11 @@ func TestContractsBackend_GetContractsByAddress(t *testing.T) {
 		backend := NewContractsBackend(unittest.Logger(), &backendBase{config: DefaultConfig()}, mockStore)
 
 		contractID := fmt.Sprintf("A.%s.Foo", addr.Hex())
-		page := accessmodel.ContractDeploymentPage{
-			Deployments: []accessmodel.ContractDeployment{makeContractDeployment(contractID, 15)},
-		}
-		mockStore.On("ByAddress", addr, uint32(DefaultConfig().DefaultPageSize),
-			(*accessmodel.ContractDeploymentCursor)(nil), mocktestify.Anything).
-			Return(page, nil).Once()
+		deployments := []accessmodel.ContractDeployment{makeContractDeployment(contractID, 15)}
+		mockStore.On("ByAddress", addr, (*accessmodel.ContractDeploymentCursor)(nil)).
+			Return(makeContractDeploymentIter(deployments), nil).Once()
 
-		result, err := backend.GetContractsByAddress(context.Background(), addr, 0, nil, ContractDeploymentFilter{})
+		result, err := backend.GetContractsByAddress(context.Background(), addr, 0, nil, ContractDeploymentFilter{}, ContractDeploymentExpandOptions{}, entities.EventEncodingVersion_JSON_CDC_V0)
 		require.NoError(t, err)
 		require.NotNil(t, result)
 		require.Len(t, result.Deployments, 1)
@@ -359,10 +374,10 @@ func TestContractsBackend_GetContractsByAddress(t *testing.T) {
 		backend := NewContractsBackend(unittest.Logger(), &backendBase{config: DefaultConfig()}, mockStore)
 
 		cursor := &accessmodel.ContractDeploymentCursor{ContractID: fmt.Sprintf("A.%s.Foo", addr.Hex())}
-		mockStore.On("ByAddress", addr, uint32(10), cursor, mocktestify.Anything).
-			Return(accessmodel.ContractDeploymentPage{}, nil).Once()
+		mockStore.On("ByAddress", addr, cursor).
+			Return(makeContractDeploymentIter(nil), nil).Once()
 
-		_, err := backend.GetContractsByAddress(context.Background(), addr, 10, cursor, ContractDeploymentFilter{})
+		_, err := backend.GetContractsByAddress(context.Background(), addr, 10, cursor, ContractDeploymentFilter{}, ContractDeploymentExpandOptions{}, entities.EventEncodingVersion_JSON_CDC_V0)
 		require.NoError(t, err)
 	})
 
@@ -371,7 +386,7 @@ func TestContractsBackend_GetContractsByAddress(t *testing.T) {
 		mockStore := storagemock.NewContractDeploymentsIndexReader(t)
 		backend := NewContractsBackend(unittest.Logger(), &backendBase{config: DefaultConfig()}, mockStore)
 
-		_, err := backend.GetContractsByAddress(context.Background(), addr, DefaultConfig().MaxPageSize+1, nil, ContractDeploymentFilter{})
+		_, err := backend.GetContractsByAddress(context.Background(), addr, DefaultConfig().MaxPageSize+1, nil, ContractDeploymentFilter{}, ContractDeploymentExpandOptions{}, entities.EventEncodingVersion_JSON_CDC_V0)
 		require.Error(t, err)
 		st, ok := status.FromError(err)
 		require.True(t, ok)
@@ -383,11 +398,10 @@ func TestContractsBackend_GetContractsByAddress(t *testing.T) {
 		mockStore := storagemock.NewContractDeploymentsIndexReader(t)
 		backend := NewContractsBackend(unittest.Logger(), &backendBase{config: DefaultConfig()}, mockStore)
 
-		mockStore.On("ByAddress", addr, uint32(DefaultConfig().DefaultPageSize),
-			(*accessmodel.ContractDeploymentCursor)(nil), mocktestify.Anything).
-			Return(accessmodel.ContractDeploymentPage{}, storage.ErrNotBootstrapped).Once()
+		mockStore.On("ByAddress", addr, (*accessmodel.ContractDeploymentCursor)(nil)).
+			Return(nil, storage.ErrNotBootstrapped).Once()
 
-		_, err := backend.GetContractsByAddress(context.Background(), addr, 0, nil, ContractDeploymentFilter{})
+		_, err := backend.GetContractsByAddress(context.Background(), addr, 0, nil, ContractDeploymentFilter{}, ContractDeploymentExpandOptions{}, entities.EventEncodingVersion_JSON_CDC_V0)
 		require.Error(t, err)
 		st, ok := status.FromError(err)
 		require.True(t, ok)
@@ -400,12 +414,11 @@ func TestContractsBackend_GetContractsByAddress(t *testing.T) {
 		backend := NewContractsBackend(unittest.Logger(), &backendBase{config: DefaultConfig()}, mockStore)
 
 		unexpectedErr := fmt.Errorf("disk failure")
-		mockStore.On("ByAddress", addr, uint32(DefaultConfig().DefaultPageSize),
-			(*accessmodel.ContractDeploymentCursor)(nil), mocktestify.Anything).
-			Return(accessmodel.ContractDeploymentPage{}, unexpectedErr).Once()
+		mockStore.On("ByAddress", addr, (*accessmodel.ContractDeploymentCursor)(nil)).
+			Return(nil, unexpectedErr).Once()
 
 		signalerCtx, verifyThrown := contractSignalerCtxExpectingThrow(t)
-		_, err := backend.GetContractsByAddress(signalerCtx, addr, 0, nil, ContractDeploymentFilter{})
+		_, err := backend.GetContractsByAddress(signalerCtx, addr, 0, nil, ContractDeploymentFilter{}, ContractDeploymentExpandOptions{}, entities.EventEncodingVersion_JSON_CDC_V0)
 		require.Error(t, err)
 		verifyThrown()
 	})

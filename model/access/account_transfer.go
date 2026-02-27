@@ -27,8 +27,8 @@ type FungibleTokenTransfer struct {
 	RecipientAddress flow.Address    // Account that received the tokens
 
 	// Expansion fields populated when expandResults is true.
-	Transaction *flow.TransactionBody // Transaction body (nil unless expanded)
-	Result      *TransactionResult    // Transaction result (nil unless expanded)
+	Transaction *flow.TransactionBody `msgpack:"-"` // Transaction body (nil unless expanded)
+	Result      *TransactionResult    `msgpack:"-"` // Transaction result (nil unless expanded)
 }
 
 // NonFungibleTokenTransfer represents a non-fungible token transfer event extracted from block execution data.
@@ -45,8 +45,8 @@ type NonFungibleTokenTransfer struct {
 	RecipientAddress flow.Address    // Account that received the token
 
 	// Expansion fields populated when expandResults is true.
-	Transaction *flow.TransactionBody // Transaction body (nil unless expanded)
-	Result      *TransactionResult    // Transaction result (nil unless expanded)
+	Transaction *flow.TransactionBody `msgpack:"-"` // Transaction body (nil unless expanded)
+	Result      *TransactionResult    `msgpack:"-"` // Transaction result (nil unless expanded)
 }
 
 // TransferCursor identifies a position in the token transfer index for cursor-based pagination.
