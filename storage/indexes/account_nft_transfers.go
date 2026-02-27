@@ -160,6 +160,7 @@ func (idx *NonFungibleTokenTransfers) rangeKeys(account flow.Address, cursor *ac
 	// since the cursor may point to a transaction within idx.firstHeight, we need to use the last
 	// possible key for the prefix.
 	startKey = makeNFTTransferKey(account, cursor.BlockHeight, cursor.TransactionIndex, cursor.EventIndex)
+	endKey = makeNFTTransferKeyPrefix(account, idx.firstHeight)
 	endKey = storage.PrefixInclusiveEnd(endKey, startKey)
 
 	return startKey, endKey, nil
