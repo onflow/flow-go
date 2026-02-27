@@ -108,7 +108,7 @@ func New(
 	}
 
 	chainID := vmCtx.Chain.ChainID()
-	options := DefaultFVMOptions(chainID, params.ExtensiveTracing, vmCtx.ScheduleCallbacksEnabled)
+	options := DefaultFVMOptions(chainID, params.ExtensiveTracing, vmCtx.ScheduleCallbacksEnabled, false)
 	vmCtx = fvm.NewContextFromParent(vmCtx, options...)
 
 	blockComputer, err := computer.NewBlockComputer(
