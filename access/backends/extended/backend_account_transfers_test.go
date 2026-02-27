@@ -26,11 +26,11 @@ type ftEntry struct {
 	transfer accessmodel.FungibleTokenTransfer
 }
 
-func (e ftEntry) Cursor() (accessmodel.TransferCursor, error) {
+func (e ftEntry) Cursor() accessmodel.TransferCursor {
 	return accessmodel.TransferCursor{
 		BlockHeight:      e.transfer.BlockHeight,
 		TransactionIndex: e.transfer.TransactionIndex,
-	}, nil
+	}
 }
 
 func (e ftEntry) Value() (accessmodel.FungibleTokenTransfer, error) {
@@ -38,9 +38,9 @@ func (e ftEntry) Value() (accessmodel.FungibleTokenTransfer, error) {
 }
 
 func newFTSliceIter(transfers []accessmodel.FungibleTokenTransfer) storage.FungibleTokenTransferIterator {
-	return func(yield func(storage.IteratorEntry[accessmodel.FungibleTokenTransfer, accessmodel.TransferCursor]) bool) {
+	return func(yield func(storage.IteratorEntry[accessmodel.FungibleTokenTransfer, accessmodel.TransferCursor], error) bool) {
 		for _, t := range transfers {
-			if !yield(ftEntry{transfer: t}) {
+			if !yield(ftEntry{transfer: t}, nil) {
 				return
 			}
 		}
@@ -52,11 +52,11 @@ type nftEntry struct {
 	transfer accessmodel.NonFungibleTokenTransfer
 }
 
-func (e nftEntry) Cursor() (accessmodel.TransferCursor, error) {
+func (e nftEntry) Cursor() accessmodel.TransferCursor {
 	return accessmodel.TransferCursor{
 		BlockHeight:      e.transfer.BlockHeight,
 		TransactionIndex: e.transfer.TransactionIndex,
-	}, nil
+	}
 }
 
 func (e nftEntry) Value() (accessmodel.NonFungibleTokenTransfer, error) {
@@ -64,9 +64,9 @@ func (e nftEntry) Value() (accessmodel.NonFungibleTokenTransfer, error) {
 }
 
 func newNFTSliceIter(transfers []accessmodel.NonFungibleTokenTransfer) storage.NonFungibleTokenTransferIterator {
-	return func(yield func(storage.IteratorEntry[accessmodel.NonFungibleTokenTransfer, accessmodel.TransferCursor]) bool) {
+	return func(yield func(storage.IteratorEntry[accessmodel.NonFungibleTokenTransfer, accessmodel.TransferCursor], error) bool) {
 		for _, t := range transfers {
-			if !yield(nftEntry{transfer: t}) {
+			if !yield(nftEntry{transfer: t}, nil) {
 				return
 			}
 		}

@@ -8,7 +8,7 @@ type IndexFilter[T any] func(T) bool
 
 // IndexIterator is an iterator over index entries.
 // This is intended to be used with the `indexes` package to allow clients to collect filtered results.
-type IndexIterator[T any, C any] iter.Seq[IteratorEntry[T, C]]
+type IndexIterator[T any, C any] iter.Seq2[IteratorEntry[T, C], error]
 
 // ReconstructFunc is a function that reconstructs an output value T based on the key and value from storage.
 type ReconstructFunc[T any, C any] func(C, []byte, *T) error
@@ -20,9 +20,7 @@ type DecodeKeyFunc[C any] func([]byte) (C, error)
 // It provides access to the cursor and value for the entry.
 type IteratorEntry[T any, C any] interface {
 	// Cursor returns the cursor for the entry, which includes all data included in the storage key.
-	//
-	// Any error indicates the storage key cannot be decoded into a cursor.
-	Cursor() (C, error)
+	Cursor() C
 
 	// Value returns the fully reconstructed value for the entry.
 	//

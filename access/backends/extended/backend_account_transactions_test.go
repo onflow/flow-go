@@ -27,12 +27,12 @@ type txEntry struct {
 	tx accessmodel.AccountTransaction
 }
 
-func (e txEntry) Cursor() (accessmodel.AccountTransactionCursor, error) {
+func (e txEntry) Cursor() accessmodel.AccountTransactionCursor {
 	return accessmodel.AccountTransactionCursor{
 		Address:          e.tx.Address,
 		BlockHeight:      e.tx.BlockHeight,
 		TransactionIndex: e.tx.TransactionIndex,
-	}, nil
+	}
 }
 
 func (e txEntry) Value() (accessmodel.AccountTransaction, error) {
@@ -40,9 +40,9 @@ func (e txEntry) Value() (accessmodel.AccountTransaction, error) {
 }
 
 func newSliceIter(txs []accessmodel.AccountTransaction) storage.AccountTransactionIterator {
-	return func(yield func(storage.IteratorEntry[accessmodel.AccountTransaction, accessmodel.AccountTransactionCursor]) bool) {
+	return func(yield func(storage.IteratorEntry[accessmodel.AccountTransaction, accessmodel.AccountTransactionCursor], error) bool) {
 		for _, tx := range txs {
-			if !yield(txEntry{tx: tx}) {
+			if !yield(txEntry{tx: tx}, nil) {
 				return
 			}
 		}
