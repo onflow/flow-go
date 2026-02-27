@@ -136,7 +136,7 @@ type API interface {
 		ctx context.Context,
 		id string,
 		limit uint32,
-		cursor *accessmodel.ContractDeploymentCursor,
+		cursor *accessmodel.ContractDeploymentsCursor,
 		filter ContractDeploymentFilter,
 		expandOptions ContractDeploymentExpandOptions,
 		encodingVersion entities.EventEncodingVersion,
@@ -150,11 +150,11 @@ type API interface {
 	GetContracts(
 		ctx context.Context,
 		limit uint32,
-		cursor *accessmodel.ContractDeploymentCursor,
+		cursor *accessmodel.ContractDeploymentsCursor,
 		filter ContractDeploymentFilter,
 		expandOptions ContractDeploymentExpandOptions,
 		encodingVersion entities.EventEncodingVersion,
-	) (*accessmodel.ContractDeploymentPage, error)
+	) (*accessmodel.ContractsPage, error)
 
 	// GetContractsByAddress returns a paginated list of contracts at their latest deployment for
 	// the given address.
@@ -166,9 +166,9 @@ type API interface {
 		ctx context.Context,
 		address flow.Address,
 		limit uint32,
-		cursor *accessmodel.ContractDeploymentCursor,
+		cursor *accessmodel.ContractDeploymentsCursor,
 		filter ContractDeploymentFilter,
 		expandOptions ContractDeploymentExpandOptions,
 		encodingVersion entities.EventEncodingVersion,
-	) (*accessmodel.ContractDeploymentPage, error)
+	) (*accessmodel.ContractsPage, error)
 }

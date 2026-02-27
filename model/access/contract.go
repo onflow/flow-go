@@ -44,27 +44,36 @@ func CadenceCodeHash(code []byte) []byte {
 	return hash[:]
 }
 
-// ContractDeploymentCursor is an opaque pagination token for contract deployment queries.
-// If ContractID is non-empty, the cursor is used to paginate over unique contracts (All, ByAddress).
-// If ContractID is empty, Height, TxIndex, and EventIndex identify the last returned deployment
-// and are used to paginate over deployments of a single contract (GetContractDeployments).
-type ContractDeploymentCursor struct {
-	// ContractID is the unique contract identifier of the last returned contract.
-	// Used when paginating over unique contracts.
+// ContractDeploymentsCursor is the single pagination cursor type for all contract index iterators.
+// For DeploymentsByContractID, all fields are meaningful. For All and ByAddress, only ContractID
+// is used for resumption; Height/TxIndex/EventIndex are populated but ignored by callers.
+type ContractDeploymentsCursor struct {
+	// ContractID identifies the contract. For All/ByAddress it is the resume key; for
+	// DeploymentsByContractID it is set by the storage layer and not encoded in the REST cursor.
 	ContractID string
 	// Height is the block height of the last returned deployment.
-	// Used when paginating over deployments of a single contract.
 	Height uint64
-	// TxIndex is the transaction index of the last returned deployment within its block.
+	// TxIndex is the position of the deploying transaction within its block.
 	TxIndex uint32
-	// EventIndex is the event index of the last returned deployment within its transaction.
+	// EventIndex is the position of the contract event within its transaction.
 	EventIndex uint32
 }
 
-// ContractDeploymentPage is a page of ContractDeployment results with an optional continuation cursor.
+// ContractDeploymentPage is a page of deployment history for a single contract.
+// Returned by GetContractDeployments.
 type ContractDeploymentPage struct {
-	// Deployments is the list of contract deployments for this page.
+	// Deployments is the ordered list of deployments for this page.
 	Deployments []ContractDeployment
 	// NextCursor is nil when no more results exist.
-	NextCursor *ContractDeploymentCursor
+	NextCursor *ContractDeploymentsCursor
+}
+
+// ContractsPage is a page of contracts at their latest deployment.
+// Returned by GetContracts and GetContractsByAddress.
+type ContractsPage struct {
+	// Deployments is the ordered list of latest-deployment entries for this page.
+	Deployments []ContractDeployment
+	// NextCursor is nil when no more results exist.
+	// Only the ContractID field is used for resumption; Height/TxIndex/EventIndex are ignored.
+	NextCursor *ContractDeploymentsCursor
 }

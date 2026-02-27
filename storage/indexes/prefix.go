@@ -16,7 +16,7 @@ const (
 	codeAccountNonFungibleTokenTransfers byte = 12 // Account non-fungible token transfers index
 	codeScheduledTransaction             byte = 13 // Scheduled transaction index
 	codeScheduledTransactionByAddress    byte = 14 // Scheduled transaction by address
-	codeContractDeployment               byte = 15 // Contract deployment index
+	codeContractDeployment               byte = 15 // Contract deployment index (full history)
 
 	// reserved as extension byte for future use
 	_ byte = 255

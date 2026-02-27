@@ -7,9 +7,9 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// ContractDeploymentIterator is an iterator over contract deployments ordered by the
-// index's natural key ordering.
-type ContractDeploymentIterator = IndexIterator[accessmodel.ContractDeployment, accessmodel.ContractDeploymentCursor]
+// ContractDeploymentIterator iterates over contract deployments with a [accessmodel.ContractDeploymentsCursor].
+// Used by DeploymentsByContractID, All, and ByAddress.
+type ContractDeploymentIterator = IndexIterator[accessmodel.ContractDeployment, accessmodel.ContractDeploymentsCursor]
 
 // ContractDeploymentsIndexReader provides read access to the contract deployments index.
 //
@@ -25,7 +25,7 @@ type ContractDeploymentsIndexReader interface {
 	// DeploymentsByContractID returns an iterator over all recorded deployments for the given
 	// contract, ordered from most recent to oldest (descending block height).
 	//
-	// cursor is a pointer to an [accessmodel.ContractDeploymentCursor]:
+	// cursor is a pointer to an [accessmodel.ContractDeploymentsCursor]:
 	//   - nil means start from the most recent deployment
 	//   - non-nil means start at the cursor position (inclusive)
 	//
@@ -33,33 +33,33 @@ type ContractDeploymentsIndexReader interface {
 	//   - [ErrNotBootstrapped]: if the index has not been initialized
 	DeploymentsByContractID(
 		id string,
-		cursor *accessmodel.ContractDeploymentCursor,
+		cursor *accessmodel.ContractDeploymentsCursor,
 	) (ContractDeploymentIterator, error)
 
 	// ByAddress returns an iterator over the latest deployment for each contract deployed
 	// by the given address, ordered by contract identifier (ascending).
 	//
-	// cursor is a pointer to an [accessmodel.ContractDeploymentCursor]:
+	// cursor is a pointer to an [accessmodel.ContractDeploymentsCursor]:
 	//   - nil means start from the first contract (by identifier)
-	//   - non-nil means start at the cursor's contract (inclusive)
+	//   - non-nil resumes from cursor.ContractID (inclusive); other cursor fields are ignored
 	//
 	// Expected error returns during normal operation:
 	//   - [ErrNotBootstrapped]: if the index has not been initialized
 	ByAddress(
 		account flow.Address,
-		cursor *accessmodel.ContractDeploymentCursor,
+		cursor *accessmodel.ContractDeploymentsCursor,
 	) (ContractDeploymentIterator, error)
 
 	// All returns an iterator over the latest deployment for each indexed contract,
 	// ordered by contract identifier (ascending).
 	//
-	// cursor is a pointer to an [accessmodel.ContractDeploymentCursor]:
+	// cursor is a pointer to an [accessmodel.ContractDeploymentsCursor]:
 	//   - nil means start from the first contract (by identifier)
-	//   - non-nil means start at the cursor's contract (inclusive)
+	//   - non-nil resumes from cursor.ContractID (inclusive); other cursor fields are ignored
 	//
 	// Expected error returns during normal operation:
 	//   - [ErrNotBootstrapped]: if the index has not been initialized
-	All(cursor *accessmodel.ContractDeploymentCursor) (ContractDeploymentIterator, error)
+	All(cursor *accessmodel.ContractDeploymentsCursor) (ContractDeploymentIterator, error)
 }
 
 // ContractDeploymentsIndexRangeReader provides access to the range of indexed heights.

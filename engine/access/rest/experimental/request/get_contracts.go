@@ -14,7 +14,7 @@ import (
 // GetContracts holds parsed request params for GET /contracts.
 type GetContracts struct {
 	Limit  uint32
-	Cursor *accessmodel.ContractDeploymentCursor
+	Cursor *accessmodel.ContractDeploymentsCursor
 	Filter extended.ContractDeploymentFilter
 }
 
@@ -33,7 +33,7 @@ func NewGetContracts(r *common.Request) (GetContracts, error) {
 	}
 
 	if raw := r.GetQueryParam("cursor"); raw != "" {
-		c, err := DecodeContractDeploymentCursor(raw)
+		c, err := DecodeContractDeploymentsCursor(raw)
 		if err != nil {
 			return req, err
 		}
@@ -72,7 +72,7 @@ func NewGetContract(r *common.Request) (GetContract, error) {
 type GetContractDeployments struct {
 	ID     string
 	Limit  uint32
-	Cursor *accessmodel.ContractDeploymentCursor
+	Cursor *accessmodel.ContractDeploymentsCursor
 	Filter extended.ContractDeploymentFilter
 }
 
@@ -94,7 +94,7 @@ func NewGetContractDeployments(r *common.Request) (GetContractDeployments, error
 	}
 
 	if raw := r.GetQueryParam("cursor"); raw != "" {
-		c, err := DecodeContractDeploymentCursor(raw)
+		c, err := DecodeContractDeploymentsCursor(raw)
 		if err != nil {
 			return req, err
 		}
@@ -112,7 +112,7 @@ func NewGetContractDeployments(r *common.Request) (GetContractDeployments, error
 type GetContractsByAddress struct {
 	Address flow.Address
 	Limit   uint32
-	Cursor  *accessmodel.ContractDeploymentCursor
+	Cursor  *accessmodel.ContractDeploymentsCursor
 	Filter  extended.ContractDeploymentFilter
 }
 
@@ -138,7 +138,7 @@ func NewGetContractsByAddress(r *common.Request) (GetContractsByAddress, error) 
 	}
 
 	if raw := r.GetQueryParam("cursor"); raw != "" {
-		c, err := DecodeContractDeploymentCursor(raw)
+		c, err := DecodeContractDeploymentsCursor(raw)
 		if err != nil {
 			return req, err
 		}

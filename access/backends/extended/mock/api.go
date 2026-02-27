@@ -422,7 +422,7 @@ func (_c *API_GetContract_Call) RunAndReturn(run func(ctx context.Context, id st
 }
 
 // GetContractDeployments provides a mock function for the type API
-func (_mock *API) GetContractDeployments(ctx context.Context, id string, limit uint32, cursor *access.ContractDeploymentCursor, filter extended.ContractDeploymentFilter, expandOptions extended.ContractDeploymentExpandOptions, encodingVersion entities.EventEncodingVersion) (*access.ContractDeploymentPage, error) {
+func (_mock *API) GetContractDeployments(ctx context.Context, id string, limit uint32, cursor *access.ContractDeploymentsCursor, filter extended.ContractDeploymentFilter, expandOptions extended.ContractDeploymentExpandOptions, encodingVersion entities.EventEncodingVersion) (*access.ContractDeploymentPage, error) {
 	ret := _mock.Called(ctx, id, limit, cursor, filter, expandOptions, encodingVersion)
 
 	if len(ret) == 0 {
@@ -431,17 +431,17 @@ func (_mock *API) GetContractDeployments(ctx context.Context, id string, limit u
 
 	var r0 *access.ContractDeploymentPage
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string, uint32, *access.ContractDeploymentCursor, extended.ContractDeploymentFilter, extended.ContractDeploymentExpandOptions, entities.EventEncodingVersion) (*access.ContractDeploymentPage, error)); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, uint32, *access.ContractDeploymentsCursor, extended.ContractDeploymentFilter, extended.ContractDeploymentExpandOptions, entities.EventEncodingVersion) (*access.ContractDeploymentPage, error)); ok {
 		return returnFunc(ctx, id, limit, cursor, filter, expandOptions, encodingVersion)
 	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string, uint32, *access.ContractDeploymentCursor, extended.ContractDeploymentFilter, extended.ContractDeploymentExpandOptions, entities.EventEncodingVersion) *access.ContractDeploymentPage); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, uint32, *access.ContractDeploymentsCursor, extended.ContractDeploymentFilter, extended.ContractDeploymentExpandOptions, entities.EventEncodingVersion) *access.ContractDeploymentPage); ok {
 		r0 = returnFunc(ctx, id, limit, cursor, filter, expandOptions, encodingVersion)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*access.ContractDeploymentPage)
 		}
 	}
-	if returnFunc, ok := ret.Get(1).(func(context.Context, string, uint32, *access.ContractDeploymentCursor, extended.ContractDeploymentFilter, extended.ContractDeploymentExpandOptions, entities.EventEncodingVersion) error); ok {
+	if returnFunc, ok := ret.Get(1).(func(context.Context, string, uint32, *access.ContractDeploymentsCursor, extended.ContractDeploymentFilter, extended.ContractDeploymentExpandOptions, entities.EventEncodingVersion) error); ok {
 		r1 = returnFunc(ctx, id, limit, cursor, filter, expandOptions, encodingVersion)
 	} else {
 		r1 = ret.Error(1)
@@ -458,7 +458,7 @@ type API_GetContractDeployments_Call struct {
 //   - ctx context.Context
 //   - id string
 //   - limit uint32
-//   - cursor *access.ContractDeploymentCursor
+//   - cursor *access.ContractDeploymentsCursor
 //   - filter extended.ContractDeploymentFilter
 //   - expandOptions extended.ContractDeploymentExpandOptions
 //   - encodingVersion entities.EventEncodingVersion
@@ -466,7 +466,7 @@ func (_e *API_Expecter) GetContractDeployments(ctx interface{}, id interface{}, 
 	return &API_GetContractDeployments_Call{Call: _e.mock.On("GetContractDeployments", ctx, id, limit, cursor, filter, expandOptions, encodingVersion)}
 }
 
-func (_c *API_GetContractDeployments_Call) Run(run func(ctx context.Context, id string, limit uint32, cursor *access.ContractDeploymentCursor, filter extended.ContractDeploymentFilter, expandOptions extended.ContractDeploymentExpandOptions, encodingVersion entities.EventEncodingVersion)) *API_GetContractDeployments_Call {
+func (_c *API_GetContractDeployments_Call) Run(run func(ctx context.Context, id string, limit uint32, cursor *access.ContractDeploymentsCursor, filter extended.ContractDeploymentFilter, expandOptions extended.ContractDeploymentExpandOptions, encodingVersion entities.EventEncodingVersion)) *API_GetContractDeployments_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
@@ -480,9 +480,9 @@ func (_c *API_GetContractDeployments_Call) Run(run func(ctx context.Context, id 
 		if args[2] != nil {
 			arg2 = args[2].(uint32)
 		}
-		var arg3 *access.ContractDeploymentCursor
+		var arg3 *access.ContractDeploymentsCursor
 		if args[3] != nil {
-			arg3 = args[3].(*access.ContractDeploymentCursor)
+			arg3 = args[3].(*access.ContractDeploymentsCursor)
 		}
 		var arg4 extended.ContractDeploymentFilter
 		if args[4] != nil {
@@ -514,32 +514,32 @@ func (_c *API_GetContractDeployments_Call) Return(contractDeploymentPage *access
 	return _c
 }
 
-func (_c *API_GetContractDeployments_Call) RunAndReturn(run func(ctx context.Context, id string, limit uint32, cursor *access.ContractDeploymentCursor, filter extended.ContractDeploymentFilter, expandOptions extended.ContractDeploymentExpandOptions, encodingVersion entities.EventEncodingVersion) (*access.ContractDeploymentPage, error)) *API_GetContractDeployments_Call {
+func (_c *API_GetContractDeployments_Call) RunAndReturn(run func(ctx context.Context, id string, limit uint32, cursor *access.ContractDeploymentsCursor, filter extended.ContractDeploymentFilter, expandOptions extended.ContractDeploymentExpandOptions, encodingVersion entities.EventEncodingVersion) (*access.ContractDeploymentPage, error)) *API_GetContractDeployments_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // GetContracts provides a mock function for the type API
-func (_mock *API) GetContracts(ctx context.Context, limit uint32, cursor *access.ContractDeploymentCursor, filter extended.ContractDeploymentFilter, expandOptions extended.ContractDeploymentExpandOptions, encodingVersion entities.EventEncodingVersion) (*access.ContractDeploymentPage, error) {
+func (_mock *API) GetContracts(ctx context.Context, limit uint32, cursor *access.ContractDeploymentsCursor, filter extended.ContractDeploymentFilter, expandOptions extended.ContractDeploymentExpandOptions, encodingVersion entities.EventEncodingVersion) (*access.ContractsPage, error) {
 	ret := _mock.Called(ctx, limit, cursor, filter, expandOptions, encodingVersion)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetContracts")
 	}
 
-	var r0 *access.ContractDeploymentPage
+	var r0 *access.ContractsPage
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, uint32, *access.ContractDeploymentCursor, extended.ContractDeploymentFilter, extended.ContractDeploymentExpandOptions, entities.EventEncodingVersion) (*access.ContractDeploymentPage, error)); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, uint32, *access.ContractDeploymentsCursor, extended.ContractDeploymentFilter, extended.ContractDeploymentExpandOptions, entities.EventEncodingVersion) (*access.ContractsPage, error)); ok {
 		return returnFunc(ctx, limit, cursor, filter, expandOptions, encodingVersion)
 	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, uint32, *access.ContractDeploymentCursor, extended.ContractDeploymentFilter, extended.ContractDeploymentExpandOptions, entities.EventEncodingVersion) *access.ContractDeploymentPage); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, uint32, *access.ContractDeploymentsCursor, extended.ContractDeploymentFilter, extended.ContractDeploymentExpandOptions, entities.EventEncodingVersion) *access.ContractsPage); ok {
 		r0 = returnFunc(ctx, limit, cursor, filter, expandOptions, encodingVersion)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*access.ContractDeploymentPage)
+			r0 = ret.Get(0).(*access.ContractsPage)
 		}
 	}
-	if returnFunc, ok := ret.Get(1).(func(context.Context, uint32, *access.ContractDeploymentCursor, extended.ContractDeploymentFilter, extended.ContractDeploymentExpandOptions, entities.EventEncodingVersion) error); ok {
+	if returnFunc, ok := ret.Get(1).(func(context.Context, uint32, *access.ContractDeploymentsCursor, extended.ContractDeploymentFilter, extended.ContractDeploymentExpandOptions, entities.EventEncodingVersion) error); ok {
 		r1 = returnFunc(ctx, limit, cursor, filter, expandOptions, encodingVersion)
 	} else {
 		r1 = ret.Error(1)
@@ -555,7 +555,7 @@ type API_GetContracts_Call struct {
 // GetContracts is a helper method to define mock.On call
 //   - ctx context.Context
 //   - limit uint32
-//   - cursor *access.ContractDeploymentCursor
+//   - cursor *access.ContractDeploymentsCursor
 //   - filter extended.ContractDeploymentFilter
 //   - expandOptions extended.ContractDeploymentExpandOptions
 //   - encodingVersion entities.EventEncodingVersion
@@ -563,7 +563,7 @@ func (_e *API_Expecter) GetContracts(ctx interface{}, limit interface{}, cursor 
 	return &API_GetContracts_Call{Call: _e.mock.On("GetContracts", ctx, limit, cursor, filter, expandOptions, encodingVersion)}
 }
 
-func (_c *API_GetContracts_Call) Run(run func(ctx context.Context, limit uint32, cursor *access.ContractDeploymentCursor, filter extended.ContractDeploymentFilter, expandOptions extended.ContractDeploymentExpandOptions, encodingVersion entities.EventEncodingVersion)) *API_GetContracts_Call {
+func (_c *API_GetContracts_Call) Run(run func(ctx context.Context, limit uint32, cursor *access.ContractDeploymentsCursor, filter extended.ContractDeploymentFilter, expandOptions extended.ContractDeploymentExpandOptions, encodingVersion entities.EventEncodingVersion)) *API_GetContracts_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
@@ -573,9 +573,9 @@ func (_c *API_GetContracts_Call) Run(run func(ctx context.Context, limit uint32,
 		if args[1] != nil {
 			arg1 = args[1].(uint32)
 		}
-		var arg2 *access.ContractDeploymentCursor
+		var arg2 *access.ContractDeploymentsCursor
 		if args[2] != nil {
-			arg2 = args[2].(*access.ContractDeploymentCursor)
+			arg2 = args[2].(*access.ContractDeploymentsCursor)
 		}
 		var arg3 extended.ContractDeploymentFilter
 		if args[3] != nil {
@@ -601,37 +601,37 @@ func (_c *API_GetContracts_Call) Run(run func(ctx context.Context, limit uint32,
 	return _c
 }
 
-func (_c *API_GetContracts_Call) Return(contractDeploymentPage *access.ContractDeploymentPage, err error) *API_GetContracts_Call {
-	_c.Call.Return(contractDeploymentPage, err)
+func (_c *API_GetContracts_Call) Return(contractsPage *access.ContractsPage, err error) *API_GetContracts_Call {
+	_c.Call.Return(contractsPage, err)
 	return _c
 }
 
-func (_c *API_GetContracts_Call) RunAndReturn(run func(ctx context.Context, limit uint32, cursor *access.ContractDeploymentCursor, filter extended.ContractDeploymentFilter, expandOptions extended.ContractDeploymentExpandOptions, encodingVersion entities.EventEncodingVersion) (*access.ContractDeploymentPage, error)) *API_GetContracts_Call {
+func (_c *API_GetContracts_Call) RunAndReturn(run func(ctx context.Context, limit uint32, cursor *access.ContractDeploymentsCursor, filter extended.ContractDeploymentFilter, expandOptions extended.ContractDeploymentExpandOptions, encodingVersion entities.EventEncodingVersion) (*access.ContractsPage, error)) *API_GetContracts_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // GetContractsByAddress provides a mock function for the type API
-func (_mock *API) GetContractsByAddress(ctx context.Context, address flow.Address, limit uint32, cursor *access.ContractDeploymentCursor, filter extended.ContractDeploymentFilter, expandOptions extended.ContractDeploymentExpandOptions, encodingVersion entities.EventEncodingVersion) (*access.ContractDeploymentPage, error) {
+func (_mock *API) GetContractsByAddress(ctx context.Context, address flow.Address, limit uint32, cursor *access.ContractDeploymentsCursor, filter extended.ContractDeploymentFilter, expandOptions extended.ContractDeploymentExpandOptions, encodingVersion entities.EventEncodingVersion) (*access.ContractsPage, error) {
 	ret := _mock.Called(ctx, address, limit, cursor, filter, expandOptions, encodingVersion)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetContractsByAddress")
 	}
 
-	var r0 *access.ContractDeploymentPage
+	var r0 *access.ContractsPage
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, flow.Address, uint32, *access.ContractDeploymentCursor, extended.ContractDeploymentFilter, extended.ContractDeploymentExpandOptions, entities.EventEncodingVersion) (*access.ContractDeploymentPage, error)); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, flow.Address, uint32, *access.ContractDeploymentsCursor, extended.ContractDeploymentFilter, extended.ContractDeploymentExpandOptions, entities.EventEncodingVersion) (*access.ContractsPage, error)); ok {
 		return returnFunc(ctx, address, limit, cursor, filter, expandOptions, encodingVersion)
 	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, flow.Address, uint32, *access.ContractDeploymentCursor, extended.ContractDeploymentFilter, extended.ContractDeploymentExpandOptions, entities.EventEncodingVersion) *access.ContractDeploymentPage); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, flow.Address, uint32, *access.ContractDeploymentsCursor, extended.ContractDeploymentFilter, extended.ContractDeploymentExpandOptions, entities.EventEncodingVersion) *access.ContractsPage); ok {
 		r0 = returnFunc(ctx, address, limit, cursor, filter, expandOptions, encodingVersion)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*access.ContractDeploymentPage)
+			r0 = ret.Get(0).(*access.ContractsPage)
 		}
 	}
-	if returnFunc, ok := ret.Get(1).(func(context.Context, flow.Address, uint32, *access.ContractDeploymentCursor, extended.ContractDeploymentFilter, extended.ContractDeploymentExpandOptions, entities.EventEncodingVersion) error); ok {
+	if returnFunc, ok := ret.Get(1).(func(context.Context, flow.Address, uint32, *access.ContractDeploymentsCursor, extended.ContractDeploymentFilter, extended.ContractDeploymentExpandOptions, entities.EventEncodingVersion) error); ok {
 		r1 = returnFunc(ctx, address, limit, cursor, filter, expandOptions, encodingVersion)
 	} else {
 		r1 = ret.Error(1)
@@ -648,7 +648,7 @@ type API_GetContractsByAddress_Call struct {
 //   - ctx context.Context
 //   - address flow.Address
 //   - limit uint32
-//   - cursor *access.ContractDeploymentCursor
+//   - cursor *access.ContractDeploymentsCursor
 //   - filter extended.ContractDeploymentFilter
 //   - expandOptions extended.ContractDeploymentExpandOptions
 //   - encodingVersion entities.EventEncodingVersion
@@ -656,7 +656,7 @@ func (_e *API_Expecter) GetContractsByAddress(ctx interface{}, address interface
 	return &API_GetContractsByAddress_Call{Call: _e.mock.On("GetContractsByAddress", ctx, address, limit, cursor, filter, expandOptions, encodingVersion)}
 }
 
-func (_c *API_GetContractsByAddress_Call) Run(run func(ctx context.Context, address flow.Address, limit uint32, cursor *access.ContractDeploymentCursor, filter extended.ContractDeploymentFilter, expandOptions extended.ContractDeploymentExpandOptions, encodingVersion entities.EventEncodingVersion)) *API_GetContractsByAddress_Call {
+func (_c *API_GetContractsByAddress_Call) Run(run func(ctx context.Context, address flow.Address, limit uint32, cursor *access.ContractDeploymentsCursor, filter extended.ContractDeploymentFilter, expandOptions extended.ContractDeploymentExpandOptions, encodingVersion entities.EventEncodingVersion)) *API_GetContractsByAddress_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
@@ -670,9 +670,9 @@ func (_c *API_GetContractsByAddress_Call) Run(run func(ctx context.Context, addr
 		if args[2] != nil {
 			arg2 = args[2].(uint32)
 		}
-		var arg3 *access.ContractDeploymentCursor
+		var arg3 *access.ContractDeploymentsCursor
 		if args[3] != nil {
-			arg3 = args[3].(*access.ContractDeploymentCursor)
+			arg3 = args[3].(*access.ContractDeploymentsCursor)
 		}
 		var arg4 extended.ContractDeploymentFilter
 		if args[4] != nil {
@@ -699,12 +699,12 @@ func (_c *API_GetContractsByAddress_Call) Run(run func(ctx context.Context, addr
 	return _c
 }
 
-func (_c *API_GetContractsByAddress_Call) Return(contractDeploymentPage *access.ContractDeploymentPage, err error) *API_GetContractsByAddress_Call {
-	_c.Call.Return(contractDeploymentPage, err)
+func (_c *API_GetContractsByAddress_Call) Return(contractsPage *access.ContractsPage, err error) *API_GetContractsByAddress_Call {
+	_c.Call.Return(contractsPage, err)
 	return _c
 }
 
-func (_c *API_GetContractsByAddress_Call) RunAndReturn(run func(ctx context.Context, address flow.Address, limit uint32, cursor *access.ContractDeploymentCursor, filter extended.ContractDeploymentFilter, expandOptions extended.ContractDeploymentExpandOptions, encodingVersion entities.EventEncodingVersion) (*access.ContractDeploymentPage, error)) *API_GetContractsByAddress_Call {
+func (_c *API_GetContractsByAddress_Call) RunAndReturn(run func(ctx context.Context, address flow.Address, limit uint32, cursor *access.ContractDeploymentsCursor, filter extended.ContractDeploymentFilter, expandOptions extended.ContractDeploymentExpandOptions, encodingVersion entities.EventEncodingVersion) (*access.ContractsPage, error)) *API_GetContractsByAddress_Call {
 	_c.Call.Return(run)
 	return _c
 }

@@ -40,7 +40,7 @@ func (_m *ContractDeploymentsIndexBootstrapper) EXPECT() *ContractDeploymentsInd
 }
 
 // All provides a mock function for the type ContractDeploymentsIndexBootstrapper
-func (_mock *ContractDeploymentsIndexBootstrapper) All(cursor *access.ContractDeploymentCursor) (storage.ContractDeploymentIterator, error) {
+func (_mock *ContractDeploymentsIndexBootstrapper) All(cursor *access.ContractDeploymentsCursor) (storage.ContractDeploymentIterator, error) {
 	ret := _mock.Called(cursor)
 
 	if len(ret) == 0 {
@@ -49,17 +49,17 @@ func (_mock *ContractDeploymentsIndexBootstrapper) All(cursor *access.ContractDe
 
 	var r0 storage.ContractDeploymentIterator
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(*access.ContractDeploymentCursor) (storage.ContractDeploymentIterator, error)); ok {
+	if returnFunc, ok := ret.Get(0).(func(*access.ContractDeploymentsCursor) (storage.ContractDeploymentIterator, error)); ok {
 		return returnFunc(cursor)
 	}
-	if returnFunc, ok := ret.Get(0).(func(*access.ContractDeploymentCursor) storage.ContractDeploymentIterator); ok {
+	if returnFunc, ok := ret.Get(0).(func(*access.ContractDeploymentsCursor) storage.ContractDeploymentIterator); ok {
 		r0 = returnFunc(cursor)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(storage.ContractDeploymentIterator)
 		}
 	}
-	if returnFunc, ok := ret.Get(1).(func(*access.ContractDeploymentCursor) error); ok {
+	if returnFunc, ok := ret.Get(1).(func(*access.ContractDeploymentsCursor) error); ok {
 		r1 = returnFunc(cursor)
 	} else {
 		r1 = ret.Error(1)
@@ -73,16 +73,16 @@ type ContractDeploymentsIndexBootstrapper_All_Call struct {
 }
 
 // All is a helper method to define mock.On call
-//   - cursor *access.ContractDeploymentCursor
+//   - cursor *access.ContractDeploymentsCursor
 func (_e *ContractDeploymentsIndexBootstrapper_Expecter) All(cursor interface{}) *ContractDeploymentsIndexBootstrapper_All_Call {
 	return &ContractDeploymentsIndexBootstrapper_All_Call{Call: _e.mock.On("All", cursor)}
 }
 
-func (_c *ContractDeploymentsIndexBootstrapper_All_Call) Run(run func(cursor *access.ContractDeploymentCursor)) *ContractDeploymentsIndexBootstrapper_All_Call {
+func (_c *ContractDeploymentsIndexBootstrapper_All_Call) Run(run func(cursor *access.ContractDeploymentsCursor)) *ContractDeploymentsIndexBootstrapper_All_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 *access.ContractDeploymentCursor
+		var arg0 *access.ContractDeploymentsCursor
 		if args[0] != nil {
-			arg0 = args[0].(*access.ContractDeploymentCursor)
+			arg0 = args[0].(*access.ContractDeploymentsCursor)
 		}
 		run(
 			arg0,
@@ -96,13 +96,13 @@ func (_c *ContractDeploymentsIndexBootstrapper_All_Call) Return(v storage.Contra
 	return _c
 }
 
-func (_c *ContractDeploymentsIndexBootstrapper_All_Call) RunAndReturn(run func(cursor *access.ContractDeploymentCursor) (storage.ContractDeploymentIterator, error)) *ContractDeploymentsIndexBootstrapper_All_Call {
+func (_c *ContractDeploymentsIndexBootstrapper_All_Call) RunAndReturn(run func(cursor *access.ContractDeploymentsCursor) (storage.ContractDeploymentIterator, error)) *ContractDeploymentsIndexBootstrapper_All_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // ByAddress provides a mock function for the type ContractDeploymentsIndexBootstrapper
-func (_mock *ContractDeploymentsIndexBootstrapper) ByAddress(account flow.Address, cursor *access.ContractDeploymentCursor) (storage.ContractDeploymentIterator, error) {
+func (_mock *ContractDeploymentsIndexBootstrapper) ByAddress(account flow.Address, cursor *access.ContractDeploymentsCursor) (storage.ContractDeploymentIterator, error) {
 	ret := _mock.Called(account, cursor)
 
 	if len(ret) == 0 {
@@ -111,17 +111,17 @@ func (_mock *ContractDeploymentsIndexBootstrapper) ByAddress(account flow.Addres
 
 	var r0 storage.ContractDeploymentIterator
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(flow.Address, *access.ContractDeploymentCursor) (storage.ContractDeploymentIterator, error)); ok {
+	if returnFunc, ok := ret.Get(0).(func(flow.Address, *access.ContractDeploymentsCursor) (storage.ContractDeploymentIterator, error)); ok {
 		return returnFunc(account, cursor)
 	}
-	if returnFunc, ok := ret.Get(0).(func(flow.Address, *access.ContractDeploymentCursor) storage.ContractDeploymentIterator); ok {
+	if returnFunc, ok := ret.Get(0).(func(flow.Address, *access.ContractDeploymentsCursor) storage.ContractDeploymentIterator); ok {
 		r0 = returnFunc(account, cursor)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(storage.ContractDeploymentIterator)
 		}
 	}
-	if returnFunc, ok := ret.Get(1).(func(flow.Address, *access.ContractDeploymentCursor) error); ok {
+	if returnFunc, ok := ret.Get(1).(func(flow.Address, *access.ContractDeploymentsCursor) error); ok {
 		r1 = returnFunc(account, cursor)
 	} else {
 		r1 = ret.Error(1)
@@ -136,20 +136,20 @@ type ContractDeploymentsIndexBootstrapper_ByAddress_Call struct {
 
 // ByAddress is a helper method to define mock.On call
 //   - account flow.Address
-//   - cursor *access.ContractDeploymentCursor
+//   - cursor *access.ContractDeploymentsCursor
 func (_e *ContractDeploymentsIndexBootstrapper_Expecter) ByAddress(account interface{}, cursor interface{}) *ContractDeploymentsIndexBootstrapper_ByAddress_Call {
 	return &ContractDeploymentsIndexBootstrapper_ByAddress_Call{Call: _e.mock.On("ByAddress", account, cursor)}
 }
 
-func (_c *ContractDeploymentsIndexBootstrapper_ByAddress_Call) Run(run func(account flow.Address, cursor *access.ContractDeploymentCursor)) *ContractDeploymentsIndexBootstrapper_ByAddress_Call {
+func (_c *ContractDeploymentsIndexBootstrapper_ByAddress_Call) Run(run func(account flow.Address, cursor *access.ContractDeploymentsCursor)) *ContractDeploymentsIndexBootstrapper_ByAddress_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 flow.Address
 		if args[0] != nil {
 			arg0 = args[0].(flow.Address)
 		}
-		var arg1 *access.ContractDeploymentCursor
+		var arg1 *access.ContractDeploymentsCursor
 		if args[1] != nil {
-			arg1 = args[1].(*access.ContractDeploymentCursor)
+			arg1 = args[1].(*access.ContractDeploymentsCursor)
 		}
 		run(
 			arg0,
@@ -164,7 +164,7 @@ func (_c *ContractDeploymentsIndexBootstrapper_ByAddress_Call) Return(v storage.
 	return _c
 }
 
-func (_c *ContractDeploymentsIndexBootstrapper_ByAddress_Call) RunAndReturn(run func(account flow.Address, cursor *access.ContractDeploymentCursor) (storage.ContractDeploymentIterator, error)) *ContractDeploymentsIndexBootstrapper_ByAddress_Call {
+func (_c *ContractDeploymentsIndexBootstrapper_ByAddress_Call) RunAndReturn(run func(account flow.Address, cursor *access.ContractDeploymentsCursor) (storage.ContractDeploymentIterator, error)) *ContractDeploymentsIndexBootstrapper_ByAddress_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -230,7 +230,7 @@ func (_c *ContractDeploymentsIndexBootstrapper_ByContractID_Call) RunAndReturn(r
 }
 
 // DeploymentsByContractID provides a mock function for the type ContractDeploymentsIndexBootstrapper
-func (_mock *ContractDeploymentsIndexBootstrapper) DeploymentsByContractID(id string, cursor *access.ContractDeploymentCursor) (storage.ContractDeploymentIterator, error) {
+func (_mock *ContractDeploymentsIndexBootstrapper) DeploymentsByContractID(id string, cursor *access.ContractDeploymentsCursor) (storage.ContractDeploymentIterator, error) {
 	ret := _mock.Called(id, cursor)
 
 	if len(ret) == 0 {
@@ -239,17 +239,17 @@ func (_mock *ContractDeploymentsIndexBootstrapper) DeploymentsByContractID(id st
 
 	var r0 storage.ContractDeploymentIterator
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(string, *access.ContractDeploymentCursor) (storage.ContractDeploymentIterator, error)); ok {
+	if returnFunc, ok := ret.Get(0).(func(string, *access.ContractDeploymentsCursor) (storage.ContractDeploymentIterator, error)); ok {
 		return returnFunc(id, cursor)
 	}
-	if returnFunc, ok := ret.Get(0).(func(string, *access.ContractDeploymentCursor) storage.ContractDeploymentIterator); ok {
+	if returnFunc, ok := ret.Get(0).(func(string, *access.ContractDeploymentsCursor) storage.ContractDeploymentIterator); ok {
 		r0 = returnFunc(id, cursor)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(storage.ContractDeploymentIterator)
 		}
 	}
-	if returnFunc, ok := ret.Get(1).(func(string, *access.ContractDeploymentCursor) error); ok {
+	if returnFunc, ok := ret.Get(1).(func(string, *access.ContractDeploymentsCursor) error); ok {
 		r1 = returnFunc(id, cursor)
 	} else {
 		r1 = ret.Error(1)
@@ -264,20 +264,20 @@ type ContractDeploymentsIndexBootstrapper_DeploymentsByContractID_Call struct {
 
 // DeploymentsByContractID is a helper method to define mock.On call
 //   - id string
-//   - cursor *access.ContractDeploymentCursor
+//   - cursor *access.ContractDeploymentsCursor
 func (_e *ContractDeploymentsIndexBootstrapper_Expecter) DeploymentsByContractID(id interface{}, cursor interface{}) *ContractDeploymentsIndexBootstrapper_DeploymentsByContractID_Call {
 	return &ContractDeploymentsIndexBootstrapper_DeploymentsByContractID_Call{Call: _e.mock.On("DeploymentsByContractID", id, cursor)}
 }
 
-func (_c *ContractDeploymentsIndexBootstrapper_DeploymentsByContractID_Call) Run(run func(id string, cursor *access.ContractDeploymentCursor)) *ContractDeploymentsIndexBootstrapper_DeploymentsByContractID_Call {
+func (_c *ContractDeploymentsIndexBootstrapper_DeploymentsByContractID_Call) Run(run func(id string, cursor *access.ContractDeploymentsCursor)) *ContractDeploymentsIndexBootstrapper_DeploymentsByContractID_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 string
 		if args[0] != nil {
 			arg0 = args[0].(string)
 		}
-		var arg1 *access.ContractDeploymentCursor
+		var arg1 *access.ContractDeploymentsCursor
 		if args[1] != nil {
-			arg1 = args[1].(*access.ContractDeploymentCursor)
+			arg1 = args[1].(*access.ContractDeploymentsCursor)
 		}
 		run(
 			arg0,
@@ -292,7 +292,7 @@ func (_c *ContractDeploymentsIndexBootstrapper_DeploymentsByContractID_Call) Ret
 	return _c
 }
 
-func (_c *ContractDeploymentsIndexBootstrapper_DeploymentsByContractID_Call) RunAndReturn(run func(id string, cursor *access.ContractDeploymentCursor) (storage.ContractDeploymentIterator, error)) *ContractDeploymentsIndexBootstrapper_DeploymentsByContractID_Call {
+func (_c *ContractDeploymentsIndexBootstrapper_DeploymentsByContractID_Call) RunAndReturn(run func(id string, cursor *access.ContractDeploymentsCursor) (storage.ContractDeploymentIterator, error)) *ContractDeploymentsIndexBootstrapper_DeploymentsByContractID_Call {
 	_c.Call.Return(run)
 	return _c
 }

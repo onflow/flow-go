@@ -3,7 +3,6 @@ package indexes
 import (
 	"encoding/binary"
 	"fmt"
-	"math"
 	"strings"
 
 	"github.com/jordanschalm/lockctx"
@@ -23,16 +22,17 @@ const (
 	//	[code(1)][contractID bytes][~height(8)][txIndex(4)][eventIndex(4)]
 	//
 	// so the overhead is code(1) + ~height(8) + txIndex(4) + eventIndex(4) = 17 bytes.
-	contractDeploymentKeyOverhead = 1 + 8 + 4 + 4
+	contractDeploymentKeyOverhead = 1 + heightLen + txIndexLen + eventIndexLen
 
 	// minContractIDLength is the minimum length of a contractID.
 	// e.g. "A.1234567890abcdef.a" = 22 bytes
+	// Address is a hex-encoded string
 	minContractIDLength = 4 + flow.AddressLength*2 + 1
 )
 
 // storedContractDeployment holds the fields of a [access.ContractDeployment] that are not
-// derivable from the key. Fields derivable from the key (ContractID, Address, Height, TxIndex,
-// EventIndex) are not stored here.
+// derivable from the primary key. Fields derivable from the key (ContractID, Address, Height,
+// TxIndex, EventIndex) are not stored here.
 type storedContractDeployment struct {
 	TransactionID flow.Identifier
 	Code          []byte
@@ -41,13 +41,16 @@ type storedContractDeployment struct {
 
 // ContractDeploymentsIndex implements [storage.ContractDeploymentsIndex] using Pebble.
 //
-// Key format: [codeContractDeployment][contractID bytes][~height(8)][txIndex(4)][eventIndex(4)]
+// Primary index key format:
+//
+//	[codeContractDeployment][contractID bytes][~height(8)][txIndex(4)][eventIndex(4)]
 //
 // The one's complement of height (~height) ensures that the most recent deployment (highest
 // height) has the smallest byte value, so it appears first during ascending key iteration.
 //
-// Because contractIDs have the form "A.{address_hex}.{name}", a prefix scan on the address
-// portion suffices for ByAddress — no secondary by-address key is needed.
+// [All] and [ByAddress] use [BuildPrefixIterator] over the primary index with the prefix
+// [codeContractDeployment][contractID bytes], which yields exactly one entry (the most recent
+// deployment) per contract without a separate secondary index.
 //
 // All read methods are safe for concurrent access. Write methods must be called sequentially.
 type ContractDeploymentsIndex struct {
@@ -111,57 +114,44 @@ func BootstrapContractDeployments(
 // Expected error returns during normal operation:
 //   - [storage.ErrNotFound]: if no deployment for the given contract ID exists
 func (idx *ContractDeploymentsIndex) ByContractID(id string) (access.ContractDeployment, error) {
-	prefix := makeContractDeploymentContractPrefix(id)
-
-	var result *access.ContractDeployment
-	err := operation.IterateKeys(idx.db.Reader(), prefix, prefix,
-		func(keyCopy []byte, getValue func(any) error) (bail bool, err error) {
-			var val storedContractDeployment
-			if err := getValue(&val); err != nil {
-				return true, fmt.Errorf("could not read value: %w", err)
-			}
-			d, err := reconstructDeployment(keyCopy, val)
-			if err != nil {
-				return true, fmt.Errorf("could not reconstruct deployment: %w", err)
-			}
-			result = &d
-			// The first key is the most recent (due to ~height ordering). Stop immediately.
-			return true, nil
-		}, storage.DefaultIteratorOptions())
-
+	// pass a nil cursor to indicate search should start from the latest deployment
+	iter, err := idx.DeploymentsByContractID(id, nil)
 	if err != nil {
-		return access.ContractDeployment{}, fmt.Errorf("could not iterate contract deployments for %s: %w", id, err)
+		return access.ContractDeployment{}, fmt.Errorf("could not get deployments by contract ID: %w", err)
 	}
 
-	if result == nil {
-		return access.ContractDeployment{}, storage.ErrNotFound
+	// iterate over deployments for the contract, and return the first one (most recent)
+	for item, err := range iter {
+		if err != nil {
+			return access.ContractDeployment{}, fmt.Errorf("could not iterate contract deployments for %s: %w", id, err)
+		}
+		return item.Value()
 	}
-	return *result, nil
+
+	return access.ContractDeployment{}, storage.ErrNotFound
 }
 
 // DeploymentsByContractID returns an iterator over all recorded deployments for the given
 // contract, ordered from most recent to oldest (descending block height).
 //
-// cursor is a pointer to an [access.ContractDeploymentCursor]:
+// cursor is a pointer to an [access.ContractDeploymentsCursor]:
 //   - nil means start from the most recent deployment
 //   - non-nil means start at the cursor position (inclusive)
 //
 // No error returns are expected during normal operation.
 func (idx *ContractDeploymentsIndex) DeploymentsByContractID(
 	id string,
-	cursor *access.ContractDeploymentCursor,
+	cursor *access.ContractDeploymentsCursor,
 ) (storage.ContractDeploymentIterator, error) {
 	prefix := makeContractDeploymentContractPrefix(id)
 
-	startKey := prefix
+	// by default, iterate over all deployments for the exact contractID
+	startKey, endKey := prefix, prefix
 	if cursor != nil {
+		// if there is a cursor, start from the cursor position, and iterate for all remaining deployments of the contractID
 		startKey = makeContractDeploymentKey(id, cursor.Height, cursor.TxIndex, cursor.EventIndex)
+		endKey = storage.PrefixInclusiveEnd(prefix, startKey)
 	}
-	// endKey is the maximum possible key for this contractID: the key suffix is all 0xFF bytes
-	// (height=0 gives ~height=0xFFFFFFFFFFFFFFFF, and max tx/event indices are all 0xFF).
-	// PrefixUpperBound(endKey) naturally overflows the suffix and increments the contractID's last
-	// byte, giving a tight upper bound that excludes keys from any other contractID.
-	endKey := makeContractDeploymentKey(id, 0, math.MaxUint32, math.MaxUint32)
 
 	reader := idx.db.Reader()
 	storageIter, err := reader.NewIter(startKey, endKey, storage.DefaultIteratorOptions())
@@ -169,25 +159,29 @@ func (idx *ContractDeploymentsIndex) DeploymentsByContractID(
 		return nil, fmt.Errorf("could not create iterator for contract %s: %w", id, err)
 	}
 
-	return iterator.Build(storageIter, decodeContractDeploymentCursor, reconstructContractDeploymentFromCursor), nil
+	return iterator.Build(storageIter, decodeDeploymentCursor, reconstructContractDeployment), nil
 }
 
 // All returns an iterator over the latest deployment for each indexed contract,
 // ordered by contract identifier (ascending).
 //
-// cursor is a pointer to an [access.ContractDeploymentCursor]:
+// cursor is a pointer to an [access.ContractDeploymentsCursor]:
 //   - nil means start from the first contract (by identifier)
-//   - non-nil means start at the cursor's contract (inclusive)
+//   - non-nil resumes from cursor.ContractID (inclusive); other cursor fields are ignored
 //
 // No error returns are expected during normal operation.
 func (idx *ContractDeploymentsIndex) All(
-	cursor *access.ContractDeploymentCursor,
+	cursor *access.ContractDeploymentsCursor,
 ) (storage.ContractDeploymentIterator, error) {
-	startKey := []byte{codeContractDeployment}
+	prefix := []byte{codeContractDeployment}
+
+	// by default, iterate over all contracts
+	startKey, endKey := prefix, prefix
 	if cursor != nil && cursor.ContractID != "" {
+		// if there is a cursor, start from the cursor position, and iterate for all remaining contracts
 		startKey = makeContractDeploymentContractPrefix(cursor.ContractID)
+		endKey = storage.PrefixInclusiveEnd(prefix, startKey)
 	}
-	endKey := []byte{codeContractDeployment + 1}
 
 	reader := idx.db.Reader()
 	storageIter, err := reader.NewIter(startKey, endKey, storage.DefaultIteratorOptions())
@@ -195,28 +189,35 @@ func (idx *ContractDeploymentsIndex) All(
 		return nil, fmt.Errorf("could not create iterator for all contracts: %w", err)
 	}
 
-	return buildDeduplicatingContractIterator(storageIter), nil
+	return iterator.BuildPrefixIterator(
+		storageIter,
+		decodeDeploymentCursor,
+		reconstructContractDeployment,
+		contractDeploymentKeyPrefix,
+	), nil
 }
 
 // ByAddress returns an iterator over the latest deployment for each contract deployed by the
 // given address, ordered by contract identifier (ascending).
 //
-// cursor is a pointer to an [access.ContractDeploymentCursor]:
+// cursor is a pointer to an [access.ContractDeploymentsCursor]:
 //   - nil means start from the first contract at the address (by identifier)
-//   - non-nil means start at the cursor's contract (inclusive)
+//   - non-nil resumes from cursor.ContractID (inclusive); other cursor fields are ignored
 //
 // No error returns are expected during normal operation.
 func (idx *ContractDeploymentsIndex) ByAddress(
 	account flow.Address,
-	cursor *access.ContractDeploymentCursor,
+	cursor *access.ContractDeploymentsCursor,
 ) (storage.ContractDeploymentIterator, error) {
 	addrPrefix := makeContractDeploymentAddressPrefix(account)
 
-	startKey := addrPrefix
+	// by default, iterate over all contracts for the address
+	startKey, endKey := addrPrefix, addrPrefix
 	if cursor != nil && cursor.ContractID != "" {
+		// if there is a cursor, start from the cursor position, and iterate for all remaining contracts for the address
 		startKey = makeContractDeploymentContractPrefix(cursor.ContractID)
+		endKey = storage.PrefixInclusiveEnd(addrPrefix, startKey)
 	}
-	endKey := incrementContractPrefix(addrPrefix)
 
 	reader := idx.db.Reader()
 	storageIter, err := reader.NewIter(startKey, endKey, storage.DefaultIteratorOptions())
@@ -224,7 +225,34 @@ func (idx *ContractDeploymentsIndex) ByAddress(
 		return nil, fmt.Errorf("could not create iterator for address %s: %w", account.Hex(), err)
 	}
 
-	return buildDeduplicatingContractIterator(storageIter), nil
+	return iterator.BuildPrefixIterator(
+		storageIter,
+		decodeDeploymentCursor,
+		reconstructContractDeployment,
+		contractDeploymentKeyPrefix,
+	), nil
+}
+
+// rangeKeys computes the start and end keys for iterating over contracts, based on
+// the provided cursor.
+//
+// Any error indicates the cursor is invalid
+func (idx *ContractDeploymentsIndex) rangeKeys(prefix string, cursor *access.ContractDeploymentsCursor) (startKey, endKey []byte, err error) {
+	latestHeight := idx.latestHeight.Load()
+	if cursor == nil {
+		startKey = makeContractDeploymentContractPrefix(prefix)
+		endKey = makeContractDeploymentContractPrefix(prefix)
+		return startKey, endKey, nil
+	}
+
+	if err := validateCursorHeight(cursor.BlockHeight, idx.firstHeight, latestHeight); err != nil {
+		return nil, nil, err
+	}
+
+	startKey = makeFTTransferKey(account, cursor.BlockHeight, cursor.TransactionIndex, cursor.EventIndex)
+	endKey = storage.PrefixInclusiveEnd(endKey, startKey)
+
+	return startKey, endKey, nil
 }
 
 // Store indexes all contract deployments from the given block and advances the latest indexed
@@ -247,6 +275,9 @@ func (idx *ContractDeploymentsIndex) Store(
 }
 
 // storeAllContractDeployments writes all contract deployment entries to the batch.
+// For each deployment it writes a primary index entry at
+// [codeContractDeployment][contractID][~height][txIndex][eventIndex].
+//
 // The caller must hold the [storage.LockIndexContractDeployments] lock until the batch is committed.
 //
 // No error returns are expected during normal operation.
@@ -257,23 +288,21 @@ func storeAllContractDeployments(rw storage.ReaderBatchWriter, deployments []acc
 			return fmt.Errorf("contract ID %q is too short", d.ContractID)
 		}
 
-		key := makeContractDeploymentKey(d.ContractID, d.BlockHeight, d.TxIndex, d.EventIndex)
-
-		exists, err := operation.KeyExists(rw.GlobalReader(), key)
+		primaryKey := makeContractDeploymentKey(d.ContractID, d.BlockHeight, d.TxIndex, d.EventIndex)
+		exists, err := operation.KeyExists(rw.GlobalReader(), primaryKey)
 		if err != nil {
 			return fmt.Errorf("could not check key for deployment %s: %w", d.ContractID, err)
 		}
 		if exists {
 			return fmt.Errorf("deployment %s at height %d already exists: %w", d.ContractID, d.BlockHeight, storage.ErrAlreadyExists)
 		}
-
-		val := storedContractDeployment{
+		primaryVal := storedContractDeployment{
 			TransactionID: d.TransactionID,
 			Code:          d.Code,
 			CodeHash:      d.CodeHash,
 		}
-		if err := operation.UpsertByKey(writer, key, val); err != nil {
-			return fmt.Errorf("could not store deployment %s: %w", d.ContractID, err)
+		if err := operation.UpsertByKey(writer, primaryKey, primaryVal); err != nil {
+			return fmt.Errorf("could not store primary deployment entry for %s: %w", d.ContractID, err)
 		}
 	}
 	return nil
@@ -332,6 +361,33 @@ func makeContractDeploymentAddressPrefix(addr flow.Address) []byte {
 	return prefix
 }
 
+// contractDeploymentKeyPrefix returns the contract-ID portion of a primary key:
+//
+//	[codeContractDeployment][contractID bytes]
+//
+// It strips the fixed 16-byte suffix ([~height(8)][txIndex(4)][eventIndex(4)]) from the key.
+// Used as the keyPrefix argument to [iterator.BuildPrefixIterator] so that all deployments of
+// the same contract are grouped together and only the first (most recent) is yielded.
+func contractDeploymentKeyPrefix(key []byte) []byte {
+	return key[:len(key)-heightLen-txIndexLen-eventIndexLen]
+}
+
+// decodeDeploymentCursor decodes a primary key into an [access.ContractDeploymentsCursor].
+//
+// Any error indicates a malformed key.
+func decodeDeploymentCursor(key []byte) (access.ContractDeploymentsCursor, error) {
+	contractID, height, txIndex, eventIndex, err := decodeContractDeploymentKey(key)
+	if err != nil {
+		return access.ContractDeploymentsCursor{}, err
+	}
+	return access.ContractDeploymentsCursor{
+		ContractID: contractID,
+		Height:     height,
+		TxIndex:    txIndex,
+		EventIndex: eventIndex,
+	}, nil
+}
+
 // decodeContractDeploymentKey decodes a primary key into its components.
 //
 // Any error indicates a malformed key.
@@ -345,7 +401,7 @@ func decodeContractDeploymentKey(key []byte) (contractID string, height uint64, 
 
 	// The fixed-size suffix is ~height(8) + txIndex(4) + eventIndex(4) = 16 bytes.
 	// Everything between the code byte and the suffix is the contractID.
-	contractIDEnd := len(key) - 16
+	contractIDEnd := len(key) - heightLen - txIndexLen - eventIndexLen
 	contractID = string(key[1:contractIDEnd])
 
 	offset := contractIDEnd
@@ -358,6 +414,31 @@ func decodeContractDeploymentKey(key []byte) (contractID string, height uint64, 
 	eventIndex = binary.BigEndian.Uint32(key[offset:])
 
 	return contractID, height, txIndex, eventIndex, nil
+}
+
+// reconstructContractDeployment builds a full [access.ContractDeployment] from a decoded
+// [access.ContractDeploymentsCursor] and the primary index value bytes.
+//
+// Any error indicates a malformed value.
+func reconstructContractDeployment(cur access.ContractDeploymentsCursor, val []byte) (*access.ContractDeployment, error) {
+	var stored storedContractDeployment
+	if err := msgpack.Unmarshal(val, &stored); err != nil {
+		return nil, fmt.Errorf("could not unmarshal contract deployment: %w", err)
+	}
+	addr, err := addressFromContractID(cur.ContractID)
+	if err != nil {
+		return nil, fmt.Errorf("could not extract address from contract ID %s: %w", cur.ContractID, err)
+	}
+	return &access.ContractDeployment{
+		ContractID:    cur.ContractID,
+		Address:       addr,
+		BlockHeight:   cur.Height,
+		TransactionID: stored.TransactionID,
+		TxIndex:       cur.TxIndex,
+		EventIndex:    cur.EventIndex,
+		Code:          stored.Code,
+		CodeHash:      stored.CodeHash,
+	}, nil
 }
 
 // reconstructDeployment reconstructs a full [access.ContractDeployment] from a key and stored value.
@@ -403,92 +484,4 @@ func addressFromContractID(contractID string) (flow.Address, error) {
 		return flow.Address{}, fmt.Errorf("could not parse address %q from contract ID %q: %w", addrHex, contractID, err)
 	}
 	return addr, nil
-}
-
-// decodeContractDeploymentCursor decodes a primary key into a [access.ContractDeploymentCursor]
-// containing the contractID, height, txIndex, and eventIndex.
-//
-// Any error indicates a malformed key.
-func decodeContractDeploymentCursor(key []byte) (access.ContractDeploymentCursor, error) {
-	contractID, height, txIndex, eventIndex, err := decodeContractDeploymentKey(key)
-	if err != nil {
-		return access.ContractDeploymentCursor{}, err
-	}
-	return access.ContractDeploymentCursor{
-		ContractID: contractID,
-		Height:     height,
-		TxIndex:    txIndex,
-		EventIndex: eventIndex,
-	}, nil
-}
-
-// reconstructContractDeploymentFromCursor builds a full [access.ContractDeployment] from a
-// decoded cursor and the raw msgpack-encoded value bytes.
-//
-// Any error indicates a malformed value or an unrecognized contractID format.
-func reconstructContractDeploymentFromCursor(cur access.ContractDeploymentCursor, value []byte, dest *access.ContractDeployment) error {
-	var stored storedContractDeployment
-	if err := msgpack.Unmarshal(value, &stored); err != nil {
-		return fmt.Errorf("could not unmarshal contract deployment: %w", err)
-	}
-	addr, err := addressFromContractID(cur.ContractID)
-	if err != nil {
-		return fmt.Errorf("could not extract address from contract ID %s: %w", cur.ContractID, err)
-	}
-	*dest = access.ContractDeployment{
-		ContractID:    cur.ContractID,
-		Address:       addr,
-		BlockHeight:   cur.Height,
-		TransactionID: stored.TransactionID,
-		TxIndex:       cur.TxIndex,
-		EventIndex:    cur.EventIndex,
-		Code:          stored.Code,
-		CodeHash:      stored.CodeHash,
-	}
-	return nil
-}
-
-// buildDeduplicatingContractIterator wraps a storage iterator and returns a
-// [storage.ContractDeploymentIterator] that yields exactly one entry per unique contractID
-// (the first — most recent — entry encountered). The underlying storageIter is closed when
-// iteration is complete or stopped early.
-func buildDeduplicatingContractIterator(storageIter storage.Iterator) storage.ContractDeploymentIterator {
-	return func(yield func(storage.IteratorEntry[access.ContractDeployment, access.ContractDeploymentCursor]) bool) {
-		defer storageIter.Close()
-		var prevContractID string
-		for storageIter.First(); storageIter.Valid(); storageIter.Next() {
-			item := storageIter.IterItem()
-			key := item.KeyCopy(nil)
-
-			// Decode the contractID for deduplication. On error, yield the entry so that the
-			// error is visible to the caller via entry.Value().
-			contractID, _, _, _, decodeErr := decodeContractDeploymentKey(key)
-			if decodeErr == nil {
-				if contractID == prevContractID {
-					continue
-				}
-				prevContractID = contractID
-			}
-
-			getValue := func(cur access.ContractDeploymentCursor, v *access.ContractDeployment) error {
-				return item.Value(func(val []byte) error {
-					return reconstructContractDeploymentFromCursor(cur, val, v)
-				})
-			}
-
-			entry := iterator.NewEntry(key, decodeContractDeploymentCursor, getValue)
-			if !yield(entry) {
-				return
-			}
-		}
-	}
-}
-
-// incrementContractPrefix returns a copy of the prefix with the last byte incremented by one.
-// This is used to construct an exclusive upper bound for prefix-based iteration.
-func incrementContractPrefix(prefix []byte) []byte {
-	result := make([]byte, len(prefix))
-	copy(result, prefix)
-	result[len(result)-1]++
-	return result
 }

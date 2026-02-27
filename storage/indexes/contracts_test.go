@@ -66,9 +66,9 @@ func collectContractDeployments(
 	idx *ContractDeploymentsIndex,
 	id string,
 	limit uint32,
-	cursor *access.ContractDeploymentCursor,
+	cursor *access.ContractDeploymentsCursor,
 	filter storage.IndexFilter[*access.ContractDeployment],
-) ([]access.ContractDeployment, *access.ContractDeploymentCursor) {
+) ([]access.ContractDeployment, *access.ContractDeploymentsCursor) {
 	tb.Helper()
 	iter, err := idx.DeploymentsByContractID(id, cursor)
 	require.NoError(tb, err)
@@ -83,9 +83,9 @@ func collectAllContracts(
 	tb testing.TB,
 	idx *ContractDeploymentsIndex,
 	limit uint32,
-	cursor *access.ContractDeploymentCursor,
+	cursor *access.ContractDeploymentsCursor,
 	filter storage.IndexFilter[*access.ContractDeployment],
-) ([]access.ContractDeployment, *access.ContractDeploymentCursor) {
+) ([]access.ContractDeployment, *access.ContractDeploymentsCursor) {
 	tb.Helper()
 	iter, err := idx.All(cursor)
 	require.NoError(tb, err)
@@ -101,9 +101,9 @@ func collectContractsByAddress(
 	idx *ContractDeploymentsIndex,
 	addr flow.Address,
 	limit uint32,
-	cursor *access.ContractDeploymentCursor,
+	cursor *access.ContractDeploymentsCursor,
 	filter storage.IndexFilter[*access.ContractDeployment],
-) ([]access.ContractDeployment, *access.ContractDeploymentCursor) {
+) ([]access.ContractDeployment, *access.ContractDeploymentsCursor) {
 	tb.Helper()
 	iter, err := idx.ByAddress(addr, cursor)
 	require.NoError(tb, err)

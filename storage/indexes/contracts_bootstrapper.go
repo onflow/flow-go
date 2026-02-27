@@ -102,7 +102,7 @@ func (b *ContractDeploymentsBootstrapper) ByContractID(id string) (accessmodel.C
 //   - [storage.ErrNotBootstrapped] if the index has not been initialized
 func (b *ContractDeploymentsBootstrapper) DeploymentsByContractID(
 	id string,
-	cursor *accessmodel.ContractDeploymentCursor,
+	cursor *accessmodel.ContractDeploymentsCursor,
 ) (storage.ContractDeploymentIterator, error) {
 	store := b.store.Load()
 	if store == nil {
@@ -118,7 +118,7 @@ func (b *ContractDeploymentsBootstrapper) DeploymentsByContractID(
 //   - [storage.ErrNotBootstrapped] if the index has not been initialized
 func (b *ContractDeploymentsBootstrapper) ByAddress(
 	account flow.Address,
-	cursor *accessmodel.ContractDeploymentCursor,
+	cursor *accessmodel.ContractDeploymentsCursor,
 ) (storage.ContractDeploymentIterator, error) {
 	store := b.store.Load()
 	if store == nil {
@@ -133,7 +133,7 @@ func (b *ContractDeploymentsBootstrapper) ByAddress(
 // Expected error returns during normal operations:
 //   - [storage.ErrNotBootstrapped] if the index has not been initialized
 func (b *ContractDeploymentsBootstrapper) All(
-	cursor *accessmodel.ContractDeploymentCursor,
+	cursor *accessmodel.ContractDeploymentsCursor,
 ) (storage.ContractDeploymentIterator, error) {
 	store := b.store.Load()
 	if store == nil {

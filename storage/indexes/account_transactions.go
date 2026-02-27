@@ -120,17 +120,10 @@ func (idx *AccountTransactions) ByAddress(
 	account flow.Address,
 	cursor *access.AccountTransactionCursor,
 ) (storage.IndexIterator[access.AccountTransaction, access.AccountTransactionCursor], error) {
-	latestHeight := idx.latestHeight.Load()
-	startKey := makeAccountTxKeyPrefix(account, latestHeight)
-
-	if cursor != nil {
-		if err := validateCursorHeight(cursor.BlockHeight, idx.firstHeight, latestHeight); err != nil {
-			return nil, err
-		}
-		startKey = makeAccountTxKey(account, cursor.BlockHeight, cursor.TransactionIndex)
+	startKey, endKey, err := idx.rangeKeys(account, cursor)
+	if err != nil {
+		return nil, fmt.Errorf("could not determine range keys: %w", err)
 	}
-
-	endKey := makeAccountTxKeyPrefix(account, idx.firstHeight)
 
 	iter, err := idx.db.Reader().NewIter(startKey, endKey, storage.DefaultIteratorOptions())
 	if err != nil {
@@ -138,6 +131,29 @@ func (idx *AccountTransactions) ByAddress(
 	}
 
 	return iterator.Build(iter, decodeAccountTxKey, reconstructAccountTransaction), nil
+}
+
+// rangeKeys computes the start and end keys for iterating over transactions of an account, based on
+// the provided cursor.
+//
+// Any error indicates the cursor is invalid
+func (idx *AccountTransactions) rangeKeys(account flow.Address, cursor *access.AccountTransactionCursor) (startKey, endKey []byte, err error) {
+	latestHeight := idx.latestHeight.Load()
+	if cursor == nil {
+		startKey = makeAccountTxKeyPrefix(account, latestHeight)
+		endKey = makeAccountTxKeyPrefix(account, idx.firstHeight)
+		return startKey, endKey, nil
+	}
+
+	if err := validateCursorHeight(cursor.BlockHeight, idx.firstHeight, latestHeight); err != nil {
+		return nil, nil, err
+	}
+
+	// since the cursor could point to some entry
+	startKey = makeAccountTxKey(account, cursor.BlockHeight, cursor.TransactionIndex)
+	endKey = storage.PrefixInclusiveEnd(endKey, startKey)
+
+	return startKey, endKey, nil
 }
 
 // Store indexes all account-transaction associations for a block.

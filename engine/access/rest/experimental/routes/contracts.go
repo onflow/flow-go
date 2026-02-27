@@ -114,9 +114,13 @@ func buildContractDeploymentsResponse(
 		deployments[i].Build(&page.Deployments[i], link)
 	}
 
-	nextCursor, err := encodeNextCursor(page)
-	if err != nil {
-		return models.ContractDeploymentsResponse{}, err
+	var nextCursor string
+	if page.NextCursor != nil {
+		var err error
+		nextCursor, err = request.EncodeContractDeploymentsCursor(page.NextCursor)
+		if err != nil {
+			return models.ContractDeploymentsResponse{}, common.NewRestError(http.StatusInternalServerError, "failed to encode next cursor", err)
+		}
 	}
 
 	return models.ContractDeploymentsResponse{
@@ -125,10 +129,10 @@ func buildContractDeploymentsResponse(
 	}, nil
 }
 
-// buildContractsResponse converts a [accessmodel.ContractDeploymentPage] to a
-// [models.ContractsResponse] for the list and by-address endpoints.
+// buildContractsResponse converts a [accessmodel.ContractsPage] to a [models.ContractsResponse]
+// for the list and by-address endpoints.
 func buildContractsResponse(
-	page *accessmodel.ContractDeploymentPage,
+	page *accessmodel.ContractsPage,
 	link models.LinkGenerator,
 ) (models.ContractsResponse, error) {
 	contracts := make([]models.ContractDeployment, len(page.Deployments))
@@ -136,26 +140,17 @@ func buildContractsResponse(
 		contracts[i].Build(&page.Deployments[i], link)
 	}
 
-	nextCursor, err := encodeNextCursor(page)
-	if err != nil {
-		return models.ContractsResponse{}, err
+	var nextCursor string
+	if page.NextCursor != nil {
+		var err error
+		nextCursor, err = request.EncodeContractDeploymentsCursor(page.NextCursor)
+		if err != nil {
+			return models.ContractsResponse{}, common.NewRestError(http.StatusInternalServerError, "failed to encode next cursor", err)
+		}
 	}
 
 	return models.ContractsResponse{
 		Contracts:  contracts,
 		NextCursor: nextCursor,
 	}, nil
-}
-
-// encodeNextCursor encodes the next cursor for a contract deployment page, returning an
-// empty string if there is no next page.
-func encodeNextCursor(page *accessmodel.ContractDeploymentPage) (string, error) {
-	if page.NextCursor == nil {
-		return "", nil
-	}
-	cursor, err := request.EncodeContractDeploymentCursor(page.NextCursor)
-	if err != nil {
-		return "", common.NewRestError(http.StatusInternalServerError, "failed to encode next cursor", err)
-	}
-	return cursor, nil
 }

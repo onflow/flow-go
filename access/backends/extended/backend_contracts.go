@@ -115,7 +115,7 @@ func (b *ContractsBackend) GetContractDeployments(
 	ctx context.Context,
 	id string,
 	limit uint32,
-	cursor *accessmodel.ContractDeploymentCursor,
+	cursor *accessmodel.ContractDeploymentsCursor,
 	filter ContractDeploymentFilter,
 	expandOptions ContractDeploymentExpandOptions,
 	encodingVersion entities.EventEncodingVersion,
@@ -163,11 +163,11 @@ func (b *ContractsBackend) GetContractDeployments(
 func (b *ContractsBackend) GetContracts(
 	ctx context.Context,
 	limit uint32,
-	cursor *accessmodel.ContractDeploymentCursor,
+	cursor *accessmodel.ContractDeploymentsCursor,
 	filter ContractDeploymentFilter,
 	expandOptions ContractDeploymentExpandOptions,
 	encodingVersion entities.EventEncodingVersion,
-) (*accessmodel.ContractDeploymentPage, error) {
+) (*accessmodel.ContractsPage, error) {
 	limit, err := b.normalizeLimit(limit)
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "invalid limit: %v", err)
@@ -185,7 +185,7 @@ func (b *ContractsBackend) GetContracts(
 		return nil, err
 	}
 
-	page := &accessmodel.ContractDeploymentPage{
+	page := &accessmodel.ContractsPage{
 		Deployments: collected,
 		NextCursor:  nextCursor,
 	}
@@ -213,11 +213,11 @@ func (b *ContractsBackend) GetContractsByAddress(
 	ctx context.Context,
 	address flow.Address,
 	limit uint32,
-	cursor *accessmodel.ContractDeploymentCursor,
+	cursor *accessmodel.ContractDeploymentsCursor,
 	filter ContractDeploymentFilter,
 	expandOptions ContractDeploymentExpandOptions,
 	encodingVersion entities.EventEncodingVersion,
-) (*accessmodel.ContractDeploymentPage, error) {
+) (*accessmodel.ContractsPage, error) {
 	limit, err := b.normalizeLimit(limit)
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "invalid limit: %v", err)
@@ -235,7 +235,7 @@ func (b *ContractsBackend) GetContractsByAddress(
 		return nil, err
 	}
 
-	page := &accessmodel.ContractDeploymentPage{
+	page := &accessmodel.ContractsPage{
 		Deployments: collected,
 		NextCursor:  nextCursor,
 	}
