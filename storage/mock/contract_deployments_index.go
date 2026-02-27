@@ -84,7 +84,9 @@ func (_c *ContractDeploymentsIndex_All_Call) Run(run func(cursor *access.Contrac
 		if args[0] != nil {
 			arg0 = args[0].(*access.ContractDeploymentCursor)
 		}
-		run(arg0)
+		run(
+			arg0,
+		)
 	})
 	return _c
 }
@@ -149,7 +151,10 @@ func (_c *ContractDeploymentsIndex_ByAddress_Call) Run(run func(account flow.Add
 		if args[1] != nil {
 			arg1 = args[1].(*access.ContractDeploymentCursor)
 		}
-		run(arg0, arg1)
+		run(
+			arg0,
+			arg1,
+		)
 	})
 	return _c
 }
@@ -274,7 +279,10 @@ func (_c *ContractDeploymentsIndex_DeploymentsByContractID_Call) Run(run func(id
 		if args[1] != nil {
 			arg1 = args[1].(*access.ContractDeploymentCursor)
 		}
-		run(arg0, arg1)
+		run(
+			arg0,
+			arg1,
+		)
 	})
 	return _c
 }

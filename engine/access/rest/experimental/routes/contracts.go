@@ -3,6 +3,8 @@ package routes
 import (
 	"net/http"
 
+	"github.com/onflow/flow/protobuf/go/flow/entities"
+
 	"github.com/onflow/flow-go/access/backends/extended"
 	"github.com/onflow/flow-go/engine/access/rest/common"
 	"github.com/onflow/flow-go/engine/access/rest/experimental/models"
@@ -22,6 +24,8 @@ func GetContracts(r *common.Request, backend extended.API, link models.LinkGener
 		req.Limit,
 		req.Cursor,
 		req.Filter,
+		extended.ContractDeploymentExpandOptions{},
+		entities.EventEncodingVersion_JSON_CDC_V0,
 	)
 	if err != nil {
 		return nil, err
@@ -41,6 +45,8 @@ func GetContract(r *common.Request, backend extended.API, link models.LinkGenera
 		r.Context(),
 		req.ID,
 		req.Filter,
+		extended.ContractDeploymentExpandOptions{},
+		entities.EventEncodingVersion_JSON_CDC_V0,
 	)
 	if err != nil {
 		return nil, err
@@ -64,6 +70,8 @@ func GetContractDeployments(r *common.Request, backend extended.API, link models
 		req.Limit,
 		req.Cursor,
 		req.Filter,
+		extended.ContractDeploymentExpandOptions{},
+		entities.EventEncodingVersion_JSON_CDC_V0,
 	)
 	if err != nil {
 		return nil, err
@@ -85,6 +93,8 @@ func GetContractsByAddress(r *common.Request, backend extended.API, link models.
 		req.Limit,
 		req.Cursor,
 		req.Filter,
+		extended.ContractDeploymentExpandOptions{},
+		entities.EventEncodingVersion_JSON_CDC_V0,
 	)
 	if err != nil {
 		return nil, err

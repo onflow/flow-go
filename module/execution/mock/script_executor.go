@@ -119,65 +119,6 @@ func (_c *ScriptExecutor_ExecuteAtBlockHeight_Call) RunAndReturn(run func(ctx co
 	return _c
 }
 
-// GetAccountCode provides a mock function for the type ScriptExecutor
-func (_mock *ScriptExecutor) GetAccountCode(ctx context.Context, address flow.Address, contractName string, height uint64) ([]byte, error) {
-	ret := _mock.Called(ctx, address, contractName, height)
-
-	if len(ret) == 0 {
-		panic("no return value specified for GetAccountCode")
-	}
-
-	var r0 []byte
-	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, flow.Address, string, uint64) ([]byte, error)); ok {
-		return returnFunc(ctx, address, contractName, height)
-	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, flow.Address, string, uint64) []byte); ok {
-		r0 = returnFunc(ctx, address, contractName, height)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]byte)
-		}
-	}
-	if returnFunc, ok := ret.Get(1).(func(context.Context, flow.Address, string, uint64) error); ok {
-		r1 = returnFunc(ctx, address, contractName, height)
-	} else {
-		r1 = ret.Error(1)
-	}
-	return r0, r1
-}
-
-// ScriptExecutor_GetAccountCode_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetAccountCode'
-type ScriptExecutor_GetAccountCode_Call struct {
-	*mock.Call
-}
-
-// GetAccountCode is a helper method to define mock.On call
-//   - ctx context.Context
-//   - address flow.Address
-//   - contractName string
-//   - height uint64
-func (_e *ScriptExecutor_Expecter) GetAccountCode(ctx interface{}, address interface{}, contractName interface{}, height interface{}) *ScriptExecutor_GetAccountCode_Call {
-	return &ScriptExecutor_GetAccountCode_Call{Call: _e.mock.On("GetAccountCode", ctx, address, contractName, height)}
-}
-
-func (_c *ScriptExecutor_GetAccountCode_Call) Run(run func(ctx context.Context, address flow.Address, contractName string, height uint64)) *ScriptExecutor_GetAccountCode_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(flow.Address), args[2].(string), args[3].(uint64))
-	})
-	return _c
-}
-
-func (_c *ScriptExecutor_GetAccountCode_Call) Return(code []byte, err error) *ScriptExecutor_GetAccountCode_Call {
-	_c.Call.Return(code, err)
-	return _c
-}
-
-func (_c *ScriptExecutor_GetAccountCode_Call) RunAndReturn(run func(context.Context, flow.Address, string, uint64) ([]byte, error)) *ScriptExecutor_GetAccountCode_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
 // GetAccountAtBlockHeight provides a mock function for the type ScriptExecutor
 func (_mock *ScriptExecutor) GetAccountAtBlockHeight(ctx context.Context, address flow.Address, height uint64) (*flow.Account, error) {
 	ret := _mock.Called(ctx, address, height)
@@ -392,6 +333,86 @@ func (_c *ScriptExecutor_GetAccountBalance_Call) Return(v uint64, err error) *Sc
 }
 
 func (_c *ScriptExecutor_GetAccountBalance_Call) RunAndReturn(run func(ctx context.Context, address flow.Address, height uint64) (uint64, error)) *ScriptExecutor_GetAccountBalance_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// GetAccountCode provides a mock function for the type ScriptExecutor
+func (_mock *ScriptExecutor) GetAccountCode(ctx context.Context, address flow.Address, contractName string, height uint64) ([]byte, error) {
+	ret := _mock.Called(ctx, address, contractName, height)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetAccountCode")
+	}
+
+	var r0 []byte
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, flow.Address, string, uint64) ([]byte, error)); ok {
+		return returnFunc(ctx, address, contractName, height)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, flow.Address, string, uint64) []byte); ok {
+		r0 = returnFunc(ctx, address, contractName, height)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]byte)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, flow.Address, string, uint64) error); ok {
+		r1 = returnFunc(ctx, address, contractName, height)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// ScriptExecutor_GetAccountCode_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetAccountCode'
+type ScriptExecutor_GetAccountCode_Call struct {
+	*mock.Call
+}
+
+// GetAccountCode is a helper method to define mock.On call
+//   - ctx context.Context
+//   - address flow.Address
+//   - contractName string
+//   - height uint64
+func (_e *ScriptExecutor_Expecter) GetAccountCode(ctx interface{}, address interface{}, contractName interface{}, height interface{}) *ScriptExecutor_GetAccountCode_Call {
+	return &ScriptExecutor_GetAccountCode_Call{Call: _e.mock.On("GetAccountCode", ctx, address, contractName, height)}
+}
+
+func (_c *ScriptExecutor_GetAccountCode_Call) Run(run func(ctx context.Context, address flow.Address, contractName string, height uint64)) *ScriptExecutor_GetAccountCode_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 flow.Address
+		if args[1] != nil {
+			arg1 = args[1].(flow.Address)
+		}
+		var arg2 string
+		if args[2] != nil {
+			arg2 = args[2].(string)
+		}
+		var arg3 uint64
+		if args[3] != nil {
+			arg3 = args[3].(uint64)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+			arg3,
+		)
+	})
+	return _c
+}
+
+func (_c *ScriptExecutor_GetAccountCode_Call) Return(bytes []byte, err error) *ScriptExecutor_GetAccountCode_Call {
+	_c.Call.Return(bytes, err)
+	return _c
+}
+
+func (_c *ScriptExecutor_GetAccountCode_Call) RunAndReturn(run func(ctx context.Context, address flow.Address, contractName string, height uint64) ([]byte, error)) *ScriptExecutor_GetAccountCode_Call {
 	_c.Call.Return(run)
 	return _c
 }
