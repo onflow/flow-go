@@ -36,7 +36,7 @@ func (_m *IteratorEntry[T, C]) EXPECT() *IteratorEntry_Expecter[T, C] {
 }
 
 // Cursor provides a mock function for the type IteratorEntry
-func (_mock *IteratorEntry[T, C]) Cursor() (C, error) {
+func (_mock *IteratorEntry[T, C]) Cursor() C {
 	ret := _mock.Called()
 
 	if len(ret) == 0 {
@@ -44,10 +44,6 @@ func (_mock *IteratorEntry[T, C]) Cursor() (C, error) {
 	}
 
 	var r0 C
-	var r1 error
-	if returnFunc, ok := ret.Get(0).(func() (C, error)); ok {
-		return returnFunc()
-	}
 	if returnFunc, ok := ret.Get(0).(func() C); ok {
 		r0 = returnFunc()
 	} else {
@@ -55,12 +51,7 @@ func (_mock *IteratorEntry[T, C]) Cursor() (C, error) {
 			r0 = ret.Get(0).(C)
 		}
 	}
-	if returnFunc, ok := ret.Get(1).(func() error); ok {
-		r1 = returnFunc()
-	} else {
-		r1 = ret.Error(1)
-	}
-	return r0, r1
+	return r0
 }
 
 // IteratorEntry_Cursor_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Cursor'
@@ -80,12 +71,12 @@ func (_c *IteratorEntry_Cursor_Call[T, C]) Run(run func()) *IteratorEntry_Cursor
 	return _c
 }
 
-func (_c *IteratorEntry_Cursor_Call[T, C]) Return(v C, err error) *IteratorEntry_Cursor_Call[T, C] {
-	_c.Call.Return(v, err)
+func (_c *IteratorEntry_Cursor_Call[T, C]) Return(v C) *IteratorEntry_Cursor_Call[T, C] {
+	_c.Call.Return(v)
 	return _c
 }
 
-func (_c *IteratorEntry_Cursor_Call[T, C]) RunAndReturn(run func() (C, error)) *IteratorEntry_Cursor_Call[T, C] {
+func (_c *IteratorEntry_Cursor_Call[T, C]) RunAndReturn(run func() C) *IteratorEntry_Cursor_Call[T, C] {
 	_c.Call.Return(run)
 	return _c
 }
