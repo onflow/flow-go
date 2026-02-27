@@ -241,6 +241,7 @@ func DefaultFVMOptions(chainID flow.ChainID, extensiveTracing, scheduleCallbacks
 	}
 
 	if tokenTracking {
+		log.Info().Msg("token tracking enabled - adding TokenChanges inspector")
 		options = append(options, fvm.WithInspectors([]inspection.Inspector{
 			inspection.NewTokenChangesInspector(inspection.DefaultTokenDiffSearchTokens(chainID.Chain())),
 		}))
