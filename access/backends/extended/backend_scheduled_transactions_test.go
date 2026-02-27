@@ -29,8 +29,8 @@ type testSchedTxEntry struct {
 	tx accessmodel.ScheduledTransaction
 }
 
-func (e testSchedTxEntry) Cursor() (accessmodel.ScheduledTransactionCursor, error) {
-	return accessmodel.ScheduledTransactionCursor{ID: e.tx.ID}, nil
+func (e testSchedTxEntry) Cursor() accessmodel.ScheduledTransactionCursor {
+	return accessmodel.ScheduledTransactionCursor{ID: e.tx.ID}
 }
 
 func (e testSchedTxEntry) Value() (accessmodel.ScheduledTransaction, error) {
@@ -39,9 +39,9 @@ func (e testSchedTxEntry) Value() (accessmodel.ScheduledTransaction, error) {
 
 // makeScheduledTxIter builds a storage.ScheduledTransactionIterator from a slice of transactions.
 func makeScheduledTxIter(txs []accessmodel.ScheduledTransaction) storage.ScheduledTransactionIterator {
-	return func(yield func(storage.IteratorEntry[accessmodel.ScheduledTransaction, accessmodel.ScheduledTransactionCursor]) bool) {
+	return func(yield func(storage.IteratorEntry[accessmodel.ScheduledTransaction, accessmodel.ScheduledTransactionCursor], error) bool) {
 		for _, tx := range txs {
-			if !yield(testSchedTxEntry{tx: tx}) {
+			if !yield(testSchedTxEntry{tx: tx}, nil) {
 				return
 			}
 		}
