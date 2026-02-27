@@ -43,7 +43,7 @@ var ExperimentalRoutes = []experimentalRoute{{
 	Handler: routes.GetScheduledTransaction,
 }, {
 	Method:  http.MethodGet,
-	Pattern: "/scheduled/account/{address}",
+	Pattern: "/accounts/{address}/scheduled",
 	Name:    "getScheduledTransactionsByAddress",
 	Handler: routes.GetScheduledTransactionsByAddress,
 }}

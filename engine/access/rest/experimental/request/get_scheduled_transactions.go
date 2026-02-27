@@ -58,7 +58,7 @@ type GetAccountScheduledTransactions struct {
 	Address flow.Address
 }
 
-// NewGetScheduledTransactionsByAddress parses GET /scheduled/account/{address}.
+// NewGetScheduledTransactionsByAddress parses GET /accounts/{address}/scheduled.
 //
 // All errors indicate an invalid request.
 func NewGetScheduledTransactionsByAddress(r *common.Request) (GetAccountScheduledTransactions, error) {

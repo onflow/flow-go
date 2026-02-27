@@ -88,10 +88,10 @@ func (s *ExtendedIndexingSuite) TestScheduledTransactionLifecycle() {
 	s.True(foundID1, "tx1 (executed) should appear in /scheduled")
 	s.True(foundID2, "tx2 (cancelled) should appear in /scheduled")
 
-	// ---- Verify /scheduled/account/{address} scopes to owner ----
+	// ---- Verify /accounts/{address}/scheduled scopes to owner ----
 	ownerAddr := flow.Address(accessClient.SDKServiceAddress()).String()
 	addrTxs := s.fetchAllScheduledTxsByAddress(ownerAddr, 20)
-	s.T().Logf("found %d scheduled transactions in /scheduled/account/{address}", len(addrTxs))
+	s.T().Logf("found %d scheduled transactions in /accounts/{address}/scheduled", len(addrTxs))
 
 	var addrFoundID1, addrFoundID2 bool
 	for _, tx := range addrTxs {
@@ -103,8 +103,8 @@ func (s *ExtendedIndexingSuite) TestScheduledTransactionLifecycle() {
 			addrFoundID2 = true
 		}
 	}
-	s.True(addrFoundID1, "tx1 should appear in /scheduled/account/{address}")
-	s.True(addrFoundID2, "tx2 should appear in /scheduled/account/{address}")
+	s.True(addrFoundID1, "tx1 should appear in /accounts/{address}/scheduled")
+	s.True(addrFoundID2, "tx2 should appear in /accounts/{address}/scheduled")
 
 	// ---- Verify pagination works via /scheduled with limit=1 ----
 	s.verifyScheduledTxPagination()
@@ -147,10 +147,10 @@ func (s *ExtendedIndexingSuite) fetchAllScheduledTxs(pageSize int) []map[string]
 	)
 }
 
-// fetchAllScheduledTxsByAddress paginates through GET /experimental/v1/scheduled/account/{address}.
+// fetchAllScheduledTxsByAddress paginates through GET /experimental/v1/accounts/{address}/scheduled.
 func (s *ExtendedIndexingSuite) fetchAllScheduledTxsByAddress(address string, pageSize int) []map[string]any {
 	return s.collectScheduledPages(
-		fmt.Sprintf("%s/experimental/v1/scheduled/account/%s?limit=%d", s.restBaseURL, address, pageSize),
+		fmt.Sprintf("%s/experimental/v1/accounts/%s/scheduled?limit=%d", s.restBaseURL, address, pageSize),
 		pageSize,
 	)
 }
