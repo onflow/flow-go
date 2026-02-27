@@ -23,7 +23,6 @@ type ftDecodedDeposit struct {
 // ftTxEventGroup holds decoded withdrawal and deposit events for a single transaction.
 type ftTxEventGroup struct {
 	withdrawals []*ftDecodedWithdrawal
-	deposits    []*ftDecodedDeposit
 	flowFees    *events.FlowFeesEvent
 
 	withdrawalByUUID map[uint64]int
@@ -91,7 +90,6 @@ func (g *ftTxEventGroup) addWithdrawal(event flow.Event, decoded *events.FTWithd
 // No error returns are expected during normal operation.
 func (g *ftTxEventGroup) addDeposit(event flow.Event, decoded *events.FTDepositedEvent) error {
 	d := &ftDecodedDeposit{source: event, decoded: *decoded}
-	g.deposits = append(g.deposits, d)
 
 	uuid := decoded.DepositedUUID
 
