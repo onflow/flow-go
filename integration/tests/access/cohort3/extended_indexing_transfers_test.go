@@ -388,16 +388,15 @@ func (s *ExtendedIndexingSuite) verifyFTTransfers(
 		}
 	}
 
-	// Verify role filter: recipient-only transfers for the recipient address.
-	role := swagger.RECIPIENT_TransferRole
+	// Verify recipient_address filter: recipient-only transfers for the recipient address.
 	recipientOnly, err := s.apiClient.GetAllAccountFungibleTransfers(ctx, recipientAddr.String(), 50,
 		&swagger.AccountsApiGetAccountFungibleTransfersOpts{
-			Role: optional.NewInterface(role),
+			RecipientAddress: optional.NewInterface(recipientAddr.String()),
 		})
 	s.Require().NoError(err)
 	for _, t := range recipientOnly {
 		s.Equal(recipientAddr.Hex(), t.RecipientAddress,
-			"role=recipient filter should only return transfers where this account is the recipient")
+			"recipient_address filter should only return transfers where this account is the recipient")
 	}
 
 	// Verify the sender sent both FlowToken and ExampleToken.
@@ -406,16 +405,15 @@ func (s *ExtendedIndexingSuite) verifyFTTransfers(
 	s.T().Logf("sender %s has %d FT transfers", senderAddr, len(senderTransfers))
 	s.GreaterOrEqual(len(senderTransfers), 2, "sender should have at least 2 FT transfers")
 
-	// Verify role filter: sender-only transfers for the sender address.
-	senderRole := swagger.SENDER_TransferRole
+	// Verify source_address filter: sender-only transfers for the sender address.
 	senderOnly, err := s.apiClient.GetAllAccountFungibleTransfers(ctx, senderAddr.String(), 50,
 		&swagger.AccountsApiGetAccountFungibleTransfersOpts{
-			Role: optional.NewInterface(senderRole),
+			SourceAddress: optional.NewInterface(senderAddr.String()),
 		})
 	s.Require().NoError(err)
 	for _, t := range senderOnly {
 		s.Equal(senderAddr.Hex(), t.SourceAddress,
-			"role=sender filter should only return transfers where this account is the sender")
+			"source_address filter should only return transfers where this account is the sender")
 	}
 
 	// Verify FT pagination: page through with limit=1, compare to unpaginated.
@@ -450,16 +448,15 @@ func (s *ExtendedIndexingSuite) verifyNFTTransfers(
 		s.Equal(recipientAddr.Hex(), transfer.RecipientAddress, "recipient address should match")
 	}
 
-	// Verify role filter: recipient-only.
-	role := swagger.RECIPIENT_TransferRole
+	// Verify recipient_address filter: recipient-only.
 	recipientOnly, err := s.apiClient.GetAllAccountNonFungibleTransfers(ctx, recipientAddr.String(), 50,
 		&swagger.AccountsApiGetAccountNonFungibleTransfersOpts{
-			Role: optional.NewInterface(role),
+			RecipientAddress: optional.NewInterface(recipientAddr.String()),
 		})
 	s.Require().NoError(err)
 	for _, t := range recipientOnly {
 		s.Equal(recipientAddr.Hex(), t.RecipientAddress,
-			"role=recipient filter should only return transfers where this account is the recipient")
+			"recipient_address filter should only return transfers where this account is the recipient")
 	}
 
 	// Verify NFT pagination.

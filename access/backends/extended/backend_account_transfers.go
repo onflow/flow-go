@@ -39,6 +39,8 @@ func (f *AccountTransferFilter) isEmpty() bool {
 			f.RecipientAddress == flow.EmptyAddress)
 }
 
+// FTFilter returns a filter function for fungible token transfers based on the filter criteria.
+// Returns nil when no filter criteria are set, indicating all transfers should be accepted.
 func (f *AccountTransferFilter) FTFilter() storage.IndexFilter[*accessmodel.FungibleTokenTransfer] {
 	if f.isEmpty() {
 		return nil
@@ -48,6 +50,8 @@ func (f *AccountTransferFilter) FTFilter() storage.IndexFilter[*accessmodel.Fung
 	}
 }
 
+// NFTFilter returns a filter function for non-fungible token transfers based on the filter criteria.
+// Returns nil when no filter criteria are set, indicating all transfers should be accepted.
 func (f *AccountTransferFilter) NFTFilter() storage.IndexFilter[*accessmodel.NonFungibleTokenTransfer] {
 	if f.isEmpty() {
 		return nil

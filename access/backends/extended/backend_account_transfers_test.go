@@ -504,7 +504,7 @@ func TestAccountFTTransferFilter(t *testing.T) {
 
 	t.Run("empty filter matches all", func(t *testing.T) {
 		filter := AccountTransferFilter{}
-		assert.True(t, filter.FTFilter()(transfer))
+		assert.Nil(t, filter.FTFilter(), "empty filter should return nil, indicating all transfers are accepted")
 	})
 
 	t.Run("token type filter matches", func(t *testing.T) {
@@ -587,7 +587,7 @@ func TestAccountFTTransferFilter(t *testing.T) {
 			SourceAddress:    flow.EmptyAddress,
 			RecipientAddress: flow.EmptyAddress,
 		}
-		assert.True(t, filter.FTFilter()(transfer))
+		assert.Nil(t, filter.FTFilter(), "filter with only empty addresses should return nil, indicating all transfers are accepted")
 	})
 }
 
@@ -606,7 +606,7 @@ func TestAccountTransferFilter(t *testing.T) {
 
 	t.Run("empty filter matches all", func(t *testing.T) {
 		filter := AccountTransferFilter{}
-		assert.True(t, filter.NFTFilter()(transfer))
+		assert.Nil(t, filter.NFTFilter(), "empty filter should return nil, indicating all transfers are accepted")
 	})
 
 	t.Run("token type filter matches", func(t *testing.T) {
@@ -689,6 +689,6 @@ func TestAccountTransferFilter(t *testing.T) {
 			SourceAddress:    flow.EmptyAddress,
 			RecipientAddress: flow.EmptyAddress,
 		}
-		assert.True(t, filter.NFTFilter()(transfer))
+		assert.Nil(t, filter.NFTFilter(), "filter with only empty addresses should return nil, indicating all transfers are accepted")
 	})
 }
