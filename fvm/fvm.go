@@ -232,7 +232,7 @@ func (vm *VirtualMachine) inspectProcedureResults(
 	inspectionResults := make([]inspection.Result, len(context.Inspectors))
 	var err error
 	for i, inspector := range context.Inspectors {
-		inspectionResults[i], err = inspector.Inspect(storageSnapshot, executionSnapshot, evts)
+		inspectionResults[i], err = inspector.Inspect(logger, storageSnapshot, executionSnapshot, evts)
 		if err != nil {
 			logger.Warn().Str("module", "tc-inspector").Err(err).Msg("failed to inspect procedure results")
 		}
