@@ -153,6 +153,7 @@ func (idx *AccountTransactions) rangeKeys(account flow.Address, cursor *access.A
 	// since the cursor may point to a transaction within idx.firstHeight, we need to use the last
 	// possible key for the prefix.
 	startKey = makeAccountTxKey(account, cursor.BlockHeight, cursor.TransactionIndex)
+	endKey = makeAccountTxKeyPrefix(account, idx.firstHeight)
 	endKey = storage.PrefixInclusiveEnd(endKey, startKey)
 
 	return startKey, endKey, nil
