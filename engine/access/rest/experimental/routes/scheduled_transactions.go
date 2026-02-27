@@ -56,7 +56,7 @@ func GetScheduledTransaction(r *common.Request, backend extended.API, link model
 	return m, nil
 }
 
-// GetScheduledTransactionsByAddress handles GET /scheduled/account/{address}.
+// GetScheduledTransactionsByAddress handles GET /accounts/{address}/scheduled.
 func GetScheduledTransactionsByAddress(r *common.Request, backend extended.API, link models.LinkGenerator) (interface{}, error) {
 	req, err := request.NewGetScheduledTransactionsByAddress(r)
 	if err != nil {

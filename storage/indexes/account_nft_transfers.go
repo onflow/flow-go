@@ -147,6 +147,7 @@ func (idx *NonFungibleTokenTransfers) ByAddress(
 func (idx *NonFungibleTokenTransfers) rangeKeys(account flow.Address, cursor *access.TransferCursor) (startKey, endKey []byte, err error) {
 	latestHeight := idx.latestHeight.Load()
 	if cursor == nil {
+		// keys include the one's complement of the height, so iteration is in descending order of height.
 		startKey = makeNFTTransferKeyPrefix(account, latestHeight)
 		endKey = makeNFTTransferKeyPrefix(account, idx.firstHeight)
 		return startKey, endKey, nil
@@ -156,6 +157,8 @@ func (idx *NonFungibleTokenTransfers) rangeKeys(account flow.Address, cursor *ac
 		return nil, nil, err
 	}
 
+	// since the cursor may point to a transaction within idx.firstHeight, we need to use the last
+	// possible key for the prefix.
 	startKey = makeNFTTransferKey(account, cursor.BlockHeight, cursor.TransactionIndex, cursor.EventIndex)
 	endKey = storage.PrefixInclusiveEnd(endKey, startKey)
 

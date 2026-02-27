@@ -110,11 +110,7 @@ func (idx *ScheduledTransactionsIndex) ByID(id uint64) (access.ScheduledTransact
 func (idx *ScheduledTransactionsIndex) All(
 	cursor *access.ScheduledTransactionCursor,
 ) (storage.ScheduledTransactionIterator, error) {
-	startKey := makeScheduledTxPrimaryKey(math.MaxUint64)
-	if cursor != nil {
-		startKey = makeScheduledTxPrimaryKey(cursor.ID)
-	}
-	endKey := makeScheduledTxPrimaryKey(0)
+	startKey, endKey := idx.rangeKeysAll(cursor)
 
 	reader := idx.db.Reader()
 	iter, err := reader.NewIter(startKey, endKey, storage.DefaultIteratorOptions())
@@ -138,11 +134,7 @@ func (idx *ScheduledTransactionsIndex) ByAddress(
 	account flow.Address,
 	cursor *access.ScheduledTransactionCursor,
 ) (storage.ScheduledTransactionIterator, error) {
-	startKey := makeScheduledTxByAddrKey(account, math.MaxUint64)
-	if cursor != nil {
-		startKey = makeScheduledTxByAddrKey(account, cursor.ID)
-	}
-	endKey := makeScheduledTxByAddrKey(account, 0)
+	startKey, endKey := idx.rangeKeysAddress(account, cursor)
 
 	reader := idx.db.Reader()
 	iter, err := reader.NewIter(startKey, endKey, storage.DefaultIteratorOptions())
@@ -161,6 +153,40 @@ func (idx *ScheduledTransactionsIndex) ByAddress(
 	}
 
 	return iterator.Build(iter, decodeScheduledTxByAddrCursor, getValue), nil
+}
+
+// rangeKeysAll computes the start and end keys for iterating over all scheduled transactions based
+// on the provided cursor.
+//
+// Any error indicates the cursor is invalid
+func (idx *ScheduledTransactionsIndex) rangeKeysAll(cursor *access.ScheduledTransactionCursor) (startKey, endKey []byte) {
+	if cursor == nil {
+		// keys include the one's complement of the ID, so iteration is in descending order of ids.
+		startKey = makeScheduledTxPrimaryKey(math.MaxUint64)
+		endKey = makeScheduledTxPrimaryKey(0)
+		return startKey, endKey
+	}
+
+	startKey = makeScheduledTxPrimaryKey(cursor.ID)
+	endKey = makeScheduledTxPrimaryKey(0)
+	return startKey, endKey
+}
+
+// rangeKeysAddress computes the start and end keys for iterating over scheduled transactions of an
+// account, based on the provided cursor.
+//
+// Any error indicates the cursor is invalid
+func (idx *ScheduledTransactionsIndex) rangeKeysAddress(address flow.Address, cursor *access.ScheduledTransactionCursor) (startKey, endKey []byte) {
+	if cursor == nil {
+		// keys include the one's complement of the ID, so iteration is in descending order of ids.
+		startKey := makeScheduledTxByAddrKey(address, math.MaxUint64)
+		endKey := makeScheduledTxByAddrKey(address, 0)
+		return startKey, endKey
+	}
+
+	startKey = makeScheduledTxByAddrKey(address, cursor.ID)
+	endKey = makeScheduledTxByAddrKey(address, 0)
+	return startKey, endKey
 }
 
 // Store indexes new scheduled transactions from the block and advances the latest indexed height.

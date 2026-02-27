@@ -140,6 +140,7 @@ func (idx *AccountTransactions) ByAddress(
 func (idx *AccountTransactions) rangeKeys(account flow.Address, cursor *access.AccountTransactionCursor) (startKey, endKey []byte, err error) {
 	latestHeight := idx.latestHeight.Load()
 	if cursor == nil {
+		// keys include the one's complement of the height, so iteration is in descending order of height.
 		startKey = makeAccountTxKeyPrefix(account, latestHeight)
 		endKey = makeAccountTxKeyPrefix(account, idx.firstHeight)
 		return startKey, endKey, nil
@@ -149,7 +150,8 @@ func (idx *AccountTransactions) rangeKeys(account flow.Address, cursor *access.A
 		return nil, nil, err
 	}
 
-	// since the cursor could point to some entry
+	// since the cursor may point to a transaction within idx.firstHeight, we need to use the last
+	// possible key for the prefix.
 	startKey = makeAccountTxKey(account, cursor.BlockHeight, cursor.TransactionIndex)
 	endKey = storage.PrefixInclusiveEnd(endKey, startKey)
 

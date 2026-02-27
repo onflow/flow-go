@@ -61,7 +61,7 @@ func scheduledTxByIDURL(t *testing.T, id uint64, params scheduledTxURLParams) st
 }
 
 func scheduledTxsByAddrURL(t *testing.T, address string, params scheduledTxURLParams) string {
-	u, err := url.ParseRequestURI(fmt.Sprintf("/experimental/v1/scheduled/account/%s", address))
+	u, err := url.ParseRequestURI(fmt.Sprintf("/experimental/v1/accounts/%s/scheduled", address))
 	require.NoError(t, err)
 	q := u.Query()
 	if params.limit != "" {
