@@ -127,17 +127,10 @@ func (idx *NonFungibleTokenTransfers) ByAddress(
 	account flow.Address,
 	cursor *access.TransferCursor,
 ) (storage.IndexIterator[access.NonFungibleTokenTransfer, access.TransferCursor], error) {
-	latestHeight := idx.latestHeight.Load()
-	startKey := makeNFTTransferKeyPrefix(account, latestHeight)
-
-	if cursor != nil {
-		if err := validateCursorHeight(cursor.BlockHeight, idx.firstHeight, latestHeight); err != nil {
-			return nil, err
-		}
-		startKey = makeNFTTransferKey(account, cursor.BlockHeight, cursor.TransactionIndex, cursor.EventIndex)
+	startKey, endKey, err := idx.rangeKeys(account, cursor)
+	if err != nil {
+		return nil, fmt.Errorf("could not determine range keys: %w", err)
 	}
-
-	endKey := makeNFTTransferKeyPrefix(account, idx.firstHeight)
 
 	iter, err := idx.db.Reader().NewIter(startKey, endKey, storage.DefaultIteratorOptions())
 	if err != nil {
@@ -145,6 +138,28 @@ func (idx *NonFungibleTokenTransfers) ByAddress(
 	}
 
 	return iterator.Build(iter, decodeNFTTransferKey, reconstructNFTTransfer), nil
+}
+
+// rangeKeys computes the start and end keys for iterating over transfers of an account, based on
+// the provided cursor.
+//
+// Any error indicates the cursor is invalid
+func (idx *NonFungibleTokenTransfers) rangeKeys(account flow.Address, cursor *access.TransferCursor) (startKey, endKey []byte, err error) {
+	latestHeight := idx.latestHeight.Load()
+	if cursor == nil {
+		startKey = makeNFTTransferKeyPrefix(account, latestHeight)
+		endKey = makeNFTTransferKeyPrefix(account, idx.firstHeight)
+		return startKey, endKey, nil
+	}
+
+	if err := validateCursorHeight(cursor.BlockHeight, idx.firstHeight, latestHeight); err != nil {
+		return nil, nil, err
+	}
+
+	startKey = makeNFTTransferKey(account, cursor.BlockHeight, cursor.TransactionIndex, cursor.EventIndex)
+	endKey = storage.PrefixInclusiveEnd(endKey, startKey)
+
+	return startKey, endKey, nil
 }
 
 // Store indexes all non-fungible token transfers for a block.
