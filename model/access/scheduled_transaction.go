@@ -121,7 +121,15 @@ type ScheduledTransaction struct {
 	// Expansion fields populated when expandResults is true. Never persisted.
 	Transaction     *flow.TransactionBody `msgpack:"-"` // Transaction body (nil unless expanded)
 	Result          *TransactionResult    `msgpack:"-"` // Transaction result (nil unless expanded)
-	HandlerContract *Contract             `msgpack:"-"` // Handler contract (nil unless expanded)
+	HandlerContract *ContractDeployment   `msgpack:"-"` // Handler contract (nil unless expanded)
+}
+
+func (tx *ScheduledTransaction) HandlerContractID() (string, error) {
+	parts := strings.Split(tx.TransactionHandlerTypeIdentifier, ".")
+	if len(parts) < 3 {
+		return "", fmt.Errorf("invalid handler type identifier: %s", tx.TransactionHandlerTypeIdentifier)
+	}
+	return strings.Join(parts[:3], "."), nil
 }
 
 // ScheduledTransactionCursor identifies a position in the scheduled transaction index for

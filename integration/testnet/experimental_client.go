@@ -169,6 +169,147 @@ func (c *ExperimentalAPIClient) GetAllAccountNonFungibleTransfers(
 	return all, nil
 }
 
+// GetContractByIdentifier fetches the latest deployment of the contract with the given identifier.
+//
+// Expected error returns during normal operation:
+//   - Returns an error with the HTTP status code and response body for non-200 responses.
+func (c *ExperimentalAPIClient) GetContractByIdentifier(
+	ctx context.Context,
+	identifier string,
+) (*swagger.ContractDeployment, error) {
+	resp, _, err := c.client.ContractsApi.GetContractByIdentifier(ctx, identifier, nil)
+	if err != nil {
+		return nil, fmt.Errorf("contracts API request failed for %s: %w", identifier, err)
+	}
+	return &resp, nil
+}
+
+// GetContractDeployments fetches a single page of deployment history for the given contract.
+//
+// Expected error returns during normal operation:
+//   - Returns an error with the HTTP status code and response body for non-200 responses.
+func (c *ExperimentalAPIClient) GetContractDeployments(
+	ctx context.Context,
+	identifier string,
+	opts *swagger.ContractsApiGetContractDeploymentsOpts,
+) (*swagger.ContractDeploymentsResponse, error) {
+	resp, _, err := c.client.ContractsApi.GetContractDeployments(ctx, identifier, opts)
+	if err != nil {
+		return nil, fmt.Errorf("contract deployments API request failed for %s: %w", identifier, err)
+	}
+	return &resp, nil
+}
+
+// GetAllContractDeployments paginates through all deployment history pages for the given contract
+// and returns the accumulated results.
+//
+// No error returns are expected during normal operation.
+func (c *ExperimentalAPIClient) GetAllContractDeployments(
+	ctx context.Context,
+	identifier string,
+	pageSize int,
+) ([]swagger.ContractDeployment, error) {
+	var all []swagger.ContractDeployment
+	opts := &swagger.ContractsApiGetContractDeploymentsOpts{
+		Limit: optional.NewInt32(int32(pageSize)),
+	}
+	for {
+		resp, err := c.GetContractDeployments(ctx, identifier, opts)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get contract deployments page: %w", err)
+		}
+		all = append(all, resp.Deployments...)
+		if resp.NextCursor == "" {
+			break
+		}
+		opts.Cursor = optional.NewInterface(resp.NextCursor)
+	}
+	return all, nil
+}
+
+// GetContracts fetches a single page of contracts (latest deployment per contract).
+//
+// Expected error returns during normal operation:
+//   - Returns an error with the HTTP status code and response body for non-200 responses.
+func (c *ExperimentalAPIClient) GetContracts(
+	ctx context.Context,
+	opts *swagger.ContractsApiGetContractsOpts,
+) (*swagger.ContractsResponse, error) {
+	resp, _, err := c.client.ContractsApi.GetContracts(ctx, opts)
+	if err != nil {
+		return nil, fmt.Errorf("contracts list API request failed: %w", err)
+	}
+	return &resp, nil
+}
+
+// GetAllContracts paginates through all contracts pages and returns the accumulated results.
+//
+// No error returns are expected during normal operation.
+func (c *ExperimentalAPIClient) GetAllContracts(
+	ctx context.Context,
+	pageSize int,
+) ([]swagger.ContractDeployment, error) {
+	var all []swagger.ContractDeployment
+	opts := &swagger.ContractsApiGetContractsOpts{
+		Limit: optional.NewInt32(int32(pageSize)),
+	}
+	for {
+		resp, err := c.GetContracts(ctx, opts)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get contracts page: %w", err)
+		}
+		all = append(all, resp.Contracts...)
+		if resp.NextCursor == "" {
+			break
+		}
+		opts.Cursor = optional.NewInterface(resp.NextCursor)
+	}
+	return all, nil
+}
+
+// GetContractsByAccount fetches a single page of contracts deployed to the given account.
+//
+// Expected error returns during normal operation:
+//   - Returns an error with the HTTP status code and response body for non-200 responses.
+func (c *ExperimentalAPIClient) GetContractsByAccount(
+	ctx context.Context,
+	address string,
+	opts *swagger.ContractsApiGetContractsByAccountOpts,
+) (*swagger.ContractsResponse, error) {
+	resp, _, err := c.client.ContractsApi.GetContractsByAccount(ctx, address, opts)
+	if err != nil {
+		return nil, fmt.Errorf("contracts by account API request failed for %s: %w", address, err)
+	}
+	return &resp, nil
+}
+
+// GetAllContractsByAccount paginates through all contract pages for the given account and
+// returns the accumulated results.
+//
+// No error returns are expected during normal operation.
+func (c *ExperimentalAPIClient) GetAllContractsByAccount(
+	ctx context.Context,
+	address string,
+	pageSize int,
+) ([]swagger.ContractDeployment, error) {
+	var all []swagger.ContractDeployment
+	opts := &swagger.ContractsApiGetContractsByAccountOpts{
+		Limit: optional.NewInt32(int32(pageSize)),
+	}
+	for {
+		resp, err := c.GetContractsByAccount(ctx, address, opts)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get contracts by account page: %w", err)
+		}
+		all = append(all, resp.Contracts...)
+		if resp.NextCursor == "" {
+			break
+		}
+		opts.Cursor = optional.NewInterface(resp.NextCursor)
+	}
+	return all, nil
+}
+
 // buildOpts constructs [swagger.AccountsApiGetAccountTransactionsOpts] from the given parameters.
 func buildOpts(
 	limit int32,

@@ -159,9 +159,7 @@ func TestGetScheduledTransactions(t *testing.T) {
 					"transaction_handler_uuid": "7",
 					"created_transaction_id": "%s",
 					"_expandable": {
-						"transaction": "transaction",
-						"result": "result",
-						"handler_contract": "handler_contract"
+						"handler_contract": "/experimental/v1/contracts/A.0000.MyScheduler"
 					}
 				},
 				{
@@ -177,14 +175,14 @@ func TestGetScheduledTransactions(t *testing.T) {
 					"created_transaction_id": "%s",
 					"executed_transaction_id": "%s",
 					"_expandable": {
-						"transaction": "transaction",
-						"result": "result",
-						"handler_contract": "handler_contract"
+						"handler_contract": "/experimental/v1/contracts/A.0000.MyScheduler",
+						"transaction": "/v1/transactions/%s",
+						"result": "/v1/transaction_results/%s"
 					}
 				}
 			],
 			"next_cursor": "%s"
-		}`, handlerOwner.String(), tx1CreatedID.String(), handlerOwner.String(), tx2CreatedID.String(), tx2ExecutedID.String(), expectedNextCursor)
+		}`, handlerOwner.String(), tx1CreatedID.String(), handlerOwner.String(), tx2CreatedID.String(), tx2ExecutedID.String(), tx2ExecutedID.String(), tx2ExecutedID.String(), expectedNextCursor)
 
 		assert.JSONEq(t, expected, rr.Body.String())
 	})
@@ -368,9 +366,7 @@ func TestGetScheduledTransaction(t *testing.T) {
 			"transaction_handler_uuid": "3",
 			"created_transaction_id": "%s",
 			"_expandable": {
-				"transaction": "transaction",
-				"result": "result",
-				"handler_contract": "handler_contract"
+				"handler_contract": "/experimental/v1/contracts/A.0000.MyScheduler"
 			}
 		}`, handlerOwner.String(), txCreatedID.String())
 
@@ -403,9 +399,10 @@ func TestGetScheduledTransaction(t *testing.T) {
 			TransactionHandlerUUID:           3,
 			Status:                           accessmodel.ScheduledTxStatusScheduled,
 			CreatedTransactionID:             txCreatedID,
-			HandlerContract: &accessmodel.Contract{
-				Identifier: "A.0000.MyScheduler",
-				Body:       "pub contract MyScheduler {}",
+			HandlerContract: &accessmodel.ContractDeployment{
+				ContractID: "A.0000.MyScheduler",
+				Code:       []byte("pub contract MyScheduler {}"),
+				CodeHash:   accessmodel.CadenceCodeHash([]byte("pub contract MyScheduler {}")),
 			},
 		}
 
@@ -435,13 +432,19 @@ func TestGetScheduledTransaction(t *testing.T) {
 			"transaction_handler_uuid": "3",
 			"created_transaction_id": "%s",
 			"handler_contract": {
-				"identifier": "A.0000.MyScheduler",
-				"body": "pub contract MyScheduler {}"
+				"contract_id": "A.0000.MyScheduler",
+				"address": "0000000000000000",
+				"block_height": "0",
+				"transaction_id": "0000000000000000000000000000000000000000000000000000000000000000",
+				"tx_index": "0",
+				"event_index": "0",
+				"code": "cHViIGNvbnRyYWN0IE15U2NoZWR1bGVyIHt9",
+				"code_hash": "383198cd7e974ca055c4137bdd1fa44934882f569e7f0c353254e0e7ce8a50fb",
+				"_expandable": {
+					"transaction": "/v1/transactions/0000000000000000000000000000000000000000000000000000000000000000"
+				}
 			},
-			"_expandable": {
-				"transaction": "transaction",
-				"result": "result"
-			}
+			"_expandable": {}
 		}`, handlerOwner.String(), txCreatedID.String())
 
 		assert.JSONEq(t, expected, rr.Body.String())

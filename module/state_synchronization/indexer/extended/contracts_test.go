@@ -2,7 +2,6 @@ package extended_test
 
 import (
 	"bytes"
-	"crypto/sha3"
 	"fmt"
 	"os"
 	"testing"
@@ -17,6 +16,7 @@ import (
 
 	"github.com/onflow/flow-go/fvm/environment"
 	fvmsnapshot "github.com/onflow/flow-go/fvm/storage/snapshot"
+	"github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
 	executionmock "github.com/onflow/flow-go/module/execution/mock"
 	"github.com/onflow/flow-go/module/metrics"
@@ -87,7 +87,7 @@ func TestContractsIndexer_ContractAdded(t *testing.T) {
 	address := unittest.RandomAddressFixture()
 	contractName := "MyContract"
 	code := []byte("access(all) contract MyContract {}")
-	codeHash := cadenceCodeHash(code)
+	codeHash := access.CadenceCodeHash(code)
 
 	scriptExecutor := executionmock.NewScriptExecutor(t)
 	indexer, store, lm, db := newContractsIndexerWithScriptExecutor(t, flow.Testnet, contractsBootstrapHeight, scriptExecutor)
@@ -132,8 +132,8 @@ func TestContractsIndexer_ContractUpdated(t *testing.T) {
 	contractName := "MyContract"
 	codeV1 := []byte("access(all) contract MyContract { let x: Int; init() { self.x = 1 } }")
 	codeV2 := []byte("access(all) contract MyContract { let x: Int; init() { self.x = 2 } }")
-	codeHashV1 := cadenceCodeHash(codeV1)
-	codeHashV2 := cadenceCodeHash(codeV2)
+	codeHashV1 := access.CadenceCodeHash(codeV1)
+	codeHashV2 := access.CadenceCodeHash(codeV2)
 
 	scriptExecutor := executionmock.NewScriptExecutor(t)
 	indexer, store, lm, db := newContractsIndexerWithScriptExecutor(t, flow.Testnet, contractsBootstrapHeight, scriptExecutor)
@@ -188,8 +188,8 @@ func TestContractsIndexer_MultipleContractsInOneBlock(t *testing.T) {
 	addr2 := unittest.RandomAddressFixture()
 	code1 := []byte("access(all) contract Alpha {}")
 	code2 := []byte("access(all) contract Beta {}")
-	hash1 := cadenceCodeHash(code1)
-	hash2 := cadenceCodeHash(code2)
+	hash1 := access.CadenceCodeHash(code1)
+	hash2 := access.CadenceCodeHash(code2)
 
 	scriptExecutor := executionmock.NewScriptExecutor(t)
 	indexer, store, lm, db := newContractsIndexerWithScriptExecutor(t, flow.Testnet, contractsBootstrapHeight, scriptExecutor)
@@ -243,8 +243,8 @@ func TestContractsIndexer_SameAccountCached(t *testing.T) {
 	address := unittest.RandomAddressFixture()
 	codeA := []byte("access(all) contract Alpha {}")
 	codeB := []byte("access(all) contract Beta {}")
-	hashA := cadenceCodeHash(codeA)
-	hashB := cadenceCodeHash(codeB)
+	hashA := access.CadenceCodeHash(codeA)
+	hashB := access.CadenceCodeHash(codeB)
 
 	scriptExecutor := executionmock.NewScriptExecutor(t)
 	indexer, store, lm, db := newContractsIndexerWithScriptExecutor(t, flow.Testnet, contractsBootstrapHeight, scriptExecutor)
@@ -299,7 +299,7 @@ func TestContractsIndexer_ByAddress(t *testing.T) {
 	header1 := unittest.BlockHeaderFixtureOnChain(flow.Testnet, unittest.WithHeaderHeight(contractsEventHeight))
 	indexContractsBlock(t, indexer, lm, db, BlockData{
 		Header: header1,
-		Events: []flow.Event{makeAccountContractAddedEvent(t, addr1, "Foo", cadenceCodeHash(code1), 0, 0)},
+		Events: []flow.Event{makeAccountContractAddedEvent(t, addr1, "Foo", access.CadenceCodeHash(code1), 0, 0)},
 	})
 
 	// Block 102: addr2 deploys Bar.
@@ -309,7 +309,7 @@ func TestContractsIndexer_ByAddress(t *testing.T) {
 	header2 := unittest.BlockHeaderFixtureOnChain(flow.Testnet, unittest.WithHeaderHeight(contractsEventHeight+1))
 	indexContractsBlock(t, indexer, lm, db, BlockData{
 		Header: header2,
-		Events: []flow.Event{makeAccountContractAddedEvent(t, addr2, "Bar", cadenceCodeHash(code2), 0, 0)},
+		Events: []flow.Event{makeAccountContractAddedEvent(t, addr2, "Bar", access.CadenceCodeHash(code2), 0, 0)},
 	})
 
 	// ByAddress(addr1) returns only Foo.
@@ -337,8 +337,8 @@ func TestContractsIndexer_Backfill(t *testing.T) {
 	contractName := "BackfillContract"
 	codeV1 := []byte("access(all) contract BackfillContract { let v: Int; init() { self.v = 1 } }")
 	codeV2 := []byte("access(all) contract BackfillContract { let v: Int; init() { self.v = 2 } }")
-	hashV1 := cadenceCodeHash(codeV1)
-	hashV2 := cadenceCodeHash(codeV2)
+	hashV1 := access.CadenceCodeHash(codeV1)
+	hashV2 := access.CadenceCodeHash(codeV2)
 
 	scriptExecutor := executionmock.NewScriptExecutor(t)
 	firstHeight := contractsBootstrapHeight
@@ -411,7 +411,7 @@ func TestContractsIndexer_BackfillMultipleBlocks(t *testing.T) {
 	for i := range addrs {
 		addrs[i] = unittest.RandomAddressFixture()
 		codes[i] = fmt.Appendf(nil, "access(all) contract C%d {}", i)
-		hashes[i] = cadenceCodeHash(codes[i])
+		hashes[i] = access.CadenceCodeHash(codes[i])
 	}
 
 	scriptExecutor := executionmock.NewScriptExecutor(t)
@@ -497,7 +497,7 @@ func TestContractsIndexer_CodeHashMismatch(t *testing.T) {
 	eventCode := []byte("access(all) contract Mismatch {}")
 	differentCode := []byte("access(all) contract Different {}")
 	// Event carries hash of eventCode, but the snapshot holds differentCode.
-	eventHash := cadenceCodeHash(eventCode)
+	eventHash := access.CadenceCodeHash(eventCode)
 
 	scriptExecutor := executionmock.NewScriptExecutor(t)
 	indexer, _, lm, db := newContractsIndexerWithScriptExecutor(t, flow.Testnet, contractsBootstrapHeight, scriptExecutor)
@@ -543,7 +543,7 @@ func TestContractsIndexer_ScriptExecutorError(t *testing.T) {
 	eventHeader := unittest.BlockHeaderFixtureOnChain(flow.Testnet, unittest.WithHeaderHeight(contractsEventHeight))
 	scriptExecutor.On("GetStorageSnapshot", contractsEventHeight).Return(nil, scriptErr).Once()
 
-	codeHash := cadenceCodeHash([]byte("access(all) contract MyContract {}"))
+	codeHash := access.CadenceCodeHash([]byte("access(all) contract MyContract {}"))
 	event := makeAccountContractAddedEvent(t, address, "MyContract", codeHash, 0, 0)
 
 	err := indexContractsBlockExpectError(t, indexer, lm, db, BlockData{
@@ -812,11 +812,4 @@ func makeContractEvent(
 		EventIndex:       eventIndex,
 		Payload:          payload,
 	}
-}
-
-// cadenceCodeHash computes the SHA3-256 hash of contract code using the same algorithm
-// that cadence uses internally (stdlib.CodeToHashValue).
-func cadenceCodeHash(code []byte) []byte {
-	h := sha3.Sum256(code)
-	return h[:]
 }

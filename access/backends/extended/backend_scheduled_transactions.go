@@ -345,10 +345,7 @@ func (b *ScheduledTransactionsBackend) expandHandlerContract(
 	contract, err := b.contracts.ByContractID(contractID)
 
 	if err == nil {
-		tx.HandlerContract = &accessmodel.Contract{
-			Identifier: contract.ContractID,
-			Body:       string(contract.Code),
-		}
+		tx.HandlerContract = &contract
 		return nil
 	}
 
@@ -369,9 +366,12 @@ func (b *ScheduledTransactionsBackend) expandHandlerContract(
 		return fmt.Errorf("failed to get contract code for tx handler %s: %w", address, err)
 	}
 
-	tx.HandlerContract = &accessmodel.Contract{
-		Identifier: contractID,
-		Body:       string(code),
+	tx.HandlerContract = &accessmodel.ContractDeployment{
+		ContractID:    contractID,
+		Address:       address,
+		Code:          code,
+		CodeHash:      accessmodel.CadenceCodeHash(code),
+		IsPlaceholder: true,
 	}
 
 	return nil

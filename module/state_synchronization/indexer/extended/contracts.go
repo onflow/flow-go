@@ -2,7 +2,6 @@ package extended
 
 import (
 	"bytes"
-	"crypto/sha3"
 	"errors"
 	"fmt"
 
@@ -132,7 +131,7 @@ func (c *Contracts) collectDeployments(data BlockData) (deployments []access.Con
 			}
 
 			// make sure the hash of the code fetched from state matches the hash in the event
-			if !bytes.Equal(e.CodeHash, cadenceCodeToHash(code)) {
+			if !bytes.Equal(e.CodeHash, access.CadenceCodeHash(code)) {
 				return nil, 0, 0, fmt.Errorf("code hash mismatch for %s event: %s", event.Type, e.ContractName)
 			}
 
@@ -165,7 +164,7 @@ func (c *Contracts) collectDeployments(data BlockData) (deployments []access.Con
 			}
 
 			// make sure the hash of the code fetched from state matches the hash in the event
-			if !bytes.Equal(e.CodeHash, cadenceCodeToHash(code)) {
+			if !bytes.Equal(e.CodeHash, access.CadenceCodeHash(code)) {
 				return nil, 0, 0, fmt.Errorf("code hash mismatch for %s event: %s", event.Type, e.ContractName)
 			}
 
@@ -240,7 +239,7 @@ func (c *Contracts) loadDeployedContracts(height uint64) ([]access.ContractDeplo
 				ContractID: events.ContractIDFromAddress(address, contractName),
 				Address:    address,
 				Code:       code,
-				CodeHash:   cadenceCodeToHash(code),
+				CodeHash:   access.CadenceCodeHash(code),
 				// all other fields are omitted because we do not do not know the actual deployment details
 				IsPlaceholder: true,
 			})
@@ -248,15 +247,6 @@ func (c *Contracts) loadDeployedContracts(height uint64) ([]access.ContractDeplo
 	}
 
 	return deployments, nil
-}
-
-// cadenceCodeToHash calculates the hash of the provided code using the same algorithm as cadence.
-// This method should return the same value as the CodeHash field in flow.AccountContractAdded
-// and flow.AccountContractUpdated events.
-func cadenceCodeToHash(code []byte) []byte {
-	// this is what cadence does in stdlib.CodeToHashValue()
-	codeHash := sha3.Sum256(code)
-	return codeHash[:]
 }
 
 type contractRetriever struct {

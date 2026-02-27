@@ -7,14 +7,13 @@ import (
 
 	"github.com/onflow/flow-go/access/backends/extended"
 	"github.com/onflow/flow-go/engine/access/rest/common"
-	commonmodels "github.com/onflow/flow-go/engine/access/rest/common/models"
 	"github.com/onflow/flow-go/engine/access/rest/experimental/models"
 	"github.com/onflow/flow-go/engine/access/rest/experimental/request"
 	accessmodel "github.com/onflow/flow-go/model/access"
 )
 
 // GetScheduledTransactions handles GET /scheduled.
-func GetScheduledTransactions(r *common.Request, backend extended.API, link commonmodels.LinkGenerator) (interface{}, error) {
+func GetScheduledTransactions(r *common.Request, backend extended.API, link models.LinkGenerator) (interface{}, error) {
 	req, err := request.NewGetScheduledTransactions(r)
 	if err != nil {
 		return nil, common.NewBadRequestError(err)
@@ -36,7 +35,7 @@ func GetScheduledTransactions(r *common.Request, backend extended.API, link comm
 }
 
 // GetScheduledTransaction handles GET /scheduled/transaction/{id}.
-func GetScheduledTransaction(r *common.Request, backend extended.API, link commonmodels.LinkGenerator) (interface{}, error) {
+func GetScheduledTransaction(r *common.Request, backend extended.API, link models.LinkGenerator) (interface{}, error) {
 	req, err := request.NewGetScheduledTransaction(r)
 	if err != nil {
 		return nil, common.NewBadRequestError(err)
@@ -58,7 +57,7 @@ func GetScheduledTransaction(r *common.Request, backend extended.API, link commo
 }
 
 // GetScheduledTransactionsByAddress handles GET /scheduled/account/{address}.
-func GetScheduledTransactionsByAddress(r *common.Request, backend extended.API, link commonmodels.LinkGenerator) (interface{}, error) {
+func GetScheduledTransactionsByAddress(r *common.Request, backend extended.API, link models.LinkGenerator) (interface{}, error) {
 	req, err := request.NewGetScheduledTransactionsByAddress(r)
 	if err != nil {
 		return nil, common.NewBadRequestError(err)
@@ -84,7 +83,7 @@ func GetScheduledTransactionsByAddress(r *common.Request, backend extended.API, 
 // response, encoding the next cursor if present.
 func buildScheduledTransactionsResponse(
 	page *accessmodel.ScheduledTransactionsPage,
-	link commonmodels.LinkGenerator,
+	link models.LinkGenerator,
 	expandMap map[string]bool,
 ) (models.ScheduledTransactionsResponse, error) {
 	scheduledTransactions := make([]models.ScheduledTransaction, len(page.Transactions))

@@ -1,6 +1,7 @@
 package models
 
 import (
+	"fmt"
 	"strconv"
 
 	commonmodels "github.com/onflow/flow-go/engine/access/rest/common/models"
@@ -8,18 +9,12 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-const (
-	expandableTransaction     = "transaction"
-	expandableResult          = "result"
-	expandableHandlerContract = "handler_contract"
-)
-
 // Build populates a [ScheduledTransaction] from a domain model.
 func (t *ScheduledTransaction) Build(
 	tx *accessmodel.ScheduledTransaction,
-	link commonmodels.LinkGenerator,
+	link LinkGenerator,
 	expand map[string]bool,
-) {
+) error {
 	t.Id = strconv.FormatUint(tx.ID, 10)
 	var priority ScheduledTransactionPriority
 	priority.Build(tx.Priority)
@@ -53,26 +48,45 @@ func (t *ScheduledTransaction) Build(
 
 	t.Expandable = new(ScheduledTransactionExpandable)
 
-	if expand[expandableTransaction] && tx.Transaction != nil {
+	if tx.Transaction != nil {
 		t.Transaction = new(commonmodels.Transaction)
 		t.Transaction.Build(tx.Transaction, nil, link)
-	} else {
-		t.Expandable.Transaction = expandableTransaction
+	} else if tx.ExecutedTransactionID != flow.ZeroID {
+		transactionLink, err := link.TransactionLink(tx.ExecutedTransactionID)
+		if err != nil {
+			return fmt.Errorf("failed to generate transaction link: %w", err)
+		}
+		t.Expandable.Transaction = transactionLink
 	}
 
-	if expand[expandableResult] && tx.Result != nil {
+	if tx.Result != nil {
 		t.Result = new(commonmodels.TransactionResult)
 		t.Result.Build(tx.Result, tx.ExecutedTransactionID, link)
-	} else {
-		t.Expandable.Result = expandableResult
+	} else if tx.ExecutedTransactionID != flow.ZeroID {
+		resultLink, err := link.TransactionResultLink(tx.ExecutedTransactionID)
+		if err != nil {
+			return fmt.Errorf("failed to generate result link: %w", err)
+		}
+		t.Expandable.Result = resultLink
 	}
 
-	if expand[expandableHandlerContract] && tx.HandlerContract != nil {
-		t.HandlerContract = new(Contract)
-		t.HandlerContract.Build(tx.HandlerContract)
+	if tx.HandlerContract != nil {
+		t.HandlerContract = new(ContractDeployment)
+		t.HandlerContract.Build(tx.HandlerContract, link)
 	} else {
-		t.Expandable.HandlerContract = expandableHandlerContract
+		contractID, err := tx.HandlerContractID()
+		if err != nil {
+			return fmt.Errorf("failed to get handler contract ID: %w", err)
+		}
+
+		handlerContractLink, err := link.ContractLink(contractID)
+		if err != nil {
+			return fmt.Errorf("failed to generate handler contract link: %w", err)
+		}
+		t.Expandable.HandlerContract = handlerContractLink
 	}
+
+	return nil
 }
 
 // Build sets the [ScheduledTransactionStatus] from a domain status value.

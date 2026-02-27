@@ -2,16 +2,19 @@ package cohort3
 
 import (
 	"context"
-	"encoding/json"
+	"encoding/base64"
+	"encoding/hex"
 	"fmt"
-	"io"
-	"net/http"
+	"strconv"
 	"time"
 
 	sdk "github.com/onflow/flow-go-sdk"
 	"github.com/stretchr/testify/require"
 
+	swagger "github.com/onflow/flow/openapi/experimental/go-client-generated"
+
 	"github.com/onflow/flow-go/integration/testnet"
+	accessmodel "github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/dsl"
 )
@@ -97,225 +100,180 @@ func (s *ExtendedIndexingSuite) TestContractLifecycle() {
 	contractID := fmt.Sprintf("A.%s.%s", serviceAddr.Hex(), testContractName)
 	t.Logf("contract identifier: %s", contractID)
 
+	deploy1Code := []byte(contractV1.ToCadence())
+	deploy1CodeHash := accessmodel.CadenceCodeHash(deploy1Code)
+	deploy1 := accessmodel.ContractDeployment{
+		ContractID:    contractID,
+		Address:       serviceAddr,
+		BlockHeight:   deployResult.BlockHeight,
+		TransactionID: flow.Identifier(deployTx.ID()),
+		Code:          deploy1Code,
+		CodeHash:      deploy1CodeHash,
+	}
+
+	deploy2Code := []byte(contractV2.ToCadence())
+	deploy2CodeHash := accessmodel.CadenceCodeHash(deploy2Code)
+	deploy2 := accessmodel.ContractDeployment{
+		ContractID:    contractID,
+		Address:       serviceAddr,
+		BlockHeight:   updateResult.BlockHeight,
+		TransactionID: flow.Identifier(updateTx.ID()),
+		Code:          deploy2Code,
+		CodeHash:      deploy2CodeHash[:],
+	}
+
 	// ---- Step 4: Verify GET /experimental/v1/contracts/{identifier} ----
-	s.verifyContractLatestDeployment(contractID, updateResult.BlockHeight)
+	s.verifyContractLatestDeployment(contractID, deploy2)
 
 	// ---- Step 5: Verify GET /experimental/v1/contracts/{identifier}/deployments ----
-	s.verifyContractDeploymentHistory(contractID, deployResult.BlockHeight, updateResult.BlockHeight)
+	// The API returns deployments newest-first (descending block height).
+	s.verifyContractDeploymentHistory(contractID, []accessmodel.ContractDeployment{deploy2, deploy1})
 
 	// ---- Step 6: Verify GET /experimental/v1/contracts lists the contract ----
-	s.verifyContractInList(contractID, updateResult.BlockHeight)
+	s.verifyContractInList(contractID, deploy2)
 
 	// ---- Step 7: Verify GET /experimental/v1/contracts/account/{address} scopes correctly ----
-	s.verifyContractsByAddress(serviceAddr.String(), contractID)
+	s.verifyContractsByAddress(serviceAddr.Hex(), deploy2)
 
 	// ---- Step 8: Verify pagination for deployments ----
 	s.verifyContractDeploymentPagination(contractID)
 }
 
 // verifyContractLatestDeployment polls GET /experimental/v1/contracts/{identifier} until it
-// returns the most recent deployment (at expectedHeight), then asserts all key fields.
-func (s *ExtendedIndexingSuite) verifyContractLatestDeployment(contractID string, expectedHeight uint64) {
-	url := fmt.Sprintf("%s/experimental/v1/contracts/%s", s.restBaseURL, contractID)
+// returns the most recent deployment, then asserts all key fields.
+func (s *ExtendedIndexingSuite) verifyContractLatestDeployment(contractID string, expected accessmodel.ContractDeployment) {
+	ctx := context.Background()
 
-	var deployment map[string]any
+	var d *swagger.ContractDeployment
 	require.Eventually(s.T(), func() bool {
-		d := s.fetchContractJSON(url)
-		if d == nil {
+		resp, err := s.apiClient.GetContractByIdentifier(ctx, contractID)
+		if err != nil {
+			s.T().Logf("GET contract %s failed: %v", contractID, err)
 			return false
 		}
-		blockHeight, _ := d["block_height"].(float64)
-		if uint64(blockHeight) != expectedHeight {
-			s.T().Logf("waiting for latest deployment at height %d, got %.0f", expectedHeight, blockHeight)
-			return false
-		}
-		deployment = d
+		d = resp
 		return true
-	}, 60*time.Second, 2*time.Second, "latest deployment should appear at height %d", expectedHeight)
+	}, 30*time.Second, 1*time.Second, "GET contract %s should succeed", contractID)
 
-	s.Equal(contractID, deployment["identifier"], "identifier should match")
-	s.NotEmpty(deployment["transaction_id"], "transaction_id should be set")
-	s.NotEmpty(deployment["code_hash"], "code_hash should be set")
-	s.NotEmpty(deployment["code"], "code should be populated")
-	s.T().Logf("verified latest deployment for %s at height %.0f", contractID, deployment["block_height"])
+	s.Equal(contractID, d.ContractId, "contract_id should match")
+	s.Equal(strconv.FormatUint(expected.BlockHeight, 10), d.BlockHeight, "block_height should match")
+	s.Equal(expected.TransactionID.String(), d.TransactionId, "transaction_id should match")
+	s.Equal(base64.StdEncoding.EncodeToString(expected.Code), d.Code, "code should match")
+	s.Equal(hex.EncodeToString(expected.CodeHash), d.CodeHash, "code_hash should match")
+
+	s.T().Logf("verified latest deployment for %s at height %s", contractID, d.BlockHeight)
 }
 
 // verifyContractDeploymentHistory polls GET /experimental/v1/contracts/{identifier}/deployments
 // until two deployments are present, then asserts correct ordering (newest first).
-func (s *ExtendedIndexingSuite) verifyContractDeploymentHistory(contractID string, deployHeight, updateHeight uint64) {
-	url := fmt.Sprintf("%s/experimental/v1/contracts/%s/deployments", s.restBaseURL, contractID)
+func (s *ExtendedIndexingSuite) verifyContractDeploymentHistory(contractID string, expected []accessmodel.ContractDeployment) {
+	ctx := context.Background()
 
-	var contracts []map[string]any
+	var deployments []swagger.ContractDeployment
 	require.Eventually(s.T(), func() bool {
-		body := s.fetchContractJSON(url)
-		if body == nil {
+		resp, err := s.apiClient.GetContractDeployments(ctx, contractID, nil)
+		if err != nil {
+			s.T().Logf("GET contract deployments %s failed: %v", contractID, err)
 			return false
 		}
-		raw, _ := body["contracts"].([]any)
-		cs := toMapSlice(raw)
-		if len(cs) < 2 {
-			s.T().Logf("waiting for 2 deployments, got %d", len(cs))
-			return false
-		}
-		contracts = cs
+		deployments = resp.Deployments
 		return true
-	}, 60*time.Second, 2*time.Second, "deployment history should contain 2 entries")
+	}, 30*time.Second, 1*time.Second, "GET contract deployments %s should succeed", contractID)
 
-	s.Require().Len(contracts, 2, "should have exactly 2 deployments")
+	s.Require().Len(deployments, 2, "should have exactly 2 deployments")
 
-	// Deployments are ordered newest-first.
-	h0, _ := contracts[0]["block_height"].(float64)
-	h1, _ := contracts[1]["block_height"].(float64)
-	s.Equal(updateHeight, uint64(h0), "first entry should be the update deployment")
-	s.Equal(deployHeight, uint64(h1), "second entry should be the initial deployment")
+	for i, exp := range expected {
+		d := deployments[i]
+		s.Equal(exp.ContractID, d.ContractId, "deployment at index %d should have matching contract_id", i)
+		s.Equal(strconv.FormatUint(exp.BlockHeight, 10), d.BlockHeight, "deployment at index %d should have matching block_height", i)
+		s.Equal(exp.TransactionID.String(), d.TransactionId, "deployment at index %d should have matching transaction_id", i)
+		s.Equal(base64.StdEncoding.EncodeToString(exp.Code), d.Code, "deployment at index %d should have matching code", i)
+		s.Equal(hex.EncodeToString(exp.CodeHash), d.CodeHash, "deployment at index %d should have matching code_hash", i)
+	}
 
-	s.T().Logf("verified deployment history for %s: heights %.0f, %.0f", contractID, h0, h1)
+	s.T().Logf("verified deployment history for %s: %d deployments", contractID, len(expected))
 }
 
-// verifyContractInList polls GET /experimental/v1/contracts (paginating all results) until the
-// expected contract appears with its latest deployment height.
-func (s *ExtendedIndexingSuite) verifyContractInList(contractID string, expectedHeight uint64) {
-	require.Eventually(s.T(), func() bool {
-		all := s.fetchAllContractPages(20)
-		for _, c := range all {
-			if id, _ := c["identifier"].(string); id == contractID {
-				h, _ := c["block_height"].(float64)
-				if uint64(h) == expectedHeight {
-					return true
-				}
-				s.T().Logf("waiting for %s at height %d in /contracts list, got %.0f", contractID, expectedHeight, h)
-			}
-		}
-		s.T().Logf("contract %s not yet in /contracts list (%d total)", contractID, len(all))
-		return false
-	}, 60*time.Second, 2*time.Second, "contract %s should appear in /contracts list at height %d", contractID, expectedHeight)
+// verifyContractInList paginates GET /experimental/v1/contracts until the expected contract
+// appears with its latest deployment, then asserts all key fields.
+func (s *ExtendedIndexingSuite) verifyContractInList(contractID string, expected accessmodel.ContractDeployment) {
+	ctx := context.Background()
 
-	s.T().Logf("verified %s appears in /contracts list", contractID)
+	var all []swagger.ContractDeployment
+	require.Eventually(s.T(), func() bool {
+		contracts, err := s.apiClient.GetAllContracts(ctx, 20)
+		if err != nil {
+			s.T().Logf("GET /contracts failed: %v", err)
+			return false
+		}
+		all = contracts
+		return true
+	}, 30*time.Second, 1*time.Second, "GET /contracts should succeed")
+
+	for _, d := range all {
+		if d.ContractId == contractID {
+			s.Equal(expected.ContractID, d.ContractId, "contract_id should match")
+			s.Equal(strconv.FormatUint(expected.BlockHeight, 10), d.BlockHeight, "block_height should match")
+			s.Equal(expected.TransactionID.String(), d.TransactionId, "transaction_id should match")
+			s.Equal(base64.StdEncoding.EncodeToString(expected.Code), d.Code, "code should match")
+			s.Equal(hex.EncodeToString(expected.CodeHash), d.CodeHash, "code_hash should match")
+			s.T().Logf("verified %s appears in /contracts list at height %s", contractID, d.BlockHeight)
+			return
+		}
+	}
+	s.Require().Fail("contract should appear in /contracts list", "contract %s not found in /contracts list", contractID)
 }
 
-// verifyContractsByAddress polls GET /experimental/v1/contracts/account/{address} and verifies
-// the expected contract is present at its latest deployment.
-func (s *ExtendedIndexingSuite) verifyContractsByAddress(address string, contractID string) {
-	require.Eventually(s.T(), func() bool {
-		all := s.fetchAllContractsByAddressPages(address, 20)
-		for _, c := range all {
-			if id, _ := c["identifier"].(string); id == contractID {
-				return true
-			}
-		}
-		s.T().Logf("contract %s not yet in /contracts/account/%s list (%d total)", contractID, address, len(all))
-		return false
-	}, 30*time.Second, 1*time.Second, "contract %s should appear under address %s", contractID, address)
+// verifyContractsByAddress paginates GET /experimental/v1/contracts/account/{address} and
+// verifies the expected contract is present at its latest deployment.
+func (s *ExtendedIndexingSuite) verifyContractsByAddress(address string, expected accessmodel.ContractDeployment) {
+	ctx := context.Background()
 
-	s.T().Logf("verified %s appears under address %s", contractID, address)
+	var all []swagger.ContractDeployment
+	require.Eventually(s.T(), func() bool {
+		contracts, err := s.apiClient.GetAllContractsByAccount(ctx, address, 20)
+		if err != nil {
+			s.T().Logf("GET /contracts/account/%s failed: %v", address, err)
+			return false
+		}
+		all = contracts
+		return true
+	}, 30*time.Second, 1*time.Second, "GET /contracts/account/%s should succeed", address)
+
+	for _, d := range all {
+		if d.ContractId == expected.ContractID {
+			s.Equal(expected.ContractID, d.ContractId, "contract_id should match")
+			s.Equal(strconv.FormatUint(expected.BlockHeight, 10), d.BlockHeight, "block_height should match")
+			s.Equal(expected.TransactionID.String(), d.TransactionId, "transaction_id should match")
+			s.Equal(base64.StdEncoding.EncodeToString(expected.Code), d.Code, "code should match")
+			s.Equal(hex.EncodeToString(expected.CodeHash), d.CodeHash, "code_hash should match")
+			s.T().Logf("verified %s appears under address %s", expected.ContractID, address)
+			return
+		}
+	}
+	s.Require().Fail("contract should appear in /contracts/account list",
+		"contract %s not found in /contracts/account/%s list", expected.ContractID, address)
 }
 
 // verifyContractDeploymentPagination verifies that paginating through
 // GET /experimental/v1/contracts/{identifier}/deployments with limit=1 returns the same entries
 // as a single large-page request.
 func (s *ExtendedIndexingSuite) verifyContractDeploymentPagination(contractID string) {
-	allAtOnce := s.fetchAllContractDeploymentPages(contractID, 100)
+	ctx := context.Background()
 
-	// Collect all pages one at a time.
-	allPaged := s.fetchAllContractDeploymentPages(contractID, 1)
+	allAtOnce, err := s.apiClient.GetAllContractDeployments(ctx, contractID, 100)
+	s.Require().NoError(err, "bulk fetch of contract deployments should succeed")
+
+	allPaged, err := s.apiClient.GetAllContractDeployments(ctx, contractID, 1)
+	s.Require().NoError(err, "paginated fetch of contract deployments should succeed")
 
 	s.Require().Equal(len(allAtOnce), len(allPaged),
 		"paginated deployments should equal bulk-fetched deployments")
 
 	for i := range allAtOnce {
-		h0, _ := allAtOnce[i]["block_height"].(float64)
-		hp, _ := allPaged[i]["block_height"].(float64)
-		s.Equal(h0, hp, "deployment at index %d should have matching block_height", i)
+		s.Equal(allAtOnce[i].BlockHeight, allPaged[i].BlockHeight,
+			"deployment at index %d should have matching block_height", i)
 	}
 
 	s.T().Logf("pagination verified for %s: %d deployments", contractID, len(allAtOnce))
-}
-
-// ===== HTTP helpers =====
-
-// fetchAllContractPages paginates GET /experimental/v1/contracts and returns all contract entries.
-func (s *ExtendedIndexingSuite) fetchAllContractPages(pageSize int) []map[string]any {
-	firstURL := fmt.Sprintf("%s/experimental/v1/contracts?limit=%d", s.restBaseURL, pageSize)
-	return s.collectContractPages(firstURL, "contracts")
-}
-
-// fetchAllContractsByAddressPages paginates GET /experimental/v1/contracts/account/{address}
-// and returns all contract entries.
-func (s *ExtendedIndexingSuite) fetchAllContractsByAddressPages(address string, pageSize int) []map[string]any {
-	firstURL := fmt.Sprintf("%s/experimental/v1/contracts/account/%s?limit=%d", s.restBaseURL, address, pageSize)
-	return s.collectContractPages(firstURL, "contracts")
-}
-
-// fetchAllContractDeploymentPages paginates GET /experimental/v1/contracts/{id}/deployments
-// and returns all deployment entries.
-func (s *ExtendedIndexingSuite) fetchAllContractDeploymentPages(contractID string, pageSize int) []map[string]any {
-	firstURL := fmt.Sprintf("%s/experimental/v1/contracts/%s/deployments?limit=%d", s.restBaseURL, contractID, pageSize)
-	return s.collectContractPages(firstURL, "contracts")
-}
-
-// collectContractPages follows next_cursor links and collects all entries under the given JSON key.
-// firstURL must already include the limit query parameter.
-func (s *ExtendedIndexingSuite) collectContractPages(firstURL string, key string) []map[string]any {
-	var all []map[string]any
-	url := firstURL
-	for {
-		body := s.fetchContractJSONWithRetry(url)
-		if body == nil {
-			break
-		}
-		raw, _ := body[key].([]any)
-		all = append(all, toMapSlice(raw)...)
-
-		nextCursor, _ := body["next_cursor"].(string)
-		if nextCursor == "" {
-			break
-		}
-
-		// Determine the base path to construct the next page URL.
-		// The cursor is appended as a query parameter to the current page's base URL (without cursor).
-		url = fmt.Sprintf("%s&cursor=%s", firstURL, nextCursor)
-	}
-	return all
-}
-
-// fetchContractJSONWithRetry fetches JSON from the given URL with require.Eventually retry logic.
-func (s *ExtendedIndexingSuite) fetchContractJSONWithRetry(url string) map[string]any {
-	var result map[string]any
-	require.Eventually(s.T(), func() bool {
-		r := s.fetchContractJSON(url)
-		if r == nil {
-			return false
-		}
-		result = r
-		return true
-	}, 30*time.Second, 1*time.Second, "REST GET %s should succeed", url)
-	return result
-}
-
-// fetchContractJSON performs a single HTTP GET and returns the decoded JSON body, or nil on failure.
-// A 400 Bad Request is treated as retryable because codes.FailedPrecondition (index not yet
-// bootstrapped) maps to HTTP 400 in this REST framework.
-func (s *ExtendedIndexingSuite) fetchContractJSON(url string) map[string]any {
-	resp, err := http.Get(url) //nolint:gosec
-	if err != nil {
-		return nil
-	}
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		s.T().Logf("GET %s returned status %d: %s", url, resp.StatusCode, string(body))
-		return nil
-	}
-
-	var result map[string]any
-	if err := json.Unmarshal(body, &result); err != nil {
-		s.T().Logf("GET %s JSON decode failed: %v", url, err)
-		return nil
-	}
-	return result
 }

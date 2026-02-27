@@ -22,7 +22,7 @@ func addressHex(addr flow.Address) string {
 // Build populates the AccountTransaction from a domain model.
 func (t *AccountTransaction) Build(
 	tx *accessmodel.AccountTransaction,
-	link commonmodels.LinkGenerator,
+	link LinkGenerator,
 ) error {
 	roles := make([]string, len(tx.Roles))
 	for i, role := range tx.Roles {

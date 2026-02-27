@@ -8,9 +8,7 @@
  */
 package models
 
-type Contract struct {
-	// Unique identifier for the contract (e.g. `A.1654653399040a61.MyContract`).
-	Identifier string `json:"identifier"`
-	// Full source code of the contract.
-	Body string `json:"body"`
+type ContractDeploymentsResponse struct {
+	Deployments []ContractDeployment `json:"deployments"`
+	NextCursor  string               `json:"next_cursor,omitempty"`
 }

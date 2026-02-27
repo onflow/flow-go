@@ -5,14 +5,13 @@ import (
 
 	"github.com/onflow/flow-go/access/backends/extended"
 	"github.com/onflow/flow-go/engine/access/rest/common"
-	commonmodels "github.com/onflow/flow-go/engine/access/rest/common/models"
 	"github.com/onflow/flow-go/engine/access/rest/experimental/models"
 	"github.com/onflow/flow-go/engine/access/rest/experimental/request"
 	accessmodel "github.com/onflow/flow-go/model/access"
 )
 
 // GetContracts handles GET /experimental/v1/contracts.
-func GetContracts(r *common.Request, backend extended.API, link commonmodels.LinkGenerator) (interface{}, error) {
+func GetContracts(r *common.Request, backend extended.API, link models.LinkGenerator) (interface{}, error) {
 	req, err := request.NewGetContracts(r)
 	if err != nil {
 		return nil, common.NewBadRequestError(err)
@@ -28,11 +27,11 @@ func GetContracts(r *common.Request, backend extended.API, link commonmodels.Lin
 		return nil, err
 	}
 
-	return buildContractDeploymentsResponse(page)
+	return buildContractsResponse(page, link)
 }
 
 // GetContract handles GET /experimental/v1/contracts/{identifier}.
-func GetContract(r *common.Request, backend extended.API, link commonmodels.LinkGenerator) (interface{}, error) {
+func GetContract(r *common.Request, backend extended.API, link models.LinkGenerator) (interface{}, error) {
 	req, err := request.NewGetContract(r)
 	if err != nil {
 		return nil, common.NewBadRequestError(err)
@@ -48,12 +47,12 @@ func GetContract(r *common.Request, backend extended.API, link commonmodels.Link
 	}
 
 	var m models.ContractDeployment
-	m.Build(deployment)
+	m.Build(deployment, link)
 	return m, nil
 }
 
 // GetContractDeployments handles GET /experimental/v1/contracts/{identifier}/deployments.
-func GetContractDeployments(r *common.Request, backend extended.API, link commonmodels.LinkGenerator) (interface{}, error) {
+func GetContractDeployments(r *common.Request, backend extended.API, link models.LinkGenerator) (interface{}, error) {
 	req, err := request.NewGetContractDeployments(r)
 	if err != nil {
 		return nil, common.NewBadRequestError(err)
@@ -70,11 +69,11 @@ func GetContractDeployments(r *common.Request, backend extended.API, link common
 		return nil, err
 	}
 
-	return buildContractDeploymentsResponse(page)
+	return buildContractDeploymentsResponse(page, link)
 }
 
 // GetContractsByAddress handles GET /experimental/v1/contracts/account/{address}.
-func GetContractsByAddress(r *common.Request, backend extended.API, link commonmodels.LinkGenerator) (interface{}, error) {
+func GetContractsByAddress(r *common.Request, backend extended.API, link models.LinkGenerator) (interface{}, error) {
 	req, err := request.NewGetContractsByAddress(r)
 	if err != nil {
 		return nil, common.NewBadRequestError(err)
@@ -91,30 +90,62 @@ func GetContractsByAddress(r *common.Request, backend extended.API, link commonm
 		return nil, err
 	}
 
-	return buildContractDeploymentsResponse(page)
+	return buildContractsResponse(page, link)
 }
 
-// buildContractDeploymentsResponse converts a [accessmodel.ContractDeploymentPage] to a REST
-// response, encoding the next cursor if present.
+// buildContractDeploymentsResponse converts a [accessmodel.ContractDeploymentPage] to a
+// [models.ContractDeploymentsResponse] for the deployment history endpoint.
 func buildContractDeploymentsResponse(
 	page *accessmodel.ContractDeploymentPage,
+	link models.LinkGenerator,
 ) (models.ContractDeploymentsResponse, error) {
-	contracts := make([]models.ContractDeployment, len(page.Deployments))
+	deployments := make([]models.ContractDeployment, len(page.Deployments))
 	for i := range page.Deployments {
-		contracts[i].Build(&page.Deployments[i])
+		deployments[i].Build(&page.Deployments[i], link)
 	}
 
-	var nextCursor string
-	if page.NextCursor != nil {
-		var err error
-		nextCursor, err = request.EncodeContractDeploymentCursor(page.NextCursor)
-		if err != nil {
-			return models.ContractDeploymentsResponse{}, common.NewRestError(http.StatusInternalServerError, "failed to encode next cursor", err)
-		}
+	nextCursor, err := encodeNextCursor(page)
+	if err != nil {
+		return models.ContractDeploymentsResponse{}, err
 	}
 
 	return models.ContractDeploymentsResponse{
+		Deployments: deployments,
+		NextCursor:  nextCursor,
+	}, nil
+}
+
+// buildContractsResponse converts a [accessmodel.ContractDeploymentPage] to a
+// [models.ContractsResponse] for the list and by-address endpoints.
+func buildContractsResponse(
+	page *accessmodel.ContractDeploymentPage,
+	link models.LinkGenerator,
+) (models.ContractsResponse, error) {
+	contracts := make([]models.ContractDeployment, len(page.Deployments))
+	for i := range page.Deployments {
+		contracts[i].Build(&page.Deployments[i], link)
+	}
+
+	nextCursor, err := encodeNextCursor(page)
+	if err != nil {
+		return models.ContractsResponse{}, err
+	}
+
+	return models.ContractsResponse{
 		Contracts:  contracts,
 		NextCursor: nextCursor,
 	}, nil
+}
+
+// encodeNextCursor encodes the next cursor for a contract deployment page, returning an
+// empty string if there is no next page.
+func encodeNextCursor(page *accessmodel.ContractDeploymentPage) (string, error) {
+	if page.NextCursor == nil {
+		return "", nil
+	}
+	cursor, err := request.EncodeContractDeploymentCursor(page.NextCursor)
+	if err != nil {
+		return "", common.NewRestError(http.StatusInternalServerError, "failed to encode next cursor", err)
+	}
+	return cursor, nil
 }

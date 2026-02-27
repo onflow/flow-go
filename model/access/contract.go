@@ -1,6 +1,10 @@
 package access
 
-import "github.com/onflow/flow-go/model/flow"
+import (
+	"crypto/sha3"
+
+	"github.com/onflow/flow-go/model/flow"
+)
 
 // Contract represents a Cadence smart contract as returned by the extended API.
 type Contract struct {
@@ -34,6 +38,15 @@ type ContractDeployment struct {
 	// chain state, and not based on a protocol event.
 	// When true, the BlockHeight, TransactionID, TxIndex, and EventIndex fields are undefined.
 	IsPlaceholder bool
+
+	// Transaction is the transaction that applied this deployment.
+	Transaction *flow.TransactionBody
+}
+
+// CadenceCodeHash calculates the SHA3-256 hash of the provided code using the same algorithm as Cadence.
+func CadenceCodeHash(code []byte) []byte {
+	hash := sha3.Sum256(code)
+	return hash[:]
 }
 
 // ContractDeploymentCursor is an opaque pagination token for contract deployment queries.

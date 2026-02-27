@@ -514,8 +514,8 @@ func TestScheduledTransactionsBackend_GetScheduledTransaction(t *testing.T) {
 		)
 		require.NoError(t, err)
 		require.NotNil(t, result.HandlerContract)
-		assert.Equal(t, contractID, result.HandlerContract.Identifier)
-		assert.Equal(t, string(contractBody), result.HandlerContract.Body)
+		assert.Equal(t, contractID, result.HandlerContract.ContractID)
+		assert.Equal(t, contractBody, result.HandlerContract.Code)
 	})
 
 	t.Run("TransactionIDByID error during expand triggers irrecoverable", func(t *testing.T) {
@@ -786,8 +786,8 @@ func TestScheduledTransactionsBackend_GetScheduledTransaction(t *testing.T) {
 		)
 		require.NoError(t, err)
 		require.NotNil(t, tx.HandlerContract)
-		assert.Equal(t, "A.1654653399040a61.MyScheduler", tx.HandlerContract.Identifier)
-		assert.Equal(t, string(contractCode), tx.HandlerContract.Body)
+		assert.Equal(t, "A.1654653399040a61.MyScheduler", tx.HandlerContract.ContractID)
+		assert.Equal(t, contractCode, tx.HandlerContract.Code)
 	})
 
 	t.Run("expandHandlerContract: ErrNotFound and state.Sealed fails triggers irrecoverable", func(t *testing.T) {
