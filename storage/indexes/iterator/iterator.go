@@ -24,10 +24,14 @@ func Build[T any, C any](iter storage.Iterator, decodeKey storage.DecodeKeyFunc[
 			storageItem := iter.IterItem()
 			key := storageItem.KeyCopy(nil)
 
-			getValue := func(decodedKey C, v *T) error {
-				return storageItem.Value(func(val []byte) error {
-					return reconstruct(decodedKey, val, v)
+			getValue := func(decodedKey C) (*T, error) {
+				var result *T
+				err := storageItem.Value(func(val []byte) error {
+					var err error
+					result, err = reconstruct(decodedKey, val)
+					return err
 				})
+				return result, err
 			}
 
 			cursor, err := decodeKey(key)

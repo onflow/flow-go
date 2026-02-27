@@ -11,7 +11,7 @@ type IndexFilter[T any] func(T) bool
 type IndexIterator[T any, C any] iter.Seq2[IteratorEntry[T, C], error]
 
 // ReconstructFunc is a function that reconstructs an output value T based on the key and value from storage.
-type ReconstructFunc[T any, C any] func(C, []byte, *T) error
+type ReconstructFunc[T any, C any] func(C, []byte) (*T, error)
 
 // DecodeKeyFunc is a function that decodes a storage key into a cursor C.
 type DecodeKeyFunc[C any] func([]byte) (C, error)

@@ -209,12 +209,12 @@ func ftEventIndex(entry access.FungibleTokenTransfer) uint32 {
 // reconstructFTTransfer decodes a stored value into an [access.FungibleTokenTransfer].
 //
 // Any error indicates the value is not valid.
-func reconstructFTTransfer(cursor access.TransferCursor, value []byte, dest *access.FungibleTokenTransfer) error {
+func reconstructFTTransfer(cursor access.TransferCursor, value []byte) (*access.FungibleTokenTransfer, error) {
 	var stored storedFungibleTokenTransfer
 	if err := msgpack.Unmarshal(value, &stored); err != nil {
-		return fmt.Errorf("could not decode value: %w", err)
+		return nil, fmt.Errorf("could not decode value: %w", err)
 	}
-	*dest = access.FungibleTokenTransfer{
+	return &access.FungibleTokenTransfer{
 		TransactionID:    stored.TransactionID,
 		BlockHeight:      cursor.BlockHeight,
 		TransactionIndex: cursor.TransactionIndex,
@@ -223,8 +223,7 @@ func reconstructFTTransfer(cursor access.TransferCursor, value []byte, dest *acc
 		RecipientAddress: stored.RecipientAddress,
 		TokenType:        stored.TokenType,
 		Amount:           new(big.Int).SetBytes(stored.Amount),
-	}
-	return nil
+	}, nil
 }
 
 // makeFTTransferValue builds the stored value for a fungible token transfer index entry.

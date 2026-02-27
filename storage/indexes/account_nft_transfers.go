@@ -204,12 +204,12 @@ func nftTransferEventIndex(entry access.NonFungibleTokenTransfer) uint32 {
 // reconstructNFTTransfer decodes a stored value into an [access.NonFungibleTokenTransfer].
 //
 // Any error indicates the value is not valid.
-func reconstructNFTTransfer(cursor access.TransferCursor, value []byte, dest *access.NonFungibleTokenTransfer) error {
+func reconstructNFTTransfer(cursor access.TransferCursor, value []byte) (*access.NonFungibleTokenTransfer, error) {
 	var stored storedNonFungibleTokenTransfer
 	if err := msgpack.Unmarshal(value, &stored); err != nil {
-		return fmt.Errorf("could not decode value: %w", err)
+		return nil, fmt.Errorf("could not decode value: %w", err)
 	}
-	*dest = access.NonFungibleTokenTransfer{
+	return &access.NonFungibleTokenTransfer{
 		TransactionID:    stored.TransactionID,
 		BlockHeight:      cursor.BlockHeight,
 		TransactionIndex: cursor.TransactionIndex,
@@ -218,8 +218,7 @@ func reconstructNFTTransfer(cursor access.TransferCursor, value []byte, dest *ac
 		RecipientAddress: stored.RecipientAddress,
 		TokenType:        stored.TokenType,
 		ID:               stored.ID,
-	}
-	return nil
+	}, nil
 }
 
 // makeNFTTransferValue builds the stored value for a non-fungible token transfer index entry.

@@ -3,10 +3,10 @@ package iterator
 // Entry is a single stored entry returned by an index iterator.
 type Entry[T any, C any] struct {
 	cursor   C
-	getValue func(C, *T) error
+	getValue func(C) (*T, error)
 }
 
-func NewEntry[T any, C any](cursor C, getValue func(C, *T) error) Entry[T, C] {
+func NewEntry[T any, C any](cursor C, getValue func(C) (*T, error)) Entry[T, C] {
 	return Entry[T, C]{
 		cursor:   cursor,
 		getValue: getValue,
@@ -22,7 +22,10 @@ func (i Entry[T, C]) Cursor() C {
 //
 // Any error indicates the value cannot be reconstructed from the storage value.
 func (i Entry[T, C]) Value() (T, error) {
-	var v T
-	err := i.getValue(i.cursor, &v)
-	return v, err
+	v, err := i.getValue(i.cursor)
+	if err != nil {
+		var zero T
+		return zero, err
+	}
+	return *v, nil
 }
