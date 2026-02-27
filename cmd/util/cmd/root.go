@@ -41,6 +41,7 @@ import (
 	remove_execution_fork "github.com/onflow/flow-go/cmd/util/cmd/remove-execution-fork/cmd"
 	rollback_executed_height "github.com/onflow/flow-go/cmd/util/cmd/rollback-executed-height/cmd"
 	run_script "github.com/onflow/flow-go/cmd/util/cmd/run-script"
+	inspect_token_movements "github.com/onflow/flow-go/cmd/util/cmd/inspect-token-movements"
 	"github.com/onflow/flow-go/cmd/util/cmd/snapshot"
 	storehouse_checkpoint_validator "github.com/onflow/flow-go/cmd/util/cmd/storehouse-checkpoint-validator"
 	system_addresses "github.com/onflow/flow-go/cmd/util/cmd/system-addresses"
@@ -136,6 +137,8 @@ func addCommands() {
 	rootCmd.AddCommand(db_migration.Cmd)
 	rootCmd.AddCommand(storehouse_checkpoint_validator.Cmd)
 	rootCmd.AddCommand(remove_execution_fork.RootCmd)
+	rootCmd.AddCommand(diffkeys.Cmd)
+	rootCmd.AddCommand(inspect_token_movements.Cmd)
 }
 
 func initConfig() {
