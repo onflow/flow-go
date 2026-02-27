@@ -287,7 +287,7 @@ func TestEVMRun(t *testing.T) {
 				require.NoError(t, err)
 
 				// commit block
-				blockEventPayload, snapshot := callEVMHeartBeat(t,
+				blockEventPayload, _ := callEVMHeartBeat(t,
 					ctx,
 					vm,
 					snapshot,
