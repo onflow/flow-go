@@ -48,13 +48,13 @@ type storedNonFungibleTokenTransfer struct {
 const (
 	// nftTransferKeyLen is the total length of a non-fungible token transfer index key
 	// 1 (prefix) + 8 (address) + 8 (height) + 4 (txIndex) + 4 (eventIndex) = 25
-	nftTransferKeyLen = 1 + flow.AddressLength + 8 + 4 + 4
+	nftTransferKeyLen = 1 + flow.AddressLength + heightLen + txIndexLen + eventIndexLen
 
 	// nftTransferPrefixLen is the length of the prefix used for iteration (prefix + address)
 	nftTransferPrefixLen = 1 + flow.AddressLength
 
 	// nftTransferPrefixWithHeightLen includes the height for range queries
-	nftTransferPrefixWithHeightLen = nftTransferPrefixLen + 8
+	nftTransferPrefixWithHeightLen = nftTransferPrefixLen + heightLen
 )
 
 var _ storage.NonFungibleTokenTransfers = (*NonFungibleTokenTransfers)(nil)
@@ -204,12 +204,12 @@ func nftTransferEventIndex(entry access.NonFungibleTokenTransfer) uint32 {
 // reconstructNFTTransfer decodes a stored value into an [access.NonFungibleTokenTransfer].
 //
 // Any error indicates the value is not valid.
-func reconstructNFTTransfer(cursor access.TransferCursor, value []byte, dest *access.NonFungibleTokenTransfer) error {
+func reconstructNFTTransfer(cursor access.TransferCursor, value []byte) (*access.NonFungibleTokenTransfer, error) {
 	var stored storedNonFungibleTokenTransfer
 	if err := msgpack.Unmarshal(value, &stored); err != nil {
-		return fmt.Errorf("could not decode value: %w", err)
+		return nil, fmt.Errorf("could not decode value: %w", err)
 	}
-	*dest = access.NonFungibleTokenTransfer{
+	return &access.NonFungibleTokenTransfer{
 		TransactionID:    stored.TransactionID,
 		BlockHeight:      cursor.BlockHeight,
 		TransactionIndex: cursor.TransactionIndex,
@@ -218,8 +218,7 @@ func reconstructNFTTransfer(cursor access.TransferCursor, value []byte, dest *ac
 		RecipientAddress: stored.RecipientAddress,
 		TokenType:        stored.TokenType,
 		ID:               stored.ID,
-	}
-	return nil
+	}, nil
 }
 
 // makeNFTTransferValue builds the stored value for a non-fungible token transfer index entry.

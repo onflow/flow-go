@@ -32,13 +32,30 @@ type AccountTransferFilter struct {
 	RecipientAddress flow.Address
 }
 
+func (f *AccountTransferFilter) isEmpty() bool {
+	return f == nil ||
+		(f.TokenType == "" &&
+			f.SourceAddress == flow.EmptyAddress &&
+			f.RecipientAddress == flow.EmptyAddress)
+}
+
+// FTFilter returns a filter function for fungible token transfers based on the filter criteria.
+// Returns nil when no filter criteria are set, indicating all transfers should be accepted.
 func (f *AccountTransferFilter) FTFilter() storage.IndexFilter[*accessmodel.FungibleTokenTransfer] {
+	if f.isEmpty() {
+		return nil
+	}
 	return func(transfer *accessmodel.FungibleTokenTransfer) bool {
 		return f.filter(transfer.TokenType, transfer.SourceAddress, transfer.RecipientAddress)
 	}
 }
 
+// NFTFilter returns a filter function for non-fungible token transfers based on the filter criteria.
+// Returns nil when no filter criteria are set, indicating all transfers should be accepted.
 func (f *AccountTransferFilter) NFTFilter() storage.IndexFilter[*accessmodel.NonFungibleTokenTransfer] {
+	if f.isEmpty() {
+		return nil
+	}
 	return func(transfer *accessmodel.NonFungibleTokenTransfer) bool {
 		return f.filter(transfer.TokenType, transfer.SourceAddress, transfer.RecipientAddress)
 	}

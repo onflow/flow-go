@@ -42,7 +42,7 @@ type ScheduledTransactionFilter struct {
 	TransactionHandlerUUID   *uint64
 }
 
-func (f *ScheduledTransactionFilter) IsEmpty() bool {
+func (f *ScheduledTransactionFilter) isEmpty() bool {
 	if f == nil {
 		return true
 	}
@@ -60,7 +60,7 @@ func (f *ScheduledTransactionFilter) IsEmpty() bool {
 
 // Filter builds a [storage.IndexFilter] from the non-nil filter fields.
 func (f *ScheduledTransactionFilter) Filter() storage.IndexFilter[*accessmodel.ScheduledTransaction] {
-	if f.IsEmpty() {
+	if f.isEmpty() {
 		return nil
 	}
 

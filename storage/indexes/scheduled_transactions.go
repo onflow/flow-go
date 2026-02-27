@@ -17,9 +17,9 @@ import (
 
 const (
 	// scheduledTxPrimaryKeyLen is [code(1)][~id(8)] = 9 bytes
-	scheduledTxPrimaryKeyLen = 1 + 8
+	scheduledTxPrimaryKeyLen = 1 + heightLen
 	// scheduledTxByAddrKeyLen is [code(1)][address(8)][~id(8)] = 17 bytes
-	scheduledTxByAddrKeyLen = 1 + flow.AddressLength + 8
+	scheduledTxByAddrKeyLen = 1 + flow.AddressLength + heightLen
 )
 
 // ScheduledTransactionsIndex implements [storage.ScheduledTransactionsIndex] using Pebble.
@@ -152,8 +152,12 @@ func (idx *ScheduledTransactionsIndex) ByAddress(
 
 	// The by-address index is key-only (nil values). The getValue closure performs
 	// a secondary lookup into the primary index using the decoded cursor's ID.
-	getValue := func(cur access.ScheduledTransactionCursor, _ []byte, dest *access.ScheduledTransaction) error {
-		return operation.RetrieveByKey(reader, makeScheduledTxPrimaryKey(cur.ID), dest)
+	getValue := func(cur access.ScheduledTransactionCursor, _ []byte) (*access.ScheduledTransaction, error) {
+		var tx access.ScheduledTransaction
+		if err := operation.RetrieveByKey(reader, makeScheduledTxPrimaryKey(cur.ID), &tx); err != nil {
+			return nil, err
+		}
+		return &tx, nil
 	}
 
 	return iterator.Build(iter, decodeScheduledTxByAddrCursor, getValue), nil
@@ -320,8 +324,12 @@ func (idx *ScheduledTransactionsIndex) Failed(
 // reconstructScheduledTx decodes a msgpack-encoded value into a [access.ScheduledTransaction].
 //
 // Any error indicates a malformed value.
-func reconstructScheduledTx(_ access.ScheduledTransactionCursor, value []byte, dest *access.ScheduledTransaction) error {
-	return msgpack.Unmarshal(value, dest)
+func reconstructScheduledTx(_ access.ScheduledTransactionCursor, value []byte) (*access.ScheduledTransaction, error) {
+	var tx access.ScheduledTransaction
+	if err := msgpack.Unmarshal(value, &tx); err != nil {
+		return nil, err
+	}
+	return &tx, nil
 }
 
 // makeScheduledTxPrimaryKey creates a primary key [code][~id].

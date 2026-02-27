@@ -7,6 +7,12 @@ import (
 	"github.com/onflow/flow-go/storage/operation"
 )
 
+const (
+	heightLen     = 8 // length of uint64 in bytes
+	txIndexLen    = 4 // length of uint32 in bytes
+	eventIndexLen = 4 // length of uint32 in bytes
+)
+
 // validateCursorHeight validates the block height for the cursor is within the valid range (firstHeight, latestHeight)
 //
 // Expected error returns during normal operations:
