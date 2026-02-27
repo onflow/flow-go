@@ -165,6 +165,7 @@ func (idx *FungibleTokenTransfers) rangeKeys(account flow.Address, cursor *acces
 	// since the cursor may point to a transaction within idx.firstHeight, we need to use the last
 	// possible key for the prefix.
 	startKey = makeFTTransferKey(account, cursor.BlockHeight, cursor.TransactionIndex, cursor.EventIndex)
+	endKey = makeFTTransferKeyPrefix(account, idx.firstHeight)
 	endKey = storage.PrefixInclusiveEnd(endKey, startKey)
 
 	return startKey, endKey, nil
