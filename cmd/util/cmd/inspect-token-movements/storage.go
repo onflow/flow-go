@@ -136,7 +136,8 @@ func newChunkInspector(
 			false,
 		)...,
 	)
-	vmCtx := fvm.NewContext(chainID.Chain(), fvmOptions...)
+	fvmOptions = append(fvmOptions, fvm.WithChain(chainID.Chain()))
+	vmCtx := fvm.NewContext(fvmOptions...)
 
 	return &chunkInspector{
 		vm:             vm,
