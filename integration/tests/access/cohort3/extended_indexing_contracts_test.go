@@ -51,7 +51,7 @@ var contractV2 = dsl.Contract{
 //     - GET /experimental/v1/contracts/{identifier} returns the latest deployment
 //     - GET /experimental/v1/contracts/{identifier}/deployments returns both in newest-first order
 //     - GET /experimental/v1/contracts lists the contract
-//     - GET /experimental/v1/contracts/account/{address} scopes to the service account
+//     - GET /experimental/v1/accounts/{address}/contracts scopes to the service account
 //     - Pagination via next_cursor works for both /contracts and /deployments
 func (s *ExtendedIndexingSuite) TestContractLifecycle() {
 	t := s.T()
@@ -132,7 +132,7 @@ func (s *ExtendedIndexingSuite) TestContractLifecycle() {
 	// ---- Step 6: Verify GET /experimental/v1/contracts lists the contract ----
 	s.verifyContractInList(contractID, deploy2)
 
-	// ---- Step 7: Verify GET /experimental/v1/contracts/account/{address} scopes correctly ----
+	// ---- Step 7: Verify GET /experimental/v1/accounts/{address}/contracts scopes correctly ----
 	s.verifyContractsByAddress(serviceAddr.Hex(), deploy2)
 
 	// ---- Step 8: Verify pagination for deployments ----
@@ -224,7 +224,7 @@ func (s *ExtendedIndexingSuite) verifyContractInList(contractID string, expected
 	s.Require().Fail("contract should appear in /contracts list", "contract %s not found in /contracts list", contractID)
 }
 
-// verifyContractsByAddress paginates GET /experimental/v1/contracts/account/{address} and
+// verifyContractsByAddress paginates GET /experimental/v1/accounts/{address}/contracts and
 // verifies the expected contract is present at its latest deployment.
 func (s *ExtendedIndexingSuite) verifyContractsByAddress(address string, expected accessmodel.ContractDeployment) {
 	ctx := context.Background()
@@ -233,12 +233,12 @@ func (s *ExtendedIndexingSuite) verifyContractsByAddress(address string, expecte
 	require.Eventually(s.T(), func() bool {
 		contracts, err := s.apiClient.GetAllContractsByAccount(ctx, address, 20)
 		if err != nil {
-			s.T().Logf("GET /contracts/account/%s failed: %v", address, err)
+			s.T().Logf("GET /accounts/%s/contracts failed: %v", address, err)
 			return false
 		}
 		all = contracts
 		return true
-	}, 30*time.Second, 1*time.Second, "GET /contracts/account/%s should succeed", address)
+	}, 30*time.Second, 1*time.Second, "GET /accounts/%s/contracts should succeed", address)
 
 	for _, d := range all {
 		if d.ContractId == expected.ContractID {
@@ -251,8 +251,8 @@ func (s *ExtendedIndexingSuite) verifyContractsByAddress(address string, expecte
 			return
 		}
 	}
-	s.Require().Fail("contract should appear in /contracts/account list",
-		"contract %s not found in /contracts/account/%s list", expected.ContractID, address)
+	s.Require().Fail("contract should appear in /accounts/%s/contracts list",
+		"contract %s not found in /accounts/%s/contracts list", address, expected.ContractID, address)
 }
 
 // verifyContractDeploymentPagination verifies that paginating through

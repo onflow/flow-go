@@ -108,7 +108,7 @@ func NewGetContractDeployments(r *common.Request) (GetContractDeployments, error
 	return req, nil
 }
 
-// GetContractsByAddress holds parsed request params for GET /contracts/account/{address}.
+// GetContractsByAddress holds parsed request params for GET /accounts/{address}/contracts.
 type GetContractsByAddress struct {
 	Address flow.Address
 	Limit   uint32
@@ -117,7 +117,7 @@ type GetContractsByAddress struct {
 }
 
 // NewGetContractsByAddress parses and validates the HTTP request for
-// GET /contracts/account/{address}.
+// GET /accounts/{address}/contracts.
 //
 // All errors indicate an invalid request.
 func NewGetContractsByAddress(r *common.Request) (GetContractsByAddress, error) {

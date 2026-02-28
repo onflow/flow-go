@@ -83,7 +83,7 @@ func GetContractDeployments(r *common.Request, backend extended.API, link models
 	return buildContractDeploymentsResponse(page, link)
 }
 
-// GetContractsByAddress handles GET /experimental/v1/contracts/account/{address}.
+// GetContractsByAddress handles GET /experimental/v1/accounts/{address}/contracts.
 func GetContractsByAddress(r *common.Request, backend extended.API, link models.LinkGenerator) (interface{}, error) {
 	req, err := request.NewGetContractsByAddress(r)
 	if err != nil {

@@ -53,7 +53,7 @@ var ExperimentalRoutes = []experimentalRoute{{
 	Handler: routes.GetContracts,
 }, {
 	Method:  http.MethodGet,
-	Pattern: "/contracts/account/{address}",
+	Pattern: "/accounts/{address}/contracts",
 	Name:    "getContractsByAddress",
 	Handler: routes.GetContractsByAddress,
 }, {
