@@ -109,6 +109,10 @@ func (c *Contracts) IndexBlockData(lctx lockctx.Proof, data BlockData, rw storag
 			updatedContracts[deployment.ContractID] = true
 		}
 
+		// TODO: this will currently load all contracts into memory, then store them in one large batch.
+		// this is probably ok for now since there is a relatively small number of contracts. This should
+		// be updated to allow storing the contracts in smaller batches.
+
 		bootstrapContracts, err := c.loadDeployedContracts(bootstrapHeight, updatedContracts)
 		if err != nil {
 			return fmt.Errorf("failed to load deployed contracts: %w", err)
@@ -235,10 +239,9 @@ func (c *Contracts) loadDeployedContracts(height uint64, seenContracts map[strin
 
 	generator := c.chain.NewAddressGenerator()
 
-	// get the highest used address index from the chain
-	highestIndex := environment.NewAddressGenerator(txnState, c.chain).AddressCount()
+	latestIndex := environment.NewAddressGenerator(txnState, c.chain).AddressCount()
 
-	progress := util.LogProgress(c.log, util.DefaultLogProgressConfig("loading deployed contracts", highestIndex))
+	progress := util.LogProgress(c.log, util.DefaultLogProgressConfig("loading deployed contracts", latestIndex))
 
 	var deployments []access.ContractDeployment
 
@@ -248,14 +251,7 @@ func (c *Contracts) loadDeployedContracts(height uint64, seenContracts map[strin
 			return nil, fmt.Errorf("cannot get address: %w", err)
 		}
 
-		exists, err := accounts.Exists(address)
-		if err != nil {
-			return nil, fmt.Errorf("error while checking if account exists: %w", err)
-		}
-		progress(1)
-
-		// iterate until we find the first account that does not exist in the snapshot.
-		if !exists {
+		if generator.AddressCount() >= latestIndex {
 			return deployments, nil
 		}
 
@@ -287,6 +283,7 @@ func (c *Contracts) loadDeployedContracts(height uint64, seenContracts map[strin
 				IsPlaceholder: true,
 			})
 		}
+		progress(1)
 	}
 }
 
