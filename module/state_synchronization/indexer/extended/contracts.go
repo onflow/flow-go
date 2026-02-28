@@ -16,6 +16,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/state_synchronization/indexer/extended/events"
+	"github.com/onflow/flow-go/module/util"
 	"github.com/onflow/flow-go/storage"
 )
 
@@ -30,6 +31,7 @@ const (
 // snapshotProvider is the subset of execution.ScriptExecutor used by the Contracts indexer.
 type snapshotProvider interface {
 	GetStorageSnapshot(height uint64) (snapshot.StorageSnapshot, error)
+	RegisterValue(ID flow.RegisterID, height uint64) (flow.RegisterValue, error)
 }
 
 // Contracts indexes contract deployment lifecycle events and writes to the contract deployments
@@ -233,6 +235,11 @@ func (c *Contracts) loadDeployedContracts(height uint64, seenContracts map[strin
 
 	generator := c.chain.NewAddressGenerator()
 
+	// get the highest used address index from the chain
+	highestIndex := environment.NewAddressGenerator(txnState, c.chain).AddressCount()
+
+	progress := util.LogProgress(c.log, util.DefaultLogProgressConfig("loading deployed contracts", highestIndex))
+
 	var deployments []access.ContractDeployment
 
 	for {
@@ -245,6 +252,7 @@ func (c *Contracts) loadDeployedContracts(height uint64, seenContracts map[strin
 		if err != nil {
 			return nil, fmt.Errorf("error while checking if account exists: %w", err)
 		}
+		progress(1)
 
 		// iterate until we find the first account that does not exist in the snapshot.
 		if !exists {
