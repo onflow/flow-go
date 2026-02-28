@@ -130,7 +130,10 @@ func (td *TokenChanges) getTokenDiff(
 	for a := range addresses {
 		diff := diffAccountTokens(before[a], after[a])
 		if len(diff) == 0 {
+			logger.Info().Str("module", "tc-inspector").Msgf("account token change: %s is the same: %v", a, before[a])
 			continue
+		} else {
+			logger.Info().Str("module", "tc-inspector").Msgf("account token change: %s changed: %v", a, diff)
 		}
 		tokenDiffResult.Changes[flow.Address(a)] = diff
 	}
