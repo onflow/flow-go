@@ -1671,6 +1671,7 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 					utils.NotNil(builder.events),
 					utils.NotNil(builder.lightTransactionResults),
 					utils.NotNil(builder.ScriptExecutor),
+					utils.NotNil(builder.Storage.RegisterIndex),
 					builder.extendedIndexingBackfillDelay,
 				)
 				if err != nil {

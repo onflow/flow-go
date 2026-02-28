@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/fxamacker/cbor/v2"
@@ -58,10 +59,6 @@ func TestContractsIndexer_NoEvents(t *testing.T) {
 	indexer, store, lm, db := newContractsIndexerWithScriptExecutor(t, flow.Testnet, contractsBootstrapHeight, scriptExecutor)
 
 	header := unittest.BlockHeaderFixtureOnChain(flow.Testnet, unittest.WithHeaderHeight(contractsBootstrapHeight))
-	// loadDeployedContracts is called; empty snapshot → no pre-existing contracts.
-	scriptExecutor.On("GetStorageSnapshot", contractsBootstrapHeight).
-		Return(fvmsnapshot.MapStorageSnapshot{}, nil).Once()
-
 	indexContractsBlock(t, indexer, lm, db, BlockData{
 		Header: header,
 		Events: []flow.Event{},
@@ -105,8 +102,6 @@ func TestContractsIndexer_ContractAdded(t *testing.T) {
 
 	// Step 1: bootstrap block — no events, empty snapshot.
 	bootstrapHeader := unittest.BlockHeaderFixtureOnChain(flow.Testnet, unittest.WithHeaderHeight(contractsBootstrapHeight))
-	scriptExecutor.On("GetStorageSnapshot", contractsBootstrapHeight).
-		Return(fvmsnapshot.MapStorageSnapshot{}, nil).Once()
 	indexContractsBlock(t, indexer, lm, db, BlockData{Header: bootstrapHeader, Events: []flow.Event{}})
 
 	// Step 2: event block — contract deployed.
@@ -151,8 +146,6 @@ func TestContractsIndexer_ContractUpdated(t *testing.T) {
 
 	// Bootstrap block.
 	bootstrapHeader := unittest.BlockHeaderFixtureOnChain(flow.Testnet, unittest.WithHeaderHeight(contractsBootstrapHeight))
-	scriptExecutor.On("GetStorageSnapshot", contractsBootstrapHeight).
-		Return(fvmsnapshot.MapStorageSnapshot{}, nil).Once()
 	indexContractsBlock(t, indexer, lm, db, BlockData{Header: bootstrapHeader, Events: []flow.Event{}})
 
 	// Height 101: AccountContractAdded
@@ -208,8 +201,6 @@ func TestContractsIndexer_MultipleContractsInOneBlock(t *testing.T) {
 
 	// Bootstrap block.
 	bootstrapHeader := unittest.BlockHeaderFixtureOnChain(flow.Testnet, unittest.WithHeaderHeight(contractsBootstrapHeight))
-	scriptExecutor.On("GetStorageSnapshot", contractsBootstrapHeight).
-		Return(fvmsnapshot.MapStorageSnapshot{}, nil).Once()
 	indexContractsBlock(t, indexer, lm, db, BlockData{Header: bootstrapHeader, Events: []flow.Event{}})
 
 	// Event block: two contracts deployed in the same block.
@@ -263,8 +254,6 @@ func TestContractsIndexer_SameAccountCached(t *testing.T) {
 
 	// Bootstrap block.
 	bootstrapHeader := unittest.BlockHeaderFixtureOnChain(flow.Testnet, unittest.WithHeaderHeight(contractsBootstrapHeight))
-	scriptExecutor.On("GetStorageSnapshot", contractsBootstrapHeight).
-		Return(fvmsnapshot.MapStorageSnapshot{}, nil).Once()
 	indexContractsBlock(t, indexer, lm, db, BlockData{Header: bootstrapHeader, Events: []flow.Event{}})
 
 	// Event block: GetStorageSnapshot must be called exactly once (caching).
@@ -300,8 +289,6 @@ func TestContractsIndexer_ByAddress(t *testing.T) {
 
 	// Bootstrap block.
 	bootstrapHeader := unittest.BlockHeaderFixtureOnChain(flow.Testnet, unittest.WithHeaderHeight(contractsBootstrapHeight))
-	scriptExecutor.On("GetStorageSnapshot", contractsBootstrapHeight).
-		Return(fvmsnapshot.MapStorageSnapshot{}, nil).Once()
 	indexContractsBlock(t, indexer, lm, db, BlockData{Header: bootstrapHeader, Events: []flow.Event{}})
 
 	// Block 101: addr1 deploys Foo.
@@ -360,8 +347,6 @@ func TestContractsIndexer_Backfill(t *testing.T) {
 
 	// Height 100 (firstHeight): bootstrap with no events. loadDeployedContracts is called.
 	header100 := unittest.BlockHeaderFixtureOnChain(flow.Testnet, unittest.WithHeaderHeight(firstHeight))
-	scriptExecutor.On("GetStorageSnapshot", firstHeight).
-		Return(fvmsnapshot.MapStorageSnapshot{}, nil).Once()
 	indexContractsBlock(t, indexer, lm, db, BlockData{Header: header100, Events: []flow.Event{}})
 
 	first, err := store.FirstIndexedHeight()
@@ -434,8 +419,6 @@ func TestContractsIndexer_BackfillMultipleBlocks(t *testing.T) {
 	indexer, store, lm, db := newContractsIndexerWithScriptExecutor(t, flow.Testnet, firstHeight, scriptExecutor)
 
 	// Root block: no events, but loadDeployedContracts is called.
-	scriptExecutor.On("GetStorageSnapshot", firstHeight).
-		Return(fvmsnapshot.MapStorageSnapshot{}, nil).Once()
 	root := unittest.BlockHeaderFixtureOnChain(flow.Testnet, unittest.WithHeaderHeight(firstHeight))
 	indexContractsBlock(t, indexer, lm, db, BlockData{Header: root, Events: []flow.Event{}})
 
@@ -461,6 +444,82 @@ func TestContractsIndexer_BackfillMultipleBlocks(t *testing.T) {
 	assert.Len(t, collectContractPage(t, allIter, 10), 3)
 }
 
+// TestContractsIndexer_Bootstrap_PreExistingContracts verifies that loadDeployedContracts
+// finds contracts pre-loaded into the fakeRegisters and stores placeholder deployments for
+// them, while skipping any contract already covered by the bootstrap block's own events.
+func TestContractsIndexer_Bootstrap_PreExistingContracts(t *testing.T) {
+	t.Parallel()
+
+	addr1 := unittest.RandomAddressFixture()
+	addr2 := unittest.RandomAddressFixture()
+	codeAlpha := []byte("access(all) contract Alpha {}")
+	codeBeta := []byte("access(all) contract Beta {}")
+	codeGamma := []byte("access(all) contract Gamma {}")
+
+	// addr1 has Alpha and Beta pre-deployed; addr2 has Gamma. Alpha is also in the
+	// bootstrap block's events, so it should NOT get a placeholder.
+	registers := &fakeRegisters{
+		Entries: []flow.RegisterEntry{
+			{Key: flow.ContractRegisterID(addr1, "Alpha"), Value: codeAlpha},
+			{Key: flow.ContractRegisterID(addr1, "Beta"), Value: codeBeta},
+			{Key: flow.ContractRegisterID(addr2, "Gamma"), Value: codeGamma},
+		},
+	}
+
+	pdb, dbDir := unittest.TempPebbleDB(t)
+	db := pebbleimpl.ToDB(pdb)
+	t.Cleanup(func() {
+		require.NoError(t, db.Close())
+		require.NoError(t, os.RemoveAll(dbDir))
+	})
+	lm := storage.NewTestingLockManager()
+	store, err := indexes.NewContractDeploymentsBootstrapper(db, contractsBootstrapHeight)
+	require.NoError(t, err)
+
+	scriptExecutor := executionmock.NewScriptExecutor(t)
+	indexer := NewContracts(unittest.Logger(), store, registers, scriptExecutor, &metrics.NoopCollector{})
+
+	// Bootstrap block also deploys Alpha — that deployment gets a real record, not a placeholder.
+	alphaHash := access.CadenceCodeHash(codeAlpha)
+	snap := makeContractSnapshot(t, addr1, map[string][]byte{"Alpha": codeAlpha})
+	scriptExecutor.On("GetStorageSnapshot", contractsBootstrapHeight).Return(snap, nil).Once()
+
+	bootstrapHeader := unittest.BlockHeaderFixtureOnChain(flow.Testnet, unittest.WithHeaderHeight(contractsBootstrapHeight))
+	alphaEvent := makeAccountContractAddedEvent(t, addr1, "Alpha", alphaHash, 0, 0)
+	indexContractsBlock(t, indexer, lm, db, BlockData{
+		Header: bootstrapHeader,
+		Events: []flow.Event{alphaEvent},
+	})
+
+	alphaID := fmt.Sprintf("A.%s.Alpha", addr1.Hex())
+	betaID := fmt.Sprintf("A.%s.Beta", addr1.Hex())
+	gammaID := fmt.Sprintf("A.%s.Gamma", addr2.Hex())
+
+	// Alpha: real deployment from the event — not a placeholder.
+	alpha, err := store.ByContractID(alphaID)
+	require.NoError(t, err)
+	assert.Equal(t, codeAlpha, alpha.Code)
+	assert.Equal(t, contractsBootstrapHeight, alpha.BlockHeight)
+	assert.False(t, alpha.IsPlaceholder)
+
+	// Beta: placeholder from loadDeployedContracts.
+	beta, err := store.ByContractID(betaID)
+	require.NoError(t, err)
+	assert.Equal(t, codeBeta, beta.Code)
+	assert.True(t, beta.IsPlaceholder)
+
+	// Gamma: placeholder from loadDeployedContracts.
+	gamma, err := store.ByContractID(gammaID)
+	require.NoError(t, err)
+	assert.Equal(t, codeGamma, gamma.Code)
+	assert.True(t, gamma.IsPlaceholder)
+
+	// All() returns all three contracts.
+	allIter, err := store.All(nil)
+	require.NoError(t, err)
+	assert.Len(t, collectContractPage(t, allIter, 10), 3)
+}
+
 // ===== Error and edge-case tests =====
 
 // TestContractsIndexer_AlreadyIndexed verifies that attempting to index the same height
@@ -472,8 +531,6 @@ func TestContractsIndexer_AlreadyIndexed(t *testing.T) {
 	indexer, _, lm, db := newContractsIndexerWithScriptExecutor(t, flow.Testnet, contractsBootstrapHeight, scriptExecutor)
 	header := unittest.BlockHeaderFixtureOnChain(flow.Testnet, unittest.WithHeaderHeight(contractsBootstrapHeight))
 
-	scriptExecutor.On("GetStorageSnapshot", contractsBootstrapHeight).
-		Return(fvmsnapshot.MapStorageSnapshot{}, nil).Once()
 	indexContractsBlock(t, indexer, lm, db, BlockData{Header: header, Events: []flow.Event{}})
 
 	err := indexContractsBlockExpectError(t, indexer, lm, db, BlockData{Header: header, Events: []flow.Event{}})
@@ -519,8 +576,6 @@ func TestContractsIndexer_CodeHashMismatch(t *testing.T) {
 
 	// Bootstrap block.
 	bootstrapHeader := unittest.BlockHeaderFixtureOnChain(flow.Testnet, unittest.WithHeaderHeight(contractsBootstrapHeight))
-	scriptExecutor.On("GetStorageSnapshot", contractsBootstrapHeight).
-		Return(fvmsnapshot.MapStorageSnapshot{}, nil).Once()
 	indexContractsBlock(t, indexer, lm, db, BlockData{Header: bootstrapHeader, Events: []flow.Event{}})
 
 	// Event block: snapshot has differentCode, but event hash is for eventCode.
@@ -550,8 +605,6 @@ func TestContractsIndexer_ScriptExecutorError(t *testing.T) {
 
 	// Bootstrap block.
 	bootstrapHeader := unittest.BlockHeaderFixtureOnChain(flow.Testnet, unittest.WithHeaderHeight(contractsBootstrapHeight))
-	scriptExecutor.On("GetStorageSnapshot", contractsBootstrapHeight).
-		Return(fvmsnapshot.MapStorageSnapshot{}, nil).Once()
 	indexContractsBlock(t, indexer, lm, db, BlockData{Header: bootstrapHeader, Events: []flow.Event{}})
 
 	// Event block: GetStorageSnapshot fails.
@@ -580,7 +633,7 @@ func TestContractsIndexer_NextHeight_MockErrors(t *testing.T) {
 		unexpectedErr := fmt.Errorf("disk I/O failure")
 		mockStore.On("LatestIndexedHeight").Return(uint64(0), unexpectedErr)
 
-		indexer := NewContracts(unittest.Logger(), flow.Testnet.Chain(), mockStore, nil, &metrics.NoopCollector{})
+		indexer := NewContracts(unittest.Logger(), mockStore, nil, nil, &metrics.NoopCollector{})
 
 		_, err := indexer.NextHeight()
 		require.Error(t, err)
@@ -594,7 +647,7 @@ func TestContractsIndexer_NextHeight_MockErrors(t *testing.T) {
 		mockStore.On("LatestIndexedHeight").Return(uint64(0), storage.ErrNotBootstrapped)
 		mockStore.On("UninitializedFirstHeight").Return(uint64(42), true)
 
-		indexer := NewContracts(unittest.Logger(), flow.Testnet.Chain(), mockStore, nil, &metrics.NoopCollector{})
+		indexer := NewContracts(unittest.Logger(), mockStore, nil, nil, &metrics.NoopCollector{})
 
 		_, err := indexer.NextHeight()
 		require.Error(t, err)
@@ -612,7 +665,7 @@ func TestContractsIndexer_NextHeight_MockErrors(t *testing.T) {
 		mockStore.On("Store", mock.Anything, mock.Anything, testHeight, mock.Anything).Return(storeErr)
 
 		lm := storage.NewTestingLockManager()
-		indexer := NewContracts(unittest.Logger(), flow.Testnet.Chain(), mockStore, nil, &metrics.NoopCollector{})
+		indexer := NewContracts(unittest.Logger(), mockStore, nil, nil, &metrics.NoopCollector{})
 		header := unittest.BlockHeaderFixtureOnChain(flow.Testnet, unittest.WithHeaderHeight(testHeight))
 
 		err := unittest.WithLock(t, lm, storage.LockIndexContractDeployments, func(lctx lockctx.Context) error {
@@ -625,8 +678,37 @@ func TestContractsIndexer_NextHeight_MockErrors(t *testing.T) {
 
 // ===== Test Setup Helpers =====
 
-// newContractsIndexerNilExecutor creates a Contracts indexer with a nil script executor.
-// Use this for tests where GetStorageSnapshot will never be called:
+// fakeRegisters is a minimal registerScanner for tests. Populate Entries with register
+// entries that should appear in the ByKeyPrefix scan (e.g. code registers for
+// pre-existing contracts at the bootstrap height).
+type fakeRegisters struct {
+	Entries []flow.RegisterEntry
+}
+
+func (r *fakeRegisters) ByKeyPrefix(keyPrefix string, _ uint64, _ *flow.RegisterID) storage.IndexIterator[flow.RegisterValue, flow.RegisterID] {
+	return func(yield func(storage.IteratorEntry[flow.RegisterValue, flow.RegisterID], error) bool) {
+		for _, e := range r.Entries {
+			if !strings.HasPrefix(e.Key.Key, keyPrefix) {
+				continue
+			}
+			entry := fakeRegisterEntry{id: e.Key, val: e.Value}
+			if !yield(entry, nil) {
+				return
+			}
+		}
+	}
+}
+
+type fakeRegisterEntry struct {
+	id  flow.RegisterID
+	val flow.RegisterValue
+}
+
+func (e fakeRegisterEntry) Cursor() flow.RegisterID            { return e.id }
+func (e fakeRegisterEntry) Value() (flow.RegisterValue, error) { return e.val, nil }
+
+// newContractsIndexerNilExecutor creates a Contracts indexer with nil registers and a nil
+// script executor. Use this for tests where loadDeployedContracts will never be called:
 //   - tests that don't call IndexBlockData, OR
 //   - tests where collectDeployments errors before loadDeployedContracts runs.
 func newContractsIndexerNilExecutor(
@@ -643,12 +725,12 @@ func newContractsIndexerNilExecutor(
 	lm := storage.NewTestingLockManager()
 	store, err := indexes.NewContractDeploymentsBootstrapper(db, firstHeight)
 	require.NoError(t, err)
-	indexer := NewContracts(unittest.Logger(), chainID.Chain(), store, nil, &metrics.NoopCollector{})
+	indexer := NewContracts(unittest.Logger(), store, nil, nil, &metrics.NoopCollector{})
 	return indexer, store, lm, db
 }
 
 // newContractsIndexerWithScriptExecutor creates a Contracts indexer backed by a real pebble DB
-// with the given script executor.
+// with the given script executor. An empty fakeRegisters is used for bootstrap scanning.
 func newContractsIndexerWithScriptExecutor(
 	t *testing.T,
 	chainID flow.ChainID,
@@ -666,7 +748,7 @@ func newContractsIndexerWithScriptExecutor(
 	store, err := indexes.NewContractDeploymentsBootstrapper(db, firstHeight)
 	require.NoError(t, err)
 
-	indexer := NewContracts(unittest.Logger(), chainID.Chain(), store, scriptExecutor, &metrics.NoopCollector{})
+	indexer := NewContracts(unittest.Logger(), store, &fakeRegisters{}, scriptExecutor, &metrics.NoopCollector{})
 	return indexer, store, lm, db
 }
 

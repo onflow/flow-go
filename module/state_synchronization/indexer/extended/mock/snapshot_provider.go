@@ -6,6 +6,7 @@ package mock
 
 import (
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
+	"github.com/onflow/flow-go/model/flow"
 	mock "github.com/stretchr/testify/mock"
 )
 
@@ -94,6 +95,74 @@ func (_c *snapshotProvider_GetStorageSnapshot_Call) Return(storageSnapshot snaps
 }
 
 func (_c *snapshotProvider_GetStorageSnapshot_Call) RunAndReturn(run func(height uint64) (snapshot.StorageSnapshot, error)) *snapshotProvider_GetStorageSnapshot_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// RegisterValue provides a mock function for the type snapshotProvider
+func (_mock *snapshotProvider) RegisterValue(ID flow.RegisterID, height uint64) (flow.RegisterValue, error) {
+	ret := _mock.Called(ID, height)
+
+	if len(ret) == 0 {
+		panic("no return value specified for RegisterValue")
+	}
+
+	var r0 flow.RegisterValue
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(flow.RegisterID, uint64) (flow.RegisterValue, error)); ok {
+		return returnFunc(ID, height)
+	}
+	if returnFunc, ok := ret.Get(0).(func(flow.RegisterID, uint64) flow.RegisterValue); ok {
+		r0 = returnFunc(ID, height)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(flow.RegisterValue)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(flow.RegisterID, uint64) error); ok {
+		r1 = returnFunc(ID, height)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// snapshotProvider_RegisterValue_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'RegisterValue'
+type snapshotProvider_RegisterValue_Call struct {
+	*mock.Call
+}
+
+// RegisterValue is a helper method to define mock.On call
+//   - ID flow.RegisterID
+//   - height uint64
+func (_e *snapshotProvider_Expecter) RegisterValue(ID interface{}, height interface{}) *snapshotProvider_RegisterValue_Call {
+	return &snapshotProvider_RegisterValue_Call{Call: _e.mock.On("RegisterValue", ID, height)}
+}
+
+func (_c *snapshotProvider_RegisterValue_Call) Run(run func(ID flow.RegisterID, height uint64)) *snapshotProvider_RegisterValue_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 flow.RegisterID
+		if args[0] != nil {
+			arg0 = args[0].(flow.RegisterID)
+		}
+		var arg1 uint64
+		if args[1] != nil {
+			arg1 = args[1].(uint64)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *snapshotProvider_RegisterValue_Call) Return(v flow.RegisterValue, err error) *snapshotProvider_RegisterValue_Call {
+	_c.Call.Return(v, err)
+	return _c
+}
+
+func (_c *snapshotProvider_RegisterValue_Call) RunAndReturn(run func(ID flow.RegisterID, height uint64) (flow.RegisterValue, error)) *snapshotProvider_RegisterValue_Call {
 	_c.Call.Return(run)
 	return _c
 }

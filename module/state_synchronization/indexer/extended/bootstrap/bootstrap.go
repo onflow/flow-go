@@ -110,6 +110,7 @@ func BootstrapIndexers(
 	events storage.Events,
 	results storage.LightTransactionResults,
 	scriptExecutor execution.ScriptExecutor,
+	registers storage.RegisterIndex,
 	backfillDelay time.Duration,
 ) (*extended.ExtendedIndexer, error) {
 	accountTransactions, err := extended.NewAccountTransactions(
@@ -148,8 +149,8 @@ func BootstrapIndexers(
 
 	contracts := extended.NewContracts(
 		log,
-		chainID.Chain(),
 		extendedStorage.ContractDeploymentsBootstrapper,
+		registers,
 		scriptExecutor,
 		extendedMetrics,
 	)

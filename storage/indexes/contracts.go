@@ -25,9 +25,9 @@ const (
 	contractDeploymentKeyOverhead = 1 + heightLen + txIndexLen + eventIndexLen
 
 	// minContractIDLength is the minimum length of a contractID.
-	// e.g. "[code][A.1234567890abcdef.a]" = 22 bytes
+	// e.g. "A.1234567890abcdef.a" = 20 bytes
 	// Address is a hex-encoded string
-	minContractIDLength = 4 + flow.AddressLength*2 + 1
+	minContractIDLength = 4 + flow.AddressLength*2
 )
 
 // storedContractDeployment holds the fields of a [access.ContractDeployment] that are not
@@ -37,6 +37,7 @@ type storedContractDeployment struct {
 	TransactionID flow.Identifier
 	Code          []byte
 	CodeHash      []byte
+	IsPlaceholder bool
 }
 
 // ContractDeploymentsIndex implements [storage.ContractDeploymentsIndex] using Pebble.
@@ -330,6 +331,7 @@ func storeAllContractDeployments(rw storage.ReaderBatchWriter, deployments []acc
 			TransactionID: d.TransactionID,
 			Code:          d.Code,
 			CodeHash:      d.CodeHash,
+			IsPlaceholder: d.IsPlaceholder,
 		}
 		if err := operation.UpsertByKey(writer, primaryKey, primaryVal); err != nil {
 			return fmt.Errorf("could not store primary deployment entry for %s: %w", d.ContractID, err)
@@ -468,6 +470,7 @@ func reconstructContractDeployment(cursor access.ContractDeploymentsCursor, val 
 		EventIndex:       cursor.EventIndex,
 		Code:             stored.Code,
 		CodeHash:         stored.CodeHash,
+		IsPlaceholder:    stored.IsPlaceholder,
 	}, nil
 }
 

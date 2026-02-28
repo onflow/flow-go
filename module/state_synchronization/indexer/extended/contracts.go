@@ -16,7 +16,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/state_synchronization/indexer/extended/events"
-	"github.com/onflow/flow-go/module/util"
 	"github.com/onflow/flow-go/storage"
 )
 
@@ -26,12 +25,26 @@ const (
 	flowAccountContractAdded   flow.EventType = "flow.AccountContractAdded"
 	flowAccountContractUpdated flow.EventType = "flow.AccountContractUpdated"
 	flowAccountContractRemoved flow.EventType = "flow.AccountContractRemoved"
+
+	// contractsBootstrapMaxIterationDuration is the maximum time the bootstrap scan holds a
+	// pebble iterator open before releasing it and resuming from a cursor. Pebble defers
+	// compaction while any iterator is open, so keeping iterations short lets compaction run
+	// between batches and prevents read-amplification from building up during the potentially
+	// hours-long initial scan.
+	contractsBootstrapMaxIterationDuration = 30 * time.Second
 )
 
 // snapshotProvider is the subset of execution.ScriptExecutor used by the Contracts indexer.
 type snapshotProvider interface {
 	GetStorageSnapshot(height uint64) (snapshot.StorageSnapshot, error)
 	RegisterValue(ID flow.RegisterID, height uint64) (flow.RegisterValue, error)
+}
+
+// registerScanner can efficiently scan all registers with a given key prefix in a single
+// forward pass. Used during bootstrap to load all deployed contracts without iterating
+// every account address.
+type registerScanner interface {
+	ByKeyPrefix(keyPrefix string, height uint64, cursor *flow.RegisterID) storage.IndexIterator[flow.RegisterValue, flow.RegisterID]
 }
 
 // Contracts indexes contract deployment lifecycle events and writes to the contract deployments
@@ -46,9 +59,9 @@ type snapshotProvider interface {
 // CAUTION: Not safe for concurrent use.
 type Contracts struct {
 	log            zerolog.Logger
-	chain          flow.Chain
 	metrics        module.ExtendedIndexingMetrics
 	store          storage.ContractDeploymentsIndexBootstrapper
+	registers      registerScanner
 	scriptExecutor snapshotProvider
 }
 
@@ -57,16 +70,16 @@ var _ Indexer = (*Contracts)(nil)
 // NewContracts creates a new Contracts indexer backed by store.
 func NewContracts(
 	log zerolog.Logger,
-	chain flow.Chain,
 	store storage.ContractDeploymentsIndexBootstrapper,
+	registers registerScanner,
 	scriptExecutor snapshotProvider,
 	metrics module.ExtendedIndexingMetrics,
 ) *Contracts {
 	return &Contracts{
 		log:            log.With().Str("component", "contracts_indexer").Logger(),
-		chain:          chain,
 		metrics:        metrics,
 		store:          store,
+		registers:      registers,
 		scriptExecutor: scriptExecutor,
 	}
 }
@@ -224,66 +237,60 @@ func (c *Contracts) collectDeployments(data BlockData) (deployments []access.Con
 	return deployments, created, updated, nil
 }
 
-// loadDeployedContracts loads all deployed contracts from storage at the given height and returns a
-// list of access.ContractDeployment records.
+// loadDeployedContracts scans all code registers at the given height and returns a
+// access.ContractDeployment placeholder record for each deployed contract not already
+// covered by seenContracts.
+//
+// The scan is broken into iterations bounded by [contractsBootstrapMaxIterationDuration].
+// Each iteration holds a single pebble iterator open; releasing it between iterations
+// allows pebble compaction to run and prevents read-amplification build-up during the
+// potentially hours-long bootstrap scan.
 //
 // No error returns are expected during normal operation.
 func (c *Contracts) loadDeployedContracts(height uint64, seenContracts map[string]bool) ([]access.ContractDeployment, error) {
-	snapshot, err := c.scriptExecutor.GetStorageSnapshot(height)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get storage snapshot: %w", err)
-	}
-
-	txnState := state.NewTransactionState(snapshot, state.DefaultParameters())
-	accounts := environment.NewAccounts(txnState)
-
-	generator := c.chain.NewAddressGenerator()
-
-	latestIndex := environment.NewAddressGenerator(txnState, c.chain).AddressCount()
-
-	progress := util.LogProgress(c.log, util.DefaultLogProgressConfig("loading deployed contracts", latestIndex))
-
 	var deployments []access.ContractDeployment
-
+	var cursor *flow.RegisterID
 	for {
-		address, err := generator.NextAddress()
-		if err != nil {
-			return nil, fmt.Errorf("cannot get address: %w", err)
-		}
+		batchStart := time.Now()
+		timedOut := false
 
-		if generator.AddressCount() >= latestIndex {
-			return deployments, nil
-		}
+		for entry, err := range c.registers.ByKeyPrefix(flow.CodeKeyPrefix, height, cursor) {
+			if err != nil {
+				return nil, fmt.Errorf("error scanning contract code registers: %w", err)
+			}
 
-		contractNames, err := accounts.GetContractNames(address)
-		if err != nil {
-			return nil, fmt.Errorf("error while getting contract names: %w", err)
-		}
-
-		for _, contractName := range contractNames {
+			reg := entry.Cursor()
+			address := flow.BytesToAddress([]byte(reg.Owner))
+			contractName := flow.KeyContractName(reg.Key)
 			contractID := events.ContractIDFromAddress(address, contractName)
 
-			// skip any contracts that were already updated in this block since the deployment object
-			// is already created
-			if seenContracts[contractID] {
-				continue
+			if !seenContracts[contractID] {
+				code, err := entry.Value()
+				if err != nil {
+					return nil, fmt.Errorf("error reading contract code for %s: %w", contractID, err)
+				}
+				deployments = append(deployments, access.ContractDeployment{
+					ContractID: contractID,
+					Address:    address,
+					Code:       code,
+					CodeHash:   access.CadenceCodeHash(code),
+					// all other fields are omitted because we do not know the actual deployment details
+					IsPlaceholder: true,
+				})
 			}
 
-			code, err := accounts.GetContract(contractName, address)
-			if err != nil {
-				return nil, fmt.Errorf("error while getting contract: %w", err)
+			// If we've held the iterator open too long, record the cursor and release it so
+			// pebble compaction can proceed before we resume.
+			if time.Since(batchStart) >= contractsBootstrapMaxIterationDuration {
+				cursor = &reg
+				timedOut = true
+				break
 			}
-
-			deployments = append(deployments, access.ContractDeployment{
-				ContractID: contractID,
-				Address:    address,
-				Code:       code,
-				CodeHash:   access.CadenceCodeHash(code),
-				// all other fields are omitted because we do not know the actual deployment details
-				IsPlaceholder: true,
-			})
 		}
-		progress(1)
+
+		if !timedOut {
+			return deployments, nil
+		}
 	}
 }
 

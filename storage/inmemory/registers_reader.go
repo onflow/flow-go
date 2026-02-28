@@ -1,6 +1,8 @@
 package inmemory
 
 import (
+	"fmt"
+
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
 )
@@ -51,4 +53,10 @@ func (r *RegistersReader) LatestHeight() uint64 {
 // FirstHeight returns the first indexed height found in the store.
 func (r *RegistersReader) FirstHeight() uint64 {
 	return r.blockHeight
+}
+
+func (r *RegistersReader) ByKeyPrefix(keyPrefix string, height uint64, cursor *flow.RegisterID) storage.IndexIterator[flow.RegisterValue, flow.RegisterID] {
+	return func(yield func(storage.IteratorEntry[flow.RegisterValue, flow.RegisterID], error) bool) {
+		yield(nil, fmt.Errorf("not implemented"))
+	}
 }
