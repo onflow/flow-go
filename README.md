@@ -192,3 +192,5 @@ type StateMachineEventsTelemetryFactory interface {
     config:
       dir: "state/protocol/protocol_state/mock"
 ```
+<br>## Welcome to Cadence Smart Contracts<br>Flow's Cadence enables resource-oriented contracts—new contributors, start with the Flow CLI tutorial for your first script. Tip: Use Emulator for local dev! <br>
+
