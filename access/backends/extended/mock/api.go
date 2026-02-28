@@ -601,8 +601,8 @@ func (_c *API_GetContracts_Call) Run(run func(ctx context.Context, limit uint32,
 	return _c
 }
 
-func (_c *API_GetContracts_Call) Return(contractsPage *access.ContractDeploymentPage, err error) *API_GetContracts_Call {
-	_c.Call.Return(contractsPage, err)
+func (_c *API_GetContracts_Call) Return(contractDeploymentPage *access.ContractDeploymentPage, err error) *API_GetContracts_Call {
+	_c.Call.Return(contractDeploymentPage, err)
 	return _c
 }
 
@@ -699,8 +699,8 @@ func (_c *API_GetContractsByAddress_Call) Run(run func(ctx context.Context, addr
 	return _c
 }
 
-func (_c *API_GetContractsByAddress_Call) Return(contractsPage *access.ContractDeploymentPage, err error) *API_GetContractsByAddress_Call {
-	_c.Call.Return(contractsPage, err)
+func (_c *API_GetContractsByAddress_Call) Return(contractDeploymentPage *access.ContractDeploymentPage, err error) *API_GetContractsByAddress_Call {
+	_c.Call.Return(contractDeploymentPage, err)
 	return _c
 }
 
