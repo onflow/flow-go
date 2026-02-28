@@ -82,11 +82,12 @@ func (td *TokenChanges) Inspect(
 		}
 	}()
 
-	diff, err = td.getTokenDiff(storage, executionSnapshot, events, td.getSearchedTokensRef())
+	diff, err = td.getTokenDiff(logger, storage, executionSnapshot, events, td.getSearchedTokensRef())
 	return
 }
 
 func (td *TokenChanges) getTokenDiff(
+	logger zerolog.Logger,
 	storage snapshot.StorageSnapshot,
 	executionSnapshot *snapshot.ExecutionSnapshot,
 	events []flow.Event,
@@ -112,11 +113,11 @@ func (td *TokenChanges) getTokenDiff(
 	newValuesRegister := executionSnapshotLedgers.NewValuesLedger()
 
 	// TODO: possible optimisation: run both at the same time
-	before, err := td.getTokens(oldRegistersLedger, addresses, tokenDiffSearchDomains, searchedTokens)
+	before, err := td.getTokens(logger, oldRegistersLedger, addresses, tokenDiffSearchDomains, searchedTokens)
 	if err != nil {
 		return TokenDiffResult{}, fmt.Errorf("failed to get tokens before: %w", err)
 	}
-	after, err := td.getTokens(newValuesRegister, addresses, tokenDiffSearchDomains, searchedTokens)
+	after, err := td.getTokens(logger, newValuesRegister, addresses, tokenDiffSearchDomains, searchedTokens)
 	if err != nil {
 		return TokenDiffResult{}, fmt.Errorf("failed to get tokens after: %w", err)
 	}
@@ -144,6 +145,7 @@ func (td *TokenChanges) getTokenDiff(
 }
 
 func (td *TokenChanges) getTokens(
+	logger zerolog.Logger,
 	storage ledgerSnapshot,
 	addresses map[common.Address]struct{},
 	domains []common.StorageDomain,
@@ -170,7 +172,11 @@ func (td *TokenChanges) getTokens(
 		for _, d := range domains {
 			// We are making the assumption that if a register was changed, the registers read to make that change
 			// are enough to read that register before the change (if it existed)
-			storageMap := storageRuntime.Storage.GetDomainStorageMap(storageRuntime.Interpreter, a, d, false)
+
+			// It seems that GetDomainStorageMap() tries to load domain storage map if it isn't loaded.
+			// This causes a "slab not found" panic because we only included loaded registers in the underlying storage.
+			// This workaround is to catch the panic gracefully so we can continue to inspect the next domain storage map.
+			storageMap := getDomainStorageMap(logger, storageRuntime, storageRuntime.Interpreter, a, d)
 			if storageMap == nil {
 				continue
 			}
@@ -189,6 +195,22 @@ func (td *TokenChanges) getTokens(
 		tokens[a] = tkns
 	}
 	return tokens, nil
+}
+
+func getDomainStorageMap(
+	logger zerolog.Logger,
+	storageRuntime *readonlyStorageRuntime,
+	storageMutationTracker interpreter.StorageMutationTracker,
+	address common.Address,
+	domain common.StorageDomain,
+) (dm *interpreter.DomainStorageMap) {
+	defer func() {
+		if r := recover(); r != nil {
+			logger.Warn().Str("module", "tc-inspector").Msgf("failed to get domain storage map %s.%s: %v", address.String(), domain.Identifier(), r)
+			dm = nil
+		}
+	}()
+	return storageRuntime.Storage.GetDomainStorageMap(storageMutationTracker, address, domain, false)
 }
 
 func walkLoaded(
