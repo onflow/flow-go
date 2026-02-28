@@ -27,20 +27,36 @@ import (
 	flowgo "github.com/onflow/flow-go/model/flow"
 )
 
-func TransactionFixture() flowgo.TransactionBody {
-	return *emulator.SDKTransactionToFlow(*test.TransactionGenerator().New())
+// NewTransactionBodyFixture generates a complete and random flowgo.TransactionBody object.
+func NewTransactionBodyFixture() flowgo.TransactionBody {
+	sdkTx := test.TransactionGenerator().New()
+	flowTx, err := emulator.SDKTransactionToFlow(*sdkTx)
+	if err != nil {
+		panic(err)
+	}
+	return *flowTx
 }
 
-func StorableTransactionResultFixture(eventEncodingVersion entities.EventEncodingVersion) emulator.StorableTransactionResult {
+// NewStorableTransactionResultFixture generates a complete and random emulator.StorableTransactionResult object.
+func NewStorableTransactionResultFixture(eventEncodingVersion entities.EventEncodingVersion) emulator.StorableTransactionResult {
 	events := test.EventGenerator(eventEncodingVersion)
 
-	eventA, _ := emulator.SDKEventToFlow(events.New())
-	eventB, _ := emulator.SDKEventToFlow(events.New())
+	sdkEventA := events.New()
+	eventA, err := emulator.SDKEventToFlow(sdkEventA)
+	if err != nil {
+		panic(err)
+	}
+
+	sdkEventB := events.New()
+	eventB, err := emulator.SDKEventToFlow(sdkEventB)
+	if err != nil {
+		panic(err)
+	}
 
 	return emulator.StorableTransactionResult{
-		ErrorCode:    42,
-		ErrorMessage: "foo",
-		Logs:         []string{"a", "b", "c"},
+		ErrorCode:    uint32(test.RandomNumber(0, 100)),
+		ErrorMessage: test.RandomString(20),
+		Logs:         []string{test.RandomString(10), test.RandomString(15), test.RandomString(12)},
 		Events: []flowgo.Event{
 			*eventA,
 			*eventB,
@@ -48,10 +64,31 @@ func StorableTransactionResultFixture(eventEncodingVersion entities.EventEncodin
 	}
 }
 
-func FullCollectionFixture(n int) flowgo.Collection {
+// NewBlockHeaderFixture generates a complete and random flowgo.BlockHeader object.
+func NewBlockHeaderFixture() flowgo.BlockHeader {
+	sdkHeader := test.BlockGenerator().NewHeader()
+	flowHeader, err := emulator.SDKBlockHeaderToFlow(sdkHeader)
+	if err != nil {
+		panic(err)
+	}
+	return *flowHeader
+}
+
+// NewBlockFixture generates a complete and random flowgo.Block object.
+func NewBlockFixture() flowgo.Block {
+	sdkBlock := test.BlockGenerator().New()
+	flowBlock, err := emulator.SDKBlockToFlow(sdkBlock)
+	if err != nil {
+		panic(err)
+	}
+	return *flowBlock
+}
+
+// NewCollectionFixture generates a flowgo.Collection with n random transactions.
+func NewCollectionFixture(n int) flowgo.Collection {
 	transactions := make([]*flowgo.TransactionBody, n)
 	for i := 0; i < n; i++ {
-		tx := TransactionFixture()
+		tx := NewTransactionBodyFixture()
 		transactions[i] = &tx
 	}
 
