@@ -6,14 +6,11 @@ import (
 	"fmt"
 
 	"github.com/onflow/flow/protobuf/go/flow/entities"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 
 	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/provider"
 	accessmodel "github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/access/systemcollection"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/storage"
 )
 
@@ -29,23 +26,6 @@ type backendBase struct {
 
 	transactionsProvider provider.TransactionProvider
 	systemCollections    *systemcollection.Versioned
-}
-
-// mapReadError converts storage read errors to appropriate gRPC status errors.
-func (b *backendBase) mapReadError(ctx context.Context, label string, err error) error {
-	switch {
-	case errors.Is(err, storage.ErrNotBootstrapped):
-		return status.Errorf(codes.FailedPrecondition, "%s index not initialized: %v", label, err)
-	case errors.Is(err, storage.ErrHeightNotIndexed):
-		return status.Errorf(codes.OutOfRange, "requested height not indexed: %v", err)
-	case errors.Is(err, storage.ErrInvalidQuery):
-		return status.Errorf(codes.InvalidArgument, "invalid query: %v", err)
-	case errors.Is(err, storage.ErrNotFound):
-		return status.Errorf(codes.NotFound, "not found: %v", err)
-	default:
-		irrecoverable.Throw(ctx, fmt.Errorf("failed to get %s: %w", label, err))
-		return err
-	}
 }
 
 // normalizeLimit applies default page size when limit is 0, and returns an error if the limit

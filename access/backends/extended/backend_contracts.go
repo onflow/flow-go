@@ -101,7 +101,7 @@ func (b *ContractsBackend) GetContract(
 ) (*accessmodel.ContractDeployment, error) {
 	deployment, err := b.store.ByContractID(id)
 	if err != nil {
-		return nil, b.mapReadError(ctx, "contract", err)
+		return nil, mapReadError(ctx, "contract", err)
 	}
 
 	if expandOptions.HasExpand() {
@@ -138,7 +138,7 @@ func (b *ContractsBackend) GetContractDeployments(
 
 	iter, err := b.store.DeploymentsByContractID(id, cursor)
 	if err != nil {
-		return nil, b.mapReadError(ctx, "contract deployments", err)
+		return nil, mapReadError(ctx, "contract deployments", err)
 	}
 
 	collected, nextCursor, err := iterator.CollectResults(iter, limit, filter.Filter())
@@ -186,7 +186,7 @@ func (b *ContractsBackend) GetContracts(
 
 	iter, err := b.store.All(cursor)
 	if err != nil {
-		return nil, b.mapReadError(ctx, "contracts", err)
+		return nil, mapReadError(ctx, "contracts", err)
 	}
 
 	collected, nextCursor, err := iterator.CollectResults(iter, limit, filter.Filter())
@@ -236,7 +236,7 @@ func (b *ContractsBackend) GetContractsByAddress(
 
 	iter, err := b.store.ByAddress(address, cursor)
 	if err != nil {
-		return nil, b.mapReadError(ctx, "contracts", err)
+		return nil, mapReadError(ctx, "contracts", err)
 	}
 
 	collected, nextCursor, err := iterator.CollectResults(iter, limit, filter.Filter())

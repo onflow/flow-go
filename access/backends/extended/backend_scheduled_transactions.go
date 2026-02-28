@@ -142,7 +142,7 @@ func (b *ScheduledTransactionsBackend) GetScheduledTransaction(
 ) (*accessmodel.ScheduledTransaction, error) {
 	tx, err := b.store.ByID(id)
 	if err != nil {
-		return nil, b.mapReadError(ctx, "scheduled transaction", err)
+		return nil, mapReadError(ctx, "scheduled transaction", err)
 	}
 
 	if !expandOptions.HasExpand() {
@@ -179,7 +179,7 @@ func (b *ScheduledTransactionsBackend) GetScheduledTransactions(
 
 	iter, err := b.store.All(cursor)
 	if err != nil {
-		return nil, b.mapReadError(ctx, "scheduled transactions", err)
+		return nil, mapReadError(ctx, "scheduled transactions", err)
 	}
 
 	collected, nextCursor, err := iterator.CollectResults(iter, limit, filter.Filter())
@@ -230,7 +230,7 @@ func (b *ScheduledTransactionsBackend) GetScheduledTransactionsByAddress(
 
 	iter, err := b.store.ByAddress(address, cursor)
 	if err != nil {
-		return nil, b.mapReadError(ctx, "scheduled transactions", err)
+		return nil, mapReadError(ctx, "scheduled transactions", err)
 	}
 
 	collected, nextCursor, err := iterator.CollectResults(iter, limit, filter.Filter())
