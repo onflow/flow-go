@@ -95,7 +95,7 @@ func contractDeploymentsURL(t *testing.T, identifier string, params contractsLis
 }
 
 func contractsByAddressURL(t *testing.T, address string, params contractsListURLParams) string {
-	u, err := url.ParseRequestURI(fmt.Sprintf("/experimental/v1/contracts/account/%s", address))
+	u, err := url.ParseRequestURI(fmt.Sprintf("/experimental/v1/accounts/%s/contracts", address))
 	require.NoError(t, err)
 	q := u.Query()
 	if params.limit != "" {
