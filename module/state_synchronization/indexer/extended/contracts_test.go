@@ -128,7 +128,7 @@ func TestContractsIndexer_ContractAdded(t *testing.T) {
 	assert.Equal(t, address, deployment.Address)
 	assert.Equal(t, contractsEventHeight, deployment.BlockHeight)
 	assert.Equal(t, deployingTxID, deployment.TransactionID)
-	assert.Equal(t, uint32(0), deployment.TxIndex)
+	assert.Equal(t, uint32(0), deployment.TransactionIndex)
 	assert.Equal(t, uint32(0), deployment.EventIndex)
 	assert.Equal(t, code, deployment.Code)
 	assert.Equal(t, codeHash, deployment.CodeHash)

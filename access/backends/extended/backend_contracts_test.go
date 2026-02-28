@@ -41,9 +41,9 @@ type testContractDeploymentHistoryEntry struct {
 
 func (e testContractDeploymentHistoryEntry) Cursor() accessmodel.ContractDeploymentsCursor {
 	return accessmodel.ContractDeploymentsCursor{
-		Height:     e.d.BlockHeight,
-		TxIndex:    e.d.TxIndex,
-		EventIndex: e.d.EventIndex,
+		BlockHeight:      e.d.BlockHeight,
+		TransactionIndex: e.d.TransactionIndex,
+		EventIndex:       e.d.EventIndex,
 	}
 }
 
@@ -86,6 +86,14 @@ func makeContractsIter(deployments []accessmodel.ContractDeployment) storage.Con
 				return
 			}
 		}
+	}
+}
+
+// makeIterWithError returns an iterator that immediately yields the given error.
+// Used to test error handling in CollectResults.
+func makeIterWithError(err error) storage.ContractDeploymentIterator {
+	return func(yield func(storage.IteratorEntry[accessmodel.ContractDeployment, accessmodel.ContractDeploymentsCursor], error) bool) {
+		yield(nil, err)
 	}
 }
 
@@ -217,7 +225,7 @@ func TestContractsBackend_GetContractDeployments(t *testing.T) {
 		result, err := backend.GetContractDeployments(context.Background(), contractID, 1, nil, ContractDeploymentFilter{}, ContractDeploymentExpandOptions{}, entities.EventEncodingVersion_JSON_CDC_V0)
 		require.NoError(t, err)
 		require.NotNil(t, result.NextCursor)
-		assert.Equal(t, uint64(30), result.NextCursor.Height)
+		assert.Equal(t, uint64(30), result.NextCursor.BlockHeight)
 	})
 
 	t.Run("cursor forwarded to store", func(t *testing.T) {
@@ -225,7 +233,7 @@ func TestContractsBackend_GetContractDeployments(t *testing.T) {
 		mockStore := storagemock.NewContractDeploymentsIndexReader(t)
 		backend := NewContractsBackend(unittest.Logger(), &backendBase{config: DefaultConfig()}, mockStore)
 
-		cursor := &accessmodel.ContractDeploymentsCursor{Height: 30, TxIndex: 1, EventIndex: 2}
+		cursor := &accessmodel.ContractDeploymentsCursor{BlockHeight: 30, TransactionIndex: 1, EventIndex: 2}
 		mockStore.On("DeploymentsByContractID", contractID, cursor).
 			Return(makeContractDeploymentIter(nil), nil).Once()
 
@@ -268,6 +276,21 @@ func TestContractsBackend_GetContractDeployments(t *testing.T) {
 		unexpectedErr := fmt.Errorf("disk failure")
 		mockStore.On("DeploymentsByContractID", contractID, (*accessmodel.ContractDeploymentsCursor)(nil)).
 			Return(nil, unexpectedErr).Once()
+
+		signalerCtx, verifyThrown := contractSignalerCtxExpectingThrow(t)
+		_, err := backend.GetContractDeployments(signalerCtx, contractID, 0, nil, ContractDeploymentFilter{}, ContractDeploymentExpandOptions{}, entities.EventEncodingVersion_JSON_CDC_V0)
+		require.Error(t, err)
+		verifyThrown()
+	})
+
+	t.Run("iterator error triggers irrecoverable", func(t *testing.T) {
+		t.Parallel()
+		mockStore := storagemock.NewContractDeploymentsIndexReader(t)
+		backend := NewContractsBackend(unittest.Logger(), &backendBase{config: DefaultConfig()}, mockStore)
+
+		iterErr := fmt.Errorf("storage read failure")
+		mockStore.On("DeploymentsByContractID", contractID, (*accessmodel.ContractDeploymentsCursor)(nil)).
+			Return(makeIterWithError(iterErr), nil).Once()
 
 		signalerCtx, verifyThrown := contractSignalerCtxExpectingThrow(t)
 		_, err := backend.GetContractDeployments(signalerCtx, contractID, 0, nil, ContractDeploymentFilter{}, ContractDeploymentExpandOptions{}, entities.EventEncodingVersion_JSON_CDC_V0)
@@ -372,6 +395,21 @@ func TestContractsBackend_GetContracts(t *testing.T) {
 		require.Error(t, err)
 		verifyThrown()
 	})
+
+	t.Run("iterator error triggers irrecoverable", func(t *testing.T) {
+		t.Parallel()
+		mockStore := storagemock.NewContractDeploymentsIndexReader(t)
+		backend := NewContractsBackend(unittest.Logger(), &backendBase{config: DefaultConfig()}, mockStore)
+
+		iterErr := fmt.Errorf("storage read failure")
+		mockStore.On("All", (*accessmodel.ContractDeploymentsCursor)(nil)).
+			Return(makeIterWithError(iterErr), nil).Once()
+
+		signalerCtx, verifyThrown := contractSignalerCtxExpectingThrow(t)
+		_, err := backend.GetContracts(signalerCtx, 0, nil, ContractDeploymentFilter{}, ContractDeploymentExpandOptions{}, entities.EventEncodingVersion_JSON_CDC_V0)
+		require.Error(t, err)
+		verifyThrown()
+	})
 }
 
 // TestContractsBackend_GetContractsByAddress tests all code paths for GetContractsByAddress.
@@ -395,6 +433,26 @@ func TestContractsBackend_GetContractsByAddress(t *testing.T) {
 		require.NotNil(t, result)
 		require.Len(t, result.Deployments, 1)
 		assert.Equal(t, contractID, result.Deployments[0].ContractID)
+	})
+
+	t.Run("has more results sets NextCursor", func(t *testing.T) {
+		t.Parallel()
+		mockStore := storagemock.NewContractDeploymentsIndexReader(t)
+		backend := NewContractsBackend(unittest.Logger(), &backendBase{config: DefaultConfig()}, mockStore)
+
+		contractID1 := fmt.Sprintf("A.%s.Bar", addr.Hex())
+		contractID2 := fmt.Sprintf("A.%s.Foo", addr.Hex())
+		deployments := []accessmodel.ContractDeployment{
+			makeContractDeployment(contractID1, 10),
+			makeContractDeployment(contractID2, 11), // cursor item (first of next page)
+		}
+		mockStore.On("ByAddress", addr, (*accessmodel.ContractDeploymentsCursor)(nil)).
+			Return(makeContractsIter(deployments), nil).Once()
+
+		result, err := backend.GetContractsByAddress(context.Background(), addr, 1, nil, ContractDeploymentFilter{}, ContractDeploymentExpandOptions{}, entities.EventEncodingVersion_JSON_CDC_V0)
+		require.NoError(t, err)
+		require.NotNil(t, result.NextCursor)
+		assert.Equal(t, contractID2, result.NextCursor.ContractID)
 	})
 
 	t.Run("cursor forwarded to store", func(t *testing.T) {
@@ -451,6 +509,21 @@ func TestContractsBackend_GetContractsByAddress(t *testing.T) {
 		require.Error(t, err)
 		verifyThrown()
 	})
+
+	t.Run("iterator error triggers irrecoverable", func(t *testing.T) {
+		t.Parallel()
+		mockStore := storagemock.NewContractDeploymentsIndexReader(t)
+		backend := NewContractsBackend(unittest.Logger(), &backendBase{config: DefaultConfig()}, mockStore)
+
+		iterErr := fmt.Errorf("storage read failure")
+		mockStore.On("ByAddress", addr, (*accessmodel.ContractDeploymentsCursor)(nil)).
+			Return(makeIterWithError(iterErr), nil).Once()
+
+		signalerCtx, verifyThrown := contractSignalerCtxExpectingThrow(t)
+		_, err := backend.GetContractsByAddress(signalerCtx, addr, 0, nil, ContractDeploymentFilter{}, ContractDeploymentExpandOptions{}, entities.EventEncodingVersion_JSON_CDC_V0)
+		require.Error(t, err)
+		verifyThrown()
+	})
 }
 
 // TestContractDeploymentFilter tests the Filter() predicate builder.
@@ -464,12 +537,10 @@ func TestContractDeploymentFilter(t *testing.T) {
 	foo := &accessmodel.ContractDeployment{ContractID: fooID, BlockHeight: 100}
 	bar := &accessmodel.ContractDeployment{ContractID: barID, BlockHeight: 200}
 
-	t.Run("empty filter passes all", func(t *testing.T) {
+	t.Run("empty filter returns nil (accept all)", func(t *testing.T) {
 		t.Parallel()
 		f := ContractDeploymentFilter{}
-		filter := f.Filter()
-		assert.True(t, filter(foo))
-		assert.True(t, filter(bar))
+		assert.Nil(t, f.Filter())
 	})
 
 	t.Run("ContractName suffix match immediately passes, non-match falls through to block range", func(t *testing.T) {
@@ -519,5 +590,23 @@ func TestContractDeploymentFilter(t *testing.T) {
 		filter := f.Filter()
 		assert.True(t, filter(foo), "height 100 within [50, 150] should be included")
 		assert.False(t, filter(bar), "height 200 outside [50, 150] should be excluded")
+	})
+
+	t.Run("StartBlock boundary is inclusive", func(t *testing.T) {
+		t.Parallel()
+		start := uint64(100) // exactly foo's height
+		f := ContractDeploymentFilter{StartBlock: &start}
+		filter := f.Filter()
+		assert.True(t, filter(foo), "height 100 == StartBlock 100 should be included")
+		assert.True(t, filter(bar), "height 200 > StartBlock 100 should be included")
+	})
+
+	t.Run("EndBlock boundary is inclusive", func(t *testing.T) {
+		t.Parallel()
+		end := uint64(100) // exactly foo's height
+		f := ContractDeploymentFilter{EndBlock: &end}
+		filter := f.Filter()
+		assert.True(t, filter(foo), "height 100 == EndBlock 100 should be included")
+		assert.False(t, filter(bar), "height 200 > EndBlock 100 should be excluded")
 	})
 }

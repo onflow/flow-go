@@ -25,7 +25,7 @@ const (
 	contractDeploymentKeyOverhead = 1 + heightLen + txIndexLen + eventIndexLen
 
 	// minContractIDLength is the minimum length of a contractID.
-	// e.g. "A.1234567890abcdef.a" = 22 bytes
+	// e.g. "[code][A.1234567890abcdef.a]" = 22 bytes
 	// Address is a hex-encoded string
 	minContractIDLength = 4 + flow.AddressLength*2 + 1
 )
@@ -128,6 +128,7 @@ func (idx *ContractDeploymentsIndex) ByContractID(id string) (access.ContractDep
 		return item.Value()
 	}
 
+	// no deployments were found for the contract ID
 	return access.ContractDeployment{}, storage.ErrNotFound
 }
 
@@ -138,19 +139,16 @@ func (idx *ContractDeploymentsIndex) ByContractID(id string) (access.ContractDep
 //   - nil means start from the most recent deployment
 //   - non-nil means start at the cursor position (inclusive)
 //
+// Returns an exhausted iterator (zero items) and no error if no deployments exist for the given contract ID.
+//
 // No error returns are expected during normal operation.
 func (idx *ContractDeploymentsIndex) DeploymentsByContractID(
 	id string,
 	cursor *access.ContractDeploymentsCursor,
 ) (storage.ContractDeploymentIterator, error) {
-	prefix := makeContractDeploymentContractPrefix(id)
-
-	// by default, iterate over all deployments for the exact contractID
-	startKey, endKey := prefix, prefix
-	if cursor != nil {
-		// if there is a cursor, start from the cursor position, and iterate for all remaining deployments of the contractID
-		startKey = makeContractDeploymentKey(id, cursor.Height, cursor.TxIndex, cursor.EventIndex)
-		endKey = storage.PrefixInclusiveEnd(prefix, startKey)
+	startKey, endKey, err := idx.rangeKeysByID(id, cursor)
+	if err != nil {
+		return nil, fmt.Errorf("could not determine range keys: %w", err)
 	}
 
 	reader := idx.db.Reader()
@@ -169,18 +167,15 @@ func (idx *ContractDeploymentsIndex) DeploymentsByContractID(
 //   - nil means start from the first contract (by identifier)
 //   - non-nil resumes from cursor.ContractID (inclusive); other cursor fields are ignored
 //
+// Returns an exhausted iterator (zero items) and no error if no contracts exist.
+//
 // No error returns are expected during normal operation.
 func (idx *ContractDeploymentsIndex) All(
 	cursor *access.ContractDeploymentsCursor,
 ) (storage.ContractDeploymentIterator, error) {
-	prefix := []byte{codeContractDeployment}
-
-	// by default, iterate over all contracts
-	startKey, endKey := prefix, prefix
-	if cursor != nil && cursor.ContractID != "" {
-		// if there is a cursor, start from the cursor position, and iterate for all remaining contracts
-		startKey = makeContractDeploymentContractPrefix(cursor.ContractID)
-		endKey = storage.PrefixInclusiveEnd(prefix, startKey)
+	startKey, endKey, err := idx.rangeKeysAll(cursor)
+	if err != nil {
+		return nil, fmt.Errorf("could not determine range keys: %w", err)
 	}
 
 	reader := idx.db.Reader()
@@ -189,6 +184,7 @@ func (idx *ContractDeploymentsIndex) All(
 		return nil, fmt.Errorf("could not create iterator for all contracts: %w", err)
 	}
 
+	// this prefix iterator will return the first entry for each prefix returned by contractDeploymentKeyPrefix
 	return iterator.BuildPrefixIterator(
 		storageIter,
 		decodeDeploymentCursor,
@@ -204,19 +200,16 @@ func (idx *ContractDeploymentsIndex) All(
 //   - nil means start from the first contract at the address (by identifier)
 //   - non-nil resumes from cursor.ContractID (inclusive); other cursor fields are ignored
 //
+// Returns an exhausted iterator (zero items) and no error if no deployments exist for the given address.
+//
 // No error returns are expected during normal operation.
 func (idx *ContractDeploymentsIndex) ByAddress(
 	account flow.Address,
 	cursor *access.ContractDeploymentsCursor,
 ) (storage.ContractDeploymentIterator, error) {
-	addrPrefix := makeContractDeploymentAddressPrefix(account)
-
-	// by default, iterate over all contracts for the address
-	startKey, endKey := addrPrefix, addrPrefix
-	if cursor != nil && cursor.ContractID != "" {
-		// if there is a cursor, start from the cursor position, and iterate for all remaining contracts for the address
-		startKey = makeContractDeploymentContractPrefix(cursor.ContractID)
-		endKey = storage.PrefixInclusiveEnd(addrPrefix, startKey)
+	startKey, endKey, err := idx.rangeKeysByAddress(account, cursor)
+	if err != nil {
+		return nil, fmt.Errorf("could not determine range keys: %w", err)
 	}
 
 	reader := idx.db.Reader()
@@ -225,6 +218,7 @@ func (idx *ContractDeploymentsIndex) ByAddress(
 		return nil, fmt.Errorf("could not create iterator for address %s: %w", account.Hex(), err)
 	}
 
+	// this prefix iterator will return the first entry for each prefix returned by contractDeploymentKeyPrefix
 	return iterator.BuildPrefixIterator(
 		storageIter,
 		decodeDeploymentCursor,
@@ -233,24 +227,60 @@ func (idx *ContractDeploymentsIndex) ByAddress(
 	), nil
 }
 
-// rangeKeys computes the start and end keys for iterating over contracts, based on
+// rangeKeysByID computes the start and end keys for iterating over contracts by contract id, based on
 // the provided cursor.
 //
 // Any error indicates the cursor is invalid
-func (idx *ContractDeploymentsIndex) rangeKeys(prefix string, cursor *access.ContractDeploymentsCursor) (startKey, endKey []byte, err error) {
+func (idx *ContractDeploymentsIndex) rangeKeysByID(contractID string, cursor *access.ContractDeploymentsCursor) (startKey, endKey []byte, err error) {
+	prefix := makeContractDeploymentContractPrefix(contractID)
+
 	latestHeight := idx.latestHeight.Load()
 	if cursor == nil {
-		startKey = makeContractDeploymentContractPrefix(prefix)
-		endKey = makeContractDeploymentContractPrefix(prefix)
-		return startKey, endKey, nil
+		// by default, iterate over all deployments for the exact contractID
+		return prefix, prefix, nil
 	}
 
 	if err := validateCursorHeight(cursor.BlockHeight, idx.firstHeight, latestHeight); err != nil {
 		return nil, nil, err
 	}
 
-	startKey = makeFTTransferKey(account, cursor.BlockHeight, cursor.TransactionIndex, cursor.EventIndex)
-	endKey = storage.PrefixInclusiveEnd(endKey, startKey)
+	startKey = makeContractDeploymentKey(contractID, cursor.BlockHeight, cursor.TransactionIndex, cursor.EventIndex)
+	endKey = storage.PrefixInclusiveEnd(prefix, startKey)
+
+	return startKey, endKey, nil
+}
+
+// rangeKeysAll computes the start and end keys for iterating over all contracts, based on the provided cursor.
+//
+// Any error indicates the cursor is invalid
+func (idx *ContractDeploymentsIndex) rangeKeysAll(cursor *access.ContractDeploymentsCursor) (startKey, endKey []byte, err error) {
+	prefix := []byte{codeContractDeployment}
+
+	if cursor == nil || cursor.ContractID == "" {
+		// by default, iterate over all contracts
+		return prefix, prefix, nil
+	}
+
+	startKey = makeContractDeploymentContractPrefix(cursor.ContractID)
+	endKey = storage.PrefixInclusiveEnd(prefix, startKey)
+
+	return startKey, endKey, nil
+}
+
+// rangeKeysByAddress computes the start and end keys for iterating over contracts by address, based on
+// the provided cursor.
+//
+// Any error indicates the cursor is invalid
+func (idx *ContractDeploymentsIndex) rangeKeysByAddress(account flow.Address, cursor *access.ContractDeploymentsCursor) (startKey, endKey []byte, err error) {
+	prefix := makeContractDeploymentAddressPrefix(account)
+
+	if cursor == nil || cursor.ContractID == "" {
+		// by default, iterate over all contracts for the address
+		return prefix, prefix, nil
+	}
+
+	startKey = makeContractDeploymentContractPrefix(cursor.ContractID)
+	endKey = storage.PrefixInclusiveEnd(prefix, startKey)
 
 	return startKey, endKey, nil
 }
@@ -285,10 +315,10 @@ func storeAllContractDeployments(rw storage.ReaderBatchWriter, deployments []acc
 	writer := rw.Writer()
 	for _, d := range deployments {
 		if len(d.ContractID) < minContractIDLength {
-			return fmt.Errorf("contract ID %q is too short", d.ContractID)
+			return fmt.Errorf("contract ID %q is invalid", d.ContractID)
 		}
 
-		primaryKey := makeContractDeploymentKey(d.ContractID, d.BlockHeight, d.TxIndex, d.EventIndex)
+		primaryKey := makeContractDeploymentKey(d.ContractID, d.BlockHeight, d.TransactionIndex, d.EventIndex)
 		exists, err := operation.KeyExists(rw.GlobalReader(), primaryKey)
 		if err != nil {
 			return fmt.Errorf("could not check key for deployment %s: %w", d.ContractID, err)
@@ -324,10 +354,10 @@ func makeContractDeploymentKey(contractID string, height uint64, txIndex, eventI
 	offset += len(contractIDBytes)
 
 	binary.BigEndian.PutUint64(key[offset:], ^height) // one's complement for descending height order
-	offset += 8
+	offset += heightLen
 
 	binary.BigEndian.PutUint32(key[offset:], txIndex)
-	offset += 4
+	offset += txIndexLen
 
 	binary.BigEndian.PutUint32(key[offset:], eventIndex)
 
@@ -381,10 +411,10 @@ func decodeDeploymentCursor(key []byte) (access.ContractDeploymentsCursor, error
 		return access.ContractDeploymentsCursor{}, err
 	}
 	return access.ContractDeploymentsCursor{
-		ContractID: contractID,
-		Height:     height,
-		TxIndex:    txIndex,
-		EventIndex: eventIndex,
+		ContractID:       contractID,
+		BlockHeight:      height,
+		TransactionIndex: txIndex,
+		EventIndex:       eventIndex,
 	}, nil
 }
 
@@ -406,10 +436,10 @@ func decodeContractDeploymentKey(key []byte) (contractID string, height uint64, 
 
 	offset := contractIDEnd
 	height = ^binary.BigEndian.Uint64(key[offset:])
-	offset += 8
+	offset += heightLen
 
 	txIndex = binary.BigEndian.Uint32(key[offset:])
-	offset += 4
+	offset += txIndexLen
 
 	eventIndex = binary.BigEndian.Uint32(key[offset:])
 
@@ -420,50 +450,24 @@ func decodeContractDeploymentKey(key []byte) (contractID string, height uint64, 
 // [access.ContractDeploymentsCursor] and the primary index value bytes.
 //
 // Any error indicates a malformed value.
-func reconstructContractDeployment(cur access.ContractDeploymentsCursor, val []byte) (*access.ContractDeployment, error) {
+func reconstructContractDeployment(cursor access.ContractDeploymentsCursor, val []byte) (*access.ContractDeployment, error) {
 	var stored storedContractDeployment
 	if err := msgpack.Unmarshal(val, &stored); err != nil {
 		return nil, fmt.Errorf("could not unmarshal contract deployment: %w", err)
 	}
-	addr, err := addressFromContractID(cur.ContractID)
+	addr, err := addressFromContractID(cursor.ContractID)
 	if err != nil {
-		return nil, fmt.Errorf("could not extract address from contract ID %s: %w", cur.ContractID, err)
+		return nil, fmt.Errorf("could not extract address from contract ID %s: %w", cursor.ContractID, err)
 	}
 	return &access.ContractDeployment{
-		ContractID:    cur.ContractID,
-		Address:       addr,
-		BlockHeight:   cur.Height,
-		TransactionID: stored.TransactionID,
-		TxIndex:       cur.TxIndex,
-		EventIndex:    cur.EventIndex,
-		Code:          stored.Code,
-		CodeHash:      stored.CodeHash,
-	}, nil
-}
-
-// reconstructDeployment reconstructs a full [access.ContractDeployment] from a key and stored value.
-//
-// Any error indicates a malformed key or unexpected contractID format.
-func reconstructDeployment(key []byte, val storedContractDeployment) (access.ContractDeployment, error) {
-	contractID, height, txIndex, eventIndex, err := decodeContractDeploymentKey(key)
-	if err != nil {
-		return access.ContractDeployment{}, fmt.Errorf("could not decode key: %w", err)
-	}
-
-	addr, err := addressFromContractID(contractID)
-	if err != nil {
-		return access.ContractDeployment{}, fmt.Errorf("could not extract address from contract ID %s: %w", contractID, err)
-	}
-
-	return access.ContractDeployment{
-		ContractID:    contractID,
-		Address:       addr,
-		BlockHeight:   height,
-		TransactionID: val.TransactionID,
-		TxIndex:       txIndex,
-		EventIndex:    eventIndex,
-		Code:          val.Code,
-		CodeHash:      val.CodeHash,
+		ContractID:       cursor.ContractID,
+		Address:          addr,
+		BlockHeight:      cursor.BlockHeight,
+		TransactionID:    stored.TransactionID,
+		TransactionIndex: cursor.TransactionIndex,
+		EventIndex:       cursor.EventIndex,
+		Code:             stored.Code,
+		CodeHash:         stored.CodeHash,
 	}, nil
 }
 

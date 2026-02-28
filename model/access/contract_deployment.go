@@ -17,8 +17,8 @@ type ContractDeployment struct {
 	BlockHeight uint64
 	// TransactionID is the ID of the transaction that applied this deployment.
 	TransactionID flow.Identifier
-	// TxIndex is the position of the deploying transaction within its block.
-	TxIndex uint32
+	// TransactionIndex is the position of the deploying transaction within its block.
+	TransactionIndex uint32
 	// EventIndex is the position of the contract event within its transaction.
 	// Needed to uniquely identify a deployment when a single transaction deploys multiple contracts.
 	EventIndex uint32
@@ -51,10 +51,10 @@ type ContractDeploymentsCursor struct {
 	// ContractID identifies the contract. For All/ByAddress it is the resume key; for
 	// DeploymentsByContractID it is set by the storage layer and not encoded in the REST cursor.
 	ContractID string
-	// Height is the block height of the last returned deployment.
-	Height uint64
-	// TxIndex is the position of the deploying transaction within its block.
-	TxIndex uint32
+	// BlockHeight is the block height of the last returned deployment.
+	BlockHeight uint64
+	// TransactionIndex is the position of the deploying transaction within its block.
+	TransactionIndex uint32
 	// EventIndex is the position of the contract event within its transaction.
 	EventIndex uint32
 }
@@ -68,12 +68,3 @@ type ContractDeploymentPage struct {
 	NextCursor *ContractDeploymentsCursor
 }
 
-// ContractsPage is a page of contracts at their latest deployment.
-// Returned by GetContracts and GetContractsByAddress.
-type ContractsPage struct {
-	// Deployments is the ordered list of latest-deployment entries for this page.
-	Deployments []ContractDeployment
-	// NextCursor is nil when no more results exist.
-	// Only the ContractID field is used for resumption; Height/TxIndex/EventIndex are ignored.
-	NextCursor *ContractDeploymentsCursor
-}

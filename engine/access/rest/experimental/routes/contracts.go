@@ -53,7 +53,10 @@ func GetContract(r *common.Request, backend extended.API, link models.LinkGenera
 	}
 
 	var m models.ContractDeployment
-	m.Build(deployment, link)
+	err = m.Build(deployment, link)
+	if err != nil {
+		return nil, common.NewRestError(http.StatusInternalServerError, "failed to build contract deployment", err)
+	}
 	return m, nil
 }
 
@@ -111,7 +114,10 @@ func buildContractDeploymentsResponse(
 ) (models.ContractDeploymentsResponse, error) {
 	deployments := make([]models.ContractDeployment, len(page.Deployments))
 	for i := range page.Deployments {
-		deployments[i].Build(&page.Deployments[i], link)
+		err := deployments[i].Build(&page.Deployments[i], link)
+		if err != nil {
+			return models.ContractDeploymentsResponse{}, common.NewRestError(http.StatusInternalServerError, "failed to build deployment", err)
+		}
 	}
 
 	var nextCursor string
@@ -129,15 +135,18 @@ func buildContractDeploymentsResponse(
 	}, nil
 }
 
-// buildContractsResponse converts a [accessmodel.ContractsPage] to a [models.ContractsResponse]
+// buildContractsResponse converts a [accessmodel.ContractDeploymentPage] to a [models.ContractsResponse]
 // for the list and by-address endpoints.
 func buildContractsResponse(
-	page *accessmodel.ContractsPage,
+	page *accessmodel.ContractDeploymentPage,
 	link models.LinkGenerator,
 ) (models.ContractsResponse, error) {
 	contracts := make([]models.ContractDeployment, len(page.Deployments))
 	for i := range page.Deployments {
-		contracts[i].Build(&page.Deployments[i], link)
+		err := contracts[i].Build(&page.Deployments[i], link)
+		if err != nil {
+			return models.ContractsResponse{}, common.NewRestError(http.StatusInternalServerError, "failed to build deployment", err)
+		}
 	}
 
 	var nextCursor string

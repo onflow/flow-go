@@ -441,7 +441,8 @@ func TestGetScheduledTransaction(t *testing.T) {
 				"code": "cHViIGNvbnRyYWN0IE15U2NoZWR1bGVyIHt9",
 				"code_hash": "383198cd7e974ca055c4137bdd1fa44934882f569e7f0c353254e0e7ce8a50fb",
 				"_expandable": {
-					"transaction": "/v1/transactions/0000000000000000000000000000000000000000000000000000000000000000"
+					"transaction": "/v1/transactions/0000000000000000000000000000000000000000000000000000000000000000",
+					"result": "/v1/transaction_results/0000000000000000000000000000000000000000000000000000000000000000"
 				}
 			},
 			"_expandable": {}

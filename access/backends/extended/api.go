@@ -154,7 +154,7 @@ type API interface {
 		filter ContractDeploymentFilter,
 		expandOptions ContractDeploymentExpandOptions,
 		encodingVersion entities.EventEncodingVersion,
-	) (*accessmodel.ContractsPage, error)
+	) (*accessmodel.ContractDeploymentPage, error)
 
 	// GetContractsByAddress returns a paginated list of contracts at their latest deployment for
 	// the given address.
@@ -170,5 +170,5 @@ type API interface {
 		filter ContractDeploymentFilter,
 		expandOptions ContractDeploymentExpandOptions,
 		encodingVersion entities.EventEncodingVersion,
-	) (*accessmodel.ContractsPage, error)
+	) (*accessmodel.ContractDeploymentPage, error)
 }

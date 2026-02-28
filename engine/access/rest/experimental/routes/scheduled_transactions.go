@@ -52,7 +52,10 @@ func GetScheduledTransaction(r *common.Request, backend extended.API, link model
 	}
 
 	var m models.ScheduledTransaction
-	m.Build(tx, link, r.ExpandFields)
+	err = m.Build(tx, link, r.ExpandFields)
+	if err != nil {
+		return nil, common.NewRestError(http.StatusInternalServerError, "failed to build scheduled transaction", err)
+	}
 	return m, nil
 }
 
@@ -88,7 +91,10 @@ func buildScheduledTransactionsResponse(
 ) (models.ScheduledTransactionsResponse, error) {
 	scheduledTransactions := make([]models.ScheduledTransaction, len(page.Transactions))
 	for i := range page.Transactions {
-		scheduledTransactions[i].Build(&page.Transactions[i], link, expandMap)
+		err := scheduledTransactions[i].Build(&page.Transactions[i], link, expandMap)
+		if err != nil {
+			return models.ScheduledTransactionsResponse{}, common.NewRestError(http.StatusInternalServerError, "failed to build scheduled transaction", err)
+		}
 	}
 
 	var nextCursor string

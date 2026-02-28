@@ -46,6 +46,8 @@ func (t *ScheduledTransaction) Build(
 		t.CancelledTransactionId = tx.CancelledTransactionID.String()
 	}
 
+	t.IsPlaceholder = tx.IsPlaceholder
+
 	t.Expandable = new(ScheduledTransactionExpandable)
 
 	if tx.Transaction != nil {
@@ -72,7 +74,9 @@ func (t *ScheduledTransaction) Build(
 
 	if tx.HandlerContract != nil {
 		t.HandlerContract = new(ContractDeployment)
-		t.HandlerContract.Build(tx.HandlerContract, link)
+		if err := t.HandlerContract.Build(tx.HandlerContract, link); err != nil {
+			return err
+		}
 	} else {
 		contractID, err := tx.HandlerContractID()
 		if err != nil {

@@ -25,8 +25,9 @@ type ContractDeployment struct {
 	// Hex-encoded SHA3-256 hash of the contract code.
 	CodeHash string `json:"code_hash"`
 	// True if the deployment was created during bootstrapping based on the current chain state, not based on a protocol event. When true, block_height, transaction_id, tx_index, and event_index are absent.
-	IsPlaceholder bool                          `json:"is_placeholder,omitempty"`
-	Transaction   *commonmodels.Transaction     `json:"transaction,omitempty"`
-	Expandable    *ContractDeploymentExpandable `json:"_expandable"`
-	Links         *commonmodels.Links           `json:"_links,omitempty"`
+	IsPlaceholder bool                            `json:"is_placeholder,omitempty"`
+	Transaction   *commonmodels.Transaction       `json:"transaction,omitempty"`
+	Result        *commonmodels.TransactionResult `json:"result,omitempty"`
+	Expandable    *ContractDeploymentExpandable   `json:"_expandable"`
+	Links         *commonmodels.Links             `json:"_links,omitempty"`
 }

@@ -760,6 +760,8 @@ github.com/onflow/fixed-point v0.1.1 h1:j0jYZVO8VGyk1476alGudEg7XqCkeTVxb5ElRJRK
 github.com/onflow/fixed-point v0.1.1/go.mod h1:gJdoHqKtToKdOZbvryJvDZfcpzC7d2fyWuo3ZmLtcGY=
 github.com/onflow/flow v0.4.20-0.20260227142445-6427bfb62cdc h1:Z3YY3bGM/GGoN8cNp8CDfzAzsRm0RTqVIpQ5tWQVHr4=
 github.com/onflow/flow v0.4.20-0.20260227142445-6427bfb62cdc/go.mod h1:lzyAYmbu1HfkZ9cfnL5/sjrrsnJiUU8fRL26CqLP7+c=
+github.com/onflow/flow v0.4.20-0.20260228003152-aa70c242271f h1:RJhAIeUrkAAfbPTuqOCgSxW1biT3qnMkJz4hG2GnHOA=
+github.com/onflow/flow v0.4.20-0.20260228003152-aa70c242271f/go.mod h1:lzyAYmbu1HfkZ9cfnL5/sjrrsnJiUU8fRL26CqLP7+c=
 github.com/onflow/flow-core-contracts/lib/go/contracts v1.9.3 h1:AFl2fKKXhSW0X0KpqBMteQkIJLRjVJzIJzGbMuOGgeE=
 github.com/onflow/flow-core-contracts/lib/go/contracts v1.9.3/go.mod h1:hV8Pi5pGraiY8f9k0tAeuky6m+NbIMvxf7wg5QZ+e8k=
 github.com/onflow/flow-core-contracts/lib/go/templates v1.9.3 h1:b70XytJTPthaLcQJC3neGLZbQGBEw/SvKgYVNUv1JKM=

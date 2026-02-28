@@ -122,15 +122,16 @@ func makeDeployment(contractID string, height uint64, txIndex, eventIndex uint32
 			addr = parsed
 		}
 	}
+	fakeHash := unittest.IdentifierFixture()
 	return access.ContractDeployment{
-		ContractID:    contractID,
-		Address:       addr,
-		BlockHeight:   height,
-		TransactionID: unittest.IdentifierFixture(),
-		TxIndex:       txIndex,
-		EventIndex:    eventIndex,
-		Code:          []byte("access(all) contract MyContract {}"),
-		CodeHash:      []byte("fakehash12345678901234567890123456"),
+		ContractID:       contractID,
+		Address:          addr,
+		BlockHeight:      height,
+		TransactionID:    unittest.IdentifierFixture(),
+		TransactionIndex: txIndex,
+		EventIndex:       eventIndex,
+		Code:             []byte("access(all) contract MyContract {}"),
+		CodeHash:         fakeHash[:],
 	}
 }
 
@@ -216,7 +217,7 @@ func TestContractDeployments_Bootstrap(t *testing.T) {
 			require.NoError(t, err)
 			assert.Equal(t, d.ContractID, result.ContractID)
 			assert.Equal(t, d.BlockHeight, result.BlockHeight)
-			assert.Equal(t, d.TxIndex, result.TxIndex)
+			assert.Equal(t, d.TransactionIndex, result.TransactionIndex)
 			assert.Equal(t, d.EventIndex, result.EventIndex)
 		})
 	})
@@ -300,7 +301,7 @@ func TestContractDeployments_ByContractID(t *testing.T) {
 			require.NoError(t, err)
 			assert.Equal(t, contractID, result.ContractID)
 			assert.Equal(t, uint64(2), result.BlockHeight)
-			assert.Equal(t, uint32(1), result.TxIndex)
+			assert.Equal(t, uint32(1), result.TransactionIndex)
 			assert.Equal(t, uint32(2), result.EventIndex)
 			assert.Equal(t, d.TransactionID, result.TransactionID)
 		})
@@ -360,7 +361,7 @@ func TestContractDeployments_DeploymentsByContractID(t *testing.T) {
 			collected, nextCursor := collectContractDeployments(t, idx, contractID, 2, nil, nil)
 			require.Len(t, collected, 2)
 			require.NotNil(t, nextCursor)
-			assert.Equal(t, uint64(2), nextCursor.Height)
+			assert.Equal(t, uint64(2), nextCursor.BlockHeight)
 		})
 	})
 
@@ -379,6 +380,10 @@ func TestContractDeployments_DeploymentsByContractID(t *testing.T) {
 			collected1, nextCursor := collectContractDeployments(t, idx, contractID, 2, nil, nil)
 			require.Len(t, collected1, 2)
 			require.NotNil(t, nextCursor)
+
+			require.Equal(t, uint64(3), nextCursor.BlockHeight)
+			require.Equal(t, uint32(0), nextCursor.TransactionIndex)
+			require.Equal(t, uint32(0), nextCursor.EventIndex)
 
 			// Second page: resume from cursor → [h=3, h=2]
 			collected2, _ := collectContractDeployments(t, idx, contractID, 2, nextCursor, nil)
@@ -669,7 +674,7 @@ func TestContractDeployments_Store(t *testing.T) {
 		RunWithBootstrappedContractDeploymentsIndex(t, 1, nil, func(_ storage.DB, lm storage.LockManager, idx *ContractDeploymentsIndex) {
 			err := storeContractDeployments(t, lm, idx, 5, nil)
 			require.Error(t, err)
-			assert.False(t, err == storage.ErrAlreadyExists,
+			assert.NotErrorIs(t, err, storage.ErrAlreadyExists,
 				"non-consecutive height should not return ErrAlreadyExists")
 		})
 	})
@@ -802,225 +807,3 @@ func TestContractDeployments_KeyCodec(t *testing.T) {
 	})
 }
 
-// ----------------------------------------------------------------------------
-// ContractDeploymentsBootstrapper
-// ----------------------------------------------------------------------------
-
-func TestContractDeploymentsBootstrapper_Constructor(t *testing.T) {
-	t.Parallel()
-
-	t.Run("nil store when not bootstrapped", func(t *testing.T) {
-		t.Parallel()
-		unittest.RunWithPebbleDB(t, func(db *pebble.DB) {
-			storageDB := pebbleimpl.ToDB(db)
-			b, err := NewContractDeploymentsBootstrapper(storageDB, 5)
-			require.NoError(t, err)
-			// Store is nil: read operations return ErrNotBootstrapped
-			_, err = b.ByContractID("A.1234567890abcdef.Foo")
-			require.ErrorIs(t, err, storage.ErrNotBootstrapped)
-		})
-	})
-
-	t.Run("loads existing bootstrapped index", func(t *testing.T) {
-		t.Parallel()
-		RunWithBootstrappedContractDeploymentsIndex(t, 7, nil, func(db storage.DB, _ storage.LockManager, _ *ContractDeploymentsIndex) {
-			b, err := NewContractDeploymentsBootstrapper(db, 7)
-			require.NoError(t, err)
-
-			first, err := b.FirstIndexedHeight()
-			require.NoError(t, err)
-			assert.Equal(t, uint64(7), first)
-
-			latest, err := b.LatestIndexedHeight()
-			require.NoError(t, err)
-			assert.Equal(t, uint64(7), latest)
-		})
-	})
-}
-
-func TestContractDeploymentsBootstrapper_BeforeBootstrap(t *testing.T) {
-	t.Parallel()
-
-	// A bootstrapper created from an empty DB: all read methods return ErrNotBootstrapped.
-	unittest.RunWithPebbleDB(t, func(db *pebble.DB) {
-		storageDB := pebbleimpl.ToDB(db)
-		b, err := NewContractDeploymentsBootstrapper(storageDB, 5)
-		require.NoError(t, err)
-
-		t.Run("FirstIndexedHeight returns ErrNotBootstrapped", func(t *testing.T) {
-			_, err := b.FirstIndexedHeight()
-			require.ErrorIs(t, err, storage.ErrNotBootstrapped)
-		})
-
-		t.Run("LatestIndexedHeight returns ErrNotBootstrapped", func(t *testing.T) {
-			_, err := b.LatestIndexedHeight()
-			require.ErrorIs(t, err, storage.ErrNotBootstrapped)
-		})
-
-		t.Run("ByContractID returns ErrNotBootstrapped", func(t *testing.T) {
-			_, err := b.ByContractID("A.1234567890abcdef.Foo")
-			require.ErrorIs(t, err, storage.ErrNotBootstrapped)
-		})
-
-		t.Run("DeploymentsByContractID returns ErrNotBootstrapped", func(t *testing.T) {
-			_, err := b.DeploymentsByContractID("A.1234567890abcdef.Foo", nil)
-			require.ErrorIs(t, err, storage.ErrNotBootstrapped)
-		})
-
-		t.Run("ByAddress returns ErrNotBootstrapped", func(t *testing.T) {
-			_, err := b.ByAddress(unittest.RandomAddressFixture(), nil)
-			require.ErrorIs(t, err, storage.ErrNotBootstrapped)
-		})
-
-		t.Run("All returns ErrNotBootstrapped", func(t *testing.T) {
-			_, err := b.All(nil)
-			require.ErrorIs(t, err, storage.ErrNotBootstrapped)
-		})
-	})
-}
-
-func TestContractDeploymentsBootstrapper_UninitializedFirstHeight(t *testing.T) {
-	t.Parallel()
-
-	t.Run("returns (initialStartHeight, false) before bootstrap", func(t *testing.T) {
-		t.Parallel()
-		unittest.RunWithPebbleDB(t, func(db *pebble.DB) {
-			storageDB := pebbleimpl.ToDB(db)
-			b, err := NewContractDeploymentsBootstrapper(storageDB, 42)
-			require.NoError(t, err)
-
-			h, initialized := b.UninitializedFirstHeight()
-			assert.Equal(t, uint64(42), h)
-			assert.False(t, initialized)
-		})
-	})
-
-	t.Run("returns (firstHeight, true) after bootstrap", func(t *testing.T) {
-		t.Parallel()
-		unittest.RunWithPebbleDB(t, func(db *pebble.DB) {
-			storageDB := pebbleimpl.ToDB(db)
-			lm := storage.NewTestingLockManager()
-
-			b, err := NewContractDeploymentsBootstrapper(storageDB, 10)
-			require.NoError(t, err)
-
-			// Bootstrap by calling Store at the initial height.
-			err = unittest.WithLock(t, lm, storage.LockIndexContractDeployments, func(lctx lockctx.Context) error {
-				return storageDB.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-					return b.Store(lctx, rw, 10, nil)
-				})
-			})
-			require.NoError(t, err)
-
-			h, initialized := b.UninitializedFirstHeight()
-			assert.Equal(t, uint64(10), h)
-			assert.True(t, initialized)
-		})
-	})
-}
-
-func TestContractDeploymentsBootstrapper_Store(t *testing.T) {
-	t.Parallel()
-
-	t.Run("store at wrong height before bootstrap returns ErrNotBootstrapped", func(t *testing.T) {
-		t.Parallel()
-		unittest.RunWithPebbleDB(t, func(db *pebble.DB) {
-			storageDB := pebbleimpl.ToDB(db)
-			lm := storage.NewTestingLockManager()
-
-			b, err := NewContractDeploymentsBootstrapper(storageDB, 10)
-			require.NoError(t, err)
-
-			// Store at height 5 when initialStartHeight is 10
-			err = unittest.WithLock(t, lm, storage.LockIndexContractDeployments, func(lctx lockctx.Context) error {
-				return storageDB.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-					return b.Store(lctx, rw, 5, nil)
-				})
-			})
-			require.ErrorIs(t, err, storage.ErrNotBootstrapped)
-		})
-	})
-
-	t.Run("store at correct height bootstraps index", func(t *testing.T) {
-		t.Parallel()
-		unittest.RunWithPebbleDB(t, func(db *pebble.DB) {
-			storageDB := pebbleimpl.ToDB(db)
-			lm := storage.NewTestingLockManager()
-
-			b, err := NewContractDeploymentsBootstrapper(storageDB, 10)
-			require.NoError(t, err)
-
-			err = unittest.WithLock(t, lm, storage.LockIndexContractDeployments, func(lctx lockctx.Context) error {
-				return storageDB.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-					return b.Store(lctx, rw, 10, nil)
-				})
-			})
-			require.NoError(t, err)
-
-			// After bootstrapping, read operations should succeed.
-			first, err := b.FirstIndexedHeight()
-			require.NoError(t, err)
-			assert.Equal(t, uint64(10), first)
-		})
-	})
-
-	t.Run("subsequent heights work normally after bootstrap", func(t *testing.T) {
-		t.Parallel()
-		unittest.RunWithPebbleDB(t, func(db *pebble.DB) {
-			storageDB := pebbleimpl.ToDB(db)
-			lm := storage.NewTestingLockManager()
-
-			b, err := NewContractDeploymentsBootstrapper(storageDB, 10)
-			require.NoError(t, err)
-
-			// Bootstrap at height 10
-			err = unittest.WithLock(t, lm, storage.LockIndexContractDeployments, func(lctx lockctx.Context) error {
-				return storageDB.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-					return b.Store(lctx, rw, 10, nil)
-				})
-			})
-			require.NoError(t, err)
-
-			// Store at height 11 should work
-			contractID := "A.1234567890abcdef.MyContract"
-			d := makeDeployment(contractID, 11, 0, 0)
-			err = unittest.WithLock(t, lm, storage.LockIndexContractDeployments, func(lctx lockctx.Context) error {
-				return storageDB.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-					return b.Store(lctx, rw, 11, []access.ContractDeployment{d})
-				})
-			})
-			require.NoError(t, err)
-
-			// Verify the deployment is queryable
-			result, err := b.ByContractID(contractID)
-			require.NoError(t, err)
-			assert.Equal(t, uint64(11), result.BlockHeight)
-		})
-	})
-
-	t.Run("store with initial deployments at bootstrap height", func(t *testing.T) {
-		t.Parallel()
-		unittest.RunWithPebbleDB(t, func(db *pebble.DB) {
-			storageDB := pebbleimpl.ToDB(db)
-			lm := storage.NewTestingLockManager()
-
-			b, err := NewContractDeploymentsBootstrapper(storageDB, 5)
-			require.NoError(t, err)
-
-			contractID := "A.1234567890abcdef.MyContract"
-			d := makeDeployment(contractID, 5, 0, 0)
-
-			err = unittest.WithLock(t, lm, storage.LockIndexContractDeployments, func(lctx lockctx.Context) error {
-				return storageDB.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-					return b.Store(lctx, rw, 5, []access.ContractDeployment{d})
-				})
-			})
-			require.NoError(t, err)
-
-			result, err := b.ByContractID(contractID)
-			require.NoError(t, err)
-			assert.Equal(t, contractID, result.ContractID)
-			assert.Equal(t, uint64(5), result.BlockHeight)
-		})
-	})
-}

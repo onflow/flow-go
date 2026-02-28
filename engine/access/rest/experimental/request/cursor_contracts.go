@@ -24,8 +24,8 @@ type contractDeploymentsCursorJSON struct {
 func EncodeContractDeploymentsCursor(cursor *accessmodel.ContractDeploymentsCursor) (string, error) {
 	data, err := json.Marshal(contractDeploymentsCursorJSON{
 		ContractID: cursor.ContractID,
-		Height:     cursor.Height,
-		TxIndex:    cursor.TxIndex,
+		Height:     cursor.BlockHeight,
+		TxIndex:    cursor.TransactionIndex,
 		EventIndex: cursor.EventIndex,
 	})
 	if err != nil {
@@ -49,9 +49,9 @@ func DecodeContractDeploymentsCursor(raw string) (*accessmodel.ContractDeploymen
 		return nil, fmt.Errorf("invalid deployments cursor format: %w", err)
 	}
 	return &accessmodel.ContractDeploymentsCursor{
-		ContractID: c.ContractID,
-		Height:     c.Height,
-		TxIndex:    c.TxIndex,
-		EventIndex: c.EventIndex,
+		ContractID:       c.ContractID,
+		BlockHeight:      c.Height,
+		TransactionIndex: c.TxIndex,
+		EventIndex:       c.EventIndex,
 	}, nil
 }

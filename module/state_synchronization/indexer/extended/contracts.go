@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/jordanschalm/lockctx"
 	"github.com/rs/zerolog"
@@ -18,9 +19,9 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
-const contractsIndexerName = "contracts"
-
 const (
+	contractsIndexerName = "contracts"
+
 	flowAccountContractAdded   flow.EventType = "flow.AccountContractAdded"
 	flowAccountContractUpdated flow.EventType = "flow.AccountContractUpdated"
 	flowAccountContractRemoved flow.EventType = "flow.AccountContractRemoved"
@@ -35,7 +36,12 @@ type snapshotProvider interface {
 // index. Handles [flow.AccountContractAdded] and [flow.AccountContractUpdated] events.
 // [flow.AccountContractRemoved] is not currently permitted; encountering one returns an error.
 //
-// Not safe for concurrent use.
+// On first bootstrapping, the indexer will load all deployed contracts from storage at the bootstrap
+// height and include placeholder deployment objects for all contracts that are deployed at that height.
+// Any contracts that are deployed in the same block as the bootstrap height will not have placeholder
+// deployment objects created since there are already deployment objects for those contracts.
+//
+// CAUTION: Not safe for concurrent use.
 type Contracts struct {
 	log            zerolog.Logger
 	chain          flow.Chain
@@ -76,6 +82,10 @@ func (c *Contracts) NextHeight() (uint64, error) {
 // IndexBlockData processes one block's events and transactions and updates the contract
 // deployments index.
 //
+// The caller must hold the [storage.LockIndexContractDeployments] lock until the batch is committed.
+//
+// CAUTION: Not safe for concurrent use.
+//
 // Expected error returns during normal operations:
 //   - [ErrAlreadyIndexed]: if the data is already indexed for the height
 func (c *Contracts) IndexBlockData(lctx lockctx.Proof, data BlockData, rw storage.ReaderBatchWriter) error {
@@ -86,12 +96,28 @@ func (c *Contracts) IndexBlockData(lctx lockctx.Proof, data BlockData, rw storag
 
 	// if storage is not bootstrapped yet, do an initial load of all deployed contracts and include it in
 	// the initial store operation.
+	// TODO: avoid doing this check on every block. in the mean time, this is a fast check
 	if bootstrapHeight, isInitialized := c.store.UninitializedFirstHeight(); !isInitialized {
-		bootstrapContracts, err := c.loadDeployedContracts(bootstrapHeight)
+		start := time.Now()
+
+		// keep track of the contracts with deployments in this block. these can be skipped during the
+		// initial load since the deployment object is already created.
+		updatedContracts := make(map[string]bool, len(deployments))
+		for _, deployment := range deployments {
+			updatedContracts[deployment.ContractID] = true
+		}
+
+		bootstrapContracts, err := c.loadDeployedContracts(bootstrapHeight, updatedContracts)
 		if err != nil {
 			return fmt.Errorf("failed to load deployed contracts: %w", err)
 		}
 		deployments = append(deployments, bootstrapContracts...)
+
+		c.log.Info().
+			Uint64("height", bootstrapHeight).
+			Int("contracts", len(bootstrapContracts)).
+			Dur("dur_ms", time.Since(start)).
+			Msg("loaded deployed contracts during bootstrap")
 	}
 
 	if err := c.store.Store(lctx, rw, data.Header.Height, deployments); err != nil {
@@ -100,7 +126,8 @@ func (c *Contracts) IndexBlockData(lctx lockctx.Proof, data BlockData, rw storag
 		}
 		return fmt.Errorf("failed to store contract deployments for block %s: %w", data.Header.ID(), err)
 	}
-	c.metrics.ContractDeploymentIndexed(created, updated)
+
+	c.metrics.ContractDeploymentIndexed(created, updated) // ignores bootstrap deployments
 	return nil
 }
 
@@ -136,14 +163,14 @@ func (c *Contracts) collectDeployments(data BlockData) (deployments []access.Con
 			}
 
 			deployments = append(deployments, access.ContractDeployment{
-				ContractID:    events.ContractIDFromAddress(e.Address, e.ContractName),
-				Address:       e.Address,
-				BlockHeight:   data.Header.Height,
-				TransactionID: event.TransactionID,
-				TxIndex:       event.TransactionIndex,
-				EventIndex:    event.EventIndex,
-				Code:          code,
-				CodeHash:      e.CodeHash,
+				ContractID:       events.ContractIDFromAddress(e.Address, e.ContractName),
+				Address:          e.Address,
+				BlockHeight:      data.Header.Height,
+				TransactionID:    event.TransactionID,
+				TransactionIndex: event.TransactionIndex,
+				EventIndex:       event.EventIndex,
+				Code:             code,
+				CodeHash:         e.CodeHash,
 			})
 			created++
 
@@ -169,14 +196,14 @@ func (c *Contracts) collectDeployments(data BlockData) (deployments []access.Con
 			}
 
 			deployments = append(deployments, access.ContractDeployment{
-				ContractID:    events.ContractIDFromAddress(e.Address, e.ContractName),
-				Address:       e.Address,
-				BlockHeight:   data.Header.Height,
-				TransactionID: event.TransactionID,
-				TxIndex:       event.TransactionIndex,
-				EventIndex:    event.EventIndex,
-				Code:          code,
-				CodeHash:      e.CodeHash,
+				ContractID:       events.ContractIDFromAddress(e.Address, e.ContractName),
+				Address:          e.Address,
+				BlockHeight:      data.Header.Height,
+				TransactionID:    event.TransactionID,
+				TransactionIndex: event.TransactionIndex,
+				EventIndex:       event.EventIndex,
+				Code:             code,
+				CodeHash:         e.CodeHash,
 			})
 			updated++
 
@@ -195,7 +222,7 @@ func (c *Contracts) collectDeployments(data BlockData) (deployments []access.Con
 // list of access.ContractDeployment records.
 //
 // No error returns are expected during normal operation.
-func (c *Contracts) loadDeployedContracts(height uint64) ([]access.ContractDeployment, error) {
+func (c *Contracts) loadDeployedContracts(height uint64, seenContracts map[string]bool) ([]access.ContractDeployment, error) {
 	snapshot, err := c.scriptExecutor.GetStorageSnapshot(height)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get storage snapshot: %w", err)
@@ -221,7 +248,7 @@ func (c *Contracts) loadDeployedContracts(height uint64) ([]access.ContractDeplo
 
 		// iterate until we find the first account that does not exist in the snapshot.
 		if !exists {
-			break
+			return deployments, nil
 		}
 
 		contractNames, err := accounts.GetContractNames(address)
@@ -230,25 +257,35 @@ func (c *Contracts) loadDeployedContracts(height uint64) ([]access.ContractDeplo
 		}
 
 		for _, contractName := range contractNames {
+			contractID := events.ContractIDFromAddress(address, contractName)
+
+			// skip any contracts that were already updated in this block since the deployment object
+			// is already created
+			if seenContracts[contractID] {
+				continue
+			}
+
 			code, err := accounts.GetContract(contractName, address)
 			if err != nil {
 				return nil, fmt.Errorf("error while getting contract: %w", err)
 			}
 
 			deployments = append(deployments, access.ContractDeployment{
-				ContractID: events.ContractIDFromAddress(address, contractName),
+				ContractID: contractID,
 				Address:    address,
 				Code:       code,
 				CodeHash:   access.CadenceCodeHash(code),
-				// all other fields are omitted because we do not do not know the actual deployment details
+				// all other fields are omitted because we do not know the actual deployment details
 				IsPlaceholder: true,
 			})
 		}
 	}
-
-	return deployments, nil
 }
 
+// contractRetriever is a helper for retrieving contract code from the snapshot at the given height.
+// It lazily sets up the accounts instance, so unused instances are cheap to create.
+//
+// CAUTION: Not safe for concurrent use.
 type contractRetriever struct {
 	height         uint64
 	accounts       environment.Accounts

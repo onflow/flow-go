@@ -54,7 +54,9 @@ func (a *NonFungibleTokenTransfers) NextHeight() (uint64, error) {
 // IndexBlockData indexes NFT transfer data for the given height.
 // If the header in `data` does not match the expected height, an error is returned.
 //
-// Not safe for concurrent use.
+// The caller must hold the [storage.LockIndexNonFungibleTokenTransfers] lock until the batch is committed.
+//
+// CAUTION: Not safe for concurrent use.
 //
 // Expected error returns during normal operations:
 //   - [ErrAlreadyIndexed]: if the data is already indexed for the height.

@@ -38,9 +38,20 @@ type ContractDeploymentFilter struct {
 	EndBlock *uint64
 }
 
+func (f *ContractDeploymentFilter) isEmpty() bool {
+	return f.ContractName == "" && f.StartBlock == nil && f.EndBlock == nil
+}
+
 // Filter builds a [storage.IndexFilter] from the non-nil filter fields.
 func (f *ContractDeploymentFilter) Filter() storage.IndexFilter[*accessmodel.ContractDeployment] {
-	searchSuffix := "." + f.ContractName
+	if f.isEmpty() {
+		return nil
+	}
+
+	var searchSuffix string
+	if f.ContractName != "" {
+		searchSuffix = "." + f.ContractName
+	}
 	return func(d *accessmodel.ContractDeployment) bool {
 		if f.ContractName != "" && strings.HasSuffix(d.ContractID, searchSuffix) {
 			return true
@@ -167,7 +178,7 @@ func (b *ContractsBackend) GetContracts(
 	filter ContractDeploymentFilter,
 	expandOptions ContractDeploymentExpandOptions,
 	encodingVersion entities.EventEncodingVersion,
-) (*accessmodel.ContractsPage, error) {
+) (*accessmodel.ContractDeploymentPage, error) {
 	limit, err := b.normalizeLimit(limit)
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "invalid limit: %v", err)
@@ -185,7 +196,7 @@ func (b *ContractsBackend) GetContracts(
 		return nil, err
 	}
 
-	page := &accessmodel.ContractsPage{
+	page := &accessmodel.ContractDeploymentPage{
 		Deployments: collected,
 		NextCursor:  nextCursor,
 	}
@@ -217,7 +228,7 @@ func (b *ContractsBackend) GetContractsByAddress(
 	filter ContractDeploymentFilter,
 	expandOptions ContractDeploymentExpandOptions,
 	encodingVersion entities.EventEncodingVersion,
-) (*accessmodel.ContractsPage, error) {
+) (*accessmodel.ContractDeploymentPage, error) {
 	limit, err := b.normalizeLimit(limit)
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "invalid limit: %v", err)
@@ -235,7 +246,7 @@ func (b *ContractsBackend) GetContractsByAddress(
 		return nil, err
 	}
 
-	page := &accessmodel.ContractsPage{
+	page := &accessmodel.ContractDeploymentPage{
 		Deployments: collected,
 		NextCursor:  nextCursor,
 	}
