@@ -4,7 +4,7 @@ import (
 	"context"
 	"sync"
 	"testing"
-	"time"
+	"testing/synctest"
 
 	"github.com/cockroachdb/pebble/v2"
 	"github.com/stretchr/testify/mock"
@@ -14,6 +14,7 @@ import (
 	"github.com/onflow/flow-go/consensus"
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/mocks"
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/compliance"
@@ -43,6 +44,13 @@ import (
 // Each worker submits batchesPerWorker*blocksPerBatch blocks
 // In total we will submit workers*batchesPerWorker*blocksPerBatch
 func TestFollowerHappyPath(t *testing.T) {
+	// All construction happens inside the synctest bubble so that channels
+	// created by the engine components are associated with the bubble.
+	// This allows synctest.Wait() to detect when all goroutines have settled.
+	synctest.Test(t, runTestFollowerHappyPath)
+}
+
+func runTestFollowerHappyPath(t *testing.T) {
 	allIdentities := unittest.CompleteIdentitySet()
 	rootSnapshot := unittest.RootSnapshotFixture(allIdentities)
 	lockManager := storage.NewTestingLockManager()
@@ -148,7 +156,15 @@ func TestFollowerHappyPath(t *testing.T) {
 		// start hotstuff logic and follower engine
 		followerLoop.Start(mockCtx)
 		engine.Start(mockCtx)
-		unittest.RequireCloseBefore(t, moduleutil.AllReady(engine, followerLoop), time.Second, "engine failed to start")
+		allReady := moduleutil.AllReady(engine, followerLoop)
+
+		// Wait until all startup goroutines have settled, then verify readiness.
+		synctest.Wait()
+		select {
+		case <-allReady:
+		default:
+			t.Fatal("engine failed to start")
+		}
 
 		// prepare chain of blocks, we will use a continuous chain assuming it was generated on happy path.
 		workers := 5
@@ -188,6 +204,22 @@ func TestFollowerHappyPath(t *testing.T) {
 		// where ◄(B) denotes a QC for block B
 		targetBlockHeight := pendingBlocks[len(pendingBlocks)-3].Block.Height
 
+		// Register a finalization callback so the test can block on a channel instead of polling
+		// with require.Eventually. require.Eventually uses time.Sleep internally; in a synctest
+		// bubble fake time only advances when all goroutines are durably blocked, which never
+		// happens while the worker goroutines are running their continuous submission loop.
+		// A channel receive IS durably blocking, so the main goroutine can wait here while workers
+		// keep running and the engine keeps processing blocks.
+		finalized := make(chan struct{}, 1)
+		consensusConsumer.AddOnBlockFinalizedConsumer(func(b *model.Block) {
+			if b.View >= targetBlockHeight {
+				select {
+				case finalized <- struct{}{}:
+				default:
+				}
+			}
+		})
+
 		// emulate syncing logic, where we push same blocks over and over.
 		originID := unittest.IdentifierFixture()
 		submittingBlocks := atomic.NewBool(true)
@@ -207,44 +239,22 @@ func TestFollowerHappyPath(t *testing.T) {
 			}(pendingBlocks[i*blocksPerWorker : (i+1)*blocksPerWorker])
 		}
 
-		// Ensure graceful shutdown even if the test fails early (e.g., Eventually times out).
-		// Otherwise, the test may panic with "pebble: closed" when threads are attempting to still write to the database, while
-		// the test is unwinding and closing the database. If such panics happen, we don't know what assertation failed and
-		// just see the panic. Hence, we call `cancel()` and attempt to wait for the engine to stop in all cases.
-		defer func() {
-			// stop producers and wait for them to exit
-			submittingBlocks.Store(false)
-			// Cancel context before waiting for producers, so the engine starts shutting down
-			// even if the producer-wait times out.
-			cancel()
-			unittest.RequireReturnsBefore(t, wg.Wait, time.Second, "expect workers to stop producing")
+		// Block until the target block is finalized. The callback above fires from within the
+		// HotStuff finalization goroutine (inside the bubble) and sends on this channel, which
+		// unblocks the main goroutine. This replaces the original require.Eventually polling loop.
+		<-finalized
 
-			// Wait for engine shutdown. processCertifiedBlocks does not check context
-			// cancellation within its loop, so a large connected-block batch can take
-			// longer than a short fixed timeout. Use t.Errorf (non-fatal) so the defer
-			// always runs to completion: a fatal assertion here calls runtime.Goexit(),
-			// which would leave engine goroutines running while pebble is closed, causing
-			// a "pebble: closed" panic that obscures the real test failure.
-			select {
-			case <-moduleutil.AllDone(engine, followerLoop):
-			case <-time.After(30 * time.Second):
-				t.Errorf("engine failed to stop")
-			}
-			// Note: in case any error occur, the `mockCtx` will fail the test, due to the unexpected call of `Throw` on the mock.
-		}()
+		// stop producers and wait for them to exit, then wait for engine shutdown.
+		submittingBlocks.Store(false)
+		cancel()
 
-		// wait for target block to become finalized, this might take a while.
-		require.Eventually(t, func() bool {
-			final, err := followerState.Final().Head()
-			require.NoError(t, err)
-			success := final.Height == targetBlockHeight
-			if !success {
-				t.Logf("finalized height %d, waiting for %d", final.Height, targetBlockHeight)
-			} else {
-				t.Logf("successfully finalized target height %d\n", targetBlockHeight)
-			}
-			return success
-		}, 90*time.Second, time.Second, "expect to process all blocks before timeout")
-
+		allDone := moduleutil.AllDone(engine, followerLoop)
+		synctest.Wait()
+		select {
+		case <-allDone:
+		default:
+			t.Fatal("engine failed to stop")
+		}
+		// Note: in case any error occur, the `mockCtx` will fail the test, due to the unexpected call of `Throw` on the mock.
 	})
 }
