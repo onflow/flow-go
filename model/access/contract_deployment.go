@@ -73,6 +73,9 @@ func ParseContractID(id string) (flow.Address, string, error) {
 	if err != nil {
 		return flow.Address{}, "", fmt.Errorf("invalid address in contract ID %q: %w", id, err)
 	}
+	if strings.Contains(name, ".") {
+		return flow.Address{}, "", fmt.Errorf("contract name is invalid: %q", name)
+	}
 	return address, name, nil
 }
 
