@@ -886,6 +886,15 @@ func makeContractSnapshot(t *testing.T, address flow.Address, contracts map[stri
 	return snap
 }
 
+// encodeContractNames returns the CBOR-encoded contract names register value for the given names,
+// matching the encoding used by accounts.setContractNames.
+func encodeContractNames(t *testing.T, names ...string) flow.RegisterValue {
+	t.Helper()
+	var buf bytes.Buffer
+	require.NoError(t, cbor.NewEncoder(&buf).Encode(names))
+	return buf.Bytes()
+}
+
 // makeMultiAccountSnapshot builds a MapStorageSnapshot containing two accounts with contracts.
 func makeMultiAccountSnapshot(
 	t *testing.T,
