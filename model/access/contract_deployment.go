@@ -2,17 +2,25 @@ package access
 
 import (
 	"crypto/sha3"
+	"fmt"
+	"strings"
 
 	"github.com/onflow/flow-go/model/flow"
+)
+
+const (
+	// MinContractIDLength is the minimum length of a valid contract ID.
+	// The format is "A.{address_hex}.{name}".
+	MinContractIDLength = 4 + 2*flow.AddressLength
 )
 
 // ContractDeployment is a point-in-time snapshot of a contract on-chain.
 // Each deployment (add or update) produces a distinct ContractDeployment record.
 type ContractDeployment struct {
-	// ContractID is the address-qualified canonical identifier, e.g. "A.1654653399040a61.EVM".
-	ContractID string
 	// Address is the account that owns the contract.
 	Address flow.Address
+	// ContractName is the unqualified contract name, derived from ContractID.
+	ContractName string
 	// BlockHeight is the block height at which this deployment was applied.
 	BlockHeight uint64
 	// TransactionID is the ID of the transaction that applied this deployment.
@@ -28,6 +36,11 @@ type ContractDeployment struct {
 	// CodeHash is the SHA3-256 hash of the contract code, as reported in the protocol event.
 	CodeHash []byte
 
+	// IsDeleted is true if the contract was deleted.
+	// Deleting contracts is not currently supported by the protocol, however there are contracts on
+	// mainnet that are deleted.
+	IsDeleted bool
+
 	// IsPlaceholder is true if the deployment was created during bootstrapping based on the current
 	// chain state, and not based on a protocol event.
 	// When true, the BlockHeight, TransactionID, TxIndex, and EventIndex fields are undefined.
@@ -38,6 +51,31 @@ type ContractDeployment struct {
 	Result      *TransactionResult    `msgpack:"-"` // Transaction result (nil unless expanded)
 }
 
+// ContractID constructs the canonical contract ID string from an address and contract name.
+// Format: "A.{address_hex}.{name}"
+func ContractID(address flow.Address, name string) string {
+	return "A." + address.Hex() + "." + name
+}
+
+// ParseContractID extracts the address and contract name from a contract identifier of the form
+// "A.{address_hex}.{name}".
+//
+// Any error indicates the contractID is not in the expected format.
+func ParseContractID(id string) (flow.Address, string, error) {
+	if len(id) < MinContractIDLength || id[:2] != "A." {
+		return flow.Address{}, "", fmt.Errorf("unexpected contract ID format: %q", id)
+	}
+	addr, name, ok := strings.Cut(id[2:], ".") // strip "A." then split on "."
+	if !ok {
+		return flow.Address{}, "", fmt.Errorf("unexpected contract ID format (no second dot): %q", id)
+	}
+	address, err := flow.StringToAddress(addr)
+	if err != nil {
+		return flow.Address{}, "", fmt.Errorf("invalid address in contract ID %q: %w", id, err)
+	}
+	return address, name, nil
+}
+
 // CadenceCodeHash calculates the SHA3-256 hash of the provided code using the same algorithm as Cadence.
 func CadenceCodeHash(code []byte) []byte {
 	hash := sha3.Sum256(code)
@@ -45,12 +83,11 @@ func CadenceCodeHash(code []byte) []byte {
 }
 
 // ContractDeploymentsCursor is the single pagination cursor type for all contract index iterators.
-// For DeploymentsByContractID, all fields are meaningful. For All and ByAddress, only ContractID
-// is used for resumption; Height/TxIndex/EventIndex are populated but ignored by callers.
 type ContractDeploymentsCursor struct {
-	// ContractID identifies the contract. For All/ByAddress it is the resume key; for
-	// DeploymentsByContractID it is set by the storage layer and not encoded in the REST cursor.
-	ContractID string
+	// Address is the account that owns the contract.
+	Address flow.Address
+	// ContractName is the unqualified contract name.
+	ContractName string
 	// BlockHeight is the block height of the last returned deployment.
 	BlockHeight uint64
 	// TransactionIndex is the position of the deploying transaction within its block.
@@ -67,4 +104,3 @@ type ContractDeploymentPage struct {
 	// NextCursor is nil when no more results exist.
 	NextCursor *ContractDeploymentsCursor
 }
-

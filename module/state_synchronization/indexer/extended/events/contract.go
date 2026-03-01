@@ -119,12 +119,6 @@ func DecodeAccountContractRemoved(event cadence.Event) (*AccountContractRemovedE
 	}, nil
 }
 
-// ContractIDFromAddress constructs the canonical contract ID string from an address and contract name.
-// Format: "A.{address_hex}.{name}"
-func ContractIDFromAddress(address flow.Address, contractName string) string {
-	return fmt.Sprintf("A.%s.%s", address.Hex(), contractName)
-}
-
 // decodeCodeHashValue extracts a []byte from a Cadence constant-sized array of UInt8 values
 // ([UInt8; 32]). Returns an error if the value is not a cadence.Array or contains non-UInt8 elements.
 //

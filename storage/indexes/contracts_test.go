@@ -59,7 +59,7 @@ func storeContractDeployments(
 	})
 }
 
-// collectContractDeployments is a test helper that creates a DeploymentsByContractID iterator
+// collectContractDeployments is a test helper that creates a DeploymentsByContract iterator
 // and collects results via CollectResults.
 func collectContractDeployments(
 	tb testing.TB,
@@ -70,7 +70,9 @@ func collectContractDeployments(
 	filter storage.IndexFilter[*access.ContractDeployment],
 ) ([]access.ContractDeployment, *access.ContractDeploymentsCursor) {
 	tb.Helper()
-	iter, err := idx.DeploymentsByContractID(id, cursor)
+	addr, name, err := access.ParseContractID(id)
+	require.NoError(tb, err)
+	iter, err := idx.DeploymentsByContract(addr, name, cursor)
 	require.NoError(tb, err)
 	collected, nextCursor, err := iterator.CollectResults(iter, limit, filter)
 	require.NoError(tb, err)
@@ -116,15 +118,17 @@ func collectContractsByAddress(
 func makeDeployment(contractID string, height uint64, txIndex, eventIndex uint32) access.ContractDeployment {
 	parts := strings.Split(contractID, ".")
 	var addr flow.Address
-	if len(parts) >= 2 {
+	var name string
+	if len(parts) >= 3 {
 		parsed, err := flow.StringToAddress(parts[1])
 		if err == nil {
 			addr = parsed
 		}
+		name = parts[2]
 	}
 	fakeHash := unittest.IdentifierFixture()
 	return access.ContractDeployment{
-		ContractID:       contractID,
+		ContractName:     name,
 		Address:          addr,
 		BlockHeight:      height,
 		TransactionID:    unittest.IdentifierFixture(),
@@ -213,9 +217,9 @@ func TestContractDeployments_Bootstrap(t *testing.T) {
 		t.Parallel()
 		d := makeDeployment("A.1234567890abcdef.MyContract", 5, 0, 0)
 		RunWithBootstrappedContractDeploymentsIndex(t, 5, []access.ContractDeployment{d}, func(_ storage.DB, _ storage.LockManager, idx *ContractDeploymentsIndex) {
-			result, err := idx.ByContractID(d.ContractID)
+			result, err := idx.ByContract(d.Address, d.ContractName)
 			require.NoError(t, err)
-			assert.Equal(t, d.ContractID, result.ContractID)
+			assert.Equal(t, access.ContractID(d.Address, d.ContractName), access.ContractID(result.Address, result.ContractName))
 			assert.Equal(t, d.BlockHeight, result.BlockHeight)
 			assert.Equal(t, d.TransactionIndex, result.TransactionIndex)
 			assert.Equal(t, d.EventIndex, result.EventIndex)
@@ -229,7 +233,6 @@ func TestContractDeployments_Bootstrap(t *testing.T) {
 			lm := storage.NewTestingLockManager()
 
 			shortID := access.ContractDeployment{
-				ContractID:  "A.short",
 				BlockHeight: 1,
 			}
 
@@ -258,16 +261,16 @@ func TestContractDeployments_Bootstrap(t *testing.T) {
 }
 
 // ----------------------------------------------------------------------------
-// ByContractID
+// ByContract
 // ----------------------------------------------------------------------------
 
-func TestContractDeployments_ByContractID(t *testing.T) {
+func TestContractDeployments_ByContract(t *testing.T) {
 	t.Parallel()
 
 	t.Run("not found returns ErrNotFound", func(t *testing.T) {
 		t.Parallel()
 		RunWithBootstrappedContractDeploymentsIndex(t, 1, nil, func(_ storage.DB, _ storage.LockManager, idx *ContractDeploymentsIndex) {
-			_, err := idx.ByContractID("A.1234567890abcdef.NoSuchContract")
+			_, err := idx.ByContract(flow.HexToAddress("1234567890abcdef"), "NoSuchContract")
 			require.ErrorIs(t, err, storage.ErrNotFound)
 		})
 	})
@@ -282,7 +285,7 @@ func TestContractDeployments_ByContractID(t *testing.T) {
 			require.NoError(t, storeContractDeployments(t, lm, idx, 2, []access.ContractDeployment{d1}))
 			require.NoError(t, storeContractDeployments(t, lm, idx, 3, []access.ContractDeployment{d2}))
 
-			result, err := idx.ByContractID(contractID)
+			result, err := idx.ByContract(d2.Address, d2.ContractName)
 			require.NoError(t, err)
 			// Most recent is height 3
 			assert.Equal(t, uint64(3), result.BlockHeight)
@@ -297,9 +300,9 @@ func TestContractDeployments_ByContractID(t *testing.T) {
 		RunWithBootstrappedContractDeploymentsIndex(t, 1, nil, func(_ storage.DB, lm storage.LockManager, idx *ContractDeploymentsIndex) {
 			require.NoError(t, storeContractDeployments(t, lm, idx, 2, []access.ContractDeployment{d}))
 
-			result, err := idx.ByContractID(contractID)
+			result, err := idx.ByContract(d.Address, d.ContractName)
 			require.NoError(t, err)
-			assert.Equal(t, contractID, result.ContractID)
+			assert.Equal(t, contractID, access.ContractID(result.Address, result.ContractName))
 			assert.Equal(t, uint64(2), result.BlockHeight)
 			assert.Equal(t, uint32(1), result.TransactionIndex)
 			assert.Equal(t, uint32(2), result.EventIndex)
@@ -437,9 +440,9 @@ func TestContractDeployments_All(t *testing.T) {
 			require.Len(t, collected, 3)
 
 			// Ascending contractID order
-			assert.Equal(t, contractA, collected[0].ContractID)
-			assert.Equal(t, contractB, collected[1].ContractID)
-			assert.Equal(t, contractC, collected[2].ContractID)
+			assert.Equal(t, contractA, access.ContractID(collected[0].Address, collected[0].ContractName))
+			assert.Equal(t, contractB, access.ContractID(collected[1].Address, collected[1].ContractName))
+			assert.Equal(t, contractC, access.ContractID(collected[2].Address, collected[2].ContractName))
 
 			// contractA shows the most recent deployment (height 3)
 			assert.Equal(t, uint64(3), collected[0].BlockHeight)
@@ -462,7 +465,8 @@ func TestContractDeployments_All(t *testing.T) {
 			collected, nextCursor := collectAllContracts(t, idx, 2, nil, nil)
 			require.Len(t, collected, 2)
 			require.NotNil(t, nextCursor)
-			assert.Equal(t, contractC, nextCursor.ContractID)
+			assert.Equal(t, dC.Address, nextCursor.Address)
+			assert.Equal(t, dC.ContractName, nextCursor.ContractName)
 		})
 	})
 
@@ -490,10 +494,10 @@ func TestContractDeployments_All(t *testing.T) {
 			require.Len(t, collected2, 2)
 
 			ids := []string{
-				collected1[0].ContractID,
-				collected1[1].ContractID,
-				collected2[0].ContractID,
-				collected2[1].ContractID,
+				access.ContractID(collected1[0].Address, collected1[0].ContractName),
+				access.ContractID(collected1[1].Address, collected1[1].ContractName),
+				access.ContractID(collected2[0].Address, collected2[0].ContractName),
+				access.ContractID(collected2[1].Address, collected2[1].ContractName),
 			}
 			assert.Equal(t, []string{contractA, contractB, contractC, contractD}, ids)
 		})
@@ -511,12 +515,12 @@ func TestContractDeployments_All(t *testing.T) {
 
 			// Filter that only accepts contractA
 			filter := func(d *access.ContractDeployment) bool {
-				return d.ContractID == contractA
+				return access.ContractID(d.Address, d.ContractName) == contractA
 			}
 
 			collected, _ := collectAllContracts(t, idx, 10, nil, filter)
 			require.Len(t, collected, 1)
-			assert.Equal(t, contractA, collected[0].ContractID)
+			assert.Equal(t, contractA, access.ContractID(collected[0].Address, collected[0].ContractName))
 		})
 	})
 }
@@ -553,14 +557,14 @@ func TestContractDeployments_ByAddress(t *testing.T) {
 			collected1, _ := collectContractsByAddress(t, idx, addr1, 10, nil, nil)
 			require.Len(t, collected1, 2)
 			for _, d := range collected1 {
-				assert.True(t, strings.Contains(d.ContractID, addrHex1),
-					"deployment %s should belong to addr1", d.ContractID)
+				assert.Equal(t, addr1, d.Address,
+					"deployment %s should belong to addr1", access.ContractID(d.Address, d.ContractName))
 			}
 
 			// Query addr2 - should get ContractC only
 			collected2, _ := collectContractsByAddress(t, idx, addr2, 10, nil, nil)
 			require.Len(t, collected2, 1)
-			assert.Equal(t, contractC, collected2[0].ContractID)
+			assert.Equal(t, contractC, access.ContractID(collected2[0].Address, collected2[0].ContractName))
 		})
 	})
 
@@ -594,7 +598,8 @@ func TestContractDeployments_ByAddress(t *testing.T) {
 			collected, nextCursor := collectContractsByAddress(t, idx, addr, 2, nil, nil)
 			require.Len(t, collected, 2)
 			require.NotNil(t, nextCursor)
-			assert.Equal(t, contractC, nextCursor.ContractID)
+			assert.Equal(t, dC.Address, nextCursor.Address)
+			assert.Equal(t, dC.ContractName, nextCursor.ContractName)
 		})
 	})
 
@@ -626,10 +631,10 @@ func TestContractDeployments_ByAddress(t *testing.T) {
 			require.Len(t, collected2, 2)
 
 			ids := []string{
-				collected1[0].ContractID,
-				collected1[1].ContractID,
-				collected2[0].ContractID,
-				collected2[1].ContractID,
+				access.ContractID(collected1[0].Address, collected1[0].ContractName),
+				access.ContractID(collected1[1].Address, collected1[1].ContractName),
+				access.ContractID(collected2[0].Address, collected2[0].ContractName),
+				access.ContractID(collected2[1].Address, collected2[1].ContractName),
 			}
 			assert.Equal(t, []string{contractA, contractB, contractC, contractD}, ids)
 		})
@@ -679,11 +684,10 @@ func TestContractDeployments_Store(t *testing.T) {
 		})
 	})
 
-	t.Run("short contractID in batch returns error", func(t *testing.T) {
+	t.Run("empty contract name in batch returns error", func(t *testing.T) {
 		t.Parallel()
 		RunWithBootstrappedContractDeploymentsIndex(t, 1, nil, func(_ storage.DB, lm storage.LockManager, idx *ContractDeploymentsIndex) {
 			bad := access.ContractDeployment{
-				ContractID:  "A.short",
 				BlockHeight: 2,
 			}
 			err := storeContractDeployments(t, lm, idx, 2, []access.ContractDeployment{bad})
@@ -727,34 +731,161 @@ func TestContractDeployments_Store(t *testing.T) {
 }
 
 // ----------------------------------------------------------------------------
+// IsDeleted
+// ----------------------------------------------------------------------------
+
+func TestContractDeployments_IsDeleted(t *testing.T) {
+	t.Parallel()
+
+	contractID := "A.1234567890abcdef.MyContract"
+
+	t.Run("IsDeleted=true is persisted and returned by ByContract", func(t *testing.T) {
+		t.Parallel()
+		d := makeDeployment(contractID, 2, 0, 0)
+		d.IsDeleted = true
+
+		RunWithBootstrappedContractDeploymentsIndex(t, 1, nil, func(_ storage.DB, lm storage.LockManager, idx *ContractDeploymentsIndex) {
+			require.NoError(t, storeContractDeployments(t, lm, idx, 2, []access.ContractDeployment{d}))
+
+			result, err := idx.ByContract(d.Address, d.ContractName)
+			require.NoError(t, err)
+			assert.True(t, result.IsDeleted)
+		})
+	})
+
+	t.Run("IsDeleted=false is persisted and returned by ByContract", func(t *testing.T) {
+		t.Parallel()
+		d := makeDeployment(contractID, 2, 0, 0)
+		d.IsDeleted = false
+
+		RunWithBootstrappedContractDeploymentsIndex(t, 1, nil, func(_ storage.DB, lm storage.LockManager, idx *ContractDeploymentsIndex) {
+			require.NoError(t, storeContractDeployments(t, lm, idx, 2, []access.ContractDeployment{d}))
+
+			result, err := idx.ByContract(d.Address, d.ContractName)
+			require.NoError(t, err)
+			assert.False(t, result.IsDeleted)
+		})
+	})
+
+	t.Run("ByContract returns deleted deployment as most recent", func(t *testing.T) {
+		t.Parallel()
+		d1 := makeDeployment(contractID, 2, 0, 0) // initial deploy
+		d2 := makeDeployment(contractID, 3, 0, 0) // deletion
+		d2.IsDeleted = true
+
+		RunWithBootstrappedContractDeploymentsIndex(t, 1, nil, func(_ storage.DB, lm storage.LockManager, idx *ContractDeploymentsIndex) {
+			require.NoError(t, storeContractDeployments(t, lm, idx, 2, []access.ContractDeployment{d1}))
+			require.NoError(t, storeContractDeployments(t, lm, idx, 3, []access.ContractDeployment{d2}))
+
+			result, err := idx.ByContract(d2.Address, d2.ContractName)
+			require.NoError(t, err)
+			assert.Equal(t, uint64(3), result.BlockHeight)
+			assert.True(t, result.IsDeleted)
+		})
+	})
+
+	t.Run("IsDeleted is preserved across deploy-delete-redeploy sequence", func(t *testing.T) {
+		t.Parallel()
+		d1 := makeDeployment(contractID, 2, 0, 0) // initial deploy
+		d2 := makeDeployment(contractID, 3, 0, 0) // deletion
+		d2.IsDeleted = true
+		d3 := makeDeployment(contractID, 4, 0, 0) // redeploy
+
+		RunWithBootstrappedContractDeploymentsIndex(t, 1, nil, func(_ storage.DB, lm storage.LockManager, idx *ContractDeploymentsIndex) {
+			require.NoError(t, storeContractDeployments(t, lm, idx, 2, []access.ContractDeployment{d1}))
+			require.NoError(t, storeContractDeployments(t, lm, idx, 3, []access.ContractDeployment{d2}))
+			require.NoError(t, storeContractDeployments(t, lm, idx, 4, []access.ContractDeployment{d3}))
+
+			// Most recent is the redeploy at h=4, not deleted
+			result, err := idx.ByContract(d3.Address, d3.ContractName)
+			require.NoError(t, err)
+			assert.Equal(t, uint64(4), result.BlockHeight)
+			assert.False(t, result.IsDeleted)
+
+			// Full history shows the deletion at h=3
+			collected, _ := collectContractDeployments(t, idx, contractID, 10, nil, nil)
+			require.Len(t, collected, 3)
+			assert.False(t, collected[0].IsDeleted) // h=4
+			assert.True(t, collected[1].IsDeleted)  // h=3 (deleted)
+			assert.False(t, collected[2].IsDeleted) // h=2
+		})
+	})
+
+	t.Run("IsDeleted=true persisted in bootstrap deployments", func(t *testing.T) {
+		t.Parallel()
+		d := makeDeployment(contractID, 5, 0, 0)
+		d.IsDeleted = true
+
+		RunWithBootstrappedContractDeploymentsIndex(t, 5, []access.ContractDeployment{d}, func(_ storage.DB, _ storage.LockManager, idx *ContractDeploymentsIndex) {
+			result, err := idx.ByContract(d.Address, d.ContractName)
+			require.NoError(t, err)
+			assert.True(t, result.IsDeleted)
+		})
+	})
+
+	t.Run("All returns deleted deployments (filtering is at backend layer)", func(t *testing.T) {
+		t.Parallel()
+		d := makeDeployment(contractID, 2, 0, 0)
+		d.IsDeleted = true
+
+		RunWithBootstrappedContractDeploymentsIndex(t, 1, nil, func(_ storage.DB, lm storage.LockManager, idx *ContractDeploymentsIndex) {
+			require.NoError(t, storeContractDeployments(t, lm, idx, 2, []access.ContractDeployment{d}))
+
+			collected, _ := collectAllContracts(t, idx, 10, nil, nil)
+			require.Len(t, collected, 1)
+			assert.True(t, collected[0].IsDeleted)
+		})
+	})
+
+	t.Run("ByAddress returns deleted deployments (filtering is at backend layer)", func(t *testing.T) {
+		t.Parallel()
+		d := makeDeployment(contractID, 2, 0, 0)
+		d.IsDeleted = true
+
+		RunWithBootstrappedContractDeploymentsIndex(t, 1, nil, func(_ storage.DB, lm storage.LockManager, idx *ContractDeploymentsIndex) {
+			require.NoError(t, storeContractDeployments(t, lm, idx, 2, []access.ContractDeployment{d}))
+
+			collected, _ := collectContractsByAddress(t, idx, d.Address, 10, nil, nil)
+			require.Len(t, collected, 1)
+			assert.True(t, collected[0].IsDeleted)
+		})
+	})
+}
+
+// ----------------------------------------------------------------------------
 // Key codec
 // ----------------------------------------------------------------------------
 
 func TestContractDeployments_KeyCodec(t *testing.T) {
 	t.Parallel()
 
-	t.Run("roundtrip: makeContractDeploymentKey then decodeContractDeploymentKey", func(t *testing.T) {
+	t.Run("roundtrip: makeContractDeploymentKey then decodeDeploymentCursor", func(t *testing.T) {
 		t.Parallel()
-		contractID := "A.1234567890abcdef.MyContract"
+		addr, err := flow.StringToAddress("1234567890abcdef")
+		require.NoError(t, err)
+		name := "MyContract"
 		height := uint64(12345)
 		txIndex := uint32(42)
 		eventIndex := uint32(7)
 
-		key := makeContractDeploymentKey(contractID, height, txIndex, eventIndex)
-		gotContractID, gotHeight, gotTxIndex, gotEventIndex, err := decodeContractDeploymentKey(key)
+		key := makeContractDeploymentKey(addr, name, height, txIndex, eventIndex)
+		cursor, err := decodeDeploymentCursor(key)
 		require.NoError(t, err)
-		assert.Equal(t, contractID, gotContractID)
-		assert.Equal(t, height, gotHeight)
-		assert.Equal(t, txIndex, gotTxIndex)
-		assert.Equal(t, eventIndex, gotEventIndex)
+		assert.Equal(t, addr, cursor.Address)
+		assert.Equal(t, name, cursor.ContractName)
+		assert.Equal(t, height, cursor.BlockHeight)
+		assert.Equal(t, txIndex, cursor.TransactionIndex)
+		assert.Equal(t, eventIndex, cursor.EventIndex)
 	})
 
 	t.Run("ones complement ensures descending height order", func(t *testing.T) {
 		t.Parallel()
-		contractID := "A.1234567890abcdef.MyContract"
+		addr, err := flow.StringToAddress("1234567890abcdef")
+		require.NoError(t, err)
+		name := "MyContract"
 
-		keyLow := makeContractDeploymentKey(contractID, 100, 0, 0)
-		keyHigh := makeContractDeploymentKey(contractID, 200, 0, 0)
+		keyLow := makeContractDeploymentKey(addr, name, 100, 0, 0)
+		keyHigh := makeContractDeploymentKey(addr, name, 200, 0, 0)
 
 		// Higher height => smaller key (descending iteration)
 		assert.True(t, string(keyHigh) < string(keyLow),
@@ -763,46 +894,48 @@ func TestContractDeployments_KeyCodec(t *testing.T) {
 
 	t.Run("malformed key too short returns error", func(t *testing.T) {
 		t.Parallel()
-		_, _, _, _, err := decodeContractDeploymentKey(make([]byte, 5))
+		_, err := decodeDeploymentCursor(make([]byte, 5))
 		require.Error(t, err)
 	})
 
 	t.Run("malformed key with wrong prefix byte returns error", func(t *testing.T) {
 		t.Parallel()
-		contractID := "A.1234567890abcdef.MyContract"
-		key := makeContractDeploymentKey(contractID, 1, 0, 0)
+		addr, err := flow.StringToAddress("1234567890abcdef")
+		require.NoError(t, err)
+		key := makeContractDeploymentKey(addr, "MyContract", 1, 0, 0)
 		key[0] = 0xFF
-		_, _, _, _, err := decodeContractDeploymentKey(key)
+		_, err = decodeDeploymentCursor(key)
 		require.Error(t, err)
 	})
 
-	t.Run("addressFromContractID parses valid ID", func(t *testing.T) {
+	t.Run("ParseContractID parses valid ID", func(t *testing.T) {
 		t.Parallel()
 		addrHex := "1234567890abcdef"
 		contractID := "A." + addrHex + ".MyContract"
 		expected, err := flow.StringToAddress(addrHex)
 		require.NoError(t, err)
 
-		got, err := addressFromContractID(contractID)
+		gotAddr, gotName, err := access.ParseContractID(contractID)
 		require.NoError(t, err)
-		assert.Equal(t, expected, got)
+		assert.Equal(t, expected, gotAddr)
+		assert.Equal(t, "MyContract", gotName)
 	})
 
-	t.Run("addressFromContractID rejects missing A. prefix", func(t *testing.T) {
+	t.Run("ParseContractID rejects missing A. prefix", func(t *testing.T) {
 		t.Parallel()
-		_, err := addressFromContractID("1234567890abcdef.MyContract")
+		_, _, err := access.ParseContractID("1234567890abcdef.MyContract")
 		require.Error(t, err)
 	})
 
-	t.Run("addressFromContractID rejects missing second dot", func(t *testing.T) {
+	t.Run("ParseContractID rejects missing second dot", func(t *testing.T) {
 		t.Parallel()
-		_, err := addressFromContractID("A.1234567890abcdef")
+		_, _, err := access.ParseContractID("A.1234567890abcdef")
 		require.Error(t, err)
 	})
 
-	t.Run("addressFromContractID rejects invalid hex address", func(t *testing.T) {
+	t.Run("ParseContractID rejects invalid hex address", func(t *testing.T) {
 		t.Parallel()
-		_, err := addressFromContractID("A.ZZZZZZZZZZZZZZZZ.MyContract")
+		_, _, err := access.ParseContractID("A.ZZZZZZZZZZZZZZZZ.MyContract")
 		require.Error(t, err)
 	})
 }

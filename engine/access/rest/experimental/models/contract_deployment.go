@@ -12,7 +12,7 @@ import (
 
 // Build populates the REST model from the domain model.
 func (m *ContractDeployment) Build(d *accessmodel.ContractDeployment, link LinkGenerator) error {
-	m.ContractId = d.ContractID
+	m.ContractId = accessmodel.ContractID(d.Address, d.ContractName)
 	m.Address = d.Address.Hex()
 	m.BlockHeight = strconv.FormatUint(d.BlockHeight, 10)
 	m.TransactionId = d.TransactionID.String()

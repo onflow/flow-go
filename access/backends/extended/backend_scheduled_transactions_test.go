@@ -115,13 +115,12 @@ func TestTransactionHandlerContract(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			contractID, addr, contractName, err := transactionHandlerContract(tt.input)
+			addr, contractName, err := transactionHandlerContract(tt.input)
 			if tt.expectedErr {
 				require.Error(t, err)
 				return
 			}
 			require.NoError(t, err)
-			assert.Equal(t, tt.expectedID, contractID)
 			assert.Equal(t, tt.expectedAddrHex, addr.Hex())
 			assert.Equal(t, tt.expectedContract, contractName)
 		})
@@ -502,8 +501,8 @@ func TestScheduledTransactionsBackend_GetScheduledTransaction(t *testing.T) {
 		}
 
 		store.On("ByID", uint64(1)).Return(storedTx, nil).Once()
-		mockContracts.On("ByContractID", contractID).Return(
-			accessmodel.ContractDeployment{ContractID: contractID, Code: contractBody},
+		mockContracts.On("ByContract", flow.HexToAddress("1654653399040a61"), "MyScheduler").Return(
+			accessmodel.ContractDeployment{Address: flow.HexToAddress("1654653399040a61"), ContractName: "MyScheduler", Code: contractBody},
 			nil,
 		).Once()
 
@@ -514,7 +513,7 @@ func TestScheduledTransactionsBackend_GetScheduledTransaction(t *testing.T) {
 		)
 		require.NoError(t, err)
 		require.NotNil(t, result.HandlerContract)
-		assert.Equal(t, contractID, result.HandlerContract.ContractID)
+		assert.Equal(t, contractID, accessmodel.ContractID(result.HandlerContract.Address, result.HandlerContract.ContractName))
 		assert.Equal(t, contractBody, result.HandlerContract.Code)
 	})
 
@@ -713,7 +712,7 @@ func TestScheduledTransactionsBackend_GetScheduledTransaction(t *testing.T) {
 		verifyThrown()
 	})
 
-	t.Run("expandHandlerContract: ByContractID error triggers irrecoverable", func(t *testing.T) {
+	t.Run("expandHandlerContract: ByContract error triggers irrecoverable", func(t *testing.T) {
 		store := storagemock.NewScheduledTransactionsIndexReader(t)
 		mockContracts := storagemock.NewContractDeploymentsIndexReader(t)
 
@@ -730,7 +729,7 @@ func TestScheduledTransactionsBackend_GetScheduledTransaction(t *testing.T) {
 		contractErr := fmt.Errorf("contract read error")
 
 		store.On("ByID", uint64(1)).Return(storedTx, nil).Once()
-		mockContracts.On("ByContractID", "A.1654653399040a61.MyScheduler").Return(
+		mockContracts.On("ByContract", flow.HexToAddress("1654653399040a61"), "MyScheduler").Return(
 			accessmodel.ContractDeployment{}, contractErr,
 		).Once()
 
@@ -769,7 +768,7 @@ func TestScheduledTransactionsBackend_GetScheduledTransaction(t *testing.T) {
 		}
 
 		store.On("ByID", uint64(1)).Return(storedTx, nil).Once()
-		mockContracts.On("ByContractID", "A.1654653399040a61.MyScheduler").Return(
+		mockContracts.On("ByContract", flow.HexToAddress("1654653399040a61"), "MyScheduler").Return(
 			accessmodel.ContractDeployment{}, storage.ErrNotFound,
 		).Once()
 		mockState.On("Sealed").Return(mockSnapshot).Once()
@@ -786,7 +785,7 @@ func TestScheduledTransactionsBackend_GetScheduledTransaction(t *testing.T) {
 		)
 		require.NoError(t, err)
 		require.NotNil(t, tx.HandlerContract)
-		assert.Equal(t, "A.1654653399040a61.MyScheduler", tx.HandlerContract.ContractID)
+		assert.Equal(t, "A.1654653399040a61.MyScheduler", accessmodel.ContractID(tx.HandlerContract.Address, tx.HandlerContract.ContractName))
 		assert.Equal(t, contractCode, tx.HandlerContract.Code)
 	})
 
@@ -808,7 +807,7 @@ func TestScheduledTransactionsBackend_GetScheduledTransaction(t *testing.T) {
 		}
 
 		store.On("ByID", uint64(1)).Return(storedTx, nil).Once()
-		mockContracts.On("ByContractID", "A.1654653399040a61.MyScheduler").Return(
+		mockContracts.On("ByContract", flow.HexToAddress("1654653399040a61"), "MyScheduler").Return(
 			accessmodel.ContractDeployment{}, storage.ErrNotFound,
 		).Once()
 		mockState.On("Sealed").Return(mockSnapshot).Once()
@@ -848,7 +847,7 @@ func TestScheduledTransactionsBackend_GetScheduledTransaction(t *testing.T) {
 		}
 
 		store.On("ByID", uint64(1)).Return(storedTx, nil).Once()
-		mockContracts.On("ByContractID", "A.1654653399040a61.MyScheduler").Return(
+		mockContracts.On("ByContract", flow.HexToAddress("1654653399040a61"), "MyScheduler").Return(
 			accessmodel.ContractDeployment{}, storage.ErrNotFound,
 		).Once()
 		mockState.On("Sealed").Return(mockSnapshot).Once()

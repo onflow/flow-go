@@ -82,33 +82,35 @@ func (b *ContractDeploymentsBootstrapper) UninitializedFirstHeight() (uint64, bo
 	return store.FirstIndexedHeight(), true
 }
 
-// ByContractID returns the most recent deployment for the given contract identifier.
+// ByContract returns the most recent deployment for the given contract.
+// See [ContractDeploymentsIndex.ByContract].
 //
 // Expected error returns during normal operations:
 //   - [storage.ErrNotBootstrapped] if the index has not been initialized
-//   - [storage.ErrNotFound] if no deployment for the given contract ID exists
-func (b *ContractDeploymentsBootstrapper) ByContractID(id string) (accessmodel.ContractDeployment, error) {
+//   - [storage.ErrNotFound] if no deployment for the given contract exists
+func (b *ContractDeploymentsBootstrapper) ByContract(account flow.Address, name string) (accessmodel.ContractDeployment, error) {
 	store := b.store.Load()
 	if store == nil {
 		return accessmodel.ContractDeployment{}, storage.ErrNotBootstrapped
 	}
-	return store.ByContractID(id)
+	return store.ByContract(account, name)
 }
 
-// DeploymentsByContractID returns an iterator over all recorded deployments for the given contract,
-// ordered from most recent to oldest. See [ContractDeploymentsIndex.DeploymentsByContractID].
+// DeploymentsByContract returns an iterator over all recorded deployments for the given contract,
+// ordered from most recent to oldest. See [ContractDeploymentsIndex.DeploymentsByContract].
 //
 // Expected error returns during normal operations:
 //   - [storage.ErrNotBootstrapped] if the index has not been initialized
-func (b *ContractDeploymentsBootstrapper) DeploymentsByContractID(
-	id string,
+func (b *ContractDeploymentsBootstrapper) DeploymentsByContract(
+	account flow.Address,
+	name string,
 	cursor *accessmodel.ContractDeploymentsCursor,
 ) (storage.ContractDeploymentIterator, error) {
 	store := b.store.Load()
 	if store == nil {
 		return nil, storage.ErrNotBootstrapped
 	}
-	return store.DeploymentsByContractID(id, cursor)
+	return store.DeploymentsByContract(account, name, cursor)
 }
 
 // ByAddress returns an iterator over the latest deployment for each contract deployed by the

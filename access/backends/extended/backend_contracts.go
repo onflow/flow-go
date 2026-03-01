@@ -3,7 +3,6 @@ package extended
 import (
 	"context"
 	"fmt"
-	"strings"
 
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc/codes"
@@ -38,23 +37,18 @@ type ContractDeploymentFilter struct {
 	EndBlock *uint64
 }
 
-func (f *ContractDeploymentFilter) isEmpty() bool {
-	return f.ContractName == "" && f.StartBlock == nil && f.EndBlock == nil
-}
-
 // Filter builds a [storage.IndexFilter] from the non-nil filter fields.
 func (f *ContractDeploymentFilter) Filter() storage.IndexFilter[*accessmodel.ContractDeployment] {
-	if f.isEmpty() {
-		return nil
-	}
+	// No nil filters. Always filter out deleted contracts.
+	// When deleting contracts is eventually supported, make this a configurable option. for now,
+	// always remove deleted contracts from the results.
 
-	var searchSuffix string
-	if f.ContractName != "" {
-		searchSuffix = "." + f.ContractName
-	}
 	return func(d *accessmodel.ContractDeployment) bool {
-		if f.ContractName != "" && strings.HasSuffix(d.ContractID, searchSuffix) {
-			return true
+		if d.IsDeleted {
+			return false
+		}
+		if f.ContractName != "" && d.ContractName != f.ContractName {
+			return false
 		}
 		if f.StartBlock != nil && d.BlockHeight < *f.StartBlock {
 			return false
@@ -99,14 +93,19 @@ func (b *ContractsBackend) GetContract(
 	expandOptions ContractDeploymentExpandOptions,
 	encodingVersion entities.EventEncodingVersion,
 ) (*accessmodel.ContractDeployment, error) {
-	deployment, err := b.store.ByContractID(id)
+	account, contractName, err := accessmodel.ParseContractID(id)
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "invalid contract identifier: %v", err)
+	}
+
+	deployment, err := b.store.ByContract(account, contractName)
 	if err != nil {
 		return nil, mapReadError(ctx, "contract", err)
 	}
 
 	if expandOptions.HasExpand() {
 		if err := b.expand(ctx, &deployment, expandOptions, encodingVersion); err != nil {
-			err = fmt.Errorf("failed to expand contract deployment %s: %w", deployment.ContractID, err)
+			err = fmt.Errorf("failed to expand contract deployment %s: %w", id, err)
 			irrecoverable.Throw(ctx, err)
 			return nil, err
 		}
@@ -136,7 +135,18 @@ func (b *ContractsBackend) GetContractDeployments(
 		return nil, status.Errorf(codes.InvalidArgument, "invalid limit: %v", err)
 	}
 
-	iter, err := b.store.DeploymentsByContractID(id, cursor)
+	account, contractName, err := accessmodel.ParseContractID(id)
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "invalid contract identifier: %v", err)
+	}
+
+	if cursor != nil {
+		// ignore address/contract name passed by the caller
+		cursor.Address = account
+		cursor.ContractName = contractName
+	}
+
+	iter, err := b.store.DeploymentsByContract(account, contractName, cursor)
 	if err != nil {
 		return nil, mapReadError(ctx, "contract deployments", err)
 	}
@@ -155,8 +165,9 @@ func (b *ContractsBackend) GetContractDeployments(
 
 	if expandOptions.HasExpand() {
 		for i := range page.Deployments {
-			if err := b.expand(ctx, &page.Deployments[i], expandOptions, encodingVersion); err != nil {
-				err = fmt.Errorf("failed to expand contract deployment %s: %w", page.Deployments[i].ContractID, err)
+			deployment := &page.Deployments[i]
+			if err := b.expand(ctx, deployment, expandOptions, encodingVersion); err != nil {
+				err = fmt.Errorf("failed to expand contract deployment at height %d: %w", deployment.BlockHeight, err)
 				irrecoverable.Throw(ctx, err)
 				return nil, err
 			}
@@ -203,8 +214,10 @@ func (b *ContractsBackend) GetContracts(
 
 	if expandOptions.HasExpand() {
 		for i := range page.Deployments {
-			if err := b.expand(ctx, &page.Deployments[i], expandOptions, encodingVersion); err != nil {
-				err = fmt.Errorf("failed to expand contract deployment %s: %w", page.Deployments[i].ContractID, err)
+			deployment := &page.Deployments[i]
+			if err := b.expand(ctx, deployment, expandOptions, encodingVersion); err != nil {
+				contractID := accessmodel.ContractID(deployment.Address, deployment.ContractName)
+				err = fmt.Errorf("failed to expand contract deployment %s: %w", contractID, err)
 				irrecoverable.Throw(ctx, err)
 				return nil, err
 			}
@@ -234,6 +247,11 @@ func (b *ContractsBackend) GetContractsByAddress(
 		return nil, status.Errorf(codes.InvalidArgument, "invalid limit: %v", err)
 	}
 
+	if cursor != nil {
+		// ignore any address passed by the caller
+		cursor.Address = address
+	}
+
 	iter, err := b.store.ByAddress(address, cursor)
 	if err != nil {
 		return nil, mapReadError(ctx, "contracts", err)
@@ -253,8 +271,10 @@ func (b *ContractsBackend) GetContractsByAddress(
 
 	if expandOptions.HasExpand() {
 		for i := range page.Deployments {
-			if err := b.expand(ctx, &page.Deployments[i], expandOptions, encodingVersion); err != nil {
-				err = fmt.Errorf("failed to expand contract deployment %s: %w", page.Deployments[i].ContractID, err)
+			deployment := &page.Deployments[i]
+			if err := b.expand(ctx, deployment, expandOptions, encodingVersion); err != nil {
+				contractID := accessmodel.ContractID(deployment.Address, deployment.ContractName)
+				err = fmt.Errorf("failed to expand contract deployment %s: %w", contractID, err)
 				irrecoverable.Throw(ctx, err)
 				return nil, err
 			}

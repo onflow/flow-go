@@ -19,6 +19,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/rest/experimental/request"
 	"github.com/onflow/flow-go/engine/access/rest/router"
 	accessmodel "github.com/onflow/flow-go/model/access"
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -400,9 +401,10 @@ func TestGetScheduledTransaction(t *testing.T) {
 			Status:                           accessmodel.ScheduledTxStatusScheduled,
 			CreatedTransactionID:             txCreatedID,
 			HandlerContract: &accessmodel.ContractDeployment{
-				ContractID: "A.0000.MyScheduler",
-				Code:       []byte("pub contract MyScheduler {}"),
-				CodeHash:   accessmodel.CadenceCodeHash([]byte("pub contract MyScheduler {}")),
+				Address:      flow.HexToAddress("0000"),
+				ContractName: "MyScheduler",
+				Code:         []byte("pub contract MyScheduler {}"),
+				CodeHash:     accessmodel.CadenceCodeHash([]byte("pub contract MyScheduler {}")),
 			},
 		}
 
@@ -432,7 +434,7 @@ func TestGetScheduledTransaction(t *testing.T) {
 			"transaction_handler_uuid": "3",
 			"created_transaction_id": "%s",
 			"handler_contract": {
-				"contract_id": "A.0000.MyScheduler",
+				"contract_id": "A.0000000000000000.MyScheduler",
 				"address": "0000000000000000",
 				"block_height": "0",
 				"transaction_id": "0000000000000000000000000000000000000000000000000000000000000000",

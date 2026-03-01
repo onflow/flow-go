@@ -103,7 +103,7 @@ func (s *ExtendedIndexingSuite) TestContractLifecycle() {
 	deploy1Code := []byte(contractV1.ToCadence())
 	deploy1CodeHash := accessmodel.CadenceCodeHash(deploy1Code)
 	deploy1 := accessmodel.ContractDeployment{
-		ContractID:    contractID,
+		ContractName:  testContractName,
 		Address:       serviceAddr,
 		BlockHeight:   deployResult.BlockHeight,
 		TransactionID: flow.Identifier(deployTx.ID()),
@@ -114,12 +114,12 @@ func (s *ExtendedIndexingSuite) TestContractLifecycle() {
 	deploy2Code := []byte(contractV2.ToCadence())
 	deploy2CodeHash := accessmodel.CadenceCodeHash(deploy2Code)
 	deploy2 := accessmodel.ContractDeployment{
-		ContractID:    contractID,
+		ContractName:  testContractName,
 		Address:       serviceAddr,
 		BlockHeight:   updateResult.BlockHeight,
 		TransactionID: flow.Identifier(updateTx.ID()),
 		Code:          deploy2Code,
-		CodeHash:      deploy2CodeHash[:],
+		CodeHash:      deploy2CodeHash,
 	}
 
 	// ---- Step 4: Verify GET /experimental/v1/contracts/{identifier} ----
@@ -184,7 +184,7 @@ func (s *ExtendedIndexingSuite) verifyContractDeploymentHistory(contractID strin
 
 	for i, exp := range expected {
 		d := deployments[i]
-		s.Equal(exp.ContractID, d.ContractId, "deployment at index %d should have matching contract_id", i)
+		s.Equal(accessmodel.ContractID(exp.Address, exp.ContractName), d.ContractId, "deployment at index %d should have matching contract_id", i)
 		s.Equal(strconv.FormatUint(exp.BlockHeight, 10), d.BlockHeight, "deployment at index %d should have matching block_height", i)
 		s.Equal(exp.TransactionID.String(), d.TransactionId, "deployment at index %d should have matching transaction_id", i)
 		s.Equal(base64.StdEncoding.EncodeToString(exp.Code), d.Code, "deployment at index %d should have matching code", i)
@@ -212,7 +212,7 @@ func (s *ExtendedIndexingSuite) verifyContractInList(contractID string, expected
 
 	for _, d := range all {
 		if d.ContractId == contractID {
-			s.Equal(expected.ContractID, d.ContractId, "contract_id should match")
+			s.Equal(accessmodel.ContractID(expected.Address, expected.ContractName), d.ContractId, "contract_id should match")
 			s.Equal(strconv.FormatUint(expected.BlockHeight, 10), d.BlockHeight, "block_height should match")
 			s.Equal(expected.TransactionID.String(), d.TransactionId, "transaction_id should match")
 			s.Equal(base64.StdEncoding.EncodeToString(expected.Code), d.Code, "code should match")
@@ -241,18 +241,19 @@ func (s *ExtendedIndexingSuite) verifyContractsByAddress(address string, expecte
 	}, 30*time.Second, 1*time.Second, "GET /accounts/%s/contracts should succeed", address)
 
 	for _, d := range all {
-		if d.ContractId == expected.ContractID {
-			s.Equal(expected.ContractID, d.ContractId, "contract_id should match")
+		expectedContractID := accessmodel.ContractID(expected.Address, expected.ContractName)
+		if d.ContractId == expectedContractID {
+			s.Equal(expectedContractID, d.ContractId, "contract_id should match")
 			s.Equal(strconv.FormatUint(expected.BlockHeight, 10), d.BlockHeight, "block_height should match")
 			s.Equal(expected.TransactionID.String(), d.TransactionId, "transaction_id should match")
 			s.Equal(base64.StdEncoding.EncodeToString(expected.Code), d.Code, "code should match")
 			s.Equal(hex.EncodeToString(expected.CodeHash), d.CodeHash, "code_hash should match")
-			s.T().Logf("verified %s appears under address %s", expected.ContractID, address)
+			s.T().Logf("verified %s appears under address %s", expectedContractID, address)
 			return
 		}
 	}
 	s.Require().Fail("contract should appear in /accounts/%s/contracts list",
-		"contract %s not found in /accounts/%s/contracts list", address, expected.ContractID, address)
+		"contract %s not found in /accounts/%s/contracts list", address, accessmodel.ContractID(expected.Address, expected.ContractName), address)
 }
 
 // verifyContractDeploymentPagination verifies that paginating through

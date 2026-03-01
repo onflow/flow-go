@@ -100,7 +100,6 @@ func TestBackend_GetAccountFungibleTokenTransfers(t *testing.T) {
 					RecipientAddress: unittest.RandomAddressFixture(),
 				},
 			},
-			NextCursor: nil,
 		}
 
 		blockID := unittest.IdentifierFixture()
@@ -308,7 +307,6 @@ func TestBackend_GetAccountNonFungibleTokenTransfers(t *testing.T) {
 					RecipientAddress: unittest.RandomAddressFixture(),
 				},
 			},
-			NextCursor: nil,
 		}
 
 		blockID := unittest.IdentifierFixture()

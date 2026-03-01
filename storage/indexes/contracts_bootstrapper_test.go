@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/access"
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -24,7 +25,7 @@ func TestContractDeploymentsBootstrapper_Constructor(t *testing.T) {
 			b, err := NewContractDeploymentsBootstrapper(storageDB, 5)
 			require.NoError(t, err)
 			// Store is nil: read operations return ErrNotBootstrapped
-			_, err = b.ByContractID("A.1234567890abcdef.Foo")
+			_, err = b.ByContract(flow.HexToAddress("1234567890abcdef"), "Foo")
 			require.ErrorIs(t, err, storage.ErrNotBootstrapped)
 		})
 	})
@@ -65,13 +66,13 @@ func TestContractDeploymentsBootstrapper_BeforeBootstrap(t *testing.T) {
 			require.ErrorIs(t, err, storage.ErrNotBootstrapped)
 		})
 
-		t.Run("ByContractID returns ErrNotBootstrapped", func(t *testing.T) {
-			_, err := b.ByContractID("A.1234567890abcdef.Foo")
+		t.Run("ByContract returns ErrNotBootstrapped", func(t *testing.T) {
+			_, err := b.ByContract(flow.HexToAddress("1234567890abcdef"), "Foo")
 			require.ErrorIs(t, err, storage.ErrNotBootstrapped)
 		})
 
-		t.Run("DeploymentsByContractID returns ErrNotBootstrapped", func(t *testing.T) {
-			_, err := b.DeploymentsByContractID("A.1234567890abcdef.Foo", nil)
+		t.Run("DeploymentsByContract returns ErrNotBootstrapped", func(t *testing.T) {
+			_, err := b.DeploymentsByContract(flow.HexToAddress("1234567890abcdef"), "Foo", nil)
 			require.ErrorIs(t, err, storage.ErrNotBootstrapped)
 		})
 
@@ -200,7 +201,7 @@ func TestContractDeploymentsBootstrapper_Store(t *testing.T) {
 			require.NoError(t, err)
 
 			// Verify the deployment is queryable
-			result, err := b.ByContractID(contractID)
+			result, err := b.ByContract(d.Address, d.ContractName)
 			require.NoError(t, err)
 			assert.Equal(t, uint64(11), result.BlockHeight)
 		})
@@ -225,9 +226,9 @@ func TestContractDeploymentsBootstrapper_Store(t *testing.T) {
 			})
 			require.NoError(t, err)
 
-			result, err := b.ByContractID(contractID)
+			result, err := b.ByContract(d.Address, d.ContractName)
 			require.NoError(t, err)
-			assert.Equal(t, contractID, result.ContractID)
+			assert.Equal(t, contractID, access.ContractID(result.Address, result.ContractName))
 			assert.Equal(t, uint64(5), result.BlockHeight)
 		})
 	})

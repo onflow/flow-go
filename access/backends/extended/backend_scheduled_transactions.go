@@ -337,12 +337,12 @@ func (b *ScheduledTransactionsBackend) expandHandlerContract(
 	ctx context.Context,
 	tx *accessmodel.ScheduledTransaction,
 ) error {
-	contractID, address, contractName, err := transactionHandlerContract(tx.TransactionHandlerTypeIdentifier)
+	address, contractName, err := transactionHandlerContract(tx.TransactionHandlerTypeIdentifier)
 	if err != nil {
 		return fmt.Errorf("failed to get contract ID for tx handler %s: %w", tx.TransactionHandlerTypeIdentifier, err)
 	}
 
-	contract, err := b.contracts.ByContractID(contractID)
+	contract, err := b.contracts.ByContract(address, contractName)
 
 	if err == nil {
 		tx.HandlerContract = &contract
@@ -367,8 +367,8 @@ func (b *ScheduledTransactionsBackend) expandHandlerContract(
 	}
 
 	tx.HandlerContract = &accessmodel.ContractDeployment{
-		ContractID:    contractID,
 		Address:       address,
+		ContractName:  contractName,
 		Code:          code,
 		CodeHash:      accessmodel.CadenceCodeHash(code),
 		IsPlaceholder: true,
@@ -390,20 +390,18 @@ func (b *ScheduledTransactionsBackend) getContractFromState(ctx context.Context,
 // e.g.
 //
 //	A.1654653399040a61.MyScheduler.Handler -> A.1654653399040a61.MyScheduler
-func transactionHandlerContract(handlerTypeIdentifier string) (contractID string, address flow.Address, contractName string, err error) {
+func transactionHandlerContract(handlerTypeIdentifier string) (address flow.Address, contractName string, err error) {
 	parts := strings.Split(handlerTypeIdentifier, ".")
 	if len(parts) < 3 {
-		return "", flow.Address{}, "", fmt.Errorf("invalid handler type identifier: %s", handlerTypeIdentifier)
+		return flow.Address{}, "", fmt.Errorf("invalid handler type identifier: %s", handlerTypeIdentifier)
 	}
 
 	address, err = flow.StringToAddress(parts[1])
 	if err != nil {
-		return "", flow.Address{}, "", fmt.Errorf("failed to parse address from handler type identifier: %w", err)
+		return flow.Address{}, "", fmt.Errorf("failed to parse address from handler type identifier: %w", err)
 	}
 
 	contractName = parts[2]
 
-	contractID = strings.Join(parts[:3], ".")
-
-	return contractID, address, contractName, nil
+	return address, contractName, nil
 }

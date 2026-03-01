@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"sort"
 	"time"
 
 	"github.com/jordanschalm/lockctx"
@@ -114,30 +113,23 @@ func (c *Contracts) IndexBlockData(lctx lockctx.Proof, data BlockData, rw storag
 	// the initial store operation.
 	// TODO: avoid doing this check on every block. in the mean time, this is a fast check
 	if bootstrapHeight, isInitialized := c.store.UninitializedFirstHeight(); !isInitialized {
-		start := time.Now()
-
 		// keep track of the contracts with deployments in this block. these can be skipped during the
 		// initial load since the deployment object is already created.
 		updatedContracts := make(map[string]bool, len(deployments))
 		for _, deployment := range deployments {
-			updatedContracts[deployment.ContractID] = true
+			updatedContracts[access.ContractID(deployment.Address, deployment.ContractName)] = true
 		}
 
 		// TODO: this will currently load all contracts into memory, then store them in one large batch.
 		// this is probably ok for now since there is a relatively small number of contracts. This should
 		// be updated to allow storing the contracts in smaller batches.
 
-		bootstrapContracts, err := c.loadDeployedContracts(bootstrapHeight, updatedContracts)
+		loader := newDeployedContractsLoader(c.log, c.scriptExecutor, c.registers)
+		bootstrapContracts, err := loader.Load(bootstrapHeight, updatedContracts)
 		if err != nil {
 			return fmt.Errorf("failed to load deployed contracts: %w", err)
 		}
 		deployments = append(deployments, bootstrapContracts...)
-
-		c.log.Info().
-			Uint64("height", bootstrapHeight).
-			Int("contracts", len(bootstrapContracts)).
-			Dur("dur_ms", time.Since(start)).
-			Msg("loaded deployed contracts during bootstrap")
 	}
 
 	if err := c.store.Store(lctx, rw, data.Header.Height, deployments); err != nil {
@@ -183,7 +175,7 @@ func (c *Contracts) collectDeployments(data BlockData) (deployments []access.Con
 			}
 
 			deployments = append(deployments, access.ContractDeployment{
-				ContractID:       events.ContractIDFromAddress(e.Address, e.ContractName),
+				ContractName:     e.ContractName,
 				Address:          e.Address,
 				BlockHeight:      data.Header.Height,
 				TransactionID:    event.TransactionID,
@@ -216,7 +208,7 @@ func (c *Contracts) collectDeployments(data BlockData) (deployments []access.Con
 			}
 
 			deployments = append(deployments, access.ContractDeployment{
-				ContractID:       events.ContractIDFromAddress(e.Address, e.ContractName),
+				ContractName:     e.ContractName,
 				Address:          e.Address,
 				BlockHeight:      data.Header.Height,
 				TransactionID:    event.TransactionID,
@@ -228,121 +220,16 @@ func (c *Contracts) collectDeployments(data BlockData) (deployments []access.Con
 			updated++
 
 		case flowAccountContractRemoved:
-			// contract removal is not currently supported. returning an error here will cause the
-			// indexer to crash, signalling that implementation is needed.
+			// contract removal is not currently supported. receiving this event is unexpected.
+			//
+			// Eventually, we can indicated deleted by setting the code to nil and adding the
+			// `IsDeleted` flag.
 			return nil, 0, 0, fmt.Errorf("unexpected %s event in block %s tx %s: not supported",
 				event.Type, data.Header.ID(), event.TransactionID)
 		}
 	}
 
 	return deployments, created, updated, nil
-}
-
-// loadDeployedContracts scans all code registers at the given height and returns a
-// access.ContractDeployment placeholder record for each deployed contract not already
-// covered by seenContracts.
-//
-// The scan is broken into iterations bounded by [contractsBootstrapMaxIterationDuration].
-// Each iteration holds a single pebble iterator open; releasing it between iterations
-// allows pebble compaction to run and prevents read-amplification build-up during the
-// potentially hours-long bootstrap scan.
-//
-// No error returns are expected during normal operation.
-func (c *Contracts) loadDeployedContracts(height uint64, seenContracts map[string]bool) ([]access.ContractDeployment, error) {
-	var deployments []access.ContractDeployment
-	var cursor *flow.RegisterID
-	skippedAlreadySeen := 0
-	loadedContracts := make(map[flow.Address][]string)
-	for {
-		batchStart := time.Now()
-		timedOut := false
-
-		for entry, err := range c.registers.ByKeyPrefix(flow.CodeKeyPrefix, height, cursor) {
-			if err != nil {
-				return nil, fmt.Errorf("error scanning contract code registers: %w", err)
-			}
-
-			reg := entry.Cursor()
-			address := flow.BytesToAddress([]byte(reg.Owner))
-			contractName := flow.KeyContractName(reg.Key)
-			contractID := events.ContractIDFromAddress(address, contractName)
-
-			if !seenContracts[contractID] {
-				// when a contract is deleted, it's code is set to nil/empty and the name is removed
-				// from the contract names register. the actual register is still present in state.
-				// while deleting contracts is not supported, there are deleted contracts in the state.
-				code, err := entry.Value()
-				if err != nil {
-					return nil, fmt.Errorf("error reading contract code for %s: %w", contractID, err)
-				}
-				if len(code) == 0 {
-					continue // skip deleted contracts
-				}
-
-				deployments = append(deployments, access.ContractDeployment{
-					ContractID: contractID,
-					Address:    address,
-					Code:       code,
-					CodeHash:   access.CadenceCodeHash(code),
-					// all other fields are omitted because we do not know the actual deployment details
-					IsPlaceholder: true,
-				})
-				c.log.Info().
-					Str("contract_id", contractID).
-					Msg("loaded contract during bootstrap")
-			} else {
-				skippedAlreadySeen++
-			}
-
-			loadedContracts[address] = append(loadedContracts[address], contractName)
-
-			// If we've held the iterator open too long, record the cursor and release it so
-			// pebble compaction can proceed before we resume.
-			if time.Since(batchStart) >= contractsBootstrapMaxIterationDuration {
-				cursor = &reg
-				timedOut = true
-				break
-			}
-		}
-
-		if !timedOut {
-			break
-		}
-	}
-
-	c.log.Info().
-		Uint64("height", height).
-		Int("contracts", len(deployments)).
-		Int("skipped_already_seen", skippedAlreadySeen).
-		Msg("loaded contracts during bootstrap")
-
-	// verify that the contract names in the contract names register match the contract names in the loaded contracts
-	for address, loadedContractNames := range loadedContracts {
-		registerValue, err := c.scriptExecutor.RegisterValue(flow.ContractNamesRegisterID(address), height)
-		if err != nil {
-			return nil, fmt.Errorf("error getting contract names for %s: %w", address, err)
-		}
-
-		contractNames, err := environment.DecodeContractNames(registerValue)
-		if err != nil {
-			return nil, fmt.Errorf("error decoding contract names for %s: %w", address, err)
-		}
-
-		sort.Strings(contractNames)
-		sort.Strings(loadedContractNames)
-
-		if len(contractNames) != len(loadedContractNames) {
-			return nil, fmt.Errorf("contract names length mismatch for %s: %d != %d", address, len(contractNames), len(loadedContractNames))
-		}
-
-		for i := range contractNames {
-			if contractNames[i] != loadedContractNames[i] {
-				return nil, fmt.Errorf("contract name mismatch for %s: %s != %s", address, contractNames[i], loadedContractNames[i])
-			}
-		}
-	}
-
-	return deployments, nil
 }
 
 // contractRetriever is a helper for retrieving contract code from the snapshot at the given height.

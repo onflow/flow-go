@@ -8,21 +8,20 @@ import (
 )
 
 // ContractDeploymentIterator iterates over contract deployments with a [accessmodel.ContractDeploymentsCursor].
-// Used by DeploymentsByContractID, All, and ByAddress.
 type ContractDeploymentIterator = IndexIterator[accessmodel.ContractDeployment, accessmodel.ContractDeploymentsCursor]
 
 // ContractDeploymentsIndexReader provides read access to the contract deployments index.
 //
 // All methods are safe for concurrent access.
 type ContractDeploymentsIndexReader interface {
-	// ByContractID returns the most recent deployment for the given contract identifier.
+	// ByContract returns the most recent deployment for the given contract.
 	//
 	// Expected error returns during normal operation:
-	//   - [ErrNotFound]: if no deployment for the given contract ID exists
+	//   - [ErrNotFound]: if no deployment for the given contract exists
 	//   - [ErrNotBootstrapped]: if the index has not been initialized
-	ByContractID(id string) (accessmodel.ContractDeployment, error)
+	ByContract(account flow.Address, name string) (accessmodel.ContractDeployment, error)
 
-	// DeploymentsByContractID returns an iterator over all recorded deployments for the given
+	// DeploymentsByContract returns an iterator over all recorded deployments for the given
 	// contract, ordered from most recent to oldest (descending block height).
 	//
 	// cursor is a pointer to an [accessmodel.ContractDeploymentsCursor]:
@@ -31,8 +30,9 @@ type ContractDeploymentsIndexReader interface {
 	//
 	// Expected error returns during normal operation:
 	//   - [ErrNotBootstrapped]: if the index has not been initialized
-	DeploymentsByContractID(
-		id string,
+	DeploymentsByContract(
+		account flow.Address,
+		name string,
 		cursor *accessmodel.ContractDeploymentsCursor,
 	) (ContractDeploymentIterator, error)
 
@@ -41,7 +41,7 @@ type ContractDeploymentsIndexReader interface {
 	//
 	// cursor is a pointer to an [accessmodel.ContractDeploymentsCursor]:
 	//   - nil means start from the first contract (by identifier)
-	//   - non-nil resumes from cursor.ContractID (inclusive); other cursor fields are ignored
+	//   - non-nil resumes from cursor.Address and cursor.ContractName (inclusive); other cursor fields are ignored
 	//
 	// Expected error returns during normal operation:
 	//   - [ErrNotBootstrapped]: if the index has not been initialized
@@ -55,7 +55,7 @@ type ContractDeploymentsIndexReader interface {
 	//
 	// cursor is a pointer to an [accessmodel.ContractDeploymentsCursor]:
 	//   - nil means start from the first contract (by identifier)
-	//   - non-nil resumes from cursor.ContractID (inclusive); other cursor fields are ignored
+	//   - non-nil resumes from cursor.Address and cursor.ContractName (inclusive); other cursor fields are ignored
 	//
 	// Expected error returns during normal operation:
 	//   - [ErrNotBootstrapped]: if the index has not been initialized

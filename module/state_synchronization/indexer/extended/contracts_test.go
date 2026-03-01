@@ -56,7 +56,7 @@ func TestContractsIndexer_NoEvents(t *testing.T) {
 	t.Parallel()
 
 	scriptExecutor := executionmock.NewScriptExecutor(t)
-	indexer, store, lm, db := newContractsIndexerWithScriptExecutor(t, flow.Testnet, contractsBootstrapHeight, scriptExecutor)
+	indexer, store, lm, db := newContractsIndexerWithScriptExecutor(t, contractsBootstrapHeight, scriptExecutor)
 
 	header := unittest.BlockHeaderFixtureOnChain(flow.Testnet, unittest.WithHeaderHeight(contractsBootstrapHeight))
 	indexContractsBlock(t, indexer, lm, db, BlockData{
@@ -80,7 +80,7 @@ func TestContractsIndexer_NextHeight_NotBootstrapped(t *testing.T) {
 	t.Parallel()
 
 	// No script executor needed — NextHeight() only touches the store, not the executor.
-	indexer, _, _, _ := newContractsIndexerNilExecutor(t, flow.Testnet, contractsBootstrapHeight)
+	indexer, _, _, _ := newContractsIndexerNilExecutor(t, contractsBootstrapHeight)
 
 	height, err := indexer.NextHeight()
 	require.NoError(t, err)
@@ -98,7 +98,7 @@ func TestContractsIndexer_ContractAdded(t *testing.T) {
 	codeHash := access.CadenceCodeHash(code)
 
 	scriptExecutor := executionmock.NewScriptExecutor(t)
-	indexer, store, lm, db := newContractsIndexerWithScriptExecutor(t, flow.Testnet, contractsBootstrapHeight, scriptExecutor)
+	indexer, store, lm, db := newContractsIndexerWithScriptExecutor(t, contractsBootstrapHeight, scriptExecutor)
 
 	// Step 1: bootstrap block — no events, empty snapshot.
 	bootstrapHeader := unittest.BlockHeaderFixtureOnChain(flow.Testnet, unittest.WithHeaderHeight(contractsBootstrapHeight))
@@ -116,10 +116,10 @@ func TestContractsIndexer_ContractAdded(t *testing.T) {
 	indexContractsBlock(t, indexer, lm, db, BlockData{Header: eventHeader, Events: []flow.Event{event}})
 
 	contractID := fmt.Sprintf("A.%s.%s", address.Hex(), contractName)
-	deployment, err := store.ByContractID(contractID)
+	deployment, err := store.ByContract(address, contractName)
 	require.NoError(t, err)
 
-	assert.Equal(t, contractID, deployment.ContractID)
+	assert.Equal(t, contractID, access.ContractID(deployment.Address, deployment.ContractName))
 	assert.Equal(t, address, deployment.Address)
 	assert.Equal(t, contractsEventHeight, deployment.BlockHeight)
 	assert.Equal(t, deployingTxID, deployment.TransactionID)
@@ -142,7 +142,7 @@ func TestContractsIndexer_ContractUpdated(t *testing.T) {
 	codeHashV2 := access.CadenceCodeHash(codeV2)
 
 	scriptExecutor := executionmock.NewScriptExecutor(t)
-	indexer, store, lm, db := newContractsIndexerWithScriptExecutor(t, flow.Testnet, contractsBootstrapHeight, scriptExecutor)
+	indexer, store, lm, db := newContractsIndexerWithScriptExecutor(t, contractsBootstrapHeight, scriptExecutor)
 
 	// Bootstrap block.
 	bootstrapHeader := unittest.BlockHeaderFixtureOnChain(flow.Testnet, unittest.WithHeaderHeight(contractsBootstrapHeight))
@@ -166,17 +166,15 @@ func TestContractsIndexer_ContractUpdated(t *testing.T) {
 	updateEvent.TransactionID = updateTxID
 	indexContractsBlock(t, indexer, lm, db, BlockData{Header: header2, Events: []flow.Event{updateEvent}})
 
-	contractID := fmt.Sprintf("A.%s.%s", address.Hex(), contractName)
-
-	// ByContractID returns the most recent deployment (height 102).
-	latest, err := store.ByContractID(contractID)
+	// ByContract returns the most recent deployment (height 102).
+	latest, err := store.ByContract(address, contractName)
 	require.NoError(t, err)
 	assert.Equal(t, contractsEventHeight+1, latest.BlockHeight)
 	assert.Equal(t, codeV2, latest.Code)
 	assert.Equal(t, updateTxID, latest.TransactionID)
 
-	// DeploymentsByContractID returns both deployments, most recent first.
-	depIter, err := store.DeploymentsByContractID(contractID, nil)
+	// DeploymentsByContract returns both deployments, most recent first.
+	depIter, err := store.DeploymentsByContract(address, contractName, nil)
 	require.NoError(t, err)
 	deployments := collectContractPage(t, depIter, 10)
 	require.Len(t, deployments, 2)
@@ -197,7 +195,7 @@ func TestContractsIndexer_MultipleContractsInOneBlock(t *testing.T) {
 	hash2 := access.CadenceCodeHash(code2)
 
 	scriptExecutor := executionmock.NewScriptExecutor(t)
-	indexer, store, lm, db := newContractsIndexerWithScriptExecutor(t, flow.Testnet, contractsBootstrapHeight, scriptExecutor)
+	indexer, store, lm, db := newContractsIndexerWithScriptExecutor(t, contractsBootstrapHeight, scriptExecutor)
 
 	// Bootstrap block.
 	bootstrapHeader := unittest.BlockHeaderFixtureOnChain(flow.Testnet, unittest.WithHeaderHeight(contractsBootstrapHeight))
@@ -221,14 +219,11 @@ func TestContractsIndexer_MultipleContractsInOneBlock(t *testing.T) {
 		Events: []flow.Event{event1, event2},
 	})
 
-	id1 := fmt.Sprintf("A.%s.Alpha", addr1.Hex())
-	id2 := fmt.Sprintf("A.%s.Beta", addr2.Hex())
-
-	d1, err := store.ByContractID(id1)
+	d1, err := store.ByContract(addr1, "Alpha")
 	require.NoError(t, err)
 	assert.Equal(t, code1, d1.Code)
 
-	d2, err := store.ByContractID(id2)
+	d2, err := store.ByContract(addr2, "Beta")
 	require.NoError(t, err)
 	assert.Equal(t, code2, d2.Code)
 
@@ -250,7 +245,7 @@ func TestContractsIndexer_SameAccountCached(t *testing.T) {
 	hashB := access.CadenceCodeHash(codeB)
 
 	scriptExecutor := executionmock.NewScriptExecutor(t)
-	indexer, store, lm, db := newContractsIndexerWithScriptExecutor(t, flow.Testnet, contractsBootstrapHeight, scriptExecutor)
+	indexer, store, lm, db := newContractsIndexerWithScriptExecutor(t, contractsBootstrapHeight, scriptExecutor)
 
 	// Bootstrap block.
 	bootstrapHeader := unittest.BlockHeaderFixtureOnChain(flow.Testnet, unittest.WithHeaderHeight(contractsBootstrapHeight))
@@ -285,7 +280,7 @@ func TestContractsIndexer_ByAddress(t *testing.T) {
 	code2 := []byte("access(all) contract Bar {}")
 
 	scriptExecutor := executionmock.NewScriptExecutor(t)
-	indexer, store, lm, db := newContractsIndexerWithScriptExecutor(t, flow.Testnet, contractsBootstrapHeight, scriptExecutor)
+	indexer, store, lm, db := newContractsIndexerWithScriptExecutor(t, contractsBootstrapHeight, scriptExecutor)
 
 	// Bootstrap block.
 	bootstrapHeader := unittest.BlockHeaderFixtureOnChain(flow.Testnet, unittest.WithHeaderHeight(contractsBootstrapHeight))
@@ -316,14 +311,16 @@ func TestContractsIndexer_ByAddress(t *testing.T) {
 	require.NoError(t, err)
 	deps1 := collectContractPage(t, iter1, 10)
 	require.Len(t, deps1, 1)
-	assert.Equal(t, fmt.Sprintf("A.%s.Foo", addr1.Hex()), deps1[0].ContractID)
+	assert.Equal(t, addr1, deps1[0].Address)
+	assert.Equal(t, "Foo", deps1[0].ContractName)
 
 	// ByAddress(addr2) returns only Bar.
 	iter2, err := store.ByAddress(addr2, nil)
 	require.NoError(t, err)
 	deps2 := collectContractPage(t, iter2, 10)
 	require.Len(t, deps2, 1)
-	assert.Equal(t, fmt.Sprintf("A.%s.Bar", addr2.Hex()), deps2[0].ContractID)
+	assert.Equal(t, addr2, deps2[0].Address)
+	assert.Equal(t, "Bar", deps2[0].ContractName)
 }
 
 // ===== Backfill tests =====
@@ -343,7 +340,7 @@ func TestContractsIndexer_Backfill(t *testing.T) {
 
 	scriptExecutor := executionmock.NewScriptExecutor(t)
 	firstHeight := contractsBootstrapHeight
-	indexer, store, lm, db := newContractsIndexerWithScriptExecutor(t, flow.Testnet, firstHeight, scriptExecutor)
+	indexer, store, lm, db := newContractsIndexerWithScriptExecutor(t, firstHeight, scriptExecutor)
 
 	// Height 100 (firstHeight): bootstrap with no events. loadDeployedContracts is called.
 	header100 := unittest.BlockHeaderFixtureOnChain(flow.Testnet, unittest.WithHeaderHeight(firstHeight))
@@ -379,17 +376,15 @@ func TestContractsIndexer_Backfill(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, firstHeight+2, latest)
 
-	contractID := fmt.Sprintf("A.%s.%s", address.Hex(), contractName)
-
-	// ByContractID returns the latest (height 102) deployment.
-	d, err := store.ByContractID(contractID)
+	// ByContract returns the latest (height 102) deployment.
+	d, err := store.ByContract(address, contractName)
 	require.NoError(t, err)
 	assert.Equal(t, firstHeight+2, d.BlockHeight)
 	assert.Equal(t, codeV2, d.Code)
 	assert.Equal(t, updateTxID, d.TransactionID)
 
-	// DeploymentsByContractID returns both deployments ordered most recent first.
-	depIter, err := store.DeploymentsByContractID(contractID, nil)
+	// DeploymentsByContract returns both deployments ordered most recent first.
+	depIter, err := store.DeploymentsByContract(address, contractName, nil)
 	require.NoError(t, err)
 	deps := collectContractPage(t, depIter, 10)
 	require.Len(t, deps, 2)
@@ -416,7 +411,7 @@ func TestContractsIndexer_BackfillMultipleBlocks(t *testing.T) {
 
 	scriptExecutor := executionmock.NewScriptExecutor(t)
 	firstHeight := contractsBootstrapHeight
-	indexer, store, lm, db := newContractsIndexerWithScriptExecutor(t, flow.Testnet, firstHeight, scriptExecutor)
+	indexer, store, lm, db := newContractsIndexerWithScriptExecutor(t, firstHeight, scriptExecutor)
 
 	// Root block: no events, but loadDeployedContracts is called.
 	root := unittest.BlockHeaderFixtureOnChain(flow.Testnet, unittest.WithHeaderHeight(firstHeight))
@@ -497,25 +492,21 @@ func TestContractsIndexer_Bootstrap_PreExistingContracts(t *testing.T) {
 		Events: []flow.Event{alphaEvent},
 	})
 
-	alphaID := fmt.Sprintf("A.%s.Alpha", addr1.Hex())
-	betaID := fmt.Sprintf("A.%s.Beta", addr1.Hex())
-	gammaID := fmt.Sprintf("A.%s.Gamma", addr2.Hex())
-
 	// Alpha: real deployment from the event — not a placeholder.
-	alpha, err := store.ByContractID(alphaID)
+	alpha, err := store.ByContract(addr1, "Alpha")
 	require.NoError(t, err)
 	assert.Equal(t, codeAlpha, alpha.Code)
 	assert.Equal(t, contractsBootstrapHeight, alpha.BlockHeight)
 	assert.False(t, alpha.IsPlaceholder)
 
 	// Beta: placeholder from loadDeployedContracts.
-	beta, err := store.ByContractID(betaID)
+	beta, err := store.ByContract(addr1, "Beta")
 	require.NoError(t, err)
 	assert.Equal(t, codeBeta, beta.Code)
 	assert.True(t, beta.IsPlaceholder)
 
 	// Gamma: placeholder from loadDeployedContracts.
-	gamma, err := store.ByContractID(gammaID)
+	gamma, err := store.ByContract(addr2, "Gamma")
 	require.NoError(t, err)
 	assert.Equal(t, codeGamma, gamma.Code)
 	assert.True(t, gamma.IsPlaceholder)
@@ -526,12 +517,12 @@ func TestContractsIndexer_Bootstrap_PreExistingContracts(t *testing.T) {
 	assert.Len(t, collectContractPage(t, allIter, 10), 3)
 }
 
-// TestContractsIndexer_Bootstrap_SkipsDeletedContracts verifies that loadDeployedContracts
-// skips code registers whose value is empty (representing a contract deleted via
-// accounts.DeleteContract, which sets the code register to nil). Without this skip, the
-// code-register count exceeds the contract names register count and the verification step
-// returns a mismatch error.
-func TestContractsIndexer_Bootstrap_SkipsDeletedContracts(t *testing.T) {
+// TestContractsIndexer_Bootstrap_MarksDeletedContracts verifies that loadDeployedContracts loads
+// all code registers (including those with empty values representing deleted contracts) and marks
+// them as deleted if their name is absent from the contract names register. The contract names
+// register is the source of truth: contracts present in code registers but absent from the names
+// register are indexed with IsDeleted=true.
+func TestContractsIndexer_Bootstrap_MarksDeletedContracts(t *testing.T) {
 	t.Parallel()
 
 	addr := unittest.RandomAddressFixture()
@@ -571,30 +562,29 @@ func TestContractsIndexer_Bootstrap_SkipsDeletedContracts(t *testing.T) {
 		Events: []flow.Event{},
 	})
 
-	alphaID := fmt.Sprintf("A.%s.Alpha", addr.Hex())
-	betaID := fmt.Sprintf("A.%s.Beta", addr.Hex())
-	deletedID := fmt.Sprintf("A.%s.Deleted", addr.Hex())
-
 	// Alpha and Beta get placeholder deployments.
-	alpha, err := store.ByContractID(alphaID)
+	alpha, err := store.ByContract(addr, "Alpha")
 	require.NoError(t, err)
 	assert.Equal(t, codeAlpha, alpha.Code)
 	assert.True(t, alpha.IsPlaceholder)
+	assert.False(t, alpha.IsDeleted)
 
-	beta, err := store.ByContractID(betaID)
+	beta, err := store.ByContract(addr, "Beta")
 	require.NoError(t, err)
 	assert.Equal(t, codeBeta, beta.Code)
 	assert.True(t, beta.IsPlaceholder)
+	assert.False(t, beta.IsDeleted)
 
-	// Deleted contract is not indexed.
-	_, err = store.ByContractID(deletedID)
-	require.Error(t, err)
-	require.ErrorIs(t, err, storage.ErrNotFound)
+	// Deleted contract is indexed but marked as deleted.
+	deleted, err := store.ByContract(addr, "Deleted")
+	require.NoError(t, err)
+	assert.True(t, deleted.IsPlaceholder)
+	assert.True(t, deleted.IsDeleted)
 
-	// All() returns exactly the two live contracts.
+	// All() returns all three contracts (including deleted).
 	allIter, err := store.All(nil)
 	require.NoError(t, err)
-	assert.Len(t, collectContractPage(t, allIter, 10), 2)
+	assert.Len(t, collectContractPage(t, allIter, 10), 3)
 }
 
 // ===== Error and edge-case tests =====
@@ -605,7 +595,7 @@ func TestContractsIndexer_AlreadyIndexed(t *testing.T) {
 	t.Parallel()
 
 	scriptExecutor := executionmock.NewScriptExecutor(t)
-	indexer, _, lm, db := newContractsIndexerWithScriptExecutor(t, flow.Testnet, contractsBootstrapHeight, scriptExecutor)
+	indexer, _, lm, db := newContractsIndexerWithScriptExecutor(t, contractsBootstrapHeight, scriptExecutor)
 	header := unittest.BlockHeaderFixtureOnChain(flow.Testnet, unittest.WithHeaderHeight(contractsBootstrapHeight))
 
 	indexContractsBlock(t, indexer, lm, db, BlockData{Header: header, Events: []flow.Event{}})
@@ -623,7 +613,7 @@ func TestContractsIndexer_ContractRemoved(t *testing.T) {
 	address := unittest.RandomAddressFixture()
 	// collectDeployments errors for ContractRemoved before loadDeployedContracts runs,
 	// so no GetStorageSnapshot call is made — use nil executor.
-	indexer, _, lm, db := newContractsIndexerNilExecutor(t, flow.Testnet, contractsBootstrapHeight)
+	indexer, _, lm, db := newContractsIndexerNilExecutor(t, contractsBootstrapHeight)
 	header := unittest.BlockHeaderFixtureOnChain(flow.Testnet, unittest.WithHeaderHeight(contractsBootstrapHeight))
 
 	removedEvent := makeAccountContractRemovedEvent(t, address, "SomeContract", make([]byte, 32), 0, 0)
@@ -649,7 +639,7 @@ func TestContractsIndexer_CodeHashMismatch(t *testing.T) {
 	eventHash := access.CadenceCodeHash(eventCode)
 
 	scriptExecutor := executionmock.NewScriptExecutor(t)
-	indexer, _, lm, db := newContractsIndexerWithScriptExecutor(t, flow.Testnet, contractsBootstrapHeight, scriptExecutor)
+	indexer, _, lm, db := newContractsIndexerWithScriptExecutor(t, contractsBootstrapHeight, scriptExecutor)
 
 	// Bootstrap block.
 	bootstrapHeader := unittest.BlockHeaderFixtureOnChain(flow.Testnet, unittest.WithHeaderHeight(contractsBootstrapHeight))
@@ -678,7 +668,7 @@ func TestContractsIndexer_ScriptExecutorError(t *testing.T) {
 	scriptErr := fmt.Errorf("storage unavailable")
 
 	scriptExecutor := executionmock.NewScriptExecutor(t)
-	indexer, _, lm, db := newContractsIndexerWithScriptExecutor(t, flow.Testnet, contractsBootstrapHeight, scriptExecutor)
+	indexer, _, lm, db := newContractsIndexerWithScriptExecutor(t, contractsBootstrapHeight, scriptExecutor)
 
 	// Bootstrap block.
 	bootstrapHeader := unittest.BlockHeaderFixtureOnChain(flow.Testnet, unittest.WithHeaderHeight(contractsBootstrapHeight))
@@ -790,7 +780,6 @@ func (e fakeRegisterEntry) Value() (flow.RegisterValue, error) { return e.val, n
 //   - tests where collectDeployments errors before loadDeployedContracts runs.
 func newContractsIndexerNilExecutor(
 	t *testing.T,
-	chainID flow.ChainID,
 	firstHeight uint64,
 ) (*Contracts, storage.ContractDeploymentsIndexBootstrapper, storage.LockManager, storage.DB) {
 	pdb, dbDir := unittest.TempPebbleDB(t)
@@ -810,7 +799,6 @@ func newContractsIndexerNilExecutor(
 // with the given script executor. An empty fakeRegisters is used for bootstrap scanning.
 func newContractsIndexerWithScriptExecutor(
 	t *testing.T,
-	chainID flow.ChainID,
 	firstHeight uint64,
 	scriptExecutor *executionmock.ScriptExecutor,
 ) (*Contracts, storage.ContractDeploymentsIndexBootstrapper, storage.LockManager, storage.DB) {

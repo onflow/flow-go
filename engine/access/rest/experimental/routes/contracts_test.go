@@ -141,7 +141,7 @@ func buildExpectedDeploymentJSON(d *accessmodel.ContractDeployment) string {
 			"result": "/v1/transaction_results/%s"
 		}
 	}`,
-		d.ContractID,
+		accessmodel.ContractID(d.Address, d.ContractName),
 		d.Address.Hex(),
 		d.BlockHeight,
 		txID,
@@ -163,8 +163,8 @@ func TestGetContracts(t *testing.T) {
 	code2 := []byte("pub contract Second {}")
 
 	d1 := accessmodel.ContractDeployment{
-		ContractID:       "A.1234567890abcdef.First",
 		Address:          addr1,
+		ContractName:     "First",
 		BlockHeight:      1000,
 		TransactionID:    txID1,
 		TransactionIndex: 2,
@@ -173,8 +173,8 @@ func TestGetContracts(t *testing.T) {
 		CodeHash:         accessmodel.CadenceCodeHash(code1),
 	}
 	d2 := accessmodel.ContractDeployment{
-		ContractID:       "A.fedcba0987654321.Second",
 		Address:          addr2,
+		ContractName:     "Second",
 		BlockHeight:      999,
 		TransactionID:    txID2,
 		TransactionIndex: 0,
@@ -187,7 +187,8 @@ func TestGetContracts(t *testing.T) {
 		backend := extendedmock.NewAPI(t)
 
 		nextCursorVal := &accessmodel.ContractDeploymentsCursor{
-			ContractID:       d2.ContractID,
+			Address:          d2.Address,
+			ContractName:     d2.ContractName,
 			BlockHeight:      d2.BlockHeight,
 			TransactionIndex: d2.TransactionIndex,
 			EventIndex:       d2.EventIndex,
@@ -255,7 +256,8 @@ func TestGetContracts(t *testing.T) {
 		backend := extendedmock.NewAPI(t)
 
 		inputCursor := &accessmodel.ContractDeploymentsCursor{
-			ContractID:       d1.ContractID,
+			Address:          d1.Address,
+			ContractName:     d1.ContractName,
 			BlockHeight:      d1.BlockHeight,
 			TransactionIndex: d1.TransactionIndex,
 			EventIndex:       d1.EventIndex,
@@ -402,8 +404,8 @@ func TestGetContract(t *testing.T) {
 		backend := extendedmock.NewAPI(t)
 
 		d := &accessmodel.ContractDeployment{
-			ContractID:       contractID,
 			Address:          addr,
+			ContractName:     "MyContract",
 			BlockHeight:      1234,
 			TransactionID:    txID,
 			TransactionIndex: 5,
@@ -433,8 +435,8 @@ func TestGetContract(t *testing.T) {
 		backend := extendedmock.NewAPI(t)
 
 		d := &accessmodel.ContractDeployment{
-			ContractID:       contractID,
 			Address:          addr,
+			ContractName:     "MyContract",
 			BlockHeight:      1234,
 			TransactionID:    txID,
 			TransactionIndex: 5,
@@ -465,8 +467,8 @@ func TestGetContract(t *testing.T) {
 		backend := extendedmock.NewAPI(t)
 
 		d := &accessmodel.ContractDeployment{
-			ContractID:    contractID,
 			Address:       addr,
+			ContractName:  "MyContract",
 			Code:          code,
 			CodeHash:      codeHash,
 			IsPlaceholder: true,
@@ -554,8 +556,8 @@ func TestGetContractDeployments(t *testing.T) {
 	contractID := "A.1234567890abcdef.MyContract"
 
 	d1 := accessmodel.ContractDeployment{
-		ContractID:       contractID,
 		Address:          addr,
+		ContractName:     "MyContract",
 		BlockHeight:      2000,
 		TransactionID:    txID1,
 		TransactionIndex: 1,
@@ -564,8 +566,8 @@ func TestGetContractDeployments(t *testing.T) {
 		CodeHash:         accessmodel.CadenceCodeHash(code),
 	}
 	d2 := accessmodel.ContractDeployment{
-		ContractID:       contractID,
 		Address:          addr,
+		ContractName:     "MyContract",
 		BlockHeight:      1000,
 		TransactionID:    txID2,
 		TransactionIndex: 3,
@@ -577,9 +579,11 @@ func TestGetContractDeployments(t *testing.T) {
 	t.Run("happy path with next cursor", func(t *testing.T) {
 		backend := extendedmock.NewAPI(t)
 
-		// For DeploymentsByContractID cursors, ContractID is omitted from the REST cursor.
+		// For DeploymentsByContractID, the contract is identified by the URL; Address and
+		// ContractName are populated from the storage key but not used for resumption.
 		nextCursorVal := &accessmodel.ContractDeploymentsCursor{
-			ContractID:       contractID,
+			Address:          d2.Address,
+			ContractName:     d2.ContractName,
 			BlockHeight:      d2.BlockHeight,
 			TransactionIndex: d2.TransactionIndex,
 			EventIndex:       d2.EventIndex,
@@ -648,9 +652,10 @@ func TestGetContractDeployments(t *testing.T) {
 	t.Run("with cursor parameter", func(t *testing.T) {
 		backend := extendedmock.NewAPI(t)
 
-		// DeploymentsByContractID cursors omit ContractID in REST encoding (it comes from the URL).
+		// DeploymentsByContractID cursors include Address and ContractName from the storage key.
 		inputCursor := &accessmodel.ContractDeploymentsCursor{
-			ContractID:       "",
+			Address:          d1.Address,
+			ContractName:     d1.ContractName,
 			BlockHeight:      d1.BlockHeight,
 			TransactionIndex: d1.TransactionIndex,
 			EventIndex:       d1.EventIndex,
@@ -754,8 +759,8 @@ func TestGetContractsByAddress(t *testing.T) {
 	code := []byte("pub contract MyContract {}")
 
 	d1 := accessmodel.ContractDeployment{
-		ContractID:       "A." + address.Hex() + ".First",
 		Address:          address,
+		ContractName:     "First",
 		BlockHeight:      1500,
 		TransactionID:    txID1,
 		TransactionIndex: 0,
@@ -764,8 +769,8 @@ func TestGetContractsByAddress(t *testing.T) {
 		CodeHash:         accessmodel.CadenceCodeHash(code),
 	}
 	d2 := accessmodel.ContractDeployment{
-		ContractID:       "A." + address.Hex() + ".Second",
 		Address:          address,
+		ContractName:     "Second",
 		BlockHeight:      1400,
 		TransactionID:    txID2,
 		TransactionIndex: 1,
@@ -778,7 +783,8 @@ func TestGetContractsByAddress(t *testing.T) {
 		backend := extendedmock.NewAPI(t)
 
 		nextCursorVal := &accessmodel.ContractDeploymentsCursor{
-			ContractID:       d2.ContractID,
+			Address:          d2.Address,
+			ContractName:     d2.ContractName,
 			BlockHeight:      d2.BlockHeight,
 			TransactionIndex: d2.TransactionIndex,
 			EventIndex:       d2.EventIndex,
@@ -847,9 +853,10 @@ func TestGetContractsByAddress(t *testing.T) {
 	t.Run("with cursor parameter", func(t *testing.T) {
 		backend := extendedmock.NewAPI(t)
 
-		// ByAddress cursors include ContractID as the resume key.
+		// ByAddress cursors include Address and ContractName as the resume key.
 		inputCursor := &accessmodel.ContractDeploymentsCursor{
-			ContractID:       d1.ContractID,
+			Address:          d1.Address,
+			ContractName:     d1.ContractName,
 			BlockHeight:      d1.BlockHeight,
 			TransactionIndex: d1.TransactionIndex,
 			EventIndex:       d1.EventIndex,
