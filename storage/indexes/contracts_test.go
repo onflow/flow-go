@@ -1,7 +1,6 @@
 package indexes
 
 import (
-	"strings"
 	"testing"
 
 	"github.com/cockroachdb/pebble/v2"
@@ -64,14 +63,13 @@ func storeContractDeployments(
 func collectContractDeployments(
 	tb testing.TB,
 	idx *ContractDeploymentsIndex,
-	id string,
+	addr flow.Address,
+	name string,
 	limit uint32,
 	cursor *access.ContractDeploymentsCursor,
 	filter storage.IndexFilter[*access.ContractDeployment],
 ) ([]access.ContractDeployment, *access.ContractDeploymentsCursor) {
 	tb.Helper()
-	addr, name, err := access.ParseContractID(id)
-	require.NoError(tb, err)
 	iter, err := idx.DeploymentsByContract(addr, name, cursor)
 	require.NoError(tb, err)
 	collected, nextCursor, err := iterator.CollectResults(iter, limit, filter)
@@ -114,18 +112,23 @@ func collectContractsByAddress(
 	return collected, nextCursor
 }
 
+// assertDeployment asserts that actual matches all fields of expected.
+func assertDeployment(tb testing.TB, expected, actual access.ContractDeployment) {
+	tb.Helper()
+	assert.Equal(tb, expected.Address, actual.Address)
+	assert.Equal(tb, expected.ContractName, actual.ContractName)
+	assert.Equal(tb, expected.BlockHeight, actual.BlockHeight)
+	assert.Equal(tb, expected.TransactionID, actual.TransactionID)
+	assert.Equal(tb, expected.TransactionIndex, actual.TransactionIndex)
+	assert.Equal(tb, expected.EventIndex, actual.EventIndex)
+	assert.Equal(tb, expected.Code, actual.Code)
+	assert.Equal(tb, expected.CodeHash, actual.CodeHash)
+	assert.Equal(tb, expected.IsDeleted, actual.IsDeleted)
+	assert.Equal(tb, expected.IsPlaceholder, actual.IsPlaceholder)
+}
+
 // makeDeployment builds a minimal access.ContractDeployment for use in tests.
-func makeDeployment(contractID string, height uint64, txIndex, eventIndex uint32) access.ContractDeployment {
-	parts := strings.Split(contractID, ".")
-	var addr flow.Address
-	var name string
-	if len(parts) >= 3 {
-		parsed, err := flow.StringToAddress(parts[1])
-		if err == nil {
-			addr = parsed
-		}
-		name = parts[2]
-	}
+func makeDeployment(addr flow.Address, name string, height uint64, txIndex, eventIndex uint32) access.ContractDeployment {
 	fakeHash := unittest.IdentifierFixture()
 	return access.ContractDeployment{
 		ContractName:     name,
@@ -168,8 +171,7 @@ func TestContractDeployments_NewIndex(t *testing.T) {
 
 			_, err = NewContractDeploymentsIndex(storageDB)
 			require.Error(t, err)
-			assert.False(t, isNotBootstrapped(err),
-				"corrupted state should not return ErrNotBootstrapped")
+			assert.NotErrorIs(t, err, storage.ErrNotBootstrapped, "corrupted state should not return ErrNotBootstrapped")
 		})
 	})
 
@@ -183,11 +185,6 @@ func TestContractDeployments_NewIndex(t *testing.T) {
 			assert.Equal(t, uint64(5), idx2.LatestIndexedHeight())
 		})
 	})
-}
-
-// isNotBootstrapped is a helper to avoid importing errors in the test body.
-func isNotBootstrapped(err error) bool {
-	return err != nil && strings.Contains(err.Error(), storage.ErrNotBootstrapped.Error())
 }
 
 // ----------------------------------------------------------------------------
@@ -215,30 +212,51 @@ func TestContractDeployments_Bootstrap(t *testing.T) {
 
 	t.Run("bootstrap with initial deployments stores them", func(t *testing.T) {
 		t.Parallel()
-		d := makeDeployment("A.1234567890abcdef.MyContract", 5, 0, 0)
+		d := makeDeployment(unittest.RandomAddressFixture(), "MyContract", 5, 0, 0)
 		RunWithBootstrappedContractDeploymentsIndex(t, 5, []access.ContractDeployment{d}, func(_ storage.DB, _ storage.LockManager, idx *ContractDeploymentsIndex) {
 			result, err := idx.ByContract(d.Address, d.ContractName)
 			require.NoError(t, err)
-			assert.Equal(t, access.ContractID(d.Address, d.ContractName), access.ContractID(result.Address, result.ContractName))
-			assert.Equal(t, d.BlockHeight, result.BlockHeight)
-			assert.Equal(t, d.TransactionIndex, result.TransactionIndex)
-			assert.Equal(t, d.EventIndex, result.EventIndex)
+			assertDeployment(t, d, result)
 		})
 	})
 
-	t.Run("short contractID returns error during bootstrap", func(t *testing.T) {
+	t.Run("empty contract name returns error during bootstrap", func(t *testing.T) {
 		t.Parallel()
 		unittest.RunWithPebbleDB(t, func(db *pebble.DB) {
 			storageDB := pebbleimpl.ToDB(db)
 			lm := storage.NewTestingLockManager()
 
-			shortID := access.ContractDeployment{
+			deployment := access.ContractDeployment{
+				Address:     unittest.RandomAddressFixture(),
+				ContractName: "",
 				BlockHeight: 1,
 			}
 
 			err := unittest.WithLock(t, lm, storage.LockIndexContractDeployments, func(lctx lockctx.Context) error {
 				return storageDB.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-					_, err := BootstrapContractDeployments(lctx, rw, storageDB, 1, []access.ContractDeployment{shortID})
+					_, err := BootstrapContractDeployments(lctx, rw, storageDB, 1, []access.ContractDeployment{deployment})
+					return err
+				})
+			})
+			require.Error(t, err)
+		})
+	})
+
+	t.Run("contract name containing dot returns error during bootstrap", func(t *testing.T) {
+		t.Parallel()
+		unittest.RunWithPebbleDB(t, func(db *pebble.DB) {
+			storageDB := pebbleimpl.ToDB(db)
+			lm := storage.NewTestingLockManager()
+
+			deployment := access.ContractDeployment{
+				Address:      unittest.RandomAddressFixture(),
+				ContractName: "My.Contract",
+				BlockHeight:  1,
+			}
+
+			err := unittest.WithLock(t, lm, storage.LockIndexContractDeployments, func(lctx lockctx.Context) error {
+				return storageDB.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+					_, err := BootstrapContractDeployments(lctx, rw, storageDB, 1, []access.ContractDeployment{deployment})
 					return err
 				})
 			})
@@ -270,16 +288,16 @@ func TestContractDeployments_ByContract(t *testing.T) {
 	t.Run("not found returns ErrNotFound", func(t *testing.T) {
 		t.Parallel()
 		RunWithBootstrappedContractDeploymentsIndex(t, 1, nil, func(_ storage.DB, _ storage.LockManager, idx *ContractDeploymentsIndex) {
-			_, err := idx.ByContract(flow.HexToAddress("1234567890abcdef"), "NoSuchContract")
+			_, err := idx.ByContract(unittest.RandomAddressFixture(), "NoSuchContract")
 			require.ErrorIs(t, err, storage.ErrNotFound)
 		})
 	})
 
 	t.Run("returns most recent deployment when multiple exist", func(t *testing.T) {
 		t.Parallel()
-		contractID := "A.1234567890abcdef.MyContract"
-		d1 := makeDeployment(contractID, 2, 0, 0)
-		d2 := makeDeployment(contractID, 3, 0, 0)
+		addr := unittest.RandomAddressFixture()
+		d1 := makeDeployment(addr, "MyContract", 2, 0, 0)
+		d2 := makeDeployment(addr, "MyContract", 3, 0, 0)
 
 		RunWithBootstrappedContractDeploymentsIndex(t, 1, nil, func(_ storage.DB, lm storage.LockManager, idx *ContractDeploymentsIndex) {
 			require.NoError(t, storeContractDeployments(t, lm, idx, 2, []access.ContractDeployment{d1}))
@@ -294,19 +312,14 @@ func TestContractDeployments_ByContract(t *testing.T) {
 
 	t.Run("returns single deployment correctly", func(t *testing.T) {
 		t.Parallel()
-		contractID := "A.1234567890abcdef.MyContract"
-		d := makeDeployment(contractID, 2, 1, 2)
+		d := makeDeployment(unittest.RandomAddressFixture(), "MyContract", 2, 1, 2)
 
 		RunWithBootstrappedContractDeploymentsIndex(t, 1, nil, func(_ storage.DB, lm storage.LockManager, idx *ContractDeploymentsIndex) {
 			require.NoError(t, storeContractDeployments(t, lm, idx, 2, []access.ContractDeployment{d}))
 
 			result, err := idx.ByContract(d.Address, d.ContractName)
 			require.NoError(t, err)
-			assert.Equal(t, contractID, access.ContractID(result.Address, result.ContractName))
-			assert.Equal(t, uint64(2), result.BlockHeight)
-			assert.Equal(t, uint32(1), result.TransactionIndex)
-			assert.Equal(t, uint32(2), result.EventIndex)
-			assert.Equal(t, d.TransactionID, result.TransactionID)
+			assertDeployment(t, d, result)
 		})
 	})
 }
@@ -321,7 +334,7 @@ func TestContractDeployments_DeploymentsByContractID(t *testing.T) {
 	t.Run("no deployments for contract returns empty results", func(t *testing.T) {
 		t.Parallel()
 		RunWithBootstrappedContractDeploymentsIndex(t, 1, nil, func(_ storage.DB, _ storage.LockManager, idx *ContractDeploymentsIndex) {
-			collected, nextCursor := collectContractDeployments(t, idx, "A.1234567890abcdef.NoSuchContract", 10, nil, nil)
+			collected, nextCursor := collectContractDeployments(t, idx, unittest.RandomAddressFixture(), "NoSuchContract", 10, nil, nil)
 			assert.Empty(t, collected)
 			assert.Nil(t, nextCursor)
 		})
@@ -329,39 +342,40 @@ func TestContractDeployments_DeploymentsByContractID(t *testing.T) {
 
 	t.Run("first page returns deployments in descending order", func(t *testing.T) {
 		t.Parallel()
-		contractID := "A.1234567890abcdef.MyContract"
-		d1 := makeDeployment(contractID, 2, 0, 0)
-		d2 := makeDeployment(contractID, 3, 0, 0)
-		d3 := makeDeployment(contractID, 4, 0, 0)
+		addr := unittest.RandomAddressFixture()
+		d1 := makeDeployment(addr, "MyContract", 2, 1, 4)
+		d2 := makeDeployment(addr, "MyContract", 3, 2, 5)
+		d3 := makeDeployment(addr, "MyContract", 4, 3, 6)
 
 		RunWithBootstrappedContractDeploymentsIndex(t, 1, nil, func(_ storage.DB, lm storage.LockManager, idx *ContractDeploymentsIndex) {
 			require.NoError(t, storeContractDeployments(t, lm, idx, 2, []access.ContractDeployment{d1}))
 			require.NoError(t, storeContractDeployments(t, lm, idx, 3, []access.ContractDeployment{d2}))
 			require.NoError(t, storeContractDeployments(t, lm, idx, 4, []access.ContractDeployment{d3}))
 
-			collected, nextCursor := collectContractDeployments(t, idx, contractID, 10, nil, nil)
+			collected, nextCursor := collectContractDeployments(t, idx, addr, "MyContract", 10, nil, nil)
 			require.Len(t, collected, 3)
 			// Descending order: height 4, 3, 2
-			assert.Equal(t, uint64(4), collected[0].BlockHeight)
-			assert.Equal(t, uint64(3), collected[1].BlockHeight)
-			assert.Equal(t, uint64(2), collected[2].BlockHeight)
+			assertDeployment(t, d3, collected[0])
+			assertDeployment(t, d2, collected[1])
+			assertDeployment(t, d1, collected[2])
 			assert.Nil(t, nextCursor)
 		})
 	})
 
 	t.Run("has-more sets NextCursor pointing to first item of next page", func(t *testing.T) {
 		t.Parallel()
-		contractID := "A.1234567890abcdef.MyContract"
+		addr := unittest.RandomAddressFixture()
+		name := "MyContract"
 
 		RunWithBootstrappedContractDeploymentsIndex(t, 1, nil, func(_ storage.DB, lm storage.LockManager, idx *ContractDeploymentsIndex) {
 			// Store 3 deployments at heights 2, 3, 4
 			for h := uint64(2); h <= 4; h++ {
-				d := makeDeployment(contractID, h, 0, 0)
+				d := makeDeployment(addr, name, h, 0, 0)
 				require.NoError(t, storeContractDeployments(t, lm, idx, h, []access.ContractDeployment{d}))
 			}
 
 			// Request page of 2 when 3 exist: returns [h=4, h=3], cursor points to h=2 (next page).
-			collected, nextCursor := collectContractDeployments(t, idx, contractID, 2, nil, nil)
+			collected, nextCursor := collectContractDeployments(t, idx, addr, name, 2, nil, nil)
 			require.Len(t, collected, 2)
 			require.NotNil(t, nextCursor)
 			assert.Equal(t, uint64(2), nextCursor.BlockHeight)
@@ -370,17 +384,18 @@ func TestContractDeployments_DeploymentsByContractID(t *testing.T) {
 
 	t.Run("with cursor resumes from cursor position (inclusive)", func(t *testing.T) {
 		t.Parallel()
-		contractID := "A.1234567890abcdef.MyContract"
+		addr := unittest.RandomAddressFixture()
+		name := "MyContract"
 
 		RunWithBootstrappedContractDeploymentsIndex(t, 1, nil, func(_ storage.DB, lm storage.LockManager, idx *ContractDeploymentsIndex) {
 			// Store 4 deployments at heights 2-5
 			for h := uint64(2); h <= 5; h++ {
-				d := makeDeployment(contractID, h, 0, 0)
+				d := makeDeployment(addr, name, h, 0, 0)
 				require.NoError(t, storeContractDeployments(t, lm, idx, h, []access.ContractDeployment{d}))
 			}
 
 			// First page: limit=2, no cursor → [h=5, h=4], cursor → h=3
-			collected1, nextCursor := collectContractDeployments(t, idx, contractID, 2, nil, nil)
+			collected1, nextCursor := collectContractDeployments(t, idx, addr, name, 2, nil, nil)
 			require.Len(t, collected1, 2)
 			require.NotNil(t, nextCursor)
 
@@ -389,7 +404,7 @@ func TestContractDeployments_DeploymentsByContractID(t *testing.T) {
 			require.Equal(t, uint32(0), nextCursor.EventIndex)
 
 			// Second page: resume from cursor → [h=3, h=2]
-			collected2, _ := collectContractDeployments(t, idx, contractID, 2, nextCursor, nil)
+			collected2, _ := collectContractDeployments(t, idx, addr, name, 2, nextCursor, nil)
 			require.Len(t, collected2, 2)
 
 			// Heights across both pages must be distinct and descending
@@ -420,18 +435,15 @@ func TestContractDeployments_All(t *testing.T) {
 		})
 	})
 
-	t.Run("returns latest per contract in ascending contract ID order", func(t *testing.T) {
+	t.Run("returns latest per contract in ascending address/contract name order", func(t *testing.T) {
 		t.Parallel()
-		// Use contractIDs with different names so lexicographic order is predictable
-		contractA := "A.1234567890abcdef.AContract"
-		contractB := "A.1234567890abcdef.BContract"
-		contractC := "A.1234567890abcdef.CContract"
+		addr := unittest.RandomAddressFixture()
 
 		RunWithBootstrappedContractDeploymentsIndex(t, 1, nil, func(_ storage.DB, lm storage.LockManager, idx *ContractDeploymentsIndex) {
-			dA1 := makeDeployment(contractA, 2, 0, 0)
-			dA2 := makeDeployment(contractA, 3, 0, 0) // later update
-			dB := makeDeployment(contractB, 2, 1, 0)
-			dC := makeDeployment(contractC, 2, 2, 0)
+			dA1 := makeDeployment(addr, "AContract", 2, 0, 0)
+			dA2 := makeDeployment(addr, "AContract", 3, 0, 0) // later update
+			dB := makeDeployment(addr, "BContract", 2, 1, 0)
+			dC := makeDeployment(addr, "CContract", 2, 2, 0)
 
 			require.NoError(t, storeContractDeployments(t, lm, idx, 2, []access.ContractDeployment{dA1, dB, dC}))
 			require.NoError(t, storeContractDeployments(t, lm, idx, 3, []access.ContractDeployment{dA2}))
@@ -439,26 +451,21 @@ func TestContractDeployments_All(t *testing.T) {
 			collected, _ := collectAllContracts(t, idx, 10, nil, nil)
 			require.Len(t, collected, 3)
 
-			// Ascending contractID order
-			assert.Equal(t, contractA, access.ContractID(collected[0].Address, collected[0].ContractName))
-			assert.Equal(t, contractB, access.ContractID(collected[1].Address, collected[1].ContractName))
-			assert.Equal(t, contractC, access.ContractID(collected[2].Address, collected[2].ContractName))
-
-			// contractA shows the most recent deployment (height 3)
-			assert.Equal(t, uint64(3), collected[0].BlockHeight)
+			// Ascending contractID order; contractA shows the most recent deployment (dA2)
+			assertDeployment(t, dA2, collected[0])
+			assertDeployment(t, dB, collected[1])
+			assertDeployment(t, dC, collected[2])
 		})
 	})
 
 	t.Run("has-more sets NextCursor pointing to first item of next page", func(t *testing.T) {
 		t.Parallel()
-		contractA := "A.1234567890abcdef.AContract"
-		contractB := "A.1234567890abcdef.BContract"
-		contractC := "A.1234567890abcdef.CContract"
+		addr := unittest.RandomAddressFixture()
 
 		RunWithBootstrappedContractDeploymentsIndex(t, 1, nil, func(_ storage.DB, lm storage.LockManager, idx *ContractDeploymentsIndex) {
-			dA := makeDeployment(contractA, 2, 0, 0)
-			dB := makeDeployment(contractB, 2, 1, 0)
-			dC := makeDeployment(contractC, 2, 2, 0)
+			dA := makeDeployment(addr, "AContract", 2, 0, 0)
+			dB := makeDeployment(addr, "BContract", 2, 1, 0)
+			dC := makeDeployment(addr, "CContract", 2, 2, 0)
 			require.NoError(t, storeContractDeployments(t, lm, idx, 2, []access.ContractDeployment{dA, dB, dC}))
 
 			// limit=2, 3 exist: returns [A, B], cursor → C (first of next page)
@@ -472,16 +479,13 @@ func TestContractDeployments_All(t *testing.T) {
 
 	t.Run("with cursor resumes from cursor position (inclusive)", func(t *testing.T) {
 		t.Parallel()
-		contractA := "A.1234567890abcdef.AContract"
-		contractB := "A.1234567890abcdef.BContract"
-		contractC := "A.1234567890abcdef.CContract"
-		contractD := "A.1234567890abcdef.DContract"
+		addr := unittest.RandomAddressFixture()
 
 		RunWithBootstrappedContractDeploymentsIndex(t, 1, nil, func(_ storage.DB, lm storage.LockManager, idx *ContractDeploymentsIndex) {
-			dA := makeDeployment(contractA, 2, 0, 0)
-			dB := makeDeployment(contractB, 2, 1, 0)
-			dC := makeDeployment(contractC, 2, 2, 0)
-			dD := makeDeployment(contractD, 2, 3, 0)
+			dA := makeDeployment(addr, "AContract", 2, 0, 0)
+			dB := makeDeployment(addr, "BContract", 2, 1, 0)
+			dC := makeDeployment(addr, "CContract", 2, 2, 0)
+			dD := makeDeployment(addr, "DContract", 2, 3, 0)
 			require.NoError(t, storeContractDeployments(t, lm, idx, 2, []access.ContractDeployment{dA, dB, dC, dD}))
 
 			// First page: [A, B], cursor → C
@@ -493,34 +497,33 @@ func TestContractDeployments_All(t *testing.T) {
 			collected2, _ := collectAllContracts(t, idx, 2, nextCursor, nil)
 			require.Len(t, collected2, 2)
 
-			ids := []string{
-				access.ContractID(collected1[0].Address, collected1[0].ContractName),
-				access.ContractID(collected1[1].Address, collected1[1].ContractName),
-				access.ContractID(collected2[0].Address, collected2[0].ContractName),
-				access.ContractID(collected2[1].Address, collected2[1].ContractName),
+			names := []string{
+				collected1[0].ContractName,
+				collected1[1].ContractName,
+				collected2[0].ContractName,
+				collected2[1].ContractName,
 			}
-			assert.Equal(t, []string{contractA, contractB, contractC, contractD}, ids)
+			assert.Equal(t, []string{"AContract", "BContract", "CContract", "DContract"}, names)
 		})
 	})
 
 	t.Run("filter applied to results", func(t *testing.T) {
 		t.Parallel()
-		contractA := "A.1234567890abcdef.AContract"
-		contractB := "A.1234567890abcdef.BContract"
+		addr := unittest.RandomAddressFixture()
 
 		RunWithBootstrappedContractDeploymentsIndex(t, 1, nil, func(_ storage.DB, lm storage.LockManager, idx *ContractDeploymentsIndex) {
-			dA := makeDeployment(contractA, 2, 0, 0)
-			dB := makeDeployment(contractB, 2, 1, 0)
+			dA := makeDeployment(addr, "AContract", 2, 0, 0)
+			dB := makeDeployment(addr, "BContract", 2, 1, 0)
 			require.NoError(t, storeContractDeployments(t, lm, idx, 2, []access.ContractDeployment{dA, dB}))
 
-			// Filter that only accepts contractA
+			// Filter that only accepts AContract
 			filter := func(d *access.ContractDeployment) bool {
-				return access.ContractID(d.Address, d.ContractName) == contractA
+				return d.Address == dA.Address && d.ContractName == dA.ContractName
 			}
 
 			collected, _ := collectAllContracts(t, idx, 10, nil, filter)
 			require.Len(t, collected, 1)
-			assert.Equal(t, contractA, access.ContractID(collected[0].Address, collected[0].ContractName))
+			assertDeployment(t, dA, collected[0])
 		})
 	})
 }
@@ -534,37 +537,26 @@ func TestContractDeployments_ByAddress(t *testing.T) {
 
 	t.Run("returns only contracts for that address", func(t *testing.T) {
 		t.Parallel()
-		// Two different address hex values
-		addrHex1 := "1234567890abcdef"
-		addrHex2 := "fedcba0987654321"
-
-		contractA := "A." + addrHex1 + ".ContractA"
-		contractB := "A." + addrHex1 + ".ContractB"
-		contractC := "A." + addrHex2 + ".ContractC"
-
-		addr1, err := flow.StringToAddress(addrHex1)
-		require.NoError(t, err)
-		addr2, err := flow.StringToAddress(addrHex2)
-		require.NoError(t, err)
+		addr1 := unittest.RandomAddressFixture()
+		addr2 := unittest.RandomAddressFixture()
 
 		RunWithBootstrappedContractDeploymentsIndex(t, 1, nil, func(_ storage.DB, lm storage.LockManager, idx *ContractDeploymentsIndex) {
-			dA := makeDeployment(contractA, 2, 0, 0)
-			dB := makeDeployment(contractB, 2, 1, 0)
-			dC := makeDeployment(contractC, 2, 2, 0)
+			dA := makeDeployment(addr1, "ContractA", 2, 0, 0)
+			dB := makeDeployment(addr1, "ContractB", 2, 1, 0)
+			dC := makeDeployment(addr2, "ContractC", 2, 2, 0)
 			require.NoError(t, storeContractDeployments(t, lm, idx, 2, []access.ContractDeployment{dA, dB, dC}))
 
 			// Query addr1 - should get ContractA and ContractB only
 			collected1, _ := collectContractsByAddress(t, idx, addr1, 10, nil, nil)
 			require.Len(t, collected1, 2)
 			for _, d := range collected1 {
-				assert.Equal(t, addr1, d.Address,
-					"deployment %s should belong to addr1", access.ContractID(d.Address, d.ContractName))
+				assert.Equal(t, addr1, d.Address, "deployment %s should belong to addr1", d.ContractName)
 			}
 
 			// Query addr2 - should get ContractC only
 			collected2, _ := collectContractsByAddress(t, idx, addr2, 10, nil, nil)
 			require.Len(t, collected2, 1)
-			assert.Equal(t, contractC, access.ContractID(collected2[0].Address, collected2[0].ContractName))
+			assertDeployment(t, dC, collected2[0])
 		})
 	})
 
@@ -580,18 +572,12 @@ func TestContractDeployments_ByAddress(t *testing.T) {
 
 	t.Run("has-more sets NextCursor pointing to first item of next page", func(t *testing.T) {
 		t.Parallel()
-		addrHex := "1234567890abcdef"
-		contractA := "A." + addrHex + ".ContractA"
-		contractB := "A." + addrHex + ".ContractB"
-		contractC := "A." + addrHex + ".ContractC"
-
-		addr, err := flow.StringToAddress(addrHex)
-		require.NoError(t, err)
+		addr := unittest.RandomAddressFixture()
 
 		RunWithBootstrappedContractDeploymentsIndex(t, 1, nil, func(_ storage.DB, lm storage.LockManager, idx *ContractDeploymentsIndex) {
-			dA := makeDeployment(contractA, 2, 0, 0)
-			dB := makeDeployment(contractB, 2, 1, 0)
-			dC := makeDeployment(contractC, 2, 2, 0)
+			dA := makeDeployment(addr, "ContractA", 2, 0, 0)
+			dB := makeDeployment(addr, "ContractB", 2, 1, 0)
+			dC := makeDeployment(addr, "ContractC", 2, 2, 0)
 			require.NoError(t, storeContractDeployments(t, lm, idx, 2, []access.ContractDeployment{dA, dB, dC}))
 
 			// limit=2, 3 exist: returns [A, B], cursor → C (first of next page)
@@ -605,20 +591,13 @@ func TestContractDeployments_ByAddress(t *testing.T) {
 
 	t.Run("with cursor resumes from cursor position (inclusive)", func(t *testing.T) {
 		t.Parallel()
-		addrHex := "1234567890abcdef"
-		contractA := "A." + addrHex + ".ContractA"
-		contractB := "A." + addrHex + ".ContractB"
-		contractC := "A." + addrHex + ".ContractC"
-		contractD := "A." + addrHex + ".ContractD"
-
-		addr, err := flow.StringToAddress(addrHex)
-		require.NoError(t, err)
+		addr := unittest.RandomAddressFixture()
 
 		RunWithBootstrappedContractDeploymentsIndex(t, 1, nil, func(_ storage.DB, lm storage.LockManager, idx *ContractDeploymentsIndex) {
-			dA := makeDeployment(contractA, 2, 0, 0)
-			dB := makeDeployment(contractB, 2, 1, 0)
-			dC := makeDeployment(contractC, 2, 2, 0)
-			dD := makeDeployment(contractD, 2, 3, 0)
+			dA := makeDeployment(addr, "ContractA", 2, 0, 0)
+			dB := makeDeployment(addr, "ContractB", 2, 1, 0)
+			dC := makeDeployment(addr, "ContractC", 2, 2, 0)
+			dD := makeDeployment(addr, "ContractD", 2, 3, 0)
 			require.NoError(t, storeContractDeployments(t, lm, idx, 2, []access.ContractDeployment{dA, dB, dC, dD}))
 
 			// First page: [A, B], cursor → C
@@ -630,13 +609,13 @@ func TestContractDeployments_ByAddress(t *testing.T) {
 			collected2, _ := collectContractsByAddress(t, idx, addr, 2, nextCursor, nil)
 			require.Len(t, collected2, 2)
 
-			ids := []string{
-				access.ContractID(collected1[0].Address, collected1[0].ContractName),
-				access.ContractID(collected1[1].Address, collected1[1].ContractName),
-				access.ContractID(collected2[0].Address, collected2[0].ContractName),
-				access.ContractID(collected2[1].Address, collected2[1].ContractName),
+			names := []string{
+				collected1[0].ContractName,
+				collected1[1].ContractName,
+				collected2[0].ContractName,
+				collected2[1].ContractName,
 			}
-			assert.Equal(t, []string{contractA, contractB, contractC, contractD}, ids)
+			assert.Equal(t, []string{"ContractA", "ContractB", "ContractC", "ContractD"}, names)
 		})
 	})
 }
@@ -650,11 +629,11 @@ func TestContractDeployments_Store(t *testing.T) {
 
 	t.Run("stores consecutive heights successfully", func(t *testing.T) {
 		t.Parallel()
-		contractID := "A.1234567890abcdef.MyContract"
+		addr := unittest.RandomAddressFixture()
 
 		RunWithBootstrappedContractDeploymentsIndex(t, 1, nil, func(_ storage.DB, lm storage.LockManager, idx *ContractDeploymentsIndex) {
-			d2 := makeDeployment(contractID, 2, 0, 0)
-			d3 := makeDeployment(contractID, 3, 0, 0)
+			d2 := makeDeployment(addr, "MyContract", 2, 0, 0)
+			d3 := makeDeployment(addr, "MyContract", 3, 0, 0)
 
 			require.NoError(t, storeContractDeployments(t, lm, idx, 2, []access.ContractDeployment{d2}))
 			assert.Equal(t, uint64(2), idx.LatestIndexedHeight())
@@ -688,7 +667,22 @@ func TestContractDeployments_Store(t *testing.T) {
 		t.Parallel()
 		RunWithBootstrappedContractDeploymentsIndex(t, 1, nil, func(_ storage.DB, lm storage.LockManager, idx *ContractDeploymentsIndex) {
 			bad := access.ContractDeployment{
-				BlockHeight: 2,
+				Address:      unittest.RandomAddressFixture(),
+				ContractName: "",
+				BlockHeight:  2,
+			}
+			err := storeContractDeployments(t, lm, idx, 2, []access.ContractDeployment{bad})
+			require.Error(t, err)
+		})
+	})
+
+	t.Run("contract name containing dot in batch returns error", func(t *testing.T) {
+		t.Parallel()
+		RunWithBootstrappedContractDeploymentsIndex(t, 1, nil, func(_ storage.DB, lm storage.LockManager, idx *ContractDeploymentsIndex) {
+			bad := access.ContractDeployment{
+				Address:      unittest.RandomAddressFixture(),
+				ContractName: "My.Contract",
+				BlockHeight:  2,
 			}
 			err := storeContractDeployments(t, lm, idx, 2, []access.ContractDeployment{bad})
 			require.Error(t, err)
@@ -737,11 +731,12 @@ func TestContractDeployments_Store(t *testing.T) {
 func TestContractDeployments_IsDeleted(t *testing.T) {
 	t.Parallel()
 
-	contractID := "A.1234567890abcdef.MyContract"
+	addr := unittest.RandomAddressFixture()
+	name := "MyContract"
 
 	t.Run("IsDeleted=true is persisted and returned by ByContract", func(t *testing.T) {
 		t.Parallel()
-		d := makeDeployment(contractID, 2, 0, 0)
+		d := makeDeployment(addr, name, 2, 0, 0)
 		d.IsDeleted = true
 
 		RunWithBootstrappedContractDeploymentsIndex(t, 1, nil, func(_ storage.DB, lm storage.LockManager, idx *ContractDeploymentsIndex) {
@@ -749,13 +744,13 @@ func TestContractDeployments_IsDeleted(t *testing.T) {
 
 			result, err := idx.ByContract(d.Address, d.ContractName)
 			require.NoError(t, err)
-			assert.True(t, result.IsDeleted)
+			assertDeployment(t, d, result)
 		})
 	})
 
 	t.Run("IsDeleted=false is persisted and returned by ByContract", func(t *testing.T) {
 		t.Parallel()
-		d := makeDeployment(contractID, 2, 0, 0)
+		d := makeDeployment(addr, name, 2, 0, 0)
 		d.IsDeleted = false
 
 		RunWithBootstrappedContractDeploymentsIndex(t, 1, nil, func(_ storage.DB, lm storage.LockManager, idx *ContractDeploymentsIndex) {
@@ -763,14 +758,14 @@ func TestContractDeployments_IsDeleted(t *testing.T) {
 
 			result, err := idx.ByContract(d.Address, d.ContractName)
 			require.NoError(t, err)
-			assert.False(t, result.IsDeleted)
+			assertDeployment(t, d, result)
 		})
 	})
 
 	t.Run("ByContract returns deleted deployment as most recent", func(t *testing.T) {
 		t.Parallel()
-		d1 := makeDeployment(contractID, 2, 0, 0) // initial deploy
-		d2 := makeDeployment(contractID, 3, 0, 0) // deletion
+		d1 := makeDeployment(addr, name, 2, 0, 0) // initial deploy
+		d2 := makeDeployment(addr, name, 3, 0, 0) // deletion
 		d2.IsDeleted = true
 
 		RunWithBootstrappedContractDeploymentsIndex(t, 1, nil, func(_ storage.DB, lm storage.LockManager, idx *ContractDeploymentsIndex) {
@@ -779,17 +774,16 @@ func TestContractDeployments_IsDeleted(t *testing.T) {
 
 			result, err := idx.ByContract(d2.Address, d2.ContractName)
 			require.NoError(t, err)
-			assert.Equal(t, uint64(3), result.BlockHeight)
-			assert.True(t, result.IsDeleted)
+			assertDeployment(t, d2, result)
 		})
 	})
 
 	t.Run("IsDeleted is preserved across deploy-delete-redeploy sequence", func(t *testing.T) {
 		t.Parallel()
-		d1 := makeDeployment(contractID, 2, 0, 0) // initial deploy
-		d2 := makeDeployment(contractID, 3, 0, 0) // deletion
+		d1 := makeDeployment(addr, name, 2, 0, 0) // initial deploy
+		d2 := makeDeployment(addr, name, 3, 0, 0) // deletion
 		d2.IsDeleted = true
-		d3 := makeDeployment(contractID, 4, 0, 0) // redeploy
+		d3 := makeDeployment(addr, name, 4, 0, 0) // redeploy
 
 		RunWithBootstrappedContractDeploymentsIndex(t, 1, nil, func(_ storage.DB, lm storage.LockManager, idx *ContractDeploymentsIndex) {
 			require.NoError(t, storeContractDeployments(t, lm, idx, 2, []access.ContractDeployment{d1}))
@@ -799,33 +793,32 @@ func TestContractDeployments_IsDeleted(t *testing.T) {
 			// Most recent is the redeploy at h=4, not deleted
 			result, err := idx.ByContract(d3.Address, d3.ContractName)
 			require.NoError(t, err)
-			assert.Equal(t, uint64(4), result.BlockHeight)
-			assert.False(t, result.IsDeleted)
+			assertDeployment(t, d3, result)
 
 			// Full history shows the deletion at h=3
-			collected, _ := collectContractDeployments(t, idx, contractID, 10, nil, nil)
+			collected, _ := collectContractDeployments(t, idx, addr, name, 10, nil, nil)
 			require.Len(t, collected, 3)
-			assert.False(t, collected[0].IsDeleted) // h=4
-			assert.True(t, collected[1].IsDeleted)  // h=3 (deleted)
-			assert.False(t, collected[2].IsDeleted) // h=2
+			assertDeployment(t, d3, collected[0]) // h=4
+			assertDeployment(t, d2, collected[1]) // h=3 (deleted)
+			assertDeployment(t, d1, collected[2]) // h=2
 		})
 	})
 
 	t.Run("IsDeleted=true persisted in bootstrap deployments", func(t *testing.T) {
 		t.Parallel()
-		d := makeDeployment(contractID, 5, 0, 0)
+		d := makeDeployment(addr, name, 5, 0, 0)
 		d.IsDeleted = true
 
 		RunWithBootstrappedContractDeploymentsIndex(t, 5, []access.ContractDeployment{d}, func(_ storage.DB, _ storage.LockManager, idx *ContractDeploymentsIndex) {
 			result, err := idx.ByContract(d.Address, d.ContractName)
 			require.NoError(t, err)
-			assert.True(t, result.IsDeleted)
+			assertDeployment(t, d, result)
 		})
 	})
 
 	t.Run("All returns deleted deployments (filtering is at backend layer)", func(t *testing.T) {
 		t.Parallel()
-		d := makeDeployment(contractID, 2, 0, 0)
+		d := makeDeployment(addr, name, 2, 0, 0)
 		d.IsDeleted = true
 
 		RunWithBootstrappedContractDeploymentsIndex(t, 1, nil, func(_ storage.DB, lm storage.LockManager, idx *ContractDeploymentsIndex) {
@@ -833,13 +826,13 @@ func TestContractDeployments_IsDeleted(t *testing.T) {
 
 			collected, _ := collectAllContracts(t, idx, 10, nil, nil)
 			require.Len(t, collected, 1)
-			assert.True(t, collected[0].IsDeleted)
+			assertDeployment(t, d, collected[0])
 		})
 	})
 
 	t.Run("ByAddress returns deleted deployments (filtering is at backend layer)", func(t *testing.T) {
 		t.Parallel()
-		d := makeDeployment(contractID, 2, 0, 0)
+		d := makeDeployment(addr, name, 2, 0, 0)
 		d.IsDeleted = true
 
 		RunWithBootstrappedContractDeploymentsIndex(t, 1, nil, func(_ storage.DB, lm storage.LockManager, idx *ContractDeploymentsIndex) {
@@ -847,7 +840,7 @@ func TestContractDeployments_IsDeleted(t *testing.T) {
 
 			collected, _ := collectContractsByAddress(t, idx, d.Address, 10, nil, nil)
 			require.Len(t, collected, 1)
-			assert.True(t, collected[0].IsDeleted)
+			assertDeployment(t, d, collected[0])
 		})
 	})
 }
@@ -861,8 +854,7 @@ func TestContractDeployments_KeyCodec(t *testing.T) {
 
 	t.Run("roundtrip: makeContractDeploymentKey then decodeDeploymentCursor", func(t *testing.T) {
 		t.Parallel()
-		addr, err := flow.StringToAddress("1234567890abcdef")
-		require.NoError(t, err)
+		addr := unittest.RandomAddressFixture()
 		name := "MyContract"
 		height := uint64(12345)
 		txIndex := uint32(42)
@@ -880,8 +872,7 @@ func TestContractDeployments_KeyCodec(t *testing.T) {
 
 	t.Run("ones complement ensures descending height order", func(t *testing.T) {
 		t.Parallel()
-		addr, err := flow.StringToAddress("1234567890abcdef")
-		require.NoError(t, err)
+		addr := unittest.RandomAddressFixture()
 		name := "MyContract"
 
 		keyLow := makeContractDeploymentKey(addr, name, 100, 0, 0)
@@ -900,43 +891,10 @@ func TestContractDeployments_KeyCodec(t *testing.T) {
 
 	t.Run("malformed key with wrong prefix byte returns error", func(t *testing.T) {
 		t.Parallel()
-		addr, err := flow.StringToAddress("1234567890abcdef")
-		require.NoError(t, err)
+		addr := unittest.RandomAddressFixture()
 		key := makeContractDeploymentKey(addr, "MyContract", 1, 0, 0)
 		key[0] = 0xFF
-		_, err = decodeDeploymentCursor(key)
-		require.Error(t, err)
-	})
-
-	t.Run("ParseContractID parses valid ID", func(t *testing.T) {
-		t.Parallel()
-		addrHex := "1234567890abcdef"
-		contractID := "A." + addrHex + ".MyContract"
-		expected, err := flow.StringToAddress(addrHex)
-		require.NoError(t, err)
-
-		gotAddr, gotName, err := access.ParseContractID(contractID)
-		require.NoError(t, err)
-		assert.Equal(t, expected, gotAddr)
-		assert.Equal(t, "MyContract", gotName)
-	})
-
-	t.Run("ParseContractID rejects missing A. prefix", func(t *testing.T) {
-		t.Parallel()
-		_, _, err := access.ParseContractID("1234567890abcdef.MyContract")
-		require.Error(t, err)
-	})
-
-	t.Run("ParseContractID rejects missing second dot", func(t *testing.T) {
-		t.Parallel()
-		_, _, err := access.ParseContractID("A.1234567890abcdef")
-		require.Error(t, err)
-	})
-
-	t.Run("ParseContractID rejects invalid hex address", func(t *testing.T) {
-		t.Parallel()
-		_, _, err := access.ParseContractID("A.ZZZZZZZZZZZZZZZZ.MyContract")
+		_, err := decodeDeploymentCursor(key)
 		require.Error(t, err)
 	})
 }
-

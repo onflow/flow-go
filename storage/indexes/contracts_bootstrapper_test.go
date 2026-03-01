@@ -191,8 +191,7 @@ func TestContractDeploymentsBootstrapper_Store(t *testing.T) {
 			require.NoError(t, err)
 
 			// Store at height 11 should work
-			contractID := "A.1234567890abcdef.MyContract"
-			d := makeDeployment(contractID, 11, 0, 0)
+			d := makeDeployment(flow.HexToAddress("1234567890abcdef"), "MyContract", 11, 0, 0)
 			err = unittest.WithLock(t, lm, storage.LockIndexContractDeployments, func(lctx lockctx.Context) error {
 				return storageDB.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 					return b.Store(lctx, rw, 11, []access.ContractDeployment{d})
@@ -203,7 +202,7 @@ func TestContractDeploymentsBootstrapper_Store(t *testing.T) {
 			// Verify the deployment is queryable
 			result, err := b.ByContract(d.Address, d.ContractName)
 			require.NoError(t, err)
-			assert.Equal(t, uint64(11), result.BlockHeight)
+			assertDeployment(t, d, result)
 		})
 	})
 
@@ -216,8 +215,7 @@ func TestContractDeploymentsBootstrapper_Store(t *testing.T) {
 			b, err := NewContractDeploymentsBootstrapper(storageDB, 5)
 			require.NoError(t, err)
 
-			contractID := "A.1234567890abcdef.MyContract"
-			d := makeDeployment(contractID, 5, 0, 0)
+			d := makeDeployment(flow.HexToAddress("1234567890abcdef"), "MyContract", 5, 0, 0)
 
 			err = unittest.WithLock(t, lm, storage.LockIndexContractDeployments, func(lctx lockctx.Context) error {
 				return storageDB.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
@@ -228,8 +226,7 @@ func TestContractDeploymentsBootstrapper_Store(t *testing.T) {
 
 			result, err := b.ByContract(d.Address, d.ContractName)
 			require.NoError(t, err)
-			assert.Equal(t, contractID, access.ContractID(result.Address, result.ContractName))
-			assert.Equal(t, uint64(5), result.BlockHeight)
+			assertDeployment(t, d, result)
 		})
 	})
 }
