@@ -267,13 +267,18 @@ func (c *Contracts) loadDeployedContracts(height uint64, seenContracts map[strin
 			contractName := flow.KeyContractName(reg.Key)
 			contractID := events.ContractIDFromAddress(address, contractName)
 
-			loadedContracts[address] = append(loadedContracts[address], contractName)
-
 			if !seenContracts[contractID] {
+				// when a contract is deleted, it's code is set to nil/empty and the name is removed
+				// from the contract names register. the actual register is still present in state.
+				// while deleting contracts is not supported, there are deleted contracts in the state.
 				code, err := entry.Value()
 				if err != nil {
 					return nil, fmt.Errorf("error reading contract code for %s: %w", contractID, err)
 				}
+				if len(code) == 0 {
+					continue // skip deleted contracts
+				}
+
 				deployments = append(deployments, access.ContractDeployment{
 					ContractID: contractID,
 					Address:    address,
@@ -288,6 +293,8 @@ func (c *Contracts) loadDeployedContracts(height uint64, seenContracts map[strin
 			} else {
 				skippedAlreadySeen++
 			}
+
+			loadedContracts[address] = append(loadedContracts[address], contractName)
 
 			// If we've held the iterator open too long, record the cursor and release it so
 			// pebble compaction can proceed before we resume.
