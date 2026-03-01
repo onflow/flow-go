@@ -36,36 +36,33 @@ func makeContractDeployment(tb testing.TB, contractID string, height uint64) acc
 	}
 }
 
-// testContractDeploymentHistoryEntry is a storage.IteratorEntry for DeploymentsByContractID
-// (uses ContractDeploymentsCursor: Height/TxIndex/EventIndex).
-type testContractDeploymentHistoryEntry struct {
-	d accessmodel.ContractDeployment
+// testIterEntry is a storage.IteratorEntry used by both deployment-history and contracts iterators.
+// The cursor is pre-computed at construction time via newDeploymentHistoryEntry or newContractsEntry.
+type testIterEntry struct {
+	d      accessmodel.ContractDeployment
+	cursor accessmodel.ContractDeploymentsCursor
 }
 
-func (e testContractDeploymentHistoryEntry) Cursor() accessmodel.ContractDeploymentsCursor {
-	return accessmodel.ContractDeploymentsCursor{
-		BlockHeight:      e.d.BlockHeight,
-		TransactionIndex: e.d.TransactionIndex,
-		EventIndex:       e.d.EventIndex,
-	}
+func (e testIterEntry) Cursor() accessmodel.ContractDeploymentsCursor { return e.cursor }
+func (e testIterEntry) Value() (accessmodel.ContractDeployment, error) { return e.d, nil }
+
+// newDeploymentHistoryEntry builds a testIterEntry whose cursor is keyed by
+// BlockHeight/TransactionIndex/EventIndex (used by DeploymentsByContract).
+func newDeploymentHistoryEntry(d accessmodel.ContractDeployment) testIterEntry {
+	return testIterEntry{d: d, cursor: accessmodel.ContractDeploymentsCursor{
+		BlockHeight:      d.BlockHeight,
+		TransactionIndex: d.TransactionIndex,
+		EventIndex:       d.EventIndex,
+	}}
 }
 
-func (e testContractDeploymentHistoryEntry) Value() (accessmodel.ContractDeployment, error) {
-	return e.d, nil
-}
-
-// testContractsEntry is a storage.IteratorEntry for All/ByAddress iterators
-// (uses ContractsCursor: ContractID only).
-type testContractsEntry struct {
-	d accessmodel.ContractDeployment
-}
-
-func (e testContractsEntry) Cursor() accessmodel.ContractDeploymentsCursor {
-	return accessmodel.ContractDeploymentsCursor{Address: e.d.Address, ContractName: e.d.ContractName}
-}
-
-func (e testContractsEntry) Value() (accessmodel.ContractDeployment, error) {
-	return e.d, nil
+// newContractsEntry builds a testIterEntry whose cursor is keyed by Address/ContractName
+// (used by All and ByAddress).
+func newContractsEntry(d accessmodel.ContractDeployment) testIterEntry {
+	return testIterEntry{d: d, cursor: accessmodel.ContractDeploymentsCursor{
+		Address:      d.Address,
+		ContractName: d.ContractName,
+	}}
 }
 
 // makeContractDeploymentIter builds a storage.ContractDeploymentIterator from a slice of deployments.
@@ -73,7 +70,7 @@ func (e testContractsEntry) Value() (accessmodel.ContractDeployment, error) {
 func makeContractDeploymentIter(deployments []accessmodel.ContractDeployment) storage.ContractDeploymentIterator {
 	return func(yield func(storage.IteratorEntry[accessmodel.ContractDeployment, accessmodel.ContractDeploymentsCursor], error) bool) {
 		for _, d := range deployments {
-			if !yield(testContractDeploymentHistoryEntry{d: d}, nil) {
+			if !yield(newDeploymentHistoryEntry(d), nil) {
 				return
 			}
 		}
@@ -85,7 +82,7 @@ func makeContractDeploymentIter(deployments []accessmodel.ContractDeployment) st
 func makeContractsIter(deployments []accessmodel.ContractDeployment) storage.ContractDeploymentIterator {
 	return func(yield func(storage.IteratorEntry[accessmodel.ContractDeployment, accessmodel.ContractDeploymentsCursor], error) bool) {
 		for _, d := range deployments {
-			if !yield(testContractsEntry{d: d}, nil) {
+			if !yield(newContractsEntry(d), nil) {
 				return
 			}
 		}
@@ -317,6 +314,28 @@ func TestContractsBackend_GetContractDeployments(t *testing.T) {
 		verifyThrown()
 	})
 
+	t.Run("filter excludes out-of-range deployments", func(t *testing.T) {
+		t.Parallel()
+		mockStore := storagemock.NewContractDeploymentsIndexReader(t)
+		backend := NewContractsBackend(unittest.Logger(), &backendBase{config: DefaultConfig()}, mockStore)
+
+		deployments := []accessmodel.ContractDeployment{
+			makeContractDeployment(t, contractID, 50),
+			makeContractDeployment(t, contractID, 30),
+			makeContractDeployment(t, contractID, 10),
+		}
+		mockStore.On("DeploymentsByContract", contractAddr, contractName, (*accessmodel.ContractDeploymentsCursor)(nil)).
+			Return(makeContractDeploymentIter(deployments), nil).Once()
+
+		start, end := uint64(20), uint64(40)
+		result, err := backend.GetContractDeployments(context.Background(), contractID, 0, nil,
+			ContractDeploymentFilter{StartBlock: &start, EndBlock: &end},
+			ContractDeploymentExpandOptions{}, entities.EventEncodingVersion_JSON_CDC_V0)
+		require.NoError(t, err)
+		require.Len(t, result.Deployments, 1)
+		assert.Equal(t, uint64(30), result.Deployments[0].BlockHeight)
+	})
+
 	t.Run("invalid contract ID returns codes.InvalidArgument", func(t *testing.T) {
 		t.Parallel()
 		mockStore := storagemock.NewContractDeploymentsIndexReader(t)
@@ -442,6 +461,26 @@ func TestContractsBackend_GetContracts(t *testing.T) {
 		require.Error(t, err)
 		verifyThrown()
 	})
+
+	t.Run("filter by contract name excludes non-matching contracts", func(t *testing.T) {
+		t.Parallel()
+		mockStore := storagemock.NewContractDeploymentsIndexReader(t)
+		backend := NewContractsBackend(unittest.Logger(), &backendBase{config: DefaultConfig()}, mockStore)
+
+		deployments := []accessmodel.ContractDeployment{
+			makeContractDeployment(t, "A.0000000000000001.FungibleToken", 10),
+			makeContractDeployment(t, "A.0000000000000002.FlowToken", 11),
+		}
+		mockStore.On("All", (*accessmodel.ContractDeploymentsCursor)(nil)).
+			Return(makeContractsIter(deployments), nil).Once()
+
+		result, err := backend.GetContracts(context.Background(), 0, nil,
+			ContractDeploymentFilter{ContractName: "FungibleToken"},
+			ContractDeploymentExpandOptions{}, entities.EventEncodingVersion_JSON_CDC_V0)
+		require.NoError(t, err)
+		require.Len(t, result.Deployments, 1)
+		assert.Equal(t, "FungibleToken", result.Deployments[0].ContractName)
+	})
 }
 
 // TestContractsBackend_GetContractsByAddress tests all code paths for GetContractsByAddress.
@@ -556,6 +595,29 @@ func TestContractsBackend_GetContractsByAddress(t *testing.T) {
 		_, err := backend.GetContractsByAddress(signalerCtx, addr, 0, nil, ContractDeploymentFilter{}, ContractDeploymentExpandOptions{}, entities.EventEncodingVersion_JSON_CDC_V0)
 		require.Error(t, err)
 		verifyThrown()
+	})
+
+	t.Run("filter excludes out-of-range contracts", func(t *testing.T) {
+		t.Parallel()
+		mockStore := storagemock.NewContractDeploymentsIndexReader(t)
+		backend := NewContractsBackend(unittest.Logger(), &backendBase{config: DefaultConfig()}, mockStore)
+
+		contractID1 := fmt.Sprintf("A.%s.Bar", addr.Hex())
+		contractID2 := fmt.Sprintf("A.%s.Foo", addr.Hex())
+		deployments := []accessmodel.ContractDeployment{
+			makeContractDeployment(t, contractID1, 10),
+			makeContractDeployment(t, contractID2, 50),
+		}
+		mockStore.On("ByAddress", addr, (*accessmodel.ContractDeploymentsCursor)(nil)).
+			Return(makeContractsIter(deployments), nil).Once()
+
+		end := uint64(30)
+		result, err := backend.GetContractsByAddress(context.Background(), addr, 0, nil,
+			ContractDeploymentFilter{EndBlock: &end},
+			ContractDeploymentExpandOptions{}, entities.EventEncodingVersion_JSON_CDC_V0)
+		require.NoError(t, err)
+		require.Len(t, result.Deployments, 1)
+		assert.Equal(t, "Bar", result.Deployments[0].ContractName)
 	})
 }
 
