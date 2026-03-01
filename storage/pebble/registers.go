@@ -259,9 +259,31 @@ func nextRegisterKeyStart(owner, regKey string) []byte {
 // register entries for the current owner after processing their target key register (or
 // determining they have none).
 func nextOwnerStart(owner string) []byte {
-	ownerPrefix := make([]byte, 1+len(owner))
+	// Include the '/' separator in the prefix so that PrefixUpperBound targets exactly
+	// the entries for this owner. Pebble keys have the form:
+	//
+	//   [codeRegister] [owner] '/' [key] '/' [^height]
+	//
+	// All entries for a given owner share the prefix [codeRegister][owner]['/']. Using
+	// that full prefix ensures PrefixUpperBound returns the first key strictly after
+	// all of that owner's entries, regardless of owner length.
+	//
+	// The empty-owner case illustrates why the separator is required. Global registers
+	// (owner="") have keys of the form [codeRegister, '/' (0x2F), ...]. Without the
+	// separator, the prefix would be just [codeRegister] and PrefixUpperBound would
+	// return [codeRegister+1] = [0x03], which equals the iterator's upper bound,
+	// terminating the scan immediately and silently skipping every account whose first
+	// address byte is > '/' (0x2F). With the separator:
+	//
+	//   PrefixUpperBound([codeRegister, '/']) = [codeRegister, 0x30]
+	//
+	// That seek target is strictly after all global-register keys ([codeRegister, 0x2F,
+	// ...]) and before any account whose first address byte is >= 0x30, so the scan
+	// correctly continues into those accounts.
+	ownerPrefix := make([]byte, 2+len(owner))
 	ownerPrefix[0] = codeRegister
 	copy(ownerPrefix[1:], []byte(owner))
+	ownerPrefix[1+len(owner)] = '/'
 	return storage.PrefixUpperBound(ownerPrefix) // increment key by 1
 }
 

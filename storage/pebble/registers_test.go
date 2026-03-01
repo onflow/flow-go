@@ -528,6 +528,38 @@ func TestRegisters_ByKeyPrefix(t *testing.T) {
 	})
 }
 
+// TestRegisters_ByKeyPrefix_GlobalRegisters verifies that ByKeyPrefix does not terminate
+// early when global registers (empty owner) are present in pebble between account registers
+// whose first address bytes straddle the '/' byte (0x2F). Before the fix, nextOwnerStart("")
+// returned [codeRegister+1] which equals the iterator's upper bound, causing the scan to
+// stop before processing any account whose first address byte is > 0x2F.
+func TestRegisters_ByKeyPrefix_GlobalRegisters(t *testing.T) {
+	t.Parallel()
+
+	// addrLow: first address byte 0x01 < '/' (0x2F) — pebble key sorts before global registers
+	addrLow := flow.BytesToAddress([]byte{0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01})
+	// addrHigh: first address byte 0x30 > '/' (0x2F) — pebble key sorts after global registers
+	addrHigh := flow.BytesToAddress([]byte{0x30, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01})
+
+	regLow := flow.RegisterID{Owner: string(addrLow.Bytes()), Key: "code.Low"}
+	regHigh := flow.RegisterID{Owner: string(addrHigh.Bytes()), Key: "code.High"}
+	// global register (empty owner): pebble key [codeRegister, '/', ...] sorts between addrLow and addrHigh
+	regGlobal := flow.RegisterID{Owner: "", Key: flow.AddressStateKey}
+
+	RunWithRegistersStorageAtInitialHeights(t, 1, 1, func(r *Registers) {
+		require.NoError(t, r.Store(flow.RegisterEntries{
+			{Key: regLow, Value: []byte("low-code")},
+			{Key: regHigh, Value: []byte("high-code")},
+			{Key: regGlobal, Value: []byte("global-state")},
+		}, 2))
+
+		results := collectRegistersByKey(t, r.ByKeyPrefix(flow.CodeKeyPrefix, 2, nil))
+		assert.Len(t, results, 2)
+		assert.Equal(t, flow.RegisterValue([]byte("low-code")), results[regLow])
+		assert.Equal(t, flow.RegisterValue([]byte("high-code")), results[regHigh])
+	})
+}
+
 // collectRegistersByKey drains a ByKey iterator into a map keyed by register ID.
 func collectRegistersByKey(t *testing.T, iter storage.IndexIterator[flow.RegisterValue, flow.RegisterID]) map[flow.RegisterID]flow.RegisterValue {
 	t.Helper()
