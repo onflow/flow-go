@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"sort"
 	"time"
 
 	"github.com/jordanschalm/lockctx"
@@ -250,6 +251,8 @@ func (c *Contracts) collectDeployments(data BlockData) (deployments []access.Con
 func (c *Contracts) loadDeployedContracts(height uint64, seenContracts map[string]bool) ([]access.ContractDeployment, error) {
 	var deployments []access.ContractDeployment
 	var cursor *flow.RegisterID
+	skippedAlreadySeen := 0
+	loadedContracts := make(map[flow.Address][]string)
 	for {
 		batchStart := time.Now()
 		timedOut := false
@@ -264,6 +267,8 @@ func (c *Contracts) loadDeployedContracts(height uint64, seenContracts map[strin
 			contractName := flow.KeyContractName(reg.Key)
 			contractID := events.ContractIDFromAddress(address, contractName)
 
+			loadedContracts[address] = append(loadedContracts[address], contractName)
+
 			if !seenContracts[contractID] {
 				code, err := entry.Value()
 				if err != nil {
@@ -277,6 +282,11 @@ func (c *Contracts) loadDeployedContracts(height uint64, seenContracts map[strin
 					// all other fields are omitted because we do not know the actual deployment details
 					IsPlaceholder: true,
 				})
+				c.log.Info().
+					Str("contract_id", contractID).
+					Msg("loaded contract during bootstrap")
+			} else {
+				skippedAlreadySeen++
 			}
 
 			// If we've held the iterator open too long, record the cursor and release it so
@@ -289,9 +299,43 @@ func (c *Contracts) loadDeployedContracts(height uint64, seenContracts map[strin
 		}
 
 		if !timedOut {
-			return deployments, nil
+			break
 		}
 	}
+
+	c.log.Info().
+		Uint64("height", height).
+		Int("contracts", len(deployments)).
+		Int("skipped_already_seen", skippedAlreadySeen).
+		Msg("loaded contracts during bootstrap")
+
+	// verify that the contract names in the contract names register match the contract names in the loaded contracts
+	for address, loadedContractNames := range loadedContracts {
+		registerValue, err := c.scriptExecutor.RegisterValue(flow.ContractNamesRegisterID(address), height)
+		if err != nil {
+			return nil, fmt.Errorf("error getting contract names for %s: %w", address, err)
+		}
+
+		contractNames, err := environment.DecodeContractNames(registerValue)
+		if err != nil {
+			return nil, fmt.Errorf("error decoding contract names for %s: %w", address, err)
+		}
+
+		sort.Strings(contractNames)
+		sort.Strings(loadedContractNames)
+
+		if len(contractNames) != len(loadedContractNames) {
+			return nil, fmt.Errorf("contract names length mismatch for %s: %d != %d", address, len(contractNames), len(loadedContractNames))
+		}
+
+		for i := range contractNames {
+			if contractNames[i] != loadedContractNames[i] {
+				return nil, fmt.Errorf("contract name mismatch for %s: %s != %s", address, contractNames[i], loadedContractNames[i])
+			}
+		}
+	}
+
+	return deployments, nil
 }
 
 // contractRetriever is a helper for retrieving contract code from the snapshot at the given height.
