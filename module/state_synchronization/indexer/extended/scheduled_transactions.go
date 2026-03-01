@@ -220,7 +220,7 @@ func (s *ScheduledTransactions) IndexBlockData(lctx lockctx.Proof, data BlockDat
 	}
 
 	s.metrics.ScheduledTransactionIndexed(
-		len(collected.newTxs)-len(missingIDs),
+		len(newTxs)-len(missingIDs),
 		len(collected.executedEntries),
 		len(collected.failedEntries),
 		len(collected.canceledEntries),

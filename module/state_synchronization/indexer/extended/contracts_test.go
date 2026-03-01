@@ -484,6 +484,12 @@ func TestContractsIndexer_Bootstrap_PreExistingContracts(t *testing.T) {
 	snap := makeContractSnapshot(t, addr1, map[string][]byte{"Alpha": codeAlpha})
 	scriptExecutor.On("GetStorageSnapshot", contractsBootstrapHeight).Return(snap, nil).Once()
 
+	// loadDeployedContracts verifies the code-register scan against the contract names register.
+	scriptExecutor.On("RegisterValue", flow.ContractNamesRegisterID(addr1), contractsBootstrapHeight).
+		Return(encodeContractNames(t, "Alpha", "Beta"), nil)
+	scriptExecutor.On("RegisterValue", flow.ContractNamesRegisterID(addr2), contractsBootstrapHeight).
+		Return(encodeContractNames(t, "Gamma"), nil)
+
 	bootstrapHeader := unittest.BlockHeaderFixtureOnChain(flow.Testnet, unittest.WithHeaderHeight(contractsBootstrapHeight))
 	alphaEvent := makeAccountContractAddedEvent(t, addr1, "Alpha", alphaHash, 0, 0)
 	indexContractsBlock(t, indexer, lm, db, BlockData{
@@ -518,6 +524,77 @@ func TestContractsIndexer_Bootstrap_PreExistingContracts(t *testing.T) {
 	allIter, err := store.All(nil)
 	require.NoError(t, err)
 	assert.Len(t, collectContractPage(t, allIter, 10), 3)
+}
+
+// TestContractsIndexer_Bootstrap_SkipsDeletedContracts verifies that loadDeployedContracts
+// skips code registers whose value is empty (representing a contract deleted via
+// accounts.DeleteContract, which sets the code register to nil). Without this skip, the
+// code-register count exceeds the contract names register count and the verification step
+// returns a mismatch error.
+func TestContractsIndexer_Bootstrap_SkipsDeletedContracts(t *testing.T) {
+	t.Parallel()
+
+	addr := unittest.RandomAddressFixture()
+	codeAlpha := []byte("access(all) contract Alpha {}")
+	codeBeta := []byte("access(all) contract Beta {}")
+
+	// Alpha and Beta are live; Deleted was removed (empty value in pebble).
+	registers := &fakeRegisters{
+		Entries: []flow.RegisterEntry{
+			{Key: flow.ContractRegisterID(addr, "Alpha"), Value: codeAlpha},
+			{Key: flow.ContractRegisterID(addr, "Beta"), Value: codeBeta},
+			{Key: flow.ContractRegisterID(addr, "Deleted"), Value: []byte{}},
+		},
+	}
+
+	pdb, dbDir := unittest.TempPebbleDB(t)
+	db := pebbleimpl.ToDB(pdb)
+	t.Cleanup(func() {
+		require.NoError(t, db.Close())
+		require.NoError(t, os.RemoveAll(dbDir))
+	})
+	lm := storage.NewTestingLockManager()
+	store, err := indexes.NewContractDeploymentsBootstrapper(db, contractsBootstrapHeight)
+	require.NoError(t, err)
+
+	scriptExecutor := executionmock.NewScriptExecutor(t)
+	indexer := NewContracts(unittest.Logger(), store, registers, scriptExecutor, &metrics.NoopCollector{})
+
+	// The contract names register only contains the two live contracts; the deleted one
+	// was already removed from it when the contract was removed.
+	scriptExecutor.On("RegisterValue", flow.ContractNamesRegisterID(addr), contractsBootstrapHeight).
+		Return(encodeContractNames(t, "Alpha", "Beta"), nil)
+
+	bootstrapHeader := unittest.BlockHeaderFixtureOnChain(flow.Testnet, unittest.WithHeaderHeight(contractsBootstrapHeight))
+	indexContractsBlock(t, indexer, lm, db, BlockData{
+		Header: bootstrapHeader,
+		Events: []flow.Event{},
+	})
+
+	alphaID := fmt.Sprintf("A.%s.Alpha", addr.Hex())
+	betaID := fmt.Sprintf("A.%s.Beta", addr.Hex())
+	deletedID := fmt.Sprintf("A.%s.Deleted", addr.Hex())
+
+	// Alpha and Beta get placeholder deployments.
+	alpha, err := store.ByContractID(alphaID)
+	require.NoError(t, err)
+	assert.Equal(t, codeAlpha, alpha.Code)
+	assert.True(t, alpha.IsPlaceholder)
+
+	beta, err := store.ByContractID(betaID)
+	require.NoError(t, err)
+	assert.Equal(t, codeBeta, beta.Code)
+	assert.True(t, beta.IsPlaceholder)
+
+	// Deleted contract is not indexed.
+	_, err = store.ByContractID(deletedID)
+	require.Error(t, err)
+	require.ErrorIs(t, err, storage.ErrNotFound)
+
+	// All() returns exactly the two live contracts.
+	allIter, err := store.All(nil)
+	require.NoError(t, err)
+	assert.Len(t, collectContractPage(t, allIter, 10), 2)
 }
 
 // ===== Error and edge-case tests =====
