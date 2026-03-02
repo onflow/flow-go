@@ -67,6 +67,10 @@ func (s *SetComponentLogLevelCommand) Validator(req *admin.CommandRequest) error
 		if err := logging.ValidatePattern(pattern); err != nil {
 			return admin.NewInvalidAdminReqErrorf("%w", err)
 		}
+		if pattern == "*" {
+			return admin.NewInvalidAdminReqErrorf("global wildcard \"*\" is not a valid when setting component level logging. use set-log-level instead")
+		}
+
 		parsed = append(parsed, parsedComponentLevel{pattern: pattern, level: level})
 	}
 

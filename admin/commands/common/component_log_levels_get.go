@@ -30,11 +30,12 @@ func (g *GetComponentLogLevelsCommand) Validator(_ *admin.CommandRequest) error 
 	return nil
 }
 
-// Handler returns a snapshot of all registered component log levels and the global default.
+// Handler returns a snapshot of all registered component log levels and the registry config.
 //
 // No error returns are expected during normal operation.
 func (g *GetComponentLogLevelsCommand) Handler(_ context.Context, _ *admin.CommandRequest) (interface{}, error) {
-	defaultLevel, levels := g.registry.Levels()
+	_, levels := g.registry.Levels()
+	cfg := g.registry.Config()
 
 	components := make(map[string]interface{}, len(levels))
 	for id, cl := range levels {
@@ -44,8 +45,22 @@ func (g *GetComponentLogLevelsCommand) Handler(_ context.Context, _ *admin.Comma
 		}
 	}
 
+	staticOverrides := make(map[string]string, len(cfg.StaticOverrides))
+	for pattern, level := range cfg.StaticOverrides {
+		staticOverrides[pattern] = level.String()
+	}
+
+	dynamicOverrides := make(map[string]string, len(cfg.DynamicOverrides))
+	for pattern, level := range cfg.DynamicOverrides {
+		dynamicOverrides[pattern] = level.String()
+	}
+
 	return map[string]interface{}{
-		"default":    defaultLevel.String(),
+		"config": map[string]interface{}{
+			"default":           cfg.Default.String(),
+			"static_overrides":  staticOverrides,
+			"dynamic_overrides": dynamicOverrides,
+		},
 		"components": components,
 	}, nil
 }

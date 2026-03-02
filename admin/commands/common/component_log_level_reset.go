@@ -44,16 +44,13 @@ func (r *ResetComponentLogLevelCommand) Validator(req *admin.CommandRequest) err
 
 	patterns := make([]string, 0, len(raw))
 	for _, v := range raw {
-		s, ok := v.(string)
+		p, ok := v.(string)
 		if !ok {
 			return admin.NewInvalidAdminReqFormatError("each element must be a string")
 		}
-		patterns = append(patterns, s)
-	}
 
-	for i, p := range patterns {
 		if p == "*" {
-			if len(patterns) > 1 {
+			if len(raw) > 1 {
 				return admin.NewInvalidAdminReqErrorf("\"*\" must be the only element when resetting all components")
 			}
 			continue
@@ -62,7 +59,8 @@ func (r *ResetComponentLogLevelCommand) Validator(req *admin.CommandRequest) err
 		if err := logging.ValidatePattern(p); err != nil {
 			return admin.NewInvalidAdminReqErrorf("%w", err)
 		}
-		patterns[i] = p
+
+		patterns = append(patterns, p)
 	}
 
 	req.ValidatorData = patterns
@@ -74,6 +72,6 @@ func (r *ResetComponentLogLevelCommand) Validator(req *admin.CommandRequest) err
 // No error returns are expected during normal operation.
 func (r *ResetComponentLogLevelCommand) Handler(_ context.Context, req *admin.CommandRequest) (interface{}, error) {
 	patterns := req.ValidatorData.([]string)
-	r.registry.Reset(patterns)
+	r.registry.Reset(patterns...)
 	return "ok", nil
 }

@@ -6,6 +6,9 @@
 /cmd/util/util
 /cmd/bootstrap/bootstrap
 
+# omit agent plans files
+/docs/plans
+
 # Test ouput of  bootstrapping CLI
 cmd/bootstrap/bootstrap-example
 
