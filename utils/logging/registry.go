@@ -127,10 +127,10 @@ func bestWildcardMatch(config map[string]zerolog.Level, id string) (zerolog.Leve
 	var bestLevel zerolog.Level
 	found := false
 	for pattern, level := range config {
-		if !strings.HasSuffix(pattern, ".*") {
+		prefix, ok := strings.CutSuffix(pattern, ".*")
+		if !ok {
 			continue
 		}
-		prefix := strings.TrimSuffix(pattern, ".*")
 		if strings.HasPrefix(id, prefix+".") && len(prefix) > len(bestPrefix) {
 			bestPrefix = prefix
 			bestLevel = level
@@ -201,8 +201,7 @@ func (r *LogRegistry) Reset(patterns []string) {
 				affected[id] = struct{}{}
 			}
 			r.overrides = make(map[string]zerolog.Level)
-		} else if strings.HasSuffix(pattern, ".*") {
-			prefix := strings.TrimSuffix(pattern, ".*")
+		} else if prefix, ok := strings.CutSuffix(pattern, ".*"); ok {
 			for id := range r.registered {
 				if strings.HasPrefix(id, prefix+".") {
 					affected[id] = struct{}{}
@@ -273,8 +272,7 @@ func (r *LogRegistry) resolveWithSource(id string) (zerolog.Level, LevelSource) 
 // applyToMatching re-resolves all registered components matched by pattern.
 // Must be called with r.mu held.
 func (r *LogRegistry) applyToMatching(pattern string) {
-	if strings.HasSuffix(pattern, ".*") {
-		prefix := strings.TrimSuffix(pattern, ".*")
+	if prefix, ok := strings.CutSuffix(pattern, ".*"); ok {
 		for id, al := range r.registered {
 			if strings.HasPrefix(id, prefix+".") {
 				al.Store(int32(r.resolve(id)))
