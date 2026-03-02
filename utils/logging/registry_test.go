@@ -91,3 +91,139 @@ func TestLogRegistry_GlobalLevelSetToMinimum(t *testing.T) {
 	r.Logger("network")
 	assert.Equal(t, zerolog.DebugLevel, zerolog.GlobalLevel())
 }
+
+// TestLogRegistry_SetLevelExact verifies that SetLevel with an exact pattern updates only
+// the matching registered component.
+func TestLogRegistry_SetLevelExact(t *testing.T) {
+	r := testRegistry(t, zerolog.InfoLevel, nil)
+	r.Logger("hotstuff")
+	r.Logger("hotstuff.voter")
+
+	r.SetLevel("hotstuff", zerolog.DebugLevel)
+
+	assert.Equal(t, zerolog.DebugLevel, r.EffectiveLevel("hotstuff"))
+	assert.Equal(t, zerolog.InfoLevel, r.EffectiveLevel("hotstuff.voter"))
+}
+
+// TestLogRegistry_SetLevelWildcard verifies that SetLevel with a wildcard pattern updates
+// all matching children but not the parent.
+func TestLogRegistry_SetLevelWildcard(t *testing.T) {
+	r := testRegistry(t, zerolog.InfoLevel, nil)
+	r.Logger("hotstuff")
+	r.Logger("hotstuff.voter")
+	r.Logger("hotstuff.pacemaker")
+	r.Logger("network")
+
+	r.SetLevel("hotstuff.*", zerolog.DebugLevel)
+
+	assert.Equal(t, zerolog.InfoLevel, r.EffectiveLevel("hotstuff"))
+	assert.Equal(t, zerolog.DebugLevel, r.EffectiveLevel("hotstuff.voter"))
+	assert.Equal(t, zerolog.DebugLevel, r.EffectiveLevel("hotstuff.pacemaker"))
+	assert.Equal(t, zerolog.InfoLevel, r.EffectiveLevel("network"))
+}
+
+// TestLogRegistry_SetLevelMoreSpecificOverrideNotClobbered verifies that a more specific
+// override is not overwritten by a less specific wildcard set.
+func TestLogRegistry_SetLevelMoreSpecificOverrideNotClobbered(t *testing.T) {
+	r := testRegistry(t, zerolog.InfoLevel, nil)
+	r.Logger("hotstuff.voter")
+
+	r.SetLevel("hotstuff.voter", zerolog.WarnLevel) // exact override first
+	r.SetLevel("hotstuff.*", zerolog.DebugLevel)    // wildcard applied second
+
+	// exact override beats wildcard
+	assert.Equal(t, zerolog.WarnLevel, r.EffectiveLevel("hotstuff.voter"))
+}
+
+// TestLogRegistry_SetLevelUpdatesGlobalLevel verifies that lowering a component level
+// also lowers zerolog.GlobalLevel.
+func TestLogRegistry_SetLevelUpdatesGlobalLevel(t *testing.T) {
+	r := testRegistry(t, zerolog.InfoLevel, nil)
+	r.Logger("hotstuff")
+
+	r.SetLevel("hotstuff", zerolog.DebugLevel)
+	assert.Equal(t, zerolog.DebugLevel, zerolog.GlobalLevel())
+}
+
+// TestLogRegistry_ResetExact verifies that Reset removes a runtime override, restoring
+// the component to its static config or global default.
+func TestLogRegistry_ResetExact(t *testing.T) {
+	r := testRegistry(t, zerolog.InfoLevel, map[string]zerolog.Level{
+		"hotstuff": zerolog.WarnLevel,
+	})
+	r.Logger("hotstuff")
+	r.SetLevel("hotstuff", zerolog.DebugLevel)
+	assert.Equal(t, zerolog.DebugLevel, r.EffectiveLevel("hotstuff"))
+
+	r.Reset([]string{"hotstuff"})
+	assert.Equal(t, zerolog.WarnLevel, r.EffectiveLevel("hotstuff")) // back to static
+}
+
+// TestLogRegistry_ResetWildcard verifies that Reset with a wildcard removes matching
+// overrides and re-resolves affected components.
+func TestLogRegistry_ResetWildcard(t *testing.T) {
+	r := testRegistry(t, zerolog.InfoLevel, nil)
+	r.Logger("hotstuff.voter")
+	r.Logger("hotstuff.pacemaker")
+
+	r.SetLevel("hotstuff.*", zerolog.DebugLevel)
+	r.Reset([]string{"hotstuff.*"})
+
+	assert.Equal(t, zerolog.InfoLevel, r.EffectiveLevel("hotstuff.voter"))
+	assert.Equal(t, zerolog.InfoLevel, r.EffectiveLevel("hotstuff.pacemaker"))
+}
+
+// TestLogRegistry_ResetAll verifies that Reset(["*"]) restores all components to static
+// config or global default.
+func TestLogRegistry_ResetAll(t *testing.T) {
+	r := testRegistry(t, zerolog.InfoLevel, nil)
+	r.Logger("hotstuff")
+	r.Logger("network")
+
+	r.SetLevel("hotstuff", zerolog.DebugLevel)
+	r.SetLevel("network", zerolog.TraceLevel)
+	r.Reset([]string{"*"})
+
+	assert.Equal(t, zerolog.InfoLevel, r.EffectiveLevel("hotstuff"))
+	assert.Equal(t, zerolog.InfoLevel, r.EffectiveLevel("network"))
+	assert.Equal(t, zerolog.InfoLevel, zerolog.GlobalLevel())
+}
+
+// TestLogRegistry_SetDefaultLevel verifies that updating the default re-resolves components
+// without explicit overrides and leaves overridden components unchanged.
+func TestLogRegistry_SetDefaultLevel(t *testing.T) {
+	r := testRegistry(t, zerolog.InfoLevel, nil)
+	r.Logger("hotstuff")
+	r.Logger("network")
+	r.SetLevel("network", zerolog.WarnLevel)
+
+	r.SetDefaultLevel(zerolog.DebugLevel)
+
+	assert.Equal(t, zerolog.DebugLevel, r.EffectiveLevel("hotstuff")) // re-resolved
+	assert.Equal(t, zerolog.WarnLevel, r.EffectiveLevel("network"))   // override preserved
+}
+
+// TestLogRegistry_Levels verifies that Levels returns the correct level and source for
+// each registered component.
+func TestLogRegistry_Levels(t *testing.T) {
+	r := testRegistry(t, zerolog.InfoLevel, map[string]zerolog.Level{
+		"hotstuff.voter": zerolog.WarnLevel,
+		"network.*":      zerolog.ErrorLevel,
+	})
+	r.Logger("hotstuff")
+	r.Logger("hotstuff.voter")
+	r.Logger("network.p2p")
+	r.SetLevel("hotstuff", zerolog.DebugLevel)
+
+	defaultLevel, levels := r.Levels()
+	assert.Equal(t, zerolog.InfoLevel, defaultLevel)
+
+	assert.Equal(t, zerolog.DebugLevel, levels["hotstuff"].Level)
+	assert.Equal(t, logging.LevelSourceOverride, levels["hotstuff"].Source)
+
+	assert.Equal(t, zerolog.WarnLevel, levels["hotstuff.voter"].Level)
+	assert.Equal(t, logging.LevelSourceStatic, levels["hotstuff.voter"].Source)
+
+	assert.Equal(t, zerolog.ErrorLevel, levels["network.p2p"].Level)
+	assert.Equal(t, logging.LevelSourceStaticWildcard, levels["network.p2p"].Source)
+}

@@ -147,3 +147,142 @@ func toLevelWriter(w io.Writer) zerolog.LevelWriter {
 	}
 	return NoopLevelWriter(w)
 }
+
+// LevelSource describes where a component's effective level originated.
+type LevelSource string
+
+const (
+	// LevelSourceOverride indicates the level was set by an admin command (exact pattern).
+	LevelSourceOverride LevelSource = "override"
+	// LevelSourceOverrideWildcard indicates the level was set by an admin command (wildcard pattern).
+	LevelSourceOverrideWildcard LevelSource = "override-wildcard"
+	// LevelSourceStatic indicates the level was set by the --component-log-levels CLI flag (exact).
+	LevelSourceStatic LevelSource = "static"
+	// LevelSourceStaticWildcard indicates the level was set by the --component-log-levels CLI flag (wildcard).
+	LevelSourceStaticWildcard LevelSource = "static-wildcard"
+	// LevelSourceDefault indicates the level falls back to the global default.
+	LevelSourceDefault LevelSource = "default"
+)
+
+// ComponentLevel holds the effective log level and its source for a registered component.
+type ComponentLevel struct {
+	Level  zerolog.Level
+	Source LevelSource
+}
+
+// SetLevel applies level to all registered components matching pattern. pattern may be an
+// exact component ID or a wildcard ("prefix.*"). The new override is stored and takes effect
+// immediately on all matching registered components.
+//
+// No error returns are expected during normal operation.
+func (r *LogRegistry) SetLevel(pattern string, level zerolog.Level) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	r.overrides[pattern] = level
+	r.applyToMatching(pattern)
+	r.updateGlobalLevel()
+}
+
+// Reset removes runtime overrides matching each pattern in patterns and re-resolves affected
+// components from static config and globalDefault. Passing ["*"] removes all overrides and
+// resets every registered component.
+//
+// No error returns are expected during normal operation.
+func (r *LogRegistry) Reset(patterns []string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	affected := make(map[string]struct{})
+
+	for _, pattern := range patterns {
+		if pattern == "*" {
+			for id := range r.registered {
+				affected[id] = struct{}{}
+			}
+			r.overrides = make(map[string]zerolog.Level)
+		} else if strings.HasSuffix(pattern, ".*") {
+			prefix := strings.TrimSuffix(pattern, ".*")
+			for id := range r.registered {
+				if strings.HasPrefix(id, prefix+".") {
+					affected[id] = struct{}{}
+				}
+			}
+			delete(r.overrides, pattern)
+		} else {
+			affected[pattern] = struct{}{}
+			delete(r.overrides, pattern)
+		}
+	}
+
+	for id := range affected {
+		if al, ok := r.registered[id]; ok {
+			al.Store(int32(r.resolve(id)))
+		}
+	}
+	r.updateGlobalLevel()
+}
+
+// SetDefaultLevel updates the global default and re-resolves all registered components.
+// Per-component overrides (runtime or static) take priority and are preserved.
+//
+// No error returns are expected during normal operation.
+func (r *LogRegistry) SetDefaultLevel(level zerolog.Level) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	r.globalDefault = level
+	for id, al := range r.registered {
+		al.Store(int32(r.resolve(id)))
+	}
+	r.updateGlobalLevel()
+}
+
+// Levels returns the current globalDefault and a snapshot of every registered component's
+// effective level and source.
+func (r *LogRegistry) Levels() (zerolog.Level, map[string]ComponentLevel) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	result := make(map[string]ComponentLevel, len(r.registered))
+	for id := range r.registered {
+		level, source := r.resolveWithSource(id)
+		result[id] = ComponentLevel{Level: level, Source: source}
+	}
+	return r.globalDefault, result
+}
+
+// resolveWithSource is like resolve but also returns the LevelSource for reporting.
+// Must be called with r.mu held.
+func (r *LogRegistry) resolveWithSource(id string) (zerolog.Level, LevelSource) {
+	if level, ok := r.overrides[id]; ok {
+		return level, LevelSourceOverride
+	}
+	if level, ok := bestWildcardMatch(r.overrides, id); ok {
+		return level, LevelSourceOverrideWildcard
+	}
+	if level, ok := r.staticConfig[id]; ok {
+		return level, LevelSourceStatic
+	}
+	if level, ok := bestWildcardMatch(r.staticConfig, id); ok {
+		return level, LevelSourceStaticWildcard
+	}
+	return r.globalDefault, LevelSourceDefault
+}
+
+// applyToMatching re-resolves all registered components matched by pattern.
+// Must be called with r.mu held.
+func (r *LogRegistry) applyToMatching(pattern string) {
+	if strings.HasSuffix(pattern, ".*") {
+		prefix := strings.TrimSuffix(pattern, ".*")
+		for id, al := range r.registered {
+			if strings.HasPrefix(id, prefix+".") {
+				al.Store(int32(r.resolve(id)))
+			}
+		}
+	} else {
+		if al, ok := r.registered[pattern]; ok {
+			al.Store(int32(r.resolve(pattern)))
+		}
+	}
+}
