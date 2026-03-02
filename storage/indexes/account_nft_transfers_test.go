@@ -13,6 +13,7 @@ import (
 	"github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/storage/indexes/iterator"
 	"github.com/onflow/flow-go/storage/operation"
 	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -719,5 +720,70 @@ func storeNFTTransfers(tb testing.TB, lockManager storage.LockManager, idx *NonF
 		return idx.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 			return idx.Store(lctx, rw, height, transfers)
 		})
+	})
+}
+
+// TestNFTTransfers_PaginationCoversAllEntries verifies that paginating through all transfers
+// for an account using CollectResults visits every entry exactly once. This specifically
+// exercises the PrefixInclusiveEnd logic: when a cursor lands at firstHeight, the iterator
+// range must still include all remaining entries at that height.
+func TestNFTTransfers_PaginationCoversAllEntries(t *testing.T) {
+	t.Parallel()
+
+	const firstHeight = uint64(5)
+	const pageSize = uint32(3)
+
+	account := unittest.RandomAddressFixture()
+	other := unittest.RandomAddressFixture()
+
+	// Bootstrap with 3 transfers at firstHeight so that all 3 are stored at the
+	// first indexed height. When the page boundary later falls exactly at firstHeight,
+	// PrefixInclusiveEnd must pad the end key so the iterator covers all entries there.
+	initialTransfers := []access.NonFungibleTokenTransfer{
+		{TransactionID: unittest.IdentifierFixture(), BlockHeight: firstHeight, TransactionIndex: 0, EventIndices: []uint32{0}, SourceAddress: account, RecipientAddress: other, ID: 1},
+		{TransactionID: unittest.IdentifierFixture(), BlockHeight: firstHeight, TransactionIndex: 1, EventIndices: []uint32{0}, SourceAddress: account, RecipientAddress: other, ID: 2},
+		{TransactionID: unittest.IdentifierFixture(), BlockHeight: firstHeight, TransactionIndex: 2, EventIndices: []uint32{0}, SourceAddress: account, RecipientAddress: other, ID: 3},
+	}
+
+	RunWithBootstrappedNFTTransferIndex(t, firstHeight, initialTransfers, func(_ storage.DB, lm storage.LockManager, idx *NonFungibleTokenTransfers) {
+		// 3 more transfers at height 6 (one above firstHeight)
+		err := storeNFTTransfers(t, lm, idx, 6, []access.NonFungibleTokenTransfer{
+			{TransactionID: unittest.IdentifierFixture(), BlockHeight: 6, TransactionIndex: 0, EventIndices: []uint32{0}, SourceAddress: account, RecipientAddress: other, ID: 4},
+			{TransactionID: unittest.IdentifierFixture(), BlockHeight: 6, TransactionIndex: 1, EventIndices: []uint32{0}, SourceAddress: account, RecipientAddress: other, ID: 5},
+			{TransactionID: unittest.IdentifierFixture(), BlockHeight: 6, TransactionIndex: 2, EventIndices: []uint32{0}, SourceAddress: account, RecipientAddress: other, ID: 6},
+		})
+		require.NoError(t, err)
+
+		// Paginate using CollectResults until cursor is nil.
+		// Page 1 (cursor=nil) collects height-6 entries and returns a cursor pointing
+		// to firstHeight. Page 2 must still return all 3 entries at firstHeight.
+		var allCollected []access.NonFungibleTokenTransfer
+		var cursor *access.TransferCursor
+		for {
+			nftIter, err := idx.ByAddress(account, cursor)
+			require.NoError(t, err)
+
+			page, nextCursor, err := iterator.CollectResults(nftIter, pageSize, nil)
+			require.NoError(t, err)
+
+			allCollected = append(allCollected, page...)
+			cursor = nextCursor
+			if cursor == nil {
+				break
+			}
+		}
+
+		// All 6 transfers must be visited exactly once.
+		require.Len(t, allCollected, 6)
+
+		// First 3 results are from height 6 (newest first), next 3 from firstHeight.
+		for i := 0; i < 3; i++ {
+			assert.Equal(t, uint64(6), allCollected[i].BlockHeight)
+			assert.Equal(t, uint32(i), allCollected[i].TransactionIndex)
+		}
+		for i := 0; i < 3; i++ {
+			assert.Equal(t, firstHeight, allCollected[3+i].BlockHeight)
+			assert.Equal(t, uint32(i), allCollected[3+i].TransactionIndex)
+		}
 	})
 }
