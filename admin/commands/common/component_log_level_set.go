@@ -11,6 +11,10 @@ import (
 	"github.com/onflow/flow-go/utils/logging"
 )
 
+const (
+	maxPatternLength = 1024
+)
+
 var _ commands.AdminCommand = (*SetComponentLogLevelCommand)(nil)
 
 // SetComponentLogLevelCommand sets the log level for one or more components identified by
@@ -55,6 +59,13 @@ func (s *SetComponentLogLevelCommand) Validator(req *admin.CommandRequest) error
 		level, err := zerolog.ParseLevel(levelStr)
 		if err != nil {
 			return admin.NewInvalidAdminReqErrorf("invalid level %q for component %q: %w", levelStr, pattern, err)
+		}
+		if len(pattern) > maxPatternLength {
+			return admin.NewInvalidAdminReqErrorf("pattern %q is too long (max %d characters)", pattern, maxPatternLength)
+		}
+		pattern = logging.NormalizePattern(pattern)
+		if err := logging.ValidatePattern(pattern); err != nil {
+			return admin.NewInvalidAdminReqErrorf("%w", err)
 		}
 		parsed = append(parsed, parsedComponentLevel{pattern: pattern, level: level})
 	}

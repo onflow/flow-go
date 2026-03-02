@@ -8,13 +8,13 @@ import (
 )
 
 // ParseComponentLogLevels parses the --component-log-levels flag value into a map of
-// component pattern to zerolog.Level.
+// component pattern to zerolog.Level. Component patterns are normalized to lowercase.
 //
 // Format: "component:level,prefix.*:level"
 // Example: "hotstuff:debug,network.*:warn"
 //
 // Expected error returns during normal operation:
-//   - error: if any entry is malformed or contains an unrecognized level string.
+//   - error: if any entry is malformed, contains an invalid pattern, or an unrecognized level string.
 func ParseComponentLogLevels(s string) (map[string]zerolog.Level, error) {
 	result := make(map[string]zerolog.Level)
 	if s == "" {
@@ -25,10 +25,13 @@ func ParseComponentLogLevels(s string) (map[string]zerolog.Level, error) {
 		if len(parts) != 2 {
 			return nil, fmt.Errorf("invalid component log level entry %q: expected format component:level", entry)
 		}
-		component := strings.TrimSpace(parts[0])
+		component := NormalizePattern(strings.TrimSpace(parts[0]))
 		levelStr := strings.TrimSpace(parts[1])
 		if component == "" {
 			return nil, fmt.Errorf("invalid component log level entry %q: component name must not be empty", entry)
+		}
+		if err := ValidatePattern(component); err != nil {
+			return nil, fmt.Errorf("invalid component log level entry %q: %w", entry, err)
 		}
 		level, err := zerolog.ParseLevel(strings.ToLower(levelStr))
 		if err != nil {

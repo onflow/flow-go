@@ -59,11 +59,16 @@ func NewLogRegistry(
 
 // Logger registers componentID and returns a zerolog.Logger backed by a componentLevelWriter
 // for that component. The logger inherits the base logger's context fields.
-// Panics if componentID is already registered — duplicate registration is a programming error.
+// Panics if componentID is already registered or invalid — both are programming errors.
+// componentID is normalized to lowercase before registration.
 func (r *LogRegistry) Logger(componentID string) zerolog.Logger {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
+	componentID = NormalizePattern(componentID)
+	if err := ValidateComponentID(componentID); err != nil {
+		panic(fmt.Sprintf("log registry: %s", err))
+	}
 	if _, exists := r.registered[componentID]; exists {
 		panic(fmt.Sprintf("log registry: component %q already registered", componentID))
 	}
@@ -80,10 +85,11 @@ func (r *LogRegistry) Logger(componentID string) zerolog.Logger {
 
 // EffectiveLevel returns the current effective log level for a registered component.
 // Returns [zerolog.Disabled] if not registered.
+// componentID is normalized to lowercase before lookup.
 func (r *LogRegistry) EffectiveLevel(componentID string) zerolog.Level {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
-	if al, ok := r.registered[componentID]; ok {
+	if al, ok := r.registered[NormalizePattern(componentID)]; ok {
 		return zerolog.Level(al.Load())
 	}
 	return zerolog.Disabled
@@ -173,12 +179,14 @@ type ComponentLevel struct {
 // SetLevel applies level to all registered components matching pattern. pattern may be an
 // exact component ID or a wildcard ("prefix.*"). The new override is stored and takes effect
 // immediately on all matching registered components.
+// pattern is normalized to lowercase before storage.
 //
 // No error returns are expected during normal operation.
 func (r *LogRegistry) SetLevel(pattern string, level zerolog.Level) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
+	pattern = NormalizePattern(pattern)
 	r.overrides[pattern] = level
 	r.applyToMatching(pattern)
 	r.updateGlobalLevel()
@@ -186,7 +194,7 @@ func (r *LogRegistry) SetLevel(pattern string, level zerolog.Level) {
 
 // Reset removes runtime overrides matching each pattern in patterns and re-resolves affected
 // components from static config and globalDefault. Passing ["*"] removes all overrides and
-// resets every registered component.
+// resets every registered component. Each pattern is normalized to lowercase.
 //
 // No error returns are expected during normal operation.
 func (r *LogRegistry) Reset(patterns []string) {
@@ -196,6 +204,7 @@ func (r *LogRegistry) Reset(patterns []string) {
 	affected := make(map[string]struct{})
 
 	for _, pattern := range patterns {
+		pattern = NormalizePattern(pattern)
 		if pattern == "*" {
 			for id := range r.registered {
 				affected[id] = struct{}{}

@@ -51,10 +51,18 @@ func (r *ResetComponentLogLevelCommand) Validator(req *admin.CommandRequest) err
 		patterns = append(patterns, s)
 	}
 
-	for _, p := range patterns {
-		if p == "*" && len(patterns) > 1 {
-			return admin.NewInvalidAdminReqErrorf("\"*\" must be the only element when resetting all components")
+	for i, p := range patterns {
+		if p == "*" {
+			if len(patterns) > 1 {
+				return admin.NewInvalidAdminReqErrorf("\"*\" must be the only element when resetting all components")
+			}
+			continue
 		}
+		p = logging.NormalizePattern(p)
+		if err := logging.ValidatePattern(p); err != nil {
+			return admin.NewInvalidAdminReqErrorf("%w", err)
+		}
+		patterns[i] = p
 	}
 
 	req.ValidatorData = patterns
