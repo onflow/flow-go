@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"io"
 	"time"
 
 	"github.com/dgraph-io/badger/v2"
@@ -197,9 +198,10 @@ type BaseConfig struct {
 type NodeConfig struct {
 	Cancel context.CancelFunc // cancel function for the context that is passed to the networking layer
 	BaseConfig
-	Logger      zerolog.Logger
-	LogRegistry *logging.LogRegistry
-	NodeID      flow.Identifier
+	Logger            zerolog.Logger
+	LogWriter         io.Writer
+	LogRegistry       *logging.LogRegistry
+	NodeID            flow.Identifier
 	Me                module.Local
 	Tracer            module.Tracer
 	ConfigManager     *updatable_configs.Manager

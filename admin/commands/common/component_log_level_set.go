@@ -63,14 +63,11 @@ func (s *SetComponentLogLevelCommand) Validator(req *admin.CommandRequest) error
 		if len(pattern) > maxPatternLength {
 			return admin.NewInvalidAdminReqErrorf("pattern %q is too long (max %d characters)", pattern, maxPatternLength)
 		}
-		pattern = logging.NormalizePattern(pattern)
-		if err := logging.ValidatePattern(pattern); err != nil {
-			return admin.NewInvalidAdminReqErrorf("%w", err)
-		}
 		if pattern == "*" {
 			return admin.NewInvalidAdminReqErrorf("global wildcard \"*\" is not a valid when setting component level logging. use set-log-level instead")
 		}
 
+		// pattern validation performed by [LogRegistry.SetLevel]
 		parsed = append(parsed, parsedComponentLevel{pattern: pattern, level: level})
 	}
 
@@ -86,7 +83,9 @@ func (s *SetComponentLogLevelCommand) Handler(_ context.Context, req *admin.Comm
 
 	result := make(map[string]string, len(entries))
 	for _, e := range entries {
-		s.registry.SetLevel(e.pattern, e.level)
+		if err := s.registry.SetLevel(e.pattern, e.level); err != nil {
+			return nil, fmt.Errorf("failed to set level for pattern %q: %w", e.pattern, err)
+		}
 		result[e.pattern] = fmt.Sprintf("set to %s", e.level)
 	}
 	return result, nil

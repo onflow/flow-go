@@ -115,7 +115,8 @@ func TestLogRegistry_SetLevelExact(t *testing.T) {
 	r.Logger(log, "hotstuff")
 	r.Logger(log, "hotstuff.voter")
 
-	r.SetLevel("hotstuff", zerolog.DebugLevel)
+	err := r.SetLevel("hotstuff", zerolog.DebugLevel)
+	require.NoError(t, err)
 
 	assert.Equal(t, zerolog.DebugLevel, r.EffectiveLevel("hotstuff"))
 	assert.Equal(t, zerolog.InfoLevel, r.EffectiveLevel("hotstuff.voter"))
@@ -130,7 +131,8 @@ func TestLogRegistry_SetLevelWildcard(t *testing.T) {
 	r.Logger(log, "hotstuff.pacemaker")
 	r.Logger(log, "network")
 
-	r.SetLevel("hotstuff.*", zerolog.DebugLevel)
+	err := r.SetLevel("hotstuff.*", zerolog.DebugLevel)
+	require.NoError(t, err)
 
 	assert.Equal(t, zerolog.InfoLevel, r.EffectiveLevel("hotstuff"))
 	assert.Equal(t, zerolog.DebugLevel, r.EffectiveLevel("hotstuff.voter"))
@@ -144,8 +146,10 @@ func TestLogRegistry_SetLevelMoreSpecificOverrideNotClobbered(t *testing.T) {
 	r, log := testRegistry(t, zerolog.InfoLevel, nil)
 	r.Logger(log, "hotstuff.voter")
 
-	r.SetLevel("hotstuff.voter", zerolog.WarnLevel) // exact override first
-	r.SetLevel("hotstuff.*", zerolog.DebugLevel)    // wildcard applied second
+	err := r.SetLevel("hotstuff.voter", zerolog.WarnLevel) // exact override first
+	require.NoError(t, err)
+	err = r.SetLevel("hotstuff.*", zerolog.DebugLevel) // wildcard applied second
+	require.NoError(t, err)
 
 	// exact override beats wildcard
 	assert.Equal(t, zerolog.WarnLevel, r.EffectiveLevel("hotstuff.voter"))
@@ -157,7 +161,8 @@ func TestLogRegistry_SetLevelUpdatesGlobalLevel(t *testing.T) {
 	r, log := testRegistry(t, zerolog.InfoLevel, nil)
 	r.Logger(log, "hotstuff")
 
-	r.SetLevel("hotstuff", zerolog.DebugLevel)
+	err := r.SetLevel("hotstuff", zerolog.DebugLevel)
+	require.NoError(t, err)
 	assert.Equal(t, zerolog.DebugLevel, zerolog.GlobalLevel())
 }
 
@@ -168,10 +173,12 @@ func TestLogRegistry_ResetExact(t *testing.T) {
 		"hotstuff": zerolog.WarnLevel,
 	})
 	r.Logger(log, "hotstuff")
-	r.SetLevel("hotstuff", zerolog.DebugLevel)
+	err := r.SetLevel("hotstuff", zerolog.DebugLevel)
+	require.NoError(t, err)
 	assert.Equal(t, zerolog.DebugLevel, r.EffectiveLevel("hotstuff"))
 
-	r.Reset("hotstuff")
+	err = r.Reset("hotstuff")
+	require.NoError(t, err)
 	assert.Equal(t, zerolog.WarnLevel, r.EffectiveLevel("hotstuff")) // back to static
 }
 
@@ -182,11 +189,13 @@ func TestLogRegistry_ResetWildcard(t *testing.T) {
 	r.Logger(log, "hotstuff.voter")
 	r.Logger(log, "hotstuff.pacemaker")
 
-	r.SetLevel("hotstuff.*", zerolog.DebugLevel)
+	err := r.SetLevel("hotstuff.*", zerolog.DebugLevel)
+	require.NoError(t, err)
 	assert.Equal(t, zerolog.DebugLevel, r.EffectiveLevel("hotstuff.voter"))
 	assert.Equal(t, zerolog.DebugLevel, r.EffectiveLevel("hotstuff.pacemaker"))
 
-	r.Reset("hotstuff.*")
+	err = r.Reset("hotstuff.*")
+	require.NoError(t, err)
 	assert.Equal(t, zerolog.InfoLevel, r.EffectiveLevel("hotstuff.voter"))
 	assert.Equal(t, zerolog.InfoLevel, r.EffectiveLevel("hotstuff.pacemaker"))
 }
@@ -198,12 +207,15 @@ func TestLogRegistry_ResetAll(t *testing.T) {
 	r.Logger(log, "hotstuff")
 	r.Logger(log, "network")
 
-	r.SetLevel("hotstuff", zerolog.DebugLevel)
-	r.SetLevel("network", zerolog.TraceLevel)
+	err := r.SetLevel("hotstuff", zerolog.DebugLevel)
+	require.NoError(t, err)
+	err = r.SetLevel("network", zerolog.TraceLevel)
+	require.NoError(t, err)
 	assert.Equal(t, zerolog.DebugLevel, r.EffectiveLevel("hotstuff"))
 	assert.Equal(t, zerolog.TraceLevel, r.EffectiveLevel("network"))
 
-	r.Reset("*")
+	err = r.Reset("*")
+	require.NoError(t, err)
 	assert.Equal(t, zerolog.InfoLevel, r.EffectiveLevel("hotstuff"))
 	assert.Equal(t, zerolog.InfoLevel, r.EffectiveLevel("network"))
 	assert.Equal(t, zerolog.InfoLevel, zerolog.GlobalLevel())
@@ -216,7 +228,8 @@ func TestLogRegistry_SetDefaultLevel(t *testing.T) {
 	r.Logger(log, "hotstuff")
 	r.Logger(log, "network")
 
-	r.SetLevel("network", zerolog.WarnLevel)
+	err := r.SetLevel("network", zerolog.WarnLevel)
+	require.NoError(t, err)
 	assert.Equal(t, zerolog.WarnLevel, r.EffectiveLevel("network"))
 
 	r.SetDefaultLevel(zerolog.DebugLevel)
@@ -234,7 +247,8 @@ func TestLogRegistry_Levels(t *testing.T) {
 	r.Logger(log, "hotstuff")
 	r.Logger(log, "hotstuff.voter")
 	r.Logger(log, "network.p2p")
-	r.SetLevel("hotstuff", zerolog.DebugLevel)
+	err := r.SetLevel("hotstuff", zerolog.DebugLevel)
+	require.NoError(t, err)
 
 	defaultLevel, levels := r.Levels()
 	assert.Equal(t, zerolog.InfoLevel, defaultLevel)
@@ -271,7 +285,8 @@ func TestLogRegistry_OutputFiltering_LowerLevel(t *testing.T) {
 	logger.Debug().Msg("debug suppressed")
 	assert.Empty(t, buf.String(), "debug should produce no output at info level")
 
-	r.SetLevel("hotstuff", zerolog.DebugLevel)
+	err := r.SetLevel("hotstuff", zerolog.DebugLevel)
+	require.NoError(t, err)
 
 	logger.Debug().Msg("debug now visible")
 	assert.Contains(t, buf.String(), "debug now visible")
@@ -283,11 +298,14 @@ func TestLogRegistry_OutputFiltering_ResetRestoresSuppression(t *testing.T) {
 	r, log, buf := testRegistryWithBuffer(t, zerolog.InfoLevel)
 	logger := r.Logger(log, "hotstuff")
 
-	r.SetLevel("hotstuff", zerolog.DebugLevel)
+	err := r.SetLevel("hotstuff", zerolog.DebugLevel)
+	require.NoError(t, err)
 	logger.Debug().Msg("debug visible")
 	require.Contains(t, buf.String(), "debug visible")
 
-	r.Reset("hotstuff")
+	buf.Reset()
+	err = r.Reset("hotstuff")
+	require.NoError(t, err)
 
 	logger.Debug().Msg("debug suppressed again")
 	assert.Empty(t, buf.String(), "debug should be suppressed after reset")
@@ -304,7 +322,8 @@ func TestLogRegistry_OutputFiltering_IndependentComponents(t *testing.T) {
 	loggerA := r.Logger(log, "component-a") // stays at info
 	loggerB := r.Logger(log, "component-b") // lowered to debug
 
-	r.SetLevel("component-b", zerolog.DebugLevel)
+	err := r.SetLevel("component-b", zerolog.DebugLevel)
+	require.NoError(t, err)
 	// GlobalLevel is now debug to allow B's debug events through — but A's writer
 	// should still discard them.
 
@@ -332,7 +351,8 @@ func TestLogRegistry_OutputFiltering_ChildLoggerInheritsLevel(t *testing.T) {
 	assert.Empty(t, buf.String())
 
 	// Lower the component level — child should pick it up automatically
-	r.SetLevel("hotstuff", zerolog.DebugLevel)
+	err := r.SetLevel("hotstuff", zerolog.DebugLevel)
+	require.NoError(t, err)
 
 	child.Debug().Msg("child debug visible")
 	assert.Contains(t, buf.String(), "child debug visible",
@@ -346,7 +366,8 @@ func TestLogRegistry_OutputFiltering_WildcardAffectsOutput(t *testing.T) {
 	voter := r.Logger(log, "hotstuff.voter")
 	pacemaker := r.Logger(log, "hotstuff.pacemaker")
 
-	r.SetLevel("hotstuff.*", zerolog.DebugLevel)
+	err := r.SetLevel("hotstuff.*", zerolog.DebugLevel)
+	require.NoError(t, err)
 
 	voter.Debug().Msg("voter-debug")
 	pacemaker.Debug().Msg("pacemaker-debug")
@@ -380,7 +401,8 @@ func TestLogRegistry_Logger_IndependentLevelControl(t *testing.T) {
 	child := r.Logger(parent, "hotstuff.voter")
 
 	// Lower child to debug — parent stays at info
-	r.SetLevel("hotstuff.voter", zerolog.DebugLevel)
+	err := r.SetLevel("hotstuff.voter", zerolog.DebugLevel)
+	require.NoError(t, err)
 
 	parent.Debug().Msg("parent-debug")
 	assert.Empty(t, buf.String(), "parent should still be at info")
@@ -398,7 +420,8 @@ func TestLogRegistry_Logger_ParentLevelDoesNotAffectChild(t *testing.T) {
 	child := r.Logger(parent, "hotstuff.voter")
 
 	// Lower parent to debug — child stays at info
-	r.SetLevel("hotstuff", zerolog.DebugLevel)
+	err := r.SetLevel("hotstuff", zerolog.DebugLevel)
+	require.NoError(t, err)
 
 	child.Debug().Msg("child-debug")
 	assert.Empty(t, buf.String(), "child should still be at info")

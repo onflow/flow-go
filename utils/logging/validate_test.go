@@ -94,7 +94,8 @@ func TestLogRegistry_NormalizesComponentID(t *testing.T) {
 
 	// Prove they are the same registration: changing via the lowercase key is
 	// reflected in the mixed-case lookup, and attempting to re-register panics.
-	r.SetLevel("hotstuff", zerolog.DebugLevel)
+	err := r.SetLevel("hotstuff", zerolog.DebugLevel)
+	require.NoError(t, err)
 	assert.Equal(t, zerolog.DebugLevel, r.EffectiveLevel("HotStuff"), "mixed-case lookup should see the level change")
 
 	require.Panics(t, func() { r.Logger(log, "hotstuff") }, "re-registering the normalized form should panic")
@@ -105,7 +106,8 @@ func TestLogRegistry_NormalizesSetLevel(t *testing.T) {
 	r, log := testRegistry(t, zerolog.InfoLevel, nil)
 	r.Logger(log, "hotstuff.voter")
 
-	r.SetLevel("Hotstuff.Voter", zerolog.DebugLevel)
+	err := r.SetLevel("Hotstuff.Voter", zerolog.DebugLevel)
+	require.NoError(t, err)
 	assert.Equal(t, zerolog.DebugLevel, r.EffectiveLevel("hotstuff.voter"))
 }
 

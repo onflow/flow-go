@@ -2,6 +2,7 @@ package common
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/onflow/flow-go/admin"
 	"github.com/onflow/flow-go/admin/commands"
@@ -48,18 +49,7 @@ func (r *ResetComponentLogLevelCommand) Validator(req *admin.CommandRequest) err
 		if !ok {
 			return admin.NewInvalidAdminReqFormatError("each element must be a string")
 		}
-
-		if p == "*" {
-			if len(raw) > 1 {
-				return admin.NewInvalidAdminReqErrorf("\"*\" must be the only element when resetting all components")
-			}
-			continue
-		}
-		p = logging.NormalizePattern(p)
-		if err := logging.ValidatePattern(p); err != nil {
-			return admin.NewInvalidAdminReqErrorf("%w", err)
-		}
-
+		// pattern validation performed by [LogRegistry.Reset]
 		patterns = append(patterns, p)
 	}
 
@@ -72,6 +62,8 @@ func (r *ResetComponentLogLevelCommand) Validator(req *admin.CommandRequest) err
 // No error returns are expected during normal operation.
 func (r *ResetComponentLogLevelCommand) Handler(_ context.Context, req *admin.CommandRequest) (interface{}, error) {
 	patterns := req.ValidatorData.([]string)
-	r.registry.Reset(patterns...)
+	if err := r.registry.Reset(patterns...); err != nil {
+		return nil, fmt.Errorf("failed to reset component log levels: %w", err)
+	}
 	return "ok", nil
 }

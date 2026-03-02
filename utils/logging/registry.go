@@ -160,25 +160,40 @@ func (r *LogRegistry) updateGlobalLevel() {
 // exact component ID or a wildcard ("prefix.*"). The new override is stored and takes effect
 // immediately on all matching registered components.
 // pattern is normalized to lowercase before storage.
-func (r *LogRegistry) SetLevel(pattern string, level zerolog.Level) {
+func (r *LogRegistry) SetLevel(pattern string, level zerolog.Level) error {
+	pattern = NormalizePattern(pattern)
+	if err := ValidatePattern(pattern); err != nil {
+		return err
+	}
+
 	r.mu.Lock()
 	defer r.mu.Unlock()
-
-	pattern = NormalizePattern(pattern)
 	r.overrides[pattern] = level
 	r.applyToMatching(pattern)
 	r.updateGlobalLevel()
+	return nil
 }
 
 // Reset removes runtime overrides matching each pattern in patterns and re-resolves affected
 // components from static config and globalDefault. Passing ["*"] removes all overrides and
 // resets every registered component. Each pattern is normalized to lowercase.
-func (r *LogRegistry) Reset(patterns ...string) {
+func (r *LogRegistry) Reset(patterns ...string) error {
+	for i, pattern := range patterns {
+		normalized := NormalizePattern(pattern)
+		if normalized == "*" {
+			if len(patterns) > 1 {
+				return fmt.Errorf("\"*\" must be the only pattern when resetting all components")
+			}
+		} else if err := ValidatePattern(normalized); err != nil {
+			return fmt.Errorf("pattern %d is invalid: %w", i, err)
+		}
+		patterns[i] = normalized
+	}
+
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
 	for _, pattern := range patterns {
-		pattern = NormalizePattern(pattern)
 		if pattern == "*" {
 			r.overrides = make(map[string]zerolog.Level)
 			for id, al := range r.registered {
@@ -190,6 +205,7 @@ func (r *LogRegistry) Reset(patterns ...string) {
 		r.applyToMatching(pattern)
 	}
 	r.updateGlobalLevel()
+	return nil
 }
 
 // SetDefaultLevel updates the global default and re-resolves all registered components.

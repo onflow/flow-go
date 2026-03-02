@@ -56,13 +56,14 @@ func TestComponentLevelWriter_AtomicUpdate(t *testing.T) {
 	w := logging.NewComponentLevelWriter(&lvl, delegate)
 
 	// debug blocked at info
-	_, _ = w.WriteLevel(zerolog.DebugLevel, []byte(`{"level":"debug"}`))
+	_, err := w.WriteLevel(zerolog.DebugLevel, []byte(`{"level":"debug"}`))
+	require.NoError(t, err)
 	assert.Equal(t, 0, buf.Len())
 
 	// lower to debug
 	lvl.Store(int32(zerolog.DebugLevel))
 	msg := []byte(`{"level":"debug","msg":"now visible"}`)
-	_, err := w.WriteLevel(zerolog.DebugLevel, msg)
+	_, err = w.WriteLevel(zerolog.DebugLevel, msg)
 	require.NoError(t, err)
 	assert.Equal(t, msg, buf.Bytes())
 }
