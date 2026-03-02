@@ -83,6 +83,41 @@ func (r *LogRegistry) Logger(componentID string) zerolog.Logger {
 	return r.baseLogger.Output(w)
 }
 
+// LoggerFrom registers componentID and returns a zerolog.Logger derived from parent,
+// preserving all of parent's context fields (labels, fields added via With()) while
+// backing the new logger with a fresh componentLevelWriter for componentID.
+//
+// Use this when passing loggers down a hierarchy: the parent carries accumulated context
+// (e.g. block height, round number) and the child needs independent level control.
+//
+//	parent := registry.Logger("hotstuff")
+//	parent = parent.With().Uint64("view", view).Logger() // add context along the way
+//	child  := registry.LoggerFrom(parent, "hotstuff.voter") // inherits "view", own level
+//
+// Panics if componentID is already registered or invalid — both are programming errors.
+// componentID is normalized to lowercase before registration.
+func (r *LogRegistry) LoggerFrom(parent zerolog.Logger, componentID string) zerolog.Logger {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	componentID = NormalizePattern(componentID)
+	if err := ValidateComponentID(componentID); err != nil {
+		panic(fmt.Sprintf("log registry: %s", err))
+	}
+	if _, exists := r.registered[componentID]; exists {
+		panic(fmt.Sprintf("log registry: component %q already registered", componentID))
+	}
+
+	level := r.resolve(componentID)
+	atomicLevel := &atomic.Int32{}
+	atomicLevel.Store(int32(level))
+	r.registered[componentID] = atomicLevel
+
+	w := NewComponentLevelWriter(atomicLevel, r.baseWriter)
+	r.updateGlobalLevel()
+	return parent.Output(w)
+}
+
 // EffectiveLevel returns the current effective log level for a registered component.
 // Returns [zerolog.Disabled] if not registered.
 // componentID is normalized to lowercase before lookup.

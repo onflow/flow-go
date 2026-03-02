@@ -342,3 +342,47 @@ func TestLogRegistry_OutputFiltering_WildcardAffectsOutput(t *testing.T) {
 	assert.Contains(t, buf.String(), "voter-debug")
 	assert.Contains(t, buf.String(), "pacemaker-debug")
 }
+
+// TestLogRegistry_LoggerFrom_InheritsParentContext verifies that LoggerFrom preserves
+// all context fields added to the parent logger before the child is registered.
+func TestLogRegistry_LoggerFrom_InheritsParentContext(t *testing.T) {
+	r, buf := testRegistryWithBuffer(t, zerolog.InfoLevel)
+
+	parent := r.Logger("hotstuff")
+	parent = parent.With().Str("view", "42").Logger() // add context after registration
+
+	child := r.LoggerFrom(parent, "hotstuff.voter")
+
+	child.Info().Msg("child message")
+	out := buf.String()
+	assert.Contains(t, out, "child message")
+	assert.Contains(t, out, `"view":"42"`, "child should inherit parent's context field")
+}
+
+// TestLogRegistry_LoggerFrom_IndependentLevelControl verifies that the child registered
+// via LoggerFrom has its own independently controllable level.
+func TestLogRegistry_LoggerFrom_IndependentLevelControl(t *testing.T) {
+	r, buf := testRegistryWithBuffer(t, zerolog.InfoLevel)
+
+	parent := r.Logger("hotstuff")
+	child := r.LoggerFrom(parent, "hotstuff.voter")
+
+	// Lower child to debug — parent stays at info
+	r.SetLevel("hotstuff.voter", zerolog.DebugLevel)
+
+	buf.Reset()
+	parent.Debug().Msg("parent-debug")
+	assert.Empty(t, buf.String(), "parent should still be at info")
+
+	child.Debug().Msg("child-debug")
+	assert.Contains(t, buf.String(), "child-debug")
+}
+
+// TestLogRegistry_LoggerFrom_PanicsOnDuplicate verifies that registering the same
+// component ID twice via LoggerFrom panics.
+func TestLogRegistry_LoggerFrom_PanicsOnDuplicate(t *testing.T) {
+	r := testRegistry(t, zerolog.InfoLevel, nil)
+	parent := r.Logger("hotstuff")
+	r.LoggerFrom(parent, "hotstuff.voter")
+	require.Panics(t, func() { r.LoggerFrom(parent, "hotstuff.voter") })
+}
