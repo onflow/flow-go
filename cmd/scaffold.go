@@ -176,6 +176,7 @@ func (fnb *FlowNodeBuilder) BaseFlags() {
 	fnb.flags.StringVar(&fnb.BaseConfig.pebbleCheckpointsDir, "pebble-checkpoints-dir", defaultConfig.pebbleCheckpointsDir, "directory to store the checkpoints for the public pebble database (protocol state)")
 	fnb.flags.StringVar(&fnb.BaseConfig.secretsdir, "secretsdir", defaultConfig.secretsdir, "directory to store private database (secrets)")
 	fnb.flags.StringVarP(&fnb.BaseConfig.level, "loglevel", "l", defaultConfig.level, "level for logging output")
+	fnb.flags.StringVar(&fnb.BaseConfig.componentLogLevels, "component-log-levels", "", `per-component log levels, format: "component:level,prefix.*:level", e.g. "hotstuff:debug,network.*:warn"`)
 	fnb.flags.Uint32Var(&fnb.BaseConfig.debugLogLimit, "debug-log-limit", defaultConfig.debugLogLimit, "max number of debug/trace log events per second")
 	fnb.flags.UintVarP(&fnb.BaseConfig.metricsPort, "metricport", "m", defaultConfig.metricsPort, "port for /metrics endpoint")
 	fnb.flags.BoolVar(&fnb.BaseConfig.profilerConfig.Enabled, "profiler-enabled", defaultConfig.profilerConfig.Enabled, "whether to enable the auto-profiler")
@@ -910,11 +911,15 @@ func (fnb *FlowNodeBuilder) initLogger() error {
 		return fmt.Errorf("invalid log level: %w", err)
 	}
 
-	// Minimum log level is set to trace, then overridden by SetGlobalLevel.
-	// this allows admin commands to modify the level to any value during runtime
-	log = log.Level(zerolog.TraceLevel)
-	zerolog.SetGlobalLevel(lvl)
+	staticConfig, err := logging.ParseComponentLogLevels(fnb.BaseConfig.componentLogLevels)
+	if err != nil {
+		return fmt.Errorf("invalid --component-log-levels: %w", err)
+	}
 
+	// Logger level is set to trace; all filtering is owned by LogRegistry.
+	log = log.Level(zerolog.TraceLevel)
+
+	fnb.LogRegistry = logging.NewLogRegistry(log, os.Stderr, lvl, staticConfig)
 	fnb.Logger = log
 
 	return nil
@@ -2015,7 +2020,13 @@ func (fnb *FlowNodeBuilder) Initialize() error {
 
 func (fnb *FlowNodeBuilder) RegisterDefaultAdminCommands() {
 	fnb.AdminCommand("set-log-level", func(config *NodeConfig) commands.AdminCommand {
-		return &common.SetLogLevelCommand{}
+		return common.NewSetLogLevelCommand(config.LogRegistry)
+	}).AdminCommand("set-component-log-level", func(config *NodeConfig) commands.AdminCommand {
+		return common.NewSetComponentLogLevelCommand(config.LogRegistry)
+	}).AdminCommand("reset-component-log-level", func(config *NodeConfig) commands.AdminCommand {
+		return common.NewResetComponentLogLevelCommand(config.LogRegistry)
+	}).AdminCommand("get-component-log-levels", func(config *NodeConfig) commands.AdminCommand {
+		return common.NewGetComponentLogLevelsCommand(config.LogRegistry)
 	}).AdminCommand("set-golog-level", func(config *NodeConfig) commands.AdminCommand {
 		return &common.SetGologLevelCommand{}
 	}).AdminCommand("get-config", func(config *NodeConfig) commands.AdminCommand {

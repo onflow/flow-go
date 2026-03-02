@@ -30,6 +30,7 @@ import (
 	"github.com/onflow/flow-go/state/protocol/events"
 	"github.com/onflow/flow-go/storage"
 	bstorage "github.com/onflow/flow-go/storage/badger"
+	"github.com/onflow/flow-go/utils/logging"
 )
 
 const NotSet = "not set"
@@ -159,6 +160,7 @@ type BaseConfig struct {
 	secretsDBEnabled            bool
 	InsecureSecretsDB           bool
 	level                       string
+	componentLogLevels          string
 	debugLogLimit               uint32
 	metricsPort                 uint
 	BootstrapDir                string
@@ -195,8 +197,9 @@ type BaseConfig struct {
 type NodeConfig struct {
 	Cancel context.CancelFunc // cancel function for the context that is passed to the networking layer
 	BaseConfig
-	Logger            zerolog.Logger
-	NodeID            flow.Identifier
+	Logger      zerolog.Logger
+	LogRegistry *logging.LogRegistry
+	NodeID      flow.Identifier
 	Me                module.Local
 	Tracer            module.Tracer
 	ConfigManager     *updatable_configs.Manager
