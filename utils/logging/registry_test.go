@@ -1,6 +1,7 @@
 package logging_test
 
 import (
+	"bytes"
 	"os"
 	"testing"
 
@@ -17,6 +18,16 @@ func testRegistry(t *testing.T, defaultLevel zerolog.Level, static map[string]ze
 	r := logging.NewLogRegistry(baseLogger, os.Stderr, defaultLevel, static)
 	t.Cleanup(func() { zerolog.SetGlobalLevel(zerolog.TraceLevel) })
 	return r
+}
+
+// testRegistryWithBuffer creates a LogRegistry backed by a bytes.Buffer for output inspection.
+func testRegistryWithBuffer(t *testing.T, defaultLevel zerolog.Level) (*logging.LogRegistry, *bytes.Buffer) {
+	t.Helper()
+	var buf bytes.Buffer
+	baseLogger := zerolog.New(&buf)
+	r := logging.NewLogRegistry(baseLogger, &buf, defaultLevel, nil)
+	t.Cleanup(func() { zerolog.SetGlobalLevel(zerolog.TraceLevel) })
+	return r, &buf
 }
 
 // TestLogRegistry_RegisterReturnsLogger verifies Logger() returns a usable zerolog.Logger.
@@ -226,4 +237,108 @@ func TestLogRegistry_Levels(t *testing.T) {
 
 	assert.Equal(t, zerolog.ErrorLevel, levels["network.p2p"].Level)
 	assert.Equal(t, logging.LevelSourceStaticWildcard, levels["network.p2p"].Source)
+}
+
+// TestLogRegistry_OutputFiltering_DefaultLevel verifies that at the default level (info),
+// debug events produce no output and info events are written.
+func TestLogRegistry_OutputFiltering_DefaultLevel(t *testing.T) {
+	r, buf := testRegistryWithBuffer(t, zerolog.InfoLevel)
+	logger := r.Logger("hotstuff")
+
+	logger.Debug().Msg("debug suppressed")
+	assert.Empty(t, buf.String(), "debug should produce no output at info level")
+
+	logger.Info().Msg("info visible")
+	assert.Contains(t, buf.String(), "info visible")
+}
+
+// TestLogRegistry_OutputFiltering_LowerLevel verifies that after SetLevel lowers a
+// component to debug, debug events are written to the output.
+func TestLogRegistry_OutputFiltering_LowerLevel(t *testing.T) {
+	r, buf := testRegistryWithBuffer(t, zerolog.InfoLevel)
+	logger := r.Logger("hotstuff")
+
+	r.SetLevel("hotstuff", zerolog.DebugLevel)
+
+	logger.Debug().Msg("debug now visible")
+	assert.Contains(t, buf.String(), "debug now visible")
+}
+
+// TestLogRegistry_OutputFiltering_ResetRestoresSuppression verifies that after Reset,
+// debug events are suppressed again.
+func TestLogRegistry_OutputFiltering_ResetRestoresSuppression(t *testing.T) {
+	r, buf := testRegistryWithBuffer(t, zerolog.InfoLevel)
+	logger := r.Logger("hotstuff")
+
+	r.SetLevel("hotstuff", zerolog.DebugLevel)
+	logger.Debug().Msg("debug visible")
+	require.Contains(t, buf.String(), "debug visible")
+
+	buf.Reset()
+	r.Reset([]string{"hotstuff"})
+
+	logger.Debug().Msg("debug suppressed again")
+	assert.Empty(t, buf.String(), "debug should be suppressed after reset")
+
+	logger.Info().Msg("info still visible")
+	assert.Contains(t, buf.String(), "info still visible")
+}
+
+// TestLogRegistry_OutputFiltering_IndependentComponents verifies that lowering one
+// component's level does not cause another component to emit events below its level.
+// This tests the key design property: each component has its own componentLevelWriter.
+func TestLogRegistry_OutputFiltering_IndependentComponents(t *testing.T) {
+	r, buf := testRegistryWithBuffer(t, zerolog.InfoLevel)
+	loggerA := r.Logger("component-a") // stays at info
+	loggerB := r.Logger("component-b") // lowered to debug
+
+	r.SetLevel("component-b", zerolog.DebugLevel)
+	// GlobalLevel is now debug to allow B's debug events through — but A's writer
+	// should still discard them.
+
+	buf.Reset()
+	loggerA.Debug().Msg("a-debug")
+	assert.Empty(t, buf.String(), "component-a should not emit debug despite global level drop")
+
+	loggerB.Debug().Msg("b-debug")
+	assert.Contains(t, buf.String(), "b-debug", "component-b should emit debug")
+
+	loggerA.Info().Msg("a-info")
+	assert.Contains(t, buf.String(), "a-info", "component-a should still emit info")
+}
+
+// TestLogRegistry_OutputFiltering_ChildLoggerInheritsLevel verifies that child loggers
+// derived from a component logger via With() share the same componentLevelWriter and
+// automatically reflect level changes without re-registration.
+func TestLogRegistry_OutputFiltering_ChildLoggerInheritsLevel(t *testing.T) {
+	r, buf := testRegistryWithBuffer(t, zerolog.InfoLevel)
+	parent := r.Logger("hotstuff")
+	child := parent.With().Str("sub", "voter").Logger()
+
+	// Before: both suppressed at info
+	child.Debug().Msg("child debug suppressed")
+	assert.Empty(t, buf.String())
+
+	// Lower the component level — child should pick it up automatically
+	r.SetLevel("hotstuff", zerolog.DebugLevel)
+
+	child.Debug().Msg("child debug visible")
+	assert.Contains(t, buf.String(), "child debug visible",
+		"child should inherit level change via shared componentLevelWriter")
+}
+
+// TestLogRegistry_OutputFiltering_WildcardAffectsOutput verifies that a wildcard SetLevel
+// affects the actual output of all matching components.
+func TestLogRegistry_OutputFiltering_WildcardAffectsOutput(t *testing.T) {
+	r, buf := testRegistryWithBuffer(t, zerolog.InfoLevel)
+	voter := r.Logger("hotstuff.voter")
+	pacemaker := r.Logger("hotstuff.pacemaker")
+
+	r.SetLevel("hotstuff.*", zerolog.DebugLevel)
+
+	voter.Debug().Msg("voter-debug")
+	pacemaker.Debug().Msg("pacemaker-debug")
+
+	assert.Contains(t, buf.String(), "voter-debug")
+	assert.Contains(t, buf.String(), "pacemaker-debug")
 }
