@@ -21,19 +21,19 @@ func ParseComponentLogLevels(s string) (map[string]zerolog.Level, error) {
 		return result, nil
 	}
 	for entry := range strings.SplitSeq(s, ",") {
-		parts := strings.SplitN(entry, ":", 2)
-		if len(parts) != 2 {
+		if strings.Count(entry, ":") != 1 {
 			return nil, fmt.Errorf("invalid component log level entry %q: expected format component:level", entry)
 		}
+		parts := strings.SplitN(entry, ":", 2)
 		component := NormalizePattern(strings.TrimSpace(parts[0]))
-		levelStr := strings.TrimSpace(parts[1])
+		levelStr := strings.ToLower(strings.TrimSpace(parts[1]))
 		if component == "" {
 			return nil, fmt.Errorf("invalid component log level entry %q: component name must not be empty", entry)
 		}
 		if err := ValidatePattern(component); err != nil {
 			return nil, fmt.Errorf("invalid component log level entry %q: %w", entry, err)
 		}
-		level, err := zerolog.ParseLevel(strings.ToLower(levelStr))
+		level, err := zerolog.ParseLevel(levelStr)
 		if err != nil {
 			return nil, fmt.Errorf("invalid log level %q for component %q: %w", levelStr, component, err)
 		}
