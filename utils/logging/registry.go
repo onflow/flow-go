@@ -3,6 +3,7 @@ package logging
 import (
 	"fmt"
 	"io"
+	"maps"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -43,9 +44,7 @@ func NewLogRegistry(
 	staticConfig map[string]zerolog.Level,
 ) *LogRegistry {
 	static := make(map[string]zerolog.Level, len(staticConfig))
-	for k, v := range staticConfig {
-		static[k] = v
-	}
+	maps.Copy(static, staticConfig)
 	r := &LogRegistry{
 		baseLogger:    baseLogger.Level(zerolog.TraceLevel),
 		baseWriter:    toLevelWriter(baseWriter),
