@@ -20,7 +20,7 @@ func ParseComponentLogLevels(s string) (map[string]zerolog.Level, error) {
 	if s == "" {
 		return result, nil
 	}
-	for _, entry := range strings.Split(s, ",") {
+	for entry := range strings.SplitSeq(s, ",") {
 		parts := strings.SplitN(entry, ":", 2)
 		if len(parts) != 2 {
 			return nil, fmt.Errorf("invalid component log level entry %q: expected format component:level", entry)
