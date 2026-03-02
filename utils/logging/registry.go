@@ -23,7 +23,6 @@ import (
 type LogRegistry struct {
 	mu sync.RWMutex
 
-	baseLogger    zerolog.Logger
 	baseWriter    zerolog.LevelWriter
 	globalDefault zerolog.Level
 
@@ -33,12 +32,10 @@ type LogRegistry struct {
 	registered map[string]*atomic.Int32 // componentID → current effective level
 }
 
-// NewLogRegistry constructs a LogRegistry. baseLogger carries node-level context fields
-// (node_role, node_id, etc.) that are inherited by all component loggers. baseWriter is the
-// underlying output; it is wrapped per component. staticConfig is the parsed --component-log-levels
-// flag; it must not be mutated after construction.
+// NewLogRegistry constructs a LogRegistry. baseWriter is the underlying output; it is wrapped
+// per component. staticConfig is the parsed --component-log-levels flag; it must not be mutated
+// after construction.
 func NewLogRegistry(
-	baseLogger zerolog.Logger,
 	baseWriter io.Writer,
 	globalDefault zerolog.Level,
 	staticConfig map[string]zerolog.Level,
@@ -46,7 +43,6 @@ func NewLogRegistry(
 	static := make(map[string]zerolog.Level, len(staticConfig))
 	maps.Copy(static, staticConfig)
 	r := &LogRegistry{
-		baseLogger:    baseLogger.Level(zerolog.TraceLevel),
 		baseWriter:    toLevelWriter(baseWriter),
 		globalDefault: globalDefault,
 		staticConfig:  static,
@@ -57,46 +53,22 @@ func NewLogRegistry(
 	return r
 }
 
-// Logger registers componentID and returns a zerolog.Logger backed by a componentLevelWriter
-// for that component. The logger inherits the base logger's context fields.
-// Panics if componentID is already registered or invalid — both are programming errors.
-// componentID is normalized to lowercase before registration.
-func (r *LogRegistry) Logger(componentID string) zerolog.Logger {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
-	componentID = NormalizePattern(componentID)
-	if err := ValidateComponentID(componentID); err != nil {
-		panic(fmt.Sprintf("log registry: %s", err))
-	}
-	if _, exists := r.registered[componentID]; exists {
-		panic(fmt.Sprintf("log registry: component %q already registered", componentID))
-	}
-
-	level := r.resolve(componentID)
-	atomicLevel := &atomic.Int32{}
-	atomicLevel.Store(int32(level))
-	r.registered[componentID] = atomicLevel
-
-	w := NewComponentLevelWriter(atomicLevel, r.baseWriter)
-	r.updateGlobalLevel()
-	return r.baseLogger.Output(w)
-}
-
-// LoggerFrom registers componentID and returns a zerolog.Logger derived from parent,
-// preserving all of parent's context fields (labels, fields added via With()) while
-// backing the new logger with a fresh componentLevelWriter for componentID.
+// Logger registers componentID and returns a zerolog.Logger derived from parent,
+// preserving all of parent's context fields while backing the logger with a fresh
+// componentLevelWriter for this component.
 //
-// Use this when passing loggers down a hierarchy: the parent carries accumulated context
-// (e.g. block height, round number) and the child needs independent level control.
+// Use the node's top-level logger as parent at the root level:
 //
-//	parent := registry.Logger("hotstuff")
-//	parent = parent.With().Uint64("view", view).Logger() // add context along the way
-//	child  := registry.LoggerFrom(parent, "hotstuff.voter") // inherits "view", own level
+//	logger := registry.Logger(node.Logger, "hotstuff")
+//
+// Pass an already-enriched logger to inherit accumulated context down a hierarchy:
+//
+//	enriched := logger.With().Uint64("view", view).Logger()
+//	child := registry.Logger(enriched, "hotstuff.voter")
 //
 // Panics if componentID is already registered or invalid — both are programming errors.
 // componentID is normalized to lowercase before registration.
-func (r *LogRegistry) LoggerFrom(parent zerolog.Logger, componentID string) zerolog.Logger {
+func (r *LogRegistry) Logger(parent zerolog.Logger, componentID string) zerolog.Logger {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 

@@ -87,8 +87,8 @@ func TestValidatePattern(t *testing.T) {
 // TestLogRegistry_NormalizesComponentID verifies that Logger() accepts mixed-case IDs
 // and normalizes them to lowercase before registration and lookup.
 func TestLogRegistry_NormalizesComponentID(t *testing.T) {
-	r := testRegistry(t, zerolog.InfoLevel, nil)
-	r.Logger("HotStuff") // registered as "hotstuff"
+	r, log := testRegistry(t, zerolog.InfoLevel, nil)
+	r.Logger(log, "HotStuff") // registered as "hotstuff"
 
 	assert.Equal(t, zerolog.InfoLevel, r.EffectiveLevel("hotstuff"))
 	assert.Equal(t, zerolog.InfoLevel, r.EffectiveLevel("HotStuff")) // lookup also normalizes
@@ -96,8 +96,8 @@ func TestLogRegistry_NormalizesComponentID(t *testing.T) {
 
 // TestLogRegistry_NormalizesSetLevel verifies that SetLevel normalizes the pattern.
 func TestLogRegistry_NormalizesSetLevel(t *testing.T) {
-	r := testRegistry(t, zerolog.InfoLevel, nil)
-	r.Logger("hotstuff.voter")
+	r, log := testRegistry(t, zerolog.InfoLevel, nil)
+	r.Logger(log, "hotstuff.voter")
 
 	r.SetLevel("Hotstuff.Voter", zerolog.DebugLevel)
 	assert.Equal(t, zerolog.DebugLevel, r.EffectiveLevel("hotstuff.voter"))
@@ -105,10 +105,10 @@ func TestLogRegistry_NormalizesSetLevel(t *testing.T) {
 
 // TestLogRegistry_PanicsOnInvalidComponentID verifies that Logger() panics for invalid IDs.
 func TestLogRegistry_PanicsOnInvalidComponentID(t *testing.T) {
-	r := testRegistry(t, zerolog.InfoLevel, nil)
-	require.Panics(t, func() { r.Logger("invalid id with spaces") })
-	require.Panics(t, func() { r.Logger(".leading-dot") })
-	require.Panics(t, func() { r.Logger("trailing-dot.") })
+	r, log := testRegistry(t, zerolog.InfoLevel, nil)
+	require.Panics(t, func() { r.Logger(log, "invalid id with spaces") })
+	require.Panics(t, func() { r.Logger(log, ".leading-dot") })
+	require.Panics(t, func() { r.Logger(log, "trailing-dot.") })
 }
 
 // TestParseComponentLogLevels_NormalizesAndValidatesPatterns verifies that parsing

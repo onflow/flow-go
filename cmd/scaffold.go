@@ -919,7 +919,7 @@ func (fnb *FlowNodeBuilder) initLogger() error {
 	// Logger level is set to trace; all filtering is owned by LogRegistry.
 	log = log.Level(zerolog.TraceLevel)
 
-	fnb.LogRegistry = logging.NewLogRegistry(log, os.Stderr, lvl, staticConfig)
+	fnb.LogRegistry = logging.NewLogRegistry(os.Stderr, lvl, staticConfig)
 	fnb.Logger = log
 
 	return nil

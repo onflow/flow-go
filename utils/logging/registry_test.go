@@ -12,103 +12,102 @@ import (
 	"github.com/onflow/flow-go/utils/logging"
 )
 
-func testRegistry(t *testing.T, defaultLevel zerolog.Level, static map[string]zerolog.Level) *logging.LogRegistry {
+func testRegistry(t *testing.T, defaultLevel zerolog.Level, static map[string]zerolog.Level) (*logging.LogRegistry, zerolog.Logger) {
 	t.Helper()
-	baseLogger := zerolog.New(os.Stderr)
-	r := logging.NewLogRegistry(baseLogger, os.Stderr, defaultLevel, static)
+	r := logging.NewLogRegistry(os.Stderr, defaultLevel, static)
 	t.Cleanup(func() { zerolog.SetGlobalLevel(zerolog.TraceLevel) })
-	return r
+	return r, zerolog.New(os.Stderr).Level(zerolog.TraceLevel)
 }
 
 // testRegistryWithBuffer creates a LogRegistry backed by a bytes.Buffer for output inspection.
-func testRegistryWithBuffer(t *testing.T, defaultLevel zerolog.Level) (*logging.LogRegistry, *bytes.Buffer) {
+func testRegistryWithBuffer(t *testing.T, defaultLevel zerolog.Level) (*logging.LogRegistry, zerolog.Logger, *bytes.Buffer) {
 	t.Helper()
 	var buf bytes.Buffer
-	baseLogger := zerolog.New(&buf)
-	r := logging.NewLogRegistry(baseLogger, &buf, defaultLevel, nil)
+	baseLogger := zerolog.New(&buf).Level(zerolog.TraceLevel)
+	r := logging.NewLogRegistry(&buf, defaultLevel, nil)
 	t.Cleanup(func() { zerolog.SetGlobalLevel(zerolog.TraceLevel) })
-	return r, &buf
+	return r, baseLogger, &buf
 }
 
 // TestLogRegistry_RegisterReturnsLogger verifies Logger() returns a usable zerolog.Logger.
 func TestLogRegistry_RegisterReturnsLogger(t *testing.T) {
-	r := testRegistry(t, zerolog.InfoLevel, nil)
-	logger := r.Logger("hotstuff")
+	r, log := testRegistry(t, zerolog.InfoLevel, nil)
+	logger := r.Logger(log, "hotstuff")
 	logger.Info().Msg("test")
 }
 
 // TestLogRegistry_DuplicateRegisterPanics verifies that registering the same ID twice panics.
 func TestLogRegistry_DuplicateRegisterPanics(t *testing.T) {
-	r := testRegistry(t, zerolog.InfoLevel, nil)
-	r.Logger("hotstuff")
-	require.Panics(t, func() { r.Logger("hotstuff") })
+	r, log := testRegistry(t, zerolog.InfoLevel, nil)
+	r.Logger(log, "hotstuff")
+	require.Panics(t, func() { r.Logger(log, "hotstuff") })
 }
 
 // TestLogRegistry_ResolvesDefaultLevel verifies that a component with no static config
 // or override resolves to globalDefault.
 func TestLogRegistry_ResolvesDefaultLevel(t *testing.T) {
-	r := testRegistry(t, zerolog.WarnLevel, nil)
-	r.Logger("hotstuff")
+	r, log := testRegistry(t, zerolog.WarnLevel, nil)
+	r.Logger(log, "hotstuff")
 	assert.Equal(t, zerolog.WarnLevel, r.EffectiveLevel("hotstuff"))
 }
 
 // TestLogRegistry_ResolvesStaticExact verifies that a static exact match beats globalDefault.
 func TestLogRegistry_ResolvesStaticExact(t *testing.T) {
-	r := testRegistry(t, zerolog.InfoLevel, map[string]zerolog.Level{
+	r, log := testRegistry(t, zerolog.InfoLevel, map[string]zerolog.Level{
 		"hotstuff": zerolog.DebugLevel,
 	})
-	r.Logger("hotstuff")
+	r.Logger(log, "hotstuff")
 	assert.Equal(t, zerolog.DebugLevel, r.EffectiveLevel("hotstuff"))
 }
 
 // TestLogRegistry_ResolvesStaticWildcard verifies that a static wildcard match is applied
 // when no exact match exists.
 func TestLogRegistry_ResolvesStaticWildcard(t *testing.T) {
-	r := testRegistry(t, zerolog.InfoLevel, map[string]zerolog.Level{
+	r, log := testRegistry(t, zerolog.InfoLevel, map[string]zerolog.Level{
 		"hotstuff.*": zerolog.DebugLevel,
 	})
-	r.Logger("hotstuff.voter")
+	r.Logger(log, "hotstuff.voter")
 	assert.Equal(t, zerolog.DebugLevel, r.EffectiveLevel("hotstuff.voter"))
 }
 
 // TestLogRegistry_StaticWildcardDoesNotMatchParent verifies that "hotstuff.*" does not
 // match "hotstuff" itself.
 func TestLogRegistry_StaticWildcardDoesNotMatchParent(t *testing.T) {
-	r := testRegistry(t, zerolog.InfoLevel, map[string]zerolog.Level{
+	r, log := testRegistry(t, zerolog.InfoLevel, map[string]zerolog.Level{
 		"hotstuff.*": zerolog.DebugLevel,
 	})
-	r.Logger("hotstuff")
+	r.Logger(log, "hotstuff")
 	assert.Equal(t, zerolog.InfoLevel, r.EffectiveLevel("hotstuff"))
 }
 
 // TestLogRegistry_MostSpecificWildcardWins verifies that the longest matching prefix
 // wildcard takes priority.
 func TestLogRegistry_MostSpecificWildcardWins(t *testing.T) {
-	r := testRegistry(t, zerolog.InfoLevel, map[string]zerolog.Level{
+	r, log := testRegistry(t, zerolog.InfoLevel, map[string]zerolog.Level{
 		"hotstuff.*":       zerolog.DebugLevel,
 		"hotstuff.voter.*": zerolog.WarnLevel,
 	})
-	r.Logger("hotstuff.voter.timer")
+	r.Logger(log, "hotstuff.voter.timer")
 	assert.Equal(t, zerolog.WarnLevel, r.EffectiveLevel("hotstuff.voter.timer"))
 }
 
 // TestLogRegistry_GlobalLevelSetToMinimum verifies that zerolog.GlobalLevel is set to
 // the minimum of all component levels after registration.
 func TestLogRegistry_GlobalLevelSetToMinimum(t *testing.T) {
-	r := testRegistry(t, zerolog.InfoLevel, map[string]zerolog.Level{
+	r, log := testRegistry(t, zerolog.InfoLevel, map[string]zerolog.Level{
 		"hotstuff": zerolog.DebugLevel,
 	})
-	r.Logger("hotstuff")
-	r.Logger("network")
+	r.Logger(log, "hotstuff")
+	r.Logger(log, "network")
 	assert.Equal(t, zerolog.DebugLevel, zerolog.GlobalLevel())
 }
 
 // TestLogRegistry_SetLevelExact verifies that SetLevel with an exact pattern updates only
 // the matching registered component.
 func TestLogRegistry_SetLevelExact(t *testing.T) {
-	r := testRegistry(t, zerolog.InfoLevel, nil)
-	r.Logger("hotstuff")
-	r.Logger("hotstuff.voter")
+	r, log := testRegistry(t, zerolog.InfoLevel, nil)
+	r.Logger(log, "hotstuff")
+	r.Logger(log, "hotstuff.voter")
 
 	r.SetLevel("hotstuff", zerolog.DebugLevel)
 
@@ -119,11 +118,11 @@ func TestLogRegistry_SetLevelExact(t *testing.T) {
 // TestLogRegistry_SetLevelWildcard verifies that SetLevel with a wildcard pattern updates
 // all matching children but not the parent.
 func TestLogRegistry_SetLevelWildcard(t *testing.T) {
-	r := testRegistry(t, zerolog.InfoLevel, nil)
-	r.Logger("hotstuff")
-	r.Logger("hotstuff.voter")
-	r.Logger("hotstuff.pacemaker")
-	r.Logger("network")
+	r, log := testRegistry(t, zerolog.InfoLevel, nil)
+	r.Logger(log, "hotstuff")
+	r.Logger(log, "hotstuff.voter")
+	r.Logger(log, "hotstuff.pacemaker")
+	r.Logger(log, "network")
 
 	r.SetLevel("hotstuff.*", zerolog.DebugLevel)
 
@@ -136,8 +135,8 @@ func TestLogRegistry_SetLevelWildcard(t *testing.T) {
 // TestLogRegistry_SetLevelMoreSpecificOverrideNotClobbered verifies that a more specific
 // override is not overwritten by a less specific wildcard set.
 func TestLogRegistry_SetLevelMoreSpecificOverrideNotClobbered(t *testing.T) {
-	r := testRegistry(t, zerolog.InfoLevel, nil)
-	r.Logger("hotstuff.voter")
+	r, log := testRegistry(t, zerolog.InfoLevel, nil)
+	r.Logger(log, "hotstuff.voter")
 
 	r.SetLevel("hotstuff.voter", zerolog.WarnLevel) // exact override first
 	r.SetLevel("hotstuff.*", zerolog.DebugLevel)    // wildcard applied second
@@ -149,8 +148,8 @@ func TestLogRegistry_SetLevelMoreSpecificOverrideNotClobbered(t *testing.T) {
 // TestLogRegistry_SetLevelUpdatesGlobalLevel verifies that lowering a component level
 // also lowers zerolog.GlobalLevel.
 func TestLogRegistry_SetLevelUpdatesGlobalLevel(t *testing.T) {
-	r := testRegistry(t, zerolog.InfoLevel, nil)
-	r.Logger("hotstuff")
+	r, log := testRegistry(t, zerolog.InfoLevel, nil)
+	r.Logger(log, "hotstuff")
 
 	r.SetLevel("hotstuff", zerolog.DebugLevel)
 	assert.Equal(t, zerolog.DebugLevel, zerolog.GlobalLevel())
@@ -159,10 +158,10 @@ func TestLogRegistry_SetLevelUpdatesGlobalLevel(t *testing.T) {
 // TestLogRegistry_ResetExact verifies that Reset removes a runtime override, restoring
 // the component to its static config or global default.
 func TestLogRegistry_ResetExact(t *testing.T) {
-	r := testRegistry(t, zerolog.InfoLevel, map[string]zerolog.Level{
+	r, log := testRegistry(t, zerolog.InfoLevel, map[string]zerolog.Level{
 		"hotstuff": zerolog.WarnLevel,
 	})
-	r.Logger("hotstuff")
+	r.Logger(log, "hotstuff")
 	r.SetLevel("hotstuff", zerolog.DebugLevel)
 	assert.Equal(t, zerolog.DebugLevel, r.EffectiveLevel("hotstuff"))
 
@@ -173,9 +172,9 @@ func TestLogRegistry_ResetExact(t *testing.T) {
 // TestLogRegistry_ResetWildcard verifies that Reset with a wildcard removes matching
 // overrides and re-resolves affected components.
 func TestLogRegistry_ResetWildcard(t *testing.T) {
-	r := testRegistry(t, zerolog.InfoLevel, nil)
-	r.Logger("hotstuff.voter")
-	r.Logger("hotstuff.pacemaker")
+	r, log := testRegistry(t, zerolog.InfoLevel, nil)
+	r.Logger(log, "hotstuff.voter")
+	r.Logger(log, "hotstuff.pacemaker")
 
 	r.SetLevel("hotstuff.*", zerolog.DebugLevel)
 	r.Reset([]string{"hotstuff.*"})
@@ -187,9 +186,9 @@ func TestLogRegistry_ResetWildcard(t *testing.T) {
 // TestLogRegistry_ResetAll verifies that Reset(["*"]) restores all components to static
 // config or global default.
 func TestLogRegistry_ResetAll(t *testing.T) {
-	r := testRegistry(t, zerolog.InfoLevel, nil)
-	r.Logger("hotstuff")
-	r.Logger("network")
+	r, log := testRegistry(t, zerolog.InfoLevel, nil)
+	r.Logger(log, "hotstuff")
+	r.Logger(log, "network")
 
 	r.SetLevel("hotstuff", zerolog.DebugLevel)
 	r.SetLevel("network", zerolog.TraceLevel)
@@ -203,9 +202,9 @@ func TestLogRegistry_ResetAll(t *testing.T) {
 // TestLogRegistry_SetDefaultLevel verifies that updating the default re-resolves components
 // without explicit overrides and leaves overridden components unchanged.
 func TestLogRegistry_SetDefaultLevel(t *testing.T) {
-	r := testRegistry(t, zerolog.InfoLevel, nil)
-	r.Logger("hotstuff")
-	r.Logger("network")
+	r, log := testRegistry(t, zerolog.InfoLevel, nil)
+	r.Logger(log, "hotstuff")
+	r.Logger(log, "network")
 	r.SetLevel("network", zerolog.WarnLevel)
 
 	r.SetDefaultLevel(zerolog.DebugLevel)
@@ -217,13 +216,13 @@ func TestLogRegistry_SetDefaultLevel(t *testing.T) {
 // TestLogRegistry_Levels verifies that Levels returns the correct level and source for
 // each registered component.
 func TestLogRegistry_Levels(t *testing.T) {
-	r := testRegistry(t, zerolog.InfoLevel, map[string]zerolog.Level{
+	r, log := testRegistry(t, zerolog.InfoLevel, map[string]zerolog.Level{
 		"hotstuff.voter": zerolog.WarnLevel,
 		"network.*":      zerolog.ErrorLevel,
 	})
-	r.Logger("hotstuff")
-	r.Logger("hotstuff.voter")
-	r.Logger("network.p2p")
+	r.Logger(log, "hotstuff")
+	r.Logger(log, "hotstuff.voter")
+	r.Logger(log, "network.p2p")
 	r.SetLevel("hotstuff", zerolog.DebugLevel)
 
 	defaultLevel, levels := r.Levels()
@@ -242,8 +241,8 @@ func TestLogRegistry_Levels(t *testing.T) {
 // TestLogRegistry_OutputFiltering_DefaultLevel verifies that at the default level (info),
 // debug events produce no output and info events are written.
 func TestLogRegistry_OutputFiltering_DefaultLevel(t *testing.T) {
-	r, buf := testRegistryWithBuffer(t, zerolog.InfoLevel)
-	logger := r.Logger("hotstuff")
+	r, log, buf := testRegistryWithBuffer(t, zerolog.InfoLevel)
+	logger := r.Logger(log, "hotstuff")
 
 	logger.Debug().Msg("debug suppressed")
 	assert.Empty(t, buf.String(), "debug should produce no output at info level")
@@ -255,8 +254,8 @@ func TestLogRegistry_OutputFiltering_DefaultLevel(t *testing.T) {
 // TestLogRegistry_OutputFiltering_LowerLevel verifies that after SetLevel lowers a
 // component to debug, debug events are written to the output.
 func TestLogRegistry_OutputFiltering_LowerLevel(t *testing.T) {
-	r, buf := testRegistryWithBuffer(t, zerolog.InfoLevel)
-	logger := r.Logger("hotstuff")
+	r, log, buf := testRegistryWithBuffer(t, zerolog.InfoLevel)
+	logger := r.Logger(log, "hotstuff")
 
 	r.SetLevel("hotstuff", zerolog.DebugLevel)
 
@@ -267,8 +266,8 @@ func TestLogRegistry_OutputFiltering_LowerLevel(t *testing.T) {
 // TestLogRegistry_OutputFiltering_ResetRestoresSuppression verifies that after Reset,
 // debug events are suppressed again.
 func TestLogRegistry_OutputFiltering_ResetRestoresSuppression(t *testing.T) {
-	r, buf := testRegistryWithBuffer(t, zerolog.InfoLevel)
-	logger := r.Logger("hotstuff")
+	r, log, buf := testRegistryWithBuffer(t, zerolog.InfoLevel)
+	logger := r.Logger(log, "hotstuff")
 
 	r.SetLevel("hotstuff", zerolog.DebugLevel)
 	logger.Debug().Msg("debug visible")
@@ -288,9 +287,9 @@ func TestLogRegistry_OutputFiltering_ResetRestoresSuppression(t *testing.T) {
 // component's level does not cause another component to emit events below its level.
 // This tests the key design property: each component has its own componentLevelWriter.
 func TestLogRegistry_OutputFiltering_IndependentComponents(t *testing.T) {
-	r, buf := testRegistryWithBuffer(t, zerolog.InfoLevel)
-	loggerA := r.Logger("component-a") // stays at info
-	loggerB := r.Logger("component-b") // lowered to debug
+	r, log, buf := testRegistryWithBuffer(t, zerolog.InfoLevel)
+	loggerA := r.Logger(log, "component-a") // stays at info
+	loggerB := r.Logger(log, "component-b") // lowered to debug
 
 	r.SetLevel("component-b", zerolog.DebugLevel)
 	// GlobalLevel is now debug to allow B's debug events through — but A's writer
@@ -311,8 +310,8 @@ func TestLogRegistry_OutputFiltering_IndependentComponents(t *testing.T) {
 // derived from a component logger via With() share the same componentLevelWriter and
 // automatically reflect level changes without re-registration.
 func TestLogRegistry_OutputFiltering_ChildLoggerInheritsLevel(t *testing.T) {
-	r, buf := testRegistryWithBuffer(t, zerolog.InfoLevel)
-	parent := r.Logger("hotstuff")
+	r, log, buf := testRegistryWithBuffer(t, zerolog.InfoLevel)
+	parent := r.Logger(log, "hotstuff")
 	child := parent.With().Str("sub", "voter").Logger()
 
 	// Before: both suppressed at info
@@ -330,9 +329,9 @@ func TestLogRegistry_OutputFiltering_ChildLoggerInheritsLevel(t *testing.T) {
 // TestLogRegistry_OutputFiltering_WildcardAffectsOutput verifies that a wildcard SetLevel
 // affects the actual output of all matching components.
 func TestLogRegistry_OutputFiltering_WildcardAffectsOutput(t *testing.T) {
-	r, buf := testRegistryWithBuffer(t, zerolog.InfoLevel)
-	voter := r.Logger("hotstuff.voter")
-	pacemaker := r.Logger("hotstuff.pacemaker")
+	r, log, buf := testRegistryWithBuffer(t, zerolog.InfoLevel)
+	voter := r.Logger(log, "hotstuff.voter")
+	pacemaker := r.Logger(log, "hotstuff.pacemaker")
 
 	r.SetLevel("hotstuff.*", zerolog.DebugLevel)
 
@@ -343,15 +342,15 @@ func TestLogRegistry_OutputFiltering_WildcardAffectsOutput(t *testing.T) {
 	assert.Contains(t, buf.String(), "pacemaker-debug")
 }
 
-// TestLogRegistry_LoggerFrom_InheritsParentContext verifies that LoggerFrom preserves
+// TestLogRegistry_LoggerFrom_InheritsParentContext verifies that Logger preserves
 // all context fields added to the parent logger before the child is registered.
 func TestLogRegistry_LoggerFrom_InheritsParentContext(t *testing.T) {
-	r, buf := testRegistryWithBuffer(t, zerolog.InfoLevel)
+	r, log, buf := testRegistryWithBuffer(t, zerolog.InfoLevel)
 
-	parent := r.Logger("hotstuff")
+	parent := r.Logger(log, "hotstuff")
 	parent = parent.With().Str("view", "42").Logger() // add context after registration
 
-	child := r.LoggerFrom(parent, "hotstuff.voter")
+	child := r.Logger(parent, "hotstuff.voter")
 
 	child.Info().Msg("child message")
 	out := buf.String()
@@ -360,12 +359,12 @@ func TestLogRegistry_LoggerFrom_InheritsParentContext(t *testing.T) {
 }
 
 // TestLogRegistry_LoggerFrom_IndependentLevelControl verifies that the child registered
-// via LoggerFrom has its own independently controllable level.
+// via Logger has its own independently controllable level.
 func TestLogRegistry_LoggerFrom_IndependentLevelControl(t *testing.T) {
-	r, buf := testRegistryWithBuffer(t, zerolog.InfoLevel)
+	r, log, buf := testRegistryWithBuffer(t, zerolog.InfoLevel)
 
-	parent := r.Logger("hotstuff")
-	child := r.LoggerFrom(parent, "hotstuff.voter")
+	parent := r.Logger(log, "hotstuff")
+	child := r.Logger(parent, "hotstuff.voter")
 
 	// Lower child to debug — parent stays at info
 	r.SetLevel("hotstuff.voter", zerolog.DebugLevel)
@@ -379,10 +378,10 @@ func TestLogRegistry_LoggerFrom_IndependentLevelControl(t *testing.T) {
 }
 
 // TestLogRegistry_LoggerFrom_PanicsOnDuplicate verifies that registering the same
-// component ID twice via LoggerFrom panics.
+// component ID twice via Logger panics.
 func TestLogRegistry_LoggerFrom_PanicsOnDuplicate(t *testing.T) {
-	r := testRegistry(t, zerolog.InfoLevel, nil)
-	parent := r.Logger("hotstuff")
-	r.LoggerFrom(parent, "hotstuff.voter")
-	require.Panics(t, func() { r.LoggerFrom(parent, "hotstuff.voter") })
+	r, log := testRegistry(t, zerolog.InfoLevel, nil)
+	parent := r.Logger(log, "hotstuff")
+	r.Logger(parent, "hotstuff.voter")
+	require.Panics(t, func() { r.Logger(parent, "hotstuff.voter") })
 }
