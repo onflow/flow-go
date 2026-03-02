@@ -36,14 +36,14 @@ func TestValidateComponentID(t *testing.T) {
 
 	invalid := []string{
 		"",
-		"Hotstuff",          // uppercase rejected (must normalize first)
-		"hotstuff.",         // trailing dot
-		".hotstuff",         // leading dot
-		"hotstuff..voter",   // double dot
-		"hotstuff.*",        // wildcard is not a component ID
-		"*",                 // reset-all token
-		"-hotstuff",         // segment starting with hyphen
-		"hotstuff voter",    // space
+		"Hotstuff",        // uppercase rejected (must normalize first)
+		"hotstuff.",       // trailing dot
+		".hotstuff",       // leading dot
+		"hotstuff..voter", // double dot
+		"hotstuff.*",      // wildcard is not a component ID
+		"*",               // reset-all token
+		"-hotstuff",       // segment starting with hyphen
+		"hotstuff voter",  // space
 	}
 	for _, id := range invalid {
 		t.Run(id, func(t *testing.T) {
@@ -70,12 +70,14 @@ func TestValidatePattern(t *testing.T) {
 
 	invalid := []string{
 		"",
-		"*",                   // reset-all token, not a pattern
-		"hotstuff.**",         // double wildcard
-		"hotstuff.*.voter",    // wildcard in the middle
-		"HotStuff",            // uppercase rejected (must normalize first)
-		"-hotstuff",           // segment starting with hyphen
-		"hotstuff.",           // trailing dot without wildcard
+		"*",                // reset-all token, not a pattern
+		"hotstuff.**",      // double wildcard
+		"hotstuff.*.voter", // wildcard in the middle
+		"*.hotstuff",       // wildcard at the beginning
+		"hotstuff*",        // wildcard without dot
+		"HotStuff",         // uppercase rejected (must normalize first)
+		"-hotstuff",        // segment starting with hyphen
+		"hotstuff.",        // trailing dot without wildcard
 	}
 	for _, p := range invalid {
 		t.Run(p, func(t *testing.T) {
@@ -84,14 +86,18 @@ func TestValidatePattern(t *testing.T) {
 	}
 }
 
-// TestLogRegistry_NormalizesComponentID verifies that Logger() accepts mixed-case IDs
-// and normalizes them to lowercase before registration and lookup.
+// TestLogRegistry_NormalizesComponentID verifies that Logger() normalizes the ID to
+// lowercase, such that mixed-case and lowercase refer to the same registration.
 func TestLogRegistry_NormalizesComponentID(t *testing.T) {
 	r, log := testRegistry(t, zerolog.InfoLevel, nil)
 	r.Logger(log, "HotStuff") // registered as "hotstuff"
 
-	assert.Equal(t, zerolog.InfoLevel, r.EffectiveLevel("hotstuff"))
-	assert.Equal(t, zerolog.InfoLevel, r.EffectiveLevel("HotStuff")) // lookup also normalizes
+	// Prove they are the same registration: changing via the lowercase key is
+	// reflected in the mixed-case lookup, and attempting to re-register panics.
+	r.SetLevel("hotstuff", zerolog.DebugLevel)
+	assert.Equal(t, zerolog.DebugLevel, r.EffectiveLevel("HotStuff"), "mixed-case lookup should see the level change")
+
+	require.Panics(t, func() { r.Logger(log, "hotstuff") }, "re-registering the normalized form should panic")
 }
 
 // TestLogRegistry_NormalizesSetLevel verifies that SetLevel normalizes the pattern.
