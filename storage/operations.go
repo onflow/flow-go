@@ -305,10 +305,8 @@ func PrefixInclusiveEnd(prefix, start []byte) []byte {
 	copy(end, prefix)
 
 	// pad up to the length of start
-	i := len(prefix)
-	for range len(end) - len(prefix) {
+	for i := len(prefix); i < len(end); i++ {
 		end[i] = 0xff
-		i++
 	}
 	return end
 }
