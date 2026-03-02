@@ -78,16 +78,17 @@ func (h *ContractHandler) SetState(
 	slot gethCommon.Hash,
 	value gethCommon.Hash,
 ) gethCommon.Hash {
-	execState, err := state.NewStateDB(h.backend, evm.StorageAccountAddress(h.flowChainID))
-	if err != nil {
-		return gethCommon.Hash{}
+	// should only be allowed on Emulator, for testing purposes
+	if h.flowChainID != flow.Emulator {
+		panicOnError(types.ErrUnsupportedNetworkOperation)
 	}
+
+	execState, err := state.NewStateDB(h.backend, evm.StorageAccountAddress(h.flowChainID))
+	panicOnError(err)
 
 	prevValue := execState.SetState(address, slot, value)
 	_, err = execState.Commit(true)
-	if err != nil {
-		return gethCommon.Hash{}
-	}
+	panicOnError(err)
 
 	return prevValue
 }
@@ -96,10 +97,13 @@ func (h *ContractHandler) GetState(
 	address gethCommon.Address,
 	slot gethCommon.Hash,
 ) gethCommon.Hash {
-	execState, err := state.NewStateDB(h.backend, evm.StorageAccountAddress(h.flowChainID))
-	if err != nil {
-		return gethCommon.Hash{}
+	// should only be allowed on Emulator, for testing purposes
+	if h.flowChainID != flow.Emulator {
+		panicOnError(types.ErrUnsupportedNetworkOperation)
 	}
+
+	execState, err := state.NewStateDB(h.backend, evm.StorageAccountAddress(h.flowChainID))
+	panicOnError(err)
 
 	return execState.GetState(address, slot)
 }
