@@ -145,7 +145,7 @@ func (r *LogRegistry) EffectiveLevel(componentID string) zerolog.Level {
 
 // updateGlobalLevel sets zerolog.GlobalLevel to min(globalDefault, all component levels).
 //
-// Not concurrency safe. caller must hold r.mu
+// Not concurrency safe
 func (r *LogRegistry) updateGlobalLevel() {
 	min := r.globalDefault
 	for _, al := range r.registered {
@@ -160,8 +160,6 @@ func (r *LogRegistry) updateGlobalLevel() {
 // exact component ID or a wildcard ("prefix.*"). The new override is stored and takes effect
 // immediately on all matching registered components.
 // pattern is normalized to lowercase before storage.
-//
-// No error returns are expected during normal operation.
 func (r *LogRegistry) SetLevel(pattern string, level zerolog.Level) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -175,8 +173,6 @@ func (r *LogRegistry) SetLevel(pattern string, level zerolog.Level) {
 // Reset removes runtime overrides matching each pattern in patterns and re-resolves affected
 // components from static config and globalDefault. Passing ["*"] removes all overrides and
 // resets every registered component. Each pattern is normalized to lowercase.
-//
-// No error returns are expected during normal operation.
 func (r *LogRegistry) Reset(patterns ...string) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -198,8 +194,6 @@ func (r *LogRegistry) Reset(patterns ...string) {
 
 // SetDefaultLevel updates the global default and re-resolves all registered components.
 // Per-component overrides (runtime or static) take priority and are preserved.
-//
-// No error returns are expected during normal operation.
 func (r *LogRegistry) SetDefaultLevel(level zerolog.Level) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -246,7 +240,7 @@ func (r *LogRegistry) Config() RegistryConfig {
 // resolve returns the effective level for componentID using the priority order:
 // override exact > override wildcard (most specific) > static exact > static wildcard > globalDefault.
 //
-// Not concurrency safe. caller must hold r.mu
+// Not concurrency safe
 func (r *LogRegistry) resolve(componentID string) zerolog.Level {
 	level, _ := r.resolveWithSource(componentID)
 	return level
@@ -254,7 +248,7 @@ func (r *LogRegistry) resolve(componentID string) zerolog.Level {
 
 // resolveWithSource is like resolve but also returns the LevelSource for reporting.
 //
-// Not concurrency safe. caller must hold r.mu
+// Not concurrency safe
 func (r *LogRegistry) resolveWithSource(id string) (zerolog.Level, LevelSource) {
 	if level, ok := r.overrides[id]; ok {
 		return level, LevelSourceOverride
@@ -273,7 +267,7 @@ func (r *LogRegistry) resolveWithSource(id string) (zerolog.Level, LevelSource) 
 
 // applyToMatching re-resolves all registered components matched by pattern.
 //
-// Not concurrency safe. caller must hold r.mu
+// Not concurrency safe
 func (r *LogRegistry) applyToMatching(pattern string) {
 	if prefix, ok := strings.CutSuffix(pattern, ".*"); ok {
 		for id, al := range r.registered {

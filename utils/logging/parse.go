@@ -13,8 +13,7 @@ import (
 // Format: "component:level,prefix.*:level"
 // Example: "hotstuff:debug,network.*:warn"
 //
-// Expected error returns during normal operation:
-//   - error: if any entry is malformed, contains an invalid pattern, or an unrecognized level string.
+// Any error indicates the entry is invalid.
 func ParseComponentLogLevels(s string) (map[string]zerolog.Level, error) {
 	result := make(map[string]zerolog.Level)
 	if s == "" {
