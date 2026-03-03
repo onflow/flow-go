@@ -39,6 +39,18 @@ func (f *AccountTransferFilter) isEmpty() bool {
 			f.RecipientAddress == flow.EmptyAddress)
 }
 
+func (f *AccountTransferFilter) validate(account flow.Address) error {
+	// if both source and recipient addresses are set and neither are the account's address, then the
+	// filter will never match.
+	if f.SourceAddress != flow.EmptyAddress && f.RecipientAddress != flow.EmptyAddress {
+		if f.SourceAddress == account || f.RecipientAddress == account {
+			return nil
+		}
+		return fmt.Errorf("source and recipient addresses are set and neither are the account's address. filter will never match")
+	}
+	return nil
+}
+
 // FTFilter returns a filter function for fungible token transfers based on the filter criteria.
 // Returns nil when no filter criteria are set, indicating all transfers should be accepted.
 func (f *AccountTransferFilter) FTFilter() storage.IndexFilter[*accessmodel.FungibleTokenTransfer] {
@@ -126,6 +138,10 @@ func (b *AccountTransfersBackend) GetAccountFungibleTokenTransfers(
 		return nil, status.Errorf(codes.InvalidArgument, "invalid limit: %v", err)
 	}
 
+	if err := filter.validate(address); err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "filter is not valid for account: %v", err)
+	}
+
 	if !b.chain.IsValid(address) {
 		return nil, status.Errorf(codes.NotFound, "account %s is not valid on chain %s", address, b.chain.ChainID())
 	}
@@ -189,6 +205,10 @@ func (b *AccountTransfersBackend) GetAccountNonFungibleTokenTransfers(
 	limit, err := b.normalizeLimit(limit)
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "invalid limit: %v", err)
+	}
+
+	if err := filter.validate(address); err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "filter is not valid for account: %v", err)
 	}
 
 	if !b.chain.IsValid(address) {
