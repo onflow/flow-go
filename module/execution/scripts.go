@@ -23,6 +23,7 @@ import (
 // If the register with the ID was not indexed at all return nil value and no error.
 //
 // Expected error returns during normal operation
+//   - [storage.ErrNotFound] if the register is not found at the given height.
 //   - [storage.ErrHeightNotIndexed] if the given height was not indexed yet or lower than the first indexed height.
 type RegisterAtHeight func(ID flow.RegisterID, height uint64) (flow.RegisterValue, error)
 
