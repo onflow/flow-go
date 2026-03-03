@@ -157,8 +157,6 @@ func (idx *ScheduledTransactionsIndex) ByAddress(
 
 // rangeKeysAll computes the start and end keys for iterating over all scheduled transactions based
 // on the provided cursor.
-//
-// Any error indicates the cursor is invalid
 func (idx *ScheduledTransactionsIndex) rangeKeysAll(cursor *access.ScheduledTransactionCursor) (startKey, endKey []byte) {
 	if cursor == nil {
 		// keys include the one's complement of the ID, so iteration is in descending order of ids.
@@ -174,8 +172,6 @@ func (idx *ScheduledTransactionsIndex) rangeKeysAll(cursor *access.ScheduledTran
 
 // rangeKeysAddress computes the start and end keys for iterating over scheduled transactions of an
 // account, based on the provided cursor.
-//
-// Any error indicates the cursor is invalid
 func (idx *ScheduledTransactionsIndex) rangeKeysAddress(address flow.Address, cursor *access.ScheduledTransactionCursor) (startKey, endKey []byte) {
 	if cursor == nil {
 		// keys include the one's complement of the ID, so iteration is in descending order of ids.

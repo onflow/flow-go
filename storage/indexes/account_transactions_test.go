@@ -13,6 +13,7 @@ import (
 	"github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/storage/indexes/iterator"
 	"github.com/onflow/flow-go/storage/operation"
 	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -835,6 +836,70 @@ func RunWithBootstrappedAccountTxIndex(tb testing.TB, startHeight uint64, txData
 		require.NoError(tb, err)
 
 		f(storageDB, lockManager, accountTx)
+	})
+}
+
+// TestAccountTransactions_PaginationCoversAllEntries verifies that paginating through all
+// transactions for an account using CollectResults visits every entry exactly once. This
+// specifically exercises the PrefixInclusiveEnd logic: when a cursor lands at firstHeight,
+// the iterator range must still include all remaining entries at that height.
+func TestAccountTransactions_PaginationCoversAllEntries(t *testing.T) {
+	t.Parallel()
+
+	const firstHeight = uint64(5)
+	const pageSize = uint32(3)
+
+	account := unittest.RandomAddressFixture()
+
+	// Bootstrap with 3 transactions at firstHeight so that all 3 are stored at the
+	// first indexed height. When the page boundary later falls exactly at firstHeight,
+	// PrefixInclusiveEnd must pad the end key so the iterator covers all entries there.
+	initialTxs := []access.AccountTransaction{
+		{Address: account, BlockHeight: firstHeight, TransactionID: unittest.IdentifierFixture(), TransactionIndex: 0, Roles: []access.TransactionRole{access.TransactionRoleAuthorizer}},
+		{Address: account, BlockHeight: firstHeight, TransactionID: unittest.IdentifierFixture(), TransactionIndex: 1, Roles: []access.TransactionRole{access.TransactionRoleAuthorizer}},
+		{Address: account, BlockHeight: firstHeight, TransactionID: unittest.IdentifierFixture(), TransactionIndex: 2, Roles: []access.TransactionRole{access.TransactionRoleAuthorizer}},
+	}
+
+	RunWithBootstrappedAccountTxIndex(t, firstHeight, initialTxs, func(_ storage.DB, lm storage.LockManager, idx *AccountTransactions) {
+		// 3 more transactions at height 6 (one above firstHeight)
+		err := storeAccountTransactions(t, lm, idx, 6, []access.AccountTransaction{
+			{Address: account, BlockHeight: 6, TransactionID: unittest.IdentifierFixture(), TransactionIndex: 0, Roles: []access.TransactionRole{access.TransactionRoleAuthorizer}},
+			{Address: account, BlockHeight: 6, TransactionID: unittest.IdentifierFixture(), TransactionIndex: 1, Roles: []access.TransactionRole{access.TransactionRoleAuthorizer}},
+			{Address: account, BlockHeight: 6, TransactionID: unittest.IdentifierFixture(), TransactionIndex: 2, Roles: []access.TransactionRole{access.TransactionRoleAuthorizer}},
+		})
+		require.NoError(t, err)
+
+		// Paginate using CollectResults until cursor is nil.
+		// Page 1 (cursor=nil) collects height-6 entries and returns a cursor pointing
+		// to firstHeight. Page 2 must still return all 3 entries at firstHeight.
+		var allCollected []access.AccountTransaction
+		var cursor *access.AccountTransactionCursor
+		for {
+			txIter, err := idx.ByAddress(account, cursor)
+			require.NoError(t, err)
+
+			page, nextCursor, err := iterator.CollectResults(txIter, pageSize, nil)
+			require.NoError(t, err)
+
+			allCollected = append(allCollected, page...)
+			cursor = nextCursor
+			if cursor == nil {
+				break
+			}
+		}
+
+		// All 6 transactions must be visited exactly once.
+		require.Len(t, allCollected, 6)
+
+		// First 3 results are from height 6 (newest first), next 3 from firstHeight.
+		for i := 0; i < 3; i++ {
+			assert.Equal(t, uint64(6), allCollected[i].BlockHeight)
+			assert.Equal(t, uint32(i), allCollected[i].TransactionIndex)
+		}
+		for i := 0; i < 3; i++ {
+			assert.Equal(t, firstHeight, allCollected[3+i].BlockHeight)
+			assert.Equal(t, uint32(i), allCollected[3+i].TransactionIndex)
+		}
 	})
 }
 

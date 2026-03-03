@@ -119,6 +119,11 @@ func (r *ScheduledTransactionRequester) fetchMissingTxs(
 			return nil, fmt.Errorf("expected Array result, got %T", results)
 		}
 
+		if len(array.Values) != len(batch) {
+			return nil, fmt.Errorf("expected %d results from scheduled transaction data script, got %d",
+				len(batch), len(array.Values))
+		}
+
 		for i, result := range array.Values {
 			opt, ok := result.(cadence.Optional)
 			if !ok {

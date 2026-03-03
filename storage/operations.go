@@ -297,20 +297,16 @@ func PrefixUpperBound(prefix []byte) []byte {
 // If len(prefix) > len(start), the returned prefix will be the first `len(start)` bytes of the prefix.
 func PrefixInclusiveEnd(prefix, start []byte) []byte {
 	// if prefix is already greater than start, then no padding is needed
-	if bytes.Compare(start, prefix) < 0 {
-		end := make([]byte, len(prefix))
-		copy(end, prefix)
-		return end
+	if bytes.Compare(start, prefix) <= 0 {
+		return prefix
 	}
 
 	end := make([]byte, len(start))
 	copy(end, prefix)
 
 	// pad up to the length of start
-	i := len(prefix)
-	for range len(end) - len(prefix) {
+	for i := len(prefix); i < len(end); i++ {
 		end[i] = 0xff
-		i++
 	}
 	return end
 }

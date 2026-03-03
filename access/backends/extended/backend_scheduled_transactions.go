@@ -159,7 +159,6 @@ func (b *ScheduledTransactionsBackend) GetScheduledTransaction(
 }
 
 // GetScheduledTransactions returns a paginated list of scheduled transactions.
-// When filter.Address is set, results are scoped to that address; otherwise all are returned.
 //
 // Expected error returns during normal operations:
 //   - [codes.FailedPrecondition]: if the index has not been initialized

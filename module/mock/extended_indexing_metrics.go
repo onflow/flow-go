@@ -127,6 +127,7 @@ func (_c *ExtendedIndexingMetrics_ContractDeploymentIndexed_Call) RunAndReturn(r
 	return _c
 }
 
+
 // FTTransferIndexed provides a mock function for the type ExtendedIndexingMetrics
 func (_mock *ExtendedIndexingMetrics) FTTransferIndexed(count int) {
 	_mock.Called(count)

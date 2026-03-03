@@ -202,6 +202,26 @@ func TestBackend_GetAccountFungibleTokenTransfers(t *testing.T) {
 		assert.Equal(t, codes.NotFound, st.Code())
 	})
 
+	t.Run("filter with both addresses neither matching account returns InvalidArgument", func(t *testing.T) {
+		ftStore := storagemock.NewFungibleTokenTransfersBootstrapper(t)
+		nftStore := storagemock.NewNonFungibleTokenTransfersBootstrapper(t)
+		backend := NewAccountTransfersBackend(unittest.Logger(), &backendBase{config: defaultConfig}, ftStore, nftStore, flow.Testnet.Chain())
+
+		addr := unittest.RandomAddressFixture()
+		filter := AccountTransferFilter{
+			SourceAddress:    unittest.RandomAddressFixture(),
+			RecipientAddress: unittest.RandomAddressFixture(),
+		}
+
+		_, err := backend.GetAccountFungibleTokenTransfers(
+			context.Background(), addr, 0, nil, filter, AccountTransferExpandOptions{}, defaultEncoding,
+		)
+		require.Error(t, err)
+		st, ok := status.FromError(err)
+		require.True(t, ok)
+		assert.Equal(t, codes.InvalidArgument, st.Code())
+	})
+
 	t.Run("empty results with valid address returns empty page", func(t *testing.T) {
 		ftStore := storagemock.NewFungibleTokenTransfersBootstrapper(t)
 		nftStore := storagemock.NewNonFungibleTokenTransfersBootstrapper(t)
@@ -407,6 +427,26 @@ func TestBackend_GetAccountNonFungibleTokenTransfers(t *testing.T) {
 		st, ok := status.FromError(err)
 		require.True(t, ok)
 		assert.Equal(t, codes.NotFound, st.Code())
+	})
+
+	t.Run("filter with both addresses neither matching account returns InvalidArgument", func(t *testing.T) {
+		ftStore := storagemock.NewFungibleTokenTransfersBootstrapper(t)
+		nftStore := storagemock.NewNonFungibleTokenTransfersBootstrapper(t)
+		backend := NewAccountTransfersBackend(unittest.Logger(), &backendBase{config: defaultConfig}, ftStore, nftStore, flow.Testnet.Chain())
+
+		addr := unittest.RandomAddressFixture()
+		filter := AccountTransferFilter{
+			SourceAddress:    unittest.RandomAddressFixture(),
+			RecipientAddress: unittest.RandomAddressFixture(),
+		}
+
+		_, err := backend.GetAccountNonFungibleTokenTransfers(
+			context.Background(), addr, 0, nil, filter, AccountTransferExpandOptions{}, defaultEncoding,
+		)
+		require.Error(t, err)
+		st, ok := status.FromError(err)
+		require.True(t, ok)
+		assert.Equal(t, codes.InvalidArgument, st.Code())
 	})
 
 	t.Run("empty results with valid address returns empty page", func(t *testing.T) {
@@ -689,4 +729,59 @@ func TestAccountTransferFilter(t *testing.T) {
 		}
 		assert.Nil(t, filter.NFTFilter(), "filter with only empty addresses should return nil, indicating all transfers are accepted")
 	})
+}
+
+func TestAccountTransferFilter_Validate(t *testing.T) {
+	t.Parallel()
+
+	account := unittest.RandomAddressFixture()
+	otherAddr1 := unittest.RandomAddressFixture()
+	otherAddr2 := unittest.RandomAddressFixture()
+
+	tests := []struct {
+		name      string
+		filter    AccountTransferFilter
+		expectErr bool
+	}{
+		{
+			name:      "both addresses set and account is source",
+			filter:    AccountTransferFilter{SourceAddress: account, RecipientAddress: otherAddr1},
+			expectErr: false,
+		},
+		{
+			name:      "both addresses set and account is recipient",
+			filter:    AccountTransferFilter{SourceAddress: otherAddr1, RecipientAddress: account},
+			expectErr: false,
+		},
+		{
+			name:      "both addresses set and account is neither",
+			filter:    AccountTransferFilter{SourceAddress: otherAddr1, RecipientAddress: otherAddr2},
+			expectErr: true,
+		},
+		{
+			name:      "only source set",
+			filter:    AccountTransferFilter{SourceAddress: otherAddr1},
+			expectErr: false,
+		},
+		{
+			name:      "only recipient set",
+			filter:    AccountTransferFilter{RecipientAddress: otherAddr1},
+			expectErr: false,
+		},
+		{
+			name:      "empty filter",
+			filter:    AccountTransferFilter{},
+			expectErr: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := tt.filter.validate(account)
+			if tt.expectErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
 }

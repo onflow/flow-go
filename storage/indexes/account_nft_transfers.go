@@ -27,6 +27,10 @@ import (
 // - tx_index: 4 bytes (uint32, big-endian)
 // - event_index: 4 bytes (uint32, big-endian)
 //
+// Heights are stored as one's complement to ensure descending order search. This optimizes for the
+// most common use case of iterating over the most recent transfers, and makes it easy to answer the
+// question "give me the most recent N transfers for this account that meet these criteria".
+//
 // Value format: [storedNonFungibleTokenTransfer]
 //
 // All read methods are safe for concurrent access. Write methods (Store)
