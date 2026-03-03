@@ -464,7 +464,7 @@ func newInternalEVMTypeRunTxAsFunction(
 ) *interpreter.HostFunctionValue {
 	return interpreter.NewStaticHostFunctionValue(
 		gauge,
-		stdlib.InternalEVMTypeCallFunctionType,
+		stdlib.InternalEVMTypeRunTxAsFunctionType,
 		func(invocation interpreter.Invocation) interpreter.Value {
 			context := invocation.InvocationContext
 
@@ -977,7 +977,7 @@ func newInternalEVMTypeLoadFunction(
 
 			addr := types.NewAddressFromBytes(target)
 
-			value := handler.GetState(addr.ToCommon(), slot)
+			value := handler.GetState(addr, slot)
 			return interpreter.ByteSliceToByteArrayValue(context, value.Bytes())
 		},
 	)
@@ -1022,7 +1022,7 @@ func newInternalEVMTypeStoreFunction(
 
 			addr := types.NewAddressFromBytes(target)
 
-			handler.SetState(addr.ToCommon(), slot, value)
+			handler.SetState(addr, slot, value)
 
 			return interpreter.Void
 		},

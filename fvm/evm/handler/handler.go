@@ -73,8 +73,12 @@ func (h *ContractHandler) EVMContractAddress() common.Address {
 	return common.Address(h.evmContractAddress)
 }
 
+// SetState sets a value for the given storage slot.
+// It returns the previous value in any case.
+// The operation is only allowed on Emulator network,
+// for testing purposes.
 func (h *ContractHandler) SetState(
-	address gethCommon.Address,
+	address types.Address,
 	slot gethCommon.Hash,
 	value gethCommon.Hash,
 ) gethCommon.Hash {
@@ -86,15 +90,18 @@ func (h *ContractHandler) SetState(
 	execState, err := state.NewStateDB(h.backend, evm.StorageAccountAddress(h.flowChainID))
 	panicOnError(err)
 
-	prevValue := execState.SetState(address, slot, value)
+	prevValue := execState.SetState(address.ToCommon(), slot, value)
 	_, err = execState.Commit(true)
 	panicOnError(err)
 
 	return prevValue
 }
 
+// GetState returns the value for the given storage slot.
+// The operation is only allowed on Emulator network,
+// for testing purposes.
 func (h *ContractHandler) GetState(
-	address gethCommon.Address,
+	address types.Address,
 	slot gethCommon.Hash,
 ) gethCommon.Hash {
 	// should only be allowed on Emulator, for testing purposes
@@ -105,9 +112,13 @@ func (h *ContractHandler) GetState(
 	execState, err := state.NewStateDB(h.backend, evm.StorageAccountAddress(h.flowChainID))
 	panicOnError(err)
 
-	return execState.GetState(address, slot)
+	return execState.GetState(address.ToCommon(), slot)
 }
 
+// RunTxAs runs a transaction by setting the call's `msg.sender`
+// to be the `from` address.
+// The operation is only allowed on Emulator network,
+// for testing purposes.
 func (h *ContractHandler) RunTxAs(
 	from types.Address,
 	to types.Address,

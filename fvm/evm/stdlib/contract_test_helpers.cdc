@@ -12,7 +12,7 @@
 
     /// Loads a storage slot from an address.
     access(all)
-    fun load(target: EVM.EVMAddress, slot: String): [UInt8] {
+    view fun load(target: EVM.EVMAddress, slot: String): [UInt8] {
         pre {
             slot.length == 64 || slot.length == 66:
                 "EVM.load(): Invalid hex string length for EVM slot. The provided string is \(slot.length), but the length must be 64 or 66."

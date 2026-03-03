@@ -1171,6 +1171,6 @@ access(all) contract EVM {
         self.setupHeartbeat()
     }
 
-    // Placeholder to load test helpers available only on Flow Emulator chain
+    // Placeholder to load test helpers available only on Flow Emulator network
     // #loadTestHelpers
 }

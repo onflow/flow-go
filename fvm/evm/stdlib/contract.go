@@ -49,7 +49,7 @@ func ContractCode(
 	)
 
 	// Inject the contract_test_helpers.cdc code, only if we are
-	// bootstrapping the Flow Emulator chain.
+	// bootstrapping the Flow Emulator network.
 	if chainID == flow.Emulator {
 		replaced := loadTestHelpersPattern.ReplaceAllLiteralString(
 			evmContract,
@@ -616,6 +616,7 @@ var InternalEVMTypeStoreFunctionType = &sema.FunctionType{
 const InternalEVMTypeLoadFunctionName = "load"
 
 var InternalEVMTypeLoadFunctionType = &sema.FunctionType{
+	Purity: sema.FunctionPurityView,
 	Parameters: []sema.Parameter{
 		{
 			Label:          "target",

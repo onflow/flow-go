@@ -65,8 +65,13 @@ type ContractHandler interface {
 	// Constructs and commits a new block from the block proposal
 	CommitBlockProposal()
 
-	SetState(gethCommon.Address, gethCommon.Hash, gethCommon.Hash) gethCommon.Hash
-	GetState(gethCommon.Address, gethCommon.Hash) gethCommon.Hash
+	// SetState sets a value for the given storage slot
+	SetState(target Address, slot gethCommon.Hash, value gethCommon.Hash) gethCommon.Hash
+
+	// GetState returns the value for the given storage slot
+	GetState(target Address, slot gethCommon.Hash) gethCommon.Hash
+
+	// RunTxAs runs a transaction by setting the call's `msg.sender` to be the `from` address
 	RunTxAs(from Address, to Address, txData Data, gasLimit GasLimit, balance Balance) *ResultSummary
 }
 
