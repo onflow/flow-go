@@ -141,18 +141,12 @@ func (s *ExtendedIndexingSuite) verifyScheduledTxStatus(id uint64, expectedStatu
 
 // fetchAllScheduledTxs paginates through GET /experimental/v1/scheduled and returns all results.
 func (s *ExtendedIndexingSuite) fetchAllScheduledTxs(pageSize int) []map[string]any {
-	return s.collectScheduledPages(
-		fmt.Sprintf("%s/experimental/v1/scheduled?limit=%d", s.restBaseURL, pageSize),
-		pageSize,
-	)
+	return s.collectScheduledPages(fmt.Sprintf("%s/experimental/v1/scheduled?limit=%d", s.restBaseURL, pageSize))
 }
 
 // fetchAllScheduledTxsByAddress paginates through GET /experimental/v1/accounts/{address}/scheduled.
 func (s *ExtendedIndexingSuite) fetchAllScheduledTxsByAddress(address string, pageSize int) []map[string]any {
-	return s.collectScheduledPages(
-		fmt.Sprintf("%s/experimental/v1/accounts/%s/scheduled?limit=%d", s.restBaseURL, address, pageSize),
-		pageSize,
-	)
+	return s.collectScheduledPages(fmt.Sprintf("%s/experimental/v1/accounts/%s/scheduled?limit=%d", s.restBaseURL, address, pageSize))
 }
 
 // fetchScheduledTxsWithFilter fetches /experimental/v1/scheduled with the given query string filter.
@@ -170,10 +164,7 @@ func (s *ExtendedIndexingSuite) fetchScheduledTxsWithFilter(filter string) []map
 // same total as fetching all at once.
 func (s *ExtendedIndexingSuite) verifyScheduledTxPagination() {
 	allAtOnce := s.fetchAllScheduledTxs(100)
-	allPaged := s.collectScheduledPages(
-		fmt.Sprintf("%s/experimental/v1/scheduled?limit=1", s.restBaseURL),
-		1,
-	)
+	allPaged := s.collectScheduledPages(fmt.Sprintf("%s/experimental/v1/scheduled?limit=1", s.restBaseURL))
 
 	s.Require().Equal(len(allAtOnce), len(allPaged),
 		"paginated results should equal unpaginated results")
@@ -185,7 +176,7 @@ func (s *ExtendedIndexingSuite) verifyScheduledTxPagination() {
 }
 
 // collectScheduledPages follows next_cursor links to collect all transactions across all pages.
-func (s *ExtendedIndexingSuite) collectScheduledPages(firstURL string, pageSize int) []map[string]any {
+func (s *ExtendedIndexingSuite) collectScheduledPages(firstURL string) []map[string]any {
 	var all []map[string]any
 	url := firstURL
 	for {
@@ -200,8 +191,7 @@ func (s *ExtendedIndexingSuite) collectScheduledPages(firstURL string, pageSize 
 		if nextCursor == "" {
 			break
 		}
-		url = fmt.Sprintf("%s/experimental/v1/scheduled?limit=%d&cursor=%s",
-			s.restBaseURL, pageSize, nextCursor)
+		url = fmt.Sprintf("%s&cursor=%s", firstURL, nextCursor)
 	}
 	return all
 }

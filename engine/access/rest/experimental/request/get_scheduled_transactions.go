@@ -107,7 +107,7 @@ func parseScheduledTxFilter(r *common.Request, filter *extended.ScheduledTransac
 	if raw := r.GetQueryParam("status"); raw != "" {
 		rawStatuses := strings.Split(raw, ",")
 		for _, rawStatus := range rawStatuses {
-			s, err := accessmodel.ParseScheduledTransactionStatus(rawStatus)
+			s, err := accessmodel.ParseScheduledTransactionStatus(strings.TrimSpace(rawStatus))
 			if err != nil {
 				return fmt.Errorf("invalid status: %w", err)
 			}

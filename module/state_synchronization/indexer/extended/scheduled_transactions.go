@@ -207,6 +207,11 @@ func (s *ScheduledTransactions) IndexBlockData(lctx lockctx.Proof, data BlockDat
 		newTxs = append(newTxs, missingTxs...)
 	}
 
+	// at this point, all missing scheduled transactions should be present in the newTxs slice.
+	if len(newTxs) < len(missingIDs) {
+		return fmt.Errorf("missing backfilled scheduled transactions: expected %d, got %d", len(missingIDs), len(newTxs))
+	}
+
 	// finally store all new transactions in a single call to Store since store may only be called
 	// once per block.
 	if err := s.store.Store(lctx, rw, data.Header.Height, newTxs); err != nil {
@@ -343,6 +348,11 @@ func (s *ScheduledTransactions) collectScheduledTransactionData(data BlockData) 
 
 	// Any remaining pendingIDs were scheduled for execution but not executed — they failed.
 	if len(pendingIDs) > 0 {
+		if pendingEventTxIndex == nil {
+			// this shouldn't be possible and indicates a bug in the indexer
+			return nil, fmt.Errorf("found pending scheduled transactions, but no PendingExecution event found in block %d", data.Header.Height)
+		}
+
 		// find the transaction that attempted to execute the scheduled transactions, and mark it as failed.
 		// start searching from the system transaction that adds the scheduled transactions into the
 		// system collection to reduce overhead.

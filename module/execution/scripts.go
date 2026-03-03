@@ -20,8 +20,8 @@ import (
 
 // RegisterAtHeight returns register value for provided register ID at the block height.
 // Even if the register wasn't indexed at the provided height, returns the highest height the register was indexed at.
-// If the register with the ID was not indexed at all return nil value and no error.
 // Expected errors:
+// - storage.ErrNotFound if block or register value at height was not found.
 // - storage.ErrHeightNotIndexed if the given height was not indexed yet or lower than the first indexed height.
 type RegisterAtHeight func(ID flow.RegisterID, height uint64) (flow.RegisterValue, error)
 

@@ -16,12 +16,19 @@ func (t *ScheduledTransaction) Build(
 	expand map[string]bool,
 ) error {
 	t.Id = strconv.FormatUint(tx.ID, 10)
+
 	var priority ScheduledTransactionPriority
-	priority.Build(tx.Priority)
+	if err := priority.Build(tx.Priority); err != nil {
+		return fmt.Errorf("failed to build scheduled transaction priority: %w", err)
+	}
 	t.Priority = &priority
+
 	var status ScheduledTransactionStatus
-	status.Build(tx.Status)
+	if err := status.Build(tx.Status); err != nil {
+		return fmt.Errorf("failed to build scheduled transaction status: %w", err)
+	}
 	t.Status = &status
+
 	t.Timestamp = strconv.FormatUint(tx.Timestamp, 10)
 	t.ExecutionEffort = strconv.FormatUint(tx.ExecutionEffort, 10)
 	t.Fees = strconv.FormatUint(tx.Fees, 10)
@@ -83,7 +90,7 @@ func (t *ScheduledTransaction) Build(
 }
 
 // Build sets the [ScheduledTransactionStatus] from a domain status value.
-func (s *ScheduledTransactionStatus) Build(status accessmodel.ScheduledTransactionStatus) {
+func (s *ScheduledTransactionStatus) Build(status accessmodel.ScheduledTransactionStatus) error {
 	switch status {
 	case accessmodel.ScheduledTxStatusScheduled:
 		*s = SCHEDULED_ScheduledTransactionStatus
@@ -94,19 +101,23 @@ func (s *ScheduledTransactionStatus) Build(status accessmodel.ScheduledTransacti
 	case accessmodel.ScheduledTxStatusFailed:
 		*s = FAILED_ScheduledTransactionStatus
 	default:
-		*s = ""
+		return fmt.Errorf("unknown scheduled transaction status: %d", status)
 	}
+	return nil
 }
 
 // Build sets the [ScheduledTransactionPriority] from a domain priority value.
 // The contract encodes priority as: 0 = high, 1 = medium, 2 = low.
-func (p *ScheduledTransactionPriority) Build(priority accessmodel.ScheduledTransactionPriority) {
+func (p *ScheduledTransactionPriority) Build(priority accessmodel.ScheduledTransactionPriority) error {
 	switch priority {
 	case accessmodel.ScheduledTxPriorityHigh:
 		*p = HIGH_ScheduledTransactionPriority
 	case accessmodel.ScheduledTxPriorityMedium:
 		*p = MEDIUM_ScheduledTransactionPriority
-	default:
+	case accessmodel.ScheduledTxPriorityLow:
 		*p = LOW_ScheduledTransactionPriority
+	default:
+		return fmt.Errorf("unknown scheduled transaction priority: %d", priority)
 	}
+	return nil
 }
