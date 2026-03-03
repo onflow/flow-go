@@ -213,26 +213,10 @@ func (s *ExtendedIndexerSuite) assertLiveBlockData(m *mockIndexer, fixture *bloc
 	s.assertEventGroups(data.Events, fixture.Events)
 }
 
-// assertEventGroups verifies that the actual event map matches the expected events when grouped
-// by transaction index. Each group is compared element-by-element to ensure correct ordering.
-func (s *ExtendedIndexerSuite) assertEventGroups(actual map[uint32][]flow.Event, allEvents []flow.Event) {
+// assertEventGroups verifies that the actual events match the expected events.
+func (s *ExtendedIndexerSuite) assertEventGroups(actual []flow.Event, allEvents []flow.Event) {
 	s.T().Helper()
-
-	// Build expected groups independently from the production groupEventsByTxIndex.
-	expected := make(map[uint32][]flow.Event)
-	for _, event := range allEvents {
-		expected[event.TransactionIndex] = append(expected[event.TransactionIndex], event)
-	}
-
-	require.Equal(s.T(), len(expected), len(actual), "event group count mismatch")
-	for txIndex, expectedGroup := range expected {
-		actualGroup, ok := actual[txIndex]
-		require.True(s.T(), ok, "missing event group for tx index %d", txIndex)
-		require.Len(s.T(), actualGroup, len(expectedGroup), "event count mismatch for tx index %d", txIndex)
-
-		// must be in the same order
-		assert.Equal(s.T(), expectedGroup, actualGroup, "event mismatch at tx index %d", txIndex)
-	}
+	assert.Equal(s.T(), allEvents, actual)
 }
 
 // ===== Tests =====
@@ -449,8 +433,8 @@ func (s *ExtendedIndexerSuite) TestBackfillRetryOnNotFound() {
 
 	// Let a few timer iterations pass with ErrNotFound -- indexer should not have advanced.
 	require.Never(s.T(), func() bool {
-		return idx.nextHeight.Load() > 5
-	}, 50*time.Millisecond, time.Millisecond, "indexer should not have advanced before data is available")
+		return idx.nextHeight.Load() > 5 // startHeight
+	}, 50*time.Millisecond, time.Millisecond, "indexer should not have advanced")
 
 	// Make data available -- next timer tick should process it.
 	available.Store(true)

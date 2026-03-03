@@ -10,8 +10,10 @@ const (
 	// Example: prefix [9][10] means this entry is the highest processed height for the type with code 10.
 	codeIndexProcessedHeightUpperBound byte = 9
 
-	// codeAccountTransactions is the prefix for account transaction index entries
-	codeAccountTransactions byte = 10
+	// Account indexes
+	codeAccountTransactions              byte = 10 // Account transactions index
+	codeAccountFungibleTokenTransfers    byte = 11 // Account fungible token transfers index
+	codeAccountNonFungibleTokenTransfers byte = 12 // Account non-fungible token transfers index
 
 	// reserved as extension byte for future use
 	_ byte = 255
@@ -20,8 +22,15 @@ const (
 // Indexer Processed Heights Keys
 // these are the currently supported indexers' upper and lower bound height keys
 var (
-	// keyAccountTransactionLatestHeightKey stores the latest indexed height for account transactions
+	// Upper and lower bound keys for account transactions
 	keyAccountTransactionLatestHeightKey = []byte{codeIndexProcessedHeightUpperBound, codeAccountTransactions}
-	// keyAccountTransactionFirstHeightKey stores the first indexed height for account transactions
-	keyAccountTransactionFirstHeightKey = []byte{codeIndexProcessedHeightLowerBound, codeAccountTransactions}
+	keyAccountTransactionFirstHeightKey  = []byte{codeIndexProcessedHeightLowerBound, codeAccountTransactions}
+
+	// Upper and lower bound keys for account fungible token transfers
+	keyAccountFTTransferLatestHeightKey = []byte{codeIndexProcessedHeightUpperBound, codeAccountFungibleTokenTransfers}
+	keyAccountFTTransferFirstHeightKey  = []byte{codeIndexProcessedHeightLowerBound, codeAccountFungibleTokenTransfers}
+
+	// Upper and lower bound keys for account non-fungible token transfers
+	keyAccountNFTTransferLatestHeightKey = []byte{codeIndexProcessedHeightUpperBound, codeAccountNonFungibleTokenTransfers}
+	keyAccountNFTTransferFirstHeightKey  = []byte{codeIndexProcessedHeightLowerBound, codeAccountNonFungibleTokenTransfers}
 )

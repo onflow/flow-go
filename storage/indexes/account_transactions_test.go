@@ -13,10 +13,23 @@ import (
 	"github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/storage/indexes/iterator"
 	"github.com/onflow/flow-go/storage/operation"
 	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
 	"github.com/onflow/flow-go/utils/unittest"
 )
+
+// collectAll drains an iterator into a slice.
+func collectAll(tb testing.TB, iter storage.AccountTransactionIterator) []access.AccountTransaction {
+	tb.Helper()
+	var txs []access.AccountTransaction
+	for item := range iter {
+		tx, err := item.Value()
+		require.NoError(tb, err)
+		txs = append(txs, tx)
+	}
+	return txs
+}
 
 func TestAccountTransactions_Initialize(t *testing.T) {
 	t.Parallel()
@@ -73,13 +86,14 @@ func TestAccountTransactions_Initialize(t *testing.T) {
 			latest := idx.LatestIndexedHeight()
 			assert.Equal(t, uint64(1), latest)
 
-			page, err := idx.TransactionsByAddress(initialData[0].Address, 100, nil, nil)
+			iter, err := idx.ByAddress(initialData[0].Address, nil)
 			require.NoError(t, err)
-			require.Len(t, page.Transactions, 1)
-			assert.Equal(t, initialData[0].BlockHeight, page.Transactions[0].BlockHeight)
-			assert.Equal(t, initialData[0].TransactionID, page.Transactions[0].TransactionID)
-			assert.Equal(t, initialData[0].TransactionIndex, page.Transactions[0].TransactionIndex)
-			assert.Equal(t, initialData[0].Roles, page.Transactions[0].Roles)
+			txs := collectAll(t, iter)
+			require.Len(t, txs, 1)
+			assert.Equal(t, initialData[0].BlockHeight, txs[0].BlockHeight)
+			assert.Equal(t, initialData[0].TransactionID, txs[0].TransactionID)
+			assert.Equal(t, initialData[0].TransactionIndex, txs[0].TransactionIndex)
+			assert.Equal(t, initialData[0].Roles, txs[0].Roles)
 		})
 	})
 
@@ -104,10 +118,11 @@ func TestAccountTransactions_Initialize(t *testing.T) {
 
 			assert.Equal(t, uint64(1), idx.LatestIndexedHeight())
 
-			page, err := idx.TransactionsByAddress(account, 100, nil, nil)
+			iter, err := idx.ByAddress(account, nil)
 			require.NoError(t, err)
-			require.Len(t, page.Transactions, 1)
-			assert.Equal(t, txID, page.Transactions[0].TransactionID)
+			txs := collectAll(t, iter)
+			require.Len(t, txs, 1)
+			assert.Equal(t, txID, txs[0].TransactionID)
 		})
 	})
 }
@@ -133,14 +148,14 @@ func TestAccountTransactions_IndexAndQuery(t *testing.T) {
 			err := storeAccountTransactions(t, lm, idx, 2, txData)
 			require.NoError(t, err)
 
-			page, err := idx.TransactionsByAddress(account1, 100, nil, nil)
+			iter, err := idx.ByAddress(account1, nil)
 			require.NoError(t, err)
-			require.Len(t, page.Transactions, 1)
-			assert.Equal(t, txID, page.Transactions[0].TransactionID)
-			assert.Equal(t, uint64(2), page.Transactions[0].BlockHeight)
-			assert.Equal(t, uint32(0), page.Transactions[0].TransactionIndex)
-			assert.Equal(t, []access.TransactionRole{access.TransactionRoleAuthorizer}, page.Transactions[0].Roles)
-			assert.Nil(t, page.NextCursor)
+			txs := collectAll(t, iter)
+			require.Len(t, txs, 1)
+			assert.Equal(t, txID, txs[0].TransactionID)
+			assert.Equal(t, uint64(2), txs[0].BlockHeight)
+			assert.Equal(t, uint32(0), txs[0].TransactionIndex)
+			assert.Equal(t, []access.TransactionRole{access.TransactionRoleAuthorizer}, txs[0].Roles)
 		})
 	})
 
@@ -192,36 +207,38 @@ func TestAccountTransactions_IndexAndQuery(t *testing.T) {
 			require.NoError(t, err)
 
 			// Query account1 (should have 2 txs)
-			page, err := idx.TransactionsByAddress(account1, 100, nil, nil)
+			iter, err := idx.ByAddress(account1, nil)
 			require.NoError(t, err)
-			require.Len(t, page.Transactions, 2)
+			txs := collectAll(t, iter)
+			require.Len(t, txs, 2)
 
 			// Results should be in descending order (newest first)
-			assert.Equal(t, txID2, page.Transactions[0].TransactionID)
-			assert.Equal(t, uint64(3), page.Transactions[0].BlockHeight)
-			assert.Equal(t, []access.TransactionRole{access.TransactionRoleInteracted}, page.Transactions[0].Roles)
+			assert.Equal(t, txID2, txs[0].TransactionID)
+			assert.Equal(t, uint64(3), txs[0].BlockHeight)
+			assert.Equal(t, []access.TransactionRole{access.TransactionRoleInteracted}, txs[0].Roles)
 
-			assert.Equal(t, txID1, page.Transactions[1].TransactionID)
-			assert.Equal(t, uint64(2), page.Transactions[1].BlockHeight)
-			assert.Equal(t, []access.TransactionRole{access.TransactionRoleAuthorizer}, page.Transactions[1].Roles)
+			assert.Equal(t, txID1, txs[1].TransactionID)
+			assert.Equal(t, uint64(2), txs[1].BlockHeight)
+			assert.Equal(t, []access.TransactionRole{access.TransactionRoleAuthorizer}, txs[1].Roles)
 
 			// Query account2 (should have 2 txs, both in block 3)
-			page, err = idx.TransactionsByAddress(account2, 100, nil, nil)
+			iter, err = idx.ByAddress(account2, nil)
 			require.NoError(t, err)
-			require.Len(t, page.Transactions, 2)
+			txs = collectAll(t, iter)
+			require.Len(t, txs, 2)
 
 			// Both in block 3, ordered by txIndex ascending
-			assert.Equal(t, uint64(3), page.Transactions[0].BlockHeight)
-			assert.Equal(t, uint64(3), page.Transactions[1].BlockHeight)
-			assert.Less(t, page.Transactions[0].TransactionIndex, page.Transactions[1].TransactionIndex)
+			assert.Equal(t, uint64(3), txs[0].BlockHeight)
+			assert.Equal(t, uint64(3), txs[1].BlockHeight)
+			assert.Less(t, txs[0].TransactionIndex, txs[1].TransactionIndex)
 		})
 	})
 }
 
-func TestAccountTransactions_Pagination(t *testing.T) {
+func TestAccountTransactions_CursorPositioning(t *testing.T) {
 	t.Parallel()
 
-	t.Run("pagination with limit returns correct pages", func(t *testing.T) {
+	t.Run("cursor positions iterator at correct entry", func(t *testing.T) {
 		RunWithBootstrappedAccountTxIndex(t, 1, nil, func(_ storage.DB, lm storage.LockManager, idx *AccountTransactions) {
 			account := unittest.RandomAddressFixture()
 
@@ -240,38 +257,30 @@ func TestAccountTransactions_Pagination(t *testing.T) {
 				require.NoError(t, err)
 			}
 
-			// First page: limit 2
-			page1, err := idx.TransactionsByAddress(account, 2, nil, nil)
+			// No cursor: starts from latest (height 6)
+			iter, err := idx.ByAddress(account, nil)
 			require.NoError(t, err)
-			require.Len(t, page1.Transactions, 2)
-			require.NotNil(t, page1.NextCursor, "should have next cursor")
-			// Descending: heights 6, 5
-			assert.Equal(t, uint64(6), page1.Transactions[0].BlockHeight)
-			assert.Equal(t, uint64(5), page1.Transactions[1].BlockHeight)
+			txs := collectAll(t, iter)
+			require.Len(t, txs, 5)
+			assert.Equal(t, uint64(6), txs[0].BlockHeight)
+			assert.Equal(t, uint64(2), txs[4].BlockHeight)
 
-			// Second page: use cursor from first page
-			page2, err := idx.TransactionsByAddress(account, 2, page1.NextCursor, nil)
+			// Cursor at height 4, txIndex 0: starts from that entry inclusive
+			cursor := &access.AccountTransactionCursor{BlockHeight: 4, TransactionIndex: 0}
+			iter, err = idx.ByAddress(account, cursor)
 			require.NoError(t, err)
-			require.Len(t, page2.Transactions, 2)
-			require.NotNil(t, page2.NextCursor, "should have next cursor")
-			// Heights 4, 3
-			assert.Equal(t, uint64(4), page2.Transactions[0].BlockHeight)
-			assert.Equal(t, uint64(3), page2.Transactions[1].BlockHeight)
-
-			// Third page: only 1 remaining
-			page3, err := idx.TransactionsByAddress(account, 2, page2.NextCursor, nil)
-			require.NoError(t, err)
-			require.Len(t, page3.Transactions, 1)
-			assert.Nil(t, page3.NextCursor, "no more results")
-			assert.Equal(t, uint64(2), page3.Transactions[0].BlockHeight)
+			txs = collectAll(t, iter)
+			require.Len(t, txs, 3) // heights 4, 3, 2
+			assert.Equal(t, uint64(4), txs[0].BlockHeight)
+			assert.Equal(t, uint64(3), txs[1].BlockHeight)
+			assert.Equal(t, uint64(2), txs[2].BlockHeight)
 		})
 	})
 
-	t.Run("pagination with multiple txs per block", func(t *testing.T) {
+	t.Run("cursor within same block positions by transaction index", func(t *testing.T) {
 		RunWithBootstrappedAccountTxIndex(t, 1, nil, func(_ storage.DB, lm storage.LockManager, idx *AccountTransactions) {
 			account := unittest.RandomAddressFixture()
 
-			// Block 2: 3 txs for the same account
 			txID1 := unittest.IdentifierFixture()
 			txID2 := unittest.IdentifierFixture()
 			txID3 := unittest.IdentifierFixture()
@@ -282,96 +291,14 @@ func TestAccountTransactions_Pagination(t *testing.T) {
 			})
 			require.NoError(t, err)
 
-			// Page 1: limit 2
-			page1, err := idx.TransactionsByAddress(account, 2, nil, nil)
+			// Cursor at txIndex 1: starts from txIndex 1 inclusive
+			cursor := &access.AccountTransactionCursor{BlockHeight: 2, TransactionIndex: 1}
+			iter, err := idx.ByAddress(account, cursor)
 			require.NoError(t, err)
-			require.Len(t, page1.Transactions, 2)
-			require.NotNil(t, page1.NextCursor)
-			assert.Equal(t, uint32(0), page1.Transactions[0].TransactionIndex)
-			assert.Equal(t, uint32(1), page1.Transactions[1].TransactionIndex)
-
-			// Page 2: remaining 1
-			page2, err := idx.TransactionsByAddress(account, 2, page1.NextCursor, nil)
-			require.NoError(t, err)
-			require.Len(t, page2.Transactions, 1)
-			assert.Nil(t, page2.NextCursor)
-			assert.Equal(t, uint32(2), page2.Transactions[0].TransactionIndex)
-		})
-	})
-}
-
-func TestAccountTransactions_PaginationWithFilter(t *testing.T) {
-	t.Parallel()
-
-	// Index 6 blocks (heights 2-7), each with 2 txs for the same account:
-	//   - txIndex 0: TransactionRoleAuthorizer
-	//   - txIndex 1: TransactionRolePayer
-	//
-	// With a filter for authorizer-only, 6 transactions match. Paginating with limit=2 should
-	// yield 3 pages of 2, with no duplicates or gaps across pages.
-	t.Run("pagination with active filter produces correct pages without duplicates", func(t *testing.T) {
-		RunWithBootstrappedAccountTxIndex(t, 1, nil, func(_ storage.DB, lm storage.LockManager, idx *AccountTransactions) {
-			account := unittest.RandomAddressFixture()
-
-			for height := uint64(2); height <= 7; height++ {
-				err := storeAccountTransactions(t, lm, idx, height, []access.AccountTransaction{
-					{
-						Address:          account,
-						BlockHeight:      height,
-						TransactionID:    unittest.IdentifierFixture(),
-						TransactionIndex: 0,
-						Roles:            []access.TransactionRole{access.TransactionRoleAuthorizer},
-					},
-					{
-						Address:          account,
-						BlockHeight:      height,
-						TransactionID:    unittest.IdentifierFixture(),
-						TransactionIndex: 1,
-						Roles:            []access.TransactionRole{access.TransactionRolePayer},
-					},
-				})
-				require.NoError(t, err)
-			}
-
-			authorizerOnly := func(tx *access.AccountTransaction) bool {
-				for _, r := range tx.Roles {
-					if r == access.TransactionRoleAuthorizer {
-						return true
-					}
-				}
-				return false
-			}
-
-			// Collect all results across pages and verify no duplicates or gaps.
-			var allTxIDs []flow.Identifier
-			var cursor *access.AccountTransactionCursor
-
-			for page := range 3 {
-				result, err := idx.TransactionsByAddress(account, 2, cursor, authorizerOnly)
-				require.NoError(t, err)
-				require.Len(t, result.Transactions, 2, "page %d should have 2 results", page)
-
-				for _, tx := range result.Transactions {
-					assert.Equal(t, access.TransactionRoleAuthorizer, tx.Roles[0], "only authorizer txs should be returned")
-					allTxIDs = append(allTxIDs, tx.TransactionID)
-				}
-
-				if page < 2 {
-					require.NotNil(t, result.NextCursor, "page %d should have a next cursor", page)
-				} else {
-					assert.Nil(t, result.NextCursor, "last page should have no cursor")
-				}
-				cursor = result.NextCursor
-			}
-
-			// All 6 authorizer txs should be present with no duplicates.
-			require.Len(t, allTxIDs, 6)
-			seen := make(map[flow.Identifier]struct{}, len(allTxIDs))
-			for _, id := range allTxIDs {
-				_, dup := seen[id]
-				assert.False(t, dup, "duplicate tx ID %s", id)
-				seen[id] = struct{}{}
-			}
+			txs := collectAll(t, iter)
+			require.Len(t, txs, 2)
+			assert.Equal(t, uint32(1), txs[0].TransactionIndex)
+			assert.Equal(t, uint32(2), txs[1].TransactionIndex)
 		})
 	})
 }
@@ -396,14 +323,14 @@ func TestAccountTransactions_DescendingOrder(t *testing.T) {
 			require.NoError(t, err)
 		}
 
-		// Query all
-		page, err := idx.TransactionsByAddress(account, 100, nil, nil)
+		iter, err := idx.ByAddress(account, nil)
 		require.NoError(t, err)
-		require.Len(t, page.Transactions, 10)
+		txs := collectAll(t, iter)
+		require.Len(t, txs, 10)
 
 		// Verify descending order
-		for i := 0; i < len(page.Transactions)-1; i++ {
-			assert.Greater(t, page.Transactions[i].BlockHeight, page.Transactions[i+1].BlockHeight,
+		for i := 0; i < len(txs)-1; i++ {
+			assert.Greater(t, txs[i].BlockHeight, txs[i+1].BlockHeight,
 				"results should be in descending order by height")
 		}
 	})
@@ -445,47 +372,30 @@ func TestAccountTransactions_MultiTxSameHeightOrdering(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		page, err := idx.TransactionsByAddress(account, 100, nil, nil)
+		iter, err := idx.ByAddress(account, nil)
 		require.NoError(t, err)
-		require.Len(t, page.Transactions, 3)
+		txs := collectAll(t, iter)
+		require.Len(t, txs, 3)
 
 		// All at same height, should be ordered by ascending txIndex
-		assert.Equal(t, txID0, page.Transactions[0].TransactionID)
-		assert.Equal(t, uint32(0), page.Transactions[0].TransactionIndex)
-		assert.Equal(t, txID1, page.Transactions[1].TransactionID)
-		assert.Equal(t, uint32(1), page.Transactions[1].TransactionIndex)
-		assert.Equal(t, txID2, page.Transactions[2].TransactionID)
-		assert.Equal(t, uint32(2), page.Transactions[2].TransactionIndex)
+		assert.Equal(t, txID0, txs[0].TransactionID)
+		assert.Equal(t, uint32(0), txs[0].TransactionIndex)
+		assert.Equal(t, txID1, txs[1].TransactionID)
+		assert.Equal(t, uint32(1), txs[1].TransactionIndex)
+		assert.Equal(t, txID2, txs[2].TransactionID)
+		assert.Equal(t, uint32(2), txs[2].TransactionIndex)
 	})
 }
 
 func TestAccountTransactions_ErrorCases(t *testing.T) {
 	t.Parallel()
 
-	t.Run("limit of zero returns ErrInvalidQuery", func(t *testing.T) {
-		RunWithBootstrappedAccountTxIndex(t, 1, nil, func(_ storage.DB, _ storage.LockManager, idx *AccountTransactions) {
-			account := unittest.RandomAddressFixture()
-
-			_, err := idx.TransactionsByAddress(account, 0, nil, nil)
-			require.ErrorIs(t, err, storage.ErrInvalidQuery)
-		})
-	})
-
-	t.Run("limit of math.MaxUint32 returns ErrInvalidQuery", func(t *testing.T) {
-		RunWithBootstrappedAccountTxIndex(t, 1, nil, func(_ storage.DB, _ storage.LockManager, idx *AccountTransactions) {
-			account := unittest.RandomAddressFixture()
-
-			_, err := idx.TransactionsByAddress(account, math.MaxUint32, nil, nil)
-			require.ErrorIs(t, err, storage.ErrInvalidQuery)
-		})
-	})
-
 	t.Run("cursor before first indexed height returns error", func(t *testing.T) {
 		RunWithBootstrappedAccountTxIndex(t, 5, nil, func(_ storage.DB, _ storage.LockManager, idx *AccountTransactions) {
 			account := unittest.RandomAddressFixture()
 
 			cursor := &access.AccountTransactionCursor{BlockHeight: 3, TransactionIndex: 0}
-			_, err := idx.TransactionsByAddress(account, 10, cursor, nil)
+			_, err := idx.ByAddress(account, cursor)
 			require.ErrorIs(t, err, storage.ErrHeightNotIndexed)
 		})
 	})
@@ -495,18 +405,19 @@ func TestAccountTransactions_ErrorCases(t *testing.T) {
 			account := unittest.RandomAddressFixture()
 
 			cursor := &access.AccountTransactionCursor{BlockHeight: 100, TransactionIndex: 0}
-			_, err := idx.TransactionsByAddress(account, 10, cursor, nil)
+			_, err := idx.ByAddress(account, cursor)
 			require.ErrorIs(t, err, storage.ErrHeightNotIndexed)
 		})
 	})
 
-	t.Run("nil cursor returns empty for account with no transactions", func(t *testing.T) {
+	t.Run("nil cursor returns empty iterator for account with no transactions", func(t *testing.T) {
 		RunWithBootstrappedAccountTxIndex(t, 5, nil, func(_ storage.DB, _ storage.LockManager, idx *AccountTransactions) {
 			account := unittest.RandomAddressFixture()
 
-			page, err := idx.TransactionsByAddress(account, 10, nil, nil)
+			iter, err := idx.ByAddress(account, nil)
 			require.NoError(t, err)
-			assert.Empty(t, page.Transactions)
+			txs := collectAll(t, iter)
+			assert.Empty(t, txs)
 		})
 	})
 
@@ -560,16 +471,9 @@ func TestAccountTransactions_ErrorCases(t *testing.T) {
 			})
 			require.NoError(t, err)
 
-			// Now indexAccountTransactions at height 2 passes the consecutive check
-			// (2 == 1+1) but finds the already-committed keys.
-			err = unittest.WithLock(t, lm, storage.LockIndexAccountTransactions, func(lctx lockctx.Context) error {
-				return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-					return indexAccountTransactions(lctx, rw, 2, txData)
-				})
-			})
-			// an error should be returned, but it should not be a generic error and not storage.ErrAlreadyExists
-			require.Error(t, err)
-			assert.False(t, errors.Is(err, storage.ErrAlreadyExists))
+			// Now Store at height 2 detects (via in-memory height) that height 2 is already indexed.
+			err = storeAccountTransactions(t, lm, idx, 2, txData)
+			require.ErrorIs(t, err, storage.ErrAlreadyExists)
 		})
 	})
 
@@ -593,45 +497,15 @@ func TestAccountTransactions_ErrorCases(t *testing.T) {
 		})
 	})
 
-	t.Run("repeated store at latest height is a no-op", func(t *testing.T) {
+	t.Run("repeated store at latest height returns ErrAlreadyExists", func(t *testing.T) {
 		RunWithBootstrappedAccountTxIndex(t, 1, nil, func(_ storage.DB, lm storage.LockManager, idx *AccountTransactions) {
-			account := unittest.RandomAddressFixture()
-			txID := unittest.IdentifierFixture()
-
-			txData := []access.AccountTransaction{
-				{
-					Address:          account,
-					BlockHeight:      2,
-					TransactionID:    txID,
-					TransactionIndex: 0,
-					Roles:            []access.TransactionRole{access.TransactionRoleAuthorizer},
-				},
-			}
-
-			// Index height 2 with actual data
-			err := storeAccountTransactions(t, lm, idx, 2, txData)
+			// Index height 2
+			err := storeAccountTransactions(t, lm, idx, 2, nil)
 			require.NoError(t, err)
 
-			// Re-indexing height 2 with different data should be a no-op (original data retained)
-			differentTxID := unittest.IdentifierFixture()
-			differentTxData := []access.AccountTransaction{
-				{
-					Address:          account,
-					BlockHeight:      2,
-					TransactionID:    differentTxID,
-					TransactionIndex: 0,
-					Roles:            []access.TransactionRole{access.TransactionRolePayer},
-				},
-			}
-			err = storeAccountTransactions(t, lm, idx, 2, differentTxData)
-			require.NoError(t, err)
-
-			// Verify original data is retained, not replaced
-			page, err := idx.TransactionsByAddress(account, 100, nil, nil)
-			require.NoError(t, err)
-			require.Len(t, page.Transactions, 1)
-			assert.Equal(t, txID, page.Transactions[0].TransactionID)
-			assert.Equal(t, []access.TransactionRole{access.TransactionRoleAuthorizer}, page.Transactions[0].Roles)
+			// Re-indexing height 2 should return ErrAlreadyExists
+			err = storeAccountTransactions(t, lm, idx, 2, nil)
+			require.ErrorIs(t, err, storage.ErrAlreadyExists)
 		})
 	})
 }
@@ -646,11 +520,11 @@ func TestAccountTransactions_KeyEncoding(t *testing.T) {
 
 		key := makeAccountTxKey(address, height, txIndex)
 
-		decodedAddress, decodedHeight, decodedTxIndex, err := decodeAccountTxKey(key)
+		cursor, err := decodeAccountTxKey(key)
 		require.NoError(t, err)
-		assert.Equal(t, address, decodedAddress)
-		assert.Equal(t, height, decodedHeight)
-		assert.Equal(t, txIndex, decodedTxIndex)
+		assert.Equal(t, address, cursor.Address)
+		assert.Equal(t, height, cursor.BlockHeight)
+		assert.Equal(t, txIndex, cursor.TransactionIndex)
 	})
 
 	t.Run("makeAccountTxValue sorts roles", func(t *testing.T) {
@@ -680,11 +554,11 @@ func TestAccountTransactions_KeyEncoding(t *testing.T) {
 		txIndex := uint32(0)
 
 		key := makeAccountTxKey(address, height, txIndex)
-		decodedAddress, decodedHeight, decodedTxIndex, err := decodeAccountTxKey(key)
+		cursor, err := decodeAccountTxKey(key)
 		require.NoError(t, err)
-		assert.Equal(t, address, decodedAddress)
-		assert.Equal(t, height, decodedHeight)
-		assert.Equal(t, txIndex, decodedTxIndex)
+		assert.Equal(t, address, cursor.Address)
+		assert.Equal(t, height, cursor.BlockHeight)
+		assert.Equal(t, txIndex, cursor.TransactionIndex)
 	})
 
 	t.Run("boundary values: max height, max txIndex", func(t *testing.T) {
@@ -693,11 +567,11 @@ func TestAccountTransactions_KeyEncoding(t *testing.T) {
 		txIndex := uint32(math.MaxUint32)
 
 		key := makeAccountTxKey(address, height, txIndex)
-		decodedAddress, decodedHeight, decodedTxIndex, err := decodeAccountTxKey(key)
+		cursor, err := decodeAccountTxKey(key)
 		require.NoError(t, err)
-		assert.Equal(t, address, decodedAddress)
-		assert.Equal(t, height, decodedHeight)
-		assert.Equal(t, txIndex, decodedTxIndex)
+		assert.Equal(t, address, cursor.Address)
+		assert.Equal(t, uint64(math.MaxUint64), cursor.BlockHeight)
+		assert.Equal(t, uint32(math.MaxUint32), cursor.TransactionIndex)
 	})
 
 	t.Run("boundary values: zero address", func(t *testing.T) {
@@ -706,11 +580,11 @@ func TestAccountTransactions_KeyEncoding(t *testing.T) {
 		txIndex := uint32(42)
 
 		key := makeAccountTxKey(address, height, txIndex)
-		decodedAddress, decodedHeight, decodedTxIndex, err := decodeAccountTxKey(key)
+		cursor, err := decodeAccountTxKey(key)
 		require.NoError(t, err)
-		assert.Equal(t, address, decodedAddress)
-		assert.Equal(t, height, decodedHeight)
-		assert.Equal(t, txIndex, decodedTxIndex)
+		assert.Equal(t, address, cursor.Address)
+		assert.Equal(t, height, cursor.BlockHeight)
+		assert.Equal(t, txIndex, cursor.TransactionIndex)
 	})
 }
 
@@ -718,13 +592,13 @@ func TestAccountTransactions_KeyDecoding_Errors(t *testing.T) {
 	t.Parallel()
 
 	t.Run("key too short", func(t *testing.T) {
-		_, _, _, err := decodeAccountTxKey(make([]byte, 10))
+		_, err := decodeAccountTxKey(make([]byte, 10))
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid key length")
 	})
 
 	t.Run("key too long", func(t *testing.T) {
-		_, _, _, err := decodeAccountTxKey(make([]byte, 25))
+		_, err := decodeAccountTxKey(make([]byte, 25))
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid key length")
 	})
@@ -732,7 +606,7 @@ func TestAccountTransactions_KeyDecoding_Errors(t *testing.T) {
 	t.Run("invalid prefix", func(t *testing.T) {
 		key := make([]byte, accountTxKeyLen)
 		key[0] = 0xFF // wrong prefix
-		_, _, _, err := decodeAccountTxKey(key)
+		_, err := decodeAccountTxKey(key)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid prefix")
 	})
@@ -749,9 +623,10 @@ func TestAccountTransactions_EmptyResults(t *testing.T) {
 		err := storeAccountTransactions(t, lm, idx, 2, nil)
 		require.NoError(t, err)
 
-		page, err := idx.TransactionsByAddress(account, 100, nil, nil)
+		iter, err := idx.ByAddress(account, nil)
 		require.NoError(t, err)
-		assert.Empty(t, page.Transactions)
+		txs := collectAll(t, iter)
+		assert.Empty(t, txs)
 	})
 }
 
@@ -858,11 +733,12 @@ func TestAccountTransactions_RolesRoundTrip(t *testing.T) {
 				err := storeAccountTransactions(t, lm, idx, 2, txData)
 				require.NoError(t, err)
 
-				page, err := idx.TransactionsByAddress(account, 100, nil, nil)
+				iter, err := idx.ByAddress(account, nil)
 				require.NoError(t, err)
-				require.Len(t, page.Transactions, 1)
-				assert.Equal(t, txID, page.Transactions[0].TransactionID)
-				assert.Equal(t, tt.expectedRoles, page.Transactions[0].Roles)
+				txs := collectAll(t, iter)
+				require.Len(t, txs, 1)
+				assert.Equal(t, txID, txs[0].TransactionID)
+				assert.Equal(t, tt.expectedRoles, txs[0].Roles)
 			})
 		})
 	}
@@ -871,14 +747,14 @@ func TestAccountTransactions_RolesRoundTrip(t *testing.T) {
 func TestAccountTransactions_LockRequirement(t *testing.T) {
 	t.Parallel()
 
-	t.Run("indexAccountTransactions without lock returns error", func(t *testing.T) {
-		RunWithBootstrappedAccountTxIndex(t, 1, nil, func(db storage.DB, lm storage.LockManager, _ *AccountTransactions) {
+	t.Run("Store without lock returns error", func(t *testing.T) {
+		RunWithBootstrappedAccountTxIndex(t, 1, nil, func(db storage.DB, lm storage.LockManager, idx *AccountTransactions) {
 			lctx := lm.NewContext()
 			defer lctx.Release()
 
 			// Call without acquiring the required lock
 			err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-				return indexAccountTransactions(lctx, rw, 2, nil)
+				return idx.Store(lctx, rw, 2, nil)
 			})
 			require.Error(t, err)
 			assert.Contains(t, err.Error(), "missing required lock")
@@ -960,6 +836,70 @@ func RunWithBootstrappedAccountTxIndex(tb testing.TB, startHeight uint64, txData
 		require.NoError(tb, err)
 
 		f(storageDB, lockManager, accountTx)
+	})
+}
+
+// TestAccountTransactions_PaginationCoversAllEntries verifies that paginating through all
+// transactions for an account using CollectResults visits every entry exactly once. This
+// specifically exercises the PrefixInclusiveEnd logic: when a cursor lands at firstHeight,
+// the iterator range must still include all remaining entries at that height.
+func TestAccountTransactions_PaginationCoversAllEntries(t *testing.T) {
+	t.Parallel()
+
+	const firstHeight = uint64(5)
+	const pageSize = uint32(3)
+
+	account := unittest.RandomAddressFixture()
+
+	// Bootstrap with 3 transactions at firstHeight so that all 3 are stored at the
+	// first indexed height. When the page boundary later falls exactly at firstHeight,
+	// PrefixInclusiveEnd must pad the end key so the iterator covers all entries there.
+	initialTxs := []access.AccountTransaction{
+		{Address: account, BlockHeight: firstHeight, TransactionID: unittest.IdentifierFixture(), TransactionIndex: 0, Roles: []access.TransactionRole{access.TransactionRoleAuthorizer}},
+		{Address: account, BlockHeight: firstHeight, TransactionID: unittest.IdentifierFixture(), TransactionIndex: 1, Roles: []access.TransactionRole{access.TransactionRoleAuthorizer}},
+		{Address: account, BlockHeight: firstHeight, TransactionID: unittest.IdentifierFixture(), TransactionIndex: 2, Roles: []access.TransactionRole{access.TransactionRoleAuthorizer}},
+	}
+
+	RunWithBootstrappedAccountTxIndex(t, firstHeight, initialTxs, func(_ storage.DB, lm storage.LockManager, idx *AccountTransactions) {
+		// 3 more transactions at height 6 (one above firstHeight)
+		err := storeAccountTransactions(t, lm, idx, 6, []access.AccountTransaction{
+			{Address: account, BlockHeight: 6, TransactionID: unittest.IdentifierFixture(), TransactionIndex: 0, Roles: []access.TransactionRole{access.TransactionRoleAuthorizer}},
+			{Address: account, BlockHeight: 6, TransactionID: unittest.IdentifierFixture(), TransactionIndex: 1, Roles: []access.TransactionRole{access.TransactionRoleAuthorizer}},
+			{Address: account, BlockHeight: 6, TransactionID: unittest.IdentifierFixture(), TransactionIndex: 2, Roles: []access.TransactionRole{access.TransactionRoleAuthorizer}},
+		})
+		require.NoError(t, err)
+
+		// Paginate using CollectResults until cursor is nil.
+		// Page 1 (cursor=nil) collects height-6 entries and returns a cursor pointing
+		// to firstHeight. Page 2 must still return all 3 entries at firstHeight.
+		var allCollected []access.AccountTransaction
+		var cursor *access.AccountTransactionCursor
+		for {
+			txIter, err := idx.ByAddress(account, cursor)
+			require.NoError(t, err)
+
+			page, nextCursor, err := iterator.CollectResults(txIter, pageSize, nil)
+			require.NoError(t, err)
+
+			allCollected = append(allCollected, page...)
+			cursor = nextCursor
+			if cursor == nil {
+				break
+			}
+		}
+
+		// All 6 transactions must be visited exactly once.
+		require.Len(t, allCollected, 6)
+
+		// First 3 results are from height 6 (newest first), next 3 from firstHeight.
+		for i := 0; i < 3; i++ {
+			assert.Equal(t, uint64(6), allCollected[i].BlockHeight)
+			assert.Equal(t, uint32(i), allCollected[i].TransactionIndex)
+		}
+		for i := 0; i < 3; i++ {
+			assert.Equal(t, firstHeight, allCollected[3+i].BlockHeight)
+			assert.Equal(t, uint32(i), allCollected[3+i].TransactionIndex)
+		}
 	})
 }
 

@@ -12,8 +12,10 @@ import (
 )
 
 type Storage struct {
-	DB                              storage.DB
-	AccountTransactionsBootstrapper storage.AccountTransactionsBootstrapper
+	DB                                    storage.DB
+	AccountTransactionsBootstrapper       storage.AccountTransactionsBootstrapper
+	FungibleTokenTransfersBootstrapper    storage.FungibleTokenTransfersBootstrapper
+	NonFungibleTokenTransfersBootstrapper storage.NonFungibleTokenTransfersBootstrapper
 }
 
 // OpenExtendedIndexDB opens the pebble database for extended indexes and creates the account
@@ -36,10 +38,7 @@ func OpenExtendedIndexDB(
 	}
 
 	indexerStorageDB := pebbleimpl.ToDB(indexerDB)
-	accountTxStore, err := indexes.NewAccountTransactionsBootstrapper(
-		indexerStorageDB,
-		sealedRootHeight,
-	)
+	accountTxStore, err := indexes.NewAccountTransactionsBootstrapper(indexerStorageDB, sealedRootHeight)
 	if err != nil {
 		if closeErr := indexerDB.Close(); closeErr != nil {
 			log.Error().Err(closeErr).Msg("error closing indexer db")
@@ -47,8 +46,26 @@ func OpenExtendedIndexDB(
 		return Storage{}, fmt.Errorf("could not create account transactions index: %w", err)
 	}
 
+	ftStore, err := indexes.NewFungibleTokenTransfersBootstrapper(indexerStorageDB, sealedRootHeight)
+	if err != nil {
+		if closeErr := indexerDB.Close(); closeErr != nil {
+			log.Error().Err(closeErr).Msg("error closing indexer db")
+		}
+		return Storage{}, fmt.Errorf("could not create fungible token transfers index: %w", err)
+	}
+
+	nftStore, err := indexes.NewNonFungibleTokenTransfersBootstrapper(indexerStorageDB, sealedRootHeight)
+	if err != nil {
+		if closeErr := indexerDB.Close(); closeErr != nil {
+			log.Error().Err(closeErr).Msg("error closing indexer db")
+		}
+		return Storage{}, fmt.Errorf("could not create non-fungible token transfers index: %w", err)
+	}
+
 	return Storage{
-		DB:                              indexerStorageDB,
-		AccountTransactionsBootstrapper: accountTxStore,
+		DB:                                    indexerStorageDB,
+		AccountTransactionsBootstrapper:       accountTxStore,
+		FungibleTokenTransfersBootstrapper:    ftStore,
+		NonFungibleTokenTransfersBootstrapper: nftStore,
 	}, nil
 }

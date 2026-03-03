@@ -2,21 +2,19 @@ package extended
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
+	"github.com/rs/zerolog"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
 	"github.com/onflow/flow/protobuf/go/flow/entities"
-	"github.com/rs/zerolog"
 
-	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/provider"
 	accessmodel "github.com/onflow/flow-go/model/access"
-	"github.com/onflow/flow-go/model/access/systemcollection"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/storage/indexes/iterator"
 )
 
 type AccountTransactionExpandOptions struct {
@@ -54,41 +52,25 @@ func (f *AccountTransactionFilter) Filter() storage.IndexFilter[*accessmodel.Acc
 
 // AccountTransactionsBackend implements the extended API for querying account transactions.
 type AccountTransactionsBackend struct {
-	log    zerolog.Logger
-	config Config
-	store  storage.AccountTransactionsReader
+	*backendBase
 
-	headers               storage.Headers
-	collections           storage.CollectionsReader
-	transactions          storage.TransactionsReader
-	scheduledTransactions storage.ScheduledTransactionsReader
-
-	transactionsProvider provider.TransactionProvider
-	systemCollections    *systemcollection.Versioned
+	log   zerolog.Logger
+	store storage.AccountTransactionsReader
+	chain flow.Chain
 }
 
-// New creates a new AccountTransactionsBackend instance.
+// NewAccountTransactionsBackend creates a new AccountTransactionsBackend instance.
 func NewAccountTransactionsBackend(
 	log zerolog.Logger,
-	config Config,
+	base *backendBase,
 	store storage.AccountTransactionsReader,
-	headers storage.Headers,
-	collections storage.CollectionsReader,
-	transactions storage.TransactionsReader,
-	scheduledTransactions storage.ScheduledTransactionsReader,
-	systemCollections *systemcollection.Versioned,
-	transactionsProvider provider.TransactionProvider,
+	chain flow.Chain,
 ) *AccountTransactionsBackend {
 	return &AccountTransactionsBackend{
-		log:                   log,
-		config:                config,
-		store:                 store,
-		headers:               headers,
-		collections:           collections,
-		transactions:          transactions,
-		scheduledTransactions: scheduledTransactions,
-		systemCollections:     systemCollections,
-		transactionsProvider:  transactionsProvider,
+		backendBase: base,
+		log:         log,
+		store:       store,
+		chain:       chain,
 	}
 }
 
@@ -98,8 +80,10 @@ func NewAccountTransactionsBackend(
 // If the account is found but has no transactions, the response will include an empty array and no error.
 //
 // Expected error returns during normal operations:
+//   - [codes.NotFound] if the account is not found
 //   - [codes.FailedPrecondition] if the account transaction index has not been initialized
 //   - [codes.OutOfRange] if the cursor references a height outside the indexed range
+//   - [codes.InvalidArgument] if the query parameters are invalid
 func (b *AccountTransactionsBackend) GetAccountTransactions(
 	ctx context.Context,
 	address flow.Address,
@@ -109,32 +93,37 @@ func (b *AccountTransactionsBackend) GetAccountTransactions(
 	expandOptions AccountTransactionExpandOptions,
 	encodingVersion entities.EventEncodingVersion,
 ) (*accessmodel.AccountTransactionsPage, error) {
-	if limit == 0 {
-		limit = b.config.DefaultPageSize
-	}
-	if limit > b.config.MaxPageSize {
-		limit = b.config.MaxPageSize
-	}
-
-	page, err := b.store.TransactionsByAddress(address, limit, cursor, filter.Filter())
+	limit, err := b.normalizeLimit(limit)
 	if err != nil {
-		switch {
-		case errors.Is(err, storage.ErrNotBootstrapped):
-			return nil, status.Errorf(codes.FailedPrecondition, "account transaction index not initialized: %v", err)
-		case errors.Is(err, storage.ErrHeightNotIndexed):
-			return nil, status.Errorf(codes.OutOfRange, "requested height not indexed: %v", err)
-		default:
-			irrecoverable.Throw(ctx, fmt.Errorf("failed to get account transactions: %w", err))
-			return nil, err
-		}
+		return nil, status.Errorf(codes.InvalidArgument, "invalid limit: %v", err)
 	}
 
-	// enrich the transactions with additional details requested by the client
-	// Note: if no transactions are found, the response will include an empty array and no error.
+	if !b.chain.IsValid(address) {
+		return nil, status.Errorf(codes.NotFound, "account %s is not valid on chain %s", address, b.chain.ChainID())
+	}
+	// TODO: check if account exists for the chain
+
+	iter, err := b.store.ByAddress(address, cursor)
+	if err != nil {
+		return nil, mapReadError(ctx, "account transactions", err)
+	}
+
+	collected, nextCursor, err := iterator.CollectResults(iter, limit, filter.Filter())
+	if err != nil {
+		err = fmt.Errorf("error collecting transactions: %w", err)
+		irrecoverable.Throw(ctx, err)
+		return nil, err
+	}
+
+	page := accessmodel.AccountTransactionsPage{
+		Transactions: collected,
+		NextCursor:   nextCursor,
+	}
+
 	for i := range page.Transactions {
-		err := b.enrichTransaction(ctx, &page.Transactions[i], expandOptions, encodingVersion)
-		if err != nil {
-			err = fmt.Errorf("failed to populate details for transaction %s: %w", page.Transactions[i].TransactionID, err)
+		tx := &page.Transactions[i]
+		if err := b.expand(ctx, tx, expandOptions, encodingVersion); err != nil {
+			err = fmt.Errorf("unexpected error expanding transaction: %w", err)
 			irrecoverable.Throw(ctx, err)
 			return nil, err
 		}
@@ -143,24 +132,19 @@ func (b *AccountTransactionsBackend) GetAccountTransactions(
 	return &page, nil
 }
 
-// enrichTransaction adds additional details to the transaction.
+// expand adds additional details to the transaction.
 //
 // Since the extended indexer only indexes sealed data, all transaction and result data should exist
 // in storage for the given height.
 //
 // No error returns are expected during normal operation.
-func (b *AccountTransactionsBackend) enrichTransaction(
+func (b *AccountTransactionsBackend) expand(
 	ctx context.Context,
 	tx *accessmodel.AccountTransaction,
 	expandOptions AccountTransactionExpandOptions,
 	encodingVersion entities.EventEncodingVersion,
 ) error {
-	blockID, err := b.headers.BlockIDByHeight(tx.BlockHeight)
-	if err != nil {
-		return fmt.Errorf("could not retrieve block ID: %w", err)
-	}
-
-	header, err := b.headers.ByBlockID(blockID)
+	header, err := b.headers.ByHeight(tx.BlockHeight)
 	if err != nil {
 		return fmt.Errorf("could not retrieve block header: %w", err)
 	}
@@ -192,114 +176,4 @@ func (b *AccountTransactionsBackend) enrichTransaction(
 	}
 
 	return nil
-}
-
-// getTransactionBody retrieves the transaction body for the given txID by searching in order:
-// submitted transactions, system transactions, and finally scheduled transactions.
-// The second return value indicates whether the transaction is a system transaction
-// (system chunk or scheduled execution).
-//
-// If the transaction is a scheduled transaction, the block ID stored for it must match the
-// provided header. A mismatch indicates an inconsistency in the node's storage, which is
-// treated as an irrecoverable exception.
-//
-// Similarly, if the transaction was indexed for an account but cannot be found in any storage
-// location, the node's state is inconsistent, which is also treated as an irrecoverable
-// exception.
-//
-// No error returns are expected during normal operation.
-func (b *AccountTransactionsBackend) getTransactionBody(ctx context.Context, header *flow.Header, txID flow.Identifier) (*flow.TransactionBody, bool, error) {
-	// first, check if it's a submitted transaction since that's the most common
-	txBody, err := b.transactions.ByID(txID)
-	if err == nil {
-		return txBody, false, nil
-	}
-	if !errors.Is(err, storage.ErrNotFound) {
-		return nil, false, fmt.Errorf("failed to retrieve transaction body: %w", err)
-	}
-
-	// next, check if the transaction is a system transaction because it's the cheapest lookup
-	systemTx, ok := b.systemCollections.SearchAll(txID)
-	if ok {
-		return systemTx, true, nil
-	}
-
-	// finally, check if it's a scheduled transaction
-	blockID, err := b.scheduledTransactions.BlockIDByTransactionID(txID)
-	if err != nil {
-		if errors.Is(err, storage.ErrNotFound) {
-			return nil, false, fmt.Errorf("transaction not found: %w", err)
-		}
-		return nil, false, fmt.Errorf("could not retrieve scheduled transaction block ID: %w", err)
-	}
-
-	// the provided header was looked up based on data stored in the db for the account transaction.
-	// if the transaction is a scheduled transaction, it must match the block ID indexed for the
-	// scheduled transaction, otherwise the node is in an inconsistent state.
-	if blockID != header.ID() {
-		err := fmt.Errorf("scheduled transaction found in block %s, but %s was provided", blockID, header.ID())
-		irrecoverable.Throw(ctx, err)
-		return nil, false, err
-	}
-
-	allScheduledTxs, err := b.transactionsProvider.ScheduledTransactionsByBlockID(ctx, header)
-	if err != nil {
-		return nil, false, fmt.Errorf("could not retrieve all scheduled transactions: %w", err)
-	}
-
-	for _, scheduledTx := range allScheduledTxs {
-		if scheduledTx.ID() == txID {
-			return scheduledTx, true, nil
-		}
-	}
-
-	// at this point, the transaction is not known to the node.
-	// this is unexpected. if the account transaction was indexed, then the transaction should be found
-	// somewhere in storage.
-	err = fmt.Errorf("indexed transaction not found")
-	irrecoverable.Throw(ctx, err)
-	return nil, false, err
-}
-
-// getTransactionResult retrieves the transaction result for a given transaction.
-//
-// Expected error returns during normal operation:
-//   - [storage.ErrNotFound] if the transaction is not found
-func (b *AccountTransactionsBackend) getTransactionResult(
-	ctx context.Context,
-	txID flow.Identifier,
-	header *flow.Header,
-	isSystemChunkTx bool,
-	expandTransaction bool,
-	encodingVersion entities.EventEncodingVersion,
-) (*accessmodel.TransactionResult, error) {
-	// the system collection is not indexed and uses the zero ID by convention.
-	var collectionID flow.Identifier
-
-	if !isSystemChunkTx {
-		collection, err := b.collections.LightByTransactionID(txID)
-		if err != nil {
-			if !errors.Is(err, storage.ErrNotFound) {
-				return nil, fmt.Errorf("could not retrieve collection: %w", err)
-			}
-			// if we have already looked up the transaction and confirmed it is NOT a system chunk tx,
-			// then there should be an entry in the tx/collection index. however, the collection/tx
-			// index is built asynchronously with the extended indexer and may not be available yet.
-			// return an error, but don't throw an irrecoverable error.
-			if expandTransaction {
-				return nil, fmt.Errorf("could not retrieve collection for standard transaction: %w", err)
-			}
-			// if the collection is not found and we're not expanding the transaction,
-			// proceed with zero collectionID.
-		} else {
-			collectionID = collection.ID()
-		}
-	}
-
-	result, err := b.transactionsProvider.TransactionResult(ctx, header, txID, collectionID, encodingVersion)
-	if err != nil {
-		return nil, fmt.Errorf("could not retrieve transaction result: %w", err)
-	}
-
-	return result, nil
 }
