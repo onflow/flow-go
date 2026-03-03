@@ -25,6 +25,10 @@ import (
 // - ~block_height: 8 bytes (one's complement for descending sort)
 // - tx_index: 4 bytes (uint32, big-endian)
 //
+// Heights are stored as one's complement to ensure descending order search. This optimizes for the
+// most common use case of iterating over the most recent transactions, and makes it easy to answer the
+// question "give me the most recent N transactions for this account that meet these criteria".
+//
 // Value format: storedAccountTransaction
 // - tx_id: 32 bytes (flow.Identifier)
 // - roles: variable length ([]access.TransactionRole)
