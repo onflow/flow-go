@@ -160,7 +160,7 @@ func TestGetScheduledTransactions(t *testing.T) {
 					"transaction_handler_uuid": "7",
 					"created_transaction_id": "%s",
 					"_expandable": {
-						"handler_contract": "/experimental/v1/contracts/A.0000.MyScheduler"
+						"handler_contract": "/experimental/v1/contracts/A.0000.MyScheduler?expand=code"
 					}
 				},
 				{
@@ -176,7 +176,7 @@ func TestGetScheduledTransactions(t *testing.T) {
 					"created_transaction_id": "%s",
 					"executed_transaction_id": "%s",
 					"_expandable": {
-						"handler_contract": "/experimental/v1/contracts/A.0000.MyScheduler",
+						"handler_contract": "/experimental/v1/contracts/A.0000.MyScheduler?expand=code",
 						"transaction": "/v1/transactions/%s",
 						"result": "/v1/transaction_results/%s"
 					}
@@ -367,7 +367,7 @@ func TestGetScheduledTransaction(t *testing.T) {
 			"transaction_handler_uuid": "3",
 			"created_transaction_id": "%s",
 			"_expandable": {
-				"handler_contract": "/experimental/v1/contracts/A.0000.MyScheduler"
+				"handler_contract": "/experimental/v1/contracts/A.0000.MyScheduler?expand=code"
 			}
 		}`, handlerOwner.String(), txCreatedID.String())
 

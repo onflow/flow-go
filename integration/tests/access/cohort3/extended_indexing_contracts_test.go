@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/antihax/optional"
 	sdk "github.com/onflow/flow-go-sdk"
 	"github.com/stretchr/testify/require"
 
@@ -146,7 +147,9 @@ func (s *ExtendedIndexingSuite) verifyContractLatestDeployment(contractID string
 
 	var d *swagger.ContractDeployment
 	require.Eventually(s.T(), func() bool {
-		resp, err := s.apiClient.GetContractByIdentifier(ctx, contractID)
+		resp, err := s.apiClient.GetContractByIdentifier(ctx, contractID, &swagger.ContractsApiGetContractByIdentifierOpts{
+			Expand: optional.NewInterface([]string{"code"}),
+		})
 		if err != nil {
 			s.T().Logf("GET contract %s failed: %v", contractID, err)
 			return false
@@ -171,7 +174,9 @@ func (s *ExtendedIndexingSuite) verifyContractDeploymentHistory(contractID strin
 
 	var deployments []swagger.ContractDeployment
 	require.Eventually(s.T(), func() bool {
-		resp, err := s.apiClient.GetContractDeployments(ctx, contractID, nil)
+		resp, err := s.apiClient.GetContractDeployments(ctx, contractID, &swagger.ContractsApiGetContractDeploymentsOpts{
+			Expand: optional.NewInterface([]string{"code"}),
+		})
 		if err != nil {
 			s.T().Logf("GET contract deployments %s failed: %v", contractID, err)
 			return false
@@ -201,7 +206,7 @@ func (s *ExtendedIndexingSuite) verifyContractInList(contractID string, expected
 
 	var all []swagger.ContractDeployment
 	require.Eventually(s.T(), func() bool {
-		contracts, err := s.apiClient.GetAllContracts(ctx, 20)
+		contracts, err := s.apiClient.GetAllContracts(ctx, 20, []string{"code"})
 		if err != nil {
 			s.T().Logf("GET /contracts failed: %v", err)
 			return false
@@ -231,7 +236,7 @@ func (s *ExtendedIndexingSuite) verifyContractsByAddress(address string, expecte
 
 	var all []swagger.ContractDeployment
 	require.Eventually(s.T(), func() bool {
-		contracts, err := s.apiClient.GetAllContractsByAccount(ctx, address, 20)
+		contracts, err := s.apiClient.GetAllContractsByAccount(ctx, address, 20, []string{"code"})
 		if err != nil {
 			s.T().Logf("GET /accounts/%s/contracts failed: %v", address, err)
 			return false

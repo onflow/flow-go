@@ -21,7 +21,7 @@ type ContractDeployment struct {
 	// Position of the contract event within its transaction.
 	EventIndex string `json:"event_index,omitempty"`
 	// Base64-encoded Cadence source code of the contract deployed.
-	Code string `json:"code"`
+	Code string `json:"code,omitempty"`
 	// Hex-encoded SHA3-256 hash of the contract code.
 	CodeHash string `json:"code_hash"`
 	// True if the deployment was created during bootstrapping based on the current chain state, not based on a protocol event. When true, block_height, transaction_id, tx_index, and event_index are absent.

@@ -12,6 +12,7 @@ type LinkGenerator interface {
 	commonmodels.LinkGenerator
 
 	ContractLink(identifier string) (string, error)
+	ContractCodeLink(identifier string) (string, error)
 }
 
 type LinkGeneratorImpl struct {
@@ -28,6 +29,17 @@ func NewLinkGeneratorImpl(router *mux.Router, baseGenerator commonmodels.LinkGen
 
 func (generator *LinkGeneratorImpl) ContractLink(identifier string) (string, error) {
 	return generator.link("getContract", "identifier", identifier)
+}
+
+func (generator *LinkGeneratorImpl) ContractCodeLink(identifier string) (string, error) {
+	u, err := generator.router.Get("getContract").URLPath("identifier", identifier)
+	if err != nil {
+		return "", err
+	}
+	q := u.Query()
+	q.Set("expand", "code")
+	u.RawQuery = q.Encode()
+	return u.String(), nil
 }
 
 func (generator *LinkGeneratorImpl) link(route string, key string, value string) (string, error) {

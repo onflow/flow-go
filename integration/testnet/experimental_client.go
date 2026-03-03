@@ -176,8 +176,9 @@ func (c *ExperimentalAPIClient) GetAllAccountNonFungibleTransfers(
 func (c *ExperimentalAPIClient) GetContractByIdentifier(
 	ctx context.Context,
 	identifier string,
+	opts *swagger.ContractsApiGetContractByIdentifierOpts,
 ) (*swagger.ContractDeployment, error) {
-	resp, _, err := c.client.ContractsApi.GetContractByIdentifier(ctx, identifier, nil)
+	resp, _, err := c.client.ContractsApi.GetContractByIdentifier(ctx, identifier, opts)
 	if err != nil {
 		return nil, fmt.Errorf("contracts API request failed for %s: %w", identifier, err)
 	}
@@ -243,15 +244,20 @@ func (c *ExperimentalAPIClient) GetContracts(
 }
 
 // GetAllContracts paginates through all contracts pages and returns the accumulated results.
+// expand optionally specifies fields to expand inline (e.g. []string{"code"}).
 //
 // No error returns are expected during normal operation.
 func (c *ExperimentalAPIClient) GetAllContracts(
 	ctx context.Context,
 	pageSize int,
+	expand []string,
 ) ([]swagger.ContractDeployment, error) {
 	var all []swagger.ContractDeployment
 	opts := &swagger.ContractsApiGetContractsOpts{
 		Limit: optional.NewInt32(int32(pageSize)),
+	}
+	if len(expand) > 0 {
+		opts.Expand = optional.NewInterface(expand)
 	}
 	for {
 		resp, err := c.GetContracts(ctx, opts)
@@ -285,16 +291,21 @@ func (c *ExperimentalAPIClient) GetContractsByAccount(
 
 // GetAllContractsByAccount paginates through all contract pages for the given account and
 // returns the accumulated results.
+// expand optionally specifies fields to expand inline (e.g. []string{"code"}).
 //
 // No error returns are expected during normal operation.
 func (c *ExperimentalAPIClient) GetAllContractsByAccount(
 	ctx context.Context,
 	address string,
 	pageSize int,
+	expand []string,
 ) ([]swagger.ContractDeployment, error) {
 	var all []swagger.ContractDeployment
 	opts := &swagger.ContractsApiGetContractsByAccountOpts{
 		Limit: optional.NewInt32(int32(pageSize)),
+	}
+	if len(expand) > 0 {
+		opts.Expand = optional.NewInterface(expand)
 	}
 	for {
 		resp, err := c.GetContractsByAccount(ctx, address, opts)

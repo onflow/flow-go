@@ -13,9 +13,10 @@ import (
 
 // GetContracts holds parsed request params for GET /contracts.
 type GetContracts struct {
-	Limit  uint32
-	Cursor *accessmodel.ContractDeploymentsCursor
-	Filter extended.ContractDeploymentFilter
+	Limit         uint32
+	Cursor        *accessmodel.ContractDeploymentsCursor
+	Filter        extended.ContractDeploymentFilter
+	ExpandOptions extended.ContractDeploymentExpandOptions
 }
 
 // NewGetContracts parses and validates the HTTP request for GET /contracts.
@@ -44,13 +45,16 @@ func NewGetContracts(r *common.Request) (GetContracts, error) {
 		return req, err
 	}
 
+	req.ExpandOptions = parseContractExpandOptions(r)
+
 	return req, nil
 }
 
 // GetContract holds parsed request params for GET /contracts/{identifier}.
 type GetContract struct {
-	ID     string
-	Filter extended.ContractDeploymentFilter
+	ID            string
+	Filter        extended.ContractDeploymentFilter
+	ExpandOptions extended.ContractDeploymentExpandOptions
 }
 
 // NewGetContract parses and validates the HTTP request for GET /contracts/{identifier}.
@@ -65,15 +69,18 @@ func NewGetContract(r *common.Request) (GetContract, error) {
 		return req, err
 	}
 
+	req.ExpandOptions = parseContractExpandOptions(r)
+
 	return req, nil
 }
 
 // GetContractDeployments holds parsed request params for GET /contracts/{identifier}/deployments.
 type GetContractDeployments struct {
-	ID     string
-	Limit  uint32
-	Cursor *accessmodel.ContractDeploymentsCursor
-	Filter extended.ContractDeploymentFilter
+	ID            string
+	Limit         uint32
+	Cursor        *accessmodel.ContractDeploymentsCursor
+	Filter        extended.ContractDeploymentFilter
+	ExpandOptions extended.ContractDeploymentExpandOptions
 }
 
 // NewGetContractDeployments parses and validates the HTTP request for
@@ -105,15 +112,18 @@ func NewGetContractDeployments(r *common.Request) (GetContractDeployments, error
 		return req, err
 	}
 
+	req.ExpandOptions = parseContractExpandOptions(r)
+
 	return req, nil
 }
 
 // GetContractsByAddress holds parsed request params for GET /accounts/{address}/contracts.
 type GetContractsByAddress struct {
-	Address flow.Address
-	Limit   uint32
-	Cursor  *accessmodel.ContractDeploymentsCursor
-	Filter  extended.ContractDeploymentFilter
+	Address       flow.Address
+	Limit         uint32
+	Cursor        *accessmodel.ContractDeploymentsCursor
+	Filter        extended.ContractDeploymentFilter
+	ExpandOptions extended.ContractDeploymentExpandOptions
 }
 
 // NewGetContractsByAddress parses and validates the HTTP request for
@@ -149,7 +159,18 @@ func NewGetContractsByAddress(r *common.Request) (GetContractsByAddress, error) 
 		return req, err
 	}
 
+	req.ExpandOptions = parseContractExpandOptions(r)
+
 	return req, nil
+}
+
+// parseContractExpandOptions parses the expand query parameter for contract endpoints.
+func parseContractExpandOptions(r *common.Request) extended.ContractDeploymentExpandOptions {
+	return extended.ContractDeploymentExpandOptions{
+		Code:        r.Expands("code"),
+		Transaction: r.Expands("transaction"),
+		Result:      r.Expands("result"),
+	}
 }
 
 // parseContractFilter parses all optional filter query params from r into filter.

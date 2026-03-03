@@ -11,7 +11,7 @@ import (
 )
 
 // Build populates the REST model from the domain model.
-func (m *ContractDeployment) Build(d *accessmodel.ContractDeployment, link LinkGenerator) error {
+func (m *ContractDeployment) Build(d *accessmodel.ContractDeployment, link LinkGenerator, expand map[string]bool) error {
 	m.ContractId = accessmodel.ContractID(d.Address, d.ContractName)
 	m.Address = d.Address.Hex()
 	m.BlockHeight = strconv.FormatUint(d.BlockHeight, 10)
@@ -19,13 +19,22 @@ func (m *ContractDeployment) Build(d *accessmodel.ContractDeployment, link LinkG
 	m.TxIndex = strconv.FormatUint(uint64(d.TransactionIndex), 10)
 	m.EventIndex = strconv.FormatUint(uint64(d.EventIndex), 10)
 	m.CodeHash = hex.EncodeToString(d.CodeHash)
-	if len(d.Code) > 0 {
-		m.Code = base64.StdEncoding.EncodeToString(d.Code)
-	}
-
 	m.IsPlaceholder = d.IsPlaceholder
 
 	m.Expandable = new(ContractDeploymentExpandable)
+
+	if expand["code"] {
+		if len(d.Code) > 0 {
+			m.Code = base64.StdEncoding.EncodeToString(d.Code)
+		}
+	} else {
+		codeLink, err := link.ContractCodeLink(m.ContractId)
+		if err != nil {
+			return fmt.Errorf("failed to generate code link: %w", err)
+		}
+		m.Expandable.Code = codeLink
+	}
+
 	if d.Transaction != nil {
 		m.Transaction = new(commonmodels.Transaction)
 		m.Transaction.Build(d.Transaction, nil, link)

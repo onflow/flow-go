@@ -74,7 +74,8 @@ func (t *ScheduledTransaction) Build(
 
 	if tx.HandlerContract != nil {
 		t.HandlerContract = new(ContractDeployment)
-		if err := t.HandlerContract.Build(tx.HandlerContract, link); err != nil {
+		expandWithCode := map[string]bool{"code": true}
+		if err := t.HandlerContract.Build(tx.HandlerContract, link, expandWithCode); err != nil {
 			return err
 		}
 	} else {
@@ -83,7 +84,7 @@ func (t *ScheduledTransaction) Build(
 			return fmt.Errorf("failed to get handler contract ID: %w", err)
 		}
 
-		handlerContractLink, err := link.ContractLink(contractID)
+		handlerContractLink, err := link.ContractCodeLink(contractID)
 		if err != nil {
 			return fmt.Errorf("failed to generate handler contract link: %w", err)
 		}

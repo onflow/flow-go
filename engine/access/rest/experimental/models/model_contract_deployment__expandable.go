@@ -10,6 +10,8 @@ package models
 
 // Contains URI links for fields not included in the response. When a field is expanded via the `expand` query parameter, it appears inline and is removed from `_expandable`.
 type ContractDeploymentExpandable struct {
+	// Link to fetch the Cadence source code of this deployment.
+	Code string `json:"code,omitempty"`
 	// Link to fetch the full transaction that applied this deployment.
 	Transaction string `json:"transaction,omitempty"`
 	// Link to fetch the transaction result.

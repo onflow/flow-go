@@ -17,6 +17,7 @@ import (
 )
 
 type ContractDeploymentExpandOptions struct {
+	Code        bool
 	Transaction bool
 	Result      bool
 }
@@ -111,6 +112,11 @@ func (b *ContractsBackend) GetContract(
 		}
 	}
 
+	// code is always loaded from storage, so remove it if not requested
+	if !expandOptions.Code {
+		deployment.Code = nil
+	}
+
 	return &deployment, nil
 }
 
@@ -174,6 +180,13 @@ func (b *ContractsBackend) GetContractDeployments(
 		}
 	}
 
+	// code is always loaded from storage, so remove it if not requested
+	if !expandOptions.Code {
+		for i := range page.Deployments {
+			page.Deployments[i].Code = nil
+		}
+	}
+
 	return page, nil
 }
 
@@ -221,6 +234,13 @@ func (b *ContractsBackend) GetContracts(
 				irrecoverable.Throw(ctx, err)
 				return nil, err
 			}
+		}
+	}
+
+	// code is always loaded from storage, so remove it if not requested
+	if !expandOptions.Code {
+		for i := range page.Deployments {
+			page.Deployments[i].Code = nil
 		}
 	}
 
@@ -278,6 +298,13 @@ func (b *ContractsBackend) GetContractsByAddress(
 				irrecoverable.Throw(ctx, err)
 				return nil, err
 			}
+		}
+	}
+
+	// code is always loaded from storage, so remove it if not requested
+	if !expandOptions.Code {
+		for i := range page.Deployments {
+			page.Deployments[i].Code = nil
 		}
 	}
 

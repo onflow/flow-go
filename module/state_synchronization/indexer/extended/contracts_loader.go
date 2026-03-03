@@ -16,8 +16,8 @@ import (
 // It scans all code registers at the given height and returns a [access.ContractDeployment] placeholder record
 // for each deployed contract.
 //
-// All loaded contracts have their IsPlaceholder flag set to true and the BlockHeight, TransactionID,
-// TxIndex, and EventIndex fields are undefined (0).
+// All loaded contracts have their IsPlaceholder flag set to true, their BlockHeight set to
+// the scanned height, and the TransactionID, TxIndex, and EventIndex fields are undefined (0).
 //
 // CAUTION: Not safe for concurrent use.
 type deployedContractsLoader struct {
@@ -42,8 +42,8 @@ func newDeployedContractsLoader(
 // access.ContractDeployment placeholder record for each deployed contract not already
 // covered by seenContracts.
 //
-// All loaded contracts have their IsPlaceholder flag set to true and the BlockHeight, TransactionID,
-// TxIndex, and EventIndex fields are undefined (0).
+// All loaded contracts have their IsPlaceholder flag set to true, their BlockHeight set to
+// the scanned height, and the TransactionID, TxIndex, and EventIndex fields are undefined (0).
 //
 // CAUTION: Not safe for concurrent use.
 //
@@ -87,7 +87,7 @@ func (c *deployedContractsLoader) Load(height uint64, seenContracts map[string]b
 			}
 
 			registerID := item.Cursor()
-			deployment, isNew, err := c.parseContractRegister(registerID, item.Value, seenContracts)
+			deployment, isNew, err := c.parseContractRegister(registerID, item.Value, seenContracts, height)
 			if err != nil {
 				return nil, fmt.Errorf("error processing contract: %w", err)
 			}
@@ -171,12 +171,14 @@ func (c *deployedContractsLoader) Load(height uint64, seenContracts map[string]b
 
 // parseContractRegister parses a contract register and returns a [access.ContractDeployment] placeholder record.
 // Returns false and an empty deployment if the contract was already seen.
+// The returned deployment has BlockHeight set to height.
 //
 // No error returns are expected during normal operation.
 func (c *deployedContractsLoader) parseContractRegister(
 	reg flow.RegisterID,
 	getRegistryValue func() (flow.RegisterValue, error),
 	seenContracts map[string]bool,
+	height uint64,
 ) (access.ContractDeployment, bool, error) {
 	if reg.Owner == "" {
 		return access.ContractDeployment{}, false, fmt.Errorf("found contract with empty owner: %q", reg)
@@ -198,6 +200,7 @@ func (c *deployedContractsLoader) parseContractRegister(
 	return access.ContractDeployment{
 		ContractName:  contractName,
 		Address:       address,
+		BlockHeight:   height,
 		Code:          code,
 		CodeHash:      access.CadenceCodeHash(code),
 		IsPlaceholder: true,

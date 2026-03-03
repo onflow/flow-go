@@ -39,6 +39,7 @@ type contractsListURLParams struct {
 	contractName string
 	startBlock   string
 	endBlock     string
+	expand       string
 }
 
 func contractsListURL(t *testing.T, params contractsListURLParams) string {
@@ -60,6 +61,9 @@ func contractsListURL(t *testing.T, params contractsListURLParams) string {
 	if params.endBlock != "" {
 		q.Add("end_block", params.endBlock)
 	}
+	if params.expand != "" {
+		q.Add("expand", params.expand)
+	}
 	u.RawQuery = q.Encode()
 	return u.String()
 }
@@ -67,7 +71,11 @@ func contractsListURL(t *testing.T, params contractsListURLParams) string {
 func contractURL(t *testing.T, identifier string, params contractsListURLParams) string {
 	u, err := url.ParseRequestURI(fmt.Sprintf("/experimental/v1/contracts/%s", identifier))
 	require.NoError(t, err)
-	u.RawQuery = url.Values{}.Encode()
+	q := u.Query()
+	if params.expand != "" {
+		q.Add("expand", params.expand)
+	}
+	u.RawQuery = q.Encode()
 	return u.String()
 }
 
@@ -89,6 +97,9 @@ func contractDeploymentsURL(t *testing.T, identifier string, params contractsLis
 	}
 	if params.endBlock != "" {
 		q.Add("end_block", params.endBlock)
+	}
+	if params.expand != "" {
+		q.Add("expand", params.expand)
 	}
 	u.RawQuery = q.Encode()
 	return u.String()
@@ -113,13 +124,50 @@ func contractsByAddressURL(t *testing.T, address string, params contractsListURL
 	if params.endBlock != "" {
 		q.Add("end_block", params.endBlock)
 	}
+	if params.expand != "" {
+		q.Add("expand", params.expand)
+	}
 	u.RawQuery = q.Encode()
 	return u.String()
 }
 
 // buildExpectedDeploymentJSON produces the expected JSON object for a ContractDeployment with
-// no inline expansions (both transaction and result appear as expandable links).
+// no inline expansions: code, transaction, and result appear as expandable links.
 func buildExpectedDeploymentJSON(d *accessmodel.ContractDeployment) string {
+	codeHashStr := hex.EncodeToString(d.CodeHash)
+	contractID := accessmodel.ContractID(d.Address, d.ContractName)
+	txID := d.TransactionID.String()
+
+	return fmt.Sprintf(`{
+		"contract_id": %q,
+		"address": %q,
+		"block_height": "%d",
+		"transaction_id": %q,
+		"tx_index": "%d",
+		"event_index": "%d",
+		"code_hash": %q,
+		"_expandable": {
+			"code": "/experimental/v1/contracts/%s?expand=code",
+			"transaction": "/v1/transactions/%s",
+			"result": "/v1/transaction_results/%s"
+		}
+	}`,
+		contractID,
+		d.Address.Hex(),
+		d.BlockHeight,
+		txID,
+		d.TransactionIndex,
+		d.EventIndex,
+		codeHashStr,
+		contractID,
+		txID,
+		txID,
+	)
+}
+
+// buildExpectedDeploymentJSONWithCode produces the expected JSON object for a ContractDeployment
+// with code expanded inline (expand=code), and transaction/result as expandable links.
+func buildExpectedDeploymentJSONWithCode(d *accessmodel.ContractDeployment) string {
 	var codeStr string
 	if len(d.Code) > 0 {
 		codeStr = base64.StdEncoding.EncodeToString(d.Code)
@@ -400,7 +448,7 @@ func TestGetContract(t *testing.T) {
 
 	contractID := "A.1234567890abcdef.MyContract"
 
-	t.Run("happy path with code", func(t *testing.T) {
+	t.Run("happy path - code in expandable by default", func(t *testing.T) {
 		backend := extendedmock.NewAPI(t)
 
 		d := &accessmodel.ContractDeployment{
@@ -431,7 +479,38 @@ func TestGetContract(t *testing.T) {
 		assert.JSONEq(t, buildExpectedDeploymentJSON(d), rr.Body.String())
 	})
 
-	t.Run("happy path without code", func(t *testing.T) {
+	t.Run("expand=code includes code inline", func(t *testing.T) {
+		backend := extendedmock.NewAPI(t)
+
+		d := &accessmodel.ContractDeployment{
+			Address:          addr,
+			ContractName:     "MyContract",
+			BlockHeight:      1234,
+			TransactionID:    txID,
+			TransactionIndex: 5,
+			EventIndex:       3,
+			Code:             code,
+			CodeHash:         codeHash,
+		}
+
+		backend.On("GetContract",
+			mocktestify.Anything,
+			contractID,
+			extended.ContractDeploymentFilter{},
+			extended.ContractDeploymentExpandOptions{Code: true},
+			entities.EventEncodingVersion_JSON_CDC_V0,
+		).Return(d, nil)
+
+		req, err := http.NewRequest(http.MethodGet, contractURL(t, contractID, contractsListURLParams{expand: "code"}), nil)
+		require.NoError(t, err)
+
+		rr := router.ExecuteExperimentalRequest(req, backend)
+
+		assert.Equal(t, http.StatusOK, rr.Code)
+		assert.JSONEq(t, buildExpectedDeploymentJSONWithCode(d), rr.Body.String())
+	})
+
+	t.Run("happy path - code not loaded by backend", func(t *testing.T) {
 		backend := extendedmock.NewAPI(t)
 
 		d := &accessmodel.ContractDeployment{
@@ -459,7 +538,6 @@ func TestGetContract(t *testing.T) {
 		rr := router.ExecuteExperimentalRequest(req, backend)
 
 		assert.Equal(t, http.StatusOK, rr.Code)
-		// code field is present but empty string (no omitempty on the JSON tag)
 		assert.JSONEq(t, buildExpectedDeploymentJSON(d), rr.Body.String())
 	})
 
@@ -489,8 +567,7 @@ func TestGetContract(t *testing.T) {
 		rr := router.ExecuteExperimentalRequest(req, backend)
 
 		assert.Equal(t, http.StatusOK, rr.Code)
-		// Placeholder deployments have is_placeholder=true and no transaction/result links.
-		codeStr := base64.StdEncoding.EncodeToString(code)
+		// Placeholder deployments have is_placeholder=true, no transaction/result links, and code is expandable.
 		codeHashStr := hex.EncodeToString(codeHash)
 		expected := fmt.Sprintf(`{
 			"contract_id": %q,
@@ -499,11 +576,12 @@ func TestGetContract(t *testing.T) {
 			"transaction_id": "0000000000000000000000000000000000000000000000000000000000000000",
 			"tx_index": "0",
 			"event_index": "0",
-			"code": %q,
 			"code_hash": %q,
 			"is_placeholder": true,
-			"_expandable": {}
-		}`, contractID, addr.Hex(), codeStr, codeHashStr)
+			"_expandable": {
+				"code": "/experimental/v1/contracts/%s?expand=code"
+			}
+		}`, contractID, addr.Hex(), codeHashStr, contractID)
 		assert.JSONEq(t, expected, rr.Body.String())
 	})
 

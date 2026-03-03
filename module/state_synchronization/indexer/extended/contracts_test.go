@@ -462,25 +462,25 @@ func TestContractsIndexer_Bootstrap_PreExistingContracts(t *testing.T) {
 		beta, err := store.ByContract(addr1, "Beta")
 		require.NoError(t, err)
 		assertContractDeployment(t, access.ContractDeployment{
-			Address:      addr1,
-			ContractName: "Beta",
-			BlockHeight:  contractsBootstrapHeight,
-			Code:         codeBeta,
-			CodeHash:     access.CadenceCodeHash(codeBeta),
+			Address:       addr1,
+			ContractName:  "Beta",
+			BlockHeight:   contractsBootstrapHeight,
+			Code:          codeBeta,
+			CodeHash:      access.CadenceCodeHash(codeBeta),
+			IsPlaceholder: true,
 		}, beta)
-		assert.True(t, beta.IsPlaceholder)
 
 		// Gamma: placeholder from loadDeployedContracts.
 		gamma, err := store.ByContract(addr2, "Gamma")
 		require.NoError(t, err)
 		assertContractDeployment(t, access.ContractDeployment{
-			Address:      addr2,
-			ContractName: "Gamma",
-			BlockHeight:  contractsBootstrapHeight,
-			Code:         codeGamma,
-			CodeHash:     access.CadenceCodeHash(codeGamma),
+			Address:       addr2,
+			ContractName:  "Gamma",
+			BlockHeight:   contractsBootstrapHeight,
+			Code:          codeGamma,
+			CodeHash:      access.CadenceCodeHash(codeGamma),
+			IsPlaceholder: true,
 		}, gamma)
-		assert.True(t, gamma.IsPlaceholder)
 
 		// All() returns all three contracts.
 		allIter, err := store.All(nil)
@@ -531,6 +531,7 @@ func TestContractsIndexer_Bootstrap_MarksDeletedContracts(t *testing.T) {
 		assertContractDeployment(t, access.ContractDeployment{
 			Address:       addr,
 			ContractName:  "Alpha",
+			BlockHeight:   contractsBootstrapHeight,
 			Code:          codeAlpha,
 			CodeHash:      access.CadenceCodeHash(codeAlpha),
 			IsPlaceholder: true,
@@ -541,6 +542,7 @@ func TestContractsIndexer_Bootstrap_MarksDeletedContracts(t *testing.T) {
 		assertContractDeployment(t, access.ContractDeployment{
 			Address:       addr,
 			ContractName:  "Beta",
+			BlockHeight:   contractsBootstrapHeight,
 			Code:          codeBeta,
 			CodeHash:      access.CadenceCodeHash(codeBeta),
 			IsPlaceholder: true,
@@ -552,6 +554,7 @@ func TestContractsIndexer_Bootstrap_MarksDeletedContracts(t *testing.T) {
 		assertContractDeployment(t, access.ContractDeployment{
 			Address:       addr,
 			ContractName:  "Deleted",
+			BlockHeight:   contractsBootstrapHeight,
 			Code:          codeDeleted,
 			CodeHash:      access.CadenceCodeHash(codeDeleted),
 			IsPlaceholder: true,

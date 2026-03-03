@@ -24,14 +24,14 @@ func GetContracts(r *common.Request, backend extended.API, link models.LinkGener
 		req.Limit,
 		req.Cursor,
 		req.Filter,
-		extended.ContractDeploymentExpandOptions{},
+		req.ExpandOptions,
 		entities.EventEncodingVersion_JSON_CDC_V0,
 	)
 	if err != nil {
 		return nil, err
 	}
 
-	return buildContractsResponse(page, link)
+	return buildContractsResponse(page, link, r.ExpandFields)
 }
 
 // GetContract handles GET /experimental/v1/contracts/{identifier}.
@@ -45,7 +45,7 @@ func GetContract(r *common.Request, backend extended.API, link models.LinkGenera
 		r.Context(),
 		req.ID,
 		req.Filter,
-		extended.ContractDeploymentExpandOptions{},
+		req.ExpandOptions,
 		entities.EventEncodingVersion_JSON_CDC_V0,
 	)
 	if err != nil {
@@ -53,7 +53,7 @@ func GetContract(r *common.Request, backend extended.API, link models.LinkGenera
 	}
 
 	var m models.ContractDeployment
-	err = m.Build(deployment, link)
+	err = m.Build(deployment, link, r.ExpandFields)
 	if err != nil {
 		return nil, common.NewRestError(http.StatusInternalServerError, "failed to build contract deployment", err)
 	}
@@ -73,14 +73,14 @@ func GetContractDeployments(r *common.Request, backend extended.API, link models
 		req.Limit,
 		req.Cursor,
 		req.Filter,
-		extended.ContractDeploymentExpandOptions{},
+		req.ExpandOptions,
 		entities.EventEncodingVersion_JSON_CDC_V0,
 	)
 	if err != nil {
 		return nil, err
 	}
 
-	return buildContractDeploymentsResponse(page, link)
+	return buildContractDeploymentsResponse(page, link, r.ExpandFields)
 }
 
 // GetContractsByAddress handles GET /experimental/v1/accounts/{address}/contracts.
@@ -96,14 +96,14 @@ func GetContractsByAddress(r *common.Request, backend extended.API, link models.
 		req.Limit,
 		req.Cursor,
 		req.Filter,
-		extended.ContractDeploymentExpandOptions{},
+		req.ExpandOptions,
 		entities.EventEncodingVersion_JSON_CDC_V0,
 	)
 	if err != nil {
 		return nil, err
 	}
 
-	return buildContractsResponse(page, link)
+	return buildContractsResponse(page, link, r.ExpandFields)
 }
 
 // buildContractDeploymentsResponse converts a [accessmodel.ContractDeploymentPage] to a
@@ -111,10 +111,11 @@ func GetContractsByAddress(r *common.Request, backend extended.API, link models.
 func buildContractDeploymentsResponse(
 	page *accessmodel.ContractDeploymentPage,
 	link models.LinkGenerator,
+	expand map[string]bool,
 ) (models.ContractDeploymentsResponse, error) {
 	deployments := make([]models.ContractDeployment, len(page.Deployments))
 	for i := range page.Deployments {
-		err := deployments[i].Build(&page.Deployments[i], link)
+		err := deployments[i].Build(&page.Deployments[i], link, expand)
 		if err != nil {
 			return models.ContractDeploymentsResponse{}, common.NewRestError(http.StatusInternalServerError, "failed to build deployment", err)
 		}
@@ -140,10 +141,11 @@ func buildContractDeploymentsResponse(
 func buildContractsResponse(
 	page *accessmodel.ContractDeploymentPage,
 	link models.LinkGenerator,
+	expand map[string]bool,
 ) (models.ContractsResponse, error) {
 	contracts := make([]models.ContractDeployment, len(page.Deployments))
 	for i := range page.Deployments {
-		err := contracts[i].Build(&page.Deployments[i], link)
+		err := contracts[i].Build(&page.Deployments[i], link, expand)
 		if err != nil {
 			return models.ContractsResponse{}, common.NewRestError(http.StatusInternalServerError, "failed to build deployment", err)
 		}
