@@ -61,6 +61,7 @@ func NewInternalEVMContractValue(
 			stdlib.InternalEVMTypeCommitBlockProposalFunctionName:       newInternalEVMTypeCommitBlockProposalFunction(gauge, handler),
 			stdlib.InternalEVMTypeStoreFunctionName:                     newInternalEVMTypeStoreFunction(gauge, handler),
 			stdlib.InternalEVMTypeLoadFunctionName:                      newInternalEVMTypeLoadFunction(gauge, handler),
+			stdlib.InternalEVMTypeRunTxAsFunctionName:                   newInternalEVMTypeRunTxAsFunction(gauge, handler),
 		},
 		nil,
 		nil,
@@ -446,6 +447,41 @@ func newInternalEVMTypeCallFunction(
 			const isAuthorized = true
 			account := handler.AccountByAddress(callArgs.from, isAuthorized)
 			result := account.Call(callArgs.to, callArgs.data, callArgs.gasLimit, callArgs.balance)
+
+			return NewResultValue(
+				handler,
+				gauge,
+				context,
+				result,
+			)
+		},
+	)
+}
+
+func newInternalEVMTypeRunTxAsFunction(
+	gauge common.MemoryGauge,
+	handler types.ContractHandler,
+) *interpreter.HostFunctionValue {
+	return interpreter.NewStaticHostFunctionValue(
+		gauge,
+		stdlib.InternalEVMTypeCallFunctionType,
+		func(invocation interpreter.Invocation) interpreter.Value {
+			context := invocation.InvocationContext
+
+			callArgs, err := parseCallArguments(invocation)
+			if err != nil {
+				panic(err)
+			}
+
+			// Call
+
+			result := handler.RunTxAs(
+				callArgs.from,
+				callArgs.to,
+				callArgs.data,
+				callArgs.gasLimit,
+				callArgs.balance,
+			)
 
 			return NewResultValue(
 				handler,

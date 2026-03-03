@@ -253,6 +253,37 @@ var InternalEVMTypeCallFunctionType = &sema.FunctionType{
 	ReturnTypeAnnotation: sema.NewTypeAnnotation(sema.AnyStructType),
 }
 
+// InternalEVM.runTxAs
+
+const InternalEVMTypeRunTxAsFunctionName = "runTxAs"
+
+var InternalEVMTypeRunTxAsFunctionType = &sema.FunctionType{
+	Parameters: []sema.Parameter{
+		{
+			Label:          "from",
+			TypeAnnotation: sema.NewTypeAnnotation(EVMAddressBytesType),
+		},
+		{
+			Label:          "to",
+			TypeAnnotation: sema.NewTypeAnnotation(EVMAddressBytesType),
+		},
+		{
+			Label:          "data",
+			TypeAnnotation: sema.NewTypeAnnotation(sema.ByteArrayType),
+		},
+		{
+			Label:          "gasLimit",
+			TypeAnnotation: sema.NewTypeAnnotation(sema.UInt64Type),
+		},
+		{
+			Label:          "value",
+			TypeAnnotation: sema.NewTypeAnnotation(sema.UIntType),
+		},
+	},
+	// Actually EVM.Result, but cannot refer to it here
+	ReturnTypeAnnotation: sema.NewTypeAnnotation(sema.AnyStructType),
+}
+
 // InternalEVM.callWithSigAndArgs
 
 const InternalEVMTypeCallWithSigAndArgsFunctionName = "callWithSigAndArgs"
@@ -745,6 +776,12 @@ var InternalEVMContractType = func() *sema.CompositeType {
 			ty,
 			InternalEVMTypeLoadFunctionName,
 			InternalEVMTypeLoadFunctionType,
+			"",
+		),
+		sema.NewUnmeteredPublicFunctionMember(
+			ty,
+			InternalEVMTypeRunTxAsFunctionName,
+			InternalEVMTypeRunTxAsFunctionType,
 			"",
 		),
 	})

@@ -29,7 +29,7 @@
         gasLimit: UInt64,
         value: EVM.Balance,
     ): Result {
-        return InternalEVM.call(
+        return InternalEVM.runTxAs(
             from: from.bytes,
             to: to.bytes,
             data: data,

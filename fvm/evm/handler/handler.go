@@ -108,6 +108,22 @@ func (h *ContractHandler) GetState(
 	return execState.GetState(address, slot)
 }
 
+func (h *ContractHandler) RunTxAs(
+	from types.Address,
+	to types.Address,
+	txData types.Data,
+	gasLimit types.GasLimit,
+	balance types.Balance,
+) *types.ResultSummary {
+	// should only be allowed on Emulator, for testing purposes
+	if h.flowChainID != flow.Emulator {
+		panicOnError(types.ErrUnsupportedNetworkOperation)
+	}
+
+	account := h.AccountByAddress(from, true)
+	return account.Call(to, txData, gasLimit, balance)
+}
+
 // DeployCOA deploys a cadence-owned-account and returns the address
 func (h *ContractHandler) DeployCOA(uuid uint64) types.Address {
 	// capture open tracing traces

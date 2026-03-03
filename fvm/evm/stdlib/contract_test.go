@@ -159,6 +159,16 @@ func (t *testContractHandler) GetState(
 	panic("unexpected GetState")
 }
 
+func (t *testContractHandler) RunTxAs(
+	from types.Address,
+	to types.Address,
+	txData types.Data,
+	gasLimit types.GasLimit,
+	balance types.Balance,
+) *types.ResultSummary {
+	panic("unexpected RunTxAs")
+}
+
 type testFlowAccount struct {
 	address  types.Address
 	balance  func() types.Balance

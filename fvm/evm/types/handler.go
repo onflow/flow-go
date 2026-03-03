@@ -67,6 +67,7 @@ type ContractHandler interface {
 
 	SetState(gethCommon.Address, gethCommon.Hash, gethCommon.Hash) gethCommon.Hash
 	GetState(gethCommon.Address, gethCommon.Hash) gethCommon.Hash
+	RunTxAs(from Address, to Address, txData Data, gasLimit GasLimit, balance Balance) *ResultSummary
 }
 
 // AddressAllocator allocates addresses, used by the handler
