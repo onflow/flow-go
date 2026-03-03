@@ -179,7 +179,7 @@ func (info *accountInfo) GetStorageUsed(
 	}
 
 	value, err := info.accounts.GetStorageUsed(
-		flow.ConvertAddress(runtimeAddress))
+		flow.Address(runtimeAddress))
 	if err != nil {
 		return 0, fmt.Errorf("get storage used failed: %w", err)
 	}
@@ -214,7 +214,7 @@ func (info *accountInfo) GetStorageCapacity(
 	}
 
 	result, invokeErr := info.systemContracts.AccountStorageCapacity(
-		flow.ConvertAddress(runtimeAddress))
+		flow.Address(runtimeAddress))
 	if invokeErr != nil {
 		return 0, invokeErr
 	}
@@ -243,7 +243,7 @@ func (info *accountInfo) GetAccountBalance(
 		return 0, fmt.Errorf("get account balance failed: %w", err)
 	}
 
-	result, invokeErr := info.systemContracts.AccountBalance(flow.ConvertAddress(runtimeAddress))
+	result, invokeErr := info.systemContracts.AccountBalance(flow.Address(runtimeAddress))
 	if invokeErr != nil {
 		return 0, invokeErr
 	}
@@ -270,7 +270,7 @@ func (info *accountInfo) GetAccountAvailableBalance(
 		return 0, fmt.Errorf("get account available balance failed: %w", err)
 	}
 
-	result, invokeErr := info.systemContracts.AccountAvailableBalance(flow.ConvertAddress(runtimeAddress))
+	result, invokeErr := info.systemContracts.AccountAvailableBalance(flow.Address(runtimeAddress))
 	if invokeErr != nil {
 		return 0, invokeErr
 	}
@@ -293,7 +293,7 @@ func (info *accountInfo) GetAccount(
 
 	if info.serviceAccountEnabled {
 		balance, err := info.GetAccountBalance(
-			common.MustBytesToAddress(address.Bytes()))
+			common.Address(address))
 		if err != nil {
 			return nil, err
 		}

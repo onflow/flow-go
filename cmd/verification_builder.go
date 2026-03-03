@@ -16,7 +16,6 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
 	recoveryprotocol "github.com/onflow/flow-go/consensus/recovery/protocol"
 	"github.com/onflow/flow-go/engine/common/follower"
-	followereng "github.com/onflow/flow-go/engine/common/follower"
 	commonsync "github.com/onflow/flow-go/engine/common/synchronization"
 	"github.com/onflow/flow-go/engine/execution/computation"
 	"github.com/onflow/flow-go/engine/verification/assigner"
@@ -91,11 +90,11 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 	var (
 		followerState protocol.FollowerState
 
-		chunkStatuses        *stdmap.ChunkStatuses               // used in fetcher engine
-		chunkRequests        *stdmap.ChunkRequests               // used in requester engine
-		processedChunkIndex  storage.ConsumerProgressInitializer // used in chunk consumer
-		processedBlockHeight storage.ConsumerProgressInitializer // used in block consumer
-		chunkQueue           storage.ChunksQueue                 // used in chunk consumer
+		chunkStatuses                   *stdmap.ChunkStatuses               // used in fetcher engine
+		chunkRequests                   *stdmap.ChunkRequests               // used in requester engine
+		processedChunkIndexInitializer  storage.ConsumerProgressInitializer // used in chunk consumer
+		processedBlockHeightInitializer storage.ConsumerProgressInitializer // used in block consumer
+		chunkQueue                      storage.ChunksQueue                 // used in chunk consumer
 
 		syncCore            *chainsync.Core   // used in follower engine
 		assignerEngine      *assigner.Engine  // the assigner engine
@@ -158,11 +157,11 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 			return nil
 		}).
 		Module("processed chunk index consumer progress", func(node *NodeConfig) error {
-			processedChunkIndex = store.NewConsumerProgress(node.ProtocolDB, module.ConsumeProgressVerificationChunkIndex)
+			processedChunkIndexInitializer = store.NewConsumerProgress(node.ProtocolDB, module.ConsumeProgressVerificationChunkIndex)
 			return nil
 		}).
 		Module("processed block height consumer progress", func(node *NodeConfig) error {
-			processedBlockHeight = store.NewConsumerProgress(node.ProtocolDB, module.ConsumeProgressVerificationBlockHeight)
+			processedBlockHeightInitializer = store.NewConsumerProgress(node.ProtocolDB, module.ConsumeProgressVerificationBlockHeight)
 			return nil
 		}).
 		Module("chunks queue", func(node *NodeConfig) error {
@@ -214,7 +213,7 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 					v.verConf.scheduledTransactionsEnabled,
 				)...,
 			)
-			vmCtx := fvm.NewContext(fvmOptions...)
+			vmCtx := fvm.NewContext(node.RootChainID.Chain(), fvmOptions...)
 
 			chunkVerifier := chunks.NewChunkVerifier(vm, vmCtx, node.Logger)
 
@@ -269,6 +268,11 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 				requesterEngine,
 				v.verConf.stopAtHeight)
 
+			processedChunkIndex, err := processedChunkIndexInitializer.Initialize(chunkconsumer.DefaultJobIndex)
+			if err != nil {
+				return nil, fmt.Errorf("could not initialize processed index: %w", err)
+			}
+
 			// requester and fetcher engines are started by chunk consumer
 			chunkConsumer, err = chunkconsumer.NewChunkConsumer(
 				node.Logger,
@@ -312,17 +316,25 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 			return assignerEngine, nil
 		}).
 		Component("block consumer", func(node *NodeConfig) (module.ReadyDoneAware, error) {
-			var initBlockHeight uint64
-			var err error
+			sealedHead, err := node.State.Sealed().Head()
+			if err != nil {
+				return nil, fmt.Errorf("could not get sealed head: %w", err)
+			}
 
-			blockConsumer, initBlockHeight, err = blockconsumer.NewBlockConsumer(
+			processedBlockHeight, err := processedBlockHeightInitializer.Initialize(sealedHead.Height)
+			if err != nil {
+				return nil, fmt.Errorf("could not initialize processed block height index: %w", err)
+			}
+
+			blockConsumer, err = blockconsumer.NewBlockConsumer(
 				node.Logger,
 				collector,
 				processedBlockHeight,
 				node.Storage.Blocks,
 				node.State,
 				assignerEngine,
-				v.verConf.blockWorkers)
+				v.verConf.blockWorkers,
+				followerDistributor)
 
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize block consumer: %w", err)
@@ -335,7 +347,7 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 
 			node.Logger.Info().
 				Str("component", "node-builder").
-				Uint64("init_height", initBlockHeight).
+				Uint64("init_height", sealedHead.Height).
 				Msg("block consumer initialized")
 
 			return blockConsumer, nil
@@ -358,8 +370,6 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 			if err != nil {
 				return nil, fmt.Errorf("could not find latest finalized block and pending blocks to recover consensus follower: %w", err)
 			}
-
-			followerDistributor.AddOnBlockFinalizedConsumer(blockConsumer.OnFinalizedBlock)
 
 			// creates a consensus follower with ingestEngine as the notifier
 			// so that it gets notified upon each new finalized block
@@ -391,7 +401,7 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 				heroCacheCollector = metrics.FollowerCacheMetrics(node.MetricsRegisterer)
 			}
 
-			core, err := followereng.NewComplianceCore(
+			core, err := follower.NewComplianceCore(
 				node.Logger,
 				node.Metrics.Mempool,
 				heroCacheCollector,
@@ -406,7 +416,7 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 				return nil, fmt.Errorf("could not create follower core: %w", err)
 			}
 
-			followerEng, err = followereng.NewComplianceLayer(
+			followerEng, err = follower.NewComplianceLayer(
 				node.Logger,
 				node.EngineRegistry,
 				node.Me,
@@ -414,12 +424,12 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 				node.Storage.Headers,
 				node.LastFinalizedHeader,
 				core,
+				followerDistributor,
 				node.ComplianceConfig,
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create follower engine: %w", err)
 			}
-			followerDistributor.AddOnBlockFinalizedConsumer(followerEng.OnFinalizedBlock)
 
 			return followerEng, nil
 		}).
@@ -440,11 +450,11 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 				syncCore,
 				node.SyncEngineIdentifierProvider,
 				spamConfig,
+				followerDistributor,
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create synchronization engine: %w", err)
 			}
-			followerDistributor.AddFinalizationConsumer(sync)
 
 			return sync, nil
 		})

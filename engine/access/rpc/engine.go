@@ -12,6 +12,8 @@ import (
 	"google.golang.org/grpc/credentials"
 
 	"github.com/onflow/flow-go/access"
+	"github.com/onflow/flow-go/access/backends/extended"
+	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/engine/access/rest"
 	"github.com/onflow/flow-go/engine/access/rest/websockets"
@@ -70,7 +72,8 @@ type Engine struct {
 	config             Config
 	chain              flow.Chain
 
-	restHandler access.API
+	restHandler     access.API
+	extendedBackend extended.API
 
 	addrLock       sync.RWMutex
 	restAPIAddress net.Addr
@@ -96,6 +99,8 @@ func NewBuilder(
 	stateStreamBackend state_stream.API,
 	stateStreamConfig statestreambackend.Config,
 	indexReporter state_synchronization.IndexReporter,
+	finalizationRegistrar hotstuff.FinalizationRegistrar,
+	extendedBackend extended.API,
 ) (*RPCEngineBuilder, error) {
 	log = log.With().Str("engine", "rpc").Logger()
 
@@ -119,6 +124,7 @@ func NewBuilder(
 		chain:                     chainID.Chain(),
 		restCollector:             accessMetrics,
 		restHandler:               restHandler,
+		extendedBackend:           extendedBackend,
 		stateStreamBackend:        stateStreamBackend,
 		stateStreamConfig:         stateStreamConfig,
 	}
@@ -145,6 +151,9 @@ func NewBuilder(
 	if rpcMetricsEnabled {
 		builder.WithMetrics()
 	}
+
+	// register callback with finalization registrar
+	finalizationRegistrar.AddOnBlockFinalizedConsumer(eng.onFinalizedBlock)
 
 	return builder, nil
 }
@@ -174,8 +183,8 @@ func (e *Engine) shutdown() {
 	}
 }
 
-// OnFinalizedBlock responds to block finalization events.
-func (e *Engine) OnFinalizedBlock(block *model.Block) {
+// onFinalizedBlock responds to block finalization events.
+func (e *Engine) onFinalizedBlock(block *model.Block) {
 	e.finalizedHeaderCacheActor.OnFinalizedBlock(block)
 	e.backendNotifierActor.OnFinalizedBlock(block)
 }
@@ -248,6 +257,7 @@ func (e *Engine) serveREST(ctx irrecoverable.SignalerContext, ready component.Re
 		e.stateStreamConfig,
 		e.config.EnableWebSocketsStreamAPI,
 		e.config.WebSocketConfig,
+		e.extendedBackend,
 	)
 	if err != nil {
 		e.log.Err(err).Msg("failed to initialize the REST server")

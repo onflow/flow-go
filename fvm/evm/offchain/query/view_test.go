@@ -5,9 +5,11 @@ import (
 	"math/big"
 	"testing"
 
+	"github.com/holiman/uint256"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ethereum/go-ethereum/common"
+	gethTypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/params"
 
 	"github.com/onflow/flow-go/fvm/evm/handler"
@@ -91,6 +93,7 @@ func TestView(t *testing.T) {
 							testAccount.Address().ToCommon(),
 							testContract.DeployedAt.ToCommon(),
 							testContract.MakeCallData(t, "verifyArchCallToFlowBlockHeight", expectedFlowHeight),
+							[]gethTypes.SetCodeAuthorization{},
 							big.NewInt(0),
 							uint64(1_000_000),
 							query.WithExtraPrecompiledContracts(
@@ -110,6 +113,7 @@ func TestView(t *testing.T) {
 								testAccount.Address().ToCommon(),
 								newBalance,
 							),
+							[]gethTypes.SetCodeAuthorization{},
 							big.NewInt(0),
 							uint64(1_000_000),
 							query.WithStateOverrideBalance(
@@ -129,6 +133,7 @@ func TestView(t *testing.T) {
 								"store",
 								big.NewInt(2),
 							),
+							[]gethTypes.SetCodeAuthorization{},
 							big.NewInt(0),
 							params.MaxTxGas+1_000,
 						)
@@ -142,6 +147,7 @@ func TestView(t *testing.T) {
 								"store",
 								big.NewInt(2),
 							),
+							[]gethTypes.SetCodeAuthorization{},
 							big.NewInt(0),
 							maxCallGasLimit+1,
 						)
@@ -151,6 +157,29 @@ func TestView(t *testing.T) {
 							err,
 							"gas limit is bigger than max gas limit allowed 26777217 > 26777216",
 						)
+
+						// test non-empty SetCode authorization list
+						_, err = view.DryCall(
+							testAccount.Address().ToCommon(),
+							testContract.DeployedAt.ToCommon(),
+							testContract.MakeCallData(t,
+								"store",
+								big.NewInt(2),
+							),
+							[]gethTypes.SetCodeAuthorization{
+								gethTypes.SetCodeAuthorization{
+									ChainID: *uint256.NewInt(747),
+									Address: common.HexToAddress("0xD370975A6257fE8CeF93101799D602D30838BAad"),
+									Nonce:   1,
+									V:       28,
+									R:       *RandomUint256Int(15_000_000),
+									S:       *RandomUint256Int(15_000_000),
+								},
+							},
+							big.NewInt(0),
+							maxCallGasLimit,
+						)
+						require.NoError(t, err)
 					})
 				})
 		})
@@ -186,6 +215,7 @@ func TestViewStateOverrides(t *testing.T) {
 								testAccount.Address().ToCommon(),
 								testContract.DeployedAt.ToCommon(),
 								testContract.MakeCallData(t, "retrieve"),
+								nil,
 								big.NewInt(0),
 								uint64(1_000_000),
 								query.WithStateOverrideState(
@@ -225,6 +255,7 @@ func TestViewStateOverrides(t *testing.T) {
 								testAccount.Address().ToCommon(),
 								testContract.DeployedAt.ToCommon(),
 								testContract.MakeCallData(t, "retrieve"),
+								nil,
 								big.NewInt(0),
 								uint64(1_000_000),
 								query.WithStateOverrideStateDiff(
@@ -264,6 +295,7 @@ func TestViewStateOverrides(t *testing.T) {
 								testAccount.Address().ToCommon(),
 								testContract.DeployedAt.ToCommon(),
 								testContract.MakeCallData(t, "retrieve"),
+								nil,
 								big.NewInt(0),
 								uint64(1_000_000),
 								query.WithStateOverrideState(
@@ -304,6 +336,7 @@ func TestViewStateOverrides(t *testing.T) {
 								testAccount.Address().ToCommon(),
 								testContract.DeployedAt.ToCommon(),
 								testContract.MakeCallData(t, "retrieve"),
+								nil,
 								big.NewInt(0),
 								uint64(1_000_000),
 								query.WithStateOverrideStateDiff(
@@ -346,6 +379,7 @@ func TestViewStateOverrides(t *testing.T) {
 								testAccount.Address().ToCommon(),
 								newContractAddress,
 								testContract.MakeCallData(t, "retrieve"),
+								nil,
 								big.NewInt(0),
 								uint64(1_000_000),
 								query.WithStateOverrideCode(
@@ -391,6 +425,7 @@ func TestViewStateOverrides(t *testing.T) {
 								testAccount.Address().ToCommon(),
 								newContractAddress,
 								testContract.MakeCallData(t, "retrieve"),
+								nil,
 								big.NewInt(0),
 								uint64(1_000_000),
 								query.WithStateOverrideCode(

@@ -178,11 +178,10 @@ func (suite *CollectorSuite) TxForCluster(target flow.IdentitySkeletonList) *sdk
 
 	// hash-grind the script until the transaction will be routed to target cluster
 	for {
-		serviceAccountAddr, err := suite.net.Root().ChainID.Chain().AddressAtIndex(suite.serviceAccountIdx)
-		suite.Require().NoError(err)
-		suite.serviceAccountIdx++
+		// update the script for each loop
 		tx.SetScript(append(tx.Script, '/', '/'))
-		err = tx.SignEnvelope(sdk.Address(serviceAccountAddr), acct.key.Index, acct.signer)
+		tx.EnvelopeSignatures = nil // clear the envelope signatures before adding a fresh one
+		err := tx.SignEnvelope(acct.addr, acct.key.Index, acct.signer)
 		require.NoError(suite.T(), err)
 		routed, ok := clusters.ByTxID(convert.IDFromSDK(tx.ID()))
 		require.True(suite.T(), ok)
@@ -339,7 +338,7 @@ func (suite *CollectorSuite) ClusterStateFor(id flow.Identifier) *clusterstateim
 
 	setup, ok := suite.net.Result().ServiceEvents[0].Event.(*flow.EpochSetup)
 	suite.Require().True(ok, "could not get root seal setup")
-	rootBlock, err := clusterstate.CanonicalRootBlock(setup.Counter, myCluster)
+	rootBlock, err := clusterstate.CanonicalRootBlock(setup.Counter, myCluster.NodeIDs())
 	suite.Require().NoError(err)
 	node := suite.net.ContainerByID(id)
 

@@ -12,7 +12,7 @@ import (
 )
 
 // eventKey generates a unique fingerprint for the tuple of (sender, event, type of event, channel)
-func eventKey(from flow.Identifier, channel channels.Channel, event interface{}) (string, error) {
+func eventKey(from flow.Identifier, channel channels.Channel, event any) (string, error) {
 	marshaler := json.NewMarshaler()
 
 	tag, err := marshaler.Marshal([]byte(fmt.Sprintf("testthenetwork %s %T", channel, event)))

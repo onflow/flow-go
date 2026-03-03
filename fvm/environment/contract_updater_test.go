@@ -60,7 +60,7 @@ func TestContract_ChildMergeFunctionality(t *testing.T) {
 	err = contractUpdater.SetContract(
 		common.AddressLocation{
 			Name:    "testContract",
-			Address: common.MustBytesToAddress(address.Bytes())},
+			Address: common.Address(address)},
 		[]byte("ABC"),
 		nil)
 	require.NoError(t, err)
@@ -82,7 +82,7 @@ func TestContract_ChildMergeFunctionality(t *testing.T) {
 	err = contractUpdater.SetContract(
 		common.AddressLocation{
 			Name:    "testContract2",
-			Address: common.MustBytesToAddress(address.Bytes())},
+			Address: common.Address(address)},
 		[]byte("ABC"),
 		nil)
 	require.NoError(t, err)
@@ -104,7 +104,7 @@ func TestContract_ChildMergeFunctionality(t *testing.T) {
 	// remove
 	err = contractUpdater.RemoveContract(common.AddressLocation{
 		Name:    "testContract",
-		Address: common.MustBytesToAddress(address.Bytes())}, nil)
+		Address: common.Address(address)}, nil)
 	require.NoError(t, err)
 
 	// contract still there because no commit yet
@@ -160,7 +160,7 @@ func TestContract_AuthorizationFunctionality(t *testing.T) {
 		err = contractUpdater.SetContract(
 			common.AddressLocation{
 				Name:    "testContract1",
-				Address: common.MustBytesToAddress(authAdd.Bytes())},
+				Address: common.Address(authAdd)},
 			[]byte("ABC"),
 			[]flow.Address{unAuth})
 		require.Error(t, err)
@@ -173,7 +173,7 @@ func TestContract_AuthorizationFunctionality(t *testing.T) {
 		err = contractUpdater.SetContract(
 			common.AddressLocation{
 				Name:    "testContract1",
-				Address: common.MustBytesToAddress(authAdd.Bytes())},
+				Address: common.Address(authAdd)},
 			[]byte("ABC"),
 			[]flow.Address{authRemove})
 		require.Error(t, err)
@@ -186,7 +186,7 @@ func TestContract_AuthorizationFunctionality(t *testing.T) {
 		err = contractUpdater.SetContract(
 			common.AddressLocation{
 				Name:    "testContract2",
-				Address: common.MustBytesToAddress(authAdd.Bytes())},
+				Address: common.Address(authAdd)},
 			[]byte("ABC"),
 			[]flow.Address{authAdd})
 		require.NoError(t, err)
@@ -199,7 +199,7 @@ func TestContract_AuthorizationFunctionality(t *testing.T) {
 		err = contractUpdater.SetContract(
 			common.AddressLocation{
 				Name:    "testContract2",
-				Address: common.MustBytesToAddress(authAdd.Bytes())},
+				Address: common.Address(authAdd)},
 			[]byte("ABC"),
 			[]flow.Address{authBoth})
 		require.NoError(t, err)
@@ -212,7 +212,7 @@ func TestContract_AuthorizationFunctionality(t *testing.T) {
 		err = contractUpdater.SetContract(
 			common.AddressLocation{
 				Name:    "testContract1",
-				Address: common.MustBytesToAddress(authAdd.Bytes())},
+				Address: common.Address(authAdd)},
 			[]byte("ABC"),
 			[]flow.Address{authAdd})
 		require.NoError(t, err)
@@ -222,7 +222,7 @@ func TestContract_AuthorizationFunctionality(t *testing.T) {
 		err = contractUpdater.RemoveContract(
 			common.AddressLocation{
 				Name:    "testContract2",
-				Address: common.MustBytesToAddress(authAdd.Bytes())},
+				Address: common.Address(authAdd)},
 			[]flow.Address{unAuth})
 		require.Error(t, err)
 		require.False(t, contractUpdater.HasUpdates())
@@ -234,7 +234,7 @@ func TestContract_AuthorizationFunctionality(t *testing.T) {
 		err = contractUpdater.SetContract(
 			common.AddressLocation{
 				Name:    "testContract1",
-				Address: common.MustBytesToAddress(authAdd.Bytes())},
+				Address: common.Address(authAdd)},
 			[]byte("ABC"),
 			[]flow.Address{authAdd})
 		require.NoError(t, err)
@@ -244,7 +244,7 @@ func TestContract_AuthorizationFunctionality(t *testing.T) {
 		err = contractUpdater.RemoveContract(
 			common.AddressLocation{
 				Name:    "testContract2",
-				Address: common.MustBytesToAddress(authAdd.Bytes())},
+				Address: common.Address(authAdd)},
 			[]flow.Address{authRemove})
 		require.NoError(t, err)
 		require.True(t, contractUpdater.HasUpdates())
@@ -256,7 +256,7 @@ func TestContract_AuthorizationFunctionality(t *testing.T) {
 		err = contractUpdater.SetContract(
 			common.AddressLocation{
 				Name:    "testContract1",
-				Address: common.MustBytesToAddress(authAdd.Bytes())},
+				Address: common.Address(authAdd)},
 			[]byte("ABC"),
 			[]flow.Address{authAdd})
 		require.NoError(t, err)
@@ -266,7 +266,7 @@ func TestContract_AuthorizationFunctionality(t *testing.T) {
 		err = contractUpdater.RemoveContract(
 			common.AddressLocation{
 				Name:    "testContract2",
-				Address: common.MustBytesToAddress(authAdd.Bytes())},
+				Address: common.Address(authAdd)},
 			[]flow.Address{authAdd})
 		require.Error(t, err)
 		require.False(t, contractUpdater.HasUpdates())
@@ -278,7 +278,7 @@ func TestContract_AuthorizationFunctionality(t *testing.T) {
 		err = contractUpdater.SetContract(
 			common.AddressLocation{
 				Name:    "testContract1",
-				Address: common.MustBytesToAddress(authAdd.Bytes())},
+				Address: common.Address(authAdd)},
 			[]byte("ABC"),
 			[]flow.Address{authAdd})
 		require.NoError(t, err)
@@ -288,7 +288,7 @@ func TestContract_AuthorizationFunctionality(t *testing.T) {
 		err = contractUpdater.RemoveContract(
 			common.AddressLocation{
 				Name:    "testContract2",
-				Address: common.MustBytesToAddress(authAdd.Bytes())},
+				Address: common.Address(authAdd)},
 			[]flow.Address{authBoth})
 		require.NoError(t, err)
 		require.True(t, contractUpdater.HasUpdates())
@@ -316,21 +316,21 @@ func TestContract_DeterministicErrorOnCommit(t *testing.T) {
 	err := contractUpdater.SetContract(
 		common.AddressLocation{
 			Name:    "A",
-			Address: common.MustBytesToAddress(address2.Bytes())},
+			Address: common.Address(address2)},
 		[]byte("ABC"), nil)
 	require.NoError(t, err)
 
 	err = contractUpdater.SetContract(
 		common.AddressLocation{
 			Name:    "B",
-			Address: common.MustBytesToAddress(address1.Bytes())},
+			Address: common.Address(address1)},
 		[]byte("ABC"), nil)
 	require.NoError(t, err)
 
 	err = contractUpdater.SetContract(
 		common.AddressLocation{
 			Name:    "A",
-			Address: common.MustBytesToAddress(address1.Bytes())},
+			Address: common.Address(address1)},
 		[]byte("ABC"), nil)
 	require.NoError(t, err)
 
@@ -355,7 +355,7 @@ func TestContract_ContractRemoval(t *testing.T) {
 
 		location := common.AddressLocation{
 			Name:    "TestContract",
-			Address: common.MustBytesToAddress(flowAddress.Bytes())}
+			Address: common.Address(flowAddress)}
 
 		// deploy contract with voucher
 		err = contractUpdater.SetContract(
@@ -411,7 +411,7 @@ func TestContract_ContractRemoval(t *testing.T) {
 
 		location := common.AddressLocation{
 			Name:    "TestContract",
-			Address: common.MustBytesToAddress(flowAddress.Bytes())}
+			Address: common.Address(flowAddress)}
 
 		// deploy contract with voucher
 		err = contractUpdater.SetContract(

@@ -94,8 +94,8 @@ func (v *VersionBeacon) EqualTo(other *VersionBeacon) bool {
 // An error with an appropriate message is returned
 // if any validation fails.
 func (v *VersionBeacon) Validate() error {
-	eventError := func(format string, args ...interface{}) error {
-		args = append([]interface{}{v.Sequence}, args...)
+	eventError := func(format string, args ...any) error {
+		args = append([]any{v.Sequence}, args...)
 		return fmt.Errorf(
 			"version beacon (sequence=%d) error: "+format,
 			args...,

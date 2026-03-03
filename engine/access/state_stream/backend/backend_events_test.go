@@ -1,7 +1,6 @@
 package backend
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"sort"
@@ -103,7 +102,7 @@ func (s *BackendEventsSuite) setupFilterForTestCases(baseTests []eventsTestType)
 func (s *BackendEventsSuite) setupLocalStorage() {
 	s.SetupBackend(true)
 
-	// events returned from the db are sorted by txID, txIndex, then eventIndex.
+	// events returned from storage are sorted by txIndex, then eventIndex (execution order).
 	// reproduce that here to ensure output order works as expected
 	blockEvents := make(map[flow.Identifier][]flow.Event)
 	for _, b := range s.blocks {
@@ -112,14 +111,10 @@ func (s *BackendEventsSuite) setupLocalStorage() {
 			events[i] = event
 		}
 		sort.Slice(events, func(i, j int) bool {
-			cmp := bytes.Compare(events[i].TransactionID[:], events[j].TransactionID[:])
-			if cmp == 0 {
-				if events[i].TransactionIndex == events[j].TransactionIndex {
-					return events[i].EventIndex < events[j].EventIndex
-				}
-				return events[i].TransactionIndex < events[j].TransactionIndex
+			if events[i].TransactionIndex == events[j].TransactionIndex {
+				return events[i].EventIndex < events[j].EventIndex
 			}
-			return cmp < 0
+			return events[i].TransactionIndex < events[j].TransactionIndex
 		})
 		blockEvents[b.ID()] = events
 	}

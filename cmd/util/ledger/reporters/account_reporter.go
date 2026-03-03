@@ -143,7 +143,7 @@ func NewBalanceReporter(
 ) *balanceProcessor {
 	vm := fvm.NewVirtualMachine()
 	ctx := fvm.NewContext(
-		fvm.WithChain(chain),
+		chain,
 		fvm.WithMemoryAndInteractionLimitsDisabled())
 
 	env := environment.NewScriptEnvironmentFromStorageSnapshot(
@@ -217,7 +217,7 @@ func (c *balanceProcessor) reportAccountData(indx uint64) {
 		return
 	}
 
-	runtimeAddress := common.MustBytesToAddress(address.Bytes())
+	runtimeAddress := common.Address(address)
 
 	u, err := c.env.GetStorageUsed(runtimeAddress)
 	if err != nil {

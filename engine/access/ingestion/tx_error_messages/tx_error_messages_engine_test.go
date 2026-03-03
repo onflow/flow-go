@@ -15,6 +15,7 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	hotmodel "github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	"github.com/onflow/flow-go/engine/access/index"
 	accessmock "github.com/onflow/flow-go/engine/access/mock"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/node_communicator"
@@ -69,8 +70,9 @@ type TxErrorMessagesEngineSuite struct {
 	db    storage.DB
 	dbDir string
 
-	ctx    context.Context
-	cancel context.CancelFunc
+	ctx                 context.Context
+	cancel              context.CancelFunc
+	followerDistributor *pubsub.FollowerDistributor
 }
 
 // TestTxErrorMessagesEngine runs the test suite for the transaction error messages engine.
@@ -134,10 +136,7 @@ func (s *TxErrorMessagesEngineSuite) SetupTest() {
 	).Maybe()
 
 	s.proto.state.On("Params").Return(s.proto.params)
-
-	// Mock the finalized and sealed root block header with height 0.
 	s.proto.params.On("FinalizedRoot").Return(s.rootBlock.ToHeader(), nil)
-	s.proto.params.On("SealedRoot").Return(s.rootBlock.ToHeader(), nil)
 
 	s.proto.snapshot.On("Head").Return(
 		func() *flow.Header {
@@ -156,10 +155,8 @@ func (s *TxErrorMessagesEngineSuite) SetupTest() {
 // initEngine creates a new instance of the transaction error messages engine
 // and waits for it to start. It initializes the engine with mocked components and state.
 func (s *TxErrorMessagesEngineSuite) initEngine(ctx irrecoverable.SignalerContext) *Engine {
-	processedTxErrorMessagesBlockHeight := store.NewConsumerProgress(
-		s.db,
-		module.ConsumeProgressEngineTxErrorMessagesBlockHeight,
-	)
+	processedTxErrorMessagesBlockHeight, err := store.NewConsumerProgress(s.db, module.ConsumeProgressEngineTxErrorMessagesBlockHeight).Initialize(s.rootBlock.Height)
+	require.NoError(s.T(), err)
 
 	execNodeIdentitiesProvider := commonrpc.NewExecutionNodeIdentitiesProvider(
 		s.log,
@@ -186,6 +183,7 @@ func (s *TxErrorMessagesEngineSuite) initEngine(ctx irrecoverable.SignalerContex
 		s.lockManager,
 	)
 
+	followerDistributor := pubsub.NewFollowerDistributor()
 	eng, err := New(
 		s.log,
 		s.metrics,
@@ -193,8 +191,12 @@ func (s *TxErrorMessagesEngineSuite) initEngine(ctx irrecoverable.SignalerContex
 		s.headers,
 		processedTxErrorMessagesBlockHeight,
 		txResultErrorMessagesCore,
+		followerDistributor,
 	)
 	require.NoError(s.T(), err)
+
+	// Store distributor for use in tests
+	s.followerDistributor = followerDistributor
 
 	eng.ComponentManager.Start(ctx)
 	<-eng.Ready()
@@ -261,9 +263,9 @@ func (s *TxErrorMessagesEngineSuite) TestOnFinalizedBlockHandleTxErrorMessages()
 			}).Once()
 	}
 
-	eng := s.initEngine(irrecoverableCtx)
+	_ = s.initEngine(irrecoverableCtx)
 	// process the block through the finalized callback
-	eng.OnFinalizedBlock(&hotstuffBlock)
+	s.followerDistributor.OnFinalizedBlock(&hotstuffBlock)
 
 	// Verify that all transaction error messages were processed within the timeout.
 	unittest.RequireReturnsBefore(s.T(), wg.Wait, 2*time.Second, "expect to process new block before timeout")

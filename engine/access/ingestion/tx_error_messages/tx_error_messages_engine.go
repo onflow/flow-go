@@ -8,6 +8,7 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/sethvargo/go-retry"
 
+	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
@@ -71,8 +72,9 @@ func New(
 	metrics module.TransactionErrorMessagesMetrics,
 	state protocol.State,
 	headers storage.Headers,
-	txErrorMessagesProcessedHeight storage.ConsumerProgressInitializer,
+	txErrorMessagesProcessedHeight storage.ConsumerProgress,
 	txErrorMessagesCore *TxErrorMessagesCore,
+	finalizationRegistrar hotstuff.FinalizationRegistrar,
 ) (*Engine, error) {
 	e := &Engine{
 		log:                     log.With().Str("engine", "tx_error_messages_engine").Logger(),
@@ -102,7 +104,6 @@ func New(
 		e.txErrorMessagesNotifier.Channel(),
 		txErrorMessagesProcessedHeight,
 		sealedBlockReader,
-		e.state.Params().SealedRoot().Height,
 		e.processTxResultErrorMessagesJob,
 		processTxErrorMessagesWorkersCount,
 		0,
@@ -117,6 +118,9 @@ func New(
 	e.ComponentManager = component.NewComponentManagerBuilder().
 		AddWorker(e.runTxResultErrorMessagesConsumer).
 		Build()
+
+	// register callback with finalization registrar
+	finalizationRegistrar.AddOnBlockFinalizedConsumer(e.onFinalizedBlock)
 
 	return e, nil
 }
@@ -167,9 +171,9 @@ func (e *Engine) runTxResultErrorMessagesConsumer(ctx irrecoverable.SignalerCont
 	<-e.txErrorMessagesConsumer.Done()
 }
 
-// OnFinalizedBlock is called by the follower engine after a block has been finalized and the state has been updated.
-// Receives block finalized events from the finalization distributor and forwards them to the txErrorMessagesConsumer.
-func (e *Engine) OnFinalizedBlock(*model.Block) {
+// onFinalizedBlock is called by the follower engine after a block has been finalized and the state has been updated.
+// Receives block finalized events from the finalization registrar and forwards them to the txErrorMessagesConsumer.
+func (e *Engine) onFinalizedBlock(*model.Block) {
 	e.txErrorMessagesNotifier.Notify()
 }
 

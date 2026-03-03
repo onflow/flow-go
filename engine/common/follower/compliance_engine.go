@@ -5,6 +5,7 @@ import (
 
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/consensus/hotstuff/tracker"
 	"github.com/onflow/flow-go/engine"
@@ -97,6 +98,7 @@ func NewComplianceLayer(
 	headers storage.Headers,
 	finalized *flow.Header,
 	core complianceCore,
+	registrar hotstuff.FinalizationRegistrar,
 	config compliance.Config,
 	opts ...EngineOption,
 ) (*ComplianceEngine, error) {
@@ -145,6 +147,8 @@ func NewComplianceLayer(
 		return nil, fmt.Errorf("could not register engine to network: %w", err)
 	}
 	e.con = con
+
+	registrar.AddOnBlockFinalizedConsumer(e.onFinalizedBlock)
 
 	cmBuilder := component.NewComponentManagerBuilder().
 		AddWorker(e.finalizationProcessingLoop).
@@ -198,14 +202,14 @@ func (e *ComplianceEngine) OnSyncedBlocks(blocks flow.Slashable[[]*flow.Proposal
 	}
 }
 
-// OnFinalizedBlock informs the compliance layer about finalization of a new block. It does not block
+// onFinalizedBlock informs the compliance layer about finalization of a new block. It does not block
 // and asynchronously executes the internal pruning logic. We accept inputs out of order, and only act
 // on inputs with strictly monotonicly increasing views.
 //
 // Implements the `OnFinalizedBlock` callback from the `hotstuff.FinalizationConsumer`
 // CAUTION: the input to this callback is treated as trusted; precautions should be taken that messages
 // from external nodes cannot be considered as inputs to this function.
-func (e *ComplianceEngine) OnFinalizedBlock(block *model.Block) {
+func (e *ComplianceEngine) onFinalizedBlock(block *model.Block) {
 	if e.finalizedBlockTracker.Track(block) {
 		e.finalizedBlockNotifier.Notify()
 	}

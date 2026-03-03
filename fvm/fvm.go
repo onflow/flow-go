@@ -237,7 +237,7 @@ func GetAccountBalance(
 ) {
 	env, _ := getScriptEnvironment(ctx, storageSnapshot)
 
-	accountBalance, err := env.GetAccountBalance(common.MustBytesToAddress(address.Bytes()))
+	accountBalance, err := env.GetAccountBalance(common.Address(address))
 
 	if err != nil {
 		return 0, fmt.Errorf("cannot get account balance: %w", err)
@@ -256,7 +256,7 @@ func GetAccountAvailableBalance(
 ) {
 	env, _ := getScriptEnvironment(ctx, storageSnapshot)
 
-	accountBalance, err := env.GetAccountAvailableBalance(common.MustBytesToAddress(address.Bytes()))
+	accountBalance, err := env.GetAccountAvailableBalance(common.Address(address))
 
 	if err != nil {
 		return 0, fmt.Errorf("cannot get account balance: %w", err)

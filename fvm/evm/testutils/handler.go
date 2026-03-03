@@ -19,7 +19,7 @@ func SetupHandler(
 	return handler.NewContractHandler(
 		chainID,
 		rootAddr,
-		common.MustBytesToAddress(systemcontracts.SystemContractsForChain(chainID).FlowToken.Address.Bytes()),
+		common.Address(systemcontracts.SystemContractsForChain(chainID).FlowToken.Address),
 		rootAddr,
 		handler.NewBlockStore(chainID, backend, rootAddr),
 		handler.NewAddressAllocator(),

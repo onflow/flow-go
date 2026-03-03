@@ -148,7 +148,8 @@ func WithConsumer(
 		db := pebbleimpl.ToDB(pebbleDB)
 
 		collector := &metrics.NoopCollector{}
-		processedIndex := store.NewConsumerProgress(db, module.ConsumeProgressVerificationChunkIndex)
+		processedIndex, err := store.NewConsumerProgress(db, module.ConsumeProgressVerificationChunkIndex).Initialize(chunkconsumer.DefaultJobIndex)
+		require.NoError(t, err)
 		chunksQueue := store.NewChunkQueue(collector, db)
 		ok, err := chunksQueue.Init(chunkconsumer.DefaultJobIndex)
 		require.NoError(t, err)

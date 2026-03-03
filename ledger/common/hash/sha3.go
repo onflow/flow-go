@@ -68,7 +68,7 @@ func xorInAtIndex(d *state, buf []byte, index int) {
 	n := len(buf) >> 3
 	aAtIndex := d.a[index:]
 
-	for i := 0; i < n; i++ {
+	for i := range n {
 		a := binary.LittleEndian.Uint64(buf)
 		aAtIndex[i] ^= a
 		buf = buf[8:]

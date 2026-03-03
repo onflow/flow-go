@@ -49,7 +49,7 @@ func (suite *ClusterSuite) SetupTest() {
 	suite.members = unittest.IdentityListFixture(5, unittest.WithRole(flow.RoleCollection))
 	suite.me = suite.members[0]
 	counter := uint64(1)
-	rootBlock, err := clusterstate.CanonicalRootBlock(counter, suite.members.ToSkeleton())
+	rootBlock, err := clusterstate.CanonicalRootBlock(counter, suite.members.ToSkeleton().NodeIDs())
 	suite.Require().NoError(err)
 	suite.root = rootBlock
 

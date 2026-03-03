@@ -1,8 +1,6 @@
 package wintermute
 
 import (
-	"github.com/rs/zerolog"
-
 	"github.com/onflow/flow-go/insecure"
 	"github.com/onflow/flow-go/insecure/wintermute"
 	"github.com/onflow/flow-go/integration/testnet"
@@ -54,7 +52,6 @@ func (s *Suite) SetupSuite() {
 	for _, nodeID := range unittest.IdentifierListFixture(4) {
 		nodeConfig := testnet.NewNodeConfig(flow.RoleConsensus,
 			testnet.WithID(nodeID),
-			testnet.WithLogLevel(zerolog.ErrorLevel),
 			testnet.WithAdditionalFlag(chunkAlpha),
 
 			// two approvals needed to seal a chunk
@@ -70,7 +67,6 @@ func (s *Suite) SetupSuite() {
 		verConfig := testnet.NewNodeConfig(flow.RoleVerification,
 			testnet.WithID(nodeID),
 			testnet.WithAdditionalFlag(chunkAlpha),
-			testnet.WithLogLevel(zerolog.FatalLevel),
 			testnet.AsCorrupted())
 		s.NodeConfigs = append(s.NodeConfigs, verConfig)
 	}
@@ -80,7 +76,7 @@ func (s *Suite) SetupSuite() {
 	ver4Config := testnet.NewNodeConfig(flow.RoleVerification,
 		testnet.WithAdditionalFlag(chunkAlpha),
 		testnet.WithID(s.honestVN),
-		testnet.WithLogLevel(zerolog.FatalLevel))
+	)
 	s.NodeConfigs = append(s.NodeConfigs, ver4Config)
 
 	// generates three execution nodes: two corrupted and one honest
@@ -88,7 +84,6 @@ func (s *Suite) SetupSuite() {
 	s.corruptedEN1Id = unittest.IdentifierFixture()
 	exe1Config := testnet.NewNodeConfig(flow.RoleExecution,
 		testnet.WithID(s.corruptedEN1Id),
-		testnet.WithLogLevel(zerolog.ErrorLevel),
 		testnet.AsCorrupted())
 	s.NodeConfigs = append(s.NodeConfigs, exe1Config)
 
@@ -96,7 +91,6 @@ func (s *Suite) SetupSuite() {
 	s.corruptedEN2Id = unittest.IdentifierFixture()
 	exe2Config := testnet.NewNodeConfig(flow.RoleExecution,
 		testnet.WithID(s.corruptedEN2Id),
-		testnet.WithLogLevel(zerolog.ErrorLevel),
 		testnet.AsCorrupted())
 	s.NodeConfigs = append(s.NodeConfigs, exe2Config)
 
@@ -104,7 +98,7 @@ func (s *Suite) SetupSuite() {
 	s.honestENId = unittest.IdentifierFixture()
 	exe3Config := testnet.NewNodeConfig(flow.RoleExecution,
 		testnet.WithID(s.honestENId),
-		testnet.WithLogLevel(zerolog.ErrorLevel))
+	)
 	s.NodeConfigs = append(s.NodeConfigs, exe3Config)
 
 	s.BaseSuite.StartCorruptedNetwork(

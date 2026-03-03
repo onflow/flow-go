@@ -118,20 +118,27 @@ func InvalidFormatSignature() flow.TransactionSignature {
 	}
 }
 
-func TransactionSignatureFixture() flow.TransactionSignature {
+func SignatureFixtureForTransactions() crypto.Signature {
 	sigLen := crypto.SignatureLenECDSAP256
+	sig := SeedFixture(sigLen)
+
+	// make sure the ECDSA signature passes the format check
+	sig[sigLen/2] = 0
+	sig[0] = 0
+	sig[sigLen/2-1] |= 1
+	sig[sigLen-1] |= 1
+	return sig
+}
+
+func TransactionSignatureFixture() flow.TransactionSignature {
 	s := flow.TransactionSignature{
 		Address:       AddressFixture(),
 		SignerIndex:   0,
-		Signature:     SeedFixture(sigLen),
+		Signature:     SignatureFixtureForTransactions(),
 		KeyIndex:      1,
 		ExtensionData: []byte{},
 	}
-	// make sure the ECDSA signature passes the format check
-	s.Signature[sigLen/2] = 0
-	s.Signature[0] = 0
-	s.Signature[sigLen/2-1] |= 1
-	s.Signature[sigLen-1] |= 1
+
 	return s
 }
 
@@ -1616,7 +1623,7 @@ func TransactionBodyFixture(opts ...func(*flow.TransactionBody)) flow.Transactio
 func TransactionBodyListFixture(n int) []flow.TransactionBody {
 	l := make([]flow.TransactionBody, n)
 	for i := 0; i < n; i++ {
-		l[i] = TransactionBodyFixture()
+		l[i] = TransactionFixture()
 	}
 
 	return l
@@ -2642,7 +2649,7 @@ func MachineAccountFixture(t *testing.T) (
 ) {
 	info := NodeMachineAccountInfoFixture()
 
-	bal, err := cadence.NewUFix64("0.5")
+	bal, err := cadence.NewUFix64("5.0")
 	require.NoError(t, err)
 
 	acct := &sdk.Account{

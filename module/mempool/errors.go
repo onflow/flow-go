@@ -10,7 +10,7 @@ type UnknownExecutionResultError struct {
 	err error
 }
 
-func NewUnknownExecutionResultErrorf(msg string, args ...interface{}) error {
+func NewUnknownExecutionResultErrorf(msg string, args ...any) error {
 	return UnknownExecutionResultError{
 		err: fmt.Errorf(msg, args...),
 	}
@@ -37,7 +37,7 @@ type BelowPrunedThresholdError struct {
 	err error
 }
 
-func NewBelowPrunedThresholdErrorf(msg string, args ...interface{}) error {
+func NewBelowPrunedThresholdErrorf(msg string, args ...any) error {
 	return BelowPrunedThresholdError{
 		err: fmt.Errorf(msg, args...),
 	}

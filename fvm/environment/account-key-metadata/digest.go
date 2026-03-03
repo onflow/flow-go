@@ -6,6 +6,7 @@ import (
 
 	"github.com/fxamacker/circlehash"
 
+	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -78,3 +79,26 @@ func GetPublicKeyDigest(owner flow.Address, encodedPublicKey []byte) uint64 {
 // SentinelFastDigest64 is the sentinel digest used for 64-bit fast hash collision handling.  SentinelFastDigest64
 // is stored in key metadata's digest list as a placeholder.
 const SentinelFastDigest64 uint64 = 0 // don't change this value (instead, declare new constant with new value if needed)
+
+// Utility functions for tests and validation
+
+// DecodeDigests decodes raw bytes of digest list in account key metadata.
+func DecodeDigests(b []byte) ([]uint64, error) {
+	if len(b)%digestSize != 0 {
+		return nil, errors.NewKeyMetadataUnexpectedLengthError(
+			"failed to decode digest list",
+			digestSize,
+			len(b),
+		)
+	}
+
+	storedDigestCount := len(b) / digestSize
+
+	digests := make([]uint64, 0, storedDigestCount)
+
+	for i := 0; i < len(b); i += digestSize {
+		digests = append(digests, binary.BigEndian.Uint64(b[i:]))
+	}
+
+	return digests, nil
+}

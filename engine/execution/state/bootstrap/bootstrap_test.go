@@ -57,7 +57,9 @@ func TestBootstrapLedger(t *testing.T) {
 }
 
 func TestBootstrapLedger_ZeroTokenSupply(t *testing.T) {
-	expectedStateCommitmentBytes, _ := hex.DecodeString("25d43f1c2183d7f60ca58dcaa6ea44546c8ca089a79dc21759bf64fa58919269")
+	expectedStateCommitmentBytes, _ := hex.DecodeString(
+		"133252e776891078b18abee23d9c173145a54f7c7488535055ca6b8eb5fd785a",
+	)
 	expectedStateCommitment, err := flow.ToStateCommitment(expectedStateCommitmentBytes)
 	require.NoError(t, err)
 
@@ -104,7 +106,9 @@ func TestBootstrapLedger_ZeroTokenSupply(t *testing.T) {
 // - transaction fee deduction
 // This tests that the state commitment has not changed for the bookkeeping parts of the transaction.
 func TestBootstrapLedger_EmptyTransaction(t *testing.T) {
-	expectedStateCommitmentBytes, _ := hex.DecodeString("7066b254876bc873c682a46199010837149ecae1415871074d0a592385aea1f6")
+	expectedStateCommitmentBytes, _ := hex.DecodeString(
+		"cc55e484da7536ba97c1bcc7fc4201cffa0e7f71b18ebd347e9693454a75b184",
+	)
 	expectedStateCommitment, err := flow.ToStateCommitment(expectedStateCommitmentBytes)
 	require.NoError(t, err)
 
@@ -139,7 +143,7 @@ func TestBootstrapLedger_EmptyTransaction(t *testing.T) {
 		vm := fvm.NewVirtualMachine()
 
 		ctx := fvm.NewContext(
-			fvm.WithChain(chain),
+			chain,
 			fvm.WithTransactionFeesEnabled(true),
 			fvm.WithAccountStorageLimit(true),
 			fvm.WithSequenceNumberCheckAndIncrementEnabled(false),

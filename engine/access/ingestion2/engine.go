@@ -177,7 +177,7 @@ func (e *Engine) persistExecutionReceipt(receipt *flow.ExecutionReceipt) error {
 }
 
 // OnFinalizedBlock is called by the follower engine after a block has been finalized and the state has been updated.
-// Receives block finalized events from the finalization distributor and forwards them to the consumer.
+// Receives block finalized events from the finalization registrar and forwards them to the consumer.
 func (e *Engine) OnFinalizedBlock(_ *model.Block) {
 	e.finalizedBlockProcessor.Notify()
 }

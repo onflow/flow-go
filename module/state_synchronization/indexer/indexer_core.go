@@ -21,6 +21,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
+	"github.com/onflow/flow-go/module/state_synchronization/indexer/extended"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/logging"
 )
@@ -42,6 +43,8 @@ type IndexerCore struct {
 	results               storage.LightTransactionResults
 	scheduledTransactions storage.ScheduledTransactions
 	protocolDB            storage.DB
+
+	extendedIndexer *extended.ExtendedIndexer
 
 	derivedChainData *derived.DerivedChainData
 	serviceAddress   flow.Address
@@ -67,6 +70,7 @@ func New(
 	collectionIndexer collections.CollectionIndexer,
 	collectionExecutedMetric module.CollectionExecutedMetric,
 	lockManager lockctx.Manager,
+	extendedIndexer *extended.ExtendedIndexer,
 ) *IndexerCore {
 	log = log.With().Str("component", "execution_indexer").Logger()
 	metrics.InitializeLatestHeight(registers.LatestHeight())
@@ -76,7 +80,8 @@ func New(
 		Uint64("latest_height", registers.LatestHeight()).
 		Msg("indexer initialized")
 
-	fvmEnv := systemcontracts.SystemContractsForChain(chainID).AsTemplateEnv()
+	sc := systemcontracts.SystemContractsForChain(chainID)
+	fvmEnv := sc.AsTemplateEnv()
 
 	return &IndexerCore{
 		log:                   log,
@@ -94,6 +99,7 @@ func New(
 		serviceAddress:        chainID.Chain().ServiceAddress(),
 		derivedChainData:      derivedChainData,
 
+		extendedIndexer:          extendedIndexer,
 		collectionIndexer:        collectionIndexer,
 		collectionExecutedMetric: collectionExecutedMetric,
 		lockManager:              lockManager,
@@ -145,8 +151,9 @@ func (c *IndexerCore) IndexBlockData(data *execution_data.BlockExecutionDataEnti
 		return fmt.Errorf("must index block data with the next height %d, but got %d", latest+1, header.Height)
 	}
 
-	// allow rerunning the indexer for same height since we are fetching height from register storage, but there are other storages
-	// for indexing resources which might fail to update the values, so this enables rerunning and reindexing those resources
+	// Data for the block is stored into both the protocol and registers databases. This creates a
+	// race condition where it's possible only one completes if the node crashes at an inopportune time.
+	// In this case, allow reindexing the last block. Both databases should treat this as a no-op.
 	if header.Height == latest {
 		lg.Warn().Msg("reindexing block data")
 		c.metrics.BlockReindexed()
@@ -183,7 +190,6 @@ func (c *IndexerCore) IndexBlockData(data *execution_data.BlockExecutionDataEnti
 						return fmt.Errorf("could not index events at height %d: %w", header.Height, err)
 					}
 
-					// requires the [storage.LockInsertLightTransactionResult] lock
 					err = c.results.BatchStore(lctx, rw, data.BlockID, results)
 					if err != nil {
 						return fmt.Errorf("could not index transaction results at height %d: %w", header.Height, err)
@@ -201,6 +207,10 @@ func (c *IndexerCore) IndexBlockData(data *execution_data.BlockExecutionDataEnti
 			})
 
 		if err != nil {
+			if errors.Is(err, storage.ErrAlreadyExists) {
+				// Since reindexing is a no-op, return early without an error
+				return nil
+			}
 			return fmt.Errorf("could not commit block data: %w", err)
 		}
 
@@ -242,6 +252,18 @@ func (c *IndexerCore) IndexBlockData(data *execution_data.BlockExecutionDataEnti
 
 		return nil
 	})
+
+	// Index account transactions if enabled
+	if c.extendedIndexer != nil {
+		g.Go(func() error {
+			err := c.extendedIndexer.IndexBlockExecutionData(data)
+			if err != nil {
+				return fmt.Errorf("could not index extended block data: %w", err)
+			}
+
+			return nil
+		})
+	}
 
 	g.Go(func() error {
 		start := time.Now()

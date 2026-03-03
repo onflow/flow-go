@@ -77,6 +77,7 @@ func New(
 	core module.SyncCore,
 	participantsProvider module.IdentifierProvider,
 	spamDetectionConfig *SpamDetectionConfig,
+	registrar hotstuff.FinalizationRegistrar,
 	opts ...OptionFunc,
 ) (*Engine, error) {
 
@@ -132,6 +133,9 @@ func New(
 	if err != nil {
 		return nil, fmt.Errorf("could not setup message handler")
 	}
+
+	registrar.AddOnBlockFinalizedConsumer(finalizedHeaderCache.OnFinalizedBlock)
+	registrar.AddOnBlockIncorporatedConsumer(finalizedHeaderCache.OnBlockIncorporated)
 
 	return e, nil
 }

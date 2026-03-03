@@ -14,6 +14,7 @@ type Distributor struct {
 }
 
 var _ hotstuff.Consumer = (*Distributor)(nil)
+var _ hotstuff.FinalizationRegistrar = (*Distributor)(nil)
 
 func NewDistributor() *Distributor {
 	return &Distributor{

@@ -176,7 +176,7 @@ func validateClusterQC(cluster protocol.Cluster) error {
 // version beacon is invalid
 func validateVersionBeacon(snap protocol.Snapshot) error {
 	errf := func(msg string, args ...any) error {
-		return protocol.NewInvalidServiceEventErrorf(msg, args)
+		return protocol.NewInvalidServiceEventErrorf(msg, args...)
 	}
 
 	versionBeacon, err := snap.VersionBeacon()

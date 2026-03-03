@@ -11,6 +11,7 @@ import (
 
 	"github.com/onflow/flow-go/integration/tests/lib"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func TestExecutionFailingTxReverted(t *testing.T) {
@@ -68,7 +69,12 @@ func (s *FailingTxRevertedSuite) TestExecutionFailingTxReverted() {
 		lib.WithChainID(chainID),
 	)
 	failingTx.PayloadSignatures = nil
-	failingTx.EnvelopeSignatures = nil
+	failingTx.EnvelopeSignatures = []sdk.TransactionSignature{
+		sdk.TransactionSignature{
+			Address:   failingTx.Payer,
+			Signature: unittest.SignatureFixtureForTransactions(),
+		},
+	}
 
 	err = s.AccessClient().SendTransaction(context.Background(), &failingTx)
 	require.NoError(s.T(), err, "could not send tx to create counter with wrong sig")

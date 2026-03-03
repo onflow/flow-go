@@ -65,7 +65,7 @@ const (
 )
 
 // MessageCodeFromInterface returns the correct Code based on the underlying type of message v.
-func MessageCodeFromInterface(v interface{}) (MessageCode, string, error) {
+func MessageCodeFromInterface(v any) (MessageCode, string, error) {
 	s := what(v)
 	switch v.(type) {
 	// consensus
@@ -231,6 +231,6 @@ func MessageCodeFromPayload(payload []byte) (MessageCode, error) {
 	return MessageCode(payload[0]), nil
 }
 
-func what(v interface{}) string {
+func what(v any) string {
 	return fmt.Sprintf("%T", v)
 }

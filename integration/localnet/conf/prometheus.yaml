@@ -22,3 +22,42 @@ scrape_configs:
     scrape_interval: 1s
     static_configs:
       - targets: [ "loader:8443" ]
+
+  # Automatically discover and scrape metrics from integration test containers
+  # Uses Docker service discovery to find containers with org.flowfoundation.role label
+  # Scrapes via host ports (Prometheus uses host network mode)
+  - job_name: integration-tests
+    scrape_interval: 5s
+    docker_sd_configs:
+      - host: unix:///var/run/docker.sock
+        refresh_interval: 5s
+        # Only scrape containers that have a `org.flowfoundation.role` label
+        filters:
+          - name: "label"
+            values:
+              - 'org.flowfoundation.role'
+    relabel_configs:
+      # Extract container labels as Prometheus labels
+      - regex: "__meta_docker_container_label_org_flowfoundation_(.+)"
+        action: labelmap
+        replacement: "$1"
+      # Use container name as instance label
+      - source_labels: ['__meta_docker_container_name']
+        regex: "/(.*)"
+        target_label: "instance"
+        replacement: "$1"
+      # Get host port for metrics port (8080) from Docker port mappings
+      # Docker SD provides labels like __meta_docker_container_port_private_8080 and __meta_docker_container_port_public_8080
+      # We construct the address using the public port
+      - source_labels: ['__meta_docker_container_port_public_8080']
+        regex: '(\d+)'
+        target_label: "__address__"
+        replacement: 'localhost:${1}'
+      # Drop targets that don't have metrics port 8080 exposed (no public port found)
+      - source_labels: ['__address__']
+        regex: 'localhost:\d+'
+        action: keep
+      # Only keep containers that have the role label
+      - source_labels: ['__meta_docker_container_label_org_flowfoundation_role']
+        regex: ".+"
+        action: keep

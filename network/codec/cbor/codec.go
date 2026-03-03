@@ -47,7 +47,7 @@ func (c *Codec) NewDecoder(r io.Reader) network.Decoder {
 // NOTE: 'what' is the 'code' name for debugging / instrumentation.
 // NOTE: 'envelope' contains 'code' & serialized / encoded 'v'.
 // i.e.  1st byte is 'code' and remaining bytes are CBOR encoded 'v'.
-func (c *Codec) Encode(v interface{}) ([]byte, error) {
+func (c *Codec) Encode(v any) ([]byte, error) {
 
 	// encode the value
 	code, what, err := codec.MessageCodeFromInterface(v)

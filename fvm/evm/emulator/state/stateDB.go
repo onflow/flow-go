@@ -9,7 +9,6 @@ import (
 	gethCommon "github.com/ethereum/go-ethereum/common"
 	gethState "github.com/ethereum/go-ethereum/core/state"
 	gethStateless "github.com/ethereum/go-ethereum/core/stateless"
-	"github.com/ethereum/go-ethereum/core/tracing"
 	gethTracing "github.com/ethereum/go-ethereum/core/tracing"
 	gethTypes "github.com/ethereum/go-ethereum/core/types"
 	gethParams "github.com/ethereum/go-ethereum/params"
@@ -227,7 +226,7 @@ func (db *StateDB) GetCodeSize(addr gethCommon.Address) int {
 func (db *StateDB) SetCode(
 	addr gethCommon.Address,
 	code []byte,
-	reason tracing.CodeChangeReason,
+	reason gethTracing.CodeChangeReason,
 ) (prev []byte) {
 	prev = db.GetCode(addr)
 	err := db.latestView().SetCode(addr, code)

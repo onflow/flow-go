@@ -14,7 +14,7 @@ import (
 func EncodeArgs(args []cadence.Value) ([]byte, error) {
 
 	// will hold unmarshalled cadence JSON
-	parsedArgs := make([]interface{}, len(args))
+	parsedArgs := make([]any, len(args))
 
 	for index, cdcVal := range args {
 
@@ -25,7 +25,7 @@ func EncodeArgs(args []cadence.Value) ([]byte, error) {
 		}
 
 		// unmarshal json to interface and append to array
-		var arg interface{}
+		var arg any
 		err = json.Unmarshal(encoded, &arg)
 		if err != nil {
 			return nil, fmt.Errorf("failed to unmarshal cadence arguments: %w", err)

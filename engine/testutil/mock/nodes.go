@@ -12,6 +12,7 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	"github.com/onflow/flow-go/engine/collection/epochmgr"
 	collectioningest "github.com/onflow/flow-go/engine/collection/ingest"
 	"github.com/onflow/flow-go/engine/collection/pusher"
@@ -242,6 +243,7 @@ func (en ExecutionNode) Ready(t *testing.T, ctx context.Context) {
 	en.FollowerCore.Start(irctx)
 	en.FollowerEngine.Start(irctx)
 	en.SyncEngine.Start(irctx)
+	en.RequestEngine.Start(irctx)
 
 	<-util.AllReady(
 		en.Ledger,
@@ -302,13 +304,14 @@ type VerificationNode struct {
 	Receipts      storage.ExecutionReceipts
 
 	// chunk consumer and processor for fetcher engine
-	ProcessedChunkIndex storage.ConsumerProgressInitializer
+	ProcessedChunkIndex storage.ConsumerProgress
 	ChunksQueue         storage.ChunksQueue
 	ChunkConsumer       *chunkconsumer.ChunkConsumer
 
 	// block consumer for chunk consumer
-	ProcessedBlockHeight storage.ConsumerProgressInitializer
+	ProcessedBlockHeight storage.ConsumerProgress
 	BlockConsumer        *blockconsumer.BlockConsumer
+	FollowerDistributor  *pubsub.FollowerDistributor
 
 	VerifierEngine  *verifier.Engine
 	AssignerEngine  *assigner.Engine

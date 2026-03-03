@@ -1,4 +1,4 @@
-package approvals
+package approvals_test
 
 import (
 	"testing"
@@ -8,6 +8,8 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/engine/consensus/approvals"
+	"github.com/onflow/flow-go/engine/consensus/approvals/testutil"
 	"github.com/onflow/flow-go/model/flow"
 	mempool "github.com/onflow/flow-go/module/mempool/mock"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -23,10 +25,10 @@ func TestApprovalCollector(t *testing.T) {
 }
 
 type ApprovalCollectorTestSuite struct {
-	BaseApprovalsTestSuite
+	testutil.BaseApprovalsTestSuite
 
 	sealsPL   *mempool.IncorporatedResultSeals
-	collector *ApprovalCollector
+	collector *approvals.ApprovalCollector
 }
 
 func (s *ApprovalCollectorTestSuite) SetupTest() {
@@ -34,7 +36,7 @@ func (s *ApprovalCollectorTestSuite) SetupTest() {
 	s.sealsPL = &mempool.IncorporatedResultSeals{}
 
 	var err error
-	s.collector, err = NewApprovalCollector(unittest.Logger(), s.IncorporatedResult, s.IncorporatedBlock, s.Block, s.ChunksAssignment, s.sealsPL, uint(len(s.AuthorizedVerifiers)))
+	s.collector, err = approvals.NewApprovalCollector(unittest.Logger(), s.IncorporatedResult, s.IncorporatedBlock, s.Block, s.ChunksAssignment, s.sealsPL, uint(len(s.AuthorizedVerifiers)))
 	require.NoError(s.T(), err)
 }
 
@@ -62,7 +64,7 @@ func (s *ApprovalCollectorTestSuite) TestProcessApproval_SealResult() {
 
 	for i, chunk := range s.Chunks {
 		var err error
-		sigCollector := NewSignatureCollector()
+		sigCollector := approvals.NewSignatureCollector()
 		for verID := range s.AuthorizedVerifiers {
 			approval := unittest.ResultApprovalFixture(unittest.WithChunk(chunk.Index), unittest.WithApproverID(verID))
 			err = s.collector.ProcessApproval(approval)

@@ -472,7 +472,7 @@ func (s *EventsSuite) setupExecutionNodes(block *flow.Block) {
 
 	// this line causes a S1021 lint error because receipts is explicitly declared. this is required
 	// to ensure the mock library handles the response type correctly
-	var receipts flow.ExecutionReceiptList //nolint:gosimple
+	var receipts flow.ExecutionReceiptList //nolint:staticcheck
 	receipts = unittest.ReceiptsForBlockFixture(block, s.executionNodes.NodeIDs())
 	s.receipts.On("ByBlockID", block.ID()).Return(receipts, nil)
 

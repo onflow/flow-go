@@ -9,6 +9,7 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/sethvargo/go-retry"
 
+	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
@@ -44,7 +45,7 @@ import (
 //
 // The requester is made up of 3 subcomponents:
 //
-// * OnBlockFinalized:     receives block finalized events from the finalization distributor and
+// * OnBlockFinalized:     receives block finalized events from the finalization registrar and
 //                         forwards them to the blockConsumer.
 //
 // * blockConsumer:        is a jobqueue that receives block finalization events. On each event,
@@ -145,12 +146,13 @@ func New(
 	edrMetrics module.ExecutionDataRequesterMetrics,
 	downloader execution_data.Downloader,
 	execDataCache *cache.ExecutionDataCache,
-	processedHeight storage.ConsumerProgressInitializer,
-	processedNotifications storage.ConsumerProgressInitializer,
+	processedHeight storage.ConsumerProgress,
+	processedNotifications storage.ConsumerProgress,
 	state protocol.State,
 	headers storage.Headers,
 	cfg ExecutionDataConfig,
 	distributor *ExecutionDataDistributor,
+	finalizationRegistrar hotstuff.FinalizationRegistrar,
 ) (state_synchronization.ExecutionDataRequester, error) {
 	e := &executionDataRequester{
 		log:                  log.With().Str("component", "execution_data_requester").Logger(),
@@ -184,7 +186,6 @@ func New(
 		e.finalizationNotifier.Channel(), // to listen to finalization events to find newly sealed blocks
 		processedHeight,                  // read and persist the downloaded height
 		sealedBlockReader,                // read sealed blocks by height
-		e.config.InitialBlockHeight,      // initial "last processed" height for empty db
 		e.processBlockJob,                // process the sealed block job to download its execution data
 		fetchWorkers,                     // the number of concurrent workers
 		e.config.MaxSearchAhead,          // max number of unsent notifications to allow before pausing new fetches
@@ -231,7 +232,6 @@ func New(
 		executionDataNotifier.Channel(), // listen for notifications from the block consumer
 		processedNotifications,          // read and persist the notified height
 		e.executionDataReader,           // read execution data by height
-		e.config.InitialBlockHeight,     // initial "last processed" height for empty db
 		e.processNotificationJob,        // process the job to send notifications for an execution data
 		1,                               // use a single worker to ensure notification is delivered in consecutive order
 		0,                               // search ahead limit controlled by worker count
@@ -247,11 +247,14 @@ func New(
 		AddWorker(e.runNotificationConsumer).
 		Build()
 
+	// register callback with finalization registrar
+	finalizationRegistrar.AddOnBlockFinalizedConsumer(e.onBlockFinalized)
+
 	return e, nil
 }
 
-// OnBlockFinalized accepts block finalization notifications from the FollowerDistributor
-func (e *executionDataRequester) OnBlockFinalized(*model.Block) {
+// onBlockFinalized accepts block finalization notifications from the FollowerDistributor
+func (e *executionDataRequester) onBlockFinalized(*model.Block) {
 	e.finalizationNotifier.Notify()
 }
 

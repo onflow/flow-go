@@ -1,0 +1,227 @@
+---
+- name: Prepare and sign collection cluster root block
+  hosts: collection
+  become: true
+  gather_facts: false
+
+  vars:
+
+    # Required inputs (no defaults)
+    # http(s) URL or absolute local path to boot-tools.tar (on controller)
+    boot_tools_tar: "{{ boot_tools_tar }}"              
+    bootstrap_directory: "{{ bootstrap_directory }}"
+    genesis_bucket: "{{ genesis_bucket }}"
+    network_version_token: "{{ network_version_token }}"
+    output_directory: "{{ output_directory }}"          
+
+    # Derived
+    transit_path: "{{ output_directory }}/transit"
+    _is_url: "{{ (boot_tools_tar is string) and (boot_tools_tar is match('^https?://')) }}"
+
+    # Flag to force re-pull/install of transit
+    force_repull_transit: false
+
+  pre_tasks:
+    - name: Validate required inputs are provided
+      assert:
+        that:
+          - boot_tools_tar is defined and (boot_tools_tar | string | length) > 0
+          - output_directory is defined and (output_directory | string | length) > 0
+          - network_version_token is defined and (network_version_token | string | length) > 0
+          - genesis_bucket is defined and (genesis_bucket | string | length) > 0
+        fail_msg: >-
+          Missing one or more required inputs: boot_tools_tar, output_directory,
+          network_version_token, genesis_bucket.
+      tags: [validate]
+
+    - name: Validate output_directory is an absolute path
+      assert:
+        that:
+          - output_directory is match('^/')
+        fail_msg: "output_directory must be an absolute path (e.g., /opt/flow/transit-bin)."
+      tags: [validate]
+
+    - name: Validate bootstrap_directory is an absolute path
+      assert:
+        that:
+          - bootstrap_directory is match('^/')
+        fail_msg: "bootstrap_directory must be an absolute path (e.g., /opt/flow/transit-bin)."
+      tags: [validate]
+
+    - name: Validate boot_tools_tar looks like a URL or an absolute file path
+      vars:
+        _looks_like_path: "{{ (not _is_url) and (boot_tools_tar is match('^/')) }}"
+      assert:
+        that:
+          - _is_url or _looks_like_path
+        fail_msg: "boot_tools_tar must be an http(s) URL or an absolute local path on the controller."
+      tags: [validate]
+
+  tasks:
+    - name: Check if output directory exists
+      stat:
+        path: "{{ output_directory }}"
+      register: dir_stat
+
+    - name: Create output directory (skip if exists)
+      file:
+        path: "{{ output_directory }}"
+        state: directory
+        mode: "0755"
+      when: not dir_stat.stat.exists
+
+    - name: Check if transit already exists in output directory
+      stat:
+        path: "{{ transit_path }}"
+      register: transit_stat
+      when: not force_repull_transit
+
+    - name: Decide if we should fetch/reinstall transit
+      set_fact:
+        should_fetch_transit: "{{ true if force_repull_transit else (not transit_stat.stat.exists) }}"
+
+    - block:
+        - name: Create temporary working directory
+          tempfile:
+            state: directory
+            suffix: boottools
+          register: tmpdir
+
+        - name: Download boot-tools.tar to temp directory (URL)
+          get_url:
+            url: "{{ boot_tools_tar }}"
+            dest: "{{ tmpdir.path }}/boot-tools.tar"
+            mode: "0644"
+            force: true
+            timeout: 120
+          when: _is_url
+
+        - name: Copy boot-tools.tar to temp directory (local controller path)
+          copy:
+            src: "{{ boot_tools_tar }}"
+            dest: "{{ tmpdir.path }}/boot-tools.tar"
+            mode: "0644"
+          when: not _is_url
+
+        - name: Extract boot-tools.tar into temp directory
+          unarchive:
+            src: "{{ tmpdir.path }}/boot-tools.tar"
+            dest: "{{ tmpdir.path }}"
+            remote_src: true
+
+        - name: Find the transit binary inside the extracted boot tools
+          find:
+            paths: "{{ tmpdir.path }}"
+            patterns: "transit"
+            file_type: file
+            recurse: true
+          register: transit_found
+
+        - name: Ensure transit binary was found in boot-tools.tar
+          assert:
+            that:
+              - (transit_found.files | length) > 0
+            fail_msg: "Could not locate 'transit' inside boot-tools.tar."
+
+        - name: Install transit into output directory
+          copy:
+            src: "{{ (transit_found.files | first).path }}"
+            dest: "{{ transit_path }}"
+            mode: "0755"
+            remote_src: true
+
+        - name: Cleanup temporary working directory
+          file:
+            path: "{{ tmpdir.path }}"
+            state: absent
+      when: should_fetch_transit
+
+    - name: Ensure transit binary is executable
+      file:
+        path: "{{ transit_path }}"
+        mode: "0755"
+        state: file
+
+    # --- Transit commands ---
+    - name: Pull root clustering assignment command
+      command:
+        argv:
+          - "{{ transit_path }}"
+          - pull-clustering
+          - -t
+          - "{{ network_version_token }}"
+          - -b
+          - "{{ bootstrap_directory }}"
+          - -o
+          - "{{ output_directory }}"
+          - -g
+          - "{{ genesis_bucket }}"
+      register: pull_clustering_result
+      ignore_errors: false
+
+    - name: Show output of pull clustering command
+      debug:
+        msg:
+          - "stdout: {{ pull_clustering_result.stdout | default('') }}"
+          - "stderr: {{ pull_clustering_result.stderr | default('') }}"
+
+    - name: Generate cluster block vote
+      command:
+        argv:
+          - "{{ transit_path }}"
+          - generate-cluster-block-vote
+          - -b
+          - "{{ bootstrap_directory }}"
+          - -o
+          - "{{ output_directory }}"
+      register: gen_vote_result
+      ignore_errors: false
+
+    - name: Show output of generate cluster block vote command
+      debug:
+        msg:
+          - "stdout: {{ gen_vote_result.stdout | default('') }}"
+          - "stderr: {{ gen_vote_result.stderr | default('') }}"
+
+    - name: Push cluster block vote
+      command:
+        argv:
+          - "{{ transit_path }}"
+          - push-cluster-block-vote
+          - -t
+          - "{{ network_version_token }}"
+          - -b
+          - "{{ bootstrap_directory }}"
+          - -d
+          - "{{ output_directory }}"
+          - -g
+          - "{{ genesis_bucket }}"
+      register: push_vote_result
+      ignore_errors: false
+
+    - name: Show output of push root block vote
+      debug:
+        msg:
+          - "stdout: {{ push_vote_result.stdout | default('') }}"
+          - "stderr: {{ push_vote_result.stderr | default('') }}"
+
+    - name: Get node id from file
+      command: cat {{ boostrap_directory }}/public-root-information/node-id
+      register: nodeid_result
+
+    - name: Strip whitespace from node id
+      set_fact:
+        node_id: "{{ nodeid_result.stdout | trim }}"
+
+    - name: Check if cluster block vote file exists in GCS
+      command: >
+        gsutil ls gs://{{ genesis_bucket }}/{{ network_version_token }}/root-cluster-block-vote.{{ node_id }}.json
+      register: gsutil_result
+      ignore_errors: true
+
+    - name: Assert cluster block vote file exists in bucket
+      assert:
+        that:
+          - gsutil_result.rc == 0
+        fail_msg: "Cluster block vote file not found in bucket"
+

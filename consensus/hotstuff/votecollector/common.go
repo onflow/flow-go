@@ -3,9 +3,11 @@ package votecollector
 import (
 	"errors"
 	"fmt"
+	"sync"
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 var (
@@ -31,8 +33,8 @@ func (c *NoopProcessor) Status() hotstuff.VoteCollectorStatus { return c.status 
 
 // EnsureVoteForBlock verifies that the vote is for the given block.
 // Returns nil on success and sentinel errors:
-//   - model.VoteForIncompatibleViewError if the vote is from a different view than block
-//   - model.VoteForIncompatibleBlockError if the vote is from the same view as block
+//   - [VoteForIncompatibleViewError] if the vote is from a different view than the block
+//   - [VoteForIncompatibleBlockError] if the vote is from the same view as the block
 //     but for a different blockID
 func EnsureVoteForBlock(vote *model.Vote, block *model.Block) error {
 	if vote.View != block.View {
@@ -42,4 +44,30 @@ func EnsureVoteForBlock(vote *model.Vote, block *model.Block) error {
 		return fmt.Errorf("expecting only votes for block %v, but vote %v is for block %v: %w ", block.BlockID, vote.ID(), vote.BlockID, VoteForIncompatibleBlockError)
 	}
 	return nil
+}
+
+// AppendOnlyIdentifierSet implements a simple set for tracking unique entries by identifier.
+// Removal of set elements is not supported, we want to provide append-only guarantees.
+// Concurrency safe.
+type AppendOnlyIdentifierSet struct {
+	set  map[flow.Identifier]struct{}
+	lock sync.Mutex
+}
+
+// NewConcurrentIdentifierSet creates new identifier set, with strict append-only characteristics.
+func NewConcurrentIdentifierSet() *AppendOnlyIdentifierSet {
+	return &AppendOnlyIdentifierSet{
+		set: make(map[flow.Identifier]struct{}),
+	}
+}
+
+// Add adds identifier to the internal set, returns true when added, otherwise returns false.
+func (s *AppendOnlyIdentifierSet) Add(identifier flow.Identifier) bool {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+	_, exists := s.set[identifier]
+	if !exists {
+		s.set[identifier] = struct{}{}
+	}
+	return !exists
 }

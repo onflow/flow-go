@@ -28,9 +28,11 @@ func TestSafetyCheck(t *testing.T) {
 		proc := fvm.Transaction(&flow.TransactionBody{Script: []byte(code)}, 0)
 
 		context := fvm.NewContext(
+			flow.Mainnet.Chain(),
 			fvm.WithLogger(log),
 			fvm.WithAuthorizationChecksEnabled(false),
-			fvm.WithSequenceNumberCheckAndIncrementEnabled(false))
+			fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
+		)
 
 		txnState := testutils.NewSimpleTransaction(nil)
 
@@ -54,9 +56,11 @@ func TestSafetyCheck(t *testing.T) {
 		proc := fvm.Transaction(&flow.TransactionBody{Script: []byte(code)}, 0)
 
 		context := fvm.NewContext(
+			flow.Mainnet.Chain(),
 			fvm.WithLogger(log),
 			fvm.WithAuthorizationChecksEnabled(false),
-			fvm.WithSequenceNumberCheckAndIncrementEnabled(false))
+			fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
+		)
 
 		txnState := testutils.NewSimpleTransaction(nil)
 

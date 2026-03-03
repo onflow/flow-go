@@ -86,13 +86,17 @@ func NewTransactionGenerator(
 
 // Fixture generates a [flow.TransactionBody] with random data based on the provided options.
 func (g *TransactionGenerator) Fixture(opts ...TransactionOption) *flow.TransactionBody {
+	// simplify the transaction by using the same address for the proposer, payer and authorizers
+	proposalKey := g.proposalKeys.Fixture()
+	proposalAddress := proposalKey.Address
+
 	tx := &flow.TransactionBody{
 		ReferenceBlockID: g.identifiers.Fixture(),
 		Script:           []byte("access(all) fun main() {}"),
 		GasLimit:         10,
-		ProposalKey:      g.proposalKeys.Fixture(),
-		Payer:            g.addresses.Fixture(),
-		Authorizers:      []flow.Address{g.addresses.Fixture()},
+		ProposalKey:      proposalKey,
+		Payer:            proposalAddress,
+		Authorizers:      []flow.Address{proposalAddress},
 	}
 
 	for _, opt := range opts {
@@ -104,6 +108,9 @@ func (g *TransactionGenerator) Fixture(opts ...TransactionOption) *flow.Transact
 		// allowing the transaction to be properly serialized and deserialized over protobuf.
 		// if the signature does not match the proposer, the signer index resolved during
 		// deserialization will be incorrect.
+
+		// this would also pass the sanity checks on the transaction signatures
+		// by the access TransactionValidator
 		tx.EnvelopeSignatures = []flow.TransactionSignature{
 			g.transactionSigs.Fixture(
 				TransactionSignature.WithAddress(tx.ProposalKey.Address),

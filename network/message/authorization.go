@@ -25,7 +25,7 @@ type MsgAuthConfig struct {
 	// Name is the string representation of the message type.
 	Name string
 	// Type is a func that returns a new instance of message type.
-	Type func() interface{}
+	Type func() any
 	// Config is the mapping of network channel to list of authorized flow roles.
 	Config map[channels.Channel]ChannelAuthConfig
 }
@@ -60,7 +60,7 @@ func initializeMessageAuthConfigsMap() {
 	// consensus
 	authorizationConfigs[BlockProposal] = MsgAuthConfig{
 		Name: BlockProposal,
-		Type: func() interface{} {
+		Type: func() any {
 			return new(messages.Proposal)
 		},
 		Config: map[channels.Channel]ChannelAuthConfig{
@@ -76,7 +76,7 @@ func initializeMessageAuthConfigsMap() {
 	}
 	authorizationConfigs[BlockVote] = MsgAuthConfig{
 		Name: BlockVote,
-		Type: func() interface{} {
+		Type: func() any {
 			return new(messages.BlockVote)
 		},
 		Config: map[channels.Channel]ChannelAuthConfig{
@@ -88,7 +88,7 @@ func initializeMessageAuthConfigsMap() {
 	}
 	authorizationConfigs[TimeoutObject] = MsgAuthConfig{
 		Name: TimeoutObject,
-		Type: func() interface{} {
+		Type: func() any {
 			return new(messages.TimeoutObject)
 		},
 		Config: map[channels.Channel]ChannelAuthConfig{
@@ -102,7 +102,7 @@ func initializeMessageAuthConfigsMap() {
 	// protocol state sync
 	authorizationConfigs[SyncRequest] = MsgAuthConfig{
 		Name: SyncRequest,
-		Type: func() interface{} {
+		Type: func() any {
 			return new(messages.SyncRequest)
 		},
 		Config: map[channels.Channel]ChannelAuthConfig{
@@ -118,7 +118,7 @@ func initializeMessageAuthConfigsMap() {
 	}
 	authorizationConfigs[SyncResponse] = MsgAuthConfig{
 		Name: SyncResponse,
-		Type: func() interface{} {
+		Type: func() any {
 			return new(messages.SyncResponse)
 		},
 		Config: map[channels.Channel]ChannelAuthConfig{
@@ -134,7 +134,7 @@ func initializeMessageAuthConfigsMap() {
 	}
 	authorizationConfigs[RangeRequest] = MsgAuthConfig{
 		Name: RangeRequest,
-		Type: func() interface{} {
+		Type: func() any {
 			return new(messages.RangeRequest)
 		},
 		Config: map[channels.Channel]ChannelAuthConfig{
@@ -150,7 +150,7 @@ func initializeMessageAuthConfigsMap() {
 	}
 	authorizationConfigs[BatchRequest] = MsgAuthConfig{
 		Name: BatchRequest,
-		Type: func() interface{} {
+		Type: func() any {
 			return new(messages.BatchRequest)
 		},
 		Config: map[channels.Channel]ChannelAuthConfig{
@@ -166,7 +166,7 @@ func initializeMessageAuthConfigsMap() {
 	}
 	authorizationConfigs[BlockResponse] = MsgAuthConfig{
 		Name: BlockResponse,
-		Type: func() interface{} {
+		Type: func() any {
 			return new(messages.BlockResponse)
 		},
 		Config: map[channels.Channel]ChannelAuthConfig{
@@ -180,7 +180,7 @@ func initializeMessageAuthConfigsMap() {
 	// cluster consensus
 	authorizationConfigs[ClusterBlockProposal] = MsgAuthConfig{
 		Name: ClusterBlockProposal,
-		Type: func() interface{} {
+		Type: func() any {
 			return new(messages.ClusterProposal)
 		},
 		Config: map[channels.Channel]ChannelAuthConfig{
@@ -192,7 +192,7 @@ func initializeMessageAuthConfigsMap() {
 	}
 	authorizationConfigs[ClusterBlockVote] = MsgAuthConfig{
 		Name: ClusterBlockVote,
-		Type: func() interface{} {
+		Type: func() any {
 			return new(messages.ClusterBlockVote)
 		},
 		Config: map[channels.Channel]ChannelAuthConfig{
@@ -204,7 +204,7 @@ func initializeMessageAuthConfigsMap() {
 	}
 	authorizationConfigs[ClusterTimeoutObject] = MsgAuthConfig{
 		Name: ClusterTimeoutObject,
-		Type: func() interface{} {
+		Type: func() any {
 			return new(messages.ClusterTimeoutObject)
 		},
 		Config: map[channels.Channel]ChannelAuthConfig{
@@ -216,7 +216,7 @@ func initializeMessageAuthConfigsMap() {
 	}
 	authorizationConfigs[ClusterBlockResponse] = MsgAuthConfig{
 		Name: ClusterBlockResponse,
-		Type: func() interface{} {
+		Type: func() any {
 			return new(messages.ClusterBlockResponse)
 		},
 		Config: map[channels.Channel]ChannelAuthConfig{
@@ -230,7 +230,7 @@ func initializeMessageAuthConfigsMap() {
 	// collections, guarantees & transactions
 	authorizationConfigs[CollectionGuarantee] = MsgAuthConfig{
 		Name: CollectionGuarantee,
-		Type: func() interface{} {
+		Type: func() any {
 			return new(messages.CollectionGuarantee)
 		},
 		Config: map[channels.Channel]ChannelAuthConfig{
@@ -242,7 +242,7 @@ func initializeMessageAuthConfigsMap() {
 	}
 	authorizationConfigs[TransactionBody] = MsgAuthConfig{
 		Name: TransactionBody,
-		Type: func() interface{} {
+		Type: func() any {
 			return new(messages.TransactionBody)
 		},
 		Config: map[channels.Channel]ChannelAuthConfig{
@@ -256,7 +256,7 @@ func initializeMessageAuthConfigsMap() {
 	// core messages for execution & verification
 	authorizationConfigs[ExecutionReceipt] = MsgAuthConfig{
 		Name: ExecutionReceipt,
-		Type: func() interface{} {
+		Type: func() any {
 			return new(messages.ExecutionReceipt)
 		},
 		Config: map[channels.Channel]ChannelAuthConfig{
@@ -268,7 +268,7 @@ func initializeMessageAuthConfigsMap() {
 	}
 	authorizationConfigs[ResultApproval] = MsgAuthConfig{
 		Name: ResultApproval,
-		Type: func() interface{} {
+		Type: func() any {
 			return new(messages.ResultApproval)
 		},
 		Config: map[channels.Channel]ChannelAuthConfig{
@@ -282,7 +282,7 @@ func initializeMessageAuthConfigsMap() {
 	// data exchange for execution of blocks
 	authorizationConfigs[ChunkDataRequest] = MsgAuthConfig{
 		Name: ChunkDataRequest,
-		Type: func() interface{} {
+		Type: func() any {
 			return new(messages.ChunkDataRequest)
 		},
 		Config: map[channels.Channel]ChannelAuthConfig{
@@ -294,7 +294,7 @@ func initializeMessageAuthConfigsMap() {
 	}
 	authorizationConfigs[ChunkDataResponse] = MsgAuthConfig{
 		Name: ChunkDataResponse,
-		Type: func() interface{} {
+		Type: func() any {
 			return new(messages.ChunkDataResponse)
 		},
 		Config: map[channels.Channel]ChannelAuthConfig{
@@ -308,7 +308,7 @@ func initializeMessageAuthConfigsMap() {
 	// result approvals
 	authorizationConfigs[ApprovalRequest] = MsgAuthConfig{
 		Name: ApprovalRequest,
-		Type: func() interface{} {
+		Type: func() any {
 			return new(messages.ApprovalRequest)
 		},
 		Config: map[channels.Channel]ChannelAuthConfig{
@@ -320,7 +320,7 @@ func initializeMessageAuthConfigsMap() {
 	}
 	authorizationConfigs[ApprovalResponse] = MsgAuthConfig{
 		Name: ApprovalResponse,
-		Type: func() interface{} {
+		Type: func() any {
 			return new(messages.ApprovalResponse)
 		},
 		Config: map[channels.Channel]ChannelAuthConfig{
@@ -334,7 +334,7 @@ func initializeMessageAuthConfigsMap() {
 	// generic entity exchange engines
 	authorizationConfigs[EntityRequest] = MsgAuthConfig{
 		Name: EntityRequest,
-		Type: func() interface{} {
+		Type: func() any {
 			return new(messages.EntityRequest)
 		},
 		Config: map[channels.Channel]ChannelAuthConfig{
@@ -350,7 +350,7 @@ func initializeMessageAuthConfigsMap() {
 	}
 	authorizationConfigs[EntityResponse] = MsgAuthConfig{
 		Name: EntityResponse,
-		Type: func() interface{} {
+		Type: func() any {
 			return new(messages.EntityResponse)
 		},
 		Config: map[channels.Channel]ChannelAuthConfig{
@@ -368,7 +368,7 @@ func initializeMessageAuthConfigsMap() {
 	// testing
 	authorizationConfigs[TestMessage] = MsgAuthConfig{
 		Name: TestMessage,
-		Type: func() interface{} {
+		Type: func() any {
 			return new(message.TestMessage)
 		},
 		Config: map[channels.Channel]ChannelAuthConfig{
@@ -386,7 +386,7 @@ func initializeMessageAuthConfigsMap() {
 	// DKG
 	authorizationConfigs[DKGMessage] = MsgAuthConfig{
 		Name: DKGMessage,
-		Type: func() interface{} {
+		Type: func() any {
 			return new(messages.DKGMessage)
 		},
 		Config: map[channels.Channel]ChannelAuthConfig{
@@ -402,7 +402,7 @@ func initializeMessageAuthConfigsMap() {
 // message auth Config.
 // Expected error returns during normal operations:
 //   - ErrUnknownMsgType : if underlying type of v does  not match any of the known message types
-func GetMessageAuthConfig(v interface{}) (MsgAuthConfig, error) {
+func GetMessageAuthConfig(v any) (MsgAuthConfig, error) {
 	switch v.(type) {
 	// consensus
 	case *messages.Proposal:

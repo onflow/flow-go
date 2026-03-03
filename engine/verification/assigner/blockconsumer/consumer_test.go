@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	"github.com/onflow/flow-go/engine/testutil"
 	"github.com/onflow/flow-go/engine/verification/assigner/blockconsumer"
 	vertestutils "github.com/onflow/flow-go/engine/verification/utils/unittest"
@@ -48,14 +49,14 @@ func TestProduceConsume(t *testing.T) {
 			// hence from consumer perspective, it is blocking on each received block.
 		}
 
-		withConsumer(t, 10, 3, neverFinish, func(consumer *blockconsumer.BlockConsumer, blocks []*flow.Block) {
+		withConsumer(t, 10, 3, neverFinish, func(consumer *blockconsumer.BlockConsumer, blocks []*flow.Block, followerDistributor *pubsub.FollowerDistributor) {
 			unittest.RequireCloseBefore(t, consumer.Ready(), time.Second, "could not start consumer")
 
 			for i := 0; i < len(blocks); i++ {
 				// consumer is only required to be "notified" that a new finalized block available.
 				// It keeps track of the last finalized block it has read, and read the next height upon
 				// getting notified as follows:
-				consumer.OnFinalizedBlock(&model.Block{})
+				followerDistributor.OnFinalizedBlock(&model.Block{})
 			}
 
 			unittest.RequireCloseBefore(t, consumer.Done(), time.Second, "could not terminate consumer")
@@ -76,30 +77,31 @@ func TestProduceConsume(t *testing.T) {
 		var processAll sync.WaitGroup
 		alwaysFinish := func(notifier module.ProcessingNotifier, block *flow.Block) {
 			lock.Lock()
-			defer lock.Unlock()
-
 			received = append(received, block)
+			lock.Unlock()
 
-			go func() {
-				notifier.Notify(block.ID())
-				processAll.Done()
-			}()
+			notifier.Notify(block.ID())
+			processAll.Done()
 		}
 
-		withConsumer(t, 100, 3, alwaysFinish, func(consumer *blockconsumer.BlockConsumer, blocks []*flow.Block) {
+		withConsumer(t, 100, 3, alwaysFinish, func(consumer *blockconsumer.BlockConsumer, blocks []*flow.Block, followerDistributor *pubsub.FollowerDistributor) {
 			unittest.RequireCloseBefore(t, consumer.Ready(), time.Second, "could not start consumer")
+			// defer shutdown to ensure it runs even if a `unittest.Require*` fails.
+			// this helps avoid a "pebble: closed" panic when the test times out.
+			defer func() {
+				unittest.RequireCloseBefore(t, consumer.Done(), time.Second, "could not terminate consumer")
+			}()
 			processAll.Add(len(blocks))
 
 			for i := 0; i < len(blocks); i++ {
 				// consumer is only required to be "notified" that a new finalized block available.
 				// It keeps track of the last finalized block it has read, and read the next height upon
 				// getting notified as follows:
-				consumer.OnFinalizedBlock(&model.Block{})
+				followerDistributor.OnFinalizedBlock(&model.Block{})
 			}
 
 			// waits until all blocks finish processing
 			unittest.RequireReturnsBefore(t, processAll.Wait, time.Second, "could not process all blocks on time")
-			unittest.RequireCloseBefore(t, consumer.Done(), time.Second, "could not terminate consumer")
 
 			// expects the mock engine receive all 100 blocks.
 			require.ElementsMatch(t, flow.GetIDs(blocks), flow.GetIDs(received))
@@ -116,13 +118,12 @@ func withConsumer(
 	blockCount int,
 	workerCount int,
 	process func(notifier module.ProcessingNotifier, block *flow.Block),
-	withBlockConsumer func(*blockconsumer.BlockConsumer, []*flow.Block),
+	withBlockConsumer func(*blockconsumer.BlockConsumer, []*flow.Block, *pubsub.FollowerDistributor),
 ) {
 
 	unittest.RunWithPebbleDB(t, func(pdb *pebble.DB) {
 		maxProcessing := uint64(workerCount)
 
-		processedHeight := store.NewConsumerProgress(pebbleimpl.ToDB(pdb), module.ConsumeProgressVerificationBlockHeight)
 		collector := &metrics.NoopCollector{}
 		tracer := trace.NewNoopTracer()
 		log := unittest.Logger()
@@ -134,14 +135,22 @@ func withConsumer(
 			process: process,
 		}
 
-		consumer, _, err := blockconsumer.NewBlockConsumer(
+		sealedHead, err := s.State.Sealed().Head()
+		require.NoError(t, err)
+
+		processedHeight, err := store.NewConsumerProgress(pebbleimpl.ToDB(pdb), module.ConsumeProgressVerificationBlockHeight).Initialize(sealedHead.Height)
+		require.NoError(t, err)
+
+		followerDistributor := pubsub.NewFollowerDistributor()
+		consumer, err := blockconsumer.NewBlockConsumer(
 			unittest.Logger(),
 			collector,
 			processedHeight,
 			s.Storage.Blocks,
 			s.State,
 			engine,
-			maxProcessing)
+			maxProcessing,
+			followerDistributor)
 		require.NoError(t, err)
 
 		// generates a chain of blocks in the form of root <- R1 <- C1 <- R2 <- C2 <- ... where Rs are distinct reference
@@ -167,7 +176,7 @@ func withConsumer(
 		// makes sure that we generated a block chain of requested length.
 		require.Len(t, blocks, blockCount)
 
-		withBlockConsumer(consumer, blocks)
+		withBlockConsumer(consumer, blocks, followerDistributor)
 	})
 }
 

@@ -62,7 +62,7 @@ func TestPrefixedHash(t *testing.T) {
 		})
 
 		t.Run(hashAlgo.String()+" without a prefix", func(t *testing.T) {
-			for i := 0; i < 5000; i++ {
+			for i := range 5000 {
 				data := make([]byte, i)
 				_, err := rand.Read(data)
 				require.NoError(t, err)

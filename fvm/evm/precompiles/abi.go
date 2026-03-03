@@ -8,6 +8,22 @@ import (
 	gethCommon "github.com/ethereum/go-ethereum/common"
 )
 
+// The Cadence Arch precompiled contract that is injected in the EVM environment,
+// implements the following functions:
+// - `flowBlockHeight()`
+// - `revertibleRandom()`
+// - `getRandomSource(uint64)`
+// - `verifyCOAOwnershipProof(address,bytes32,bytes)`
+//
+// By design, all errors that are the result of user input, will be propagated
+// in the EVM environment, and can be handled by developers, as they see fit.
+// However, all FVM fatal errors, will cause a panic and abort the outer Cadence
+// transaction. The reason behind this is that we want to have visibility when
+// such special errors occur. This way, any potential bugs will not go unnoticed.
+// The Cadence runtime recovers any Go crashers (index out of bounds, nil
+// dereferences, etc.) and fails the transaction gracefully, so a panic in the
+// precompiled contract does not indicate a node/runtime crash.
+
 // This package provides fast and efficient
 // utilities needed for abi encoding and decoding
 // encodings are mostly used for testing purpose
@@ -30,9 +46,11 @@ const (
 	EncodedUint256Size = FixedSizeUnitDataReadSize
 )
 
-var ErrInputDataTooSmall = errors.New("input data is too small for decoding")
-var ErrBufferTooSmall = errors.New("buffer too small for encoding")
-var ErrDataTooLarge = errors.New("input data is too large for encoding")
+var (
+	ErrInputDataTooSmall = errors.New("input data is too small for decoding")
+	ErrBufferTooSmall    = errors.New("buffer too small for encoding")
+	ErrDataTooLarge      = errors.New("input data is too large for encoding")
+)
 
 // ReadAddress reads an address from the buffer at index
 func ReadAddress(buffer []byte, index int) (gethCommon.Address, error) {
@@ -72,7 +90,7 @@ func EncodeBool(bitSet bool, buffer []byte, index int) error {
 		return ErrBufferTooSmall
 	}
 	// bit set with left padding
-	for i := 0; i < EncodedBoolSize; i++ {
+	for i := range EncodedBoolSize {
 		buffer[index+i] = 0
 	}
 	if bitSet {
@@ -158,11 +176,16 @@ func ReadBytes(buffer []byte, index int) ([]byte, error) {
 	if len(buffer) < index+EncodedUint64Size {
 		return nil, ErrInputDataTooSmall
 	}
+
 	// reading offset (we read into uint64) and adjust index
 	offset, err := ReadUint64(buffer, index)
 	if err != nil {
 		return nil, err
 	}
+	if offset > uint64(len(buffer)) {
+		return nil, ErrInputDataTooSmall
+	}
+
 	index = int(offset)
 	if len(buffer) < index+EncodedUint64Size {
 		return nil, ErrInputDataTooSmall
@@ -172,6 +195,10 @@ func ReadBytes(buffer []byte, index int) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+	if length > uint64(len(buffer)) {
+		return nil, ErrInputDataTooSmall
+	}
+
 	index += EncodedUint64Size
 	if len(buffer) < index+int(length) {
 		return nil, ErrInputDataTooSmall

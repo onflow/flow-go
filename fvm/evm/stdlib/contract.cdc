@@ -175,7 +175,7 @@ access(all) contract EVM {
 
         /// Nonce of the address
         access(all)
-        fun nonce(): UInt64 {
+        view fun nonce(): UInt64 {
             return InternalEVM.nonce(
                 address: self.bytes
             )
@@ -183,7 +183,7 @@ access(all) contract EVM {
 
         /// Code of the address
         access(all)
-        fun code(): [UInt8] {
+        view fun code(): [UInt8] {
             return InternalEVM.code(
                 address: self.bytes
             )
@@ -191,7 +191,7 @@ access(all) contract EVM {
 
         /// CodeHash of the address
         access(all)
-        fun codeHash(): [UInt8] {
+        view fun codeHash(): [UInt8] {
             return InternalEVM.codeHash(
                 address: self.bytes
             )
@@ -241,9 +241,18 @@ access(all) contract EVM {
                 "EVM.addressFromString(): Invalid hex string length for an EVM address. The provided string is \(asHex.length), but the length must be 40 or 42."
         }
         // Strip the 0x prefix if it exists
-        var withoutPrefix = (asHex[1] == "x" ? asHex.slice(from: 2, upTo: asHex.length) : asHex).toLower()
-        let bytes = withoutPrefix.decodeHex().toConstantSized<[UInt8; 20]>()!
-        return EVMAddress(bytes: bytes)
+        var withoutPrefix = asHex
+        if asHex.length == 42 {
+            assert(
+                asHex[0] == "0" && asHex[1] == "x",
+                message: "EVM.addressFromString(): The 42-character EVM address string must have a '0x' prefix"
+            )
+            withoutPrefix = asHex.slice(from: 2, upTo: asHex.length)
+        }
+
+        return EVMAddress(
+            bytes: withoutPrefix.decodeHex().toConstantSized<[UInt8; 20]>()!
+        )
     }
 
     /// EVMBytes is a type wrapper used for ABI encoding/decoding into
@@ -306,7 +315,7 @@ access(all) contract EVM {
         /// Casts the balance to a UFix64 (rounding down)
         /// Warning! casting a balance to a UFix64 which supports a lower level of precision
         /// (8 decimal points in compare to 18) might result in rounding down error.
-        /// Use the inAttoFlow function if you need more accuracy.
+        /// Use the inAttoFLOW function if you need more accuracy.
         access(all)
         view fun inFLOW(): UFix64 {
             return InternalEVM.castToFLOW(balance: self.attoflow)
@@ -392,6 +401,55 @@ access(all) contract EVM {
             self.errorMessage = errorMessage
             self.gasUsed = gasUsed
             self.data = data
+
+            if let addressBytes = contractAddress {
+                self.deployedContract = EVMAddress(bytes: addressBytes)
+            } else {
+                self.deployedContract = nil
+            }
+        }
+    }
+
+    /// Reports the outcome of an evm transaction/call execution attempt.
+    /// The results field has the decoded evm transaction/call results if
+    /// result types are provided; otherwise, the results field is nil.
+    access(all) struct ResultDecoded {
+        /// status of the execution
+        access(all) let status: Status
+
+        /// error code (error code zero means no error)
+        access(all) let errorCode: UInt64
+
+        /// error message
+        access(all) let errorMessage: String
+
+        /// returns the amount of gas metered during
+        /// evm execution
+        access(all) let gasUsed: UInt64
+
+        /// Returns the decoded results from the evm call if
+        /// the evm call is successful and resultTypes are provided.
+        /// Otherwise, returns raw result data from the evm call.
+        access(all) let results: [AnyStruct]
+
+        /// returns the newly deployed contract address
+        /// if the transaction caused such a deployment
+        /// otherwise the value is nil.
+        access(all) let deployedContract: EVMAddress?
+
+        init(
+            status: Status,
+            errorCode: UInt64,
+            errorMessage: String,
+            gasUsed: UInt64,
+            results: [AnyStruct],
+            contractAddress: [UInt8; 20]?
+        ) {
+            self.status = status
+            self.errorCode = errorCode
+            self.errorMessage = errorMessage
+            self.gasUsed = gasUsed
+            self.results = results
 
             if let addressBytes = contractAddress {
                 self.deployedContract = EVMAddress(bytes: addressBytes)
@@ -513,11 +571,14 @@ access(all) contract EVM {
             return self.address()
         }
 
-        /// Withdraws the balance from the cadence owned account's balance
-        /// Note that amounts smaller than 10nF (10e-8) can't be withdrawn
-        /// given that Flow Token Vaults use UFix64s to store balances.
-        /// If the given balance conversion to UFix64 results in
-        /// rounding error, this function would fail.
+        /// Withdraws the balance from the cadence owned account's balance.
+        /// Note that amounts smaller than 1e10 attoFlow can't be withdrawn,
+        /// given that Flow Token Vaults use UFix64 to store balances.
+        /// In other words, the smallest withdrawable amount is 1e10 attoFlow.
+        /// Amounts smaller than 1e10 attoFlow, will cause the function to panic
+        /// with: "withdraw failed! smallest unit allowed to transfer is 1e10 attoFlow".
+        /// If the given balance conversion to UFix64 results in rounding loss,
+        /// the withdrawal amount will be truncated to the maximum precision for UFix64.
         ///
         /// @param balance: The EVM balance to withdraw
         ///
@@ -581,6 +642,31 @@ access(all) contract EVM {
             ) as! Result
         }
 
+        /// Calls a contract function with the given signature and args.
+        /// The execution is limited by the given amount of gas.
+        /// The value is attoflow.  If the resultTypes is provided,
+        /// the evm call results are decoded and returned in ResultDecoded.results;
+        /// otherwise, the evm call results are discarded and not returned.
+        access(Owner | Call)
+        fun callWithSigAndArgs(
+            to: EVMAddress,
+            signature: String,
+            args: [AnyStruct],
+            gasLimit: UInt64,
+            value: UInt,
+            resultTypes: [Type]?
+        ): ResultDecoded {
+            return InternalEVM.callWithSigAndArgs(
+                from: self.addressBytes,
+                to: to.bytes,
+                signature: signature,
+                args: args,
+                gasLimit: gasLimit,
+                value: value,
+                resultTypes: resultTypes
+            ) as! ResultDecoded
+        }
+
         /// Calls a contract function with the given data.
         /// The execution is limited by the given amount of gas.
         /// The transaction state changes are not persisted.
@@ -598,6 +684,32 @@ access(all) contract EVM {
                 gasLimit: gasLimit,
                 value: value.attoflow
             ) as! Result
+        }
+
+        /// Calls a contract function with the given signature and args.
+        /// The execution is limited by the given amount of gas.
+        /// The value is attoflow.  If the resultTypes is provided,
+        /// the evm call results are decoded and returned in ResultDecoded.results;
+        /// otherwise, the evm call results are discarded and not returned.
+        /// The transaction state changes are not persisted.
+        access(all)
+        fun dryCallWithSigAndArgs(
+            to: EVMAddress,
+            signature: String,
+            args: [AnyStruct],
+            gasLimit: UInt64,
+            value: UInt,
+            resultTypes: [Type]?
+        ): ResultDecoded {
+            return InternalEVM.dryCallWithSigAndArgs(
+                from: self.addressBytes,
+                to: to.bytes,
+                signature: signature,
+                args: args,
+                gasLimit: gasLimit,
+                value: value,
+                resultTypes: resultTypes,
+            ) as! ResultDecoded
         }
 
         /// Bridges the given NFT to the EVM environment, requiring a Provider
@@ -687,8 +799,8 @@ access(all) contract EVM {
     access(all)
     fun run(tx: [UInt8], coinbase: EVMAddress): Result {
         return InternalEVM.run(
-                tx: tx,
-                coinbase: coinbase.bytes
+            tx: tx,
+            coinbase: coinbase.bytes
         ) as! Result
     }
 
@@ -739,6 +851,33 @@ access(all) contract EVM {
         ) as! Result
     }
 
+    /// Calls a contract function with the given signature and args.
+    /// The execution is limited by the given amount of gas.
+    /// The value is attoflow.  If the resultTypes is provided,
+    /// the evm call results are decoded and returned in ResultDecoded.results;
+    /// otherwise, the evm call results are discarded and not returned.
+    /// The transaction state changes are not persisted.
+    access(all)
+    fun dryCallWithSigAndArgs(
+        from: EVMAddress,
+        to: EVMAddress,
+        signature: String,
+        args: [AnyStruct],
+        gasLimit: UInt64,
+        value: UInt,
+        resultTypes: [Type]?,
+    ): ResultDecoded {
+        return InternalEVM.dryCallWithSigAndArgs(
+            from: from.bytes,
+            to: to.bytes,
+            signature: signature,
+            args: args,
+            gasLimit: gasLimit,
+            value: value,
+            resultTypes: resultTypes
+        ) as! ResultDecoded
+    }
+
     /// Runs a batch of RLP-encoded EVM transactions, deducts the gas fees,
     /// and deposits the gas fees into the provided coinbase address.
     /// An invalid transaction is not executed and not included in the block.
@@ -779,6 +918,9 @@ access(all) contract EVM {
         types: [Type],
         data: [UInt8]
     ): [AnyStruct] {
+        pre {
+            data.length >= 4: "EVM.decodeABIWithSignature(): Cannot decode! The provided data does not contain a signature."
+        }
         let methodID = HashAlgorithm.KECCAK_256.hash(
             signature.utf8
         ).slice(from: 0, upTo: 4)

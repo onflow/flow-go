@@ -82,13 +82,13 @@ func TestMachineAccountChecking(t *testing.T) {
 	t.Run("account with < hard minimum balance", func(t *testing.T) {
 		t.Run("collection", func(t *testing.T) {
 			local, remote := unittest.MachineAccountFixture(t)
-			remote.Balance = uint64(defaultHardMinBalanceLN) - 1
+			remote.Balance = uint64(cdcRecommendedMinBalanceLN) - 1
 			err := CheckMachineAccountInfo(zerolog.Nop(), conf, flow.RoleCollection, local, remote)
 			require.Error(t, err)
 		})
 		t.Run("consensus", func(t *testing.T) {
 			local, remote := unittest.MachineAccountFixture(t)
-			remote.Balance = uint64(defaultHardMinBalanceSN) - 1
+			remote.Balance = uint64(cdcRecommendedMinBalanceSN) - 1
 			err := CheckMachineAccountInfo(zerolog.Nop(), conf, flow.RoleConsensus, local, remote)
 			require.Error(t, err)
 		})
@@ -112,29 +112,6 @@ func TestMachineAccountChecking(t *testing.T) {
 			remote.Balance = uint64(minBalance)
 			err := CheckMachineAccountInfo(zerolog.Nop(), balanceDisabledConfig, flow.RoleConsensus, local, remote)
 			require.NoError(t, err)
-		})
-	})
-
-	// should log a warning when balance below soft minimum balance (but not
-	// below hard minimum balance)
-	t.Run("account with < soft minimum balance", func(t *testing.T) {
-		t.Run("collection", func(t *testing.T) {
-			local, remote := unittest.MachineAccountFixture(t)
-			remote.Balance = uint64(defaultSoftMinBalanceLN) - 1
-			log, hook := unittest.HookedLogger()
-
-			err := CheckMachineAccountInfo(log, conf, flow.RoleCollection, local, remote)
-			assert.NoError(t, err)
-			assert.Regexp(t, "machine account balance is below recommended balance", hook.Logs())
-		})
-		t.Run("consensus", func(t *testing.T) {
-			local, remote := unittest.MachineAccountFixture(t)
-			remote.Balance = uint64(defaultSoftMinBalanceSN) - 1
-			log, hook := unittest.HookedLogger()
-
-			err := CheckMachineAccountInfo(log, conf, flow.RoleConsensus, local, remote)
-			assert.NoError(t, err)
-			assert.Regexp(t, "machine account balance is below recommended balance", hook.Logs())
 		})
 	})
 
@@ -187,8 +164,8 @@ func TestMachineAccountValidatorBackoff_Overflow(t *testing.T) {
 	backoff := checkMachineAccountRetryBackoff()
 
 	// once the backoff reaches the maximum, it should remain in [(1-jitter)*max,(1+jitter*max)]
-	max := checkMachineAccountRetryMax + checkMachineAccountRetryMax*(checkMachineAccountRetryJitterPct+1)/100
-	min := checkMachineAccountRetryMax - checkMachineAccountRetryMax*(checkMachineAccountRetryJitterPct+1)/100
+	maxBackoff := checkMachineAccountRetryMax + checkMachineAccountRetryMax*(checkMachineAccountRetryJitterPct+1)/100
+	minBackoff := checkMachineAccountRetryMax - checkMachineAccountRetryMax*(checkMachineAccountRetryJitterPct+1)/100
 
 	lastWait, stop := backoff.Next()
 	assert.False(t, stop)
@@ -199,8 +176,8 @@ func TestMachineAccountValidatorBackoff_Overflow(t *testing.T) {
 		// * strictly increase, or
 		// * be within range of max duration + jitter
 		if wait < lastWait {
-			assert.Less(t, min, wait)
-			assert.Less(t, wait, max)
+			assert.Less(t, minBackoff, wait)
+			assert.Less(t, wait, maxBackoff)
 		}
 		lastWait = wait
 	}

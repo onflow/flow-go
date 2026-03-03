@@ -420,6 +420,11 @@ func (s *ObserverSuite) getRestEndpoints() []RestEndpointTest {
 			path:   "/transactions/" + transactionId,
 		},
 		{
+			name:   "getTransactionsByBlockID",
+			method: http.MethodGet,
+			path:   "/transactions?block_id=" + block.ID().String(),
+		},
+		{
 			name:   "createTransaction",
 			method: http.MethodPost,
 			path:   "/transactions",
@@ -429,6 +434,11 @@ func (s *ObserverSuite) getRestEndpoints() []RestEndpointTest {
 			name:   "getTransactionResultByID",
 			method: http.MethodGet,
 			path:   fmt.Sprintf("/transaction_results/%s?block_id=%s&collection_id=%s", transactionId, block.ID().String(), collection.ID().String()),
+		},
+		{
+			name:   "getTransactionResultsByBlock",
+			method: http.MethodGet,
+			path:   "/transaction_results?block_id=" + block.ID().String(),
 		},
 		{
 			name:   "getBlocksByIDs",

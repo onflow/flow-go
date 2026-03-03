@@ -268,17 +268,24 @@ func (suite *EpochLookupSuite) TestProtocolEvents_EpochExtended_SanityChecks() {
 			FinalView: suite.currEpoch.finalView + 100,
 		}
 
+		throwCalled := make(chan struct{})
 		ctx.On("Throw", mock.AnythingOfType("*errors.errorString")).Run(func(args mock.Arguments) {
 			err, ok := args.Get(0).(error)
 			assert.True(suite.T(), ok)
 			assert.Contains(suite.T(), err.Error(), fmt.Sprintf(invalidEpochViewSequence, extension.FirstView, suite.currEpoch.finalView))
+			close(throwCalled)
 		})
 
 		suite.lookup.EpochExtended(suite.currEpoch.epochCounter, nil, extension)
 
 		// wait for the protocol event to be processed (async)
 		assert.Eventually(suite.T(), func() bool {
-			return len(suite.lookup.epochEvents) == 0
+			select {
+			case <-throwCalled:
+				return len(suite.lookup.epochEvents) == 0
+			default:
+				return false
+			}
 		}, 2*time.Second, 50*time.Millisecond)
 	})
 }

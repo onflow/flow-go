@@ -94,7 +94,7 @@ func NewScripts(
 	options = append(options, fvm.WithBlocks(blocks)) // add blocks for getBlocks calls in scripts
 	options = append(options, fvm.WithMetricsReporter(metrics))
 	options = append(options, fvm.WithAllowProgramCacheWritesInScriptsEnabled(enableProgramCacheWrites))
-	vmCtx := fvm.NewContext(options...)
+	vmCtx := fvm.NewContext(chainID.Chain(), options...)
 
 	queryExecutor := query.NewQueryExecutor(
 		queryConf,

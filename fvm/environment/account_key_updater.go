@@ -362,10 +362,11 @@ func (updater *accountKeyUpdater) AddAccountKey(
 	}
 
 	accKey, err := updater.addAccountKey(
-		flow.ConvertAddress(runtimeAddress),
+		flow.Address(runtimeAddress),
 		publicKey,
 		hashAlgo,
-		weight)
+		weight,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("add account key failed: %w", err)
 	}
@@ -393,6 +394,7 @@ func (updater *accountKeyUpdater) RevokeAccountKey(
 	}
 
 	return updater.revokeAccountKey(
-		flow.ConvertAddress(runtimeAddress),
-		keyIndex)
+		flow.Address(runtimeAddress),
+		keyIndex,
+	)
 }
