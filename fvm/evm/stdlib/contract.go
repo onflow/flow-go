@@ -51,10 +51,14 @@ func ContractCode(
 	// Inject the contract_test_helpers.cdc code, only if we are
 	// bootstrapping the Flow Emulator chain.
 	if chainID == flow.Emulator {
-		evmContract = loadTestHelpersPattern.ReplaceAllString(
+		replaced := loadTestHelpersPattern.ReplaceAllLiteralString(
 			evmContract,
 			contractTestHelpers,
 		)
+		if replaced == evmContract {
+			panic("missing // `#loadTestHelpers` marker in contract.cdc")
+		}
+		evmContract = replaced
 	}
 
 	return []byte(evmContract)
