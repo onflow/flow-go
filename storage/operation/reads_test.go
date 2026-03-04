@@ -410,6 +410,10 @@ func TestFindHighestAtOrBelow(t *testing.T) {
 
 func TestPrefixExists(t *testing.T) {
 	dbtest.RunWithStorages(t, func(t *testing.T, r storage.Reader, withWriter dbtest.WithWriter) {
+		// Empty prefix should return an error.
+		_, err := operation.PrefixExists(r, []byte{}, storage.DefaultIteratorOptions())
+		require.Error(t, err)
+
 		prefix := []byte{0x10, 0x20}
 
 		// No keys with the prefix exist yet.

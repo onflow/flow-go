@@ -142,7 +142,9 @@ func (e *Engine) processTxResultErrorMessagesJob(ctx irrecoverable.SignalerConte
 
 	err = e.processErrorMessagesForBlock(ctx, header.ID())
 	if err != nil {
-		ctx.Throw(fmt.Errorf("failed to process transaction result error messages for block: %w", err))
+		if !errors.Is(err, context.Canceled) {
+			ctx.Throw(fmt.Errorf("failed to process transaction result error messages for block: %w", err))
+		}
 		return
 	}
 
@@ -194,6 +196,9 @@ func (e *Engine) processErrorMessagesForBlock(ctx context.Context, blockID flow.
 
 		err := e.txErrorMessagesCore.FetchErrorMessages(ctx, blockID)
 		if err != nil {
+			if errors.Is(err, context.Canceled) {
+				return err
+			}
 			if !isRetryableError(err) {
 				return fmt.Errorf("failed to fetch transaction result error messages: %w", err)
 			}
@@ -218,6 +223,9 @@ func (e *Engine) processErrorMessagesForBlock(ctx context.Context, blockID flow.
 // isRetryableError returns true if the error is retryable.
 // If this method returns false, the error is an exception and it should not be retried.
 func isRetryableError(err error) bool {
+	// this is permissive in that it will allow any grpc status error, including those that are not
+	// retryable. This is OK here since the backend will send requests across multiple execution nodes
+	// so retrying will generally result in a new set of nodes to try.
 	if _, ok := status.FromError(err); ok {
 		return true
 	}

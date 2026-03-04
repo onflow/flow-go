@@ -262,6 +262,62 @@ func (s *TxErrorMessagesEngineSuite) TestOnFinalizedBlock_NonRetryableError_Thro
 	}
 }
 
+// TestOnFinalizedBlock_ContextCancelled_NoThrow verifies that when the context is cancelled
+// during the processing of transaction error messages, the engine does NOT escalate the
+// cancellation via ctx.Throw and instead shuts down gracefully.
+func (s *TxErrorMessagesEngineSuite) TestOnFinalizedBlock_ContextCancelled_NoThrow() {
+	irrecoverableCtx, cancel := irrecoverable.NewMockSignalerContextWithCancel(s.T(), context.Background())
+
+	s.connFactory.On("GetExecutionAPIClient", mock.Anything).Return(s.execClient, &mockCloser{}, nil)
+	s.proto.snapshot.On("Identities", mock.Anything).Return(s.enNodeIDs, nil)
+	s.proto.state.On("AtBlockID", mock.Anything).Return(s.proto.snapshot)
+
+	// execClientCalled is closed when the exec client is first called,
+	// signaling that processing is underway and context.Canceled will be returned.
+	execClientCalled := make(chan struct{})
+	var once sync.Once
+	for _, b := range s.blockMap {
+		receipt1 := unittest.ReceiptForBlockFixture(b)
+		receipt1.ExecutorID = s.enNodeIDs.NodeIDs()[0]
+		receipt2 := unittest.ReceiptForBlockFixture(b)
+		receipt2.ExecutorID = s.enNodeIDs.NodeIDs()[0]
+		receipt1.ExecutionResult = receipt2.ExecutionResult
+		receipts := flow.ExecutionReceiptList{receipt1, receipt2}
+
+		// .Maybe() is required on per-block mocks: with processTxErrorMessagesWorkersCount
+		// concurrent workers and the context cancelled after the first exec client call,
+		// not all blocks are guaranteed to be reached before shutdown.
+		s.receipts.On("ByBlockID", b.ID()).
+			Return(func(flow.Identifier) (flow.ExecutionReceiptList, error) {
+				return receipts, nil
+			}).
+			Maybe()
+
+		s.txErrorMessages.On("Exists", b.ID()).Return(false, nil).Maybe()
+		blockID := b.ID()
+		exeEventReq := &execproto.GetTransactionErrorMessagesByBlockIDRequest{
+			BlockId: blockID[:],
+		}
+		s.execClient.On("GetTransactionErrorMessagesByBlockID", mock.Anything, exeEventReq).
+			Run(func(args mock.Arguments) {
+				once.Do(func() { close(execClientCalled) })
+			}).
+			Return(nil, context.Canceled).
+			Maybe()
+	}
+
+	eng := s.initEngine(irrecoverableCtx)
+
+	// Wait until processing has started (exec client was called at least once).
+	unittest.RequireCloseBefore(s.T(), execClientCalled, 2*time.Second, "expected processing to start before timeout")
+
+	// Cancel the context to trigger graceful shutdown.
+	cancel()
+
+	// Verify the engine shuts down cleanly.
+	unittest.RequireCloseBefore(s.T(), eng.Done(), 2*time.Second, "expected engine to stop before timeout")
+}
+
 // TestOnFinalizedBlockHandleTxErrorMessages tests the handling of transaction error messages
 // when a new finalized block is processed. It verifies that the engine fetches transaction
 // error messages from execution nodes and stores them in the database.

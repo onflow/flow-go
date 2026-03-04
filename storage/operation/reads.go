@@ -131,6 +131,10 @@ func KeyExists(r storage.Reader, key []byte) (exist bool, errToReturn error) {
 //
 // No errors are expected during normal operation.
 func PrefixExists(r storage.Reader, prefix []byte, opt storage.IteratorOption) (exist bool, errToReturn error) {
+	if len(prefix) == 0 {
+		return false, fmt.Errorf("prefix must not be empty")
+	}
+
 	iter, err := r.NewIter(prefix, prefix, opt)
 	if err != nil {
 		return false, fmt.Errorf("can not create iterator: %w", err)
