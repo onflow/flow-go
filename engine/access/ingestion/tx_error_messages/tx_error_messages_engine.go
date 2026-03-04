@@ -206,10 +206,11 @@ func (e *Engine) processErrorMessagesForBlock(ctx context.Context, blockID flow.
 					Uint64("attempt", uint64(attempt)).
 					Msgf("failed to fetch transaction result error messages. will retry")
 			}
+			return retry.RetryableError(err)
 		}
 		attempt++
 
-		return retry.RetryableError(err)
+		return nil
 	})
 }
 
