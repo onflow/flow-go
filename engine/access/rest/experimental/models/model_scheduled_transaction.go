@@ -35,6 +35,10 @@ type ScheduledTransaction struct {
 	CreatedTransactionId   string `json:"created_transaction_id"`
 	ExecutedTransactionId  string `json:"executed_transaction_id,omitempty"`
 	CancelledTransactionId string `json:"cancelled_transaction_id,omitempty"`
+	// RFC3339Nano timestamp of the block in which the scheduled transaction was created. Absent for placeholder transactions.
+	CreatedAt string `json:"created_at,omitempty"`
+	// RFC3339Nano timestamp of the block in which the scheduled transaction was executed or cancelled. Absent when still scheduled.
+	CompletedAt string `json:"completed_at,omitempty"`
 	// True if the scheduled transaction was created during bootstrapping based on the current chain state, not based on a protocol event. When true, block_height, transaction_id, tx_index, and event_index are absent.
 	IsPlaceholder   bool                            `json:"is_placeholder,omitempty"`
 	Transaction     *commonmodels.Transaction       `json:"transaction,omitempty"`

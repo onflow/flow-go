@@ -2,6 +2,7 @@ package extended
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -99,11 +100,11 @@ func (f *ScheduledTransactionFilter) Filter() storage.IndexFilter[*accessmodel.S
 type ScheduledTransactionsBackend struct {
 	*backendBase
 
-	log               zerolog.Logger
-	store             storage.ScheduledTransactionsIndexReader
-	scheduledTxLookup storage.ScheduledTransactionsReader
-	state             protocol.State
-	scriptExecutor    execution.ScriptExecutor
+	log                   zerolog.Logger
+	store                 storage.ScheduledTransactionsIndexReader
+	scheduledTransactions storage.ScheduledTransactionsReader
+	state                 protocol.State
+	scriptExecutor        execution.ScriptExecutor
 }
 
 // NewScheduledTransactionsBackend creates a new [ScheduledTransactionsBackend].
@@ -111,17 +112,17 @@ func NewScheduledTransactionsBackend(
 	log zerolog.Logger,
 	base *backendBase,
 	store storage.ScheduledTransactionsIndexReader,
-	scheduledTxLookup storage.ScheduledTransactionsReader,
+	scheduledTransactions storage.ScheduledTransactionsReader,
 	state protocol.State,
 	scriptExecutor execution.ScriptExecutor,
 ) *ScheduledTransactionsBackend {
 	return &ScheduledTransactionsBackend{
-		backendBase:       base,
-		log:               log,
-		store:             store,
-		scheduledTxLookup: scheduledTxLookup,
-		state:             state,
-		scriptExecutor:    scriptExecutor,
+		backendBase:           base,
+		log:                   log,
+		store:                 store,
+		scheduledTransactions: scheduledTransactions,
+		state:                 state,
+		scriptExecutor:        scriptExecutor,
 	}
 }
 
@@ -139,10 +140,6 @@ func (b *ScheduledTransactionsBackend) GetScheduledTransaction(
 	tx, err := b.store.ByID(id)
 	if err != nil {
 		return nil, mapReadError(ctx, "scheduled transaction", err)
-	}
-
-	if !expandOptions.HasExpand() {
-		return &tx, nil
 	}
 
 	if err := b.expand(ctx, &tx, expandOptions, encodingVersion); err != nil {
@@ -189,13 +186,10 @@ func (b *ScheduledTransactionsBackend) GetScheduledTransactions(
 		NextCursor:   nextCursor,
 	}
 
-	if !expandOptions.HasExpand() {
-		return page, nil
-	}
-
 	for i := range page.Transactions {
-		if err := b.expand(ctx, &page.Transactions[i], expandOptions, encodingVersion); err != nil {
-			err = fmt.Errorf("failed to expand scheduled transaction %d: %w", page.Transactions[i].ID, err)
+		tx := &page.Transactions[i]
+		if err := b.expand(ctx, tx, expandOptions, encodingVersion); err != nil {
+			err = fmt.Errorf("failed to expand scheduled transaction %d: %w", tx.ID, err)
 			irrecoverable.Throw(ctx, err)
 			return nil, err
 		}
@@ -240,19 +234,137 @@ func (b *ScheduledTransactionsBackend) GetScheduledTransactionsByAddress(
 		NextCursor:   nextCursor,
 	}
 
-	if !expandOptions.HasExpand() {
-		return page, nil
-	}
-
 	for i := range page.Transactions {
-		if err := b.expand(ctx, &page.Transactions[i], expandOptions, encodingVersion); err != nil {
-			err = fmt.Errorf("failed to expand scheduled transaction %d: %w", page.Transactions[i].ID, err)
+		tx := &page.Transactions[i]
+		if err := b.expand(ctx, tx, expandOptions, encodingVersion); err != nil {
+			err = fmt.Errorf("failed to expand scheduled transaction %d: %w", tx.ID, err)
 			irrecoverable.Throw(ctx, err)
 			return nil, err
 		}
 	}
 
 	return page, nil
+}
+
+// populateBlockTimestamps looks up the block headers for the creation and completion
+// transactions and sets CreatedAt and CompletedAt on the transaction.
+//
+// No error returns are expected during normal operation.
+func (b *ScheduledTransactionsBackend) populateBlockTimestamps(
+	tx *accessmodel.ScheduledTransaction,
+) (executedHeader *flow.Header, err error) {
+	// `CreatedTransactionID` may be empty if this scheduled transaction was backfilled
+	if tx.CreatedTransactionID != flow.ZeroID {
+		header, err := b.lookupAnyTransactionBlock(tx.CreatedTransactionID)
+		if err != nil && !errors.Is(err, storage.ErrNotFound) {
+			return nil, fmt.Errorf("failed to get creation block timestamp for scheduled tx %d: %w", tx.ID, err)
+		}
+		if err == nil {
+			tx.CreatedAt = header.Timestamp
+		}
+		// if the created transaction was not found, don't populate the timestamp, but continue to
+		// return a response. the created transaction ID will be populated, so it will be clear this
+		// information is not available yet.
+	}
+
+	switch tx.Status {
+	case accessmodel.ScheduledTxStatusExecuted, accessmodel.ScheduledTxStatusFailed:
+		header, err := b.lookupScheduledTransactionBlock(tx.ExecutedTransactionID)
+		if err != nil {
+			// if the scheduled transaction record was found in the extended index, then the scheduled
+			// transaction to block ID mapping must exist in storage.
+			err = irrecoverable.NewException(fmt.Errorf("failed to get completion block timestamp for scheduled tx %d: %w", tx.ID, err))
+			return nil, err
+		}
+		// Note: the executed transaction header must be found, so the method can guarantee a header
+		// is returned for all executed scheduled transactions if no error is encountered.
+		tx.CompletedAt = header.Timestamp
+		return header, nil
+
+	case accessmodel.ScheduledTxStatusCancelled:
+		header, err := b.lookupAnyTransactionBlock(tx.CancelledTransactionID)
+		if err != nil && !errors.Is(err, storage.ErrNotFound) {
+			return nil, fmt.Errorf("failed to get creation block timestamp for scheduled tx %d: %w", tx.ID, err)
+		}
+		if err == nil {
+			tx.CompletedAt = header.Timestamp
+		}
+		return nil, nil
+		// if the cancelled transaction was not found, don't populate the timestamp, but continue to
+		// return a response. the cancelled transaction ID will be populated, so it will be clear this
+		// information is not available yet.
+	}
+
+	return nil, nil
+}
+
+// lookupAnyTransactionBlock looks up the block timestamp for a transaction by its ID.
+// It supports both scheduled and standard transactions.
+//
+// Expected error returns during normal operation:
+//   - [storage.ErrNotFound]: if the transaction's block could not be resolved.
+func (b *ScheduledTransactionsBackend) lookupAnyTransactionBlock(txID flow.Identifier) (*flow.Header, error) {
+	header, err := b.lookupScheduledTransactionBlock(txID)
+	if err == nil {
+		return header, nil
+	}
+	if !errors.Is(err, storage.ErrNotFound) {
+		return nil, fmt.Errorf("failed to get block timestamp for scheduled tx %s: %w", txID, err)
+	}
+	// the transaction may not be a scheduled transaction, so try to look up the block for a
+	// standard transaction.
+
+	header, err = b.lookupStandardTransactionBlock(txID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get block timestamp for standard tx %s: %w", txID, err)
+	}
+
+	return header, nil
+}
+
+// lookupStandardTransactionBlock looks up the block timestamp for a standard transaction by its ID.
+//
+// Expected error returns during normal operation:
+//   - [storage.ErrNotFound]: if the transaction's block could not be resolved.
+func (b *ScheduledTransactionsBackend) lookupStandardTransactionBlock(txID flow.Identifier) (*flow.Header, error) {
+	collection, err := b.collections.LightByTransactionID(txID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get collection for tx: %w", err)
+	}
+	collectionID := collection.ID()
+
+	block, err := b.blocks.ByCollectionID(collectionID)
+	if err != nil {
+		// The txID → collectionID index (LightByTransactionID) and the collectionID → blockID index
+		// (checked here) are built by separate async components: the collection Indexer and
+		// the FinalizedBlockProcessor respectively. During catch-up or under load, the
+		// FinalizedBlockProcessor may lag behind, causing ErrNotFound here even though the
+		// collection is indexed. This is a transient state that resolves once finalization
+		// processing catches up.
+		//
+		// Note: this will also fail if the transaction is a system transaction.
+		return nil, fmt.Errorf("failed to get block ID for collection %s: %w", collectionID, err)
+	}
+	return block.ToHeader(), nil
+}
+
+// lookupScheduledTransactionBlock looks up the block timestamp for a scheduled transaction by its ID.
+//
+// Expected error returns during normal operation:
+//   - [storage.ErrNotFound]: if the scheduled transaction did not exist in storage.
+func (b *ScheduledTransactionsBackend) lookupScheduledTransactionBlock(txID flow.Identifier) (*flow.Header, error) {
+	blockID, err := b.scheduledTransactions.BlockIDByTransactionID(txID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get block ID for scheduled tx: %w", err)
+	}
+
+	header, err := b.headers.ByBlockID(blockID)
+	if err != nil {
+		// if the scheduled transaction was found, the block must exist in storage.
+		err = irrecoverable.NewException(fmt.Errorf("failed to get header for block %s: %w", blockID, err))
+		return nil, err
+	}
+	return header, nil
 }
 
 // expand enriches an executed scheduled transaction with its transaction result.
@@ -265,6 +377,12 @@ func (b *ScheduledTransactionsBackend) expand(
 	expandOptions ScheduledTransactionExpandOptions,
 	encodingVersion entities.EventEncodingVersion,
 ) error {
+	// always populate the block timestamps
+	executedHeader, err := b.populateBlockTimestamps(tx)
+	if err != nil {
+		return fmt.Errorf("failed to get block timestamp for scheduled tx %d: %w", tx.ID, err)
+	}
+
 	if expandOptions.HandlerContract {
 		err := b.expandHandlerContract(ctx, tx)
 		if err != nil {
@@ -281,43 +399,27 @@ func (b *ScheduledTransactionsBackend) expand(
 		return nil
 	}
 
-	txID, err := b.scheduledTxLookup.TransactionIDByID(tx.ID)
-	if err != nil {
-		// the transaction is marked as executed, so it must exist in storage.
-		return fmt.Errorf("failed to lookup transaction ID for scheduled tx %d: %w", tx.ID, err)
-	}
-
-	blockID, err := b.scheduledTxLookup.BlockIDByTransactionID(txID)
-	if err != nil {
-		return fmt.Errorf("failed to lookup block ID for tx %s: %w", txID, err)
-	}
-
-	header, err := b.headers.ByBlockID(blockID)
-	if err != nil {
-		return fmt.Errorf("failed to get header for block %s: %w", blockID, err)
-	}
-
 	if expandOptions.Transaction {
-		allScheduledTxs, err := b.transactionsProvider.ScheduledTransactionsByBlockID(ctx, header)
+		allScheduledTxs, err := b.transactionsProvider.ScheduledTransactionsByBlockID(ctx, executedHeader)
 		if err != nil {
 			return fmt.Errorf("could not retrieve all scheduled transactions: %w", err)
 		}
 
 		for _, scheduledTx := range allScheduledTxs {
-			if scheduledTx.ID() == txID {
+			if scheduledTx.ID() == tx.ExecutedTransactionID {
 				tx.Transaction = scheduledTx
 				break
 			}
 		}
 		if tx.Transaction == nil {
-			return fmt.Errorf("scheduled transaction %s not found in block %s", txID, blockID)
+			return fmt.Errorf("scheduled transaction %s not found in block %s", tx.ExecutedTransactionID, executedHeader.ID())
 		}
 	}
 
 	if expandOptions.Result {
-		result, err := b.getTransactionResult(ctx, txID, header, true, expandOptions.Transaction, encodingVersion)
+		result, err := b.getTransactionResult(ctx, tx.ExecutedTransactionID, executedHeader, true, expandOptions.Transaction, encodingVersion)
 		if err != nil {
-			return fmt.Errorf("failed to get transaction result for tx %s: %w", txID, err)
+			return fmt.Errorf("failed to get transaction result for tx %s: %w", tx.ExecutedTransactionID, err)
 		}
 		tx.Result = result
 	}

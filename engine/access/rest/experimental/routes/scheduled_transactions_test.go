@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/url"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	mocktestify "github.com/stretchr/testify/mock"
@@ -91,6 +92,7 @@ func testEncodeScheduledTxCursor(t *testing.T, id uint64) string {
 func TestGetScheduledTransactions(t *testing.T) {
 	handlerOwner := unittest.AddressFixture()
 
+	tx1CreatedAt := uint64(1700000000000) // Unix ms
 	tx1CreatedID := unittest.IdentifierFixture()
 	tx1 := accessmodel.ScheduledTransaction{
 		ID:                               100,
@@ -103,7 +105,10 @@ func TestGetScheduledTransactions(t *testing.T) {
 		TransactionHandlerUUID:           7,
 		Status:                           accessmodel.ScheduledTxStatusScheduled,
 		CreatedTransactionID:             tx1CreatedID,
+		CreatedAt:                        tx1CreatedAt,
 	}
+	tx2CreatedAt := uint64(1699999000000)  // Unix ms
+	tx2CompletedAt := uint64(1700001000000) // Unix ms
 	tx2CreatedID := unittest.IdentifierFixture()
 	tx2ExecutedID := unittest.IdentifierFixture()
 	tx2 := accessmodel.ScheduledTransaction{
@@ -118,6 +123,8 @@ func TestGetScheduledTransactions(t *testing.T) {
 		Status:                           accessmodel.ScheduledTxStatusExecuted,
 		CreatedTransactionID:             tx2CreatedID,
 		ExecutedTransactionID:            tx2ExecutedID,
+		CreatedAt:                        tx2CreatedAt,
+		CompletedAt:                      tx2CompletedAt,
 	}
 
 	t.Run("happy path with next cursor", func(t *testing.T) {
@@ -145,6 +152,9 @@ func TestGetScheduledTransactions(t *testing.T) {
 		assert.Equal(t, http.StatusOK, rr.Code)
 
 		expectedNextCursor := testEncodeScheduledTxCursor(t, 99)
+		tx1CreatedAtStr := time.UnixMilli(int64(tx1CreatedAt)).UTC().Format(time.RFC3339Nano)
+		tx2CreatedAtStr := time.UnixMilli(int64(tx2CreatedAt)).UTC().Format(time.RFC3339Nano)
+		tx2CompletedAtStr := time.UnixMilli(int64(tx2CompletedAt)).UTC().Format(time.RFC3339Nano)
 		expected := fmt.Sprintf(`{
 			"scheduled_transactions": [
 				{
@@ -158,6 +168,7 @@ func TestGetScheduledTransactions(t *testing.T) {
 					"transaction_handler_type_identifier": "A.0000.MyScheduler.Handler",
 					"transaction_handler_uuid": "7",
 					"created_transaction_id": "%s",
+					"created_at": "%s",
 					"_expandable": {
 						"handler_contract": "handler_contract"
 					}
@@ -174,6 +185,8 @@ func TestGetScheduledTransactions(t *testing.T) {
 					"transaction_handler_uuid": "8",
 					"created_transaction_id": "%s",
 					"executed_transaction_id": "%s",
+					"created_at": "%s",
+					"completed_at": "%s",
 					"_expandable": {
 						"transaction": "/v1/transactions/%s",
 						"result": "/v1/transaction_results/%s",
@@ -182,7 +195,9 @@ func TestGetScheduledTransactions(t *testing.T) {
 				}
 			],
 			"next_cursor": "%s"
-		}`, handlerOwner.String(), tx1CreatedID.String(), handlerOwner.String(), tx2CreatedID.String(), tx2ExecutedID.String(), tx2ExecutedID.String(), tx2ExecutedID.String(), expectedNextCursor)
+		}`, handlerOwner.String(), tx1CreatedID.String(), tx1CreatedAtStr,
+			handlerOwner.String(), tx2CreatedID.String(), tx2ExecutedID.String(), tx2CreatedAtStr, tx2CompletedAtStr,
+			tx2ExecutedID.String(), tx2ExecutedID.String(), expectedNextCursor)
 
 		assert.JSONEq(t, expected, rr.Body.String())
 	})
