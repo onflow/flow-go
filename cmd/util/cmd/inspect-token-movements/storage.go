@@ -245,11 +245,13 @@ func (ci *chunkInspector) inspectChunk(
 
 func (ci *chunkInspector) logInspectionResult(txID flow.Identifier, txIndex int, result inspection.Result) {
 	if result == nil {
+		ci.logger.Info().Msgf("no result from inspection, transaction did not trigger any token movements")
 		return
 	}
 
 	lvl, evt := result.AsLogEvent()
 	if evt == nil {
+		ci.logger.Info().Msgf("transaction did not trigger any token movements")
 		return
 	}
 
