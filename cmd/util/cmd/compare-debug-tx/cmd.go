@@ -117,10 +117,14 @@ func run(_ *cobra.Command, args []string) {
 	defer trace2.Close()
 
 	checkoutBranch(repoRoot, flagBranch1)
-	runAllBlocks(repoRoot, args, blockIDs, result1, trace1)
+	binary1 := buildUtil(repoRoot)
+	defer os.Remove(binary1)
+	runAllBlocks(binary1, args, blockIDs, result1, trace1)
 
 	checkoutBranch(repoRoot, flagBranch2)
-	runAllBlocks(repoRoot, args, blockIDs, result2, trace2)
+	binary2 := buildUtil(repoRoot)
+	defer os.Remove(binary2)
+	runAllBlocks(binary2, args, blockIDs, result2, trace2)
 
 	fmt.Printf("=== Result diff (%s vs %s) ===\n", flagBranch1, flagBranch2)
 	diffFiles(result1.Name(), result2.Name(), flagBranch1, flagBranch2)
@@ -133,9 +137,11 @@ func run(_ *cobra.Command, args []string) {
 // blockIDs is empty), up to flagParallel blocks concurrently. Results and traces from each
 // block are collected into per-block temp files and concatenated into resultDst and traceDst
 // in deterministic order after all blocks complete.
-func runAllBlocks(repoRoot string, txIDs []string, blockIDs []string, resultDst *os.File, traceDst *os.File) {
+func runAllBlocks(binaryPath string, txIDs []string, blockIDs []string, resultDst *os.File, traceDst *os.File) {
 	if len(blockIDs) == 0 {
-		runDebugTx(repoRoot, buildDebugTxArgs(txIDs, traceDst.Name(), ""), resultDst)
+		if err := runDebugTx(binaryPath, buildDebugTxArgs(txIDs, traceDst.Name(), ""), resultDst); err != nil {
+			log.Fatal().Err(err).Msg("failed to run debug-tx")
+		}
 		return
 	}
 
@@ -170,11 +176,12 @@ func runAllBlocks(repoRoot string, txIDs []string, blockIDs []string, resultDst 
 
 	for i, blockID := range blockIDs {
 		g.Go(func() error {
-			runDebugTx(repoRoot, buildDebugTxArgs(txIDs, files[i].trace.Name(), blockID), files[i].result)
-			return nil
+			return runDebugTx(binaryPath, buildDebugTxArgs(txIDs, files[i].trace.Name(), blockID), files[i].result)
 		})
 	}
-	_ = g.Wait()
+	if err := g.Wait(); err != nil {
+		log.Fatal().Err(err).Msg("failed to run debug-tx")
+	}
 
 	for _, f := range files {
 		if _, err := f.result.Seek(0, io.SeekStart); err != nil {
@@ -265,19 +272,33 @@ func checkoutBranch(repoRoot, branch string) {
 	}
 }
 
-// runDebugTx runs `go run -tags cadence_tracing ./cmd/util debug-tx` with fwdArgs in repoRoot,
-// directing stdout to resultDst and stderr to os.Stderr.
-//
-// No error returns are expected during normal operation.
-func runDebugTx(repoRoot string, fwdArgs []string, resultDst *os.File) {
-	goArgs := append([]string{"run", "-tags", "cadence_tracing", "./cmd/util", "debug-tx"}, fwdArgs...)
-	cmd := exec.Command("go", goArgs...)
+// buildUtil compiles `./cmd/util` with the cadence_tracing build tag in repoRoot,
+// writes the binary to a temp file, and returns its path. The caller is responsible
+// for removing the file when done.
+func buildUtil(repoRoot string) string {
+	binary, err := os.CreateTemp("", "compare-debug-tx-util-*")
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to create temp file for util binary")
+	}
+	binary.Close()
+
+	cmd := exec.Command("go", "build", "-tags", "cadence_tracing", "-o", binary.Name(), "./cmd/util")
 	cmd.Dir = repoRoot
-	cmd.Stdout = resultDst
 	cmd.Stderr = os.Stderr
 	if err := cmd.Run(); err != nil {
-		log.Fatal().Err(err).Msg("failed to run debug-tx")
+		log.Fatal().Err(err).Msg("failed to build util binary")
 	}
+
+	return binary.Name()
+}
+
+// runDebugTx runs the `debug-tx` subcommand of the prebuilt binaryPath with fwdArgs,
+// directing stdout to resultDst and stderr to os.Stderr.
+func runDebugTx(binaryPath string, fwdArgs []string, resultDst *os.File) error {
+	cmd := exec.Command(binaryPath, append([]string{"debug-tx"}, fwdArgs...)...)
+	cmd.Stdout = resultDst
+	cmd.Stderr = os.Stderr
+	return cmd.Run()
 }
 
 // buildDebugTxArgs assembles the flag arguments for the debug-tx command, appending
