@@ -197,6 +197,9 @@ func (td *TokenChanges) getTokens(
 				walkLoaded(interpreterValue, searchedTokens, tkns)
 			}
 		}
+		if len(tkns) > 0 {
+			logger.Debug().Str("module", "tc-inspector").Msgf("found tokens for %s: %v", a, tkns)
+		}
 		tokens[a] = tkns
 	}
 	return tokens, nil
