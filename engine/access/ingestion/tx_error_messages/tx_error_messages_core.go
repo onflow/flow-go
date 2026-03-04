@@ -54,10 +54,11 @@ func NewTxErrorMessagesCore(
 //
 // Expected error returns during normal operation:
 //   - [status.Error] if the GRPC call failed
+//   - [rpc.ErrNoENsFoundForExecutionResult] - if no execution nodes were found that produced the provided
+//     execution result and matched the operators criteria
 func (c *TxErrorMessagesCore) FetchErrorMessages(ctx context.Context, blockID flow.Identifier) error {
 	execNodes, err := c.execNodeIdentitiesProvider.ExecutionNodesForBlockID(ctx, blockID)
 	if err != nil {
-		c.log.Error().Err(err).Msg(fmt.Sprintf("failed to find execution nodes for block id: %s", blockID))
 		return fmt.Errorf("could not find execution nodes for block: %w", err)
 	}
 
