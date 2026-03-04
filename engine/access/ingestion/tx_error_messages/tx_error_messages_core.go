@@ -2,6 +2,7 @@ package tx_error_messages
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/jordanschalm/lockctx"
@@ -51,11 +52,8 @@ func NewTxErrorMessagesCore(
 // The function first checks if error messages for the given block ID are already present in storage.
 // If they are not, it fetches the messages from execution nodes and stores them.
 //
-// Parameters:
-// - ctx: The context for managing cancellation and deadlines during the operation.
-// - blockID: The identifier of the block for which transaction result error messages need to be processed.
-//
-// No errors are expected during normal operation.
+// Expected error returns during normal operation:
+//   - [status.Error] if the GRPC call failed
 func (c *TxErrorMessagesCore) FetchErrorMessages(ctx context.Context, blockID flow.Identifier) error {
 	execNodes, err := c.execNodeIdentitiesProvider.ExecutionNodesForBlockID(ctx, blockID)
 	if err != nil {
@@ -74,7 +72,8 @@ func (c *TxErrorMessagesCore) FetchErrorMessages(ctx context.Context, blockID fl
 // not protected by the protocol. Execution Error messages might be non-deterministic, i.e. potentially different
 // for different execution nodes. Hence, we also persist which execution node (`execNode) provided the error message.
 //
-// It returns [storage.ErrAlreadyExists] if tx result error messages for the block already exist.
+// Expected error returns during normal operation:
+//   - [status.Error] if the GRPC call failed
 func (c *TxErrorMessagesCore) FetchErrorMessagesByENs(
 	ctx context.Context,
 	blockID flow.Identifier,
@@ -105,6 +104,10 @@ func (c *TxErrorMessagesCore) FetchErrorMessagesByENs(
 	if len(resp) > 0 {
 		err = c.storeTransactionResultErrorMessages(blockID, resp, execNode)
 		if err != nil {
+			if errors.Is(err, storage.ErrAlreadyExists) {
+				// data for the block already exists. nothing to do.
+				return nil
+			}
 			return fmt.Errorf("could not store error messages (block: %s): %w", blockID, err)
 		}
 	}
@@ -115,7 +118,8 @@ func (c *TxErrorMessagesCore) FetchErrorMessagesByENs(
 // storeTransactionResultErrorMessages persists and indexes all transaction result error messages for the given blockID.
 // The caller must acquire [storage.LockInsertTransactionResultErrMessage] and hold it until the write batch has been committed.
 //
-// It returns [storage.ErrAlreadyExists] if tx result error messages for the block already exist.
+// Expected error returns during normal operation:
+//   - [storage.ErrAlreadyExists] if tx result error messages for the block already exist.
 func (c *TxErrorMessagesCore) storeTransactionResultErrorMessages(
 	blockID flow.Identifier,
 	errorMessagesResponses []*execproto.GetTransactionErrorMessagesResponse_Result,

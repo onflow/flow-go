@@ -193,8 +193,9 @@ func (e *Engine) processErrorMessagesForBlock(ctx context.Context, blockID flow.
 		}
 
 		err := e.txErrorMessagesCore.FetchErrorMessages(ctx, blockID)
-		if err != nil {
-			e.log.Debug().
+		if err != nil && attempt%20 == 0 {
+			// throttle logging to once every 20 attempts
+			e.log.Warn().
 				Err(err).
 				Str("block_id", blockID.String()).
 				Uint64("attempt", uint64(attempt)).
