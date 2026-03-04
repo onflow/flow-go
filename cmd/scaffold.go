@@ -920,7 +920,11 @@ func (fnb *FlowNodeBuilder) initLogger() error {
 	log = log.Level(zerolog.TraceLevel)
 
 	fnb.LogRegistry = logging.NewLogRegistry(fnb.LogWriter, lvl, staticConfig)
-	fnb.Logger = log
+
+	// setup the main logger under a default component. this ensures any logs emitted under the default
+	// logger remain at the set global level, even if there are other components with lower levels.
+	// for details on why this is necessary, see the LogRegistry documentation.
+	fnb.Logger = fnb.LogRegistry.Logger(log, "default")
 
 	return nil
 }

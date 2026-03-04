@@ -3,6 +3,7 @@ package common
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/rs/zerolog"
 
@@ -63,11 +64,14 @@ func (s *SetComponentLogLevelCommand) Validator(req *admin.CommandRequest) error
 		if len(pattern) > maxPatternLength {
 			return admin.NewInvalidAdminReqErrorf("pattern %q is too long (max %d characters)", pattern, maxPatternLength)
 		}
+		pattern = logging.NormalizePattern(strings.TrimSpace(pattern))
 		if pattern == "*" {
 			return admin.NewInvalidAdminReqErrorf("global wildcard \"*\" is not a valid when setting component level logging. use set-log-level instead")
 		}
+		if err := logging.ValidatePattern(logging.NormalizePattern(pattern)); err != nil {
+			return admin.NewInvalidAdminReqErrorf("invalid pattern %q: %w", pattern, err)
+		}
 
-		// pattern validation performed by [LogRegistry.SetLevel]
 		parsed = append(parsed, parsedComponentLevel{pattern: pattern, level: level})
 	}
 

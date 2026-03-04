@@ -49,7 +49,11 @@ type RegistryConfig struct {
 // same componentLevelWriter and automatically reflect level changes.
 //
 // The registry owns zerolog.SetGlobalLevel, maintaining it as the minimum of all configured
-// component levels to preserve zerolog's pre-creation event optimisation.
+// component levels to preserve zerolog's pre-creation event optimisation. A consequence of this is
+// that any logger NOT registered with the registry will emit logs at the lowest level of any
+// registered component, rather than the global default. To avoid this, the top-level node logger
+// should be registered under a "default" component so that its level is independently controlled
+// by a componentLevelWriter, regardless of what other components are configured to.
 //
 // All exported methods are safe for concurrent access.
 type LogRegistry struct {
