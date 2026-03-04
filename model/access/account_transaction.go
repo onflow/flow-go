@@ -74,8 +74,9 @@ type AccountTransaction struct {
 // AccountTransactionCursor identifies a position in the account transaction index for
 // cursor-based pagination. It corresponds to the last entry returned in a previous page.
 type AccountTransactionCursor struct {
-	BlockHeight      uint64 // Block height of the last returned entry
-	TransactionIndex uint32 // Transaction index within the block of the last returned entry
+	Address          flow.Address // Account address
+	BlockHeight      uint64       // Block height of the last returned entry
+	TransactionIndex uint32       // Transaction index within the block of the last returned entry
 }
 
 // AccountTransactionsPage represents a single page of account transaction results.

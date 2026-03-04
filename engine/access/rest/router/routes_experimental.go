@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/onflow/flow-go/engine/access/rest/experimental"
+	"github.com/onflow/flow-go/engine/access/rest/experimental/routes"
 )
 
 // Route defines an experimental API route.
@@ -19,5 +20,15 @@ var ExperimentalRoutes = []experimentalRoute{{
 	Method:  http.MethodGet,
 	Pattern: "/accounts/{address}/transactions",
 	Name:    "getAccountTransactions",
-	Handler: experimental.GetAccountTransactions,
+	Handler: routes.GetAccountTransactions,
+}, {
+	Method:  http.MethodGet,
+	Pattern: "/accounts/{address}/ft/transfers",
+	Name:    "getAccountFungibleTokenTransfers",
+	Handler: routes.GetAccountFungibleTokenTransfers,
+}, {
+	Method:  http.MethodGet,
+	Pattern: "/accounts/{address}/nft/transfers",
+	Name:    "getAccountNonFungibleTokenTransfers",
+	Handler: routes.GetAccountNonFungibleTokenTransfers,
 }}

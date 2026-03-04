@@ -68,8 +68,8 @@ func TestBootstrapper_PreBootstrapState(t *testing.T) {
 			assert.False(t, initialized)
 		})
 
-		t.Run("TransactionsByAddress returns ErrNotBootstrapped", func(t *testing.T) {
-			_, err := store.TransactionsByAddress(unittest.RandomAddressFixture(), 10, nil, nil)
+		t.Run("ByAddress returns ErrNotBootstrapped", func(t *testing.T) {
+			_, err := store.ByAddress(unittest.RandomAddressFixture(), nil)
 			require.ErrorIs(t, err, storage.ErrNotBootstrapped)
 		})
 	})
@@ -143,13 +143,14 @@ func TestBootstrapper_BootstrapWithData(t *testing.T) {
 			err = storeBootstrapperTx(t, store, storageDB, firstHeight, txData)
 			require.NoError(t, err)
 
-			page, err := store.TransactionsByAddress(account, 100, nil, nil)
+			iter, err := store.ByAddress(account, nil)
 			require.NoError(t, err)
-			require.Len(t, page.Transactions, 1)
-			assert.Equal(t, txID, page.Transactions[0].TransactionID)
-			assert.Equal(t, uint64(5), page.Transactions[0].BlockHeight)
-			assert.Equal(t, uint32(0), page.Transactions[0].TransactionIndex)
-			assert.Equal(t, []access.TransactionRole{access.TransactionRoleAuthorizer}, page.Transactions[0].Roles)
+			txs := collectAll(t, iter)
+			require.Len(t, txs, 1)
+			assert.Equal(t, txID, txs[0].TransactionID)
+			assert.Equal(t, uint64(5), txs[0].BlockHeight)
+			assert.Equal(t, uint32(0), txs[0].TransactionIndex)
+			assert.Equal(t, []access.TransactionRole{access.TransactionRoleAuthorizer}, txs[0].Roles)
 		})
 	})
 
@@ -185,18 +186,19 @@ func TestBootstrapper_BootstrapWithData(t *testing.T) {
 			})
 			require.NoError(t, err)
 
-			page, err := store.TransactionsByAddress(account, 100, nil, nil)
+			iter, err := store.ByAddress(account, nil)
 			require.NoError(t, err)
-			require.Len(t, page.Transactions, 2)
+			txs := collectAll(t, iter)
+			require.Len(t, txs, 2)
 
 			// Descending order: height 2 first, then height 1
-			assert.Equal(t, txID2, page.Transactions[0].TransactionID)
-			assert.Equal(t, uint64(2), page.Transactions[0].BlockHeight)
-			assert.Equal(t, []access.TransactionRole{access.TransactionRoleInteracted}, page.Transactions[0].Roles)
+			assert.Equal(t, txID2, txs[0].TransactionID)
+			assert.Equal(t, uint64(2), txs[0].BlockHeight)
+			assert.Equal(t, []access.TransactionRole{access.TransactionRoleInteracted}, txs[0].Roles)
 
-			assert.Equal(t, txID1, page.Transactions[1].TransactionID)
-			assert.Equal(t, uint64(1), page.Transactions[1].BlockHeight)
-			assert.Equal(t, []access.TransactionRole{access.TransactionRoleAuthorizer}, page.Transactions[1].Roles)
+			assert.Equal(t, txID1, txs[1].TransactionID)
+			assert.Equal(t, uint64(1), txs[1].BlockHeight)
+			assert.Equal(t, []access.TransactionRole{access.TransactionRoleAuthorizer}, txs[1].Roles)
 
 			latest, err := store.LatestIndexedHeight()
 			require.NoError(t, err)
@@ -264,10 +266,11 @@ func TestBootstrapper_PersistenceAcrossRestart(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, uint64(100), first)
 
-		page, err := store.TransactionsByAddress(account, 100, nil, nil)
+		iter, err := store.ByAddress(account, nil)
 		require.NoError(t, err)
-		require.Len(t, page.Transactions, 1)
-		assert.Equal(t, txID, page.Transactions[0].TransactionID)
+		txs := collectAll(t, iter)
+		require.Len(t, txs, 1)
+		assert.Equal(t, txID, txs[0].TransactionID)
 	})
 }
 

@@ -51,7 +51,9 @@ const (
 	// LockIndexScheduledTransaction protects the indexing of scheduled transactions.
 	LockIndexScheduledTransaction = "lock_index_scheduled_transaction"
 
-	LockIndexAccountTransactions = "lock_index_account_transactions"
+	LockIndexAccountTransactions       = "lock_index_account_transactions"
+	LockIndexFungibleTokenTransfers    = "lock_index_fungible_token_transfers"
+	LockIndexNonFungibleTokenTransfers = "lock_index_non_fungible_token_transfers"
 )
 
 // Locks returns a list of all named locks used by the storage layer.
@@ -79,6 +81,8 @@ func Locks() []string {
 		LockInsertLivenessData,
 		LockIndexScheduledTransaction,
 		LockIndexAccountTransactions,
+		LockIndexFungibleTokenTransfers,
+		LockIndexNonFungibleTokenTransfers,
 	}
 }
 
@@ -134,6 +138,8 @@ var LockGroupProtocolStateBootstrap = []string{
 
 var LockGroupAccessExtendedIndexers = []string{
 	LockIndexAccountTransactions,
+	LockIndexFungibleTokenTransfers,
+	LockIndexNonFungibleTokenTransfers,
 }
 
 // addLocks adds a chain of locks to the builder in the order they appear in the locks slice.

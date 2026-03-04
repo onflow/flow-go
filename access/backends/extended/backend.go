@@ -1,16 +1,21 @@
 package extended
 
 import (
+	"context"
+	"errors"
 	"fmt"
 
 	"github.com/rs/zerolog"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	"github.com/onflow/flow-go/engine/access/index"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/error_messages"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/provider"
-	"github.com/onflow/flow-go/engine/access/rpc/backend/transactions/status"
+	txstatus "github.com/onflow/flow-go/engine/access/rpc/backend/transactions/status"
 	"github.com/onflow/flow-go/model/access/systemcollection"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 )
@@ -29,9 +34,10 @@ func DefaultConfig() Config {
 	}
 }
 
-// Backend implements the extended API for querying account transactions.
+// Backend implements the extended API for querying account transactions and token transfers.
 type Backend struct {
 	*AccountTransactionsBackend
+	*AccountTransfersBackend
 
 	log zerolog.Logger
 }
@@ -44,6 +50,8 @@ func New(
 	config Config,
 	chainID flow.ChainID,
 	store storage.AccountTransactionsReader,
+	ftStore storage.FungibleTokenTransfersBootstrapper,
+	nftStore storage.NonFungibleTokenTransfersBootstrapper,
 	state protocol.State,
 	blocks storage.Blocks,
 	headers storage.Headers,
@@ -53,7 +61,7 @@ func New(
 	collections storage.CollectionsReader,
 	transactions storage.TransactionsReader,
 	scheduledTransactions storage.ScheduledTransactionsReader,
-	txStatusDeriver *status.TxStatusDeriver,
+	txStatusDeriver *txstatus.TxStatusDeriver,
 ) (*Backend, error) {
 	log = log.With().Str("component", "extended_backend").Logger()
 
@@ -74,18 +82,38 @@ func New(
 		chainID,
 	)
 
+	base := &backendBase{
+		config:                config,
+		headers:               headers,
+		collections:           collections,
+		transactions:          transactions,
+		scheduledTransactions: scheduledTransactions,
+		systemCollections:     systemCollections,
+		transactionsProvider:  transactionsProvider,
+	}
+
+	chain := chainID.Chain()
 	return &Backend{
-		log: log,
-		AccountTransactionsBackend: NewAccountTransactionsBackend(
-			log,
-			config,
-			store,
-			headers,
-			collections,
-			transactions,
-			scheduledTransactions,
-			systemCollections,
-			transactionsProvider,
-		),
+		log:                        log,
+		AccountTransactionsBackend: NewAccountTransactionsBackend(log, base, store, chain),
+		AccountTransfersBackend:    NewAccountTransfersBackend(log, base, ftStore, nftStore, chain),
 	}, nil
+}
+
+// mapReadError converts storage read errors to appropriate gRPC status errors.
+func mapReadError(ctx context.Context, label string, err error) error {
+	switch {
+	case errors.Is(err, storage.ErrNotBootstrapped):
+		return status.Errorf(codes.FailedPrecondition, "%s index not initialized: %v", label, err)
+	case errors.Is(err, storage.ErrHeightNotIndexed):
+		return status.Errorf(codes.OutOfRange, "requested height not indexed: %v", err)
+	case errors.Is(err, storage.ErrInvalidQuery):
+		return status.Errorf(codes.InvalidArgument, "invalid query: %v", err)
+	case errors.Is(err, storage.ErrNotFound):
+		return status.Errorf(codes.NotFound, "not found: %v", err)
+	default:
+		err = fmt.Errorf("failed to get %s: %w", label, err)
+		irrecoverable.Throw(ctx, err)
+		return err
+	}
 }
