@@ -205,6 +205,11 @@ func (ci *chunkInspector) inspectChunk(
 
 	// Execute each transaction and inspect
 	for i, tx := range transactions {
+		ci.logger.Info().
+			Int("tx_index", i).
+			Hex("tx_id", tx.ID[:]).
+			Msg("executing transaction")
+
 		executionSnapshot, output, err := ci.vm.Run(
 			ctx,
 			tx,
