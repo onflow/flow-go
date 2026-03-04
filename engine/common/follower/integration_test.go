@@ -157,6 +157,17 @@ func runTestFollowerHappyPath(t *testing.T) {
 		followerLoop.Start(mockCtx)
 		engine.Start(mockCtx)
 		allReady := moduleutil.AllReady(engine, followerLoop)
+		defer func() {
+			cancel()
+
+			allDone := moduleutil.AllDone(engine, followerLoop)
+			synctest.Wait()
+			select {
+			case <-allDone:
+			default:
+				t.Fatal("engine failed to stop")
+			}
+		}()
 
 		// Wait until all startup goroutines have settled, then verify readiness.
 		synctest.Wait()
@@ -241,20 +252,13 @@ func runTestFollowerHappyPath(t *testing.T) {
 
 		// Block until the target block is finalized. The callback above fires from within the
 		// HotStuff finalization goroutine (inside the bubble) and sends on this channel, which
-		// unblocks the main goroutine. This replaces the original require.Eventually polling loop.
+		// unblocks the main goroutine.
 		<-finalized
 
 		// stop producers and wait for them to exit, then wait for engine shutdown.
 		submittingBlocks.Store(false)
-		cancel()
 
-		allDone := moduleutil.AllDone(engine, followerLoop)
-		synctest.Wait()
-		select {
-		case <-allDone:
-		default:
-			t.Fatal("engine failed to stop")
-		}
 		// Note: in case any error occur, the `mockCtx` will fail the test, due to the unexpected call of `Throw` on the mock.
+		// shutdown is in defer
 	})
 }
