@@ -3,6 +3,7 @@ package models
 import (
 	"fmt"
 	"strconv"
+	"time"
 
 	commonmodels "github.com/onflow/flow-go/engine/access/rest/common/models"
 	accessmodel "github.com/onflow/flow-go/model/access"
@@ -54,6 +55,13 @@ func (t *ScheduledTransaction) Build(
 	}
 
 	t.IsPlaceholder = tx.IsPlaceholder
+
+	if tx.CreatedAt != 0 {
+		t.CreatedAt = time.UnixMilli(int64(tx.CreatedAt)).UTC().Format(time.RFC3339Nano)
+	}
+	if tx.CompletedAt != 0 {
+		t.CompletedAt = time.UnixMilli(int64(tx.CompletedAt)).UTC().Format(time.RFC3339Nano)
+	}
 
 	t.Expandable = new(ScheduledTransactionExpandable)
 

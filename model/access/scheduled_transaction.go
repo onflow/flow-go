@@ -122,6 +122,10 @@ type ScheduledTransaction struct {
 	Transaction     *flow.TransactionBody `msgpack:"-"` // Transaction body (nil unless expanded)
 	Result          *TransactionResult    `msgpack:"-"` // Transaction result (nil unless expanded)
 	HandlerContract *ContractDeployment   `msgpack:"-"` // Handler contract (nil unless expanded)
+
+	// Timestamp fields are populated by the backend. Never persisted. Zero when not applicable.
+	CreatedAt   uint64 `msgpack:"-"` // Unix ms timestamp of block in which the scheduled transaction was created
+	CompletedAt uint64 `msgpack:"-"` // Unix ms timestamp of block in which the scheduled transaction was executed or cancelled
 }
 
 func (tx *ScheduledTransaction) HandlerContractID() (string, error) {

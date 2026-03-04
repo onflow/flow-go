@@ -91,6 +91,7 @@ func New(
 	base := &backendBase{
 		config:                config,
 		headers:               headers,
+		blocks:                blocks,
 		collections:           collections,
 		transactions:          transactions,
 		scheduledTransactions: scheduledTransactions,

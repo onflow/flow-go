@@ -13,6 +13,7 @@ import (
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/indexes/iterator"
 	"github.com/onflow/flow-go/storage/operation"
+	"github.com/onflow/flow-go/utils/visited"
 )
 
 const (
@@ -212,7 +213,12 @@ func (idx *ScheduledTransactionsIndex) Store(
 //   - [storage.ErrAlreadyExists]: if any scheduled transaction ID already exists
 func storeAllScheduledTransactions(rw storage.ReaderBatchWriter, scheduledTxs []access.ScheduledTransaction) error {
 	writer := rw.Writer()
+	seen := visited.New[uint64]()
 	for _, tx := range scheduledTxs {
+		if seen.Visit(tx.ID) {
+			return fmt.Errorf("scheduled transaction %d appears more than once in batch: %w", tx.ID, storage.ErrAlreadyExists)
+		}
+
 		primaryKey := makeScheduledTxPrimaryKey(tx.ID)
 
 		exists, err := operation.KeyExists(rw.GlobalReader(), primaryKey)

@@ -365,29 +365,70 @@ func TestScheduledTransactionsBackend_GetScheduledTransaction(t *testing.T) {
 		require.Error(t, err)
 	})
 
-	// expand is no-op for scheduled and cancelled statuses
-	for _, status := range []accessmodel.ScheduledTransactionStatus{accessmodel.ScheduledTxStatusScheduled, accessmodel.ScheduledTxStatusCancelled} {
-		t.Run(fmt.Sprintf("expand is no-op for %s status", status), func(t *testing.T) {
-			store := storagemock.NewScheduledTransactionsIndexReader(t)
-			backend := NewScheduledTransactionsBackend(
-				unittest.Logger(), &backendBase{config: defaultConfig},
-				store, nil, nil, nil, nil,
-			)
+	// expand is no-op for scheduled status (no block lookups, no result/transaction populated)
+	t.Run("expand is no-op for scheduled status", func(t *testing.T) {
+		store := storagemock.NewScheduledTransactionsIndexReader(t)
+		backend := NewScheduledTransactionsBackend(
+			unittest.Logger(), &backendBase{config: defaultConfig},
+			store, nil, nil, nil, nil,
+		)
 
-			tx := accessmodel.ScheduledTransaction{ID: 1, Status: status}
-			store.On("ByID", uint64(1)).Return(tx, nil).Once()
+		tx := accessmodel.ScheduledTransaction{ID: 1, Status: accessmodel.ScheduledTxStatusScheduled}
+		store.On("ByID", uint64(1)).Return(tx, nil).Once()
 
-			// expand options set but status is Scheduled: no storage lookups expected
-			result, err := backend.GetScheduledTransaction(
-				context.Background(), 1,
-				ScheduledTransactionExpandOptions{Result: true, Transaction: true},
-				defaultEncoding,
-			)
-			require.NoError(t, err)
-			assert.Nil(t, result.Transaction)
-			assert.Nil(t, result.Result)
-		})
-	}
+		// expand options set but status is Scheduled: no storage lookups expected
+		result, err := backend.GetScheduledTransaction(
+			context.Background(), 1,
+			ScheduledTransactionExpandOptions{Result: true, Transaction: true},
+			defaultEncoding,
+		)
+		require.NoError(t, err)
+		assert.Nil(t, result.Transaction)
+		assert.Nil(t, result.Result)
+	})
+
+	// for cancelled status: block timestamps are looked up, but result/transaction are not expanded
+	t.Run("expand is no-op for result/transaction on cancelled status", func(t *testing.T) {
+		store := storagemock.NewScheduledTransactionsIndexReader(t)
+		scheduledTxLookup := storagemock.NewScheduledTransactionsReader(t)
+		mockCollections := storagemock.NewCollectionsReader(t)
+		mockBlocks := storagemock.NewBlocks(t)
+
+		cancelledTxID := unittest.IdentifierFixture()
+		cancelledCollection := &flow.LightCollection{Transactions: []flow.Identifier{cancelledTxID}}
+		cancelledBlock := unittest.BlockFixture()
+
+		backend := NewScheduledTransactionsBackend(
+			unittest.Logger(),
+			&backendBase{
+				config:      defaultConfig,
+				collections: mockCollections,
+				blocks:      mockBlocks,
+			},
+			store, nil, scheduledTxLookup, nil, nil,
+		)
+
+		tx := accessmodel.ScheduledTransaction{
+			ID:                     1,
+			Status:                 accessmodel.ScheduledTxStatusCancelled,
+			CancelledTransactionID: cancelledTxID,
+		}
+		store.On("ByID", uint64(1)).Return(tx, nil).Once()
+		// CancelledTransactionID is a user tx: not in scheduled lookup, falls back to collection
+		scheduledTxLookup.On("BlockIDByTransactionID", cancelledTxID).Return(flow.Identifier{}, storage.ErrNotFound).Once()
+		mockCollections.On("LightByTransactionID", cancelledTxID).Return(cancelledCollection, nil).Once()
+		mockBlocks.On("ByCollectionID", cancelledCollection.ID()).Return(cancelledBlock, nil).Once()
+
+		result, err := backend.GetScheduledTransaction(
+			context.Background(), 1,
+			ScheduledTransactionExpandOptions{Result: true, Transaction: true},
+			defaultEncoding,
+		)
+		require.NoError(t, err)
+		assert.Equal(t, cancelledBlock.Timestamp, result.CompletedAt)
+		assert.Nil(t, result.Transaction)
+		assert.Nil(t, result.Result)
+	})
 
 	// expand result works for executed and failed transactions
 	for _, status := range []accessmodel.ScheduledTransactionStatus{accessmodel.ScheduledTxStatusExecuted, accessmodel.ScheduledTxStatusFailed} {
@@ -411,7 +452,7 @@ func TestScheduledTransactionsBackend_GetScheduledTransaction(t *testing.T) {
 			blockHeader := unittest.BlockHeaderFixture()
 			blockID := blockHeader.ID()
 
-			storedTx := accessmodel.ScheduledTransaction{ID: 1, Status: status}
+			storedTx := accessmodel.ScheduledTransaction{ID: 1, Status: status, ExecutedTransactionID: txID}
 			expectedResult := &accessmodel.TransactionResult{
 				TransactionID: txID,
 				BlockID:       blockID,
@@ -419,7 +460,6 @@ func TestScheduledTransactionsBackend_GetScheduledTransaction(t *testing.T) {
 			}
 
 			store.On("ByID", uint64(1)).Return(storedTx, nil).Once()
-			scheduledTxLookup.On("TransactionIDByID", uint64(1)).Return(txID, nil).Once()
 			scheduledTxLookup.On("BlockIDByTransactionID", txID).Return(blockID, nil).Once()
 			mockHeaders.On("ByBlockID", blockID).Return(blockHeader, nil).Once()
 			mockProvider.On("TransactionResult", mocktestify.Anything, blockHeader, txID, mocktestify.Anything, defaultEncoding).
@@ -460,10 +500,9 @@ func TestScheduledTransactionsBackend_GetScheduledTransaction(t *testing.T) {
 			blockHeader := unittest.BlockHeaderFixture()
 			blockID := blockHeader.ID()
 
-			storedTx := accessmodel.ScheduledTransaction{ID: 1, Status: status}
+			storedTx := accessmodel.ScheduledTransaction{ID: 1, Status: status, ExecutedTransactionID: txID}
 
 			store.On("ByID", uint64(1)).Return(storedTx, nil).Once()
-			scheduledTxLookup.On("TransactionIDByID", uint64(1)).Return(txID, nil).Once()
 			scheduledTxLookup.On("BlockIDByTransactionID", txID).Return(blockID, nil).Once()
 			mockHeaders.On("ByBlockID", blockID).Return(blockHeader, nil).Once()
 			mockProvider.On("ScheduledTransactionsByBlockID", mocktestify.Anything, blockHeader).
@@ -517,7 +556,76 @@ func TestScheduledTransactionsBackend_GetScheduledTransaction(t *testing.T) {
 		assert.Equal(t, contractBody, result.HandlerContract.Code)
 	})
 
-	t.Run("TransactionIDByID error during expand triggers irrecoverable", func(t *testing.T) {
+	t.Run("created tx block not yet available returns zero CreatedAt", func(t *testing.T) {
+		store := storagemock.NewScheduledTransactionsIndexReader(t)
+		scheduledTxLookup := storagemock.NewScheduledTransactionsReader(t)
+		mockCollections := storagemock.NewCollectionsReader(t)
+		mockBlocks := storagemock.NewBlocks(t)
+
+		backend := NewScheduledTransactionsBackend(
+			unittest.Logger(),
+			&backendBase{
+				config:      defaultConfig,
+				collections: mockCollections,
+				blocks:      mockBlocks,
+			},
+			store, nil, scheduledTxLookup, nil, nil,
+		)
+
+		createdTxID := unittest.IdentifierFixture()
+		createdCollection := &flow.LightCollection{Transactions: []flow.Identifier{createdTxID}}
+		storedTx := accessmodel.ScheduledTransaction{
+			ID:                   1,
+			Status:               accessmodel.ScheduledTxStatusScheduled,
+			CreatedTransactionID: createdTxID,
+		}
+
+		store.On("ByID", uint64(1)).Return(storedTx, nil).Once()
+		scheduledTxLookup.On("BlockIDByTransactionID", createdTxID).Return(flow.Identifier{}, storage.ErrNotFound).Once()
+		mockCollections.On("LightByTransactionID", createdTxID).Return(createdCollection, nil).Once()
+		// block not yet indexed by FinalizedBlockProcessor
+		mockBlocks.On("ByCollectionID", createdCollection.ID()).Return((*flow.Block)(nil), storage.ErrNotFound).Once()
+
+		result, err := backend.GetScheduledTransaction(context.Background(), 1, ScheduledTransactionExpandOptions{}, defaultEncoding)
+		require.NoError(t, err)
+		assert.Zero(t, result.CreatedAt)
+	})
+
+	t.Run("cancelled tx block not yet available returns zero CompletedAt", func(t *testing.T) {
+		store := storagemock.NewScheduledTransactionsIndexReader(t)
+		scheduledTxLookup := storagemock.NewScheduledTransactionsReader(t)
+		mockCollections := storagemock.NewCollectionsReader(t)
+		mockBlocks := storagemock.NewBlocks(t)
+
+		backend := NewScheduledTransactionsBackend(
+			unittest.Logger(),
+			&backendBase{
+				config:      defaultConfig,
+				collections: mockCollections,
+				blocks:      mockBlocks,
+			},
+			store, nil, scheduledTxLookup, nil, nil,
+		)
+
+		cancelledTxID := unittest.IdentifierFixture()
+		cancelledCollection := &flow.LightCollection{Transactions: []flow.Identifier{cancelledTxID}}
+		storedTx := accessmodel.ScheduledTransaction{
+			ID:                     1,
+			Status:                 accessmodel.ScheduledTxStatusCancelled,
+			CancelledTransactionID: cancelledTxID,
+		}
+
+		store.On("ByID", uint64(1)).Return(storedTx, nil).Once()
+		scheduledTxLookup.On("BlockIDByTransactionID", cancelledTxID).Return(flow.Identifier{}, storage.ErrNotFound).Once()
+		mockCollections.On("LightByTransactionID", cancelledTxID).Return(cancelledCollection, nil).Once()
+		mockBlocks.On("ByCollectionID", cancelledCollection.ID()).Return((*flow.Block)(nil), storage.ErrNotFound).Once()
+
+		result, err := backend.GetScheduledTransaction(context.Background(), 1, ScheduledTransactionExpandOptions{}, defaultEncoding)
+		require.NoError(t, err)
+		assert.Zero(t, result.CompletedAt)
+	})
+
+	t.Run("BlockIDByTransactionID error during populateBlockTimestamps triggers irrecoverable", func(t *testing.T) {
 		store := storagemock.NewScheduledTransactionsIndexReader(t)
 		scheduledTxLookup := storagemock.NewScheduledTransactionsReader(t)
 
@@ -526,11 +634,12 @@ func TestScheduledTransactionsBackend_GetScheduledTransaction(t *testing.T) {
 			store, nil, scheduledTxLookup, nil, nil,
 		)
 
-		storedTx := accessmodel.ScheduledTransaction{ID: 1, Status: accessmodel.ScheduledTxStatusExecuted}
+		txID := unittest.IdentifierFixture()
+		storedTx := accessmodel.ScheduledTransaction{ID: 1, Status: accessmodel.ScheduledTxStatusExecuted, ExecutedTransactionID: txID}
 		lookupErr := fmt.Errorf("lookup error")
 
 		store.On("ByID", uint64(1)).Return(storedTx, nil).Once()
-		scheduledTxLookup.On("TransactionIDByID", uint64(1)).Return(flow.Identifier{}, lookupErr).Once()
+		scheduledTxLookup.On("BlockIDByTransactionID", txID).Return(flow.Identifier{}, lookupErr).Once()
 
 		signalerCtx, verifyThrown := signalerCtxExpectingThrow(t)
 
@@ -551,11 +660,10 @@ func TestScheduledTransactionsBackend_GetScheduledTransaction(t *testing.T) {
 		)
 
 		txID := unittest.IdentifierFixture()
-		storedTx := accessmodel.ScheduledTransaction{ID: 1, Status: accessmodel.ScheduledTxStatusExecuted}
+		storedTx := accessmodel.ScheduledTransaction{ID: 1, Status: accessmodel.ScheduledTxStatusExecuted, ExecutedTransactionID: txID}
 		blockLookupErr := fmt.Errorf("block lookup error")
 
 		store.On("ByID", uint64(1)).Return(storedTx, nil).Once()
-		scheduledTxLookup.On("TransactionIDByID", uint64(1)).Return(txID, nil).Once()
 		scheduledTxLookup.On("BlockIDByTransactionID", txID).Return(flow.Identifier{}, blockLookupErr).Once()
 
 		signalerCtx, verifyThrown := signalerCtxExpectingThrow(t)
@@ -579,11 +687,10 @@ func TestScheduledTransactionsBackend_GetScheduledTransaction(t *testing.T) {
 
 		txID := unittest.IdentifierFixture()
 		blockID := unittest.IdentifierFixture()
-		storedTx := accessmodel.ScheduledTransaction{ID: 1, Status: accessmodel.ScheduledTxStatusExecuted}
+		storedTx := accessmodel.ScheduledTransaction{ID: 1, Status: accessmodel.ScheduledTxStatusExecuted, ExecutedTransactionID: txID}
 		headerErr := fmt.Errorf("header lookup error")
 
 		store.On("ByID", uint64(1)).Return(storedTx, nil).Once()
-		scheduledTxLookup.On("TransactionIDByID", uint64(1)).Return(txID, nil).Once()
 		scheduledTxLookup.On("BlockIDByTransactionID", txID).Return(blockID, nil).Once()
 		mockHeaders.On("ByBlockID", blockID).Return((*flow.Header)(nil), headerErr).Once()
 
@@ -615,11 +722,10 @@ func TestScheduledTransactionsBackend_GetScheduledTransaction(t *testing.T) {
 		txID := unittest.IdentifierFixture()
 		blockHeader := unittest.BlockHeaderFixture()
 		blockID := blockHeader.ID()
-		storedTx := accessmodel.ScheduledTransaction{ID: 1, Status: accessmodel.ScheduledTxStatusExecuted}
+		storedTx := accessmodel.ScheduledTransaction{ID: 1, Status: accessmodel.ScheduledTxStatusExecuted, ExecutedTransactionID: txID}
 		providerErr := fmt.Errorf("provider error")
 
 		store.On("ByID", uint64(1)).Return(storedTx, nil).Once()
-		scheduledTxLookup.On("TransactionIDByID", uint64(1)).Return(txID, nil).Once()
 		scheduledTxLookup.On("BlockIDByTransactionID", txID).Return(blockID, nil).Once()
 		mockHeaders.On("ByBlockID", blockID).Return(blockHeader, nil).Once()
 		mockProvider.On("ScheduledTransactionsByBlockID", mocktestify.Anything, blockHeader).
@@ -654,12 +760,11 @@ func TestScheduledTransactionsBackend_GetScheduledTransaction(t *testing.T) {
 		txID := unittest.IdentifierFixture()
 		blockHeader := unittest.BlockHeaderFixture()
 		blockID := blockHeader.ID()
-		storedTx := accessmodel.ScheduledTransaction{ID: 1, Status: accessmodel.ScheduledTxStatusExecuted}
+		storedTx := accessmodel.ScheduledTransaction{ID: 1, Status: accessmodel.ScheduledTxStatusExecuted, ExecutedTransactionID: txID}
 		// otherTxBody.ID() != txID
 		otherTxBody := unittest.TransactionBodyFixture()
 
 		store.On("ByID", uint64(1)).Return(storedTx, nil).Once()
-		scheduledTxLookup.On("TransactionIDByID", uint64(1)).Return(txID, nil).Once()
 		scheduledTxLookup.On("BlockIDByTransactionID", txID).Return(blockID, nil).Once()
 		mockHeaders.On("ByBlockID", blockID).Return(blockHeader, nil).Once()
 		mockProvider.On("ScheduledTransactionsByBlockID", mocktestify.Anything, blockHeader).
@@ -693,11 +798,10 @@ func TestScheduledTransactionsBackend_GetScheduledTransaction(t *testing.T) {
 		txID := unittest.IdentifierFixture()
 		blockHeader := unittest.BlockHeaderFixture()
 		blockID := blockHeader.ID()
-		storedTx := accessmodel.ScheduledTransaction{ID: 1, Status: accessmodel.ScheduledTxStatusExecuted}
+		storedTx := accessmodel.ScheduledTransaction{ID: 1, Status: accessmodel.ScheduledTxStatusExecuted, ExecutedTransactionID: txID}
 		resultErr := fmt.Errorf("result lookup error")
 
 		store.On("ByID", uint64(1)).Return(storedTx, nil).Once()
-		scheduledTxLookup.On("TransactionIDByID", uint64(1)).Return(txID, nil).Once()
 		scheduledTxLookup.On("BlockIDByTransactionID", txID).Return(blockID, nil).Once()
 		mockHeaders.On("ByBlockID", blockID).Return(blockHeader, nil).Once()
 		mockProvider.On("TransactionResult", mocktestify.Anything, blockHeader, txID, mocktestify.Anything, defaultEncoding).
@@ -912,7 +1016,7 @@ func TestScheduledTransactionsBackend_GetScheduledTransactions(t *testing.T) {
 
 		txs := []accessmodel.ScheduledTransaction{
 			{ID: 5, Status: accessmodel.ScheduledTxStatusScheduled},
-			{ID: 3, Status: accessmodel.ScheduledTxStatusExecuted},
+			{ID: 3, Status: accessmodel.ScheduledTxStatusScheduled},
 		}
 
 		store.On("All", (*accessmodel.ScheduledTransactionCursor)(nil)).
@@ -938,7 +1042,7 @@ func TestScheduledTransactionsBackend_GetScheduledTransactions(t *testing.T) {
 		// limit=2, provide 3 items: CollectResults collects 2, then peeks at item 3 to build cursor
 		txs := []accessmodel.ScheduledTransaction{
 			{ID: 5, Status: accessmodel.ScheduledTxStatusScheduled},
-			{ID: 3, Status: accessmodel.ScheduledTxStatusExecuted},
+			{ID: 3, Status: accessmodel.ScheduledTxStatusScheduled},
 			{ID: 1, Status: accessmodel.ScheduledTxStatusScheduled},
 		}
 
@@ -1102,14 +1206,15 @@ func TestScheduledTransactionsBackend_GetScheduledTransactions(t *testing.T) {
 			store, nil, scheduledTxLookup, nil, nil,
 		)
 
+		txID := unittest.IdentifierFixture()
 		txs := []accessmodel.ScheduledTransaction{
-			{ID: 1, Status: accessmodel.ScheduledTxStatusExecuted},
+			{ID: 1, Status: accessmodel.ScheduledTxStatusExecuted, ExecutedTransactionID: txID},
 		}
 		lookupErr := fmt.Errorf("lookup failed")
 
 		store.On("All", (*accessmodel.ScheduledTransactionCursor)(nil)).
 			Return(makeScheduledTxIter(txs), nil).Once()
-		scheduledTxLookup.On("TransactionIDByID", uint64(1)).Return(flow.Identifier{}, lookupErr).Once()
+		scheduledTxLookup.On("BlockIDByTransactionID", txID).Return(flow.Identifier{}, lookupErr).Once()
 
 		signalerCtx, verifyThrown := signalerCtxExpectingThrow(t)
 
@@ -1120,6 +1225,44 @@ func TestScheduledTransactionsBackend_GetScheduledTransactions(t *testing.T) {
 		)
 		require.Error(t, err)
 		verifyThrown()
+	})
+
+	t.Run("tx block not yet available returns zero timestamps", func(t *testing.T) {
+		store := storagemock.NewScheduledTransactionsIndexReader(t)
+		scheduledTxLookup := storagemock.NewScheduledTransactionsReader(t)
+		mockCollections := storagemock.NewCollectionsReader(t)
+		mockBlocks := storagemock.NewBlocks(t)
+
+		backend := NewScheduledTransactionsBackend(
+			unittest.Logger(),
+			&backendBase{
+				config:      defaultConfig,
+				collections: mockCollections,
+				blocks:      mockBlocks,
+			},
+			store, nil, scheduledTxLookup, nil, nil,
+		)
+
+		createdTxID := unittest.IdentifierFixture()
+		createdCollection := &flow.LightCollection{Transactions: []flow.Identifier{createdTxID}}
+		txs := []accessmodel.ScheduledTransaction{
+			{ID: 1, Status: accessmodel.ScheduledTxStatusScheduled, CreatedTransactionID: createdTxID},
+		}
+
+		store.On("All", (*accessmodel.ScheduledTransactionCursor)(nil)).
+			Return(makeScheduledTxIter(txs), nil).Once()
+		scheduledTxLookup.On("BlockIDByTransactionID", createdTxID).Return(flow.Identifier{}, storage.ErrNotFound).Once()
+		mockCollections.On("LightByTransactionID", createdTxID).Return(createdCollection, nil).Once()
+		mockBlocks.On("ByCollectionID", createdCollection.ID()).Return((*flow.Block)(nil), storage.ErrNotFound).Once()
+
+		page, err := backend.GetScheduledTransactions(
+			context.Background(), 0, nil,
+			ScheduledTransactionFilter{}, ScheduledTransactionExpandOptions{},
+			defaultEncoding,
+		)
+		require.NoError(t, err)
+		require.Len(t, page.Transactions, 1)
+		assert.Zero(t, page.Transactions[0].CreatedAt)
 	})
 }
 
@@ -1293,14 +1436,15 @@ func TestScheduledTransactionsBackend_GetScheduledTransactionsByAddress(t *testi
 		)
 
 		addr := unittest.RandomAddressFixture()
+		txID := unittest.IdentifierFixture()
 		txs := []accessmodel.ScheduledTransaction{
-			{ID: 1, Status: accessmodel.ScheduledTxStatusExecuted},
+			{ID: 1, Status: accessmodel.ScheduledTxStatusExecuted, ExecutedTransactionID: txID},
 		}
 		lookupErr := fmt.Errorf("lookup failed")
 
 		store.On("ByAddress", addr, (*accessmodel.ScheduledTransactionCursor)(nil)).
 			Return(makeScheduledTxIter(txs), nil).Once()
-		scheduledTxLookup.On("TransactionIDByID", uint64(1)).Return(flow.Identifier{}, lookupErr).Once()
+		scheduledTxLookup.On("BlockIDByTransactionID", txID).Return(flow.Identifier{}, lookupErr).Once()
 
 		signalerCtx, verifyThrown := signalerCtxExpectingThrow(t)
 
@@ -1309,6 +1453,259 @@ func TestScheduledTransactionsBackend_GetScheduledTransactionsByAddress(t *testi
 			ScheduledTransactionFilter{}, ScheduledTransactionExpandOptions{Result: true},
 			defaultEncoding,
 		)
+		require.Error(t, err)
+		verifyThrown()
+	})
+
+	t.Run("tx block not yet available returns zero timestamps", func(t *testing.T) {
+		store := storagemock.NewScheduledTransactionsIndexReader(t)
+		scheduledTxLookup := storagemock.NewScheduledTransactionsReader(t)
+		mockCollections := storagemock.NewCollectionsReader(t)
+		mockBlocks := storagemock.NewBlocks(t)
+
+		backend := NewScheduledTransactionsBackend(
+			unittest.Logger(),
+			&backendBase{
+				config:      defaultConfig,
+				collections: mockCollections,
+				blocks:      mockBlocks,
+			},
+			store, nil, scheduledTxLookup, nil, nil,
+		)
+
+		addr := unittest.RandomAddressFixture()
+		createdTxID := unittest.IdentifierFixture()
+		createdCollection := &flow.LightCollection{Transactions: []flow.Identifier{createdTxID}}
+		txs := []accessmodel.ScheduledTransaction{
+			{ID: 1, Status: accessmodel.ScheduledTxStatusScheduled, CreatedTransactionID: createdTxID},
+		}
+
+		store.On("ByAddress", addr, (*accessmodel.ScheduledTransactionCursor)(nil)).
+			Return(makeScheduledTxIter(txs), nil).Once()
+		scheduledTxLookup.On("BlockIDByTransactionID", createdTxID).Return(flow.Identifier{}, storage.ErrNotFound).Once()
+		mockCollections.On("LightByTransactionID", createdTxID).Return(createdCollection, nil).Once()
+		mockBlocks.On("ByCollectionID", createdCollection.ID()).Return((*flow.Block)(nil), storage.ErrNotFound).Once()
+
+		page, err := backend.GetScheduledTransactionsByAddress(
+			context.Background(), addr, 0, nil,
+			ScheduledTransactionFilter{}, ScheduledTransactionExpandOptions{},
+			defaultEncoding,
+		)
+		require.NoError(t, err)
+		require.Len(t, page.Transactions, 1)
+		assert.Zero(t, page.Transactions[0].CreatedAt)
+	})
+}
+
+// TestScheduledTransactionsBackend_PopulateBlockTimestamps verifies that populateBlockTimestamps
+// correctly resolves CreatedAt and CompletedAt from the stored transaction IDs.
+func TestScheduledTransactionsBackend_PopulateBlockTimestamps(t *testing.T) {
+	t.Parallel()
+
+	defaultConfig := DefaultConfig()
+	defaultEncoding := entities.EventEncodingVersion_JSON_CDC_V0
+
+	// helper builds a full backend with all mocks configured
+	makeBackend := func(
+		store *storagemock.ScheduledTransactionsIndexReader,
+		scheduledTxLookup *storagemock.ScheduledTransactionsReader,
+		mockHeaders *storagemock.Headers,
+		mockCollections *storagemock.CollectionsReader,
+		mockBlocks *storagemock.Blocks,
+	) *ScheduledTransactionsBackend {
+		return NewScheduledTransactionsBackend(
+			unittest.Logger(),
+			&backendBase{
+				config:      defaultConfig,
+				headers:     mockHeaders,
+				blocks:      mockBlocks,
+				collections: mockCollections,
+			},
+			store, nil, scheduledTxLookup, nil, nil,
+		)
+	}
+
+	t.Run("created_at populated for non-placeholder tx with CreatedTransactionID", func(t *testing.T) {
+		store := storagemock.NewScheduledTransactionsIndexReader(t)
+		scheduledTxLookup := storagemock.NewScheduledTransactionsReader(t)
+		mockCollections := storagemock.NewCollectionsReader(t)
+		mockBlocks := storagemock.NewBlocks(t)
+		backend := makeBackend(store, scheduledTxLookup, nil, mockCollections, mockBlocks)
+
+		createdTxID := unittest.IdentifierFixture()
+		collection := &flow.LightCollection{Transactions: []flow.Identifier{createdTxID}}
+		block := unittest.BlockFixture()
+
+		storedTx := accessmodel.ScheduledTransaction{
+			ID:                   1,
+			Status:               accessmodel.ScheduledTxStatusScheduled,
+			CreatedTransactionID: createdTxID,
+		}
+
+		store.On("ByID", uint64(1)).Return(storedTx, nil).Once()
+		// createdTxID is a user transaction: not in scheduled tx lookup, falls back to collection
+		scheduledTxLookup.On("BlockIDByTransactionID", createdTxID).Return(flow.Identifier{}, storage.ErrNotFound).Once()
+		mockCollections.On("LightByTransactionID", createdTxID).Return(collection, nil).Once()
+		mockBlocks.On("ByCollectionID", collection.ID()).Return(block, nil).Once()
+
+		result, err := backend.GetScheduledTransaction(context.Background(), 1, ScheduledTransactionExpandOptions{}, defaultEncoding)
+		require.NoError(t, err)
+		assert.Equal(t, block.Timestamp, result.CreatedAt)
+		assert.Zero(t, result.CompletedAt)
+	})
+
+	t.Run("created_at absent for placeholder tx", func(t *testing.T) {
+		store := storagemock.NewScheduledTransactionsIndexReader(t)
+		scheduledTxLookup := storagemock.NewScheduledTransactionsReader(t)
+		backend := makeBackend(store, scheduledTxLookup, nil, nil, nil)
+
+		storedTx := accessmodel.ScheduledTransaction{
+			ID:            1,
+			Status:        accessmodel.ScheduledTxStatusScheduled,
+			IsPlaceholder: true,
+		}
+
+		store.On("ByID", uint64(1)).Return(storedTx, nil).Once()
+		// no lookups expected: placeholder tx skips CreatedAt, Scheduled status skips CompletedAt
+
+		result, err := backend.GetScheduledTransaction(context.Background(), 1, ScheduledTransactionExpandOptions{}, defaultEncoding)
+		require.NoError(t, err)
+		assert.Zero(t, result.CreatedAt)
+		assert.Zero(t, result.CompletedAt)
+	})
+
+	t.Run("completed_at populated for executed tx via scheduledTxLookup", func(t *testing.T) {
+		store := storagemock.NewScheduledTransactionsIndexReader(t)
+		scheduledTxLookup := storagemock.NewScheduledTransactionsReader(t)
+		mockHeaders := storagemock.NewHeaders(t)
+		mockCollections := storagemock.NewCollectionsReader(t)
+		mockBlocks := storagemock.NewBlocks(t)
+		backend := makeBackend(store, scheduledTxLookup, mockHeaders, mockCollections, mockBlocks)
+
+		createdTxID := unittest.IdentifierFixture()
+		executedTxID := unittest.IdentifierFixture()
+		createdCollection := &flow.LightCollection{Transactions: []flow.Identifier{createdTxID}}
+		createdBlock := unittest.BlockFixture()
+		executedBlockHeader := unittest.BlockHeaderFixture()
+		executedBlockID := executedBlockHeader.ID()
+
+		storedTx := accessmodel.ScheduledTransaction{
+			ID:                    1,
+			Status:                accessmodel.ScheduledTxStatusExecuted,
+			CreatedTransactionID:  createdTxID,
+			ExecutedTransactionID: executedTxID,
+		}
+
+		store.On("ByID", uint64(1)).Return(storedTx, nil).Once()
+		// createdTxID is a user transaction: scheduledTxLookup returns ErrNotFound, falls back to collection
+		scheduledTxLookup.On("BlockIDByTransactionID", createdTxID).Return(flow.Identifier{}, storage.ErrNotFound).Once()
+		mockCollections.On("LightByTransactionID", createdTxID).Return(createdCollection, nil).Once()
+		mockBlocks.On("ByCollectionID", createdCollection.ID()).Return(createdBlock, nil).Once()
+		// executedTxID is a system transaction: scheduledTxLookup succeeds
+		scheduledTxLookup.On("BlockIDByTransactionID", executedTxID).Return(executedBlockID, nil).Once()
+		mockHeaders.On("ByBlockID", executedBlockID).Return(executedBlockHeader, nil).Once()
+
+		result, err := backend.GetScheduledTransaction(context.Background(), 1, ScheduledTransactionExpandOptions{}, defaultEncoding)
+		require.NoError(t, err)
+		assert.Equal(t, createdBlock.Timestamp, result.CreatedAt)
+		assert.Equal(t, executedBlockHeader.Timestamp, result.CompletedAt)
+	})
+
+	t.Run("completed_at populated for cancelled tx via collection lookup", func(t *testing.T) {
+		store := storagemock.NewScheduledTransactionsIndexReader(t)
+		scheduledTxLookup := storagemock.NewScheduledTransactionsReader(t)
+		mockCollections := storagemock.NewCollectionsReader(t)
+		mockBlocks := storagemock.NewBlocks(t)
+		backend := makeBackend(store, scheduledTxLookup, nil, mockCollections, mockBlocks)
+
+		createdTxID := unittest.IdentifierFixture()
+		cancelledTxID := unittest.IdentifierFixture()
+		createdCollection := &flow.LightCollection{Transactions: []flow.Identifier{createdTxID}}
+		cancelledCollection := &flow.LightCollection{Transactions: []flow.Identifier{cancelledTxID}}
+		createdBlock := unittest.BlockFixture()
+		cancelledBlock := unittest.BlockFixture()
+
+		storedTx := accessmodel.ScheduledTransaction{
+			ID:                     1,
+			Status:                 accessmodel.ScheduledTxStatusCancelled,
+			CreatedTransactionID:   createdTxID,
+			CancelledTransactionID: cancelledTxID,
+		}
+
+		store.On("ByID", uint64(1)).Return(storedTx, nil).Once()
+		// both are user transactions: not in scheduled tx lookup, fall back to collection
+		scheduledTxLookup.On("BlockIDByTransactionID", createdTxID).Return(flow.Identifier{}, storage.ErrNotFound).Once()
+		mockCollections.On("LightByTransactionID", createdTxID).Return(createdCollection, nil).Once()
+		mockBlocks.On("ByCollectionID", createdCollection.ID()).Return(createdBlock, nil).Once()
+		scheduledTxLookup.On("BlockIDByTransactionID", cancelledTxID).Return(flow.Identifier{}, storage.ErrNotFound).Once()
+		mockCollections.On("LightByTransactionID", cancelledTxID).Return(cancelledCollection, nil).Once()
+		mockBlocks.On("ByCollectionID", cancelledCollection.ID()).Return(cancelledBlock, nil).Once()
+
+		result, err := backend.GetScheduledTransaction(context.Background(), 1, ScheduledTransactionExpandOptions{}, defaultEncoding)
+		require.NoError(t, err)
+		assert.Equal(t, createdBlock.Timestamp, result.CreatedAt)
+		assert.Equal(t, cancelledBlock.Timestamp, result.CompletedAt)
+	})
+
+	t.Run("collection lookup error for created tx triggers irrecoverable", func(t *testing.T) {
+		store := storagemock.NewScheduledTransactionsIndexReader(t)
+		scheduledTxLookup := storagemock.NewScheduledTransactionsReader(t)
+		mockCollections := storagemock.NewCollectionsReader(t)
+		backend := makeBackend(store, scheduledTxLookup, nil, mockCollections, nil)
+
+		createdTxID := unittest.IdentifierFixture()
+		lookupErr := fmt.Errorf("collection lookup error")
+
+		storedTx := accessmodel.ScheduledTransaction{
+			ID:                   1,
+			Status:               accessmodel.ScheduledTxStatusScheduled,
+			CreatedTransactionID: createdTxID,
+		}
+
+		store.On("ByID", uint64(1)).Return(storedTx, nil).Once()
+		// not in scheduled lookup, falls back to collection which errors
+		scheduledTxLookup.On("BlockIDByTransactionID", createdTxID).Return(flow.Identifier{}, storage.ErrNotFound).Once()
+		mockCollections.On("LightByTransactionID", createdTxID).Return((*flow.LightCollection)(nil), lookupErr).Once()
+
+		signalerCtx, verifyThrown := signalerCtxExpectingThrow(t)
+
+		_, err := backend.GetScheduledTransaction(signalerCtx, 1, ScheduledTransactionExpandOptions{}, defaultEncoding)
+		require.Error(t, err)
+		verifyThrown()
+	})
+
+	t.Run("BlockIDByTransactionID error for executed tx triggers irrecoverable", func(t *testing.T) {
+		store := storagemock.NewScheduledTransactionsIndexReader(t)
+		scheduledTxLookup := storagemock.NewScheduledTransactionsReader(t)
+		mockCollections := storagemock.NewCollectionsReader(t)
+		mockBlocks := storagemock.NewBlocks(t)
+		mockHeaders := storagemock.NewHeaders(t)
+		backend := makeBackend(store, scheduledTxLookup, mockHeaders, mockCollections, mockBlocks)
+
+		createdTxID := unittest.IdentifierFixture()
+		executedTxID := unittest.IdentifierFixture()
+		createdCollection := &flow.LightCollection{Transactions: []flow.Identifier{createdTxID}}
+		createdBlock := unittest.BlockFixture()
+		lookupErr := fmt.Errorf("block lookup error")
+
+		storedTx := accessmodel.ScheduledTransaction{
+			ID:                    1,
+			Status:                accessmodel.ScheduledTxStatusExecuted,
+			CreatedTransactionID:  createdTxID,
+			ExecutedTransactionID: executedTxID,
+		}
+
+		store.On("ByID", uint64(1)).Return(storedTx, nil).Once()
+		// createdTxID falls back to collection
+		scheduledTxLookup.On("BlockIDByTransactionID", createdTxID).Return(flow.Identifier{}, storage.ErrNotFound).Once()
+		mockCollections.On("LightByTransactionID", createdTxID).Return(createdCollection, nil).Once()
+		mockBlocks.On("ByCollectionID", createdCollection.ID()).Return(createdBlock, nil).Once()
+		// executedTxID lookup returns an unexpected error
+		scheduledTxLookup.On("BlockIDByTransactionID", executedTxID).Return(flow.Identifier{}, lookupErr).Once()
+
+		signalerCtx, verifyThrown := signalerCtxExpectingThrow(t)
+
+		_, err := backend.GetScheduledTransaction(signalerCtx, 1, ScheduledTransactionExpandOptions{}, defaultEncoding)
 		require.Error(t, err)
 		verifyThrown()
 	})

@@ -20,6 +20,7 @@ type backendBase struct {
 	config Config
 
 	headers               storage.Headers
+	blocks                storage.Blocks
 	collections           storage.CollectionsReader
 	transactions          storage.TransactionsReader
 	scheduledTransactions storage.ScheduledTransactionsReader
