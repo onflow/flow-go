@@ -88,7 +88,7 @@ func (a *AccountTransactions) NextHeight() (uint64, error) {
 //
 // The caller must hold the [storage.LockIndexAccountTransactions] lock until the batch is committed.
 //
-// Not safe for concurrent use.
+// CAUTION: Not safe for concurrent use.
 //
 // Expected error returns during normal operations:
 //   - [ErrAlreadyIndexed]: if the data is already indexed for the height.

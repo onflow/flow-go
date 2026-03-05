@@ -231,18 +231,6 @@ func (c *IndexerCore) IndexBlockData(data *execution_data.BlockExecutionDataEnti
 		return nil
 	})
 
-	// Index account transactions if enabled
-	if c.extendedIndexer != nil {
-		g.Go(func() error {
-			err := c.extendedIndexer.IndexBlockExecutionData(data)
-			if err != nil {
-				return fmt.Errorf("could not index extended block data: %w", err)
-			}
-
-			return nil
-		})
-	}
-
 	g.Go(func() error {
 		start := time.Now()
 
@@ -294,6 +282,15 @@ func (c *IndexerCore) IndexBlockData(data *execution_data.BlockExecutionDataEnti
 	err = g.Wait()
 	if err != nil {
 		return fmt.Errorf("failed to index block data at height %d: %w", header.Height, err)
+	}
+
+	// Notify the extended indexer after all other indexing (including register writing) has
+	// completed. This ordering is required because some extended indexers (e.g. contracts) read
+	// from the register index when processing blocks, so the registers must be committed first.
+	if c.extendedIndexer != nil {
+		if err := c.extendedIndexer.IndexBlockExecutionData(data); err != nil {
+			return fmt.Errorf("could not index extended block data: %w", err)
+		}
 	}
 
 	c.metrics.BlockIndexed(header.Height, time.Since(start), eventCount, registerCount, resultCount)

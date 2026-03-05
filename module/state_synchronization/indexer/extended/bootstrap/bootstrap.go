@@ -24,6 +24,7 @@ type Storage struct {
 	FungibleTokenTransfersBootstrapper    storage.FungibleTokenTransfersBootstrapper
 	NonFungibleTokenTransfersBootstrapper storage.NonFungibleTokenTransfersBootstrapper
 	ScheduledTransactionsBootstrapper     storage.ScheduledTransactionsIndexBootstrapper
+	ContractDeploymentsBootstrapper       storage.ContractDeploymentsIndexBootstrapper
 }
 
 // OpenExtendedIndexDB opens the pebble database for extended indexes and creates the account
@@ -78,12 +79,21 @@ func OpenExtendedIndexDB(
 		return Storage{}, fmt.Errorf("could not create scheduled transactions index: %w", err)
 	}
 
+	contractDeploymentsStore, err := indexes.NewContractDeploymentsBootstrapper(indexerStorageDB, sealedRootHeight)
+	if err != nil {
+		if closeErr := indexerDB.Close(); closeErr != nil {
+			log.Error().Err(closeErr).Msg("error closing indexer db")
+		}
+		return Storage{}, fmt.Errorf("could not create contract deployments index: %w", err)
+	}
+
 	return Storage{
 		DB:                                    indexerStorageDB,
 		AccountTransactionsBootstrapper:       accountTxStore,
 		FungibleTokenTransfersBootstrapper:    ftStore,
 		NonFungibleTokenTransfersBootstrapper: nftStore,
 		ScheduledTransactionsBootstrapper:     scheduledTxStore,
+		ContractDeploymentsBootstrapper:       contractDeploymentsStore,
 	}, nil
 }
 
@@ -100,6 +110,7 @@ func BootstrapIndexers(
 	events storage.Events,
 	results storage.LightTransactionResults,
 	scriptExecutor execution.ScriptExecutor,
+	registers storage.RegisterIndex,
 	backfillDelay time.Duration,
 ) (*extended.ExtendedIndexer, error) {
 	accountTransactions, err := extended.NewAccountTransactions(
@@ -136,11 +147,20 @@ func BootstrapIndexers(
 		chainID,
 	)
 
+	contracts := extended.NewContracts(
+		log,
+		extendedStorage.ContractDeploymentsBootstrapper,
+		registers,
+		scriptExecutor,
+		extendedMetrics,
+	)
+
 	extendedIndexers := []extended.Indexer{
 		accountTransactions,
 		ftTransfers,
 		nftTransfers,
 		scheduledTransactions,
+		contracts,
 	}
 
 	extendedIndexer, err := extended.NewExtendedIndexer(

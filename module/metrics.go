@@ -843,6 +843,10 @@ type ExtendedIndexingMetrics interface {
 
 	// NFTTransferIndexed records the number of non-fungible token transfers indexed for a single block.
 	NFTTransferIndexed(count int)
+
+	// ContractDeploymentIndexed records the number of contract deployments indexed for a single block,
+	// broken down by action (create vs update).
+	ContractDeploymentIndexed(created, updated int)
 }
 
 type TransactionErrorMessagesMetrics interface {

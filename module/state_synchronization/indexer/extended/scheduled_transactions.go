@@ -132,6 +132,10 @@ func (s *ScheduledTransactions) NextHeight() (uint64, error) {
 // IndexBlockData processes one block's events and transactions, and updates the scheduled
 // transactions index.
 //
+// The caller must hold the [storage.LockIndexScheduledTransactionsIndex] lock until the batch is committed.
+//
+// CAUTION: Not safe for concurrent use.
+//
 // Expected error returns during normal operations:
 //   - [ErrAlreadyIndexed]: if the data is already indexed for the height
 //   - [ErrFutureHeight]: if the data is for a future height
@@ -221,7 +225,7 @@ func (s *ScheduledTransactions) IndexBlockData(lctx lockctx.Proof, data BlockDat
 	}
 
 	s.metrics.ScheduledTransactionIndexed(
-		len(collected.newTxs)-len(missingIDs),
+		len(newTxs)-len(missingIDs),
 		len(collected.executedEntries),
 		len(collected.failedEntries),
 		len(collected.canceledEntries),

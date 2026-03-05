@@ -10,34 +10,6 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
-// we will have a secondary (optional) indexer that runs on ANs.
-// it will have a configurable set of indexes.
-// only supports sealed data (no forks)
-// each index has its own start/end range
-// each index supports independent backfilling
-
-// nice to have:
-// - 2 backfill modes: from start height, bi-directional (starts from current height onwards, then backfills in reverse order)
-
-// Design:
-// collection of indexers
-// each indexer has its own state
-// indexes are backfilled until they reach the latest block
-// all blocks that can be indexed from the latest are indexed.
-
-// ExtendedIndexer indexes data for optional, non-core access indexes, including
-// - transactions
-// - transfers
-// - creation
-// - contract updates
-
-// AccountsAPI
-// /accounts/v1/account/{address}/transactions
-// /accounts/v1/account/{address}/transfers
-// /accounts/v1/account/{address}/lineage
-
-// /accounts/v1/contract/{address}
-
 var (
 	ErrAlreadyIndexed = errors.New("data already indexed for height")
 	ErrFutureHeight   = errors.New("cannot index future height")
@@ -56,7 +28,7 @@ type Indexer interface {
 	// IndexBlockData indexes the block data for the given height.
 	// If the header in `data` does not match the expected height, an error is returned.
 	//
-	// Not safe for concurrent use.
+	// CAUTION: Not safe for concurrent use.
 	//
 	// Expected error returns during normal operations:
 	//   - [ErrAlreadyIndexed]: if the data is already indexed for the height.

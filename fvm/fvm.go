@@ -302,6 +302,25 @@ func GetAccountKey(
 	return accountKey, nil
 }
 
+// GetAccountCode returns contract code by location or an error if none exists.
+func GetAccountCode(
+	ctx Context,
+	location common.AddressLocation,
+	storageSnapshot snapshot.StorageSnapshot,
+) (
+	[]byte,
+	error,
+) {
+	scriptEnv, _ := getScriptEnvironment(ctx, storageSnapshot)
+	code, err := scriptEnv.GetAccountContractCode(location)
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to get account code (%s): %w", location.String(), err)
+	}
+
+	return code, nil
+}
+
 // Helper function to initialize common components.
 func getScriptEnvironment(
 	ctx Context,

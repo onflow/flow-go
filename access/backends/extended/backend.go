@@ -40,6 +40,7 @@ type Backend struct {
 	*AccountTransactionsBackend
 	*AccountTransfersBackend
 	*ScheduledTransactionsBackend
+	*ContractsBackend
 
 	log zerolog.Logger
 }
@@ -64,6 +65,7 @@ func New(
 	transactions storage.TransactionsReader,
 	scheduledTransactions storage.ScheduledTransactionsReader,
 	scheduledTxIndex storage.ScheduledTransactionsIndexReader,
+	contractsIndex storage.ContractDeploymentsIndexReader,
 	txStatusDeriver *txstatus.TxStatusDeriver,
 	scriptExecutor execution.ScriptExecutor,
 ) (*Backend, error) {
@@ -102,7 +104,8 @@ func New(
 		log:                          log,
 		AccountTransactionsBackend:   NewAccountTransactionsBackend(log, base, store, chain),
 		AccountTransfersBackend:      NewAccountTransfersBackend(log, base, ftStore, nftStore, chain),
-		ScheduledTransactionsBackend: NewScheduledTransactionsBackend(log, base, scheduledTxIndex, scheduledTransactions, state, scriptExecutor),
+		ScheduledTransactionsBackend: NewScheduledTransactionsBackend(log, base, scheduledTxIndex, contractsIndex, scheduledTransactions, state, scriptExecutor),
+		ContractsBackend:             NewContractsBackend(log, base, contractsIndex),
 	}, nil
 }
 

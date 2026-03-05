@@ -1671,6 +1671,7 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 					utils.NotNil(builder.events),
 					utils.NotNil(builder.lightTransactionResults),
 					utils.NotNil(builder.ScriptExecutor),
+					utils.NotNil(builder.Storage.RegisterIndex),
 					builder.extendedIndexingBackfillDelay,
 				)
 				if err != nil {
@@ -2210,6 +2211,7 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 				utils.NotNil(node.Storage.Transactions),
 				builder.scheduledTransactions,
 				builder.ExtendedStorage.ScheduledTransactionsBootstrapper,
+				builder.ExtendedStorage.ContractDeploymentsBootstrapper,
 				txstatus.NewTxStatusDeriver(node.State, builder.lastFullBlockHeight),
 				builder.ScriptExecutor,
 			)
