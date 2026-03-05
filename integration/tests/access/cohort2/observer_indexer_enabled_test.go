@@ -457,6 +457,32 @@ func (s *ObserverIndexerEnabledSuite) TestAllObserverIndexedRPCsHappyPath() {
 		return res.ExecutionResult, err
 	})
 
+	// GetExecutionReceiptsByBlockID
+	checkRPC(func(client accessproto.AccessAPIClient) (any, error) {
+		res, err := client.GetExecutionReceiptsByBlockID(ctx, &accessproto.GetExecutionReceiptsByBlockIDRequest{
+			BlockId: blockWithAccount.Block.Id,
+		})
+		if err != nil {
+			return nil, err
+		}
+		return res.Receipts, nil
+	})
+
+	// GetExecutionReceiptsByResultID
+	checkRPC(func(client accessproto.AccessAPIClient) (any, error) {
+		converted, err := convert.MessageToBlock(blockWithAccount.Block)
+		require.NoError(t, err)
+
+		resultId := converted.Payload.Results[0].ID()
+		res, err := client.GetExecutionReceiptsByResultID(ctx, &accessproto.GetExecutionReceiptsByResultIDRequest{
+			ResultId: convert.IdentifierToMessage(resultId),
+		})
+		if err != nil {
+			return nil, err
+		}
+		return res.Receipts, nil
+	})
+
 	// GetTransaction
 	checkRPC(func(client accessproto.AccessAPIClient) (any, error) {
 		res, err := client.GetTransaction(ctx, &accessproto.GetTransactionRequest{
@@ -656,6 +682,18 @@ func (s *ObserverIndexerEnabledSuite) getRPCs() []RPCTest {
 			_, err := client.GetExecutionResultForBlockID(ctx, &accessproto.GetExecutionResultForBlockIDRequest{})
 			return err
 		}},
+		{name: "GetExecutionReceiptsByBlockID", call: func(ctx context.Context, client accessproto.AccessAPIClient) error {
+			_, err := client.GetExecutionReceiptsByBlockID(ctx, &accessproto.GetExecutionReceiptsByBlockIDRequest{
+				BlockId: make([]byte, 32),
+			})
+			return err
+		}},
+		{name: "GetExecutionReceiptsByResultID", call: func(ctx context.Context, client accessproto.AccessAPIClient) error {
+			_, err := client.GetExecutionReceiptsByResultID(ctx, &accessproto.GetExecutionReceiptsByResultIDRequest{
+				ResultId: make([]byte, 32),
+			})
+			return err
+		}},
 	}
 }
 
@@ -739,6 +777,16 @@ func (s *ObserverIndexerEnabledSuite) getRestEndpoints() []RestEndpointTest {
 			name:   "getNodeVersionInfo",
 			method: http.MethodGet,
 			path:   "/node_version_info",
+		},
+		{
+			name:   "getExecutionReceiptsByBlockID",
+			method: http.MethodGet,
+			path:   "/execution_receipts?block_id=" + block.ID().String(),
+		},
+		{
+			name:   "getExecutionReceiptsByResultID",
+			method: http.MethodGet,
+			path:   "/execution_receipts/results/" + executionResult.ID().String(),
 		},
 	}
 }
