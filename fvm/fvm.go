@@ -7,6 +7,7 @@ import (
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/common"
 	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 
 	"github.com/onflow/flow-go/fvm/inspection"
 
@@ -205,6 +206,10 @@ func (vm *VirtualMachine) Run(
 	// This is of informative nature right now so this placement is ok
 	// In the future we will need to move this inside the procedure if we want it to affect execution
 	output := executor.Output()
+	log.Debug().Str("module", "tc-inspector").
+		Str("procedure-type", string(proc.Type())).
+		Int("inspectors", len(ctx.Inspectors)).
+		Msg("populating environment values for procedure output")
 	inspectionResults := vm.inspectProcedureResults(ctx.Logger, ctx, proc, storageSnapshot, executionSnapshot, output)
 	output.InspectionResults = inspectionResults
 
