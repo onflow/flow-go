@@ -149,7 +149,11 @@ func (td *TokenChanges) getTokenDiff(
 	}
 
 	for a := range addresses {
-		beforeTokens := before[a]
+		// Copy beforeTokens before calling diffAccountTokens, which mutates the before map
+		beforeTokens := make(accountTokens, len(before[a]))
+		for k, v := range before[a] {
+			beforeTokens[k] = v
+		}
 		afterTokens := after[a]
 		diff := diffAccountTokens(before[a], after[a])
 		if len(diff) == 0 {
