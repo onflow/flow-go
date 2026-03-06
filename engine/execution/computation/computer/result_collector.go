@@ -320,7 +320,13 @@ func (collector *resultCollector) logInspectionResults(
 	// logLevel := zerolog.TraceLevel
 	// leo: debugging with info level log
 	logLevel := zerolog.InfoLevel
-	for _, inspectionResult := range results {
+	for i, inspectionResult := range results {
+		if inspectionResult == nil {
+			log.Warn().
+				Int("index", i).
+				Msg("inspection result is nil, likely due to a panic or error during inspection")
+			continue
+		}
 		lvl, evt := inspectionResult.AsLogEvent()
 		if lvl > logLevel {
 			logLevel = lvl
