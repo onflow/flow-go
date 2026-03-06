@@ -307,6 +307,11 @@ func walkLoaded(
 				f(value)
 				return true
 			})
+		case interpreter.PathLinkValue, interpreter.AccountLinkValue:
+			// Link values are deprecated legacy types that don't contain tokens.
+			// PathLinkValue.Walk and AccountLinkValue.Walk panic with "unreachable",
+			// so we skip them.
+			return
 		default:
 			// This assumes all other types cannot be partially loaded.
 			v.Walk(c, f)
