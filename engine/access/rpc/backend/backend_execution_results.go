@@ -53,13 +53,16 @@ func (b *backendExecutionResults) GetExecutionResultByID(ctx context.Context, id
 func (b *backendExecutionResults) GetExecutionReceiptsByBlockID(ctx context.Context, blockID flow.Identifier) ([]*flow.ExecutionReceipt, error) {
 	receipts, err := b.receipts.ByBlockID(blockID)
 	if err != nil {
-		if !errors.Is(err, storage.ErrNotFound) {
-			err = fmt.Errorf("failed to get execution receipts by block ID: %w", err)
-			irrecoverable.Throw(ctx, err)
-			return nil, err
-		}
-		return nil, status.Errorf(codes.NotFound, "could not find execution receipts for block: %v", err)
+		// ByBlockID does not return an error if no receipts are found
+		err = fmt.Errorf("failed to get execution receipts by block ID: %w", err)
+		irrecoverable.Throw(ctx, err)
+		return nil, err
 	}
+
+	if len(receipts) == 0 {
+		return nil, status.Errorf(codes.NotFound, "no receipts found for block")
+	}
+
 	return receipts, nil
 }
 
@@ -83,12 +86,10 @@ func (b *backendExecutionResults) GetExecutionReceiptsByResultID(ctx context.Con
 	// there is no receipt/result index, so we have to lookup the block and filter by result ID
 	allReceipts, err := b.receipts.ByBlockID(result.BlockID)
 	if err != nil {
-		if !errors.Is(err, storage.ErrNotFound) {
-			err = fmt.Errorf("failed to get execution receipts by result ID: %w", err)
-			irrecoverable.Throw(ctx, err)
-			return nil, err
-		}
-		return nil, status.Errorf(codes.NotFound, "could not find execution receipts for block %v: %v", result.BlockID, err)
+		// ByBlockID does not return an error if no receipts are found for the given block.
+		err = fmt.Errorf("failed to get execution receipts by result ID: %w", err)
+		irrecoverable.Throw(ctx, err)
+		return nil, err
 	}
 
 	var receipts []*flow.ExecutionReceipt
@@ -97,5 +98,10 @@ func (b *backendExecutionResults) GetExecutionReceiptsByResultID(ctx context.Con
 			receipts = append(receipts, receipt)
 		}
 	}
+
+	if len(receipts) == 0 {
+		return nil, status.Errorf(codes.NotFound, "no results found for result")
+	}
+
 	return receipts, nil
 }

@@ -169,16 +169,6 @@ func (s *ExecutionResultsSuite) TestGetExecutionReceiptsByBlockID() {
 	receipt1 := s.g.ExecutionReceipts().Fixture(fixtures.ExecutionReceipt.WithExecutionResult(*result1))
 	receipt2 := s.g.ExecutionReceipts().Fixture(fixtures.ExecutionReceipt.WithExecutionResult(*result2))
 
-	s.Run("not found", func() {
-		unknownBlockID := s.g.Identifiers().Fixture()
-		s.receipts.On("ByBlockID", unknownBlockID).
-			Return(nil, storage.ErrNotFound).Once()
-
-		_, err := s.backend.GetExecutionReceiptsByBlockID(ctx, unknownBlockID)
-		s.Require().Error(err)
-		s.Assert().Equal(codes.NotFound, status.Code(err))
-	})
-
 	// GetExecutionReceiptsByBlockID calls irrecoverable.Throw for unexpected storage errors.
 	s.Run("exception - receipts storage failure", func() {
 		unknownBlockID := s.g.Identifiers().Fixture()
@@ -195,14 +185,14 @@ func (s *ExecutionResultsSuite) TestGetExecutionReceiptsByBlockID() {
 		s.Assert().True(errors.Is(err, storageErr))
 	})
 
-	s.Run("happy path - empty list", func() {
+	s.Run("not found - empty list", func() {
 		emptyBlockID := s.g.Identifiers().Fixture()
 		s.receipts.On("ByBlockID", emptyBlockID).
 			Return(flow.ExecutionReceiptList{}, nil).Once()
 
-		actual, err := s.backend.GetExecutionReceiptsByBlockID(ctx, emptyBlockID)
-		s.Require().NoError(err)
-		s.Assert().Empty(actual)
+		_, err := s.backend.GetExecutionReceiptsByBlockID(ctx, emptyBlockID)
+		s.Require().Error(err)
+		s.Assert().Equal(codes.NotFound, status.Code(err))
 	})
 
 	s.Run("happy path - multiple receipts", func() {
@@ -236,17 +226,6 @@ func (s *ExecutionResultsSuite) TestGetExecutionReceiptsByResultID() {
 			Return(nil, storage.ErrNotFound).Once()
 
 		_, err := s.backend.GetExecutionReceiptsByResultID(ctx, unknownID)
-		s.Require().Error(err)
-		s.Assert().Equal(codes.NotFound, status.Code(err))
-	})
-
-	s.Run("not found - receipts storage error for block", func() {
-		s.results.On("ByID", targetResult.ID()).
-			Return(targetResult, nil).Once()
-		s.receipts.On("ByBlockID", blockID).
-			Return(nil, storage.ErrNotFound).Once()
-
-		_, err := s.backend.GetExecutionReceiptsByResultID(ctx, targetResult.ID())
 		s.Require().Error(err)
 		s.Assert().Equal(codes.NotFound, status.Code(err))
 	})
@@ -295,14 +274,14 @@ func (s *ExecutionResultsSuite) TestGetExecutionReceiptsByResultID() {
 		s.Assert().ElementsMatch([]*flow.ExecutionReceipt{matchingReceipt1, matchingReceipt2}, actual)
 	})
 
-	s.Run("happy path - no matching receipts for result", func() {
+	s.Run("not found - no matching receipts for result", func() {
 		s.results.On("ByID", targetResult.ID()).
 			Return(targetResult, nil).Once()
 		s.receipts.On("ByBlockID", blockID).
 			Return(flow.ExecutionReceiptList{nonMatchingReceipt}, nil).Once()
 
-		actual, err := s.backend.GetExecutionReceiptsByResultID(ctx, targetResult.ID())
-		s.Require().NoError(err)
-		s.Assert().Empty(actual)
+		_, err := s.backend.GetExecutionReceiptsByResultID(ctx, targetResult.ID())
+		s.Require().Error(err)
+		s.Assert().Equal(codes.NotFound, status.Code(err))
 	})
 }
