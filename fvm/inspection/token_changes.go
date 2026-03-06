@@ -71,6 +71,12 @@ func (td *TokenChanges) Inspect(
 	executionSnapshot *snapshot.ExecutionSnapshot,
 	events []flow.Event,
 ) (diff Result, err error) {
+	logger.Info().Str("module", "tc-inspector").
+		Int("events", len(events)).
+		Int("read_set", len(executionSnapshot.ReadSet)).
+		Int("write_set", len(executionSnapshot.WriteSet)).
+		Msg("starting token inspection for transaction")
+
 	defer func() {
 		if r := recover(); r != nil {
 			logger.Warn().Str("module", "tc-inspector").Msgf("trace=%s", string(debug.Stack()))
@@ -239,7 +245,10 @@ func (td *TokenChanges) getTokens(
 			}
 		}
 		if len(tkns) > 0 {
-			logger.Debug().Str("module", "tc-inspector").Msgf("found tokens for %s: %v", a, tkns)
+			logger.Info().Str("module", "tc-inspector").
+				Str("account", a.String()).
+				Interface("tokens", tkns).
+				Msg("found tokens in account")
 		}
 		tokens[a] = tkns
 	}
