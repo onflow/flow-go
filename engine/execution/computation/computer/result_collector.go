@@ -257,6 +257,12 @@ func (collector *resultCollector) processTransactionResult(
 	// We log inspection results here, because if we logged them ih the FVM
 	// they would get logged on every transaction retry.
 	// Same for the metrics.
+	if len(output.InspectionResults) == 0 {
+		logger.Info().
+			Hex("tx_id", txn.ID[:]).
+			Msg("no inspection results for transaction")
+	}
+
 	collector.logInspectionResults(logger, output.InspectionResults)
 
 	collector.handleTransactionExecutionMetrics(
