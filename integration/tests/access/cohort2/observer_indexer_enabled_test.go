@@ -67,14 +67,18 @@ func (s *ObserverIndexerEnabledSuite) SetupTest() {
 		"GetAccount":                     {},
 		"GetAccountAtLatestBlock":        {},
 		"GetAccountAtBlockHeight":        {},
+		"GetExecutionReceiptsByBlockID":  {},
+		"GetExecutionReceiptsByResultID": {},
 	}
 
 	s.localRest = map[string]struct{}{
-		"getBlocksByIDs":       {},
-		"getBlocksByHeight":    {},
-		"getBlockPayloadByID":  {},
-		"getNetworkParameters": {},
-		"getNodeVersionInfo":   {},
+		"getBlocksByIDs":                 {},
+		"getBlocksByHeight":              {},
+		"getBlockPayloadByID":            {},
+		"getNetworkParameters":           {},
+		"getNodeVersionInfo":             {},
+		"getExecutionReceiptsByBlockID":  {},
+		"getExecutionReceiptsByResultID": {},
 	}
 
 	s.testedRPCs = s.getRPCs
