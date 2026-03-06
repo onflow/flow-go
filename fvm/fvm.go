@@ -124,6 +124,17 @@ type VM interface {
 		ProcedureOutput,
 		error,
 	)
+
+	// Inspect runs configured inspectors on the procedure results.
+	// This is used by the block computer which manages transaction execution
+	// manually via NewExecutor rather than using Run.
+	Inspect(
+		ctx Context,
+		proc Procedure,
+		storageSnapshot snapshot.StorageSnapshot,
+		executionSnapshot *snapshot.ExecutionSnapshot,
+		output ProcedureOutput,
+	) []inspection.Result
 }
 
 var _ VM = (*VirtualMachine)(nil)
@@ -214,6 +225,19 @@ func (vm *VirtualMachine) Run(
 	output.InspectionResults = inspectionResults
 
 	return executionSnapshot, output, nil
+}
+
+// Inspect runs configured inspectors on the procedure results.
+// This is used by the block computer which manages transaction execution
+// manually via NewExecutor rather than using Run.
+func (vm *VirtualMachine) Inspect(
+	ctx Context,
+	proc Procedure,
+	storageSnapshot snapshot.StorageSnapshot,
+	executionSnapshot *snapshot.ExecutionSnapshot,
+	output ProcedureOutput,
+) []inspection.Result {
+	return vm.inspectProcedureResults(ctx.Logger, ctx, proc, storageSnapshot, executionSnapshot, output)
 }
 
 func (vm *VirtualMachine) inspectProcedureResults(
