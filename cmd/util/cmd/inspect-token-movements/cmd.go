@@ -29,9 +29,9 @@ var (
 // by reading chunk data packs and running the token changes inspector.
 //
 // # inspect the last 100 sealed blocks
-// ./util inspect-token-movements --chain flow-mainnet --datadir /var/flow/data/protocol --chunk_data_pack_dir /var/flow/data/chunk_data_pack --lastk 100
+// ./util inspect-token-movements --chain flow-mainnet --datadir /var/flow/data/protocol --chunk_data_pack_dir /var/flow/data/chunk_data_packs --lastk 100
 // # inspect the blocks from height 2000 to 3000
-// ./util inspect-token-movements --chain flow-mainnet --datadir /var/flow/data/protocol --chunk_data_pack_dir /var/flow/data/chunk_data_pack --from_to 2000_3000
+// ./util inspect-token-movements --chain flow-mainnet --datadir /var/flow/data/protocol --chunk_data_pack_dir /var/flow/data/chunk_data_packs --from_to 2000_3000
 var Cmd = &cobra.Command{
 	Use:   "inspect-token-movements",
 	Short: "inspect token movements by analyzing chunk data packs for unaccounted token mints/burns",
@@ -44,7 +44,7 @@ func init() {
 
 	common.InitDataDirFlag(Cmd, &flagDatadir)
 
-	Cmd.Flags().StringVar(&flagChunkDataPackDir, "chunk_data_pack_dir", "/var/flow/data/chunk_data_pack",
+	Cmd.Flags().StringVar(&flagChunkDataPackDir, "chunk_data_pack_dir", "/var/flow/data/chunk_data_packs",
 		"directory that stores the chunk data packs")
 	_ = Cmd.MarkFlagRequired("chunk_data_pack_dir")
 
