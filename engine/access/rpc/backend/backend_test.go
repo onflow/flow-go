@@ -2040,7 +2040,7 @@ func (suite *Suite) TestGetExecutionReceiptsByBlockID() {
 	receipts := new(storagemock.ExecutionReceipts)
 	receipts.
 		On("ByBlockID", nonexistingBlockID).
-		Return(nil, storage.ErrNotFound)
+		Return(flow.ExecutionReceiptList{}, nil)
 
 	result1 := unittest.ExecutionResultFixture(unittest.WithExecutionResultBlockID(blockID))
 	receipt1 := unittest.ExecutionReceiptFixture(unittest.WithResult(result1))
