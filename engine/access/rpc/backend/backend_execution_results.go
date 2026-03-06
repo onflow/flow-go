@@ -5,12 +5,13 @@ import (
 	"errors"
 	"fmt"
 
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+
 	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/storage"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 )
 
 type backendExecutionResults struct {
