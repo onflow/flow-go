@@ -115,6 +115,8 @@ func TestConvertExecutionReceiptsExcludeResult(t *testing.T) {
 		assert.Nil(t, msg.ExecutionResult)
 		assert.Equal(t, receipts[i].ExecutorID, convert.MessageToIdentifier(msg.Meta.ExecutorId))
 		assert.Equal(t, receipts[i].ExecutionResult.ID(), convert.MessageToIdentifier(msg.Meta.ResultId))
+		assert.Equal(t, receipts[i].ExecutorSignature, convert.MessageToSignature(msg.Meta.ExecutorSignature))
+		assert.Equal(t, receipts[i].Spocks, convert.MessagesToSignatures(msg.Meta.Spocks))
 	}
 }
 
@@ -134,6 +136,8 @@ func TestConvertExecutionReceiptsIncludeResult(t *testing.T) {
 		require.NotNil(t, msg.ExecutionResult)
 		assert.Equal(t, receipts[i].ExecutorID, convert.MessageToIdentifier(msg.Meta.ExecutorId))
 		assert.Equal(t, receipts[i].ExecutionResult.ID(), convert.MessageToIdentifier(msg.Meta.ResultId))
+		assert.Equal(t, receipts[i].ExecutorSignature, convert.MessageToSignature(msg.Meta.ExecutorSignature))
+		assert.Equal(t, receipts[i].Spocks, convert.MessagesToSignatures(msg.Meta.Spocks))
 
 		convertedResult, err := convert.MessageToExecutionResult(msg.ExecutionResult)
 		require.NoError(t, err)
