@@ -608,6 +608,7 @@ func (exeNode *ExecutionNode) LoadProviderEngine(
 	}
 
 	ledgerViewCommitter := committer.NewLedgerViewCommitter(exeNode.ledgerStorage, node.Tracer)
+	exeNode.exeConf.computationConfig.TokenTrackingEnabled = exeNode.exeConf.tokenTrackingEnabled
 	manager, err := computation.New(
 		node.Logger,
 		collector,

@@ -68,6 +68,9 @@ type ComputationConfig struct {
 	DerivedDataCacheSize uint
 	MaxConcurrency       int
 
+	// TokenTrackingEnabled enables tracking and logging of token movements on transactions.
+	TokenTrackingEnabled bool
+
 	// When NewCustomVirtualMachine is nil, the manager will create a standard
 	// fvm virtual machine via fvm.NewVirtualMachine.  Otherwise, the manager
 	// will create a virtual machine using this function.
@@ -108,7 +111,7 @@ func New(
 	}
 
 	chainID := vmCtx.Chain.ChainID()
-	options := DefaultFVMOptions(chainID, params.ExtensiveTracing, vmCtx.ScheduleCallbacksEnabled, false)
+	options := DefaultFVMOptions(chainID, params.ExtensiveTracing, vmCtx.ScheduleCallbacksEnabled, params.TokenTrackingEnabled)
 	vmCtx = fvm.NewContextFromParent(vmCtx, options...)
 
 	blockComputer, err := computer.NewBlockComputer(
