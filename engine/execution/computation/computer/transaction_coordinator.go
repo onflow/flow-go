@@ -34,8 +34,9 @@ type transactionCoordinator struct {
 
 	// Note: database commit and result logging must occur within the same
 	// critical section (guraded by mutex).
-	database       *storage.BlockDatabase
-	writeBehindLog TransactionWriteBehindLogger
+	database        *storage.BlockDatabase
+	writeBehindLog  TransactionWriteBehindLogger
+	storageSnapshot snapshot.StorageSnapshot // used for inspection
 }
 
 type transaction struct {
@@ -64,13 +65,14 @@ func newTransactionCoordinator(
 		cachedDerivedBlockData)
 
 	return &transactionCoordinator{
-		vm:             vm,
-		mutex:          mutex,
-		cond:           cond,
-		snapshotTime:   0,
-		abortErr:       nil,
-		database:       database,
-		writeBehindLog: writeBehindLog,
+		vm:              vm,
+		mutex:           mutex,
+		cond:            cond,
+		snapshotTime:    0,
+		abortErr:        nil,
+		database:        database,
+		writeBehindLog:  writeBehindLog,
+		storageSnapshot: storageSnapshot,
 	}
 }
 
@@ -147,10 +149,23 @@ func (coordinator *transactionCoordinator) commit(txn *transaction) error {
 		return err
 	}
 
+	output := txn.Output()
+
+	// Run inspection on the transaction results.
+	// This is done here rather than in vm.Run() because the block computer
+	// uses NewExecutor for fine-grained transaction control.
+	output.InspectionResults = coordinator.vm.Inspect(
+		txn.request.ctx,
+		txn.request.TransactionProcedure,
+		coordinator.storageSnapshot,
+		executionSnapshot,
+		output,
+	)
+
 	coordinator.writeBehindLog.AddTransactionResult(
 		txn.request,
 		executionSnapshot,
-		txn.Output(),
+		output,
 		time.Since(txn.startedAt),
 		txn.numConflictRetries)
 
