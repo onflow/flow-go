@@ -451,14 +451,26 @@ func (h *FlowAccessAPIRouter) GetExecutionResultByID(context context.Context, re
 }
 
 func (h *FlowAccessAPIRouter) GetExecutionReceiptsByBlockID(context context.Context, req *access.GetExecutionReceiptsByBlockIDRequest) (*access.ExecutionReceiptsResponse, error) {
-	res, err := h.local.GetExecutionReceiptsByBlockID(context, req)
-	h.log(LocalApiService, "GetExecutionReceiptsByBlockID", err)
+	if h.useIndex {
+		res, err := h.local.GetExecutionReceiptsByBlockID(context, req)
+		h.log(LocalApiService, "GetExecutionReceiptsByBlockID", err)
+		return res, err
+	}
+
+	res, err := h.upstream.GetExecutionReceiptsByBlockID(context, req)
+	h.log(UpstreamApiService, "GetExecutionReceiptsByBlockID", err)
 	return res, err
 }
 
 func (h *FlowAccessAPIRouter) GetExecutionReceiptsByResultID(context context.Context, req *access.GetExecutionReceiptsByResultIDRequest) (*access.ExecutionReceiptsResponse, error) {
-	res, err := h.local.GetExecutionReceiptsByResultID(context, req)
-	h.log(LocalApiService, "GetExecutionReceiptsByResultID", err)
+	if h.useIndex {
+		res, err := h.local.GetExecutionReceiptsByResultID(context, req)
+		h.log(LocalApiService, "GetExecutionReceiptsByResultID", err)
+		return res, err
+	}
+
+	res, err := h.upstream.GetExecutionReceiptsByResultID(context, req)
+	h.log(UpstreamApiService, "GetExecutionReceiptsByResultID", err)
 	return res, err
 }
 
