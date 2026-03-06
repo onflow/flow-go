@@ -221,6 +221,7 @@ func (vm *VirtualMachine) inspectProcedureResults(
 ) []inspection.Result {
 	// TODO: this should be decided by the inspector
 	if proc.Type() != TransactionProcedureType {
+		logger.Info().Str("module", "tc-inspector").Msg("skipping inspection for non-transaction procedure")
 		return nil
 	}
 
@@ -230,6 +231,7 @@ func (vm *VirtualMachine) inspectProcedureResults(
 	evts = append(evts, output.ServiceEvents...)
 
 	inspectionResults := make([]inspection.Result, len(context.Inspectors))
+	logger.Debug().Str("module", "tc-inspector").Int("num_inspectors", len(context.Inspectors)).Msg("inspecting procedure results")
 	var err error
 	for i, inspector := range context.Inspectors {
 		inspectionResults[i], err = inspector.Inspect(logger, storageSnapshot, executionSnapshot, evts)
