@@ -311,7 +311,9 @@ func (collector *resultCollector) logInspectionResults(
 	logEvents := make([]func(e *zerolog.Event), 0, len(results))
 
 	// The log level will be decided by the inspectionResults
-	logLevel := zerolog.TraceLevel
+	// logLevel := zerolog.TraceLevel
+	// leo: debugging with info level log
+	logLevel := zerolog.InfoLevel
 	for _, inspectionResult := range results {
 		lvl, evt := inspectionResult.AsLogEvent()
 		if lvl > logLevel {
