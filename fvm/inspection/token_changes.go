@@ -100,13 +100,28 @@ func (td *TokenChanges) getTokenDiff(
 
 	// get all distinct addresses
 	addresses := make(map[common.Address]struct{})
-	for k := range executionSnapshotLedgers.allTouchedRegisters() {
+	allTouched := executionSnapshotLedgers.allTouchedRegisters()
+	for k := range allTouched {
 		// skip special registers
 		// none of them can hold resources
 		if len(k.Owner) == 0 {
 			continue
 		}
 		addresses[common.Address([]byte(k.Owner))] = struct{}{}
+	}
+
+	logger.Info().Str("module", "tc-inspector").
+		Int("touched_registers", len(allTouched)).
+		Int("addresses_to_inspect", len(addresses)).
+		Int("searched_tokens", len(searchedTokens)).
+		Msg("inspecting token movements")
+
+	if len(addresses) == 0 {
+		logger.Info().Str("module", "tc-inspector").Msg("no addresses touched, skipping token inspection")
+		return TokenDiffResult{
+			Changes:           make(map[flow.Address]AccountChange),
+			KnownSourcesSinks: make(map[string]int64),
+		}, nil
 	}
 
 	oldRegistersLedger := executionSnapshotLedgers.OldValuesLedger()
@@ -128,15 +143,26 @@ func (td *TokenChanges) getTokenDiff(
 	}
 
 	for a := range addresses {
-		beforeTokens := fmt.Sprintf("%v", before[a])
-		afterTokens := fmt.Sprintf("%v", after[a])
+		beforeTokens := before[a]
+		afterTokens := after[a]
 		diff := diffAccountTokens(before[a], after[a])
 		if len(diff) == 0 {
-			logger.Info().Str("module", "tc-inspector").Msgf("account token change: %s is the same: before=%s after=%s", a, beforeTokens, afterTokens)
+			// Only log if the account had tokens before or after
+			if len(beforeTokens) > 0 || len(afterTokens) > 0 {
+				logger.Info().Str("module", "tc-inspector").
+					Str("account", a.String()).
+					Interface("before", beforeTokens).
+					Interface("after", afterTokens).
+					Msg("account token balance unchanged")
+			}
 			continue
-		} else {
-			logger.Info().Str("module", "tc-inspector").Msgf("account token change: %s changed: before=%s after=%s diff=%v", a, beforeTokens, afterTokens, diff)
 		}
+		logger.Info().Str("module", "tc-inspector").
+			Str("account", a.String()).
+			Interface("before", beforeTokens).
+			Interface("after", afterTokens).
+			Interface("diff", diff).
+			Msg("account token balance changed")
 		tokenDiffResult.Changes[flow.Address(a)] = diff
 	}
 
@@ -145,6 +171,21 @@ func (td *TokenChanges) getTokenDiff(
 		return TokenDiffResult{}, fmt.Errorf("failed to find sources/sinks: %w", err)
 	}
 	tokenDiffResult.KnownSourcesSinks = sourcesSinks
+
+	// Log summary of token movements
+	unaccounted := tokenDiffResult.UnaccountedTokens()
+	if len(unaccounted) > 0 {
+		logger.Warn().Str("module", "tc-inspector").
+			Int("accounts_changed", len(tokenDiffResult.Changes)).
+			Interface("sources_sinks", sourcesSinks).
+			Interface("unaccounted", unaccounted).
+			Msg("token inspection complete - unaccounted token movements detected")
+	} else if len(tokenDiffResult.Changes) > 0 {
+		logger.Info().Str("module", "tc-inspector").
+			Int("accounts_changed", len(tokenDiffResult.Changes)).
+			Interface("sources_sinks", sourcesSinks).
+			Msg("token inspection complete - all movements accounted for")
+	}
 
 	return tokenDiffResult, nil
 }
