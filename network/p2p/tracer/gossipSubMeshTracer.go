@@ -510,12 +510,6 @@ func (t *GossipSubMeshTracer) logLoop(ctx irrecoverable.SignalerContext) {
 		select {
 		case <-ctx.Done():
 			return
-		default:
-		}
-
-		select {
-		case <-ctx.Done():
-			return
 		case <-ticker.C:
 			t.logPeers()
 		}
