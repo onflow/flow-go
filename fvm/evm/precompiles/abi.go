@@ -221,16 +221,21 @@ func SizeNeededForBytesEncoding(data []byte) int {
 // EncodeBytes encodes the data into the buffer at index and append payload to the
 // end of buffer
 func EncodeBytes(data []byte, buffer []byte, headerIndex, payloadIndex int) error {
-	//// updating offset
+	if len(buffer) < SizeNeededForBytesEncoding(data) {
+		return ErrBufferTooSmall
+	}
+
 	if len(buffer) < headerIndex+EncodedUint64Size {
 		return ErrBufferTooSmall
 	}
+
 	dataSize := len(data)
 	// compute padded data size
-	paddedSize := (dataSize / FixedSizeUnitDataReadSize)
+	chunks := (dataSize / FixedSizeUnitDataReadSize)
 	if dataSize%FixedSizeUnitDataReadSize != 0 {
-		paddedSize += FixedSizeUnitDataReadSize
+		chunks += 1
 	}
+	paddedSize := chunks * FixedSizeUnitDataReadSize
 	if len(buffer) < payloadIndex+EncodedUint64Size+paddedSize {
 		return ErrBufferTooSmall
 	}
@@ -240,7 +245,6 @@ func EncodeBytes(data []byte, buffer []byte, headerIndex, payloadIndex int) erro
 		return err
 	}
 
-	//// updating payload
 	// padding data
 	if dataSize%FixedSizeUnitDataReadSize != 0 {
 		data = gethCommon.RightPadBytes(data, paddedSize)
