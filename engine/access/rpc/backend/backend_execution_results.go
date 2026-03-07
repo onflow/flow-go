@@ -51,6 +51,8 @@ func (b *backendExecutionResults) GetExecutionResultByID(ctx context.Context, id
 // Expected error returns during normal operation:
 //   - [codes.NotFound]: if no receipts are indexed for the given block ID.
 func (b *backendExecutionResults) GetExecutionReceiptsByBlockID(ctx context.Context, blockID flow.Identifier) ([]*flow.ExecutionReceipt, error) {
+	// the block/receipt index is populated by the Access ingestion engine when receiving receipts
+	// directly from execution nodes, and by the follower engine when persisting blocks.
 	receipts, err := b.receipts.ByBlockID(blockID)
 	if err != nil {
 		// ByBlockID does not return an error if no receipts are found
