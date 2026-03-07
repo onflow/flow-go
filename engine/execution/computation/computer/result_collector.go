@@ -8,7 +8,10 @@ import (
 
 	"github.com/onflow/crypto"
 	"github.com/onflow/crypto/hash"
+	"github.com/rs/zerolog"
 	otelTrace "go.opentelemetry.io/otel/trace"
+
+	"github.com/onflow/flow-go/fvm/inspection"
 
 	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/engine/execution/storehouse"
@@ -241,6 +244,11 @@ func (collector *resultCollector) processTransactionResult(
 		logger.Info().Msg("transaction executed successfully")
 	}
 
+	// We log inspection results here, because if we logged them ih the FVM
+	// they would get logged on every transaction retry.
+	// Same for the metrics.
+	collector.logInspectionResults(logger, output.InspectionResults)
+
 	collector.handleTransactionExecutionMetrics(
 		timeSpent,
 		output,
@@ -280,6 +288,40 @@ func (collector *resultCollector) processTransactionResult(
 		txn.collectionInfo,
 		collector.currentCollectionStartTime,
 		collector.currentCollectionState.Finalize())
+}
+
+func (collector *resultCollector) logInspectionResults(
+	log zerolog.Logger,
+	results []inspection.Result,
+) {
+	if len(results) == 0 {
+		return
+	}
+
+	logEvents := make([]func(e *zerolog.Event), 0, len(results))
+
+	// The log level will be decided by the inspectionResults
+	logLevel := zerolog.TraceLevel
+	for _, inspectionResult := range results {
+		lvl, evt := inspectionResult.AsLogEvent()
+		if lvl > logLevel {
+			logLevel = lvl
+		}
+		if evt != nil {
+			logEvents = append(logEvents, evt)
+		}
+	}
+
+	// if there are no loggable inspection results, don't log at all
+	if len(logEvents) == 0 {
+		return
+	}
+
+	evt := log.WithLevel(logLevel)
+	for _, logEvent := range logEvents {
+		logEvent(evt)
+	}
+	evt.Msg("Inspection results")
 }
 
 func (collector *resultCollector) handleTransactionExecutionMetrics(
