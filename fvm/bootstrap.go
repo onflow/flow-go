@@ -1017,7 +1017,12 @@ func (b *bootstrapExecutor) setupEVM(serviceAddress, nonFungibleTokenAddress, fu
 	// deploy the EVM contract to the service account
 	txBody, err := blueprints.DeployContractTransaction(
 		serviceAddress,
-		stdlib.ContractCode(nonFungibleTokenAddress, fungibleTokenAddress, flowTokenAddress),
+		stdlib.ContractCode(
+			b.ctx.Chain.ChainID(),
+			nonFungibleTokenAddress,
+			fungibleTokenAddress,
+			flowTokenAddress,
+		),
 		stdlib.ContractName,
 	).Build()
 	if err != nil {

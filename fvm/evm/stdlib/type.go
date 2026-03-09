@@ -18,6 +18,7 @@ func newContractType(chainID flow.ChainID) *sema.CompositeType {
 	contracts := systemcontracts.SystemContractsForChain(chainID)
 
 	evmCode := ContractCode(
+		chainID,
 		contracts.NonFungibleToken.Address,
 		contracts.FungibleToken.Address,
 		contracts.FlowToken.Address,

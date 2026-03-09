@@ -92,6 +92,18 @@ func testCases() []testCase {
 		},
 		{
 			method:   http.MethodGet,
+			name:     "/v1/execution_receipts",
+			url:      "/v1/execution_receipts",
+			expected: "getExecutionReceiptsByBlockID",
+		},
+		{
+			method:   http.MethodGet,
+			name:     "/v1/execution_receipts/results/{id}",
+			url:      "/v1/execution_receipts/results/53730d3f3d2d2f46cb910b16db817d3a62adaaa72fdb3a92ee373c37c5b55a76",
+			expected: "getExecutionReceiptsByResultID",
+		},
+		{
+			method:   http.MethodGet,
 			name:     "/v1/collections/{id}",
 			url:      "/v1/collections/53730d3f3d2d2f46cb910b16db817d3a62adaaa72fdb3a92ee373c37c5b55a76",
 			expected: "getCollectionByID",
