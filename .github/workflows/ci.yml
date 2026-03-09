@@ -29,7 +29,7 @@ concurrency:
 jobs:
   build-linter:
     name: Build Custom Linter
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     steps:
       - name: Check out code
         uses: actions/checkout@v4
@@ -69,7 +69,7 @@ jobs:
       matrix:
         dir: [./, ./integration/, ./insecure/]
     name: Lint
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     needs: build-linter # must wait for custom linter binary to be available
     steps:
     - name: Checkout repo
@@ -115,7 +115,7 @@ jobs:
 
   tidy:
     name: Tidy
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
@@ -139,7 +139,7 @@ jobs:
 
   create-dynamic-test-matrix:
     name: Create Dynamic Test Matrix
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     outputs:
       dynamic-matrix: ${{ steps.set-test-matrix.outputs.dynamicMatrix }}
     steps:
@@ -157,7 +157,7 @@ jobs:
 
   create-insecure-dynamic-test-matrix:
     name: Create Dynamic Unit Test Insecure Package Matrix
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     outputs:
       dynamic-matrix: ${{ steps.set-test-matrix.outputs.dynamicMatrix }}
     steps:
@@ -175,7 +175,7 @@ jobs:
 
   create-integration-dynamic-test-matrix:
     name: Create Dynamic Integration Test Package Matrix
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     outputs:
       dynamic-matrix: ${{ steps.set-test-matrix.outputs.dynamicMatrix }}
     steps:
@@ -402,29 +402,29 @@ jobs:
             runner: blacksmith-4vcpu-ubuntu-2404
           - name: Access Cohort2 Integration Tests
             make: make -C integration access-cohort2-tests
-            runner: ubuntu-latest
+            runner: blacksmith-4vcpu-ubuntu-2404
           - name: Access Cohort3 Integration Tests
             make: make -C integration access-cohort3-tests
-            runner: ubuntu-latest
+            runner: blacksmith-4vcpu-ubuntu-2404
           - name: Access Cohort4 Integration Tests
             make: make -C integration access-cohort4-tests
-            runner: ubuntu-latest
+            runner: blacksmith-4vcpu-ubuntu-2404
             # test suite has single test which is flaky and needs to be fixed - reminder here to put it back when it's fixed
 #          - name: BFT (Framework) Integration Tests
 #            make: make -C integration bft-framework-tests
-#            runner: ubuntu-latest
+#            runner: blacksmith-4vcpu-ubuntu-2404
           - name: BFT (Protocol) Integration Tests
             make: make -C integration bft-protocol-tests
             runner: blacksmith-8vcpu-ubuntu-2404
           - name: BFT (Gossipsub) Integration Tests
             make: make -C integration bft-gossipsub-tests
-            runner: ubuntu-latest
+            runner: blacksmith-4vcpu-ubuntu-2404
           - name: Collection Integration Tests
             make: make -C integration collection-tests
-            runner: ubuntu-latest
+            runner: blacksmith-4vcpu-ubuntu-2404
           - name: Consensus Integration Tests
             make: make -C integration consensus-tests
-            runner: ubuntu-latest
+            runner: blacksmith-4vcpu-ubuntu-2404
           - name: Epoch Cohort1 Integration Tests
             make: make -C integration epochs-cohort1-tests
             runner: blacksmith-8vcpu-ubuntu-2404
@@ -433,22 +433,22 @@ jobs:
             runner: blacksmith-4vcpu-ubuntu-2404
           - name: Execution Integration Tests
             make: make -C integration execution-tests
-            runner: ubuntu-latest
+            runner: blacksmith-4vcpu-ubuntu-2404
           - name: Ghost Integration Tests
             make: make -C integration ghost-tests
-            runner: ubuntu-latest
+            runner: blacksmith-4vcpu-ubuntu-2404
           - name: MVP Integration Tests
             make: make -C integration mvp-tests
-            runner: ubuntu-latest
+            runner: blacksmith-4vcpu-ubuntu-2404
           - name: Network Integration Tests
             make: make -C integration network-tests
-            runner: ubuntu-latest
+            runner: blacksmith-4vcpu-ubuntu-2404
           - name: Verification Integration Tests
             make: make -C integration verification-tests
-            runner: ubuntu-latest
+            runner: blacksmith-4vcpu-ubuntu-2404
           - name: Upgrade Integration Tests
             make: make -C integration upgrades-tests
-            runner: ubuntu-latest
+            runner: blacksmith-4vcpu-ubuntu-2404
     runs-on: ${{ matrix.runner }}
     steps:
     - name: Checkout repo
