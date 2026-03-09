@@ -232,7 +232,7 @@ func EncodeBytes(data []byte, buffer []byte, headerIndex, payloadIndex int) erro
 	// padding data
 	dataSize := len(data)
 	paddedSize := computePaddedSize(dataSize)
-	if dataSize%FixedSizeUnitDataReadSize != 0 {
+	if dataSize < paddedSize {
 		data = gethCommon.RightPadBytes(data, paddedSize)
 	}
 
