@@ -102,7 +102,7 @@ func (b *backendExecutionResults) GetExecutionReceiptsByResultID(ctx context.Con
 	}
 
 	if len(receipts) == 0 {
-		return nil, status.Errorf(codes.NotFound, "no results found for result")
+		return nil, status.Errorf(codes.NotFound, "no receipts found for result")
 	}
 
 	return receipts, nil
