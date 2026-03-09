@@ -208,30 +208,19 @@ func ReadBytes(buffer []byte, index int) ([]byte, error) {
 
 // SizeNeededForBytesEncoding computes the number of bytes needed for bytes encoding
 func SizeNeededForBytesEncoding(data []byte) int {
-	if len(data) == 0 {
-		return EncodedUint64Size + EncodedUint64Size + FixedSizeUnitDataReadSize
+	dataSize := len(data)
+	if dataSize == 0 {
+		return EncodedUint64Size + EncodedUint64Size
 	}
-	paddedSize := (len(data) / FixedSizeUnitDataReadSize)
-	if len(data)%FixedSizeUnitDataReadSize != 0 {
-		paddedSize += 1
-	}
-	return EncodedUint64Size + EncodedUint64Size + paddedSize*FixedSizeUnitDataReadSize
+
+	paddedSize := computePaddedSize(dataSize)
+	return EncodedUint64Size + EncodedUint64Size + paddedSize
 }
 
 // EncodeBytes encodes the data into the buffer at index and append payload to the
 // end of buffer
 func EncodeBytes(data []byte, buffer []byte, headerIndex, payloadIndex int) error {
-	//// updating offset
-	if len(buffer) < headerIndex+EncodedUint64Size {
-		return ErrBufferTooSmall
-	}
-	dataSize := len(data)
-	// compute padded data size
-	paddedSize := (dataSize / FixedSizeUnitDataReadSize)
-	if dataSize%FixedSizeUnitDataReadSize != 0 {
-		paddedSize += FixedSizeUnitDataReadSize
-	}
-	if len(buffer) < payloadIndex+EncodedUint64Size+paddedSize {
+	if len(buffer) < headerIndex+SizeNeededForBytesEncoding(data) {
 		return ErrBufferTooSmall
 	}
 
@@ -240,9 +229,10 @@ func EncodeBytes(data []byte, buffer []byte, headerIndex, payloadIndex int) erro
 		return err
 	}
 
-	//// updating payload
 	// padding data
-	if dataSize%FixedSizeUnitDataReadSize != 0 {
+	dataSize := len(data)
+	paddedSize := computePaddedSize(dataSize)
+	if dataSize < paddedSize {
 		data = gethCommon.RightPadBytes(data, paddedSize)
 	}
 
@@ -253,6 +243,18 @@ func EncodeBytes(data []byte, buffer []byte, headerIndex, payloadIndex int) erro
 	}
 	payloadIndex += EncodedUint64Size
 	// adding data
-	copy(buffer[payloadIndex:payloadIndex+len(data)], data)
+	copy(buffer[payloadIndex:payloadIndex+dataSize], data)
 	return nil
+}
+
+// computePaddedSize computes the 32-byte padding needed for data of the
+// given size
+func computePaddedSize(dataSize int) int {
+	// compute padded data size
+	chunks := (dataSize / FixedSizeUnitDataReadSize)
+	if dataSize%FixedSizeUnitDataReadSize != 0 {
+		chunks += 1
+	}
+
+	return chunks * FixedSizeUnitDataReadSize
 }
