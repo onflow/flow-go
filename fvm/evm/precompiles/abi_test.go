@@ -109,9 +109,11 @@ func TestABIEncodingDecodingFunctions(t *testing.T) {
 		require.Equal(t, 3*32, bufferSize)
 
 		buffer := make([]byte, bufferSize-5)
+		original := append([]byte(nil), buffer...)
 		err = precompiles.EncodeBytes(encodedData, buffer, 0, precompiles.EncodedUint64Size)
 		require.Error(t, err)
 		require.ErrorContains(t, err, "buffer too small for encoding")
+		require.Equal(t, original, buffer)
 	})
 
 	t.Run("test encode bytes (multiple chunks)", func(t *testing.T) {
