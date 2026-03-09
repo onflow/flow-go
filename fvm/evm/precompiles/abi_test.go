@@ -137,13 +137,12 @@ func TestABIEncodingDecodingFunctions(t *testing.T) {
 		data := []byte{}
 		ret := precompiles.SizeNeededForBytesEncoding(data)
 		offsetAndLenEncodingSize := precompiles.EncodedUint64Size + precompiles.EncodedUint64Size
-		expectedSize := offsetAndLenEncodingSize + precompiles.FixedSizeUnitDataReadSize
-		require.Equal(t, expectedSize, ret)
+		require.Equal(t, offsetAndLenEncodingSize, ret)
 
 		// data size 1
 		data = []byte{1}
 		ret = precompiles.SizeNeededForBytesEncoding(data)
-		expectedSize = offsetAndLenEncodingSize + precompiles.FixedSizeUnitDataReadSize
+		expectedSize := offsetAndLenEncodingSize + precompiles.FixedSizeUnitDataReadSize
 		require.Equal(t, expectedSize, ret)
 
 		// data size 32
