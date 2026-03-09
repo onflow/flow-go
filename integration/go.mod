@@ -30,7 +30,7 @@ require (
 	github.com/onflow/flow-go-sdk v1.9.16
 	github.com/onflow/flow-go/insecure v0.0.0-00010101000000-000000000000
 	github.com/onflow/flow-nft/lib/go/contracts v1.3.0
-	github.com/onflow/flow/protobuf/go/flow v0.4.20-0.20260304213159-636750371b10
+	github.com/onflow/flow/protobuf/go/flow v0.4.20
 	github.com/onflow/testingdock v0.5.0
 	github.com/prometheus/client_golang v1.20.5
 	github.com/prometheus/client_model v0.6.2
