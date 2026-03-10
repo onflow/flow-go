@@ -56,14 +56,9 @@ func ExecuteCallbacksTransactions(chain flow.Chain, processEvents flow.EventsLis
 			return nil, fmt.Errorf("failed to get callback args from event: %w", err)
 		}
 
-		tx, err := flow.NewTransactionBodyBuilder().
-			AddAuthorizer(sc.ScheduledTransactionExecutor.Address).
-			SetScript(script).
-			AddArgument(id).
-			SetComputeLimit(effort).
-			Build()
+		tx, err := generateExecuteCallbacksTransaction(sc, script, id, effort)
 		if err != nil {
-			return nil, fmt.Errorf("failed to construct execute callback transactions: %w", err)
+			return nil, fmt.Errorf("failed to generate execute callback transaction: %w", err)
 		}
 		txs = append(txs, tx)
 	}
@@ -71,15 +66,53 @@ func ExecuteCallbacksTransactions(chain flow.Chain, processEvents flow.EventsLis
 	return txs, nil
 }
 
+// ExecuteCallbacksTransaction constructs a list of transaction to execute callbacks, for the given chain.
+//
+// No error returns are expected during normal operation.
+func ExecuteCallbacksTransaction(chain flow.Chain, id uint64, effort uint64) (*flow.TransactionBody, error) {
+	sc := systemcontracts.SystemContractsForChain(chain.ChainID())
+	env := sc.AsTemplateEnv()
+	script := templates.GenerateSchedulerExecutorTransactionScript(env)
+
+	return generateExecuteCallbacksTransaction(sc, script, id, effort)
+}
+
+// generateExecuteCallbacksTransaction generates a transaction to execute a callback, for the given chain.
+//
+// No error returns are expected during normal operation.
+func generateExecuteCallbacksTransaction(
+	sc *systemcontracts.SystemContracts,
+	script []byte,
+	id uint64,
+	effort uint64,
+) (*flow.TransactionBody, error) {
+	encID, err := jsoncdc.Encode(cadence.UInt64(id))
+	if err != nil {
+		return nil, fmt.Errorf("failed to encode id: %w", err)
+	}
+
+	tx, err := flow.NewTransactionBodyBuilder().
+		AddAuthorizer(sc.ScheduledTransactionExecutor.Address).
+		SetScript(script).
+		AddArgument(encID).
+		SetComputeLimit(effort).
+		Build()
+	if err != nil {
+		return nil, fmt.Errorf("failed to construct execute callback transactions: %w", err)
+	}
+
+	return tx, nil
+}
+
 // callbackArgsFromEvent decodes the event payload and returns the callback ID and effort.
 //
 // The event for processed callback event is emitted by the process callback transaction from
 // callback scheduler contract and has the following signature:
 // event PendingExecution(id: UInt64, priority: UInt8, executionEffort: UInt64, fees: UFix64, callbackOwner: Address)
-func callbackArgsFromEvent(event flow.Event) ([]byte, uint64, error) {
+func callbackArgsFromEvent(event flow.Event) (uint64, uint64, error) {
 	cadenceId, cadenceEffort, err := ParsePendingExecutionEvent(event)
 	if err != nil {
-		return nil, 0, err
+		return 0, 0, err
 	}
 
 	effort := uint64(cadenceEffort)
@@ -89,12 +122,7 @@ func callbackArgsFromEvent(event flow.Event) ([]byte, uint64, error) {
 		effort = flow.DefaultMaxTransactionGasLimit
 	}
 
-	encID, err := jsoncdc.Encode(cadenceId)
-	if err != nil {
-		return nil, 0, fmt.Errorf("failed to encode id: %w", err)
-	}
-
-	return encID, uint64(effort), nil
+	return uint64(cadenceId), uint64(effort), nil
 }
 
 // ParsePendingExecutionEvent decodes the PendingExecution event payload and returns the scheduled

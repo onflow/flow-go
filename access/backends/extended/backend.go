@@ -102,7 +102,7 @@ func New(
 		log:                          log,
 		AccountTransactionsBackend:   NewAccountTransactionsBackend(log, base, store, chain),
 		AccountTransfersBackend:      NewAccountTransfersBackend(log, base, ftStore, nftStore, chain),
-		ScheduledTransactionsBackend: NewScheduledTransactionsBackend(log, base, scheduledTxIndex, scheduledTransactions, state, scriptExecutor),
+		ScheduledTransactionsBackend: NewScheduledTransactionsBackend(log, base, chainID, scheduledTxIndex, scheduledTransactions, state, scriptExecutor),
 	}, nil
 }
 
