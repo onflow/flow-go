@@ -128,6 +128,7 @@ var (
 	executionParametersAddressMainnet = flow.HexToAddress("f426ff57ee8f6110")
 
 	// flowFeesReceiversAddressTestnet is the address of the Flow Fees Receivers contract on Testnet
+	// See tx be210889dd26a320f530595bd369093e866e26c3941bf7a3d01f861db3eeda81
 	flowFeesReceiversAddressesTestnet = []flow.Address{
 		flow.HexToAddress("912d5440f7e3769e"),
 		flow.HexToAddress("e1ac6b2740d204c2"),
