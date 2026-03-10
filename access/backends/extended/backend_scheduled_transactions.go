@@ -101,6 +101,7 @@ type ScheduledTransactionsBackend struct {
 	*backendBase
 
 	log                   zerolog.Logger
+	chainID               flow.ChainID
 	state                 protocol.State
 	store                 storage.ScheduledTransactionsIndexReader
 	contracts             storage.ContractDeploymentsIndexReader
@@ -112,6 +113,7 @@ type ScheduledTransactionsBackend struct {
 func NewScheduledTransactionsBackend(
 	log zerolog.Logger,
 	base *backendBase,
+	chainID flow.ChainID,
 	store storage.ScheduledTransactionsIndexReader,
 	contracts storage.ContractDeploymentsIndexReader,
 	scheduledTransactions storage.ScheduledTransactionsReader,
@@ -121,6 +123,7 @@ func NewScheduledTransactionsBackend(
 	return &ScheduledTransactionsBackend{
 		backendBase:           base,
 		log:                   log,
+		chainID:               chainID,
 		store:                 store,
 		contracts:             contracts,
 		scheduledTransactions: scheduledTransactions,
@@ -403,20 +406,17 @@ func (b *ScheduledTransactionsBackend) expand(
 	}
 
 	if expandOptions.Transaction {
-		allScheduledTxs, err := b.transactionsProvider.ScheduledTransactionsByBlockID(ctx, executedHeader)
+		txBody, err := b.systemCollections.
+			ByHeight(executedHeader.Height).
+			ExecuteCallbacksTransaction(b.chainID.Chain(), tx.ID, tx.ExecutionEffort)
 		if err != nil {
-			return fmt.Errorf("could not retrieve all scheduled transactions: %w", err)
+			return fmt.Errorf("failed to construct scheduled transaction body: %w", err)
 		}
 
-		for _, scheduledTx := range allScheduledTxs {
-			if scheduledTx.ID() == tx.ExecutedTransactionID {
-				tx.Transaction = scheduledTx
-				break
-			}
+		if txBody.ID() != tx.ExecutedTransactionID {
+			return fmt.Errorf("scheduled transaction body ID %s does not match executed transaction ID %s", txBody.ID(), tx.ExecutedTransactionID)
 		}
-		if tx.Transaction == nil {
-			return fmt.Errorf("scheduled transaction %s not found in block %s", tx.ExecutedTransactionID, executedHeader.ID())
-		}
+		tx.Transaction = txBody
 	}
 
 	if expandOptions.Result {

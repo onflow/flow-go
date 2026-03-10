@@ -11,6 +11,8 @@ import (
 
 	"github.com/onflow/flow-go/fvm/environment"
 	fvmErrors "github.com/onflow/flow-go/fvm/errors"
+	"github.com/onflow/flow-go/fvm/evm"
+	"github.com/onflow/flow-go/fvm/evm/emulator/state"
 	"github.com/onflow/flow-go/fvm/evm/events"
 	"github.com/onflow/flow-go/fvm/evm/handler/coa"
 	"github.com/onflow/flow-go/fvm/evm/types"
@@ -69,6 +71,68 @@ func (h *ContractHandler) FlowTokenAddress() common.Address {
 // EVMContractAddress returns the address where EVM contract is deployed
 func (h *ContractHandler) EVMContractAddress() common.Address {
 	return common.Address(h.evmContractAddress)
+}
+
+// SetState sets a value for the given storage slot.
+// It returns the previous value in any case.
+// The operation is only allowed on Emulator network,
+// for testing purposes.
+func (h *ContractHandler) SetState(
+	address types.Address,
+	slot gethCommon.Hash,
+	value gethCommon.Hash,
+) gethCommon.Hash {
+	// should only be allowed on Emulator, for testing purposes
+	if h.flowChainID != flow.Emulator {
+		panicOnError(types.ErrUnsupportedNetworkOperation)
+	}
+
+	execState, err := state.NewStateDB(h.backend, evm.StorageAccountAddress(h.flowChainID))
+	panicOnError(err)
+
+	prevValue := execState.SetState(address.ToCommon(), slot, value)
+	_, err = execState.Commit(true)
+	panicOnError(err)
+
+	return prevValue
+}
+
+// GetState returns the value for the given storage slot.
+// The operation is only allowed on Emulator network,
+// for testing purposes.
+func (h *ContractHandler) GetState(
+	address types.Address,
+	slot gethCommon.Hash,
+) gethCommon.Hash {
+	// should only be allowed on Emulator, for testing purposes
+	if h.flowChainID != flow.Emulator {
+		panicOnError(types.ErrUnsupportedNetworkOperation)
+	}
+
+	execState, err := state.NewStateDB(h.backend, evm.StorageAccountAddress(h.flowChainID))
+	panicOnError(err)
+
+	return execState.GetState(address.ToCommon(), slot)
+}
+
+// RunTxAs runs a transaction by setting the call's `msg.sender`
+// to be the `from` address.
+// The operation is only allowed on Emulator network,
+// for testing purposes.
+func (h *ContractHandler) RunTxAs(
+	from types.Address,
+	to types.Address,
+	txData types.Data,
+	gasLimit types.GasLimit,
+	balance types.Balance,
+) *types.ResultSummary {
+	// should only be allowed on Emulator, for testing purposes
+	if h.flowChainID != flow.Emulator {
+		panicOnError(types.ErrUnsupportedNetworkOperation)
+	}
+
+	account := h.AccountByAddress(from, true)
+	return account.Call(to, txData, gasLimit, balance)
 }
 
 // DeployCOA deploys a cadence-owned-account and returns the address

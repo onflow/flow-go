@@ -14,7 +14,9 @@ import (
 	"github.com/onflow/flow/protobuf/go/flow/entities"
 
 	providermock "github.com/onflow/flow-go/engine/access/rpc/backend/transactions/provider/mock"
+	"github.com/onflow/flow-go/fvm/blueprints"
 	accessmodel "github.com/onflow/flow-go/model/access"
+	"github.com/onflow/flow-go/model/access/systemcollection"
 	"github.com/onflow/flow-go/model/flow"
 	executionmock "github.com/onflow/flow-go/module/execution/mock"
 	"github.com/onflow/flow-go/module/irrecoverable"
@@ -292,7 +294,7 @@ func TestScheduledTransactionsBackend_GetScheduledTransaction(t *testing.T) {
 		store := storagemock.NewScheduledTransactionsIndexReader(t)
 		backend := NewScheduledTransactionsBackend(
 			unittest.Logger(), &backendBase{config: defaultConfig},
-			store, nil, nil, nil, nil,
+			flow.Mainnet, store, nil, nil, nil, nil,
 		)
 
 		expectedTx := accessmodel.ScheduledTransaction{ID: 1, Status: accessmodel.ScheduledTxStatusScheduled}
@@ -313,7 +315,7 @@ func TestScheduledTransactionsBackend_GetScheduledTransaction(t *testing.T) {
 		store := storagemock.NewScheduledTransactionsIndexReader(t)
 		backend := NewScheduledTransactionsBackend(
 			unittest.Logger(), &backendBase{config: defaultConfig},
-			store, nil, nil, nil, nil,
+			flow.Mainnet, store, nil, nil, nil, nil,
 		)
 
 		store.On("ByID", uint64(99)).Return(accessmodel.ScheduledTransaction{}, storage.ErrNotFound).Once()
@@ -331,7 +333,7 @@ func TestScheduledTransactionsBackend_GetScheduledTransaction(t *testing.T) {
 		store := storagemock.NewScheduledTransactionsIndexReader(t)
 		backend := NewScheduledTransactionsBackend(
 			unittest.Logger(), &backendBase{config: defaultConfig},
-			store, nil, nil, nil, nil,
+			flow.Mainnet, store, nil, nil, nil, nil,
 		)
 
 		store.On("ByID", uint64(1)).Return(accessmodel.ScheduledTransaction{}, storage.ErrNotBootstrapped).Once()
@@ -349,7 +351,7 @@ func TestScheduledTransactionsBackend_GetScheduledTransaction(t *testing.T) {
 		store := storagemock.NewScheduledTransactionsIndexReader(t)
 		backend := NewScheduledTransactionsBackend(
 			unittest.Logger(), &backendBase{config: defaultConfig},
-			store, nil, nil, nil, nil,
+			flow.Mainnet, store, nil, nil, nil, nil,
 		)
 
 		storageErr := fmt.Errorf("unexpected disk failure")
@@ -370,7 +372,7 @@ func TestScheduledTransactionsBackend_GetScheduledTransaction(t *testing.T) {
 		store := storagemock.NewScheduledTransactionsIndexReader(t)
 		backend := NewScheduledTransactionsBackend(
 			unittest.Logger(), &backendBase{config: defaultConfig},
-			store, nil, nil, nil, nil,
+			flow.Mainnet, store, nil, nil, nil, nil,
 		)
 
 		tx := accessmodel.ScheduledTransaction{ID: 1, Status: accessmodel.ScheduledTxStatusScheduled}
@@ -405,7 +407,7 @@ func TestScheduledTransactionsBackend_GetScheduledTransaction(t *testing.T) {
 				collections: mockCollections,
 				blocks:      mockBlocks,
 			},
-			store, nil, scheduledTxLookup, nil, nil,
+			flow.Mainnet, store, nil, scheduledTxLookup, nil, nil,
 		)
 
 		tx := accessmodel.ScheduledTransaction{
@@ -445,7 +447,7 @@ func TestScheduledTransactionsBackend_GetScheduledTransaction(t *testing.T) {
 					headers:              mockHeaders,
 					transactionsProvider: mockProvider,
 				},
-				store, nil, scheduledTxLookup, nil, nil,
+				flow.Mainnet, store, nil, scheduledTxLookup, nil, nil,
 			)
 
 			txID := unittest.IdentifierFixture()
@@ -483,39 +485,49 @@ func TestScheduledTransactionsBackend_GetScheduledTransaction(t *testing.T) {
 			store := storagemock.NewScheduledTransactionsIndexReader(t)
 			scheduledTxLookup := storagemock.NewScheduledTransactionsReader(t)
 			mockHeaders := storagemock.NewHeaders(t)
-			mockProvider := providermock.NewTransactionProvider(t)
+
+			sysCollections, err := systemcollection.NewVersioned(
+				flow.Mainnet.Chain(), systemcollection.Default(flow.Mainnet),
+			)
+			require.NoError(t, err)
 
 			backend := NewScheduledTransactionsBackend(
 				unittest.Logger(),
 				&backendBase{
-					config:               defaultConfig,
-					headers:              mockHeaders,
-					transactionsProvider: mockProvider,
+					config:            defaultConfig,
+					headers:           mockHeaders,
+					systemCollections: sysCollections,
 				},
-				store, nil, scheduledTxLookup, nil, nil,
+				flow.Mainnet, store, nil, scheduledTxLookup, nil, nil,
 			)
 
-			txBody := unittest.TransactionBodyFixture()
-			txID := txBody.ID()
+			// construct the expected tx body using the same path the production code will use
+			const scheduledTxID = uint64(42)
+			const executionEffort = uint64(1000)
+			expectedTxBody, err := blueprints.ExecuteCallbacksTransaction(flow.Mainnet.Chain(), scheduledTxID, executionEffort)
+			require.NoError(t, err)
+			txID := expectedTxBody.ID()
+
 			blockHeader := unittest.BlockHeaderFixture()
 			blockID := blockHeader.ID()
 
-			storedTx := accessmodel.ScheduledTransaction{ID: 1, Status: status, ExecutedTransactionID: txID}
+			storedTx := accessmodel.ScheduledTransaction{
+				ID: scheduledTxID, Status: status,
+				ExecutedTransactionID: txID, ExecutionEffort: executionEffort,
+			}
 
-			store.On("ByID", uint64(1)).Return(storedTx, nil).Once()
+			store.On("ByID", scheduledTxID).Return(storedTx, nil).Once()
 			scheduledTxLookup.On("BlockIDByTransactionID", txID).Return(blockID, nil).Once()
 			mockHeaders.On("ByBlockID", blockID).Return(blockHeader, nil).Once()
-			mockProvider.On("ScheduledTransactionsByBlockID", mocktestify.Anything, blockHeader).
-				Return([]*flow.TransactionBody{&txBody}, nil).Once()
 
 			result, err := backend.GetScheduledTransaction(
-				context.Background(), 1,
+				context.Background(), scheduledTxID,
 				ScheduledTransactionExpandOptions{Transaction: true},
 				defaultEncoding,
 			)
 			require.NoError(t, err)
 			require.NotNil(t, result.Transaction)
-			assert.Equal(t, &txBody, result.Transaction)
+			assert.Equal(t, txID, result.Transaction.ID())
 			assert.Nil(t, result.Result)
 		})
 	}
@@ -526,7 +538,7 @@ func TestScheduledTransactionsBackend_GetScheduledTransaction(t *testing.T) {
 
 		backend := NewScheduledTransactionsBackend(
 			unittest.Logger(), &backendBase{config: defaultConfig},
-			store, mockContracts, nil, nil, nil,
+			flow.Mainnet, store, mockContracts, nil, nil, nil,
 		)
 
 		handlerTypeID := "A.1654653399040a61.MyScheduler.Handler"
@@ -569,7 +581,7 @@ func TestScheduledTransactionsBackend_GetScheduledTransaction(t *testing.T) {
 				collections: mockCollections,
 				blocks:      mockBlocks,
 			},
-			store, nil, scheduledTxLookup, nil, nil,
+			flow.Mainnet, store, nil, scheduledTxLookup, nil, nil,
 		)
 
 		createdTxID := unittest.IdentifierFixture()
@@ -604,7 +616,7 @@ func TestScheduledTransactionsBackend_GetScheduledTransaction(t *testing.T) {
 				collections: mockCollections,
 				blocks:      mockBlocks,
 			},
-			store, nil, scheduledTxLookup, nil, nil,
+			flow.Mainnet, store, nil, scheduledTxLookup, nil, nil,
 		)
 
 		cancelledTxID := unittest.IdentifierFixture()
@@ -631,7 +643,7 @@ func TestScheduledTransactionsBackend_GetScheduledTransaction(t *testing.T) {
 
 		backend := NewScheduledTransactionsBackend(
 			unittest.Logger(), &backendBase{config: defaultConfig},
-			store, nil, scheduledTxLookup, nil, nil,
+			flow.Mainnet, store, nil, scheduledTxLookup, nil, nil,
 		)
 
 		txID := unittest.IdentifierFixture()
@@ -656,7 +668,7 @@ func TestScheduledTransactionsBackend_GetScheduledTransaction(t *testing.T) {
 
 		backend := NewScheduledTransactionsBackend(
 			unittest.Logger(), &backendBase{config: defaultConfig},
-			store, nil, scheduledTxLookup, nil, nil,
+			flow.Mainnet, store, nil, scheduledTxLookup, nil, nil,
 		)
 
 		txID := unittest.IdentifierFixture()
@@ -682,7 +694,7 @@ func TestScheduledTransactionsBackend_GetScheduledTransaction(t *testing.T) {
 
 		backend := NewScheduledTransactionsBackend(
 			unittest.Logger(), &backendBase{config: defaultConfig, headers: mockHeaders},
-			store, nil, scheduledTxLookup, nil, nil,
+			flow.Mainnet, store, nil, scheduledTxLookup, nil, nil,
 		)
 
 		txID := unittest.IdentifierFixture()
@@ -703,38 +715,43 @@ func TestScheduledTransactionsBackend_GetScheduledTransaction(t *testing.T) {
 		verifyThrown()
 	})
 
-	t.Run("ScheduledTransactionsByBlockID error during expand triggers irrecoverable", func(t *testing.T) {
+	t.Run("transaction ID mismatch during expand triggers irrecoverable", func(t *testing.T) {
 		store := storagemock.NewScheduledTransactionsIndexReader(t)
 		scheduledTxLookup := storagemock.NewScheduledTransactionsReader(t)
 		mockHeaders := storagemock.NewHeaders(t)
-		mockProvider := providermock.NewTransactionProvider(t)
+
+		sysCollections, err := systemcollection.NewVersioned(
+			flow.Mainnet.Chain(), systemcollection.Default(flow.Mainnet),
+		)
+		require.NoError(t, err)
 
 		backend := NewScheduledTransactionsBackend(
 			unittest.Logger(),
 			&backendBase{
-				config:               defaultConfig,
-				headers:              mockHeaders,
-				transactionsProvider: mockProvider,
+				config:            defaultConfig,
+				headers:           mockHeaders,
+				systemCollections: sysCollections,
 			},
-			store, nil, scheduledTxLookup, nil, nil,
+			flow.Mainnet, store, nil, scheduledTxLookup, nil, nil,
 		)
 
-		txID := unittest.IdentifierFixture()
+		// ExecutedTransactionID does NOT match the tx body constructed by systemCollections
+		mismatchedTxID := unittest.IdentifierFixture()
 		blockHeader := unittest.BlockHeaderFixture()
 		blockID := blockHeader.ID()
-		storedTx := accessmodel.ScheduledTransaction{ID: 1, Status: accessmodel.ScheduledTxStatusExecuted, ExecutedTransactionID: txID}
-		providerErr := fmt.Errorf("provider error")
+		storedTx := accessmodel.ScheduledTransaction{
+			ID: 42, Status: accessmodel.ScheduledTxStatusExecuted,
+			ExecutedTransactionID: mismatchedTxID, ExecutionEffort: 1000,
+		}
 
-		store.On("ByID", uint64(1)).Return(storedTx, nil).Once()
-		scheduledTxLookup.On("BlockIDByTransactionID", txID).Return(blockID, nil).Once()
+		store.On("ByID", uint64(42)).Return(storedTx, nil).Once()
+		scheduledTxLookup.On("BlockIDByTransactionID", mismatchedTxID).Return(blockID, nil).Once()
 		mockHeaders.On("ByBlockID", blockID).Return(blockHeader, nil).Once()
-		mockProvider.On("ScheduledTransactionsByBlockID", mocktestify.Anything, blockHeader).
-			Return(nil, providerErr).Once()
 
 		signalerCtx, verifyThrown := signalerCtxExpectingThrow(t)
 
-		_, err := backend.GetScheduledTransaction(
-			signalerCtx, 1, ScheduledTransactionExpandOptions{Transaction: true}, defaultEncoding,
+		_, err = backend.GetScheduledTransaction(
+			signalerCtx, 42, ScheduledTransactionExpandOptions{Transaction: true}, defaultEncoding,
 		)
 		require.Error(t, err)
 		verifyThrown()
@@ -753,7 +770,7 @@ func TestScheduledTransactionsBackend_GetScheduledTransaction(t *testing.T) {
 				headers:              mockHeaders,
 				transactionsProvider: mockProvider,
 			},
-			store, nil, scheduledTxLookup, nil, nil,
+			flow.Mainnet, store, nil, scheduledTxLookup, nil, nil,
 		)
 
 		// txID that does NOT match the tx body returned by the provider.
@@ -792,7 +809,7 @@ func TestScheduledTransactionsBackend_GetScheduledTransaction(t *testing.T) {
 				headers:              mockHeaders,
 				transactionsProvider: mockProvider,
 			},
-			store, nil, scheduledTxLookup, nil, nil,
+			flow.Mainnet, store, nil, scheduledTxLookup, nil, nil,
 		)
 
 		txID := unittest.IdentifierFixture()
@@ -822,7 +839,7 @@ func TestScheduledTransactionsBackend_GetScheduledTransaction(t *testing.T) {
 
 		backend := NewScheduledTransactionsBackend(
 			unittest.Logger(), &backendBase{config: defaultConfig},
-			store, mockContracts, nil, nil, nil,
+			flow.Mainnet, store, mockContracts, nil, nil, nil,
 		)
 
 		storedTx := accessmodel.ScheduledTransaction{
@@ -857,7 +874,7 @@ func TestScheduledTransactionsBackend_GetScheduledTransaction(t *testing.T) {
 
 		backend := NewScheduledTransactionsBackend(
 			unittest.Logger(), &backendBase{config: defaultConfig},
-			store, mockContracts, nil, mockState, mockExecutor,
+			flow.Mainnet, store, mockContracts, nil, mockState, mockExecutor,
 		)
 
 		sealedHeader := unittest.BlockHeaderFixture()
@@ -901,7 +918,7 @@ func TestScheduledTransactionsBackend_GetScheduledTransaction(t *testing.T) {
 
 		backend := NewScheduledTransactionsBackend(
 			unittest.Logger(), &backendBase{config: defaultConfig},
-			store, mockContracts, nil, mockState, nil,
+			flow.Mainnet, store, mockContracts, nil, mockState, nil,
 		)
 
 		storedTx := accessmodel.ScheduledTransaction{
@@ -937,7 +954,7 @@ func TestScheduledTransactionsBackend_GetScheduledTransaction(t *testing.T) {
 
 		backend := NewScheduledTransactionsBackend(
 			unittest.Logger(), &backendBase{config: defaultConfig},
-			store, mockContracts, nil, mockState, mockExecutor,
+			flow.Mainnet, store, mockContracts, nil, mockState, mockExecutor,
 		)
 
 		sealedHeader := unittest.BlockHeaderFixture()
@@ -975,7 +992,7 @@ func TestScheduledTransactionsBackend_GetScheduledTransaction(t *testing.T) {
 
 		backend := NewScheduledTransactionsBackend(
 			unittest.Logger(), &backendBase{config: defaultConfig},
-			store, nil, nil, nil, nil,
+			flow.Mainnet, store, nil, nil, nil, nil,
 		)
 
 		storedTx := accessmodel.ScheduledTransaction{
@@ -1011,7 +1028,7 @@ func TestScheduledTransactionsBackend_GetScheduledTransactions(t *testing.T) {
 		store := storagemock.NewScheduledTransactionsIndexReader(t)
 		backend := NewScheduledTransactionsBackend(
 			unittest.Logger(), &backendBase{config: defaultConfig},
-			store, nil, nil, nil, nil,
+			flow.Mainnet, store, nil, nil, nil, nil,
 		)
 
 		txs := []accessmodel.ScheduledTransaction{
@@ -1036,7 +1053,7 @@ func TestScheduledTransactionsBackend_GetScheduledTransactions(t *testing.T) {
 		store := storagemock.NewScheduledTransactionsIndexReader(t)
 		backend := NewScheduledTransactionsBackend(
 			unittest.Logger(), &backendBase{config: defaultConfig},
-			store, nil, nil, nil, nil,
+			flow.Mainnet, store, nil, nil, nil, nil,
 		)
 
 		// limit=2, provide 3 items: CollectResults collects 2, then peeks at item 3 to build cursor
@@ -1064,7 +1081,7 @@ func TestScheduledTransactionsBackend_GetScheduledTransactions(t *testing.T) {
 		store := storagemock.NewScheduledTransactionsIndexReader(t)
 		backend := NewScheduledTransactionsBackend(
 			unittest.Logger(), &backendBase{config: defaultConfig},
-			store, nil, nil, nil, nil,
+			flow.Mainnet, store, nil, nil, nil, nil,
 		)
 
 		store.On("All", (*accessmodel.ScheduledTransactionCursor)(nil)).
@@ -1082,7 +1099,7 @@ func TestScheduledTransactionsBackend_GetScheduledTransactions(t *testing.T) {
 		store := storagemock.NewScheduledTransactionsIndexReader(t)
 		backend := NewScheduledTransactionsBackend(
 			unittest.Logger(), &backendBase{config: defaultConfig},
-			store, nil, nil, nil, nil,
+			flow.Mainnet, store, nil, nil, nil, nil,
 		)
 
 		store.On("All", (*accessmodel.ScheduledTransactionCursor)(nil)).
@@ -1100,7 +1117,7 @@ func TestScheduledTransactionsBackend_GetScheduledTransactions(t *testing.T) {
 		store := storagemock.NewScheduledTransactionsIndexReader(t)
 		backend := NewScheduledTransactionsBackend(
 			unittest.Logger(), &backendBase{config: defaultConfig},
-			store, nil, nil, nil, nil,
+			flow.Mainnet, store, nil, nil, nil, nil,
 		)
 
 		_, err := backend.GetScheduledTransactions(
@@ -1118,7 +1135,7 @@ func TestScheduledTransactionsBackend_GetScheduledTransactions(t *testing.T) {
 		store := storagemock.NewScheduledTransactionsIndexReader(t)
 		backend := NewScheduledTransactionsBackend(
 			unittest.Logger(), &backendBase{config: defaultConfig},
-			store, nil, nil, nil, nil,
+			flow.Mainnet, store, nil, nil, nil, nil,
 		)
 
 		cursor := &accessmodel.ScheduledTransactionCursor{ID: 100}
@@ -1137,7 +1154,7 @@ func TestScheduledTransactionsBackend_GetScheduledTransactions(t *testing.T) {
 		store := storagemock.NewScheduledTransactionsIndexReader(t)
 		backend := NewScheduledTransactionsBackend(
 			unittest.Logger(), &backendBase{config: defaultConfig},
-			store, nil, nil, nil, nil,
+			flow.Mainnet, store, nil, nil, nil, nil,
 		)
 
 		store.On("All", (*accessmodel.ScheduledTransactionCursor)(nil)).
@@ -1157,7 +1174,7 @@ func TestScheduledTransactionsBackend_GetScheduledTransactions(t *testing.T) {
 		store := storagemock.NewScheduledTransactionsIndexReader(t)
 		backend := NewScheduledTransactionsBackend(
 			unittest.Logger(), &backendBase{config: defaultConfig},
-			store, nil, nil, nil, nil,
+			flow.Mainnet, store, nil, nil, nil, nil,
 		)
 
 		store.On("All", (*accessmodel.ScheduledTransactionCursor)(nil)).
@@ -1178,7 +1195,7 @@ func TestScheduledTransactionsBackend_GetScheduledTransactions(t *testing.T) {
 		store := storagemock.NewScheduledTransactionsIndexReader(t)
 		backend := NewScheduledTransactionsBackend(
 			unittest.Logger(), &backendBase{config: defaultConfig},
-			store, nil, nil, nil, nil,
+			flow.Mainnet, store, nil, nil, nil, nil,
 		)
 
 		storageErr := fmt.Errorf("unexpected disk failure")
@@ -1203,7 +1220,7 @@ func TestScheduledTransactionsBackend_GetScheduledTransactions(t *testing.T) {
 
 		backend := NewScheduledTransactionsBackend(
 			unittest.Logger(), &backendBase{config: defaultConfig},
-			store, nil, scheduledTxLookup, nil, nil,
+			flow.Mainnet, store, nil, scheduledTxLookup, nil, nil,
 		)
 
 		txID := unittest.IdentifierFixture()
@@ -1240,7 +1257,7 @@ func TestScheduledTransactionsBackend_GetScheduledTransactions(t *testing.T) {
 				collections: mockCollections,
 				blocks:      mockBlocks,
 			},
-			store, nil, scheduledTxLookup, nil, nil,
+			flow.Mainnet, store, nil, scheduledTxLookup, nil, nil,
 		)
 
 		createdTxID := unittest.IdentifierFixture()
@@ -1278,7 +1295,7 @@ func TestScheduledTransactionsBackend_GetScheduledTransactionsByAddress(t *testi
 		store := storagemock.NewScheduledTransactionsIndexReader(t)
 		backend := NewScheduledTransactionsBackend(
 			unittest.Logger(), &backendBase{config: defaultConfig},
-			store, nil, nil, nil, nil,
+			flow.Mainnet, store, nil, nil, nil, nil,
 		)
 
 		addr := unittest.RandomAddressFixture()
@@ -1304,7 +1321,7 @@ func TestScheduledTransactionsBackend_GetScheduledTransactionsByAddress(t *testi
 		store := storagemock.NewScheduledTransactionsIndexReader(t)
 		backend := NewScheduledTransactionsBackend(
 			unittest.Logger(), &backendBase{config: defaultConfig},
-			store, nil, nil, nil, nil,
+			flow.Mainnet, store, nil, nil, nil, nil,
 		)
 
 		addr := unittest.RandomAddressFixture()
@@ -1323,7 +1340,7 @@ func TestScheduledTransactionsBackend_GetScheduledTransactionsByAddress(t *testi
 		store := storagemock.NewScheduledTransactionsIndexReader(t)
 		backend := NewScheduledTransactionsBackend(
 			unittest.Logger(), &backendBase{config: defaultConfig},
-			store, nil, nil, nil, nil,
+			flow.Mainnet, store, nil, nil, nil, nil,
 		)
 
 		addr := unittest.RandomAddressFixture()
@@ -1343,7 +1360,7 @@ func TestScheduledTransactionsBackend_GetScheduledTransactionsByAddress(t *testi
 		store := storagemock.NewScheduledTransactionsIndexReader(t)
 		backend := NewScheduledTransactionsBackend(
 			unittest.Logger(), &backendBase{config: defaultConfig},
-			store, nil, nil, nil, nil,
+			flow.Mainnet, store, nil, nil, nil, nil,
 		)
 
 		addr := unittest.RandomAddressFixture()
@@ -1363,7 +1380,7 @@ func TestScheduledTransactionsBackend_GetScheduledTransactionsByAddress(t *testi
 		store := storagemock.NewScheduledTransactionsIndexReader(t)
 		backend := NewScheduledTransactionsBackend(
 			unittest.Logger(), &backendBase{config: defaultConfig},
-			store, nil, nil, nil, nil,
+			flow.Mainnet, store, nil, nil, nil, nil,
 		)
 
 		addr := unittest.RandomAddressFixture()
@@ -1384,7 +1401,7 @@ func TestScheduledTransactionsBackend_GetScheduledTransactionsByAddress(t *testi
 		store := storagemock.NewScheduledTransactionsIndexReader(t)
 		backend := NewScheduledTransactionsBackend(
 			unittest.Logger(), &backendBase{config: defaultConfig},
-			store, nil, nil, nil, nil,
+			flow.Mainnet, store, nil, nil, nil, nil,
 		)
 
 		addr := unittest.RandomAddressFixture()
@@ -1406,7 +1423,7 @@ func TestScheduledTransactionsBackend_GetScheduledTransactionsByAddress(t *testi
 		store := storagemock.NewScheduledTransactionsIndexReader(t)
 		backend := NewScheduledTransactionsBackend(
 			unittest.Logger(), &backendBase{config: defaultConfig},
-			store, nil, nil, nil, nil,
+			flow.Mainnet, store, nil, nil, nil, nil,
 		)
 
 		addr := unittest.RandomAddressFixture()
@@ -1432,7 +1449,7 @@ func TestScheduledTransactionsBackend_GetScheduledTransactionsByAddress(t *testi
 
 		backend := NewScheduledTransactionsBackend(
 			unittest.Logger(), &backendBase{config: defaultConfig},
-			store, nil, scheduledTxLookup, nil, nil,
+			flow.Mainnet, store, nil, scheduledTxLookup, nil, nil,
 		)
 
 		addr := unittest.RandomAddressFixture()
@@ -1470,7 +1487,7 @@ func TestScheduledTransactionsBackend_GetScheduledTransactionsByAddress(t *testi
 				collections: mockCollections,
 				blocks:      mockBlocks,
 			},
-			store, nil, scheduledTxLookup, nil, nil,
+			flow.Mainnet, store, nil, scheduledTxLookup, nil, nil,
 		)
 
 		addr := unittest.RandomAddressFixture()
@@ -1521,7 +1538,7 @@ func TestScheduledTransactionsBackend_PopulateBlockTimestamps(t *testing.T) {
 				blocks:      mockBlocks,
 				collections: mockCollections,
 			},
-			store, nil, scheduledTxLookup, nil, nil,
+			flow.Mainnet, store, nil, scheduledTxLookup, nil, nil,
 		)
 	}
 

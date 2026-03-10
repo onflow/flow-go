@@ -15,6 +15,7 @@ import (
 	"github.com/onflow/flow-go/fvm/evm/types"
 	"github.com/onflow/flow-go/model/flow"
 
+	gethCommon "github.com/ethereum/go-ethereum/common"
 	gethTypes "github.com/ethereum/go-ethereum/core/types"
 	gethCrypto "github.com/ethereum/go-ethereum/crypto"
 )
@@ -58,6 +59,9 @@ func NewInternalEVMContractValue(
 			stdlib.InternalEVMTypeDryCallFunctionName:                   newInternalEVMTypeDryCallFunction(gauge, handler),
 			stdlib.InternalEVMTypeDryCallWithSigAndArgsFunctionName:     newInternalEVMTypeDryCallWithSigAndArgsFunction(gauge, handler, location),
 			stdlib.InternalEVMTypeCommitBlockProposalFunctionName:       newInternalEVMTypeCommitBlockProposalFunction(gauge, handler),
+			stdlib.InternalEVMTypeStoreFunctionName:                     newInternalEVMTypeStoreFunction(gauge, handler),
+			stdlib.InternalEVMTypeLoadFunctionName:                      newInternalEVMTypeLoadFunction(gauge, handler),
+			stdlib.InternalEVMTypeRunTxAsFunctionName:                   newInternalEVMTypeRunTxAsFunction(gauge, handler),
 		},
 		nil,
 		nil,
@@ -443,6 +447,41 @@ func newInternalEVMTypeCallFunction(
 			const isAuthorized = true
 			account := handler.AccountByAddress(callArgs.from, isAuthorized)
 			result := account.Call(callArgs.to, callArgs.data, callArgs.gasLimit, callArgs.balance)
+
+			return NewResultValue(
+				handler,
+				gauge,
+				context,
+				result,
+			)
+		},
+	)
+}
+
+func newInternalEVMTypeRunTxAsFunction(
+	gauge common.MemoryGauge,
+	handler types.ContractHandler,
+) *interpreter.HostFunctionValue {
+	return interpreter.NewStaticHostFunctionValue(
+		gauge,
+		stdlib.InternalEVMTypeRunTxAsFunctionType,
+		func(invocation interpreter.Invocation) interpreter.Value {
+			context := invocation.InvocationContext
+
+			callArgs, err := parseCallArguments(invocation)
+			if err != nil {
+				panic(err)
+			}
+
+			// Call
+
+			result := handler.RunTxAs(
+				callArgs.from,
+				callArgs.to,
+				callArgs.data,
+				callArgs.gasLimit,
+				callArgs.balance,
+			)
 
 			return NewResultValue(
 				handler,
@@ -902,6 +941,94 @@ func newInternalEVMTypeCommitBlockProposalFunction(
 		stdlib.InternalEVMTypeCommitBlockProposalFunctionType,
 		func(invocation interpreter.Invocation) interpreter.Value {
 			handler.CommitBlockProposal()
+			return interpreter.Void
+		},
+	)
+}
+
+func newInternalEVMTypeLoadFunction(
+	gauge common.MemoryGauge,
+	handler types.ContractHandler,
+) *interpreter.HostFunctionValue {
+	return interpreter.NewStaticHostFunctionValue(
+		gauge,
+		stdlib.InternalEVMTypeLoadFunctionType,
+		func(invocation interpreter.Invocation) interpreter.Value {
+			context := invocation.InvocationContext
+
+			// Get target argument
+			targetValue, ok := invocation.Arguments[0].(*interpreter.ArrayValue)
+			if !ok {
+				panic(errors.NewUnreachableError())
+			}
+
+			addr, err := AddressBytesArrayValueToEVMAddress(context, targetValue)
+			if err != nil {
+				panic(err)
+			}
+
+			// Get slot argument
+			slotValue, ok := invocation.Arguments[1].(*interpreter.StringValue)
+			if !ok {
+				panic(errors.NewUnreachableError())
+			}
+
+			if !isHexHash(slotValue.Str) {
+				panic(fmt.Errorf("invalid input: slot is not a valid hex-encoded Ethereum hash"))
+			}
+			slot := gethCommon.HexToHash(slotValue.Str)
+
+			value := handler.GetState(addr, slot)
+			return interpreter.ByteSliceToByteArrayValue(context, value.Bytes())
+		},
+	)
+}
+
+func newInternalEVMTypeStoreFunction(
+	gauge common.MemoryGauge,
+	handler types.ContractHandler,
+) *interpreter.HostFunctionValue {
+	return interpreter.NewStaticHostFunctionValue(
+		gauge,
+		stdlib.InternalEVMTypeStoreFunctionType,
+		func(invocation interpreter.Invocation) interpreter.Value {
+			context := invocation.InvocationContext
+
+			// Get target argument
+			targetValue, ok := invocation.Arguments[0].(*interpreter.ArrayValue)
+			if !ok {
+				panic(errors.NewUnreachableError())
+			}
+
+			addr, err := AddressBytesArrayValueToEVMAddress(context, targetValue)
+			if err != nil {
+				panic(err)
+			}
+
+			// Get slot argument
+			slotValue, ok := invocation.Arguments[1].(*interpreter.StringValue)
+			if !ok {
+				panic(errors.NewUnreachableError())
+			}
+
+			if !isHexHash(slotValue.Str) {
+				panic(fmt.Errorf("invalid input: slot is not a valid hex-encoded Ethereum hash"))
+			}
+			slot := gethCommon.HexToHash(slotValue.Str)
+
+			// Get value argument
+			valueValue, ok := invocation.Arguments[2].(*interpreter.StringValue)
+			if !ok {
+				panic(errors.NewUnreachableError())
+			}
+
+			if !isHexHash(valueValue.Str) {
+				panic(fmt.Errorf("invalid input: value is not a valid hex-encoded Ethereum hash"))
+			}
+			value := gethCommon.HexToHash(valueValue.Str)
+
+			handler.SetState(addr, slot, value)
+
 			return interpreter.Void
 		},
 	)
@@ -1584,4 +1711,36 @@ func encodeABIWithSigAndArgs(
 	copy(data[n:], encodedArguments)
 
 	return data, nil
+}
+
+// isHexHash verifies whether a string can represent a valid hex-encoded
+// Ethereum hash or not.
+func isHexHash(s string) bool {
+	if has0xPrefix(s) {
+		s = s[2:]
+	}
+	return len(s) == 2*gethCommon.HashLength && isHex(s)
+}
+
+// has0xPrefix validates str begins with '0x' or '0X'.
+func has0xPrefix(str string) bool {
+	return len(str) >= 2 && str[0] == '0' && (str[1] == 'x' || str[1] == 'X')
+}
+
+// isHexCharacter returns bool of c being a valid hexadecimal.
+func isHexCharacter(c byte) bool {
+	return ('0' <= c && c <= '9') || ('a' <= c && c <= 'f') || ('A' <= c && c <= 'F')
+}
+
+// isHex validates whether each byte is valid hexadecimal string.
+func isHex(str string) bool {
+	if len(str)%2 != 0 {
+		return false
+	}
+	for _, c := range []byte(str) {
+		if !isHexCharacter(c) {
+			return false
+		}
+	}
+	return true
 }
