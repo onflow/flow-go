@@ -217,7 +217,10 @@ func (_c *ContractDeploymentsIndexBootstrapper_ByContract_Call) Run(run func(acc
 		if args[1] != nil {
 			arg1 = args[1].(string)
 		}
-		run(arg0, arg1)
+		run(
+			arg0,
+			arg1,
+		)
 	})
 	return _c
 }
