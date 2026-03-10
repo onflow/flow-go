@@ -9,10 +9,10 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// contractDeploymentsCursorJSON is the JSON shape for a [accessmodel.ContractDeploymentsCursor].
+// contractDeploymentsCursor is the JSON shape for a [accessmodel.ContractDeploymentsCursor].
 // Address and Name are omitted when empty (DeploymentsByContract cursors; the contract is
 // identified by the URL parameter).
-type contractDeploymentsCursorJSON struct {
+type contractDeploymentsCursor struct {
 	Address    string `json:"a,omitempty"`
 	Name       string `json:"n,omitempty"`
 	Height     uint64 `json:"h"`
@@ -25,7 +25,7 @@ type contractDeploymentsCursorJSON struct {
 //
 // No error returns are expected during normal operation.
 func EncodeContractDeploymentsCursor(cursor *accessmodel.ContractDeploymentsCursor) (string, error) {
-	data, err := json.Marshal(contractDeploymentsCursorJSON{
+	data, err := json.Marshal(contractDeploymentsCursor{
 		Address:    cursor.Address.Hex(),
 		Name:       cursor.ContractName,
 		Height:     cursor.BlockHeight,
@@ -48,7 +48,7 @@ func DecodeContractDeploymentsCursor(raw string) (*accessmodel.ContractDeploymen
 	if err != nil {
 		return nil, fmt.Errorf("invalid cursor encoding: %w", err)
 	}
-	var c contractDeploymentsCursorJSON
+	var c contractDeploymentsCursor
 	if err := json.Unmarshal(data, &c); err != nil {
 		return nil, fmt.Errorf("invalid deployments cursor format: %w", err)
 	}
