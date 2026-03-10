@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/onflow/cadence"
+	"github.com/onflow/cadence/common"
 	"github.com/onflow/cadence/encoding/ccf"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -37,6 +38,34 @@ func TestAddressFromOptional(t *testing.T) {
 	t.Run("non-address value in optional returns error", func(t *testing.T) {
 		opt := cadence.NewOptional(cadence.String("not an address"))
 		_, err := AddressFromOptional(opt)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "unexpected type")
+	})
+}
+
+// ==========================================================================
+// PathFromOptional Tests
+// ==========================================================================
+
+func TestPathFromOptional(t *testing.T) {
+	t.Run("valid path", func(t *testing.T) {
+		path := cadence.Path{Domain: common.PathDomainStorage, Identifier: "flowToken"}
+		opt := cadence.NewOptional(path)
+		result, err := PathFromOptional(opt)
+		require.NoError(t, err)
+		assert.Equal(t, path.String(), result)
+	})
+
+	t.Run("nil optional value", func(t *testing.T) {
+		opt := cadence.NewOptional(nil)
+		result, err := PathFromOptional(opt)
+		require.NoError(t, err)
+		assert.Equal(t, "", result)
+	})
+
+	t.Run("non-path value in optional returns error", func(t *testing.T) {
+		opt := cadence.NewOptional(cadence.String("not a path"))
+		_, err := PathFromOptional(opt)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "unexpected type")
 	})

@@ -45,7 +45,7 @@ type AccountTransactionsRangeReader interface {
 
 // AccountTransactionsWriter provides write access to the account transaction index.
 //
-// NOT CONCURRENTLY SAFE.
+// NOT CONCURRENCY SAFE.
 type AccountTransactionsWriter interface {
 	// Store indexes all account-transaction associations for a block.
 	// Must be called sequentially with consecutive heights (latestHeight + 1).
