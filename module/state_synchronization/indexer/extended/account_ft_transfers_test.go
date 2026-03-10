@@ -246,6 +246,86 @@ func TestFungibleTokenTransfers_Name(t *testing.T) {
 	assert.Equal(t, "account_ft_transfers", a.Name())
 }
 
+// ===== TestFungibleTokenTransfers_ProcessBlockData =====
+
+func TestFungibleTokenTransfers_ProcessBlockData(t *testing.T) {
+	t.Parallel()
+
+	t.Run("empty block returns empty entries and zero filtered count", func(t *testing.T) {
+		a := NewFungibleTokenTransfers(unittest.Logger(), flow.Testnet, &mockFTBootstrapper{latestHeight: 99}, metrics.NewNoopCollector())
+
+		data := BlockData{
+			Header: unittest.BlockHeaderFixture(unittest.WithHeaderHeight(100)),
+			Events: []flow.Event{},
+		}
+
+		entries, meta, err := a.ProcessBlockData(data)
+		require.NoError(t, err)
+		assert.Empty(t, entries)
+		assert.Equal(t, 0, meta.FilteredCount)
+	})
+
+	t.Run("self-transfer is filtered and counted in metadata", func(t *testing.T) {
+		a := NewFungibleTokenTransfers(unittest.Logger(), flow.Testnet, &mockFTBootstrapper{latestHeight: 99}, metrics.NewNoopCollector())
+
+		addr := unittest.RandomAddressFixture()
+		txID := unittest.IdentifierFixture()
+		amount := cadence.UFix64(5_00000000)
+
+		data := BlockData{
+			Header: unittest.BlockHeaderFixture(unittest.WithHeaderHeight(100)),
+			Events: []flow.Event{
+				testutil.MakeFTWithdrawnEvent(t, flow.Testnet, &addr, txID, 0, 0, 1, 50, amount),
+				testutil.MakeFTDepositedEvent(t, flow.Testnet, &addr, txID, 0, 1, 1, 50, amount),
+			},
+		}
+
+		entries, meta, err := a.ProcessBlockData(data)
+		require.NoError(t, err)
+		assert.Empty(t, entries)
+		assert.Equal(t, 1, meta.FilteredCount)
+	})
+
+	t.Run("valid transfer returned with zero filtered count", func(t *testing.T) {
+		a := NewFungibleTokenTransfers(unittest.Logger(), flow.Testnet, &mockFTBootstrapper{latestHeight: 99}, metrics.NewNoopCollector())
+
+		src := unittest.RandomAddressFixture()
+		dst := unittest.RandomAddressFixture()
+		txID := unittest.IdentifierFixture()
+		amount := cadence.UFix64(10_00000000)
+
+		data := BlockData{
+			Header: unittest.BlockHeaderFixture(unittest.WithHeaderHeight(100)),
+			Events: []flow.Event{
+				testutil.MakeFTWithdrawnEvent(t, flow.Testnet, &src, txID, 0, 0, 1, 50, amount),
+				testutil.MakeFTDepositedEvent(t, flow.Testnet, &dst, txID, 0, 1, 1, 50, amount),
+			},
+		}
+
+		entries, meta, err := a.ProcessBlockData(data)
+		require.NoError(t, err)
+		require.Len(t, entries, 1)
+		assert.Equal(t, src, entries[0].SourceAddress)
+		assert.Equal(t, dst, entries[0].RecipientAddress)
+		assert.Equal(t, 0, meta.FilteredCount)
+	})
+
+	t.Run("does not depend on indexer height state", func(t *testing.T) {
+		// ProcessBlockData should work regardless of the indexer's height state
+		a := NewFungibleTokenTransfers(unittest.Logger(), flow.Testnet, &mockFTBootstrapper{latestHeight: 50}, metrics.NewNoopCollector())
+
+		data := BlockData{
+			Header: unittest.BlockHeaderFixture(unittest.WithHeaderHeight(200)),
+			Events: []flow.Event{},
+		}
+
+		entries, meta, err := a.ProcessBlockData(data)
+		require.NoError(t, err)
+		assert.Empty(t, entries)
+		assert.Equal(t, 0, meta.FilteredCount)
+	})
+}
+
 // ===== TestFungibleTokenTransfers_IndexBlockData =====
 
 func TestFungibleTokenTransfers_IndexBlockData(t *testing.T) {

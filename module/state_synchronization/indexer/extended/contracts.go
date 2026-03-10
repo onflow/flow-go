@@ -66,6 +66,13 @@ type Contracts struct {
 }
 
 var _ Indexer = (*Contracts)(nil)
+var _ IndexProcessor[access.ContractDeployment, ContractsMetadata] = (*Contracts)(nil)
+
+// ContractsMetadata contains indexing metrics for a single block's contract events.
+type ContractsMetadata struct {
+	Created int
+	Updated int
+}
 
 // NewContracts creates a new Contracts indexer backed by store.
 func NewContracts(
@@ -104,9 +111,9 @@ func (c *Contracts) NextHeight() (uint64, error) {
 // Expected error returns during normal operations:
 //   - [ErrAlreadyIndexed]: if the data is already indexed for the height
 func (c *Contracts) IndexBlockData(lctx lockctx.Proof, data BlockData, rw storage.ReaderBatchWriter) error {
-	deployments, created, updated, err := c.collectDeployments(data)
+	deployments, meta, err := c.ProcessBlockData(data)
 	if err != nil {
-		return fmt.Errorf("failed to collect contract deployments for block %s: %w", data.Header.ID(), err)
+		return err
 	}
 
 	// if storage is not bootstrapped yet, do an initial load of all deployed contracts and include it in
@@ -139,8 +146,21 @@ func (c *Contracts) IndexBlockData(lctx lockctx.Proof, data BlockData, rw storag
 		return fmt.Errorf("failed to store contract deployments for block %s: %w", data.Header.ID(), err)
 	}
 
-	c.metrics.ContractDeploymentIndexed(created, updated) // ignores bootstrap deployments
+	c.metrics.ContractDeploymentIndexed(meta.Created, meta.Updated) // ignores bootstrap deployments
 	return nil
+}
+
+// ProcessBlockData processes the block data and returns the indexed contract deployment entries
+// along with metadata containing the counts of created and updated contracts.
+//
+// No error returns are expected during normal operation.
+func (c *Contracts) ProcessBlockData(data BlockData) ([]access.ContractDeployment, ContractsMetadata, error) {
+	deployments, created, updated, err := c.collectDeployments(data)
+	if err != nil {
+		return nil, ContractsMetadata{}, fmt.Errorf("failed to collect contract deployments for block %s: %w", data.Header.ID(), err)
+	}
+
+	return deployments, ContractsMetadata{Created: created, Updated: updated}, nil
 }
 
 // collectDeployments iterates the block events and builds a [access.ContractDeployment] for

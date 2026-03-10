@@ -568,6 +568,110 @@ func TestContractsIndexer_Bootstrap_MarksDeletedContracts(t *testing.T) {
 	})
 }
 
+// ===== ProcessBlockData tests =====
+
+// TestContractsIndexer_ProcessBlockData_NoEvents verifies that ProcessBlockData returns
+// empty entries and zero counts for a block with no contract events.
+func TestContractsIndexer_ProcessBlockData_NoEvents(t *testing.T) {
+	t.Parallel()
+
+	runWithContractsIndexer(t, contractsBootstrapHeight, nil, nil, func(indexer *Contracts, _ storage.ContractDeploymentsIndexBootstrapper, _ storage.LockManager, _ storage.DB) {
+		header := unittest.BlockHeaderFixtureOnChain(flow.Testnet, unittest.WithHeaderHeight(contractsBootstrapHeight))
+
+		entries, meta, err := indexer.ProcessBlockData(BlockData{Header: header, Events: []flow.Event{}})
+		require.NoError(t, err)
+		assert.Empty(t, entries)
+		assert.Equal(t, 0, meta.Created)
+		assert.Equal(t, 0, meta.Updated)
+	})
+}
+
+// TestContractsIndexer_ProcessBlockData_ContractAdded verifies that ProcessBlockData returns
+// the correct deployment entry and metadata for an AccountContractAdded event.
+func TestContractsIndexer_ProcessBlockData_ContractAdded(t *testing.T) {
+	t.Parallel()
+
+	address := unittest.RandomAddressFixture()
+	contractName := "MyContract"
+	code := []byte("access(all) contract MyContract {}")
+	codeHash := access.CadenceCodeHash(code)
+
+	scriptExecutor := executionmock.NewScriptExecutor(t)
+	runWithContractsIndexer(t, contractsBootstrapHeight, &fakeRegisters{}, scriptExecutor, func(indexer *Contracts, _ storage.ContractDeploymentsIndexBootstrapper, _ storage.LockManager, _ storage.DB) {
+		header := unittest.BlockHeaderFixtureOnChain(flow.Testnet, unittest.WithHeaderHeight(contractsEventHeight))
+		snap := makeContractSnapshot(t, address, map[string][]byte{contractName: code})
+		scriptExecutor.On("GetStorageSnapshot", contractsEventHeight).Return(snap, nil).Once()
+
+		event := makeContractEvent(t, eventContractAdded, address, contractName, codeHash, 0, 0)
+
+		entries, meta, err := indexer.ProcessBlockData(BlockData{Header: header, Events: []flow.Event{event}})
+		require.NoError(t, err)
+		require.Len(t, entries, 1)
+		assert.Equal(t, address, entries[0].Address)
+		assert.Equal(t, contractName, entries[0].ContractName)
+		assert.Equal(t, code, entries[0].Code)
+		assert.Equal(t, 1, meta.Created)
+		assert.Equal(t, 0, meta.Updated)
+	})
+}
+
+// TestContractsIndexer_ProcessBlockData_ContractUpdated verifies that ProcessBlockData returns
+// the correct metadata counts when processing an AccountContractUpdated event.
+func TestContractsIndexer_ProcessBlockData_ContractUpdated(t *testing.T) {
+	t.Parallel()
+
+	address := unittest.RandomAddressFixture()
+	contractName := "MyContract"
+	code := []byte("access(all) contract MyContract { let x: Int; init() { self.x = 2 } }")
+	codeHash := access.CadenceCodeHash(code)
+
+	scriptExecutor := executionmock.NewScriptExecutor(t)
+	runWithContractsIndexer(t, contractsBootstrapHeight, &fakeRegisters{}, scriptExecutor, func(indexer *Contracts, _ storage.ContractDeploymentsIndexBootstrapper, _ storage.LockManager, _ storage.DB) {
+		header := unittest.BlockHeaderFixtureOnChain(flow.Testnet, unittest.WithHeaderHeight(contractsEventHeight))
+		snap := makeContractSnapshot(t, address, map[string][]byte{contractName: code})
+		scriptExecutor.On("GetStorageSnapshot", contractsEventHeight).Return(snap, nil).Once()
+
+		event := makeContractEvent(t, eventContractUpdated, address, contractName, codeHash, 0, 0)
+
+		entries, meta, err := indexer.ProcessBlockData(BlockData{Header: header, Events: []flow.Event{event}})
+		require.NoError(t, err)
+		require.Len(t, entries, 1)
+		assert.Equal(t, 0, meta.Created)
+		assert.Equal(t, 1, meta.Updated)
+	})
+}
+
+// TestContractsIndexer_ProcessBlockData_DoesNotDependOnHeight verifies that ProcessBlockData
+// can be called with any height without checking the indexer's height state.
+func TestContractsIndexer_ProcessBlockData_DoesNotDependOnHeight(t *testing.T) {
+	t.Parallel()
+
+	runWithContractsIndexer(t, contractsBootstrapHeight, nil, nil, func(indexer *Contracts, _ storage.ContractDeploymentsIndexBootstrapper, _ storage.LockManager, _ storage.DB) {
+		// Use a height far beyond what the indexer expects
+		header := unittest.BlockHeaderFixtureOnChain(flow.Testnet, unittest.WithHeaderHeight(contractsBootstrapHeight+100))
+
+		entries, _, err := indexer.ProcessBlockData(BlockData{Header: header, Events: []flow.Event{}})
+		require.NoError(t, err)
+		assert.Empty(t, entries)
+	})
+}
+
+// TestContractsIndexer_ProcessBlockData_ContractRemoved verifies that ProcessBlockData returns
+// an error when encountering a ContractRemoved event (same as IndexBlockData).
+func TestContractsIndexer_ProcessBlockData_ContractRemoved(t *testing.T) {
+	t.Parallel()
+
+	address := unittest.RandomAddressFixture()
+	runWithContractsIndexer(t, contractsBootstrapHeight, nil, nil, func(indexer *Contracts, _ storage.ContractDeploymentsIndexBootstrapper, _ storage.LockManager, _ storage.DB) {
+		header := unittest.BlockHeaderFixtureOnChain(flow.Testnet, unittest.WithHeaderHeight(contractsBootstrapHeight))
+		removedEvent := makeContractEvent(t, eventContractRemoved, address, "SomeContract", make([]byte, 32), 0, 0)
+
+		_, _, err := indexer.ProcessBlockData(BlockData{Header: header, Events: []flow.Event{removedEvent}})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "not supported")
+	})
+}
+
 // ===== Error and edge-case tests =====
 
 // TestContractsIndexer_AlreadyIndexed verifies that attempting to index the same height

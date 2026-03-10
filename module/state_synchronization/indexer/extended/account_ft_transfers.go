@@ -31,7 +31,13 @@ type FungibleTokenTransfers struct {
 	metrics  module.ExtendedIndexingMetrics
 }
 
+type FungibleTokenTransfersMetadata struct {
+	// FilteredCount is the number of transfers that were omitted.
+	FilteredCount int
+}
+
 var _ Indexer = (*FungibleTokenTransfers)(nil)
+var _ IndexProcessor[access.FungibleTokenTransfer, FungibleTokenTransfersMetadata] = (*FungibleTokenTransfers)(nil)
 
 // NewFungibleTokenTransfers creates a new [FungibleTokenTransfers] indexer.
 func NewFungibleTokenTransfers(
@@ -82,11 +88,10 @@ func (a *FungibleTokenTransfers) IndexBlockData(lctx lockctx.Proof, data BlockDa
 		return ErrAlreadyIndexed
 	}
 
-	ftEntries, err := a.ftParser.Parse(data.Events, data.Header.Height)
+	ftEntries, _, err := a.ProcessBlockData(data)
 	if err != nil {
-		return fmt.Errorf("failed to parse fungible token transfers: %w", err)
+		return err
 	}
-	ftEntries = a.filterFTTransfers(ftEntries)
 
 	if err := a.ftStore.Store(lctx, batch, data.Header.Height, ftEntries); err != nil {
 		return fmt.Errorf("failed to store fungible token transfers: %w", err)
@@ -95,6 +100,20 @@ func (a *FungibleTokenTransfers) IndexBlockData(lctx lockctx.Proof, data BlockDa
 	a.metrics.FTTransferIndexed(len(ftEntries))
 
 	return nil
+}
+
+// ProcessBlockData processes the block data and returns the indexed fungible token transfer entries.
+//
+// No error returns are expected during normal operation.
+func (a *FungibleTokenTransfers) ProcessBlockData(data BlockData) ([]access.FungibleTokenTransfer, FungibleTokenTransfersMetadata, error) {
+	ftEntries, err := a.ftParser.Parse(data.Events, data.Header.Height)
+	if err != nil {
+		return nil, FungibleTokenTransfersMetadata{}, fmt.Errorf("failed to parse fungible token transfers: %w", err)
+	}
+	filtered := a.filterFTTransfers(ftEntries)
+	return filtered, FungibleTokenTransfersMetadata{
+		FilteredCount: len(ftEntries) - len(filtered),
+	}, nil
 }
 
 // filterFTTransfers filters out transfers that do not need to be indexed.

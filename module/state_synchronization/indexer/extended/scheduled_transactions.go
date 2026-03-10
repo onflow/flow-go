@@ -64,13 +64,20 @@ type ScheduledTransactions struct {
 }
 
 var _ Indexer = (*ScheduledTransactions)(nil)
+var _ IndexProcessor[access.ScheduledTransaction, ScheduledTransactionsMetadata] = (*ScheduledTransactions)(nil)
 
-// scheduledTransactionData collects the data for a block's scheduled transactions.
-type scheduledTransactionData struct {
-	newTxs          []access.ScheduledTransaction
-	executedEntries []executedEntry
-	canceledEntries []canceledEntry
-	failedEntries   []failedEntry
+// ScheduledTransactionsMetadata collects all event-derived data for a single block's scheduled
+// transaction lifecycle. It contains the newly scheduled transactions as well as the executed,
+// canceled, and failed lifecycle entries.
+//
+// Note: the complete indexed dataset is NOT available from [IndexProcessor.ProcessBlockData] alone
+// because backfilling missing transactions requires storage and script execution. The full dataset
+// is only assembled inside [ScheduledTransactions.IndexBlockData].
+type ScheduledTransactionsMetadata struct {
+	NewTxs          []access.ScheduledTransaction
+	ExecutedEntries []executedEntry
+	CanceledEntries []canceledEntry
+	FailedEntries   []failedEntry
 }
 
 // executedEntry pairs a decoded Executed event with the Flow transaction ID that emitted it.
@@ -151,10 +158,12 @@ func (s *ScheduledTransactions) IndexBlockData(lctx lockctx.Proof, data BlockDat
 		return ErrAlreadyIndexed
 	}
 
-	collected, err := s.collectScheduledTransactionData(data)
+	_, meta, err := s.ProcessBlockData(data)
 	if err != nil {
-		return fmt.Errorf("failed to collect scheduled transaction data: %w", err)
+		return err
 	}
+
+	newTxs := meta.NewTxs
 
 	// when a node is bootstrapped after a scheduled transaction was first scheduled, it will not exist
 	// in the local index. In this case, calls to Executed, Cancelled, and Failed will fail because the
@@ -172,7 +181,7 @@ func (s *ScheduledTransactions) IndexBlockData(lctx lockctx.Proof, data BlockDat
 	// 3. Store the updated transactions in the index.
 	var missingIDs []uint64
 
-	for _, entry := range collected.executedEntries {
+	for _, entry := range meta.ExecutedEntries {
 		if err := s.store.Executed(lctx, rw, entry.event.ID, entry.transactionID); err != nil {
 			if !errors.Is(err, storage.ErrNotFound) {
 				return fmt.Errorf("failed to mark tx %d executed: %w", entry.event.ID, err)
@@ -180,7 +189,7 @@ func (s *ScheduledTransactions) IndexBlockData(lctx lockctx.Proof, data BlockDat
 			missingIDs = append(missingIDs, entry.event.ID)
 		}
 	}
-	for _, entry := range collected.canceledEntries {
+	for _, entry := range meta.CanceledEntries {
 		if err := s.store.Cancelled(lctx, rw, entry.event.ID, uint64(entry.event.FeesReturned), uint64(entry.event.FeesDeducted), entry.transactionID); err != nil {
 			if !errors.Is(err, storage.ErrNotFound) {
 				return fmt.Errorf("failed to mark tx %d cancelled: %w", entry.event.ID, err)
@@ -188,7 +197,7 @@ func (s *ScheduledTransactions) IndexBlockData(lctx lockctx.Proof, data BlockDat
 			missingIDs = append(missingIDs, entry.event.ID)
 		}
 	}
-	for _, entry := range collected.failedEntries {
+	for _, entry := range meta.FailedEntries {
 		if err := s.store.Failed(lctx, rw, entry.scheduledTxID, entry.transactionID); err != nil {
 			if !errors.Is(err, storage.ErrNotFound) {
 				return fmt.Errorf("failed to mark tx %d failed: %w", entry.scheduledTxID, err)
@@ -196,14 +205,12 @@ func (s *ScheduledTransactions) IndexBlockData(lctx lockctx.Proof, data BlockDat
 			missingIDs = append(missingIDs, entry.scheduledTxID)
 		}
 	}
-
-	newTxs := collected.newTxs
 	if len(missingIDs) > 0 {
 		// scripts are executed against end of the block state, so the height must be before the current block,
 		// otherwise the executed/canceled events may not be found. Use one block before the current block.
 		// This is safe for genesis/spork root blocks because the root block does not execute transactions and
 		// thus will never have any scheduled transaction events, so the block here will always be after the root block.
-		missingTxs, err := s.requester.Fetch(context.TODO(), missingIDs, data.Header.Height-1, collected)
+		missingTxs, err := s.requester.Fetch(context.TODO(), missingIDs, data.Header.Height-1, meta)
 		if err != nil {
 			return fmt.Errorf("failed to fetch scheduled transaction data from state: %w", err)
 		}
@@ -226,19 +233,35 @@ func (s *ScheduledTransactions) IndexBlockData(lctx lockctx.Proof, data BlockDat
 
 	s.metrics.ScheduledTransactionIndexed(
 		len(newTxs)-len(missingIDs),
-		len(collected.executedEntries),
-		len(collected.failedEntries),
-		len(collected.canceledEntries),
+		len(meta.ExecutedEntries),
+		len(meta.FailedEntries),
+		len(meta.CanceledEntries),
 		len(missingIDs),
 	)
 
 	return nil
 }
 
+// ProcessBlockData processes the block data and returns event-derived metadata for the block's
+// scheduled transaction lifecycle events.
+//
+// The returned []access.ScheduledTransaction slice is always nil because all updates in the block
+// cannot be represented by a single slice of objects. Instead, data is passed via
+// [ScheduledTransactionsMetadata], partitioned into their respective lifecycle events.
+//
+// No error returns are expected during normal operation.
+func (s *ScheduledTransactions) ProcessBlockData(data BlockData) ([]access.ScheduledTransaction, ScheduledTransactionsMetadata, error) {
+	meta, err := s.collectScheduledTransactionData(data)
+	if err != nil {
+		return nil, ScheduledTransactionsMetadata{}, fmt.Errorf("failed to collect scheduled transaction data: %w", err)
+	}
+	return nil, *meta, nil
+}
+
 // collectScheduledTransactionData collects the scheduled transaction data from the block events.
 //
 // No error returns are expected during normal operation.
-func (s *ScheduledTransactions) collectScheduledTransactionData(data BlockData) (*scheduledTransactionData, error) {
+func (s *ScheduledTransactions) collectScheduledTransactionData(data BlockData) (*ScheduledTransactionsMetadata, error) {
 	var newTxs []access.ScheduledTransaction
 	var executedEntries []executedEntry
 	var canceledEntries []canceledEntry
@@ -392,11 +415,11 @@ func (s *ScheduledTransactions) collectScheduledTransactionData(data BlockData) 
 		}
 	}
 
-	return &scheduledTransactionData{
-		newTxs:          newTxs,
-		executedEntries: executedEntries,
-		canceledEntries: canceledEntries,
-		failedEntries:   failedEntries,
+	return &ScheduledTransactionsMetadata{
+		NewTxs:          newTxs,
+		ExecutedEntries: executedEntries,
+		CanceledEntries: canceledEntries,
+		FailedEntries:   failedEntries,
 	}, nil
 }
 

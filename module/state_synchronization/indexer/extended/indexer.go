@@ -60,3 +60,16 @@ type IndexerManager interface {
 	// No error returns are expected during normal operation.
 	IndexBlockData(header *flow.Header, transactions []*flow.TransactionBody, events []flow.Event) error
 }
+
+// IndexProcessor is a helper interface for indexers that need to process the block data and return
+// indexed data for a specific type. The second type parameter M allows each indexer to return
+// indexer-specific metadata alongside the indexed entries.
+//
+// Safe for concurrent use.
+type IndexProcessor[T any, M any] interface {
+	// ProcessBlockData processes the block data and returns the indexed data for the given type
+	// along with indexer-specific metadata.
+	//
+	// No error returns are expected during normal operation.
+	ProcessBlockData(data BlockData) ([]T, M, error)
+}
