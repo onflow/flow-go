@@ -106,28 +106,6 @@ func New(
 	}
 }
 
-// RegisterValue retrieves register values by the register IDs at the provided block height.
-// Even if the register wasn't indexed at the provided height, returns the highest height the register was indexed at.
-// If a register is not found it will return a nil value and not an error.
-//
-// Expected error returns during normal operation:
-//   - [storage.ErrHeightNotIndexed]: if the given height was not indexed yet or lower than the first indexed height.
-func (c *IndexerCore) RegisterValue(ID flow.RegisterID, height uint64) (flow.RegisterValue, error) {
-	value, err := c.registers.Get(ID, height)
-	if err != nil {
-		// only return an error if the error doesn't match the not found error, since we have
-		// to gracefully handle not found values and instead assign nil, that is because the script executor
-		// expects that behaviour
-		if errors.Is(err, storage.ErrNotFound) {
-			return nil, nil
-		}
-
-		return nil, err
-	}
-
-	return value, nil
-}
-
 // IndexBlockData indexes all execution block data by height.
 // This method shouldn't be used concurrently.
 // Expected error returns during normal operations:

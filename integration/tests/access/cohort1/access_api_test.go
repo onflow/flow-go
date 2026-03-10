@@ -1383,6 +1383,106 @@ func (s *AccessAPISuite) TestSystemTransactions() {
 	s.testSystemTransactionsRest(systemCollection, blockID, txResults)
 }
 
+// TestExecutionReceiptsAndResultsConsistency verifies the consistency of the execution receipt and
+// result endpoints using a real sealed block. The test chains the following queries and asserts
+// cross-API consistency:
+//
+//  1. GetExecutionResultForBlockID — the sealed execution result for a known block.
+//  2. GetExecutionReceiptsByBlockID — all execution receipts stored for the block; the result ID
+//     is taken directly from a receipt's Meta field (avoiding proto round-trip hash issues).
+//  3. GetExecutionResultByID — fetch the result by the ID obtained from the receipt; must reference
+//     the same block as in step 1.
+//  4. GetExecutionReceiptsByResultID — all receipts committing to that result ID.
+//
+// Invariants checked:
+//   - GetExecutionResultForBlockID succeeds and the result references the queried block.
+//   - GetExecutionReceiptsByBlockID returns at least one receipt for the sealed block.
+//   - GetExecutionResultByID(receipt.Meta.ResultId) returns a result whose BlockId matches blockID.
+//   - Every receipt from GetExecutionReceiptsByResultID commits to the expected result ID.
+//   - Receipts from GetExecutionReceiptsByResultID are a subset of those from GetExecutionReceiptsByBlockID.
+func (s *AccessAPISuite) TestExecutionReceiptsAndResultsConsistency() {
+	rpcClient := s.an2Client.RPCClient()
+
+	// Wait until block 5 is both available and sealed (GetExecutionResultForBlockID requires
+	// the finalized seal to be indexed, which happens after the block is finalized and sealed).
+	var blockID flow.Identifier
+	var sealedResultResp *accessproto.ExecutionResultForBlockIDResponse
+	require.Eventually(s.T(), func() bool {
+		resp, err := rpcClient.GetBlockHeaderByHeight(s.ctx, &accessproto.GetBlockHeaderByHeightRequest{Height: 5})
+		if err != nil {
+			return false
+		}
+		id := convert.MessageToIdentifier(resp.GetBlock().GetId())
+		resultResp, err := rpcClient.GetExecutionResultForBlockID(s.ctx, &accessproto.GetExecutionResultForBlockIDRequest{
+			BlockId: id[:],
+		})
+		if err != nil {
+			return false
+		}
+		blockID = id
+		sealedResultResp = resultResp
+		return true
+	}, 60*time.Second, 500*time.Millisecond)
+
+	// GetExecutionResultForBlockID — verify the sealed result references this block.
+	s.Require().NotNil(sealedResultResp.ExecutionResult)
+	s.Require().Equal(blockID, convert.MessageToIdentifier(sealedResultResp.ExecutionResult.BlockId),
+		"sealed result's BlockId must match the queried block")
+
+	// GetExecutionReceiptsByBlockID — fetch all receipts stored for this block.
+	// Use the result ID directly from a receipt's Meta field to avoid proto round-trip
+	// hash recomputation, which is unreliable due to nil-vs-empty-slice differences.
+	receiptsByBlock, err := rpcClient.GetExecutionReceiptsByBlockID(s.ctx, &accessproto.GetExecutionReceiptsByBlockIDRequest{
+		BlockId: blockID[:],
+	})
+	s.Require().NoError(err)
+	s.Require().NotEmpty(receiptsByBlock.Receipts, "must have at least one receipt for the sealed block")
+
+	for _, receipt := range receiptsByBlock.Receipts {
+		s.Require().NotNil(receipt.Meta, "all receipts must have meta set")
+	}
+
+	// Take the result ID from the first receipt's Meta — this is the as-stored ID with no recomputation.
+	resultID := convert.MessageToIdentifier(receiptsByBlock.Receipts[0].Meta.ResultId)
+
+	// GetExecutionResultByID — must return a result whose BlockId matches our block.
+	resultByID, err := rpcClient.GetExecutionResultByID(s.ctx, &accessproto.GetExecutionResultByIDRequest{
+		Id: convert.IdentifierToMessage(resultID),
+	})
+	s.Require().NoError(err)
+	s.Require().NotNil(resultByID.ExecutionResult)
+	s.Require().Equal(blockID, convert.MessageToIdentifier(resultByID.ExecutionResult.BlockId),
+		"result fetched by ID must reference the same block")
+
+	// GetExecutionReceiptsByResultID — all receipts committing to this result ID.
+	receiptsByResult, err := rpcClient.GetExecutionReceiptsByResultID(s.ctx, &accessproto.GetExecutionReceiptsByResultIDRequest{
+		ResultId: convert.IdentifierToMessage(resultID),
+	})
+	s.Require().NoError(err)
+	s.Require().NotEmpty(receiptsByResult.Receipts, "must have at least one receipt for the result")
+
+	// Every receipt from GetExecutionReceiptsByResultID must commit to the requested result ID.
+	for _, receipt := range receiptsByResult.Receipts {
+		s.Require().NotNil(receipt.Meta)
+		s.Require().Equal(resultID, convert.MessageToIdentifier(receipt.Meta.ResultId),
+			"all receipts returned by result ID must commit to the requested result")
+	}
+
+	// Receipts from GetExecutionReceiptsByResultID must be a subset of those from GetExecutionReceiptsByBlockID.
+	byBlockSet := make(map[string]struct{}, len(receiptsByBlock.Receipts))
+	for _, receipt := range receiptsByBlock.Receipts {
+		key := convert.MessageToIdentifier(receipt.Meta.ExecutorId).String() +
+			convert.MessageToIdentifier(receipt.Meta.ResultId).String()
+		byBlockSet[key] = struct{}{}
+	}
+	for _, receipt := range receiptsByResult.Receipts {
+		key := convert.MessageToIdentifier(receipt.Meta.ExecutorId).String() +
+			convert.MessageToIdentifier(receipt.Meta.ResultId).String()
+		s.Require().Contains(byBlockSet, key,
+			"every receipt returned by result ID must also appear in the receipts for the block")
+	}
+}
+
 func (s *AccessAPISuite) testSystemTransactionsGrpc(systemCollection *flow.Collection, blockID flow.Identifier) []*accessmodel.TransactionResult {
 	rpcClient := s.an2Client.RPCClient()
 

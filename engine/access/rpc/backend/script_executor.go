@@ -11,9 +11,14 @@ import (
 	"github.com/onflow/flow-go/engine/common/version"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/execution"
-	"github.com/onflow/flow-go/module/state_synchronization"
 	"github.com/onflow/flow-go/storage"
 )
+
+// indexReporter provides information about the data available in the registers database
+type indexReporter interface {
+	LatestHeight() uint64
+	FirstHeight() uint64
+}
 
 // ErrIncompatibleNodeVersion indicates that node version is incompatible with the block version
 var ErrIncompatibleNodeVersion = errors.New("node version is incompatible with data for block")
@@ -25,7 +30,7 @@ type ScriptExecutor struct {
 	scriptExecutor *execution.Scripts
 
 	// indexReporter provides information about the current state of the execution state indexer.
-	indexReporter state_synchronization.IndexReporter
+	indexReporter indexReporter
 
 	// versionControl provides information about the current version beacon for each block
 	versionControl *version.VersionControl
@@ -73,7 +78,7 @@ func (s *ScriptExecutor) SetMaxCompatibleHeight(height uint64) {
 // This method can be called at any time after the ScriptExecutor object is created. Any requests
 // made to the other methods will return storage.ErrHeightNotIndexed until this method is called.
 func (s *ScriptExecutor) Initialize(
-	indexReporter state_synchronization.IndexReporter,
+	indexReporter indexReporter,
 	scriptExecutor *execution.Scripts,
 	versionControl *version.VersionControl,
 ) error {
@@ -196,20 +201,11 @@ func (s *ScriptExecutor) checkHeight(height uint64) error {
 		return fmt.Errorf("%w: script executor not initialized", storage.ErrHeightNotIndexed)
 	}
 
-	highestHeight, err := s.indexReporter.HighestIndexedHeight()
-	if err != nil {
-		return fmt.Errorf("could not get highest indexed height: %w", err)
-	}
-	if height > highestHeight {
+	if height > s.indexReporter.LatestHeight() {
 		return fmt.Errorf("%w: block not indexed yet", storage.ErrHeightNotIndexed)
 	}
 
-	lowestHeight, err := s.indexReporter.LowestIndexedHeight()
-	if err != nil {
-		return fmt.Errorf("could not get lowest indexed height: %w", err)
-	}
-
-	if height < lowestHeight {
+	if height < s.indexReporter.FirstHeight() {
 		return fmt.Errorf("%w: block is before lowest indexed height", storage.ErrHeightNotIndexed)
 	}
 
