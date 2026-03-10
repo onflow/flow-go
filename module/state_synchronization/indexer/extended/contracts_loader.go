@@ -59,7 +59,7 @@ func (c *deployedContractsLoader) Load(height uint64, seenContracts map[string]b
 			Int("contracts", len(deployments)).
 			Int("skipped_updated_in_block", len(seenContracts)).
 			Int("deleted", deletedCount).
-			Str("duration_ms", time.Since(start).String()).
+			Str("duration", time.Since(start).String()).
 			Msg("loaded contracts during bootstrap")
 	}()
 

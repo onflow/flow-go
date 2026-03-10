@@ -18,9 +18,9 @@ type memItem struct {
 	val []byte
 }
 
-func (m *memItem) Key() []byte                        { return m.key }
-func (m *memItem) KeyCopy(dst []byte) []byte          { return append(dst[:0], m.key...) }
-func (m *memItem) Value(fn func([]byte) error) error  { return fn(m.val) }
+func (m *memItem) Key() []byte                       { return m.key }
+func (m *memItem) KeyCopy(dst []byte) []byte         { return append(dst[:0], m.key...) }
+func (m *memItem) Value(fn func([]byte) error) error { return fn(m.val) }
 
 // memIterator implements [storage.Iterator] backed by an in-memory slice.
 type memIterator struct {

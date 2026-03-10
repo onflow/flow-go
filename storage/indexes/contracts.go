@@ -412,7 +412,7 @@ func contractDeploymentKeyPrefix(key []byte) ([]byte, error) {
 	if key[0] != codeContractDeployment {
 		return nil, fmt.Errorf("invalid key prefix: expected %d, got %d", codeContractDeployment, key[0])
 	}
-	return key[:len(key)-heightLen+txIndexLen+eventIndexLen], nil
+	return key[:len(key)-heightLen-txIndexLen-eventIndexLen], nil
 }
 
 // decodeDeploymentCursor decodes a primary key into an [access.ContractDeploymentsCursor].
