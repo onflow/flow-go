@@ -34,6 +34,10 @@ var (
 
 	// ErrInvalidQuery is returned when parameters passed to a read query are invalid (e.g., startHeight > endHeight).
 	ErrInvalidQuery = errors.New("invalid query")
+
+	// ErrInvalidStatusTransition is returned when a status update is not valid for the
+	// current state (e.g. executing an already-cancelled scheduled transaction).
+	ErrInvalidStatusTransition = errors.New("invalid scheduled transaction status transition")
 )
 
 // InvalidDKGStateTransitionError is a sentinel error that is returned in case an invalid state transition is attempted.

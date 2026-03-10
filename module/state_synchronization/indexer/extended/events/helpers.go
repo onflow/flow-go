@@ -45,6 +45,38 @@ func AddressFromOptional(opt cadence.Optional) (flow.Address, error) {
 	return flow.BytesToAddress(addr.Bytes()), nil
 }
 
+// PathFromOptional extracts a path string from a [cadence.Optional] containing a [cadence.Path].
+// Returns the path string (e.g "/public/identifier"), or "" if the optional is empty.
+//
+// Any error indicates that the optional value is not a valid path.
+func PathFromOptional(opt cadence.Optional) (string, error) {
+	if opt.Value == nil {
+		return "", nil
+	}
+	path, ok := opt.Value.(cadence.Path)
+	if !ok {
+		return "", fmt.Errorf("unexpected type in optional path field: %T", opt.Value)
+	}
+	return path.String(), nil
+}
+
+// EnumToType extracts the raw value from a Cadence enum and converts it to T.
+// Cadence enums encode their raw value in a field named "rawValue".
+//
+// Any error indicates that the enum is malformed or the rawValue is not convertible to T.
+func EnumToType[T any](enum cadence.Enum) (T, error) {
+	var zero T
+	raw := enum.SearchFieldByName("rawValue")
+	if raw == nil {
+		return zero, fmt.Errorf("enum has no rawValue field")
+	}
+	v, ok := raw.(T)
+	if !ok {
+		return zero, fmt.Errorf("expected %T rawValue, got %T", zero, raw)
+	}
+	return v, nil
+}
+
 // HexToEVMAddress decodes a hex string to an EVM address.
 // This is the same logic as `common.HexToAddress`, except it returns an error if the hex string is
 // not valid hex or an incorrect length.

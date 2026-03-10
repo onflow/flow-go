@@ -46,7 +46,7 @@ type FungibleTokenTransfersRangeReader interface {
 
 // FungibleTokenTransfersWriter provides write access to the fungible token transfer index.
 //
-// NOT CONCURRENTLY SAFE.
+// NOT CONCURRENCY SAFE.
 type FungibleTokenTransfersWriter interface {
 	// Store indexes all fungible token transfers for a block.
 	// Each transfer is indexed under both the source and recipient addresses.
@@ -133,7 +133,7 @@ type NonFungibleTokenTransfersRangeReader interface {
 
 // NonFungibleTokenTransfersWriter provides write access to the non-fungible token transfer index.
 //
-// NOT CONCURRENTLY SAFE.
+// NOT CONCURRENCY SAFE.
 type NonFungibleTokenTransfersWriter interface {
 	// Store indexes all non-fungible token transfers for a block.
 	// Each transfer is indexed under both the source and recipient addresses.
