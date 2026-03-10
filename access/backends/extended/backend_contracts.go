@@ -99,6 +99,10 @@ func (b *ContractsBackend) GetContract(
 		return nil, status.Errorf(codes.InvalidArgument, "invalid contract identifier: %v", err)
 	}
 
+	if filter.ContractName != "" && contractName != filter.ContractName {
+		return nil, status.Errorf(codes.InvalidArgument, "contract name filter is not supported for single contract requests")
+	}
+
 	deployment, err := b.store.ByContract(account, contractName)
 	if err != nil {
 		return nil, mapReadError(ctx, "contract", err)
@@ -144,6 +148,10 @@ func (b *ContractsBackend) GetContractDeployments(
 	account, contractName, err := accessmodel.ParseContractID(id)
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "invalid contract identifier: %v", err)
+	}
+
+	if filter.ContractName != "" && contractName != filter.ContractName {
+		return nil, status.Errorf(codes.InvalidArgument, "contract name filter is not supported for single contract requests")
 	}
 
 	if cursor != nil {

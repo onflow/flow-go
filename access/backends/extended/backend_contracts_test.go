@@ -195,6 +195,21 @@ func TestContractsBackend_GetContract(t *testing.T) {
 		require.True(t, ok)
 		assert.Equal(t, codes.InvalidArgument, st.Code())
 	})
+
+	t.Run("mismatched contract name filter returns codes.InvalidArgument", func(t *testing.T) {
+		t.Parallel()
+		mockStore := storagemock.NewContractDeploymentsIndexReader(t)
+		backend := NewContractsBackend(unittest.Logger(), &backendBase{config: DefaultConfig()}, mockStore)
+
+		// contractID contains "FungibleToken" but filter specifies a different name
+		_, err := backend.GetContract(context.Background(), contractID,
+			ContractDeploymentFilter{ContractName: "FlowToken"},
+			ContractDeploymentExpandOptions{}, entities.EventEncodingVersion_JSON_CDC_V0)
+		require.Error(t, err)
+		st, ok := status.FromError(err)
+		require.True(t, ok)
+		assert.Equal(t, codes.InvalidArgument, st.Code())
+	})
 }
 
 // TestContractsBackend_GetContractDeployments tests all code paths for GetContractDeployments.
@@ -341,6 +356,21 @@ func TestContractsBackend_GetContractDeployments(t *testing.T) {
 		backend := NewContractsBackend(unittest.Logger(), &backendBase{config: DefaultConfig()}, mockStore)
 
 		_, err := backend.GetContractDeployments(context.Background(), "notavalidid", 0, nil, ContractDeploymentFilter{}, ContractDeploymentExpandOptions{}, entities.EventEncodingVersion_JSON_CDC_V0)
+		require.Error(t, err)
+		st, ok := status.FromError(err)
+		require.True(t, ok)
+		assert.Equal(t, codes.InvalidArgument, st.Code())
+	})
+
+	t.Run("mismatched contract name filter returns codes.InvalidArgument", func(t *testing.T) {
+		t.Parallel()
+		mockStore := storagemock.NewContractDeploymentsIndexReader(t)
+		backend := NewContractsBackend(unittest.Logger(), &backendBase{config: DefaultConfig()}, mockStore)
+
+		// contractID contains "FungibleToken" but filter specifies a different name
+		_, err := backend.GetContractDeployments(context.Background(), contractID, 0, nil,
+			ContractDeploymentFilter{ContractName: "FlowToken"},
+			ContractDeploymentExpandOptions{}, entities.EventEncodingVersion_JSON_CDC_V0)
 		require.Error(t, err)
 		st, ok := status.FromError(err)
 		require.True(t, ok)
