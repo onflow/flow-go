@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/onflow/flow/protobuf/go/flow/entities"
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -13,7 +14,6 @@ import (
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/indexes/iterator"
-	"github.com/onflow/flow/protobuf/go/flow/entities"
 )
 
 type ContractDeploymentExpandOptions struct {

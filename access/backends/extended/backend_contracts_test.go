@@ -5,12 +5,11 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/onflow/flow/protobuf/go/flow/entities"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-
-	"github.com/onflow/flow/protobuf/go/flow/entities"
 
 	accessmodel "github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
@@ -43,7 +42,7 @@ type testIterEntry struct {
 	cursor accessmodel.ContractDeploymentsCursor
 }
 
-func (e testIterEntry) Cursor() accessmodel.ContractDeploymentsCursor { return e.cursor }
+func (e testIterEntry) Cursor() accessmodel.ContractDeploymentsCursor  { return e.cursor }
 func (e testIterEntry) Value() (accessmodel.ContractDeployment, error) { return e.d, nil }
 
 // newDeploymentHistoryEntry builds a testIterEntry whose cursor is keyed by

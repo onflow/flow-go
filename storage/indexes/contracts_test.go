@@ -227,9 +227,9 @@ func TestContractDeployments_Bootstrap(t *testing.T) {
 			lm := storage.NewTestingLockManager()
 
 			deployment := access.ContractDeployment{
-				Address:     unittest.RandomAddressFixture(),
+				Address:      unittest.RandomAddressFixture(),
 				ContractName: "",
-				BlockHeight: 1,
+				BlockHeight:  1,
 			}
 
 			err := unittest.WithLock(t, lm, storage.LockIndexContractDeployments, func(lctx lockctx.Context) error {

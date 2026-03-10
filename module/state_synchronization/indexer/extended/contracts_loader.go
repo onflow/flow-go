@@ -4,12 +4,13 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/rs/zerolog"
+
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/util"
 	"github.com/onflow/flow-go/utils/slices"
-	"github.com/rs/zerolog"
 )
 
 // deployedContractsLoader is a helper for loading deployed contracts from storage at the given height.
@@ -49,9 +50,18 @@ func newDeployedContractsLoader(
 //
 // No error returns are expected during normal operation.
 func (c *deployedContractsLoader) Load(height uint64, seenContracts map[string]bool) ([]access.ContractDeployment, error) {
-	start := time.Now()
-
 	var deployments []access.ContractDeployment
+	var deletedCount int
+	start := time.Now()
+	defer func() {
+		c.log.Info().
+			Uint64("height", height).
+			Int("contracts", len(deployments)).
+			Int("skipped_updated_in_block", len(seenContracts)).
+			Int("deleted", deletedCount).
+			Str("duration_ms", time.Since(start).String()).
+			Msg("loaded contracts during bootstrap")
+	}()
 
 	// log progress since this may be a long operation
 	progress := util.LogProgress(c.log,
@@ -121,7 +131,7 @@ func (c *deployedContractsLoader) Load(height uint64, seenContracts map[string]b
 	// 1. Set IsDeleted for contracts whose names are absent from the register
 	// 2. Verify every name in the register has a corresponding deployment (loaded here or already
 	//    seen in the current block via seenContracts).
-	deletedCount := 0
+	deletedCount = 0
 	for address, byName := range loadedContracts {
 		registerValue, err := c.scriptExecutor.RegisterValue(flow.ContractNamesRegisterID(address), height)
 		if err != nil {
@@ -157,14 +167,6 @@ func (c *deployedContractsLoader) Load(height uint64, seenContracts map[string]b
 	}
 
 	logProgress(255) // log to 100%
-
-	c.log.Info().
-		Uint64("height", height).
-		Int("contracts", len(deployments)).
-		Int("skipped_updated_in_block", len(seenContracts)).
-		Int("deleted", deletedCount).
-		Str("duration_ms", time.Since(start).String()).
-		Msg("loaded contracts during bootstrap")
 
 	return deployments, nil
 }

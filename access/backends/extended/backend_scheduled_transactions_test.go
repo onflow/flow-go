@@ -761,35 +761,35 @@ func TestScheduledTransactionsBackend_GetScheduledTransaction(t *testing.T) {
 		store := storagemock.NewScheduledTransactionsIndexReader(t)
 		scheduledTxLookup := storagemock.NewScheduledTransactionsReader(t)
 		mockHeaders := storagemock.NewHeaders(t)
-		mockProvider := providermock.NewTransactionProvider(t)
+
+		sysCollections, err := systemcollection.NewVersioned(
+			flow.Mainnet.Chain(), systemcollection.Default(flow.Mainnet),
+		)
+		require.NoError(t, err)
 
 		backend := NewScheduledTransactionsBackend(
 			unittest.Logger(),
 			&backendBase{
-				config:               defaultConfig,
-				headers:              mockHeaders,
-				transactionsProvider: mockProvider,
+				config:            defaultConfig,
+				headers:           mockHeaders,
+				systemCollections: sysCollections,
 			},
 			flow.Mainnet, store, nil, scheduledTxLookup, nil, nil,
 		)
 
-		// txID that does NOT match the tx body returned by the provider.
+		// txID that does NOT match the tx body constructed by systemCollections.
 		txID := unittest.IdentifierFixture()
 		blockHeader := unittest.BlockHeaderFixture()
 		blockID := blockHeader.ID()
-		storedTx := accessmodel.ScheduledTransaction{ID: 1, Status: accessmodel.ScheduledTxStatusExecuted, ExecutedTransactionID: txID}
-		// otherTxBody.ID() != txID
-		otherTxBody := unittest.TransactionBodyFixture()
+		storedTx := accessmodel.ScheduledTransaction{ID: 1, Status: accessmodel.ScheduledTxStatusExecuted, ExecutedTransactionID: txID, ExecutionEffort: 1000}
 
 		store.On("ByID", uint64(1)).Return(storedTx, nil).Once()
 		scheduledTxLookup.On("BlockIDByTransactionID", txID).Return(blockID, nil).Once()
 		mockHeaders.On("ByBlockID", blockID).Return(blockHeader, nil).Once()
-		mockProvider.On("ScheduledTransactionsByBlockID", mocktestify.Anything, blockHeader).
-			Return([]*flow.TransactionBody{&otherTxBody}, nil).Once()
 
 		signalerCtx, verifyThrown := signalerCtxExpectingThrow(t)
 
-		_, err := backend.GetScheduledTransaction(
+		_, err = backend.GetScheduledTransaction(
 			signalerCtx, 1, ScheduledTransactionExpandOptions{Transaction: true}, defaultEncoding,
 		)
 		require.Error(t, err)
