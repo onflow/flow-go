@@ -14,7 +14,6 @@ import (
 
 // GetScheduledTransactions holds parsed request params for the list endpoints.
 type GetScheduledTransactions struct {
-	Address       *flow.Address
 	Limit         uint32
 	Cursor        *accessmodel.ScheduledTransactionCursor
 	Filter        extended.ScheduledTransactionFilter
@@ -52,7 +51,7 @@ func NewGetScheduledTransactions(r *common.Request) (GetScheduledTransactions, e
 	return req, nil
 }
 
-// GetScheduledTransactions holds parsed request params for the list endpoints.
+// GetAccountScheduledTransactions holds parsed request params for the list endpoints.
 type GetAccountScheduledTransactions struct {
 	GetScheduledTransactions
 	Address flow.Address
@@ -70,6 +69,10 @@ func NewGetScheduledTransactionsByAddress(r *common.Request) (GetAccountSchedule
 	address, err := parser.ParseAddress(r.GetVar("address"), r.Chain)
 	if err != nil {
 		return GetAccountScheduledTransactions{}, err
+	}
+
+	if req.Filter.TransactionHandlerOwner != nil && *req.Filter.TransactionHandlerOwner != address {
+		return GetAccountScheduledTransactions{}, fmt.Errorf("handler_owner must be the same as the address")
 	}
 
 	return GetAccountScheduledTransactions{
@@ -105,8 +108,7 @@ func NewGetScheduledTransaction(r *common.Request) (GetScheduledTransaction, err
 // All errors indicate an invalid request.
 func parseScheduledTxFilter(r *common.Request, filter *extended.ScheduledTransactionFilter) error {
 	if raw := r.GetQueryParam("status"); raw != "" {
-		rawStatuses := strings.Split(raw, ",")
-		for _, rawStatus := range rawStatuses {
+		for rawStatus := range strings.SplitSeq(raw, ",") {
 			s, err := accessmodel.ParseScheduledTransactionStatus(strings.TrimSpace(rawStatus))
 			if err != nil {
 				return fmt.Errorf("invalid status: %w", err)
@@ -137,6 +139,10 @@ func parseScheduledTxFilter(r *common.Request, filter *extended.ScheduledTransac
 			return fmt.Errorf("invalid end_time: %w", err)
 		}
 		filter.EndTime = &v
+	}
+
+	if filter.StartTime != nil && filter.EndTime != nil && *filter.StartTime > *filter.EndTime {
+		return fmt.Errorf("start_time must be before end_time")
 	}
 
 	if raw := r.GetQueryParam("handler_owner"); raw != "" {

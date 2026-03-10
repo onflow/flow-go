@@ -107,7 +107,7 @@ func TestGetScheduledTransactions(t *testing.T) {
 		CreatedTransactionID:             tx1CreatedID,
 		CreatedAt:                        tx1CreatedAt,
 	}
-	tx2CreatedAt := uint64(1699999000000)  // Unix ms
+	tx2CreatedAt := uint64(1699999000000)   // Unix ms
 	tx2CompletedAt := uint64(1700001000000) // Unix ms
 	tx2CreatedID := unittest.IdentifierFixture()
 	tx2ExecutedID := unittest.IdentifierFixture()

@@ -17,10 +17,12 @@ import (
 )
 
 const (
+	// idLen is the length of the uint64 ID in bytes
+	idLen = 8
 	// scheduledTxPrimaryKeyLen is [code(1)][~id(8)] = 9 bytes
-	scheduledTxPrimaryKeyLen = 1 + heightLen
+	scheduledTxPrimaryKeyLen = 1 + idLen
 	// scheduledTxByAddrKeyLen is [code(1)][address(8)][~id(8)] = 17 bytes
-	scheduledTxByAddrKeyLen = 1 + flow.AddressLength + heightLen
+	scheduledTxByAddrKeyLen = 1 + flow.AddressLength + idLen
 )
 
 // ScheduledTransactionsIndex implements [storage.ScheduledTransactionsIndex] using Pebble.

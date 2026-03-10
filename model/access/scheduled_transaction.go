@@ -104,11 +104,22 @@ type ScheduledTransaction struct {
 
 	Status ScheduledTransactionStatus
 
-	CreatedTransactionID   flow.Identifier
-	ExecutedTransactionID  flow.Identifier
+	// CreatedTransactionID is the transaction ID of the transaction in which the scheduled transaction was created
+	// It is always set unless the scheduled transaction is a placeholder, in which case IsPlaceholder is true.
+	CreatedTransactionID flow.Identifier
+
+	// ExecutedTransactionID is the transaction ID of the transaction in which the scheduled transaction was executed
+	// If set, status is set to [ScheduledTxStatusExecuted].
+	ExecutedTransactionID flow.Identifier
+
+	// CancelledTransactionID is the transaction ID of the transaction in which the scheduled transaction was cancelled
+	// If set, status is set to [ScheduledTxStatusCancelled].
 	CancelledTransactionID flow.Identifier
 
+	// FeesReturned is the amount of fees returned to the scheduled transaction's owner when the scheduled transaction was cancelled
 	FeesReturned uint64
+
+	// FeesDeducted is the amount of fees deducted from the scheduled transaction's owner when the scheduled transaction was cancelled
 	FeesDeducted uint64
 
 	// IsPlaceholder is true if the scheduled transaction was created based on the current chain state,
