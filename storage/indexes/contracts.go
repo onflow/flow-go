@@ -23,6 +23,10 @@ const (
 	//
 	// so the overhead is code(1) + address(8) + ~height(8) + txIndex(4) + eventIndex(4) = 25 bytes.
 	contractDeploymentKeyOverhead = 1 + flow.AddressLength + heightLen + txIndexLen + eventIndexLen
+
+	// minValidKeyLen is the minimum length of a valid contract deployment key.
+	// This is contractDeploymentKeyOverhead, plus a 1 character contract name.
+	minValidKeyLen = contractDeploymentKeyOverhead + 1
 )
 
 // storedContractDeployment holds the fields of a [access.ContractDeployment] that are not
@@ -401,16 +405,21 @@ func makeContractDeploymentAddressPrefix(addr flow.Address) []byte {
 // It strips the fixed 16-byte suffix ([~height(8)][txIndex(4)][eventIndex(4)]) from the key.
 // Used as the keyPrefix argument to [iterator.BuildPrefixIterator] so that all deployments of
 // the same contract are grouped together and only the first (most recent) is yielded.
-func contractDeploymentKeyPrefix(key []byte) []byte {
-	return key[:len(key)-heightLen-txIndexLen-eventIndexLen]
+func contractDeploymentKeyPrefix(key []byte) ([]byte, error) {
+	if len(key) < minValidKeyLen {
+		return nil, fmt.Errorf("key too short: expected at least %d bytes, got %d", minValidKeyLen, len(key))
+	}
+	if key[0] != codeContractDeployment {
+		return nil, fmt.Errorf("invalid key prefix: expected %d, got %d", codeContractDeployment, key[0])
+	}
+	return key[:len(key)-heightLen+txIndexLen+eventIndexLen], nil
 }
 
 // decodeDeploymentCursor decodes a primary key into an [access.ContractDeploymentsCursor].
 //
 // Any error indicates a malformed key.
 func decodeDeploymentCursor(key []byte) (access.ContractDeploymentsCursor, error) {
-	// Minimum valid key: overhead bytes + at least 1 byte for the contract name.
-	if len(key) < contractDeploymentKeyOverhead+1 {
+	if len(key) < minValidKeyLen {
 		return access.ContractDeploymentsCursor{}, fmt.Errorf("key too short: %d bytes", len(key))
 	}
 	if key[0] != codeContractDeployment {
