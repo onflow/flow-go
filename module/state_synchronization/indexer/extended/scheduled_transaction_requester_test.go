@@ -40,15 +40,15 @@ func TestScheduledTransactionRequester_ExecutedEntry(t *testing.T) {
 		requesterTestHeight,
 	).Return(MakeJITScriptResponse(t, comp), nil).Once()
 
-	data := &scheduledTransactionData{
-		executedEntries: []executedEntry{
+	meta := ScheduledTransactionsMetadata{
+		ExecutedEntries: []executedEntry{
 			{
 				event:         &events.TransactionSchedulerExecutedEvent{ID: 5},
 				transactionID: executedTxID,
 			},
 		},
 	}
-	txs, err := requester.Fetch(context.Background(), []uint64{5}, requesterTestHeight, data)
+	txs, err := requester.Fetch(context.Background(), []uint64{5}, requesterTestHeight, meta)
 	require.NoError(t, err)
 	require.Len(t, txs, 1)
 	assert.Equal(t, uint64(5), txs[0].ID)
@@ -75,15 +75,15 @@ func TestScheduledTransactionRequester_CancelledEntry(t *testing.T) {
 		requesterTestHeight,
 	).Return(MakeJITScriptResponse(t, comp), nil).Once()
 
-	data := &scheduledTransactionData{
-		canceledEntries: []canceledEntry{
+	meta := ScheduledTransactionsMetadata{
+		CanceledEntries: []canceledEntry{
 			{
 				event:         &events.TransactionSchedulerCanceledEvent{ID: 7, FeesReturned: 50, FeesDeducted: 25},
 				transactionID: cancelTxID,
 			},
 		},
 	}
-	txs, err := requester.Fetch(context.Background(), []uint64{7}, requesterTestHeight, data)
+	txs, err := requester.Fetch(context.Background(), []uint64{7}, requesterTestHeight, meta)
 	require.NoError(t, err)
 	require.Len(t, txs, 1)
 	assert.Equal(t, uint64(7), txs[0].ID)
@@ -112,12 +112,12 @@ func TestScheduledTransactionRequester_FailedEntry(t *testing.T) {
 		requesterTestHeight,
 	).Return(MakeJITScriptResponse(t, comp), nil).Once()
 
-	data := &scheduledTransactionData{
-		failedEntries: []failedEntry{
+	meta := ScheduledTransactionsMetadata{
+		FailedEntries: []failedEntry{
 			{scheduledTxID: 42, transactionID: executorTxID},
 		},
 	}
-	txs, err := requester.Fetch(context.Background(), []uint64{42}, requesterTestHeight, data)
+	txs, err := requester.Fetch(context.Background(), []uint64{42}, requesterTestHeight, meta)
 	require.NoError(t, err)
 	require.Len(t, txs, 1)
 	assert.Equal(t, uint64(42), txs[0].ID)
@@ -149,13 +149,13 @@ func TestScheduledTransactionRequester_NilOptional(t *testing.T) {
 		requesterTestHeight,
 	).Return(response, nil).Once()
 
-	data := &scheduledTransactionData{
-		executedEntries: []executedEntry{
+	meta := ScheduledTransactionsMetadata{
+		ExecutedEntries: []executedEntry{
 			{event: &events.TransactionSchedulerExecutedEvent{ID: 10}, transactionID: unittest.IdentifierFixture()},
 			{event: &events.TransactionSchedulerExecutedEvent{ID: 11}, transactionID: unittest.IdentifierFixture()},
 		},
 	}
-	_, err := requester.Fetch(context.Background(), []uint64{10, 11}, requesterTestHeight, data)
+	_, err := requester.Fetch(context.Background(), []uint64{10, 11}, requesterTestHeight, meta)
 	require.Error(t, err)
 	require.ErrorContains(t, err, "is not found on-chain")
 }
@@ -176,12 +176,12 @@ func TestScheduledTransactionRequester_ScriptError(t *testing.T) {
 		requesterTestHeight,
 	).Return([]byte(nil), scriptErr).Once()
 
-	data := &scheduledTransactionData{
-		canceledEntries: []canceledEntry{
+	meta := ScheduledTransactionsMetadata{
+		CanceledEntries: []canceledEntry{
 			{event: &events.TransactionSchedulerCanceledEvent{ID: 9}},
 		},
 	}
-	_, err := requester.Fetch(context.Background(), []uint64{9}, requesterTestHeight, data)
+	_, err := requester.Fetch(context.Background(), []uint64{9}, requesterTestHeight, meta)
 	require.Error(t, err)
 	require.ErrorIs(t, err, scriptErr)
 }
@@ -233,8 +233,8 @@ func TestScheduledTransactionRequester_Batching(t *testing.T) {
 		}
 	}
 
-	data := &scheduledTransactionData{canceledEntries: canceledEntries}
-	txs, err := requester.Fetch(context.Background(), lookupIDs, requesterTestHeight, data)
+	meta := ScheduledTransactionsMetadata{CanceledEntries: canceledEntries}
+	txs, err := requester.Fetch(context.Background(), lookupIDs, requesterTestHeight, meta)
 	require.NoError(t, err)
 	assert.Len(t, txs, totalIDs)
 }

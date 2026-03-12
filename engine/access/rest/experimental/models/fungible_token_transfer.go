@@ -12,7 +12,7 @@ import (
 // Build populates the FungibleTokenTransfer from a domain model.
 func (t *FungibleTokenTransfer) Build(
 	transfer *accessmodel.FungibleTokenTransfer,
-	link commonmodels.LinkGenerator,
+	link LinkGenerator,
 ) error {
 	eventIndices := make([]string, len(transfer.EventIndices))
 	for i, idx := range transfer.EventIndices {

@@ -102,9 +102,10 @@ type ScheduledTransactionsBackend struct {
 
 	log                   zerolog.Logger
 	chainID               flow.ChainID
-	store                 storage.ScheduledTransactionsIndexReader
-	scheduledTransactions storage.ScheduledTransactionsReader
 	state                 protocol.State
+	store                 storage.ScheduledTransactionsIndexReader
+	contracts             storage.ContractDeploymentsIndexReader
+	scheduledTransactions storage.ScheduledTransactionsReader
 	scriptExecutor        execution.ScriptExecutor
 }
 
@@ -114,6 +115,7 @@ func NewScheduledTransactionsBackend(
 	base *backendBase,
 	chainID flow.ChainID,
 	store storage.ScheduledTransactionsIndexReader,
+	contracts storage.ContractDeploymentsIndexReader,
 	scheduledTransactions storage.ScheduledTransactionsReader,
 	state protocol.State,
 	scriptExecutor execution.ScriptExecutor,
@@ -123,6 +125,7 @@ func NewScheduledTransactionsBackend(
 		log:                   log,
 		chainID:               chainID,
 		store:                 store,
+		contracts:             contracts,
 		scheduledTransactions: scheduledTransactions,
 		state:                 state,
 		scriptExecutor:        scriptExecutor,
@@ -427,36 +430,59 @@ func (b *ScheduledTransactionsBackend) expand(
 	return nil
 }
 
+// expandHandlerContract expands the handler contract for a scheduled transaction.
+//
+// No error returns are expected during normal operation.
 func (b *ScheduledTransactionsBackend) expandHandlerContract(
 	ctx context.Context,
 	tx *accessmodel.ScheduledTransaction,
 ) error {
-	latest, err := b.state.Sealed().Head()
-	if err != nil {
-		return fmt.Errorf("failed to get latest sealed header: %w", err)
-	}
-
-	// TODO: switch to the contracts index when it's implemented
-	account, err := b.scriptExecutor.GetAccountAtBlockHeight(ctx, tx.TransactionHandlerOwner, latest.Height)
-	if err != nil {
-		return fmt.Errorf("failed to get account for tx handler %s: %w", tx.TransactionHandlerOwner, err)
-	}
-
-	contractID, err := transactionHandlerContract(tx.TransactionHandlerTypeIdentifier)
+	address, contractName, err := transactionHandlerContract(tx.TransactionHandlerTypeIdentifier)
 	if err != nil {
 		return fmt.Errorf("failed to get contract ID for tx handler %s: %w", tx.TransactionHandlerTypeIdentifier, err)
 	}
-	contract, ok := account.Contracts[contractID]
-	if !ok {
-		return fmt.Errorf("contract %q not found in account %s", contractID, tx.TransactionHandlerOwner)
+
+	contract, err := b.contracts.ByContract(address, contractName)
+
+	if err == nil {
+		tx.HandlerContract = &contract
+		return nil
 	}
 
-	tx.HandlerContract = &accessmodel.Contract{
-		Identifier: contractID,
-		Body:       string(contract),
+	if !errors.Is(err, storage.ErrNotFound) {
+		return fmt.Errorf("failed to get contract for tx handler %s: %w", tx.TransactionHandlerTypeIdentifier, err)
+	}
+
+	// it's possible that the contracts index is backfilling and not caught up yet. in this case,
+	// fetch the code from the node's state.
+
+	latest, err := b.state.Sealed().Head()
+	if err != nil {
+		return fmt.Errorf("failed to get latest sealed block: %w", err)
+	}
+
+	code, err := b.getContractFromState(ctx, address, contractName, latest.Height)
+	if err != nil {
+		return fmt.Errorf("failed to get contract code for tx handler %s: %w", address, err)
+	}
+
+	tx.HandlerContract = &accessmodel.ContractDeployment{
+		Address:       address,
+		ContractName:  contractName,
+		Code:          code,
+		CodeHash:      accessmodel.CadenceCodeHash(code),
+		IsPlaceholder: true,
 	}
 
 	return nil
+}
+
+func (b *ScheduledTransactionsBackend) getContractFromState(ctx context.Context, address flow.Address, contractName string, height uint64) ([]byte, error) {
+	contract, err := b.scriptExecutor.GetAccountCode(ctx, address, contractName, height)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get contract code for tx handler %s: %w", address, err)
+	}
+	return contract, nil
 }
 
 // transactionHandlerContract extracts the contract ID from a transaction handler type identifier.
@@ -464,10 +490,18 @@ func (b *ScheduledTransactionsBackend) expandHandlerContract(
 // e.g.
 //
 //	A.1654653399040a61.MyScheduler.Handler -> A.1654653399040a61.MyScheduler
-func transactionHandlerContract(handlerTypeIdentifier string) (string, error) {
+func transactionHandlerContract(handlerTypeIdentifier string) (address flow.Address, contractName string, err error) {
 	parts := strings.Split(handlerTypeIdentifier, ".")
 	if len(parts) < 3 {
-		return "", fmt.Errorf("invalid handler type identifier: %s", handlerTypeIdentifier)
+		return flow.Address{}, "", fmt.Errorf("invalid handler type identifier: %s", handlerTypeIdentifier)
 	}
-	return strings.Join(parts[:3], "."), nil
+
+	address, err = flow.StringToAddress(parts[1])
+	if err != nil {
+		return flow.Address{}, "", fmt.Errorf("failed to parse address from handler type identifier: %w", err)
+	}
+
+	contractName = parts[2]
+
+	return address, contractName, nil
 }

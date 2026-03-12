@@ -46,7 +46,7 @@ func (r *ScheduledTransactionRequester) Fetch(
 	ctx context.Context,
 	lookupIDs []uint64,
 	lookupHeight uint64,
-	data *scheduledTransactionData,
+	meta ScheduledTransactionsMetadata,
 ) ([]access.ScheduledTransaction, error) {
 	missingTxs, err := r.fetchMissingTxs(ctx, lookupIDs, lookupHeight)
 	if err != nil {
@@ -54,7 +54,7 @@ func (r *ScheduledTransactionRequester) Fetch(
 	}
 
 	updatedTxs := make([]access.ScheduledTransaction, 0, len(missingTxs))
-	for _, entry := range data.executedEntries {
+	for _, entry := range meta.ExecutedEntries {
 		if missing, ok := missingTxs[entry.event.ID]; ok {
 			// set IsPlaceholder = true to signal that some information is missing because we don't know the original transaction.
 			missing.IsPlaceholder = true
@@ -63,7 +63,7 @@ func (r *ScheduledTransactionRequester) Fetch(
 			updatedTxs = append(updatedTxs, missing)
 		}
 	}
-	for _, entry := range data.canceledEntries {
+	for _, entry := range meta.CanceledEntries {
 		if missing, ok := missingTxs[entry.event.ID]; ok {
 			// set IsPlaceholder = true to signal that some information is missing because we don't know the original transaction.
 			missing.IsPlaceholder = true
@@ -74,7 +74,7 @@ func (r *ScheduledTransactionRequester) Fetch(
 			updatedTxs = append(updatedTxs, missing)
 		}
 	}
-	for _, entry := range data.failedEntries {
+	for _, entry := range meta.FailedEntries {
 		if missing, ok := missingTxs[entry.scheduledTxID]; ok {
 			// set IsPlaceholder = true to signal that some information is missing because we don't know the original transaction.
 			missing.IsPlaceholder = true

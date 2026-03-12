@@ -13,7 +13,7 @@ import (
 // Build populates a [ScheduledTransaction] from a domain model.
 func (t *ScheduledTransaction) Build(
 	tx *accessmodel.ScheduledTransaction,
-	link commonmodels.LinkGenerator,
+	link LinkGenerator,
 	expand map[string]bool,
 ) error {
 	t.Id = strconv.FormatUint(tx.ID, 10)
@@ -88,10 +88,22 @@ func (t *ScheduledTransaction) Build(
 	}
 
 	if tx.HandlerContract != nil {
-		t.HandlerContract = new(Contract)
-		t.HandlerContract.Build(tx.HandlerContract)
+		t.HandlerContract = new(ContractDeployment)
+		expandWithCode := map[string]bool{"code": true}
+		if err := t.HandlerContract.Build(tx.HandlerContract, link, expandWithCode); err != nil {
+			return err
+		}
 	} else {
-		t.Expandable.HandlerContract = "handler_contract" // TODO: this will be implemented in the next PR
+		contractID, err := tx.HandlerContractID()
+		if err != nil {
+			return fmt.Errorf("failed to get handler contract ID: %w", err)
+		}
+
+		handlerContractLink, err := link.ContractCodeLink(contractID)
+		if err != nil {
+			return fmt.Errorf("failed to generate handler contract link: %w", err)
+		}
+		t.Expandable.HandlerContract = handlerContractLink
 	}
 
 	return nil

@@ -31,7 +31,10 @@ type AccountTransactions struct {
 	systemCollections        *systemcollection.Versioned
 }
 
+type AccountTransactionsMetadata struct{}
+
 var _ Indexer = (*AccountTransactions)(nil)
+var _ IndexProcessor[access.AccountTransaction, AccountTransactionsMetadata] = (*AccountTransactions)(nil)
 
 func NewAccountTransactions(
 	log zerolog.Logger,
@@ -88,7 +91,7 @@ func (a *AccountTransactions) NextHeight() (uint64, error) {
 //
 // The caller must hold the [storage.LockIndexAccountTransactions] lock until the batch is committed.
 //
-// Not safe for concurrent use.
+// CAUTION: Not safe for concurrent use.
 //
 // Expected error returns during normal operations:
 //   - [ErrAlreadyIndexed]: if the data is already indexed for the height.
@@ -105,7 +108,7 @@ func (a *AccountTransactions) IndexBlockData(lctx lockctx.Proof, data BlockData,
 		return ErrAlreadyIndexed
 	}
 
-	entries, err := a.buildAccountTransactionsFromBlockData(data)
+	entries, _, err := a.ProcessBlockData(data)
 	if err != nil {
 		return fmt.Errorf("failed to build account transactions from block data: %w", err)
 	}
@@ -119,7 +122,10 @@ func (a *AccountTransactions) IndexBlockData(lctx lockctx.Proof, data BlockData,
 	return nil
 }
 
-func (a *AccountTransactions) buildAccountTransactionsFromBlockData(data BlockData) ([]access.AccountTransaction, error) {
+// ProcessBlockData processes the block data and returns the indexed account transaction entries.
+//
+// No error returns are expected during normal operation.
+func (a *AccountTransactions) ProcessBlockData(data BlockData) ([]access.AccountTransaction, AccountTransactionsMetadata, error) {
 	chain := a.chainID.Chain()
 	entries := make([]access.AccountTransaction, 0)
 
@@ -166,7 +172,7 @@ func (a *AccountTransactions) buildAccountTransactionsFromBlockData(data BlockDa
 		for _, event := range eventsByTxIndex[txIndex] {
 			eventAddresses, err := a.extractAddresses(event)
 			if err != nil {
-				return nil, fmt.Errorf("failed to extract addresses from event: %w", err)
+				return nil, AccountTransactionsMetadata{}, fmt.Errorf("failed to extract addresses from event: %w", err)
 			}
 			for _, addr := range eventAddresses {
 				// only add the role once for an address per transaction
@@ -195,7 +201,7 @@ func (a *AccountTransactions) buildAccountTransactionsFromBlockData(data BlockDa
 			})
 		}
 	}
-	return entries, nil
+	return entries, AccountTransactionsMetadata{}, nil
 }
 
 // extractAddresses extracts all addresses referenced in a flow event.
