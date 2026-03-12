@@ -177,7 +177,7 @@ func (c *ExtendedIndexer) IndexBlockData(
 	c.latestBlockData = &BlockData{
 		Header:       header,
 		Transactions: transactions,
-		Events:       groupEventsByTxIndex(events),
+		Events:       events,
 	}
 	c.notifier.Notify()
 
@@ -379,7 +379,7 @@ func (c *ExtendedIndexer) blockDataFromStorage(height uint64) (BlockData, error)
 	return BlockData{
 		Header:       header,
 		Transactions: transactions,
-		Events:       groupEventsByTxIndex(events),
+		Events:       events,
 	}, nil
 }
 
@@ -427,13 +427,4 @@ func buildGroupLookup(indexers []Indexer, latestBlockData *BlockData) ([]Indexer
 	}
 
 	return liveGroup, backfillGroups, nil
-}
-
-// groupEventsByTxIndex returns a map of events grouped by transaction index in the original event order.
-func groupEventsByTxIndex(events []flow.Event) map[uint32][]flow.Event {
-	eventsByTxIndex := make(map[uint32][]flow.Event)
-	for _, event := range events {
-		eventsByTxIndex[event.TransactionIndex] = append(eventsByTxIndex[event.TransactionIndex], event)
-	}
-	return eventsByTxIndex
 }

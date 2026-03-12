@@ -37,7 +37,7 @@ func TestAccountTransactionsIndexer(t *testing.T) {
 		indexBlock(t, indexer, lm, db, BlockData{
 			Header:       header,
 			Transactions: nil,
-			Events:       map[uint32][]flow.Event{},
+			Events:       []flow.Event{},
 		})
 
 		// Verify height was updated
@@ -69,7 +69,7 @@ func TestAccountTransactionsIndexer(t *testing.T) {
 		indexBlock(t, indexer, lm, db, BlockData{
 			Header:       header,
 			Transactions: []*flow.TransactionBody{&tx},
-			Events:       map[uint32][]flow.Event{},
+			Events:       []flow.Event{},
 		})
 
 		txID := tx.ID()
@@ -97,7 +97,7 @@ func TestAccountTransactionsIndexer(t *testing.T) {
 		indexBlock(t, indexer, lm, db, BlockData{
 			Header:       header,
 			Transactions: []*flow.TransactionBody{&tx},
-			Events:       map[uint32][]flow.Event{},
+			Events:       []flow.Event{},
 		})
 
 		txID := tx.ID()
@@ -124,7 +124,7 @@ func TestAccountTransactionsIndexer(t *testing.T) {
 		indexBlock(t, indexer, lm, db, BlockData{
 			Header:       header,
 			Transactions: []*flow.TransactionBody{&tx},
-			Events:       map[uint32][]flow.Event{},
+			Events:       []flow.Event{},
 		})
 
 		txID := tx.ID()
@@ -167,7 +167,7 @@ func TestAccountTransactionsIndexer(t *testing.T) {
 		indexBlock(t, indexer, lm, db, BlockData{
 			Header:       header,
 			Transactions: []*flow.TransactionBody{&tx1, &tx2, &tx3},
-			Events:       map[uint32][]flow.Event{},
+			Events:       []flow.Event{},
 		})
 
 		allRoles := []access.TransactionRole{access.TransactionRoleAuthorizer, access.TransactionRolePayer, access.TransactionRoleProposer}
@@ -238,7 +238,7 @@ func TestAccountTransactionsIndexer_EventAddresses(t *testing.T) {
 		indexBlock(t, indexer, lm, db, BlockData{
 			Header:       header,
 			Transactions: []*flow.TransactionBody{&tx},
-			Events:       map[uint32][]flow.Event{0: {event}},
+			Events:       []flow.Event{event},
 		})
 
 		txID := tx.ID()
@@ -273,7 +273,7 @@ func TestAccountTransactionsIndexer_EventAddresses(t *testing.T) {
 		indexBlock(t, indexer, lm, db, BlockData{
 			Header:       header,
 			Transactions: []*flow.TransactionBody{&tx},
-			Events:       map[uint32][]flow.Event{0: {depositEvent}},
+			Events:       []flow.Event{depositEvent},
 		})
 
 		txID := tx.ID()
@@ -293,7 +293,7 @@ func TestAccountTransactionsIndexer_EventAddresses(t *testing.T) {
 		indexBlock(t, indexer, lm, db, BlockData{
 			Header:       header,
 			Transactions: []*flow.TransactionBody{&tx},
-			Events:       map[uint32][]flow.Event{0: {withdrawEvent}},
+			Events:       []flow.Event{withdrawEvent},
 		})
 
 		txID := tx.ID()
@@ -313,7 +313,7 @@ func TestAccountTransactionsIndexer_EventAddresses(t *testing.T) {
 		indexBlock(t, indexer, lm, db, BlockData{
 			Header:       header,
 			Transactions: []*flow.TransactionBody{&tx},
-			Events:       map[uint32][]flow.Event{0: {depositEvent}},
+			Events:       []flow.Event{depositEvent},
 		})
 
 		txID := tx.ID()
@@ -333,7 +333,7 @@ func TestAccountTransactionsIndexer_EventAddresses(t *testing.T) {
 		indexBlock(t, indexer, lm, db, BlockData{
 			Header:       header,
 			Transactions: []*flow.TransactionBody{&tx},
-			Events:       map[uint32][]flow.Event{0: {withdrawEvent}},
+			Events:       []flow.Event{withdrawEvent},
 		})
 
 		txID := tx.ID()
@@ -352,7 +352,7 @@ func TestAccountTransactionsIndexer_EventAddresses(t *testing.T) {
 		indexBlock(t, indexer, lm, db, BlockData{
 			Header:       header,
 			Transactions: []*flow.TransactionBody{&tx},
-			Events:       map[uint32][]flow.Event{0: {depositEvent}},
+			Events:       []flow.Event{depositEvent},
 		})
 
 		txID := tx.ID()
@@ -381,7 +381,7 @@ func TestAccountTransactionsIndexer_EventAddresses(t *testing.T) {
 		indexBlock(t, indexer, lm, db, BlockData{
 			Header:       header,
 			Transactions: []*flow.TransactionBody{&tx},
-			Events:       map[uint32][]flow.Event{0: {event}},
+			Events:       []flow.Event{event},
 		})
 
 		// Payer should appear exactly once despite also being in the event
@@ -422,7 +422,7 @@ func TestAccountTransactionsIndexer_EventAddresses(t *testing.T) {
 		indexBlock(t, indexer, lm, db, BlockData{
 			Header:       header,
 			Transactions: []*flow.TransactionBody{&tx},
-			Events:       map[uint32][]flow.Event{0: {event1, event2}},
+			Events:       []flow.Event{event1, event2},
 		})
 
 		// eventAddr should appear exactly once with a single Interaction role
@@ -457,7 +457,7 @@ func TestAccountTransactionsIndexer_EventAddresses(t *testing.T) {
 		indexBlock(t, indexer, lm, db, BlockData{
 			Header:       header,
 			Transactions: []*flow.TransactionBody{&tx},
-			Events:       map[uint32][]flow.Event{0: {event}},
+			Events:       []flow.Event{event},
 		})
 
 		txID := tx.ID()
@@ -485,7 +485,7 @@ func TestAccountTransactionsIndexer_EventAddresses(t *testing.T) {
 		indexBlock(t, indexer, lm, db, BlockData{
 			Header:       header,
 			Transactions: []*flow.TransactionBody{&tx},
-			Events:       map[uint32][]flow.Event{0: {withdrawEvent, depositEvent}},
+			Events:       []flow.Event{withdrawEvent, depositEvent},
 		})
 
 		txID := tx.ID()
@@ -512,10 +512,7 @@ func TestAccountTransactionsIndexer_EventAddresses(t *testing.T) {
 		indexBlock(t, indexer, lm, db, BlockData{
 			Header:       header,
 			Transactions: []*flow.TransactionBody{&tx1, &tx2},
-			Events: map[uint32][]flow.Event{
-				0: {event1},
-				1: {event2},
-			},
+			Events:       []flow.Event{event1, event2},
 		})
 
 		// tx1: account1 (payer+proposer+authorizer) + recipient1 (from FT event)
@@ -553,7 +550,7 @@ func TestAccountTransactionsIndexer_EventAddresses(t *testing.T) {
 		indexBlock(t, indexer, lm, db, BlockData{
 			Header:       header,
 			Transactions: []*flow.TransactionBody{&tx},
-			Events:       map[uint32][]flow.Event{0: {accountCreatedEvent, ftDepositEvent}},
+			Events:       []flow.Event{accountCreatedEvent, ftDepositEvent},
 		})
 
 		txID := tx.ID()
@@ -587,7 +584,7 @@ func TestAccountTransactionsIndexer_EventAddresses(t *testing.T) {
 		indexBlock(t, indexer, lm, db, BlockData{
 			Header:       header,
 			Transactions: []*flow.TransactionBody{&tx},
-			Events:       map[uint32][]flow.Event{0: {event}},
+			Events:       []flow.Event{event},
 		})
 
 		txID := tx.ID()
@@ -614,9 +611,7 @@ func TestAccountTransactionsIndexer_EventAddresses(t *testing.T) {
 		err := indexBlockExpectError(t, indexer, lm, db, BlockData{
 			Header:       header,
 			Transactions: []*flow.TransactionBody{&tx},
-			Events: map[uint32][]flow.Event{
-				0: {badEvent},
-			},
+			Events:       []flow.Event{badEvent},
 		})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to extract addresses from event")
@@ -857,10 +852,12 @@ func assertAccountTxRoles(
 	expectedRoles []access.TransactionRole,
 ) {
 	t.Helper()
-	page, err := store.TransactionsByAddress(addr, 1000, nil, nil)
+	iter, err := store.ByAddress(addr, nil)
 	require.NoError(t, err)
 
-	for _, r := range page.Transactions {
+	for entry := range iter {
+		r, err := entry.Value()
+		require.NoError(t, err)
 		if r.TransactionID == txID && r.BlockHeight == height {
 			assert.Equal(t, expectedRoles, r.Roles,
 				"address %s tx %s: expected roles=%v, got roles=%v", addr, txID, expectedRoles, r.Roles)
@@ -879,11 +876,13 @@ func assertTransactionCount(
 	expectedCount int,
 ) {
 	t.Helper()
-	page, err := store.TransactionsByAddress(addr, 1000, nil, nil)
+	iter, err := store.ByAddress(addr, nil)
 	require.NoError(t, err)
 
 	var count int
-	for _, r := range page.Transactions {
+	for entry := range iter {
+		r, err := entry.Value()
+		require.NoError(t, err)
 		if r.BlockHeight == height {
 			count++
 		}

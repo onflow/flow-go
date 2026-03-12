@@ -84,6 +84,12 @@ func (s *ExtendedIndexingSuite) SetupTest() {
 		testnet.WithLogLevel(zerolog.FatalLevel),
 	}
 
+	executionConfigs := []func(config *testnet.NodeConfig){
+		testnet.WithLogLevel(zerolog.FatalLevel),
+		// Enable scheduled transaction execution so PendingExecution/Executed events are emitted.
+		testnet.WithAdditionalFlag("--scheduled-callbacks-enabled=true"),
+	}
+
 	// Access node with execution data sync, execution data indexing, and extended indexing enabled.
 	accessNodeOpts := []func(config *testnet.NodeConfig){
 		testnet.WithLogLevel(zerolog.InfoLevel),
@@ -98,8 +104,8 @@ func (s *ExtendedIndexingSuite) SetupTest() {
 	nodeConfigs := []testnet.NodeConfig{
 		testnet.NewNodeConfig(flow.RoleCollection, testnet.WithLogLevel(zerolog.FatalLevel)),
 		testnet.NewNodeConfig(flow.RoleCollection, testnet.WithLogLevel(zerolog.FatalLevel)),
-		testnet.NewNodeConfig(flow.RoleExecution, testnet.WithLogLevel(zerolog.FatalLevel)),
-		testnet.NewNodeConfig(flow.RoleExecution, testnet.WithLogLevel(zerolog.FatalLevel)),
+		testnet.NewNodeConfig(flow.RoleExecution, executionConfigs...),
+		testnet.NewNodeConfig(flow.RoleExecution, executionConfigs...),
 		testnet.NewNodeConfig(flow.RoleConsensus, consensusConfigs...),
 		testnet.NewNodeConfig(flow.RoleConsensus, consensusConfigs...),
 		testnet.NewNodeConfig(flow.RoleConsensus, consensusConfigs...),
