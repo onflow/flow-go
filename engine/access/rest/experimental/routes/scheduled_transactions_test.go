@@ -20,6 +20,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/rest/experimental/request"
 	"github.com/onflow/flow-go/engine/access/rest/router"
 	accessmodel "github.com/onflow/flow-go/model/access"
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -170,7 +171,7 @@ func TestGetScheduledTransactions(t *testing.T) {
 					"created_transaction_id": "%s",
 					"created_at": "%s",
 					"_expandable": {
-						"handler_contract": "handler_contract"
+						"handler_contract": "/experimental/v1/contracts/A.0000.MyScheduler?expand=code"
 					}
 				},
 				{
@@ -188,9 +189,9 @@ func TestGetScheduledTransactions(t *testing.T) {
 					"created_at": "%s",
 					"completed_at": "%s",
 					"_expandable": {
+						"handler_contract": "/experimental/v1/contracts/A.0000.MyScheduler?expand=code",
 						"transaction": "/v1/transactions/%s",
-						"result": "/v1/transaction_results/%s",
-						"handler_contract": "handler_contract"
+						"result": "/v1/transaction_results/%s"
 					}
 				}
 			],
@@ -381,7 +382,7 @@ func TestGetScheduledTransaction(t *testing.T) {
 			"transaction_handler_uuid": "3",
 			"created_transaction_id": "%s",
 			"_expandable": {
-				"handler_contract": "handler_contract"
+				"handler_contract": "/experimental/v1/contracts/A.0000.MyScheduler?expand=code"
 			}
 		}`, handlerOwner.String(), txCreatedID.String())
 
@@ -414,9 +415,11 @@ func TestGetScheduledTransaction(t *testing.T) {
 			TransactionHandlerUUID:           3,
 			Status:                           accessmodel.ScheduledTxStatusScheduled,
 			CreatedTransactionID:             txCreatedID,
-			HandlerContract: &accessmodel.Contract{
-				Identifier: "A.0000.MyScheduler",
-				Body:       "pub contract MyScheduler {}",
+			HandlerContract: &accessmodel.ContractDeployment{
+				Address:      flow.HexToAddress("0000"),
+				ContractName: "MyScheduler",
+				Code:         []byte("pub contract MyScheduler {}"),
+				CodeHash:     accessmodel.CadenceCodeHash([]byte("pub contract MyScheduler {}")),
 			},
 		}
 
@@ -446,8 +449,18 @@ func TestGetScheduledTransaction(t *testing.T) {
 			"transaction_handler_uuid": "3",
 			"created_transaction_id": "%s",
 			"handler_contract": {
-				"identifier": "A.0000.MyScheduler",
-				"body": "pub contract MyScheduler {}"
+				"contract_id": "A.0000000000000000.MyScheduler",
+				"address": "0000000000000000",
+				"block_height": "0",
+				"transaction_id": "0000000000000000000000000000000000000000000000000000000000000000",
+				"tx_index": "0",
+				"event_index": "0",
+				"code": "cHViIGNvbnRyYWN0IE15U2NoZWR1bGVyIHt9",
+				"code_hash": "383198cd7e974ca055c4137bdd1fa44934882f569e7f0c353254e0e7ce8a50fb",
+				"_expandable": {
+					"transaction": "/v1/transactions/0000000000000000000000000000000000000000000000000000000000000000",
+					"result": "/v1/transaction_results/0000000000000000000000000000000000000000000000000000000000000000"
+				}
 			},
 			"_expandable": {}
 		}`, handlerOwner.String(), txCreatedID.String())

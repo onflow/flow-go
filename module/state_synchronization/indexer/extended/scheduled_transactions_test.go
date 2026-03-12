@@ -368,6 +368,101 @@ func TestScheduledTransactionsIndexer_DuplicateID(t *testing.T) {
 	})
 }
 
+// ===== ProcessBlockData tests =====
+
+// TestScheduledTransactionsIndexer_ProcessBlockData_NoEvents verifies that ProcessBlockData
+// returns nil entries and empty metadata for a block with no scheduler events.
+func TestScheduledTransactionsIndexer_ProcessBlockData_NoEvents(t *testing.T) {
+	t.Parallel()
+
+	indexer, _, _, _ := newScheduledTxIndexerForTest(t, flow.Testnet, scheduledTestHeight)
+	header := unittest.BlockHeaderFixtureOnChain(flow.Testnet, unittest.WithHeaderHeight(scheduledTestHeight))
+
+	entries, meta, err := indexer.ProcessBlockData(BlockData{Header: header, Events: []flow.Event{}})
+	require.NoError(t, err)
+	assert.Nil(t, entries)
+	assert.Empty(t, meta.NewTxs)
+	assert.Empty(t, meta.ExecutedEntries)
+	assert.Empty(t, meta.CanceledEntries)
+	assert.Empty(t, meta.FailedEntries)
+}
+
+// TestScheduledTransactionsIndexer_ProcessBlockData_ScheduledEvent verifies that ProcessBlockData
+// populates NewTxs in the metadata for a Scheduled event.
+func TestScheduledTransactionsIndexer_ProcessBlockData_ScheduledEvent(t *testing.T) {
+	t.Parallel()
+
+	sc := systemcontracts.SystemContractsForChain(flow.Testnet)
+	indexer, _, _, _ := newScheduledTxIndexerForTest(t, flow.Testnet, scheduledTestHeight)
+	header := unittest.BlockHeaderFixtureOnChain(flow.Testnet, unittest.WithHeaderHeight(scheduledTestHeight))
+
+	owner := unittest.RandomAddressFixture()
+	event := createScheduledEvent(t, sc, 1, 3, 1000, 500, 200, owner, "A.1234.SomeContract.Handler", 42, "")
+
+	entries, meta, err := indexer.ProcessBlockData(BlockData{Header: header, Events: []flow.Event{event}})
+	require.NoError(t, err)
+	assert.Nil(t, entries) // always nil for scheduled txs
+	require.Len(t, meta.NewTxs, 1)
+	assert.Equal(t, uint64(1), meta.NewTxs[0].ID)
+	assert.Equal(t, access.ScheduledTransactionPriority(3), meta.NewTxs[0].Priority)
+	assert.Empty(t, meta.ExecutedEntries)
+	assert.Empty(t, meta.CanceledEntries)
+	assert.Empty(t, meta.FailedEntries)
+}
+
+// TestScheduledTransactionsIndexer_ProcessBlockData_ExecutedEvent verifies that ProcessBlockData
+// populates ExecutedEntries in the metadata for PendingExecution + Executed events.
+func TestScheduledTransactionsIndexer_ProcessBlockData_ExecutedEvent(t *testing.T) {
+	t.Parallel()
+
+	sc := systemcontracts.SystemContractsForChain(flow.Testnet)
+	indexer, _, _, _ := newScheduledTxIndexerForTest(t, flow.Testnet, scheduledTestHeight)
+	header := unittest.BlockHeaderFixtureOnChain(flow.Testnet, unittest.WithHeaderHeight(scheduledTestHeight))
+
+	owner := unittest.RandomAddressFixture()
+	pendingEvt := createPendingExecutionEvent(t, sc, 5, 1, 300, 100, owner, "A.abc.Contract.Handler")
+	executedEvt := createExecutedEvent(t, sc, 5, 1, 300, owner, "A.abc.Contract.Handler", 99, "")
+
+	_, meta, err := indexer.ProcessBlockData(BlockData{Header: header, Events: []flow.Event{pendingEvt, executedEvt}})
+	require.NoError(t, err)
+	require.Len(t, meta.ExecutedEntries, 1)
+	assert.Empty(t, meta.NewTxs)
+	assert.Empty(t, meta.CanceledEntries)
+}
+
+// TestScheduledTransactionsIndexer_ProcessBlockData_CanceledEvent verifies that ProcessBlockData
+// populates CanceledEntries in the metadata for a Canceled event.
+func TestScheduledTransactionsIndexer_ProcessBlockData_CanceledEvent(t *testing.T) {
+	t.Parallel()
+
+	sc := systemcontracts.SystemContractsForChain(flow.Testnet)
+	indexer, _, _, _ := newScheduledTxIndexerForTest(t, flow.Testnet, scheduledTestHeight)
+	header := unittest.BlockHeaderFixtureOnChain(flow.Testnet, unittest.WithHeaderHeight(scheduledTestHeight))
+
+	owner := unittest.RandomAddressFixture()
+	canceledEvt := createCanceledEvent(t, sc, 7, 2, 100, 50, owner, "A.def.Contract.Handler")
+
+	_, meta, err := indexer.ProcessBlockData(BlockData{Header: header, Events: []flow.Event{canceledEvt}})
+	require.NoError(t, err)
+	require.Len(t, meta.CanceledEntries, 1)
+	assert.Empty(t, meta.NewTxs)
+	assert.Empty(t, meta.ExecutedEntries)
+}
+
+// TestScheduledTransactionsIndexer_ProcessBlockData_DoesNotDependOnHeight verifies that
+// ProcessBlockData can be called with any height without checking the indexer's height state.
+func TestScheduledTransactionsIndexer_ProcessBlockData_DoesNotDependOnHeight(t *testing.T) {
+	t.Parallel()
+
+	indexer, _, _, _ := newScheduledTxIndexerForTest(t, flow.Testnet, scheduledTestHeight)
+	header := unittest.BlockHeaderFixtureOnChain(flow.Testnet, unittest.WithHeaderHeight(scheduledTestHeight+100))
+
+	entries, meta, err := indexer.ProcessBlockData(BlockData{Header: header, Events: []flow.Event{}})
+	require.NoError(t, err)
+	assert.Nil(t, entries)
+	assert.Empty(t, meta.NewTxs)
+}
+
 // TestScheduledTransactionsIndexer_AlreadyIndexed verifies that indexing the same height twice
 // returns ErrAlreadyIndexed.
 func TestScheduledTransactionsIndexer_AlreadyIndexed(t *testing.T) {

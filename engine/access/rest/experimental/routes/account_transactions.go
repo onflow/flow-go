@@ -7,13 +7,12 @@ import (
 
 	"github.com/onflow/flow-go/access/backends/extended"
 	"github.com/onflow/flow-go/engine/access/rest/common"
-	commonmodels "github.com/onflow/flow-go/engine/access/rest/common/models"
 	"github.com/onflow/flow-go/engine/access/rest/experimental/models"
 	"github.com/onflow/flow-go/engine/access/rest/experimental/request"
 )
 
 // GetAccountTransactions returns a paginated list of transactions for the given account address.
-func GetAccountTransactions(r *common.Request, backend extended.API, link commonmodels.LinkGenerator) (interface{}, error) {
+func GetAccountTransactions(r *common.Request, backend extended.API, link models.LinkGenerator) (interface{}, error) {
 	req, err := request.NewGetAccountTransactions(r)
 	if err != nil {
 		return nil, common.NewBadRequestError(err)

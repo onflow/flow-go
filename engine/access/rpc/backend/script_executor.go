@@ -9,6 +9,7 @@ import (
 	"go.uber.org/atomic"
 
 	"github.com/onflow/flow-go/engine/common/version"
+	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/execution"
 	"github.com/onflow/flow-go/storage"
@@ -44,6 +45,8 @@ type ScriptExecutor struct {
 	minCompatibleHeight *atomic.Uint64
 	maxCompatibleHeight *atomic.Uint64
 }
+
+var _ execution.ScriptExecutor = (*ScriptExecutor)(nil)
 
 func NewScriptExecutor(log zerolog.Logger, minHeight, maxHeight uint64) *ScriptExecutor {
 	logger := log.With().Str("component", "script-executor").Logger()
@@ -95,10 +98,10 @@ func (s *ScriptExecutor) Initialize(
 // ExecuteAtBlockHeight executes provided script at the provided block height against a local execution state.
 //
 // Expected errors:
-//   - storage.ErrNotFound if the register or block height is not found
-//   - storage.ErrHeightNotIndexed if the ScriptExecutor is not initialized, or if the height is not indexed yet,
+//   - [storage.ErrNotFound] if the register or block height is not found
+//   - [storage.ErrHeightNotIndexed] if the ScriptExecutor is not initialized, or if the height is not indexed yet,
 //     or if the height is before the lowest indexed height.
-//   - ErrIncompatibleNodeVersion if the block height is not compatible with the node version.
+//   - [ErrIncompatibleNodeVersion] if the block height is not compatible with the node version.
 func (s *ScriptExecutor) ExecuteAtBlockHeight(ctx context.Context, script []byte, arguments [][]byte, height uint64) ([]byte, error) {
 	if err := s.checkHeight(height); err != nil {
 		return nil, err
@@ -110,10 +113,10 @@ func (s *ScriptExecutor) ExecuteAtBlockHeight(ctx context.Context, script []byte
 // GetAccountAtBlockHeight returns the account at the provided block height from a local execution state.
 //
 // Expected errors:
-//   - storage.ErrNotFound if the account or block height is not found
-//   - storage.ErrHeightNotIndexed if the ScriptExecutor is not initialized, or if the height is not indexed yet,
+//   - [storage.ErrNotFound] if the account or block height is not found
+//   - [storage.ErrHeightNotIndexed] if the ScriptExecutor is not initialized, or if the height is not indexed yet,
 //     or if the height is before the lowest indexed height.
-//   - ErrIncompatibleNodeVersion if the block height is not compatible with the node version.
+//   - [ErrIncompatibleNodeVersion] if the block height is not compatible with the node version.
 func (s *ScriptExecutor) GetAccountAtBlockHeight(ctx context.Context, address flow.Address, height uint64) (*flow.Account, error) {
 	if err := s.checkHeight(height); err != nil {
 		return nil, err
@@ -125,9 +128,9 @@ func (s *ScriptExecutor) GetAccountAtBlockHeight(ctx context.Context, address fl
 // GetAccountBalance returns a balance of Flow account by the provided address and block height.
 // Expected errors:
 //   - Script execution related errors
-//   - storage.ErrHeightNotIndexed if the ScriptExecutor is not initialized, or if the height is not indexed yet,
+//   - [storage.ErrHeightNotIndexed] if the ScriptExecutor is not initialized, or if the height is not indexed yet,
 //     or if the height is before the lowest indexed height.
-//   - ErrIncompatibleNodeVersion if the block height is not compatible with the node version.
+//   - [ErrIncompatibleNodeVersion] if the block height is not compatible with the node version.
 func (s *ScriptExecutor) GetAccountBalance(ctx context.Context, address flow.Address, height uint64) (uint64, error) {
 	if err := s.checkHeight(height); err != nil {
 		return 0, err
@@ -139,9 +142,9 @@ func (s *ScriptExecutor) GetAccountBalance(ctx context.Context, address flow.Add
 // GetAccountAvailableBalance returns an available balance of Flow account by the provided address and block height.
 // Expected errors:
 //   - Script execution related errors
-//   - storage.ErrHeightNotIndexed if the ScriptExecutor is not initialized, or if the height is not indexed yet,
+//   - [storage.ErrHeightNotIndexed] if the ScriptExecutor is not initialized, or if the height is not indexed yet,
 //     or if the height is before the lowest indexed height.
-//   - ErrIncompatibleNodeVersion if the block height is not compatible with the node version.
+//   - [ErrIncompatibleNodeVersion] if the block height is not compatible with the node version.
 func (s *ScriptExecutor) GetAccountAvailableBalance(ctx context.Context, address flow.Address, height uint64) (uint64, error) {
 	if err := s.checkHeight(height); err != nil {
 		return 0, err
@@ -153,9 +156,9 @@ func (s *ScriptExecutor) GetAccountAvailableBalance(ctx context.Context, address
 // GetAccountKeys returns a public key of Flow account by the provided address, block height and index.
 // Expected errors:
 //   - Script execution related errors
-//   - storage.ErrHeightNotIndexed if the ScriptExecutor is not initialized, or if the height is not indexed yet,
+//   - [storage.ErrHeightNotIndexed] if the ScriptExecutor is not initialized, or if the height is not indexed yet,
 //     or if the height is before the lowest indexed height.
-//   - ErrIncompatibleNodeVersion if the block height is not compatible with the node version.
+//   - [ErrIncompatibleNodeVersion] if the block height is not compatible with the node version.
 func (s *ScriptExecutor) GetAccountKeys(ctx context.Context, address flow.Address, height uint64) ([]flow.AccountPublicKey, error) {
 	if err := s.checkHeight(height); err != nil {
 		return nil, err
@@ -167,15 +170,57 @@ func (s *ScriptExecutor) GetAccountKeys(ctx context.Context, address flow.Addres
 // GetAccountKey returns
 // Expected errors:
 //   - Script execution related errors
-//   - storage.ErrHeightNotIndexed if the ScriptExecutor is not initialized, or if the height is not indexed yet,
+//   - [storage.ErrHeightNotIndexed] if the ScriptExecutor is not initialized, or if the height is not indexed yet,
 //     or if the height is before the lowest indexed height.
-//   - ErrIncompatibleNodeVersion if the block height is not compatible with the node version.
+//   - [ErrIncompatibleNodeVersion] if the block height is not compatible with the node version.
 func (s *ScriptExecutor) GetAccountKey(ctx context.Context, address flow.Address, keyIndex uint32, height uint64) (*flow.AccountPublicKey, error) {
 	if err := s.checkHeight(height); err != nil {
 		return nil, err
 	}
 
 	return s.scriptExecutor.GetAccountKey(ctx, address, keyIndex, height)
+}
+
+// GetAccountCode returns a Flow account code by the provided address, contract name and block height.
+// Expected errors:
+//   - Script execution related errors
+//   - [storage.ErrHeightNotIndexed] if the ScriptExecutor is not initialized, or if the height is not indexed yet,
+//     or if the height is before the lowest indexed height.
+//   - [ErrIncompatibleNodeVersion] if the block height is not compatible with the node version.
+func (s *ScriptExecutor) GetAccountCode(ctx context.Context, address flow.Address, contractName string, height uint64) ([]byte, error) {
+	if err := s.checkHeight(height); err != nil {
+		return nil, err
+	}
+
+	return s.scriptExecutor.GetAccountCode(ctx, address, contractName, height)
+}
+
+// RegisterValue returns the register value for the given register ID at the provided block height.
+//
+// Expected errors:
+//   - [storage.ErrHeightNotIndexed] if the ScriptExecutor is not initialized, or if the height is not indexed yet,
+//     or if the height is before the lowest indexed height.
+//   - [ErrIncompatibleNodeVersion] if the block height is not compatible with the node version.
+func (s *ScriptExecutor) RegisterValue(ID flow.RegisterID, height uint64) (flow.RegisterValue, error) {
+	if err := s.checkHeight(height); err != nil {
+		return nil, err
+	}
+
+	return s.scriptExecutor.RegisterValue(ID, height)
+}
+
+// GetStorageSnapshot returns a storage snapshot at the provided block height.
+//
+// Expected errors:
+//   - [storage.ErrHeightNotIndexed] if the ScriptExecutor is not initialized, or if the height is not indexed yet,
+//     or if the height is before the lowest indexed height.
+//   - [ErrIncompatibleNodeVersion] if the block height is not compatible with the node version.
+func (s *ScriptExecutor) GetStorageSnapshot(height uint64) (snapshot.StorageSnapshot, error) {
+	if err := s.checkHeight(height); err != nil {
+		return nil, err
+	}
+
+	return s.scriptExecutor.GetStorageSnapshot(height)
 }
 
 // checkHeight checks if the provided block height is within the range of indexed heights
@@ -186,16 +231,10 @@ func (s *ScriptExecutor) GetAccountKey(ctx context.Context, address flow.Address
 // 2. Compares the provided height with the highest and lowest indexed heights.
 // 3. Ensures the height is within the compatible version range if version control is enabled.
 //
-// Parameters:
-// - height: the block height to check.
-//
-// Returns:
-// - error: if the block height is not within the indexed range or not compatible with the node's version.
-//
 // Expected errors:
-// - storage.ErrHeightNotIndexed if the ScriptExecutor is not initialized, or if the height is not indexed yet,
+// - [storage.ErrHeightNotIndexed] if the ScriptExecutor is not initialized, or if the height is not indexed yet,
 // or if the height is before the lowest indexed height.
-// - ErrIncompatibleNodeVersion if the block height is not compatible with the node version.
+// - [ErrIncompatibleNodeVersion] if the block height is not compatible with the node version.
 func (s *ScriptExecutor) checkHeight(height uint64) error {
 	if !s.initialized.Load() {
 		return fmt.Errorf("%w: script executor not initialized", storage.ErrHeightNotIndexed)

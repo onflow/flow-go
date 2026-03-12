@@ -81,6 +81,52 @@ func (_c *ExtendedIndexingMetrics_BlockIndexedExtended_Call) RunAndReturn(run fu
 	return _c
 }
 
+// ContractDeploymentIndexed provides a mock function for the type ExtendedIndexingMetrics
+func (_mock *ExtendedIndexingMetrics) ContractDeploymentIndexed(created int, updated int) {
+	_mock.Called(created, updated)
+	return
+}
+
+// ExtendedIndexingMetrics_ContractDeploymentIndexed_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ContractDeploymentIndexed'
+type ExtendedIndexingMetrics_ContractDeploymentIndexed_Call struct {
+	*mock.Call
+}
+
+// ContractDeploymentIndexed is a helper method to define mock.On call
+//   - created int
+//   - updated int
+func (_e *ExtendedIndexingMetrics_Expecter) ContractDeploymentIndexed(created interface{}, updated interface{}) *ExtendedIndexingMetrics_ContractDeploymentIndexed_Call {
+	return &ExtendedIndexingMetrics_ContractDeploymentIndexed_Call{Call: _e.mock.On("ContractDeploymentIndexed", created, updated)}
+}
+
+func (_c *ExtendedIndexingMetrics_ContractDeploymentIndexed_Call) Run(run func(created int, updated int)) *ExtendedIndexingMetrics_ContractDeploymentIndexed_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 int
+		if args[0] != nil {
+			arg0 = args[0].(int)
+		}
+		var arg1 int
+		if args[1] != nil {
+			arg1 = args[1].(int)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *ExtendedIndexingMetrics_ContractDeploymentIndexed_Call) Return() *ExtendedIndexingMetrics_ContractDeploymentIndexed_Call {
+	_c.Call.Return()
+	return _c
+}
+
+func (_c *ExtendedIndexingMetrics_ContractDeploymentIndexed_Call) RunAndReturn(run func(created int, updated int)) *ExtendedIndexingMetrics_ContractDeploymentIndexed_Call {
+	_c.Run(run)
+	return _c
+}
+
 // FTTransferIndexed provides a mock function for the type ExtendedIndexingMetrics
 func (_mock *ExtendedIndexingMetrics) FTTransferIndexed(count int) {
 	_mock.Called(count)

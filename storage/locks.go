@@ -57,6 +57,8 @@ const (
 	// LockIndexScheduledTransactionsIndex protects the extended scheduled transactions index.
 	// This is distinct from LockIndexScheduledTransaction which protects a different lookup.
 	LockIndexScheduledTransactionsIndex = "lock_index_scheduled_transactions_index"
+	// LockIndexContractDeployments protects the extended contract deployments index.
+	LockIndexContractDeployments = "lock_index_contract_deployments"
 )
 
 // Locks returns a list of all named locks used by the storage layer.
@@ -87,6 +89,7 @@ func Locks() []string {
 		LockIndexFungibleTokenTransfers,
 		LockIndexNonFungibleTokenTransfers,
 		LockIndexScheduledTransactionsIndex,
+		LockIndexContractDeployments,
 	}
 }
 
@@ -145,6 +148,7 @@ var LockGroupAccessExtendedIndexers = []string{
 	LockIndexFungibleTokenTransfers,
 	LockIndexNonFungibleTokenTransfers,
 	LockIndexScheduledTransactionsIndex,
+	LockIndexContractDeployments,
 }
 
 // addLocks adds a chain of locks to the builder in the order they appear in the locks slice.

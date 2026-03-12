@@ -15,6 +15,7 @@ type ExtendedIndexingCollector struct {
 	scheduledTxBackfillCount prometheus.Counter
 	ftTransferCount          prometheus.Counter
 	nftTransferCount         prometheus.Counter
+	contractDeploymentCount  *prometheus.CounterVec
 }
 
 func NewExtendedIndexingCollector() module.ExtendedIndexingMetrics {
@@ -53,12 +54,20 @@ func NewExtendedIndexingCollector() module.ExtendedIndexingMetrics {
 		Help:      "total number of non-fungible token transfers indexed",
 	})
 
+	contractDeploymentCount := promauto.NewCounterVec(prometheus.CounterOpts{
+		Namespace: namespaceAccess,
+		Subsystem: subsystemExtendedIndexing,
+		Name:      "contract_deployments_total",
+		Help:      "total number of contract deployments indexed, by action",
+	}, []string{"action"})
+
 	return &ExtendedIndexingCollector{
 		indexedHeight:            indexedHeight,
 		scheduledTxCount:         scheduledTxCount,
 		scheduledTxBackfillCount: scheduledTxBackfillCount,
 		ftTransferCount:          ftTransferCount,
 		nftTransferCount:         nftTransferCount,
+		contractDeploymentCount:  contractDeploymentCount,
 	}
 }
 
@@ -84,4 +93,11 @@ func (c *ExtendedIndexingCollector) FTTransferIndexed(count int) {
 // NFTTransferIndexed records the number of non-fungible token transfers indexed for a single block.
 func (c *ExtendedIndexingCollector) NFTTransferIndexed(count int) {
 	c.nftTransferCount.Add(float64(count))
+}
+
+// ContractDeploymentIndexed records the number of contract deployments indexed for a single block,
+// broken down by action (create vs update).
+func (c *ExtendedIndexingCollector) ContractDeploymentIndexed(created, updated int) {
+	c.contractDeploymentCount.WithLabelValues("create").Add(float64(created))
+	c.contractDeploymentCount.WithLabelValues("update").Add(float64(updated))
 }

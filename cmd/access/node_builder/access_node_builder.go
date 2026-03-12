@@ -1132,6 +1132,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 					utils.NotNil(builder.events),
 					utils.NotNil(builder.lightTransactionResults),
 					utils.NotNil(builder.ScriptExecutor),
+					utils.NotNil(builder.Storage.RegisterIndex),
 					builder.extendedIndexingBackfillDelay,
 				)
 				if err != nil {
@@ -2327,6 +2328,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 					utils.NotNil(node.Storage.Transactions),
 					builder.scheduledTransactions,
 					builder.ExtendedStorage.ScheduledTransactionsBootstrapper,
+					builder.ExtendedStorage.ContractDeploymentsBootstrapper,
 					txstatus.NewTxStatusDeriver(node.State, lastFullBlockHeight),
 					utils.NotNil(builder.ScriptExecutor),
 				)

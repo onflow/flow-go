@@ -103,6 +103,40 @@ func TestNonFungibleTokenTransfers_Name(t *testing.T) {
 	assert.Equal(t, "account_nft_transfers", a.Name())
 }
 
+// ===== TestNonFungibleTokenTransfers_ProcessBlockData =====
+
+func TestNonFungibleTokenTransfers_ProcessBlockData(t *testing.T) {
+	t.Parallel()
+
+	t.Run("empty block returns empty entries", func(t *testing.T) {
+		a := NewNonFungibleTokenTransfers(unittest.Logger(), flow.Testnet, &mockNFTBootstrapper{latestHeight: 99}, metrics.NewNoopCollector())
+
+		data := BlockData{
+			Header: unittest.BlockHeaderFixture(unittest.WithHeaderHeight(100)),
+			Events: []flow.Event{},
+		}
+
+		entries, meta, err := a.ProcessBlockData(data)
+		require.NoError(t, err)
+		assert.Empty(t, entries)
+		assert.Equal(t, NonFungibleTokenTransfersMetadata{}, meta)
+	})
+
+	t.Run("does not depend on indexer height state", func(t *testing.T) {
+		// ProcessBlockData should work regardless of the indexer's height state
+		a := NewNonFungibleTokenTransfers(unittest.Logger(), flow.Testnet, &mockNFTBootstrapper{latestHeight: 50}, metrics.NewNoopCollector())
+
+		data := BlockData{
+			Header: unittest.BlockHeaderFixture(unittest.WithHeaderHeight(200)),
+			Events: []flow.Event{},
+		}
+
+		entries, _, err := a.ProcessBlockData(data)
+		require.NoError(t, err)
+		assert.Empty(t, entries)
+	})
+}
+
 // ===== TestNonFungibleTokenTransfers_IndexBlockData =====
 
 func TestNonFungibleTokenTransfers_IndexBlockData(t *testing.T) {
