@@ -196,12 +196,24 @@ func (s *ExecutionStateSyncSuite) executionDataForHeight(ctx context.Context, no
 			BlockId:              header.ID[:],
 			EventEncodingVersion: entities.EventEncodingVersion_CCF_V0,
 		})
+
 		if err != nil {
+			s.log.Info().
+				Uint64("height", height).
+				Hex("block_id", header.ID[:]).
+				Err(err).
+				Msg("failed to get execution data")
 			return err
 		}
 
 		blockED, err = convert.MessageToBlockExecutionData(ed.GetBlockExecutionData(), flow.Localnet.Chain())
 		s.Require().NoError(err, "could not convert execution data")
+
+		s.log.Info().
+			Uint64("height", height).
+			Hex("block_id", header.ID[:]).
+			Int("chunks", len(blockED.ChunkExecutionDatas)).
+			Msg("successfully retrieved execution data")
 
 		return err
 	}), "could not get execution data for block %d", height)
