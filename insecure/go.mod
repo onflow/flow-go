@@ -215,8 +215,8 @@ require (
 	github.com/multiformats/go-varint v0.0.7 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/olekukonko/tablewriter v0.0.5 // indirect
-	github.com/onflow/atree v0.12.1 // indirect
-	github.com/onflow/cadence v1.9.10-0.20260226160750-ec74df097e10 // indirect
+	github.com/onflow/atree v0.14.0 // indirect
+	github.com/onflow/cadence v1.9.10-0.20260312224004-6e7bbb2b947e // indirect
 	github.com/onflow/fixed-point v0.1.1 // indirect
 	github.com/onflow/flow-core-contracts/lib/go/contracts v1.9.3 // indirect
 	github.com/onflow/flow-core-contracts/lib/go/templates v1.9.3 // indirect

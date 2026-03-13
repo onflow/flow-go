@@ -253,6 +253,16 @@ func (v ByteStringValue) ChildStorables() []atree.Storable {
 	return nil
 }
 
+func (v ByteStringValue) CanCopyNonRefSimple() bool {
+	return true
+}
+
+func (v ByteStringValue) CopyNonRefSimple() (atree.Storable, error) {
+	data := make([]byte, len(v.data))
+	copy(data, v.data)
+	return NewByteStringValue(data), nil
+}
+
 func (v ByteStringValue) StoredValue(_ atree.SlabStorage) (atree.Value, error) {
 	return v, nil
 }

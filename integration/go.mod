@@ -20,7 +20,7 @@ require (
 	github.com/ipfs/go-datastore v0.8.2
 	github.com/ipfs/go-ds-pebble v0.5.0
 	github.com/libp2p/go-libp2p v0.38.2
-	github.com/onflow/cadence v1.9.10-0.20260226160750-ec74df097e10
+	github.com/onflow/cadence v1.9.10-0.20260312224004-6e7bbb2b947e
 	github.com/onflow/crypto v0.25.4
 	github.com/onflow/flow v0.4.20-0.20260227142445-6427bfb62cdc
 	github.com/onflow/flow-core-contracts/lib/go/contracts v1.9.3
@@ -267,7 +267,7 @@ require (
 	github.com/multiformats/go-varint v0.0.7 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/olekukonko/tablewriter v0.0.5 // indirect
-	github.com/onflow/atree v0.12.1 // indirect
+	github.com/onflow/atree v0.14.0 // indirect
 	github.com/onflow/fixed-point v0.1.1 // indirect
 	github.com/onflow/flow-evm-bridge v0.1.0 // indirect
 	github.com/onflow/flow-ft/lib/go/templates v1.0.1 // indirect
