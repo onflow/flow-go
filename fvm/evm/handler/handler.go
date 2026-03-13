@@ -82,11 +82,6 @@ func (h *ContractHandler) SetState(
 	slot gethCommon.Hash,
 	value gethCommon.Hash,
 ) gethCommon.Hash {
-	// should only be allowed on Emulator, for testing purposes
-	if h.flowChainID != flow.Emulator {
-		panicOnError(types.ErrUnsupportedNetworkOperation)
-	}
-
 	execState, err := state.NewStateDB(h.backend, evm.StorageAccountAddress(h.flowChainID))
 	panicOnError(err)
 
@@ -104,11 +99,6 @@ func (h *ContractHandler) GetState(
 	address types.Address,
 	slot gethCommon.Hash,
 ) gethCommon.Hash {
-	// should only be allowed on Emulator, for testing purposes
-	if h.flowChainID != flow.Emulator {
-		panicOnError(types.ErrUnsupportedNetworkOperation)
-	}
-
 	execState, err := state.NewStateDB(h.backend, evm.StorageAccountAddress(h.flowChainID))
 	panicOnError(err)
 
@@ -126,11 +116,6 @@ func (h *ContractHandler) RunTxAs(
 	gasLimit types.GasLimit,
 	balance types.Balance,
 ) *types.ResultSummary {
-	// should only be allowed on Emulator, for testing purposes
-	if h.flowChainID != flow.Emulator {
-		panicOnError(types.ErrUnsupportedNetworkOperation)
-	}
-
 	account := h.AccountByAddress(from, true)
 	return account.Call(to, txData, gasLimit, balance)
 }

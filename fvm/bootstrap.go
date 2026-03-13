@@ -86,6 +86,7 @@ type BootstrapParams struct {
 	storagePerFlow                   cadence.UFix64
 	restrictedAccountCreationEnabled cadence.Bool
 	setupVMBridgeEnabled             cadence.Bool
+	evmTestHelpersEnabled            cadence.Bool
 
 	// versionFreezePeriod is the number of blocks in the future where the version
 	// changes are frozen. The Node version beacon manages the freeze period,
@@ -226,6 +227,15 @@ func WithRestrictedAccountCreationEnabled(enabled cadence.Bool) BootstrapProcedu
 func WithSetupVMBridgeEnabled(enabled cadence.Bool) BootstrapProcedureOption {
 	return func(bp *BootstrapProcedure) *BootstrapProcedure {
 		bp.setupVMBridgeEnabled = enabled
+		return bp
+	}
+}
+
+// Option to include testing helper functions in the EVM system contract.
+// Useful for Emulator and forked networks.
+func WithEVMTestHelpersEnabled(enabled cadence.Bool) BootstrapProcedureOption {
+	return func(bp *BootstrapProcedure) *BootstrapProcedure {
+		bp.evmTestHelpersEnabled = enabled
 		return bp
 	}
 }
@@ -1018,10 +1028,10 @@ func (b *bootstrapExecutor) setupEVM(serviceAddress, nonFungibleTokenAddress, fu
 	txBody, err := blueprints.DeployContractTransaction(
 		serviceAddress,
 		stdlib.ContractCode(
-			b.ctx.Chain.ChainID(),
 			nonFungibleTokenAddress,
 			fungibleTokenAddress,
 			flowTokenAddress,
+			bool(b.evmTestHelpersEnabled),
 		),
 		stdlib.ContractName,
 	).Build()
