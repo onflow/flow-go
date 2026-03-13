@@ -8,11 +8,13 @@ import (
 
 	"github.com/onflow/crypto"
 	"github.com/onflow/crypto/hash"
+	"github.com/rs/zerolog"
 	otelTrace "go.opentelemetry.io/otel/trace"
 
 	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/engine/execution/storehouse"
 	"github.com/onflow/flow-go/fvm"
+	"github.com/onflow/flow-go/fvm/inspection"
 	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/fvm/storage/state"
@@ -241,6 +243,17 @@ func (collector *resultCollector) processTransactionResult(
 		logger.Info().Msg("transaction executed successfully")
 	}
 
+	// (leo debugging): We log inspection results here, because if we logged them ih the FVM
+	// they would get logged on every transaction retry.
+	// Same for the metrics.
+	if len(output.InspectionResults) == 0 {
+		logger.Debug().
+			Hex("tx_id", txn.ID[:]).
+			Msg("no inspection results for transaction")
+	}
+
+	collector.logInspectionResults(logger, output.InspectionResults)
+
 	collector.handleTransactionExecutionMetrics(
 		timeSpent,
 		output,
@@ -280,6 +293,48 @@ func (collector *resultCollector) processTransactionResult(
 		txn.collectionInfo,
 		collector.currentCollectionStartTime,
 		collector.currentCollectionState.Finalize())
+}
+
+func (collector *resultCollector) logInspectionResults(
+	log zerolog.Logger,
+	results []inspection.Result,
+) {
+	if len(results) == 0 {
+		return
+	}
+
+	logEvents := make([]func(e *zerolog.Event), 0, len(results))
+
+	// The log level will be decided by the inspectionResults
+	// logLevel := zerolog.TraceLevel
+	// leo: debugging with info level log
+	logLevel := zerolog.InfoLevel
+	for i, inspectionResult := range results {
+		if inspectionResult == nil {
+			log.Warn().
+				Int("index", i).
+				Msg("inspection result is nil, likely due to a panic or error during inspection")
+			continue
+		}
+		lvl, evt := inspectionResult.AsLogEvent()
+		if lvl > logLevel {
+			logLevel = lvl
+		}
+		if evt != nil {
+			logEvents = append(logEvents, evt)
+		}
+	}
+
+	// if there are no loggable inspection results, don't log at all
+	if len(logEvents) == 0 {
+		return
+	}
+
+	evt := log.WithLevel(logLevel).Str("module", "tc-inspector")
+	for _, logEvent := range logEvents {
+		logEvent(evt)
+	}
+	evt.Msg("Inspection results")
 }
 
 func (collector *resultCollector) handleTransactionExecutionMetrics(

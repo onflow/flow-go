@@ -7,6 +7,8 @@ import (
 	"github.com/onflow/cadence/runtime"
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/fvm/inspection"
+
 	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/engine/execution/computation/computer"
 	"github.com/onflow/flow-go/engine/execution/computation/query"
@@ -66,6 +68,9 @@ type ComputationConfig struct {
 	DerivedDataCacheSize uint
 	MaxConcurrency       int
 
+	// TokenTrackingEnabled enables tracking and logging of token movements on transactions.
+	TokenTrackingEnabled bool
+
 	// When NewCustomVirtualMachine is nil, the manager will create a standard
 	// fvm virtual machine via fvm.NewVirtualMachine.  Otherwise, the manager
 	// will create a virtual machine using this function.
@@ -106,7 +111,7 @@ func New(
 	}
 
 	chainID := vmCtx.Chain.ChainID()
-	options := DefaultFVMOptions(chainID, params.ExtensiveTracing, vmCtx.ScheduledTransactionsEnabled)
+	options := DefaultFVMOptions(chainID, params.ExtensiveTracing, vmCtx.ScheduledTransactionsEnabled, params.TokenTrackingEnabled)
 	vmCtx = fvm.NewContextFromParent(vmCtx, options...)
 
 	blockComputer, err := computer.NewBlockComputer(
@@ -222,7 +227,7 @@ func (e *Manager) QueryExecutor() query.Executor {
 	return e.queryExecutor
 }
 
-func DefaultFVMOptions(chainID flow.ChainID, extensiveTracing bool, scheduleCallbacksEnabled bool) []fvm.Option {
+func DefaultFVMOptions(chainID flow.ChainID, extensiveTracing, scheduleCallbacksEnabled, tokenTracking bool) []fvm.Option {
 	options := []fvm.Option{
 		fvm.WithReusableCadenceRuntimePool(
 			reusableRuntime.NewReusableCadenceRuntimePool(
@@ -236,6 +241,12 @@ func DefaultFVMOptions(chainID flow.ChainID, extensiveTracing bool, scheduleCall
 
 	if extensiveTracing {
 		options = append(options, fvm.WithExtensiveTracing())
+	}
+
+	if tokenTracking {
+		options = append(options, fvm.WithInspectors([]inspection.Inspector{
+			inspection.NewTokenChangesInspector(inspection.DefaultTokenDiffSearchTokens(chainID.Chain())),
+		}))
 	}
 
 	return options

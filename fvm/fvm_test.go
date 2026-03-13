@@ -11,9 +11,13 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/onflow/flow-core-contracts/lib/go/templates"
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	mockery "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+
+	"github.com/onflow/flow-go/fvm/inspection"
 
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/common"
@@ -4401,4 +4405,254 @@ func TestTransactionIndexCall(t *testing.T) {
 				},
 			),
 	)
+}
+
+func TestFlowTokenChangesInspector(t *testing.T) {
+	t.Parallel()
+
+	type testCase struct {
+		txBody           func(*testing.T, flow.Chain, []flow.Address) *flow.TransactionBody
+		txErrorExpected  bool
+		resultChecker    func(*testing.T, inspection.TokenDiffResult)
+		tokenDefinitions map[string]inspection.SearchToken
+		name             string
+	}
+
+	// account keys that can be used in the tests
+	makeKey := func() flow.AccountPrivateKey {
+		privateKey, err := testutil.GenerateAccountPrivateKey()
+		require.NoError(t, err)
+		return privateKey
+	}
+	numAccounts := 5
+	accountKeys := make([]flow.AccountPrivateKey, numAccounts)
+	for i := 0; i < numAccounts; i++ {
+		accountKeys[i] = makeKey()
+	}
+
+	testCases := []testCase{
+		{
+			name: "transfer",
+			tokenDefinitions: map[string]inspection.SearchToken{
+				"A.7e60df042a9c0868.FlowToken.Vault": {
+					ID: "A.7e60df042a9c0868.FlowToken.Vault",
+					GetBalance: func(value *interpreter.CompositeValue) uint64 {
+						return uint64(value.GetField(nil, "balance").(interpreter.UFix64Value).UFix64Value)
+					},
+				},
+			},
+			txBody: func(t *testing.T, chain flow.Chain, accounts []flow.Address) *flow.TransactionBody {
+				sc := systemcontracts.SystemContractsForChain(chain.ChainID())
+				env := sc.AsTemplateEnv()
+
+				txBodyBuilder := blueprints.TransferFlowTokenTransaction(env, chain.ServiceAddress(), accounts[0], "2.0")
+				err := testutil.SignTransactionAsServiceAccount(txBodyBuilder, 0, chain)
+				require.NoError(t, err)
+
+				txBody, err := txBodyBuilder.Build()
+				require.NoError(t, err)
+				return txBody
+			},
+			resultChecker: func(t *testing.T, result inspection.TokenDiffResult) {
+				require.Len(t, result.UnaccountedTokens(), 0, "no tokens were created or destroyed")
+				require.Len(t, result.Changes, 3, "change should be on 3 addresses: sender, receiver, fees")
+			},
+		},
+		{
+			name: "mint without mint event monitoring",
+			tokenDefinitions: map[string]inspection.SearchToken{
+				"A.7e60df042a9c0868.FlowToken.Vault": {
+					ID: "A.7e60df042a9c0868.FlowToken.Vault",
+					GetBalance: func(value *interpreter.CompositeValue) uint64 {
+						return uint64(value.GetField(nil, "balance").(interpreter.UFix64Value).UFix64Value)
+					},
+				},
+			},
+			txBody: func(t *testing.T, chain flow.Chain, accounts []flow.Address) *flow.TransactionBody {
+				sc := systemcontracts.SystemContractsForChain(chain.ChainID())
+				env := sc.AsTemplateEnv()
+
+				txBodyBuilder := flow.NewTransactionBodyBuilder().
+					SetScript(templates.GenerateMintFlowScript(env)).
+					AddArgument(jsoncdc.MustEncode(cadence.Address(accounts[0]))).
+					AddArgument(jsoncdc.MustEncode(cadence.UFix64(10_000_000))).
+					AddAuthorizer(chain.ServiceAddress()).
+					SetPayer(chain.ServiceAddress())
+
+				err := testutil.SignTransactionAsServiceAccount(txBodyBuilder, 0, chain)
+				require.NoError(t, err)
+
+				txBody, err := txBodyBuilder.Build()
+				require.NoError(t, err)
+
+				return txBody
+			},
+			resultChecker: func(t *testing.T, result inspection.TokenDiffResult) {
+				unaccounted := result.UnaccountedTokens()
+				require.Len(t, unaccounted, 1, "expectation: some tokens were created and are unaccounted for")
+				require.Equal(t, unaccounted["A.7e60df042a9c0868.FlowToken.Vault"], int64(10000000))
+				require.Len(t, result.Changes, 3, "change should be on 3 addresses: sender, receiver, fees")
+			},
+		},
+		{
+			name: "mint with mint event monitoring",
+			tokenDefinitions: map[string]inspection.SearchToken{
+				"A.7e60df042a9c0868.FlowToken.Vault": {
+					ID: "A.7e60df042a9c0868.FlowToken.Vault",
+					GetBalance: func(value *interpreter.CompositeValue) uint64 {
+						return uint64(value.GetField(nil, "balance").(interpreter.UFix64Value).UFix64Value)
+					},
+					SinksSources: map[string]func(flow.Event) (int64, error){
+						"A.7e60df042a9c0868.FlowToken.TokensMinted": func(evt flow.Event) (int64, error) {
+							payload, err := ccf.Decode(nil, evt.Payload)
+							require.NoError(t, err)
+							return int64(payload.(cadence.Event).SearchFieldByName("amount").(cadence.UFix64)), nil
+						},
+					},
+				},
+			},
+			txBody: func(t *testing.T, chain flow.Chain, accounts []flow.Address) *flow.TransactionBody {
+				sc := systemcontracts.SystemContractsForChain(chain.ChainID())
+				env := sc.AsTemplateEnv()
+
+				txBodyBuilder := flow.NewTransactionBodyBuilder().
+					SetScript(templates.GenerateMintFlowScript(env)).
+					AddArgument(jsoncdc.MustEncode(cadence.Address(accounts[0]))).
+					AddArgument(jsoncdc.MustEncode(cadence.UFix64(10_000_000))).
+					AddAuthorizer(chain.ServiceAddress()).
+					SetPayer(chain.ServiceAddress())
+
+				err := testutil.SignTransactionAsServiceAccount(txBodyBuilder, 0, chain)
+				require.NoError(t, err)
+
+				txBody, err := txBodyBuilder.Build()
+				require.NoError(t, err)
+
+				return txBody
+			},
+			resultChecker: func(t *testing.T, result inspection.TokenDiffResult) {
+				unaccounted := result.UnaccountedTokens()
+				require.Len(t, unaccounted, 0, "expectation: all tokens were accounted for")
+				require.Len(t, result.Changes, 3, "change should be on 3 addresses: sender, receiver, fees")
+			},
+		},
+		{
+			name:             "mint with default tracking",
+			tokenDefinitions: inspection.DefaultTokenDiffSearchTokens(flow.Testnet.Chain()),
+			txBody: func(t *testing.T, chain flow.Chain, accounts []flow.Address) *flow.TransactionBody {
+				sc := systemcontracts.SystemContractsForChain(chain.ChainID())
+				env := sc.AsTemplateEnv()
+
+				txBodyBuilder := flow.NewTransactionBodyBuilder().
+					SetScript(templates.GenerateMintFlowScript(env)).
+					AddArgument(jsoncdc.MustEncode(cadence.Address(accounts[0]))).
+					AddArgument(jsoncdc.MustEncode(cadence.UFix64(10_000_000))).
+					AddAuthorizer(chain.ServiceAddress()).
+					SetPayer(chain.ServiceAddress())
+
+				err := testutil.SignTransactionAsServiceAccount(txBodyBuilder, 0, chain)
+				require.NoError(t, err)
+
+				txBody, err := txBodyBuilder.Build()
+				require.NoError(t, err)
+
+				return txBody
+			},
+			resultChecker: func(t *testing.T, result inspection.TokenDiffResult) {
+				unaccounted := result.UnaccountedTokens()
+				require.Len(t, unaccounted, 0, "expectation: all tokens were accounted for")
+				require.Len(t, result.Changes, 3, "change should be on 3 addresses: sender, receiver, fees")
+			},
+		}, {
+			name:             "create account",
+			tokenDefinitions: inspection.DefaultTokenDiffSearchTokens(flow.Testnet.Chain()),
+			txBody: func(t *testing.T, chain flow.Chain, accounts []flow.Address) *flow.TransactionBody {
+				_, txBodyBuilder := testutil.CreateAccountCreationTransaction(t, chain)
+
+				err := testutil.SignTransactionAsServiceAccount(txBodyBuilder, 0, chain)
+				require.NoError(t, err)
+
+				txBody, err := txBodyBuilder.Build()
+				require.NoError(t, err)
+
+				return txBody
+			},
+			resultChecker: func(t *testing.T, result inspection.TokenDiffResult) {
+				unaccounted := result.UnaccountedTokens()
+				require.Len(t, unaccounted, 0, "no tokens were created or destroyed")
+				require.Len(t, result.Changes, 3, "change should be on 3 addresses: sender, receiver, fees")
+			},
+		},
+	}
+
+	runAndCheckTransactionTest := func(tc testCase) func(t *testing.T) {
+		return newVMTest().
+			withBootstrapProcedureOptions(
+				fvm.WithTransactionFee(fvm.DefaultTransactionFees),
+				fvm.WithStorageMBPerFLOW(fvm.DefaultStorageMBPerFLOW),
+				fvm.WithMinimumStorageReservation(fvm.DefaultMinimumStorageReservation),
+				fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
+				fvm.WithExecutionMemoryLimit(math.MaxUint64),
+				fvm.WithExecutionEffortWeights(environment.MainnetExecutionEffortWeights),
+				fvm.WithExecutionMemoryWeights(meter.DefaultMemoryWeights),
+			).
+			withContextOptions(
+				fvm.WithTransactionFeesEnabled(true),
+				fvm.WithAccountStorageLimit(true),
+				fvm.WithAuthorizationChecksEnabled(false),
+			).
+			run(
+				func(
+					t *testing.T,
+					vm fvm.VM,
+					chain flow.Chain,
+					ctx fvm.Context,
+					snapshotTree snapshot.SnapshotTree,
+				) {
+					t.Parallel()
+
+					differ := inspection.NewTokenChangesInspector(tc.tokenDefinitions)
+
+					// Create an account private key.
+					privateKey, err := testutil.GenerateAccountPrivateKey()
+					require.NoError(t, err)
+
+					// Create accounts with the provided private
+					// key and the root account.
+					snapshotTree, accounts, err := testutil.CreateAccounts(
+						vm,
+						snapshotTree,
+						[]flow.AccountPrivateKey{privateKey, privateKey, privateKey},
+						chain)
+					require.NoError(t, err)
+
+					txBody := tc.txBody(t, chain, accounts)
+
+					executionSnapshot, output, err := vm.Run(
+						ctx,
+						fvm.Transaction(txBody, 0),
+						snapshotTree)
+
+					require.NoError(t, err)
+					if tc.txErrorExpected {
+						require.Error(t, output.Err)
+					} else {
+						require.NoError(t, output.Err)
+					}
+
+					evts := make([]flow.Event, 0, len(output.Events)+len(output.ServiceEvents))
+					evts = append(evts, output.Events...)
+					evts = append(evts, output.ServiceEvents...)
+
+					diff, err := differ.Inspect(zerolog.Nop(), snapshotTree, executionSnapshot, evts)
+					require.NoError(t, err)
+
+					tc.resultChecker(t, diff.(inspection.TokenDiffResult))
+				},
+			)
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, runAndCheckTransactionTest(tc))
+	}
 }

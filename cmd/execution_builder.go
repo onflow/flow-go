@@ -599,8 +599,13 @@ func (exeNode *ExecutionNode) LoadProviderEngine(
 			node.RootChainID,
 			exeNode.exeConf.computationConfig.ExtensiveTracing,
 			exeNode.exeConf.scheduleCallbacksEnabled,
+			exeNode.exeConf.tokenTrackingEnabled,
 		)...,
 	)
+
+	if exeNode.exeConf.tokenTrackingEnabled {
+		node.Logger.Info().Str("module", "tc-inspector").Msg("token tracking inspector enabled")
+	}
 
 	vmCtx := fvm.NewContext(node.RootChainID.Chain(), opts...)
 
@@ -622,6 +627,7 @@ func (exeNode *ExecutionNode) LoadProviderEngine(
 	}
 
 	ledgerViewCommitter := committer.NewLedgerViewCommitter(exeNode.ledgerStorage, node.Tracer)
+	exeNode.exeConf.computationConfig.TokenTrackingEnabled = exeNode.exeConf.tokenTrackingEnabled
 	manager, err := computation.New(
 		node.Logger,
 		collector,
