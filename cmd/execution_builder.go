@@ -607,7 +607,7 @@ func (exeNode *ExecutionNode) LoadProviderEngine(
 		node.Logger.Info().Str("module", "tc-inspector").Msg("token tracking inspector enabled")
 	}
 
-	vmCtx := fvm.NewContext(opts...)
+	vmCtx := fvm.NewContext(node.RootChainID.Chain(), opts...)
 
 	var collector module.ExecutionMetrics
 	collector = exeNode.collector
