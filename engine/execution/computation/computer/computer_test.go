@@ -36,6 +36,7 @@ import (
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/environment"
 	fvmErrors "github.com/onflow/flow-go/fvm/errors"
+	"github.com/onflow/flow-go/fvm/inspection"
 	fvmmock "github.com/onflow/flow-go/fvm/mock"
 	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
 	"github.com/onflow/flow-go/fvm/storage"
@@ -350,6 +351,9 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		vm.On("NewExecutor", mock.Anything, mock.Anything, mock.Anything).
 			Return(noOpExecutor{}).
 			Once() // just system chunk
+
+		vm.On("Inspect", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+			Return(nil)
 
 		snapshot := storehouse.NewExecutingBlockSnapshot(
 			snapshot.MapStorageSnapshot{},
@@ -2003,6 +2007,16 @@ func (testVM) GetAccount(
 	panic("not implemented")
 }
 
+func (testVM) Inspect(
+	_ fvm.Context,
+	_ fvm.Procedure,
+	_ snapshot.StorageSnapshot,
+	_ *snapshot.ExecutionSnapshot,
+	_ fvm.ProcedureOutput,
+) []inspection.Result {
+	return nil
+}
+
 func generateEvents(eventCount int, txIndex uint32) []flow.Event {
 	events := make([]flow.Event, eventCount)
 	for i := 0; i < eventCount; i++ {
@@ -2077,6 +2091,16 @@ func (errorVM) GetAccount(
 	error,
 ) {
 	panic("not implemented")
+}
+
+func (errorVM) Inspect(
+	_ fvm.Context,
+	_ fvm.Procedure,
+	_ snapshot.StorageSnapshot,
+	_ *snapshot.ExecutionSnapshot,
+	_ fvm.ProcedureOutput,
+) []inspection.Result {
+	return nil
 }
 
 func getSetAProgram(
