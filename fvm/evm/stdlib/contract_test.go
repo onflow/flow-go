@@ -352,10 +352,10 @@ func deployContracts(
 		{
 			name: stdlib.ContractName,
 			code: stdlib.ContractCode(
-				flow.Emulator,
 				contractsAddress,
 				contractsAddress,
 				contractsAddress,
+				true,
 			),
 		},
 	}
