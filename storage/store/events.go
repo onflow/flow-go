@@ -73,6 +73,9 @@ func (e *Events) BatchStore(lctx lockctx.Proof, blockID flow.Identifier, blockEv
 			eventIndex++
 		}
 	}
+	if err := validateEventOrder(combinedEvents); err != nil {
+		return fmt.Errorf("invalid event ordering for block %s: %w", blockID, err)
+	}
 
 	storage.OnCommitSucceed(batch, func() {
 		e.cache.Insert(blockID, combinedEvents)
@@ -251,6 +254,65 @@ func (e *ServiceEvents) RemoveByBlockID(blockID flow.Identifier) error {
 // No errors are expected during normal operation, even if no entries are matched.
 func (e *ServiceEvents) BatchRemoveByBlockID(blockID flow.Identifier, rw storage.ReaderBatchWriter) error {
 	return e.cache.RemoveTx(rw, blockID)
+}
+
+// validateEventOrder verifies that a flattened slice of block events is correctly
+// ordered and internally consistent before being written to storage.
+//
+// The following invariants are enforced:
+//   - TransactionIndex must be monotonically non-decreasing.
+//   - TransactionIndex is permitted to skip values; transactions that emit no
+//     events are simply absent from the slice.
+//   - Within a single transaction, EventIndex must form a contiguous sequence
+//     starting at 0 (i.e. 0, 1, 2, …).
+//   - The first event of every new transaction must have EventIndex == 0.
+//
+// The function runs in O(n) time and performs no allocations.
+//
+// No error returns are expected during normal operation.
+// Returns an error if any invariant is violated, including the offending indices.
+func validateEventOrder(events []flow.Event) error {
+	if len(events) == 0 {
+		return nil
+	}
+
+	if events[0].EventIndex != 0 {
+		return fmt.Errorf("first event must have EventIndex 0, got EventIndex %d at TransactionIndex %d",
+			events[0].EventIndex, events[0].TransactionIndex)
+	}
+
+	prevTxIndex := events[0].TransactionIndex
+	nextEventIndex := uint32(1)
+
+	for i := 1; i < len(events); i++ {
+		e := events[i]
+
+		switch {
+		case e.TransactionIndex == prevTxIndex:
+			// Same transaction: EventIndex must increment by exactly 1.
+			if e.EventIndex != nextEventIndex {
+				return fmt.Errorf("event %d: TransactionIndex %d expected EventIndex %d, got %d",
+					i, e.TransactionIndex, nextEventIndex, e.EventIndex)
+			}
+			nextEventIndex++
+
+		case e.TransactionIndex > prevTxIndex:
+			// New transaction (skips are allowed): must start at EventIndex 0.
+			if e.EventIndex != 0 {
+				return fmt.Errorf("event %d: first event of TransactionIndex %d must have EventIndex 0, got %d",
+					i, e.TransactionIndex, e.EventIndex)
+			}
+			prevTxIndex = e.TransactionIndex
+			nextEventIndex = 1
+
+		default:
+			// TransactionIndex went backwards — never valid.
+			return fmt.Errorf("event %d: TransactionIndex must be non-decreasing, got %d after %d",
+				i, e.TransactionIndex, prevTxIndex)
+		}
+	}
+
+	return nil
 }
 
 // sortEventsExecutionOrder sorts events by [txIndex, eventIndex] (execution order).
