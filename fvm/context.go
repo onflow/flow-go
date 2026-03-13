@@ -422,10 +422,3 @@ func WithInspectors(inspectors []inspection.Inspector) Option {
 		return ctx
 	}
 }
-
-func WithInspectors(inspectors []inspection.Inspector) Option {
-	return func(ctx Context) Context {
-		ctx.Inspectors = inspectors
-		return ctx
-	}
-}

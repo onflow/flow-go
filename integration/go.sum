@@ -748,8 +748,8 @@ github.com/nxadm/tail v1.4.11/go.mod h1:OTaG3NK980DZzxbRq6lEuzgU+mug70nY11sMd4JX
 github.com/oklog/ulid v1.3.1/go.mod h1:CirwcVhetQ6Lv90oh/F+FBtV6XMibvdAFo93nm5qn4U=
 github.com/olekukonko/tablewriter v0.0.5 h1:P2Ga83D34wi1o9J6Wh1mRuqd4mF/x/lgBS7N7AbDhec=
 github.com/olekukonko/tablewriter v0.0.5/go.mod h1:hPp6KlRPjbx+hW8ykQs1w3UBbZlj6HuIJcUGPhkA7kY=
-github.com/onflow/atree v0.12.1 h1:WfnhnhZJISiRa6trEz2lq49my326xjzS1JRaH8naXv0=
-github.com/onflow/atree v0.12.1/go.mod h1:qdZcfLQwPirHcNpLiK+2t3KAo+SAb9Si6TqurE6pykE=
+github.com/onflow/atree v0.14.0 h1:VFrvRsDBfBujviAseIYFb/KCo2mD4chcM7LpGbcCDdM=
+github.com/onflow/atree v0.14.0/go.mod h1:qdZcfLQwPirHcNpLiK+2t3KAo+SAb9Si6TqurE6pykE=
 github.com/onflow/boxo v0.0.0-20240201202436-f2477b92f483 h1:LpiQhTAfM9CAmNVEs0n//cBBgCg+vJSiIxTHYUklZ84=
 github.com/onflow/boxo v0.0.0-20240201202436-f2477b92f483/go.mod h1:pIZgTWdm3k3pLF9Uq6MB8JEcW07UDwNJjlXW1HELW80=
 github.com/onflow/cadence v1.9.10 h1:nFH8iPzXbYK2/+549QBVHX1yfKIlYBRivOSvQxf2bxk=

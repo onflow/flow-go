@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	mockery "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -4643,7 +4644,7 @@ func TestFlowTokenChangesInspector(t *testing.T) {
 					evts = append(evts, output.Events...)
 					evts = append(evts, output.ServiceEvents...)
 
-					diff, err := differ.Inspect(snapshotTree, executionSnapshot, evts)
+					diff, err := differ.Inspect(zerolog.Nop(), snapshotTree, executionSnapshot, evts)
 					require.NoError(t, err)
 
 					tc.resultChecker(t, diff.(inspection.TokenDiffResult))
