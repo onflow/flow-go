@@ -73,6 +73,7 @@ func NewTracer(
 		chainID,
 		sensitivity,
 		traceExporter,
+		false,
 	)
 }
 
@@ -82,6 +83,7 @@ func NewTracerWithExporter(
 	chainID string,
 	sensitivity uint,
 	traceExporter sdktrace.SpanExporter,
+	sync bool,
 ) (
 	*Tracer,
 	error,
@@ -98,9 +100,16 @@ func NewTracerWithExporter(
 		return nil, fmt.Errorf("failed to create resource: %w", err)
 	}
 
+	var exporterOpt sdktrace.TracerProviderOption
+	if sync {
+		exporterOpt = sdktrace.WithSyncer(traceExporter)
+	} else {
+		exporterOpt = sdktrace.WithBatcher(traceExporter)
+	}
+
 	tracerProvider := sdktrace.NewTracerProvider(
 		sdktrace.WithResource(res),
-		sdktrace.WithBatcher(traceExporter),
+		exporterOpt,
 	)
 
 	otel.SetTracerProvider(tracerProvider)
