@@ -12,7 +12,7 @@ import (
 // Build populates the NonFungibleTokenTransfer from a domain model.
 func (t *NonFungibleTokenTransfer) Build(
 	transfer *accessmodel.NonFungibleTokenTransfer,
-	link commonmodels.LinkGenerator,
+	link LinkGenerator,
 ) error {
 	eventIndices := make([]string, len(transfer.EventIndices))
 	for i, idx := range transfer.EventIndices {
