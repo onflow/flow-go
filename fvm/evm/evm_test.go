@@ -309,7 +309,7 @@ func TestEVMRun(t *testing.T) {
 				require.Equal(t, testContract.DeployedAt.String(), directCall.To.String())
 				require.Equal(t, uint64(100_000), directCall.GasLimit)
 			},
-			fvm.WithEVMTestHelpersEnabled(cadence.NewBool(true)),
+			fvm.WithEVMTestHelpersEnabled(true),
 		)
 	})
 
@@ -383,7 +383,7 @@ func TestEVMRun(t *testing.T) {
 					"value of type `&EVM` has no member `runTxAs`",
 				)
 			},
-			fvm.WithEVMTestHelpersEnabled(cadence.NewBool(false)),
+			fvm.WithEVMTestHelpersEnabled(false),
 		)
 	})
 
@@ -482,7 +482,7 @@ func TestEVMRun(t *testing.T) {
 				require.NoError(t, output.Err)
 				require.NotEmpty(t, state.WriteSet)
 			},
-			fvm.WithEVMTestHelpersEnabled(cadence.NewBool(true)),
+			fvm.WithEVMTestHelpersEnabled(true),
 		)
 	})
 
@@ -563,7 +563,7 @@ func TestEVMRun(t *testing.T) {
 					"value of type `&EVM` has no member `store`",
 				)
 			},
-			fvm.WithEVMTestHelpersEnabled(cadence.NewBool(false)),
+			fvm.WithEVMTestHelpersEnabled(false),
 		)
 	})
 
@@ -644,7 +644,7 @@ func TestEVMRun(t *testing.T) {
 					"value of type `&EVM` has no member `load`",
 				)
 			},
-			fvm.WithEVMTestHelpersEnabled(cadence.NewBool(false)),
+			fvm.WithEVMTestHelpersEnabled(false),
 		)
 	})
 
