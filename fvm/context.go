@@ -367,10 +367,10 @@ func WithAllowProgramCacheWritesInScriptsEnabled(enabled bool) Option {
 	}
 }
 
-// WithAllowEVMTestOperationsEnabled enables EVM test operations in the context
-func WithAllowEVMTestOperationsEnabled(enabled bool) Option {
+// WithEVMTestOperationsAllowed enables EVM test operations in the context
+func WithEVMTestOperationsAllowed(enabled bool) Option {
 	return func(ctx Context) Context {
-		ctx.AllowEVMTestOperations = enabled
+		ctx.EVMTestOperationsAllowed = enabled
 		return ctx
 	}
 }

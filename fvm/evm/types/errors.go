@@ -188,16 +188,22 @@ func IsAInsufficientTotalSupplyError(err error) bool {
 	return errors.Is(err, ErrInsufficientTotalSupply)
 }
 
-// IsWithdrawBalanceRoundingError returns true if the error type is
+// IsAWithdrawBalanceRoundingError returns true if the error type is
 // ErrWithdrawBalanceRounding
-func IsWithdrawBalanceRoundingError(err error) bool {
+func IsAWithdrawBalanceRoundingError(err error) bool {
 	return errors.Is(err, ErrWithdrawBalanceRounding)
 }
 
 // IsAUnauthorizedMethodCallError returns true if the error type is
-// UnauthorizedMethodCallError
+// ErrUnauthorizedMethodCall
 func IsAUnauthorizedMethodCallError(err error) bool {
 	return errors.Is(err, ErrUnauthorizedMethodCall)
+}
+
+// IsAUnsupportedOperationError returns true if the error type is
+// ErrUnsupportedOperation
+func IsAUnsupportedOperationError(err error) bool {
+	return errors.Is(err, ErrUnsupportedOperation)
 }
 
 // BackendError is a non-fatal error wraps errors returned from the backend

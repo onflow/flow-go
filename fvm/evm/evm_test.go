@@ -274,6 +274,8 @@ func TestEVMRun(t *testing.T) {
 
 				tx := fvm.Transaction(txBody, 0)
 
+				ctx.EVMTestOperationsAllowed = true
+
 				state, output, err := vm.Run(ctx, tx, snapshot)
 				require.NoError(t, err)
 				require.NoError(t, output.Err)
@@ -308,6 +310,80 @@ func TestEVMRun(t *testing.T) {
 				require.Equal(t, fromAddress, directCall.From.String())
 				require.Equal(t, testContract.DeployedAt.String(), directCall.To.String())
 				require.Equal(t, uint64(100_000), directCall.GasLimit)
+			},
+			fvm.WithEVMTestHelpersEnabled(true),
+		)
+	})
+
+	t.Run("testing EVM.runTxAs when context option not enabled", func(t *testing.T) {
+		t.Parallel()
+
+		RunWithNewEnvironment(t,
+			chain, func(
+				ctx fvm.Context,
+				vm fvm.VM,
+				snapshot snapshot.SnapshotTree,
+				testContract *TestContract,
+				testAccount *EOATestAccount,
+			) {
+				sc := systemcontracts.SystemContractsForChain(chain.ChainID())
+				code := []byte(fmt.Sprintf(
+					`
+					import EVM from %s
+
+					transaction(from: String, to: String, data: [UInt8]){
+						prepare(account: &Account) {
+							let res = EVM.runTxAs(
+								from: EVM.addressFromString(from),
+								to: EVM.addressFromString(to),
+								data: data,
+								gasLimit: 100_000,
+								value: EVM.Balance(attoflow: 0)
+							)
+
+							assert(res.status == EVM.Status.successful, message: "unexpected status")
+							assert(res.errorCode == 0, message: "unexpected error code")
+							assert(res.deployedContract == nil, message: "unexpected deployed contract")
+						}
+					}
+					`,
+					sc.EVMContract.Address.HexWithPrefix(),
+				))
+
+				num := int64(42)
+				callData := cadence.NewArray(
+					unittest.BytesToCdcUInt8(
+						testContract.MakeCallData(t, "store", big.NewInt(num)),
+					),
+				).WithType(stdlib.EVMTransactionBytesCadenceType)
+
+				fromAddress := "0xF376A6849184571fEEdD246a1Ba2D331cfe56c8c"
+				from, err := cadence.NewString(fromAddress)
+				require.NoError(t, err)
+
+				to, err := cadence.NewString(testContract.DeployedAt.String())
+				require.NoError(t, err)
+
+				txBody, err := flow.NewTransactionBodyBuilder().
+					SetScript(code).
+					SetPayer(sc.FlowServiceAccount.Address).
+					AddAuthorizer(sc.FlowServiceAccount.Address).
+					AddArgument(json.MustEncode(from)).
+					AddArgument(json.MustEncode(to)).
+					AddArgument(json.MustEncode(callData)).
+					Build()
+				require.NoError(t, err)
+
+				tx := fvm.Transaction(txBody, 0)
+
+				_, output, err := vm.Run(ctx, tx, snapshot)
+				require.NoError(t, err)
+				require.Error(t, output.Err)
+				require.ErrorContains(
+					t,
+					output.Err,
+					"evm runtime error: operation is not supported",
+				)
 			},
 			fvm.WithEVMTestHelpersEnabled(true),
 		)
@@ -473,6 +549,8 @@ func TestEVMRun(t *testing.T) {
 
 				tx := fvm.Transaction(txBody, 0)
 
+				ctx.EVMTestOperationsAllowed = true
+
 				state, output, err := vm.Run(
 					ctx,
 					tx,
@@ -481,6 +559,87 @@ func TestEVMRun(t *testing.T) {
 				require.NoError(t, err)
 				require.NoError(t, output.Err)
 				require.NotEmpty(t, state.WriteSet)
+			},
+			fvm.WithEVMTestHelpersEnabled(true),
+		)
+	})
+
+	t.Run("testing EVM.store when context option not enabled", func(t *testing.T) {
+		t.Parallel()
+
+		RunWithNewEnvironment(t,
+			chain, func(
+				ctx fvm.Context,
+				vm fvm.VM,
+				snapshot snapshot.SnapshotTree,
+				testContract *TestContract,
+				testAccount *EOATestAccount,
+			) {
+				sc := systemcontracts.SystemContractsForChain(chain.ChainID())
+				code := []byte(fmt.Sprintf(
+					`
+					import EVM from %s
+
+					transaction(tx: [UInt8], target: String, coinbaseBytes: [UInt8; 20]){
+						prepare(account: &Account) {
+							let targetAddr = EVM.addressFromString(target)
+							let slotValue = "00000000000000000000000000000000000000000000000000000000000003e8"
+							EVM.store(
+								target: targetAddr,
+								slot: "0x0000000000000000000000000000000000000000000000000000000000000000",
+								value: slotValue
+							)
+						}
+					}
+					`,
+					sc.EVMContract.Address.HexWithPrefix(),
+				))
+
+				coinbaseAddr := types.Address{1, 2, 3}
+				coinbaseBalance := getEVMAccountBalance(t, ctx, vm, snapshot, coinbaseAddr)
+				require.Zero(t, types.BalanceToBigInt(coinbaseBalance).Uint64())
+
+				evmTx := gethTypes.NewTransaction(
+					0,
+					testContract.DeployedAt.ToCommon(),
+					big.NewInt(0),
+					uint64(100_000),
+					big.NewInt(0),
+					testContract.MakeCallData(t, "retrieve"),
+				)
+				innerTxBytes, err := evmTx.MarshalBinary()
+				require.NoError(t, err)
+
+				innerTx := cadence.NewArray(
+					unittest.BytesToCdcUInt8(innerTxBytes),
+				).WithType(stdlib.EVMTransactionBytesCadenceType)
+
+				coinbase := cadence.NewArray(
+					unittest.BytesToCdcUInt8(coinbaseAddr.Bytes()),
+				).WithType(stdlib.EVMAddressBytesCadenceType)
+				target, err := cadence.NewString(testContract.DeployedAt.String())
+				require.NoError(t, err)
+
+				txBody, err := flow.NewTransactionBodyBuilder().
+					SetScript(code).
+					SetPayer(sc.FlowServiceAccount.Address).
+					AddAuthorizer(sc.FlowServiceAccount.Address).
+					AddArgument(json.MustEncode(innerTx)).
+					AddArgument(json.MustEncode(target)).
+					AddArgument(json.MustEncode(coinbase)).
+					Build()
+				require.NoError(t, err)
+
+				tx := fvm.Transaction(txBody, 0)
+
+				_, output, err := vm.Run(ctx, tx, snapshot)
+				require.NoError(t, err)
+				require.Error(t, output.Err)
+				require.ErrorContains(
+					t,
+					output.Err,
+					"evm runtime error: operation is not supported",
+				)
 			},
 			fvm.WithEVMTestHelpersEnabled(true),
 		)
@@ -564,6 +723,87 @@ func TestEVMRun(t *testing.T) {
 				)
 			},
 			fvm.WithEVMTestHelpersEnabled(false),
+		)
+	})
+
+	t.Run("testing EVM.load when context option not enabled", func(t *testing.T) {
+		t.Parallel()
+
+		RunWithNewEnvironment(t,
+			chain, func(
+				ctx fvm.Context,
+				vm fvm.VM,
+				snapshot snapshot.SnapshotTree,
+				testContract *TestContract,
+				testAccount *EOATestAccount,
+			) {
+				sc := systemcontracts.SystemContractsForChain(chain.ChainID())
+				code := []byte(fmt.Sprintf(
+					`
+					import EVM from %s
+
+					transaction(tx: [UInt8], target: String, coinbaseBytes: [UInt8; 20]){
+						prepare(account: &Account) {
+							let targetAddr = EVM.addressFromString(target)
+							let slotValue = "00000000000000000000000000000000000000000000000000000000000003e8"
+							let stateValue = EVM.load(
+								target: targetAddr,
+								slot: "0x0000000000000000000000000000000000000000000000000000000000000000"
+							)
+							assert(String.encodeHex(stateValue) == slotValue, message: slotValue)
+						}
+					}
+					`,
+					sc.EVMContract.Address.HexWithPrefix(),
+				))
+
+				coinbaseAddr := types.Address{1, 2, 3}
+				coinbaseBalance := getEVMAccountBalance(t, ctx, vm, snapshot, coinbaseAddr)
+				require.Zero(t, types.BalanceToBigInt(coinbaseBalance).Uint64())
+
+				evmTx := gethTypes.NewTransaction(
+					0,
+					testContract.DeployedAt.ToCommon(),
+					big.NewInt(0),
+					uint64(100_000),
+					big.NewInt(0),
+					testContract.MakeCallData(t, "retrieve"),
+				)
+				innerTxBytes, err := evmTx.MarshalBinary()
+				require.NoError(t, err)
+
+				innerTx := cadence.NewArray(
+					unittest.BytesToCdcUInt8(innerTxBytes),
+				).WithType(stdlib.EVMTransactionBytesCadenceType)
+
+				coinbase := cadence.NewArray(
+					unittest.BytesToCdcUInt8(coinbaseAddr.Bytes()),
+				).WithType(stdlib.EVMAddressBytesCadenceType)
+				target, err := cadence.NewString(testContract.DeployedAt.String())
+				require.NoError(t, err)
+
+				txBody, err := flow.NewTransactionBodyBuilder().
+					SetScript(code).
+					SetPayer(sc.FlowServiceAccount.Address).
+					AddAuthorizer(sc.FlowServiceAccount.Address).
+					AddArgument(json.MustEncode(innerTx)).
+					AddArgument(json.MustEncode(target)).
+					AddArgument(json.MustEncode(coinbase)).
+					Build()
+				require.NoError(t, err)
+
+				tx := fvm.Transaction(txBody, 0)
+
+				_, output, err := vm.Run(ctx, tx, snapshot)
+				require.NoError(t, err)
+				require.Error(t, output.Err)
+				require.ErrorContains(
+					t,
+					output.Err,
+					"evm runtime error: operation is not supported",
+				)
+			},
+			fvm.WithEVMTestHelpersEnabled(true),
 		)
 	})
 

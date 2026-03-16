@@ -156,8 +156,6 @@ type EnvironmentParams struct {
 	ExecutionVersionProvider
 
 	ContractUpdaterParams
-
-	AllowEVMTestOperations bool
 }
 
 func (env *EnvironmentParams) SetScriptInfoParams(info *ScriptInfoParams) {
