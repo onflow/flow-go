@@ -51,6 +51,9 @@ type Context struct {
 	// AllowProgramCacheWritesInScripts determines if the program cache can be written to in scripts
 	// By default, the program cache is only updated by transactions.
 	AllowProgramCacheWritesInScripts bool
+
+	// AllowEVMTestOperations determines if EVM test operations are allowed to be executed in the context.
+	AllowEVMTestOperations bool
 }
 
 // NewContext initializes a new execution context with the provided options.
@@ -363,6 +366,14 @@ func WithEventEncoder(encoder environment.EventEncoder) Option {
 func WithAllowProgramCacheWritesInScriptsEnabled(enabled bool) Option {
 	return func(ctx Context) Context {
 		ctx.AllowProgramCacheWritesInScripts = enabled
+		return ctx
+	}
+}
+
+// WithAllowEVMTestOperationsEnabled enables EVM test operations in the context
+func WithAllowEVMTestOperationsEnabled(enabled bool) Option {
+	return func(ctx Context) Context {
+		ctx.AllowEVMTestOperations = enabled
 		return ctx
 	}
 }
