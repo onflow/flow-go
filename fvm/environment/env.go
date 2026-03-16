@@ -72,6 +72,8 @@ type Environment interface {
 	// history for commit-reveal schemes.
 	RandomSourceHistory() ([]byte, error)
 
+	EVMTestOperationsAllowed() bool
+
 	// FlushPendingUpdates flushes pending updates from the stateful environment
 	// modules (i.e., ContractUpdater) to the state transaction, and return
 	// the updated contract keys.
@@ -154,6 +156,8 @@ type EnvironmentParams struct {
 	ExecutionVersionProvider
 
 	ContractUpdaterParams
+
+	AllowEVMTestOperations bool
 }
 
 func (env *EnvironmentParams) SetScriptInfoParams(info *ScriptInfoParams) {

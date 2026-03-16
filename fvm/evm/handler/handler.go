@@ -31,7 +31,6 @@ type ContractHandler struct {
 	backend              types.Backend
 	emulator             types.Emulator
 	precompiledContracts []types.PrecompiledContract
-	allowTestOperations  bool
 }
 
 var _ types.ContractHandler = &ContractHandler{}
@@ -46,7 +45,6 @@ func NewContractHandler(
 	addressAllocator types.AddressAllocator,
 	backend types.Backend,
 	emulator types.Emulator,
-	allowTestOperations bool,
 ) *ContractHandler {
 	return &ContractHandler{
 		flowChainID:        flowChainID,
@@ -62,7 +60,6 @@ func NewContractHandler(
 			addressAllocator,
 			backend,
 		),
-		allowTestOperations: allowTestOperations,
 	}
 }
 
@@ -77,7 +74,7 @@ func (h *ContractHandler) EVMContractAddress() common.Address {
 }
 
 func (h *ContractHandler) validateTestOperation() {
-	if !h.allowTestOperations {
+	if !h.backend.EVMTestOperationsAllowed() {
 		panicOnError(types.ErrUnsupportedOperation)
 	}
 }

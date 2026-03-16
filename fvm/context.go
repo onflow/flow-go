@@ -51,9 +51,6 @@ type Context struct {
 	// AllowProgramCacheWritesInScripts determines if the program cache can be written to in scripts
 	// By default, the program cache is only updated by transactions.
 	AllowProgramCacheWritesInScripts bool
-
-	// AllowEVMTestOperations determines if EVM test operations are allowed to be executed in the context.
-	AllowEVMTestOperations bool
 }
 
 // NewContext initializes a new execution context with the provided options.

@@ -238,6 +238,11 @@ type TestBackend struct {
 	*TestTracer
 	*TestMetricsReporter
 	*TestLoggerProvider
+	allowEVMTestOperations bool
+}
+
+func (tb *TestBackend) EVMTestOperationsAllowed() bool {
+	return tb.allowEVMTestOperations
 }
 
 var _ types.Backend = &TestBackend{}
