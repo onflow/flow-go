@@ -222,8 +222,8 @@ func WithRestrictedAccountCreationEnabled(enabled cadence.Bool) BootstrapProcedu
 	}
 }
 
-// Option to deploy and setup the Flow VM bridge during bootstrapping
-// so that assets can be bridged between Flow-Cadence and Flow-EVM
+// WithSetupVMBridgeEnabled returns a bootstrap option that enables deployment and setup
+// of the Flow VM bridge, so that assets can be bridged between Flow-Cadence and Flow-EVM
 func WithSetupVMBridgeEnabled(enabled cadence.Bool) BootstrapProcedureOption {
 	return func(bp *BootstrapProcedure) *BootstrapProcedure {
 		bp.setupVMBridgeEnabled = enabled
@@ -231,8 +231,8 @@ func WithSetupVMBridgeEnabled(enabled cadence.Bool) BootstrapProcedureOption {
 	}
 }
 
-// Option to include testing helper functions in the EVM system contract.
-// Useful for Emulator and forked networks.
+// WithEVMTestHelpersEnabled returns a bootstrap option that enables testing helper functions
+// in the EVM system contract. Useful for Emulator and forked networks.
 func WithEVMTestHelpersEnabled(enabled cadence.Bool) BootstrapProcedureOption {
 	return func(bp *BootstrapProcedure) *BootstrapProcedure {
 		bp.evmTestHelpersEnabled = enabled
