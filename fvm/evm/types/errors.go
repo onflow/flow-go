@@ -120,6 +120,9 @@ var (
 	// ErrUnexpectedEmptyTransactionData is returned when empty transaction data is received.
 	// This should never happen and is a safety error.
 	ErrUnexpectedEmptyTransactionData = errors.New("unexpected empty transaction data has been received")
+
+	// ErrUnsupportedOperation is returned when the operation is not supported.
+	ErrUnsupportedOperation = errors.New("operation is not supported")
 )
 
 // StateError is a non-fatal error, returned when a state operation
