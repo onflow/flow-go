@@ -76,7 +76,7 @@ type ExtendedIndexingSuite struct {
 	restBaseURL string
 }
 
-func (s *ExtendedIndexingSuite) SetupTest() {
+func (s *ExtendedIndexingSuite) SetupSuite() {
 	consensusConfigs := []func(config *testnet.NodeConfig){
 		testnet.WithAdditionalFlag("--cruise-ctl-fallback-proposal-duration=250ms"),
 		testnet.WithAdditionalFlagf("--required-verification-seal-approvals=%d", 1),
@@ -128,7 +128,7 @@ func (s *ExtendedIndexingSuite) SetupTest() {
 	s.apiClient = apiClient
 }
 
-func (s *ExtendedIndexingSuite) TearDownTest() {
+func (s *ExtendedIndexingSuite) TearDownSuite() {
 	if s.net != nil {
 		s.net.Remove()
 		s.net = nil

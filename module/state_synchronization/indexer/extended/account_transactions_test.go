@@ -622,6 +622,60 @@ func TestAccountTransactionsIndexer_EventAddresses(t *testing.T) {
 	})
 }
 
+// ===== ProcessBlockData Tests =====
+
+func TestAccountTransactionsIndexer_ProcessBlockData(t *testing.T) {
+	t.Parallel()
+	const testHeight = uint64(100)
+
+	t.Run("empty block returns empty entries", func(t *testing.T) {
+		header := unittest.BlockHeaderFixtureOnChain(flow.Testnet, unittest.WithHeaderHeight(testHeight))
+		indexer, _, _, _ := newAccountTxIndexerForTest(t, flow.Testnet, testHeight)
+
+		entries, meta, err := indexer.ProcessBlockData(BlockData{
+			Header: header,
+		})
+		require.NoError(t, err)
+		assert.Empty(t, entries)
+		assert.Equal(t, AccountTransactionsMetadata{}, meta)
+	})
+
+	t.Run("returns correct entries for single transaction", func(t *testing.T) {
+		header := unittest.BlockHeaderFixtureOnChain(flow.Testnet, unittest.WithHeaderHeight(testHeight))
+		indexer, _, _, _ := newAccountTxIndexerForTest(t, flow.Testnet, testHeight)
+
+		payer := unittest.RandomAddressFixture()
+		tx := unittest.TransactionBodyFixture(func(tb *flow.TransactionBody) {
+			tb.Payer = payer
+			tb.ProposalKey = flow.ProposalKey{Address: payer}
+			tb.Authorizers = []flow.Address{payer}
+		})
+
+		entries, _, err := indexer.ProcessBlockData(BlockData{
+			Header:       header,
+			Transactions: []*flow.TransactionBody{&tx},
+			Events:       []flow.Event{},
+		})
+		require.NoError(t, err)
+		require.Len(t, entries, 1)
+		assert.Equal(t, payer, entries[0].Address)
+		assert.Equal(t, tx.ID(), entries[0].TransactionID)
+	})
+
+	t.Run("does not depend on indexer height state", func(t *testing.T) {
+		// ProcessBlockData should work regardless of the indexer's height state
+		indexer, _, _, _ := newAccountTxIndexerForTest(t, flow.Testnet, testHeight)
+
+		header := unittest.BlockHeaderFixtureOnChain(flow.Testnet, unittest.WithHeaderHeight(testHeight+50))
+
+		entries, _, err := indexer.ProcessBlockData(BlockData{
+			Header: header,
+		})
+		require.NoError(t, err)
+		assert.Empty(t, entries)
+	})
+}
+
 // ===== Height Validation Tests =====
 
 func TestAccountTransactionsIndexer_HeightValidation(t *testing.T) {

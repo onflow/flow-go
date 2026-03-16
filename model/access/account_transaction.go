@@ -61,14 +61,16 @@ func ParseTransactionRole(s string) (TransactionRole, error) {
 // It contains the essential fields needed to identify and locate a transaction,
 // plus metadata about the account's participation.
 type AccountTransaction struct {
-	Address          flow.Address          // Account address
-	BlockHeight      uint64                // Block height where transaction was included
-	BlockTimestamp   uint64                // Block timestamp where transaction was included, in Unix milliseconds
-	TransactionID    flow.Identifier       // Transaction identifier
-	TransactionIndex uint32                // Index of transaction within the block
-	Roles            []TransactionRole     // Roles of the account in the transaction
-	Transaction      *flow.TransactionBody // Transaction body
-	Result           *TransactionResult    // Transaction result
+	Address          flow.Address      // Account address
+	BlockHeight      uint64            // Block height where transaction was included
+	BlockTimestamp   uint64            // Block timestamp where transaction was included, in Unix milliseconds
+	TransactionID    flow.Identifier   // Transaction identifier
+	TransactionIndex uint32            // Index of transaction within the block
+	Roles            []TransactionRole // Roles of the account in the transaction
+
+	// Expansion fields populated when expandResults is true.
+	Transaction *flow.TransactionBody `msgpack:"-"` // Transaction body (nil unless expanded)
+	Result      *TransactionResult    `msgpack:"-"` // Transaction result (nil unless expanded)
 }
 
 // AccountTransactionCursor identifies a position in the account transaction index for

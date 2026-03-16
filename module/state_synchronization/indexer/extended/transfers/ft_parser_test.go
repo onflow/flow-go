@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/state_synchronization/indexer/extended/transfers/testutil"
@@ -620,6 +621,59 @@ func TestParseFTTransfers_FlowFees(t *testing.T) {
 
 		expected := []access.FungibleTokenTransfer{
 			testutil.MakeFTTransfer(testBlockHeight, txID, 0, payer, flowFeesAddress, feeAmount, 0, 1),
+		}
+
+		transfers, err := parser.Parse(events, testBlockHeight)
+		require.NoError(t, err)
+		assert.ElementsMatch(t, expected, transfers)
+	})
+}
+
+// TestParseFTTransfers_FlowFees_MultipleReceiverAddressesAcrossTxs verifies that fee
+// deposits to different flow fee receiver addresses (across different transactions in the
+// same block) are each correctly identified as fee transfers.
+//
+// Testnet has multiple fee receiver addresses. This test exercises two transactions where
+// each pays fees to a distinct receiver. When omitFlowFees=true all fee transfers are
+// excluded; when omitFlowFees=false all are included.
+func TestParseFTTransfers_FlowFees_MultipleReceiverAddressesAcrossTxs(t *testing.T) {
+	sc := systemcontracts.SystemContractsForChain(flow.Testnet)
+	require.GreaterOrEqual(t, len(sc.FlowFeesReceivers), 2, "testnet must have at least 2 fee receiver addresses")
+
+	payer1 := unittest.RandomAddressFixture()
+	payer2 := unittest.RandomAddressFixture()
+	txID1 := unittest.IdentifierFixture()
+	txID2 := unittest.IdentifierFixture()
+
+	receiver1 := sc.FlowFeesReceivers[0].Address
+	receiver2 := sc.FlowFeesReceivers[1].Address
+
+	feeAmount1 := cadence.UFix64(1_00000000)
+	feeAmount2 := cadence.UFix64(2_00000000)
+
+	// TX0 pays fees deposited to receiver1; TX1 pays fees deposited to receiver2.
+	events := []flow.Event{
+		testutil.MakeFTWithdrawnEvent(t, flow.Testnet, &payer1, txID1, 0, 0, 1, 50, feeAmount1),
+		testutil.MakeFTDepositedEvent(t, flow.Testnet, &receiver1, txID1, 0, 1, 1, 50, feeAmount1),
+		testutil.MakeFlowFeesEvent(t, flow.Testnet, txID1, 0, 2, feeAmount1),
+		testutil.MakeFTWithdrawnEvent(t, flow.Testnet, &payer2, txID2, 1, 0, 1, 60, feeAmount2),
+		testutil.MakeFTDepositedEvent(t, flow.Testnet, &receiver2, txID2, 1, 1, 1, 60, feeAmount2),
+		testutil.MakeFlowFeesEvent(t, flow.Testnet, txID2, 1, 2, feeAmount2),
+	}
+
+	t.Run("flow fees omitted for all receiver addresses", func(t *testing.T) {
+		parser := NewFTParser(flow.Testnet, true)
+		transfers, err := parser.Parse(events, testBlockHeight)
+		require.NoError(t, err)
+		assert.Empty(t, transfers)
+	})
+
+	t.Run("flow fees included for all receiver addresses", func(t *testing.T) {
+		parser := NewFTParser(flow.Testnet, false)
+
+		expected := []access.FungibleTokenTransfer{
+			testutil.MakeFTTransfer(testBlockHeight, txID1, 0, payer1, receiver1, feeAmount1, 0, 1),
+			testutil.MakeFTTransfer(testBlockHeight, txID2, 1, payer2, receiver2, feeAmount2, 0, 1),
 		}
 
 		transfers, err := parser.Parse(events, testBlockHeight)

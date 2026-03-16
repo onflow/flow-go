@@ -46,4 +46,24 @@ var ExperimentalRoutes = []experimentalRoute{{
 	Pattern: "/accounts/{address}/scheduled",
 	Name:    "getScheduledTransactionsByAddress",
 	Handler: routes.GetScheduledTransactionsByAddress,
+}, {
+	Method:  http.MethodGet,
+	Pattern: "/contracts",
+	Name:    "getContracts",
+	Handler: routes.GetContracts,
+}, {
+	Method:  http.MethodGet,
+	Pattern: "/accounts/{address}/contracts",
+	Name:    "getContractsByAddress",
+	Handler: routes.GetContractsByAddress,
+}, {
+	Method:  http.MethodGet,
+	Pattern: "/contracts/{identifier}",
+	Name:    "getContract",
+	Handler: routes.GetContract,
+}, {
+	Method:  http.MethodGet,
+	Pattern: "/contracts/{identifier}/deployments",
+	Name:    "getContractDeployments",
+	Handler: routes.GetContractDeployments,
 }}

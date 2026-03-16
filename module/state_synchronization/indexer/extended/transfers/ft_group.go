@@ -30,14 +30,14 @@ type ftTxEventGroup struct {
 
 	pairedResults []ftPairedResult
 
-	flowFeesAddress flow.Address
+	flowFeesReceivers map[flow.Address]bool
 }
 
-func newFTTxEventGroup(flowFeesAddress flow.Address) *ftTxEventGroup {
+func newFTTxEventGroup(flowFeesReceivers map[flow.Address]bool) *ftTxEventGroup {
 	return &ftTxEventGroup{
-		withdrawalByUUID: make(map[uint64]int),
-		matchedDeposits:  make(map[uint64]struct{}),
-		flowFeesAddress:  flowFeesAddress,
+		withdrawalByUUID:  make(map[uint64]int),
+		matchedDeposits:   make(map[uint64]struct{}),
+		flowFeesReceivers: flowFeesReceivers,
 	}
 }
 
@@ -146,7 +146,10 @@ func (g *ftTxEventGroup) addFlowFees(decoded *events.FlowFeesEvent) error {
 	// in the same transaction, it will be treated as a regular transfer.
 	for i := len(g.pairedResults) - 1; i >= 0; i-- {
 		pair := g.pairedResults[i]
-		if pair.deposit != nil && pair.deposit.To == g.flowFeesAddress && pair.deposit.Amount == decoded.Amount {
+		if pair.deposit == nil {
+			continue
+		}
+		if g.flowFeesReceivers[pair.deposit.To] && pair.deposit.Amount == decoded.Amount {
 			g.pairedResults[i].isFlowFees = true
 			return nil
 		}
