@@ -71,7 +71,7 @@ func (td *TokenChanges) Inspect(
 	executionSnapshot *snapshot.ExecutionSnapshot,
 	events []flow.Event,
 ) (diff Result, err error) {
-	logger.Info().Str("module", "tc-inspector").
+	logger.Debug().Str("module", "tc-inspector").
 		Int("events", len(events)).
 		Int("read_set", len(executionSnapshot.ReadSet)).
 		Int("write_set", len(executionSnapshot.WriteSet)).
@@ -133,7 +133,7 @@ func (td *TokenChanges) getTokenDiff(
 	oldRegistersLedger := executionSnapshotLedgers.OldValuesLedger()
 	newValuesRegister := executionSnapshotLedgers.NewValuesLedger()
 
-	// TODO: possible optimisation: run both at the same time
+	// TODO(janezp): possible optimisation: run both at the same time
 	before, err := td.getTokens(logger, oldRegistersLedger, addresses, tokenDiffSearchDomains, searchedTokens)
 	if err != nil {
 		return TokenDiffResult{}, fmt.Errorf("failed to get tokens before: %w", err)
@@ -159,7 +159,7 @@ func (td *TokenChanges) getTokenDiff(
 		if len(diff) == 0 {
 			// Only log if the account had tokens before or after
 			if len(beforeTokens) > 0 || len(afterTokens) > 0 {
-				logger.Info().Str("module", "tc-inspector").
+				logger.Debug().Str("module", "tc-inspector").
 					Str("account", a.String()).
 					Interface("before", beforeTokens).
 					Interface("after", afterTokens).
@@ -167,7 +167,7 @@ func (td *TokenChanges) getTokenDiff(
 			}
 			continue
 		}
-		logger.Info().Str("module", "tc-inspector").
+		logger.Debug().Str("module", "tc-inspector").
 			Str("account", a.String()).
 			Interface("before", beforeTokens).
 			Interface("after", afterTokens).
@@ -183,15 +183,16 @@ func (td *TokenChanges) getTokenDiff(
 	tokenDiffResult.KnownSourcesSinks = sourcesSinks
 
 	// Log summary of token movements
+	// Only log as debug because it's going to get properly logged in `TokenDiffResult.AsLogEvent()`
 	unaccounted := tokenDiffResult.UnaccountedTokens()
 	if len(unaccounted) > 0 {
-		logger.Warn().Str("module", "tc-inspector").
+		logger.Debug().Str("module", "tc-inspector").
 			Int("accounts_changed", len(tokenDiffResult.Changes)).
 			Interface("sources_sinks", sourcesSinks).
 			Interface("unaccounted", unaccounted).
 			Msg("token inspection complete - unaccounted token movements detected")
 	} else if len(tokenDiffResult.Changes) > 0 {
-		logger.Info().Str("module", "tc-inspector").
+		logger.Debug().Str("module", "tc-inspector").
 			Int("accounts_changed", len(tokenDiffResult.Changes)).
 			Interface("sources_sinks", sourcesSinks).
 			Msg("token inspection complete - all movements accounted for")
@@ -542,14 +543,15 @@ type TokenDiffResult struct {
 var _ Result = TokenDiffResult{}
 
 func (r TokenDiffResult) AsLogEvent() (zerolog.Level, func(e *zerolog.Event)) {
-	sum := r.UnaccountedTokens()
-	if len(sum) == 0 {
+	unaccountedTokens := r.UnaccountedTokens()
+
+	if len(unaccountedTokens) == 0 {
 		// everything is ok: log no issues with debug logging
 		return zerolog.DebugLevel, func(e *zerolog.Event) { e.Str("token_diff", "no issues") }
 	}
 
 	anyPositive := false
-	for _, v := range sum {
+	for _, v := range unaccountedTokens {
 		if v > 0 {
 			anyPositive = true
 			break
@@ -565,7 +567,7 @@ func (r TokenDiffResult) AsLogEvent() (zerolog.Level, func(e *zerolog.Event)) {
 
 	return level, func(e *zerolog.Event) {
 		dict := zerolog.Dict()
-		for k, v := range sum {
+		for k, v := range unaccountedTokens {
 			dict = dict.Int64(k, v)
 		}
 		e.Dict("token_diff", dict)
@@ -698,44 +700,51 @@ var tokenDiffSearchDomains = []common.StorageDomain{
 
 type TokenChangesSearchTokens map[string]SearchToken
 
-func DefaultTokenDiffSearchTokens(chain flow.Chain) TokenChangesSearchTokens {
+// DefaultTokenDiffSearchTokens returns the default settings for token inspection
+// We temporarily want to handle all token mints as a warning. To do that set the
+// `withoutMintingEvent` to true.
+func DefaultTokenDiffSearchTokens(chain flow.Chain, withoutMintingEvent bool) TokenChangesSearchTokens {
 	sc := systemcontracts.SystemContractsForChain(chain.ChainID())
 	flowTokenID := fmt.Sprintf("A.%s.FlowToken.Vault", sc.FlowToken.Address.Hex())
 	flowTokenMintedEventID := fmt.Sprintf("A.%s.FlowToken.TokensMinted", sc.FlowToken.Address.Hex())
 
-	return map[string]SearchToken{
+	searchTokens := map[string]SearchToken{
 		flowTokenID: {
 			ID: flowTokenID,
 			GetBalance: func(value *interpreter.CompositeValue) uint64 {
 				return uint64(value.GetField(nil, "balance").(interpreter.UFix64Value).UFix64Value)
 			},
-			SinksSources: map[string]func(flow.Event) (int64, error){
-				flowTokenMintedEventID: func(evt flow.Event) (int64, error) {
-					// this decoding will only happen for the specified event (in the case of FlowToken.TokensMinted it
-					// is extremely rare).
-					payload, err := ccf.Decode(nil, evt.Payload)
-					if err != nil {
-						return 0, err
-					}
-					v := payload.(cadence.Event).SearchFieldByName("amount")
-					if v == nil {
-						return 0, fmt.Errorf("no amount field found for token minted")
-					}
-
-					ufix, ok := payload.(cadence.Event).SearchFieldByName("amount").(cadence.UFix64)
-					if !ok {
-						return 0, fmt.Errorf("amount field is not a cadence.UFix64")
-					}
-
-					if ufix > math.MaxInt64 {
-						// this is very unlikely
-						// but in case it happens, it will get logged
-						return 0, fmt.Errorf("amount field is too large")
-					}
-
-					return int64(ufix), nil
-				},
-			},
+			SinksSources: map[string]func(flow.Event) (int64, error){},
 		},
 	}
+
+	if !withoutMintingEvent {
+		searchTokens[flowTokenID].SinksSources[flowTokenMintedEventID] = func(evt flow.Event) (int64, error) {
+			// this decoding will only happen for the specified event (in the case of FlowToken.TokensMinted it
+			// is extremely rare).
+			payload, err := ccf.Decode(nil, evt.Payload)
+			if err != nil {
+				return 0, err
+			}
+			v := payload.(cadence.Event).SearchFieldByName("amount")
+			if v == nil {
+				return 0, fmt.Errorf("no amount field found for token minted")
+			}
+
+			ufix, ok := payload.(cadence.Event).SearchFieldByName("amount").(cadence.UFix64)
+			if !ok {
+				return 0, fmt.Errorf("amount field is not a cadence.UFix64")
+			}
+
+			if ufix > math.MaxInt64 {
+				// this is very unlikely
+				// but in case it happens, it will get logged
+				return 0, fmt.Errorf("amount field is too large")
+			}
+
+			return int64(ufix), nil
+		}
+	}
+
+	return searchTokens
 }
