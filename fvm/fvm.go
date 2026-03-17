@@ -248,13 +248,13 @@ func (vm *VirtualMachine) inspectProcedureResults(
 	executionSnapshot *snapshot.ExecutionSnapshot,
 	output ProcedureOutput,
 ) []inspection.Result {
-	// TODO: this should be decided by the inspector
+	// TODO(janezp): this should be decided by the inspector
 	if proc.Type() != TransactionProcedureType {
-		logger.Info().Str("module", "tc-inspector").Msg("skipping inspection for non-transaction procedure")
+		logger.Debug().Str("module", "tc-inspector").Msg("skipping inspection for non-transaction procedure")
 		return nil
 	}
 
-	// TODO: imspector should be able to receive ProcedureOutput directly
+	// TODO(janezp): inspector should be able to receive ProcedureOutput directly
 	evts := make([]flow.Event, 0, len(output.Events)+len(output.ServiceEvents))
 	evts = append(evts, output.Events...)
 	evts = append(evts, output.ServiceEvents...)

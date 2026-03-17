@@ -4538,7 +4538,7 @@ func TestFlowTokenChangesInspector(t *testing.T) {
 		},
 		{
 			name:             "mint with default tracking",
-			tokenDefinitions: inspection.DefaultTokenDiffSearchTokens(flow.Testnet.Chain()),
+			tokenDefinitions: inspection.DefaultTokenDiffSearchTokens(flow.Testnet.Chain(), false),
 			txBody: func(t *testing.T, chain flow.Chain, accounts []flow.Address) *flow.TransactionBody {
 				sc := systemcontracts.SystemContractsForChain(chain.ChainID())
 				env := sc.AsTemplateEnv()
@@ -4565,7 +4565,7 @@ func TestFlowTokenChangesInspector(t *testing.T) {
 			},
 		}, {
 			name:             "create account",
-			tokenDefinitions: inspection.DefaultTokenDiffSearchTokens(flow.Testnet.Chain()),
+			tokenDefinitions: inspection.DefaultTokenDiffSearchTokens(flow.Testnet.Chain(), false),
 			txBody: func(t *testing.T, chain flow.Chain, accounts []flow.Address) *flow.TransactionBody {
 				_, txBodyBuilder := testutil.CreateAccountCreationTransaction(t, chain)
 

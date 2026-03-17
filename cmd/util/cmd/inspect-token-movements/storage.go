@@ -50,6 +50,7 @@ func initStorages(
 	storages := common.InitStorages(db)
 	state, err := common.OpenProtocolState(lockManager, db, storages)
 	if err != nil {
+		_ = db.Close()
 		return nil, nil, nil, nil, fmt.Errorf("could not open protocol state: %w", err)
 	}
 
@@ -57,6 +58,7 @@ func initStorages(
 	chunkDataPackDB, err := storagepebble.ShouldOpenDefaultPebbleDB(
 		log.Logger.With().Str("pebbledb", "cdp").Logger(), chunkDataPackDir)
 	if err != nil {
+		_ = db.Close()
 		return nil, nil, nil, nil, fmt.Errorf("could not open chunk data pack DB: %w", err)
 	}
 	storedChunkDataPacks := store.NewStoredChunkDataPacks(metrics.NewNoopCollector(), pebbleimpl.ToDB(chunkDataPackDB), 1000)
