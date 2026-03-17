@@ -73,15 +73,23 @@ func (h *ContractHandler) EVMContractAddress() common.Address {
 	return common.Address(h.evmContractAddress)
 }
 
+func (h *ContractHandler) validateTestOperation() {
+	if !h.backend.EVMTestOperationsAllowed() {
+		panicOnError(types.ErrUnsupportedOperation)
+	}
+}
+
 // SetState sets a value for the given storage slot.
 // It returns the previous value in any case.
-// The operation is only allowed on Emulator network,
-// for testing purposes.
+// The operation is only allowed for testing purposes.
 func (h *ContractHandler) SetState(
 	address types.Address,
 	slot gethCommon.Hash,
 	value gethCommon.Hash,
 ) gethCommon.Hash {
+
+	h.validateTestOperation()
+
 	execState, err := state.NewStateDB(h.backend, evm.StorageAccountAddress(h.flowChainID))
 	panicOnError(err)
 
@@ -93,12 +101,14 @@ func (h *ContractHandler) SetState(
 }
 
 // GetState returns the value for the given storage slot.
-// The operation is only allowed on Emulator network,
-// for testing purposes.
+// The operation is only allowed for testing purposes.
 func (h *ContractHandler) GetState(
 	address types.Address,
 	slot gethCommon.Hash,
 ) gethCommon.Hash {
+
+	h.validateTestOperation()
+
 	execState, err := state.NewStateDB(h.backend, evm.StorageAccountAddress(h.flowChainID))
 	panicOnError(err)
 
@@ -107,8 +117,7 @@ func (h *ContractHandler) GetState(
 
 // RunTxAs runs a transaction by setting the call's `msg.sender`
 // to be the `from` address.
-// The operation is only allowed on Emulator network,
-// for testing purposes.
+// The operation is only allowed for testing purposes.
 func (h *ContractHandler) RunTxAs(
 	from types.Address,
 	to types.Address,
@@ -116,6 +125,9 @@ func (h *ContractHandler) RunTxAs(
 	gasLimit types.GasLimit,
 	balance types.Balance,
 ) *types.ResultSummary {
+
+	h.validateTestOperation()
+
 	account := h.AccountByAddress(from, true)
 	return account.Call(to, txData, gasLimit, balance)
 }
