@@ -244,8 +244,11 @@ func DefaultFVMOptions(chainID flow.ChainID, extensiveTracing, scheduleCallbacks
 	}
 
 	if tokenTracking {
+
+		// We temporarily want to log all mints/burns, so remove the minting event from the DefaultTokenDiffSearchTokens
+
 		options = append(options, fvm.WithInspectors([]inspection.Inspector{
-			inspection.NewTokenChangesInspector(inspection.DefaultTokenDiffSearchTokens(chainID.Chain())),
+			inspection.NewTokenChangesInspector(inspection.DefaultTokenDiffSearchTokens(chainID.Chain(), true)),
 		}))
 	}
 

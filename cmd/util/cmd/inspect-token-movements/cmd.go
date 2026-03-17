@@ -81,21 +81,25 @@ func run(*cobra.Command, []string) {
 	}()
 
 	// Create the token changes inspector with default search tokens for this chain
-	inspector := inspection.NewTokenChangesInspector(inspection.DefaultTokenDiffSearchTokens(chain))
+	inspector := inspection.NewTokenChangesInspector(inspection.DefaultTokenDiffSearchTokens(chain, true))
 
 	var from, to uint64
+
+	lastSealed, err := state.Sealed().Head()
+	if err != nil {
+		lg.Fatal().Err(err).Msg("could not get last sealed height")
+	}
 
 	if flagFromTo != "" {
 		from, to, err = parseFromTo(flagFromTo)
 		if err != nil {
 			lg.Fatal().Err(err).Msg("could not parse from_to")
 		}
-	} else {
-		lastSealed, err := state.Sealed().Head()
-		if err != nil {
-			lg.Fatal().Err(err).Msg("could not get last sealed height")
-		}
 
+		if to > lastSealed.Height {
+			lg.Fatal().Msgf("'to' height (%d) exceeds last sealed block height (%d)", to, lastSealed.Height)
+		}
+	} else {
 		root := state.Params().SealedRoot().Height
 
 		// preventing overflow
