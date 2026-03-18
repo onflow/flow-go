@@ -28,10 +28,10 @@ jobs:
         languages: ['go']
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup Go
-        uses: actions/setup-go@v4
+        uses: actions/setup-go@v6
         with:
             go-version-file: ./go.mod
 

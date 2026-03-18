@@ -21,7 +21,7 @@ jobs:
       vulnerable-changes: ${{ steps.review.outputs.vulnerable-changes }}
     steps:
       - name: "Checkout repository"
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
       - name: "Dependency Review"
         id: review
         uses: actions/dependency-review-action@v4

@@ -80,12 +80,12 @@ jobs:
     environment: container builds
     steps:
       - name: Setup Go
-        uses: actions/setup-go@v4
+        uses: actions/setup-go@v6
         with:
           go-version: ${{ env.GO_VERSION }}
 
       - name: Checkout Public flow-go repo
-        uses: actions/checkout@v3
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
           repository: onflow/flow-go
@@ -172,7 +172,7 @@ jobs:
     environment: ${{ matrix.role }} image promotion to partner registry
     steps:
       - name: Checkout repo
-        uses: actions/checkout@v3
+        uses: actions/checkout@v6
 
       - name: Promote ${{ matrix.role }}
         uses: ./actions/promote-images
@@ -204,7 +204,7 @@ jobs:
     environment: ${{ matrix.role }} image promotion to public registry
     steps:
       - name: Checkout repo
-        uses: actions/checkout@v3
+        uses: actions/checkout@v6
 
       - name: Promote ${{ matrix.role }}
         uses: ./actions/promote-images
