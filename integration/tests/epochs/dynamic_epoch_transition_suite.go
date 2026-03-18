@@ -53,7 +53,7 @@ func (s *DynamicEpochTransitionSuite) SetupTest() {
 	// try increasing (by 10-20 views).
 	s.StakingAuctionLen = 70
 	s.DKGPhaseLen = 50
-	s.EpochLen = 250
+	s.EpochLen = 270
 	s.FinalizationSafetyThreshold = 20
 
 	// run the generic setup, which starts up the network
