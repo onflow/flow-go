@@ -1,0 +1,47 @@
+name: Retry Command
+description: Runs a shell command with retries and a per-attempt timeout. Pure-shell drop-in for nick-fields/retry.
+
+inputs:
+  command:
+    description: The shell command to run
+    required: true
+  max_attempts:
+    description: Number of attempts before failing
+    required: false
+    default: '3'
+  timeout_minutes:
+    description: Minutes before each attempt is killed and retried
+    required: false
+    default: '60'
+
+runs:
+  using: composite
+  steps:
+    - name: Run with retry
+      shell: bash
+      env:
+        COMMAND: ${{ inputs.command }}
+        MAX_ATTEMPTS: ${{ inputs.max_attempts }}
+        TIMEOUT_MINUTES: ${{ inputs.timeout_minutes }}
+      run: |
+        attempt=1
+        while [ "$attempt" -le "$MAX_ATTEMPTS" ]; do
+          echo "::group::Attempt $attempt of $MAX_ATTEMPTS"
+          if timeout $(( TIMEOUT_MINUTES * 60 )) bash -eo pipefail -c "$COMMAND"; then
+            echo "::endgroup::"
+            exit 0
+          fi
+          exit_code=$?
+          echo "::endgroup::"
+          if [ "$attempt" -lt "$MAX_ATTEMPTS" ]; then
+            if [ "$exit_code" -eq 124 ]; then
+              echo "::warning::Attempt $attempt timed out after ${TIMEOUT_MINUTES}m, retrying..."
+            else
+              echo "::warning::Attempt $attempt failed (exit code $exit_code), retrying..."
+            fi
+          else
+            echo "::error::All $MAX_ATTEMPTS attempts failed."
+            exit $exit_code
+          fi
+          attempt=$(( attempt + 1 ))
+        done

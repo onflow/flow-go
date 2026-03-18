@@ -42,14 +42,14 @@ runs:
       uses: 'google-github-actions/setup-gcloud@v2'
 
     - name: Upload results to BigQuery (skipped tests)
-      run: bq load --source_format=NEWLINE_DELIMITED_JSON $BIGQUERY_DATASET.$BIGQUERY_TABLE $SKIPPED_TESTS_FILE tools/test_monitor/schemas/skipped_tests_schema.json
-      timeout-minutes: 1
-      retry:
-        max-attempts: 3
-        when: failure()
+      uses: ./.github/workflows/actions/retry
+      with:
+        timeout_minutes: 1
+        max_attempts: 3
+        command: bq load --source_format=NEWLINE_DELIMITED_JSON $BIGQUERY_DATASET.$BIGQUERY_TABLE $SKIPPED_TESTS_FILE tools/test_monitor/schemas/skipped_tests_schema.json
     - name: Upload results to BigQuery (test run)
-      run: bq load --source_format=NEWLINE_DELIMITED_JSON $BIGQUERY_DATASET.$BIGQUERY_TABLE2 $RESULTS_FILE tools/test_monitor/schemas/test_results_schema.json
-      timeout-minutes: 2
-      retry:
-        max-attempts: 3
-        when: failure()
+      uses: ./.github/workflows/actions/retry
+      with:
+        timeout_minutes: 2
+        max_attempts: 3
+        command: bq load --source_format=NEWLINE_DELIMITED_JSON $BIGQUERY_DATASET.$BIGQUERY_TABLE2 $RESULTS_FILE tools/test_monitor/schemas/test_results_schema.json

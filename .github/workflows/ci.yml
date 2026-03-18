@@ -219,11 +219,11 @@ jobs:
     - name: Setup tests (${{ matrix.targets.name }})
       run: VERBOSE=1 make -e GO_TEST_PACKAGES="${{ matrix.targets.packages }}" install-tools
     - name: Run tests (${{ matrix.targets.name }})
-      run: VERBOSE=1 make -e GO_TEST_PACKAGES="${{ matrix.targets.packages }}" test
-      timeout-minutes: 35
-      retry:
-        max-attempts: 5
-        when: failure()
+      uses: ./.github/workflows/actions/retry
+      with:
+        timeout_minutes: 35
+        max_attempts: 5
+        command: VERBOSE=1 make -e GO_TEST_PACKAGES="${{ matrix.targets.packages }}" test
       # TODO(rbtz): re-enable when we fix exisiting races.
       #env:
       #  RACE_DETECTOR: 1
@@ -265,11 +265,11 @@ jobs:
       - name: Setup tests (${{ matrix.targets.name }})
         run: VERBOSE=1 make -e GO_TEST_PACKAGES="${{ matrix.targets.packages }}" install-tools
       - name: Run tests (${{ matrix.targets.name }})
-        run: VERBOSE=1 make -C ./insecure -e GO_TEST_PACKAGES="${{ matrix.targets.packages }}" test
-        timeout-minutes: 35
-        retry:
-          max-attempts: 5
-          when: failure()
+        uses: ./.github/workflows/actions/retry
+        with:
+          timeout_minutes: 35
+          max_attempts: 5
+          command: VERBOSE=1 make -C ./insecure -e GO_TEST_PACKAGES="${{ matrix.targets.packages }}" test
         # TODO(rbtz): re-enable when we fix exisiting races.
         #env:
         #  RACE_DETECTOR: 1
@@ -372,11 +372,11 @@ jobs:
       - name: Setup tests (${{ matrix.targets.name }})
         run: VERBOSE=1 make -e GO_TEST_PACKAGES="${{ matrix.targets.packages }}" install-tools
       - name: Run tests (${{ matrix.targets.name }})
-        run: VERBOSE=1 make -C ./integration -e GO_TEST_PACKAGES="${{ matrix.targets.packages }}" test
-        timeout-minutes: 35
-        retry:
-          max-attempts: 5
-          when: failure()
+        uses: ./.github/workflows/actions/retry
+        with:
+          timeout_minutes: 35
+          max_attempts: 5
+          command: VERBOSE=1 make -C ./integration -e GO_TEST_PACKAGES="${{ matrix.targets.packages }}" test
         # TODO(rbtz): re-enable when we fix exisiting races.
         #env:
         #  RACE_DETECTOR: 1
@@ -481,8 +481,8 @@ jobs:
       # TODO(rbtz): re-enable when we fix exisiting races.
       #env:
       #  RACE_DETECTOR: 1
-      run: VERBOSE=1 ${{ matrix.make }}
-      timeout-minutes: 35
-      retry:
-        max-attempts: 5
-        when: failure()
+      uses: ./.github/workflows/actions/retry
+      with:
+        timeout_minutes: 35
+        max_attempts: 5
+        command: VERBOSE=1 ${{ matrix.make }}
