@@ -23,9 +23,10 @@ func benchmarkBlockProposalGrowth(b *testing.B, txCounts int) {
 				require.NoError(b, err)
 				res := testutils.RandomResultFixture(b)
 				bp.AppendTransaction(res)
-				err = bs.UpdateBlockProposal(bp)
-				require.NoError(b, err)
+				bs.StageBlockProposal(bp)
 			}
+			err := bs.FlushBlockProposal()
+			require.NoError(b, err)
 
 			// check the impact of updating block proposal after x number of transactions
 			backend.ResetStats()
@@ -34,7 +35,8 @@ func benchmarkBlockProposalGrowth(b *testing.B, txCounts int) {
 			require.NoError(b, err)
 			res := testutils.RandomResultFixture(b)
 			bp.AppendTransaction(res)
-			err = bs.UpdateBlockProposal(bp)
+			bs.StageBlockProposal(bp)
+			err = bs.FlushBlockProposal()
 			require.NoError(b, err)
 
 			b.ReportMetric(float64(time.Since(startTime).Nanoseconds()), "proposal_update_time_ns")

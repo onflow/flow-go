@@ -25,7 +25,7 @@ type WrappedEnvironment struct {
 
 // NewWrappedEnvironment constructs a new wrapped environment
 func NewWrappedEnvironment(env environment.Environment) *WrappedEnvironment {
-	return &WrappedEnvironment{env}
+	return &WrappedEnvironment{env: env}
 }
 
 var _ types.Backend = &WrappedEnvironment{}
@@ -135,6 +135,26 @@ func (we *WrappedEnvironment) ConvertedServiceEvents() flow.ServiceEventList {
 // all stateful environment modules (events, storage, ...)
 func (we *WrappedEnvironment) Reset() {
 	we.env.Reset()
+}
+
+// CachedBlockProposal returns the currently cached block proposal, or nil if none is cached.
+func (we *WrappedEnvironment) CachedBlockProposal() any {
+	return we.env.CachedBlockProposal()
+}
+
+// CacheBlockProposal stores the given block proposal in the in-memory cache.
+func (we *WrappedEnvironment) CacheBlockProposal(v any) {
+	we.env.CacheBlockProposal(v)
+}
+
+// SetBlockProposalFlusher registers a function to persist the cached proposal to storage.
+func (we *WrappedEnvironment) SetBlockProposalFlusher(f func() error) {
+	we.env.SetBlockProposalFlusher(f)
+}
+
+// FlushBlockProposal calls the registered flusher to persist the cached proposal.
+func (we *WrappedEnvironment) FlushBlockProposal() error {
+	return we.env.FlushBlockProposal()
 }
 
 // GetCurrentBlockHeight returns the current Flow block height

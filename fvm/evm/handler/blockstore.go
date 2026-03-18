@@ -16,6 +16,13 @@ const (
 	BlockStoreLatestBlockProposalKey = "LatestBlockProposal"
 )
 
+// BlockStore manages EVM block proposal and block hash data for a single Cadence transaction.
+// The block proposal is cached in memory (via the backend's [types.BlockProposalCache]) to avoid
+// repeated serialization/deserialization overhead across multiple reads and writes within the same
+// Cadence transaction execution.
+// Writes to storage are deferred: [StageBlockProposal] only updates the in-memory cache,
+// and persistence is handled automatically at transaction end via [BlockProposalCache.FlushBlockProposal].
+// CAUTION: not concurrency safe.
 type BlockStore struct {
 	chainID     flow.ChainID
 	backend     types.Backend
@@ -30,32 +37,38 @@ func NewBlockStore(
 	backend types.Backend,
 	rootAddress flow.Address,
 ) *BlockStore {
-	return &BlockStore{
+	bs := &BlockStore{
 		chainID:     chainID,
 		backend:     backend,
 		rootAddress: rootAddress,
 	}
+	return bs
 }
 
 // BlockProposal returns the block proposal to be updated by the handler
 func (bs *BlockStore) BlockProposal() (*types.BlockProposal, error) {
-	// first fetch it from the storage
+	cached, ok := bs.backend.CachedBlockProposal().(*types.BlockProposal)
+	if ok && cached != nil {
+		return cached, nil
+	}
+	// fetch from storage
 	data, err := bs.backend.GetValue(bs.rootAddress[:], []byte(BlockStoreLatestBlockProposalKey))
 	if err != nil {
 		return nil, err
 	}
 	if len(data) != 0 {
-		return types.NewBlockProposalFromBytes(data)
+		bp, err := types.NewBlockProposalFromBytes(data)
+		if err != nil {
+			return nil, err
+		}
+		bs.backend.CacheBlockProposal(bp)
+		return bp, nil
 	}
 	bp, err := bs.constructBlockProposal()
 	if err != nil {
 		return nil, err
 	}
-	// store block proposal
-	err = bs.UpdateBlockProposal(bp)
-	if err != nil {
-		return nil, err
-	}
+	bs.StageBlockProposal(bp)
 	return bp, nil
 }
 
@@ -106,13 +119,25 @@ func (bs *BlockStore) constructBlockProposal() (*types.BlockProposal, error) {
 	return blockProposal, nil
 }
 
-// UpdateBlockProposal updates the block proposal
-func (bs *BlockStore) UpdateBlockProposal(bp *types.BlockProposal) error {
-	blockProposalBytes, err := bp.ToBytes()
+// StageBlockProposal updates the in-memory block proposal cache and registers the
+// persistence flusher on the backend so it is called at the end of the Cadence transaction.
+func (bs *BlockStore) StageBlockProposal(bp *types.BlockProposal) {
+	bs.backend.SetBlockProposalFlusher(bs.FlushBlockProposal)
+	bs.backend.CacheBlockProposal(bp)
+}
+
+// flushBlockProposal writes the cached block proposal to storage.
+// It is registered on the backend's BlockProposalCache and called by
+// facadeEnvironment.FlushPendingUpdates at the end of the Cadence transaction.
+func (bs *BlockStore) FlushBlockProposal() error {
+	cached, ok := bs.backend.CachedBlockProposal().(*types.BlockProposal)
+	if !ok || cached == nil {
+		return nil
+	}
+	blockProposalBytes, err := cached.ToBytes()
 	if err != nil {
 		return types.NewFatalError(err)
 	}
-
 	return bs.backend.SetValue(
 		bs.rootAddress[:],
 		[]byte(BlockStoreLatestBlockProposalKey),
@@ -153,10 +178,7 @@ func (bs *BlockStore) CommitBlockProposal(bp *types.BlockProposal) error {
 	if err != nil {
 		return err
 	}
-	err = bs.UpdateBlockProposal(newBP)
-	if err != nil {
-		return err
-	}
+	bs.StageBlockProposal(newBP)
 
 	return nil
 }
