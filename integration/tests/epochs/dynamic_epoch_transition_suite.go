@@ -51,9 +51,9 @@ func (s *DynamicEpochTransitionSuite) SetupTest() {
 	// NOTE: this value is set fairly aggressively to ensure shorter test times.
 	// If flakiness due to failure to complete staking operations in time is observed,
 	// try increasing (by 10-20 views).
-	s.StakingAuctionLen = 50
+	s.StakingAuctionLen = 70
 	s.DKGPhaseLen = 50
-	s.EpochLen = 250
+	s.EpochLen = 270
 	s.FinalizationSafetyThreshold = 20
 
 	// run the generic setup, which starts up the network
