@@ -14,6 +14,7 @@ type BackendStorage interface {
 // a `BackendError`.
 type Backend interface {
 	BackendStorage
+	environment.BlockProposalCache
 	environment.Meter
 	environment.EventEmitter
 	environment.BlockInfo

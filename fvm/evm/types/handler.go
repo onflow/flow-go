@@ -102,8 +102,10 @@ type BlockStore interface {
 	// BlockProposal returns the active block proposal
 	BlockProposal() (*BlockProposal, error)
 
-	// UpdateBlockProposal replaces the current block proposal with the ones passed
-	UpdateBlockProposal(*BlockProposal) error
+	// StageBlockProposal updates the in-memory block proposal cache without writing to storage.
+	// Persistence is handled automatically at the end of the Cadence transaction via
+	// the flusher registered on the backend's BlockProposalCache.
+	StageBlockProposal(*BlockProposal)
 
 	// CommitBlockProposal commits the block proposal and update the chain of blocks
 	CommitBlockProposal(*BlockProposal) error

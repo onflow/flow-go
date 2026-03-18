@@ -564,6 +564,92 @@ func (_c *Environment_BorrowCadenceRuntime_Call) RunAndReturn(run func() environ
 	return _c
 }
 
+// CacheBlockProposal provides a mock function for the type Environment
+func (_mock *Environment) CacheBlockProposal(v any) {
+	_mock.Called(v)
+	return
+}
+
+// Environment_CacheBlockProposal_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CacheBlockProposal'
+type Environment_CacheBlockProposal_Call struct {
+	*mock.Call
+}
+
+// CacheBlockProposal is a helper method to define mock.On call
+//   - v any
+func (_e *Environment_Expecter) CacheBlockProposal(v interface{}) *Environment_CacheBlockProposal_Call {
+	return &Environment_CacheBlockProposal_Call{Call: _e.mock.On("CacheBlockProposal", v)}
+}
+
+func (_c *Environment_CacheBlockProposal_Call) Run(run func(v any)) *Environment_CacheBlockProposal_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 any
+		if args[0] != nil {
+			arg0 = args[0].(any)
+		}
+		run(
+			arg0,
+		)
+	})
+	return _c
+}
+
+func (_c *Environment_CacheBlockProposal_Call) Return() *Environment_CacheBlockProposal_Call {
+	_c.Call.Return()
+	return _c
+}
+
+func (_c *Environment_CacheBlockProposal_Call) RunAndReturn(run func(v any)) *Environment_CacheBlockProposal_Call {
+	_c.Run(run)
+	return _c
+}
+
+// CachedBlockProposal provides a mock function for the type Environment
+func (_mock *Environment) CachedBlockProposal() any {
+	ret := _mock.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for CachedBlockProposal")
+	}
+
+	var r0 any
+	if returnFunc, ok := ret.Get(0).(func() any); ok {
+		r0 = returnFunc()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(any)
+		}
+	}
+	return r0
+}
+
+// Environment_CachedBlockProposal_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CachedBlockProposal'
+type Environment_CachedBlockProposal_Call struct {
+	*mock.Call
+}
+
+// CachedBlockProposal is a helper method to define mock.On call
+func (_e *Environment_Expecter) CachedBlockProposal() *Environment_CachedBlockProposal_Call {
+	return &Environment_CachedBlockProposal_Call{Call: _e.mock.On("CachedBlockProposal")}
+}
+
+func (_c *Environment_CachedBlockProposal_Call) Run(run func()) *Environment_CachedBlockProposal_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *Environment_CachedBlockProposal_Call) Return(v any) *Environment_CachedBlockProposal_Call {
+	_c.Call.Return(v)
+	return _c
+}
+
+func (_c *Environment_CachedBlockProposal_Call) RunAndReturn(run func() any) *Environment_CachedBlockProposal_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // CheckPayerBalanceAndGetMaxTxFees provides a mock function for the type Environment
 func (_mock *Environment) CheckPayerBalanceAndGetMaxTxFees(payer flow.Address, inclusionEffort uint64, executionEffort uint64) (cadence.Value, error) {
 	ret := _mock.Called(payer, inclusionEffort, executionEffort)
@@ -1330,6 +1416,50 @@ func (_c *Environment_Events_Call) Return(eventsList flow.EventsList) *Environme
 }
 
 func (_c *Environment_Events_Call) RunAndReturn(run func() flow.EventsList) *Environment_Events_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// FlushBlockProposal provides a mock function for the type Environment
+func (_mock *Environment) FlushBlockProposal() error {
+	ret := _mock.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for FlushBlockProposal")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func() error); ok {
+		r0 = returnFunc()
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// Environment_FlushBlockProposal_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'FlushBlockProposal'
+type Environment_FlushBlockProposal_Call struct {
+	*mock.Call
+}
+
+// FlushBlockProposal is a helper method to define mock.On call
+func (_e *Environment_Expecter) FlushBlockProposal() *Environment_FlushBlockProposal_Call {
+	return &Environment_FlushBlockProposal_Call{Call: _e.mock.On("FlushBlockProposal")}
+}
+
+func (_c *Environment_FlushBlockProposal_Call) Run(run func()) *Environment_FlushBlockProposal_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *Environment_FlushBlockProposal_Call) Return(err error) *Environment_FlushBlockProposal_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *Environment_FlushBlockProposal_Call) RunAndReturn(run func() error) *Environment_FlushBlockProposal_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -3962,6 +4092,46 @@ func (_c *Environment_ServiceEvents_Call) Return(eventsList flow.EventsList) *En
 
 func (_c *Environment_ServiceEvents_Call) RunAndReturn(run func() flow.EventsList) *Environment_ServiceEvents_Call {
 	_c.Call.Return(run)
+	return _c
+}
+
+// SetBlockProposalFlusher provides a mock function for the type Environment
+func (_mock *Environment) SetBlockProposalFlusher(fn func() error) {
+	_mock.Called(fn)
+	return
+}
+
+// Environment_SetBlockProposalFlusher_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SetBlockProposalFlusher'
+type Environment_SetBlockProposalFlusher_Call struct {
+	*mock.Call
+}
+
+// SetBlockProposalFlusher is a helper method to define mock.On call
+//   - fn func() error
+func (_e *Environment_Expecter) SetBlockProposalFlusher(fn interface{}) *Environment_SetBlockProposalFlusher_Call {
+	return &Environment_SetBlockProposalFlusher_Call{Call: _e.mock.On("SetBlockProposalFlusher", fn)}
+}
+
+func (_c *Environment_SetBlockProposalFlusher_Call) Run(run func(fn func() error)) *Environment_SetBlockProposalFlusher_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 func() error
+		if args[0] != nil {
+			arg0 = args[0].(func() error)
+		}
+		run(
+			arg0,
+		)
+	})
+	return _c
+}
+
+func (_c *Environment_SetBlockProposalFlusher_Call) Return() *Environment_SetBlockProposalFlusher_Call {
+	_c.Call.Return()
+	return _c
+}
+
+func (_c *Environment_SetBlockProposalFlusher_Call) RunAndReturn(run func(fn func() error)) *Environment_SetBlockProposalFlusher_Call {
+	_c.Run(run)
 	return _c
 }
 

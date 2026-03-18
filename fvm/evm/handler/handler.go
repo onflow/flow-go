@@ -372,10 +372,7 @@ func (h *ContractHandler) batchRun(rlpEncodedTxs [][]byte) ([]*types.Result, err
 	}
 
 	// update the block proposal
-	err = h.blockStore.UpdateBlockProposal(bp)
-	if err != nil {
-		return nil, err
-	}
+	h.blockStore.StageBlockProposal(bp)
 
 	return res, nil
 }
@@ -481,10 +478,7 @@ func (h *ContractHandler) run(rlpEncodedTx []byte) (*types.Result, error) {
 
 	// step 8 - update the block proposal
 	bp.AppendTransaction(res)
-	err = h.blockStore.UpdateBlockProposal(bp)
-	if err != nil {
-		return nil, err
-	}
+	h.blockStore.StageBlockProposal(bp)
 
 	// step 9 - emit transaction event
 	err = h.emitEvent(
@@ -753,10 +747,7 @@ func (h *ContractHandler) executeAndHandleCall(
 	}
 
 	// update the block proposal
-	err = h.blockStore.UpdateBlockProposal(bp)
-	if err != nil {
-		return nil, err
-	}
+	h.blockStore.StageBlockProposal(bp)
 
 	// step 8 - emit transaction event
 	encoded, err := call.Encode()

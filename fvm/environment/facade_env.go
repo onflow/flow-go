@@ -50,6 +50,7 @@ type facadeEnvironment struct {
 
 	*ContractReader
 	ContractUpdater
+	BlockProposalCache
 	*Programs
 
 	accounts Accounts
@@ -146,7 +147,8 @@ func newFacadeEnvironment(
 			accounts,
 			common.Address(sc.Crypto.Address),
 		),
-		ContractUpdater: NoContractUpdater{},
+		ContractUpdater:    NoContractUpdater{},
+		BlockProposalCache: &blockProposalCache{},
 		Programs: NewPrograms(
 			tracer,
 			meter,
@@ -331,6 +333,9 @@ func (env *facadeEnvironment) FlushPendingUpdates() (
 	ContractUpdates,
 	error,
 ) {
+	if err := env.BlockProposalCache.FlushBlockProposal(); err != nil {
+		return ContractUpdates{}, err
+	}
 	return env.ContractUpdater.Commit()
 }
 
