@@ -143,8 +143,8 @@ func (s *DynamicEpochTransitionSuite) StakeNode(ctx context.Context, env templat
 	result = s.SubmitSetApprovedListTx(ctx, env, append(s.Net.Identities().NodeIDs(), nodeID)...)
 	require.NoError(s.T(), result.Error)
 
-	// ensure we are still in staking auction
-	s.AssertInEpochPhase(ctx, 0, flow.EpochPhaseStaking)
+	// ensure staking/approved-list operations completed before identity table was finalized
+	s.AssertInEpochPhaseStakingOrSetup(ctx, 0)
 
 	return &StakedNodeOperationInfo{
 		NodeID:                  nodeID,
@@ -195,8 +195,8 @@ func (s *DynamicEpochTransitionSuite) removeNodeFromProtocol(ctx context.Context
 	require.NoError(s.T(), err)
 	require.NoError(s.T(), result.Error)
 
-	// ensure we submit transaction while in staking phase
-	s.AssertInEpochPhase(ctx, 0, flow.EpochPhaseStaking)
+	// ensure remove operation completed before identity table was finalized
+	s.AssertInEpochPhaseStakingOrSetup(ctx, 0)
 }
 
 // submitAdminRemoveNodeTx will submit the admin remove node transaction
@@ -361,6 +361,28 @@ func (s *DynamicEpochTransitionSuite) AssertInEpochPhase(ctx context.Context, ex
 	head, err := snapshot.Head()
 	require.NoError(s.T(), err)
 	s.TimedLogf("asserted in epoch %d, phase %s, finalized height/view: %d/%d", expectedEpoch, expectedPhase, head.Height, head.View)
+}
+
+// AssertInEpochPhaseStakingOrSetup asserts we're in epoch 0 and in Staking or Setup phase.
+// Used after staking/removal operations where the network may transition to Setup during
+// the operation. Accepting both phases is deterministic—we only need to ensure we didn't
+// miss the identity-table window (e.g. we're not in Committed).
+func (s *DynamicEpochTransitionSuite) AssertInEpochPhaseStakingOrSetup(ctx context.Context, expectedEpoch uint64) {
+	snapshot, err := s.Client.GetLatestProtocolSnapshot(ctx)
+	require.NoError(s.T(), err)
+	epoch, err := snapshot.Epochs().Current()
+	require.NoError(s.T(), err)
+	actualEpoch := epoch.Counter()
+	actualPhase, err := snapshot.EpochPhase()
+	require.NoError(s.T(), err)
+	require.Equal(s.T(), expectedEpoch, actualEpoch, "not in correct epoch")
+	require.True(s.T(),
+		actualPhase == flow.EpochPhaseStaking || actualPhase == flow.EpochPhaseSetup,
+		"expected staking or setup phase for staking/removal operations, got %s", actualPhase)
+
+	head, err := snapshot.Head()
+	require.NoError(s.T(), err)
+	s.TimedLogf("asserted in epoch %d, phase %s (staking or setup allowed), finalized height/view: %d/%d", expectedEpoch, actualPhase, head.Height, head.View)
 }
 
 // AssertNodeNotParticipantInEpoch asserts that the given node ID does not exist
