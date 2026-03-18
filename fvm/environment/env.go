@@ -83,6 +83,8 @@ type Environment interface {
 	// Reset resets all stateful environment modules (e.g., ContractUpdater,
 	// EventEmitter) to initial state.
 	Reset()
+
+	BlockProposalCache
 }
 
 // ReusableCadenceRuntime is a wrapper around the cadence runtime and environment that

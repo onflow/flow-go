@@ -238,7 +238,20 @@ type TestBackend struct {
 	*TestTracer
 	*TestMetricsReporter
 	*TestLoggerProvider
+	cachedProposal any
 }
+
+func (tb *TestBackend) CachedBlockProposal() any {
+	return tb.cachedProposal
+}
+
+func (tb *TestBackend) CacheBlockProposal(v any) {
+	tb.cachedProposal = v
+}
+
+func (tb *TestBackend) SetBlockProposalFlusher(func() error) {}
+
+func (tb *TestBackend) FlushBlockProposal() error { return nil }
 
 var _ types.Backend = &TestBackend{}
 

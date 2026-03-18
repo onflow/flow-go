@@ -43,8 +43,7 @@ func TestBlockStore(t *testing.T) {
 
 			// update the block proposal
 			bp.TotalGasUsed += 100
-			err = bs.UpdateBlockProposal(bp)
-			require.NoError(t, err)
+			bs.StageBlockProposal(bp)
 
 			// reset the bs and check if it still return the block proposal
 			bs = handler.NewBlockStore(chainID, backend, root)
@@ -55,8 +54,7 @@ func TestBlockStore(t *testing.T) {
 			// update the block proposal again
 			supply := big.NewInt(100)
 			bp.TotalSupply = supply
-			err = bs.UpdateBlockProposal(bp)
-			require.NoError(t, err)
+			bs.StageBlockProposal(bp)
 			// this should still return the genesis block
 			retb, err := bs.LatestBlock()
 			require.NoError(t, err)
