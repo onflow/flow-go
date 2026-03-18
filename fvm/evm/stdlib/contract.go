@@ -30,10 +30,10 @@ var flowTokenImportPattern = regexp.MustCompile(`(?m)^import "FlowToken"`)
 var loadTestHelpersPattern = regexp.MustCompile(`(?m)\/\/ #loadTestHelpers`)
 
 func ContractCode(
-	chainID flow.ChainID,
 	nonFungibleTokenAddress,
 	fungibleTokenAddress,
 	flowTokenAddress flow.Address,
+	evmTestHelpersEnabled bool,
 ) []byte {
 	evmContract := nftImportPattern.ReplaceAllString(
 		contractCode,
@@ -48,9 +48,9 @@ func ContractCode(
 		fmt.Sprintf("import FlowToken from %s", flowTokenAddress.HexWithPrefix()),
 	)
 
-	// Inject the contract_test_helpers.cdc code, only if we are
-	// bootstrapping the Flow Emulator network.
-	if chainID == flow.Emulator {
+	// Inject the contract_test_helpers.cdc code, only if the
+	// bootstrapping option was specified.
+	if evmTestHelpersEnabled {
 		replaced := loadTestHelpersPattern.ReplaceAllLiteralString(
 			evmContract,
 			contractTestHelpers,
