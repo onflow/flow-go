@@ -846,6 +846,10 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				blob.WithParentBlobService(bs),
 			}
 
+			if !builder.BitswapReprovideEnabled {
+				opts = append(opts, blob.WithReprovideInterval(-1))
+			}
+
 			net := builder.AccessNodeConfig.PublicNetworkConfig.Network
 
 			var err error
