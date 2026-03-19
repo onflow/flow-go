@@ -15,6 +15,7 @@ import (
 	txstatus "github.com/onflow/flow-go/engine/access/rpc/backend/transactions/status"
 	"github.com/onflow/flow-go/model/access/systemcollection"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/execution"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
@@ -38,6 +39,8 @@ func DefaultConfig() Config {
 type Backend struct {
 	*AccountTransactionsBackend
 	*AccountTransfersBackend
+	*ScheduledTransactionsBackend
+	*ContractsBackend
 
 	log zerolog.Logger
 }
@@ -61,7 +64,10 @@ func New(
 	collections storage.CollectionsReader,
 	transactions storage.TransactionsReader,
 	scheduledTransactions storage.ScheduledTransactionsReader,
+	scheduledTxIndex storage.ScheduledTransactionsIndexReader,
+	contractsIndex storage.ContractDeploymentsIndexReader,
 	txStatusDeriver *txstatus.TxStatusDeriver,
+	scriptExecutor execution.ScriptExecutor,
 ) (*Backend, error) {
 	log = log.With().Str("component", "extended_backend").Logger()
 
@@ -85,6 +91,7 @@ func New(
 	base := &backendBase{
 		config:                config,
 		headers:               headers,
+		blocks:                blocks,
 		collections:           collections,
 		transactions:          transactions,
 		scheduledTransactions: scheduledTransactions,
@@ -94,9 +101,11 @@ func New(
 
 	chain := chainID.Chain()
 	return &Backend{
-		log:                        log,
-		AccountTransactionsBackend: NewAccountTransactionsBackend(log, base, store, chain),
-		AccountTransfersBackend:    NewAccountTransfersBackend(log, base, ftStore, nftStore, chain),
+		log:                          log,
+		AccountTransactionsBackend:   NewAccountTransactionsBackend(log, base, store, chain),
+		AccountTransfersBackend:      NewAccountTransfersBackend(log, base, ftStore, nftStore, chain),
+		ScheduledTransactionsBackend: NewScheduledTransactionsBackend(log, base, chainID, scheduledTxIndex, contractsIndex, scheduledTransactions, state, scriptExecutor),
+		ContractsBackend:             NewContractsBackend(log, base, contractsIndex),
 	}, nil
 }
 
@@ -112,8 +121,7 @@ func mapReadError(ctx context.Context, label string, err error) error {
 	case errors.Is(err, storage.ErrNotFound):
 		return status.Errorf(codes.NotFound, "not found: %v", err)
 	default:
-		err = fmt.Errorf("failed to get %s: %w", label, err)
-		irrecoverable.Throw(ctx, err)
+		irrecoverable.Throw(ctx, fmt.Errorf("failed to get %s: %w", label, err))
 		return err
 	}
 }

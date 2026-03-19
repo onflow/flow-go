@@ -37,18 +37,22 @@ type FTParser struct {
 	withdrawnEventType flow.EventType
 	depositedEventType flow.EventType
 	flowFeesEventType  flow.EventType
-	flowFeesAddress    flow.Address
+	flowFeesReceivers  map[flow.Address]bool
 	omitFlowFees       bool
 }
 
 // NewFTParser creates a new fungible token transfer event parser.
 func NewFTParser(chainID flow.ChainID, omitFlowFees bool) *FTParser {
 	sc := systemcontracts.SystemContractsForChain(chainID)
+	receivers := make(map[flow.Address]bool, len(sc.FlowFeesReceivers))
+	for _, receiver := range sc.FlowFeesReceivers {
+		receivers[receiver.Address] = true
+	}
 	return &FTParser{
 		withdrawnEventType: flow.EventType(fmt.Sprintf(ftWithdrawnFormat, sc.FungibleToken.Address)),
 		depositedEventType: flow.EventType(fmt.Sprintf(ftDepositedFormat, sc.FungibleToken.Address)),
 		flowFeesEventType:  flow.EventType(fmt.Sprintf(flowFeesFormat, sc.FlowFees.Address)),
-		flowFeesAddress:    sc.FlowFees.Address,
+		flowFeesReceivers:  receivers,
 		omitFlowFees:       omitFlowFees,
 	}
 }
@@ -89,7 +93,7 @@ func (p *FTParser) filterAndDecodeFT(evts []flow.Event) (map[uint32]*ftTxEventGr
 	ensureGroup := func(txIndex uint32) *ftTxEventGroup {
 		g, ok := txEventGroups[txIndex]
 		if !ok {
-			g = newFTTxEventGroup(p.flowFeesAddress)
+			g = newFTTxEventGroup(p.flowFeesReceivers)
 			txEventGroups[txIndex] = g
 		}
 		return g

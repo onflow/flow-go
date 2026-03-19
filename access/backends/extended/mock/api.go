@@ -334,3 +334,647 @@ func (_c *API_GetAccountTransactions_Call) RunAndReturn(run func(ctx context.Con
 	_c.Call.Return(run)
 	return _c
 }
+
+// GetContract provides a mock function for the type API
+func (_mock *API) GetContract(ctx context.Context, id string, filter extended.ContractDeploymentFilter, expandOptions extended.ContractDeploymentExpandOptions, encodingVersion entities.EventEncodingVersion) (*access.ContractDeployment, error) {
+	ret := _mock.Called(ctx, id, filter, expandOptions, encodingVersion)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetContract")
+	}
+
+	var r0 *access.ContractDeployment
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, extended.ContractDeploymentFilter, extended.ContractDeploymentExpandOptions, entities.EventEncodingVersion) (*access.ContractDeployment, error)); ok {
+		return returnFunc(ctx, id, filter, expandOptions, encodingVersion)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, extended.ContractDeploymentFilter, extended.ContractDeploymentExpandOptions, entities.EventEncodingVersion) *access.ContractDeployment); ok {
+		r0 = returnFunc(ctx, id, filter, expandOptions, encodingVersion)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*access.ContractDeployment)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, string, extended.ContractDeploymentFilter, extended.ContractDeploymentExpandOptions, entities.EventEncodingVersion) error); ok {
+		r1 = returnFunc(ctx, id, filter, expandOptions, encodingVersion)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// API_GetContract_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetContract'
+type API_GetContract_Call struct {
+	*mock.Call
+}
+
+// GetContract is a helper method to define mock.On call
+//   - ctx context.Context
+//   - id string
+//   - filter extended.ContractDeploymentFilter
+//   - expandOptions extended.ContractDeploymentExpandOptions
+//   - encodingVersion entities.EventEncodingVersion
+func (_e *API_Expecter) GetContract(ctx interface{}, id interface{}, filter interface{}, expandOptions interface{}, encodingVersion interface{}) *API_GetContract_Call {
+	return &API_GetContract_Call{Call: _e.mock.On("GetContract", ctx, id, filter, expandOptions, encodingVersion)}
+}
+
+func (_c *API_GetContract_Call) Run(run func(ctx context.Context, id string, filter extended.ContractDeploymentFilter, expandOptions extended.ContractDeploymentExpandOptions, encodingVersion entities.EventEncodingVersion)) *API_GetContract_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		var arg2 extended.ContractDeploymentFilter
+		if args[2] != nil {
+			arg2 = args[2].(extended.ContractDeploymentFilter)
+		}
+		var arg3 extended.ContractDeploymentExpandOptions
+		if args[3] != nil {
+			arg3 = args[3].(extended.ContractDeploymentExpandOptions)
+		}
+		var arg4 entities.EventEncodingVersion
+		if args[4] != nil {
+			arg4 = args[4].(entities.EventEncodingVersion)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+			arg3,
+			arg4,
+		)
+	})
+	return _c
+}
+
+func (_c *API_GetContract_Call) Return(contractDeployment *access.ContractDeployment, err error) *API_GetContract_Call {
+	_c.Call.Return(contractDeployment, err)
+	return _c
+}
+
+func (_c *API_GetContract_Call) RunAndReturn(run func(ctx context.Context, id string, filter extended.ContractDeploymentFilter, expandOptions extended.ContractDeploymentExpandOptions, encodingVersion entities.EventEncodingVersion) (*access.ContractDeployment, error)) *API_GetContract_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// GetContractDeployments provides a mock function for the type API
+func (_mock *API) GetContractDeployments(ctx context.Context, id string, limit uint32, cursor *access.ContractDeploymentsCursor, filter extended.ContractDeploymentFilter, expandOptions extended.ContractDeploymentExpandOptions, encodingVersion entities.EventEncodingVersion) (*access.ContractDeploymentPage, error) {
+	ret := _mock.Called(ctx, id, limit, cursor, filter, expandOptions, encodingVersion)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetContractDeployments")
+	}
+
+	var r0 *access.ContractDeploymentPage
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, uint32, *access.ContractDeploymentsCursor, extended.ContractDeploymentFilter, extended.ContractDeploymentExpandOptions, entities.EventEncodingVersion) (*access.ContractDeploymentPage, error)); ok {
+		return returnFunc(ctx, id, limit, cursor, filter, expandOptions, encodingVersion)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, uint32, *access.ContractDeploymentsCursor, extended.ContractDeploymentFilter, extended.ContractDeploymentExpandOptions, entities.EventEncodingVersion) *access.ContractDeploymentPage); ok {
+		r0 = returnFunc(ctx, id, limit, cursor, filter, expandOptions, encodingVersion)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*access.ContractDeploymentPage)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, string, uint32, *access.ContractDeploymentsCursor, extended.ContractDeploymentFilter, extended.ContractDeploymentExpandOptions, entities.EventEncodingVersion) error); ok {
+		r1 = returnFunc(ctx, id, limit, cursor, filter, expandOptions, encodingVersion)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// API_GetContractDeployments_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetContractDeployments'
+type API_GetContractDeployments_Call struct {
+	*mock.Call
+}
+
+// GetContractDeployments is a helper method to define mock.On call
+//   - ctx context.Context
+//   - id string
+//   - limit uint32
+//   - cursor *access.ContractDeploymentsCursor
+//   - filter extended.ContractDeploymentFilter
+//   - expandOptions extended.ContractDeploymentExpandOptions
+//   - encodingVersion entities.EventEncodingVersion
+func (_e *API_Expecter) GetContractDeployments(ctx interface{}, id interface{}, limit interface{}, cursor interface{}, filter interface{}, expandOptions interface{}, encodingVersion interface{}) *API_GetContractDeployments_Call {
+	return &API_GetContractDeployments_Call{Call: _e.mock.On("GetContractDeployments", ctx, id, limit, cursor, filter, expandOptions, encodingVersion)}
+}
+
+func (_c *API_GetContractDeployments_Call) Run(run func(ctx context.Context, id string, limit uint32, cursor *access.ContractDeploymentsCursor, filter extended.ContractDeploymentFilter, expandOptions extended.ContractDeploymentExpandOptions, encodingVersion entities.EventEncodingVersion)) *API_GetContractDeployments_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		var arg2 uint32
+		if args[2] != nil {
+			arg2 = args[2].(uint32)
+		}
+		var arg3 *access.ContractDeploymentsCursor
+		if args[3] != nil {
+			arg3 = args[3].(*access.ContractDeploymentsCursor)
+		}
+		var arg4 extended.ContractDeploymentFilter
+		if args[4] != nil {
+			arg4 = args[4].(extended.ContractDeploymentFilter)
+		}
+		var arg5 extended.ContractDeploymentExpandOptions
+		if args[5] != nil {
+			arg5 = args[5].(extended.ContractDeploymentExpandOptions)
+		}
+		var arg6 entities.EventEncodingVersion
+		if args[6] != nil {
+			arg6 = args[6].(entities.EventEncodingVersion)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+			arg3,
+			arg4,
+			arg5,
+			arg6,
+		)
+	})
+	return _c
+}
+
+func (_c *API_GetContractDeployments_Call) Return(contractDeploymentPage *access.ContractDeploymentPage, err error) *API_GetContractDeployments_Call {
+	_c.Call.Return(contractDeploymentPage, err)
+	return _c
+}
+
+func (_c *API_GetContractDeployments_Call) RunAndReturn(run func(ctx context.Context, id string, limit uint32, cursor *access.ContractDeploymentsCursor, filter extended.ContractDeploymentFilter, expandOptions extended.ContractDeploymentExpandOptions, encodingVersion entities.EventEncodingVersion) (*access.ContractDeploymentPage, error)) *API_GetContractDeployments_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// GetContracts provides a mock function for the type API
+func (_mock *API) GetContracts(ctx context.Context, limit uint32, cursor *access.ContractDeploymentsCursor, filter extended.ContractDeploymentFilter, expandOptions extended.ContractDeploymentExpandOptions, encodingVersion entities.EventEncodingVersion) (*access.ContractDeploymentPage, error) {
+	ret := _mock.Called(ctx, limit, cursor, filter, expandOptions, encodingVersion)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetContracts")
+	}
+
+	var r0 *access.ContractDeploymentPage
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, uint32, *access.ContractDeploymentsCursor, extended.ContractDeploymentFilter, extended.ContractDeploymentExpandOptions, entities.EventEncodingVersion) (*access.ContractDeploymentPage, error)); ok {
+		return returnFunc(ctx, limit, cursor, filter, expandOptions, encodingVersion)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, uint32, *access.ContractDeploymentsCursor, extended.ContractDeploymentFilter, extended.ContractDeploymentExpandOptions, entities.EventEncodingVersion) *access.ContractDeploymentPage); ok {
+		r0 = returnFunc(ctx, limit, cursor, filter, expandOptions, encodingVersion)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*access.ContractDeploymentPage)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, uint32, *access.ContractDeploymentsCursor, extended.ContractDeploymentFilter, extended.ContractDeploymentExpandOptions, entities.EventEncodingVersion) error); ok {
+		r1 = returnFunc(ctx, limit, cursor, filter, expandOptions, encodingVersion)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// API_GetContracts_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetContracts'
+type API_GetContracts_Call struct {
+	*mock.Call
+}
+
+// GetContracts is a helper method to define mock.On call
+//   - ctx context.Context
+//   - limit uint32
+//   - cursor *access.ContractDeploymentsCursor
+//   - filter extended.ContractDeploymentFilter
+//   - expandOptions extended.ContractDeploymentExpandOptions
+//   - encodingVersion entities.EventEncodingVersion
+func (_e *API_Expecter) GetContracts(ctx interface{}, limit interface{}, cursor interface{}, filter interface{}, expandOptions interface{}, encodingVersion interface{}) *API_GetContracts_Call {
+	return &API_GetContracts_Call{Call: _e.mock.On("GetContracts", ctx, limit, cursor, filter, expandOptions, encodingVersion)}
+}
+
+func (_c *API_GetContracts_Call) Run(run func(ctx context.Context, limit uint32, cursor *access.ContractDeploymentsCursor, filter extended.ContractDeploymentFilter, expandOptions extended.ContractDeploymentExpandOptions, encodingVersion entities.EventEncodingVersion)) *API_GetContracts_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 uint32
+		if args[1] != nil {
+			arg1 = args[1].(uint32)
+		}
+		var arg2 *access.ContractDeploymentsCursor
+		if args[2] != nil {
+			arg2 = args[2].(*access.ContractDeploymentsCursor)
+		}
+		var arg3 extended.ContractDeploymentFilter
+		if args[3] != nil {
+			arg3 = args[3].(extended.ContractDeploymentFilter)
+		}
+		var arg4 extended.ContractDeploymentExpandOptions
+		if args[4] != nil {
+			arg4 = args[4].(extended.ContractDeploymentExpandOptions)
+		}
+		var arg5 entities.EventEncodingVersion
+		if args[5] != nil {
+			arg5 = args[5].(entities.EventEncodingVersion)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+			arg3,
+			arg4,
+			arg5,
+		)
+	})
+	return _c
+}
+
+func (_c *API_GetContracts_Call) Return(contractDeploymentPage *access.ContractDeploymentPage, err error) *API_GetContracts_Call {
+	_c.Call.Return(contractDeploymentPage, err)
+	return _c
+}
+
+func (_c *API_GetContracts_Call) RunAndReturn(run func(ctx context.Context, limit uint32, cursor *access.ContractDeploymentsCursor, filter extended.ContractDeploymentFilter, expandOptions extended.ContractDeploymentExpandOptions, encodingVersion entities.EventEncodingVersion) (*access.ContractDeploymentPage, error)) *API_GetContracts_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// GetContractsByAddress provides a mock function for the type API
+func (_mock *API) GetContractsByAddress(ctx context.Context, address flow.Address, limit uint32, cursor *access.ContractDeploymentsCursor, filter extended.ContractDeploymentFilter, expandOptions extended.ContractDeploymentExpandOptions, encodingVersion entities.EventEncodingVersion) (*access.ContractDeploymentPage, error) {
+	ret := _mock.Called(ctx, address, limit, cursor, filter, expandOptions, encodingVersion)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetContractsByAddress")
+	}
+
+	var r0 *access.ContractDeploymentPage
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, flow.Address, uint32, *access.ContractDeploymentsCursor, extended.ContractDeploymentFilter, extended.ContractDeploymentExpandOptions, entities.EventEncodingVersion) (*access.ContractDeploymentPage, error)); ok {
+		return returnFunc(ctx, address, limit, cursor, filter, expandOptions, encodingVersion)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, flow.Address, uint32, *access.ContractDeploymentsCursor, extended.ContractDeploymentFilter, extended.ContractDeploymentExpandOptions, entities.EventEncodingVersion) *access.ContractDeploymentPage); ok {
+		r0 = returnFunc(ctx, address, limit, cursor, filter, expandOptions, encodingVersion)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*access.ContractDeploymentPage)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, flow.Address, uint32, *access.ContractDeploymentsCursor, extended.ContractDeploymentFilter, extended.ContractDeploymentExpandOptions, entities.EventEncodingVersion) error); ok {
+		r1 = returnFunc(ctx, address, limit, cursor, filter, expandOptions, encodingVersion)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// API_GetContractsByAddress_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetContractsByAddress'
+type API_GetContractsByAddress_Call struct {
+	*mock.Call
+}
+
+// GetContractsByAddress is a helper method to define mock.On call
+//   - ctx context.Context
+//   - address flow.Address
+//   - limit uint32
+//   - cursor *access.ContractDeploymentsCursor
+//   - filter extended.ContractDeploymentFilter
+//   - expandOptions extended.ContractDeploymentExpandOptions
+//   - encodingVersion entities.EventEncodingVersion
+func (_e *API_Expecter) GetContractsByAddress(ctx interface{}, address interface{}, limit interface{}, cursor interface{}, filter interface{}, expandOptions interface{}, encodingVersion interface{}) *API_GetContractsByAddress_Call {
+	return &API_GetContractsByAddress_Call{Call: _e.mock.On("GetContractsByAddress", ctx, address, limit, cursor, filter, expandOptions, encodingVersion)}
+}
+
+func (_c *API_GetContractsByAddress_Call) Run(run func(ctx context.Context, address flow.Address, limit uint32, cursor *access.ContractDeploymentsCursor, filter extended.ContractDeploymentFilter, expandOptions extended.ContractDeploymentExpandOptions, encodingVersion entities.EventEncodingVersion)) *API_GetContractsByAddress_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 flow.Address
+		if args[1] != nil {
+			arg1 = args[1].(flow.Address)
+		}
+		var arg2 uint32
+		if args[2] != nil {
+			arg2 = args[2].(uint32)
+		}
+		var arg3 *access.ContractDeploymentsCursor
+		if args[3] != nil {
+			arg3 = args[3].(*access.ContractDeploymentsCursor)
+		}
+		var arg4 extended.ContractDeploymentFilter
+		if args[4] != nil {
+			arg4 = args[4].(extended.ContractDeploymentFilter)
+		}
+		var arg5 extended.ContractDeploymentExpandOptions
+		if args[5] != nil {
+			arg5 = args[5].(extended.ContractDeploymentExpandOptions)
+		}
+		var arg6 entities.EventEncodingVersion
+		if args[6] != nil {
+			arg6 = args[6].(entities.EventEncodingVersion)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+			arg3,
+			arg4,
+			arg5,
+			arg6,
+		)
+	})
+	return _c
+}
+
+func (_c *API_GetContractsByAddress_Call) Return(contractDeploymentPage *access.ContractDeploymentPage, err error) *API_GetContractsByAddress_Call {
+	_c.Call.Return(contractDeploymentPage, err)
+	return _c
+}
+
+func (_c *API_GetContractsByAddress_Call) RunAndReturn(run func(ctx context.Context, address flow.Address, limit uint32, cursor *access.ContractDeploymentsCursor, filter extended.ContractDeploymentFilter, expandOptions extended.ContractDeploymentExpandOptions, encodingVersion entities.EventEncodingVersion) (*access.ContractDeploymentPage, error)) *API_GetContractsByAddress_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// GetScheduledTransaction provides a mock function for the type API
+func (_mock *API) GetScheduledTransaction(ctx context.Context, id uint64, expandOptions extended.ScheduledTransactionExpandOptions, encodingVersion entities.EventEncodingVersion) (*access.ScheduledTransaction, error) {
+	ret := _mock.Called(ctx, id, expandOptions, encodingVersion)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetScheduledTransaction")
+	}
+
+	var r0 *access.ScheduledTransaction
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, uint64, extended.ScheduledTransactionExpandOptions, entities.EventEncodingVersion) (*access.ScheduledTransaction, error)); ok {
+		return returnFunc(ctx, id, expandOptions, encodingVersion)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, uint64, extended.ScheduledTransactionExpandOptions, entities.EventEncodingVersion) *access.ScheduledTransaction); ok {
+		r0 = returnFunc(ctx, id, expandOptions, encodingVersion)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*access.ScheduledTransaction)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, uint64, extended.ScheduledTransactionExpandOptions, entities.EventEncodingVersion) error); ok {
+		r1 = returnFunc(ctx, id, expandOptions, encodingVersion)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// API_GetScheduledTransaction_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetScheduledTransaction'
+type API_GetScheduledTransaction_Call struct {
+	*mock.Call
+}
+
+// GetScheduledTransaction is a helper method to define mock.On call
+//   - ctx context.Context
+//   - id uint64
+//   - expandOptions extended.ScheduledTransactionExpandOptions
+//   - encodingVersion entities.EventEncodingVersion
+func (_e *API_Expecter) GetScheduledTransaction(ctx interface{}, id interface{}, expandOptions interface{}, encodingVersion interface{}) *API_GetScheduledTransaction_Call {
+	return &API_GetScheduledTransaction_Call{Call: _e.mock.On("GetScheduledTransaction", ctx, id, expandOptions, encodingVersion)}
+}
+
+func (_c *API_GetScheduledTransaction_Call) Run(run func(ctx context.Context, id uint64, expandOptions extended.ScheduledTransactionExpandOptions, encodingVersion entities.EventEncodingVersion)) *API_GetScheduledTransaction_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 uint64
+		if args[1] != nil {
+			arg1 = args[1].(uint64)
+		}
+		var arg2 extended.ScheduledTransactionExpandOptions
+		if args[2] != nil {
+			arg2 = args[2].(extended.ScheduledTransactionExpandOptions)
+		}
+		var arg3 entities.EventEncodingVersion
+		if args[3] != nil {
+			arg3 = args[3].(entities.EventEncodingVersion)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+			arg3,
+		)
+	})
+	return _c
+}
+
+func (_c *API_GetScheduledTransaction_Call) Return(scheduledTransaction *access.ScheduledTransaction, err error) *API_GetScheduledTransaction_Call {
+	_c.Call.Return(scheduledTransaction, err)
+	return _c
+}
+
+func (_c *API_GetScheduledTransaction_Call) RunAndReturn(run func(ctx context.Context, id uint64, expandOptions extended.ScheduledTransactionExpandOptions, encodingVersion entities.EventEncodingVersion) (*access.ScheduledTransaction, error)) *API_GetScheduledTransaction_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// GetScheduledTransactions provides a mock function for the type API
+func (_mock *API) GetScheduledTransactions(ctx context.Context, limit uint32, cursor *access.ScheduledTransactionCursor, filter extended.ScheduledTransactionFilter, expandOptions extended.ScheduledTransactionExpandOptions, encodingVersion entities.EventEncodingVersion) (*access.ScheduledTransactionsPage, error) {
+	ret := _mock.Called(ctx, limit, cursor, filter, expandOptions, encodingVersion)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetScheduledTransactions")
+	}
+
+	var r0 *access.ScheduledTransactionsPage
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, uint32, *access.ScheduledTransactionCursor, extended.ScheduledTransactionFilter, extended.ScheduledTransactionExpandOptions, entities.EventEncodingVersion) (*access.ScheduledTransactionsPage, error)); ok {
+		return returnFunc(ctx, limit, cursor, filter, expandOptions, encodingVersion)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, uint32, *access.ScheduledTransactionCursor, extended.ScheduledTransactionFilter, extended.ScheduledTransactionExpandOptions, entities.EventEncodingVersion) *access.ScheduledTransactionsPage); ok {
+		r0 = returnFunc(ctx, limit, cursor, filter, expandOptions, encodingVersion)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*access.ScheduledTransactionsPage)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, uint32, *access.ScheduledTransactionCursor, extended.ScheduledTransactionFilter, extended.ScheduledTransactionExpandOptions, entities.EventEncodingVersion) error); ok {
+		r1 = returnFunc(ctx, limit, cursor, filter, expandOptions, encodingVersion)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// API_GetScheduledTransactions_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetScheduledTransactions'
+type API_GetScheduledTransactions_Call struct {
+	*mock.Call
+}
+
+// GetScheduledTransactions is a helper method to define mock.On call
+//   - ctx context.Context
+//   - limit uint32
+//   - cursor *access.ScheduledTransactionCursor
+//   - filter extended.ScheduledTransactionFilter
+//   - expandOptions extended.ScheduledTransactionExpandOptions
+//   - encodingVersion entities.EventEncodingVersion
+func (_e *API_Expecter) GetScheduledTransactions(ctx interface{}, limit interface{}, cursor interface{}, filter interface{}, expandOptions interface{}, encodingVersion interface{}) *API_GetScheduledTransactions_Call {
+	return &API_GetScheduledTransactions_Call{Call: _e.mock.On("GetScheduledTransactions", ctx, limit, cursor, filter, expandOptions, encodingVersion)}
+}
+
+func (_c *API_GetScheduledTransactions_Call) Run(run func(ctx context.Context, limit uint32, cursor *access.ScheduledTransactionCursor, filter extended.ScheduledTransactionFilter, expandOptions extended.ScheduledTransactionExpandOptions, encodingVersion entities.EventEncodingVersion)) *API_GetScheduledTransactions_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 uint32
+		if args[1] != nil {
+			arg1 = args[1].(uint32)
+		}
+		var arg2 *access.ScheduledTransactionCursor
+		if args[2] != nil {
+			arg2 = args[2].(*access.ScheduledTransactionCursor)
+		}
+		var arg3 extended.ScheduledTransactionFilter
+		if args[3] != nil {
+			arg3 = args[3].(extended.ScheduledTransactionFilter)
+		}
+		var arg4 extended.ScheduledTransactionExpandOptions
+		if args[4] != nil {
+			arg4 = args[4].(extended.ScheduledTransactionExpandOptions)
+		}
+		var arg5 entities.EventEncodingVersion
+		if args[5] != nil {
+			arg5 = args[5].(entities.EventEncodingVersion)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+			arg3,
+			arg4,
+			arg5,
+		)
+	})
+	return _c
+}
+
+func (_c *API_GetScheduledTransactions_Call) Return(scheduledTransactionsPage *access.ScheduledTransactionsPage, err error) *API_GetScheduledTransactions_Call {
+	_c.Call.Return(scheduledTransactionsPage, err)
+	return _c
+}
+
+func (_c *API_GetScheduledTransactions_Call) RunAndReturn(run func(ctx context.Context, limit uint32, cursor *access.ScheduledTransactionCursor, filter extended.ScheduledTransactionFilter, expandOptions extended.ScheduledTransactionExpandOptions, encodingVersion entities.EventEncodingVersion) (*access.ScheduledTransactionsPage, error)) *API_GetScheduledTransactions_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// GetScheduledTransactionsByAddress provides a mock function for the type API
+func (_mock *API) GetScheduledTransactionsByAddress(ctx context.Context, address flow.Address, limit uint32, cursor *access.ScheduledTransactionCursor, filter extended.ScheduledTransactionFilter, expandOptions extended.ScheduledTransactionExpandOptions, encodingVersion entities.EventEncodingVersion) (*access.ScheduledTransactionsPage, error) {
+	ret := _mock.Called(ctx, address, limit, cursor, filter, expandOptions, encodingVersion)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetScheduledTransactionsByAddress")
+	}
+
+	var r0 *access.ScheduledTransactionsPage
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, flow.Address, uint32, *access.ScheduledTransactionCursor, extended.ScheduledTransactionFilter, extended.ScheduledTransactionExpandOptions, entities.EventEncodingVersion) (*access.ScheduledTransactionsPage, error)); ok {
+		return returnFunc(ctx, address, limit, cursor, filter, expandOptions, encodingVersion)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, flow.Address, uint32, *access.ScheduledTransactionCursor, extended.ScheduledTransactionFilter, extended.ScheduledTransactionExpandOptions, entities.EventEncodingVersion) *access.ScheduledTransactionsPage); ok {
+		r0 = returnFunc(ctx, address, limit, cursor, filter, expandOptions, encodingVersion)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*access.ScheduledTransactionsPage)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, flow.Address, uint32, *access.ScheduledTransactionCursor, extended.ScheduledTransactionFilter, extended.ScheduledTransactionExpandOptions, entities.EventEncodingVersion) error); ok {
+		r1 = returnFunc(ctx, address, limit, cursor, filter, expandOptions, encodingVersion)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// API_GetScheduledTransactionsByAddress_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetScheduledTransactionsByAddress'
+type API_GetScheduledTransactionsByAddress_Call struct {
+	*mock.Call
+}
+
+// GetScheduledTransactionsByAddress is a helper method to define mock.On call
+//   - ctx context.Context
+//   - address flow.Address
+//   - limit uint32
+//   - cursor *access.ScheduledTransactionCursor
+//   - filter extended.ScheduledTransactionFilter
+//   - expandOptions extended.ScheduledTransactionExpandOptions
+//   - encodingVersion entities.EventEncodingVersion
+func (_e *API_Expecter) GetScheduledTransactionsByAddress(ctx interface{}, address interface{}, limit interface{}, cursor interface{}, filter interface{}, expandOptions interface{}, encodingVersion interface{}) *API_GetScheduledTransactionsByAddress_Call {
+	return &API_GetScheduledTransactionsByAddress_Call{Call: _e.mock.On("GetScheduledTransactionsByAddress", ctx, address, limit, cursor, filter, expandOptions, encodingVersion)}
+}
+
+func (_c *API_GetScheduledTransactionsByAddress_Call) Run(run func(ctx context.Context, address flow.Address, limit uint32, cursor *access.ScheduledTransactionCursor, filter extended.ScheduledTransactionFilter, expandOptions extended.ScheduledTransactionExpandOptions, encodingVersion entities.EventEncodingVersion)) *API_GetScheduledTransactionsByAddress_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 flow.Address
+		if args[1] != nil {
+			arg1 = args[1].(flow.Address)
+		}
+		var arg2 uint32
+		if args[2] != nil {
+			arg2 = args[2].(uint32)
+		}
+		var arg3 *access.ScheduledTransactionCursor
+		if args[3] != nil {
+			arg3 = args[3].(*access.ScheduledTransactionCursor)
+		}
+		var arg4 extended.ScheduledTransactionFilter
+		if args[4] != nil {
+			arg4 = args[4].(extended.ScheduledTransactionFilter)
+		}
+		var arg5 extended.ScheduledTransactionExpandOptions
+		if args[5] != nil {
+			arg5 = args[5].(extended.ScheduledTransactionExpandOptions)
+		}
+		var arg6 entities.EventEncodingVersion
+		if args[6] != nil {
+			arg6 = args[6].(entities.EventEncodingVersion)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+			arg3,
+			arg4,
+			arg5,
+			arg6,
+		)
+	})
+	return _c
+}
+
+func (_c *API_GetScheduledTransactionsByAddress_Call) Return(scheduledTransactionsPage *access.ScheduledTransactionsPage, err error) *API_GetScheduledTransactionsByAddress_Call {
+	_c.Call.Return(scheduledTransactionsPage, err)
+	return _c
+}
+
+func (_c *API_GetScheduledTransactionsByAddress_Call) RunAndReturn(run func(ctx context.Context, address flow.Address, limit uint32, cursor *access.ScheduledTransactionCursor, filter extended.ScheduledTransactionFilter, expandOptions extended.ScheduledTransactionExpandOptions, encodingVersion entities.EventEncodingVersion) (*access.ScheduledTransactionsPage, error)) *API_GetScheduledTransactionsByAddress_Call {
+	_c.Call.Return(run)
+	return _c
+}

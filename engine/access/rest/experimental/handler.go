@@ -7,19 +7,19 @@ import (
 
 	"github.com/onflow/flow-go/access/backends/extended"
 	"github.com/onflow/flow-go/engine/access/rest/common"
-	commonmodels "github.com/onflow/flow-go/engine/access/rest/common/models"
+	"github.com/onflow/flow-go/engine/access/rest/experimental/models"
 	"github.com/onflow/flow-go/model/flow"
 )
 
 // ApiHandlerFunc is the handler function signature for experimental API endpoints.
 // It uses extended.API as the backend instead of access.API.
-type ApiHandlerFunc func(r *common.Request, backend extended.API, link commonmodels.LinkGenerator) (interface{}, error)
+type ApiHandlerFunc func(r *common.Request, backend extended.API, link models.LinkGenerator) (interface{}, error)
 
 // Handler wraps an ApiHandlerFunc with common HTTP handling (error handling, JSON responses).
 type Handler struct {
 	*common.HttpHandler
 	backend        extended.API
-	linkGenerator  commonmodels.LinkGenerator
+	linkGenerator  models.LinkGenerator
 	apiHandlerFunc ApiHandlerFunc
 }
 
@@ -28,7 +28,7 @@ func NewHandler(
 	logger zerolog.Logger,
 	backend extended.API,
 	handlerFunc ApiHandlerFunc,
-	linkGenerator commonmodels.LinkGenerator,
+	linkGenerator models.LinkGenerator,
 	chain flow.Chain,
 	maxRequestSize int64,
 	maxResponseSize int64,

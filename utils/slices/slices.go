@@ -76,3 +76,13 @@ func AreStringSlicesEqual(a, b []string) bool {
 func StringSliceContainsElement(a []string, v string) bool {
 	return slices.Contains(a, v)
 }
+
+// ToMap converts a slice of any comparable type into a map where each element
+// in the slice becomes a key in the map with the value set to a struct{}.
+func ToMap[T comparable](values []T) map[T]struct{} {
+	valueMap := make(map[T]struct{}, len(values))
+	for _, v := range values {
+		valueMap[v] = struct{}{}
+	}
+	return valueMap
+}

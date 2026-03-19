@@ -11,6 +11,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/rest/common/middleware"
 	"github.com/onflow/flow-go/engine/access/rest/common/models"
 	"github.com/onflow/flow-go/engine/access/rest/experimental"
+	experimentalmodels "github.com/onflow/flow-go/engine/access/rest/experimental/models"
 	flowhttp "github.com/onflow/flow-go/engine/access/rest/http"
 	"github.com/onflow/flow-go/engine/access/rest/websockets"
 	dp "github.com/onflow/flow-go/engine/access/rest/websockets/data_providers"
@@ -126,8 +127,10 @@ func (b *RouterBuilder) AddExperimentalRoutes(
 	router.Use(middleware.QuerySelect())
 	router.Use(middleware.MetricsMiddleware(b.restCollector))
 
+	experimentalLinkGenerator := experimentalmodels.NewLinkGeneratorImpl(router, b.LinkGenerator)
+
 	for _, r := range ExperimentalRoutes {
-		h := experimental.NewHandler(b.logger, backend, r.Handler, b.LinkGenerator, chain, maxRequestSize, maxResponseSize)
+		h := experimental.NewHandler(b.logger, backend, r.Handler, experimentalLinkGenerator, chain, maxRequestSize, maxResponseSize)
 		router.
 			Methods(r.Method).
 			Path(r.Pattern).

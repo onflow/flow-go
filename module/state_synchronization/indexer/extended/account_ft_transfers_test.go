@@ -13,6 +13,7 @@ import (
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/state_synchronization/indexer/extended/transfers/testutil"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -245,6 +246,86 @@ func TestFungibleTokenTransfers_Name(t *testing.T) {
 	assert.Equal(t, "account_ft_transfers", a.Name())
 }
 
+// ===== TestFungibleTokenTransfers_ProcessBlockData =====
+
+func TestFungibleTokenTransfers_ProcessBlockData(t *testing.T) {
+	t.Parallel()
+
+	t.Run("empty block returns empty entries and zero filtered count", func(t *testing.T) {
+		a := NewFungibleTokenTransfers(unittest.Logger(), flow.Testnet, &mockFTBootstrapper{latestHeight: 99}, metrics.NewNoopCollector())
+
+		data := BlockData{
+			Header: unittest.BlockHeaderFixture(unittest.WithHeaderHeight(100)),
+			Events: []flow.Event{},
+		}
+
+		entries, meta, err := a.ProcessBlockData(data)
+		require.NoError(t, err)
+		assert.Empty(t, entries)
+		assert.Equal(t, 0, meta.FilteredCount)
+	})
+
+	t.Run("self-transfer is filtered and counted in metadata", func(t *testing.T) {
+		a := NewFungibleTokenTransfers(unittest.Logger(), flow.Testnet, &mockFTBootstrapper{latestHeight: 99}, metrics.NewNoopCollector())
+
+		addr := unittest.RandomAddressFixture()
+		txID := unittest.IdentifierFixture()
+		amount := cadence.UFix64(5_00000000)
+
+		data := BlockData{
+			Header: unittest.BlockHeaderFixture(unittest.WithHeaderHeight(100)),
+			Events: []flow.Event{
+				testutil.MakeFTWithdrawnEvent(t, flow.Testnet, &addr, txID, 0, 0, 1, 50, amount),
+				testutil.MakeFTDepositedEvent(t, flow.Testnet, &addr, txID, 0, 1, 1, 50, amount),
+			},
+		}
+
+		entries, meta, err := a.ProcessBlockData(data)
+		require.NoError(t, err)
+		assert.Empty(t, entries)
+		assert.Equal(t, 1, meta.FilteredCount)
+	})
+
+	t.Run("valid transfer returned with zero filtered count", func(t *testing.T) {
+		a := NewFungibleTokenTransfers(unittest.Logger(), flow.Testnet, &mockFTBootstrapper{latestHeight: 99}, metrics.NewNoopCollector())
+
+		src := unittest.RandomAddressFixture()
+		dst := unittest.RandomAddressFixture()
+		txID := unittest.IdentifierFixture()
+		amount := cadence.UFix64(10_00000000)
+
+		data := BlockData{
+			Header: unittest.BlockHeaderFixture(unittest.WithHeaderHeight(100)),
+			Events: []flow.Event{
+				testutil.MakeFTWithdrawnEvent(t, flow.Testnet, &src, txID, 0, 0, 1, 50, amount),
+				testutil.MakeFTDepositedEvent(t, flow.Testnet, &dst, txID, 0, 1, 1, 50, amount),
+			},
+		}
+
+		entries, meta, err := a.ProcessBlockData(data)
+		require.NoError(t, err)
+		require.Len(t, entries, 1)
+		assert.Equal(t, src, entries[0].SourceAddress)
+		assert.Equal(t, dst, entries[0].RecipientAddress)
+		assert.Equal(t, 0, meta.FilteredCount)
+	})
+
+	t.Run("does not depend on indexer height state", func(t *testing.T) {
+		// ProcessBlockData should work regardless of the indexer's height state
+		a := NewFungibleTokenTransfers(unittest.Logger(), flow.Testnet, &mockFTBootstrapper{latestHeight: 50}, metrics.NewNoopCollector())
+
+		data := BlockData{
+			Header: unittest.BlockHeaderFixture(unittest.WithHeaderHeight(200)),
+			Events: []flow.Event{},
+		}
+
+		entries, meta, err := a.ProcessBlockData(data)
+		require.NoError(t, err)
+		assert.Empty(t, entries)
+		assert.Equal(t, 0, meta.FilteredCount)
+	})
+}
+
 // ===== TestFungibleTokenTransfers_IndexBlockData =====
 
 func TestFungibleTokenTransfers_IndexBlockData(t *testing.T) {
@@ -252,7 +333,7 @@ func TestFungibleTokenTransfers_IndexBlockData(t *testing.T) {
 
 	t.Run("empty block stores empty transfer slice", func(t *testing.T) {
 		ftStore := &mockFTBootstrapper{latestHeight: 99}
-		a := NewFungibleTokenTransfers(unittest.Logger(), flow.Testnet, ftStore)
+		a := NewFungibleTokenTransfers(unittest.Logger(), flow.Testnet, ftStore, metrics.NewNoopCollector())
 
 		data := BlockData{
 			Header: unittest.BlockHeaderFixture(unittest.WithHeaderHeight(100)),
@@ -267,7 +348,7 @@ func TestFungibleTokenTransfers_IndexBlockData(t *testing.T) {
 
 	t.Run("future height returns ErrFutureHeight", func(t *testing.T) {
 		ftStore := &mockFTBootstrapper{latestHeight: 99}
-		a := NewFungibleTokenTransfers(unittest.Logger(), flow.Testnet, ftStore)
+		a := NewFungibleTokenTransfers(unittest.Logger(), flow.Testnet, ftStore, metrics.NewNoopCollector())
 
 		data := BlockData{
 			Header: unittest.BlockHeaderFixture(unittest.WithHeaderHeight(101)), // next expected is 100
@@ -280,7 +361,7 @@ func TestFungibleTokenTransfers_IndexBlockData(t *testing.T) {
 
 	t.Run("already indexed returns ErrAlreadyIndexed", func(t *testing.T) {
 		ftStore := &mockFTBootstrapper{latestHeight: 99}
-		a := NewFungibleTokenTransfers(unittest.Logger(), flow.Testnet, ftStore)
+		a := NewFungibleTokenTransfers(unittest.Logger(), flow.Testnet, ftStore, metrics.NewNoopCollector())
 
 		data := BlockData{
 			Header: unittest.BlockHeaderFixture(unittest.WithHeaderHeight(99)), // next expected is 100
@@ -294,7 +375,7 @@ func TestFungibleTokenTransfers_IndexBlockData(t *testing.T) {
 	t.Run("NextHeight error propagates", func(t *testing.T) {
 		nextHeightErr := fmt.Errorf("next height failure")
 		ftStore := &mockFTBootstrapper{latestHeightErr: nextHeightErr}
-		a := NewFungibleTokenTransfers(unittest.Logger(), flow.Testnet, ftStore)
+		a := NewFungibleTokenTransfers(unittest.Logger(), flow.Testnet, ftStore, metrics.NewNoopCollector())
 
 		data := BlockData{
 			Header: unittest.BlockHeaderFixture(unittest.WithHeaderHeight(100)),
@@ -309,7 +390,7 @@ func TestFungibleTokenTransfers_IndexBlockData(t *testing.T) {
 	t.Run("store error propagates", func(t *testing.T) {
 		storeErr := fmt.Errorf("FT storage failure")
 		ftStore := &mockFTBootstrapper{latestHeight: 99, storeErr: storeErr}
-		a := NewFungibleTokenTransfers(unittest.Logger(), flow.Testnet, ftStore)
+		a := NewFungibleTokenTransfers(unittest.Logger(), flow.Testnet, ftStore, metrics.NewNoopCollector())
 
 		data := BlockData{
 			Header: unittest.BlockHeaderFixture(unittest.WithHeaderHeight(100)),
@@ -325,7 +406,7 @@ func TestFungibleTokenTransfers_IndexBlockData(t *testing.T) {
 	// is present, since the indexer is created with omitFlowFees=true.
 	t.Run("flow fees transfer omitted when FeesDeducted event is present", func(t *testing.T) {
 		ftStore := &mockFTBootstrapper{latestHeight: 99}
-		a := NewFungibleTokenTransfers(unittest.Logger(), flow.Testnet, ftStore)
+		a := NewFungibleTokenTransfers(unittest.Logger(), flow.Testnet, ftStore, metrics.NewNoopCollector())
 
 		payer := unittest.RandomAddressFixture()
 		txID := unittest.IdentifierFixture()
@@ -350,7 +431,7 @@ func TestFungibleTokenTransfers_IndexBlockData(t *testing.T) {
 	// Tests that a self-transfer (same source and recipient address) is not stored.
 	t.Run("self-transfer is not stored", func(t *testing.T) {
 		ftStore := &mockFTBootstrapper{latestHeight: 99}
-		a := NewFungibleTokenTransfers(unittest.Logger(), flow.Testnet, ftStore)
+		a := NewFungibleTokenTransfers(unittest.Logger(), flow.Testnet, ftStore, metrics.NewNoopCollector())
 
 		addr := unittest.RandomAddressFixture()
 		txID := unittest.IdentifierFixture()
@@ -374,7 +455,7 @@ func TestFungibleTokenTransfers_IndexBlockData(t *testing.T) {
 	// The parser only omits transfers that are paired with a FeesDeducted event.
 	t.Run("transfer to flow fees address without FeesDeducted event is indexed", func(t *testing.T) {
 		ftStore := &mockFTBootstrapper{latestHeight: 99}
-		a := NewFungibleTokenTransfers(unittest.Logger(), flow.Testnet, ftStore)
+		a := NewFungibleTokenTransfers(unittest.Logger(), flow.Testnet, ftStore, metrics.NewNoopCollector())
 
 		payer := unittest.RandomAddressFixture()
 		txID := unittest.IdentifierFixture()

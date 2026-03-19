@@ -67,6 +67,9 @@ type testContractHandler struct {
 	dryRun               func(tx []byte, from types.Address) *types.ResultSummary
 	dryRunWithTxData     func(txData gethTypes.TxData, from types.Address) *types.ResultSummary
 	commitBlockProposal  func()
+	getState             func(target types.Address, slot gethCommon.Hash) gethCommon.Hash
+	setState             func(target types.Address, slot gethCommon.Hash, value gethCommon.Hash) gethCommon.Hash
+	runTxAs              func(from types.Address, to types.Address, txData types.Data, gasLimit types.GasLimit, balance types.Balance) *types.ResultSummary
 }
 
 var _ types.ContractHandler = &testContractHandler{}
@@ -142,6 +145,40 @@ func (t *testContractHandler) CommitBlockProposal() {
 		panic("unexpected CommitBlockProposal")
 	}
 	t.commitBlockProposal()
+}
+
+func (t *testContractHandler) SetState(
+	target types.Address,
+	slot gethCommon.Hash,
+	value gethCommon.Hash,
+) gethCommon.Hash {
+	if t.setState == nil {
+		panic("unexpected SetState")
+	}
+	return t.setState(target, slot, value)
+}
+
+func (t *testContractHandler) GetState(
+	target types.Address,
+	slot gethCommon.Hash,
+) gethCommon.Hash {
+	if t.getState == nil {
+		panic("unexpected GetState")
+	}
+	return t.getState(target, slot)
+}
+
+func (t *testContractHandler) RunTxAs(
+	from types.Address,
+	to types.Address,
+	txData types.Data,
+	gasLimit types.GasLimit,
+	balance types.Balance,
+) *types.ResultSummary {
+	if t.runTxAs == nil {
+		panic("unexpected RunTxAs")
+	}
+	return t.runTxAs(from, to, txData, gasLimit, balance)
 }
 
 type testFlowAccount struct {
@@ -314,7 +351,12 @@ func deployContracts(
 		},
 		{
 			name: stdlib.ContractName,
-			code: stdlib.ContractCode(contractsAddress, contractsAddress, contractsAddress),
+			code: stdlib.ContractCode(
+				contractsAddress,
+				contractsAddress,
+				contractsAddress,
+				true,
+			),
 		},
 	}
 

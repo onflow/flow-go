@@ -95,6 +95,7 @@ import (
 	"github.com/onflow/flow-go/module/state_synchronization"
 	"github.com/onflow/flow-go/module/state_synchronization/indexer"
 	"github.com/onflow/flow-go/module/state_synchronization/indexer/extended"
+	extendedbootstrap "github.com/onflow/flow-go/module/state_synchronization/indexer/extended/bootstrap"
 	edrequester "github.com/onflow/flow-go/module/state_synchronization/requester"
 	"github.com/onflow/flow-go/network"
 	alspmgr "github.com/onflow/flow-go/network/alsp/manager"
@@ -342,7 +343,7 @@ type FlowAccessNodeBuilder struct {
 	ExecutionIndexerCore         *indexer.IndexerCore
 	ExtendedIndexer              *extended.ExtendedIndexer
 	ExtendedBackend              *extendedbackend.Backend
-	ExtendedStorage              extended.Storage
+	ExtendedStorage              extendedbootstrap.Storage
 	CollectionIndexer            *collections.Indexer
 	CollectionSyncer             *collections.Syncer
 	ScriptExecutor               *backend.ScriptExecutor
@@ -845,6 +846,10 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				blob.WithParentBlobService(bs),
 			}
 
+			if !builder.BitswapReprovideEnabled {
+				opts = append(opts, blob.WithReprovideInterval(-1))
+			}
+
 			net := builder.AccessNodeConfig.PublicNetworkConfig.Network
 
 			var err error
@@ -865,8 +870,28 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 		builder.IndexerDependencies.Add(&module.NoopReadyDoneAware{})
 	} else {
 		var indexedBlockHeightInitializer storage.ConsumerProgressInitializer
+
+		scriptExecutorDependendable := module.NewProxiedReadyDoneAware()
 		extendedIndexerDependable := module.NewProxiedReadyDoneAware()
+
+		// Script executor:
+		// -> registers storage
+		scriptExecutorDependencies := cmd.NewDependencyList()
+		scriptExecutorDependencies.Add(registerStorageDependable)
+
+		// Extended indexer:
+		// -> script executor
+		extendedIndexerDependencies := cmd.NewDependencyList()
+		extendedIndexerDependencies.Add(scriptExecutorDependendable)
+
+		// Regular indexer:
+		// -> script executor
+		// -> extended indexer
+		builder.IndexerDependencies.Add(scriptExecutorDependendable)
 		builder.IndexerDependencies.Add(extendedIndexerDependable)
+
+		var indexerDerivedChainData *derived.DerivedChainData
+		var queryDerivedChainData *derived.DerivedChainData
 
 		builder.
 			AdminCommand("execute-script", func(config *cmd.NodeConfig) commands.AdminCommand {
@@ -890,7 +915,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 					return nil
 				}
 
-				extendedStorage, err := extended.OpenExtendedIndexDB(
+				extendedStorage, err := extendedbootstrap.OpenExtendedIndexDB(
 					node.Logger,
 					builder.extendedIndexingDBPath,
 					builder.SealedRootBlock.Height,
@@ -994,15 +1019,46 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				registerStorageDependable.Init(rda)
 				return rda, nil
 			}, nil).
+			DependableComponent("script executor", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+				var err error
+				indexerDerivedChainData, queryDerivedChainData, err = builder.buildDerivedChainData()
+				if err != nil {
+					return nil, fmt.Errorf("could not create derived chain data: %w", err)
+				}
+
+				// create script execution module, this depends on the indexer being initialized and the
+				// having the register storage bootstrapped
+				scripts := execution.NewScripts(
+					builder.Logger,
+					metrics.NewExecutionCollector(builder.Tracer),
+					builder.RootChainID,
+					computation.NewProtocolStateWrapper(builder.State),
+					builder.Storage.Headers,
+					builder.Storage.RegisterIndex.Get,
+					builder.scriptExecutorConfig,
+					queryDerivedChainData,
+					builder.programCacheSize > 0,
+				)
+
+				err = builder.ScriptExecutor.Initialize(builder.Storage.RegisterIndex, scripts, builder.VersionControl)
+				if err != nil {
+					return nil, fmt.Errorf("could not initialize script executor: %w", err)
+				}
+
+				err = builder.RegistersAsyncStore.Initialize(builder.Storage.RegisterIndex)
+				if err != nil {
+					return nil, fmt.Errorf("could not initialize registers async store: %w", err)
+				}
+				scriptExecutorDependendable.Init(&module.NoopReadyDoneAware{})
+
+				// the script executor is not a component. it is being started as a DependableComponent
+				// to ensure dependencies are setup in the correct order.
+				return &module.NoopReadyDoneAware{}, nil
+			}, scriptExecutorDependencies).
 			DependableComponent("execution data indexer", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 				// Note: using a DependableComponent here to ensure that the indexer does not block
 				// other components from starting while bootstrapping the register db since it may
 				// take hours to complete.
-
-				indexerDerivedChainData, queryDerivedChainData, err := builder.buildDerivedChainData()
-				if err != nil {
-					return nil, fmt.Errorf("could not create derived chain data: %w", err)
-				}
 
 				builder.ExecutionIndexerCore = indexer.New(
 					builder.Logger,
@@ -1016,7 +1072,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 					utils.NotNil(builder.lightTransactionResults),
 					utils.NotNil(builder.scheduledTransactions),
 					builder.RootChainID,
-					indexerDerivedChainData,
+					indexerDerivedChainData, // might be nil if program caching is disabled
 					utils.NotNil(builder.CollectionIndexer),
 					utils.NotNil(builder.collectionExecutedMetric),
 					node.StorageLockMgr,
@@ -1051,31 +1107,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				// setup requester to notify indexer when new execution data is received
 				execDataDistributor.AddOnExecutionDataReceivedConsumer(builder.ExecutionIndexer.OnExecutionData)
 
-				// create script execution module, this depends on the indexer being initialized and the
-				// having the register storage bootstrapped
-				scripts := execution.NewScripts(
-					builder.Logger,
-					metrics.NewExecutionCollector(builder.Tracer),
-					builder.RootChainID,
-					computation.NewProtocolStateWrapper(builder.State),
-					builder.Storage.Headers,
-					builder.ExecutionIndexerCore.RegisterValue,
-					builder.scriptExecutorConfig,
-					queryDerivedChainData,
-					builder.programCacheSize > 0,
-				)
-
-				err = builder.ScriptExecutor.Initialize(builder.ExecutionIndexer, scripts, builder.VersionControl)
-				if err != nil {
-					return nil, err
-				}
-
 				err = builder.Reporter.Initialize(builder.ExecutionIndexer)
-				if err != nil {
-					return nil, err
-				}
-
-				err = builder.RegistersAsyncStore.Initialize(builder.Storage.RegisterIndex)
 				if err != nil {
 					return nil, err
 				}
@@ -1091,48 +1123,20 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 			extendedIndexerDependable.Init(&module.NoopReadyDoneAware{})
 		} else {
 			builder.DependableComponent("extended indexer", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-				accountTransactions, err := extended.NewAccountTransactions(
+				extendedIndexer, err := extendedbootstrap.BootstrapIndexers(
 					node.Logger,
-					builder.ExtendedStorage.AccountTransactionsBootstrapper,
 					node.RootChainID,
+					utils.NotNil(builder.ExtendedStorage),
 					utils.NotNil(builder.StorageLockMgr),
-				)
-				if err != nil {
-					return nil, fmt.Errorf("could not create account transactions indexer: %w", err)
-				}
-
-				ftTransfers := extended.NewFungibleTokenTransfers(
-					node.Logger,
-					node.RootChainID,
-					builder.ExtendedStorage.FungibleTokenTransfersBootstrapper,
-				)
-
-				nftTransfers := extended.NewNonFungibleTokenTransfers(
-					node.Logger,
-					node.RootChainID,
-					builder.ExtendedStorage.NonFungibleTokenTransfersBootstrapper,
-				)
-
-				extendedIndexers := []extended.Indexer{
-					accountTransactions,
-					ftTransfers,
-					nftTransfers,
-				}
-
-				extendedIndexer, err := extended.NewExtendedIndexer(
-					node.Logger,
-					metrics.NewExtendedIndexingCollector(),
-					builder.ExtendedStorage.DB,
-					utils.NotNil(builder.StorageLockMgr),
-					utils.NotNil(builder.State),
+					utils.NotNil(node.State),
 					utils.NotNil(builder.Storage.Index),
 					utils.NotNil(builder.Storage.Headers),
 					utils.NotNil(builder.Storage.Guarantees),
 					utils.NotNil(builder.Storage.Collections),
 					utils.NotNil(builder.events),
 					utils.NotNil(builder.lightTransactionResults),
-					extendedIndexers,
-					node.RootChainID,
+					utils.NotNil(builder.ScriptExecutor),
+					utils.NotNil(builder.Storage.RegisterIndex),
 					builder.extendedIndexingBackfillDelay,
 				)
 				if err != nil {
@@ -1143,7 +1147,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				extendedIndexerDependable.Init(builder.ExtendedIndexer)
 
 				return builder.ExtendedIndexer, nil
-			}, cmd.NewDependencyList())
+			}, extendedIndexerDependencies)
 		}
 	}
 
@@ -2327,7 +2331,10 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 					utils.NotNil(node.Storage.Collections),
 					utils.NotNil(node.Storage.Transactions),
 					builder.scheduledTransactions,
+					builder.ExtendedStorage.ScheduledTransactionsBootstrapper,
+					builder.ExtendedStorage.ContractDeploymentsBootstrapper,
 					txstatus.NewTxStatusDeriver(node.State, lastFullBlockHeight),
+					utils.NotNil(builder.ScriptExecutor),
 				)
 				if err != nil {
 					return nil, fmt.Errorf("could not initialize extended backend: %w", err)
