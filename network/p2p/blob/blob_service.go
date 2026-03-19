@@ -161,6 +161,11 @@ func NewBlobService(
 			}
 		}).
 		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+			if bs.config.ReprovideInterval < 0 {
+				ready()
+				return
+			}
+
 			// New creates and starts the reprovider (non-blocking)
 			reprovider, err := provider.New(ds,
 				provider.Online(r),
@@ -182,7 +187,9 @@ func NewBlobService(
 
 			var err *multierror.Error
 
-			err = multierror.Append(err, bs.reprovider.Close())
+			if bs.reprovider != nil {
+				err = multierror.Append(err, bs.reprovider.Close())
+			}
 			err = multierror.Append(err, bs.blockService.Close())
 
 			if err.ErrorOrNil() != nil {
@@ -197,6 +204,9 @@ func NewBlobService(
 }
 
 func (bs *blobService) TriggerReprovide(ctx context.Context) error {
+	if bs.reprovider == nil {
+		return nil
+	}
 	return bs.reprovider.Reprovide(ctx)
 }
 
