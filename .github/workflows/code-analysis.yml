@@ -43,7 +43,7 @@ jobs:
 
 
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@v3
+        uses: github/codeql-action/init@v4
         with:
           languages: ${{ matrix.languages}}
           queries: security-extended
@@ -52,7 +52,7 @@ jobs:
         run: CGO_ENABLED=0 go build -mod=vendor -tags=no_cgo ./... 
 
       - name: CodeQL Analyze 
-        uses: github/codeql-action/analyze@v3
+        uses: github/codeql-action/analyze@v4
         with:
           category: "/language:${{ matrix.languages}}"
           # need org username and pat to access private libraries
