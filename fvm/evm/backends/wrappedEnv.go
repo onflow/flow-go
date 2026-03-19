@@ -209,6 +209,10 @@ func (we *WrappedEnvironment) Logger() zerolog.Logger {
 	return we.env.Logger()
 }
 
+func (we *WrappedEnvironment) EVMTestOperationsAllowed() bool {
+	return we.env.EVMTestOperationsAllowed()
+}
+
 func handleEnvironmentError(err error) error {
 	if err == nil {
 		return nil
