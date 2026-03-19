@@ -81,6 +81,9 @@ go.work.sum
 # Local testing result files
 tps-results*.json
 
+# Nix/direnv
+.direnv/
+
 # Custom golangcilint build
 custom-gcl
 tools/custom-gcl

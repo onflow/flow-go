@@ -465,5 +465,7 @@ func (executor *transactionExecutor) commit(
 			commitErr)
 	}
 
+	executor.output.PopulateInspectionResults(executor.ctx.Logger, executor.ctx, executor.env, executor.txnState, executor.executionStateRead)
+
 	return nil
 }
