@@ -6,7 +6,6 @@ package mock
 
 import (
 	"github.com/onflow/flow-go/fvm"
-	"github.com/onflow/flow-go/fvm/inspection"
 	"github.com/onflow/flow-go/fvm/storage"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	mock "github.com/stretchr/testify/mock"
@@ -37,83 +36,6 @@ type VM_Expecter struct {
 
 func (_m *VM) EXPECT() *VM_Expecter {
 	return &VM_Expecter{mock: &_m.Mock}
-}
-
-// Inspect provides a mock function for the type VM
-func (_mock *VM) Inspect(ctx fvm.Context, proc fvm.Procedure, storageSnapshot snapshot.StorageSnapshot, executionSnapshot *snapshot.ExecutionSnapshot, output fvm.ProcedureOutput) []inspection.Result {
-	ret := _mock.Called(ctx, proc, storageSnapshot, executionSnapshot, output)
-
-	if len(ret) == 0 {
-		panic("no return value specified for Inspect")
-	}
-
-	var r0 []inspection.Result
-	if returnFunc, ok := ret.Get(0).(func(fvm.Context, fvm.Procedure, snapshot.StorageSnapshot, *snapshot.ExecutionSnapshot, fvm.ProcedureOutput) []inspection.Result); ok {
-		r0 = returnFunc(ctx, proc, storageSnapshot, executionSnapshot, output)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]inspection.Result)
-		}
-	}
-	return r0
-}
-
-// VM_Inspect_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Inspect'
-type VM_Inspect_Call struct {
-	*mock.Call
-}
-
-// Inspect is a helper method to define mock.On call
-//   - ctx fvm.Context
-//   - proc fvm.Procedure
-//   - storageSnapshot snapshot.StorageSnapshot
-//   - executionSnapshot *snapshot.ExecutionSnapshot
-//   - output fvm.ProcedureOutput
-func (_e *VM_Expecter) Inspect(ctx interface{}, proc interface{}, storageSnapshot interface{}, executionSnapshot interface{}, output interface{}) *VM_Inspect_Call {
-	return &VM_Inspect_Call{Call: _e.mock.On("Inspect", ctx, proc, storageSnapshot, executionSnapshot, output)}
-}
-
-func (_c *VM_Inspect_Call) Run(run func(ctx fvm.Context, proc fvm.Procedure, storageSnapshot snapshot.StorageSnapshot, executionSnapshot *snapshot.ExecutionSnapshot, output fvm.ProcedureOutput)) *VM_Inspect_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 fvm.Context
-		if args[0] != nil {
-			arg0 = args[0].(fvm.Context)
-		}
-		var arg1 fvm.Procedure
-		if args[1] != nil {
-			arg1 = args[1].(fvm.Procedure)
-		}
-		var arg2 snapshot.StorageSnapshot
-		if args[2] != nil {
-			arg2 = args[2].(snapshot.StorageSnapshot)
-		}
-		var arg3 *snapshot.ExecutionSnapshot
-		if args[3] != nil {
-			arg3 = args[3].(*snapshot.ExecutionSnapshot)
-		}
-		var arg4 fvm.ProcedureOutput
-		if args[4] != nil {
-			arg4 = args[4].(fvm.ProcedureOutput)
-		}
-		run(
-			arg0,
-			arg1,
-			arg2,
-			arg3,
-			arg4,
-		)
-	})
-	return _c
-}
-
-func (_c *VM_Inspect_Call) Return(results []inspection.Result) *VM_Inspect_Call {
-	_c.Call.Return(results)
-	return _c
-}
-
-func (_c *VM_Inspect_Call) RunAndReturn(run func(ctx fvm.Context, proc fvm.Procedure, storageSnapshot snapshot.StorageSnapshot, executionSnapshot *snapshot.ExecutionSnapshot, output fvm.ProcedureOutput) []inspection.Result) *VM_Inspect_Call {
-	_c.Call.Return(run)
-	return _c
 }
 
 // NewExecutor provides a mock function for the type VM

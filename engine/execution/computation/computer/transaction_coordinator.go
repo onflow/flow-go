@@ -149,23 +149,10 @@ func (coordinator *transactionCoordinator) commit(txn *transaction) error {
 		return err
 	}
 
-	output := txn.Output()
-
-	// Run inspection on the transaction results.
-	// This is done here rather than in vm.Run() because the block computer
-	// uses NewExecutor for fine-grained transaction control.
-	output.InspectionResults = coordinator.vm.Inspect(
-		txn.request.ctx,
-		txn.request.TransactionProcedure,
-		coordinator.storageSnapshot,
-		executionSnapshot,
-		output,
-	)
-
 	coordinator.writeBehindLog.AddTransactionResult(
 		txn.request,
 		executionSnapshot,
-		output,
+		txn.Output(),
 		time.Since(txn.startedAt),
 		txn.numConflictRetries)
 
