@@ -352,9 +352,6 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			Return(noOpExecutor{}).
 			Once() // just system chunk
 
-		vm.On("Inspect", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
-			Return(nil)
-
 		snapshot := storehouse.NewExecutingBlockSnapshot(
 			snapshot.MapStorageSnapshot{},
 			unittest.StateCommitmentFixture(),
