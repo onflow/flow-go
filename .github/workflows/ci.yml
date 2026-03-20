@@ -219,7 +219,7 @@ jobs:
     - name: Setup tests (${{ matrix.targets.name }})
       run: VERBOSE=1 make -e GO_TEST_PACKAGES="${{ matrix.targets.packages }}" install-tools
     - name: Run tests (${{ matrix.targets.name }})
-      uses: ./.github/workflows/actions/retry
+      uses: nick-fields/retry@v4
       with:
         timeout_minutes: 35
         max_attempts: 5
@@ -265,7 +265,7 @@ jobs:
       - name: Setup tests (${{ matrix.targets.name }})
         run: VERBOSE=1 make -e GO_TEST_PACKAGES="${{ matrix.targets.packages }}" install-tools
       - name: Run tests (${{ matrix.targets.name }})
-        uses: ./.github/workflows/actions/retry
+        uses: nick-fields/retry@v4
         with:
           timeout_minutes: 35
           max_attempts: 5
@@ -372,7 +372,7 @@ jobs:
       - name: Setup tests (${{ matrix.targets.name }})
         run: VERBOSE=1 make -e GO_TEST_PACKAGES="${{ matrix.targets.packages }}" install-tools
       - name: Run tests (${{ matrix.targets.name }})
-        uses: ./.github/workflows/actions/retry
+        uses: nick-fields/retry@v4
         with:
           timeout_minutes: 35
           max_attempts: 5
@@ -481,7 +481,7 @@ jobs:
       # TODO(rbtz): re-enable when we fix exisiting races.
       #env:
       #  RACE_DETECTOR: 1
-      uses: ./.github/workflows/actions/retry
+      uses: nick-fields/retry@v4
       with:
         timeout_minutes: 35
         max_attempts: 5
