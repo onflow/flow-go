@@ -457,7 +457,7 @@ func (executor *transactionExecutor) commit(
 	// the same as a successful transaction without any updates.
 	executor.txnState.AddInvalidator(invalidator)
 
-	_, commitErr := executor.txnState.CommitNestedTransaction(
+	executionSnapshot, commitErr := executor.txnState.CommitNestedTransaction(
 		executor.nestedTxnId)
 	if commitErr != nil {
 		return fmt.Errorf(
@@ -465,7 +465,7 @@ func (executor *transactionExecutor) commit(
 			commitErr)
 	}
 
-	executor.output.PopulateInspectionResults(executor.ctx.Logger, executor.ctx, executor.env, executor.txnState, executor.executionStateRead)
+	executor.output.PopulateInspectionResults(executor.ctx.Logger, executor.ctx, executor.env, executor.txnState.BaseStorageSnapshot(), executionSnapshot)
 
 	return nil
 }
