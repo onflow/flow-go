@@ -74,7 +74,6 @@ func (output *ProcedureOutput) PopulateEnvironmentValues(
 func (output *ProcedureOutput) PopulateInspectionResults(
 	log zerolog.Logger,
 	ctx Context,
-	env environment.Environment,
 	storageSnapshot snapshot.StorageSnapshot,
 	executionSnapshot *snapshot.ExecutionSnapshot,
 ) {
