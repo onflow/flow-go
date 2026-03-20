@@ -12,7 +12,6 @@ import (
 	"testing"
 
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
-	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	mockery "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -4613,6 +4612,10 @@ func TestFlowTokenChangesInspector(t *testing.T) {
 
 					differ := inspection.NewTokenChangesInspector(tc.tokenDefinitions)
 
+					// Add the inspector to the context so inspection runs
+					// as part of the transaction execution pipeline.
+					ctx = fvm.NewContextFromParent(ctx, fvm.WithInspectors([]inspection.Inspector{differ}))
+
 					// Create an account private key.
 					privateKey, err := testutil.GenerateAccountPrivateKey()
 					require.NoError(t, err)
@@ -4628,7 +4631,7 @@ func TestFlowTokenChangesInspector(t *testing.T) {
 
 					txBody := tc.txBody(t, chain, accounts)
 
-					executionSnapshot, output, err := vm.Run(
+					_, output, err := vm.Run(
 						ctx,
 						fvm.Transaction(txBody, 0),
 						snapshotTree)
@@ -4640,14 +4643,8 @@ func TestFlowTokenChangesInspector(t *testing.T) {
 						require.NoError(t, output.Err)
 					}
 
-					evts := make([]flow.Event, 0, len(output.Events)+len(output.ServiceEvents))
-					evts = append(evts, output.Events...)
-					evts = append(evts, output.ServiceEvents...)
-
-					diff, err := differ.Inspect(zerolog.Nop(), snapshotTree, executionSnapshot, evts)
-					require.NoError(t, err)
-
-					tc.resultChecker(t, diff.(inspection.TokenDiffResult))
+					require.Len(t, output.InspectionResults, 1, "expected one inspection result")
+					tc.resultChecker(t, output.InspectionResults[0].(inspection.TokenDiffResult))
 				},
 			)
 	}

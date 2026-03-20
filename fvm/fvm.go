@@ -7,7 +7,6 @@ import (
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/common"
 	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
 
 	"github.com/onflow/flow-go/fvm/inspection"
 
@@ -72,6 +71,25 @@ func (output *ProcedureOutput) PopulateEnvironmentValues(
 	return nil
 }
 
+func (output *ProcedureOutput) PopulateInspectionResults(
+	log zerolog.Logger,
+	ctx Context,
+	env environment.Environment,
+	storageSnapshot snapshot.StorageSnapshot,
+	executionSnapshot *snapshot.ExecutionSnapshot,
+) {
+
+	evts := make([]flow.Event, 0, len(output.Events)+len(output.ServiceEvents))
+	evts = append(evts, output.Events...)
+	evts = append(evts, output.ServiceEvents...)
+
+	log.Debug().Str("module", "tc-inspector").
+		Int("inspectors", len(ctx.Inspectors)).
+		Msg("populating environment values for procedure output")
+	inspectionResults := inspectProcedureResults(log, ctx, storageSnapshot, executionSnapshot, evts)
+	output.InspectionResults = inspectionResults
+}
+
 type ProcedureExecutor interface {
 	Preprocess() error
 	Execute() error
@@ -124,17 +142,6 @@ type VM interface {
 		ProcedureOutput,
 		error,
 	)
-
-	// Inspect runs configured inspectors on the procedure results.
-	// This is used by the block computer which manages transaction execution
-	// manually via NewExecutor rather than using Run.
-	Inspect(
-		ctx Context,
-		proc Procedure,
-		storageSnapshot snapshot.StorageSnapshot,
-		executionSnapshot *snapshot.ExecutionSnapshot,
-		output ProcedureOutput,
-	) []inspection.Result
 }
 
 var _ VM = (*VirtualMachine)(nil)
@@ -214,56 +221,22 @@ func (vm *VirtualMachine) Run(
 		return nil, ProcedureOutput{}, err
 	}
 
-	// This is of informative nature right now so this placement is ok
-	// In the future we will need to move this inside the procedure if we want it to affect execution
-	output := executor.Output()
-	log.Debug().Str("module", "tc-inspector").
-		Str("procedure-type", string(proc.Type())).
-		Int("inspectors", len(ctx.Inspectors)).
-		Msg("populating environment values for procedure output")
-	inspectionResults := vm.inspectProcedureResults(ctx.Logger, ctx, proc, storageSnapshot, executionSnapshot, output)
-	output.InspectionResults = inspectionResults
-
-	return executionSnapshot, output, nil
+	return executionSnapshot, executor.Output(), nil
 }
 
-// Inspect runs configured inspectors on the procedure results.
-// This is used by the block computer which manages transaction execution
-// manually via NewExecutor rather than using Run.
-func (vm *VirtualMachine) Inspect(
-	ctx Context,
-	proc Procedure,
-	storageSnapshot snapshot.StorageSnapshot,
-	executionSnapshot *snapshot.ExecutionSnapshot,
-	output ProcedureOutput,
-) []inspection.Result {
-	return vm.inspectProcedureResults(ctx.Logger, ctx, proc, storageSnapshot, executionSnapshot, output)
-}
-
-func (vm *VirtualMachine) inspectProcedureResults(
+func inspectProcedureResults(
 	logger zerolog.Logger,
 	context Context,
-	proc Procedure,
 	storageSnapshot snapshot.StorageSnapshot,
 	executionSnapshot *snapshot.ExecutionSnapshot,
-	output ProcedureOutput,
+	events []flow.Event,
 ) []inspection.Result {
-	// TODO(janezp): this should be decided by the inspector
-	if proc.Type() != TransactionProcedureType {
-		logger.Debug().Str("module", "tc-inspector").Msg("skipping inspection for non-transaction procedure")
-		return nil
-	}
-
-	// TODO(janezp): inspector should be able to receive ProcedureOutput directly
-	evts := make([]flow.Event, 0, len(output.Events)+len(output.ServiceEvents))
-	evts = append(evts, output.Events...)
-	evts = append(evts, output.ServiceEvents...)
-
 	inspectionResults := make([]inspection.Result, len(context.Inspectors))
 	logger.Debug().Str("module", "tc-inspector").Int("num_inspectors", len(context.Inspectors)).Msg("inspecting procedure results")
 	var err error
 	for i, inspector := range context.Inspectors {
-		inspectionResults[i], err = inspector.Inspect(logger, storageSnapshot, executionSnapshot, evts)
+		// TODO(janezp): inspector should be able to receive ProcedureOutput directly
+		inspectionResults[i], err = inspector.Inspect(logger, storageSnapshot, executionSnapshot, events)
 		if err != nil {
 			logger.Warn().Str("module", "tc-inspector").Err(err).Msg("failed to inspect procedure results")
 		}
