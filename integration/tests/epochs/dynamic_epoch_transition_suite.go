@@ -528,7 +528,7 @@ func (s *DynamicEpochTransitionSuite) RunTestEpochJoinAndLeave(role flow.Role, c
 		segment.Sealed().View, segment.Highest().View)
 
 	testContainer.WriteRootSnapshot(rootSnapshot)
-	testContainer.Container.Start(s.Ctx)
+	require.NoError(s.T(), testContainer.Container.Start(s.Ctx))
 
 	epoch1, err := rootSnapshot.Epochs().Current()
 	require.NoError(s.T(), err)
