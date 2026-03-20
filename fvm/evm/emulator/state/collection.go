@@ -328,6 +328,14 @@ func (v ByteStringValue) Bytes() []byte {
 	return v.data
 }
 
+func (ByteStringValue) CanCopyNonRefSimple() bool {
+	return true
+}
+
+func (v ByteStringValue) CopyNonRefSimple() (atree.Storable, error) {
+	return v, nil
+}
+
 func decodeStorable(dec *cbor.StreamDecoder, slabID atree.SlabID, inlinedExtraData []atree.ExtraData) (atree.Storable, error) {
 	t, err := dec.NextType()
 	if err != nil {
