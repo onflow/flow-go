@@ -11,6 +11,8 @@ import (
 
 	"github.com/onflow/flow-go/fvm/environment"
 	fvmErrors "github.com/onflow/flow-go/fvm/errors"
+	"github.com/onflow/flow-go/fvm/evm"
+	"github.com/onflow/flow-go/fvm/evm/emulator/state"
 	"github.com/onflow/flow-go/fvm/evm/events"
 	"github.com/onflow/flow-go/fvm/evm/handler/coa"
 	"github.com/onflow/flow-go/fvm/evm/types"
@@ -69,6 +71,65 @@ func (h *ContractHandler) FlowTokenAddress() common.Address {
 // EVMContractAddress returns the address where EVM contract is deployed
 func (h *ContractHandler) EVMContractAddress() common.Address {
 	return common.Address(h.evmContractAddress)
+}
+
+func (h *ContractHandler) validateTestOperation() {
+	if !h.backend.EVMTestOperationsAllowed() {
+		panicOnError(types.ErrUnsupportedOperation)
+	}
+}
+
+// SetState sets a value for the given storage slot.
+// It returns the previous value in any case.
+// The operation is only allowed for testing purposes.
+func (h *ContractHandler) SetState(
+	address types.Address,
+	slot gethCommon.Hash,
+	value gethCommon.Hash,
+) gethCommon.Hash {
+
+	h.validateTestOperation()
+
+	execState, err := state.NewStateDB(h.backend, evm.StorageAccountAddress(h.flowChainID))
+	panicOnError(err)
+
+	prevValue := execState.SetState(address.ToCommon(), slot, value)
+	_, err = execState.Commit(true)
+	panicOnError(err)
+
+	return prevValue
+}
+
+// GetState returns the value for the given storage slot.
+// The operation is only allowed for testing purposes.
+func (h *ContractHandler) GetState(
+	address types.Address,
+	slot gethCommon.Hash,
+) gethCommon.Hash {
+
+	h.validateTestOperation()
+
+	execState, err := state.NewStateDB(h.backend, evm.StorageAccountAddress(h.flowChainID))
+	panicOnError(err)
+
+	return execState.GetState(address.ToCommon(), slot)
+}
+
+// RunTxAs runs a transaction by setting the call's `msg.sender`
+// to be the `from` address.
+// The operation is only allowed for testing purposes.
+func (h *ContractHandler) RunTxAs(
+	from types.Address,
+	to types.Address,
+	txData types.Data,
+	gasLimit types.GasLimit,
+	balance types.Balance,
+) *types.ResultSummary {
+
+	h.validateTestOperation()
+
+	account := h.AccountByAddress(from, true)
+	return account.Call(to, txData, gasLimit, balance)
 }
 
 // DeployCOA deploys a cadence-owned-account and returns the address
@@ -476,6 +537,19 @@ func (h *ContractHandler) dryRun(
 		return nil, err
 	}
 
+	return h.dryRunTx(&tx, from)
+}
+
+func (h *ContractHandler) dryRunTx(
+	tx *gethTypes.Transaction,
+	from types.Address,
+) (*types.Result, error) {
+	// check if enough computation is available
+	err := h.checkGasLimit(types.GasLimit(tx.Gas()))
+	if err != nil {
+		return nil, err
+	}
+
 	bp, err := h.getBlockProposal()
 	if err != nil {
 		return nil, err
@@ -490,7 +564,13 @@ func (h *ContractHandler) dryRun(
 		return nil, err
 	}
 
-	res, err := blk.DryRunTransaction(&tx, from.ToCommon())
+	var res *types.Result
+	// just like with EVM.run / EVM.batchRun / COA.call, we disable metering
+	// so we can fully meter the gas usage in the next step, even in case
+	// of unhandled errors/exceptions.
+	h.backend.RunWithMeteringDisabled(func() {
+		res, err = blk.DryRunTransaction(tx, from.ToCommon())
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -498,7 +578,33 @@ func (h *ContractHandler) dryRun(
 		return nil, types.ErrUnexpectedEmptyResult
 	}
 
+	// gas meter even invalid or failed status
+	if err = h.meterGasUsage(res); err != nil {
+		return nil, err
+	}
+
 	return res, nil
+}
+
+// DryRunWithTxData simulates execution of the provided transaction data.
+// The from address is required since the transaction is unsigned.
+// The function should not have any persisted changes made to the state.
+func (h *ContractHandler) DryRunWithTxData(
+	txData gethTypes.TxData,
+	from types.Address,
+) *types.ResultSummary {
+	if txData == nil {
+		panicOnError(types.ErrUnexpectedEmptyTransactionData)
+	}
+
+	defer h.backend.StartChildSpan(trace.FVMEVMDryRun).End()
+
+	tx := gethTypes.NewTx(txData)
+
+	res, err := h.dryRunTx(tx, from)
+	panicOnError(err)
+
+	return res.ResultSummary()
 }
 
 // checkGasLimit checks if enough computation is left in the environment
@@ -709,16 +815,7 @@ func (a *Account) Nonce() uint64 {
 }
 
 func (a *Account) nonce() (uint64, error) {
-	bp, err := a.fch.getBlockProposal()
-	if err != nil {
-		return 0, err
-	}
-	ctx, err := a.fch.getBlockContext(bp)
-	if err != nil {
-		return 0, err
-	}
-
-	blk, err := a.fch.emulator.NewReadOnlyBlockView(ctx)
+	blk, err := a.fch.emulator.NewReadOnlyBlockView()
 	if err != nil {
 		return 0, err
 	}
@@ -737,17 +834,7 @@ func (a *Account) Balance() types.Balance {
 }
 
 func (a *Account) balance() (types.Balance, error) {
-	bp, err := a.fch.getBlockProposal()
-	if err != nil {
-		return nil, err
-	}
-
-	ctx, err := a.fch.getBlockContext(bp)
-	if err != nil {
-		return nil, err
-	}
-
-	blk, err := a.fch.emulator.NewReadOnlyBlockView(ctx)
+	blk, err := a.fch.emulator.NewReadOnlyBlockView()
 	if err != nil {
 		return nil, err
 	}
@@ -767,17 +854,7 @@ func (a *Account) Code() types.Code {
 }
 
 func (a *Account) code() (types.Code, error) {
-	bp, err := a.fch.getBlockProposal()
-	if err != nil {
-		return nil, err
-	}
-
-	ctx, err := a.fch.getBlockContext(bp)
-	if err != nil {
-		return nil, err
-	}
-
-	blk, err := a.fch.emulator.NewReadOnlyBlockView(ctx)
+	blk, err := a.fch.emulator.NewReadOnlyBlockView()
 	if err != nil {
 		return nil, err
 	}
@@ -795,17 +872,7 @@ func (a *Account) CodeHash() []byte {
 }
 
 func (a *Account) codeHash() ([]byte, error) {
-	bp, err := a.fch.getBlockProposal()
-	if err != nil {
-		return nil, err
-	}
-
-	ctx, err := a.fch.getBlockContext(bp)
-	if err != nil {
-		return nil, err
-	}
-
-	blk, err := a.fch.emulator.NewReadOnlyBlockView(ctx)
+	blk, err := a.fch.emulator.NewReadOnlyBlockView()
 	if err != nil {
 		return nil, err
 	}

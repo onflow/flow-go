@@ -6,6 +6,22 @@ import (
 	"github.com/onflow/flow-go/fvm/evm/types"
 )
 
+// The Cadence Arch precompiled contract that is injected in the EVM environment,
+// implements the following functions:
+// - `flowBlockHeight()`
+// - `revertibleRandom()`
+// - `getRandomSource(uint64)`
+// - `verifyCOAOwnershipProof(address,bytes32,bytes)`
+//
+// By design, all errors that are the result of user input, will be propagated
+// in the EVM environment, and can be handled by developers, as they see fit.
+// However, all FVM fatal errors, will cause a panic and abort the outer Cadence
+// transaction. The reason behind this is that we want to have visibility when
+// such special errors occur. This way, any potential bugs will not go unnoticed.
+// The Cadence runtime recovers any Go crashers (index out of bounds, nil
+// dereferences, etc.) and fails the transaction gracefully, so a panic in the
+// precompiled contract does not indicate a node/runtime crash.
+
 const CADENCE_ARCH_PRECOMPILE_NAME = "CADENCE_ARCH"
 
 var (

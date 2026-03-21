@@ -146,7 +146,7 @@ func TestTimestampedSnapshotTree(t *testing.T) {
 	_, err = tree4.UpdatesSince(baseSnapshotTime - 1)
 	require.ErrorContains(t, err, "missing update log range [4, 5)")
 
-	for i := 0; i < 5; i++ {
+	for i := range 5 {
 		updates, err = tree4.UpdatesSince(baseSnapshotTime + logical.Time(i))
 		require.NoError(t, err)
 		require.Equal(t, logs[i:], updates)

@@ -26,7 +26,7 @@ func NewTransactionBasedMigration(
 			fvm.WithAuthorizationChecksEnabled(false),
 			fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
 			fvm.WithTransactionFeesEnabled(false))
-		ctx := fvm.NewContext(options...)
+		ctx := fvm.NewContext(chainID.Chain(), options...)
 
 		storageSnapshot := registers.StorageSnapshot{
 			Registers: registersByAccount,

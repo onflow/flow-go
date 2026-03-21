@@ -141,7 +141,7 @@ func getTestContract(
 	error,
 ) {
 	env := environment.NewScriptEnvironmentFromStorageSnapshot(
-		environment.DefaultEnvironmentParams(),
+		fvm.DefaultEnvironmentParams(flow.Mainnet.Chain()),
 		snapshot)
 	return env.GetAccountContractCode(location)
 }
@@ -155,11 +155,13 @@ func Test_Programs(t *testing.T) {
 	mainSnapshot := setupProgramsTest(t)
 
 	context := fvm.NewContext(
+		flow.Mainnet.Chain(),
 		fvm.WithContractDeploymentRestricted(false),
 		fvm.WithAuthorizationChecksEnabled(false),
 		fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
 		fvm.WithCadenceLogging(true),
-		fvm.WithDerivedBlockData(derivedBlockData))
+		fvm.WithDerivedBlockData(derivedBlockData),
+	)
 
 	var contractASnapshot *snapshot.ExecutionSnapshot
 	var contractBSnapshot *snapshot.ExecutionSnapshot
@@ -635,12 +637,14 @@ func Test_ProgramsDoubleCounting(t *testing.T) {
 
 	metrics := &metricsReporter{}
 	context := fvm.NewContext(
+		flow.Mainnet.Chain(),
 		fvm.WithContractDeploymentRestricted(false),
 		fvm.WithAuthorizationChecksEnabled(false),
 		fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
 		fvm.WithCadenceLogging(true),
 		fvm.WithDerivedBlockData(derivedBlockData),
-		fvm.WithMetricsReporter(metrics))
+		fvm.WithMetricsReporter(metrics),
+	)
 
 	t.Run("deploy contracts and ensure cache is empty", func(t *testing.T) {
 		// deploy contract A

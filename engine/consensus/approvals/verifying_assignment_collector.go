@@ -387,6 +387,14 @@ func (ac *VerifyingAssignmentCollector) RequestMissingApprovals(observation cons
 	return overallRequestCount, nil
 }
 
+// ColectorsLen returns the number of collectors.
+// This is currently only used in tests
+func (ac *VerifyingAssignmentCollector) ColectorsLen() int {
+	ac.lock.RLock()
+	defer ac.lock.RUnlock()
+	return len(ac.collectors)
+}
+
 // authorizedVerifiersAtBlock pre-select all authorized Verifiers at the block that incorporates the result.
 // The method returns the set of all node IDs that:
 //   - are authorized members of the network at the given block and

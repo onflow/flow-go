@@ -33,10 +33,6 @@ UNAME := $(shell uname)
 # Used when building within docker
 GOARCH := $(shell go env GOARCH)
 
-# The location of the k8s YAML files
-K8S_YAMLS_LOCATION_STAGING=./k8s/staging
-
-
 # docker container registry
 export CONTAINER_REGISTRY := gcr.io/flow-container-registry
 export DOCKER_BUILDKIT := 1
@@ -77,7 +73,7 @@ unittest-main:
 .PHONY: install-mock-generators
 install-mock-generators:
 	cd ${GOPATH}; \
-    go install github.com/vektra/mockery/v2@v2.53.5;
+    go install github.com/vektra/mockery/v3@v3.6.1;
 
 .PHONY: install-tools
 install-tools: check-go-version install-mock-generators
@@ -105,8 +101,15 @@ go-math-rand-check:
        echo "[Error] Go production code should not use math/rand package"; exit 1; \
     fi
 
+.SILENT: go-fix
+go-fix:
+	# fix go code style issues
+	go fix ./...
+	git diff --exit-code
+
+
 .PHONY: code-sanity-check
-code-sanity-check: go-math-rand-check
+code-sanity-check: go-fix go-math-rand-check
 
 .PHONY: fuzz-fvm
 fuzz-fvm:
@@ -145,7 +148,7 @@ generate: generate-proto generate-mocks generate-fvm-env-wrappers
 
 .PHONY: generate-proto
 generate-proto:
-	prototool generate protobuf
+	cd ledger/protobuf && buf generate
 
 .PHONY: generate-fvm-env-wrappers
 generate-fvm-env-wrappers:
@@ -153,8 +156,7 @@ generate-fvm-env-wrappers:
 
 .PHONY: generate-mocks
 generate-mocks: install-mock-generators
-	mockery --config .mockery.yaml
-	cd insecure; mockery --config .mockery.yaml
+	mockery --config .mockery.yaml --log-level warn
 
 # this ensures there is no unused dependency being added by accident
 .PHONY: tidy
@@ -167,11 +169,10 @@ tidy:
 
 # Builds a custom version of the golangci-lint binary which includes custom plugins
 tools/custom-gcl: tools/structwrite .custom-gcl.yml
-	golangci-lint custom
+	$(shell go env GOPATH)/bin/golangci-lint custom
 
 .PHONY: lint
 lint: tools/custom-gcl
-	# revive -config revive.toml -exclude storage/ledger/trie ./...
 	./tools/custom-gcl run -v $(or $(LINT_PATH),./...)
 
 .PHONY: lint-new
@@ -180,7 +181,6 @@ lint-new: tools/custom-gcl
 
 .PHONY: fix-lint
 fix-lint: tools/custom-gcl
-	# revive -config revive.toml -exclude storage/ledger/trie ./...
 	./tools/custom-gcl run -v --fix $(or $(LINT_PATH),./...)
 
 .PHONY: fix-lint-new
@@ -373,6 +373,42 @@ docker-cross-build-execution-arm:
 		--label "git_commit=${COMMIT}" --label "git_tag=${IMAGE_TAG_ARM}" \
 		-t "$(CONTAINER_REGISTRY)/execution:$(IMAGE_TAG_ARM)" .
 
+.PHONY: docker-build-execution-ledger-with-adx
+docker-build-execution-ledger-with-adx:
+	docker build -f cmd/Dockerfile --build-arg TARGET=./cmd/ledger --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(IMAGE_TAG) --build-arg GOARCH=amd64 --target production \
+		--secret id=cadence_deploy_key,env=CADENCE_DEPLOY_KEY --build-arg GOPRIVATE=$(GOPRIVATE) \
+		--label "git_commit=${COMMIT}" --label "git_tag=$(IMAGE_TAG)" \
+		-t "$(CONTAINER_REGISTRY)/execution-ledger:$(IMAGE_TAG)" .
+
+.PHONY: docker-build-execution-ledger-without-adx
+docker-build-execution-ledger-without-adx:
+	docker build -f cmd/Dockerfile --build-arg TARGET=./cmd/ledger --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(IMAGE_TAG_NO_ADX) --build-arg GOARCH=amd64 --build-arg CGO_FLAG=$(DISABLE_ADX) --target production \
+		--secret id=cadence_deploy_key,env=CADENCE_DEPLOY_KEY --build-arg GOPRIVATE=$(GOPRIVATE) \
+		--label "git_commit=${COMMIT}" --label "git_tag=$(IMAGE_TAG_NO_ADX)" \
+		-t "$(CONTAINER_REGISTRY)/execution-ledger:$(IMAGE_TAG_NO_ADX)" .
+
+.PHONY: docker-build-execution-ledger-without-netgo-without-adx
+docker-build-execution-ledger-without-netgo-without-adx:
+	docker build -f cmd/Dockerfile --build-arg TARGET=./cmd/ledger --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(IMAGE_TAG_NO_NETGO_NO_ADX) --build-arg GOARCH=amd64 --build-arg TAGS="" --build-arg CGO_FLAG=$(DISABLE_ADX) --target production \
+		--secret id=cadence_deploy_key,env=CADENCE_DEPLOY_KEY --build-arg GOPRIVATE=$(GOPRIVATE) \
+		--label "git_commit=${COMMIT}" --label "git_tag=$(IMAGE_TAG_NO_NETGO_NO_ADX)" \
+		-t "$(CONTAINER_REGISTRY)/execution-ledger:$(IMAGE_TAG_NO_NETGO_NO_ADX)" .
+
+.PHONY: docker-cross-build-execution-ledger-arm
+docker-cross-build-execution-ledger-arm:
+	docker build -f cmd/Dockerfile  --build-arg TARGET=./cmd/ledger --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(IMAGE_TAG_ARM) --build-arg GOARCH=arm64 --build-arg CC=aarch64-linux-gnu-gcc --target production \
+		--secret id=cadence_deploy_key,env=CADENCE_DEPLOY_KEY --build-arg GOPRIVATE=$(GOPRIVATE) \
+		--label "git_commit=${COMMIT}" --label "git_tag=${IMAGE_TAG_ARM}" \
+		-t "$(CONTAINER_REGISTRY)/execution-ledger:$(IMAGE_TAG_ARM)" .
+
+.PHONY: docker-native-build-execution-ledger
+docker-native-build-execution-ledger:
+	docker build -f cmd/Dockerfile --build-arg TARGET=./cmd/ledger --build-arg COMMIT=$(COMMIT) --build-arg VERSION=$(IMAGE_TAG) --build-arg GOARCH=$(GOARCH) --build-arg CGO_FLAG=$(CRYPTO_FLAG) --target production \
+		--secret id=cadence_deploy_key,env=CADENCE_DEPLOY_KEY --build-arg GOPRIVATE=$(GOPRIVATE) \
+		--label "git_commit=${COMMIT}" --label "git_tag=${IMAGE_TAG}" \
+		-t "$(CONTAINER_REGISTRY)/execution-ledger:latest" \
+		-t "$(CONTAINER_REGISTRY)/execution-ledger:$(IMAGE_TAG)" .
+
 .PHONY: docker-native-build-execution-debug
 docker-native-build-execution-debug:
 	docker build -f cmd/Dockerfile  --build-arg TARGET=./cmd/execution --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(IMAGE_TAG) --build-arg GOARCH=$(GOARCH) --build-arg CGO_FLAG=$(CRYPTO_FLAG) --target debug \
@@ -560,7 +596,7 @@ docker-native-build-ghost-debug:
 		-t "$(CONTAINER_REGISTRY)/ghost-debug:latest" \
 		-t "$(CONTAINER_REGISTRY)/ghost-debug:$(IMAGE_TAG)" .
 
-PHONY: docker-build-bootstrap
+.PHONY: docker-build-bootstrap
 docker-build-bootstrap:
 	docker build -f cmd/Dockerfile  --build-arg TARGET=./cmd/bootstrap --build-arg GOARCH=$(GOARCH) --build-arg VERSION=$(IMAGE_TAG) --build-arg CGO_FLAG=$(CRYPTO_FLAG) --target production \
 		--secret id=cadence_deploy_key,env=CADENCE_DEPLOY_KEY \
@@ -592,7 +628,7 @@ docker-native-build-loader:
 		-t "$(CONTAINER_REGISTRY)/loader:$(IMAGE_TAG)" .
 
 .PHONY: docker-native-build-flow
-docker-native-build-flow: docker-native-build-collection docker-native-build-consensus docker-native-build-execution docker-native-build-verification docker-native-build-access docker-native-build-observer docker-native-build-ghost
+docker-native-build-flow: docker-native-build-collection docker-native-build-consensus docker-native-build-execution docker-native-build-execution-ledger docker-native-build-verification docker-native-build-access docker-native-build-observer docker-native-build-ghost
 
 .PHONY: docker-build-flow-with-adx
 docker-build-flow-with-adx: docker-build-collection-with-adx docker-build-consensus-with-adx docker-build-execution-with-adx docker-build-verification-with-adx docker-build-access-with-adx docker-build-observer-with-adx
@@ -677,6 +713,22 @@ docker-push-execution-arm:
 .PHONY: docker-push-execution-latest
 docker-push-execution-latest: docker-push-execution
 	docker push "$(CONTAINER_REGISTRY)/execution:latest"
+
+.PHONY: docker-push-execution-ledger-with-adx
+docker-push-execution-ledger-with-adx:
+	docker push "$(CONTAINER_REGISTRY)/execution-ledger:$(IMAGE_TAG)"
+
+.PHONY: docker-push-execution-ledger-without-adx
+docker-push-execution-ledger-without-adx:
+	docker push "$(CONTAINER_REGISTRY)/execution-ledger:$(IMAGE_TAG_NO_ADX)"
+
+.PHONY: docker-push-execution-ledger-without-netgo-without-adx
+docker-push-execution-ledger-without-netgo-without-adx:
+	docker push "$(CONTAINER_REGISTRY)/execution-ledger:$(IMAGE_TAG_NO_NETGO_NO_ADX)"
+
+.PHONY: docker-push-execution-ledger-arm
+docker-push-execution-ledger-arm:
+	docker push "$(CONTAINER_REGISTRY)/execution-ledger:$(IMAGE_TAG_ARM)"
 
 .PHONY: docker-push-verification-with-adx
 docker-push-verification-with-adx:
@@ -850,39 +902,3 @@ check-go-version:
 			exit 1; \
 		fi; \
 		'
-
-#----------------------------------------------------------------------
-# CD COMMANDS
-#----------------------------------------------------------------------
-
-.PHONY: deploy-staging
-deploy-staging: update-deployment-image-name-staging apply-staging-files monitor-rollout
-
-# Staging YAMLs must have 'staging' in their name.
-.PHONY: apply-staging-files
-apply-staging-files:
-	kconfig=$$(uuidgen); \
-	echo "$$KUBECONFIG_STAGING" > $$kconfig; \
-	files=$$(find ${K8S_YAMLS_LOCATION_STAGING} -type f \( --name "*.yml" -or --name "*.yaml" \)); \
-	echo "$$files" | xargs -I {} kubectl --kubeconfig=$$kconfig apply -f {}
-
-# Deployment YAMLs must have 'deployment' in their name.
-.PHONY: update-deployment-image-name-staging
-update-deployment-image-name-staging: CONTAINER=flow-test-net
-update-deployment-image-name-staging:
-	@files=$$(find ${K8S_YAMLS_LOCATION_STAGING} -type f \( --name "*.yml" -or --name "*.yaml" \) | grep deployment); \
-	for file in $$files; do \
-		patched=`openssl rand -hex 8`; \
-		node=`echo "$$file" | grep -oP 'flow-\K\w+(?=-node-deployment.yml)'`; \
-		kubectl patch -f $$file -p '{"spec":{"template":{"spec":{"containers":[{"name":"${CONTAINER}","image":"$(CONTAINER_REGISTRY)/'"$$node"':${IMAGE_TAG}"}]}}}}`' --local -o yaml > $$patched; \
-		mv -f $$patched $$file; \
-	done
-
-.PHONY: monitor-rollout
-monitor-rollout:
-	kconfig=$$(uuidgen); \
-	echo "$$KUBECONFIG_STAGING" > $$kconfig; \
-	kubectl --kubeconfig=$$kconfig rollout status statefulsets.apps flow-collection-node-v1; \
-	kubectl --kubeconfig=$$kconfig rollout status statefulsets.apps flow-consensus-node-v1; \
-	kubectl --kubeconfig=$$kconfig rollout status statefulsets.apps flow-execution-node-v1; \
-	kubectl --kubeconfig=$$kconfig rollout status statefulsets.apps flow-verification-node-v1

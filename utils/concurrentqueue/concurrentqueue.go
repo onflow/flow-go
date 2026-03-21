@@ -19,21 +19,21 @@ func (s *ConcurrentQueue) Len() int {
 	return s.q.Len()
 }
 
-func (s *ConcurrentQueue) Push(v interface{}) {
+func (s *ConcurrentQueue) Push(v any) {
 	s.m.Lock()
 	defer s.m.Unlock()
 
 	s.q.PushBack(v)
 }
 
-func (s *ConcurrentQueue) Pop() (interface{}, bool) {
+func (s *ConcurrentQueue) Pop() (any, bool) {
 	s.m.Lock()
 	defer s.m.Unlock()
 
 	return s.q.PopFront()
 }
 
-func (s *ConcurrentQueue) PopBatch(batchSize int) ([]interface{}, bool) {
+func (s *ConcurrentQueue) PopBatch(batchSize int) ([]any, bool) {
 	s.m.Lock()
 	defer s.m.Unlock()
 
@@ -46,7 +46,7 @@ func (s *ConcurrentQueue) PopBatch(batchSize int) ([]interface{}, bool) {
 		count = batchSize
 	}
 
-	result := make([]interface{}, count)
+	result := make([]any, count)
 	for i := 0; i < count; i++ {
 		v, _ := s.q.PopFront()
 		result[i] = v
@@ -55,7 +55,7 @@ func (s *ConcurrentQueue) PopBatch(batchSize int) ([]interface{}, bool) {
 	return result, true
 }
 
-func (s *ConcurrentQueue) Front() (interface{}, bool) {
+func (s *ConcurrentQueue) Front() (any, bool) {
 	s.m.Lock()
 	defer s.m.Unlock()
 

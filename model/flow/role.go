@@ -2,6 +2,7 @@ package flow
 
 import (
 	"fmt"
+	"slices"
 	"sort"
 
 	"github.com/pkg/errors"
@@ -78,12 +79,7 @@ type RoleList []Role
 
 // Contains returns true if RoleList contains the role, otherwise false.
 func (r RoleList) Contains(role Role) bool {
-	for _, each := range r {
-		if each == role {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(r, role)
 }
 
 // Union returns a new role list containing every role that occurs in

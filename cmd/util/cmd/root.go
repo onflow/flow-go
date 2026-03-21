@@ -21,7 +21,6 @@ import (
 	debug_script "github.com/onflow/flow-go/cmd/util/cmd/debug-script"
 	debug_tx "github.com/onflow/flow-go/cmd/util/cmd/debug-tx"
 	diff_states "github.com/onflow/flow-go/cmd/util/cmd/diff-states"
-	"github.com/onflow/flow-go/cmd/util/cmd/diffkeys"
 	epochs "github.com/onflow/flow-go/cmd/util/cmd/epochs/cmd"
 	export "github.com/onflow/flow-go/cmd/util/cmd/exec-data-json-export"
 	edbs "github.com/onflow/flow-go/cmd/util/cmd/execution-data-blobstore/cmd"
@@ -39,9 +38,11 @@ import (
 	read_execution_state "github.com/onflow/flow-go/cmd/util/cmd/read-execution-state"
 	read_hotstuff "github.com/onflow/flow-go/cmd/util/cmd/read-hotstuff/cmd"
 	read_protocol_state "github.com/onflow/flow-go/cmd/util/cmd/read-protocol-state/cmd"
+	remove_execution_fork "github.com/onflow/flow-go/cmd/util/cmd/remove-execution-fork/cmd"
 	rollback_executed_height "github.com/onflow/flow-go/cmd/util/cmd/rollback-executed-height/cmd"
 	run_script "github.com/onflow/flow-go/cmd/util/cmd/run-script"
 	"github.com/onflow/flow-go/cmd/util/cmd/snapshot"
+	storehouse_checkpoint_validator "github.com/onflow/flow-go/cmd/util/cmd/storehouse-checkpoint-validator"
 	system_addresses "github.com/onflow/flow-go/cmd/util/cmd/system-addresses"
 	verify_evm_offchain_replay "github.com/onflow/flow-go/cmd/util/cmd/verify-evm-offchain-replay"
 	verify_execution_result "github.com/onflow/flow-go/cmd/util/cmd/verify_execution_result"
@@ -133,7 +134,8 @@ func addCommands() {
 	rootCmd.AddCommand(verify_evm_offchain_replay.Cmd)
 	rootCmd.AddCommand(pebble_checkpoint.Cmd)
 	rootCmd.AddCommand(db_migration.Cmd)
-	rootCmd.AddCommand(diffkeys.Cmd)
+	rootCmd.AddCommand(storehouse_checkpoint_validator.Cmd)
+	rootCmd.AddCommand(remove_execution_fork.RootCmd)
 }
 
 func initConfig() {

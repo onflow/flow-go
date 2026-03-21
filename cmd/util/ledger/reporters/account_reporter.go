@@ -143,7 +143,7 @@ func NewBalanceReporter(
 ) *balanceProcessor {
 	vm := fvm.NewVirtualMachine()
 	ctx := fvm.NewContext(
-		fvm.WithChain(chain),
+		chain,
 		fvm.WithMemoryAndInteractionLimitsDisabled())
 
 	env := environment.NewScriptEnvironmentFromStorageSnapshot(

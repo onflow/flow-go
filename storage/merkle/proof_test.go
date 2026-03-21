@@ -151,7 +151,7 @@ func TestProofsWithRandomKeys(t *testing.T) {
 	// generate the desired number of keys and map a value to each key
 	keys := make([][]byte, 0, numberOfInsertions)
 	vals := make(map[string][]byte)
-	for i := 0; i < numberOfInsertions; i++ {
+	for range numberOfInsertions {
 		key, val := randomKeyValuePair(32, 128)
 		keys = append(keys, key)
 		vals[string(key)] = val

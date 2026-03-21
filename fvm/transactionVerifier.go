@@ -37,13 +37,13 @@ type signatureContinuation struct {
 	// signatureEntry is the initial input.
 	signatureEntry
 
-	// accountKey is set by getAccountKeys().
+	// accountKey is set by getAccountKeysAndAggregateWeights().
 	accountKey flow.RuntimeAccountPublicKey
 
-	// invokedVerify and verifyErr are set by verifyAccountSignatures().  Note
-	// that	verifyAccountSignatures() is always called after getAccountKeys()
+	// invokedVerify and verifyErr are set by verifySignatures().  Note
+	// that	verifySignatures() is always called after getAccountKeysAndAggregateWeights()
 	// (i.e., accountKey is always initialized by the time
-	// verifyAccountSignatures is called).
+	// verifySignatures is called).
 	invokedVerify bool
 	verifyErr     errors.CodedError
 }
@@ -69,6 +69,7 @@ func (entry *signatureContinuation) verify() errors.CodedError {
 	valid, message := entry.ValidateExtensionDataAndReconstructMessage(entry.payload)
 	if !valid {
 		entry.verifyErr = entry.newError(fmt.Errorf("signature extension data is not valid"))
+		return entry.verifyErr
 	}
 
 	valid, err := crypto.VerifySignatureFromTransaction(
@@ -86,19 +87,27 @@ func (entry *signatureContinuation) verify() errors.CodedError {
 	return entry.verifyErr
 }
 
-func newSignatureEntries(
-	payloadSignatures []flow.TransactionSignature,
-	payloadMessage []byte,
-	envelopeSignatures []flow.TransactionSignature,
-	envelopeMessage []byte,
-) (
+// newSignatureEntries creates a list of signatureContinuation entries and deduplicate signatures
+// per account key.
+// The function returns an error if:
+// - there are duplicate signatures for the same account key (address and key index pair)
+// - a signature is provided for an account that is not a payer, proposer or authorizer
+func newSignatureEntries(tx *flow.TransactionBody) (
 	[]*signatureContinuation,
 	map[flow.Address]int,
 	map[flow.Address]int,
 	error,
 ) {
-	payloadWeights := make(map[flow.Address]int, len(payloadSignatures))
-	envelopeWeights := make(map[flow.Address]int, len(envelopeSignatures))
+	transactionAddresses := make(map[flow.Address]struct{})
+	transactionAddresses[tx.Payer] = struct{}{}
+	transactionAddresses[tx.ProposalKey.Address] = struct{}{}
+	for _, addr := range tx.Authorizers {
+		transactionAddresses[addr] = struct{}{}
+	}
+
+	// weight maps are assigned to entries in this function, but are returned as empty maps
+	payloadWeights := make(map[flow.Address]int, len(tx.PayloadSignatures))
+	envelopeWeights := make(map[flow.Address]int, len(tx.EnvelopeSignatures))
 
 	type pair struct {
 		signatureType
@@ -108,24 +117,24 @@ func newSignatureEntries(
 	list := []pair{
 		{
 			signatureType{
-				payloadMessage,
+				tx.PayloadMessage(),
 				errors.NewInvalidPayloadSignatureError,
 				payloadWeights,
 			},
-			payloadSignatures,
+			tx.PayloadSignatures,
 		},
 		{
 			signatureType{
-				envelopeMessage,
+				tx.EnvelopeMessage(),
 				errors.NewInvalidEnvelopeSignatureError,
 				envelopeWeights,
 			},
-			envelopeSignatures,
+			tx.EnvelopeSignatures,
 		},
 	}
 
-	numSignatures := len(payloadSignatures) + len(envelopeSignatures)
-	signatures := make([]*signatureContinuation, 0, numSignatures)
+	numSignatures := len(tx.PayloadSignatures) + len(tx.EnvelopeSignatures)
+	signatureContinuations := make([]*signatureContinuation, 0, numSignatures)
 
 	type uniqueKey struct {
 		address flow.Address
@@ -142,22 +151,29 @@ func newSignatureEntries(
 				},
 			}
 
+			// check signature address is either payer, proposer or authorizer
+			_, ok := transactionAddresses[signature.Address]
+			if !ok {
+				return nil, nil, nil, entry.newError(
+					fmt.Errorf("signature is provided for account %s that is neither payer nor authorizer nor proposer", signature.Address))
+			}
+
 			key := uniqueKey{
 				address: signature.Address,
 				index:   signature.KeyIndex,
 			}
 
-			_, ok := duplicate[key]
+			_, ok = duplicate[key]
 			if ok {
 				return nil, nil, nil, entry.newError(
 					fmt.Errorf("duplicate signatures are provided for the same key"))
 			}
 			duplicate[key] = struct{}{}
-			signatures = append(signatures, entry)
+			signatureContinuations = append(signatureContinuations, entry)
 		}
 	}
 
-	return signatures, payloadWeights, envelopeWeights, nil
+	return signatureContinuations, payloadWeights, envelopeWeights, nil
 }
 
 // TransactionVerifier verifies the content of the transaction by
@@ -207,12 +223,10 @@ func (v *TransactionVerifier) verifyTransaction(
 		return errors.NewInvalidAddressErrorf(tx.Payer, "payer address is invalid")
 	}
 
-	signatures, payloadWeights, envelopeWeights, err := newSignatureEntries(
-		tx.PayloadSignatures,
-		tx.PayloadMessage(),
-		tx.EnvelopeSignatures,
-		tx.EnvelopeMessage(),
-	)
+	// return the signature entries (both payload and envelope) and empty weight maps
+	// that will be used to aggregate weights.
+	// the account keys are deduplicated during this call.
+	signatures, payloadWeights, envelopeWeights, err := newSignatureEntries(tx)
 	if err != nil {
 		return err
 	}
@@ -223,16 +237,13 @@ func (v *TransactionVerifier) verifyTransaction(
 		return nil
 	}
 
-	err = v.getAccountKeys(txnState, accounts, signatures, tx.ProposalKey)
+	// at this point, account keys are guaranteed to be unique across all signatures
+	err = v.getAccountKeysAndAggregateWeights(txnState, accounts, signatures, tx.ProposalKey)
 	if err != nil {
 		return errors.NewInvalidProposalSignatureError(tx.ProposalKey, err)
 	}
 
-	err = v.verifyAccountSignatures(signatures)
-	if err != nil {
-		return errors.NewInvalidProposalSignatureError(tx.ProposalKey, err)
-	}
-
+	// all authorizers must have sufficient weights
 	for _, addr := range tx.Authorizers {
 		// Skip this authorizer if it is also the payer. In the case where an account is
 		// both a PAYER as well as an AUTHORIZER or PROPOSER, that account is required
@@ -250,6 +261,7 @@ func (v *TransactionVerifier) verifyTransaction(
 		}
 	}
 
+	// payer must have sufficient weights
 	if !v.hasSufficientKeyWeight(envelopeWeights, tx.Payer, keyWeightThreshold) {
 		// TODO change this to payer error (needed for fees)
 		return errors.NewAccountAuthorizationErrorf(
@@ -259,12 +271,21 @@ func (v *TransactionVerifier) verifyTransaction(
 			keyWeightThreshold)
 	}
 
+	// Verify all cryptographic signatures against account public keys (concurrently)
+	// and fail if at least one signature is invalid.
+	// (at this point, signatures have been deduplicated and weights have been checked,
+	// we wouldn't verify the signatures if any of those checks failed)
+	err = v.verifySignatures(signatures)
+	if err != nil {
+		return errors.NewInvalidProposalSignatureError(tx.ProposalKey, err)
+	}
+
 	return nil
 }
 
-// getAccountKeys gets the signatures' account keys and populate the account
-// keys into the signature continuation structs.
-func (v *TransactionVerifier) getAccountKeys(
+// getAccountKeysAndAggregateWeights gets the signatures' account keys and populate the
+// keys and their weights into the signature continuation structs.
+func (v *TransactionVerifier) getAccountKeysAndAggregateWeights(
 	_ storage.TransactionPreparer,
 	accounts environment.Accounts,
 	signatures []*signatureContinuation,
@@ -285,6 +306,8 @@ func (v *TransactionVerifier) getAccountKeys(
 		}
 
 		signature.accountKey = accountKey
+		// aggregateWeight
+		signature.aggregateWeights[signature.Address] += accountKey.Weight
 
 		if !foundProposalSignature && signature.matches(proposalKey) {
 			foundProposalSignature = true
@@ -300,9 +323,9 @@ func (v *TransactionVerifier) getAccountKeys(
 	return nil
 }
 
-// verifyAccountSignatures verifies the given signature continuations and
-// aggregate the valid signatures' weights.
-func (v *TransactionVerifier) verifyAccountSignatures(
+// verifySignatures verifies the given cryptographic signature continuations (concurrently).
+// It returns an error if at least one signature is invalid and no error if all signatures are valid.
+func (v *TransactionVerifier) verifySignatures(
 	signatures []*signatureContinuation,
 ) error {
 	toVerifyChan := make(chan *signatureContinuation, len(signatures))
@@ -351,7 +374,7 @@ func (v *TransactionVerifier) verifyAccountSignatures(
 	close(toVerifyChan)
 
 	foundError := false
-	for i := 0; i < len(signatures); i++ {
+	for range signatures {
 		entry := <-verifiedChan
 
 		if !entry.invokedVerify {
@@ -366,8 +389,6 @@ func (v *TransactionVerifier) verifyAccountSignatures(
 			foundError = true
 			break
 		}
-
-		entry.aggregateWeights[entry.Address] += entry.accountKey.Weight
 	}
 
 	if !foundError {

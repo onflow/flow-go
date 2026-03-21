@@ -16,7 +16,7 @@ type IncomingMessageScope interface {
 	Proto() *message.Message
 
 	// DecodedPayload returns the decoded payload of the message.
-	DecodedPayload() interface{}
+	DecodedPayload() any
 
 	// Protocol returns the type of protocol used to receive the message.
 	Protocol() message.ProtocolType

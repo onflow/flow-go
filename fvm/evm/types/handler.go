@@ -2,6 +2,7 @@ package types
 
 import (
 	gethCommon "github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/onflow/cadence/common"
 )
 
@@ -43,6 +44,11 @@ type ContractHandler interface {
 	// The function should not have any persisted changes made to the state.
 	DryRun(tx []byte, from Address) *ResultSummary
 
+	// DryRunWithTxData simulates execution of the provided transaction data.
+	// The from address is required since the transaction is unsigned.
+	// The function should not have any persisted changes made to the state.
+	DryRunWithTxData(txData types.TxData, from Address) *ResultSummary
+
 	// BatchRun runs transaction batch in the evm environment,
 	// collect all the gas fees and transfers the gas fees to the gasFeeCollector account.
 	BatchRun(txs [][]byte, gasFeeCollector Address) []*ResultSummary
@@ -58,6 +64,15 @@ type ContractHandler interface {
 
 	// Constructs and commits a new block from the block proposal
 	CommitBlockProposal()
+
+	// SetState sets a value for the given storage slot
+	SetState(target Address, slot gethCommon.Hash, value gethCommon.Hash) gethCommon.Hash
+
+	// GetState returns the value for the given storage slot
+	GetState(target Address, slot gethCommon.Hash) gethCommon.Hash
+
+	// RunTxAs runs a transaction by setting the call's `msg.sender` to be the `from` address
+	RunTxAs(from Address, to Address, txData Data, gasLimit GasLimit, balance Balance) *ResultSummary
 }
 
 // AddressAllocator allocates addresses, used by the handler

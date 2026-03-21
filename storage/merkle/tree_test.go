@@ -245,7 +245,7 @@ func TestTreeSingle(t *testing.T) {
 	assert.NoError(t, err)
 
 	// for the pre-defined number of times...
-	for i := 0; i < TreeTestLength; i++ {
+	for range TreeTestLength {
 		// insert a random key with a random value and make sure it didn't
 		// exist yet; collisions are unlikely enough to never happen
 		key, val := randomKeyValuePair(keyLength, 128)
@@ -283,7 +283,7 @@ func TestTreeBatch(t *testing.T) {
 	// insert a batch of random key-value pairs
 	keys := make([][]byte, 0, TreeTestLength)
 	vals := make([][]byte, 0, TreeTestLength)
-	for i := 0; i < TreeTestLength; i++ {
+	for range TreeTestLength {
 		key, val := randomKeyValuePair(keyLength, 128)
 		keys = append(keys, key)
 		vals = append(vals, val)
@@ -331,7 +331,7 @@ func TestRandomOrder(t *testing.T) {
 	// generate the desired number of keys and map a value to each key
 	keys := make([][]byte, 0, TreeTestLength)
 	vals := make(map[string][]byte)
-	for i := 0; i < TreeTestLength; i++ {
+	for range TreeTestLength {
 		key, val := randomKeyValuePair(32, 128)
 		keys = append(keys, key)
 		vals[string(key)] = val
@@ -392,7 +392,7 @@ func createTree(n int) *Tree {
 	if err != nil {
 		panic(err.Error())
 	}
-	for i := 0; i < n; i++ {
+	for range n {
 		key, val := randomKeyValuePair(32, 128)
 		_, _ = t.Put(key, val)
 	}

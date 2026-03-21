@@ -24,7 +24,7 @@ type WrappedEnvironment struct {
 }
 
 // NewWrappedEnvironment constructs a new wrapped environment
-func NewWrappedEnvironment(env environment.Environment) types.Backend {
+func NewWrappedEnvironment(env environment.Environment) *WrappedEnvironment {
 	return &WrappedEnvironment{env}
 }
 
@@ -207,6 +207,10 @@ func (we *WrappedEnvironment) EVMBlockExecuted(
 
 func (we *WrappedEnvironment) Logger() zerolog.Logger {
 	return we.env.Logger()
+}
+
+func (we *WrappedEnvironment) EVMTestOperationsAllowed() bool {
+	return we.env.EVMTestOperationsAllowed()
 }
 
 func handleEnvironmentError(err error) error {

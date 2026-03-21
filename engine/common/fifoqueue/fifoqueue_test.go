@@ -10,13 +10,13 @@ import (
 func TestPushAndPull(t *testing.T) {
 	queue, err := NewFifoQueue(CapacityUnlimited)
 	require.NoError(t, err)
-	for i := 0; i < 10; i++ {
+	for i := range 10 {
 		queue.Push(i)
 	}
 
 	require.Equal(t, 10, queue.Len())
 
-	for i := 0; i < 10; i++ {
+	for i := range 10 {
 		n, ok := queue.Pop()
 		require.True(t, ok)
 		require.Equal(t, i, n)
@@ -34,7 +34,7 @@ func TestConcurrentPushPull(t *testing.T) {
 	count := 100
 	// verify that concurrent push will end up having 100 items in the queue
 	var sent sync.WaitGroup
-	for i := 0; i < count; i++ {
+	for i := range count {
 		sent.Add(1)
 		go func(i int) {
 			queue.Push(i)
@@ -47,7 +47,7 @@ func TestConcurrentPushPull(t *testing.T) {
 
 	// verify that concurrent Pop will always get one, and in the end, the queue
 	// is empty
-	for i := 0; i < count; i++ {
+	for i := range count {
 		sent.Add(1)
 		go func(i int) {
 			_, ok := queue.Pop()

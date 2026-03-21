@@ -29,7 +29,6 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 //go:build (!amd64 && !386 && !ppc64le) || purego
-// +build !amd64,!386,!ppc64le purego
 
 package hash
 
@@ -40,7 +39,7 @@ import (
 // copyOut copies 32 bytes to a hash array.
 func copyOut(d *state) Hash {
 	var out Hash
-	for i := 0; i < 4; i++ {
+	for i := range 4 {
 		binary.LittleEndian.PutUint64(out[i<<3:], d.a[i])
 	}
 	return out
@@ -74,7 +73,7 @@ func copyIn512(d *state, buf1, buf2 Hash) {
 func copyIn256(d *state, buf Hash) {
 	sliceBuf := buf[:]
 
-	for i := 0; i < 4; i++ {
+	for i := range 4 {
 		d.a[i] = binary.LittleEndian.Uint64(sliceBuf)
 		sliceBuf = sliceBuf[8:]
 	}

@@ -86,8 +86,9 @@ func NewFifoQueue(maxCapacity int, options ...ConstructorOption) (*FifoQueue, er
 }
 
 // Push appends the given value to the tail of the queue.
-// If queue capacity is reached, the message is silently dropped.
-func (q *FifoQueue) Push(element interface{}) bool {
+// Returns true if and only if the element was added, or false if
+// the element was dropped due the queue being full.
+func (q *FifoQueue) Push(element any) bool {
 	length, pushed := q.push(element)
 
 	if pushed {
@@ -96,7 +97,7 @@ func (q *FifoQueue) Push(element interface{}) bool {
 	return pushed
 }
 
-func (q *FifoQueue) push(element interface{}) (int, bool) {
+func (q *FifoQueue) push(element any) (int, bool) {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 
@@ -109,7 +110,7 @@ func (q *FifoQueue) push(element interface{}) (int, bool) {
 }
 
 // Front peeks message at the head of the queue (without removing the head).
-func (q *FifoQueue) Head() (interface{}, bool) {
+func (q *FifoQueue) Head() (any, bool) {
 	q.mu.RLock()
 	defer q.mu.RUnlock()
 
@@ -118,7 +119,7 @@ func (q *FifoQueue) Head() (interface{}, bool) {
 
 // Pop removes and returns the queue's head element.
 // If the queue is empty, (nil, false) is returned.
-func (q *FifoQueue) Pop() (interface{}, bool) {
+func (q *FifoQueue) Pop() (any, bool) {
 	event, length, ok := q.pop()
 	if !ok {
 		return nil, false
@@ -128,7 +129,7 @@ func (q *FifoQueue) Pop() (interface{}, bool) {
 	return event, true
 }
 
-func (q *FifoQueue) pop() (interface{}, int, bool) {
+func (q *FifoQueue) pop() (any, int, bool) {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 

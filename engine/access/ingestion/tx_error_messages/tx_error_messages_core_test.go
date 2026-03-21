@@ -219,6 +219,30 @@ func (s *TxErrorMessagesCoreSuite) TestHandleTransactionResultErrorMessages_Erro
 		s.txErrorMessages.AssertNotCalled(s.T(), "Store", mock.Anything, mock.Anything)
 	})
 
+	s.Run("ErrAlreadyExists from Store is treated as success", func() {
+		// Simulate successful fetching but Store returns ErrAlreadyExists
+
+		s.txErrorMessages.On("Exists", blockId).Return(false, nil).Once()
+
+		resultsByBlockID := mockTransactionResultsByBlock(5)
+		exeEventReq := &execproto.GetTransactionErrorMessagesByBlockIDRequest{
+			BlockId: blockId[:],
+		}
+		s.execClient.On("GetTransactionErrorMessagesByBlockID", mock.Anything, exeEventReq).
+			Return(createTransactionErrorMessagesResponse(resultsByBlockID), nil).Once()
+
+		expectedStoreTxErrorMessages := createExpectedTxErrorMessages(resultsByBlockID, s.enNodeIDs.NodeIDs()[0])
+		s.txErrorMessages.On("Store", mock.Anything, blockId, expectedStoreTxErrorMessages).
+			Return(func(lctx lockctx.Proof, blockID flow.Identifier, transactionResultErrorMessages []flow.TransactionResultErrorMessage) error {
+				require.True(s.T(), lctx.HoldsLock(storage.LockInsertTransactionResultErrMessage))
+				return storage.ErrAlreadyExists
+			}).Once()
+
+		core := s.initCore()
+		err := core.FetchErrorMessages(irrecoverableCtx, blockId)
+		require.NoError(s.T(), err)
+	})
+
 	s.Run("Storage error after fetching results", func() {
 		// Simulate successful fetching of transaction error messages but error in storing them.
 

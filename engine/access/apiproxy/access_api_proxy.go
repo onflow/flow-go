@@ -450,6 +450,30 @@ func (h *FlowAccessAPIRouter) GetExecutionResultByID(context context.Context, re
 	return res, err
 }
 
+func (h *FlowAccessAPIRouter) GetExecutionReceiptsByBlockID(context context.Context, req *access.GetExecutionReceiptsByBlockIDRequest) (*access.ExecutionReceiptsResponse, error) {
+	if h.useIndex {
+		res, err := h.local.GetExecutionReceiptsByBlockID(context, req)
+		h.log(LocalApiService, "GetExecutionReceiptsByBlockID", err)
+		return res, err
+	}
+
+	res, err := h.upstream.GetExecutionReceiptsByBlockID(context, req)
+	h.log(UpstreamApiService, "GetExecutionReceiptsByBlockID", err)
+	return res, err
+}
+
+func (h *FlowAccessAPIRouter) GetExecutionReceiptsByResultID(context context.Context, req *access.GetExecutionReceiptsByResultIDRequest) (*access.ExecutionReceiptsResponse, error) {
+	if h.useIndex {
+		res, err := h.local.GetExecutionReceiptsByResultID(context, req)
+		h.log(LocalApiService, "GetExecutionReceiptsByResultID", err)
+		return res, err
+	}
+
+	res, err := h.upstream.GetExecutionReceiptsByResultID(context, req)
+	h.log(UpstreamApiService, "GetExecutionReceiptsByResultID", err)
+	return res, err
+}
+
 func (h *FlowAccessAPIRouter) SubscribeBlocksFromStartBlockID(req *access.SubscribeBlocksFromStartBlockIDRequest, server access.AccessAPI_SubscribeBlocksFromStartBlockIDServer) error {
 	err := h.local.SubscribeBlocksFromStartBlockID(req, server)
 	h.log(LocalApiService, "SubscribeBlocksFromStartBlockID", err)
@@ -926,6 +950,26 @@ func (h *FlowAccessAPIForwarder) GetExecutionResultByID(context context.Context,
 	}
 	defer closer.Close()
 	return upstream.GetExecutionResultByID(context, req)
+}
+
+func (h *FlowAccessAPIForwarder) GetExecutionReceiptsByBlockID(context context.Context, req *access.GetExecutionReceiptsByBlockIDRequest) (*access.ExecutionReceiptsResponse, error) {
+	// This is a passthrough request
+	upstream, closer, err := h.FaultTolerantClient()
+	if err != nil {
+		return nil, err
+	}
+	defer closer.Close()
+	return upstream.GetExecutionReceiptsByBlockID(context, req)
+}
+
+func (h *FlowAccessAPIForwarder) GetExecutionReceiptsByResultID(context context.Context, req *access.GetExecutionReceiptsByResultIDRequest) (*access.ExecutionReceiptsResponse, error) {
+	// This is a passthrough request
+	upstream, closer, err := h.FaultTolerantClient()
+	if err != nil {
+		return nil, err
+	}
+	defer closer.Close()
+	return upstream.GetExecutionReceiptsByResultID(context, req)
 }
 
 func (h *FlowAccessAPIForwarder) SendAndSubscribeTransactionStatuses(req *access.SendAndSubscribeTransactionStatusesRequest, server access.AccessAPI_SendAndSubscribeTransactionStatusesServer) error {

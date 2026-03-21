@@ -6,13 +6,14 @@ import (
 	"os"
 	"testing"
 
+	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/suite"
+
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/encoding/ccf"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/cadence/stdlib"
-	"github.com/rs/zerolog"
-	"github.com/stretchr/testify/require"
-	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/engine/execution/computation/query"
 	"github.com/onflow/flow-go/engine/execution/testutil"
@@ -23,7 +24,6 @@ import (
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
-	"github.com/onflow/flow-go/module/state_synchronization/indexer"
 	synctest "github.com/onflow/flow-go/module/state_synchronization/requester/unittest"
 	"github.com/onflow/flow-go/storage"
 	pebbleStorage "github.com/onflow/flow-go/storage/pebble"
@@ -152,8 +152,65 @@ func (s *scriptTestSuite) TestGetAccountKeys() {
 
 }
 
+func (s *scriptTestSuite) TestRegisterValue() {
+	regAddress := unittest.RandomAddressFixture()
+	registerID := flow.NewRegisterID(regAddress, "test_key")
+	value := flow.RegisterValue([]byte("test_value"))
+
+	s.Run("returns stored register value", func() {
+		s.height++
+		err := s.registerIndex.Store(flow.RegisterEntries{{Key: registerID, Value: value}}, s.height)
+		s.Require().NoError(err)
+
+		result, err := s.scripts.RegisterValue(registerID, s.height)
+		s.Require().NoError(err)
+		s.Assert().Equal(value, result)
+	})
+
+	s.Run("returns ErrNotFound for missing register at indexed height", func() {
+		missingID := flow.NewRegisterID(unittest.RandomAddressFixture(), "missing_key")
+		result, err := s.scripts.RegisterValue(missingID, s.height)
+		s.Assert().ErrorIs(err, storage.ErrNotFound)
+		s.Assert().Nil(result)
+	})
+
+	s.Run("returns most recently indexed value when queried at later height", func() {
+		lateRegID := flow.NewRegisterID(unittest.RandomAddressFixture(), "late_key")
+		v1 := flow.RegisterValue([]byte("v1"))
+		v2 := flow.RegisterValue([]byte("v2"))
+
+		h1 := s.height + 1
+		err := s.registerIndex.Store(flow.RegisterEntries{{Key: lateRegID, Value: v1}}, h1)
+		s.Require().NoError(err)
+
+		// advance height without storing lateRegID
+		h2 := h1 + 1
+		err = s.registerIndex.Store(flow.RegisterEntries{}, h2)
+		s.Require().NoError(err)
+
+		// querying at h2 returns v1 (stored at h1)
+		result, err := s.scripts.RegisterValue(lateRegID, h2)
+		s.Require().NoError(err)
+		s.Assert().Equal(v1, result)
+
+		// store v2 at h3
+		h3 := h2 + 1
+		err = s.registerIndex.Store(flow.RegisterEntries{{Key: lateRegID, Value: v2}}, h3)
+		s.Require().NoError(err)
+		s.height = h3
+
+		result, err = s.scripts.RegisterValue(lateRegID, h3)
+		s.Require().NoError(err)
+		s.Assert().Equal(v2, result)
+
+		// querying at h2 still returns v1
+		result, err = s.scripts.RegisterValue(lateRegID, h2)
+		s.Require().NoError(err)
+		s.Assert().Equal(v1, result)
+	})
+}
+
 func (s *scriptTestSuite) SetupTest() {
-	lockManager := storage.NewTestingLockManager()
 	logger := unittest.LoggerForTest(s.Suite.T(), zerolog.InfoLevel)
 	entropyProvider := testutil.ProtocolStateWithSourceFixture(nil)
 	blockchain := unittest.BlockchainFixture(10)
@@ -163,7 +220,7 @@ func (s *scriptTestSuite) SetupTest() {
 	s.snapshot = snapshot.NewSnapshotTree(nil)
 	s.vm = fvm.NewVirtualMachine()
 	s.vmCtx = fvm.NewContext(
-		fvm.WithChain(s.chain),
+		s.chain,
 		fvm.WithAuthorizationChecksEnabled(false),
 		fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
 	)
@@ -178,31 +235,13 @@ func (s *scriptTestSuite) SetupTest() {
 	derivedChainData, err := derived.NewDerivedChainData(derived.DefaultDerivedDataCacheSize)
 	s.Require().NoError(err)
 
-	index := indexer.New(
-		logger,
-		metrics.NewNoopCollector(),
-		nil,
-		s.registerIndex,
-		headers,
-		nil,
-		nil,
-		nil,
-		nil,
-		nil,
-		flow.Testnet,
-		derivedChainData,
-		nil,
-		nil,
-		lockManager,
-	)
-
 	s.scripts = NewScripts(
 		logger,
 		metrics.NewNoopCollector(),
 		s.chain.ChainID(),
 		entropyProvider,
 		headers,
-		index.RegisterValue,
+		s.registerIndex.Get,
 		query.NewDefaultConfig(),
 		derivedChainData,
 		true,

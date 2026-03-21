@@ -188,7 +188,7 @@ func createMultipleRandomTriesMini(t *testing.T) ([]*trie.MTrie, *trie.MTrie) {
 
 func TestEncodeSubTrie(t *testing.T) {
 	file := "checkpoint"
-	logger := unittest.Logger()
+	logger := zerolog.Nop()
 	tries := createMultipleRandomTries(t)
 	estimatedSubtrieNodeCount := estimateSubtrieNodeCount(tries[0])
 	subtrieRoots := createSubTrieRoots(tries)
@@ -287,7 +287,7 @@ func TestWriteAndReadCheckpointV6EmptyTrie(t *testing.T) {
 	unittest.RunWithTempDir(t, func(dir string) {
 		tries := []*trie.MTrie{trie.NewEmptyMTrie()}
 		fileName := "checkpoint-empty-trie"
-		logger := unittest.Logger()
+		logger := zerolog.Nop()
 		require.NoErrorf(t, StoreCheckpointV6Concurrently(tries, dir, fileName, logger), "fail to store checkpoint")
 		decoded, err := OpenAndReadCheckpointV6(dir, fileName, logger)
 		require.NoErrorf(t, err, "fail to read checkpoint %v/%v", dir, fileName)
@@ -299,7 +299,7 @@ func TestWriteAndReadCheckpointV6SimpleTrie(t *testing.T) {
 	unittest.RunWithTempDir(t, func(dir string) {
 		tries := createSimpleTrie(t)
 		fileName := "checkpoint"
-		logger := unittest.Logger()
+		logger := zerolog.Nop()
 		require.NoErrorf(t, StoreCheckpointV6Concurrently(tries, dir, fileName, logger), "fail to store checkpoint")
 		decoded, err := OpenAndReadCheckpointV6(dir, fileName, logger)
 		require.NoErrorf(t, err, "fail to read checkpoint %v/%v", dir, fileName)
@@ -311,7 +311,7 @@ func TestWriteAndReadCheckpointV6MultipleTries(t *testing.T) {
 	unittest.RunWithTempDir(t, func(dir string) {
 		tries := createMultipleRandomTries(t)
 		fileName := "checkpoint-multi-file"
-		logger := unittest.Logger()
+		logger := zerolog.Nop()
 		require.NoErrorf(t, StoreCheckpointV6Concurrently(tries, dir, fileName, logger), "fail to store checkpoint")
 		decoded, err := OpenAndReadCheckpointV6(dir, fileName, logger)
 		require.NoErrorf(t, err, "fail to read checkpoint %v/%v", dir, fileName)
@@ -323,7 +323,7 @@ func TestWriteAndReadCheckpointV6MultipleTries(t *testing.T) {
 func TestCheckpointV6IsDeterminstic(t *testing.T) {
 	unittest.RunWithTempDir(t, func(dir string) {
 		tries := createMultipleRandomTries(t)
-		logger := unittest.Logger()
+		logger := zerolog.Nop()
 		require.NoErrorf(t, StoreCheckpointV6Concurrently(tries, dir, "checkpoint1", logger), "fail to store checkpoint")
 		require.NoErrorf(t, StoreCheckpointV6Concurrently(tries, dir, "checkpoint2", logger), "fail to store checkpoint")
 		partFiles1 := filePaths(dir, "checkpoint1", subtrieLevel)
@@ -342,7 +342,7 @@ func TestWriteAndReadCheckpointV6LeafEmptyTrie(t *testing.T) {
 	unittest.RunWithTempDir(t, func(dir string) {
 		tries := []*trie.MTrie{trie.NewEmptyMTrie()}
 		fileName := "checkpoint-empty-trie"
-		logger := unittest.Logger()
+		logger := zerolog.Nop()
 		require.NoErrorf(t, StoreCheckpointV6Concurrently(tries, dir, fileName, logger), "fail to store checkpoint")
 
 		bufSize := 10
@@ -361,7 +361,7 @@ func TestWriteAndReadCheckpointV6LeafSimpleTrie(t *testing.T) {
 	unittest.RunWithTempDir(t, func(dir string) {
 		tries := createSimpleTrie(t)
 		fileName := "checkpoint"
-		logger := unittest.Logger()
+		logger := zerolog.Nop()
 		require.NoErrorf(t, StoreCheckpointV6Concurrently(tries, dir, fileName, logger), "fail to store checkpoint")
 		bufSize := 1
 		leafNodesCh := make(chan *LeafNode, bufSize)
@@ -385,7 +385,7 @@ func TestWriteAndReadCheckpointV6LeafMultipleTriesFail(t *testing.T) {
 	unittest.RunWithTempDir(t, func(dir string) {
 		fileName := "checkpoint-multi-leaf-file"
 		tries, _ := createMultipleRandomTriesMini(t)
-		logger := unittest.Logger()
+		logger := zerolog.Nop()
 		require.NoErrorf(t, StoreCheckpointV6Concurrently(tries, dir, fileName, logger), "fail to store checkpoint")
 		bufSize := 5
 		leafNodesCh := make(chan *LeafNode, bufSize)
@@ -402,7 +402,7 @@ func TestWriteAndReadCheckpointV6LeafMultipleTriesOK(t *testing.T) {
 
 		tries := []*trie.MTrie{last}
 
-		logger := unittest.Logger()
+		logger := zerolog.Nop()
 		require.NoErrorf(t, StoreCheckpointV6Concurrently(tries, dir, fileName, logger), "fail to store checkpoint")
 		bufSize := 5
 		leafNodesCh := make(chan *LeafNode, bufSize)
@@ -491,7 +491,7 @@ func TestWriteAndReadCheckpointV5(t *testing.T) {
 	unittest.RunWithTempDir(t, func(dir string) {
 		tries := createMultipleRandomTries(t)
 		fileName := "checkpoint1"
-		logger := unittest.Logger()
+		logger := zerolog.Nop()
 
 		require.NoErrorf(t, storeCheckpointV5(tries, dir, fileName, logger), "fail to store checkpoint")
 		decoded, err := LoadCheckpoint(filepath.Join(dir, fileName), logger)
@@ -505,7 +505,7 @@ func TestWriteAndReadCheckpointV5(t *testing.T) {
 func TestWriteAndReadCheckpointV6ThenBackToV5(t *testing.T) {
 	unittest.RunWithTempDir(t, func(dir string) {
 		tries := createMultipleRandomTries(t)
-		logger := unittest.Logger()
+		logger := zerolog.Nop()
 
 		// store tries into v6 then read back, then store into v5
 		require.NoErrorf(t, StoreCheckpointV6Concurrently(tries, dir, "checkpoint-v6", logger), "fail to store checkpoint")
@@ -534,7 +534,7 @@ func TestCleanupOnErrorIfNotExist(t *testing.T) {
 	t.Run("clean up after finish storing files", func(t *testing.T) {
 		unittest.RunWithTempDir(t, func(dir string) {
 			tries := createMultipleRandomTries(t)
-			logger := unittest.Logger()
+			logger := zerolog.Nop()
 
 			// store tries into v6 then read back, then store into v5
 			require.NoErrorf(t, StoreCheckpointV6Concurrently(tries, dir, "checkpoint-v6", logger), "fail to store checkpoint")
@@ -565,7 +565,7 @@ func TestAllPartFileExist(t *testing.T) {
 			}
 			require.NoErrorf(t, err, "fail to find sub trie file path")
 
-			logger := unittest.Logger()
+			logger := zerolog.Nop()
 			require.NoErrorf(t, StoreCheckpointV6Concurrently(tries, dir, fileName, logger), "fail to store checkpoint")
 
 			// delete i-th part file, then the error should mention i-th file missing
@@ -593,7 +593,7 @@ func TestAllPartFileExistLeafReader(t *testing.T) {
 			}
 			require.NoErrorf(t, err, "fail to find sub trie file path")
 
-			logger := unittest.Logger()
+			logger := zerolog.Nop()
 			require.NoErrorf(t, StoreCheckpointV6Concurrently(tries, dir, fileName, logger), "fail to store checkpoint")
 
 			// delete i-th part file, then the error should mention i-th file missing
@@ -613,7 +613,7 @@ func TestCannotStoreTwice(t *testing.T) {
 	unittest.RunWithTempDir(t, func(dir string) {
 		tries := createSimpleTrie(t)
 		fileName := "checkpoint"
-		logger := unittest.Logger()
+		logger := zerolog.Nop()
 		require.NoErrorf(t, StoreCheckpointV6Concurrently(tries, dir, fileName, logger), "fail to store checkpoint")
 		// checkpoint already exist, can't store again
 		require.Error(t, StoreCheckpointV6Concurrently(tries, dir, fileName, logger))
@@ -640,7 +640,7 @@ func TestCopyCheckpointFileV6(t *testing.T) {
 	unittest.RunWithTempDir(t, func(dir string) {
 		tries := createSimpleTrie(t)
 		fileName := "checkpoint"
-		logger := unittest.Logger()
+		logger := zerolog.Nop()
 		require.NoErrorf(t, StoreCheckpointV6Concurrently(tries, dir, fileName, logger), "fail to store checkpoint")
 		to := filepath.Join(dir, "newfolder")
 		newPaths, err := CopyCheckpointFile(fileName, dir, to)
@@ -656,7 +656,7 @@ func TestReadCheckpointRootHash(t *testing.T) {
 	unittest.RunWithTempDir(t, func(dir string) {
 		tries := createSimpleTrie(t)
 		fileName := "checkpoint"
-		logger := unittest.Logger()
+		logger := zerolog.Nop()
 		require.NoErrorf(t, StoreCheckpointV6Concurrently(tries, dir, fileName, logger), "fail to store checkpoint")
 
 		trieRoots, err := ReadTriesRootHash(logger, dir, fileName)
@@ -673,7 +673,7 @@ func TestReadCheckpointRootHashValidateChecksum(t *testing.T) {
 	unittest.RunWithTempDir(t, func(dir string) {
 		tries := createSimpleTrie(t)
 		fileName := "checkpoint"
-		logger := unittest.Logger()
+		logger := zerolog.Nop()
 		require.NoErrorf(t, StoreCheckpointV6Concurrently(tries, dir, fileName, logger), "fail to store checkpoint")
 
 		// add a wrong checksum to top trie file
@@ -700,7 +700,7 @@ func TestReadCheckpointRootHashMulti(t *testing.T) {
 	unittest.RunWithTempDir(t, func(dir string) {
 		tries := createMultipleRandomTries(t)
 		fileName := "checkpoint"
-		logger := unittest.Logger()
+		logger := zerolog.Nop()
 		require.NoErrorf(t, StoreCheckpointV6Concurrently(tries, dir, fileName, logger), "fail to store checkpoint")
 
 		trieRoots, err := ReadTriesRootHash(logger, dir, fileName)
@@ -717,7 +717,7 @@ func TestCheckpointHasRootHash(t *testing.T) {
 	unittest.RunWithTempDir(t, func(dir string) {
 		tries := createMultipleRandomTries(t)
 		fileName := "checkpoint"
-		logger := unittest.Logger()
+		logger := zerolog.Nop()
 		require.NoErrorf(t, StoreCheckpointV6Concurrently(tries, dir, fileName, logger), "fail to store checkpoint")
 
 		trieRoots, err := ReadTriesRootHash(logger, dir, fileName)

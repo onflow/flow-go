@@ -22,9 +22,7 @@ func newBootstrapPayloads(
 	bootstrapProcedureOptions ...fvm.BootstrapProcedureOption,
 ) ([]*ledger.Payload, error) {
 
-	ctx := fvm.NewContext(
-		fvm.WithChain(chainID.Chain()),
-	)
+	ctx := fvm.NewContext(chainID.Chain())
 
 	vm := fvm.NewVirtualMachine()
 
@@ -159,7 +157,7 @@ func TestDeploy(t *testing.T) {
 	}
 
 	ctx := fvm.NewContext(
-		fvm.WithChain(chain),
+		chain,
 		fvm.WithAuthorizationChecksEnabled(false),
 		fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
 		fvm.WithCadenceLogging(true),

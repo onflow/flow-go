@@ -244,7 +244,7 @@ func TestMeterParamOverridesUpdated(t *testing.T) {
 
 	snapshotTree := snapshot.NewSnapshotTree(nil)
 
-	ctx := fvm.NewContext(fvm.WithChain(flow.Emulator.Chain()))
+	ctx := fvm.NewContext(flow.Emulator.Chain())
 
 	vm := fvm.NewVirtualMachine()
 	executionSnapshot, _, err := vm.Run(

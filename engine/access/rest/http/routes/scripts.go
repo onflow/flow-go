@@ -9,7 +9,7 @@ import (
 )
 
 // ExecuteScript handler sends the script from the request to be executed.
-func ExecuteScript(r *common.Request, backend access.API, _ models.LinkGenerator) (interface{}, error) {
+func ExecuteScript(r *common.Request, backend access.API, _ models.LinkGenerator) (any, error) {
 	req, err := request.GetScriptRequest(r)
 	if err != nil {
 		return nil, common.NewBadRequestError(err)

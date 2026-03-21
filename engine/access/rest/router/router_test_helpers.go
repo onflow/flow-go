@@ -15,6 +15,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/access"
+	"github.com/onflow/flow-go/access/backends/extended"
 	"github.com/onflow/flow-go/access/mock"
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/engine/access/state_stream/backend"
@@ -157,6 +158,30 @@ func ExecuteLegacyWsRequest(req *http.Request, stateStreamApi state_stream.API, 
 
 func AssertOKResponse(t *testing.T, req *http.Request, expectedRespBody string, backend *mock.API) {
 	AssertResponse(t, req, http.StatusOK, expectedRespBody, backend)
+}
+
+// ExecuteExperimentalRequest builds a router with experimental routes and executes the given request.
+// Named routes from the main v1 API (e.g. getTransactionByID) are registered as no-ops so that
+// the link generator can produce proper expandable links without requiring a full access backend.
+func ExecuteExperimentalRequest(req *http.Request, backend extended.API) *httptest.ResponseRecorder {
+	builder := NewRouterBuilder(
+		unittest.Logger(),
+		metrics.NewNoopCollector(),
+	)
+	noop := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {})
+	for _, r := range Routes {
+		builder.v1SubRouter.Methods(r.Method).Path(r.Pattern).Name(r.Name).Handler(noop)
+	}
+	router := builder.AddExperimentalRoutes(
+		backend,
+		flow.Testnet.Chain(),
+		commonrpc.DefaultAccessMaxRequestSize,
+		commonrpc.DefaultAccessMaxResponseSize,
+	).Build()
+
+	rr := httptest.NewRecorder()
+	router.ServeHTTP(rr, req)
+	return rr
 }
 
 func AssertResponse(t *testing.T, req *http.Request, status int, expectedRespBody string, backend *mock.API) {

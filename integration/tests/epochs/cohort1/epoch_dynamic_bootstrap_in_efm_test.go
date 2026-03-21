@@ -55,7 +55,7 @@ func (s *DynamicBootstrapInEFMSuite) TestDynamicBootstrapInEFM() {
 	}
 	testContainer := s.Net.AddObserver(s.T(), observerConf)
 	testContainer.WriteRootSnapshot(snapshot)
-	testContainer.Container.Start(s.Ctx)
+	require.NoError(s.T(), testContainer.Container.Start(s.Ctx))
 	s.TimedLogf("successfully started observer")
 
 	observerClient, err := testContainer.TestnetClient()

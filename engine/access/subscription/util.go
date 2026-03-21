@@ -41,7 +41,7 @@ func HandleSubscription[T any](sub Subscription, handleResponse func(resp T) err
 // - transform: A function to transform the response into the expected interface{} type.
 //
 // No errors are expected during normal operations.
-func HandleResponse[T any](send chan<- interface{}, transform func(resp T) (interface{}, error)) func(resp T) error {
+func HandleResponse[T any](send chan<- any, transform func(resp T) (any, error)) func(resp T) error {
 	return func(response T) error {
 		// Transform the response
 		resp, err := transform(response)

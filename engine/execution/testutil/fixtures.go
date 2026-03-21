@@ -223,11 +223,7 @@ func CreateAccountsWithSimpleAddresses(
 	[]flow.Address,
 	error,
 ) {
-	ctx := fvm.NewContext(
-		fvm.WithChain(chain),
-		fvm.WithAuthorizationChecksEnabled(false),
-		fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
-	)
+	ctx := fvm.NewContext(chain, fvm.WithAuthorizationChecksEnabled(false), fvm.WithSequenceNumberCheckAndIncrementEnabled(false))
 
 	var accounts []flow.Address
 

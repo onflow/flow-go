@@ -29,7 +29,6 @@ func MockBlobService(bs blockstore.Blockstore) *mocknetwork.BlobService {
 			wg.Add(len(cids))
 
 			for _, c := range cids {
-				c := c
 				go func() {
 					defer wg.Done()
 

@@ -17,6 +17,6 @@ import (
 //			return nil
 //		}).
 //		Once()
-func MatchLock(lock string) interface{} {
+func MatchLock(lock string) any {
 	return mock.MatchedBy(func(lctx lockctx.Proof) bool { return lctx.HoldsLock(lock) })
 }
