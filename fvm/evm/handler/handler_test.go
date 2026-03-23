@@ -402,7 +402,7 @@ func TestHandler_COA(t *testing.T) {
 				require.Greater(t, computationUsed, types.DefaultDirectCallBaseGasUsage*3)
 
 				// Withdraw with invalid balance
-				assertPanic(t, types.IsWithdrawBalanceRoundingError, func() {
+				assertPanic(t, types.IsAWithdrawBalanceRoundingError, func() {
 					// deposit some money
 					foa.Deposit(vault)
 					// then withdraw invalid balance
@@ -1293,48 +1293,46 @@ func TestHandler_Metrics(t *testing.T) {
 func TestHandler_GetState(t *testing.T) {
 	t.Parallel()
 
-	t.Run("with non-Emulator network", func(t *testing.T) {
-		t.Parallel()
+	testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
+		backend.SetEVMTestOperationsAllowed(true)
 
-		testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
-			testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
-				testutils.RunWithEOATestAccount(t, backend, rootAddr, func(eoa *testutils.EOATestAccount) {
+		testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
+			testutils.RunWithEOATestAccount(t, backend, rootAddr, func(eoa *testutils.EOATestAccount) {
 
-					bs := handler.NewBlockStore(defaultChainID, backend, rootAddr)
-					aa := handler.NewAddressAllocator()
-					em := &testutils.TestEmulator{}
-					handler := handler.NewContractHandler(defaultChainID, rootAddr, flowTokenAddress, rootAddr, bs, aa, backend, em)
+				bs := handler.NewBlockStore(flow.Emulator, backend, rootAddr)
+				aa := handler.NewAddressAllocator()
 
-					address := types.NewAddressFromString("0x7e093BA1474b79481f9B87D66c99a819F25e82E2")
-					slot := gethCommon.HexToHash("0x5591cf37b43a6cc1c6a0b89114c8779fca21c866d7fc4a827ce040428eb28b78")
+				em := &testutils.TestEmulator{}
+				handler := handler.NewContractHandler(flow.Emulator, rootAddr, flowTokenAddress, rootAddr, bs, aa, backend, em)
 
-					isExpectedError := func(err error) bool {
-						return errors.Is(err, types.ErrUnsupportedNetworkOperation)
-					}
-					assertPanic(t, isExpectedError, func() {
-						handler.GetState(address, slot)
-					})
-				})
+				address := types.NewAddressFromString("0x7e093BA1474b79481f9B87D66c99a819F25e82E2")
+				slot := gethCommon.HexToHash("0x5591cf37b43a6cc1c6a0b89114c8779fca21c866d7fc4a827ce040428eb28b78")
+
+				handler.GetState(address, slot)
 			})
 		})
 	})
+}
 
-	t.Run("with Emulator network", func(t *testing.T) {
-		t.Parallel()
+func TestHandler_GetState_Disabled(t *testing.T) {
+	t.Parallel()
 
-		testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
-			testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
-				testutils.RunWithEOATestAccount(t, backend, rootAddr, func(eoa *testutils.EOATestAccount) {
+	testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
+		backend.SetEVMTestOperationsAllowed(false)
 
-					bs := handler.NewBlockStore(flow.Emulator, backend, rootAddr)
-					aa := handler.NewAddressAllocator()
+		testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
+			testutils.RunWithEOATestAccount(t, backend, rootAddr, func(eoa *testutils.EOATestAccount) {
 
-					em := &testutils.TestEmulator{}
-					handler := handler.NewContractHandler(flow.Emulator, rootAddr, flowTokenAddress, rootAddr, bs, aa, backend, em)
+				bs := handler.NewBlockStore(flow.Emulator, backend, rootAddr)
+				aa := handler.NewAddressAllocator()
 
-					address := types.NewAddressFromString("0x7e093BA1474b79481f9B87D66c99a819F25e82E2")
-					slot := gethCommon.HexToHash("0x5591cf37b43a6cc1c6a0b89114c8779fca21c866d7fc4a827ce040428eb28b78")
+				em := &testutils.TestEmulator{}
+				handler := handler.NewContractHandler(flow.Emulator, rootAddr, flowTokenAddress, rootAddr, bs, aa, backend, em)
 
+				address := types.NewAddressFromString("0x7e093BA1474b79481f9B87D66c99a819F25e82E2")
+				slot := gethCommon.HexToHash("0x5591cf37b43a6cc1c6a0b89114c8779fca21c866d7fc4a827ce040428eb28b78")
+
+				assertPanic(t, types.IsAUnsupportedOperationError, func() {
 					handler.GetState(address, slot)
 				})
 			})
@@ -1345,60 +1343,66 @@ func TestHandler_GetState(t *testing.T) {
 func TestHandler_SetState(t *testing.T) {
 	t.Parallel()
 
-	t.Run("with non-Emulator network", func(t *testing.T) {
-		t.Parallel()
+	testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
+		backend.SetEVMTestOperationsAllowed(true)
 
-		testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
-			testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
-				testutils.RunWithEOATestAccount(t, backend, rootAddr, func(eoa *testutils.EOATestAccount) {
+		testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
+			testutils.RunWithEOATestAccount(t, backend, rootAddr, func(eoa *testutils.EOATestAccount) {
 
-					bs := handler.NewBlockStore(defaultChainID, backend, rootAddr)
-					aa := handler.NewAddressAllocator()
+				bs := handler.NewBlockStore(flow.Emulator, backend, rootAddr)
+				aa := handler.NewAddressAllocator()
 
-					em := &testutils.TestEmulator{}
-					handler := handler.NewContractHandler(defaultChainID, rootAddr, flowTokenAddress, rootAddr, bs, aa, backend, em)
+				execState, err := state.NewStateDB(backend, evm.StorageAccountAddress(flow.Emulator))
+				require.NoError(t, err)
 
-					address := types.NewAddressFromString("0x7e093BA1474b79481f9B87D66c99a819F25e82E2")
-					slot := gethCommon.HexToHash("0x5591cf37b43a6cc1c6a0b89114c8779fca21c866d7fc4a827ce040428eb28b78")
-					value := gethCommon.HexToHash("0x00000000000000000000000000000000000000000000000000000000000003e8")
+				address := types.NewAddressFromString("0x7e093BA1474b79481f9B87D66c99a819F25e82E2")
+				slot := gethCommon.HexToHash("0x5591cf37b43a6cc1c6a0b89114c8779fca21c866d7fc4a827ce040428eb28b78")
+				value := gethCommon.HexToHash("0x00000000000000000000000000000000000000000000000000000000000003e8")
 
-					isExpectedError := func(err error) bool {
-						return errors.Is(err, types.ErrUnsupportedNetworkOperation)
-					}
-					assertPanic(t, isExpectedError, func() {
-						handler.SetState(address, slot, value)
-					})
-				})
+				execState.CreateAccount(address.ToCommon())
+				prevValue := execState.SetState(address.ToCommon(), slot, value)
+				_, err = execState.Commit(true)
+				require.NoError(t, err)
+				require.Equal(t, gethCommon.Hash{}, prevValue)
+
+				em := &testutils.TestEmulator{}
+				handler := handler.NewContractHandler(flow.Emulator, rootAddr, flowTokenAddress, rootAddr, bs, aa, backend, em)
+
+				handler.SetState(address, slot, value)
 			})
 		})
 	})
+}
 
-	t.Run("with Emulator network", func(t *testing.T) {
-		t.Parallel()
+func TestHandler_SetState_Disabled(t *testing.T) {
+	t.Parallel()
 
-		testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
-			testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
-				testutils.RunWithEOATestAccount(t, backend, rootAddr, func(eoa *testutils.EOATestAccount) {
+	testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
+		backend.SetEVMTestOperationsAllowed(false)
 
-					bs := handler.NewBlockStore(flow.Emulator, backend, rootAddr)
-					aa := handler.NewAddressAllocator()
+		testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
+			testutils.RunWithEOATestAccount(t, backend, rootAddr, func(eoa *testutils.EOATestAccount) {
 
-					execState, err := state.NewStateDB(backend, evm.StorageAccountAddress(flow.Emulator))
-					require.NoError(t, err)
+				bs := handler.NewBlockStore(flow.Emulator, backend, rootAddr)
+				aa := handler.NewAddressAllocator()
 
-					address := types.NewAddressFromString("0x7e093BA1474b79481f9B87D66c99a819F25e82E2")
-					slot := gethCommon.HexToHash("0x5591cf37b43a6cc1c6a0b89114c8779fca21c866d7fc4a827ce040428eb28b78")
-					value := gethCommon.HexToHash("0x00000000000000000000000000000000000000000000000000000000000003e8")
+				execState, err := state.NewStateDB(backend, evm.StorageAccountAddress(flow.Emulator))
+				require.NoError(t, err)
 
-					execState.CreateAccount(address.ToCommon())
-					prevValue := execState.SetState(address.ToCommon(), slot, value)
-					_, err = execState.Commit(true)
-					require.NoError(t, err)
-					require.Equal(t, gethCommon.Hash{}, prevValue)
+				address := types.NewAddressFromString("0x7e093BA1474b79481f9B87D66c99a819F25e82E2")
+				slot := gethCommon.HexToHash("0x5591cf37b43a6cc1c6a0b89114c8779fca21c866d7fc4a827ce040428eb28b78")
+				value := gethCommon.HexToHash("0x00000000000000000000000000000000000000000000000000000000000003e8")
 
-					em := &testutils.TestEmulator{}
-					handler := handler.NewContractHandler(flow.Emulator, rootAddr, flowTokenAddress, rootAddr, bs, aa, backend, em)
+				execState.CreateAccount(address.ToCommon())
+				prevValue := execState.SetState(address.ToCommon(), slot, value)
+				_, err = execState.Commit(true)
+				require.NoError(t, err)
+				require.Equal(t, gethCommon.Hash{}, prevValue)
 
+				em := &testutils.TestEmulator{}
+				handler := handler.NewContractHandler(flow.Emulator, rootAddr, flowTokenAddress, rootAddr, bs, aa, backend, em)
+
+				assertPanic(t, types.IsAUnsupportedOperationError, func() {
 					handler.SetState(address, slot, value)
 				})
 			})
@@ -1409,76 +1413,82 @@ func TestHandler_SetState(t *testing.T) {
 func TestHandler_RunTxAs(t *testing.T) {
 	t.Parallel()
 
-	t.Run("with non-Emulator network", func(t *testing.T) {
-		t.Parallel()
+	testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
+		backend.SetEVMTestOperationsAllowed(true)
 
-		testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
-			testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
-				testutils.RunWithEOATestAccount(t, backend, rootAddr, func(eoa *testutils.EOATestAccount) {
+		testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
+			testutils.RunWithEOATestAccount(t, backend, rootAddr, func(eoa *testutils.EOATestAccount) {
 
-					bs := handler.NewBlockStore(defaultChainID, backend, rootAddr)
-					aa := handler.NewAddressAllocator()
+				bs := handler.NewBlockStore(flow.Emulator, backend, rootAddr)
+				aa := handler.NewAddressAllocator()
+				result := &types.Result{
+					ReturnedData: testutils.RandomData(t),
+					GasConsumed:  testutils.RandomGas(1000),
+					Logs: []*gethTypes.Log{
+						testutils.GetRandomLogFixture(t),
+						testutils.GetRandomLogFixture(t),
+					},
+				}
 
-					em := &testutils.TestEmulator{}
-					handler := handler.NewContractHandler(defaultChainID, rootAddr, flowTokenAddress, rootAddr, bs, aa, backend, em)
+				em := &testutils.TestEmulator{
+					NonceOfFunc: func(address types.Address) (uint64, error) {
+						return 1, nil
+					},
+					DirectCallFunc: func(call *types.DirectCall) (*types.Result, error) {
+						return result, nil
+					},
+				}
+				handler := handler.NewContractHandler(flow.Emulator, rootAddr, flowTokenAddress, rootAddr, bs, aa, backend, em)
 
-					from := types.NewAddressFromString("0x7e093BA1474b79481f9B87D66c99a819F25e82E2")
-					to := types.NewAddressFromString("0x7A038Ec292505B94d20004d3761Db0d1623bb45b")
-					data := types.Data{10, 50, 20, 30, 50}
-					gasLimit := types.GasLimit(25_000)
-					balance := types.Balance(big.NewInt(150))
+				from := types.NewAddressFromString("0x7e093BA1474b79481f9B87D66c99a819F25e82E2")
+				to := types.NewAddressFromString("0x7A038Ec292505B94d20004d3761Db0d1623bb45b")
+				data := types.Data{10, 50, 20, 30, 50}
+				gasLimit := types.GasLimit(25_000)
+				balance := types.Balance(big.NewInt(150))
 
-					isExpectedError := func(err error) bool {
-						return errors.Is(err, types.ErrUnsupportedNetworkOperation)
-					}
-					assertPanic(t, isExpectedError, func() {
-						handler.RunTxAs(
-							from,
-							to,
-							data,
-							gasLimit,
-							balance,
-						)
-					})
-				})
+				handler.RunTxAs(from, to, data, gasLimit, balance)
 			})
 		})
 	})
+}
 
-	t.Run("with Emulator network", func(t *testing.T) {
-		t.Parallel()
+func TestHandler_RunTxAs_Disabled(t *testing.T) {
+	t.Parallel()
 
-		testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
-			testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
-				testutils.RunWithEOATestAccount(t, backend, rootAddr, func(eoa *testutils.EOATestAccount) {
+	testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
+		backend.SetEVMTestOperationsAllowed(false)
 
-					bs := handler.NewBlockStore(flow.Emulator, backend, rootAddr)
-					aa := handler.NewAddressAllocator()
-					result := &types.Result{
-						ReturnedData: testutils.RandomData(t),
-						GasConsumed:  testutils.RandomGas(1000),
-						Logs: []*gethTypes.Log{
-							testutils.GetRandomLogFixture(t),
-							testutils.GetRandomLogFixture(t),
-						},
-					}
+		testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
+			testutils.RunWithEOATestAccount(t, backend, rootAddr, func(eoa *testutils.EOATestAccount) {
 
-					em := &testutils.TestEmulator{
-						NonceOfFunc: func(address types.Address) (uint64, error) {
-							return 1, nil
-						},
-						DirectCallFunc: func(call *types.DirectCall) (*types.Result, error) {
-							return result, nil
-						},
-					}
-					handler := handler.NewContractHandler(flow.Emulator, rootAddr, flowTokenAddress, rootAddr, bs, aa, backend, em)
+				bs := handler.NewBlockStore(flow.Emulator, backend, rootAddr)
+				aa := handler.NewAddressAllocator()
+				result := &types.Result{
+					ReturnedData: testutils.RandomData(t),
+					GasConsumed:  testutils.RandomGas(1000),
+					Logs: []*gethTypes.Log{
+						testutils.GetRandomLogFixture(t),
+						testutils.GetRandomLogFixture(t),
+					},
+				}
 
-					from := types.NewAddressFromString("0x7e093BA1474b79481f9B87D66c99a819F25e82E2")
-					to := types.NewAddressFromString("0x7A038Ec292505B94d20004d3761Db0d1623bb45b")
-					data := types.Data{10, 50, 20, 30, 50}
-					gasLimit := types.GasLimit(25_000)
-					balance := types.Balance(big.NewInt(150))
+				em := &testutils.TestEmulator{
+					NonceOfFunc: func(address types.Address) (uint64, error) {
+						return 1, nil
+					},
+					DirectCallFunc: func(call *types.DirectCall) (*types.Result, error) {
+						return result, nil
+					},
+				}
+				handler := handler.NewContractHandler(flow.Emulator, rootAddr, flowTokenAddress, rootAddr, bs, aa, backend, em)
 
+				from := types.NewAddressFromString("0x7e093BA1474b79481f9B87D66c99a819F25e82E2")
+				to := types.NewAddressFromString("0x7A038Ec292505B94d20004d3761Db0d1623bb45b")
+				data := types.Data{10, 50, 20, 30, 50}
+				gasLimit := types.GasLimit(25_000)
+				balance := types.Balance(big.NewInt(150))
+
+				assertPanic(t, types.IsAUnsupportedOperationError, func() {
 					handler.RunTxAs(from, to, data, gasLimit, balance)
 				})
 			})
