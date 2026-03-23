@@ -34,8 +34,8 @@ type transactionCoordinator struct {
 
 	// Note: database commit and result logging must occur within the same
 	// critical section (guraded by mutex).
-	database        *storage.BlockDatabase
-	writeBehindLog  TransactionWriteBehindLogger
+	database       *storage.BlockDatabase
+	writeBehindLog TransactionWriteBehindLogger
 }
 
 type transaction struct {
@@ -64,13 +64,13 @@ func newTransactionCoordinator(
 		cachedDerivedBlockData)
 
 	return &transactionCoordinator{
-		vm:              vm,
-		mutex:           mutex,
-		cond:            cond,
-		snapshotTime:    0,
-		abortErr:        nil,
-		database:        database,
-		writeBehindLog:  writeBehindLog,
+		vm:             vm,
+		mutex:          mutex,
+		cond:           cond,
+		snapshotTime:   0,
+		abortErr:       nil,
+		database:       database,
+		writeBehindLog: writeBehindLog,
 	}
 }
 
