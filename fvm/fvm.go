@@ -83,11 +83,42 @@ func (output *ProcedureOutput) PopulateInspectionResults(
 	evts = append(evts, output.Events...)
 	evts = append(evts, output.ServiceEvents...)
 
-	log.Debug().Str("module", "tc-inspector").
+	log = log.With().Str("module", "transaction-inspection").Logger()
+
+	log.Debug().
 		Int("inspectors", len(ctx.Inspectors)).
-		Msg("populating environment values for procedure output")
+		Msg("running transaction inspection")
+
 	inspectionResults := inspectProcedureResults(log, ctx, storageSnapshot, executionSnapshot, evts)
 	output.InspectionResults = inspectionResults
+}
+
+func inspectProcedureResults(
+	log zerolog.Logger,
+	context Context,
+	storageSnapshot snapshot.StorageSnapshot,
+	executionSnapshot *snapshot.ExecutionSnapshot,
+	events []flow.Event,
+) []inspection.Result {
+	inspectionResults := make([]inspection.Result, 0, len(context.Inspectors))
+
+	for i, inspector := range context.Inspectors {
+		log := log.With().Str("inspector", inspector.Name()).Int("inspector-num", i).Logger()
+		log.Debug().Msg("starting inspection")
+
+		result, err := inspector.Inspect(log, storageSnapshot, executionSnapshot, events)
+		if err != nil {
+			log.Error().Err(err).Msg("failed to inspect procedure results")
+		}
+
+		if result == nil {
+			log.Error().Msg("inspection results are nil")
+			continue
+		}
+		inspectionResults = append(inspectionResults, result)
+	}
+
+	return inspectionResults
 }
 
 type ProcedureExecutor interface {
@@ -222,27 +253,6 @@ func (vm *VirtualMachine) Run(
 	}
 
 	return executionSnapshot, executor.Output(), nil
-}
-
-func inspectProcedureResults(
-	logger zerolog.Logger,
-	context Context,
-	storageSnapshot snapshot.StorageSnapshot,
-	executionSnapshot *snapshot.ExecutionSnapshot,
-	events []flow.Event,
-) []inspection.Result {
-	inspectionResults := make([]inspection.Result, len(context.Inspectors))
-	logger.Debug().Str("module", "tc-inspector").Int("num_inspectors", len(context.Inspectors)).Msg("inspecting procedure results")
-	var err error
-	for i, inspector := range context.Inspectors {
-		// TODO(janezp): inspector should be able to receive ProcedureOutput directly
-		inspectionResults[i], err = inspector.Inspect(logger, storageSnapshot, executionSnapshot, events)
-		if err != nil {
-			logger.Warn().Str("module", "tc-inspector").Err(err).Msg("failed to inspect procedure results")
-		}
-	}
-
-	return inspectionResults
 }
 
 // GetAccount returns an account by address or an error if none exists.

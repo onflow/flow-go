@@ -21,9 +21,13 @@ type Inspector interface {
 		executionSnapshot *snapshot.ExecutionSnapshot,
 		events []flow.Event,
 	) (Result, error)
+
+	// Name is the name of the inspector
+	Name() string
 }
 
 // Result is the result of a procedure inspector
 type Result interface {
+	InspectionName() string
 	AsLogEvent() (zerolog.Level, func(e *zerolog.Event))
 }
