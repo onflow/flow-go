@@ -53,6 +53,8 @@ func Fill[T any](val T, n int) []T {
 }
 
 // AreStringSlicesEqual returns true if the two string slices are equal.
+//
+// CAUTION: this function performs inplace sorts of the input slices.
 func AreStringSlicesEqual(a, b []string) bool {
 	if len(a) != len(b) {
 		return false
@@ -73,4 +75,14 @@ func AreStringSlicesEqual(a, b []string) bool {
 // StringSliceContainsElement returns true if the string slice contains the element.
 func StringSliceContainsElement(a []string, v string) bool {
 	return slices.Contains(a, v)
+}
+
+// ToMap converts a slice of any comparable type into a map where each element
+// in the slice becomes a key in the map with the value set to a struct{}.
+func ToMap[T comparable](values []T) map[T]struct{} {
+	valueMap := make(map[T]struct{}, len(values))
+	for _, v := range values {
+		valueMap[v] = struct{}{}
+	}
+	return valueMap
 }

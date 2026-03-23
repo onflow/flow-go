@@ -21,11 +21,20 @@ var contractCode string
 //go:embed contract_minimal.cdc
 var ContractMinimalCode string
 
+//go:embed contract_test_helpers.cdc
+var contractTestHelpers string
+
 var nftImportPattern = regexp.MustCompile(`(?m)^import "NonFungibleToken"`)
 var fungibleTokenImportPattern = regexp.MustCompile(`(?m)^import "FungibleToken"`)
 var flowTokenImportPattern = regexp.MustCompile(`(?m)^import "FlowToken"`)
+var loadTestHelpersPattern = regexp.MustCompile(`(?m)\/\/ #loadTestHelpers`)
 
-func ContractCode(nonFungibleTokenAddress, fungibleTokenAddress, flowTokenAddress flow.Address) []byte {
+func ContractCode(
+	nonFungibleTokenAddress,
+	fungibleTokenAddress,
+	flowTokenAddress flow.Address,
+	evmTestHelpersEnabled bool,
+) []byte {
 	evmContract := nftImportPattern.ReplaceAllString(
 		contractCode,
 		fmt.Sprintf("import NonFungibleToken from %s", nonFungibleTokenAddress.HexWithPrefix()),
@@ -38,6 +47,20 @@ func ContractCode(nonFungibleTokenAddress, fungibleTokenAddress, flowTokenAddres
 		evmContract,
 		fmt.Sprintf("import FlowToken from %s", flowTokenAddress.HexWithPrefix()),
 	)
+
+	// Inject the contract_test_helpers.cdc code, only if the
+	// bootstrapping option was specified.
+	if evmTestHelpersEnabled {
+		replaced := loadTestHelpersPattern.ReplaceAllLiteralString(
+			evmContract,
+			contractTestHelpers,
+		)
+		if replaced == evmContract {
+			panic("missing // `#loadTestHelpers` marker in contract.cdc")
+		}
+		evmContract = replaced
+	}
+
 	return []byte(evmContract)
 }
 
@@ -204,6 +227,37 @@ var InternalEVMTypeBatchRunFunctionType *sema.FunctionType = &sema.FunctionType{
 const InternalEVMTypeCallFunctionName = "call"
 
 var InternalEVMTypeCallFunctionType = &sema.FunctionType{
+	Parameters: []sema.Parameter{
+		{
+			Label:          "from",
+			TypeAnnotation: sema.NewTypeAnnotation(EVMAddressBytesType),
+		},
+		{
+			Label:          "to",
+			TypeAnnotation: sema.NewTypeAnnotation(EVMAddressBytesType),
+		},
+		{
+			Label:          "data",
+			TypeAnnotation: sema.NewTypeAnnotation(sema.ByteArrayType),
+		},
+		{
+			Label:          "gasLimit",
+			TypeAnnotation: sema.NewTypeAnnotation(sema.UInt64Type),
+		},
+		{
+			Label:          "value",
+			TypeAnnotation: sema.NewTypeAnnotation(sema.UIntType),
+		},
+	},
+	// Actually EVM.Result, but cannot refer to it here
+	ReturnTypeAnnotation: sema.NewTypeAnnotation(sema.AnyStructType),
+}
+
+// InternalEVM.runTxAs
+
+const InternalEVMTypeRunTxAsFunctionName = "runTxAs"
+
+var InternalEVMTypeRunTxAsFunctionType = &sema.FunctionType{
 	Parameters: []sema.Parameter{
 		{
 			Label:          "from",
@@ -401,6 +455,7 @@ var InternalEVMTypeBalanceFunctionType = &sema.FunctionType{
 const InternalEVMTypeNonceFunctionName = "nonce"
 
 var InternalEVMTypeNonceFunctionType = &sema.FunctionType{
+	Purity: sema.FunctionPurityView,
 	Parameters: []sema.Parameter{
 		{
 			Label:          "address",
@@ -415,6 +470,7 @@ var InternalEVMTypeNonceFunctionType = &sema.FunctionType{
 const InternalEVMTypeCodeFunctionName = "code"
 
 var InternalEVMTypeCodeFunctionType = &sema.FunctionType{
+	Purity: sema.FunctionPurityView,
 	Parameters: []sema.Parameter{
 		{
 			Label:          "address",
@@ -429,6 +485,7 @@ var InternalEVMTypeCodeFunctionType = &sema.FunctionType{
 const InternalEVMTypeCodeHashFunctionName = "codeHash"
 
 var InternalEVMTypeCodeHashFunctionType = &sema.FunctionType{
+	Purity: sema.FunctionPurityView,
 	Parameters: []sema.Parameter{
 		{
 			Label:          "address",
@@ -530,6 +587,47 @@ var InternalEVMTypeGetLatestBlockFunctionType = &sema.FunctionType{
 	Parameters: []sema.Parameter{},
 	// Actually EVM.Block, but cannot refer to it here
 	ReturnTypeAnnotation: sema.NewTypeAnnotation(sema.AnyStructType),
+}
+
+// InternalEVM.store
+
+const InternalEVMTypeStoreFunctionName = "store"
+
+var InternalEVMTypeStoreFunctionType = &sema.FunctionType{
+	Parameters: []sema.Parameter{
+		{
+			Label:          "target",
+			TypeAnnotation: sema.NewTypeAnnotation(EVMAddressBytesType),
+		},
+		{
+			Label:          "slot",
+			TypeAnnotation: sema.NewTypeAnnotation(sema.StringType),
+		},
+		{
+			Label:          "value",
+			TypeAnnotation: sema.NewTypeAnnotation(sema.StringType),
+		},
+	},
+	ReturnTypeAnnotation: sema.NewTypeAnnotation(sema.VoidType),
+}
+
+// InternalEVM.load
+
+const InternalEVMTypeLoadFunctionName = "load"
+
+var InternalEVMTypeLoadFunctionType = &sema.FunctionType{
+	Purity: sema.FunctionPurityView,
+	Parameters: []sema.Parameter{
+		{
+			Label:          "target",
+			TypeAnnotation: sema.NewTypeAnnotation(EVMAddressBytesType),
+		},
+		{
+			Label:          "slot",
+			TypeAnnotation: sema.NewTypeAnnotation(sema.StringType),
+		},
+	},
+	ReturnTypeAnnotation: sema.NewTypeAnnotation(sema.ByteArrayType),
 }
 
 // InternalEVM
@@ -667,6 +765,24 @@ var InternalEVMContractType = func() *sema.CompositeType {
 			ty,
 			InternalEVMTypeCommitBlockProposalFunctionName,
 			InternalEVMTypeCommitBlockProposalFunctionType,
+			"",
+		),
+		sema.NewUnmeteredPublicFunctionMember(
+			ty,
+			InternalEVMTypeStoreFunctionName,
+			InternalEVMTypeStoreFunctionType,
+			"",
+		),
+		sema.NewUnmeteredPublicFunctionMember(
+			ty,
+			InternalEVMTypeLoadFunctionName,
+			InternalEVMTypeLoadFunctionType,
+			"",
+		),
+		sema.NewUnmeteredPublicFunctionMember(
+			ty,
+			InternalEVMTypeRunTxAsFunctionName,
+			InternalEVMTypeRunTxAsFunctionType,
 			"",
 		),
 	})

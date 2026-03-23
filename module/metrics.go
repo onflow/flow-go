@@ -829,6 +829,24 @@ type ExecutionStateIndexerMetrics interface {
 type ExtendedIndexingMetrics interface {
 	// BlockIndexedExtended records the latest processed height for a given extended indexer.
 	BlockIndexedExtended(indexer string, height uint64)
+
+	// ScheduledTransactionIndexed records counts of scheduled transactions processed in a single block.
+	// scheduled is the number of newly created scheduled transactions.
+	// executed is the number marked as executed.
+	// failed is the number marked as failed.
+	// canceled is the number marked as canceled.
+	// backfilled is the number fetched from state because they were unknown to the local index.
+	ScheduledTransactionIndexed(scheduled, executed, failed, canceled, backfilled int)
+
+	// FTTransferIndexed records the number of fungible token transfers indexed for a single block.
+	FTTransferIndexed(count int)
+
+	// NFTTransferIndexed records the number of non-fungible token transfers indexed for a single block.
+	NFTTransferIndexed(count int)
+
+	// ContractDeploymentIndexed records the number of contract deployments indexed for a single block,
+	// broken down by action (create vs update).
+	ContractDeploymentIndexed(created, updated int)
 }
 
 type TransactionErrorMessagesMetrics interface {

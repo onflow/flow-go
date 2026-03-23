@@ -7,6 +7,7 @@ package mock
 import (
 	"github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/storage"
 	mock "github.com/stretchr/testify/mock"
 )
 
@@ -37,76 +38,70 @@ func (_m *AccountTransactionsReader) EXPECT() *AccountTransactionsReader_Expecte
 	return &AccountTransactionsReader_Expecter{mock: &_m.Mock}
 }
 
-// TransactionsByAddress provides a mock function for the type AccountTransactionsReader
-func (_mock *AccountTransactionsReader) TransactionsByAddress(account flow.Address, startHeight uint64, endHeight uint64) ([]access.AccountTransaction, error) {
-	ret := _mock.Called(account, startHeight, endHeight)
+// ByAddress provides a mock function for the type AccountTransactionsReader
+func (_mock *AccountTransactionsReader) ByAddress(account flow.Address, cursor *access.AccountTransactionCursor) (storage.AccountTransactionIterator, error) {
+	ret := _mock.Called(account, cursor)
 
 	if len(ret) == 0 {
-		panic("no return value specified for TransactionsByAddress")
+		panic("no return value specified for ByAddress")
 	}
 
-	var r0 []access.AccountTransaction
+	var r0 storage.AccountTransactionIterator
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(flow.Address, uint64, uint64) ([]access.AccountTransaction, error)); ok {
-		return returnFunc(account, startHeight, endHeight)
+	if returnFunc, ok := ret.Get(0).(func(flow.Address, *access.AccountTransactionCursor) (storage.AccountTransactionIterator, error)); ok {
+		return returnFunc(account, cursor)
 	}
-	if returnFunc, ok := ret.Get(0).(func(flow.Address, uint64, uint64) []access.AccountTransaction); ok {
-		r0 = returnFunc(account, startHeight, endHeight)
+	if returnFunc, ok := ret.Get(0).(func(flow.Address, *access.AccountTransactionCursor) storage.AccountTransactionIterator); ok {
+		r0 = returnFunc(account, cursor)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]access.AccountTransaction)
+			r0 = ret.Get(0).(storage.AccountTransactionIterator)
 		}
 	}
-	if returnFunc, ok := ret.Get(1).(func(flow.Address, uint64, uint64) error); ok {
-		r1 = returnFunc(account, startHeight, endHeight)
+	if returnFunc, ok := ret.Get(1).(func(flow.Address, *access.AccountTransactionCursor) error); ok {
+		r1 = returnFunc(account, cursor)
 	} else {
 		r1 = ret.Error(1)
 	}
 	return r0, r1
 }
 
-// AccountTransactionsReader_TransactionsByAddress_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'TransactionsByAddress'
-type AccountTransactionsReader_TransactionsByAddress_Call struct {
+// AccountTransactionsReader_ByAddress_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ByAddress'
+type AccountTransactionsReader_ByAddress_Call struct {
 	*mock.Call
 }
 
-// TransactionsByAddress is a helper method to define mock.On call
+// ByAddress is a helper method to define mock.On call
 //   - account flow.Address
-//   - startHeight uint64
-//   - endHeight uint64
-func (_e *AccountTransactionsReader_Expecter) TransactionsByAddress(account interface{}, startHeight interface{}, endHeight interface{}) *AccountTransactionsReader_TransactionsByAddress_Call {
-	return &AccountTransactionsReader_TransactionsByAddress_Call{Call: _e.mock.On("TransactionsByAddress", account, startHeight, endHeight)}
+//   - cursor *access.AccountTransactionCursor
+func (_e *AccountTransactionsReader_Expecter) ByAddress(account interface{}, cursor interface{}) *AccountTransactionsReader_ByAddress_Call {
+	return &AccountTransactionsReader_ByAddress_Call{Call: _e.mock.On("ByAddress", account, cursor)}
 }
 
-func (_c *AccountTransactionsReader_TransactionsByAddress_Call) Run(run func(account flow.Address, startHeight uint64, endHeight uint64)) *AccountTransactionsReader_TransactionsByAddress_Call {
+func (_c *AccountTransactionsReader_ByAddress_Call) Run(run func(account flow.Address, cursor *access.AccountTransactionCursor)) *AccountTransactionsReader_ByAddress_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 flow.Address
 		if args[0] != nil {
 			arg0 = args[0].(flow.Address)
 		}
-		var arg1 uint64
+		var arg1 *access.AccountTransactionCursor
 		if args[1] != nil {
-			arg1 = args[1].(uint64)
-		}
-		var arg2 uint64
-		if args[2] != nil {
-			arg2 = args[2].(uint64)
+			arg1 = args[1].(*access.AccountTransactionCursor)
 		}
 		run(
 			arg0,
 			arg1,
-			arg2,
 		)
 	})
 	return _c
 }
 
-func (_c *AccountTransactionsReader_TransactionsByAddress_Call) Return(accountTransactions []access.AccountTransaction, err error) *AccountTransactionsReader_TransactionsByAddress_Call {
-	_c.Call.Return(accountTransactions, err)
+func (_c *AccountTransactionsReader_ByAddress_Call) Return(v storage.AccountTransactionIterator, err error) *AccountTransactionsReader_ByAddress_Call {
+	_c.Call.Return(v, err)
 	return _c
 }
 
-func (_c *AccountTransactionsReader_TransactionsByAddress_Call) RunAndReturn(run func(account flow.Address, startHeight uint64, endHeight uint64) ([]access.AccountTransaction, error)) *AccountTransactionsReader_TransactionsByAddress_Call {
+func (_c *AccountTransactionsReader_ByAddress_Call) RunAndReturn(run func(account flow.Address, cursor *access.AccountTransactionCursor) (storage.AccountTransactionIterator, error)) *AccountTransactionsReader_ByAddress_Call {
 	_c.Call.Return(run)
 	return _c
 }

@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"bytes"
 	"io"
 )
 
@@ -274,4 +275,38 @@ func PrefixUpperBound(prefix []byte) []byte {
 		}
 	}
 	return nil // no upper-bound
+}
+
+// PrefixInclusiveEnd returns the inclusive upper bound for iterating over keys with `prefix`.
+//
+// Consider iterating over keys with format [code][address][height][txIndex] for a specific address.
+// A simple full-range scan uses [code][address] as both the lower and upper prefix bounds.
+//
+// Resumable iteration introduces a complication: resuming from a saved position requires a start
+// key of [code][address][lastHeight][lastTxIndex+1]. The bare prefix [code][address] cannot serve
+// as the end bound in this case — it is lexicographically less than the resume start key, so an
+// iterator with that range would return no entries.
+//
+// The correct end bound is [code][address] padded with 0xff bytes to the full key length, i.e.,
+// [code][address][maxHeight][maxTxIndex]. This is the lexicographically largest key sharing the given
+// prefix and key length, and is always greater than any valid key in the namespace.
+//
+// PrefixInclusiveEnd produces exactly this: a byte slice that begins with `prefix` and is
+// padded with 0xff bytes to match the length of `start`.
+//
+// If len(prefix) > len(start), the returned prefix will be the first `len(start)` bytes of the prefix.
+func PrefixInclusiveEnd(prefix, start []byte) []byte {
+	// if prefix is already greater than start, then no padding is needed
+	if bytes.Compare(start, prefix) <= 0 {
+		return prefix
+	}
+
+	end := make([]byte, len(start))
+	copy(end, prefix)
+
+	// pad up to the length of start
+	for i := len(prefix); i < len(end); i++ {
+		end[i] = 0xff
+	}
+	return end
 }

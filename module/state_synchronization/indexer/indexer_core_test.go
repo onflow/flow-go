@@ -57,7 +57,6 @@ type indexCoreTest struct {
 	firstHeightStore      func(t *testing.T) uint64
 	registersStore        func(t *testing.T, entries flow.RegisterEntries, height uint64) error
 	eventsStore           func(t *testing.T, ID flow.Identifier, events []flow.EventsList) error
-	registersGet          func(t *testing.T, IDs flow.RegisterID, height uint64) (flow.RegisterValue, error)
 }
 
 func newIndexCoreTest(
@@ -166,15 +165,6 @@ func (i *indexCoreTest) setStoreTransactionResults(f func(*testing.T, flow.Ident
 	return i
 }
 
-func (i *indexCoreTest) setGetRegisters(f func(t *testing.T, ID flow.RegisterID, height uint64) (flow.RegisterValue, error)) *indexCoreTest {
-	i.registers.
-		On("Get", mock.AnythingOfType("flow.RegisterID"), mock.AnythingOfType("uint64")).
-		Return(func(IDs flow.RegisterID, height uint64) (flow.RegisterValue, error) {
-			return f(i.t, IDs, height)
-		})
-	return i
-}
-
 func (i *indexCoreTest) useDefaultEvents() *indexCoreTest {
 	i.events.
 		On("BatchStore",
@@ -255,11 +245,6 @@ func (i *indexCoreTest) initIndexer() *indexCoreTest {
 func (i *indexCoreTest) runIndexBlockData() error {
 	i.initIndexer()
 	return i.indexer.IndexBlockData(i.data)
-}
-
-func (i *indexCoreTest) runGetRegister(ID flow.RegisterID, height uint64) (flow.RegisterValue, error) {
-	i.initIndexer()
-	return i.indexer.RegisterValue(ID, height)
 }
 
 func TestExecutionState_IndexBlockData(t *testing.T) {
@@ -404,8 +389,8 @@ func TestExecutionState_IndexBlockData(t *testing.T) {
 			test.indexer.protocolDB,
 			storage.NewTestingLockManager(),
 			mockState,
-			storagemock.NewHeaders(t),
 			storagemock.NewIndex(t),
+			storagemock.NewHeaders(t),
 			storagemock.NewGuarantees(t),
 			test.collections,
 			test.events,
@@ -500,8 +485,8 @@ func TestExecutionState_IndexBlockData(t *testing.T) {
 			test.indexer.protocolDB,
 			storage.NewTestingLockManager(),
 			mockState,
-			storagemock.NewHeaders(t),
 			storagemock.NewIndex(t),
+			storagemock.NewHeaders(t),
 			storagemock.NewGuarantees(t),
 			test.collections,
 			test.events,
@@ -557,29 +542,6 @@ func TestExecutionState_IndexBlockData(t *testing.T) {
 	})
 }
 
-func TestExecutionState_RegisterValues(t *testing.T) {
-	g := fixtures.NewGeneratorSuite()
-	t.Run("Get value for single register", func(t *testing.T) {
-		blocks := g.Blocks().List(5)
-		height := blocks[1].Height
-		id := flow.RegisterID{
-			Owner: "1",
-			Key:   "2",
-		}
-		val := flow.RegisterValue("0x1")
-
-		values, err := newIndexCoreTest(t, g, blocks, nil).
-			initIndexer().
-			setGetRegisters(func(t *testing.T, ID flow.RegisterID, height uint64) (flow.RegisterValue, error) {
-				return val, nil
-			}).
-			runGetRegister(id, height)
-
-		assert.NoError(t, err)
-		assert.Equal(t, values, val)
-	})
-}
-
 func newBlockHeadersStorage(blocks []*flow.Block) storage.Headers {
 	blocksByID := make(map[flow.Identifier]*flow.Block, 0)
 	for _, b := range blocks {
@@ -591,10 +553,6 @@ func newBlockHeadersStorage(blocks []*flow.Block) storage.Headers {
 
 func TestIndexerIntegration_StoreAndGet(t *testing.T) {
 	lockManager := storage.NewTestingLockManager()
-	regOwnerAddress := unittest.RandomAddressFixture()
-	regOwner := string(regOwnerAddress.Bytes())
-	regKey := "code"
-	registerID := flow.NewRegisterID(regOwnerAddress, regKey)
 
 	pdb, dbDir := unittest.TempPebbleDB(t)
 	t.Cleanup(func() {
@@ -606,120 +564,6 @@ func TestIndexerIntegration_StoreAndGet(t *testing.T) {
 
 	derivedChainData, err := derived.NewDerivedChainData(derived.DefaultDerivedDataCacheSize)
 	require.NoError(t, err)
-
-	// this test makes sure index values for a single register are correctly updated and always last value is returned
-	t.Run("Single Index Value Changes", func(t *testing.T) {
-		pebbleStorage.RunWithRegistersStorageAtInitialHeights(t, 0, 0, func(registers *pebbleStorage.Registers) {
-			index := New(
-				logger,
-				module.ExecutionStateIndexerMetrics(metrics),
-				pebbleimpl.ToDB(pdb),
-				registers,
-				nil,
-				nil,
-				nil,
-				nil,
-				nil,
-				nil,
-				flow.Testnet,
-				derivedChainData,
-				collectionsmock.NewCollectionIndexer(t),
-				nil,
-				lockManager,
-				nil, // accountTxIndex
-			)
-
-			values := [][]byte{[]byte("1"), []byte("1"), []byte("2"), []byte("3"), []byte("4")}
-			for i, val := range values {
-				testDesc := fmt.Sprintf("test iteration number %d failed with test value %s", i, val)
-				height := uint64(i + 1)
-				err := storeRegisterWithValue(index, height, regOwner, regKey, val)
-				require.NoError(t, err)
-
-				results, err := index.RegisterValue(registerID, height)
-				require.NoError(t, err, testDesc)
-				assert.Equal(t, val, results)
-			}
-		})
-	})
-
-	// this test makes sure if a register is not found the value returned is nil and without an error in order for this to be
-	// up to the specification script executor requires
-	t.Run("Missing Register", func(t *testing.T) {
-		pebbleStorage.RunWithRegistersStorageAtInitialHeights(t, 0, 0, func(registers *pebbleStorage.Registers) {
-			index := New(
-				logger,
-				module.ExecutionStateIndexerMetrics(metrics),
-				pebbleimpl.ToDB(pdb),
-				registers,
-				nil,
-				nil,
-				nil,
-				nil,
-				nil,
-				nil,
-				flow.Testnet,
-				derivedChainData,
-				collectionsmock.NewCollectionIndexer(t),
-				nil,
-				lockManager,
-				nil, // accountTxIndex
-			)
-
-			value, err := index.RegisterValue(registerID, 0)
-			require.Nil(t, value)
-			assert.NoError(t, err)
-		})
-	})
-
-	// this test makes sure that even if indexed values for a single register are requested with higher height
-	// the correct highest height indexed value is returned.
-	// e.g. we index A{h(1) -> X}, A{h(2) -> Y}, when we request h(4) we get value Y
-	t.Run("Single Index Value At Later Heights", func(t *testing.T) {
-		pebbleStorage.RunWithRegistersStorageAtInitialHeights(t, 0, 0, func(registers *pebbleStorage.Registers) {
-			index := New(
-				logger,
-				module.ExecutionStateIndexerMetrics(metrics),
-				pebbleimpl.ToDB(pdb),
-				registers,
-				nil,
-				nil,
-				nil,
-				nil,
-				nil,
-				nil,
-				flow.Testnet,
-				derivedChainData,
-				collectionsmock.NewCollectionIndexer(t),
-				nil,
-				lockManager,
-				nil, // accountTxIndex
-			)
-
-			storeValues := [][]byte{[]byte("1"), []byte("2")}
-
-			require.NoError(t, storeRegisterWithValue(index, 1, regOwner, regKey, storeValues[0]))
-
-			require.NoError(t, index.indexRegisters(nil, 2))
-
-			value, err := index.RegisterValue(registerID, uint64(2))
-			require.NoError(t, err)
-			assert.Equal(t, storeValues[0], value)
-
-			require.NoError(t, index.indexRegisters(nil, 3))
-
-			err = storeRegisterWithValue(index, 4, regOwner, regKey, storeValues[1])
-			require.NoError(t, err)
-
-			value, err = index.RegisterValue(registerID, uint64(4))
-			require.NoError(t, err)
-			assert.Equal(t, storeValues[1], value)
-
-			value, err = index.RegisterValue(registerID, uint64(3))
-			require.NoError(t, err)
-			assert.Equal(t, storeValues[0], value)
-		})
-	})
 
 	// this test makes sure we correctly handle weird payloads
 	t.Run("Empty and Nil Payloads", func(t *testing.T) {
@@ -811,12 +655,6 @@ func TestCollectScheduledTransactions(t *testing.T) {
 		require.ErrorContains(t, err, "system chunk result at index 0 does not match expected.")
 		require.Nil(t, actual)
 	})
-}
-
-// helper to store register at height and increment index range
-func storeRegisterWithValue(indexer *IndexerCore, height uint64, owner string, key string, value []byte) error {
-	payload := LedgerPayloadFixture(owner, key, value)
-	return indexer.indexRegisters(map[ledger.Path]*ledger.Payload{ledger.DummyPath: payload}, height)
 }
 
 // newMockStateForBlock returns a mock protocol.State configured so that

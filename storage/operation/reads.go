@@ -106,8 +106,7 @@ func KeyOnlyIterateFunc(fn func(key []byte) error) IterationFunc {
 }
 
 // KeyExists returns true if a key exists in the database.
-// When this returned function is executed (and only then), it will write into the `keyExists` whether
-// the key exists.
+//
 // No errors are expected during normal operation.
 func KeyExists(r storage.Reader, key []byte) (exist bool, errToReturn error) {
 	_, closer, err := r.Get(key)
@@ -125,6 +124,31 @@ func KeyExists(r storage.Reader, key []byte) (exist bool, errToReturn error) {
 
 	// the key does exist in the database
 	return true, nil
+}
+
+// PrefixExists returns true if at least one key with the provided prefix exists in the database.
+// This is distinct from KeyExists which checks for an exact key match.
+//
+// No errors are expected during normal operation.
+func PrefixExists(r storage.Reader, prefix []byte, opt storage.IteratorOption) (exist bool, errToReturn error) {
+	if len(prefix) == 0 {
+		return false, fmt.Errorf("prefix must not be empty")
+	}
+
+	iter, err := r.NewIter(prefix, prefix, opt)
+	if err != nil {
+		return false, fmt.Errorf("can not create iterator: %w", err)
+	}
+	defer func() {
+		errToReturn = merr.CloseAndMergeError(iter, errToReturn)
+	}()
+
+	// First returns true if it finds a valid key with the given prefix, otherwise it returns false.
+	if iter.First() {
+		return true, nil
+	}
+
+	return false, nil
 }
 
 // RetrieveByKey will retrieve the binary data under the given key from the database

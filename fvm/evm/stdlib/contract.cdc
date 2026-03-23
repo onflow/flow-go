@@ -175,7 +175,7 @@ access(all) contract EVM {
 
         /// Nonce of the address
         access(all)
-        fun nonce(): UInt64 {
+        view fun nonce(): UInt64 {
             return InternalEVM.nonce(
                 address: self.bytes
             )
@@ -183,7 +183,7 @@ access(all) contract EVM {
 
         /// Code of the address
         access(all)
-        fun code(): [UInt8] {
+        view fun code(): [UInt8] {
             return InternalEVM.code(
                 address: self.bytes
             )
@@ -191,7 +191,7 @@ access(all) contract EVM {
 
         /// CodeHash of the address
         access(all)
-        fun codeHash(): [UInt8] {
+        view fun codeHash(): [UInt8] {
             return InternalEVM.codeHash(
                 address: self.bytes
             )
@@ -200,6 +200,10 @@ access(all) contract EVM {
         /// Deposits the given vault into the EVM account with the given address
         access(all)
         fun deposit(from: @FlowToken.Vault) {
+            pre {
+                !EVM.isPaused(): "EVM operations are temporarily paused"
+            }
+
             let amount = from.balance
             if amount == 0.0 {
                 destroy from
@@ -241,9 +245,18 @@ access(all) contract EVM {
                 "EVM.addressFromString(): Invalid hex string length for an EVM address. The provided string is \(asHex.length), but the length must be 40 or 42."
         }
         // Strip the 0x prefix if it exists
-        var withoutPrefix = (asHex[1] == "x" ? asHex.slice(from: 2, upTo: asHex.length) : asHex).toLower()
-        let bytes = withoutPrefix.decodeHex().toConstantSized<[UInt8; 20]>()!
-        return EVMAddress(bytes: bytes)
+        var withoutPrefix = asHex
+        if asHex.length == 42 {
+            assert(
+                asHex[0] == "0" && asHex[1] == "x",
+                message: "EVM.addressFromString(): The 42-character EVM address string must have a '0x' prefix"
+            )
+            withoutPrefix = asHex.slice(from: 2, upTo: asHex.length)
+        }
+
+        return EVMAddress(
+            bytes: withoutPrefix.decodeHex().toConstantSized<[UInt8; 20]>()!
+        )
     }
 
     /// EVMBytes is a type wrapper used for ABI encoding/decoding into
@@ -552,6 +565,9 @@ access(all) contract EVM {
         /// @return the token decimals of the ERC20
         access(all)
         fun deposit(from: @FlowToken.Vault) {
+            pre {
+                !EVM.isPaused(): "EVM operations are temporarily paused"
+            }
             self.address().deposit(from: <-from)
         }
 
@@ -576,6 +592,10 @@ access(all) contract EVM {
         /// @return A FlowToken Vault with the requested balance
         access(Owner | Withdraw)
         fun withdraw(balance: Balance): @FlowToken.Vault {
+            pre {
+                !EVM.isPaused(): "EVM operations are temporarily paused"
+            }
+
             if balance.isZero() {
                 return <-FlowToken.createEmptyVault(vaultType: Type<@FlowToken.Vault>())
             }
@@ -607,6 +627,9 @@ access(all) contract EVM {
             gasLimit: UInt64,
             value: Balance
         ): Result {
+            pre {
+                !EVM.isPaused(): "EVM operations are temporarily paused"
+            }
             return InternalEVM.deploy(
                 from: self.addressBytes,
                 code: code,
@@ -624,6 +647,9 @@ access(all) contract EVM {
             gasLimit: UInt64,
             value: Balance
         ): Result {
+            pre {
+                !EVM.isPaused(): "EVM operations are temporarily paused"
+            }
             return InternalEVM.call(
                 from: self.addressBytes,
                 to: to.bytes,
@@ -647,6 +673,9 @@ access(all) contract EVM {
             value: UInt,
             resultTypes: [Type]?
         ): ResultDecoded {
+            pre {
+                !EVM.isPaused(): "EVM operations are temporarily paused"
+            }
             return InternalEVM.callWithSigAndArgs(
                 from: self.addressBytes,
                 to: to.bytes,
@@ -714,6 +743,9 @@ access(all) contract EVM {
             nft: @{NonFungibleToken.NFT},
             feeProvider: auth(FungibleToken.Withdraw) &{FungibleToken.Provider}
         ) {
+            pre {
+                !EVM.isPaused(): "EVM operations are temporarily paused"
+            }
             EVM.borrowBridgeAccessor().depositNFT(nft: <-nft, to: self.address(), feeProvider: feeProvider)
         }
 
@@ -733,6 +765,9 @@ access(all) contract EVM {
             id: UInt256,
             feeProvider: auth(FungibleToken.Withdraw) &{FungibleToken.Provider}
         ): @{NonFungibleToken.NFT} {
+            pre {
+                !EVM.isPaused(): "EVM operations are temporarily paused"
+            }
             return <- EVM.borrowBridgeAccessor().withdrawNFT(
                 caller: &self as auth(Call) &CadenceOwnedAccount,
                 type: type,
@@ -747,6 +782,9 @@ access(all) contract EVM {
             vault: @{FungibleToken.Vault},
             feeProvider: auth(FungibleToken.Withdraw) &{FungibleToken.Provider}
         ) {
+            pre {
+                !EVM.isPaused(): "EVM operations are temporarily paused"
+            }
             EVM.borrowBridgeAccessor().depositTokens(vault: <-vault, to: self.address(), feeProvider: feeProvider)
         }
 
@@ -759,6 +797,9 @@ access(all) contract EVM {
             amount: UInt256,
             feeProvider: auth(FungibleToken.Withdraw) &{FungibleToken.Provider}
         ): @{FungibleToken.Vault} {
+            pre {
+                !EVM.isPaused(): "EVM operations are temporarily paused"
+            }
             return <- EVM.borrowBridgeAccessor().withdrawTokens(
                 caller: &self as auth(Call) &CadenceOwnedAccount,
                 type: type,
@@ -771,6 +812,9 @@ access(all) contract EVM {
     /// Creates a new cadence owned account
     access(all)
     fun createCadenceOwnedAccount(): @CadenceOwnedAccount {
+        pre {
+            !self.isPaused(): "EVM operations are temporarily paused"
+        }
         let acc <-create CadenceOwnedAccount()
         let addr = InternalEVM.createCadenceOwnedAccount(uuid: acc.uuid)
         acc.initAddress(addressBytes: addr)
@@ -789,6 +833,9 @@ access(all) contract EVM {
     /// @return: The transaction result
     access(all)
     fun run(tx: [UInt8], coinbase: EVMAddress): Result {
+        pre {
+            !self.isPaused(): "EVM operations are temporarily paused"
+        }
         return InternalEVM.run(
             tx: tx,
             coinbase: coinbase.bytes
@@ -874,6 +921,9 @@ access(all) contract EVM {
     /// An invalid transaction is not executed and not included in the block.
     access(all)
     fun batchRun(txs: [[UInt8]], coinbase: EVMAddress): [Result] {
+        pre {
+            !self.isPaused(): "EVM operations are temporarily paused"
+        }
         return InternalEVM.batchRun(
             txs: txs,
             coinbase: coinbase.bytes,
@@ -909,6 +959,9 @@ access(all) contract EVM {
         types: [Type],
         data: [UInt8]
     ): [AnyStruct] {
+        pre {
+            data.length >= 4: "EVM.decodeABIWithSignature(): Cannot decode! The provided data does not contain a signature."
+        }
         let methodID = HashAlgorithm.KECCAK_256.hash(
             signature.utf8
         ).slice(from: 0, upTo: 4)
@@ -1155,7 +1208,25 @@ access(all) contract EVM {
         self.account.storage.save(<-create Heartbeat(), to: /storage/EVMHeartbeat)
     }
 
+    /// Returns whether EVM transactions have been paused, either for
+    /// maintenance or any situation that requires special governance
+    /// handling.
+    ///
+    /// Only the Governance Committee can pause the EVM transactions, with
+    /// a multi-sig Cadence transaction. The EVM enters a read-only mode,
+    /// where all EVM state is available for reading, but no state updates
+    /// are executed.
+    access(all)
+    view fun isPaused(): Bool {
+        return self.account.storage.copy<Bool>(
+            from: /storage/evmOperationsPaused
+        ) ?? false
+    }
+
     init() {
         self.setupHeartbeat()
     }
+
+    // Placeholder to load test helpers available only on Flow Emulator network
+    // #loadTestHelpers
 }

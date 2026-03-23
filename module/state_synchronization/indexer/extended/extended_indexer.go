@@ -45,14 +45,15 @@ type ExtendedIndexer struct {
 	metrics       module.ExtendedIndexingMetrics
 	backfillDelay time.Duration
 
-	chainID           flow.ChainID
-	state             protocol.State
-	headers           storage.Headers
-	index             storage.Index
-	guarantees        storage.Guarantees
-	collections       storage.Collections
-	events            storage.Events
-	results           storage.LightTransactionResults
+	chainID     flow.ChainID
+	state       protocol.State
+	headers     storage.Headers
+	index       storage.Index
+	collections storage.Collections
+	guarantees  storage.Guarantees
+	events      storage.Events
+	results     storage.LightTransactionResults
+
 	systemCollections *access.Versioned[access.SystemCollectionBuilder]
 
 	indexers []Indexer
@@ -74,8 +75,8 @@ func NewExtendedIndexer(
 	db storage.DB,
 	lockManager storage.LockManager,
 	state protocol.State,
-	headers storage.Headers,
 	index storage.Index,
+	headers storage.Headers,
 	guarantees storage.Guarantees,
 	collections storage.Collections,
 	events storage.Events,
@@ -91,7 +92,7 @@ func NewExtendedIndexer(
 
 	log = log.With().Str("component", "extended_indexer").Logger()
 	c := &ExtendedIndexer{
-		log:           log.With().Str("component", "extended_indexer").Logger(),
+		log:           log,
 		db:            db,
 		lockManager:   lockManager,
 		metrics:       metrics,
@@ -176,7 +177,7 @@ func (c *ExtendedIndexer) IndexBlockData(
 	c.latestBlockData = &BlockData{
 		Header:       header,
 		Transactions: transactions,
-		Events:       groupEventsByTxIndex(events),
+		Events:       events,
 	}
 	c.notifier.Notify()
 
@@ -349,7 +350,7 @@ func (c *ExtendedIndexer) blockDataFromStorage(height uint64) (BlockData, error)
 		// results will similarly return an empty slice and no error if no results are found
 		// or if the block's execution data is not indexed yet.
 		if len(results) == 0 {
-			return BlockData{}, fmt.Errorf("results for block %d not indexed yet: %w", header.Height, storage.ErrNotFound)
+			return BlockData{}, fmt.Errorf("results for block %d not indexed yet: %w", height, storage.ErrNotFound)
 		}
 	}
 
@@ -368,7 +369,7 @@ func (c *ExtendedIndexer) blockDataFromStorage(height uint64) (BlockData, error)
 
 	// the system collection is not indexed, so construct it.
 	sysCollection, err := c.systemCollections.
-		ByHeight(header.Height).
+		ByHeight(height).
 		SystemCollection(c.chainID.Chain(), access.StaticEventProvider(events))
 	if err != nil {
 		return BlockData{}, fmt.Errorf("could not construct system collection: %w", err)
@@ -378,7 +379,7 @@ func (c *ExtendedIndexer) blockDataFromStorage(height uint64) (BlockData, error)
 	return BlockData{
 		Header:       header,
 		Transactions: transactions,
-		Events:       groupEventsByTxIndex(events),
+		Events:       events,
 	}, nil
 }
 
@@ -426,13 +427,4 @@ func buildGroupLookup(indexers []Indexer, latestBlockData *BlockData) ([]Indexer
 	}
 
 	return liveGroup, backfillGroups, nil
-}
-
-// groupEventsByTxIndex returns a map of events grouped by transaction index in the original event order.
-func groupEventsByTxIndex(events []flow.Event) map[uint32][]flow.Event {
-	groups := make(map[uint32][]flow.Event)
-	for _, event := range events {
-		groups[event.TransactionIndex] = append(groups[event.TransactionIndex], event)
-	}
-	return groups
 }

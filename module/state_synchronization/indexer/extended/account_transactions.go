@@ -9,10 +9,12 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/cadence"
-	"github.com/onflow/cadence/encoding/ccf"
 
+	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/access"
+	"github.com/onflow/flow-go/model/access/systemcollection"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/state_synchronization/indexer/extended/events"
 	"github.com/onflow/flow-go/storage"
 )
 
@@ -20,26 +22,41 @@ const accountTransactionsIndexerName = "account_transactions"
 
 // AccountTransactions indexes account-transaction associations for a block.
 type AccountTransactions struct {
-	log         zerolog.Logger
-	store       storage.AccountTransactionsBootstrapper
-	chainID     flow.ChainID
-	lockManager storage.LockManager
+	log                      zerolog.Logger
+	store                    storage.AccountTransactionsBootstrapper
+	chainID                  flow.ChainID
+	lockManager              storage.LockManager
+	serviceAccount           flow.Address
+	scheduledExecutorAccount flow.Address
+	systemCollections        *systemcollection.Versioned
 }
 
+type AccountTransactionsMetadata struct{}
+
 var _ Indexer = (*AccountTransactions)(nil)
+var _ IndexProcessor[access.AccountTransaction, AccountTransactionsMetadata] = (*AccountTransactions)(nil)
 
 func NewAccountTransactions(
 	log zerolog.Logger,
 	store storage.AccountTransactionsBootstrapper,
 	chainID flow.ChainID,
 	lockManager storage.LockManager,
-) *AccountTransactions {
-	return &AccountTransactions{
-		log:         log.With().Str("component", "account_tx_indexer").Logger(),
-		store:       store,
-		chainID:     chainID,
-		lockManager: lockManager,
+) (*AccountTransactions, error) {
+	sc := systemcontracts.SystemContractsForChain(chainID)
+	systemCollections, err := systemcollection.NewVersioned(chainID.Chain(), systemcollection.Default(chainID))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create system collection set: %w", err)
 	}
+
+	return &AccountTransactions{
+		log:                      log.With().Str("component", "account_tx_indexer").Logger(),
+		store:                    store,
+		chainID:                  chainID,
+		lockManager:              lockManager,
+		serviceAccount:           sc.FlowServiceAccount.Address,
+		scheduledExecutorAccount: sc.ScheduledTransactionExecutor.Address,
+		systemCollections:        systemCollections,
+	}, nil
 }
 
 // Name returns the name of the indexer.
@@ -74,7 +91,7 @@ func (a *AccountTransactions) NextHeight() (uint64, error) {
 //
 // The caller must hold the [storage.LockIndexAccountTransactions] lock until the batch is committed.
 //
-// Not safe for concurrent use.
+// CAUTION: Not safe for concurrent use.
 //
 // Expected error returns during normal operations:
 //   - [ErrAlreadyIndexed]: if the data is already indexed for the height.
@@ -91,7 +108,7 @@ func (a *AccountTransactions) IndexBlockData(lctx lockctx.Proof, data BlockData,
 		return ErrAlreadyIndexed
 	}
 
-	entries, err := a.buildAccountTransactionsFromBlockData(data)
+	entries, _, err := a.ProcessBlockData(data)
 	if err != nil {
 		return fmt.Errorf("failed to build account transactions from block data: %w", err)
 	}
@@ -105,7 +122,10 @@ func (a *AccountTransactions) IndexBlockData(lctx lockctx.Proof, data BlockData,
 	return nil
 }
 
-func (a *AccountTransactions) buildAccountTransactionsFromBlockData(data BlockData) ([]access.AccountTransaction, error) {
+// ProcessBlockData processes the block data and returns the indexed account transaction entries.
+//
+// No error returns are expected during normal operation.
+func (a *AccountTransactions) ProcessBlockData(data BlockData) ([]access.AccountTransaction, AccountTransactionsMetadata, error) {
 	chain := a.chainID.Chain()
 	entries := make([]access.AccountTransaction, 0)
 
@@ -116,8 +136,20 @@ func (a *AccountTransactions) buildAccountTransactionsFromBlockData(data BlockDa
 		addrRoles[addr] = append(addrRoles[addr], role)
 	}
 
+	eventsByTxIndex := groupEventsByTxIndex(data.Events)
+
+	// By the Flow protocol, system chunk transactions always appear after all user transactions
+	// in a block. Once the first system transaction is encountered, all subsequent transactions
+	// are also part of the system chunk.
+	isSystemChunk := false
 	for i, tx := range data.Transactions {
 		txIndex := uint32(i)
+		txID := tx.ID()
+
+		// all tx after the first system tx are in the system chunk
+		if !isSystemChunk {
+			_, isSystemChunk = a.systemCollections.SearchAll(txID)
+		}
 
 		// Track roles per address. An address can have multiple roles (e.g., payer AND authorizer).
 		addrRoles := make(map[flow.Address][]access.TransactionRole)
@@ -125,14 +157,22 @@ func (a *AccountTransactions) buildAccountTransactionsFromBlockData(data BlockDa
 		addRole(addrRoles, tx.Payer, access.TransactionRolePayer)
 		addRole(addrRoles, tx.ProposalKey.Address, access.TransactionRoleProposer)
 		for _, auth := range tx.Authorizers {
+			// the service account authorizes all system transactions, and the scheduled tx executor
+			// account authorizes all scheduled transactions. skip indexing since we can derive them
+			// as needed.
+			if isSystemChunk {
+				if auth == a.serviceAccount || auth == a.scheduledExecutorAccount {
+					continue
+				}
+			}
 			addRole(addrRoles, auth, access.TransactionRoleAuthorizer)
 		}
 
 		seen := make(map[flow.Address]struct{})
-		for _, event := range data.Events[txIndex] {
+		for _, event := range eventsByTxIndex[txIndex] {
 			eventAddresses, err := a.extractAddresses(event)
 			if err != nil {
-				return nil, fmt.Errorf("failed to extract addresses from event: %w", err)
+				return nil, AccountTransactionsMetadata{}, fmt.Errorf("failed to extract addresses from event: %w", err)
 			}
 			for _, addr := range eventAddresses {
 				// only add the role once for an address per transaction
@@ -145,7 +185,7 @@ func (a *AccountTransactions) buildAccountTransactionsFromBlockData(data BlockDa
 				// that the event contains invalid addresses, or addresses from a different chain.
 				// Only index addresses that are actually valid for the current chain.
 				if chain.IsValid(addr) {
-					addRole(addrRoles, addr, access.TransactionRoleInteraction)
+					addRole(addrRoles, addr, access.TransactionRoleInteracted)
 				}
 			}
 		}
@@ -155,20 +195,20 @@ func (a *AccountTransactions) buildAccountTransactionsFromBlockData(data BlockDa
 			entries = append(entries, access.AccountTransaction{
 				Address:          addr,
 				BlockHeight:      data.Header.Height,
-				TransactionID:    tx.ID(),
+				TransactionID:    txID,
 				TransactionIndex: txIndex,
 				Roles:            roles,
 			})
 		}
 	}
-	return entries, nil
+	return entries, AccountTransactionsMetadata{}, nil
 }
 
 // extractAddresses extracts all addresses referenced in a flow event.
 //
 // No error returns are expected during normal operation.
 func (a *AccountTransactions) extractAddresses(event flow.Event) ([]flow.Address, error) {
-	cadenceEvent, err := decodeEventPayload(event.Payload)
+	cadenceEvent, err := events.DecodePayload(event)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode event payload: %w", err)
 	}
@@ -194,21 +234,4 @@ func (a *AccountTransactions) extractAddresses(event flow.Event) ([]flow.Address
 		}
 	}
 	return addresses, nil
-}
-
-// decodeEventPayload decodes CCF-encoded event payload.
-//
-// Any error indicates that the event payload is malformed.
-func decodeEventPayload(payload []byte) (cadence.Event, error) {
-	value, err := ccf.Decode(nil, payload)
-	if err != nil {
-		return cadence.Event{}, fmt.Errorf("failed to decode CCF payload: %w", err)
-	}
-
-	event, ok := value.(cadence.Event)
-	if !ok {
-		return cadence.Event{}, fmt.Errorf("decoded value is not an event: %T", value)
-	}
-
-	return event, nil
 }

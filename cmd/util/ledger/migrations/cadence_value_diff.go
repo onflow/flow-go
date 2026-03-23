@@ -863,6 +863,7 @@ func (dr *CadenceValueDiffReporter) diffCadenceDictionaryValue(
 			oldKeys = append(oldKeys, key)
 			return true
 		},
+		false,
 	)
 
 	newKeys := make([]interpreter.Value, 0, otherDictionary.Count())
@@ -872,6 +873,7 @@ func (dr *CadenceValueDiffReporter) diffCadenceDictionaryValue(
 			newKeys = append(newKeys, key)
 			return true
 		},
+		false,
 	)
 
 	onlyOldKeys := make([]interpreter.Value, 0, len(oldKeys))

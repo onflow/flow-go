@@ -27,6 +27,9 @@ type AccountTransactionsBootstrapper struct {
 
 var _ storage.AccountTransactionsBootstrapper = (*AccountTransactionsBootstrapper)(nil)
 
+// NewAccountTransactionsBootstrapper creates a new account transactions bootstrapper.
+//
+// No error returns are expected during normal operation.
 func NewAccountTransactionsBootstrapper(db storage.DB, initialStartHeight uint64) (*AccountTransactionsBootstrapper, error) {
 	store, err := NewAccountTransactions(db)
 	if err != nil {
@@ -40,7 +43,7 @@ func NewAccountTransactionsBootstrapper(db storage.DB, initialStartHeight uint64
 	return &AccountTransactionsBootstrapper{
 		db:                 db,
 		initialStartHeight: initialStartHeight,
-		store:              atomic.NewPointer[AccountTransactions](store),
+		store:              atomic.NewPointer(store),
 	}, nil
 }
 
@@ -79,23 +82,25 @@ func (b *AccountTransactionsBootstrapper) UninitializedFirstHeight() (uint64, bo
 	return store.FirstIndexedHeight(), true
 }
 
-// TransactionsByAddress retrieves transaction references for an account within the specified
-// block height range (inclusive). Results are returned in descending order (newest first).
+// ByAddress returns an iterator over transactions for the given account.
+// See [AccountTransactions.ByAddress] for full documentation.
 //
 // Expected error returns during normal operations:
 //   - [storage.ErrNotBootstrapped] if the index has not been initialized
-//   - [storage.ErrHeightNotIndexed] if the requested range extends beyond indexed heights
-func (b *AccountTransactionsBootstrapper) TransactionsByAddress(account flow.Address, startHeight uint64, endHeight uint64) ([]access.AccountTransaction, error) {
+//   - [storage.ErrHeightNotIndexed] if the cursor height extends beyond indexed heights
+func (b *AccountTransactionsBootstrapper) ByAddress(
+	account flow.Address,
+	cursor *access.AccountTransactionCursor,
+) (storage.IndexIterator[access.AccountTransaction, access.AccountTransactionCursor], error) {
 	store := b.store.Load()
 	if store == nil {
 		return nil, storage.ErrNotBootstrapped
 	}
-	return store.TransactionsByAddress(account, startHeight, endHeight)
+	return store.ByAddress(account, cursor)
 }
 
 // Store indexes all account-transaction associations for a block.
 // Must be called sequentially with consecutive heights (latestHeight + 1).
-// Calling with the last height is a no-op.
 // The caller must hold the [storage.LockIndexAccountTransactions] lock until the batch is committed.
 //
 // Expected error returns during normal operations:

@@ -99,8 +99,8 @@ func TestScripts(t *testing.T) {
 		router.AssertResponse(
 			t,
 			req,
-			http.StatusBadRequest,
-			`{"code":400, "message":"Invalid Flow request: internal server error"}`,
+			http.StatusInternalServerError,
+			`{"code":500, "message":"Invalid Flow request: internal server error"}`,
 			backend,
 		)
 	})

@@ -119,8 +119,8 @@ func (s *ExtendedIndexerSuite) newExtendedIndexer(
 		s.db,
 		storage.NewTestingLockManager(),
 		state,
-		s.headers,
 		s.index,
+		s.headers,
 		s.guarantees,
 		s.collections,
 		s.events,
@@ -213,26 +213,10 @@ func (s *ExtendedIndexerSuite) assertLiveBlockData(m *mockIndexer, fixture *bloc
 	s.assertEventGroups(data.Events, fixture.Events)
 }
 
-// assertEventGroups verifies that the actual event map matches the expected events when grouped
-// by transaction index. Each group is compared element-by-element to ensure correct ordering.
-func (s *ExtendedIndexerSuite) assertEventGroups(actual map[uint32][]flow.Event, allEvents []flow.Event) {
+// assertEventGroups verifies that the actual events match the expected events.
+func (s *ExtendedIndexerSuite) assertEventGroups(actual []flow.Event, allEvents []flow.Event) {
 	s.T().Helper()
-
-	// Build expected groups independently from the production groupEventsByTxIndex.
-	expected := make(map[uint32][]flow.Event)
-	for _, event := range allEvents {
-		expected[event.TransactionIndex] = append(expected[event.TransactionIndex], event)
-	}
-
-	require.Equal(s.T(), len(expected), len(actual), "event group count mismatch")
-	for txIndex, expectedGroup := range expected {
-		actualGroup, ok := actual[txIndex]
-		require.True(s.T(), ok, "missing event group for tx index %d", txIndex)
-		require.Len(s.T(), actualGroup, len(expectedGroup), "event count mismatch for tx index %d", txIndex)
-
-		// must be in the same order
-		assert.Equal(s.T(), expectedGroup, actualGroup, "event mismatch at tx index %d", txIndex)
-	}
+	assert.Equal(s.T(), allEvents, actual)
 }
 
 // ===== Tests =====
@@ -449,8 +433,8 @@ func (s *ExtendedIndexerSuite) TestBackfillRetryOnNotFound() {
 
 	// Let a few timer iterations pass with ErrNotFound -- indexer should not have advanced.
 	require.Never(s.T(), func() bool {
-		return idx.nextHeight.Load() > 5
-	}, 50*time.Millisecond, time.Millisecond, "indexer should not have advanced before data is available")
+		return idx.nextHeight.Load() > 5 // startHeight
+	}, 50*time.Millisecond, time.Millisecond, "indexer should not have advanced")
 
 	// Make data available -- next timer tick should process it.
 	available.Store(true)
@@ -485,7 +469,7 @@ func (s *ExtendedIndexerSuite) TestIndexerError() {
 
 	select {
 	case err := <-thrown:
-		assert.ErrorIs(s.T(), err, indexerErr)
+		s.Assert().ErrorIs(err, indexerErr)
 	case <-time.After(testTimeout):
 		s.T().Fatal("timeout waiting for thrown error")
 	}
@@ -512,7 +496,7 @@ func (s *ExtendedIndexerSuite) TestBackfillError() {
 
 	select {
 	case err := <-thrown:
-		assert.ErrorIs(s.T(), err, backfillErr)
+		s.Assert().ErrorIs(err, backfillErr)
 	case <-time.After(testTimeout):
 		s.T().Fatal("timeout waiting for thrown error")
 	}
@@ -528,11 +512,11 @@ func (s *ExtendedIndexerSuite) TestAlreadyIndexedSkipped() {
 	idx2.On("Name").Return("b")
 	idx1.On("NextHeight").Return(liveHeight, nil)
 	idx2.On("NextHeight").Return(liveHeight, nil)
-	// idx1 returns ErrAlreadyIndexed -- should be skipped without error.
+	// idx1 returns ErrAlreadyIndexed — should be skipped without error
 	idx1.On("IndexBlockData", mock.Anything, mock.Anything, mock.Anything).
 		Return(extended.ErrAlreadyIndexed).Once()
 
-	// idx2 succeeds -- signals done.
+	// idx2 succeeds — signals done
 	done := make(chan struct{})
 	idx2.On("IndexBlockData", mock.Anything, mock.Anything, mock.Anything).
 		Return(nil).Once().Run(func(args mock.Arguments) {
@@ -554,49 +538,103 @@ func (s *ExtendedIndexerSuite) TestNonSequentialHeight() {
 	s.newExtendedIndexer(protocolmock.NewState(s.T()), []extended.Indexer{idx}, time.Hour)
 	s.startComponent()
 
-	// First call succeeds.
+	// First call succeeds
 	s.provideBlock(11)
 
-	// Non-sequential height is rejected.
+	// Non-sequential height is rejected
 	header := unittest.BlockHeaderFixtureOnChain(flow.Testnet, unittest.WithHeaderHeight(13))
 	err := s.ext.IndexBlockData(header, nil, nil)
-	assert.Error(s.T(), err)
-	assert.Contains(s.T(), err.Error(), fmt.Sprintf("unexpected block received: expected height %d, got %d", 12, 13))
+	s.Assert().Error(err)
+	s.Assert().Contains(err.Error(), fmt.Sprintf("unexpected block received: expected height %d, got %d", 12, 13))
 }
 
-// ===== Fixture Types and Helpers =====
+// mockIndexer wraps the mock with atomic state tracking.
+type mockIndexer struct {
+	*extendedmock.Indexer
+	nextHeight   *atomic.Uint64
+	done         chan struct{}
+	receivedData sync.Map // maps uint64 (height) -> extended.BlockData
+}
 
-// blockFixtures holds pre-generated, internally consistent test data for a single block.
-// The guarantee->collection wiring is set up so that:
-//   - Index.GuaranteeIDs[i] == Guarantees[i].ID()
-//   - Guarantees[i].CollectionID == Collections[i].ID()
+// blockDataForHeight returns the BlockData received for the given height, or nil if not received.
+func (m *mockIndexer) blockDataForHeight(height uint64) *extended.BlockData {
+	val, ok := m.receivedData.Load(height)
+	if !ok {
+		return nil
+	}
+	data := val.(extended.BlockData)
+	return &data
+}
+
+// newMockIndexer creates a mock indexer using an atomic counter for NextHeight.
+// Each successful IndexBlockData call advances the counter to data.Header.Height + 1.
+// The done channel is closed when the targetHeight is processed (0 means never).
+func newMockIndexer(
+	t *testing.T,
+	name string,
+	startHeight uint64,
+	targetHeight uint64,
+) *mockIndexer {
+	idx := extendedmock.NewIndexer(t)
+	nextHeight := atomic.NewUint64(startHeight)
+	done := make(chan struct{})
+	var doneOnce sync.Once
+
+	m := &mockIndexer{Indexer: idx, nextHeight: nextHeight, done: done}
+
+	idx.On("Name").Return(name)
+
+	idx.On("NextHeight").Return(func() (uint64, error) {
+		return nextHeight.Load(), nil
+	})
+	idx.On("IndexBlockData", mock.Anything, mock.Anything, mock.Anything).
+		Run(func(args mock.Arguments) {
+			data := args.Get(1).(extended.BlockData)
+			nextHeight.Store(data.Header.Height + 1)
+			m.receivedData.Store(data.Header.Height, data)
+			if targetHeight > 0 && data.Header.Height == targetHeight {
+				doneOnce.Do(func() { close(done) })
+			}
+		}).
+		Return(nil)
+
+	return m
+}
+
+// newMockState returns a mock protocol.State where Params().SporkRootBlockHeight() returns 0.
+func newMockState(t *testing.T) protocol.State {
+	params := protocolmock.NewParams(t)
+	params.On("SporkRootBlockHeight").Return(uint64(0))
+
+	state := protocolmock.NewState(t)
+	state.On("Params").Return(params)
+	return state
+}
+
+// blockFixtures holds all data for a single block used in suite tests.
 type blockFixtures struct {
-	Header      *flow.Header
-	Collections []*flow.Collection
-	Guarantees  []*flow.CollectionGuarantee
-	Events      []flow.Event
-	Index       *flow.Index
-
-	// SystemCollection contains the expected system collection transactions (process callback,
-	// execute callbacks, and system chunk transaction). These are appended after user transactions
-	// during backfill.
+	Header           *flow.Header
+	Index            *flow.Index
+	Events           []flow.Event
+	Guarantees       []*flow.CollectionGuarantee
+	Collections      []*flow.Collection
 	SystemCollection *flow.Collection
 }
 
-// userTransactions returns all transactions from the fixture's collections, in order.
-func (f *blockFixtures) userTransactions() []*flow.TransactionBody {
+// userTransactions returns all transactions from the block's user collections.
+func (b *blockFixtures) userTransactions() []*flow.TransactionBody {
 	var txs []*flow.TransactionBody
-	for _, coll := range f.Collections {
+	for _, coll := range b.Collections {
 		txs = append(txs, coll.Transactions...)
 	}
 	return txs
 }
 
-// allTransactions returns user transactions followed by system transactions,
-// matching the expected output of the backfill pipeline.
-func (f *blockFixtures) allTransactions() []*flow.TransactionBody {
-	txs := f.userTransactions()
-	return append(txs, f.SystemCollection.Transactions...)
+// allTransactions returns user transactions followed by system transactions.
+func (b *blockFixtures) allTransactions() []*flow.TransactionBody {
+	txs := b.userTransactions()
+	txs = append(txs, b.SystemCollection.Transactions...)
+	return txs
 }
 
 // generateBlockFixtures creates internally consistent fixture data for a block at the given height.
@@ -623,91 +661,4 @@ func generateBlockFixtures(t *testing.T, g *fixtures.GeneratorSuite, height uint
 		Index:            fixture.Index,
 		SystemCollection: systemCollection,
 	}
-}
-
-// ===== Mock Helpers =====
-
-// mockIndexer wraps the mock with atomic state tracking and received data capture.
-type mockIndexer struct {
-	*extendedmock.Indexer
-	targetHeight uint64
-	nextHeight   *atomic.Uint64
-	done         chan struct{}
-
-	mu       sync.Mutex
-	received map[uint64]extended.BlockData
-	isDone   bool
-}
-
-// blockDataForHeight returns the BlockData received for the given height, or nil if not found.
-func (m *mockIndexer) blockDataForHeight(height uint64) *extended.BlockData {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	data, ok := m.received[height]
-	if !ok {
-		return nil
-	}
-	return &data
-}
-
-// receiveBlockData receives a block data and updates the mock indexer's state.
-func (m *mockIndexer) receiveBlockData(t *testing.T, data extended.BlockData) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	require.Equal(t, m.nextHeight.Load(), data.Header.Height, "expected height %d, got %d", data.Header.Height, m.nextHeight.Load())
-
-	m.received[data.Header.Height] = data
-	m.nextHeight.Store(data.Header.Height + 1)
-
-	if data.Header.Height >= m.targetHeight && m.targetHeight > 0 && !m.isDone {
-		m.isDone = true
-		close(m.done)
-	}
-}
-
-// newMockIndexer creates a mock indexer that captures received BlockData.
-// Each successful IndexBlockData call advances the counter to data.Header.Height + 1.
-// The done channel is closed when the targetHeight is processed (0 means never).
-func newMockIndexer(
-	t *testing.T,
-	name string,
-	startHeight uint64,
-	targetHeight uint64,
-) *mockIndexer {
-	idx := extendedmock.NewIndexer(t)
-	m := &mockIndexer{
-		Indexer:      idx,
-		targetHeight: targetHeight,
-		nextHeight:   atomic.NewUint64(startHeight),
-		done:         make(chan struct{}),
-		received:     make(map[uint64]extended.BlockData),
-	}
-
-	idx.On("Name").Return(name)
-
-	idx.On("NextHeight").Return(func() (uint64, error) {
-		return m.nextHeight.Load(), nil
-	})
-
-	idx.On("IndexBlockData", mock.Anything, mock.Anything, mock.Anything).
-		Run(func(args mock.Arguments) {
-			data, ok := args.Get(1).(extended.BlockData)
-			require.True(t, ok, "expected extended.BlockData, got %T", args.Get(1))
-
-			m.receiveBlockData(t, data)
-		}).
-		Return(nil)
-
-	return m
-}
-
-// newMockState returns a mock protocol.State where Params().SporkRootBlockHeight() returns 0.
-func newMockState(t *testing.T) protocol.State {
-	params := protocolmock.NewParams(t)
-	params.On("SporkRootBlockHeight").Return(uint64(0))
-
-	state := protocolmock.NewState(t)
-	state.On("Params").Return(params)
-	return state
 }
