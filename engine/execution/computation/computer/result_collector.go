@@ -218,6 +218,7 @@ func (collector *resultCollector) processTransactionResult(
 	numConflictRetries int,
 ) error {
 	logger := txn.ctx.Logger.With().
+		Hex("tx_id", txn.ID[:]).
 		Uint64("computation_used", output.ComputationUsed).
 		Uint64("memory_used", output.MemoryEstimate).
 		Int64("time_spent_in_ms", timeSpent.Milliseconds()).
@@ -248,7 +249,6 @@ func (collector *resultCollector) processTransactionResult(
 	// Same for the metrics.
 	if len(output.InspectionResults) == 0 {
 		logger.Debug().
-			Hex("tx_id", txn.ID[:]).
 			Msg("no inspection results for transaction")
 	}
 
