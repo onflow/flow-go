@@ -36,7 +36,6 @@ type transactionCoordinator struct {
 	// critical section (guraded by mutex).
 	database        *storage.BlockDatabase
 	writeBehindLog  TransactionWriteBehindLogger
-	storageSnapshot snapshot.StorageSnapshot // used for inspection
 }
 
 type transaction struct {
@@ -72,7 +71,6 @@ func newTransactionCoordinator(
 		abortErr:        nil,
 		database:        database,
 		writeBehindLog:  writeBehindLog,
-		storageSnapshot: storageSnapshot,
 	}
 }
 

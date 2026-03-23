@@ -38,6 +38,10 @@ func NewTokenChangesInspector(searchedTokens TokenChangesSearchTokens) *TokenCha
 	return &TokenChanges{searchedTokens: searchedTokens}
 }
 
+func (td *TokenChanges) Name() string {
+	return "TokenChanges"
+}
+
 // SetSearchedTokens are safe to replace whenever.
 // The change will not affect the inspections already in progress.
 // TODO: this can be tied into the admin commands
@@ -66,12 +70,12 @@ func (td *TokenChanges) getSearchedTokensRef() TokenChangesSearchTokens {
 //
 // Inspect could technically be run on chunk data packs.
 func (td *TokenChanges) Inspect(
-	logger zerolog.Logger,
+	log zerolog.Logger,
 	storage snapshot.StorageSnapshot,
 	executionSnapshot *snapshot.ExecutionSnapshot,
 	events []flow.Event,
 ) (diff Result, err error) {
-	logger.Debug().Str("module", "tc-inspector").
+	log.Debug().
 		Int("events", len(events)).
 		Int("read_set", len(executionSnapshot.ReadSet)).
 		Int("write_set", len(executionSnapshot.WriteSet)).
@@ -79,7 +83,8 @@ func (td *TokenChanges) Inspect(
 
 	defer func() {
 		if r := recover(); r != nil {
-			logger.Warn().Str("module", "tc-inspector").Msgf("trace=%s", string(debug.Stack()))
+			// info level is sufficient since the error is already getting logged outside of this function
+			log.Info().Msgf("trace=%s", string(debug.Stack()))
 			err = fmt.Errorf("panic: %v", r)
 		}
 
@@ -88,12 +93,12 @@ func (td *TokenChanges) Inspect(
 		}
 	}()
 
-	diff, err = td.getTokenDiff(logger, storage, executionSnapshot, events, td.getSearchedTokensRef())
+	diff, err = td.getTokenDiff(log, storage, executionSnapshot, events, td.getSearchedTokensRef())
 	return
 }
 
 func (td *TokenChanges) getTokenDiff(
-	logger zerolog.Logger,
+	log zerolog.Logger,
 	storage snapshot.StorageSnapshot,
 	executionSnapshot *snapshot.ExecutionSnapshot,
 	events []flow.Event,
@@ -116,14 +121,14 @@ func (td *TokenChanges) getTokenDiff(
 		addresses[common.Address([]byte(k.Owner))] = struct{}{}
 	}
 
-	logger.Info().Str("module", "tc-inspector").
+	log.Debug().
 		Int("touched_registers", len(allTouched)).
 		Int("addresses_to_inspect", len(addresses)).
 		Int("searched_tokens", len(searchedTokens)).
 		Msg("inspecting token movements")
 
 	if len(addresses) == 0 {
-		logger.Info().Str("module", "tc-inspector").Msg("no addresses touched, skipping token inspection")
+		log.Debug().Msg("no addresses touched, skipping token inspection")
 		return TokenDiffResult{
 			Changes:           make(map[flow.Address]AccountChange),
 			KnownSourcesSinks: make(map[string]int64),
@@ -134,11 +139,11 @@ func (td *TokenChanges) getTokenDiff(
 	newValuesRegister := executionSnapshotLedgers.NewValuesLedger()
 
 	// TODO(janezp): possible optimisation: run both at the same time
-	before, err := td.getTokens(logger, oldRegistersLedger, addresses, tokenDiffSearchDomains, searchedTokens)
+	before, err := td.getTokens(log, oldRegistersLedger, addresses, tokenDiffSearchDomains, searchedTokens)
 	if err != nil {
 		return TokenDiffResult{}, fmt.Errorf("failed to get tokens before: %w", err)
 	}
-	after, err := td.getTokens(logger, newValuesRegister, addresses, tokenDiffSearchDomains, searchedTokens)
+	after, err := td.getTokens(log, newValuesRegister, addresses, tokenDiffSearchDomains, searchedTokens)
 	if err != nil {
 		return TokenDiffResult{}, fmt.Errorf("failed to get tokens after: %w", err)
 	}
@@ -159,7 +164,7 @@ func (td *TokenChanges) getTokenDiff(
 		if len(diff) == 0 {
 			// Only log if the account had tokens before or after
 			if len(beforeTokens) > 0 || len(afterTokens) > 0 {
-				logger.Debug().Str("module", "tc-inspector").
+				log.Debug().
 					Str("account", a.String()).
 					Interface("before", beforeTokens).
 					Interface("after", afterTokens).
@@ -167,7 +172,7 @@ func (td *TokenChanges) getTokenDiff(
 			}
 			continue
 		}
-		logger.Debug().Str("module", "tc-inspector").
+		log.Debug().
 			Str("account", a.String()).
 			Interface("before", beforeTokens).
 			Interface("after", afterTokens).
@@ -186,13 +191,13 @@ func (td *TokenChanges) getTokenDiff(
 	// Only log as debug because it's going to get properly logged in `TokenDiffResult.AsLogEvent()`
 	unaccounted := tokenDiffResult.UnaccountedTokens()
 	if len(unaccounted) > 0 {
-		logger.Debug().Str("module", "tc-inspector").
+		log.Debug().
 			Int("accounts_changed", len(tokenDiffResult.Changes)).
 			Interface("sources_sinks", sourcesSinks).
 			Interface("unaccounted", unaccounted).
 			Msg("token inspection complete - unaccounted token movements detected")
 	} else if len(tokenDiffResult.Changes) > 0 {
-		logger.Debug().Str("module", "tc-inspector").
+		log.Debug().
 			Int("accounts_changed", len(tokenDiffResult.Changes)).
 			Interface("sources_sinks", sourcesSinks).
 			Msg("token inspection complete - all movements accounted for")
@@ -250,7 +255,7 @@ func (td *TokenChanges) getTokens(
 			}
 		}
 		if len(tkns) > 0 {
-			logger.Info().Str("module", "tc-inspector").
+			logger.Debug().
 				Str("account", a.String()).
 				Interface("tokens", tkns).
 				Msg("found tokens in account")
@@ -261,7 +266,7 @@ func (td *TokenChanges) getTokens(
 }
 
 func getDomainStorageMap(
-	logger zerolog.Logger,
+	log zerolog.Logger,
 	storageRuntime *readonlyStorageRuntime,
 	storageMutationTracker interpreter.StorageMutationTracker,
 	address common.Address,
@@ -269,7 +274,7 @@ func getDomainStorageMap(
 ) (dm *interpreter.DomainStorageMap) {
 	defer func() {
 		if r := recover(); r != nil {
-			logger.Warn().Str("module", "tc-inspector").Msgf("failed to get domain storage map %s.%s: %v", address.String(), domain.Identifier(), r)
+			log.Warn().Msgf("failed to get domain storage map %s.%s: %v", address.String(), domain.Identifier(), r)
 			dm = nil
 		}
 	}()
@@ -542,12 +547,16 @@ type TokenDiffResult struct {
 
 var _ Result = TokenDiffResult{}
 
+func (r TokenDiffResult) InspectionName() string {
+	return "token-tracker-inspection"
+}
+
 func (r TokenDiffResult) AsLogEvent() (zerolog.Level, func(e *zerolog.Event)) {
 	unaccountedTokens := r.UnaccountedTokens()
 
 	if len(unaccountedTokens) == 0 {
 		// everything is ok: log no issues with debug logging
-		return zerolog.DebugLevel, func(e *zerolog.Event) { e.Str("token_diff", "no issues") }
+		return zerolog.InfoLevel, func(e *zerolog.Event) { e.Str(r.InspectionName(), "no issues") }
 	}
 
 	anyPositive := false
@@ -562,6 +571,7 @@ func (r TokenDiffResult) AsLogEvent() (zerolog.Level, func(e *zerolog.Event)) {
 	if anyPositive {
 		// if any tracked token increase in supply
 		// log at error level
+		// otherwise just use warn level
 		level = zerolog.ErrorLevel
 	}
 
@@ -570,7 +580,7 @@ func (r TokenDiffResult) AsLogEvent() (zerolog.Level, func(e *zerolog.Event)) {
 		for k, v := range unaccountedTokens {
 			dict = dict.Int64(k, v)
 		}
-		e.Dict("token_diff", dict)
+		e.Dict(r.InspectionName(), dict)
 	}
 }
 
@@ -692,10 +702,7 @@ func getSlabIDsFromRegisters(registers registers) ([]atree.SlabID, error) {
 var tokenDiffSearchDomains = []common.StorageDomain{
 	common.StorageDomainPathStorage,
 	common.StorageDomainContract,
-
-	common.StorageDomainPathPrivate, // ?? probably not needed. TODO: check
-	common.StorageDomainInbox,       // ?? probably not needed. TODO: check
-	// do we need any other? TODO: check
+	common.StorageDomainInbox,
 }
 
 type TokenChangesSearchTokens map[string]SearchToken

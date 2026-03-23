@@ -311,7 +311,8 @@ func (collector *resultCollector) logInspectionResults(
 	logLevel := zerolog.InfoLevel
 	for i, inspectionResult := range results {
 		if inspectionResult == nil {
-			log.Warn().
+			// This code path is unlikely since it should be handled earlier
+			log.Error().
 				Int("index", i).
 				Msg("inspection result is nil, likely due to a panic or error during inspection")
 			continue
@@ -327,14 +328,15 @@ func (collector *resultCollector) logInspectionResults(
 
 	// if there are no loggable inspection results, don't log at all
 	if len(logEvents) == 0 {
+
 		return
 	}
 
-	evt := log.WithLevel(logLevel).Str("module", "tc-inspector")
+	evt := log.WithLevel(logLevel).Str("module", "transaction-inspection")
 	for _, logEvent := range logEvents {
 		logEvent(evt)
 	}
-	evt.Msg("Inspection results")
+	evt.Msg("Transaction inspection results")
 }
 
 func (collector *resultCollector) handleTransactionExecutionMetrics(
