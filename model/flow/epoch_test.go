@@ -16,21 +16,11 @@ func TestMalleability(t *testing.T) {
 	t.Run("EpochSetup", func(t *testing.T) {
 		unittest.RequireEntityNonMalleable(t, unittest.EpochSetupFixture())
 	})
-	t.Run("EpochCommit with nil DKGIndexMap", func(t *testing.T) {
-		require.Nil(t, unittest.EpochCommitFixture().DKGIndexMap) // sanity check that the fixture has left `DKGIndexMap` nil
-		unittest.RequireEntityNonMalleable(t, unittest.EpochCommitFixture(),
-			// We pin the `DKGIndexMap` to the current value (nil), so `MalleabilityChecker` will not mutate this field:
-			unittest.WithPinnedField("DKGIndexMap"),
-		)
-	})
-
 	t.Run("EpochCommit with proper DKGIndexMap", func(t *testing.T) {
 		checker := unittest.NewMalleabilityChecker(unittest.WithFieldGenerator("DKGIndexMap", func() flow.DKGIndexMap {
 			return flow.DKGIndexMap{unittest.IdentifierFixture(): 0, unittest.IdentifierFixture(): 1}
 		}))
-		err := checker.CheckEntity(unittest.EpochCommitFixture(func(commit *flow.EpochCommit) {
-			commit.DKGIndexMap = flow.DKGIndexMap{unittest.IdentifierFixture(): 0, unittest.IdentifierFixture(): 1}
-		}))
+		err := checker.CheckEntity(unittest.EpochCommitFixture())
 		require.NoError(t, err)
 	})
 	t.Run("EpochRecover", func(t *testing.T) {
@@ -669,6 +659,20 @@ func TestNewEpochCommit(t *testing.T) {
 		require.Error(t, err)
 		require.Nil(t, commit)
 		require.Contains(t, err.Error(), "DKG group key must not be nil")
+	})
+
+	t.Run("nil DKGIndexMap", func(t *testing.T) {
+		untrusted := flow.UntrustedEpochCommit{
+			Counter:            1,
+			ClusterQCs:         validClusterQCs,
+			DKGGroupKey:        validDKGGroupKey,
+			DKGParticipantKeys: make([]crypto.PublicKey, 0),
+			DKGIndexMap:        nil,
+		}
+		commit, err := flow.NewEpochCommit(untrusted)
+		require.Error(t, err)
+		require.Nil(t, commit)
+		require.Contains(t, err.Error(), "DKG index map must not be nil")
 	})
 
 	t.Run("empty list of cluster QCs", func(t *testing.T) {
