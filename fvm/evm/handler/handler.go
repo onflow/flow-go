@@ -184,7 +184,9 @@ func (h *ContractHandler) runWithGasFeeRefund(gasFeeCollector types.Address, f f
 func (h *ContractHandler) BatchRun(rlpEncodedTxs [][]byte, gasFeeCollector types.Address) []*types.ResultSummary {
 	// capture open tracing
 	span := h.backend.StartChildSpan(trace.FVMEVMBatchRun)
-	span.SetAttributes(attribute.Int("tx_counts", len(rlpEncodedTxs)))
+	if span.Tracer != nil {
+		span.SetAttributes(attribute.Int("tx_counts", len(rlpEncodedTxs)))
+	}
 	defer span.End()
 
 	var results []*types.Result
