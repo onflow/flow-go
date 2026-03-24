@@ -81,7 +81,7 @@ func run(*cobra.Command, []string) {
 	}()
 
 	// Create the token changes inspector with default search tokens for this chain
-	inspector := inspection.NewTokenChangesInspector(inspection.DefaultTokenDiffSearchTokens(chain, true))
+	inspector := inspection.NewTokenChangesInspector(inspection.DefaultTokenDiffSearchTokens(chain, true), chainID)
 
 	var from, to uint64
 
