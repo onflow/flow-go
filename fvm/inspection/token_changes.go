@@ -27,6 +27,8 @@ type TokenChanges struct {
 	// should work properly
 	searchedTokens   TokenChangesSearchTokens
 	searchedTokensMu sync.RWMutex
+
+	evmStorageAccount string
 }
 
 var _ Inspector = (*TokenChanges)(nil)
@@ -34,8 +36,13 @@ var _ Inspector = (*TokenChanges)(nil)
 // NewTokenChangesInspector return a TokenChanges inspector, that will be run
 // after transaction execution and analyze if any unaccounted tokens were created or
 // destroy.
-func NewTokenChangesInspector(searchedTokens TokenChangesSearchTokens) *TokenChanges {
-	return &TokenChanges{searchedTokens: searchedTokens}
+func NewTokenChangesInspector(searchedTokens TokenChangesSearchTokens, chain flow.ChainID) *TokenChanges {
+	sc := systemcontracts.SystemContractsForChain(chain)
+
+	return &TokenChanges{
+		searchedTokens:    searchedTokens,
+		evmStorageAccount: string(sc.EVMStorage.Address.Bytes()),
+	}
 }
 
 func (td *TokenChanges) Name() string {
@@ -218,7 +225,7 @@ func (td *TokenChanges) getTokens(
 
 	// without this the tokens are not properly detected!
 	// TODO: choose a good number for the workers
-	err := loadAtreeSlabsInStorage(runtimeStorage, storage, 1)
+	err := td.loadAtreeSlabsInStorage(runtimeStorage, storage, 1)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load atree slabs: %w", err)
 	}
@@ -661,13 +668,13 @@ type registers interface {
 	Count() int
 }
 
-func loadAtreeSlabsInStorage(
+func (td *TokenChanges) loadAtreeSlabsInStorage(
 	storage *runtime.Storage,
 	registers registers,
 	nWorkers int,
 ) error {
 
-	storageIDs, err := getSlabIDsFromRegisters(registers)
+	storageIDs, err := td.getSlabIDsFromRegisters(registers)
 	if err != nil {
 		return err
 	}
@@ -675,11 +682,11 @@ func loadAtreeSlabsInStorage(
 	return storage.PersistentSlabStorage.BatchPreload(storageIDs, nWorkers)
 }
 
-func getSlabIDsFromRegisters(registers registers) ([]atree.SlabID, error) {
+func (td *TokenChanges) getSlabIDsFromRegisters(registers registers) ([]atree.SlabID, error) {
 	storageIDs := make([]atree.SlabID, 0, registers.Count())
 
 	err := registers.ForEach(func(owner string, key string, _ []byte) error {
-		if !flow.IsSlabIndexKey(key) {
+		if !td.isRelevantSlabIndexKey(owner, key) {
 			return nil
 		}
 
@@ -697,6 +704,15 @@ func getSlabIDsFromRegisters(registers registers) ([]atree.SlabID, error) {
 	}
 
 	return storageIDs, nil
+}
+
+func (td *TokenChanges) isRelevantSlabIndexKey(owner, key string) bool {
+	if owner == td.evmStorageAccount {
+		// skip EVM slabs for now
+		return false
+	}
+
+	return flow.IsSlabIndexKey(key)
 }
 
 var tokenDiffSearchDomains = []common.StorageDomain{
@@ -726,32 +742,44 @@ func DefaultTokenDiffSearchTokens(chain flow.Chain, withoutMintingEvent bool) To
 	}
 
 	if !withoutMintingEvent {
-		searchTokens[flowTokenID].SinksSources[flowTokenMintedEventID] = func(evt flow.Event) (int64, error) {
-			// this decoding will only happen for the specified event (in the case of FlowToken.TokensMinted it
-			// is extremely rare).
-			payload, err := ccf.Decode(nil, evt.Payload)
-			if err != nil {
-				return 0, err
-			}
-			v := payload.(cadence.Event).SearchFieldByName("amount")
-			if v == nil {
-				return 0, fmt.Errorf("no amount field found for token minted")
-			}
-
-			ufix, ok := payload.(cadence.Event).SearchFieldByName("amount").(cadence.UFix64)
-			if !ok {
-				return 0, fmt.Errorf("amount field is not a cadence.UFix64")
-			}
-
-			if ufix > math.MaxInt64 {
-				// this is very unlikely
-				// but in case it happens, it will get logged
-				return 0, fmt.Errorf("amount field is too large")
-			}
-
-			return int64(ufix), nil
-		}
+		searchTokens[flowTokenID].SinksSources[flowTokenMintedEventID] = decodeFlowEventAmount(false)
 	}
 
+	// EVM bridge events: FLOW tokens moving between Cadence and EVM.
+	// Deposited = tokens leave Cadence into EVM (sink, negative).
+	// Withdrawn = tokens leave EVM into Cadence (source, positive).
+	evmDepositedEventID := fmt.Sprintf("A.%s.EVM.FLOWTokensDeposited", sc.EVMContract.Address.Hex())
+	evmWithdrawnEventID := fmt.Sprintf("A.%s.EVM.FLOWTokensWithdrawn", sc.EVMContract.Address.Hex())
+
+	searchTokens[flowTokenID].SinksSources[evmDepositedEventID] = decodeFlowEventAmount(true)
+	searchTokens[flowTokenID].SinksSources[evmWithdrawnEventID] = decodeFlowEventAmount(false)
+
 	return searchTokens
+}
+
+// decodeFlowEventAmount returns a function that decodes the "amount" field from a
+// CCF-encoded event as a UFix64. If isSink is true, the returned value is negated
+// (tokens leaving Cadence). If isSink is false, the value is positive (tokens
+// entering Cadence).
+func decodeFlowEventAmount(isSink bool) func(flow.Event) (int64, error) {
+	return func(evt flow.Event) (int64, error) {
+		payload, err := ccf.Decode(nil, evt.Payload)
+		if err != nil {
+			return 0, err
+		}
+
+		ufix, ok := payload.(cadence.Event).SearchFieldByName("amount").(cadence.UFix64)
+		if !ok {
+			return 0, fmt.Errorf("amount field is not a cadence.UFix64")
+		}
+
+		if ufix > math.MaxInt64 {
+			return 0, fmt.Errorf("amount field is too large")
+		}
+
+		if isSink {
+			return -int64(ufix), nil
+		}
+		return int64(ufix), nil
+	}
 }

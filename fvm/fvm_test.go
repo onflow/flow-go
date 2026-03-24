@@ -4409,6 +4409,11 @@ func TestTransactionIndexCall(t *testing.T) {
 func TestFlowTokenChangesInspector(t *testing.T) {
 	t.Parallel()
 
+	chain := flow.Emulator.Chain()
+	sc := systemcontracts.SystemContractsForChain(chain.ChainID())
+	flowTokenVaultID := fmt.Sprintf("A.%s.FlowToken.Vault", sc.FlowToken.Address.Hex())
+	flowTokenMintedEventID := fmt.Sprintf("A.%s.FlowToken.TokensMinted", sc.FlowToken.Address.Hex())
+
 	type testCase struct {
 		txBody           func(*testing.T, flow.Chain, []flow.Address) *flow.TransactionBody
 		txErrorExpected  bool
@@ -4429,17 +4434,27 @@ func TestFlowTokenChangesInspector(t *testing.T) {
 		accountKeys[i] = makeKey()
 	}
 
+	// blocks mock needed for EVM test case
+	blocks := new(envMock.Blocks)
+	block1 := unittest.BlockFixture()
+	blocks.On("ByHeightFrom",
+		block1.Height,
+		block1.ToHeader(),
+	).Return(block1.ToHeader(), nil)
+
+	vaultOnlyTokenDefs := map[string]inspection.SearchToken{
+		flowTokenVaultID: {
+			ID: flowTokenVaultID,
+			GetBalance: func(value *interpreter.CompositeValue) uint64 {
+				return uint64(value.GetField(nil, "balance").(interpreter.UFix64Value).UFix64Value)
+			},
+		},
+	}
+
 	testCases := []testCase{
 		{
-			name: "transfer",
-			tokenDefinitions: map[string]inspection.SearchToken{
-				"A.7e60df042a9c0868.FlowToken.Vault": {
-					ID: "A.7e60df042a9c0868.FlowToken.Vault",
-					GetBalance: func(value *interpreter.CompositeValue) uint64 {
-						return uint64(value.GetField(nil, "balance").(interpreter.UFix64Value).UFix64Value)
-					},
-				},
-			},
+			name:             "transfer",
+			tokenDefinitions: vaultOnlyTokenDefs,
 			txBody: func(t *testing.T, chain flow.Chain, accounts []flow.Address) *flow.TransactionBody {
 				sc := systemcontracts.SystemContractsForChain(chain.ChainID())
 				env := sc.AsTemplateEnv()
@@ -4458,15 +4473,8 @@ func TestFlowTokenChangesInspector(t *testing.T) {
 			},
 		},
 		{
-			name: "mint without mint event monitoring",
-			tokenDefinitions: map[string]inspection.SearchToken{
-				"A.7e60df042a9c0868.FlowToken.Vault": {
-					ID: "A.7e60df042a9c0868.FlowToken.Vault",
-					GetBalance: func(value *interpreter.CompositeValue) uint64 {
-						return uint64(value.GetField(nil, "balance").(interpreter.UFix64Value).UFix64Value)
-					},
-				},
-			},
+			name:             "mint without mint event monitoring",
+			tokenDefinitions: vaultOnlyTokenDefs,
 			txBody: func(t *testing.T, chain flow.Chain, accounts []flow.Address) *flow.TransactionBody {
 				sc := systemcontracts.SystemContractsForChain(chain.ChainID())
 				env := sc.AsTemplateEnv()
@@ -4489,20 +4497,20 @@ func TestFlowTokenChangesInspector(t *testing.T) {
 			resultChecker: func(t *testing.T, result inspection.TokenDiffResult) {
 				unaccounted := result.UnaccountedTokens()
 				require.Len(t, unaccounted, 1, "expectation: some tokens were created and are unaccounted for")
-				require.Equal(t, unaccounted["A.7e60df042a9c0868.FlowToken.Vault"], int64(10000000))
+				require.Equal(t, unaccounted[flowTokenVaultID], int64(10000000))
 				require.Len(t, result.Changes, 3, "change should be on 3 addresses: sender, receiver, fees")
 			},
 		},
 		{
 			name: "mint with mint event monitoring",
 			tokenDefinitions: map[string]inspection.SearchToken{
-				"A.7e60df042a9c0868.FlowToken.Vault": {
-					ID: "A.7e60df042a9c0868.FlowToken.Vault",
+				flowTokenVaultID: {
+					ID: flowTokenVaultID,
 					GetBalance: func(value *interpreter.CompositeValue) uint64 {
 						return uint64(value.GetField(nil, "balance").(interpreter.UFix64Value).UFix64Value)
 					},
 					SinksSources: map[string]func(flow.Event) (int64, error){
-						"A.7e60df042a9c0868.FlowToken.TokensMinted": func(evt flow.Event) (int64, error) {
+						flowTokenMintedEventID: func(evt flow.Event) (int64, error) {
 							payload, err := ccf.Decode(nil, evt.Payload)
 							require.NoError(t, err)
 							return int64(payload.(cadence.Event).SearchFieldByName("amount").(cadence.UFix64)), nil
@@ -4537,7 +4545,7 @@ func TestFlowTokenChangesInspector(t *testing.T) {
 		},
 		{
 			name:             "mint with default tracking",
-			tokenDefinitions: inspection.DefaultTokenDiffSearchTokens(flow.Testnet.Chain(), false),
+			tokenDefinitions: inspection.DefaultTokenDiffSearchTokens(chain, false),
 			txBody: func(t *testing.T, chain flow.Chain, accounts []flow.Address) *flow.TransactionBody {
 				sc := systemcontracts.SystemContractsForChain(chain.ChainID())
 				env := sc.AsTemplateEnv()
@@ -4564,7 +4572,7 @@ func TestFlowTokenChangesInspector(t *testing.T) {
 			},
 		}, {
 			name:             "create account",
-			tokenDefinitions: inspection.DefaultTokenDiffSearchTokens(flow.Testnet.Chain(), false),
+			tokenDefinitions: inspection.DefaultTokenDiffSearchTokens(chain, false),
 			txBody: func(t *testing.T, chain flow.Chain, accounts []flow.Address) *flow.TransactionBody {
 				_, txBodyBuilder := testutil.CreateAccountCreationTransaction(t, chain)
 
@@ -4581,11 +4589,61 @@ func TestFlowTokenChangesInspector(t *testing.T) {
 				require.Len(t, unaccounted, 0, "no tokens were created or destroyed")
 				require.Len(t, result.Changes, 3, "change should be on 3 addresses: sender, receiver, fees")
 			},
+		}, {
+			name:             "evm transaction",
+			tokenDefinitions: inspection.DefaultTokenDiffSearchTokens(chain, false),
+			txBody: func(t *testing.T, chain flow.Chain, _ []flow.Address) *flow.TransactionBody {
+				sc := systemcontracts.SystemContractsForChain(chain.ChainID())
+
+				txBodyBuilder := flow.NewTransactionBodyBuilder().
+					SetScript([]byte(fmt.Sprintf(`
+						import FungibleToken from %s
+						import FlowToken from %s
+						import EVM from %s
+
+						transaction() {
+							prepare(acc: auth(Storage) &Account) {
+								let vaultRef = acc.storage
+									.borrow<auth(FungibleToken.Withdraw) &FlowToken.Vault>(from: /storage/flowTokenVault)
+									?? panic("Could not borrow reference to the owner's Vault!")
+
+								let evmHeartbeat = acc.storage
+									.borrow<&EVM.Heartbeat>(from: /storage/EVMHeartbeat)
+									?? panic("Couldn't borrow EVM.Heartbeat Resource")
+
+								let evmAccount <- EVM.createCadenceOwnedAccount()
+								let amount <- vaultRef.withdraw(amount: 1.0) as! @FlowToken.Vault
+								evmAccount.deposit(from: <- amount)
+								destroy evmAccount
+
+								evmHeartbeat.heartbeat()
+							}
+						}`,
+						sc.FungibleToken.Address.HexWithPrefix(),
+						sc.FlowToken.Address.HexWithPrefix(),
+						sc.FlowServiceAccount.Address.HexWithPrefix(),
+					))).
+					SetProposalKey(chain.ServiceAddress(), 0, 0).
+					AddAuthorizer(chain.ServiceAddress()).
+					SetPayer(chain.ServiceAddress())
+
+				err := testutil.SignTransactionAsServiceAccount(txBodyBuilder, 0, chain)
+				require.NoError(t, err)
+
+				txBody, err := txBodyBuilder.Build()
+				require.NoError(t, err)
+				return txBody
+			},
+			resultChecker: func(t *testing.T, result inspection.TokenDiffResult) {
+				unaccounted := result.UnaccountedTokens()
+				require.Len(t, unaccounted, 0, "all tokens should be accounted for (EVM deposit is a known sink)")
+			},
 		},
 	}
 
 	runAndCheckTransactionTest := func(tc testCase) func(t *testing.T) {
 		return newVMTest().
+			withChain(chain).
 			withBootstrapProcedureOptions(
 				fvm.WithTransactionFee(fvm.DefaultTransactionFees),
 				fvm.WithStorageMBPerFLOW(fvm.DefaultStorageMBPerFLOW),
@@ -4599,6 +4657,8 @@ func TestFlowTokenChangesInspector(t *testing.T) {
 				fvm.WithTransactionFeesEnabled(true),
 				fvm.WithAccountStorageLimit(true),
 				fvm.WithAuthorizationChecksEnabled(false),
+				fvm.WithBlocks(blocks),
+				fvm.WithBlockHeader(block1.ToHeader()),
 			).
 			run(
 				func(
@@ -4610,7 +4670,7 @@ func TestFlowTokenChangesInspector(t *testing.T) {
 				) {
 					t.Parallel()
 
-					differ := inspection.NewTokenChangesInspector(tc.tokenDefinitions)
+					differ := inspection.NewTokenChangesInspector(tc.tokenDefinitions, chain.ChainID())
 
 					// Add the inspector to the context so inspection runs
 					// as part of the transaction execution pipeline.

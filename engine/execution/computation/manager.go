@@ -248,7 +248,7 @@ func DefaultFVMOptions(chainID flow.ChainID, extensiveTracing, scheduleCallbacks
 		withoutMintingEvent := true
 
 		options = append(options, fvm.WithInspectors([]inspection.Inspector{
-			inspection.NewTokenChangesInspector(inspection.DefaultTokenDiffSearchTokens(chainID.Chain(), withoutMintingEvent)),
+			inspection.NewTokenChangesInspector(inspection.DefaultTokenDiffSearchTokens(chainID.Chain(), withoutMintingEvent), chainID),
 		}))
 	}
 
