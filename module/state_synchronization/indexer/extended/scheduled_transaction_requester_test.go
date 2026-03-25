@@ -41,10 +41,10 @@ func TestScheduledTransactionRequester_ExecutedEntry(t *testing.T) {
 	).Return(MakeJITScriptResponse(t, comp), nil).Once()
 
 	meta := ScheduledTransactionsMetadata{
-		ExecutedEntries: []executedEntry{
+		ExecutedEntries: []ExecutedEntry{
 			{
-				event:         &events.TransactionSchedulerExecutedEvent{ID: 5},
-				transactionID: executedTxID,
+				Event:         &events.TransactionSchedulerExecutedEvent{ID: 5},
+				TransactionID: executedTxID,
 			},
 		},
 	}
@@ -76,10 +76,10 @@ func TestScheduledTransactionRequester_CancelledEntry(t *testing.T) {
 	).Return(MakeJITScriptResponse(t, comp), nil).Once()
 
 	meta := ScheduledTransactionsMetadata{
-		CanceledEntries: []canceledEntry{
+		CanceledEntries: []CanceledEntry{
 			{
-				event:         &events.TransactionSchedulerCanceledEvent{ID: 7, FeesReturned: 50, FeesDeducted: 25},
-				transactionID: cancelTxID,
+				Event:         &events.TransactionSchedulerCanceledEvent{ID: 7, FeesReturned: 50, FeesDeducted: 25},
+				TransactionID: cancelTxID,
 			},
 		},
 	}
@@ -113,8 +113,8 @@ func TestScheduledTransactionRequester_FailedEntry(t *testing.T) {
 	).Return(MakeJITScriptResponse(t, comp), nil).Once()
 
 	meta := ScheduledTransactionsMetadata{
-		FailedEntries: []failedEntry{
-			{scheduledTxID: 42, transactionID: executorTxID},
+		FailedEntries: []FailedEntry{
+			{ScheduledTxID: 42, TransactionID: executorTxID},
 		},
 	}
 	txs, err := requester.Fetch(context.Background(), []uint64{42}, requesterTestHeight, meta)
@@ -150,9 +150,9 @@ func TestScheduledTransactionRequester_NilOptional(t *testing.T) {
 	).Return(response, nil).Once()
 
 	meta := ScheduledTransactionsMetadata{
-		ExecutedEntries: []executedEntry{
-			{event: &events.TransactionSchedulerExecutedEvent{ID: 10}, transactionID: unittest.IdentifierFixture()},
-			{event: &events.TransactionSchedulerExecutedEvent{ID: 11}, transactionID: unittest.IdentifierFixture()},
+		ExecutedEntries: []ExecutedEntry{
+			{Event: &events.TransactionSchedulerExecutedEvent{ID: 10}, TransactionID: unittest.IdentifierFixture()},
+			{Event: &events.TransactionSchedulerExecutedEvent{ID: 11}, TransactionID: unittest.IdentifierFixture()},
 		},
 	}
 	_, err := requester.Fetch(context.Background(), []uint64{10, 11}, requesterTestHeight, meta)
@@ -177,8 +177,8 @@ func TestScheduledTransactionRequester_ScriptError(t *testing.T) {
 	).Return([]byte(nil), scriptErr).Once()
 
 	meta := ScheduledTransactionsMetadata{
-		CanceledEntries: []canceledEntry{
-			{event: &events.TransactionSchedulerCanceledEvent{ID: 9}},
+		CanceledEntries: []CanceledEntry{
+			{Event: &events.TransactionSchedulerCanceledEvent{ID: 9}},
 		},
 	}
 	_, err := requester.Fetch(context.Background(), []uint64{9}, requesterTestHeight, meta)
@@ -223,13 +223,13 @@ func TestScheduledTransactionRequester_Batching(t *testing.T) {
 	).Return(MakeJITScriptResponse(t, batch2Composite), nil).Once()
 
 	lookupIDs := make([]uint64, totalIDs)
-	canceledEntries := make([]canceledEntry, totalIDs)
+	canceledEntries := make([]CanceledEntry, totalIDs)
 	for i := range totalIDs {
 		id := uint64(i + 1)
 		lookupIDs[i] = id
-		canceledEntries[i] = canceledEntry{
-			event:         &events.TransactionSchedulerCanceledEvent{ID: id},
-			transactionID: unittest.IdentifierFixture(),
+		canceledEntries[i] = CanceledEntry{
+			Event:         &events.TransactionSchedulerCanceledEvent{ID: id},
+			TransactionID: unittest.IdentifierFixture(),
 		}
 	}
 

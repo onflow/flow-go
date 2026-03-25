@@ -55,31 +55,31 @@ func (r *ScheduledTransactionRequester) Fetch(
 
 	updatedTxs := make([]access.ScheduledTransaction, 0, len(missingTxs))
 	for _, entry := range meta.ExecutedEntries {
-		if missing, ok := missingTxs[entry.event.ID]; ok {
+		if missing, ok := missingTxs[entry.Event.ID]; ok {
 			// set IsPlaceholder = true to signal that some information is missing because we don't know the original transaction.
 			missing.IsPlaceholder = true
 			missing.Status = access.ScheduledTxStatusExecuted
-			missing.ExecutedTransactionID = entry.transactionID
+			missing.ExecutedTransactionID = entry.TransactionID
 			updatedTxs = append(updatedTxs, missing)
 		}
 	}
 	for _, entry := range meta.CanceledEntries {
-		if missing, ok := missingTxs[entry.event.ID]; ok {
+		if missing, ok := missingTxs[entry.Event.ID]; ok {
 			// set IsPlaceholder = true to signal that some information is missing because we don't know the original transaction.
 			missing.IsPlaceholder = true
 			missing.Status = access.ScheduledTxStatusCancelled
-			missing.CancelledTransactionID = entry.transactionID
-			missing.FeesReturned = uint64(entry.event.FeesReturned)
-			missing.FeesDeducted = uint64(entry.event.FeesDeducted)
+			missing.CancelledTransactionID = entry.TransactionID
+			missing.FeesReturned = uint64(entry.Event.FeesReturned)
+			missing.FeesDeducted = uint64(entry.Event.FeesDeducted)
 			updatedTxs = append(updatedTxs, missing)
 		}
 	}
 	for _, entry := range meta.FailedEntries {
-		if missing, ok := missingTxs[entry.scheduledTxID]; ok {
+		if missing, ok := missingTxs[entry.ScheduledTxID]; ok {
 			// set IsPlaceholder = true to signal that some information is missing because we don't know the original transaction.
 			missing.IsPlaceholder = true
 			missing.Status = access.ScheduledTxStatusFailed
-			missing.ExecutedTransactionID = entry.transactionID
+			missing.ExecutedTransactionID = entry.TransactionID
 			updatedTxs = append(updatedTxs, missing)
 		}
 	}
