@@ -371,6 +371,14 @@ func WithAllowProgramCacheWritesInScriptsEnabled(enabled bool) Option {
 	}
 }
 
+// WithEVMTestOperationsAllowed enables EVM test operations in the context
+func WithEVMTestOperationsAllowed(enabled bool) Option {
+	return func(ctx Context) Context {
+		ctx.EVMTestOperationsAllowed = enabled
+		return ctx
+	}
+}
+
 // WithEntropyProvider sets the entropy provider of a virtual machine context.
 //
 // The VM uses the input to provide entropy to the Cadence runtime randomness functions.

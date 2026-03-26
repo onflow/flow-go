@@ -54,6 +54,12 @@ type facadeEnvironment struct {
 
 	accounts Accounts
 	txnState storage.TransactionPreparer
+
+	evmTestOperationsAllowed bool
+}
+
+func (env *facadeEnvironment) EVMTestOperationsAllowed() bool {
+	return env.evmTestOperationsAllowed
 }
 
 func newFacadeEnvironment(
@@ -150,6 +156,8 @@ func newFacadeEnvironment(
 
 		accounts: accounts,
 		txnState: txnState,
+
+		evmTestOperationsAllowed: params.TransactionInfoParams.EVMTestOperationsAllowed,
 	}
 
 	env.CadenceRuntimeProvider.SetEnvironment(env)

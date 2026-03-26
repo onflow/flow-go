@@ -70,8 +70,8 @@ func NewExecutionNodeIdentitiesProvider(
 // which have executed the given block ID.
 //
 // Expected errors during normal operations:
-//   - InsufficientExecutionReceipts - If no such execution node is found.
-//   - ErrNoENsFoundForExecutionResult - if no execution nodes were found that produced
+//   - [context.Canceled] - if the context is canceled
+//   - [ErrNoENsFoundForExecutionResult] - if no execution nodes were found that produced
 //     the provided execution result and matched the operators criteria
 func (e *ExecutionNodeIdentitiesProvider) ExecutionNodesForBlockID(
 	ctx context.Context,
