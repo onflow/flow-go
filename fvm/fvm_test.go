@@ -4422,18 +4422,6 @@ func TestFlowTokenChangesInspector(t *testing.T) {
 		name             string
 	}
 
-	// account keys that can be used in the tests
-	makeKey := func() flow.AccountPrivateKey {
-		privateKey, err := testutil.GenerateAccountPrivateKey()
-		require.NoError(t, err)
-		return privateKey
-	}
-	numAccounts := 5
-	accountKeys := make([]flow.AccountPrivateKey, numAccounts)
-	for i := 0; i < numAccounts; i++ {
-		accountKeys[i] = makeKey()
-	}
-
 	// blocks mock needed for EVM test case
 	blocks := new(envMock.Blocks)
 	block1 := unittest.BlockFixture()

@@ -348,6 +348,16 @@ func (td *TokenChanges) findSourcesSinks(events []flow.Event, tokens map[string]
 	results := make(map[string]int64)
 	for _, token := range tokens {
 		for evt, ss := range token.SinksSources {
+			// Each event ID should be unique across all tokens. If two tokens register
+			// handlers for the same event ID, the second handler would silently overwrite
+			// the first, causing incorrect token accounting. This should not happen with
+			// the current token definitions, but we guard against it defensively.
+			if existing, ok := sourcesSinks[evt]; ok {
+				return nil, fmt.Errorf(
+					"event %s is registered by both token %s and token %s",
+					evt, existing.tokenID, token.ID,
+				)
+			}
 			sourcesSinks[evt] = tokenSourceSink{tokenID: token.ID, f: ss}
 		}
 	}
