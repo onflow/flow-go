@@ -244,15 +244,13 @@ func (collector *resultCollector) processTransactionResult(
 		logger.Info().Msg("transaction executed successfully")
 	}
 
-	// (leo debugging): We log inspection results here, because if we logged them ih the FVM
+	// We log inspection results here, because if we logged them in the FVM
 	// they would get logged on every transaction retry.
 	// Same for the metrics.
-	if len(output.InspectionResults) == 0 {
-		logger.Debug().
-			Msg("no inspection results for transaction")
-	}
-
-	collector.logInspectionResults(logger, output.InspectionResults)
+	collector.logInspectionResults(
+		logger.With().Str("module", "transaction-inspection").Logger(),
+		output.InspectionResults,
+	)
 
 	collector.handleTransactionExecutionMetrics(
 		timeSpent,
@@ -300,6 +298,8 @@ func (collector *resultCollector) logInspectionResults(
 	results []inspection.Result,
 ) {
 	if len(results) == 0 {
+		log.Info().
+			Msg("no inspection results for transaction")
 		return
 	}
 
@@ -332,7 +332,7 @@ func (collector *resultCollector) logInspectionResults(
 		return
 	}
 
-	evt := log.WithLevel(logLevel).Str("module", "transaction-inspection")
+	evt := log.WithLevel(logLevel)
 	for _, logEvent := range logEvents {
 		logEvent(evt)
 	}
