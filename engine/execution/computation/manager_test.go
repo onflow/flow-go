@@ -30,6 +30,7 @@ import (
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/environment"
 	fvmErrors "github.com/onflow/flow-go/fvm/errors"
+	"github.com/onflow/flow-go/fvm/inspection"
 	"github.com/onflow/flow-go/fvm/storage"
 	"github.com/onflow/flow-go/fvm/storage/derived"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
@@ -572,6 +573,16 @@ func (p *PanickingVM) GetAccount(
 	panic("not expected")
 }
 
+func (p *PanickingVM) Inspect(
+	ctx fvm.Context,
+	proc fvm.Procedure,
+	storageSnapshot snapshot.StorageSnapshot,
+	executionSnapshot *snapshot.ExecutionSnapshot,
+	output fvm.ProcedureOutput,
+) []inspection.Result {
+	return nil
+}
+
 type LongRunningExecutor struct {
 	duration time.Duration
 }
@@ -634,6 +645,16 @@ func (l *LongRunningVM) GetAccount(
 	error,
 ) {
 	panic("not expected")
+}
+
+func (l *LongRunningVM) Inspect(
+	ctx fvm.Context,
+	proc fvm.Procedure,
+	storageSnapshot snapshot.StorageSnapshot,
+	executionSnapshot *snapshot.ExecutionSnapshot,
+	output fvm.ProcedureOutput,
+) []inspection.Result {
+	return nil
 }
 
 type FakeBlockComputer struct {
