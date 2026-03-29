@@ -186,7 +186,7 @@ type StateMachineEventsTelemetryFactory interface {
 	Execute(candidateView uint64) protocol_state.StateMachineTelemetryConsumer
 }
 ```
-3. Add the package to `.mockery.yaml`. Note: specify the directory where you want the mock to be placed.
+3. Add the package to `.mockery.yaml`. Note: specify the directory where you want the mock to be placed..
 ```
   github.com/onflow/flow-go/state/protocol/protocol_state/mock_interfaces:
     config:
