@@ -3,11 +3,14 @@ package environment
 import (
 	"context"
 
+	gocommon "github.com/ethereum/go-ethereum/common"
 	"github.com/onflow/cadence/ast"
 	"github.com/onflow/cadence/common"
 	"github.com/onflow/cadence/interpreter"
 	"github.com/onflow/cadence/sema"
 
+	"github.com/onflow/flow-go/fvm/evm"
+	"github.com/onflow/flow-go/fvm/evm/types"
 	"github.com/onflow/flow-go/fvm/storage"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/fvm/storage/state"
@@ -50,8 +53,8 @@ type facadeEnvironment struct {
 
 	*ContractReader
 	ContractUpdater
-	BlockProposalCache
 	*Programs
+	EVMBlockStore EVMBlockStore
 
 	accounts Accounts
 	txnState storage.TransactionPreparer
@@ -147,8 +150,8 @@ func newFacadeEnvironment(
 			accounts,
 			common.Address(sc.Crypto.Address),
 		),
-		ContractUpdater:    NoContractUpdater{},
-		BlockProposalCache: &blockProposalCache{},
+		ContractUpdater: NoContractUpdater{},
+		EVMBlockStore:   NoEVMBlockStore{},
 		Programs: NewPrograms(
 			tracer,
 			meter,
@@ -202,6 +205,13 @@ func NewScriptEnv(
 		params.ScriptInfoParams.ID[:],
 	)
 	env.addParseRestrictedChecks()
+	env.EVMBlockStore = NewBlockStore(
+		params.Chain.ChainID(),
+		env.ValueStore,
+		env.BlockInfo,
+		env.RandomGenerator,
+		evm.StorageAccountAddress(params.Chain.ChainID()),
+	)
 	return env
 }
 
@@ -272,6 +282,14 @@ func NewTransactionEnvironment(
 		params.TransactionInfoParams.RandomSourceHistoryCallAllowed,
 	)
 
+	env.EVMBlockStore = NewBlockStore(
+		params.Chain.ChainID(),
+		env.ValueStore,
+		env.BlockInfo,
+		env.RandomGenerator,
+		evm.StorageAccountAddress(params.Chain.ChainID()),
+	)
+
 	env.addParseRestrictedChecks()
 
 	return env
@@ -333,16 +351,50 @@ func (env *facadeEnvironment) FlushPendingUpdates() (
 	ContractUpdates,
 	error,
 ) {
-	if err := env.BlockProposalCache.FlushBlockProposal(); err != nil {
+	updates, err := env.ContractUpdater.Commit()
+	if err != nil {
 		return ContractUpdates{}, err
 	}
-	return env.ContractUpdater.Commit()
+	err = env.EVMBlockStore.FlushBlockProposal()
+	if err != nil {
+		return ContractUpdates{}, err
+	}
+	return updates, nil
 }
 
 func (env *facadeEnvironment) Reset() {
 	env.ContractUpdater.Reset()
 	env.EventEmitter.Reset()
 	env.Programs.Reset()
+	env.EVMBlockStore.ResetBlockProposal()
+}
+
+func (env *facadeEnvironment) BlockHash(height uint64) (gocommon.Hash, error) {
+	return env.EVMBlockStore.BlockHash(height)
+}
+
+func (env *facadeEnvironment) BlockProposal() (*types.BlockProposal, error) {
+	return env.EVMBlockStore.BlockProposal()
+}
+
+func (env *facadeEnvironment) StageBlockProposal(bp *types.BlockProposal) {
+	env.EVMBlockStore.StageBlockProposal(bp)
+}
+
+func (env *facadeEnvironment) CommitBlockProposal(bp *types.BlockProposal) error {
+	return env.EVMBlockStore.CommitBlockProposal(bp)
+}
+
+func (env *facadeEnvironment) FlushBlockProposal() error {
+	return env.EVMBlockStore.FlushBlockProposal()
+}
+
+func (env *facadeEnvironment) LatestBlock() (*types.Block, error) {
+	return env.EVMBlockStore.LatestBlock()
+}
+
+func (env *facadeEnvironment) ResetBlockProposal() {
+	env.EVMBlockStore.ResetBlockProposal()
 }
 
 // Miscellaneous Cadence runtime.Interface API

@@ -1,4 +1,4 @@
-package types
+package backends
 
 import (
 	"github.com/onflow/flow-go/fvm/environment"
@@ -14,7 +14,6 @@ type BackendStorage interface {
 // a `BackendError`.
 type Backend interface {
 	BackendStorage
-	environment.BlockProposalCache
 	environment.Meter
 	environment.EventEmitter
 	environment.BlockInfo
@@ -24,5 +23,6 @@ type Backend interface {
 	environment.Tracer
 	environment.EVMMetricsReporter
 	environment.LoggerProvider
+	environment.EVMBlockStore
 	EVMTestOperationsAllowed() bool
 }

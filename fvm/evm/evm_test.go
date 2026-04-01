@@ -170,7 +170,7 @@ func TestEVMRun(t *testing.T) {
 
 						assert(res.status == EVM.Status.successful, message: "unexpected status")
 						assert(res.errorCode == 0, message: "unexpected error code")
-						
+
 						return res
 					}
 					`,
@@ -1465,7 +1465,7 @@ func TestEVMBatchRun(t *testing.T) {
 						prepare(account: &Account) {
 							let coinbase = EVM.EVMAddress(bytes: coinbaseBytes)
 							let batchResults = EVM.batchRun(txs: txs, coinbase: coinbase)
-							
+
 							assert(batchResults.length == txs.length, message: "invalid result length")
 							for res in batchResults {
 								assert(res.status == EVM.Status.successful, message: "unexpected status")
@@ -1657,7 +1657,7 @@ func TestEVMBatchRun(t *testing.T) {
 						prepare(account: &Account) {
 							let coinbase = EVM.EVMAddress(bytes: coinbaseBytes)
 							let batchResults = EVM.batchRun(txs: txs, coinbase: coinbase)
-							
+
 							assert(batchResults.length == txs.length, message: "invalid result length")
 							for i, res in batchResults {
 								if i != %d {
@@ -2826,7 +2826,7 @@ func TestCadenceOwnedAccountFunctionalities(t *testing.T) {
 					`
 					import EVM from %s
 					import FlowToken from %s
-	
+
 					access(all)
 					fun main(code: [UInt8]): EVM.Result {
 						let admin = getAuthAccount<auth(Storage) &Account>(%s)
@@ -2834,10 +2834,10 @@ func TestCadenceOwnedAccountFunctionalities(t *testing.T) {
 						let minter <- admin.createNewMinter(allowedAmount: 2.34)
 						let vault <- minter.mintTokens(amount: 2.34)
 						destroy minter
-	
+
 						let cadenceOwnedAccount <- EVM.createCadenceOwnedAccount()
 						cadenceOwnedAccount.deposit(from: <-vault)
-	
+
 						let res = cadenceOwnedAccount.deploy(
 							code: code,
 							gasLimit: 2_000_000,
@@ -3324,7 +3324,7 @@ func TestDryRun(t *testing.T) {
 			access(all)
 			fun main(tx: [UInt8]): EVM.Result {
 				return EVM.dryRun(
-					tx: tx, 
+					tx: tx,
 					from: EVM.EVMAddress(bytes: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19])
 				)
 			}`,
@@ -4015,7 +4015,7 @@ func TestDryRun(t *testing.T) {
 
 				require.NoError(t, err)
 				require.NoError(t, output.Err)
-				assert.Equal(t, uint64(86), output.ComputationUsed)
+				assert.Equal(t, uint64(85), output.ComputationUsed)
 			},
 		)
 	})
@@ -6698,7 +6698,7 @@ func createAndFundFlowAccount(
 	code := []byte(fmt.Sprintf(
 		`
 		import FlowToken from %s
-		import FungibleToken from %s 
+		import FungibleToken from %s
 
 		transaction {
 			prepare(account: auth(BorrowValue) &Account) {
@@ -6768,7 +6768,7 @@ func setupCOA(
 	transaction(amount: UFix64) {
 		prepare(account: auth(Capabilities, Storage) &Account) {
 			let cadenceOwnedAccount1 <- EVM.createCadenceOwnedAccount()
-			
+
 			let vaultRef = account.storage
                 .borrow<auth(FungibleToken.Withdraw) &FlowToken.Vault>(from: /storage/flowTokenVault)
 				?? panic("Could not borrow reference to the owner's Vault!")
@@ -6777,7 +6777,7 @@ func setupCOA(
 				let vault <- vaultRef.withdraw(amount: amount) as! @FlowToken.Vault
 				cadenceOwnedAccount1.deposit(from: <-vault)
 			}
-			
+
 			account.storage.save<@EVM.CadenceOwnedAccount>(
 				<-cadenceOwnedAccount1,
 				to: /storage/coa

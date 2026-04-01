@@ -1,4 +1,4 @@
-package handler_test
+package environment_test
 
 import (
 	"math/big"
@@ -7,7 +7,7 @@ import (
 	gethCommon "github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/fvm/evm/handler"
+	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/evm/testutils"
 	"github.com/onflow/flow-go/fvm/evm/types"
 	"github.com/onflow/flow-go/model/flow"
@@ -18,7 +18,7 @@ func TestBlockStore(t *testing.T) {
 	var chainID = flow.Testnet
 	testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
 		testutils.RunWithTestFlowEVMRootAddress(t, backend, func(root flow.Address) {
-			bs := handler.NewBlockStore(chainID, backend, root)
+			bs := environment.NewBlockStore(chainID, backend, backend, backend, root)
 
 			// check the Genesis block
 			b, err := bs.LatestBlock()
@@ -44,9 +44,10 @@ func TestBlockStore(t *testing.T) {
 			// update the block proposal
 			bp.TotalGasUsed += 100
 			bs.StageBlockProposal(bp)
+			err = bs.FlushBlockProposal()
+			require.NoError(t, err)
 
-			// reset the bs and check if it still return the block proposal
-			bs = handler.NewBlockStore(chainID, backend, root)
+			bs = environment.NewBlockStore(chainID, backend, backend, backend, root)
 			retbp, err = bs.BlockProposal()
 			require.NoError(t, err)
 			require.Equal(t, bp, retbp)
@@ -55,6 +56,8 @@ func TestBlockStore(t *testing.T) {
 			supply := big.NewInt(100)
 			bp.TotalSupply = supply
 			bs.StageBlockProposal(bp)
+			err = bs.FlushBlockProposal()
+			require.NoError(t, err)
 			// this should still return the genesis block
 			retb, err := bs.LatestBlock()
 			require.NoError(t, err)

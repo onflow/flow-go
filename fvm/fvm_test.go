@@ -40,7 +40,6 @@ import (
 	envMock "github.com/onflow/flow-go/fvm/environment/mock"
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/evm/events"
-	"github.com/onflow/flow-go/fvm/evm/handler"
 	"github.com/onflow/flow-go/fvm/evm/stdlib"
 	"github.com/onflow/flow-go/fvm/evm/types"
 	"github.com/onflow/flow-go/fvm/meter"
@@ -4227,7 +4226,7 @@ func Test_BlockHashListShouldWriteOnPush(t *testing.T) {
 	chain := flow.Emulator.Chain()
 	sc := systemcontracts.SystemContractsForChain(chain.ChainID())
 
-	push := func(bhl *handler.BlockHashList, height uint64) {
+	push := func(bhl *environment.BlockHashList, height uint64) {
 		buffer := make([]byte, 32)
 		pos := 0
 
@@ -4262,7 +4261,7 @@ func Test_BlockHashListShouldWriteOnPush(t *testing.T) {
 				accounts,
 			)
 
-			bhl, err := handler.NewBlockHashList(valueStore, sc.EVMStorage.Address, capacity)
+			bhl, err := environment.NewBlockHashList(valueStore, sc.EVMStorage.Address, capacity)
 			require.NoError(t, err)
 
 			// fill the block hash list
@@ -4287,7 +4286,7 @@ func Test_BlockHashListShouldWriteOnPush(t *testing.T) {
 				accounts,
 			)
 
-			bhl, err = handler.NewBlockHashList(valueStore, sc.EVMStorage.Address, capacity)
+			bhl, err = environment.NewBlockHashList(valueStore, sc.EVMStorage.Address, capacity)
 			require.NoError(t, err)
 
 			// after we push the changes should be applied and the first block hash in the bucket should be capacity+1 instead of 0

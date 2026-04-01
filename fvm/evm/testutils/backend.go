@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"testing"
 
+	gocommon "github.com/ethereum/go-ethereum/common"
 	"github.com/onflow/cadence/stdlib"
 	"github.com/rs/zerolog"
 	otelTrace "go.opentelemetry.io/otel/trace"
@@ -38,16 +39,20 @@ func RunWithTestFlowEVMRootAddress(t testing.TB, backend atree.Ledger, f func(fl
 }
 
 func RunWithTestBackend(t testing.TB, f func(*TestBackend)) {
+	vs := GetSimpleValueStore()
+	bi := getSimpleBlockInfo()
+	rg := getSimpleRandomGenerator()
 	tb := &TestBackend{
-		TestValueStore:              GetSimpleValueStore(),
+		TestValueStore:              vs,
 		testEventEmitter:            getSimpleEventEmitter(),
 		testMeter:                   getSimpleMeter(),
-		TestBlockInfo:               getSimpleBlockStore(),
-		TestRandomGenerator:         getSimpleRandomGenerator(),
+		TestBlockInfo:               bi,
+		TestRandomGenerator:         rg,
 		TestContractFunctionInvoker: &TestContractFunctionInvoker{},
 		TestTracer:                  &TestTracer{},
 		TestMetricsReporter:         &TestMetricsReporter{},
 		TestLoggerProvider:          &TestLoggerProvider{},
+		TestBlockStore:              getSimpleBlockStore(vs, bi, rg),
 	}
 	f(tb)
 }
@@ -209,7 +214,7 @@ func getSimpleMeter() *testMeter {
 	}
 }
 
-func getSimpleBlockStore() *TestBlockInfo {
+func getSimpleBlockInfo() *TestBlockInfo {
 	var index int64 = 1
 	return &TestBlockInfo{
 		GetCurrentBlockHeightFunc: func() (uint64, error) {
@@ -227,6 +232,34 @@ func getSimpleBlockStore() *TestBlockInfo {
 	}
 }
 
+func getSimpleBlockStore(vs *TestValueStore, bi *TestBlockInfo, rg *TestRandomGenerator) *TestBlockStore {
+	bs := environment.NewBlockStore(flow.Testnet, vs, bi, rg, TestFlowEVMRootAddress)
+
+	return &TestBlockStore{
+		LatestBlockFunc: func() (*types.Block, error) {
+			return bs.LatestBlock()
+		},
+		BlockHashFunc: func(height uint64) (gocommon.Hash, error) {
+			return bs.BlockHash(height)
+		},
+		BlockProposalFunc: func() (*types.BlockProposal, error) {
+			return bs.BlockProposal()
+		},
+		StageBlockProposalFunc: func(_bp *types.BlockProposal) {
+			bs.StageBlockProposal(_bp)
+		},
+		FlushBlockProposalFunc: func() error {
+			return bs.FlushBlockProposal()
+		},
+		CommitBlockProposalFunc: func(_bp *types.BlockProposal) error {
+			return bs.CommitBlockProposal(_bp)
+		},
+		ResetBlockProposalFunc: func() {
+			bs.ResetBlockProposal()
+		},
+	}
+}
+
 type TestBackend struct {
 	*TestValueStore
 	*testMeter
@@ -238,27 +271,13 @@ type TestBackend struct {
 	*TestTracer
 	*TestMetricsReporter
 	*TestLoggerProvider
+	*TestBlockStore
 	evmTestOperationsAllowed bool
-	cachedProposal           any
 }
 
 func (tb *TestBackend) EVMTestOperationsAllowed() bool {
 	return tb.evmTestOperationsAllowed
 }
-
-func (tb *TestBackend) CachedBlockProposal() any {
-	return tb.cachedProposal
-}
-
-func (tb *TestBackend) CacheBlockProposal(v any) {
-	tb.cachedProposal = v
-}
-
-func (tb *TestBackend) SetBlockProposalFlusher(func() error) {}
-
-func (tb *TestBackend) FlushBlockProposal() error { return nil }
-
-var _ types.Backend = &TestBackend{}
 
 func (tb *TestBackend) TotalStorageSize() int {
 	if tb.TotalStorageSizeFunc == nil {
@@ -711,4 +730,72 @@ func (tlp *TestLoggerProvider) Logger() zerolog.Logger {
 		return loggerFunc()
 	}
 	return zerolog.Nop()
+}
+
+type TestBlockStore struct {
+	BlockHashFunc           func(height uint64) (gocommon.Hash, error)
+	BlockProposalFunc       func() (*types.BlockProposal, error)
+	CommitBlockProposalFunc func(*types.BlockProposal) error
+	LatestBlockFunc         func() (*types.Block, error)
+	StageBlockProposalFunc  func(*types.BlockProposal)
+	FlushBlockProposalFunc  func() error
+	ResetBlockProposalFunc  func()
+}
+
+var _ environment.EVMBlockStore = &TestBlockStore{}
+
+func (tb *TestBlockStore) BlockHash(height uint64) (gocommon.Hash, error) {
+	blockHashFunc := tb.BlockHashFunc
+	if blockHashFunc == nil {
+		panic("BlockHashFunc method is not set")
+	}
+	return blockHashFunc(height)
+}
+
+func (tb *TestBlockStore) BlockProposal() (*types.BlockProposal, error) {
+	blockProposalFunc := tb.BlockProposalFunc
+	if blockProposalFunc == nil {
+		panic("BlockProposalFunc method is not set")
+	}
+	return blockProposalFunc()
+}
+
+func (tb *TestBlockStore) CommitBlockProposal(bp *types.BlockProposal) error {
+	commitBlockProposalFunc := tb.CommitBlockProposalFunc
+	if commitBlockProposalFunc == nil {
+		panic("CommitBlockProposalFunc method is not set")
+	}
+	return commitBlockProposalFunc(bp)
+}
+
+func (tb *TestBlockStore) LatestBlock() (*types.Block, error) {
+	latestBlockFunc := tb.LatestBlockFunc
+	if latestBlockFunc == nil {
+		panic("LatestBlockFunc method is not set")
+	}
+	return latestBlockFunc()
+}
+
+func (tb *TestBlockStore) StageBlockProposal(bp *types.BlockProposal) {
+	stageBlockProposalFunc := tb.StageBlockProposalFunc
+	if stageBlockProposalFunc == nil {
+		panic("StageBlockProposalFunc method is not set")
+	}
+	stageBlockProposalFunc(bp)
+}
+
+func (tb *TestBlockStore) FlushBlockProposal() error {
+	flushBlockProposalFunc := tb.FlushBlockProposalFunc
+	if flushBlockProposalFunc == nil {
+		panic("FlushBlockProposalFunc method is not set")
+	}
+	return flushBlockProposalFunc()
+}
+
+func (tb *TestBlockStore) ResetBlockProposal() {
+	resetFunc := tb.ResetBlockProposalFunc
+	if resetFunc == nil {
+		panic("ResetBlockProposalFunc method is not set")
+	}
+	resetFunc()
 }

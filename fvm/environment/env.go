@@ -86,7 +86,7 @@ type Environment interface {
 	// EventEmitter) to initial state.
 	Reset()
 
-	BlockProposalCache
+	EVMBlockStore
 }
 
 // ReusableCadenceRuntime is a wrapper around the cadence runtime and environment that

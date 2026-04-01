@@ -3,8 +3,9 @@ package blocks
 import (
 	"fmt"
 
+	"github.com/onflow/flow-go/fvm/environment"
+	"github.com/onflow/flow-go/fvm/evm/backends"
 	"github.com/onflow/flow-go/fvm/evm/events"
-	"github.com/onflow/flow-go/fvm/evm/handler"
 	"github.com/onflow/flow-go/fvm/evm/types"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -17,7 +18,7 @@ type BasicProvider struct {
 	chainID            flow.ChainID
 	blks               *Blocks
 	rootAddr           flow.Address
-	storage            types.BackendStorage
+	storage            backends.BackendStorage
 	latestBlockPayload *events.BlockEventPayload
 }
 
@@ -25,7 +26,7 @@ var _ types.BlockSnapshotProvider = (*BasicProvider)(nil)
 
 func NewBasicProvider(
 	chainID flow.ChainID,
-	storage types.BackendStorage,
+	storage backends.BackendStorage,
 	rootAddr flow.Address,
 ) (*BasicProvider, error) {
 	blks, err := NewBlocks(chainID, rootAddr, storage)
@@ -87,7 +88,7 @@ func (p *BasicProvider) OnBlockExecuted(
 	// do the same as handler.CommitBlockProposal
 	err = p.storage.SetValue(
 		p.rootAddr[:],
-		[]byte(handler.BlockStoreLatestBlockKey),
+		[]byte(environment.BlockStoreLatestBlockKey),
 		blockBytes,
 	)
 	if err != nil {
@@ -103,7 +104,7 @@ func (p *BasicProvider) OnBlockExecuted(
 	// update block proposal
 	err = p.storage.SetValue(
 		p.rootAddr[:],
-		[]byte(handler.BlockStoreLatestBlockProposalKey),
+		[]byte(environment.BlockStoreLatestBlockProposalKey),
 		blockProposalBytes,
 	)
 	if err != nil {

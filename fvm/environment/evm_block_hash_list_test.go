@@ -1,4 +1,4 @@
-package handler_test
+package environment_test
 
 import (
 	"testing"
@@ -6,7 +6,7 @@ import (
 	gethCommon "github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/fvm/evm/handler"
+	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/evm/testutils"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -15,7 +15,7 @@ func TestBlockHashList(t *testing.T) {
 	testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
 		testutils.RunWithTestFlowEVMRootAddress(t, backend, func(root flow.Address) {
 			capacity := 256
-			bhl, err := handler.NewBlockHashList(backend, root, capacity)
+			bhl, err := environment.NewBlockHashList(backend, root, capacity)
 			require.NoError(t, err)
 			require.True(t, bhl.IsEmpty())
 
@@ -75,7 +75,7 @@ func TestBlockHashList(t *testing.T) {
 			require.Equal(t, gethCommon.Hash{byte(capacity + 2)}, h)
 
 			// construct a new one and check
-			bhl, err = handler.NewBlockHashList(backend, root, capacity)
+			bhl, err = environment.NewBlockHashList(backend, root, capacity)
 			require.NoError(t, err)
 			require.False(t, bhl.IsEmpty())
 

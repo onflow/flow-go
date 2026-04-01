@@ -1,6 +1,7 @@
 package backends
 
 import (
+	gocommon "github.com/ethereum/go-ethereum/common"
 	"github.com/onflow/atree"
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/common"
@@ -25,10 +26,10 @@ type WrappedEnvironment struct {
 
 // NewWrappedEnvironment constructs a new wrapped environment
 func NewWrappedEnvironment(env environment.Environment) *WrappedEnvironment {
-	return &WrappedEnvironment{env: env}
+	return &WrappedEnvironment{env}
 }
 
-var _ types.Backend = &WrappedEnvironment{}
+var _ Backend = &WrappedEnvironment{}
 
 // GetValue gets a value from the storage for the given owner and key pair,
 // if value not found empty slice and no error is returned.
@@ -137,26 +138,6 @@ func (we *WrappedEnvironment) Reset() {
 	we.env.Reset()
 }
 
-// CachedBlockProposal returns the currently cached block proposal, or nil if none is cached.
-func (we *WrappedEnvironment) CachedBlockProposal() any {
-	return we.env.CachedBlockProposal()
-}
-
-// CacheBlockProposal stores the given block proposal in the in-memory cache.
-func (we *WrappedEnvironment) CacheBlockProposal(v any) {
-	we.env.CacheBlockProposal(v)
-}
-
-// SetBlockProposalFlusher registers a function to persist the cached proposal to storage.
-func (we *WrappedEnvironment) SetBlockProposalFlusher(f func() error) {
-	we.env.SetBlockProposalFlusher(f)
-}
-
-// FlushBlockProposal calls the registered flusher to persist the cached proposal.
-func (we *WrappedEnvironment) FlushBlockProposal() error {
-	return we.env.FlushBlockProposal()
-}
-
 // GetCurrentBlockHeight returns the current Flow block height
 func (we *WrappedEnvironment) GetCurrentBlockHeight() (uint64, error) {
 	val, err := we.env.GetCurrentBlockHeight()
@@ -244,4 +225,44 @@ func handleEnvironmentError(err error) error {
 	}
 
 	return types.NewBackendError(err)
+}
+
+// BlockHash implements [Backend].
+func (we *WrappedEnvironment) BlockHash(height uint64) (gocommon.Hash, error) {
+	hash, err := we.env.BlockHash(height)
+	return hash, handleEnvironmentError(err)
+}
+
+// BlockProposal implements [Backend].
+func (we *WrappedEnvironment) BlockProposal() (*types.BlockProposal, error) {
+	bp, err := we.env.BlockProposal()
+	return bp, handleEnvironmentError(err)
+}
+
+// CommitBlockProposal implements [Backend].
+func (we *WrappedEnvironment) CommitBlockProposal(bp *types.BlockProposal) error {
+	err := we.env.CommitBlockProposal(bp)
+	return handleEnvironmentError(err)
+}
+
+// LatestBlock implements [Backend].
+func (we *WrappedEnvironment) LatestBlock() (*types.Block, error) {
+	block, err := we.env.LatestBlock()
+	return block, handleEnvironmentError(err)
+}
+
+// StageBlockProposal implements [Backend].
+func (we *WrappedEnvironment) StageBlockProposal(bp *types.BlockProposal) {
+	we.env.StageBlockProposal(bp)
+}
+
+// FlushBlockProposal implements [Backend].
+func (we *WrappedEnvironment) FlushBlockProposal() error {
+	err := we.env.FlushBlockProposal()
+	return handleEnvironmentError(err)
+}
+
+// ResetBlockProposal implements [Backend].
+func (we *WrappedEnvironment) ResetBlockProposal() {
+	we.env.ResetBlockProposal()
 }

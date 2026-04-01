@@ -1,4 +1,4 @@
-package handler
+package environment
 
 import (
 	"fmt"
@@ -10,49 +10,74 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
+// BlockStore stores the chain of blocks
+type EVMBlockStore interface {
+	// LatestBlock returns the latest appended block
+	LatestBlock() (*types.Block, error)
+
+	// BlockHash returns the hash of the block at the given height
+	BlockHash(height uint64) (gethCommon.Hash, error)
+
+	// BlockProposal returns the active block proposal
+	BlockProposal() (*types.BlockProposal, error)
+
+	// StageBlockProposal updates the in-memory block proposal without writing to
+	// storage. Persistence happens at transaction end via FlushBlockProposal.
+	StageBlockProposal(*types.BlockProposal)
+
+	// FlushBlockProposal writes the cached block proposal to storage. Called by the
+	// fvm.Environment at the end of each Cadence transaction.
+	FlushBlockProposal() error
+
+	// CommitBlockProposal commits the block proposal and update the chain of blocks
+	CommitBlockProposal(*types.BlockProposal) error
+
+	// Reset discards any staged but unflushed block proposal. Called by the
+	// fvm.Environment when a transaction fails.
+	ResetBlockProposal()
+}
+
 const (
 	BlockHashListCapacity            = 256
 	BlockStoreLatestBlockKey         = "LatestBlock"
 	BlockStoreLatestBlockProposalKey = "LatestBlockProposal"
 )
 
-// BlockStore manages EVM block proposal and block hash data for a single Cadence transaction.
-// The block proposal is cached in memory (via the backend's [types.BlockProposalCache]) to avoid
-// repeated serialization/deserialization overhead across multiple reads and writes within the same
-// Cadence transaction execution.
-// Writes to storage are deferred: [StageBlockProposal] only updates the in-memory cache,
-// and persistence is handled automatically at transaction end via [BlockProposalCache.FlushBlockProposal].
-// CAUTION: not concurrency safe.
 type BlockStore struct {
 	chainID     flow.ChainID
-	backend     types.Backend
+	storage     ValueStore
+	blockInfo   BlockInfo
+	randGen     RandomGenerator
 	rootAddress flow.Address
+	cached      *types.BlockProposal
 }
 
-var _ types.BlockStore = &BlockStore{}
+var _ EVMBlockStore = &BlockStore{}
 
 // NewBlockStore constructs a new block store
 func NewBlockStore(
 	chainID flow.ChainID,
-	backend types.Backend,
+	storage ValueStore,
+	blockInfo BlockInfo,
+	randGen RandomGenerator,
 	rootAddress flow.Address,
 ) *BlockStore {
-	bs := &BlockStore{
+	return &BlockStore{
 		chainID:     chainID,
-		backend:     backend,
+		storage:     storage,
+		blockInfo:   blockInfo,
+		randGen:     randGen,
 		rootAddress: rootAddress,
 	}
-	return bs
 }
 
 // BlockProposal returns the block proposal to be updated by the handler
 func (bs *BlockStore) BlockProposal() (*types.BlockProposal, error) {
-	cached, ok := bs.backend.CachedBlockProposal().(*types.BlockProposal)
-	if ok && cached != nil {
-		return cached, nil
+	if bs.cached != nil {
+		return bs.cached, nil
 	}
-	// fetch from storage
-	data, err := bs.backend.GetValue(bs.rootAddress[:], []byte(BlockStoreLatestBlockProposalKey))
+	// first fetch it from the storage
+	data, err := bs.storage.GetValue(bs.rootAddress[:], []byte(BlockStoreLatestBlockProposalKey))
 	if err != nil {
 		return nil, err
 	}
@@ -61,25 +86,25 @@ func (bs *BlockStore) BlockProposal() (*types.BlockProposal, error) {
 		if err != nil {
 			return nil, err
 		}
-		bs.backend.CacheBlockProposal(bp)
+		bs.cached = bp
 		return bp, nil
 	}
 	bp, err := bs.constructBlockProposal()
 	if err != nil {
 		return nil, err
 	}
-	bs.StageBlockProposal(bp)
+	bs.cached = bp
 	return bp, nil
 }
 
 func (bs *BlockStore) constructBlockProposal() (*types.BlockProposal, error) {
 	// if available construct a new one
-	cadenceHeight, err := bs.backend.GetCurrentBlockHeight()
+	cadenceHeight, err := bs.blockInfo.GetCurrentBlockHeight()
 	if err != nil {
 		return nil, err
 	}
 
-	cadenceBlock, found, err := bs.backend.GetBlockAtHeight(cadenceHeight)
+	cadenceBlock, found, err := bs.blockInfo.GetBlockAtHeight(cadenceHeight)
 	if err != nil {
 		return nil, err
 	}
@@ -103,7 +128,7 @@ func (bs *BlockStore) constructBlockProposal() (*types.BlockProposal, error) {
 
 	// read a random value for block proposal
 	prevrandao := gethCommon.Hash{}
-	err = bs.backend.ReadRandom(prevrandao[:])
+	err = bs.randGen.ReadRandom(prevrandao[:])
 	if err != nil {
 		return nil, err
 	}
@@ -119,26 +144,14 @@ func (bs *BlockStore) constructBlockProposal() (*types.BlockProposal, error) {
 	return blockProposal, nil
 }
 
-// StageBlockProposal updates the in-memory block proposal cache and registers the
-// persistence flusher on the backend so it is called at the end of the Cadence transaction.
-func (bs *BlockStore) StageBlockProposal(bp *types.BlockProposal) {
-	bs.backend.SetBlockProposalFlusher(bs.FlushBlockProposal)
-	bs.backend.CacheBlockProposal(bp)
-}
-
-// flushBlockProposal writes the cached block proposal to storage.
-// It is registered on the backend's BlockProposalCache and called by
-// facadeEnvironment.FlushPendingUpdates at the end of the Cadence transaction.
-func (bs *BlockStore) FlushBlockProposal() error {
-	cached, ok := bs.backend.CachedBlockProposal().(*types.BlockProposal)
-	if !ok || cached == nil {
-		return nil
-	}
-	blockProposalBytes, err := cached.ToBytes()
+// UpdateBlockProposal updates the block proposal
+func (bs *BlockStore) updateBlockProposal(bp *types.BlockProposal) error {
+	blockProposalBytes, err := bp.ToBytes()
 	if err != nil {
 		return types.NewFatalError(err)
 	}
-	return bs.backend.SetValue(
+
+	return bs.storage.SetValue(
 		bs.rootAddress[:],
 		[]byte(BlockStoreLatestBlockProposalKey),
 		blockProposalBytes,
@@ -154,7 +167,7 @@ func (bs *BlockStore) CommitBlockProposal(bp *types.BlockProposal) error {
 		return types.NewFatalError(err)
 	}
 
-	err = bs.backend.SetValue(bs.rootAddress[:], []byte(BlockStoreLatestBlockKey), blockBytes)
+	err = bs.storage.SetValue(bs.rootAddress[:], []byte(BlockStoreLatestBlockKey), blockBytes)
 	if err != nil {
 		return err
 	}
@@ -178,14 +191,17 @@ func (bs *BlockStore) CommitBlockProposal(bp *types.BlockProposal) error {
 	if err != nil {
 		return err
 	}
-	bs.StageBlockProposal(newBP)
-
+	err = bs.updateBlockProposal(newBP)
+	if err != nil {
+		return err
+	}
+	bs.cached = newBP
 	return nil
 }
 
 // LatestBlock returns the latest executed block
 func (bs *BlockStore) LatestBlock() (*types.Block, error) {
-	data, err := bs.backend.GetValue(bs.rootAddress[:], []byte(BlockStoreLatestBlockKey))
+	data, err := bs.storage.GetValue(bs.rootAddress[:], []byte(BlockStoreLatestBlockKey))
 	if err != nil {
 		return nil, err
 	}
@@ -206,7 +222,7 @@ func (bs *BlockStore) BlockHash(height uint64) (gethCommon.Hash, error) {
 }
 
 func (bs *BlockStore) getBlockHashList() (*BlockHashList, error) {
-	bhl, err := NewBlockHashList(bs.backend, bs.rootAddress, BlockHashListCapacity)
+	bhl, err := NewBlockHashList(bs.storage, bs.rootAddress, BlockHashListCapacity)
 	if err != nil {
 		return nil, err
 	}
@@ -222,4 +238,51 @@ func (bs *BlockStore) getBlockHashList() (*BlockHashList, error) {
 	}
 
 	return bhl, nil
+}
+
+func (bs *BlockStore) ResetBlockProposal() {
+	bs.cached = nil
+}
+
+func (bs *BlockStore) StageBlockProposal(bp *types.BlockProposal) {
+	bs.cached = bp
+}
+
+func (bs *BlockStore) FlushBlockProposal() error {
+	if bs.cached == nil {
+		return nil
+	}
+	err := bs.updateBlockProposal(bs.cached)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+type NoEVMBlockStore struct{}
+
+var _ EVMBlockStore = &NoEVMBlockStore{}
+
+func (bs NoEVMBlockStore) BlockProposal() (*types.BlockProposal, error) {
+	return nil, nil
+}
+
+func (bs NoEVMBlockStore) CommitBlockProposal(bp *types.BlockProposal) error {
+	return nil
+}
+
+func (bs NoEVMBlockStore) LatestBlock() (*types.Block, error) {
+	return nil, nil
+}
+
+func (bs NoEVMBlockStore) BlockHash(height uint64) (gethCommon.Hash, error) {
+	return gethCommon.Hash{}, nil
+}
+
+func (bs NoEVMBlockStore) ResetBlockProposal() {}
+
+func (bs NoEVMBlockStore) StageBlockProposal(bp *types.BlockProposal) {}
+
+func (bs NoEVMBlockStore) FlushBlockProposal() error {
+	return nil
 }
