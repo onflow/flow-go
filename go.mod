@@ -368,4 +368,4 @@ replace github.com/ipfs/boxo => github.com/onflow/boxo v0.0.0-20240201202436-f24
 // Using custom fork until https://github.com/ipfs/go-ds-pebble/issues/64 is merged
 replace github.com/ipfs/go-ds-pebble => github.com/onflow/go-ds-pebble v0.0.0-20251003225212-131edca3a897
 
-replace github.com/onflow/cadence => github.com/onflow/cadence-internal v1.9.10-rc.1.0.20260323161617-56ca747a5d6e
+replace github.com/onflow/cadence => github.com/onflow/cadence-internal v1.9.10-rc.1.0.20260401203249-ba76e2b29215

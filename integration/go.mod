@@ -404,4 +404,4 @@ replace github.com/ipfs/go-ds-pebble => github.com/onflow/go-ds-pebble v0.0.0-20
 
 replace github.com/hashicorp/golang-lru/v2 => github.com/fxamacker/golang-lru/v2 v2.0.0-20250430153159-6f72f038a30f
 
-replace github.com/onflow/cadence => github.com/onflow/cadence-internal v1.9.10-rc.1.0.20260323161617-56ca747a5d6e
+replace github.com/onflow/cadence => github.com/onflow/cadence-internal v1.9.10-rc.1.0.20260401203249-ba76e2b29215
