@@ -6969,7 +6969,7 @@ func RunWithNewEnvironment(
 	bootstrapOpts ...fvm.BootstrapProcedureOption,
 ) {
 	rootAddr := evm.StorageAccountAddress(chain.ChainID())
-	RunWithTestBackend(t, func(backend *TestBackend) {
+	RunWithTestBackend(t, chain.ChainID(), func(backend *TestBackend) {
 		RunWithDeployedContract(t, GetStorageTestContract(t), backend, rootAddr, func(testContract *TestContract) {
 			RunWithEOATestAccount(t, backend, rootAddr, func(testAccount *EOATestAccount) {
 				blocks := new(envMock.Blocks)
@@ -7030,7 +7030,7 @@ func RunContractWithNewEnvironment(
 ) {
 	rootAddr := evm.StorageAccountAddress(chain.ChainID())
 
-	RunWithTestBackend(t, func(backend *TestBackend) {
+	RunWithTestBackend(t, chain.ChainID(), func(backend *TestBackend) {
 		RunWithDeployedContract(t, tc, backend, rootAddr, func(testContract *TestContract) {
 			RunWithEOATestAccount(t, backend, rootAddr, func(testAccount *EOATestAccount) {
 

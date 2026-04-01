@@ -20,6 +20,7 @@ import (
 	"golang.org/x/exp/maps"
 
 	"github.com/onflow/flow-go/fvm/environment"
+	"github.com/onflow/flow-go/fvm/evm"
 	"github.com/onflow/flow-go/fvm/evm/types"
 	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/fvm/tracing"
@@ -38,7 +39,7 @@ func RunWithTestFlowEVMRootAddress(t testing.TB, backend atree.Ledger, f func(fl
 	f(TestFlowEVMRootAddress)
 }
 
-func RunWithTestBackend(t testing.TB, f func(*TestBackend)) {
+func RunWithTestBackend(t testing.TB, chain flow.ChainID, f func(*TestBackend)) {
 	vs := GetSimpleValueStore()
 	bi := getSimpleBlockInfo()
 	rg := getSimpleRandomGenerator()
@@ -52,7 +53,7 @@ func RunWithTestBackend(t testing.TB, f func(*TestBackend)) {
 		TestTracer:                  &TestTracer{},
 		TestMetricsReporter:         &TestMetricsReporter{},
 		TestLoggerProvider:          &TestLoggerProvider{},
-		TestBlockStore:              getSimpleBlockStore(vs, bi, rg),
+		TestBlockStore:              getSimpleBlockStore(chain, vs, bi, rg),
 	}
 	f(tb)
 }
@@ -232,8 +233,14 @@ func getSimpleBlockInfo() *TestBlockInfo {
 	}
 }
 
-func getSimpleBlockStore(vs *TestValueStore, bi *TestBlockInfo, rg *TestRandomGenerator) *TestBlockStore {
-	bs := environment.NewBlockStore(flow.Testnet, vs, bi, rg, TestFlowEVMRootAddress)
+func getSimpleBlockStore(chain flow.ChainID, vs *TestValueStore, bi *TestBlockInfo, rg *TestRandomGenerator) *TestBlockStore {
+	bs := environment.NewBlockStore(
+		chain,
+		vs,
+		bi,
+		rg,
+		evm.StorageAccountAddress(chain),
+	)
 
 	return &TestBlockStore{
 		LatestBlockFunc: func() (*types.Block, error) {

@@ -14,7 +14,7 @@ import (
 func BenchmarkProposalGrowth(b *testing.B) { benchmarkBlockProposalGrowth(b, 1000) }
 
 func benchmarkBlockProposalGrowth(b *testing.B, txCounts int) {
-	testutils.RunWithTestBackend(b, func(backend *testutils.TestBackend) {
+	testutils.RunWithTestBackend(b, flow.Testnet, func(backend *testutils.TestBackend) {
 		testutils.RunWithTestFlowEVMRootAddress(b, backend, func(rootAddr flow.Address) {
 
 			bs := environment.NewBlockStore(flow.Testnet, backend, backend, backend, rootAddr)
@@ -24,7 +24,6 @@ func benchmarkBlockProposalGrowth(b *testing.B, txCounts int) {
 				res := testutils.RandomResultFixture(b)
 				bp.AppendTransaction(res)
 				bs.StageBlockProposal(bp)
-				require.NoError(b, err)
 			}
 
 			// check the impact of updating block proposal after x number of transactions

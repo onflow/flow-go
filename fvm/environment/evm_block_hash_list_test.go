@@ -12,7 +12,7 @@ import (
 )
 
 func TestBlockHashList(t *testing.T) {
-	testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
+	testutils.RunWithTestBackend(t, flow.Testnet, func(backend *testutils.TestBackend) {
 		testutils.RunWithTestFlowEVMRootAddress(t, backend, func(root flow.Address) {
 			capacity := 256
 			bhl, err := environment.NewBlockHashList(backend, root, capacity)

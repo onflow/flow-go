@@ -41,7 +41,7 @@ func TestHandler_TransactionRunOrPanic(t *testing.T) {
 	t.Run("test RunOrPanic run (happy case)", func(t *testing.T) {
 		t.Parallel()
 
-		testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
+		testutils.RunWithTestBackend(t, flow.Testnet, func(backend *testutils.TestBackend) {
 			testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
 				testutils.RunWithEOATestAccount(t, backend, rootAddr, func(eoa *testutils.EOATestAccount) {
 
@@ -124,7 +124,7 @@ func TestHandler_TransactionRunOrPanic(t *testing.T) {
 	t.Run("test RunOrPanic (unhappy non-fatal cases)", func(t *testing.T) {
 		t.Parallel()
 
-		testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
+		testutils.RunWithTestBackend(t, flow.Testnet, func(backend *testutils.TestBackend) {
 			testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
 				testutils.RunWithEOATestAccount(t, backend, rootAddr, func(eoa *testutils.EOATestAccount) {
 					aa := handler.NewAddressAllocator()
@@ -186,7 +186,7 @@ func TestHandler_TransactionRunOrPanic(t *testing.T) {
 		t.Run("test RunOrPanic (fatal cases)", func(t *testing.T) {
 			t.Parallel()
 
-			testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
+			testutils.RunWithTestBackend(t, flow.Testnet, func(backend *testutils.TestBackend) {
 				testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
 					testutils.RunWithEOATestAccount(t, backend, rootAddr, func(eoa *testutils.EOATestAccount) {
 						aa := handler.NewAddressAllocator()
@@ -220,7 +220,7 @@ func TestHandler_TransactionRunOrPanic(t *testing.T) {
 	t.Run("test RunOrPanic (with integrated emulator)", func(t *testing.T) {
 		t.Parallel()
 
-		testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
+		testutils.RunWithTestBackend(t, flow.Testnet, func(backend *testutils.TestBackend) {
 			testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
 				handler := SetupHandler(t, backend, rootAddr)
 
@@ -280,7 +280,7 @@ func TestHandler_OpsWithoutEmulator(t *testing.T) {
 	t.Run("test last executed block call", func(t *testing.T) {
 		t.Parallel()
 
-		testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
+		testutils.RunWithTestBackend(t, flow.Testnet, func(backend *testutils.TestBackend) {
 			testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
 				handler := SetupHandler(t, backend, rootAddr)
 
@@ -305,7 +305,7 @@ func TestHandler_OpsWithoutEmulator(t *testing.T) {
 	t.Run("test address allocation", func(t *testing.T) {
 		t.Parallel()
 
-		testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
+		testutils.RunWithTestBackend(t, flow.Testnet, func(backend *testutils.TestBackend) {
 			testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
 				h := SetupHandler(t, backend, rootAddr)
 
@@ -323,7 +323,7 @@ func TestHandler_COA(t *testing.T) {
 	t.Parallel()
 
 	t.Run("test deposit/withdraw (with integrated emulator)", func(t *testing.T) {
-		testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
+		testutils.RunWithTestBackend(t, flow.Testnet, func(backend *testutils.TestBackend) {
 			testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
 				sc := systemcontracts.SystemContractsForChain(flow.Emulator)
 
@@ -410,7 +410,7 @@ func TestHandler_COA(t *testing.T) {
 	})
 
 	t.Run("test coa deployment", func(t *testing.T) {
-		testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
+		testutils.RunWithTestBackend(t, flow.Testnet, func(backend *testutils.TestBackend) {
 			testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
 				h := SetupHandler(t, backend, rootAddr)
 
@@ -457,7 +457,7 @@ func TestHandler_COA(t *testing.T) {
 	})
 
 	t.Run("test withdraw (unhappy case)", func(t *testing.T) {
-		testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
+		testutils.RunWithTestBackend(t, flow.Testnet, func(backend *testutils.TestBackend) {
 			testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
 				testutils.RunWithEOATestAccount(t, backend, rootAddr, func(eoa *testutils.EOATestAccount) {
 					aa := handler.NewAddressAllocator()
@@ -534,7 +534,7 @@ func TestHandler_COA(t *testing.T) {
 	t.Run("test deposit (unhappy case)", func(t *testing.T) {
 		t.Parallel()
 
-		testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
+		testutils.RunWithTestBackend(t, flow.Testnet, func(backend *testutils.TestBackend) {
 			testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
 				testutils.RunWithEOATestAccount(t, backend, rootAddr, func(eoa *testutils.EOATestAccount) {
 					aa := handler.NewAddressAllocator()
@@ -581,7 +581,7 @@ func TestHandler_COA(t *testing.T) {
 		t.Parallel()
 
 		// TODO update this test with events, gas metering, etc
-		testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
+		testutils.RunWithTestBackend(t, flow.Testnet, func(backend *testutils.TestBackend) {
 			testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
 				handler := SetupHandler(t, backend, rootAddr)
 
@@ -623,7 +623,7 @@ func TestHandler_COA(t *testing.T) {
 	t.Run("test call to cadence arch", func(t *testing.T) {
 		t.Parallel()
 
-		testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
+		testutils.RunWithTestBackend(t, flow.Testnet, func(backend *testutils.TestBackend) {
 			blockHeight := uint64(123)
 			backend.GetCurrentBlockHeightFunc = func() (uint64, error) {
 				return blockHeight, nil
@@ -677,7 +677,7 @@ func TestHandler_COA(t *testing.T) {
 	t.Run("test block.random call (with integrated emulator)", func(t *testing.T) {
 		t.Parallel()
 
-		testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
+		testutils.RunWithTestBackend(t, flow.Testnet, func(backend *testutils.TestBackend) {
 			random := testutils.RandomCommonHash(t)
 			backend.ReadRandomFunc = func(buffer []byte) error {
 				copy(buffer, random.Bytes())
@@ -721,7 +721,7 @@ func TestHandler_TransactionRun(t *testing.T) {
 	t.Run("test - transaction run (success)", func(t *testing.T) {
 		t.Parallel()
 
-		testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
+		testutils.RunWithTestBackend(t, flow.Testnet, func(backend *testutils.TestBackend) {
 			testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
 				testutils.RunWithEOATestAccount(t, backend, rootAddr, func(eoa *testutils.EOATestAccount) {
 
@@ -790,7 +790,7 @@ func TestHandler_TransactionRun(t *testing.T) {
 	t.Run("test - transaction run (failed)", func(t *testing.T) {
 		t.Parallel()
 
-		testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
+		testutils.RunWithTestBackend(t, flow.Testnet, func(backend *testutils.TestBackend) {
 			testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
 				testutils.RunWithEOATestAccount(t, backend, rootAddr, func(eoa *testutils.EOATestAccount) {
 
@@ -838,7 +838,7 @@ func TestHandler_TransactionRun(t *testing.T) {
 	t.Run("test - transaction run (unhappy cases)", func(t *testing.T) {
 		t.Parallel()
 
-		testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
+		testutils.RunWithTestBackend(t, flow.Testnet, func(backend *testutils.TestBackend) {
 			testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
 				testutils.RunWithEOATestAccount(t, backend, rootAddr, func(eoa *testutils.EOATestAccount) {
 					aa := handler.NewAddressAllocator()
@@ -890,7 +890,7 @@ func TestHandler_TransactionRun(t *testing.T) {
 	t.Run("test - transaction batch run (success)", func(t *testing.T) {
 		t.Parallel()
 
-		testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
+		testutils.RunWithTestBackend(t, flow.Testnet, func(backend *testutils.TestBackend) {
 			testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
 				testutils.RunWithEOATestAccount(t, backend, rootAddr, func(eoa *testutils.EOATestAccount) {
 					sc := systemcontracts.SystemContractsForChain(chainID)
@@ -1018,7 +1018,7 @@ func TestHandler_TransactionRun(t *testing.T) {
 	t.Run("test - transaction batch run (unhappy case)", func(t *testing.T) {
 		t.Parallel()
 
-		testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
+		testutils.RunWithTestBackend(t, flow.Testnet, func(backend *testutils.TestBackend) {
 			testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
 				testutils.RunWithEOATestAccount(t, backend, rootAddr, func(eoa *testutils.EOATestAccount) {
 					aa := handler.NewAddressAllocator()
@@ -1067,7 +1067,7 @@ func TestHandler_TransactionRun(t *testing.T) {
 	t.Run("test dry run successful", func(t *testing.T) {
 		t.Parallel()
 
-		testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
+		testutils.RunWithTestBackend(t, flow.Testnet, func(backend *testutils.TestBackend) {
 			testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
 				testutils.RunWithEOATestAccount(t, backend, rootAddr, func(eoa *testutils.EOATestAccount) {
 
@@ -1132,7 +1132,7 @@ func TestHandler_TransactionRun(t *testing.T) {
 	t.Run("test - open tracing", func(t *testing.T) {
 		t.Parallel()
 
-		testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
+		testutils.RunWithTestBackend(t, flow.Testnet, func(backend *testutils.TestBackend) {
 			testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
 				testutils.RunWithEOATestAccount(t, backend, rootAddr, func(eoa *testutils.EOATestAccount) {
 
@@ -1184,7 +1184,7 @@ func TestHandler_TransactionRun(t *testing.T) {
 func TestHandler_Metrics(t *testing.T) {
 	t.Parallel()
 
-	testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
+	testutils.RunWithTestBackend(t, flow.Testnet, func(backend *testutils.TestBackend) {
 		testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
 			testutils.RunWithEOATestAccount(t, backend, rootAddr, func(eoa *testutils.EOATestAccount) {
 				gasUsed := testutils.RandomGas(1000)
@@ -1281,7 +1281,7 @@ func TestHandler_Metrics(t *testing.T) {
 func TestHandler_GetState(t *testing.T) {
 	t.Parallel()
 
-	testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
+	testutils.RunWithTestBackend(t, flow.Testnet, func(backend *testutils.TestBackend) {
 		backend.SetEVMTestOperationsAllowed(true)
 
 		testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
@@ -1304,7 +1304,7 @@ func TestHandler_GetState(t *testing.T) {
 func TestHandler_GetState_Disabled(t *testing.T) {
 	t.Parallel()
 
-	testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
+	testutils.RunWithTestBackend(t, flow.Testnet, func(backend *testutils.TestBackend) {
 		backend.SetEVMTestOperationsAllowed(false)
 
 		testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
@@ -1329,7 +1329,7 @@ func TestHandler_GetState_Disabled(t *testing.T) {
 func TestHandler_SetState(t *testing.T) {
 	t.Parallel()
 
-	testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
+	testutils.RunWithTestBackend(t, flow.Testnet, func(backend *testutils.TestBackend) {
 		backend.SetEVMTestOperationsAllowed(true)
 
 		testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
@@ -1362,7 +1362,7 @@ func TestHandler_SetState(t *testing.T) {
 func TestHandler_SetState_Disabled(t *testing.T) {
 	t.Parallel()
 
-	testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
+	testutils.RunWithTestBackend(t, flow.Testnet, func(backend *testutils.TestBackend) {
 		backend.SetEVMTestOperationsAllowed(false)
 
 		testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
@@ -1397,7 +1397,7 @@ func TestHandler_SetState_Disabled(t *testing.T) {
 func TestHandler_RunTxAs(t *testing.T) {
 	t.Parallel()
 
-	testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
+	testutils.RunWithTestBackend(t, flow.Testnet, func(backend *testutils.TestBackend) {
 		backend.SetEVMTestOperationsAllowed(true)
 
 		testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
@@ -1438,7 +1438,7 @@ func TestHandler_RunTxAs(t *testing.T) {
 func TestHandler_RunTxAs_Disabled(t *testing.T) {
 	t.Parallel()
 
-	testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
+	testutils.RunWithTestBackend(t, flow.Testnet, func(backend *testutils.TestBackend) {
 		backend.SetEVMTestOperationsAllowed(false)
 
 		testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {

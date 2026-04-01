@@ -16,7 +16,7 @@ import (
 func TestBlockStore(t *testing.T) {
 
 	var chainID = flow.Testnet
-	testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
+	testutils.RunWithTestBackend(t, chainID, func(backend *testutils.TestBackend) {
 		testutils.RunWithTestFlowEVMRootAddress(t, backend, func(root flow.Address) {
 			bs := environment.NewBlockStore(chainID, backend, backend, backend, root)
 
