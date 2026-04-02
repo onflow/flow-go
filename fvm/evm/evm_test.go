@@ -4019,6 +4019,90 @@ func TestDryRun(t *testing.T) {
 			},
 		)
 	})
+
+	// Regression test: dryRun reads the block proposal into the cache. A subsequent
+	// EVM.run in the same Cadence transaction must still see a clean proposal (not
+	// one tainted by the dry-run read) and complete successfully.
+	t.Run("test EVM.dryRun followed by EVM.run in same transaction", func(t *testing.T) {
+		RunWithNewEnvironment(t,
+			chain, func(
+				ctx fvm.Context,
+				vm fvm.VM,
+				snapshot snapshot.SnapshotTree,
+				testContract *TestContract,
+				testAccount *EOATestAccount,
+			) {
+				sc := systemcontracts.SystemContractsForChain(chain.ChainID())
+
+				data := testContract.MakeCallData(t, "store", big.NewInt(42))
+
+				// The dry-run tx uses nonce 0 (doesn't consume it).
+				dryTx := gethTypes.NewTransaction(
+					testAccount.Nonce(),
+					testContract.DeployedAt.ToCommon(),
+					big.NewInt(0),
+					uint64(50_000),
+					big.NewInt(0),
+					data,
+				)
+				dryTxBytes, err := dryTx.MarshalBinary()
+				require.NoError(t, err)
+
+				// The real tx is signed and uses the same nonce.
+				realTxBytes := testAccount.PrepareSignAndEncodeTx(t,
+					testContract.DeployedAt.ToCommon(),
+					data,
+					big.NewInt(0),
+					uint64(50_000),
+					big.NewInt(0),
+				)
+
+				code := []byte(fmt.Sprintf(`
+					import EVM from %s
+
+					transaction(dryTx: [UInt8], realTx: [UInt8], coinbaseBytes: [UInt8; 20]) {
+						prepare(account: &Account) {
+							let from = EVM.EVMAddress(bytes: coinbaseBytes)
+							let coinbase = EVM.EVMAddress(bytes: coinbaseBytes)
+
+							let dryResult = EVM.dryRun(tx: dryTx, from: from)
+							assert(dryResult.status == EVM.Status.successful, message: "dry run failed")
+
+							let runResult = EVM.run(tx: realTx, coinbase: coinbase)
+							assert(runResult.status == EVM.Status.successful, message: "run after dry run failed")
+						}
+					}
+				`, sc.EVMContract.Address.HexWithPrefix()))
+
+				dryTxArg := cadence.NewArray(
+					unittest.BytesToCdcUInt8(dryTxBytes),
+				).WithType(stdlib.EVMTransactionBytesCadenceType)
+
+				realTxArg := cadence.NewArray(
+					unittest.BytesToCdcUInt8(realTxBytes),
+				).WithType(stdlib.EVMTransactionBytesCadenceType)
+
+				coinbase := cadence.NewArray(
+					unittest.BytesToCdcUInt8(testAccount.Address().Bytes()),
+				).WithType(stdlib.EVMAddressBytesCadenceType)
+
+				txBody, err := flow.NewTransactionBodyBuilder().
+					SetScript(code).
+					SetPayer(sc.FlowServiceAccount.Address).
+					AddAuthorizer(sc.FlowServiceAccount.Address).
+					AddArgument(json.MustEncode(dryTxArg)).
+					AddArgument(json.MustEncode(realTxArg)).
+					AddArgument(json.MustEncode(coinbase)).
+					Build()
+				require.NoError(t, err)
+
+				tx := fvm.Transaction(txBody, 0)
+				_, output, err := vm.Run(ctx, tx, snapshot)
+				require.NoError(t, err)
+				require.NoError(t, output.Err)
+			},
+		)
+	})
 }
 
 func TestDryCall(t *testing.T) {
