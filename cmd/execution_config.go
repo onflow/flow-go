@@ -62,6 +62,7 @@ type ExecutionConfig struct {
 	transactionExecutionMetricsEnabled    bool
 	transactionExecutionMetricsBufferSize uint
 	scheduleCallbacksEnabled              bool
+	tokenTrackingEnabled                  bool
 
 	computationConfig        computation.ComputationConfig
 	receiptRequestWorkers    uint   // common provider engine workers
@@ -157,6 +158,7 @@ func (exeConf *ExecutionConfig) SetupFlags(flags *pflag.FlagSet) {
 	flags.Uint64Var(&exeConf.backgroundIndexerHeightsPerSecond, "background-indexer-heights-per-second", storehouse.DefaultHeightsPerSecond, fmt.Sprintf("rate limit for background indexer in heights per second. 0 means no rate limiting. default: %v", storehouse.DefaultHeightsPerSecond))
 	flags.BoolVar(&exeConf.enableChecker, "enable-checker", true, "enable checker to check the correctness of the execution result, default is true")
 	flags.BoolVar(&exeConf.scheduleCallbacksEnabled, "scheduled-callbacks-enabled", fvm.DefaultScheduledTransactionsEnabled, "[deprecated] enable execution of scheduled transactions")
+	flags.BoolVar(&exeConf.tokenTrackingEnabled, "token-tracking-enabled", false, "enable tracking and logging of token moves on transactions")
 	// deprecated. Retain it to prevent nodes that previously had this configuration from crashing.
 	var deprecatedEnableNewIngestionEngine bool
 	flags.BoolVar(&deprecatedEnableNewIngestionEngine, "enable-new-ingestion-engine", true, "enable new ingestion engine, default is true")

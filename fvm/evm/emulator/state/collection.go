@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"math"
 	"runtime"
-	"slices"
 
 	"github.com/fxamacker/cbor/v2"
 	"github.com/onflow/atree"
@@ -254,6 +253,16 @@ func (v ByteStringValue) ChildStorables() []atree.Storable {
 	return nil
 }
 
+func (v ByteStringValue) CanCopyNonRefSimple() bool {
+	return true
+}
+
+func (v ByteStringValue) CopyNonRefSimple() (atree.Storable, error) {
+	data := make([]byte, len(v.data))
+	copy(data, v.data)
+	return NewByteStringValue(data), nil
+}
+
 func (v ByteStringValue) StoredValue(_ atree.SlabStorage) (atree.Value, error) {
 	return v, nil
 }
@@ -327,17 +336,6 @@ func (v ByteStringValue) String() string {
 
 func (v ByteStringValue) Bytes() []byte {
 	return v.data
-}
-
-func (ByteStringValue) CanCopyNonRefSimple() bool {
-	return true
-}
-
-func (v ByteStringValue) CopyNonRefSimple() (atree.Storable, error) {
-	return ByteStringValue{
-		data: slices.Clone(v.data),
-		size: v.size,
-	}, nil
 }
 
 func decodeStorable(dec *cbor.StreamDecoder, slabID atree.SlabID, inlinedExtraData []atree.ExtraData) (atree.Storable, error) {
