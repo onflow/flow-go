@@ -20,6 +20,16 @@ import (
 	"github.com/onflow/flow-go/module/trace"
 )
 
+const (
+	maxDryCallCacheResultDataSize = 1024
+	maxDryCallCacheCount          = 16
+)
+
+type evmDryCallCacheKey struct {
+	from   types.Address
+	txHash gethCommon.Hash
+}
+
 // ContractHandler is responsible for triggering calls to emulator, metering,
 // event emission and updating the block
 type ContractHandler struct {
@@ -31,6 +41,7 @@ type ContractHandler struct {
 	backend              types.Backend
 	emulator             types.Emulator
 	precompiledContracts []types.PrecompiledContract
+	evmDryCallCache      map[evmDryCallCacheKey]*types.ResultSummary // evmDryCallCache caches EVM drycall results in a transaction.  It is cleared when the EVM state is changed via Run(), BatchRun(), etc., or at the end of a transaction.
 }
 
 var _ types.ContractHandler = &ContractHandler{}
@@ -63,6 +74,18 @@ func NewContractHandler(
 	}
 }
 
+// ResetCaches resets caches. It is called by the runtime pool via
+// SwappableEnvironment.onSwap when the runtime is borrowed or returned.
+func (h *ContractHandler) ResetCaches() {
+	h.evmDryCallCache = nil
+}
+
+// invalidateDryCallCache clear evmDryCallCache.  It is called when
+// the EVM state is about to change via Run(), BatchRun(), etc.
+func (h *ContractHandler) invalidateDryCallCache() {
+	clear(h.evmDryCallCache)
+}
+
 // FlowTokenAddress returns the address where the FlowToken contract is deployed
 func (h *ContractHandler) FlowTokenAddress() common.Address {
 	return h.flowTokenAddress
@@ -87,6 +110,7 @@ func (h *ContractHandler) SetState(
 	slot gethCommon.Hash,
 	value gethCommon.Hash,
 ) gethCommon.Hash {
+	h.invalidateDryCallCache()
 
 	h.validateTestOperation()
 
@@ -267,6 +291,8 @@ func (h *ContractHandler) BatchRun(rlpEncodedTxs [][]byte, gasFeeCollector types
 }
 
 func (h *ContractHandler) batchRun(rlpEncodedTxs [][]byte) ([]*types.Result, error) {
+	h.invalidateDryCallCache()
+
 	// step 1 - transaction decoding and check that enough evm gas is available in the FVM transaction
 
 	// remainingGasLimit is the remaining EVM gas available in hte FVM transaction
@@ -387,6 +413,8 @@ func (h *ContractHandler) CommitBlockProposal() {
 }
 
 func (h *ContractHandler) commitBlockProposal() error {
+	h.invalidateDryCallCache()
+
 	// load latest block proposal
 	bp, err := h.blockStore.BlockProposal()
 	if err != nil {
@@ -425,6 +453,8 @@ func (h *ContractHandler) commitBlockProposal() error {
 }
 
 func (h *ContractHandler) run(rlpEncodedTx []byte) (*types.Result, error) {
+	h.invalidateDryCallCache()
+
 	// step 1 - transaction decoding
 	tx, err := h.decodeTransaction(rlpEncodedTx)
 	if err != nil {
@@ -512,16 +542,16 @@ func (h *ContractHandler) DryRun(
 ) *types.ResultSummary {
 	defer h.backend.StartChildSpan(trace.FVMEVMDryRun).End()
 
-	res, err := h.dryRun(rlpEncodedTx, from)
+	resSummary, err := h.dryRun(rlpEncodedTx, from)
 	panicOnError(err)
 
-	return res.ResultSummary()
+	return resSummary
 }
 
 func (h *ContractHandler) dryRun(
 	rlpEncodedTx []byte,
 	from types.Address,
-) (*types.Result, error) {
+) (*types.ResultSummary, error) {
 	// step 1 - transaction decoding
 	err := h.backend.MeterComputation(
 		common.ComputationUsage{
@@ -545,11 +575,22 @@ func (h *ContractHandler) dryRun(
 func (h *ContractHandler) dryRunTx(
 	tx *gethTypes.Transaction,
 	from types.Address,
-) (*types.Result, error) {
+) (*types.ResultSummary, error) {
 	// check if enough computation is available
 	err := h.checkGasLimit(types.GasLimit(tx.Gas()))
 	if err != nil {
 		return nil, err
+	}
+
+	// Cache lookup
+	key := evmDryCallCacheKey{from: from, txHash: tx.Hash()}
+	if cached, ok := h.evmDryCallCache[key]; ok {
+		// Meter cached gas
+		panicOnError(h.backend.MeterComputation(common.ComputationUsage{
+			Kind:      environment.ComputationKindEVMGasUsage,
+			Intensity: cached.GasConsumed,
+		}))
+		return cached, nil
 	}
 
 	bp, err := h.getBlockProposal()
@@ -585,7 +626,22 @@ func (h *ContractHandler) dryRunTx(
 		return nil, err
 	}
 
-	return res, nil
+	resSummary := res.ResultSummary()
+
+	// Don't store drycall result in the cache if the result data exceeds max limit, or
+	// if the max cache count is reached.
+	if len(resSummary.ReturnedData) > maxDryCallCacheResultDataSize ||
+		len(h.evmDryCallCache) >= maxDryCallCacheCount {
+		return resSummary, nil
+	}
+
+	// Store in cache
+	if h.evmDryCallCache == nil {
+		h.evmDryCallCache = make(map[evmDryCallCacheKey]*types.ResultSummary)
+	}
+	h.evmDryCallCache[key] = resSummary
+
+	return resSummary, nil
 }
 
 // DryRunWithTxData simulates execution of the provided transaction data.
@@ -603,10 +659,10 @@ func (h *ContractHandler) DryRunWithTxData(
 
 	tx := gethTypes.NewTx(txData)
 
-	res, err := h.dryRunTx(tx, from)
+	resSummary, err := h.dryRunTx(tx, from)
 	panicOnError(err)
 
-	return res.ResultSummary()
+	return resSummary
 }
 
 // checkGasLimit checks if enough computation is left in the environment
@@ -689,6 +745,8 @@ func (h *ContractHandler) executeAndHandleCall(
 	totalSupplyDiff *big.Int,
 	deductSupplyDiff bool,
 ) (*types.Result, error) {
+	h.invalidateDryCallCache()
+
 	// step 1 - check enough computation is available
 	if err := h.checkGasLimit(types.GasLimit(call.GasLimit)); err != nil {
 		return nil, err
