@@ -301,7 +301,7 @@ func DefaultBaseConfig() *BaseConfig {
 		CodecFactory:            codecFactory,
 		ComplianceConfig:        compliance.DefaultConfig(),
 		DhtSystemEnabled:        true,
-		BitswapReprovideEnabled: true,
+		BitswapReprovideEnabled: false,
 	}
 }
 
