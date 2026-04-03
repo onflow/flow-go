@@ -3,6 +3,7 @@ package testutils
 import (
 	"fmt"
 
+	"github.com/onflow/flow-go/fvm/evm/backends"
 	"github.com/onflow/flow-go/fvm/evm/offchain/storage"
 	"github.com/onflow/flow-go/fvm/evm/types"
 )
@@ -11,7 +12,7 @@ import (
 // storage provider that only provides
 // storage for an specific height
 type TestStorageProvider struct {
-	storage types.BackendStorage
+	storage backends.BackendStorage
 	height  uint64
 }
 

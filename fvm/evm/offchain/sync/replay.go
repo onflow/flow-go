@@ -9,6 +9,7 @@ import (
 	gethTrie "github.com/ethereum/go-ethereum/trie"
 	"github.com/onflow/atree"
 
+	"github.com/onflow/flow-go/fvm/evm/backends"
 	"github.com/onflow/flow-go/fvm/evm/emulator"
 	"github.com/onflow/flow-go/fvm/evm/events"
 	"github.com/onflow/flow-go/fvm/evm/precompiles"
@@ -24,7 +25,7 @@ var emptyChecksum = [types.ChecksumLength]byte{0, 0, 0, 0}
 func ReplayBlockExecution(
 	chainID flow.ChainID,
 	rootAddr flow.Address,
-	storage types.BackendStorage,
+	storage backends.BackendStorage,
 	blockSnapshot types.BlockSnapshot,
 	tracer *gethTracer.Tracer,
 	transactionEvents []events.TransactionEventPayload,

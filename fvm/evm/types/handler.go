@@ -90,21 +90,3 @@ type AddressAllocator interface {
 	// AllocateAddress allocates an address by index to be used by a precompile contract
 	AllocatePrecompileAddress(index uint64) Address
 }
-
-// BlockStore stores the chain of blocks
-type BlockStore interface {
-	// LatestBlock returns the latest appended block
-	LatestBlock() (*Block, error)
-
-	// BlockHash returns the hash of the block at the given height
-	BlockHash(height uint64) (gethCommon.Hash, error)
-
-	// BlockProposal returns the active block proposal
-	BlockProposal() (*BlockProposal, error)
-
-	// UpdateBlockProposal replaces the current block proposal with the ones passed
-	UpdateBlockProposal(*BlockProposal) error
-
-	// CommitBlockProposal commits the block proposal and update the chain of blocks
-	CommitBlockProposal(*BlockProposal) error
-}
