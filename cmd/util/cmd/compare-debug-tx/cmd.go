@@ -32,6 +32,7 @@ var (
 	flagLogCadenceTraces    bool
 	flagOnlyTraceCadence    bool
 	flagEntropyProvider     string
+	flagShowTraceDiff       bool
 )
 
 var Cmd = &cobra.Command{
@@ -70,15 +71,17 @@ func init() {
 	Cmd.Flags().BoolVar(&flagOnlyTraceCadence, "only-trace-cadence", false, "when tracing, only include spans related to Cadence execution (default: false)")
 
 	Cmd.Flags().StringVar(&flagEntropyProvider, "entropy-provider", "none", "entropy provider to use (default: none; options: none, block-hash)")
+
+	Cmd.Flags().BoolVar(&flagShowTraceDiff, "show-trace-diff", false, "show trace diff output (default: false)")
 }
 
 func run(_ *cobra.Command, args []string) {
 	repoRoot := findRepoRoot()
 	checkCleanWorkingTree(repoRoot)
 
-	// Resolve block IDs before git checkouts when --block-count > 1.
+	// Resolve block IDs before git checkouts when --block-count > 0.
 	var blockIDs []string
-	if flagBlockCount != 1 {
+	if flagBlockCount > 0 {
 		if flagBlockID == "" {
 			log.Fatal().Msg("--block-count requires --block-id to be set")
 		}
@@ -119,38 +122,60 @@ func run(_ *cobra.Command, args []string) {
 	checkoutBranch(repoRoot, flagBranch1)
 	binary1 := buildUtil(repoRoot)
 	defer os.Remove(binary1)
-	runAllBlocks(binary1, args, blockIDs, result1, trace1)
+	perBlock1 := runAllBlocks(binary1, args, blockIDs, result1, trace1)
+	defer cleanupPerBlockFiles(perBlock1)
 
 	checkoutBranch(repoRoot, flagBranch2)
 	binary2 := buildUtil(repoRoot)
 	defer os.Remove(binary2)
-	runAllBlocks(binary2, args, blockIDs, result2, trace2)
+	perBlock2 := runAllBlocks(binary2, args, blockIDs, result2, trace2)
+	defer cleanupPerBlockFiles(perBlock2)
 
-	fmt.Printf("=== Result diff (%s vs %s) ===\n", flagBranch1, flagBranch2)
-	diffFiles(result1.Name(), result2.Name(), flagBranch1, flagBranch2)
+	if len(blockIDs) == 1 {
+		fmt.Printf("=== Result diff (%s vs %s) ===\n", flagBranch1, flagBranch2)
+		diffFiles(result1.Name(), result2.Name(), flagBranch1, flagBranch2)
 
-	fmt.Printf("=== Trace diff (%s vs %s) ===\n", flagBranch1, flagBranch2)
-	diffFiles(trace1.Name(), trace2.Name(), flagBranch1, flagBranch2)
+		if flagShowTraceDiff {
+			fmt.Printf("=== Trace diff (%s vs %s) ===\n", flagBranch1, flagBranch2)
+			diffFiles(trace1.Name(), trace2.Name(), flagBranch1, flagBranch2)
+		}
+	}
+
+	printMismatchStats(blockIDs, perBlock1, perBlock2)
+}
+
+// perBlockFiles holds per-block result and trace temp files.
+type perBlockFiles struct {
+	result *os.File
+	trace  *os.File
+}
+
+// cleanupPerBlockFiles closes and removes all per-block temp files.
+func cleanupPerBlockFiles(files []perBlockFiles) {
+	for _, f := range files {
+		f.result.Close()
+		os.Remove(f.result.Name())
+		f.trace.Close()
+		os.Remove(f.trace.Name())
+	}
 }
 
 // runAllBlocks runs debug-tx for each block ID in blockIDs (or a single invocation when
 // blockIDs is empty), up to flagParallel blocks concurrently. Results and traces from each
 // block are collected into per-block temp files and concatenated into resultDst and traceDst
 // in deterministic order after all blocks complete.
-func runAllBlocks(binaryPath string, txIDs []string, blockIDs []string, resultDst *os.File, traceDst *os.File) {
+//
+// When blockIDs has entries, the per-block files are returned and the caller is responsible
+// for cleanup via cleanupPerBlockFiles. When blockIDs is empty, nil is returned.
+func runAllBlocks(binaryPath string, txIDs []string, blockIDs []string, resultDst *os.File, traceDst *os.File) []perBlockFiles {
 	if len(blockIDs) == 0 {
 		if err := runDebugTx(binaryPath, buildDebugTxArgs(txIDs, traceDst.Name(), ""), resultDst); err != nil {
 			log.Fatal().Err(err).Msg("failed to run debug-tx")
 		}
-		return
+		return nil
 	}
 
-	type blockFiles struct {
-		result *os.File
-		trace  *os.File
-	}
-
-	files := make([]blockFiles, len(blockIDs))
+	files := make([]perBlockFiles, len(blockIDs))
 	for i := range blockIDs {
 		result, err := os.CreateTemp("", "compare-debug-tx-block-result-*")
 		if err != nil {
@@ -160,16 +185,8 @@ func runAllBlocks(binaryPath string, txIDs []string, blockIDs []string, resultDs
 		if err != nil {
 			log.Fatal().Err(err).Msg("failed to create per-block trace temp file")
 		}
-		files[i] = blockFiles{result: result, trace: trace}
+		files[i] = perBlockFiles{result: result, trace: trace}
 	}
-	defer func() {
-		for _, f := range files {
-			f.result.Close()
-			os.Remove(f.result.Name())
-			f.trace.Close()
-			os.Remove(f.trace.Name())
-		}
-	}()
 
 	g, _ := errgroup.WithContext(context.Background())
 	g.SetLimit(flagParallel)
@@ -197,6 +214,8 @@ func runAllBlocks(binaryPath string, txIDs []string, blockIDs []string, resultDs
 			log.Fatal().Err(err).Msg("failed to append per-block trace")
 		}
 	}
+
+	return files
 }
 
 // resolveBlockChain fetches count consecutive block IDs starting from startBlockID,
@@ -331,6 +350,96 @@ func buildDebugTxArgs(txIDs []string, tracePath string, blockIDOverride string) 
 
 	args = append(args, txIDs...)
 	return args
+}
+
+// printMismatchStats compares per-block result files from two branches and prints
+// statistics on how many blocks and transactions had result mismatches.
+func printMismatchStats(blockIDs []string, files1, files2 []perBlockFiles) {
+	blocksWithMismatch := 0
+	totalTxs := 0
+	txsWithMismatch := 0
+
+	fmt.Printf("\n=== Result Mismatch Summary ===\n")
+
+	for i, blockID := range blockIDs {
+		data1 := readFileFromStart(files1[i].result)
+		data2 := readFileFromStart(files2[i].result)
+
+		sections1 := splitTxSections(data1)
+		sections2 := splitTxSections(data2)
+
+		blockTxMismatches := 0
+		txCount := max(len(sections1), len(sections2))
+		totalTxs += txCount
+
+		for j := range txCount {
+			var s1, s2 []byte
+			if j < len(sections1) {
+				s1 = sections1[j]
+			}
+			if j < len(sections2) {
+				s2 = sections2[j]
+			}
+			if !bytes.Equal(s1, s2) {
+				txsWithMismatch++
+				blockTxMismatches++
+			}
+		}
+
+		if blockTxMismatches > 0 {
+			blocksWithMismatch++
+			log.Error().Msgf("Block %s: %d/%d transactions differ", blockID, blockTxMismatches, txCount)
+		}
+	}
+
+	log.Info().Msgf("Blocks with result mismatches: %d/%d", blocksWithMismatch, len(blockIDs))
+	log.Info().Msgf("Transactions with result mismatches: %d/%d", txsWithMismatch, totalTxs)
+}
+
+// readFileFromStart seeks to the beginning of the file and reads all content.
+func readFileFromStart(f *os.File) []byte {
+	if _, err := f.Seek(0, io.SeekStart); err != nil {
+		log.Fatal().Err(err).Msg("failed to seek file")
+	}
+	data, err := io.ReadAll(f)
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to read file")
+	}
+	return data
+}
+
+// splitTxSections splits result data into per-transaction sections.
+// Each section starts with a "# ID: " line and includes all content up to the next such line.
+func splitTxSections(data []byte) [][]byte {
+	prefix := []byte("# ID: ")
+	var sections [][]byte
+	sectionStart := -1
+
+	for i := 0; i < len(data); {
+		lineEnd := bytes.IndexByte(data[i:], '\n')
+		var line []byte
+		if lineEnd < 0 {
+			line = data[i:]
+		} else {
+			line = data[i : i+lineEnd]
+		}
+
+		if bytes.HasPrefix(line, prefix) {
+			if sectionStart >= 0 {
+				sections = append(sections, data[sectionStart:i])
+			}
+			sectionStart = i
+		}
+
+		if lineEnd < 0 {
+			break
+		}
+		i += lineEnd + 1
+	}
+	if sectionStart >= 0 {
+		sections = append(sections, data[sectionStart:])
+	}
+	return sections
 }
 
 // diffFiles runs `diff -u --label label1 --label label2 file1 file2` and prints the output.
