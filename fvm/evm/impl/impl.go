@@ -259,22 +259,10 @@ func EVMAddressToAddressBytesArrayValue(
 	context interpreter.ArrayCreationContext,
 	address types.Address,
 ) *interpreter.ArrayValue {
-	var index int
-	return interpreter.NewArrayValueWithIterator(
+	return interpreter.ByteSliceToByteArrayValueWithType(
 		context,
 		stdlib.EVMAddressBytesStaticType,
-		common.ZeroAddress,
-		types.AddressLength,
-		func() interpreter.Value {
-			if index >= types.AddressLength {
-				return nil
-			}
-			result := interpreter.NewUInt8Value(context, func() uint8 {
-				return address[index]
-			})
-			index++
-			return result
-		},
+		address[:],
 	)
 }
 
@@ -282,22 +270,10 @@ func EVMBytesToBytesArrayValue(
 	context interpreter.ArrayCreationContext,
 	bytes []byte,
 ) *interpreter.ArrayValue {
-	var index int
-	return interpreter.NewArrayValueWithIterator(
+	return interpreter.ByteSliceToByteArrayValueWithType(
 		context,
 		stdlib.EVMBytesValueStaticType,
-		common.ZeroAddress,
-		uint64(len(bytes)),
-		func() interpreter.Value {
-			if index >= len(bytes) {
-				return nil
-			}
-			result := interpreter.NewUInt8Value(context, func() uint8 {
-				return bytes[index]
-			})
-			index++
-			return result
-		},
+		bytes,
 	)
 }
 
@@ -305,22 +281,10 @@ func EVMBytes4ToBytesArrayValue(
 	context interpreter.ArrayCreationContext,
 	bytes [4]byte,
 ) *interpreter.ArrayValue {
-	var index int
-	return interpreter.NewArrayValueWithIterator(
+	return interpreter.ByteSliceToByteArrayValueWithType(
 		context,
 		stdlib.EVMBytes4ValueStaticType,
-		common.ZeroAddress,
-		stdlib.EVMBytes4Length,
-		func() interpreter.Value {
-			if index >= stdlib.EVMBytes4Length {
-				return nil
-			}
-			result := interpreter.NewUInt8Value(context, func() uint8 {
-				return bytes[index]
-			})
-			index++
-			return result
-		},
+		bytes[:],
 	)
 }
 
@@ -328,22 +292,10 @@ func EVMBytes32ToBytesArrayValue(
 	context interpreter.ArrayCreationContext,
 	bytes [32]byte,
 ) *interpreter.ArrayValue {
-	var index int
-	return interpreter.NewArrayValueWithIterator(
+	return interpreter.ByteSliceToByteArrayValueWithType(
 		context,
 		stdlib.EVMBytes32ValueStaticType,
-		common.ZeroAddress,
-		stdlib.EVMBytes32Length,
-		func() interpreter.Value {
-			if index >= stdlib.EVMBytes32Length {
-				return nil
-			}
-			result := interpreter.NewUInt8Value(context, func() uint8 {
-				return bytes[index]
-			})
-			index++
-			return result
-		},
+		bytes[:],
 	)
 }
 
