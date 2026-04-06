@@ -114,7 +114,6 @@ func (h *ContractHandler) SetState(
 	slot gethCommon.Hash,
 	value gethCommon.Hash,
 ) gethCommon.Hash {
-	h.invalidateDryCallCache()
 
 	h.validateTestOperation()
 
@@ -124,6 +123,8 @@ func (h *ContractHandler) SetState(
 	prevValue := execState.SetState(address.ToCommon(), slot, value)
 	_, err = execState.Commit(true)
 	panicOnError(err)
+
+	h.invalidateDryCallCache()
 
 	return prevValue
 }
@@ -294,8 +295,13 @@ func (h *ContractHandler) BatchRun(rlpEncodedTxs [][]byte, gasFeeCollector types
 	return resSummaries
 }
 
-func (h *ContractHandler) batchRun(rlpEncodedTxs [][]byte) ([]*types.Result, error) {
-	h.invalidateDryCallCache()
+func (h *ContractHandler) batchRun(rlpEncodedTxs [][]byte) (_ []*types.Result, err error) {
+	defer func() {
+		if err == nil {
+			// Invalidate drycall cache if EVM state is changed (batchRun is successful).
+			h.invalidateDryCallCache()
+		}
+	}()
 
 	// step 1 - transaction decoding and check that enough evm gas is available in the FVM transaction
 
@@ -416,8 +422,13 @@ func (h *ContractHandler) CommitBlockProposal() {
 	panicOnError(h.commitBlockProposal())
 }
 
-func (h *ContractHandler) commitBlockProposal() error {
-	h.invalidateDryCallCache()
+func (h *ContractHandler) commitBlockProposal() (err error) {
+	defer func() {
+		if err == nil {
+			// Invalidate drycall cache if EVM state is changed (commitBlockProposal is successful).
+			h.invalidateDryCallCache()
+		}
+	}()
 
 	// load latest block proposal
 	bp, err := h.blockStore.BlockProposal()
@@ -456,8 +467,13 @@ func (h *ContractHandler) commitBlockProposal() error {
 	return nil
 }
 
-func (h *ContractHandler) run(rlpEncodedTx []byte) (*types.Result, error) {
-	h.invalidateDryCallCache()
+func (h *ContractHandler) run(rlpEncodedTx []byte) (_ *types.Result, err error) {
+	defer func() {
+		if err == nil {
+			// Invalidate drycall cache if EVM state is changed (run is successful).
+			h.invalidateDryCallCache()
+		}
+	}()
 
 	// step 1 - transaction decoding
 	tx, err := h.decodeTransaction(rlpEncodedTx)
@@ -748,8 +764,13 @@ func (h *ContractHandler) executeAndHandleCall(
 	call *types.DirectCall,
 	totalSupplyDiff *big.Int,
 	deductSupplyDiff bool,
-) (*types.Result, error) {
-	h.invalidateDryCallCache()
+) (_ *types.Result, err error) {
+	defer func() {
+		if err == nil {
+			// Invalidate drycall cache if EVM state is changed (executeAndHandleCall is successful).
+			h.invalidateDryCallCache()
+		}
+	}()
 
 	// step 1 - check enough computation is available
 	if err := h.checkGasLimit(types.GasLimit(call.GasLimit)); err != nil {
