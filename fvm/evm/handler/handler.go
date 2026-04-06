@@ -41,7 +41,11 @@ type ContractHandler struct {
 	backend              types.Backend
 	emulator             types.Emulator
 	precompiledContracts []types.PrecompiledContract
-	evmDryCallCache      map[evmDryCallCacheKey]*types.ResultSummary // evmDryCallCache caches EVM drycall results in a transaction.  It is cleared when the EVM state is changed via Run(), BatchRun(), etc., or at the end of a transaction.
+	// evmDryCallCache caches EVM drycall results in a transaction.
+	// evmDryCallCache is cleared when the EVM state is changed via
+	// COA.deploy(), COA.call(), Run(), BatchRun(), etc., or
+	// at the end of a transaction.
+	evmDryCallCache map[evmDryCallCacheKey]*types.ResultSummary
 }
 
 var _ types.ContractHandler = &ContractHandler{}
@@ -81,7 +85,7 @@ func (h *ContractHandler) ResetCaches() {
 }
 
 // invalidateDryCallCache clear evmDryCallCache.  It is called when
-// the EVM state is about to change via Run(), BatchRun(), etc.
+// the EVM state is about to change via COA.deploy(), COA.call(), Run(), BatchRun(), etc.
 func (h *ContractHandler) invalidateDryCallCache() {
 	clear(h.evmDryCallCache)
 }
