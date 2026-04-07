@@ -949,12 +949,37 @@ func (n *Network) handleIncomingStream(s libp2pnet.Stream) {
 		return
 	}
 
-	// TODO: We need to allow per-topic timeouts and message size limits.
-	// This allows us to configure higher limits for topics on which we expect
-	// to receive large messages (e.g. Chunk Data Packs), and use the normal
-	// limits for other topics. In order to enable this, we will need to register
-	// a separate stream handler for each topic.
-	ctx, cancel := context.WithTimeout(n.ctx, LargeMsgUnicastTimeout)
+	// Resolve remote peer identity to determine the max message size and timeout for this stream.
+	//
+	// Only chunk data packs require the larger message size limit. Currently, the message
+	// type cannot be determined until the message is fully received and parsed from the
+	// payload, so we use the sender and receiver roles as a proxy. Since chunk data packs
+	// are only sent by execution nodes to verification nodes, and since execution nodes
+	// are permissioned and will be for the foreseeable future, we allow the higher limit
+	// for all unicast streams from execution nodes to verification nodes. All other node
+	// combinations use the default (lower) limit.
+	remoteIdentity, ok := n.Identity(remotePeer)
+	if !ok {
+		log.Error().
+			Str("remote_peer", remotePeer.String()).
+			Bool(logging.KeySuspicious, true).
+			Msg("failed to resolve identity of remote peer")
+		n.slashingViolationsConsumer.OnUnAuthorizedSenderError(&network.Violation{
+			PeerID:   p2plogging.PeerId(remotePeer),
+			Protocol: message.ProtocolTypeUnicast,
+			Err:      validator.ErrIdentityUnverified,
+		})
+		return
+	}
+
+	maxMsgSize := DefaultMaxUnicastMsgSize
+	unicastTimeout := DefaultUnicastTimeout
+	if n.me.Role() == flow.RoleVerification && remoteIdentity.Role == flow.RoleExecution {
+		maxMsgSize = LargeMsgMaxUnicastMsgSize
+		unicastTimeout = LargeMsgUnicastTimeout
+	}
+
+	ctx, cancel := context.WithTimeout(n.ctx, unicastTimeout)
 	defer cancel()
 
 	deadline, _ := ctx.Deadline()
@@ -966,7 +991,7 @@ func (n *Network) handleIncomingStream(s libp2pnet.Stream) {
 	}
 
 	// create the reader
-	r := ggio.NewDelimitedReader(s, LargeMsgMaxUnicastMsgSize)
+	r := ggio.NewDelimitedReader(s, maxMsgSize)
 	for {
 		if ctx.Err() != nil {
 			return

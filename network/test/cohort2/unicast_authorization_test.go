@@ -132,8 +132,8 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_UnstakedPeer() 
 	expectedViolation := &network.Violation{
 		Identity: nilID, // because the peer will be unverified this identity will be nil
 		PeerID:   p2plogging.PeerId(expectedSenderPeerID),
-		MsgType:  "",                          // message will not be decoded before OnSenderEjectedError is logged, we won't log message type
-		Channel:  channels.TestNetworkChannel, // message will not be decoded before OnSenderEjectedError is logged, we won't log peer ID
+		MsgType:  "", // message will not be decoded before OnSenderEjectedError is logged, we won't log message type
+		Channel:  "", // channel is not known until the message is decoded, which happens after identity check
 		Protocol: message.ProtocolTypeUnicast,
 		Err:      validator.ErrIdentityUnverified,
 	}
