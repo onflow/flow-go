@@ -1120,6 +1120,64 @@ func (h *Handler) GetExecutionResultByID(ctx context.Context, req *accessproto.G
 	}, nil
 }
 
+// GetExecutionReceiptsByBlockID returns all execution receipts for the given block ID.
+// If req.IncludeResult is true, each receipt in the response includes the full ExecutionResult.
+//
+// Expected error returns during normal operation:
+//   - codes.NotFound: if no receipts are indexed for the given block ID.
+func (h *Handler) GetExecutionReceiptsByBlockID(ctx context.Context, req *accessproto.GetExecutionReceiptsByBlockIDRequest) (*accessproto.ExecutionReceiptsResponse, error) {
+	metadata, err := h.buildMetadataResponse()
+	if err != nil {
+		return nil, err
+	}
+
+	blockID := convert.MessageToIdentifier(req.GetBlockId())
+
+	receipts, err := h.api.GetExecutionReceiptsByBlockID(ctx, blockID)
+	if err != nil {
+		return nil, err
+	}
+
+	msgs, err := convert.ExecutionReceiptsToMessages(receipts, req.GetIncludeResult())
+	if err != nil {
+		return nil, err
+	}
+
+	return &accessproto.ExecutionReceiptsResponse{
+		Receipts: msgs,
+		Metadata: metadata,
+	}, nil
+}
+
+// GetExecutionReceiptsByResultID returns all execution receipts committing to the given execution
+// result ID. If req.IncludeResult is true, each receipt in the response includes the full ExecutionResult.
+//
+// Expected error returns during normal operation:
+//   - codes.NotFound: if the execution result or its block's receipts are not found.
+func (h *Handler) GetExecutionReceiptsByResultID(ctx context.Context, req *accessproto.GetExecutionReceiptsByResultIDRequest) (*accessproto.ExecutionReceiptsResponse, error) {
+	metadata, err := h.buildMetadataResponse()
+	if err != nil {
+		return nil, err
+	}
+
+	resultID := convert.MessageToIdentifier(req.GetResultId())
+
+	receipts, err := h.api.GetExecutionReceiptsByResultID(ctx, resultID)
+	if err != nil {
+		return nil, err
+	}
+
+	msgs, err := convert.ExecutionReceiptsToMessages(receipts, req.GetIncludeResult())
+	if err != nil {
+		return nil, err
+	}
+
+	return &accessproto.ExecutionReceiptsResponse{
+		Receipts: msgs,
+		Metadata: metadata,
+	}, nil
+}
+
 // SubscribeBlocksFromStartBlockID handles subscription requests for blocks started from block id.
 // It takes a SubscribeBlocksFromStartBlockIDRequest and an AccessAPI_SubscribeBlocksFromStartBlockIDServer stream as input.
 // The handler manages the subscription to block updates and sends the subscribed block information
