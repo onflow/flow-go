@@ -398,6 +398,45 @@ func initializeMessageAuthConfigsMap() {
 	}
 }
 
+// unicastRoleAuthorization defines which sender roles are authorized to open
+// unicast streams to each receiver role. This is a more restrictive check than
+// channel-based authorization, applied before any message data is read.
+//
+// The map key is the receiver role, and the value is the list of sender roles
+// allowed to initiate unicast streams to that receiver.
+var unicastRoleAuthorization = map[flow.Role]flow.RoleList{
+	// Consensus nodes can receive unicasts from: Consensus (sync), Execution (receipts), Verification (approvals)
+	flow.RoleConsensus: {flow.RoleConsensus, flow.RoleExecution, flow.RoleVerification},
+	// Collection nodes can receive unicasts from: Consensus (sync), Execution (state requests), Collection (cluster sync), Access (collection requests)
+	flow.RoleCollection: {flow.RoleConsensus, flow.RoleExecution, flow.RoleCollection, flow.RoleAccess},
+	// Execution nodes can receive unicasts from: Consensus (sync), Collection (collections)
+	flow.RoleExecution: {flow.RoleConsensus, flow.RoleCollection},
+	// Verification nodes can receive unicasts from: Consensus (sync), Execution (chunk data)
+	flow.RoleVerification: {flow.RoleConsensus, flow.RoleExecution},
+	// Access nodes can receive unicasts from: Consensus (sync), Collection (collection responses)
+	flow.RoleAccess: {flow.RoleConsensus, flow.RoleCollection},
+}
+
+// IsAuthorizedUnicastSenderRole checks whether the given sender role is authorized to open a unicast
+// stream to the given receiver role. This is used for pre-authorization of unicast streams before
+// any message data is read.
+//
+// This authorization is intentionally more restrictive than channel-based authorization. It is
+// rather than derived from channel subscriptions, because channel subscriptions are broader than
+// what is correct for unicast (e.g. Access nodes subscribe to RequestCollections to receive
+// responses, but should not be unicast targets from other Access nodes).
+func IsAuthorizedUnicastSenderRole(sender flow.Role, receiver flow.Role) bool {
+	senders, ok := unicastRoleAuthorization[receiver]
+	return ok && senders.Contains(sender)
+}
+
+// AlwaysAuthorizedUnicastSenderRole is unicast stream authorizer that always returns true.
+//
+// This is used for the public network where peers are not authorized based on role.
+func AlwaysAuthorizedUnicastSenderRole(sender, receiver flow.Role) bool {
+	return true
+}
+
 // GetMessageAuthConfig checks the underlying type and returns the correct
 // message auth Config.
 // Expected error returns during normal operations:
