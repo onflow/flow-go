@@ -14,7 +14,6 @@ import (
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/access/backends/extended"
 	"github.com/onflow/flow-go/consensus/hotstuff"
-	"github.com/onflow/flow-go/module/limiters"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/engine/access/rest"
 	"github.com/onflow/flow-go/engine/access/rest/websockets"
@@ -27,6 +26,7 @@ import (
 	"github.com/onflow/flow-go/module/events"
 	"github.com/onflow/flow-go/module/grpcserver"
 	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/module/limiters"
 	"github.com/onflow/flow-go/module/state_synchronization"
 	"github.com/onflow/flow-go/state/protocol"
 )

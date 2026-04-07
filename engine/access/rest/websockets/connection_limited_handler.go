@@ -3,9 +3,10 @@ package websockets
 import (
 	"net/http"
 
+	"github.com/rs/zerolog"
+
 	"github.com/onflow/flow-go/engine/access/rest/common"
 	"github.com/onflow/flow-go/module/limiters"
-	"github.com/rs/zerolog"
 )
 
 type ConnectionLimitedHandler struct {

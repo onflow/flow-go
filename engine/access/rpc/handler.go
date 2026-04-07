@@ -16,12 +16,12 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/signature"
 	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/engine/common/rpc"
-	"github.com/onflow/flow-go/module/limiters"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	accessmodel "github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/counters"
+	"github.com/onflow/flow-go/module/limiters"
 	"github.com/onflow/flow-go/module/state_synchronization"
 	"github.com/onflow/flow-go/module/state_synchronization/indexer"
 )
