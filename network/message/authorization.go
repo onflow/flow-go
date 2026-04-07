@@ -16,7 +16,23 @@ type ChannelAuthConfig struct {
 	AllowedProtocols Protocols
 }
 
-var authorizationConfigs map[string]MsgAuthConfig
+var (
+	authorizationConfigs map[string]MsgAuthConfig
+
+	// unicastRoleAuthorization maps which sender roles are authorized to open unicast streams to
+	// which receiver roles.
+	//
+	// This map is explicitly defined rather than derived from channel subscriptions, because channel
+	// subscriptions are broader than what is correct for unicast. For example, Access nodes subscribe
+	// to RequestCollections to receive collection responses, but should not be unicast targets from
+	// other Access nodes or Execution nodes.
+	//
+	// When adding new unicast message types, this map must be updated to include the new receiver/sender
+	// role pairs.
+	//
+	// maps[receiver] = {senders}
+	unicastRoleAuthorization map[flow.Role]flow.RoleList
+)
 
 // MsgAuthConfig contains authorization information for a specific flow message. The authorization
 // is represented as a map from network channel -> list of all roles allowed to send the message on
@@ -396,6 +412,27 @@ func initializeMessageAuthConfigsMap() {
 			},
 		},
 	}
+
+	unicastRoleAuthorization = map[flow.Role]flow.RoleList{ // receiver -> sender
+		flow.RoleConsensus:    {flow.RoleConsensus, flow.RoleExecution, flow.RoleVerification},
+		flow.RoleCollection:   {flow.RoleConsensus, flow.RoleCollection, flow.RoleExecution, flow.RoleAccess},
+		flow.RoleExecution:    {flow.RoleConsensus, flow.RoleCollection},
+		flow.RoleVerification: {flow.RoleConsensus, flow.RoleExecution},
+		flow.RoleAccess:       {flow.RoleConsensus, flow.RoleCollection},
+	}
+}
+
+// IsAuthorizedUnicastSender checks whether the given sender role is authorized to open a unicast
+// stream to the given receiver role. This is used for pre-authorization of unicast streams before
+// any message data is read.
+//
+// The underlying authorization map is explicitly defined in initializeUnicastRoleAuthorization
+// rather than derived from channel subscriptions, because channel subscriptions are broader than
+// what is correct for unicast (e.g. Access nodes subscribe to RequestCollections to receive
+// responses, but should not be unicast targets from other Access nodes).
+func IsAuthorizedUnicastSender(sender flow.Role, receiver flow.Role) bool {
+	senders, ok := unicastRoleAuthorization[receiver]
+	return ok && senders.Contains(sender)
 }
 
 // GetMessageAuthConfig checks the underlying type and returns the correct

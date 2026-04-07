@@ -219,6 +219,7 @@ func NetworkConfigFixture(
 		SlashingViolationConsumerFactory: func(_ network.ConduitAdapter) network.ViolationsConsumer {
 			return mocknetwork.NewViolationsConsumer(t)
 		},
+		UnicastStreamAuthorizer: func(_, _ flow.Role) bool { return true },
 	}
 
 	for _, opt := range opts {
