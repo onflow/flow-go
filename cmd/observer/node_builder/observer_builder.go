@@ -1129,6 +1129,17 @@ func (builder *ObserverServiceBuilder) Build() (cmd.Node, error) {
 		builder.BuildExecutionSyncComponents()
 	}
 
+	// Initialize stream limiter for RPC server - must be done unconditionally
+	// since the RPC server always uses it for stream concurrency limiting.
+	builder.Module("stream limiter", func(node *cmd.NodeConfig) error {
+		var err error
+		builder.streamLimiter, err = limiters.NewConcurrencyLimiter(builder.stateStreamConf.MaxGlobalStreams)
+		if err != nil {
+			return fmt.Errorf("could not create stream limiter: %w", err)
+		}
+		return nil
+	})
+
 	builder.enqueueRPCServer()
 	return builder.FlowNodeBuilder.Build()
 }
@@ -1687,15 +1698,6 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 			}, extendedIndexerDependencies)
 		}
 	}
-
-	builder.Module("stream limiter", func(node *cmd.NodeConfig) error {
-		var err error
-		builder.streamLimiter, err = limiters.NewConcurrencyLimiter(builder.stateStreamConf.MaxGlobalStreams)
-		if err != nil {
-			return fmt.Errorf("could not create stream limiter: %w", err)
-		}
-		return nil
-	})
 
 	if builder.stateStreamConf.ListenAddr != "" {
 		builder.Component("exec state stream engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
