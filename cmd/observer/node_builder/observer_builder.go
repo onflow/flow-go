@@ -83,6 +83,7 @@ import (
 	finalizer "github.com/onflow/flow-go/module/finalizer/consensus"
 	"github.com/onflow/flow-go/module/grpcserver"
 	"github.com/onflow/flow-go/module/id"
+	"github.com/onflow/flow-go/module/limiters"
 	"github.com/onflow/flow-go/module/local"
 	"github.com/onflow/flow-go/module/mempool/herocache"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
@@ -341,6 +342,7 @@ type ObserverServiceBuilder struct {
 	stateStreamGrpcServer *grpcserver.GrpcServer
 
 	stateStreamBackend *statestreambackend.StateStreamBackend
+	streamLimiter      *limiters.ConcurrencyLimiter
 }
 
 // deriveBootstrapPeerIdentities derives the Flow Identity of the bootstrap peers from the parameters.
@@ -1686,6 +1688,15 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 		}
 	}
 
+	builder.Module("stream limiter", func(node *cmd.NodeConfig) error {
+		var err error
+		builder.streamLimiter, err = limiters.NewConcurrencyLimiter(builder.stateStreamConf.MaxGlobalStreams)
+		if err != nil {
+			return fmt.Errorf("could not create stream limiter: %w", err)
+		}
+		return nil
+	})
+
 	if builder.stateStreamConf.ListenAddr != "" {
 		builder.Component("exec state stream engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			for key, value := range builder.stateStreamFilterConf {
@@ -1762,6 +1773,7 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 				node.RootChainID,
 				builder.stateStreamGrpcServer,
 				builder.stateStreamBackend,
+				utils.NotNil(builder.streamLimiter),
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create state stream engine: %w", err)
@@ -2237,6 +2249,7 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			indexReporter,
 			builder.FollowerDistributor,
 			builder.ExtendedBackend,
+			utils.NotNil(builder.streamLimiter),
 		)
 		if err != nil {
 			return nil, err
