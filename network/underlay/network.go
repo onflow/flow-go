@@ -162,12 +162,16 @@ type NetworkConfig struct {
 	Libp2pNode                       p2p.LibP2PNode
 	BitSwapMetrics                   module.BitswapMetrics
 	SlashingViolationConsumerFactory func(network.ConduitAdapter) network.ViolationsConsumer
+	UnicastStreamAuthorizer          func(flow.Role, flow.Role) bool
 }
 
 // Validate validates the configuration, and sets default values for any missing fields.
 func (cfg *NetworkConfig) Validate() {
 	if cfg.UnicastMessageTimeout <= 0 {
 		cfg.UnicastMessageTimeout = DefaultUnicastTimeout
+	}
+	if cfg.UnicastStreamAuthorizer == nil {
+		cfg.UnicastStreamAuthorizer = message.IsAuthorizedUnicastSenderRole
 	}
 }
 
@@ -197,6 +201,14 @@ func WithCodec(codec network.Codec) NetworkConfigOption {
 func WithSlashingViolationConsumerFactory(factory func(adapter network.ConduitAdapter) network.ViolationsConsumer) NetworkConfigOption {
 	return func(params *NetworkConfig) {
 		params.SlashingViolationConsumerFactory = factory
+	}
+}
+
+// WithUnicastStreamAuthorizer sets a custom unicast stream authorizer function.
+// This function is called to authorize incoming unicast streams based on sender and receiver roles.
+func WithUnicastStreamAuthorizer(authorizer func(flow.Role, flow.Role) bool) NetworkConfigOption {
+	return func(params *NetworkConfig) {
+		params.UnicastStreamAuthorizer = authorizer
 	}
 }
 
