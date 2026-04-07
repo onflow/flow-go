@@ -1153,15 +1153,6 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 		}
 	}
 
-	builder.Module("stream limiter", func(node *cmd.NodeConfig) error {
-		var err error
-		builder.streamLimiter, err = limiters.NewConcurrencyLimiter(builder.stateStreamConf.MaxGlobalStreams)
-		if err != nil {
-			return fmt.Errorf("could not create stream limiter: %w", err)
-		}
-		return nil
-	})
-
 	if builder.stateStreamConf.ListenAddr != "" {
 		builder.Component("exec state stream engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			for key, value := range builder.stateStreamFilterConf {
@@ -2175,6 +2166,16 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			stopControlDependable.Init(builder.StopControl)
 
 			return stopControl, nil
+		}).
+		Module("stream limiter", func(node *cmd.NodeConfig) error {
+			// Initialize stream limiter for RPC server - must be done unconditionally
+			// since the RPC server always uses it for stream concurrency limiting.
+			var err error
+			builder.streamLimiter, err = limiters.NewConcurrencyLimiter(builder.stateStreamConf.MaxGlobalStreams)
+			if err != nil {
+				return fmt.Errorf("could not create stream limiter: %w", err)
+			}
+			return nil
 		}).
 		Component("RPC engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			config := builder.rpcConf
