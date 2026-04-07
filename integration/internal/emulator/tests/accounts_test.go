@@ -1045,7 +1045,7 @@ func TestImportAccountCode(t *testing.T) {
 
 	script := []byte(fmt.Sprintf(`
 		// address imports can omit leading zeros
-		import 0x%s
+		import Computer from 0x%s
 
 		transaction {
 		  execute {

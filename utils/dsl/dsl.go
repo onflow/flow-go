@@ -66,10 +66,10 @@ type Import struct {
 
 func (i Import) ToCadence() string {
 	if i.Address != sdk.EmptyAddress {
-		if len(i.Names) > 0 {
-			return fmt.Sprintf("import %s from 0x%s\n", strings.Join(i.Names, ", "), i.Address)
+		if len(i.Names) == 0 {
+			panic("Import must have at least one name")
 		}
-		return fmt.Sprintf("import 0x%s\n", i.Address)
+		return fmt.Sprintf("import %s from 0x%s\n", strings.Join(i.Names, ", "), i.Address)
 	}
 	return ""
 }

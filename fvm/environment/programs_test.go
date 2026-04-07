@@ -28,10 +28,6 @@ var (
 		Address: common.Address(addressA),
 		Name:    "A",
 	}
-	contractA2Location = common.AddressLocation{
-		Address: common.Address(addressA),
-		Name:    "A2",
-	}
 
 	contractBLocation = common.AddressLocation{
 		Address: common.Address(addressB),
@@ -63,16 +59,6 @@ var (
 		}
 	`
 
-	contractA2Code = `
-		access(all) contract A2 {
-			access(all) struct interface Foo{}
-
-			access(all) fun hello(): String {
-        		return "hello from A2"
-    		}
-		}
-	`
-
 	contractABreakingCode = `
 		access(all) contract A {
 			access(all) struct interface Foo{
@@ -86,7 +72,7 @@ var (
 	`
 
 	contractBCode = `
-		import 0xa
+		import A from 0xa
 
 		access(all) contract B {
 			access(all) struct Bar : A.Foo {}
@@ -409,119 +395,6 @@ func Test_Programs(t *testing.T) {
 		compareExecutionSnapshots(t, executionSnapshotB, executionSnapshotB2)
 	})
 
-	t.Run("deploying new contract A2 invalidates B because of * imports", func(t *testing.T) {
-		// deploy contract A2
-		txBody, err := contractDeployTx("A2", contractA2Code, addressA)
-		require.NoError(t, err)
-		executionSnapshot, output, err := vm.Run(
-			context,
-			fvm.Transaction(
-				txBody,
-				derivedBlockData.NextTxIndexForTestingOnly()),
-			mainSnapshot)
-		require.NoError(t, err)
-		require.NoError(t, output.Err)
-
-		mainSnapshot = mainSnapshot.Append(executionSnapshot)
-
-		// a, b and c are invalid
-		entryB := derivedBlockData.GetProgramForTestingOnly(contractBLocation)
-		entryC := derivedBlockData.GetProgramForTestingOnly(contractCLocation)
-		entryA := derivedBlockData.GetProgramForTestingOnly(contractALocation)
-
-		require.Nil(t, entryB) // B could have star imports to 0xa, so it's invalidated
-		require.Nil(t, entryC) // still invalid
-		require.Nil(t, entryA) // A could have star imports to 0xa, so it's invalidated
-
-		cached := derivedBlockData.CachedPrograms()
-		require.Equal(t, 0, cached)
-	})
-
-	t.Run("contract B imports contract A and A2 because of * import", func(t *testing.T) {
-
-		// programs should have no entries for A and B, as per previous test
-
-		// run a TX using contract B
-		txBody, err := callTx("B", addressB)
-		require.NoError(t, err)
-		executionSnapshotB, output, err := vm.Run(
-			context,
-			fvm.Transaction(
-				txBody,
-				derivedBlockData.NextTxIndexForTestingOnly()),
-			mainSnapshot)
-		require.NoError(t, err)
-		require.NoError(t, output.Err)
-
-		require.Contains(t, output.Logs, "\"hello from B but also hello from A\"")
-
-		mainSnapshot = mainSnapshot.Append(executionSnapshotB)
-
-		entry := derivedBlockData.GetProgramForTestingOnly(contractALocation)
-		require.NotNil(t, entry)
-
-		// state should be essentially the same as one which we got in tx with contract A
-		require.Equal(t, contractASnapshot, entry.ExecutionSnapshot)
-
-		entryB := derivedBlockData.GetProgramForTestingOnly(contractBLocation)
-		require.NotNil(t, entryB)
-
-		// assert dependencies are correct
-		require.Equal(t, 3, entryB.Value.Dependencies.Count())
-		require.NotNil(t, entryB.Value.Dependencies.ContainsLocation(contractALocation))
-		require.NotNil(t, entryB.Value.Dependencies.ContainsLocation(contractBLocation))
-		require.NotNil(t, entryB.Value.Dependencies.ContainsLocation(contractA2Location))
-
-		// program B should contain all the registers used by program A, as it depends on it
-		contractBSnapshot = entryB.ExecutionSnapshot
-
-		require.Empty(t, contractASnapshot.WriteSet)
-
-		for id := range contractASnapshot.ReadSet {
-			_, ok := contractBSnapshot.ReadSet[id]
-			require.True(t, ok)
-		}
-
-		// rerun transaction
-
-		// execute transaction again, this time make sure it doesn't load code
-		execB2Snapshot := snapshot.NewReadFuncStorageSnapshot(
-			func(id flow.RegisterID) (flow.RegisterValue, error) {
-				idA := flow.ContractRegisterID(
-					flow.BytesToAddress([]byte(id.Owner)),
-					"A")
-				idA2 := flow.ContractRegisterID(
-					flow.BytesToAddress([]byte(id.Owner)),
-					"A2")
-				idB := flow.ContractRegisterID(
-					flow.BytesToAddress([]byte(id.Owner)),
-					"B")
-				// this time we fail if a read of code occurs
-				require.NotEqual(t, id.Key, idA.Key)
-				require.NotEqual(t, id.Key, idA2.Key)
-				require.NotEqual(t, id.Key, idB.Key)
-
-				return mainSnapshot.Get(id)
-			})
-
-		txBody, err = callTx("B", addressB)
-		require.NoError(t, err)
-		executionSnapshotB2, output, err := vm.Run(
-			context,
-			fvm.Transaction(
-				txBody,
-				derivedBlockData.NextTxIndexForTestingOnly()),
-			execB2Snapshot)
-		require.NoError(t, err)
-		require.NoError(t, output.Err)
-
-		require.Contains(t, output.Logs, "\"hello from B but also hello from A\"")
-
-		mainSnapshot = mainSnapshot.Append(executionSnapshotB2)
-
-		compareExecutionSnapshots(t, executionSnapshotB, executionSnapshotB2)
-	})
-
 	t.Run("contract A runs from cache after program B has been loaded", func(t *testing.T) {
 
 		// at this point programs cache should contain data for contract A
@@ -573,17 +446,15 @@ func Test_Programs(t *testing.T) {
 		mainSnapshot = mainSnapshot.Append(executionSnapshot)
 
 		entryA := derivedBlockData.GetProgramForTestingOnly(contractALocation)
-		entryA2 := derivedBlockData.GetProgramForTestingOnly(contractA2Location)
 		entryB := derivedBlockData.GetProgramForTestingOnly(contractBLocation)
 		entryC := derivedBlockData.GetProgramForTestingOnly(contractCLocation)
 
 		require.NotNil(t, entryA)
-		require.NotNil(t, entryA2)
 		require.NotNil(t, entryB)
 		require.Nil(t, entryC)
 
 		cached := derivedBlockData.CachedPrograms()
-		require.Equal(t, 3, cached)
+		require.Equal(t, 2, cached)
 	})
 
 	t.Run("importing C should chain-import B and A", func(t *testing.T) {
@@ -619,13 +490,13 @@ func Test_Programs(t *testing.T) {
 		require.NotNil(t, entryC)
 
 		// assert dependencies are correct
-		require.Equal(t, 4, entryC.Value.Dependencies.Count())
+		require.Equal(t, 3, entryC.Value.Dependencies.Count())
 		require.NotNil(t, entryC.Value.Dependencies.ContainsLocation(contractALocation))
 		require.NotNil(t, entryC.Value.Dependencies.ContainsLocation(contractBLocation))
 		require.NotNil(t, entryC.Value.Dependencies.ContainsLocation(contractCLocation))
 
 		cached := derivedBlockData.CachedPrograms()
-		require.Equal(t, 4, cached)
+		require.Equal(t, 3, cached)
 	})
 }
 
@@ -647,6 +518,7 @@ func Test_ProgramsDoubleCounting(t *testing.T) {
 	)
 
 	t.Run("deploy contracts and ensure cache is empty", func(t *testing.T) {
+
 		// deploy contract A
 		txBody, err := contractDeployTx("A", contractACode, addressA)
 		require.NoError(t, err)
@@ -689,8 +561,8 @@ func Test_ProgramsDoubleCounting(t *testing.T) {
 
 		snapshotTree = snapshotTree.Append(executionSnapshot)
 
-		// deploy contract A2 last to clear any cache so far
-		txBody, err = contractDeployTx("A2", contractA2Code, addressA)
+		// update contract A last to clear any cache so far
+		txBody, err = updateContractTx("A", contractACode, addressA)
 		require.NoError(t, err)
 		executionSnapshot, output, err = vm.Run(
 			context,
@@ -704,12 +576,10 @@ func Test_ProgramsDoubleCounting(t *testing.T) {
 		snapshotTree = snapshotTree.Append(executionSnapshot)
 
 		entryA := derivedBlockData.GetProgramForTestingOnly(contractALocation)
-		entryA2 := derivedBlockData.GetProgramForTestingOnly(contractA2Location)
 		entryB := derivedBlockData.GetProgramForTestingOnly(contractBLocation)
 		entryC := derivedBlockData.GetProgramForTestingOnly(contractCLocation)
 
 		require.Nil(t, entryA)
-		require.Nil(t, entryA2)
 		require.Nil(t, entryB)
 		require.Nil(t, entryC)
 
@@ -748,23 +618,21 @@ func Test_ProgramsDoubleCounting(t *testing.T) {
 			t,
 			uint64(
 				1+ // import A
-					3+ // import B (import A, import A2)
-					4, // import C (import B (3), import A (already imported in this scope))
+					2+ // import B (import A)
+					3, // import C (import B (2), import A (already imported in this scope))
 			),
 			output.ComputationIntensities[environment.ComputationKindGetCode])
 
 		entryA := derivedBlockData.GetProgramForTestingOnly(contractALocation)
-		entryA2 := derivedBlockData.GetProgramForTestingOnly(contractA2Location)
 		entryB := derivedBlockData.GetProgramForTestingOnly(contractBLocation)
 		entryC := derivedBlockData.GetProgramForTestingOnly(contractCLocation)
 
 		require.NotNil(t, entryA)
-		require.NotNil(t, entryA2) // loaded due to "*" import
 		require.NotNil(t, entryB)
 		require.NotNil(t, entryC)
 
 		cached := derivedBlockData.CachedPrograms()
-		require.Equal(t, 4, cached)
+		require.Equal(t, 3, cached)
 
 		return snapshotTree.Append(executionSnapshot)
 	}
@@ -775,7 +643,6 @@ func Test_ProgramsDoubleCounting(t *testing.T) {
 
 		// miss A because loading transaction
 		// hit A because loading B because loading transaction
-		// miss A2 because loading B because loading transaction
 		// miss B because loading transaction
 		// hit B because loading C because loading transaction
 		// hit A because loading C because loading transaction
@@ -784,9 +651,8 @@ func Test_ProgramsDoubleCounting(t *testing.T) {
 		// hit C because interpreting transaction
 		// hit B because interpreting C because interpreting transaction
 		// hit A because interpreting B because interpreting C because interpreting transaction
-		// hit A2 because interpreting B because interpreting C because interpreting transaction
-		require.Equal(t, 7, metrics.CacheHits)
-		require.Equal(t, 4, metrics.CacheMisses)
+		require.Equal(t, 6, metrics.CacheHits)
+		require.Equal(t, 3, metrics.CacheMisses)
 	})
 
 	t.Run("Call C Again", func(t *testing.T) {
@@ -801,7 +667,7 @@ func Test_ProgramsDoubleCounting(t *testing.T) {
 		// hit B because interpreting C because interpreting transaction
 		// hit A because interpreting B because interpreting C because interpreting transaction
 		// hit A2 because interpreting B because interpreting C because interpreting transaction
-		require.Equal(t, 7, metrics.CacheHits)
+		require.Equal(t, 6, metrics.CacheHits)
 		require.Equal(t, 0, metrics.CacheMisses)
 	})
 
@@ -829,7 +695,7 @@ func Test_ProgramsDoubleCounting(t *testing.T) {
 		require.Nil(t, entryC)
 
 		cached := derivedBlockData.CachedPrograms()
-		require.Equal(t, 1, cached)
+		require.Equal(t, 0, cached)
 	})
 
 	callCAfterItsBroken := func(snapshotTree snapshot.SnapshotTree) snapshot.SnapshotTree {
@@ -859,17 +725,15 @@ func Test_ProgramsDoubleCounting(t *testing.T) {
 		require.Error(t, output.Err)
 
 		entryA := derivedBlockData.GetProgramForTestingOnly(contractALocation)
-		entryA2 := derivedBlockData.GetProgramForTestingOnly(contractA2Location)
 		entryB := derivedBlockData.GetProgramForTestingOnly(contractBLocation)
 		entryC := derivedBlockData.GetProgramForTestingOnly(contractCLocation)
 
 		require.NotNil(t, entryA)
-		require.NotNil(t, entryA2) // loaded due to "*" import in B
-		require.Nil(t, entryB)     // failed to load
-		require.Nil(t, entryC)     // failed to load
+		require.Nil(t, entryB) // failed to load
+		require.Nil(t, entryC) // failed to load
 
 		cached := derivedBlockData.CachedPrograms()
-		require.Equal(t, 2, cached)
+		require.Equal(t, 1, cached)
 
 		return snapshotTree.Append(executionSnapshot)
 	}
@@ -878,8 +742,8 @@ func Test_ProgramsDoubleCounting(t *testing.T) {
 		metrics.Reset()
 		snapshotTree = callCAfterItsBroken(snapshotTree)
 
-		// miss A, hit A, hit A2, hit A, hit A2, hit A
-		require.Equal(t, 5, metrics.CacheHits)
+		// miss A, hit A, hit A, hit A
+		require.Equal(t, 3, metrics.CacheHits)
 		require.Equal(t, 1, metrics.CacheMisses)
 	})
 

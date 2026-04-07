@@ -16,7 +16,7 @@ require (
 	github.com/dgraph-io/badger/v2 v2.2007.4
 	github.com/ef-ds/deque v1.0.4
 	github.com/ethereum/go-ethereum v1.16.8
-	github.com/fxamacker/cbor/v2 v2.9.1-0.20251019205732-39888e6be013
+	github.com/fxamacker/cbor/v2 v2.9.2-0.20260331174317-a78e92ec038e
 	github.com/gammazero/workerpool v1.1.3
 	github.com/gogo/protobuf v1.3.2
 	github.com/golang/mock v1.6.0
@@ -46,13 +46,13 @@ require (
 	github.com/multiformats/go-multiaddr v0.14.0
 	github.com/multiformats/go-multiaddr-dns v0.4.1
 	github.com/multiformats/go-multihash v0.2.3
-	github.com/onflow/atree v0.14.0
-	github.com/onflow/cadence v1.10.0
+	github.com/onflow/atree v0.15.0
+	github.com/onflow/cadence v1.10.1
 	github.com/onflow/crypto v0.25.4
 	github.com/onflow/flow v0.4.20-0.20260303141511-b7c99b4fb01b
 	github.com/onflow/flow-core-contracts/lib/go/contracts v1.9.3
 	github.com/onflow/flow-core-contracts/lib/go/templates v1.9.3
-	github.com/onflow/flow-go-sdk v1.10.0
+	github.com/onflow/flow-go-sdk v1.10.1
 	github.com/onflow/flow/protobuf/go/flow v0.4.20
 	github.com/pbnjay/memory v0.0.0-20210728143218-7b4eea64cf58
 	github.com/pkg/errors v0.9.1
@@ -83,7 +83,7 @@ require (
 	golang.org/x/tools v0.40.0
 	google.golang.org/api v0.267.0
 	google.golang.org/genproto v0.0.0-20260128011058-8636f8732409
-	google.golang.org/grpc v1.79.1
+	google.golang.org/grpc v1.79.3
 	google.golang.org/grpc/cmd/protoc-gen-go-grpc v1.2.0
 	google.golang.org/protobuf v1.36.11
 	gotest.tools v2.2.0+incompatible
@@ -114,7 +114,7 @@ require (
 	github.com/sony/gobreaker v0.5.0
 	go.opentelemetry.io/otel/exporters/stdout/stdouttrace v1.21.0
 	golang.org/x/xerrors v0.0.0-20240903120638-7835f813f4da
-	google.golang.org/genproto/googleapis/api v0.0.0-20260128011058-8636f8732409
+	google.golang.org/genproto/googleapis/api v0.0.0-20260203192932-546029d2fa20
 	google.golang.org/genproto/googleapis/bytestream v0.0.0-20260203192932-546029d2fa20
 	gopkg.in/yaml.v2 v2.4.0
 )
