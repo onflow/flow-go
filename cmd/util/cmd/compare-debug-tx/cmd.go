@@ -75,6 +75,20 @@ func init() {
 	Cmd.Flags().BoolVar(&flagShowTraceDiff, "show-trace-diff", false, "show trace diff output (default: false)")
 }
 
+// closeFile closes the file and fatals on failure.
+func closeFile(f *os.File) {
+	if err := f.Close(); err != nil {
+		log.Fatal().Err(err).Str("file", f.Name()).Msg("failed to close temp file")
+	}
+}
+
+// removeFile removes the file at path and fatals on failure.
+func removeFile(path string) {
+	if err := os.Remove(path); err != nil {
+		log.Fatal().Err(err).Str("file", path).Msg("failed to remove temp file")
+	}
+}
+
 func run(_ *cobra.Command, args []string) {
 	repoRoot := findRepoRoot()
 	checkCleanWorkingTree(repoRoot)
@@ -95,39 +109,39 @@ func run(_ *cobra.Command, args []string) {
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to create temp file for result1")
 	}
-	defer os.Remove(result1.Name())
-	defer result1.Close()
+	defer removeFile(result1.Name())
+	defer closeFile(result1)
 
 	result2, err := os.CreateTemp("", "compare-debug-tx-result2-*")
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to create temp file for result2")
 	}
-	defer os.Remove(result2.Name())
-	defer result2.Close()
+	defer removeFile(result2.Name())
+	defer closeFile(result2)
 
 	trace1, err := os.CreateTemp("", "compare-debug-tx-trace1-*")
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to create temp file for trace1")
 	}
-	defer os.Remove(trace1.Name())
-	defer trace1.Close()
+	defer removeFile(trace1.Name())
+	defer closeFile(trace1)
 
 	trace2, err := os.CreateTemp("", "compare-debug-tx-trace2-*")
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to create temp file for trace2")
 	}
-	defer os.Remove(trace2.Name())
-	defer trace2.Close()
+	defer removeFile(trace2.Name())
+	defer closeFile(trace2)
 
 	checkoutBranch(repoRoot, flagBranch1)
 	binary1 := buildUtil(repoRoot)
-	defer os.Remove(binary1)
+	defer removeFile(binary1)
 	perBlock1 := runAllBlocks(binary1, args, blockIDs, result1, trace1)
 	defer cleanupPerBlockFiles(perBlock1)
 
 	checkoutBranch(repoRoot, flagBranch2)
 	binary2 := buildUtil(repoRoot)
-	defer os.Remove(binary2)
+	defer removeFile(binary2)
 	perBlock2 := runAllBlocks(binary2, args, blockIDs, result2, trace2)
 	defer cleanupPerBlockFiles(perBlock2)
 
@@ -153,10 +167,10 @@ type perBlockFiles struct {
 // cleanupPerBlockFiles closes and removes all per-block temp files.
 func cleanupPerBlockFiles(files []perBlockFiles) {
 	for _, f := range files {
-		f.result.Close()
-		os.Remove(f.result.Name())
-		f.trace.Close()
-		os.Remove(f.trace.Name())
+		closeFile(f.result)
+		removeFile(f.result.Name())
+		closeFile(f.trace)
+		removeFile(f.trace.Name())
 	}
 }
 
@@ -299,7 +313,7 @@ func buildUtil(repoRoot string) string {
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to create temp file for util binary")
 	}
-	binary.Close()
+	closeFile(binary)
 
 	cmd := exec.Command("go", "build", "-tags", "cadence_tracing", "-o", binary.Name(), "./cmd/util")
 	cmd.Dir = repoRoot
