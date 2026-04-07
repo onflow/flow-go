@@ -211,6 +211,7 @@ func (suite *RestAPITestSuite) SetupTest() {
 		nil,
 		followerDistributor,
 		nil,
+		nil,
 	)
 	assert.NoError(suite.T(), err)
 	suite.rpcEng, err = rpcEngBuilder.WithLegacy().Build()

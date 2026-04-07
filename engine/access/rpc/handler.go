@@ -16,6 +16,7 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/signature"
 	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/engine/common/rpc"
+	"github.com/onflow/flow-go/module/limiters"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	accessmodel "github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
@@ -26,7 +27,7 @@ import (
 )
 
 type Handler struct {
-	subscription.StreamingData
+	limiter              *limiters.ConcurrencyLimiter
 	api                  access.API
 	chain                flow.Chain
 	signerIndicesDecoder hotstuff.BlockSignerDecoder
@@ -57,11 +58,11 @@ func NewHandler(
 	chain flow.Chain,
 	finalizedHeader module.FinalizedHeaderCache,
 	me module.Local,
-	maxStreams uint32,
+	limiter *limiters.ConcurrencyLimiter,
 	options ...HandlerOption,
 ) *Handler {
 	h := &Handler{
-		StreamingData:        subscription.NewStreamingData(maxStreams),
+		limiter:              limiter,
 		api:                  api,
 		chain:                chain,
 		finalizedHeaderCache: finalizedHeader,
@@ -72,6 +73,19 @@ func NewHandler(
 		opt(h)
 	}
 	return h
+}
+
+// withStreamLimit executes fn within the global stream concurrency limit.
+// Returns codes.ResourceExhausted if the limit is reached.
+func (h *Handler) withStreamLimit(fn func() error) error {
+	var err error
+	allowed := h.limiter.Allow(func() {
+		err = fn()
+	})
+	if !allowed {
+		return status.Errorf(codes.ResourceExhausted, "maximum number of streams reached")
+	}
+	return err
 }
 
 // Ping the Access API server for a response.
@@ -1106,64 +1120,6 @@ func (h *Handler) GetExecutionResultByID(ctx context.Context, req *accessproto.G
 	}, nil
 }
 
-// GetExecutionReceiptsByBlockID returns all execution receipts for the given block ID.
-// If req.IncludeResult is true, each receipt in the response includes the full ExecutionResult.
-//
-// Expected error returns during normal operation:
-//   - codes.NotFound: if no receipts are indexed for the given block ID.
-func (h *Handler) GetExecutionReceiptsByBlockID(ctx context.Context, req *accessproto.GetExecutionReceiptsByBlockIDRequest) (*accessproto.ExecutionReceiptsResponse, error) {
-	metadata, err := h.buildMetadataResponse()
-	if err != nil {
-		return nil, err
-	}
-
-	blockID := convert.MessageToIdentifier(req.GetBlockId())
-
-	receipts, err := h.api.GetExecutionReceiptsByBlockID(ctx, blockID)
-	if err != nil {
-		return nil, err
-	}
-
-	msgs, err := convert.ExecutionReceiptsToMessages(receipts, req.GetIncludeResult())
-	if err != nil {
-		return nil, err
-	}
-
-	return &accessproto.ExecutionReceiptsResponse{
-		Receipts: msgs,
-		Metadata: metadata,
-	}, nil
-}
-
-// GetExecutionReceiptsByResultID returns all execution receipts committing to the given execution
-// result ID. If req.IncludeResult is true, each receipt in the response includes the full ExecutionResult.
-//
-// Expected error returns during normal operation:
-//   - codes.NotFound: if the execution result or its block's receipts are not found.
-func (h *Handler) GetExecutionReceiptsByResultID(ctx context.Context, req *accessproto.GetExecutionReceiptsByResultIDRequest) (*accessproto.ExecutionReceiptsResponse, error) {
-	metadata, err := h.buildMetadataResponse()
-	if err != nil {
-		return nil, err
-	}
-
-	resultID := convert.MessageToIdentifier(req.GetResultId())
-
-	receipts, err := h.api.GetExecutionReceiptsByResultID(ctx, resultID)
-	if err != nil {
-		return nil, err
-	}
-
-	msgs, err := convert.ExecutionReceiptsToMessages(receipts, req.GetIncludeResult())
-	if err != nil {
-		return nil, err
-	}
-
-	return &accessproto.ExecutionReceiptsResponse{
-		Receipts: msgs,
-		Metadata: metadata,
-	}, nil
-}
-
 // SubscribeBlocksFromStartBlockID handles subscription requests for blocks started from block id.
 // It takes a SubscribeBlocksFromStartBlockIDRequest and an AccessAPI_SubscribeBlocksFromStartBlockIDServer stream as input.
 // The handler manages the subscription to block updates and sends the subscribed block information
@@ -1174,20 +1130,15 @@ func (h *Handler) GetExecutionReceiptsByResultID(ctx context.Context, req *acces
 // - codes.ResourceExhausted - if the maximum number of streams is reached.
 // - codes.Internal - if stream encountered an error, if stream got unexpected response or could not convert block to message or could not send response.
 func (h *Handler) SubscribeBlocksFromStartBlockID(request *accessproto.SubscribeBlocksFromStartBlockIDRequest, stream accessproto.AccessAPI_SubscribeBlocksFromStartBlockIDServer) error {
-	// check if the maximum number of streams is reached
-	if h.StreamCount.Load() >= h.MaxStreams {
-		return status.Errorf(codes.ResourceExhausted, "maximum number of streams reached")
-	}
-	h.StreamCount.Add(1)
-	defer h.StreamCount.Add(-1)
+	return h.withStreamLimit(func() error {
+		startBlockID, blockStatus, err := h.getSubscriptionDataFromStartBlockID(request.GetStartBlockId(), request.GetBlockStatus())
+		if err != nil {
+			return err
+		}
 
-	startBlockID, blockStatus, err := h.getSubscriptionDataFromStartBlockID(request.GetStartBlockId(), request.GetBlockStatus())
-	if err != nil {
-		return err
-	}
-
-	sub := h.api.SubscribeBlocksFromStartBlockID(stream.Context(), startBlockID, blockStatus)
-	return HandleRPCSubscription(sub, h.handleBlocksResponse(stream.Send, request.GetFullBlockResponse(), blockStatus))
+		sub := h.api.SubscribeBlocksFromStartBlockID(stream.Context(), startBlockID, blockStatus)
+		return HandleRPCSubscription(sub, h.handleBlocksResponse(stream.Send, request.GetFullBlockResponse(), blockStatus))
+	})
 }
 
 // SubscribeBlocksFromStartHeight handles subscription requests for blocks started from block height.
@@ -1200,21 +1151,16 @@ func (h *Handler) SubscribeBlocksFromStartBlockID(request *accessproto.Subscribe
 // - codes.ResourceExhausted - if the maximum number of streams is reached.
 // - codes.Internal - if stream encountered an error, if stream got unexpected response or could not convert block to message or could not send response.
 func (h *Handler) SubscribeBlocksFromStartHeight(request *accessproto.SubscribeBlocksFromStartHeightRequest, stream accessproto.AccessAPI_SubscribeBlocksFromStartHeightServer) error {
-	// check if the maximum number of streams is reached
-	if h.StreamCount.Load() >= h.MaxStreams {
-		return status.Errorf(codes.ResourceExhausted, "maximum number of streams reached")
-	}
-	h.StreamCount.Add(1)
-	defer h.StreamCount.Add(-1)
+	return h.withStreamLimit(func() error {
+		blockStatus := convert.MessageToBlockStatus(request.GetBlockStatus())
+		err := checkBlockStatus(blockStatus)
+		if err != nil {
+			return err
+		}
 
-	blockStatus := convert.MessageToBlockStatus(request.GetBlockStatus())
-	err := checkBlockStatus(blockStatus)
-	if err != nil {
-		return err
-	}
-
-	sub := h.api.SubscribeBlocksFromStartHeight(stream.Context(), request.GetStartBlockHeight(), blockStatus)
-	return HandleRPCSubscription(sub, h.handleBlocksResponse(stream.Send, request.GetFullBlockResponse(), blockStatus))
+		sub := h.api.SubscribeBlocksFromStartHeight(stream.Context(), request.GetStartBlockHeight(), blockStatus)
+		return HandleRPCSubscription(sub, h.handleBlocksResponse(stream.Send, request.GetFullBlockResponse(), blockStatus))
+	})
 }
 
 // SubscribeBlocksFromLatest handles subscription requests for blocks started from latest sealed block.
@@ -1227,21 +1173,16 @@ func (h *Handler) SubscribeBlocksFromStartHeight(request *accessproto.SubscribeB
 // - codes.ResourceExhausted - if the maximum number of streams is reached.
 // - codes.Internal - if stream encountered an error, if stream got unexpected response or could not convert block to message or could not send response.
 func (h *Handler) SubscribeBlocksFromLatest(request *accessproto.SubscribeBlocksFromLatestRequest, stream accessproto.AccessAPI_SubscribeBlocksFromLatestServer) error {
-	// check if the maximum number of streams is reached
-	if h.StreamCount.Load() >= h.MaxStreams {
-		return status.Errorf(codes.ResourceExhausted, "maximum number of streams reached")
-	}
-	h.StreamCount.Add(1)
-	defer h.StreamCount.Add(-1)
+	return h.withStreamLimit(func() error {
+		blockStatus := convert.MessageToBlockStatus(request.GetBlockStatus())
+		err := checkBlockStatus(blockStatus)
+		if err != nil {
+			return err
+		}
 
-	blockStatus := convert.MessageToBlockStatus(request.GetBlockStatus())
-	err := checkBlockStatus(blockStatus)
-	if err != nil {
-		return err
-	}
-
-	sub := h.api.SubscribeBlocksFromLatest(stream.Context(), blockStatus)
-	return HandleRPCSubscription(sub, h.handleBlocksResponse(stream.Send, request.GetFullBlockResponse(), blockStatus))
+		sub := h.api.SubscribeBlocksFromLatest(stream.Context(), blockStatus)
+		return HandleRPCSubscription(sub, h.handleBlocksResponse(stream.Send, request.GetFullBlockResponse(), blockStatus))
+	})
 }
 
 // handleBlocksResponse handles the subscription to block updates and sends
@@ -1287,20 +1228,15 @@ func (h *Handler) handleBlocksResponse(send sendSubscribeBlocksResponseFunc, ful
 // - codes.ResourceExhausted - if the maximum number of streams is reached.
 // - codes.Internal - if stream encountered an error, if stream got unexpected response or could not convert block header to message or could not send response.
 func (h *Handler) SubscribeBlockHeadersFromStartBlockID(request *accessproto.SubscribeBlockHeadersFromStartBlockIDRequest, stream accessproto.AccessAPI_SubscribeBlockHeadersFromStartBlockIDServer) error {
-	// check if the maximum number of streams is reached
-	if h.StreamCount.Load() >= h.MaxStreams {
-		return status.Errorf(codes.ResourceExhausted, "maximum number of streams reached")
-	}
-	h.StreamCount.Add(1)
-	defer h.StreamCount.Add(-1)
+	return h.withStreamLimit(func() error {
+		startBlockID, blockStatus, err := h.getSubscriptionDataFromStartBlockID(request.GetStartBlockId(), request.GetBlockStatus())
+		if err != nil {
+			return err
+		}
 
-	startBlockID, blockStatus, err := h.getSubscriptionDataFromStartBlockID(request.GetStartBlockId(), request.GetBlockStatus())
-	if err != nil {
-		return err
-	}
-
-	sub := h.api.SubscribeBlockHeadersFromStartBlockID(stream.Context(), startBlockID, blockStatus)
-	return HandleRPCSubscription(sub, h.handleBlockHeadersResponse(stream.Send))
+		sub := h.api.SubscribeBlockHeadersFromStartBlockID(stream.Context(), startBlockID, blockStatus)
+		return HandleRPCSubscription(sub, h.handleBlockHeadersResponse(stream.Send))
+	})
 }
 
 // SubscribeBlockHeadersFromStartHeight handles subscription requests for block headers started from block height.
@@ -1313,21 +1249,16 @@ func (h *Handler) SubscribeBlockHeadersFromStartBlockID(request *accessproto.Sub
 // - codes.ResourceExhausted - if the maximum number of streams is reached.
 // - codes.Internal - if stream encountered an error, if stream got unexpected response or could not convert block header to message or could not send response.
 func (h *Handler) SubscribeBlockHeadersFromStartHeight(request *accessproto.SubscribeBlockHeadersFromStartHeightRequest, stream accessproto.AccessAPI_SubscribeBlockHeadersFromStartHeightServer) error {
-	// check if the maximum number of streams is reached
-	if h.StreamCount.Load() >= h.MaxStreams {
-		return status.Errorf(codes.ResourceExhausted, "maximum number of streams reached")
-	}
-	h.StreamCount.Add(1)
-	defer h.StreamCount.Add(-1)
+	return h.withStreamLimit(func() error {
+		blockStatus := convert.MessageToBlockStatus(request.GetBlockStatus())
+		err := checkBlockStatus(blockStatus)
+		if err != nil {
+			return err
+		}
 
-	blockStatus := convert.MessageToBlockStatus(request.GetBlockStatus())
-	err := checkBlockStatus(blockStatus)
-	if err != nil {
-		return err
-	}
-
-	sub := h.api.SubscribeBlockHeadersFromStartHeight(stream.Context(), request.GetStartBlockHeight(), blockStatus)
-	return HandleRPCSubscription(sub, h.handleBlockHeadersResponse(stream.Send))
+		sub := h.api.SubscribeBlockHeadersFromStartHeight(stream.Context(), request.GetStartBlockHeight(), blockStatus)
+		return HandleRPCSubscription(sub, h.handleBlockHeadersResponse(stream.Send))
+	})
 }
 
 // SubscribeBlockHeadersFromLatest handles subscription requests for block headers started from latest sealed block.
@@ -1340,21 +1271,16 @@ func (h *Handler) SubscribeBlockHeadersFromStartHeight(request *accessproto.Subs
 // - codes.ResourceExhausted - if the maximum number of streams is reached.
 // - codes.Internal - if stream encountered an error, if stream got unexpected response or could not convert block header to message or could not send response.
 func (h *Handler) SubscribeBlockHeadersFromLatest(request *accessproto.SubscribeBlockHeadersFromLatestRequest, stream accessproto.AccessAPI_SubscribeBlockHeadersFromLatestServer) error {
-	// check if the maximum number of streams is reached
-	if h.StreamCount.Load() >= h.MaxStreams {
-		return status.Errorf(codes.ResourceExhausted, "maximum number of streams reached")
-	}
-	h.StreamCount.Add(1)
-	defer h.StreamCount.Add(-1)
+	return h.withStreamLimit(func() error {
+		blockStatus := convert.MessageToBlockStatus(request.GetBlockStatus())
+		err := checkBlockStatus(blockStatus)
+		if err != nil {
+			return err
+		}
 
-	blockStatus := convert.MessageToBlockStatus(request.GetBlockStatus())
-	err := checkBlockStatus(blockStatus)
-	if err != nil {
-		return err
-	}
-
-	sub := h.api.SubscribeBlockHeadersFromLatest(stream.Context(), blockStatus)
-	return HandleRPCSubscription(sub, h.handleBlockHeadersResponse(stream.Send))
+		sub := h.api.SubscribeBlockHeadersFromLatest(stream.Context(), blockStatus)
+		return HandleRPCSubscription(sub, h.handleBlockHeadersResponse(stream.Send))
+	})
 }
 
 // handleBlockHeadersResponse handles the subscription to block updates and sends
@@ -1401,20 +1327,15 @@ func (h *Handler) handleBlockHeadersResponse(send sendSubscribeBlockHeadersRespo
 // - codes.ResourceExhausted - if the maximum number of streams is reached.
 // - codes.Internal - if stream encountered an error, if stream got unexpected response or could not convert block to message or could not send response.
 func (h *Handler) SubscribeBlockDigestsFromStartBlockID(request *accessproto.SubscribeBlockDigestsFromStartBlockIDRequest, stream accessproto.AccessAPI_SubscribeBlockDigestsFromStartBlockIDServer) error {
-	// check if the maximum number of streams is reached
-	if h.StreamCount.Load() >= h.MaxStreams {
-		return status.Errorf(codes.ResourceExhausted, "maximum number of streams reached")
-	}
-	h.StreamCount.Add(1)
-	defer h.StreamCount.Add(-1)
+	return h.withStreamLimit(func() error {
+		startBlockID, blockStatus, err := h.getSubscriptionDataFromStartBlockID(request.GetStartBlockId(), request.GetBlockStatus())
+		if err != nil {
+			return err
+		}
 
-	startBlockID, blockStatus, err := h.getSubscriptionDataFromStartBlockID(request.GetStartBlockId(), request.GetBlockStatus())
-	if err != nil {
-		return err
-	}
-
-	sub := h.api.SubscribeBlockDigestsFromStartBlockID(stream.Context(), startBlockID, blockStatus)
-	return HandleRPCSubscription(sub, h.handleBlockDigestsResponse(stream.Send))
+		sub := h.api.SubscribeBlockDigestsFromStartBlockID(stream.Context(), startBlockID, blockStatus)
+		return HandleRPCSubscription(sub, h.handleBlockDigestsResponse(stream.Send))
+	})
 }
 
 // SubscribeBlockDigestsFromStartHeight handles subscription requests for lightweight blocks started from block height.
@@ -1427,21 +1348,16 @@ func (h *Handler) SubscribeBlockDigestsFromStartBlockID(request *accessproto.Sub
 // - codes.ResourceExhausted - if the maximum number of streams is reached.
 // - codes.Internal - if stream encountered an error, if stream got unexpected response or could not convert block to message or could not send response.
 func (h *Handler) SubscribeBlockDigestsFromStartHeight(request *accessproto.SubscribeBlockDigestsFromStartHeightRequest, stream accessproto.AccessAPI_SubscribeBlockDigestsFromStartHeightServer) error {
-	// check if the maximum number of streams is reached
-	if h.StreamCount.Load() >= h.MaxStreams {
-		return status.Errorf(codes.ResourceExhausted, "maximum number of streams reached")
-	}
-	h.StreamCount.Add(1)
-	defer h.StreamCount.Add(-1)
+	return h.withStreamLimit(func() error {
+		blockStatus := convert.MessageToBlockStatus(request.GetBlockStatus())
+		err := checkBlockStatus(blockStatus)
+		if err != nil {
+			return err
+		}
 
-	blockStatus := convert.MessageToBlockStatus(request.GetBlockStatus())
-	err := checkBlockStatus(blockStatus)
-	if err != nil {
-		return err
-	}
-
-	sub := h.api.SubscribeBlockDigestsFromStartHeight(stream.Context(), request.GetStartBlockHeight(), blockStatus)
-	return HandleRPCSubscription(sub, h.handleBlockDigestsResponse(stream.Send))
+		sub := h.api.SubscribeBlockDigestsFromStartHeight(stream.Context(), request.GetStartBlockHeight(), blockStatus)
+		return HandleRPCSubscription(sub, h.handleBlockDigestsResponse(stream.Send))
+	})
 }
 
 // SubscribeBlockDigestsFromLatest handles subscription requests for lightweight block started from latest sealed block.
@@ -1454,21 +1370,16 @@ func (h *Handler) SubscribeBlockDigestsFromStartHeight(request *accessproto.Subs
 // - codes.ResourceExhausted - if the maximum number of streams is reached.
 // - codes.Internal - if stream encountered an error, if stream got unexpected response or could not convert block to message or could not send response.
 func (h *Handler) SubscribeBlockDigestsFromLatest(request *accessproto.SubscribeBlockDigestsFromLatestRequest, stream accessproto.AccessAPI_SubscribeBlockDigestsFromLatestServer) error {
-	// check if the maximum number of streams is reached
-	if h.StreamCount.Load() >= h.MaxStreams {
-		return status.Errorf(codes.ResourceExhausted, "maximum number of streams reached")
-	}
-	h.StreamCount.Add(1)
-	defer h.StreamCount.Add(-1)
+	return h.withStreamLimit(func() error {
+		blockStatus := convert.MessageToBlockStatus(request.GetBlockStatus())
+		err := checkBlockStatus(blockStatus)
+		if err != nil {
+			return err
+		}
 
-	blockStatus := convert.MessageToBlockStatus(request.GetBlockStatus())
-	err := checkBlockStatus(blockStatus)
-	if err != nil {
-		return err
-	}
-
-	sub := h.api.SubscribeBlockDigestsFromLatest(stream.Context(), blockStatus)
-	return HandleRPCSubscription(sub, h.handleBlockDigestsResponse(stream.Send))
+		sub := h.api.SubscribeBlockDigestsFromLatest(stream.Context(), blockStatus)
+		return HandleRPCSubscription(sub, h.handleBlockDigestsResponse(stream.Send))
+	})
 }
 
 // handleBlockDigestsResponse handles the subscription to block updates and sends
@@ -1532,41 +1443,36 @@ func (h *Handler) SendAndSubscribeTransactionStatuses(
 	request *accessproto.SendAndSubscribeTransactionStatusesRequest,
 	stream accessproto.AccessAPI_SendAndSubscribeTransactionStatusesServer,
 ) error {
-	ctx := stream.Context()
+	return h.withStreamLimit(func() error {
+		ctx := stream.Context()
 
-	// check if the maximum number of streams is reached
-	if h.StreamCount.Load() >= h.MaxStreams {
-		return status.Errorf(codes.ResourceExhausted, "maximum number of streams reached")
-	}
-	h.StreamCount.Add(1)
-	defer h.StreamCount.Add(-1)
-
-	tx, err := convert.MessageToTransaction(request.GetTransaction(), h.chain)
-	if err != nil {
-		return status.Error(codes.InvalidArgument, err.Error())
-	}
-
-	sub := h.api.SendAndSubscribeTransactionStatuses(ctx, &tx, request.GetEventEncodingVersion())
-
-	messageIndex := counters.NewMonotonicCounter(0)
-	return HandleRPCSubscription(sub, func(txResults []*accessmodel.TransactionResult) error {
-		for i := range txResults {
-			index := messageIndex.Value()
-			if ok := messageIndex.Set(index + 1); !ok {
-				return status.Errorf(codes.Internal, "message index already incremented to %d", messageIndex.Value())
-			}
-
-			err = stream.Send(&accessproto.SendAndSubscribeTransactionStatusesResponse{
-				TransactionResults: convert.TransactionResultToMessage(txResults[i]),
-				MessageIndex:       index,
-			})
-			if err != nil {
-				return rpc.ConvertError(err, "could not send response", codes.Internal)
-			}
-
+		tx, err := convert.MessageToTransaction(request.GetTransaction(), h.chain)
+		if err != nil {
+			return status.Error(codes.InvalidArgument, err.Error())
 		}
 
-		return nil
+		sub := h.api.SendAndSubscribeTransactionStatuses(ctx, &tx, request.GetEventEncodingVersion())
+
+		messageIndex := counters.NewMonotonicCounter(0)
+		return HandleRPCSubscription(sub, func(txResults []*accessmodel.TransactionResult) error {
+			for i := range txResults {
+				index := messageIndex.Value()
+				if ok := messageIndex.Set(index + 1); !ok {
+					return status.Errorf(codes.Internal, "message index already incremented to %d", messageIndex.Value())
+				}
+
+				err = stream.Send(&accessproto.SendAndSubscribeTransactionStatusesResponse{
+					TransactionResults: convert.TransactionResultToMessage(txResults[i]),
+					MessageIndex:       index,
+				})
+				if err != nil {
+					return rpc.ConvertError(err, "could not send response", codes.Internal)
+				}
+
+			}
+
+			return nil
+		})
 	})
 }
 

@@ -203,6 +203,7 @@ func (suite *RateLimitTestSuite) SetupTest() {
 		nil,
 		followerDistributor,
 		nil,
+		nil,
 	)
 	require.NoError(suite.T(), err)
 	suite.rpcEng, err = rpcEngBuilder.WithLegacy().Build()
