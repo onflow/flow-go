@@ -174,6 +174,50 @@ func (_c *Local_NotMeFilter_Call) RunAndReturn(run func() flow.IdentityFilter[fl
 	return _c
 }
 
+// Role provides a mock function for the type Local
+func (_mock *Local) Role() flow.Role {
+	ret := _mock.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for Role")
+	}
+
+	var r0 flow.Role
+	if returnFunc, ok := ret.Get(0).(func() flow.Role); ok {
+		r0 = returnFunc()
+	} else {
+		r0 = ret.Get(0).(flow.Role)
+	}
+	return r0
+}
+
+// Local_Role_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Role'
+type Local_Role_Call struct {
+	*mock.Call
+}
+
+// Role is a helper method to define mock.On call
+func (_e *Local_Expecter) Role() *Local_Role_Call {
+	return &Local_Role_Call{Call: _e.mock.On("Role")}
+}
+
+func (_c *Local_Role_Call) Run(run func()) *Local_Role_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *Local_Role_Call) Return(role flow.Role) *Local_Role_Call {
+	_c.Call.Return(role)
+	return _c
+}
+
+func (_c *Local_Role_Call) RunAndReturn(run func() flow.Role) *Local_Role_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // Sign provides a mock function for the type Local
 func (_mock *Local) Sign(bytes []byte, hasher hash.Hasher) (crypto.Signature, error) {
 	ret := _mock.Called(bytes, hasher)
