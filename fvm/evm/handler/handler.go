@@ -648,8 +648,9 @@ func (h *ContractHandler) dryRunTx(
 
 	resSummary := res.ResultSummary()
 
-	// Don't store drycall result in the cache if the result data exceeds max limit, or
-	// if the max cache count is reached.
+	// Skip caching results if they are too large or if the cache has reached its limit.
+	// These safeguards prevent excessive memory usage from large return data and
+	// uncontrolled cache growth within a single transaction.
 	if len(resSummary.ReturnedData) > maxDryCallCacheResultDataSize ||
 		len(h.evmDryCallCache) >= maxDryCallCacheCount {
 		return resSummary, nil
