@@ -124,7 +124,6 @@ jobs:
     if: ${{ github.event.inputs.secure-build == 'true' }}
     strategy:
       fail-fast: false
-      max-parallel: 1
       matrix:
         role: [access, collection, consensus, execution, observer, verification]
     environment: secure builds
