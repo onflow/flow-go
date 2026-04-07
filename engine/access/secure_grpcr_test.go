@@ -20,6 +20,7 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	accessmock "github.com/onflow/flow-go/engine/access/mock"
 	"github.com/onflow/flow-go/engine/access/rest/websockets"
+	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/engine/access/rpc"
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/node_communicator"
@@ -29,6 +30,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/grpcserver"
 	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/module/limiters"
 	"github.com/onflow/flow-go/module/metrics"
 	module "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/network"
@@ -170,6 +172,8 @@ func (suite *SecureGRPCTestSuite) SetupTest() {
 
 	stateStreamConfig := statestreambackend.Config{}
 	followerDistributor := pubsub.NewFollowerDistributor()
+	streamLimiter, err := limiters.NewConcurrencyLimiter(subscription.DefaultMaxGlobalStreams)
+	suite.Require().NoError(err)
 	rpcEngBuilder, err := rpc.NewBuilder(
 		suite.log,
 		suite.state,
@@ -187,7 +191,7 @@ func (suite *SecureGRPCTestSuite) SetupTest() {
 		nil,
 		followerDistributor,
 		nil,
-		nil,
+		streamLimiter,
 	)
 	assert.NoError(suite.T(), err)
 	suite.rpcEng, err = rpcEngBuilder.WithLegacy().Build()
