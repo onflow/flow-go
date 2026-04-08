@@ -1018,8 +1018,7 @@ access(all) contract EVM {
         if keyIndices.length != signatures.length {
             return ValidationResult(
                 isValid: false,
-                problem: "EVM.validateCOAOwnershipProof(): Key indices array length"
-                         .concat(" doesn't match the signatures array length!")
+                problem: "EVM.validateCOAOwnershipProof(): Key indices array length doesn't match the signatures array length!"
             )
         }
 
@@ -1042,8 +1041,7 @@ access(all) contract EVM {
                     if key.isRevoked {
                         return ValidationResult(
                             isValid: false,
-                            problem: "EVM.validateCOAOwnershipProof(): Cannot validate COA ownership"
-                                     .concat(" for Cadence account \(address). The account key at index \(accountKeyIndex) is revoked.")
+                            problem: "EVM.validateCOAOwnershipProof(): Cannot validate COA ownership for Cadence account \(address). The account key at index \(accountKeyIndex) is revoked."
                         )
                     }
 
@@ -1062,8 +1060,7 @@ access(all) contract EVM {
                 } else {
                     return ValidationResult(
                         isValid: false,
-                        problem: "EVM.validateCOAOwnershipProof(): Cannot validate COA ownership"
-                                     .concat(" for Cadence account \(address). The key index \(accountKeyIndex) is invalid.")
+                        problem: "EVM.validateCOAOwnershipProof(): Cannot validate COA ownership for Cadence account \(address). The key index \(accountKeyIndex) is invalid."
                     )
                 }
             } else {
@@ -1088,8 +1085,7 @@ access(all) contract EVM {
         if !isValid{
             return ValidationResult(
                 isValid: false,
-                problem: "EVM.validateCOAOwnershipProof(): Cannot validate COA ownership"
-                         .concat(" for Cadence account \(address). The given signatures are not valid or provide enough weight.")
+                problem: "EVM.validateCOAOwnershipProof(): Cannot validate COA ownership for Cadence account \(address). The given signatures are not valid or provide enough weight."
             )
         }
 
@@ -1100,8 +1096,7 @@ access(all) contract EVM {
                 if item != evmAddress[index] {
                     return ValidationResult(
                         isValid: false,
-                        problem: "EVM.validateCOAOwnershipProof(): Cannot validate COA ownership."
-                                 .concat("The provided evm address does not match the account's COA address.")
+                        problem: "EVM.validateCOAOwnershipProof(): Cannot validate COA ownership. The provided evm address does not match the account's COA address."
                     )
                 }
             }
@@ -1113,8 +1108,7 @@ access(all) contract EVM {
 
         return ValidationResult(
             isValid: false,
-            problem: "EVM.validateCOAOwnershipProof(): Cannot validate COA ownership. "
-                     .concat("Could not borrow the COA resource for account \(address).")
+            problem: "EVM.validateCOAOwnershipProof(): Cannot validate COA ownership. Could not borrow the COA resource for account \(address)."
         )
     }
 
