@@ -110,7 +110,7 @@ func TestGetAuthorizedIdentity_EjectedPeer(t *testing.T) {
 		Identity: ejectedIdentity,
 		PeerID:   p2plogging.PeerId(remotePeerID),
 		Protocol: message.ProtocolTypeUnicast,
-		Err:      validator.ErrIdentityUnverified,
+		Err:      validator.ErrSenderEjected,
 	}).Once()
 
 	net := &Network{
