@@ -829,11 +829,15 @@ func DefaultValidators(log zerolog.Logger, flowID flow.Identifier) []network.Mes
 	}
 }
 
-// isProtocolParticipant returns a PeerFilter that returns true if a peer is a staked (i.e., authorized) node.
+// isProtocolParticipant returns a PeerFilter that allows if a peer is a staked (i.e., authorized) node.
 func (n *Network) isProtocolParticipant() p2p.PeerFilter {
 	return func(p peer.ID) error {
-		if _, ok := n.Identity(p); !ok {
+		id, ok := n.Identity(p)
+		if !ok {
 			return fmt.Errorf("failed to get identity of unknown peer with peer id %s", p2plogging.PeerId(p))
+		}
+		if id.IsEjected() {
+			return fmt.Errorf("peer with peer id %s is ejected", p2plogging.PeerId(p))
 		}
 		return nil
 	}
@@ -981,17 +985,8 @@ func (n *Network) handleIncomingStream(s libp2pnet.Stream) {
 	// are permissioned and will be for the foreseeable future, we allow the higher limit
 	// for all unicast streams from execution nodes to verification nodes. All other node
 	// combinations use the default (lower) limit.
-	remoteIdentity, ok := n.Identity(remotePeer)
+	remoteIdentity, ok := n.getAuthorizedIdentity(log, remotePeer)
 	if !ok {
-		log.Error().
-			Str("remote_peer", remotePeer.String()).
-			Bool(logging.KeySuspicious, true).
-			Msg("failed to resolve identity of remote peer")
-		n.slashingViolationsConsumer.OnUnAuthorizedSenderError(&network.Violation{
-			PeerID:   p2plogging.PeerId(remotePeer),
-			Protocol: message.ProtocolTypeUnicast,
-			Err:      validator.ErrIdentityUnverified,
-		})
 		return
 	}
 
@@ -1111,6 +1106,39 @@ func (n *Network) handleIncomingStream(s libp2pnet.Stream) {
 	}
 
 	success = true
+}
+
+// getAuthorizedIdentity resolves the identity of a remote peer and returns it if it is authorized.
+// If the peer is not authorized (unknown or ejected), it returns false and logs a violation.
+func (n *Network) getAuthorizedIdentity(log zerolog.Logger, remotePeer peer.ID) (*flow.Identity, bool) {
+	remoteIdentity, ok := n.Identity(remotePeer)
+	if !ok {
+		log.Error().
+			Str("remote_peer", remotePeer.String()).
+			Bool(logging.KeySuspicious, true).
+			Msg("failed to resolve identity of remote peer")
+		n.slashingViolationsConsumer.OnUnauthorizedSenderError(&network.Violation{
+			PeerID:   p2plogging.PeerId(remotePeer),
+			Protocol: message.ProtocolTypeUnicast,
+			Err:      validator.ErrIdentityUnverified,
+		})
+		return nil, false
+	}
+	if remoteIdentity.IsEjected() {
+		log.Error().
+			Str("remote_peer", remotePeer.String()).
+			Bool(logging.KeySuspicious, true).
+			Msg("remote peer is ejected")
+		n.slashingViolationsConsumer.OnSenderEjectedError(&network.Violation{
+			OriginID: remoteIdentity.NodeID,
+			Identity: remoteIdentity,
+			PeerID:   p2plogging.PeerId(remotePeer),
+			Protocol: message.ProtocolTypeUnicast,
+			Err:      validator.ErrSenderEjected,
+		})
+		return nil, false
+	}
+	return remoteIdentity, true
 }
 
 // Subscribe subscribes the network to a channel.

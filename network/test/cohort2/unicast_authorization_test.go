@@ -134,7 +134,7 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_UnstakedPeer() 
 		Protocol: message.ProtocolTypeUnicast,
 		Err:      validator.ErrIdentityUnverified,
 	}
-	slashingViolationsConsumer.On("OnUnAuthorizedSenderError", expectedViolation).Return(nil).Once().Run(func(args mockery.Arguments) {
+	slashingViolationsConsumer.On("OnUnauthorizedSenderError", expectedViolation).Return(nil).Once().Run(func(args mockery.Arguments) {
 		close(u.waitCh)
 	})
 
@@ -226,7 +226,7 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_UnauthorizedPee
 		Err:      message.ErrUnauthorizedMessageOnChannel,
 	}
 
-	slashingViolationsConsumer.On("OnUnAuthorizedSenderError", expectedViolation).
+	slashingViolationsConsumer.On("OnUnauthorizedSenderError", expectedViolation).
 		Return(nil).Once().Run(func(args mockery.Arguments) {
 		close(u.waitCh)
 	})
@@ -329,7 +329,7 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_WrongMsgCode() 
 		Err:      message.ErrUnauthorizedMessageOnChannel,
 	}
 
-	slashingViolationsConsumer.On("OnUnAuthorizedSenderError", expectedViolation).
+	slashingViolationsConsumer.On("OnUnauthorizedSenderError", expectedViolation).
 		Return(nil).Once().Run(func(args mockery.Arguments) {
 		close(u.waitCh)
 	})
