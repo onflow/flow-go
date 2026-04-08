@@ -8,11 +8,14 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
+	"github.com/onflow/flow-go/module"
 )
 
 type LocalNoKey struct {
 	me flow.IdentitySkeleton
 }
+
+var _ module.Local = (*LocalNoKey)(nil)
 
 func NewNoKey(id flow.IdentitySkeleton) (*LocalNoKey, error) {
 	l := &LocalNoKey{
@@ -23,6 +26,10 @@ func NewNoKey(id flow.IdentitySkeleton) (*LocalNoKey, error) {
 
 func (l *LocalNoKey) NodeID() flow.Identifier {
 	return l.me.NodeID
+}
+
+func (l *LocalNoKey) Role() flow.Role {
+	return l.me.Role
 }
 
 func (l *LocalNoKey) Address() string {

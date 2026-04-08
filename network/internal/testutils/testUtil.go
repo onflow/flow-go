@@ -183,6 +183,7 @@ func NetworkConfigFixture(
 
 	me := mock.NewLocal(t)
 	me.On("NodeID").Return(myId.NodeID).Maybe()
+	me.On("Role").Return(myId.Role).Maybe()
 	me.On("NotMeFilter").Return(filter.Not(filter.HasNodeID[flow.Identity](me.NodeID()))).Maybe()
 	me.On("Address").Return(myId.Address).Maybe()
 
@@ -218,6 +219,7 @@ func NetworkConfigFixture(
 		SlashingViolationConsumerFactory: func(_ network.ConduitAdapter) network.ViolationsConsumer {
 			return mocknetwork.NewViolationsConsumer(t)
 		},
+		UnicastStreamAuthorizer: func(_, _ flow.Role) bool { return true },
 	}
 
 	for _, opt := range opts {

@@ -8,12 +8,15 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
+	"github.com/onflow/flow-go/module"
 )
 
 type Local struct {
 	me flow.IdentitySkeleton
 	sk crypto.PrivateKey // instance of the node's private staking key
 }
+
+var _ module.Local = (*Local)(nil)
 
 func New(id flow.IdentitySkeleton, sk crypto.PrivateKey) (*Local, error) {
 	if !sk.PublicKey().Equals(id.StakingPubKey) {
@@ -30,6 +33,10 @@ func New(id flow.IdentitySkeleton, sk crypto.PrivateKey) (*Local, error) {
 
 func (l *Local) NodeID() flow.Identifier {
 	return l.me.NodeID
+}
+
+func (l *Local) Role() flow.Role {
+	return l.me.Role
 }
 
 func (l *Local) Address() string {
