@@ -89,6 +89,7 @@ import (
 
 	dp "github.com/onflow/flow-go/engine/access/rest/websockets/data_providers"
 	"github.com/onflow/flow-go/engine/access/rest/websockets/models"
+	"github.com/onflow/flow-go/module/limiters"
 	"github.com/onflow/flow-go/utils/concurrentmap"
 )
 
@@ -135,7 +136,8 @@ type Controller struct {
 	dataProviders       *concurrentmap.Map[SubscriptionID, dp.DataProvider]
 	dataProviderFactory dp.DataProviderFactory
 	dataProvidersGroup  *sync.WaitGroup
-	limiter             *rate.Limiter
+	rateLimiter         *rate.Limiter
+	streamLimiter       *limiters.ConcurrencyLimiter
 
 	keepaliveConfig KeepaliveConfig
 }
@@ -145,10 +147,11 @@ func NewWebSocketController(
 	config Config,
 	conn WebsocketConnection,
 	dataProviderFactory dp.DataProviderFactory,
+	streamLimiter *limiters.ConcurrencyLimiter,
 ) *Controller {
-	var limiter *rate.Limiter
+	var rateLimiter *rate.Limiter
 	if config.MaxResponsesPerSecond > 0 {
-		limiter = rate.NewLimiter(rate.Limit(config.MaxResponsesPerSecond), 1)
+		rateLimiter = rate.NewLimiter(rate.Limit(config.MaxResponsesPerSecond), 1)
 	}
 
 	return &Controller{
@@ -159,7 +162,8 @@ func NewWebSocketController(
 		dataProviders:       concurrentmap.New[SubscriptionID, dp.DataProvider](),
 		dataProviderFactory: dataProviderFactory,
 		dataProvidersGroup:  &sync.WaitGroup{},
-		limiter:             limiter,
+		rateLimiter:         rateLimiter,
+		streamLimiter:       streamLimiter,
 		keepaliveConfig:     DefaultKeepaliveConfig(),
 	}
 }
@@ -442,8 +446,20 @@ func (c *Controller) handleSubscribe(ctx context.Context, msg models.SubscribeMe
 		return
 	}
 
+	// Check if the global stream limit has been reached.
+	if !c.streamLimiter.Acquire() {
+		err := fmt.Errorf("error creating new subscription: maximum number of streams reached")
+		c.writeErrorResponse(
+			ctx,
+			err,
+			wrapErrorMessage(http.StatusTooManyRequests, err.Error(), models.SubscribeAction, msg.SubscriptionID),
+		)
+		return
+	}
+
 	subscriptionID, err := c.parseOrCreateSubscriptionID(msg.SubscriptionID)
 	if err != nil {
+		c.streamLimiter.Release()
 		err = fmt.Errorf("error parsing subscription id: %w", err)
 		c.writeErrorResponse(
 			ctx,
@@ -456,6 +472,7 @@ func (c *Controller) handleSubscribe(ctx context.Context, msg models.SubscribeMe
 	// register new provider
 	provider, err := c.dataProviderFactory.NewDataProvider(ctx, subscriptionID.String(), msg.Topic, msg.Arguments, c.multiplexedStream)
 	if err != nil {
+		c.streamLimiter.Release()
 		err = fmt.Errorf("error creating data provider: %w", err)
 		c.writeErrorResponse(
 			ctx,
@@ -478,6 +495,8 @@ func (c *Controller) handleSubscribe(ctx context.Context, msg models.SubscribeMe
 	// run provider
 	c.dataProvidersGroup.Add(1)
 	go func() {
+		defer c.streamLimiter.Release()
+
 		err = provider.Run()
 		if err != nil {
 			err = fmt.Errorf("internal error: %w", err)
@@ -604,9 +623,9 @@ func (c *Controller) parseOrCreateSubscriptionID(id string) (SubscriptionID, err
 // An error is returned if the context is canceled or the expected wait time exceeds the context's
 // deadline.
 func (c *Controller) checkRateLimit(ctx context.Context) error {
-	if c.limiter == nil {
+	if c.rateLimiter == nil {
 		return nil
 	}
 
-	return c.limiter.WaitN(ctx, 1)
+	return c.rateLimiter.WaitN(ctx, 1)
 }
