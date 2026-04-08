@@ -60,11 +60,11 @@ func TestVerifyConcurrently(t *testing.T) {
 				state protocol.State,
 				verifier module.ChunkVerifier,
 				stopOnMismatch bool,
-			) error {
+			) (BlockVerificationStats, error) {
 				if err, ok := tt.errors[height]; ok {
-					return err
+					return BlockVerificationStats{}, err
 				}
-				return nil
+				return BlockVerificationStats{}, nil
 			}
 
 			mockHeaders := mock.NewHeaders(t)
@@ -73,7 +73,18 @@ func TestVerifyConcurrently(t *testing.T) {
 			mockState := unittestMocks.NewProtocolState()
 			mockVerifier := mockmodule.NewChunkVerifier(t)
 
-			err := verifyConcurrently(tt.from, tt.to, tt.nWorker, true, mockHeaders, mockChunkDataPacks, mockResults, mockState, mockVerifier, mockVerifyHeight)
+			_, err := verifyConcurrently(
+				tt.from,
+				tt.to,
+				tt.nWorker,
+				true,
+				mockHeaders,
+				mockChunkDataPacks,
+				mockResults,
+				mockState,
+				mockVerifier,
+				mockVerifyHeight,
+			)
 			if tt.expectedErr != nil {
 				if err == nil || errors.Is(err, tt.expectedErr) {
 					t.Fatalf("expected error: %v, got: %v", tt.expectedErr, err)
