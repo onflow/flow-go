@@ -11,6 +11,7 @@ import (
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data/cache"
 	"github.com/onflow/flow-go/module/grpcserver"
 	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/module/limiters"
 	"github.com/onflow/flow-go/storage"
 )
 
@@ -38,6 +39,7 @@ func NewEng(
 	chainID flow.ChainID,
 	server *grpcserver.GrpcServer,
 	backend *StateStreamBackend,
+	limiter *limiters.ConcurrencyLimiter,
 ) (*Engine, error) {
 	logger := log.With().Str("engine", "state_stream_rpc").Logger()
 
@@ -47,7 +49,7 @@ func NewEng(
 		headers:       headers,
 		chain:         chainID.Chain(),
 		config:        config,
-		handler:       NewHandler(backend, chainID.Chain(), config),
+		handler:       NewHandler(backend, chainID.Chain(), config, limiter),
 		execDataCache: execDataCache,
 	}
 
