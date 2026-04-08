@@ -5,9 +5,11 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 
+	compare_debug_tx "github.com/onflow/flow-go/cmd/util/cmd/compare-debug-tx"
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	"github.com/onflow/flow-go/engine/verification/verifier"
 	"github.com/onflow/flow-go/fvm"
@@ -25,6 +27,11 @@ var (
 	flagStopOnMismatch               bool
 	flagtransactionFeesDisabled      bool
 	flagScheduledTransactionsEnabled bool
+
+	flagCompareBranch1       string
+	flagCompareBranch2       string
+	flagCompareAccessAddress string
+	flagCompareParallel      int
 )
 
 // # verify the last 100 sealed blocks
@@ -61,6 +68,11 @@ func init() {
 	Cmd.Flags().BoolVar(&flagtransactionFeesDisabled, "fees_disabled", false, "disable transaction fees")
 
 	Cmd.Flags().BoolVar(&flagScheduledTransactionsEnabled, "scheduled_callbacks_enabled", fvm.DefaultScheduledTransactionsEnabled, "[deprecated] enable scheduled transactions")
+
+	Cmd.Flags().StringVar(&flagCompareBranch1, "compare-branch1", "", "first git branch for cross-branch comparison on mismatch")
+	Cmd.Flags().StringVar(&flagCompareBranch2, "compare-branch2", "", "second git branch for cross-branch comparison on mismatch")
+	Cmd.Flags().StringVar(&flagCompareAccessAddress, "compare-access-address", "", "access node address for cross-branch comparison")
+	Cmd.Flags().IntVar(&flagCompareParallel, "compare-parallel", 1, "number of blocks to process in parallel during comparison")
 }
 
 func run(*cobra.Command, []string) {
@@ -88,6 +100,13 @@ func run(*cobra.Command, []string) {
 		lg.Info().Msgf("look for 'could not verify' in the log for any mismatch, or try again with --stop_on_mismatch true to stop on first mismatch")
 	}
 
+	compareEnabled := flagCompareBranch1 != ""
+	if compareEnabled {
+		if flagCompareBranch2 == "" || flagCompareAccessAddress == "" {
+			lg.Fatal().Msg("--compare-branch2 and --compare-access-address are required when --compare-branch1 is set")
+		}
+	}
+
 	var totalStats verifier.BlockVerificationStats
 
 	if flagFromTo != "" {
@@ -110,9 +129,14 @@ func run(*cobra.Command, []string) {
 			flagScheduledTransactionsEnabled,
 		)
 		if err != nil {
-			lg.Fatal().Err(err).Msgf("could not verify range from %d to %d", from, to)
+			if compareEnabled && len(totalStats.MismatchedBlockIDs) > 0 {
+				lg.Error().Err(err).Msgf("verification stopped due to mismatch, proceeding to comparison")
+			} else {
+				lg.Fatal().Err(err).Msgf("could not verify range from %d to %d", from, to)
+			}
+		} else {
+			lg.Info().Msgf("finished verifying range from %d to %d", from, to)
 		}
-		lg.Info().Msgf("finished verifying range from %d to %d", from, to)
 	} else {
 		lg.Info().Msgf("verifying last %d sealed blocks", flagLastK)
 		var err error
@@ -128,10 +152,14 @@ func run(*cobra.Command, []string) {
 			flagScheduledTransactionsEnabled,
 		)
 		if err != nil {
-			lg.Fatal().Err(err).Msg("could not verify last k height")
+			if compareEnabled && len(totalStats.MismatchedBlockIDs) > 0 {
+				lg.Error().Err(err).Msgf("verification stopped due to mismatch, proceeding to comparison")
+			} else {
+				lg.Fatal().Err(err).Msg("could not verify last k height")
+			}
+		} else {
+			lg.Info().Msgf("finished verifying last %d sealed blocks", flagLastK)
 		}
-
-		lg.Info().Msgf("finished verifying last %d sealed blocks", flagLastK)
 	}
 
 	lg.Info().Msgf("matching chunks: %d/%d. matching transactions: %d/%d",
@@ -140,6 +168,30 @@ func run(*cobra.Command, []string) {
 		totalStats.MatchedTransactionCount,
 		totalStats.MatchedTransactionCount+totalStats.MismatchedTransactionCount,
 	)
+
+	if compareEnabled && len(totalStats.MismatchedBlockIDs) > 0 {
+		runCompareDebugTx(lg, totalStats.MismatchedBlockIDs)
+	}
+}
+
+func runCompareDebugTx(lg zerolog.Logger, mismatchedBlockIDs []flow.Identifier) {
+	blockIDs := make([]string, len(mismatchedBlockIDs))
+	for i, id := range mismatchedBlockIDs {
+		blockIDs[i] = id.String()
+	}
+
+	lg.Info().
+		Int("mismatch_count", len(mismatchedBlockIDs)).
+		Msg("invoking compare-debug-tx for mismatched blocks")
+
+	compare_debug_tx.Run(compare_debug_tx.Config{
+		Branch1:       flagCompareBranch1,
+		Branch2:       flagCompareBranch2,
+		Chain:         flagChain,
+		AccessAddress: flagCompareAccessAddress,
+		BlockIDs:      blockIDs,
+		Parallel:      flagCompareParallel,
+	})
 }
 
 func parseFromTo(fromTo string) (from, to uint64, err error) {
