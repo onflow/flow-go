@@ -995,7 +995,15 @@ access(all) contract EVM {
         }
     }
 
-    /// validateCOAOwnershipProof validates a COA ownership proof
+    /// validateCOAOwnershipProof validates a COA ownership proof.
+    ///
+    /// Note: this function does not enforce that `signedData` includes `evmAddress`.
+    /// In principle, a signature produced for one purpose could be replayed here against
+    /// a different COA owned by the same Cadence account. In practice this is low-risk:
+    /// the EVM-side precompile (verifyCOAOwnershipProof) always passes the calling COA's
+    /// address as the evmAddress argument, and Flow wallets historically create at most one
+    /// COA per account. Callers building off-chain authentication flows on top of this
+    /// function should ensure `signedData` encodes `evmAddress` to prevent cross-address replay.
     access(all)
     fun validateCOAOwnershipProof(
         address: Address,
