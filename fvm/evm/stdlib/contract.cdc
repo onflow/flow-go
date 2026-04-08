@@ -971,13 +971,16 @@ access(all) contract EVM {
             signature.utf8
         ).slice(from: 0, upTo: 4)
 
-        for byte in methodID {
-            if byte != data.removeFirst() {
+        // Compare the 4-byte method ID prefix using index access rather than removeFirst(),
+        // since removeFirst() is O(n) and would shift the entire array on each call.
+        // data.slice() is then used to pass only the ABI-encoded arguments to decodeABI.
+        for i, byte in methodID {
+            if byte != data[i] {
                 panic("EVM.decodeABIWithSignature(): Cannot decode! The signature does not match the provided data.")
             }
         }
 
-        return InternalEVM.decodeABI(types: types, data: data)
+        return InternalEVM.decodeABI(types: types, data: data.slice(from: 4, upTo: data.length))
     }
 
     /// ValidationResult returns the result of COA ownership proof validation
