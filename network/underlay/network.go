@@ -1092,7 +1092,7 @@ func (n *Network) getAuthorizedIdentity(log zerolog.Logger, remotePeer peer.ID) 
 			Identity: remoteIdentity,
 			PeerID:   p2plogging.PeerId(remotePeer),
 			Protocol: message.ProtocolTypeUnicast,
-			Err:      validator.ErrIdentityUnverified,
+			Err:      validator.ErrSenderEjected,
 		})
 		return nil, false
 	}
