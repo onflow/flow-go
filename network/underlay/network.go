@@ -169,7 +169,7 @@ type NetworkConfig struct {
 	SlashingViolationConsumerFactory func(network.ConduitAdapter) network.ViolationsConsumer
 	// UnicastStreamAuthorizer determines whether a sender role is permitted to open a unicast
 	// stream to a receiver role, before any message data is read from the stream. If nil,
-	// defaults to message.IsAuthorizedUnicastSender.
+	// defaults to message.IsAuthorizedUnicastSenderRole.
 	UnicastStreamAuthorizer func(sender, receiver flow.Role) bool
 }
 
@@ -179,7 +179,7 @@ func (cfg *NetworkConfig) Validate() {
 		cfg.UnicastMessageTimeout = DefaultUnicastTimeout
 	}
 	if cfg.UnicastStreamAuthorizer == nil {
-		cfg.UnicastStreamAuthorizer = message.IsAuthorizedUnicastSender
+		cfg.UnicastStreamAuthorizer = message.IsAuthorizedUnicastSenderRole
 	}
 }
 
@@ -215,7 +215,7 @@ func WithSlashingViolationConsumerFactory(factory func(adapter network.ConduitAd
 // WithUnicastStreamAuthorizer overrides the default unicast stream authorizer function.
 // The authorizer determines whether a sender role is permitted to open a unicast stream
 // to a receiver role, before any message data is read from the stream.
-// Defaults to message.IsAuthorizedUnicastSender when nil.
+// Defaults to [message.IsAuthorizedUnicastSenderRole] when nil.
 func WithUnicastStreamAuthorizer(authorizer func(sender, receiver flow.Role) bool) NetworkConfigOption {
 	return func(params *NetworkConfig) {
 		params.UnicastStreamAuthorizer = authorizer

@@ -532,7 +532,7 @@ func (u *UnicastAuthorizationTestSuite) setupNetworksWithRoles(
 		underlay.WithSlashingViolationConsumerFactory(func(_ network.ConduitAdapter) network.ViolationsConsumer {
 			return slashingViolationsConsumer
 		}),
-		underlay.WithUnicastStreamAuthorizer(message.IsAuthorizedUnicastSender))
+		underlay.WithUnicastStreamAuthorizer(message.IsAuthorizedUnicastSenderRole))
 	require.Len(u.T(), ids, 2)
 	require.Len(u.T(), providers, 2)
 	require.Len(u.T(), nets, 2)

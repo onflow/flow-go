@@ -13,36 +13,46 @@ import (
 func TestIsAuthorizedUnicastSender(t *testing.T) {
 	// Consensus nodes can send unicast to all roles (sync protocol)
 	for _, receiver := range flow.Roles() {
-		require.True(t, IsAuthorizedUnicastSender(flow.RoleConsensus, receiver), "consensus -> %s should be authorized", receiver)
+		require.True(t, IsAuthorizedUnicastSenderRole(flow.RoleConsensus, receiver), "consensus -> %s should be authorized", receiver)
 	}
 
 	// Execution nodes can unicast to: Consensus, Collection, Verification
-	require.True(t, IsAuthorizedUnicastSender(flow.RoleExecution, flow.RoleConsensus))
-	require.True(t, IsAuthorizedUnicastSender(flow.RoleExecution, flow.RoleCollection))
-	require.True(t, IsAuthorizedUnicastSender(flow.RoleExecution, flow.RoleVerification))
-	require.False(t, IsAuthorizedUnicastSender(flow.RoleExecution, flow.RoleExecution))
-	require.False(t, IsAuthorizedUnicastSender(flow.RoleExecution, flow.RoleAccess))
+	require.True(t, IsAuthorizedUnicastSenderRole(flow.RoleExecution, flow.RoleConsensus))
+	require.True(t, IsAuthorizedUnicastSenderRole(flow.RoleExecution, flow.RoleCollection))
+	require.True(t, IsAuthorizedUnicastSenderRole(flow.RoleExecution, flow.RoleVerification))
+	require.False(t, IsAuthorizedUnicastSenderRole(flow.RoleExecution, flow.RoleExecution))
+	require.False(t, IsAuthorizedUnicastSenderRole(flow.RoleExecution, flow.RoleAccess))
 
 	// Collection nodes can unicast to: Collection, Execution, Access
-	require.True(t, IsAuthorizedUnicastSender(flow.RoleCollection, flow.RoleCollection))
-	require.True(t, IsAuthorizedUnicastSender(flow.RoleCollection, flow.RoleExecution))
-	require.True(t, IsAuthorizedUnicastSender(flow.RoleCollection, flow.RoleAccess))
-	require.False(t, IsAuthorizedUnicastSender(flow.RoleCollection, flow.RoleConsensus))
-	require.False(t, IsAuthorizedUnicastSender(flow.RoleCollection, flow.RoleVerification))
+	require.True(t, IsAuthorizedUnicastSenderRole(flow.RoleCollection, flow.RoleCollection))
+	require.True(t, IsAuthorizedUnicastSenderRole(flow.RoleCollection, flow.RoleExecution))
+	require.True(t, IsAuthorizedUnicastSenderRole(flow.RoleCollection, flow.RoleAccess))
+	require.False(t, IsAuthorizedUnicastSenderRole(flow.RoleCollection, flow.RoleConsensus))
+	require.False(t, IsAuthorizedUnicastSenderRole(flow.RoleCollection, flow.RoleVerification))
 
 	// Verification nodes can unicast to: Consensus only
-	require.True(t, IsAuthorizedUnicastSender(flow.RoleVerification, flow.RoleConsensus))
-	require.False(t, IsAuthorizedUnicastSender(flow.RoleVerification, flow.RoleCollection))
-	require.False(t, IsAuthorizedUnicastSender(flow.RoleVerification, flow.RoleExecution))
-	require.False(t, IsAuthorizedUnicastSender(flow.RoleVerification, flow.RoleVerification))
-	require.False(t, IsAuthorizedUnicastSender(flow.RoleVerification, flow.RoleAccess))
+	require.True(t, IsAuthorizedUnicastSenderRole(flow.RoleVerification, flow.RoleConsensus))
+	require.False(t, IsAuthorizedUnicastSenderRole(flow.RoleVerification, flow.RoleCollection))
+	require.False(t, IsAuthorizedUnicastSenderRole(flow.RoleVerification, flow.RoleExecution))
+	require.False(t, IsAuthorizedUnicastSenderRole(flow.RoleVerification, flow.RoleVerification))
+	require.False(t, IsAuthorizedUnicastSenderRole(flow.RoleVerification, flow.RoleAccess))
 
 	// Access nodes can unicast to: Collection only
-	require.True(t, IsAuthorizedUnicastSender(flow.RoleAccess, flow.RoleCollection))
-	require.False(t, IsAuthorizedUnicastSender(flow.RoleAccess, flow.RoleConsensus))
-	require.False(t, IsAuthorizedUnicastSender(flow.RoleAccess, flow.RoleExecution))
-	require.False(t, IsAuthorizedUnicastSender(flow.RoleAccess, flow.RoleVerification))
-	require.False(t, IsAuthorizedUnicastSender(flow.RoleAccess, flow.RoleAccess))
+	require.True(t, IsAuthorizedUnicastSenderRole(flow.RoleAccess, flow.RoleCollection))
+	require.False(t, IsAuthorizedUnicastSenderRole(flow.RoleAccess, flow.RoleConsensus))
+	require.False(t, IsAuthorizedUnicastSenderRole(flow.RoleAccess, flow.RoleExecution))
+	require.False(t, IsAuthorizedUnicastSenderRole(flow.RoleAccess, flow.RoleVerification))
+	require.False(t, IsAuthorizedUnicastSenderRole(flow.RoleAccess, flow.RoleAccess))
+}
+
+// TestAlwaysAuthorizedUnicastSenderRole verifies that the public-network authorizer permits all role pairs.
+func TestAlwaysAuthorizedUnicastSenderRole(t *testing.T) {
+	for _, sender := range flow.Roles() {
+		for _, receiver := range flow.Roles() {
+			require.True(t, AlwaysAuthorizedUnicastSenderRole(sender, receiver),
+				"AlwaysAuthorizedUnicastSenderRole should permit %s -> %s", sender, receiver)
+		}
+	}
 }
 
 // TestIsAuthorizedUnicastSender_CrossValidation ensures that the explicit unicast role authorization
@@ -79,10 +89,10 @@ func TestIsAuthorizedUnicastSender_CrossValidation(t *testing.T) {
 	for _, sender := range flow.Roles() {
 		derivedReceivers, ok := derived[sender]
 		for _, receiver := range flow.Roles() {
-			if IsAuthorizedUnicastSender(sender, receiver) {
+			if IsAuthorizedUnicastSenderRole(sender, receiver) {
 				require.True(t, ok, "sender role %s is authorized but has no unicast message configs", sender)
 				require.True(t, derivedReceivers.Contains(receiver),
-					"IsAuthorizedUnicastSender allows %s -> %s but no unicast message config supports this", sender, receiver)
+					"IsAuthorizedUnicastSenderRole allows %s -> %s but no unicast message config supports this", sender, receiver)
 			}
 		}
 	}
@@ -108,8 +118,8 @@ func TestIsAuthorizedUnicastSender_CrossValidation(t *testing.T) {
 			if intentionalRestrictions[senderRole].Contains(receiver) {
 				continue // intentionally restricted
 			}
-			require.True(t, IsAuthorizedUnicastSender(senderRole, receiver),
-				"message configs allow %s -> %s via unicast but IsAuthorizedUnicastSender rejects it — update the authorization map or add to intentionalRestrictions", senderRole, receiver)
+			require.True(t, IsAuthorizedUnicastSenderRole(senderRole, receiver),
+				"message configs allow %s -> %s via unicast but IsAuthorizedUnicastSenderRole rejects it — update the authorization map or add to intentionalRestrictions", senderRole, receiver)
 		}
 	}
 }
