@@ -16,7 +16,9 @@ type ChannelAuthConfig struct {
 	AllowedProtocols Protocols
 }
 
-var authorizationConfigs map[string]MsgAuthConfig
+var (
+	authorizationConfigs map[string]MsgAuthConfig
+)
 
 // MsgAuthConfig contains authorization information for a specific flow message. The authorization
 // is represented as a map from network channel -> list of all roles allowed to send the message on
@@ -396,6 +398,7 @@ func initializeMessageAuthConfigsMap() {
 			},
 		},
 	}
+
 }
 
 // unicastRoleAuthorization defines which sender roles are authorized to open

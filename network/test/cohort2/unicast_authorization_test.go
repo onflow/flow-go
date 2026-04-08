@@ -24,6 +24,7 @@ import (
 	mocknetwork "github.com/onflow/flow-go/network/mock"
 	"github.com/onflow/flow-go/network/p2p"
 	p2plogging "github.com/onflow/flow-go/network/p2p/logging"
+	p2ptest "github.com/onflow/flow-go/network/p2p/test"
 	"github.com/onflow/flow-go/network/underlay"
 	"github.com/onflow/flow-go/network/validator"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -128,16 +129,12 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_UnstakedPeer() 
 	expectedSenderPeerID, err := unittest.PeerIDFromFlowID(u.senderID)
 	require.NoError(u.T(), err)
 
-	var nilID *flow.Identity
 	expectedViolation := &network.Violation{
-		Identity: nilID, // because the peer will be unverified this identity will be nil
 		PeerID:   p2plogging.PeerId(expectedSenderPeerID),
-		MsgType:  "",                          // message will not be decoded before OnSenderEjectedError is logged, we won't log message type
-		Channel:  channels.TestNetworkChannel, // message will not be decoded before OnSenderEjectedError is logged, we won't log peer ID
 		Protocol: message.ProtocolTypeUnicast,
 		Err:      validator.ErrIdentityUnverified,
 	}
-	slashingViolationsConsumer.On("OnUnAuthorizedSenderError", expectedViolation).Return(nil).Once().Run(func(args mockery.Arguments) {
+	slashingViolationsConsumer.On("OnUnauthorizedSenderError", expectedViolation).Return(nil).Once().Run(func(args mockery.Arguments) {
 		close(u.waitCh)
 	})
 
@@ -229,7 +226,7 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_UnauthorizedPee
 		Err:      message.ErrUnauthorizedMessageOnChannel,
 	}
 
-	slashingViolationsConsumer.On("OnUnAuthorizedSenderError", expectedViolation).
+	slashingViolationsConsumer.On("OnUnauthorizedSenderError", expectedViolation).
 		Return(nil).Once().Run(func(args mockery.Arguments) {
 		close(u.waitCh)
 	})
@@ -332,7 +329,7 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_WrongMsgCode() 
 		Err:      message.ErrUnauthorizedMessageOnChannel,
 	}
 
-	slashingViolationsConsumer.On("OnUnAuthorizedSenderError", expectedViolation).
+	slashingViolationsConsumer.On("OnUnauthorizedSenderError", expectedViolation).
 		Return(nil).Once().Run(func(args mockery.Arguments) {
 		close(u.waitCh)
 	})
@@ -503,6 +500,89 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_ReceiverHasSubs
 	require.NoError(u.T(), err)
 
 	// wait for slashing violations consumer mock to invoke run func and close ch if expected method call happens
+	unittest.RequireCloseBefore(u.T(), u.waitCh, u.channelCloseDuration, "could close ch on time")
+}
+
+// setupNetworksWithRoles will setup the sender and receiver networks with the given roles and slashing violations consumer.
+func (u *UnicastAuthorizationTestSuite) setupNetworksWithRoles(
+	senderRole flow.Role,
+	receiverRole flow.Role,
+	slashingViolationsConsumer network.ViolationsConsumer,
+) {
+	u.sporkId = unittest.IdentifierFixture()
+	idProvider := unittest.NewUpdatableIDProvider(flow.IdentityList{})
+
+	senderNode, senderIdentity := p2ptest.NodeFixture(u.T(), u.sporkId, u.T().Name(), idProvider,
+		p2ptest.WithRole(senderRole),
+		p2ptest.WithUnicastHandlerFunc(nil))
+	receiverNode, receiverIdentity := p2ptest.NodeFixture(u.T(), u.sporkId, u.T().Name(), idProvider,
+		p2ptest.WithRole(receiverRole),
+		p2ptest.WithUnicastHandlerFunc(nil))
+
+	ids := flow.IdentityList{&senderIdentity, &receiverIdentity}
+	idProvider.SetIdentities(ids)
+
+	u.codec = newOverridableMessageEncoder(unittest.NetworkCodec())
+	nets, providers := testutils.NetworksFixture(
+		u.T(),
+		u.sporkId,
+		ids,
+		[]p2p.LibP2PNode{senderNode, receiverNode},
+		underlay.WithCodec(u.codec),
+		underlay.WithSlashingViolationConsumerFactory(func(_ network.ConduitAdapter) network.ViolationsConsumer {
+			return slashingViolationsConsumer
+		}),
+		underlay.WithUnicastStreamAuthorizer(message.IsAuthorizedUnicastSenderRole))
+	require.Len(u.T(), ids, 2)
+	require.Len(u.T(), providers, 2)
+	require.Len(u.T(), nets, 2)
+
+	u.senderNetwork = nets[0]
+	u.receiverNetwork = nets[1]
+	u.senderID = ids[0]
+	u.receiverID = ids[1]
+	u.providers = providers
+	u.libP2PNodes = []p2p.LibP2PNode{senderNode, receiverNode}
+}
+
+// TestUnicastAuthorization_UnauthorizedSenderRole tests that unicast streams from an unauthorized
+// sender role are rejected before reading any message data. An LN sender to an SN receiver is
+// not an authorized pair per the unicast role authorization matrix.
+func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_UnauthorizedSenderRole() {
+	slashingViolationsConsumer := mocknetwork.NewViolationsConsumer(u.T())
+	u.setupNetworksWithRoles(flow.RoleCollection, flow.RoleConsensus, slashingViolationsConsumer)
+
+	expectedSenderPeerID, err := unittest.PeerIDFromFlowID(u.senderID)
+	require.NoError(u.T(), err)
+
+	expectedViolation := &network.Violation{
+		Identity: u.senderID,
+		PeerID:   p2plogging.PeerId(expectedSenderPeerID),
+		Protocol: message.ProtocolTypeUnicast,
+		Err:      underlay.ErrUnauthorizedUnicastSender,
+	}
+
+	slashingViolationsConsumer.On("OnUnauthorizedUnicastOnChannel", expectedViolation).
+		Return(nil).Once().Run(func(args mockery.Arguments) {
+		close(u.waitCh)
+	})
+
+	u.startNetworksAndLibp2pNodes()
+
+	// both sides register on the test channel so the sender can create a conduit
+	_, err = u.receiverNetwork.Register(channels.TestNetworkChannel, &mocknetwork.MessageProcessor{})
+	require.NoError(u.T(), err)
+
+	senderCon, err := u.senderNetwork.Register(channels.TestNetworkChannel, &mocknetwork.MessageProcessor{})
+	require.NoError(u.T(), err)
+
+	// send message via unicast from LN to SN — should be rejected at stream pre-authorization
+	err = senderCon.Unicast(&libp2pmessage.TestMessage{
+		Text: "hello",
+	}, u.receiverID.NodeID)
+	require.NoError(u.T(), err)
+
+	// wait for slashing violations consumer to be invoked
 	unittest.RequireCloseBefore(u.T(), u.waitCh, u.channelCloseDuration, "could close ch on time")
 }
 

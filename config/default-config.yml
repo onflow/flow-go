@@ -19,11 +19,11 @@ network-config:
   unicast:
     rate-limiter:
       # Setting this to true will disable connection disconnects and gating when unicast rate limiters are configured
-      dry-run: true
+      dry-run: false
       # The number of seconds a peer will be forced to wait before being allowed to successfully reconnect to the node after being rate limited
       lockout-duration: 10s
       # Amount of unicast messages that can be sent by a peer per second
-      message-rate-limit: 0
+      message-rate-limit: 500
       # Bandwidth size in bytes a peer is allowed to send via unicast streams per second
       bandwidth-rate-limit: 0
       # Bandwidth size in bytes a peer is allowed to send via unicast streams at once

@@ -6,8 +6,10 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/network/channels"
 )
 
+// TestIsAuthorizedUnicastSender verifies the expected authorization matrix for all role pairs.
 func TestIsAuthorizedUnicastSender(t *testing.T) {
 	// Consensus nodes can send unicast to all roles (sync protocol)
 	for _, receiver := range flow.Roles() {
@@ -54,66 +56,70 @@ func TestAlwaysAuthorizedUnicastSenderRole(t *testing.T) {
 }
 
 // TestIsAuthorizedUnicastSender_CrossValidation ensures that the explicit unicast role authorization
-// is consistent with the message-level authorization configs. Specifically:
-//   - Any sender->receiver pair permitted by IsAuthorizedUnicastSenderRole should have at least one
-//     unicast message config that permits that pair.
-//   - Any sender->receiver pair permitted by a unicast message config should be permitted by
-//     IsAuthorizedUnicastSenderRole, unless explicitly intentionally restricted.
+// stays consistent with the message authorization configs. It derives the maximum possible
+// authorization from the configs and channel subscriptions, and verifies:
+//  1. Every authorized pair in the explicit map is justified by at least one unicast message config.
+//  2. Every pair derivable from the configs is authorized (with documented exceptions).
+//
+// This test will fail if a new unicast message type is added but the authorization map is not updated.
 func TestIsAuthorizedUnicastSender_CrossValidation(t *testing.T) {
-	// Build a map of sender -> set of receivers based on unicast message configs
+	// Derive the maximum authorization from message auth configs.
+	// Skip test message types since they allow all roles on test channels and would
+	// make the derived map trivially allow everything.
 	derived := make(map[flow.Role]flow.RoleList)
-	for _, cfg := range GetAllMessageAuthConfigs() {
-		for _, channelCfg := range cfg.Config {
-			if !channelCfg.AllowedProtocols.Contains(ProtocolTypeUnicast) {
+	for _, msgAuthConfig := range GetAllMessageAuthConfigs() {
+		if msgAuthConfig.Name == TestMessage {
+			continue
+		}
+		for channel, channelAuthConfig := range msgAuthConfig.Config {
+			if !channelAuthConfig.AllowedProtocols.Contains(ProtocolTypeUnicast) {
 				continue
 			}
-			for _, sender := range channelCfg.AuthorizedRoles {
-				for _, receiver := range flow.Roles() {
-					// If sender is authorized to send this unicast message type,
-					// they could potentially target any receiver who subscribes
-					// For now, assume all roles could be receivers
-					if !derived[sender].Contains(receiver) {
-						derived[sender] = append(derived[sender], receiver)
-					}
-				}
+			receiverRoles, ok := channels.RolesByChannel(channel)
+			if !ok {
+				continue
+			}
+			for _, senderRole := range channelAuthConfig.AuthorizedRoles {
+				derived[senderRole] = derived[senderRole].Union(receiverRoles)
 			}
 		}
 	}
 
-	// Check that IsAuthorizedUnicastSenderRole is at least as restrictive as message configs
+	// Check 1: every authorized pair must be justified by at least one unicast message config
 	for _, sender := range flow.Roles() {
 		derivedReceivers, ok := derived[sender]
 		for _, receiver := range flow.Roles() {
 			if IsAuthorizedUnicastSenderRole(sender, receiver) {
 				require.True(t, ok, "sender role %s is authorized but has no unicast message configs", sender)
 				require.True(t, derivedReceivers.Contains(receiver),
-					"IsAuthorizedUnicastSender allows %s -> %s but no unicast message config supports this", sender, receiver)
+					"IsAuthorizedUnicastSenderRole allows %s -> %s but no unicast message config supports this", sender, receiver)
 			}
 		}
 	}
 
-	// Check that message configs don't permit more than IsAuthorizedUnicastSenderRole
-	// (with documented exceptions)
+	// Intentional restrictions: these (sender, receiver) pairs are derivable from the configs
+	// but intentionally excluded from the authorization map.
+	//  - Access->Access, Access->Execution: The RequestCollections channel includes AN and EN
+	//    as subscribers, but ANs should only send collection requests to LNs.
+	//  - Execution->Execution, Execution->Access: The RequestCollections and ProvideReceiptsByBlockID
+	//    channels include ENs/ANs as subscribers, but ENs do not need to unicast to themselves or ANs.
+	//  - Verification->Verification: The ProvideApprovalsByChunk channel includes VNs as subscribers,
+	//    but VNs only send approval responses to consensus nodes.
 	intentionalRestrictions := map[flow.Role]flow.RoleList{
-		// Execution nodes can send ChunkDataResponse to Verification, but we intentionally
-		// don't allow Execution -> Execution unicast streams
-		flow.RoleExecution: {flow.RoleExecution, flow.RoleAccess},
-		// Collection nodes can send ClusterBlockResponse to other Collection nodes,
-		// but we intentionally restrict some paths
-		flow.RoleCollection: {flow.RoleConsensus, flow.RoleVerification},
-		// Verification can send ApprovalResponse to Consensus, which is allowed
-		flow.RoleVerification: {flow.RoleCollection, flow.RoleExecution, flow.RoleVerification, flow.RoleAccess},
-		// Access nodes only need to request collections from Collection nodes
-		flow.RoleAccess: {flow.RoleConsensus, flow.RoleExecution, flow.RoleVerification, flow.RoleAccess},
+		flow.RoleAccess:       {flow.RoleAccess, flow.RoleExecution},
+		flow.RoleExecution:    {flow.RoleExecution, flow.RoleAccess},
+		flow.RoleVerification: {flow.RoleVerification},
 	}
 
+	// Check 2: every derived pair must be authorized, except for intentional restrictions.
+	// This catches new unicast message types that require updating the authorization map.
 	for senderRole, derivedReceivers := range derived {
 		for _, receiver := range derivedReceivers {
 			if intentionalRestrictions[senderRole].Contains(receiver) {
 				continue // intentionally restricted
 			}
 			require.True(t, IsAuthorizedUnicastSenderRole(senderRole, receiver),
-				"message configs allow %s -> %s via unicast but IsAuthorizedUnicastSender rejects it — update the authorization map or add to intentionalRestrictions", senderRole, receiver)
+				"message configs allow %s -> %s via unicast but IsAuthorizedUnicastSenderRole rejects it — update the authorization map or add to intentionalRestrictions", senderRole, receiver)
 		}
 	}
 }
