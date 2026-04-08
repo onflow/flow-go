@@ -116,46 +116,6 @@ func (_c *ViolationsConsumer_OnSenderEjectedError_Call) RunAndReturn(run func(vi
 	return _c
 }
 
-// OnUnauthorizedSenderError provides a mock function for the type ViolationsConsumer
-func (_mock *ViolationsConsumer) OnUnauthorizedSenderError(violation *network.Violation) {
-	_mock.Called(violation)
-	return
-}
-
-// ViolationsConsumer_OnUnauthorizedSenderError_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'OnUnauthorizedSenderError'
-type ViolationsConsumer_OnUnauthorizedSenderError_Call struct {
-	*mock.Call
-}
-
-// OnUnauthorizedSenderError is a helper method to define mock.On call
-//   - violation *network.Violation
-func (_e *ViolationsConsumer_Expecter) OnUnauthorizedSenderError(violation interface{}) *ViolationsConsumer_OnUnauthorizedSenderError_Call {
-	return &ViolationsConsumer_OnUnauthorizedSenderError_Call{Call: _e.mock.On("OnUnauthorizedSenderError", violation)}
-}
-
-func (_c *ViolationsConsumer_OnUnauthorizedSenderError_Call) Run(run func(violation *network.Violation)) *ViolationsConsumer_OnUnauthorizedSenderError_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 *network.Violation
-		if args[0] != nil {
-			arg0 = args[0].(*network.Violation)
-		}
-		run(
-			arg0,
-		)
-	})
-	return _c
-}
-
-func (_c *ViolationsConsumer_OnUnauthorizedSenderError_Call) Return() *ViolationsConsumer_OnUnauthorizedSenderError_Call {
-	_c.Call.Return()
-	return _c
-}
-
-func (_c *ViolationsConsumer_OnUnauthorizedSenderError_Call) RunAndReturn(run func(violation *network.Violation)) *ViolationsConsumer_OnUnauthorizedSenderError_Call {
-	_c.Run(run)
-	return _c
-}
-
 // OnUnauthorizedPublishOnChannel provides a mock function for the type ViolationsConsumer
 func (_mock *ViolationsConsumer) OnUnauthorizedPublishOnChannel(violation *network.Violation) {
 	_mock.Called(violation)
@@ -192,6 +152,46 @@ func (_c *ViolationsConsumer_OnUnauthorizedPublishOnChannel_Call) Return() *Viol
 }
 
 func (_c *ViolationsConsumer_OnUnauthorizedPublishOnChannel_Call) RunAndReturn(run func(violation *network.Violation)) *ViolationsConsumer_OnUnauthorizedPublishOnChannel_Call {
+	_c.Run(run)
+	return _c
+}
+
+// OnUnauthorizedSenderError provides a mock function for the type ViolationsConsumer
+func (_mock *ViolationsConsumer) OnUnauthorizedSenderError(violation *network.Violation) {
+	_mock.Called(violation)
+	return
+}
+
+// ViolationsConsumer_OnUnauthorizedSenderError_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'OnUnauthorizedSenderError'
+type ViolationsConsumer_OnUnauthorizedSenderError_Call struct {
+	*mock.Call
+}
+
+// OnUnauthorizedSenderError is a helper method to define mock.On call
+//   - violation *network.Violation
+func (_e *ViolationsConsumer_Expecter) OnUnauthorizedSenderError(violation interface{}) *ViolationsConsumer_OnUnauthorizedSenderError_Call {
+	return &ViolationsConsumer_OnUnauthorizedSenderError_Call{Call: _e.mock.On("OnUnauthorizedSenderError", violation)}
+}
+
+func (_c *ViolationsConsumer_OnUnauthorizedSenderError_Call) Run(run func(violation *network.Violation)) *ViolationsConsumer_OnUnauthorizedSenderError_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 *network.Violation
+		if args[0] != nil {
+			arg0 = args[0].(*network.Violation)
+		}
+		run(
+			arg0,
+		)
+	})
+	return _c
+}
+
+func (_c *ViolationsConsumer_OnUnauthorizedSenderError_Call) Return() *ViolationsConsumer_OnUnauthorizedSenderError_Call {
+	_c.Call.Return()
+	return _c
+}
+
+func (_c *ViolationsConsumer_OnUnauthorizedSenderError_Call) RunAndReturn(run func(violation *network.Violation)) *ViolationsConsumer_OnUnauthorizedSenderError_Call {
 	_c.Run(run)
 	return _c
 }
