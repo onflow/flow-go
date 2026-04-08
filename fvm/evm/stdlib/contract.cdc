@@ -1161,8 +1161,10 @@ access(all) contract EVM {
         /// Sets the BridgeAccessor Capability in the BridgeRouter
         access(Bridge) fun setBridgeAccessor(_ accessor: Capability<auth(Bridge) &{BridgeAccessor}>) {
             pre {
-                accessor.check(): 
+                accessor.check():
                     "EVM.setBridgeAccessor(): Invalid BridgeAccessor Capability provided"
+            }
+            post {
                 emit BridgeAccessorUpdated(
                     routerType: self.getType(),
                     routerUUID: self.uuid,
