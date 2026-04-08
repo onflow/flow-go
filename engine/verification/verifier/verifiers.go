@@ -98,7 +98,7 @@ func VerifyLastKHeight(
 		verifyHeight,
 	)
 	if err != nil {
-		return BlockVerificationStats{}, err
+		return totalStats, err
 	}
 
 	return totalStats, nil
@@ -155,7 +155,7 @@ func VerifyRange(
 		verifyHeight,
 	)
 	if err != nil {
-		return BlockVerificationStats{}, err
+		return totalStats, err
 	}
 
 	return totalStats, nil
@@ -281,7 +281,7 @@ func verifyConcurrently(
 	// Check if there was an error
 	if lowestErr != nil {
 		log.Error().Uint64("height", lowestErrHeight).Err(lowestErr).Msg("error encountered while verifying height")
-		return BlockVerificationStats{}, fmt.Errorf("could not verify height %d: %w", lowestErrHeight, lowestErr)
+		return totalStats, fmt.Errorf("could not verify height %d: %w", lowestErrHeight, lowestErr)
 	}
 
 	return totalStats, nil
@@ -399,7 +399,10 @@ func verifyHeight(
 			}
 
 			if stopOnMismatch {
-				return BlockVerificationStats{}, fmt.Errorf(
+				return BlockVerificationStats{
+					MismatchedChunkCount:       1,
+					MismatchedTransactionCount: chunkTransactionCount,
+				}, fmt.Errorf(
 					"could not verify chunk (index: %v, ID: %v) at block %v (%v): %w",
 					i,
 					collectionID,

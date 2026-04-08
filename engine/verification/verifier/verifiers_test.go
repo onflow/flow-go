@@ -251,7 +251,10 @@ func TestVerifyHeight_MismatchWithStop(t *testing.T) {
 	stats, err := verifyHeight(height, headers, chunkDataPacks, results, state, chunkVerifier, true)
 	require.Error(t, err)
 	assert.ErrorIs(t, err, verifyErr)
-	assert.Equal(t, BlockVerificationStats{}, stats)
+	assert.Equal(t, uint64(0), stats.MatchedChunkCount)
+	assert.Equal(t, uint64(1), stats.MismatchedChunkCount)
+	assert.Equal(t, uint64(0), stats.MatchedTransactionCount)
+	assert.Equal(t, txPerChunk, stats.MismatchedTransactionCount)
 }
 
 func TestVerifyHeight_BlockNotExecuted(t *testing.T) {
