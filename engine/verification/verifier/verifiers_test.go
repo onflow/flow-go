@@ -2,7 +2,6 @@ package verifier
 
 import (
 	"errors"
-	"fmt"
 	"testing"
 
 	"github.com/onflow/flow-go/module"
@@ -14,6 +13,10 @@ import (
 )
 
 func TestVerifyConcurrently(t *testing.T) {
+
+	errMock := errors.New("mock error")
+	errTwo := errors.New("error 2")
+	errFour := errors.New("error 4")
 
 	tests := []struct {
 		name        string
@@ -32,20 +35,25 @@ func TestVerifyConcurrently(t *testing.T) {
 			expectedErr: nil,
 		},
 		{
-			name:        "Single error at a height",
-			from:        1,
-			to:          5,
-			nWorker:     3,
-			errors:      map[uint64]error{3: errors.New("mock error")},
-			expectedErr: fmt.Errorf("mock error"),
+			name:    "Single error at a height",
+			from:    1,
+			to:      5,
+			nWorker: 3,
+			errors: map[uint64]error{
+				3: errMock,
+			},
+			expectedErr: errMock,
 		},
 		{
-			name:        "Multiple errors, lowest height returned",
-			from:        1,
-			to:          5,
-			nWorker:     3,
-			errors:      map[uint64]error{2: errors.New("error 2"), 4: errors.New("error 4")},
-			expectedErr: fmt.Errorf("error 2"),
+			name:    "Multiple errors, lowest height returned",
+			from:    1,
+			to:      5,
+			nWorker: 3,
+			errors: map[uint64]error{
+				2: errTwo,
+				4: errFour,
+			},
+			expectedErr: errTwo,
 		},
 	}
 
@@ -86,7 +94,7 @@ func TestVerifyConcurrently(t *testing.T) {
 				mockVerifyHeight,
 			)
 			if tt.expectedErr != nil {
-				if err == nil || errors.Is(err, tt.expectedErr) {
+				if err == nil || !errors.Is(err, tt.expectedErr) {
 					t.Fatalf("expected error: %v, got: %v", tt.expectedErr, err)
 				}
 			} else if err != nil {
