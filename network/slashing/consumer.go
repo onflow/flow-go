@@ -92,8 +92,8 @@ func (c *Consumer) reportMisbehavior(misbehavior network.Misbehavior, violation 
 	c.misbehaviorReportConsumer.ReportMisbehaviorOnChannel(violation.Channel, report)
 }
 
-// OnUnAuthorizedSenderError logs an error for unauthorized sender error and reports a misbehavior to alsp misbehavior report manager.
-func (c *Consumer) OnUnAuthorizedSenderError(violation *network.Violation) {
+// OnUnauthorizedSenderError logs an error for unauthorized sender error and reports a misbehavior to alsp misbehavior report manager.
+func (c *Consumer) OnUnauthorizedSenderError(violation *network.Violation) {
 	c.logOffense(alsp.UnAuthorizedSender, violation)
 	c.reportMisbehavior(alsp.UnAuthorizedSender, violation)
 }

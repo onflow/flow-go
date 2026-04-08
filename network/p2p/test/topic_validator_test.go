@@ -351,7 +351,7 @@ func TestAuthorizedSenderValidator_Unauthorized(t *testing.T) {
 		Err:      message.ErrUnauthorizedRole,
 	}
 	violationsConsumer := mocknetwork.NewViolationsConsumer(t)
-	violationsConsumer.On("OnUnAuthorizedSenderError", violation).Once().Return(nil)
+	violationsConsumer.On("OnUnauthorizedSenderError", violation).Once().Return(nil)
 	getIdentity := func(pid peer.ID) (*flow.Identity, bool) {
 		fid, err := translatorFixture.GetFlowID(pid)
 		if err != nil {
