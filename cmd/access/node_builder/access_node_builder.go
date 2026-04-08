@@ -103,6 +103,7 @@ import (
 	netcache "github.com/onflow/flow-go/network/cache"
 	"github.com/onflow/flow-go/network/channels"
 	cborcodec "github.com/onflow/flow-go/network/codec/cbor"
+	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/blob"
 	p2pbuilder "github.com/onflow/flow-go/network/p2p/builder"
@@ -2657,6 +2658,7 @@ func (builder *FlowAccessNodeBuilder) enqueuePublicNetworkInit() {
 				SlashingViolationConsumerFactory: func(adapter network.ConduitAdapter) network.ViolationsConsumer {
 					return slashing.NewSlashingViolationsConsumer(builder.Logger, builder.Metrics.Network, adapter)
 				},
+				UnicastStreamAuthorizer: message.AlwaysAuthorizedUnicastSenderRole,
 			}, underlay.WithMessageValidators(msgValidators...))
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize network: %w", err)

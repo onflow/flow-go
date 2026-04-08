@@ -72,6 +72,10 @@ var (
 	// the network receives a message via unicast but does not have a corresponding subscription for
 	// the channel in that message.
 	ErrUnicastMsgWithoutSub = errors.New("networking layer does not have subscription for the channel ID indicated in the unicast message received")
+
+	// ErrUnauthorizedUnicastSender is reported via the slashing violations consumer when a peer
+	// opens a unicast stream but its role is not authorized to send unicast messages to this node's role.
+	ErrUnauthorizedUnicastSender = errors.New("sender role not authorized to send unicast messages to receiver role")
 )
 
 // Network serves as the comprehensive networking layer that integrates three interfaces within Flow; Underlay, EngineRegistry, and ConduitAdapter.
@@ -113,6 +117,7 @@ type Network struct {
 	validators                  []network.MessageValidator
 	authorizedSenderValidator   *validator.AuthorizedSenderValidator
 	preferredUnicasts           []protocols.ProtocolName
+	unicastStreamAuthorizer     func(sender, receiver flow.Role) bool
 }
 
 var _ network.EngineRegistry = &Network{}
@@ -162,12 +167,19 @@ type NetworkConfig struct {
 	Libp2pNode                       p2p.LibP2PNode
 	BitSwapMetrics                   module.BitswapMetrics
 	SlashingViolationConsumerFactory func(network.ConduitAdapter) network.ViolationsConsumer
+	// UnicastStreamAuthorizer determines whether a sender role is permitted to open a unicast
+	// stream to a receiver role, before any message data is read from the stream. If nil,
+	// defaults to message.IsAuthorizedUnicastSenderRole.
+	UnicastStreamAuthorizer func(sender, receiver flow.Role) bool
 }
 
 // Validate validates the configuration, and sets default values for any missing fields.
 func (cfg *NetworkConfig) Validate() {
 	if cfg.UnicastMessageTimeout <= 0 {
 		cfg.UnicastMessageTimeout = DefaultUnicastTimeout
+	}
+	if cfg.UnicastStreamAuthorizer == nil {
+		cfg.UnicastStreamAuthorizer = message.IsAuthorizedUnicastSenderRole
 	}
 }
 
@@ -197,6 +209,16 @@ func WithCodec(codec network.Codec) NetworkConfigOption {
 func WithSlashingViolationConsumerFactory(factory func(adapter network.ConduitAdapter) network.ViolationsConsumer) NetworkConfigOption {
 	return func(params *NetworkConfig) {
 		params.SlashingViolationConsumerFactory = factory
+	}
+}
+
+// WithUnicastStreamAuthorizer overrides the default unicast stream authorizer function.
+// The authorizer determines whether a sender role is permitted to open a unicast stream
+// to a receiver role, before any message data is read from the stream.
+// Defaults to [message.IsAuthorizedUnicastSenderRole] when nil.
+func WithUnicastStreamAuthorizer(authorizer func(sender, receiver flow.Role) bool) NetworkConfigOption {
+	return func(params *NetworkConfig) {
+		params.UnicastStreamAuthorizer = authorizer
 	}
 }
 
@@ -282,6 +304,7 @@ func NewNetwork(param *NetworkConfig, opts ...NetworkOption) (*Network, error) {
 		libP2PNode:                  param.Libp2pNode,
 		unicastRateLimiters:         ratelimit.NoopRateLimiters(),
 		validators:                  DefaultValidators(param.Logger.With().Str("component", "network-validators").Logger(), param.Me.NodeID()),
+		unicastStreamAuthorizer:     param.UnicastStreamAuthorizer,
 	}
 
 	n.subscriptionManager = subscription.NewChannelSubscriptionManager(n)
@@ -806,11 +829,15 @@ func DefaultValidators(log zerolog.Logger, flowID flow.Identifier) []network.Mes
 	}
 }
 
-// isProtocolParticipant returns a PeerFilter that returns true if a peer is a staked (i.e., authorized) node.
+// isProtocolParticipant returns a PeerFilter that allows if a peer is a staked (i.e., authorized) node.
 func (n *Network) isProtocolParticipant() p2p.PeerFilter {
 	return func(p peer.ID) error {
-		if _, ok := n.Identity(p); !ok {
+		id, ok := n.Identity(p)
+		if !ok {
 			return fmt.Errorf("failed to get identity of unknown peer with peer id %s", p2plogging.PeerId(p))
+		}
+		if id.IsEjected() {
+			return fmt.Errorf("peer with peer id %s is ejected", p2plogging.PeerId(p))
 		}
 		return nil
 	}
@@ -949,12 +976,47 @@ func (n *Network) handleIncomingStream(s libp2pnet.Stream) {
 		return
 	}
 
-	// TODO: We need to allow per-topic timeouts and message size limits.
-	// This allows us to configure higher limits for topics on which we expect
-	// to receive large messages (e.g. Chunk Data Packs), and use the normal
-	// limits for other topics. In order to enable this, we will need to register
-	// a separate stream handler for each topic.
-	ctx, cancel := context.WithTimeout(n.ctx, LargeMsgUnicastTimeout)
+	// Resolve remote peer identity to determine the max message size and timeout for this stream.
+	//
+	// Only chunk data packs require the larger message size limit. Currently, the message
+	// type cannot be determined until the message is fully received and parsed from the
+	// payload, so we use the sender and receiver roles as a proxy. Since chunk data packs
+	// are only sent by execution nodes to verification nodes, and since execution nodes
+	// are permissioned and will be for the foreseeable future, we allow the higher limit
+	// for all unicast streams from execution nodes to verification nodes. All other node
+	// combinations use the default (lower) limit.
+	remoteIdentity, ok := n.getAuthorizedIdentity(log, remotePeer)
+	if !ok {
+		return
+	}
+
+	// Before reading anything from the stream, check if the sender's role is allowed to send unicast
+	// messages to the receiver's role. This avoids spending resources processing messages that will
+	// fail validation later.
+	if !n.unicastStreamAuthorizer(remoteIdentity.Role, n.me.Role()) {
+		log.Warn().
+			Str("remote_peer", remotePeer.String()).
+			Str("remote_role", remoteIdentity.Role.String()).
+			Str("local_role", n.me.Role().String()).
+			Bool(logging.KeySuspicious, true).
+			Msg("rejecting unicast stream from unauthorized sender role")
+		n.slashingViolationsConsumer.OnUnauthorizedUnicastOnChannel(&network.Violation{
+			Identity: remoteIdentity,
+			PeerID:   p2plogging.PeerId(remotePeer),
+			Protocol: message.ProtocolTypeUnicast,
+			Err:      ErrUnauthorizedUnicastSender,
+		})
+		return
+	}
+
+	maxMsgSize := DefaultMaxUnicastMsgSize
+	unicastTimeout := DefaultUnicastTimeout
+	if n.me.Role() == flow.RoleVerification && remoteIdentity.Role == flow.RoleExecution {
+		maxMsgSize = LargeMsgMaxUnicastMsgSize
+		unicastTimeout = LargeMsgUnicastTimeout
+	}
+
+	ctx, cancel := context.WithTimeout(n.ctx, unicastTimeout)
 	defer cancel()
 
 	deadline, _ := ctx.Deadline()
@@ -966,7 +1028,7 @@ func (n *Network) handleIncomingStream(s libp2pnet.Stream) {
 	}
 
 	// create the reader
-	r := ggio.NewDelimitedReader(s, LargeMsgMaxUnicastMsgSize)
+	r := ggio.NewDelimitedReader(s, maxMsgSize)
 	for {
 		if ctx.Err() != nil {
 			return
@@ -1044,6 +1106,39 @@ func (n *Network) handleIncomingStream(s libp2pnet.Stream) {
 	}
 
 	success = true
+}
+
+// getAuthorizedIdentity resolves the identity of a remote peer and returns it if it is authorized.
+// If the peer is not authorized (unknown or ejected), it returns false and logs a violation.
+func (n *Network) getAuthorizedIdentity(log zerolog.Logger, remotePeer peer.ID) (*flow.Identity, bool) {
+	remoteIdentity, ok := n.Identity(remotePeer)
+	if !ok {
+		log.Error().
+			Str("remote_peer", remotePeer.String()).
+			Bool(logging.KeySuspicious, true).
+			Msg("failed to resolve identity of remote peer")
+		n.slashingViolationsConsumer.OnUnauthorizedSenderError(&network.Violation{
+			PeerID:   p2plogging.PeerId(remotePeer),
+			Protocol: message.ProtocolTypeUnicast,
+			Err:      validator.ErrIdentityUnverified,
+		})
+		return nil, false
+	}
+	if remoteIdentity.IsEjected() {
+		log.Error().
+			Str("remote_peer", remotePeer.String()).
+			Bool(logging.KeySuspicious, true).
+			Msg("remote peer is ejected")
+		n.slashingViolationsConsumer.OnSenderEjectedError(&network.Violation{
+			OriginID: remoteIdentity.NodeID,
+			Identity: remoteIdentity,
+			PeerID:   p2plogging.PeerId(remotePeer),
+			Protocol: message.ProtocolTypeUnicast,
+			Err:      validator.ErrSenderEjected,
+		})
+		return nil, false
+	}
+	return remoteIdentity, true
 }
 
 // Subscribe subscribes the network to a channel.
