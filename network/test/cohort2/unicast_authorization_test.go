@@ -183,8 +183,8 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_EjectedPeer() {
 		Identity: u.senderID, // we expect this method to be called with the ejected identity
 		OriginID: u.senderID.NodeID,
 		PeerID:   p2plogging.PeerId(expectedSenderPeerID),
-		MsgType:  "",                          // message will not be decoded before OnSenderEjectedError is logged, we won't log message type
-		Channel:  channels.TestNetworkChannel, // message will not be decoded before OnSenderEjectedError is logged, we won't log peer ID
+		MsgType:  "", // message will not be decoded before OnSenderEjectedError is logged, we won't log message type
+		Channel:  "", // ejection is checked before the channel is known
 		Protocol: message.ProtocolTypeUnicast,
 		Err:      validator.ErrSenderEjected,
 	}
