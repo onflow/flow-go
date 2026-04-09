@@ -77,6 +77,20 @@ func (g *nftTxEventGroup) addWithdrawal(event flow.Event, decoded *events.NFTWit
 
 // addDeposit adds a deposit event to the event group.
 //
+// NFT transfers emit two separate Cadence events: a Withdrawn event when the NFT leaves the
+// sender's collection, and a Deposited event when it enters the receiver's collection. To
+// reconstruct a complete transfer record (sender → receiver), we must pair these events by
+// matching the NFT's UUID and ID. A deposit without a matching withdrawal indicates a mint;
+// a withdrawal without a matching deposit (resolved later in ResolvePairs) indicates a burn.
+//
+// UUID Reuse Problem:
+// The `pendingWithdrawals` map is keyed by UUID. However, some NFT collections (e.g., TopShot)
+// reuse Cadence resource UUIDs across distinct NFTs, meaning multiple NFTs with different IDs
+// can share the same UUID within a transaction. Therefore, we filter pending withdrawals by
+// both UUID and NFT ID — only withdrawals with a matching ID belong to this deposit; the rest
+// remain pending for future deposits.
+
+//
 // No error returns are expected during normal operation.
 func (g *nftTxEventGroup) addDeposit(event flow.Event, decoded *events.NFTDepositedEvent) error {
 	d := &nftDecodedDeposit{source: event, decoded: *decoded}
