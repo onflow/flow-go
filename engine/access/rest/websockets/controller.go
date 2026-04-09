@@ -148,7 +148,11 @@ func NewWebSocketController(
 	conn WebsocketConnection,
 	dataProviderFactory dp.DataProviderFactory,
 	streamLimiter *limiters.ConcurrencyLimiter,
-) *Controller {
+) (*Controller, error) {
+	if streamLimiter == nil {
+		return nil, errors.New("stream limiter is required")
+	}
+
 	var rateLimiter *rate.Limiter
 	if config.MaxResponsesPerSecond > 0 {
 		rateLimiter = rate.NewLimiter(rate.Limit(config.MaxResponsesPerSecond), 1)
@@ -165,7 +169,7 @@ func NewWebSocketController(
 		rateLimiter:         rateLimiter,
 		streamLimiter:       streamLimiter,
 		keepaliveConfig:     DefaultKeepaliveConfig(),
-	}
+	}, nil
 }
 
 // HandleConnection manages the lifecycle of a WebSocket connection,

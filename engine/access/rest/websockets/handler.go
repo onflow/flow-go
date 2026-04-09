@@ -73,6 +73,10 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	controller := NewWebSocketController(logger, h.websocketConfig, NewWebsocketConnection(conn), h.dataProviderFactory, h.streamLimiter)
+	controller, err := NewWebSocketController(logger, h.websocketConfig, NewWebsocketConnection(conn), h.dataProviderFactory, h.streamLimiter)
+	if err != nil {
+		h.HttpHandler.ErrorHandler(w, common.NewRestError(http.StatusInternalServerError, "could not create websocket controller: ", err), logger)
+		return
+	}
 	controller.HandleConnection(h.ctx)
 }
