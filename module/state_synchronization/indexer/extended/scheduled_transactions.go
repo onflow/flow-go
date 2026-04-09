@@ -16,6 +16,7 @@ import (
 
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/access"
+	"github.com/onflow/flow-go/model/access/systemcollection"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/state_synchronization/indexer/extended/events"
@@ -53,7 +54,9 @@ type ScheduledTransactions struct {
 	store   storage.ScheduledTransactionsIndexBootstrapper
 	metrics module.ExtendedIndexingMetrics
 
-	scheduledExecutorAddr flow.Address
+	// executorAddr resolves the executor authorizer address for a given block height.
+	// v0 system collections use FlowServiceAccount; v1 uses ScheduledTransactionExecutor.
+	executorAddr *access.Versioned[flow.Address]
 
 	scheduledEventType   flow.EventType
 	pendingExecutionType flow.EventType
@@ -113,12 +116,24 @@ func NewScheduledTransactions(
 	scheduler := sc.FlowTransactionScheduler
 	prefix := fmt.Sprintf("A.%s.%s.", scheduler.Address.Hex(), scheduler.Name)
 
+	// Build a height-versioned executor address that matches the system collection builder versions.
+	// v0 uses FlowServiceAccount as the executor authorizer; v1 uses ScheduledTransactionExecutor.
+	versionMapper, ok := systemcollection.ChainHeightVersions[chainID]
+	if !ok {
+		versionMapper = access.NewStaticHeightVersionMapper(access.LatestBoundary)
+	}
+	executorAddr := access.NewVersioned(map[access.Version]flow.Address{
+		systemcollection.Version0:  sc.FlowServiceAccount.Address,
+		systemcollection.Version1:  sc.ScheduledTransactionExecutor.Address,
+		access.VersionLatest:       sc.ScheduledTransactionExecutor.Address,
+	}, versionMapper)
+
 	return &ScheduledTransactions{
-		log:                   log.With().Str("component", "scheduled_tx_indexer").Logger(),
-		store:                 store,
-		metrics:               metrics,
-		requester:             NewScheduledTransactionRequester(scriptExecutor, chainID),
-		scheduledExecutorAddr: sc.ScheduledTransactionExecutor.Address,
+		log:          log.With().Str("component", "scheduled_tx_indexer").Logger(),
+		store:        store,
+		metrics:      metrics,
+		requester:    NewScheduledTransactionRequester(scriptExecutor, chainID),
+		executorAddr: executorAddr,
 		scheduledEventType:    flow.EventType(prefix + "Scheduled"),
 		pendingExecutionType:  flow.EventType(prefix + "PendingExecution"),
 		executedEventType:     flow.EventType(prefix + "Executed"),
@@ -384,12 +399,8 @@ func (s *ScheduledTransactions) collectScheduledTransactionData(data BlockData) 
 		// start searching from the system transaction that adds the scheduled transactions into the
 		// system collection to reduce overhead.
 		for _, tx := range data.Transactions[*pendingEventTxIndex:] {
-			if !s.isExecutorTransaction(tx) {
+			if !s.isExecutorTransaction(tx, data.Header.Height) {
 				continue
-			}
-			// the executor transaction must have a scheduled tx ID argument.
-			if len(tx.Arguments) < 1 {
-				return nil, fmt.Errorf("executor transaction %s has no scheduled tx ID argument", tx.ID())
 			}
 
 			id, err := decodeScheduledTxIDArg(tx.Arguments[0])
@@ -424,11 +435,14 @@ func (s *ScheduledTransactions) collectScheduledTransactionData(data BlockData) 
 }
 
 // isExecutorTransaction returns true if the transaction was submitted by the scheduled executor
-// account: sole authorizer is the scheduled executor address and payer is the empty address.
-func (s *ScheduledTransactions) isExecutorTransaction(tx *flow.TransactionBody) bool {
+// account for the given block height: sole authorizer matches the height-appropriate executor
+// address, payer is the empty address, and the transaction has at least one argument (the
+// scheduled tx ID).
+func (s *ScheduledTransactions) isExecutorTransaction(tx *flow.TransactionBody, height uint64) bool {
 	return tx.Payer == flow.EmptyAddress &&
 		len(tx.Authorizers) == 1 &&
-		tx.Authorizers[0] == s.scheduledExecutorAddr
+		len(tx.Arguments) >= 1 &&
+		tx.Authorizers[0] == s.executorAddr.ByHeight(height)
 }
 
 // decodeScheduledTxIDArg decodes a JSON-CDC encoded UInt64 argument as a scheduled tx ID.
