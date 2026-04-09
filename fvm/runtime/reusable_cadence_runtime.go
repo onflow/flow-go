@@ -43,6 +43,15 @@ type reusableCadenceRuntime struct {
 // It is designed to allow dynamic replacement of the underlying environment implementation.
 type SwappableEnvironment struct {
 	environment.Environment
+	onSwap []func() // Callbacks triggered on every SetFvmEnvironment call.
+}
+
+// RegisterOnSwapCallback registers a callback that is invoked whenever
+// the underlying Environment is swapped (during pool Borrow and Return).
+// This enables long-lived, reusable objects to clear per-transaction
+// caches at transaction boundaries.
+func (se *SwappableEnvironment) RegisterOnSwapCallback(cb func()) {
+	se.onSwap = append(se.onSwap, cb)
 }
 
 func newReusableCadenceRuntime(
@@ -90,6 +99,9 @@ func (reusable *reusableCadenceRuntime) declareStandardLibraryFunctions() {
 }
 
 func (reusable *reusableCadenceRuntime) SetFvmEnvironment(fvmEnv environment.Environment) {
+	for _, fn := range reusable.fvmEnv.onSwap {
+		fn()
+	}
 	reusable.fvmEnv.Environment = fvmEnv
 }
 

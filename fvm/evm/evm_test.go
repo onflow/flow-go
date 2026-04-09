@@ -4015,7 +4015,7 @@ func TestDryRun(t *testing.T) {
 
 				require.NoError(t, err)
 				require.NoError(t, output.Err)
-				assert.Equal(t, uint64(82), output.ComputationUsed)
+				assert.Equal(t, uint64(81), output.ComputationUsed)
 			},
 		)
 	})
@@ -4564,6 +4564,138 @@ func TestDryCall(t *testing.T) {
 			},
 		)
 	})
+}
+
+func TestDryCallCacheInvalidationAfterDeposit(t *testing.T) {
+	t.Parallel()
+
+	chain := flow.Emulator.Chain()
+	sc := systemcontracts.SystemContractsForChain(chain.ChainID())
+
+	RunWithNewEnvironment(t,
+		chain, func(
+			ctx fvm.Context,
+			vm fvm.VM,
+			snapshot snapshot.SnapshotTree,
+			testContract *TestContract,
+			testAccount *EOATestAccount,
+		) {
+			addr := RandomAddress(t)
+
+			checkBalanceZeroData := testContract.MakeCallData(t, "checkBalance", addr.ToCommon(), big.NewInt(0))
+			oneFlow := new(big.Int).SetUint64(1e18)
+			checkBalanceOneFlowData := testContract.MakeCallData(t, "checkBalance", addr.ToCommon(), oneFlow)
+
+			code := []byte(fmt.Sprintf(
+				`
+				import EVM from %s
+				import FlowToken from %s
+
+				transaction(
+					depositAddrBytes: [UInt8; 20],
+					contractAddrBytes: [UInt8; 20],
+					checkBalanceZeroData: [UInt8],
+					checkBalanceOneFlowData: [UInt8],
+				) {
+					prepare(account: auth(BorrowValue) &Account) {
+						let depositAddr = EVM.EVMAddress(bytes: depositAddrBytes)
+						let contractAddr = EVM.EVMAddress(bytes: contractAddrBytes)
+
+						// 1. checkBalance(addr, 0) — cache miss, executes on contract
+						var res = EVM.dryCall(
+							from: depositAddr,
+							to: contractAddr,
+							data: checkBalanceZeroData,
+							gasLimit: 100_000,
+							value: EVM.Balance(attoflow: 0)
+						)
+						assert(res.status == EVM.Status.successful, message: "step 1 failed")
+
+						// 2. checkBalance(addr, 0) — cache hit (same key)
+						res = EVM.dryCall(
+							from: depositAddr,
+							to: contractAddr,
+							data: checkBalanceZeroData,
+							gasLimit: 100_000,
+							value: EVM.Balance(attoflow: 0)
+						)
+						assert(res.status == EVM.Status.successful, message: "step 2 failed")
+
+						// Mint FLOW
+						let admin = account.storage
+							.borrow<&FlowToken.Administrator>(from: /storage/flowTokenAdmin)!
+						let minter <- admin.createNewMinter(allowedAmount: 1.0)
+						let vault <- minter.mintTokens(amount: 1.0)
+						destroy minter
+
+						// 3. Deposit FLOW to addr (invalidates cache)
+						depositAddr.deposit(from: <-vault)
+
+						// 4. checkBalance(addr, 0) — must be cache miss (not stale hit),
+						//    re-executes and reverts because balance is now 1 FLOW
+						res = EVM.dryCall(
+							from: depositAddr,
+							to: contractAddr,
+							data: checkBalanceZeroData,
+							gasLimit: 100_000,
+							value: EVM.Balance(attoflow: 0)
+						)
+						assert(res.status == EVM.Status.failed, message: "step 4: stale cache returned success for zero balance after deposit")
+
+						// 5. checkBalance(addr, 1 FLOW) — cache miss, succeeds with updated balance
+						res = EVM.dryCall(
+							from: depositAddr,
+							to: contractAddr,
+							data: checkBalanceOneFlowData,
+							gasLimit: 100_000,
+							value: EVM.Balance(attoflow: 0)
+						)
+						assert(res.status == EVM.Status.successful, message: "step 5 failed")
+
+						// 6. checkBalance(addr, 1 FLOW) — cache hit
+						res = EVM.dryCall(
+							from: depositAddr,
+							to: contractAddr,
+							data: checkBalanceOneFlowData,
+							gasLimit: 100_000,
+							value: EVM.Balance(attoflow: 0)
+						)
+						assert(res.status == EVM.Status.successful, message: "step 6 failed")
+					}
+				}
+				`,
+				sc.EVMContract.Address.HexWithPrefix(),
+				sc.FlowToken.Address.HexWithPrefix(),
+			))
+
+			txBody, err := flow.NewTransactionBodyBuilder().
+				SetScript(code).
+				SetPayer(sc.FlowServiceAccount.Address).
+				AddAuthorizer(sc.FlowServiceAccount.Address).
+				AddArgument(json.MustEncode(cadence.NewArray(
+					unittest.BytesToCdcUInt8(addr.Bytes()),
+				).WithType(stdlib.EVMAddressBytesCadenceType))).
+				AddArgument(json.MustEncode(cadence.NewArray(
+					unittest.BytesToCdcUInt8(testContract.DeployedAt.Bytes()),
+				).WithType(stdlib.EVMAddressBytesCadenceType))).
+				AddArgument(json.MustEncode(
+					cadence.NewArray(
+						unittest.BytesToCdcUInt8(checkBalanceZeroData),
+					).WithType(stdlib.EVMTransactionBytesCadenceType),
+				)).
+				AddArgument(json.MustEncode(
+					cadence.NewArray(
+						unittest.BytesToCdcUInt8(checkBalanceOneFlowData),
+					).WithType(stdlib.EVMTransactionBytesCadenceType),
+				)).
+				Build()
+			require.NoError(t, err)
+
+			tx := fvm.Transaction(txBody, 0)
+			_, output, err := vm.Run(ctx, tx, snapshot)
+			require.NoError(t, err)
+			require.NoError(t, output.Err)
+		})
 }
 
 func TestDryCallWithSigAndArgs(t *testing.T) {
