@@ -457,9 +457,8 @@ func (b *bootstrapExecutor) Execute() error {
 
 	// sets up the EVM environment
 	b.setupEVM(service, nonFungibleToken, fungibleToken, flowToken, &env)
-	b.setupVMBridge(service, &env)
-
 	b.deployCrossVMMetadataViews(nonFungibleToken, &env)
+	b.setupVMBridge(service, &env)
 
 	err = expectAccounts(systemcontracts.EVMStorageAccountIndex)
 	if err != nil {
@@ -797,7 +796,8 @@ func (b *bootstrapExecutor) deployServiceAccount(deployTo flow.Address, env *tem
 func (b *bootstrapExecutor) deployNFTStorefrontV2(deployTo flow.Address, env *templates.Environment) {
 	contract := storefront.NFTStorefrontV2(
 		env.FungibleTokenAddress,
-		env.NonFungibleTokenAddress)
+		env.NonFungibleTokenAddress,
+		env.BurnerAddress)
 	txBody, err := blueprints.DeployContractTransaction(deployTo, contract, "NFTStorefrontV2").Build()
 	if err != nil {
 		panic(fmt.Sprintf("failed to build deploy NFTStorefrontV2 transaction: %s", err))
@@ -1073,9 +1073,11 @@ func (b *bootstrapExecutor) setupVMBridge(serviceAddress flow.Address, env *temp
 		IEVMBridgeTokenMinterAddress:          env.ServiceAccountAddress,
 		IFlowEVMNFTBridgeAddress:              env.ServiceAccountAddress,
 		IFlowEVMTokenBridgeAddress:            env.ServiceAccountAddress,
-		FlowEVMBridgeAddress:                  env.ServiceAccountAddress,
-		FlowEVMBridgeAccessorAddress:          env.ServiceAccountAddress,
-		FlowEVMBridgeConfigAddress:            env.ServiceAccountAddress,
+		FlowEVMBridgeAddress:                          env.ServiceAccountAddress,
+		FlowEVMBridgeAccessorAddress:                  env.ServiceAccountAddress,
+		FlowEVMBridgeCustomAssociationTypesAddress:    env.ServiceAccountAddress,
+		FlowEVMBridgeCustomAssociationsAddress:        env.ServiceAccountAddress,
+		FlowEVMBridgeConfigAddress:                    env.ServiceAccountAddress,
 		FlowEVMBridgeHandlersAddress:          env.ServiceAccountAddress,
 		FlowEVMBridgeNFTEscrowAddress:         env.ServiceAccountAddress,
 		FlowEVMBridgeResolverAddress:          env.ServiceAccountAddress,
