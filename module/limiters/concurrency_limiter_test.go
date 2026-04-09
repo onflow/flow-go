@@ -162,6 +162,17 @@ func TestConcurrencyLimiter_Acquire_ConcurrentCalls(t *testing.T) {
 		"peak concurrent acquisitions must not exceed maxConcurrent")
 }
 
+// TestConcurrencyLimiter_Release_Underflow verifies that Release panics when called
+// without a matching Acquire (counter at zero).
+func TestConcurrencyLimiter_Release_Underflow(t *testing.T) {
+	limiter, err := NewConcurrencyLimiter(1)
+	require.NoError(t, err)
+
+	assert.PanicsWithValue(t, "concurrency limiter release without matching acquire", func() {
+		limiter.Release()
+	})
+}
+
 // TestConcurrencyLimiter_Allow_ConcurrentCalls verifies that at most maxConcurrent
 // goroutines execute fn simultaneously across a burst of concurrent callers.
 func TestConcurrencyLimiter_Allow_ConcurrentCalls(t *testing.T) {

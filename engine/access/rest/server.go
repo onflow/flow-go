@@ -1,6 +1,7 @@
 package rest
 
 import (
+	"errors"
 	"net/http"
 	"time"
 
@@ -55,6 +56,10 @@ func NewServer(
 	extendedBackend extended.API,
 	limiter *limiters.ConcurrencyLimiter,
 ) (*http.Server, error) {
+	if limiter == nil && (stateStreamApi != nil || enableNewWebsocketsStreamAPI) {
+		return nil, errors.New("stream limiter is required when websocket routes are enabled")
+	}
+
 	builder := router.NewRouterBuilder(logger, restCollector).AddRestRoutes(serverAPI, chain, config.MaxRequestSize, config.MaxResponseSize)
 	if stateStreamApi != nil {
 		builder.AddLegacyWebsocketsRoutes(stateStreamApi, chain, stateStreamConfig, config.MaxRequestSize, config.MaxResponseSize, limiter)

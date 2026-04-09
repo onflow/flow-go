@@ -43,8 +43,17 @@ func (h *ConcurrencyLimiter) Acquire() bool {
 
 // Release decrements the concurrency counter, freeing a slot previously obtained via [Acquire].
 // Must be called exactly once for every successful [Acquire] call.
+// Panics if called without a matching [Acquire] (counter underflow).
 func (h *ConcurrencyLimiter) Release() {
-	h.totalConcurrent.Sub(1)
+	for {
+		current := h.totalConcurrent.Load()
+		if current == 0 {
+			panic("concurrency limiter release without matching acquire")
+		}
+		if h.totalConcurrent.CompareAndSwap(current, current-1) {
+			return
+		}
+	}
 }
 
 // Allow executes fn if the number of concurrent operations is below the configured limit.
