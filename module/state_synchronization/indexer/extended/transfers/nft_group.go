@@ -89,7 +89,6 @@ func (g *nftTxEventGroup) addWithdrawal(event flow.Event, decoded *events.NFTWit
 // can share the same UUID within a transaction. Therefore, we filter pending withdrawals by
 // both UUID and NFT ID — only withdrawals with a matching ID belong to this deposit; the rest
 // remain pending for future deposits.
-
 //
 // No error returns are expected during normal operation.
 func (g *nftTxEventGroup) addDeposit(event flow.Event, decoded *events.NFTDepositedEvent) error {
@@ -106,6 +105,9 @@ func (g *nftTxEventGroup) addDeposit(event flow.Event, decoded *events.NFTDeposi
 	// Partition pending withdrawals by NFT ID. Some collections (e.g. TopShot) reuse Cadence
 	// resource UUIDs across distinct NFTs, so multiple NFTs with different IDs can share a UUID.
 	// Only withdrawals with a matching ID belong to this deposit; the rest stay pending.
+	//
+	// NFTs can be transferred multiple times within a transaction. capture all matching withdrawals
+	// to include in the transfer event indices.
 	var matching []*nftDecodedWithdrawal
 	var remaining []*nftDecodedWithdrawal
 	for _, w := range pending {
