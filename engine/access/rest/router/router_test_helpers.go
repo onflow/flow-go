@@ -22,6 +22,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/subscription"
 	commonrpc "github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/limiters"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -137,7 +138,7 @@ func ExecuteRequest(req *http.Request, backend access.API) *httptest.ResponseRec
 	return rr
 }
 
-func ExecuteLegacyWsRequest(req *http.Request, stateStreamApi state_stream.API, responseRecorder *TestHijackResponseRecorder, chain flow.Chain) {
+func ExecuteLegacyWsRequest(t *testing.T, req *http.Request, stateStreamApi state_stream.API, responseRecorder *TestHijackResponseRecorder, chain flow.Chain) {
 	restCollector := metrics.NewNoopCollector()
 
 	config := backend.Config{
@@ -146,12 +147,14 @@ func ExecuteLegacyWsRequest(req *http.Request, stateStreamApi state_stream.API, 
 		HeartbeatInterval: subscription.DefaultHeartbeatInterval,
 	}
 
+	limiter, err := limiters.NewConcurrencyLimiter(subscription.DefaultMaxGlobalStreams)
+	require.NoError(t, err)
 	router := NewRouterBuilder(
 		unittest.Logger(),
 		restCollector,
 	).AddLegacyWebsocketsRoutes(
 		stateStreamApi,
-		chain, config, commonrpc.DefaultAccessMaxRequestSize, commonrpc.DefaultAccessMaxResponseSize,
+		chain, config, commonrpc.DefaultAccessMaxRequestSize, commonrpc.DefaultAccessMaxResponseSize, limiter,
 	).Build()
 	router.ServeHTTP(responseRecorder, req)
 }

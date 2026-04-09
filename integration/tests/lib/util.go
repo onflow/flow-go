@@ -125,6 +125,7 @@ func CreateCounterTx(counterAddress sdk.Address) dsl.Transaction {
 	return dsl.Transaction{
 		Imports: dsl.Imports{
 			dsl.Import{
+				Names:   []string{"Testing"},
 				Address: counterAddress,
 			},
 		},
@@ -176,6 +177,7 @@ func CreateCounterPanicTx(chain flow.Chain) dsl.Transaction {
 	return dsl.Transaction{
 		Imports: dsl.Imports{
 			dsl.Import{
+				Names:   []string{"Testing"},
 				Address: sdk.Address(chain.ServiceAddress()),
 			},
 		},

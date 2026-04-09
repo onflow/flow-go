@@ -3995,7 +3995,7 @@ func TestDryRun(t *testing.T) {
 
 				require.NoError(t, err)
 				require.NoError(t, output.Err)
-				assert.Equal(t, uint64(30), output.ComputationUsed)
+				assert.Equal(t, uint64(28), output.ComputationUsed)
 
 				// Increase call count of EVM.dryRun to 15
 				iterations = cadence.NewUInt(15)
@@ -4015,7 +4015,7 @@ func TestDryRun(t *testing.T) {
 
 				require.NoError(t, err)
 				require.NoError(t, output.Err)
-				assert.Equal(t, uint64(85), output.ComputationUsed)
+				assert.Equal(t, uint64(81), output.ComputationUsed)
 			},
 		)
 	})
@@ -4538,7 +4538,7 @@ func TestDryCall(t *testing.T) {
 
 				require.NoError(t, err)
 				require.NoError(t, output.Err)
-				assert.Equal(t, uint64(39), output.ComputationUsed)
+				assert.Equal(t, uint64(36), output.ComputationUsed)
 
 				// Increase call count of EVM.dryCall to 15
 				iterations = cadence.NewUInt(15)
@@ -4560,7 +4560,7 @@ func TestDryCall(t *testing.T) {
 
 				require.NoError(t, err)
 				require.NoError(t, output.Err)
-				assert.Equal(t, uint64(115), output.ComputationUsed)
+				assert.Equal(t, uint64(105), output.ComputationUsed)
 			},
 		)
 	})
