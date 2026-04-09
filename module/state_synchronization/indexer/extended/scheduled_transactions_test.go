@@ -30,7 +30,10 @@ import (
 	. "github.com/onflow/flow-go/module/state_synchronization/indexer/extended"
 )
 
-const scheduledTestHeight = uint64(100)
+const (
+	scheduledTestHeight   = uint64(100)       // v0 range on testnet (boundary at 290050888)
+	scheduledTestHeightV1 = uint64(290050900) // v1 range on testnet
+)
 
 // TestScheduledTransactionsIndexer_NoEvents verifies that indexing a block with no scheduler
 // events stores an empty slice and advances the height.
@@ -242,16 +245,13 @@ func TestScheduledTransactionsIndexer_FailedTransaction(t *testing.T) {
 func TestScheduledTransactionsIndexer_FailedTransactionV1(t *testing.T) {
 	t.Parallel()
 
-	// Use a height in the v1 range on testnet (boundary at 290050888).
-	v1Height := uint64(290050900)
-
 	sc := systemcontracts.SystemContractsForChain(flow.Testnet)
-	indexer, store, lm, db := newScheduledTxIndexerForTest(t, flow.Testnet, v1Height)
+	indexer, store, lm, db := newScheduledTxIndexerForTest(t, flow.Testnet, scheduledTestHeightV1)
 
 	owner := unittest.RandomAddressFixture()
 
 	// Height 1: schedule tx with id=99
-	header1 := unittest.BlockHeaderFixtureOnChain(flow.Testnet, unittest.WithHeaderHeight(v1Height))
+	header1 := unittest.BlockHeaderFixtureOnChain(flow.Testnet, unittest.WithHeaderHeight(scheduledTestHeightV1))
 	scheduledEvt := createScheduledEvent(t, sc, 99, 1, 3000, 200, 80, owner, "A.xyz.Contract.Handler", 15, "")
 	indexScheduledBlock(t, indexer, lm, db, BlockData{
 		Header: header1,
@@ -260,7 +260,7 @@ func TestScheduledTransactionsIndexer_FailedTransactionV1(t *testing.T) {
 
 	// Height 2: PendingExecution for tx 99, no Executed event.
 	// v1 uses ScheduledTransactionExecutor.Address as the authorizer.
-	header2 := unittest.BlockHeaderFixtureOnChain(flow.Testnet, unittest.WithHeaderHeight(v1Height+1))
+	header2 := unittest.BlockHeaderFixtureOnChain(flow.Testnet, unittest.WithHeaderHeight(scheduledTestHeightV1+1))
 	pendingEvt := createPendingExecutionEvent(t, sc, 99, 1, 200, 80, owner, "A.xyz.Contract.Handler")
 	executorTx := makeExecutorTransactionBody(t, sc.ScheduledTransactionExecutor.Address, 99)
 	indexScheduledBlock(t, indexer, lm, db, BlockData{
@@ -686,6 +686,88 @@ func TestScheduledTransactionsIndexer_NonExecutorTxSkipped(t *testing.T) {
 		Authorizers: []flow.Address{sc.FlowServiceAccount.Address},
 	}
 	executorTx := makeExecutorTransactionBody(t, sc.FlowServiceAccount.Address, 30)
+	indexScheduledBlock(t, indexer, lm, db, BlockData{
+		Header:       header2,
+		Events:       []flow.Event{pendingEvt},
+		Transactions: []*flow.TransactionBody{nonExecutorTx, executorTx},
+	})
+
+	tx, err := store.ByID(30)
+	require.NoError(t, err)
+	assert.Equal(t, access.ScheduledTxStatusFailed, tx.Status)
+	assert.Equal(t, executorTx.ID(), tx.ExecutedTransactionID)
+}
+
+// TestScheduledTransactionsIndexer_MixedFailedAndExecutedV1 is the v1 counterpart of
+// TestScheduledTransactionsIndexer_MixedFailedAndExecuted, using ScheduledTransactionExecutor
+// as the executor authorizer.
+func TestScheduledTransactionsIndexer_MixedFailedAndExecutedV1(t *testing.T) {
+	t.Parallel()
+
+	sc := systemcontracts.SystemContractsForChain(flow.Testnet)
+	indexer, store, lm, db := newScheduledTxIndexerForTest(t, flow.Testnet, scheduledTestHeightV1)
+
+	owner := unittest.RandomAddressFixture()
+
+	// Height 1: schedule txs 20 and 21
+	header1 := unittest.BlockHeaderFixtureOnChain(flow.Testnet, unittest.WithHeaderHeight(scheduledTestHeightV1))
+	evt20 := createScheduledEvent(t, sc, 20, 1, 1000, 100, 10, owner, "A.abc.Contract.Handler", 20, "")
+	evt21 := createScheduledEvent(t, sc, 21, 1, 1000, 150, 10, owner, "A.abc.Contract.Handler", 21, "")
+	indexScheduledBlock(t, indexer, lm, db, BlockData{
+		Header: header1,
+		Events: []flow.Event{evt20, evt21},
+	})
+
+	// Height 2: tx 20 succeeds, tx 21 fails (executor tx present, no Executed event)
+	header2 := unittest.BlockHeaderFixtureOnChain(flow.Testnet, unittest.WithHeaderHeight(scheduledTestHeightV1+1))
+	pending20 := createPendingExecutionEvent(t, sc, 20, 1, 100, 10, owner, "A.abc.Contract.Handler")
+	pending21 := createPendingExecutionEvent(t, sc, 21, 1, 150, 10, owner, "A.abc.Contract.Handler")
+	executed20 := createExecutedEvent(t, sc, 20, 1, 100, owner, "A.abc.Contract.Handler", 20, "")
+	executorTx21 := makeExecutorTransactionBody(t, sc.ScheduledTransactionExecutor.Address, 21)
+	indexScheduledBlock(t, indexer, lm, db, BlockData{
+		Header:       header2,
+		Events:       []flow.Event{pending20, pending21, executed20},
+		Transactions: []*flow.TransactionBody{executorTx21},
+	})
+
+	tx20, err := store.ByID(20)
+	require.NoError(t, err)
+	assert.Equal(t, access.ScheduledTxStatusExecuted, tx20.Status)
+
+	tx21, err := store.ByID(21)
+	require.NoError(t, err)
+	assert.Equal(t, access.ScheduledTxStatusFailed, tx21.Status)
+	assert.Equal(t, executorTx21.ID(), tx21.ExecutedTransactionID)
+}
+
+// TestScheduledTransactionsIndexer_NonExecutorTxSkippedV1 is the v1 counterpart of
+// TestScheduledTransactionsIndexer_NonExecutorTxSkipped, using ScheduledTransactionExecutor
+// as the executor authorizer.
+func TestScheduledTransactionsIndexer_NonExecutorTxSkippedV1(t *testing.T) {
+	t.Parallel()
+
+	sc := systemcontracts.SystemContractsForChain(flow.Testnet)
+	indexer, store, lm, db := newScheduledTxIndexerForTest(t, flow.Testnet, scheduledTestHeightV1)
+
+	owner := unittest.RandomAddressFixture()
+
+	// Height 1: schedule tx with id=30
+	header1 := unittest.BlockHeaderFixtureOnChain(flow.Testnet, unittest.WithHeaderHeight(scheduledTestHeightV1))
+	scheduledEvt := createScheduledEvent(t, sc, 30, 1, 1000, 100, 10, owner, "A.abc.Contract.Handler", 30, "")
+	indexScheduledBlock(t, indexer, lm, db, BlockData{
+		Header: header1,
+		Events: []flow.Event{scheduledEvt},
+	})
+
+	// Height 2: PendingExecution for tx 30, a non-executor tx, then the real executor tx.
+	// The non-executor tx has the wrong payer and should be skipped.
+	header2 := unittest.BlockHeaderFixtureOnChain(flow.Testnet, unittest.WithHeaderHeight(scheduledTestHeightV1+1))
+	pendingEvt := createPendingExecutionEvent(t, sc, 30, 1, 100, 10, owner, "A.abc.Contract.Handler")
+	nonExecutorTx := &flow.TransactionBody{
+		Payer:       unittest.RandomAddressFixture(), // wrong payer
+		Authorizers: []flow.Address{sc.ScheduledTransactionExecutor.Address},
+	}
+	executorTx := makeExecutorTransactionBody(t, sc.ScheduledTransactionExecutor.Address, 30)
 	indexScheduledBlock(t, indexer, lm, db, BlockData{
 		Header:       header2,
 		Events:       []flow.Event{pendingEvt},
