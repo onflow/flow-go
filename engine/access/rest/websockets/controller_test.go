@@ -23,6 +23,7 @@ import (
 	connmock "github.com/onflow/flow-go/engine/access/rest/websockets/mock"
 	"github.com/onflow/flow-go/engine/access/rest/websockets/models"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/limiters"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -30,8 +31,9 @@ import (
 type WsControllerSuite struct {
 	suite.Suite
 
-	logger   zerolog.Logger
-	wsConfig Config
+	logger        zerolog.Logger
+	wsConfig      Config
+	streamLimiter *limiters.ConcurrencyLimiter
 }
 
 func TestControllerSuite(t *testing.T) {
@@ -42,6 +44,10 @@ func TestControllerSuite(t *testing.T) {
 func (s *WsControllerSuite) SetupTest() {
 	s.logger = unittest.Logger()
 	s.wsConfig = NewDefaultWebsocketConfig()
+
+	var err error
+	s.streamLimiter, err = limiters.NewConcurrencyLimiter(1000)
+	s.Require().NoError(err)
 }
 
 // TestSubscribeRequest tests the subscribe to topic flow.
@@ -51,7 +57,7 @@ func (s *WsControllerSuite) TestSubscribeRequest() {
 		t.Parallel()
 
 		conn, dataProviderFactory, dataProvider := newControllerMocks(t)
-		controller := NewWebSocketController(s.logger, s.wsConfig, conn, dataProviderFactory)
+		controller := NewWebSocketController(s.logger, s.wsConfig, conn, dataProviderFactory, s.streamLimiter)
 
 		dataProviderFactory.
 			On("NewDataProvider", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
@@ -115,7 +121,7 @@ func (s *WsControllerSuite) TestSubscribeRequest() {
 		t.Parallel()
 
 		conn, dataProviderFactory, _ := newControllerMocks(t)
-		controller := NewWebSocketController(s.logger, s.wsConfig, conn, dataProviderFactory)
+		controller := NewWebSocketController(s.logger, s.wsConfig, conn, dataProviderFactory, s.streamLimiter)
 
 		type Request struct {
 			Action string `json:"action"`
@@ -164,7 +170,7 @@ func (s *WsControllerSuite) TestSubscribeRequest() {
 		t.Parallel()
 
 		conn, dataProviderFactory, _ := newControllerMocks(t)
-		controller := NewWebSocketController(s.logger, s.wsConfig, conn, dataProviderFactory)
+		controller := NewWebSocketController(s.logger, s.wsConfig, conn, dataProviderFactory, s.streamLimiter)
 
 		dataProviderFactory.
 			On("NewDataProvider", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
@@ -201,7 +207,7 @@ func (s *WsControllerSuite) TestSubscribeRequest() {
 		t.Parallel()
 
 		conn, dataProviderFactory, dataProvider := newControllerMocks(t)
-		controller := NewWebSocketController(s.logger, s.wsConfig, conn, dataProviderFactory)
+		controller := NewWebSocketController(s.logger, s.wsConfig, conn, dataProviderFactory, s.streamLimiter)
 
 		// data provider might finish on its own or controller will close it via Close()
 		dataProvider.On("Close").Return(nil).Maybe()
@@ -245,12 +251,152 @@ func (s *WsControllerSuite) TestSubscribeRequest() {
 	})
 }
 
+// TestGlobalStreamLimiter verifies that the global stream limiter correctly
+// controls subscription creation and releases slots on completion or error.
+func (s *WsControllerSuite) TestGlobalStreamLimiter() {
+	s.T().Run("Rejects subscription when global limit reached", func(t *testing.T) {
+		t.Parallel()
+
+		// Create a limiter with capacity 1 and exhaust it.
+		streamLimiter, err := limiters.NewConcurrencyLimiter(1)
+		require.NoError(t, err)
+		require.True(t, streamLimiter.Acquire()) // exhaust the single slot
+
+		conn, dataProviderFactory, _ := newControllerMocks(t)
+		controller := NewWebSocketController(s.logger, s.wsConfig, conn, dataProviderFactory, streamLimiter)
+
+		done := make(chan struct{})
+		subscriptionID := "dummy-id"
+		s.expectSubscribeRequest(t, conn, subscriptionID)
+
+		conn.
+			On("WriteJSON", mock.Anything).
+			Return(func(msg interface{}) error {
+				defer close(done)
+
+				response, ok := msg.(models.BaseMessageResponse)
+				require.True(t, ok)
+				require.NotEmpty(t, response.Error)
+				require.Equal(t, http.StatusTooManyRequests, response.Error.Code)
+				require.Contains(t, response.Error.Message, "maximum number of streams reached")
+
+				return &websocket.CloseError{Code: websocket.CloseNormalClosure}
+			})
+
+		s.expectCloseConnection(conn, done)
+
+		controller.HandleConnection(context.Background())
+
+		conn.AssertExpectations(t)
+		// Factory should never be called — rejected before provider creation.
+		dataProviderFactory.AssertExpectations(t)
+
+		// The externally acquired slot must still be held.
+		require.False(t, streamLimiter.Acquire(), "externally acquired slot should still be held")
+		streamLimiter.Release()
+	})
+
+	s.T().Run("Releases slot when provider creation fails", func(t *testing.T) {
+		t.Parallel()
+
+		streamLimiter, err := limiters.NewConcurrencyLimiter(1)
+		require.NoError(t, err)
+
+		conn, dataProviderFactory, _ := newControllerMocks(t)
+		controller := NewWebSocketController(s.logger, s.wsConfig, conn, dataProviderFactory, streamLimiter)
+
+		dataProviderFactory.
+			On("NewDataProvider", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+			Return(nil, fmt.Errorf("invalid topic")).
+			Once()
+
+		done := make(chan struct{})
+		subscriptionID := "dummy-id"
+		s.expectSubscribeRequest(t, conn, subscriptionID)
+
+		conn.
+			On("WriteJSON", mock.Anything).
+			Return(func(msg interface{}) error {
+				defer close(done)
+
+				response, ok := msg.(models.BaseMessageResponse)
+				require.True(t, ok)
+				require.NotEmpty(t, response.Error)
+				require.Equal(t, http.StatusBadRequest, response.Error.Code)
+
+				return &websocket.CloseError{Code: websocket.CloseNormalClosure}
+			})
+
+		s.expectCloseConnection(conn, done)
+
+		controller.HandleConnection(context.Background())
+
+		// Slot must have been released despite the error.
+		require.True(t, streamLimiter.Acquire(), "slot should be released after provider creation failure")
+		streamLimiter.Release()
+
+		conn.AssertExpectations(t)
+		dataProviderFactory.AssertExpectations(t)
+	})
+
+	s.T().Run("Releases slot when provider completes", func(t *testing.T) {
+		t.Parallel()
+
+		streamLimiter, err := limiters.NewConcurrencyLimiter(1)
+		require.NoError(t, err)
+
+		conn, dataProviderFactory, dataProvider := newControllerMocks(t)
+		controller := NewWebSocketController(s.logger, s.wsConfig, conn, dataProviderFactory, streamLimiter)
+
+		dataProvider.On("Close").Return(nil).Maybe()
+		dataProvider.
+			On("Run", mock.Anything).
+			Return(nil).
+			Once()
+
+		dataProviderFactory.
+			On("NewDataProvider", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+			Return(dataProvider, nil).
+			Once()
+
+		done := make(chan struct{})
+		subscriptionID := "dummy-id"
+		s.expectSubscribeRequest(t, conn, subscriptionID)
+
+		// When the subscribe OK response is written, close done to trigger
+		// connection shutdown. The provider runs and completes immediately
+		// (Run returns nil), so no further writes are expected.
+		conn.
+			On("WriteJSON", mock.Anything).
+			Run(func(args mock.Arguments) {
+				response, ok := args.Get(0).(models.SubscribeMessageResponse)
+				require.True(t, ok)
+				require.Equal(t, subscriptionID, response.SubscriptionID)
+				close(done)
+			}).
+			Return(nil).
+			Once()
+
+		s.expectCloseConnection(conn, done)
+
+		controller.HandleConnection(context.Background())
+
+		// Slot must have been released after provider completed.
+		require.True(t, streamLimiter.Acquire(), "slot should be released after provider completes")
+		streamLimiter.Release()
+
+		conn.AssertExpectations(t)
+		dataProviderFactory.AssertExpectations(t)
+		dataProvider.AssertExpectations(t)
+	})
+}
+
 func (s *WsControllerSuite) TestUnsubscribeRequest() {
 	s.T().Run("Happy path", func(t *testing.T) {
 		t.Parallel()
 
 		conn, dataProviderFactory, dataProvider := newControllerMocks(t)
-		controller := NewWebSocketController(s.logger, s.wsConfig, conn, dataProviderFactory)
+		controller := NewWebSocketController(s.logger, s.wsConfig, conn, dataProviderFactory, s.streamLimiter)
 
 		dataProviderFactory.
 			On("NewDataProvider", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
@@ -318,7 +464,7 @@ func (s *WsControllerSuite) TestUnsubscribeRequest() {
 		t.Parallel()
 
 		conn, dataProviderFactory, dataProvider := newControllerMocks(t)
-		controller := NewWebSocketController(s.logger, s.wsConfig, conn, dataProviderFactory)
+		controller := NewWebSocketController(s.logger, s.wsConfig, conn, dataProviderFactory, s.streamLimiter)
 
 		dataProviderFactory.
 			On("NewDataProvider", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
@@ -388,7 +534,7 @@ func (s *WsControllerSuite) TestUnsubscribeRequest() {
 		t.Parallel()
 
 		conn, dataProviderFactory, dataProvider := newControllerMocks(t)
-		controller := NewWebSocketController(s.logger, s.wsConfig, conn, dataProviderFactory)
+		controller := NewWebSocketController(s.logger, s.wsConfig, conn, dataProviderFactory, s.streamLimiter)
 
 		dataProviderFactory.
 			On("NewDataProvider", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
@@ -461,7 +607,7 @@ func (s *WsControllerSuite) TestListSubscriptions() {
 	s.T().Run("Happy path", func(t *testing.T) {
 
 		conn, dataProviderFactory, dataProvider := newControllerMocks(t)
-		controller := NewWebSocketController(s.logger, s.wsConfig, conn, dataProviderFactory)
+		controller := NewWebSocketController(s.logger, s.wsConfig, conn, dataProviderFactory, s.streamLimiter)
 
 		dataProviderFactory.
 			On("NewDataProvider", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
@@ -543,7 +689,7 @@ func (s *WsControllerSuite) TestSubscribeBlocks() {
 		t.Parallel()
 
 		conn, dataProviderFactory, dataProvider := newControllerMocks(t)
-		controller := NewWebSocketController(s.logger, s.wsConfig, conn, dataProviderFactory)
+		controller := NewWebSocketController(s.logger, s.wsConfig, conn, dataProviderFactory, s.streamLimiter)
 
 		dataProviderFactory.
 			On("NewDataProvider", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
@@ -597,7 +743,7 @@ func (s *WsControllerSuite) TestSubscribeBlocks() {
 		t.Parallel()
 
 		conn, dataProviderFactory, dataProvider := newControllerMocks(t)
-		controller := NewWebSocketController(s.logger, s.wsConfig, conn, dataProviderFactory)
+		controller := NewWebSocketController(s.logger, s.wsConfig, conn, dataProviderFactory, s.streamLimiter)
 
 		dataProviderFactory.
 			On("NewDataProvider", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
@@ -682,7 +828,7 @@ func (s *WsControllerSuite) TestRateLimiter() {
 	config := NewDefaultWebsocketConfig()
 	config.MaxResponsesPerSecond = 2
 
-	controller := NewWebSocketController(s.logger, config, conn, nil)
+	controller := NewWebSocketController(s.logger, config, conn, nil, s.streamLimiter)
 
 	// Step 3: Simulate sending messages to the controller's `multiplexedStream`.
 	go func() {
@@ -733,7 +879,7 @@ func (s *WsControllerSuite) TestConfigureKeepaliveConnection() {
 		conn.On("SetReadDeadline", mock.Anything).Return(nil)
 
 		factory := dpmock.NewDataProviderFactory(t)
-		controller := NewWebSocketController(s.logger, s.wsConfig, conn, factory)
+		controller := NewWebSocketController(s.logger, s.wsConfig, conn, factory, s.streamLimiter)
 
 		err := controller.configureKeepalive()
 		s.Require().NoError(err, "configureKeepalive should not return an error")
@@ -752,7 +898,7 @@ func (s *WsControllerSuite) TestControllerShutdown() {
 		conn.On("SetPongHandler", mock.AnythingOfType("func(string) error")).Return(nil).Once()
 
 		factory := dpmock.NewDataProviderFactory(t)
-		controller := NewWebSocketController(s.logger, s.wsConfig, conn, factory)
+		controller := NewWebSocketController(s.logger, s.wsConfig, conn, factory, s.streamLimiter)
 
 		// Mock keepalive to return an error
 		done := make(chan struct{}, 1)
@@ -786,7 +932,7 @@ func (s *WsControllerSuite) TestControllerShutdown() {
 		conn.On("SetPongHandler", mock.AnythingOfType("func(string) error")).Return(nil).Once()
 
 		factory := dpmock.NewDataProviderFactory(t)
-		controller := NewWebSocketController(s.logger, s.wsConfig, conn, factory)
+		controller := NewWebSocketController(s.logger, s.wsConfig, conn, factory, s.streamLimiter)
 
 		conn.
 			On("ReadJSON", mock.Anything).
@@ -803,7 +949,7 @@ func (s *WsControllerSuite) TestControllerShutdown() {
 		t.Parallel()
 
 		conn, dataProviderFactory, dataProvider := newControllerMocks(t)
-		controller := NewWebSocketController(s.logger, s.wsConfig, conn, dataProviderFactory)
+		controller := NewWebSocketController(s.logger, s.wsConfig, conn, dataProviderFactory, s.streamLimiter)
 
 		dataProviderFactory.
 			On("NewDataProvider", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
@@ -852,7 +998,7 @@ func (s *WsControllerSuite) TestControllerShutdown() {
 		conn.On("SetPongHandler", mock.AnythingOfType("func(string) error")).Return(nil).Once()
 
 		factory := dpmock.NewDataProviderFactory(t)
-		controller := NewWebSocketController(s.logger, s.wsConfig, conn, factory)
+		controller := NewWebSocketController(s.logger, s.wsConfig, conn, factory, s.streamLimiter)
 
 		ctx, cancel := context.WithCancel(context.Background())
 
@@ -875,7 +1021,7 @@ func (s *WsControllerSuite) TestControllerShutdown() {
 		wsConfig := s.wsConfig
 
 		wsConfig.InactivityTimeout = 50 * time.Millisecond
-		controller := NewWebSocketController(s.logger, wsConfig, conn, factory)
+		controller := NewWebSocketController(s.logger, wsConfig, conn, factory, s.streamLimiter)
 
 		conn.
 			On("ReadJSON", mock.Anything).
@@ -927,7 +1073,7 @@ func (s *WsControllerSuite) TestKeepaliveRoutine() {
 		})
 
 		factory := dpmock.NewDataProviderFactory(t)
-		controller := NewWebSocketController(s.logger, s.wsConfig, conn, factory)
+		controller := NewWebSocketController(s.logger, s.wsConfig, conn, factory, s.streamLimiter)
 		controller.keepaliveConfig = keepaliveConfig
 
 		controller.HandleConnection(context.Background())
@@ -942,7 +1088,7 @@ func (s *WsControllerSuite) TestKeepaliveRoutine() {
 			Once()
 
 		factory := dpmock.NewDataProviderFactory(t)
-		controller := NewWebSocketController(s.logger, s.wsConfig, conn, factory)
+		controller := NewWebSocketController(s.logger, s.wsConfig, conn, factory, s.streamLimiter)
 		controller.keepaliveConfig = keepaliveConfig
 
 		ctx, cancel := context.WithCancel(context.Background())
@@ -961,7 +1107,7 @@ func (s *WsControllerSuite) TestKeepaliveRoutine() {
 			Once()
 
 		factory := dpmock.NewDataProviderFactory(t)
-		controller := NewWebSocketController(s.logger, s.wsConfig, conn, factory)
+		controller := NewWebSocketController(s.logger, s.wsConfig, conn, factory, s.streamLimiter)
 		controller.keepaliveConfig = keepaliveConfig
 
 		ctx, cancel := context.WithCancel(context.Background())
@@ -975,7 +1121,7 @@ func (s *WsControllerSuite) TestKeepaliveRoutine() {
 	s.T().Run("Context cancelled", func(t *testing.T) {
 		conn := connmock.NewWebsocketConnection(t)
 		factory := dpmock.NewDataProviderFactory(t)
-		controller := NewWebSocketController(s.logger, s.wsConfig, conn, factory)
+		controller := NewWebSocketController(s.logger, s.wsConfig, conn, factory, s.streamLimiter)
 		controller.keepaliveConfig = keepaliveConfig
 
 		ctx, cancel := context.WithCancel(context.Background())
