@@ -134,7 +134,7 @@ func run(*cobra.Command, []string) {
 		registersByAccount.AccountCount(),
 	)
 
-	options := computation.DefaultFVMOptions(chainID, false, false)
+	options := computation.DefaultFVMOptions(chainID, false, false, false)
 	options = append(
 		options,
 		fvm.WithContractDeploymentRestricted(false),
@@ -183,6 +183,7 @@ func run(*cobra.Command, []string) {
 			backend.Config{},
 			false,
 			websockets.NewDefaultWebsocketConfig(),
+			nil,
 			nil,
 		)
 		if err != nil {

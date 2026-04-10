@@ -11,6 +11,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/rest/common/middleware"
 	"github.com/onflow/flow-go/engine/access/rest/common/models"
 	"github.com/onflow/flow-go/engine/access/rest/experimental"
+	experimentalmodels "github.com/onflow/flow-go/engine/access/rest/experimental/models"
 	flowhttp "github.com/onflow/flow-go/engine/access/rest/http"
 	"github.com/onflow/flow-go/engine/access/rest/websockets"
 	dp "github.com/onflow/flow-go/engine/access/rest/websockets/data_providers"
@@ -20,6 +21,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/module/limiters"
 )
 
 // RouterBuilder is a utility for building HTTP routers with common middleware and routes.
@@ -35,7 +37,8 @@ type RouterBuilder struct {
 // NewRouterBuilder creates a new RouterBuilder instance with common middleware and a v1 sub-router.
 func NewRouterBuilder(
 	logger zerolog.Logger,
-	restCollector module.RestMetrics) *RouterBuilder {
+	restCollector module.RestMetrics,
+) *RouterBuilder {
 	router := mux.NewRouter().StrictSlash(true)
 	v1SubRouter := router.PathPrefix("/v1").Subrouter()
 
@@ -82,14 +85,17 @@ func (b *RouterBuilder) AddLegacyWebsocketsRoutes(
 	stateStreamConfig backend.Config,
 	maxRequestSize int64,
 	maxResponseSize int64,
+	limiter *limiters.ConcurrencyLimiter,
 ) *RouterBuilder {
 	for _, r := range WSLegacyRoutes {
 		h := legacyws.NewWSHandler(b.logger, stateStreamApi, r.Handler, chain, stateStreamConfig, maxRequestSize, maxResponseSize)
+		handler := websockets.NewConnectionLimitedHandler(b.logger, h.HttpHandler, h, limiter)
+
 		b.v1SubRouter.
 			Methods(r.Method).
 			Path(r.Pattern).
 			Name(r.Name).
-			Handler(h)
+			Handler(handler)
 	}
 
 	return b
@@ -102,8 +108,10 @@ func (b *RouterBuilder) AddWebsocketsRoute(
 	maxRequestSize int64,
 	maxResponseSize int64,
 	dataProviderFactory dp.DataProviderFactory,
+	limiter *limiters.ConcurrencyLimiter,
 ) *RouterBuilder {
-	handler := websockets.NewWebSocketHandler(ctx, b.logger, config, chain, maxRequestSize, maxResponseSize, dataProviderFactory)
+	h := websockets.NewWebSocketHandler(ctx, b.logger, config, chain, maxRequestSize, maxResponseSize, dataProviderFactory)
+	handler := websockets.NewConnectionLimitedHandler(b.logger, h.HttpHandler, h, limiter)
 	b.v1SubRouter.
 		Methods(http.MethodGet).
 		Path("/ws").
@@ -126,8 +134,10 @@ func (b *RouterBuilder) AddExperimentalRoutes(
 	router.Use(middleware.QuerySelect())
 	router.Use(middleware.MetricsMiddleware(b.restCollector))
 
+	experimentalLinkGenerator := experimentalmodels.NewLinkGeneratorImpl(router, b.LinkGenerator)
+
 	for _, r := range ExperimentalRoutes {
-		h := experimental.NewHandler(b.logger, backend, r.Handler, b.LinkGenerator, chain, maxRequestSize, maxResponseSize)
+		h := experimental.NewHandler(b.logger, backend, r.Handler, experimentalLinkGenerator, chain, maxRequestSize, maxResponseSize)
 		router.
 			Methods(r.Method).
 			Path(r.Pattern).

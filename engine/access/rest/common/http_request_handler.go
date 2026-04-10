@@ -99,6 +99,7 @@ func (h *HttpHandler) ErrorHandler(w http.ResponseWriter, err error, errorLogger
 			h.errorResponse(w, http.StatusServiceUnavailable, msg, errorLogger)
 			return
 		case codes.FailedPrecondition:
+			// indicates the system wasn't in a state to handle the request, treated as a bad request.
 			msg := fmt.Sprintf("Precondition failed: %s", se.Message())
 			h.errorResponse(w, http.StatusBadRequest, msg, errorLogger)
 			return

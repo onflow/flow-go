@@ -9,12 +9,12 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/cadence"
-	"github.com/onflow/cadence/encoding/ccf"
 
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/access/systemcollection"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/state_synchronization/indexer/extended/events"
 	"github.com/onflow/flow-go/storage"
 )
 
@@ -31,7 +31,10 @@ type AccountTransactions struct {
 	systemCollections        *systemcollection.Versioned
 }
 
+type AccountTransactionsMetadata struct{}
+
 var _ Indexer = (*AccountTransactions)(nil)
+var _ IndexProcessor[access.AccountTransaction, AccountTransactionsMetadata] = (*AccountTransactions)(nil)
 
 func NewAccountTransactions(
 	log zerolog.Logger,
@@ -88,7 +91,7 @@ func (a *AccountTransactions) NextHeight() (uint64, error) {
 //
 // The caller must hold the [storage.LockIndexAccountTransactions] lock until the batch is committed.
 //
-// Not safe for concurrent use.
+// CAUTION: Not safe for concurrent use.
 //
 // Expected error returns during normal operations:
 //   - [ErrAlreadyIndexed]: if the data is already indexed for the height.
@@ -105,7 +108,7 @@ func (a *AccountTransactions) IndexBlockData(lctx lockctx.Proof, data BlockData,
 		return ErrAlreadyIndexed
 	}
 
-	entries, err := a.buildAccountTransactionsFromBlockData(data)
+	entries, _, err := a.ProcessBlockData(data)
 	if err != nil {
 		return fmt.Errorf("failed to build account transactions from block data: %w", err)
 	}
@@ -119,7 +122,10 @@ func (a *AccountTransactions) IndexBlockData(lctx lockctx.Proof, data BlockData,
 	return nil
 }
 
-func (a *AccountTransactions) buildAccountTransactionsFromBlockData(data BlockData) ([]access.AccountTransaction, error) {
+// ProcessBlockData processes the block data and returns the indexed account transaction entries.
+//
+// No error returns are expected during normal operation.
+func (a *AccountTransactions) ProcessBlockData(data BlockData) ([]access.AccountTransaction, AccountTransactionsMetadata, error) {
 	chain := a.chainID.Chain()
 	entries := make([]access.AccountTransaction, 0)
 
@@ -129,6 +135,8 @@ func (a *AccountTransactions) buildAccountTransactionsFromBlockData(data BlockDa
 		}
 		addrRoles[addr] = append(addrRoles[addr], role)
 	}
+
+	eventsByTxIndex := groupEventsByTxIndex(data.Events)
 
 	// By the Flow protocol, system chunk transactions always appear after all user transactions
 	// in a block. Once the first system transaction is encountered, all subsequent transactions
@@ -161,10 +169,10 @@ func (a *AccountTransactions) buildAccountTransactionsFromBlockData(data BlockDa
 		}
 
 		seen := make(map[flow.Address]struct{})
-		for _, event := range data.Events[txIndex] {
+		for _, event := range eventsByTxIndex[txIndex] {
 			eventAddresses, err := a.extractAddresses(event)
 			if err != nil {
-				return nil, fmt.Errorf("failed to extract addresses from event: %w", err)
+				return nil, AccountTransactionsMetadata{}, fmt.Errorf("failed to extract addresses from event: %w", err)
 			}
 			for _, addr := range eventAddresses {
 				// only add the role once for an address per transaction
@@ -193,14 +201,14 @@ func (a *AccountTransactions) buildAccountTransactionsFromBlockData(data BlockDa
 			})
 		}
 	}
-	return entries, nil
+	return entries, AccountTransactionsMetadata{}, nil
 }
 
 // extractAddresses extracts all addresses referenced in a flow event.
 //
 // No error returns are expected during normal operation.
 func (a *AccountTransactions) extractAddresses(event flow.Event) ([]flow.Address, error) {
-	cadenceEvent, err := decodeEventPayload(event.Payload)
+	cadenceEvent, err := events.DecodePayload(event)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode event payload: %w", err)
 	}
@@ -226,21 +234,4 @@ func (a *AccountTransactions) extractAddresses(event flow.Event) ([]flow.Address
 		}
 	}
 	return addresses, nil
-}
-
-// decodeEventPayload decodes CCF-encoded event payload.
-//
-// Any error indicates that the event payload is malformed.
-func decodeEventPayload(payload []byte) (cadence.Event, error) {
-	value, err := ccf.Decode(nil, payload)
-	if err != nil {
-		return cadence.Event{}, fmt.Errorf("failed to decode CCF payload: %w", err)
-	}
-
-	event, ok := value.(cadence.Event)
-	if !ok {
-		return cadence.Event{}, fmt.Errorf("decoded value is not an event: %T", value)
-	}
-
-	return event, nil
 }

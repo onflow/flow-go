@@ -10,8 +10,8 @@ import (
 // misbehavior report manager. Any errors encountered while reporting the misbehavior are considered irrecoverable and
 // will result in a fatal level log.
 type ViolationsConsumer interface {
-	// OnUnAuthorizedSenderError logs an error for unauthorized sender error.
-	OnUnAuthorizedSenderError(violation *Violation)
+	// OnUnauthorizedSenderError logs an error for unauthorized sender error.
+	OnUnauthorizedSenderError(violation *Violation)
 
 	// OnUnknownMsgTypeError logs an error for unknown message type error.
 	OnUnknownMsgTypeError(violation *Violation)

@@ -20,16 +20,18 @@ require (
 	github.com/ipfs/go-datastore v0.8.2
 	github.com/ipfs/go-ds-pebble v0.5.0
 	github.com/libp2p/go-libp2p v0.38.2
-	github.com/onflow/cadence v1.9.10
+	github.com/onflow/cadence v1.10.1
 	github.com/onflow/crypto v0.25.4
-	github.com/onflow/flow v0.4.20-0.20260214160309-cf4461323391
+	github.com/onflow/flow v0.4.20-0.20260303141511-b7c99b4fb01b
 	github.com/onflow/flow-core-contracts/lib/go/contracts v1.9.3
 	github.com/onflow/flow-core-contracts/lib/go/templates v1.9.3
+	github.com/onflow/flow-ft/lib/go/contracts v1.0.1
 	github.com/onflow/flow-go v0.38.0-preview.0.0.20241021221952-af9cd6e99de1
-	github.com/onflow/flow-go-sdk v1.9.16
+	github.com/onflow/flow-go-sdk v1.10.1
 	github.com/onflow/flow-go/insecure v0.0.0-00010101000000-000000000000
-	github.com/onflow/flow/protobuf/go/flow v0.4.19
-	github.com/onflow/testingdock v0.5.0
+	github.com/onflow/flow-nft/lib/go/contracts v1.3.0
+	github.com/onflow/flow/protobuf/go/flow v0.4.20
+	github.com/onflow/testingdock v0.6.0
 	github.com/prometheus/client_golang v1.20.5
 	github.com/prometheus/client_model v0.6.2
 	github.com/prometheus/common v0.61.0
@@ -41,7 +43,7 @@ require (
 	go.uber.org/mock v0.5.0
 	golang.org/x/exp v0.0.0-20241217172543-b2144cdd0a67
 	golang.org/x/sync v0.19.0
-	google.golang.org/grpc v1.79.1
+	google.golang.org/grpc v1.79.3
 	google.golang.org/protobuf v1.36.11
 	gopkg.in/yaml.v3 v3.0.1
 )
@@ -142,7 +144,7 @@ require (
 	github.com/flynn/noise v1.1.0 // indirect
 	github.com/francoispqt/gojay v1.2.13 // indirect
 	github.com/fsnotify/fsnotify v1.6.0 // indirect
-	github.com/fxamacker/cbor/v2 v2.9.1-0.20251019205732-39888e6be013 // indirect
+	github.com/fxamacker/cbor/v2 v2.9.2-0.20260331174317-a78e92ec038e // indirect
 	github.com/fxamacker/circlehash v0.3.0 // indirect
 	github.com/fxamacker/golang-lru/v2 v2.0.0-20250716153046-22c8d17dc4ee // indirect
 	github.com/gabriel-vasile/mimetype v1.4.6 // indirect
@@ -265,12 +267,10 @@ require (
 	github.com/multiformats/go-varint v0.0.7 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/olekukonko/tablewriter v0.0.5 // indirect
-	github.com/onflow/atree v0.12.1 // indirect
+	github.com/onflow/atree v0.15.0 // indirect
 	github.com/onflow/fixed-point v0.1.1 // indirect
 	github.com/onflow/flow-evm-bridge v0.1.0 // indirect
-	github.com/onflow/flow-ft/lib/go/contracts v1.0.1 // indirect
 	github.com/onflow/flow-ft/lib/go/templates v1.0.1 // indirect
-	github.com/onflow/flow-nft/lib/go/contracts v1.3.0 // indirect
 	github.com/onflow/flow-nft/lib/go/templates v1.3.0 // indirect
 	github.com/onflow/go-ethereum v1.16.2 // indirect
 	github.com/onflow/nft-storefront/lib/go/contracts v1.0.0 // indirect
@@ -383,7 +383,7 @@ require (
 	google.golang.org/api v0.267.0 // indirect
 	google.golang.org/appengine v1.6.8 // indirect
 	google.golang.org/genproto v0.0.0-20260128011058-8636f8732409 // indirect
-	google.golang.org/genproto/googleapis/api v0.0.0-20260128011058-8636f8732409 // indirect
+	google.golang.org/genproto/googleapis/api v0.0.0-20260203192932-546029d2fa20 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260203192932-546029d2fa20 // indirect
 	google.golang.org/grpc/cmd/protoc-gen-go-grpc v1.2.0 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect

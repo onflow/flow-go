@@ -6,6 +6,8 @@ import (
 	"github.com/rs/zerolog"
 	otelTrace "go.opentelemetry.io/otel/trace"
 
+	"github.com/onflow/flow-go/fvm/inspection"
+
 	"github.com/onflow/flow-go/fvm/environment"
 	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
 	"github.com/onflow/flow-go/fvm/storage/derived"
@@ -51,6 +53,8 @@ type Context struct {
 	// AllowProgramCacheWritesInScripts determines if the program cache can be written to in scripts
 	// By default, the program cache is only updated by transactions.
 	AllowProgramCacheWritesInScripts bool
+
+	Inspectors []inspection.Inspector
 }
 
 // NewContext initializes a new execution context with the provided options.
@@ -367,6 +371,14 @@ func WithAllowProgramCacheWritesInScriptsEnabled(enabled bool) Option {
 	}
 }
 
+// WithEVMTestOperationsAllowed enables EVM test operations in the context
+func WithEVMTestOperationsAllowed(enabled bool) Option {
+	return func(ctx Context) Context {
+		ctx.EVMTestOperationsAllowed = enabled
+		return ctx
+	}
+}
+
 // WithEntropyProvider sets the entropy provider of a virtual machine context.
 //
 // The VM uses the input to provide entropy to the Cadence runtime randomness functions.
@@ -410,4 +422,11 @@ func WithScheduledTransactionsEnabled(enabled bool) Option {
 // Deprecated: WithScheduleCallbacksEnabled is deprecated, use WithScheduledTransactionsEnabled instead.
 func WithScheduleCallbacksEnabled(enabled bool) Option {
 	return WithScheduledTransactionsEnabled(enabled)
+}
+
+func WithInspectors(inspectors []inspection.Inspector) Option {
+	return func(ctx Context) Context {
+		ctx.Inspectors = inspectors
+		return ctx
+	}
 }

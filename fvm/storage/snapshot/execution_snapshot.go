@@ -57,6 +57,11 @@ func (snapshot *ExecutionSnapshot) UpdatedRegisterIDs() []flow.RegisterID {
 	return ids
 }
 
+// ReadRegisterSet returns all registers that were read by this view.
+func (snapshot *ExecutionSnapshot) ReadRegisterSet() map[flow.RegisterID]struct{} {
+	return snapshot.ReadSet
+}
+
 // ReadRegisterIDs returns a list of register ids that were read.
 // The returned ids are unsorted
 func (snapshot *ExecutionSnapshot) ReadRegisterIDs() []flow.RegisterID {

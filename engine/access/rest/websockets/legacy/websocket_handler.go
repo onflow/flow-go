@@ -9,7 +9,6 @@ import (
 
 	"github.com/gorilla/websocket"
 	"github.com/rs/zerolog"
-	"go.uber.org/atomic"
 
 	"github.com/onflow/flow-go/engine/access/rest/common"
 	"github.com/onflow/flow-go/engine/access/rest/websockets"
@@ -29,8 +28,6 @@ type WebsocketController struct {
 	conn              *websocket.Conn                // the WebSocket connection for communication with the client
 	Api               state_stream.API               // the state_stream.API instance for managing event subscriptions
 	EventFilterConfig state_stream.EventFilterConfig // the configuration for filtering events
-	maxStreams        int32                          // the maximum number of streams allowed
-	activeStreamCount *atomic.Int32                  // the current number of active streams
 	readChannel       chan error                     // channel which notify closing connection by the client and provide errors to the client
 	HeartbeatInterval uint64                         // the interval to deliver heartbeat messages to client[IN BLOCKS]
 }
@@ -244,9 +241,7 @@ type WSHandler struct {
 
 	api                      state_stream.API
 	eventFilterConfig        state_stream.EventFilterConfig
-	maxStreams               int32
 	defaultHeartbeatInterval uint64
-	activeStreamCount        *atomic.Int32
 }
 
 var _ http.Handler = (*WSHandler)(nil)
@@ -264,9 +259,7 @@ func NewWSHandler(
 		subscribeFunc:            subscribeFunc,
 		api:                      api,
 		eventFilterConfig:        stateStreamConfig.EventFilterConfig,
-		maxStreams:               int32(stateStreamConfig.MaxGlobalStreams),
 		defaultHeartbeatInterval: stateStreamConfig.HeartbeatInterval,
-		activeStreamCount:        atomic.NewInt32(0),
 		HttpHandler:              common.NewHttpHandler(logger, chain, maxRequestSize, maxResponseSize),
 	}
 
@@ -304,8 +297,6 @@ func (h *WSHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		conn:              conn,
 		Api:               h.api,
 		EventFilterConfig: h.eventFilterConfig,
-		maxStreams:        h.maxStreams,
-		activeStreamCount: h.activeStreamCount,
 		readChannel:       make(chan error),
 		HeartbeatInterval: h.defaultHeartbeatInterval, // set default heartbeat interval from state stream config
 	}
@@ -315,14 +306,6 @@ func (h *WSHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		wsController.wsErrorHandler(err)
 		return
 	}
-
-	if wsController.activeStreamCount.Load() >= wsController.maxStreams {
-		err := fmt.Errorf("maximum number of streams reached")
-		wsController.wsErrorHandler(common.NewRestError(http.StatusServiceUnavailable, err.Error(), err))
-		return
-	}
-	wsController.activeStreamCount.Add(1)
-	defer wsController.activeStreamCount.Add(-1)
 
 	// cancelling the context passed into the `subscribeFunc` to ensure that when the client disconnects,
 	// gorountines setup by the backend are cleaned up.

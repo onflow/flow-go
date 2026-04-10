@@ -83,6 +83,7 @@ import (
 	finalizer "github.com/onflow/flow-go/module/finalizer/consensus"
 	"github.com/onflow/flow-go/module/grpcserver"
 	"github.com/onflow/flow-go/module/id"
+	"github.com/onflow/flow-go/module/limiters"
 	"github.com/onflow/flow-go/module/local"
 	"github.com/onflow/flow-go/module/mempool/herocache"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
@@ -90,6 +91,7 @@ import (
 	"github.com/onflow/flow-go/module/state_synchronization"
 	"github.com/onflow/flow-go/module/state_synchronization/indexer"
 	"github.com/onflow/flow-go/module/state_synchronization/indexer/extended"
+	extendedbootstrap "github.com/onflow/flow-go/module/state_synchronization/indexer/extended/bootstrap"
 	edrequester "github.com/onflow/flow-go/module/state_synchronization/requester"
 	consensus_follower "github.com/onflow/flow-go/module/upstream"
 	"github.com/onflow/flow-go/network"
@@ -97,6 +99,7 @@ import (
 	netcache "github.com/onflow/flow-go/network/cache"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/converter"
+	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/blob"
 	"github.com/onflow/flow-go/network/p2p/cache"
@@ -293,7 +296,7 @@ type ObserverServiceBuilder struct {
 	ExecutionIndexerCore *indexer.IndexerCore
 	ExtendedIndexer      *extended.ExtendedIndexer
 	ExtendedBackend      *extendedbackend.Backend
-	ExtendedStorage      extended.Storage
+	ExtendedStorage      extendedbootstrap.Storage
 	TxResultsIndex       *index.TransactionResultsIndex
 	IndexerDependencies  *cmd.DependencyList
 	VersionControl       *version.VersionControl
@@ -340,6 +343,7 @@ type ObserverServiceBuilder struct {
 	stateStreamGrpcServer *grpcserver.GrpcServer
 
 	stateStreamBackend *statestreambackend.StateStreamBackend
+	streamLimiter      *limiters.ConcurrencyLimiter
 }
 
 // deriveBootstrapPeerIdentities derives the Flow Identity of the bootstrap peers from the parameters.
@@ -1126,6 +1130,17 @@ func (builder *ObserverServiceBuilder) Build() (cmd.Node, error) {
 		builder.BuildExecutionSyncComponents()
 	}
 
+	// Initialize stream limiter for RPC server - must be done unconditionally
+	// since the RPC server always uses it for stream concurrency limiting.
+	builder.Module("stream limiter", func(node *cmd.NodeConfig) error {
+		var err error
+		builder.streamLimiter, err = limiters.NewConcurrencyLimiter(builder.stateStreamConf.MaxGlobalStreams)
+		if err != nil {
+			return fmt.Errorf("could not create stream limiter: %w", err)
+		}
+		return nil
+	})
+
 	builder.enqueueRPCServer()
 	return builder.FlowNodeBuilder.Build()
 }
@@ -1145,9 +1160,6 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 
 	registerStorageDependable := module.NewProxiedReadyDoneAware()
 	builder.IndexerDependencies.Add(registerStorageDependable)
-
-	extendedIndexerDependable := module.NewProxiedReadyDoneAware()
-	builder.IndexerDependencies.Add(extendedIndexerDependable)
 
 	executionDataPrunerEnabled := builder.executionDataPrunerHeightRangeTarget != 0
 
@@ -1388,6 +1400,28 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 	if builder.executionDataIndexingEnabled {
 		var indexedBlockHeightInitializer storage.ConsumerProgressInitializer
 
+		scriptExecutorDependendable := module.NewProxiedReadyDoneAware()
+		extendedIndexerDependable := module.NewProxiedReadyDoneAware()
+
+		// Script executor:
+		// -> registers storage
+		scriptExecutorDependencies := cmd.NewDependencyList()
+		scriptExecutorDependencies.Add(registerStorageDependable)
+
+		// Extended indexer:
+		// -> script executor
+		extendedIndexerDependencies := cmd.NewDependencyList()
+		extendedIndexerDependencies.Add(scriptExecutorDependendable)
+
+		// Regular indexer:
+		// -> script executor
+		// -> extended indexer
+		builder.IndexerDependencies.Add(scriptExecutorDependendable)
+		builder.IndexerDependencies.Add(extendedIndexerDependable)
+
+		var indexerDerivedChainData *derived.DerivedChainData
+		var queryDerivedChainData *derived.DerivedChainData
+
 		builder.Module("indexed block height consumer progress", func(node *cmd.NodeConfig) error {
 			// Note: progress is stored in the MAIN db since that is where indexed execution data is stored.
 			indexedBlockHeightInitializer = store.NewConsumerProgress(builder.ProtocolDB, module.ConsumeProgressExecutionDataIndexerBlockHeight)
@@ -1403,7 +1437,7 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 				return nil
 			}
 
-			extendedStorage, err := extended.OpenExtendedIndexDB(
+			extendedStorage, err := extendedbootstrap.OpenExtendedIndexDB(
 				node.Logger,
 				builder.extendedIndexingDBPath,
 				builder.State.Params().SealedRoot().Height,
@@ -1519,81 +1553,11 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 			rda := &module.NoopReadyDoneAware{}
 			registerStorageDependable.Init(rda)
 			return rda, nil
-		}, nil).DependableComponent("execution data indexer", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-			// Note: using a DependableComponent here to ensure that the indexer does not block
-			// other components from starting while bootstrapping the register db since it may
-			// take hours to complete.
-
-			indexerDerivedChainData, queryDerivedChainData, err := builder.buildDerivedChainData()
+		}, nil).DependableComponent("script executor", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			var err error
+			indexerDerivedChainData, queryDerivedChainData, err = builder.buildDerivedChainData()
 			if err != nil {
 				return nil, fmt.Errorf("could not create derived chain data: %w", err)
-			}
-
-			var collectionExecutedMetric module.CollectionExecutedMetric = metrics.NewNoopCollector()
-			collectionIndexer, err := collections.NewIndexer(
-				builder.Logger,
-				builder.ProtocolDB,
-				collectionExecutedMetric,
-				builder.State,
-				builder.Storage.Blocks,
-				builder.Storage.Collections,
-				builder.lastFullBlockHeight,
-				builder.StorageLockMgr,
-			)
-			if err != nil {
-				return nil, fmt.Errorf("could not create collection indexer: %w", err)
-			}
-
-			builder.ExecutionIndexerCore = indexer.New(
-				builder.Logger,
-				metrics.NewExecutionStateIndexerCollector(),
-				builder.ProtocolDB,
-				builder.Storage.RegisterIndex,
-				builder.Storage.Headers,
-				builder.events,
-				builder.Storage.Collections,
-				builder.Storage.Transactions,
-				builder.lightTransactionResults,
-				builder.scheduledTransactions,
-				builder.RootChainID,
-				indexerDerivedChainData,
-				collectionIndexer,
-				collectionExecutedMetric,
-				node.StorageLockMgr,
-				builder.ExtendedIndexer,
-			)
-
-			// start processing from the first height of the registers db, which is initialized from
-			// the checkpoint. this ensures a consistent starting point for the indexed data.
-			indexedBlockHeight, err := indexedBlockHeightInitializer.Initialize(builder.Storage.RegisterIndex.FirstHeight())
-			if err != nil {
-				return nil, fmt.Errorf("could not initialize indexed block height: %w", err)
-			}
-
-			// execution state worker uses a jobqueue to process new execution data and indexes it by using the indexer.
-			builder.ExecutionIndexer, err = indexer.NewIndexer(
-				builder.Logger,
-				builder.Storage.RegisterIndex.FirstHeight(),
-				builder.Storage.RegisterIndex,
-				builder.ExecutionIndexerCore,
-				executionDataStoreCache,
-				builder.ExecutionDataRequester.HighestConsecutiveHeight,
-				indexedBlockHeight,
-			)
-			if err != nil {
-				return nil, err
-			}
-
-			if executionDataPrunerEnabled {
-				builder.ExecutionDataPruner.RegisterHeightRecorder(builder.ExecutionIndexer)
-			}
-
-			// setup requester to notify indexer when new execution data is received
-			execDataDistributor.AddOnExecutionDataReceivedConsumer(builder.ExecutionIndexer.OnExecutionData)
-
-			err = builder.Reporter.Initialize(builder.ExecutionIndexer)
-			if err != nil {
-				return nil, err
 			}
 
 			// create script execution module, this depends on the indexer being initialized and the
@@ -1604,61 +1568,124 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 				builder.RootChainID,
 				computation.NewProtocolStateWrapper(builder.State),
 				builder.Storage.Headers,
-				builder.ExecutionIndexerCore.RegisterValue,
+				builder.Storage.RegisterIndex.Get,
 				builder.scriptExecutorConfig,
 				queryDerivedChainData,
 				builder.programCacheSize > 0,
 			)
 
-			err = builder.ScriptExecutor.Initialize(builder.ExecutionIndexer, scripts, builder.VersionControl)
+			err = builder.ScriptExecutor.Initialize(builder.Storage.RegisterIndex, scripts, builder.VersionControl)
 			if err != nil {
-				return nil, err
+				return nil, fmt.Errorf("could not initialize script executor: %w", err)
 			}
 
 			err = builder.RegistersAsyncStore.Initialize(builder.Storage.RegisterIndex)
 			if err != nil {
-				return nil, err
+				return nil, fmt.Errorf("could not initialize registers async store: %w", err)
 			}
+			scriptExecutorDependendable.Init(&module.NoopReadyDoneAware{})
 
-			if builder.stopControlEnabled {
-				builder.StopControl.RegisterHeightRecorder(builder.ExecutionIndexer)
-			}
+			// the script executor is not a component. it is being started as a DependableComponent
+			// to ensure dependencies are setup in the correct order.
+			return &module.NoopReadyDoneAware{}, nil
+		}, scriptExecutorDependencies).
+			DependableComponent("execution data indexer", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+				// Note: using a DependableComponent here to ensure that the indexer does not block
+				// other components from starting while bootstrapping the register db since it may
+				// take hours to complete.
 
-			return builder.ExecutionIndexer, nil
-		}, builder.IndexerDependencies)
+				var collectionExecutedMetric module.CollectionExecutedMetric = metrics.NewNoopCollector()
+				collectionIndexer, err := collections.NewIndexer(
+					builder.Logger,
+					builder.ProtocolDB,
+					collectionExecutedMetric,
+					builder.State,
+					builder.Storage.Blocks,
+					builder.Storage.Collections,
+					builder.lastFullBlockHeight,
+					builder.StorageLockMgr,
+				)
+				if err != nil {
+					return nil, fmt.Errorf("could not create collection indexer: %w", err)
+				}
+
+				builder.ExecutionIndexerCore = indexer.New(
+					builder.Logger,
+					metrics.NewExecutionStateIndexerCollector(),
+					builder.ProtocolDB,
+					builder.Storage.RegisterIndex,
+					builder.Storage.Headers,
+					builder.events,
+					builder.Storage.Collections,
+					builder.Storage.Transactions,
+					builder.lightTransactionResults,
+					builder.scheduledTransactions,
+					builder.RootChainID,
+					indexerDerivedChainData, // might be nil if program caching is disabled
+					collectionIndexer,
+					collectionExecutedMetric,
+					node.StorageLockMgr,
+					builder.ExtendedIndexer,
+				)
+
+				// start processing from the first height of the registers db, which is initialized from
+				// the checkpoint. this ensures a consistent starting point for the indexed data.
+				indexedBlockHeight, err := indexedBlockHeightInitializer.Initialize(builder.Storage.RegisterIndex.FirstHeight())
+				if err != nil {
+					return nil, fmt.Errorf("could not initialize indexed block height: %w", err)
+				}
+
+				// execution state worker uses a jobqueue to process new execution data and indexes it by using the indexer.
+				builder.ExecutionIndexer, err = indexer.NewIndexer(
+					builder.Logger,
+					builder.Storage.RegisterIndex.FirstHeight(),
+					builder.Storage.RegisterIndex,
+					builder.ExecutionIndexerCore,
+					executionDataStoreCache,
+					builder.ExecutionDataRequester.HighestConsecutiveHeight,
+					indexedBlockHeight,
+				)
+				if err != nil {
+					return nil, err
+				}
+
+				if executionDataPrunerEnabled {
+					builder.ExecutionDataPruner.RegisterHeightRecorder(builder.ExecutionIndexer)
+				}
+
+				// setup requester to notify indexer when new execution data is received
+				execDataDistributor.AddOnExecutionDataReceivedConsumer(builder.ExecutionIndexer.OnExecutionData)
+
+				err = builder.Reporter.Initialize(builder.ExecutionIndexer)
+				if err != nil {
+					return nil, err
+				}
+
+				if builder.stopControlEnabled {
+					builder.StopControl.RegisterHeightRecorder(builder.ExecutionIndexer)
+				}
+
+				return builder.ExecutionIndexer, nil
+			}, builder.IndexerDependencies)
 
 		if !builder.extendedIndexingEnabled {
 			extendedIndexerDependable.Init(&module.NoopReadyDoneAware{})
 		} else {
 			builder.DependableComponent("extended indexer", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-				accountTransactions, err := extended.NewAccountTransactions(
+				extendedIndexer, err := extendedbootstrap.BootstrapIndexers(
 					node.Logger,
-					builder.ExtendedStorage.AccountTransactionsBootstrapper,
 					node.RootChainID,
+					utils.NotNil(builder.ExtendedStorage),
 					utils.NotNil(builder.StorageLockMgr),
-				)
-				if err != nil {
-					return nil, fmt.Errorf("could not create account transactions indexer: %w", err)
-				}
-
-				extendedIndexers := []extended.Indexer{
-					accountTransactions,
-				}
-
-				extendedIndexer, err := extended.NewExtendedIndexer(
-					node.Logger,
-					metrics.NewExtendedIndexingCollector(),
-					builder.ExtendedStorage.DB,
-					utils.NotNil(builder.StorageLockMgr),
-					utils.NotNil(builder.State),
+					utils.NotNil(node.State),
 					utils.NotNil(builder.Storage.Index),
 					utils.NotNil(builder.Storage.Headers),
 					utils.NotNil(builder.Storage.Guarantees),
 					utils.NotNil(builder.Storage.Collections),
 					utils.NotNil(builder.events),
 					utils.NotNil(builder.lightTransactionResults),
-					extendedIndexers,
-					node.RootChainID,
+					utils.NotNil(builder.ScriptExecutor),
+					utils.NotNil(builder.Storage.RegisterIndex),
 					builder.extendedIndexingBackfillDelay,
 				)
 				if err != nil {
@@ -1669,7 +1696,7 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 				extendedIndexerDependable.Init(builder.ExtendedIndexer)
 
 				return builder.ExtendedIndexer, nil
-			}, cmd.NewDependencyList())
+			}, extendedIndexerDependencies)
 		}
 	}
 
@@ -1749,6 +1776,7 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 				node.RootChainID,
 				builder.stateStreamGrpcServer,
 				builder.stateStreamBackend,
+				utils.NotNil(builder.streamLimiter),
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create state stream engine: %w", err)
@@ -1844,6 +1872,7 @@ func (builder *ObserverServiceBuilder) enqueuePublicNetworkInit() {
 				SlashingViolationConsumerFactory: func(adapter network.ConduitAdapter) network.ViolationsConsumer {
 					return slashing.NewSlashingViolationsConsumer(builder.Logger, builder.Metrics.Network, adapter)
 				},
+				UnicastStreamAuthorizer: message.AlwaysAuthorizedUnicastSenderRole,
 			}, underlay.WithMessageValidators(publicNetworkMsgValidators(node.Logger, node.IdentityProvider, node.NodeID)...))
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize network: %w", err)
@@ -2186,6 +2215,8 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 				extendedbackend.DefaultConfig(),
 				node.RootChainID,
 				builder.ExtendedStorage.AccountTransactionsBootstrapper,
+				builder.ExtendedStorage.FungibleTokenTransfersBootstrapper,
+				builder.ExtendedStorage.NonFungibleTokenTransfersBootstrapper,
 				utils.NotNil(node.State),
 				utils.NotNil(node.Storage.Blocks),
 				utils.NotNil(node.Storage.Headers),
@@ -2195,7 +2226,10 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 				utils.NotNil(node.Storage.Collections),
 				utils.NotNil(node.Storage.Transactions),
 				builder.scheduledTransactions,
+				builder.ExtendedStorage.ScheduledTransactionsBootstrapper,
+				builder.ExtendedStorage.ContractDeploymentsBootstrapper,
 				txstatus.NewTxStatusDeriver(node.State, builder.lastFullBlockHeight),
+				builder.ScriptExecutor,
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize extended backend: %w", err)
@@ -2219,6 +2253,7 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			indexReporter,
 			builder.FollowerDistributor,
 			builder.ExtendedBackend,
+			utils.NotNil(builder.streamLimiter),
 		)
 		if err != nil {
 			return nil, err

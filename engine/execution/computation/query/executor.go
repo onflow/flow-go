@@ -10,6 +10,7 @@ import (
 
 	"github.com/onflow/flow-go/fvm/errors"
 
+	"github.com/onflow/cadence/common"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/rs/zerolog"
 
@@ -405,4 +406,35 @@ func (e *QueryExecutor) GetAccountKey(
 	}
 
 	return accountKey, nil
+}
+
+// GetAccountCode returns the code for the given account and contract name at the provided block height.
+func (e *QueryExecutor) GetAccountCode(
+	_ context.Context,
+	address flow.Address,
+	contractName string,
+	blockHeader *flow.Header,
+	snapshot snapshot.StorageSnapshot,
+) ([]byte, error) {
+	blockCtx := fvm.NewContextFromParent(
+		e.vmCtx,
+		fvm.WithBlockHeader(blockHeader),
+		fvm.WithDerivedBlockData(
+			e.derivedChainData.NewDerivedBlockDataForScript(blockHeader.ID())))
+
+	location := common.AddressLocation{
+		Address: common.Address(address),
+		Name:    contractName,
+	}
+
+	code, err := fvm.GetAccountCode(blockCtx, location, snapshot)
+	if err != nil {
+		return nil, fmt.Errorf(
+			"failed to get account code (%s) at block (%s): %w",
+			location.String(),
+			blockHeader.ID(),
+			err)
+	}
+
+	return code, nil
 }

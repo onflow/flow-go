@@ -76,12 +76,18 @@ type ExtendedIndexingSuite struct {
 	restBaseURL string
 }
 
-func (s *ExtendedIndexingSuite) SetupTest() {
+func (s *ExtendedIndexingSuite) SetupSuite() {
 	consensusConfigs := []func(config *testnet.NodeConfig){
 		testnet.WithAdditionalFlag("--cruise-ctl-fallback-proposal-duration=250ms"),
 		testnet.WithAdditionalFlagf("--required-verification-seal-approvals=%d", 1),
 		testnet.WithAdditionalFlagf("--required-construction-seal-approvals=%d", 1),
 		testnet.WithLogLevel(zerolog.FatalLevel),
+	}
+
+	executionConfigs := []func(config *testnet.NodeConfig){
+		testnet.WithLogLevel(zerolog.FatalLevel),
+		// Enable scheduled transaction execution so PendingExecution/Executed events are emitted.
+		testnet.WithAdditionalFlag("--scheduled-callbacks-enabled=true"),
 	}
 
 	// Access node with execution data sync, execution data indexing, and extended indexing enabled.
@@ -98,8 +104,8 @@ func (s *ExtendedIndexingSuite) SetupTest() {
 	nodeConfigs := []testnet.NodeConfig{
 		testnet.NewNodeConfig(flow.RoleCollection, testnet.WithLogLevel(zerolog.FatalLevel)),
 		testnet.NewNodeConfig(flow.RoleCollection, testnet.WithLogLevel(zerolog.FatalLevel)),
-		testnet.NewNodeConfig(flow.RoleExecution, testnet.WithLogLevel(zerolog.FatalLevel)),
-		testnet.NewNodeConfig(flow.RoleExecution, testnet.WithLogLevel(zerolog.FatalLevel)),
+		testnet.NewNodeConfig(flow.RoleExecution, executionConfigs...),
+		testnet.NewNodeConfig(flow.RoleExecution, executionConfigs...),
 		testnet.NewNodeConfig(flow.RoleConsensus, consensusConfigs...),
 		testnet.NewNodeConfig(flow.RoleConsensus, consensusConfigs...),
 		testnet.NewNodeConfig(flow.RoleConsensus, consensusConfigs...),
@@ -122,7 +128,7 @@ func (s *ExtendedIndexingSuite) SetupTest() {
 	s.apiClient = apiClient
 }
 
-func (s *ExtendedIndexingSuite) TearDownTest() {
+func (s *ExtendedIndexingSuite) TearDownSuite() {
 	if s.net != nil {
 		s.net.Remove()
 		s.net = nil

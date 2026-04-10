@@ -2,6 +2,7 @@ package execution
 
 import (
 	"context"
+	"errors"
 
 	"github.com/rs/zerolog"
 
@@ -20,17 +21,20 @@ import (
 // RegisterAtHeight returns register value for provided register ID at the block height.
 // Even if the register wasn't indexed at the provided height, returns the highest height the register was indexed at.
 // If the register with the ID was not indexed at all return nil value and no error.
-// Expected errors:
-// - storage.ErrHeightNotIndexed if the given height was not indexed yet or lower than the first indexed height.
+//
+// Expected error returns during normal operation
+//   - [storage.ErrNotFound] if the register is not found at the given height.
+//   - [storage.ErrHeightNotIndexed] if the given height was not indexed yet or lower than the first indexed height.
 type RegisterAtHeight func(ID flow.RegisterID, height uint64) (flow.RegisterValue, error)
 
 type ScriptExecutor interface {
 	// ExecuteAtBlockHeight executes provided script against the block height.
 	// A result value is returned encoded as byte array. An error will be returned if script
 	// doesn't successfully execute.
-	// Expected errors:
-	// - storage.ErrNotFound if block or register value at height was not found.
-	// - storage.ErrHeightNotIndexed if the data for the block height is not available
+	//
+	// Expected error returns during normal operation
+	//   - [storage.ErrNotFound] if block or register value at height was not found.
+	//   - [storage.ErrHeightNotIndexed] if the data for the block height is not available
 	ExecuteAtBlockHeight(
 		ctx context.Context,
 		script []byte,
@@ -39,29 +43,52 @@ type ScriptExecutor interface {
 	) ([]byte, error)
 
 	// GetAccountAtBlockHeight returns a Flow account by the provided address and block height.
-	// Expected errors:
-	// - storage.ErrHeightNotIndexed if the data for the block height is not available
+	//
+	// Expected error returns during normal operation
+	//   - [storage.ErrHeightNotIndexed] if the data for the block height is not available
 	GetAccountAtBlockHeight(ctx context.Context, address flow.Address, height uint64) (*flow.Account, error)
 
 	// GetAccountBalance returns a Flow account balance by the provided address and block height.
-	// Expected errors:
-	// - storage.ErrHeightNotIndexed if the data for the block height is not available
+	//
+	// Expected error returns during normal operation
+	//   - [storage.ErrHeightNotIndexed] if the data for the block height is not available
 	GetAccountBalance(ctx context.Context, address flow.Address, height uint64) (uint64, error)
 
 	// GetAccountAvailableBalance returns a Flow account available balance by the provided address and block height.
-	// Expected errors:
-	// - storage.ErrHeightNotIndexed if the data for the block height is not available
+	//
+	// Expected error returns during normal operation
+	//   - [storage.ErrHeightNotIndexed] if the data for the block height is not available
 	GetAccountAvailableBalance(ctx context.Context, address flow.Address, height uint64) (uint64, error)
 
 	// GetAccountKeys returns a Flow account public keys by the provided address and block height.
-	// Expected errors:
-	// - storage.ErrHeightNotIndexed if the data for the block height is not available
+	//
+	// Expected error returns during normal operation
+	//   - [storage.ErrHeightNotIndexed] if the data for the block height is not available
 	GetAccountKeys(ctx context.Context, address flow.Address, height uint64) ([]flow.AccountPublicKey, error)
 
 	// GetAccountKey returns a Flow account public key by the provided address, block height and index.
-	// Expected errors:
-	// - storage.ErrHeightNotIndexed if the data for the block height is not available
+	//
+	// Expected error returns during normal operation
+	//   - [storage.ErrHeightNotIndexed] if the data for the block height is not available
 	GetAccountKey(ctx context.Context, address flow.Address, keyIndex uint32, height uint64) (*flow.AccountPublicKey, error)
+
+	// GetAccountCode returns a Flow account code by the provided address, contract name and block height.
+	//
+	// Expected error returns during normal operation:
+	//   - [storage.ErrHeightNotIndexed] if the data for the block height is not available
+	GetAccountCode(ctx context.Context, address flow.Address, contractName string, height uint64) ([]byte, error)
+
+	// RegisterValue retrieves register values by the register IDs at the provided block height.
+	//
+	// Expected error returns during normal operation
+	//   - [storage.ErrHeightNotIndexed] if the data for the block height is not available
+	RegisterValue(ID flow.RegisterID, height uint64) (flow.RegisterValue, error)
+
+	// GetStorageSnapshot returns a storage snapshot at the provided block height.
+	//
+	// Expected error returns during normal operation
+	//   - [storage.ErrHeightNotIndexed] if the data for the block height is not available
+	GetStorageSnapshot(height uint64) (snapshot.StorageSnapshot, error)
 }
 
 var _ ScriptExecutor = (*Scripts)(nil)
@@ -89,6 +116,7 @@ func NewScripts(
 		chainID,
 		false,
 		true,
+		false,
 	)
 	blocks := environment.NewBlockFinder(header)
 	options = append(options, fvm.WithBlocks(blocks)) // add blocks for getBlocks calls in scripts
@@ -116,9 +144,10 @@ func NewScripts(
 // ExecuteAtBlockHeight executes provided script against the block height.
 // A result value is returned encoded as byte array. An error will be returned if script
 // doesn't successfully execute.
-// Expected errors:
-// - Script execution related errors
-// - storage.ErrHeightNotIndexed if the data for the block height is not available
+//
+// Expected error returns during normal operation
+//   - Script execution related errors
+//   - [storage.ErrHeightNotIndexed] if the data for the block height is not available
 func (s *Scripts) ExecuteAtBlockHeight(
 	ctx context.Context,
 	script []byte,
@@ -138,9 +167,10 @@ func (s *Scripts) ExecuteAtBlockHeight(
 }
 
 // GetAccountAtBlockHeight returns a Flow account by the provided address and block height.
-// Expected errors:
-// - Script execution related errors
-// - storage.ErrHeightNotIndexed if the data for the block height is not available
+//
+// Expected error returns during normal operation
+//   - Script execution related errors
+//   - [storage.ErrHeightNotIndexed] if the data for the block height is not available
 func (s *Scripts) GetAccountAtBlockHeight(ctx context.Context, address flow.Address, height uint64) (*flow.Account, error) {
 	snap, header, err := s.snapshotWithBlock(height)
 	if err != nil {
@@ -151,9 +181,10 @@ func (s *Scripts) GetAccountAtBlockHeight(ctx context.Context, address flow.Addr
 }
 
 // GetAccountBalance returns a balance of Flow account by the provided address and block height.
-// Expected errors:
-// - Script execution related errors
-// - storage.ErrHeightNotIndexed if the data for the block height is not available
+//
+// Expected error returns during normal operation
+//   - Script execution related errors
+//   - [storage.ErrHeightNotIndexed] if the data for the block height is not available
 func (s *Scripts) GetAccountBalance(ctx context.Context, address flow.Address, height uint64) (uint64, error) {
 	snap, header, err := s.snapshotWithBlock(height)
 	if err != nil {
@@ -164,9 +195,10 @@ func (s *Scripts) GetAccountBalance(ctx context.Context, address flow.Address, h
 }
 
 // GetAccountAvailableBalance returns an available balance of Flow account by the provided address and block height.
-// Expected errors:
-// - Script execution related errors
-// - storage.ErrHeightNotIndexed if the data for the block height is not available
+//
+// Expected error returns during normal operation
+//   - Script execution related errors
+//   - [storage.ErrHeightNotIndexed] if the data for the block height is not available
 func (s *Scripts) GetAccountAvailableBalance(ctx context.Context, address flow.Address, height uint64) (uint64, error) {
 	snap, header, err := s.snapshotWithBlock(height)
 	if err != nil {
@@ -177,9 +209,10 @@ func (s *Scripts) GetAccountAvailableBalance(ctx context.Context, address flow.A
 }
 
 // GetAccountKeys returns a public keys of Flow account by the provided address and block height.
-// Expected errors:
-// - Script execution related errors
-// - storage.ErrHeightNotIndexed if the data for the block height is not available
+//
+// Expected error returns during normal operation
+//   - Script execution related errors
+//   - [storage.ErrHeightNotIndexed] if the data for the block height is not available
 func (s *Scripts) GetAccountKeys(ctx context.Context, address flow.Address, height uint64) ([]flow.AccountPublicKey, error) {
 	snap, header, err := s.snapshotWithBlock(height)
 	if err != nil {
@@ -190,9 +223,10 @@ func (s *Scripts) GetAccountKeys(ctx context.Context, address flow.Address, heig
 }
 
 // GetAccountKey returns a public key of Flow account by the provided address, block height and index.
-// Expected errors:
-// - Script execution related errors
-// - storage.ErrHeightNotIndexed if the data for the block height is not available
+//
+// Expected error returns during normal operation
+//   - Script execution related errors
+//   - [storage.ErrHeightNotIndexed] if the data for the block height is not available
 func (s *Scripts) GetAccountKey(ctx context.Context, address flow.Address, keyIndex uint32, height uint64) (*flow.AccountPublicKey, error) {
 	snap, header, err := s.snapshotWithBlock(height)
 	if err != nil {
@@ -202,8 +236,41 @@ func (s *Scripts) GetAccountKey(ctx context.Context, address flow.Address, keyIn
 	return s.executor.GetAccountKey(ctx, address, keyIndex, header, snap)
 }
 
+// GetAccountCode returns a Flow account code by the provided address, contract name and block height.
+//
+// Expected error returns during normal operation:
+//   - [storage.ErrHeightNotIndexed] if the data for the block height is not available
+func (s *Scripts) GetAccountCode(ctx context.Context, address flow.Address, contractName string, height uint64) ([]byte, error) {
+	snap, header, err := s.snapshotWithBlock(height)
+	if err != nil {
+		return nil, err
+	}
+
+	return s.executor.GetAccountCode(ctx, address, contractName, header, snap)
+}
+
+// GetStorageSnapshot returns a storage snapshot at the given height.
+//
+// Expected error returns during normal operation:
+//   - [storage.ErrHeightNotIndexed] if the data for the block height is not available
+func (s *Scripts) GetStorageSnapshot(height uint64) (snapshot.StorageSnapshot, error) {
+	snapshot, _, err := s.snapshotWithBlock(height)
+	return snapshot, err
+}
+
+// RegisterValue retrieves register values by the register IDs at the provided block height.
+//
+// Expected error returns during normal operation:
+//   - [storage.ErrNotFound]: if the register is not found at the given height.
+//   - [storage.ErrHeightNotIndexed]: if the given height was not indexed yet or lower than the first indexed height.
+func (s *Scripts) RegisterValue(ID flow.RegisterID, height uint64) (flow.RegisterValue, error) {
+	return s.registerAtHeight(ID, height)
+}
+
 // snapshotWithBlock is a common function for executing scripts and get account functionality.
 // It creates a storage snapshot that is needed by the FVM to execute scripts.
+//
+// No error returns during normal operation.
 func (s *Scripts) snapshotWithBlock(height uint64) (snapshot.StorageSnapshot, *flow.Header, error) {
 	header, err := s.headers.ByHeight(height)
 	if err != nil {
@@ -211,7 +278,16 @@ func (s *Scripts) snapshotWithBlock(height uint64) (snapshot.StorageSnapshot, *f
 	}
 
 	storageSnapshot := snapshot.NewReadFuncStorageSnapshot(func(ID flow.RegisterID) (flow.RegisterValue, error) {
-		return s.registerAtHeight(ID, height)
+		value, err := s.registerAtHeight(ID, height)
+		if err != nil {
+			// the storage snapshot consumer expects the snapshot to return nil if the register is not found
+			// instead of an error.
+			if errors.Is(err, storage.ErrNotFound) {
+				return nil, nil
+			}
+			return nil, err
+		}
+		return value, nil
 	})
 
 	return storageSnapshot, header, nil

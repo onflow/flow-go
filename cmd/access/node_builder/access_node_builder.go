@@ -88,6 +88,7 @@ import (
 	finalizer "github.com/onflow/flow-go/module/finalizer/consensus"
 	"github.com/onflow/flow-go/module/grpcserver"
 	"github.com/onflow/flow-go/module/id"
+	"github.com/onflow/flow-go/module/limiters"
 	"github.com/onflow/flow-go/module/mempool/herocache"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/module/metrics"
@@ -95,12 +96,14 @@ import (
 	"github.com/onflow/flow-go/module/state_synchronization"
 	"github.com/onflow/flow-go/module/state_synchronization/indexer"
 	"github.com/onflow/flow-go/module/state_synchronization/indexer/extended"
+	extendedbootstrap "github.com/onflow/flow-go/module/state_synchronization/indexer/extended/bootstrap"
 	edrequester "github.com/onflow/flow-go/module/state_synchronization/requester"
 	"github.com/onflow/flow-go/network"
 	alspmgr "github.com/onflow/flow-go/network/alsp/manager"
 	netcache "github.com/onflow/flow-go/network/cache"
 	"github.com/onflow/flow-go/network/channels"
 	cborcodec "github.com/onflow/flow-go/network/codec/cbor"
+	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/blob"
 	p2pbuilder "github.com/onflow/flow-go/network/p2p/builder"
@@ -342,7 +345,7 @@ type FlowAccessNodeBuilder struct {
 	ExecutionIndexerCore         *indexer.IndexerCore
 	ExtendedIndexer              *extended.ExtendedIndexer
 	ExtendedBackend              *extendedbackend.Backend
-	ExtendedStorage              extended.Storage
+	ExtendedStorage              extendedbootstrap.Storage
 	CollectionIndexer            *collections.Indexer
 	CollectionSyncer             *collections.Syncer
 	ScriptExecutor               *backend.ScriptExecutor
@@ -385,6 +388,7 @@ type FlowAccessNodeBuilder struct {
 
 	stateStreamBackend *statestreambackend.StateStreamBackend
 	nodeBackend        *backend.Backend
+	streamLimiter      *limiters.ConcurrencyLimiter
 
 	ExecNodeIdentitiesProvider   *commonrpc.ExecutionNodeIdentitiesProvider
 	TxResultErrorMessagesCore    *tx_error_messages.TxErrorMessagesCore
@@ -845,6 +849,10 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				blob.WithParentBlobService(bs),
 			}
 
+			if !builder.BitswapReprovideEnabled {
+				opts = append(opts, blob.WithReprovideInterval(-1))
+			}
+
 			net := builder.AccessNodeConfig.PublicNetworkConfig.Network
 
 			var err error
@@ -861,10 +869,32 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 		})
 	}
 
-	if builder.executionDataIndexingEnabled {
+	if !builder.executionDataIndexingEnabled {
+		builder.IndexerDependencies.Add(&module.NoopReadyDoneAware{})
+	} else {
 		var indexedBlockHeightInitializer storage.ConsumerProgressInitializer
+
+		scriptExecutorDependendable := module.NewProxiedReadyDoneAware()
 		extendedIndexerDependable := module.NewProxiedReadyDoneAware()
+
+		// Script executor:
+		// -> registers storage
+		scriptExecutorDependencies := cmd.NewDependencyList()
+		scriptExecutorDependencies.Add(registerStorageDependable)
+
+		// Extended indexer:
+		// -> script executor
+		extendedIndexerDependencies := cmd.NewDependencyList()
+		extendedIndexerDependencies.Add(scriptExecutorDependendable)
+
+		// Regular indexer:
+		// -> script executor
+		// -> extended indexer
+		builder.IndexerDependencies.Add(scriptExecutorDependendable)
 		builder.IndexerDependencies.Add(extendedIndexerDependable)
+
+		var indexerDerivedChainData *derived.DerivedChainData
+		var queryDerivedChainData *derived.DerivedChainData
 
 		builder.
 			AdminCommand("execute-script", func(config *cmd.NodeConfig) commands.AdminCommand {
@@ -888,7 +918,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 					return nil
 				}
 
-				extendedStorage, err := extended.OpenExtendedIndexDB(
+				extendedStorage, err := extendedbootstrap.OpenExtendedIndexDB(
 					node.Logger,
 					builder.extendedIndexingDBPath,
 					builder.SealedRootBlock.Height,
@@ -992,15 +1022,46 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				registerStorageDependable.Init(rda)
 				return rda, nil
 			}, nil).
+			DependableComponent("script executor", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+				var err error
+				indexerDerivedChainData, queryDerivedChainData, err = builder.buildDerivedChainData()
+				if err != nil {
+					return nil, fmt.Errorf("could not create derived chain data: %w", err)
+				}
+
+				// create script execution module, this depends on the indexer being initialized and the
+				// having the register storage bootstrapped
+				scripts := execution.NewScripts(
+					builder.Logger,
+					metrics.NewExecutionCollector(builder.Tracer),
+					builder.RootChainID,
+					computation.NewProtocolStateWrapper(builder.State),
+					builder.Storage.Headers,
+					builder.Storage.RegisterIndex.Get,
+					builder.scriptExecutorConfig,
+					queryDerivedChainData,
+					builder.programCacheSize > 0,
+				)
+
+				err = builder.ScriptExecutor.Initialize(builder.Storage.RegisterIndex, scripts, builder.VersionControl)
+				if err != nil {
+					return nil, fmt.Errorf("could not initialize script executor: %w", err)
+				}
+
+				err = builder.RegistersAsyncStore.Initialize(builder.Storage.RegisterIndex)
+				if err != nil {
+					return nil, fmt.Errorf("could not initialize registers async store: %w", err)
+				}
+				scriptExecutorDependendable.Init(&module.NoopReadyDoneAware{})
+
+				// the script executor is not a component. it is being started as a DependableComponent
+				// to ensure dependencies are setup in the correct order.
+				return &module.NoopReadyDoneAware{}, nil
+			}, scriptExecutorDependencies).
 			DependableComponent("execution data indexer", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 				// Note: using a DependableComponent here to ensure that the indexer does not block
 				// other components from starting while bootstrapping the register db since it may
 				// take hours to complete.
-
-				indexerDerivedChainData, queryDerivedChainData, err := builder.buildDerivedChainData()
-				if err != nil {
-					return nil, fmt.Errorf("could not create derived chain data: %w", err)
-				}
 
 				builder.ExecutionIndexerCore = indexer.New(
 					builder.Logger,
@@ -1014,7 +1075,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 					utils.NotNil(builder.lightTransactionResults),
 					utils.NotNil(builder.scheduledTransactions),
 					builder.RootChainID,
-					indexerDerivedChainData,
+					indexerDerivedChainData, // might be nil if program caching is disabled
 					utils.NotNil(builder.CollectionIndexer),
 					utils.NotNil(builder.collectionExecutedMetric),
 					node.StorageLockMgr,
@@ -1049,31 +1110,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				// setup requester to notify indexer when new execution data is received
 				execDataDistributor.AddOnExecutionDataReceivedConsumer(builder.ExecutionIndexer.OnExecutionData)
 
-				// create script execution module, this depends on the indexer being initialized and the
-				// having the register storage bootstrapped
-				scripts := execution.NewScripts(
-					builder.Logger,
-					metrics.NewExecutionCollector(builder.Tracer),
-					builder.RootChainID,
-					computation.NewProtocolStateWrapper(builder.State),
-					builder.Storage.Headers,
-					builder.ExecutionIndexerCore.RegisterValue,
-					builder.scriptExecutorConfig,
-					queryDerivedChainData,
-					builder.programCacheSize > 0,
-				)
-
-				err = builder.ScriptExecutor.Initialize(builder.ExecutionIndexer, scripts, builder.VersionControl)
-				if err != nil {
-					return nil, err
-				}
-
 				err = builder.Reporter.Initialize(builder.ExecutionIndexer)
-				if err != nil {
-					return nil, err
-				}
-
-				err = builder.RegistersAsyncStore.Initialize(builder.Storage.RegisterIndex)
 				if err != nil {
 					return nil, err
 				}
@@ -1089,34 +1126,20 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 			extendedIndexerDependable.Init(&module.NoopReadyDoneAware{})
 		} else {
 			builder.DependableComponent("extended indexer", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-				accountTransactions, err := extended.NewAccountTransactions(
+				extendedIndexer, err := extendedbootstrap.BootstrapIndexers(
 					node.Logger,
-					builder.ExtendedStorage.AccountTransactionsBootstrapper,
 					node.RootChainID,
+					utils.NotNil(builder.ExtendedStorage),
 					utils.NotNil(builder.StorageLockMgr),
-				)
-				if err != nil {
-					return nil, fmt.Errorf("could not create account transactions indexer: %w", err)
-				}
-
-				extendedIndexers := []extended.Indexer{
-					accountTransactions,
-				}
-
-				extendedIndexer, err := extended.NewExtendedIndexer(
-					node.Logger,
-					metrics.NewExtendedIndexingCollector(),
-					builder.ExtendedStorage.DB,
-					utils.NotNil(builder.StorageLockMgr),
-					utils.NotNil(builder.State),
+					utils.NotNil(node.State),
 					utils.NotNil(builder.Storage.Index),
 					utils.NotNil(builder.Storage.Headers),
 					utils.NotNil(builder.Storage.Guarantees),
 					utils.NotNil(builder.Storage.Collections),
 					utils.NotNil(builder.events),
 					utils.NotNil(builder.lightTransactionResults),
-					extendedIndexers,
-					node.RootChainID,
+					utils.NotNil(builder.ScriptExecutor),
+					utils.NotNil(builder.Storage.RegisterIndex),
 					builder.extendedIndexingBackfillDelay,
 				)
 				if err != nil {
@@ -1127,7 +1150,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				extendedIndexerDependable.Init(builder.ExtendedIndexer)
 
 				return builder.ExtendedIndexer, nil
-			}, cmd.NewDependencyList())
+			}, extendedIndexerDependencies)
 		}
 	}
 
@@ -1207,6 +1230,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				node.RootChainID,
 				builder.stateStreamGrpcServer,
 				builder.stateStreamBackend,
+				utils.NotNil(builder.streamLimiter),
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create state stream engine: %w", err)
@@ -2144,6 +2168,16 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 
 			return stopControl, nil
 		}).
+		Module("stream limiter", func(node *cmd.NodeConfig) error {
+			// Initialize stream limiter for RPC server - must be done unconditionally
+			// since the RPC server always uses it for stream concurrency limiting.
+			var err error
+			builder.streamLimiter, err = limiters.NewConcurrencyLimiter(builder.stateStreamConf.MaxGlobalStreams)
+			if err != nil {
+				return fmt.Errorf("could not create stream limiter: %w", err)
+			}
+			return nil
+		}).
 		Component("RPC engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			config := builder.rpcConf
 			backendConfig := config.BackendConfig
@@ -2300,6 +2334,8 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 					extendedbackend.DefaultConfig(),
 					node.RootChainID,
 					builder.ExtendedStorage.AccountTransactionsBootstrapper,
+					builder.ExtendedStorage.FungibleTokenTransfersBootstrapper,
+					builder.ExtendedStorage.NonFungibleTokenTransfersBootstrapper,
 					utils.NotNil(node.State),
 					utils.NotNil(node.Storage.Blocks),
 					utils.NotNil(node.Storage.Headers),
@@ -2309,7 +2345,10 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 					utils.NotNil(node.Storage.Collections),
 					utils.NotNil(node.Storage.Transactions),
 					builder.scheduledTransactions,
+					builder.ExtendedStorage.ScheduledTransactionsBootstrapper,
+					builder.ExtendedStorage.ContractDeploymentsBootstrapper,
 					txstatus.NewTxStatusDeriver(node.State, lastFullBlockHeight),
+					utils.NotNil(builder.ScriptExecutor),
 				)
 				if err != nil {
 					return nil, fmt.Errorf("could not initialize extended backend: %w", err)
@@ -2333,6 +2372,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				indexReporter,
 				builder.FollowerDistributor,
 				builder.ExtendedBackend,
+				utils.NotNil(builder.streamLimiter),
 			)
 			if err != nil {
 				return nil, err
@@ -2618,6 +2658,7 @@ func (builder *FlowAccessNodeBuilder) enqueuePublicNetworkInit() {
 				SlashingViolationConsumerFactory: func(adapter network.ConduitAdapter) network.ViolationsConsumer {
 					return slashing.NewSlashingViolationsConsumer(builder.Logger, builder.Metrics.Network, adapter)
 				},
+				UnicastStreamAuthorizer: message.AlwaysAuthorizedUnicastSenderRole,
 			}, underlay.WithMessageValidators(msgValidators...))
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize network: %w", err)

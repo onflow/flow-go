@@ -66,6 +66,16 @@ var Routes = []route{{
 	Handler: routes.GetExecutionResultsByBlockIDs,
 }, {
 	Method:  http.MethodGet,
+	Pattern: "/execution_receipts",
+	Name:    "getExecutionReceiptsByBlockID",
+	Handler: routes.GetExecutionReceiptsByBlockID,
+}, {
+	Method:  http.MethodGet,
+	Pattern: "/execution_receipts/results/{id}",
+	Name:    "getExecutionReceiptsByResultID",
+	Handler: routes.GetExecutionReceiptsByResultID,
+}, {
+	Method:  http.MethodGet,
 	Pattern: "/collections/{id}",
 	Name:    "getCollectionByID",
 	Handler: routes.GetCollectionByID,

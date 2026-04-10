@@ -14,21 +14,27 @@ import (
 // We needed to develop a separate mock for Local as we could not mock
 // a method with return values with gomock
 type MockLocal struct {
-	sk crypto.PrivateKey
-	t  mock.TestingT
-	id flow.Identifier
+	sk   crypto.PrivateKey
+	t    mock.TestingT
+	id   flow.Identifier
+	role flow.Role
 }
 
 func NewMockLocal(sk crypto.PrivateKey, id flow.Identifier, t mock.TestingT) *MockLocal {
 	return &MockLocal{
-		sk: sk,
-		t:  t,
-		id: id,
+		sk:   sk,
+		t:    t,
+		id:   id,
+		role: flow.RoleConsensus,
 	}
 }
 
 func (m *MockLocal) NodeID() flow.Identifier {
 	return m.id
+}
+
+func (m *MockLocal) Role() flow.Role {
+	return m.role
 }
 
 func (m *MockLocal) Address() string {
