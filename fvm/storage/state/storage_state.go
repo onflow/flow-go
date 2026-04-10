@@ -131,3 +131,9 @@ func (state *storageState) interimReadSet(
 		accumulator[id] = struct{}{}
 	}
 }
+
+// BaseStorageSnapshot gives access to the storage snapshot as it was without changes
+// WARNING: this should not be read mid-transaction as reads to it are not recorded in the spocks
+func (state *storageState) BaseStorageSnapshot() snapshot.StorageSnapshot {
+	return state.baseStorage
+}

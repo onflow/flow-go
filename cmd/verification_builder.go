@@ -211,6 +211,7 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 					node.RootChainID,
 					false,
 					v.verConf.scheduledTransactionsEnabled,
+					false,
 				)...,
 			)
 			vmCtx := fvm.NewContext(node.RootChainID.Chain(), fvmOptions...)

@@ -116,6 +116,7 @@ func NewScripts(
 		chainID,
 		false,
 		true,
+		false,
 	)
 	blocks := environment.NewBlockFinder(header)
 	options = append(options, fvm.WithBlocks(blocks)) // add blocks for getBlocks calls in scripts
