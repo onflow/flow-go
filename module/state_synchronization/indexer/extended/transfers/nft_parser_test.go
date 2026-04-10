@@ -415,6 +415,72 @@ func TestParseNFTTransfers_MultiLayerBurn(t *testing.T) {
 	assert.ElementsMatch(t, expected, transfers)
 }
 
+// TestParseNFTTransfers_DuplicateUUIDDifferentIDs verifies that when multiple distinct NFTs
+// share the same UUID (as happens with early TopShot NFTs), withdrawals and deposits are
+// correctly matched by NFT ID rather than mismatching across different NFTs.
+func TestParseNFTTransfers_DuplicateUUIDDifferentIDs(t *testing.T) {
+	parser := NewNFTParser(flow.Testnet)
+	txID := unittest.IdentifierFixture()
+
+	sender := unittest.RandomAddressFixture()
+	recipient := unittest.RandomAddressFixture()
+
+	sharedUUID := uint64(6) // TopShot-style low UUID shared across NFTs
+
+	events := []flow.Event{
+		testutil.MakeNFTWithdrawnEvent(t, flow.Testnet, &sender, txID, 0, 0, sharedUUID, 45475),
+		testutil.MakeNFTWithdrawnEvent(t, flow.Testnet, &sender, txID, 0, 1, sharedUUID, 127424),
+		testutil.MakeNFTWithdrawnEvent(t, flow.Testnet, &sender, txID, 0, 2, sharedUUID, 29440),
+		testutil.MakeNFTDepositedEvent(t, flow.Testnet, &recipient, txID, 0, 3, sharedUUID, 45475),
+		testutil.MakeNFTDepositedEvent(t, flow.Testnet, &recipient, txID, 0, 4, sharedUUID, 127424),
+		testutil.MakeNFTDepositedEvent(t, flow.Testnet, &recipient, txID, 0, 5, sharedUUID, 29440),
+	}
+
+	expected := []access.NonFungibleTokenTransfer{
+		testutil.MakeNFTTransfer(testBlockHeight, txID, 0, sender, recipient, 45475, 0, 3),
+		testutil.MakeNFTTransfer(testBlockHeight, txID, 0, sender, recipient, 127424, 1, 4),
+		testutil.MakeNFTTransfer(testBlockHeight, txID, 0, sender, recipient, 29440, 2, 5),
+	}
+
+	transfers, err := parser.Parse(events, testBlockHeight)
+	require.NoError(t, err)
+	assert.ElementsMatch(t, expected, transfers)
+}
+
+// TestParseNFTTransfers_DuplicateUUIDMixedWithUnpaired verifies correct handling when
+// duplicate-UUID NFTs include both paired transfers and unpaired events (mints/burns).
+func TestParseNFTTransfers_DuplicateUUIDMixedWithUnpaired(t *testing.T) {
+	parser := NewNFTParser(flow.Testnet)
+	txID := unittest.IdentifierFixture()
+
+	sender := unittest.RandomAddressFixture()
+	recipient := unittest.RandomAddressFixture()
+	mintRecipient := unittest.RandomAddressFixture()
+
+	sharedUUID := uint64(3)
+
+	events := []flow.Event{
+		// Withdrawal for NFT 100 (will be paired)
+		testutil.MakeNFTWithdrawnEvent(t, flow.Testnet, &sender, txID, 0, 0, sharedUUID, 100),
+		// Withdrawal for NFT 200 (no deposit - burn)
+		testutil.MakeNFTWithdrawnEvent(t, flow.Testnet, &sender, txID, 0, 1, sharedUUID, 200),
+		// Deposit for NFT 100 (paired with withdrawal above)
+		testutil.MakeNFTDepositedEvent(t, flow.Testnet, &recipient, txID, 0, 2, sharedUUID, 100),
+		// Deposit for NFT 300 (no withdrawal - mint)
+		testutil.MakeNFTDepositedEvent(t, flow.Testnet, &mintRecipient, txID, 0, 3, sharedUUID, 300),
+	}
+
+	expected := []access.NonFungibleTokenTransfer{
+		testutil.MakeNFTTransfer(testBlockHeight, txID, 0, sender, recipient, 100, 0, 2),
+		testutil.MakeNFTTransfer(testBlockHeight, txID, 0, sender, flow.Address{}, 200, 1),
+		testutil.MakeNFTTransfer(testBlockHeight, txID, 0, flow.Address{}, mintRecipient, 300, 3),
+	}
+
+	transfers, err := parser.Parse(events, testBlockHeight)
+	require.NoError(t, err)
+	assert.ElementsMatch(t, expected, transfers)
+}
+
 // TestParseNFTTransfers_MultipleTransactionsInBlock verifies that events from
 // different transactions in the same block are grouped and paired independently.
 func TestParseNFTTransfers_MultipleTransactionsInBlock(t *testing.T) {
