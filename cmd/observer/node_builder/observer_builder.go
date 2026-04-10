@@ -945,6 +945,10 @@ func (builder *ObserverServiceBuilder) extraFlags() {
 			return errors.New("rest-max-request-size must be greater than 0")
 		}
 
+		if builder.stateStreamConf.MaxGlobalStreams == 0 {
+			return errors.New("state-stream-global-max-streams must be greater than 0")
+		}
+
 		return nil
 	})
 }

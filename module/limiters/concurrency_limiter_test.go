@@ -90,6 +90,89 @@ func TestConcurrencyLimiter_NewZeroLimit(t *testing.T) {
 	assert.Error(t, err)
 }
 
+// TestConcurrencyLimiter_Acquire_WithinLimit verifies that Acquire returns true
+// when below the concurrency limit.
+func TestConcurrencyLimiter_Acquire_WithinLimit(t *testing.T) {
+	limiter, err := NewConcurrencyLimiter(2)
+	require.NoError(t, err)
+
+	assert.True(t, limiter.Acquire())
+	assert.True(t, limiter.Acquire())
+
+	limiter.Release()
+	limiter.Release()
+}
+
+// TestConcurrencyLimiter_Acquire_AtLimit verifies that Acquire returns false
+// when the concurrency limit is reached, and succeeds again after Release.
+func TestConcurrencyLimiter_Acquire_AtLimit(t *testing.T) {
+	limiter, err := NewConcurrencyLimiter(1)
+	require.NoError(t, err)
+
+	assert.True(t, limiter.Acquire())
+	assert.False(t, limiter.Acquire(), "second Acquire must fail at limit")
+
+	limiter.Release()
+	assert.True(t, limiter.Acquire(), "Acquire must succeed after Release")
+
+	limiter.Release()
+}
+
+// TestConcurrencyLimiter_Acquire_ConcurrentCalls verifies that at most maxConcurrent
+// slots can be acquired simultaneously across concurrent goroutines.
+func TestConcurrencyLimiter_Acquire_ConcurrentCalls(t *testing.T) {
+	const maxConcurrent = 5
+	const totalGoroutines = 50
+
+	limiter, err := NewConcurrencyLimiter(maxConcurrent)
+	require.NoError(t, err)
+
+	var (
+		peak    atomic.Int32
+		current atomic.Int32
+		wg      sync.WaitGroup
+	)
+
+	start := make(chan struct{})
+
+	for i := 0; i < totalGoroutines; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			<-start
+			if limiter.Acquire() {
+				n := current.Add(1)
+				for {
+					old := peak.Load()
+					if n <= old || peak.CompareAndSwap(old, n) {
+						break
+					}
+				}
+				time.Sleep(time.Millisecond)
+				current.Add(-1)
+				limiter.Release()
+			}
+		}()
+	}
+
+	close(start)
+	wg.Wait()
+
+	assert.LessOrEqual(t, peak.Load(), int32(maxConcurrent),
+		"peak concurrent acquisitions must not exceed maxConcurrent")
+}
+
+// TestConcurrencyLimiter_Release_Underflow verifies that Release panics when called
+// without a matching Acquire (counter at zero).
+func TestConcurrencyLimiter_Release_Underflow(t *testing.T) {
+	limiter, err := NewConcurrencyLimiter(1)
+	require.NoError(t, err)
+
+	assert.PanicsWithValue(t, "concurrency limiter release without matching acquire", func() {
+		limiter.Release()
+	})
+}
+
 // TestConcurrencyLimiter_Allow_ConcurrentCalls verifies that at most maxConcurrent
 // goroutines execute fn simultaneously across a burst of concurrent callers.
 func TestConcurrencyLimiter_Allow_ConcurrentCalls(t *testing.T) {

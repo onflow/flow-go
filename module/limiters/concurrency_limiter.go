@@ -26,23 +26,45 @@ func NewConcurrencyLimiter(maxConcurrent uint32) (*ConcurrencyLimiter, error) {
 	}, nil
 }
 
-// Allow executes fn if the number of concurrent operations is below the configured limit.
-// Returns true if fn was executed, false if the limit was reached and fn was not called.
-// The concurrency counter is decremented when fn returns, including on panic.
-func (h *ConcurrencyLimiter) Allow(fn func()) bool {
+// Acquire atomically increments the concurrency counter if it is below the configured limit.
+// Returns true if the slot was acquired, false if the limit was reached.
+// The caller MUST call [Release] exactly once after a successful Acquire.
+func (h *ConcurrencyLimiter) Acquire() bool {
 	for {
 		current := h.totalConcurrent.Load()
 		if current >= h.maxConcurrent {
 			return false
 		}
 		if h.totalConcurrent.CompareAndSwap(current, current+1) {
-			break
+			return true
 		}
 	}
+}
+
+// Release decrements the concurrency counter, freeing a slot previously obtained via [Acquire].
+// Must be called exactly once for every successful [Acquire] call.
+// Panics if called without a matching [Acquire] (counter underflow).
+func (h *ConcurrencyLimiter) Release() {
+	for {
+		current := h.totalConcurrent.Load()
+		if current == 0 {
+			panic("concurrency limiter release without matching acquire")
+		}
+		if h.totalConcurrent.CompareAndSwap(current, current-1) {
+			return
+		}
+	}
+}
+
+// Allow executes fn if the number of concurrent operations is below the configured limit.
+// Returns true if fn was executed, false if the limit was reached and fn was not called.
+// The concurrency counter is decremented when fn returns, including on panic.
+func (h *ConcurrencyLimiter) Allow(fn func()) bool {
+	if !h.Acquire() {
+		return false
+	}
 	// decrement within a defer to support usecases where panics are handled gracefully by the caller
-	defer func() {
-		h.totalConcurrent.Sub(1)
-	}()
+	defer h.Release()
 
 	fn()
 	return true
