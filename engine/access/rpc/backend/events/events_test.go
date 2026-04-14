@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"math"
 	"sort"
 	"testing"
 
@@ -315,6 +316,38 @@ func (s *EventsSuite) TestGetEventsForHeightRange_HandlesErrors() {
 		endHeight := startHeight + DefaultMaxHeightRange
 
 		response, err := backend.GetEventsForHeightRange(ctx, targetEvent, startHeight, endHeight, encoding)
+		s.Assert().Equal(codes.InvalidArgument, status.Code(err))
+		s.Assert().Nil(response)
+	})
+
+	// Regression tests for unsigned integer overflow vulnerability (KRITT-1)
+	// When endHeight = math.MaxUint64 and startHeight = 0, the computation
+	// (endHeight - startHeight + 1) would overflow to 0, bypassing the range check.
+	s.Run("returns error for max uint64 end height - overflow prevention", func() {
+		backend := s.defaultBackend(query_mode.IndexQueryModeExecutionNodesOnly, s.eventsIndex)
+
+		response, err := backend.GetEventsForHeightRange(ctx, targetEvent, 0, math.MaxUint64, encoding)
+		s.Assert().Equal(codes.InvalidArgument, status.Code(err))
+		s.Assert().Contains(err.Error(), "exceeded maximum")
+		s.Assert().Nil(response)
+	})
+
+	s.Run("returns error for max uint64 end height with non-zero start - overflow prevention", func() {
+		backend := s.defaultBackend(query_mode.IndexQueryModeExecutionNodesOnly, s.eventsIndex)
+
+		response, err := backend.GetEventsForHeightRange(ctx, targetEvent, 100, math.MaxUint64, encoding)
+		s.Assert().Equal(codes.InvalidArgument, status.Code(err))
+		s.Assert().Contains(err.Error(), "exceeded maximum")
+		s.Assert().Nil(response)
+	})
+
+	s.Run("returns error for range exactly at max boundary", func() {
+		backend := s.defaultBackend(query_mode.IndexQueryModeExecutionNodesOnly, s.eventsIndex)
+		// Range of exactly maxHeightRange should be allowed (inclusive range = maxHeightRange blocks)
+		// But range of maxHeightRange + 1 blocks (endHeight = startHeight + maxHeightRange) should fail
+
+		// endHeight = startHeight + maxHeightRange gives maxHeightRange + 1 blocks, should fail
+		response, err := backend.GetEventsForHeightRange(ctx, targetEvent, startHeight, startHeight+DefaultMaxHeightRange, encoding)
 		s.Assert().Equal(codes.InvalidArgument, status.Code(err))
 		s.Assert().Nil(response)
 	})
