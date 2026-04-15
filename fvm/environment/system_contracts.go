@@ -49,10 +49,12 @@ func (sys *SystemContracts) Invoke(
 	}
 
 	span := sys.tracer.StartChildSpan(trace.FVMInvokeContractFunction)
-	span.SetAttributes(
-		attribute.String(
-			"transaction.ContractFunctionCall",
-			contractLocation.String()+"."+spec.FunctionName))
+	if span.Tracer != nil {
+		span.SetAttributes(
+			attribute.String(
+				"transaction.ContractFunctionCall",
+				contractLocation.String()+"."+spec.FunctionName))
+	}
 	defer span.End()
 
 	runtime := sys.runtime.BorrowCadenceRuntime()
