@@ -400,16 +400,16 @@ func verifyHeight(
 
 			if stopOnMismatch {
 				return BlockVerificationStats{
-					MismatchedChunkCount:       1,
-					MismatchedTransactionCount: chunkTransactionCount,
-				}, fmt.Errorf(
-					"could not verify chunk (index: %v, ID: %v) at block %v (%v): %w",
-					i,
-					collectionID,
-					height,
-					blockID,
-					err,
-				)
+						MismatchedChunkCount:       1,
+						MismatchedTransactionCount: chunkTransactionCount,
+					}, fmt.Errorf(
+						"could not verify chunk (index: %v, ID: %v) at block %v (%v): %w",
+						i,
+						collectionID,
+						height,
+						blockID,
+						err,
+					)
 			}
 
 			if vcd.IsSystemChunk {
