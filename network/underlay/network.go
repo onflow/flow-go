@@ -455,7 +455,7 @@ func (n *Network) processRegisterBlobServiceRequests(parent irrecoverable.Signal
 
 // createInboundMessageQueue creates the queue that will be used to process incoming messages.
 func (n *Network) createInboundMessageQueue(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-	n.queue = queue.NewMessageQueue(ctx, queue.GetEventPriority, n.metrics)
+	n.queue = queue.NewMessageQueue(ctx, queue.GetEventPriority, n.metrics, queue.DefaultMaxSize)
 	queue.CreateQueueWorkers(ctx, queue.DefaultNumWorkers, n.queue, n.queueSubmitFunc)
 
 	ready()
@@ -1328,6 +1328,11 @@ func (n *Network) processMessage(scope network.IncomingMessageScope) {
 	// if validation passed, send the message to the overlay
 	err := n.Receive(scope)
 	if err != nil {
+		if errors.Is(err, queue.ErrQueueFull) {
+			// queue full is expected during message floods
+			logger.Warn().Msg("message dropped: queue full")
+			return
+		}
 		n.logger.Error().Err(err).Msg("could not deliver payload")
 	}
 }
