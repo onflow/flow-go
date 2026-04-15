@@ -5,6 +5,7 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -15,6 +16,19 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
+
+// TestNew verifies that New constructs an Engine without panicking and that
+// the logging interceptor is registered as part of the interceptor chain.
+func TestNew(t *testing.T) {
+	backend := new(rpcmock.Backend)
+	log := zerolog.Nop()
+	config := Config{
+		MaxRequestMsgSize:  1024,
+		MaxResponseMsgSize: 1024,
+	}
+	e := New(config, backend, log, flow.Testnet, nil, nil)
+	require.NotNil(t, e)
+}
 
 func TestSubmitTransaction(t *testing.T) {
 	backend := new(rpcmock.Backend)

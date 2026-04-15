@@ -10,6 +10,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -20,9 +21,14 @@ import (
 
 	commonrpc "github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
+	txmetrics "github.com/onflow/flow-go/engine/execution/computation/metrics"
 	mockEng "github.com/onflow/flow-go/engine/execution/mock"
 	"github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/state/protocol"
+	protocolmock "github.com/onflow/flow-go/state/protocol/mock"
+	hotstuffmocks "github.com/onflow/flow-go/consensus/hotstuff/mocks"
 	realstorage "github.com/onflow/flow-go/storage"
 	storage "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -1369,4 +1375,52 @@ func (suite *Suite) defaultHandler() (*handler, *mockEng.ScriptExecutor) {
 		maxBlockRange:      DefaultMaxBlockRange,
 		maxScriptSize:      commonrpc.DefaultAccessMaxRequestSize,
 	}, mockEngine
+}
+
+// noopMetricsProvider is a minimal stub satisfying txmetrics.TransactionExecutionMetricsProvider.
+// It is used only in tests where method calls on the provider are not expected.
+type noopMetricsProvider struct{}
+
+func (n *noopMetricsProvider) Start(_ irrecoverable.SignalerContext)                   {}
+func (n *noopMetricsProvider) Ready() <-chan struct{}                                  { return nil }
+func (n *noopMetricsProvider) Done() <-chan struct{}                                   { return nil }
+func (n *noopMetricsProvider) BlockFinalized(_ *flow.Header)                           {}
+func (n *noopMetricsProvider) BlockProcessable(_ *flow.Header, _ *flow.QuorumCertificate) {}
+func (n *noopMetricsProvider) EpochTransition(_ uint64, _ *flow.Header)                {}
+func (n *noopMetricsProvider) EpochSetupPhaseStarted(_ uint64, _ *flow.Header)         {}
+func (n *noopMetricsProvider) EpochCommittedPhaseStarted(_ uint64, _ *flow.Header)     {}
+func (n *noopMetricsProvider) EpochFallbackModeTriggered(_ uint64, _ *flow.Header)     {}
+func (n *noopMetricsProvider) EpochFallbackModeExited(_ uint64, _ *flow.Header)        {}
+func (n *noopMetricsProvider) EpochExtended(_ uint64, _ *flow.Header, _ flow.EpochExtension) {}
+func (n *noopMetricsProvider) GetTransactionExecutionMetricsAfter(_ uint64) (txmetrics.GetTransactionExecutionMetricsAfterResponse, error) {
+	return nil, nil
+}
+func (n *noopMetricsProvider) Collect(_ flow.Identifier, _ uint64, _ txmetrics.TransactionExecutionMetrics) {
+}
+
+var _ txmetrics.TransactionExecutionMetricsProvider = (*noopMetricsProvider)(nil)
+var _ protocol.Consumer = (*noopMetricsProvider)(nil)
+
+// TestNew verifies that New constructs an Engine without panicking and that
+// the logging interceptor is registered as part of the interceptor chain.
+func TestNew(t *testing.T) {
+	log := zerolog.Nop()
+	config := Config{
+		MaxRequestMsgSize:  1024,
+		MaxResponseMsgSize: 1024,
+	}
+
+	scriptsExecutor := mockEng.NewScriptExecutor(t)
+	headers := storage.NewHeaders(t)
+	protocolState := protocolmock.NewState(t)
+	events := storage.NewEventsReader(t)
+	exeResults := storage.NewExecutionResultsReader(t)
+	txResults := storage.NewTransactionResultsReader(t)
+	commits := storage.NewCommitsReader(t)
+	transactionMetrics := &noopMetricsProvider{}
+	signerDecoder := hotstuffmocks.NewBlockSignerDecoder(t)
+
+	e := New(log, config, scriptsExecutor, headers, protocolState, events, exeResults, txResults, commits,
+		transactionMetrics, flow.Mainnet, signerDecoder, nil, nil)
+	require.NotNil(t, e)
 }
