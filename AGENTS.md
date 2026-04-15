@@ -86,6 +86,14 @@ Note: this repo includes 2 go modules:
 - **Verification Node** (`/cmd/verification/`) - Execution result verification
 - **Observer Node** (`/cmd/observer/`) - Read-only network participant
 
+Abbreviations:
+- **AN**: Access Node
+- **LN**: Collection Node
+- **SN**: Consensus Node
+- **EN**: Execution Node
+- **VN**: Verification Node
+- **ON**: Observer Node
+
 ### Core Components
 
 #### Consensus (HotStuff/Jolteon)

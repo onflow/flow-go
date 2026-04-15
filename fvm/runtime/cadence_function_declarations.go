@@ -109,6 +109,13 @@ func EVMInternalEVMContractValue(chainID flow.ChainID, fvmEnv environment.Enviro
 		evmEmulator,
 	)
 
+	// Register cache cleanup callback on the SwappableEnvironment.
+	// This ensures the cache is cleared whenever the runtime is
+	// borrowed for a new transaction or returned to the pool.
+	if se, ok := fvmEnv.(*SwappableEnvironment); ok {
+		se.RegisterOnSwapCallback(contractHandler.ResetCaches)
+	}
+
 	return impl.NewInternalEVMContractValue(
 		nil,
 		contractHandler,
