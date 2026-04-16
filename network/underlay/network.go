@@ -118,6 +118,7 @@ type Network struct {
 	authorizedSenderValidator   *validator.AuthorizedSenderValidator
 	preferredUnicasts           []protocols.ProtocolName
 	unicastStreamAuthorizer     func(sender, receiver flow.Role) bool
+	messageQueueSize            int
 }
 
 var _ network.EngineRegistry = &Network{}
@@ -171,6 +172,9 @@ type NetworkConfig struct {
 	// stream to a receiver role, before any message data is read from the stream. If nil,
 	// defaults to message.IsAuthorizedUnicastSenderRole.
 	UnicastStreamAuthorizer func(sender, receiver flow.Role) bool
+	// MessageQueueSize is the maximum number of messages that can be buffered in the inbound message queue.
+	// If set to 0, queue.DefaultMaxSize will be used.
+	MessageQueueSize int
 }
 
 // Validate validates the configuration, and sets default values for any missing fields.
@@ -305,6 +309,7 @@ func NewNetwork(param *NetworkConfig, opts ...NetworkOption) (*Network, error) {
 		unicastRateLimiters:         ratelimit.NoopRateLimiters(),
 		validators:                  DefaultValidators(param.Logger.With().Str("component", "network-validators").Logger(), param.Me.NodeID()),
 		unicastStreamAuthorizer:     param.UnicastStreamAuthorizer,
+		messageQueueSize:            param.MessageQueueSize,
 	}
 
 	n.subscriptionManager = subscription.NewChannelSubscriptionManager(n)
@@ -455,7 +460,7 @@ func (n *Network) processRegisterBlobServiceRequests(parent irrecoverable.Signal
 
 // createInboundMessageQueue creates the queue that will be used to process incoming messages.
 func (n *Network) createInboundMessageQueue(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-	n.queue = queue.NewMessageQueue(ctx, queue.GetEventPriority, n.metrics, queue.DefaultMaxSize)
+	n.queue = queue.NewMessageQueue(ctx, queue.GetEventPriority, n.metrics, n.messageQueueSize)
 	queue.CreateQueueWorkers(ctx, queue.DefaultNumWorkers, n.queue, n.queueSubmitFunc)
 
 	ready()
