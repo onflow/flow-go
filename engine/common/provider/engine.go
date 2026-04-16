@@ -33,7 +33,9 @@ const (
 
 	// DefaultMaxEntityIDs is the default maximum number of entity IDs that can be requested in a single
 	// EntityRequest. This limit prevents amplification attacks where a small request triggers excessive
-	// retrieval and serialization work.
+	// retrieval and serialization work. Note: the default requester engine (engine/common/requester) only
+	// requests up to 32 entity IDs per batch (see BatchThreshold), so this limit provides ample headroom
+	// for legitimate requests.
 	DefaultMaxEntityIDs = 100
 
 	// DefaultMaxResponseByteSize is the default maximum cumulative byte size of encoded entities in a response.
