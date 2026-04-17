@@ -242,12 +242,19 @@ func TestStreamUnsubscribesOnContextCancel(t *testing.T) {
 			synctest.Wait()
 			assert.Equal(t, numStreams, broadcaster.SubscriberCount())
 
+			// Verify broadcast reaches all subscribers
+			broadcaster.Publish()
+			synctest.Wait()
+
 			// Cancel streams one by one and verify count decreases
 			for i := 0; i < numStreams; i++ {
 				cancels[i]()
 				synctest.Wait()
 				assert.Equal(t, numStreams-i-1, broadcaster.SubscriberCount())
 			}
+
+			// Verify broadcasting to empty subscriber list works
+			broadcaster.Publish()
 		})
 	})
 }
