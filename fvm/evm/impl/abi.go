@@ -174,7 +174,11 @@ func reportABIEncodingComputation(
 
 		case evmTypeIDs.BytesTypeID:
 			computation := uint64(2 * abiEncodingByteSize)
-			valueMember := value.GetMember(context, stdlib.EVMBytesTypeValueFieldName)
+			valueMember := value.GetMember(
+				context,
+				stdlib.EVMBytesTypeValueFieldName,
+				common.DeclarationKindField,
+			)
 			bytesArray, ok := valueMember.(*interpreter.ArrayValue)
 			if !ok {
 				panic(abiEncodingError{
@@ -199,11 +203,12 @@ func reportABIEncodingComputation(
 			if compositeType := asTupleEncodableCompositeType(semaType); compositeType != nil {
 
 				compositeType.Members.Foreach(func(name string, member *sema.Member) {
-					if member.DeclarationKind != common.DeclarationKindField {
+					declarationKind := member.DeclarationKind
+					if declarationKind != common.DeclarationKindField {
 						return
 					}
 
-					fieldValue := value.GetMember(context, name)
+					fieldValue := value.GetMember(context, name, declarationKind)
 					reportABIEncodingComputation(
 						context,
 						fieldValue,
@@ -741,7 +746,11 @@ func encodeABI(
 	case *interpreter.CompositeValue:
 		switch value.TypeID() {
 		case evmTypeIDs.AddressTypeID:
-			addressBytesArrayValue := value.GetMember(context, stdlib.EVMAddressTypeBytesFieldName)
+			addressBytesArrayValue := value.GetMember(
+				context,
+				stdlib.EVMAddressTypeBytesFieldName,
+				common.DeclarationKindField,
+			)
 			bytes, err := interpreter.ByteArrayValueToByteSlice(context, addressBytesArrayValue)
 			if err != nil {
 				panic(err)
@@ -749,7 +758,11 @@ func encodeABI(
 			return gethCommon.Address(bytes), gethTypeAddress, nil
 
 		case evmTypeIDs.BytesTypeID:
-			bytesValue := value.GetMember(context, stdlib.EVMBytesTypeValueFieldName)
+			bytesValue := value.GetMember(
+				context,
+				stdlib.EVMBytesTypeValueFieldName,
+				common.DeclarationKindField,
+			)
 			bytes, err := interpreter.ByteArrayValueToByteSlice(context, bytesValue)
 			if err != nil {
 				panic(err)
@@ -757,7 +770,11 @@ func encodeABI(
 			return bytes, gethTypeBytes, nil
 
 		case evmTypeIDs.Bytes4TypeID:
-			bytesValue := value.GetMember(context, stdlib.EVMBytesTypeValueFieldName)
+			bytesValue := value.GetMember(
+				context,
+				stdlib.EVMBytesTypeValueFieldName,
+				common.DeclarationKindField,
+			)
 			bytes, err := interpreter.ByteArrayValueToByteSlice(context, bytesValue)
 			if err != nil {
 				panic(err)
@@ -765,7 +782,11 @@ func encodeABI(
 			return [stdlib.EVMBytes4Length]byte(bytes), gethTypeBytes4, nil
 
 		case evmTypeIDs.Bytes32TypeID:
-			bytesValue := value.GetMember(context, stdlib.EVMBytesTypeValueFieldName)
+			bytesValue := value.GetMember(
+				context,
+				stdlib.EVMBytesTypeValueFieldName,
+				common.DeclarationKindField,
+			)
 			bytes, err := interpreter.ByteArrayValueToByteSlice(context, bytesValue)
 			if err != nil {
 				panic(err)
@@ -793,7 +814,8 @@ func encodeABI(
 
 			compositeType.Members.Foreach(func(name string, member *sema.Member) {
 
-				if member.DeclarationKind != common.DeclarationKindField {
+				declarationKind := member.DeclarationKind
+				if declarationKind != common.DeclarationKindField {
 					return
 				}
 
@@ -806,7 +828,7 @@ func encodeABI(
 
 				index++
 
-				fieldValue := value.GetMember(context, name)
+				fieldValue := value.GetMember(context, name, declarationKind)
 
 				fieldElement, _, err := encodeABI(
 					context,

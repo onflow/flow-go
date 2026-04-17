@@ -110,7 +110,7 @@ func TestEventEmitted(t *testing.T) {
 		assert.NoError(t, err)
 
 		script := []byte(fmt.Sprintf(`
-			import 0x%s
+			import Test from 0x%s
 
 			transaction {
 				execute {
