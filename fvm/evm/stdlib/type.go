@@ -13,7 +13,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-func newContractType(chainID flow.ChainID) *sema.CompositeType {
+func newContractType(chainID flow.ChainID, evmTestHelpersEnabled bool) *sema.CompositeType {
 
 	contracts := systemcontracts.SystemContractsForChain(chainID)
 
@@ -21,6 +21,7 @@ func newContractType(chainID flow.ChainID) *sema.CompositeType {
 		contracts.NonFungibleToken.Address,
 		contracts.FungibleToken.Address,
 		contracts.FlowToken.Address,
+		evmTestHelpersEnabled,
 	)
 
 	evmContractAddress := contracts.EVMContract.Address
@@ -98,7 +99,7 @@ func exportCadenceEventType(contractType *sema.CompositeType, name string) (*cad
 
 func init() {
 	for _, chain := range flow.AllChainIDs() {
-		contractType := newContractType(chain)
+		contractType := newContractType(chain, true)
 		contractTypes[chain] = contractType
 
 		transactionExecutedEvent, err := exportCadenceEventType(contractType, "TransactionExecuted")

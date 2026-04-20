@@ -559,7 +559,7 @@ func NewTrieBatchProof() *TrieBatchProof {
 func NewTrieBatchProofWithEmptyProofs(numberOfProofs int) *TrieBatchProof {
 	bp := new(TrieBatchProof)
 	bp.Proofs = make([]*TrieProof, numberOfProofs)
-	for i := 0; i < numberOfProofs; i++ {
+	for i := range numberOfProofs {
 		bp.Proofs[i] = NewTrieProof()
 	}
 	return bp

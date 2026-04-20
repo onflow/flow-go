@@ -20,7 +20,7 @@ func SliceToMap(values []string) map[string]bool {
 
 // ParseBody parses the input data into the destination interface and returns any decoding errors
 // updated to be more user-friendly. It also checks that there is exactly one json object in the input
-func ParseBody(raw io.Reader, dst interface{}) error {
+func ParseBody(raw io.Reader, dst any) error {
 	dec := json.NewDecoder(raw)
 	dec.DisallowUnknownFields()
 
@@ -62,12 +62,12 @@ func ParseBody(raw io.Reader, dst interface{}) error {
 // ConvertInterfaceToArrayOfStrings converts a slice of interface{} to a slice of strings.
 //
 // No errors are expected during normal operations.
-func ConvertInterfaceToArrayOfStrings(value interface{}) ([]string, error) {
+func ConvertInterfaceToArrayOfStrings(value any) ([]string, error) {
 	if strSlice, ok := value.([]string); ok {
 		return strSlice, nil
 	}
 
-	interfaceSlice, ok := value.([]interface{})
+	interfaceSlice, ok := value.([]any)
 	if !ok {
 		return nil, fmt.Errorf("value must be an array. got %T", value)
 	}

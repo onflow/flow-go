@@ -213,9 +213,11 @@ func (v *TransactionVerifier) verifyTransaction(
 	keyWeightThreshold int,
 ) error {
 	span := tracer.StartChildSpan(trace.FVMVerifyTransaction)
-	span.SetAttributes(
-		attribute.String("transaction.ID", proc.ID.String()),
-	)
+	if span.Tracer != nil {
+		span.SetAttributes(
+			attribute.String("transaction.ID", proc.ID.String()),
+		)
+	}
 	defer span.End()
 
 	tx := proc.Transaction
@@ -374,7 +376,7 @@ func (v *TransactionVerifier) verifySignatures(
 	close(toVerifyChan)
 
 	foundError := false
-	for i := 0; i < len(signatures); i++ {
+	for range signatures {
 		entry := <-verifiedChan
 
 		if !entry.invokedVerify {

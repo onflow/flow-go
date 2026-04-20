@@ -285,7 +285,7 @@ const invalidCodePreviewNetwork = uint64(0x5211829E88528817)
 func encodeWord(word uint64) uint64 {
 	// Multiply the index GF(2) vector by the code generator matrix
 	codeWord := uint64(0)
-	for i := 0; i < linearCodeK; i++ {
+	for i := range linearCodeK {
 		if word&1 == 1 {
 			codeWord ^= generatorMatrixRows[i]
 		}
@@ -298,7 +298,7 @@ func encodeWord(word uint64) uint64 {
 func isValidCodeWord(codeWord uint64) bool {
 	// Multiply the code word GF(2)-vector by the parity-check matrix
 	parity := uint(0)
-	for i := 0; i < linearCodeN; i++ {
+	for i := range linearCodeN {
 		if codeWord&1 == 1 {
 			parity ^= parityCheckMatrixColumns[i]
 		}
@@ -314,7 +314,7 @@ func decodeCodeWord(codeWord uint64) uint64 {
 	// the partial code generator.
 	word := uint64(0)
 	codeWord >>= (linearCodeN - linearCodeK)
-	for i := 0; i < linearCodeK; i++ {
+	for i := range linearCodeK {
 		if codeWord&1 == 1 {
 			word ^= inverseMatrixRows[i]
 		}

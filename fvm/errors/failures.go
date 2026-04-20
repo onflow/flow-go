@@ -15,7 +15,7 @@ func NewUnknownFailure(err error) CodedFailure {
 func NewEncodingFailuref(
 	err error,
 	msg string,
-	args ...interface{},
+	args ...any,
 ) CodedFailure {
 	return WrapCodedFailure(
 		FailureCodeEncodingFailure,

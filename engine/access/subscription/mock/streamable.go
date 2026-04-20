@@ -156,23 +156,23 @@ func (_c *Streamable_ID_Call) RunAndReturn(run func() string) *Streamable_ID_Cal
 }
 
 // Next provides a mock function for the type Streamable
-func (_mock *Streamable) Next(context1 context.Context) (interface{}, error) {
+func (_mock *Streamable) Next(context1 context.Context) (any, error) {
 	ret := _mock.Called(context1)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Next")
 	}
 
-	var r0 interface{}
+	var r0 any
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context) (interface{}, error)); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context) (any, error)); ok {
 		return returnFunc(context1)
 	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context) interface{}); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context) any); ok {
 		r0 = returnFunc(context1)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(interface{})
+			r0 = ret.Get(0).(any)
 		}
 	}
 	if returnFunc, ok := ret.Get(1).(func(context.Context) error); ok {
@@ -207,27 +207,27 @@ func (_c *Streamable_Next_Call) Run(run func(context1 context.Context)) *Streama
 	return _c
 }
 
-func (_c *Streamable_Next_Call) Return(ifaceVal interface{}, err error) *Streamable_Next_Call {
-	_c.Call.Return(ifaceVal, err)
+func (_c *Streamable_Next_Call) Return(v any, err error) *Streamable_Next_Call {
+	_c.Call.Return(v, err)
 	return _c
 }
 
-func (_c *Streamable_Next_Call) RunAndReturn(run func(context1 context.Context) (interface{}, error)) *Streamable_Next_Call {
+func (_c *Streamable_Next_Call) RunAndReturn(run func(context1 context.Context) (any, error)) *Streamable_Next_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // Send provides a mock function for the type Streamable
-func (_mock *Streamable) Send(context1 context.Context, ifaceVal interface{}, duration time.Duration) error {
-	ret := _mock.Called(context1, ifaceVal, duration)
+func (_mock *Streamable) Send(context1 context.Context, v any, duration time.Duration) error {
+	ret := _mock.Called(context1, v, duration)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Send")
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, interface{}, time.Duration) error); ok {
-		r0 = returnFunc(context1, ifaceVal, duration)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, any, time.Duration) error); ok {
+		r0 = returnFunc(context1, v, duration)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -241,21 +241,21 @@ type Streamable_Send_Call struct {
 
 // Send is a helper method to define mock.On call
 //   - context1 context.Context
-//   - ifaceVal interface{}
+//   - v any
 //   - duration time.Duration
-func (_e *Streamable_Expecter) Send(context1 interface{}, ifaceVal interface{}, duration interface{}) *Streamable_Send_Call {
-	return &Streamable_Send_Call{Call: _e.mock.On("Send", context1, ifaceVal, duration)}
+func (_e *Streamable_Expecter) Send(context1 interface{}, v interface{}, duration interface{}) *Streamable_Send_Call {
+	return &Streamable_Send_Call{Call: _e.mock.On("Send", context1, v, duration)}
 }
 
-func (_c *Streamable_Send_Call) Run(run func(context1 context.Context, ifaceVal interface{}, duration time.Duration)) *Streamable_Send_Call {
+func (_c *Streamable_Send_Call) Run(run func(context1 context.Context, v any, duration time.Duration)) *Streamable_Send_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
 			arg0 = args[0].(context.Context)
 		}
-		var arg1 interface{}
+		var arg1 any
 		if args[1] != nil {
-			arg1 = args[1].(interface{})
+			arg1 = args[1].(any)
 		}
 		var arg2 time.Duration
 		if args[2] != nil {
@@ -275,7 +275,7 @@ func (_c *Streamable_Send_Call) Return(err error) *Streamable_Send_Call {
 	return _c
 }
 
-func (_c *Streamable_Send_Call) RunAndReturn(run func(context1 context.Context, ifaceVal interface{}, duration time.Duration) error) *Streamable_Send_Call {
+func (_c *Streamable_Send_Call) RunAndReturn(run func(context1 context.Context, v any, duration time.Duration) error) *Streamable_Send_Call {
 	_c.Call.Return(run)
 	return _c
 }

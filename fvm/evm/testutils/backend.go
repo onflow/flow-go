@@ -238,6 +238,11 @@ type TestBackend struct {
 	*TestTracer
 	*TestMetricsReporter
 	*TestLoggerProvider
+	evmTestOperationsAllowed bool
+}
+
+func (tb *TestBackend) EVMTestOperationsAllowed() bool {
+	return tb.evmTestOperationsAllowed
 }
 
 var _ types.Backend = &TestBackend{}
@@ -258,6 +263,10 @@ func (tb *TestBackend) DropEvents() {
 
 func (tb *TestBackend) Get(id flow.RegisterID) (flow.RegisterValue, error) {
 	return tb.GetValue([]byte(id.Owner), []byte(id.Key))
+}
+
+func (tb *TestBackend) SetEVMTestOperationsAllowed(allowed bool) {
+	tb.evmTestOperationsAllowed = allowed
 }
 
 type TestValueStore struct {

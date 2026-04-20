@@ -80,19 +80,19 @@ jobs:
     environment: container builds
     steps:
       - name: Setup Go
-        uses: actions/setup-go@v4
+        uses: actions/setup-go@v6
         with:
           go-version: ${{ env.GO_VERSION }}
 
       - name: Checkout Public flow-go repo
-        uses: actions/checkout@v3
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
           repository: onflow/flow-go
           ref: ${{ inputs.tag }}
 
       - name: Authenticate with Docker Registry
-        uses: google-github-actions/auth@v1
+        uses: google-github-actions/auth@v3
         with:
           credentials_json: ${{ secrets.GCP_CREDENTIALS_FOR_PRIVATE_REGISTRY }}
 
@@ -100,7 +100,7 @@ jobs:
         run: gcloud auth configure-docker ${{ env.PRIVATE_REGISTRY_HOST }}
 
       - name: Login to Docker Hub
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           username: ${{ vars.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
@@ -117,7 +117,8 @@ jobs:
     # It uses a matrix strategy to handle the builds for different roles in parallel.
     # The environment is set to 'secure builds' to ensure that the builds are gated and only approved images are deployed.
     # The job is triggered only if the 'secure-build' input is set to 'true'.
-    # The job uses an action to execute a cross-repo workflow that builds and pushes the images to the private registry.
+    # max-parallel: 1 ensures each role gets the correct run ID (avoids wrong run mapping when polling).
+    # Set vars.SECURE_BUILDS_REPO (e.g. flow-go-internal) for unmasked run links in logs.
     name: Execute secure build & push to private registry
     runs-on: ubuntu-latest
     if: ${{ github.event.inputs.secure-build == 'true' }}
@@ -135,6 +136,7 @@ jobs:
           owner: ${{ github.repository_owner }}
 
       - uses: convictional/trigger-workflow-and-wait@v1.6.5
+        id: trigger-secure-build
         with:
           client_payload: '{"role": "${{ matrix.role }}", "tag": "${{ inputs.tag }}"}'
           github_token: ${{ steps.app-token.outputs.token }}
@@ -142,6 +144,11 @@ jobs:
           repo: ${{ secrets.SECURE_BUILDS_REPO }}
           ref: master-private
           workflow_file_name: 'secure_build.yml'
+
+      - name: Print secure build run URL
+        run: |
+          REPO="${{ vars.SECURE_BUILDS_REPO || 'flow-go-internal' }}"
+          echo "Secure build for ${{ matrix.role }}: https://github.com/onflow/${REPO}/actions/runs/${{ steps.trigger-secure-build.outputs.workflow_id }}"
 
   promote-to-partner-registry:
     # This job promotes container images from the private registry to the partner registry.
@@ -164,7 +171,7 @@ jobs:
     environment: ${{ matrix.role }} image promotion to partner registry
     steps:
       - name: Checkout repo
-        uses: actions/checkout@v3
+        uses: actions/checkout@v6
 
       - name: Promote ${{ matrix.role }}
         uses: ./actions/promote-images
@@ -196,7 +203,7 @@ jobs:
     environment: ${{ matrix.role }} image promotion to public registry
     steps:
       - name: Checkout repo
-        uses: actions/checkout@v3
+        uses: actions/checkout@v6
 
       - name: Promote ${{ matrix.role }}
         uses: ./actions/promote-images

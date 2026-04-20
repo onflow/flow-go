@@ -3,6 +3,7 @@ package operation
 import (
 	"errors"
 	"fmt"
+	"slices"
 
 	"github.com/jordanschalm/lockctx"
 
@@ -63,10 +64,8 @@ func indexBlockByParent(rw storage.ReaderBatchWriter, blockID flow.Identifier, p
 	}
 
 	// check we don't add a duplicate
-	for _, dupID := range childrenIDs {
-		if blockID == dupID {
-			return storage.ErrAlreadyExists
-		}
+	if slices.Contains(childrenIDs, blockID) {
+		return storage.ErrAlreadyExists
 	}
 
 	// adding the new block to be another child of the parent

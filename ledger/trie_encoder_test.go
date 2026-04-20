@@ -370,7 +370,7 @@ func TestPayloadWithoutPrefixSerialization(t *testing.T) {
 			require.Equal(t, p, decodedp)
 
 			// Reset encoded payload
-			for i := 0; i < len(encoded); i++ {
+			for i := range encoded {
 				encoded[i] = 0
 			}
 

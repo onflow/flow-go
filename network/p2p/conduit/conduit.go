@@ -76,7 +76,7 @@ var _ network.Conduit = (*Conduit)(nil)
 // to subscribers of the given event on the network layer. It uses a
 // publish-subscribe layer and can thus not guarantee that the specified
 // recipients received the event.
-func (c *Conduit) Publish(event interface{}, targetIDs ...flow.Identifier) error {
+func (c *Conduit) Publish(event any, targetIDs ...flow.Identifier) error {
 	if c.ctx.Err() != nil {
 		return fmt.Errorf("conduit for channel %s closed", c.channel)
 	}
@@ -86,7 +86,7 @@ func (c *Conduit) Publish(event interface{}, targetIDs ...flow.Identifier) error
 // Unicast sends an event in a reliable way to the given recipient.
 // It uses 1-1 direct messaging over the underlying network to deliver the event.
 // It returns an error if the unicast fails.
-func (c *Conduit) Unicast(event interface{}, targetID flow.Identifier) error {
+func (c *Conduit) Unicast(event any, targetID flow.Identifier) error {
 	if c.ctx.Err() != nil {
 		return fmt.Errorf("conduit for channel %s closed", c.channel)
 	}
@@ -95,7 +95,7 @@ func (c *Conduit) Unicast(event interface{}, targetID flow.Identifier) error {
 
 // Multicast unreliably sends the specified event to the specified number of recipients selected from the specified subset.
 // The recipients are selected randomly from targetIDs
-func (c *Conduit) Multicast(event interface{}, num uint, targetIDs ...flow.Identifier) error {
+func (c *Conduit) Multicast(event any, num uint, targetIDs ...flow.Identifier) error {
 	if c.ctx.Err() != nil {
 		return fmt.Errorf("conduit for channel %s closed", c.channel)
 	}

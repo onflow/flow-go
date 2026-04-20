@@ -38,7 +38,7 @@ func TestConcurrentQueueAccess(t *testing.T) {
 
 	messages := createMessages(messageCnt, randomPriority)
 
-	var priorityFunc queue.MessagePriorityFunc = func(message interface{}) (queue.Priority, error) {
+	var priorityFunc queue.MessagePriorityFunc = func(message any) (queue.Priority, error) {
 		return messages[message.(string)], nil
 	}
 
@@ -71,13 +71,13 @@ func TestConcurrentQueueAccess(t *testing.T) {
 	}
 
 	// kick off writers
-	for i := 0; i < writerCnt; i++ {
+	for range writerCnt {
 		writeWg.Add(1)
 		go write()
 	}
 
 	// kick off readers
-	for i := 0; i < readerCnt; i++ {
+	for range readerCnt {
 		go read()
 	}
 
@@ -118,7 +118,7 @@ func TestQueueShutdown(t *testing.T) {
 func testQueue(t *testing.T, messages map[string]queue.Priority) {
 
 	// create the priority function
-	var priorityFunc queue.MessagePriorityFunc = func(message interface{}) (queue.Priority, error) {
+	var priorityFunc queue.MessagePriorityFunc = func(message any) (queue.Priority, error) {
 		return messages[message.(string)], nil
 	}
 
@@ -205,7 +205,7 @@ func createMessages(messageCnt int, priorityFunc queue.MessagePriorityFunc) map[
 	// create a map of messages -> priority
 	messages := make(map[string]queue.Priority, messageCnt)
 
-	for i := 0; i < messageCnt; i++ {
+	for i := range messageCnt {
 		// choose a random priority
 		p, _ := priorityFunc(nil)
 		// create a message
@@ -216,12 +216,12 @@ func createMessages(messageCnt int, priorityFunc queue.MessagePriorityFunc) map[
 	return messages
 }
 
-func randomPriority(_ interface{}) (queue.Priority, error) {
+func randomPriority(_ any) (queue.Priority, error) {
 
 	p := rand.Intn(int(queue.HighPriority-queue.LowPriority+1)) + int(queue.LowPriority)
 	return queue.Priority(p), nil
 }
 
-func fixedPriority(_ interface{}) (queue.Priority, error) {
+func fixedPriority(_ any) (queue.Priority, error) {
 	return queue.MediumPriority, nil
 }

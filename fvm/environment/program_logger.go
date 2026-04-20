@@ -155,7 +155,15 @@ func (logger *ProgramLogger) ProgramParsed(
 	location common.Location,
 	duration time.Duration,
 ) {
-	logger.RecordTrace("parseProgram", duration, nil)
+	var attrs []attribute.KeyValue
+	if logger.tracer.IsTraceable() && location != nil {
+		attrs = append(
+			attrs,
+			attribute.String("location", location.String()),
+		)
+	}
+
+	logger.RecordTrace("parseProgram", duration, attrs)
 
 	// These checks prevent re-reporting durations, the metrics collection is
 	// a bit counter-intuitive:
@@ -177,7 +185,15 @@ func (logger *ProgramLogger) ProgramChecked(
 	location common.Location,
 	duration time.Duration,
 ) {
-	logger.RecordTrace("checkProgram", duration, nil)
+	var attrs []attribute.KeyValue
+	if logger.tracer.IsTraceable() && location != nil {
+		attrs = append(
+			attrs,
+			attribute.String("location", location.String()),
+		)
+	}
+
+	logger.RecordTrace("checkProgram", duration, attrs)
 
 	// see the comment for ProgramParsed
 	if location == nil {

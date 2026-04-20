@@ -185,7 +185,7 @@ func testAddressGeneration(t *testing.T) {
 		// sanity check of NextAddress function consistency
 		state := chain.NewAddressGenerator()
 		expectedIndex := uint64(0)
-		for i := 0; i < loop; i++ {
+		for range loop {
 			expectedIndex++
 			address, err := state.NextAddress()
 			require.NoError(t, err)
@@ -201,7 +201,7 @@ func testAddressGeneration(t *testing.T) {
 		if chainID == Mainnet {
 			r := uint64(rand.Intn(maxIndex - loop))
 			state = chain.NewAddressGeneratorAtIndex(r)
-			for i := 0; i < loop; i++ {
+			for range loop {
 				address, err := state.NextAddress()
 				require.NoError(t, err)
 				weight := bits.OnesCount64(address.uint64())
@@ -216,7 +216,7 @@ func testAddressGeneration(t *testing.T) {
 		state = chain.NewAddressGeneratorAtIndex(r)
 		refAddress, err := state.NextAddress()
 		require.NoError(t, err)
-		for i := 0; i < loop; i++ {
+		for range loop {
 			address, err := state.NextAddress()
 			require.NoError(t, err)
 			distance := bits.OnesCount64(address.uint64() ^ refAddress.uint64())
@@ -227,7 +227,7 @@ func testAddressGeneration(t *testing.T) {
 		// All valid addresses must pass IsValid.
 		r = uint64(rand.Intn(maxIndex - loop))
 		state = chain.NewAddressGeneratorAtIndex(r)
-		for i := 0; i < loop; i++ {
+		for range loop {
 			address, err := state.NextAddress()
 			require.NoError(t, err)
 			check := chain.IsValid(address)
@@ -242,7 +242,7 @@ func testAddressGeneration(t *testing.T) {
 		r = uint64(rand.Intn(maxIndex - loop))
 
 		state = chain.NewAddressGeneratorAtIndex(r)
-		for i := 0; i < loop; i++ {
+		for range loop {
 			address, err := state.NextAddress()
 			require.NoError(t, err)
 			invalidAddress = uint64ToAddress(address.uint64() ^ invalidCodeWord)
@@ -272,7 +272,7 @@ func testAddressesIntersection(t *testing.T) {
 		// a valid address in one network must be invalid in all other networks
 		r := uint64(rand.Intn(maxIndex - loop))
 		state := chain.NewAddressGeneratorAtIndex(r)
-		for k := 0; k < loop; k++ {
+		for range loop {
 			address, err := state.NextAddress()
 			require.NoError(t, err)
 			for _, otherChain := range chainIDs {
@@ -298,7 +298,7 @@ func testAddressesIntersection(t *testing.T) {
 		// fail the check for all networks
 		r = uint64(rand.Intn(maxIndex - loop))
 		state = chain.NewAddressGeneratorAtIndex(r)
-		for k := 0; k < loop; k++ {
+		for range loop {
 			address, err := state.NextAddress()
 			require.NoError(t, err)
 			invalidAddress = uint64ToAddress(address.uint64() ^ invalidCodeWord)
@@ -322,7 +322,7 @@ func testIndexFromAddress(t *testing.T) {
 	}
 
 	for _, chain := range chains {
-		for i := 0; i < loop; i++ {
+		for range loop {
 			// check the correctness of IndexFromAddress
 
 			// random valid index
@@ -350,7 +350,7 @@ func testIndexFromAddress(t *testing.T) {
 func TestUint48(t *testing.T) {
 	const loop = 50
 	// test consistensy of putUint48 and uint48
-	for i := 0; i < loop; i++ {
+	for range loop {
 		r := uint64(rand.Intn(1 << linearCodeK))
 		b := make([]byte, addressIndexLength)
 		putUint48(b, r)

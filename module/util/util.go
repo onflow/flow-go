@@ -87,7 +87,7 @@ func CheckClosed(done <-chan struct{}) bool {
 }
 
 // MergeChannels merges a list of channels into a single channel
-func MergeChannels(channels interface{}) interface{} {
+func MergeChannels(channels any) any {
 	sliceType := reflect.TypeOf(channels)
 	if sliceType.Kind() != reflect.Slice && sliceType.Kind() != reflect.Array {
 		panic("argument must be an array or slice")

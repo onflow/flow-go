@@ -1,7 +1,0 @@
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: flow-node-config-map
-  namespace: flow
-data:
-  entries: 'collection-8a9a01361b8a1e048a17acbd0deb18473e335389667b3e491edf030948335487@flow-collection-node-v1-0.flow-test-network-v1.flow.svc.cluster.local:3569=1000,collection-a1f922ed445ea61dd50d97d0fa69a69aa22e998530a0b976aae679ebf4756ade@flow-collection-node-v1-1.flow-test-network-v1.flow.svc.cluster.local:3569=1000,collection-b6beaa7f7d45c74192029b9261b703b208d76d054505e77758659c48c1f6f4eb@flow-collection-node-v1-2.flow-test-network-v1.flow.svc.cluster.local:3569=1000,consensus-87aa9e83d59111f912fe785d32e361ff917bb0b452a736dc8de0ca0bdd577b3b@flow-consensus-node-v1-0.flow-test-network-v1.flow.svc.cluster.local:3569=1000,execution-8806fa187214d53bb1d2ed7fc67d7c3bfc0e1518fa28319c9b9598e89b2cd2ee@flow-execution-node-v1-0.flow-test-network-v1.flow.svc.cluster.local:3569=1000,verification-fbdb6deafcecaf3b318d271af56156ff99bc9d40152cd93920173fe4027e6d7f@flow-verification-node-v1-0.flow-test-network-v1.flow.svc.cluster.local:3569=1000'

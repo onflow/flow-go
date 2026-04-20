@@ -57,7 +57,7 @@ const (
 
 // getCode returns the header code for the given value's type.
 // It returns an error if the type is not supported.
-func getCode(v interface{}) (byte, error) {
+func getCode(v any) (byte, error) {
 	switch v.(type) {
 	case *flow.BlockExecutionDataRoot:
 		return codeExecutionDataRoot, nil
@@ -74,7 +74,7 @@ func getCode(v interface{}) (byte, error) {
 
 // getPrototype returns a new instance of the type that corresponds to the given header code.
 // It returns an error if the code is not supported.
-func getPrototype(code byte) (interface{}, error) {
+func getPrototype(code byte) (any, error) {
 	switch code {
 	case codeExecutionDataRoot:
 		return &flow.BlockExecutionDataRoot{}, nil
@@ -92,11 +92,11 @@ func getPrototype(code byte) (interface{}, error) {
 type Serializer interface {
 	// Serialize encodes and compresses the given value to the given writer.
 	// No errors are expected during normal operation.
-	Serialize(io.Writer, interface{}) error
+	Serialize(io.Writer, any) error
 
 	// Deserialize decompresses and decodes the data from the given reader.
 	// No errors are expected during normal operation.
-	Deserialize(io.Reader) (interface{}, error)
+	Deserialize(io.Reader) (any, error)
 }
 
 // serializer implements the Serializer interface. Object are serialized by encoding and
@@ -118,7 +118,7 @@ func NewSerializer(codec encoding.Codec, compressor network.Compressor) *seriali
 }
 
 // writePrototype writes the header code for the given value to the given writer
-func (s *serializer) writePrototype(w io.Writer, v interface{}) error {
+func (s *serializer) writePrototype(w io.Writer, v any) error {
 	var code byte
 	var err error
 
@@ -141,7 +141,7 @@ func (s *serializer) writePrototype(w io.Writer, v interface{}) error {
 
 // Serialize encodes and compresses the given value to the given writer.
 // No errors are expected during normal operation.
-func (s *serializer) Serialize(w io.Writer, v interface{}) error {
+func (s *serializer) Serialize(w io.Writer, v any) error {
 	if err := s.writePrototype(w, v); err != nil {
 		return fmt.Errorf("failed to write prototype: %w", err)
 	}
@@ -167,7 +167,7 @@ func (s *serializer) Serialize(w io.Writer, v interface{}) error {
 }
 
 // readPrototype reads a header code from the given reader and returns a prototype value
-func (s *serializer) readPrototype(r io.Reader) (interface{}, error) {
+func (s *serializer) readPrototype(r io.Reader) (any, error) {
 	var code byte
 	var err error
 
@@ -188,7 +188,7 @@ func (s *serializer) readPrototype(r io.Reader) (interface{}, error) {
 
 // Deserialize decompresses and decodes the data from the given reader.
 // No errors are expected during normal operation.
-func (s *serializer) Deserialize(r io.Reader) (interface{}, error) {
+func (s *serializer) Deserialize(r io.Reader) (any, error) {
 	v, err := s.readPrototype(r)
 
 	if err != nil {

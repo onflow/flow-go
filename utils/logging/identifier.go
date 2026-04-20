@@ -16,7 +16,7 @@ func ID(id flow.Identifier) []byte {
 	return id[:]
 }
 
-func Type(obj interface{}) string {
+func Type(obj any) string {
 	return fmt.Sprintf("%T", obj)
 }
 

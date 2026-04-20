@@ -36,7 +36,7 @@ type InvalidSignatureIncludedError struct {
 	err error
 }
 
-func NewInvalidSignatureIncludedErrorf(msg string, args ...interface{}) error {
+func NewInvalidSignatureIncludedErrorf(msg string, args ...any) error {
 	return InvalidSignatureIncludedError{
 		err: fmt.Errorf(msg, args...),
 	}
@@ -58,7 +58,7 @@ type InvalidSignerIdxError struct {
 	err error
 }
 
-func NewInvalidSignerIdxErrorf(msg string, args ...interface{}) error {
+func NewInvalidSignerIdxErrorf(msg string, args ...any) error {
 	return InvalidSignerIdxError{
 		err: fmt.Errorf(msg, args...),
 	}
@@ -80,7 +80,7 @@ type DuplicatedSignerIdxError struct {
 	err error
 }
 
-func NewDuplicatedSignerIdxErrorf(msg string, args ...interface{}) error {
+func NewDuplicatedSignerIdxErrorf(msg string, args ...any) error {
 	return DuplicatedSignerIdxError{
 		err: fmt.Errorf(msg, args...),
 	}
@@ -102,7 +102,7 @@ type InsufficientSignaturesError struct {
 	err error
 }
 
-func NewInsufficientSignaturesErrorf(msg string, args ...interface{}) error {
+func NewInsufficientSignaturesErrorf(msg string, args ...any) error {
 	return InsufficientSignaturesError{
 		err: fmt.Errorf(msg, args...),
 	}
@@ -124,7 +124,7 @@ type InvalidSignerIndicesError struct {
 	err error
 }
 
-func NewInvalidSignerIndicesErrorf(msg string, args ...interface{}) error {
+func NewInvalidSignerIndicesErrorf(msg string, args ...any) error {
 	return InvalidSignerIndicesError{
 		err: fmt.Errorf(msg, args...),
 	}
@@ -146,7 +146,7 @@ type InvalidSigTypesError struct {
 	err error
 }
 
-func NewInvalidSigTypesErrorf(msg string, args ...interface{}) error {
+func NewInvalidSigTypesErrorf(msg string, args ...any) error {
 	return InvalidSigTypesError{
 		err: fmt.Errorf(msg, args...),
 	}

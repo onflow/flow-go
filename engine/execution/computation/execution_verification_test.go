@@ -220,7 +220,7 @@ func Test_ExecutionMatchesVerification(t *testing.T) {
 		err = testutil.SignTransaction(addKeyTxBuilder, accountAddress, accountPrivKey, 0)
 		require.NoError(t, err)
 
-		minimumStorage, err := cadence.NewUFix64("0.00011661")
+		minimumStorage, err := cadence.NewUFix64("0.00015594")
 		require.NoError(t, err)
 
 		createAccountTx, err := createAccountTxBuilder.Build()

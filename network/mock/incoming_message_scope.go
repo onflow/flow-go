@@ -83,19 +83,19 @@ func (_c *IncomingMessageScope_Channel_Call) RunAndReturn(run func() channels.Ch
 }
 
 // DecodedPayload provides a mock function for the type IncomingMessageScope
-func (_mock *IncomingMessageScope) DecodedPayload() interface{} {
+func (_mock *IncomingMessageScope) DecodedPayload() any {
 	ret := _mock.Called()
 
 	if len(ret) == 0 {
 		panic("no return value specified for DecodedPayload")
 	}
 
-	var r0 interface{}
-	if returnFunc, ok := ret.Get(0).(func() interface{}); ok {
+	var r0 any
+	if returnFunc, ok := ret.Get(0).(func() any); ok {
 		r0 = returnFunc()
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(interface{})
+			r0 = ret.Get(0).(any)
 		}
 	}
 	return r0
@@ -118,12 +118,12 @@ func (_c *IncomingMessageScope_DecodedPayload_Call) Run(run func()) *IncomingMes
 	return _c
 }
 
-func (_c *IncomingMessageScope_DecodedPayload_Call) Return(ifaceVal interface{}) *IncomingMessageScope_DecodedPayload_Call {
-	_c.Call.Return(ifaceVal)
+func (_c *IncomingMessageScope_DecodedPayload_Call) Return(v any) *IncomingMessageScope_DecodedPayload_Call {
+	_c.Call.Return(v)
 	return _c
 }
 
-func (_c *IncomingMessageScope_DecodedPayload_Call) RunAndReturn(run func() interface{}) *IncomingMessageScope_DecodedPayload_Call {
+func (_c *IncomingMessageScope_DecodedPayload_Call) RunAndReturn(run func() any) *IncomingMessageScope_DecodedPayload_Call {
 	_c.Call.Return(run)
 	return _c
 }

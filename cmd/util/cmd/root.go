@@ -17,6 +17,7 @@ import (
 	checkpoint_collect_stats "github.com/onflow/flow-go/cmd/util/cmd/checkpoint-collect-stats"
 	checkpoint_list_tries "github.com/onflow/flow-go/cmd/util/cmd/checkpoint-list-tries"
 	checkpoint_trie_stats "github.com/onflow/flow-go/cmd/util/cmd/checkpoint-trie-stats"
+	compare_debug_tx "github.com/onflow/flow-go/cmd/util/cmd/compare-debug-tx"
 	db_migration "github.com/onflow/flow-go/cmd/util/cmd/db-migration"
 	debug_script "github.com/onflow/flow-go/cmd/util/cmd/debug-script"
 	debug_tx "github.com/onflow/flow-go/cmd/util/cmd/debug-tx"
@@ -32,12 +33,14 @@ import (
 	find_inconsistent_result "github.com/onflow/flow-go/cmd/util/cmd/find-inconsistent-result"
 	find_trie_root "github.com/onflow/flow-go/cmd/util/cmd/find-trie-root"
 	generate_authorization_fixes "github.com/onflow/flow-go/cmd/util/cmd/generate-authorization-fixes"
+	inspect_token_movements "github.com/onflow/flow-go/cmd/util/cmd/inspect-token-movements"
 	"github.com/onflow/flow-go/cmd/util/cmd/leaders"
 	pebble_checkpoint "github.com/onflow/flow-go/cmd/util/cmd/pebble-checkpoint"
 	read_badger "github.com/onflow/flow-go/cmd/util/cmd/read-badger/cmd"
 	read_execution_state "github.com/onflow/flow-go/cmd/util/cmd/read-execution-state"
 	read_hotstuff "github.com/onflow/flow-go/cmd/util/cmd/read-hotstuff/cmd"
 	read_protocol_state "github.com/onflow/flow-go/cmd/util/cmd/read-protocol-state/cmd"
+	remove_execution_fork "github.com/onflow/flow-go/cmd/util/cmd/remove-execution-fork/cmd"
 	rollback_executed_height "github.com/onflow/flow-go/cmd/util/cmd/rollback-executed-height/cmd"
 	run_script "github.com/onflow/flow-go/cmd/util/cmd/run-script"
 	"github.com/onflow/flow-go/cmd/util/cmd/snapshot"
@@ -126,6 +129,7 @@ func addCommands() {
 	rootCmd.AddCommand(system_addresses.Cmd)
 	rootCmd.AddCommand(check_storage.Cmd)
 	rootCmd.AddCommand(debug_tx.Cmd)
+	rootCmd.AddCommand(compare_debug_tx.Cmd)
 	rootCmd.AddCommand(debug_script.Cmd)
 	rootCmd.AddCommand(generate_authorization_fixes.Cmd)
 	rootCmd.AddCommand(evm_state_exporter.Cmd)
@@ -134,6 +138,8 @@ func addCommands() {
 	rootCmd.AddCommand(pebble_checkpoint.Cmd)
 	rootCmd.AddCommand(db_migration.Cmd)
 	rootCmd.AddCommand(storehouse_checkpoint_validator.Cmd)
+	rootCmd.AddCommand(remove_execution_fork.RootCmd)
+	rootCmd.AddCommand(inspect_token_movements.Cmd)
 }
 
 func initConfig() {

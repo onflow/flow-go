@@ -36,7 +36,7 @@ func (_m *MessageQueue) EXPECT() *MessageQueue_Expecter {
 }
 
 // Insert provides a mock function for the type MessageQueue
-func (_mock *MessageQueue) Insert(message interface{}) error {
+func (_mock *MessageQueue) Insert(message any) error {
 	ret := _mock.Called(message)
 
 	if len(ret) == 0 {
@@ -44,7 +44,7 @@ func (_mock *MessageQueue) Insert(message interface{}) error {
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(interface{}) error); ok {
+	if returnFunc, ok := ret.Get(0).(func(any) error); ok {
 		r0 = returnFunc(message)
 	} else {
 		r0 = ret.Error(0)
@@ -58,16 +58,16 @@ type MessageQueue_Insert_Call struct {
 }
 
 // Insert is a helper method to define mock.On call
-//   - message interface{}
+//   - message any
 func (_e *MessageQueue_Expecter) Insert(message interface{}) *MessageQueue_Insert_Call {
 	return &MessageQueue_Insert_Call{Call: _e.mock.On("Insert", message)}
 }
 
-func (_c *MessageQueue_Insert_Call) Run(run func(message interface{})) *MessageQueue_Insert_Call {
+func (_c *MessageQueue_Insert_Call) Run(run func(message any)) *MessageQueue_Insert_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 interface{}
+		var arg0 any
 		if args[0] != nil {
-			arg0 = args[0].(interface{})
+			arg0 = args[0].(any)
 		}
 		run(
 			arg0,
@@ -81,7 +81,7 @@ func (_c *MessageQueue_Insert_Call) Return(err error) *MessageQueue_Insert_Call 
 	return _c
 }
 
-func (_c *MessageQueue_Insert_Call) RunAndReturn(run func(message interface{}) error) *MessageQueue_Insert_Call {
+func (_c *MessageQueue_Insert_Call) RunAndReturn(run func(message any) error) *MessageQueue_Insert_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -131,19 +131,19 @@ func (_c *MessageQueue_Len_Call) RunAndReturn(run func() int) *MessageQueue_Len_
 }
 
 // Remove provides a mock function for the type MessageQueue
-func (_mock *MessageQueue) Remove() interface{} {
+func (_mock *MessageQueue) Remove() any {
 	ret := _mock.Called()
 
 	if len(ret) == 0 {
 		panic("no return value specified for Remove")
 	}
 
-	var r0 interface{}
-	if returnFunc, ok := ret.Get(0).(func() interface{}); ok {
+	var r0 any
+	if returnFunc, ok := ret.Get(0).(func() any); ok {
 		r0 = returnFunc()
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(interface{})
+			r0 = ret.Get(0).(any)
 		}
 	}
 	return r0
@@ -166,12 +166,12 @@ func (_c *MessageQueue_Remove_Call) Run(run func()) *MessageQueue_Remove_Call {
 	return _c
 }
 
-func (_c *MessageQueue_Remove_Call) Return(ifaceVal interface{}) *MessageQueue_Remove_Call {
-	_c.Call.Return(ifaceVal)
+func (_c *MessageQueue_Remove_Call) Return(v any) *MessageQueue_Remove_Call {
+	_c.Call.Return(v)
 	return _c
 }
 
-func (_c *MessageQueue_Remove_Call) RunAndReturn(run func() interface{}) *MessageQueue_Remove_Call {
+func (_c *MessageQueue_Remove_Call) RunAndReturn(run func() any) *MessageQueue_Remove_Call {
 	_c.Call.Return(run)
 	return _c
 }

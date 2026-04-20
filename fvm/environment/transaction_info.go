@@ -17,9 +17,14 @@ type TransactionInfoParams struct {
 
 	TransactionFeesEnabled bool
 	LimitAccountStorage    bool
+
 	// RandomSourceHistoryCallAllowed is true if the transaction is allowed to call the `entropy`
 	// cadence function to get the entropy of that block.
 	RandomSourceHistoryCallAllowed bool
+
+	// EVMTestOperationsAllowed is true if the transaction is allowed to call EVM test operations,
+	// which should only be used for testing and should not be enabled in production.
+	EVMTestOperationsAllowed bool
 }
 
 func DefaultTransactionInfoParams() TransactionInfoParams {
@@ -29,6 +34,7 @@ func DefaultTransactionInfoParams() TransactionInfoParams {
 		TransactionFeesEnabled:         false,
 		LimitAccountStorage:            false,
 		RandomSourceHistoryCallAllowed: false,
+		EVMTestOperationsAllowed:       false,
 	}
 }
 

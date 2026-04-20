@@ -63,6 +63,15 @@ func TestServiceEvents_InvalidChainID(t *testing.T) {
 	require.Panics(t, func() { ServiceEventsForChain(invalidChain) })
 }
 
+// TestFlowFeesReceivers_NotEmpty verifies that FlowFeesReceivers is non-empty for
+// mainnet and testnet.
+func TestFlowFeesReceivers_NotEmpty(t *testing.T) {
+	for _, chain := range []flow.ChainID{flow.Mainnet, flow.Testnet, flow.Emulator} {
+		contracts := SystemContractsForChain(chain)
+		assert.NotEmpty(t, contracts.FlowFeesReceivers, "FlowFeesReceivers must not be empty for chain %s", chain)
+	}
+}
+
 func checkSystemContracts(t *testing.T, chainID flow.ChainID) {
 	contracts := SystemContractsForChain(chainID)
 

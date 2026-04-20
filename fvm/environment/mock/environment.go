@@ -1141,6 +1141,50 @@ func (_c *Environment_EVMBlockExecuted_Call) RunAndReturn(run func(txCount int, 
 	return _c
 }
 
+// EVMTestOperationsAllowed provides a mock function for the type Environment
+func (_mock *Environment) EVMTestOperationsAllowed() bool {
+	ret := _mock.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for EVMTestOperationsAllowed")
+	}
+
+	var r0 bool
+	if returnFunc, ok := ret.Get(0).(func() bool); ok {
+		r0 = returnFunc()
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+	return r0
+}
+
+// Environment_EVMTestOperationsAllowed_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'EVMTestOperationsAllowed'
+type Environment_EVMTestOperationsAllowed_Call struct {
+	*mock.Call
+}
+
+// EVMTestOperationsAllowed is a helper method to define mock.On call
+func (_e *Environment_Expecter) EVMTestOperationsAllowed() *Environment_EVMTestOperationsAllowed_Call {
+	return &Environment_EVMTestOperationsAllowed_Call{Call: _e.mock.On("EVMTestOperationsAllowed")}
+}
+
+func (_c *Environment_EVMTestOperationsAllowed_Call) Run(run func()) *Environment_EVMTestOperationsAllowed_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *Environment_EVMTestOperationsAllowed_Call) Return(b bool) *Environment_EVMTestOperationsAllowed_Call {
+	_c.Call.Return(b)
+	return _c
+}
+
+func (_c *Environment_EVMTestOperationsAllowed_Call) RunAndReturn(run func() bool) *Environment_EVMTestOperationsAllowed_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // EVMTransactionExecuted provides a mock function for the type Environment
 func (_mock *Environment) EVMTransactionExecuted(gasUsed uint64, isDirectCall bool, failed bool) {
 	_mock.Called(gasUsed, isDirectCall, failed)

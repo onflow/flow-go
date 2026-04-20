@@ -82,7 +82,7 @@ func (_c *Conduit_Close_Call) RunAndReturn(run func() error) *Conduit_Close_Call
 }
 
 // Multicast provides a mock function for the type Conduit
-func (_mock *Conduit) Multicast(event interface{}, num uint, targetIDs ...flow.Identifier) error {
+func (_mock *Conduit) Multicast(event any, num uint, targetIDs ...flow.Identifier) error {
 	// flow.Identifier
 	_va := make([]interface{}, len(targetIDs))
 	for _i := range targetIDs {
@@ -98,7 +98,7 @@ func (_mock *Conduit) Multicast(event interface{}, num uint, targetIDs ...flow.I
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(interface{}, uint, ...flow.Identifier) error); ok {
+	if returnFunc, ok := ret.Get(0).(func(any, uint, ...flow.Identifier) error); ok {
 		r0 = returnFunc(event, num, targetIDs...)
 	} else {
 		r0 = ret.Error(0)
@@ -112,7 +112,7 @@ type Conduit_Multicast_Call struct {
 }
 
 // Multicast is a helper method to define mock.On call
-//   - event interface{}
+//   - event any
 //   - num uint
 //   - targetIDs ...flow.Identifier
 func (_e *Conduit_Expecter) Multicast(event interface{}, num interface{}, targetIDs ...interface{}) *Conduit_Multicast_Call {
@@ -120,11 +120,11 @@ func (_e *Conduit_Expecter) Multicast(event interface{}, num interface{}, target
 		append([]interface{}{event, num}, targetIDs...)...)}
 }
 
-func (_c *Conduit_Multicast_Call) Run(run func(event interface{}, num uint, targetIDs ...flow.Identifier)) *Conduit_Multicast_Call {
+func (_c *Conduit_Multicast_Call) Run(run func(event any, num uint, targetIDs ...flow.Identifier)) *Conduit_Multicast_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 interface{}
+		var arg0 any
 		if args[0] != nil {
-			arg0 = args[0].(interface{})
+			arg0 = args[0].(any)
 		}
 		var arg1 uint
 		if args[1] != nil {
@@ -152,13 +152,13 @@ func (_c *Conduit_Multicast_Call) Return(err error) *Conduit_Multicast_Call {
 	return _c
 }
 
-func (_c *Conduit_Multicast_Call) RunAndReturn(run func(event interface{}, num uint, targetIDs ...flow.Identifier) error) *Conduit_Multicast_Call {
+func (_c *Conduit_Multicast_Call) RunAndReturn(run func(event any, num uint, targetIDs ...flow.Identifier) error) *Conduit_Multicast_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // Publish provides a mock function for the type Conduit
-func (_mock *Conduit) Publish(event interface{}, targetIDs ...flow.Identifier) error {
+func (_mock *Conduit) Publish(event any, targetIDs ...flow.Identifier) error {
 	// flow.Identifier
 	_va := make([]interface{}, len(targetIDs))
 	for _i := range targetIDs {
@@ -174,7 +174,7 @@ func (_mock *Conduit) Publish(event interface{}, targetIDs ...flow.Identifier) e
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(interface{}, ...flow.Identifier) error); ok {
+	if returnFunc, ok := ret.Get(0).(func(any, ...flow.Identifier) error); ok {
 		r0 = returnFunc(event, targetIDs...)
 	} else {
 		r0 = ret.Error(0)
@@ -188,18 +188,18 @@ type Conduit_Publish_Call struct {
 }
 
 // Publish is a helper method to define mock.On call
-//   - event interface{}
+//   - event any
 //   - targetIDs ...flow.Identifier
 func (_e *Conduit_Expecter) Publish(event interface{}, targetIDs ...interface{}) *Conduit_Publish_Call {
 	return &Conduit_Publish_Call{Call: _e.mock.On("Publish",
 		append([]interface{}{event}, targetIDs...)...)}
 }
 
-func (_c *Conduit_Publish_Call) Run(run func(event interface{}, targetIDs ...flow.Identifier)) *Conduit_Publish_Call {
+func (_c *Conduit_Publish_Call) Run(run func(event any, targetIDs ...flow.Identifier)) *Conduit_Publish_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 interface{}
+		var arg0 any
 		if args[0] != nil {
-			arg0 = args[0].(interface{})
+			arg0 = args[0].(any)
 		}
 		var arg1 []flow.Identifier
 		variadicArgs := make([]flow.Identifier, len(args)-1)
@@ -222,7 +222,7 @@ func (_c *Conduit_Publish_Call) Return(err error) *Conduit_Publish_Call {
 	return _c
 }
 
-func (_c *Conduit_Publish_Call) RunAndReturn(run func(event interface{}, targetIDs ...flow.Identifier) error) *Conduit_Publish_Call {
+func (_c *Conduit_Publish_Call) RunAndReturn(run func(event any, targetIDs ...flow.Identifier) error) *Conduit_Publish_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -268,7 +268,7 @@ func (_c *Conduit_ReportMisbehavior_Call) RunAndReturn(run func(misbehaviorRepor
 }
 
 // Unicast provides a mock function for the type Conduit
-func (_mock *Conduit) Unicast(event interface{}, targetID flow.Identifier) error {
+func (_mock *Conduit) Unicast(event any, targetID flow.Identifier) error {
 	ret := _mock.Called(event, targetID)
 
 	if len(ret) == 0 {
@@ -276,7 +276,7 @@ func (_mock *Conduit) Unicast(event interface{}, targetID flow.Identifier) error
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(interface{}, flow.Identifier) error); ok {
+	if returnFunc, ok := ret.Get(0).(func(any, flow.Identifier) error); ok {
 		r0 = returnFunc(event, targetID)
 	} else {
 		r0 = ret.Error(0)
@@ -290,17 +290,17 @@ type Conduit_Unicast_Call struct {
 }
 
 // Unicast is a helper method to define mock.On call
-//   - event interface{}
+//   - event any
 //   - targetID flow.Identifier
 func (_e *Conduit_Expecter) Unicast(event interface{}, targetID interface{}) *Conduit_Unicast_Call {
 	return &Conduit_Unicast_Call{Call: _e.mock.On("Unicast", event, targetID)}
 }
 
-func (_c *Conduit_Unicast_Call) Run(run func(event interface{}, targetID flow.Identifier)) *Conduit_Unicast_Call {
+func (_c *Conduit_Unicast_Call) Run(run func(event any, targetID flow.Identifier)) *Conduit_Unicast_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 interface{}
+		var arg0 any
 		if args[0] != nil {
-			arg0 = args[0].(interface{})
+			arg0 = args[0].(any)
 		}
 		var arg1 flow.Identifier
 		if args[1] != nil {
@@ -319,7 +319,7 @@ func (_c *Conduit_Unicast_Call) Return(err error) *Conduit_Unicast_Call {
 	return _c
 }
 
-func (_c *Conduit_Unicast_Call) RunAndReturn(run func(event interface{}, targetID flow.Identifier) error) *Conduit_Unicast_Call {
+func (_c *Conduit_Unicast_Call) RunAndReturn(run func(event any, targetID flow.Identifier) error) *Conduit_Unicast_Call {
 	_c.Call.Return(run)
 	return _c
 }

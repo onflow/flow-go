@@ -2,6 +2,7 @@ package channels
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -371,10 +372,8 @@ func IsValidFlowClusterTopic(topic Topic, activeClusterIDS flow.ChainIDList) err
 		return NewInvalidTopicErr(topic, fmt.Errorf("failed to get cluster ID from topic: %w", err))
 	}
 
-	for _, activeClusterID := range activeClusterIDS {
-		if clusterID == activeClusterID {
-			return nil
-		}
+	if slices.Contains(activeClusterIDS, clusterID) {
+		return nil
 	}
 
 	return NewUnknownClusterIdErr(clusterID, activeClusterIDS)

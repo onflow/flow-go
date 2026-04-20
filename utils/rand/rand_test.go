@@ -127,11 +127,11 @@ func TestShuffle(t *testing.T) {
 
 		t.Run("shuffle a random permutation", func(t *testing.T) {
 			// initialize the list
-			for i := 0; i < listSize; i++ {
+			for i := range listSize {
 				list[i] = i
 			}
 			// shuffle and count multiple times
-			for k := 0; k < sampleSize; k++ {
+			for range sampleSize {
 				shuffleAndCount(t)
 			}
 			// if the shuffle is uniform, the test element
@@ -140,8 +140,8 @@ func TestShuffle(t *testing.T) {
 		})
 
 		t.Run("shuffle a same permutation", func(t *testing.T) {
-			for k := 0; k < sampleSize; k++ {
-				for i := 0; i < listSize; i++ {
+			for range sampleSize {
+				for i := range listSize {
 					list[i] = i
 				}
 				// suffle the same permutation
@@ -175,11 +175,11 @@ func TestSamples(t *testing.T) {
 		testElement := mrand.Intn(listSize)
 		// Slice to shuffle
 		list := make([]int, 0, listSize)
-		for i := 0; i < listSize; i++ {
+		for i := range listSize {
 			list = append(list, i)
 		}
 
-		for i := 0; i < sampleSize; i++ {
+		for range sampleSize {
 			err := Samples(uint(listSize), uint(samplesSize), func(i, j uint) {
 				list[i], list[j] = list[j], list[i]
 			})

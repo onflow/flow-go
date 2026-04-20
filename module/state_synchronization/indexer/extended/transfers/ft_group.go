@@ -1,0 +1,192 @@
+package transfers
+
+import (
+	"fmt"
+
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/state_synchronization/indexer/extended/events"
+)
+
+// ftDecodedWithdrawal wraps a decoded FT withdrawal event with its source [flow.Event] metadata.
+type ftDecodedWithdrawal struct {
+	source         flow.Event
+	decoded        events.FTWithdrawnEvent
+	ancestorEvents []flow.Event // events from removed parent withdrawals in the event chain
+}
+
+// ftDecodedDeposit wraps a decoded FT deposit event with its source [flow.Event] metadata.
+type ftDecodedDeposit struct {
+	source  flow.Event
+	decoded events.FTDepositedEvent
+}
+
+// ftTxEventGroup holds decoded withdrawal and deposit events for a single transaction.
+type ftTxEventGroup struct {
+	withdrawals []*ftDecodedWithdrawal
+	flowFees    *events.FlowFeesEvent
+
+	withdrawalByUUID map[uint64]int
+	matchedDeposits  map[uint64]struct{}
+
+	pairedResults []ftPairedResult
+
+	flowFeesReceivers map[flow.Address]bool
+}
+
+func newFTTxEventGroup(flowFeesReceivers map[flow.Address]bool) *ftTxEventGroup {
+	return &ftTxEventGroup{
+		withdrawalByUUID:  make(map[uint64]int),
+		matchedDeposits:   make(map[uint64]struct{}),
+		flowFeesReceivers: flowFeesReceivers,
+	}
+}
+
+// addWithdrawal adds a withdrawal event to the event group.
+//
+// No error returns are expected during normal operation.
+func (g *ftTxEventGroup) addWithdrawal(event flow.Event, decoded *events.FTWithdrawnEvent) error {
+	w := &ftDecodedWithdrawal{source: event, decoded: *decoded}
+
+	// 1. build a mapping of withdrawn vault UUID to the index in the `withdrawals` slice.
+	// this is used to identify the parent when there is a chain of withdrawals.
+	if _, exists := g.withdrawalByUUID[decoded.WithdrawnUUID]; exists {
+		return fmt.Errorf("duplicate withdrawal resource UUID %d in transaction %d", decoded.WithdrawnUUID, event.TransactionIndex)
+	}
+	g.withdrawals = append(g.withdrawals, w)
+	g.withdrawalByUUID[decoded.WithdrawnUUID] = len(g.withdrawals) - 1
+
+	// 2. check if withdrawal is from a stored vault or another withdrawn vault
+	parentIdx, ok := g.withdrawalByUUID[w.decoded.FromUUID]
+	if !ok {
+		return nil // withdrew from stored vault (or mint)
+	}
+	parent := g.withdrawals[parentIdx]
+
+	// 3. build event ancestor chain: parent's ancestors + parent itself.
+	chain := make([]flow.Event, len(parent.ancestorEvents)+1)
+	copy(chain, parent.ancestorEvents)
+	chain[len(chain)-1] = parent.source
+	w.ancestorEvents = chain
+
+	// 4. propagate the source address from parent to track sender
+	if w.decoded.From == flow.EmptyAddress && parent.decoded.From != flow.EmptyAddress {
+		w.decoded.From = parent.decoded.From
+	}
+
+	// 5. Subtract child withdrawal amount from parent. this ensures the final amounts used in
+	// the deposit/withdraw pairing are correct.
+	if w.decoded.Amount <= parent.decoded.Amount {
+		parent.decoded.Amount -= w.decoded.Amount
+	} else {
+		return fmt.Errorf("child withdrawal amount %s (eventIdx=%d) is greater than the remaining parent withdrawal amount %s (eventIdx=%d) in transaction %d",
+			w.decoded.Amount.String(), w.source.EventIndex, parent.decoded.Amount.String(), parent.source.EventIndex, event.TransactionIndex)
+	}
+
+	return nil
+}
+
+// addDeposit adds a deposit event to the event group.
+//
+// No error returns are expected during normal operation.
+func (g *ftTxEventGroup) addDeposit(event flow.Event, decoded *events.FTDepositedEvent) error {
+	d := &ftDecodedDeposit{source: event, decoded: *decoded}
+
+	uuid := decoded.DepositedUUID
+
+	// If the destination vault (toUUID) is a tracked withdrawal vault, the minted tokens are flowing
+	// into it and must be reflected in its tracked amount.
+	if destIdx, destOk := g.withdrawalByUUID[decoded.ToUUID]; destOk {
+		g.withdrawals[destIdx].decoded.Amount += decoded.Amount
+	}
+
+	// 1. check if the deposit is a vault withdrawn in this transaction.
+	wIdx, ok := g.withdrawalByUUID[uuid]
+	if !ok {
+		// No corresponding withdrawal - treat as mint.
+		g.pairedResults = append(g.pairedResults, ftPairedResult{
+			sourceEvents: mergeEvents(nil, d),
+			deposit:      &d.decoded,
+		})
+		return nil
+	}
+	w := g.withdrawals[wIdx]
+
+	// 2. make sure the deposit and withdrawal match.
+	// if not, then there is likely a bug in the event parsing logic.
+	if w.decoded.Amount != d.decoded.Amount {
+		return fmt.Errorf("withdrawal amount %s (eventIdx=%d) is not equal to the deposit amount %s (eventIdx=%d) in transaction %d",
+			d.decoded.Amount.String(), d.source.EventIndex, w.decoded.Amount.String(), w.source.EventIndex, event.TransactionIndex)
+	}
+
+	if w.decoded.Type != d.decoded.Type {
+		return fmt.Errorf("withdrawal token type %s (eventIdx=%d) is not equal to the deposit token type %s (eventIdx=%d) in transaction %d",
+			w.decoded.Type, w.source.EventIndex, d.decoded.Type, d.source.EventIndex, event.TransactionIndex)
+	}
+
+	// 3. pair the deposit with the withdrawal.
+	g.matchedDeposits[uuid] = struct{}{}
+	g.pairedResults = append(g.pairedResults, ftPairedResult{
+		sourceEvents: mergeEvents(w, d),
+		withdrawal:   &w.decoded,
+		deposit:      &d.decoded,
+	})
+	return nil
+}
+
+// addFlowFees adds a flow fees event to the event group.
+//
+// No error returns are expected during normal operation.
+func (g *ftTxEventGroup) addFlowFees(decoded *events.FlowFeesEvent) error {
+	g.flowFees = decoded
+
+	// a flow fees deposit always comes after the withdrawal and deposit events, so it will always have a pair.
+	// walk backwards to find the first pair that matches the flow fees deposit, since the flow fees
+	// event is always immediately following the withdrawal and deposit events.
+	// this ensures that if there was another transfer to the flow fees address for the same amount
+	// in the same transaction, it will be treated as a regular transfer.
+	for i := len(g.pairedResults) - 1; i >= 0; i-- {
+		pair := g.pairedResults[i]
+		if pair.deposit == nil {
+			continue
+		}
+		if g.flowFeesReceivers[pair.deposit.To] && pair.deposit.Amount == decoded.Amount {
+			g.pairedResults[i].isFlowFees = true
+			return nil
+		}
+	}
+
+	// if we didn't find the fees transfer pair, then there is a bug in the event parsing logic.
+	return fmt.Errorf("flow fees deposit not found for amount %s", decoded.Amount.String())
+}
+
+// ResolvePairs returns all paired results.
+func (g *ftTxEventGroup) ResolvePairs() []ftPairedResult {
+	// find all unmatched withdrawals
+	for uuid, wIdx := range g.withdrawalByUUID {
+		if _, ok := g.matchedDeposits[uuid]; ok {
+			continue
+		}
+		if g.withdrawals[wIdx].decoded.Amount == 0 {
+			// ignore fully consumed withdrawals (full amount was withdrawn into a child vault)
+			continue
+		}
+		// Unmatched withdrawal -- treat as burn.
+		g.pairedResults = append(g.pairedResults, ftPairedResult{
+			sourceEvents: mergeEvents(g.withdrawals[wIdx], nil),
+			withdrawal:   &g.withdrawals[wIdx].decoded,
+		})
+	}
+	return g.pairedResults
+}
+
+func mergeEvents(w *ftDecodedWithdrawal, d *ftDecodedDeposit) []flow.Event {
+	var events []flow.Event
+	if w != nil {
+		events = append(events, w.ancestorEvents...)
+		events = append(events, w.source)
+	}
+	if d != nil {
+		events = append(events, d.source)
+	}
+	return events
+}

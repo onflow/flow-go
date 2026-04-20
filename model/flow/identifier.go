@@ -127,7 +127,7 @@ func HashToID(hash []byte) Identifier {
 // different hashes depending on the JSON implementation and b) the Fingerprinter interface allows to exclude fields not
 // needed in the pre-image of the hash that comprises the Identifier, which could be different from the encoding for
 // sending entities in messages or for storing them.
-func MakeID(entity interface{}) Identifier {
+func MakeID(entity any) Identifier {
 	// collect fingerprint of the entity
 	data := fingerprint.Fingerprint(entity)
 	// make ID from fingerprint
@@ -248,7 +248,7 @@ func ByteSlicesToIds(b [][]byte) (IdentifierList, error) {
 	total := len(b)
 	ids := make(IdentifierList, total)
 
-	for i := 0; i < total; i++ {
+	for i := range total {
 		id, err := ByteSliceToId(b[i])
 		if err != nil {
 			return nil, err

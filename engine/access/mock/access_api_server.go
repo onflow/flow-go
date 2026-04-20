@@ -1330,6 +1330,142 @@ func (_c *AccessAPIServer_GetEventsForHeightRange_Call) RunAndReturn(run func(co
 	return _c
 }
 
+// GetExecutionReceiptsByBlockID provides a mock function for the type AccessAPIServer
+func (_mock *AccessAPIServer) GetExecutionReceiptsByBlockID(context1 context.Context, getExecutionReceiptsByBlockIDRequest *access.GetExecutionReceiptsByBlockIDRequest) (*access.ExecutionReceiptsResponse, error) {
+	ret := _mock.Called(context1, getExecutionReceiptsByBlockIDRequest)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetExecutionReceiptsByBlockID")
+	}
+
+	var r0 *access.ExecutionReceiptsResponse
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *access.GetExecutionReceiptsByBlockIDRequest) (*access.ExecutionReceiptsResponse, error)); ok {
+		return returnFunc(context1, getExecutionReceiptsByBlockIDRequest)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *access.GetExecutionReceiptsByBlockIDRequest) *access.ExecutionReceiptsResponse); ok {
+		r0 = returnFunc(context1, getExecutionReceiptsByBlockIDRequest)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*access.ExecutionReceiptsResponse)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, *access.GetExecutionReceiptsByBlockIDRequest) error); ok {
+		r1 = returnFunc(context1, getExecutionReceiptsByBlockIDRequest)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// AccessAPIServer_GetExecutionReceiptsByBlockID_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetExecutionReceiptsByBlockID'
+type AccessAPIServer_GetExecutionReceiptsByBlockID_Call struct {
+	*mock.Call
+}
+
+// GetExecutionReceiptsByBlockID is a helper method to define mock.On call
+//   - context1 context.Context
+//   - getExecutionReceiptsByBlockIDRequest *access.GetExecutionReceiptsByBlockIDRequest
+func (_e *AccessAPIServer_Expecter) GetExecutionReceiptsByBlockID(context1 interface{}, getExecutionReceiptsByBlockIDRequest interface{}) *AccessAPIServer_GetExecutionReceiptsByBlockID_Call {
+	return &AccessAPIServer_GetExecutionReceiptsByBlockID_Call{Call: _e.mock.On("GetExecutionReceiptsByBlockID", context1, getExecutionReceiptsByBlockIDRequest)}
+}
+
+func (_c *AccessAPIServer_GetExecutionReceiptsByBlockID_Call) Run(run func(context1 context.Context, getExecutionReceiptsByBlockIDRequest *access.GetExecutionReceiptsByBlockIDRequest)) *AccessAPIServer_GetExecutionReceiptsByBlockID_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *access.GetExecutionReceiptsByBlockIDRequest
+		if args[1] != nil {
+			arg1 = args[1].(*access.GetExecutionReceiptsByBlockIDRequest)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *AccessAPIServer_GetExecutionReceiptsByBlockID_Call) Return(executionReceiptsResponse *access.ExecutionReceiptsResponse, err error) *AccessAPIServer_GetExecutionReceiptsByBlockID_Call {
+	_c.Call.Return(executionReceiptsResponse, err)
+	return _c
+}
+
+func (_c *AccessAPIServer_GetExecutionReceiptsByBlockID_Call) RunAndReturn(run func(context1 context.Context, getExecutionReceiptsByBlockIDRequest *access.GetExecutionReceiptsByBlockIDRequest) (*access.ExecutionReceiptsResponse, error)) *AccessAPIServer_GetExecutionReceiptsByBlockID_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// GetExecutionReceiptsByResultID provides a mock function for the type AccessAPIServer
+func (_mock *AccessAPIServer) GetExecutionReceiptsByResultID(context1 context.Context, getExecutionReceiptsByResultIDRequest *access.GetExecutionReceiptsByResultIDRequest) (*access.ExecutionReceiptsResponse, error) {
+	ret := _mock.Called(context1, getExecutionReceiptsByResultIDRequest)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetExecutionReceiptsByResultID")
+	}
+
+	var r0 *access.ExecutionReceiptsResponse
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *access.GetExecutionReceiptsByResultIDRequest) (*access.ExecutionReceiptsResponse, error)); ok {
+		return returnFunc(context1, getExecutionReceiptsByResultIDRequest)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *access.GetExecutionReceiptsByResultIDRequest) *access.ExecutionReceiptsResponse); ok {
+		r0 = returnFunc(context1, getExecutionReceiptsByResultIDRequest)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*access.ExecutionReceiptsResponse)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, *access.GetExecutionReceiptsByResultIDRequest) error); ok {
+		r1 = returnFunc(context1, getExecutionReceiptsByResultIDRequest)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// AccessAPIServer_GetExecutionReceiptsByResultID_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetExecutionReceiptsByResultID'
+type AccessAPIServer_GetExecutionReceiptsByResultID_Call struct {
+	*mock.Call
+}
+
+// GetExecutionReceiptsByResultID is a helper method to define mock.On call
+//   - context1 context.Context
+//   - getExecutionReceiptsByResultIDRequest *access.GetExecutionReceiptsByResultIDRequest
+func (_e *AccessAPIServer_Expecter) GetExecutionReceiptsByResultID(context1 interface{}, getExecutionReceiptsByResultIDRequest interface{}) *AccessAPIServer_GetExecutionReceiptsByResultID_Call {
+	return &AccessAPIServer_GetExecutionReceiptsByResultID_Call{Call: _e.mock.On("GetExecutionReceiptsByResultID", context1, getExecutionReceiptsByResultIDRequest)}
+}
+
+func (_c *AccessAPIServer_GetExecutionReceiptsByResultID_Call) Run(run func(context1 context.Context, getExecutionReceiptsByResultIDRequest *access.GetExecutionReceiptsByResultIDRequest)) *AccessAPIServer_GetExecutionReceiptsByResultID_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *access.GetExecutionReceiptsByResultIDRequest
+		if args[1] != nil {
+			arg1 = args[1].(*access.GetExecutionReceiptsByResultIDRequest)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *AccessAPIServer_GetExecutionReceiptsByResultID_Call) Return(executionReceiptsResponse *access.ExecutionReceiptsResponse, err error) *AccessAPIServer_GetExecutionReceiptsByResultID_Call {
+	_c.Call.Return(executionReceiptsResponse, err)
+	return _c
+}
+
+func (_c *AccessAPIServer_GetExecutionReceiptsByResultID_Call) RunAndReturn(run func(context1 context.Context, getExecutionReceiptsByResultIDRequest *access.GetExecutionReceiptsByResultIDRequest) (*access.ExecutionReceiptsResponse, error)) *AccessAPIServer_GetExecutionReceiptsByResultID_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetExecutionResultByID provides a mock function for the type AccessAPIServer
 func (_mock *AccessAPIServer) GetExecutionResultByID(context1 context.Context, getExecutionResultByIDRequest *access.GetExecutionResultByIDRequest) (*access.ExecutionResultByIDResponse, error) {
 	ret := _mock.Called(context1, getExecutionResultByIDRequest)

@@ -15,7 +15,9 @@ import (
 	"github.com/onflow/flow-go/fvm/evm/types"
 	"github.com/onflow/flow-go/model/flow"
 
+	gethCommon "github.com/ethereum/go-ethereum/common"
 	gethTypes "github.com/ethereum/go-ethereum/core/types"
+	gethCrypto "github.com/ethereum/go-ethereum/crypto"
 )
 
 var internalEVMContractStaticType = interpreter.ConvertSemaCompositeTypeToStaticCompositeType(
@@ -30,34 +32,83 @@ func NewInternalEVMContractValue(
 ) *interpreter.SimpleCompositeValue {
 	location := common.NewAddressLocation(nil, common.Address(contractAddress), stdlib.ContractName)
 
+	methods := map[string]interpreter.FunctionValue{}
+
+	computeLazyStoredMethod := func(name string) interpreter.FunctionValue {
+		switch name {
+		case stdlib.InternalEVMTypeRunFunctionName:
+			return newInternalEVMTypeRunFunction(gauge, handler)
+		case stdlib.InternalEVMTypeBatchRunFunctionName:
+			return newInternalEVMTypeBatchRunFunction(gauge, handler)
+		case stdlib.InternalEVMTypeCreateCadenceOwnedAccountFunctionName:
+			return newInternalEVMTypeCreateCadenceOwnedAccountFunction(gauge, handler)
+		case stdlib.InternalEVMTypeCallFunctionName:
+			return newInternalEVMTypeCallFunction(gauge, handler)
+		case stdlib.InternalEVMTypeCallWithSigAndArgsFunctionName:
+			return newInternalEVMTypeCallWithSigAndArgsFunction(gauge, handler, location)
+		case stdlib.InternalEVMTypeDepositFunctionName:
+			return newInternalEVMTypeDepositFunction(gauge, handler)
+		case stdlib.InternalEVMTypeWithdrawFunctionName:
+			return newInternalEVMTypeWithdrawFunction(gauge, handler)
+		case stdlib.InternalEVMTypeDeployFunctionName:
+			return newInternalEVMTypeDeployFunction(gauge, handler)
+		case stdlib.InternalEVMTypeBalanceFunctionName:
+			return newInternalEVMTypeBalanceFunction(gauge, handler)
+		case stdlib.InternalEVMTypeNonceFunctionName:
+			return newInternalEVMTypeNonceFunction(gauge, handler)
+		case stdlib.InternalEVMTypeCodeFunctionName:
+			return newInternalEVMTypeCodeFunction(gauge, handler)
+		case stdlib.InternalEVMTypeCodeHashFunctionName:
+			return newInternalEVMTypeCodeHashFunction(gauge, handler)
+		case stdlib.InternalEVMTypeEncodeABIFunctionName:
+			return newInternalEVMTypeEncodeABIFunction(gauge, location)
+		case stdlib.InternalEVMTypeDecodeABIFunctionName:
+			return newInternalEVMTypeDecodeABIFunction(gauge, location)
+		case stdlib.InternalEVMTypeCastToAttoFLOWFunctionName:
+			return newInternalEVMTypeCastToAttoFLOWFunction(gauge)
+		case stdlib.InternalEVMTypeCastToFLOWFunctionName:
+			return newInternalEVMTypeCastToFLOWFunction(gauge)
+		case stdlib.InternalEVMTypeGetLatestBlockFunctionName:
+			return newInternalEVMTypeGetLatestBlockFunction(gauge, handler)
+		case stdlib.InternalEVMTypeDryRunFunctionName:
+			return newInternalEVMTypeDryRunFunction(gauge, handler)
+		case stdlib.InternalEVMTypeDryCallFunctionName:
+			return newInternalEVMTypeDryCallFunction(gauge, handler)
+		case stdlib.InternalEVMTypeDryCallWithSigAndArgsFunctionName:
+			return newInternalEVMTypeDryCallWithSigAndArgsFunction(gauge, handler, location)
+		case stdlib.InternalEVMTypeCommitBlockProposalFunctionName:
+			return newInternalEVMTypeCommitBlockProposalFunction(gauge, handler)
+		case stdlib.InternalEVMTypeStoreFunctionName:
+			return newInternalEVMTypeStoreFunction(gauge, handler)
+		case stdlib.InternalEVMTypeLoadFunctionName:
+			return newInternalEVMTypeLoadFunction(gauge, handler)
+		case stdlib.InternalEVMTypeRunTxAsFunctionName:
+			return newInternalEVMTypeRunTxAsFunction(gauge, handler)
+		}
+
+		return nil
+	}
+
+	methodGetter := func(name string, _ interpreter.MemberAccessibleContext) interpreter.FunctionValue {
+		method, ok := methods[name]
+		if !ok {
+			method = computeLazyStoredMethod(name)
+			if method != nil {
+				methods[name] = method
+			}
+		}
+
+		return method
+	}
+
 	return interpreter.NewSimpleCompositeValue(
 		gauge,
 		stdlib.InternalEVMContractType.ID(),
 		internalEVMContractStaticType,
 		stdlib.InternalEVMContractType.Fields,
-		map[string]interpreter.Value{
-			stdlib.InternalEVMTypeRunFunctionName:                       newInternalEVMTypeRunFunction(gauge, handler),
-			stdlib.InternalEVMTypeBatchRunFunctionName:                  newInternalEVMTypeBatchRunFunction(gauge, handler),
-			stdlib.InternalEVMTypeCreateCadenceOwnedAccountFunctionName: newInternalEVMTypeCreateCadenceOwnedAccountFunction(gauge, handler),
-			stdlib.InternalEVMTypeCallFunctionName:                      newInternalEVMTypeCallFunction(gauge, handler),
-			stdlib.InternalEVMTypeDepositFunctionName:                   newInternalEVMTypeDepositFunction(gauge, handler),
-			stdlib.InternalEVMTypeWithdrawFunctionName:                  newInternalEVMTypeWithdrawFunction(gauge, handler),
-			stdlib.InternalEVMTypeDeployFunctionName:                    newInternalEVMTypeDeployFunction(gauge, handler),
-			stdlib.InternalEVMTypeBalanceFunctionName:                   newInternalEVMTypeBalanceFunction(gauge, handler),
-			stdlib.InternalEVMTypeNonceFunctionName:                     newInternalEVMTypeNonceFunction(gauge, handler),
-			stdlib.InternalEVMTypeCodeFunctionName:                      newInternalEVMTypeCodeFunction(gauge, handler),
-			stdlib.InternalEVMTypeCodeHashFunctionName:                  newInternalEVMTypeCodeHashFunction(gauge, handler),
-			stdlib.InternalEVMTypeEncodeABIFunctionName:                 newInternalEVMTypeEncodeABIFunction(gauge, location),
-			stdlib.InternalEVMTypeDecodeABIFunctionName:                 newInternalEVMTypeDecodeABIFunction(gauge, location),
-			stdlib.InternalEVMTypeCastToAttoFLOWFunctionName:            newInternalEVMTypeCastToAttoFLOWFunction(gauge),
-			stdlib.InternalEVMTypeCastToFLOWFunctionName:                newInternalEVMTypeCastToFLOWFunction(gauge),
-			stdlib.InternalEVMTypeGetLatestBlockFunctionName:            newInternalEVMTypeGetLatestBlockFunction(gauge, handler),
-			stdlib.InternalEVMTypeDryRunFunctionName:                    newInternalEVMTypeDryRunFunction(gauge, handler),
-			stdlib.InternalEVMTypeDryCallFunctionName:                   newInternalEVMTypeDryCallFunction(gauge, handler),
-			stdlib.InternalEVMTypeCommitBlockProposalFunctionName:       newInternalEVMTypeCommitBlockProposalFunction(gauge, handler),
-		},
 		nil,
 		nil,
+		methodGetter,
 		nil,
 		nil,
 	)
@@ -252,22 +303,10 @@ func EVMAddressToAddressBytesArrayValue(
 	context interpreter.ArrayCreationContext,
 	address types.Address,
 ) *interpreter.ArrayValue {
-	var index int
-	return interpreter.NewArrayValueWithIterator(
+	return interpreter.ByteSliceToByteArrayValueWithType(
 		context,
 		stdlib.EVMAddressBytesStaticType,
-		common.ZeroAddress,
-		types.AddressLength,
-		func() interpreter.Value {
-			if index >= types.AddressLength {
-				return nil
-			}
-			result := interpreter.NewUInt8Value(context, func() uint8 {
-				return address[index]
-			})
-			index++
-			return result
-		},
+		address[:],
 	)
 }
 
@@ -275,22 +314,10 @@ func EVMBytesToBytesArrayValue(
 	context interpreter.ArrayCreationContext,
 	bytes []byte,
 ) *interpreter.ArrayValue {
-	var index int
-	return interpreter.NewArrayValueWithIterator(
+	return interpreter.ByteSliceToByteArrayValueWithType(
 		context,
 		stdlib.EVMBytesValueStaticType,
-		common.ZeroAddress,
-		uint64(len(bytes)),
-		func() interpreter.Value {
-			if index >= len(bytes) {
-				return nil
-			}
-			result := interpreter.NewUInt8Value(context, func() uint8 {
-				return bytes[index]
-			})
-			index++
-			return result
-		},
+		bytes,
 	)
 }
 
@@ -298,22 +325,10 @@ func EVMBytes4ToBytesArrayValue(
 	context interpreter.ArrayCreationContext,
 	bytes [4]byte,
 ) *interpreter.ArrayValue {
-	var index int
-	return interpreter.NewArrayValueWithIterator(
+	return interpreter.ByteSliceToByteArrayValueWithType(
 		context,
 		stdlib.EVMBytes4ValueStaticType,
-		common.ZeroAddress,
-		stdlib.EVMBytes4Length,
-		func() interpreter.Value {
-			if index >= stdlib.EVMBytes4Length {
-				return nil
-			}
-			result := interpreter.NewUInt8Value(context, func() uint8 {
-				return bytes[index]
-			})
-			index++
-			return result
-		},
+		bytes[:],
 	)
 }
 
@@ -321,22 +336,10 @@ func EVMBytes32ToBytesArrayValue(
 	context interpreter.ArrayCreationContext,
 	bytes [32]byte,
 ) *interpreter.ArrayValue {
-	var index int
-	return interpreter.NewArrayValueWithIterator(
+	return interpreter.ByteSliceToByteArrayValueWithType(
 		context,
 		stdlib.EVMBytes32ValueStaticType,
-		common.ZeroAddress,
-		stdlib.EVMBytes32Length,
-		func() interpreter.Value {
-			if index >= stdlib.EVMBytes32Length {
-				return nil
-			}
-			result := interpreter.NewUInt8Value(context, func() uint8 {
-				return bytes[index]
-			})
-			index++
-			return result
-		},
+		bytes[:],
 	)
 }
 
@@ -451,6 +454,87 @@ func newInternalEVMTypeCallFunction(
 	)
 }
 
+func newInternalEVMTypeRunTxAsFunction(
+	gauge common.MemoryGauge,
+	handler types.ContractHandler,
+) *interpreter.HostFunctionValue {
+	return interpreter.NewStaticHostFunctionValue(
+		gauge,
+		stdlib.InternalEVMTypeRunTxAsFunctionType,
+		func(invocation interpreter.Invocation) interpreter.Value {
+			context := invocation.InvocationContext
+
+			callArgs, err := parseCallArguments(invocation)
+			if err != nil {
+				panic(err)
+			}
+
+			// Call
+
+			result := handler.RunTxAs(
+				callArgs.from,
+				callArgs.to,
+				callArgs.data,
+				callArgs.gasLimit,
+				callArgs.balance,
+			)
+
+			return NewResultValue(
+				handler,
+				gauge,
+				context,
+				result,
+			)
+		},
+	)
+}
+
+func newInternalEVMTypeCallWithSigAndArgsFunction(
+	gauge common.MemoryGauge,
+	handler types.ContractHandler,
+	location common.AddressLocation,
+) *interpreter.HostFunctionValue {
+	evmSpecialTypeIDs := NewEVMSpecialTypeIDs(gauge, location)
+
+	return interpreter.NewStaticHostFunctionValue(
+		gauge,
+		stdlib.InternalEVMTypeCallWithSigAndArgsFunctionType,
+		func(invocation interpreter.Invocation) interpreter.Value {
+			context := invocation.InvocationContext
+
+			// Parse arguments
+
+			callArgs, err := parseCallArgumentsWithSigAndArgs(invocation)
+			if err != nil {
+				panic(err)
+			}
+
+			// Encode signature and arguments
+
+			data, err := encodeABIWithSigAndArgs(context, evmSpecialTypeIDs, callArgs.signature, callArgs.args)
+			if err != nil {
+				panic(err)
+			}
+
+			// Call
+
+			const isAuthorized = true
+			account := handler.AccountByAddress(callArgs.from, isAuthorized)
+			result := account.Call(callArgs.to, data, callArgs.gasLimit, callArgs.value)
+
+			return NewResultDecodedValue(
+				handler,
+				gauge,
+				context,
+				location,
+				evmSpecialTypeIDs,
+				callArgs.resultTypes,
+				result,
+			)
+		},
+	)
+}
+
 func newInternalEVMTypeDryCallFunction(
 	gauge common.MemoryGauge,
 	handler types.ContractHandler,
@@ -480,6 +564,57 @@ func newInternalEVMTypeDryCallFunction(
 
 			res := handler.DryRunWithTxData(txData, callArgs.from)
 			return NewResultValue(handler, gauge, context, res)
+		},
+	)
+}
+
+func newInternalEVMTypeDryCallWithSigAndArgsFunction(
+	gauge common.MemoryGauge,
+	handler types.ContractHandler,
+	location common.AddressLocation,
+) *interpreter.HostFunctionValue {
+	evmSpecialTypeIDs := NewEVMSpecialTypeIDs(gauge, location)
+
+	return interpreter.NewStaticHostFunctionValue(
+		gauge,
+		stdlib.InternalEVMTypeDryCallWithSigAndArgsFunctionType,
+		func(invocation interpreter.Invocation) interpreter.Value {
+			context := invocation.InvocationContext
+
+			// Parse arguments
+
+			callArgs, err := parseCallArgumentsWithSigAndArgs(invocation)
+			if err != nil {
+				panic(err)
+			}
+			to := callArgs.to.ToCommon()
+
+			data, err := encodeABIWithSigAndArgs(context, evmSpecialTypeIDs, callArgs.signature, callArgs.args)
+			if err != nil {
+				panic(err)
+			}
+
+			txData := &gethTypes.LegacyTx{
+				Nonce:    0,
+				To:       &to,
+				Gas:      uint64(callArgs.gasLimit),
+				Data:     data,
+				GasPrice: big.NewInt(0),
+				Value:    callArgs.value,
+			}
+
+			// Call contract function
+
+			res := handler.DryRunWithTxData(txData, callArgs.from)
+			return NewResultDecodedValue(
+				handler,
+				gauge,
+				context,
+				location,
+				evmSpecialTypeIDs,
+				callArgs.resultTypes,
+				res,
+			)
 		},
 	)
 }
@@ -807,6 +942,94 @@ func newInternalEVMTypeCommitBlockProposalFunction(
 	)
 }
 
+func newInternalEVMTypeLoadFunction(
+	gauge common.MemoryGauge,
+	handler types.ContractHandler,
+) *interpreter.HostFunctionValue {
+	return interpreter.NewStaticHostFunctionValue(
+		gauge,
+		stdlib.InternalEVMTypeLoadFunctionType,
+		func(invocation interpreter.Invocation) interpreter.Value {
+			context := invocation.InvocationContext
+
+			// Get target argument
+			targetValue, ok := invocation.Arguments[0].(*interpreter.ArrayValue)
+			if !ok {
+				panic(errors.NewUnreachableError())
+			}
+
+			addr, err := AddressBytesArrayValueToEVMAddress(context, targetValue)
+			if err != nil {
+				panic(err)
+			}
+
+			// Get slot argument
+			slotValue, ok := invocation.Arguments[1].(*interpreter.StringValue)
+			if !ok {
+				panic(errors.NewUnreachableError())
+			}
+
+			if !isHexHash(slotValue.Str) {
+				panic(fmt.Errorf("invalid input: slot is not a valid hex-encoded Ethereum hash"))
+			}
+			slot := gethCommon.HexToHash(slotValue.Str)
+
+			value := handler.GetState(addr, slot)
+			return interpreter.ByteSliceToByteArrayValue(context, value.Bytes())
+		},
+	)
+}
+
+func newInternalEVMTypeStoreFunction(
+	gauge common.MemoryGauge,
+	handler types.ContractHandler,
+) *interpreter.HostFunctionValue {
+	return interpreter.NewStaticHostFunctionValue(
+		gauge,
+		stdlib.InternalEVMTypeStoreFunctionType,
+		func(invocation interpreter.Invocation) interpreter.Value {
+			context := invocation.InvocationContext
+
+			// Get target argument
+			targetValue, ok := invocation.Arguments[0].(*interpreter.ArrayValue)
+			if !ok {
+				panic(errors.NewUnreachableError())
+			}
+
+			addr, err := AddressBytesArrayValueToEVMAddress(context, targetValue)
+			if err != nil {
+				panic(err)
+			}
+
+			// Get slot argument
+			slotValue, ok := invocation.Arguments[1].(*interpreter.StringValue)
+			if !ok {
+				panic(errors.NewUnreachableError())
+			}
+
+			if !isHexHash(slotValue.Str) {
+				panic(fmt.Errorf("invalid input: slot is not a valid hex-encoded Ethereum hash"))
+			}
+			slot := gethCommon.HexToHash(slotValue.Str)
+
+			// Get value argument
+			valueValue, ok := invocation.Arguments[2].(*interpreter.StringValue)
+			if !ok {
+				panic(errors.NewUnreachableError())
+			}
+
+			if !isHexHash(valueValue.Str) {
+				panic(fmt.Errorf("invalid input: value is not a valid hex-encoded Ethereum hash"))
+			}
+			value := gethCommon.HexToHash(valueValue.Str)
+
+			handler.SetState(addr, slot, value)
+
+			return interpreter.Void
+		},
+	)
+}
+
 func newInternalEVMTypeRunFunction(
 	gauge common.MemoryGauge,
 	handler types.ContractHandler,
@@ -1085,6 +1308,115 @@ func NewResultValue(
 	)
 }
 
+func NewResultDecodedValue(
+	handler types.ContractHandler,
+	gauge common.MemoryGauge,
+	context interpreter.InvocationContext,
+	location common.AddressLocation,
+	evmSpecialTypeIDs *evmSpecialTypeIDs,
+	resultTypes *interpreter.ArrayValue,
+	result *types.ResultSummary,
+) *interpreter.CompositeValue {
+
+	evmContractLocation := common.NewAddressLocation(
+		gauge,
+		handler.EVMContractAddress(),
+		stdlib.ContractName,
+	)
+
+	deployedContractAddress := result.DeployedContractAddress
+	deployedContractValue := interpreter.NilOptionalValue
+	if deployedContractAddress != nil {
+		deployedContractValue = interpreter.NewSomeValueNonCopying(
+			context,
+			NewEVMAddress(
+				context,
+				evmContractLocation,
+				*deployedContractAddress,
+			),
+		)
+	}
+
+	results, err := decodeResultData(context, location, evmSpecialTypeIDs, resultTypes, result)
+	if err != nil {
+		panic(err)
+	}
+
+	fields := []interpreter.CompositeField{
+		{
+			Name: "status",
+			Value: interpreter.NewEnumCaseValue(
+				context,
+				&sema.CompositeType{
+					Location:   evmContractLocation,
+					Identifier: stdlib.EVMStatusTypeQualifiedIdentifier,
+					Kind:       common.CompositeKindEnum,
+				},
+				interpreter.NewUInt8Value(gauge, func() uint8 {
+					return uint8(result.Status)
+				}),
+				nil,
+			),
+		},
+		{
+			Name: "errorCode",
+			Value: interpreter.NewUInt64Value(gauge, func() uint64 {
+				return uint64(result.ErrorCode)
+			}),
+		},
+		{
+			Name: "errorMessage",
+			Value: interpreter.NewStringValue(
+				context,
+				common.NewStringMemoryUsage(len(result.ErrorMessage)),
+				func() string {
+					return result.ErrorMessage
+				},
+			),
+		},
+		{
+			Name: "gasUsed",
+			Value: interpreter.NewUInt64Value(gauge, func() uint64 {
+				return result.GasConsumed
+			}),
+		},
+		{
+			Name:  "results",
+			Value: results,
+		},
+		{
+			Name:  "deployedContract",
+			Value: deployedContractValue,
+		},
+	}
+
+	return interpreter.NewCompositeValue(
+		context,
+		evmContractLocation,
+		stdlib.EVMResultDecodedTypeQualifiedIdentifier,
+		common.CompositeKindStructure,
+		fields,
+		common.ZeroAddress,
+	)
+}
+
+func decodeResultData(
+	context interpreter.InvocationContext,
+	location common.AddressLocation,
+	evmSpecialTypeIDs *evmSpecialTypeIDs,
+	resultTypes *interpreter.ArrayValue,
+	result *types.ResultSummary,
+) (interpreter.Value, error) {
+
+	if result.Status != types.StatusSuccessful || resultTypes == nil || resultTypes.Count() == 0 {
+		resultValue := interpreter.ByteSliceToByteArrayValue(context, result.ReturnedData)
+		return resultValue, nil
+	}
+
+	resultValue := decodeABIs(context, location, evmSpecialTypeIDs, resultTypes, result.ReturnedData)
+	return resultValue, nil
+}
+
 func ResultSummaryFromEVMResultValue(val cadence.Value) (*types.ResultSummary, error) {
 	str, ok := val.(cadence.Struct)
 	if !ok {
@@ -1229,7 +1561,7 @@ func parseCallArguments(invocation interpreter.Invocation) (
 
 	gasLimitValue, ok := invocation.Arguments[3].(interpreter.UInt64Value)
 	if !ok {
-		panic(errors.NewUnreachableError())
+		return nil, errors.NewUnreachableError()
 	}
 
 	gasLimit := types.GasLimit(gasLimitValue)
@@ -1250,4 +1582,161 @@ func parseCallArguments(invocation interpreter.Invocation) (
 		gasLimit: gasLimit,
 		balance:  balance,
 	}, nil
+}
+
+type callArgumentsWithSigAndArgs struct {
+	from        types.Address
+	to          types.Address
+	signature   string
+	args        *interpreter.ArrayValue
+	gasLimit    types.GasLimit
+	value       types.Balance
+	resultTypes *interpreter.ArrayValue
+}
+
+func parseCallArgumentsWithSigAndArgs(invocation interpreter.Invocation) (*callArgumentsWithSigAndArgs, error) {
+	context := invocation.InvocationContext
+
+	// Get from address
+
+	fromAddressValue, ok := invocation.Arguments[0].(*interpreter.ArrayValue)
+	if !ok {
+		return nil, errors.NewUnreachableError()
+	}
+
+	fromAddress, err := AddressBytesArrayValueToEVMAddress(context, fromAddressValue)
+	if err != nil {
+		return nil, err
+	}
+
+	// Get to address
+
+	toAddressValue, ok := invocation.Arguments[1].(*interpreter.ArrayValue)
+	if !ok {
+		return nil, errors.NewUnreachableError()
+	}
+
+	toAddress, err := AddressBytesArrayValueToEVMAddress(context, toAddressValue)
+	if err != nil {
+		return nil, err
+	}
+
+	// Get signature
+
+	signature, ok := invocation.Arguments[2].(*interpreter.StringValue)
+	if !ok {
+		return nil, errors.NewUnreachableError()
+	}
+
+	// Get arguments
+
+	args, ok := invocation.Arguments[3].(*interpreter.ArrayValue)
+	if !ok {
+		return nil, errors.NewUnreachableError()
+	}
+
+	// Get gas limit
+
+	gasLimitValue, ok := invocation.Arguments[4].(interpreter.UInt64Value)
+	if !ok {
+		return nil, errors.NewUnreachableError()
+	}
+
+	gasLimit := types.GasLimit(gasLimitValue)
+
+	// Get value
+
+	valueValue, ok := invocation.Arguments[5].(interpreter.UIntValue)
+	if !ok {
+		return nil, errors.NewUnreachableError()
+	}
+
+	value := types.NewBalance(valueValue.BigInt)
+
+	// Get resultTypes
+
+	var resultTypes *interpreter.ArrayValue
+	switch resultTypesField := invocation.Arguments[6].(type) {
+	case *interpreter.SomeValue:
+		if types := resultTypesField.InnerValue(); types != nil {
+			resultTypes, ok = types.(*interpreter.ArrayValue)
+			if !ok {
+				return nil, errors.NewUnreachableError()
+			}
+		} else {
+			return nil, errors.NewUnreachableError()
+		}
+	case interpreter.NilValue:
+	default:
+		return nil, errors.NewUnreachableError()
+	}
+
+	return &callArgumentsWithSigAndArgs{
+		from:        fromAddress,
+		to:          toAddress,
+		signature:   signature.Str,
+		args:        args,
+		gasLimit:    gasLimit,
+		value:       value,
+		resultTypes: resultTypes,
+	}, nil
+}
+
+func encodeABIWithSigAndArgs(
+	context interpreter.InvocationContext,
+	evmSpecialTypeIDs *evmSpecialTypeIDs,
+	signature string,
+	args *interpreter.ArrayValue,
+) ([]byte, error) {
+	sig := gethCrypto.Keccak256([]byte(signature))
+
+	if len(sig) < 4 {
+		return nil, errors.NewUnreachableError()
+	}
+
+	sig = sig[:4]
+
+	if args.Count() == 0 {
+		return sig, nil
+	}
+
+	encodedArguments := encodeABIs(context, evmSpecialTypeIDs, args)
+
+	data := make([]byte, len(sig)+len(encodedArguments))
+	n := copy(data, sig)
+	copy(data[n:], encodedArguments)
+
+	return data, nil
+}
+
+// isHexHash verifies whether a string can represent a valid hex-encoded
+// Ethereum hash or not.
+func isHexHash(s string) bool {
+	if has0xPrefix(s) {
+		s = s[2:]
+	}
+	return len(s) == 2*gethCommon.HashLength && isHex(s)
+}
+
+// has0xPrefix validates str begins with '0x' or '0X'.
+func has0xPrefix(str string) bool {
+	return len(str) >= 2 && str[0] == '0' && (str[1] == 'x' || str[1] == 'X')
+}
+
+// isHexCharacter returns bool of c being a valid hexadecimal.
+func isHexCharacter(c byte) bool {
+	return ('0' <= c && c <= '9') || ('a' <= c && c <= 'f') || ('A' <= c && c <= 'F')
+}
+
+// isHex validates whether each byte is valid hexadecimal string.
+func isHex(str string) bool {
+	if len(str)%2 != 0 {
+		return false
+	}
+	for _, c := range []byte(str) {
+		if !isHexCharacter(c) {
+			return false
+		}
+	}
+	return true
 }

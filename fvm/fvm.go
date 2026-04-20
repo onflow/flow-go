@@ -6,6 +6,9 @@ import (
 
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/common"
+	"github.com/rs/zerolog"
+
+	"github.com/onflow/flow-go/fvm/inspection"
 
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/errors"
@@ -35,6 +38,7 @@ type ProcedureOutput struct {
 	ComputationIntensities meter.MeteredComputationIntensities
 	MemoryEstimate         uint64
 	Err                    errors.CodedError
+	InspectionResults      []inspection.Result
 
 	// Output only by script.
 	Value cadence.Value
@@ -65,6 +69,56 @@ func (output *ProcedureOutput) PopulateEnvironmentValues(
 	output.ConvertedServiceEvents = env.ConvertedServiceEvents()
 
 	return nil
+}
+
+func (output *ProcedureOutput) PopulateInspectionResults(
+	log zerolog.Logger,
+	ctx Context,
+	env environment.Environment,
+	storageSnapshot snapshot.StorageSnapshot,
+	executionSnapshot *snapshot.ExecutionSnapshot,
+) {
+
+	evts := make([]flow.Event, 0, len(output.Events)+len(output.ServiceEvents))
+	evts = append(evts, output.Events...)
+	evts = append(evts, output.ServiceEvents...)
+
+	log = log.With().Str("module", "transaction-inspection").Logger()
+
+	log.Debug().
+		Int("inspectors", len(ctx.Inspectors)).
+		Msg("running transaction inspection")
+
+	inspectionResults := inspectProcedureResults(log, ctx, storageSnapshot, executionSnapshot, evts)
+	output.InspectionResults = inspectionResults
+}
+
+func inspectProcedureResults(
+	log zerolog.Logger,
+	context Context,
+	storageSnapshot snapshot.StorageSnapshot,
+	executionSnapshot *snapshot.ExecutionSnapshot,
+	events []flow.Event,
+) []inspection.Result {
+	inspectionResults := make([]inspection.Result, 0, len(context.Inspectors))
+
+	for i, inspector := range context.Inspectors {
+		log := log.With().Str("inspector", inspector.Name()).Int("inspector-num", i).Logger()
+		log.Debug().Msg("starting inspection")
+
+		result, err := inspector.Inspect(log, storageSnapshot, executionSnapshot, events)
+		if err != nil {
+			log.Error().Err(err).Msg("failed to inspect procedure results")
+		}
+
+		if result == nil {
+			log.Error().Msg("inspection results are nil")
+			continue
+		}
+		inspectionResults = append(inspectionResults, result)
+	}
+
+	return inspectionResults
 }
 
 type ProcedureExecutor interface {
@@ -300,6 +354,25 @@ func GetAccountKey(
 	}
 
 	return accountKey, nil
+}
+
+// GetAccountCode returns contract code by location or an error if none exists.
+func GetAccountCode(
+	ctx Context,
+	location common.AddressLocation,
+	storageSnapshot snapshot.StorageSnapshot,
+) (
+	[]byte,
+	error,
+) {
+	scriptEnv, _ := getScriptEnvironment(ctx, storageSnapshot)
+	code, err := scriptEnv.GetAccountContractCode(location)
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to get account code (%s): %w", location.String(), err)
+	}
+
+	return code, nil
 }
 
 // Helper function to initialize common components.

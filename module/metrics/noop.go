@@ -4,12 +4,11 @@ import (
 	"context"
 	"time"
 
-	"google.golang.org/grpc/codes"
-
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/protocol"
 	httpmetrics "github.com/slok/go-http-metrics/metrics"
+	"google.golang.org/grpc/codes"
 
 	"github.com/onflow/flow-go/model/chainsync"
 	"github.com/onflow/flow-go/model/cluster"
@@ -377,6 +376,14 @@ var _ module.ExecutionStateIndexerMetrics = (*NoopCollector)(nil)
 func (nc *NoopCollector) BlockIndexed(uint64, time.Duration, int, int, int) {}
 func (nc *NoopCollector) BlockReindexed()                                   {}
 func (nc *NoopCollector) InitializeLatestHeight(height uint64)              {}
+
+var _ module.ExtendedIndexingMetrics = (*NoopCollector)(nil)
+
+func (nc *NoopCollector) BlockIndexedExtended(string, uint64)                 {}
+func (nc *NoopCollector) ScheduledTransactionIndexed(int, int, int, int, int) {}
+func (nc *NoopCollector) FTTransferIndexed(int)                               {}
+func (nc *NoopCollector) NFTTransferIndexed(int)                              {}
+func (nc *NoopCollector) ContractDeploymentIndexed(int, int)                  {}
 
 var _ module.TransactionErrorMessagesMetrics = (*NoopCollector)(nil)
 

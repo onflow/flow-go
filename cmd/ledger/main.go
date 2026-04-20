@@ -246,7 +246,6 @@ func main() {
 	// Start server on all listeners in separate goroutines
 	errCh := make(chan error, len(listeners))
 	for _, info := range listeners {
-		info := info // capture loop variable
 		go func() {
 			if err := grpcServer.Serve(info.listener); err != nil {
 				errCh <- fmt.Errorf("gRPC server error on %s: %w", info.address, err)

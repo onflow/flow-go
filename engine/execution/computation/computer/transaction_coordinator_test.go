@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/fvm"
+	"github.com/onflow/flow-go/fvm/inspection"
 	"github.com/onflow/flow-go/fvm/storage"
 	"github.com/onflow/flow-go/fvm/storage/logical"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
@@ -48,6 +49,16 @@ func (testCoordinatorVM) GetAccount(
 	error,
 ) {
 	panic("not implemented")
+}
+
+func (testCoordinatorVM) Inspect(
+	_ fvm.Context,
+	_ fvm.Procedure,
+	_ snapshot.StorageSnapshot,
+	_ *snapshot.ExecutionSnapshot,
+	_ fvm.ProcedureOutput,
+) []inspection.Result {
+	return nil
 }
 
 type testCoordinatorExecutor struct {

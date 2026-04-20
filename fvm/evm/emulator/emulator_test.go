@@ -38,7 +38,7 @@ func RunWithNewBlockView(t testing.TB, em *emulator.Emulator, f func(blk types.B
 }
 
 func RunWithNewReadOnlyBlockView(t testing.TB, em *emulator.Emulator, f func(blk types.ReadOnlyBlockView)) {
-	blk, err := em.NewReadOnlyBlockView(defaultCtx)
+	blk, err := em.NewReadOnlyBlockView()
 	require.NoError(t, err)
 	f(blk)
 }

@@ -14,14 +14,14 @@ type ProxyConduit struct {
 
 var _ network.Conduit = (*ProxyConduit)(nil)
 
-func (c *ProxyConduit) Publish(event interface{}, targetIDs ...flow.Identifier) error {
+func (c *ProxyConduit) Publish(event any, targetIDs ...flow.Identifier) error {
 	return c.Conduit.Publish(event, c.targetNodeID)
 }
 
-func (c *ProxyConduit) Unicast(event interface{}, targetID flow.Identifier) error {
+func (c *ProxyConduit) Unicast(event any, targetID flow.Identifier) error {
 	return c.Conduit.Unicast(event, c.targetNodeID)
 }
 
-func (c *ProxyConduit) Multicast(event interface{}, num uint, targetIDs ...flow.Identifier) error {
+func (c *ProxyConduit) Multicast(event any, num uint, targetIDs ...flow.Identifier) error {
 	return c.Conduit.Multicast(event, 1, c.targetNodeID)
 }

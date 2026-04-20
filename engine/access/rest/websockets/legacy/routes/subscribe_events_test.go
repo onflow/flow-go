@@ -248,7 +248,7 @@ func (s *SubscribeEventsSuite) TestSubscribeEvents() {
 				time.Sleep(1 * time.Second)
 				respRecorder.Close()
 			}()
-			router.ExecuteLegacyWsRequest(req, stateStreamBackend, respRecorder, chainID.Chain())
+			router.ExecuteLegacyWsRequest(s.T(), req, stateStreamBackend, respRecorder, chainID.Chain())
 			requireResponse(s.T(), respRecorder, expectedEventsResponses)
 		})
 	}
@@ -260,7 +260,7 @@ func (s *SubscribeEventsSuite) TestSubscribeEventsHandlesErrors() {
 		req, err := getSubscribeEventsRequest(s.T(), s.blocks[0].ID(), s.blocks[0].Height, nil, nil, nil, 1, nil)
 		require.NoError(s.T(), err)
 		respRecorder := router.NewTestHijackResponseRecorder()
-		router.ExecuteLegacyWsRequest(req, stateStreamBackend, respRecorder, chainID.Chain())
+		router.ExecuteLegacyWsRequest(s.T(), req, stateStreamBackend, respRecorder, chainID.Chain())
 		requireError(s.T(), respRecorder, "can only provide either block ID or start height")
 	})
 
@@ -285,7 +285,7 @@ func (s *SubscribeEventsSuite) TestSubscribeEventsHandlesErrors() {
 		req, err := getSubscribeEventsRequest(s.T(), invalidBlock.ID(), request.EmptyHeight, nil, nil, nil, 1, nil)
 		require.NoError(s.T(), err)
 		respRecorder := router.NewTestHijackResponseRecorder()
-		router.ExecuteLegacyWsRequest(req, stateStreamBackend, respRecorder, chainID.Chain())
+		router.ExecuteLegacyWsRequest(s.T(), req, stateStreamBackend, respRecorder, chainID.Chain())
 		requireError(s.T(), respRecorder, "stream encountered an error: subscription error")
 	})
 
@@ -294,7 +294,7 @@ func (s *SubscribeEventsSuite) TestSubscribeEventsHandlesErrors() {
 		req, err := getSubscribeEventsRequest(s.T(), s.blocks[0].ID(), request.EmptyHeight, []string{"foo"}, nil, nil, 1, nil)
 		require.NoError(s.T(), err)
 		respRecorder := router.NewTestHijackResponseRecorder()
-		router.ExecuteLegacyWsRequest(req, stateStreamBackend, respRecorder, chainID.Chain())
+		router.ExecuteLegacyWsRequest(s.T(), req, stateStreamBackend, respRecorder, chainID.Chain())
 		requireError(s.T(), respRecorder, "invalid event type format")
 	})
 
@@ -319,7 +319,7 @@ func (s *SubscribeEventsSuite) TestSubscribeEventsHandlesErrors() {
 		req, err := getSubscribeEventsRequest(s.T(), s.blocks[0].ID(), request.EmptyHeight, nil, nil, nil, 1, nil)
 		require.NoError(s.T(), err)
 		respRecorder := router.NewTestHijackResponseRecorder()
-		router.ExecuteLegacyWsRequest(req, stateStreamBackend, respRecorder, chainID.Chain())
+		router.ExecuteLegacyWsRequest(s.T(), req, stateStreamBackend, respRecorder, chainID.Chain())
 		requireError(s.T(), respRecorder, "subscription channel closed")
 	})
 }

@@ -10,7 +10,7 @@ import (
 )
 
 func ParseAddress(raw string, chain flow.Chain) (flow.Address, error) {
-	raw = strings.ReplaceAll(raw, "0x", "") // remove 0x prefix
+	raw = strings.TrimPrefix(raw, "0x") // remove 0x prefix
 
 	valid, _ := regexp.MatchString(`^[0-9a-fA-F]{16}$`, raw)
 	if !valid {

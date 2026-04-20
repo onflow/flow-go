@@ -74,6 +74,10 @@ This file provides guidance to AI Agents when working with code in this reposito
 
 Flow is a multi-node blockchain protocol implementing a byzantine fault-tolerant consensus mechanism. The architecture follows a data flow graph pattern where components are processing vertices connected by message-passing edges.
 
+Note: this repo includes 2 go modules:
+- `/`: this is the main module `github.com/onflow/flow-go`
+- `integration/`: this is a separate module for integration tests `github.com/onflow/flow-go/integration`
+
 ### Node Types
 - **Access Node** (`/cmd/access/`) - Public API gateway, transaction submission and execution
 - **Collection Node** (`/cmd/collection/`) - Transaction batching into collections
@@ -81,6 +85,14 @@ Flow is a multi-node blockchain protocol implementing a byzantine fault-tolerant
 - **Execution Node** (`/cmd/execution/`) - Transaction execution and state management
 - **Verification Node** (`/cmd/verification/`) - Execution result verification
 - **Observer Node** (`/cmd/observer/`) - Read-only network participant
+
+Abbreviations:
+- **AN**: Access Node
+- **LN**: Collection Node
+- **SN**: Consensus Node
+- **EN**: Execution Node
+- **VN**: Verification Node
+- **ON**: Observer Node
 
 ### Core Components
 

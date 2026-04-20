@@ -3,7 +3,7 @@ package queue
 import "time"
 
 type item struct {
-	message  interface{}
+	message  any
 	priority int // The priority of the item in the queue.
 	// The index is needed by update and is maintained by the heap.Interface methods.
 	index     int       // The index of the item in the heap.
@@ -34,7 +34,7 @@ func (pq priorityQueue) Swap(i, j int) {
 	pq[j].index = j
 }
 
-func (pq *priorityQueue) Push(x interface{}) {
+func (pq *priorityQueue) Push(x any) {
 	n := len(*pq)
 	item, ok := x.(*item)
 	if !ok {
@@ -44,7 +44,7 @@ func (pq *priorityQueue) Push(x interface{}) {
 	*pq = append(*pq, item)
 }
 
-func (pq *priorityQueue) Pop() interface{} {
+func (pq *priorityQueue) Pop() any {
 	old := *pq
 	n := len(old)
 	item := old[n-1]

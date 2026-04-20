@@ -1692,6 +1692,180 @@ func (_c *AccessAPIClient_GetEventsForHeightRange_Call) RunAndReturn(run func(ct
 	return _c
 }
 
+// GetExecutionReceiptsByBlockID provides a mock function for the type AccessAPIClient
+func (_mock *AccessAPIClient) GetExecutionReceiptsByBlockID(ctx context.Context, in *access.GetExecutionReceiptsByBlockIDRequest, opts ...grpc.CallOption) (*access.ExecutionReceiptsResponse, error) {
+	// grpc.CallOption
+	_va := make([]interface{}, len(opts))
+	for _i := range opts {
+		_va[_i] = opts[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, in)
+	_ca = append(_ca, _va...)
+	ret := _mock.Called(_ca...)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetExecutionReceiptsByBlockID")
+	}
+
+	var r0 *access.ExecutionReceiptsResponse
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *access.GetExecutionReceiptsByBlockIDRequest, ...grpc.CallOption) (*access.ExecutionReceiptsResponse, error)); ok {
+		return returnFunc(ctx, in, opts...)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *access.GetExecutionReceiptsByBlockIDRequest, ...grpc.CallOption) *access.ExecutionReceiptsResponse); ok {
+		r0 = returnFunc(ctx, in, opts...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*access.ExecutionReceiptsResponse)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, *access.GetExecutionReceiptsByBlockIDRequest, ...grpc.CallOption) error); ok {
+		r1 = returnFunc(ctx, in, opts...)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// AccessAPIClient_GetExecutionReceiptsByBlockID_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetExecutionReceiptsByBlockID'
+type AccessAPIClient_GetExecutionReceiptsByBlockID_Call struct {
+	*mock.Call
+}
+
+// GetExecutionReceiptsByBlockID is a helper method to define mock.On call
+//   - ctx context.Context
+//   - in *access.GetExecutionReceiptsByBlockIDRequest
+//   - opts ...grpc.CallOption
+func (_e *AccessAPIClient_Expecter) GetExecutionReceiptsByBlockID(ctx interface{}, in interface{}, opts ...interface{}) *AccessAPIClient_GetExecutionReceiptsByBlockID_Call {
+	return &AccessAPIClient_GetExecutionReceiptsByBlockID_Call{Call: _e.mock.On("GetExecutionReceiptsByBlockID",
+		append([]interface{}{ctx, in}, opts...)...)}
+}
+
+func (_c *AccessAPIClient_GetExecutionReceiptsByBlockID_Call) Run(run func(ctx context.Context, in *access.GetExecutionReceiptsByBlockIDRequest, opts ...grpc.CallOption)) *AccessAPIClient_GetExecutionReceiptsByBlockID_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *access.GetExecutionReceiptsByBlockIDRequest
+		if args[1] != nil {
+			arg1 = args[1].(*access.GetExecutionReceiptsByBlockIDRequest)
+		}
+		var arg2 []grpc.CallOption
+		variadicArgs := make([]grpc.CallOption, len(args)-2)
+		for i, a := range args[2:] {
+			if a != nil {
+				variadicArgs[i] = a.(grpc.CallOption)
+			}
+		}
+		arg2 = variadicArgs
+		run(
+			arg0,
+			arg1,
+			arg2...,
+		)
+	})
+	return _c
+}
+
+func (_c *AccessAPIClient_GetExecutionReceiptsByBlockID_Call) Return(executionReceiptsResponse *access.ExecutionReceiptsResponse, err error) *AccessAPIClient_GetExecutionReceiptsByBlockID_Call {
+	_c.Call.Return(executionReceiptsResponse, err)
+	return _c
+}
+
+func (_c *AccessAPIClient_GetExecutionReceiptsByBlockID_Call) RunAndReturn(run func(ctx context.Context, in *access.GetExecutionReceiptsByBlockIDRequest, opts ...grpc.CallOption) (*access.ExecutionReceiptsResponse, error)) *AccessAPIClient_GetExecutionReceiptsByBlockID_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// GetExecutionReceiptsByResultID provides a mock function for the type AccessAPIClient
+func (_mock *AccessAPIClient) GetExecutionReceiptsByResultID(ctx context.Context, in *access.GetExecutionReceiptsByResultIDRequest, opts ...grpc.CallOption) (*access.ExecutionReceiptsResponse, error) {
+	// grpc.CallOption
+	_va := make([]interface{}, len(opts))
+	for _i := range opts {
+		_va[_i] = opts[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, in)
+	_ca = append(_ca, _va...)
+	ret := _mock.Called(_ca...)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetExecutionReceiptsByResultID")
+	}
+
+	var r0 *access.ExecutionReceiptsResponse
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *access.GetExecutionReceiptsByResultIDRequest, ...grpc.CallOption) (*access.ExecutionReceiptsResponse, error)); ok {
+		return returnFunc(ctx, in, opts...)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *access.GetExecutionReceiptsByResultIDRequest, ...grpc.CallOption) *access.ExecutionReceiptsResponse); ok {
+		r0 = returnFunc(ctx, in, opts...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*access.ExecutionReceiptsResponse)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, *access.GetExecutionReceiptsByResultIDRequest, ...grpc.CallOption) error); ok {
+		r1 = returnFunc(ctx, in, opts...)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// AccessAPIClient_GetExecutionReceiptsByResultID_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetExecutionReceiptsByResultID'
+type AccessAPIClient_GetExecutionReceiptsByResultID_Call struct {
+	*mock.Call
+}
+
+// GetExecutionReceiptsByResultID is a helper method to define mock.On call
+//   - ctx context.Context
+//   - in *access.GetExecutionReceiptsByResultIDRequest
+//   - opts ...grpc.CallOption
+func (_e *AccessAPIClient_Expecter) GetExecutionReceiptsByResultID(ctx interface{}, in interface{}, opts ...interface{}) *AccessAPIClient_GetExecutionReceiptsByResultID_Call {
+	return &AccessAPIClient_GetExecutionReceiptsByResultID_Call{Call: _e.mock.On("GetExecutionReceiptsByResultID",
+		append([]interface{}{ctx, in}, opts...)...)}
+}
+
+func (_c *AccessAPIClient_GetExecutionReceiptsByResultID_Call) Run(run func(ctx context.Context, in *access.GetExecutionReceiptsByResultIDRequest, opts ...grpc.CallOption)) *AccessAPIClient_GetExecutionReceiptsByResultID_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *access.GetExecutionReceiptsByResultIDRequest
+		if args[1] != nil {
+			arg1 = args[1].(*access.GetExecutionReceiptsByResultIDRequest)
+		}
+		var arg2 []grpc.CallOption
+		variadicArgs := make([]grpc.CallOption, len(args)-2)
+		for i, a := range args[2:] {
+			if a != nil {
+				variadicArgs[i] = a.(grpc.CallOption)
+			}
+		}
+		arg2 = variadicArgs
+		run(
+			arg0,
+			arg1,
+			arg2...,
+		)
+	})
+	return _c
+}
+
+func (_c *AccessAPIClient_GetExecutionReceiptsByResultID_Call) Return(executionReceiptsResponse *access.ExecutionReceiptsResponse, err error) *AccessAPIClient_GetExecutionReceiptsByResultID_Call {
+	_c.Call.Return(executionReceiptsResponse, err)
+	return _c
+}
+
+func (_c *AccessAPIClient_GetExecutionReceiptsByResultID_Call) RunAndReturn(run func(ctx context.Context, in *access.GetExecutionReceiptsByResultIDRequest, opts ...grpc.CallOption) (*access.ExecutionReceiptsResponse, error)) *AccessAPIClient_GetExecutionReceiptsByResultID_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetExecutionResultByID provides a mock function for the type AccessAPIClient
 func (_mock *AccessAPIClient) GetExecutionResultByID(ctx context.Context, in *access.GetExecutionResultByIDRequest, opts ...grpc.CallOption) (*access.ExecutionResultByIDResponse, error) {
 	// grpc.CallOption

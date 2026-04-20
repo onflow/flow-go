@@ -42,7 +42,7 @@ type retryableConflictError struct {
 
 func NewRetryableConflictError(
 	msg string,
-	vals ...interface{},
+	vals ...any,
 ) error {
 	return &retryableConflictError{
 		error: fmt.Errorf(msg, vals...),

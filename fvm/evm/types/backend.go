@@ -23,4 +23,5 @@ type Backend interface {
 	environment.Tracer
 	environment.EVMMetricsReporter
 	environment.LoggerProvider
+	EVMTestOperationsAllowed() bool
 }

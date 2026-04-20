@@ -84,6 +84,14 @@ func (s *builderV0Suite) TestExecuteCallbacksTransactions() {
 	}
 }
 
+func (s *builderV0Suite) TestExecuteCallbacksTransaction() {
+	expectedID := flow.MustHexStringToIdentifier("3b16467513ee196aa369bafab83786dcd0aa0ae09059369df13cf45b13b7de26")
+
+	tx, err := s.builder.ExecuteCallbacksTransaction(s.g.ChainID().Chain(), 42, 1000)
+	s.Require().NoError(err)
+	s.Require().True(expectedID == tx.ID(), "invalid change made in the v0 versioned system collection")
+}
+
 func (s *builderV0Suite) TestSystemChunkTransaction() {
 	expectedID := flow.MustHexStringToIdentifier("3408f8b1aa1b33cfc3f78c3f15217272807b14cec4ef64168bcf313bc4174621")
 

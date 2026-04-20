@@ -370,7 +370,7 @@ func TestRandomProofs(t *testing.T) {
 	minPayloadSize := 2
 	maxPayloadSize := 10
 	experimentRep := 20
-	for e := 0; e < experimentRep; e++ {
+	for range experimentRep {
 		withForest(t, pathByteSize, experimentRep+1, func(t *testing.T, f *mtrie.Forest) {
 
 			// generate some random paths and payloads

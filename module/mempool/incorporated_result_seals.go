@@ -7,7 +7,9 @@ import (
 // IncorporatedResultSeals represents a concurrency safe memory pool for
 // incorporated result seals.
 type IncorporatedResultSeals interface {
-	// Add adds an IncorporatedResultSeal to the mempool.
+	// Add adds an IncorporatedResultSeal to the mempool. The method returns true if the seal was added to the mempool,
+	// and false if it was a duplicate (dropped). The seal is considered a duplicate if and only if a seal for the same
+	// IncorporatedResult ID is already present in the mempool.
 	Add(irSeal *flow.IncorporatedResultSeal) (bool, error)
 
 	// All returns all the IncorporatedResultSeals in the mempool.

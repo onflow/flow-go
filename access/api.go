@@ -99,6 +99,23 @@ type TransactionStreamAPI interface {
 	) subscription.Subscription
 }
 
+// ReceiptsAPI provides access to execution receipts for blocks and execution results.
+type ReceiptsAPI interface {
+	// GetExecutionReceiptsByBlockID retrieves all known execution receipts for the given block.
+	//
+	// Expected error returns during normal operation:
+	//   - codes.NotFound: if no receipts are indexed for the given block ID.
+	GetExecutionReceiptsByBlockID(ctx context.Context, blockID flow.Identifier) ([]*flow.ExecutionReceipt, error)
+
+	// GetExecutionReceiptsByResultID retrieves all known execution receipts that commit to the
+	// given execution result ID. It resolves the associated block ID from the result, then
+	// retrieves all receipts for that block, filtering to those matching the requested result.
+	//
+	// Expected error returns during normal operation:
+	//   - codes.NotFound: if the execution result or its block's receipts are not found.
+	GetExecutionReceiptsByResultID(ctx context.Context, resultID flow.Identifier) ([]*flow.ExecutionReceipt, error)
+}
+
 // API provides all public-facing functionality of the Flow Access API.
 type API interface {
 	AccountsAPI
@@ -106,6 +123,7 @@ type API interface {
 	ScriptsAPI
 	TransactionsAPI
 	TransactionStreamAPI
+	ReceiptsAPI
 
 	Ping(ctx context.Context) error
 	GetNetworkParameters(ctx context.Context) accessmodel.NetworkParameters

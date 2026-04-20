@@ -8,6 +8,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/access"
+	"github.com/onflow/flow-go/access/backends/extended"
 	"github.com/onflow/flow-go/engine/access/rest/router"
 	"github.com/onflow/flow-go/engine/access/rest/websockets"
 	dp "github.com/onflow/flow-go/engine/access/rest/websockets/data_providers"
@@ -16,6 +17,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/module/limiters"
 )
 
 const (
@@ -50,10 +52,12 @@ func NewServer(
 	stateStreamConfig backend.Config,
 	enableNewWebsocketsStreamAPI bool,
 	wsConfig websockets.Config,
+	extendedBackend extended.API,
+	limiter *limiters.ConcurrencyLimiter,
 ) (*http.Server, error) {
 	builder := router.NewRouterBuilder(logger, restCollector).AddRestRoutes(serverAPI, chain, config.MaxRequestSize, config.MaxResponseSize)
 	if stateStreamApi != nil {
-		builder.AddLegacyWebsocketsRoutes(stateStreamApi, chain, stateStreamConfig, config.MaxRequestSize, config.MaxResponseSize)
+		builder.AddLegacyWebsocketsRoutes(stateStreamApi, chain, stateStreamConfig, config.MaxRequestSize, config.MaxResponseSize, limiter)
 	}
 
 	dataProviderFactory := dp.NewDataProviderFactory(
@@ -67,7 +71,11 @@ func NewServer(
 	)
 
 	if enableNewWebsocketsStreamAPI {
-		builder.AddWebsocketsRoute(ctx, chain, wsConfig, config.MaxRequestSize, config.MaxResponseSize, dataProviderFactory)
+		builder.AddWebsocketsRoute(ctx, chain, wsConfig, config.MaxRequestSize, config.MaxResponseSize, dataProviderFactory, limiter)
+	}
+
+	if extendedBackend != nil {
+		builder.AddExperimentalRoutes(extendedBackend, chain, config.MaxRequestSize, config.MaxResponseSize)
 	}
 
 	c := cors.New(cors.Options{

@@ -27,6 +27,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/limiters"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -62,7 +63,7 @@ func (fake *fakeReadServerImpl) Send(response *executiondata.SubscribeEventsResp
 func (s *HandlerTestSuite) SetupTest() {
 	s.BackendExecutionDataSuite.SetupTest()
 	chain := flow.MonotonicEmulator.Chain()
-	s.handler = NewHandler(s.backend, chain, makeConfig(5))
+	s.handler = NewHandler(s.backend, chain, makeConfig(5), makeLimiter(s.T(), 5))
 }
 
 // TestHeartbeatResponse tests the periodic heartbeat response.
@@ -227,7 +228,7 @@ func TestGetExecutionDataByBlockID(t *testing.T) {
 			api := ssmock.NewAPI(t)
 			api.On("GetExecutionDataByBlockID", mock.Anything, blockID).Return(result, nil)
 
-			h := NewHandler(api, flow.Localnet.Chain(), makeConfig(1))
+			h := NewHandler(api, flow.Localnet.Chain(), makeConfig(1), makeLimiter(t, 1))
 
 			response, err := h.GetExecutionDataByBlockID(ctx, &executiondata.GetExecutionDataByBlockIDRequest{
 				BlockId:              blockID[:],
@@ -281,7 +282,7 @@ func TestExecutionDataStream(t *testing.T) {
 
 		api.On("SubscribeExecutionData", mock.Anything, flow.ZeroID, uint64(0), mock.Anything).Return(sub)
 
-		h := NewHandler(api, flow.Localnet.Chain(), makeConfig(1))
+		h := NewHandler(api, flow.Localnet.Chain(), makeConfig(1), makeLimiter(t, 1))
 
 		wg := sync.WaitGroup{}
 		wg.Add(1)
@@ -407,7 +408,7 @@ func TestEventStream(t *testing.T) {
 
 		api.On("SubscribeEvents", mock.Anything, flow.ZeroID, uint64(0), mock.Anything).Return(sub)
 
-		h := NewHandler(api, flow.Localnet.Chain(), makeConfig(1))
+		h := NewHandler(api, flow.Localnet.Chain(), makeConfig(1), makeLimiter(t, 1))
 
 		wg := sync.WaitGroup{}
 		wg.Add(1)
@@ -532,7 +533,7 @@ func TestGetRegisterValues(t *testing.T) {
 
 	t.Run("invalid message", func(t *testing.T) {
 		api := ssmock.NewAPI(t)
-		h := NewHandler(api, flow.Testnet.Chain(), makeConfig(1))
+		h := NewHandler(api, flow.Testnet.Chain(), makeConfig(1), makeLimiter(t, 1))
 
 		invalidMessage := &executiondata.GetRegisterValuesRequest{
 			RegisterIds: nil,
@@ -544,7 +545,7 @@ func TestGetRegisterValues(t *testing.T) {
 	t.Run("valid registers", func(t *testing.T) {
 		api := ssmock.NewAPI(t)
 		api.On("GetRegisterValues", testIds, testHeight).Return(testValues, nil)
-		h := NewHandler(api, flow.Testnet.Chain(), makeConfig(1))
+		h := NewHandler(api, flow.Testnet.Chain(), makeConfig(1), makeLimiter(t, 1))
 
 		validRegisters := make([]*entities.RegisterID, len(testIds))
 		for i, id := range testIds {
@@ -565,7 +566,7 @@ func TestGetRegisterValues(t *testing.T) {
 		api := ssmock.NewAPI(t)
 		expectedErr := status.Errorf(codes.NotFound, "could not get register values: %v", storage.ErrNotFound)
 		api.On("GetRegisterValues", invalidIDs, testHeight).Return(nil, expectedErr)
-		h := NewHandler(api, flow.Testnet.Chain(), makeConfig(1))
+		h := NewHandler(api, flow.Testnet.Chain(), makeConfig(1), makeLimiter(t, 1))
 
 		unavailableRegisters := make([]*entities.RegisterID, len(invalidIDs))
 		for i, id := range invalidIDs {
@@ -585,7 +586,7 @@ func TestGetRegisterValues(t *testing.T) {
 		api := ssmock.NewAPI(t)
 		expectedErr := status.Errorf(codes.OutOfRange, "could not get register values: %v", storage.ErrHeightNotIndexed)
 		api.On("GetRegisterValues", testIds, testHeight+1).Return(nil, expectedErr)
-		h := NewHandler(api, flow.Testnet.Chain(), makeConfig(1))
+		h := NewHandler(api, flow.Testnet.Chain(), makeConfig(1), makeLimiter(t, 1))
 
 		validRegisters := make([]*entities.RegisterID, len(testIds))
 		for i, id := range testIds {
@@ -611,6 +612,38 @@ func generateEvents(t *testing.T, n int) ([]flow.Event, []flow.Event) {
 		jsonEvents[i] = *jsonEvent
 	}
 	return ccfEvents, jsonEvents
+}
+
+func TestWithStreamLimit_RejectsWhenLimitReached(t *testing.T) {
+	limiter := makeLimiter(t, 1)
+	h := NewHandler(nil, flow.Localnet.Chain(), makeConfig(1), limiter)
+
+	// Saturate the limiter by blocking inside Allow.
+	started := make(chan struct{})
+	unblock := make(chan struct{})
+	go func() {
+		limiter.Allow(func() {
+			close(started)
+			<-unblock
+		})
+	}()
+	<-started
+
+	// A streaming call while the limiter is full must return ResourceExhausted.
+	err := h.withStreamLimit(func() error {
+		t.Fatal("fn should not be called when limiter is full")
+		return nil
+	})
+	require.Error(t, err)
+	assert.Equal(t, codes.ResourceExhausted, status.Code(err))
+
+	close(unblock)
+}
+
+func makeLimiter(t *testing.T, maxGlobalStreams uint32) *limiters.ConcurrencyLimiter {
+	l, err := limiters.NewConcurrencyLimiter(maxGlobalStreams)
+	require.NoError(t, err)
+	return l
 }
 
 func makeConfig(maxGlobalStreams uint32) Config {

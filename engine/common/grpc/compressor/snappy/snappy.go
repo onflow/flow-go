@@ -13,7 +13,7 @@ const Name = "snappy"
 
 func init() {
 	c := &compressor{}
-	c.poolCompressor.New = func() interface{} {
+	c.poolCompressor.New = func() any {
 		return &writer{Writer: snappy.NewBufferedWriter(nil), pool: &c.poolCompressor}
 	}
 	encoding.RegisterCompressor(c)

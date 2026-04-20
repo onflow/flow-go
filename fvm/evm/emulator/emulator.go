@@ -58,7 +58,7 @@ func newConfig(ctx types.BlockContext) *Config {
 }
 
 // NewReadOnlyBlockView constructs a new read-only block view
-func (em *Emulator) NewReadOnlyBlockView(ctx types.BlockContext) (types.ReadOnlyBlockView, error) {
+func (em *Emulator) NewReadOnlyBlockView() (types.ReadOnlyBlockView, error) {
 	execState, err := state.NewStateDB(em.ledger, em.rootAddr)
 	return &ReadOnlyBlockView{
 		state: execState,

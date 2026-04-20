@@ -118,7 +118,7 @@ func (n *Network) UnRegisterChannel(channel channels.Channel) error {
 
 // submit is called when the attached Engine to the channel is sending an event to an
 // Engine attached to the same channel on another node or nodes.
-func (n *Network) submit(channel channels.Channel, event interface{}, targetIDs ...flow.Identifier) error {
+func (n *Network) submit(channel channels.Channel, event any, targetIDs ...flow.Identifier) error {
 	e, ok := event.(messages.UntrustedMessage)
 	if !ok {
 		return fmt.Errorf("invalid message type: expected messages.UntrustedMessage, got %T", event)
@@ -137,7 +137,7 @@ func (n *Network) submit(channel channels.Channel, event interface{}, targetIDs 
 
 // UnicastOnChannel is called when the attached Engine to the channel is sending an event to a single target
 // Engine attached to the same channel on another node.
-func (n *Network) UnicastOnChannel(channel channels.Channel, event interface{}, targetID flow.Identifier) error {
+func (n *Network) UnicastOnChannel(channel channels.Channel, event any, targetID flow.Identifier) error {
 	msg, ok := event.(messages.UntrustedMessage)
 	if !ok {
 		return fmt.Errorf("invalid message type: expected messages.UntrustedMessage, got %T", event)
@@ -156,7 +156,7 @@ func (n *Network) UnicastOnChannel(channel channels.Channel, event interface{}, 
 // publish is called when the attached Engine is sending an event to a group of Engines attached to the
 // same channel on other nodes based on selector.
 // In this test helper implementation, publish uses submit method under the hood.
-func (n *Network) PublishOnChannel(channel channels.Channel, event interface{}, targetIDs ...flow.Identifier) error {
+func (n *Network) PublishOnChannel(channel channels.Channel, event any, targetIDs ...flow.Identifier) error {
 
 	if len(targetIDs) == 0 {
 		return fmt.Errorf("publish found empty target ID list for the message")
@@ -168,7 +168,7 @@ func (n *Network) PublishOnChannel(channel channels.Channel, event interface{}, 
 // multicast is called when an engine attached to the channel is sending an event to a number of randomly chosen
 // Engines attached to the same channel on other nodes. The targeted nodes are selected based on the selector.
 // In this test helper implementation, multicast uses submit method under the hood.
-func (n *Network) MulticastOnChannel(channel channels.Channel, event interface{}, num uint, targetIDs ...flow.Identifier) error {
+func (n *Network) MulticastOnChannel(channel channels.Channel, event any, num uint, targetIDs ...flow.Identifier) error {
 	var err error
 	targetIDs, err = flow.Sample(num, targetIDs...)
 	if err != nil {

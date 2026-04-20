@@ -144,7 +144,7 @@ func FundAndGetEOATestAccount(t testing.TB, led atree.Ledger, flowEVMRootAddress
 	)
 	require.NoError(t, err)
 
-	blk2, err := e.NewReadOnlyBlockView(types.NewDefaultBlockContext(2))
+	blk2, err := e.NewReadOnlyBlockView()
 	require.NoError(t, err)
 
 	bal, err := blk2.BalanceOf(account.Address())
