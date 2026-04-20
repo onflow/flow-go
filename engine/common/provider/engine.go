@@ -284,7 +284,6 @@ func (e *Engine) onEntityRequest(request *internal.EntityRequest) error {
 	entityIDs := make([]flow.Identifier, 0, len(requestedIDs))
 	seen := make(map[flow.Identifier]struct{})
 	var cumulativeSize int
-	budgetExceeded := false
 
 	for _, entityID := range requestedIDs {
 		// skip requesting duplicate entity IDs
@@ -316,7 +315,6 @@ func (e *Engine) onEntityRequest(request *internal.EntityRequest) error {
 
 		// Check if adding this entity would exceed the response byte budget
 		if cumulativeSize+len(blob) > e.maxResponseByteSize {
-			budgetExceeded = true
 			lg.Info().
 				Int("cumulative_size", cumulativeSize).
 				Int("blob_size", len(blob)).
@@ -330,8 +328,6 @@ func (e *Engine) onEntityRequest(request *internal.EntityRequest) error {
 		entityIDs = append(entityIDs, entityID)
 		cumulativeSize += len(blob)
 	}
-
-	_ = budgetExceeded // used for logging above; silence unused warning
 
 	// NOTE: we do _NOT_ avoid sending empty responses, as this will allow
 	// the requester to know we don't have any of the requested entities, which
