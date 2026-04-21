@@ -14,7 +14,7 @@ func BenchmarkStorage(b *testing.B) { benchmarkStorageGrowth(b, 100, 100, 100) }
 
 // benchmark
 func benchmarkStorageGrowth(b *testing.B, accountCount, setupKittyCount, txPerBlock int) {
-	testutils.RunWithTestBackend(b, func(backend *testutils.TestBackend) {
+	testutils.RunWithTestBackend(b, flow.Testnet, func(backend *testutils.TestBackend) {
 		testutils.RunWithTestFlowEVMRootAddress(b, backend, func(rootAddr flow.Address) {
 			testutils.RunWithDeployedContract(b,
 				testutils.GetDummyKittyTestContract(b),

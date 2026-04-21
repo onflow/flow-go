@@ -93,7 +93,6 @@ func EVMInternalEVMContractValue(chainID flow.ChainID, fvmEnv environment.Enviro
 
 	evmBackend := backends.NewWrappedEnvironment(fvmEnv)
 	evmEmulator := emulator.NewEmulator(evmBackend, evm.StorageAccountAddress(chainID))
-	blockStore := handler.NewBlockStore(chainID, evmBackend, evm.StorageAccountAddress(chainID))
 	addressAllocator := handler.NewAddressAllocator()
 
 	evmContractAddress := evm.ContractAccountAddress(chainID)
@@ -103,7 +102,6 @@ func EVMInternalEVMContractValue(chainID flow.ChainID, fvmEnv environment.Enviro
 		evmContractAddress,
 		common.Address(flowTokenAddress),
 		randomBeaconAddress,
-		blockStore,
 		addressAllocator,
 		evmBackend,
 		evmEmulator,
