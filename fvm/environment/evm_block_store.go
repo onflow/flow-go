@@ -77,7 +77,7 @@ const (
 //	    └── heartbeat()
 //	        └── CommitBlockProposal()
 //	            ├── write LatestBlock
-//	            ├── remove LatestBlockProposal (new proposal constructed lazily in next flow block)
+//	            ├── write new LatestBlockProposal (for next flow block)
 //	            └── cache = nil
 type BlockStore struct {
 	chainID     flow.ChainID
@@ -222,13 +222,13 @@ func (bs *BlockStore) CommitBlockProposal(bp *types.BlockProposal) error {
 		return err
 	}
 
-	// Remove LatestBlockProposal key - the new proposal will be constructed lazily
-	// on the next BlockProposal() call by reading LatestBlock for parent hash and height.
-	err = bs.storage.SetValue(
-		bs.rootAddress[:],
-		[]byte(BlockStoreLatestBlockProposalKey),
-		nil, // setting to nil removes the key
-	)
+	// Construct and store the new block proposal eagerly to maintain
+	// state compatibility with the previous implementation.
+	newBP, err := bs.constructBlockProposal()
+	if err != nil {
+		return err
+	}
+	err = bs.updateBlockProposal(newBP)
 	if err != nil {
 		return err
 	}
