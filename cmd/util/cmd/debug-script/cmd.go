@@ -1,18 +1,14 @@
 package debug_tx
 
 import (
-	"context"
 	"os"
 
 	"github.com/onflow/flow/protobuf/go/flow/access"
-	"github.com/onflow/flow/protobuf/go/flow/execution"
-	"github.com/onflow/flow/protobuf/go/flow/executiondata"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
-	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/debug"
 )
@@ -48,7 +44,6 @@ func init() {
 	_ = Cmd.MarkFlagRequired("access-address")
 
 	Cmd.Flags().StringVar(&flagExecutionAddress, "execution-address", "", "address of the execution node")
-	_ = Cmd.MarkFlagRequired("execution-address")
 
 	Cmd.Flags().StringVar(&flagBlockID, "block-id", "", "block ID")
 	_ = Cmd.MarkFlagRequired("block-id")
@@ -58,27 +53,26 @@ func init() {
 	Cmd.Flags().StringVar(&flagScript, "script", "", "path to script")
 	_ = Cmd.MarkFlagRequired("script")
 
-	Cmd.Flags().BoolVar(&flagUseExecutionDataAPI, "use-execution-data-api", false, "use the execution data API")
+	Cmd.Flags().BoolVar(&flagUseExecutionDataAPI, "use-execution-data-api", true, "use the execution data API (default: true)")
 }
 
-func run(*cobra.Command, []string) {
+func run(cmd *cobra.Command, _ []string) {
+	ctx := cmd.Context()
 
 	chainID := flow.ChainID(flagChain)
 	chain := chainID.Chain()
 
 	code, err := os.ReadFile(flagScript)
 	if err != nil {
-		log.Fatal().Err(err).Msgf("failed to read script from file %s", flagScript)
+		log.Fatal().Err(err).Msgf("Failed to read script from file %s", flagScript)
 	}
-
-	log.Info().Msg("Fetching block header ...")
 
 	accessConn, err := grpc.NewClient(
 		flagAccessAddress,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 	)
 	if err != nil {
-		log.Fatal().Err(err).Msg("failed to create access connection")
+		log.Fatal().Err(err).Msg("Failed to create access connection")
 	}
 	defer accessConn.Close()
 
@@ -86,59 +80,60 @@ func run(*cobra.Command, []string) {
 
 	blockID, err := flow.HexStringToIdentifier(flagBlockID)
 	if err != nil {
-		log.Fatal().Err(err).Msg("failed to parse block ID")
+		log.Fatal().Err(err).Msg("Failed to parse block ID")
 	}
 
-	header, err := debug.GetAccessAPIBlockHeader(accessClient, context.Background(), blockID)
+	log.Info().Msgf("Fetching block header for %s ...", blockID)
+
+	blockHeader, err := debug.GetAccessAPIBlockHeader(ctx, accessClient, blockID)
 	if err != nil {
-		log.Fatal().Err(err).Msg("failed to fetch block header")
+		log.Fatal().Err(err).Msg("Failed to fetch block header")
 	}
-
-	blockHeight := header.Height
 
 	log.Info().Msgf(
 		"Fetched block header: %s (height %d)",
-		header.ID(),
-		blockHeight,
+		blockID,
+		blockHeader.Height,
 	)
 
-	var snap snapshot.StorageSnapshot
-
+	var remoteClient debug.RemoteClient
 	if flagUseExecutionDataAPI {
-		executionDataClient := executiondata.NewExecutionDataAPIClient(accessConn)
-		snap, err = debug.NewExecutionDataStorageSnapshot(executionDataClient, nil, blockHeight)
-		if err != nil {
-			log.Fatal().Err(err).Msg("failed to create storage snapshot")
-		}
+		remoteClient, err = debug.NewExecutionDataRemoteClient(flagAccessAddress, chain)
+	} else if flagExecutionAddress != "" {
+		remoteClient, err = debug.NewExecutionNodeRemoteClient(flagExecutionAddress)
 	} else {
-		executionConn, err := grpc.NewClient(
-			flagExecutionAddress,
-			grpc.WithTransportCredentials(insecure.NewCredentials()),
-		)
-		if err != nil {
-			log.Fatal().Err(err).Msg("failed to create execution connection")
-		}
-		defer executionConn.Close()
+		log.Fatal().Msg("Either --use-execution-data-api or --execution-address must be provided")
+	}
+	if err != nil {
+		log.Fatal().Err(err).Msg("Failed to create remote client")
+	}
+	defer remoteClient.Close()
 
-		executionClient := execution.NewExecutionAPIClient(executionConn)
-		snap, err = debug.NewExecutionNodeStorageSnapshot(executionClient, nil, blockID)
-		if err != nil {
-			log.Fatal().Err(err).Msg("failed to create storage snapshot")
-		}
+	remoteSnapshot, err := remoteClient.StorageSnapshot(blockHeader.Height, blockID)
+	if err != nil {
+		log.Fatal().Err(err).Msg("Failed to create storage snapshot")
 	}
 
-	debugger := debug.NewRemoteDebugger(chain, log.Logger)
+	blockSnapshot := debug.NewCachingStorageSnapshot(remoteSnapshot)
+
+	debugger := debug.NewRemoteDebugger(
+		chain,
+		log.Logger,
+	)
 
 	// TODO: add support for arguments
 	var arguments [][]byte
 
-	result, scriptErr, processErr := debugger.RunScript(code, arguments, snap, header)
+	result, err := debugger.RunScript(code, arguments, blockSnapshot, blockHeader)
+	if err != nil {
+		log.Fatal().Err(err).Msg("Failed to run script")
+	}
 
-	if scriptErr != nil {
-		log.Fatal().Err(scriptErr).Msg("transaction error")
+	if result.Output.Err != nil {
+		log.Fatal().Err(result.Output.Err).Msg("Script execution failed")
+	} else {
+		log.Info().Msg("Script executed successfully")
 	}
-	if processErr != nil {
-		log.Fatal().Err(processErr).Msg("process error")
-	}
-	log.Info().Msgf("result: %s", result)
+
+	log.Info().Msgf("Result: %s", result.Output.Value)
 }

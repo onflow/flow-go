@@ -32,15 +32,15 @@ jobs:
     runs-on: blacksmith-4vcpu-ubuntu-2404
     steps:
       - name: Check out code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v6
         with:
           go-version: ${{ env.GO_VERSION }}
           cache: true
       - name: Cache custom linter binary
         id: cache-linter
-        uses: actions/cache@v3
+        uses: actions/cache@v5
         with:
           # Key should change whenever implementation (tools/structwrite), or compilation config (.custom-gcl.yml) changes
           # When the key is different, it is a cache miss, and the custom linter binary is recompiled
@@ -73,16 +73,16 @@ jobs:
     needs: build-linter # must wait for custom linter binary to be available
     steps:
     - name: Checkout repo
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6
     - name: Setup Go
-      uses: actions/setup-go@v5
+      uses: actions/setup-go@v6
       timeout-minutes: 10 # fail fast. sometimes this step takes an extremely long time
       with:
         go-version: ${{ env.GO_VERSION }}
         cache: true
     - name: Restore custom linter binary from cache
       id: cache-linter
-      uses: actions/cache@v3
+      uses: actions/cache@v5
       with:
         # See "Cache custom linter binary" job for information about the key structure
         key: custom-linter-${{ env.GO_VERSION }}-${{ runner.os }}-${{ hashFiles('.custom-gcl.yml', 'tools/structwrite/**') }}-${{ github.sha }}
@@ -118,7 +118,7 @@ jobs:
     runs-on: blacksmith-4vcpu-ubuntu-2404
     steps:
       - name: Checkout repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup private build environment
         if: ${{ vars.PRIVATE_BUILDS_SUPPORTED == 'true' }} 
@@ -127,7 +127,7 @@ jobs:
           cadence_deploy_key: ${{ secrets.CADENCE_DEPLOY_KEY }}
 
       - name: Setup Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v6
         timeout-minutes: 10 # fail fast. sometimes this step takes an extremely long time
         with:
           go-version: ${{ env.GO_VERSION }}
@@ -144,9 +144,9 @@ jobs:
       dynamic-matrix: ${{ steps.set-test-matrix.outputs.dynamicMatrix }}
     steps:
       - name: Checkout repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
       - name: Setup Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v6
         timeout-minutes: 10 # fail fast. sometimes this step takes an extremely long time
         with:
           go-version: ${{ env.GO_VERSION }}
@@ -162,9 +162,9 @@ jobs:
       dynamic-matrix: ${{ steps.set-test-matrix.outputs.dynamicMatrix }}
     steps:
       - name: Checkout repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
       - name: Setup Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v6
         timeout-minutes: 10 # fail fast. sometimes this step takes an extremely long time
         with:
           go-version: ${{ env.GO_VERSION }}
@@ -180,9 +180,9 @@ jobs:
       dynamic-matrix: ${{ steps.set-test-matrix.outputs.dynamicMatrix }}
     steps:
       - name: Checkout repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
       - name: Setup Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v6
         timeout-minutes: 10 # fail fast. sometimes this step takes an extremely long time
         with:
           go-version: ${{ env.GO_VERSION }}
@@ -202,7 +202,7 @@ jobs:
     runs-on: ${{ matrix.targets.runner }}
     steps:
     - name: Checkout repo
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6
 
     - name: Setup private build environment
       if: ${{ vars.PRIVATE_BUILDS_SUPPORTED == 'true' }} 
@@ -211,7 +211,7 @@ jobs:
         cadence_deploy_key: ${{ secrets.CADENCE_DEPLOY_KEY }}
 
     - name: Setup Go
-      uses: actions/setup-go@v5
+      uses: actions/setup-go@v6
       timeout-minutes: 10 # fail fast. sometimes this step takes an extremely long time
       with:
         go-version: ${{ env.GO_VERSION }}
@@ -219,7 +219,7 @@ jobs:
     - name: Setup tests (${{ matrix.targets.name }})
       run: VERBOSE=1 make -e GO_TEST_PACKAGES="${{ matrix.targets.packages }}" install-tools
     - name: Run tests (${{ matrix.targets.name }})
-      uses: nick-fields/retry@v3
+      uses: nick-fields/retry@v4
       with:
         timeout_minutes: 35
         max_attempts: 5
@@ -248,7 +248,7 @@ jobs:
     runs-on: ${{ matrix.targets.runner }}
     steps:
       - name: Checkout repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup private build environment
         if: ${{ vars.PRIVATE_BUILDS_SUPPORTED == 'true' }} 
@@ -257,7 +257,7 @@ jobs:
           cadence_deploy_key: ${{ secrets.CADENCE_DEPLOY_KEY }}
 
       - name: Setup Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v6
         timeout-minutes: 10 # fail fast. sometimes this step takes an extremely long time
         with:
           go-version: ${{ env.GO_VERSION }}
@@ -265,7 +265,7 @@ jobs:
       - name: Setup tests (${{ matrix.targets.name }})
         run: VERBOSE=1 make -e GO_TEST_PACKAGES="${{ matrix.targets.packages }}" install-tools
       - name: Run tests (${{ matrix.targets.name }})
-        uses: nick-fields/retry@v3
+        uses: nick-fields/retry@v4
         with:
           timeout_minutes: 35
           max_attempts: 5
@@ -290,7 +290,7 @@ jobs:
       CADENCE_DEPLOY_KEY: ${{ secrets.CADENCE_DEPLOY_KEY }}
     steps:
       - name: Checkout repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           # all tags are needed for integration tests
           fetch-depth: 0
@@ -302,14 +302,14 @@ jobs:
           cadence_deploy_key: ${{ secrets.CADENCE_DEPLOY_KEY }}
 
       - name: Setup Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v6
         timeout-minutes: 10 # fail fast. sometimes this step takes an extremely long time
         with:
           go-version: ${{ env.GO_VERSION }}
           cache: true
 
       - name: Login to Docker Hub
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           username: ${{ vars.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
@@ -337,7 +337,7 @@ jobs:
           gcr.io/flow-container-registry/execution-corrupted:latest \
           gcr.io/flow-container-registry/verification-corrupted:latest > flow-docker-images.tar
       - name: Cache Docker images
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: flow-docker-images.tar
           # use the workflow run id as part of the cache key to ensure these docker images will only be used for a single workflow run
@@ -355,7 +355,7 @@ jobs:
 
     steps:
       - name: Checkout repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
       
       - name: Setup private build environment
         if: ${{ vars.PRIVATE_BUILDS_SUPPORTED == 'true' }} 
@@ -364,7 +364,7 @@ jobs:
           cadence_deploy_key: ${{ secrets.CADENCE_DEPLOY_KEY }}
 
       - name: Setup Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v6
         timeout-minutes: 10 # fail fast. sometimes this step takes an extremely long time
         with:
           go-version: ${{ env.GO_VERSION }}
@@ -372,7 +372,7 @@ jobs:
       - name: Setup tests (${{ matrix.targets.name }})
         run: VERBOSE=1 make -e GO_TEST_PACKAGES="${{ matrix.targets.packages }}" install-tools
       - name: Run tests (${{ matrix.targets.name }})
-        uses: nick-fields/retry@v3
+        uses: nick-fields/retry@v4
         with:
           timeout_minutes: 35
           max_attempts: 5
@@ -452,7 +452,7 @@ jobs:
     runs-on: ${{ matrix.runner }}
     steps:
     - name: Checkout repo
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6
       with:
           # all tags are needed for integration tests
           fetch-depth: 0
@@ -464,13 +464,13 @@ jobs:
         cadence_deploy_key: ${{ secrets.CADENCE_DEPLOY_KEY }}
 
     - name: Setup Go
-      uses: actions/setup-go@v5
+      uses: actions/setup-go@v6
       timeout-minutes: 10 # fail fast. sometimes this step takes an extremely long time
       with:
         go-version: ${{ env.GO_VERSION }}
         cache: true
     - name: Load cached Docker images
-      uses: actions/cache@v4
+      uses: actions/cache@v5
       with:
         path: flow-docker-images.tar
         # use the same cache key as the docker-build job
@@ -481,7 +481,7 @@ jobs:
       # TODO(rbtz): re-enable when we fix exisiting races.
       #env:
       #  RACE_DETECTOR: 1
-      uses: nick-fields/retry@v3
+      uses: nick-fields/retry@v4
       with:
         timeout_minutes: 35
         max_attempts: 5

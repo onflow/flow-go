@@ -75,28 +75,28 @@ var _ IndexProcessor[access.ScheduledTransaction, ScheduledTransactionsMetadata]
 // is only assembled inside [ScheduledTransactions.IndexBlockData].
 type ScheduledTransactionsMetadata struct {
 	NewTxs          []access.ScheduledTransaction
-	ExecutedEntries []executedEntry
-	CanceledEntries []canceledEntry
-	FailedEntries   []failedEntry
+	ExecutedEntries []ExecutedEntry
+	CanceledEntries []CanceledEntry
+	FailedEntries   []FailedEntry
 }
 
-// executedEntry pairs a decoded Executed event with the Flow transaction ID that emitted it.
-type executedEntry struct {
-	event         *events.TransactionSchedulerExecutedEvent
-	transactionID flow.Identifier
+// ExecutedEntry pairs a decoded Executed event with the Flow transaction ID that emitted it.
+type ExecutedEntry struct {
+	Event         *events.TransactionSchedulerExecutedEvent
+	TransactionID flow.Identifier
 }
 
-// canceledEntry pairs a decoded Canceled event with the Flow transaction ID that emitted it.
-type canceledEntry struct {
-	event         *events.TransactionSchedulerCanceledEvent
-	transactionID flow.Identifier
+// CanceledEntry pairs a decoded Canceled event with the Flow transaction ID that emitted it.
+type CanceledEntry struct {
+	Event         *events.TransactionSchedulerCanceledEvent
+	TransactionID flow.Identifier
 }
 
-// failedEntry pairs a scheduled tx ID with the Flow transaction ID of the executor transaction
+// FailedEntry pairs a scheduled tx ID with the Flow transaction ID of the executor transaction
 // that attempted (and failed) to execute the scheduled transaction.
-type failedEntry struct {
-	scheduledTxID uint64
-	transactionID flow.Identifier
+type FailedEntry struct {
+	ScheduledTxID uint64
+	TransactionID flow.Identifier
 }
 
 // NewScheduledTransactions creates a new ScheduledTransactions indexer.
@@ -182,27 +182,27 @@ func (s *ScheduledTransactions) IndexBlockData(lctx lockctx.Proof, data BlockDat
 	var missingIDs []uint64
 
 	for _, entry := range meta.ExecutedEntries {
-		if err := s.store.Executed(lctx, rw, entry.event.ID, entry.transactionID); err != nil {
+		if err := s.store.Executed(lctx, rw, entry.Event.ID, entry.TransactionID); err != nil {
 			if !errors.Is(err, storage.ErrNotFound) {
-				return fmt.Errorf("failed to mark tx %d executed: %w", entry.event.ID, err)
+				return fmt.Errorf("failed to mark tx %d executed: %w", entry.Event.ID, err)
 			}
-			missingIDs = append(missingIDs, entry.event.ID)
+			missingIDs = append(missingIDs, entry.Event.ID)
 		}
 	}
 	for _, entry := range meta.CanceledEntries {
-		if err := s.store.Cancelled(lctx, rw, entry.event.ID, uint64(entry.event.FeesReturned), uint64(entry.event.FeesDeducted), entry.transactionID); err != nil {
+		if err := s.store.Cancelled(lctx, rw, entry.Event.ID, uint64(entry.Event.FeesReturned), uint64(entry.Event.FeesDeducted), entry.TransactionID); err != nil {
 			if !errors.Is(err, storage.ErrNotFound) {
-				return fmt.Errorf("failed to mark tx %d cancelled: %w", entry.event.ID, err)
+				return fmt.Errorf("failed to mark tx %d cancelled: %w", entry.Event.ID, err)
 			}
-			missingIDs = append(missingIDs, entry.event.ID)
+			missingIDs = append(missingIDs, entry.Event.ID)
 		}
 	}
 	for _, entry := range meta.FailedEntries {
-		if err := s.store.Failed(lctx, rw, entry.scheduledTxID, entry.transactionID); err != nil {
+		if err := s.store.Failed(lctx, rw, entry.ScheduledTxID, entry.TransactionID); err != nil {
 			if !errors.Is(err, storage.ErrNotFound) {
-				return fmt.Errorf("failed to mark tx %d failed: %w", entry.scheduledTxID, err)
+				return fmt.Errorf("failed to mark tx %d failed: %w", entry.ScheduledTxID, err)
 			}
-			missingIDs = append(missingIDs, entry.scheduledTxID)
+			missingIDs = append(missingIDs, entry.ScheduledTxID)
 		}
 	}
 	if len(missingIDs) > 0 {
@@ -263,9 +263,9 @@ func (s *ScheduledTransactions) ProcessBlockData(data BlockData) ([]access.Sched
 // No error returns are expected during normal operation.
 func (s *ScheduledTransactions) collectScheduledTransactionData(data BlockData) (*ScheduledTransactionsMetadata, error) {
 	var newTxs []access.ScheduledTransaction
-	var executedEntries []executedEntry
-	var canceledEntries []canceledEntry
-	var failedEntries []failedEntry
+	var executedEntries []ExecutedEntry
+	var canceledEntries []CanceledEntry
+	var failedEntries []FailedEntry
 
 	// pendingEventTxIndex is the transaction index of the transaction that emitted the PendingExecution events.
 	// This is the system transaction that added the scheduled transactions into the system collection.
@@ -345,7 +345,7 @@ func (s *ScheduledTransactions) collectScheduledTransactionData(data BlockData) 
 				return nil, err
 			}
 
-			executedEntries = append(executedEntries, executedEntry{event: e, transactionID: event.TransactionID})
+			executedEntries = append(executedEntries, ExecutedEntry{Event: e, TransactionID: event.TransactionID})
 
 			// sanity check: every Executed event must have a corresponding PendingExecution event.
 			// otherwise, there is a bug in the indexer, or elsewhere in the system.
@@ -369,7 +369,7 @@ func (s *ScheduledTransactions) collectScheduledTransactionData(data BlockData) 
 				return nil, err
 			}
 
-			canceledEntries = append(canceledEntries, canceledEntry{event: e, transactionID: event.TransactionID})
+			canceledEntries = append(canceledEntries, CanceledEntry{Event: e, TransactionID: event.TransactionID})
 		}
 	}
 
@@ -397,7 +397,7 @@ func (s *ScheduledTransactions) collectScheduledTransactionData(data BlockData) 
 				return nil, fmt.Errorf("failed to decode scheduled tx ID from executor transaction: %w", err)
 			}
 			if _, ok := pendingIDs[id]; ok {
-				failedEntries = append(failedEntries, failedEntry{scheduledTxID: id, transactionID: tx.ID()})
+				failedEntries = append(failedEntries, FailedEntry{ScheduledTxID: id, TransactionID: tx.ID()})
 				delete(pendingIDs, id)
 			}
 		}
