@@ -42,43 +42,32 @@ const (
 //   - LatestBlockProposal: The in-progress EVM block accumulating transactions.
 //     Its parent hash must equal hash(LatestBlock) and height must equal LatestBlock.Height + 1.
 //
-// Each Cadence transaction creates a new BlockStore instance with an empty cache.
-// The cache avoids repeated storage reads within a single Cadence transaction.
+// This implementation performs storage operations on every call (for metering compatibility)
+// but uses caching to avoid repeated deserialization. This ensures metered computation
+// matches the old implementation while still providing some performance benefit.
 //
 // Flow Block K Execution:
 //
 //	├── Cadence tx 1 (succeed)
 //	│   ├── EVM Tx A
-//	│   │   ├── BlockProposal()
-//	│   │   │   ├── cache miss
-//	│   │   │   ├── read LatestBlockProposal from storage
-//	│   │   │   │   └── (if empty) read LatestBlock from storage (for parent hash, height)
-//	│   │   │   └── cache it
-//	│   │   └── StageBlockProposal()  → update cache
+//	│   │   ├── BlockProposal()        → storage read (metered), deserialize, cache
+//	│   │   └── StageBlockProposal()   → storage write (metered), update cache
 //	│   ├── EVM Tx B
-//	│   │   ├── BlockProposal()       → cache hit
-//	│   │   └── StageBlockProposal()  → update cache
+//	│   │   ├── BlockProposal()        → storage read (metered), return from cache
+//	│   │   └── StageBlockProposal()   → storage write (metered), update cache
 //	│   └── [tx end]
-//	│       └── FlushBlockProposal()  → write LatestBlockProposal, cache = nil
+//	│       └── FlushBlockProposal()   → no-op (writes already happened)
 //	│
 //	├── Cadence tx 2 (failed)
-//	│   ├── EVM Tx C
-//	│   │   ├── BlockProposal()
-//	│   │   │   ├── cache miss
-//	│   │   │   └── read LatestBlockProposal from storage → cache it
-//	│   │   └── StageBlockProposal()  → update cache
-//	│   ├── EVM Tx D
-//	│   │   ├── BlockProposal()       → cache hit
-//	│   │   └── StageBlockProposal()  → update cache
+//	│   ├── EVM Tx C/D                 → same as above
 //	│   └── [tx fail/revert]
-//	│       └── Reset()               → cache = nil, storage unchanged
+//	│       └── Reset()                → clear cache (storage rolled back by FVM)
 //	│
 //	└── System chunk tx (last)
 //	    └── heartbeat()
 //	        └── CommitBlockProposal()
 //	            ├── write LatestBlock
-//	            ├── write new LatestBlockProposal (for next flow block)
-//	            └── cache = nil
+//	            └── write new LatestBlockProposal (for next flow block)
 type BlockStore struct {
 	chainID     flow.ChainID
 	storage     ValueStore
@@ -107,16 +96,22 @@ func NewBlockStore(
 	}
 }
 
-// BlockProposal returns the block proposal to be updated by the handler
+// BlockProposal returns the block proposal to be updated by the handler.
+// Always performs storage read for metering compatibility, but returns
+// cached value if available to avoid deserialization overhead.
 func (bs *BlockStore) BlockProposal() (*types.BlockProposal, error) {
-	if bs.cached != nil {
-		return bs.cached, nil
-	}
-	// first fetch it from the storage
+	// Always read from storage for metering purposes
 	data, err := bs.storage.GetValue(bs.rootAddress[:], []byte(BlockStoreLatestBlockProposalKey))
 	if err != nil {
 		return nil, err
 	}
+
+	// If cached, return from cache (avoids deserialization)
+	if bs.cached != nil {
+		return bs.cached, nil
+	}
+
+	// First call - deserialize and cache
 	if len(data) != 0 {
 		bp, err := types.NewBlockProposalFromBytes(data)
 		if err != nil {
@@ -125,7 +120,13 @@ func (bs *BlockStore) BlockProposal() (*types.BlockProposal, error) {
 		bs.cached = bp
 		return bp, nil
 	}
+
+	// Storage empty - construct new proposal and write immediately
 	bp, err := bs.constructBlockProposal()
+	if err != nil {
+		return nil, err
+	}
+	err = bs.updateBlockProposal(bp)
 	if err != nil {
 		return nil, err
 	}
@@ -281,17 +282,20 @@ func (bs *BlockStore) ResetBlockProposal() {
 	bs.cached = nil
 }
 
+// StageBlockProposal writes the block proposal to storage and updates the cache.
+// Always performs storage write for metering compatibility.
 func (bs *BlockStore) StageBlockProposal(bp *types.BlockProposal) {
+	// Always write to storage for metering purposes
+	err := bs.updateBlockProposal(bp)
+	if err != nil {
+		panic(types.NewFatalError(err))
+	}
+	// Update cache to avoid deserialization on next BlockProposal() call
 	bs.cached = bp
 }
 
+// FlushBlockProposal is a no-op since StageBlockProposal writes immediately.
+// Kept for interface compatibility.
 func (bs *BlockStore) FlushBlockProposal() error {
-	if bs.cached == nil {
-		return nil
-	}
-	err := bs.updateBlockProposal(bs.cached)
-	if err != nil {
-		return err
-	}
 	return nil
 }
