@@ -72,6 +72,7 @@ import (
 	"github.com/onflow/flow-go/network/p2p/unicast/ratelimit"
 	"github.com/onflow/flow-go/network/p2p/utils"
 	"github.com/onflow/flow-go/network/p2p/utils/ratelimiter"
+	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/slashing"
 	"github.com/onflow/flow-go/network/topology"
 	"github.com/onflow/flow-go/network/underlay"
@@ -691,6 +692,13 @@ func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(
 		SlashingViolationConsumerFactory: func(adapter network.ConduitAdapter) network.ViolationsConsumer {
 			return slashing.NewSlashingViolationsConsumer(fnb.Logger, fnb.Metrics.Network, adapter)
 		},
+		UnicastStreamAuthorizer: func() func(flow.Role, flow.Role) bool {
+			if fnb.ObserverMode {
+				// observer mode uses public network where peers are not authorized based on role
+				return message.AlwaysAuthorizedUnicastSenderRole
+			}
+			return nil // use default (IsAuthorizedUnicastSenderRole)
+		}(),
 	}, networkOptions...)
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize network: %w", err)
