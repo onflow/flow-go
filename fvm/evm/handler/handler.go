@@ -12,6 +12,7 @@ import (
 	"github.com/onflow/flow-go/fvm/environment"
 	fvmErrors "github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/evm"
+	"github.com/onflow/flow-go/fvm/evm/backends"
 	"github.com/onflow/flow-go/fvm/evm/emulator/state"
 	"github.com/onflow/flow-go/fvm/evm/events"
 	"github.com/onflow/flow-go/fvm/evm/handler/coa"
@@ -36,9 +37,8 @@ type ContractHandler struct {
 	flowChainID          flow.ChainID
 	evmContractAddress   flow.Address
 	flowTokenAddress     common.Address
-	blockStore           types.BlockStore
 	addressAllocator     types.AddressAllocator
-	backend              types.Backend
+	backend              backends.Backend
 	emulator             types.Emulator
 	precompiledContracts []types.PrecompiledContract
 	// evmDryCallCache caches EVM drycall results in a transaction.
@@ -56,16 +56,14 @@ func NewContractHandler(
 	evmContractAddress flow.Address,
 	flowTokenAddress common.Address,
 	randomBeaconAddress flow.Address,
-	blockStore types.BlockStore,
 	addressAllocator types.AddressAllocator,
-	backend types.Backend,
+	backend backends.Backend,
 	emulator types.Emulator,
 ) *ContractHandler {
 	return &ContractHandler{
 		flowChainID:        flowChainID,
 		evmContractAddress: evmContractAddress,
 		flowTokenAddress:   flowTokenAddress,
-		blockStore:         blockStore,
 		addressAllocator:   addressAllocator,
 		backend:            backend,
 		emulator:           emulator,
@@ -215,7 +213,7 @@ func (h *ContractHandler) AccountByAddress(addr types.Address, isAuthorized bool
 
 // LastExecutedBlock returns the last executed block
 func (h *ContractHandler) LastExecutedBlock() *types.Block {
-	block, err := h.blockStore.LatestBlock()
+	block, err := h.backend.LatestBlock()
 	panicOnError(err)
 	return block
 }
@@ -408,10 +406,7 @@ func (h *ContractHandler) batchRun(rlpEncodedTxs [][]byte) (_ []*types.Result, e
 	}
 
 	// update the block proposal
-	err = h.blockStore.UpdateBlockProposal(bp)
-	if err != nil {
-		return nil, err
-	}
+	h.backend.StageBlockProposal(bp)
 
 	return res, nil
 }
@@ -431,13 +426,13 @@ func (h *ContractHandler) commitBlockProposal() (err error) {
 	}()
 
 	// load latest block proposal
-	bp, err := h.blockStore.BlockProposal()
+	bp, err := h.backend.BlockProposal()
 	if err != nil {
 		return err
 	}
 
 	// commit the proposal
-	err = h.blockStore.CommitBlockProposal(bp)
+	err = h.backend.CommitBlockProposal(bp)
 	if err != nil {
 		return err
 	}
@@ -531,10 +526,7 @@ func (h *ContractHandler) run(rlpEncodedTx []byte) (_ *types.Result, err error) 
 
 	// step 8 - update the block proposal
 	bp.AppendTransaction(res)
-	err = h.blockStore.UpdateBlockProposal(bp)
-	if err != nil {
-		return nil, err
-	}
+	h.backend.StageBlockProposal(bp)
 
 	// step 9 - emit transaction event
 	err = h.emitEvent(
@@ -745,7 +737,7 @@ func (h *ContractHandler) getBlockContext(bp *types.BlockProposal) (
 		BlockTimestamp:         bp.Timestamp,
 		DirectCallBaseGasUsage: types.DefaultDirectCallBaseGasUsage,
 		GetHashFunc: func(n uint64) gethCommon.Hash {
-			hash, err := h.blockStore.BlockHash(n)
+			hash, err := h.backend.BlockHash(n)
 			panicOnError(err) // we have to handle it here given we can't continue with it even in try case
 			return hash
 		},
@@ -758,7 +750,7 @@ func (h *ContractHandler) getBlockContext(bp *types.BlockProposal) (
 }
 
 func (h *ContractHandler) getBlockProposal() (*types.BlockProposal, error) {
-	return h.blockStore.BlockProposal()
+	return h.backend.BlockProposal()
 }
 
 func (h *ContractHandler) executeAndHandleCall(
@@ -837,10 +829,7 @@ func (h *ContractHandler) executeAndHandleCall(
 	}
 
 	// update the block proposal
-	err = h.blockStore.UpdateBlockProposal(bp)
-	if err != nil {
-		return nil, err
-	}
+	h.backend.StageBlockProposal(bp)
 
 	// step 8 - emit transaction event
 	encoded, err := call.Encode()

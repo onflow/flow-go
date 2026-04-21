@@ -6,6 +6,7 @@ import (
 	"github.com/onflow/atree"
 
 	"github.com/onflow/flow-go/fvm/environment"
+	"github.com/onflow/flow-go/fvm/evm/backends"
 	"github.com/onflow/flow-go/fvm/evm/types"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -14,19 +15,19 @@ import (
 // the provided backend storage. It can be used for dry running transaction/calls
 // or batching updates for atomic operations.
 type EphemeralStorage struct {
-	parent types.BackendStorage
+	parent backends.BackendStorage
 	deltas map[flow.RegisterID]flow.RegisterValue
 }
 
 // NewEphemeralStorage constructs a new EphemeralStorage
-func NewEphemeralStorage(parent types.BackendStorage) *EphemeralStorage {
+func NewEphemeralStorage(parent backends.BackendStorage) *EphemeralStorage {
 	return &EphemeralStorage{
 		parent: parent,
 		deltas: make(map[flow.RegisterID]flow.RegisterValue),
 	}
 }
 
-var _ types.BackendStorage = (*EphemeralStorage)(nil)
+var _ backends.BackendStorage = (*EphemeralStorage)(nil)
 
 var _ types.ReplayResultCollector = (*EphemeralStorage)(nil)
 

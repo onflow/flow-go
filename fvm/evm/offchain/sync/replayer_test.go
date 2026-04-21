@@ -23,7 +23,7 @@ func TestChainReplay(t *testing.T) {
 
 	const chainID = flow.Emulator
 	var snapshot *TestValueStore
-	RunWithTestBackend(t, func(backend *TestBackend) {
+	RunWithTestBackend(t, chainID, func(backend *TestBackend) {
 		RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
 			RunWithDeployedContract(t,
 				GetStorageTestContract(t), backend, rootAddr, func(testContract *TestContract) {
