@@ -20,6 +20,11 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
+type removedAccountWithBalance struct {
+	address gethCommon.Address
+	balance *uint256.Int
+}
+
 // StateDB implements a types.StateDB interface
 //
 // stateDB interface defined by the Geth doesn't support returning errors
@@ -558,6 +563,51 @@ func (db *StateDB) Commit(finalize bool) (hash.Hash, error) {
 		}
 	}
 	return updateCommit, nil
+}
+
+// EmitLogsForBurnAccounts emits the eth burn logs for accounts scheduled for
+// removal which still have positive balance. The purpose of this function is
+// to handle a corner case of EIP-7708 where a self-destructed account might
+// still receive funds between sending/burning its previous balance and actual
+// removal. In this case the burning of these remaining balances still need to
+// be logged.
+// Specification EIP-7708: https://eips.ethereum.org/EIPS/eip-7708
+//
+// This function should only be invoked at the transaction boundary, specifically
+// before the Finalise.
+func (db *StateDB) EmitLogsForBurnAccounts() {
+	// iterate views and collect dirty addresses
+	addresses := make(map[gethCommon.Address]struct{})
+	for _, view := range db.views {
+		for key := range view.DirtyAddresses() {
+			addresses[key] = struct{}{}
+		}
+	}
+
+	// sort addresses
+	sortedAddresses := make([]gethCommon.Address, 0, len(addresses))
+	for addr := range addresses {
+		sortedAddresses = append(sortedAddresses, addr)
+	}
+
+	var list []removedAccountWithBalance
+	for _, addr := range sortedAddresses {
+		balance := db.GetBalance(addr)
+		if db.HasSelfDestructed(addr) && !balance.IsZero() {
+			list = append(list, removedAccountWithBalance{
+				address: addr,
+				balance: balance,
+			})
+		}
+	}
+	if list != nil {
+		sort.Slice(list, func(i, j int) bool {
+			return list[i].address.Cmp(list[j].address) < 0
+		})
+	}
+	for _, acct := range list {
+		db.AddLog(gethTypes.EthBurnLog(acct.address, acct.balance))
+	}
 }
 
 // This is a no-op for our custom implementation of the StateDB interface,
