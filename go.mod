@@ -15,7 +15,7 @@ require (
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc
 	github.com/dgraph-io/badger/v2 v2.2007.4
 	github.com/ef-ds/deque v1.0.4
-	github.com/ethereum/go-ethereum v1.16.9
+	github.com/ethereum/go-ethereum v1.17.0
 	github.com/fxamacker/cbor/v2 v2.9.2-0.20260331174317-a78e92ec038e
 	github.com/gammazero/workerpool v1.1.3
 	github.com/gogo/protobuf v1.3.2
@@ -178,7 +178,6 @@ require (
 	github.com/consensys/gnark-crypto v0.18.1 // indirect
 	github.com/containerd/cgroups v1.1.0 // indirect
 	github.com/coreos/go-systemd/v22 v22.5.0 // indirect
-	github.com/crate-crypto/go-ipa v0.0.0-20240724233137-53bbb0ceb27a // indirect
 	github.com/cskr/pubsub v1.0.2 // indirect
 	github.com/davidlazar/go-crypto v0.0.0-20200604182044-b73af7476f6c // indirect
 	github.com/deckarep/golang-set/v2 v2.6.0 // indirect
@@ -189,7 +188,6 @@ require (
 	github.com/elastic/gosigar v0.14.3 // indirect
 	github.com/envoyproxy/go-control-plane/envoy v1.36.0 // indirect
 	github.com/envoyproxy/protoc-gen-validate v1.3.0 // indirect
-	github.com/ethereum/go-verkle v0.2.2 // indirect
 	github.com/felixge/fgprof v0.9.3 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
 	github.com/filecoin-project/go-clock v0.1.0 // indirect
@@ -259,7 +257,6 @@ require (
 	github.com/marten-seemann/tcp v0.0.0-20210406111302-dfbc87cc63fd // indirect
 	github.com/mattn/go-colorable v0.1.14 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
-	github.com/mattn/go-runewidth v0.0.16 // indirect
 	github.com/miekg/dns v1.1.62 // indirect
 	github.com/mikioh/tcpinfo v0.0.0-20190314235526-30a79bb1804b // indirect
 	github.com/mikioh/tcpopt v0.0.0-20190314235656-172688c1accc // indirect
@@ -274,7 +271,6 @@ require (
 	github.com/multiformats/go-multistream v0.6.0 // indirect
 	github.com/multiformats/go-varint v0.0.7 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
-	github.com/olekukonko/tablewriter v0.0.5 // indirect
 	github.com/onflow/fixed-point v0.1.1 // indirect
 	github.com/onflow/flow-ft/lib/go/contracts v1.1.1 // indirect
 	github.com/onflow/flow-ft/lib/go/templates v1.1.1 // indirect
