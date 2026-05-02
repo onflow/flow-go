@@ -8,6 +8,7 @@ import (
 	gethVM "github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/eth/tracers"
 	gethParams "github.com/ethereum/go-ethereum/params"
+	"github.com/holiman/uint256"
 
 	"github.com/onflow/flow-go/fvm/evm/types"
 )
@@ -135,8 +136,7 @@ func defaultConfig() *Config {
 			NoBaseFee: true,
 		},
 		TxContext: &gethVM.TxContext{
-			GasPrice:   new(big.Int),
-			BlobFeeCap: new(big.Int),
+			GasPrice: new(uint256.Int),
 		},
 		BlockContext: &gethVM.BlockContext{
 			CanTransfer: gethCore.CanTransfer,
@@ -188,7 +188,7 @@ func WithOrigin(origin gethCommon.Address) Option {
 // WithGasPrice sets the gas price for the transaction (usually the one sets by the sender)
 func WithGasPrice(gasPrice *big.Int) Option {
 	return func(c *Config) *Config {
-		c.TxContext.GasPrice = gasPrice
+		c.TxContext.GasPrice = new(uint256.Int).SetBytes(gasPrice.Bytes())
 		return c
 	}
 }

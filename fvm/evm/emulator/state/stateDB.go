@@ -12,7 +12,6 @@ import (
 	gethTracing "github.com/ethereum/go-ethereum/core/tracing"
 	gethTypes "github.com/ethereum/go-ethereum/core/types"
 	gethParams "github.com/ethereum/go-ethereum/params"
-	gethUtils "github.com/ethereum/go-ethereum/trie/utils"
 	"github.com/holiman/uint256"
 	"github.com/onflow/atree"
 	"github.com/onflow/crypto/hash"
@@ -98,34 +97,25 @@ func (db *StateDB) CreateContract(addr gethCommon.Address) {
 	db.latestView().CreateContract(addr)
 }
 
-// IsCreated returns true if address is a new contract
+// IsNewContract returns true if address is a new contract
 func (db *StateDB) IsNewContract(addr gethCommon.Address) bool {
 	return db.latestView().IsNewContract(addr)
 }
 
-// SelfDestruct flags the address for deletion and returns the previous balance.
+// SelfDestruct flags the address for deletion.
 //
 // While this address exists for the rest of the transaction,
 // the balance of this account is cleared after the SelfDestruct call.
-func (db *StateDB) SelfDestruct(addr gethCommon.Address) uint256.Int {
-	db.handleError(fmt.Errorf("legacy self destruct is not supported"))
-	return uint256.Int{}
-}
-
-// SelfDestruct6780 would only follow the self destruct steps if account is a new contract
-// either just created, or address had balance before but got a contract deployed to it (in this tx).
-// Returns the previous balance and a boolean value denoting whether the address was self destructed.
-func (db *StateDB) SelfDestruct6780(addr gethCommon.Address) (uint256.Int, bool) {
-	balance, err := db.latestView().GetBalance(addr)
-	db.handleError(err)
-
+func (db *StateDB) SelfDestruct(addr gethCommon.Address) {
+	// Flow EVM went live with the Cancun hard-fork, we we only support
+	// EIP-6780 SELFDESTRUCT, only in same transaction.
+	// EIP-6780 would only follow the self destruct steps if account is a new
+	// contract either just created, or address had balance before but got a
+	// contract deployed to it (in this tx).
 	if db.IsNewContract(addr) {
 		err := db.latestView().SelfDestruct(addr)
 		db.handleError(err)
-		return *balance, true
 	}
-
-	return *balance, false
 }
 
 // HasSelfDestructed returns true if address is flagged with self destruct.
@@ -619,13 +609,6 @@ func (db *StateDB) Reset() {
 // Error returns the memorized database failure occurred earlier.
 func (s *StateDB) Error() error {
 	return wrapError(s.cachedError)
-}
-
-// PointCache is not supported and only needed
-// when EIP-4762 is enabled in the future versions
-// (currently planned for after Verkle fork).
-func (s *StateDB) PointCache() *gethUtils.PointCache {
-	return nil
 }
 
 // Witness is not supported and only needed
