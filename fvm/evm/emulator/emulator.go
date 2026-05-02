@@ -555,12 +555,14 @@ func (proc *procedure) deployAt(
 	// setup account
 	proc.state.CreateAccount(addr)
 	proc.state.SetNonce(addr, 1, gethTracing.NonceChangeNewContract) // (EIP-158)
+	rules := proc.config.ChainRules()
 	if call.Value.Sign() > 0 {
 		proc.evm.Context.Transfer( // transfer value
 			proc.state,
 			callerCommon,
 			addr,
 			uint256.MustFromBig(call.Value),
+			&rules,
 		)
 	}
 
@@ -676,7 +678,7 @@ func (proc *procedure) run(
 	// Set gas pool based on block gas limit
 	// if the block gas limit is set to anything than max
 	// we need to update this code.
-	gasPool := (*gethCore.GasPool)(&proc.config.BlockContext.GasLimit)
+	gasPool := gethCore.NewGasPool(proc.config.BlockContext.GasLimit)
 
 	// transit the state
 	execResult, err := gethCore.ApplyMessage(
