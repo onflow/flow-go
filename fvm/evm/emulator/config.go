@@ -26,6 +26,10 @@ var (
 	PreviewnetOsakaActivation = uint64(0)          // already on Osaka for PreviewNet
 	TestnetOsakaActivation    = uint64(1763575200) // Wednesday, November 19, 2025 18:00:00 GMT+0000
 	MainnetOsakaActivation    = uint64(1764784800) // Wednesday, December 03, 2025 18:00:00 GMT+0000
+
+	PreviewnetAmsterdamActivation = uint64(0)          // already on Amsterdam for PreviewNet
+	TestnetAmsterdamActivation    = uint64(1782842400) // Tuesday, June 30, 2026 at 18:00:00 GMT+0000
+	MainnetAmsterdamActivation    = uint64(1782842400) // Tuesday, June 30, 2026 at 18:00:00 GMT+0000
 )
 
 // Config aggregates all the configuration (chain, evm, block, tx, ...)
@@ -103,22 +107,26 @@ func MakeChainConfig(chainID *big.Int) *gethParams.ChainConfig {
 		MuirGlacierBlock:    bigZero, // already on MuirGlacier
 
 		// Fork scheduling based on timestamps
-		ShanghaiTime: &zero, // already on Shanghai
-		CancunTime:   &zero, // already on Cancun
-		PragueTime:   nil,   // this is conditionally set below
-		OsakaTime:    nil,   // this is conditionally set below
-		VerkleTime:   nil,   // not on Verkle
+		ShanghaiTime:  &zero, // already on Shanghai
+		CancunTime:    &zero, // already on Cancun
+		PragueTime:    nil,   // this is conditionally set below
+		OsakaTime:     nil,   // this is conditionally set below
+		AmsterdamTime: nil,   // this is conditionally set below
+		VerkleTime:    nil,   // not on Verkle
 	}
 
 	if chainID.Cmp(types.FlowEVMPreviewNetChainID) == 0 {
 		chainConfig.PragueTime = &PreviewnetPragueActivation
 		chainConfig.OsakaTime = &PreviewnetOsakaActivation
+		chainConfig.AmsterdamTime = &PreviewnetAmsterdamActivation
 	} else if chainID.Cmp(types.FlowEVMTestNetChainID) == 0 {
 		chainConfig.PragueTime = &TestnetPragueActivation
 		chainConfig.OsakaTime = &TestnetOsakaActivation
+		chainConfig.AmsterdamTime = &TestnetAmsterdamActivation
 	} else if chainID.Cmp(types.FlowEVMMainNetChainID) == 0 {
 		chainConfig.PragueTime = &MainnetPragueActivation
 		chainConfig.OsakaTime = &MainnetOsakaActivation
+		chainConfig.AmsterdamTime = &MainnetAmsterdamActivation
 	}
 
 	return chainConfig
