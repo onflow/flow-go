@@ -108,15 +108,14 @@ func (b *RouterBuilder) AddWebsocketsRoute(
 	maxRequestSize int64,
 	maxResponseSize int64,
 	dataProviderFactory dp.DataProviderFactory,
-	limiter *limiters.ConcurrencyLimiter,
+	streamLimiter *limiters.ConcurrencyLimiter,
 ) *RouterBuilder {
-	h := websockets.NewWebSocketHandler(ctx, b.logger, config, chain, maxRequestSize, maxResponseSize, dataProviderFactory)
-	handler := websockets.NewConnectionLimitedHandler(b.logger, h.HttpHandler, h, limiter)
+	h := websockets.NewWebSocketHandler(ctx, b.logger, config, chain, maxRequestSize, maxResponseSize, dataProviderFactory, streamLimiter)
 	b.v1SubRouter.
 		Methods(http.MethodGet).
 		Path("/ws").
 		Name("ws").
-		Handler(handler)
+		Handler(h)
 
 	return b
 }
