@@ -1763,6 +1763,10 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 			return errors.New("execution-data-indexing-enabled must be set if store-tx-result-error-messages is enabled")
 		}
 
+		if builder.stateStreamConf.MaxGlobalStreams == 0 {
+			return errors.New("state-stream-global-max-streams must be greater than 0")
+		}
+
 		return nil
 	})
 }
