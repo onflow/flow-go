@@ -35,6 +35,7 @@ import (
 	generate_authorization_fixes "github.com/onflow/flow-go/cmd/util/cmd/generate-authorization-fixes"
 	inspect_token_movements "github.com/onflow/flow-go/cmd/util/cmd/inspect-token-movements"
 	"github.com/onflow/flow-go/cmd/util/cmd/leaders"
+	ledger_benchmark "github.com/onflow/flow-go/cmd/util/cmd/ledger-benchmark"
 	pebble_checkpoint "github.com/onflow/flow-go/cmd/util/cmd/pebble-checkpoint"
 	read_badger "github.com/onflow/flow-go/cmd/util/cmd/read-badger/cmd"
 	read_execution_state "github.com/onflow/flow-go/cmd/util/cmd/read-execution-state"
@@ -140,6 +141,7 @@ func addCommands() {
 	rootCmd.AddCommand(storehouse_checkpoint_validator.Cmd)
 	rootCmd.AddCommand(remove_execution_fork.RootCmd)
 	rootCmd.AddCommand(inspect_token_movements.Cmd)
+	rootCmd.AddCommand(ledger_benchmark.Cmd)
 }
 
 func initConfig() {
