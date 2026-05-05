@@ -1,7 +1,22 @@
-# Flow [![GoDoc](https://godoc.org/github.com/onflow/flow-go?status.svg)](https://godoc.org/github.com/onflow/flow-go)
+# flow-go — Flow Network Reference Implementation in Go
 
-Flow is a fast, secure, and developer-friendly blockchain built to support the next generation of games, apps and the
-digital assets that power them. Read more about it [here](https://github.com/onflow/flow).
+[![GoDoc](https://godoc.org/github.com/onflow/flow-go?status.svg)](https://godoc.org/github.com/onflow/flow-go)
+[![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
+[![Release](https://img.shields.io/github/v/release/onflow/flow-go)](https://github.com/onflow/flow-go/releases)
+[![Discord](https://img.shields.io/badge/Discord-Flow-7289DA?logo=discord&logoColor=white)](https://discord.gg/flow)
+[![Built on Flow](https://img.shields.io/badge/Built_on-Flow-00EF8B)](https://flow.com)
+
+Reference implementation of the [Flow network](https://flow.com) in Go. Flow is a Layer 1 proof-of-stake blockchain built for consumer apps, AI Agents, and DeFi at scale. This repo hosts the node software — consensus, execution, verification, access, and collection roles — and the Cadence VM integration used on mainnet, testnet, and local networks.
+
+## TL;DR
+
+- **What:** flow-go is the Go reference implementation of the Flow network, a Layer 1 proof-of-stake blockchain.
+- **Who it's for:** protocol contributors, node operators, and teams building infrastructure on or adjacent to Flow.
+- **Why use it:** canonical source of truth for Flow consensus (HotStuff), multi-role architecture, Cadence VM integration, and Flow EVM.
+- **Status:** see [Releases](https://github.com/onflow/flow-go/releases) for the latest version. Live on mainnet.
+- **License:** AGPL-3.0
+- **Related repos:** [cadence](https://github.com/onflow/cadence) (language) · [flow-cli](https://github.com/onflow/flow-cli) (CLI) · [fcl-js](https://github.com/onflow/fcl-js) (JS client) · [flow-go-sdk](https://github.com/onflow/flow-go-sdk) (Go client)
+- The reference Go implementation for the Flow network, open-sourced since 2019.
 
 <!-- START doctoc generated TOC please keep comment here to allow auto update -->
 <!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
@@ -192,3 +207,35 @@ type StateMachineEventsTelemetryFactory interface {
     config:
       dir: "state/protocol/protocol_state/mock"
 ```
+
+## FAQ
+
+### What is flow-go?
+flow-go is the Go reference implementation of the Flow network — a Layer 1 proof-of-stake blockchain. It implements the node software (Access, Collection, Consensus, Execution, Verification roles), the HotStuff consensus algorithm, ledger, storage, networking, and cryptography subsystems.
+
+### How does flow-go differ from the Cadence repo?
+flow-go is the **protocol / node** implementation. [`onflow/cadence`](https://github.com/onflow/cadence) is the **Cadence smart contract language** (compiler, interpreter, type system). flow-go embeds the Cadence VM to execute transactions, but the language itself is developed in the Cadence repo.
+
+### What are the five node roles in Flow?
+Access, Collection, Consensus, Execution, and Verification. Each has its own entry point under `/cmd/`. There is also an Observer service for staking-free read-only access.
+
+### Which Go version does flow-go require?
+Go 1.25 or later. See the [Installation](#installation) section for the full environment setup.
+
+### Where is the consensus algorithm implemented?
+Under [`/consensus/hotstuff`](/consensus/hotstuff). HotStuff is the BFT consensus family used by Flow.
+
+### How do I run a local Flow network?
+See the [Local Network Guide](/integration/localnet/README.md) for a full local multi-role network suitable for integration testing.
+
+### Where do I report a security issue?
+See [SECURITY.md](/SECURITY.md) for the responsible disclosure policy.
+
+## About Flow
+
+This repo is the Go reference implementation of the [Flow network](https://flow.com), a Layer 1 blockchain built for consumer applications, AI Agents, and DeFi at scale.
+
+- Developer docs: https://developers.flow.com
+- Cadence language: https://cadence-lang.org
+- Community: [Flow Discord](https://discord.gg/flow) · [Flow Forum](https://forum.flow.com)
+- Governance: [Flow Improvement Proposals](https://github.com/onflow/flips)

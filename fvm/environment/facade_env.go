@@ -8,6 +8,8 @@ import (
 	"github.com/onflow/cadence/interpreter"
 	"github.com/onflow/cadence/sema"
 
+	"github.com/onflow/flow-go/fvm/evm"
+
 	"github.com/onflow/flow-go/fvm/storage"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/fvm/storage/state"
@@ -51,6 +53,7 @@ type facadeEnvironment struct {
 	*ContractReader
 	ContractUpdater
 	*Programs
+	*BlockStore
 
 	accounts Accounts
 	txnState storage.TransactionPreparer
@@ -147,6 +150,7 @@ func newFacadeEnvironment(
 			common.Address(sc.Crypto.Address),
 		),
 		ContractUpdater: NoContractUpdater{},
+
 		Programs: NewPrograms(
 			tracer,
 			meter,
@@ -200,6 +204,13 @@ func NewScriptEnv(
 		params.ScriptInfoParams.ID[:],
 	)
 	env.addParseRestrictedChecks()
+	env.BlockStore = NewBlockStore(
+		params.Chain.ChainID(),
+		env.ValueStore,
+		env.BlockInfo,
+		env.RandomGenerator,
+		evm.StorageAccountAddress(params.Chain.ChainID()),
+	)
 	return env
 }
 
@@ -270,6 +281,14 @@ func NewTransactionEnvironment(
 		params.TransactionInfoParams.RandomSourceHistoryCallAllowed,
 	)
 
+	env.BlockStore = NewBlockStore(
+		params.Chain.ChainID(),
+		env.ValueStore,
+		env.BlockInfo,
+		env.RandomGenerator,
+		evm.StorageAccountAddress(params.Chain.ChainID()),
+	)
+
 	env.addParseRestrictedChecks()
 
 	return env
@@ -331,13 +350,22 @@ func (env *facadeEnvironment) FlushPendingUpdates() (
 	ContractUpdates,
 	error,
 ) {
-	return env.ContractUpdater.Commit()
+	updates, err := env.ContractUpdater.Commit()
+	if err != nil {
+		return ContractUpdates{}, err
+	}
+	err = env.BlockStore.FlushBlockProposal()
+	if err != nil {
+		return ContractUpdates{}, err
+	}
+	return updates, nil
 }
 
 func (env *facadeEnvironment) Reset() {
 	env.ContractUpdater.Reset()
 	env.EventEmitter.Reset()
 	env.Programs.Reset()
+	env.BlockStore.ResetBlockProposal()
 }
 
 // Miscellaneous Cadence runtime.Interface API

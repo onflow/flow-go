@@ -10,6 +10,7 @@ import (
 	dp "github.com/onflow/flow-go/engine/access/rest/websockets/data_providers"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/module/limiters"
 )
 
 type Handler struct {
@@ -24,6 +25,7 @@ type Handler struct {
 	logger              zerolog.Logger
 	websocketConfig     Config
 	dataProviderFactory dp.DataProviderFactory
+	streamLimiter       *limiters.ConcurrencyLimiter
 }
 
 var _ http.Handler = (*Handler)(nil)
@@ -36,6 +38,7 @@ func NewWebSocketHandler(
 	maxRequestSize int64,
 	maxResponseSize int64,
 	dataProviderFactory dp.DataProviderFactory,
+	streamLimiter *limiters.ConcurrencyLimiter,
 ) *Handler {
 	return &Handler{
 		ctx:                 ctx,
@@ -43,6 +46,7 @@ func NewWebSocketHandler(
 		websocketConfig:     config,
 		logger:              logger,
 		dataProviderFactory: dataProviderFactory,
+		streamLimiter:       streamLimiter,
 	}
 }
 
@@ -69,6 +73,10 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	controller := NewWebSocketController(logger, h.websocketConfig, NewWebsocketConnection(conn), h.dataProviderFactory)
+	controller, err := NewWebSocketController(logger, h.websocketConfig, NewWebsocketConnection(conn), h.dataProviderFactory, h.streamLimiter)
+	if err != nil {
+		h.HttpHandler.ErrorHandler(w, common.NewRestError(http.StatusInternalServerError, "could not create websocket controller: ", err), logger)
+		return
+	}
 	controller.HandleConnection(h.ctx)
 }
