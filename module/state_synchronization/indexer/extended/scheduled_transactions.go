@@ -123,21 +123,21 @@ func NewScheduledTransactions(
 		versionMapper = access.NewStaticHeightVersionMapper(access.LatestBoundary)
 	}
 	executorAddr := access.NewVersioned(map[access.Version]flow.Address{
-		systemcollection.Version0:  sc.FlowServiceAccount.Address,
-		systemcollection.Version1:  sc.ScheduledTransactionExecutor.Address,
-		access.VersionLatest:       sc.ScheduledTransactionExecutor.Address,
+		systemcollection.Version0: sc.FlowServiceAccount.Address,
+		systemcollection.Version1: sc.ScheduledTransactionExecutor.Address,
+		access.VersionLatest:      sc.ScheduledTransactionExecutor.Address,
 	}, versionMapper)
 
 	return &ScheduledTransactions{
-		log:          log.With().Str("component", "scheduled_tx_indexer").Logger(),
-		store:        store,
-		metrics:      metrics,
-		requester:    NewScheduledTransactionRequester(scriptExecutor, chainID),
-		executorAddr: executorAddr,
-		scheduledEventType:    flow.EventType(prefix + "Scheduled"),
-		pendingExecutionType:  flow.EventType(prefix + "PendingExecution"),
-		executedEventType:     flow.EventType(prefix + "Executed"),
-		canceledEventType:     flow.EventType(prefix + "Canceled"),
+		log:                  log.With().Str("component", "scheduled_tx_indexer").Logger(),
+		store:                store,
+		metrics:              metrics,
+		requester:            NewScheduledTransactionRequester(scriptExecutor, chainID),
+		executorAddr:         executorAddr,
+		scheduledEventType:   flow.EventType(prefix + "Scheduled"),
+		pendingExecutionType: flow.EventType(prefix + "PendingExecution"),
+		executedEventType:    flow.EventType(prefix + "Executed"),
+		canceledEventType:    flow.EventType(prefix + "Canceled"),
 	}
 }
 
