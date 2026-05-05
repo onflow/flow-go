@@ -111,7 +111,7 @@ func DeployContract(t testing.TB, caller types.Address, tc *TestContract, led at
 			caller,
 			tc.ByteCode,
 			gethParams.MaxTxGas,
-			big.NewInt(0),
+			big.NewInt(1_000_000_000),
 			nonce+1,
 		),
 	)
