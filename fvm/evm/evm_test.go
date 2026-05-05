@@ -28,6 +28,7 @@ import (
 	envMock "github.com/onflow/flow-go/fvm/environment/mock"
 	"github.com/onflow/flow-go/fvm/evm"
 	"github.com/onflow/flow-go/fvm/evm/events"
+	"github.com/onflow/flow-go/fvm/evm/handler"
 	"github.com/onflow/flow-go/fvm/evm/impl"
 	"github.com/onflow/flow-go/fvm/evm/stdlib"
 	. "github.com/onflow/flow-go/fvm/evm/testutils"
@@ -2072,10 +2073,11 @@ func TestEVMBlockData(t *testing.T) {
 }
 
 func TestEVMAddressDeposit(t *testing.T) {
-
 	t.Parallel()
+
 	chain := flow.Emulator.Chain()
 	sc := systemcontracts.SystemContractsForChain(chain.ChainID())
+
 	RunWithNewEnvironment(t,
 		chain, func(
 			ctx fvm.Context,
@@ -2108,6 +2110,8 @@ func TestEVMAddressDeposit(t *testing.T) {
 				sc.FlowToken.Address.HexWithPrefix(),
 			))
 
+			addressAllocator := handler.NewAddressAllocator()
+			bridgeAddress := addressAllocator.NativeTokenBridgeAddress()
 			addr := RandomAddress(t)
 
 			txBody, err := flow.NewTransactionBodyBuilder().
@@ -2138,6 +2142,20 @@ func TestEVMAddressDeposit(t *testing.T) {
 			// tx executed event
 			txEvent := output.Events[2]
 			txEventPayload := TxEventToPayload(t, txEvent, sc.EVMContract.Address)
+			require.Greater(t, len(txEventPayload.Logs), 0)
+
+			gethLogs := []*gethTypes.Log{}
+			err = rlp.Decode(bytes.NewReader(txEventPayload.Logs), &gethLogs)
+			require.NoError(t, err)
+			require.Len(t, gethLogs, 1)
+
+			ethTransferLog := gethLogs[0]
+			require.Equal(t, gethParams.SystemAddress, ethTransferLog.Address)
+			require.Len(t, ethTransferLog.Topics, 3)
+			require.Equal(t, gethParams.EthTransferLogEvent, ethTransferLog.Topics[0])
+			require.Equal(t, common.BytesToHash(bridgeAddress.Bytes()), ethTransferLog.Topics[1])
+			require.Equal(t, common.BytesToHash(addr.Bytes()), ethTransferLog.Topics[2])
+			require.Equal(t, big.NewInt(1_000_000_000_000_000_000), new(big.Int).SetBytes(ethTransferLog.Data))
 
 			// deposit event
 			depositEvent := output.Events[3]
@@ -2163,7 +2181,8 @@ func TestEVMAddressDeposit(t *testing.T) {
 				txHashes.RootHash(),
 				blockEventPayload.TransactionHashRoot,
 			)
-		})
+		},
+	)
 }
 
 func TestCOAAddressDeposit(t *testing.T) {
@@ -2704,61 +2723,83 @@ func TestCadenceOwnedAccountFunctionalities(t *testing.T) {
 			) {
 				code := []byte(fmt.Sprintf(
 					`
-				import EVM from %s
-				import FlowToken from %s
+					import EVM from %s
+					import FlowToken from %s
 
-				access(all)
-				fun main(address: [UInt8; 20]): UFix64 {
-					let admin = getAuthAccount<auth(BorrowValue) &Account>(%s)
-						.storage.borrow<&FlowToken.Administrator>(from: /storage/flowTokenAdmin)!
+					transaction(address: [UInt8; 20]) {
+						prepare(account: auth(BorrowValue) &Account) {
+							let admin = account.storage.borrow<&FlowToken.Administrator>(
+								from: /storage/flowTokenAdmin
+							)!
 
-					let minter <- admin.createNewMinter(allowedAmount: 2.34)
-					let vault <- minter.mintTokens(amount: 2.34)
-					destroy minter
+							let minter <- admin.createNewMinter(allowedAmount: 2.34)
+							let vault <- minter.mintTokens(amount: 2.34)
+							destroy minter
 
-					let cadenceOwnedAccount <- EVM.createCadenceOwnedAccount()
-					cadenceOwnedAccount.deposit(from: <-vault)
+							let cadenceOwnedAccount <- EVM.createCadenceOwnedAccount()
+							cadenceOwnedAccount.deposit(from: <-vault)
 
-					let bal = EVM.Balance(attoflow: 0)
-					bal.setFLOW(flow: 1.23)
+							let bal = EVM.Balance(attoflow: 0)
+							bal.setFLOW(flow: 1.23)
 
-					let recipientEVMAddress = EVM.EVMAddress(bytes: address)
+							let recipientEVMAddress = EVM.EVMAddress(bytes: address)
 
-					let res = cadenceOwnedAccount.call(
-						to: recipientEVMAddress,
-						data: [],
-						gasLimit: 100_000,
-						value: bal,
-					)
+							let res = cadenceOwnedAccount.call(
+								to: recipientEVMAddress,
+								data: [],
+								gasLimit: 100_000,
+								value: bal,
+							)
 
-					assert(res.status == EVM.Status.successful, message: "transfer call was not successful")
+							assert(res.status == EVM.Status.successful, message: "transfer call was not successful")
 
-					destroy cadenceOwnedAccount
-					return recipientEVMAddress.balance().inFLOW()
-				}
-				`,
+							destroy cadenceOwnedAccount
+						}
+					}
+					`,
 					sc.EVMContract.Address.HexWithPrefix(),
 					sc.FlowToken.Address.HexWithPrefix(),
-					sc.FlowServiceAccount.Address.HexWithPrefix(),
 				))
 
-				addr := cadence.NewArray(
-					unittest.BytesToCdcUInt8(RandomAddress(t).Bytes()),
+				addr := RandomAddress(t)
+				addrBytes := cadence.NewArray(
+					unittest.BytesToCdcUInt8(addr.Bytes()),
 				).WithType(stdlib.EVMAddressBytesCadenceType)
 
-				script := fvm.Script(code).WithArguments(
-					json.MustEncode(addr),
-				)
+				txBody, err := flow.NewTransactionBodyBuilder().
+					SetScript(code).
+					SetPayer(sc.FlowServiceAccount.Address).
+					AddAuthorizer(sc.FlowServiceAccount.Address).
+					AddArgument(json.MustEncode(addrBytes)).
+					Build()
+				require.NoError(t, err)
+				tx := fvm.Transaction(txBody, 0)
 
-				_, output, err := vm.Run(
-					ctx,
-					script,
-					snapshot)
+				_, output, err := vm.Run(ctx, tx, snapshot)
 				require.NoError(t, err)
 				require.NoError(t, output.Err)
 
-				require.Equal(t, uint64(123000000), uint64(output.Value.(cadence.UFix64)))
-			})
+				// tx executed events
+				coaAddress, err := types.COAAddressFromFlowCOACreatedEvent(sc.EVMContract.Address, output.Events[3])
+				require.NoError(t, err)
+
+				coaDepositEvent := TxEventToPayload(t, output.Events[6], sc.EVMContract.Address)
+				require.Greater(t, len(coaDepositEvent.Logs), 0)
+
+				gethLogs := []*gethTypes.Log{}
+				err = rlp.Decode(bytes.NewReader(coaDepositEvent.Logs), &gethLogs)
+				require.NoError(t, err)
+				require.Len(t, gethLogs, 1)
+
+				ethTransferLog := gethLogs[0]
+				require.Equal(t, gethParams.SystemAddress, ethTransferLog.Address)
+				require.Len(t, ethTransferLog.Topics, 3)
+				require.Equal(t, gethParams.EthTransferLogEvent, ethTransferLog.Topics[0])
+				require.Equal(t, common.BytesToHash(coaAddress.Bytes()), ethTransferLog.Topics[1])
+				require.Equal(t, common.BytesToHash(addr.Bytes()), ethTransferLog.Topics[2])
+				require.Equal(t, big.NewInt(1_230_000_000_000_000_000), new(big.Int).SetBytes(ethTransferLog.Data))
+			},
+		)
 	})
 
 	t.Run("test coa deposit and withdraw in a single transaction", func(t *testing.T) {
@@ -2772,31 +2813,31 @@ func TestCadenceOwnedAccountFunctionalities(t *testing.T) {
 			) {
 				code := []byte(fmt.Sprintf(
 					`
-				import EVM from %s
-				import FlowToken from %s
+					import EVM from %s
+					import FlowToken from %s
 
-				access(all)
-				fun main(): UFix64 {
-					let admin = getAuthAccount<auth(Storage) &Account>(%s)
-						.storage.borrow<&FlowToken.Administrator>(from: /storage/flowTokenAdmin)!
+					access(all)
+					fun main(): UFix64 {
+						let admin = getAuthAccount<auth(Storage) &Account>(%s)
+							.storage.borrow<&FlowToken.Administrator>(from: /storage/flowTokenAdmin)!
 
-					let minter <- admin.createNewMinter(allowedAmount: 2.34)
-					let vault <- minter.mintTokens(amount: 2.34)
-					destroy minter
+						let minter <- admin.createNewMinter(allowedAmount: 2.34)
+						let vault <- minter.mintTokens(amount: 2.34)
+						destroy minter
 
-					let cadenceOwnedAccount <- EVM.createCadenceOwnedAccount()
-					cadenceOwnedAccount.deposit(from: <-vault)
+						let cadenceOwnedAccount <- EVM.createCadenceOwnedAccount()
+						cadenceOwnedAccount.deposit(from: <-vault)
 
-					let bal = EVM.Balance(attoflow: 0)
-					bal.setFLOW(flow: 1.23)
-					let vault2 <- cadenceOwnedAccount.withdraw(balance: bal)
-					let balance = vault2.balance
-					destroy cadenceOwnedAccount
-					destroy vault2
+						let bal = EVM.Balance(attoflow: 0)
+						bal.setFLOW(flow: 1.23)
+						let vault2 <- cadenceOwnedAccount.withdraw(balance: bal)
+						let balance = vault2.balance
+						destroy cadenceOwnedAccount
+						destroy vault2
 
-					return balance
-				}
-				`,
+						return balance
+					}
+					`,
 					sc.EVMContract.Address.HexWithPrefix(),
 					sc.FlowToken.Address.HexWithPrefix(),
 					sc.FlowServiceAccount.Address.HexWithPrefix(),
@@ -2814,6 +2855,8 @@ func TestCadenceOwnedAccountFunctionalities(t *testing.T) {
 	})
 
 	t.Run("test coa deploy", func(t *testing.T) {
+		t.Parallel()
+
 		RunWithNewEnvironment(t,
 			chain, func(
 				ctx fvm.Context,
@@ -2827,54 +2870,173 @@ func TestCadenceOwnedAccountFunctionalities(t *testing.T) {
 					import EVM from %s
 					import FlowToken from %s
 
-					access(all)
-					fun main(code: [UInt8]): EVM.Result {
-						let admin = getAuthAccount<auth(Storage) &Account>(%s)
-							.storage.borrow<&FlowToken.Administrator>(from: /storage/flowTokenAdmin)!
-						let minter <- admin.createNewMinter(allowedAmount: 2.34)
-						let vault <- minter.mintTokens(amount: 2.34)
-						destroy minter
+					transaction() {
+						prepare(account: auth(BorrowValue) &Account) {
+							let admin = account.storage.borrow<&FlowToken.Administrator>(
+								from: /storage/flowTokenAdmin
+							)!
 
-						let cadenceOwnedAccount <- EVM.createCadenceOwnedAccount()
-						cadenceOwnedAccount.deposit(from: <-vault)
+							let minter <- admin.createNewMinter(allowedAmount: 2.34)
+							let vault <- minter.mintTokens(amount: 2.34)
+							destroy minter
 
-						let res = cadenceOwnedAccount.deploy(
-							code: code,
-							gasLimit: 2_000_000,
-							value: EVM.Balance(attoflow: 1230000000000000000)
-						)
-						destroy cadenceOwnedAccount
-						return res
+							let cadenceOwnedAccount <- EVM.createCadenceOwnedAccount()
+							cadenceOwnedAccount.deposit(from: <-vault)
+
+							let bal = EVM.Balance(attoflow: 0)
+							bal.setFLOW(flow: 1.23)
+							let vault2 <- cadenceOwnedAccount.withdraw(balance: bal)
+							let balance = vault2.balance
+							destroy cadenceOwnedAccount
+							destroy vault2
+						}
 					}
 					`,
 					sc.EVMContract.Address.HexWithPrefix(),
 					sc.FlowToken.Address.HexWithPrefix(),
-					sc.FlowServiceAccount.Address.HexWithPrefix(),
 				))
 
-				script := fvm.Script(code).
-					WithArguments(json.MustEncode(
-						cadence.NewArray(
-							unittest.BytesToCdcUInt8(testContract.ByteCode),
-						).WithType(cadence.NewVariableSizedArrayType(cadence.UInt8Type)),
-					))
+				txBody, err := flow.NewTransactionBodyBuilder().
+					SetScript(code).
+					SetPayer(sc.FlowServiceAccount.Address).
+					AddAuthorizer(sc.FlowServiceAccount.Address).
+					Build()
+				require.NoError(t, err)
+				tx := fvm.Transaction(txBody, 0)
 
-				_, output, err := vm.Run(
-					ctx,
-					script,
-					snapshot)
+				_, output, err := vm.Run(ctx, tx, snapshot)
 				require.NoError(t, err)
 				require.NoError(t, output.Err)
 
-				res, err := impl.ResultSummaryFromEVMResultValue(output.Value)
+				addressAllocator := handler.NewAddressAllocator()
+				bridgeAddress := addressAllocator.NativeTokenBridgeAddress()
+
+				// tx executed events
+				coaAddress, err := types.COAAddressFromFlowCOACreatedEvent(sc.EVMContract.Address, output.Events[3])
 				require.NoError(t, err)
-				require.Equal(t, types.StatusSuccessful, res.Status)
-				require.Equal(t, types.ErrCodeNoError, res.ErrorCode)
-				require.Empty(t, res.ErrorMessage)
-				require.NotNil(t, res.DeployedContractAddress)
+
+				coaDepositEvent := TxEventToPayload(t, output.Events[4], sc.EVMContract.Address)
+				require.Greater(t, len(coaDepositEvent.Logs), 0)
+
+				gethLogs := []*gethTypes.Log{}
+				err = rlp.Decode(bytes.NewReader(coaDepositEvent.Logs), &gethLogs)
+				require.NoError(t, err)
+				require.Len(t, gethLogs, 1)
+
+				ethTransferLog := gethLogs[0]
+				require.Equal(t, gethParams.SystemAddress, ethTransferLog.Address)
+				require.Len(t, ethTransferLog.Topics, 3)
+				require.Equal(t, gethParams.EthTransferLogEvent, ethTransferLog.Topics[0])
+				require.Equal(t, common.BytesToHash(bridgeAddress.Bytes()), ethTransferLog.Topics[1])
+				require.Equal(t, common.BytesToHash(coaAddress.Bytes()), ethTransferLog.Topics[2])
+				require.Equal(t, big.NewInt(2_340_000_000_000_000_000), new(big.Int).SetBytes(ethTransferLog.Data))
+
+				coaWithdrawEvent := TxEventToPayload(t, output.Events[6], sc.EVMContract.Address)
+				require.Greater(t, len(coaWithdrawEvent.Logs), 0)
+
+				gethLogs = []*gethTypes.Log{}
+				err = rlp.Decode(bytes.NewReader(coaWithdrawEvent.Logs), &gethLogs)
+				require.NoError(t, err)
+				require.Len(t, gethLogs, 1)
+
+				ethTransferLog = gethLogs[0]
+				require.Equal(t, gethParams.SystemAddress, ethTransferLog.Address)
+				require.Len(t, ethTransferLog.Topics, 3)
+				require.Equal(t, gethParams.EthTransferLogEvent, ethTransferLog.Topics[0])
+				require.Equal(t, common.BytesToHash(coaAddress.Bytes()), ethTransferLog.Topics[1])
+				require.Equal(t, common.BytesToHash(bridgeAddress.Bytes()), ethTransferLog.Topics[2])
+				require.Equal(t, big.NewInt(1_230_000_000_000_000_000), new(big.Int).SetBytes(ethTransferLog.Data))
+			},
+		)
+	})
+
+	t.Run("test coa deploy", func(t *testing.T) {
+		t.Parallel()
+
+		RunWithNewEnvironment(t,
+			chain, func(
+				ctx fvm.Context,
+				vm fvm.VM,
+				snapshot snapshot.SnapshotTree,
+				testContract *TestContract,
+				testAccount *EOATestAccount,
+			) {
+				code := []byte(fmt.Sprintf(
+					`
+					import EVM from %s
+					import FlowToken from %s
+
+					transaction(code: [UInt8]) {
+						prepare(account: auth(BorrowValue) &Account) {
+							let admin = account.storage.borrow<&FlowToken.Administrator>(
+								from: /storage/flowTokenAdmin
+							)!
+
+							let minter <- admin.createNewMinter(allowedAmount: 2.34)
+							let vault <- minter.mintTokens(amount: 2.34)
+							destroy minter
+
+							let cadenceOwnedAccount <- EVM.createCadenceOwnedAccount()
+							cadenceOwnedAccount.deposit(from: <-vault)
+
+							let res = cadenceOwnedAccount.deploy(
+								code: code,
+								gasLimit: 2_000_000,
+								value: EVM.Balance(attoflow: 1230000000000000000)
+							)
+							destroy cadenceOwnedAccount
+						}
+					}
+					`,
+					sc.EVMContract.Address.HexWithPrefix(),
+					sc.FlowToken.Address.HexWithPrefix(),
+				))
+
+				txBody, err := flow.NewTransactionBodyBuilder().
+					SetScript(code).
+					SetPayer(sc.FlowServiceAccount.Address).
+					AddAuthorizer(sc.FlowServiceAccount.Address).
+					AddArgument(json.MustEncode(
+						cadence.NewArray(
+							unittest.BytesToCdcUInt8(testContract.ByteCode),
+						).WithType(cadence.NewVariableSizedArrayType(cadence.UInt8Type)),
+					)).
+					Build()
+				require.NoError(t, err)
+				tx := fvm.Transaction(txBody, 0)
+
+				_, output, err := vm.Run(ctx, tx, snapshot)
+				require.NoError(t, err)
+				require.NoError(t, output.Err)
+
+				// tx executed events
+				coaAddress, err := types.COAAddressFromFlowCOACreatedEvent(sc.EVMContract.Address, output.Events[3])
+				require.NoError(t, err)
+
+				coaDeployEvent := TxEventToPayload(t, output.Events[6], sc.EVMContract.Address)
+				require.Greater(t, len(coaDeployEvent.Logs), 0)
+				require.Equal(t, uint16(0), coaDeployEvent.ErrorCode)
+				require.Empty(t, coaDeployEvent.ErrorMessage)
+				require.NotNil(t, coaDeployEvent.ContractAddress)
 				// we strip away first few bytes because they contain deploy code
-				require.Equal(t, testContract.ByteCode[17:], []byte(res.ReturnedData))
-			})
+				require.Equal(t, testContract.ByteCode[17:], []byte(coaDeployEvent.ReturnedData))
+
+				contractAddress := common.HexToAddress(coaDeployEvent.ContractAddress)
+
+				gethLogs := []*gethTypes.Log{}
+				err = rlp.Decode(bytes.NewReader(coaDeployEvent.Logs), &gethLogs)
+				require.NoError(t, err)
+				require.Len(t, gethLogs, 1)
+
+				ethTransferLog := gethLogs[0]
+				require.Equal(t, gethParams.SystemAddress, ethTransferLog.Address)
+				require.Len(t, ethTransferLog.Topics, 3)
+				require.Equal(t, gethParams.EthTransferLogEvent, ethTransferLog.Topics[0])
+				require.Equal(t, common.BytesToHash(coaAddress.Bytes()), ethTransferLog.Topics[1])
+				require.Equal(t, common.BytesToHash(contractAddress.Bytes()), ethTransferLog.Topics[2])
+				require.Equal(t, big.NewInt(1_230_000_000_000_000_000), new(big.Int).SetBytes(ethTransferLog.Data))
+			},
+		)
 	})
 
 	t.Run("test coa dryCall", func(t *testing.T) {
@@ -6890,6 +7052,225 @@ func TestEVMPauseFunctionality(t *testing.T) {
 			})
 		},
 	)
+}
+
+func TestEthLogEmissionWithSelfDestruct(t *testing.T) {
+	t.Parallel()
+
+	chain := flow.Emulator.Chain()
+
+	t.Run("test SelfDestruct with self beneficiary emits EthBurnLog", func(t *testing.T) {
+		t.Parallel()
+
+		RunContractWithNewEnvironment(
+			t,
+			chain,
+			GetFactoryTestContract(t),
+			func(
+				ctx fvm.Context,
+				vm fvm.VM,
+				snapshot snapshot.SnapshotTree,
+				testContract *TestContract,
+				testAccount *EOATestAccount,
+			) {
+				sc := systemcontracts.SystemContractsForChain(chain.ChainID())
+				code := []byte(fmt.Sprintf(
+					`
+					import EVM from %s
+
+					transaction(tx: [UInt8], coinbaseBytes: [UInt8; 20]){
+						prepare(account: &Account) {
+							let coinbase = EVM.EVMAddress(bytes: coinbaseBytes)
+							let res = EVM.run(tx: tx, coinbase: coinbase)
+
+							assert(res.status == EVM.Status.successful, message: "unexpected status")
+							assert(res.errorCode == 0, message: "unexpected error code")
+							assert(res.deployedContract == nil, message: "unexpected deployed contract")
+						}
+					}
+					`,
+					sc.EVMContract.Address.HexWithPrefix(),
+				))
+
+				coinbaseAddr := types.Address{1, 2, 3}
+				coinbaseBalance := getEVMAccountBalance(t, ctx, vm, snapshot, coinbaseAddr)
+				require.Zero(t, types.BalanceToBigInt(coinbaseBalance).Uint64())
+
+				salt := [32]byte{1}
+				storedValue := big.NewInt(100)
+				amount := big.NewInt(1_000_000)
+				innerTxBytes := testAccount.PrepareSignAndEncodeTx(t,
+					testContract.DeployedAt.ToCommon(),
+					testContract.MakeCallData(t, "depositDeployAndDestroyWithBurn", salt, amount, storedValue),
+					big.NewInt(0),
+					uint64(1_000_000),
+					big.NewInt(1),
+				)
+
+				innerTx := cadence.NewArray(
+					unittest.BytesToCdcUInt8(innerTxBytes),
+				).WithType(stdlib.EVMTransactionBytesCadenceType)
+
+				coinbase := cadence.NewArray(
+					unittest.BytesToCdcUInt8(coinbaseAddr.Bytes()),
+				).WithType(stdlib.EVMAddressBytesCadenceType)
+
+				txBody, err := flow.NewTransactionBodyBuilder().
+					SetScript(code).
+					SetPayer(sc.FlowServiceAccount.Address).
+					AddAuthorizer(sc.FlowServiceAccount.Address).
+					AddArgument(json.MustEncode(innerTx)).
+					AddArgument(json.MustEncode(coinbase)).
+					Build()
+				require.NoError(t, err)
+
+				tx := fvm.Transaction(txBody, 0)
+				state, output, err := vm.Run(ctx, tx, snapshot)
+				require.NoError(t, err)
+				require.NoError(t, output.Err)
+				require.NotEmpty(t, state.WriteSet)
+
+				// assert event fields are correct
+				require.Len(t, output.Events, 2)
+				txEvent := output.Events[0]
+				txEventPayload := TxEventToPayload(t, txEvent, sc.EVMContract.Address)
+				require.NoError(t, err)
+				require.Equal(t, uint16(types.ErrCodeNoError), txEventPayload.ErrorCode)
+				require.Equal(t, uint16(0), txEventPayload.Index)
+				require.Equal(t, uint64(239_774), txEventPayload.GasConsumed)
+				require.Greater(t, len(txEventPayload.Logs), 0)
+
+				gethLogs := []*gethTypes.Log{}
+				err = rlp.Decode(bytes.NewReader(txEventPayload.Logs), &gethLogs)
+				require.NoError(t, err)
+				require.Len(t, gethLogs, 2)
+
+				ethTransferLog := gethLogs[0]
+				selfDestructContract := ethTransferLog.Topics[2]
+				require.Equal(t, gethParams.SystemAddress, ethTransferLog.Address)
+				require.Len(t, ethTransferLog.Topics, 3)
+				require.Equal(t, gethParams.EthTransferLogEvent, ethTransferLog.Topics[0])
+				require.Equal(t, common.BytesToHash(testContract.DeployedAt.Bytes()), ethTransferLog.Topics[1])
+				require.Equal(t, amount, new(big.Int).SetBytes(ethTransferLog.Data))
+
+				ethBurnLog := gethLogs[1]
+				// Since the beneficiary is the contract being self-destructed,
+				// its ETH balance is burned
+				require.Equal(t, gethParams.SystemAddress, ethBurnLog.Address)
+				require.Len(t, ethBurnLog.Topics, 2)
+				require.Equal(t, gethParams.EthBurnLogEvent, ethBurnLog.Topics[0])
+				require.Equal(t, amount, new(big.Int).SetBytes(ethBurnLog.Data))
+				require.Equal(t, selfDestructContract, ethBurnLog.Topics[1])
+			},
+		)
+	})
+
+	t.Run("test SelfDestruct with non-self beneficiary does not emit EthBurnLog", func(t *testing.T) {
+		t.Parallel()
+
+		RunContractWithNewEnvironment(
+			t,
+			chain,
+			GetFactoryTestContract(t),
+			func(
+				ctx fvm.Context,
+				vm fvm.VM,
+				snapshot snapshot.SnapshotTree,
+				testContract *TestContract,
+				testAccount *EOATestAccount,
+			) {
+				sc := systemcontracts.SystemContractsForChain(chain.ChainID())
+				code := []byte(fmt.Sprintf(
+					`
+					import EVM from %s
+
+					transaction(tx: [UInt8], coinbaseBytes: [UInt8; 20]){
+						prepare(account: &Account) {
+							let coinbase = EVM.EVMAddress(bytes: coinbaseBytes)
+							let res = EVM.run(tx: tx, coinbase: coinbase)
+
+							assert(res.status == EVM.Status.successful, message: "unexpected status")
+							assert(res.errorCode == 0, message: "unexpected error code")
+							assert(res.deployedContract == nil, message: "unexpected deployed contract")
+						}
+					}
+					`,
+					sc.EVMContract.Address.HexWithPrefix(),
+				))
+
+				coinbaseAddr := types.Address{1, 2, 3}
+				coinbaseBalance := getEVMAccountBalance(t, ctx, vm, snapshot, coinbaseAddr)
+				require.Zero(t, types.BalanceToBigInt(coinbaseBalance).Uint64())
+
+				salt := [32]byte{1}
+				storedValue := big.NewInt(100)
+				amount := big.NewInt(1_000_000)
+				innerTxBytes := testAccount.PrepareSignAndEncodeTx(t,
+					testContract.DeployedAt.ToCommon(),
+					testContract.MakeCallData(t, "depositDeployAndDestroy", salt, amount, storedValue),
+					big.NewInt(0),
+					uint64(1_000_000),
+					big.NewInt(1),
+				)
+
+				innerTx := cadence.NewArray(
+					unittest.BytesToCdcUInt8(innerTxBytes),
+				).WithType(stdlib.EVMTransactionBytesCadenceType)
+
+				coinbase := cadence.NewArray(
+					unittest.BytesToCdcUInt8(coinbaseAddr.Bytes()),
+				).WithType(stdlib.EVMAddressBytesCadenceType)
+
+				txBody, err := flow.NewTransactionBodyBuilder().
+					SetScript(code).
+					SetPayer(sc.FlowServiceAccount.Address).
+					AddAuthorizer(sc.FlowServiceAccount.Address).
+					AddArgument(json.MustEncode(innerTx)).
+					AddArgument(json.MustEncode(coinbase)).
+					Build()
+				require.NoError(t, err)
+
+				tx := fvm.Transaction(txBody, 0)
+				state, output, err := vm.Run(ctx, tx, snapshot)
+				require.NoError(t, err)
+				require.NoError(t, output.Err)
+				require.NotEmpty(t, state.WriteSet)
+
+				// assert event fields are correct
+				require.Len(t, output.Events, 2)
+				txEvent := output.Events[0]
+				txEventPayload := TxEventToPayload(t, txEvent, sc.EVMContract.Address)
+				require.NoError(t, err)
+				require.Equal(t, uint16(types.ErrCodeNoError), txEventPayload.ErrorCode)
+				require.Equal(t, uint16(0), txEventPayload.Index)
+				require.Equal(t, uint64(239_795), txEventPayload.GasConsumed)
+				require.Greater(t, len(txEventPayload.Logs), 0)
+
+				gethLogs := []*gethTypes.Log{}
+				err = rlp.Decode(bytes.NewReader(txEventPayload.Logs), &gethLogs)
+				require.NoError(t, err)
+				require.Len(t, gethLogs, 2)
+
+				ethTransferLog := gethLogs[0]
+				selfDestructContract := ethTransferLog.Topics[2]
+				require.Equal(t, gethParams.SystemAddress, ethTransferLog.Address)
+				require.Len(t, ethTransferLog.Topics, 3)
+				require.Equal(t, gethParams.EthTransferLogEvent, ethTransferLog.Topics[0])
+				require.Equal(t, common.BytesToHash(testContract.DeployedAt.Bytes()), ethTransferLog.Topics[1])
+				require.Equal(t, amount, new(big.Int).SetBytes(ethTransferLog.Data))
+
+				ethTransferLog = gethLogs[1]
+				// Since the beneficiary is NOT the contract being self-destructed,
+				// its ETH balance is simply transferred, not burned
+				require.Equal(t, gethParams.SystemAddress, ethTransferLog.Address)
+				require.Len(t, ethTransferLog.Topics, 3)
+				require.Equal(t, gethParams.EthTransferLogEvent, ethTransferLog.Topics[0])
+				require.Equal(t, selfDestructContract, ethTransferLog.Topics[1])
+				require.Equal(t, common.BytesToHash(testContract.DeployedAt.Bytes()), ethTransferLog.Topics[2])
+				require.Equal(t, amount, new(big.Int).SetBytes(ethTransferLog.Data))
+			},
+		)
+	})
 }
 
 func createAndFundFlowAccount(

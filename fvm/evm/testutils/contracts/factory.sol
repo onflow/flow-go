@@ -40,6 +40,18 @@ contract Factory {
         dep.destroy(address(this));
     }
 
+    function depositDeployAndDestroyWithBurn(bytes32 salt, uint256 amount, uint256 stored) public {
+        address addr = _getCreate2Address(salt, keccak256(abi.encodePacked(type(Deployable).creationCode)));
+        bool success;
+        assembly {
+            success := call(gas(), addr, amount, 0, 0, 0, 0)
+        }
+        require(success);
+        Deployable dep = new Deployable{salt: salt}();
+        dep.set(stored);
+        dep.destroy(addr);
+    }
+
     function _getCreate2Address(bytes32 salt, bytes32 codeHash) internal view returns (address) {
         return address(uint160(uint256(keccak256(abi.encodePacked(bytes1(0xff), address(this), salt, codeHash)))));
     }
