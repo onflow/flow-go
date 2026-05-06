@@ -130,6 +130,11 @@ func (b *RegisterBootstrap) indexCheckpointFileWorker(ctx context.Context) error
 	return nil
 }
 
+// RegisterCount returns the number of registers indexed.
+func (b *RegisterBootstrap) RegisterCount() uint64 {
+	return b.registerCount.Load()
+}
+
 // IndexCheckpointFile indexes the checkpoint file in the Dir provided
 func (b *RegisterBootstrap) IndexCheckpointFile(ctx context.Context, workerCount int) error {
 	cct, cancel := context.WithCancel(ctx)

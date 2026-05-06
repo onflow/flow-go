@@ -34,6 +34,7 @@ WORKERS="8,16,32,64"
 WAL_COUNTS="10,50,100,200,500"
 PHASE=""
 SKIP_IMPORT=false
+SKIP_PHASES=""
 
 # Parse arguments
 while [[ $# -gt 0 ]]; do
@@ -62,6 +63,10 @@ while [[ $# -gt 0 ]]; do
             SKIP_IMPORT=true
             shift
             ;;
+        --skip-phases)
+            SKIP_PHASES="$2"
+            shift 2
+            ;;
         --workers)
             WORKERS="$2"
             shift 2
@@ -82,6 +87,7 @@ while [[ $# -gt 0 ]]; do
             echo "Optional:"
             echo "  --phase N            Run only phase N (1-4)"
             echo "  --skip-import        Skip phase 1 (use existing storehouse)"
+            echo "  --skip-phases LIST   Skip phases (e.g., '1,2' to skip phases 1 and 2)"
             echo "  --workers LIST       Worker counts for phase 2 (default: 8,16,32,64)"
             echo "  --wal-counts LIST    WAL segment counts for phase 3 (default: 10,50,100,200,500)"
             exit 0
@@ -166,6 +172,9 @@ log "Output Dir:    $OUTPUT_DIR"
 log "Root Height:   $ROOT_HEIGHT"
 log "Workers:       $WORKERS"
 log "WAL Counts:    $WAL_COUNTS"
+if [[ -n "$SKIP_PHASES" ]]; then
+    log "Skip Phases:   $SKIP_PHASES"
+fi
 log "Log File:      $LOG_FILE"
 
 # Validate inputs
@@ -432,12 +441,45 @@ EOF
 
 START_TIME=$(date +%s)
 
+# Helper to check if phase should be skipped
+should_skip_phase() {
+    local phase=$1
+    if [[ -n "$SKIP_PHASES" ]]; then
+        IFS=',' read -ra SKIP_ARRAY <<< "$SKIP_PHASES"
+        for skip in "${SKIP_ARRAY[@]}"; do
+            if [[ "$skip" == "$phase" ]]; then
+                return 0
+            fi
+        done
+    fi
+    return 1
+}
+
 if [[ -z "$PHASE" ]]; then
-    # Run all phases
-    run_phase1
-    run_phase2
-    run_phase3
-    run_phase4
+    # Run all phases (except skipped ones)
+    if should_skip_phase 1; then
+        log_warn "Skipping Phase 1 (--skip-phases)"
+    else
+        run_phase1
+    fi
+
+    if should_skip_phase 2; then
+        log_warn "Skipping Phase 2 (--skip-phases)"
+    else
+        run_phase2
+    fi
+
+    if should_skip_phase 3; then
+        log_warn "Skipping Phase 3 (--skip-phases)"
+    else
+        run_phase3
+    fi
+
+    if should_skip_phase 4; then
+        log_warn "Skipping Phase 4 (--skip-phases)"
+    else
+        run_phase4
+    fi
 else
     # Run specific phase
     case $PHASE in

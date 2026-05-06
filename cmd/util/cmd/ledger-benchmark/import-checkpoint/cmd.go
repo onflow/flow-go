@@ -240,16 +240,9 @@ func run(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to create registers: %w", err)
 	}
 
-	// Count registers by iterating (approximation based on bootstrap)
-	// For accurate count, we'd need to track during import
-	finalRegCount := registerCount.Load()
+	// Get final register count from bootstrap
+	finalRegCount := int64(bootstrap.RegisterCount())
 	finalBytes := totalBytes.Load()
-
-	// If we didn't track during import, estimate from elapsed time
-	// This is a placeholder - actual implementation would track during IndexCheckpointFile
-	if finalRegCount == 0 {
-		logger.Warn().Msg("Register count not tracked during import, using estimate")
-	}
 
 	// Calculate final metrics
 	var m runtime.MemStats

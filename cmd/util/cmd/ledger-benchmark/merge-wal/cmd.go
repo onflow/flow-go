@@ -75,13 +75,13 @@ type BenchmarkResult struct {
 		SegmentCount int    `json:"segment_count"`
 	} `json:"inputs"`
 	Results struct {
-		MergeTimeSec            float64 `json:"merge_time_sec"`
-		InputSizeBytes          int64   `json:"input_size_bytes"`
-		OutputSizeBytes         int64   `json:"output_size_bytes"`
-		TotalUpdatesPreMerge    int64   `json:"total_updates_pre_merge"`
+		MergeTimeSec             float64 `json:"merge_time_sec"`
+		InputSizeBytes           int64   `json:"input_size_bytes"`
+		OutputSizeBytes          int64   `json:"output_size_bytes"`
+		TotalUpdatesPreMerge     int64   `json:"total_updates_pre_merge"`
 		UniqueRegistersPostMerge int64   `json:"unique_registers_post_merge"`
-		DeduplicationRatio      float64 `json:"deduplication_ratio_pct"`
-		TrieUpdatesProcessed    int64   `json:"trie_updates_processed"`
+		DeduplicationRatio       float64 `json:"deduplication_ratio_pct"`
+		TrieUpdatesProcessed     int64   `json:"trie_updates_processed"`
 	} `json:"results"`
 	Resources struct {
 		PeakMemoryMB float64          `json:"peak_memory_mb"`
@@ -93,16 +93,10 @@ type BenchmarkResult struct {
 }
 
 type ResourceSample struct {
-	ElapsedSec       float64 `json:"elapsed_sec"`
-	MemoryMB         float64 `json:"memory_mb"`
-	SegmentsRead     int     `json:"segments_read"`
-	UniqueRegisters  int     `json:"unique_registers"`
-}
-
-// MergedPayload holds the merged register value
-type MergedPayload struct {
-	Value   []byte
-	Height  uint64 // Track which update this came from
+	ElapsedSec      float64 `json:"elapsed_sec"`
+	MemoryMB        float64 `json:"memory_mb"`
+	SegmentsRead    int     `json:"segments_read"`
+	UniqueRegisters int     `json:"unique_registers"`
 }
 
 func run(cmd *cobra.Command, args []string) error {
@@ -119,6 +113,12 @@ func run(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("WAL directory not found: %s", flagWALDir)
 	}
 
+	// Convert to absolute path for symlinks to work correctly
+	absWALDir, err := filepath.Abs(flagWALDir)
+	if err != nil {
+		return fmt.Errorf("failed to get absolute path for WAL dir: %w", err)
+	}
+
 	// Create output directory
 	if err := os.MkdirAll(flagOutputDir, 0755); err != nil {
 		return fmt.Errorf("failed to create output directory: %w", err)
@@ -130,17 +130,52 @@ func run(cmd *cobra.Command, args []string) error {
 		Timestamp: time.Now(),
 	}
 	result.Inputs.WALDir = flagWALDir
-	result.Inputs.SegmentCount = flagSegmentCount
 
-	// Calculate input size
-	inputSize, err := calculateWALSize(flagWALDir, flagSegmentCount)
+	// Get WAL segment files and create temp directory with only N segments
+	segments, err := getWALSegmentFiles(absWALDir, flagSegmentCount)
 	if err != nil {
-		logger.Warn().Err(err).Msg("Could not calculate input size")
+		return fmt.Errorf("failed to get WAL segments: %w", err)
+	}
+	if len(segments) == 0 {
+		return fmt.Errorf("no WAL segments found in %s", absWALDir)
+	}
+	logger.Info().Int("segments_found", len(segments)).Int("segments_requested", flagSegmentCount).Msg("Found WAL segments")
+
+	// Record actual segment count used
+	result.Inputs.SegmentCount = len(segments)
+
+	// Calculate input size from selected segments
+	var inputSize int64
+	for _, seg := range segments {
+		info, err := os.Stat(seg)
+		if err == nil {
+			inputSize += info.Size()
+		}
 	}
 	result.Results.InputSizeBytes = inputSize
 
-	// Create WAL for reading
-	// Use a no-op metrics collector
+	// Create temp directory with symlinks to only the selected segments
+	tempDir, err := os.MkdirTemp("", "wal-merge-benchmark-*")
+	if err != nil {
+		return fmt.Errorf("failed to create temp directory: %w", err)
+	}
+	defer os.RemoveAll(tempDir)
+
+	for _, seg := range segments {
+		segName := filepath.Base(seg)
+		linkPath := filepath.Join(tempDir, segName)
+		if err := os.Symlink(seg, linkPath); err != nil {
+			return fmt.Errorf("failed to create symlink for %s: %w", segName, err)
+		}
+	}
+
+	logger.Info().
+		Str("temp_dir", tempDir).
+		Int("segments", len(segments)).
+		Int64("input_size_bytes", inputSize).
+		Msg("Created temp directory with segment symlinks")
+
+	// Create WAL for reading from temp directory
 	noopMetrics := &metrics.NoopCollector{}
 	noopRegistry := prometheusWAL.NewRegistry()
 
@@ -148,9 +183,9 @@ func run(cmd *cobra.Command, args []string) error {
 		logger,
 		noopRegistry,
 		noopMetrics,
-		flagWALDir,
-		100,  // capacity (doesn't matter for replay)
-		32,   // pathByteSize
+		tempDir,
+		100, // capacity (doesn't matter for replay)
+		32,  // pathByteSize
 		wal.SegmentSize,
 	)
 	if err != nil {
@@ -162,7 +197,6 @@ func run(cmd *cobra.Command, args []string) error {
 	var totalUpdates int64
 	var trieUpdatesProcessed int64
 	var peakMemoryMB float64
-	segmentsRead := 0
 
 	// Start timing
 	startTime := time.Now()
@@ -179,12 +213,6 @@ func run(cmd *cobra.Command, args []string) error {
 		// Update callback - merge payloads
 		func(update *ledger.TrieUpdate) error {
 			trieUpdatesProcessed++
-
-			// Check if we've processed enough segments
-			// (approximate by counting updates)
-			if segmentsRead >= flagSegmentCount {
-				return nil
-			}
 
 			paths := update.Paths
 			payloads := update.Payloads
@@ -210,7 +238,7 @@ func run(cmd *cobra.Command, args []string) error {
 				result.Resources.Samples = append(result.Resources.Samples, ResourceSample{
 					ElapsedSec:      elapsed,
 					MemoryMB:        memMB,
-					SegmentsRead:    segmentsRead,
+					SegmentsRead:    len(segments),
 					UniqueRegisters: len(mergedPayloads),
 				})
 
@@ -293,14 +321,14 @@ func run(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func calculateWALSize(dir string, maxSegments int) (int64, error) {
+// getWALSegmentFiles returns the first N WAL segment files from the directory
+func getWALSegmentFiles(dir string, maxSegments int) ([]string, error) {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
 
-	var totalSize int64
-	segmentCount := 0
+	var segments []string
 
 	// Sort entries to get segments in order
 	sort.Slice(entries, func(i, j int) bool {
@@ -312,23 +340,17 @@ func calculateWALSize(dir string, maxSegments int) (int64, error) {
 			continue
 		}
 
-		// Check if it looks like a WAL segment (numeric name)
+		// Check if it looks like a WAL segment (numeric name, 8 characters)
 		name := entry.Name()
-		if len(name) == 8 { // WAL segments are named like "00000001"
-			info, err := entry.Info()
-			if err != nil {
-				continue
-			}
-			totalSize += info.Size()
-			segmentCount++
-
-			if segmentCount >= maxSegments {
+		if len(name) == 8 {
+			segments = append(segments, filepath.Join(dir, name))
+			if len(segments) >= maxSegments {
 				break
 			}
 		}
 	}
 
-	return totalSize, nil
+	return segments, nil
 }
 
 func writeMergedWAL(path string, payloads map[ledger.Path]*ledger.Payload, logger zerolog.Logger) (int64, error) {
