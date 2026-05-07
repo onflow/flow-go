@@ -739,6 +739,7 @@ func (h *ContractHandler) getBlockContext(bp *types.BlockProposal) (
 		},
 		ExtraPrecompiledContracts: h.precompiledContracts,
 		Random:                    bp.PrevRandao,
+		SlotNum:                   bp.SlotNumber(h.flowChainID),
 		TxCountSoFar:              uint(len(bp.TxHashes)),
 		TotalGasUsedSoFar:         bp.TotalGasUsed,
 		GasFeeCollector:           types.CoinbaseAddress,

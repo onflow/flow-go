@@ -3,6 +3,7 @@ package types
 import (
 	"math/big"
 	"testing"
+	"time"
 
 	gethCommon "github.com/ethereum/go-ethereum/common"
 	gethTypes "github.com/ethereum/go-ethereum/core/types"
@@ -52,7 +53,8 @@ func Test_BlockHash(t *testing.T) {
 }
 
 func Test_BlockProposal(t *testing.T) {
-	bp := NewBlockProposal(gethCommon.Hash{1}, 1, 0, nil, gethCommon.Hash{1, 2, 3})
+	timestamp := uint64(time.Date(2026, time.January, 1, 0, 0, 0, 0, time.UTC).Unix())
+	bp := NewBlockProposal(gethCommon.Hash{1}, 1, timestamp, nil, gethCommon.Hash{1, 2, 3})
 
 	bp.AppendTransaction(nil)
 	require.Empty(t, bp.TxHashes)
@@ -74,6 +76,10 @@ func Test_BlockProposal(t *testing.T) {
 
 	bp.PopulateRoots()
 	require.NotEqual(t, gethTypes.EmptyReceiptsHash, bp.ReceiptRoot)
+
+	require.Equal(t, uint64(5_263_200), bp.SlotNumber(flow.Emulator))
+	require.Equal(t, uint64(3_729_600), bp.SlotNumber(flow.Testnet))
+	require.Equal(t, uint64(3_506_400), bp.SlotNumber(flow.Mainnet))
 }
 
 func Test_DecodeHistoricBlocks(t *testing.T) {

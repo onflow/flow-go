@@ -272,6 +272,14 @@ func WithRandom(rand *gethCommon.Hash) Option {
 	}
 }
 
+// WithSlotNum sets the block time in the block context
+func WithSlotNum(slotNum uint64) Option {
+	return func(c *Config) *Config {
+		c.BlockContext.SlotNum = slotNum
+		return c
+	}
+}
+
 // WithTransactionTracer sets a transaction tracer
 func WithTransactionTracer(tracer *tracers.Tracer) Option {
 	return func(c *Config) *Config {

@@ -97,6 +97,8 @@ func NewBlockFromBytes(encoded []byte) (*Block, error) {
 // GenesisTimestamp returns the block time stamp for EVM genesis block
 func GenesisTimestamp(flowChainID flow.ChainID) uint64 {
 	switch flowChainID {
+	case flow.Emulator, flow.Previewnet:
+		return uint64(time.Date(2024, time.January, 1, 0, 0, 0, 0, time.UTC).Unix())
 	case flow.Testnet:
 		return uint64(time.Date(2024, time.August, 1, 0, 0, 0, 0, time.UTC).Unix())
 	case flow.Mainnet:
@@ -205,6 +207,11 @@ func (b *BlockProposal) PopulateReceiptRoot() {
 // ToBytes encodes the block proposal into bytes
 func (b *BlockProposal) ToBytes() ([]byte, error) {
 	return gethRLP.EncodeToBytes(b)
+}
+
+func (b *BlockProposal) SlotNumber(chainID flow.ChainID) uint64 {
+	genesisTime := GenesisBlock(chainID).Timestamp
+	return (b.Timestamp - genesisTime) / 12
 }
 
 // NewBlockProposalFromBytes constructs a new block proposal from encoded data

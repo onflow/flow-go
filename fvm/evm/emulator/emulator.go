@@ -51,6 +51,7 @@ func newConfig(ctx types.BlockContext) *Config {
 		WithExtraPrecompiledContracts(ctx.ExtraPrecompiledContracts),
 		WithGetBlockHashFunction(ctx.GetHashFunc),
 		WithRandom(&ctx.Random),
+		WithSlotNum(ctx.SlotNum),
 		WithTransactionTracer(ctx.Tracer),
 		WithBlockTotalGasUsedSoFar(ctx.TotalGasUsedSoFar),
 		WithBlockTxCountSoFar(ctx.TxCountSoFar),
