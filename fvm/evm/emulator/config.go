@@ -196,7 +196,7 @@ func WithOrigin(origin gethCommon.Address) Option {
 // WithGasPrice sets the gas price for the transaction (usually the one sets by the sender)
 func WithGasPrice(gasPrice *big.Int) Option {
 	return func(c *Config) *Config {
-		c.TxContext.GasPrice = new(uint256.Int).SetBytes(gasPrice.Bytes())
+		c.TxContext.GasPrice = uint256.MustFromBig(gasPrice)
 		return c
 	}
 }
@@ -272,7 +272,7 @@ func WithRandom(rand *gethCommon.Hash) Option {
 	}
 }
 
-// WithSlotNum sets the block time in the block context
+// WithSlotNum sets the slot number in the block context
 func WithSlotNum(slotNum uint64) Option {
 	return func(c *Config) *Config {
 		c.BlockContext.SlotNum = slotNum

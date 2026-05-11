@@ -112,8 +112,8 @@ func (db *StateDB) IsNewContract(addr gethCommon.Address) bool {
 // While this address exists for the rest of the transaction,
 // the balance of this account is cleared after the SelfDestruct call.
 func (db *StateDB) SelfDestruct(addr gethCommon.Address) {
-	// Flow EVM went live with the Cancun hard-fork, we we only support
-	// EIP-6780 SELFDESTRUCT, only in same transaction.
+	// Flow EVM went live with the Cancun hard-fork, so we only support the
+	// EIP-6780 SELFDESTRUCT variation, which works only in same transaction.
 	// EIP-6780 would only follow the self destruct steps if account is a new
 	// contract either just created, or address had balance before but got a
 	// contract deployed to it (in this tx).
