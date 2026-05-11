@@ -7059,7 +7059,7 @@ func TestEthLogEmissionWithSelfDestruct(t *testing.T) {
 
 	chain := flow.Emulator.Chain()
 
-	t.Run("test SelfDestruct with self beneficiary emits EthBurnLog", func(t *testing.T) {
+	t.Run("test SelfDestruct with self as beneficiary emits EthBurnLog", func(t *testing.T) {
 		t.Parallel()
 
 		RunContractWithNewEnvironment(
@@ -7165,7 +7165,7 @@ func TestEthLogEmissionWithSelfDestruct(t *testing.T) {
 		)
 	})
 
-	t.Run("test SelfDestruct with non-self beneficiary does not emit EthBurnLog", func(t *testing.T) {
+	t.Run("test SelfDestruct with non-self as beneficiary does not emit EthBurnLog", func(t *testing.T) {
 		t.Parallel()
 
 		RunContractWithNewEnvironment(
