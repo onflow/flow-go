@@ -112,7 +112,7 @@ func MakeChainConfig(chainID *big.Int) *gethParams.ChainConfig {
 		PragueTime:    nil,   // this is conditionally set below
 		OsakaTime:     nil,   // this is conditionally set below
 		AmsterdamTime: nil,   // this is conditionally set below
-		VerkleTime:    nil,   // not on Verkle
+		UBTTime:       nil,   // not on Verkle (a.k.a UBT)
 	}
 
 	if chainID.Cmp(types.FlowEVMPreviewNetChainID) == 0 {

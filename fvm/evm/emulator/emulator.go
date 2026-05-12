@@ -311,23 +311,60 @@ func (bl *BlockView) DryRunTransaction(
 		return nil, err
 	}
 
-	// convert tx into message
-	msg, err := gethCore.TransactionToMessage(
-		tx,
-		GetSigner(bl.config),
-		proc.config.BlockContext.BaseFee,
-	)
-
-	// we can ignore invalid signature errors since we don't expect signed transactions
-	if !errors.Is(err, gethTypes.ErrInvalidSig) {
-		return nil, err
+	gasPrice, overflow := uint256.FromBig(tx.GasPrice())
+	if overflow {
+		return nil, fmt.Errorf("%w: address %v, maxFeePerGas bit length: %d", gethCore.ErrFeeCapVeryHigh,
+			from.Hex(), tx.GasPrice().BitLen())
+	}
+	txGasFeeCap := tx.GasFeeCap()
+	gasFeeCap, overflow := uint256.FromBig(txGasFeeCap)
+	if overflow {
+		return nil, fmt.Errorf("%w: address %v, maxFeePerGas bit length: %d", gethCore.ErrFeeCapVeryHigh,
+			from.Hex(), tx.GasFeeCap().BitLen())
+	}
+	txGasTipCap := tx.GasTipCap()
+	gasTipCap, overflow := uint256.FromBig(txGasTipCap)
+	if overflow {
+		return nil, fmt.Errorf("%w: address %v, maxPriorityFeePerGas bit length: %d", gethCore.ErrTipVeryHigh,
+			from.Hex(), tx.GasTipCap().BitLen())
+	}
+	value, overflow := uint256.FromBig(tx.Value())
+	if overflow {
+		return nil, fmt.Errorf("value exceeds 256 bits: address %v", from.Hex())
+	}
+	blobGasFeeCap, overflow := uint256.FromBig(tx.BlobGasFeeCap())
+	if overflow {
+		return nil, fmt.Errorf("blobGasFeeCap exceeds 256 bits: address %v", from.Hex())
 	}
 
-	// use the from as the signer
-	msg.From = from
-	// we need to skip nonce/transaction checks for dry run
-	msg.SkipNonceChecks = true
-	msg.SkipTransactionChecks = true
+	msg := &gethCore.Message{
+		From:                  from,
+		Nonce:                 tx.Nonce(),
+		GasLimit:              tx.Gas(),
+		GasPrice:              gasPrice,
+		GasFeeCap:             gasFeeCap,
+		GasTipCap:             gasTipCap,
+		To:                    tx.To(),
+		Value:                 value,
+		Data:                  tx.Data(),
+		AccessList:            tx.AccessList(),
+		SetCodeAuthorizations: tx.SetCodeAuthorizations(),
+		SkipNonceChecks:       true,
+		SkipTransactionChecks: true,
+		BlobHashes:            tx.BlobHashes(),
+		BlobGasFeeCap:         blobGasFeeCap,
+	}
+	// If baseFee provided, set gasPrice to effectiveGasPrice.
+	baseFee := proc.config.BlockContext.BaseFee
+	if baseFee != nil {
+		effectiveGasPrice := new(big.Int).Add(baseFee, txGasTipCap)
+		if effectiveGasPrice.Cmp(txGasFeeCap) > 0 {
+			effectiveGasPrice = txGasFeeCap
+		}
+		// EffectiveGasPrice is already capped by txGasFeeCap, therefore
+		// the overflow check is not required.
+		msg.GasPrice = uint256.MustFromBig(effectiveGasPrice)
+	}
 
 	// run and return without committing the state changes
 	return proc.run(msg, tx.Hash(), tx.Type())
@@ -586,11 +623,12 @@ func (proc *procedure) deployAt(
 
 	// initialise a new contract and set the code that is to be used by the EVM.
 	// the contract is a scoped environment for this execution context only.
+	gasBudget := gethVM.NewGasBudget(call.GasLimit)
 	contract := gethVM.NewContract(
 		caller,
 		addr,
 		castedValue,
-		call.GasLimit,
+		gasBudget,
 		nil,
 	)
 

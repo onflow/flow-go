@@ -1276,9 +1276,8 @@ func TestEVMRun(t *testing.T) {
 						prepare(account: &Account) {
 							let coinbase = EVM.EVMAddress(bytes: coinbaseBytes)
 							let res = EVM.run(tx: tx, coinbase: coinbase)
-							assert(res.status == EVM.Status.invalid, message: "unexpected status")
-							assert(res.errorCode == 100, message: "unexpected error code: \(res.errorCode)")
-							assert(res.errorMessage == "transaction gas limit too high (cap: 16777216, tx: 16777220)")
+							assert(res.status == EVM.Status.successful, message: "unexpected status")
+							assert(res.errorCode == 0, message: "unexpected error code: \(res.errorCode)")
 						}
 					}
 					`,
@@ -1326,8 +1325,7 @@ func TestEVMRun(t *testing.T) {
 				require.NoError(t, output.Err)
 				require.NotEmpty(t, state.WriteSet)
 
-				// assert no events were produced from an invalid EVM transaction
-				require.Len(t, output.Events, 0)
+				require.Len(t, output.Events, 2)
 			})
 	})
 
@@ -1807,11 +1805,11 @@ func TestEVMBatchRun(t *testing.T) {
 
 							for i, res in batchResults {
 								if i %% 2 != 0 {
-									assert(res.status == EVM.Status.successful, message: "unexpected success status")
+									assert(res.status == EVM.Status.successful, message: "\(res.errorMessage)")
 									assert(res.errorCode == 0, message: "unexpected error code")
 									assert(res.errorMessage == "", message: "unexpected error msg")
 								} else {
-									assert(res.status == EVM.Status.failed, message: "unexpected failed status")
+									assert(res.status == EVM.Status.failed, message: "\(res.errorMessage)")
 									assert(res.errorCode == 400, message: "unexpected error code")
 								}
 							}
@@ -1828,7 +1826,7 @@ func TestEVMBatchRun(t *testing.T) {
 					gas := uint64(100_000)
 					if i%2 == 0 {
 						// fail with too low gas limit
-						gas = 22_000
+						gas = 23_500
 					} else {
 						// update number with only valid transactions
 						num = int64(i)
@@ -6146,10 +6144,12 @@ func TestEVMFileSystemContract(t *testing.T) {
 			`
 					import EVM from %s
 
-					transaction(tx: [UInt8], coinbaseBytes: [UInt8; 20]){
+					transaction(tx: [UInt8], coinbaseBytes: [UInt8; 20]) {
 						prepare(account: &Account) {
 							let coinbase = EVM.EVMAddress(bytes: coinbaseBytes)
 							let res = EVM.run(tx: tx, coinbase: coinbase)
+							assert(res.status == EVM.Status.successful, message: "\(res.errorMessage)")
+							assert(res.errorCode == 0, message: "unexpected error code: \(res.errorCode)")
 						}
 					}
 					`,
@@ -6179,7 +6179,7 @@ func TestEVMFileSystemContract(t *testing.T) {
 				buffer.String(),
 			),
 			big.NewInt(0),
-			uint64(2_132_171),
+			uint64(3_375_890),
 			big.NewInt(1),
 		)
 
@@ -6248,7 +6248,7 @@ func TestEVMFileSystemContract(t *testing.T) {
 				)
 				//
 				require.NotEmpty(t, blockEventPayload.Hash)
-				require.Equal(t, uint64(2_132_170), blockEventPayload.TotalGasUsed)
+				require.Equal(t, uint64(3_396_880), blockEventPayload.TotalGasUsed)
 
 				txHashes := types.TransactionHashes{txEventPayload.Hash, feeTranferEventPayload.Hash}
 				require.Equal(t,
