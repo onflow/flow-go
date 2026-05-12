@@ -28,8 +28,8 @@ var (
 	MainnetOsakaActivation    = uint64(1764784800) // Wednesday, December 03, 2025 18:00:00 GMT+0000
 
 	PreviewnetAmsterdamActivation = uint64(0)          // already on Amsterdam for PreviewNet
-	TestnetAmsterdamActivation    = uint64(1782842400) // Tuesday, June 30, 2026 at 18:00:00 GMT+0000
-	MainnetAmsterdamActivation    = uint64(1782842400) // Tuesday, June 30, 2026 at 18:00:00 GMT+0000
+	TestnetAmsterdamActivation    = uint64(1798740000) // Thursday, December 31, 2026 at 18:00:00 GMT+0000
+	MainnetAmsterdamActivation    = uint64(1798740000) // Thursday, December 31, 2026 at 18:00:00 GMT+0000
 )
 
 // Config aggregates all the configuration (chain, evm, block, tx, ...)
