@@ -209,9 +209,20 @@ func (b *BlockProposal) ToBytes() ([]byte, error) {
 	return gethRLP.EncodeToBytes(b)
 }
 
+// SlotNumber returns the corresponding slot number for the current block.
+// In Ethereum, a slot is a 12-second time period where a validator is assigned
+// to propose a new block, functioning as the network's "heartbeat" in PoS.
+// Slots occur automatically every 12 seconds, and 32 slots are grouped together
+// into a 6.4-minute period known as an epoch.
 func (b *BlockProposal) SlotNumber(chainID flow.ChainID) uint64 {
-	genesisTime := GenesisBlock(chainID).Timestamp
-	return (b.Timestamp - genesisTime) / 12
+	// to calculate the Ethereum slot number from a block timestamp,
+	// subtract the Genesis timestamp from the block timestamp and
+	// divide by the slot duration (12 seconds on Ethereum).
+	// The formula is: slot = (block timestamp - genesis timestamp) / slot duration
+	// as slot duration we can use the block production rate, which is about 0.8
+	// seconds on mainnet.
+	genesisTimestamp := GenesisBlock(chainID).Timestamp
+	return ((b.Timestamp - genesisTimestamp) * 5) / 4
 }
 
 // NewBlockProposalFromBytes constructs a new block proposal from encoded data
