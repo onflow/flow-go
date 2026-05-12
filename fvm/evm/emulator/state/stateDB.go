@@ -11,6 +11,7 @@ import (
 	gethStateless "github.com/ethereum/go-ethereum/core/stateless"
 	gethTracing "github.com/ethereum/go-ethereum/core/tracing"
 	gethTypes "github.com/ethereum/go-ethereum/core/types"
+	gethBAL "github.com/ethereum/go-ethereum/core/types/bal"
 	gethParams "github.com/ethereum/go-ethereum/params"
 	"github.com/holiman/uint256"
 	"github.com/onflow/atree"
@@ -36,11 +37,13 @@ type removedAccountWithBalance struct {
 // thread safe. yet the current design supports addition of concurrency in the
 // future if needed
 type StateDB struct {
-	ledger      atree.Ledger
-	root        flow.Address
-	baseView    types.BaseView
-	views       []*DeltaView
-	cachedError error
+	ledger   atree.Ledger
+	root     flow.Address
+	baseView types.BaseView
+	views    []*DeltaView
+	// Per-transaction state access footprint for EIP-7928
+	stateReadList *gethBAL.StateAccessList
+	cachedError   error
 }
 
 var _ types.StateDB = &StateDB{}
@@ -79,6 +82,11 @@ func (db *StateDB) Empty(addr gethCommon.Address) bool {
 	return db.GetNonce(addr) == 0 &&
 		db.GetBalance(addr).Sign() == 0 &&
 		bytes.Equal(db.GetCodeHash(addr).Bytes(), gethTypes.EmptyCodeHash.Bytes())
+}
+
+// Touch accesses the specific account without returning anything.
+func (s *StateDB) Touch(addr gethCommon.Address) {
+	// TODO(m-Peter): Investigate Geth logic on this
 }
 
 // CreateAccount creates a new account for the given address
@@ -565,7 +573,7 @@ func (db *StateDB) Commit(finalize bool) (hash.Hash, error) {
 	return updateCommit, nil
 }
 
-// EmitLogsForBurnAccounts emits the eth burn logs for accounts scheduled for
+// LogsForBurnAccounts returns the eth burn logs for accounts scheduled for
 // removal which still have positive balance. The purpose of this function is
 // to handle a corner case of EIP-7708 where a self-destructed account might
 // still receive funds between sending/burning its previous balance and actual
@@ -575,7 +583,7 @@ func (db *StateDB) Commit(finalize bool) (hash.Hash, error) {
 //
 // This function should only be invoked at the transaction boundary, specifically
 // before the Finalise.
-func (db *StateDB) EmitLogsForBurnAccounts() {
+func (db *StateDB) LogsForBurnAccounts() []*gethTypes.Log {
 	// iterate views and collect dirty addresses
 	addresses := make(map[gethCommon.Address]struct{})
 	for _, view := range db.views {
@@ -600,20 +608,25 @@ func (db *StateDB) EmitLogsForBurnAccounts() {
 			})
 		}
 	}
-	if list != nil {
-		sort.Slice(list, func(i, j int) bool {
-			return list[i].address.Cmp(list[j].address) < 0
-		})
+	if list == nil {
+		return nil
 	}
-	for _, acct := range list {
-		db.AddLog(gethTypes.EthBurnLog(acct.address, acct.balance))
+	sort.Slice(list, func(i, j int) bool {
+		return list[i].address.Cmp(list[j].address) < 0
+	})
+	logs := make([]*gethTypes.Log, len(list))
+	for i, acct := range list {
+		logs[i] = gethTypes.EthBurnLog(acct.address, acct.balance)
 	}
+	return logs
 }
 
 // This is a no-op for our custom implementation of the StateDB interface,
 // since Commit() already handles finalization and deletion of empty
 // objects.
-func (db *StateDB) Finalise(deleteEmptyObjects bool) {}
+func (db *StateDB) Finalise(deleteEmptyObjects bool) *gethBAL.StateAccessList {
+	return db.stateReadList
+}
 
 // Finalize flushes all the changes
 // to the permanent storage
@@ -645,6 +658,10 @@ func (db *StateDB) Prepare(rules gethParams.Rules, sender, coinbase gethCommon.A
 		if rules.IsShanghai { // EIP-3651: warm coinbase
 			db.AddAddressToAccessList(coinbase)
 		}
+	}
+
+	if rules.IsAmsterdam {
+		db.stateReadList = gethBAL.NewStateAccessList()
 	}
 }
 

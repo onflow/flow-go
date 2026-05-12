@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	gethABI "github.com/ethereum/go-ethereum/accounts/abi"
 	gethCommon "github.com/ethereum/go-ethereum/common"
 	gethTypes "github.com/ethereum/go-ethereum/core/types"
 	gethVM "github.com/ethereum/go-ethereum/core/vm"
@@ -191,8 +192,7 @@ func TestNativeTokenBridging(t *testing.T) {
 				RunWithNewEmulator(t, backend, rootAddr, func(env *emulator.Emulator) {
 					RunWithNewBlockView(t, env, func(blk types.BlockView) {
 						// Test withdraw amounts that overflow the UInt256 range
-						amount := big.NewInt(1)
-						amount.Lsh(amount, 256)
+						amount := gethABI.MaxUint256
 
 						call := types.NewWithdrawCall(bridgeAccount, testAccount, amount, testAccountNonce)
 						res, err := blk.DirectCall(call)
@@ -207,9 +207,8 @@ func TestNativeTokenBridging(t *testing.T) {
 				})
 				RunWithNewEmulator(t, backend, rootAddr, func(env *emulator.Emulator) {
 					RunWithNewBlockView(t, env, func(blk types.BlockView) {
-						// Test withdraw amounts within the max range of UInt256
-						amount := big.NewInt(1)
-						amount.Lsh(amount, 255)
+						// Test withdraw amounts within the max range of Int256
+						amount := gethABI.MaxInt256
 
 						call := types.NewWithdrawCall(bridgeAccount, testAccount, amount, testAccountNonce)
 						res, err := blk.DirectCall(call)

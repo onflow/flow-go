@@ -9,6 +9,7 @@ import (
 	gethTypes "github.com/ethereum/go-ethereum/core/types"
 	gethParams "github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/rlp"
+	"github.com/holiman/uint256"
 )
 
 const (
@@ -94,13 +95,13 @@ func (dc *DirectCall) Message() *gethCore.Message {
 	return &gethCore.Message{
 		From:                  dc.From.ToCommon(),
 		To:                    dc.to(),
-		Value:                 dc.Value,
+		Value:                 uint256.MustFromBig(dc.Value),
 		Data:                  dc.Data,
 		Nonce:                 dc.Nonce,
 		GasLimit:              dc.GasLimit,
-		GasPrice:              big.NewInt(0),            // price is set to zero fo direct calls
-		GasTipCap:             big.NewInt(0),            // also known as maxPriorityFeePerGas (in GWei)
-		GasFeeCap:             big.NewInt(0),            // also known as maxFeePerGas (in GWei)
+		GasPrice:              uint256.NewInt(0),        // price is set to zero fo direct calls
+		GasTipCap:             uint256.NewInt(0),        // also known as maxPriorityFeePerGas (in GWei)
+		GasFeeCap:             uint256.NewInt(0),        // also known as maxFeePerGas (in GWei)
 		SetCodeAuthorizations: dc.setCodeAuthorizations, // introduced in EIP-7702 tx type
 		// TODO: maybe revisit setting the access list
 		// AccessList:        tx.AccessList(),
