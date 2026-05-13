@@ -4542,7 +4542,7 @@ func TestFlowTokenChangesInspector(t *testing.T) {
 		},
 		{
 			name:             "mint with default tracking",
-			tokenDefinitions: inspection.DefaultTokenDiffSearchTokens(chain, false),
+			tokenDefinitions: inspection.DefaultTokenDiffSearchTokens(chain),
 			txBody: func(t *testing.T, chain flow.Chain, accounts []flow.Address) *flow.TransactionBody {
 				sc := systemcontracts.SystemContractsForChain(chain.ChainID())
 				env := sc.AsTemplateEnv()
@@ -4569,7 +4569,7 @@ func TestFlowTokenChangesInspector(t *testing.T) {
 			},
 		}, {
 			name:             "create account",
-			tokenDefinitions: inspection.DefaultTokenDiffSearchTokens(chain, false),
+			tokenDefinitions: inspection.DefaultTokenDiffSearchTokens(chain),
 			txBody: func(t *testing.T, chain flow.Chain, accounts []flow.Address) *flow.TransactionBody {
 				_, txBodyBuilder := testutil.CreateAccountCreationTransaction(t, chain)
 
@@ -4588,7 +4588,7 @@ func TestFlowTokenChangesInspector(t *testing.T) {
 			},
 		}, {
 			name:             "evm transaction",
-			tokenDefinitions: inspection.DefaultTokenDiffSearchTokens(chain, false),
+			tokenDefinitions: inspection.DefaultTokenDiffSearchTokens(chain),
 			txBody: func(t *testing.T, chain flow.Chain, _ []flow.Address) *flow.TransactionBody {
 				sc := systemcontracts.SystemContractsForChain(chain.ChainID())
 
