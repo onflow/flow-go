@@ -168,15 +168,11 @@ func (dc *DirectCall) ValidEIP7825GasLimit(rules gethParams.Rules) bool {
 		return true
 	}
 
-	// If the `Osaka` hard-fork is not activated, then there's no need to
-	// check for EIP-7825 gas limit validity.
-	if !rules.IsOsaka {
-		return true
-	}
-
-	// After the `Osaka` hard-fork, direct calls have the same gas limit
+	// Under the `Osaka` hard-fork, direct calls have the same gas limit
 	// cap as native EVM transactions.
-	if dc.GasLimit > gethParams.MaxTxGas {
+	// Under the `Amsterdam`` hard-fork, the gas limit cap was removed
+	// in favor of EIP-8037.
+	if dc.GasLimit > gethParams.MaxTxGas && rules.IsOsaka && !rules.IsAmsterdam {
 		return false
 	}
 
