@@ -67,6 +67,7 @@ func NewStateDB(ledger atree.Ledger, root flow.Address) (*StateDB, error) {
 //
 // this should also return true for self destructed accounts during the transaction execution.
 func (db *StateDB) Exist(addr gethCommon.Address) bool {
+	db.recordStateAccess(addr)
 	exist, err := db.latestView().Exist(addr)
 	db.handleError(err)
 	return exist
@@ -76,6 +77,7 @@ func (db *StateDB) Exist(addr gethCommon.Address) bool {
 //
 // Empty is defined according to EIP161 (balance = nonce = code = 0).
 func (db *StateDB) Empty(addr gethCommon.Address) bool {
+	db.recordStateAccess(addr)
 	if !db.Exist(addr) {
 		return true
 	}
@@ -85,8 +87,8 @@ func (db *StateDB) Empty(addr gethCommon.Address) bool {
 }
 
 // Touch accesses the specific account without returning anything.
-func (s *StateDB) Touch(addr gethCommon.Address) {
-	// TODO(m-Peter): Investigate Geth logic on this
+func (db *StateDB) Touch(addr gethCommon.Address) {
+	db.recordStateAccess(addr)
 }
 
 // CreateAccount creates a new account for the given address
@@ -107,11 +109,13 @@ func (db *StateDB) IsCreated(addr gethCommon.Address) bool {
 // This operation sets the 'newContract'-flag, which is required in order to
 // correctly handle EIP-6780 'delete-in-same-transaction' logic.
 func (db *StateDB) CreateContract(addr gethCommon.Address) {
+	db.recordStateAccess(addr)
 	db.latestView().CreateContract(addr)
 }
 
 // IsNewContract returns true if address is a new contract
 func (db *StateDB) IsNewContract(addr gethCommon.Address) bool {
+	db.recordStateAccess(addr)
 	return db.latestView().IsNewContract(addr)
 }
 
@@ -125,6 +129,7 @@ func (db *StateDB) SelfDestruct(addr gethCommon.Address) {
 	// EIP-6780 would only follow the self destruct steps if account is a new
 	// contract either just created, or address had balance before but got a
 	// contract deployed to it (in this tx).
+	db.recordStateAccess(addr)
 	if db.IsNewContract(addr) {
 		err := db.latestView().SelfDestruct(addr)
 		db.handleError(err)
@@ -133,6 +138,7 @@ func (db *StateDB) SelfDestruct(addr gethCommon.Address) {
 
 // HasSelfDestructed returns true if address is flagged with self destruct.
 func (db *StateDB) HasSelfDestructed(addr gethCommon.Address) bool {
+	db.recordStateAccess(addr)
 	destructed, _ := db.latestView().HasSelfDestructed(addr)
 	return destructed
 }
@@ -144,6 +150,7 @@ func (db *StateDB) SubBalance(
 	amount *uint256.Int,
 	reason gethTracing.BalanceChangeReason,
 ) uint256.Int {
+	db.recordStateAccess(addr)
 	// negative amounts are not accepted.
 	if amount.Sign() < 0 {
 		db.handleError(types.ErrInvalidBalance)
@@ -165,6 +172,7 @@ func (db *StateDB) AddBalance(
 	amount *uint256.Int,
 	reason gethTracing.BalanceChangeReason,
 ) uint256.Int {
+	db.recordStateAccess(addr)
 	// negative amounts are not accepted.
 	if amount.Sign() < 0 {
 		db.handleError(types.ErrInvalidBalance)
@@ -181,6 +189,7 @@ func (db *StateDB) AddBalance(
 
 // GetBalance returns the balance of the given address
 func (db *StateDB) GetBalance(addr gethCommon.Address) *uint256.Int {
+	db.recordStateAccess(addr)
 	bal, err := db.latestView().GetBalance(addr)
 	db.handleError(err)
 	return bal
@@ -188,6 +197,7 @@ func (db *StateDB) GetBalance(addr gethCommon.Address) *uint256.Int {
 
 // GetNonce returns the nonce of the given address
 func (db *StateDB) GetNonce(addr gethCommon.Address) uint64 {
+	db.recordStateAccess(addr)
 	nonce, err := db.latestView().GetNonce(addr)
 	db.handleError(err)
 	return nonce
@@ -199,12 +209,14 @@ func (db *StateDB) SetNonce(
 	nonce uint64,
 	reason gethTracing.NonceChangeReason,
 ) {
+	db.recordStateAccess(addr)
 	err := db.latestView().SetNonce(addr, nonce)
 	db.handleError(err)
 }
 
 // GetCodeHash returns the code hash of the given address
 func (db *StateDB) GetCodeHash(addr gethCommon.Address) gethCommon.Hash {
+	db.recordStateAccess(addr)
 	hash, err := db.latestView().GetCodeHash(addr)
 	db.handleError(err)
 	return hash
@@ -212,6 +224,7 @@ func (db *StateDB) GetCodeHash(addr gethCommon.Address) gethCommon.Hash {
 
 // GetCode returns the code for the given address
 func (db *StateDB) GetCode(addr gethCommon.Address) []byte {
+	db.recordStateAccess(addr)
 	code, err := db.latestView().GetCode(addr)
 	db.handleError(err)
 	return code
@@ -219,6 +232,7 @@ func (db *StateDB) GetCode(addr gethCommon.Address) []byte {
 
 // GetCodeSize returns the size of the code for the given address
 func (db *StateDB) GetCodeSize(addr gethCommon.Address) int {
+	db.recordStateAccess(addr)
 	codeSize, err := db.latestView().GetCodeSize(addr)
 	db.handleError(err)
 	return codeSize
@@ -231,6 +245,7 @@ func (db *StateDB) SetCode(
 	code []byte,
 	reason gethTracing.CodeChangeReason,
 ) (prev []byte) {
+	db.recordStateAccess(addr)
 	prev = db.GetCode(addr)
 	err := db.latestView().SetCode(addr, code)
 	db.handleError(err)
@@ -258,6 +273,7 @@ func (db *StateDB) GetRefund() uint64 {
 // GetCommittedState returns the value for the given storage slot considering only the committed state and not
 // changes in the scope of current transaction.
 func (db *StateDB) GetCommittedState(addr gethCommon.Address, key gethCommon.Hash) gethCommon.Hash {
+	db.recordStateAccess(addr)
 	value, err := db.baseView.GetState(types.SlotAddress{Address: addr, Key: key})
 	db.handleError(err)
 	return value
@@ -268,6 +284,7 @@ func (db *StateDB) GetStateAndCommittedState(
 	addr gethCommon.Address,
 	key gethCommon.Hash,
 ) (gethCommon.Hash, gethCommon.Hash) {
+	db.recordStateAccess(addr)
 	origin := db.GetCommittedState(addr, key)
 	value := db.GetState(addr, key)
 
@@ -276,6 +293,7 @@ func (db *StateDB) GetStateAndCommittedState(
 
 // GetState returns the value for the given storage slot
 func (db *StateDB) GetState(addr gethCommon.Address, key gethCommon.Hash) gethCommon.Hash {
+	db.recordStateAccess(addr)
 	state, err := db.latestView().GetState(types.SlotAddress{Address: addr, Key: key})
 	db.handleError(err)
 	return state
@@ -296,6 +314,7 @@ func (db *StateDB) GetState(addr gethCommon.Address, key gethCommon.Hash) gethCo
 // This endpoint is added mostly to prevent the case that an smart contract is self-destructed
 // and a later transaction tries to deploy a contract to the same address.
 func (db *StateDB) GetStorageRoot(addr gethCommon.Address) gethCommon.Hash {
+	db.recordStateAccess(addr)
 	root, err := db.latestView().GetStorageRoot(addr)
 	db.handleError(err)
 	return root
@@ -308,6 +327,7 @@ func (db *StateDB) SetState(
 	key gethCommon.Hash,
 	value gethCommon.Hash,
 ) gethCommon.Hash {
+	db.recordStateAccess(addr)
 	prevState, err := db.latestView().SetState(types.SlotAddress{Address: addr, Key: key}, value)
 	db.handleError(err)
 
@@ -692,6 +712,11 @@ func (s *StateDB) Witness() *gethStateless.Witness {
 // See: https://eips.ethereum.org/EIPS/eip-4762#access-events
 func (s *StateDB) AccessEvents() *gethState.AccessEvents {
 	return nil
+}
+
+// recordStateAccess records state access regardless of whether the account exists.
+func (db *StateDB) recordStateAccess(addr gethCommon.Address) {
+	db.stateReadList.AddAccount(addr)
 }
 
 func (db *StateDB) latestView() *DeltaView {
