@@ -3,6 +3,7 @@ package checkpoint_trie_stats
 import (
 	"errors"
 	"fmt"
+	"path/filepath"
 
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -16,6 +17,7 @@ import (
 var (
 	flagCheckpoint string
 	flagTrieIndex  int
+	flagFast       bool
 )
 
 var Cmd = &cobra.Command{
@@ -30,10 +32,15 @@ func init() {
 		"checkpoint file to read")
 	_ = Cmd.MarkFlagRequired("checkpoint")
 	Cmd.Flags().IntVar(&flagTrieIndex, "trie-index", 0, "trie index to read, 0 being the first trie, -1 is the last trie")
+	Cmd.Flags().BoolVar(&flagFast, "fast", false, "fast mode: iterate nodes without loading full trie (requires checkpoint with exactly 1 trie)")
 
 }
 
 func run(*cobra.Command, []string) {
+	if flagFast {
+		runFast()
+		return
+	}
 
 	log.Info().Msgf("loading checkpoint %v, reading %v-th trie", flagCheckpoint, flagTrieIndex)
 	res, err := scanCheckpoint(flagCheckpoint, flagTrieIndex, log.Logger)
@@ -46,6 +53,25 @@ func run(*cobra.Command, []string) {
 		Int("LeafNodeCount", res.leafNodeCount).
 		Int("TotalPayloadSize", res.totalPayloadSize).
 		Msgf("successfully scanned checkpoint %v", flagCheckpoint)
+}
+
+func runFast() {
+	dir := filepath.Dir(flagCheckpoint)
+	fileName := filepath.Base(flagCheckpoint)
+
+	log.Info().Msgf("fast mode: scanning checkpoint %v without loading full trie", flagCheckpoint)
+
+	stats, err := wal.ReadCheckpointStats(dir, fileName, log.Logger)
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to read checkpoint stats")
+	}
+
+	log.Info().
+		Str("TrieRootHash", stats.RootHash.String()).
+		Uint64("InterimNodeCount", stats.InterimNodeCount).
+		Uint64("LeafNodeCount", stats.LeafNodeCount).
+		Uint64("TotalPayloadSize", stats.TotalPayloadSize).
+		Msgf("successfully scanned checkpoint %v (fast mode)", flagCheckpoint)
 }
 
 type result struct {
