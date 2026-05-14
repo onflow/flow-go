@@ -620,8 +620,8 @@ func (db *StateDB) LogsForBurnAccounts() []*gethTypes.Log {
 
 	var list []removedAccountWithBalance
 	for _, addr := range sortedAddresses {
-		balance := db.GetBalance(addr)
-		if db.HasSelfDestructed(addr) && !balance.IsZero() {
+		hasSelfDestructed, balance := db.latestView().HasSelfDestructed(addr)
+		if hasSelfDestructed && !balance.IsZero() {
 			list = append(list, removedAccountWithBalance{
 				address: addr,
 				balance: balance,
@@ -716,6 +716,10 @@ func (s *StateDB) AccessEvents() *gethState.AccessEvents {
 
 // recordStateAccess records state access regardless of whether the account exists.
 func (db *StateDB) recordStateAccess(addr gethCommon.Address) {
+	// Amsterdam hard-fork not activated
+	if db.stateReadList == nil {
+		return
+	}
 	db.stateReadList.AddAccount(addr)
 }
 

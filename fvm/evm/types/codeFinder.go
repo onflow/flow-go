@@ -28,6 +28,8 @@ func ValidationErrorCode(err error) ErrorCode {
 		return ValidationErrCodeGasLimitReached
 	case gethCore.ErrInsufficientFundsForTransfer:
 		return ValidationErrCodeInsufficientFundsForTransfer
+	case gethVM.ErrMaxInitCodeSizeExceeded:
+		return ValidationErrCodeMaxInitCodeSizeExceeded
 	case gethCore.ErrInsufficientFunds:
 		return ValidationErrCodeInsufficientFunds
 	case gethCore.ErrIntrinsicGas:
@@ -101,6 +103,8 @@ func ErrorFromCode(errorCode ErrorCode) error {
 		return gethCore.ErrGasLimitReached
 	case ValidationErrCodeInsufficientFundsForTransfer:
 		return gethCore.ErrInsufficientFundsForTransfer
+	case ValidationErrCodeMaxInitCodeSizeExceeded:
+		return gethVM.ErrMaxInitCodeSizeExceeded
 	case ValidationErrCodeInsufficientFunds:
 		return gethCore.ErrInsufficientFunds
 	case ValidationErrCodeIntrinsicGas:
