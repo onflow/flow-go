@@ -2,14 +2,19 @@ package trie
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"sync"
 
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/bitutils"
+	"github.com/onflow/flow-go/ledger/common/hash"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/node"
 )
+
+// ErrPayloadlessTrieRead is returned when attempting to read payload values from a payloadless trie.
+var ErrPayloadlessTrieRead = errors.New("read operation not supported for payloadless trie")
 
 // MTrie represents a perfect in-memory full binary Merkle tree with uniform height.
 // For a detailed description of the storage model, please consult `mtrie/README.md`
@@ -33,14 +38,20 @@ import (
 //     between v and a tree leaf. The height of a tree is the height of its root.
 //     The height of a Trie is always the height of the fully-expanded tree.
 type MTrie struct {
-	root     *node.Node
-	regCount uint64 // number of registers allocated in the trie
-	regSize  uint64 // size of registers allocated in the trie
+	root          *node.Node
+	regCount      uint64 // number of registers allocated in the trie
+	regSize       uint64 // size of registers allocated in the trie
+	isPayloadless bool   // if true, leaf nodes store payload hashes instead of full payloads
 }
 
 // NewEmptyMTrie returns an empty Mtrie (root is nil)
 func NewEmptyMTrie() *MTrie {
-	return &MTrie{root: nil}
+	return &MTrie{root: nil, isPayloadless: false}
+}
+
+// NewEmptyMTrieWithPayloadless returns an empty Mtrie with the specified payloadless mode.
+func NewEmptyMTrieWithPayloadless(isPayloadless bool) *MTrie {
+	return &MTrie{root: nil, isPayloadless: isPayloadless}
 }
 
 // IsEmpty checks if a trie is empty.
@@ -50,15 +61,27 @@ func (mt *MTrie) IsEmpty() bool {
 	return mt.root == nil
 }
 
+// IsPayloadless returns true if the trie stores payload hashes instead of full payloads.
+func (mt *MTrie) IsPayloadless() bool {
+	return mt.isPayloadless
+}
+
 // NewMTrie returns a Mtrie given the root
 func NewMTrie(root *node.Node, regCount uint64, regSize uint64) (*MTrie, error) {
+	return NewMTrieWithPayloadless(root, regCount, regSize, false)
+}
+
+// NewMTrieWithPayloadless returns a Mtrie given the root and payloadless mode.
+// When isPayloadless is true, the trie stores payload hashes instead of full payloads.
+func NewMTrieWithPayloadless(root *node.Node, regCount uint64, regSize uint64, isPayloadless bool) (*MTrie, error) {
 	if root != nil && root.Height() != ledger.NodeMaxHeight {
 		return nil, fmt.Errorf("height of root node must be %d but is %d, hash: %s", ledger.NodeMaxHeight, root.Height(), root.Hash().String())
 	}
 	return &MTrie{
-		root:     root,
-		regCount: regCount,
-		regSize:  regSize,
+		root:          root,
+		regCount:      regCount,
+		regSize:       regSize,
+		isPayloadless: isPayloadless,
 	}, nil
 }
 
@@ -109,11 +132,17 @@ func (mt *MTrie) String() string {
 //     the size operation completes, the order of `path` and `sizes` are such that
 //     for `path[i]` the corresponding register value size is referenced by `sizes[i]`.
 //
+// Expected errors during normal operation:
+//   - ErrPayloadlessTrieRead if the trie is in payloadless mode
+//
 // TODO move consistency checks from Forest into Trie to obtain a safe, self-contained API
-func (mt *MTrie) UnsafeValueSizes(paths []ledger.Path) []int {
+func (mt *MTrie) UnsafeValueSizes(paths []ledger.Path) ([]int, error) {
+	if mt.isPayloadless {
+		return nil, fmt.Errorf("UnsafeValueSizes: %w", ErrPayloadlessTrieRead)
+	}
 	sizes := make([]int, len(paths)) // pre-allocate slice for the result
 	valueSizes(sizes, paths, mt.root)
-	return sizes
+	return sizes, nil
 }
 
 // valueSizes returns value sizes of all the registers in `paths“ in subtree with `head` as root node.
@@ -197,8 +226,14 @@ func valueSizes(sizes []int, paths []ledger.Path, head *node.Node) {
 }
 
 // ReadSinglePayload reads and returns a payload for a single path.
-func (mt *MTrie) ReadSinglePayload(path ledger.Path) *ledger.Payload {
-	return readSinglePayload(path, mt.root)
+//
+// Expected errors during normal operation:
+//   - ErrPayloadlessTrieRead if the trie is in payloadless mode
+func (mt *MTrie) ReadSinglePayload(path ledger.Path) (*ledger.Payload, error) {
+	if mt.isPayloadless {
+		return nil, fmt.Errorf("ReadSinglePayload: %w", ErrPayloadlessTrieRead)
+	}
+	return readSinglePayload(path, mt.root), nil
 }
 
 // readSinglePayload reads and returns a payload for a single path in subtree with `head` as root node.
@@ -238,11 +273,17 @@ func readSinglePayload(path ledger.Path, head *node.Node) *ledger.Payload {
 //     the read operation completes, the order of `path` and `payloads` are such that
 //     for `path[i]` the corresponding register value is referenced by 0`payloads[i]`.
 //
+// Expected errors during normal operation:
+//   - ErrPayloadlessTrieRead if the trie is in payloadless mode
+//
 // TODO move consistency checks from Forest into Trie to obtain a safe, self-contained API
-func (mt *MTrie) UnsafeRead(paths []ledger.Path) []*ledger.Payload {
+func (mt *MTrie) UnsafeRead(paths []ledger.Path) ([]*ledger.Payload, error) {
+	if mt.isPayloadless {
+		return nil, fmt.Errorf("UnsafeRead: %w", ErrPayloadlessTrieRead)
+	}
 	payloads := make([]*ledger.Payload, len(paths)) // pre-allocate slice for the result
 	read(payloads, paths, mt.root)
-	return payloads
+	return payloads, nil
 }
 
 // read reads all the registers in subtree with `head` as root node. For each
@@ -331,6 +372,27 @@ func NewTrieWithUpdatedRegisters(
 	updatedPayloads []ledger.Payload,
 	prune bool,
 ) (*MTrie, uint16, error) {
+	return NewTrieWithUpdatedRegistersAndPayloadless(
+		parentTrie,
+		updatedPaths,
+		updatedPayloads,
+		prune,
+		parentTrie.isPayloadless,
+	)
+}
+
+// NewTrieWithUpdatedRegistersAndPayloadless constructs a new trie containing all registers from the parent trie,
+// with explicit control over payloadless mode. When isPayloadless is true, leaf nodes store payload hashes
+// instead of full payloads.
+//
+// See NewTrieWithUpdatedRegisters for full documentation.
+func NewTrieWithUpdatedRegistersAndPayloadless(
+	parentTrie *MTrie,
+	updatedPaths []ledger.Path,
+	updatedPayloads []ledger.Payload,
+	prune bool,
+	isPayloadless bool,
+) (*MTrie, uint16, error) {
 	updatedRoot, regCountDelta, regSizeDelta, lowestHeightTouched := update(
 		ledger.NodeMaxHeight,
 		parentTrie.root,
@@ -338,13 +400,14 @@ func NewTrieWithUpdatedRegisters(
 		updatedPayloads,
 		nil,
 		prune,
+		isPayloadless,
 	)
 
 	updatedTrieRegCount := int64(parentTrie.AllocatedRegCount()) + regCountDelta
 	updatedTrieRegSize := int64(parentTrie.AllocatedRegSize()) + regSizeDelta
 	maxDepthTouched := uint16(ledger.NodeMaxHeight - lowestHeightTouched)
 
-	updatedTrie, err := NewMTrie(updatedRoot, uint64(updatedTrieRegCount), uint64(updatedTrieRegSize))
+	updatedTrie, err := NewMTrieWithPayloadless(updatedRoot, uint64(updatedTrieRegCount), uint64(updatedTrieRegSize), isPayloadless)
 	if err != nil {
 		return nil, 0, fmt.Errorf("constructing updated trie failed: %w", err)
 	}
@@ -387,6 +450,7 @@ func update(
 	payloads []ledger.Payload, // the payloads to be updated at the given paths
 	compactLeaf *node.Node, // a compact leaf node from its ancester, it could be nil
 	prune bool, // prune is a flag for whether pruning nodes with empty payload. not pruning is useful for generating proof, expecially non-inclusion proof
+	isPayloadless bool, // if true, store payload hash instead of full payload in leaf nodes
 ) (n *node.Node, allocatedRegCountDelta int64, allocatedRegSizeDelta int64, lowestHeightTouched int) {
 	// No new path to update
 	if len(paths) == 0 {
@@ -406,14 +470,23 @@ func update(
 	if len(paths) == 1 && currentNode == nil && compactLeaf == nil {
 		// if there is only 1 path to update, and the existing tree has no node on this path, also
 		// no compact leaf node from its ancester, it means we are storing a payload on a new path,
-		n = node.NewLeaf(paths[0], payloads[0].DeepCopy(), nodeHeight)
+		var leafPayload *ledger.Payload
+		var regSize int64
+		if isPayloadless {
+			leafPayload = createPayloadlessPayload(&payloads[0], paths[0], nodeHeight)
+			regSize = int64(hash.HashLen) // 32 bytes for the hash
+		} else {
+			leafPayload = payloads[0].DeepCopy()
+			regSize = int64(payloads[0].Size())
+		}
+		n = node.NewLeaf(paths[0], leafPayload, nodeHeight)
 		if payloads[0].IsEmpty() {
 			// if we are storing an empty node, then no register is allocated
 			// allocatedRegCountDelta and allocatedRegSizeDelta should both be 0
 			return n, 0, 0, nodeHeight
 		}
 		// if we are storing a non-empty node, we are allocating a new register
-		return n, 1, int64(payloads[0].Size()), nodeHeight
+		return n, 1, regSize, nodeHeight
 	}
 
 	if currentNode != nil && currentNode.IsLeaf() { // if we're here then compactLeaf == nil
@@ -427,10 +500,16 @@ func update(
 					// check if the only path to update has the same payload.
 					// if payload is the same, we could skip the update to avoid creating duplicated node
 					if !currentNode.Payload().ValueEquals(&payloads[i]) {
-						n = node.NewLeaf(paths[i], payloads[i].DeepCopy(), nodeHeight)
+						var leafPayload *ledger.Payload
+						if isPayloadless {
+							leafPayload = createPayloadlessPayload(&payloads[i], paths[i], nodeHeight)
+						} else {
+							leafPayload = payloads[i].DeepCopy()
+						}
+						n = node.NewLeaf(paths[i], leafPayload, nodeHeight)
 
 						allocatedRegCountDelta, allocatedRegSizeDelta =
-							computeAllocatedRegDeltas(currentNode.Payload(), &payloads[i])
+							computeAllocatedRegDeltas(currentNode.Payload(), &payloads[i], isPayloadless)
 
 						return n, allocatedRegCountDelta, allocatedRegSizeDelta, nodeHeight
 					}
@@ -441,7 +520,7 @@ func update(
 				found = true
 
 				allocatedRegCountDelta, allocatedRegSizeDelta =
-					computeAllocatedRegDeltasFromHigherHeight(currentNode.Payload())
+					computeAllocatedRegDeltasFromHigherHeight(currentNode.Payload(), isPayloadless)
 
 				break
 			}
@@ -493,8 +572,8 @@ func update(
 	parallelRecursionThreshold := 16
 	if len(lpaths) < parallelRecursionThreshold || len(rpaths) < parallelRecursionThreshold {
 		// runtime optimization: if there are _no_ updates for either left or right sub-tree, proceed single-threaded
-		newLeftChild, lRegCountDelta, lRegSizeDelta, lLowestHeightTouched = update(nodeHeight-1, oldLeftChild, lpaths, lpayloads, lcompactLeaf, prune)
-		newRightChild, rRegCountDelta, rRegSizeDelta, rLowestHeightTouched = update(nodeHeight-1, oldRightChild, rpaths, rpayloads, rcompactLeaf, prune)
+		newLeftChild, lRegCountDelta, lRegSizeDelta, lLowestHeightTouched = update(nodeHeight-1, oldLeftChild, lpaths, lpayloads, lcompactLeaf, prune, isPayloadless)
+		newRightChild, rRegCountDelta, rRegSizeDelta, rLowestHeightTouched = update(nodeHeight-1, oldRightChild, rpaths, rpayloads, rcompactLeaf, prune, isPayloadless)
 	} else {
 		// runtime optimization: process the left child in a separate thread
 
@@ -505,11 +584,11 @@ func update(
 		// channel is faster and uses fewer allocs/op in this case.
 		results := make(chan updateResult, 1)
 		go func(retChan chan<- updateResult) {
-			child, regCountDelta, regSizeDelta, lowestHeightTouched := update(nodeHeight-1, oldLeftChild, lpaths, lpayloads, lcompactLeaf, prune)
+			child, regCountDelta, regSizeDelta, lowestHeightTouched := update(nodeHeight-1, oldLeftChild, lpaths, lpayloads, lcompactLeaf, prune, isPayloadless)
 			retChan <- updateResult{child, regCountDelta, regSizeDelta, lowestHeightTouched}
 		}(results)
 
-		newRightChild, rRegCountDelta, rRegSizeDelta, rLowestHeightTouched = update(nodeHeight-1, oldRightChild, rpaths, rpayloads, rcompactLeaf, prune)
+		newRightChild, rRegCountDelta, rRegSizeDelta, rLowestHeightTouched = update(nodeHeight-1, oldRightChild, rpaths, rpayloads, rcompactLeaf, prune, isPayloadless)
 
 		// Wait for results from goroutine.
 		ret := <-results
@@ -541,23 +620,43 @@ func update(
 	return n, allocatedRegCountDelta, allocatedRegSizeDelta, lowestHeightTouched
 }
 
+// createPayloadlessPayload creates a payload for payloadless mode where the value
+// is the payload hash (32 bytes) instead of the actual payload value.
+// The hash is computed as ComputeCompactValue(Hash(path), value, nodeHeight).
+func createPayloadlessPayload(originalPayload *ledger.Payload, path ledger.Path, nodeHeight int) *ledger.Payload {
+	// Compute the hash from the original payload value
+	computedHash := ledger.ComputeCompactValue(hash.Hash(path), originalPayload.Value(), nodeHeight)
+
+	// Create a new payload with the hash bytes as the value
+	// We preserve the key so the register can be identified
+	key, err := originalPayload.Key()
+	if err != nil {
+		key = ledger.Key{}
+	}
+	return ledger.NewPayload(key, computedHash[:])
+}
+
 // computeAllocatedRegDeltasFromHigherHeight returns the deltas
 // needed to compute the allocated reg count and reg size when
 // a payload is updated or unallocated at a lower height.
-func computeAllocatedRegDeltasFromHigherHeight(oldPayload *ledger.Payload) (allocatedRegCountDelta, allocatedRegSizeDelta int64) {
+func computeAllocatedRegDeltasFromHigherHeight(oldPayload *ledger.Payload, isPayloadless bool) (allocatedRegCountDelta, allocatedRegSizeDelta int64) {
 	if !oldPayload.IsEmpty() {
 		// Allocated register will be updated or unallocated at lower height.
 		allocatedRegCountDelta--
 	}
-	oldPayloadSize := oldPayload.Size()
-	allocatedRegSizeDelta -= int64(oldPayloadSize)
+	if isPayloadless {
+		allocatedRegSizeDelta -= int64(hash.HashLen) // 32 bytes for the hash
+	} else {
+		oldPayloadSize := oldPayload.Size()
+		allocatedRegSizeDelta -= int64(oldPayloadSize)
+	}
 	return
 }
 
 // computeAllocatedRegDeltas returns the allocated reg count
 // and reg size deltas computed from old payload and new payload.
 // PRECONDITION: !oldPayload.Equals(newPayload)
-func computeAllocatedRegDeltas(oldPayload, newPayload *ledger.Payload) (allocatedRegCountDelta, allocatedRegSizeDelta int64) {
+func computeAllocatedRegDeltas(oldPayload, newPayload *ledger.Payload, isPayloadless bool) (allocatedRegCountDelta, allocatedRegSizeDelta int64) {
 	allocatedRegCountDelta = 0
 	if newPayload.IsEmpty() {
 		// Old payload is not empty while new payload is empty.
@@ -569,9 +668,22 @@ func computeAllocatedRegDeltas(oldPayload, newPayload *ledger.Payload) (allocate
 		allocatedRegCountDelta = 1
 	}
 
-	oldPayloadSize := oldPayload.Size()
-	newPayloadSize := newPayload.Size()
-	allocatedRegSizeDelta = int64(newPayloadSize - oldPayloadSize)
+	if isPayloadless {
+		// In payloadless mode, the size is always the hash size (32 bytes)
+		// If both old and new are non-empty, delta is 0
+		// If old is empty and new is not, delta is +32
+		// If new is empty and old is not, delta is -32
+		if newPayload.IsEmpty() && !oldPayload.IsEmpty() {
+			allocatedRegSizeDelta = -int64(hash.HashLen)
+		} else if !newPayload.IsEmpty() && oldPayload.IsEmpty() {
+			allocatedRegSizeDelta = int64(hash.HashLen)
+		}
+		// else: both empty or both non-empty, delta is 0
+	} else {
+		oldPayloadSize := oldPayload.Size()
+		newPayloadSize := newPayload.Size()
+		allocatedRegSizeDelta = int64(newPayloadSize - oldPayloadSize)
+	}
 	return
 }
 

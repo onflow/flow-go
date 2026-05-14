@@ -1,6 +1,7 @@
 package complete
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"sync"
@@ -17,6 +18,9 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 )
+
+// ErrPayloadlessLedgerRead is returned when attempting to read values from a payloadless ledger.
+var ErrPayloadlessLedgerRead = errors.New("read operation not supported for payloadless ledger")
 
 const (
 	DefaultCacheSize          = 1000
@@ -43,6 +47,7 @@ type Ledger struct {
 	trieUpdateCh      chan *WALTrieUpdate
 	closeTrieUpdateCh sync.Once
 	pathFinderVersion uint8
+	isPayloadless     bool // if true, trie stores payload hashes instead of full payloads
 }
 
 // NewLedger creates a new in-memory trie-backed ledger storage with persistence.
@@ -52,10 +57,23 @@ func NewLedger(
 	metrics module.LedgerMetrics,
 	log zerolog.Logger,
 	pathFinderVer uint8) (*Ledger, error) {
+	return NewLedgerWithPayloadless(wal, capacity, metrics, log, pathFinderVer, false)
+}
+
+// NewLedgerWithPayloadless creates a new in-memory trie-backed ledger storage with persistence
+// and explicit payloadless mode. When isPayloadless is true, the ledger stores payload hashes
+// instead of full payloads, significantly reducing memory usage.
+func NewLedgerWithPayloadless(
+	wal realWAL.LedgerWAL,
+	capacity int,
+	metrics module.LedgerMetrics,
+	log zerolog.Logger,
+	pathFinderVer uint8,
+	isPayloadless bool) (*Ledger, error) {
 
 	logger := log.With().Str("ledger_mod", "complete").Logger()
 
-	forest, err := mtrie.NewForest(capacity, metrics, nil)
+	forest, err := mtrie.NewForestWithPayloadless(capacity, metrics, nil, isPayloadless)
 	if err != nil {
 		return nil, fmt.Errorf("cannot create forest: %w", err)
 	}
@@ -67,6 +85,7 @@ func NewLedger(
 		logger:            logger,
 		pathFinderVersion: pathFinderVer,
 		trieUpdateCh:      make(chan *WALTrieUpdate, defaultTrieUpdateChanSize),
+		isPayloadless:     isPayloadless,
 	}
 
 	// pause records to prevent double logging trie removals
@@ -84,6 +103,11 @@ func NewLedger(
 	metrics.ForestApproxMemorySize(0)
 
 	return storage, nil
+}
+
+// IsPayloadless returns true if the ledger stores payload hashes instead of full payloads.
+func (l *Ledger) IsPayloadless() bool {
+	return l.isPayloadless
 }
 
 // TrieUpdateChan returns a channel which is used to receive trie updates that needs to be logged in WALs.
@@ -126,7 +150,14 @@ func (l *Ledger) InitialState() ledger.State {
 
 // ValueSizes read the values of the given keys at the given state.
 // It returns value sizes in the same order as given registerIDs and errors (if any)
+//
+// Expected errors during normal operation:
+//   - ErrPayloadlessLedgerRead if the ledger is in payloadless mode
 func (l *Ledger) ValueSizes(query *ledger.Query) (valueSizes []int, err error) {
+	if l.isPayloadless {
+		return nil, fmt.Errorf("ValueSizes: %w", ErrPayloadlessLedgerRead)
+	}
+
 	start := time.Now()
 	paths, err := pathfinder.KeysToPaths(query.Keys(), l.pathFinderVersion)
 	if err != nil {
@@ -151,7 +182,14 @@ func (l *Ledger) ValueSizes(query *ledger.Query) (valueSizes []int, err error) {
 }
 
 // GetSingleValue reads value of a single given key at the given state.
+//
+// Expected errors during normal operation:
+//   - ErrPayloadlessLedgerRead if the ledger is in payloadless mode
 func (l *Ledger) GetSingleValue(query *ledger.QuerySingleValue) (value ledger.Value, err error) {
+	if l.isPayloadless {
+		return nil, fmt.Errorf("GetSingleValue: %w", ErrPayloadlessLedgerRead)
+	}
+
 	start := time.Now()
 	path, err := pathfinder.KeyToPath(query.Key(), l.pathFinderVersion)
 	if err != nil {
@@ -175,7 +213,14 @@ func (l *Ledger) GetSingleValue(query *ledger.QuerySingleValue) (value ledger.Va
 
 // Get read the values of the given keys at the given state
 // it returns the values in the same order as given registerIDs and errors (if any)
+//
+// Expected errors during normal operation:
+//   - ErrPayloadlessLedgerRead if the ledger is in payloadless mode
 func (l *Ledger) Get(query *ledger.Query) (values []ledger.Value, err error) {
+	if l.isPayloadless {
+		return nil, fmt.Errorf("Get: %w", ErrPayloadlessLedgerRead)
+	}
+
 	start := time.Now()
 	paths, err := pathfinder.KeysToPaths(query.Keys(), l.pathFinderVersion)
 	if err != nil {

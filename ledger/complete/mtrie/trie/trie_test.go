@@ -14,8 +14,10 @@ import (
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/bitutils"
 	"github.com/onflow/flow-go/ledger/common/hash"
+	prf "github.com/onflow/flow-go/ledger/common/proof"
 	"github.com/onflow/flow-go/ledger/common/testutils"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
+	"github.com/onflow/flow-go/ledger/partial/ptrie"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -707,13 +709,15 @@ func Test_Pruning(t *testing.T) {
 				queryPaths = append(queryPaths, path)
 			}
 
-			payloads := activeTrie.UnsafeRead(queryPaths)
+			payloads, err := activeTrie.UnsafeRead(queryPaths)
+			require.NoError(t, err)
 			for i, pp := range payloads {
 				expectedPayload := allPaths[queryPaths[i]]
 				require.True(t, pp.Equals(&expectedPayload))
 			}
 
-			payloads = activeTrieWithPruning.UnsafeRead(queryPaths)
+			payloads, err = activeTrieWithPruning.UnsafeRead(queryPaths)
+			require.NoError(t, err)
 			for i, pp := range payloads {
 				expectedPayload := allPaths[queryPaths[i]]
 				require.True(t, pp.Equals(&expectedPayload))
@@ -736,7 +740,8 @@ func TestValueSizes(t *testing.T) {
 	t.Run("empty trie", func(t *testing.T) {
 		path := testutils.PathByUint16LeftPadded(0)
 		pathsToGetValueSize := []ledger.Path{path}
-		sizes := emptyTrie.UnsafeValueSizes(pathsToGetValueSize)
+		sizes, err := emptyTrie.UnsafeValueSizes(pathsToGetValueSize)
+		require.NoError(t, err)
 		require.Equal(t, len(pathsToGetValueSize), len(sizes))
 		require.Equal(t, 0, sizes[0])
 	})
@@ -758,7 +763,8 @@ func TestValueSizes(t *testing.T) {
 
 		pathsToGetValueSize := []ledger.Path{path1, path2}
 
-		sizes := newTrie.UnsafeValueSizes(pathsToGetValueSize)
+		sizes, err := newTrie.UnsafeValueSizes(pathsToGetValueSize)
+		require.NoError(t, err)
 		require.Equal(t, len(pathsToGetValueSize), len(sizes))
 		require.Equal(t, payload1.Value().Size(), sizes[0])
 		require.Equal(t, 0, sizes[1])
@@ -800,7 +806,8 @@ func TestValueSizes(t *testing.T) {
 		}
 
 		// Test value sizes for a mix of existent and non-existent paths.
-		sizes := newTrie.UnsafeValueSizes(pathsToGetValueSize)
+		sizes, err := newTrie.UnsafeValueSizes(pathsToGetValueSize)
+		require.NoError(t, err)
 		require.Equal(t, len(pathsToGetValueSize), len(sizes))
 		for i, p := range pathsToGetValueSize {
 			switch p {
@@ -816,13 +823,15 @@ func TestValueSizes(t *testing.T) {
 
 		// Test value size for a single existent path
 		pathsToGetValueSize = []ledger.Path{path1}
-		sizes = newTrie.UnsafeValueSizes(pathsToGetValueSize)
+		sizes, err = newTrie.UnsafeValueSizes(pathsToGetValueSize)
+		require.NoError(t, err)
 		require.Equal(t, len(pathsToGetValueSize), len(sizes))
 		require.Equal(t, payload1.Value().Size(), sizes[0])
 
 		// Test value size for a single non-existent path
 		pathsToGetValueSize = []ledger.Path{testutils.PathByUint16(3 << 12)}
-		sizes = newTrie.UnsafeValueSizes(pathsToGetValueSize)
+		sizes, err = newTrie.UnsafeValueSizes(pathsToGetValueSize)
+		require.NoError(t, err)
 		require.Equal(t, len(pathsToGetValueSize), len(sizes))
 		require.Equal(t, 0, sizes[0])
 	})
@@ -851,7 +860,8 @@ func TestValueSizesWithDuplicatePaths(t *testing.T) {
 		path1, path2, path3,
 	}
 
-	sizes := newTrie.UnsafeValueSizes(pathsToGetValueSize)
+	sizes, err := newTrie.UnsafeValueSizes(pathsToGetValueSize)
+	require.NoError(t, err)
 	require.Equal(t, len(pathsToGetValueSize), len(sizes))
 	for i, p := range pathsToGetValueSize {
 		switch p {
@@ -1115,7 +1125,8 @@ func TestReadSinglePayload(t *testing.T) {
 		savedRootHash := emptyTrie.RootHash()
 
 		path := testutils.PathByUint16LeftPadded(0)
-		payload := emptyTrie.ReadSinglePayload(path)
+		payload, err := emptyTrie.ReadSinglePayload(path)
+		require.NoError(t, err)
 		require.True(t, payload.IsEmpty())
 		require.Equal(t, savedRootHash, emptyTrie.RootHash())
 	})
@@ -1136,13 +1147,15 @@ func TestReadSinglePayload(t *testing.T) {
 		savedRootHash := newTrie.RootHash()
 
 		// Get payload for existent path path
-		retPayload := newTrie.ReadSinglePayload(path1)
+		retPayload, err := newTrie.ReadSinglePayload(path1)
+		require.NoError(t, err)
 		require.Equal(t, payload1, retPayload)
 		require.Equal(t, savedRootHash, newTrie.RootHash())
 
 		// Get payload for non-existent path
 		path2 := testutils.PathByUint16LeftPadded(1)
-		retPayload = newTrie.ReadSinglePayload(path2)
+		retPayload, err = newTrie.ReadSinglePayload(path2)
+		require.NoError(t, err)
 		require.True(t, retPayload.IsEmpty())
 		require.Equal(t, savedRootHash, newTrie.RootHash())
 	})
@@ -1184,7 +1197,8 @@ func TestReadSinglePayload(t *testing.T) {
 		for i := 0; i < 16; i++ {
 			path := testutils.PathByUint16(uint16(i << 12))
 
-			retPayload := newTrie.ReadSinglePayload(path)
+			retPayload, err := newTrie.ReadSinglePayload(path)
+			require.NoError(t, err)
 			require.Equal(t, savedRootHash, newTrie.RootHash())
 			switch path {
 			case path1:
@@ -1196,4 +1210,550 @@ func TestReadSinglePayload(t *testing.T) {
 			}
 		}
 	})
+}
+
+// TestPayloadlessTrieCreation tests creating payloadless tries.
+func TestPayloadlessTrieCreation(t *testing.T) {
+	t.Run("empty payloadless trie", func(t *testing.T) {
+		emptyTrie := trie.NewEmptyMTrieWithPayloadless(true)
+		require.True(t, emptyTrie.IsPayloadless())
+		require.True(t, emptyTrie.IsEmpty())
+		require.Equal(t, trie.EmptyTrieRootHash(), emptyTrie.RootHash())
+
+		// Regular empty trie should not be payloadless
+		regularTrie := trie.NewEmptyMTrie()
+		require.False(t, regularTrie.IsPayloadless())
+	})
+
+	t.Run("payloadless trie with root", func(t *testing.T) {
+		path := testutils.PathByUint16LeftPadded(0)
+		payload := testutils.LightPayload(11, 12345)
+
+		// Create a regular trie first
+		regularTrie, _, err := trie.NewTrieWithUpdatedRegisters(
+			trie.NewEmptyMTrie(),
+			[]ledger.Path{path},
+			[]ledger.Payload{*payload},
+			true,
+		)
+		require.NoError(t, err)
+
+		// Create payloadless trie with same path and payload
+		payloadlessTrie, _, err := trie.NewTrieWithUpdatedRegistersAndPayloadless(
+			trie.NewEmptyMTrieWithPayloadless(true),
+			[]ledger.Path{path},
+			[]ledger.Payload{*payload},
+			true,
+			true,
+		)
+		require.NoError(t, err)
+
+		// Payloadless trie should have different root hash
+		require.NotEqual(t, regularTrie.RootHash(), payloadlessTrie.RootHash())
+		require.True(t, payloadlessTrie.IsPayloadless())
+		require.False(t, regularTrie.IsPayloadless())
+
+		// Both should have same register count
+		require.Equal(t, regularTrie.AllocatedRegCount(), payloadlessTrie.AllocatedRegCount())
+
+		// Payloadless trie should have smaller register size (32 bytes hash vs actual payload)
+		require.Equal(t, uint64(hash.HashLen), payloadlessTrie.AllocatedRegSize())
+		require.Equal(t, uint64(payload.Size()), regularTrie.AllocatedRegSize())
+	})
+}
+
+// TestPayloadlessTrieReadOperations tests that read operations return errors in payloadless mode.
+func TestPayloadlessTrieReadOperations(t *testing.T) {
+	// Create a payloadless trie with some data
+	path := testutils.PathByUint16LeftPadded(0)
+	payload := testutils.LightPayload(11, 12345)
+
+	payloadlessTrie, _, err := trie.NewTrieWithUpdatedRegistersAndPayloadless(
+		trie.NewEmptyMTrieWithPayloadless(true),
+		[]ledger.Path{path},
+		[]ledger.Payload{*payload},
+		true,
+		true,
+	)
+	require.NoError(t, err)
+
+	t.Run("UnsafeValueSizes returns error", func(t *testing.T) {
+		_, err := payloadlessTrie.UnsafeValueSizes([]ledger.Path{path})
+		require.Error(t, err)
+		require.ErrorIs(t, err, trie.ErrPayloadlessTrieRead)
+	})
+
+	t.Run("ReadSinglePayload returns error", func(t *testing.T) {
+		_, err := payloadlessTrie.ReadSinglePayload(path)
+		require.Error(t, err)
+		require.ErrorIs(t, err, trie.ErrPayloadlessTrieRead)
+	})
+
+	t.Run("UnsafeRead returns error", func(t *testing.T) {
+		_, err := payloadlessTrie.UnsafeRead([]ledger.Path{path})
+		require.Error(t, err)
+		require.ErrorIs(t, err, trie.ErrPayloadlessTrieRead)
+	})
+}
+
+// TestPayloadlessTrieStoredValue tests that payloadless tries store the correct hash value.
+func TestPayloadlessTrieStoredValue(t *testing.T) {
+	path := testutils.PathByUint16LeftPadded(0)
+	payload := testutils.LightPayload(11, 12345)
+
+	payloadlessTrie, _, err := trie.NewTrieWithUpdatedRegistersAndPayloadless(
+		trie.NewEmptyMTrieWithPayloadless(true),
+		[]ledger.Path{path},
+		[]ledger.Payload{*payload},
+		true,
+		true,
+	)
+	require.NoError(t, err)
+
+	// Get all payloads from the trie
+	storedPayloads := payloadlessTrie.AllPayloads()
+	require.Len(t, storedPayloads, 1)
+
+	storedPayload := storedPayloads[0]
+
+	// The stored value should be 32 bytes (hash size)
+	require.Equal(t, hash.HashLen, storedPayload.Value().Size())
+
+	// Compute the expected hash: ComputeCompactValue(Hash(path), value, nodeHeight)
+	// For a single leaf at root, nodeHeight is ledger.NodeMaxHeight
+	expectedHash := ledger.ComputeCompactValue(hash.Hash(path), payload.Value(), ledger.NodeMaxHeight)
+
+	// Verify the stored value matches the expected hash
+	require.Equal(t, expectedHash[:], []byte(storedPayload.Value()))
+
+	// Verify the key is preserved
+	storedKey, err := storedPayload.Key()
+	require.NoError(t, err)
+	originalKey, err := payload.Key()
+	require.NoError(t, err)
+	require.Equal(t, originalKey, storedKey)
+}
+
+// TestPayloadlessTrieUpdate tests updating payloadless tries.
+func TestPayloadlessTrieUpdate(t *testing.T) {
+	t.Run("update preserves payloadless mode", func(t *testing.T) {
+		path1 := testutils.PathByUint16LeftPadded(0)
+		payload1 := testutils.LightPayload(11, 12345)
+
+		payloadlessTrie, _, err := trie.NewTrieWithUpdatedRegistersAndPayloadless(
+			trie.NewEmptyMTrieWithPayloadless(true),
+			[]ledger.Path{path1},
+			[]ledger.Payload{*payload1},
+			true,
+			true,
+		)
+		require.NoError(t, err)
+		require.True(t, payloadlessTrie.IsPayloadless())
+
+		// Update with a new path
+		path2 := testutils.PathByUint16LeftPadded(1)
+		payload2 := testutils.LightPayload(22, 6789)
+
+		updatedTrie, _, err := trie.NewTrieWithUpdatedRegisters(
+			payloadlessTrie,
+			[]ledger.Path{path2},
+			[]ledger.Payload{*payload2},
+			true,
+		)
+		require.NoError(t, err)
+		require.True(t, updatedTrie.IsPayloadless())
+		require.Equal(t, uint64(2), updatedTrie.AllocatedRegCount())
+		require.Equal(t, uint64(2*hash.HashLen), updatedTrie.AllocatedRegSize())
+	})
+
+	t.Run("unallocate register in payloadless trie", func(t *testing.T) {
+		path := testutils.PathByUint16LeftPadded(0)
+		payload := testutils.LightPayload(11, 12345)
+
+		payloadlessTrie, _, err := trie.NewTrieWithUpdatedRegistersAndPayloadless(
+			trie.NewEmptyMTrieWithPayloadless(true),
+			[]ledger.Path{path},
+			[]ledger.Payload{*payload},
+			true,
+			true,
+		)
+		require.NoError(t, err)
+		require.Equal(t, uint64(1), payloadlessTrie.AllocatedRegCount())
+		require.Equal(t, uint64(hash.HashLen), payloadlessTrie.AllocatedRegSize())
+
+		// Unallocate by setting empty payload
+		updatedTrie, _, err := trie.NewTrieWithUpdatedRegisters(
+			payloadlessTrie,
+			[]ledger.Path{path},
+			[]ledger.Payload{*ledger.EmptyPayload()},
+			true,
+		)
+		require.NoError(t, err)
+		require.True(t, updatedTrie.IsPayloadless())
+		require.Equal(t, uint64(0), updatedTrie.AllocatedRegCount())
+		require.Equal(t, uint64(0), updatedTrie.AllocatedRegSize())
+	})
+
+	t.Run("multiple updates in payloadless mode", func(t *testing.T) {
+		rng := &LinearCongruentialGenerator{seed: 42}
+		paths, payloads := deduplicateWrites(sampleRandomRegisterWrites(rng, 100))
+
+		payloadlessTrie, _, err := trie.NewTrieWithUpdatedRegistersAndPayloadless(
+			trie.NewEmptyMTrieWithPayloadless(true),
+			paths,
+			payloads,
+			true,
+			true,
+		)
+		require.NoError(t, err)
+		require.True(t, payloadlessTrie.IsPayloadless())
+		require.Equal(t, uint64(len(paths)), payloadlessTrie.AllocatedRegCount())
+		require.Equal(t, uint64(len(paths)*hash.HashLen), payloadlessTrie.AllocatedRegSize())
+
+		// Update some payloads
+		newPayloads := make([]ledger.Payload, len(paths)/2)
+		for i := range newPayloads {
+			newPayloads[i] = *testutils.LightPayload(rng.next(), rng.next())
+		}
+
+		updatedTrie, _, err := trie.NewTrieWithUpdatedRegisters(
+			payloadlessTrie,
+			paths[:len(paths)/2],
+			newPayloads,
+			true,
+		)
+		require.NoError(t, err)
+		require.True(t, updatedTrie.IsPayloadless())
+		// Count should remain the same since we're updating existing registers
+		require.Equal(t, uint64(len(paths)), updatedTrie.AllocatedRegCount())
+		require.Equal(t, uint64(len(paths)*hash.HashLen), updatedTrie.AllocatedRegSize())
+	})
+}
+
+// TestPayloadlessTrieProofs tests proof generation and verification for payloadless tries.
+func TestPayloadlessTrieProofs(t *testing.T) {
+	path := testutils.PathByUint16LeftPadded(0)
+	payload := testutils.LightPayload(11, 12345)
+
+	payloadlessTrie, _, err := trie.NewTrieWithUpdatedRegistersAndPayloadless(
+		trie.NewEmptyMTrieWithPayloadless(true),
+		[]ledger.Path{path},
+		[]ledger.Payload{*payload},
+		true,
+		true,
+	)
+	require.NoError(t, err)
+
+	// Proofs can be generated for payloadless tries
+	proofs := payloadlessTrie.UnsafeProofs([]ledger.Path{path})
+	require.NotNil(t, proofs)
+	require.Len(t, proofs.Proofs, 1)
+	require.True(t, proofs.Proofs[0].Inclusion)
+
+	// The proof contains the payloadless payload (hash value, not original value)
+	require.Equal(t, hash.HashLen, proofs.Proofs[0].Payload.Value().Size())
+
+	// Proof verification works against the payloadless root hash
+	// because both the node hash and verification compute:
+	// ComputeCompactValue(path, hash_value, height)
+	verified := prf.VerifyTrieProof(proofs.Proofs[0], ledger.State(payloadlessTrie.RootHash()))
+	require.True(t, verified, "payloadless proof should verify against payloadless root")
+}
+
+// TestPayloadlessTrieProofVerification tests proof verification behavior for payloadless tries.
+func TestPayloadlessTrieProofVerification(t *testing.T) {
+	path1 := testutils.PathByUint16(0b0000000000000000) // 0000...
+	path2 := testutils.PathByUint16(0b1000000000000000) // 1000...
+
+	payload1 := testutils.LightPayload(1, 100)
+	payload2 := testutils.LightPayload(2, 200)
+
+	paths := []ledger.Path{path1, path2}
+	payloads := []ledger.Payload{*payload1, *payload2}
+
+	// Create payloadless trie
+	payloadlessTrie, _, err := trie.NewTrieWithUpdatedRegistersAndPayloadless(
+		trie.NewEmptyMTrieWithPayloadless(true),
+		paths,
+		payloads,
+		true,
+		true,
+	)
+	require.NoError(t, err)
+
+	// Create regular trie with same data
+	regularTrie, _, err := trie.NewTrieWithUpdatedRegisters(
+		trie.NewEmptyMTrie(),
+		paths,
+		payloads,
+		true,
+	)
+	require.NoError(t, err)
+
+	// Root hashes are different
+	require.NotEqual(t, payloadlessTrie.RootHash(), regularTrie.RootHash())
+
+	// Generate proofs from both tries
+	payloadlessProofs := payloadlessTrie.UnsafeProofs(paths)
+	regularProofs := regularTrie.UnsafeProofs(paths)
+
+	// Payloadless proofs verify against payloadless root hash
+	for i, proof := range payloadlessProofs.Proofs {
+		verified := prf.VerifyTrieProof(proof, ledger.State(payloadlessTrie.RootHash()))
+		require.True(t, verified, "proof %d: payloadless proof should verify against payloadless root", i)
+	}
+
+	// Regular proofs verify against regular root hash
+	for i, proof := range regularProofs.Proofs {
+		verified := prf.VerifyTrieProof(proof, ledger.State(regularTrie.RootHash()))
+		require.True(t, verified, "proof %d: regular proof should verify against regular root", i)
+	}
+
+	// Cross-verification fails: payloadless proof against regular root
+	for i, proof := range payloadlessProofs.Proofs {
+		verified := prf.VerifyTrieProof(proof, ledger.State(regularTrie.RootHash()))
+		require.False(t, verified, "proof %d: payloadless proof should NOT verify against regular root", i)
+	}
+
+	// Cross-verification fails: regular proof against payloadless root
+	for i, proof := range regularProofs.Proofs {
+		verified := prf.VerifyTrieProof(proof, ledger.State(payloadlessTrie.RootHash()))
+		require.False(t, verified, "proof %d: regular proof should NOT verify against payloadless root", i)
+	}
+}
+
+// TestPayloadlessTriePartialTrieConstruction tests that a partial trie (PSMT) can be
+// constructed from payloadless trie proofs and used to retrieve the payload hashes.
+func TestPayloadlessTriePartialTrieConstruction(t *testing.T) {
+	path1 := testutils.PathByUint16(0b0000000000000000) // 0000...
+	path2 := testutils.PathByUint16(0b1000000000000000) // 1000...
+
+	payload1 := testutils.LightPayload(1, 100)
+	payload2 := testutils.LightPayload(2, 200)
+
+	paths := []ledger.Path{path1, path2}
+	payloads := []ledger.Payload{*payload1, *payload2}
+
+	// Create payloadless trie
+	payloadlessTrie, _, err := trie.NewTrieWithUpdatedRegistersAndPayloadless(
+		trie.NewEmptyMTrieWithPayloadless(true),
+		paths,
+		payloads,
+		true,
+		true,
+	)
+	require.NoError(t, err)
+
+	// Generate proofs from payloadless trie
+	batchProof := payloadlessTrie.UnsafeProofs(paths)
+	require.Len(t, batchProof.Proofs, 2)
+
+	// Construct partial trie from payloadless proofs
+	partialTrie, err := ptrie.NewPSMT(payloadlessTrie.RootHash(), batchProof)
+	require.NoError(t, err)
+
+	// Verify partial trie root hash matches payloadless trie root hash
+	require.Equal(t, payloadlessTrie.RootHash(), partialTrie.RootHash())
+
+	// Retrieve payloads from partial trie - these should be the hash values
+	for i, path := range paths {
+		retrievedPayload, err := partialTrie.GetSinglePayload(path)
+		require.NoError(t, err)
+
+		// The retrieved payload value should be 32 bytes (the hash)
+		require.Equal(t, hash.HashLen, retrievedPayload.Value().Size(),
+			"retrieved payload should be hash (32 bytes)")
+
+		// Verify the retrieved hash matches what we expect
+		// The stored hash is ComputeCompactValue(path, original_value, height)
+		// For this trie structure, leaves are at height 255 (one step from root)
+		expectedHash := ledger.ComputeCompactValue(hash.Hash(path), payloads[i].Value(), ledger.NodeMaxHeight-1)
+		require.Equal(t, expectedHash[:], []byte(retrievedPayload.Value()),
+			"retrieved hash should match expected ComputeCompactValue")
+	}
+
+	// For comparison: regular trie partial trie contains original values
+	regularTrie, _, err := trie.NewTrieWithUpdatedRegisters(
+		trie.NewEmptyMTrie(),
+		paths,
+		payloads,
+		true,
+	)
+	require.NoError(t, err)
+
+	regularBatchProof := regularTrie.UnsafeProofs(paths)
+	regularPartialTrie, err := ptrie.NewPSMT(regularTrie.RootHash(), regularBatchProof)
+	require.NoError(t, err)
+
+	for i, path := range paths {
+		retrievedPayload, err := regularPartialTrie.GetSinglePayload(path)
+		require.NoError(t, err)
+
+		// Regular partial trie contains original payload values
+		require.True(t, payloads[i].Equals(retrievedPayload),
+			"regular partial trie should contain original payload")
+	}
+}
+
+// TestPayloadlessTrieMultipleRegisters tests payloadless trie with multiple registers
+// at different depths in the trie, verifying hash computation at different node heights.
+func TestPayloadlessTrieMultipleRegisters(t *testing.T) {
+	// Create paths that will be at different depths in the trie
+	path1 := testutils.PathByUint16(0b0000000000000000) // 0000...
+	path2 := testutils.PathByUint16(0b1000000000000000) // 1000...
+	path3 := testutils.PathByUint16(0b0100000000000000) // 0100...
+	path4 := testutils.PathByUint16(0b0010000000000000) // 0010...
+
+	payload1 := testutils.LightPayload(1, 100)
+	payload2 := testutils.LightPayload(2, 200)
+	payload3 := testutils.LightPayload(3, 300)
+	payload4 := testutils.LightPayload(4, 400)
+
+	paths := []ledger.Path{path1, path2, path3, path4}
+	payloads := []ledger.Payload{*payload1, *payload2, *payload3, *payload4}
+
+	payloadlessTrie, _, err := trie.NewTrieWithUpdatedRegistersAndPayloadless(
+		trie.NewEmptyMTrieWithPayloadless(true),
+		paths,
+		payloads,
+		true,
+		true,
+	)
+	require.NoError(t, err)
+
+	// Verify register count and size
+	require.Equal(t, uint64(4), payloadlessTrie.AllocatedRegCount())
+	require.Equal(t, uint64(4*hash.HashLen), payloadlessTrie.AllocatedRegSize())
+
+	// Get all stored payloads and verify each is 32 bytes
+	storedPayloads := payloadlessTrie.AllPayloads()
+	require.Len(t, storedPayloads, 4)
+
+	for _, sp := range storedPayloads {
+		require.Equal(t, hash.HashLen, sp.Value().Size(),
+			"stored payload value should be 32 bytes (hash)")
+	}
+}
+
+// TestPayloadlessTrieEmptyPayload tests that empty payloads are handled correctly
+// in payloadless mode (should not allocate register, but node still exists).
+func TestPayloadlessTrieEmptyPayload(t *testing.T) {
+	path := testutils.PathByUint16LeftPadded(0)
+	emptyPayload := ledger.EmptyPayload()
+
+	// Create payloadless trie with empty payload
+	payloadlessTrie, _, err := trie.NewTrieWithUpdatedRegistersAndPayloadless(
+		trie.NewEmptyMTrieWithPayloadless(true),
+		[]ledger.Path{path},
+		[]ledger.Payload{*emptyPayload},
+		true,
+		true,
+	)
+	require.NoError(t, err)
+
+	// Empty payload should not allocate a register (same as regular trie behavior)
+	require.Equal(t, uint64(0), payloadlessTrie.AllocatedRegCount())
+	require.Equal(t, uint64(0), payloadlessTrie.AllocatedRegSize())
+
+	// The trie still has a node (with hash of empty value), so root hash differs from empty trie
+	// This is consistent with regular trie behavior when prune=true but an empty payload is written
+	require.NotEqual(t, trie.EmptyTrieRootHash(), payloadlessTrie.RootHash())
+
+	// Verify the stored value is still 32 bytes (hash of empty value)
+	storedPayloads := payloadlessTrie.AllPayloads()
+	require.Len(t, storedPayloads, 1)
+	require.Equal(t, hash.HashLen, storedPayloads[0].Value().Size())
+}
+
+// TestPayloadlessTrieRootHashDeterminism tests that the same data always produces
+// the same root hash in payloadless mode.
+func TestPayloadlessTrieRootHashDeterminism(t *testing.T) {
+	path1 := testutils.PathByUint16LeftPadded(0)
+	path2 := testutils.PathByUint16LeftPadded(1)
+	payload1 := testutils.LightPayload(11, 12345)
+	payload2 := testutils.LightPayload(22, 54321)
+
+	paths := []ledger.Path{path1, path2}
+	payloads := []ledger.Payload{*payload1, *payload2}
+
+	// Create first trie
+	trie1, _, err := trie.NewTrieWithUpdatedRegistersAndPayloadless(
+		trie.NewEmptyMTrieWithPayloadless(true),
+		paths,
+		payloads,
+		true,
+		true,
+	)
+	require.NoError(t, err)
+
+	// Create second trie with same data
+	trie2, _, err := trie.NewTrieWithUpdatedRegistersAndPayloadless(
+		trie.NewEmptyMTrieWithPayloadless(true),
+		paths,
+		payloads,
+		true,
+		true,
+	)
+	require.NoError(t, err)
+
+	// Root hashes should be identical
+	require.Equal(t, trie1.RootHash(), trie2.RootHash())
+
+	// Create trie with paths in different order
+	reversedPaths := []ledger.Path{path2, path1}
+	reversedPayloads := []ledger.Payload{*payload2, *payload1}
+
+	trie3, _, err := trie.NewTrieWithUpdatedRegistersAndPayloadless(
+		trie.NewEmptyMTrieWithPayloadless(true),
+		reversedPaths,
+		reversedPayloads,
+		true,
+		true,
+	)
+	require.NoError(t, err)
+
+	// Root hash should still be the same regardless of insertion order
+	require.Equal(t, trie1.RootHash(), trie3.RootHash())
+}
+
+// TestPayloadlessTrieUpdateExistingRegister tests updating an existing register
+// in payloadless mode and verifies the hash is recomputed correctly.
+func TestPayloadlessTrieUpdateExistingRegister(t *testing.T) {
+	path := testutils.PathByUint16LeftPadded(0)
+	payload1 := testutils.LightPayload(11, 12345)
+	payload2 := testutils.LightPayload(22, 54321)
+
+	// Create initial trie
+	trie1, _, err := trie.NewTrieWithUpdatedRegistersAndPayloadless(
+		trie.NewEmptyMTrieWithPayloadless(true),
+		[]ledger.Path{path},
+		[]ledger.Payload{*payload1},
+		true,
+		true,
+	)
+	require.NoError(t, err)
+	rootHash1 := trie1.RootHash()
+
+	// Update the register with new payload
+	trie2, _, err := trie.NewTrieWithUpdatedRegisters(
+		trie1,
+		[]ledger.Path{path},
+		[]ledger.Payload{*payload2},
+		true,
+	)
+	require.NoError(t, err)
+	rootHash2 := trie2.RootHash()
+
+	// Root hash should change
+	require.NotEqual(t, rootHash1, rootHash2)
+
+	// Verify the stored value is the new hash
+	storedPayloads := trie2.AllPayloads()
+	require.Len(t, storedPayloads, 1)
+
+	expectedHash := ledger.ComputeCompactValue(hash.Hash(path), payload2.Value(), ledger.NodeMaxHeight)
+	require.Equal(t, expectedHash[:], []byte(storedPayloads[0].Value()))
+
+	// Size should still be 32 bytes
+	require.Equal(t, uint64(hash.HashLen), trie2.AllocatedRegSize())
 }

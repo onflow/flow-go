@@ -1125,3 +1125,104 @@ func TestPurgeCacheExcept(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, 1, forest.tries.Count())
 }
+
+// TestPayloadlessForestCreation tests creating a payloadless forest.
+func TestPayloadlessForestCreation(t *testing.T) {
+	forest, err := NewForestWithPayloadless(5, &metrics.NoopCollector{}, nil, true)
+	require.NoError(t, err)
+	require.True(t, forest.IsPayloadless())
+
+	// Regular forest should not be payloadless
+	regularForest, err := NewForest(5, &metrics.NoopCollector{}, nil)
+	require.NoError(t, err)
+	require.False(t, regularForest.IsPayloadless())
+}
+
+// TestPayloadlessForestUpdate tests updating a payloadless forest.
+func TestPayloadlessForestUpdate(t *testing.T) {
+	forest, err := NewForestWithPayloadless(5, &metrics.NoopCollector{}, nil, true)
+	require.NoError(t, err)
+
+	p1 := pathByUint8s([]uint8{uint8(53), uint8(74)})
+	v1 := payloadBySlices([]byte{'A'}, []byte{'A'})
+
+	paths := []ledger.Path{p1}
+	payloads := []*ledger.Payload{v1}
+	update := &ledger.TrieUpdate{RootHash: forest.GetEmptyRootHash(), Paths: paths, Payloads: payloads}
+
+	updatedRoot, err := forest.Update(update)
+	require.NoError(t, err)
+	require.NotEqual(t, forest.GetEmptyRootHash(), updatedRoot)
+
+	// Get the updated trie and verify it's payloadless
+	updatedTrie, err := forest.GetTrie(updatedRoot)
+	require.NoError(t, err)
+	require.True(t, updatedTrie.IsPayloadless())
+
+	// Verify stored size is hash size (32 bytes) not payload size
+	require.Equal(t, uint64(hash.HashLen), updatedTrie.AllocatedRegSize())
+}
+
+// TestPayloadlessForestReadReturnsError tests that read operations on payloadless forest return errors.
+func TestPayloadlessForestReadReturnsError(t *testing.T) {
+	forest, err := NewForestWithPayloadless(5, &metrics.NoopCollector{}, nil, true)
+	require.NoError(t, err)
+
+	p1 := pathByUint8s([]uint8{uint8(53), uint8(74)})
+	v1 := payloadBySlices([]byte{'A'}, []byte{'A'})
+
+	paths := []ledger.Path{p1}
+	payloads := []*ledger.Payload{v1}
+	update := &ledger.TrieUpdate{RootHash: forest.GetEmptyRootHash(), Paths: paths, Payloads: payloads}
+
+	updatedRoot, err := forest.Update(update)
+	require.NoError(t, err)
+
+	// Read should return error for payloadless forest
+	read := &ledger.TrieRead{RootHash: updatedRoot, Paths: paths}
+	_, err = forest.Read(read)
+	require.Error(t, err)
+	require.ErrorIs(t, err, trie.ErrPayloadlessTrieRead)
+
+	// ValueSizes should return error for payloadless forest
+	_, err = forest.ValueSizes(read)
+	require.Error(t, err)
+	require.ErrorIs(t, err, trie.ErrPayloadlessTrieRead)
+
+	// ReadSingleValue should return error for payloadless forest
+	singleRead := &ledger.TrieReadSingleValue{RootHash: updatedRoot, Path: p1}
+	_, err = forest.ReadSingleValue(singleRead)
+	require.Error(t, err)
+	require.ErrorIs(t, err, trie.ErrPayloadlessTrieRead)
+}
+
+// TestPayloadlessForestProofs tests that Forest.Proofs returns error for payloadless forest
+// because it internally uses ValueSizes to find non-existent paths.
+// Note: Direct trie-level proofs (MTrie.UnsafeProofs) still work for payloadless tries.
+func TestPayloadlessForestProofs(t *testing.T) {
+	forest, err := NewForestWithPayloadless(5, &metrics.NoopCollector{}, nil, true)
+	require.NoError(t, err)
+
+	p1 := pathByUint8s([]uint8{uint8(53), uint8(74)})
+	v1 := payloadBySlices([]byte{'A'}, []byte{'A'})
+
+	paths := []ledger.Path{p1}
+	payloads := []*ledger.Payload{v1}
+	update := &ledger.TrieUpdate{RootHash: forest.GetEmptyRootHash(), Paths: paths, Payloads: payloads}
+
+	updatedRoot, err := forest.Update(update)
+	require.NoError(t, err)
+
+	// Forest.Proofs uses ValueSizes internally, which fails for payloadless tries
+	read := &ledger.TrieRead{RootHash: updatedRoot, Paths: paths}
+	_, err = forest.Proofs(read)
+	require.Error(t, err)
+	require.ErrorIs(t, err, trie.ErrPayloadlessTrieRead)
+
+	// However, direct trie-level proofs still work
+	payloadlessTrie, err := forest.GetTrie(updatedRoot)
+	require.NoError(t, err)
+	proofs := payloadlessTrie.UnsafeProofs(paths)
+	require.NotNil(t, proofs)
+	require.Len(t, proofs.Proofs, 1)
+}

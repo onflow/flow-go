@@ -28,6 +28,7 @@ type Forest struct {
 	forestCapacity int
 	onTreeEvicted  func(tree *trie.MTrie)
 	metrics        module.LedgerMetrics
+	isPayloadless  bool // if true, tries store payload hashes instead of full payloads
 }
 
 // NewForest returns a new instance of memory forest.
@@ -37,14 +38,21 @@ type Forest struct {
 // Make sure you chose a sufficiently large forestCapacity, such that, when reaching the capacity, the
 // Least Recently Added trie will never be needed again.
 func NewForest(forestCapacity int, metrics module.LedgerMetrics, onTreeEvicted func(tree *trie.MTrie)) (*Forest, error) {
+	return NewForestWithPayloadless(forestCapacity, metrics, onTreeEvicted, false)
+}
+
+// NewForestWithPayloadless returns a new instance of memory forest with explicit payloadless mode.
+// When isPayloadless is true, the forest creates tries that store payload hashes instead of full payloads.
+func NewForestWithPayloadless(forestCapacity int, metrics module.LedgerMetrics, onTreeEvicted func(tree *trie.MTrie), isPayloadless bool) (*Forest, error) {
 	forest := &Forest{tries: NewTrieCache(uint(forestCapacity), onTreeEvicted),
 		forestCapacity: forestCapacity,
 		onTreeEvicted:  onTreeEvicted,
 		metrics:        metrics,
+		isPayloadless:  isPayloadless,
 	}
 
 	// add trie with no allocated registers
-	emptyTrie := trie.NewEmptyMTrie()
+	emptyTrie := trie.NewEmptyMTrieWithPayloadless(isPayloadless)
 	err := forest.AddTrie(emptyTrie)
 	if err != nil {
 		return nil, fmt.Errorf("adding empty trie to forest failed: %w", err)
@@ -52,8 +60,16 @@ func NewForest(forestCapacity int, metrics module.LedgerMetrics, onTreeEvicted f
 	return forest, nil
 }
 
+// IsPayloadless returns true if the forest stores payload hashes instead of full payloads.
+func (f *Forest) IsPayloadless() bool {
+	return f.isPayloadless
+}
+
 // ValueSizes returns value sizes for a slice of paths and error (if any)
 // TODO: can be optimized further if we don't care about changing the order of the input r.Paths
+//
+// Expected errors during normal operation:
+//   - trie.ErrPayloadlessTrieRead if the forest is in payloadless mode
 func (f *Forest) ValueSizes(r *ledger.TrieRead) ([]int, error) {
 
 	if len(r.Paths) == 0 {
@@ -82,7 +98,10 @@ func (f *Forest) ValueSizes(r *ledger.TrieRead) ([]int, error) {
 		pathOrgIndex[path] = append(indices, i)
 	}
 
-	sizes := trie.UnsafeValueSizes(deduplicatedPaths) // this sorts deduplicatedPaths IN-PLACE
+	sizes, err := trie.UnsafeValueSizes(deduplicatedPaths) // this sorts deduplicatedPaths IN-PLACE
+	if err != nil {
+		return nil, fmt.Errorf("reading value sizes failed: %w", err)
+	}
 
 	// reconstruct value sizes in the same key order that called the method
 	orderedValueSizes := make([]int, len(r.Paths))
@@ -102,6 +121,9 @@ func (f *Forest) ValueSizes(r *ledger.TrieRead) ([]int, error) {
 }
 
 // ReadSingleValue reads value for a single path and returns value and error (if any)
+//
+// Expected errors during normal operation:
+//   - trie.ErrPayloadlessTrieRead if the forest is in payloadless mode
 func (f *Forest) ReadSingleValue(r *ledger.TrieReadSingleValue) (ledger.Value, error) {
 	// lookup the trie by rootHash
 	trie, err := f.GetTrie(r.RootHash)
@@ -109,12 +131,18 @@ func (f *Forest) ReadSingleValue(r *ledger.TrieReadSingleValue) (ledger.Value, e
 		return nil, err
 	}
 
-	payload := trie.ReadSinglePayload(r.Path)
+	payload, err := trie.ReadSinglePayload(r.Path)
+	if err != nil {
+		return nil, fmt.Errorf("reading single payload failed: %w", err)
+	}
 	return payload.Value().DeepCopy(), nil
 }
 
 // Read reads values for an slice of paths and returns values and error (if any)
 // TODO: can be optimized further if we don't care about changing the order of the input r.Paths
+//
+// Expected errors during normal operation:
+//   - trie.ErrPayloadlessTrieRead if the forest is in payloadless mode
 func (f *Forest) Read(r *ledger.TrieRead) ([]ledger.Value, error) {
 
 	if len(r.Paths) == 0 {
@@ -129,7 +157,10 @@ func (f *Forest) Read(r *ledger.TrieRead) ([]ledger.Value, error) {
 
 	// call ReadSinglePayload if there is only one path
 	if len(r.Paths) == 1 {
-		payload := trie.ReadSinglePayload(r.Paths[0])
+		payload, err := trie.ReadSinglePayload(r.Paths[0])
+		if err != nil {
+			return nil, fmt.Errorf("reading single payload failed: %w", err)
+		}
 		return []ledger.Value{payload.Value().DeepCopy()}, nil
 	}
 
@@ -149,7 +180,10 @@ func (f *Forest) Read(r *ledger.TrieRead) ([]ledger.Value, error) {
 		pathOrgIndex[path] = append(indices, i)
 	}
 
-	payloads := trie.UnsafeRead(deduplicatedPaths) // this sorts deduplicatedPaths IN-PLACE
+	payloads, err := trie.UnsafeRead(deduplicatedPaths) // this sorts deduplicatedPaths IN-PLACE
+	if err != nil {
+		return nil, fmt.Errorf("reading payloads failed: %w", err)
+	}
 
 	// reconstruct the payloads in the same key order that called the method
 	orderedValues := make([]ledger.Value, len(r.Paths))
@@ -231,7 +265,8 @@ func (f *Forest) NewTrie(u *ledger.TrieUpdate) (*trie.MTrie, error) {
 
 	// apply pruning on update
 	applyPruning := true
-	newTrie, maxDepthTouched, err := trie.NewTrieWithUpdatedRegisters(parentTrie, deduplicatedPaths, deduplicatedPayloads, applyPruning)
+	newTrie, maxDepthTouched, err := trie.NewTrieWithUpdatedRegistersAndPayloadless(
+		parentTrie, deduplicatedPaths, deduplicatedPayloads, applyPruning, f.isPayloadless)
 	if err != nil {
 		return nil, fmt.Errorf("constructing updated trie failed: %w", err)
 	}
