@@ -311,6 +311,10 @@ func (bl *BlockView) DryRunTransaction(
 		return nil, err
 	}
 
+	value, overflow := uint256.FromBig(tx.Value())
+	if overflow {
+		return nil, fmt.Errorf("value exceeds 256 bits: address %v", from.Hex())
+	}
 	gasPrice, overflow := uint256.FromBig(tx.GasPrice())
 	if overflow {
 		return nil, fmt.Errorf("%w: address %v, maxFeePerGas bit length: %d", gethCore.ErrFeeCapVeryHigh,
@@ -328,32 +332,23 @@ func (bl *BlockView) DryRunTransaction(
 		return nil, fmt.Errorf("%w: address %v, maxPriorityFeePerGas bit length: %d", gethCore.ErrTipVeryHigh,
 			from.Hex(), tx.GasTipCap().BitLen())
 	}
-	value, overflow := uint256.FromBig(tx.Value())
-	if overflow {
-		return nil, fmt.Errorf("value exceeds 256 bits: address %v", from.Hex())
-	}
-	blobGasFeeCap, overflow := uint256.FromBig(tx.BlobGasFeeCap())
-	if overflow {
-		return nil, fmt.Errorf("blobGasFeeCap exceeds 256 bits: address %v", from.Hex())
-	}
 
 	msg := &gethCore.Message{
 		From:                  from,
-		Nonce:                 tx.Nonce(),
-		GasLimit:              tx.Gas(),
-		GasPrice:              gasPrice,
-		GasFeeCap:             gasFeeCap,
-		GasTipCap:             gasTipCap,
 		To:                    tx.To(),
 		Value:                 value,
 		Data:                  tx.Data(),
-		AccessList:            tx.AccessList(),
+		Nonce:                 tx.Nonce(),
+		GasLimit:              tx.Gas(),
+		GasPrice:              gasPrice,
+		GasTipCap:             gasTipCap,
+		GasFeeCap:             gasFeeCap,
 		SetCodeAuthorizations: tx.SetCodeAuthorizations(),
+		AccessList:            tx.AccessList(),
 		SkipNonceChecks:       true,
 		SkipTransactionChecks: true,
-		BlobHashes:            tx.BlobHashes(),
-		BlobGasFeeCap:         blobGasFeeCap,
 	}
+
 	// If baseFee provided, set gasPrice to effectiveGasPrice.
 	baseFee := proc.config.BlockContext.BaseFee
 	if baseFee != nil {

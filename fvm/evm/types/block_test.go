@@ -78,6 +78,7 @@ func Test_BlockProposal(t *testing.T) {
 	require.NotEqual(t, gethTypes.EmptyReceiptsHash, bp.ReceiptRoot)
 
 	require.Equal(t, uint64(78_948_000), bp.SlotNumber(flow.Emulator))
+	require.Equal(t, uint64(78_948_000), bp.SlotNumber(flow.Previewnet))
 	require.Equal(t, uint64(55_944_000), bp.SlotNumber(flow.Testnet))
 	require.Equal(t, uint64(52_596_000), bp.SlotNumber(flow.Mainnet))
 }

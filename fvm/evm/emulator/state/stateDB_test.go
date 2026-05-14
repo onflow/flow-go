@@ -255,6 +255,7 @@ func TestStateDB(t *testing.T) {
 		require.True(t, db.AddressInAccessList(sender))
 		require.True(t, db.AddressInAccessList(coinbase))
 		require.True(t, db.AddressInAccessList(dest))
+		require.Nil(t, db.Finalise(true)) // no BAL unless Amsterdam is activated
 
 		for _, add := range precompiles {
 			require.True(t, db.AddressInAccessList(add))
@@ -267,6 +268,19 @@ func TestStateDB(t *testing.T) {
 				require.True(t, slotFound)
 			}
 		}
+
+		rules = gethParams.Rules{
+			IsBerlin:    true,
+			IsShanghai:  true,
+			IsPrague:    true,
+			IsOsaka:     true,
+			IsAmsterdam: true,
+		}
+
+		require.NoError(t, err)
+		db.Prepare(rules, sender, coinbase, &dest, precompiles, txAccesses)
+
+		require.NotNil(t, db.Finalise(true)) // BAL should be present when Amsterdam is activated
 	})
 
 	t.Run("test non-fatal error handling", func(t *testing.T) {
@@ -397,6 +411,7 @@ func TestStateDB(t *testing.T) {
 		require.Equal(t, balance1, db.GetBalance(addr1))
 		require.Equal(t, code1, db.GetCode(addr1))
 		require.NoError(t, db.Error())
+		require.Len(t, db.LogsForBurnAccounts(), 0)
 
 		// test 2 - account exist before with some balance
 		// but not a contract - selfdestruct should work
@@ -431,6 +446,12 @@ func TestStateDB(t *testing.T) {
 		// now calling selfdestruct should do the job
 		db.SelfDestruct(addr2)
 		require.NoError(t, db.Error())
+		burnLogs := db.LogsForBurnAccounts()
+		require.Len(t, burnLogs, 1)
+		ethBurnLog := burnLogs[0]
+		require.Equal(t, gethParams.EthBurnLogEvent, ethBurnLog.Topics[0])
+		require.Equal(t, gethCommon.BytesToHash(addr2.Bytes()), ethBurnLog.Topics[1])
+
 		commit, err = db.Commit(true)
 		require.NoError(t, err)
 		require.NotEmpty(t, commit)
@@ -458,6 +479,12 @@ func TestStateDB(t *testing.T) {
 		// call self destruct
 		db.SelfDestruct(addr3)
 		require.NoError(t, db.Error())
+		burnLogs = db.LogsForBurnAccounts()
+		require.Len(t, burnLogs, 1)
+		ethBurnLog = burnLogs[0]
+		require.Equal(t, gethParams.EthBurnLogEvent, ethBurnLog.Topics[0])
+		require.Equal(t, gethCommon.BytesToHash(addr3.Bytes()), ethBurnLog.Topics[1])
+
 		// commit changes
 		commit, err = db.Commit(true)
 		require.NoError(t, err)
