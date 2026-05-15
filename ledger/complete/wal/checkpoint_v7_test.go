@@ -1,7 +1,9 @@
 package wal
 
 import (
+	"crypto/rand"
 	"os"
+	"path"
 	"path/filepath"
 	"testing"
 
@@ -10,7 +12,9 @@ import (
 
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/testutils"
+	"github.com/onflow/flow-go/ledger/complete/mtrie"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
+	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -400,4 +404,321 @@ func TestOpenAndReadAsPayloadlessTriePayloadValues(t *testing.T) {
 			}
 		}
 	})
+}
+
+// TestV6V7CheckpointConsistencyWithWALUpdates is a comprehensive test that verifies:
+// 1. Path 1: Load V6 checkpoint (from payloadless forest) -> apply WAL updates with payloadless forest -> get root hash
+// 2. Path 2: Load V6 as payloadless -> apply WAL updates -> should get same root hash -> export V7
+// 3. Path 3: Load V6 as payloadless -> export V7 -> load V7 -> apply WAL updates -> should get same root hash -> export V7
+// Path 2 and Path 3 V7 checkpoints should be identical
+//
+// IMPORTANT: The V6 checkpoint is created from a PAYLOADLESS forest, so the payload values
+// stored in the checkpoint are already 32-byte hashes. This allows OpenAndReadAsPayloadlessTrie
+// to correctly load it as a payloadless trie.
+func TestV6V7CheckpointConsistencyWithWALUpdates(t *testing.T) {
+	unittest.RunWithTempDir(t, func(dir string) {
+		logger := zerolog.Nop()
+		forestCapacity := 100
+
+		// ============================================================
+		// Step 1: Create initial V6 checkpoint from a PAYLOADLESS forest
+		// This is the key - the V6 checkpoint will contain payload hashes as values
+		// ============================================================
+		initialPaths, initialPayloads := generateInitialData(t, 50)
+
+		// Create a PAYLOADLESS forest and add initial data
+		payloadlessForest, err := mtrie.NewForestWithPayloadless(forestCapacity, &metrics.NoopCollector{}, nil, true)
+		require.NoError(t, err, "failed to create payloadless forest")
+
+		initialUpdate := &ledger.TrieUpdate{
+			RootHash: payloadlessForest.GetEmptyRootHash(),
+			Paths:    initialPaths,
+			Payloads: toPayloadPtrs(initialPayloads),
+		}
+		initialRootHash, err := payloadlessForest.Update(initialUpdate)
+		require.NoError(t, err, "failed to apply initial update")
+
+		// Store as V6 checkpoint (the values stored are payload hashes, not full payloads)
+		v6CheckpointFile := "checkpoint-v6-initial"
+		initialTries, err := payloadlessForest.GetTries()
+		require.NoError(t, err, "failed to get tries from forest")
+		// Only store the trie with initial data (not the empty trie)
+		var trieToStore *trie.MTrie
+		for _, tr := range initialTries {
+			if tr.RootHash() == initialRootHash {
+				trieToStore = tr
+				break
+			}
+		}
+		require.NotNil(t, trieToStore, "failed to find trie with initial root hash")
+		require.True(t, trieToStore.IsPayloadless(), "initial trie should be payloadless")
+		require.NoErrorf(t, StoreCheckpointV6SingleThread([]*trie.MTrie{trieToStore}, dir, v6CheckpointFile, logger),
+			"fail to store V6 checkpoint")
+
+		t.Logf("Initial V6 checkpoint created from payloadless forest with root hash: %s", initialRootHash)
+
+		// ============================================================
+		// Step 2: Generate WAL updates (add, remove, update operations)
+		// ============================================================
+		walUpdates := generateWALUpdates(t, initialPaths, initialPayloads, 30)
+		t.Logf("Generated %d WAL updates", len(walUpdates))
+
+		// ============================================================
+		// Path 1: Load V6 as payloadless -> apply WAL updates -> get final root hash
+		// This is the reference path that Path 2 and Path 3 should match
+		// ============================================================
+		path1Dir := path.Join(dir, "path1")
+		require.NoError(t, os.MkdirAll(path1Dir, 0755))
+
+		// Copy checkpoint to path1
+		_, err = CopyCheckpointFile(v6CheckpointFile, dir, path1Dir)
+		require.NoError(t, err, "failed to copy checkpoint to path1")
+
+		// Load V6 checkpoint as payloadless
+		path1Tries, err := OpenAndReadAsPayloadlessTrie(path1Dir, v6CheckpointFile, logger)
+		require.NoError(t, err, "failed to load V6 checkpoint as payloadless for path1")
+		require.Len(t, path1Tries, 1, "expected 1 trie in checkpoint")
+		require.True(t, path1Tries[0].IsPayloadless(), "path1 trie should be payloadless")
+
+		// Create payloadless forest
+		path1Forest, err := mtrie.NewForestWithPayloadless(forestCapacity, &metrics.NoopCollector{}, nil, true)
+		require.NoError(t, err)
+		require.NoError(t, path1Forest.AddTries(path1Tries))
+
+		// Apply WAL updates
+		path1RootHash := path1Tries[0].RootHash()
+		for i, update := range walUpdates {
+			update.RootHash = path1RootHash
+			path1RootHash, err = path1Forest.Update(update)
+			require.NoError(t, err, "failed to apply WAL update %d in path1", i)
+		}
+		t.Logf("Path 1 final root hash: %s", path1RootHash)
+
+		// ============================================================
+		// Path 2: Load V6 as payloadless -> apply WAL updates -> export V7
+		// ============================================================
+		path2Dir := path.Join(dir, "path2")
+		require.NoError(t, os.MkdirAll(path2Dir, 0755))
+
+		// Copy checkpoint to path2
+		_, err = CopyCheckpointFile(v6CheckpointFile, dir, path2Dir)
+		require.NoError(t, err, "failed to copy checkpoint to path2")
+
+		// Load V6 checkpoint as payloadless
+		path2Tries, err := OpenAndReadAsPayloadlessTrie(path2Dir, v6CheckpointFile, logger)
+		require.NoError(t, err, "failed to load V6 checkpoint as payloadless for path2")
+		require.Len(t, path2Tries, 1, "expected 1 trie in checkpoint")
+		require.True(t, path2Tries[0].IsPayloadless(), "path2 trie should be payloadless")
+
+		// Create payloadless forest
+		path2Forest, err := mtrie.NewForestWithPayloadless(forestCapacity, &metrics.NoopCollector{}, nil, true)
+		require.NoError(t, err)
+		require.NoError(t, path2Forest.AddTries(path2Tries))
+
+		// Apply WAL updates
+		path2RootHash := path2Tries[0].RootHash()
+		for i, update := range walUpdates {
+			update.RootHash = path2RootHash
+			path2RootHash, err = path2Forest.Update(update)
+			require.NoError(t, err, "failed to apply WAL update %d in path2", i)
+		}
+		t.Logf("Path 2 final root hash: %s", path2RootHash)
+
+		// Verify root hash matches path1
+		require.Equal(t, path1RootHash, path2RootHash,
+			"Path 2 root hash should match Path 1 root hash")
+
+		// Export to V7 checkpoint
+		v7CheckpointPath2 := "checkpoint-v7-path2"
+		path2FinalTrie, err := path2Forest.GetTrie(path2RootHash)
+		require.NoError(t, err, "failed to get final trie from path2 forest")
+		require.NoErrorf(t, StoreCheckpointV7SingleThread([]*trie.MTrie{path2FinalTrie}, path2Dir, v7CheckpointPath2, logger),
+			"fail to store V7 checkpoint for path2")
+
+		// ============================================================
+		// Path 3: Load V6 as payloadless -> export V7 -> load V7 -> apply WAL updates -> export V7
+		// ============================================================
+		path3Dir := path.Join(dir, "path3")
+		require.NoError(t, os.MkdirAll(path3Dir, 0755))
+
+		// Copy checkpoint to path3
+		_, err = CopyCheckpointFile(v6CheckpointFile, dir, path3Dir)
+		require.NoError(t, err, "failed to copy checkpoint to path3")
+
+		// Load V6 checkpoint as payloadless
+		path3Tries, err := OpenAndReadAsPayloadlessTrie(path3Dir, v6CheckpointFile, logger)
+		require.NoError(t, err, "failed to load V6 checkpoint as payloadless for path3")
+		require.Len(t, path3Tries, 1, "expected 1 trie in checkpoint")
+
+		// Export to intermediate V7 checkpoint
+		v7CheckpointIntermediate := "checkpoint-v7-intermediate"
+		require.NoErrorf(t, StoreCheckpointV7SingleThread(path3Tries, path3Dir, v7CheckpointIntermediate, logger),
+			"fail to store intermediate V7 checkpoint for path3")
+
+		// Delete the V6 checkpoint files to ensure we're loading from V7
+		deleteCheckpointFiles(path3Dir, v6CheckpointFile)
+
+		// Load the intermediate V7 checkpoint
+		path3TriesFromV7, err := OpenAndReadCheckpointV7(path3Dir, v7CheckpointIntermediate, logger)
+		require.NoError(t, err, "failed to load intermediate V7 checkpoint for path3")
+		require.Len(t, path3TriesFromV7, 1, "expected 1 trie in V7 checkpoint")
+		require.True(t, path3TriesFromV7[0].IsPayloadless(), "path3 trie from V7 should be payloadless")
+
+		// Verify intermediate root hash matches
+		require.Equal(t, path2Tries[0].RootHash(), path3TriesFromV7[0].RootHash(),
+			"Intermediate V7 checkpoint root hash should match original")
+
+		// Create payloadless forest from V7 checkpoint
+		path3Forest, err := mtrie.NewForestWithPayloadless(forestCapacity, &metrics.NoopCollector{}, nil, true)
+		require.NoError(t, err)
+		require.NoError(t, path3Forest.AddTries(path3TriesFromV7))
+
+		// Apply WAL updates
+		path3RootHash := path3TriesFromV7[0].RootHash()
+		for i, update := range walUpdates {
+			update.RootHash = path3RootHash
+			path3RootHash, err = path3Forest.Update(update)
+			require.NoError(t, err, "failed to apply WAL update %d in path3", i)
+		}
+		t.Logf("Path 3 final root hash: %s", path3RootHash)
+
+		// Verify root hash matches path1 and path2
+		require.Equal(t, path1RootHash, path3RootHash,
+			"Path 3 root hash should match Path 1 root hash")
+
+		// Export to V7 checkpoint
+		v7CheckpointPath3 := "checkpoint-v7-path3"
+		path3FinalTrie, err := path3Forest.GetTrie(path3RootHash)
+		require.NoError(t, err, "failed to get final trie from path3 forest")
+		require.NoErrorf(t, StoreCheckpointV7SingleThread([]*trie.MTrie{path3FinalTrie}, path3Dir, v7CheckpointPath3, logger),
+			"fail to store V7 checkpoint for path3")
+
+		// ============================================================
+		// Verify Path 2 and Path 3 V7 checkpoints are identical
+		// ============================================================
+		path2V7Files := filePaths(path2Dir, v7CheckpointPath2, subtrieLevel)
+		path3V7Files := filePaths(path3Dir, v7CheckpointPath3, subtrieLevel)
+
+		require.Equal(t, len(path2V7Files), len(path3V7Files),
+			"Path 2 and Path 3 V7 checkpoints should have same number of files")
+
+		for i, path2File := range path2V7Files {
+			path3File := path3V7Files[i]
+			err := compareFiles(path2File, path3File)
+			require.NoError(t, err,
+				"Path 2 and Path 3 V7 checkpoint files should be identical: %s vs %s", path2File, path3File)
+		}
+
+		t.Log("SUCCESS: All paths produce identical results!")
+		t.Logf("  - Path 1 (V6 -> payloadless -> apply WAL): root hash = %s", path1RootHash)
+		t.Logf("  - Path 2 (V6 -> payloadless -> apply WAL -> V7): root hash = %s", path2RootHash)
+		t.Logf("  - Path 3 (V6 -> payloadless -> V7 -> load -> apply WAL -> V7): root hash = %s", path3RootHash)
+		t.Log("  - Path 2 and Path 3 V7 checkpoints are byte-for-byte identical")
+	})
+}
+
+// generateInitialData creates initial paths and payloads for the test
+func generateInitialData(t *testing.T, count int) ([]ledger.Path, []ledger.Payload) {
+	paths := make([]ledger.Path, count)
+	payloads := make([]ledger.Payload, count)
+
+	for i := 0; i < count; i++ {
+		var p ledger.Path
+		_, err := rand.Read(p[:])
+		require.NoError(t, err)
+		paths[i] = p
+
+		payload := testutils.RandomPayload(10, 100)
+		payloads[i] = *payload
+	}
+
+	return paths, payloads
+}
+
+// generateWALUpdates creates a series of updates including add, remove, and update operations
+func generateWALUpdates(t *testing.T, existingPaths []ledger.Path, existingPayloads []ledger.Payload, count int) []*ledger.TrieUpdate {
+	updates := make([]*ledger.TrieUpdate, 0, count)
+
+	// Track which paths exist and their current payloads
+	pathState := make(map[ledger.Path]ledger.Payload)
+	for i, p := range existingPaths {
+		pathState[p] = existingPayloads[i]
+	}
+
+	existingPathsList := make([]ledger.Path, len(existingPaths))
+	copy(existingPathsList, existingPaths)
+
+	for i := 0; i < count; i++ {
+		var updatePaths []ledger.Path
+		var updatePayloads []*ledger.Payload
+
+		// Randomly choose operation type
+		opType := i % 3
+		numOps := 1 + (i % 5) // 1-5 operations per update
+
+		for j := 0; j < numOps; j++ {
+			switch opType {
+			case 0: // Add new value
+				var newPath ledger.Path
+				_, err := rand.Read(newPath[:])
+				require.NoError(t, err)
+
+				// Make sure it's actually new
+				if _, exists := pathState[newPath]; !exists {
+					newPayload := testutils.RandomPayload(10, 100)
+					updatePaths = append(updatePaths, newPath)
+					updatePayloads = append(updatePayloads, newPayload)
+					pathState[newPath] = *newPayload
+					existingPathsList = append(existingPathsList, newPath)
+				}
+
+			case 1: // Remove existing value (set to empty payload)
+				if len(existingPathsList) > 0 {
+					// Pick a random existing path
+					idx := j % len(existingPathsList)
+					pathToRemove := existingPathsList[idx]
+
+					if _, exists := pathState[pathToRemove]; exists {
+						emptyPayload := ledger.EmptyPayload()
+						updatePaths = append(updatePaths, pathToRemove)
+						updatePayloads = append(updatePayloads, emptyPayload)
+						delete(pathState, pathToRemove)
+					}
+				}
+
+			case 2: // Update existing value
+				if len(existingPathsList) > 0 {
+					// Pick a random existing path
+					idx := j % len(existingPathsList)
+					pathToUpdate := existingPathsList[idx]
+
+					if _, exists := pathState[pathToUpdate]; exists {
+						newPayload := testutils.RandomPayload(10, 100)
+						updatePaths = append(updatePaths, pathToUpdate)
+						updatePayloads = append(updatePayloads, newPayload)
+						pathState[pathToUpdate] = *newPayload
+					}
+				}
+			}
+		}
+
+		if len(updatePaths) > 0 {
+			update := &ledger.TrieUpdate{
+				Paths:    updatePaths,
+				Payloads: updatePayloads,
+			}
+			updates = append(updates, update)
+		}
+	}
+
+	return updates
+}
+
+// toPayloadPtrs converts a slice of payloads to a slice of payload pointers
+func toPayloadPtrs(payloads []ledger.Payload) []*ledger.Payload {
+	ptrs := make([]*ledger.Payload, len(payloads))
+	for i := range payloads {
+		ptrs[i] = &payloads[i]
+	}
+	return ptrs
 }
