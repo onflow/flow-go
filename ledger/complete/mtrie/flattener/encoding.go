@@ -354,6 +354,12 @@ func ReadEncodedTrie(reader io.Reader, scratch []byte) (EncodedTrie, error) {
 
 // ReadTrie reconstructs a trie from data read from reader.
 func ReadTrie(reader io.Reader, scratch []byte, getNode func(nodeIndex uint64) (*node.Node, error)) (*trie.MTrie, error) {
+	return ReadTrieWithPayloadless(reader, scratch, getNode, false)
+}
+
+// ReadTrieWithPayloadless reconstructs a trie from data read from reader with explicit payloadless mode.
+// When isPayloadless is true, the trie stores payload hashes instead of full payloads.
+func ReadTrieWithPayloadless(reader io.Reader, scratch []byte, getNode func(nodeIndex uint64) (*node.Node, error), isPayloadless bool) (*trie.MTrie, error) {
 	encodedTrie, err := ReadEncodedTrie(reader, scratch)
 	if err != nil {
 		return nil, err
@@ -364,7 +370,7 @@ func ReadTrie(reader io.Reader, scratch []byte, getNode func(nodeIndex uint64) (
 		return nil, fmt.Errorf("failed to find root node of serialized trie: %w", err)
 	}
 
-	mtrie, err := trie.NewMTrie(rootNode, encodedTrie.RegCount, encodedTrie.RegSize)
+	mtrie, err := trie.NewMTrieWithPayloadless(rootNode, encodedTrie.RegCount, encodedTrie.RegSize, isPayloadless)
 	if err != nil {
 		return nil, fmt.Errorf("failed to restore serialized trie: %w", err)
 	}

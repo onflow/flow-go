@@ -59,9 +59,14 @@ const VersionV5 uint16 = 0x05
 //     file name extension
 const VersionV6 uint16 = 0x06
 
+// Version 7 includes these changes:
+//   - payloadless mode: leaf nodes store payload hashes (32 bytes) instead of full payloads
+//   - used for verification nodes that don't need actual payload values
+const VersionV7 uint16 = 0x07
+
 // MaxVersion is the latest checkpoint version we support.
 // Need to update MaxVersion when creating a newer version.
-const MaxVersion = VersionV6
+const MaxVersion = VersionV7
 
 const (
 	encMagicSize        = 2
@@ -696,6 +701,8 @@ func readCheckpoint(f *os.File, logger zerolog.Logger) ([]*trie.MTrie, error) {
 		return readCheckpointV5(f, logger)
 	case VersionV6:
 		return readCheckpointV6(f, logger)
+	case VersionV7:
+		return readCheckpointV7(f, logger)
 	default:
 		return nil, fmt.Errorf("unsupported file version %x", version)
 	}
