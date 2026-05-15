@@ -1226,3 +1226,103 @@ func TestPayloadlessForestProofs(t *testing.T) {
 	require.NotNil(t, proofs)
 	require.Len(t, proofs.Proofs, 1)
 }
+
+// TestAddTriePayloadlessMismatch tests that AddTrie returns ErrPayloadlessMismatch
+// when attempting to add a trie with a different payloadless mode than the forest.
+func TestAddTriePayloadlessMismatch(t *testing.T) {
+	t.Run("adding regular trie to payloadless forest", func(t *testing.T) {
+		// Create a payloadless forest
+		payloadlessForest, err := NewForestWithPayloadless(5, &metrics.NoopCollector{}, nil, true)
+		require.NoError(t, err)
+		require.True(t, payloadlessForest.IsPayloadless())
+
+		// Create a regular (non-payloadless) trie
+		regularTrie := trie.NewEmptyMTrie()
+		require.False(t, regularTrie.IsPayloadless())
+
+		// Add some data to the regular trie
+		p1 := pathByUint8s([]uint8{uint8(53), uint8(74)})
+		v1 := payloadBySlices([]byte{'A'}, []byte{'A'})
+		updatedRegularTrie, _, err := trie.NewTrieWithUpdatedRegisters(regularTrie, []ledger.Path{p1}, []ledger.Payload{*v1}, true)
+		require.NoError(t, err)
+		require.False(t, updatedRegularTrie.IsPayloadless())
+
+		// Attempt to add the regular trie to the payloadless forest - should fail
+		err = payloadlessForest.AddTrie(updatedRegularTrie)
+		require.Error(t, err)
+		require.ErrorIs(t, err, ErrPayloadlessMismatch)
+	})
+
+	t.Run("adding payloadless trie to regular forest", func(t *testing.T) {
+		// Create a regular forest
+		regularForest, err := NewForest(5, &metrics.NoopCollector{}, nil)
+		require.NoError(t, err)
+		require.False(t, regularForest.IsPayloadless())
+
+		// Create a payloadless trie
+		payloadlessTrie := trie.NewEmptyMTrieWithPayloadless(true)
+		require.True(t, payloadlessTrie.IsPayloadless())
+
+		// Add some data to the payloadless trie
+		p1 := pathByUint8s([]uint8{uint8(53), uint8(74)})
+		v1 := payloadBySlices([]byte{'A'}, []byte{'A'})
+		updatedPayloadlessTrie, _, err := trie.NewTrieWithUpdatedRegisters(payloadlessTrie, []ledger.Path{p1}, []ledger.Payload{*v1}, true)
+		require.NoError(t, err)
+		require.True(t, updatedPayloadlessTrie.IsPayloadless())
+
+		// Attempt to add the payloadless trie to the regular forest - should fail
+		err = regularForest.AddTrie(updatedPayloadlessTrie)
+		require.Error(t, err)
+		require.ErrorIs(t, err, ErrPayloadlessMismatch)
+	})
+
+	t.Run("adding matching trie succeeds", func(t *testing.T) {
+		// Create a payloadless forest
+		payloadlessForest, err := NewForestWithPayloadless(5, &metrics.NoopCollector{}, nil, true)
+		require.NoError(t, err)
+
+		// Create a payloadless trie
+		payloadlessTrie := trie.NewEmptyMTrieWithPayloadless(true)
+		p1 := pathByUint8s([]uint8{uint8(53), uint8(74)})
+		v1 := payloadBySlices([]byte{'A'}, []byte{'A'})
+		updatedPayloadlessTrie, _, err := trie.NewTrieWithUpdatedRegisters(payloadlessTrie, []ledger.Path{p1}, []ledger.Payload{*v1}, true)
+		require.NoError(t, err)
+		require.True(t, updatedPayloadlessTrie.IsPayloadless())
+
+		// Adding a payloadless trie to a payloadless forest should succeed
+		err = payloadlessForest.AddTrie(updatedPayloadlessTrie)
+		require.NoError(t, err)
+
+		// Create a regular forest
+		regularForest, err := NewForest(5, &metrics.NoopCollector{}, nil)
+		require.NoError(t, err)
+
+		// Create a regular trie
+		regularTrie := trie.NewEmptyMTrie()
+		updatedRegularTrie, _, err := trie.NewTrieWithUpdatedRegisters(regularTrie, []ledger.Path{p1}, []ledger.Payload{*v1}, true)
+		require.NoError(t, err)
+		require.False(t, updatedRegularTrie.IsPayloadless())
+
+		// Adding a regular trie to a regular forest should succeed
+		err = regularForest.AddTrie(updatedRegularTrie)
+		require.NoError(t, err)
+	})
+
+	t.Run("AddTries propagates mismatch error", func(t *testing.T) {
+		// Create a payloadless forest
+		payloadlessForest, err := NewForestWithPayloadless(5, &metrics.NoopCollector{}, nil, true)
+		require.NoError(t, err)
+
+		// Create multiple regular tries
+		regularTrie := trie.NewEmptyMTrie()
+		p1 := pathByUint8s([]uint8{uint8(53), uint8(74)})
+		v1 := payloadBySlices([]byte{'A'}, []byte{'A'})
+		updatedRegularTrie, _, err := trie.NewTrieWithUpdatedRegisters(regularTrie, []ledger.Path{p1}, []ledger.Payload{*v1}, true)
+		require.NoError(t, err)
+
+		// Attempt to add multiple regular tries to payloadless forest - should fail
+		err = payloadlessForest.AddTries([]*trie.MTrie{updatedRegularTrie})
+		require.Error(t, err)
+		require.ErrorIs(t, err, ErrPayloadlessMismatch)
+	})
+}

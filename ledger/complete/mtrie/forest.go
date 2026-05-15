@@ -1,6 +1,7 @@
 package mtrie
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/onflow/flow-go/ledger"
@@ -8,6 +9,10 @@ import (
 	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
 	"github.com/onflow/flow-go/module"
 )
+
+// ErrPayloadlessMismatch is returned when attempting to add a trie with a different
+// payloadless mode than the forest.
+var ErrPayloadlessMismatch = errors.New("trie payloadless mode does not match forest payloadless mode")
 
 // Forest holds several in-memory tries. As Forest is a storage-abstraction layer,
 // we assume that all registers are addressed via paths of pre-defined uniform length.
@@ -357,7 +362,10 @@ func (f *Forest) GetTries() ([]*trie.MTrie, error) {
 	return f.tries.Tries(), nil
 }
 
-// AddTries adds a trie to the forest
+// AddTries adds multiple tries to the forest.
+//
+// Expected errors during normal operation:
+//   - ErrPayloadlessMismatch if any trie's payloadless mode does not match the forest's
 func (f *Forest) AddTries(newTries []*trie.MTrie) error {
 	for _, t := range newTries {
 		err := f.AddTrie(t)
@@ -368,10 +376,19 @@ func (f *Forest) AddTries(newTries []*trie.MTrie) error {
 	return nil
 }
 
-// AddTrie adds a trie to the forest
+// AddTrie adds a trie to the forest.
+//
+// Expected errors during normal operation:
+//   - ErrPayloadlessMismatch if the trie's payloadless mode does not match the forest's
 func (f *Forest) AddTrie(newTrie *trie.MTrie) error {
 	if newTrie == nil {
 		return nil
+	}
+
+	// Validate payloadless mode matches
+	if newTrie.IsPayloadless() != f.isPayloadless {
+		return fmt.Errorf("cannot add trie (payloadless=%v) to forest (payloadless=%v): %w",
+			newTrie.IsPayloadless(), f.isPayloadless, ErrPayloadlessMismatch)
 	}
 
 	// TODO: check Thread safety
