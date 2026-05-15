@@ -1,15 +1,12 @@
 package wal
 
 import (
-	"encoding/hex"
 	"fmt"
-	"io"
 	"path"
 
 	"github.com/docker/go-units"
 	"github.com/rs/zerolog"
 
-	"github.com/onflow/flow-go/ledger/complete/mtrie/flattener"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/node"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
 )
@@ -357,49 +354,4 @@ func storeCheckpointSubTrieV7(
 	}
 
 	return subtrieRootNodes, totalNodeCount, checksum, nil
-}
-
-// storeUniqueNodesV7 is similar to storeUniqueNodes but logs with V7 context.
-func storeUniqueNodesV7(
-	root *node.Node,
-	visitedNodes map[*node.Node]uint64,
-	nodeCounter uint64,
-	scratch []byte,
-	writer io.Writer,
-	nodeCounterUpdated func(nodeCounter uint64),
-) (uint64, error) {
-	for itr := flattener.NewUniqueNodeIterator(root, visitedNodes); itr.Next(); {
-		n := itr.Value()
-
-		visitedNodes[n] = nodeCounter
-		nodeCounter++
-		nodeCounterUpdated(nodeCounter)
-
-		var lchildIndex, rchildIndex uint64
-
-		if lchild := n.LeftChild(); lchild != nil {
-			var found bool
-			lchildIndex, found = visitedNodes[lchild]
-			if !found {
-				hash := lchild.Hash()
-				return 0, fmt.Errorf("internal error: missing node with hash %s", hex.EncodeToString(hash[:]))
-			}
-		}
-		if rchild := n.RightChild(); rchild != nil {
-			var found bool
-			rchildIndex, found = visitedNodes[rchild]
-			if !found {
-				hash := rchild.Hash()
-				return 0, fmt.Errorf("internal error: missing node with hash %s", hex.EncodeToString(hash[:]))
-			}
-		}
-
-		encNode := flattener.EncodeNode(n, lchildIndex, rchildIndex, scratch)
-		_, err := writer.Write(encNode)
-		if err != nil {
-			return 0, fmt.Errorf("cannot serialize node: %w", err)
-		}
-	}
-
-	return nodeCounter, nil
 }

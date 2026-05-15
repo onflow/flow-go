@@ -227,7 +227,7 @@ func TestV7AllPartFileExist(t *testing.T) {
 			require.ErrorIs(t, err, os.ErrNotExist, "wrong error type returned for missing file %d", i)
 
 			// cleanup for next iteration
-			deleteCheckpointFiles(dir, fileName)
+			require.NoError(t, deleteCheckpointFiles(dir, fileName))
 		}
 	})
 }
@@ -556,7 +556,7 @@ func TestV6V7CheckpointConsistencyWithWALUpdates(t *testing.T) {
 			"fail to store intermediate V7 checkpoint for path3")
 
 		// Delete the V6 checkpoint files to ensure we're loading from V7
-		deleteCheckpointFiles(path3Dir, v6CheckpointFile)
+		require.NoError(t, deleteCheckpointFiles(path3Dir, v6CheckpointFile))
 
 		// Load the intermediate V7 checkpoint
 		path3TriesFromV7, err := OpenAndReadCheckpointV7(path3Dir, v7CheckpointIntermediate, logger)
