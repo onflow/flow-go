@@ -192,7 +192,7 @@ func TestNativeTokenBridging(t *testing.T) {
 				RunWithNewEmulator(t, backend, rootAddr, func(env *emulator.Emulator) {
 					RunWithNewBlockView(t, env, func(blk types.BlockView) {
 						// Test withdraw amounts that overflow the UInt256 range
-						amount := gethABI.MaxUint256
+						amount := new(big.Int).Lsh(big.NewInt(1), 256)
 
 						call := types.NewWithdrawCall(bridgeAccount, testAccount, amount, testAccountNonce)
 						res, err := blk.DirectCall(call)

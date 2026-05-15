@@ -646,14 +646,6 @@ func (proc *procedure) deployAt(
 		return res, nil
 	}
 
-	// update gas usage
-	if createDataGas > call.GasLimit {
-		// consume all the remaining gas (Homestead)
-		res.GasConsumed = call.GasLimit
-		res.VMError = gethVM.ErrCodeStoreOutOfGas
-		return res, nil
-	}
-
 	// check whether the max code size has been exceeded
 	if err := gethVM.CheckMaxCodeSize(&rules, uint64(len(ret))); err != nil {
 		// consume all the remaining gas (Homestead)
@@ -667,6 +659,14 @@ func (proc *procedure) deployAt(
 		// consume all the remaining gas (Homestead)
 		res.GasConsumed = call.GasLimit
 		res.VMError = gethVM.ErrInvalidCode
+		return res, nil
+	}
+
+	// update gas usage
+	if !contract.UseGas(gethVM.GasCosts{RegularGas: createDataGas}, proc.evm.Config.Tracer, gethTracing.GasChangeCallCodeStorage) {
+		// consume all the remaining gas (Homestead)
+		res.GasConsumed = call.GasLimit
+		res.VMError = gethVM.ErrCodeStoreOutOfGas
 		return res, nil
 	}
 
