@@ -37,6 +37,7 @@ var (
 	logLevel            = flag.String("loglevel", "info", "Log level (panic, fatal, error, warn, info, debug)")
 	maxRequestSize      = flag.Uint("max-request-size", 1<<30, "Maximum request message size in bytes (default: 1 GiB)")
 	maxResponseSize     = flag.Uint("max-response-size", 1<<30, "Maximum response message size in bytes (default: 1 GiB)")
+	payloadless         = flag.Bool("payloadless", false, "Enable payloadless trie mode. Stores payload hashes instead of full payloads, reducing storage requirements.")
 )
 
 func main() {
@@ -72,6 +73,7 @@ func main() {
 		Str("admin_addr", *adminAddr).
 		Uint("metrics_port", *metricsPort).
 		Int("mtrie_cache_size", *mtrieCacheSize).
+		Bool("payloadless", *payloadless).
 		Msg("starting ledger service")
 
 	// Create trigger for manual checkpointing (used by admin command)
@@ -88,6 +90,7 @@ func main() {
 		WALMetrics:         metricsCollector,
 		LedgerMetrics:      metricsCollector,
 		Logger:             logger,
+		Payloadless:        *payloadless,
 	}, triggerCheckpointOnNextSegmentFinish)
 	if err != nil {
 		logger.Fatal().Err(err).Msg("failed to create ledger")
