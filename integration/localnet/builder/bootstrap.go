@@ -81,6 +81,7 @@ var (
 	consensusDelay              time.Duration
 	collectionDelay             time.Duration
 	logLevel                    string
+	payloadless                 bool
 
 	ports *PortAllocator
 )
@@ -109,6 +110,7 @@ func init() {
 	flag.DurationVar(&collectionDelay, "collection-delay", DefaultCollectionDelay, "delay on collection node block proposals")
 	flag.StringVar(&logLevel, "loglevel", DefaultLogLevel, "log level for all nodes")
 	flag.IntVar(&ledgerExecutionCount, "ledger-execution", 0, "number of execution nodes that use remote ledger service (0 = all use local ledger, max = execution count)")
+	flag.BoolVar(&payloadless, "payloadless", false, "enable payloadless trie mode (stores payload hashes instead of full payloads)")
 }
 
 func generateBootstrapData(flowNetworkConf testnet.NetworkConfig) []testnet.ContainerConfig {
@@ -480,6 +482,15 @@ func prepareExecutionService(container testnet.ContainerConfig, i int, n int) Se
 		service.Volumes = append(service.Volumes,
 			fmt.Sprintf("%s:/trie:z", trieDir),
 		)
+		if payloadless {
+			service.Command = append(service.Command, "--payloadless")
+		}
+	}
+
+	// Payloadless mode requires storehouse to store the actual payloads
+	// (the trie only stores payload hashes)
+	if payloadless {
+		service.Command = append(service.Command, "--enable-storehouse")
 	}
 
 	service.AddExposedPorts(testnet.GRPCPort)
@@ -865,17 +876,22 @@ func prepareLedgerService(dockerServices Services, flowNodeContainerConfigs []te
 
 	// Create ledger service
 	// Use Unix domain socket; ledger and execution nodes share absSocketDir mounted at /sockets
+	ledgerCommand := []string{
+		"--triedir=/trie",
+		"--ledger-service-socket=/sockets/ledger.sock",
+		"--mtrie-cache-size=100",
+		"--checkpoint-distance=100",
+		"--checkpoints-to-keep=3",
+		fmt.Sprintf("--loglevel=%s", logLevel),
+	}
+	if payloadless {
+		ledgerCommand = append(ledgerCommand, "--payloadless")
+	}
+
 	service := Service{
-		name:  ledgerServiceName,
-		Image: "localnet-ledger",
-		Command: []string{
-			"--triedir=/trie",
-			"--ledger-service-socket=/sockets/ledger.sock",
-			"--mtrie-cache-size=100",
-			"--checkpoint-distance=100",
-			"--checkpoints-to-keep=3",
-			fmt.Sprintf("--loglevel=%s", logLevel),
-		},
+		name:    ledgerServiceName,
+		Image:   "localnet-ledger",
+		Command: ledgerCommand,
 		Volumes: []string{
 			fmt.Sprintf("%s:/trie:z", trieDir),
 			fmt.Sprintf("%s:/bootstrap:z", BootstrapDir),
