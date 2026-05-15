@@ -222,6 +222,10 @@ func (b *BlockProposal) SlotNumber(chainID flow.ChainID) uint64 {
 	// as slot duration we can use the block production rate, which is about 0.8
 	// seconds on mainnet.
 	genesisTimestamp := GenesisBlock(chainID).Timestamp
+	// prevent uint64 underflow
+	if b.Timestamp <= genesisTimestamp {
+		return 0
+	}
 	return ((b.Timestamp - genesisTimestamp) * 5) / 4
 }
 
