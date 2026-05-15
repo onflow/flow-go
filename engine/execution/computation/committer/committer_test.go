@@ -12,8 +12,10 @@ import (
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/convert"
+	"github.com/onflow/flow-go/ledger/common/hash"
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
 	"github.com/onflow/flow-go/ledger/complete"
+	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
 	ledgermock "github.com/onflow/flow-go/ledger/mock"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/trace"
@@ -102,4 +104,250 @@ func TestLedgerViewCommitter(t *testing.T) {
 
 	})
 
+}
+
+func TestPayloadlessLedgerViewCommitter(t *testing.T) {
+
+	t.Run("payloadless committer reconstructs proof with actual values", func(t *testing.T) {
+		// Create test register with proper address format for round-trip conversion
+		owner := flow.BytesToAddress([]byte("owner"))
+		key := "key1"
+		value := []byte("test_value_for_payloadless")
+
+		// Create register ID that will round-trip correctly through ledger key conversion
+		registerID := flow.NewRegisterID(owner, key)
+		ledgerKey := convert.RegisterIDToLedgerKey(registerID)
+
+		// Verify round-trip works
+		roundTrippedID, err := convert.LedgerKeyToRegisterID(ledgerKey)
+		require.NoError(t, err)
+		require.Equal(t, registerID, roundTrippedID)
+
+		path, err := pathfinder.KeyToPath(ledgerKey, complete.DefaultPathFinderVersion)
+		require.NoError(t, err)
+
+		payload := ledger.NewPayload(ledgerKey, value)
+
+		// Create a payloadless trie and generate a proof from it
+		payloadlessTrie := trie.NewEmptyMTrieWithPayloadless(true)
+		payloadlessTrie, _, err = trie.NewTrieWithUpdatedRegisters(
+			payloadlessTrie,
+			[]ledger.Path{path},
+			[]ledger.Payload{*payload},
+			true,
+		)
+		require.NoError(t, err)
+
+		// Get proof from payloadless trie (contains hash values, not actual values)
+		payloadlessProofs := payloadlessTrie.UnsafeProofs([]ledger.Path{path})
+		encodedPayloadlessProof := ledger.EncodeTrieBatchProof(payloadlessProofs)
+
+		// Verify the payloadless proof contains hash (32 bytes), not actual value
+		require.Equal(t, 1, payloadlessProofs.Size())
+		require.Equal(t, hash.HashLen, payloadlessProofs.Proofs[0].Payload.Value().Size())
+
+		// Create mock ledger that returns the payloadless proof
+		l := ledgermock.NewLedger(t)
+
+		startState := unittest.StateCommitmentFixture()
+		endState := unittest.StateCommitmentFixture()
+		require.NotEqual(t, startState, endState)
+
+		update, err := ledger.NewUpdate(ledger.State(startState), []ledger.Key{ledgerKey}, []ledger.Value{value})
+		require.NoError(t, err)
+
+		expectedTrieUpdate, err := pathfinder.UpdateToTrieUpdate(update, complete.DefaultPathFinderVersion)
+		require.NoError(t, err)
+
+		// Mock ledger.Set
+		l.On("Set", mock.Anything).
+			Return(func(update *ledger.Update) (newState ledger.State, trieUpdate *ledger.TrieUpdate, err error) {
+				if update.State().Equals(ledger.State(startState)) {
+					return ledger.State(endState), expectedTrieUpdate, nil
+				}
+				return ledger.DummyState, nil, fmt.Errorf("wrong update")
+			}).
+			Once()
+
+		// Mock ledger.Prove to return the payloadless proof (with hash values)
+		l.On("Prove", mock.Anything).
+			Return(func(query *ledger.Query) (proof ledger.Proof, err error) {
+				return encodedPayloadlessProof, nil
+			}).
+			Once()
+
+		// Create payloadless committer
+		payloadlessCommitter := committer.NewPayloadlessLedgerViewCommitter(l, trace.NewNoopTracer())
+
+		// Create storage snapshot with actual values (simulating storehouse)
+		// Use the same registerID that will be derived from the proof
+		previousBlockSnapshot := storehouse.NewExecutingBlockSnapshot(
+			snapshot.MapStorageSnapshot{
+				registerID: value, // Actual value available in storehouse
+			},
+			flow.StateCommitment(update.State()),
+		)
+
+		// Block updates
+		blockUpdates := &snapshot.ExecutionSnapshot{
+			WriteSet: map[flow.RegisterID]flow.RegisterValue{
+				registerID: value,
+			},
+		}
+
+		// Commit the view
+		newCommit, proof, trieUpdate, newStorageSnapshot, err := payloadlessCommitter.CommitView(
+			blockUpdates,
+			previousBlockSnapshot,
+		)
+		require.NoError(t, err)
+
+		// Verify basic results
+		require.Equal(t, endState, newCommit)
+		require.Equal(t, newCommit, newStorageSnapshot.Commitment())
+		require.True(t, expectedTrieUpdate.Equals(trieUpdate))
+
+		// Decode the returned proof and verify it contains actual values (not hashes)
+		decodedProof, err := ledger.DecodeTrieBatchProof(proof)
+		require.NoError(t, err)
+		require.Equal(t, 1, decodedProof.Size())
+
+		// The reconstructed proof should have the actual value, not the hash
+		actualValue := decodedProof.Proofs[0].Payload.Value()
+		require.Equal(t, value, []byte(actualValue), "proof should contain actual value, not hash")
+		require.NotEqual(t, hash.HashLen, actualValue.Size(), "proof value should not be hash length")
+	})
+
+	t.Run("payloadless committer fails on hash mismatch", func(t *testing.T) {
+		// Create test register with proper address format
+		owner := flow.BytesToAddress([]byte("owner"))
+		key := "key1"
+		originalValue := []byte("original_value")
+
+		registerID := flow.NewRegisterID(owner, key)
+		ledgerKey := convert.RegisterIDToLedgerKey(registerID)
+
+		path, err := pathfinder.KeyToPath(ledgerKey, complete.DefaultPathFinderVersion)
+		require.NoError(t, err)
+
+		payload := ledger.NewPayload(ledgerKey, originalValue)
+
+		// Create payloadless trie with original value
+		payloadlessTrie := trie.NewEmptyMTrieWithPayloadless(true)
+		payloadlessTrie, _, err = trie.NewTrieWithUpdatedRegisters(
+			payloadlessTrie,
+			[]ledger.Path{path},
+			[]ledger.Payload{*payload},
+			true,
+		)
+		require.NoError(t, err)
+
+		// Get proof from payloadless trie
+		payloadlessProofs := payloadlessTrie.UnsafeProofs([]ledger.Path{path})
+		encodedPayloadlessProof := ledger.EncodeTrieBatchProof(payloadlessProofs)
+
+		// Create mock ledger
+		l := ledgermock.NewLedger(t)
+
+		startState := unittest.StateCommitmentFixture()
+		endState := unittest.StateCommitmentFixture()
+
+		update, err := ledger.NewUpdate(ledger.State(startState), []ledger.Key{ledgerKey}, []ledger.Value{originalValue})
+		require.NoError(t, err)
+
+		expectedTrieUpdate, err := pathfinder.UpdateToTrieUpdate(update, complete.DefaultPathFinderVersion)
+		require.NoError(t, err)
+
+		l.On("Set", mock.Anything).
+			Return(func(update *ledger.Update) (newState ledger.State, trieUpdate *ledger.TrieUpdate, err error) {
+				return ledger.State(endState), expectedTrieUpdate, nil
+			}).
+			Once()
+
+		l.On("Prove", mock.Anything).
+			Return(func(query *ledger.Query) (proof ledger.Proof, err error) {
+				return encodedPayloadlessProof, nil
+			}).
+			Once()
+
+		payloadlessCommitter := committer.NewPayloadlessLedgerViewCommitter(l, trace.NewNoopTracer())
+
+		// Create storage snapshot with DIFFERENT value (simulating inconsistency)
+		wrongValue := []byte("wrong_value_in_storehouse")
+		previousBlockSnapshot := storehouse.NewExecutingBlockSnapshot(
+			snapshot.MapStorageSnapshot{
+				registerID: wrongValue, // Wrong value!
+			},
+			flow.StateCommitment(update.State()),
+		)
+
+		blockUpdates := &snapshot.ExecutionSnapshot{
+			WriteSet: map[flow.RegisterID]flow.RegisterValue{
+				registerID: originalValue,
+			},
+		}
+
+		// Commit should fail due to hash mismatch
+		_, _, _, _, err = payloadlessCommitter.CommitView(
+			blockUpdates,
+			previousBlockSnapshot,
+		)
+		require.Error(t, err)
+		require.ErrorIs(t, err, trie.ErrPayloadHashMismatch)
+	})
+
+	t.Run("non-payloadless committer returns proof as-is", func(t *testing.T) {
+		l := ledgermock.NewLedger(t)
+		regularCommitter := committer.NewLedgerViewCommitter(l, trace.NewNoopTracer())
+
+		reg := unittest.MakeOwnerReg("key1", "val1")
+		startState := unittest.StateCommitmentFixture()
+
+		update, err := ledger.NewUpdate(ledger.State(startState), []ledger.Key{convert.RegisterIDToLedgerKey(reg.Key)}, []ledger.Value{reg.Value})
+		require.NoError(t, err)
+
+		expectedTrieUpdate, err := pathfinder.UpdateToTrieUpdate(update, complete.DefaultPathFinderVersion)
+		require.NoError(t, err)
+
+		endState := unittest.StateCommitmentFixture()
+
+		l.On("Set", mock.Anything).
+			Return(func(update *ledger.Update) (newState ledger.State, trieUpdate *ledger.TrieUpdate, err error) {
+				if update.State().Equals(ledger.State(startState)) {
+					return ledger.State(endState), expectedTrieUpdate, nil
+				}
+				return ledger.DummyState, nil, fmt.Errorf("wrong update")
+			}).
+			Once()
+
+		// Return a simple proof (not reconstructed)
+		expectedProof := ledger.Proof([]byte{2, 3, 4})
+		l.On("Prove", mock.Anything).
+			Return(func(query *ledger.Query) (proof ledger.Proof, err error) {
+				return expectedProof, nil
+			}).
+			Once()
+
+		previousBlockSnapshot := storehouse.NewExecutingBlockSnapshot(
+			snapshot.MapStorageSnapshot{
+				reg.Key: reg.Value,
+			},
+			flow.StateCommitment(update.State()),
+		)
+
+		blockUpdates := &snapshot.ExecutionSnapshot{
+			WriteSet: map[flow.RegisterID]flow.RegisterValue{
+				reg.Key: reg.Value,
+			},
+		}
+
+		_, proof, _, _, err := regularCommitter.CommitView(
+			blockUpdates,
+			previousBlockSnapshot,
+		)
+
+		require.NoError(t, err)
+		// Non-payloadless committer returns proof exactly as received from ledger
+		require.Equal(t, []byte(expectedProof), proof)
+	})
 }
