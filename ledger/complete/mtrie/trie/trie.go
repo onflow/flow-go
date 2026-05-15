@@ -473,7 +473,7 @@ func update(
 		var leafPayload *ledger.Payload
 		var regSize int64
 		if isPayloadless {
-			leafPayload = createPayloadlessPayload(&payloads[0], paths[0], nodeHeight)
+			leafPayload = createPayloadlessPayload(&payloads[0], paths[0])
 			regSize = int64(hash.HashLen) // 32 bytes for the hash
 		} else {
 			leafPayload = payloads[0].DeepCopy()
@@ -502,7 +502,7 @@ func update(
 					if !currentNode.Payload().ValueEquals(&payloads[i]) {
 						var leafPayload *ledger.Payload
 						if isPayloadless {
-							leafPayload = createPayloadlessPayload(&payloads[i], paths[i], nodeHeight)
+							leafPayload = createPayloadlessPayload(&payloads[i], paths[i])
 						} else {
 							leafPayload = payloads[i].DeepCopy()
 						}
@@ -622,10 +622,13 @@ func update(
 
 // createPayloadlessPayload creates a payload for payloadless mode where the value
 // is the payload hash (32 bytes) instead of the actual payload value.
-// The hash is computed as ComputeCompactValue(Hash(path), value, nodeHeight).
-func createPayloadlessPayload(originalPayload *ledger.Payload, path ledger.Path, nodeHeight int) *ledger.Payload {
-	// Compute the hash from the original payload value
-	computedHash := ledger.ComputeCompactValue(hash.Hash(path), originalPayload.Value(), nodeHeight)
+// The hash is computed as HashLeaf(path, value), which is height-independent.
+// This allows for simpler validation when assembling proofs, as we don't need
+// to know the node height to verify consistency with storehouse values.
+func createPayloadlessPayload(originalPayload *ledger.Payload, path ledger.Path) *ledger.Payload {
+	// Compute the hash from the original payload value using HashLeaf (height=0)
+	// This is height-independent, making validation simpler
+	computedHash := hash.HashLeaf(hash.Hash(path), originalPayload.Value())
 
 	// Create a new payload with the hash bytes as the value
 	// We preserve the key so the register can be identified

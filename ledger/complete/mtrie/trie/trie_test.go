@@ -1319,9 +1319,9 @@ func TestPayloadlessTrieStoredValue(t *testing.T) {
 	// The stored value should be 32 bytes (hash size)
 	require.Equal(t, hash.HashLen, storedPayload.Value().Size())
 
-	// Compute the expected hash: ComputeCompactValue(Hash(path), value, nodeHeight)
-	// For a single leaf at root, nodeHeight is ledger.NodeMaxHeight
-	expectedHash := ledger.ComputeCompactValue(hash.Hash(path), payload.Value(), ledger.NodeMaxHeight)
+	// Compute the expected hash: HashLeaf(Hash(path), value)
+	// This is height-independent for simpler validation
+	expectedHash := hash.HashLeaf(hash.Hash(path), payload.Value())
 
 	// Verify the stored value matches the expected hash
 	require.Equal(t, expectedHash[:], []byte(storedPayload.Value()))
@@ -1565,11 +1565,10 @@ func TestPayloadlessTriePartialTrieConstruction(t *testing.T) {
 			"retrieved payload should be hash (32 bytes)")
 
 		// Verify the retrieved hash matches what we expect
-		// The stored hash is ComputeCompactValue(path, original_value, height)
-		// For this trie structure, leaves are at height 255 (one step from root)
-		expectedHash := ledger.ComputeCompactValue(hash.Hash(path), payloads[i].Value(), ledger.NodeMaxHeight-1)
+		// The stored hash is HashLeaf(path, original_value) - height-independent
+		expectedHash := hash.HashLeaf(hash.Hash(path), payloads[i].Value())
 		require.Equal(t, expectedHash[:], []byte(retrievedPayload.Value()),
-			"retrieved hash should match expected ComputeCompactValue")
+			"retrieved hash should match expected HashLeaf")
 	}
 
 	// For comparison: regular trie partial trie contains original values
@@ -1751,7 +1750,7 @@ func TestPayloadlessTrieUpdateExistingRegister(t *testing.T) {
 	storedPayloads := trie2.AllPayloads()
 	require.Len(t, storedPayloads, 1)
 
-	expectedHash := ledger.ComputeCompactValue(hash.Hash(path), payload2.Value(), ledger.NodeMaxHeight)
+	expectedHash := hash.HashLeaf(hash.Hash(path), payload2.Value())
 	require.Equal(t, expectedHash[:], []byte(storedPayloads[0].Value()))
 
 	// Size should still be 32 bytes
