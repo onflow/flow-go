@@ -11,13 +11,15 @@ import (
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/convert"
+	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 )
 
 type LedgerViewCommitter struct {
-	ledger ledger.Ledger
-	tracer module.Tracer
+	ledger      ledger.Ledger
+	tracer      module.Tracer
+	payloadless bool
 }
 
 func NewLedgerViewCommitter(
@@ -25,8 +27,22 @@ func NewLedgerViewCommitter(
 	tracer module.Tracer,
 ) *LedgerViewCommitter {
 	return &LedgerViewCommitter{
-		ledger: ledger,
-		tracer: tracer,
+		ledger:      ledger,
+		tracer:      tracer,
+		payloadless: false,
+	}
+}
+
+// NewPayloadlessLedgerViewCommitter creates a committer for payloadless ledger mode.
+// In payloadless mode, proofs are reconstructed with actual values from the storage snapshot.
+func NewPayloadlessLedgerViewCommitter(
+	ledger ledger.Ledger,
+	tracer module.Tracer,
+) *LedgerViewCommitter {
+	return &LedgerViewCommitter{
+		ledger:      ledger,
+		tracer:      tracer,
+		payloadless: true,
 	}
 }
 
@@ -64,7 +80,7 @@ func (committer *LedgerViewCommitter) CommitView(
 }
 
 func (committer *LedgerViewCommitter) collectProofs(
-	snapshot *snapshot.ExecutionSnapshot,
+	execSnapshot *snapshot.ExecutionSnapshot,
 	baseStorageSnapshot execution.ExtendableStorageSnapshot,
 ) (
 	proof []byte,
@@ -79,7 +95,7 @@ func (committer *LedgerViewCommitter) collectProofs(
 	// by writes, especially the interim trie nodes for them, verification nodes won't be
 	// able to reconstruct the trie root hash of the execution state post execution. That's why
 	// the storage proof needs both read registers and write registers, which specifically is AllRegisterIDs
-	allIds := snapshot.AllRegisterIDs()
+	allIds := execSnapshot.AllRegisterIDs()
 	keys := make([]ledger.Key, 0, len(allIds))
 	for _, id := range allIds {
 		keys = append(keys, convert.RegisterIDToLedgerKey(id))
@@ -90,5 +106,21 @@ func (committer *LedgerViewCommitter) collectProofs(
 		return nil, fmt.Errorf("cannot create ledger query: %w", err)
 	}
 
-	return committer.ledger.Prove(query)
+	// Get encoded proof from ledger
+	encodedProof, err := committer.ledger.Prove(query)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate proof: %w", err)
+	}
+
+	// If not payloadless mode, return the proof as-is
+	if !committer.payloadless {
+		return encodedProof, nil
+	}
+
+	// In payloadless mode, reconstruct the proof with actual values from storage snapshot
+	valueReader := func(registerID flow.RegisterID) (flow.RegisterValue, error) {
+		return baseStorageSnapshot.Get(registerID)
+	}
+
+	return trie.ReconstructPayloadlessProof(encodedProof, valueReader)
 }
