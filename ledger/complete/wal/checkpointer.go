@@ -254,7 +254,24 @@ func (c *Checkpointer) Checkpoint(to int) (err error) {
 
 	fileName := NumberToFilename(to)
 
-	err = StoreCheckpointV6SingleThread(tries, c.wal.dir, fileName, c.wal.log)
+	// Determine if the tries are payloadless by checking the first non-empty trie.
+	// All tries in a forest should have the same payloadless setting.
+	payloadless := false
+	for _, t := range tries {
+		if !t.IsEmpty() {
+			payloadless = t.IsPayloadless()
+			break
+		}
+	}
+
+	// Use V7 format for payloadless tries, V6 for regular tries.
+	if payloadless {
+		c.wal.log.Info().Msgf("using checkpoint v7 format (payloadless) for checkpoint %d", to)
+		err = StoreCheckpointV7SingleThread(tries, c.wal.dir, fileName, c.wal.log)
+	} else {
+		c.wal.log.Info().Msgf("using checkpoint v6 format for checkpoint %d", to)
+		err = StoreCheckpointV6SingleThread(tries, c.wal.dir, fileName, c.wal.log)
+	}
 
 	if err != nil {
 		return fmt.Errorf("could not create checkpoint for %v: %w", to, err)
