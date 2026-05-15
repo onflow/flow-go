@@ -50,7 +50,7 @@ func requireSuccessfulExecution(t testing.TB, err error, res *types.Result) {
 }
 
 func TestNativeTokenBridging(t *testing.T) {
-	testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
+	testutils.RunWithTestBackend(t, flow.Testnet, func(backend *testutils.TestBackend) {
 		testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
 			originalBalance := types.MakeBigIntInFlow(3)
 			testAccount := types.NewAddressFromString("test")
@@ -245,7 +245,7 @@ func TestNativeTokenBridging(t *testing.T) {
 
 func TestContractInteraction(t *testing.T) {
 	t.Parallel()
-	testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
+	testutils.RunWithTestBackend(t, flow.Testnet, func(backend *testutils.TestBackend) {
 		testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
 
 			testContract := testutils.GetStorageTestContract(t)
@@ -635,7 +635,7 @@ func TestContractInteraction(t *testing.T) {
 }
 
 func TestDeployAtFunctionality(t *testing.T) {
-	testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
+	testutils.RunWithTestBackend(t, flow.Testnet, func(backend *testutils.TestBackend) {
 		testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
 			testContract := testutils.GetStorageTestContract(t)
 			testAccount := types.NewAddressFromString("test")
@@ -724,7 +724,7 @@ func TestDeployAtFunctionality(t *testing.T) {
 // EIP 6780 https://eips.ethereum.org/EIPS/eip-6780 in case where the selfdestruct
 // is not called in the same transaction as deployment.
 func TestSelfdestruct(t *testing.T) {
-	testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
+	testutils.RunWithTestBackend(t, flow.Testnet, func(backend *testutils.TestBackend) {
 		testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
 			testutils.RunWithEOATestAccount(t, backend, rootAddr, func(testAccount *testutils.EOATestAccount) {
 
@@ -808,7 +808,7 @@ func TestSelfdestruct(t *testing.T) {
 
 // test factory patterns
 func TestFactoryPatterns(t *testing.T) {
-	testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
+	testutils.RunWithTestBackend(t, flow.Testnet, func(backend *testutils.TestBackend) {
 		testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
 
 			var factoryAddress types.Address
@@ -1067,7 +1067,7 @@ func TestFactoryPatterns(t *testing.T) {
 }
 
 func TestTransfers(t *testing.T) {
-	testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
+	testutils.RunWithTestBackend(t, flow.Testnet, func(backend *testutils.TestBackend) {
 		testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
 
 			testAccount1 := types.NewAddressFromString("test1")
@@ -1107,7 +1107,7 @@ func TestTransfers(t *testing.T) {
 }
 
 func TestStorageNoSideEffect(t *testing.T) {
-	testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
+	testutils.RunWithTestBackend(t, flow.Testnet, func(backend *testutils.TestBackend) {
 		testutils.RunWithTestFlowEVMRootAddress(t, backend, func(flowEVMRoot flow.Address) {
 			var err error
 			em := emulator.NewEmulator(backend, flowEVMRoot)
@@ -1131,7 +1131,7 @@ func TestStorageNoSideEffect(t *testing.T) {
 }
 
 func TestCallingExtraPrecompiles(t *testing.T) {
-	testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
+	testutils.RunWithTestBackend(t, flow.Testnet, func(backend *testutils.TestBackend) {
 		testutils.RunWithTestFlowEVMRootAddress(t, backend, func(flowEVMRoot flow.Address) {
 			RunWithNewEmulator(t, backend, flowEVMRoot, func(em *emulator.Emulator) {
 
@@ -1198,7 +1198,7 @@ func TestCallingExtraPrecompiles(t *testing.T) {
 }
 
 func TestTxIndex(t *testing.T) {
-	testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
+	testutils.RunWithTestBackend(t, flow.Testnet, func(backend *testutils.TestBackend) {
 		testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
 			RunWithNewEmulator(t, backend, rootAddr, func(em *emulator.Emulator) {
 				ctx := types.NewDefaultBlockContext(blockNumber.Uint64())

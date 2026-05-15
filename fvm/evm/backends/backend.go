@@ -1,4 +1,4 @@
-package types
+package backends
 
 import (
 	"github.com/onflow/flow-go/fvm/environment"
@@ -23,5 +23,6 @@ type Backend interface {
 	environment.Tracer
 	environment.EVMMetricsReporter
 	environment.LoggerProvider
+	environment.EVMBlockStore
 	EVMTestOperationsAllowed() bool
 }
