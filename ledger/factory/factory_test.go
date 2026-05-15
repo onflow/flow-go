@@ -393,6 +393,7 @@ func startLedgerServer(t *testing.T, walDir string) (string, func()) {
 		metricsCollector,
 		logger,
 		complete.DefaultPathFinderVersion,
+		false, // payloadless
 	)
 
 	// Create ledger instance

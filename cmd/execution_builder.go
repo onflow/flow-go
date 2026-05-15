@@ -934,6 +934,7 @@ func (exeNode *ExecutionNode) LoadExecutionStateLedger(
 		WALMetrics:            exeNode.collector,
 		LedgerMetrics:         exeNode.collector,
 		Logger:                node.Logger,
+		Payloadless:           exeNode.exeConf.payloadless,
 	}, exeNode.toTriggerCheckpoint)
 	if err != nil {
 		return nil, err

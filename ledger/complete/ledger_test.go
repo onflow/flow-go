@@ -940,6 +940,7 @@ func TestLedgerWithCompactor_StateCountAndStateByIndex(t *testing.T) {
 			metricsCollector,
 			zerolog.Nop(),
 			complete.DefaultPathFinderVersion,
+			false, // payloadless
 		)
 		require.NoError(t, err)
 

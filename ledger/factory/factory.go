@@ -31,6 +31,9 @@ type Config struct {
 	WALMetrics         module.WALMetrics
 	LedgerMetrics      module.LedgerMetrics
 	Logger             zerolog.Logger
+
+	// Payloadless mode configuration
+	Payloadless bool // if true, trie stores payload hashes instead of full payloads
 }
 
 // NewLedger creates a ledger instance based on the configuration.
@@ -73,6 +76,7 @@ func newLocalLedger(config Config, triggerCheckpoint *atomic.Bool) (ledger.Ledge
 
 	config.Logger.Info().
 		Str("triedir", config.Triedir).
+		Bool("payloadless", config.Payloadless).
 		Msg("using local ledger")
 
 	// Create WAL
@@ -106,6 +110,7 @@ func newLocalLedger(config Config, triggerCheckpoint *atomic.Bool) (ledger.Ledge
 		config.LedgerMetrics,
 		config.Logger.With().Str("subcomponent", "ledger").Logger(),
 		complete.DefaultPathFinderVersion,
+		config.Payloadless,
 	)
 
 	ledgerStorage, err := factory.NewLedger()

@@ -25,6 +25,7 @@ type LedgerWithCompactor struct {
 // The compactor lifecycle is managed by this wrapper.
 // Use Ready() to wait for the ledger and compactor to be ready.
 // triggerCheckpoint is a runtime control signal to trigger checkpoint on next segment finish.
+// payloadless indicates whether the ledger should operate in payloadless mode.
 func NewLedgerWithCompactor(
 	diskWAL realWAL.LedgerWAL,
 	ledgerCapacity int,
@@ -33,11 +34,12 @@ func NewLedgerWithCompactor(
 	metrics module.LedgerMetrics,
 	logger zerolog.Logger,
 	pathFinderVersion uint8,
+	payloadless bool,
 ) (*LedgerWithCompactor, error) {
 	logger = logger.With().Str("ledger_mod", "complete").Logger()
 
 	// Create the ledger
-	l, err := NewLedger(diskWAL, ledgerCapacity, metrics, logger, pathFinderVersion)
+	l, err := NewLedgerWithPayloadless(diskWAL, ledgerCapacity, metrics, logger, pathFinderVersion, payloadless)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create ledger: %w", err)
 	}

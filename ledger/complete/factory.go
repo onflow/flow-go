@@ -18,10 +18,12 @@ type LocalLedgerFactory struct {
 	metrics           module.LedgerMetrics
 	logger            zerolog.Logger
 	pathFinderVersion uint8
+	payloadless       bool
 }
 
 // NewLocalLedgerFactory creates a new factory for local ledger instances.
 // triggerCheckpoint is a runtime control signal to trigger checkpoint on next segment finish.
+// payloadless indicates whether the ledger should operate in payloadless mode.
 func NewLocalLedgerFactory(
 	ledgerWAL wal.LedgerWAL,
 	capacity int,
@@ -30,6 +32,7 @@ func NewLocalLedgerFactory(
 	metrics module.LedgerMetrics,
 	logger zerolog.Logger,
 	pathFinderVersion uint8,
+	payloadless bool,
 ) ledger.Factory {
 	return &LocalLedgerFactory{
 		wal:               ledgerWAL,
@@ -39,6 +42,7 @@ func NewLocalLedgerFactory(
 		metrics:           metrics,
 		logger:            logger,
 		pathFinderVersion: pathFinderVersion,
+		payloadless:       payloadless,
 	}
 }
 
@@ -51,6 +55,7 @@ func (f *LocalLedgerFactory) NewLedger() (ledger.Ledger, error) {
 		f.metrics,
 		f.logger,
 		f.pathFinderVersion,
+		f.payloadless,
 	)
 	if err != nil {
 		return nil, err
