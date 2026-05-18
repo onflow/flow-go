@@ -182,6 +182,11 @@ type LocalGossipSubRouterMetrics interface {
 
 	// OnMessageDeliveredToAllSubscribers is called when a message is delivered to all subscribers of the topic.
 	OnMessageDeliveredToAllSubscribers(size int)
+
+	// OnClusterTopicMetricsCleanup is called when the local node leaves a cluster topic. It cleans up all
+	// metrics associated with the topic to prevent unbounded metric cardinality growth during epoch transitions.
+	// This should only be called for cluster topics (sync-cluster-*, consensus-cluster-*).
+	OnClusterTopicMetricsCleanup(topic string)
 }
 
 // UnicastManagerMetrics unicast manager metrics.
