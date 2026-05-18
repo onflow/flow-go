@@ -605,21 +605,15 @@ func (db *StateDB) Commit(finalize bool) (hash.Hash, error) {
 // before the Finalise.
 func (db *StateDB) LogsForBurnAccounts() []*gethTypes.Log {
 	// iterate views and collect dirty addresses
-	addresses := make(map[gethCommon.Address]struct{})
+	dirtyAddresses := make(map[gethCommon.Address]struct{})
 	for _, view := range db.views {
 		for key := range view.DirtyAddresses() {
-			addresses[key] = struct{}{}
+			dirtyAddresses[key] = struct{}{}
 		}
 	}
 
-	// sort addresses
-	sortedAddresses := make([]gethCommon.Address, 0, len(addresses))
-	for addr := range addresses {
-		sortedAddresses = append(sortedAddresses, addr)
-	}
-
 	var list []removedAccountWithBalance
-	for _, addr := range sortedAddresses {
+	for addr := range dirtyAddresses {
 		hasSelfDestructed, balance := db.latestView().HasSelfDestructed(addr)
 		if hasSelfDestructed && !balance.IsZero() {
 			list = append(list, removedAccountWithBalance{
