@@ -378,3 +378,12 @@ func (g *LocalGossipSubRouterMetrics) OnUndeliveredMessage() {
 func (g *LocalGossipSubRouterMetrics) OnMessageDeliveredToAllSubscribers(size int) {
 	g.messageDeliveredSize.Observe(float64(size))
 }
+
+// OnClusterTopicMetricsCleanup removes all metric label values associated with the given cluster topic.
+// This prevents unbounded metric cardinality growth during epoch transitions when collection nodes
+// join new clusters and leave old ones. Only call this for cluster topics (sync-cluster-*, consensus-cluster-*).
+func (g *LocalGossipSubRouterMetrics) OnClusterTopicMetricsCleanup(topic string) {
+	g.localMeshSize.DeleteLabelValues(topic)
+	g.peerGraftTopicCount.DeleteLabelValues(topic)
+	g.peerPruneTopicCount.DeleteLabelValues(topic)
+}

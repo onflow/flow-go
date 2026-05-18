@@ -279,6 +279,18 @@ func (t *GossipSubMeshTracer) Leave(topic string) {
 			Str("topic", topic).
 			Msg("local peer left topic")
 	}
+
+	// Clean up topic mesh tracking and metrics for cluster topics to prevent unbounded
+	// metric cardinality growth during epoch transitions.
+	if channels.IsClusterChannel(channels.Channel(topic)) {
+		t.topicMeshMu.Lock()
+		delete(t.topicMeshMap, topic)
+		t.topicMeshMu.Unlock()
+		t.metrics.OnClusterTopicMetricsCleanup(topic)
+		t.logger.Debug().
+			Str("topic", topic).
+			Msg("cleaned up cluster topic metrics")
+	}
 }
 
 // ValidateMessage is called by GossipSub as a callback when a message is received by the local node and entered the validation phase.

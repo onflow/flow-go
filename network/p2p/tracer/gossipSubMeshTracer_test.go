@@ -218,3 +218,85 @@ func (c *localMeshTracerMetricsCollector) OnLocalMeshSizeUpdated(topic string, s
 	// calls the mock method to assert the metrics.
 	c.l.OnLocalMeshSizeUpdated(topic, size)
 }
+
+func (c *localMeshTracerMetricsCollector) OnClusterTopicMetricsCleanup(topic string) {
+	// calls the mock method to assert the metrics cleanup.
+	c.l.OnClusterTopicMetricsCleanup(topic)
+}
+
+// TestGossipSubMeshTracer_ClusterTopicCleanup tests that when a node leaves a cluster topic,
+// the mesh tracer cleans up metrics for that topic to prevent unbounded metric cardinality growth.
+func TestGossipSubMeshTracer_ClusterTopicCleanup(t *testing.T) {
+	defaultConfig, err := config.DefaultConfig()
+	require.NoError(t, err)
+	ctx, cancel := context.WithCancel(context.Background())
+	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
+	sporkId := unittest.IdentifierFixture()
+	idProvider := mockmodule.NewIdentityProvider(t)
+	defer cancel()
+
+	// create a non-cluster channel and a cluster channel
+	nonClusterChannel := channels.PushBlocks
+	nonClusterTopic := channels.TopicFromChannel(nonClusterChannel, sporkId)
+	clusterID := flow.ChainID("test-cluster-id")
+	clusterChannel := channels.SyncCluster(clusterID)
+	clusterTopic := channels.Topic(clusterChannel)
+
+	logger := zerolog.New(io.Discard).Level(zerolog.DebugLevel)
+
+	collector := newLocalMeshTracerMetricsCollector(t)
+	// set the meshTracer to log at 1 second intervals for sake of testing.
+	defaultConfig.NetworkConfig.GossipSub.RpcTracer.LocalMeshLogInterval = 1 * time.Second
+	// disables peer scoring for sake of testing
+	defaultConfig.NetworkConfig.GossipSub.PeerScoringEnabled = false
+
+	tracerNode, tracerId := p2ptest.NodeFixture(
+		t,
+		sporkId,
+		t.Name(),
+		idProvider,
+		p2ptest.WithLogger(logger),
+		p2ptest.OverrideFlowConfig(defaultConfig),
+		p2ptest.WithMetricsCollector(collector),
+		p2ptest.WithRole(flow.RoleCollection))
+
+	idProvider.On("ByPeerID", tracerNode.ID()).Return(&tracerId, true).Maybe()
+
+	nodes := []p2p.LibP2PNode{tracerNode}
+	ids := flow.IdentityList{&tracerId}
+
+	p2ptest.RegisterPeerProviders(t, nodes)
+	p2ptest.StartNodes(t, signalerCtx, nodes)
+	defer p2ptest.StopNodes(t, nodes, cancel)
+
+	p2ptest.LetNodesDiscoverEachOther(t, ctx, nodes, ids)
+
+	// allow any OnLocalMeshSizeUpdated calls since we're not testing that here
+	collector.l.On("OnLocalMeshSizeUpdated", nonClusterTopic.String(), 0).Maybe()
+	collector.l.On("OnLocalMeshSizeUpdated", clusterTopic.String(), 0).Maybe()
+
+	// subscribe to both topics
+	_, err = tracerNode.Subscribe(
+		nonClusterTopic,
+		validator.TopicValidator(
+			unittest.Logger(),
+			unittest.AllowAllPeerFilter()))
+	require.NoError(t, err)
+
+	_, err = tracerNode.Subscribe(
+		clusterTopic,
+		validator.TopicValidator(
+			unittest.Logger(),
+			unittest.AllowAllPeerFilter()))
+	require.NoError(t, err)
+
+	// set up expectation: OnClusterTopicMetricsCleanup should only be called for the cluster topic
+	collector.l.On("OnClusterTopicMetricsCleanup", clusterTopic.String()).Once()
+
+	// unsubscribe from both topics
+	require.NoError(t, tracerNode.Unsubscribe(nonClusterTopic))
+	require.NoError(t, tracerNode.Unsubscribe(clusterTopic))
+
+	// give time for the Leave callback to be processed
+	time.Sleep(100 * time.Millisecond)
+}
