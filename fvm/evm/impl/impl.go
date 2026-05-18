@@ -89,7 +89,14 @@ func NewInternalEVMContractValue(
 		return nil
 	}
 
-	methodGetter := func(name string, _ interpreter.MemberAccessibleContext) interpreter.FunctionValue {
+	// Given all methods of InternalEVM are essentially "static" functions,
+	// we can cache them and avoid recomputing them on every access.
+
+	methodGetter := func(
+		name string,
+		_ interpreter.MemberAccessibleContext,
+		_ interpreter.ReferenceValue,
+	) interpreter.FunctionValue {
 		method, ok := methods[name]
 		if !ok {
 			method = computeLazyStoredMethod(name)
