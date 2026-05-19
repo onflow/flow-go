@@ -584,3 +584,10 @@ func (c *GossipSubRpcValidationInspectorMetrics) OnPublishMessageInspected(total
 func (c *GossipSubRpcValidationInspectorMetrics) OnPublishMessagesInspectionErrorExceedsThreshold() {
 	c.publishMessageInspectionErrExceedThresholdCount.Inc()
 }
+
+// OnClusterTopicMetricsCleanup removes all metric label values associated with the given cluster topic.
+// This prevents unbounded metric cardinality growth during epoch transitions when collection nodes
+// join new clusters and leave old ones. Only call this for cluster topics (sync-cluster-*, consensus-cluster-*).
+func (c *GossipSubRpcValidationInspectorMetrics) OnClusterTopicMetricsCleanup(topic string) {
+	c.receivedIHaveMsgIDsHistogram.DeleteLabelValues(topic)
+}

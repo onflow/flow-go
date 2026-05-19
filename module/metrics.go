@@ -389,6 +389,11 @@ type GossipSubRpcValidationInspectorMetrics interface {
 	// - invalidSubscriptionsCount: the number of times that an invalid subscription was detected during the async inspection of publish messages.
 	// - invalidSendersCount: the number of times that an invalid sender was detected during the async inspection of publish messages.
 	OnPublishMessageInspected(totalErrCount int, invalidTopicIdsCount int, invalidSubscriptionsCount int, invalidSendersCount int)
+
+	// OnClusterTopicMetricsCleanup is called when the local node leaves a cluster topic. It cleans up all
+	// metrics associated with the topic to prevent unbounded metric cardinality growth during epoch transitions.
+	// This should only be called for cluster topics (sync-cluster-*, consensus-cluster-*).
+	OnClusterTopicMetricsCleanup(topic string)
 }
 
 // NetworkInboundQueueMetrics encapsulates the metrics collectors for the inbound queue of the networking layer.
