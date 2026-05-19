@@ -274,6 +274,24 @@ func (nc *NetworkCollector) DuplicateInboundMessagesDropped(topic, protocol, mes
 	nc.duplicateMessagesDropped.WithLabelValues(topic, protocol, messageType).Add(1)
 }
 
+// OnClusterTopicMetricsCleanup removes all metric label values associated with the given cluster topic.
+// This prevents unbounded metric cardinality growth during epoch transitions when collection nodes
+// join new clusters and leave old ones. Only call this for cluster topics (sync-cluster-*, consensus-cluster-*).
+// This method overrides the embedded LocalGossipSubRouterMetrics.OnClusterTopicMetricsCleanup to also
+// clean up inbound/outbound message size metrics and iHave message ID metrics.
+func (nc *NetworkCollector) OnClusterTopicMetricsCleanup(topic string) {
+	// Clean up LocalGossipSubRouterMetrics (localMeshSize, peerGraftTopicCount, peerPruneTopicCount)
+	nc.LocalGossipSubRouterMetrics.OnClusterTopicMetricsCleanup(topic)
+
+	// Clean up GossipSubRpcValidationInspectorMetrics (receivedIHaveMsgIDsHistogram)
+	nc.GossipSubRpcValidationInspectorMetrics.OnClusterTopicMetricsCleanup(topic)
+
+	// Clean up inbound/outbound message size metrics using partial match on topic
+	nc.inboundMessageSize.DeletePartialMatch(prometheus.Labels{LabelChannel: topic})
+	nc.outboundMessageSize.DeletePartialMatch(prometheus.Labels{LabelChannel: topic})
+	nc.duplicateMessagesDropped.DeletePartialMatch(prometheus.Labels{LabelChannel: topic})
+}
+
 func (nc *NetworkCollector) MessageAdded(priority int) {
 	nc.queueSize.WithLabelValues(strconv.Itoa(priority)).Inc()
 }

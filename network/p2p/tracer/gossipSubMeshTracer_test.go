@@ -297,6 +297,13 @@ func TestGossipSubMeshTracer_ClusterTopicCleanup(t *testing.T) {
 	require.NoError(t, tracerNode.Unsubscribe(nonClusterTopic))
 	require.NoError(t, tracerNode.Unsubscribe(clusterTopic))
 
-	// give time for the Leave callback to be processed
-	time.Sleep(100 * time.Millisecond)
+	// wait until cleanup callback is observed (avoid flaky timing with time.Sleep)
+	require.Eventually(t, func() bool {
+		for _, c := range collector.l.Calls {
+			if c.Method == "OnClusterTopicMetricsCleanup" && len(c.Arguments) == 1 && c.Arguments[0] == clusterTopic.String() {
+				return true
+			}
+		}
+		return false
+	}, time.Second, 10*time.Millisecond)
 }
