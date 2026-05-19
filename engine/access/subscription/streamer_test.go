@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/google/uuid"
@@ -105,6 +106,157 @@ func TestStreamRatelimited(t *testing.T) {
 			assert.LessOrEqual(t, sendCalls, target*3)
 		})
 	}
+}
+
+// TestStreamUnsubscribesOnContextCancel tests that the streamer properly unsubscribes from the
+// broadcaster when the context is cancelled, preventing subscriber leaks.
+func TestStreamUnsubscribesOnContextCancel(t *testing.T) {
+	t.Parallel()
+
+	timeout := subscription.DefaultSendTimeout
+
+	t.Run("unsubscribes on context cancel", func(t *testing.T) {
+		t.Parallel()
+		synctest.Test(t, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+
+			sub := submock.NewStreamable(t)
+			sub.On("ID").Return(uuid.NewString())
+			// Mock Next to return ErrBlockNotReady so the stream waits for more notifications
+			sub.On("Next", mock.Anything).Return(nil, subscription.ErrBlockNotReady).Maybe()
+			sub.On("Fail", mock.Anything).Return().Once()
+
+			broadcaster := engine.NewBroadcaster()
+			streamer := subscription.NewStreamer(unittest.Logger(), broadcaster, timeout, subscription.DefaultResponseLimit, sub)
+
+			assert.Equal(t, 0, broadcaster.SubscriberCount())
+
+			// Start streaming in a goroutine
+			go streamer.Stream(ctx)
+
+			// Wait for the stream to start and subscribe (blocks until goroutine is waiting)
+			synctest.Wait()
+			assert.Equal(t, 1, broadcaster.SubscriberCount())
+
+			// Cancel the context
+			cancel()
+
+			// Wait for the stream to finish
+			synctest.Wait()
+
+			// Verify subscriber was removed
+			assert.Equal(t, 0, broadcaster.SubscriberCount())
+		})
+	})
+
+	t.Run("unsubscribes on error", func(t *testing.T) {
+		t.Parallel()
+		ctx := context.Background()
+
+		sub := submock.NewStreamable(t)
+		sub.On("ID").Return(uuid.NewString())
+		sub.On("Next", mock.Anything).Return(nil, testErr).Once()
+		sub.On("Fail", mock.Anything).Return().Once()
+
+		broadcaster := engine.NewBroadcaster()
+		streamer := subscription.NewStreamer(unittest.Logger(), broadcaster, timeout, subscription.DefaultResponseLimit, sub)
+
+		assert.Equal(t, 0, broadcaster.SubscriberCount())
+
+		unittest.RequireReturnsBefore(t, func() {
+			streamer.Stream(ctx)
+		}, 100*time.Millisecond, "stream should finish")
+
+		// Verify subscriber was removed after error
+		assert.Equal(t, 0, broadcaster.SubscriberCount())
+	})
+
+	t.Run("unsubscribes on end of data", func(t *testing.T) {
+		t.Parallel()
+		ctx := context.Background()
+
+		sub := submock.NewStreamable(t)
+		sub.On("ID").Return(uuid.NewString())
+		sub.On("Next", mock.Anything).Return(nil, subscription.ErrEndOfData).Once()
+		sub.On("Close").Return().Once()
+
+		broadcaster := engine.NewBroadcaster()
+		streamer := subscription.NewStreamer(unittest.Logger(), broadcaster, timeout, subscription.DefaultResponseLimit, sub)
+
+		assert.Equal(t, 0, broadcaster.SubscriberCount())
+
+		unittest.RequireReturnsBefore(t, func() {
+			streamer.Stream(ctx)
+		}, 100*time.Millisecond, "stream should finish")
+
+		// Verify subscriber was removed after end of data
+		assert.Equal(t, 0, broadcaster.SubscriberCount())
+	})
+
+	t.Run("does not subscribe if context already cancelled", func(t *testing.T) {
+		t.Parallel()
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel() // Cancel before streaming starts
+
+		sub := submock.NewStreamable(t)
+		sub.On("ID").Return(uuid.NewString())
+		sub.On("Fail", mock.Anything).Return().Once()
+
+		broadcaster := engine.NewBroadcaster()
+		streamer := subscription.NewStreamer(unittest.Logger(), broadcaster, timeout, subscription.DefaultResponseLimit, sub)
+
+		assert.Equal(t, 0, broadcaster.SubscriberCount())
+
+		unittest.RequireReturnsBefore(t, func() {
+			streamer.Stream(ctx)
+		}, 100*time.Millisecond, "stream should finish immediately")
+
+		// Verify no subscriber was ever added
+		assert.Equal(t, 0, broadcaster.SubscriberCount())
+	})
+
+	t.Run("multiple streams subscribe and unsubscribe correctly", func(t *testing.T) {
+		t.Parallel()
+		synctest.Test(t, func(t *testing.T) {
+			broadcaster := engine.NewBroadcaster()
+			const numStreams = 10
+
+			cancels := make([]context.CancelFunc, numStreams)
+
+			for i := 0; i < numStreams; i++ {
+				var ctx context.Context
+				ctx, cancels[i] = context.WithCancel(context.Background())
+
+				sub := submock.NewStreamable(t)
+				sub.On("ID").Return(uuid.NewString())
+				// Mock Next to return ErrBlockNotReady so the stream waits for more notifications
+				sub.On("Next", mock.Anything).Return(nil, subscription.ErrBlockNotReady).Maybe()
+				sub.On("Fail", mock.Anything).Return().Once()
+
+				streamer := subscription.NewStreamer(unittest.Logger(), broadcaster, timeout, subscription.DefaultResponseLimit, sub)
+
+				go streamer.Stream(ctx)
+			}
+
+			// Wait for all streams to start (blocks until all goroutines are waiting)
+			synctest.Wait()
+			assert.Equal(t, numStreams, broadcaster.SubscriberCount())
+
+			// Verify broadcast reaches all subscribers
+			broadcaster.Publish()
+			synctest.Wait()
+
+			// Cancel streams one by one and verify count decreases
+			for i := 0; i < numStreams; i++ {
+				cancels[i]()
+				synctest.Wait()
+				assert.Equal(t, numStreams-i-1, broadcaster.SubscriberCount())
+			}
+
+			// Verify broadcasting to empty subscriber list works
+			broadcaster.Publish()
+		})
+	})
 }
 
 // TestLongStreamRatelimited tests that the streamer is uses the correct rate limit over a longer
