@@ -30,6 +30,19 @@ const (
 	// DefaultEntityRequestCacheSize is the default max message queue size for the provider engine.
 	// This equates to ~5GB of memory usage with a full queue (10M*500)
 	DefaultEntityRequestCacheSize = 500
+
+	// DefaultMaxEntityIDs is the default maximum number of entity IDs that can be requested in a single
+	// EntityRequest. This limit prevents amplification attacks where a small request triggers excessive
+	// retrieval and serialization work. Note: the default requester engine (engine/common/requester) only
+	// requests up to 32 entity IDs per batch (see BatchThreshold), so this limit provides ample headroom
+	// for legitimate requests.
+	DefaultMaxEntityIDs = 100
+
+	// DefaultMaxResponseByteSize is the default maximum cumulative byte size of encoded entities in a response.
+	// This is set conservatively below the network's DefaultMaxUnicastMsgSize (10MB) to account for
+	// message overhead (headers, encoding wrappers, etc.). The provider will stop adding entities to the
+	// response once this budget is exceeded, preventing unbounded serialization work.
+	DefaultMaxResponseByteSize = 8 * 1024 * 1024 // 8MB
 )
 
 // RetrieveFunc is a function provided to the provider engine upon construction.
@@ -56,9 +69,34 @@ type Engine struct {
 	retrieve       RetrieveFunc
 	// buffered channel for EntityRequest workers to pick and process.
 	requestChannel chan *internal.EntityRequest
+	// maxEntityIDs is the maximum number of entity IDs allowed per request.
+	// Requests with more IDs will be truncated to this limit.
+	maxEntityIDs int
+	// maxResponseByteSize is the maximum cumulative byte size of encoded entities in a response.
+	// The provider will stop adding entities once this budget is exceeded.
+	maxResponseByteSize int
 }
 
 var _ network.MessageProcessor = (*Engine)(nil)
+
+// Option is a functional option for configuring the provider Engine.
+type Option func(*Engine)
+
+// WithMaxEntityIDs sets the maximum number of entity IDs that can be requested in a single request.
+// Requests with more IDs will be truncated to this limit.
+func WithMaxEntityIDs(max int) Option {
+	return func(e *Engine) {
+		e.maxEntityIDs = max
+	}
+}
+
+// WithMaxResponseByteSize sets the maximum cumulative byte size of encoded entities in a response.
+// The provider will stop adding entities once this budget is exceeded.
+func WithMaxResponseByteSize(max int) Option {
+	return func(e *Engine) {
+		e.maxResponseByteSize = max
+	}
+}
 
 // New creates a new provider engine, operating on the provided network channel, and accepting requests for entities
 // from a node within the set obtained by applying the provided selector filter. It uses the injected retrieve function
@@ -73,7 +111,8 @@ func New(
 	requestWorkers uint,
 	channel channels.Channel,
 	selector flow.IdentityFilter[flow.Identity],
-	retrieve RetrieveFunc) (*Engine, error) {
+	retrieve RetrieveFunc,
+	opts ...Option) (*Engine, error) {
 
 	// make sure we don't respond to request sent by self or unauthorized nodes
 	selector = filter.And(
@@ -114,15 +153,22 @@ func New(
 
 	// initialize the propagation engine with its dependencies
 	e := &Engine{
-		log:            log.With().Str("engine", "provider").Logger(),
-		metrics:        metrics,
-		state:          state,
-		channel:        channel,
-		selector:       selector,
-		retrieve:       retrieve,
-		requestHandler: handler,
-		requestQueue:   requestQueue,
-		requestChannel: make(chan *internal.EntityRequest, requestWorkers),
+		log:                 log.With().Str("engine", "provider").Logger(),
+		metrics:             metrics,
+		state:               state,
+		channel:             channel,
+		selector:            selector,
+		retrieve:            retrieve,
+		requestHandler:      handler,
+		requestQueue:        requestQueue,
+		requestChannel:      make(chan *internal.EntityRequest, requestWorkers),
+		maxEntityIDs:        DefaultMaxEntityIDs,
+		maxResponseByteSize: DefaultMaxResponseByteSize,
+	}
+
+	// apply functional options
+	for _, opt := range opts {
+		opt(e)
 	}
 
 	// register the engine with the network layer and store the conduit
@@ -176,21 +222,45 @@ func (e *Engine) Process(channel channels.Channel, originID flow.Identifier, eve
 }
 
 // onEntityRequest processes an entity request message from a remote node.
+//
+// To prevent amplification attacks, this method enforces two limits:
+//   - Maximum number of entity IDs per request (truncates to maxEntityIDs)
+//   - Maximum cumulative response size (stops adding entities once maxResponseByteSize is exceeded)
+//
 // Error returns:
-// * NetworkTransmissionError if there is a network error happens on transmitting the requested entities.
-// * InvalidInputError if the list of requested entities is invalid (empty).
-// * generic error in case of unexpected failure or implementation bug.
+//   - NetworkTransmissionError if there is a network error happens on transmitting the requested entities.
+//   - InvalidInputError if the list of requested entities is invalid (empty).
+//   - generic error in case of unexpected failure or implementation bug.
 func (e *Engine) onEntityRequest(request *internal.EntityRequest) error {
 	defer e.metrics.MessageHandled(e.channel.String(), metrics.MessageEntityRequest)
 
+	requestedIDs := request.EntityIds
+	truncated := false
+
+	// Enforce maximum number of entity IDs per request to limit retrieval work
+	if len(requestedIDs) > e.maxEntityIDs {
+		requestedIDs = requestedIDs[:e.maxEntityIDs]
+		truncated = true
+	}
+
 	lg := e.log.With().
 		Str("origin_id", request.OriginId.String()).
-		Strs("entity_ids", flow.IdentifierList(request.EntityIds).Strings()).
+		Strs("entity_ids", flow.IdentifierList(requestedIDs).Strings()).
 		Logger()
 
-	lg.Info().
-		Uint64("nonce", request.Nonce).
-		Msg("entity request received")
+	if truncated {
+		lg.Warn().
+			Uint64("nonce", request.Nonce).
+			Int("original_count", len(request.EntityIds)).
+			Int("truncated_to", len(requestedIDs)).
+			Bool(logging.KeySuspicious, true).
+			Msg("entity request truncated: exceeded maximum entity IDs limit")
+	} else {
+		lg.Info().
+			Uint64("nonce", request.Nonce).
+			Int("requested_count", len(request.EntityIds)).
+			Msg("entity request received")
+	}
 
 	// TODO: add reputation system to punish nodes for malicious behaviour (spam / repeated requests)
 
@@ -207,11 +277,15 @@ func (e *Engine) onEntityRequest(request *internal.EntityRequest) error {
 		return engine.NewInvalidInputErrorf("invalid requester origin (%x)", request.OriginId)
 	}
 
-	// try to retrieve each entity and skip missing ones
-	entities := make([]flow.Entity, 0, len(request.EntityIds))
-	entityIDs := make([]flow.Identifier, 0, len(request.EntityIds))
+	// Retrieve and encode entities one at a time, tracking cumulative response size.
+	// We encode during retrieval (rather than in a separate loop) to allow early termination
+	// once the response byte budget is exceeded. This prevents unbounded serialization work.
+	blobs := make([][]byte, 0, len(requestedIDs))
+	entityIDs := make([]flow.Identifier, 0, len(requestedIDs))
 	seen := make(map[flow.Identifier]struct{})
-	for _, entityID := range request.EntityIds {
+	var cumulativeSize int
+
+	for _, entityID := range requestedIDs {
 		// skip requesting duplicate entity IDs
 		if _, ok := seen[entityID]; ok {
 			lg.Warn().
@@ -220,6 +294,7 @@ func (e *Engine) onEntityRequest(request *internal.EntityRequest) error {
 				Msg("duplicate entity ID in entity request")
 			continue
 		}
+		seen[entityID] = struct{}{}
 
 		entity, err := e.retrieve(entityID)
 		if errors.Is(err, storage.ErrNotFound) {
@@ -231,19 +306,27 @@ func (e *Engine) onEntityRequest(request *internal.EntityRequest) error {
 		if err != nil {
 			return fmt.Errorf("could not retrieve entity (%x): %w", entityID, err)
 		}
-		entities = append(entities, entity)
-		entityIDs = append(entityIDs, entityID)
-		seen[entityID] = struct{}{}
-	}
 
-	// encode all of the entities
-	blobs := make([][]byte, 0, len(entities))
-	for _, entity := range entities {
+		// Encode the entity immediately to check size budget
 		blob, err := msgpack.Marshal(entity)
 		if err != nil {
 			return fmt.Errorf("could not encode entity (%x): %w", entity.ID(), err)
 		}
+
+		// Check if adding this entity would exceed the response byte budget
+		if cumulativeSize+len(blob) > e.maxResponseByteSize {
+			lg.Info().
+				Int("cumulative_size", cumulativeSize).
+				Int("blob_size", len(blob)).
+				Int("max_response_size", e.maxResponseByteSize).
+				Int("entities_included", len(blobs)).
+				Msg("response byte budget exceeded, returning partial response")
+			break
+		}
+
 		blobs = append(blobs, blob)
+		entityIDs = append(entityIDs, entityID)
+		cumulativeSize += len(blob)
 	}
 
 	// NOTE: we do _NOT_ avoid sending empty responses, as this will allow
