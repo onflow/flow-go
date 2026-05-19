@@ -40,7 +40,7 @@ func testWorkers(t *testing.T, maxPriority int, messageCnt int, workerCnt int) {
 		assert.True(t, ok)
 		return queue.Priority(i), nil
 	},
-		metrics.NewNoopCollector())
+		metrics.NewNoopCollector(), 0)
 
 	var l sync.Mutex                                // protect comparisons with expectedPriority
 	messagesPerPriority := messageCnt / maxPriority // messages per priority

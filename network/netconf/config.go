@@ -33,6 +33,10 @@ type Config struct {
 	DNSCacheTTL time.Duration `validate:"gt=0s" mapstructure:"dns-cache-ttl"`
 	// DisallowListNotificationCacheSize size of the queue for notifications about new peers in the disallow list.
 	DisallowListNotificationCacheSize uint32 `validate:"gt=0" mapstructure:"disallow-list-notification-cache-size"`
+	// MessageQueueSize is the maximum number of messages that can be buffered in the inbound message queue.
+	// This limit prevents unbounded memory growth from message flooding attacks.
+	// If set to 0, a default value will be used.
+	MessageQueueSize uint32 `mapstructure:"message-queue-size"`
 }
 
 // AlspConfig is the config for the Application Layer Spam Prevention (ALSP) protocol.
