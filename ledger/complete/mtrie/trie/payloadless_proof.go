@@ -118,15 +118,14 @@ func ReconstructPayloadlessProof(
 		}
 
 		// Get the stored value from the proof.
-		// In payloadless mode, this should be a 32-byte hash (HashLeaf(path, actualValue)).
-		// However, if the proof comes from a non-payloadless trie (e.g., during bootstrap
-		// with mixed trie modes), the value is the actual register value, not a hash.
-		// In that case, we keep the proof as-is since it already contains the actual value.
+		// In payloadless mode, this must be a 32-byte hash (HashLeaf(path, actualValue)).
+		// If the value is not 32 bytes, it indicates a bug - the caller should only use
+		// this function with proofs from payloadless tries.
 		storedValue := proof.Payload.Value()
 		if len(storedValue) != hash.HashLen {
-			// Not a hash - this proof comes from a non-payloadless trie.
-			// The proof already contains the actual value, so skip reconstruction.
-			continue
+			return nil, fmt.Errorf(
+				"proof reconstruction failed for register %s: expected 32-byte hash in payloadless proof, got %d bytes",
+				registerID, len(storedValue))
 		}
 		storedHash := storedValue
 
@@ -138,14 +137,14 @@ func ReconstructPayloadlessProof(
 		}
 
 		// Verify consistency: HashLeaf(path, actualValue) == storedHash
-		// If the hash matches, this is a payloadless proof and we replace the hash with actual value.
-		// If the hash doesn't match, the stored value is an actual 32-byte value from a non-payloadless
-		// trie (e.g., mixed mode during bootstrap). In this case, skip reconstruction.
+		// If the hash matches, we replace the hash with actual value.
+		// If not, the storehouse has wrong/missing value - return error.
 		expectedHash := hash.HashLeaf(hash.Hash(proof.Path), actualValue)
 		if !bytes.Equal(expectedHash[:], storedHash) {
-			// Hash mismatch means this is a 32-byte actual value, not a hash.
-			// Keep the proof as-is since it already contains the actual value.
-			continue
+			return nil, fmt.Errorf(
+				"proof reconstruction failed for register %s: storehouse value (len=%d) does not hash to "+
+					"the value stored in proof: %w",
+				registerID, len(actualValue), ErrPayloadHashMismatch)
 		}
 
 		// Replace the hash payload with actual value payload
