@@ -12,7 +12,6 @@ import (
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/complete/mtrie"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
-	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/module"
 	utilsio "github.com/onflow/flow-go/utils/io"
 )
@@ -338,17 +337,10 @@ func (w *DiskWAL) replay(
 				}
 			}
 		} else if *versionFilter == VersionV7 {
-			// Payloadless mode: prefer V7, fall back to V6 (will be loaded as payloadless)
+			// Payloadless mode: only V7 checkpoints are supported
 			hasRootCheckpoint, err = checkpointer.HasRootCheckpointV7()
 			if err != nil {
 				return fmt.Errorf("cannot check V7 root checkpoint existence: %w", err)
-			}
-			if !hasRootCheckpoint {
-				// No V7 checkpoint, check if V6 exists (can be loaded as payloadless)
-				hasRootCheckpoint, err = checkpointer.HasRootCheckpoint()
-				if err != nil {
-					return fmt.Errorf("cannot check root checkpoint existence: %w", err)
-				}
 			}
 		} else {
 			// VersionV6 or any other version - use standard root checkpoint
@@ -371,19 +363,8 @@ func (w *DiskWAL) replay(
 					flattenedForest, err = checkpointer.LoadRootCheckpoint()
 				}
 			} else if *versionFilter == VersionV7 {
-				// Payloadless mode: prefer V7, fall back to V6 loaded as payloadless
-				hasV7, _ := checkpointer.HasRootCheckpointV7()
-				if hasV7 {
-					flattenedForest, err = checkpointer.LoadRootCheckpointV7()
-				} else {
-					// V7 doesn't exist, load V6 as payloadless (preserves root hash)
-					w.log.Info().Msg("V7 root checkpoint not found, loading V6 as payloadless")
-					flattenedForest, err = OpenAndReadAsPayloadlessTrie(
-						checkpointer.Dir(),
-						bootstrap.FilenameWALRootCheckpoint,
-						w.log,
-					)
-				}
+				// Payloadless mode: only V7 checkpoints are supported
+				flattenedForest, err = checkpointer.LoadRootCheckpointV7()
 			} else {
 				flattenedForest, err = checkpointer.LoadRootCheckpoint()
 			}
