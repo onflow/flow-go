@@ -273,13 +273,13 @@ func (s *SealValidationSuite) TestSealDuplicatedApproval() {
 }
 
 // TestSealInvalidFinalState verifies that we reject a seal whose `FinalState` does not equal the
-// final state derived from the referenced execution result (i.e. the last chunk's `EndState`).
+// final state from the sealed execution result (i.e. the last chunk's `EndState`).
 //
 // Background: `Seal.FinalState` is a supplied field whose authoritative value is already determined
 // by the referenced `ExecutionResult` (via `executionResult.FinalStateCommitment()`). The verifier
 // attestations only cover `{BlockID, ExecutionResultID, ChunkIndex}` — they do _not_ commit to
-// `Seal.FinalState`. Without an explicit binding check in the seal validator, an authorized
-// Byzantine consensus proposer could build a block payload with valid aggregated approvals for a
+// `Seal.FinalState`. Without an explicit check for equality in the seal validator, a Byzantine
+// consensus node could propose a block payload with valid aggregated approvals for a
 // real incorporated execution result but set `Seal.FinalState` to an arbitrary non-empty value.
 // The downstream `Snapshot.Commit` would then expose the poisoned commitment as the sealed state.
 //
@@ -292,16 +292,21 @@ func (s *SealValidationSuite) TestSealDuplicatedApproval() {
 func (s *SealValidationSuite) TestSealInvalidFinalState() {
 	_, _, newBlock, receipt, seal := s.generateBasicTestFork()
 
-	// Sanity: the fixture's seal must agree with the execution result's final state. This guarantees
-	// that the subsequent mutation below is the _only_ deviation between the seal and the result.
+	// Sanity check for correct testing setup: the fixture's seal must agree with the execution result's final state.
+	// This guarantees that the subsequent mutation below is the _only_ deviation between the seal and the result.
 	expectedFinalState, err := receipt.ExecutionResult.FinalStateCommitment()
 	s.Require().NoError(err)
 	s.Require().Equal(expectedFinalState, seal.FinalState)
 
-	// Mutate one byte of `FinalState` to model the Byzantine proposer who keeps all attestation-bound
-	// fields (BlockID, ResultID, ChunkIndex, AggregatedApprovalSigs) intact but tampers with the
-	// redundant `Seal.FinalState`. The seal pointer is already included in `newBlock`'s payload.
-	seal.FinalState[0] ^= 0xff
+	// Attack Details: The Byzantine proposer publishes `newBlock` containing a seal for B0. The byzantine proposer complies with the
+	// protocol in that it includes the required number of valid verifier signatures in the seal. It truthfully sets all fields in the
+	// seal that are covered by the verifier signatures (BlockID, ResultID, ChunkIndex, AggregatedApprovalSigs), to not invalidate the
+	// aggregated verifier signatures. However, while the protocol mandates that `Seal.FinalState` is set to the `FinalStateCommitment`
+	// of the execution result previously incorporated in the fork, the byzantine proposer chooses a conflicting value.
+	// To mount such an attack, the proposer would build (and sign) their proposal with the poisoned `Seal.FinalState` from the start.
+	// The test takes the shortcut of mutating `Seal.FinalState` in place because `sealValidator.Validate` only inspects the block
+	// payload; proposer signatures will have been checked in production by the compliance layer before (which we omit here).
+	seal.FinalState[0] ^= 0xff                                       // bitwise XOR with `0xFF`: inverts all bits
 	s.Require().NotEqual(flow.EmptyStateCommitment, seal.FinalState) // remains non-empty (NewSeal precondition)
 	s.Require().NotEqual(expectedFinalState, seal.FinalState)
 

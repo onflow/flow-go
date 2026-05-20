@@ -242,13 +242,8 @@ func (s *sealValidator) Validate(candidate *flow.Block) (*flow.Seal, error) {
 	return latestSeal, nil
 }
 
-// validateSeal performs integrity checks of single seal. To be valid, we
-// require that seal:
-//  1. Commits to the final state derived from the referenced execution result. `Seal.FinalState`
-//     is redundant data (the authoritative value is `executionResult.FinalStateCommitment()`); the
-//     verifier attestations only bind {BlockID, ExecutionResultID, ChunkIndex} and do _not_ cover
-//     `Seal.FinalState`. Without this explicit binding, an authorized Byzantine consensus proposer
-//     could swap in an arbitrary non-empty `FinalState` while keeping the approval signatures valid.
+// validateSeal performs integrity checks of single seal. To be valid, we require that the seal:
+//  1. `Seal.FinalState` is equal to the final state as committed to by the sealed execution result.
 //  2. Contains correct number of approval signatures, one aggregated sig for each chunk.
 //  3. Every aggregated signature contains valid signer ids. `module.ChunkAssigner` is used to perform this check.
 //  4. Every aggregated signature contains valid signatures.
@@ -260,16 +255,21 @@ func (s *sealValidator) Validate(candidate *flow.Block) (*flow.Seal, error) {
 func (s *sealValidator) validateSeal(seal *flow.Seal, incorporatedResult *flow.IncorporatedResult) error {
 	executionResult := incorporatedResult.Result
 
-	// Verify `Seal.FinalState` matches the execution result. We run this check first so a
-	// byzantine `FinalState` is rejected before any of the more expensive per-chunk work.
-	//
-	// `FinalStateCommitment` is documented to fail only with `flow.ErrNoChunks`. That error is unreachable here: `executionResult` is
-	// loaded from local storage and was incorporated in a strict ancestor of the candidate block, so `ReceiptValidator.verifyChunksFormat`
-	// has already enforced `Chunks.Len() ≥ 1` (the system chunk is mandatory). A `nil` result pointer is likewise impossible (rejected by
-	// `flow.NewIncorporatedResult`). Any error observed here therefore indicates a bug or storage corruption.
+	// Check that `Seal.FinalState` equals the final state of the execution result, i.e. the last chunk's `EndState`, returned by
+	// `executionResult.FinalStateCommitment()`. `Seal.FinalState` is a redundant copy of that value, included so that callers such as
+	// `Snapshot.Commit` can read the sealed state commitment directly from the seal without looking up the execution result. The verifier
+	// signatures are computed over the fields `{chunk.BlockID, ExecutionResultID, chunk.Index}` for each chunk in the execution result,
+	// so tampering with those fields in the seal would invalidate verifier signatures in seal, which is caught when checking those
+	// verifier signatures. Verifiers check the `IncorporatedResult` while consensus nodes check the correct construction of the seal for
+	// the `IncorporatedResult`. So the only remaining field that a Byzantine proposer could tamper with is the `Seal.FinalState`. We check
+	// this field first before the  per-chunk work, because the check is cheap. But formally, there is no order dependence of the checks.
 	expectedFinalState, err := executionResult.FinalStateCommitment()
 	if err != nil {
-		return irrecoverable.NewExceptionf("could not retrieve final state commitment from incorporated execution result %x: %w", executionResult.ID(), err)
+		// `FinalStateCommitment` is documented to fail only with `flow.ErrNoChunks`. That error cannot occur here: `incorporatedResult.Result`
+		// was loaded from local storage after being incorporated in an ancestor of the candidate block (not the candidate itself), so
+		// `ReceiptValidator.verifyChunksFormat` has already enforced `Chunks.Len() ≥ 1` (the system chunk is mandatory). Any error observed here
+		// therefore indicates a bug or storage corruption.
+		return irrecoverable.NewExceptionf("could not derive final state commitment for execution result %x: %w", executionResult.ID(), err)
 	}
 	if seal.FinalState != expectedFinalState {
 		return engine.NewInvalidInputErrorf("seal's final state does not match execution result")
