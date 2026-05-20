@@ -126,7 +126,13 @@ func TestReconstructPayloadlessProof(t *testing.T) {
 		}
 	})
 
-	t.Run("consistency verification catches mismatch", func(t *testing.T) {
+	t.Run("wrong value reader result skips reconstruction", func(t *testing.T) {
+		// This test verifies that when the value reader returns a wrong value,
+		// the reconstruction treats the stored hash as a 32-byte actual value
+		// (since it doesn't match) and skips reconstruction. The proof keeps
+		// the original hash value, which will cause VN verification to fail later.
+		// This is the expected behavior for mixed-mode compatibility.
+
 		// Create test data
 		owner := randomBytes(8)
 		key := "test_key"
@@ -146,6 +152,7 @@ func TestReconstructPayloadlessProof(t *testing.T) {
 
 		// Get proof and encode
 		directProofs := payloadlessTrie.UnsafeProofs([]ledger.Path{path})
+		originalHash := directProofs.Proofs[0].Payload.Value()
 		encodedProof := ledger.EncodeTrieBatchProof(directProofs)
 
 		// Create value reader that returns WRONG value
@@ -157,10 +164,19 @@ func TestReconstructPayloadlessProof(t *testing.T) {
 			return nil, nil
 		}
 
-		// Reconstruction should fail with hash mismatch
-		_, err = trie.ReconstructPayloadlessProof(encodedProof, valueReader)
-		require.Error(t, err)
-		require.ErrorIs(t, err, trie.ErrPayloadHashMismatch)
+		// Reconstruction should succeed but skip the mismatched proof
+		// (treating the hash as a 32-byte actual value)
+		reconstructedBytes, err := trie.ReconstructPayloadlessProof(encodedProof, valueReader)
+		require.NoError(t, err)
+
+		// Verify the proof still contains the original hash (not reconstructed to wrong value)
+		reconstructedProof, err := ledger.DecodeTrieBatchProof(reconstructedBytes)
+		require.NoError(t, err)
+		require.Len(t, reconstructedProof.Proofs, 1)
+
+		// The payload should still have the original hash value (32 bytes)
+		require.Equal(t, hash.HashLen, reconstructedProof.Proofs[0].Payload.Value().Size())
+		require.Equal(t, []byte(originalHash), []byte(reconstructedProof.Proofs[0].Payload.Value()))
 	})
 
 	t.Run("non-inclusion proofs pass through unchanged", func(t *testing.T) {

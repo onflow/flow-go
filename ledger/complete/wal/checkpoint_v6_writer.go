@@ -582,6 +582,11 @@ func storeTries(
 	return nil
 }
 
+// DeleteCheckpointFiles removes any checkpoint files with given checkpoint prefix in the outputDir.
+func DeleteCheckpointFiles(outputDir string, outputFile string) error {
+	return deleteCheckpointFiles(outputDir, outputFile)
+}
+
 // deleteCheckpointFiles removes any checkpoint files with given checkpoint prefix in the outputDir.
 func deleteCheckpointFiles(outputDir string, outputFile string) error {
 	pattern := filePathPattern(outputDir, outputFile)

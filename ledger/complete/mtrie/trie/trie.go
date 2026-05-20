@@ -132,14 +132,13 @@ func (mt *MTrie) String() string {
 //     the size operation completes, the order of `path` and `sizes` are such that
 //     for `path[i]` the corresponding register value size is referenced by `sizes[i]`.
 //
-// Expected errors during normal operation:
-//   - ErrPayloadlessTrieRead if the trie is in payloadless mode
+// No expected errors during normal operation.
+//
+// Note: For payloadless tries, returned sizes represent the hash size (32 bytes) for existing
+// paths and 0 for non-existent paths. This is useful for determining path existence.
 //
 // TODO move consistency checks from Forest into Trie to obtain a safe, self-contained API
 func (mt *MTrie) UnsafeValueSizes(paths []ledger.Path) ([]int, error) {
-	if mt.isPayloadless {
-		return nil, fmt.Errorf("UnsafeValueSizes: %w", ErrPayloadlessTrieRead)
-	}
 	sizes := make([]int, len(paths)) // pre-allocate slice for the result
 	valueSizes(sizes, paths, mt.root)
 	return sizes, nil
@@ -459,7 +458,20 @@ func update(
 			// then expand the compact leaf node to the current height by creating a new compact leaf
 			// node with the same path and payload.
 			// The old node shouldn't be recycled as it is still used by the tree copy before the update.
-			n = node.NewLeaf(*compactLeaf.Path(), compactLeaf.Payload(), nodeHeight)
+			if isPayloadless {
+				// In payloadless mode, we need to extend the existing hash rather than recomputing it.
+				// The compactLeaf's hash was computed using the original value, so we extend it from
+				// its current height to the new nodeHeight. This preserves the correct state commitment.
+				extendedHash := ledger.ExtendHashToHeight(
+					hash.Hash(*compactLeaf.Path()),
+					compactLeaf.Hash(),
+					compactLeaf.Height(),
+					nodeHeight,
+				)
+				n = node.NewNode(nodeHeight, nil, nil, *compactLeaf.Path(), compactLeaf.Payload(), extendedHash)
+			} else {
+				n = node.NewLeaf(*compactLeaf.Path(), compactLeaf.Payload(), nodeHeight)
+			}
 			return n, 0, 0, nodeHeight
 		}
 		// if no path to update and there is no compact leaf node on this path, we return
@@ -470,16 +482,15 @@ func update(
 	if len(paths) == 1 && currentNode == nil && compactLeaf == nil {
 		// if there is only 1 path to update, and the existing tree has no node on this path, also
 		// no compact leaf node from its ancester, it means we are storing a payload on a new path,
-		var leafPayload *ledger.Payload
 		var regSize int64
 		if isPayloadless {
-			leafPayload = createPayloadlessPayload(&payloads[0], paths[0])
+			n = newPayloadlessLeaf(paths[0], &payloads[0], nodeHeight)
 			regSize = int64(hash.HashLen) // 32 bytes for the hash
 		} else {
-			leafPayload = payloads[0].DeepCopy()
+			leafPayload := payloads[0].DeepCopy()
 			regSize = int64(payloads[0].Size())
+			n = node.NewLeaf(paths[0], leafPayload, nodeHeight)
 		}
-		n = node.NewLeaf(paths[0], leafPayload, nodeHeight)
 		if payloads[0].IsEmpty() {
 			// if we are storing an empty node, then no register is allocated
 			// allocatedRegCountDelta and allocatedRegSizeDelta should both be 0
@@ -500,13 +511,12 @@ func update(
 					// check if the only path to update has the same payload.
 					// if payload is the same, we could skip the update to avoid creating duplicated node
 					if !currentNode.Payload().ValueEquals(&payloads[i]) {
-						var leafPayload *ledger.Payload
 						if isPayloadless {
-							leafPayload = createPayloadlessPayload(&payloads[i], paths[i])
+							n = newPayloadlessLeaf(paths[i], &payloads[i], nodeHeight)
 						} else {
-							leafPayload = payloads[i].DeepCopy()
+							leafPayload := payloads[i].DeepCopy()
+							n = node.NewLeaf(paths[i], leafPayload, nodeHeight)
 						}
-						n = node.NewLeaf(paths[i], leafPayload, nodeHeight)
 
 						allocatedRegCountDelta, allocatedRegSizeDelta =
 							computeAllocatedRegDeltas(currentNode.Payload(), &payloads[i], isPayloadless)
@@ -618,6 +628,28 @@ func update(
 
 	n = node.NewInterimNode(nodeHeight, newLeftChild, newRightChild)
 	return n, allocatedRegCountDelta, allocatedRegSizeDelta, lowestHeightTouched
+}
+
+// newPayloadlessLeaf creates a leaf node for payloadless mode.
+//
+// In payloadless mode:
+// - The payload stores HashLeaf(path, originalValue) as the value (to save space)
+// - But the node hash is computed using the original value (to match regular trie state commitment)
+//
+// This ensures:
+// 1. The state commitment is identical to what a regular trie would produce
+// 2. Proof reconstruction (replacing stored hashes with actual values) produces valid proofs
+// 3. Verification nodes can verify proofs against the state commitment
+func newPayloadlessLeaf(path ledger.Path, originalPayload *ledger.Payload, height int) *node.Node {
+	// Compute the node hash using the ORIGINAL value
+	// This ensures the state commitment matches what a regular trie would produce
+	nodeHash := ledger.ComputeCompactValue(hash.Hash(path), originalPayload.Value(), height)
+
+	// Create the payloadless payload (stores hash instead of actual value)
+	payloadlessPayload := createPayloadlessPayload(originalPayload, path)
+
+	// Create the node with the precomputed hash and payloadless payload
+	return node.NewNode(height, nil, nil, path, payloadlessPayload, nodeHash)
 }
 
 // createPayloadlessPayload creates a payload for payloadless mode where the value

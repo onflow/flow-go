@@ -99,6 +99,12 @@ func ReconstructPayloadlessProof(
 			continue
 		}
 
+		// Empty payloads represent non-existent registers (used for non-inclusion proofs
+		// that are represented as inclusion proofs with empty values). Skip these.
+		if proof.Payload.IsEmpty() {
+			continue
+		}
+
 		// Extract the key from the payload
 		key, err := proof.Payload.Key()
 		if err != nil {
@@ -111,11 +117,18 @@ func ReconstructPayloadlessProof(
 			return nil, fmt.Errorf("failed to convert key to register ID: %w", err)
 		}
 
-		// Get the stored hash from the payloadless proof
-		storedHash := proof.Payload.Value()
-		if len(storedHash) != hash.HashLen {
-			return nil, fmt.Errorf("invalid stored hash length: expected %d, got %d", hash.HashLen, len(storedHash))
+		// Get the stored value from the proof.
+		// In payloadless mode, this should be a 32-byte hash (HashLeaf(path, actualValue)).
+		// However, if the proof comes from a non-payloadless trie (e.g., during bootstrap
+		// with mixed trie modes), the value is the actual register value, not a hash.
+		// In that case, we keep the proof as-is since it already contains the actual value.
+		storedValue := proof.Payload.Value()
+		if len(storedValue) != hash.HashLen {
+			// Not a hash - this proof comes from a non-payloadless trie.
+			// The proof already contains the actual value, so skip reconstruction.
+			continue
 		}
+		storedHash := storedValue
 
 		// Fetch the actual value from the value reader
 		// TODO: making value retrieval concurrent, and benchmark if faster
@@ -125,9 +138,14 @@ func ReconstructPayloadlessProof(
 		}
 
 		// Verify consistency: HashLeaf(path, actualValue) == storedHash
+		// If the hash matches, this is a payloadless proof and we replace the hash with actual value.
+		// If the hash doesn't match, the stored value is an actual 32-byte value from a non-payloadless
+		// trie (e.g., mixed mode during bootstrap). In this case, skip reconstruction.
 		expectedHash := hash.HashLeaf(hash.Hash(proof.Path), actualValue)
 		if !bytes.Equal(expectedHash[:], storedHash) {
-			return nil, fmt.Errorf("register %s: %w", registerID, ErrPayloadHashMismatch)
+			// Hash mismatch means this is a 32-byte actual value, not a hash.
+			// Keep the proof as-is since it already contains the actual value.
+			continue
 		}
 
 		// Replace the hash payload with actual value payload

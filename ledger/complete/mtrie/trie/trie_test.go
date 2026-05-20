@@ -13,11 +13,15 @@ import (
 
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/bitutils"
+	"github.com/onflow/flow-go/ledger/common/convert"
 	"github.com/onflow/flow-go/ledger/common/hash"
+	"github.com/onflow/flow-go/ledger/common/pathfinder"
 	prf "github.com/onflow/flow-go/ledger/common/proof"
 	"github.com/onflow/flow-go/ledger/common/testutils"
+	"github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
 	"github.com/onflow/flow-go/ledger/partial/ptrie"
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -1248,8 +1252,9 @@ func TestPayloadlessTrieCreation(t *testing.T) {
 		)
 		require.NoError(t, err)
 
-		// Payloadless trie should have different root hash
-		require.NotEqual(t, regularTrie.RootHash(), payloadlessTrie.RootHash())
+		// Payloadless trie should have SAME root hash (required for VN verification)
+		require.Equal(t, regularTrie.RootHash(), payloadlessTrie.RootHash(),
+			"payloadless and regular tries should have the same root hash")
 		require.True(t, payloadlessTrie.IsPayloadless())
 		require.False(t, regularTrie.IsPayloadless())
 
@@ -1277,10 +1282,13 @@ func TestPayloadlessTrieReadOperations(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	t.Run("UnsafeValueSizes returns error", func(t *testing.T) {
-		_, err := payloadlessTrie.UnsafeValueSizes([]ledger.Path{path})
-		require.Error(t, err)
-		require.ErrorIs(t, err, trie.ErrPayloadlessTrieRead)
+	t.Run("UnsafeValueSizes returns hash size", func(t *testing.T) {
+		// UnsafeValueSizes works in payloadless mode - it returns the size of stored values (hashes)
+		sizes, err := payloadlessTrie.UnsafeValueSizes([]ledger.Path{path})
+		require.NoError(t, err)
+		require.Len(t, sizes, 1)
+		// The stored value is a 32-byte hash
+		require.Equal(t, hash.HashLen, sizes[0])
 	})
 
 	t.Run("ReadSinglePayload returns error", func(t *testing.T) {
@@ -1430,11 +1438,17 @@ func TestPayloadlessTrieUpdate(t *testing.T) {
 	})
 }
 
-// TestPayloadlessTrieProofs tests proof generation and verification for payloadless tries.
+// TestPayloadlessTrieProofs tests proof generation for payloadless tries.
+// Key behaviors:
+// 1. Proofs can be generated from payloadless tries
+// 2. The proof payload contains the hash value (32 bytes)
+// 3. The payloadless proof does NOT verify directly against root hash (requires reconstruction)
+// 4. A proof with actual values (from regular trie) DOES verify against the same root hash
 func TestPayloadlessTrieProofs(t *testing.T) {
 	path := testutils.PathByUint16LeftPadded(0)
 	payload := testutils.LightPayload(11, 12345)
 
+	// Create payloadless trie
 	payloadlessTrie, _, err := trie.NewTrieWithUpdatedRegistersAndPayloadless(
 		trie.NewEmptyMTrieWithPayloadless(true),
 		[]ledger.Path{path},
@@ -1444,23 +1458,45 @@ func TestPayloadlessTrieProofs(t *testing.T) {
 	)
 	require.NoError(t, err)
 
+	// Create regular trie with same data
+	regularTrie, _, err := trie.NewTrieWithUpdatedRegisters(
+		trie.NewEmptyMTrie(),
+		[]ledger.Path{path},
+		[]ledger.Payload{*payload},
+		true,
+	)
+	require.NoError(t, err)
+
+	// Verify root hashes are equal (key requirement for verification)
+	require.Equal(t, payloadlessTrie.RootHash(), regularTrie.RootHash(),
+		"payloadless and regular tries should have same root hash")
+
 	// Proofs can be generated for payloadless tries
-	proofs := payloadlessTrie.UnsafeProofs([]ledger.Path{path})
-	require.NotNil(t, proofs)
-	require.Len(t, proofs.Proofs, 1)
-	require.True(t, proofs.Proofs[0].Inclusion)
+	payloadlessProofs := payloadlessTrie.UnsafeProofs([]ledger.Path{path})
+	require.NotNil(t, payloadlessProofs)
+	require.Len(t, payloadlessProofs.Proofs, 1)
+	require.True(t, payloadlessProofs.Proofs[0].Inclusion)
 
-	// The proof contains the payloadless payload (hash value, not original value)
-	require.Equal(t, hash.HashLen, proofs.Proofs[0].Payload.Value().Size())
+	// The payloadless proof contains the hash value (32 bytes), not original value
+	require.Equal(t, hash.HashLen, payloadlessProofs.Proofs[0].Payload.Value().Size())
 
-	// Proof verification works against the payloadless root hash
-	// because both the node hash and verification compute:
-	// ComputeCompactValue(path, hash_value, height)
-	verified := prf.VerifyTrieProof(proofs.Proofs[0], ledger.State(payloadlessTrie.RootHash()))
-	require.True(t, verified, "payloadless proof should verify against payloadless root")
+	// Payloadless proof does NOT verify directly against root hash
+	// because the root hash was computed using original values, not hash values
+	verified := prf.VerifyTrieProof(payloadlessProofs.Proofs[0], ledger.State(payloadlessTrie.RootHash()))
+	require.False(t, verified, "payloadless proof should NOT verify directly (needs reconstruction)")
+
+	// Regular proof (with actual value) DOES verify against the same root hash
+	regularProofs := regularTrie.UnsafeProofs([]ledger.Path{path})
+	verified = prf.VerifyTrieProof(regularProofs.Proofs[0], ledger.State(payloadlessTrie.RootHash()))
+	require.True(t, verified, "regular proof should verify against payloadless root (same hash)")
 }
 
 // TestPayloadlessTrieProofVerification tests proof verification behavior for payloadless tries.
+// Key behaviors:
+// 1. Payloadless and regular tries have the SAME root hash (state commitment)
+// 2. Payloadless proofs (containing hashes) do NOT directly verify against root hash
+// 3. Regular proofs (containing actual values) verify against root hash
+// 4. Cross-verification works because root hashes are equal
 func TestPayloadlessTrieProofVerification(t *testing.T) {
 	path1 := testutils.PathByUint16(0b0000000000000000) // 0000...
 	path2 := testutils.PathByUint16(0b1000000000000000) // 1000...
@@ -1490,40 +1526,42 @@ func TestPayloadlessTrieProofVerification(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	// Root hashes are different
-	require.NotEqual(t, payloadlessTrie.RootHash(), regularTrie.RootHash())
+	// Root hashes are EQUAL - this is required for verification nodes to verify proofs
+	// The state commitment (root hash) must be computed the same way regardless of internal storage
+	require.Equal(t, payloadlessTrie.RootHash(), regularTrie.RootHash(),
+		"payloadless and regular tries should have the same root hash")
 
 	// Generate proofs from both tries
 	payloadlessProofs := payloadlessTrie.UnsafeProofs(paths)
 	regularProofs := regularTrie.UnsafeProofs(paths)
 
-	// Payloadless proofs verify against payloadless root hash
+	// Payloadless proofs (containing hashes) do NOT verify directly against root hash
+	// because the root hash was computed using original values, not the stored hashes
 	for i, proof := range payloadlessProofs.Proofs {
 		verified := prf.VerifyTrieProof(proof, ledger.State(payloadlessTrie.RootHash()))
-		require.True(t, verified, "proof %d: payloadless proof should verify against payloadless root", i)
+		require.False(t, verified, "proof %d: payloadless proof with hashes should NOT verify directly", i)
 	}
 
 	// Regular proofs verify against regular root hash
 	for i, proof := range regularProofs.Proofs {
 		verified := prf.VerifyTrieProof(proof, ledger.State(regularTrie.RootHash()))
-		require.True(t, verified, "proof %d: regular proof should verify against regular root", i)
+		require.True(t, verified, "proof %d: regular proof should verify against root", i)
 	}
 
-	// Cross-verification fails: payloadless proof against regular root
-	for i, proof := range payloadlessProofs.Proofs {
-		verified := prf.VerifyTrieProof(proof, ledger.State(regularTrie.RootHash()))
-		require.False(t, verified, "proof %d: payloadless proof should NOT verify against regular root", i)
-	}
-
-	// Cross-verification fails: regular proof against payloadless root
+	// Cross-verification works: regular proof against payloadless root (they're equal)
 	for i, proof := range regularProofs.Proofs {
 		verified := prf.VerifyTrieProof(proof, ledger.State(payloadlessTrie.RootHash()))
-		require.False(t, verified, "proof %d: regular proof should NOT verify against payloadless root", i)
+		require.True(t, verified, "proof %d: regular proof should verify against payloadless root (same hash)", i)
 	}
 }
 
 // TestPayloadlessTriePartialTrieConstruction tests that a partial trie (PSMT) can be
-// constructed from payloadless trie proofs and used to retrieve the payload hashes.
+// constructed from proofs with actual values.
+// Key behaviors:
+// 1. Payloadless proofs (with hashes) CANNOT be used directly to construct partial trie
+// 2. Proofs with actual values (e.g., from regular trie) CAN be used to construct partial trie
+// 3. The partial trie root hash matches the state commitment
+// 4. Since payloadless and regular tries have the same root hash, regular proofs work with payloadless root
 func TestPayloadlessTriePartialTrieConstruction(t *testing.T) {
 	path1 := testutils.PathByUint16(0b0000000000000000) // 0000...
 	path2 := testutils.PathByUint16(0b1000000000000000) // 1000...
@@ -1544,34 +1582,7 @@ func TestPayloadlessTriePartialTrieConstruction(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	// Generate proofs from payloadless trie
-	batchProof := payloadlessTrie.UnsafeProofs(paths)
-	require.Len(t, batchProof.Proofs, 2)
-
-	// Construct partial trie from payloadless proofs
-	partialTrie, err := ptrie.NewPSMT(payloadlessTrie.RootHash(), batchProof)
-	require.NoError(t, err)
-
-	// Verify partial trie root hash matches payloadless trie root hash
-	require.Equal(t, payloadlessTrie.RootHash(), partialTrie.RootHash())
-
-	// Retrieve payloads from partial trie - these should be the hash values
-	for i, path := range paths {
-		retrievedPayload, err := partialTrie.GetSinglePayload(path)
-		require.NoError(t, err)
-
-		// The retrieved payload value should be 32 bytes (the hash)
-		require.Equal(t, hash.HashLen, retrievedPayload.Value().Size(),
-			"retrieved payload should be hash (32 bytes)")
-
-		// Verify the retrieved hash matches what we expect
-		// The stored hash is HashLeaf(path, original_value) - height-independent
-		expectedHash := hash.HashLeaf(hash.Hash(path), payloads[i].Value())
-		require.Equal(t, expectedHash[:], []byte(retrievedPayload.Value()),
-			"retrieved hash should match expected HashLeaf")
-	}
-
-	// For comparison: regular trie partial trie contains original values
+	// Create regular trie with same data
 	regularTrie, _, err := trie.NewTrieWithUpdatedRegisters(
 		trie.NewEmptyMTrie(),
 		paths,
@@ -1580,17 +1591,39 @@ func TestPayloadlessTriePartialTrieConstruction(t *testing.T) {
 	)
 	require.NoError(t, err)
 
+	// Verify root hashes are equal
+	require.Equal(t, payloadlessTrie.RootHash(), regularTrie.RootHash(),
+		"payloadless and regular tries should have the same root hash")
+
+	// Generate proofs from payloadless trie (these contain hash values)
+	payloadlessBatchProof := payloadlessTrie.UnsafeProofs(paths)
+	require.Len(t, payloadlessBatchProof.Proofs, 2)
+
+	// Constructing partial trie from payloadless proofs (with hashes) FAILS
+	// because the root hash was computed using original values
+	_, err = ptrie.NewPSMT(payloadlessTrie.RootHash(), payloadlessBatchProof)
+	require.Error(t, err, "constructing partial trie from payloadless proofs should fail")
+	require.Contains(t, err.Error(), "rootNode hash doesn't match")
+
+	// Generate proofs from regular trie (these contain actual values)
 	regularBatchProof := regularTrie.UnsafeProofs(paths)
-	regularPartialTrie, err := ptrie.NewPSMT(regularTrie.RootHash(), regularBatchProof)
+
+	// Constructing partial trie from regular proofs (with actual values) SUCCEEDS
+	// This works with PAYLOADLESS root hash because they're equal
+	partialTrie, err := ptrie.NewPSMT(payloadlessTrie.RootHash(), regularBatchProof)
 	require.NoError(t, err)
 
+	// Verify partial trie root hash matches
+	require.Equal(t, payloadlessTrie.RootHash(), partialTrie.RootHash())
+
+	// Retrieve payloads from partial trie - these should be the ACTUAL values
 	for i, path := range paths {
-		retrievedPayload, err := regularPartialTrie.GetSinglePayload(path)
+		retrievedPayload, err := partialTrie.GetSinglePayload(path)
 		require.NoError(t, err)
 
-		// Regular partial trie contains original payload values
+		// The retrieved payload should be the original value
 		require.True(t, payloads[i].Equals(retrievedPayload),
-			"regular partial trie should contain original payload")
+			"partial trie should contain original payload")
 	}
 }
 
@@ -1635,7 +1668,7 @@ func TestPayloadlessTrieMultipleRegisters(t *testing.T) {
 }
 
 // TestPayloadlessTrieEmptyPayload tests that empty payloads are handled correctly
-// in payloadless mode (should not allocate register, but node still exists).
+// in payloadless mode - same behavior as regular trie.
 func TestPayloadlessTrieEmptyPayload(t *testing.T) {
 	path := testutils.PathByUint16LeftPadded(0)
 	emptyPayload := ledger.EmptyPayload()
@@ -1650,18 +1683,26 @@ func TestPayloadlessTrieEmptyPayload(t *testing.T) {
 	)
 	require.NoError(t, err)
 
+	// Create regular trie with same empty payload
+	regularTrie, _, err := trie.NewTrieWithUpdatedRegisters(
+		trie.NewEmptyMTrie(),
+		[]ledger.Path{path},
+		[]ledger.Payload{*emptyPayload},
+		true,
+	)
+	require.NoError(t, err)
+
 	// Empty payload should not allocate a register (same as regular trie behavior)
 	require.Equal(t, uint64(0), payloadlessTrie.AllocatedRegCount())
 	require.Equal(t, uint64(0), payloadlessTrie.AllocatedRegSize())
 
-	// The trie still has a node (with hash of empty value), so root hash differs from empty trie
-	// This is consistent with regular trie behavior when prune=true but an empty payload is written
-	require.NotEqual(t, trie.EmptyTrieRootHash(), payloadlessTrie.RootHash())
+	// Payloadless and regular tries should have the same root hash
+	require.Equal(t, regularTrie.RootHash(), payloadlessTrie.RootHash(),
+		"payloadless and regular tries should have same root hash for empty payload")
 
-	// Verify the stored value is still 32 bytes (hash of empty value)
-	storedPayloads := payloadlessTrie.AllPayloads()
-	require.Len(t, storedPayloads, 1)
-	require.Equal(t, hash.HashLen, storedPayloads[0].Value().Size())
+	// Both should equal the empty trie root hash (empty payload with prune=true is equivalent to no write)
+	require.Equal(t, trie.EmptyTrieRootHash(), payloadlessTrie.RootHash(),
+		"empty payload should result in empty trie root hash")
 }
 
 // TestPayloadlessTrieRootHashDeterminism tests that the same data always produces
@@ -1755,4 +1796,192 @@ func TestPayloadlessTrieUpdateExistingRegister(t *testing.T) {
 
 	// Size should still be 32 bytes
 	require.Equal(t, uint64(hash.HashLen), trie2.AllocatedRegSize())
+}
+
+// TestPayloadlessTrieEndToEndProofReconstruction tests the full flow from:
+// 1. Creating a payloadless trie
+// 2. Generating proofs (with hash values)
+// 3. Reconstructing proofs with actual values
+// 4. Building a partial trie (PSMT) from reconstructed proofs
+// 5. Verifying the PSMT root hash matches the original state commitment
+func TestPayloadlessTrieEndToEndProofReconstruction(t *testing.T) {
+	// Create test data with multiple registers at different tree depths
+	// Use properly formatted keys (owner + key parts) that can be converted to RegisterID
+	owner1 := flow.BytesToAddress([]byte("owner1"))
+	owner2 := flow.BytesToAddress([]byte("owner2"))
+	owner3 := flow.BytesToAddress([]byte("owner3"))
+
+	regID1 := flow.NewRegisterID(owner1, "key1")
+	regID2 := flow.NewRegisterID(owner2, "key2")
+	regID3 := flow.NewRegisterID(owner3, "key3")
+
+	value1 := []byte("value1_test_data")
+	value2 := []byte("value2_test_data")
+	value3 := []byte("value3_test_data")
+
+	key1 := convert.RegisterIDToLedgerKey(regID1)
+	key2 := convert.RegisterIDToLedgerKey(regID2)
+	key3 := convert.RegisterIDToLedgerKey(regID3)
+
+	payload1 := ledger.NewPayload(key1, value1)
+	payload2 := ledger.NewPayload(key2, value2)
+	payload3 := ledger.NewPayload(key3, value3)
+
+	// Create paths from keys using pathfinder
+	path1, err := pathfinder.KeyToPath(key1, complete.DefaultPathFinderVersion)
+	require.NoError(t, err)
+	path2, err := pathfinder.KeyToPath(key2, complete.DefaultPathFinderVersion)
+	require.NoError(t, err)
+	path3, err := pathfinder.KeyToPath(key3, complete.DefaultPathFinderVersion)
+	require.NoError(t, err)
+
+	paths := []ledger.Path{path1, path2, path3}
+	payloads := []ledger.Payload{*payload1, *payload2, *payload3}
+
+	// Step 1: Create payloadless trie
+	payloadlessTrie, _, err := trie.NewTrieWithUpdatedRegistersAndPayloadless(
+		trie.NewEmptyMTrieWithPayloadless(true),
+		paths,
+		payloads,
+		true,
+		true,
+	)
+	require.NoError(t, err)
+
+	stateCommitment := payloadlessTrie.RootHash()
+	t.Logf("State commitment: %x", stateCommitment)
+
+	// Step 2: Generate proofs from payloadless trie (contains hash values)
+	payloadlessBatchProof := payloadlessTrie.UnsafeProofs(paths)
+	require.Len(t, payloadlessBatchProof.Proofs, 3)
+
+	// Verify proofs contain hash values (32 bytes)
+	for i, proof := range payloadlessBatchProof.Proofs {
+		require.True(t, proof.Inclusion, "proof %d should be inclusion", i)
+		require.Equal(t, hash.HashLen, proof.Payload.Value().Size(),
+			"proof %d payload should be hash (32 bytes)", i)
+	}
+
+	// Step 3: Encode then reconstruct the proof using a value reader
+	encodedProof := ledger.EncodeTrieBatchProof(payloadlessBatchProof)
+
+	// Create value reader that provides actual values (simulating storehouse)
+	registerValues := map[flow.RegisterID]flow.RegisterValue{
+		regID1: value1,
+		regID2: value2,
+		regID3: value3,
+	}
+
+	valueReader := func(registerID flow.RegisterID) (flow.RegisterValue, error) {
+		if value, ok := registerValues[registerID]; ok {
+			return value, nil
+		}
+		// Return nil, nil for not found (treated as empty register)
+		return nil, nil
+	}
+
+	reconstructedBytes, err := trie.ReconstructPayloadlessProof(encodedProof, valueReader)
+	require.NoError(t, err)
+
+	// Step 4: Decode reconstructed proof and verify it has actual values
+	reconstructedProof, err := ledger.DecodeTrieBatchProof(reconstructedBytes)
+	require.NoError(t, err)
+	require.Len(t, reconstructedProof.Proofs, 3)
+
+	// Verify reconstructed proofs contain actual values (not hashes)
+	for i, proof := range reconstructedProof.Proofs {
+		require.True(t, proof.Inclusion, "reconstructed proof %d should be inclusion", i)
+		// The values should be the original payload values
+		require.NotEqual(t, hash.HashLen, proof.Payload.Value().Size(),
+			"reconstructed proof %d should have actual value, not hash", i)
+	}
+
+	// Step 5: Build partial trie from reconstructed proofs
+	psmt, err := ptrie.NewPSMT(stateCommitment, reconstructedProof)
+	require.NoError(t, err, "PSMT construction should succeed with reconstructed proofs")
+
+	// Step 6: Verify PSMT root hash matches state commitment
+	require.Equal(t, stateCommitment, psmt.RootHash(),
+		"PSMT root hash should match state commitment")
+
+	// Additional verification: retrieve values from PSMT
+	for i, path := range paths {
+		retrievedPayload, err := psmt.GetSinglePayload(path)
+		require.NoError(t, err)
+		require.True(t, payloads[i].ValueEquals(retrievedPayload),
+			"PSMT should contain original payload for path %d", i)
+	}
+}
+
+// TestPayloadlessTrieReconstructionWith32ByteValue tests that when a regular trie
+// (loaded from checkpoint) has a 32-byte value, the proof reconstruction correctly
+// identifies it as NOT a hash and passes it through unchanged.
+// This is an edge case because the reconstruction code checks for 32-byte values.
+func TestPayloadlessTrieReconstructionWith32ByteValue(t *testing.T) {
+	// Create a register with exactly 32-byte value
+	owner := flow.BytesToAddress([]byte("owner32"))
+	regID := flow.NewRegisterID(owner, "key32")
+	// Create a 32-byte value (same size as a hash)
+	value32 := make([]byte, hash.HashLen)
+	for i := range value32 {
+		value32[i] = byte(i)
+	}
+
+	key := convert.RegisterIDToLedgerKey(regID)
+	payload := ledger.NewPayload(key, value32)
+
+	path, err := pathfinder.KeyToPath(key, complete.DefaultPathFinderVersion)
+	require.NoError(t, err)
+
+	// Create a REGULAR trie (not payloadless) to simulate loading from checkpoint
+	regularTrie, _, err := trie.NewTrieWithUpdatedRegisters(
+		trie.NewEmptyMTrie(),
+		[]ledger.Path{path},
+		[]ledger.Payload{*payload},
+		true,
+	)
+	require.NoError(t, err)
+
+	stateCommitment := regularTrie.RootHash()
+	t.Logf("State commitment: %x", stateCommitment)
+
+	// Generate proof from regular trie (contains 32-byte actual value)
+	batchProof := regularTrie.UnsafeProofs([]ledger.Path{path})
+	require.Len(t, batchProof.Proofs, 1)
+
+	// Verify proof contains 32-byte value
+	require.Equal(t, hash.HashLen, batchProof.Proofs[0].Payload.Value().Size())
+	t.Logf("Proof value (32 bytes): %x", batchProof.Proofs[0].Payload.Value())
+
+	// Encode the proof
+	encodedProof := ledger.EncodeTrieBatchProof(batchProof)
+
+	// Create value reader
+	valueReader := func(registerID flow.RegisterID) (flow.RegisterValue, error) {
+		if registerID == regID {
+			return value32, nil
+		}
+		return nil, nil
+	}
+
+	// Attempt reconstruction
+	// The code sees a 32-byte value and attempts to verify it as a hash.
+	// Since HashLeaf(path, value32) != value32 (the stored value), it recognizes
+	// this as an actual 32-byte value and skips reconstruction, keeping the proof intact.
+	reconstructedBytes, err := trie.ReconstructPayloadlessProof(encodedProof, valueReader)
+	require.NoError(t, err, "reconstruction should succeed for 32-byte actual values")
+
+	// Verify the proof still works
+	reconstructedProof, err := ledger.DecodeTrieBatchProof(reconstructedBytes)
+	require.NoError(t, err)
+
+	// The reconstructed proof should still have the original 32-byte value (not reconstructed)
+	require.Equal(t, hash.HashLen, reconstructedProof.Proofs[0].Payload.Value().Size())
+	require.Equal(t, value32, []byte(reconstructedProof.Proofs[0].Payload.Value()))
+
+	// Verify PSMT can be constructed from the proof
+	psmt, err := ptrie.NewPSMT(stateCommitment, reconstructedProof)
+	require.NoError(t, err)
+
+	require.Equal(t, stateCommitment, psmt.RootHash())
 }

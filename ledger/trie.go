@@ -88,6 +88,25 @@ func ComputeCompactValue(path hash.Hash, value []byte, nodeHeight int) hash.Hash
 	return out
 }
 
+// ExtendHashToHeight extends a hash from one height to another by continuing the hash chain
+// along the path. This is used in payloadless mode to extend a leaf's hash when the leaf
+// is moved to a higher position in the trie.
+// UNCHECKED requirement: fromHeight < toHeight
+// UNCHECKED requirement: fromHeight >= 0
+func ExtendHashToHeight(path hash.Hash, baseHash hash.Hash, fromHeight, toHeight int) hash.Hash {
+	out := baseHash
+	for h := fromHeight + 1; h <= toHeight; h++ {
+		// h is the height of the node whose hash we are computing
+		bit := bitutils.ReadBit(path[:], NodeMaxHeight-h)
+		if bit == 1 { // right branching
+			out = hash.HashInterNode(GetDefaultHashForHeight(h-1), out)
+		} else { // left branching
+			out = hash.HashInterNode(out, GetDefaultHashForHeight(h-1))
+		}
+	}
+	return out
+}
+
 // TrieRead captures a trie read query
 type TrieRead struct {
 	RootHash RootHash

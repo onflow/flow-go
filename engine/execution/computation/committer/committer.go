@@ -117,7 +117,8 @@ func (committer *LedgerViewCommitter) collectProofs(
 		return encodedProof, nil
 	}
 
-	// In payloadless mode, reconstruct the proof with actual values from storage snapshot
+	// In payloadless mode, reconstruct the proof with actual values from storage snapshot.
+	// The proof is generated from baseState (pre-execution), so we need pre-execution values.
 	valueReader := func(registerID flow.RegisterID) (flow.RegisterValue, error) {
 		return baseStorageSnapshot.Get(registerID)
 	}

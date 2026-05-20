@@ -192,10 +192,16 @@ func readCheckpointHeader(filepath string, logger zerolog.Logger) (
 
 	var bufReader io.Reader = bufio.NewReaderSize(closable, defaultBufioReadSize)
 	reader := NewCRC32Reader(bufReader)
-	// read the magic bytes and check version
-	err = validateFileHeader(MagicBytesCheckpointHeader, VersionV6, reader)
+	// read the magic bytes and check version (supports both V6 and V7)
+	magic, version, err := readFileHeader(reader)
 	if err != nil {
-		return nil, 0, err
+		return nil, 0, fmt.Errorf("could not read file header: %w", err)
+	}
+	if magic != MagicBytesCheckpointHeader {
+		return nil, 0, fmt.Errorf("wrong magic bytes, expect %#x, got: %#x", MagicBytesCheckpointHeader, magic)
+	}
+	if version != VersionV6 && version != VersionV7 {
+		return nil, 0, fmt.Errorf("unsupported version %v, expected %v or %v", version, VersionV6, VersionV7)
 	}
 
 	// read the subtrie count
@@ -664,10 +670,16 @@ func readTriesRootHash(logger zerolog.Logger, dir string, fileName string) (
 	errToReturn = withFile(logger, filepath, func(file *os.File) error {
 		var err error
 
-		// read and validate magic bytes and version
-		err = validateFileHeader(MagicBytesCheckpointToptrie, VersionV6, file)
+		// read and validate magic bytes and version (supports both V6 and V7)
+		magic, version, err := readFileHeader(file)
 		if err != nil {
-			return err
+			return fmt.Errorf("could not read file header: %w", err)
+		}
+		if magic != MagicBytesCheckpointToptrie {
+			return fmt.Errorf("wrong magic bytes, expect %#x, got: %#x", MagicBytesCheckpointToptrie, magic)
+		}
+		if version != VersionV6 && version != VersionV7 {
+			return fmt.Errorf("unsupported version %v, expected %v or %v", version, VersionV6, VersionV7)
 		}
 
 		// read subtrie Node count and validate

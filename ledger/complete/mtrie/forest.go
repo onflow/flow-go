@@ -70,11 +70,12 @@ func (f *Forest) IsPayloadless() bool {
 	return f.isPayloadless
 }
 
-// ValueSizes returns value sizes for a slice of paths and error (if any)
+// ValueSizes returns value sizes for a slice of paths and error (if any).
+// For payloadless tries, returns hash sizes (32 bytes) instead of actual value sizes.
+// This is needed for proof generation to work in payloadless mode.
 // TODO: can be optimized further if we don't care about changing the order of the input r.Paths
 //
-// Expected errors during normal operation:
-//   - trie.ErrPayloadlessTrieRead if the forest is in payloadless mode
+// No error returns are expected during normal operation.
 func (f *Forest) ValueSizes(r *ledger.TrieRead) ([]int, error) {
 
 	if len(r.Paths) == 0 {
@@ -319,7 +320,12 @@ func (f *Forest) Proofs(r *ledger.TrieRead) (*ledger.TrieBatchProof, error) {
 	}
 
 	// if we have to insert empty values
-	if len(notFoundPaths) > 0 {
+	// For non-payloadless tries: expand the trie with empty payloads to convert
+	// non-inclusion proofs to inclusion proofs (a trick used for proof generation).
+	// For payloadless tries: skip this expansion because adding empty payloads
+	// changes the root hash (hash computation is different). Instead, we'll generate
+	// proper non-inclusion proofs which are handled correctly by UnsafeProofs.
+	if len(notFoundPaths) > 0 && !stateTrie.IsPayloadless() {
 		// for proofs, we have to set the pruning to false,
 		// currently batch proofs are only consists of inclusion proofs
 		// so for non-inclusion proofs we expand the trie with nil value and use an inclusion proof
@@ -378,15 +384,22 @@ func (f *Forest) AddTries(newTries []*trie.MTrie) error {
 
 // AddTrie adds a trie to the forest.
 //
+// In payloadless mode, non-payloadless tries are accepted without conversion.
+// This preserves the original root hash, which is necessary for state lookups
+// during bootstrap. New state updates via Update() will be payloadless.
+//
 // Expected errors during normal operation:
-//   - ErrPayloadlessMismatch if the trie's payloadless mode does not match the forest's
+//   - ErrPayloadlessMismatch if a payloadless trie is added to a non-payloadless forest
 func (f *Forest) AddTrie(newTrie *trie.MTrie) error {
 	if newTrie == nil {
 		return nil
 	}
 
-	// Validate payloadless mode matches
-	if newTrie.IsPayloadless() != f.isPayloadless {
+	// In payloadless mode, we accept non-payloadless tries during loading
+	// (e.g., from V6 checkpoints). The trie keeps its original root hash,
+	// which is needed for state lookups. New updates will be payloadless.
+	if !f.isPayloadless && newTrie.IsPayloadless() && !newTrie.IsEmpty() {
+		// Cannot add payloadless trie to non-payloadless forest
 		return fmt.Errorf("cannot add trie (payloadless=%v) to forest (payloadless=%v): %w",
 			newTrie.IsPayloadless(), f.isPayloadless, ErrPayloadlessMismatch)
 	}

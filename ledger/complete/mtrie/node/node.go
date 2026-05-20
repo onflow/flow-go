@@ -270,3 +270,24 @@ func (n *Node) appendSubtreePayloads(result []*ledger.Payload) []*ledger.Payload
 	result = n.rChild.appendSubtreePayloads(result)
 	return result
 }
+
+// AllPathsAndPayloads returns all paths and their corresponding payloads from the subtrie.
+func (n *Node) AllPathsAndPayloads() ([]ledger.Path, []*ledger.Payload) {
+	var paths []ledger.Path
+	var payloads []*ledger.Payload
+	paths, payloads = n.appendSubtreePathsAndPayloads(paths, payloads)
+	return paths, payloads
+}
+
+// appendSubtreePathsAndPayloads appends the paths and payloads of the subtree with this node as root.
+func (n *Node) appendSubtreePathsAndPayloads(paths []ledger.Path, payloads []*ledger.Payload) ([]ledger.Path, []*ledger.Payload) {
+	if n == nil {
+		return paths, payloads
+	}
+	if n.IsLeaf() {
+		return append(paths, n.path), append(payloads, n.Payload())
+	}
+	paths, payloads = n.lChild.appendSubtreePathsAndPayloads(paths, payloads)
+	paths, payloads = n.rChild.appendSubtreePathsAndPayloads(paths, payloads)
+	return paths, payloads
+}

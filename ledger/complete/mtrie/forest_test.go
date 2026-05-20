@@ -1163,8 +1163,10 @@ func TestPayloadlessForestUpdate(t *testing.T) {
 	require.Equal(t, uint64(hash.HashLen), updatedTrie.AllocatedRegSize())
 }
 
-// TestPayloadlessForestReadReturnsError tests that read operations on payloadless forest return errors.
-func TestPayloadlessForestReadReturnsError(t *testing.T) {
+// TestPayloadlessForestReadOperations tests read operations on payloadless forest.
+// - Read and ReadSingleValue return errors (stored values are hashes, not usable)
+// - ValueSizes works and returns hash sizes (needed for proof generation)
+func TestPayloadlessForestReadOperations(t *testing.T) {
 	forest, err := NewForestWithPayloadless(5, &metrics.NoopCollector{}, nil, true)
 	require.NoError(t, err)
 
@@ -1178,16 +1180,18 @@ func TestPayloadlessForestReadReturnsError(t *testing.T) {
 	updatedRoot, err := forest.Update(update)
 	require.NoError(t, err)
 
-	// Read should return error for payloadless forest
+	// Read should return error for payloadless forest (stored values are hashes)
 	read := &ledger.TrieRead{RootHash: updatedRoot, Paths: paths}
 	_, err = forest.Read(read)
 	require.Error(t, err)
 	require.ErrorIs(t, err, trie.ErrPayloadlessTrieRead)
 
-	// ValueSizes should return error for payloadless forest
-	_, err = forest.ValueSizes(read)
-	require.Error(t, err)
-	require.ErrorIs(t, err, trie.ErrPayloadlessTrieRead)
+	// ValueSizes works for payloadless forest - returns hash sizes (32 bytes)
+	// This is required for proof generation to work
+	sizes, err := forest.ValueSizes(read)
+	require.NoError(t, err)
+	require.Len(t, sizes, 1)
+	require.Equal(t, hash.HashLen, sizes[0]) // returns hash size, not original value size
 
 	// ReadSingleValue should return error for payloadless forest
 	singleRead := &ledger.TrieReadSingleValue{RootHash: updatedRoot, Path: p1}
@@ -1196,9 +1200,9 @@ func TestPayloadlessForestReadReturnsError(t *testing.T) {
 	require.ErrorIs(t, err, trie.ErrPayloadlessTrieRead)
 }
 
-// TestPayloadlessForestProofs tests that Forest.Proofs returns error for payloadless forest
-// because it internally uses ValueSizes to find non-existent paths.
-// Note: Direct trie-level proofs (MTrie.UnsafeProofs) still work for payloadless tries.
+// TestPayloadlessForestProofs tests that Forest.Proofs works for payloadless forest.
+// Proofs contain hash values (not actual values) which are later reconstructed
+// with actual values from storehouse before sending to verification nodes.
 func TestPayloadlessForestProofs(t *testing.T) {
 	forest, err := NewForestWithPayloadless(5, &metrics.NoopCollector{}, nil, true)
 	require.NoError(t, err)
@@ -1213,24 +1217,30 @@ func TestPayloadlessForestProofs(t *testing.T) {
 	updatedRoot, err := forest.Update(update)
 	require.NoError(t, err)
 
-	// Forest.Proofs uses ValueSizes internally, which fails for payloadless tries
+	// Forest.Proofs works for payloadless forest
 	read := &ledger.TrieRead{RootHash: updatedRoot, Paths: paths}
-	_, err = forest.Proofs(read)
-	require.Error(t, err)
-	require.ErrorIs(t, err, trie.ErrPayloadlessTrieRead)
-
-	// However, direct trie-level proofs still work
-	payloadlessTrie, err := forest.GetTrie(updatedRoot)
+	proofs, err := forest.Proofs(read)
 	require.NoError(t, err)
-	proofs := payloadlessTrie.UnsafeProofs(paths)
 	require.NotNil(t, proofs)
 	require.Len(t, proofs.Proofs, 1)
+
+	// The proof contains hash values (32 bytes), not actual values
+	// These will be reconstructed with actual values from storehouse
+	require.Equal(t, hash.HashLen, proofs.Proofs[0].Payload.Value().Size())
+
+	// Direct trie-level proofs also work
+	payloadlessTrie, err := forest.GetTrie(updatedRoot)
+	require.NoError(t, err)
+	directProofs := payloadlessTrie.UnsafeProofs(paths)
+	require.NotNil(t, directProofs)
+	require.Len(t, directProofs.Proofs, 1)
 }
 
-// TestAddTriePayloadlessMismatch tests that AddTrie returns ErrPayloadlessMismatch
-// when attempting to add a trie with a different payloadless mode than the forest.
+// TestAddTriePayloadlessMismatch tests AddTrie behavior with mixed payloadless modes.
+// - Adding non-payloadless trie to payloadless forest succeeds (mixed-mode bootstrap support)
+// - Adding payloadless trie to non-payloadless forest fails
 func TestAddTriePayloadlessMismatch(t *testing.T) {
-	t.Run("adding regular trie to payloadless forest", func(t *testing.T) {
+	t.Run("adding regular trie to payloadless forest succeeds", func(t *testing.T) {
 		// Create a payloadless forest
 		payloadlessForest, err := NewForestWithPayloadless(5, &metrics.NoopCollector{}, nil, true)
 		require.NoError(t, err)
@@ -1247,10 +1257,15 @@ func TestAddTriePayloadlessMismatch(t *testing.T) {
 		require.NoError(t, err)
 		require.False(t, updatedRegularTrie.IsPayloadless())
 
-		// Attempt to add the regular trie to the payloadless forest - should fail
+		// Adding regular trie to payloadless forest succeeds (mixed-mode bootstrap)
+		// This allows loading V6 checkpoints (with actual values) into payloadless mode
 		err = payloadlessForest.AddTrie(updatedRegularTrie)
-		require.Error(t, err)
-		require.ErrorIs(t, err, ErrPayloadlessMismatch)
+		require.NoError(t, err)
+
+		// Verify the trie was added and can be retrieved
+		retrievedTrie, err := payloadlessForest.GetTrie(updatedRegularTrie.RootHash())
+		require.NoError(t, err)
+		require.False(t, retrievedTrie.IsPayloadless()) // original trie keeps its mode
 	})
 
 	t.Run("adding payloadless trie to regular forest", func(t *testing.T) {
@@ -1308,7 +1323,7 @@ func TestAddTriePayloadlessMismatch(t *testing.T) {
 		require.NoError(t, err)
 	})
 
-	t.Run("AddTries propagates mismatch error", func(t *testing.T) {
+	t.Run("AddTries allows regular tries in payloadless forest", func(t *testing.T) {
 		// Create a payloadless forest
 		payloadlessForest, err := NewForestWithPayloadless(5, &metrics.NoopCollector{}, nil, true)
 		require.NoError(t, err)
@@ -1320,9 +1335,151 @@ func TestAddTriePayloadlessMismatch(t *testing.T) {
 		updatedRegularTrie, _, err := trie.NewTrieWithUpdatedRegisters(regularTrie, []ledger.Path{p1}, []ledger.Payload{*v1}, true)
 		require.NoError(t, err)
 
-		// Attempt to add multiple regular tries to payloadless forest - should fail
+		// Adding regular tries to payloadless forest succeeds (mixed-mode support)
 		err = payloadlessForest.AddTries([]*trie.MTrie{updatedRegularTrie})
+		require.NoError(t, err)
+	})
+
+	t.Run("AddTries rejects payloadless tries in regular forest", func(t *testing.T) {
+		// Create a regular forest
+		regularForest, err := NewForest(5, &metrics.NoopCollector{}, nil)
+		require.NoError(t, err)
+
+		// Create a payloadless trie
+		payloadlessTrie := trie.NewEmptyMTrieWithPayloadless(true)
+		p1 := pathByUint8s([]uint8{uint8(53), uint8(74)})
+		v1 := payloadBySlices([]byte{'A'}, []byte{'A'})
+		updatedPayloadlessTrie, _, err := trie.NewTrieWithUpdatedRegisters(payloadlessTrie, []ledger.Path{p1}, []ledger.Payload{*v1}, true)
+		require.NoError(t, err)
+
+		// Attempting to add payloadless tries to regular forest fails
+		err = regularForest.AddTries([]*trie.MTrie{updatedPayloadlessTrie})
 		require.Error(t, err)
 		require.ErrorIs(t, err, ErrPayloadlessMismatch)
 	})
+}
+
+// TestMixedModeProofReconstruction tests the mixed-mode scenario where:
+// 1. A regular trie is loaded into a payloadless forest (simulating checkpoint load)
+// 2. New updates are made via the forest (creating payloadless nodes)
+// 3. Proofs are generated, manually reconstructed, and verified with PSMT
+func TestMixedModeProofReconstruction(t *testing.T) {
+	// Step 1: Create a regular trie with initial registers (simulating V6 checkpoint)
+	regularTrie := trie.NewEmptyMTrie()
+
+	// Create two paths that will coexist in the trie
+	p1 := pathByUint8s([]uint8{uint8(1), uint8(2)})
+	p2 := pathByUint8s([]uint8{uint8(128), uint8(129)}) // Different branch
+
+	value1 := []byte("initial_value_1")
+	value2 := []byte("initial_value_2")
+	v1 := ledger.NewPayload(
+		ledger.Key{KeyParts: []ledger.KeyPart{{Type: 0, Value: []byte("Owner1")}, {Type: 2, Value: []byte("Key1")}}},
+		value1,
+	)
+	v2 := ledger.NewPayload(
+		ledger.Key{KeyParts: []ledger.KeyPart{{Type: 0, Value: []byte("Owner2")}, {Type: 2, Value: []byte("Key2")}}},
+		value2,
+	)
+
+	paths := []ledger.Path{p1, p2}
+	payloads := []ledger.Payload{*v1, *v2}
+
+	regularTrie, _, err := trie.NewTrieWithUpdatedRegisters(regularTrie, paths, payloads, true)
+	require.NoError(t, err)
+	require.False(t, regularTrie.IsPayloadless())
+
+	initialRootHash := regularTrie.RootHash()
+	t.Logf("Initial regular trie root hash: %x", initialRootHash)
+
+	// Step 2: Create a payloadless forest and add the regular trie
+	payloadlessForest, err := NewForestWithPayloadless(5, &metrics.NoopCollector{}, nil, true)
+	require.NoError(t, err)
+	require.True(t, payloadlessForest.IsPayloadless())
+
+	err = payloadlessForest.AddTrie(regularTrie)
+	require.NoError(t, err)
+
+	// Step 3: Update one register through the forest (creates payloadless update)
+	newValue1 := []byte("updated_value_1")
+	newPayload1 := ledger.NewPayload(
+		ledger.Key{KeyParts: []ledger.KeyPart{{Type: 0, Value: []byte("Owner1")}, {Type: 2, Value: []byte("Key1")}}},
+		newValue1,
+	)
+
+	update := &ledger.TrieUpdate{
+		RootHash: initialRootHash,
+		Paths:    []ledger.Path{p1},
+		Payloads: []*ledger.Payload{newPayload1},
+	}
+
+	newRootHash, err := payloadlessForest.Update(update)
+	require.NoError(t, err)
+	require.NotEqual(t, initialRootHash, newRootHash)
+	t.Logf("Updated trie root hash: %x", newRootHash)
+
+	// Step 4: Get the updated trie and examine it
+	updatedTrie, err := payloadlessForest.GetTrie(newRootHash)
+	require.NoError(t, err)
+	t.Logf("Updated trie IsPayloadless: %v", updatedTrie.IsPayloadless())
+
+	// Step 5: Generate proofs for both paths
+	read := &ledger.TrieRead{RootHash: newRootHash, Paths: paths}
+	batchProof, err := payloadlessForest.Proofs(read)
+	require.NoError(t, err)
+	require.Len(t, batchProof.Proofs, 2)
+
+	t.Logf("Proof 0 - Inclusion: %v, Payload size: %d", batchProof.Proofs[0].Inclusion, batchProof.Proofs[0].Payload.Value().Size())
+	t.Logf("Proof 1 - Inclusion: %v, Payload size: %d", batchProof.Proofs[1].Inclusion, batchProof.Proofs[1].Payload.Value().Size())
+
+	// In mixed mode:
+	// - Proof 0 (updated register): has 32-byte hash value (from payloadless node)
+	// - Proof 1 (unchanged register): has actual value (from regular node)
+	require.Equal(t, hash.HashLen, batchProof.Proofs[0].Payload.Value().Size(),
+		"Updated register proof should have hash value (32 bytes)")
+	require.NotEqual(t, hash.HashLen, batchProof.Proofs[1].Payload.Value().Size(),
+		"Unchanged register proof should have actual value")
+
+	// Step 6: PSMT construction fails without reconstruction
+	_, err = ptrie.NewPSMT(newRootHash, batchProof)
+	require.Error(t, err, "PSMT construction should fail with unreconstructed mixed-mode proofs")
+	require.Contains(t, err.Error(), "rootNode hash doesn't match")
+	t.Logf("PSMT construction failed as expected: %v", err)
+
+	// Step 7: Manually reconstruct proofs with actual values (what the committer does)
+	// Encode and decode to simulate the wire transfer
+	encodedProof := ledger.EncodeTrieBatchProof(batchProof)
+	decodedProof, err := ledger.DecodeTrieBatchProof(encodedProof)
+	require.NoError(t, err)
+
+	// Get keys for value lookup
+	key1, _ := v1.Key()
+
+	// Manually reconstruct each proof - this simulates what ReconstructPayloadlessProof does
+	for _, proof := range decodedProof.Proofs {
+		if !proof.Inclusion {
+			continue
+		}
+		if proof.Payload.Value().Size() != hash.HashLen {
+			continue // Already has actual value
+		}
+
+		// Get the key from the payload
+		proofKey, err := proof.Payload.Key()
+		require.NoError(t, err)
+
+		// Look up the value - in production, committer uses WriteSet for written registers
+		if proofKey.String() == key1.String() {
+			// This register was written - use new value from WriteSet
+			proof.Payload = ledger.NewPayload(proofKey, newValue1)
+		}
+		// Other registers would use baseStorageSnapshot, but they already have actual values
+	}
+
+	// Step 8: Verify PSMT construction succeeds after reconstruction
+	psmt, err := ptrie.NewPSMT(newRootHash, decodedProof)
+	require.NoError(t, err, "PSMT construction should succeed after proof reconstruction")
+	require.Equal(t, newRootHash, psmt.RootHash(),
+		"PSMT root hash should match state commitment")
+	t.Logf("PSMT construction succeeded with root hash: %x", psmt.RootHash())
 }

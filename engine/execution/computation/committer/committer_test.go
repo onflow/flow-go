@@ -218,7 +218,10 @@ func TestPayloadlessLedgerViewCommitter(t *testing.T) {
 		require.NotEqual(t, hash.HashLen, actualValue.Size(), "proof value should not be hash length")
 	})
 
-	t.Run("payloadless committer fails on hash mismatch", func(t *testing.T) {
+	t.Run("payloadless committer reconstructs proof from baseStorageSnapshot", func(t *testing.T) {
+		// This test verifies that proof reconstruction uses values from baseStorageSnapshot.
+		// The proof is generated from baseState (pre-execution), so we need pre-execution values.
+
 		// Create test register with proper address format
 		owner := flow.BytesToAddress([]byte("owner"))
 		key := "key1"
@@ -272,28 +275,45 @@ func TestPayloadlessLedgerViewCommitter(t *testing.T) {
 
 		payloadlessCommitter := committer.NewPayloadlessLedgerViewCommitter(l, trace.NewNoopTracer())
 
-		// Create storage snapshot with DIFFERENT value (simulating inconsistency)
-		wrongValue := []byte("wrong_value_in_storehouse")
+		// baseStorageSnapshot has the correct value for reconstruction
+		// (this is the value that was used to create the hash in the payloadless trie)
 		previousBlockSnapshot := storehouse.NewExecutingBlockSnapshot(
 			snapshot.MapStorageSnapshot{
-				registerID: wrongValue, // Wrong value!
+				registerID: originalValue, // Correct value from base state
 			},
 			flow.StateCommitment(update.State()),
 		)
 
+		// The WriteSet might have a different (new) value, but this shouldn't affect
+		// proof reconstruction since we use baseStorageSnapshot
+		newValue := []byte("new_value_being_written")
 		blockUpdates := &snapshot.ExecutionSnapshot{
 			WriteSet: map[flow.RegisterID]flow.RegisterValue{
-				registerID: originalValue,
+				registerID: newValue,
 			},
 		}
 
-		// Commit should fail due to hash mismatch
-		_, _, _, _, err = payloadlessCommitter.CommitView(
+		// Commit should succeed
+		newCommit, proof, trieUpdate, newStorageSnapshot, err := payloadlessCommitter.CommitView(
 			blockUpdates,
 			previousBlockSnapshot,
 		)
-		require.Error(t, err)
-		require.ErrorIs(t, err, trie.ErrPayloadHashMismatch)
+		require.NoError(t, err)
+
+		// Verify basic results
+		require.Equal(t, endState, newCommit)
+		require.Equal(t, newCommit, newStorageSnapshot.Commitment())
+		require.True(t, expectedTrieUpdate.Equals(trieUpdate))
+
+		// The proof should be reconstructed with actual value from baseStorageSnapshot
+		decodedProof, err := ledger.DecodeTrieBatchProof(proof)
+		require.NoError(t, err)
+		require.Equal(t, 1, decodedProof.Size())
+
+		// The payload should have the original value (from baseStorageSnapshot), not the new value
+		proofValue := decodedProof.Proofs[0].Payload.Value()
+		require.Equal(t, originalValue, []byte(proofValue),
+			"proof should contain actual value from baseStorageSnapshot")
 	})
 
 	t.Run("non-payloadless committer returns proof as-is", func(t *testing.T) {
