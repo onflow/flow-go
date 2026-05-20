@@ -8,6 +8,7 @@ import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/state/fork"
 	"github.com/onflow/flow-go/state/protocol"
@@ -259,18 +260,19 @@ func (s *sealValidator) Validate(candidate *flow.Block) (*flow.Seal, error) {
 func (s *sealValidator) validateSeal(seal *flow.Seal, incorporatedResult *flow.IncorporatedResult) error {
 	executionResult := incorporatedResult.Result
 
-	// Bind `Seal.FinalState` to the referenced execution result. We do this _before_ all other
-	// per-chunk checks so that a poisoned `FinalState` is rejected as early as possible.
-	// `FinalStateCommitment` only errors with `ErrNoChunks`, which cannot occur here because a
-	// valid `ExecutionResult` always has at least one chunk (enforced by `flow.NewExecutionResult`).
-	// Any error returned therefore signals a corrupted/malformed execution result that bypassed
-	// upstream validation — treat as exception, not a benign input error.
+	// Bind `Seal.FinalState` to the referenced execution result. We run this check first so a
+	// poisoned `FinalState` is rejected before any of the more expensive per-chunk work.
+	//
+	// `FinalStateCommitment` is documented to fail only with `flow.ErrNoChunks`. That error is unreachable here: `executionResult` is
+	// loaded from local storage and was incorporated in a strict ancestor of the candidate block, so `ReceiptValidator.verifyChunksFormat`
+	// has already enforced `Chunks.Len() ≥ 1` (the system chunk is mandatory). A `nil` result pointer is likewise impossible (rejected by
+	// `flow.NewIncorporatedResult`). Any error observed here therefore indicates a bug or storage corruption.
 	expectedFinalState, err := executionResult.FinalStateCommitment()
 	if err != nil {
-		return fmt.Errorf("could not derive final state commitment from execution result %x: %w", executionResult.ID(), err)
+		return irrecoverable.NewExceptionf("could not retrieve final state commitment from incorporated execution result %x: %w", executionResult.ID(), err)
 	}
 	if seal.FinalState != expectedFinalState {
-		return engine.NewInvalidInputErrorf("seal final state does not match execution result final state")
+		return engine.NewInvalidInputErrorf("seal's final state does not match execution result")
 	}
 
 	// check that each chunk has an AggregatedSignature
