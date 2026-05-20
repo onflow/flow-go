@@ -73,9 +73,22 @@ func GenerateExecutionState(
 		return flow.DummyStateCommitment, fmt.Errorf("bootstraping failed to produce a checkpoint for trie %v", stateCommitment)
 	}
 
+	// Store V6 checkpoint (regular format with full payloads)
 	err = wal.StoreCheckpointV6([]*trie.MTrie{matchTrie}, dbDir, bootstrapFilenames.FilenameWALRootCheckpoint, zerolog.Nop(), 1)
 	if err != nil {
-		return flow.DummyStateCommitment, fmt.Errorf("failed to store bootstrap checkpoint: %w", err)
+		return flow.DummyStateCommitment, fmt.Errorf("failed to store bootstrap V6 checkpoint: %w", err)
+	}
+
+	// Convert trie to payloadless format and store V7 checkpoint
+	payloadlessTrie, err := matchTrie.ConvertToPayloadless()
+	if err != nil {
+		return flow.DummyStateCommitment, fmt.Errorf("failed to convert trie to payloadless: %w", err)
+	}
+
+	v7Filename := bootstrapFilenames.FilenameWALRootCheckpoint + wal.V7FileSuffix
+	err = wal.StoreCheckpointV7([]*trie.MTrie{payloadlessTrie}, dbDir, v7Filename, zerolog.Nop(), 1)
+	if err != nil {
+		return flow.DummyStateCommitment, fmt.Errorf("failed to store bootstrap V7 checkpoint: %w", err)
 	}
 
 	return stateCommitment, nil

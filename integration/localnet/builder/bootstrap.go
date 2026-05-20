@@ -845,20 +845,32 @@ func prepareLedgerService(dockerServices Services, flowNodeContainerConfigs []te
 	// 2. Ledger service has /trie mounted and can follow symlinks to /bootstrap (via execution node's mount)
 	// 3. We create symlinks using relative paths that work in both host and container contexts
 	bootstrapExecutionStateDir := filepath.Join(BootstrapDir, bootstrapFilenames.DirnameExecutionState)
-	checkpointSource := filepath.Join(bootstrapExecutionStateDir, bootstrapFilenames.FilenameWALRootCheckpoint)
-	if _, err := os.Stat(checkpointSource); err == nil {
-		// Checkpoint exists, create symlinks on host
-		// The symlinks will use relative paths that resolve correctly inside containers
-		// because both /bootstrap and /trie are mounted in the containers
+
+	// Create symlinks for V6 checkpoint
+	checkpointSourceV6 := filepath.Join(bootstrapExecutionStateDir, bootstrapFilenames.FilenameWALRootCheckpoint)
+	if _, err := os.Stat(checkpointSourceV6); err == nil {
+		// V6 checkpoint exists, create symlinks on host
 		_, err = wal.SoftlinkCheckpointFile(bootstrapFilenames.FilenameWALRootCheckpoint, bootstrapExecutionStateDir, trieDir)
 		if err != nil {
-			panic(fmt.Errorf("failed to create checkpoint symlinks: %w", err))
+			panic(fmt.Errorf("failed to create V6 checkpoint symlinks: %w", err))
 		}
-		fmt.Printf("created checkpoint symlinks in trie directory: %s\n", trieDir)
+		fmt.Printf("created V6 checkpoint symlinks in trie directory: %s\n", trieDir)
 	} else {
-		// Checkpoint doesn't exist, this is expected for fresh bootstrap
-		// The execution node will create it when it initializes
-		fmt.Printf("root checkpoint not found in %s, ledger service will start with empty state\n", checkpointSource)
+		fmt.Printf("V6 root checkpoint not found in %s\n", checkpointSourceV6)
+	}
+
+	// Create symlinks for V7 checkpoint (payloadless)
+	v7Filename := bootstrapFilenames.FilenameWALRootCheckpoint + wal.V7FileSuffix
+	checkpointSourceV7 := filepath.Join(bootstrapExecutionStateDir, v7Filename)
+	if _, err := os.Stat(checkpointSourceV7); err == nil {
+		// V7 checkpoint exists, create symlinks on host
+		_, err = wal.SoftlinkCheckpointFile(v7Filename, bootstrapExecutionStateDir, trieDir)
+		if err != nil {
+			panic(fmt.Errorf("failed to create V7 checkpoint symlinks: %w", err))
+		}
+		fmt.Printf("created V7 checkpoint symlinks in trie directory: %s\n", trieDir)
+	} else {
+		fmt.Printf("V7 root checkpoint not found in %s\n", checkpointSourceV7)
 	}
 
 	// Allocate ports for ledger service
