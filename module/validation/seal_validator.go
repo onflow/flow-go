@@ -260,8 +260,8 @@ func (s *sealValidator) Validate(candidate *flow.Block) (*flow.Seal, error) {
 func (s *sealValidator) validateSeal(seal *flow.Seal, incorporatedResult *flow.IncorporatedResult) error {
 	executionResult := incorporatedResult.Result
 
-	// Bind `Seal.FinalState` to the referenced execution result. We run this check first so a
-	// poisoned `FinalState` is rejected before any of the more expensive per-chunk work.
+	// Verify `Seal.FinalState` matches the execution result. We run this check first so a
+	// byzantine `FinalState` is rejected before any of the more expensive per-chunk work.
 	//
 	// `FinalStateCommitment` is documented to fail only with `flow.ErrNoChunks`. That error is unreachable here: `executionResult` is
 	// loaded from local storage and was incorporated in a strict ancestor of the candidate block, so `ReceiptValidator.verifyChunksFormat`
