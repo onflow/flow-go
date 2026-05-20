@@ -302,7 +302,7 @@ func (nc *NetworkCollector) OnClusterTopicMetricsCleanup(topic string) {
 	nc.rateLimitedUnicastMessagesCount.DeletePartialMatch(prometheus.Labels{LabelChannel: topic})
 
 	// ALSP misbehavior counter (multi-label: channel + misbehavior)
-	nc.AlspMetrics.reportedMisbehaviorCount.DeletePartialMatch(prometheus.Labels{LabelChannel: topic})
+	nc.AlspMetrics.OnClusterTopicMetricsCleanup(topic)
 }
 
 func (nc *NetworkCollector) MessageAdded(priority int) {
