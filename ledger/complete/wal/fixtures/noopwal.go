@@ -35,6 +35,10 @@ func (w *NoopWAL) RecordDelete(rootHash ledger.RootHash) error { return nil }
 
 func (w *NoopWAL) ReplayOnForest(forest *mtrie.Forest) error { return nil }
 
+func (w *NoopWAL) ReplayOnForestWithPayloadless(forest *mtrie.Forest, isPayloadless bool) error {
+	return nil
+}
+
 func (w *NoopWAL) Segments() (first, last int, err error) { return 0, 0, nil }
 
 func (w *NoopWAL) Replay(checkpointFn func(tries []*trie.MTrie) error, updateFn func(update *ledger.TrieUpdate) error, deleteFn func(ledger.RootHash) error) error {

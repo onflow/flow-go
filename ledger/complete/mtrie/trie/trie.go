@@ -973,6 +973,69 @@ func minInt(a, b int) int {
 	return b
 }
 
+// ConvertToPayloadless creates a copy of the trie where leaf nodes store payload hashes
+// instead of full payloads. The root hash is preserved, as the node hashes are maintained
+// during conversion.
+//
+// This is useful for creating V7 (payloadless) checkpoints from V6 (full payload) checkpoints.
+//
+// No error returns are expected during normal operation.
+func (mt *MTrie) ConvertToPayloadless() (*MTrie, error) {
+	if mt.IsEmpty() {
+		return NewEmptyMTrieWithPayloadless(true), nil
+	}
+	if mt.isPayloadless {
+		// Already payloadless, return a copy with the same root
+		return NewMTrieWithPayloadless(mt.root, mt.regCount, mt.regSize, true)
+	}
+
+	// Convert the root node recursively
+	newRoot, newRegSize := convertNodeToPayloadless(mt.root)
+
+	// Create a new trie with the converted root
+	// regCount stays the same, regSize changes to reflect hash sizes
+	return NewMTrieWithPayloadless(newRoot, mt.regCount, newRegSize, true)
+}
+
+// convertNodeToPayloadless recursively converts a node and its children to payloadless format.
+// Returns the converted node and the total register size in the subtree.
+func convertNodeToPayloadless(n *node.Node) (*node.Node, uint64) {
+	if n == nil {
+		return nil, 0
+	}
+
+	if n.IsLeaf() {
+		// Convert leaf node to payloadless format
+		path := *n.Path()
+		payload := n.Payload()
+
+		// Create payloadless payload (stores hash instead of actual value)
+		payloadlessPayload := createPayloadlessPayload(payload, path)
+
+		// Create new node with same hash but payloadless payload
+		// The hash is already computed correctly from the original value
+		newNode := node.NewNode(n.Height(), nil, nil, path, payloadlessPayload, n.Hash())
+
+		// Size is always hash size (32 bytes) for payloadless, unless empty
+		var regSize uint64
+		if !payload.IsEmpty() {
+			regSize = uint64(hash.HashLen)
+		}
+		return newNode, regSize
+	}
+
+	// Convert children recursively
+	leftChild, leftSize := convertNodeToPayloadless(n.LeftChild())
+	rightChild, rightSize := convertNodeToPayloadless(n.RightChild())
+
+	// Create new interim node with converted children
+	// NewInterimNode computes the hash from children, which is correct since
+	// children's hashes are preserved during conversion
+	newNode := node.NewInterimNode(n.Height(), leftChild, rightChild)
+
+	return newNode, leftSize + rightSize
+}
+
 // TraverseNodes traverses all nodes of the trie in DFS order
 func TraverseNodes(trie *MTrie, processNode func(*node.Node) error) error {
 	return traverseRecursive(trie.root, processNode)
