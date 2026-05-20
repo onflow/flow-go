@@ -178,6 +178,7 @@ func reportABIEncodingComputation(
 				context,
 				stdlib.EVMBytesTypeValueFieldName,
 				common.DeclarationKindField,
+				nil,
 			)
 			bytesArray, ok := valueMember.(*interpreter.ArrayValue)
 			if !ok {
@@ -199,16 +200,21 @@ func reportABIEncodingComputation(
 
 		default:
 			staticType := value.StaticType(context)
-			semaType := interpreter.MustConvertStaticToSemaType(staticType, context)
+			semaType := context.SemaTypeFromStaticType(staticType)
 			if compositeType := asTupleEncodableCompositeType(semaType); compositeType != nil {
 
 				compositeType.Members.Foreach(func(name string, member *sema.Member) {
-					declarationKind := member.DeclarationKind
-					if declarationKind != common.DeclarationKindField {
+
+					if member.DeclarationKind != common.DeclarationKindField {
 						return
 					}
 
-					fieldValue := value.GetMember(context, name, declarationKind)
+					fieldValue := value.GetMember(
+						context,
+						name,
+						common.DeclarationKindField,
+						nil,
+					)
 					reportABIEncodingComputation(
 						context,
 						fieldValue,
@@ -433,7 +439,7 @@ func gethABIType(
 			return gethTypeBytes32, true
 		}
 
-		semaType := interpreter.MustConvertStaticToSemaType(staticType, context)
+		semaType := context.SemaTypeFromStaticType(staticType)
 		if compositeType := asTupleEncodableCompositeType(semaType); compositeType != nil {
 
 			var (
@@ -750,6 +756,7 @@ func encodeABI(
 				context,
 				stdlib.EVMAddressTypeBytesFieldName,
 				common.DeclarationKindField,
+				nil,
 			)
 			bytes, err := interpreter.ByteArrayValueToByteSlice(context, addressBytesArrayValue)
 			if err != nil {
@@ -762,6 +769,7 @@ func encodeABI(
 				context,
 				stdlib.EVMBytesTypeValueFieldName,
 				common.DeclarationKindField,
+				nil,
 			)
 			bytes, err := interpreter.ByteArrayValueToByteSlice(context, bytesValue)
 			if err != nil {
@@ -774,6 +782,7 @@ func encodeABI(
 				context,
 				stdlib.EVMBytesTypeValueFieldName,
 				common.DeclarationKindField,
+				nil,
 			)
 			bytes, err := interpreter.ByteArrayValueToByteSlice(context, bytesValue)
 			if err != nil {
@@ -786,6 +795,7 @@ func encodeABI(
 				context,
 				stdlib.EVMBytesTypeValueFieldName,
 				common.DeclarationKindField,
+				nil,
 			)
 			bytes, err := interpreter.ByteArrayValueToByteSlice(context, bytesValue)
 			if err != nil {
@@ -795,7 +805,7 @@ func encodeABI(
 		}
 
 		staticType := value.StaticType(context)
-		semaType := interpreter.MustConvertStaticToSemaType(staticType, context)
+		semaType := context.SemaTypeFromStaticType(staticType)
 
 		if compositeType := asTupleEncodableCompositeType(semaType); compositeType != nil {
 
@@ -814,8 +824,7 @@ func encodeABI(
 
 			compositeType.Members.Foreach(func(name string, member *sema.Member) {
 
-				declarationKind := member.DeclarationKind
-				if declarationKind != common.DeclarationKindField {
+				if member.DeclarationKind != common.DeclarationKindField {
 					return
 				}
 
@@ -828,7 +837,12 @@ func encodeABI(
 
 				index++
 
-				fieldValue := value.GetMember(context, name, declarationKind)
+				fieldValue := value.GetMember(
+					context,
+					name,
+					common.DeclarationKindField,
+					nil,
+				)
 
 				fieldElement, _, err := encodeABI(
 					context,
@@ -878,7 +892,7 @@ func encodeABI(
 			result = reflect.MakeSlice(reflect.SliceOf(elementGoType), size, size)
 		}
 
-		semaType := interpreter.MustConvertStaticToSemaType(elementStaticType, context)
+		semaType := context.SemaTypeFromStaticType(elementStaticType)
 		isTuple := asTupleEncodableCompositeType(semaType) != nil
 
 		var index int
@@ -1295,7 +1309,7 @@ func decodeABI(
 			), nil
 
 		default:
-			semaType := interpreter.MustConvertStaticToSemaType(staticType, context)
+			semaType := context.SemaTypeFromStaticType(staticType)
 			if compositeType := asTupleEncodableCompositeType(semaType); compositeType != nil {
 
 				valueStruct := reflect.ValueOf(value)
