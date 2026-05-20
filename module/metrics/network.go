@@ -277,19 +277,32 @@ func (nc *NetworkCollector) DuplicateInboundMessagesDropped(topic, protocol, mes
 // OnClusterTopicMetricsCleanup removes all metric label values associated with the given cluster topic.
 // This prevents unbounded metric cardinality growth during epoch transitions when collection nodes
 // join new clusters and leave old ones. Only call this for cluster topics (sync-cluster-*, consensus-cluster-*).
-// This method overrides the embedded LocalGossipSubRouterMetrics.OnClusterTopicMetricsCleanup to also
-// clean up inbound/outbound message size metrics and iHave message ID metrics.
 func (nc *NetworkCollector) OnClusterTopicMetricsCleanup(topic string) {
-	// Clean up LocalGossipSubRouterMetrics (localMeshSize, peerGraftTopicCount, peerPruneTopicCount)
+	// LocalGossipSubRouterMetrics: localMeshSize, peerGraftTopicCount, peerPruneTopicCount
 	nc.LocalGossipSubRouterMetrics.OnClusterTopicMetricsCleanup(topic)
 
-	// Clean up GossipSubRpcValidationInspectorMetrics (receivedIHaveMsgIDsHistogram)
+	// GossipSubRpcValidationInspectorMetrics: receivedIHaveMsgIDsHistogram
 	nc.GossipSubRpcValidationInspectorMetrics.OnClusterTopicMetricsCleanup(topic)
 
-	// Clean up inbound/outbound message size metrics using partial match on topic
+	// GossipSubScoreMetrics: timeInMesh, meshMessageDelivery, firstMessageDelivery, invalidMessageDelivery
+	nc.GossipSubScoreMetrics.OnClusterTopicMetricsCleanup(topic)
+
+	// inbound/outbound message size and duplicate drop counters (multi-label: channel + protocol + message)
 	nc.inboundMessageSize.DeletePartialMatch(prometheus.Labels{LabelChannel: topic})
 	nc.outboundMessageSize.DeletePartialMatch(prometheus.Labels{LabelChannel: topic})
 	nc.duplicateMessagesDropped.DeletePartialMatch(prometheus.Labels{LabelChannel: topic})
+
+	// message processing gauges and inbound process time counter (single label: channel)
+	nc.numMessagesProcessing.DeleteLabelValues(topic)
+	nc.numDirectMessagesSending.DeleteLabelValues(topic)
+	nc.inboundProcessTime.DeleteLabelValues(topic)
+
+	// security metrics (multi-label: role + message + channel + reason)
+	nc.unAuthorizedMessagesCount.DeletePartialMatch(prometheus.Labels{LabelChannel: topic})
+	nc.rateLimitedUnicastMessagesCount.DeletePartialMatch(prometheus.Labels{LabelChannel: topic})
+
+	// ALSP misbehavior counter (multi-label: channel + misbehavior)
+	nc.AlspMetrics.reportedMisbehaviorCount.DeletePartialMatch(prometheus.Labels{LabelChannel: topic})
 }
 
 func (nc *NetworkCollector) MessageAdded(priority int) {
