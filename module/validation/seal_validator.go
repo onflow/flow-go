@@ -243,15 +243,35 @@ func (s *sealValidator) Validate(candidate *flow.Block) (*flow.Seal, error) {
 
 // validateSeal performs integrity checks of single seal. To be valid, we
 // require that seal:
-// 1) Contains correct number of approval signatures, one aggregated sig for each chunk.
-// 2) Every aggregated signature contains valid signer ids. module.ChunkAssigner is used to perform this check.
-// 3) Every aggregated signature contains valid signatures.
+//  1. Commits to the final state derived from the referenced execution result. `Seal.FinalState`
+//     is redundant data (the authoritative value is `executionResult.FinalStateCommitment()`); the
+//     verifier attestations only bind {BlockID, ExecutionResultID, ChunkIndex} and do _not_ cover
+//     `Seal.FinalState`. Without this explicit binding, an authorized Byzantine consensus proposer
+//     could swap in an arbitrary non-empty `FinalState` while keeping the approval signatures valid.
+//  2. Contains correct number of approval signatures, one aggregated sig for each chunk.
+//  3. Every aggregated signature contains valid signer ids. `module.ChunkAssigner` is used to perform this check.
+//  4. Every aggregated signature contains valid signatures.
+//
 // Returns:
-// * nil - in case of success
-// * engine.InvalidInputError - in case of malformed seal
-// * exception - in case of unexpected error
+//   - nil - in case of success
+//   - engine.InvalidInputError - in case of malformed seal
+//   - exception - in case of unexpected error
 func (s *sealValidator) validateSeal(seal *flow.Seal, incorporatedResult *flow.IncorporatedResult) error {
 	executionResult := incorporatedResult.Result
+
+	// Bind `Seal.FinalState` to the referenced execution result. We do this _before_ all other
+	// per-chunk checks so that a poisoned `FinalState` is rejected as early as possible.
+	// `FinalStateCommitment` only errors with `ErrNoChunks`, which cannot occur here because a
+	// valid `ExecutionResult` always has at least one chunk (enforced by `flow.NewExecutionResult`).
+	// Any error returned therefore signals a corrupted/malformed execution result that bypassed
+	// upstream validation — treat as exception, not a benign input error.
+	expectedFinalState, err := executionResult.FinalStateCommitment()
+	if err != nil {
+		return fmt.Errorf("could not derive final state commitment from execution result %x: %w", executionResult.ID(), err)
+	}
+	if seal.FinalState != expectedFinalState {
+		return engine.NewInvalidInputErrorf("seal final state does not match execution result final state")
+	}
 
 	// check that each chunk has an AggregatedSignature
 	if len(seal.AggregatedApprovalSigs) != executionResult.Chunks.Len() {

@@ -272,6 +272,44 @@ func (s *SealValidationSuite) TestSealDuplicatedApproval() {
 	s.Require().True(engine.IsInvalidInputError(err))
 }
 
+// TestSealInvalidFinalState verifies that we reject a seal whose `FinalState` does not equal the
+// final state derived from the referenced execution result (i.e. the last chunk's `EndState`).
+//
+// Background: `Seal.FinalState` is a supplied field whose authoritative value is already determined
+// by the referenced `ExecutionResult` (via `executionResult.FinalStateCommitment()`). The verifier
+// attestations only cover `{BlockID, ExecutionResultID, ChunkIndex}` — they do _not_ commit to
+// `Seal.FinalState`. Without an explicit binding check in the seal validator, an authorized
+// Byzantine consensus proposer could build a block payload with valid aggregated approvals for a
+// real incorporated execution result but set `Seal.FinalState` to an arbitrary non-empty value.
+// The downstream `Snapshot.Commit` would then expose the poisoned commitment as the sealed state.
+//
+// We test with the following fork:
+//
+//	... <- LatestSealedBlock <- B0 <- B1{ Result[B0], Receipt[B0] } <- B2 <- ░newBlock{ Seal[B0]}░
+//
+// The gap of 1 block, i.e. B2, is required to avoid a sealing edge-case
+// (see test `TestSeal_EnforceGap` for more details).
+func (s *SealValidationSuite) TestSealInvalidFinalState() {
+	_, _, newBlock, receipt, seal := s.generateBasicTestFork()
+
+	// Sanity: the fixture's seal must agree with the execution result's final state. This guarantees
+	// that the subsequent mutation below is the _only_ deviation between the seal and the result.
+	expectedFinalState, err := receipt.ExecutionResult.FinalStateCommitment()
+	s.Require().NoError(err)
+	s.Require().Equal(expectedFinalState, seal.FinalState)
+
+	// Mutate one byte of `FinalState` to model the Byzantine proposer who keeps all attestation-bound
+	// fields (BlockID, ResultID, ChunkIndex, AggregatedApprovalSigs) intact but tampers with the
+	// redundant `Seal.FinalState`. The seal pointer is already included in `newBlock`'s payload.
+	seal.FinalState[0] ^= 0xff
+	s.Require().NotEqual(flow.EmptyStateCommitment, seal.FinalState) // remains non-empty (NewSeal precondition)
+	s.Require().NotEqual(expectedFinalState, seal.FinalState)
+
+	_, err = s.sealValidator.Validate(newBlock)
+	s.Require().Error(err)
+	s.Require().True(engine.IsInvalidInputError(err), err)
+}
+
 // TestSealInvalidChunkAssignment tests that we reject seal with invalid signerID of approval signature for
 // submitted seal. We test with the following fork:
 //
