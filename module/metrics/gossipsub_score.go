@@ -161,3 +161,13 @@ func (g *GossipSubScoreMetrics) OnInvalidMessageDeliveredUpdated(topic channels.
 func (g *GossipSubScoreMetrics) SetWarningStateCount(u uint) {
 	g.warningStateGauge.Set(float64(u))
 }
+
+// OnClusterTopicMetricsCleanup removes all per-topic scoring metric label values associated with
+// the given cluster topic. Call this when the local node leaves a cluster topic to prevent
+// unbounded metric cardinality growth across epoch transitions.
+func (g *GossipSubScoreMetrics) OnClusterTopicMetricsCleanup(topic string) {
+	g.timeInMesh.DeleteLabelValues(topic)
+	g.meshMessageDelivery.DeleteLabelValues(topic)
+	g.firstMessageDelivery.DeleteLabelValues(topic)
+	g.invalidMessageDelivery.DeleteLabelValues(topic)
+}
