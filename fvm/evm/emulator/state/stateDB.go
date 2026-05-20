@@ -67,6 +67,7 @@ func NewStateDB(ledger atree.Ledger, root flow.Address) (*StateDB, error) {
 //
 // this should also return true for self destructed accounts during the transaction execution.
 func (db *StateDB) Exist(addr gethCommon.Address) bool {
+	// EIP-7928: per-transaction state access tracking
 	db.recordStateAccess(addr)
 	exist, err := db.latestView().Exist(addr)
 	db.handleError(err)
@@ -77,6 +78,7 @@ func (db *StateDB) Exist(addr gethCommon.Address) bool {
 //
 // Empty is defined according to EIP161 (balance = nonce = code = 0).
 func (db *StateDB) Empty(addr gethCommon.Address) bool {
+	// EIP-7928: per-transaction state access tracking
 	db.recordStateAccess(addr)
 	if !db.Exist(addr) {
 		return true
@@ -88,6 +90,7 @@ func (db *StateDB) Empty(addr gethCommon.Address) bool {
 
 // Touch accesses the specific account without returning anything.
 func (db *StateDB) Touch(addr gethCommon.Address) {
+	// EIP-7928: per-transaction state access tracking
 	db.recordStateAccess(addr)
 }
 
@@ -109,12 +112,14 @@ func (db *StateDB) IsCreated(addr gethCommon.Address) bool {
 // This operation sets the 'newContract'-flag, which is required in order to
 // correctly handle EIP-6780 'delete-in-same-transaction' logic.
 func (db *StateDB) CreateContract(addr gethCommon.Address) {
+	// EIP-7928: per-transaction state access tracking
 	db.recordStateAccess(addr)
 	db.latestView().CreateContract(addr)
 }
 
 // IsNewContract returns true if address is a new contract
 func (db *StateDB) IsNewContract(addr gethCommon.Address) bool {
+	// EIP-7928: per-transaction state access tracking
 	db.recordStateAccess(addr)
 	return db.latestView().IsNewContract(addr)
 }
@@ -124,12 +129,14 @@ func (db *StateDB) IsNewContract(addr gethCommon.Address) bool {
 // While this address exists for the rest of the transaction,
 // the balance of this account is cleared after the SelfDestruct call.
 func (db *StateDB) SelfDestruct(addr gethCommon.Address) {
+	// EIP-7928: per-transaction state access tracking
+	db.recordStateAccess(addr)
+
 	// Flow EVM went live with the Cancun hard-fork, so we only support the
 	// EIP-6780 SELFDESTRUCT variation, which works only in same transaction.
 	// EIP-6780 would only follow the self destruct steps if account is a new
 	// contract either just created, or address had balance before but got a
 	// contract deployed to it (in this tx).
-	db.recordStateAccess(addr)
 	if db.IsNewContract(addr) {
 		err := db.latestView().SelfDestruct(addr)
 		db.handleError(err)
@@ -138,6 +145,7 @@ func (db *StateDB) SelfDestruct(addr gethCommon.Address) {
 
 // HasSelfDestructed returns true if address is flagged with self destruct.
 func (db *StateDB) HasSelfDestructed(addr gethCommon.Address) bool {
+	// EIP-7928: per-transaction state access tracking
 	db.recordStateAccess(addr)
 	destructed, _ := db.latestView().HasSelfDestructed(addr)
 	return destructed
@@ -150,6 +158,7 @@ func (db *StateDB) SubBalance(
 	amount *uint256.Int,
 	reason gethTracing.BalanceChangeReason,
 ) uint256.Int {
+	// EIP-7928: per-transaction state access tracking
 	db.recordStateAccess(addr)
 	// negative amounts are not accepted.
 	if amount.Sign() < 0 {
@@ -172,6 +181,7 @@ func (db *StateDB) AddBalance(
 	amount *uint256.Int,
 	reason gethTracing.BalanceChangeReason,
 ) uint256.Int {
+	// EIP-7928: per-transaction state access tracking
 	db.recordStateAccess(addr)
 	// negative amounts are not accepted.
 	if amount.Sign() < 0 {
@@ -189,6 +199,7 @@ func (db *StateDB) AddBalance(
 
 // GetBalance returns the balance of the given address
 func (db *StateDB) GetBalance(addr gethCommon.Address) *uint256.Int {
+	// EIP-7928: per-transaction state access tracking
 	db.recordStateAccess(addr)
 	bal, err := db.latestView().GetBalance(addr)
 	db.handleError(err)
@@ -197,6 +208,7 @@ func (db *StateDB) GetBalance(addr gethCommon.Address) *uint256.Int {
 
 // GetNonce returns the nonce of the given address
 func (db *StateDB) GetNonce(addr gethCommon.Address) uint64 {
+	// EIP-7928: per-transaction state access tracking
 	db.recordStateAccess(addr)
 	nonce, err := db.latestView().GetNonce(addr)
 	db.handleError(err)
@@ -209,6 +221,7 @@ func (db *StateDB) SetNonce(
 	nonce uint64,
 	reason gethTracing.NonceChangeReason,
 ) {
+	// EIP-7928: per-transaction state access tracking
 	db.recordStateAccess(addr)
 	err := db.latestView().SetNonce(addr, nonce)
 	db.handleError(err)
@@ -216,6 +229,7 @@ func (db *StateDB) SetNonce(
 
 // GetCodeHash returns the code hash of the given address
 func (db *StateDB) GetCodeHash(addr gethCommon.Address) gethCommon.Hash {
+	// EIP-7928: per-transaction state access tracking
 	db.recordStateAccess(addr)
 	hash, err := db.latestView().GetCodeHash(addr)
 	db.handleError(err)
@@ -224,6 +238,7 @@ func (db *StateDB) GetCodeHash(addr gethCommon.Address) gethCommon.Hash {
 
 // GetCode returns the code for the given address
 func (db *StateDB) GetCode(addr gethCommon.Address) []byte {
+	// EIP-7928: per-transaction state access tracking
 	db.recordStateAccess(addr)
 	code, err := db.latestView().GetCode(addr)
 	db.handleError(err)
@@ -232,6 +247,7 @@ func (db *StateDB) GetCode(addr gethCommon.Address) []byte {
 
 // GetCodeSize returns the size of the code for the given address
 func (db *StateDB) GetCodeSize(addr gethCommon.Address) int {
+	// EIP-7928: per-transaction state access tracking
 	db.recordStateAccess(addr)
 	codeSize, err := db.latestView().GetCodeSize(addr)
 	db.handleError(err)
@@ -245,6 +261,7 @@ func (db *StateDB) SetCode(
 	code []byte,
 	reason gethTracing.CodeChangeReason,
 ) (prev []byte) {
+	// EIP-7928: per-transaction state access tracking
 	db.recordStateAccess(addr)
 	prev = db.GetCode(addr)
 	err := db.latestView().SetCode(addr, code)
@@ -273,6 +290,7 @@ func (db *StateDB) GetRefund() uint64 {
 // GetCommittedState returns the value for the given storage slot considering only the committed state and not
 // changes in the scope of current transaction.
 func (db *StateDB) GetCommittedState(addr gethCommon.Address, key gethCommon.Hash) gethCommon.Hash {
+	// EIP-7928: per-transaction state access tracking
 	db.recordStateAccess(addr)
 	value, err := db.baseView.GetState(types.SlotAddress{Address: addr, Key: key})
 	db.handleError(err)
@@ -284,6 +302,7 @@ func (db *StateDB) GetStateAndCommittedState(
 	addr gethCommon.Address,
 	key gethCommon.Hash,
 ) (gethCommon.Hash, gethCommon.Hash) {
+	// EIP-7928: per-transaction state access tracking
 	db.recordStateAccess(addr)
 	origin := db.GetCommittedState(addr, key)
 	value := db.GetState(addr, key)
@@ -293,6 +312,7 @@ func (db *StateDB) GetStateAndCommittedState(
 
 // GetState returns the value for the given storage slot
 func (db *StateDB) GetState(addr gethCommon.Address, key gethCommon.Hash) gethCommon.Hash {
+	// EIP-7928: per-transaction state access tracking
 	db.recordStateAccess(addr)
 	state, err := db.latestView().GetState(types.SlotAddress{Address: addr, Key: key})
 	db.handleError(err)
@@ -314,6 +334,7 @@ func (db *StateDB) GetState(addr gethCommon.Address, key gethCommon.Hash) gethCo
 // This endpoint is added mostly to prevent the case that an smart contract is self-destructed
 // and a later transaction tries to deploy a contract to the same address.
 func (db *StateDB) GetStorageRoot(addr gethCommon.Address) gethCommon.Hash {
+	// EIP-7928: per-transaction state access tracking
 	db.recordStateAccess(addr)
 	root, err := db.latestView().GetStorageRoot(addr)
 	db.handleError(err)
@@ -327,6 +348,7 @@ func (db *StateDB) SetState(
 	key gethCommon.Hash,
 	value gethCommon.Hash,
 ) gethCommon.Hash {
+	// EIP-7928: per-transaction state access tracking
 	db.recordStateAccess(addr)
 	prevState, err := db.latestView().SetState(types.SlotAddress{Address: addr, Key: key}, value)
 	db.handleError(err)
