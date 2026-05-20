@@ -128,17 +128,23 @@ func GenerateProtocolSnapshotForCheckpoint(
 	)
 }
 
-// findLatestCheckpointFilePath finds the latest checkpoint file in the given directory
-// it returns the header file name of the latest checkpoint file
+// findLatestCheckpointFilePath finds the latest checkpoint file in the given directory.
+// It returns the header file path of the latest checkpoint file.
+// This function detects both V6 and V7 checkpoints and returns the correct filename.
 func findLatestCheckpointFilePath(checkpointDir string) (string, error) {
-	_, last, err := wal.ListCheckpoints(checkpointDir)
+	_, lastInfo, err := wal.ListCheckpointsWithInfo(checkpointDir)
 	if err != nil {
 		return "", fmt.Errorf("could not list checkpoints in directory %v: %w", checkpointDir, err)
 	}
 
-	fileName := wal.NumberToFilename(last)
-	if last < 0 {
+	var fileName string
+	if lastInfo == nil {
+		// No checkpoints found, try root checkpoint
 		fileName = "root.checkpoint"
+	} else if lastInfo.Version == wal.VersionV7 {
+		fileName = wal.NumberToFilenameV7(lastInfo.Number)
+	} else {
+		fileName = wal.NumberToFilename(lastInfo.Number)
 	}
 
 	checkpointFilePath := filepath.Join(checkpointDir, fileName)

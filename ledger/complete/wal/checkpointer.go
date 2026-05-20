@@ -68,6 +68,17 @@ const VersionV7 uint16 = 0x07
 // Need to update MaxVersion when creating a newer version.
 const MaxVersion = VersionV7
 
+// V7FileSuffix is appended to V7 (payloadless) checkpoint filenames to distinguish
+// them from V6 checkpoints. This allows both versions to coexist in the same directory.
+// Example: V6 = "checkpoint.00000100", V7 = "checkpoint.00000100.v7"
+const V7FileSuffix = ".v7"
+
+// CheckpointInfo contains metadata about a checkpoint file parsed from its filename.
+type CheckpointInfo struct {
+	Number  int    // Checkpoint number (e.g., 100 for "checkpoint.00000100")
+	Version uint16 // Checkpoint version (VersionV6 or VersionV7)
+}
+
 const (
 	encMagicSize        = 2
 	encVersionSize      = 2
@@ -109,35 +120,103 @@ func (c *Checkpointer) listCheckpoints() ([]int, int, error) {
 	return ListCheckpoints(c.dir)
 }
 
-// ListCheckpoints returns all the numbers of the checkpoint files, and the number of the last checkpoint.
-// note, it doesn't include the root checkpoint file
+// ListCheckpoints returns all the numbers of the checkpoint files (both V6 and V7), and the number of the last checkpoint.
+// Note: it doesn't include the root checkpoint file.
+// For version-specific listing, use ListV6Checkpoints or ListV7Checkpoints.
 func ListCheckpoints(dir string) ([]int, int, error) {
-	list := make([]int, 0)
+	infos, lastInfo, err := ListCheckpointsWithInfo(dir)
+	if err != nil {
+		return nil, -1, err
+	}
 
+	// Deduplicate by number (a checkpoint number may have both V6 and V7)
+	seen := make(map[int]struct{})
+	list := make([]int, 0, len(infos))
+	for _, info := range infos {
+		if _, exists := seen[info.Number]; !exists {
+			seen[info.Number] = struct{}{}
+			list = append(list, info.Number)
+		}
+	}
+
+	last := -1
+	if lastInfo != nil {
+		last = lastInfo.Number
+	}
+
+	return list, last, nil
+}
+
+// ListCheckpointsWithInfo returns all checkpoint infos and the latest checkpoint info.
+// It detects both V6 and V7 checkpoints based on their filenames.
+// Note: it doesn't include the root checkpoint file.
+func ListCheckpointsWithInfo(dir string) ([]CheckpointInfo, *CheckpointInfo, error) {
 	files, err := os.ReadDir(dir)
 	if err != nil {
-		return nil, -1, fmt.Errorf("cannot list directory [%s] content: %w", dir, err)
+		return nil, nil, fmt.Errorf("cannot list directory [%s] content: %w", dir, err)
 	}
-	last := -1
+
+	list := make([]CheckpointInfo, 0)
+	var last *CheckpointInfo
+
 	for _, fn := range files {
-		fname := fn.Name()
-		if !strings.HasPrefix(fname, checkpointFilenamePrefix) {
-			continue
-		}
-		justNumber := fname[len(checkpointFilenamePrefix):]
-		k, err := strconv.Atoi(justNumber)
-		if err != nil {
+		info, ok := parseCheckpointFilename(fn.Name())
+		if !ok {
 			continue
 		}
 
-		list = append(list, k)
+		list = append(list, info)
 
-		// the last check point is the one with the highest number
-		if k > last {
-			last = k
+		// Track the latest checkpoint (highest number; V7 takes precedence over V6 for same number)
+		if last == nil || info.Number > last.Number ||
+			(info.Number == last.Number && info.Version > last.Version) {
+			infoCopy := info
+			last = &infoCopy
 		}
 	}
 
+	return list, last, nil
+}
+
+// ListV6Checkpoints returns all V6 checkpoint numbers (unsorted) and the latest V6 checkpoint number.
+// Returns -1 as the latest if no V6 checkpoints exist.
+func ListV6Checkpoints(dir string) ([]int, int, error) {
+	infos, _, err := ListCheckpointsWithInfo(dir)
+	if err != nil {
+		return nil, -1, err
+	}
+
+	list := make([]int, 0)
+	last := -1
+	for _, info := range infos {
+		if info.Version == VersionV6 {
+			list = append(list, info.Number)
+			if info.Number > last {
+				last = info.Number
+			}
+		}
+	}
+	return list, last, nil
+}
+
+// ListV7Checkpoints returns all V7 checkpoint numbers (unsorted) and the latest V7 checkpoint number.
+// Returns -1 as the latest if no V7 checkpoints exist.
+func ListV7Checkpoints(dir string) ([]int, int, error) {
+	infos, _, err := ListCheckpointsWithInfo(dir)
+	if err != nil {
+		return nil, -1, err
+	}
+
+	list := make([]int, 0)
+	last := -1
+	for _, info := range infos {
+		if info.Version == VersionV7 {
+			list = append(list, info.Number)
+			if info.Number > last {
+				last = info.Number
+			}
+		}
+	}
 	return list, last, nil
 }
 
@@ -252,8 +331,6 @@ func (c *Checkpointer) Checkpoint(to int) (err error) {
 
 	c.wal.log.Info().Msgf("serializing checkpoint %d", to)
 
-	fileName := NumberToFilename(to)
-
 	// Determine if the tries are payloadless by checking the first non-empty trie.
 	// All tries in a forest should have the same payloadless setting.
 	payloadless := false
@@ -264,12 +341,15 @@ func (c *Checkpointer) Checkpoint(to int) (err error) {
 		}
 	}
 
-	// Use V7 format for payloadless tries, V6 for regular tries.
+	// Use V7 format and filename suffix for payloadless tries, V6 for regular tries.
+	var fileName string
 	if payloadless {
-		c.wal.log.Info().Msgf("using checkpoint v7 format (payloadless) for checkpoint %d", to)
+		fileName = NumberToFilenameV7(to)
+		c.wal.log.Info().Msgf("using checkpoint v7 format (payloadless) for checkpoint %d, file: %s", to, fileName)
 		err = StoreCheckpointV7SingleThread(tries, c.wal.dir, fileName, c.wal.log)
 	} else {
-		c.wal.log.Info().Msgf("using checkpoint v6 format for checkpoint %d", to)
+		fileName = NumberToFilename(to)
+		c.wal.log.Info().Msgf("using checkpoint v6 format for checkpoint %d, file: %s", to, fileName)
 		err = StoreCheckpointV6SingleThread(tries, c.wal.dir, fileName, c.wal.log)
 	}
 
@@ -294,8 +374,55 @@ func NumberToFilenamePart(n int) string {
 }
 
 func NumberToFilename(n int) string {
-
 	return fmt.Sprintf("%s%s", checkpointFilenamePrefix, NumberToFilenamePart(n))
+}
+
+// NumberToFilenameV7 returns the V7 (payloadless) checkpoint filename for a given number.
+// Example: 100 -> "checkpoint.00000100.v7"
+func NumberToFilenameV7(n int) string {
+	return fmt.Sprintf("%s%s%s", checkpointFilenamePrefix, NumberToFilenamePart(n), V7FileSuffix)
+}
+
+// parseCheckpointFilename parses a checkpoint filename and returns its info.
+// Returns (info, true) if successful, (CheckpointInfo{}, false) otherwise.
+//
+// Handles:
+//   - "checkpoint.00000100"     -> {100, VersionV6}
+//   - "checkpoint.00000100.v7"  -> {100, VersionV7}
+//
+// Does NOT match part files like "checkpoint.00000100.001" or "checkpoint.00000100.v7.001"
+func parseCheckpointFilename(fname string) (CheckpointInfo, bool) {
+	if !strings.HasPrefix(fname, checkpointFilenamePrefix) {
+		return CheckpointInfo{}, false
+	}
+
+	// Remove prefix: "checkpoint.00000100" -> "00000100" or "00000100.v7"
+	suffix := fname[len(checkpointFilenamePrefix):]
+
+	// Check for V7 suffix
+	if strings.HasSuffix(suffix, V7FileSuffix) {
+		numStr := suffix[:len(suffix)-len(V7FileSuffix)]
+		// Must be exactly 8 digits
+		if len(numStr) != 8 {
+			return CheckpointInfo{}, false
+		}
+		n, err := strconv.Atoi(numStr)
+		if err != nil {
+			return CheckpointInfo{}, false
+		}
+		return CheckpointInfo{Number: n, Version: VersionV7}, true
+	}
+
+	// Try to parse as V6 - must be exactly 8 digits
+	// This distinguishes "checkpoint.00000100" (V6 header) from "checkpoint.00000100.001" (part file)
+	if len(suffix) != 8 {
+		return CheckpointInfo{}, false
+	}
+	n, err := strconv.Atoi(suffix)
+	if err != nil {
+		return CheckpointInfo{}, false
+	}
+	return CheckpointInfo{Number: n, Version: VersionV6}, true
 }
 
 func (c *Checkpointer) CheckpointWriter(to int) (io.WriteCloser, error) {
@@ -638,8 +765,14 @@ func getNodesAtLevel(root *node.Node, level uint) []*node.Node {
 }
 
 func (c *Checkpointer) LoadCheckpoint(checkpoint int) ([]*trie.MTrie, error) {
-	filepath := path.Join(c.dir, NumberToFilename(checkpoint))
-	return LoadCheckpoint(filepath, c.wal.log)
+	// Try V7 (payloadless) first, then fall back to V6
+	v7Path := path.Join(c.dir, NumberToFilenameV7(checkpoint))
+	if utilsio.FileExists(v7Path) {
+		return LoadCheckpoint(v7Path, c.wal.log)
+	}
+
+	v6Path := path.Join(c.dir, NumberToFilename(checkpoint))
+	return LoadCheckpoint(v6Path, c.wal.log)
 }
 
 func (c *Checkpointer) LoadRootCheckpoint() ([]*trie.MTrie, error) {
@@ -662,8 +795,18 @@ func HasRootCheckpoint(dir string) (bool, error) {
 }
 
 func (c *Checkpointer) RemoveCheckpoint(checkpoint int) error {
-	name := NumberToFilename(checkpoint)
-	return deleteCheckpointFiles(c.dir, name)
+	// Try to remove both V6 and V7 versions if they exist
+	v6Name := NumberToFilename(checkpoint)
+	v7Name := NumberToFilenameV7(checkpoint)
+
+	v6Err := deleteCheckpointFiles(c.dir, v6Name)
+	v7Err := deleteCheckpointFiles(c.dir, v7Name)
+
+	// If both failed, return combined error
+	if v6Err != nil && v7Err != nil {
+		return fmt.Errorf("failed to remove checkpoint %d: v6 error: %w, v7 error: %v", checkpoint, v6Err, v7Err)
+	}
+	return nil
 }
 
 func LoadCheckpoint(filepath string, logger zerolog.Logger) (

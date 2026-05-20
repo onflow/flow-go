@@ -335,8 +335,28 @@ func createCheckpoint(checkpointer *realWAL.Checkpointer, logger zerolog.Logger,
 
 	startTime := time.Now()
 
-	fileName := realWAL.NumberToFilename(checkpointNum)
-	err := realWAL.StoreCheckpointV6SingleThread(tries, checkpointer.Dir(), fileName, logger)
+	// Determine if the tries are payloadless by checking the first non-empty trie.
+	// All tries in a forest should have the same payloadless setting.
+	payloadless := false
+	for _, t := range tries {
+		if !t.IsEmpty() {
+			payloadless = t.IsPayloadless()
+			break
+		}
+	}
+
+	// Use V7 format and filename suffix for payloadless tries, V6 for regular tries.
+	var fileName string
+	var err error
+	if payloadless {
+		fileName = realWAL.NumberToFilenameV7(checkpointNum)
+		logger.Info().Msgf("using checkpoint v7 format (payloadless) for checkpoint %d, file: %s", checkpointNum, fileName)
+		err = realWAL.StoreCheckpointV7SingleThread(tries, checkpointer.Dir(), fileName, logger)
+	} else {
+		fileName = realWAL.NumberToFilename(checkpointNum)
+		logger.Info().Msgf("using checkpoint v6 format for checkpoint %d, file: %s", checkpointNum, fileName)
+		err = realWAL.StoreCheckpointV6SingleThread(tries, checkpointer.Dir(), fileName, logger)
+	}
 	if err != nil {
 		return fmt.Errorf("error serializing checkpoint (%d): %w", checkpointNum, err)
 	}
