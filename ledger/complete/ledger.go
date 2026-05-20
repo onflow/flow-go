@@ -92,7 +92,10 @@ func NewLedgerWithPayloadless(
 	wal.PauseRecord()
 	defer wal.UnpauseRecord()
 
-	err = wal.ReplayOnForest(forest)
+	// Use version-aware replay to load checkpoints matching the payloadless mode.
+	// When isPayloadless is true, only V7 checkpoints are loaded.
+	// When isPayloadless is false, only V6 checkpoints are loaded.
+	err = wal.ReplayOnForestWithPayloadless(forest, isPayloadless)
 	if err != nil {
 		return nil, fmt.Errorf("cannot restore LedgerWAL: %w", err)
 	}

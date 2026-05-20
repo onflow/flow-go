@@ -1497,7 +1497,6 @@ func getContractEpochCounter(
 //     Use the execution-state-extract util commandline to generate a checkpoint file from
 //     a previous checkpoint file
 func copyBootstrapState(dir, trie string) error {
-	filename := ""
 	firstCheckpointFilename := "00000000"
 
 	fileExists := func(fileName string) bool {
@@ -1505,38 +1504,57 @@ func copyBootstrapState(dir, trie string) error {
 		return err == nil
 	}
 
-	// if there is a root checkpoint file, then copy that file over
-	if fileExists(modelbootstrap.FilenameWALRootCheckpoint) {
-		filename = modelbootstrap.FilenameWALRootCheckpoint
-	} else if fileExists(firstCheckpointFilename) {
-		// else if there is a checkpoint file, then copy that file over
-		filename = firstCheckpointFilename
-	} else {
-		filePath := filepath.Join(dir, modelbootstrap.DirnameExecutionState, firstCheckpointFilename)
-
-		// include absolute path of the missing file in the error message
-		absPath, err := filepath.Abs(filePath)
-		if err != nil {
-			absPath = filePath
-		}
-
-		return fmt.Errorf("execution state file not found: %v", absPath)
-	}
-
 	// copy from the bootstrap folder to the execution state folder
 	from, to := path.Join(dir, modelbootstrap.DirnameExecutionState), trie
 
-	log.Info().Str("dir", dir).Str("trie", trie).
-		Msgf("linking checkpoint file %v from directory: %v, to: %v", filename, from, to)
+	// Determine which checkpoint files to copy.
+	// For payloadless mode to work correctly with storehouse, we need both:
+	// - V6 checkpoint (root.checkpoint) for storehouse to import payloads
+	// - V7 checkpoint (root.checkpoint.v7) for ledger to load payloadless trie
+	var filesToCopy []string
 
-	copiedFiles, err := wal.SoftlinkCheckpointFile(filename, from, to)
-	if err != nil {
-		return fmt.Errorf("can not link checkpoint file %s, from %s to %s, %w",
-			filename, from, to, err)
+	// Check for root checkpoint V6 (required for storehouse)
+	if fileExists(modelbootstrap.FilenameWALRootCheckpoint) {
+		filesToCopy = append(filesToCopy, modelbootstrap.FilenameWALRootCheckpoint)
 	}
 
-	for _, newPath := range copiedFiles {
-		fmt.Printf("linked root checkpoint file from directory: %v, to: %v\n", from, newPath)
+	// Check for root checkpoint V7 (required for payloadless ledger)
+	v7Filename := modelbootstrap.FilenameWALRootCheckpoint + wal.V7FileSuffix
+	if fileExists(v7Filename) {
+		filesToCopy = append(filesToCopy, v7Filename)
+	}
+
+	// Fall back to numbered checkpoint if no root checkpoint exists
+	if len(filesToCopy) == 0 {
+		if fileExists(firstCheckpointFilename) {
+			filesToCopy = append(filesToCopy, firstCheckpointFilename)
+		} else {
+			filePath := filepath.Join(dir, modelbootstrap.DirnameExecutionState, firstCheckpointFilename)
+
+			// include absolute path of the missing file in the error message
+			absPath, err := filepath.Abs(filePath)
+			if err != nil {
+				absPath = filePath
+			}
+
+			return fmt.Errorf("execution state file not found: %v", absPath)
+		}
+	}
+
+	// Copy all checkpoint files
+	for _, filename := range filesToCopy {
+		log.Info().Str("dir", dir).Str("trie", trie).
+			Msgf("linking checkpoint file %v from directory: %v, to: %v", filename, from, to)
+
+		copiedFiles, err := wal.SoftlinkCheckpointFile(filename, from, to)
+		if err != nil {
+			return fmt.Errorf("can not link checkpoint file %s, from %s to %s, %w",
+				filename, from, to, err)
+		}
+
+		for _, newPath := range copiedFiles {
+			fmt.Printf("linked root checkpoint file from directory: %v, to: %v\n", from, newPath)
+		}
 	}
 
 	return nil

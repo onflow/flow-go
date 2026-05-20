@@ -111,7 +111,27 @@ func (w *DiskWAL) RecordDelete(rootHash ledger.RootHash) error {
 }
 
 func (w *DiskWAL) ReplayOnForest(forest *mtrie.Forest) error {
-	return w.Replay(
+	return w.replayOnForestInternal(forest, nil)
+}
+
+// ReplayOnForestWithPayloadless replays checkpoints and WAL on the given forest,
+// filtering checkpoints by version based on the payloadless flag.
+// When isPayloadless is true, only V7 checkpoints are considered.
+// When isPayloadless is false, only V6 checkpoints are considered.
+func (w *DiskWAL) ReplayOnForestWithPayloadless(forest *mtrie.Forest, isPayloadless bool) error {
+	var versionFilter *uint16
+	if isPayloadless {
+		v := VersionV7
+		versionFilter = &v
+	} else {
+		v := VersionV6
+		versionFilter = &v
+	}
+	return w.replayOnForestInternal(forest, versionFilter)
+}
+
+func (w *DiskWAL) replayOnForestInternal(forest *mtrie.Forest, versionFilter *uint16) error {
+	return w.replayWithVersion(
 		func(tries []*trie.MTrie) error {
 			err := forest.AddTries(tries)
 			if err != nil {
@@ -126,6 +146,7 @@ func (w *DiskWAL) ReplayOnForest(forest *mtrie.Forest) error {
 		func(rootHash ledger.RootHash) error {
 			return nil
 		},
+		versionFilter,
 	)
 }
 
@@ -142,7 +163,7 @@ func (w *DiskWAL) Replay(
 	if err != nil {
 		return fmt.Errorf("could not find segments: %w", err)
 	}
-	err = w.replay(from, to, checkpointFn, updateFn, deleteFn, true)
+	err = w.replay(from, to, checkpointFn, updateFn, deleteFn, true, nil)
 	if err != nil {
 		return fmt.Errorf("could not replay segments [%v:%v]: %w", from, to, err)
 	}
@@ -158,9 +179,28 @@ func (w *DiskWAL) ReplayLogsOnly(
 	if err != nil {
 		return fmt.Errorf("could not find segments: %w", err)
 	}
-	err = w.replay(from, to, checkpointFn, updateFn, deleteFn, false)
+	err = w.replay(from, to, checkpointFn, updateFn, deleteFn, true, nil)
 	if err != nil {
 		return fmt.Errorf("could not replay WAL only for segments [%v:%v]: %w", from, to, err)
+	}
+	return nil
+}
+
+// replayWithVersion replays checkpoints and WAL with optional version filtering.
+// If versionFilter is non-nil, only checkpoints of that version are considered.
+func (w *DiskWAL) replayWithVersion(
+	checkpointFn func(tries []*trie.MTrie) error,
+	updateFn func(update *ledger.TrieUpdate) error,
+	deleteFn func(ledger.RootHash) error,
+	versionFilter *uint16,
+) error {
+	from, to, err := w.Segments()
+	if err != nil {
+		return fmt.Errorf("could not find segments: %w", err)
+	}
+	err = w.replay(from, to, checkpointFn, updateFn, deleteFn, true, versionFilter)
+	if err != nil {
+		return fmt.Errorf("could not replay segments [%v:%v]: %w", from, to, err)
 	}
 	return nil
 }
@@ -171,9 +211,18 @@ func (w *DiskWAL) replay(
 	updateFn func(update *ledger.TrieUpdate) error,
 	deleteFn func(rootHash ledger.RootHash) error,
 	useCheckpoints bool,
+	versionFilter *uint16, // nil means no filter (use all checkpoints), non-nil means only use checkpoints of that version
 ) error {
 
-	w.log.Info().Msgf("loading checkpoint with WAL from %d to %d, useCheckpoints %v", from, to, useCheckpoints)
+	versionStr := "any"
+	if versionFilter != nil {
+		if *versionFilter == VersionV6 {
+			versionStr = "V6"
+		} else if *versionFilter == VersionV7 {
+			versionStr = "V7"
+		}
+	}
+	w.log.Info().Msgf("loading checkpoint with WAL from %d to %d, useCheckpoints %v, versionFilter %s", from, to, useCheckpoints, versionStr)
 
 	if to < from {
 		return fmt.Errorf("end of range cannot be smaller than beginning")
@@ -189,7 +238,17 @@ func (w *DiskWAL) replay(
 	}
 
 	if useCheckpoints {
-		allCheckpoints, err := checkpointer.Checkpoints()
+		// Get checkpoints filtered by version if specified
+		var allCheckpoints []int
+		if versionFilter == nil {
+			allCheckpoints, err = checkpointer.Checkpoints()
+		} else if *versionFilter == VersionV6 {
+			allCheckpoints, err = checkpointer.CheckpointsV6()
+		} else if *versionFilter == VersionV7 {
+			allCheckpoints, err = checkpointer.CheckpointsV7()
+		} else {
+			return fmt.Errorf("unsupported version filter: %d", *versionFilter)
+		}
 		if err != nil {
 			return fmt.Errorf("cannot get list of checkpoints: %w", err)
 		}
@@ -209,9 +268,17 @@ func (w *DiskWAL) replay(
 			// it allows us to load less segments.
 			latestCheckpoint := availableCheckpoints[len(availableCheckpoints)-1]
 
-			w.log.Info().Int("checkpoint", latestCheckpoint).Msg("loading checkpoint")
+			w.log.Info().Int("checkpoint", latestCheckpoint).Str("version", versionStr).Msg("loading checkpoint")
 
-			forestSequencing, err := checkpointer.LoadCheckpoint(latestCheckpoint)
+			// Load checkpoint with version-specific method if filter is specified
+			var forestSequencing []*trie.MTrie
+			if versionFilter == nil {
+				forestSequencing, err = checkpointer.LoadCheckpoint(latestCheckpoint)
+			} else if *versionFilter == VersionV6 {
+				forestSequencing, err = checkpointer.LoadCheckpointV6(latestCheckpoint)
+			} else if *versionFilter == VersionV7 {
+				forestSequencing, err = checkpointer.LoadCheckpointV7(latestCheckpoint)
+			}
 			if err != nil {
 				w.log.Warn().Int("checkpoint", latestCheckpoint).Err(err).
 					Msg("checkpoint loading failed")
@@ -255,14 +322,50 @@ func (w *DiskWAL) replay(
 	}
 
 	if loadedCheckpoint == -1 && startSegment == 0 {
-		hasRootCheckpoint, err := checkpointer.HasRootCheckpoint()
-		if err != nil {
-			return fmt.Errorf("cannot check root checkpoint existence: %w", err)
+		// Check for root checkpoint based on version filter
+		var hasRootCheckpoint bool
+		if versionFilter == nil {
+			// No filter - check for any root checkpoint (prefer V7)
+			hasRootCheckpoint, err = checkpointer.HasRootCheckpointV7()
+			if err != nil {
+				return fmt.Errorf("cannot check V7 root checkpoint existence: %w", err)
+			}
+			if !hasRootCheckpoint {
+				hasRootCheckpoint, err = checkpointer.HasRootCheckpoint()
+				if err != nil {
+					return fmt.Errorf("cannot check root checkpoint existence: %w", err)
+				}
+			}
+		} else if *versionFilter == VersionV7 {
+			hasRootCheckpoint, err = checkpointer.HasRootCheckpointV7()
+			if err != nil {
+				return fmt.Errorf("cannot check V7 root checkpoint existence: %w", err)
+			}
+		} else {
+			// VersionV6 or any other version - use standard root checkpoint
+			hasRootCheckpoint, err = checkpointer.HasRootCheckpoint()
+			if err != nil {
+				return fmt.Errorf("cannot check root checkpoint existence: %w", err)
+			}
 		}
-		if hasRootCheckpoint {
-			w.log.Info().Msgf("loading root checkpoint")
 
-			flattenedForest, err := checkpointer.LoadRootCheckpoint()
+		if hasRootCheckpoint {
+			w.log.Info().Str("version", versionStr).Msgf("loading root checkpoint")
+
+			var flattenedForest []*trie.MTrie
+			if versionFilter == nil {
+				// No filter - try V7 first, fall back to V6
+				hasV7, _ := checkpointer.HasRootCheckpointV7()
+				if hasV7 {
+					flattenedForest, err = checkpointer.LoadRootCheckpointV7()
+				} else {
+					flattenedForest, err = checkpointer.LoadRootCheckpoint()
+				}
+			} else if *versionFilter == VersionV7 {
+				flattenedForest, err = checkpointer.LoadRootCheckpointV7()
+			} else {
+				flattenedForest, err = checkpointer.LoadRootCheckpoint()
+			}
 			if err != nil {
 				return fmt.Errorf("cannot load root checkpoint: %w", err)
 			}
@@ -277,7 +380,7 @@ func (w *DiskWAL) replay(
 				Msg("root checkpoint loaded")
 			checkpointLoaded = true
 		} else {
-			w.log.Info().Msgf("no root checkpoint was found")
+			w.log.Info().Str("version", versionStr).Msgf("no root checkpoint was found")
 		}
 	}
 
@@ -395,6 +498,11 @@ type LedgerWAL interface {
 	RecordUpdate(update *ledger.TrieUpdate) (int, bool, error)
 	RecordDelete(rootHash ledger.RootHash) error
 	ReplayOnForest(forest *mtrie.Forest) error
+	// ReplayOnForestWithPayloadless replays checkpoints and WAL on the given forest,
+	// filtering checkpoints by version based on the payloadless flag.
+	// When isPayloadless is true, only V7 checkpoints are considered.
+	// When isPayloadless is false, only V6 checkpoints are considered.
+	ReplayOnForestWithPayloadless(forest *mtrie.Forest, isPayloadless bool) error
 	Segments() (first, last int, err error)
 	Replay(
 		checkpointFn func(tries []*trie.MTrie) error,

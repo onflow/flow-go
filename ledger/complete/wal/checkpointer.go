@@ -238,6 +238,28 @@ func Checkpoints(dir string) ([]int, error) {
 	return list, nil
 }
 
+// CheckpointsV6 returns all V6 checkpoint numbers in asc order.
+// Use this when loading checkpoints in non-payloadless mode.
+func (c *Checkpointer) CheckpointsV6() ([]int, error) {
+	list, _, err := ListV6Checkpoints(c.dir)
+	if err != nil {
+		return nil, fmt.Errorf("could not fetch V6 checkpoints: %w", err)
+	}
+	sort.Ints(list)
+	return list, nil
+}
+
+// CheckpointsV7 returns all V7 checkpoint numbers in asc order.
+// Use this when loading checkpoints in payloadless mode.
+func (c *Checkpointer) CheckpointsV7() ([]int, error) {
+	list, _, err := ListV7Checkpoints(c.dir)
+	if err != nil {
+		return nil, fmt.Errorf("could not fetch V7 checkpoints: %w", err)
+	}
+	sort.Ints(list)
+	return list, nil
+}
+
 // LatestCheckpoint returns number of latest checkpoint or -1 if there are no checkpoints
 func (c *Checkpointer) LatestCheckpoint() (int, error) {
 	_, last, err := c.listCheckpoints()
@@ -318,7 +340,7 @@ func (c *Checkpointer) Checkpoint(to int) (err error) {
 			return err
 		}, func(rootHash ledger.RootHash) error {
 			return nil
-		}, true)
+		}, true, nil)
 
 	if err != nil {
 		return fmt.Errorf("cannot replay WAL: %w", err)
@@ -775,8 +797,27 @@ func (c *Checkpointer) LoadCheckpoint(checkpoint int) ([]*trie.MTrie, error) {
 	return LoadCheckpoint(v6Path, c.wal.log)
 }
 
+// LoadCheckpointV6 loads a V6 checkpoint by number. Returns an error if not found.
+func (c *Checkpointer) LoadCheckpointV6(checkpoint int) ([]*trie.MTrie, error) {
+	v6Path := path.Join(c.dir, NumberToFilename(checkpoint))
+	return LoadCheckpoint(v6Path, c.wal.log)
+}
+
+// LoadCheckpointV7 loads a V7 checkpoint by number. Returns an error if not found.
+func (c *Checkpointer) LoadCheckpointV7(checkpoint int) ([]*trie.MTrie, error) {
+	v7Path := path.Join(c.dir, NumberToFilenameV7(checkpoint))
+	return LoadCheckpoint(v7Path, c.wal.log)
+}
+
 func (c *Checkpointer) LoadRootCheckpoint() ([]*trie.MTrie, error) {
 	filepath := path.Join(c.dir, bootstrap.FilenameWALRootCheckpoint)
+	return LoadCheckpoint(filepath, c.wal.log)
+}
+
+// LoadRootCheckpointV7 loads the V7 (payloadless) root checkpoint.
+// The V7 root checkpoint filename is root.checkpoint.v7
+func (c *Checkpointer) LoadRootCheckpointV7() ([]*trie.MTrie, error) {
+	filepath := path.Join(c.dir, bootstrap.FilenameWALRootCheckpoint+V7FileSuffix)
 	return LoadCheckpoint(filepath, c.wal.log)
 }
 
@@ -784,8 +825,24 @@ func (c *Checkpointer) HasRootCheckpoint() (bool, error) {
 	return HasRootCheckpoint(c.dir)
 }
 
+// HasRootCheckpointV7 checks if a V7 (payloadless) root checkpoint exists.
+func (c *Checkpointer) HasRootCheckpointV7() (bool, error) {
+	return HasRootCheckpointV7(c.dir)
+}
+
 func HasRootCheckpoint(dir string) (bool, error) {
 	if _, err := os.Stat(path.Join(dir, bootstrap.FilenameWALRootCheckpoint)); err == nil {
+		return true, nil
+	} else if os.IsNotExist(err) {
+		return false, nil
+	} else {
+		return false, err
+	}
+}
+
+// HasRootCheckpointV7 checks if a V7 (payloadless) root checkpoint exists.
+func HasRootCheckpointV7(dir string) (bool, error) {
+	if _, err := os.Stat(path.Join(dir, bootstrap.FilenameWALRootCheckpoint+V7FileSuffix)); err == nil {
 		return true, nil
 	} else if os.IsNotExist(err) {
 		return false, nil
