@@ -311,26 +311,58 @@ func (bl *BlockView) DryRunTransaction(
 		return nil, err
 	}
 
+	res := types.Result{
+		TxType: tx.Type(),
+		TxHash: tx.Hash(),
+	}
+
 	value, overflow := uint256.FromBig(tx.Value())
 	if overflow {
-		return nil, fmt.Errorf("value exceeds 256 bits: address %v", from.Hex())
+		res.SetValidationError(
+			fmt.Errorf("value exceeds 256 bits: address %v", from.Hex()),
+		)
+		return &res, nil
 	}
+
 	gasPrice, overflow := uint256.FromBig(tx.GasPrice())
 	if overflow {
-		return nil, fmt.Errorf("%w: address %v, maxFeePerGas bit length: %d", gethCore.ErrFeeCapVeryHigh,
-			from.Hex(), tx.GasPrice().BitLen())
+		res.SetValidationError(
+			fmt.Errorf(
+				"%w: address %v, maxFeePerGas bit length: %d",
+				gethCore.ErrFeeCapVeryHigh,
+				from.Hex(),
+				tx.GasPrice().BitLen(),
+			),
+		)
+		return &res, nil
 	}
+
 	txGasFeeCap := tx.GasFeeCap()
 	gasFeeCap, overflow := uint256.FromBig(txGasFeeCap)
 	if overflow {
-		return nil, fmt.Errorf("%w: address %v, maxFeePerGas bit length: %d", gethCore.ErrFeeCapVeryHigh,
-			from.Hex(), tx.GasFeeCap().BitLen())
+		res.SetValidationError(
+			fmt.Errorf(
+				"%w: address %v, maxFeePerGas bit length: %d",
+				gethCore.ErrFeeCapVeryHigh,
+				from.Hex(),
+				tx.GasFeeCap().BitLen(),
+			),
+		)
+		return &res, nil
 	}
+
 	txGasTipCap := tx.GasTipCap()
 	gasTipCap, overflow := uint256.FromBig(txGasTipCap)
 	if overflow {
-		return nil, fmt.Errorf("%w: address %v, maxPriorityFeePerGas bit length: %d", gethCore.ErrTipVeryHigh,
-			from.Hex(), tx.GasTipCap().BitLen())
+		res.SetValidationError(
+			fmt.Errorf(
+				"%w: address %v, maxPriorityFeePerGas bit length: %d",
+				gethCore.ErrTipVeryHigh,
+				from.Hex(),
+				tx.GasTipCap().BitLen(),
+			),
+		)
+		return &res, nil
 	}
 
 	msg := &gethCore.Message{
@@ -732,7 +764,9 @@ func (proc *procedure) run(
 	// Set gas pool based on block gas limit
 	// if the block gas limit is set to anything than max
 	// we need to update this code.
-	gasPool := gethCore.NewGasPool(proc.config.BlockContext.GasLimit)
+	gasPool := gethCore.NewGasPool(
+		proc.config.BlockContext.GasLimit - proc.config.BlockTotalGasUsedSoFar,
+	)
 
 	// transit the state
 	execResult, err := gethCore.ApplyMessage(proc.evm, msg, gasPool)
