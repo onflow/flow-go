@@ -1913,15 +1913,15 @@ func TestPayloadlessTrieEndToEndProofReconstruction(t *testing.T) {
 	}
 }
 
-// TestPayloadlessTrieReconstructionWith32ByteValue tests that when a regular trie
-// (loaded from checkpoint) has a 32-byte value, the proof reconstruction correctly
-// identifies it as NOT a hash and passes it through unchanged.
-// This is an edge case because the reconstruction code checks for 32-byte values.
-func TestPayloadlessTrieReconstructionWith32ByteValue(t *testing.T) {
-	// Create a register with exactly 32-byte value
+// TestReconstructPayloadlessProofRejectsNonPayloadlessProof tests that ReconstructPayloadlessProof
+// correctly rejects proofs from regular (non-payloadless) tries.
+// The caller is expected to guarantee the proof comes from a payloadless trie.
+// If a non-payloadless proof is passed, it returns ErrPayloadHashMismatch.
+func TestReconstructPayloadlessProofRejectsNonPayloadlessProof(t *testing.T) {
+	// Create a register with exactly 32-byte value (same size as a hash)
+	// This tests the edge case where the actual value happens to be 32 bytes
 	owner := flow.BytesToAddress([]byte("owner32"))
 	regID := flow.NewRegisterID(owner, "key32")
-	// Create a 32-byte value (same size as a hash)
 	value32 := make([]byte, hash.HashLen)
 	for i := range value32 {
 		value32[i] = byte(i)
@@ -1942,21 +1942,17 @@ func TestPayloadlessTrieReconstructionWith32ByteValue(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	stateCommitment := regularTrie.RootHash()
-	t.Logf("State commitment: %x", stateCommitment)
-
-	// Generate proof from regular trie (contains 32-byte actual value)
+	// Generate proof from regular trie (contains 32-byte actual value, not a hash)
 	batchProof := regularTrie.UnsafeProofs([]ledger.Path{path})
 	require.Len(t, batchProof.Proofs, 1)
 
 	// Verify proof contains 32-byte value
 	require.Equal(t, hash.HashLen, batchProof.Proofs[0].Payload.Value().Size())
-	t.Logf("Proof value (32 bytes): %x", batchProof.Proofs[0].Payload.Value())
 
 	// Encode the proof
 	encodedProof := ledger.EncodeTrieBatchProof(batchProof)
 
-	// Create value reader
+	// Create value reader that returns the actual value
 	valueReader := func(registerID flow.RegisterID) (flow.RegisterValue, error) {
 		if registerID == regID {
 			return value32, nil
@@ -1964,24 +1960,11 @@ func TestPayloadlessTrieReconstructionWith32ByteValue(t *testing.T) {
 		return nil, nil
 	}
 
-	// Attempt reconstruction
-	// The code sees a 32-byte value and attempts to verify it as a hash.
-	// Since HashLeaf(path, value32) != value32 (the stored value), it recognizes
-	// this as an actual 32-byte value and skips reconstruction, keeping the proof intact.
-	reconstructedBytes, err := trie.ReconstructPayloadlessProof(encodedProof, valueReader)
-	require.NoError(t, err, "reconstruction should succeed for 32-byte actual values")
-
-	// Verify the proof still works
-	reconstructedProof, err := ledger.DecodeTrieBatchProof(reconstructedBytes)
-	require.NoError(t, err)
-
-	// The reconstructed proof should still have the original 32-byte value (not reconstructed)
-	require.Equal(t, hash.HashLen, reconstructedProof.Proofs[0].Payload.Value().Size())
-	require.Equal(t, value32, []byte(reconstructedProof.Proofs[0].Payload.Value()))
-
-	// Verify PSMT can be constructed from the proof
-	psmt, err := ptrie.NewPSMT(stateCommitment, reconstructedProof)
-	require.NoError(t, err)
-
-	require.Equal(t, stateCommitment, psmt.RootHash())
+	// Attempt reconstruction - should fail because the proof is not from a payloadless trie.
+	// The 32-byte value in the proof is the actual value, not HashLeaf(path, value).
+	// Since HashLeaf(path, value32) != value32, the hash verification fails.
+	_, err = trie.ReconstructPayloadlessProof(encodedProof, valueReader)
+	require.Error(t, err, "reconstruction should fail for non-payloadless proofs")
+	require.ErrorIs(t, err, trie.ErrPayloadHashMismatch,
+		"error should be ErrPayloadHashMismatch when proof is not from payloadless trie")
 }

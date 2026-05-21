@@ -459,13 +459,18 @@ func update(
 			// node with the same path and payload.
 			// The old node shouldn't be recycled as it is still used by the tree copy before the update.
 			if isPayloadless {
-				// In payloadless mode, we need to extend the existing hash rather than recomputing it.
-				// The compactLeaf's hash was computed using the original value, so we extend it from
-				// its current height to the new nodeHeight. This preserves the correct state commitment.
+				// In payloadless mode, we need to compute the hash for the new height.
+				// The payloadless payload stores HashLeaf(path, originalValue) as its value,
+				// which is the height-0 hash. We extend from height 0 to nodeHeight.
+				// This works for both moving UP (higher height) and DOWN (lower height)
+				// because ExtendHashToHeight correctly handles any target height.
+				payloadHash := compactLeaf.Payload().Value()
+				var baseHash hash.Hash
+				copy(baseHash[:], payloadHash)
 				extendedHash := ledger.ExtendHashToHeight(
 					hash.Hash(*compactLeaf.Path()),
-					compactLeaf.Hash(),
-					compactLeaf.Height(),
+					baseHash,
+					0, // The payload stores the height-0 hash (HashLeaf)
 					nodeHeight,
 				)
 				n = node.NewNode(nodeHeight, nil, nil, *compactLeaf.Path(), compactLeaf.Payload(), extendedHash)
