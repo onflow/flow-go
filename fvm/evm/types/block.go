@@ -62,6 +62,37 @@ func (b *Block) Hash() (gethCommon.Hash, error) {
 	return gethCrypto.Keccak256Hash(data), err
 }
 
+// SlotNumber returns the corresponding slot number for the current block.
+// In Ethereum, a slot is a 12-second time period where a validator is assigned
+// to propose a new block, functioning as the network's "heartbeat" in PoS.
+// Slots occur automatically every 12 seconds, and 32 slots are grouped together
+// into a 6.4-minute period known as an epoch.
+func (b *Block) SlotNumber(chainID flow.ChainID) uint64 {
+	// To calculate the Ethereum slot number from a block timestamp,
+	// subtract the Genesis timestamp from the block timestamp and
+	// divide by the slot duration (12 seconds on Ethereum).
+	// The formula is: slot = (block timestamp - genesis timestamp) / slot duration
+	// as slot duration we can use the block production rate, on each network.
+	// testnet is running at 2 block / sec.
+	// mainnet is running at 1.25 block / sec.
+	genesisTimestamp := GenesisTimestamp(chainID)
+	// prevent uint64 underflow
+	if b.Timestamp <= genesisTimestamp {
+		return 0
+	}
+
+	switch chainID {
+	case flow.Mainnet:
+		return ((b.Timestamp - genesisTimestamp) * 5) / 4
+	case flow.Testnet:
+		return ((b.Timestamp - genesisTimestamp) * 2)
+	default:
+		// for all other networks (emulator/previewnet etc),
+		// default to a slot duration of 1 second
+		return b.Timestamp - genesisTimestamp
+	}
+}
+
 // NewBlock constructs a new block
 func NewBlock(
 	parentBlockHash gethCommon.Hash,
@@ -207,37 +238,6 @@ func (b *BlockProposal) PopulateReceiptRoot() {
 // ToBytes encodes the block proposal into bytes
 func (b *BlockProposal) ToBytes() ([]byte, error) {
 	return gethRLP.EncodeToBytes(b)
-}
-
-// SlotNumber returns the corresponding slot number for the current block.
-// In Ethereum, a slot is a 12-second time period where a validator is assigned
-// to propose a new block, functioning as the network's "heartbeat" in PoS.
-// Slots occur automatically every 12 seconds, and 32 slots are grouped together
-// into a 6.4-minute period known as an epoch.
-func (b *BlockProposal) SlotNumber(chainID flow.ChainID) uint64 {
-	// To calculate the Ethereum slot number from a block timestamp,
-	// subtract the Genesis timestamp from the block timestamp and
-	// divide by the slot duration (12 seconds on Ethereum).
-	// The formula is: slot = (block timestamp - genesis timestamp) / slot duration
-	// as slot duration we can use the block production rate, on each network.
-	// testnet is running at 2 block / sec.
-	// mainnet is running at 1.25 block / sec.
-	genesisTimestamp := GenesisBlock(chainID).Timestamp
-	// prevent uint64 underflow
-	if b.Timestamp <= genesisTimestamp {
-		return 0
-	}
-
-	switch chainID {
-	case flow.Mainnet:
-		return ((b.Timestamp - genesisTimestamp) * 5) / 4
-	case flow.Testnet:
-		return ((b.Timestamp - genesisTimestamp) * 2)
-	default:
-		// for all other networks (emulator/previewnet etc),
-		// default to a slot duration of 1 second
-		return b.Timestamp - genesisTimestamp
-	}
 }
 
 // NewBlockProposalFromBytes constructs a new block proposal from encoded data
