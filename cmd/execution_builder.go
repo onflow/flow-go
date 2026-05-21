@@ -1419,15 +1419,43 @@ func (exeNode *ExecutionNode) LoadBootstrapper(node *NodeConfig) error {
 
 	// if the execution database does not exist, then we need to bootstrap the execution database.
 	if !bootstrapped {
+		bootstrapDir := path.Join(node.BootstrapDir, modelbootstrap.DirnameExecutionState)
+		expectedRootHash := ledger.RootHash(node.RootSeal.FinalState)
 
+		// Validate V6 root checkpoint exists and has the expected root hash.
+		// This is required for all modes (both regular and payloadless) because:
+		// - Regular mode: ledger loads from V6 checkpoint
+		// - Payloadless mode: storehouse needs V6 checkpoint to import payloads
 		err := wal.CheckpointHasRootHash(
 			node.Logger,
-			path.Join(node.BootstrapDir, modelbootstrap.DirnameExecutionState),
+			bootstrapDir,
 			modelbootstrap.FilenameWALRootCheckpoint,
-			ledger.RootHash(node.RootSeal.FinalState),
+			expectedRootHash,
 		)
 		if err != nil {
-			return err
+			return fmt.Errorf("V6 root checkpoint validation failed: %w", err)
+		}
+
+		// For payloadless mode, also validate V7 root checkpoint exists and has the same root hash.
+		// V7 checkpoint is required for the payloadless trie to load.
+		if exeNode.exeConf.payloadless {
+			v7Filename := modelbootstrap.FilenameWALRootCheckpoint + wal.V7FileSuffix
+			err := wal.CheckpointHasRootHash(
+				node.Logger,
+				bootstrapDir,
+				v7Filename,
+				expectedRootHash,
+			)
+			if err != nil {
+				return fmt.Errorf("V7 root checkpoint validation failed (required for payloadless mode): %w. "+
+					"Ensure a V7 checkpoint file (%s) exists in the bootstrap directory with the same root hash as the V6 checkpoint",
+					err, v7Filename)
+			}
+			node.Logger.Info().
+				Str("v6_checkpoint", modelbootstrap.FilenameWALRootCheckpoint).
+				Str("v7_checkpoint", v7Filename).
+				Str("root_hash", expectedRootHash.String()).
+				Msg("validated both V6 and V7 root checkpoints exist with matching root hash for payloadless mode")
 		}
 
 		// when bootstrapping, the bootstrap folder must have a checkpoint file
