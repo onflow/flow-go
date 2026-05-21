@@ -1483,3 +1483,111 @@ func TestMixedModeProofReconstruction(t *testing.T) {
 		"PSMT root hash should match state commitment")
 	t.Logf("PSMT construction succeeded with root hash: %x", psmt.RootHash())
 }
+
+// TestPayloadlessProofsWithNonExistingPaths tests proof generation for paths that don't exist
+// in a payloadless trie. This is a regression test for a bug where non-existing paths caused
+// PSMT root hash mismatches because:
+// - Without fix: Non-existing paths got non-inclusion proofs, PSMT used default hash
+// - With fix: Non-existing paths are expanded with empty payloads, get inclusion proofs
+//
+// This test will FAIL without the fix in forest.Proofs() that enables expansion for
+// payloadless tries, and the fix in newPayloadlessLeaf() that preserves empty payloads.
+func TestPayloadlessProofsWithNonExistingPaths(t *testing.T) {
+	// Create a payloadless forest
+	forest, err := NewForestWithPayloadless(5, &metrics.NoopCollector{}, nil, true)
+	require.NoError(t, err)
+
+	// Create multiple existing registers to build a non-trivial trie structure
+	numExisting := 20
+	existingPaths := make([]ledger.Path, numExisting)
+	existingPayloads := make([]*ledger.Payload, numExisting)
+	existingValues := make(map[ledger.Path][]byte)
+
+	for i := 0; i < numExisting; i++ {
+		// Create deterministic but varied paths
+		path := testutils.PathByUint16(uint16(i * 1000))
+		// Create varied values
+		value := make([]byte, 50+i)
+		for j := range value {
+			value[j] = byte(i + j)
+		}
+
+		payload := ledger.NewPayload(
+			ledger.Key{KeyParts: []ledger.KeyPart{
+				{Type: 0, Value: []byte{byte(i)}},
+				{Type: 2, Value: []byte{byte(i), byte(i + 1)}},
+			}},
+			value,
+		)
+
+		existingPaths[i] = path
+		existingPayloads[i] = payload
+		existingValues[path] = value
+	}
+
+	// Update forest with existing registers
+	update := &ledger.TrieUpdate{
+		RootHash: forest.GetEmptyRootHash(),
+		Paths:    existingPaths,
+		Payloads: existingPayloads,
+	}
+	rootHash, err := forest.Update(update)
+	require.NoError(t, err)
+
+	// Create non-existing paths that will require expansion
+	numNonExisting := 10
+	nonExistingPaths := make([]ledger.Path, numNonExisting)
+	for i := 0; i < numNonExisting; i++ {
+		// Use paths that don't collide with existing ones
+		nonExistingPaths[i] = testutils.PathByUint16(uint16(50000 + i*100))
+	}
+
+	// Generate proofs for BOTH existing and non-existing paths
+	allPaths := append(existingPaths, nonExistingPaths...)
+	read := &ledger.TrieRead{RootHash: rootHash, Paths: allPaths}
+	batchProof, err := forest.Proofs(read)
+	require.NoError(t, err)
+	require.Len(t, batchProof.Proofs, len(allPaths))
+
+	// Verify all proofs are inclusion proofs (non-existing paths should be expanded)
+	for i, proof := range batchProof.Proofs {
+		require.True(t, proof.Inclusion,
+			"Proof %d should be an inclusion proof (path index %d)", i, i)
+
+		if i < numExisting {
+			// Existing paths should have 32-byte hash payloads (payloadless mode)
+			require.Equal(t, hash.HashLen, proof.Payload.Value().Size(),
+				"Existing path proof %d should have 32-byte hash payload", i)
+		} else {
+			// Non-existing paths should have empty payloads after expansion
+			require.True(t, proof.Payload.IsEmpty(),
+				"Non-existing path proof %d should have empty payload", i)
+		}
+	}
+
+	// Reconstruct proofs with actual values for existing paths
+	// Non-existing paths keep their empty payloads
+	for i, proof := range batchProof.Proofs {
+		if i >= numExisting {
+			continue // Non-existing paths stay empty
+		}
+
+		path := existingPaths[i]
+		actualValue := existingValues[path]
+
+		// Get key from proof and create payload with actual value
+		key, err := proof.Payload.Key()
+		require.NoError(t, err)
+		proof.Payload = ledger.NewPayload(key, actualValue)
+	}
+
+	// Build PSMT and verify root hash matches
+	// This is the critical assertion - it will FAIL without the fix
+	psmt, err := ptrie.NewPSMT(rootHash, batchProof)
+	require.NoError(t, err, "PSMT construction should succeed with expanded non-existing paths")
+	require.Equal(t, rootHash, psmt.RootHash(),
+		"PSMT root hash should match original trie root hash")
+
+	t.Logf("Test passed: %d existing + %d non-existing paths, root hash: %x",
+		numExisting, numNonExisting, rootHash[:8])
+}

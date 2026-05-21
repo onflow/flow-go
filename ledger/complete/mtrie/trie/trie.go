@@ -641,6 +641,11 @@ func update(
 // - The payload stores HashLeaf(path, originalValue) as the value (to save space)
 // - But the node hash is computed using the original value (to match regular trie state commitment)
 //
+// Special case: Empty payloads are preserved as empty (not converted to hash payloads).
+// This is important for proof generation, where empty payloads represent non-existent
+// registers that are expanded for proof structure. The node hash for empty payloads
+// equals the default hash, so preserving them doesn't affect state commitment.
+//
 // This ensures:
 // 1. The state commitment is identical to what a regular trie would produce
 // 2. Proof reconstruction (replacing stored hashes with actual values) produces valid proofs
@@ -649,6 +654,13 @@ func newPayloadlessLeaf(path ledger.Path, originalPayload *ledger.Payload, heigh
 	// Compute the node hash using the ORIGINAL value
 	// This ensures the state commitment matches what a regular trie would produce
 	nodeHash := ledger.ComputeCompactValue(hash.Hash(path), originalPayload.Value(), height)
+
+	// For empty payloads, preserve them as empty rather than converting to hash.
+	// This is needed for proof generation expansion, where empty payloads represent
+	// non-existent registers. The IsEmpty() check in proof reconstruction relies on this.
+	if originalPayload.IsEmpty() {
+		return node.NewNode(height, nil, nil, path, originalPayload.DeepCopy(), nodeHash)
+	}
 
 	// Create the payloadless payload (stores hash instead of actual value)
 	payloadlessPayload := createPayloadlessPayload(originalPayload, path)

@@ -319,13 +319,13 @@ func (f *Forest) Proofs(r *ledger.TrieRead) (*ledger.TrieBatchProof, error) {
 		return nil, err
 	}
 
-	// if we have to insert empty values
-	// For non-payloadless tries: expand the trie with empty payloads to convert
-	// non-inclusion proofs to inclusion proofs (a trick used for proof generation).
-	// For payloadless tries: skip this expansion because adding empty payloads
-	// changes the root hash (hash computation is different). Instead, we'll generate
-	// proper non-inclusion proofs which are handled correctly by UnsafeProofs.
-	if len(notFoundPaths) > 0 && !stateTrie.IsPayloadless() {
+	// If we have paths that don't exist in the trie, expand with empty payloads
+	// to convert non-inclusion proofs to inclusion proofs. This is a trick used
+	// for proof generation that works for both regular and payloadless tries:
+	// - Empty payloads compute to default hash at any height
+	// - Adding them doesn't change the root hash
+	// - PSMT expects inclusion proofs, so we must expand to generate valid proofs
+	if len(notFoundPaths) > 0 {
 		// for proofs, we have to set the pruning to false,
 		// currently batch proofs are only consists of inclusion proofs
 		// so for non-inclusion proofs we expand the trie with nil value and use an inclusion proof
