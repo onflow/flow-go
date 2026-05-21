@@ -52,9 +52,26 @@ func Test_BlockHash(t *testing.T) {
 	assert.NotEqual(t, h1, h2)
 }
 
-func Test_BlockProposal(t *testing.T) {
+func Test_SlotNumber(t *testing.T) {
 	timestamp := uint64(time.Date(2026, time.January, 1, 0, 0, 0, 0, time.UTC).Unix())
-	bp := NewBlockProposal(gethCommon.Hash{1}, 1, timestamp, nil, gethCommon.Hash{1, 2, 3})
+	b := Block{
+		ParentBlockHash:     gethCommon.HexToHash("0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"),
+		Height:              1,
+		TotalSupply:         big.NewInt(1000),
+		ReceiptRoot:         gethCommon.Hash{0x2, 0x3, 0x4},
+		TotalGasUsed:        135,
+		TransactionHashRoot: gethCommon.Hash{0x5, 0x6, 0x7},
+		Timestamp:           timestamp,
+	}
+
+	require.Equal(t, uint64(63_158_400), b.SlotNumber(flow.Emulator))
+	require.Equal(t, uint64(63_158_400), b.SlotNumber(flow.Previewnet))
+	require.Equal(t, uint64(89_510_400), b.SlotNumber(flow.Testnet))
+	require.Equal(t, uint64(52_596_000), b.SlotNumber(flow.Mainnet))
+}
+
+func Test_BlockProposal(t *testing.T) {
+	bp := NewBlockProposal(gethCommon.Hash{1}, 1, 0, nil, gethCommon.Hash{1, 2, 3})
 
 	bp.AppendTransaction(nil)
 	require.Empty(t, bp.TxHashes)
@@ -76,11 +93,6 @@ func Test_BlockProposal(t *testing.T) {
 
 	bp.PopulateRoots()
 	require.NotEqual(t, gethTypes.EmptyReceiptsHash, bp.ReceiptRoot)
-
-	require.Equal(t, uint64(63_158_400), bp.SlotNumber(flow.Emulator))
-	require.Equal(t, uint64(63_158_400), bp.SlotNumber(flow.Previewnet))
-	require.Equal(t, uint64(89_510_400), bp.SlotNumber(flow.Testnet))
-	require.Equal(t, uint64(52_596_000), bp.SlotNumber(flow.Mainnet))
 }
 
 func Test_DecodeHistoricBlocks(t *testing.T) {
