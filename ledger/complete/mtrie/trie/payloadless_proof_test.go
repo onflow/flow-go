@@ -529,4 +529,401 @@ func TestPayloadlessProofPSMTReconstruction(t *testing.T) {
 		require.NoError(t, err, "PSMT should be able to reconstruct the trie from the proof after multiple updates")
 		require.Equal(t, expectedRootHash, psmt.RootHash())
 	})
+
+	t.Run("stress test: many consecutive updates with proof verification", func(t *testing.T) {
+		// This test simulates production-like conditions:
+		// - Many consecutive updates (simulating ~100+ blocks)
+		// - Verify root hash consistency at every step
+		// - Verify proof reconstruction works at every step
+		// This should help catch edge cases in trie compaction/update logic.
+
+		// Track all register values for the value reader
+		registerMap := make(map[flow.RegisterID]flow.RegisterValue)
+
+		// Start with empty tries
+		regularTrie := trie.NewEmptyMTrie()
+		payloadlessTrie := trie.NewEmptyMTrieWithPayloadless(true)
+
+		// Track all paths for final verification
+		allPaths := make([]ledger.Path, 0)
+
+		// Simulate 50 rounds of updates (each round = 1 block with multiple register updates)
+		numRounds := 50
+		for round := 0; round < numRounds; round++ {
+			// Vary the number of updates per round
+			numUpdates := 1 + (round % 5) // 1-5 updates per round
+			paths := make([]ledger.Path, numUpdates)
+			payloads := make([]ledger.Payload, numUpdates)
+
+			for i := 0; i < numUpdates; i++ {
+				owner := randomBytes(8)
+				key := randomBytes(16)
+				value := randomBytes(20 + (round%10)*10 + i*5) // Vary value size
+
+				registerID := flow.NewRegisterID(flow.BytesToAddress(owner), string(key))
+				registerMap[registerID] = value
+
+				ledgerKey := convert.RegisterIDToLedgerKey(registerID)
+				payload := ledger.NewPayload(ledgerKey, value)
+
+				path, err := pathfinder.KeyToPath(ledgerKey, 1)
+				require.NoError(t, err)
+
+				paths[i] = path
+				payloads[i] = *payload
+				allPaths = append(allPaths, path)
+			}
+
+			// Apply updates to both tries (use same prune setting for both!)
+			var err error
+			regularTrie, _, err = trie.NewTrieWithUpdatedRegisters(regularTrie, paths, payloads, true)
+			require.NoError(t, err)
+
+			payloadlessTrie, _, err = trie.NewTrieWithUpdatedRegisters(payloadlessTrie, paths, payloads, true)
+			require.NoError(t, err)
+
+			// Verify root hashes match after each update
+			regularRH := regularTrie.RootHash()
+			payloadlessRH := payloadlessTrie.RootHash()
+			if regularRH != payloadlessRH {
+				t.Fatalf("root hash mismatch at round %d: regular=%x, payloadless=%x",
+					round, regularRH[:8], payloadlessRH[:8])
+			}
+
+			// Every 10 rounds, verify proof reconstruction works
+			if round > 0 && round%10 == 0 {
+				// Sample a subset of paths for verification
+				samplePaths := allPaths
+				if len(samplePaths) > 20 {
+					samplePaths = allPaths[:20]
+				}
+
+				expectedRootHash := payloadlessTrie.RootHash()
+				directProofs := payloadlessTrie.UnsafeProofs(samplePaths)
+				encodedProof := ledger.EncodeTrieBatchProof(directProofs)
+
+				valueReader := func(regID flow.RegisterID) (flow.RegisterValue, error) {
+					return registerMap[regID], nil
+				}
+
+				reconstructedBytes, err := trie.ReconstructPayloadlessProof(encodedProof, valueReader)
+				require.NoError(t, err, "proof reconstruction failed at round %d", round)
+
+				reconstructedProof, err := ledger.DecodeTrieBatchProof(reconstructedBytes)
+				require.NoError(t, err)
+
+				psmt, err := ptrie.NewPSMT(expectedRootHash, reconstructedProof)
+				if err != nil {
+					t.Fatalf("PSMT construction failed at round %d: %v", round, err)
+				}
+				require.Equal(t, expectedRootHash, psmt.RootHash(),
+					"PSMT root hash mismatch at round %d", round)
+			}
+		}
+
+		t.Logf("Stress test passed: %d rounds, %d total registers", numRounds, len(registerMap))
+	})
+
+	t.Run("stress test: updates to existing registers", func(t *testing.T) {
+		// This test simulates updating existing registers (common in production).
+		// Existing registers are updated when the same key is written multiple times.
+
+		// Track all register values and paths
+		type registerInfo struct {
+			path    ledger.Path
+			payload *ledger.Payload
+		}
+		registerInfos := make(map[flow.RegisterID]registerInfo)
+		registerValues := make(map[flow.RegisterID]flow.RegisterValue)
+
+		// Start with empty tries
+		regularTrie := trie.NewEmptyMTrie()
+		payloadlessTrie := trie.NewEmptyMTrieWithPayloadless(true)
+
+		// Create a fixed set of register IDs that will be updated multiple times
+		numFixedRegisters := 10
+		fixedRegisterIDs := make([]flow.RegisterID, numFixedRegisters)
+		for i := 0; i < numFixedRegisters; i++ {
+			owner := randomBytes(8)
+			key := randomBytes(16)
+			fixedRegisterIDs[i] = flow.NewRegisterID(flow.BytesToAddress(owner), string(key))
+
+			ledgerKey := convert.RegisterIDToLedgerKey(fixedRegisterIDs[i])
+			path, err := pathfinder.KeyToPath(ledgerKey, 1)
+			require.NoError(t, err)
+
+			// Initialize with some value
+			value := randomBytes(50)
+			registerValues[fixedRegisterIDs[i]] = value
+			payload := ledger.NewPayload(ledgerKey, value)
+			registerInfos[fixedRegisterIDs[i]] = registerInfo{path: path, payload: payload}
+		}
+
+		// Initial update with all registers
+		paths := make([]ledger.Path, numFixedRegisters)
+		payloads := make([]ledger.Payload, numFixedRegisters)
+		for i, regID := range fixedRegisterIDs {
+			info := registerInfos[regID]
+			paths[i] = info.path
+			payloads[i] = *info.payload
+		}
+
+		var err error
+		regularTrie, _, err = trie.NewTrieWithUpdatedRegisters(regularTrie, paths, payloads, true)
+		require.NoError(t, err)
+		payloadlessTrie, _, err = trie.NewTrieWithUpdatedRegisters(payloadlessTrie, paths, payloads, true)
+		require.NoError(t, err)
+		require.Equal(t, regularTrie.RootHash(), payloadlessTrie.RootHash(), "initial root hash mismatch")
+
+		// Now update registers multiple times
+		numRounds := 30
+		for round := 0; round < numRounds; round++ {
+			// Select a subset of registers to update (1-5 registers per round)
+			numUpdates := 1 + (round % 5)
+			updatePaths := make([]ledger.Path, numUpdates)
+			updatePayloads := make([]ledger.Payload, numUpdates)
+
+			for i := 0; i < numUpdates; i++ {
+				// Pick a register to update (cycling through the fixed set)
+				regID := fixedRegisterIDs[(round*numUpdates+i)%numFixedRegisters]
+				info := registerInfos[regID]
+
+				// Create a new value
+				newValue := randomBytes(30 + round + i*5)
+				registerValues[regID] = newValue
+
+				ledgerKey := convert.RegisterIDToLedgerKey(regID)
+				payload := ledger.NewPayload(ledgerKey, newValue)
+
+				updatePaths[i] = info.path
+				updatePayloads[i] = *payload
+			}
+
+			// Apply updates
+			regularTrie, _, err = trie.NewTrieWithUpdatedRegisters(regularTrie, updatePaths, updatePayloads, true)
+			require.NoError(t, err)
+			payloadlessTrie, _, err = trie.NewTrieWithUpdatedRegisters(payloadlessTrie, updatePaths, updatePayloads, true)
+			require.NoError(t, err)
+
+			// Verify root hashes match
+			regularRH := regularTrie.RootHash()
+			payloadlessRH := payloadlessTrie.RootHash()
+			if regularRH != payloadlessRH {
+				t.Fatalf("root hash mismatch at round %d: regular=%x, payloadless=%x",
+					round, regularRH[:8], payloadlessRH[:8])
+			}
+
+			// Verify proof reconstruction every 5 rounds
+			if round > 0 && round%5 == 0 {
+				// Collect all paths
+				allPaths := make([]ledger.Path, 0, len(registerInfos))
+				for _, info := range registerInfos {
+					allPaths = append(allPaths, info.path)
+				}
+
+				expectedRootHash := payloadlessTrie.RootHash()
+				directProofs := payloadlessTrie.UnsafeProofs(allPaths)
+				encodedProof := ledger.EncodeTrieBatchProof(directProofs)
+
+				valueReader := func(regID flow.RegisterID) (flow.RegisterValue, error) {
+					return registerValues[regID], nil
+				}
+
+				reconstructedBytes, err := trie.ReconstructPayloadlessProof(encodedProof, valueReader)
+				require.NoError(t, err, "proof reconstruction failed at round %d", round)
+
+				reconstructedProof, err := ledger.DecodeTrieBatchProof(reconstructedBytes)
+				require.NoError(t, err)
+
+				psmt, err := ptrie.NewPSMT(expectedRootHash, reconstructedProof)
+				if err != nil {
+					t.Fatalf("PSMT construction failed at round %d: %v", round, err)
+				}
+				require.Equal(t, expectedRootHash, psmt.RootHash(),
+					"PSMT root hash mismatch at round %d", round)
+			}
+		}
+
+		t.Logf("Update test passed: %d rounds, %d registers updated multiple times", numRounds, numFixedRegisters)
+	})
+
+	t.Run("test proof reconstruction with serialized/deserialized trie nodes", func(t *testing.T) {
+		// This test simulates what happens when a trie is loaded from a checkpoint:
+		// 1. Create a payloadless trie
+		// 2. Get the encoded node data (simulating checkpoint save)
+		// 3. Create a new trie from the encoded data (simulating checkpoint load)
+		// 4. Generate proofs and verify PSMT reconstruction
+
+		// Track all register values
+		registerMap := make(map[flow.RegisterID]flow.RegisterValue)
+
+		// Create initial registers
+		numRegisters := 10
+		paths := make([]ledger.Path, numRegisters)
+		payloads := make([]ledger.Payload, numRegisters)
+
+		for i := 0; i < numRegisters; i++ {
+			owner := randomBytes(8)
+			key := randomBytes(16)
+			value := randomBytes(50 + i*10)
+
+			registerID := flow.NewRegisterID(flow.BytesToAddress(owner), string(key))
+			registerMap[registerID] = value
+
+			ledgerKey := convert.RegisterIDToLedgerKey(registerID)
+			payload := ledger.NewPayload(ledgerKey, value)
+
+			path, err := pathfinder.KeyToPath(ledgerKey, 1)
+			require.NoError(t, err)
+
+			paths[i] = path
+			payloads[i] = *payload
+		}
+
+		// Create payloadless trie
+		payloadlessTrie := trie.NewEmptyMTrieWithPayloadless(true)
+		payloadlessTrie, _, err := trie.NewTrieWithUpdatedRegisters(payloadlessTrie, paths, payloads, true)
+		require.NoError(t, err)
+
+		// Create regular trie for comparison
+		regularTrie := trie.NewEmptyMTrie()
+		regularTrie, _, err = trie.NewTrieWithUpdatedRegisters(regularTrie, paths, payloads, true)
+		require.NoError(t, err)
+
+		// Verify initial root hashes match
+		require.Equal(t, regularTrie.RootHash(), payloadlessTrie.RootHash(), "initial root hash mismatch")
+
+		originalRootHash := payloadlessTrie.RootHash()
+
+		// Generate proof from payloadless trie
+		directProofs := payloadlessTrie.UnsafeProofs(paths)
+		encodedProof := ledger.EncodeTrieBatchProof(directProofs)
+
+		// Create value reader
+		valueReader := func(regID flow.RegisterID) (flow.RegisterValue, error) {
+			return registerMap[regID], nil
+		}
+
+		// Reconstruct the proof
+		reconstructedBytes, err := trie.ReconstructPayloadlessProof(encodedProof, valueReader)
+		require.NoError(t, err, "proof reconstruction failed")
+
+		// Decode the reconstructed proof
+		reconstructedProof, err := ledger.DecodeTrieBatchProof(reconstructedBytes)
+		require.NoError(t, err)
+
+		// Verify PSMT can reconstruct the correct root hash
+		psmt, err := ptrie.NewPSMT(originalRootHash, reconstructedProof)
+		require.NoError(t, err, "PSMT should be able to construct from reconstructed proof")
+		require.Equal(t, originalRootHash, psmt.RootHash(), "PSMT root hash should match original")
+
+		t.Logf("Serialization test passed with %d registers", numRegisters)
+	})
+
+	t.Run("PSMT with random subset of registers - production scenario", func(t *testing.T) {
+		// This test simulates the exact production scenario:
+		// - EN has many registers in the trie
+		// - Proofs are generated for only a RANDOM SUBSET (touched during execution)
+		// - VN builds PSMT from this subset and verifies root hash
+		//
+		// This is different from other tests that use ALL registers or first N registers.
+
+		// Track all register values
+		type regInfo struct {
+			id    flow.RegisterID
+			path  ledger.Path
+			value flow.RegisterValue
+		}
+		allRegisters := make([]regInfo, 0, 100)
+
+		// Create 100 registers (simulating a realistic trie size)
+		paths := make([]ledger.Path, 100)
+		payloads := make([]ledger.Payload, 100)
+
+		for i := 0; i < 100; i++ {
+			owner := randomBytes(8)
+			key := randomBytes(16)
+			value := randomBytes(50 + (i % 50))
+
+			registerID := flow.NewRegisterID(flow.BytesToAddress(owner), string(key))
+			ledgerKey := convert.RegisterIDToLedgerKey(registerID)
+			payload := ledger.NewPayload(ledgerKey, value)
+			path, err := pathfinder.KeyToPath(ledgerKey, 1)
+			require.NoError(t, err)
+
+			paths[i] = path
+			payloads[i] = *payload
+			allRegisters = append(allRegisters, regInfo{
+				id:    registerID,
+				path:  path,
+				value: value,
+			})
+		}
+
+		// Create payloadless trie
+		payloadlessTrie := trie.NewEmptyMTrieWithPayloadless(true)
+		payloadlessTrie, _, err := trie.NewTrieWithUpdatedRegisters(payloadlessTrie, paths, payloads, true)
+		require.NoError(t, err)
+
+		// Create regular trie for comparison
+		regularTrie := trie.NewEmptyMTrie()
+		regularTrie, _, err = trie.NewTrieWithUpdatedRegisters(regularTrie, paths, payloads, true)
+		require.NoError(t, err)
+
+		// Verify root hashes match
+		expectedRootHash := regularTrie.RootHash()
+		require.Equal(t, expectedRootHash, payloadlessTrie.RootHash(), "root hash mismatch")
+
+		// Now test with random subsets of various sizes (simulating different chunk sizes)
+		subsetSizes := []int{1, 5, 10, 20, 50, 75, 99}
+		for _, subsetSize := range subsetSizes {
+			// Generate a random subset by shuffling indices
+			indices := make([]int, len(allRegisters))
+			for i := range indices {
+				indices[i] = i
+			}
+			// Simple shuffle using the random bytes we already have
+			for i := len(indices) - 1; i > 0; i-- {
+				j := int(randomBytes(1)[0]) % (i + 1)
+				indices[i], indices[j] = indices[j], indices[i]
+			}
+			selectedIndices := indices[:subsetSize]
+
+			// Collect paths and create value reader for selected registers
+			selectedPaths := make([]ledger.Path, subsetSize)
+			registerMap := make(map[flow.RegisterID]flow.RegisterValue)
+			for i, idx := range selectedIndices {
+				reg := allRegisters[idx]
+				selectedPaths[i] = reg.path
+				registerMap[reg.id] = reg.value
+			}
+
+			// Generate proofs for ONLY the selected subset
+			directProofs := payloadlessTrie.UnsafeProofs(selectedPaths)
+			encodedProof := ledger.EncodeTrieBatchProof(directProofs)
+
+			// Create value reader for the subset
+			valueReader := func(regID flow.RegisterID) (flow.RegisterValue, error) {
+				return registerMap[regID], nil
+			}
+
+			// Reconstruct the proof
+			reconstructedBytes, err := trie.ReconstructPayloadlessProof(encodedProof, valueReader)
+			require.NoError(t, err, "proof reconstruction failed for subset size %d", subsetSize)
+
+			// Decode the reconstructed proof
+			reconstructedProof, err := ledger.DecodeTrieBatchProof(reconstructedBytes)
+			require.NoError(t, err)
+
+			// Verify PSMT can reconstruct the correct root hash
+			psmt, err := ptrie.NewPSMT(expectedRootHash, reconstructedProof)
+			require.NoError(t, err, "PSMT construction failed for subset size %d", subsetSize)
+			require.Equal(t, expectedRootHash, psmt.RootHash(),
+				"PSMT root hash mismatch for subset size %d: expected %s, got %s",
+				subsetSize, expectedRootHash, psmt.RootHash())
+		}
+
+		t.Logf("Random subset test passed: tested subsets of sizes %v out of %d total registers",
+			subsetSizes, len(allRegisters))
+	})
 }

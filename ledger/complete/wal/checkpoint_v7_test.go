@@ -11,9 +11,13 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/ledger"
+	"github.com/onflow/flow-go/ledger/common/convert"
+	"github.com/onflow/flow-go/ledger/common/pathfinder"
 	"github.com/onflow/flow-go/ledger/common/testutils"
 	"github.com/onflow/flow-go/ledger/complete/mtrie"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
+	"github.com/onflow/flow-go/ledger/partial/ptrie"
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -617,6 +621,202 @@ func TestV6V7CheckpointConsistencyWithWALUpdates(t *testing.T) {
 	})
 }
 
+// TestV7CheckpointWithPSMTVerification tests that proofs generated from a payloadless forest
+// after checkpoint loading and WAL updates can be verified by PSMT.
+// This test simulates the full production flow:
+// 1. Create a payloadless forest
+// 2. Apply initial updates
+// 3. Save V7 checkpoint
+// 4. Load V7 checkpoint into a new forest
+// 5. Apply WAL updates (simulating 100+ blocks)
+// 6. Generate proofs
+// 7. Verify PSMT can reconstruct the correct root hash
+func TestV7CheckpointWithPSMTVerification(t *testing.T) {
+	unittest.RunWithTempDir(t, func(dir string) {
+		logger := zerolog.Nop()
+		forestCapacity := 100
+
+		// Track all register values for proof reconstruction
+		registerValues := make(map[flow.RegisterID]flow.RegisterValue)
+		registerPaths := make(map[flow.RegisterID]ledger.Path)
+
+		// Create a payloadless forest
+		forest, err := mtrie.NewForestWithPayloadless(forestCapacity, &metrics.NoopCollector{}, nil, true)
+		require.NoError(t, err, "failed to create payloadless forest")
+
+		// Helper function to create valid register with path and payload
+		createRegister := func(i int, suffix string) (flow.RegisterID, ledger.Path, *ledger.Payload) {
+			owner := make([]byte, 8)
+			_, _ = rand.Read(owner)
+			key := suffix + string(rune(i))
+			value := make([]byte, 50+i%50)
+			_, _ = rand.Read(value)
+
+			regID := flow.NewRegisterID(flow.BytesToAddress(owner), key)
+			ledgerKey := convert.RegisterIDToLedgerKey(regID)
+			payload := ledger.NewPayload(ledgerKey, value)
+
+			path, err := pathfinder.KeyToPath(ledgerKey, 1)
+			require.NoError(t, err)
+			return regID, path, payload
+		}
+
+		// Apply initial updates (50 registers)
+		var initialPaths []ledger.Path
+		var initialPayloads []*ledger.Payload
+		for i := 0; i < 50; i++ {
+			regID, path, payload := createRegister(i, "init")
+			registerValues[regID] = payload.Value().DeepCopy()
+			registerPaths[regID] = path
+			initialPaths = append(initialPaths, path)
+			initialPayloads = append(initialPayloads, payload)
+		}
+
+		initialUpdate := &ledger.TrieUpdate{
+			RootHash: forest.GetEmptyRootHash(),
+			Paths:    initialPaths,
+			Payloads: initialPayloads,
+		}
+		initialRootHash, err := forest.Update(initialUpdate)
+		require.NoError(t, err, "failed to apply initial update")
+
+		// Save V7 checkpoint
+		v7CheckpointFile := "checkpoint-v7-psmt-test"
+		tries, err := forest.GetTries()
+		require.NoError(t, err)
+		var trieToStore *trie.MTrie
+		for _, tr := range tries {
+			if tr.RootHash() == initialRootHash {
+				trieToStore = tr
+				break
+			}
+		}
+		require.NotNil(t, trieToStore)
+		require.True(t, trieToStore.IsPayloadless())
+		require.NoErrorf(t, StoreCheckpointV7SingleThread([]*trie.MTrie{trieToStore}, dir, v7CheckpointFile, logger),
+			"fail to store V7 checkpoint")
+
+		t.Logf("Initial V7 checkpoint created with %d registers, root hash: %s", len(registerValues), initialRootHash)
+
+		// Load V7 checkpoint into a new forest
+		loadedTries, err := OpenAndReadCheckpointV7(dir, v7CheckpointFile, logger)
+		require.NoError(t, err, "failed to load V7 checkpoint")
+		require.Len(t, loadedTries, 1)
+		require.True(t, loadedTries[0].IsPayloadless())
+		require.Equal(t, initialRootHash, loadedTries[0].RootHash(), "loaded root hash mismatch")
+
+		// Create a new forest and add the loaded trie
+		newForest, err := mtrie.NewForestWithPayloadless(forestCapacity, &metrics.NoopCollector{}, nil, true)
+		require.NoError(t, err)
+		require.NoError(t, newForest.AddTries(loadedTries))
+
+		// Apply 107 rounds of WAL updates (simulating the production scenario)
+		currentRootHash := loadedTries[0].RootHash()
+		numRounds := 107
+		registerCounter := 50 // Continue counting from initial registers
+		for round := 0; round < numRounds; round++ {
+			// Generate updates for this round (mix of new and existing registers)
+			numNewRegisters := 1 + (round % 3) // 1-3 new registers per round
+			numUpdates := 1 + (round % 5)      // 1-5 updates to existing registers
+
+			var updatePaths []ledger.Path
+			var updatePayloads []*ledger.Payload
+
+			// Add new registers
+			for i := 0; i < numNewRegisters; i++ {
+				regID, path, payload := createRegister(registerCounter, "wal")
+				registerCounter++
+				registerValues[regID] = payload.Value().DeepCopy()
+				registerPaths[regID] = path
+				updatePaths = append(updatePaths, path)
+				updatePayloads = append(updatePayloads, payload)
+			}
+
+			// Update existing registers (if we have any)
+			existingRegIDs := make([]flow.RegisterID, 0, len(registerPaths))
+			for regID := range registerPaths {
+				existingRegIDs = append(existingRegIDs, regID)
+			}
+			for i := 0; i < numUpdates && len(existingRegIDs) > i; i++ {
+				regID := existingRegIDs[(round*numUpdates+i)%len(existingRegIDs)]
+				path := registerPaths[regID]
+				newValue := make([]byte, 30+round%20)
+				_, _ = rand.Read(newValue)
+				registerValues[regID] = newValue
+
+				key := convert.RegisterIDToLedgerKey(regID)
+				payload := ledger.NewPayload(key, newValue)
+				updatePaths = append(updatePaths, path)
+				updatePayloads = append(updatePayloads, payload)
+			}
+
+			// Apply update
+			update := &ledger.TrieUpdate{
+				RootHash: currentRootHash,
+				Paths:    updatePaths,
+				Payloads: updatePayloads,
+			}
+			currentRootHash, err = newForest.Update(update)
+			require.NoError(t, err, "failed to apply update at round %d", round)
+		}
+
+		t.Logf("Applied %d rounds of WAL updates, total registers: %d, final root hash: %s",
+			numRounds, len(registerValues), currentRootHash)
+
+		// Get the final trie
+		finalTrie, err := newForest.GetTrie(currentRootHash)
+		require.NoError(t, err)
+		require.True(t, finalTrie.IsPayloadless())
+
+		// Generate proofs for all registers
+		var allPaths []ledger.Path
+		for _, p := range registerPaths {
+			allPaths = append(allPaths, p)
+		}
+
+		// Generate proof from payloadless trie
+		trieRead := &ledger.TrieRead{
+			RootHash: currentRootHash,
+			Paths:    allPaths,
+		}
+		batchProof, err := newForest.Proofs(trieRead)
+		require.NoError(t, err, "failed to generate proofs")
+
+		// Encode the proof
+		encodedProof := ledger.EncodeTrieBatchProof(batchProof)
+
+		// Create value reader for proof reconstruction
+		valueReader := func(regID flow.RegisterID) (flow.RegisterValue, error) {
+			return registerValues[regID], nil
+		}
+
+		// Reconstruct the proof with actual values
+		reconstructedBytes, err := trie.ReconstructPayloadlessProof(encodedProof, valueReader)
+		require.NoError(t, err, "proof reconstruction failed")
+
+		// Decode the reconstructed proof
+		reconstructedProof, err := ledger.DecodeTrieBatchProof(reconstructedBytes)
+		require.NoError(t, err, "failed to decode reconstructed proof")
+
+		// Verify PSMT can reconstruct the correct root hash
+		psmt, err := ptrie.NewPSMT(currentRootHash, reconstructedProof)
+		require.NoError(t, err, "PSMT construction failed - this is the production bug!")
+		require.Equal(t, currentRootHash, psmt.RootHash(),
+			"PSMT root hash mismatch: expected %s, got %s", currentRootHash, psmt.RootHash())
+
+		t.Logf("SUCCESS: PSMT verification passed after %d rounds of updates on checkpoint-loaded forest", numRounds)
+	})
+}
+
+// toPayloadPtrs converts a slice of payloads to a slice of payload pointers
+func toPayloadPtrs(payloads []ledger.Payload) []*ledger.Payload {
+	ptrs := make([]*ledger.Payload, len(payloads))
+	for i := range payloads {
+		ptrs[i] = &payloads[i]
+	}
+	return ptrs
+}
+
 // generateInitialData creates initial paths and payloads for the test
 func generateInitialData(t *testing.T, count int) ([]ledger.Path, []ledger.Payload) {
 	paths := make([]ledger.Path, count)
@@ -712,13 +912,4 @@ func generateWALUpdates(t *testing.T, existingPaths []ledger.Path, existingPaylo
 	}
 
 	return updates
-}
-
-// toPayloadPtrs converts a slice of payloads to a slice of payload pointers
-func toPayloadPtrs(payloads []ledger.Payload) []*ledger.Payload {
-	ptrs := make([]*ledger.Payload, len(payloads))
-	for i := range payloads {
-		ptrs[i] = &payloads[i]
-	}
-	return ptrs
 }
