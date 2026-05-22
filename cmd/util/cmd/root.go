@@ -30,6 +30,7 @@ import (
 	evm_state_exporter "github.com/onflow/flow-go/cmd/util/cmd/export-evm-state"
 	ledger_json_exporter "github.com/onflow/flow-go/cmd/util/cmd/export-json-execution-state"
 	export_json_transactions "github.com/onflow/flow-go/cmd/util/cmd/export-json-transactions"
+	payload_analysis "github.com/onflow/flow-go/cmd/util/cmd/payload-analysis"
 	extractpayloads "github.com/onflow/flow-go/cmd/util/cmd/extract-payloads-by-address"
 	find_inconsistent_result "github.com/onflow/flow-go/cmd/util/cmd/find-inconsistent-result"
 	find_trie_root "github.com/onflow/flow-go/cmd/util/cmd/find-trie-root"
@@ -142,6 +143,7 @@ func addCommands() {
 	rootCmd.AddCommand(storehouse_checkpoint_validator.Cmd)
 	rootCmd.AddCommand(remove_execution_fork.RootCmd)
 	rootCmd.AddCommand(inspect_token_movements.Cmd)
+	rootCmd.AddCommand(payload_analysis.Cmd)
 }
 
 func initConfig() {
