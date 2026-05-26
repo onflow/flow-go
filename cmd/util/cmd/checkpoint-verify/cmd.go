@@ -179,7 +179,7 @@ func readAndVerifyHeader(headerPath string) ([]uint32, uint32, error) {
 		return nil, 0, fmt.Errorf("header too small")
 	}
 	storedChecksum := binary.BigEndian.Uint32(data[len(data)-4:])
-	computedChecksum := crc32.ChecksumIEEE(data[:len(data)-4])
+	computedChecksum := crc32.Checksum(data[:len(data)-4], crc32.MakeTable(crc32.Castagnoli))
 	if storedChecksum != computedChecksum {
 		return nil, 0, fmt.Errorf("header checksum mismatch: stored=%d, computed=%d", storedChecksum, computedChecksum)
 	}
@@ -253,7 +253,7 @@ func verifySubtrie(dir, filename string, index int, expectedChecksum uint32, log
 		return result
 	}
 	storedChecksum := binary.BigEndian.Uint32(data[len(data)-4:])
-	computedChecksum := crc32.ChecksumIEEE(data[:len(data)-4])
+	computedChecksum := crc32.Checksum(data[:len(data)-4], crc32.MakeTable(crc32.Castagnoli))
 	if storedChecksum != computedChecksum {
 		result.Err = fmt.Errorf("file checksum mismatch: stored=%d, computed=%d", storedChecksum, computedChecksum)
 		result.Duration = time.Since(startTime)
@@ -432,7 +432,7 @@ func verifyTopTrie(topTriePath string, expectedChecksum uint32, subtrieResults [
 		return hash.Hash{}, 0, fmt.Errorf("top trie file too small")
 	}
 	storedChecksum := binary.BigEndian.Uint32(data[len(data)-4:])
-	computedChecksum := crc32.ChecksumIEEE(data[:len(data)-4])
+	computedChecksum := crc32.Checksum(data[:len(data)-4], crc32.MakeTable(crc32.Castagnoli))
 	if storedChecksum != computedChecksum {
 		return hash.Hash{}, 0, fmt.Errorf("file checksum mismatch: stored=%d, computed=%d", storedChecksum, computedChecksum)
 	}
