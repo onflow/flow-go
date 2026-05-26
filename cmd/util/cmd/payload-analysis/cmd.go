@@ -16,4 +16,5 @@ func init() {
 	Cmd.AddCommand(walCmd)
 	Cmd.AddCommand(cdpCmd)
 	Cmd.AddCommand(cdpDedupCmd)
+	Cmd.AddCommand(hashVsStorageCmd)
 }
