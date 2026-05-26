@@ -459,7 +459,7 @@ func readAndVerifyInterimNode(reader io.Reader, previousHashes []ledgerHash.Hash
 	if err != nil {
 		return ledgerHash.Hash{}, fmt.Errorf("failed to read height: %w", err)
 	}
-	_ = binary.BigEndian.Uint16(heightBuf) // height not needed for hash
+	height := int(binary.BigEndian.Uint16(heightBuf))
 
 	// Read stored hash
 	var storedHash ledgerHash.Hash
@@ -484,19 +484,23 @@ func readAndVerifyInterimNode(reader io.Reader, previousHashes []ledgerHash.Hash
 	}
 	rchildIndex := binary.BigEndian.Uint64(rchildBuf)
 
-	// Get child hashes (index 0 means nil/empty)
+	// Get child hashes (index 0 means nil child, use default hash for height-1)
 	var lchildHash, rchildHash ledgerHash.Hash
 	if lchildIndex > 0 {
 		if int(lchildIndex-1) >= len(previousHashes) {
 			return ledgerHash.Hash{}, fmt.Errorf("left child index out of range: %d >= %d", lchildIndex-1, len(previousHashes))
 		}
 		lchildHash = previousHashes[lchildIndex-1]
+	} else {
+		lchildHash = ledger.GetDefaultHashForHeight(height - 1)
 	}
 	if rchildIndex > 0 {
 		if int(rchildIndex-1) >= len(previousHashes) {
 			return ledgerHash.Hash{}, fmt.Errorf("right child index out of range: %d >= %d", rchildIndex-1, len(previousHashes))
 		}
 		rchildHash = previousHashes[rchildIndex-1]
+	} else {
+		rchildHash = ledger.GetDefaultHashForHeight(height - 1)
 	}
 
 	// Compute hash
@@ -632,7 +636,7 @@ func readAndVerifyTopTrieInterimNode(reader io.Reader, topTrieHashes []ledgerHas
 	if err != nil {
 		return ledgerHash.Hash{}, fmt.Errorf("failed to read height: %w", err)
 	}
-	_ = binary.BigEndian.Uint16(heightBuf) // height not needed for hash
+	height := int(binary.BigEndian.Uint16(heightBuf))
 
 	// Read stored hash
 	var storedHash ledgerHash.Hash
@@ -657,14 +661,23 @@ func readAndVerifyTopTrieInterimNode(reader io.Reader, topTrieHashes []ledgerHas
 	}
 	rchildIndex := binary.BigEndian.Uint64(rchildBuf)
 
-	// Get child hashes using global index
-	lchildHash, err := getNodeHashByGlobalIndex(lchildIndex, topTrieHashes, subtrieResults, totalSubtrieNodes)
-	if err != nil {
-		return ledgerHash.Hash{}, fmt.Errorf("failed to get left child hash: %w", err)
+	// Get child hashes using global index (index 0 means nil child, use default hash)
+	var lchildHash, rchildHash ledgerHash.Hash
+	if lchildIndex == 0 {
+		lchildHash = ledger.GetDefaultHashForHeight(height - 1)
+	} else {
+		lchildHash, err = getNodeHashByGlobalIndex(lchildIndex, topTrieHashes, subtrieResults, totalSubtrieNodes)
+		if err != nil {
+			return ledgerHash.Hash{}, fmt.Errorf("failed to get left child hash: %w", err)
+		}
 	}
-	rchildHash, err := getNodeHashByGlobalIndex(rchildIndex, topTrieHashes, subtrieResults, totalSubtrieNodes)
-	if err != nil {
-		return ledgerHash.Hash{}, fmt.Errorf("failed to get right child hash: %w", err)
+	if rchildIndex == 0 {
+		rchildHash = ledger.GetDefaultHashForHeight(height - 1)
+	} else {
+		rchildHash, err = getNodeHashByGlobalIndex(rchildIndex, topTrieHashes, subtrieResults, totalSubtrieNodes)
+		if err != nil {
+			return ledgerHash.Hash{}, fmt.Errorf("failed to get right child hash: %w", err)
+		}
 	}
 
 	// Compute hash
