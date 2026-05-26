@@ -2,6 +2,7 @@ package payload_analysis
 
 import (
 	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"os"
 	"sort"
@@ -50,21 +51,36 @@ type DedupStats struct {
 	UniqueBytes      int64
 	EmptyPayloads    int64
 	PayloadHashCount map[[32]byte]*PayloadInfo // hash -> info about this payload
+	LargestPayloads  []*LargePayloadInfo       // top N largest payloads
 }
 
 // PayloadInfo tracks information about a unique payload
 type PayloadInfo struct {
-	Size        int   // size of the payload value
-	Occurrences int64 // number of times this payload appears
+	Size        int    // size of the payload value
+	Occurrences int64  // number of times this payload appears
+	Owner       string // register owner (hex encoded)
+	Key         string // register key
 }
+
+// LargePayloadInfo tracks info about large payloads for reporting
+type LargePayloadInfo struct {
+	Size        int
+	Occurrences int64
+	Owner       string
+	Key         string
+	Hash        [32]byte
+}
+
+const maxLargestPayloads = 50 // Track top 50 largest payloads
 
 func newDedupStats() *DedupStats {
 	return &DedupStats{
 		PayloadHashCount: make(map[[32]byte]*PayloadInfo),
+		LargestPayloads:  make([]*LargePayloadInfo, 0, maxLargestPayloads),
 	}
 }
 
-func (s *DedupStats) addPayload(value []byte) {
+func (s *DedupStats) addPayload(value []byte, owner, key string) {
 	s.TotalPayloads++
 	size := len(value)
 	s.TotalBytes += int64(size)
@@ -83,9 +99,57 @@ func (s *DedupStats) addPayload(value []byte) {
 		s.PayloadHashCount[hash] = &PayloadInfo{
 			Size:        size,
 			Occurrences: 1,
+			Owner:       owner,
+			Key:         key,
 		}
 		s.UniquePayloads++
 		s.UniqueBytes += int64(size)
+
+		// Track largest payloads (only for new unique payloads)
+		s.trackLargestPayload(size, owner, key, hash)
+	}
+}
+
+func (s *DedupStats) trackLargestPayload(size int, owner, key string, hash [32]byte) {
+	// Only track payloads >= 4KB
+	if size < 4096 {
+		return
+	}
+
+	info := &LargePayloadInfo{
+		Size:  size,
+		Owner: owner,
+		Key:   key,
+		Hash:  hash,
+	}
+
+	// Insert in sorted order (largest first)
+	inserted := false
+	for i, existing := range s.LargestPayloads {
+		if size > existing.Size {
+			// Insert at position i
+			s.LargestPayloads = append(s.LargestPayloads[:i], append([]*LargePayloadInfo{info}, s.LargestPayloads[i:]...)...)
+			inserted = true
+			break
+		}
+	}
+
+	if !inserted && len(s.LargestPayloads) < maxLargestPayloads {
+		s.LargestPayloads = append(s.LargestPayloads, info)
+	}
+
+	// Trim to max size
+	if len(s.LargestPayloads) > maxLargestPayloads {
+		s.LargestPayloads = s.LargestPayloads[:maxLargestPayloads]
+	}
+}
+
+// updateLargestPayloadOccurrences updates occurrence counts after scanning is complete
+func (s *DedupStats) updateLargestPayloadOccurrences() {
+	for _, large := range s.LargestPayloads {
+		if info, exists := s.PayloadHashCount[large.Hash]; exists {
+			large.Occurrences = info.Occurrences
+		}
 	}
 }
 
@@ -169,10 +233,18 @@ func runCDPDedupAnalysis(cmd *cobra.Command, args []string) error {
 		for _, proof := range batchProof.Proofs {
 			proofCount++
 			var valueBytes []byte
+			var owner, key string
 			if proof.Payload != nil && !proof.Payload.IsEmpty() {
 				valueBytes = proof.Payload.Value()
+				k, err := proof.Payload.Key()
+				if err == nil {
+					owner = hex.EncodeToString(k.KeyParts[0].Value)
+					if len(k.KeyParts) > 1 {
+						key = string(k.KeyParts[1].Value)
+					}
+				}
 			}
-			stats.addPayload(valueBytes)
+			stats.addPayload(valueBytes, owner, key)
 		}
 
 		// Progress output
@@ -187,6 +259,9 @@ func runCDPDedupAnalysis(cmd *cobra.Command, args []string) error {
 	}
 
 	elapsed := time.Since(startTime)
+
+	// Update occurrence counts for largest payloads
+	stats.updateLargestPayloadOccurrences()
 
 	// Print results
 	printDedupResults(stats, elapsed, cdpCount, proofCount)
@@ -353,6 +428,31 @@ func printDedupResults(stats *DedupStats, elapsed time.Duration, cdpCount, proof
 			formatBytes(bucket.dupBytes), dupRatio)
 	}
 	fmt.Println()
+
+	// Largest payloads
+	if len(stats.LargestPayloads) > 0 {
+		fmt.Println("=== Largest Payloads (Top 50) ===")
+		fmt.Println()
+		fmt.Printf("%-10s %12s %-20s %s\n", "Size", "Occurrences", "Owner (hex)", "Key")
+		fmt.Println("--------------------------------------------------------------------------------")
+
+		for i, p := range stats.LargestPayloads {
+			ownerDisplay := p.Owner
+			if len(ownerDisplay) > 18 {
+				ownerDisplay = ownerDisplay[:8] + "..." + ownerDisplay[len(ownerDisplay)-8:]
+			}
+			keyDisplay := p.Key
+			if len(keyDisplay) > 50 {
+				keyDisplay = keyDisplay[:47] + "..."
+			}
+			fmt.Printf("%-10s %12d %-20s %s\n",
+				formatBytes(int64(p.Size)), p.Occurrences, ownerDisplay, keyDisplay)
+			if i >= 49 {
+				break
+			}
+		}
+		fmt.Println()
+	}
 
 	// Recommendation
 	fmt.Println("=== Recommendation ===")
