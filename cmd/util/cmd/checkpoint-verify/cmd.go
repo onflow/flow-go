@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -17,6 +18,7 @@ import (
 
 	"github.com/onflow/flow-go/ledger"
 	ledgerHash "github.com/onflow/flow-go/ledger/common/hash"
+	"github.com/onflow/flow-go/module/util"
 )
 
 const (
@@ -260,6 +262,35 @@ func (c *crc32Reader) Checksum() uint32 {
 	return c.hash.Sum32()
 }
 
+// progressReader wraps a reader and tracks bytes read for progress reporting
+type progressReader struct {
+	reader       io.Reader
+	bytesRead    atomic.Uint64
+	onBytesAdded func(bytesAdded uint64) // callback with bytes added in this read
+}
+
+func newProgressReader(r io.Reader, onBytesAdded func(bytesAdded uint64)) *progressReader {
+	return &progressReader{
+		reader:       r,
+		onBytesAdded: onBytesAdded,
+	}
+}
+
+func (p *progressReader) Read(buf []byte) (int, error) {
+	n, err := p.reader.Read(buf)
+	if n > 0 {
+		p.bytesRead.Add(uint64(n))
+		if p.onBytesAdded != nil {
+			p.onBytesAdded(uint64(n))
+		}
+	}
+	return n, err
+}
+
+func (p *progressReader) BytesRead() uint64 {
+	return p.bytesRead.Load()
+}
+
 // verifySubtrieStreaming verifies a subtrie file using streaming reads
 func verifySubtrieStreaming(dir, filename string, index int, expectedChecksum uint32, logger zerolog.Logger) *SubtrieResult {
 	startTime := time.Now()
@@ -322,10 +353,28 @@ func verifySubtrieStreaming(dir, filename string, index int, expectedChecksum ui
 		return result
 	}
 
+	// Set up progress logging
+	subtrieLogger := logger.With().Int("subtrie", index).Logger()
+	logProgress := util.LogProgress(
+		subtrieLogger,
+		util.NewLogProgressConfig(
+			fmt.Sprintf("subtrie %d verification", index),
+			uint64(fileSize),
+			30*time.Second, // log if no progress for 30s
+			20,             // log at 5% increments (20 ticks)
+		),
+	)
+
 	// We need to compute checksum of everything except the last 4 bytes
 	dataSize := fileSize - 4
 	limitedReader := io.LimitReader(file, dataSize)
-	crcReader := newCRC32Reader(bufio.NewReaderSize(limitedReader, readBufferSize))
+
+	// Wrap with progress reader to track bytes read
+	progressRdr := newProgressReader(limitedReader, func(bytesAdded uint64) {
+		logProgress(bytesAdded)
+	})
+
+	crcReader := newCRC32Reader(bufio.NewReaderSize(progressRdr, readBufferSize))
 
 	// Read and verify magic + version
 	header := make([]byte, 4)
