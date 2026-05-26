@@ -1,9 +1,12 @@
 package checkpoint_verify
 
 import (
+	"bufio"
 	"encoding/binary"
 	"fmt"
+	"hash"
 	"hash/crc32"
+	"io"
 	"os"
 	"path/filepath"
 	"sync"
@@ -13,12 +16,14 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/onflow/flow-go/ledger"
-	"github.com/onflow/flow-go/ledger/common/hash"
+	ledgerHash "github.com/onflow/flow-go/ledger/common/hash"
 )
 
 const (
 	// subtrieCount is the number of subtrie files in V6 checkpoint (2^4 = 16)
 	subtrieCount = 16
+	// Buffer size for reading files
+	readBufferSize = 4 * 1024 * 1024 // 4MB buffer
 )
 
 var (
@@ -52,7 +57,7 @@ func init() {
 type SubtrieResult struct {
 	Index       int
 	NodeCount   uint64
-	NodeHashes  []hash.Hash // verified hashes in order (index 0 = first node)
+	NodeHashes  []ledgerHash.Hash // verified hashes in order (index 0 = first node)
 	Err         error
 	Duration    time.Duration
 	StartOffset uint64 // global offset where this subtrie's nodes start (1-based)
@@ -61,7 +66,7 @@ type SubtrieResult struct {
 // VerificationResult holds the complete verification result
 type VerificationResult struct {
 	Valid           bool
-	RootHash        hash.Hash
+	RootHash        ledgerHash.Hash
 	TotalNodes      uint64
 	SubtrieResults  []*SubtrieResult
 	TopTrieNodes    uint64
@@ -122,7 +127,7 @@ func VerifyCheckpointV6(dir, filename string, logger zerolog.Logger) (*Verificat
 		wg.Add(1)
 		go func(index int) {
 			defer wg.Done()
-			subtrieResults[index] = verifySubtrie(dir, filename, index, subtrieChecksums[index], logger)
+			subtrieResults[index] = verifySubtrieStreaming(dir, filename, index, subtrieChecksums[index], logger)
 		}(i)
 	}
 	wg.Wait()
@@ -149,7 +154,7 @@ func VerifyCheckpointV6(dir, filename string, logger zerolog.Logger) (*Verificat
 	fmt.Println("\nStep 3: Verifying top trie...")
 	topTrieStart := time.Now()
 	topTriePath := filePathTopTries(dir, filename)
-	rootHash, topNodeCount, err := verifyTopTrie(topTriePath, topTrieChecksum, subtrieResults, logger)
+	rootHash, topNodeCount, err := verifyTopTrieStreaming(topTriePath, topTrieChecksum, subtrieResults, logger)
 	result.TopTrieDuration = time.Since(topTrieStart)
 	result.TopTrieNodes = topNodeCount
 	result.TotalNodes += topNodeCount
@@ -179,7 +184,8 @@ func readAndVerifyHeader(headerPath string) ([]uint32, uint32, error) {
 		return nil, 0, fmt.Errorf("header too small")
 	}
 	storedChecksum := binary.BigEndian.Uint32(data[len(data)-4:])
-	computedChecksum := crc32.Checksum(data[:len(data)-4], crc32.MakeTable(crc32.Castagnoli))
+	crc32Table := crc32.MakeTable(crc32.Castagnoli)
+	computedChecksum := crc32.Checksum(data[:len(data)-4], crc32Table)
 	if storedChecksum != computedChecksum {
 		return nil, 0, fmt.Errorf("header checksum mismatch: stored=%d, computed=%d", storedChecksum, computedChecksum)
 	}
@@ -229,406 +235,531 @@ func readAndVerifyHeader(headerPath string) ([]uint32, uint32, error) {
 	return subtrieChecksums, topTrieChecksum, nil
 }
 
-func verifySubtrie(dir, filename string, index int, expectedChecksum uint32, logger zerolog.Logger) *SubtrieResult {
+// crc32Reader wraps a reader and computes CRC32 checksum while reading
+type crc32Reader struct {
+	reader io.Reader
+	hash   hash.Hash32
+}
+
+func newCRC32Reader(r io.Reader) *crc32Reader {
+	return &crc32Reader{
+		reader: r,
+		hash:   crc32.New(crc32.MakeTable(crc32.Castagnoli)),
+	}
+}
+
+func (c *crc32Reader) Read(p []byte) (int, error) {
+	n, err := c.reader.Read(p)
+	if n > 0 {
+		c.hash.Write(p[:n])
+	}
+	return n, err
+}
+
+func (c *crc32Reader) Checksum() uint32 {
+	return c.hash.Sum32()
+}
+
+// verifySubtrieStreaming verifies a subtrie file using streaming reads
+func verifySubtrieStreaming(dir, filename string, index int, expectedChecksum uint32, logger zerolog.Logger) *SubtrieResult {
 	startTime := time.Now()
 	result := &SubtrieResult{
 		Index:      index,
-		NodeHashes: make([]hash.Hash, 0),
+		NodeHashes: make([]ledgerHash.Hash, 0),
 	}
 
 	subtriePath := filePathSubTries(dir, filename, index)
 
-	// Read entire file for checksum verification
-	data, err := os.ReadFile(subtriePath)
+	// Open file
+	file, err := os.Open(subtriePath)
 	if err != nil {
-		result.Err = fmt.Errorf("failed to read subtrie file: %w", err)
+		result.Err = fmt.Errorf("failed to open subtrie file: %w", err)
+		result.Duration = time.Since(startTime)
+		return result
+	}
+	defer file.Close()
+
+	// Get file size for footer reading
+	fileInfo, err := file.Stat()
+	if err != nil {
+		result.Err = fmt.Errorf("failed to stat file: %w", err)
+		result.Duration = time.Since(startTime)
+		return result
+	}
+	fileSize := fileInfo.Size()
+
+	// Read footer first (last 12 bytes: nodeCount(8) + checksum(4))
+	if fileSize < 16 {
+		result.Err = fmt.Errorf("file too small: %d bytes", fileSize)
 		result.Duration = time.Since(startTime)
 		return result
 	}
 
-	// Verify file checksum
-	if len(data) < 4 {
-		result.Err = fmt.Errorf("subtrie file too small")
-		result.Duration = time.Since(startTime)
-		return result
-	}
-	storedChecksum := binary.BigEndian.Uint32(data[len(data)-4:])
-	computedChecksum := crc32.Checksum(data[:len(data)-4], crc32.MakeTable(crc32.Castagnoli))
-	if storedChecksum != computedChecksum {
-		result.Err = fmt.Errorf("file checksum mismatch: stored=%d, computed=%d", storedChecksum, computedChecksum)
+	footer := make([]byte, 12)
+	_, err = file.ReadAt(footer, fileSize-12)
+	if err != nil {
+		result.Err = fmt.Errorf("failed to read footer: %w", err)
 		result.Duration = time.Since(startTime)
 		return result
 	}
 
-	// Verify checksum matches header
+	nodeCount := binary.BigEndian.Uint64(footer[0:8])
+	storedChecksum := binary.BigEndian.Uint32(footer[8:12])
+
 	if storedChecksum != expectedChecksum {
 		result.Err = fmt.Errorf("checksum doesn't match header: file=%d, header=%d", storedChecksum, expectedChecksum)
 		result.Duration = time.Since(startTime)
 		return result
 	}
 
-	// Parse and verify nodes
-	err = verifySubtrieNodes(data, result)
+	result.NodeCount = nodeCount
+
+	// Reset to beginning and create CRC32 reader
+	_, err = file.Seek(0, 0)
 	if err != nil {
-		result.Err = err
+		result.Err = fmt.Errorf("failed to seek to beginning: %w", err)
+		result.Duration = time.Since(startTime)
+		return result
 	}
 
+	// We need to compute checksum of everything except the last 4 bytes
+	dataSize := fileSize - 4
+	limitedReader := io.LimitReader(file, dataSize)
+	crcReader := newCRC32Reader(bufio.NewReaderSize(limitedReader, readBufferSize))
+
+	// Read and verify magic + version
+	header := make([]byte, 4)
+	_, err = io.ReadFull(crcReader, header)
+	if err != nil {
+		result.Err = fmt.Errorf("failed to read header: %w", err)
+		result.Duration = time.Since(startTime)
+		return result
+	}
+
+	// Allocate space for node hashes
+	nodeHashes := make([]ledgerHash.Hash, 0, nodeCount)
+
+	// Stream through nodes
+	for nodeIdx := uint64(0); nodeIdx < nodeCount; nodeIdx++ {
+		nodeHash, err := readAndVerifyNode(crcReader, nodeHashes)
+		if err != nil {
+			result.Err = fmt.Errorf("failed to verify node %d: %w", nodeIdx, err)
+			result.Duration = time.Since(startTime)
+			return result
+		}
+		nodeHashes = append(nodeHashes, nodeHash)
+	}
+
+	// Read the remaining footer (nodeCount)
+	footerBuf := make([]byte, 8)
+	_, err = io.ReadFull(crcReader, footerBuf)
+	if err != nil {
+		result.Err = fmt.Errorf("failed to read footer node count: %w", err)
+		result.Duration = time.Since(startTime)
+		return result
+	}
+
+	// Verify checksum
+	computedChecksum := crcReader.Checksum()
+	if computedChecksum != storedChecksum {
+		result.Err = fmt.Errorf("computed checksum mismatch: stored=%d, computed=%d", storedChecksum, computedChecksum)
+		result.Duration = time.Since(startTime)
+		return result
+	}
+
+	result.NodeHashes = nodeHashes
 	result.Duration = time.Since(startTime)
 	return result
 }
 
-func verifySubtrieNodes(data []byte, result *SubtrieResult) error {
-	// File format: magic(2) + version(2) + nodes... + nodeCount(8) + checksum(4)
-	if len(data) < 16 {
-		return fmt.Errorf("file too small")
+// readAndVerifyNode reads a single node from the stream and verifies its hash
+func readAndVerifyNode(reader io.Reader, previousHashes []ledgerHash.Hash) (ledgerHash.Hash, error) {
+	// Read node type
+	typeBuf := make([]byte, 1)
+	_, err := io.ReadFull(reader, typeBuf)
+	if err != nil {
+		return ledgerHash.Hash{}, fmt.Errorf("failed to read node type: %w", err)
+	}
+	nodeType := typeBuf[0]
+
+	if nodeType == 0 { // Leaf node
+		return readAndVerifyLeafNode(reader)
+	} else if nodeType == 1 { // Interim node
+		return readAndVerifyInterimNode(reader, previousHashes)
 	}
 
-	// Read node count from footer
-	nodeCount := binary.BigEndian.Uint64(data[len(data)-12:])
-	result.NodeCount = nodeCount
-
-	// Parse nodes - use slice for sequential access
-	pos := 4 // Skip magic + version
-	nodeHashes := make([]hash.Hash, 0, nodeCount)
-
-	for nodeIdx := uint64(0); nodeIdx < nodeCount; nodeIdx++ {
-		if pos >= len(data)-12 {
-			return fmt.Errorf("unexpected end of data at node %d", nodeIdx)
-		}
-
-		nodeType := data[pos]
-		var computedHash hash.Hash
-		var storedHash hash.Hash
-
-		if nodeType == 0 { // Leaf node
-			// Leaf: type(1) + height(2) + hash(32) + path(32) + payloadLen(4) + payload
-			if pos+1+2+32+32+4 > len(data)-12 {
-				return fmt.Errorf("leaf node %d exceeds data bounds", nodeIdx)
-			}
-
-			height := binary.BigEndian.Uint16(data[pos+1:])
-			copy(storedHash[:], data[pos+1+2:pos+1+2+32])
-
-			var path ledger.Path
-			copy(path[:], data[pos+1+2+32:pos+1+2+32+32])
-
-			payloadLen := binary.BigEndian.Uint32(data[pos+1+2+32+32:])
-			payloadEnd := pos + 1 + 2 + 32 + 32 + 4 + int(payloadLen)
-			if payloadEnd > len(data)-12 {
-				return fmt.Errorf("leaf node %d payload exceeds data bounds", nodeIdx)
-			}
-
-			// Decode payload to get value
-			payloadData := data[pos+1+2+32+32+4 : payloadEnd]
-			payload, err := ledger.DecodePayloadWithoutPrefix(payloadData, false, 1)
-			if err != nil {
-				return fmt.Errorf("failed to decode payload at node %d: %w", nodeIdx, err)
-			}
-
-			// Compute hash
-			computedHash = ledger.ComputeCompactValue(hash.Hash(path), payload.Value(), int(height))
-
-			pos = payloadEnd
-		} else if nodeType == 1 { // Interim node
-			// Interim: type(1) + height(2) + hash(32) + lchildIndex(8) + rchildIndex(8) = 51 bytes
-			if pos+51 > len(data)-12 {
-				return fmt.Errorf("interim node %d exceeds data bounds", nodeIdx)
-			}
-
-			height := binary.BigEndian.Uint16(data[pos+1:])
-			copy(storedHash[:], data[pos+1+2:pos+1+2+32])
-
-			lchildIndex := binary.BigEndian.Uint64(data[pos+1+2+32:])
-			rchildIndex := binary.BigEndian.Uint64(data[pos+1+2+32+8:])
-
-			// Verify descendants-first relationship (indices are 0-based within subtrie)
-			if lchildIndex >= nodeIdx && lchildIndex != ^uint64(0) {
-				return fmt.Errorf("node %d: left child index %d violates descendants-first", nodeIdx, lchildIndex)
-			}
-			if rchildIndex >= nodeIdx && rchildIndex != ^uint64(0) {
-				return fmt.Errorf("node %d: right child index %d violates descendants-first", nodeIdx, rchildIndex)
-			}
-
-			// Get child hashes
-			var lchildHash, rchildHash hash.Hash
-			if lchildIndex == ^uint64(0) {
-				lchildHash = ledger.GetDefaultHashForHeight(int(height) - 1)
-			} else {
-				if lchildIndex >= uint64(len(nodeHashes)) {
-					return fmt.Errorf("node %d: left child index %d out of range", nodeIdx, lchildIndex)
-				}
-				lchildHash = nodeHashes[lchildIndex]
-			}
-			if rchildIndex == ^uint64(0) {
-				rchildHash = ledger.GetDefaultHashForHeight(int(height) - 1)
-			} else {
-				if rchildIndex >= uint64(len(nodeHashes)) {
-					return fmt.Errorf("node %d: right child index %d out of range", nodeIdx, rchildIndex)
-				}
-				rchildHash = nodeHashes[rchildIndex]
-			}
-
-			// Compute hash
-			computedHash = hash.HashInterNode(lchildHash, rchildHash)
-
-			pos += 51
-		} else {
-			return fmt.Errorf("unknown node type %d at node %d", nodeType, nodeIdx)
-		}
-
-		// Verify hash
-		if computedHash != storedHash {
-			return fmt.Errorf("node %d hash mismatch: stored=%x, computed=%x", nodeIdx, storedHash[:8], computedHash[:8])
-		}
-
-		nodeHashes = append(nodeHashes, storedHash)
-	}
-
-	// Store all node hashes for top trie verification
-	result.NodeHashes = nodeHashes
-
-	return nil
+	return ledgerHash.Hash{}, fmt.Errorf("unknown node type: %d", nodeType)
 }
 
-func verifyTopTrie(topTriePath string, expectedChecksum uint32, subtrieResults []*SubtrieResult, logger zerolog.Logger) (hash.Hash, uint64, error) {
-	// Calculate total subtrie node count and build lookup structure
-	var totalSubtrieNodeCount uint64
-	for _, sr := range subtrieResults {
-		sr.StartOffset = totalSubtrieNodeCount + 1 // 1-based global index
-		totalSubtrieNodeCount += sr.NodeCount
-	}
+// readAndVerifyLeafNode reads and verifies a leaf node
+func readAndVerifyLeafNode(reader io.Reader) (ledgerHash.Hash, error) {
+	// Leaf: type(1, already read) + height(2) + hash(32) + path(32) + payloadLen(4) + payload
 
-	// Helper to get hash by global index
-	getHashByGlobalIndex := func(globalIndex uint64, height int) (hash.Hash, error) {
-		if globalIndex == 0 {
-			// Index 0 = nil, use default hash
-			return ledger.GetDefaultHashForHeight(height - 1), nil
-		}
-
-		if globalIndex <= totalSubtrieNodeCount {
-			// Subtrie node - find which subtrie
-			offset := globalIndex - 1 // Convert to 0-based
-			for _, sr := range subtrieResults {
-				if offset < sr.NodeCount {
-					return sr.NodeHashes[offset], nil
-				}
-				offset -= sr.NodeCount
-			}
-			return hash.Hash{}, fmt.Errorf("subtrie node index %d not found", globalIndex)
-		}
-
-		// Top-level node - will be looked up in local nodeHashes
-		return hash.Hash{}, fmt.Errorf("top-level node")
-	}
-
-	// Read entire file
-	data, err := os.ReadFile(topTriePath)
+	// Read height
+	heightBuf := make([]byte, 2)
+	_, err := io.ReadFull(reader, heightBuf)
 	if err != nil {
-		return hash.Hash{}, 0, fmt.Errorf("failed to read top trie file: %w", err)
+		return ledgerHash.Hash{}, fmt.Errorf("failed to read height: %w", err)
+	}
+	height := binary.BigEndian.Uint16(heightBuf)
+
+	// Read stored hash
+	var storedHash ledgerHash.Hash
+	_, err = io.ReadFull(reader, storedHash[:])
+	if err != nil {
+		return ledgerHash.Hash{}, fmt.Errorf("failed to read stored hash: %w", err)
 	}
 
-	// Verify file checksum
-	if len(data) < 4 {
-		return hash.Hash{}, 0, fmt.Errorf("top trie file too small")
+	// Read path
+	var path ledger.Path
+	_, err = io.ReadFull(reader, path[:])
+	if err != nil {
+		return ledgerHash.Hash{}, fmt.Errorf("failed to read path: %w", err)
 	}
-	storedChecksum := binary.BigEndian.Uint32(data[len(data)-4:])
-	computedChecksum := crc32.Checksum(data[:len(data)-4], crc32.MakeTable(crc32.Castagnoli))
-	if storedChecksum != computedChecksum {
-		return hash.Hash{}, 0, fmt.Errorf("file checksum mismatch: stored=%d, computed=%d", storedChecksum, computedChecksum)
+
+	// Read payload length
+	payloadLenBuf := make([]byte, 4)
+	_, err = io.ReadFull(reader, payloadLenBuf)
+	if err != nil {
+		return ledgerHash.Hash{}, fmt.Errorf("failed to read payload length: %w", err)
 	}
+	payloadLen := binary.BigEndian.Uint32(payloadLenBuf)
+
+	// Read payload
+	payloadData := make([]byte, payloadLen)
+	_, err = io.ReadFull(reader, payloadData)
+	if err != nil {
+		return ledgerHash.Hash{}, fmt.Errorf("failed to read payload: %w", err)
+	}
+
+	// Decode payload
+	payload, err := ledger.DecodePayloadWithoutPrefix(payloadData, false, 1)
+	if err != nil {
+		return ledgerHash.Hash{}, fmt.Errorf("failed to decode payload: %w", err)
+	}
+
+	// Compute hash
+	computedHash := ledger.ComputeCompactValue(ledgerHash.Hash(path), payload.Value(), int(height))
+
+	// Verify hash
+	if storedHash != computedHash {
+		return ledgerHash.Hash{}, fmt.Errorf("leaf hash mismatch: stored=%x, computed=%x", storedHash[:8], computedHash[:8])
+	}
+
+	return storedHash, nil
+}
+
+// readAndVerifyInterimNode reads and verifies an interim node
+func readAndVerifyInterimNode(reader io.Reader, previousHashes []ledgerHash.Hash) (ledgerHash.Hash, error) {
+	// Interim: type(1, already read) + height(2) + hash(32) + lchildIndex(8) + rchildIndex(8)
+
+	// Read height
+	heightBuf := make([]byte, 2)
+	_, err := io.ReadFull(reader, heightBuf)
+	if err != nil {
+		return ledgerHash.Hash{}, fmt.Errorf("failed to read height: %w", err)
+	}
+	_ = binary.BigEndian.Uint16(heightBuf) // height not needed for hash
+
+	// Read stored hash
+	var storedHash ledgerHash.Hash
+	_, err = io.ReadFull(reader, storedHash[:])
+	if err != nil {
+		return ledgerHash.Hash{}, fmt.Errorf("failed to read stored hash: %w", err)
+	}
+
+	// Read left child index
+	lchildBuf := make([]byte, 8)
+	_, err = io.ReadFull(reader, lchildBuf)
+	if err != nil {
+		return ledgerHash.Hash{}, fmt.Errorf("failed to read left child index: %w", err)
+	}
+	lchildIndex := binary.BigEndian.Uint64(lchildBuf)
+
+	// Read right child index
+	rchildBuf := make([]byte, 8)
+	_, err = io.ReadFull(reader, rchildBuf)
+	if err != nil {
+		return ledgerHash.Hash{}, fmt.Errorf("failed to read right child index: %w", err)
+	}
+	rchildIndex := binary.BigEndian.Uint64(rchildBuf)
+
+	// Get child hashes (index 0 means nil/empty)
+	var lchildHash, rchildHash ledgerHash.Hash
+	if lchildIndex > 0 {
+		if int(lchildIndex-1) >= len(previousHashes) {
+			return ledgerHash.Hash{}, fmt.Errorf("left child index out of range: %d >= %d", lchildIndex-1, len(previousHashes))
+		}
+		lchildHash = previousHashes[lchildIndex-1]
+	}
+	if rchildIndex > 0 {
+		if int(rchildIndex-1) >= len(previousHashes) {
+			return ledgerHash.Hash{}, fmt.Errorf("right child index out of range: %d >= %d", rchildIndex-1, len(previousHashes))
+		}
+		rchildHash = previousHashes[rchildIndex-1]
+	}
+
+	// Compute hash
+	computedHash := ledgerHash.HashInterNode(lchildHash, rchildHash)
+
+	// Verify hash
+	if storedHash != computedHash {
+		return ledgerHash.Hash{}, fmt.Errorf("interim hash mismatch: stored=%x, computed=%x", storedHash[:8], computedHash[:8])
+	}
+
+	return storedHash, nil
+}
+
+// verifyTopTrieStreaming verifies the top trie file using streaming reads
+func verifyTopTrieStreaming(topTriePath string, expectedChecksum uint32, subtrieResults []*SubtrieResult, logger zerolog.Logger) (ledgerHash.Hash, uint64, error) {
+	// Open file
+	file, err := os.Open(topTriePath)
+	if err != nil {
+		return ledgerHash.Hash{}, 0, fmt.Errorf("failed to open top trie file: %w", err)
+	}
+	defer file.Close()
+
+	// Get file size
+	fileInfo, err := file.Stat()
+	if err != nil {
+		return ledgerHash.Hash{}, 0, fmt.Errorf("failed to stat file: %w", err)
+	}
+	fileSize := fileInfo.Size()
+
+	// Read footer (nodeCount(8) + trieCount(2) + checksum(4))
+	if fileSize < 18 {
+		return ledgerHash.Hash{}, 0, fmt.Errorf("file too small: %d bytes", fileSize)
+	}
+
+	footer := make([]byte, 14)
+	_, err = file.ReadAt(footer, fileSize-14)
+	if err != nil {
+		return ledgerHash.Hash{}, 0, fmt.Errorf("failed to read footer: %w", err)
+	}
+
+	nodeCount := binary.BigEndian.Uint64(footer[0:8])
+	trieCount := binary.BigEndian.Uint16(footer[8:10])
+	storedChecksum := binary.BigEndian.Uint32(footer[10:14])
 
 	if storedChecksum != expectedChecksum {
-		return hash.Hash{}, 0, fmt.Errorf("checksum doesn't match header: file=%d, header=%d", storedChecksum, expectedChecksum)
+		return ledgerHash.Hash{}, 0, fmt.Errorf("checksum doesn't match header: file=%d, header=%d", storedChecksum, expectedChecksum)
 	}
 
-	// Parse top trie file
-	// Format: magic(2) + version(2) + nodes... + nodeCount(8) + trieCount(2) + tries... + checksum(4)
-
-	// Read footer to get counts
-	if len(data) < 14 {
-		return hash.Hash{}, 0, fmt.Errorf("file too small for footer")
+	// Calculate total subtrie nodes for global indexing
+	var totalSubtrieNodes uint64
+	for _, sr := range subtrieResults {
+		totalSubtrieNodes += sr.NodeCount
 	}
 
-	// Find trie count (2 bytes before checksum)
-	trieCount := binary.BigEndian.Uint16(data[len(data)-6:])
-
-	// Calculate trie data size: each trie is 56 bytes (rootIndex(8) + regCount(8) + regSize(8) + rootHash(32))
-	trieDataSize := int(trieCount) * 56
-
-	// Node count is before trie count and trie data
-	nodeCountPos := len(data) - 4 - 2 - trieDataSize - 8
-	if nodeCountPos < 4 {
-		return hash.Hash{}, 0, fmt.Errorf("invalid file structure")
+	// Reset to beginning
+	_, err = file.Seek(0, 0)
+	if err != nil {
+		return ledgerHash.Hash{}, 0, fmt.Errorf("failed to seek to beginning: %w", err)
 	}
-	nodeCount := binary.BigEndian.Uint64(data[nodeCountPos:])
 
-	// Parse and verify nodes
-	pos := 4 // Skip magic + version
-	topLevelHashes := make([]hash.Hash, 0, nodeCount)
+	// Create CRC32 reader for everything except the last 4 bytes
+	dataSize := fileSize - 4
+	limitedReader := io.LimitReader(file, dataSize)
+	crcReader := newCRC32Reader(bufio.NewReaderSize(limitedReader, readBufferSize))
 
+	// Read and verify magic + version
+	header := make([]byte, 4)
+	_, err = io.ReadFull(crcReader, header)
+	if err != nil {
+		return ledgerHash.Hash{}, 0, fmt.Errorf("failed to read header: %w", err)
+	}
+
+	// Read top trie nodes
+	topTrieHashes := make([]ledgerHash.Hash, 0, nodeCount)
 	for nodeIdx := uint64(0); nodeIdx < nodeCount; nodeIdx++ {
-		// Global index for this top-level node
-		globalIndex := totalSubtrieNodeCount + nodeIdx + 1
-
-		if pos >= nodeCountPos {
-			return hash.Hash{}, 0, fmt.Errorf("unexpected end of node data at node %d", nodeIdx)
-		}
-
-		nodeType := data[pos]
-		var computedHash hash.Hash
-		var storedHash hash.Hash
-
-		if nodeType == 0 { // Leaf - shouldn't happen in top trie normally, but handle it
-			if pos+1+2+32+32+4 > nodeCountPos {
-				return hash.Hash{}, 0, fmt.Errorf("leaf node %d exceeds data bounds", nodeIdx)
-			}
-
-			height := binary.BigEndian.Uint16(data[pos+1:])
-			copy(storedHash[:], data[pos+1+2:pos+1+2+32])
-
-			var path ledger.Path
-			copy(path[:], data[pos+1+2+32:pos+1+2+32+32])
-
-			payloadLen := binary.BigEndian.Uint32(data[pos+1+2+32+32:])
-			payloadEnd := pos + 1 + 2 + 32 + 32 + 4 + int(payloadLen)
-			if payloadEnd > nodeCountPos {
-				return hash.Hash{}, 0, fmt.Errorf("leaf node %d payload exceeds data bounds", nodeIdx)
-			}
-
-			payloadData := data[pos+1+2+32+32+4 : payloadEnd]
-			payload, err := ledger.DecodePayloadWithoutPrefix(payloadData, false, 1)
-			if err != nil {
-				return hash.Hash{}, 0, fmt.Errorf("failed to decode payload at node %d: %w", nodeIdx, err)
-			}
-
-			computedHash = ledger.ComputeCompactValue(hash.Hash(path), payload.Value(), int(height))
-			pos = payloadEnd
-		} else if nodeType == 1 { // Interim node
-			if pos+51 > nodeCountPos {
-				return hash.Hash{}, 0, fmt.Errorf("interim node %d exceeds data bounds", nodeIdx)
-			}
-
-			height := binary.BigEndian.Uint16(data[pos+1:])
-			copy(storedHash[:], data[pos+1+2:pos+1+2+32])
-
-			lchildIndex := binary.BigEndian.Uint64(data[pos+1+2+32:])
-			rchildIndex := binary.BigEndian.Uint64(data[pos+1+2+32+8:])
-
-			// Get child hashes
-			var lchildHash, rchildHash hash.Hash
-
-			if lchildIndex == 0 {
-				lchildHash = ledger.GetDefaultHashForHeight(int(height) - 1)
-			} else {
-				h, err := getHashByGlobalIndex(lchildIndex, int(height))
-				if err != nil {
-					// Must be a top-level node reference
-					if lchildIndex <= totalSubtrieNodeCount {
-						return hash.Hash{}, 0, fmt.Errorf("node %d: left child %d: %w", nodeIdx, lchildIndex, err)
-					}
-					// Top-level node - check descendants-first
-					topLocalIndex := lchildIndex - totalSubtrieNodeCount - 1
-					if topLocalIndex >= nodeIdx {
-						return hash.Hash{}, 0, fmt.Errorf("node %d (global %d): left child %d violates descendants-first",
-							nodeIdx, globalIndex, lchildIndex)
-					}
-					lchildHash = topLevelHashes[topLocalIndex]
-				} else {
-					lchildHash = h
-				}
-			}
-
-			if rchildIndex == 0 {
-				rchildHash = ledger.GetDefaultHashForHeight(int(height) - 1)
-			} else {
-				h, err := getHashByGlobalIndex(rchildIndex, int(height))
-				if err != nil {
-					// Must be a top-level node reference
-					if rchildIndex <= totalSubtrieNodeCount {
-						return hash.Hash{}, 0, fmt.Errorf("node %d: right child %d: %w", nodeIdx, rchildIndex, err)
-					}
-					// Top-level node - check descendants-first
-					topLocalIndex := rchildIndex - totalSubtrieNodeCount - 1
-					if topLocalIndex >= nodeIdx {
-						return hash.Hash{}, 0, fmt.Errorf("node %d (global %d): right child %d violates descendants-first",
-							nodeIdx, globalIndex, rchildIndex)
-					}
-					rchildHash = topLevelHashes[topLocalIndex]
-				} else {
-					rchildHash = h
-				}
-			}
-
-			computedHash = hash.HashInterNode(lchildHash, rchildHash)
-			pos += 51
-		} else {
-			return hash.Hash{}, 0, fmt.Errorf("unknown node type %d at node %d", nodeType, nodeIdx)
-		}
-
-		// Verify hash
-		if computedHash != storedHash {
-			return hash.Hash{}, 0, fmt.Errorf("node %d hash mismatch: stored=%x, computed=%x", nodeIdx, storedHash[:8], computedHash[:8])
-		}
-
-		topLevelHashes = append(topLevelHashes, storedHash)
-	}
-
-	// Parse trie entries to get root hash
-	trieDataStart := nodeCountPos + 8 + 2 // after nodeCount and trieCount
-	if trieCount == 0 {
-		return hash.Hash{}, 0, fmt.Errorf("no tries in checkpoint")
-	}
-
-	// Read first (and typically only) trie's root hash
-	// Trie format: rootIndex(8) + regCount(8) + regSize(8) + rootHash(32)
-	triePos := trieDataStart
-	rootIndex := binary.BigEndian.Uint64(data[triePos:])
-
-	var rootHash hash.Hash
-	if rootIndex == 0 {
-		// Empty trie
-		rootHash = ledger.GetDefaultHashForHeight(ledger.NodeMaxHeight)
-	} else {
-		// Get root hash from verified nodes
-		h, err := getHashByGlobalIndex(rootIndex, ledger.NodeMaxHeight+1)
+		nodeHash, err := readAndVerifyTopTrieNode(crcReader, topTrieHashes, subtrieResults, totalSubtrieNodes)
 		if err != nil {
-			// Must be a top-level node
-			if rootIndex <= totalSubtrieNodeCount {
-				return hash.Hash{}, 0, fmt.Errorf("root index %d: %w", rootIndex, err)
-			}
-			topLocalIndex := rootIndex - totalSubtrieNodeCount - 1
-			if topLocalIndex >= uint64(len(topLevelHashes)) {
-				return hash.Hash{}, 0, fmt.Errorf("root index %d out of range", rootIndex)
-			}
-			rootHash = topLevelHashes[topLocalIndex]
-		} else {
-			rootHash = h
+			return ledgerHash.Hash{}, 0, fmt.Errorf("failed to verify top trie node %d: %w", nodeIdx, err)
 		}
+		topTrieHashes = append(topTrieHashes, nodeHash)
 	}
 
-	// Verify against stored root hash
-	storedRootHash := data[triePos+8+8+8 : triePos+8+8+8+32]
-	var expectedRootHash hash.Hash
-	copy(expectedRootHash[:], storedRootHash)
-
-	if rootHash != expectedRootHash {
-		return hash.Hash{}, 0, fmt.Errorf("root hash mismatch: computed=%x, stored=%x", rootHash[:8], expectedRootHash[:8])
+	// Read trie roots
+	var lastRootHash ledgerHash.Hash
+	for trieIdx := uint16(0); trieIdx < trieCount; trieIdx++ {
+		rootHash, err := readTrieRoot(crcReader, topTrieHashes, subtrieResults, totalSubtrieNodes)
+		if err != nil {
+			return ledgerHash.Hash{}, 0, fmt.Errorf("failed to read trie root %d: %w", trieIdx, err)
+		}
+		lastRootHash = rootHash
 	}
 
-	return rootHash, nodeCount, nil
+	// Read remaining footer
+	footerBuf := make([]byte, 10) // nodeCount(8) + trieCount(2)
+	_, err = io.ReadFull(crcReader, footerBuf)
+	if err != nil {
+		return ledgerHash.Hash{}, 0, fmt.Errorf("failed to read footer: %w", err)
+	}
+
+	// Verify checksum
+	computedChecksum := crcReader.Checksum()
+	if computedChecksum != storedChecksum {
+		return ledgerHash.Hash{}, 0, fmt.Errorf("computed checksum mismatch: stored=%d, computed=%d", storedChecksum, computedChecksum)
+	}
+
+	return lastRootHash, nodeCount, nil
 }
 
-// File path helpers (duplicated from wal package since they're not exported)
-func filePathCheckpointHeader(dir string, fileName string) string {
-	return filepath.Join(dir, fileName)
+// readAndVerifyTopTrieNode reads and verifies a top trie node
+func readAndVerifyTopTrieNode(reader io.Reader, topTrieHashes []ledgerHash.Hash, subtrieResults []*SubtrieResult, totalSubtrieNodes uint64) (ledgerHash.Hash, error) {
+	// Read node type
+	typeBuf := make([]byte, 1)
+	_, err := io.ReadFull(reader, typeBuf)
+	if err != nil {
+		return ledgerHash.Hash{}, fmt.Errorf("failed to read node type: %w", err)
+	}
+	nodeType := typeBuf[0]
+
+	if nodeType == 0 { // Leaf node
+		return readAndVerifyLeafNode(reader)
+	} else if nodeType == 1 { // Interim node
+		return readAndVerifyTopTrieInterimNode(reader, topTrieHashes, subtrieResults, totalSubtrieNodes)
+	}
+
+	return ledgerHash.Hash{}, fmt.Errorf("unknown node type: %d", nodeType)
 }
 
-func filePathSubTries(dir string, fileName string, index int) string {
-	return filepath.Join(dir, fmt.Sprintf("%s.%03d", fileName, index))
+// readAndVerifyTopTrieInterimNode reads and verifies an interim node in the top trie
+func readAndVerifyTopTrieInterimNode(reader io.Reader, topTrieHashes []ledgerHash.Hash, subtrieResults []*SubtrieResult, totalSubtrieNodes uint64) (ledgerHash.Hash, error) {
+	// Read height
+	heightBuf := make([]byte, 2)
+	_, err := io.ReadFull(reader, heightBuf)
+	if err != nil {
+		return ledgerHash.Hash{}, fmt.Errorf("failed to read height: %w", err)
+	}
+	_ = binary.BigEndian.Uint16(heightBuf) // height not needed for hash
+
+	// Read stored hash
+	var storedHash ledgerHash.Hash
+	_, err = io.ReadFull(reader, storedHash[:])
+	if err != nil {
+		return ledgerHash.Hash{}, fmt.Errorf("failed to read stored hash: %w", err)
+	}
+
+	// Read left child index (global index)
+	lchildBuf := make([]byte, 8)
+	_, err = io.ReadFull(reader, lchildBuf)
+	if err != nil {
+		return ledgerHash.Hash{}, fmt.Errorf("failed to read left child index: %w", err)
+	}
+	lchildIndex := binary.BigEndian.Uint64(lchildBuf)
+
+	// Read right child index (global index)
+	rchildBuf := make([]byte, 8)
+	_, err = io.ReadFull(reader, rchildBuf)
+	if err != nil {
+		return ledgerHash.Hash{}, fmt.Errorf("failed to read right child index: %w", err)
+	}
+	rchildIndex := binary.BigEndian.Uint64(rchildBuf)
+
+	// Get child hashes using global index
+	lchildHash, err := getNodeHashByGlobalIndex(lchildIndex, topTrieHashes, subtrieResults, totalSubtrieNodes)
+	if err != nil {
+		return ledgerHash.Hash{}, fmt.Errorf("failed to get left child hash: %w", err)
+	}
+	rchildHash, err := getNodeHashByGlobalIndex(rchildIndex, topTrieHashes, subtrieResults, totalSubtrieNodes)
+	if err != nil {
+		return ledgerHash.Hash{}, fmt.Errorf("failed to get right child hash: %w", err)
+	}
+
+	// Compute hash
+	computedHash := ledgerHash.HashInterNode(lchildHash, rchildHash)
+
+	// Verify hash
+	if storedHash != computedHash {
+		return ledgerHash.Hash{}, fmt.Errorf("interim hash mismatch: stored=%x, computed=%x", storedHash[:8], computedHash[:8])
+	}
+
+	return storedHash, nil
 }
 
-func filePathTopTries(dir string, fileName string) string {
-	return filepath.Join(dir, fmt.Sprintf("%s.%03d", fileName, subtrieCount))
+// readTrieRoot reads a trie root entry and returns the root hash
+func readTrieRoot(reader io.Reader, topTrieHashes []ledgerHash.Hash, subtrieResults []*SubtrieResult, totalSubtrieNodes uint64) (ledgerHash.Hash, error) {
+	// Trie root: rootIndex(8) + regCount(8) + regSize(8) + hash(32)
+
+	// Read root index
+	rootIndexBuf := make([]byte, 8)
+	_, err := io.ReadFull(reader, rootIndexBuf)
+	if err != nil {
+		return ledgerHash.Hash{}, fmt.Errorf("failed to read root index: %w", err)
+	}
+	rootIndex := binary.BigEndian.Uint64(rootIndexBuf)
+
+	// Read reg count
+	regCountBuf := make([]byte, 8)
+	_, err = io.ReadFull(reader, regCountBuf)
+	if err != nil {
+		return ledgerHash.Hash{}, fmt.Errorf("failed to read reg count: %w", err)
+	}
+
+	// Read reg size
+	regSizeBuf := make([]byte, 8)
+	_, err = io.ReadFull(reader, regSizeBuf)
+	if err != nil {
+		return ledgerHash.Hash{}, fmt.Errorf("failed to read reg size: %w", err)
+	}
+
+	// Read stored hash
+	var storedHash ledgerHash.Hash
+	_, err = io.ReadFull(reader, storedHash[:])
+	if err != nil {
+		return ledgerHash.Hash{}, fmt.Errorf("failed to read root hash: %w", err)
+	}
+
+	// For empty trie, root index is 0
+	if rootIndex == 0 {
+		// Empty trie should have empty hash
+		return storedHash, nil
+	}
+
+	// Get the root node hash
+	rootNodeHash, err := getNodeHashByGlobalIndex(rootIndex, topTrieHashes, subtrieResults, totalSubtrieNodes)
+	if err != nil {
+		return ledgerHash.Hash{}, fmt.Errorf("failed to get root node hash: %w", err)
+	}
+
+	// Verify root hash matches
+	if storedHash != rootNodeHash {
+		return ledgerHash.Hash{}, fmt.Errorf("root hash mismatch: stored=%x, computed=%x", storedHash[:8], rootNodeHash[:8])
+	}
+
+	return storedHash, nil
+}
+
+// getNodeHashByGlobalIndex returns the hash for a node at the given global index
+// Global index scheme:
+// - 0 = nil (empty)
+// - 1 to totalSubtrieNodes = subtrie nodes
+// - > totalSubtrieNodes = top trie nodes
+func getNodeHashByGlobalIndex(globalIndex uint64, topTrieHashes []ledgerHash.Hash, subtrieResults []*SubtrieResult, totalSubtrieNodes uint64) (ledgerHash.Hash, error) {
+	if globalIndex == 0 {
+		return ledgerHash.Hash{}, nil
+	}
+
+	if globalIndex <= totalSubtrieNodes {
+		// Node is in a subtrie
+		// Find which subtrie and local index
+		localIndex := globalIndex - 1 // Convert to 0-based
+		for _, sr := range subtrieResults {
+			if localIndex < sr.NodeCount {
+				return sr.NodeHashes[localIndex], nil
+			}
+			localIndex -= sr.NodeCount
+		}
+		return ledgerHash.Hash{}, fmt.Errorf("subtrie index out of range: %d", globalIndex)
+	}
+
+	// Node is in top trie
+	topIndex := globalIndex - totalSubtrieNodes - 1 // Convert to 0-based top trie index
+	if int(topIndex) >= len(topTrieHashes) {
+		return ledgerHash.Hash{}, fmt.Errorf("top trie index out of range: %d >= %d", topIndex, len(topTrieHashes))
+	}
+	return topTrieHashes[topIndex], nil
 }
 
 func printVerificationResult(result *VerificationResult) {
@@ -648,8 +779,27 @@ func printVerificationResult(result *VerificationResult) {
 	}
 
 	fmt.Println()
+	var subtrieNodes uint64
+	for _, sr := range result.SubtrieResults {
+		if sr != nil {
+			subtrieNodes += sr.NodeCount
+		}
+	}
 	fmt.Printf("Total Nodes Verified: %d\n", result.TotalNodes)
-	fmt.Printf("  Subtrie Nodes: %d\n", result.TotalNodes-result.TopTrieNodes)
+	fmt.Printf("  Subtrie Nodes: %d\n", subtrieNodes)
 	fmt.Printf("  Top Trie Nodes: %d\n", result.TopTrieNodes)
-	fmt.Printf("Total Duration: %v\n", result.TotalDuration)
+	fmt.Printf("Total Duration: %v\n", result.TotalDuration.Round(time.Millisecond))
+}
+
+// File path helpers (duplicated from wal package since they're unexported)
+func filePathCheckpointHeader(dir string, fileName string) string {
+	return filepath.Join(dir, fileName)
+}
+
+func filePathSubTries(dir string, fileName string, index int) string {
+	return filepath.Join(dir, fmt.Sprintf("%s.%03d", fileName, index))
+}
+
+func filePathTopTries(dir string, fileName string) string {
+	return filepath.Join(dir, fmt.Sprintf("%s.%03d", fileName, subtrieCount))
 }
