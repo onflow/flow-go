@@ -622,6 +622,17 @@ func verifyTopTrieStreaming(topTriePath string, expectedChecksum uint32, subtrie
 		return ledgerHash.Hash{}, 0, fmt.Errorf("failed to read header: %w", err)
 	}
 
+	// Read subtrie node count (8 bytes) - this is written after the header in top trie file
+	subtrieNodeCountBuf := make([]byte, 8)
+	_, err = io.ReadFull(crcReader, subtrieNodeCountBuf)
+	if err != nil {
+		return ledgerHash.Hash{}, 0, fmt.Errorf("failed to read subtrie node count: %w", err)
+	}
+	readSubtrieNodeCount := binary.BigEndian.Uint64(subtrieNodeCountBuf)
+	if readSubtrieNodeCount != totalSubtrieNodes {
+		return ledgerHash.Hash{}, 0, fmt.Errorf("subtrie node count mismatch: file=%d, computed=%d", readSubtrieNodeCount, totalSubtrieNodes)
+	}
+
 	// Read top trie nodes
 	topTrieHashes := make([]ledgerHash.Hash, 0, nodeCount)
 	for nodeIdx := uint64(0); nodeIdx < nodeCount; nodeIdx++ {
