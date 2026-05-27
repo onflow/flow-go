@@ -280,16 +280,13 @@ func (t *GossipSubMeshTracer) Leave(topic string) {
 			Msg("local peer left topic")
 	}
 
-	// Clean up topic mesh tracking and metrics for cluster topics to prevent unbounded
-	// metric cardinality growth during epoch transitions.
+	// Clean up topic mesh tracking for cluster topics.
+	// Note: Metric cardinality is bounded by normalizing cluster topics to their prefix
+	// (e.g., "consensus-cluster", "sync-cluster") when recording metrics.
 	if channels.IsClusterChannel(channels.Channel(topic)) {
 		t.topicMeshMu.Lock()
 		delete(t.topicMeshMap, topic)
 		t.topicMeshMu.Unlock()
-		t.metrics.OnClusterTopicMetricsCleanup(topic)
-		t.logger.Debug().
-			Str("topic", topic).
-			Msg("cleaned up cluster topic metrics")
 	}
 }
 

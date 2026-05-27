@@ -7,6 +7,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promauto"
 
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/network/channels"
 	p2pmsg "github.com/onflow/flow-go/network/p2p/message"
 )
 
@@ -421,11 +422,12 @@ func (c *GossipSubRpcValidationInspectorMetrics) OnIWantMessageIDsReceived(msgId
 
 // OnIHaveMessageIDsReceived tracks the number of message ids received by the node from other nodes on an iHave message.
 // This function is called on each iHave message received by the node.
+// Cluster topics are normalized to their prefix to prevent unbounded cardinality growth.
 // Args:
 // - channel: the channel on which the iHave message was received.
 // - msgIdCount: the number of message ids received on the iHave message.
 func (c *GossipSubRpcValidationInspectorMetrics) OnIHaveMessageIDsReceived(channel string, msgIdCount int) {
-	c.receivedIHaveMsgIDsHistogram.WithLabelValues(channel).Observe(float64(msgIdCount))
+	c.receivedIHaveMsgIDsHistogram.WithLabelValues(channels.NormalizeTopicForMetrics(channel)).Observe(float64(msgIdCount))
 }
 
 // OnIncomingRpcReceived tracks the number of incoming RPC messages received by the node.
@@ -583,11 +585,4 @@ func (c *GossipSubRpcValidationInspectorMetrics) OnPublishMessageInspected(total
 // Note that it causes a misbehaviour report.
 func (c *GossipSubRpcValidationInspectorMetrics) OnPublishMessagesInspectionErrorExceedsThreshold() {
 	c.publishMessageInspectionErrExceedThresholdCount.Inc()
-}
-
-// OnClusterTopicMetricsCleanup removes all metric label values associated with the given cluster topic.
-// This prevents unbounded metric cardinality growth during epoch transitions when collection nodes
-// join new clusters and leave old ones. Only call this for cluster topics (sync-cluster-*, consensus-cluster-*).
-func (c *GossipSubRpcValidationInspectorMetrics) OnClusterTopicMetricsCleanup(topic string) {
-	c.receivedIHaveMsgIDsHistogram.DeleteLabelValues(topic)
 }

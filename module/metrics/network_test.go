@@ -11,101 +11,90 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TestNetworkCollector_OnClusterTopicMetricsCleanup verifies that OnClusterTopicMetricsCleanup
-// properly cleans up all metrics associated with a cluster topic, including the top-offender
-// metrics identified in the issue: inboundMessageSize, outboundMessageSize, and receivedIHaveMsgIDsHistogram.
-func TestNetworkCollector_OnClusterTopicMetricsCleanup(t *testing.T) {
-	// Use a unique prefix to avoid metric registration conflicts between tests
+// TestNetworkCollector_ClusterTopicNormalization verifies that cluster topics are normalized
+// to their prefix (e.g., "sync-cluster-*" -> "sync-cluster") to prevent unbounded metric
+// cardinality growth during epoch transitions.
+func TestNetworkCollector_ClusterTopicNormalization(t *testing.T) {
 	prefix := fmt.Sprintf("test_%s_", t.Name())
 	logger := zerolog.Nop()
 	nc := NewNetworkCollector(logger, WithNetworkPrefix(prefix))
 
-	clusterTopic := "sync-cluster-test-cluster-id"
-	otherTopic := "blocks"
+	// These cluster topics should be normalized to their prefix
+	clusterTopic1 := "sync-cluster-test-cluster-id-1"
+	clusterTopic2 := "sync-cluster-test-cluster-id-2"
+	consensusClusterTopic := "consensus-cluster-test-cluster-id"
+	nonClusterTopic := "blocks"
 	protocol := "pubsub"
 	msgType := "BlockProposal"
 
-	// Record metrics for both cluster and non-cluster topics
-	// This simulates normal operation where metrics accumulate for various topics
-	nc.InboundMessageReceived(100, clusterTopic, protocol, msgType)
-	nc.InboundMessageReceived(200, clusterTopic, protocol, "Transaction")
-	nc.InboundMessageReceived(300, otherTopic, protocol, msgType)
+	// Record metrics for multiple cluster topics and a non-cluster topic
+	nc.InboundMessageReceived(100, clusterTopic1, protocol, msgType)
+	nc.InboundMessageReceived(200, clusterTopic2, protocol, msgType)
+	nc.InboundMessageReceived(300, consensusClusterTopic, protocol, msgType)
+	nc.InboundMessageReceived(400, nonClusterTopic, protocol, msgType)
 
-	nc.OutboundMessageSent(150, clusterTopic, protocol, msgType)
-	nc.OutboundMessageSent(250, otherTopic, protocol, msgType)
+	nc.OutboundMessageSent(150, clusterTopic1, protocol, msgType)
+	nc.OutboundMessageSent(250, clusterTopic2, protocol, msgType)
+	nc.OutboundMessageSent(350, consensusClusterTopic, protocol, msgType)
+	nc.OutboundMessageSent(450, nonClusterTopic, protocol, msgType)
 
-	nc.DuplicateInboundMessagesDropped(clusterTopic, protocol, msgType)
-	nc.DuplicateInboundMessagesDropped(otherTopic, protocol, msgType)
+	nc.DuplicateInboundMessagesDropped(clusterTopic1, protocol, msgType)
+	nc.DuplicateInboundMessagesDropped(clusterTopic2, protocol, msgType)
+	nc.DuplicateInboundMessagesDropped(consensusClusterTopic, protocol, msgType)
+	nc.DuplicateInboundMessagesDropped(nonClusterTopic, protocol, msgType)
 
-	// Record LocalGossipSubRouterMetrics
-	nc.OnLocalMeshSizeUpdated(clusterTopic, 5)
-	nc.OnLocalMeshSizeUpdated(otherTopic, 3)
-	nc.OnPeerGraftTopic(clusterTopic)
-	nc.OnPeerGraftTopic(otherTopic)
-	nc.OnPeerPruneTopic(clusterTopic)
-	nc.OnPeerPruneTopic(otherTopic)
+	// Verify cluster topics are normalized to their prefix
+	// Both sync-cluster topics should be recorded under "sync-cluster"
+	assertHistogramVecHasLabel(t, nc.inboundMessageSize, LabelChannel, "sync-cluster", "sync-cluster topics should be normalized to 'sync-cluster'")
+	assertHistogramVecHasLabel(t, nc.inboundMessageSize, LabelChannel, "consensus-cluster", "consensus-cluster topics should be normalized to 'consensus-cluster'")
 
-	// Record GossipSubRpcValidationInspectorMetrics
-	nc.OnIHaveMessageIDsReceived(clusterTopic, 10)
-	nc.OnIHaveMessageIDsReceived(otherTopic, 5)
+	// Verify the original cluster topic names are NOT present (they should be normalized)
+	assertHistogramVecNotHasLabel(t, nc.inboundMessageSize, LabelChannel, clusterTopic1, "original cluster topic name should not be present")
+	assertHistogramVecNotHasLabel(t, nc.inboundMessageSize, LabelChannel, clusterTopic2, "original cluster topic name should not be present")
+	assertHistogramVecNotHasLabel(t, nc.inboundMessageSize, LabelChannel, consensusClusterTopic, "original consensus-cluster topic name should not be present")
 
-	// Verify metrics exist before cleanup
-	assertHistogramVecHasLabel(t, nc.inboundMessageSize, LabelChannel, clusterTopic, "inboundMessageSize should have cluster topic before cleanup")
-	assertHistogramVecHasLabel(t, nc.inboundMessageSize, LabelChannel, otherTopic, "inboundMessageSize should have other topic before cleanup")
-	assertHistogramVecHasLabel(t, nc.outboundMessageSize, LabelChannel, clusterTopic, "outboundMessageSize should have cluster topic before cleanup")
-	assertHistogramVecHasLabel(t, nc.outboundMessageSize, LabelChannel, otherTopic, "outboundMessageSize should have other topic before cleanup")
-	assertCounterVecHasLabel(t, nc.duplicateMessagesDropped, LabelChannel, clusterTopic, "duplicateMessagesDropped should have cluster topic before cleanup")
-	assertCounterVecHasLabel(t, nc.duplicateMessagesDropped, LabelChannel, otherTopic, "duplicateMessagesDropped should have other topic before cleanup")
-
-	// Perform cleanup for the cluster topic
-	nc.OnClusterTopicMetricsCleanup(clusterTopic)
-
-	// Verify cluster topic metrics are cleaned up
-	assertHistogramVecNotHasLabel(t, nc.inboundMessageSize, LabelChannel, clusterTopic, "inboundMessageSize should NOT have cluster topic after cleanup")
-	assertHistogramVecNotHasLabel(t, nc.outboundMessageSize, LabelChannel, clusterTopic, "outboundMessageSize should NOT have cluster topic after cleanup")
-	assertCounterVecNotHasLabel(t, nc.duplicateMessagesDropped, LabelChannel, clusterTopic, "duplicateMessagesDropped should NOT have cluster topic after cleanup")
-
-	// Verify other topic metrics are NOT cleaned up
-	assertHistogramVecHasLabel(t, nc.inboundMessageSize, LabelChannel, otherTopic, "inboundMessageSize should still have other topic after cleanup")
-	assertHistogramVecHasLabel(t, nc.outboundMessageSize, LabelChannel, otherTopic, "outboundMessageSize should still have other topic after cleanup")
-	assertCounterVecHasLabel(t, nc.duplicateMessagesDropped, LabelChannel, otherTopic, "duplicateMessagesDropped should still have other topic after cleanup")
+	// Verify non-cluster topics are NOT normalized (they should keep their original name)
+	assertHistogramVecHasLabel(t, nc.inboundMessageSize, LabelChannel, nonClusterTopic, "non-cluster topics should keep their original name")
 }
 
-// TestNetworkCollector_OnClusterTopicMetricsCleanup_Idempotent verifies that calling
-// OnClusterTopicMetricsCleanup multiple times for the same topic doesn't cause issues.
-func TestNetworkCollector_OnClusterTopicMetricsCleanup_Idempotent(t *testing.T) {
+// TestLocalGossipSubRouterMetrics_ClusterTopicNormalization verifies that LocalGossipSubRouterMetrics
+// normalizes cluster topics to their prefix.
+func TestLocalGossipSubRouterMetrics_ClusterTopicNormalization(t *testing.T) {
 	prefix := fmt.Sprintf("test_%s_", t.Name())
-	logger := zerolog.Nop()
-	nc := NewNetworkCollector(logger, WithNetworkPrefix(prefix))
+	m := NewGossipSubLocalMeshMetrics(prefix)
 
-	clusterTopic := "sync-cluster-test-cluster-id"
-	protocol := "pubsub"
-	msgType := "BlockProposal"
+	clusterTopic1 := "sync-cluster-cluster-1"
+	clusterTopic2 := "sync-cluster-cluster-2"
+	consensusClusterTopic := "consensus-cluster-cluster-1"
+	nonClusterTopic := "blocks"
 
-	// Record some metrics
-	nc.InboundMessageReceived(100, clusterTopic, protocol, msgType)
-	nc.OutboundMessageSent(150, clusterTopic, protocol, msgType)
-	nc.OnIHaveMessageIDsReceived(clusterTopic, 10)
+	// Record metrics for cluster and non-cluster topics
+	m.OnLocalMeshSizeUpdated(clusterTopic1, 5)
+	m.OnLocalMeshSizeUpdated(clusterTopic2, 3)
+	m.OnLocalMeshSizeUpdated(consensusClusterTopic, 4)
+	m.OnLocalMeshSizeUpdated(nonClusterTopic, 2)
 
-	// Call cleanup multiple times - should not panic or cause issues
-	nc.OnClusterTopicMetricsCleanup(clusterTopic)
-	nc.OnClusterTopicMetricsCleanup(clusterTopic)
-	nc.OnClusterTopicMetricsCleanup(clusterTopic)
+	m.OnPeerGraftTopic(clusterTopic1)
+	m.OnPeerGraftTopic(clusterTopic2)
+	m.OnPeerGraftTopic(consensusClusterTopic)
+	m.OnPeerGraftTopic(nonClusterTopic)
 
-	// Verify metrics are cleaned up
-	assertHistogramVecNotHasLabel(t, nc.inboundMessageSize, LabelChannel, clusterTopic, "inboundMessageSize should be cleaned up")
-	assertHistogramVecNotHasLabel(t, nc.outboundMessageSize, LabelChannel, clusterTopic, "outboundMessageSize should be cleaned up")
-}
+	m.OnPeerPruneTopic(clusterTopic1)
+	m.OnPeerPruneTopic(clusterTopic2)
+	m.OnPeerPruneTopic(consensusClusterTopic)
+	m.OnPeerPruneTopic(nonClusterTopic)
 
-// TestNetworkCollector_OnClusterTopicMetricsCleanup_NonexistentTopic verifies that calling
-// OnClusterTopicMetricsCleanup for a topic that was never recorded doesn't cause issues.
-func TestNetworkCollector_OnClusterTopicMetricsCleanup_NonexistentTopic(t *testing.T) {
-	prefix := fmt.Sprintf("test_%s_", t.Name())
-	logger := zerolog.Nop()
-	nc := NewNetworkCollector(logger, WithNetworkPrefix(prefix))
+	// Verify cluster topics are normalized to their prefix
+	assertGaugeVecHasLabel(t, &m.localMeshSize, LabelChannel, "sync-cluster", "sync-cluster topics should be normalized")
+	assertGaugeVecHasLabel(t, &m.localMeshSize, LabelChannel, "consensus-cluster", "consensus-cluster topics should be normalized")
 
-	// Call cleanup for a topic that was never used - should not panic
-	nc.OnClusterTopicMetricsCleanup("nonexistent-cluster-topic")
+	// Verify original cluster topic names are NOT present
+	assertGaugeVecNotHasLabel(t, &m.localMeshSize, LabelChannel, clusterTopic1, "original cluster topic should not be present")
+	assertGaugeVecNotHasLabel(t, &m.localMeshSize, LabelChannel, clusterTopic2, "original cluster topic should not be present")
+	assertGaugeVecNotHasLabel(t, &m.localMeshSize, LabelChannel, consensusClusterTopic, "original consensus-cluster topic should not be present")
+
+	// Verify non-cluster topics are NOT normalized
+	assertGaugeVecHasLabel(t, &m.localMeshSize, LabelChannel, nonClusterTopic, "non-cluster topics should keep their original name")
 }
 
 // assertHistogramVecHasLabel checks that the histogram vec has at least one metric with the given label value.
@@ -122,17 +111,17 @@ func assertHistogramVecNotHasLabel(t *testing.T, hv *prometheus.HistogramVec, la
 	assert.False(t, found, msg)
 }
 
-// assertCounterVecHasLabel checks that the counter vec has at least one metric with the given label value.
-func assertCounterVecHasLabel(t *testing.T, cv *prometheus.CounterVec, labelName, labelValue, msg string) {
+// assertGaugeVecHasLabel checks that the gauge vec has at least one metric with the given label value.
+func assertGaugeVecHasLabel(t *testing.T, gv *prometheus.GaugeVec, labelName, labelValue, msg string) {
 	t.Helper()
-	found := counterVecHasLabelValue(t, cv, labelName, labelValue)
+	found := gaugeVecHasLabelValue(t, gv, labelName, labelValue)
 	assert.True(t, found, msg)
 }
 
-// assertCounterVecNotHasLabel checks that the counter vec has no metrics with the given label value.
-func assertCounterVecNotHasLabel(t *testing.T, cv *prometheus.CounterVec, labelName, labelValue, msg string) {
+// assertGaugeVecNotHasLabel checks that the gauge vec has no metrics with the given label value.
+func assertGaugeVecNotHasLabel(t *testing.T, gv *prometheus.GaugeVec, labelName, labelValue, msg string) {
 	t.Helper()
-	found := counterVecHasLabelValue(t, cv, labelName, labelValue)
+	found := gaugeVecHasLabelValue(t, gv, labelName, labelValue)
 	assert.False(t, found, msg)
 }
 
@@ -159,12 +148,12 @@ func histogramVecHasLabelValue(t *testing.T, hv *prometheus.HistogramVec, labelN
 	return false
 }
 
-// counterVecHasLabelValue collects metrics from the counter vec and checks if any have the given label value.
-func counterVecHasLabelValue(t *testing.T, cv *prometheus.CounterVec, labelName, labelValue string) bool {
+// gaugeVecHasLabelValue collects metrics from the gauge vec and checks if any have the given label value.
+func gaugeVecHasLabelValue(t *testing.T, gv *prometheus.GaugeVec, labelName, labelValue string) bool {
 	t.Helper()
 	ch := make(chan prometheus.Metric, 100)
 	go func() {
-		cv.Collect(ch)
+		gv.Collect(ch)
 		close(ch)
 	}()
 

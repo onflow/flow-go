@@ -310,7 +310,6 @@ func (nc *NoopCollector) OnRpcSent(msgCount int, iHaveCount int, iWantCount int,
 func (nc *NoopCollector) OnOutboundRpcDropped()                                            {}
 func (nc *NoopCollector) OnUndeliveredMessage()                                            {}
 func (nc *NoopCollector) OnMessageDeliveredToAllSubscribers(size int)                      {}
-func (nc *NoopCollector) OnClusterTopicMetricsCleanup(topic string)                        {}
 func (nc *NoopCollector) AllowConn(network.Direction, bool)                                {}
 func (nc *NoopCollector) BlockConn(network.Direction, bool)                                {}
 func (nc *NoopCollector) AllowStream(peer.ID, network.Direction)                           {}

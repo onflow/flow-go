@@ -5,6 +5,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promauto"
 
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/network/channels"
 )
 
 // LocalGossipSubRouterMetrics encapsulates the metrics collectors for GossipSub router of the local node.
@@ -261,8 +262,10 @@ func NewGossipSubLocalMeshMetrics(prefix string) *LocalGossipSubRouterMetrics {
 var _ module.LocalGossipSubRouterMetrics = (*LocalGossipSubRouterMetrics)(nil)
 
 // OnLocalMeshSizeUpdated updates the local mesh size metric.
+// Cluster topics are normalized to their prefix (e.g., "sync-cluster", "consensus-cluster")
+// to prevent unbounded cardinality growth during epoch transitions.
 func (g *LocalGossipSubRouterMetrics) OnLocalMeshSizeUpdated(topic string, size int) {
-	g.localMeshSize.WithLabelValues(topic).Set(float64(size))
+	g.localMeshSize.WithLabelValues(channels.NormalizeTopicForMetrics(topic)).Set(float64(size))
 }
 
 // OnPeerAddedToProtocol is called when the local node receives a stream from a peer on a gossipsub-related protocol.
@@ -296,14 +299,16 @@ func (g *LocalGossipSubRouterMetrics) OnLocalPeerLeftTopic() {
 
 // OnPeerGraftTopic is called when the local node receives a GRAFT message from a remote peer on a topic.
 // Note: the received GRAFT at this point is considered passed the RPC inspection, and is accepted by the local node.
+// Cluster topics are normalized to their prefix to prevent unbounded cardinality growth.
 func (g *LocalGossipSubRouterMetrics) OnPeerGraftTopic(topic string) {
-	g.peerGraftTopicCount.WithLabelValues(topic).Inc()
+	g.peerGraftTopicCount.WithLabelValues(channels.NormalizeTopicForMetrics(topic)).Inc()
 }
 
 // OnPeerPruneTopic is called when the local node receives a PRUNE message from a remote peer on a topic.
 // Note: the received PRUNE at this point is considered passed the RPC inspection, and is accepted by the local node.
+// Cluster topics are normalized to their prefix to prevent unbounded cardinality growth.
 func (g *LocalGossipSubRouterMetrics) OnPeerPruneTopic(topic string) {
-	g.peerPruneTopicCount.WithLabelValues(topic).Inc()
+	g.peerPruneTopicCount.WithLabelValues(channels.NormalizeTopicForMetrics(topic)).Inc()
 }
 
 // OnMessageEnteredValidation is called when a received pubsub message enters the validation pipeline. It is the
@@ -377,13 +382,4 @@ func (g *LocalGossipSubRouterMetrics) OnUndeliveredMessage() {
 //	size: the size of the delivered message.
 func (g *LocalGossipSubRouterMetrics) OnMessageDeliveredToAllSubscribers(size int) {
 	g.messageDeliveredSize.Observe(float64(size))
-}
-
-// OnClusterTopicMetricsCleanup removes all metric label values associated with the given cluster topic.
-// This prevents unbounded metric cardinality growth during epoch transitions when collection nodes
-// join new clusters and leave old ones. Only call this for cluster topics (sync-cluster-*, consensus-cluster-*).
-func (g *LocalGossipSubRouterMetrics) OnClusterTopicMetricsCleanup(topic string) {
-	g.localMeshSize.DeleteLabelValues(topic)
-	g.peerGraftTopicCount.DeleteLabelValues(topic)
-	g.peerPruneTopicCount.DeleteLabelValues(topic)
 }

@@ -144,46 +144,6 @@ func (_c *GossipSubRpcValidationInspectorMetrics_OnActiveClusterIDsNotSetErr_Cal
 	return _c
 }
 
-// OnClusterTopicMetricsCleanup provides a mock function for the type GossipSubRpcValidationInspectorMetrics
-func (_mock *GossipSubRpcValidationInspectorMetrics) OnClusterTopicMetricsCleanup(topic string) {
-	_mock.Called(topic)
-	return
-}
-
-// GossipSubRpcValidationInspectorMetrics_OnClusterTopicMetricsCleanup_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'OnClusterTopicMetricsCleanup'
-type GossipSubRpcValidationInspectorMetrics_OnClusterTopicMetricsCleanup_Call struct {
-	*mock.Call
-}
-
-// OnClusterTopicMetricsCleanup is a helper method to define mock.On call
-//   - topic string
-func (_e *GossipSubRpcValidationInspectorMetrics_Expecter) OnClusterTopicMetricsCleanup(topic interface{}) *GossipSubRpcValidationInspectorMetrics_OnClusterTopicMetricsCleanup_Call {
-	return &GossipSubRpcValidationInspectorMetrics_OnClusterTopicMetricsCleanup_Call{Call: _e.mock.On("OnClusterTopicMetricsCleanup", topic)}
-}
-
-func (_c *GossipSubRpcValidationInspectorMetrics_OnClusterTopicMetricsCleanup_Call) Run(run func(topic string)) *GossipSubRpcValidationInspectorMetrics_OnClusterTopicMetricsCleanup_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 string
-		if args[0] != nil {
-			arg0 = args[0].(string)
-		}
-		run(
-			arg0,
-		)
-	})
-	return _c
-}
-
-func (_c *GossipSubRpcValidationInspectorMetrics_OnClusterTopicMetricsCleanup_Call) Return() *GossipSubRpcValidationInspectorMetrics_OnClusterTopicMetricsCleanup_Call {
-	_c.Call.Return()
-	return _c
-}
-
-func (_c *GossipSubRpcValidationInspectorMetrics_OnClusterTopicMetricsCleanup_Call) RunAndReturn(run func(topic string)) *GossipSubRpcValidationInspectorMetrics_OnClusterTopicMetricsCleanup_Call {
-	_c.Run(run)
-	return _c
-}
-
 // OnControlMessagesTruncated provides a mock function for the type GossipSubRpcValidationInspectorMetrics
 func (_mock *GossipSubRpcValidationInspectorMetrics) OnControlMessagesTruncated(messageType p2pmsg.ControlMessageType, diff int) {
 	_mock.Called(messageType, diff)
