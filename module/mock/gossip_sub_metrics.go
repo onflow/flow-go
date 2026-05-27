@@ -225,46 +225,6 @@ func (_c *GossipSubMetrics_OnBehaviourPenaltyUpdated_Call) RunAndReturn(run func
 	return _c
 }
 
-// OnClusterTopicMetricsCleanup provides a mock function for the type GossipSubMetrics
-func (_mock *GossipSubMetrics) OnClusterTopicMetricsCleanup(topic string) {
-	_mock.Called(topic)
-	return
-}
-
-// GossipSubMetrics_OnClusterTopicMetricsCleanup_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'OnClusterTopicMetricsCleanup'
-type GossipSubMetrics_OnClusterTopicMetricsCleanup_Call struct {
-	*mock.Call
-}
-
-// OnClusterTopicMetricsCleanup is a helper method to define mock.On call
-//   - topic string
-func (_e *GossipSubMetrics_Expecter) OnClusterTopicMetricsCleanup(topic interface{}) *GossipSubMetrics_OnClusterTopicMetricsCleanup_Call {
-	return &GossipSubMetrics_OnClusterTopicMetricsCleanup_Call{Call: _e.mock.On("OnClusterTopicMetricsCleanup", topic)}
-}
-
-func (_c *GossipSubMetrics_OnClusterTopicMetricsCleanup_Call) Run(run func(topic string)) *GossipSubMetrics_OnClusterTopicMetricsCleanup_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 string
-		if args[0] != nil {
-			arg0 = args[0].(string)
-		}
-		run(
-			arg0,
-		)
-	})
-	return _c
-}
-
-func (_c *GossipSubMetrics_OnClusterTopicMetricsCleanup_Call) Return() *GossipSubMetrics_OnClusterTopicMetricsCleanup_Call {
-	_c.Call.Return()
-	return _c
-}
-
-func (_c *GossipSubMetrics_OnClusterTopicMetricsCleanup_Call) RunAndReturn(run func(topic string)) *GossipSubMetrics_OnClusterTopicMetricsCleanup_Call {
-	_c.Run(run)
-	return _c
-}
-
 // OnControlMessagesTruncated provides a mock function for the type GossipSubMetrics
 func (_mock *GossipSubMetrics) OnControlMessagesTruncated(messageType p2pmsg.ControlMessageType, diff int) {
 	_mock.Called(messageType, diff)

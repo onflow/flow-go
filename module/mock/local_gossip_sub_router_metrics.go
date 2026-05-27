@@ -35,46 +35,6 @@ func (_m *LocalGossipSubRouterMetrics) EXPECT() *LocalGossipSubRouterMetrics_Exp
 	return &LocalGossipSubRouterMetrics_Expecter{mock: &_m.Mock}
 }
 
-// OnClusterTopicMetricsCleanup provides a mock function for the type LocalGossipSubRouterMetrics
-func (_mock *LocalGossipSubRouterMetrics) OnClusterTopicMetricsCleanup(topic string) {
-	_mock.Called(topic)
-	return
-}
-
-// LocalGossipSubRouterMetrics_OnClusterTopicMetricsCleanup_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'OnClusterTopicMetricsCleanup'
-type LocalGossipSubRouterMetrics_OnClusterTopicMetricsCleanup_Call struct {
-	*mock.Call
-}
-
-// OnClusterTopicMetricsCleanup is a helper method to define mock.On call
-//   - topic string
-func (_e *LocalGossipSubRouterMetrics_Expecter) OnClusterTopicMetricsCleanup(topic interface{}) *LocalGossipSubRouterMetrics_OnClusterTopicMetricsCleanup_Call {
-	return &LocalGossipSubRouterMetrics_OnClusterTopicMetricsCleanup_Call{Call: _e.mock.On("OnClusterTopicMetricsCleanup", topic)}
-}
-
-func (_c *LocalGossipSubRouterMetrics_OnClusterTopicMetricsCleanup_Call) Run(run func(topic string)) *LocalGossipSubRouterMetrics_OnClusterTopicMetricsCleanup_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 string
-		if args[0] != nil {
-			arg0 = args[0].(string)
-		}
-		run(
-			arg0,
-		)
-	})
-	return _c
-}
-
-func (_c *LocalGossipSubRouterMetrics_OnClusterTopicMetricsCleanup_Call) Return() *LocalGossipSubRouterMetrics_OnClusterTopicMetricsCleanup_Call {
-	_c.Call.Return()
-	return _c
-}
-
-func (_c *LocalGossipSubRouterMetrics_OnClusterTopicMetricsCleanup_Call) RunAndReturn(run func(topic string)) *LocalGossipSubRouterMetrics_OnClusterTopicMetricsCleanup_Call {
-	_c.Run(run)
-	return _c
-}
-
 // OnLocalMeshSizeUpdated provides a mock function for the type LocalGossipSubRouterMetrics
 func (_mock *LocalGossipSubRouterMetrics) OnLocalMeshSizeUpdated(topic string, size int) {
 	_mock.Called(topic, size)
