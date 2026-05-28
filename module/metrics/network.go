@@ -291,18 +291,21 @@ func (nc *NetworkCollector) QueueDuration(duration time.Duration, priority int) 
 }
 
 // MessageProcessingStarted increments the metric tracking the number of messages being processed by the node.
+// Cluster topics are normalized to their prefix to prevent unbounded cardinality growth.
 func (nc *NetworkCollector) MessageProcessingStarted(topic string) {
-	nc.numMessagesProcessing.WithLabelValues(topic).Inc()
+	nc.numMessagesProcessing.WithLabelValues(channels.NormalizeTopicForMetrics(topic)).Inc()
 }
 
 // UnicastMessageSendingStarted increments the metric tracking the number of unicast messages sent by the node.
+// Cluster topics are normalized to their prefix to prevent unbounded cardinality growth.
 func (nc *NetworkCollector) UnicastMessageSendingStarted(topic string) {
-	nc.numDirectMessagesSending.WithLabelValues(topic).Inc()
+	nc.numDirectMessagesSending.WithLabelValues(channels.NormalizeTopicForMetrics(topic)).Inc()
 }
 
 // UnicastMessageSendingCompleted decrements the metric tracking the number of unicast messages sent by the node.
+// Cluster topics are normalized to their prefix to prevent unbounded cardinality growth.
 func (nc *NetworkCollector) UnicastMessageSendingCompleted(topic string) {
-	nc.numDirectMessagesSending.WithLabelValues(topic).Dec()
+	nc.numDirectMessagesSending.WithLabelValues(channels.NormalizeTopicForMetrics(topic)).Dec()
 }
 
 func (nc *NetworkCollector) RoutingTablePeerAdded() {
@@ -315,9 +318,11 @@ func (nc *NetworkCollector) RoutingTablePeerRemoved() {
 
 // MessageProcessingFinished tracks the time spent by the node to process a message and decrements the metric tracking
 // the number of messages being processed by the node.
+// Cluster topics are normalized to their prefix to prevent unbounded cardinality growth.
 func (nc *NetworkCollector) MessageProcessingFinished(topic string, duration time.Duration) {
-	nc.numMessagesProcessing.WithLabelValues(topic).Dec()
-	nc.inboundProcessTime.WithLabelValues(topic).Add(duration.Seconds())
+	normalizedTopic := channels.NormalizeTopicForMetrics(topic)
+	nc.numMessagesProcessing.WithLabelValues(normalizedTopic).Dec()
+	nc.inboundProcessTime.WithLabelValues(normalizedTopic).Add(duration.Seconds())
 }
 
 // OutboundConnections updates the metric tracking the number of outbound connections of this node
@@ -357,11 +362,13 @@ func (nc *NetworkCollector) OnDNSLookupRequestDropped() {
 }
 
 // OnUnauthorizedMessage tracks the number of unauthorized messages seen on the network.
+// Cluster topics are normalized to their prefix to prevent unbounded cardinality growth.
 func (nc *NetworkCollector) OnUnauthorizedMessage(role, msgType, topic, offense string) {
-	nc.unAuthorizedMessagesCount.WithLabelValues(role, msgType, topic, offense).Inc()
+	nc.unAuthorizedMessagesCount.WithLabelValues(role, msgType, channels.NormalizeTopicForMetrics(topic), offense).Inc()
 }
 
 // OnRateLimitedPeer tracks the number of rate limited messages seen on the network.
+// Cluster topics are normalized to their prefix to prevent unbounded cardinality growth.
 func (nc *NetworkCollector) OnRateLimitedPeer(peerID peer.ID, role, msgType, topic, reason string) {
 	nc.logger.Warn().
 		Str("peer_id", logging2.PeerId(peerID)).
@@ -371,7 +378,7 @@ func (nc *NetworkCollector) OnRateLimitedPeer(peerID peer.ID, role, msgType, top
 		Str("reason", reason).
 		Bool(logging.KeySuspicious, true).
 		Msg("unicast peer rate limited")
-	nc.rateLimitedUnicastMessagesCount.WithLabelValues(role, msgType, topic, reason).Inc()
+	nc.rateLimitedUnicastMessagesCount.WithLabelValues(role, msgType, channels.NormalizeTopicForMetrics(topic), reason).Inc()
 }
 
 // OnViolationReportSkipped tracks the number of slashing violations consumer violations that were not
