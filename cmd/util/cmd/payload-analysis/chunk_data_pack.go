@@ -196,6 +196,14 @@ func printCDPResults(stats *PayloadStats, elapsed time.Duration, cdpCount, proof
 		} else {
 			triplePermPayloads += bucket.Count
 		}
+
+		// Print subtotal after 24-31 bucket (small payload optimization boundary)
+		if name == "24-31" {
+			fmt.Println("  ------------- -------- --------- ---------------")
+			fmt.Printf("  %-13s %12d %9.2f%% %15s\n",
+				"SUBTOTAL 0-31", smallPayloads, percentage(smallPayloads, stats.TotalPayloads), formatBytes(smallBytes))
+			fmt.Println("-------------------------------------------------------")
+		}
 	}
 
 	fmt.Println()

@@ -380,6 +380,14 @@ func printStats(stats *Stats) {
 			smallCount += bucket.Count
 			smallBytes += bucket.Bytes
 		}
+
+		// Print subtotal after 24-31 bucket (small payload optimization boundary)
+		if bucket.Name == "24-31" {
+			fmt.Println("  -------------- --------------- --------- ---------------")
+			fmt.Printf("  %-13s %15d %9.2f%% %15s\n",
+				"SUBTOTAL 0-31", smallCount, pct(smallCount, stats.LeafNodes), formatBytes(smallBytes))
+			fmt.Println("─────────────────────────────────────────────────────────────")
+		}
 	}
 
 	fmt.Println()
