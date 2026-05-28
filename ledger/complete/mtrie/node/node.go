@@ -143,12 +143,29 @@ func (n *Node) IsDefaultNode() bool {
 	return n.hashValue == ledger.GetDefaultHashForHeight(n.height)
 }
 
-// computeHash returns the hashValue of the node
+// computeHash returns the hashValue of the node.
+// For regular (non-payloadless) tries only.
 func (n *Node) computeHash() hash.Hash {
+	return n.computeHashWithPayloadless(false)
+}
+
+// computeHashWithPayloadless returns the hashValue of the node, with support for payloadless mode.
+// In payloadless mode, leaf nodes store HashLeaf(path, value) as payload.Value() instead of the
+// actual value. The hash computation must use this stored hash as the base hash (height-0) and
+// extend it to the node's height, rather than computing HashLeaf from payload.Value().
+func (n *Node) computeHashWithPayloadless(isPayloadless bool) hash.Hash {
 	// check for leaf node
 	if n.lChild == nil && n.rChild == nil {
 		// if payload is non-nil, compute the hash based on the payload content
 		if n.payload != nil {
+			if isPayloadless && !n.payload.IsEmpty() {
+				// In payloadless mode, payload.Value() IS the base hash (HashLeaf(path, originalValue)).
+				// We extend this base hash from height 0 to the node's height.
+				var baseHash hash.Hash
+				copy(baseHash[:], n.payload.Value())
+				return ledger.ComputeCompactValueFromBaseHash(hash.Hash(n.path), baseHash, n.height)
+			}
+			// Regular mode or empty payload: compute hash from the actual value
 			return ledger.ComputeCompactValue(hash.Hash(n.path), n.payload.Value(), n.height)
 		}
 		// if payload is nil, return the default hash
@@ -171,22 +188,37 @@ func (n *Node) computeHash() hash.Hash {
 	return hash.HashInterNode(h1, h2)
 }
 
-// VerifyCachedHash verifies the hash of a node is valid
+// VerifyCachedHash verifies the hash of a node is valid.
+// For regular (non-payloadless) tries only.
 func verifyCachedHashRecursive(n *Node) bool {
+	return verifyCachedHashRecursiveWithPayloadless(n, false)
+}
+
+// verifyCachedHashRecursiveWithPayloadless verifies the hash of a node with payloadless support.
+func verifyCachedHashRecursiveWithPayloadless(n *Node, isPayloadless bool) bool {
 	if n == nil {
 		return true
 	}
-	if !verifyCachedHashRecursive(n.lChild) || !verifyCachedHashRecursive(n.rChild) {
+	if !verifyCachedHashRecursiveWithPayloadless(n.lChild, isPayloadless) ||
+		!verifyCachedHashRecursiveWithPayloadless(n.rChild, isPayloadless) {
 		return false
 	}
 
-	computedHash := n.computeHash()
+	computedHash := n.computeHashWithPayloadless(isPayloadless)
 	return n.hashValue == computedHash
 }
 
-// VerifyCachedHash verifies the hash of a node is valid
+// VerifyCachedHash verifies the hash of a node is valid.
+// For regular (non-payloadless) tries only. Use VerifyCachedHashWithPayloadless for payloadless tries.
 func (n *Node) VerifyCachedHash() bool {
 	return verifyCachedHashRecursive(n)
+}
+
+// VerifyCachedHashWithPayloadless verifies the hash of a node is valid, with support for payloadless mode.
+// When isPayloadless is true, leaf nodes are expected to store HashLeaf(path, value) as their payload
+// value, and the hash computation will use this as the base hash.
+func (n *Node) VerifyCachedHashWithPayloadless(isPayloadless bool) bool {
+	return verifyCachedHashRecursiveWithPayloadless(n, isPayloadless)
 }
 
 // Hash returns the Node's hash value.

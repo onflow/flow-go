@@ -1968,3 +1968,147 @@ func TestReconstructPayloadlessProofRejectsNonPayloadlessProof(t *testing.T) {
 	require.ErrorIs(t, err, trie.ErrPayloadHashMismatch,
 		"error should be ErrPayloadHashMismatch when proof is not from payloadless trie")
 }
+
+// TestPayloadlessTrieVerifyCachedHash tests that VerifyCachedHash works correctly
+// for both regular and payloadless tries.
+//
+// Background: In a payloadless trie, leaf nodes store HashLeaf(path, value) as the
+// payload value instead of the actual value. The node's hashValue is computed from
+// the original value to ensure the same root hash as a regular trie. This creates
+// a mismatch where payload.Value() != the value used to compute hashValue.
+//
+// The computeHash() function in node.go uses payload.Value() to recompute the hash,
+// which would produce incorrect results for payloadless nodes without proper handling.
+func TestPayloadlessTrieVerifyCachedHash(t *testing.T) {
+	// Create test data with multiple registers to test various trie structures
+	paths := make([]ledger.Path, 5)
+	payloads := make([]ledger.Payload, 5)
+
+	for i := 0; i < 5; i++ {
+		paths[i] = testutils.PathByUint16LeftPadded(uint16(i * 100))
+		payload := testutils.LightPayload(uint16(i), uint16(i*100+i))
+		payloads[i] = *payload
+	}
+
+	t.Run("regular trie VerifyCachedHash passes", func(t *testing.T) {
+		regularTrie, _, err := trie.NewTrieWithUpdatedRegisters(
+			trie.NewEmptyMTrie(),
+			paths,
+			payloads,
+			true,
+		)
+		require.NoError(t, err)
+		require.False(t, regularTrie.IsPayloadless())
+
+		// VerifyCachedHash should pass for regular trie
+		require.True(t, regularTrie.RootNode().VerifyCachedHash(),
+			"VerifyCachedHash should pass for regular trie")
+	})
+
+	t.Run("payloadless trie VerifyCachedHash should pass", func(t *testing.T) {
+		payloadlessTrie, _, err := trie.NewTrieWithUpdatedRegistersAndPayloadless(
+			trie.NewEmptyMTrieWithPayloadless(true),
+			paths,
+			payloads,
+			true,
+			true,
+		)
+		require.NoError(t, err)
+		require.True(t, payloadlessTrie.IsPayloadless())
+
+		// Create regular trie to verify same root hash
+		regularTrie, _, err := trie.NewTrieWithUpdatedRegisters(
+			trie.NewEmptyMTrie(),
+			paths,
+			payloads,
+			true,
+		)
+		require.NoError(t, err)
+
+		// Verify same root hash (critical for consensus)
+		require.Equal(t, regularTrie.RootHash(), payloadlessTrie.RootHash(),
+			"payloadless and regular tries must have same root hash")
+
+		// IsAValidTrie uses the payloadless-aware verification internally
+		require.True(t, payloadlessTrie.IsAValidTrie(),
+			"IsAValidTrie should pass for payloadless trie")
+
+		// Direct call with payloadless flag should also work
+		require.True(t, payloadlessTrie.RootNode().VerifyCachedHashWithPayloadless(true),
+			"VerifyCachedHashWithPayloadless(true) should pass for payloadless trie")
+	})
+
+	t.Run("payloadless trie after compaction VerifyCachedHash should pass", func(t *testing.T) {
+		// First create a trie with 3 registers
+		initialPaths := paths[:3]
+		initialPayloads := payloads[:3]
+
+		payloadlessTrie, _, err := trie.NewTrieWithUpdatedRegistersAndPayloadless(
+			trie.NewEmptyMTrieWithPayloadless(true),
+			initialPaths,
+			initialPayloads,
+			true,
+			true,
+		)
+		require.NoError(t, err)
+
+		// Now delete one register (set empty payload) to trigger compaction
+		emptyPayload := ledger.EmptyPayload()
+		payloadlessTrie2, _, err := trie.NewTrieWithUpdatedRegistersAndPayloadless(
+			payloadlessTrie,
+			[]ledger.Path{initialPaths[1]},
+			[]ledger.Payload{*emptyPayload},
+			true,
+			true,
+		)
+		require.NoError(t, err)
+
+		// Verify same behavior as regular trie
+		regularTrie, _, err := trie.NewTrieWithUpdatedRegisters(
+			trie.NewEmptyMTrie(),
+			initialPaths,
+			initialPayloads,
+			true,
+		)
+		require.NoError(t, err)
+		regularTrie2, _, err := trie.NewTrieWithUpdatedRegisters(
+			regularTrie,
+			[]ledger.Path{initialPaths[1]},
+			[]ledger.Payload{*emptyPayload},
+			true,
+		)
+		require.NoError(t, err)
+
+		// Root hashes must match
+		require.Equal(t, regularTrie2.RootHash(), payloadlessTrie2.RootHash(),
+			"payloadless and regular tries must have same root hash after compaction")
+
+		// IsAValidTrie should pass after compaction
+		require.True(t, payloadlessTrie2.IsAValidTrie(),
+			"IsAValidTrie should pass for payloadless trie after compaction")
+	})
+
+	t.Run("converted payloadless trie VerifyCachedHash should pass", func(t *testing.T) {
+		// Create a regular trie
+		regularTrie, _, err := trie.NewTrieWithUpdatedRegisters(
+			trie.NewEmptyMTrie(),
+			paths,
+			payloads,
+			true,
+		)
+		require.NoError(t, err)
+
+		// Convert to payloadless
+		convertedTrie, err := regularTrie.ConvertToPayloadless()
+		require.NoError(t, err)
+		require.True(t, convertedTrie.IsPayloadless())
+
+		// Root hash must be preserved
+		require.Equal(t, regularTrie.RootHash(), convertedTrie.RootHash(),
+			"converted trie must have same root hash")
+
+		// IsAValidTrie should pass for converted trie
+		require.True(t, convertedTrie.IsAValidTrie(),
+			"IsAValidTrie should pass for converted payloadless trie")
+	})
+}

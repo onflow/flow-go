@@ -910,10 +910,11 @@ func (mt *MTrie) AllPayloads() []*ledger.Payload {
 	return mt.root.AllPayloads()
 }
 
-// IsAValidTrie verifies the content of the trie for potential issues
+// IsAValidTrie verifies the content of the trie for potential issues.
+// It correctly handles both regular and payloadless tries.
 func (mt *MTrie) IsAValidTrie() bool {
 	// TODO add checks on the health of node max height ...
-	return mt.root.VerifyCachedHash()
+	return mt.root.VerifyCachedHashWithPayloadless(mt.isPayloadless)
 }
 
 // splitByPath permutes the input paths to be partitioned into 2 parts. The first part contains paths with a zero bit
