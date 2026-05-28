@@ -17,6 +17,7 @@ import (
 	checkpoint_collect_stats "github.com/onflow/flow-go/cmd/util/cmd/checkpoint-collect-stats"
 	checkpoint_convert_v7 "github.com/onflow/flow-go/cmd/util/cmd/checkpoint-convert-v7"
 	checkpoint_list_tries "github.com/onflow/flow-go/cmd/util/cmd/checkpoint-list-tries"
+	checkpoint_payload_stats "github.com/onflow/flow-go/cmd/util/cmd/checkpoint-payload-stats"
 	checkpoint_verify "github.com/onflow/flow-go/cmd/util/cmd/checkpoint-verify"
 	checkpoint_trie_stats "github.com/onflow/flow-go/cmd/util/cmd/checkpoint-trie-stats"
 	compare_debug_tx "github.com/onflow/flow-go/cmd/util/cmd/compare-debug-tx"
@@ -108,6 +109,7 @@ func addCommands() {
 	rootCmd.AddCommand(extract.Cmd)
 	rootCmd.AddCommand(export.Cmd)
 	rootCmd.AddCommand(checkpoint_list_tries.Cmd)
+	rootCmd.AddCommand(checkpoint_payload_stats.Cmd)
 	rootCmd.AddCommand(checkpoint_trie_stats.Cmd)
 	rootCmd.AddCommand(checkpoint_collect_stats.Cmd)
 	rootCmd.AddCommand(checkpoint_convert_v7.Cmd)
