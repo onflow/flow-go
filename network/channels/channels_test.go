@@ -129,3 +129,57 @@ func TestUniqueChannels_ClusterChannels(t *testing.T) {
 	require.Contains(t, uniques, consensusCluster) // cluster channel
 	require.Contains(t, uniques, PushTransactions) // non-cluster channel
 }
+
+// TestNormalizeTopicForMetrics verifies that cluster topics are normalized to their prefix
+// (e.g., "sync-cluster-*" -> "sync-cluster") while non-cluster topics remain unchanged.
+// This prevents unbounded metric cardinality growth during epoch transitions.
+func TestNormalizeTopicForMetrics(t *testing.T) {
+	testCases := []struct {
+		name           string
+		inputTopic     string
+		expectedOutput string
+	}{
+		{
+			name:           "sync-cluster topic normalized",
+			inputTopic:     "sync-cluster-cluster-123-abc123def456",
+			expectedOutput: SyncClusterPrefix,
+		},
+		{
+			name:           "consensus-cluster topic normalized",
+			inputTopic:     "consensus-cluster-cluster-456-def789abc123",
+			expectedOutput: ConsensusClusterPrefix,
+		},
+		{
+			name:           "sync-cluster topic with different format normalized",
+			inputTopic:     "sync-cluster-test-id",
+			expectedOutput: SyncClusterPrefix,
+		},
+		{
+			name:           "consensus-cluster topic with different format normalized",
+			inputTopic:     "consensus-cluster-test-id",
+			expectedOutput: ConsensusClusterPrefix,
+		},
+		{
+			name:           "non-cluster topic unchanged",
+			inputTopic:     "push-blocks/abc123",
+			expectedOutput: "push-blocks/abc123",
+		},
+		{
+			name:           "another non-cluster topic unchanged",
+			inputTopic:     "consensus-committee/xyz789",
+			expectedOutput: "consensus-committee/xyz789",
+		},
+		{
+			name:           "empty string unchanged",
+			inputTopic:     "",
+			expectedOutput: "",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			result := NormalizeTopicForMetrics(tc.inputTopic)
+			assert.Equal(t, tc.expectedOutput, result)
+		})
+	}
+}
