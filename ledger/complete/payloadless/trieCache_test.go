@@ -1,4 +1,4 @@
-package mtrie
+package payloadless
 
 // test addition
 // test under capacity
@@ -13,8 +13,6 @@ import (
 
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/hash"
-	"github.com/onflow/flow-go/ledger/complete/mtrie/node"
-	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -30,7 +28,7 @@ func TestTrieCache(t *testing.T) {
 	require.Equal(t, 0, len(tc.lookup))
 
 	// savedTries contains all tries that are pushed to queue
-	var savedTries []*trie.MTrie
+	var savedTries []*MTrie
 
 	// Push tries to queue to fill out capacity
 	for i := 0; i < capacity; i++ {
@@ -104,7 +102,7 @@ func TestPurge(t *testing.T) {
 	require.NoError(t, err)
 
 	called := 0
-	tc := NewTrieCache(capacity, func(tree *trie.MTrie) {
+	tc := NewTrieCache(capacity, func(tree *MTrie) {
 		switch called {
 		case 0:
 			require.Equal(t, trie1, tree)
@@ -135,7 +133,7 @@ func TestEvictCallBack(t *testing.T) {
 	require.NoError(t, err)
 
 	called := false
-	tc := NewTrieCache(capacity, func(tree *trie.MTrie) {
+	tc := NewTrieCache(capacity, func(tree *MTrie) {
 		called = true
 		require.Equal(t, trie1, tree)
 	})
@@ -172,7 +170,7 @@ func TestConcurrentAccess(t *testing.T) {
 	require.Equal(t, worker, tc.Count())
 }
 
-func randomMTrie() (*trie.MTrie, error) {
+func randomMTrie() (*MTrie, error) {
 	var randomPath ledger.Path
 	_, err := rand.Read(randomPath[:])
 	if err != nil {
@@ -185,7 +183,7 @@ func randomMTrie() (*trie.MTrie, error) {
 		return nil, err
 	}
 
-	root := node.NewNode(256, nil, nil, randomPath, nil, randomHashValue)
+	root := NewNode(256, nil, nil, randomPath, nil, randomHashValue)
 
-	return trie.NewMTrie(root, 1, 1)
+	return NewMTrie(root, 1)
 }
