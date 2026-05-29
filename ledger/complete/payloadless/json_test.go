@@ -1,7 +1,9 @@
-package trie_test
+package payloadless_test
 
 import (
 	"bytes"
+	"encoding/hex"
+	"encoding/json"
 	"strings"
 	"testing"
 
@@ -9,86 +11,76 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/ledger"
-	"github.com/onflow/flow-go/ledger/common/pathfinder"
-	"github.com/onflow/flow-go/ledger/complete"
-	"github.com/onflow/flow-go/ledger/complete/mtrie"
-	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
-	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/ledger/common/hash"
+	"github.com/onflow/flow-go/ledger/common/testutils"
+	"github.com/onflow/flow-go/ledger/complete/payloadless"
 )
 
 func Test_DumpJSONEmpty(t *testing.T) {
 
-	trie := trie.NewEmptyMTrie()
+	tr := payloadless.NewEmptyMTrie()
 
 	var buffer bytes.Buffer
-	err := trie.DumpAsJSON(&buffer)
+	err := tr.DumpAsJSON(&buffer)
 	require.NoError(t, err)
 
-	json := buffer.String()
-	assert.Empty(t, json)
+	js := buffer.String()
+	assert.Empty(t, js)
 }
 
 func Test_DumpJSONNonEmpty(t *testing.T) {
+	path1 := testutils.PathByUint16(1)
+	path2 := testutils.PathByUint16(2)
+	path3 := testutils.PathByUint16(3)
 
-	forest, err := mtrie.NewForest(complete.DefaultCacheSize, &metrics.NoopCollector{}, nil)
-	require.NoError(t, err)
+	value1 := []byte{1}
+	value2 := []byte{2}
+	value3 := []byte{3}
 
-	emptyRootHash := forest.GetEmptyRootHash()
+	paths := []ledger.Path{path1, path2, path3}
+	values := [][]byte{value1, value2, value3}
 
-	key1 := ledger.NewKey([]ledger.KeyPart{
-		ledger.NewKeyPart(0, []byte("si")),
-		ledger.NewKeyPart(5, []byte("vis")),
-		ledger.NewKeyPart(3, []byte("pacem")),
-	})
-
-	key2 := ledger.NewKey([]ledger.KeyPart{
-		ledger.NewKeyPart(3, []byte("ex")),
-		ledger.NewKeyPart(6, []byte("navicula")),
-		ledger.NewKeyPart(9, []byte("navis")),
-	})
-
-	key3 := ledger.NewKey([]ledger.KeyPart{
-		ledger.NewKeyPart(9, []byte("lorem")),
-		ledger.NewKeyPart(0, []byte("ipsum")),
-		ledger.NewKeyPart(5, []byte("dolor")),
-	})
-
-	update, err := ledger.NewUpdate(ledger.State(emptyRootHash), []ledger.Key{key1, key2, key3}, []ledger.Value{{1}, {2}, {3}})
-	require.NoError(t, err)
-
-	trieUpdate, err := pathfinder.UpdateToTrieUpdate(update, 0)
-	require.NoError(t, err)
-
-	newHash, err := forest.Update(trieUpdate)
-	require.NoError(t, err)
-
-	newTrie, err := forest.GetTrie(newHash)
+	tr, _, err := payloadless.NewTrieWithUpdatedRegisters(payloadless.NewEmptyMTrie(), paths, values, true)
 	require.NoError(t, err)
 
 	var buffer bytes.Buffer
-
-	err = newTrie.DumpAsJSON(&buffer)
+	err = tr.DumpAsJSON(&buffer)
 	require.NoError(t, err)
 
-	json := buffer.String()
-	split := strings.Split(json, "\n")
+	js := buffer.String()
+	split := strings.Split(js, "\n")
 
-	//filter out empty strings
-	jsons := make([]string, 0)
+	// filter out empty strings
+	rows := make([]string, 0)
 	for _, s := range split {
 		if len(s) > 0 {
-			jsons = append(jsons, s)
+			rows = append(rows, s)
 		}
 	}
 
-	require.Len(t, jsons, 3)
+	require.Len(t, rows, 3)
 
-	// key 1
-	require.Contains(t, jsons, "{\"Key\":{\"KeyParts\":[{\"Type\":0,\"Value\":\"7369\"},{\"Type\":5,\"Value\":\"766973\"},{\"Type\":3,\"Value\":\"706163656d\"}]},\"Value\":\"01\"}")
+	// Each row is a JSON object {"path":"<hex>","leafHash":"<hex>"}. We assert each
+	// path is present together with the leaf hash HashLeaf(path, value).
+	type entry struct {
+		Path     string `json:"path"`
+		LeafHash string `json:"leafHash"`
+	}
+	for i, p := range paths {
+		expectedLeafHash := hash.HashLeaf(hash.Hash(p), values[i])
+		expectedPathHex := hex.EncodeToString(p[:])
+		expectedHashHex := hex.EncodeToString(expectedLeafHash[:])
 
-	// key 2
-	require.Contains(t, jsons, "{\"Key\":{\"KeyParts\":[{\"Type\":3,\"Value\":\"6578\"},{\"Type\":6,\"Value\":\"6e61766963756c61\"},{\"Type\":9,\"Value\":\"6e61766973\"}]},\"Value\":\"02\"}")
-
-	// key 3
-	require.Contains(t, jsons, "{\"Key\":{\"KeyParts\":[{\"Type\":9,\"Value\":\"6c6f72656d\"},{\"Type\":0,\"Value\":\"697073756d\"},{\"Type\":5,\"Value\":\"646f6c6f72\"}]},\"Value\":\"03\"}")
+		found := false
+		for _, row := range rows {
+			var e entry
+			require.NoError(t, json.Unmarshal([]byte(row), &e), "invalid JSON row: %s", row)
+			if e.Path == expectedPathHex {
+				require.Equal(t, expectedHashHex, e.LeafHash)
+				found = true
+				break
+			}
+		}
+		require.True(t, found, "row for path %s not found", expectedPathHex)
+	}
 }
