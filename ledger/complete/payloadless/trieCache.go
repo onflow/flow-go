@@ -1,13 +1,12 @@
-package mtrie
+package payloadless
 
 import (
 	"sync"
 
 	"github.com/onflow/flow-go/ledger"
-	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
 )
 
-type OnTreeEvictedFunc func(tree *trie.MTrie)
+type OnTreeEvictedFunc func(tree *MTrie)
 
 // TrieCache caches tries into memory, it acts as a fifo queue
 // so when it reaches to the capacity it would evict the oldest trie
@@ -16,7 +15,7 @@ type OnTreeEvictedFunc func(tree *trie.MTrie)
 // Under the hood it uses a circular buffer
 // of mtrie pointers and a map of rootHash to cache index for fast lookup
 type TrieCache struct {
-	tries         []*trie.MTrie
+	tries         []*MTrie
 	lookup        map[ledger.RootHash]int // index to item
 	lock          sync.RWMutex
 	capacity      int
@@ -28,7 +27,7 @@ type TrieCache struct {
 // NewTrieCache returns a new TrieCache with given capacity.
 func NewTrieCache(capacity uint, onTreeEvicted OnTreeEvictedFunc) *TrieCache {
 	return &TrieCache{
-		tries:         make([]*trie.MTrie, capacity),
+		tries:         make([]*MTrie, capacity),
 		lookup:        make(map[ledger.RootHash]int, capacity),
 		lock:          sync.RWMutex{},
 		capacity:      int(capacity),
@@ -64,7 +63,7 @@ func (tc *TrieCache) Purge() {
 
 // Tries returns elements in queue, starting from the oldest element
 // to the newest element.
-func (tc *TrieCache) Tries() []*trie.MTrie {
+func (tc *TrieCache) Tries() []*MTrie {
 	tc.lock.RLock()
 	defer tc.lock.RUnlock()
 
@@ -72,7 +71,7 @@ func (tc *TrieCache) Tries() []*trie.MTrie {
 		return nil
 	}
 
-	tries := make([]*trie.MTrie, tc.count)
+	tries := make([]*MTrie, tc.count)
 
 	if tc.tail >= tc.count { // Data isn't wrapped around the slice.
 		head := tc.tail - tc.count
@@ -89,7 +88,7 @@ func (tc *TrieCache) Tries() []*trie.MTrie {
 }
 
 // Push pushes trie to queue.  If queue is full, it overwrites the oldest element.
-func (tc *TrieCache) Push(t *trie.MTrie) {
+func (tc *TrieCache) Push(t *MTrie) {
 	tc.lock.Lock()
 	defer tc.lock.Unlock()
 
@@ -109,7 +108,7 @@ func (tc *TrieCache) Push(t *trie.MTrie) {
 }
 
 // LastAddedTrie returns the last trie added to the cache
-func (tc *TrieCache) LastAddedTrie() *trie.MTrie {
+func (tc *TrieCache) LastAddedTrie() *MTrie {
 	tc.lock.RLock()
 	defer tc.lock.RUnlock()
 
@@ -124,7 +123,7 @@ func (tc *TrieCache) LastAddedTrie() *trie.MTrie {
 }
 
 // Get returns the trie by rootHash, if not exist will return nil and false
-func (tc *TrieCache) Get(rootHash ledger.RootHash) (*trie.MTrie, bool) {
+func (tc *TrieCache) Get(rootHash ledger.RootHash) (*MTrie, bool) {
 	tc.lock.RLock()
 	defer tc.lock.RUnlock()
 
