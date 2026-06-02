@@ -272,7 +272,7 @@ func (s *sealValidator) validateSeal(seal *flow.Seal, incorporatedResult *flow.I
 		return irrecoverable.NewExceptionf("could not derive final state commitment for execution result %x: %w", executionResult.ID(), err)
 	}
 	if seal.FinalState != expectedFinalState {
-		return engine.NewInvalidInputErrorf("seal's final state does not match execution result")
+		return engine.NewInvalidInputErrorf("seal's final state %x does not match execution result (final state %x)", seal.FinalState, expectedFinalState)
 	}
 
 	// check that each chunk has an AggregatedSignature

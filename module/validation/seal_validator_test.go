@@ -275,13 +275,13 @@ func (s *SealValidationSuite) TestSealDuplicatedApproval() {
 // TestSealInvalidFinalState verifies that we reject a seal whose `FinalState` does not equal the
 // final state from the sealed execution result (i.e. the last chunk's `EndState`).
 //
-// Background: `Seal.FinalState` is a supplied field whose authoritative value is already determined
-// by the referenced `ExecutionResult` (via `executionResult.FinalStateCommitment()`). The verifier
-// attestations only cover `{BlockID, ExecutionResultID, ChunkIndex}` — they do _not_ commit to
-// `Seal.FinalState`. Without an explicit check for equality in the seal validator, a Byzantine
-// consensus node could propose a block payload with valid aggregated approvals for a
-// real incorporated execution result but set `Seal.FinalState` to an arbitrary non-empty value.
-// The downstream `Snapshot.Commit` would then expose the poisoned commitment as the sealed state.
+// Background: `Seal.FinalState` is an auxiliary field whose value is supposed to copied from the
+// sealed `ExecutionResult` (specifically `executionResult.FinalStateCommitment()`). The verifier
+// attestations only cover `{BlockID, ExecutionResultID, ChunkIndex}` from the execution result.
+// Verifiers do _not_ commit to `Seal.FinalState`. Without an explicit check by consensus nodes in
+// the seal validator, a Byzantine consensus node could propose a block payload with valid aggregated
+// approvals for a real incorporated execution result but set `Seal.FinalState` to an arbitrary non-empty
+// value. The downstream `Snapshot.Commit` would then expose the poisoned commitment as the sealed state.
 //
 // We test with the following fork:
 //
