@@ -146,7 +146,7 @@ func NewPSMT(
 
 	// check if the rootHash matches the root node's hash value of the partial trie
 	if ledger.RootHash(psmt.root.forceComputeHash()) != rootValue {
-		return nil, fmt.Errorf("rootNode hash doesn't match the proofs expected [%x], got [%x]", psmt.root.Hash(), rootValue)
+		return nil, fmt.Errorf("rootNode hash doesn't match the proofs expected [%v], got [%v]", psmt.root.Hash(), rootValue)
 	}
 	return &psmt, nil
 }
