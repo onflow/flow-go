@@ -2,8 +2,6 @@ package complete
 
 import (
 	"fmt"
-	"io"
-	"sync"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -11,156 +9,114 @@ import (
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/hash"
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
-	"github.com/onflow/flow-go/ledger/complete/mtrie"
-	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
-	realWAL "github.com/onflow/flow-go/ledger/complete/wal"
+	"github.com/onflow/flow-go/ledger/complete/payloadless"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 )
 
-const (
-	DefaultCacheSize          = 1000
-	DefaultPathFinderVersion  = 1
-	defaultTrieUpdateChanSize = 500
-)
-
-// Ledger (complete) is a fast memory-efficient fork-aware thread-safe trie-based key/value storage.
-// Ledger holds an array of registers (key-value pairs) and keeps tracks of changes over a limited time.
-// Each register is referenced by an ID (key) and holds a value (byte slice).
-// Ledger provides atomic batched updates and read (with or without proofs) operation given a list of keys.
-// Every update to the Ledger creates a new state which captures the state of the storage.
-// Under the hood, it uses binary Merkle tries to generate inclusion and non-inclusion proofs.
-// Ledger is fork-aware which means any update can be applied at any previous state which forms a tree of tries (forest).
-// The forest is in memory but all changes (e.g. register updates) are captured inside write-ahead-logs for crash recovery reasons.
-// In order to limit the memory usage and maintain the performance storage only keeps a limited number of
-// tries and purge the old ones (FIFO-based); in other words, Ledger is not designed to be used
-// for archival usage but make it possible for other software components to reconstruct very old tries using write-ahead logs.
-type Ledger struct {
-	forest            *mtrie.Forest
-	wal               realWAL.LedgerWAL
+// PayloadlessLedger is a fork-aware, in-memory trie-based key/leaf-hash storage.
+//
+// Unlike [Ledger], the underlying trie does not retain payload values: each leaf
+// only retains its hash (HashLeaf(path, value)). Reads therefore return leaf
+// hashes rather than the original values. Use this variant when the caller only
+// needs commitment-level verification (e.g. payloadless execution) and does not
+// need the values themselves.
+//
+// PayloadlessLedger is fork-aware: any update can be applied at any previous
+// state which forms a tree of tries (forest). The forest is kept entirely in
+// memory and is bounded by `forestCapacity`. When more tries are added than the
+// capacity, the Least Recently Added trie is removed (FIFO).
+//
+// PayloadlessLedger is currently in-memory only; it does not persist updates
+// to a write-ahead log.
+type PayloadlessLedger struct {
+	forest            *payloadless.Forest
 	metrics           module.LedgerMetrics
 	logger            zerolog.Logger
-	trieUpdateCh      chan *WALTrieUpdate
-	closeTrieUpdateCh sync.Once
 	pathFinderVersion uint8
 }
 
-var _ ledger.Ledger = (*Ledger)(nil)
-
-// NewLedger creates a new in-memory trie-backed ledger storage with persistence.
-func NewLedger(
-	wal realWAL.LedgerWAL,
+// NewPayloadlessLedger creates a new in-memory payloadless trie-backed ledger.
+//
+// `capacity` bounds the number of tries kept in the forest; the least-recently
+// added trie is evicted once capacity is exceeded.
+func NewPayloadlessLedger(
 	capacity int,
 	metrics module.LedgerMetrics,
 	log zerolog.Logger,
-	pathFinderVer uint8) (*Ledger, error) {
+	pathFinderVer uint8,
+) (*PayloadlessLedger, error) {
 
-	logger := log.With().Str("ledger_mod", "complete").Logger()
+	logger := log.With().Str("ledger_mod", "complete-payloadless").Logger()
 
-	forest, err := mtrie.NewForest(capacity, metrics, nil)
+	forest, err := payloadless.NewForest(capacity, metrics, nil)
 	if err != nil {
-		return nil, fmt.Errorf("cannot create forest: %w", err)
+		return nil, fmt.Errorf("cannot create payloadless forest: %w", err)
 	}
 
-	storage := &Ledger{
+	return &PayloadlessLedger{
 		forest:            forest,
-		wal:               wal,
 		metrics:           metrics,
 		logger:            logger,
 		pathFinderVersion: pathFinderVer,
-		trieUpdateCh:      make(chan *WALTrieUpdate, defaultTrieUpdateChanSize),
-	}
-
-	// pause records to prevent double logging trie removals
-	wal.PauseRecord()
-	defer wal.UnpauseRecord()
-
-	err = wal.ReplayOnForest(forest)
-	if err != nil {
-		return nil, fmt.Errorf("cannot restore LedgerWAL: %w", err)
-	}
-
-	wal.UnpauseRecord()
-
-	// TODO update to proper value once https://github.com/onflow/flow-go/pull/3720 is merged
-	metrics.ForestApproxMemorySize(0)
-
-	return storage, nil
+	}, nil
 }
 
-// TrieUpdateChan returns a channel which is used to receive trie updates that needs to be logged in WALs.
-// This channel is closed when ledger component shutdowns down.
-func (l *Ledger) TrieUpdateChan() <-chan *WALTrieUpdate {
-	return l.trieUpdateCh
-}
-
-// Ready implements interface module.ReadyDoneAware
-// it starts the EventLoop's internal processing loop.
-func (l *Ledger) Ready() <-chan struct{} {
+// Ready implements module.ReadyDoneAware. The payloadless ledger has no
+// asynchronous initialization, so the returned channel is already closed.
+func (l *PayloadlessLedger) Ready() <-chan struct{} {
 	ready := make(chan struct{})
-	go func() {
-		defer close(ready)
-		// Start WAL component.
-		<-l.wal.Ready()
-	}()
+	close(ready)
 	return ready
 }
 
-// Done implements interface module.ReadyDoneAware
-func (l *Ledger) Done() <-chan struct{} {
+// Done implements module.ReadyDoneAware. The payloadless ledger has no
+// background workers, so the returned channel is already closed.
+func (l *PayloadlessLedger) Done() <-chan struct{} {
 	done := make(chan struct{})
-	go func() {
-		defer close(done)
-
-		// Ledger is responsible for closing trieUpdateCh channel,
-		// so Compactor can drain and process remaining updates.
-		l.closeTrieUpdateCh.Do(func() {
-			close(l.trieUpdateCh)
-		})
-	}()
+	close(done)
 	return done
 }
 
-// InitialState returns the state of an empty ledger
-func (l *Ledger) InitialState() ledger.State {
+// InitialState returns the state of an empty ledger.
+func (l *PayloadlessLedger) InitialState() ledger.State {
 	return ledger.State(l.forest.GetEmptyRootHash())
 }
 
-// ValueSizes read the values of the given keys at the given state.
-// It returns value sizes in the same order as given registerIDs and errors (if any)
-func (l *Ledger) ValueSizes(query *ledger.Query) (valueSizes []int, err error) {
-	start := time.Now()
+// HasState returns true if the given state exists inside the ledger.
+func (l *PayloadlessLedger) HasState(state ledger.State) bool {
+	return l.forest.HasTrie(ledger.RootHash(state))
+}
+
+// HasPaths reports, for each key in `query`, whether the key has an allocated
+// register at the given state. The returned slice is in the same order as
+// `query.Keys()`.
+//
+// HasPaths replaces the full ledger's ValueSizes for payloadless mode, since
+// the payloadless trie does not retain payload byte sizes.
+func (l *PayloadlessLedger) HasPaths(query *ledger.Query) ([]bool, error) {
 	paths, err := pathfinder.KeysToPaths(query.Keys(), l.pathFinderVersion)
 	if err != nil {
 		return nil, err
 	}
 	trieRead := &ledger.TrieRead{RootHash: ledger.RootHash(query.State()), Paths: paths}
-	valueSizes, err = l.forest.ValueSizes(trieRead)
-	if err != nil {
-		return nil, err
-	}
-
-	l.metrics.ReadValuesNumber(uint64(len(paths)))
-	readDuration := time.Since(start)
-	l.metrics.ReadDuration(readDuration)
-
-	if len(paths) > 0 {
-		durationPerValue := time.Duration(readDuration.Nanoseconds()/int64(len(paths))) * time.Nanosecond
-		l.metrics.ReadDurationPerItem(durationPerValue)
-	}
-
-	return valueSizes, err
+	return l.forest.HasPaths(trieRead)
 }
 
-// GetSingleValue reads value of a single given key at the given state.
-func (l *Ledger) GetSingleValue(query *ledger.QuerySingleValue) (value ledger.Value, err error) {
+// GetSingleLeafHash returns the leaf hash (HashLeaf(path, value)) for the
+// given key at the given state. Returns nil if the path has no allocated
+// register.
+//
+// GetSingleLeafHash replaces the full ledger's GetSingleValue for payloadless
+// mode, since payload values are not retained.
+func (l *PayloadlessLedger) GetSingleLeafHash(query *ledger.QuerySingleValue) (*hash.Hash, error) {
 	start := time.Now()
 	path, err := pathfinder.KeyToPath(query.Key(), l.pathFinderVersion)
 	if err != nil {
 		return nil, err
 	}
 	trieRead := &ledger.TrieReadSingleValue{RootHash: ledger.RootHash(query.State()), Path: path}
-	value, err = l.forest.ReadSingleValue(trieRead)
+	leafHash, err := l.forest.ReadSingleLeafHash(trieRead)
 	if err != nil {
 		return nil, err
 	}
@@ -168,23 +124,25 @@ func (l *Ledger) GetSingleValue(query *ledger.QuerySingleValue) (value ledger.Va
 	l.metrics.ReadValuesNumber(1)
 	readDuration := time.Since(start)
 	l.metrics.ReadDuration(readDuration)
+	l.metrics.ReadDurationPerItem(readDuration)
 
-	durationPerValue := time.Duration(readDuration.Nanoseconds()) * time.Nanosecond
-	l.metrics.ReadDurationPerItem(durationPerValue)
-
-	return value, nil
+	return leafHash, nil
 }
 
-// Get read the values of the given keys at the given state
-// it returns the values in the same order as given registerIDs and errors (if any)
-func (l *Ledger) Get(query *ledger.Query) (values []ledger.Value, err error) {
+// GetLeafHashes returns leaf hashes for the given keys at the given state,
+// in the same order as `query.Keys()`. A nil entry indicates the path has no
+// allocated register at the given state.
+//
+// GetLeafHashes replaces the full ledger's Get for payloadless mode, since
+// payload values are not retained.
+func (l *PayloadlessLedger) GetLeafHashes(query *ledger.Query) ([]*hash.Hash, error) {
 	start := time.Now()
 	paths, err := pathfinder.KeysToPaths(query.Keys(), l.pathFinderVersion)
 	if err != nil {
 		return nil, err
 	}
 	trieRead := &ledger.TrieRead{RootHash: ledger.RootHash(query.State()), Paths: paths}
-	values, err = l.forest.Read(trieRead)
+	leafHashes, err := l.forest.ReadLeafHashes(trieRead)
 	if err != nil {
 		return nil, err
 	}
@@ -198,12 +156,13 @@ func (l *Ledger) Get(query *ledger.Query) (values []ledger.Value, err error) {
 		l.metrics.ReadDurationPerItem(durationPerValue)
 	}
 
-	return values, err
+	return leafHashes, nil
 }
 
-// Set updates the ledger given an update.
-// It returns the state after update and errors (if any)
-func (l *Ledger) Set(update *ledger.Update) (newState ledger.State, trieUpdate *ledger.TrieUpdate, err error) {
+// Set applies the given update to the ledger and returns the new state and
+// the trie update that was applied. The update payload's `value` bytes are
+// hashed into the trie; the payload's key is not retained.
+func (l *PayloadlessLedger) Set(update *ledger.Update) (newState ledger.State, trieUpdate *ledger.TrieUpdate, err error) {
 	if update.Size() == 0 {
 		return update.State(),
 			&ledger.TrieUpdate{
@@ -223,13 +182,17 @@ func (l *Ledger) Set(update *ledger.Update) (newState ledger.State, trieUpdate *
 
 	l.metrics.UpdateCount()
 
-	newState, err = l.set(trieUpdate)
+	newTrie, err := l.forest.NewTrie(trieUpdate)
 	if err != nil {
-		return ledger.State(hash.DummyHash), nil, err
+		return ledger.State(hash.DummyHash), nil, fmt.Errorf("cannot update state: %w", err)
 	}
 
-	// TODO update to proper value once https://github.com/onflow/flow-go/pull/3720 is merged
-	l.metrics.ForestApproxMemorySize(0)
+	err = l.forest.AddTrie(newTrie)
+	if err != nil {
+		return ledger.State(hash.DummyHash), nil, fmt.Errorf("failed to add new trie to forest: %w", err)
+	}
+
+	newState = ledger.State(newTrie.RootHash())
 
 	elapsed := time.Since(start)
 	l.metrics.UpdateDuration(elapsed)
@@ -243,57 +206,17 @@ func (l *Ledger) Set(update *ledger.Update) (newState ledger.State, trieUpdate *
 	l.logger.Info().Hex("from", state[:]).
 		Hex("to", newState[:]).
 		Int("update_size", update.Size()).
-		Msg("ledger updated")
+		Msg("payloadless ledger updated")
 	return newState, trieUpdate, nil
 }
 
-func (l *Ledger) set(trieUpdate *ledger.TrieUpdate) (newState ledger.State, err error) {
-
-	// resultCh is a buffered channel to receive WAL update result.
-	resultCh := make(chan error, 1)
-
-	// trieCh is a buffered channel to send updated trie.
-	// trieCh can be closed without sending updated trie to indicate failure to update trie.
-	trieCh := make(chan *trie.MTrie, 1)
-	defer close(trieCh)
-
-	// There are two goroutines:
-	// 1. writing the trie update to WAL (in Compactor goroutine)
-	// 2. creating a new trie from the trie update (in this goroutine)
-	// Since writing to WAL is running concurrently, we use resultCh
-	// to receive WAL update result from Compactor.
-	// Compactor also needs new trie created here because Compactor
-	// caches new trie to minimize memory foot-print while checkpointing.
-	// `trieCh` is used to send created trie to Compactor.
-	l.trieUpdateCh <- &WALTrieUpdate{Update: trieUpdate, ResultCh: resultCh, TrieCh: trieCh}
-
-	newTrie, err := l.forest.NewTrie(trieUpdate)
-	walError := <-resultCh
-
-	if err != nil {
-		return ledger.State(hash.DummyHash), fmt.Errorf("cannot update state: %w", err)
-	}
-	if walError != nil {
-		return ledger.State(hash.DummyHash), fmt.Errorf("error while writing LedgerWAL: %w", walError)
-	}
-
-	err = l.forest.AddTrie(newTrie)
-	if err != nil {
-		return ledger.State(hash.DummyHash), fmt.Errorf("failed to add new trie to forest: %w", err)
-	}
-
-	trieCh <- newTrie
-
-	return ledger.State(newTrie.RootHash()), nil
-}
-
-// Prove provides proofs for a ledger query and errors (if any).
+// Prove returns a payloadless batch proof for the given keys at the given
+// state. The returned proofs carry leaf hashes rather than full payload values.
 //
-// Proves are generally _not_ provided in the register order of the query.
-// In the current implementation, proofs are sorted in a deterministic order specified by the
-// forest and mtrie implementation.
-func (l *Ledger) Prove(query *ledger.Query) (proof ledger.Proof, err error) {
-
+// Proofs are generally _not_ provided in the register order of the query.
+// In the current implementation, proofs follow the order specified by the
+// underlying payloadless forest implementation.
+func (l *PayloadlessLedger) Prove(query *ledger.Query) (*ledger.PayloadlessTrieBatchProof, error) {
 	paths, err := pathfinder.KeysToPaths(query.Keys(), l.pathFinderVersion)
 	if err != nil {
 		return nil, err
@@ -305,173 +228,58 @@ func (l *Ledger) Prove(query *ledger.Query) (proof ledger.Proof, err error) {
 		return nil, fmt.Errorf("could not get proofs: %w", err)
 	}
 
-	proofToGo := ledger.EncodeTrieBatchProof(batchProof)
-
-	if len(paths) > 0 {
-		l.metrics.ProofSize(uint32(len(proofToGo) / len(paths)))
-	}
-
-	return proofToGo, err
+	return batchProof, nil
 }
 
-// MemSize return the amount of memory used by ledger
-// TODO implement an approximate MemSize method
-func (l *Ledger) MemSize() (int64, error) {
+// MemSize returns the amount of memory used by the ledger.
+// TODO implement an approximate MemSize method.
+func (l *PayloadlessLedger) MemSize() (int64, error) {
 	return 0, nil
 }
 
-// ForestSize returns the number of tries stored in the forest
-func (l *Ledger) ForestSize() int {
+// ForestSize returns the number of tries stored in the forest.
+func (l *PayloadlessLedger) ForestSize() int {
 	return l.forest.Size()
 }
 
-// Tries returns the tries stored in the forest
-func (l *Ledger) Tries() ([]*trie.MTrie, error) {
+// Tries returns the tries stored in the forest.
+func (l *PayloadlessLedger) Tries() ([]*payloadless.MTrie, error) {
 	return l.forest.GetTries()
 }
 
-// Trie returns the trie stored in the forest
-func (l *Ledger) Trie(rootHash ledger.RootHash) (*trie.MTrie, error) {
+// Trie returns the trie stored in the forest with the given root hash.
+func (l *PayloadlessLedger) Trie(rootHash ledger.RootHash) (*payloadless.MTrie, error) {
 	return l.forest.GetTrie(rootHash)
 }
 
-// Checkpointer returns a checkpointer instance
-func (l *Ledger) Checkpointer() (*realWAL.Checkpointer, error) {
-	checkpointer, err := l.wal.NewCheckpointer()
-	if err != nil {
-		return nil, fmt.Errorf("cannot create checkpointer for compactor: %w", err)
-	}
-	return checkpointer, nil
-}
-
-func (l *Ledger) MigrateAt(
-	state ledger.State,
-	migration ledger.Migration,
-	targetPathFinderVersion uint8,
-) (*trie.MTrie, error) {
-	l.logger.Info().Msgf(
-		"Ledger is loaded, checkpoint export has started for state %s",
-		state.String(),
-	)
-
-	// get trie
-	t, err := l.forest.GetTrie(ledger.RootHash(state))
-	if err != nil {
-		rh, _ := l.forest.MostRecentTouchedRootHash()
-		l.logger.Info().
-			Str("hash", rh.String()).
-			Msgf("Most recently touched root hash.")
-		return nil,
-			fmt.Errorf("cannot get trie at the given state commitment: %w", err)
-	}
-
-	// clean up tries to release memory
-	err = l.keepOnlyOneTrie(state)
-	if err != nil {
-		return nil,
-			fmt.Errorf("failed to clean up tries to reduce memory usage: %w", err)
-	}
-
-	var payloads []*ledger.Payload
-	var newTrie *trie.MTrie
-
-	if migration == nil {
-		// when there is no migration, reuse the trie without rebuilding it
-		newTrie = t
-	} else {
-		// get all payloads
-		payloads = t.AllPayloads()
-		payloads, err = migration(payloads)
-		if err != nil {
-			return nil, fmt.Errorf("error applying migration: %w", err)
-		}
-
-		l.logger.Info().Msgf("creating paths for %v payloads", len(payloads))
-
-		// get paths
-		paths, err := pathfinder.PathsFromPayloads(payloads, targetPathFinderVersion)
-		if err != nil {
-			return nil, fmt.Errorf("cannot export checkpoint, can't construct paths: %w", err)
-		}
-
-		l.logger.Info().Msgf("constructing a new trie with migrated payloads (count: %d)...", len(payloads))
-
-		emptyTrie := trie.NewEmptyMTrie()
-
-		derefPayloads := make([]ledger.Payload, len(payloads))
-		for i, p := range payloads {
-			derefPayloads[i] = *p
-		}
-
-		// no need to prune the data since it has already been prunned through migrations
-		const applyPruning = false
-		newTrie, _, err = trie.NewTrieWithUpdatedRegisters(emptyTrie, paths, derefPayloads, applyPruning)
-		if err != nil {
-			return nil, fmt.Errorf("constructing updated trie failed: %w", err)
-		}
-	}
-
-	stateCommitment := ledger.State(newTrie.RootHash())
-
-	l.logger.Info().Msgf("successfully built new trie. NEW ROOT STATECOMMIEMENT: %v", stateCommitment.String())
-
-	return newTrie, nil
-}
-
-// MostRecentTouchedState returns a state which is most recently touched.
-func (l *Ledger) MostRecentTouchedState() (ledger.State, error) {
+// MostRecentTouchedState returns the state most recently touched.
+func (l *PayloadlessLedger) MostRecentTouchedState() (ledger.State, error) {
 	root, err := l.forest.MostRecentTouchedRootHash()
 	return ledger.State(root), err
 }
 
-// HasState returns true if the given state exists inside the ledger
-func (l *Ledger) HasState(state ledger.State) bool {
-	return l.forest.HasTrie(ledger.RootHash(state))
-}
-
-// DumpTrieAsJSON export trie at specific state as JSONL (each line is JSON encoding of a payload)
-func (l *Ledger) DumpTrieAsJSON(state ledger.State, writer io.Writer) error {
-	fmt.Println(ledger.RootHash(state))
-	trie, err := l.forest.GetTrie(ledger.RootHash(state))
-	if err != nil {
-		return fmt.Errorf("cannot find the target trie: %w", err)
-	}
-	return trie.DumpAsJSON(writer)
-}
-
-// this operation should only be used for exporting
-func (l *Ledger) keepOnlyOneTrie(state ledger.State) error {
-	// don't write things to WALs
-	l.wal.PauseRecord()
-	defer l.wal.UnpauseRecord()
-	return l.forest.PurgeCacheExcept(ledger.RootHash(state))
-}
-
-// FindTrieByStateCommit iterates over the ledger tries and compares the root hash to the state commitment
-// if a match is found it is returned, otherwise a nil value is returned indicating no match was found
-func (l *Ledger) FindTrieByStateCommit(commitment flow.StateCommitment) (*trie.MTrie, error) {
+// FindTrieByStateCommit iterates over the ledger tries and compares the root
+// hash to the state commitment. Returns a nil trie if no match is found.
+func (l *PayloadlessLedger) FindTrieByStateCommit(commitment flow.StateCommitment) (*payloadless.MTrie, error) {
 	tries, err := l.Tries()
 	if err != nil {
 		return nil, err
 	}
-
 	for _, t := range tries {
 		if t.RootHash().Equals(ledger.RootHash(commitment)) {
 			return t, nil
 		}
 	}
-
 	return nil, nil
 }
 
-// StateCount returns the number of states (tries) stored in the forest
-func (l *Ledger) StateCount() int {
+// StateCount returns the number of states (tries) stored in the forest.
+func (l *PayloadlessLedger) StateCount() int {
 	return l.ForestSize()
 }
 
-// StateByIndex returns the state at the given index
-// -1 is the last index
-func (l *Ledger) StateByIndex(index int) (ledger.State, error) {
+// StateByIndex returns the state at the given index. `-1` returns the last index.
+func (l *PayloadlessLedger) StateByIndex(index int) (ledger.State, error) {
 	tries, err := l.Tries()
 	if err != nil {
 		return ledger.DummyState, fmt.Errorf("failed to get tries: %w", err)
@@ -482,7 +290,6 @@ func (l *Ledger) StateByIndex(index int) (ledger.State, error) {
 		return ledger.DummyState, fmt.Errorf("no states available")
 	}
 
-	// Handle negative index (-1 means last index)
 	if index < 0 {
 		index = count + index
 		if index < 0 {
