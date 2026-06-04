@@ -48,6 +48,54 @@ type Ledger interface {
 	StateByIndex(index int) (State, error)
 }
 
+// PayloadlessLedger is the payloadless-mode counterpart of [Ledger]. It is a
+// stateful fork-aware key/value storage that stores only leaf hashes
+// (HashLeaf(path, value)) per register rather than the original payload values.
+// Reads therefore return leaf hashes, not values, and the proof type is
+// [PayloadlessTrieBatchProof] rather than [Proof] (an encoded TrieBatchProof).
+//
+// In production, *complete.PayloadlessLedger satisfies this interface by
+// construction. The interface lives here (and not in ledger/complete) so
+// downstream consumers — committer, remote gRPC service, future verification
+// clients — can depend on the payloadless ledger without importing
+// ledger/complete and pulling in WAL/forest infrastructure.
+type PayloadlessLedger interface {
+	// PayloadlessLedger implements methods needed to be ReadyDone aware
+	module.ReadyDoneAware
+
+	// InitialState returns the initial state of the ledger
+	InitialState() State
+
+	// HasState returns true if the given state exists inside the ledger
+	HasState(state State) bool
+
+	// HasPaths reports, for each key in the query, whether the corresponding
+	// path has an allocated register at the query's state. Used by callers
+	// that need register-existence checks without retrieving leaf hashes.
+	HasPaths(query *Query) ([]bool, error)
+
+	// GetSingleLeafHash returns the leaf hash for a single key at the
+	// query's state. Returns nil if the path is unallocated or the leaf
+	// represents an empty register.
+	GetSingleLeafHash(query *QuerySingleValue) (*hash.Hash, error)
+
+	// GetLeafHashes returns leaf hashes for the given slice of keys at the
+	// query's state. A nil entry indicates an unallocated path or an empty
+	// leaf. The returned slice is aligned with the query's Keys order.
+	GetLeafHashes(query *Query) ([]*hash.Hash, error)
+
+	// Set updates a list of keys with new values at the given state and
+	// returns the new state and the resulting trie update. The trie update
+	// records the writes regardless of payloadless storage; only the
+	// payload bytes are discarded.
+	Set(update *Update) (newState State, trieUpdate *TrieUpdate, err error)
+
+	// Prove returns a payloadless batch proof for the given keys at the
+	// query's state. Encoded with [EncodePayloadlessTrieBatchProof] on the
+	// wire; consumers must decode with [DecodePayloadlessTrieBatchProof].
+	Prove(query *Query) (*PayloadlessTrieBatchProof, error)
+}
+
 // Query holds all data needed for a ledger read or ledger proof
 type Query struct {
 	state State

@@ -20,10 +20,12 @@ const (
 	// CAUTION: if payload key encoding is changed, convertEncodedPayloadKey()
 	// must be modified to convert encoded payload key from one version to
 	// another version.
-	PayloadVersion        = uint16(1)
-	TrieUpdateVersion     = uint16(0) // Use payload version 0 encoding
-	TrieProofVersion      = uint16(0) // Use payload version 0 encoding
-	TrieBatchProofVersion = uint16(0) // Use payload version 0 encoding
+	PayloadVersion                   = uint16(1)
+	TrieUpdateVersion                = uint16(0) // Use payload version 0 encoding
+	TrieProofVersion                 = uint16(0) // Use payload version 0 encoding
+	TrieBatchProofVersion            = uint16(0) // Use payload version 0 encoding
+	PayloadlessTrieProofVersion      = uint16(0)
+	PayloadlessTrieBatchProofVersion = uint16(0)
 )
 
 // Type capture the type of encoded entity (e.g. State, Key, Value, Path)
@@ -55,12 +57,17 @@ const (
 	TypeUpdate
 	// TypeTrieUpdate - type for trie update
 	TypeTrieUpdate
+	// TypePayloadlessProof - type for payloadless trie proofs
+	// (leaf-hash-bearing proofs produced by payloadless tries)
+	TypePayloadlessProof
+	// TypePayloadlessBatchProof - type for payloadless trie batch proofs
+	TypePayloadlessBatchProof
 	// this is used to flag types from the future
 	typeUnsuported
 )
 
 func (e Type) String() string {
-	return [...]string{"Unknown", "State", "KeyPart", "Key", "Value", "Path", "Payload", "Proof", "BatchProof", "Query", "Update", "Trie Update"}[e]
+	return [...]string{"Unknown", "State", "KeyPart", "Key", "Value", "Path", "Payload", "Proof", "BatchProof", "Query", "Update", "Trie Update", "Payloadless Proof", "Payloadless Batch Proof"}[e]
 }
 
 // CheckVersion extracts encoding bytes from a raw encoded message
@@ -970,6 +977,236 @@ func decodeTrieBatchProof(inp []byte, version uint16) (*TrieBatchProof, error) {
 		proof, err := decodeTrieProof(encProof, version)
 		if err != nil {
 			return nil, fmt.Errorf("error decoding batch proof (content): %w", err)
+		}
+		bp.Proofs = append(bp.Proofs, proof)
+	}
+	return bp, nil
+}
+
+// EncodePayloadlessTrieProof encodes the content of a payloadless proof into a byte slice.
+//
+// The encoding mirrors [EncodeTrieProof] with one substitution: instead of an
+// embedded payload, a leaf-hash field is encoded as a single presence byte
+// (1 = present, 0 = nil) followed by [hash.HashLen] bytes of leaf hash when
+// present.
+func EncodePayloadlessTrieProof(p *PayloadlessTrieProof) []byte {
+	if p == nil {
+		return []byte{}
+	}
+	buffer := utils.AppendUint16([]byte{}, PayloadlessTrieProofVersion)
+	buffer = utils.AppendUint8(buffer, TypePayloadlessProof)
+	buffer = append(buffer, encodePayloadlessTrieProof(p)...)
+	return buffer
+}
+
+func encodePayloadlessTrieProof(p *PayloadlessTrieProof) []byte {
+	// first byte is reserved for inclusion flag
+	buffer := make([]byte, 1)
+	if p.Inclusion {
+		buffer[0] |= 1 << 7
+	}
+
+	// steps
+	buffer = utils.AppendUint8(buffer, p.Steps)
+
+	// flags size and content
+	buffer = utils.AppendUint8(buffer, uint8(len(p.Flags)))
+	buffer = append(buffer, p.Flags...)
+
+	// path size and content
+	buffer = utils.AppendUint16(buffer, uint16(PathLen))
+	buffer = append(buffer, p.Path[:]...)
+
+	// leaf hash: 1 presence byte + (optional) HashLen bytes
+	if p.LeafHash != nil {
+		buffer = utils.AppendUint8(buffer, 1)
+		buffer = append(buffer, p.LeafHash[:]...)
+	} else {
+		buffer = utils.AppendUint8(buffer, 0)
+	}
+
+	// interims
+	buffer = utils.AppendUint8(buffer, uint8(len(p.Interims)))
+	for _, inter := range p.Interims {
+		buffer = utils.AppendUint16(buffer, uint16(len(inter)))
+		buffer = append(buffer, inter[:]...)
+	}
+
+	return buffer
+}
+
+// DecodePayloadlessTrieProof constructs a payloadless proof from an encoded
+// byte slice produced by [EncodePayloadlessTrieProof].
+//
+// Expected error returns during normal operation:
+//   - generic error wrapping a sentinel from the codec when the encoded version
+//     is unsupported or the byte slice is truncated/malformed.
+func DecodePayloadlessTrieProof(encodedProof []byte) (*PayloadlessTrieProof, error) {
+	rest, _, err := CheckVersion(encodedProof, PayloadlessTrieProofVersion)
+	if err != nil {
+		return nil, fmt.Errorf("error decoding payloadless proof: %w", err)
+	}
+	rest, err = CheckType(rest, TypePayloadlessProof)
+	if err != nil {
+		return nil, fmt.Errorf("error decoding payloadless proof: %w", err)
+	}
+	return decodePayloadlessTrieProof(rest)
+}
+
+func decodePayloadlessTrieProof(inp []byte) (*PayloadlessTrieProof, error) {
+	pInst := NewPayloadlessTrieProof()
+
+	// inclusion flag
+	byteInclusion, rest, err := utils.ReadSlice(inp, 1)
+	if err != nil {
+		return nil, fmt.Errorf("error decoding payloadless proof: %w", err)
+	}
+	pInst.Inclusion = bitutils.ReadBit(byteInclusion, 0) == 1
+
+	// steps
+	steps, rest, err := utils.ReadUint8(rest)
+	if err != nil {
+		return nil, fmt.Errorf("error decoding payloadless proof: %w", err)
+	}
+	pInst.Steps = steps
+
+	// flags
+	flagsSize, rest, err := utils.ReadUint8(rest)
+	if err != nil {
+		return nil, fmt.Errorf("error decoding payloadless proof: %w", err)
+	}
+	flags, rest, err := utils.ReadSlice(rest, int(flagsSize))
+	if err != nil {
+		return nil, fmt.Errorf("error decoding payloadless proof: %w", err)
+	}
+	pInst.Flags = flags
+
+	// path
+	pathSize, rest, err := utils.ReadUint16(rest)
+	if err != nil {
+		return nil, fmt.Errorf("error decoding payloadless proof: %w", err)
+	}
+	pathBytes, rest, err := utils.ReadSlice(rest, int(pathSize))
+	if err != nil {
+		return nil, fmt.Errorf("error decoding payloadless proof: %w", err)
+	}
+	pInst.Path, err = ToPath(pathBytes)
+	if err != nil {
+		return nil, fmt.Errorf("error decoding payloadless proof: %w", err)
+	}
+
+	// leaf hash presence + (optional) HashLen bytes
+	present, rest, err := utils.ReadUint8(rest)
+	if err != nil {
+		return nil, fmt.Errorf("error decoding payloadless proof: %w", err)
+	}
+	if present == 1 {
+		hashBytes, restAfterHash, err := utils.ReadSlice(rest, hash.HashLen)
+		if err != nil {
+			return nil, fmt.Errorf("error decoding payloadless proof: %w", err)
+		}
+		lh, err := hash.ToHash(hashBytes)
+		if err != nil {
+			return nil, fmt.Errorf("error decoding payloadless proof: %w", err)
+		}
+		pInst.LeafHash = &lh
+		rest = restAfterHash
+	}
+
+	// interims
+	interimsLen, rest, err := utils.ReadUint8(rest)
+	if err != nil {
+		return nil, fmt.Errorf("error decoding payloadless proof: %w", err)
+	}
+	interims := make([]hash.Hash, interimsLen)
+	var interimSize uint16
+	var interim hash.Hash
+	var interimBytes []byte
+	for i := 0; i < int(interimsLen); i++ {
+		interimSize, rest, err = utils.ReadUint16(rest)
+		if err != nil {
+			return nil, fmt.Errorf("error decoding payloadless proof: %w", err)
+		}
+		interimBytes, rest, err = utils.ReadSlice(rest, int(interimSize))
+		if err != nil {
+			return nil, fmt.Errorf("error decoding payloadless proof: %w", err)
+		}
+		interim, err = hash.ToHash(interimBytes)
+		if err != nil {
+			return nil, fmt.Errorf("error decoding payloadless proof: %w", err)
+		}
+		interims[i] = interim
+	}
+	pInst.Interims = interims
+
+	return pInst, nil
+}
+
+// EncodePayloadlessTrieBatchProof encodes a payloadless batch proof into a
+// byte slice. The format mirrors [EncodeTrieBatchProof].
+func EncodePayloadlessTrieBatchProof(bp *PayloadlessTrieBatchProof) []byte {
+	if bp == nil {
+		return []byte{}
+	}
+	buffer := utils.AppendUint16([]byte{}, PayloadlessTrieBatchProofVersion)
+	buffer = utils.AppendUint8(buffer, TypePayloadlessBatchProof)
+	buffer = append(buffer, encodePayloadlessTrieBatchProof(bp)...)
+	return buffer
+}
+
+func encodePayloadlessTrieBatchProof(bp *PayloadlessTrieBatchProof) []byte {
+	buffer := make([]byte, 0)
+	buffer = utils.AppendUint32(buffer, uint32(len(bp.Proofs)))
+	for _, p := range bp.Proofs {
+		encP := encodePayloadlessTrieProof(p)
+		buffer = utils.AppendUint64(buffer, uint64(len(encP)))
+		buffer = append(buffer, encP...)
+	}
+	return buffer
+}
+
+// DecodePayloadlessTrieBatchProof constructs a payloadless batch proof from
+// an encoded byte slice produced by [EncodePayloadlessTrieBatchProof].
+//
+// Expected error returns during normal operation:
+//   - generic error wrapping a sentinel from the codec when the encoded version
+//     is unsupported or the byte slice is truncated/malformed.
+func DecodePayloadlessTrieBatchProof(encodedBatchProof []byte) (*PayloadlessTrieBatchProof, error) {
+	rest, _, err := CheckVersion(encodedBatchProof, PayloadlessTrieBatchProofVersion)
+	if err != nil {
+		return nil, fmt.Errorf("error decoding payloadless batch proof: %w", err)
+	}
+	rest, err = CheckType(rest, TypePayloadlessBatchProof)
+	if err != nil {
+		return nil, fmt.Errorf("error decoding payloadless batch proof: %w", err)
+	}
+	bp, err := decodePayloadlessTrieBatchProof(rest)
+	if err != nil {
+		return nil, fmt.Errorf("error decoding payloadless batch proof: %w", err)
+	}
+	return bp, nil
+}
+
+func decodePayloadlessTrieBatchProof(inp []byte) (*PayloadlessTrieBatchProof, error) {
+	bp := NewPayloadlessTrieBatchProof()
+	numOfProofs, rest, err := utils.ReadUint32(inp)
+	if err != nil {
+		return nil, fmt.Errorf("error decoding payloadless batch proof (content): %w", err)
+	}
+	for i := 0; i < int(numOfProofs); i++ {
+		var encProofSize uint64
+		var encProof []byte
+		encProofSize, rest, err = utils.ReadUint64(rest)
+		if err != nil {
+			return nil, fmt.Errorf("error decoding payloadless batch proof (content): %w", err)
+		}
+		encProof, rest, err = utils.ReadSlice(rest, int(encProofSize))
+		if err != nil {
+			return nil, fmt.Errorf("error decoding payloadless batch proof (content): %w", err)
+		}
+		proof, err := decodePayloadlessTrieProof(encProof)
+		if err != nil {
+			return nil, fmt.Errorf("error decoding payloadless batch proof (content): %w", err)
 		}
 		bp.Proofs = append(bp.Proofs, proof)
 	}
