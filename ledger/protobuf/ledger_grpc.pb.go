@@ -305,3 +305,434 @@ var LedgerService_ServiceDesc = grpc.ServiceDesc{
 	Streams:  []grpc.StreamDesc{},
 	Metadata: "ledger.proto",
 }
+
+const (
+	LedgerInfoService_ServerInfo_FullMethodName = "/ledger.LedgerInfoService/ServerInfo"
+)
+
+// LedgerInfoServiceClient is the client API for LedgerInfoService service.
+//
+// For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
+type LedgerInfoServiceClient interface {
+	// ServerInfo returns metadata about this ledger server, including its
+	// operating mode.
+	ServerInfo(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*ServerInfoResponse, error)
+}
+
+type ledgerInfoServiceClient struct {
+	cc grpc.ClientConnInterface
+}
+
+func NewLedgerInfoServiceClient(cc grpc.ClientConnInterface) LedgerInfoServiceClient {
+	return &ledgerInfoServiceClient{cc}
+}
+
+func (c *ledgerInfoServiceClient) ServerInfo(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*ServerInfoResponse, error) {
+	out := new(ServerInfoResponse)
+	err := c.cc.Invoke(ctx, LedgerInfoService_ServerInfo_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// LedgerInfoServiceServer is the server API for LedgerInfoService service.
+// All implementations must embed UnimplementedLedgerInfoServiceServer
+// for forward compatibility
+type LedgerInfoServiceServer interface {
+	// ServerInfo returns metadata about this ledger server, including its
+	// operating mode.
+	ServerInfo(context.Context, *emptypb.Empty) (*ServerInfoResponse, error)
+	mustEmbedUnimplementedLedgerInfoServiceServer()
+}
+
+// UnimplementedLedgerInfoServiceServer must be embedded to have forward compatible implementations.
+type UnimplementedLedgerInfoServiceServer struct {
+}
+
+func (UnimplementedLedgerInfoServiceServer) ServerInfo(context.Context, *emptypb.Empty) (*ServerInfoResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ServerInfo not implemented")
+}
+func (UnimplementedLedgerInfoServiceServer) mustEmbedUnimplementedLedgerInfoServiceServer() {}
+
+// UnsafeLedgerInfoServiceServer may be embedded to opt out of forward compatibility for this service.
+// Use of this interface is not recommended, as added methods to LedgerInfoServiceServer will
+// result in compilation errors.
+type UnsafeLedgerInfoServiceServer interface {
+	mustEmbedUnimplementedLedgerInfoServiceServer()
+}
+
+func RegisterLedgerInfoServiceServer(s grpc.ServiceRegistrar, srv LedgerInfoServiceServer) {
+	s.RegisterService(&LedgerInfoService_ServiceDesc, srv)
+}
+
+func _LedgerInfoService_ServerInfo_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(emptypb.Empty)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(LedgerInfoServiceServer).ServerInfo(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: LedgerInfoService_ServerInfo_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(LedgerInfoServiceServer).ServerInfo(ctx, req.(*emptypb.Empty))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+// LedgerInfoService_ServiceDesc is the grpc.ServiceDesc for LedgerInfoService service.
+// It's only intended for direct use with grpc.RegisterService,
+// and not to be introspected or modified (even as a copy)
+var LedgerInfoService_ServiceDesc = grpc.ServiceDesc{
+	ServiceName: "ledger.LedgerInfoService",
+	HandlerType: (*LedgerInfoServiceServer)(nil),
+	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "ServerInfo",
+			Handler:    _LedgerInfoService_ServerInfo_Handler,
+		},
+	},
+	Streams:  []grpc.StreamDesc{},
+	Metadata: "ledger.proto",
+}
+
+const (
+	PayloadlessLedgerService_InitialState_FullMethodName      = "/ledger.PayloadlessLedgerService/InitialState"
+	PayloadlessLedgerService_HasState_FullMethodName          = "/ledger.PayloadlessLedgerService/HasState"
+	PayloadlessLedgerService_HasPaths_FullMethodName          = "/ledger.PayloadlessLedgerService/HasPaths"
+	PayloadlessLedgerService_GetSingleLeafHash_FullMethodName = "/ledger.PayloadlessLedgerService/GetSingleLeafHash"
+	PayloadlessLedgerService_GetLeafHashes_FullMethodName     = "/ledger.PayloadlessLedgerService/GetLeafHashes"
+	PayloadlessLedgerService_Set_FullMethodName               = "/ledger.PayloadlessLedgerService/Set"
+	PayloadlessLedgerService_Prove_FullMethodName             = "/ledger.PayloadlessLedgerService/Prove"
+)
+
+// PayloadlessLedgerServiceClient is the client API for PayloadlessLedgerService service.
+//
+// For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
+type PayloadlessLedgerServiceClient interface {
+	// InitialState returns the initial state of the ledger.
+	InitialState(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*StateResponse, error)
+	// HasState checks if the given state exists in the ledger.
+	HasState(ctx context.Context, in *StateRequest, opts ...grpc.CallOption) (*HasStateResponse, error)
+	// HasPaths reports, for each input key, whether the key has an allocated
+	// register at the requested state.
+	HasPaths(ctx context.Context, in *GetRequest, opts ...grpc.CallOption) (*HasPathsResponse, error)
+	// GetSingleLeafHash returns the leaf hash for a single key at a specific
+	// state. An empty hash indicates the path is unallocated.
+	GetSingleLeafHash(ctx context.Context, in *GetSingleValueRequest, opts ...grpc.CallOption) (*LeafHashResponse, error)
+	// GetLeafHashes returns leaf hashes for multiple keys at a specific state.
+	GetLeafHashes(ctx context.Context, in *GetRequest, opts ...grpc.CallOption) (*LeafHashesResponse, error)
+	// Set updates keys with new values at a specific state and returns the
+	// new state. The server discards the keys after hashing; only the values
+	// contribute to the trie.
+	Set(ctx context.Context, in *SetRequest, opts ...grpc.CallOption) (*SetResponse, error)
+	// Prove returns a payloadless batch proof for the given keys at a
+	// specific state. Proofs carry leaf hashes rather than payload values.
+	Prove(ctx context.Context, in *ProveRequest, opts ...grpc.CallOption) (*ProofResponse, error)
+}
+
+type payloadlessLedgerServiceClient struct {
+	cc grpc.ClientConnInterface
+}
+
+func NewPayloadlessLedgerServiceClient(cc grpc.ClientConnInterface) PayloadlessLedgerServiceClient {
+	return &payloadlessLedgerServiceClient{cc}
+}
+
+func (c *payloadlessLedgerServiceClient) InitialState(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*StateResponse, error) {
+	out := new(StateResponse)
+	err := c.cc.Invoke(ctx, PayloadlessLedgerService_InitialState_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *payloadlessLedgerServiceClient) HasState(ctx context.Context, in *StateRequest, opts ...grpc.CallOption) (*HasStateResponse, error) {
+	out := new(HasStateResponse)
+	err := c.cc.Invoke(ctx, PayloadlessLedgerService_HasState_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *payloadlessLedgerServiceClient) HasPaths(ctx context.Context, in *GetRequest, opts ...grpc.CallOption) (*HasPathsResponse, error) {
+	out := new(HasPathsResponse)
+	err := c.cc.Invoke(ctx, PayloadlessLedgerService_HasPaths_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *payloadlessLedgerServiceClient) GetSingleLeafHash(ctx context.Context, in *GetSingleValueRequest, opts ...grpc.CallOption) (*LeafHashResponse, error) {
+	out := new(LeafHashResponse)
+	err := c.cc.Invoke(ctx, PayloadlessLedgerService_GetSingleLeafHash_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *payloadlessLedgerServiceClient) GetLeafHashes(ctx context.Context, in *GetRequest, opts ...grpc.CallOption) (*LeafHashesResponse, error) {
+	out := new(LeafHashesResponse)
+	err := c.cc.Invoke(ctx, PayloadlessLedgerService_GetLeafHashes_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *payloadlessLedgerServiceClient) Set(ctx context.Context, in *SetRequest, opts ...grpc.CallOption) (*SetResponse, error) {
+	out := new(SetResponse)
+	err := c.cc.Invoke(ctx, PayloadlessLedgerService_Set_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *payloadlessLedgerServiceClient) Prove(ctx context.Context, in *ProveRequest, opts ...grpc.CallOption) (*ProofResponse, error) {
+	out := new(ProofResponse)
+	err := c.cc.Invoke(ctx, PayloadlessLedgerService_Prove_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// PayloadlessLedgerServiceServer is the server API for PayloadlessLedgerService service.
+// All implementations must embed UnimplementedPayloadlessLedgerServiceServer
+// for forward compatibility
+type PayloadlessLedgerServiceServer interface {
+	// InitialState returns the initial state of the ledger.
+	InitialState(context.Context, *emptypb.Empty) (*StateResponse, error)
+	// HasState checks if the given state exists in the ledger.
+	HasState(context.Context, *StateRequest) (*HasStateResponse, error)
+	// HasPaths reports, for each input key, whether the key has an allocated
+	// register at the requested state.
+	HasPaths(context.Context, *GetRequest) (*HasPathsResponse, error)
+	// GetSingleLeafHash returns the leaf hash for a single key at a specific
+	// state. An empty hash indicates the path is unallocated.
+	GetSingleLeafHash(context.Context, *GetSingleValueRequest) (*LeafHashResponse, error)
+	// GetLeafHashes returns leaf hashes for multiple keys at a specific state.
+	GetLeafHashes(context.Context, *GetRequest) (*LeafHashesResponse, error)
+	// Set updates keys with new values at a specific state and returns the
+	// new state. The server discards the keys after hashing; only the values
+	// contribute to the trie.
+	Set(context.Context, *SetRequest) (*SetResponse, error)
+	// Prove returns a payloadless batch proof for the given keys at a
+	// specific state. Proofs carry leaf hashes rather than payload values.
+	Prove(context.Context, *ProveRequest) (*ProofResponse, error)
+	mustEmbedUnimplementedPayloadlessLedgerServiceServer()
+}
+
+// UnimplementedPayloadlessLedgerServiceServer must be embedded to have forward compatible implementations.
+type UnimplementedPayloadlessLedgerServiceServer struct {
+}
+
+func (UnimplementedPayloadlessLedgerServiceServer) InitialState(context.Context, *emptypb.Empty) (*StateResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method InitialState not implemented")
+}
+func (UnimplementedPayloadlessLedgerServiceServer) HasState(context.Context, *StateRequest) (*HasStateResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method HasState not implemented")
+}
+func (UnimplementedPayloadlessLedgerServiceServer) HasPaths(context.Context, *GetRequest) (*HasPathsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method HasPaths not implemented")
+}
+func (UnimplementedPayloadlessLedgerServiceServer) GetSingleLeafHash(context.Context, *GetSingleValueRequest) (*LeafHashResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetSingleLeafHash not implemented")
+}
+func (UnimplementedPayloadlessLedgerServiceServer) GetLeafHashes(context.Context, *GetRequest) (*LeafHashesResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetLeafHashes not implemented")
+}
+func (UnimplementedPayloadlessLedgerServiceServer) Set(context.Context, *SetRequest) (*SetResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Set not implemented")
+}
+func (UnimplementedPayloadlessLedgerServiceServer) Prove(context.Context, *ProveRequest) (*ProofResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Prove not implemented")
+}
+func (UnimplementedPayloadlessLedgerServiceServer) mustEmbedUnimplementedPayloadlessLedgerServiceServer() {
+}
+
+// UnsafePayloadlessLedgerServiceServer may be embedded to opt out of forward compatibility for this service.
+// Use of this interface is not recommended, as added methods to PayloadlessLedgerServiceServer will
+// result in compilation errors.
+type UnsafePayloadlessLedgerServiceServer interface {
+	mustEmbedUnimplementedPayloadlessLedgerServiceServer()
+}
+
+func RegisterPayloadlessLedgerServiceServer(s grpc.ServiceRegistrar, srv PayloadlessLedgerServiceServer) {
+	s.RegisterService(&PayloadlessLedgerService_ServiceDesc, srv)
+}
+
+func _PayloadlessLedgerService_InitialState_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(emptypb.Empty)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(PayloadlessLedgerServiceServer).InitialState(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: PayloadlessLedgerService_InitialState_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(PayloadlessLedgerServiceServer).InitialState(ctx, req.(*emptypb.Empty))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _PayloadlessLedgerService_HasState_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(StateRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(PayloadlessLedgerServiceServer).HasState(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: PayloadlessLedgerService_HasState_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(PayloadlessLedgerServiceServer).HasState(ctx, req.(*StateRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _PayloadlessLedgerService_HasPaths_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(PayloadlessLedgerServiceServer).HasPaths(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: PayloadlessLedgerService_HasPaths_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(PayloadlessLedgerServiceServer).HasPaths(ctx, req.(*GetRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _PayloadlessLedgerService_GetSingleLeafHash_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetSingleValueRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(PayloadlessLedgerServiceServer).GetSingleLeafHash(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: PayloadlessLedgerService_GetSingleLeafHash_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(PayloadlessLedgerServiceServer).GetSingleLeafHash(ctx, req.(*GetSingleValueRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _PayloadlessLedgerService_GetLeafHashes_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(PayloadlessLedgerServiceServer).GetLeafHashes(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: PayloadlessLedgerService_GetLeafHashes_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(PayloadlessLedgerServiceServer).GetLeafHashes(ctx, req.(*GetRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _PayloadlessLedgerService_Set_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SetRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(PayloadlessLedgerServiceServer).Set(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: PayloadlessLedgerService_Set_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(PayloadlessLedgerServiceServer).Set(ctx, req.(*SetRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _PayloadlessLedgerService_Prove_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ProveRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(PayloadlessLedgerServiceServer).Prove(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: PayloadlessLedgerService_Prove_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(PayloadlessLedgerServiceServer).Prove(ctx, req.(*ProveRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+// PayloadlessLedgerService_ServiceDesc is the grpc.ServiceDesc for PayloadlessLedgerService service.
+// It's only intended for direct use with grpc.RegisterService,
+// and not to be introspected or modified (even as a copy)
+var PayloadlessLedgerService_ServiceDesc = grpc.ServiceDesc{
+	ServiceName: "ledger.PayloadlessLedgerService",
+	HandlerType: (*PayloadlessLedgerServiceServer)(nil),
+	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "InitialState",
+			Handler:    _PayloadlessLedgerService_InitialState_Handler,
+		},
+		{
+			MethodName: "HasState",
+			Handler:    _PayloadlessLedgerService_HasState_Handler,
+		},
+		{
+			MethodName: "HasPaths",
+			Handler:    _PayloadlessLedgerService_HasPaths_Handler,
+		},
+		{
+			MethodName: "GetSingleLeafHash",
+			Handler:    _PayloadlessLedgerService_GetSingleLeafHash_Handler,
+		},
+		{
+			MethodName: "GetLeafHashes",
+			Handler:    _PayloadlessLedgerService_GetLeafHashes_Handler,
+		},
+		{
+			MethodName: "Set",
+			Handler:    _PayloadlessLedgerService_Set_Handler,
+		},
+		{
+			MethodName: "Prove",
+			Handler:    _PayloadlessLedgerService_Prove_Handler,
+		},
+	},
+	Streams:  []grpc.StreamDesc{},
+	Metadata: "ledger.proto",
+}
