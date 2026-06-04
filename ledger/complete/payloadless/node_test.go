@@ -1,4 +1,4 @@
-package node_test
+package payloadless_test
 
 import (
 	"encoding/hex"
@@ -9,14 +9,14 @@ import (
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/hash"
 	"github.com/onflow/flow-go/ledger/common/testutils"
-	"github.com/onflow/flow-go/ledger/complete/mtrie/node"
+	"github.com/onflow/flow-go/ledger/complete/payloadless"
 )
 
 // Test_ProperLeaf verifies that the hash value of a proper leaf (at height 0) is computed correctly
 func Test_ProperLeaf(t *testing.T) {
 	path := testutils.PathByUint16(56809)
-	payload := testutils.LightPayload(56810, 59656)
-	n := node.NewLeaf(path, payload, 0)
+	value := []byte(testutils.LightPayload(56810, 59656).Value())
+	n := payloadless.NewLeaf(path, value, 0)
 	expectedRootHashHex := "0ee164bc69981088186b5ceeb666e90e8e11bb15a1427aa56f47a484aedf73b4"
 	require.Equal(t, expectedRootHashHex, hashToString(n.Hash()))
 	require.True(t, n.VerifyCachedHash())
@@ -27,16 +27,16 @@ func Test_ProperLeaf(t *testing.T) {
 // at an interim height (9) and the max possible height (256)
 func Test_CompactifiedLeaf(t *testing.T) {
 	path := testutils.PathByUint16(56809)
-	payload := testutils.LightPayload(56810, 59656)
-	n := node.NewLeaf(path, payload, 1)
+	value := []byte(testutils.LightPayload(56810, 59656).Value())
+	n := payloadless.NewLeaf(path, value, 1)
 	expectedRootHashHex := "aa496f68adbbf43197f7e4b6ba1a63a47b9ce19b1587ca9ce587a7f29cad57d5"
 	require.Equal(t, expectedRootHashHex, hashToString(n.Hash()))
 
-	n = node.NewLeaf(path, payload, 9)
+	n = payloadless.NewLeaf(path, value, 9)
 	expectedRootHashHex = "606aa23fdc40443de85b75768b847f94ff1d726e0bafde037833fe27543bb988"
 	require.Equal(t, expectedRootHashHex, hashToString(n.Hash()))
 
-	n = node.NewLeaf(path, payload, 256)
+	n = payloadless.NewLeaf(path, value, 256)
 	expectedRootHashHex = "d2536303495a9325037d247cbb2b9be4d6cb3465986ea2c4481d8770ff16b6b0"
 	require.Equal(t, expectedRootHashHex, hashToString(n.Hash()))
 }
@@ -44,17 +44,17 @@ func Test_CompactifiedLeaf(t *testing.T) {
 // Test_InterimNodeWithoutChildren verifies that the hash value of an interim node without children is computed correctly.
 // We test the hash at the lowest-possible height (0), at an interim height (9) and (16)
 func Test_InterimNodeWithoutChildren(t *testing.T) {
-	n := node.NewInterimNode(0, nil, nil)
+	n := payloadless.NewInterimNode(0, nil, nil)
 	expectedRootHashHex := "18373b4b038cbbf37456c33941a7e346e752acd8fafa896933d4859002b62619"
 	require.Equal(t, expectedRootHashHex, hashToString(n.Hash()))
 	require.Equal(t, ledger.GetDefaultHashForHeight(0), n.Hash())
 
-	n = node.NewInterimNode(9, nil, nil)
+	n = payloadless.NewInterimNode(9, nil, nil)
 	expectedRootHashHex = "a37f98dbac56e315fbd4b9f9bc85fbd1b138ed4ae453b128c22c99401495af6d"
 	require.Equal(t, expectedRootHashHex, hashToString(n.Hash()))
 	require.Equal(t, ledger.GetDefaultHashForHeight(9), n.Hash())
 
-	n = node.NewInterimNode(16, nil, nil)
+	n = payloadless.NewInterimNode(16, nil, nil)
 	expectedRootHashHex = "6e24e2397f130d9d17bef32b19a77b8f5bcf03fb7e9e75fd89b8a455675d574a"
 	require.Equal(t, expectedRootHashHex, hashToString(n.Hash()))
 	require.Equal(t, ledger.GetDefaultHashForHeight(16), n.Hash())
@@ -64,14 +64,14 @@ func Test_InterimNodeWithoutChildren(t *testing.T) {
 // only one child (left or right) is computed correctly.
 func Test_InterimNodeWithOneChild(t *testing.T) {
 	path := testutils.PathByUint16(56809)
-	payload := testutils.LightPayload(56810, 59656)
-	c := node.NewLeaf(path, payload, 0)
+	value := []byte(testutils.LightPayload(56810, 59656).Value())
+	c := payloadless.NewLeaf(path, value, 0)
 
-	n := node.NewInterimNode(1, c, nil)
+	n := payloadless.NewInterimNode(1, c, nil)
 	expectedRootHashHex := "aa496f68adbbf43197f7e4b6ba1a63a47b9ce19b1587ca9ce587a7f29cad57d5"
 	require.Equal(t, expectedRootHashHex, hashToString(n.Hash()))
 
-	n = node.NewInterimNode(1, nil, c)
+	n = payloadless.NewInterimNode(1, nil, c)
 	expectedRootHashHex = "9845f2c9e9c067ec6efba06ffb7c1be387b2a893ae979b1f6cb091bda1b7e12d"
 	require.Equal(t, expectedRootHashHex, hashToString(n.Hash()))
 }
@@ -80,37 +80,37 @@ func Test_InterimNodeWithOneChild(t *testing.T) {
 // both children (left and right) is computed correctly.
 func Test_InterimNodeWithBothChildren(t *testing.T) {
 	leftPath := testutils.PathByUint16(56809)
-	leftPayload := testutils.LightPayload(56810, 59656)
-	leftChild := node.NewLeaf(leftPath, leftPayload, 0)
+	leftValue := []byte(testutils.LightPayload(56810, 59656).Value())
+	leftChild := payloadless.NewLeaf(leftPath, leftValue, 0)
 
 	rightPath := testutils.PathByUint16(2)
-	rightPayload := testutils.LightPayload(11, 22)
-	rightChild := node.NewLeaf(rightPath, rightPayload, 0)
+	rightValue := []byte(testutils.LightPayload(11, 22).Value())
+	rightChild := payloadless.NewLeaf(rightPath, rightValue, 0)
 
-	n := node.NewInterimNode(1, leftChild, rightChild)
+	n := payloadless.NewInterimNode(1, leftChild, rightChild)
 	expectedRootHashHex := "1e4754fb35ec011b6192e205de403c1031d8ce64bd3d1ff8f534a20595af90c3"
 	require.Equal(t, expectedRootHashHex, hashToString(n.Hash()))
 }
 
-func Test_AllPayloads(t *testing.T) {
+func Test_AllLeafHashes(t *testing.T) {
 	path := testutils.PathByUint16(1)
-	payload := testutils.LightPayload(2, 3)
-	n1 := node.NewLeaf(path, payload, 0)
-	n2 := node.NewLeaf(path, payload, 0)
-	n3 := node.NewLeaf(path, payload, 1)
-	n4 := node.NewInterimNode(1, n1, n2)
-	n5 := node.NewInterimNode(2, n4, n3)
-	require.Equal(t, 3, len(n5.AllPayloads()))
+	value := []byte(testutils.LightPayload(2, 3).Value())
+	n1 := payloadless.NewLeaf(path, value, 0)
+	n2 := payloadless.NewLeaf(path, value, 0)
+	n3 := payloadless.NewLeaf(path, value, 1)
+	n4 := payloadless.NewInterimNode(1, n1, n2)
+	n5 := payloadless.NewInterimNode(2, n4, n3)
+	require.Equal(t, 3, len(n5.AllLeafHashes()))
 }
 
 func Test_VerifyCachedHash(t *testing.T) {
 	path := testutils.PathByUint16(1)
-	payload := testutils.LightPayload(2, 3)
-	n1 := node.NewLeaf(path, payload, 0)
-	n2 := node.NewLeaf(path, payload, 0)
-	n3 := node.NewLeaf(path, payload, 1)
-	n4 := node.NewInterimNode(1, n1, n2)
-	n5 := node.NewInterimNode(2, n4, n3)
+	value := []byte(testutils.LightPayload(2, 3).Value())
+	n1 := payloadless.NewLeaf(path, value, 0)
+	n2 := payloadless.NewLeaf(path, value, 0)
+	n3 := payloadless.NewLeaf(path, value, 1)
+	n4 := payloadless.NewInterimNode(1, n1, n2)
+	n5 := payloadless.NewInterimNode(2, n4, n3)
 	require.True(t, n5.VerifyCachedHash())
 }
 
@@ -121,20 +121,20 @@ func Test_Compactify_EmptySubtrie(t *testing.T) {
 	//      n3
 	//    /   \
 	// n1(-)  n2(-)
-	n1 := node.NewLeaf(testutils.PathByUint16LeftPadded(0), &ledger.Payload{}, 4)    // path: ...0000 0000
-	n2 := node.NewLeaf(testutils.PathByUint16LeftPadded(1<<4), &ledger.Payload{}, 4) // path: ...0001 0000
+	n1 := payloadless.NewLeaf(testutils.PathByUint16LeftPadded(0), nil, 4)    // path: ...0000 0000
+	n2 := payloadless.NewLeaf(testutils.PathByUint16LeftPadded(1<<4), nil, 4) // path: ...0001 0000
 
 	t.Run("both children empty", func(t *testing.T) {
-		require.Nil(t, node.NewInterimCompactifiedNode(5, n1, n2))
+		require.Nil(t, payloadless.NewInterimCompactifiedNode(5, n1, n2))
 	})
 
 	t.Run("one child nil and one child empty", func(t *testing.T) {
-		require.Nil(t, node.NewInterimCompactifiedNode(5, nil, n2))
-		require.Nil(t, node.NewInterimCompactifiedNode(5, n1, nil))
+		require.Nil(t, payloadless.NewInterimCompactifiedNode(5, nil, n2))
+		require.Nil(t, payloadless.NewInterimCompactifiedNode(5, n1, nil))
 	})
 
 	t.Run("both children nil", func(t *testing.T) {
-		require.Nil(t, node.NewInterimCompactifiedNode(5, nil, nil))
+		require.Nil(t, payloadless.NewInterimCompactifiedNode(5, nil, nil))
 	})
 }
 
@@ -144,25 +144,24 @@ func Test_Compactify_EmptySubtrie(t *testing.T) {
 func Test_Compactify_ToLeaf(t *testing.T) {
 	path1 := testutils.PathByUint16LeftPadded(0)      // ...0000 0000
 	path2 := testutils.PathByUint16LeftPadded(1 << 4) // ...0001 0000
-	emptyPayload := &ledger.Payload{}
-	payloadA := testutils.LightPayload(2, 2)
+	valueA := []byte(testutils.LightPayload(2, 2).Value())
 
 	t.Run("left child empty", func(t *testing.T) {
 		// constructing an un-pruned tree first as reference:
 		//      n3
 		//    /   \
 		// n1(-)  n2(A)
-		n1 := node.NewLeaf(path1, emptyPayload, 4)
-		n2 := node.NewLeaf(path2, payloadA, 4)
-		n3 := node.NewInterimNode(5, n1, n2)
+		n1 := payloadless.NewLeaf(path1, nil, 4)
+		n2 := payloadless.NewLeaf(path2, valueA, 4)
+		n3 := payloadless.NewInterimNode(5, n1, n2)
 
 		// Constructing a trie with pruning/compactification should result in
 		//       nn3(A)
 		// while keeping the root hash invariant
-		nn3 := node.NewInterimCompactifiedNode(5, n1, n2)
+		nn3 := payloadless.NewInterimCompactifiedNode(5, n1, n2)
 		requireIsLeafWithHash(t, nn3, n3.Hash())
 
-		nn3 = node.NewInterimCompactifiedNode(5, nil, n2)
+		nn3 = payloadless.NewInterimCompactifiedNode(5, nil, n2)
 		requireIsLeafWithHash(t, nn3, n3.Hash())
 	})
 
@@ -171,17 +170,17 @@ func Test_Compactify_ToLeaf(t *testing.T) {
 		//      n3
 		//    /   \
 		// n1(A)  n2(-)
-		n1 := node.NewLeaf(path1, payloadA, 4)
-		n2 := node.NewLeaf(path2, emptyPayload, 4)
-		n3 := node.NewInterimNode(5, n1, n2)
+		n1 := payloadless.NewLeaf(path1, valueA, 4)
+		n2 := payloadless.NewLeaf(path2, nil, 4)
+		n3 := payloadless.NewInterimNode(5, n1, n2)
 
 		// Constructing a trie with pruning/compactification should result in
 		//       nn3(A)
 		// while keeping the root hash invariant
-		nn3 := node.NewInterimCompactifiedNode(5, n1, n2)
+		nn3 := payloadless.NewInterimCompactifiedNode(5, n1, n2)
 		requireIsLeafWithHash(t, nn3, n3.Hash())
 
-		nn3 = node.NewInterimCompactifiedNode(5, n1, nil)
+		nn3 = payloadless.NewInterimCompactifiedNode(5, n1, nil)
 		requireIsLeafWithHash(t, nn3, n3.Hash())
 	})
 }
@@ -190,9 +189,8 @@ func Test_Compactify_ToLeaf(t *testing.T) {
 // where one child is empty and the other child holds _multiple_ allocated registers (more than one).
 // We expect in the compactified node, the empty subtrie is completely removed and replaced by nil.
 func Test_Compactify_EmptyChild(t *testing.T) {
-	payloadA := testutils.LightPayload(2, 2)
-	payloadB := testutils.LightPayload(4, 4)
-	emptyPayload := &ledger.Payload{}
+	valueA := []byte(testutils.LightPayload(2, 2).Value())
+	valueB := []byte(testutils.LightPayload(4, 4).Value())
 
 	t.Run("right child empty", func(t *testing.T) {
 		// constructing an un-pruned tree first as reference:
@@ -201,15 +199,15 @@ func Test_Compactify_EmptyChild(t *testing.T) {
 		//      n3      n4(-)
 		//   /    \
 		// n1(A)  n2(B)
-		n1 := node.NewLeaf(testutils.PathByUint16LeftPadded(0), payloadA, 4)    // path: ...0000 0000
-		n2 := node.NewLeaf(testutils.PathByUint16LeftPadded(1<<4), payloadB, 4) // path: ...0001 0000
-		n3 := node.NewInterimNode(5, n1, n2)
-		n4 := node.NewLeaf(testutils.PathByUint16LeftPadded(3<<4), emptyPayload, 5) // path: ...0011 0000
-		n5 := node.NewInterimNode(6, n3, n4)
+		n1 := payloadless.NewLeaf(testutils.PathByUint16LeftPadded(0), valueA, 4)    // path: ...0000 0000
+		n2 := payloadless.NewLeaf(testutils.PathByUint16LeftPadded(1<<4), valueB, 4) // path: ...0001 0000
+		n3 := payloadless.NewInterimNode(5, n1, n2)
+		n4 := payloadless.NewLeaf(testutils.PathByUint16LeftPadded(3<<4), nil, 5) // path: ...0011 0000
+		n5 := payloadless.NewInterimNode(6, n3, n4)
 
 		// Constructing a trie with pruning/compactification should result
 		// in n4 being replaced with nil, while keeping the root hash invariant.
-		nn5 := node.NewInterimCompactifiedNode(6, n3, n4)
+		nn5 := payloadless.NewInterimCompactifiedNode(6, n3, n4)
 		require.Equal(t, n3, nn5.LeftChild())
 		require.Nil(t, nn5.RightChild())
 		require.True(t, nn5.VerifyCachedHash())
@@ -223,15 +221,15 @@ func Test_Compactify_EmptyChild(t *testing.T) {
 		//    n3(-)    n4
 		//           /   \
 		//        n1(A)  n2(B)
-		n1 := node.NewLeaf(testutils.PathByUint16LeftPadded(2<<4), payloadA, 4)  // path: ...0010 0000
-		n2 := node.NewLeaf(testutils.PathByUint16LeftPadded(3<<4), payloadB, 4)  // path: ...0011 0000
-		n3 := node.NewLeaf(testutils.PathByUint16LeftPadded(0), emptyPayload, 5) // path: ...0000 0000
-		n4 := node.NewInterimNode(5, n1, n2)
-		n5 := node.NewInterimNode(6, n3, n4)
+		n1 := payloadless.NewLeaf(testutils.PathByUint16LeftPadded(2<<4), valueA, 4) // path: ...0010 0000
+		n2 := payloadless.NewLeaf(testutils.PathByUint16LeftPadded(3<<4), valueB, 4) // path: ...0011 0000
+		n3 := payloadless.NewLeaf(testutils.PathByUint16LeftPadded(0), nil, 5)       // path: ...0000 0000
+		n4 := payloadless.NewInterimNode(5, n1, n2)
+		n5 := payloadless.NewInterimNode(6, n3, n4)
 
 		// Constructing a trie with pruning/compactification should result
 		// in n4 being replaced with nil, while keeping the root hash invariant.
-		nn5 := node.NewInterimCompactifiedNode(6, n3, n4)
+		nn5 := payloadless.NewInterimCompactifiedNode(6, n3, n4)
 		require.Nil(t, nn5.LeftChild())
 		require.Equal(t, n4, nn5.RightChild())
 		require.True(t, nn5.VerifyCachedHash())
@@ -250,26 +248,26 @@ func Test_Compactify_BothChildrenPopulated(t *testing.T) {
 	path1 := testutils.PathByUint16LeftPadded(0)      // ...0000 0000
 	path2 := testutils.PathByUint16LeftPadded(1 << 4) // ...0001 0000
 	path4 := testutils.PathByUint16LeftPadded(3 << 4) // ...0011 0000
-	payloadA := testutils.LightPayload(2, 2)
-	payloadB := testutils.LightPayload(3, 3)
-	payloadC := testutils.LightPayload(4, 4)
+	valueA := []byte(testutils.LightPayload(2, 2).Value())
+	valueB := []byte(testutils.LightPayload(3, 3).Value())
+	valueC := []byte(testutils.LightPayload(4, 4).Value())
 
 	// constructing an un-pruned tree first as reference:
-	n1 := node.NewLeaf(path1, payloadA, 4)
-	n2 := node.NewLeaf(path2, payloadB, 4)
-	n3 := node.NewInterimNode(5, n1, n2)
-	n4 := node.NewLeaf(path4, payloadC, 5)
-	n5 := node.NewInterimNode(6, n3, n4)
+	n1 := payloadless.NewLeaf(path1, valueA, 4)
+	n2 := payloadless.NewLeaf(path2, valueB, 4)
+	n3 := payloadless.NewInterimNode(5, n1, n2)
+	n4 := payloadless.NewLeaf(path4, valueC, 5)
+	n5 := payloadless.NewInterimNode(6, n3, n4)
 
 	// Constructing a trie with pruning/compactification should result
 	// reproduce exactly the same trie as no pruning/compactification is possible
-	nn3 := node.NewInterimCompactifiedNode(5, n1, n2)
+	nn3 := payloadless.NewInterimCompactifiedNode(5, n1, n2)
 	require.Equal(t, n1, nn3.LeftChild())
 	require.Equal(t, n2, nn3.RightChild())
 	require.True(t, nn3.VerifyCachedHash())
 	require.Equal(t, n3.Hash(), nn3.Hash())
 
-	nn5 := node.NewInterimCompactifiedNode(6, nn3, n4)
+	nn5 := payloadless.NewInterimCompactifiedNode(6, nn3, n4)
 	require.Equal(t, nn3, nn5.LeftChild())
 	require.Equal(t, n4, nn5.RightChild())
 	require.True(t, nn5.VerifyCachedHash())
@@ -288,7 +286,7 @@ func hashToString(hash hash.Hash) string {
 // * pre-computed hash matches the `expectedHash`
 // * re-computing the hash from the children yields the pre-computed value
 // * node reports itself as a leaf
-func requireIsLeafWithHash(t *testing.T, node *node.Node, expectedHash hash.Hash) {
+func requireIsLeafWithHash(t *testing.T, node *payloadless.Node, expectedHash hash.Hash) {
 	require.Nil(t, node.LeftChild())
 	require.Nil(t, node.RightChild())
 	require.Equal(t, expectedHash, node.Hash())

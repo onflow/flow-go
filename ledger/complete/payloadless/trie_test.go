@@ -1,4 +1,4 @@
-package trie_test
+package payloadless_test
 
 import (
 	"bytes"
@@ -15,20 +15,20 @@ import (
 	"github.com/onflow/flow-go/ledger/common/bitutils"
 	"github.com/onflow/flow-go/ledger/common/hash"
 	"github.com/onflow/flow-go/ledger/common/testutils"
-	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
+	"github.com/onflow/flow-go/ledger/complete/payloadless"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
 // TestEmptyTrie tests whether the root hash of an empty trie matches the formal specification.
 func Test_EmptyTrie(t *testing.T) {
 	// Make new Trie (independently of MForest):
-	emptyTrie := trie.NewEmptyMTrie()
+	emptyTrie := payloadless.NewEmptyMTrie()
 	rootHash := emptyTrie.RootHash()
 	require.Equal(t, ledger.GetDefaultHashForHeight(ledger.NodeMaxHeight), hash.Hash(rootHash))
 
 	// verify root hash
 	expectedRootHashHex := "568f4ec740fe3b5de88034cb7b1fbddb41548b068f31aebc8ae9189e429c5749"
-	require.Equal(t, expectedRootHashHex, hashToString(rootHash))
+	require.Equal(t, expectedRootHashHex, rootHashToString(rootHash))
 
 	// check String() method does not panic:
 	_ = emptyTrie.String()
@@ -39,16 +39,15 @@ func Test_EmptyTrie(t *testing.T) {
 // The expected value is coming from a reference implementation in python and is hard-coded here.
 func Test_TrieWithLeftRegister(t *testing.T) {
 	// Make new Trie (independently of MForest):
-	emptyTrie := trie.NewEmptyMTrie()
+	emptyTrie := payloadless.NewEmptyMTrie()
 	path := testutils.PathByUint16LeftPadded(0)
-	payload := testutils.LightPayload(11, 12345)
-	leftPopulatedTrie, maxDepthTouched, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, []ledger.Path{path}, []ledger.Payload{*payload}, true)
+	value := payloadValue(testutils.LightPayload(11, 12345))
+	leftPopulatedTrie, maxDepthTouched, err := payloadless.NewTrieWithUpdatedRegisters(emptyTrie, []ledger.Path{path}, [][]byte{value}, true)
 	require.NoError(t, err)
 	require.Equal(t, uint16(0), maxDepthTouched)
 	require.Equal(t, uint64(1), leftPopulatedTrie.AllocatedRegCount())
-	require.Equal(t, uint64(payload.Size()), leftPopulatedTrie.AllocatedRegSize())
 	expectedRootHashHex := "b30c99cc3e027a6ff463876c638041b1c55316ed935f1b3699e52a2c3e3eaaab"
-	require.Equal(t, expectedRootHashHex, hashToString(leftPopulatedTrie.RootHash()))
+	require.Equal(t, expectedRootHashHex, rootHashToString(leftPopulatedTrie.RootHash()))
 }
 
 // Test_TrieWithRightRegister tests whether the root hash of trie with only the right-most
@@ -56,20 +55,19 @@ func Test_TrieWithLeftRegister(t *testing.T) {
 // The expected value is coming from a reference implementation in python and is hard-coded here.
 func Test_TrieWithRightRegister(t *testing.T) {
 	// Make new Trie (independently of MForest):
-	emptyTrie := trie.NewEmptyMTrie()
+	emptyTrie := payloadless.NewEmptyMTrie()
 	// build a path with all 1s
 	var path ledger.Path
 	for i := 0; i < len(path); i++ {
 		path[i] = uint8(255)
 	}
-	payload := testutils.LightPayload(12346, 54321)
-	rightPopulatedTrie, maxDepthTouched, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, []ledger.Path{path}, []ledger.Payload{*payload}, true)
+	value := payloadValue(testutils.LightPayload(12346, 54321))
+	rightPopulatedTrie, maxDepthTouched, err := payloadless.NewTrieWithUpdatedRegisters(emptyTrie, []ledger.Path{path}, [][]byte{value}, true)
 	require.NoError(t, err)
 	require.Equal(t, uint16(0), maxDepthTouched)
 	require.Equal(t, uint64(1), rightPopulatedTrie.AllocatedRegCount())
-	require.Equal(t, uint64(payload.Size()), rightPopulatedTrie.AllocatedRegSize())
 	expectedRootHashHex := "4313d22bcabbf21b1cfb833d38f1921f06a91e7198a6672bc68fa24eaaa1a961"
-	require.Equal(t, expectedRootHashHex, hashToString(rightPopulatedTrie.RootHash()))
+	require.Equal(t, expectedRootHashHex, rootHashToString(rightPopulatedTrie.RootHash()))
 }
 
 // Test_TrieWithMiddleRegister tests the root hash of trie holding only a single
@@ -77,17 +75,16 @@ func Test_TrieWithRightRegister(t *testing.T) {
 // The expected value is coming from a reference implementation in python and is hard-coded here.
 func Test_TrieWithMiddleRegister(t *testing.T) {
 	// Make new Trie (independently of MForest):
-	emptyTrie := trie.NewEmptyMTrie()
+	emptyTrie := payloadless.NewEmptyMTrie()
 
 	path := testutils.PathByUint16LeftPadded(56809)
-	payload := testutils.LightPayload(12346, 59656)
-	leftPopulatedTrie, maxDepthTouched, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, []ledger.Path{path}, []ledger.Payload{*payload}, true)
+	value := payloadValue(testutils.LightPayload(12346, 59656))
+	leftPopulatedTrie, maxDepthTouched, err := payloadless.NewTrieWithUpdatedRegisters(emptyTrie, []ledger.Path{path}, [][]byte{value}, true)
 	require.Equal(t, uint16(0), maxDepthTouched)
 	require.Equal(t, uint64(1), leftPopulatedTrie.AllocatedRegCount())
-	require.Equal(t, uint64(payload.Size()), leftPopulatedTrie.AllocatedRegSize())
 	require.NoError(t, err)
 	expectedRootHashHex := "4a29dad0b7ae091a1f035955e0c9aab0692b412f60ae83290b6290d4bf3eb296"
-	require.Equal(t, expectedRootHashHex, hashToString(leftPopulatedTrie.RootHash()))
+	require.Equal(t, expectedRootHashHex, rootHashToString(leftPopulatedTrie.RootHash()))
 }
 
 // Test_TrieWithManyRegisters tests whether the root hash of a trie storing 12001 randomly selected registers
@@ -95,21 +92,16 @@ func Test_TrieWithMiddleRegister(t *testing.T) {
 // The expected value is coming from a reference implementation in python and is hard-coded here.
 func Test_TrieWithManyRegisters(t *testing.T) {
 	// Make new Trie (independently of MForest):
-	emptyTrie := trie.NewEmptyMTrie()
+	emptyTrie := payloadless.NewEmptyMTrie()
 	// allocate single random register
 	rng := &LinearCongruentialGenerator{seed: 0}
-	paths, payloads := deduplicateWrites(sampleRandomRegisterWrites(rng, 12001))
-	var totalPayloadSize uint64
-	for _, p := range payloads {
-		totalPayloadSize += uint64(p.Size())
-	}
-	updatedTrie, maxDepthTouched, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, paths, payloads, true)
+	paths, values := deduplicateWrites(sampleRandomRegisterWrites(rng, 12001))
+	updatedTrie, maxDepthTouched, err := payloadless.NewTrieWithUpdatedRegisters(emptyTrie, paths, values, true)
 	require.NoError(t, err)
 	require.Equal(t, uint16(255), maxDepthTouched)
 	require.Equal(t, uint64(12001), updatedTrie.AllocatedRegCount())
-	require.Equal(t, totalPayloadSize, updatedTrie.AllocatedRegSize())
 	expectedRootHashHex := "74f748dbe563bb5819d6c09a34362a048531fd9647b4b2ea0b6ff43f200198aa"
-	require.Equal(t, expectedRootHashHex, hashToString(updatedTrie.RootHash()))
+	require.Equal(t, expectedRootHashHex, rootHashToString(updatedTrie.RootHash()))
 }
 
 // Test_FullTrie tests whether the root hash of a trie,
@@ -117,28 +109,24 @@ func Test_TrieWithManyRegisters(t *testing.T) {
 // The expected value is coming from a reference implementation in python and is hard-coded here.
 func Test_FullTrie(t *testing.T) {
 	// Make new Trie (independently of MForest):
-	emptyTrie := trie.NewEmptyMTrie()
+	emptyTrie := payloadless.NewEmptyMTrie()
 
 	// allocate 65536 left-most registers
 	numberRegisters := 65536
 	rng := &LinearCongruentialGenerator{seed: 0}
 	paths := make([]ledger.Path, 0, numberRegisters)
-	payloads := make([]ledger.Payload, 0, numberRegisters)
-	var totalPayloadSize uint64
+	values := make([][]byte, 0, numberRegisters)
 	for i := 0; i < numberRegisters; i++ {
 		paths = append(paths, testutils.PathByUint16LeftPadded(uint16(i)))
 		temp := rng.next()
-		payload := testutils.LightPayload(temp, temp)
-		payloads = append(payloads, *payload)
-		totalPayloadSize += uint64(payload.Size())
+		values = append(values, payloadValue(testutils.LightPayload(temp, temp)))
 	}
-	updatedTrie, maxDepthTouched, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, paths, payloads, true)
+	updatedTrie, maxDepthTouched, err := payloadless.NewTrieWithUpdatedRegisters(emptyTrie, paths, values, true)
 	require.NoError(t, err)
 	require.Equal(t, uint16(256), maxDepthTouched)
 	require.Equal(t, uint64(numberRegisters), updatedTrie.AllocatedRegCount())
-	require.Equal(t, totalPayloadSize, updatedTrie.AllocatedRegSize())
 	expectedRootHashHex := "6b3a48d672744f5586c571c47eae32d7a4a3549c1d4fa51a0acfd7b720471de9"
-	require.Equal(t, expectedRootHashHex, hashToString(updatedTrie.RootHash()))
+	require.Equal(t, expectedRootHashHex, rootHashToString(updatedTrie.RootHash()))
 }
 
 // TestUpdateTrie tests whether iteratively updating a Trie matches the formal specification.
@@ -168,32 +156,26 @@ func Test_UpdateTrie(t *testing.T) {
 	}
 
 	// Make new Trie (independently of MForest):
-	emptyTrie := trie.NewEmptyMTrie()
+	emptyTrie := payloadless.NewEmptyMTrie()
 
 	// allocate single random register
 	rng := &LinearCongruentialGenerator{seed: 0}
 	path := testutils.PathByUint16LeftPadded(rng.next())
 	temp := rng.next()
-	payload := testutils.LightPayload(temp, temp)
-	updatedTrie, maxDepthTouched, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, []ledger.Path{path}, []ledger.Payload{*payload}, true)
+	value := payloadValue(testutils.LightPayload(temp, temp))
+	updatedTrie, maxDepthTouched, err := payloadless.NewTrieWithUpdatedRegisters(emptyTrie, []ledger.Path{path}, [][]byte{value}, true)
 	require.NoError(t, err)
 	require.Equal(t, uint16(0), maxDepthTouched)
 	require.Equal(t, uint64(1), updatedTrie.AllocatedRegCount())
-	require.Equal(t, uint64(payload.Size()), updatedTrie.AllocatedRegSize())
 	expectedRootHashHex := "08db9aeed2b9fcc66b63204a26a4c28652e44e3035bd87ba0ed632a227b3f6dd"
-	require.Equal(t, expectedRootHashHex, hashToString(updatedTrie.RootHash()))
+	require.Equal(t, expectedRootHashHex, rootHashToString(updatedTrie.RootHash()))
 
 	var paths []ledger.Path
-	var payloads []ledger.Payload
+	var values [][]byte
 	parentTrieRegCount := updatedTrie.AllocatedRegCount()
-	parentTrieRegSize := updatedTrie.AllocatedRegSize()
 	for r := 0; r < 20; r++ {
-		paths, payloads = deduplicateWrites(sampleRandomRegisterWrites(rng, r*100))
-		var totalPayloadSize uint64
-		for _, p := range payloads {
-			totalPayloadSize += uint64(p.Size())
-		}
-		updatedTrie, maxDepthTouched, err = trie.NewTrieWithUpdatedRegisters(updatedTrie, paths, payloads, true)
+		paths, values = deduplicateWrites(sampleRandomRegisterWrites(rng, r*100))
+		updatedTrie, maxDepthTouched, err = payloadless.NewTrieWithUpdatedRegisters(updatedTrie, paths, values, true)
 		require.NoError(t, err)
 		switch r {
 		case 0:
@@ -203,20 +185,17 @@ func Test_UpdateTrie(t *testing.T) {
 		default:
 			require.Equal(t, uint16(255), maxDepthTouched)
 		}
-		require.Equal(t, parentTrieRegCount+uint64(len(payloads)), updatedTrie.AllocatedRegCount())
-		require.Equal(t, parentTrieRegSize+totalPayloadSize, updatedTrie.AllocatedRegSize())
-		require.Equal(t, expectedRootHashes[r], hashToString(updatedTrie.RootHash()))
+		require.Equal(t, parentTrieRegCount+uint64(len(values)), updatedTrie.AllocatedRegCount())
+		require.Equal(t, expectedRootHashes[r], rootHashToString(updatedTrie.RootHash()))
 
 		parentTrieRegCount = updatedTrie.AllocatedRegCount()
-		parentTrieRegSize = updatedTrie.AllocatedRegSize()
 	}
 	// update with the same registers with the same values
-	newTrie, maxDepthTouched, err := trie.NewTrieWithUpdatedRegisters(updatedTrie, paths, payloads, true)
+	newTrie, maxDepthTouched, err := payloadless.NewTrieWithUpdatedRegisters(updatedTrie, paths, values, true)
 	require.NoError(t, err)
 	require.Equal(t, uint16(255), maxDepthTouched)
 	require.Equal(t, updatedTrie.AllocatedRegCount(), newTrie.AllocatedRegCount())
-	require.Equal(t, updatedTrie.AllocatedRegSize(), newTrie.AllocatedRegSize())
-	require.Equal(t, expectedRootHashes[19], hashToString(updatedTrie.RootHash()))
+	require.Equal(t, expectedRootHashes[19], rootHashToString(updatedTrie.RootHash()))
 	// check the root node pointers are equal
 	require.True(t, updatedTrie.RootNode() == newTrie.RootNode())
 }
@@ -226,49 +205,37 @@ func Test_UpdateTrie(t *testing.T) {
 // The expected value is coming from a reference implementation in python and is hard-coded here.
 func Test_UnallocateRegisters(t *testing.T) {
 	rng := &LinearCongruentialGenerator{seed: 0}
-	emptyTrie := trie.NewEmptyMTrie()
+	emptyTrie := payloadless.NewEmptyMTrie()
 
 	// we first draw 99 random key-value pairs that will be first allocated and later unallocated:
-	paths1, payloads1 := deduplicateWrites(sampleRandomRegisterWrites(rng, 99))
-	var totalPayloadSize1 uint64
-	for _, p := range payloads1 {
-		totalPayloadSize1 += uint64(p.Size())
-	}
-	updatedTrie, maxDepthTouched, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, paths1, payloads1, true)
+	paths1, values1 := deduplicateWrites(sampleRandomRegisterWrites(rng, 99))
+	updatedTrie, maxDepthTouched, err := payloadless.NewTrieWithUpdatedRegisters(emptyTrie, paths1, values1, true)
 	require.NoError(t, err)
 	require.Equal(t, uint16(254), maxDepthTouched)
-	require.Equal(t, uint64(len(payloads1)), updatedTrie.AllocatedRegCount())
-	require.Equal(t, totalPayloadSize1, updatedTrie.AllocatedRegSize())
+	require.Equal(t, uint64(len(values1)), updatedTrie.AllocatedRegCount())
 
 	// we then write an additional 117 registers
-	paths2, payloads2 := deduplicateWrites(sampleRandomRegisterWrites(rng, 117))
-	var totalPayloadSize2 uint64
-	for _, p := range payloads2 {
-		totalPayloadSize2 += uint64(p.Size())
-	}
-	updatedTrie, maxDepthTouched, err = trie.NewTrieWithUpdatedRegisters(updatedTrie, paths2, payloads2, true)
+	paths2, values2 := deduplicateWrites(sampleRandomRegisterWrites(rng, 117))
+	updatedTrie, maxDepthTouched, err = payloadless.NewTrieWithUpdatedRegisters(updatedTrie, paths2, values2, true)
 	require.Equal(t, uint16(254), maxDepthTouched)
-	require.Equal(t, uint64(len(payloads1)+len(payloads2)), updatedTrie.AllocatedRegCount())
-	require.Equal(t, totalPayloadSize1+totalPayloadSize2, updatedTrie.AllocatedRegSize())
+	require.Equal(t, uint64(len(values1)+len(values2)), updatedTrie.AllocatedRegCount())
 	require.NoError(t, err)
 
 	// and now we override the first 99 registers with default values, i.e. unallocate them
-	payloads0 := make([]ledger.Payload, len(payloads1))
-	updatedTrie, maxDepthTouched, err = trie.NewTrieWithUpdatedRegisters(updatedTrie, paths1, payloads0, true)
+	emptyValues0 := make([][]byte, len(values1))
+	updatedTrie, maxDepthTouched, err = payloadless.NewTrieWithUpdatedRegisters(updatedTrie, paths1, emptyValues0, true)
 	require.Equal(t, uint16(254), maxDepthTouched)
-	require.Equal(t, uint64(len(payloads2)), updatedTrie.AllocatedRegCount())
-	require.Equal(t, totalPayloadSize2, updatedTrie.AllocatedRegSize())
+	require.Equal(t, uint64(len(values2)), updatedTrie.AllocatedRegCount())
 	require.NoError(t, err)
 
 	// this should be identical to the first 99 registers never been written
 	expectedRootHashHex := "d81e27a93f2bef058395f70e00fb5d3c8e426e22b3391d048b34017e1ecb483e"
-	comparisonTrie, maxDepthTouched, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, paths2, payloads2, true)
+	comparisonTrie, maxDepthTouched, err := payloadless.NewTrieWithUpdatedRegisters(emptyTrie, paths2, values2, true)
 	require.NoError(t, err)
 	require.Equal(t, uint16(254), maxDepthTouched)
-	require.Equal(t, uint64(len(payloads2)), comparisonTrie.AllocatedRegCount())
-	require.Equal(t, totalPayloadSize2, comparisonTrie.AllocatedRegSize())
-	require.Equal(t, expectedRootHashHex, hashToString(comparisonTrie.RootHash()))
-	require.Equal(t, expectedRootHashHex, hashToString(updatedTrie.RootHash()))
+	require.Equal(t, uint64(len(values2)), comparisonTrie.AllocatedRegCount())
+	require.Equal(t, expectedRootHashHex, rootHashToString(comparisonTrie.RootHash()))
+	require.Equal(t, expectedRootHashHex, rootHashToString(updatedTrie.RootHash()))
 }
 
 // simple Linear congruential RNG
@@ -283,32 +250,37 @@ func (rng *LinearCongruentialGenerator) next() uint16 {
 	return uint16(rng.seed)
 }
 
-// sampleRandomRegisterWrites generates path-payload tuples for `number` randomly selected registers;
+// payloadValue extracts the raw value bytes from a *ledger.Payload, which is
+// what the payloadless trie hashes.
+func payloadValue(p *ledger.Payload) []byte {
+	return []byte(p.Value())
+}
+
+// sampleRandomRegisterWrites generates path-value tuples for `number` randomly selected registers;
 // caution: registers might repeat
-func sampleRandomRegisterWrites(rng *LinearCongruentialGenerator, number int) ([]ledger.Path, []ledger.Payload) {
+func sampleRandomRegisterWrites(rng *LinearCongruentialGenerator, number int) ([]ledger.Path, [][]byte) {
 	paths := make([]ledger.Path, 0, number)
-	payloads := make([]ledger.Payload, 0, number)
+	values := make([][]byte, 0, number)
 	for i := 0; i < number; i++ {
 		path := testutils.PathByUint16LeftPadded(rng.next())
 		paths = append(paths, path)
 		t := rng.next()
-		payload := testutils.LightPayload(t, t)
-		payloads = append(payloads, *payload)
+		values = append(values, payloadValue(testutils.LightPayload(t, t)))
 	}
-	return paths, payloads
+	return paths, values
 }
 
-// sampleRandomRegisterWritesWithPrefix generates path-payload tuples for `number` randomly selected registers;
+// sampleRandomRegisterWritesWithPrefix generates path-value tuples for `number` randomly selected registers;
 // each path is starting with the specified `prefix` and is filled to the full length with random bytes
 // caution: register paths might repeat
-func sampleRandomRegisterWritesWithPrefix(rng *LinearCongruentialGenerator, number int, prefix []byte) ([]ledger.Path, []ledger.Payload) {
+func sampleRandomRegisterWritesWithPrefix(rng *LinearCongruentialGenerator, number int, prefix []byte) ([]ledger.Path, [][]byte) {
 	prefixLen := len(prefix)
 	if prefixLen >= hash.HashLen {
 		panic("prefix must be shorter than full path length, so there is some space left for random path segment")
 	}
 
 	paths := make([]ledger.Path, 0, number)
-	payloads := make([]ledger.Payload, 0, number)
+	values := make([][]byte, 0, number)
 	nextRandomBytes := make([]byte, 2)
 	nextRandomByteIndex := 2 // index of next unused byte in nextRandomBytes; if value is >= 2, we need to generate new random bytes
 	for i := 0; i < number; i++ {
@@ -326,29 +298,28 @@ func sampleRandomRegisterWritesWithPrefix(rng *LinearCongruentialGenerator, numb
 		paths = append(paths, p)
 
 		t := rng.next()
-		payload := testutils.LightPayload(t, t)
-		payloads = append(payloads, *payload)
+		values = append(values, payloadValue(testutils.LightPayload(t, t)))
 	}
-	return paths, payloads
+	return paths, values
 }
 
 // deduplicateWrites retains only the last register write
-func deduplicateWrites(paths []ledger.Path, payloads []ledger.Payload) ([]ledger.Path, []ledger.Payload) {
-	payloadMapping := make(map[ledger.Path]int)
-	if len(paths) != len(payloads) {
-		panic("size mismatch (paths and payloads)")
+func deduplicateWrites(paths []ledger.Path, values [][]byte) ([]ledger.Path, [][]byte) {
+	mapping := make(map[ledger.Path]int)
+	if len(paths) != len(values) {
+		panic("size mismatch (paths and values)")
 	}
 	for i, path := range paths {
 		// we override the latest in the slice
-		payloadMapping[path] = i
+		mapping[path] = i
 	}
-	dedupedPaths := make([]ledger.Path, 0, len(payloadMapping))
-	dedupedPayloads := make([]ledger.Payload, 0, len(payloadMapping))
-	for path := range payloadMapping {
+	dedupedPaths := make([]ledger.Path, 0, len(mapping))
+	dedupedValues := make([][]byte, 0, len(mapping))
+	for path := range mapping {
 		dedupedPaths = append(dedupedPaths, path)
-		dedupedPayloads = append(dedupedPayloads, payloads[payloadMapping[path]])
+		dedupedValues = append(dedupedValues, values[mapping[path]])
 	}
-	return dedupedPaths, dedupedPayloads
+	return dedupedPaths, dedupedValues
 }
 
 func TestSplitByPath(t *testing.T) {
@@ -379,7 +350,7 @@ func TestSplitByPath(t *testing.T) {
 	})
 
 	// split paths
-	index := trie.SplitPaths(paths, randomIndex)
+	index := payloadless.SplitPaths(paths, randomIndex)
 
 	// check correctness
 	for i := 0; i < index; i++ {
@@ -441,167 +412,141 @@ func Test_DifferentiateEmptyVsLeaf(t *testing.T) {
 	rightSubTriePrefix, _ := hex.DecodeString(commonPrefix29bytes + "1") // in total 30 bytes
 
 	rng := &LinearCongruentialGenerator{seed: 0}
-	leftSubTriePath, leftSubTriePayload := sampleRandomRegisterWritesWithPrefix(rng, 1, leftSubTriePrefix)
-	rightSubTriePath, rightSubTriePayload := deduplicateWrites(sampleRandomRegisterWritesWithPrefix(rng, 18, rightSubTriePrefix))
+	leftSubTriePath, leftSubTrieValue := sampleRandomRegisterWritesWithPrefix(rng, 1, leftSubTriePrefix)
+	rightSubTriePath, rightSubTrieValue := deduplicateWrites(sampleRandomRegisterWritesWithPrefix(rng, 18, rightSubTriePrefix))
 
 	// initialize Trie to the depicted state
 	paths := append(leftSubTriePath, rightSubTriePath...)
-	payloads := append(leftSubTriePayload, rightSubTriePayload...)
-	var leftSubTriePayloadSize, rightSubTriePayloadSize uint64
-	for _, p := range leftSubTriePayload {
-		leftSubTriePayloadSize += uint64(p.Size())
-	}
-	for _, p := range rightSubTriePayload {
-		rightSubTriePayloadSize += uint64(p.Size())
-	}
-	startTrie, maxDepthTouched, err := trie.NewTrieWithUpdatedRegisters(trie.NewEmptyMTrie(), paths, payloads, true)
+	values := append(leftSubTrieValue, rightSubTrieValue...)
+	startTrie, maxDepthTouched, err := payloadless.NewTrieWithUpdatedRegisters(payloadless.NewEmptyMTrie(), paths, values, true)
 	require.NoError(t, err)
 	require.Equal(t, uint16(241), maxDepthTouched)
-	require.Equal(t, uint64(len(payloads)), startTrie.AllocatedRegCount())
-	require.Equal(t, leftSubTriePayloadSize+rightSubTriePayloadSize, startTrie.AllocatedRegSize())
+	require.Equal(t, uint64(len(values)), startTrie.AllocatedRegCount())
 	expectedRootHashHex := "8cf6659db0af7626ab0991e2a49019353d549aa4a8c4be1b33e8953d1a9b7fdd"
-	require.Equal(t, expectedRootHashHex, hashToString(startTrie.RootHash()))
+	require.Equal(t, expectedRootHashHex, rootHashToString(startTrie.RootHash()))
 
 	// Register update:
-	//  * de-allocate the compactified leaf (■), i.e. set its payload to nil.
+	//  * de-allocate the compactified leaf (■), i.e. set its value to nil.
 	//  * also set a previously already unallocated register to nil as well
 	unallocatedRegister := leftSubTriePath[0]            // copy path to leaf and modify it (next line)
 	unallocatedRegister[len(unallocatedRegister)-1] ^= 1 // path differs only in the last byte, i.e. register is also in the left Sub-Trie
 	updatedPaths := append(leftSubTriePath, unallocatedRegister)
-	updatedPayloads := []ledger.Payload{*ledger.EmptyPayload(), *ledger.EmptyPayload()}
-	updatedTrie, maxDepthTouched, err := trie.NewTrieWithUpdatedRegisters(startTrie, updatedPaths, updatedPayloads, true)
+	updatedValues := [][]byte{nil, nil}
+	updatedTrie, maxDepthTouched, err := payloadless.NewTrieWithUpdatedRegisters(startTrie, updatedPaths, updatedValues, true)
 	require.Equal(t, uint16(256), maxDepthTouched)
-	require.Equal(t, uint64(len(rightSubTriePayload)), updatedTrie.AllocatedRegCount())
-	require.Equal(t, rightSubTriePayloadSize, updatedTrie.AllocatedRegSize())
+	require.Equal(t, uint64(len(rightSubTrieValue)), updatedTrie.AllocatedRegCount())
 	require.NoError(t, err)
 
 	// The updated trie should equal to a trie containing only the right sub-Trie
 	expectedUpdatedRootHashHex := "576e12a7ef5c760d5cc808ce50e9297919b21b87656b0cc0d9fe8a1a589cf42c"
-	require.Equal(t, expectedUpdatedRootHashHex, hashToString(updatedTrie.RootHash()))
-	referenceTrie, maxDepthTouched, err := trie.NewTrieWithUpdatedRegisters(trie.NewEmptyMTrie(), rightSubTriePath, rightSubTriePayload, true)
+	require.Equal(t, expectedUpdatedRootHashHex, rootHashToString(updatedTrie.RootHash()))
+	referenceTrie, maxDepthTouched, err := payloadless.NewTrieWithUpdatedRegisters(payloadless.NewEmptyMTrie(), rightSubTriePath, rightSubTrieValue, true)
 	require.NoError(t, err)
 	require.Equal(t, uint16(241), maxDepthTouched)
-	require.Equal(t, uint64(len(rightSubTriePayload)), referenceTrie.AllocatedRegCount())
-	require.Equal(t, rightSubTriePayloadSize, referenceTrie.AllocatedRegSize())
-	require.Equal(t, expectedUpdatedRootHashHex, hashToString(referenceTrie.RootHash()))
+	require.Equal(t, uint64(len(rightSubTrieValue)), referenceTrie.AllocatedRegCount())
+	require.Equal(t, expectedUpdatedRootHashHex, rootHashToString(referenceTrie.RootHash()))
 }
 
 func Test_Pruning(t *testing.T) {
 	rand := unittest.GetPRG(t)
-	emptyTrie := trie.NewEmptyMTrie()
+	emptyTrie := payloadless.NewEmptyMTrie()
 
 	path1 := testutils.PathByUint16(1 << 12)       // 000100...
 	path2 := testutils.PathByUint16(1 << 13)       // 001000...
 	path4 := testutils.PathByUint16(1<<14 + 1<<13) // 01100...
 	path6 := testutils.PathByUint16(1 << 15)       // 1000...
 
-	payload1 := testutils.LightPayload(2, 1)
-	payload2 := testutils.LightPayload(2, 2)
-	payload4 := testutils.LightPayload(2, 4)
-	payload6 := testutils.LightPayload(2, 6)
-	emptyPayload := ledger.EmptyPayload()
+	value1 := payloadValue(testutils.LightPayload(2, 1))
+	value2 := payloadValue(testutils.LightPayload(2, 2))
+	value4 := payloadValue(testutils.LightPayload(2, 4))
+	value6 := payloadValue(testutils.LightPayload(2, 6))
 
 	paths := []ledger.Path{path1, path2, path4, path6}
-	payloads := []ledger.Payload{*payload1, *payload2, *payload4, *payload6}
-
-	var totalPayloadSize uint64
-	for _, p := range payloads {
-		totalPayloadSize += uint64(p.Size())
-	}
+	values := [][]byte{value1, value2, value4, value6}
 
 	//                    n7
 	//                   / \
 	//                 /     \
-	//             n5         n6 (path6/payload6) // 1000
+	//             n5         n6 (path6/value6) // 1000
 	//            /  \
 	//          /      \
 	//         /         \
-	//        n3          n4 (path4/payload4) // 01100...
+	//        n3          n4 (path4/value4) // 01100...
 	//      /     \
 	//    /          \
 	//  /              \
 	// n1 (path1,       n2 (path2)
-	//     payload1)        /payload2)
+	//     value1)         value2)
 
-	baseTrie, maxDepthTouched, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, paths, payloads, true)
+	baseTrie, maxDepthTouched, err := payloadless.NewTrieWithUpdatedRegisters(emptyTrie, paths, values, true)
 	require.NoError(t, err)
 	require.Equal(t, uint16(3), maxDepthTouched)
-	require.Equal(t, uint64(len(payloads)), baseTrie.AllocatedRegCount())
-	require.Equal(t, totalPayloadSize, baseTrie.AllocatedRegSize())
+	require.Equal(t, uint64(len(values)), baseTrie.AllocatedRegCount())
 
 	t.Run("leaf update with pruning test", func(t *testing.T) {
 		expectedRegCount := baseTrie.AllocatedRegCount() - 1
-		expectedRegSize := baseTrie.AllocatedRegSize() - uint64(payload1.Size())
 
-		trie1, maxDepthTouched, err := trie.NewTrieWithUpdatedRegisters(baseTrie, []ledger.Path{path1}, []ledger.Payload{*emptyPayload}, false)
+		trie1, maxDepthTouched, err := payloadless.NewTrieWithUpdatedRegisters(baseTrie, []ledger.Path{path1}, [][]byte{nil}, false)
 		require.NoError(t, err)
 		require.Equal(t, uint16(3), maxDepthTouched)
 		require.Equal(t, expectedRegCount, trie1.AllocatedRegCount())
-		require.Equal(t, expectedRegSize, trie1.AllocatedRegSize())
 
-		trie1withpruning, maxDepthTouched, err := trie.NewTrieWithUpdatedRegisters(baseTrie, []ledger.Path{path1}, []ledger.Payload{*emptyPayload}, true)
+		trie1withpruning, maxDepthTouched, err := payloadless.NewTrieWithUpdatedRegisters(baseTrie, []ledger.Path{path1}, [][]byte{nil}, true)
 		require.NoError(t, err)
 		require.Equal(t, uint16(3), maxDepthTouched)
 		require.Equal(t, expectedRegCount, trie1withpruning.AllocatedRegCount())
-		require.Equal(t, expectedRegSize, trie1withpruning.AllocatedRegSize())
 		require.True(t, trie1withpruning.RootNode().VerifyCachedHash())
 
 		// after pruning
 		//                    n7
 		//                   / \
 		//                 /     \
-		//             n5         n6 (path6/payload6) // 1000
+		//             n5         n6 (path6/value6) // 1000
 		//            /  \
 		//          /      \
 		//         /         \
 		//     n3 (path2       n4 (path4
-		//        /payload2)      /payload4) // 01100...
+		//        /value2)        /value4) // 01100...
 		require.Equal(t, trie1.RootHash(), trie1withpruning.RootHash())
 	})
 
 	t.Run("leaf update with two level pruning test", func(t *testing.T) {
 		expectedRegCount := baseTrie.AllocatedRegCount() - 1
-		expectedRegSize := baseTrie.AllocatedRegSize() - uint64(payload4.Size())
 
 		// setting path4 to zero from baseTrie
-		trie2, maxDepthTouched, err := trie.NewTrieWithUpdatedRegisters(baseTrie, []ledger.Path{path4}, []ledger.Payload{*emptyPayload}, false)
+		trie2, maxDepthTouched, err := payloadless.NewTrieWithUpdatedRegisters(baseTrie, []ledger.Path{path4}, [][]byte{nil}, false)
 		require.NoError(t, err)
 		require.Equal(t, uint16(2), maxDepthTouched)
 		require.Equal(t, expectedRegCount, trie2.AllocatedRegCount())
-		require.Equal(t, expectedRegSize, trie2.AllocatedRegSize())
 
 		// pruning is not activated here because n3 is not a leaf node
-		trie2withpruning, maxDepthTouched, err := trie.NewTrieWithUpdatedRegisters(baseTrie, []ledger.Path{path4}, []ledger.Payload{*emptyPayload}, true)
+		trie2withpruning, maxDepthTouched, err := payloadless.NewTrieWithUpdatedRegisters(baseTrie, []ledger.Path{path4}, [][]byte{nil}, true)
 		require.NoError(t, err)
 		require.Equal(t, uint16(2), maxDepthTouched)
 		require.Equal(t, expectedRegCount, trie2withpruning.AllocatedRegCount())
-		require.Equal(t, expectedRegSize, trie2withpruning.AllocatedRegSize())
 		require.True(t, trie2withpruning.RootNode().VerifyCachedHash())
 
 		require.Equal(t, trie2.RootHash(), trie2withpruning.RootHash())
 
 		// now setting path2 to zero should do the pruning for two levels
 		expectedRegCount -= 1
-		expectedRegSize -= uint64(payload2.Size())
 
-		trie22, maxDepthTouched, err := trie.NewTrieWithUpdatedRegisters(trie2, []ledger.Path{path2}, []ledger.Payload{*emptyPayload}, false)
+		trie22, maxDepthTouched, err := payloadless.NewTrieWithUpdatedRegisters(trie2, []ledger.Path{path2}, [][]byte{nil}, false)
 		require.NoError(t, err)
 		require.Equal(t, uint16(3), maxDepthTouched)
 		require.Equal(t, expectedRegCount, trie22.AllocatedRegCount())
-		require.Equal(t, expectedRegSize, trie22.AllocatedRegSize())
 
-		trie22withpruning, maxDepthTouched, err := trie.NewTrieWithUpdatedRegisters(trie2withpruning, []ledger.Path{path2}, []ledger.Payload{*emptyPayload}, true)
+		trie22withpruning, maxDepthTouched, err := payloadless.NewTrieWithUpdatedRegisters(trie2withpruning, []ledger.Path{path2}, [][]byte{nil}, true)
 		require.NoError(t, err)
 		require.Equal(t, uint16(3), maxDepthTouched)
 		require.Equal(t, expectedRegCount, trie22withpruning.AllocatedRegCount())
-		require.Equal(t, expectedRegSize, trie22withpruning.AllocatedRegSize())
 
 		// after pruning
 		//                     n7
 		//                   /   \
 		//                 /       \
-		//             n5 (path1,   n6 (path6/payload6) // 1000
-		//                 /payload1)
+		//             n5 (path1,   n6 (path6/value6) // 1000
+		//                 /value1)
 
 		require.Equal(t, trie22.RootHash(), trie22withpruning.RootHash())
 		require.True(t, trie22withpruning.RootNode().VerifyCachedHash())
@@ -610,21 +555,19 @@ func Test_Pruning(t *testing.T) {
 
 	t.Run("several updates at the same time", func(t *testing.T) {
 		// setting path4 to zero from baseTrie
-		trie3, maxDepthTouched, err := trie.NewTrieWithUpdatedRegisters(baseTrie, []ledger.Path{path2, path4, path6}, []ledger.Payload{*emptyPayload, *emptyPayload, *emptyPayload}, false)
+		trie3, maxDepthTouched, err := payloadless.NewTrieWithUpdatedRegisters(baseTrie, []ledger.Path{path2, path4, path6}, [][]byte{nil, nil, nil}, false)
 		require.NoError(t, err)
 		require.Equal(t, uint16(3), maxDepthTouched)
 		require.Equal(t, uint64(1), trie3.AllocatedRegCount())
-		require.Equal(t, uint64(payload1.Size()), trie3.AllocatedRegSize())
 
 		// this should prune two levels
-		trie3withpruning, maxDepthTouched, err := trie.NewTrieWithUpdatedRegisters(baseTrie, []ledger.Path{path2, path4, path6}, []ledger.Payload{*emptyPayload, *emptyPayload, *emptyPayload}, true)
+		trie3withpruning, maxDepthTouched, err := payloadless.NewTrieWithUpdatedRegisters(baseTrie, []ledger.Path{path2, path4, path6}, [][]byte{nil, nil, nil}, true)
 		require.NoError(t, err)
 		require.Equal(t, uint16(3), maxDepthTouched)
 		require.Equal(t, uint64(1), trie3withpruning.AllocatedRegCount())
-		require.Equal(t, uint64(payload1.Size()), trie3withpruning.AllocatedRegSize())
 
 		// after pruning
-		//       n7  (path1/payload1)
+		//       n7  (path1/value1)
 		require.Equal(t, trie3.RootHash(), trie3withpruning.RootHash())
 		require.True(t, trie3withpruning.RootNode().VerifyCachedHash())
 	})
@@ -637,19 +580,18 @@ func Test_Pruning(t *testing.T) {
 		numberOfRemovals := 750
 
 		var err error
-		activeTrie := trie.NewEmptyMTrie()
-		activeTrieWithPruning := trie.NewEmptyMTrie()
-		allPaths := make(map[ledger.Path]ledger.Payload)
+		activeTrie := payloadless.NewEmptyMTrie()
+		activeTrieWithPruning := payloadless.NewEmptyMTrie()
+		allPaths := make(map[ledger.Path][]byte)
 		var maxDepthTouched, maxDepthTouchedWithPruning uint16
-		var parentTrieRegCount, parentTrieRegSize uint64
+		var parentTrieRegCount uint64
 
 		for step := 0; step < numberOfSteps; step++ {
 
 			updatePaths := make([]ledger.Path, 0)
-			updatePayloads := make([]ledger.Payload, 0)
+			updateValues := make([][]byte, 0)
 
 			var expectedRegCountDelta int64
-			var expectedRegSizeDelta int64
 
 			for i := 0; i < numberOfUpdates; {
 				var path ledger.Path
@@ -657,22 +599,20 @@ func Test_Pruning(t *testing.T) {
 				require.NoError(t, err)
 				// deduplicate
 				if _, found := allPaths[path]; !found {
-					payload := testutils.RandomPayload(1, 100)
+					value := payloadValue(testutils.RandomPayload(1, 100))
 					updatePaths = append(updatePaths, path)
-					updatePayloads = append(updatePayloads, *payload)
+					updateValues = append(updateValues, value)
 					expectedRegCountDelta++
-					expectedRegSizeDelta += int64(payload.Size())
 					i++
 				}
 			}
 
 			i := 0
 			samplesNeeded := int(math.Min(float64(numberOfRemovals), float64(len(allPaths))))
-			for p, pl := range allPaths {
+			for p := range allPaths {
 				updatePaths = append(updatePaths, p)
-				updatePayloads = append(updatePayloads, *emptyPayload)
+				updateValues = append(updateValues, nil)
 				expectedRegCountDelta--
-				expectedRegSizeDelta -= int64(pl.Size())
 				delete(allPaths, p)
 				i++
 				if i > samplesNeeded {
@@ -682,486 +622,314 @@ func Test_Pruning(t *testing.T) {
 
 			// only set it for the updates
 			for i := 0; i < numberOfUpdates; i++ {
-				allPaths[updatePaths[i]] = updatePayloads[i]
+				allPaths[updatePaths[i]] = updateValues[i]
 			}
 
-			activeTrie, maxDepthTouched, err = trie.NewTrieWithUpdatedRegisters(activeTrie, updatePaths, updatePayloads, false)
+			activeTrie, maxDepthTouched, err = payloadless.NewTrieWithUpdatedRegisters(activeTrie, updatePaths, updateValues, false)
 			require.NoError(t, err)
 			require.Equal(t, uint64(int64(parentTrieRegCount)+expectedRegCountDelta), activeTrie.AllocatedRegCount())
-			require.Equal(t, uint64(int64(parentTrieRegSize)+expectedRegSizeDelta), activeTrie.AllocatedRegSize())
 
-			activeTrieWithPruning, maxDepthTouchedWithPruning, err = trie.NewTrieWithUpdatedRegisters(activeTrieWithPruning, updatePaths, updatePayloads, true)
+			activeTrieWithPruning, maxDepthTouchedWithPruning, err = payloadless.NewTrieWithUpdatedRegisters(activeTrieWithPruning, updatePaths, updateValues, true)
 			require.NoError(t, err)
 			require.True(t, maxDepthTouched >= maxDepthTouchedWithPruning)
 			require.Equal(t, uint64(int64(parentTrieRegCount)+expectedRegCountDelta), activeTrieWithPruning.AllocatedRegCount())
-			require.Equal(t, uint64(int64(parentTrieRegSize)+expectedRegSizeDelta), activeTrieWithPruning.AllocatedRegSize())
 
 			require.Equal(t, activeTrie.RootHash(), activeTrieWithPruning.RootHash())
 
 			parentTrieRegCount = activeTrie.AllocatedRegCount()
-			parentTrieRegSize = activeTrie.AllocatedRegSize()
 
-			// fetch all values and compare
+			// fetch all leaf hashes and compare
 			queryPaths := make([]ledger.Path, 0)
 			for path := range allPaths {
 				queryPaths = append(queryPaths, path)
 			}
 
-			payloads := activeTrie.UnsafeRead(queryPaths)
-			for i, pp := range payloads {
-				expectedPayload := allPaths[queryPaths[i]]
-				require.True(t, pp.Equals(&expectedPayload))
+			leafHashes := activeTrie.UnsafeRead(queryPaths)
+			for i, lh := range leafHashes {
+				expectedValue := allPaths[queryPaths[i]]
+				expectedLeafHash := hash.HashLeaf(hash.Hash(queryPaths[i]), expectedValue)
+				require.NotNil(t, lh)
+				require.Equal(t, expectedLeafHash, *lh)
 			}
 
-			payloads = activeTrieWithPruning.UnsafeRead(queryPaths)
-			for i, pp := range payloads {
-				expectedPayload := allPaths[queryPaths[i]]
-				require.True(t, pp.Equals(&expectedPayload))
+			leafHashes = activeTrieWithPruning.UnsafeRead(queryPaths)
+			for i, lh := range leafHashes {
+				expectedValue := allPaths[queryPaths[i]]
+				expectedLeafHash := hash.HashLeaf(hash.Hash(queryPaths[i]), expectedValue)
+				require.NotNil(t, lh)
+				require.Equal(t, expectedLeafHash, *lh)
 			}
 
 		}
 	})
 }
 
-func hashToString(hash ledger.RootHash) string {
-	return hex.EncodeToString(hash[:])
+func rootHashToString(rh ledger.RootHash) string {
+	return hex.EncodeToString(rh[:])
 }
 
-// TestValueSizes tests value sizes of existent and non-existent paths for trie of different layouts.
-func TestValueSizes(t *testing.T) {
-
-	emptyTrie := trie.NewEmptyMTrie()
-
-	// Test value sizes for non-existent path in empty trie
-	t.Run("empty trie", func(t *testing.T) {
-		path := testutils.PathByUint16LeftPadded(0)
-		pathsToGetValueSize := []ledger.Path{path}
-		sizes := emptyTrie.UnsafeValueSizes(pathsToGetValueSize)
-		require.Equal(t, len(pathsToGetValueSize), len(sizes))
-		require.Equal(t, 0, sizes[0])
-	})
-
-	// Test value sizes for a mix of existent and non-existent paths
-	// in trie with compact leaf as root node.
-	t.Run("compact leaf as root", func(t *testing.T) {
-		path1 := testutils.PathByUint16LeftPadded(0)
-		payload1 := testutils.RandomPayload(1, 100)
-
-		path2 := testutils.PathByUint16LeftPadded(1) // This path will not be inserted into trie.
-
-		paths := []ledger.Path{path1}
-		payloads := []ledger.Payload{*payload1}
-
-		newTrie, maxDepthTouched, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, paths, payloads, true)
-		require.NoError(t, err)
-		require.Equal(t, uint16(0), maxDepthTouched)
-
-		pathsToGetValueSize := []ledger.Path{path1, path2}
-
-		sizes := newTrie.UnsafeValueSizes(pathsToGetValueSize)
-		require.Equal(t, len(pathsToGetValueSize), len(sizes))
-		require.Equal(t, payload1.Value().Size(), sizes[0])
-		require.Equal(t, 0, sizes[1])
-	})
-
-	// Test value sizes for a mix of existent and non-existent paths in partial trie.
-	t.Run("partial trie", func(t *testing.T) {
-		path1 := testutils.PathByUint16(1 << 12) // 000100...
-		path2 := testutils.PathByUint16(1 << 13) // 001000...
-
-		payload1 := testutils.RandomPayload(1, 100)
-		payload2 := testutils.RandomPayload(1, 100)
-
-		paths := []ledger.Path{path1, path2}
-		payloads := []ledger.Payload{*payload1, *payload2}
-
-		// Create a new trie with 2 leaf nodes (n1 and n2) at height 253.
-		newTrie, maxDepthTouched, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, paths, payloads, true)
-		require.NoError(t, err)
-		require.Equal(t, uint16(3), maxDepthTouched)
-
-		//                  n5
-		//                 /
-		//                /
-		//              n4
-		//             /
-		//            /
-		//           n3
-		//        /     \
-		//      /         \
-		//   n1 (path1/     n2 (path2/
-		//       payload1)      payload2)
-		//
-
-		// Populate pathsToGetValueSize with all possible paths for the first 4 bits.
-		pathsToGetValueSize := make([]ledger.Path, 16)
-		for i := 0; i < 16; i++ {
-			pathsToGetValueSize[i] = testutils.PathByUint16(uint16(i << 12))
-		}
-
-		// Test value sizes for a mix of existent and non-existent paths.
-		sizes := newTrie.UnsafeValueSizes(pathsToGetValueSize)
-		require.Equal(t, len(pathsToGetValueSize), len(sizes))
-		for i, p := range pathsToGetValueSize {
-			switch p {
-			case path1:
-				require.Equal(t, payload1.Value().Size(), sizes[i])
-			case path2:
-				require.Equal(t, payload2.Value().Size(), sizes[i])
-			default:
-				// Test value size for non-existent path
-				require.Equal(t, 0, sizes[i])
-			}
-		}
-
-		// Test value size for a single existent path
-		pathsToGetValueSize = []ledger.Path{path1}
-		sizes = newTrie.UnsafeValueSizes(pathsToGetValueSize)
-		require.Equal(t, len(pathsToGetValueSize), len(sizes))
-		require.Equal(t, payload1.Value().Size(), sizes[0])
-
-		// Test value size for a single non-existent path
-		pathsToGetValueSize = []ledger.Path{testutils.PathByUint16(3 << 12)}
-		sizes = newTrie.UnsafeValueSizes(pathsToGetValueSize)
-		require.Equal(t, len(pathsToGetValueSize), len(sizes))
-		require.Equal(t, 0, sizes[0])
-	})
-}
-
-// TestValueSizesWithDuplicatePaths tests value sizes of duplicate existent and non-existent paths.
-func TestValueSizesWithDuplicatePaths(t *testing.T) {
-	path1 := testutils.PathByUint16(0)
-	path2 := testutils.PathByUint16(1)
-	path3 := testutils.PathByUint16(2) // This path will not be inserted into trie.
-
-	payload1 := testutils.RandomPayload(1, 100)
-	payload2 := testutils.RandomPayload(1, 100)
-
-	paths := []ledger.Path{path1, path2}
-	payloads := []ledger.Payload{*payload1, *payload2}
-
-	emptyTrie := trie.NewEmptyMTrie()
-	newTrie, maxDepthTouched, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, paths, payloads, true)
-	require.NoError(t, err)
-	require.Equal(t, uint16(16), maxDepthTouched)
-
-	// pathsToGetValueSize is a mix of duplicate existent and nonexistent paths.
-	pathsToGetValueSize := []ledger.Path{
-		path1, path2, path3,
-		path1, path2, path3,
-	}
-
-	sizes := newTrie.UnsafeValueSizes(pathsToGetValueSize)
-	require.Equal(t, len(pathsToGetValueSize), len(sizes))
-	for i, p := range pathsToGetValueSize {
-		switch p {
-		case path1:
-			require.Equal(t, payload1.Value().Size(), sizes[i])
-		case path2:
-			require.Equal(t, payload2.Value().Size(), sizes[i])
-		default:
-			// Test payload size for non-existent path
-			require.Equal(t, 0, sizes[i])
-		}
-	}
-}
-
-// TestTrieAllocatedRegCountRegSize tests allocated register count and register size for updated trie.
+// TestTrieAllocatedRegCount tests allocated register count for updated trie.
 // It tests the following updates with prune flag set to true:
-//   - update empty trie with new paths and payloads
-//   - update trie with existing paths and updated payload
-//   - update trie with new paths and empty payloads
-//   - update trie with existing path and empty payload one by one until trie is empty
+//   - update empty trie with new paths and values
+//   - update trie with existing paths and updated values
+//   - update trie with new paths and empty values
+//   - update trie with existing path and empty value one by one until trie is empty
 //
 // It also tests the following updates with prune flag set to false:
-//   - update trie with existing path and empty payload one by one until trie is empty
-//   - update trie with removed paths and empty payloads
-//   - update trie with removed paths and non-empty payloads
-func TestTrieAllocatedRegCountRegSize(t *testing.T) {
+//   - update trie with existing path and empty value one by one until trie is empty
+//   - update trie with removed paths and empty values
+//   - update trie with removed paths and non-empty values
+func TestTrieAllocatedRegCount(t *testing.T) {
 
 	rng := &LinearCongruentialGenerator{seed: 0}
 
 	// Allocate 255 registers
 	numberRegisters := 255
 	paths := make([]ledger.Path, numberRegisters)
-	payloads := make([]ledger.Payload, numberRegisters)
-	var totalPayloadSize uint64
+	values := make([][]byte, numberRegisters)
 	for i := 0; i < numberRegisters; i++ {
 		var p ledger.Path
 		p[0] = byte(i)
 
-		payload := testutils.LightPayload(rng.next(), rng.next())
 		paths[i] = p
-		payloads[i] = *payload
-
-		totalPayloadSize += uint64(payload.Size())
+		values[i] = payloadValue(testutils.LightPayload(rng.next(), rng.next()))
 	}
 
-	// Update trie with registers to test reg count and size with new registers.
-	updatedTrie, maxDepthTouched, err := trie.NewTrieWithUpdatedRegisters(trie.NewEmptyMTrie(), paths, payloads, true)
+	// Update trie with registers to test reg count with new registers.
+	updatedTrie, maxDepthTouched, err := payloadless.NewTrieWithUpdatedRegisters(payloadless.NewEmptyMTrie(), paths, values, true)
 	require.NoError(t, err)
 	require.True(t, maxDepthTouched <= 256)
-	require.Equal(t, uint64(len(payloads)), updatedTrie.AllocatedRegCount())
-	require.Equal(t, totalPayloadSize, updatedTrie.AllocatedRegSize())
+	require.Equal(t, uint64(len(values)), updatedTrie.AllocatedRegCount())
 
-	// Update trie with existing paths and updated payloads
-	// to test reg count and size with updated registers
-	// (old payload size > 0 and new payload size > 0).
-	for i := 0; i < len(payloads); i += 2 {
-		newPayload := testutils.LightPayload(rng.next(), rng.next())
-		oldPayload := payloads[i]
-		payloads[i] = *newPayload
-		totalPayloadSize += uint64(newPayload.Size()) - uint64(oldPayload.Size())
+	// Update trie with existing paths and updated values
+	// to test reg count with updated registers
+	// (old value present and new value present).
+	for i := 0; i < len(values); i += 2 {
+		values[i] = payloadValue(testutils.LightPayload(rng.next(), rng.next()))
 	}
 
-	updatedTrie, maxDepthTouched, err = trie.NewTrieWithUpdatedRegisters(updatedTrie, paths, payloads, true)
+	updatedTrie, maxDepthTouched, err = payloadless.NewTrieWithUpdatedRegisters(updatedTrie, paths, values, true)
 	require.NoError(t, err)
 	require.True(t, maxDepthTouched <= 256)
-	require.Equal(t, uint64(len(payloads)), updatedTrie.AllocatedRegCount())
-	require.Equal(t, totalPayloadSize, updatedTrie.AllocatedRegSize())
+	require.Equal(t, uint64(len(values)), updatedTrie.AllocatedRegCount())
 
 	rootHash := updatedTrie.RootHash()
 
-	// Update trie with new paths and empty payloads
-	// to test reg count and size with new empty registers.
+	// Update trie with new paths and empty values
+	// to test reg count with new empty registers.
 	newPaths := []ledger.Path{}
-	newPayloads := []ledger.Payload{}
+	newValues := [][]byte{}
 	for i := 0; i < len(paths); i++ {
 		oldPath := paths[i]
 
 		path1, _ := ledger.ToPath(oldPath[:])
 		path1[1] = 1
-		payload1 := *ledger.NewPayload(
-			ledger.Key{KeyParts: []ledger.KeyPart{{Type: 0, Value: []byte{0x00, byte(i)}}}},
-			nil,
-		)
+		value1 := []byte(nil)
 
 		path2, _ := ledger.ToPath(oldPath[:])
 		path2[1] = 2
-		payload2 := ledger.EmptyPayload()
+		value2 := []byte(nil)
 
 		newPaths = append(newPaths, oldPath, path1, path2)
-		newPayloads = append(newPayloads, payloads[i], payload1, *payload2)
+		newValues = append(newValues, values[i], value1, value2)
 	}
 
-	updatedTrie, maxDepthTouched, err = trie.NewTrieWithUpdatedRegisters(updatedTrie, newPaths, newPayloads, true)
+	updatedTrie, maxDepthTouched, err = payloadless.NewTrieWithUpdatedRegisters(updatedTrie, newPaths, newValues, true)
 	require.NoError(t, err)
 	require.Equal(t, rootHash, updatedTrie.RootHash())
 	require.True(t, maxDepthTouched <= 256)
-	require.Equal(t, uint64(len(payloads)), updatedTrie.AllocatedRegCount())
-	require.Equal(t, totalPayloadSize, updatedTrie.AllocatedRegSize())
+	require.Equal(t, uint64(len(values)), updatedTrie.AllocatedRegCount())
 
 	t.Run("pruning", func(t *testing.T) {
-		expectedRegCount := uint64(len(payloads))
-		expectedRegSize := totalPayloadSize
+		expectedRegCount := uint64(len(values))
 
 		updatedTrieWithPruning := updatedTrie
 
-		// Remove register one by one to test reg count and size with empty registers
-		// (old payload size > 0 and new payload size == 0)
+		// Remove register one by one to test reg count with empty registers
+		// (old value present and new value empty)
 		for i := 0; i < len(paths); i++ {
 			newPaths := []ledger.Path{paths[i]}
-			newPayloads := []ledger.Payload{*ledger.EmptyPayload()}
+			newValues := [][]byte{nil}
 
 			expectedRegCount--
-			expectedRegSize -= uint64(payloads[i].Size())
 
-			updatedTrieWithPruning, maxDepthTouched, err = trie.NewTrieWithUpdatedRegisters(updatedTrieWithPruning, newPaths, newPayloads, true)
+			updatedTrieWithPruning, maxDepthTouched, err = payloadless.NewTrieWithUpdatedRegisters(updatedTrieWithPruning, newPaths, newValues, true)
 			require.NoError(t, err)
 			require.True(t, maxDepthTouched <= 256)
 			require.Equal(t, expectedRegCount, updatedTrieWithPruning.AllocatedRegCount())
-			require.Equal(t, expectedRegSize, updatedTrieWithPruning.AllocatedRegSize())
 		}
 
-		// After all registered are removed, reg count and size should be 0.
-		require.Equal(t, trie.EmptyTrieRootHash(), updatedTrieWithPruning.RootHash())
-		require.Equal(t, uint64(0), updatedTrieWithPruning.AllocatedRegSize())
-		require.Equal(t, uint64(0), updatedTrieWithPruning.AllocatedRegSize())
+		// After all registered are removed, reg count should be 0.
+		require.Equal(t, payloadless.EmptyTrieRootHash(), updatedTrieWithPruning.RootHash())
+		require.Equal(t, uint64(0), updatedTrieWithPruning.AllocatedRegCount())
 	})
 
 	t.Run("no pruning", func(t *testing.T) {
-		expectedRegCount := uint64(len(payloads))
-		expectedRegSize := totalPayloadSize
+		expectedRegCount := uint64(len(values))
 
 		updatedTrieNoPruning := updatedTrie
 
-		// Remove register one by one to test reg count and size with empty registers
-		// (old payload size > 0 and new payload size == 0)
+		// Remove register one by one to test reg count with empty registers
+		// (old value present and new value empty)
 		for i := 0; i < len(paths); i++ {
 			newPaths := []ledger.Path{paths[i]}
-			newPayloads := []ledger.Payload{*ledger.EmptyPayload()}
+			newValues := [][]byte{nil}
 
 			expectedRegCount--
-			expectedRegSize -= uint64(payloads[i].Size())
 
-			updatedTrieNoPruning, maxDepthTouched, err = trie.NewTrieWithUpdatedRegisters(updatedTrieNoPruning, newPaths, newPayloads, false)
+			updatedTrieNoPruning, maxDepthTouched, err = payloadless.NewTrieWithUpdatedRegisters(updatedTrieNoPruning, newPaths, newValues, false)
 			require.NoError(t, err)
 			require.True(t, maxDepthTouched <= 256)
 			require.Equal(t, expectedRegCount, updatedTrieNoPruning.AllocatedRegCount())
-			require.Equal(t, expectedRegSize, updatedTrieNoPruning.AllocatedRegSize())
 		}
 
-		// After all registered are removed, reg count and size should be 0.
-		require.Equal(t, trie.EmptyTrieRootHash(), updatedTrieNoPruning.RootHash())
+		// After all registered are removed, reg count should be 0.
+		require.Equal(t, payloadless.EmptyTrieRootHash(), updatedTrieNoPruning.RootHash())
 		require.Equal(t, uint64(0), updatedTrieNoPruning.AllocatedRegCount())
-		require.Equal(t, uint64(0), updatedTrieNoPruning.AllocatedRegSize())
 
-		// Update with removed paths and empty payloads
-		// (old payload size == 0 and new payload size == 0)
-		newPayloads := make([]ledger.Payload, len(paths))
-		for i := 0; i < len(paths); i++ {
-			newPayloads[i] = *ledger.EmptyPayload()
-		}
+		// Update with removed paths and empty values
+		// (old value empty and new value empty)
+		newValues := make([][]byte, len(paths))
 
-		updatedTrieNoPruning, maxDepthTouched, err = trie.NewTrieWithUpdatedRegisters(updatedTrieNoPruning, paths, newPayloads, false)
+		updatedTrieNoPruning, maxDepthTouched, err = payloadless.NewTrieWithUpdatedRegisters(updatedTrieNoPruning, paths, newValues, false)
 		require.NoError(t, err)
 		require.True(t, maxDepthTouched <= 256)
-		require.Equal(t, trie.EmptyTrieRootHash(), updatedTrieNoPruning.RootHash())
+		require.Equal(t, payloadless.EmptyTrieRootHash(), updatedTrieNoPruning.RootHash())
 		require.Equal(t, uint64(0), updatedTrieNoPruning.AllocatedRegCount())
-		require.Equal(t, uint64(0), updatedTrieNoPruning.AllocatedRegSize())
 
-		// Update with removed paths and non-empty payloads
-		// (old payload size == 0 and new payload size > 0)
-		updatedTrieNoPruning, maxDepthTouched, err = trie.NewTrieWithUpdatedRegisters(updatedTrieNoPruning, paths, payloads, false)
+		// Update with removed paths and non-empty values
+		// (old value empty and new value present)
+		updatedTrieNoPruning, maxDepthTouched, err = payloadless.NewTrieWithUpdatedRegisters(updatedTrieNoPruning, paths, values, false)
 		require.NoError(t, err)
 		require.Equal(t, rootHash, updatedTrie.RootHash())
 		require.True(t, maxDepthTouched <= 256)
-		require.Equal(t, uint64(len(payloads)), updatedTrieNoPruning.AllocatedRegCount())
-		require.Equal(t, totalPayloadSize, updatedTrieNoPruning.AllocatedRegSize())
+		require.Equal(t, uint64(len(values)), updatedTrieNoPruning.AllocatedRegCount())
 	})
 }
 
-// TestTrieAllocatedRegCountRegSizeWithMixedPruneFlag tests allocated register count and size
+// TestTrieAllocatedRegCountWithMixedPruneFlag tests allocated register count
 // for updated trie with mixed pruning flag.
 // It tests the following updates:
-//   - step 1 : update empty trie with new paths and payloads (255 allocated registers)
-//   - step 2 : remove a payload without pruning (254 allocated registers)
-//   - step 3a: remove previously removed payload with pruning (254 allocated registers)
-//   - step 3b: update trie from step 2 with a new payload (sibling of removed payload)
+//   - step 1 : update empty trie with new paths and values (255 allocated registers)
+//   - step 2 : remove a value without pruning (254 allocated registers)
+//   - step 3a: remove previously removed value with pruning (254 allocated registers)
+//   - step 3b: update trie from step 2 with a new value (sibling of removed value)
 //     with pruning (255 allocated registers)
-func TestTrieAllocatedRegCountRegSizeWithMixedPruneFlag(t *testing.T) {
+func TestTrieAllocatedRegCountWithMixedPruneFlag(t *testing.T) {
 	rng := &LinearCongruentialGenerator{seed: 0}
 
 	// Allocate 255 registers
 	numberRegisters := 255
 	paths := make([]ledger.Path, numberRegisters)
-	payloads := make([]ledger.Payload, numberRegisters)
-	var totalPayloadSize uint64
+	values := make([][]byte, numberRegisters)
 	for i := 0; i < numberRegisters; i++ {
 		var p ledger.Path
 		p[0] = byte(i)
 
-		payload := testutils.LightPayload(rng.next(), rng.next())
 		paths[i] = p
-		payloads[i] = *payload
-
-		totalPayloadSize += uint64(payload.Size())
+		values[i] = payloadValue(testutils.LightPayload(rng.next(), rng.next()))
 	}
 
-	expectedAllocatedRegCount := uint64(len(payloads))
-	expectedAllocatedRegSize := totalPayloadSize
+	expectedAllocatedRegCount := uint64(len(values))
 
-	// Update trie with registers to test reg count and size with new registers.
-	baseTrie, maxDepthTouched, err := trie.NewTrieWithUpdatedRegisters(trie.NewEmptyMTrie(), paths, payloads, true)
+	// Update trie with registers to test reg count with new registers.
+	baseTrie, maxDepthTouched, err := payloadless.NewTrieWithUpdatedRegisters(payloadless.NewEmptyMTrie(), paths, values, true)
 	require.NoError(t, err)
 	require.True(t, maxDepthTouched <= 256)
 	require.Equal(t, expectedAllocatedRegCount, baseTrie.AllocatedRegCount())
-	require.Equal(t, expectedAllocatedRegSize, baseTrie.AllocatedRegSize())
 
-	// Remove one payload without pruning
+	// Remove one value without pruning
 	expectedAllocatedRegCount--
-	expectedAllocatedRegSize -= uint64(payloads[0].Size())
 
 	removePaths := []ledger.Path{paths[0]}
-	removePayloads := []ledger.Payload{*ledger.EmptyPayload()}
-	unprunedTrie, maxDepthTouched, err := trie.NewTrieWithUpdatedRegisters(baseTrie, removePaths, removePayloads, false)
+	removeValues := [][]byte{nil}
+	unprunedTrie, maxDepthTouched, err := payloadless.NewTrieWithUpdatedRegisters(baseTrie, removePaths, removeValues, false)
 	require.NoError(t, err)
 	require.True(t, maxDepthTouched <= 256)
 	require.Equal(t, expectedAllocatedRegCount, unprunedTrie.AllocatedRegCount())
-	require.Equal(t, expectedAllocatedRegSize, unprunedTrie.AllocatedRegSize())
 
-	// Remove the same payload (no affect) from unprunedTrie with pruning
-	// expected reg count and reg size remain unchanged.
-	updatedTrie, maxDepthTouched, err := trie.NewTrieWithUpdatedRegisters(unprunedTrie, removePaths, removePayloads, true)
+	// Remove the same value (no affect) from unprunedTrie with pruning
+	// expected reg count remains unchanged.
+	updatedTrie, maxDepthTouched, err := payloadless.NewTrieWithUpdatedRegisters(unprunedTrie, removePaths, removeValues, true)
 	require.NoError(t, err)
 	require.True(t, maxDepthTouched <= 256)
 	require.Equal(t, expectedAllocatedRegCount, updatedTrie.AllocatedRegCount())
-	require.Equal(t, expectedAllocatedRegSize, updatedTrie.AllocatedRegSize())
 
 	// Add sibling of removed path from unprunedTrie with pruning
 	newPath := paths[0]
 	bitutils.SetBit(newPath[:], ledger.PathLen*8-1)
 	newPaths := []ledger.Path{newPath}
-	newPayloads := []ledger.Payload{*testutils.LightPayload(rng.next(), rng.next())}
+	newValues := [][]byte{payloadValue(testutils.LightPayload(rng.next(), rng.next()))}
 
-	// expected reg count is incremented and expected reg size is increase by new payload size.
+	// expected reg count is incremented.
 	expectedAllocatedRegCount++
-	expectedAllocatedRegSize += uint64(newPayloads[0].Size())
 
-	updatedTrie, maxDepthTouched, err = trie.NewTrieWithUpdatedRegisters(unprunedTrie, newPaths, newPayloads, true)
+	updatedTrie, maxDepthTouched, err = payloadless.NewTrieWithUpdatedRegisters(unprunedTrie, newPaths, newValues, true)
 	require.NoError(t, err)
 	require.True(t, maxDepthTouched <= 256)
 	require.Equal(t, expectedAllocatedRegCount, updatedTrie.AllocatedRegCount())
-	require.Equal(t, expectedAllocatedRegSize, updatedTrie.AllocatedRegSize())
 }
 
-// TestReadSinglePayload tests reading a single payload of existent/non-existent path for trie of different layouts.
-func TestReadSinglePayload(t *testing.T) {
+// TestReadSingleLeafHash tests reading a single leaf hash of existent/non-existent path
+// for trie of different layouts.
+func TestReadSingleLeafHash(t *testing.T) {
 
-	emptyTrie := trie.NewEmptyMTrie()
+	emptyTrie := payloadless.NewEmptyMTrie()
 
-	// Test reading payload in empty trie
+	// Test reading leaf hash in empty trie
 	t.Run("empty trie", func(t *testing.T) {
 		savedRootHash := emptyTrie.RootHash()
 
 		path := testutils.PathByUint16LeftPadded(0)
-		payload := emptyTrie.ReadSinglePayload(path)
-		require.True(t, payload.IsEmpty())
+		leafHash := emptyTrie.ReadSingleLeafHash(path)
+		require.Nil(t, leafHash)
 		require.Equal(t, savedRootHash, emptyTrie.RootHash())
 	})
 
-	// Test reading payload for existent/non-existent path
+	// Test reading leaf hash for existent/non-existent path
 	// in trie with compact leaf as root node.
 	t.Run("compact leaf as root", func(t *testing.T) {
 		path1 := testutils.PathByUint16LeftPadded(0)
-		payload1 := testutils.RandomPayload(1, 100)
+		value1 := payloadValue(testutils.RandomPayload(1, 100))
 
 		paths := []ledger.Path{path1}
-		payloads := []ledger.Payload{*payload1}
+		values := [][]byte{value1}
 
-		newTrie, maxDepthTouched, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, paths, payloads, true)
+		newTrie, maxDepthTouched, err := payloadless.NewTrieWithUpdatedRegisters(emptyTrie, paths, values, true)
 		require.NoError(t, err)
 		require.Equal(t, uint16(0), maxDepthTouched)
 
 		savedRootHash := newTrie.RootHash()
 
-		// Get payload for existent path path
-		retPayload := newTrie.ReadSinglePayload(path1)
-		require.Equal(t, payload1, retPayload)
+		// Get leaf hash for existent path
+		retLeafHash := newTrie.ReadSingleLeafHash(path1)
+		require.NotNil(t, retLeafHash)
+		expectedLeafHash := hash.HashLeaf(hash.Hash(path1), value1)
+		require.Equal(t, expectedLeafHash, *retLeafHash)
 		require.Equal(t, savedRootHash, newTrie.RootHash())
 
-		// Get payload for non-existent path
+		// Get leaf hash for non-existent path
 		path2 := testutils.PathByUint16LeftPadded(1)
-		retPayload = newTrie.ReadSinglePayload(path2)
-		require.True(t, retPayload.IsEmpty())
+		retLeafHash = newTrie.ReadSingleLeafHash(path2)
+		require.Nil(t, retLeafHash)
 		require.Equal(t, savedRootHash, newTrie.RootHash())
 	})
 
-	// Test reading payload for existent/non-existent path in an unpruned trie.
+	// Test reading leaf hash for existent/non-existent path in an unpruned trie.
 	t.Run("trie", func(t *testing.T) {
 		path1 := testutils.PathByUint16(1 << 12) // 000100...
 		path2 := testutils.PathByUint16(1 << 13) // 001000...
 		path3 := testutils.PathByUint16(1 << 14) // 010000...
 
-		payload1 := testutils.RandomPayload(1, 100)
-		payload2 := testutils.RandomPayload(1, 100)
-		payload3 := ledger.EmptyPayload()
+		value1 := payloadValue(testutils.RandomPayload(1, 100))
+		value2 := payloadValue(testutils.RandomPayload(1, 100))
+		var value3 []byte // empty
 
 		paths := []ledger.Path{path1, path2, path3}
-		payloads := []ledger.Payload{*payload1, *payload2, *payload3}
+		values := [][]byte{value1, value2, value3}
 
 		// Create an unpruned trie with 3 leaf nodes (n1, n2, n3).
-		newTrie, maxDepthTouched, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, paths, payloads, false)
+		newTrie, maxDepthTouched, err := payloadless.NewTrieWithUpdatedRegisters(emptyTrie, paths, values, false)
 		require.NoError(t, err)
 		require.Equal(t, uint16(3), maxDepthTouched)
 
@@ -1174,25 +942,29 @@ func TestReadSinglePayload(t *testing.T) {
 		//             /  \
 		//            /    \
 		//           n3      n3 (path3/
-		//        /     \        payload3)
+		//        /     \        value3)
 		//      /         \
 		//   n1 (path1/     n2 (path2/
-		//       payload1)      payload2)
+		//       value1)        value2)
 		//
 
-		// Test reading payload for all possible paths for the first 4 bits.
+		// Test reading leaf hash for all possible paths for the first 4 bits.
 		for i := 0; i < 16; i++ {
 			path := testutils.PathByUint16(uint16(i << 12))
 
-			retPayload := newTrie.ReadSinglePayload(path)
+			retLeafHash := newTrie.ReadSingleLeafHash(path)
 			require.Equal(t, savedRootHash, newTrie.RootHash())
 			switch path {
 			case path1:
-				require.Equal(t, payload1, retPayload)
+				require.NotNil(t, retLeafHash)
+				expected := hash.HashLeaf(hash.Hash(path1), value1)
+				require.Equal(t, expected, *retLeafHash)
 			case path2:
-				require.Equal(t, payload2, retPayload)
+				require.NotNil(t, retLeafHash)
+				expected := hash.HashLeaf(hash.Hash(path2), value2)
+				require.Equal(t, expected, *retLeafHash)
 			default:
-				require.True(t, retPayload.IsEmpty())
+				require.Nil(t, retLeafHash)
 			}
 		}
 	})
