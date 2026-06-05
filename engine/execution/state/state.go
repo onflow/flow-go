@@ -93,9 +93,18 @@ type ExecutionState interface {
 	GetHighestFinalizedExecuted() (uint64, error)
 }
 
+// LedgerStateChecker is the minimum ledger-side contract the execution state
+// always needs, regardless of register-store mode: a way to check whether a
+// given state commitment exists in the underlying trie. Both ledger.Ledger
+// and ledger.PayloadlessLedger satisfy this interface, which is how the
+// execution state can be backed by either.
+type LedgerStateChecker interface {
+	HasState(state ledger.State) bool
+}
+
 type state struct {
 	tracer             module.Tracer
-	ls                 ledger.Ledger
+	ls                 LedgerStateChecker
 	commits            storage.Commits
 	blocks             storage.Blocks
 	headers            storage.Headers
@@ -109,15 +118,22 @@ type state struct {
 	getLatestFinalized func() (uint64, error)
 	lockManager        lockctx.Manager
 
-	registerStore execution.RegisterStore
-	// when it is true, registers are stored in both register store and ledger
-	// and register queries will send to the register store instead of ledger
+	// snapshotLedger and registerStore are needed by the NewStorageSnapshot method,
+	// when enableRegisterStore == false, registerStore is nil, snapshotLedger is used to read register values
+	// when enableRegisterStore == true, 	snapshotLedger is nil, registerStore is used to read register values
+	// note:
+	// in payloadless ledger mode, enableRegisterStore must be true, therefore snapshotLedger is not needed and
+	// registerStore is used to read register values
 	enableRegisterStore bool
+	snapshotLedger      ledger.Ledger
+	registerStore       execution.RegisterStore
 }
 
-// NewExecutionState returns a new execution state access layer for the given ledger storage.
+// NewExecutionState returns a new execution state access layer for the given
+// ledger storage.
 func NewExecutionState(
-	ls ledger.Ledger,
+	ls LedgerStateChecker,
+	snapshotLedger ledger.Ledger,
 	commits storage.Commits,
 	blocks storage.Blocks,
 	headers storage.Headers,
@@ -137,6 +153,7 @@ func NewExecutionState(
 	return &state{
 		tracer:              tracer,
 		ls:                  ls,
+		snapshotLedger:      snapshotLedger,
 		commits:             commits,
 		blocks:              blocks,
 		headers:             headers,
@@ -262,7 +279,7 @@ func (s *state) NewStorageSnapshot(
 	if s.enableRegisterStore {
 		return storehouse.NewBlockEndStateSnapshot(s.registerStore, blockID, height)
 	}
-	return NewLedgerStorageSnapshot(s.ls, commitment)
+	return NewLedgerStorageSnapshot(s.snapshotLedger, commitment)
 }
 
 func (s *state) CreateStorageSnapshot(
