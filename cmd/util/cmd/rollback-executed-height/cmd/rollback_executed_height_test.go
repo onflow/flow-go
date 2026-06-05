@@ -68,6 +68,7 @@ func TestReExecuteBlock(t *testing.T) {
 		// create execution state module
 		es := state.NewExecutionState(
 			nil,
+			nil,
 			commits,
 			nil,
 			headers,
@@ -229,6 +230,7 @@ func TestReExecuteBlockWithDifferentResult(t *testing.T) {
 
 		// create execution state module
 		es := state.NewExecutionState(
+			nil,
 			nil,
 			commits,
 			nil,
