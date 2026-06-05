@@ -115,3 +115,51 @@ func newLocalLedger(config Config, triggerCheckpoint *atomic.Bool) (ledger.Ledge
 
 	return ledgerStorage, nil
 }
+
+// NewPayloadlessLedger creates a payloadless ledger instance.
+//
+// This is the payloadless-mode counterpart of [NewLedger]. It mirrors that
+// function's signature so call sites in cmd/execution_builder.go can switch
+// between the two without changing how config is plumbed. The argument types
+// are deliberately identical (same Config struct, same triggerCheckpoint).
+//
+// TODO: payloadless WAL is not implemented yet. This factory currently
+// returns an in-memory payloadless ledger that does not persist updates to
+// a WAL. config.Triedir, config.CheckpointDistance, config.CheckpointsToKeep
+// and triggerCheckpoint are accepted for API parity but ignored.
+//
+// TODO: payloadless checkpoint loading is not implemented yet. The factory
+// does not read any checkpoint file at boot, so the trie starts empty on
+// every startup. To make payloadless nodes survive a restart, one of the
+// following must land:
+//
+//	1. A native payloadless checkpoint format with its own writer, reader,
+//	   and bootstrap path.
+//	2. A conversion path that reads the existing full V6 mtrie checkpoint
+//	   (the format LoadBootstrapper copies into triedir) and ingests its
+//	   (path, value) pairs into the payloadless trie at boot. This unblocks
+//	   payloadless boot from existing on-disk state without committing to a
+//	   payloadless checkpoint format.
+//
+// Until one of those is in place, --payloadless mode is suitable for
+// short-lived experimental nodes only; the trie has no state on first boot
+// and loses all state on restart.
+//
+// TODO: remote payloadless ledger client. When config.LedgerServiceAddr is
+// set, this factory should construct a remote.PayloadlessClient (Spec 004).
+// For now config.LedgerServiceAddr is ignored.
+func NewPayloadlessLedger(config Config, triggerCheckpoint *atomic.Bool) (ledger.PayloadlessLedger, error) {
+	_ = triggerCheckpoint // TODO: drive payloadless checkpoint generation once a format exists
+
+	config.Logger.Warn().
+		Str("triedir", config.Triedir).
+		Msg("payloadless ledger has no WAL or checkpoint support yet; " +
+			"trie state will not survive restart and will not be loaded from disk")
+
+	return complete.NewPayloadlessLedger(
+		int(config.MTrieCacheSize),
+		config.LedgerMetrics,
+		config.Logger.With().Str("subcomponent", "ledger").Logger(),
+		complete.DefaultPathFinderVersion,
+	)
+}
