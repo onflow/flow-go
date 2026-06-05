@@ -2,7 +2,6 @@ package wal
 
 import (
 	"bufio"
-	"encoding/binary"
 	"fmt"
 	"io"
 	"os"
@@ -10,237 +9,39 @@ import (
 
 	"github.com/rs/zerolog"
 
-	"github.com/onflow/flow-go/ledger/complete/mtrie/flattener"
-	"github.com/onflow/flow-go/ledger/complete/mtrie/node"
-	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
+	"github.com/onflow/flow-go/ledger/complete/payloadless"
 )
 
-// OpenAndReadAsPayloadlessTrie reads a checkpoint file (V6 or V7) and returns payloadless tries.
-// If the checkpoint is V7, it reads directly as payloadless tries.
-// If the checkpoint is V6, it reads the tries and treats them as payloadless
-// (since V6 checkpoints created from payloadless forests already store payload hashes as values).
-func OpenAndReadAsPayloadlessTrie(dir string, fileName string, logger zerolog.Logger) (
-	triesToReturn []*trie.MTrie,
+// OpenAndReadCheckpointV7 opens a V7 (payloadless) checkpoint and returns the tries
+// as []*payloadless.MTrie. The file must be a V7 checkpoint — V6 (and any other
+// version) is rejected, both because the V7 reader explicitly validates the V7
+// magic+version at every part-file header and because V7 files use a different
+// filename suffix ([V7FileSuffix]) so they're trivially distinguishable on disk.
+func OpenAndReadCheckpointV7(dir string, fileName string, logger zerolog.Logger) (
+	triesToReturn []*payloadless.MTrie,
 	errToReturn error,
 ) {
 	headerPath := filePathCheckpointHeader(dir, fileName)
 	errToReturn = withFile(logger, headerPath, func(file *os.File) error {
-		// Read header to determine version
-		header := make([]byte, headerSize)
-		_, err := io.ReadFull(file, header)
+		tries, err := readCheckpointV7(file, logger)
 		if err != nil {
-			return fmt.Errorf("cannot read header: %w", err)
+			return err
 		}
-
-		magicBytes := binary.BigEndian.Uint16(header)
-		version := binary.BigEndian.Uint16(header[encMagicSize:])
-
-		if magicBytes != MagicBytesCheckpointHeader {
-			return fmt.Errorf("unknown file format. Magic constant %x does not match expected %x", magicBytes, MagicBytesCheckpointHeader)
-		}
-
-		// Reset to start of file
-		_, err = file.Seek(0, io.SeekStart)
-		if err != nil {
-			return fmt.Errorf("cannot seek to start of file: %w", err)
-		}
-
-		switch version {
-		case VersionV7:
-			// V7 is already payloadless, read directly
-			tries, err := readCheckpointV7(file, logger)
-			if err != nil {
-				return err
-			}
-			triesToReturn = tries
-			return nil
-		case VersionV6:
-			// V6 needs to be read and converted to payloadless
-			tries, err := readCheckpointV6AsPayloadless(file, logger)
-			if err != nil {
-				return err
-			}
-			triesToReturn = tries
-			return nil
-		default:
-			return fmt.Errorf("unsupported checkpoint version %x for payloadless reading", version)
-		}
+		triesToReturn = tries
+		return nil
 	})
 	return triesToReturn, errToReturn
 }
 
-// readCheckpointV6AsPayloadless reads a V6 checkpoint and returns payloadless tries.
-// This is useful when the V6 checkpoint was created from a payloadless forest,
-// where the payload values are already 32-byte hashes.
-func readCheckpointV6AsPayloadless(headerFile *os.File, logger zerolog.Logger) ([]*trie.MTrie, error) {
-	headerPath := headerFile.Name()
-	dir, fileName := filepath.Split(headerPath)
-
-	lg := logger.With().Str("checkpoint_file", headerPath).Logger()
-	lg.Info().Msgf("reading v6 checkpoint file as payloadless")
-
-	subtrieChecksums, topTrieChecksum, err := readCheckpointHeader(headerPath, logger)
-	if err != nil {
-		return nil, fmt.Errorf("could not read header: %w", err)
-	}
-
-	err = allPartFileExist(dir, fileName, len(subtrieChecksums))
-	if err != nil {
-		return nil, fmt.Errorf("fail to check all checkpoint part file exist: %w", err)
-	}
-
-	// Read subtrie nodes (same as V6, nodes don't change)
-	subtrieNodes, err := readSubTriesConcurrently(dir, fileName, subtrieChecksums, lg)
-	if err != nil {
-		return nil, fmt.Errorf("could not read subtrie from dir: %w", err)
-	}
-
-	lg.Info().Uint32("topsum", topTrieChecksum).
-		Msg("finish reading all v6 subtrie files, start reading top level tries as payloadless")
-
-	// Read top level tries with payloadless flag
-	tries, err := readTopLevelTriesAsPayloadless(dir, fileName, subtrieNodes, topTrieChecksum, lg)
-	if err != nil {
-		return nil, fmt.Errorf("could not read top level nodes or tries: %w", err)
-	}
-
-	lg.Info().Msgf("finish reading all trie roots as payloadless, trie root count: %v", len(tries))
-
-	if len(tries) > 0 {
-		first, last := tries[0], tries[len(tries)-1]
-		logger.Info().
-			Str("first_hash", first.RootHash().String()).
-			Uint64("first_reg_count", first.AllocatedRegCount()).
-			Str("last_hash", last.RootHash().String()).
-			Uint64("last_reg_count", last.AllocatedRegCount()).
-			Bool("payloadless", true).
-			Int("version", 6).
-			Msg("checkpoint tries roots (read as payloadless)")
-	}
-
-	return tries, nil
-}
-
-// readTopLevelTriesAsPayloadless reads top level tries from V6 checkpoint but creates payloadless tries.
-func readTopLevelTriesAsPayloadless(dir string, fileName string, subtrieNodes [][]*node.Node, topTrieChecksum uint32, logger zerolog.Logger) (
-	rootTriesToReturn []*trie.MTrie,
-	errToReturn error,
-) {
-	filepath, _ := filePathTopTries(dir, fileName)
-	errToReturn = withFile(logger, filepath, func(file *os.File) error {
-		// read and validate magic bytes and version (V6)
-		err := validateFileHeader(MagicBytesCheckpointToptrie, VersionV6, file)
-		if err != nil {
-			return err
-		}
-
-		topLevelNodesCount, triesCount, expectedSum, err := readTopTriesFooter(file)
-		if err != nil {
-			return fmt.Errorf("could not read top tries footer: %w", err)
-		}
-
-		if topTrieChecksum != expectedSum {
-			return fmt.Errorf("mismatch top trie checksum, header file has %v, toptrie file has %v",
-				topTrieChecksum, expectedSum)
-		}
-
-		_, err = file.Seek(0, io.SeekStart)
-		if err != nil {
-			return fmt.Errorf("could not seek to 0: %w", err)
-		}
-
-		reader := NewCRC32Reader(bufio.NewReaderSize(file, defaultBufioReadSize))
-
-		_, _, err = readFileHeader(reader)
-		if err != nil {
-			return fmt.Errorf("could not read version for top trie: %w", err)
-		}
-
-		buf := make([]byte, encNodeCountSize)
-		_, err = io.ReadFull(reader, buf)
-		if err != nil {
-			return fmt.Errorf("could not read subtrie node count: %w", err)
-		}
-		readSubtrieNodeCount, err := decodeNodeCount(buf)
-		if err != nil {
-			return fmt.Errorf("could not decode node count: %w", err)
-		}
-
-		totalSubTrieNodeCount := computeTotalSubTrieNodeCount(subtrieNodes)
-
-		if readSubtrieNodeCount != totalSubTrieNodeCount {
-			return fmt.Errorf("mismatch subtrie node count, read from disk (%v), but got actual node count (%v)",
-				readSubtrieNodeCount, totalSubTrieNodeCount)
-		}
-
-		topLevelNodes := make([]*node.Node, topLevelNodesCount+1)
-		tries := make([]*trie.MTrie, triesCount)
-
-		scratch := make([]byte, 1024*4)
-
-		for i := uint64(1); i <= topLevelNodesCount; i++ {
-			node, err := flattener.ReadNode(reader, scratch, func(nodeIndex uint64) (*node.Node, error) {
-				if nodeIndex >= i+uint64(totalSubTrieNodeCount) {
-					return nil, fmt.Errorf("sequence of serialized nodes does not satisfy Descendents-First-Relationship")
-				}
-				return getNodeByIndex(subtrieNodes, totalSubTrieNodeCount, topLevelNodes, nodeIndex)
-			})
-			if err != nil {
-				return fmt.Errorf("cannot read node at index %d: %w", i, err)
-			}
-			topLevelNodes[i] = node
-		}
-
-		// Read trie root nodes with payloadless flag set to true
-		for i := uint16(0); i < triesCount; i++ {
-			t, err := flattener.ReadTrieWithPayloadless(reader, scratch, func(nodeIndex uint64) (*node.Node, error) {
-				return getNodeByIndex(subtrieNodes, totalSubTrieNodeCount, topLevelNodes, nodeIndex)
-			}, true) // isPayloadless = true
-
-			if err != nil {
-				return fmt.Errorf("cannot read root trie at index %d: %w", i, err)
-			}
-			tries[i] = t
-		}
-
-		_, err = io.ReadFull(reader, scratch[:encNodeCountSize+encTrieCountSize])
-		if err != nil {
-			return fmt.Errorf("cannot read footer: %w", err)
-		}
-
-		actualSum := reader.Crc32()
-
-		if actualSum != expectedSum {
-			return fmt.Errorf("invalid checksum in top level trie, expected %v, actual %v",
-				expectedSum, actualSum)
-		}
-
-		_, err = io.ReadFull(reader, scratch[:crc32SumSize])
-		if err != nil {
-			return fmt.Errorf("could not read checksum from top trie file: %w", err)
-		}
-
-		err = ensureReachedEOF(reader)
-		if err != nil {
-			return fmt.Errorf("fail to read top trie file: %w", err)
-		}
-
-		rootTriesToReturn = tries
-		return nil
-	})
-	return rootTriesToReturn, errToReturn
-}
-
-// readCheckpointV7 reads checkpoint file from a main file and 17 file parts.
-// V7 is identical to V6 in structure but creates payloadless tries.
-// The payloadless tries store payload hashes instead of full payloads.
+// readCheckpointV7 reads a payloadless checkpoint from a header file and 17 part
+// files, returning the reconstructed []*payloadless.MTrie.
 //
-// it returns (tries, nil) if there was no error
-// it returns (nil, os.ErrNotExist) if a certain file is missing, use (os.IsNotExist to check)
-// it returns (nil, ErrEOFNotReached) if a certain part file is malformed
-// it returns (nil, err) if running into any exception
-func readCheckpointV7(headerFile *os.File, logger zerolog.Logger) ([]*trie.MTrie, error) {
-	// the full path of header file
+// It returns:
+//   - (tries, nil) on success
+//   - (nil, os.ErrNotExist) if a part file is missing (callers can use [os.IsNotExist])
+//   - (nil, ErrEOFNotReached) if a part file is malformed at the trailing bytes
+//   - (nil, err) for any other exception
+func readCheckpointV7(headerFile *os.File, logger zerolog.Logger) ([]*payloadless.MTrie, error) {
 	headerPath := headerFile.Name()
 	dir, fileName := filepath.Split(headerPath)
 
@@ -252,10 +53,7 @@ func readCheckpointV7(headerFile *os.File, logger zerolog.Logger) ([]*trie.MTrie
 		return nil, fmt.Errorf("could not read header: %w", err)
 	}
 
-	// ensure all checkpoint part file exists, might return os.ErrNotExist error
-	// if a file is missing
-	err = allPartFileExist(dir, fileName, len(subtrieChecksums))
-	if err != nil {
+	if err := allPartFileExist(dir, fileName, len(subtrieChecksums)); err != nil {
 		return nil, fmt.Errorf("fail to check all checkpoint part file exist: %w", err)
 	}
 
@@ -289,7 +87,8 @@ func readCheckpointV7(headerFile *os.File, logger zerolog.Logger) ([]*trie.MTrie
 	return tries, nil
 }
 
-// readCheckpointHeaderV7 reads the V7 checkpoint header file.
+// readCheckpointHeaderV7 reads and validates the V7 checkpoint header file,
+// returning the per-subtrie checksums and the top-trie file checksum.
 func readCheckpointHeaderV7(filepath string, logger zerolog.Logger) (
 	checksumsOfSubtries []uint32,
 	checksumOfTopTrie uint32,
@@ -299,7 +98,6 @@ func readCheckpointHeaderV7(filepath string, logger zerolog.Logger) (
 	if err != nil {
 		return nil, 0, fmt.Errorf("could not open header file: %w", err)
 	}
-
 	defer func(file *os.File) {
 		evictErr := evictFileFromLinuxPageCache(file, false, logger)
 		if evictErr != nil {
@@ -310,13 +108,10 @@ func readCheckpointHeaderV7(filepath string, logger zerolog.Logger) (
 
 	var bufReader io.Reader = bufio.NewReaderSize(closable, defaultBufioReadSize)
 	reader := NewCRC32Reader(bufReader)
-	// read the magic bytes and check version
-	err = validateFileHeader(MagicBytesCheckpointHeader, VersionV7, reader)
-	if err != nil {
+	if err := validateFileHeader(MagicBytesCheckpointHeader, VersionV7, reader); err != nil {
 		return nil, 0, err
 	}
 
-	// read the subtrie count
 	subtrieCount, err := readSubtrieCount(reader)
 	if err != nil {
 		return nil, 0, err
@@ -331,48 +126,46 @@ func readCheckpointHeaderV7(filepath string, logger zerolog.Logger) (
 		subtrieChecksums[i] = sum
 	}
 
-	// read top level trie checksum
 	topTrieChecksum, err := readCRC32Sum(reader)
 	if err != nil {
 		return nil, 0, fmt.Errorf("could not read checkpoint top level trie checksum in checkpoint summary: %w", err)
 	}
 
-	// calculate the actual checksum
 	actualSum := reader.Crc32()
-
-	// read the stored checksum, and compare with the actual sum
 	expectedSum, err := readCRC32Sum(reader)
 	if err != nil {
 		return nil, 0, fmt.Errorf("could not read checkpoint header checksum: %w", err)
 	}
-
 	if actualSum != expectedSum {
 		return nil, 0, fmt.Errorf("invalid checksum in checkpoint header, expected %v, actual %v",
 			expectedSum, actualSum)
 	}
-
-	err = ensureReachedEOF(reader)
-	if err != nil {
+	if err := ensureReachedEOF(reader); err != nil {
 		return nil, 0, fmt.Errorf("fail to read checkpoint header file: %w", err)
 	}
-
 	return subtrieChecksums, topTrieChecksum, nil
 }
 
-func readSubTriesConcurrentlyV7(dir string, fileName string, subtrieChecksums []uint32, logger zerolog.Logger) ([][]*node.Node, error) {
-	numOfSubTries := len(subtrieChecksums)
-	jobs := make(chan jobReadSubtrie, numOfSubTries)
-	resultChs := make([]<-chan *resultReadSubTrie, numOfSubTries)
+type payloadlessJobReadSubtrie struct {
+	Index    int
+	Checksum uint32
+	Result   chan<- *payloadlessResultReadSubTrie
+}
 
-	// push all jobs into the channel
+type payloadlessResultReadSubTrie struct {
+	Nodes []*payloadless.Node
+	Err   error
+}
+
+func readSubTriesConcurrentlyV7(dir string, fileName string, subtrieChecksums []uint32, logger zerolog.Logger) ([][]*payloadless.Node, error) {
+	numOfSubTries := len(subtrieChecksums)
+	jobs := make(chan payloadlessJobReadSubtrie, numOfSubTries)
+	resultChs := make([]<-chan *payloadlessResultReadSubTrie, numOfSubTries)
+
 	for i, checksum := range subtrieChecksums {
-		resultCh := make(chan *resultReadSubTrie)
+		resultCh := make(chan *payloadlessResultReadSubTrie)
 		resultChs[i] = resultCh
-		jobs <- jobReadSubtrie{
-			Index:    i,
-			Checksum: checksum,
-			Result:   resultCh,
-		}
+		jobs <- payloadlessJobReadSubtrie{Index: i, Checksum: checksum, Result: resultCh}
 	}
 	close(jobs)
 
@@ -381,16 +174,13 @@ func readSubTriesConcurrentlyV7(dir string, fileName string, subtrieChecksums []
 		go func() {
 			for job := range jobs {
 				nodes, err := readCheckpointSubTrieV7(dir, fileName, job.Index, job.Checksum, logger)
-				job.Result <- &resultReadSubTrie{
-					Nodes: nodes,
-					Err:   err,
-				}
+				job.Result <- &payloadlessResultReadSubTrie{Nodes: nodes, Err: err}
 				close(job.Result)
 			}
 		}()
 	}
 
-	nodesGroups := make([][]*node.Node, 0, len(resultChs))
+	nodesGroups := make([][]*payloadless.Node, 0, len(resultChs))
 	for i, resultCh := range resultChs {
 		result := <-resultCh
 		if result.Err != nil {
@@ -398,23 +188,21 @@ func readSubTriesConcurrentlyV7(dir string, fileName string, subtrieChecksums []
 		}
 		nodesGroups = append(nodesGroups, result.Nodes)
 	}
-
 	return nodesGroups, nil
 }
 
 func readCheckpointSubTrieV7(dir string, fileName string, index int, checksum uint32, logger zerolog.Logger) (
-	[]*node.Node,
+	[]*payloadless.Node,
 	error,
 ) {
-	var nodes []*node.Node
+	var nodes []*payloadless.Node
 	err := processCheckpointSubTrieV7(dir, fileName, index, checksum, logger,
 		func(reader *Crc32Reader, nodesCount uint64) error {
 			scratch := make([]byte, 1024*4)
-
-			nodes = make([]*node.Node, nodesCount+1)
+			nodes = make([]*payloadless.Node, nodesCount+1)
 			logging := logProgress(fmt.Sprintf("reading %v-th sub trie roots (v7)", index), int(nodesCount), logger)
 			for i := uint64(1); i <= nodesCount; i++ {
-				node, err := flattener.ReadNode(reader, scratch, func(nodeIndex uint64) (*node.Node, error) {
+				n, err := payloadless.ReadPayloadlessNode(reader, scratch, func(nodeIndex uint64) (*payloadless.Node, error) {
 					if nodeIndex >= i {
 						return nil, fmt.Errorf("sequence of serialized nodes does not satisfy Descendents-First-Relationship")
 					}
@@ -423,16 +211,14 @@ func readCheckpointSubTrieV7(dir string, fileName string, index int, checksum ui
 				if err != nil {
 					return fmt.Errorf("cannot read node %d: %w", i, err)
 				}
-				nodes[i] = node
+				nodes[i] = n
 				logging(i)
 			}
 			return nil
 		})
-
 	if err != nil {
 		return nil, err
 	}
-
 	return nodes[1:], nil
 }
 
@@ -449,9 +235,7 @@ func processCheckpointSubTrieV7(
 		return err
 	}
 	return withFile(logger, filepath, func(f *os.File) error {
-		// validate the magic bytes and version (V7 subtrie files use V7 version)
-		err := validateFileHeader(MagicBytesCheckpointSubtrie, VersionV7, f)
-		if err != nil {
+		if err := validateFileHeader(MagicBytesCheckpointSubtrie, VersionV7, f); err != nil {
 			return err
 		}
 
@@ -459,66 +243,55 @@ func processCheckpointSubTrieV7(
 		if err != nil {
 			return fmt.Errorf("cannot read sub trie node count: %w", err)
 		}
-
 		if checksum != expectedSum {
 			return fmt.Errorf("mismatch checksum in subtrie file. checksum from checkpoint header %v does not "+
 				"match with the checksum in subtrie file %v", checksum, expectedSum)
 		}
 
-		_, err = f.Seek(0, io.SeekStart)
-		if err != nil {
+		if _, err := f.Seek(0, io.SeekStart); err != nil {
 			return fmt.Errorf("cannot seek to start of file: %w", err)
 		}
 
 		reader := NewCRC32Reader(bufio.NewReaderSize(f, defaultBufioReadSize))
-
-		_, _, err = readFileHeader(reader)
-		if err != nil {
+		if _, _, err := readFileHeader(reader); err != nil {
 			return fmt.Errorf("could not read version again for subtrie: %w", err)
 		}
 
-		err = processNode(reader, nodesCount)
-		if err != nil {
+		if err := processNode(reader, nodesCount); err != nil {
 			return err
 		}
 
 		scratch := make([]byte, 1024)
-		_, err = io.ReadFull(reader, scratch[:encNodeCountSize])
-		if err != nil {
+		if _, err := io.ReadFull(reader, scratch[:encNodeCountSize]); err != nil {
 			return fmt.Errorf("cannot read footer: %w", err)
 		}
 
 		actualSum := reader.Crc32()
-
 		if actualSum != expectedSum {
 			return fmt.Errorf("invalid checksum in subtrie checkpoint, expected %v, actual %v",
 				expectedSum, actualSum)
 		}
 
-		_, err = io.ReadFull(reader, scratch[:crc32SumSize])
-		if err != nil {
+		if _, err := io.ReadFull(reader, scratch[:crc32SumSize]); err != nil {
 			return fmt.Errorf("could not read subtrie file's checksum: %w", err)
 		}
-
-		err = ensureReachedEOF(reader)
-		if err != nil {
+		if err := ensureReachedEOF(reader); err != nil {
 			return fmt.Errorf("fail to read %v-th subtrie file: %w", index, err)
 		}
-
 		return nil
 	})
 }
 
-// readTopLevelTriesV7 reads the top level tries from V7 checkpoint and creates payloadless tries.
-func readTopLevelTriesV7(dir string, fileName string, subtrieNodes [][]*node.Node, topTrieChecksum uint32, logger zerolog.Logger) (
-	rootTriesToReturn []*trie.MTrie,
+// readTopLevelTriesV7 reads the top-level nodes and trie root records from the
+// V7 top-trie part file, resolving each node reference against the previously-read
+// subtrie nodes and the running top-level node table.
+func readTopLevelTriesV7(dir string, fileName string, subtrieNodes [][]*payloadless.Node, topTrieChecksum uint32, logger zerolog.Logger) (
+	rootTriesToReturn []*payloadless.MTrie,
 	errToReturn error,
 ) {
 	filepath, _ := filePathTopTries(dir, fileName)
 	errToReturn = withFile(logger, filepath, func(file *os.File) error {
-		// read and validate magic bytes and version (V7 top trie files use V7 version)
-		err := validateFileHeader(MagicBytesCheckpointToptrie, VersionV7, file)
-		if err != nil {
+		if err := validateFileHeader(MagicBytesCheckpointToptrie, VersionV7, file); err != nil {
 			return err
 		}
 
@@ -526,27 +299,22 @@ func readTopLevelTriesV7(dir string, fileName string, subtrieNodes [][]*node.Nod
 		if err != nil {
 			return fmt.Errorf("could not read top tries footer: %w", err)
 		}
-
 		if topTrieChecksum != expectedSum {
 			return fmt.Errorf("mismatch top trie checksum, header file has %v, toptrie file has %v",
 				topTrieChecksum, expectedSum)
 		}
 
-		_, err = file.Seek(0, io.SeekStart)
-		if err != nil {
+		if _, err := file.Seek(0, io.SeekStart); err != nil {
 			return fmt.Errorf("could not seek to 0: %w", err)
 		}
 
 		reader := NewCRC32Reader(bufio.NewReaderSize(file, defaultBufioReadSize))
-
-		_, _, err = readFileHeader(reader)
-		if err != nil {
+		if _, _, err := readFileHeader(reader); err != nil {
 			return fmt.Errorf("could not read version for top trie: %w", err)
 		}
 
 		buf := make([]byte, encNodeCountSize)
-		_, err = io.ReadFull(reader, buf)
-		if err != nil {
+		if _, err := io.ReadFull(reader, buf); err != nil {
 			return fmt.Errorf("could not read subtrie node count: %w", err)
 		}
 		readSubtrieNodeCount, err := decodeNodeCount(buf)
@@ -554,62 +322,54 @@ func readTopLevelTriesV7(dir string, fileName string, subtrieNodes [][]*node.Nod
 			return fmt.Errorf("could not decode node count: %w", err)
 		}
 
-		totalSubTrieNodeCount := computeTotalSubTrieNodeCount(subtrieNodes)
-
+		totalSubTrieNodeCount := computeTotalPayloadlessSubTrieNodeCount(subtrieNodes)
 		if readSubtrieNodeCount != totalSubTrieNodeCount {
 			return fmt.Errorf("mismatch subtrie node count, read from disk (%v), but got actual node count (%v)",
 				readSubtrieNodeCount, totalSubTrieNodeCount)
 		}
 
-		topLevelNodes := make([]*node.Node, topLevelNodesCount+1)
-		tries := make([]*trie.MTrie, triesCount)
+		topLevelNodes := make([]*payloadless.Node, topLevelNodesCount+1)
+		tries := make([]*payloadless.MTrie, triesCount)
 
 		scratch := make([]byte, 1024*4)
 
 		for i := uint64(1); i <= topLevelNodesCount; i++ {
-			node, err := flattener.ReadNode(reader, scratch, func(nodeIndex uint64) (*node.Node, error) {
-				if nodeIndex >= i+uint64(totalSubTrieNodeCount) {
+			n, err := payloadless.ReadPayloadlessNode(reader, scratch, func(nodeIndex uint64) (*payloadless.Node, error) {
+				if nodeIndex >= i+totalSubTrieNodeCount {
 					return nil, fmt.Errorf("sequence of serialized nodes does not satisfy Descendents-First-Relationship")
 				}
-				return getNodeByIndex(subtrieNodes, totalSubTrieNodeCount, topLevelNodes, nodeIndex)
+				return getPayloadlessNodeByIndex(subtrieNodes, totalSubTrieNodeCount, topLevelNodes, nodeIndex)
 			})
 			if err != nil {
 				return fmt.Errorf("cannot read node at index %d: %w", i, err)
 			}
-			topLevelNodes[i] = node
+			topLevelNodes[i] = n
 		}
 
-		// Read trie root nodes with payloadless flag set to true
 		for i := uint16(0); i < triesCount; i++ {
-			t, err := flattener.ReadTrieWithPayloadless(reader, scratch, func(nodeIndex uint64) (*node.Node, error) {
-				return getNodeByIndex(subtrieNodes, totalSubTrieNodeCount, topLevelNodes, nodeIndex)
-			}, true) // isPayloadless = true
-
+			t, err := payloadless.ReadPayloadlessTrie(reader, scratch, func(nodeIndex uint64) (*payloadless.Node, error) {
+				return getPayloadlessNodeByIndex(subtrieNodes, totalSubTrieNodeCount, topLevelNodes, nodeIndex)
+			})
 			if err != nil {
 				return fmt.Errorf("cannot read root trie at index %d: %w", i, err)
 			}
 			tries[i] = t
 		}
 
-		_, err = io.ReadFull(reader, scratch[:encNodeCountSize+encTrieCountSize])
-		if err != nil {
+		if _, err := io.ReadFull(reader, scratch[:encNodeCountSize+encTrieCountSize]); err != nil {
 			return fmt.Errorf("cannot read footer: %w", err)
 		}
 
 		actualSum := reader.Crc32()
-
 		if actualSum != expectedSum {
 			return fmt.Errorf("invalid checksum in top level trie, expected %v, actual %v",
 				expectedSum, actualSum)
 		}
 
-		_, err = io.ReadFull(reader, scratch[:crc32SumSize])
-		if err != nil {
+		if _, err := io.ReadFull(reader, scratch[:crc32SumSize]); err != nil {
 			return fmt.Errorf("could not read checksum from top trie file: %w", err)
 		}
-
-		err = ensureReachedEOF(reader)
-		if err != nil {
+		if err := ensureReachedEOF(reader); err != nil {
 			return fmt.Errorf("fail to read top trie file: %w", err)
 		}
 
@@ -617,4 +377,45 @@ func readTopLevelTriesV7(dir string, fileName string, subtrieNodes [][]*node.Nod
 		return nil
 	})
 	return rootTriesToReturn, errToReturn
+}
+
+// getPayloadlessNodeByIndex resolves a node reference assigned during
+// [storeUniquePayloadlessNodes]. Index 0 is the nil sentinel; indices in
+// [1, totalSubTrieNodeCount] map into the flattened subtrie node groups; higher
+// indices map into topLevelNodes (offset by totalSubTrieNodeCount).
+func getPayloadlessNodeByIndex(
+	subtrieNodes [][]*payloadless.Node,
+	totalSubTrieNodeCount uint64,
+	topLevelNodes []*payloadless.Node,
+	index uint64,
+) (*payloadless.Node, error) {
+	if index == 0 {
+		return nil, nil
+	}
+	if index > totalSubTrieNodeCount {
+		nodePos := index - totalSubTrieNodeCount
+		if nodePos >= uint64(len(topLevelNodes)) {
+			return nil, fmt.Errorf("can not find payloadless node by index %v: nodePos %v >= len(topLevelNodes) %v",
+				index, nodePos, len(topLevelNodes))
+		}
+		return topLevelNodes[nodePos], nil
+	}
+	offset := index - 1
+	for _, subtries := range subtrieNodes {
+		if int(offset) < len(subtries) {
+			return subtries[offset], nil
+		}
+		offset -= uint64(len(subtries))
+	}
+	return nil, fmt.Errorf("could not find payloadless node by index %v, totalSubTrieNodeCount %v", index, totalSubTrieNodeCount)
+}
+
+// computeTotalPayloadlessSubTrieNodeCount returns the total node count across
+// all subtrie node groups.
+func computeTotalPayloadlessSubTrieNodeCount(subtrieNodes [][]*payloadless.Node) uint64 {
+	total := 0
+	for _, nodes := range subtrieNodes {
+		total += len(nodes)
+	}
+	return uint64(total)
 }
