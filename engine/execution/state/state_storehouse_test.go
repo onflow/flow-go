@@ -96,7 +96,7 @@ func prepareStorehouseTest(f func(t *testing.T, es state.ExecutionState, l *ledg
 				}
 
 				es := state.NewExecutionState(
-					ls, stateCommitments, blocks, headers, chunkDataPacks, results, myReceipts, events, serviceEvents, txResults, pebbleimpl.ToDB(pebbleDB),
+					ls, ls, stateCommitments, blocks, headers, chunkDataPacks, results, myReceipts, events, serviceEvents, txResults, pebbleimpl.ToDB(pebbleDB),
 					getLatestFinalized,
 					trace.NewNoopTracer(),
 					rs,
