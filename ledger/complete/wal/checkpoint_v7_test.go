@@ -1,24 +1,17 @@
 package wal
 
 import (
-	"crypto/rand"
 	"os"
-	"path"
-	"path/filepath"
 	"testing"
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/ledger"
-	"github.com/onflow/flow-go/ledger/common/convert"
-	"github.com/onflow/flow-go/ledger/common/pathfinder"
+	"github.com/onflow/flow-go/ledger/common/hash"
 	"github.com/onflow/flow-go/ledger/common/testutils"
-	"github.com/onflow/flow-go/ledger/complete/mtrie"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
-	"github.com/onflow/flow-go/ledger/partial/ptrie"
-	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/ledger/complete/payloadless"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -29,9 +22,9 @@ func TestVersionV7(t *testing.T) {
 	require.Equal(t, VersionV7, v)
 }
 
-// createSimplePayloadlessTrie creates a simple payloadless trie for testing
-func createSimplePayloadlessTrie(t *testing.T) []*trie.MTrie {
-	emptyTrie := trie.NewEmptyMTrieWithPayloadless(true)
+// createSimplePayloadlessTrie creates a single payloadless trie with two registers.
+func createSimplePayloadlessTrie(t *testing.T) []*payloadless.MTrie {
+	emptyTrie := payloadless.NewEmptyMTrie()
 
 	p1 := testutils.PathByUint8(0)
 	v1 := testutils.LightPayload8('A', 'a')
@@ -40,50 +33,69 @@ func createSimplePayloadlessTrie(t *testing.T) []*trie.MTrie {
 	v2 := testutils.LightPayload8('B', 'b')
 
 	paths := []ledger.Path{p1, p2}
-	payloads := []ledger.Payload{*v1, *v2}
+	values := [][]byte{v1.Value(), v2.Value()}
 
-	updatedTrie, _, err := trie.NewTrieWithUpdatedRegistersAndPayloadless(emptyTrie, paths, payloads, true, true)
+	updatedTrie, _, err := payloadless.NewTrieWithUpdatedRegisters(emptyTrie, paths, values, true)
 	require.NoError(t, err)
-	tries := []*trie.MTrie{updatedTrie}
-	return tries
+	return []*payloadless.MTrie{updatedTrie}
 }
 
-// createMultiplePayloadlessTries creates multiple payloadless tries for testing
-func createMultiplePayloadlessTries(t *testing.T) []*trie.MTrie {
-	tries := make([]*trie.MTrie, 0)
-	activeTrie := trie.NewEmptyMTrieWithPayloadless(true)
+// createMultiplePayloadlessTries returns a chain of payloadless tries deep enough
+// for the subtrie tests by stacking random updates.
+func createMultiplePayloadlessTries(t *testing.T) []*payloadless.MTrie {
+	tries := make([]*payloadless.MTrie, 0)
+	activeTrie := payloadless.NewEmptyMTrie()
 
 	var err error
 	for i := 0; i < 5; i++ {
 		paths, payloads := randNPathPayloads(20)
-		activeTrie, _, err = trie.NewTrieWithUpdatedRegistersAndPayloadless(activeTrie, paths, payloads, false, true)
+		values := payloadsToValues(payloads)
+		activeTrie, _, err = payloadless.NewTrieWithUpdatedRegisters(activeTrie, paths, values, false)
 		require.NoError(t, err, "update registers")
 		tries = append(tries, activeTrie)
 	}
 
 	// trie must be deep enough to test the subtrie
-	if !isTrieDeepEnough(activeTrie) {
+	if !isTrieDeepEnoughPayloadless(activeTrie) {
 		return createMultiplePayloadlessTries(t)
 	}
 
 	return tries
 }
 
-// requirePayloadlessTriesEqual compares two sets of payloadless tries
-func requirePayloadlessTriesEqual(t *testing.T, tries1, tries2 []*trie.MTrie) {
+// isTrieDeepEnoughPayloadless mirrors the v6 helper for the payloadless trie type.
+// It checks that every node at the subtrieLevel boundary is a non-leaf interim
+// node, so subtrie-splitting paths in the encoder are exercised.
+func isTrieDeepEnoughPayloadless(t *payloadless.MTrie) bool {
+	nodes := getPayloadlessNodesAtLevel(t.RootNode(), subtrieLevel)
+	for _, n := range nodes {
+		if n == nil || n.IsLeaf() {
+			return false
+		}
+	}
+	return true
+}
+
+func payloadsToValues(payloads []ledger.Payload) [][]byte {
+	values := make([][]byte, len(payloads))
+	for i := range payloads {
+		values[i] = payloads[i].Value()
+	}
+	return values
+}
+
+// requirePayloadlessTriesEqual compares two slices of payloadless tries by structural Equals.
+func requirePayloadlessTriesEqual(t *testing.T, tries1, tries2 []*payloadless.MTrie) {
 	require.Equal(t, len(tries1), len(tries2), "tries have different length")
 	for i, expect := range tries1 {
 		actual := tries2[i]
 		require.True(t, expect.Equals(actual), "%v-th trie is different", i)
-		// Both should be payloadless
-		require.True(t, expect.IsPayloadless(), "original trie should be payloadless")
-		require.True(t, actual.IsPayloadless(), "loaded trie should be payloadless")
 	}
 }
 
 func TestWriteAndReadCheckpointV7EmptyTrie(t *testing.T) {
 	unittest.RunWithTempDir(t, func(dir string) {
-		tries := []*trie.MTrie{trie.NewEmptyMTrieWithPayloadless(true)}
+		tries := []*payloadless.MTrie{payloadless.NewEmptyMTrie()}
 		fileName := "checkpoint-empty-trie-v7"
 		logger := zerolog.Nop()
 		require.NoErrorf(t, StoreCheckpointV7Concurrently(tries, dir, fileName, logger), "fail to store checkpoint")
@@ -117,7 +129,8 @@ func TestWriteAndReadCheckpointV7MultipleTries(t *testing.T) {
 	})
 }
 
-// Test that V7 checkpoints are deterministic
+// TestCheckpointV7IsDeterministic verifies that two calls to StoreCheckpointV7
+// over the same tries produce byte-identical part files.
 func TestCheckpointV7IsDeterministic(t *testing.T) {
 	unittest.RunWithTempDir(t, func(dir string) {
 		tries := createMultiplePayloadlessTries(t)
@@ -135,21 +148,7 @@ func TestCheckpointV7IsDeterministic(t *testing.T) {
 	})
 }
 
-// Test that V7 can be loaded via LoadCheckpoint (generic loader)
-func TestWriteAndReadCheckpointV7ViaGenericLoader(t *testing.T) {
-	unittest.RunWithTempDir(t, func(dir string) {
-		tries := createSimplePayloadlessTrie(t)
-		fileName := "checkpoint-v7-generic"
-		logger := zerolog.Nop()
-		require.NoErrorf(t, StoreCheckpointV7Concurrently(tries, dir, fileName, logger), "fail to store checkpoint")
-		// Use the generic LoadCheckpoint function that reads the version
-		decoded, err := LoadCheckpoint(filepath.Join(dir, fileName), logger)
-		require.NoErrorf(t, err, "fail to load checkpoint")
-		requirePayloadlessTriesEqual(t, tries, decoded)
-	})
-}
-
-// Test that V7 checkpoint stores correct root hash
+// TestCheckpointV7RootHash verifies that round-tripping a V7 checkpoint preserves the trie root hash.
 func TestCheckpointV7RootHash(t *testing.T) {
 	unittest.RunWithTempDir(t, func(dir string) {
 		tries := createSimplePayloadlessTrie(t)
@@ -158,41 +157,37 @@ func TestCheckpointV7RootHash(t *testing.T) {
 		require.NoErrorf(t, StoreCheckpointV7Concurrently(tries, dir, fileName, logger), "fail to store checkpoint")
 		decoded, err := OpenAndReadCheckpointV7(dir, fileName, logger)
 		require.NoErrorf(t, err, "fail to read checkpoint")
-		// Verify root hash matches
 		for i, t1 := range tries {
 			require.Equal(t, t1.RootHash(), decoded[i].RootHash(), "root hash mismatch at index %d", i)
 		}
 	})
 }
 
-// Test that old code cannot read V7 checkpoint (version check)
+// TestV7CheckpointVersionMismatch verifies the V6 reader rejects a V7 file.
 func TestV7CheckpointVersionMismatch(t *testing.T) {
 	unittest.RunWithTempDir(t, func(dir string) {
 		tries := createSimplePayloadlessTrie(t)
 		fileName := "checkpoint-v7-version"
 		logger := zerolog.Nop()
 		require.NoErrorf(t, StoreCheckpointV7Concurrently(tries, dir, fileName, logger), "fail to store checkpoint")
-		// Try to read with V6 reader - should fail due to version mismatch
 		_, err := OpenAndReadCheckpointV6(dir, fileName, logger)
 		require.Error(t, err, "V6 reader should fail on V7 checkpoint")
 	})
 }
 
-// Test that V7 reader cannot read V6 checkpoint
+// TestV6CheckpointVersionMismatchV7Reader verifies the V7 reader rejects a V6 file.
 func TestV6CheckpointVersionMismatchV7Reader(t *testing.T) {
 	unittest.RunWithTempDir(t, func(dir string) {
-		// Create regular (non-payloadless) tries
 		tries := createSimpleTrie(t)
 		fileName := "checkpoint-v6"
 		logger := zerolog.Nop()
 		require.NoErrorf(t, StoreCheckpointV6Concurrently(tries, dir, fileName, logger), "fail to store checkpoint")
-		// Try to read with V7 reader - should fail due to version mismatch
 		_, err := OpenAndReadCheckpointV7(dir, fileName, logger)
 		require.Error(t, err, "V7 reader should fail on V6 checkpoint")
 	})
 }
 
-// Test single-threaded V7 writer
+// TestWriteAndReadCheckpointV7SingleThread covers the single-threaded encoder path.
 func TestWriteAndReadCheckpointV7SingleThread(t *testing.T) {
 	unittest.RunWithTempDir(t, func(dir string) {
 		tries := createSimplePayloadlessTrie(t)
@@ -205,7 +200,7 @@ func TestWriteAndReadCheckpointV7SingleThread(t *testing.T) {
 	})
 }
 
-// Test that missing part files return appropriate error
+// TestV7AllPartFileExist verifies that a missing part file surfaces os.ErrNotExist.
 func TestV7AllPartFileExist(t *testing.T) {
 	unittest.RunWithTempDir(t, func(dir string) {
 		for i := 0; i < 17; i++ {
@@ -223,20 +218,19 @@ func TestV7AllPartFileExist(t *testing.T) {
 			logger := zerolog.Nop()
 			require.NoErrorf(t, StoreCheckpointV7Concurrently(tries, dir, fileName, logger), "fail to store checkpoint")
 
-			// delete i-th part file
 			err = os.Remove(fileToDelete)
 			require.NoError(t, err, "fail to remove part file")
 
 			_, err = OpenAndReadCheckpointV7(dir, fileName, logger)
 			require.ErrorIs(t, err, os.ErrNotExist, "wrong error type returned for missing file %d", i)
 
-			// cleanup for next iteration
 			require.NoError(t, deleteCheckpointFiles(dir, fileName))
 		}
 	})
 }
 
-// Test that payloadless trie values are 32-byte hashes
+// TestV7PayloadlessTrieStoresHashes verifies that the projected on-disk form
+// stores 32-byte leaf hashes for every allocated register.
 func TestV7PayloadlessTrieStoresHashes(t *testing.T) {
 	unittest.RunWithTempDir(t, func(dir string) {
 		tries := createSimplePayloadlessTrie(t)
@@ -246,670 +240,42 @@ func TestV7PayloadlessTrieStoresHashes(t *testing.T) {
 		decoded, err := OpenAndReadCheckpointV7(dir, fileName, logger)
 		require.NoErrorf(t, err, "fail to read checkpoint")
 
-		// Verify payloads in decoded tries are 32-byte hashes
+		// Every leaf hash recovered from the decoded payloadless trie must be 32 bytes.
 		for _, tr := range decoded {
-			require.True(t, tr.IsPayloadless(), "decoded trie should be payloadless")
-			allPayloads := tr.AllPayloads()
-			for _, payload := range allPayloads {
-				if payload.Value().Size() > 0 {
-					require.Equal(t, 32, payload.Value().Size(),
-						"payloadless trie should store 32-byte hashes, got %d bytes", payload.Value().Size())
-				}
+			for _, lh := range tr.AllLeafHashes() {
+				require.NotNil(t, lh, "decoded payloadless trie has nil leaf hash for an allocated register")
+				require.Equal(t, hash.HashLen, len(lh), "leaf hash should be %d bytes, got %d", hash.HashLen, len(lh))
 			}
 		}
 	})
 }
 
-// OpenAndReadCheckpointV7 opens the checkpoint file and reads it with readCheckpointV7
-func OpenAndReadCheckpointV7(dir string, fileName string, logger zerolog.Logger) (
-	triesToReturn []*trie.MTrie,
-	errToReturn error,
-) {
-	filepath := filePathCheckpointHeader(dir, fileName)
-	errToReturn = withFile(logger, filepath, func(file *os.File) error {
-		tries, err := readCheckpointV7(file, logger)
-		if err != nil {
-			return err
-		}
-		triesToReturn = tries
-		return nil
-	})
-	return triesToReturn, errToReturn
-}
-
-// Tests for OpenAndReadAsPayloadlessTrie
-
-// TestOpenAndReadAsPayloadlessTrieFromV7 verifies reading V7 checkpoint as payloadless
-func TestOpenAndReadAsPayloadlessTrieFromV7(t *testing.T) {
+// TestOpenAndReadCheckpointV7RejectsV6 verifies that the V7 reader refuses a V6
+// checkpoint — version, not payload shape, is the gate.
+func TestOpenAndReadCheckpointV7RejectsV6(t *testing.T) {
 	unittest.RunWithTempDir(t, func(dir string) {
-		tries := createSimplePayloadlessTrie(t)
-		fileName := "checkpoint-v7-payloadless"
+		tries := createSimpleTrie(t)
+		fileName := "checkpoint-v6"
 		logger := zerolog.Nop()
-		require.NoErrorf(t, StoreCheckpointV7Concurrently(tries, dir, fileName, logger), "fail to store checkpoint")
+		require.NoErrorf(t, StoreCheckpointV6Concurrently(tries, dir, fileName, logger), "fail to store V6 checkpoint")
 
-		// Read using OpenAndReadAsPayloadlessTrie
-		decoded, err := OpenAndReadAsPayloadlessTrie(dir, fileName, logger)
-		require.NoErrorf(t, err, "fail to read checkpoint as payloadless")
-		requirePayloadlessTriesEqual(t, tries, decoded)
+		_, err := OpenAndReadCheckpointV7(dir, fileName, logger)
+		require.Error(t, err, "V7 reader must reject a V6 checkpoint")
 	})
 }
 
-// TestOpenAndReadAsPayloadlessTrieFromV6 verifies reading V6 checkpoint as payloadless
-func TestOpenAndReadAsPayloadlessTrieFromV6(t *testing.T) {
+// TestOpenAndReadCheckpointV7RejectsV5 verifies that the V7 reader refuses a V5 checkpoint.
+func TestOpenAndReadCheckpointV7RejectsV5(t *testing.T) {
 	unittest.RunWithTempDir(t, func(dir string) {
-		// Create a payloadless trie but store it as V6
-		// This simulates a V6 checkpoint created from a payloadless forest
-		tries := createSimplePayloadlessTrie(t)
-		fileName := "checkpoint-v6-as-payloadless"
-		logger := zerolog.Nop()
-
-		// Store as V6 (note: the payload values are already hashes from the payloadless trie)
-		require.NoErrorf(t, StoreCheckpointV6Concurrently(tries, dir, fileName, logger), "fail to store checkpoint")
-
-		// Read using OpenAndReadAsPayloadlessTrie - should work and return payloadless tries
-		decoded, err := OpenAndReadAsPayloadlessTrie(dir, fileName, logger)
-		require.NoErrorf(t, err, "fail to read V6 checkpoint as payloadless")
-
-		// Verify the decoded tries are marked as payloadless
-		for i, tr := range decoded {
-			require.True(t, tr.IsPayloadless(), "decoded trie %d should be payloadless", i)
-		}
-
-		// Verify root hashes match
-		for i, orig := range tries {
-			require.Equal(t, orig.RootHash(), decoded[i].RootHash(), "root hash mismatch at index %d", i)
-		}
-	})
-}
-
-// TestOpenAndReadAsPayloadlessTriePreservesRootHash verifies root hash is preserved
-func TestOpenAndReadAsPayloadlessTriePreservesRootHash(t *testing.T) {
-	unittest.RunWithTempDir(t, func(dir string) {
-		// Create payloadless tries
-		tries := createMultiplePayloadlessTries(t)
-		fileName := "checkpoint-roothash-test"
-		logger := zerolog.Nop()
-
-		// Store as V6
-		require.NoErrorf(t, StoreCheckpointV6Concurrently(tries, dir, fileName, logger), "fail to store checkpoint")
-
-		// Read as payloadless
-		decoded, err := OpenAndReadAsPayloadlessTrie(dir, fileName, logger)
-		require.NoErrorf(t, err, "fail to read checkpoint")
-
-		// Verify all root hashes match
-		require.Equal(t, len(tries), len(decoded), "trie count mismatch")
-		for i, orig := range tries {
-			require.Equal(t, orig.RootHash(), decoded[i].RootHash(),
-				"root hash mismatch at index %d: expected %s, got %s",
-				i, orig.RootHash(), decoded[i].RootHash())
-		}
-	})
-}
-
-// TestOpenAndReadAsPayloadlessTrieV6MultipleTries tests reading multiple tries from V6
-func TestOpenAndReadAsPayloadlessTrieV6MultipleTries(t *testing.T) {
-	unittest.RunWithTempDir(t, func(dir string) {
-		tries := createMultiplePayloadlessTries(t)
-		fileName := "checkpoint-v6-multi-payloadless"
-		logger := zerolog.Nop()
-
-		require.NoErrorf(t, StoreCheckpointV6Concurrently(tries, dir, fileName, logger), "fail to store checkpoint")
-
-		decoded, err := OpenAndReadAsPayloadlessTrie(dir, fileName, logger)
-		require.NoErrorf(t, err, "fail to read V6 checkpoint as payloadless")
-
-		require.Equal(t, len(tries), len(decoded), "trie count mismatch")
-		for i, tr := range decoded {
-			require.True(t, tr.IsPayloadless(), "decoded trie %d should be payloadless", i)
-			require.Equal(t, tries[i].RootHash(), tr.RootHash(), "root hash mismatch at index %d", i)
-		}
-	})
-}
-
-// TestOpenAndReadAsPayloadlessTrieUnsupportedVersion tests error handling for unsupported versions
-func TestOpenAndReadAsPayloadlessTrieUnsupportedVersion(t *testing.T) {
-	unittest.RunWithTempDir(t, func(dir string) {
-		// Create a V5 checkpoint
 		tries := createSimpleTrie(t)
 		fileName := "checkpoint-v5"
 		logger := zerolog.Nop()
-		require.NoErrorf(t, storeCheckpointV5(tries, dir, fileName, logger), "fail to store checkpoint")
+		require.NoErrorf(t, storeCheckpointV5(tries, dir, fileName, logger), "fail to store V5 checkpoint")
 
-		// Try to read as payloadless - should fail for V5
-		_, err := OpenAndReadAsPayloadlessTrie(dir, fileName, logger)
-		require.Error(t, err, "should fail for V5 checkpoint")
-		require.Contains(t, err.Error(), "unsupported checkpoint version", "error should mention unsupported version")
+		_, err := OpenAndReadCheckpointV7(dir, fileName, logger)
+		require.Error(t, err, "V7 reader must reject a V5 checkpoint")
 	})
 }
 
-// TestOpenAndReadAsPayloadlessTriePayloadValues verifies payload values are 32-byte hashes
-func TestOpenAndReadAsPayloadlessTriePayloadValues(t *testing.T) {
-	unittest.RunWithTempDir(t, func(dir string) {
-		tries := createSimplePayloadlessTrie(t)
-		fileName := "checkpoint-payload-values"
-		logger := zerolog.Nop()
-
-		// Store as V6
-		require.NoErrorf(t, StoreCheckpointV6Concurrently(tries, dir, fileName, logger), "fail to store checkpoint")
-
-		// Read as payloadless
-		decoded, err := OpenAndReadAsPayloadlessTrie(dir, fileName, logger)
-		require.NoErrorf(t, err, "fail to read checkpoint")
-
-		// Verify payload values are 32-byte hashes
-		for _, tr := range decoded {
-			allPayloads := tr.AllPayloads()
-			for _, payload := range allPayloads {
-				if payload.Value().Size() > 0 {
-					require.Equal(t, 32, payload.Value().Size(),
-						"payload value should be 32-byte hash, got %d bytes", payload.Value().Size())
-				}
-			}
-		}
-	})
-}
-
-// TestV6V7CheckpointConsistencyWithWALUpdates is a comprehensive test that verifies:
-// 1. Path 1: Load V6 checkpoint (from payloadless forest) -> apply WAL updates with payloadless forest -> get root hash
-// 2. Path 2: Load V6 as payloadless -> apply WAL updates -> should get same root hash -> export V7
-// 3. Path 3: Load V6 as payloadless -> export V7 -> load V7 -> apply WAL updates -> should get same root hash -> export V7
-// Path 2 and Path 3 V7 checkpoints should be identical
-//
-// IMPORTANT: The V6 checkpoint is created from a PAYLOADLESS forest, so the payload values
-// stored in the checkpoint are already 32-byte hashes. This allows OpenAndReadAsPayloadlessTrie
-// to correctly load it as a payloadless trie.
-func TestV6V7CheckpointConsistencyWithWALUpdates(t *testing.T) {
-	unittest.RunWithTempDir(t, func(dir string) {
-		logger := zerolog.Nop()
-		forestCapacity := 100
-
-		// ============================================================
-		// Step 1: Create initial V6 checkpoint from a PAYLOADLESS forest
-		// This is the key - the V6 checkpoint will contain payload hashes as values
-		// ============================================================
-		initialPaths, initialPayloads := generateInitialData(t, 50)
-
-		// Create a PAYLOADLESS forest and add initial data
-		payloadlessForest, err := mtrie.NewForestWithPayloadless(forestCapacity, &metrics.NoopCollector{}, nil, true)
-		require.NoError(t, err, "failed to create payloadless forest")
-
-		initialUpdate := &ledger.TrieUpdate{
-			RootHash: payloadlessForest.GetEmptyRootHash(),
-			Paths:    initialPaths,
-			Payloads: toPayloadPtrs(initialPayloads),
-		}
-		initialRootHash, err := payloadlessForest.Update(initialUpdate)
-		require.NoError(t, err, "failed to apply initial update")
-
-		// Store as V6 checkpoint (the values stored are payload hashes, not full payloads)
-		v6CheckpointFile := "checkpoint-v6-initial"
-		initialTries, err := payloadlessForest.GetTries()
-		require.NoError(t, err, "failed to get tries from forest")
-		// Only store the trie with initial data (not the empty trie)
-		var trieToStore *trie.MTrie
-		for _, tr := range initialTries {
-			if tr.RootHash() == initialRootHash {
-				trieToStore = tr
-				break
-			}
-		}
-		require.NotNil(t, trieToStore, "failed to find trie with initial root hash")
-		require.True(t, trieToStore.IsPayloadless(), "initial trie should be payloadless")
-		require.NoErrorf(t, StoreCheckpointV6SingleThread([]*trie.MTrie{trieToStore}, dir, v6CheckpointFile, logger),
-			"fail to store V6 checkpoint")
-
-		t.Logf("Initial V6 checkpoint created from payloadless forest with root hash: %s", initialRootHash)
-
-		// ============================================================
-		// Step 2: Generate WAL updates (add, remove, update operations)
-		// ============================================================
-		walUpdates := generateWALUpdates(t, initialPaths, initialPayloads, 30)
-		t.Logf("Generated %d WAL updates", len(walUpdates))
-
-		// ============================================================
-		// Path 1: Load V6 as payloadless -> apply WAL updates -> get final root hash
-		// This is the reference path that Path 2 and Path 3 should match
-		// ============================================================
-		path1Dir := path.Join(dir, "path1")
-		require.NoError(t, os.MkdirAll(path1Dir, 0755))
-
-		// Copy checkpoint to path1
-		_, err = CopyCheckpointFile(v6CheckpointFile, dir, path1Dir)
-		require.NoError(t, err, "failed to copy checkpoint to path1")
-
-		// Load V6 checkpoint as payloadless
-		path1Tries, err := OpenAndReadAsPayloadlessTrie(path1Dir, v6CheckpointFile, logger)
-		require.NoError(t, err, "failed to load V6 checkpoint as payloadless for path1")
-		require.Len(t, path1Tries, 1, "expected 1 trie in checkpoint")
-		require.True(t, path1Tries[0].IsPayloadless(), "path1 trie should be payloadless")
-
-		// Create payloadless forest
-		path1Forest, err := mtrie.NewForestWithPayloadless(forestCapacity, &metrics.NoopCollector{}, nil, true)
-		require.NoError(t, err)
-		require.NoError(t, path1Forest.AddTries(path1Tries))
-
-		// Apply WAL updates
-		path1RootHash := path1Tries[0].RootHash()
-		for i, update := range walUpdates {
-			update.RootHash = path1RootHash
-			path1RootHash, err = path1Forest.Update(update)
-			require.NoError(t, err, "failed to apply WAL update %d in path1", i)
-		}
-		t.Logf("Path 1 final root hash: %s", path1RootHash)
-
-		// ============================================================
-		// Path 2: Load V6 as payloadless -> apply WAL updates -> export V7
-		// ============================================================
-		path2Dir := path.Join(dir, "path2")
-		require.NoError(t, os.MkdirAll(path2Dir, 0755))
-
-		// Copy checkpoint to path2
-		_, err = CopyCheckpointFile(v6CheckpointFile, dir, path2Dir)
-		require.NoError(t, err, "failed to copy checkpoint to path2")
-
-		// Load V6 checkpoint as payloadless
-		path2Tries, err := OpenAndReadAsPayloadlessTrie(path2Dir, v6CheckpointFile, logger)
-		require.NoError(t, err, "failed to load V6 checkpoint as payloadless for path2")
-		require.Len(t, path2Tries, 1, "expected 1 trie in checkpoint")
-		require.True(t, path2Tries[0].IsPayloadless(), "path2 trie should be payloadless")
-
-		// Create payloadless forest
-		path2Forest, err := mtrie.NewForestWithPayloadless(forestCapacity, &metrics.NoopCollector{}, nil, true)
-		require.NoError(t, err)
-		require.NoError(t, path2Forest.AddTries(path2Tries))
-
-		// Apply WAL updates
-		path2RootHash := path2Tries[0].RootHash()
-		for i, update := range walUpdates {
-			update.RootHash = path2RootHash
-			path2RootHash, err = path2Forest.Update(update)
-			require.NoError(t, err, "failed to apply WAL update %d in path2", i)
-		}
-		t.Logf("Path 2 final root hash: %s", path2RootHash)
-
-		// Verify root hash matches path1
-		require.Equal(t, path1RootHash, path2RootHash,
-			"Path 2 root hash should match Path 1 root hash")
-
-		// Export to V7 checkpoint
-		v7CheckpointPath2 := "checkpoint-v7-path2"
-		path2FinalTrie, err := path2Forest.GetTrie(path2RootHash)
-		require.NoError(t, err, "failed to get final trie from path2 forest")
-		require.NoErrorf(t, StoreCheckpointV7SingleThread([]*trie.MTrie{path2FinalTrie}, path2Dir, v7CheckpointPath2, logger),
-			"fail to store V7 checkpoint for path2")
-
-		// ============================================================
-		// Path 3: Load V6 as payloadless -> export V7 -> load V7 -> apply WAL updates -> export V7
-		// ============================================================
-		path3Dir := path.Join(dir, "path3")
-		require.NoError(t, os.MkdirAll(path3Dir, 0755))
-
-		// Copy checkpoint to path3
-		_, err = CopyCheckpointFile(v6CheckpointFile, dir, path3Dir)
-		require.NoError(t, err, "failed to copy checkpoint to path3")
-
-		// Load V6 checkpoint as payloadless
-		path3Tries, err := OpenAndReadAsPayloadlessTrie(path3Dir, v6CheckpointFile, logger)
-		require.NoError(t, err, "failed to load V6 checkpoint as payloadless for path3")
-		require.Len(t, path3Tries, 1, "expected 1 trie in checkpoint")
-
-		// Export to intermediate V7 checkpoint
-		v7CheckpointIntermediate := "checkpoint-v7-intermediate"
-		require.NoErrorf(t, StoreCheckpointV7SingleThread(path3Tries, path3Dir, v7CheckpointIntermediate, logger),
-			"fail to store intermediate V7 checkpoint for path3")
-
-		// Delete the V6 checkpoint files to ensure we're loading from V7
-		require.NoError(t, deleteCheckpointFiles(path3Dir, v6CheckpointFile))
-
-		// Load the intermediate V7 checkpoint
-		path3TriesFromV7, err := OpenAndReadCheckpointV7(path3Dir, v7CheckpointIntermediate, logger)
-		require.NoError(t, err, "failed to load intermediate V7 checkpoint for path3")
-		require.Len(t, path3TriesFromV7, 1, "expected 1 trie in V7 checkpoint")
-		require.True(t, path3TriesFromV7[0].IsPayloadless(), "path3 trie from V7 should be payloadless")
-
-		// Verify intermediate root hash matches
-		require.Equal(t, path2Tries[0].RootHash(), path3TriesFromV7[0].RootHash(),
-			"Intermediate V7 checkpoint root hash should match original")
-
-		// Create payloadless forest from V7 checkpoint
-		path3Forest, err := mtrie.NewForestWithPayloadless(forestCapacity, &metrics.NoopCollector{}, nil, true)
-		require.NoError(t, err)
-		require.NoError(t, path3Forest.AddTries(path3TriesFromV7))
-
-		// Apply WAL updates
-		path3RootHash := path3TriesFromV7[0].RootHash()
-		for i, update := range walUpdates {
-			update.RootHash = path3RootHash
-			path3RootHash, err = path3Forest.Update(update)
-			require.NoError(t, err, "failed to apply WAL update %d in path3", i)
-		}
-		t.Logf("Path 3 final root hash: %s", path3RootHash)
-
-		// Verify root hash matches path1 and path2
-		require.Equal(t, path1RootHash, path3RootHash,
-			"Path 3 root hash should match Path 1 root hash")
-
-		// Export to V7 checkpoint
-		v7CheckpointPath3 := "checkpoint-v7-path3"
-		path3FinalTrie, err := path3Forest.GetTrie(path3RootHash)
-		require.NoError(t, err, "failed to get final trie from path3 forest")
-		require.NoErrorf(t, StoreCheckpointV7SingleThread([]*trie.MTrie{path3FinalTrie}, path3Dir, v7CheckpointPath3, logger),
-			"fail to store V7 checkpoint for path3")
-
-		// ============================================================
-		// Verify Path 2 and Path 3 V7 checkpoints are identical
-		// ============================================================
-		path2V7Files := filePaths(path2Dir, v7CheckpointPath2, subtrieLevel)
-		path3V7Files := filePaths(path3Dir, v7CheckpointPath3, subtrieLevel)
-
-		require.Equal(t, len(path2V7Files), len(path3V7Files),
-			"Path 2 and Path 3 V7 checkpoints should have same number of files")
-
-		for i, path2File := range path2V7Files {
-			path3File := path3V7Files[i]
-			err := compareFiles(path2File, path3File)
-			require.NoError(t, err,
-				"Path 2 and Path 3 V7 checkpoint files should be identical: %s vs %s", path2File, path3File)
-		}
-
-		t.Log("SUCCESS: All paths produce identical results!")
-		t.Logf("  - Path 1 (V6 -> payloadless -> apply WAL): root hash = %s", path1RootHash)
-		t.Logf("  - Path 2 (V6 -> payloadless -> apply WAL -> V7): root hash = %s", path2RootHash)
-		t.Logf("  - Path 3 (V6 -> payloadless -> V7 -> load -> apply WAL -> V7): root hash = %s", path3RootHash)
-		t.Log("  - Path 2 and Path 3 V7 checkpoints are byte-for-byte identical")
-	})
-}
-
-// TestV7CheckpointWithPSMTVerification tests that proofs generated from a payloadless forest
-// after checkpoint loading and WAL updates can be verified by PSMT.
-// This test simulates the full production flow:
-// 1. Create a payloadless forest
-// 2. Apply initial updates
-// 3. Save V7 checkpoint
-// 4. Load V7 checkpoint into a new forest
-// 5. Apply WAL updates (simulating 100+ blocks)
-// 6. Generate proofs
-// 7. Verify PSMT can reconstruct the correct root hash
-func TestV7CheckpointWithPSMTVerification(t *testing.T) {
-	unittest.RunWithTempDir(t, func(dir string) {
-		logger := zerolog.Nop()
-		forestCapacity := 100
-
-		// Track all register values for proof reconstruction
-		registerValues := make(map[flow.RegisterID]flow.RegisterValue)
-		registerPaths := make(map[flow.RegisterID]ledger.Path)
-
-		// Create a payloadless forest
-		forest, err := mtrie.NewForestWithPayloadless(forestCapacity, &metrics.NoopCollector{}, nil, true)
-		require.NoError(t, err, "failed to create payloadless forest")
-
-		// Helper function to create valid register with path and payload
-		createRegister := func(i int, suffix string) (flow.RegisterID, ledger.Path, *ledger.Payload) {
-			owner := make([]byte, 8)
-			_, _ = rand.Read(owner)
-			key := suffix + string(rune(i))
-			value := make([]byte, 50+i%50)
-			_, _ = rand.Read(value)
-
-			regID := flow.NewRegisterID(flow.BytesToAddress(owner), key)
-			ledgerKey := convert.RegisterIDToLedgerKey(regID)
-			payload := ledger.NewPayload(ledgerKey, value)
-
-			path, err := pathfinder.KeyToPath(ledgerKey, 1)
-			require.NoError(t, err)
-			return regID, path, payload
-		}
-
-		// Apply initial updates (50 registers)
-		var initialPaths []ledger.Path
-		var initialPayloads []*ledger.Payload
-		for i := 0; i < 50; i++ {
-			regID, path, payload := createRegister(i, "init")
-			registerValues[regID] = payload.Value().DeepCopy()
-			registerPaths[regID] = path
-			initialPaths = append(initialPaths, path)
-			initialPayloads = append(initialPayloads, payload)
-		}
-
-		initialUpdate := &ledger.TrieUpdate{
-			RootHash: forest.GetEmptyRootHash(),
-			Paths:    initialPaths,
-			Payloads: initialPayloads,
-		}
-		initialRootHash, err := forest.Update(initialUpdate)
-		require.NoError(t, err, "failed to apply initial update")
-
-		// Save V7 checkpoint
-		v7CheckpointFile := "checkpoint-v7-psmt-test"
-		tries, err := forest.GetTries()
-		require.NoError(t, err)
-		var trieToStore *trie.MTrie
-		for _, tr := range tries {
-			if tr.RootHash() == initialRootHash {
-				trieToStore = tr
-				break
-			}
-		}
-		require.NotNil(t, trieToStore)
-		require.True(t, trieToStore.IsPayloadless())
-		require.NoErrorf(t, StoreCheckpointV7SingleThread([]*trie.MTrie{trieToStore}, dir, v7CheckpointFile, logger),
-			"fail to store V7 checkpoint")
-
-		t.Logf("Initial V7 checkpoint created with %d registers, root hash: %s", len(registerValues), initialRootHash)
-
-		// Load V7 checkpoint into a new forest
-		loadedTries, err := OpenAndReadCheckpointV7(dir, v7CheckpointFile, logger)
-		require.NoError(t, err, "failed to load V7 checkpoint")
-		require.Len(t, loadedTries, 1)
-		require.True(t, loadedTries[0].IsPayloadless())
-		require.Equal(t, initialRootHash, loadedTries[0].RootHash(), "loaded root hash mismatch")
-
-		// Create a new forest and add the loaded trie
-		newForest, err := mtrie.NewForestWithPayloadless(forestCapacity, &metrics.NoopCollector{}, nil, true)
-		require.NoError(t, err)
-		require.NoError(t, newForest.AddTries(loadedTries))
-
-		// Apply 107 rounds of WAL updates (simulating the production scenario)
-		currentRootHash := loadedTries[0].RootHash()
-		numRounds := 107
-		registerCounter := 50 // Continue counting from initial registers
-		for round := 0; round < numRounds; round++ {
-			// Generate updates for this round (mix of new and existing registers)
-			numNewRegisters := 1 + (round % 3) // 1-3 new registers per round
-			numUpdates := 1 + (round % 5)      // 1-5 updates to existing registers
-
-			var updatePaths []ledger.Path
-			var updatePayloads []*ledger.Payload
-
-			// Add new registers
-			for i := 0; i < numNewRegisters; i++ {
-				regID, path, payload := createRegister(registerCounter, "wal")
-				registerCounter++
-				registerValues[regID] = payload.Value().DeepCopy()
-				registerPaths[regID] = path
-				updatePaths = append(updatePaths, path)
-				updatePayloads = append(updatePayloads, payload)
-			}
-
-			// Update existing registers (if we have any)
-			existingRegIDs := make([]flow.RegisterID, 0, len(registerPaths))
-			for regID := range registerPaths {
-				existingRegIDs = append(existingRegIDs, regID)
-			}
-			for i := 0; i < numUpdates && len(existingRegIDs) > i; i++ {
-				regID := existingRegIDs[(round*numUpdates+i)%len(existingRegIDs)]
-				path := registerPaths[regID]
-				newValue := make([]byte, 30+round%20)
-				_, _ = rand.Read(newValue)
-				registerValues[regID] = newValue
-
-				key := convert.RegisterIDToLedgerKey(regID)
-				payload := ledger.NewPayload(key, newValue)
-				updatePaths = append(updatePaths, path)
-				updatePayloads = append(updatePayloads, payload)
-			}
-
-			// Apply update
-			update := &ledger.TrieUpdate{
-				RootHash: currentRootHash,
-				Paths:    updatePaths,
-				Payloads: updatePayloads,
-			}
-			currentRootHash, err = newForest.Update(update)
-			require.NoError(t, err, "failed to apply update at round %d", round)
-		}
-
-		t.Logf("Applied %d rounds of WAL updates, total registers: %d, final root hash: %s",
-			numRounds, len(registerValues), currentRootHash)
-
-		// Get the final trie
-		finalTrie, err := newForest.GetTrie(currentRootHash)
-		require.NoError(t, err)
-		require.True(t, finalTrie.IsPayloadless())
-
-		// Generate proofs for all registers
-		var allPaths []ledger.Path
-		for _, p := range registerPaths {
-			allPaths = append(allPaths, p)
-		}
-
-		// Generate proof from payloadless trie
-		trieRead := &ledger.TrieRead{
-			RootHash: currentRootHash,
-			Paths:    allPaths,
-		}
-		batchProof, err := newForest.Proofs(trieRead)
-		require.NoError(t, err, "failed to generate proofs")
-
-		// Encode the proof
-		encodedProof := ledger.EncodeTrieBatchProof(batchProof)
-
-		// Create value reader for proof reconstruction
-		valueReader := func(regID flow.RegisterID) (flow.RegisterValue, error) {
-			return registerValues[regID], nil
-		}
-
-		// Reconstruct the proof with actual values
-		reconstructedBytes, err := trie.ReconstructPayloadlessProof(encodedProof, valueReader)
-		require.NoError(t, err, "proof reconstruction failed")
-
-		// Decode the reconstructed proof
-		reconstructedProof, err := ledger.DecodeTrieBatchProof(reconstructedBytes)
-		require.NoError(t, err, "failed to decode reconstructed proof")
-
-		// Verify PSMT can reconstruct the correct root hash
-		psmt, err := ptrie.NewPSMT(currentRootHash, reconstructedProof)
-		require.NoError(t, err, "PSMT construction failed - this is the production bug!")
-		require.Equal(t, currentRootHash, psmt.RootHash(),
-			"PSMT root hash mismatch: expected %s, got %s", currentRootHash, psmt.RootHash())
-
-		t.Logf("SUCCESS: PSMT verification passed after %d rounds of updates on checkpoint-loaded forest", numRounds)
-	})
-}
-
-// toPayloadPtrs converts a slice of payloads to a slice of payload pointers
-func toPayloadPtrs(payloads []ledger.Payload) []*ledger.Payload {
-	ptrs := make([]*ledger.Payload, len(payloads))
-	for i := range payloads {
-		ptrs[i] = &payloads[i]
-	}
-	return ptrs
-}
-
-// generateInitialData creates initial paths and payloads for the test
-func generateInitialData(t *testing.T, count int) ([]ledger.Path, []ledger.Payload) {
-	paths := make([]ledger.Path, count)
-	payloads := make([]ledger.Payload, count)
-
-	for i := 0; i < count; i++ {
-		var p ledger.Path
-		_, err := rand.Read(p[:])
-		require.NoError(t, err)
-		paths[i] = p
-
-		payload := testutils.RandomPayload(10, 100)
-		payloads[i] = *payload
-	}
-
-	return paths, payloads
-}
-
-// generateWALUpdates creates a series of updates including add, remove, and update operations
-func generateWALUpdates(t *testing.T, existingPaths []ledger.Path, existingPayloads []ledger.Payload, count int) []*ledger.TrieUpdate {
-	updates := make([]*ledger.TrieUpdate, 0, count)
-
-	// Track which paths exist and their current payloads
-	pathState := make(map[ledger.Path]ledger.Payload)
-	for i, p := range existingPaths {
-		pathState[p] = existingPayloads[i]
-	}
-
-	existingPathsList := make([]ledger.Path, len(existingPaths))
-	copy(existingPathsList, existingPaths)
-
-	for i := 0; i < count; i++ {
-		var updatePaths []ledger.Path
-		var updatePayloads []*ledger.Payload
-
-		// Randomly choose operation type
-		opType := i % 3
-		numOps := 1 + (i % 5) // 1-5 operations per update
-
-		for j := 0; j < numOps; j++ {
-			switch opType {
-			case 0: // Add new value
-				var newPath ledger.Path
-				_, err := rand.Read(newPath[:])
-				require.NoError(t, err)
-
-				// Make sure it's actually new
-				if _, exists := pathState[newPath]; !exists {
-					newPayload := testutils.RandomPayload(10, 100)
-					updatePaths = append(updatePaths, newPath)
-					updatePayloads = append(updatePayloads, newPayload)
-					pathState[newPath] = *newPayload
-					existingPathsList = append(existingPathsList, newPath)
-				}
-
-			case 1: // Remove existing value (set to empty payload)
-				if len(existingPathsList) > 0 {
-					// Pick a random existing path
-					idx := j % len(existingPathsList)
-					pathToRemove := existingPathsList[idx]
-
-					if _, exists := pathState[pathToRemove]; exists {
-						emptyPayload := ledger.EmptyPayload()
-						updatePaths = append(updatePaths, pathToRemove)
-						updatePayloads = append(updatePayloads, emptyPayload)
-						delete(pathState, pathToRemove)
-					}
-				}
-
-			case 2: // Update existing value
-				if len(existingPathsList) > 0 {
-					// Pick a random existing path
-					idx := j % len(existingPathsList)
-					pathToUpdate := existingPathsList[idx]
-
-					if _, exists := pathState[pathToUpdate]; exists {
-						newPayload := testutils.RandomPayload(10, 100)
-						updatePaths = append(updatePaths, pathToUpdate)
-						updatePayloads = append(updatePayloads, newPayload)
-						pathState[pathToUpdate] = *newPayload
-					}
-				}
-			}
-		}
-
-		if len(updatePaths) > 0 {
-			update := &ledger.TrieUpdate{
-				Paths:    updatePaths,
-				Payloads: updatePayloads,
-			}
-			updates = append(updates, update)
-		}
-	}
-
-	return updates
-}
+// Ensure the trie package import is retained for converter use in helpers above.
+var _ = trie.NewEmptyMTrie
