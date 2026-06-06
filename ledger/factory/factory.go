@@ -119,47 +119,113 @@ func newLocalLedger(config Config, triggerCheckpoint *atomic.Bool) (ledger.Ledge
 // NewPayloadlessLedger creates a payloadless ledger instance.
 //
 // This is the payloadless-mode counterpart of [NewLedger]. It mirrors that
-// function's signature so call sites in cmd/execution_builder.go can switch
-// between the two without changing how config is plumbed. The argument types
-// are deliberately identical (same Config struct, same triggerCheckpoint).
+// function's signature and contract so call sites in cmd/execution_builder.go
+// can switch between the two without changing how config is plumbed —
+// including the requirement that config.Triedir be non-empty (the same
+// requirement [newLocalLedger] places on the V6 ledger).
 //
-// TODO: payloadless WAL is not implemented yet. This factory currently
-// returns an in-memory payloadless ledger that does not persist updates to
-// a WAL. config.Triedir, config.CheckpointDistance, config.CheckpointsToKeep
-// and triggerCheckpoint are accepted for API parity but ignored.
+// The factory opens a [wal.DiskWAL] over config.Triedir and returns a
+// [complete.PayloadlessLedgerWithCompactor], which:
 //
-// TODO: payloadless checkpoint loading is not implemented yet. The factory
-// does not read any checkpoint file at boot, so the trie starts empty on
-// every startup. To make payloadless nodes survive a restart, one of the
-// following must land:
+//	(a) seeds its forest from the latest V7 (payloadless) checkpoint;
+//	(b) replays WAL segments newer than that checkpoint;
+//	(c) records subsequent updates to the shared WAL; and
+//	(d) emits a new V7 checkpoint every config.CheckpointDistance segments,
+//	    pruning down to config.CheckpointsToKeep V7 files.
 //
-//  1. A native payloadless checkpoint format with its own writer, reader,
-//     and bootstrap path.
-//  2. A conversion path that reads the existing full V6 mtrie checkpoint
-//     (the format LoadBootstrapper copies into triedir) and ingests its
-//     (path, value) pairs into the payloadless trie at boot. This unblocks
-//     payloadless boot from existing on-disk state without committing to a
-//     payloadless checkpoint format.
-//
-// Until one of those is in place, --payloadless mode is suitable for
-// short-lived experimental nodes only; the trie has no state on first boot
-// and loses all state on restart.
+// If config.Triedir contains only V6 checkpoints and no V7, the factory logs
+// a hint pointing to the checkpoint-convert-v7 utility and continues with an
+// empty forest (followed by WAL replay if any segments exist).
 //
 // TODO: remote payloadless ledger client. When config.LedgerServiceAddr is
 // set, this factory should construct a remote.PayloadlessClient (Spec 004).
 // For now config.LedgerServiceAddr is ignored.
+//
+// Expected error returns during normal operation:
+//   - error if config.Triedir is empty
 func NewPayloadlessLedger(config Config, triggerCheckpoint *atomic.Bool) (ledger.PayloadlessLedger, error) {
-	_ = triggerCheckpoint // TODO: drive payloadless checkpoint generation once a format exists
+	logger := config.Logger.With().Str("subcomponent", "ledger").Logger()
 
-	config.Logger.Warn().
+	if config.Triedir == "" {
+		return nil, fmt.Errorf("payloadless ledger requires a non-empty config.Triedir")
+	}
+
+	// A V7 (payloadless) checkpoint must exist in `Triedir` before a payloadless
+	// node can boot. There is no payloadless bootstrap path that doesn't go
+	// through a V7 checkpoint: the WAL alone records full payload updates, but
+	// the leaf-hash commitment can only be reconstructed by replaying every
+	// update from genesis, which is not feasible at runtime. Hence: no V7 →
+	// refuse to start.
+	v7Numbers, latestV7, err := wal.ListV7Checkpoints(config.Triedir)
+	if err != nil {
+		return nil, fmt.Errorf("could not list V7 checkpoints in %s: %w", config.Triedir, err)
+	}
+	if latestV7 < 0 {
+		// Look for V6 checkpoints so the error message can point the operator
+		// at the convert utility. List failures here are non-fatal: we still
+		// want the operator to see the primary "no V7" error.
+		v6Numbers, latestV6, v6ListErr := wal.ListV6Checkpoints(config.Triedir)
+		if v6ListErr != nil {
+			logger.Warn().Err(v6ListErr).
+				Str("triedir", config.Triedir).
+				Msg("payloadless ledger: could not also list V6 checkpoints while reporting missing V7")
+		}
+		if latestV6 >= 0 {
+			logger.Warn().
+				Str("triedir", config.Triedir).
+				Int("latest_v6", latestV6).
+				Int("v6_count", len(v6Numbers)).
+				Msg("payloadless ledger: no V7 checkpoint found, but V6 checkpoints exist — " +
+					"run the `checkpoint-convert-v7` util to produce a V7 checkpoint")
+			return nil, fmt.Errorf(
+				"no V7 (payloadless) checkpoint found in %s but %d V6 checkpoint(s) exist (latest: %d); "+
+					"run the `checkpoint-convert-v7` util to produce a V7 checkpoint before restart",
+				config.Triedir, len(v6Numbers), latestV6,
+			)
+		}
+		return nil, fmt.Errorf(
+			"no V7 (payloadless) checkpoint found in %s; a V7 checkpoint is required to start a payloadless node",
+			config.Triedir,
+		)
+	}
+	logger.Info().
 		Str("triedir", config.Triedir).
-		Msg("payloadless ledger has no WAL or checkpoint support yet; " +
-			"trie state will not survive restart and will not be loaded from disk")
+		Int("latest_v7", latestV7).
+		Int("v7_count", len(v7Numbers)).
+		Msg("payloadless ledger: V7 checkpoint discovered; the bundle will seed from it")
 
-	return complete.NewPayloadlessLedger(
+	diskWAL, err := wal.NewDiskWAL(
+		logger.With().Str("subcomponent", "wal").Logger(),
+		config.MetricsRegisterer,
+		config.WALMetrics,
+		config.Triedir,
 		int(config.MTrieCacheSize),
+		pathfinder.PathByteSize,
+		wal.SegmentSize,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize payloadless wal: %w", err)
+	}
+
+	compactorConfig := &ledger.CompactorConfig{
+		CheckpointCapacity: uint(config.MTrieCacheSize),
+		CheckpointDistance: config.CheckpointDistance,
+		CheckpointsToKeep:  config.CheckpointsToKeep,
+		Metrics:            config.WALMetrics,
+	}
+
+	bundle, err := complete.NewPayloadlessLedgerWithCompactor(
+		diskWAL,
+		int(config.MTrieCacheSize),
+		compactorConfig,
+		triggerCheckpoint,
 		config.LedgerMetrics,
-		config.Logger.With().Str("subcomponent", "ledger").Logger(),
+		logger,
 		complete.DefaultPathFinderVersion,
 	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create payloadless ledger with compactor: %w", err)
+	}
+
+	return bundle, nil
 }
