@@ -921,6 +921,18 @@ func (c *Checkpointer) RemoveCheckpoint(checkpoint int) error {
 	return nil
 }
 
+// RemoveCheckpointV7 deletes only the V7 (payloadless) part files for the given
+// checkpoint number, leaving any same-numbered V6 file in place. This is used
+// by the payloadless compactor's retention logic so V6 checkpoints owned by a
+// separate writer aren't collaterally damaged.
+func (c *Checkpointer) RemoveCheckpointV7(checkpoint int) error {
+	v7Name := NumberToFilenameV7(checkpoint)
+	if err := deleteCheckpointFiles(c.dir, v7Name); err != nil {
+		return fmt.Errorf("failed to remove V7 checkpoint %d: %w", checkpoint, err)
+	}
+	return nil
+}
+
 func LoadCheckpoint(filepath string, logger zerolog.Logger) (
 	tries []*trie.MTrie,
 	errToReturn error) {
