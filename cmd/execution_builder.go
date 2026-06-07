@@ -1485,6 +1485,10 @@ func (exeNode *ExecutionNode) LoadBootstrapper(node *NodeConfig) error {
 
 		// when bootstrapping, the bootstrap folder must have a checkpoint file
 		// we need to cover this file to the trie folder to restore the trie to restore the execution state.
+		//
+		// Note: in payloadless mode the V6 root checkpoint placed here is later
+		// converted to root.checkpoint.v7 by ledgerfactory.NewPayloadlessLedger
+		// before the bundle reads it. Bootstrap itself stays mode-agnostic.
 		err = copyBootstrapState(node.BootstrapDir, exeNode.exeConf.triedir)
 		if err != nil {
 			return fmt.Errorf("could not load bootstrap state from checkpoint file: %w", err)
