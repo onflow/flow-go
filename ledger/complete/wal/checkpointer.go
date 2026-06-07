@@ -967,13 +967,21 @@ func HasRootCheckpoint(dir string) (bool, error) {
 
 // HasRootCheckpointV7 checks if a V7 (payloadless) root checkpoint exists.
 func HasRootCheckpointV7(dir string) (bool, error) {
-	if _, err := os.Stat(path.Join(dir, bootstrap.FilenameWALRootCheckpoint+V7FileSuffix)); err == nil {
+	if _, err := os.Stat(path.Join(dir, RootCheckpointFilenameV7())); err == nil {
 		return true, nil
 	} else if os.IsNotExist(err) {
 		return false, nil
 	} else {
 		return false, err
 	}
+}
+
+// RootCheckpointFilenameV7 returns the on-disk filename of the V7
+// (payloadless) root checkpoint. The V7 file lives alongside the V6 root
+// (bootstrap.FilenameWALRootCheckpoint), with the V7 suffix appended, so
+// the two can coexist while a node is being migrated between modes.
+func RootCheckpointFilenameV7() string {
+	return bootstrap.FilenameWALRootCheckpoint + V7FileSuffix
 }
 
 func (c *Checkpointer) RemoveCheckpoint(checkpoint int) error {
