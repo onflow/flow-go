@@ -2,6 +2,7 @@ package payloadless_test
 
 import (
 	"errors"
+	"sync/atomic"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -50,9 +51,9 @@ func (m *mockProofLedger) Prove(q *ledger.Query) (*ledger.PayloadlessTrieBatchPr
 	return m.proveFn(q)
 }
 
-// payloadlessLeaf is a helper that builds a single inclusion-proof leaf at the
-// given path with leafHash = HashLeaf(path, value) and minimal structural
-// fields. Used by the reconstruction tests as the standard fixture shape.
+// payloadlessLeaf builds a single inclusion-proof leaf at the given path with
+// leafHash = HashLeaf(path, value) and minimal structural fields. Used as the
+// standard fixture shape for reconstruction tests.
 func payloadlessLeaf(t *testing.T, path ledger.Path, value flow.RegisterValue) *ledger.PayloadlessTrieProof {
 	t.Helper()
 	leafHash := hash.HashLeaf(hash.Hash(path), value)
@@ -67,8 +68,8 @@ func payloadlessLeaf(t *testing.T, path ledger.Path, value flow.RegisterValue) *
 }
 
 // pathFor derives the trie path for a register ID using the production
-// pathfinder version. Convenient for setting up proofs whose paths agree
-// with what `complete.PayloadlessLedger` would compute internally.
+// pathfinder version. Convenient for setting up proofs whose paths agree with
+// what `complete.PayloadlessLedger` would compute internally.
 func pathFor(t *testing.T, registerID flow.RegisterID) ledger.Path {
 	t.Helper()
 	path, err := pathfinder.KeyToPath(
@@ -79,234 +80,15 @@ func pathFor(t *testing.T, registerID flow.RegisterID) ledger.Path {
 	return path
 }
 
-// =====================================================================
-// ReconstructPayloadlessProof
-// =====================================================================
-
-func TestReconstructPayloadlessProof_HappyPath(t *testing.T) {
-	reg := unittest.MakeOwnerReg("k", "v")
-	path := pathFor(t, reg.Key)
-	leaf := payloadlessLeaf(t, path, reg.Value)
-
-	batch := ledger.NewPayloadlessTrieBatchProof()
-	batch.AppendProof(leaf)
-
-	pathToRegisterID := map[ledger.Path]flow.RegisterID{path: reg.Key}
-	reader := func(id flow.RegisterID) (flow.RegisterValue, error) {
-		require.Equal(t, reg.Key, id)
-		return reg.Value, nil
+// mockedLedger returns a mockProofLedger whose Prove() returns the supplied
+// batch verbatim.
+func mockedLedger(batch *ledger.PayloadlessTrieBatchProof) *mockProofLedger {
+	return &mockProofLedger{
+		proveFn: func(*ledger.Query) (*ledger.PayloadlessTrieBatchProof, error) {
+			return batch, nil
+		},
 	}
-
-	bytes, err := payloadless.ReconstructPayloadlessProof(batch, pathToRegisterID, reader)
-	require.NoError(t, err)
-	require.NotEmpty(t, bytes)
-
-	full, err := ledger.DecodeTrieBatchProof(bytes)
-	require.NoError(t, err)
-	require.Equal(t, 1, full.Size())
-
-	got := full.Proofs[0]
-	require.Equal(t, path, got.Path)
-	require.True(t, got.Inclusion)
-	require.Equal(t, leaf.Steps, got.Steps)
-	require.Equal(t, leaf.Flags, got.Flags)
-	require.Equal(t, leaf.Interims, got.Interims)
-	require.Equal(t, ledger.Value(reg.Value), got.Payload.Value())
 }
-
-func TestReconstructPayloadlessProof_NonInclusion(t *testing.T) {
-	reg := unittest.MakeOwnerReg("k", "v")
-	path := pathFor(t, reg.Key)
-
-	// Non-inclusion proof: Inclusion = false, no LeafHash.
-	leaf := ledger.NewPayloadlessTrieProof()
-	leaf.Path = path
-	leaf.Inclusion = false
-	leaf.Steps = 2
-	leaf.Flags[0] = 0x40
-	leaf.Interims = []hash.Hash{hash.DummyHash}
-
-	batch := ledger.NewPayloadlessTrieBatchProof()
-	batch.AppendProof(leaf)
-
-	readerNotCalled := func(flow.RegisterID) (flow.RegisterValue, error) {
-		t.Fatalf("valueReader must not be called for non-inclusion proofs")
-		return nil, nil
-	}
-
-	bytes, err := payloadless.ReconstructPayloadlessProof(batch, nil, readerNotCalled)
-	require.NoError(t, err)
-
-	full, err := ledger.DecodeTrieBatchProof(bytes)
-	require.NoError(t, err)
-	require.Equal(t, 1, full.Size())
-
-	got := full.Proofs[0]
-	require.False(t, got.Inclusion)
-	require.Equal(t, leaf.Steps, got.Steps)
-	require.Equal(t, leaf.Flags, got.Flags)
-	require.Equal(t, leaf.Interims, got.Interims)
-	require.True(t, got.Payload.IsEmpty(), "non-inclusion → empty payload on the reconstructed side")
-}
-
-func TestReconstructPayloadlessProof_EmptyLeafInclusion(t *testing.T) {
-	// Inclusion = true but LeafHash = nil. The forest pads non-inclusion
-	// proofs with empty inclusions for non-existent paths; reconstruction
-	// must collapse those to empty payloads, not reach for a value.
-	reg := unittest.MakeOwnerReg("k", "v")
-	path := pathFor(t, reg.Key)
-
-	leaf := ledger.NewPayloadlessTrieProof()
-	leaf.Path = path
-	leaf.LeafHash = nil
-	leaf.Inclusion = true
-
-	batch := ledger.NewPayloadlessTrieBatchProof()
-	batch.AppendProof(leaf)
-
-	readerNotCalled := func(flow.RegisterID) (flow.RegisterValue, error) {
-		t.Fatalf("valueReader must not be called for empty-leaf inclusion proofs")
-		return nil, nil
-	}
-
-	bytes, err := payloadless.ReconstructPayloadlessProof(batch, nil, readerNotCalled)
-	require.NoError(t, err)
-
-	full, err := ledger.DecodeTrieBatchProof(bytes)
-	require.NoError(t, err)
-	require.True(t, full.Proofs[0].Inclusion)
-	require.True(t, full.Proofs[0].Payload.IsEmpty())
-}
-
-func TestReconstructPayloadlessProof_MultipleProofs(t *testing.T) {
-	// Mix three proofs: a real inclusion, an empty-leaf inclusion, and a
-	// non-inclusion. Verify each branch is handled independently.
-	regA := unittest.MakeOwnerReg("a", "va")
-	regB := unittest.MakeOwnerReg("b", "vb")
-	regC := unittest.MakeOwnerReg("c", "vc")
-	pathA := pathFor(t, regA.Key)
-	pathB := pathFor(t, regB.Key)
-	pathC := pathFor(t, regC.Key)
-
-	inclusion := payloadlessLeaf(t, pathA, regA.Value)
-
-	empty := ledger.NewPayloadlessTrieProof()
-	empty.Path = pathB
-	empty.Inclusion = true // empty leaf, but inclusion proof shape
-
-	noninclusion := ledger.NewPayloadlessTrieProof()
-	noninclusion.Path = pathC
-	noninclusion.Inclusion = false
-
-	batch := ledger.NewPayloadlessTrieBatchProof()
-	batch.AppendProof(inclusion)
-	batch.AppendProof(empty)
-	batch.AppendProof(noninclusion)
-
-	pathToRegisterID := map[ledger.Path]flow.RegisterID{pathA: regA.Key}
-
-	called := 0
-	reader := func(id flow.RegisterID) (flow.RegisterValue, error) {
-		called++
-		require.Equal(t, regA.Key, id, "only the real inclusion path should reach the reader")
-		return regA.Value, nil
-	}
-
-	bytes, err := payloadless.ReconstructPayloadlessProof(batch, pathToRegisterID, reader)
-	require.NoError(t, err)
-	require.Equal(t, 1, called, "reader should be invoked exactly once (for the real inclusion)")
-
-	full, err := ledger.DecodeTrieBatchProof(bytes)
-	require.NoError(t, err)
-	require.Equal(t, 3, full.Size())
-
-	require.True(t, full.Proofs[0].Inclusion)
-	require.Equal(t, ledger.Value(regA.Value), full.Proofs[0].Payload.Value())
-
-	require.True(t, full.Proofs[1].Inclusion)
-	require.True(t, full.Proofs[1].Payload.IsEmpty())
-
-	require.False(t, full.Proofs[2].Inclusion)
-	require.True(t, full.Proofs[2].Payload.IsEmpty())
-}
-
-func TestReconstructPayloadlessProof_ValueMismatch(t *testing.T) {
-	// Reader returns a value that does not hash to the leafHash carried in
-	// the proof. Expect ErrPayloadHashMismatch.
-	reg := unittest.MakeOwnerReg("k", "real-value")
-	path := pathFor(t, reg.Key)
-	leaf := payloadlessLeaf(t, path, reg.Value)
-
-	batch := ledger.NewPayloadlessTrieBatchProof()
-	batch.AppendProof(leaf)
-
-	pathToRegisterID := map[ledger.Path]flow.RegisterID{path: reg.Key}
-	reader := func(flow.RegisterID) (flow.RegisterValue, error) {
-		return flow.RegisterValue("lying-value"), nil
-	}
-
-	_, err := payloadless.ReconstructPayloadlessProof(batch, pathToRegisterID, reader)
-	require.Error(t, err)
-	require.ErrorIs(t, err, payloadless.ErrPayloadHashMismatch)
-}
-
-func TestReconstructPayloadlessProof_ValueReaderError(t *testing.T) {
-	// Reader returns an error. Expect it to be propagated (wrapped, but
-	// errors.Is should still find it).
-	reg := unittest.MakeOwnerReg("k", "v")
-	path := pathFor(t, reg.Key)
-	leaf := payloadlessLeaf(t, path, reg.Value)
-
-	batch := ledger.NewPayloadlessTrieBatchProof()
-	batch.AppendProof(leaf)
-
-	pathToRegisterID := map[ledger.Path]flow.RegisterID{path: reg.Key}
-	readerErr := errors.New("storehouse offline")
-	reader := func(flow.RegisterID) (flow.RegisterValue, error) {
-		return nil, readerErr
-	}
-
-	_, err := payloadless.ReconstructPayloadlessProof(batch, pathToRegisterID, reader)
-	require.Error(t, err)
-	require.ErrorIs(t, err, readerErr)
-}
-
-func TestReconstructPayloadlessProof_MissingPath(t *testing.T) {
-	// pathToRegisterID does not contain the proof's path. Expect a
-	// descriptive error rather than a panic or a silent miss.
-	reg := unittest.MakeOwnerReg("k", "v")
-	path := pathFor(t, reg.Key)
-	leaf := payloadlessLeaf(t, path, reg.Value)
-
-	batch := ledger.NewPayloadlessTrieBatchProof()
-	batch.AppendProof(leaf)
-
-	reader := func(flow.RegisterID) (flow.RegisterValue, error) {
-		t.Fatalf("reader must not be called when path → registerID lookup fails")
-		return nil, nil
-	}
-
-	_, err := payloadless.ReconstructPayloadlessProof(batch, map[ledger.Path]flow.RegisterID{}, reader)
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "no register ID provided")
-}
-
-func TestReconstructPayloadlessProof_EmptyBatch(t *testing.T) {
-	// An empty batch round-trips to a decoded empty batch.
-	batch := ledger.NewPayloadlessTrieBatchProof()
-	require.Equal(t, 0, batch.Size())
-
-	bytes, err := payloadless.ReconstructPayloadlessProof(batch, nil, nil)
-	require.NoError(t, err)
-
-	full, err := ledger.DecodeTrieBatchProof(bytes)
-	require.NoError(t, err)
-	require.Equal(t, 0, full.Size())
-}
-
-// =====================================================================
-// ProveAndReconstruct
-// =====================================================================
 
 func TestProveAndReconstruct_HappyPath(t *testing.T) {
 	reg := unittest.MakeOwnerReg("k", "v")
@@ -343,8 +125,14 @@ func TestProveAndReconstruct_HappyPath(t *testing.T) {
 	full, err := ledger.DecodeTrieBatchProof(bytes)
 	require.NoError(t, err)
 	require.Equal(t, 1, full.Size())
-	require.True(t, full.Proofs[0].Inclusion)
-	require.Equal(t, ledger.Value(reg.Value), full.Proofs[0].Payload.Value())
+
+	got := full.Proofs[0]
+	require.Equal(t, path, got.Path)
+	require.True(t, got.Inclusion)
+	require.Equal(t, leaf.Steps, got.Steps)
+	require.Equal(t, leaf.Flags, got.Flags)
+	require.Equal(t, leaf.Interims, got.Interims)
+	require.Equal(t, ledger.Value(reg.Value), got.Payload.Value())
 }
 
 func TestProveAndReconstruct_ProveError(t *testing.T) {
@@ -417,26 +205,237 @@ func TestProveAndReconstruct_MultipleRegisters(t *testing.T) {
 	require.Equal(t, ledger.Value(regB.Value), gotByPath[pathB])
 }
 
-func TestProveAndReconstruct_PathfinderVersionMismatch(t *testing.T) {
-	// If the caller passes a pathfinder version that disagrees with the
-	// version implied by the proof's path, the path → registerID map will
-	// not contain the proof's path. The function should surface this as a
-	// "no register ID provided" error rather than crash.
+func TestProveAndReconstruct_NonInclusion(t *testing.T) {
+	// Non-inclusion proof: Inclusion = false, no LeafHash. The reader must
+	// not be called; the reconstructed leaf carries an empty payload.
 	reg := unittest.MakeOwnerReg("k", "v")
-	correctPath := pathFor(t, reg.Key)
-	leaf := payloadlessLeaf(t, correctPath, reg.Value)
+	path := pathFor(t, reg.Key)
+
+	leaf := ledger.NewPayloadlessTrieProof()
+	leaf.Path = path
+	leaf.Inclusion = false
+	leaf.Steps = 2
+	leaf.Flags[0] = 0x40
+	leaf.Interims = []hash.Hash{hash.DummyHash}
+
 	batch := ledger.NewPayloadlessTrieBatchProof()
 	batch.AppendProof(leaf)
 
-	l := &mockProofLedger{
-		proveFn: func(*ledger.Query) (*ledger.PayloadlessTrieBatchProof, error) {
-			return batch, nil
-		},
+	readerNotCalled := func(flow.RegisterID) (flow.RegisterValue, error) {
+		t.Fatalf("valueReader must not be called for non-inclusion proofs")
+		return nil, nil
 	}
 
-	// Pass a different pathfinder version. KeysToPaths will produce a path
-	// that is not correctPath, so the lookup fails.
+	bytes, err := payloadless.ProveAndReconstruct(
+		mockedLedger(batch),
+		ledger.State(unittest.StateCommitmentFixture()),
+		[]flow.RegisterID{reg.Key},
+		readerNotCalled,
+		complete.DefaultPathFinderVersion,
+	)
+	require.NoError(t, err)
+
+	full, err := ledger.DecodeTrieBatchProof(bytes)
+	require.NoError(t, err)
+	require.Equal(t, 1, full.Size())
+
+	got := full.Proofs[0]
+	require.False(t, got.Inclusion)
+	require.Equal(t, leaf.Steps, got.Steps)
+	require.Equal(t, leaf.Flags, got.Flags)
+	require.Equal(t, leaf.Interims, got.Interims)
+	require.True(t, got.Payload.IsEmpty(), "non-inclusion → empty payload on the reconstructed side")
+}
+
+func TestProveAndReconstruct_EmptyLeafInclusion(t *testing.T) {
+	// Inclusion = true but LeafHash = nil. The forest pads non-inclusion
+	// proofs with empty inclusions for non-existent paths; reconstruction
+	// must collapse those to empty payloads, not reach for a value.
+	reg := unittest.MakeOwnerReg("k", "v")
+	path := pathFor(t, reg.Key)
+
+	leaf := ledger.NewPayloadlessTrieProof()
+	leaf.Path = path
+	leaf.LeafHash = nil
+	leaf.Inclusion = true
+
+	batch := ledger.NewPayloadlessTrieBatchProof()
+	batch.AppendProof(leaf)
+
+	readerNotCalled := func(flow.RegisterID) (flow.RegisterValue, error) {
+		t.Fatalf("valueReader must not be called for empty-leaf inclusion proofs")
+		return nil, nil
+	}
+
+	bytes, err := payloadless.ProveAndReconstruct(
+		mockedLedger(batch),
+		ledger.State(unittest.StateCommitmentFixture()),
+		[]flow.RegisterID{reg.Key},
+		readerNotCalled,
+		complete.DefaultPathFinderVersion,
+	)
+	require.NoError(t, err)
+
+	full, err := ledger.DecodeTrieBatchProof(bytes)
+	require.NoError(t, err)
+	require.True(t, full.Proofs[0].Inclusion)
+	require.True(t, full.Proofs[0].Payload.IsEmpty())
+}
+
+func TestProveAndReconstruct_MixedProofs(t *testing.T) {
+	// Mix three proofs: a real inclusion, an empty-leaf inclusion, and a
+	// non-inclusion. Verify each branch is handled independently and that
+	// the reader is invoked only for the real inclusion.
+	regA := unittest.MakeOwnerReg("a", "va")
+	regB := unittest.MakeOwnerReg("b", "vb")
+	regC := unittest.MakeOwnerReg("c", "vc")
+	pathA := pathFor(t, regA.Key)
+	pathB := pathFor(t, regB.Key)
+	pathC := pathFor(t, regC.Key)
+
+	inclusion := payloadlessLeaf(t, pathA, regA.Value)
+
+	empty := ledger.NewPayloadlessTrieProof()
+	empty.Path = pathB
+	empty.Inclusion = true // empty leaf, but inclusion proof shape
+
+	noninclusion := ledger.NewPayloadlessTrieProof()
+	noninclusion.Path = pathC
+	noninclusion.Inclusion = false
+
+	batch := ledger.NewPayloadlessTrieBatchProof()
+	batch.AppendProof(inclusion)
+	batch.AppendProof(empty)
+	batch.AppendProof(noninclusion)
+
+	// Atomic counter so this assertion stays valid if the reader is later
+	// invoked from worker goroutines.
+	var called atomic.Int32
+	reader := func(id flow.RegisterID) (flow.RegisterValue, error) {
+		called.Add(1)
+		require.Equal(t, regA.Key, id, "only the real inclusion path should reach the reader")
+		return regA.Value, nil
+	}
+
+	bytes, err := payloadless.ProveAndReconstruct(
+		mockedLedger(batch),
+		ledger.State(unittest.StateCommitmentFixture()),
+		[]flow.RegisterID{regA.Key, regB.Key, regC.Key},
+		reader,
+		complete.DefaultPathFinderVersion,
+	)
+	require.NoError(t, err)
+	require.Equal(t, int32(1), called.Load(), "reader should be invoked exactly once (for the real inclusion)")
+
+	full, err := ledger.DecodeTrieBatchProof(bytes)
+	require.NoError(t, err)
+	require.Equal(t, 3, full.Size())
+
+	gotByPath := map[ledger.Path]*ledger.TrieProof{}
+	for _, p := range full.Proofs {
+		gotByPath[p.Path] = p
+	}
+	require.True(t, gotByPath[pathA].Inclusion)
+	require.Equal(t, ledger.Value(regA.Value), gotByPath[pathA].Payload.Value())
+	require.True(t, gotByPath[pathB].Inclusion)
+	require.True(t, gotByPath[pathB].Payload.IsEmpty())
+	require.False(t, gotByPath[pathC].Inclusion)
+	require.True(t, gotByPath[pathC].Payload.IsEmpty())
+}
+
+func TestProveAndReconstruct_ValueMismatch(t *testing.T) {
+	// Reader returns a value that does not hash to the leafHash carried in
+	// the proof. Expect ErrPayloadHashMismatch.
+	reg := unittest.MakeOwnerReg("k", "real-value")
+	path := pathFor(t, reg.Key)
+	leaf := payloadlessLeaf(t, path, reg.Value)
+
+	batch := ledger.NewPayloadlessTrieBatchProof()
+	batch.AppendProof(leaf)
+
+	reader := func(flow.RegisterID) (flow.RegisterValue, error) {
+		return flow.RegisterValue("lying-value"), nil
+	}
+
+	_, err := payloadless.ProveAndReconstruct(
+		mockedLedger(batch),
+		ledger.State(unittest.StateCommitmentFixture()),
+		[]flow.RegisterID{reg.Key},
+		reader,
+		complete.DefaultPathFinderVersion,
+	)
+	require.Error(t, err)
+	require.ErrorIs(t, err, payloadless.ErrPayloadHashMismatch)
+}
+
+func TestProveAndReconstruct_ValueReaderError(t *testing.T) {
+	// Reader returns an error. Expect it to be propagated (wrapped, but
+	// errors.Is should still find it).
+	reg := unittest.MakeOwnerReg("k", "v")
+	path := pathFor(t, reg.Key)
+	leaf := payloadlessLeaf(t, path, reg.Value)
+
+	batch := ledger.NewPayloadlessTrieBatchProof()
+	batch.AppendProof(leaf)
+
+	readerErr := errors.New("storehouse offline")
+	reader := func(flow.RegisterID) (flow.RegisterValue, error) {
+		return nil, readerErr
+	}
+
+	_, err := payloadless.ProveAndReconstruct(
+		mockedLedger(batch),
+		ledger.State(unittest.StateCommitmentFixture()),
+		[]flow.RegisterID{reg.Key},
+		reader,
+		complete.DefaultPathFinderVersion,
+	)
+	require.Error(t, err)
+	require.ErrorIs(t, err, readerErr)
+}
+
+func TestProveAndReconstruct_MissingTargetForProofPath(t *testing.T) {
+	// The mock returns a proof for a path that does not correspond to any
+	// of the queried register IDs. The path → target map (built from the
+	// input) won't contain that path, so the lookup must surface a "no
+	// register target provided" error rather than crash.
+	queriedReg := unittest.MakeOwnerReg("queried", "v")
+	foreignReg := unittest.MakeOwnerReg("foreign", "v")
+	foreignPath := pathFor(t, foreignReg.Key)
+
+	leaf := payloadlessLeaf(t, foreignPath, foreignReg.Value)
+	batch := ledger.NewPayloadlessTrieBatchProof()
+	batch.AppendProof(leaf)
+
+	reader := func(flow.RegisterID) (flow.RegisterValue, error) {
+		t.Fatalf("reader must not be called when path → target lookup fails")
+		return nil, nil
+	}
+
+	_, err := payloadless.ProveAndReconstruct(
+		mockedLedger(batch),
+		ledger.State(unittest.StateCommitmentFixture()),
+		[]flow.RegisterID{queriedReg.Key},
+		reader,
+		complete.DefaultPathFinderVersion,
+	)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "no register target provided")
+}
+
+func TestProveAndReconstruct_PathfinderVersionRejected(t *testing.T) {
+	// An unsupported pathfinder version is rejected by KeysToPaths before
+	// any proof is fetched. We don't assert on the specific message — just
+	// that the error is surfaced cleanly.
+	reg := unittest.MakeOwnerReg("k", "v")
 	wrongVersion := uint8(complete.DefaultPathFinderVersion + 1)
+
+	l := &mockProofLedger{
+		proveFn: func(*ledger.Query) (*ledger.PayloadlessTrieBatchProof, error) {
+			t.Fatalf("Prove must not be called when pathfinder version is rejected")
+			return nil, nil
+		},
+	}
 
 	_, err := payloadless.ProveAndReconstruct(
 		l,
