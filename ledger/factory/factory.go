@@ -133,13 +133,13 @@ func newLocalLedger(config Config, triggerCheckpoint *atomic.Bool) (ledger.Ledge
 // every startup. To make payloadless nodes survive a restart, one of the
 // following must land:
 //
-//	1. A native payloadless checkpoint format with its own writer, reader,
-//	   and bootstrap path.
-//	2. A conversion path that reads the existing full V6 mtrie checkpoint
-//	   (the format LoadBootstrapper copies into triedir) and ingests its
-//	   (path, value) pairs into the payloadless trie at boot. This unblocks
-//	   payloadless boot from existing on-disk state without committing to a
-//	   payloadless checkpoint format.
+//  1. A native payloadless checkpoint format with its own writer, reader,
+//     and bootstrap path.
+//  2. A conversion path that reads the existing full V6 mtrie checkpoint
+//     (the format LoadBootstrapper copies into triedir) and ingests its
+//     (path, value) pairs into the payloadless trie at boot. This unblocks
+//     payloadless boot from existing on-disk state without committing to a
+//     payloadless checkpoint format.
 //
 // Until one of those is in place, --payloadless mode is suitable for
 // short-lived experimental nodes only; the trie has no state on first boot
