@@ -22,6 +22,16 @@ var ErrPayloadHashMismatch = errors.New("payload hash mismatch: storehouse value
 //   - (nil, error) for any other errors
 type RegisterValueReader func(registerID flow.RegisterID) (flow.RegisterValue, error)
 
+// registerTarget pairs a register ID with its corresponding ledger key. The
+// register ID drives value lookup via [RegisterValueReader]; the ledger key is
+// used to build the reconstructed payload. Callers that have already converted
+// register IDs to keys (e.g. to derive trie paths) can stash the keys here to
+// avoid a second [convert.RegisterIDToLedgerKey] call per leaf.
+type registerTarget struct {
+	registerID flow.RegisterID
+	key        ledger.Key
+}
+
 // ProveAndReconstruct generates a reconstructed full batch proof for the
 // given register IDs using a payloadless ledger and a value source. The
 // returned bytes encode a *ledger.TrieBatchProof — wire-compatible with the
@@ -31,12 +41,27 @@ type RegisterValueReader func(registerID flow.RegisterID) (flow.RegisterValue, e
 // The flow:
 //  1. Convert register IDs to ledger keys and derive their paths via
 //     pathfinder.KeysToPaths.
-//  2. Build a path → registerID map so ReconstructPayloadlessProof can
-//     recover the register ID for each leaf in the (path-sorted) proof.
+//  2. Build a path → (registerID, key) map so reconstructPayloadlessProof
+//     can recover the register ID for each leaf in the (path-sorted) proof
+//     and reuse the already-allocated key when building the payload.
 //  3. Call ledger.Prove() to get a *PayloadlessTrieBatchProof (leaf hashes,
 //     no values).
-//  4. Hand the proof, map, and valueReader to ReconstructPayloadlessProof
+//  4. Hand the proof, map, and valueReader to reconstructPayloadlessProof
 //     to verify each leaf hash and re-encode as a full *TrieBatchProof.
+//
+// TODO(perf): overlap step 3 with the value reads from step 4. Today the
+// steps run sequentially: Prove finishes, then per-leaf value reads run
+// inline inside reconstructPayloadlessProof. The two I/O phases are
+// independent and can run in parallel:
+//   - Phase A (parallel): l.Prove(query) and one valueReader call per
+//     registerID, fanned out via an errgroup with a bounded SetLimit (the
+//     reader's backend has its own concurrency limits — don't fan out
+//     blindly to N).
+//   - Phase B: once both complete, run a pure verify+build pass over the
+//     assembled (proof, value) pairs — no I/O.
+//
+// The per-leaf verify work (HashLeaf + payload build) is microseconds and
+// is not worth pipelining at finer grain.
 //
 // Expected errors during normal operation:
 //   - [ErrPayloadHashMismatch] if storehouse value doesn't match the leaf
@@ -54,16 +79,18 @@ func ProveAndReconstruct(
 		keys = append(keys, convert.RegisterIDToLedgerKey(id))
 	}
 
-	// Build the path → registerID map. We compute paths the same way the
-	// ledger does internally, so the resulting paths match the ones
-	// carried by the returned proofs.
+	// Build the path → (registerID, key) map. We compute paths the same way
+	// the ledger does internally, so the resulting paths match the ones
+	// carried by the returned proofs. The already-allocated keys are
+	// stashed here so the reconstruction step does not have to convert
+	// register IDs to keys a second time.
 	paths, err := pathfinder.KeysToPaths(keys, pathFinderVersion)
 	if err != nil {
 		return nil, fmt.Errorf("failed to derive paths from keys: %w", err)
 	}
-	pathToRegisterID := make(map[ledger.Path]flow.RegisterID, len(paths))
+	pathToTarget := make(map[ledger.Path]registerTarget, len(paths))
 	for i, p := range paths {
-		pathToRegisterID[p] = registerIDs[i]
+		pathToTarget[p] = registerTarget{registerID: registerIDs[i], key: keys[i]}
 	}
 
 	query, err := ledger.NewQuery(state, keys)
@@ -76,44 +103,38 @@ func ProveAndReconstruct(
 		return nil, fmt.Errorf("failed to generate proof from ledger: %w", err)
 	}
 
-	return ReconstructPayloadlessProof(batchProof, pathToRegisterID, valueReader)
+	return reconstructPayloadlessProof(batchProof, pathToTarget, valueReader)
 }
 
-// ReconstructPayloadlessProof turns a *PayloadlessTrieBatchProof (each leaf
+// reconstructPayloadlessProof turns a *PayloadlessTrieBatchProof (each leaf
 // carrying a leaf hash, not a value) into encoded bytes of a full
 // *ledger.TrieBatchProof (each leaf carrying a *Payload). Used when a
 // downstream consumer expects the wire format of the full mtrie's proofs.
 //
 // For each inclusion proof:
-//   - The proof's `Path` is used to look up the register ID in
-//     `pathToRegisterID`.
-//   - The register ID is passed to `valueReader` to fetch the actual value.
+//   - The proof's `Path` is used to look up the target in `pathToTarget`.
+//   - The target's register ID is passed to `valueReader` to fetch the
+//     actual value.
 //   - The leaf hash is verified against `HashLeaf(path, actualValue)`.
-//   - The reconstructed proof's `Payload` is built as
-//     `NewPayload(RegisterIDToLedgerKey(registerID), actualValue)`.
+//   - The reconstructed proof's `Payload` is built from the target's
+//     pre-allocated ledger key and the fetched value.
 //
 // Non-inclusion proofs (and inclusion proofs of empty/unallocated leaves,
 // signalled by `LeafHash == nil`) carry `EmptyPayload()` on the reconstructed
 // side — the full-mtrie convention for "this path has no allocated value."
 //
-// The caller already has the register IDs (it requested the proof for them),
-// so the map takes register IDs directly rather than ledger keys to avoid an
-// unnecessary `LedgerKeyToRegisterID` round-trip per proof.
-//
 // Expected errors during normal operation:
 //   - [ErrPayloadHashMismatch] if the supplied value does not hash to the
 //     proof's stored leaf hash.
-func ReconstructPayloadlessProof(
+func reconstructPayloadlessProof(
 	batchProof *ledger.PayloadlessTrieBatchProof,
-	pathToRegisterID map[ledger.Path]flow.RegisterID,
+	pathToTarget map[ledger.Path]registerTarget,
 	valueReader RegisterValueReader,
 ) ([]byte, error) {
 	fullBatch := ledger.NewTrieBatchProofWithEmptyProofs(batchProof.Size())
 
 	for i, proof := range batchProof.Proofs {
 		full := fullBatch.Proofs[i]
-		// Structural fields are carried over verbatim. They are byte-equivalent
-		// between the two proof types by construction (see Spec 001).
 		full.Path = proof.Path
 		full.Interims = proof.Interims
 		full.Inclusion = proof.Inclusion
@@ -127,18 +148,21 @@ func ReconstructPayloadlessProof(
 			continue
 		}
 
-		// Recover the register ID for this path. The payloadless proof does
-		// not carry the key; the caller must have provided pathToRegisterID
-		// covering every path the underlying ledger returned a proof for.
-		registerID, ok := pathToRegisterID[proof.Path]
+		// Recover the (registerID, key) target for this path. The payloadless
+		// proof does not carry the key; the caller must have provided
+		// pathToTarget covering every path the underlying ledger returned a
+		// proof for.
+		target, ok := pathToTarget[proof.Path]
 		if !ok {
-			return nil, fmt.Errorf("no register ID provided for path %x in proof", proof.Path[:])
+			return nil, fmt.Errorf("no register target provided for path %x in proof", proof.Path[:])
 		}
 
-		// TODO: parallelize value reads if the round-trip latency matters
-		actualValue, err := valueReader(registerID)
+		// TODO(perf): see ProveAndReconstruct. Once values are pre-fetched in
+		// parallel with l.Prove and passed in alongside pathToTarget, this
+		// call becomes a map lookup, not a synchronous read.
+		actualValue, err := valueReader(target.registerID)
 		if err != nil {
-			return nil, fmt.Errorf("failed to read register value for %s: %w", registerID, err)
+			return nil, fmt.Errorf("failed to read register value for %s: %w", target.registerID, err)
 		}
 
 		// Verify the supplied value hashes to the same leaf hash carried in
@@ -149,10 +173,10 @@ func ReconstructPayloadlessProof(
 		if expectedHash != *proof.LeafHash {
 			return nil, fmt.Errorf(
 				"proof reconstruction failed for register %s: storehouse value (len=%d) does not match leaf hash in proof: %w",
-				registerID, len(actualValue), ErrPayloadHashMismatch)
+				target.registerID, len(actualValue), ErrPayloadHashMismatch)
 		}
 
-		full.Payload = ledger.NewPayload(convert.RegisterIDToLedgerKey(registerID), actualValue)
+		full.Payload = ledger.NewPayload(target.key, actualValue)
 	}
 
 	return ledger.EncodeTrieBatchProof(fullBatch), nil
