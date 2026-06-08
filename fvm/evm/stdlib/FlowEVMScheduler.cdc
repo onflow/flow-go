@@ -57,11 +57,7 @@ access(all) contract FlowEVMScheduler {
         callArgs: [UInt8]
     ): UInt64 {
         let manager = self._getManagerFromStorage() ?? panic("Could not borrow manager")
-        let coa = self.account.storage.borrow<auth(EVM.Owner) &EVM.CadenceOwnedAccount>(
-            from: /storage/coa
-        ) ?? panic("Could not borrow COA")
-
-        let fees <- coa.withdraw(balance: EVM.Balance(attoflow: UInt(feeAmount)))
+        let fees <- EVM.chargeSchedulingFees(balance: EVM.Balance(attoflow: UInt(feeAmount)))
         let txID = manager.schedule(
             handlerCap: self.evmTransactionHandlerCap,
             data: [contractAddress, callArgs],

@@ -6,26 +6,8 @@
 	},
 	{
 		"inputs": [],
-		"name": "InvalidCOAAddress",
-		"type": "error"
-	},
-	{
-		"inputs": [],
 		"name": "TransferFailed",
 		"type": "error"
-	},
-	{
-		"inputs": [],
-		"name": "authorizedCOA",
-		"outputs": [
-			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
 	},
 	{
 		"inputs": [],
@@ -151,16 +133,16 @@
 		"type": "function"
 	},
 	{
-		"inputs": [
+		"inputs": [],
+		"name": "schedulingFeesCoinbase",
+		"outputs": [
 			{
 				"internalType": "address",
-				"name": "coaAddress",
+				"name": "",
 				"type": "address"
 			}
 		],
-		"name": "setAuthorizedCOA",
-		"outputs": [],
-		"stateMutability": "nonpayable",
+		"stateMutability": "view",
 		"type": "function"
 	}
 ]

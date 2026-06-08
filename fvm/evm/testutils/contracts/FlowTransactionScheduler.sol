@@ -6,18 +6,12 @@ contract FlowTransactionScheduler {
     address public constant cadenceArch =
         0x0000000000000000000000010000000000000001;
 
-    address public authorizedCOA;
+    address public constant schedulingFeesCoinbase =
+        0x0000000000000000000000040000000000000000;
 
-    error InvalidCOAAddress();
     error TransferFailed();
 
     constructor() {}
-
-    function setAuthorizedCOA(address coaAddress) public {
-        if (coaAddress == address(0)) revert InvalidCOAAddress();
-
-        authorizedCOA = coaAddress;
-    }
 
     function scheduleTransaction(
         uint256 timestamp,
@@ -26,9 +20,9 @@ contract FlowTransactionScheduler {
         address contractAddress,
         bytes calldata args
     ) external payable returns (uint64) {
-        // 1. send fees to `authorizedCOA`
+        // 1. send fees to the scheduling coinbase address
         // Native FLOW: send via low-level call
-        (bool success, ) = authorizedCOA.call{value: msg.value}("");
+        (bool success, ) = schedulingFeesCoinbase.call{value: msg.value}("");
         if (!success) revert TransferFailed();
 
         // 2. call the cadenceArch precompile

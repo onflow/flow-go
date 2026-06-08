@@ -104,13 +104,17 @@ func TestFlowEVMScheduler(t *testing.T) {
 						prepare(account: auth(BorrowValue) &Account) {
 							let coaAddress = EVM.EVMAddress(bytes: coaAddressBytes)
 							let testAddress = EVM.EVMAddress(bytes: testAddressBytes)
+							let schedulingFeesCoinbase = EVM.EVMAddress(
+								bytes: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0]
+							)
 							let admin = account.storage
 								.borrow<&FlowToken.Administrator>(from: /storage/flowTokenAdmin)!
 
-							let minter <- admin.createNewMinter(allowedAmount: 100.0)
+							let minter <- admin.createNewMinter(allowedAmount: 150.0)
 
 							coaAddress.deposit(from: <-minter.mintTokens(amount: 50.0))
 							testAddress.deposit(from: <-minter.mintTokens(amount: 50.0))
+							schedulingFeesCoinbase.deposit(from: <-minter.mintTokens(amount: 50.0))
 
 							destroy minter
 						}
@@ -211,67 +215,6 @@ func TestFlowEVMScheduler(t *testing.T) {
 			ctrAddress := common.HexToAddress(txEventPayload.ContractAddress)
 			flowTransactionSchedulerContract.SetDeployedAt(types.NewAddress(ctrAddress))
 
-			// Set the `authorizedCOA` field on The `FlowTransactionScheduler` Solidity contract
-			code = []byte(fmt.Sprintf(
-				`
-					import EVM from %s
-					import FlowEVMScheduler from %s
-
-					transaction(tx: [UInt8], coinbaseBytes: [UInt8; 20], solAddress: [UInt8; 20]){
-						prepare(account: &Account) {
-							let coinbase = EVM.EVMAddress(bytes: coinbaseBytes)
-							let res = EVM.run(tx: tx, coinbase: coinbase)
-
-							assert(res.status == EVM.Status.successful, message: "setAuthorizedCOA: \(res.errorMessage)")
-							assert(res.errorCode == 0, message: "unexpected error code")
-							assert(res.deployedContract == nil, message: "unexpected deployed contract")
-
-							FlowEVMScheduler.setEvmRegister(address: EVM.EVMAddress(bytes: solAddress))
-						}
-					}
-				`,
-				sc.EVMContract.Address.HexWithPrefix(),
-				sc.EVMContract.Address.HexWithPrefix(),
-			))
-
-			innerTxBytes := testAccount.PrepareSignAndEncodeTx(t,
-				flowTransactionSchedulerContract.DeployedAt.ToCommon(),
-				flowTransactionSchedulerContract.MakeCallData(t, "setAuthorizedCOA", coaAddress.ToCommon()),
-				big.NewInt(0),
-				uint64(1_000_000),
-				big.NewInt(1),
-			)
-
-			innerTx := cadence.NewArray(
-				unittest.BytesToCdcUInt8(innerTxBytes),
-			).WithType(stdlib.EVMTransactionBytesCadenceType)
-
-			coinbase = cadence.NewArray(
-				unittest.BytesToCdcUInt8(coinbaseAddr.Bytes()),
-			).WithType(stdlib.EVMAddressBytesCadenceType)
-
-			solAddress := cadence.NewArray(
-				unittest.BytesToCdcUInt8(ctrAddress[:]),
-			).WithType(stdlib.EVMAddressBytesCadenceType)
-
-			txBody, err = flow.NewTransactionBodyBuilder().
-				SetScript(code).
-				SetPayer(sc.FlowServiceAccount.Address).
-				AddAuthorizer(sc.FlowServiceAccount.Address).
-				AddArgument(json.MustEncode(innerTx)).
-				AddArgument(json.MustEncode(coinbase)).
-				AddArgument(json.MustEncode(solAddress)).
-				Build()
-			require.NoError(t, err)
-
-			tx = fvm.Transaction(txBody, 0)
-
-			state, output, err = vm.Run(ctx, tx, snapshot)
-			require.NoError(t, err)
-			require.NoError(t, output.Err)
-			require.NotEmpty(t, state.WriteSet)
-			snapshot = snapshot.Append(state)
-
 			// Call the `FlowEVMScheduler.scheduleTransaction` contract function
 			contractAddress := testContract.DeployedAt.ToCommon()
 			num := big.NewInt(42)
@@ -285,7 +228,7 @@ func TestFlowEVMScheduler(t *testing.T) {
 				contractAddress,
 				args,
 			)
-			innerTxBytes = testAccount.PrepareSignAndEncodeTx(t,
+			innerTxBytes := testAccount.PrepareSignAndEncodeTx(t,
 				flowTransactionSchedulerContract.DeployedAt.ToCommon(),
 				callData,
 				big.NewInt(1_000_000_000_000_0),
@@ -293,7 +236,7 @@ func TestFlowEVMScheduler(t *testing.T) {
 				big.NewInt(1),
 			)
 
-			innerTx = cadence.NewArray(
+			innerTx := cadence.NewArray(
 				unittest.BytesToCdcUInt8(innerTxBytes),
 			).WithType(stdlib.EVMTransactionBytesCadenceType)
 
@@ -338,8 +281,8 @@ func TestFlowEVMScheduler(t *testing.T) {
 			require.NotEmpty(t, state.WriteSet)
 			snapshot = snapshot.Append(state)
 
-			require.Len(t, output.Events, 6)
-			txEvent = output.Events[4]
+			require.Len(t, output.Events, 5)
+			txEvent = output.Events[3]
 			txEventPayload = TxEventToPayload(t, txEvent, sc.EVMContract.Address)
 			require.NoError(t, err)
 			require.Equal(

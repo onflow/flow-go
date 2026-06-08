@@ -500,6 +500,10 @@ func (h *ContractHandler) run(rlpEncodedTx []byte) (_ *types.Result, err error) 
 		return nil, err
 	}
 
+	// capture scheduling fees coinbase init balance
+	cb := h.AccountByAddress(types.SchedulingFeesCoinbaseAddress, true)
+	initCoinbaseBalance := cb.Balance()
+
 	// step 5 - run transaction
 	var res *types.Result
 	h.backend.RunWithMeteringDisabled(
@@ -513,7 +517,9 @@ func (h *ContractHandler) run(rlpEncodedTx []byte) (_ *types.Result, err error) 
 		return nil, types.ErrUnexpectedEmptyResult
 	}
 	if len(res.PrecompiledCalls) > 0 && res.ScheduledTransaction {
-		if tx.Value().Cmp(big.NewInt(1_000_000_000_000_0)) < 0 {
+		afterBalance := cb.Balance()
+		diff := new(big.Int).Sub(afterBalance, initCoinbaseBalance)
+		if diff.Cmp(big.NewInt(1_000_000_000_000_0)) < 0 || tx.Value().Cmp(diff) < 0 {
 			return &types.Result{
 				TxType:  tx.Type(),
 				TxHash:  tx.Hash(),
