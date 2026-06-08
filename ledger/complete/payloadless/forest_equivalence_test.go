@@ -55,9 +55,7 @@ func cloneUpdate(u *ledger.TrieUpdate) *ledger.TrieUpdate {
 	paths := make([]ledger.Path, len(u.Paths))
 	copy(paths, u.Paths)
 	payloads := make([]*ledger.Payload, len(u.Payloads))
-	for i, p := range u.Payloads {
-		payloads[i] = p
-	}
+	copy(payloads, u.Payloads)
 	return &ledger.TrieUpdate{RootHash: u.RootHash, Paths: paths, Payloads: payloads}
 }
 
