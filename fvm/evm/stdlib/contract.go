@@ -15,6 +15,9 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
+//go:embed FlowEVMScheduler.cdc
+var FlowEVMScheduler string
+
 //go:embed contract.cdc
 var contractCode string
 

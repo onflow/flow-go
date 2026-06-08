@@ -703,6 +703,7 @@ func (proc *procedure) run(
 		res.MaxGasConsumed = execResult.MaxUsedGas
 		res.Index = uint16(txIndex)
 		res.CumulativeGasUsed = execResult.UsedGas + proc.config.BlockTotalGasUsedSoFar
+		res.ScheduledTransaction = proc.config.PCTracker.stCall
 		res.PrecompiledCalls, err = proc.config.PCTracker.CapturedCalls()
 		if err != nil {
 			return nil, err

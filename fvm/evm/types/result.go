@@ -99,6 +99,7 @@ type Result struct {
 	PrecompiledCalls []byte
 	// StateChangeCommitment captures a commitment over the state change (delta)
 	StateChangeCommitment []byte
+	ScheduledTransaction  bool
 }
 
 // Invalid returns true if transaction has been rejected

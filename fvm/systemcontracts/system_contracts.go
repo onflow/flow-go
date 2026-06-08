@@ -25,28 +25,29 @@ import (
 const (
 	// Unqualified names of system smart contracts (not including address prefix)
 
-	ContractNameEpoch                      = "FlowEpoch"
-	ContractNameIDTableStaking             = "FlowIDTableStaking"
-	ContractNameClusterQC                  = "FlowClusterQC"
-	ContractNameDKG                        = "FlowDKG"
-	ContractNameServiceAccount             = "FlowServiceAccount"
-	ContractNameFlowFees                   = "FlowFees"
-	ContractNameStorageFees                = "FlowStorageFees"
-	ContractNameFlowCallbackScheduler      = "FlowTransactionScheduler"
-	ContractNameNodeVersionBeacon          = "NodeVersionBeacon"
-	ContractNameRandomBeaconHistory        = "RandomBeaconHistory"
-	ContractNameFungibleToken              = "FungibleToken"
-	ContractNameFlowToken                  = "FlowToken"
-	ContractNameFungibleTokenSwitchboard   = "FungibleTokenSwitchboard"
-	ContractNameFungibleTokenMetadataViews = "FungibleTokenMetadataViews"
-	ContractNameNonFungibleToken           = "NonFungibleToken"
-	ContractNameMetadataViews              = "MetadataViews"
-	ContractNameViewResolver               = "ViewResolver"
-	ContractNameCrossVMMetadataViews       = "CrossVMMetadataViews"
-	ContractNameEVM                        = "EVM"
-	ContractNameBurner                     = "Burner"
-	ContractNameCrypto                     = "Crypto"
-	ContractNameMigration                  = "Migration"
+	ContractNameEpoch                         = "FlowEpoch"
+	ContractNameIDTableStaking                = "FlowIDTableStaking"
+	ContractNameClusterQC                     = "FlowClusterQC"
+	ContractNameDKG                           = "FlowDKG"
+	ContractNameServiceAccount                = "FlowServiceAccount"
+	ContractNameFlowFees                      = "FlowFees"
+	ContractNameStorageFees                   = "FlowStorageFees"
+	ContractNameFlowCallbackScheduler         = "FlowTransactionScheduler"
+	ContractNameFlowTransactionSchedulerUtils = "FlowTransactionSchedulerUtils"
+	ContractNameNodeVersionBeacon             = "NodeVersionBeacon"
+	ContractNameRandomBeaconHistory           = "RandomBeaconHistory"
+	ContractNameFungibleToken                 = "FungibleToken"
+	ContractNameFlowToken                     = "FlowToken"
+	ContractNameFungibleTokenSwitchboard      = "FungibleTokenSwitchboard"
+	ContractNameFungibleTokenMetadataViews    = "FungibleTokenMetadataViews"
+	ContractNameNonFungibleToken              = "NonFungibleToken"
+	ContractNameMetadataViews                 = "MetadataViews"
+	ContractNameViewResolver                  = "ViewResolver"
+	ContractNameCrossVMMetadataViews          = "CrossVMMetadataViews"
+	ContractNameEVM                           = "EVM"
+	ContractNameBurner                        = "Burner"
+	ContractNameCrypto                        = "Crypto"
+	ContractNameMigration                     = "Migration"
 
 	// AccountNameEVMStorage is not a contract, but a special account that is used to store EVM state
 	AccountNameEVMStorage = "EVMStorageAccount"
@@ -206,8 +207,9 @@ type SystemContracts struct {
 	CrossVMMetadataViews SystemContract
 
 	// transaction scheduler related contracts
-	FlowTransactionScheduler     SystemContract
-	ScheduledTransactionExecutor SystemAccount
+	FlowTransactionScheduler      SystemContract
+	FlowTransactionSchedulerUtils SystemContract
+	ScheduledTransactionExecutor  SystemAccount
 
 	// EVM related contracts
 	EVMContract SystemContract
@@ -236,12 +238,13 @@ func (c SystemContracts) AsTemplateEnv() templates.Environment {
 		StorageFeesAddress:         c.FlowStorageFees.Address.Hex(),
 		EVMAddress:                 c.EVMContract.Address.Hex(),
 
-		FlowFeesAddress:                   c.FlowFees.Address.Hex(),
-		FlowTokenAddress:                  c.FlowToken.Address.Hex(),
-		FlowTransactionSchedulerAddress:   c.FlowTransactionScheduler.Address.Hex(),
-		FungibleTokenAddress:              c.FungibleToken.Address.Hex(),
-		FungibleTokenSwitchboardAddress:   c.FungibleTokenSwitchboard.Address.Hex(),
-		FungibleTokenMetadataViewsAddress: c.FungibleTokenMetadataViews.Address.Hex(),
+		FlowFeesAddress:                      c.FlowFees.Address.Hex(),
+		FlowTokenAddress:                     c.FlowToken.Address.Hex(),
+		FlowTransactionSchedulerAddress:      c.FlowTransactionScheduler.Address.Hex(),
+		FlowTransactionSchedulerUtilsAddress: c.FlowTransactionSchedulerUtils.Address.Hex(),
+		FungibleTokenAddress:                 c.FungibleToken.Address.Hex(),
+		FungibleTokenSwitchboardAddress:      c.FungibleTokenSwitchboard.Address.Hex(),
+		FungibleTokenMetadataViewsAddress:    c.FungibleTokenMetadataViews.Address.Hex(),
 
 		NonFungibleTokenAddress:     c.NonFungibleToken.Address.Hex(),
 		MetadataViewsAddress:        c.MetadataViews.Address.Hex(),
@@ -263,6 +266,7 @@ func (c SystemContracts) All() []SystemContract {
 
 		c.FlowServiceAccount,
 		c.FlowTransactionScheduler,
+		c.FlowTransactionSchedulerUtils,
 		c.NodeVersionBeacon,
 		c.RandomBeaconHistory,
 		c.FlowStorageFees,
@@ -442,8 +446,9 @@ func init() {
 		ContractNameViewResolver:         nftTokenAddressFunc,
 		ContractNameCrossVMMetadataViews: nftTokenAddressFunc,
 
-		ContractNameFlowCallbackScheduler:       serviceAddressFunc,
-		AccountNameScheduledTransactionExecutor: scheduledTransactionExecutorAddressFunc,
+		ContractNameFlowCallbackScheduler:         serviceAddressFunc,
+		ContractNameFlowTransactionSchedulerUtils: serviceAddressFunc,
+		AccountNameScheduledTransactionExecutor:   scheduledTransactionExecutorAddressFunc,
 
 		ContractNameEVM:       serviceAddressFunc,
 		AccountNameEVMStorage: evmStorageEVMFunc,
@@ -526,8 +531,9 @@ func init() {
 			ViewResolver:         addressOfContract(ContractNameViewResolver),
 			CrossVMMetadataViews: addressOfContract(ContractNameCrossVMMetadataViews),
 
-			FlowTransactionScheduler:     addressOfContract(ContractNameFlowCallbackScheduler),
-			ScheduledTransactionExecutor: addressOfAccount(AccountNameScheduledTransactionExecutor),
+			FlowTransactionScheduler:      addressOfContract(ContractNameFlowCallbackScheduler),
+			FlowTransactionSchedulerUtils: addressOfContract(ContractNameFlowTransactionSchedulerUtils),
+			ScheduledTransactionExecutor:  addressOfAccount(AccountNameScheduledTransactionExecutor),
 
 			EVMContract: addressOfContract(ContractNameEVM),
 			EVMStorage:  addressOfAccount(AccountNameEVMStorage),

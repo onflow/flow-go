@@ -3,9 +3,12 @@ package handler
 import (
 	"encoding/binary"
 	"fmt"
+	"math/big"
 
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/sema"
+
+	gethCommon "github.com/ethereum/go-ethereum/common"
 
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/evm/backends"
@@ -43,6 +46,10 @@ func preparePrecompiledContracts(
 		coaOwnershipProofValidator(evmContractAddress, backend),
 		randomSourceProvider(randomBeaconAddress, backend),
 		revertibleRandomGenerator(backend),
+		scheduleTransaction(randomBeaconAddress, backend),
+		getTransactionStatus(randomBeaconAddress, backend),
+		cancelTransaction(randomBeaconAddress, backend),
+		estimateTransaction(randomBeaconAddress, backend),
 	)
 	return []types.PrecompiledContract{archContract}
 }
@@ -149,5 +156,178 @@ func coaOwnershipProofValidator(contractAddress flow.Address, backend backends.B
 		}
 
 		return bool(isValidValue.(cadence.Bool)), nil
+	}
+}
+
+func scheduleTransaction(scAddress flow.Address, backend backends.Backend) func(*big.Int, uint8, uint64, gethCommon.Address, *big.Int, gethCommon.Address, []byte) (uint64, error) {
+	return func(timestamp *big.Int, priority uint8, executionEffort uint64, caller gethCommon.Address, fees *big.Int, contractAddress gethCommon.Address, args []byte) (uint64, error) {
+		ts, err := cadence.NewUFix64(fmt.Sprintf("%d.0", timestamp))
+		if err != nil {
+			return 0, err
+		}
+		pr := cadence.NewUInt8(priority)
+		ef := cadence.NewUInt64(executionEffort)
+		feeAmount, err := cadence.NewUInt256FromBig(fees)
+		if err != nil {
+			return 0, err
+		}
+		ca := types.Address(contractAddress).ToCadenceValue()
+		caler := types.Address(caller).ToCadenceValue()
+		dt := make([]cadence.Value, len(args))
+		for i, v := range args {
+			dt[i] = cadence.NewUInt8(v)
+		}
+		callArgs := cadence.NewArray(dt).WithType(cadence.NewVariableSizedArrayType(cadence.UInt8Type))
+
+		value, err := backend.Invoke(
+			environment.ContractFunctionSpec{
+				AddressFromChain: func(_ flow.Chain) flow.Address {
+					return scAddress
+				},
+				LocationName: "FlowEVMScheduler",
+				FunctionName: "scheduleTransaction",
+				ArgumentTypes: []sema.Type{
+					sema.UFix64Type,
+					sema.UInt8Type,
+					sema.UInt64Type,
+					sema.NewConstantSizedType(nil, sema.UInt8Type, gethCommon.AddressLength),
+					sema.UInt256Type,
+					sema.NewConstantSizedType(nil, sema.UInt8Type, gethCommon.AddressLength),
+					sema.ByteArrayType,
+				},
+			},
+			[]cadence.Value{
+				ts,
+				pr,
+				ef,
+				caler,
+				feeAmount,
+				ca,
+				callArgs,
+			},
+		)
+		if err != nil {
+			if types.IsAFatalError(err) {
+				panic(err)
+			}
+			return 0, err
+		}
+
+		txID, ok := value.(cadence.UInt64)
+		if !ok {
+			return 0, fmt.Errorf("invalid output data received from scheduleTransaction")
+		}
+
+		return uint64(txID), nil
+	}
+}
+
+func getTransactionStatus(scAddress flow.Address, backend backends.Backend) func(uint64) (uint8, error) {
+	return func(txId uint64) (uint8, error) {
+		transactionId := cadence.NewUInt64(txId)
+		value, err := backend.Invoke(
+			environment.ContractFunctionSpec{
+				AddressFromChain: func(_ flow.Chain) flow.Address {
+					return scAddress
+				},
+				LocationName:  "FlowEVMScheduler",
+				FunctionName:  "getTransactionStatus",
+				ArgumentTypes: []sema.Type{sema.UInt64Type},
+			},
+			[]cadence.Value{transactionId},
+		)
+		if err != nil {
+			if types.IsAFatalError(err) {
+				panic(err)
+			}
+			return 0, err
+		}
+
+		txStatus, ok := value.(cadence.UInt8)
+		if !ok {
+			return 0, fmt.Errorf("invalid output data received from getTransactionStatus")
+		}
+
+		return uint8(txStatus), nil
+	}
+}
+
+func cancelTransaction(scAddress flow.Address, backend backends.Backend) func(uint64) error {
+	return func(txId uint64) error {
+		transactionId := cadence.NewUInt64(txId)
+		_, err := backend.Invoke(
+			environment.ContractFunctionSpec{
+				AddressFromChain: func(_ flow.Chain) flow.Address {
+					return scAddress
+				},
+				LocationName:  "FlowEVMScheduler",
+				FunctionName:  "cancelTransaction",
+				ArgumentTypes: []sema.Type{sema.UInt64Type},
+			},
+			[]cadence.Value{transactionId},
+		)
+		if err != nil {
+			if types.IsAFatalError(err) {
+				panic(err)
+			}
+			return err
+		}
+
+		return nil
+	}
+}
+
+func estimateTransaction(scAddress flow.Address, backend backends.Backend) func(*big.Int, uint8, uint64, gethCommon.Address, []byte) (*big.Int, error) {
+	return func(timestamp *big.Int, priority uint8, executionEffort uint64, contractAddress gethCommon.Address, args []byte) (*big.Int, error) {
+		ts, err := cadence.NewUFix64(fmt.Sprintf("%d.0", timestamp))
+		if err != nil {
+			return nil, err
+		}
+		pr := cadence.NewUInt8(priority)
+		ef := cadence.NewUInt64(executionEffort)
+		ca := types.Address(contractAddress).ToCadenceValue()
+		dt := make([]cadence.Value, len(args))
+		for i, v := range args {
+			dt[i] = cadence.NewUInt8(v)
+		}
+		callArgs := cadence.NewArray(dt).WithType(cadence.NewVariableSizedArrayType(cadence.UInt8Type))
+
+		value, err := backend.Invoke(
+			environment.ContractFunctionSpec{
+				AddressFromChain: func(_ flow.Chain) flow.Address {
+					return scAddress
+				},
+				LocationName: "FlowEVMScheduler",
+				FunctionName: "estimate",
+				ArgumentTypes: []sema.Type{
+					sema.UFix64Type,
+					sema.UInt8Type,
+					sema.UInt64Type,
+					sema.NewConstantSizedType(nil, sema.UInt8Type, gethCommon.AddressLength),
+					sema.ByteArrayType,
+				},
+			},
+			[]cadence.Value{
+				ts,
+				pr,
+				ef,
+				ca,
+				callArgs,
+			},
+		)
+		if err != nil {
+			if types.IsAFatalError(err) {
+				panic(err)
+			}
+			return nil, err
+		}
+
+		val, ok := value.(cadence.UFix64)
+		if !ok {
+			return nil, fmt.Errorf("invalid output data received from scheduleTransaction")
+		}
+		txFees := types.NewBalanceFromUFix64(val)
+
+		return txFees, nil
 	}
 }

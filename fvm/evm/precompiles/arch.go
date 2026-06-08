@@ -2,7 +2,9 @@ package precompiles
 
 import (
 	"fmt"
+	"math/big"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/onflow/flow-go/fvm/evm/types"
 )
 
@@ -36,6 +38,25 @@ var (
 
 	RevertibleRandomFuncSig = ComputeFunctionSelector("revertibleRandom", nil)
 
+	ScheduleTransactionFuncSig = ComputeFunctionSelector(
+		"scheduleTransaction",
+		[]string{"uint256", "uint8", "uint64", "address", "uint256", "address", "bytes"})
+
+	GetTransactionStatusFuncSig = ComputeFunctionSelector(
+		"getTransactionStatus",
+		[]string{"uint64"},
+	)
+
+	CancelTransactionFuncSig = ComputeFunctionSelector(
+		"cancelTransaction",
+		[]string{"uint64"},
+	)
+
+	EstimateTransactionFuncSig = ComputeFunctionSelector(
+		"estimate",
+		[]string{"uint256", "uint8", "uint64", "address", "bytes"},
+	)
+
 	// FlowBlockHeightFixedGas is set to match the `number` opCode (0x43)
 	FlowBlockHeightFixedGas = uint64(2)
 	// ProofVerifierBaseGas covers the cost of decoding, checking capability the resource
@@ -65,6 +86,10 @@ func ArchContract(
 	proofVer func(*types.COAOwnershipProofInContext) (bool, error),
 	randomSourceProvider func(uint64) ([]byte, error),
 	revertibleRandomGenerator func() (uint64, error),
+	scheduleTransaction func(*big.Int, uint8, uint64, common.Address, *big.Int, common.Address, []byte) (uint64, error),
+	getTransactionStatus func(uint64) (uint8, error),
+	cancelTransaction func(uint64) error,
+	estimateTransaction func(*big.Int, uint8, uint64, common.Address, []byte) (*big.Int, error),
 ) types.PrecompiledContract {
 	return MultiFunctionPrecompiledContract(
 		address,
@@ -73,8 +98,197 @@ func ArchContract(
 			&proofVerifier{proofVer},
 			&randomnessSource{randomSourceProvider},
 			&revertibleRandom{revertibleRandomGenerator},
+			&transactionScheduler{scheduleTransaction},
+			&transactionStatus{getTransactionStatus},
+			&transactionCancellation{cancelTransaction},
+			&transactionEstimation{estimateTransaction},
 		},
 	)
+}
+
+type transactionScheduler struct {
+	scheduleTransaction func(*big.Int, uint8, uint64, common.Address, *big.Int, common.Address, []byte) (uint64, error)
+}
+
+var _ Function = &transactionScheduler{}
+
+func (c *transactionScheduler) FunctionSelector() FunctionSelector {
+	return ScheduleTransactionFuncSig
+}
+
+func (c *transactionScheduler) ComputeGas(input []byte) uint64 {
+	return FlowBlockHeightFixedGas
+}
+
+func (c *transactionScheduler) Run(input []byte) ([]byte, error) {
+	index := 0
+
+	timestamp, err := ReadUint256(input, 0)
+	if err != nil {
+		return nil, err
+	}
+	index += FixedSizeUnitDataReadSize
+
+	priority, err := ReadUint64(input, index)
+	if err != nil {
+		return nil, err
+	}
+	index += FixedSizeUnitDataReadSize
+
+	executionEffort, err := ReadUint64(input, index)
+	if err != nil {
+		return nil, err
+	}
+	index += FixedSizeUnitDataReadSize
+
+	caller, err := ReadAddress(input, index)
+	if err != nil {
+		return nil, err
+	}
+	index += FixedSizeUnitDataReadSize
+
+	fees, err := ReadUint256(input, index)
+	if err != nil {
+		return nil, err
+	}
+	index += FixedSizeUnitDataReadSize
+
+	contractAddress, err := ReadAddress(input, index)
+	if err != nil {
+		return nil, err
+	}
+	index += FixedSizeUnitDataReadSize
+
+	args, err := ReadBytes(input, index)
+	if err != nil {
+		return nil, err
+	}
+
+	txID, err := c.scheduleTransaction(timestamp, uint8(priority), executionEffort, caller, fees, contractAddress, args)
+	if err != nil {
+		return nil, err
+	}
+
+	// EVM works natively in 256-bit words,
+	// Encode to 256-bit is the common practice to prevent extra gas consumtion for masking.
+	buffer := make([]byte, EncodedUint64Size)
+	return buffer, EncodeUint64(txID, buffer, 0)
+}
+
+type transactionEstimation struct {
+	estimateTransaction func(*big.Int, uint8, uint64, common.Address, []byte) (*big.Int, error)
+}
+
+var _ Function = &transactionEstimation{}
+
+func (c *transactionEstimation) FunctionSelector() FunctionSelector {
+	return EstimateTransactionFuncSig
+}
+
+func (c *transactionEstimation) ComputeGas(input []byte) uint64 {
+	return FlowBlockHeightFixedGas
+}
+
+func (c *transactionEstimation) Run(input []byte) ([]byte, error) {
+	index := 0
+
+	timestamp, err := ReadUint256(input, 0)
+	if err != nil {
+		return nil, err
+	}
+	index += FixedSizeUnitDataReadSize
+
+	priority, err := ReadUint64(input, index)
+	if err != nil {
+		return nil, err
+	}
+	index += FixedSizeUnitDataReadSize
+
+	executionEffort, err := ReadUint64(input, index)
+	if err != nil {
+		return nil, err
+	}
+	index += FixedSizeUnitDataReadSize
+
+	contractAddress, err := ReadAddress(input, index)
+	if err != nil {
+		return nil, err
+	}
+	index += FixedSizeUnitDataReadSize
+
+	args, err := ReadBytes(input, index)
+	if err != nil {
+		return nil, err
+	}
+
+	txFees, err := c.estimateTransaction(timestamp, uint8(priority), executionEffort, contractAddress, args)
+	if err != nil {
+		return nil, err
+	}
+
+	// EVM works natively in 256-bit words,
+	// Encode to 256-bit is the common practice to prevent extra gas consumtion for masking.
+	buffer := make([]byte, EncodedUint256Size)
+	return buffer, EncodeUint256(txFees, buffer, 0)
+}
+
+type transactionCancellation struct {
+	cancelTransaction func(uint64) error
+}
+
+var _ Function = &transactionCancellation{}
+
+func (c *transactionCancellation) FunctionSelector() FunctionSelector {
+	return CancelTransactionFuncSig
+}
+
+func (c *transactionCancellation) ComputeGas(input []byte) uint64 {
+	return FlowBlockHeightFixedGas
+}
+
+func (c *transactionCancellation) Run(input []byte) ([]byte, error) {
+	txId, err := ReadUint64(input, 0)
+	if err != nil {
+		return nil, err
+	}
+
+	err = c.cancelTransaction(txId)
+	if err != nil {
+		return nil, err
+	}
+
+	return []byte{}, nil
+}
+
+type transactionStatus struct {
+	getTransactionStatus func(uint64) (uint8, error)
+}
+
+var _ Function = &transactionStatus{}
+
+func (c *transactionStatus) FunctionSelector() FunctionSelector {
+	return GetTransactionStatusFuncSig
+}
+
+func (c *transactionStatus) ComputeGas(input []byte) uint64 {
+	return FlowBlockHeightFixedGas
+}
+
+func (c *transactionStatus) Run(input []byte) ([]byte, error) {
+	txId, err := ReadUint64(input, 0)
+	if err != nil {
+		return nil, err
+	}
+
+	txStatus, err := c.getTransactionStatus(txId)
+	if err != nil {
+		return nil, err
+	}
+
+	// EVM works natively in 256-bit words,
+	// Encode to 256-bit is the common practice to prevent extra gas consumtion for masking.
+	buffer := make([]byte, EncodedUint64Size)
+	return buffer, EncodeUint64(uint64(txStatus), buffer, 0)
 }
 
 type flowBlockHeight struct {

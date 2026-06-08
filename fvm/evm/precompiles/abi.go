@@ -6,6 +6,7 @@ import (
 	"math/big"
 
 	gethCommon "github.com/ethereum/go-ethereum/common"
+	gethMath "github.com/ethereum/go-ethereum/common/math"
 )
 
 // The Cadence Arch precompiled contract that is injected in the EVM environment,
@@ -118,6 +119,17 @@ func EncodeUint64(inp uint64, buffer []byte, index int) error {
 	binary.BigEndian.PutUint64(encoded, inp)
 	copy(buffer[index:index+EncodedUint64Size],
 		gethCommon.LeftPadBytes(encoded, EncodedUint64Size),
+	)
+	return nil
+}
+
+func EncodeUint256(inp *big.Int, buffer []byte, index int) error {
+	if len(buffer) < index+EncodedUint256Size {
+		return ErrBufferTooSmall
+	}
+	encoded := gethMath.U256Bytes(inp)
+	copy(buffer[index:index+EncodedUint256Size],
+		gethCommon.LeftPadBytes(encoded, EncodedUint256Size),
 	)
 	return nil
 }

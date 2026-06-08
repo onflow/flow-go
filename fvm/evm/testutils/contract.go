@@ -73,6 +73,13 @@ func GetFileSystemContract(t testing.TB) *TestContract {
 	}
 }
 
+func GetFlowTransactionSchedulerContract(t testing.TB) *TestContract {
+	return &TestContract{
+		ABI:      contracts.FlowTransactionSchedulerABIJSON,
+		ByteCode: contracts.FlowTransactionSchedulerContractBytes,
+	}
+}
+
 func RunWithDeployedContract(t testing.TB, tc *TestContract, led atree.Ledger, flowEVMRootAddress flow.Address, f func(*TestContract)) {
 	DeployContract(t, RandomAddress(t), tc, led, flowEVMRootAddress)
 	f(tc)

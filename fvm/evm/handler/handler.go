@@ -512,6 +512,15 @@ func (h *ContractHandler) run(rlpEncodedTx []byte) (_ *types.Result, err error) 
 	if res == nil { // safety check for result
 		return nil, types.ErrUnexpectedEmptyResult
 	}
+	if len(res.PrecompiledCalls) > 0 && res.ScheduledTransaction {
+		if tx.Value().Cmp(big.NewInt(1_000_000_000_000_0)) < 0 {
+			return &types.Result{
+				TxType:  tx.Type(),
+				TxHash:  tx.Hash(),
+				VMError: fmt.Errorf("no fees for tx schedule"),
+			}, nil
+		}
+	}
 
 	// step 6 - meter gas anyway (even for invalid or failed states)
 	err = h.meterGasUsage(res)
