@@ -998,7 +998,6 @@ func (exeNode *ExecutionNode) LoadExecutionStateLedger(
 	return exeNode.ledgerStorage, nil
 }
 
-
 func (exeNode *ExecutionNode) LoadExecutionDataPruner(
 	node *NodeConfig,
 ) (
