@@ -116,9 +116,14 @@ func NewCheckpointer(wal *DiskWAL, keyByteSize int, forestCapacity int) *Checkpo
 	}
 }
 
-// listCheckpoints returns all the numbers (unsorted) of the checkpoint files, and the number of the last checkpoint.
-func (c *Checkpointer) listCheckpoints() ([]int, int, error) {
-	return ListCheckpoints(c.dir)
+// listV6Checkpoints returns V6 checkpoint numbers (unsorted) and the last V6 number.
+// This Checkpointer writes V6 only, so its scheduling decisions (LatestCheckpointV6,
+// NotCheckpointedSegments, the Checkpoint(to) no-op short-circuit) must track V6
+// progress to avoid being misled by stray V7 files dropped in the same directory.
+// For cross-version inspection, use the package-level ListCheckpoints or
+// ListV7Checkpoints functions.
+func (c *Checkpointer) listV6Checkpoints() ([]int, int, error) {
+	return ListV6Checkpoints(c.dir)
 }
 
 // ListCheckpoints returns all the numbers of the checkpoint files (both V6 and V7), and the number of the last checkpoint.
@@ -261,9 +266,11 @@ func (c *Checkpointer) CheckpointsV7() ([]int, error) {
 	return list, nil
 }
 
-// LatestCheckpoint returns number of latest checkpoint or -1 if there are no checkpoints
-func (c *Checkpointer) LatestCheckpoint() (int, error) {
-	_, last, err := c.listCheckpoints()
+// LatestCheckpointV6 returns the number of the latest V6 checkpoint, or -1 if
+// there are no V6 checkpoints. V7 (payloadless) files in the same directory are
+// ignored — see [Checkpointer.listV6Checkpoints] for rationale.
+func (c *Checkpointer) LatestCheckpointV6() (int, error) {
+	_, last, err := c.listV6Checkpoints()
 	return last, err
 }
 
@@ -271,7 +278,7 @@ func (c *Checkpointer) LatestCheckpoint() (int, error) {
 // or -1, -1 if there are no segments
 func (c *Checkpointer) NotCheckpointedSegments() (from, to int, err error) {
 
-	latestCheckpoint, err := c.LatestCheckpoint()
+	latestCheckpoint, err := c.LatestCheckpointV6()
 	if err != nil {
 		return -1, -1, fmt.Errorf("cannot get last checkpoint: %w", err)
 	}
@@ -312,7 +319,7 @@ func (c *Checkpointer) Checkpoint(to int) (err error) {
 		return fmt.Errorf("cannot get not checkpointed segments: %w", err)
 	}
 
-	latestCheckpoint, err := c.LatestCheckpoint()
+	latestCheckpoint, err := c.LatestCheckpointV6()
 	if err != nil {
 		return fmt.Errorf("cannot get latest checkpoint: %w", err)
 	}
