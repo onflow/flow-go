@@ -9,8 +9,25 @@ import (
 
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/complete/payloadless"
 )
+
+// ReadTriesRootHashV7 returns the trie root hashes recorded in a V7 (payloadless)
+// checkpoint without decoding any node payloads. It first validates the part-file
+// checksums and then reads only the per-trie metadata records at the tail of the
+// top-trie file.
+//
+// fileName is the V7 header filename (typically ending in [V7FileSuffix]).
+func ReadTriesRootHashV7(logger zerolog.Logger, dir string, fileName string) (
+	[]ledger.RootHash,
+	error,
+) {
+	if err := validateCheckpointFileV7(logger, dir, fileName); err != nil {
+		return nil, err
+	}
+	return readTriesRootHashV7(logger, dir, fileName)
+}
 
 // readCheckpointV7 reads a payloadless checkpoint from a header file and 17 part
 // files, returning the reconstructed []*payloadless.MTrie.
@@ -379,6 +396,49 @@ func readTopLevelTriesV7(dir string, fileName string, subtrieNodes [][]*payloadl
 	return rootTriesToReturn, errToReturn
 }
 
+// readTriesRootHashV7 reads the trie root hashes from a V7 top-trie file by
+// seeking past the footer to the per-trie metadata records. It assumes the
+// checksums have already been validated by [validateCheckpointFileV7] and only
+// re-checks the V7 magic+version on the top-trie file.
+func readTriesRootHashV7(logger zerolog.Logger, dir string, fileName string) (
+	trieRootsToReturn []ledger.RootHash,
+	errToReturn error,
+) {
+	filepath, _ := filePathTopTries(dir, fileName)
+	errToReturn = withFile(logger, filepath, func(file *os.File) error {
+		if err := validateFileHeader(MagicBytesCheckpointToptrie, VersionV7, file); err != nil {
+			return err
+		}
+
+		_, triesCount, _, err := readTopTriesFooter(file)
+		if err != nil {
+			return fmt.Errorf("could not read top tries footer: %w", err)
+		}
+
+		footerOffset := encNodeCountSize + encTrieCountSize + crc32SumSize
+		trieRootOffset := footerOffset + payloadless.EncodedTrieSize*int(triesCount)
+
+		if _, err := file.Seek(int64(-trieRootOffset), io.SeekEnd); err != nil {
+			return fmt.Errorf("could not seek to v7 trie roots: %w", err)
+		}
+
+		reader := bufio.NewReaderSize(file, defaultBufioReadSize)
+		trieRoots := make([]ledger.RootHash, 0, triesCount)
+		scratch := make([]byte, 1024*4)
+		for i := 0; i < int(triesCount); i++ {
+			enc, err := payloadless.ReadEncodedTrie(reader, scratch)
+			if err != nil {
+				return fmt.Errorf("could not read v7 trie root record: %w", err)
+			}
+			trieRoots = append(trieRoots, ledger.RootHash(enc.RootHash))
+		}
+
+		trieRootsToReturn = trieRoots
+		return nil
+	})
+	return trieRootsToReturn, errToReturn
+}
+
 // computeTotalPayloadlessSubTrieNodeCount returns the total node count across
 // all subtrie node groups.
 func computeTotalPayloadlessSubTrieNodeCount(subtrieNodes [][]*payloadless.Node) uint64 {
@@ -418,4 +478,49 @@ func getPayloadlessNodeByIndex(
 		offset -= uint64(len(subtries))
 	}
 	return nil, fmt.Errorf("could not find payloadless node by index %v, totalSubTrieNodeCount %v", index, totalSubTrieNodeCount)
+}
+
+// validateCheckpointFileV7 mirrors [validateCheckpointFile] for V7 (payloadless)
+// checkpoints: it reads the V7 header to obtain the expected per-part checksums and
+// verifies each subtrie file footer and the top-trie file footer match.
+func validateCheckpointFileV7(logger zerolog.Logger, dir, fileName string) error {
+	headerPath := filePathCheckpointHeader(dir, fileName)
+	subtrieChecksums, topTrieChecksum, err := readCheckpointHeaderV7(headerPath, logger)
+	if err != nil {
+		return err
+	}
+
+	for index, expectedSum := range subtrieChecksums {
+		filepath, _, err := filePathSubTries(dir, fileName, index)
+		if err != nil {
+			return err
+		}
+		err = withFile(logger, filepath, func(f *os.File) error {
+			_, checksum, err := readSubTriesFooter(f)
+			if err != nil {
+				return fmt.Errorf("cannot read sub trie node count: %w", err)
+			}
+			if checksum != expectedSum {
+				return fmt.Errorf("mismatch checksum in v7 subtrie file. checksum from checkpoint header %v does not "+
+					"match with the checksum in subtrie file %v", checksum, expectedSum)
+			}
+			return nil
+		})
+		if err != nil {
+			return err
+		}
+	}
+
+	topTriePath, _ := filePathTopTries(dir, fileName)
+	return withFile(logger, topTriePath, func(file *os.File) error {
+		_, _, checkSum, err := readTopTriesFooter(file)
+		if err != nil {
+			return err
+		}
+		if topTrieChecksum != checkSum {
+			return fmt.Errorf("mismatch top trie checksum, header file has %v, toptrie file has %v",
+				topTrieChecksum, checkSum)
+		}
+		return nil
+	})
 }
