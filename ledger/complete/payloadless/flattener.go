@@ -42,6 +42,11 @@ const (
 	encodedInterimSize    = encNodeTypeSize + encHeightSize + encHashSize + encNodeIndexSize*2
 	encodedNodeHeaderSize = encNodeTypeSize + encHeightSize + encHashSize
 	encodedTrieSize       = encNodeIndexSize + encRegCountSize + encHashSize
+
+	// EncodedTrieSize is the on-disk byte size of one payloadless trie metadata record
+	// (root index + allocated reg count + root hash). Exported so checkpoint readers can
+	// compute tail-seek offsets without reading the full trie payload.
+	EncodedTrieSize = encodedTrieSize
 )
 
 // EncodedTrie holds the fields recovered from a serialized trie record.

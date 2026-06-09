@@ -3,6 +3,7 @@ package common
 import (
 	"fmt"
 	"path/filepath"
+	"strings"
 
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -32,7 +33,13 @@ func FindHeightsByCheckpoints(
 
 	// find all trie root hashes in the checkpoint file
 	dir, fileName := filepath.Split(checkpointFilePath)
-	hashes, err := wal.ReadTriesRootHash(logger, dir, fileName)
+	var hashes []ledger.RootHash
+	var err error
+	if strings.HasSuffix(fileName, wal.V7FileSuffix) {
+		hashes, err = wal.ReadTriesRootHashV7(logger, dir, fileName)
+	} else {
+		hashes, err = wal.ReadTriesRootHash(logger, dir, fileName)
+	}
 	if err != nil {
 		return 0, flow.DummyStateCommitment, 0,
 			fmt.Errorf("could not read trie root hashes from checkpoint file %v: %w",
