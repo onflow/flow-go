@@ -1,11 +1,15 @@
-import "FlowToken"
 import "EVM"
+import "FlowToken"
 import "FlowTransactionScheduler"
 import "FlowTransactionSchedulerUtils"
 
 access(all) contract FlowEVMScheduler {
 
-    access(self) var evmRegister: EVM.EVMAddress
+    access(all) event TransactionCanceled (
+        author: String,
+        txID: UInt64,
+    )
+
     access(contract) var escrowedFees: {UInt64: EVM.EVMAddress}
     access(self) var evmTransactionHandlerCap: Capability<auth(FlowTransactionScheduler.Execute) &{FlowTransactionScheduler.TransactionHandler}>
 
@@ -18,14 +22,12 @@ access(all) contract FlowEVMScheduler {
             let contractAddress = (txArgs[0] as? [UInt8; 20])!
             let callArgs = (txArgs[1] as? [UInt8])!
 
-            let txRes = coa.call(
+            coa.call(
                 to: EVM.EVMAddress(bytes: contractAddress),
                 data: callArgs,
                 gasLimit: 1_500_000,
                 value: EVM.Balance(attoflow: 0)
             )
-            assert(txRes.status == EVM.Status.successful, message: txRes.errorMessage)
-			assert(txRes.errorCode == 0, message: "unexpected error code: \(txRes.errorCode)")
             FlowEVMScheduler.escrowedFees.remove(key: id)
         }
 
@@ -78,6 +80,7 @@ access(all) contract FlowEVMScheduler {
         let caller = self.escrowedFees[id]!
         caller.deposit(from: <-fees)
         self.escrowedFees.remove(key: id)
+        emit TransactionCanceled(author: caller.toString(), txID: id)
     }
 
     access(all) view fun getTransactionStatus(id: UInt64): UInt8 {
@@ -112,10 +115,6 @@ access(all) contract FlowEVMScheduler {
             (from: FlowTransactionSchedulerUtils.managerStoragePath)
     }
 
-    access(all) fun setEvmRegister(address: EVM.EVMAddress) {
-        self.evmRegister = address
-    }
-
     init() {
         let manager <- FlowTransactionSchedulerUtils.createManager()
         self.account.storage.save(<-manager, to: FlowTransactionSchedulerUtils.managerStoragePath)
@@ -133,7 +132,6 @@ access(all) contract FlowEVMScheduler {
         self.evmTransactionHandlerCap = self.account.capabilities.storage
             .issue<auth(FlowTransactionScheduler.Execute) &{FlowTransactionScheduler.TransactionHandler}>(/storage/evmTransactionHandler)
 
-        self.evmRegister = EVM.EVMAddress(bytes: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
         self.escrowedFees = {}
     }
 }

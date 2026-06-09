@@ -100,6 +100,7 @@ type Result struct {
 	// StateChangeCommitment captures a commitment over the state change (delta)
 	StateChangeCommitment []byte
 	ScheduledTransaction  bool
+	From                  gethCommon.Address
 }
 
 // Invalid returns true if transaction has been rejected

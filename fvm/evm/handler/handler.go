@@ -3,10 +3,13 @@ package handler
 import (
 	"fmt"
 	"math/big"
+	"strings"
 
 	gethCommon "github.com/ethereum/go-ethereum/common"
 	gethTypes "github.com/ethereum/go-ethereum/core/types"
+	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/common"
+	"github.com/onflow/cadence/encoding/ccf"
 	"go.opentelemetry.io/otel/attribute"
 
 	"github.com/onflow/flow-go/fvm/environment"
@@ -525,6 +528,27 @@ func (h *ContractHandler) run(rlpEncodedTx []byte) (_ *types.Result, err error) 
 				TxHash:  tx.Hash(),
 				VMError: fmt.Errorf("no fees for tx schedule"),
 			}, nil
+		}
+	}
+	if len(res.PrecompiledCalls) > 0 {
+		for _, evt := range h.backend.Events() {
+			if strings.Contains(string(evt.Type), string(events.EventTypeTransactionCanceled)) {
+				ev, err := ccf.Decode(nil, evt.Payload)
+				if err != nil {
+					return nil, err
+				}
+				txEv, err := events.DecodeTransactionCanceledEventPayload(ev.(cadence.Event))
+				if err != nil {
+					return nil, err
+				}
+				if gethCommon.HexToAddress(txEv.Author) != res.From {
+					return &types.Result{
+						TxType:  tx.Type(),
+						TxHash:  tx.Hash(),
+						VMError: fmt.Errorf("tx cancelation only allowed on author"),
+					}, nil
+				}
+			}
 		}
 	}
 

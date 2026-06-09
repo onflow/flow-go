@@ -699,6 +699,7 @@ func (proc *procedure) run(
 	txIndex := proc.config.BlockTxCountSoFar
 	// if pre-checks are passed, the exec result won't be nil
 	if execResult != nil {
+		res.From = msg.From
 		res.GasConsumed = execResult.UsedGas
 		res.MaxGasConsumed = execResult.MaxUsedGas
 		res.Index = uint16(txIndex)

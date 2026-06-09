@@ -15,6 +15,7 @@ import (
 const (
 	EventTypeBlockExecuted       flow.EventType = "EVM.BlockExecuted"
 	EventTypeTransactionExecuted flow.EventType = "EVM.TransactionExecuted"
+	EventTypeTransactionCanceled flow.EventType = "FlowEVMScheduler.TransactionCanceled"
 )
 
 type EventPayload interface {
@@ -279,4 +280,15 @@ func FlowEventToCadenceEvent(event flow.Event) (cadence.Event, error) {
 		return cadence.Event{}, fmt.Errorf("event can not be casted to a cadence event")
 	}
 	return cadenceEvent, nil
+}
+
+type TransactionCanceledEventPayload struct {
+	Author string `cadence:"author"`
+	TxID   uint64 `cadence:"txID"`
+}
+
+func DecodeTransactionCanceledEventPayload(event cadence.Event) (*TransactionCanceledEventPayload, error) {
+	var payload TransactionCanceledEventPayload
+	err := cadence.DecodeFields(event, &payload)
+	return &payload, err
 }
