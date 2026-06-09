@@ -22,6 +22,7 @@ import (
 	"github.com/onflow/flow-go/ledger/complete/mtrie/flattener"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/node"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
+	"github.com/onflow/flow-go/ledger/complete/payloadless"
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/util"
@@ -744,6 +745,54 @@ func storeUniqueNodes(
 	return nodeCounter, nil
 }
 
+// storeUniquePayloadlessNodes iterates and serializes unique payloadless nodes for trie with given root node.
+// It also saves unique nodes and node counter in visitedNodes map.
+// It returns nodeCounter and error (if any).
+func storeUniquePayloadlessNodes(
+	root *payloadless.Node,
+	visitedNodes map[*payloadless.Node]uint64,
+	nodeCounter uint64,
+	scratch []byte,
+	writer io.Writer,
+	nodeCounterUpdated func(nodeCounter uint64), // for logging estimated progress
+) (uint64, error) {
+
+	for itr := payloadless.NewUniqueNodeIterator(root, visitedNodes); itr.Next(); {
+		n := itr.Value()
+
+		visitedNodes[n] = nodeCounter
+		nodeCounter++
+		nodeCounterUpdated(nodeCounter)
+
+		var lchildIndex, rchildIndex uint64
+
+		if lchild := n.LeftChild(); lchild != nil {
+			var found bool
+			lchildIndex, found = visitedNodes[lchild]
+			if !found {
+				hash := lchild.Hash()
+				return 0, fmt.Errorf("internal error: missing payloadless node with hash %s", hex.EncodeToString(hash[:]))
+			}
+		}
+		if rchild := n.RightChild(); rchild != nil {
+			var found bool
+			rchildIndex, found = visitedNodes[rchild]
+			if !found {
+				hash := rchild.Hash()
+				return 0, fmt.Errorf("internal error: missing payloadless node with hash %s", hex.EncodeToString(hash[:]))
+			}
+		}
+
+		encNode := payloadless.EncodeNode(n, lchildIndex, rchildIndex, scratch)
+		_, err := writer.Write(encNode)
+		if err != nil {
+			return 0, fmt.Errorf("cannot serialize payloadless node: %w", err)
+		}
+	}
+
+	return nodeCounter, nil
+}
+
 // getNodesAtLevel returns 2^level nodes at given level in breadth-first order.
 // It guarantees size and order of returned nodes (nil element if no node at the position).
 // For example, given nil root and level 3, getNodesAtLevel returns a slice
@@ -757,6 +806,34 @@ func getNodesAtLevel(root *node.Node, level uint) []*node.Node {
 	for nodesLevel < level {
 		nextLevel := nodesLevel + 1
 		nodesAtNextLevel := make([]*node.Node, 1<<nextLevel)
+
+		for i, n := range nodes {
+			if n != nil {
+				nodesAtNextLevel[i*2] = n.LeftChild()
+				nodesAtNextLevel[i*2+1] = n.RightChild()
+			}
+		}
+
+		nodes = nodesAtNextLevel
+		nodesLevel = nextLevel
+	}
+
+	return nodes
+}
+
+// getPayloadlessNodesAtLevel returns 2^level payloadless nodes at given level in breadth-first order.
+// It guarantees size and order of returned nodes (nil element if no node at the position).
+// For example, given nil root and level 3, getPayloadlessNodesAtLevel returns a slice
+// of 2^3 nil elements.
+func getPayloadlessNodesAtLevel(root *payloadless.Node, level uint) []*payloadless.Node {
+	nodes := []*payloadless.Node{root}
+	nodesLevel := uint(0)
+
+	// Use breadth first traversal to get all nodes at given level.
+	// If a node isn't found, a nil node is used in its place.
+	for nodesLevel < level {
+		nextLevel := nodesLevel + 1
+		nodesAtNextLevel := make([]*payloadless.Node, 1<<nextLevel)
 
 		for i, n := range nodes {
 			if n != nil {

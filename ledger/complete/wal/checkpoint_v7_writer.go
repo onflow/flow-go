@@ -400,7 +400,7 @@ func storeTopLevelPayloadlessNodes(
 
 // storePayloadlessTries writes each trie's metadata record (root index, reg
 // count, root hash). Empty tries use root index 0, which encodes the "nil"
-// sentinel expected by [payloadless.ReadPayloadlessTrie].
+// sentinel expected by [payloadless.ReadTrie].
 func storePayloadlessTries(
 	scratch []byte,
 	tries []*payloadless.MTrie,
