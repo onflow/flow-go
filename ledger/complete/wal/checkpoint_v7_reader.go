@@ -12,27 +12,6 @@ import (
 	"github.com/onflow/flow-go/ledger/complete/payloadless"
 )
 
-// OpenAndReadCheckpointV7 opens a V7 (payloadless) checkpoint and returns the tries
-// as []*payloadless.MTrie. The file must be a V7 checkpoint — V6 (and any other
-// version) is rejected, both because the V7 reader explicitly validates the V7
-// magic+version at every part-file header and because V7 files use a different
-// filename suffix ([V7FileSuffix]) so they're trivially distinguishable on disk.
-func OpenAndReadCheckpointV7(dir string, fileName string, logger zerolog.Logger) (
-	triesToReturn []*payloadless.MTrie,
-	errToReturn error,
-) {
-	headerPath := filePathCheckpointHeader(dir, fileName)
-	errToReturn = withFile(logger, headerPath, func(file *os.File) error {
-		tries, err := readCheckpointV7(file, logger)
-		if err != nil {
-			return err
-		}
-		triesToReturn = tries
-		return nil
-	})
-	return triesToReturn, errToReturn
-}
-
 // readCheckpointV7 reads a payloadless checkpoint from a header file and 17 part
 // files, returning the reconstructed []*payloadless.MTrie.
 //
@@ -85,6 +64,27 @@ func readCheckpointV7(headerFile *os.File, logger zerolog.Logger) ([]*payloadles
 	}
 
 	return tries, nil
+}
+
+// OpenAndReadCheckpointV7 opens a V7 (payloadless) checkpoint and returns the tries
+// as []*payloadless.MTrie. The file must be a V7 checkpoint — V6 (and any other
+// version) is rejected, both because the V7 reader explicitly validates the V7
+// magic+version at every part-file header and because V7 files use a different
+// filename suffix ([V7FileSuffix]) so they're trivially distinguishable on disk.
+func OpenAndReadCheckpointV7(dir string, fileName string, logger zerolog.Logger) (
+	triesToReturn []*payloadless.MTrie,
+	errToReturn error,
+) {
+	headerPath := filePathCheckpointHeader(dir, fileName)
+	errToReturn = withFile(logger, headerPath, func(file *os.File) error {
+		tries, err := readCheckpointV7(file, logger)
+		if err != nil {
+			return err
+		}
+		triesToReturn = tries
+		return nil
+	})
+	return triesToReturn, errToReturn
 }
 
 // readCheckpointHeaderV7 reads and validates the V7 checkpoint header file,
@@ -379,6 +379,16 @@ func readTopLevelTriesV7(dir string, fileName string, subtrieNodes [][]*payloadl
 	return rootTriesToReturn, errToReturn
 }
 
+// computeTotalPayloadlessSubTrieNodeCount returns the total node count across
+// all subtrie node groups.
+func computeTotalPayloadlessSubTrieNodeCount(subtrieNodes [][]*payloadless.Node) uint64 {
+	total := 0
+	for _, nodes := range subtrieNodes {
+		total += len(nodes)
+	}
+	return uint64(total)
+}
+
 // getPayloadlessNodeByIndex resolves a node reference assigned during
 // [storeUniquePayloadlessNodes]. Index 0 is the nil sentinel; indices in
 // [1, totalSubTrieNodeCount] map into the flattened subtrie node groups; higher
@@ -408,14 +418,4 @@ func getPayloadlessNodeByIndex(
 		offset -= uint64(len(subtries))
 	}
 	return nil, fmt.Errorf("could not find payloadless node by index %v, totalSubTrieNodeCount %v", index, totalSubTrieNodeCount)
-}
-
-// computeTotalPayloadlessSubTrieNodeCount returns the total node count across
-// all subtrie node groups.
-func computeTotalPayloadlessSubTrieNodeCount(subtrieNodes [][]*payloadless.Node) uint64 {
-	total := 0
-	for _, nodes := range subtrieNodes {
-		total += len(nodes)
-	}
-	return uint64(total)
 }
