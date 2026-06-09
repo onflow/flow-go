@@ -219,7 +219,7 @@ func readCheckpointSubTrieV7(dir string, fileName string, index int, checksum ui
 			nodes = make([]*payloadless.Node, nodesCount+1)
 			logging := logProgress(fmt.Sprintf("reading %v-th sub trie roots (v7)", index), int(nodesCount), logger)
 			for i := uint64(1); i <= nodesCount; i++ {
-				n, err := payloadless.ReadPayloadlessNode(reader, scratch, func(nodeIndex uint64) (*payloadless.Node, error) {
+				n, err := payloadless.ReadNode(reader, scratch, func(nodeIndex uint64) (*payloadless.Node, error) {
 					if nodeIndex >= i {
 						return nil, fmt.Errorf("sequence of serialized nodes does not satisfy Descendents-First-Relationship")
 					}
@@ -351,7 +351,7 @@ func readTopLevelTriesV7(dir string, fileName string, subtrieNodes [][]*payloadl
 		scratch := make([]byte, 1024*4)
 
 		for i := uint64(1); i <= topLevelNodesCount; i++ {
-			n, err := payloadless.ReadPayloadlessNode(reader, scratch, func(nodeIndex uint64) (*payloadless.Node, error) {
+			n, err := payloadless.ReadNode(reader, scratch, func(nodeIndex uint64) (*payloadless.Node, error) {
 				if nodeIndex >= i+totalSubTrieNodeCount {
 					return nil, fmt.Errorf("sequence of serialized nodes does not satisfy Descendents-First-Relationship")
 				}
@@ -364,7 +364,7 @@ func readTopLevelTriesV7(dir string, fileName string, subtrieNodes [][]*payloadl
 		}
 
 		for i := uint16(0); i < triesCount; i++ {
-			t, err := payloadless.ReadPayloadlessTrie(reader, scratch, func(nodeIndex uint64) (*payloadless.Node, error) {
+			t, err := payloadless.ReadTrie(reader, scratch, func(nodeIndex uint64) (*payloadless.Node, error) {
 				return getPayloadlessNodeByIndex(subtrieNodes, totalSubTrieNodeCount, topLevelNodes, nodeIndex)
 			})
 			if err != nil {
