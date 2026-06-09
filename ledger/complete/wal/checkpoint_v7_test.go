@@ -277,5 +277,104 @@ func TestOpenAndReadCheckpointV7RejectsV5(t *testing.T) {
 	})
 }
 
+// TestReadCheckpointV7RootHash verifies that [ReadTriesRootHashV7] returns each
+// stored trie's root hash without decoding the full payload.
+func TestReadCheckpointV7RootHash(t *testing.T) {
+	unittest.RunWithTempDir(t, func(dir string) {
+		tries := createSimplePayloadlessTrie(t)
+		fileName := "checkpoint-v7-readroot"
+		logger := zerolog.Nop()
+		require.NoErrorf(t, StoreCheckpointV7Concurrently(tries, dir, fileName, logger), "fail to store checkpoint")
+
+		trieRoots, err := ReadTriesRootHashV7(logger, dir, fileName)
+		require.NoError(t, err)
+		require.Equal(t, len(tries), len(trieRoots))
+		for i, root := range trieRoots {
+			require.Equal(t, tries[i].RootHash(), root)
+		}
+	})
+}
+
+// TestReadCheckpointV7RootHashMulti covers the multi-trie / multi-subtrie path
+// of [ReadTriesRootHashV7], ensuring tail-seek arithmetic holds when triesCount > 1.
+func TestReadCheckpointV7RootHashMulti(t *testing.T) {
+	unittest.RunWithTempDir(t, func(dir string) {
+		tries := createMultiplePayloadlessTries(t)
+		fileName := "checkpoint-v7-readroot-multi"
+		logger := zerolog.Nop()
+		require.NoErrorf(t, StoreCheckpointV7Concurrently(tries, dir, fileName, logger), "fail to store checkpoint")
+
+		trieRoots, err := ReadTriesRootHashV7(logger, dir, fileName)
+		require.NoError(t, err)
+		require.Equal(t, len(tries), len(trieRoots))
+		for i, root := range trieRoots {
+			require.Equal(t, tries[i].RootHash(), root)
+		}
+	})
+}
+
+// TestReadCheckpointV7RootHashValidateChecksum corrupts the top-trie file's CRC32
+// trailer and verifies [ReadTriesRootHashV7] surfaces the checksum mismatch.
+func TestReadCheckpointV7RootHashValidateChecksum(t *testing.T) {
+	unittest.RunWithTempDir(t, func(dir string) {
+		tries := createSimplePayloadlessTrie(t)
+		fileName := "checkpoint-v7-bad-checksum"
+		logger := zerolog.Nop()
+		require.NoErrorf(t, StoreCheckpointV7Concurrently(tries, dir, fileName, logger), "fail to store checkpoint")
+
+		topTrieFilePath, _ := filePathTopTries(dir, fileName)
+		file, err := os.OpenFile(topTrieFilePath, os.O_RDWR, 0644)
+		require.NoError(t, err)
+
+		fileInfo, err := file.Stat()
+		require.NoError(t, err)
+		fileSize := fileInfo.Size()
+
+		invalidSum := encodeCRC32Sum(10)
+		_, err = file.WriteAt(invalidSum, fileSize-crc32SumSize)
+		require.NoError(t, err)
+		require.NoError(t, file.Close())
+
+		_, err = ReadTriesRootHashV7(logger, dir, fileName)
+		require.Error(t, err)
+	})
+}
+
+// TestReadCheckpointV7RootHashRejectsV6 confirms that [ReadTriesRootHashV7]
+// refuses a V6 checkpoint (version is checked before trie-record decoding).
+func TestReadCheckpointV7RootHashRejectsV6(t *testing.T) {
+	unittest.RunWithTempDir(t, func(dir string) {
+		tries := createSimpleTrie(t)
+		fileName := "checkpoint-v6-for-v7-reader"
+		logger := zerolog.Nop()
+		require.NoErrorf(t, StoreCheckpointV6Concurrently(tries, dir, fileName, logger), "fail to store V6 checkpoint")
+
+		_, err := ReadTriesRootHashV7(logger, dir, fileName)
+		require.Error(t, err, "V7 root-hash reader must reject a V6 checkpoint")
+	})
+}
+
+// TestCheckpointHasRootHashV7Dispatch verifies the [CheckpointHasRootHash]
+// dispatcher routes through [ReadTriesRootHashV7] when the filename ends in
+// [V7FileSuffix].
+func TestCheckpointHasRootHashV7Dispatch(t *testing.T) {
+	unittest.RunWithTempDir(t, func(dir string) {
+		tries := createMultiplePayloadlessTries(t)
+		fileName := "checkpoint-v7-dispatch" + V7FileSuffix
+		logger := zerolog.Nop()
+		require.NoErrorf(t, StoreCheckpointV7Concurrently(tries, dir, fileName, logger), "fail to store checkpoint")
+
+		trieRoots, err := ReadTriesRootHashV7(logger, dir, fileName)
+		require.NoError(t, err)
+		require.NotEmpty(t, trieRoots)
+		for _, root := range trieRoots {
+			require.NoError(t, CheckpointHasRootHash(logger, dir, fileName, root))
+		}
+
+		nonExist := ledger.RootHash(unittest.StateCommitmentFixture())
+		require.Error(t, CheckpointHasRootHash(logger, dir, fileName, nonExist))
+	})
+}
+
 // Ensure the trie package import is retained for converter use in helpers above.
 var _ = trie.NewEmptyMTrie
