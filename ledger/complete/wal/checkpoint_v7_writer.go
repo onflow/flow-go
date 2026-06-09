@@ -8,6 +8,7 @@ import (
 
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/complete/payloadless"
 )
 
@@ -148,6 +149,14 @@ func storeCheckpointHeaderV7(
 	return nil
 }
 
+// 17th part file contains:
+// 1. checkpoint version
+// 2. subtrieNodeCount
+// 3. top level nodes
+// 4. trie roots
+// 5. node count
+// 6. trie count
+// 7. checksum
 func storeTopLevelNodesAndTrieRootsV7(
 	tries []*payloadless.MTrie,
 	subTrieRootIndices map[*payloadless.Node]uint64,
@@ -199,10 +208,37 @@ func storeTopLevelNodesAndTrieRootsV7(
 	return checksum, nil
 }
 
-type payloadlessJobStoreSubTrie struct {
-	Index  int
-	Roots  []*payloadless.Node
-	Result chan<- *payloadlessResultStoringSubTrie
+// createPayloadlessSubTrieRoots returns the subtrie root nodes — at depth
+// [subtrieLevel] from each trie's root — laid out in breadth-first order. The
+// outer index is the subtrie position (0..subtrieCount-1); the inner index is
+// the trie position.
+func createPayloadlessSubTrieRoots(tries []*payloadless.MTrie) [subtrieCount][]*payloadless.Node {
+	var subtrieRoots [subtrieCount][]*payloadless.Node
+	for i := 0; i < len(subtrieRoots); i++ {
+		subtrieRoots[i] = make([]*payloadless.Node, len(tries))
+	}
+	for trieIndex, t := range tries {
+		subtries := getPayloadlessNodesAtLevel(t.RootNode(), subtrieLevel)
+		for subtrieIndex, subtrieRoot := range subtries {
+			subtrieRoots[subtrieIndex][trieIndex] = subtrieRoot
+		}
+	}
+	return subtrieRoots
+}
+
+// estimatePayloadlessSubtrieNodeCount estimates the average number of nodes in a
+// subtrie at [subtrieLevel] for a single payloadless trie, using the same
+// 2*regCount-1 heuristic as the full-mtrie variant.
+func estimatePayloadlessSubtrieNodeCount(t *payloadless.MTrie) int {
+	estimatedTrieNodeCount := 2*int(t.AllocatedRegCount()) - 1
+	return estimatedTrieNodeCount / subtrieCount
+}
+
+// payloadlessSubTrieRootAndTopLevelTrieCount returns an upper-bound estimate of
+// the number of unique subtrie-root and top-level-trie nodes across the given
+// tries. Used for preallocation only.
+func payloadlessSubTrieRootAndTopLevelTrieCount(tries []*payloadless.MTrie) int {
+	return len(tries) * subtrieCount * 2
 }
 
 type payloadlessResultStoringSubTrie struct {
@@ -211,6 +247,12 @@ type payloadlessResultStoringSubTrie struct {
 	NodeCount uint64
 	Checksum  uint32
 	Err       error
+}
+
+type payloadlessJobStoreSubTrie struct {
+	Index  int
+	Roots  []*payloadless.Node
+	Result chan<- *payloadlessResultStoringSubTrie
 }
 
 func storeSubTrieConcurrentlyV7(
@@ -330,105 +372,6 @@ func storeCheckpointSubTrieV7(
 	return subtrieRootNodes, totalNodeCount, checksum, nil
 }
 
-// createPayloadlessSubTrieRoots returns the subtrie root nodes — at depth
-// [subtrieLevel] from each trie's root — laid out in breadth-first order. The
-// outer index is the subtrie position (0..subtrieCount-1); the inner index is
-// the trie position.
-func createPayloadlessSubTrieRoots(tries []*payloadless.MTrie) [subtrieCount][]*payloadless.Node {
-	var subtrieRoots [subtrieCount][]*payloadless.Node
-	for i := 0; i < len(subtrieRoots); i++ {
-		subtrieRoots[i] = make([]*payloadless.Node, len(tries))
-	}
-	for trieIndex, t := range tries {
-		subtries := getPayloadlessNodesAtLevel(t.RootNode(), subtrieLevel)
-		for subtrieIndex, subtrieRoot := range subtries {
-			subtrieRoots[subtrieIndex][trieIndex] = subtrieRoot
-		}
-	}
-	return subtrieRoots
-}
-
-// estimatePayloadlessSubtrieNodeCount estimates the average number of nodes in a
-// subtrie at [subtrieLevel] for a single payloadless trie, using the same
-// 2*regCount-1 heuristic as the full-mtrie variant.
-func estimatePayloadlessSubtrieNodeCount(t *payloadless.MTrie) int {
-	estimatedTrieNodeCount := 2*int(t.AllocatedRegCount()) - 1
-	return estimatedTrieNodeCount / subtrieCount
-}
-
-// payloadlessSubTrieRootAndTopLevelTrieCount returns an upper-bound estimate of
-// the number of unique subtrie-root and top-level-trie nodes across the given
-// tries. Used for preallocation only.
-func payloadlessSubTrieRootAndTopLevelTrieCount(tries []*payloadless.MTrie) int {
-	return len(tries) * subtrieCount * 2
-}
-
-// getPayloadlessNodesAtLevel returns the 2^level nodes at depth `level` of a
-// payloadless trie in breadth-first order. Positions with no node are nil; the
-// returned slice always has length 2^level.
-func getPayloadlessNodesAtLevel(root *payloadless.Node, level uint) []*payloadless.Node {
-	nodes := []*payloadless.Node{root}
-	nodesLevel := uint(0)
-	for nodesLevel < level {
-		nextLevel := nodesLevel + 1
-		nodesAtNextLevel := make([]*payloadless.Node, 1<<nextLevel)
-		for i, n := range nodes {
-			if n != nil {
-				nodesAtNextLevel[i*2] = n.LeftChild()
-				nodesAtNextLevel[i*2+1] = n.RightChild()
-			}
-		}
-		nodes = nodesAtNextLevel
-		nodesLevel = nextLevel
-	}
-	return nodes
-}
-
-// storeUniquePayloadlessNodes traverses the trie rooted at `root` in
-// Descendents-First order, emits each previously-unvisited node to writer via
-// [payloadless.EncodeNode], and assigns it a monotonically-increasing index in
-// `visitedNodes`. nodeCounter is the next index to assign on entry; the updated
-// counter is returned.
-func storeUniquePayloadlessNodes(
-	root *payloadless.Node,
-	visitedNodes map[*payloadless.Node]uint64,
-	nodeCounter uint64,
-	scratch []byte,
-	writer io.Writer,
-	nodeCounterUpdated func(nodeCounter uint64),
-) (uint64, error) {
-	for itr := payloadless.NewUniqueNodeIterator(root, visitedNodes); itr.Next(); {
-		n := itr.Value()
-		visitedNodes[n] = nodeCounter
-		nodeCounter++
-		nodeCounterUpdated(nodeCounter)
-
-		var lchildIndex, rchildIndex uint64
-		if lchild := n.LeftChild(); lchild != nil {
-			idx, found := visitedNodes[lchild]
-			if !found {
-				h := lchild.Hash()
-				return 0, fmt.Errorf("internal error: missing payloadless node with hash %s", hex.EncodeToString(h[:]))
-			}
-			lchildIndex = idx
-		}
-		if rchild := n.RightChild(); rchild != nil {
-			idx, found := visitedNodes[rchild]
-			if !found {
-				h := rchild.Hash()
-				return 0, fmt.Errorf("internal error: missing payloadless node with hash %s", hex.EncodeToString(h[:]))
-			}
-			rchildIndex = idx
-		}
-
-		encNode := payloadless.EncodeNode(n, lchildIndex, rchildIndex, scratch)
-		if _, err := writer.Write(encNode); err != nil {
-			return 0, fmt.Errorf("cannot serialize payloadless node: %w", err)
-		}
-	}
-	return nodeCounter, nil
-}
-
 // storeTopLevelPayloadlessNodes serializes each trie's nodes above
 // [subtrieLevel], reusing `subTrieRootIndices` as the seeded visitedNodes map so
 // subtrie roots (already written in the subtrie pass) are not re-emitted.
@@ -466,19 +409,24 @@ func storePayloadlessTries(
 ) error {
 	for _, t := range tries {
 		rootNode := t.RootNode()
-		var rootIndex uint64
-		if rootNode != nil {
-			idx, found := topLevelNodes[rootNode]
-			if !found {
-				rootHash := t.RootHash()
-				return fmt.Errorf("internal error: missing payloadless node with hash %s", hex.EncodeToString(rootHash[:]))
-			}
-			rootIndex = idx
+		if !t.IsEmpty() && rootNode.Height() != ledger.NodeMaxHeight {
+			return fmt.Errorf("height of payloadless root node must be %d, but is %d",
+				ledger.NodeMaxHeight, rootNode.Height())
 		}
+
+		// Get root node index
+		rootIndex, found := topLevelNodes[rootNode]
+		if !found {
+			rootHash := t.RootHash()
+			return fmt.Errorf("internal error: missing payloadless node with hash %s", hex.EncodeToString(rootHash[:]))
+		}
+
 		encTrie := payloadless.EncodeTrie(t, rootIndex, scratch)
-		if _, err := writer.Write(encTrie); err != nil {
+		_, err := writer.Write(encTrie)
+		if err != nil {
 			return fmt.Errorf("cannot serialize payloadless trie: %w", err)
 		}
 	}
+
 	return nil
 }
