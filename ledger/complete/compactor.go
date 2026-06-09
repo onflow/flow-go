@@ -184,7 +184,7 @@ func (c *Compactor) run() {
 		activeSegmentNum = -1
 	}
 
-	lastCheckpointNum, err := c.checkpointer.LatestCheckpoint()
+	lastCheckpointNum, err := c.checkpointer.LatestCheckpointV6()
 	if err != nil {
 		c.logger.Error().Err(err).Msg("compactor failed to get last checkpoint number")
 		lastCheckpointNum = -1
