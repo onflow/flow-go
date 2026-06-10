@@ -311,7 +311,7 @@ func (c *Compactor) checkpoint(ctx context.Context, tries []*trie.MTrie, checkpo
 	default:
 	}
 
-	err = cleanupCheckpoints(c.checkpointer, int(c.checkpointsToKeep))
+	err = cleanupCheckpointsV6(c.checkpointer, int(c.checkpointsToKeep))
 	if err != nil {
 		return &removeCheckpointError{err: err}
 	}
@@ -361,25 +361,30 @@ func createCheckpoint(checkpointer *realWAL.Checkpointer, logger zerolog.Logger,
 	return nil
 }
 
-// cleanupCheckpoints deletes prior checkpoint files if needed.
-// Since the function is side-effect free, all failures are simply a no-op.
-func cleanupCheckpoints(checkpointer *realWAL.Checkpointer, checkpointsToKeep int) error {
+// cleanupCheckpointsV6 deletes prior V6 checkpoint files if needed.
+//
+// Retention is applied per checkpoint type: this V6 compactor only counts and
+// removes V6 checkpoints, leaving any V7 (payloadless) files in the same
+// directory to be governed by the payloadless compactor's own retention. A
+// `checkpointsToKeep` of N therefore permits N V6 and N V7 checkpoints to
+// coexist.
+func cleanupCheckpointsV6(checkpointer *realWAL.Checkpointer, checkpointsToKeep int) error {
 	// Don't list checkpoints if we keep them all
 	if checkpointsToKeep == 0 {
 		return nil
 	}
-	checkpoints, err := checkpointer.Checkpoints()
+	checkpoints, err := checkpointer.CheckpointsV6()
 	if err != nil {
-		return fmt.Errorf("cannot list checkpoints: %w", err)
+		return fmt.Errorf("cannot list V6 checkpoints: %w", err)
 	}
 	if len(checkpoints) > int(checkpointsToKeep) {
 		// if condition guarantees this never fails
 		checkpointsToRemove := checkpoints[:len(checkpoints)-int(checkpointsToKeep)]
 
 		for _, checkpoint := range checkpointsToRemove {
-			err := checkpointer.RemoveCheckpoint(checkpoint)
+			err := checkpointer.RemoveCheckpointV6(checkpoint)
 			if err != nil {
-				return fmt.Errorf("cannot remove checkpoint %d: %w", checkpoint, err)
+				return fmt.Errorf("cannot remove V6 checkpoint %d: %w", checkpoint, err)
 			}
 		}
 	}

@@ -237,7 +237,13 @@ func (w *DiskWAL) replay(
 	}
 
 	if useCheckpoints {
-		allCheckpoints, err := checkpointer.Checkpoints()
+		// Only consider V6 checkpoints here: this replay path loads checkpoints via
+		// LoadCheckpointV6 (full mtrie). V7 (payloadless) files may live in the same
+		// directory but are not loadable here, so including them would only cause
+		// failed load attempts and misleading warnings before falling back to a V6
+		// checkpoint. This mirrors the V6-only enumeration used by the checkpoint
+		// scheduling logic (see Checkpointer.listV6Checkpoints).
+		allCheckpoints, err := checkpointer.CheckpointsV6()
 		if err != nil {
 			return fmt.Errorf("cannot get list of checkpoints: %w", err)
 		}

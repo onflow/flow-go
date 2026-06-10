@@ -304,7 +304,7 @@ func (c *PayloadlessCompactor) checkpoint(ctx context.Context, tries []*payloadl
 	default:
 	}
 
-	if err := cleanupPayloadlessCheckpoints(c.checkpointer, int(c.checkpointsToKeep)); err != nil {
+	if err := cleanupCheckpointsV7(c.checkpointer, int(c.checkpointsToKeep)); err != nil {
 		return &removeCheckpointError{err: err}
 	}
 
@@ -349,9 +349,9 @@ func createPayloadlessCheckpoint(
 	return nil
 }
 
-// cleanupPayloadlessCheckpoints removes V7 checkpoints in excess of the
+// cleanupCheckpointsV7 removes V7 checkpoints in excess of the
 // keep-count, oldest first. V6 files in the same directory are untouched.
-func cleanupPayloadlessCheckpoints(checkpointer *realWAL.Checkpointer, checkpointsToKeep int) error {
+func cleanupCheckpointsV7(checkpointer *realWAL.Checkpointer, checkpointsToKeep int) error {
 	if checkpointsToKeep == 0 {
 		return nil
 	}
