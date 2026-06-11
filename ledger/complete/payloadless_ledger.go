@@ -92,8 +92,25 @@ func NewPayloadlessLedger(
 		logger:            logger,
 		pathFinderVersion: pathFinderVer,
 	}
+
+	// When a WAL is attached, recover in-memory state from the latest V7
+	// checkpoint plus newer WAL segments before serving requests. This mirrors
+	// the V6 [NewLedger] recovery via [realWAL.LedgerWAL.ReplayOnForest]. When no
+	// WAL is attached the ledger is purely in-memory and there is nothing to
+	// recover.
 	if wal != nil {
 		l.trieUpdateCh = make(chan *WALPayloadlessTrieUpdate, defaultPayloadlessTrieUpdateChanSize)
+
+		// pause records to prevent double logging trie updates during replay
+		wal.PauseRecord()
+		defer wal.UnpauseRecord()
+
+		err = wal.ReplayOnPayloadlessForest(forest)
+		if err != nil {
+			return nil, fmt.Errorf("cannot restore LedgerWAL: %w", err)
+		}
+
+		wal.UnpauseRecord()
 	}
 	return l, nil
 }
@@ -362,18 +379,6 @@ func (l *PayloadlessLedger) ForestSize() int {
 // Tries returns the tries stored in the forest.
 func (l *PayloadlessLedger) Tries() ([]*payloadless.MTrie, error) {
 	return l.forest.GetTries()
-}
-
-// AddTries seeds the ledger's forest with pre-built payloadless tries — used by
-// the factory to bootstrap from a V7 (payloadless) checkpoint on startup.
-//
-// AddTries is concurrency-safe to call once at boot, but should not be mixed
-// with concurrent Update/Set traffic; it is intended to run before the ledger
-// starts serving requests.
-//
-// No error returns are expected during normal operation.
-func (l *PayloadlessLedger) AddTries(tries []*payloadless.MTrie) error {
-	return l.forest.AddTries(tries)
 }
 
 // Trie returns the trie stored in the forest with the given root hash.
