@@ -885,6 +885,67 @@ func (c *Checkpointer) LoadRootCheckpointV7() ([]*payloadless.MTrie, error) {
 	return OpenAndReadCheckpointV7(c.dir, fileName, c.wal.log)
 }
 
+// LoadLatestCheckpointV7 loads the most recent usable V7 (payloadless) checkpoint from
+// the WAL directory and returns its tries together with the number of the loaded
+// checkpoint.
+//
+// It tries the newest numbered V7 checkpoint first, falling back to older ones if
+// a checkpoint file fails to load. This mirrors the V6 checkpoint selection in
+// [DiskWAL.replay]. The returned `loadedCheckpoint` is the number of the numbered
+// checkpoint that was loaded, used by callers to determine the first WAL segment
+// to replay.
+//
+// When no numbered V7 checkpoint is usable, it falls back to the V7 root
+// checkpoint (converted from the V6 root.checkpoint during bootstrap), if present.
+// In that case, and when no V7 checkpoint of either kind exists, `loadedCheckpoint`
+// is -1, signalling that all segments must be replayed on top of the returned
+// tries (which is the empty slice when no checkpoint exists at all).
+//
+// No error returns are expected during normal operation.
+func (c *Checkpointer) LoadLatestCheckpointV7() (tries []*payloadless.MTrie, loadedCheckpoint int, err error) {
+	checkpoints, err := c.CheckpointsV7()
+	if err != nil {
+		return nil, -1, fmt.Errorf("cannot list V7 checkpoints: %w", err)
+	}
+
+	// Try the newest V7 checkpoint first, falling back to older ones if a file
+	// fails to load. This mirrors the V6 checkpoint selection in [DiskWAL.replay].
+	for i := len(checkpoints) - 1; i >= 0; i-- {
+		num := checkpoints[i]
+		name := NumberToFilenameV7(num)
+		tries, err := OpenAndReadCheckpointV7(c.dir, name, c.wal.log)
+		if err != nil {
+			c.wal.log.Warn().Int("checkpoint", num).Err(err).
+				Msg("V7 checkpoint loading failed; falling back to older checkpoint")
+			continue
+		}
+		c.wal.log.Info().Int("checkpoint", num).Int("trie_count", len(tries)).
+			Msg("loaded V7 checkpoint")
+		return tries, num, nil
+	}
+
+	// No numbered V7 checkpoint loaded: fall back to the V7 root checkpoint, if
+	// present. This is the payloadless analog of the root-checkpoint branch in
+	// [DiskWAL.replay]; like that branch it does not advance the replay start
+	// (loadedCheckpoint stays -1), so all segments are replayed on top of the
+	// root state.
+	hasV7Root, err := c.HasRootCheckpointV7()
+	if err != nil {
+		return nil, -1, fmt.Errorf("cannot check for V7 root checkpoint: %w", err)
+	}
+	if hasV7Root {
+		tries, err := c.LoadRootCheckpointV7()
+		if err != nil {
+			return nil, -1, fmt.Errorf("failed to load V7 root checkpoint: %w", err)
+		}
+		c.wal.log.Info().Int("trie_count", len(tries)).
+			Msg("loaded V7 root checkpoint")
+		return tries, -1, nil
+	}
+
+	return nil, -1, nil
+}
+
 func (c *Checkpointer) HasRootCheckpoint() (bool, error) {
 	return HasRootCheckpoint(c.dir)
 }
