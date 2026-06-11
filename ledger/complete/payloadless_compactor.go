@@ -239,58 +239,6 @@ Loop:
 	}
 }
 
-// processTrieUpdate writes the WAL record, tracks the active segment, hands
-// the newly-built trie to the queue, and signals when enough segments have
-// rolled over to checkpoint. Mirrors [Compactor.processTrieUpdate].
-func (c *PayloadlessCompactor) processTrieUpdate(
-	update *WALPayloadlessTrieUpdate,
-	trieQueue *realWAL.PayloadlessTrieQueue,
-	activeSegmentNum int,
-	nextCheckpointNum int,
-) (_activeSegmentNum int, checkpointNum int, checkpointTries []*payloadless.MTrie) {
-
-	segmentNum, skipped, updateErr := c.wal.RecordUpdate(update.Update)
-	update.ResultCh <- updateErr
-
-	defer func() {
-		// Receive the freshly-built trie from the ledger goroutine and stage it.
-		trie := <-update.TrieCh
-		if trie == nil {
-			c.logger.Error().Msg("payloadless compactor failed to get updated trie")
-			return
-		}
-		trieQueue.Push(trie)
-	}()
-
-	if activeSegmentNum == -1 {
-		return segmentNum, -1, nil
-	}
-
-	if updateErr != nil || skipped || segmentNum == activeSegmentNum {
-		return activeSegmentNum, -1, nil
-	}
-
-	// segmentNum > activeSegmentNum — a segment just rolled over.
-
-	if segmentNum != activeSegmentNum+1 {
-		c.logger.Error().Msgf("payloadless compactor got unexpected new segment %d, want %d", segmentNum, activeSegmentNum+1)
-	}
-
-	prevSegmentNum := activeSegmentNum
-	activeSegmentNum = segmentNum
-
-	c.logger.Info().Msgf("finish writing segment file %v, payloadless trie update writing to segment %v; checkpoint triggers at segment %v",
-		prevSegmentNum, activeSegmentNum, nextCheckpointNum)
-
-	if nextCheckpointNum > prevSegmentNum {
-		return activeSegmentNum, -1, nil
-	}
-
-	// nextCheckpointNum == prevSegmentNum — enough segments accumulated.
-	tries := trieQueue.Tries()
-	return activeSegmentNum, nextCheckpointNum, tries
-}
-
 // checkpoint serializes a V7 checkpoint, then prunes older V7 files per the
 // retention policy, and notifies observers.
 func (c *PayloadlessCompactor) checkpoint(ctx context.Context, tries []*payloadless.MTrie, checkpointNum int) error {
@@ -368,6 +316,58 @@ func cleanupCheckpointsV7(checkpointer *realWAL.Checkpointer, checkpointsToKeep 
 		}
 	}
 	return nil
+}
+
+// processTrieUpdate writes the WAL record, tracks the active segment, hands
+// the newly-built trie to the queue, and signals when enough segments have
+// rolled over to checkpoint. Mirrors [Compactor.processTrieUpdate].
+func (c *PayloadlessCompactor) processTrieUpdate(
+	update *WALPayloadlessTrieUpdate,
+	trieQueue *realWAL.PayloadlessTrieQueue,
+	activeSegmentNum int,
+	nextCheckpointNum int,
+) (_activeSegmentNum int, checkpointNum int, checkpointTries []*payloadless.MTrie) {
+
+	segmentNum, skipped, updateErr := c.wal.RecordUpdate(update.Update)
+	update.ResultCh <- updateErr
+
+	defer func() {
+		// Receive the freshly-built trie from the ledger goroutine and stage it.
+		trie := <-update.TrieCh
+		if trie == nil {
+			c.logger.Error().Msg("payloadless compactor failed to get updated trie")
+			return
+		}
+		trieQueue.Push(trie)
+	}()
+
+	if activeSegmentNum == -1 {
+		return segmentNum, -1, nil
+	}
+
+	if updateErr != nil || skipped || segmentNum == activeSegmentNum {
+		return activeSegmentNum, -1, nil
+	}
+
+	// segmentNum > activeSegmentNum — a segment just rolled over.
+
+	if segmentNum != activeSegmentNum+1 {
+		c.logger.Error().Msgf("payloadless compactor got unexpected new segment %d, want %d", segmentNum, activeSegmentNum+1)
+	}
+
+	prevSegmentNum := activeSegmentNum
+	activeSegmentNum = segmentNum
+
+	c.logger.Info().Msgf("finish writing segment file %v, payloadless trie update writing to segment %v; checkpoint triggers at segment %v",
+		prevSegmentNum, activeSegmentNum, nextCheckpointNum)
+
+	if nextCheckpointNum > prevSegmentNum {
+		return activeSegmentNum, -1, nil
+	}
+
+	// nextCheckpointNum == prevSegmentNum — enough segments accumulated.
+	tries := trieQueue.Tries()
+	return activeSegmentNum, nextCheckpointNum, tries
 }
 
 // latestV7CheckpointNum returns the highest V7 checkpoint number on disk,
