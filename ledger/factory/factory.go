@@ -133,9 +133,10 @@ func newLocalLedger(config Config, triggerCheckpoint *atomic.Bool) (ledger.Ledge
 //	(d) emits a new V7 checkpoint every config.CheckpointDistance segments,
 //	    pruning down to config.CheckpointsToKeep V7 files.
 //
-// If config.Triedir contains only V6 checkpoints and no V7, the factory logs
-// a hint pointing to the checkpoint-convert-v7 utility and continues with an
-// empty forest (followed by WAL replay if any segments exist).
+// Either a numbered V7 checkpoint or a V7 root checkpoint must be present in
+// config.Triedir. If only V6 checkpoints exist (no V7 of either kind), the
+// factory logs a hint pointing to the checkpoint-convert-v7 utility and refuses
+// to start.
 //
 // TODO: remote payloadless ledger client. When config.LedgerServiceAddr is
 // set, this factory should construct a remote.PayloadlessClient (Spec 004).
@@ -154,45 +155,60 @@ func NewPayloadlessLedger(config Config, triggerCheckpoint *atomic.Bool) (ledger
 	// node can boot. There is no payloadless bootstrap path that doesn't go
 	// through a V7 checkpoint: the WAL alone records full payload updates, but
 	// the leaf-hash commitment can only be reconstructed by replaying every
-	// update from genesis, which is not feasible at runtime. Hence: no V7 →
-	// refuse to start.
+	// update from genesis, which is not feasible at runtime. A numbered V7
+	// checkpoint (written by the compactor) or a V7 root checkpoint (converted
+	// from the V6 root.checkpoint during bootstrap) both satisfy this. Hence:
+	// neither present → refuse to start.
 	v7Numbers, latestV7, err := wal.ListV7Checkpoints(config.Triedir)
 	if err != nil {
 		return nil, fmt.Errorf("could not list V7 checkpoints in %s: %w", config.Triedir, err)
 	}
 	if latestV7 < 0 {
-		// Look for V6 checkpoints so the error message can point the operator
-		// at the convert utility. List failures here are non-fatal: we still
-		// want the operator to see the primary "no V7" error.
-		v6Numbers, latestV6, v6ListErr := wal.ListV6Checkpoints(config.Triedir)
-		if v6ListErr != nil {
-			logger.Warn().Err(v6ListErr).
-				Str("triedir", config.Triedir).
-				Msg("payloadless ledger: could not also list V6 checkpoints while reporting missing V7")
+		// No numbered V7 checkpoint. A V7 root checkpoint is also acceptable: a
+		// freshly-sporked payloadless node has its V6 root.checkpoint converted
+		// to a V7 root checkpoint during bootstrap, which the bundle seeds from.
+		hasV7Root, rootErr := wal.HasRootCheckpointV7(config.Triedir)
+		if rootErr != nil {
+			return nil, fmt.Errorf("could not check for V7 root checkpoint in %s: %w", config.Triedir, rootErr)
 		}
-		if latestV6 >= 0 {
-			logger.Warn().
-				Str("triedir", config.Triedir).
-				Int("latest_v6", latestV6).
-				Int("v6_count", len(v6Numbers)).
-				Msg("payloadless ledger: no V7 checkpoint found, but V6 checkpoints exist — " +
-					"run the `checkpoint-convert-v7` util to produce a V7 checkpoint")
+		if !hasV7Root {
+			// Look for V6 checkpoints so the error message can point the operator
+			// at the convert utility. List failures here are non-fatal: we still
+			// want the operator to see the primary "no V7" error.
+			v6Numbers, latestV6, v6ListErr := wal.ListV6Checkpoints(config.Triedir)
+			if v6ListErr != nil {
+				logger.Warn().Err(v6ListErr).
+					Str("triedir", config.Triedir).
+					Msg("payloadless ledger: could not also list V6 checkpoints while reporting missing V7")
+			}
+			if latestV6 >= 0 {
+				logger.Warn().
+					Str("triedir", config.Triedir).
+					Int("latest_v6", latestV6).
+					Int("v6_count", len(v6Numbers)).
+					Msg("payloadless ledger: no V7 checkpoint found, but V6 checkpoints exist — " +
+						"run the `checkpoint-convert-v7` util to produce a V7 checkpoint")
+				return nil, fmt.Errorf(
+					"no V7 (payloadless) checkpoint found in %s but %d V6 checkpoint(s) exist (latest: %d); "+
+						"run the `checkpoint-convert-v7` util to produce a V7 checkpoint before restart",
+					config.Triedir, len(v6Numbers), latestV6,
+				)
+			}
 			return nil, fmt.Errorf(
-				"no V7 (payloadless) checkpoint found in %s but %d V6 checkpoint(s) exist (latest: %d); "+
-					"run the `checkpoint-convert-v7` util to produce a V7 checkpoint before restart",
-				config.Triedir, len(v6Numbers), latestV6,
+				"no V7 (payloadless) checkpoint found in %s; a V7 checkpoint is required to start a payloadless node",
+				config.Triedir,
 			)
 		}
-		return nil, fmt.Errorf(
-			"no V7 (payloadless) checkpoint found in %s; a V7 checkpoint is required to start a payloadless node",
-			config.Triedir,
-		)
+		logger.Info().
+			Str("triedir", config.Triedir).
+			Msg("payloadless ledger: V7 root checkpoint discovered; the bundle will seed from it")
+	} else {
+		logger.Info().
+			Str("triedir", config.Triedir).
+			Int("latest_v7", latestV7).
+			Int("v7_count", len(v7Numbers)).
+			Msg("payloadless ledger: V7 checkpoint discovered; the bundle will seed from it")
 	}
-	logger.Info().
-		Str("triedir", config.Triedir).
-		Int("latest_v7", latestV7).
-		Int("v7_count", len(v7Numbers)).
-		Msg("payloadless ledger: V7 checkpoint discovered; the bundle will seed from it")
 
 	diskWAL, err := wal.NewDiskWAL(
 		logger.With().Str("subcomponent", "wal").Logger(),

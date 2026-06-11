@@ -15,6 +15,7 @@ import (
 	"go.uber.org/atomic"
 	"google.golang.org/grpc"
 
+	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -712,6 +713,60 @@ func TestNewPayloadlessLedger_LoadsConvertedV6(t *testing.T) {
 	// ledger should contain the V6 root hash.
 	require.True(t, plLedger.HasState(ledger.State(v6Trie.RootHash())),
 		"payloadless ledger should contain the converted V7 root (== V6 root)")
+}
+
+// TestNewPayloadlessLedger_LoadsV7RootCheckpoint verifies that a freshly-sporked
+// payloadless node boots from a V7 root checkpoint alone, with no numbered V7
+// checkpoint present: the factory gate accepts the V7 root and
+// ReplayOnPayloadlessForest seeds the forest from it. This mirrors the
+// post-bootstrap state produced by LoadBootstrapper, which converts the V6
+// root.checkpoint into root.checkpoint.v7 for payloadless nodes.
+func TestNewPayloadlessLedger_LoadsV7RootCheckpoint(t *testing.T) {
+	tempDir := t.TempDir()
+	logger := zerolog.Nop()
+	metricsCollector := &metrics.NoopCollector{}
+
+	// Build a V6 root checkpoint, then convert it to a V7 root checkpoint — the
+	// same root.checkpoint -> root.checkpoint.v7 step the node bootstrap performs.
+	emptyV6 := trie.NewEmptyMTrie()
+	p := testutils.PathByUint8(0)
+	v := testutils.LightPayload8('A', 'a')
+	v6Trie, _, err := trie.NewTrieWithUpdatedRegisters(
+		emptyV6, []ledger.Path{p}, []ledger.Payload{*v}, true,
+	)
+	require.NoError(t, err)
+
+	require.NoError(t, wal.StoreCheckpointV6Concurrently(
+		[]*trie.MTrie{v6Trie}, tempDir, bootstrap.FilenameWALRootCheckpoint, logger,
+	))
+	require.NoError(t, wal.ConvertCheckpointV6ToV7(
+		tempDir, bootstrap.FilenameWALRootCheckpoint,
+		tempDir, bootstrap.FilenameWALRootCheckpoint+wal.V7FileSuffix,
+		logger, 16,
+	))
+
+	// Ensure the test actually exercises the root-checkpoint path: no numbered
+	// V7 checkpoint must be present, only the V7 root checkpoint.
+	_, latestV7, err := wal.ListV7Checkpoints(tempDir)
+	require.NoError(t, err)
+	require.Equal(t, -1, latestV7, "test must exercise the root-checkpoint path (no numbered V7)")
+
+	plLedger, err := NewPayloadlessLedger(Config{
+		Triedir:        tempDir,
+		MTrieCacheSize: 100,
+		WALMetrics:     metricsCollector,
+		LedgerMetrics:  metricsCollector,
+		Logger:         logger,
+	}, atomic.NewBool(false))
+	require.NoError(t, err)
+	require.NotNil(t, plLedger)
+	<-plLedger.Ready()
+	defer func() { <-plLedger.Done() }()
+
+	// Root hash is preserved across V6 → V7 conversion, so the payloadless ledger
+	// should be seeded with the V6 root hash from the V7 root checkpoint.
+	require.True(t, plLedger.HasState(ledger.State(v6Trie.RootHash())),
+		"payloadless ledger should be seeded from the V7 root checkpoint")
 }
 
 // TestNewPayloadlessLedger_V7SeedSurvivesRestart verifies that V7 checkpoint
