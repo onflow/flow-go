@@ -36,6 +36,8 @@ func (w *NoopWAL) RecordDelete(rootHash ledger.RootHash) error { return nil }
 
 func (w *NoopWAL) ReplayOnForest(forest *mtrie.Forest) error { return nil }
 
+func (w *NoopWAL) ReplayOnPayloadlessForest(forest *payloadless.Forest) error { return nil }
+
 func (w *NoopWAL) Segments() (first, last int, err error) { return 0, 0, nil }
 
 func (w *NoopWAL) Replay(checkpointFn func(tries []*trie.MTrie) error, updateFn func(update *ledger.TrieUpdate) error, deleteFn func(ledger.RootHash) error) error {
@@ -43,9 +45,5 @@ func (w *NoopWAL) Replay(checkpointFn func(tries []*trie.MTrie) error, updateFn 
 }
 
 func (w *NoopWAL) ReplayLogsOnly(checkpointFn func(tries []*trie.MTrie) error, updateFn func(update *ledger.TrieUpdate) error, deleteFn func(rootHash ledger.RootHash) error) error {
-	return nil
-}
-
-func (w *NoopWAL) ReplaySegmentsForPayloadlessForest(forest *payloadless.Forest, afterCheckpointNum int) error {
 	return nil
 }
