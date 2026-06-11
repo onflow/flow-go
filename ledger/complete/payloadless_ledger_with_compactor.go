@@ -28,12 +28,9 @@ type PayloadlessLedgerWithCompactor struct {
 // NewPayloadlessLedgerWithCompactor constructs a payloadless ledger and a
 // payloadless compactor wired together against the shared [realWAL.LedgerWAL].
 //
-// Boot-time bootstrap:
-//
-//  1. Load the latest V7 (payloadless) checkpoint from `diskWAL`'s directory,
-//     if one exists, seeding the ledger's forest with its tries.
-//  2. Replay WAL segments newer than that checkpoint into the forest, so
-//     in-memory state is recovered up to the last durable update.
+// Boot-time recovery (loading the latest V7 checkpoint and replaying newer WAL
+// segments) is performed by [NewPayloadlessLedger], mirroring how the V6
+// [NewLedgerWithCompactor] delegates recovery to [NewLedger].
 //
 // Steady-state:
 //
@@ -54,6 +51,14 @@ func NewPayloadlessLedgerWithCompactor(
 	logger zerolog.Logger,
 	pathFinderVersion uint8,
 ) (*PayloadlessLedgerWithCompactor, error) {
+	// A compactor requires a real WAL to record updates and write checkpoints.
+	// In-memory construction (nil WAL) must go through NewPayloadlessLedger.
+	if diskWAL == nil {
+		return nil, fmt.Errorf("payloadless ledger with compactor requires a non-nil WAL")
+	}
+
+	logger = logger.With().Str("ledger_mod", "complete-payloadless").Logger()
+
 	l, err := NewPayloadlessLedger(
 		diskWAL,
 		ledgerCapacity,
@@ -64,39 +69,6 @@ func NewPayloadlessLedgerWithCompactor(
 	if err != nil {
 		return nil, fmt.Errorf("failed to create payloadless ledger: %w", err)
 	}
-
-	logger = logger.With().Str("ledger_mod", "complete-payloadless").Logger()
-
-	// Bootstrap from the latest V7 checkpoint on disk, if any, and replay any
-	// WAL segments newer than that checkpoint. Both steps are no-ops on a fresh
-	// node.
-	checkpointer, err := diskWAL.NewCheckpointer()
-	if err != nil {
-		return nil, fmt.Errorf("failed to create checkpointer: %w", err)
-	}
-	latestV7 := latestV7CheckpointNum(checkpointer, logger)
-	if latestV7 >= 0 {
-		v7Name := realWAL.NumberToFilenameV7(latestV7)
-		tries, err := realWAL.OpenAndReadCheckpointV7(checkpointer.Dir(), v7Name, logger)
-		if err != nil {
-			return nil, fmt.Errorf("failed to load V7 checkpoint %s: %w", v7Name, err)
-		}
-		if err := l.AddTries(tries); err != nil {
-			return nil, fmt.Errorf("failed to seed payloadless forest from V7 checkpoint: %w", err)
-		}
-		logger.Info().
-			Int("latest_v7", latestV7).
-			Int("trie_count", len(tries)).
-			Msg("payloadless ledger seeded from V7 checkpoint")
-	}
-
-	// Pause WAL recording while we replay so we don't re-log existing records.
-	diskWAL.PauseRecord()
-	if err := diskWAL.ReplaySegmentsForPayloadlessForest(l.forest, latestV7); err != nil {
-		diskWAL.UnpauseRecord()
-		return nil, fmt.Errorf("failed to replay WAL segments onto payloadless forest: %w", err)
-	}
-	diskWAL.UnpauseRecord()
 
 	compactor, err := NewPayloadlessCompactor(
 		l,
