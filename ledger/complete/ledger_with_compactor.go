@@ -34,8 +34,6 @@ func NewLedgerWithCompactor(
 	logger zerolog.Logger,
 	pathFinderVersion uint8,
 ) (*LedgerWithCompactor, error) {
-	logger = logger.With().Str("ledger_mod", "complete").Logger()
-
 	// Create the ledger
 	l, err := NewLedger(diskWAL, ledgerCapacity, metrics, logger, pathFinderVersion)
 	if err != nil {
