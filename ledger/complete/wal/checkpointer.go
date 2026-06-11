@@ -876,6 +876,15 @@ func (c *Checkpointer) LoadRootCheckpoint() ([]*trie.MTrie, error) {
 	return LoadCheckpoint(filepath, c.wal.log)
 }
 
+// LoadRootCheckpointV7 loads the V7 (payloadless) root checkpoint as a set of
+// payloadless tries. It is the payloadless analog of [Checkpointer.LoadRootCheckpoint].
+//
+// No error returns are expected during normal operation.
+func (c *Checkpointer) LoadRootCheckpointV7() ([]*payloadless.MTrie, error) {
+	fileName := bootstrap.FilenameWALRootCheckpoint + V7FileSuffix
+	return OpenAndReadCheckpointV7(c.dir, fileName, c.wal.log)
+}
+
 func (c *Checkpointer) HasRootCheckpoint() (bool, error) {
 	return HasRootCheckpoint(c.dir)
 }
