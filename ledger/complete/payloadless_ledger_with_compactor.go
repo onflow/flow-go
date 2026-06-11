@@ -54,12 +54,6 @@ func NewPayloadlessLedgerWithCompactor(
 	logger zerolog.Logger,
 	pathFinderVersion uint8,
 ) (*PayloadlessLedgerWithCompactor, error) {
-	if diskWAL == nil {
-		return nil, fmt.Errorf("diskWAL is required for NewPayloadlessLedgerWithCompactor (use NewPayloadlessLedger with nil WAL for in-memory mode)")
-	}
-
-	logger = logger.With().Str("ledger_mod", "complete-payloadless").Logger()
-
 	l, err := NewPayloadlessLedger(
 		diskWAL,
 		ledgerCapacity,
@@ -70,6 +64,8 @@ func NewPayloadlessLedgerWithCompactor(
 	if err != nil {
 		return nil, fmt.Errorf("failed to create payloadless ledger: %w", err)
 	}
+
+	logger = logger.With().Str("ledger_mod", "complete-payloadless").Logger()
 
 	// Bootstrap from the latest V7 checkpoint on disk, if any, and replay any
 	// WAL segments newer than that checkpoint. Both steps are no-ops on a fresh
