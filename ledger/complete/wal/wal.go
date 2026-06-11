@@ -153,52 +153,13 @@ func (w *DiskWAL) ReplayOnPayloadlessForest(forest *payloadless.Forest) error {
 		return fmt.Errorf("cannot create checkpointer: %w", err)
 	}
 
-	checkpoints, err := checkpointer.CheckpointsV7()
+	tries, loadedCheckpoint, err := checkpointer.LoadLatestCheckpointV7()
 	if err != nil {
-		return fmt.Errorf("cannot list V7 checkpoints: %w", err)
+		return fmt.Errorf("cannot load latest V7 checkpoint: %w", err)
 	}
 
-	// Try the newest V7 checkpoint first, falling back to older ones if a file
-	// fails to load. This mirrors the V6 checkpoint selection in [DiskWAL.replay].
-	loadedCheckpoint := -1
-	for i := len(checkpoints) - 1; i >= 0; i-- {
-		num := checkpoints[i]
-		name := NumberToFilenameV7(num)
-		tries, err := OpenAndReadCheckpointV7(checkpointer.Dir(), name, w.log)
-		if err != nil {
-			w.log.Warn().Int("checkpoint", num).Err(err).
-				Msg("V7 checkpoint loading failed; falling back to older checkpoint")
-			continue
-		}
-		if err := forest.AddTries(tries); err != nil {
-			return fmt.Errorf("failed to seed payloadless forest from V7 checkpoint %s: %w", name, err)
-		}
-		w.log.Info().Int("checkpoint", num).Int("trie_count", len(tries)).
-			Msg("payloadless forest seeded from V7 checkpoint")
-		loadedCheckpoint = num
-		break
-	}
-
-	// No numbered V7 checkpoint loaded: fall back to the V7 root checkpoint, if
-	// present. This is the payloadless analog of the root-checkpoint branch in
-	// [DiskWAL.replay]; like that branch it does not advance the replay start, so
-	// all segments are replayed on top of the root state.
-	if loadedCheckpoint == -1 {
-		hasV7Root, err := checkpointer.HasRootCheckpointV7()
-		if err != nil {
-			return fmt.Errorf("cannot check for V7 root checkpoint: %w", err)
-		}
-		if hasV7Root {
-			tries, err := checkpointer.LoadRootCheckpointV7()
-			if err != nil {
-				return fmt.Errorf("failed to load V7 root checkpoint: %w", err)
-			}
-			if err := forest.AddTries(tries); err != nil {
-				return fmt.Errorf("failed to seed payloadless forest from V7 root checkpoint: %w", err)
-			}
-			w.log.Info().Int("trie_count", len(tries)).
-				Msg("payloadless forest seeded from V7 root checkpoint")
-		}
+	if err := forest.AddTries(tries); err != nil {
+		return fmt.Errorf("failed to seed payloadless forest from V7 checkpoint: %w", err)
 	}
 
 	return w.replaySegmentsForPayloadlessForest(forest, loadedCheckpoint)
