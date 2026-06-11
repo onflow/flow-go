@@ -335,15 +335,6 @@ func (l *Ledger) Trie(rootHash ledger.RootHash) (*trie.MTrie, error) {
 	return l.forest.GetTrie(rootHash)
 }
 
-// Checkpointer returns a checkpointer instance
-func (l *Ledger) Checkpointer() (*realWAL.Checkpointer, error) {
-	checkpointer, err := l.wal.NewCheckpointer()
-	if err != nil {
-		return nil, fmt.Errorf("cannot create checkpointer for compactor: %w", err)
-	}
-	return checkpointer, nil
-}
-
 func (l *Ledger) MigrateAt(
 	state ledger.State,
 	migration ledger.Migration,
