@@ -46,23 +46,25 @@ func NewLedger(config Config, triggerCheckpoint *atomic.Bool) (ledger.Ledger, er
 
 // newRemoteLedger creates a remote ledger client that connects to a ledger service.
 func newRemoteLedger(config Config) (ledger.Ledger, error) {
-	config.Logger.Info().
+	logger := config.Logger.With().Str("subcomponent", "ledger").Logger()
+	logger.Info().
 		Str("ledger_service_addr", config.LedgerServiceAddr).
 		Msg("using remote ledger service")
 
-	factory := remote.NewRemoteLedgerFactory(
-		config.LedgerServiceAddr,
-		config.Logger.With().Str("subcomponent", "ledger").Logger(),
-		config.LedgerMaxRequestSize,
-		config.LedgerMaxResponseSize,
-	)
+	var opts []remote.ClientOption
+	if config.LedgerMaxRequestSize > 0 {
+		opts = append(opts, remote.WithMaxRequestSize(config.LedgerMaxRequestSize))
+	}
+	if config.LedgerMaxResponseSize > 0 {
+		opts = append(opts, remote.WithMaxResponseSize(config.LedgerMaxResponseSize))
+	}
 
-	ledgerStorage, err := factory.NewLedger()
+	client, err := remote.NewClient(config.LedgerServiceAddr, logger, opts...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create remote ledger: %w", err)
 	}
 
-	return ledgerStorage, nil
+	return client, nil
 }
 
 // newLocalLedger creates a local ledger with WAL and compactor.
@@ -97,8 +99,8 @@ func newLocalLedger(config Config, triggerCheckpoint *atomic.Bool) (ledger.Ledge
 		Metrics:            config.WALMetrics,
 	}
 
-	// Use factory to create ledger with internal compactor
-	factory := complete.NewLocalLedgerFactory(
+	// Create ledger with internal compactor
+	ledgerStorage, err := complete.NewLedgerWithCompactor(
 		diskWal,
 		int(config.MTrieCacheSize),
 		compactorConfig,
@@ -107,8 +109,6 @@ func newLocalLedger(config Config, triggerCheckpoint *atomic.Bool) (ledger.Ledge
 		config.Logger.With().Str("subcomponent", "ledger").Logger(),
 		complete.DefaultPathFinderVersion,
 	)
-
-	ledgerStorage, err := factory.NewLedger()
 	if err != nil {
 		return nil, fmt.Errorf("failed to create local ledger: %w", err)
 	}
