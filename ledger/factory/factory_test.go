@@ -388,8 +388,8 @@ func startLedgerServer(t *testing.T, walDir string) (string, func()) {
 	// Create compactor config
 	compactorConfig := ledger.DefaultCompactorConfig(metricsCollector)
 
-	// Create ledger factory
-	factory := complete.NewLocalLedgerFactory(
+	// Create ledger instance with internal compactor
+	ledgerStorage, err := complete.NewLedgerWithCompactor(
 		diskWal,
 		100,
 		compactorConfig,
@@ -398,9 +398,6 @@ func startLedgerServer(t *testing.T, walDir string) (string, func()) {
 		logger,
 		complete.DefaultPathFinderVersion,
 	)
-
-	// Create ledger instance
-	ledgerStorage, err := factory.NewLedger()
 	require.NoError(t, err)
 
 	// Wait for ledger to be ready (WAL replay)
