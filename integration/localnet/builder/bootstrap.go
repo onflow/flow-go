@@ -483,9 +483,15 @@ func prepareExecutionService(container testnet.ContainerConfig, i int, n int) Se
 		service.Volumes = append(service.Volumes,
 			fmt.Sprintf("%s:/trie:z", trieDir),
 		)
-		if payloadless {
-			service.Command = append(service.Command, "--payloadless")
-		}
+	}
+
+	// In payloadless mode, both remote-ledger and local-ledger execution nodes
+	// must run payloadless. The flag selects the payloadless committer, state
+	// checker, and ledger client. A remote-ledger node missing this flag would
+	// build a full ledger.LedgerService client and fail against a payloadless
+	// ledger service with "unknown service ledger.LedgerService".
+	if payloadless {
+		service.Command = append(service.Command, "--payloadless")
 	}
 
 	// Payloadless mode requires storehouse to store the actual payloads
