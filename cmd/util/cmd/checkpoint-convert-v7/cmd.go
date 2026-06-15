@@ -11,11 +11,13 @@ import (
 )
 
 var (
-	flagCheckpointDir string
-	flagCheckpoint    string
-	flagOutputDir     string
-	flagOutput        string
-	flagNWorker       uint
+	flagCheckpointDir  string
+	flagCheckpoint     string
+	flagOutputDir      string
+	flagOutput         string
+	flagNWorker        uint
+	flagStream         bool
+	flagVerifyLeafHash bool
 )
 
 // Cmd converts a V6 checkpoint to a V7 (payloadless) checkpoint by reading
@@ -54,6 +56,15 @@ func init() {
 
 	Cmd.Flags().UintVar(&flagNWorker, "nworker", 16,
 		"number of subtrie files to encode in parallel (valid range [1, 16])")
+
+	Cmd.Flags().BoolVar(&flagStream, "stream", false,
+		"stream part files node-by-node instead of loading the full trie forest into memory "+
+			"(constant memory, preserves node hashes without re-deriving root hashes)")
+
+	Cmd.Flags().BoolVar(&flagVerifyLeafHash, "verify-leaf-hash", false,
+		"in --stream mode, verify every allocated leaf by comparing the derived V7 node hash "+
+			"against the V6 node hash on disk (ignored without --stream, which already cross-checks "+
+			"root hashes)")
 }
 
 func run(*cobra.Command, []string) {
@@ -73,16 +84,36 @@ func run(*cobra.Command, []string) {
 		Str("output_dir", outputDir).
 		Str("output", outputFile).
 		Uint("nworker", flagNWorker).
+		Bool("stream", flagStream).
+		Bool("verify_leaf_hash", flagVerifyLeafHash).
 		Msg("converting V6 checkpoint to V7")
 
-	err := wal.ConvertCheckpointV6ToV7(
-		flagCheckpointDir,
-		flagCheckpoint,
-		outputDir,
-		outputFile,
-		log.Logger,
-		flagNWorker,
-	)
+	var err error
+	if flagStream {
+		err = wal.ConvertCheckpointV6ToV7Stream(
+			flagCheckpointDir,
+			flagCheckpoint,
+			outputDir,
+			outputFile,
+			log.Logger,
+			flagNWorker,
+			flagVerifyLeafHash,
+		)
+	} else {
+		if flagVerifyLeafHash {
+			// The in-memory converter already cross-checks every trie root hash,
+			// which transitively verifies all leaf hashes, so the flag is a no-op here.
+			log.Warn().Msg("--verify-leaf-hash has no effect without --stream; the in-memory converter already verifies root hashes")
+		}
+		err = wal.ConvertCheckpointV6ToV7(
+			flagCheckpointDir,
+			flagCheckpoint,
+			outputDir,
+			outputFile,
+			log.Logger,
+			flagNWorker,
+		)
+	}
 	if err != nil {
 		log.Fatal().Err(err).Msg("checkpoint conversion failed")
 	}
