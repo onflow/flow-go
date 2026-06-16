@@ -582,6 +582,36 @@ func storeTries(
 	return nil
 }
 
+// removeStaleTempFiles removes leftover "writing-<outputFile>*" temporary part
+// files in outputDir.
+//
+// createClosableWriter writes each checkpoint part to such a temp file and renames
+// it to the target on success (or removes it on a handled write error). A process
+// killed mid-write — e.g. OOM or Ctrl-C — leaves the temp file behind, and a
+// subsequent run uses a fresh random suffix rather than reusing it, so orphaned
+// temp files accumulate. Removing them at the start of a run reclaims that space.
+//
+// Only temp files for outputFile are matched. Final part files lack the "writing-"
+// prefix and so are never touched.
+//
+// No error returns are expected during normal operation.
+func removeStaleTempFiles(outputDir string, outputFile string, logger zerolog.Logger) error {
+	pattern := path.Join(outputDir, fmt.Sprintf("writing-%v*", outputFile))
+	filesToRemove, err := filepath.Glob(pattern)
+	if err != nil {
+		return fmt.Errorf("could not glob stale temp files with pattern %v: %w", pattern, err)
+	}
+
+	for _, file := range filesToRemove {
+		if err := os.Remove(file); err != nil {
+			return fmt.Errorf("could not remove stale temp file %v: %w", file, err)
+		}
+		logger.Info().Msgf("removed stale checkpoint temp file %v", file)
+	}
+
+	return nil
+}
+
 // deleteCheckpointFiles removes any checkpoint files with given checkpoint prefix in the outputDir.
 func deleteCheckpointFiles(outputDir string, outputFile string) error {
 	pattern := filePathPattern(outputDir, outputFile)
