@@ -147,6 +147,12 @@ func convertCheckpointV6ToV7Stream(
 		return fmt.Errorf("V7 output already exists: %v", v7Existing)
 	}
 
+	// Remove any leftover temp part files from a previously interrupted conversion
+	// to this output; they are never reused and would otherwise accumulate.
+	if err := removeStaleTempFiles(outputDir, outputFileName, logger); err != nil {
+		return fmt.Errorf("could not remove stale temp files: %w", err)
+	}
+
 	logger.Info().
 		Str("v6_dir", inputDir).
 		Str("v6_file", inputFileName).
