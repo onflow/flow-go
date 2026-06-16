@@ -118,7 +118,9 @@ func run(*cobra.Command, []string) {
 		log.Fatal().Err(err).Msg("checkpoint conversion failed")
 	}
 
-	log.Info().Msgf("wrote V7 checkpoint to %s", filepath.Join(outputDir, outputFile))
+	log.Info().
+		Str("output", filepath.Join(outputDir, outputFile)).
+		Msg("✅ V6→V7 checkpoint conversion completed successfully")
 }
 
 // defaultV7Filename returns the default V7 output filename for a given V6
