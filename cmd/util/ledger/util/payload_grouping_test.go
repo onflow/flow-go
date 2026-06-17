@@ -126,7 +126,7 @@ func generateRandomPayloads(n int) []*ledger.Payload {
 		i += registersForAccount
 
 		accountKey := generateRandomAccountKey()
-		for j := 0; j < registersForAccount; j++ {
+		for range registersForAccount {
 			payloads = append(payloads,
 				ledger.NewPayload(
 					accountKey,
@@ -153,7 +153,7 @@ func generateRandomPayloadsWithAddress(address string, n int) []*ledger.Payload 
 			Owner: address,
 			Key:   generateRandomString(10),
 		})
-		for j := 0; j < registersForAccount; j++ {
+		for range registersForAccount {
 			payloads = append(payloads,
 				ledger.NewPayload(
 					accountKey,

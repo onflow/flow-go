@@ -342,7 +342,6 @@ func (mc *MalleabilityChecker) generateRandomReflectValue(field reflect.Value) e
 		// if the field is another struct, we will deal with it recursively.
 		// at the end of the recursion, we must encounter a primitive type, which we can generate a random value for, otherwise an error is returned.
 		for _, structField := range field.Fields() {
-			structField := structField
 			err := mc.generateRandomReflectValue(structField)
 			if err != nil {
 				return fmt.Errorf("cannot generate random value for struct field: %s", field.Type().String())

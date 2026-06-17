@@ -131,7 +131,6 @@ func TestRPCSentTracker_ConcurrentTracking(t *testing.T) {
 	numOfRPCs := 100
 	rpcs := make([]*pubsub.RPC, numOfRPCs)
 	for i := range numOfRPCs {
-		i := i
 		go func() {
 			rpc := rpcFixture(withIhaves([]*pb.ControlIHave{{MessageIDs: unittest.IdentifierListFixture(numOfMsgIds).Strings()}}))
 			require.NoError(t, tracker.Track(rpc))
