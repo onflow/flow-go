@@ -196,14 +196,19 @@ func (w *DiskWAL) replaySegmentsForPayloadlessForest(
 		// V7 checkpoint already covers everything on disk.
 		return nil
 	}
-	err = w.replay(from, lastSeg,
-		func(tries []*trie.MTrie) error { return nil }, // unused when useCheckpoints=false
+	// Replay only the WAL segment records onto the forest. Unlike
+	// [DiskWAL.replay], this deliberately does NOT fall back to loading the V6
+	// root checkpoint when `from` is 0: the payloadless forest is already seeded
+	// from the V7 checkpoint by the caller ([DiskWAL.ReplayOnPayloadlessForest]),
+	// and the V6 root checkpoint is not loadable into a payloadless forest.
+	// Routing through replay would read (and immediately discard) the entire V6
+	// root checkpoint, a wasteful full-forest load at boot.
+	err = w.replaySegments(from, lastSeg,
 		func(update *ledger.TrieUpdate) error {
 			_, err := forest.Update(update)
 			return err
 		},
 		func(rootHash ledger.RootHash) error { return nil },
-		false, // useCheckpoints
 	)
 	if err != nil {
 		return fmt.Errorf("could not replay WAL segments [%v:%v] for payloadless forest: %w", from, lastSeg, err)
@@ -374,9 +379,31 @@ func (w *DiskWAL) replay(
 		Int("loaded_checkpoint", loadedCheckpoint).
 		Msgf("replaying segments from %d to %d", startSegment, to)
 
+	err = w.replaySegments(startSegment, to, updateFn, deleteFn)
+	if err != nil {
+		return err
+	}
+
+	w.log.Info().Msgf("finished loading checkpoint and replaying WAL from %d to %d", from, to)
+
+	return nil
+}
+
+// replaySegments reads the WAL segment records in the range [from, to] and
+// applies each record to the provided handlers, dispatching WALUpdate records
+// to `updateFn` and WALDelete records to `deleteFn`. It performs NO checkpoint
+// loading: the caller is responsible for seeding any starting state before
+// calling this.
+//
+// No error returns are expected during normal operation.
+func (w *DiskWAL) replaySegments(
+	from, to int,
+	updateFn func(update *ledger.TrieUpdate) error,
+	deleteFn func(rootHash ledger.RootHash) error,
+) error {
 	sr, err := prometheusWAL.NewSegmentsRangeReader(w.log, prometheusWAL.SegmentRange{
 		Dir:   w.wal.Dir(),
-		First: startSegment,
+		First: from,
 		Last:  to,
 	})
 	if err != nil {
@@ -412,8 +439,6 @@ func (w *DiskWAL) replay(
 			return fmt.Errorf("cannot read LedgerWAL: %w", err)
 		}
 	}
-
-	w.log.Info().Msgf("finished loading checkpoint and replaying WAL from %d to %d", from, to)
 
 	return nil
 }
