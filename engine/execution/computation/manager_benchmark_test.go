@@ -66,7 +66,7 @@ func createAccounts(
 	accs := &testAccounts{
 		accounts: make([]testAccount, num),
 	}
-	for i := 0; i < num; i++ {
+	for i := range num {
 		accs.accounts[i] = testAccount{
 			address:    addresses[i],
 			privateKey: privateKeys[i],
@@ -264,9 +264,9 @@ func createBlock(b *testing.B, parentBlock *flow.Block, accs *testAccounts, colN
 	collections := make([]*flow.Collection, colNum)
 	guarantees := make([]*flow.CollectionGuarantee, colNum)
 
-	for c := 0; c < colNum; c++ {
+	for c := range colNum {
 		transactions := make([]*flow.TransactionBody, txNum)
-		for t := 0; t < txNum; t++ {
+		for t := range txNum {
 			transactions[t] = createTokenTransferTransaction(b, accs)
 		}
 

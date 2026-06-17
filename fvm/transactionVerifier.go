@@ -333,10 +333,7 @@ func (v *TransactionVerifier) verifySignatures(
 	toVerifyChan := make(chan *signatureContinuation, len(signatures))
 	verifiedChan := make(chan *signatureContinuation, len(signatures))
 
-	verificationConcurrency := v.VerificationConcurrency
-	if len(signatures) < verificationConcurrency {
-		verificationConcurrency = len(signatures)
-	}
+	verificationConcurrency := min(len(signatures), v.VerificationConcurrency)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()

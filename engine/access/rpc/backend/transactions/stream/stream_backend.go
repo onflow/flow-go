@@ -177,8 +177,8 @@ func (t *TransactionStream) createSubscription(
 func (t *TransactionStream) getTransactionStatusResponse(
 	txInfo *TransactionMetadata,
 	startHeight uint64,
-) func(context.Context, uint64) (interface{}, error) {
-	return func(ctx context.Context, height uint64) (interface{}, error) {
+) func(context.Context, uint64) (any, error) {
+	return func(ctx context.Context, height uint64) (any, error) {
 		err := t.checkBlockReady(height)
 		if err != nil {
 			return nil, err

@@ -83,7 +83,7 @@ func run(t *testing.T, loop int, try int, gomaxprocs int) {
 	f := func(outerFuncName string) time.Duration {
 		bs := binstat.EnterTime(outerFuncName)
 		var sum int
-		for i := 0; i < 10000000; i++ {
+		for i := range 10000000 {
 			sum -= i / 2
 			sum *= i
 			sum /= i/3 + 1
@@ -131,7 +131,7 @@ func run(t *testing.T, loop int, try int, gomaxprocs int) {
 	require.Condition(t, func() bool { return actual >= atLeast }, "Unexpectedly few regex results on pprof output")
 
 	// add the regex matches to a table of elapsed times
-	for i := 0; i < len(matches); i++ {
+	for i := range matches {
 		//debug zlog.Debug().Msgf("test: matches[%d][1]=%s matches[%d][2]=%s", i, matches[i][1], i, matches[i][2])
 		fi, err := strconv.Atoi(matches[i][2]) // 0-5 instead of 1-6
 		require.NoError(t, err)
@@ -159,13 +159,13 @@ func TestWithPprof(t *testing.T) {
 	backTicks(t, "ls -al ./binstat.test.pid-*.binstat.txt* ./*gomaxprocs*.pprof.txt ; rm -f ./binstat.test.pid-*.binstat.txt* ./*gomaxprocs*.pprof.txt")
 
 	// run the test; loops of several tries running groups of go-routines
-	for loop := 0; loop < loops; loop++ {
+	for loop := range loops {
 		gomaxprocs := 8
 		if 0 == loop {
 			gomaxprocs = 1
 		}
 		bs := binstat.EnterTime(fmt.Sprintf("loop-%d", loop))
-		for try := 0; try < tries; try++ {
+		for try := range tries {
 			zlog.Debug().Msgf("test: loop=%d try=%d; running 6 identical functions with gomaxprocs=%d", loop, try+1, gomaxprocs)
 			run(t, loop, try, gomaxprocs)
 		}
@@ -191,11 +191,11 @@ func TestWithPprof(t *testing.T) {
 		- 0.07 0.07 0.07 0.09 0.06 0.07 // f5() seconds; loop=1 gomaxprocs=8
 		- 0.07 0.07 0.07 0.04 0.10 0.03 // f6() seconds; loop=1 gomaxprocs=8
 	*/
-	for loop := 0; loop < loops; loop++ {
+	for loop := range loops {
 		zlog.Debug().Msg("test: binstat------- pprof---------")
 		l1 := "test:"
-		for r := 0; r < 2; r++ {
-			for try := 0; try < tries; try++ {
+		for range 2 {
+			for try := range tries {
 				l1 = l1 + fmt.Sprintf(" try%d", try+1)
 			}
 		}
@@ -204,10 +204,10 @@ func TestWithPprof(t *testing.T) {
 		if 0 == loop {
 			gomaxprocs = 1
 		}
-		for i := 0; i < funcs; i++ {
+		for i := range funcs {
 			l2 := "test:"
-			for mech := 0; mech < mechs; mech++ {
-				for try := 0; try < tries; try++ {
+			for mech := range mechs {
+				for try := range tries {
 					l2 = l2 + fmt.Sprintf(" %s", el[loop][try][mech][i])
 				}
 			}

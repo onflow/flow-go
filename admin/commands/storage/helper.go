@@ -26,12 +26,12 @@ const (
 
 type blocksRequest struct {
 	requestType blocksRequestType
-	value       interface{}
+	value       any
 }
 
 // parseN verifies that the input is an integral float64 value >=1.
 // All generic errors indicate a benign validation failure, and should be wrapped by the caller.
-func parseN(m interface{}) (uint64, error) {
+func parseN(m any) (uint64, error) {
 	n, ok := m.(float64)
 	if !ok {
 		return 0, fmt.Errorf("invalid value for \"n\": %v", n)
@@ -47,7 +47,7 @@ func parseN(m interface{}) (uint64, error) {
 
 // parseBlocksRequest parses the block field of an admin request.
 // All generic errors indicate a benign validation failure, and should be wrapped by the caller.
-func parseBlocksRequest(block interface{}) (*blocksRequest, error) {
+func parseBlocksRequest(block any) (*blocksRequest, error) {
 	errInvalidBlockValue := fmt.Errorf("invalid value for \"block\": expected %q, %q, block ID, or block height, but got: %v", FINAL, SEALED, block)
 	req := &blocksRequest{}
 
@@ -93,7 +93,7 @@ func getBlockHeader(state protocol.State, req *blocksRequest) (*flow.Header, err
 }
 
 func parseHeightRangeRequestData(req *admin.CommandRequest) (*heightRangeReqData, error) {
-	input, ok := req.Data.(map[string]interface{})
+	input, ok := req.Data.(map[string]any)
 	if !ok {
 		return nil, admin.NewInvalidAdminReqFormatError("missing 'data' field")
 	}
@@ -119,7 +119,7 @@ func parseHeightRangeRequestData(req *admin.CommandRequest) (*heightRangeReqData
 }
 
 func parseString(req *admin.CommandRequest, field string) (string, error) {
-	input, ok := req.Data.(map[string]interface{})
+	input, ok := req.Data.(map[string]any)
 	if !ok {
 		return "", admin.NewInvalidAdminReqFormatError("missing 'data' field")
 	}
@@ -131,7 +131,7 @@ func parseString(req *admin.CommandRequest, field string) (string, error) {
 }
 
 // Returns admin.InvalidAdminReqError for invalid inputs
-func findUint64(input map[string]interface{}, field string) (uint64, error) {
+func findUint64(input map[string]any, field string) (uint64, error) {
 	data, ok := input[field]
 	if !ok {
 		return 0, admin.NewInvalidAdminReqErrorf("missing required field '%s'", field)
@@ -144,7 +144,7 @@ func findUint64(input map[string]interface{}, field string) (uint64, error) {
 	return uint64(val), nil
 }
 
-func findString(input map[string]interface{}, field string) (string, error) {
+func findString(input map[string]any, field string) (string, error) {
 	data, ok := input[field]
 	if !ok {
 		return "", admin.NewInvalidAdminReqErrorf("missing required field '%s'", field)

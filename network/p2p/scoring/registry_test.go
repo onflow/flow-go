@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"math"
+	"slices"
 	"sync"
 	"testing"
 	"time"
@@ -1258,19 +1259,12 @@ func withStakedIdentities(peerIds ...peer.ID) func(cfg *scoring.GossipSubAppSpec
 	return func(cfg *scoring.GossipSubAppSpecificScoreRegistryConfig) {
 		cfg.IdProvider.(*mock.IdentityProvider).On("ByPeerID", testifymock.AnythingOfType("peer.ID")).
 			Return(func(pid peer.ID) *flow.Identity {
-				for _, peerID := range peerIds {
-					if peerID == pid {
-						return unittest.IdentityFixture()
-					}
+				if slices.Contains(peerIds, pid) {
+					return unittest.IdentityFixture()
 				}
 				return nil
 			}, func(pid peer.ID) bool {
-				for _, peerID := range peerIds {
-					if peerID == pid {
-						return true
-					}
-				}
-				return false
+				return slices.Contains(peerIds, pid)
 			}).Maybe()
 	}
 }
@@ -1282,10 +1276,8 @@ func withValidSubscriptions(peerIds ...peer.ID) func(cfg *scoring.GossipSubAppSp
 		cfg.Validator.(*mockp2p.SubscriptionValidator).
 			On("CheckSubscribedToAllowedTopics", testifymock.AnythingOfType("peer.ID"), testifymock.Anything).
 			Return(func(pid peer.ID, _ flow.Role) error {
-				for _, peerID := range peerIds {
-					if peerID == pid {
-						return nil
-					}
+				if slices.Contains(peerIds, pid) {
+					return nil
 				}
 				return fmt.Errorf("invalid subscriptions")
 			}).Maybe()

@@ -202,7 +202,7 @@ func AccountFixture() (*flow.Account, error) {
 func ChainBlockFixtureWithRoot(root *flow.Header, n int) []*flow.Block {
 	bs := make([]*flow.Block, 0, n)
 	parent := root
-	for i := 0; i < n; i++ {
+	for range n {
 		b := BlockWithParentFixture(parent)
 		bs = append(bs, b)
 		parent = b.ToHeader()
@@ -255,7 +255,7 @@ func ProposalFixture() *flow.Proposal {
 
 func BlockResponseFixture(count int) *flow.BlockResponse {
 	blocks := make([]flow.Proposal, count)
-	for i := 0; i < count; i++ {
+	for i := range count {
 		blocks[i] = *ProposalFixture()
 	}
 	return &flow.BlockResponse{
@@ -270,7 +270,7 @@ func ClusterProposalFixture() *cluster.Proposal {
 
 func ClusterBlockResponseFixture(count int) *cluster.BlockResponse {
 	blocks := make([]cluster.Proposal, count)
-	for i := 0; i < count; i++ {
+	for i := range count {
 		blocks[i] = *ClusterProposalFixture()
 	}
 	return &cluster.BlockResponse{
@@ -346,7 +346,7 @@ func PayloadFixture(options ...func(*flow.Payload)) flow.Payload {
 func WithAllTheFixins(payload *flow.Payload) {
 	payload.Seals = Seal.Fixtures(3)
 	payload.Guarantees = CollectionGuaranteesFixture(4)
-	for i := 0; i < 10; i++ {
+	for range 10 {
 		receipt := ExecutionReceiptFixture(
 			WithResult(ExecutionResultFixture(WithServiceEvents(3))),
 			WithSpocks(SignaturesFixture(3)),
@@ -691,7 +691,7 @@ func ClusterBlockFixtures(n int) []*cluster.Block {
 
 	parent := ClusterBlockFixture()
 
-	for i := 0; i < n; i++ {
+	for range n {
 		block := ClusterBlockFixture(
 			ClusterBlock.WithParent(parent),
 		)
@@ -739,7 +739,7 @@ func CollectionGuaranteeFixture(options ...func(*flow.CollectionGuarantee)) *flo
 
 func CollectionGuaranteesWithCollectionIDFixture(collections []*flow.Collection) []*flow.CollectionGuarantee {
 	guarantees := make([]*flow.CollectionGuarantee, 0, len(collections))
-	for i := 0; i < len(collections); i++ {
+	for i := range collections {
 		guarantee := CollectionGuaranteeFixture(WithCollection(collections[i]))
 		guarantees = append(guarantees, guarantee)
 	}
@@ -760,7 +760,7 @@ func CollectionGuaranteesFixture(
 
 func BlockSealsFixture(n int) []*flow.Seal {
 	seals := make([]*flow.Seal, 0, n)
-	for i := 0; i < n; i++ {
+	for range n {
 		seal := Seal.Fixture()
 		seals = append(seals, seal)
 	}
@@ -769,7 +769,7 @@ func BlockSealsFixture(n int) []*flow.Seal {
 
 func CollectionListFixture(n int, options ...func(*flow.Collection)) []*flow.Collection {
 	collections := make([]*flow.Collection, n)
-	for i := 0; i < n; i++ {
+	for i := range n {
 		collection := CollectionFixture(1, options...)
 		collections[i] = &collection
 	}
@@ -779,7 +779,7 @@ func CollectionListFixture(n int, options ...func(*flow.Collection)) []*flow.Col
 
 func CollectionFixture(n int, options ...func(*flow.Collection)) flow.Collection {
 	transactions := make([]*flow.TransactionBody, 0, n)
-	for i := 0; i < n; i++ {
+	for range n {
 		tx := TransactionFixture()
 		transactions = append(transactions, &tx)
 	}
@@ -994,7 +994,7 @@ func ExecutionResultListFixture(
 	opts ...func(*flow.ExecutionResult),
 ) []*flow.ExecutionResult {
 	results := make([]*flow.ExecutionResult, 0, n)
-	for i := 0; i < n; i++ {
+	for range n {
 		results = append(results, ExecutionResultFixture(opts...))
 	}
 
@@ -1020,7 +1020,7 @@ func WithServiceEvents(n int) func(result *flow.ExecutionResult) {
 	return func(result *flow.ExecutionResult) {
 		result.ServiceEvents = ServiceEventsFixture(n)
 		// randomly assign service events to chunks
-		for i := 0; i < n; i++ {
+		for range n {
 			chunkIndex := rand.Intn(result.Chunks.Len())
 			result.Chunks[chunkIndex].ServiceEventCount++
 		}
@@ -1036,7 +1036,7 @@ func WithExecutionDataID(id flow.Identifier) func(result *flow.ExecutionResult) 
 func ServiceEventsFixture(n int) flow.ServiceEventList {
 	sel := make(flow.ServiceEventList, n)
 
-	for i := 0; i < n; i++ {
+	for i := range n {
 		switch i % 3 {
 		case 0:
 			sel[i] = EpochCommitFixture().ServiceEvent()
@@ -1141,7 +1141,7 @@ func StateCommitmentPointerFixture() *flow.StateCommitment {
 
 func HashFixture(size int) hash.Hash {
 	hash := make(hash.Hash, size)
-	for i := 0; i < size; i++ {
+	for i := range size {
 		hash[i] = byte(i)
 	}
 	return hash
@@ -1149,7 +1149,7 @@ func HashFixture(size int) hash.Hash {
 
 func IdentifierListFixture(n int) flow.IdentifierList {
 	list := make([]flow.Identifier, n)
-	for i := 0; i < n; i++ {
+	for i := range n {
 		list[i] = IdentifierFixture()
 	}
 	return list
@@ -1163,7 +1163,7 @@ func IdentifierFixture() flow.Identifier {
 
 func SignerIndicesFixture(n int) []byte {
 	indices := bitutils.MakeBitVector(10)
-	for i := 0; i < n; i++ {
+	for i := range n {
 		bitutils.SetBit(indices, i)
 	}
 	return indices
@@ -1402,7 +1402,7 @@ func CompleteIdentitySet(identities ...*flow.Identity) flow.IdentityList {
 func IdentityListFixture(n int, opts ...func(*flow.Identity)) flow.IdentityList {
 	identities := make(flow.IdentityList, 0, n)
 
-	for i := 0; i < n; i++ {
+	for range n {
 		identity := IdentityFixture()
 		identity.Address = fmt.Sprintf("%x@flow.com:1234", identity.NodeID)
 		for _, opt := range opts {
@@ -1432,7 +1432,7 @@ func DynamicIdentityEntryFixture(opts ...func(*flow.DynamicIdentityEntry)) *flow
 // DynamicIdentityEntryListFixture returns a list of DynamicIdentityEntry objects.
 func DynamicIdentityEntryListFixture(n int, opts ...func(*flow.DynamicIdentityEntry)) flow.DynamicIdentityEntryList {
 	list := make(flow.DynamicIdentityEntryList, n)
-	for i := 0; i < n; i++ {
+	for i := range n {
 		list[i] = DynamicIdentityEntryFixture(opts...)
 	}
 	return list
@@ -1583,7 +1583,7 @@ func SignatureFixture() crypto.Signature {
 
 func SignaturesFixture(n int) []crypto.Signature {
 	var sigs []crypto.Signature
-	for i := 0; i < n; i++ {
+	for range n {
 		sigs = append(sigs, SignatureFixture())
 	}
 	return sigs
@@ -1591,7 +1591,7 @@ func SignaturesFixture(n int) []crypto.Signature {
 
 func RandomSourcesFixture(n int) [][]byte {
 	var sigs [][]byte
-	for i := 0; i < n; i++ {
+	for range n {
 		sigs = append(sigs, SignatureFixture())
 	}
 	return sigs
@@ -1622,7 +1622,7 @@ func TransactionBodyFixture(opts ...func(*flow.TransactionBody)) flow.Transactio
 
 func TransactionBodyListFixture(n int) []flow.TransactionBody {
 	l := make([]flow.TransactionBody, n)
-	for i := 0; i < n; i++ {
+	for i := range n {
 		l[i] = TransactionFixture()
 	}
 
@@ -1778,7 +1778,7 @@ func ChunkDataPackRequestListFixture(
 	opts ...func(*verification.ChunkDataPackRequest),
 ) verification.ChunkDataPackRequestList {
 	lst := make([]*verification.ChunkDataPackRequest, 0, n)
-	for i := 0; i < n; i++ {
+	for range n {
 		lst = append(lst, ChunkDataPackRequestFixture(opts...))
 	}
 	return lst
@@ -1901,7 +1901,7 @@ func ChunkDataPacksFixture(
 	opts ...func(*flow.ChunkDataPack),
 ) []*flow.ChunkDataPack {
 	chunkDataPacks := make([]*flow.ChunkDataPack, count)
-	for i := 0; i < count; i++ {
+	for i := range count {
 		chunkDataPacks[i] = ChunkDataPackFixture(IdentifierFixture())
 	}
 
@@ -2029,7 +2029,7 @@ func KeyFixture(algo crypto.SigningAlgorithm) crypto.PrivateKey {
 
 func KeysFixture(n int, algo crypto.SigningAlgorithm) []crypto.PrivateKey {
 	keys := make([]crypto.PrivateKey, 0, n)
-	for i := 0; i < n; i++ {
+	for range n {
 		keys = append(keys, KeyFixture(algo))
 	}
 	return keys
@@ -2507,7 +2507,7 @@ func ChainFixture(nonGenesisCount int) (
 func ChainFixtureFrom(count int, parent *flow.Header) []*flow.Block {
 	blocks := make([]*flow.Block, 0, count)
 
-	for i := 0; i < count; i++ {
+	for range count {
 		block := BlockWithParentFixture(parent)
 		blocks = append(blocks, block)
 		parent = block.ToHeader()
@@ -2670,7 +2670,7 @@ func MachineAccountFixture(t *testing.T) (
 
 func TransactionResultsFixture(n int) []flow.TransactionResult {
 	results := make([]flow.TransactionResult, 0, n)
-	for i := 0; i < n; i++ {
+	for range n {
 		results = append(results, flow.TransactionResult{
 			TransactionID:   IdentifierFixture(),
 			ErrorMessage:    "whatever",
@@ -2682,7 +2682,7 @@ func TransactionResultsFixture(n int) []flow.TransactionResult {
 
 func LightTransactionResultsFixture(n int) []flow.LightTransactionResult {
 	results := make([]flow.LightTransactionResult, 0, n)
-	for i := 0; i < n; i++ {
+	for i := range n {
 		results = append(results, flow.LightTransactionResult{
 			TransactionID:   IdentifierFixture(),
 			Failed:          i%2 == 0,
@@ -2739,7 +2739,7 @@ func EngineMessageFixture() *engine.Message {
 
 func EngineMessageFixtures(count int) []*engine.Message {
 	messages := make([]*engine.Message, 0, count)
-	for i := 0; i < count; i++ {
+	for range count {
 		messages = append(messages, EngineMessageFixture())
 	}
 	return messages
@@ -2749,7 +2749,7 @@ func EngineMessageFixtures(count int) []*engine.Message {
 func GetFlowProtocolEventID(
 	t *testing.T,
 	channel channels.Channel,
-	event interface{},
+	event any,
 ) flow.Identifier {
 	payload, err := NetworkCodec().Encode(event)
 	require.NoError(t, err)
@@ -2790,7 +2790,7 @@ func BlockExecutionDatEntityFixture(opts ...func(*execution_data.BlockExecutionD
 
 func BlockExecutionDatEntityListFixture(n int) []*execution_data.BlockExecutionDataEntity {
 	l := make([]*execution_data.BlockExecutionDataEntity, n)
-	for i := 0; i < n; i++ {
+	for i := range n {
 		l[i] = BlockExecutionDatEntityFixture()
 	}
 
@@ -2900,7 +2900,7 @@ func TransactionResultErrorMessagesFixture(n int) []flow.TransactionResultErrorM
 	txResErrMsgs := make([]flow.TransactionResultErrorMessage, 0, n)
 	executorID := IdentifierFixture()
 
-	for i := 0; i < n; i++ {
+	for i := range n {
 		txResErrMsgs = append(txResErrMsgs, TransactionResultErrorMessageFixture(
 			WithTxResultErrorMessageIndex(uint32(i)),
 			WithTxResultErrorMessageTxMsg(fmt.Sprintf("transaction result error %d", i)),
@@ -3138,31 +3138,31 @@ func EpochProtocolStateEntryFixture(tentativePhase flow.EpochPhase, efmTriggered
 	return entry
 }
 
-func CreateSendTxHttpPayload(tx flow.TransactionBody) map[string]interface{} {
+func CreateSendTxHttpPayload(tx flow.TransactionBody) map[string]any {
 	tx.Arguments = [][]uint8{} // fix how fixture creates nil values
 	auth := make([]string, len(tx.Authorizers))
 	for i, a := range tx.Authorizers {
 		auth[i] = a.String()
 	}
 
-	return map[string]interface{}{
+	return map[string]any{
 		"script":             util.ToBase64(tx.Script),
 		"arguments":          tx.Arguments,
 		"reference_block_id": tx.ReferenceBlockID.String(),
 		"gas_limit":          fmt.Sprintf("%d", tx.GasLimit),
 		"payer":              tx.Payer.String(),
-		"proposal_key": map[string]interface{}{
+		"proposal_key": map[string]any{
 			"address":         tx.ProposalKey.Address.String(),
 			"key_index":       fmt.Sprintf("%d", tx.ProposalKey.KeyIndex),
 			"sequence_number": fmt.Sprintf("%d", tx.ProposalKey.SequenceNumber),
 		},
 		"authorizers": auth,
-		"payload_signatures": []map[string]interface{}{{
+		"payload_signatures": []map[string]any{{
 			"address":   tx.PayloadSignatures[0].Address.String(),
 			"key_index": fmt.Sprintf("%d", tx.PayloadSignatures[0].KeyIndex),
 			"signature": util.ToBase64(tx.PayloadSignatures[0].Signature),
 		}},
-		"envelope_signatures": []map[string]interface{}{{
+		"envelope_signatures": []map[string]any{{
 			"address":   tx.EnvelopeSignatures[0].Address.String(),
 			"key_index": fmt.Sprintf("%d", tx.EnvelopeSignatures[0].KeyIndex),
 			"signature": util.ToBase64(tx.EnvelopeSignatures[0].Signature),
@@ -3174,7 +3174,7 @@ func CreateSendTxHttpPayload(tx flow.TransactionBody) map[string]interface{} {
 func P2PRPCGraftFixtures(topics ...string) []*pubsub_pb.ControlGraft {
 	n := len(topics)
 	grafts := make([]*pubsub_pb.ControlGraft, n)
-	for i := 0; i < n; i++ {
+	for i := range n {
 		grafts[i] = P2PRPCGraftFixture(&topics[i])
 	}
 	return grafts
@@ -3191,7 +3191,7 @@ func P2PRPCGraftFixture(topic *string) *pubsub_pb.ControlGraft {
 func P2PRPCPruneFixtures(topics ...string) []*pubsub_pb.ControlPrune {
 	n := len(topics)
 	prunes := make([]*pubsub_pb.ControlPrune, n)
-	for i := 0; i < n; i++ {
+	for i := range n {
 		prunes[i] = P2PRPCPruneFixture(&topics[i])
 	}
 	return prunes
@@ -3208,7 +3208,7 @@ func P2PRPCPruneFixture(topic *string) *pubsub_pb.ControlPrune {
 func P2PRPCIHaveFixtures(m int, topics ...string) []*pubsub_pb.ControlIHave {
 	n := len(topics)
 	ihaves := make([]*pubsub_pb.ControlIHave, n)
-	for i := 0; i < n; i++ {
+	for i := range n {
 		ihaves[i] = P2PRPCIHaveFixture(&topics[i], IdentifierListFixture(m).Strings()...)
 	}
 	return ihaves
@@ -3225,7 +3225,7 @@ func P2PRPCIHaveFixture(topic *string, messageIds ...string) *pubsub_pb.ControlI
 // P2PRPCIWantFixtures returns n number of control message rpc iWant fixtures with m number of message ids each.
 func P2PRPCIWantFixtures(n, m int) []*pubsub_pb.ControlIWant {
 	iwants := make([]*pubsub_pb.ControlIWant, n)
-	for i := 0; i < n; i++ {
+	for i := range n {
 		iwants[i] = P2PRPCIWantFixture(IdentifierListFixture(m).Strings()...)
 	}
 	return iwants
@@ -3316,7 +3316,7 @@ func GossipSubMessageFixture(s string, opts ...func(*pubsub_pb.Message)) *pubsub
 // GossipSubMessageFixtures returns a list of gossipsub message fixtures.
 func GossipSubMessageFixtures(n int, topic string, opts ...func(*pubsub_pb.Message)) []*pubsub_pb.Message {
 	msgs := make([]*pubsub_pb.Message, n)
-	for i := 0; i < n; i++ {
+	for i := range n {
 		msgs[i] = GossipSubMessageFixture(topic, opts...)
 	}
 	return msgs

@@ -16,7 +16,7 @@ var _ commands.AdminCommand = (*SetGologLevelCommand)(nil)
 
 type SetGologLevelCommand struct{}
 
-func (s *SetGologLevelCommand) Handler(ctx context.Context, req *admin.CommandRequest) (interface{}, error) {
+func (s *SetGologLevelCommand) Handler(ctx context.Context, req *admin.CommandRequest) (any, error) {
 	level := req.ValidatorData.(golog.LogLevel)
 	golog.SetAllLoggers(level)
 

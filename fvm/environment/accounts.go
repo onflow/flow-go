@@ -469,7 +469,7 @@ func (a *StatefulAccounts) GetAccountPublicKeys(
 	}
 	publicKeys = make([]flow.AccountPublicKey, count)
 
-	for i := uint32(0); i < count; i++ {
+	for i := range count {
 		publicKey, err := a.GetAccountPublicKey(address, i)
 		if err != nil {
 			return nil, err

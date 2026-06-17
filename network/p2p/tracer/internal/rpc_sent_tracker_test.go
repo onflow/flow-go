@@ -54,7 +54,6 @@ func TestRPCSentTracker_IHave(t *testing.T) {
 		}
 		iHaves := make([]*pb.ControlIHave, len(testCases))
 		for i, testCase := range testCases {
-			testCase := testCase
 			iHaves[i] = &pb.ControlIHave{
 				MessageIDs: testCase.messageIDS,
 			}
@@ -131,7 +130,7 @@ func TestRPCSentTracker_ConcurrentTracking(t *testing.T) {
 	numOfMsgIds := 100
 	numOfRPCs := 100
 	rpcs := make([]*pubsub.RPC, numOfRPCs)
-	for i := 0; i < numOfRPCs; i++ {
+	for i := range numOfRPCs {
 		i := i
 		go func() {
 			rpc := rpcFixture(withIhaves([]*pb.ControlIHave{{MessageIDs: unittest.IdentifierListFixture(numOfMsgIds).Strings()}}))
@@ -212,7 +211,7 @@ func TestRPCSentTracker_LastHighestIHaveRPCSize(t *testing.T) {
 // mockIHaveFixture generate list of iHaves of size n. Each iHave will be created with m number of random message ids.
 func mockIHaveFixture(n, m int) []*pb.ControlIHave {
 	iHaves := make([]*pb.ControlIHave, n)
-	for i := 0; i < n; i++ {
+	for i := range n {
 		// topic does not have to be a valid flow topic, for teting purposes we can use a random string
 		topic := unittest.IdentifierFixture().String()
 		iHaves[i] = &pb.ControlIHave{

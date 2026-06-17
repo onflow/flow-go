@@ -12,7 +12,7 @@ import (
 )
 
 // GetAccountNonFungibleTokenTransfers returns a paginated list of non-fungible token transfers for the given account address.
-func GetAccountNonFungibleTokenTransfers(r *common.Request, backend extended.API, link models.LinkGenerator) (interface{}, error) {
+func GetAccountNonFungibleTokenTransfers(r *common.Request, backend extended.API, link models.LinkGenerator) (any, error) {
 	req, err := request.NewGetAccountNFTTransfers(r)
 	if err != nil {
 		return nil, common.NewBadRequestError(err)

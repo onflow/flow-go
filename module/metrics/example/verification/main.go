@@ -119,7 +119,7 @@ func demo() {
 		// to collect or not.
 		// This is done to stretch metrics and scatter their pattern
 		// for a clear visualization.
-		for i := 0; i < 100; i++ {
+		for i := range 100 {
 			// consumer
 			tryRandomCall(func() {
 				vc.OnBlockConsumerJobDone(rand.Uint64() % 10000)

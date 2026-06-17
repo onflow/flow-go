@@ -155,7 +155,7 @@ func weightedRandomSelection(
 	}
 
 	leaders := make([]uint16, 0, count)
-	for i := 0; i < count; i++ {
+	for range count {
 		// pick a random number from 0 (inclusive) to cumsum (exclusive). Or [0, cumsum)
 		randomness := rng.UintN(cumsum)
 

@@ -35,7 +35,7 @@ func NewTriggerCheckpointCommand(trigger *atomic.Bool, ledgerServiceAddr, ledger
 	}
 }
 
-func (s *TriggerCheckpointCommand) Handler(_ context.Context, _ *admin.CommandRequest) (interface{}, error) {
+func (s *TriggerCheckpointCommand) Handler(_ context.Context, _ *admin.CommandRequest) (any, error) {
 	if s.trigger.CompareAndSwap(false, true) {
 		log.Info().Msgf("admintool: trigger checkpoint as soon as finishing writing the current segment file. you can find log about 'compactor' to check the checkpointing progress")
 	} else {

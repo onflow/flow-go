@@ -539,7 +539,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		assert.Equal(t, result.BlockExecutionResult.Size(), collectionCount+1) // system chunk
 
 		// all events should have been collected
-		for i := 0; i < collectionCount; i++ {
+		for i := range collectionCount {
 			events := result.CollectionExecutionResultAt(i).Events()
 			assert.Len(t, events, eventsPerCollection)
 		}
@@ -551,8 +551,8 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 		// events should have been indexed by transaction and event
 		k := 0
-		for expectedTxIndex := 0; expectedTxIndex < totalTransactionCount; expectedTxIndex++ {
-			for expectedEventIndex := 0; expectedEventIndex < eventsPerTransaction; expectedEventIndex++ {
+		for expectedTxIndex := range totalTransactionCount {
+			for expectedEventIndex := range eventsPerTransaction {
 				e := events[k]
 				assert.EqualValues(t, expectedEventIndex, int(e.EventIndex))
 				assert.EqualValues(t, expectedTxIndex, e.TransactionIndex)
@@ -1040,7 +1040,7 @@ func assertEventHashesMatch(
 	require.Equal(t, execResSize, expectedNoOfChunks)
 	require.Equal(t, execResSize, attestResSize)
 
-	for i := 0; i < expectedNoOfChunks; i++ {
+	for i := range expectedNoOfChunks {
 		events := result.CollectionExecutionResultAt(i).Events()
 		calculatedHash, err := flow.EventsMerkleRootHash(events)
 		require.NoError(t, err)
@@ -1833,7 +1833,7 @@ func generateBlockWithVisitor(
 	guarantees := make([]*flow.CollectionGuarantee, collectionCount)
 	completeCollections := make(map[flow.Identifier]*entity.CompleteCollection)
 
-	for i := 0; i < collectionCount; i++ {
+	for i := range collectionCount {
 		collection := generateCollection(transactionCount, addressGenerator, visitor)
 		collections[i] = collection
 		guarantees[i] = collection.Guarantee
@@ -1863,7 +1863,7 @@ func generateCollection(
 ) *entity.CompleteCollection {
 	transactions := make([]*flow.TransactionBody, transactionCount)
 
-	for i := 0; i < transactionCount; i++ {
+	for i := range transactionCount {
 		nextAddress, err := addressGenerator.NextAddress()
 		if err != nil {
 			panic(fmt.Errorf("cannot generate next address in test: %w", err))
@@ -2016,7 +2016,7 @@ func (testVM) Inspect(
 
 func generateEvents(eventCount int, txIndex uint32) []flow.Event {
 	events := make([]flow.Event, eventCount)
-	for i := 0; i < eventCount; i++ {
+	for i := range eventCount {
 		// creating some dummy event
 		event := flow.Event{
 			Type:             "whatever",
@@ -2149,22 +2149,22 @@ func NewTestLogger() *TestLogger {
 type LogEntry struct {
 	Level   string
 	Message string
-	Fields  map[string]interface{}
+	Fields  map[string]any
 }
 
 func (tl *TestLogger) Logs() []LogEntry {
 	var entries []LogEntry
-	lines := strings.Split(tl.buffer.String(), "\n")
-	for _, line := range lines {
+	lines := strings.SplitSeq(tl.buffer.String(), "\n")
+	for line := range lines {
 		if line == "" {
 			continue
 		}
-		var rawEntry map[string]interface{}
+		var rawEntry map[string]any
 		if err := json.Unmarshal([]byte(line), &rawEntry); err != nil {
 			continue
 		}
 		entry := LogEntry{
-			Fields: make(map[string]interface{}),
+			Fields: make(map[string]any),
 		}
 		for k, v := range rawEntry {
 			switch k {
@@ -2185,7 +2185,7 @@ func (tl *TestLogger) HasLog(message string) bool {
 	return strings.Contains(tl.buffer.String(), message)
 }
 
-func (tl *TestLogger) HasLogWithField(message string, fieldName string, fieldValue interface{}) bool {
+func (tl *TestLogger) HasLogWithField(message string, fieldName string, fieldValue any) bool {
 	for _, entry := range tl.Logs() {
 		if strings.Contains(entry.Message, message) {
 			if val, ok := entry.Fields[fieldName]; ok {

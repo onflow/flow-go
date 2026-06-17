@@ -2,11 +2,12 @@ package hash_test
 
 import (
 	"crypto/rand"
+	sha30 "crypto/sha3"
+	hash0 "hash"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"golang.org/x/crypto/sha3"
 
 	cryhash "github.com/onflow/crypto/hash"
 
@@ -30,7 +31,7 @@ func TestHash(t *testing.T) {
 			require.NoError(t, err)
 			h := hash.HashLeaf(path, value)
 
-			hasher := sha3.New256()
+			hasher := hash0.Hash(sha30.New256())
 			_, _ = hasher.Write(path[:])
 			_, _ = hasher.Write(value)
 			expected := hasher.Sum(nil)
@@ -48,7 +49,7 @@ func TestHash(t *testing.T) {
 			require.NoError(t, err)
 			h := hash.HashInterNode(h1, h2)
 
-			hasher := sha3.New256()
+			hasher := hash0.Hash(sha30.New256())
 			_, _ = hasher.Write(h1[:])
 			_, _ = hasher.Write(h2[:])
 			expected := hasher.Sum(nil)

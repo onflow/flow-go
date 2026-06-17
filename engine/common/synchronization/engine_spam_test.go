@@ -402,7 +402,7 @@ func repeatedBlockIDs(n int) []flow.Identifier {
 	blockID := unittest.BlockFixture().ID()
 
 	arr := make([]flow.Identifier, n)
-	for i := 0; i < n; i++ {
+	for i := range n {
 		arr[i] = blockID
 	}
 	return arr

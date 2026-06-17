@@ -72,7 +72,7 @@ func Test_WAL(t *testing.T) {
 		// WAL segments are 32kB, so here we generate 2 keys 16kB each, times `size`
 		// so we should get at least `size` segments
 
-		for i := 0; i < size; i++ {
+		for range size {
 
 			keys := testutils.RandomUniqueKeys(numInsPerStep, keyNumberOfParts, keyPartMinByteSize, keyPartMaxByteSize)
 			values := testutils.RandomValues(numInsPerStep, valueMaxByteSize/2, valueMaxByteSize)
@@ -147,7 +147,7 @@ func Test_Checkpointing(t *testing.T) {
 			// so we should get at least `size` segments
 
 			// Generate the tree and create WAL
-			for i := 0; i < size; i++ {
+			for range size {
 
 				keys := testutils.RandomUniqueKeys(numInsPerStep, keyNumberOfParts, 1600, 1600)
 				values := testutils.RandomValues(numInsPerStep, valueMaxByteSize/2, valueMaxByteSize)

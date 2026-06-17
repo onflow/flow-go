@@ -33,7 +33,7 @@ type DataProviderFactory interface {
 	// and configuration parameters.
 	//
 	// No errors are expected during normal operations.
-	NewDataProvider(ctx context.Context, subID string, topic string, args wsmodels.Arguments, stream chan<- interface{}) (DataProvider, error)
+	NewDataProvider(ctx context.Context, subID string, topic string, args wsmodels.Arguments, stream chan<- any) (DataProvider, error)
 }
 
 var _ DataProviderFactory = (*DataProviderFactoryImpl)(nil)
@@ -91,7 +91,7 @@ func NewDataProviderFactory(
 // - ch: Channel to which the data provider sends data.
 //
 // No errors are expected during normal operations.
-func (s *DataProviderFactoryImpl) NewDataProvider(ctx context.Context, subscriptionID string, topic string, arguments wsmodels.Arguments, ch chan<- interface{}) (DataProvider, error) {
+func (s *DataProviderFactoryImpl) NewDataProvider(ctx context.Context, subscriptionID string, topic string, arguments wsmodels.Arguments, ch chan<- any) (DataProvider, error) {
 	switch topic {
 	case BlocksTopic:
 		return NewBlocksDataProvider(ctx, s.logger, s.accessApi, subscriptionID, s.linkGenerator, topic, arguments, ch)

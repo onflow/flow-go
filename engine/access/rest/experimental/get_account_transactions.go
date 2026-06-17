@@ -39,7 +39,7 @@ type AccountTransactionFilter struct {
 }
 
 // GetAccountTransactions returns a paginated list of transactions for the given account address.
-func GetAccountTransactions(r *common.Request, backend extended.API, link commonmodels.LinkGenerator) (interface{}, error) {
+func GetAccountTransactions(r *common.Request, backend extended.API, link commonmodels.LinkGenerator) (any, error) {
 	address, err := parser.ParseAddress(r.GetVar("address"), r.Chain)
 	if err != nil {
 		return nil, common.NewBadRequestError(err)
@@ -67,8 +67,8 @@ func GetAccountTransactions(r *common.Request, backend extended.API, link common
 
 	var filter extended.AccountTransactionFilter
 	if raw := r.GetQueryParam("roles"); raw != "" {
-		roles := strings.Split(raw, ",")
-		for _, role := range roles {
+		roles := strings.SplitSeq(raw, ",")
+		for role := range roles {
 			parsed, err := accessmodel.ParseTransactionRole(strings.TrimSpace(role))
 			if err != nil {
 				return nil, common.NewBadRequestError(fmt.Errorf("invalid role: %w", err))

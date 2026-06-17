@@ -20,7 +20,7 @@ import (
 //   - storage.ErrAlreadyExists if the key already exists in the database.
 //   - generic error in case of unexpected failure from the database layer or
 //     encoding failure.
-func insert(key []byte, entity interface{}) func(*badger.Txn) error {
+func insert(key []byte, entity any) func(*badger.Txn) error {
 	return func(tx *badger.Txn) error {
 
 		// update the maximum key size if the inserted key is bigger
@@ -63,7 +63,7 @@ func insert(key []byte, entity interface{}) func(*badger.Txn) error {
 //   - storage.ErrNotFound if the key does not already exist in the database.
 //   - generic error in case of unexpected failure from the database layer or
 //     encoding failure.
-func update(key []byte, entity interface{}) func(*badger.Txn) error {
+func update(key []byte, entity any) func(*badger.Txn) error {
 	return func(tx *badger.Txn) error {
 
 		// retrieve the item from the key-value store
@@ -93,7 +93,7 @@ func update(key []byte, entity interface{}) func(*badger.Txn) error {
 
 // upsert will encode the given entity with MsgPack and upsert the binary data
 // under the given key in the badger DB.
-func upsert(key []byte, entity interface{}) func(*badger.Txn) error {
+func upsert(key []byte, entity any) func(*badger.Txn) error {
 	return func(tx *badger.Txn) error {
 		// update the maximum key size if the inserted key is bigger
 		if uint32(len(key)) > max {
@@ -174,7 +174,7 @@ func removeByPrefix(prefix []byte) func(*badger.Txn) error {
 //   - storage.ErrNotFound if the key does not exist in the database
 //   - generic error in case of unexpected failure from the database layer, or failure
 //     to decode an existing database value
-func retrieve(key []byte, entity interface{}) func(*badger.Txn) error {
+func retrieve(key []byte, entity any) func(*badger.Txn) error {
 	return func(tx *badger.Txn) error {
 
 		// retrieve the item from the key-value store
@@ -228,7 +228,7 @@ type checkFunc func(key []byte) bool
 
 // createFunc returns a pointer to an initialized entity that we can potentially
 // decode the next value into during a badger DB iteration.
-type createFunc func() interface{}
+type createFunc func() any
 
 // handleFunc is a function that starts the processing of the current key-value
 // pair during a badger iteration. It should be called after the key was checked
@@ -253,7 +253,7 @@ func lookup(entityIDs *[]flow.Identifier) func() (checkFunc, createFunc, handleF
 			return true
 		}
 		var entityID flow.Identifier
-		create := func() interface{} {
+		create := func() any {
 			return &entityID
 		}
 		handle := func() error {
@@ -318,7 +318,7 @@ func iterate(start []byte, end []byte, iteration iterationFunc, opts ...func(*ba
 			modifier = -1          // make sure to stop after end prefix
 			length := uint32(len(start))
 			diff := max - length
-			for i := uint32(0); i < diff; i++ {
+			for range diff {
 				start = append(start, 0xff)
 			}
 		} else {
@@ -327,7 +327,7 @@ func iterate(start []byte, end []byte, iteration iterationFunc, opts ...func(*ba
 			// finishing.
 			length := uint32(len(end))
 			diff := max - length
-			for i := uint32(0); i < diff; i++ {
+			for range diff {
 				end = append(end, 0xff)
 			}
 		}
@@ -451,7 +451,7 @@ func traverse(prefix []byte, iteration iterationFunc) func(*badger.Txn) error {
 func findHighestAtOrBelow(
 	prefix []byte,
 	height uint64,
-	entity interface{},
+	entity any,
 ) func(*badger.Txn) error {
 	return func(tx *badger.Txn) error {
 		if len(prefix) == 0 {

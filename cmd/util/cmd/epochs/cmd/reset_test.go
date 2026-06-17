@@ -41,7 +41,7 @@ func TestReset_LocalSnapshot(t *testing.T) {
 			resetRun(resetCmd, nil)
 
 			// read output from stdout
-			var outputTxArgs []interface{}
+			var outputTxArgs []any
 			err = json.NewDecoder(stdout).Decode(&outputTxArgs)
 			require.NoError(t, err)
 
@@ -87,7 +87,7 @@ func TestReset_BucketSnapshot(t *testing.T) {
 		resetRun(resetCmd, nil)
 
 		// read output from stdout
-		var outputTxArgs []interface{}
+		var outputTxArgs []any
 		err := json.NewDecoder(stdout).Decode(&outputTxArgs)
 		require.NoError(t, err)
 
@@ -109,7 +109,7 @@ func TestReset_BucketSnapshot(t *testing.T) {
 		resetRun(resetCmd, nil)
 
 		// read output from stdout
-		var outputTxArgs []interface{}
+		var outputTxArgs []any
 		err := json.NewDecoder(stdout).Decode(&outputTxArgs)
 		require.NoError(t, err)
 
@@ -143,7 +143,7 @@ func writeRootSnapshot(bootDir string, snapshot *inmem.Snapshot) error {
 
 // TODO: unify methods from all commands
 // TODO: move this to common module
-func writeJSON(path string, data interface{}) error {
+func writeJSON(path string, data any) error {
 	bz, err := json.MarshalIndent(data, "", "  ")
 	if err != nil {
 		return err

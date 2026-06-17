@@ -50,7 +50,7 @@ func (s *BaseApprovalsTestSuite) SetupTest() {
 	s.PublicKey = &module.PublicKey{}
 
 	// setup identities
-	for j := 0; j < 5; j++ {
+	for range 5 {
 		identity := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
 		verifiers = append(verifiers, identity.NodeID)
 		s.AuthorizedVerifiers[identity.NodeID] = identity

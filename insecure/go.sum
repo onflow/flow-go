@@ -896,6 +896,7 @@ github.com/onflow/cadence v1.10.5 h1:Y5kk4aY70SpxJtG/Wd05+xvkUL6tvodeQjSxnXNq65A
 github.com/onflow/cadence v1.10.5/go.mod h1:axaADpRs+qTlq5cdHBawCiJ7dgqusRbBqOPkyWUwUOo=
 github.com/onflow/crypto v0.25.4 h1:R615PWPdSoA5RATNb/j3cYaloBIZlSXVNgS7BjwHiwM=
 github.com/onflow/crypto v0.25.4/go.mod h1:DlkW/1SPUvLHYvUcjWa9PkLIRgSBKR4EDc3i+ATQKW4=
+github.com/onflow/crypto v0.25.5-0.20260617202012-4e680657f0f5/go.mod h1:DlkW/1SPUvLHYvUcjWa9PkLIRgSBKR4EDc3i+ATQKW4=
 github.com/onflow/fixed-point v0.1.1 h1:j0jYZVO8VGyk1476alGudEg7XqCkeTVxb5ElRJRKS90=
 github.com/onflow/fixed-point v0.1.1/go.mod h1:gJdoHqKtToKdOZbvryJvDZfcpzC7d2fyWuo3ZmLtcGY=
 github.com/onflow/flow-core-contracts/lib/go/contracts v1.10.4 h1:tUmbvKlApxfLfguNj9UCvgIB9kxiYqdPbK/IGdKzINQ=
