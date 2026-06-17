@@ -471,12 +471,11 @@ func (e *Engine) dispatchRequest() (bool, error) {
 		entityIDs = append(entityIDs, entityID)
 		item.NumAttempts++
 		item.LastRequested = now
-		item.RetryAfter = max(
+		item.RetryAfter = min(
 			// make sure the interval is within parameters
-			e.cfg.RetryFunction(item.RetryAfter), e.cfg.RetryInitial)
-		if item.RetryAfter > e.cfg.RetryMaximum {
-			item.RetryAfter = e.cfg.RetryMaximum
-		}
+			max(
+
+				e.cfg.RetryFunction(item.RetryAfter), e.cfg.RetryInitial), e.cfg.RetryMaximum)
 
 		// if we reached the maximum size for a batch, bail
 		if uint(len(entityIDs)) >= e.cfg.BatchThreshold {

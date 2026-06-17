@@ -585,7 +585,7 @@ func toInsertables(receipts []*flow.ExecutionReceipt, includedResults map[flow.I
 
 	filteredReceipts := make([]*flow.ExecutionReceiptStub, 0, count)
 
-	for i := uint(0); i < count; i++ {
+	for i := range count {
 		receipt := receipts[i]
 		meta := receipt.Stub()
 		resultID := meta.ResultID

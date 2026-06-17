@@ -99,10 +99,7 @@ func NewEpochSetupGenerator(random *RandomGenerator, timeGen *TimeGenerator, ide
 // Fixture generates a [flow.EpochSetup] with random data based on the provided options.
 func (g *EpochSetupGenerator) Fixture(opts ...EpochSetupOption) *flow.EpochSetup {
 	baseView := uint64(g.random.Uint32())
-	finalView := max(uint64(g.random.Uint32()), baseView)
-	if finalView < baseView+1000 {
-		finalView = baseView + 1000
-	}
+	finalView := max(max(uint64(g.random.Uint32()), baseView), baseView+1000)
 
 	participants := g.identities.List(5, g.identities.WithAllRoles())
 	participants = participants.Sort(flow.Canonical[flow.Identity])

@@ -406,8 +406,7 @@ func TestBLSMultiSignature(t *testing.T) {
 			) {
 
 				code := func(signatureAlgorithm signatureAlgorithm) []byte {
-					return
-					fmt.Appendf(nil,
+					return fmt.Appendf(nil,
 						`
 								import Crypto
 		
@@ -628,8 +627,7 @@ func TestBLSMultiSignature(t *testing.T) {
 			) {
 
 				code := func(signatureAlgorithm signatureAlgorithm) []byte {
-					return
-					fmt.Appendf(nil,
+					return fmt.Appendf(nil,
 						`
 								import Crypto
 		

@@ -341,7 +341,7 @@ func (v *TransactionVerifier) verifySignatures(
 	wg := sync.WaitGroup{}
 	wg.Add(verificationConcurrency)
 
-	for i := 0; i < verificationConcurrency; i++ {
+	for range verificationConcurrency {
 		go func() {
 			defer wg.Done()
 
