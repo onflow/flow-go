@@ -88,7 +88,7 @@ func TestDuplicateMessageTrackerCache_ConcurrentSameRecordInit(t *testing.T) {
 	var wg sync.WaitGroup
 	wg.Add(concurrentAttempts)
 
-	for i := 0; i < concurrentAttempts; i++ {
+	for range concurrentAttempts {
 		go func() {
 			defer wg.Done()
 			gauge, found, err := cache.GetWithInit(peerID)

@@ -70,7 +70,7 @@ func (s *SubscribeEventsSuite) SetupTest() {
 	s.blocks = make([]*flow.Block, 0, blockCount)
 	s.blockEvents = make(map[flow.Identifier]flow.EventsList, blockCount)
 
-	for i := 0; i < blockCount; i++ {
+	for i := range blockCount {
 		block := unittest.BlockWithParentFixture(parent)
 		// update for next iteration
 		parent = block.ToHeader()
@@ -80,7 +80,7 @@ func (s *SubscribeEventsSuite) SetupTest() {
 		s.blocks = append(s.blocks, block)
 
 		var events []flow.Event
-		for j := 0; j < len(testEventTypes); j++ {
+		for j := range testEventTypes {
 			events = append(events, unittest.EventFixture(
 				unittest.Event.WithEventType(testEventTypes[j]),
 			))
@@ -217,8 +217,8 @@ func (s *SubscribeEventsSuite) TestSubscribeEvents() {
 			}
 
 			// Create a channel to receive mock EventsResponse objects
-			ch := make(chan interface{})
-			var chReadOnly <-chan interface{}
+			ch := make(chan any)
+			var chReadOnly <-chan any
 			// Simulate sending a mock EventsResponse
 			go func() {
 				for _, eventResponse := range subscriptionEventsResponses {
@@ -269,8 +269,8 @@ func (s *SubscribeEventsSuite) TestSubscribeEventsHandlesErrors() {
 		invalidBlock := unittest.BlockFixture()
 		subscription := submock.NewSubscription(s.T())
 
-		ch := make(chan interface{})
-		var chReadOnly <-chan interface{}
+		ch := make(chan any)
+		var chReadOnly <-chan any
 		go func() {
 			close(ch)
 		}()
@@ -302,8 +302,8 @@ func (s *SubscribeEventsSuite) TestSubscribeEventsHandlesErrors() {
 		stateStreamBackend := ssmock.NewAPI(s.T())
 		subscription := submock.NewSubscription(s.T())
 
-		ch := make(chan interface{})
-		var chReadOnly <-chan interface{}
+		ch := make(chan any)
+		var chReadOnly <-chan any
 
 		go func() {
 			close(ch)

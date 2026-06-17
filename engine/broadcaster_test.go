@@ -90,14 +90,14 @@ func TestUnsubscribe(t *testing.T) {
 
 		const numOperations = 100
 		notifiers := make([]engine.Notifier, numOperations)
-		for i := 0; i < numOperations; i++ {
+		for i := range numOperations {
 			notifiers[i] = engine.NewNotifier()
 		}
 
 		// Subscribe all notifiers concurrently
 		var wg sync.WaitGroup
 		wg.Add(numOperations)
-		for i := 0; i < numOperations; i++ {
+		for i := range numOperations {
 			go func(n engine.Notifier) {
 				defer wg.Done()
 				b.Subscribe(n)
@@ -109,7 +109,7 @@ func TestUnsubscribe(t *testing.T) {
 
 		// Unsubscribe all notifiers concurrently
 		wg.Add(numOperations)
-		for i := 0; i < numOperations; i++ {
+		for i := range numOperations {
 			go func(n engine.Notifier) {
 				defer wg.Done()
 				b.Unsubscribe(n)
@@ -141,7 +141,7 @@ func TestPublish(t *testing.T) {
 		subscribers := sync.WaitGroup{}
 		subscribers.Add(notifierCount)
 
-		for i := 0; i < notifierCount; i++ {
+		for range notifierCount {
 			notifier := engine.NewNotifier()
 			b.Subscribe(notifier)
 			go func() {
@@ -172,7 +172,7 @@ func TestPublish(t *testing.T) {
 		subscribers := sync.WaitGroup{}
 		subscribers.Add(notifierCount)
 
-		for i := 0; i < notifierCount; i++ {
+		for i := range notifierCount {
 			notifier := engine.NewNotifier()
 			b.Subscribe(notifier)
 
@@ -194,7 +194,7 @@ func TestPublish(t *testing.T) {
 		publishers := sync.WaitGroup{}
 		publishers.Add(20)
 
-		for i := 0; i < 20; i++ {
+		for range 20 {
 			go func() {
 				defer publishers.Done()
 				b.Publish()

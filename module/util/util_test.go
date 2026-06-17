@@ -40,7 +40,7 @@ func TestAllDone(t *testing.T) {
 func testAllDone(n int, t *testing.T) {
 
 	components := make([]realmodule.ReadyDoneAware, n)
-	for i := 0; i < n; i++ {
+	for i := range n {
 		components[i] = new(module.ReadyDoneAware)
 		unittest.ReadyDoneify(components[i])
 	}
@@ -57,7 +57,7 @@ func testAllDone(n int, t *testing.T) {
 func testAllReady(n int, t *testing.T) {
 
 	components := make([]realmodule.ReadyDoneAware, n)
-	for i := 0; i < n; i++ {
+	for i := range n {
 		components[i] = new(module.ReadyDoneAware)
 		unittest.ReadyDoneify(components[i])
 	}
@@ -138,8 +138,6 @@ func TestMergeChannels(t *testing.T) {
 		channels := []chan int{make(chan int), make(chan int), make(chan int)}
 		merged := util.MergeChannels(channels).(<-chan int)
 		for i, ch := range channels {
-			i := i
-			ch := ch
 			go func() {
 				ch <- i
 				close(ch)
@@ -154,8 +152,7 @@ func TestMergeChannels(t *testing.T) {
 }
 
 func TestWaitClosed(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 
 	t.Run("channel closed returns nil", func(t *testing.T) {
 		finished := make(chan struct{})
@@ -196,7 +193,7 @@ func TestWaitClosed(t *testing.T) {
 		// both conditions are met when WaitClosed is called. Since one is randomly selected,
 		// there is a 99.9% probability that each condition will be picked first at least once
 		// during this test.
-		for i := 0; i < 10; i++ {
+		for range 10 {
 			testCtx, testCancel := context.WithCancel(ctx)
 			finished := make(chan struct{})
 			ch := make(chan struct{})
@@ -226,8 +223,7 @@ func TestCheckClosed(t *testing.T) {
 }
 
 func TestWaitError(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 
 	testErr := errors.New("test error channel")
 	t.Run("error received returns error", func(t *testing.T) {
@@ -270,7 +266,7 @@ func TestWaitError(t *testing.T) {
 		// both conditions are met when WaitError is called. Since one is randomly selected,
 		// there is a 99.9% probability that each condition will be picked first at least once
 		// during this test.
-		for i := 0; i < 10; i++ {
+		for range 10 {
 			finished := make(chan struct{})
 			ch := make(chan error, 1) // buffered so we can add before starting
 			done := make(chan struct{})

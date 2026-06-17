@@ -172,7 +172,7 @@ func NewMessageHub(log zerolog.Logger,
 	// This implementation tolerates if the networking layer sometimes blocks on send requests.
 	// We use by default 5 go-routines here. This is fine, because outbound messages are temporally sparse
 	// under normal operations. Hence, the go-routines should mostly be asleep waiting for work.
-	for i := 0; i < defaultMessageHubRequestsWorkers; i++ {
+	for range defaultMessageHubRequestsWorkers {
 		workers.Add(1)
 		componentBuilder.AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 			defer workers.Done()
@@ -449,7 +449,7 @@ func (h *MessageHub) OnOwnProposal(proposal *flow.ProposalHeader, targetPublicat
 //
 // Some of the current error returns signal Byzantine behavior, such as forged or malformed
 // messages. These cases must be logged and routed to a dedicated violation reporting consumer.
-func (h *MessageHub) Process(channel channels.Channel, originID flow.Identifier, message interface{}) error {
+func (h *MessageHub) Process(channel channels.Channel, originID flow.Identifier, message any) error {
 	switch msg := message.(type) {
 	case *cluster.Proposal:
 		h.compliance.OnClusterBlockProposal(flow.Slashable[*cluster.Proposal]{

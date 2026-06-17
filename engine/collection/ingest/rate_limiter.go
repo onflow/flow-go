@@ -132,7 +132,7 @@ func RemoveAddresses(r *AddressRateLimiter, addresses []flow.Address) {
 // parse addresses string into a list of flow addresses
 func ParseAddresses(addresses string) ([]flow.Address, error) {
 	addressList := make([]flow.Address, 0)
-	for _, addr := range strings.Split(addresses, ",") {
+	for addr := range strings.SplitSeq(addresses, ",") {
 		addr = strings.TrimSpace(addr)
 		if addr == "" {
 			continue

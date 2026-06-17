@@ -57,7 +57,7 @@ func GeneratePrefixes(n int) [][]byte {
 	base := 1 << (8 * n)
 	results := make([][]byte, 0, base)
 
-	for i := 0; i < base; i++ {
+	for i := range base {
 		buf := make([]byte, n)
 		switch n {
 		case 1:

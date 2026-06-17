@@ -14,18 +14,18 @@ import (
 
 func TestFilteredIdentitiesProvider(t *testing.T) {
 	identities := make([]*flow.Identity, 10)
-	for i := 0; i < len(identities); i++ {
+	for i := range identities {
 		identities[i] = unittest.IdentityFixture()
 	}
 	identifiers := (flow.IdentityList)(identities).NodeIDs()
 
 	oddIdentifiers := make([]flow.Identifier, 5)
-	for j := 0; j < 5; j++ {
+	for j := range 5 {
 		oddIdentifiers[j] = identifiers[2*j+1]
 	}
 
 	oddIdentities := make([]*flow.Identity, 5)
-	for j := 0; j < 5; j++ {
+	for j := range 5 {
 		oddIdentities[j] = identities[2*j+1]
 	}
 

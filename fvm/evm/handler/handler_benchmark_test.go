@@ -25,14 +25,14 @@ func benchmarkStorageGrowth(b *testing.B, accountCount, setupKittyCount, txPerBl
 					accounts := make([]types.Account, accountCount)
 					// setup several of accounts
 					// note that trie growth is the function of number of accounts
-					for i := 0; i < accountCount; i++ {
+					for i := range accountCount {
 						account := handler.AccountByAddress(handler.DeployCOA(uint64(i+1)), true)
 						account.Deposit(types.NewFlowTokenVault(types.NewBalanceFromUFix64(100)))
 						accounts[i] = account
 					}
 					backend.DropEvents()
 					// mint kitties
-					for i := 0; i < setupKittyCount; i++ {
+					for i := range setupKittyCount {
 						account := accounts[i%accountCount]
 						matronId := testutils.RandomBigInt(1000)
 						sireId := testutils.RandomBigInt(1000)

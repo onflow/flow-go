@@ -360,7 +360,7 @@ func (c *Cache[V]) put(key flow.Identifier, value V) bool {
 // The boolean return value determines whether an value with given id exists in the BackData.
 func (c *Cache[V]) get(key flow.Identifier) (value V, bckIndex bucketIndex, sltIndex slotIndex, ok bool) {
 	entityId32of256, b := c.entityId32of256AndBucketIndex(key)
-	for s := slotIndex(0); s < slotIndex(slotsPerBucket); s++ {
+	for s := range slotIndex(slotsPerBucket) {
 		if c.buckets[b].slots[s].valueId32of256 != entityId32of256 {
 			continue
 		}
@@ -417,7 +417,7 @@ func (c *Cache[V]) slotIndexInBucket(b bucketIndex, slotId sha32of256, entityId 
 
 	oldestSlotInBucket := c.slotCount + 1 // initializes the oldest slot to current max.
 
-	for s := slotIndex(0); s < slotIndex(slotsPerBucket); s++ {
+	for s := range slotIndex(slotsPerBucket) {
 		if c.buckets[b].slots[s].slotAge < oldestSlotInBucket {
 			// record slot s as oldest slot
 			oldestSlotInBucket = c.buckets[b].slots[s].slotAge

@@ -38,7 +38,7 @@ func main() {
 		message1 := "CollectionRequest"
 		message2 := "ClusterBlockProposal"
 
-		for i := 0; i < 100; i++ {
+		for i := range 100 {
 			collector.TransactionIngested(unittest.IdentifierFixture())
 			collector.HotStuffBusyDuration(10, metrics.HotstuffEventTypeLocalTimeout)
 			collector.HotStuffWaitDuration(10, metrics.HotstuffEventTypeLocalTimeout)

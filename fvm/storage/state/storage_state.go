@@ -2,6 +2,7 @@ package state
 
 import (
 	"fmt"
+	"maps"
 
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/model/flow"
@@ -44,9 +45,7 @@ func (state *storageState) Merge(snapshot *snapshot.ExecutionSnapshot) error {
 		state.readSet[id] = struct{}{}
 	}
 
-	for id, value := range snapshot.WriteSet {
-		state.writeSet[id] = value
-	}
+	maps.Copy(state.writeSet, snapshot.WriteSet)
 
 	return nil
 }

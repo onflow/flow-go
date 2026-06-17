@@ -31,7 +31,7 @@ func NewBlockDigestsDataProvider(
 	subscriptionID string,
 	topic string,
 	rawArguments wsmodels.Arguments,
-	send chan<- interface{},
+	send chan<- any,
 ) (*BlockDigestsDataProvider, error) {
 	args, err := parseBlocksArguments(rawArguments)
 	if err != nil {

@@ -86,7 +86,7 @@ func TestGossipSubSpamRecordCache_Concurrent_Adjust(t *testing.T) {
 	wg.Add(numRecords)
 
 	// adds the records concurrently.
-	for i := 0; i < numRecords; i++ {
+	for i := range numRecords {
 		go func(num int) {
 			defer wg.Done()
 			peerID := fmt.Sprintf("peer%d", num)
@@ -106,7 +106,7 @@ func TestGossipSubSpamRecordCache_Concurrent_Adjust(t *testing.T) {
 	unittest.RequireReturnsBefore(t, wg.Wait, 100*time.Millisecond, "could not adjust all records concurrently on time")
 
 	// checks if the cache can retrieve all records.
-	for i := 0; i < numRecords; i++ {
+	for i := range numRecords {
 		peerID := fmt.Sprintf("peer%d", i)
 		record, err, found := cache.Get(peer.ID(peerID))
 		require.True(t, found)

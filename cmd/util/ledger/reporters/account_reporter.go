@@ -173,7 +173,7 @@ func newAccountDataProcessor(
 	bp.rwa = rwa
 	bp.rwc = rwc
 	bp.rwm = rwm
-	bp.balanceScript = []byte(fmt.Sprintf(`
+	bp.balanceScript = fmt.Appendf(nil, `
 				import FungibleToken from 0x%s
 				import FlowToken from 0x%s
 				access(all) fun main(account: Address): UFix64 {
@@ -182,9 +182,9 @@ func newAccountDataProcessor(
 						?? panic("Could not borrow Balance reference to the Vault")
 					return vaultRef.balance
 				}
-			`, sc.FungibleToken.Address.Hex(), sc.FlowToken.Address.Hex()))
+			`, sc.FungibleToken.Address.Hex(), sc.FlowToken.Address.Hex())
 
-	bp.fusdScript = []byte(fmt.Sprintf(`
+	bp.fusdScript = fmt.Appendf(nil, `
 			import FungibleToken from 0x%s
 			import FUSD from 0x%s
 			access(all) fun main(address: Address): UFix64 {
@@ -193,7 +193,7 @@ func newAccountDataProcessor(
 					?? panic("Could not borrow Balance reference to the Vault")
 				return vaultRef.balance
 			}
-			`, sc.FungibleToken.Address.Hex(), "3c5959b568896393"))
+			`, sc.FungibleToken.Address.Hex(), "3c5959b568896393")
 
 	bp.momentsScript = []byte(`
 			import TopShot from 0x0b2a3299cc857e29

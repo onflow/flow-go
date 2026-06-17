@@ -22,10 +22,7 @@ var statsCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return common.WithStorage(flagDatadir, func(sdb storage.DB) error {
 
-			numWorkers := runtime.NumCPU()
-			if numWorkers > 256 {
-				numWorkers = 256
-			}
+			numWorkers := min(runtime.NumCPU(), 256)
 			log.Info().Msgf("getting stats with %v workers", numWorkers)
 
 			stats, err := operation.SummarizeKeysByFirstByteConcurrent(log.Logger, sdb.Reader(), numWorkers)

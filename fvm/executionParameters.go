@@ -3,6 +3,7 @@ package fvm
 import (
 	"context"
 	"fmt"
+	"maps"
 	"math"
 
 	"github.com/rs/zerolog"
@@ -253,9 +254,7 @@ func getExecutionWeights[KindType common.ComputationKind | common.MemoryKind](
 	// (or is not metered at all), the defaults can be changed and the network restarted
 	// instead of trying to change the weights with a transaction.
 	weights := make(map[KindType]uint64, len(defaultWeights))
-	for k, v := range defaultWeights {
-		weights[k] = v
-	}
+	maps.Copy(weights, defaultWeights)
 	for k, v := range weightsRaw {
 		weights[KindType(k)] = v
 	}

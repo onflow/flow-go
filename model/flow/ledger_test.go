@@ -61,7 +61,7 @@ func TestRegisterID_IsInternalState(t *testing.T) {
 		require.False(t, id.IsInternalState())
 	}
 
-	for i := 0; i < 256; i++ {
+	for i := range 256 {
 		uuid := flow.UUIDRegisterID(byte(i))
 		if i == 0 {
 			require.Equal(t, uuid.Key, flow.UUIDKeyPrefix)

@@ -153,10 +153,7 @@ func (s sortablePayloads) FindNextKeyIndexUntil(i int, upperBound int) int {
 		step *= 2
 	}
 
-	high := low + step
-	if high > upperBound {
-		high = upperBound
-	}
+	high := min(low+step, upperBound)
 
 	for low < high {
 		mid := (low + high) / 2

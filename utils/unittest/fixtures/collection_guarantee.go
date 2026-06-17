@@ -97,7 +97,7 @@ func (g *CollectionGuaranteeGenerator) Fixture(opts ...CollectionGuaranteeOption
 // List generates a list of [flow.CollectionGuarantee] with random data.
 func (g *CollectionGuaranteeGenerator) List(n int, opts ...CollectionGuaranteeOption) []*flow.CollectionGuarantee {
 	guarantees := make([]*flow.CollectionGuarantee, 0, n)
-	for i := 0; i < n; i++ {
+	for range n {
 		guarantees = append(guarantees, g.Fixture(opts...))
 	}
 	return guarantees

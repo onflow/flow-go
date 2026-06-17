@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
+	"maps"
 	"net"
 	"net/http"
 	"net/http/pprof"
@@ -91,9 +92,7 @@ func (r *CommandRunnerBootstrapper) Bootstrap(logger zerolog.Logger, bindAddress
 	}
 
 	validators := make(map[string]CommandValidator)
-	for command, validator := range r.validators {
-		validators[command] = validator
-	}
+	maps.Copy(validators, r.validators)
 
 	commandRunner := &CommandRunner{
 		handlers:         handlers,

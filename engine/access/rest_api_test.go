@@ -331,7 +331,7 @@ func (suite *RestAPITestSuite) TestGetBlock() {
 		require.NoError(suite.T(), err)
 		assert.Equal(suite.T(), http.StatusOK, resp.StatusCode)
 		assert.Len(suite.T(), actualBlocks, blkCnt)
-		for i := 0; i < blkCnt; i++ {
+		for i := range blkCnt {
 			assert.Equal(suite.T(), testBlocks[i].ID().String(), actualBlocks[i].Header.Id)
 			assert.Equal(suite.T(), fmt.Sprintf("%d", testBlocks[i].Height), actualBlocks[i].Header.Height)
 		}
@@ -344,7 +344,7 @@ func (suite *RestAPITestSuite) TestGetBlock() {
 
 		lastIndex := len(testBlocks)
 		var reqHeights = make([]uint64, len(testBlocks))
-		for i := 0; i < lastIndex; i++ {
+		for i := range lastIndex {
 			reqHeights[i] = testBlocks[i].Height
 		}
 
@@ -352,7 +352,7 @@ func (suite *RestAPITestSuite) TestGetBlock() {
 		require.NoError(suite.T(), err)
 		assert.Equal(suite.T(), http.StatusOK, resp.StatusCode)
 		assert.Len(suite.T(), actualBlocks, lastIndex)
-		for i := 0; i < lastIndex; i++ {
+		for i := range lastIndex {
 			assert.Equal(suite.T(), testBlocks[i].ID().String(), actualBlocks[i].Header.Id)
 			assert.Equal(suite.T(), fmt.Sprintf("%d", testBlocks[i].Height), actualBlocks[i].Header.Height)
 		}

@@ -284,12 +284,12 @@ func testAddRemoveEntities(t *testing.T, limit uint32, entityCount uint32, eject
 	// this map maintains entities currently stored in the pool.
 	addedEntities := make(map[flow.Identifier]int)
 	addedEntitiesInPool := make(map[flow.Identifier]EIndex)
-	for i := 0; i < numberOfOperations; i++ {
+	for range numberOfOperations {
 		// choose between Add and Remove with a probability of probabilityOfAdding and 1-probabilityOfAdding respectively.
 		if float32(randomIntN(math.MaxInt32))/math.MaxInt32 < probabilityOfAdding || len(addedEntities) == 0 {
 			// keeps finding an entity to add until it finds one that is not already in the pool.
 			found := false
-			for retryTime := 0; retryTime < retryLimit; retryTime++ {
+			for range retryLimit {
 				toAddIndex := randomIntN(int(entityCount))
 				_, found = addedEntities[entities[toAddIndex].Identifier]
 				if !found {
@@ -376,7 +376,7 @@ func testInvalidatingHead(t *testing.T, pool *Pool[flow.Identifier, *unittest.Mo
 	freeListInitialSize := len(pool.poolEntities) - totalEntitiesStored
 
 	// (i+1) keeps total invalidated (head) entities.
-	for i := 0; i < totalEntitiesStored; i++ {
+	for i := range totalEntitiesStored {
 		headIndex := pool.invalidateUsedHead()
 		// head index should be moved to the next index after each head invalidation.
 		require.Equal(t, entities[i], headIndex)
@@ -462,7 +462,7 @@ func testInvalidatingHead(t *testing.T, pool *Pool[flow.Identifier, *unittest.Mo
 func testInvalidatingTail(t *testing.T, pool *Pool[flow.Identifier, *unittest.MockEntity], entities []*unittest.MockEntity) {
 	size := len(entities)
 	offset := len(pool.poolEntities) - size
-	for i := 0; i < size; i++ {
+	for i := range size {
 		// invalidates tail index
 		tailIndex := pool.states[stateUsed].tail
 		require.Equal(t, EIndex(size-1-i), tailIndex)
@@ -833,7 +833,7 @@ func tailAccessibleFromHead(t *testing.T, headSliceIndex EIndex, tailSliceIndex 
 	seen := make(map[EIndex]struct{})
 
 	index := headSliceIndex
-	for i := uint32(0); i < steps; i++ {
+	for i := range steps {
 		if i == steps-1 {
 			require.Equal(t, tailSliceIndex, index, "tail not reachable after steps steps")
 			return
@@ -853,7 +853,7 @@ func headAccessibleFromTail(t *testing.T, headSliceIndex EIndex, tailSliceIndex 
 	seen := make(map[EIndex]struct{})
 
 	index := tailSliceIndex
-	for i := uint32(0); i < total; i++ {
+	for i := range total {
 		if i == total-1 {
 			require.Equal(t, headSliceIndex, index, "head not reachable after total steps")
 			return
@@ -875,7 +875,7 @@ func checkEachEntityIsInFreeOrUsedState(t *testing.T, pool *Pool[flow.Identifier
 	// check elelments
 	nodesInFree := discoverEntitiesBelongingToStateList(t, pool, stateFree)
 	nodesInUsed := discoverEntitiesBelongingToStateList(t, pool, stateUsed)
-	for i := 0; i < pool_capacity; i++ {
+	for i := range pool_capacity {
 		require.False(t, !nodesInFree[i] && !nodesInUsed[i], "Node is not in any state list")
 		require.False(t, nodesInFree[i] && nodesInUsed[i], "Node is in two state lists at the same time")
 	}

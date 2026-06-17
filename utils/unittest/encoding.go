@@ -24,6 +24,8 @@ func EncodeDecodeDifferentVersions(t *testing.T, src, dst any) {
 
 // PtrTo returns a pointer to the input. Useful for concisely constructing
 // a reference-typed argument to a function or similar.
+//
+//go:fix inline
 func PtrTo[T any](target T) *T {
-	return &target
+	return new(target)
 }

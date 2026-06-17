@@ -108,7 +108,7 @@ func NewCore(
 
 	builder := component.NewComponentManagerBuilder().AddWorker(e.launchWorkerToHandleBlocks)
 
-	for w := 0; w < MaxConcurrentBlockExecutor; w++ {
+	for range MaxConcurrentBlockExecutor {
 		builder.AddWorker(e.launchWorkerToExecuteBlocks)
 	}
 

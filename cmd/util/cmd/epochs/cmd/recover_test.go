@@ -68,7 +68,7 @@ func TestRecoverEpochHappyPath(t *testing.T) {
 		generateRecoverEpochTxArgs(snapshotFn)(generateRecoverEpochTxArgsCmd, nil)
 
 		// read output from stdout
-		var outputTxArgs []interface{}
+		var outputTxArgs []any
 		err = json.NewDecoder(stdout).Decode(&outputTxArgs)
 		require.NoError(t, err)
 

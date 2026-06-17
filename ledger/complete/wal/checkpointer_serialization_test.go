@@ -17,7 +17,7 @@ func TestGetNodesAtLevel(t *testing.T) {
 
 	t.Run("nil node", func(t *testing.T) {
 		n := (*node.Node)(nil)
-		for level := uint(0); level < 6; level++ {
+		for level := range uint(6) {
 			nodes := getNodesAtLevel(n, level)
 			assert.Equal(t, 1<<level, len(nodes))
 			for _, nAtLevel := range nodes {

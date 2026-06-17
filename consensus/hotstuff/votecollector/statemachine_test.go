@@ -214,7 +214,7 @@ func (s *StateMachineTestSuite) TestProcessBlock_ProcessingOfCachedVotes() {
 	proposal := makeSignedProposalWithView(s.view)
 	block := proposal.Block
 	processor := s.prepareMockedProcessor(proposal)
-	for i := 0; i < votes; i++ {
+	for range votes {
 		vote := unittest.VoteForBlockFixture(block)
 		// once when caching vote, and once when processing cached vote
 		s.notifier.On("OnVoteProcessed", vote).Twice()
@@ -447,7 +447,7 @@ func (s *StateMachineTestSuite) RegisterVoteConsumer() {
 	block := proposal.Block
 	processor := s.prepareMockedProcessor(proposal)
 	expectedVotes := make([]*model.Vote, 0)
-	for i := 0; i < votes; i++ {
+	for range votes {
 		vote := unittest.VoteForBlockFixture(block)
 		// eventually it has to be process by processor
 		processor.On("Process", vote).Return(nil).Once()
@@ -462,7 +462,7 @@ func (s *StateMachineTestSuite) RegisterVoteConsumer() {
 
 	s.collector.RegisterVoteConsumer(consumer)
 
-	for i := 0; i < votes; i++ {
+	for range votes {
 		vote := unittest.VoteForBlockFixture(block)
 		// eventually it has to be process by processor
 		processor.On("Process", vote).Return(nil).Once()

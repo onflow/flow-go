@@ -117,7 +117,7 @@ func TestSnapshot_Params(t *testing.T) {
 		// build some non-root blocks
 		head := rootHeader
 		const nBlocks = 10
-		for i := 0; i < nBlocks; i++ {
+		for range nBlocks {
 			next := unittest.BlockWithParentAndPayload(
 				head,
 				unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)),
@@ -166,7 +166,7 @@ func TestSnapshot_Descendants(t *testing.T) {
 		usedViews[head.View] = struct{}{}
 		for forkLength := range []int{5, 4} { // construct two forks with length 5 and 4, respectively
 			parent := head
-			for n := 0; n < forkLength; n++ {
+			for range forkLength {
 				block := unittest.BlockWithParentAndPayloadAndUniqueView(
 					parent,
 					unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)),
@@ -265,7 +265,7 @@ func TestClusters(t *testing.T) {
 		require.Equal(t, nClusters, len(expectedClusters))
 		require.Equal(t, len(expectedClusters), len(actualClusters))
 
-		for i := 0; i < nClusters; i++ {
+		for i := range nClusters {
 			expected := expectedClusters[i]
 			actual := actualClusters[i]
 
@@ -401,7 +401,7 @@ func TestSealingSegment(t *testing.T) {
 
 			parent := block1
 			// build a large chain of intermediary blocks
-			for i := 0; i < 100; i++ {
+			for i := range 100 {
 				next := unittest.BlockWithParentProtocolState(parent)
 				if i == 0 {
 					// Repetitions of the same receipt in one fork would be a protocol violation.
@@ -735,7 +735,7 @@ func TestSealingSegment(t *testing.T) {
 
 			blocks := make([]*flow.Block, 0, flow.DefaultTransactionExpiry+3)
 			parent := root
-			for i := 0; i < flow.DefaultTransactionExpiry+1; i++ {
+			for range flow.DefaultTransactionExpiry + 1 {
 				next := unittest.BlockFixture(
 					unittest.Block.WithParent(parent.ID(), parent.View, parent.Height),
 					unittest.Block.WithPayload(unittest.PayloadFixture(
@@ -835,7 +835,7 @@ func TestSealingSegment(t *testing.T) {
 
 			// build chain, so it's long enough to not target blocks as inside of flow.DefaultTransactionExpiry window.
 			parent := block4
-			for i := 0; i < 1.5*flow.DefaultTransactionExpiry; i++ {
+			for range int(1.5 * flow.DefaultTransactionExpiry) {
 				next := unittest.BlockFixture(
 					unittest.Block.WithParent(parent.ID(), parent.View, parent.Height),
 					unittest.Block.WithPayload(unittest.PayloadFixture(

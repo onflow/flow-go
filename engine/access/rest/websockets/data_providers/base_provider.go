@@ -20,7 +20,7 @@ type baseDataProvider struct {
 	subscriptionID            string
 	topic                     string
 	rawArguments              wsmodels.Arguments
-	send                      chan<- interface{}
+	send                      chan<- any
 	cancelSubscriptionContext context.CancelFunc
 }
 
@@ -32,7 +32,7 @@ func newBaseDataProvider(
 	subscriptionID string,
 	topic string,
 	rawArguments wsmodels.Arguments,
-	send chan<- interface{},
+	send chan<- any,
 ) *baseDataProvider {
 	ctx, cancel := context.WithCancel(ctx)
 	return &baseDataProvider{

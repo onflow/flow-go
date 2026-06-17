@@ -32,7 +32,7 @@ func NewBlockHeadersDataProvider(
 	subscriptionID string,
 	topic string,
 	rawArguments wsmodels.Arguments,
-	send chan<- interface{},
+	send chan<- any,
 ) (*BlockHeadersDataProvider, error) {
 	args, err := parseBlocksArguments(rawArguments)
 	if err != nil {

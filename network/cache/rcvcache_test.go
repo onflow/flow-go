@@ -76,7 +76,7 @@ func (r *ReceiveCacheTestSuite) TestMultipleElementAdd() {
 	// creates and populates slice of 10 events
 	eventIDs := make([]hash.Hash, 0)
 	for i := 0; i < r.size; i++ {
-		eventID, err := message.EventId(channels.Channel("1"), []byte(fmt.Sprintf("event-%d", i)))
+		eventID, err := message.EventId(channels.Channel("1"), fmt.Appendf(nil, "event-%d", i))
 		require.NoError(r.T(), err)
 
 		eventIDs = append(eventIDs, eventID)
@@ -113,15 +113,15 @@ func (r *ReceiveCacheTestSuite) TestMultipleElementAdd() {
 func (r *ReceiveCacheTestSuite) TestLRU() {
 	eventIDs := make([]hash.Hash, 0)
 	total := r.size + 1
-	for i := 0; i < total; i++ {
-		eventID, err := message.EventId(channels.Channel("1"), []byte(fmt.Sprintf("event-%d", i)))
+	for i := range total {
+		eventID, err := message.EventId(channels.Channel("1"), fmt.Appendf(nil, "event-%d", i))
 		require.NoError(r.T(), err)
 
 		eventIDs = append(eventIDs, eventID)
 	}
 
 	// adding non-existing even id must return true
-	for i := 0; i < total; i++ {
+	for i := range total {
 		assert.True(r.Suite.T(), r.c.Add(eventIDs[i]))
 	}
 

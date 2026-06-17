@@ -13,7 +13,7 @@ type testLog struct {
 }
 
 // handle concurrent logging
-func (l *testLog) Logf(msg string, args ...interface{}) {
+func (l *testLog) Logf(msg string, args ...any) {
 	l.Log(fmt.Sprintf(msg, args...))
 }
 

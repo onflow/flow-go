@@ -68,7 +68,7 @@ func RemoveCounterContractTransaction(authorizer flow.Address, chain flow.Chain)
 
 func CreateCounterTransaction(counter, signer flow.Address) *flow.TransactionBodyBuilder {
 	return flow.NewTransactionBodyBuilder().
-		SetScript([]byte(fmt.Sprintf(`
+		SetScript(fmt.Appendf(nil, `
 			import Container from 0x%s
 
 			transaction {
@@ -81,7 +81,7 @@ func CreateCounterTransaction(counter, signer flow.Address) *flow.TransactionBod
 
 					acc.storage.save(<-maybeCounter!, to: /storage/counter)
 				}
-			}`, counter)),
+			}`, counter),
 		).
 		AddAuthorizer(signer)
 }
@@ -90,7 +90,7 @@ func CreateCounterTransaction(counter, signer flow.Address) *flow.TransactionBod
 // and then panic. It can be used to test whether execution state stays untouched/will revert
 func CreateCounterPanicTransaction(counter, signer flow.Address) *flow.TransactionBodyBuilder {
 	return flow.NewTransactionBodyBuilder().
-		SetScript([]byte(fmt.Sprintf(`
+		SetScript(fmt.Appendf(nil, `
 			import Container from 0x%s
 
 			transaction {
@@ -101,13 +101,13 @@ func CreateCounterPanicTransaction(counter, signer flow.Address) *flow.Transacti
 
 					panic("fail for testing purposes")
               	}
-            }`, counter))).
+            }`, counter)).
 		AddAuthorizer(signer)
 }
 
 func AddToCounterTransaction(counter, signer flow.Address) *flow.TransactionBodyBuilder {
 	return flow.NewTransactionBodyBuilder().
-		SetScript([]byte(fmt.Sprintf(`
+		SetScript(fmt.Appendf(nil, `
 			import Container from 0x%s
 
 			transaction {
@@ -115,6 +115,6 @@ func AddToCounterTransaction(counter, signer flow.Address) *flow.TransactionBody
 					let counter = acc.storage.borrow<&Container.Counter>(from: /storage/counter)
 					counter?.add(2)
 				}
-			}`, counter))).
+			}`, counter)).
 		AddAuthorizer(signer)
 }

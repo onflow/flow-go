@@ -99,10 +99,7 @@ func NewEpochSetupGenerator(random *RandomGenerator, timeGen *TimeGenerator, ide
 // Fixture generates a [flow.EpochSetup] with random data based on the provided options.
 func (g *EpochSetupGenerator) Fixture(opts ...EpochSetupOption) *flow.EpochSetup {
 	baseView := uint64(g.random.Uint32())
-	finalView := uint64(g.random.Uint32())
-	if finalView < baseView {
-		finalView = baseView
-	}
+	finalView := max(uint64(g.random.Uint32()), baseView)
 	if finalView < baseView+1000 {
 		finalView = baseView + 1000
 	}

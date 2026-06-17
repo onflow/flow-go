@@ -34,7 +34,7 @@ func NewReadRangeClusterBlocksCommand(db storage.DB, headers *store.Headers, pay
 	}
 }
 
-func (c *ReadRangeClusterBlocksCommand) Handler(ctx context.Context, req *admin.CommandRequest) (interface{}, error) {
+func (c *ReadRangeClusterBlocksCommand) Handler(ctx context.Context, req *admin.CommandRequest) (any, error) {
 	chainID, err := parseString(req, "chain-id")
 	if err != nil {
 		return nil, err

@@ -20,7 +20,7 @@ type MeshEngine struct {
 	t        *testing.T
 	Con      network.Conduit       // used to directly communicate with the network
 	originID flow.Identifier       // used to keep track of the id of the sender of the messages
-	Event    chan interface{}      // used to keep track of the events that the node receives
+	Event    chan any              // used to keep track of the events that the node receives
 	Channel  chan channels.Channel // used to keep track of the channels that events are Received on
 	Received chan struct{}         // used as an indicator on reception of messages for testing
 	mockcomponent.Component
@@ -29,7 +29,7 @@ type MeshEngine struct {
 func NewMeshEngine(t *testing.T, net network.EngineRegistry, cap int, channel channels.Channel) *MeshEngine {
 	te := &MeshEngine{
 		t:        t,
-		Event:    make(chan interface{}, cap),
+		Event:    make(chan any, cap),
 		Channel:  make(chan channels.Channel, cap),
 		Received: make(chan struct{}, cap),
 	}
@@ -43,13 +43,13 @@ func NewMeshEngine(t *testing.T, net network.EngineRegistry, cap int, channel ch
 
 // SubmitLocal is implemented for a valid type assertion to Engine
 // any call to it fails the test
-func (e *MeshEngine) SubmitLocal(event interface{}) {
+func (e *MeshEngine) SubmitLocal(event any) {
 	require.Fail(e.t, "not implemented")
 }
 
 // Submit is implemented for a valid type assertion to Engine
 // any call to it fails the test
-func (e *MeshEngine) Submit(channel channels.Channel, originID flow.Identifier, event interface{}) {
+func (e *MeshEngine) Submit(channel channels.Channel, originID flow.Identifier, event any) {
 	go func() {
 		err := e.Process(channel, originID, event)
 		if err != nil {
@@ -60,14 +60,14 @@ func (e *MeshEngine) Submit(channel channels.Channel, originID flow.Identifier, 
 
 // ProcessLocal is implemented for a valid type assertion to Engine
 // any call to it fails the test
-func (e *MeshEngine) ProcessLocal(event interface{}) error {
+func (e *MeshEngine) ProcessLocal(event any) error {
 	require.Fail(e.t, "not implemented")
 	return fmt.Errorf(" unexpected method called")
 }
 
 // Process receives an originID and an Event and casts them into the corresponding fields of the
 // MeshEngine. It then flags the Received Channel on reception of an Event.
-func (e *MeshEngine) Process(channel channels.Channel, originID flow.Identifier, event interface{}) error {
+func (e *MeshEngine) Process(channel channels.Channel, originID flow.Identifier, event any) error {
 	e.Lock()
 	defer e.Unlock()
 

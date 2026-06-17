@@ -1,6 +1,8 @@
 package validator
 
 import (
+	"slices"
+
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -29,10 +31,8 @@ func ValidateTarget(log zerolog.Logger, target flow.Identifier) network.MessageV
 
 // Validate returns true if the message is intended for the given target ID else it returns false
 func (tv *TargetValidator) Validate(msg network.IncomingMessageScope) bool {
-	for _, t := range msg.TargetIDs() {
-		if tv.target == t {
-			return true
-		}
+	if slices.Contains(msg.TargetIDs(), tv.target) {
+		return true
 	}
 	tv.log.Debug().
 		Hex("message_target_id", logging.ID(tv.target)).

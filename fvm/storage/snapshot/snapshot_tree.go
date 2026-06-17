@@ -1,6 +1,8 @@
 package snapshot
 
 import (
+	"maps"
+
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -43,9 +45,7 @@ func (tree SnapshotTree) Append(
 
 			mergedSet := make(map[flow.RegisterID]flow.RegisterValue, size)
 			for _, set := range compactedLog {
-				for id, value := range set {
-					mergedSet[id] = value
-				}
+				maps.Copy(mergedSet, set)
 			}
 
 			compactedLog = UpdateLog{mergedSet}

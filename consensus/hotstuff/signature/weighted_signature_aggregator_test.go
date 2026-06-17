@@ -45,7 +45,7 @@ func createAggregationData(t *testing.T, signersNumber int) (
 	sigs := make([]crypto.Signature, 0, signersNumber)
 	pks := make([]crypto.PublicKey, 0, signersNumber)
 	seed := make([]byte, crypto.KeyGenSeedMinLen)
-	for i := 0; i < signersNumber; i++ {
+	for range signersNumber {
 		// id
 		ids = append(ids, unittest.IdentityFixture())
 		// keys
@@ -149,7 +149,7 @@ func TestWeightedSignatureAggregator(t *testing.T) {
 		assert.True(t, ok)
 		// check signers
 		identifiers = make([]flow.Identifier, 0, signersNum)
-		for i := 0; i < signersNum; i++ {
+		for i := range signersNum {
 			identifiers = append(identifiers, ids[i].NodeID)
 		}
 		assert.ElementsMatch(t, signers, identifiers)

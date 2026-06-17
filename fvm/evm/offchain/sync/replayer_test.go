@@ -37,7 +37,7 @@ func TestChainReplay(t *testing.T) {
 						totalTxCount := 0
 
 						// case: check sequential updates to a slot
-						for i := 0; i < 5; i++ {
+						for i := range 5 {
 							tx := testAccount.PrepareSignAndEncodeTx(t,
 								testContract.DeployedAt.ToCommon(),
 								testContract.MakeCallData(t, "checkThenStore", big.NewInt(int64(i)), big.NewInt(int64(i+1))),
@@ -53,7 +53,7 @@ func TestChainReplay(t *testing.T) {
 						// case: add batch run BatchRun
 						batchSize := 4
 						txBatch := make([][]byte, batchSize)
-						for i := 0; i < batchSize; i++ {
+						for i := range batchSize {
 							txBatch[i] = testAccount.PrepareSignAndEncodeTx(t,
 								testContract.DeployedAt.ToCommon(),
 								testContract.MakeCallData(t, "store", big.NewInt(int64(i))),

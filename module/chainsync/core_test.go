@@ -63,7 +63,7 @@ func (ss *SyncSuite) TestQueueByHeight() {
 
 	// generate a number of heights
 	var heights []uint64
-	for n := 0; n < 100; n++ {
+	for range 100 {
 		heights = append(heights, rand.Uint64())
 	}
 
@@ -94,7 +94,7 @@ func (ss *SyncSuite) TestQueueByBlockID() {
 
 	// generate a number of block IDs
 	var blockIDs []flow.Identifier
-	for n := 0; n < 100; n++ {
+	for range 100 {
 		blockIDs = append(blockIDs, unittest.IdentifierFixture())
 	}
 
@@ -400,7 +400,7 @@ func (ss *SyncSuite) TestPrune() {
 	)
 
 	// add some finalized blocks by height
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		block := unittest.BlockFixture(
 			unittest.Block.WithHeight(uint64(i + 1)),
 		)
@@ -408,7 +408,7 @@ func (ss *SyncSuite) TestPrune() {
 		prunableHeights = append(prunableHeights, block)
 	}
 	// add some un-finalized blocks by height
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		block := unittest.BlockFixture(
 			unittest.Block.WithHeight(final.Height + uint64(i+1)),
 		)
@@ -417,7 +417,7 @@ func (ss *SyncSuite) TestPrune() {
 	}
 
 	// add some finalized blocks by block ID
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		block := unittest.BlockFixture(
 			unittest.Block.WithHeight(uint64(i + 1)),
 		)
@@ -425,7 +425,7 @@ func (ss *SyncSuite) TestPrune() {
 		prunableBlockIDs = append(prunableBlockIDs, block)
 	}
 	// add some un-finalized, received blocks by block ID
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		block := unittest.BlockFixture(
 			unittest.Block.WithHeight(100 + uint64(i+1)),
 		)

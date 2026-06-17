@@ -21,7 +21,7 @@ type ReadExecutionDataCommand struct {
 	executionDataStore execution_data.ExecutionDataStore
 }
 
-func (r *ReadExecutionDataCommand) Handler(ctx context.Context, req *admin.CommandRequest) (interface{}, error) {
+func (r *ReadExecutionDataCommand) Handler(ctx context.Context, req *admin.CommandRequest) (any, error) {
 	data := req.ValidatorData.(*requestData)
 
 	ed, err := r.executionDataStore.Get(ctx, data.rootID)
@@ -36,7 +36,7 @@ func (r *ReadExecutionDataCommand) Handler(ctx context.Context, req *admin.Comma
 // Validator validates the request.
 // Returns admin.InvalidAdminReqError for invalid/malformed requests.
 func (r *ReadExecutionDataCommand) Validator(req *admin.CommandRequest) error {
-	input, ok := req.Data.(map[string]interface{})
+	input, ok := req.Data.(map[string]any)
 	if !ok {
 		return admin.NewInvalidAdminReqFormatError("expected map[string]any")
 	}

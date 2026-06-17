@@ -303,10 +303,10 @@ func (s *CoreSuite) TestConcurrentAdd() {
 	var wg sync.WaitGroup
 	wg.Add(workers)
 
-	for i := 0; i < workers; i++ {
+	for i := range workers {
 		go func(blocks []*flow.Proposal) {
 			defer wg.Done()
-			for batch := 0; batch < batchesPerWorker; batch++ {
+			for batch := range batchesPerWorker {
 				err := s.core.OnBlockRange(s.originID, blocks[batch*blocksPerBatch:(batch+1)*blocksPerBatch])
 				require.NoError(s.T(), err)
 			}
@@ -318,6 +318,6 @@ func (s *CoreSuite) TestConcurrentAdd() {
 }
 
 // blockWithID returns a testify `argumentMatcher` that only accepts blocks with the given ID
-func blockWithID(expectedBlockID flow.Identifier) interface{} {
+func blockWithID(expectedBlockID flow.Identifier) any {
 	return mock.MatchedBy(func(block *model.CertifiedBlock) bool { return expectedBlockID == block.BlockID() })
 }

@@ -19,7 +19,7 @@ func (f serviceEventFactory) WithType(eventType flow.ServiceEventType) ServiceEv
 }
 
 // WithEvent is an option that sets the `Event` data of the service event.
-func (f serviceEventFactory) WithEvent(eventData interface{}) ServiceEventOption {
+func (f serviceEventFactory) WithEvent(eventData any) ServiceEventOption {
 	return func(g *ServiceEventGenerator, event *flow.ServiceEvent) {
 		event.Event = eventData
 	}

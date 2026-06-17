@@ -225,14 +225,12 @@ func (s *StakingVoteProcessorTestSuite) TestProcess_ConcurrentCreatingQC() {
 	vote := unittest.VoteForBlockFixture(s.proposal.Block)
 	startupWg.Add(1)
 	// prepare goroutines, so they are ready to submit a vote at roughly same time
-	for i := 0; i < 5; i++ {
-		shutdownWg.Add(1)
-		go func() {
-			defer shutdownWg.Done()
+	for range 5 {
+		shutdownWg.Go(func() {
 			startupWg.Wait()
 			err := s.processor.Process(vote)
 			require.NoError(s.T(), err)
-		}()
+		})
 	}
 
 	startupWg.Done()

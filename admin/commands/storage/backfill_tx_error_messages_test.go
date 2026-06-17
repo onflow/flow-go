@@ -180,7 +180,7 @@ func (suite *BackfillTxErrorMessagesSuite) TestValidateInvalidFormat() {
 	// invalid start-height
 	suite.Run("invalid start-height field", func() {
 		err := suite.command.Validator(&admin.CommandRequest{
-			Data: map[string]interface{}{
+			Data: map[string]any{
 				"start-height": "123",
 			},
 		})
@@ -194,7 +194,7 @@ func (suite *BackfillTxErrorMessagesSuite) TestValidateInvalidFormat() {
 	suite.Run("start-height is greater than latest sealed block", func() {
 		startHeight := 100
 		err := suite.command.Validator(&admin.CommandRequest{
-			Data: map[string]interface{}{
+			Data: map[string]any{
 				"start-height": float64(startHeight),
 			},
 		})
@@ -209,7 +209,7 @@ func (suite *BackfillTxErrorMessagesSuite) TestValidateInvalidFormat() {
 
 		startHeight := 1
 		err := suite.command.Validator(&admin.CommandRequest{
-			Data: map[string]interface{}{
+			Data: map[string]any{
 				"start-height": float64(startHeight),
 			},
 		})
@@ -223,7 +223,7 @@ func (suite *BackfillTxErrorMessagesSuite) TestValidateInvalidFormat() {
 	// invalid end-height
 	suite.Run("invalid end-height field", func() {
 		err := suite.command.Validator(&admin.CommandRequest{
-			Data: map[string]interface{}{
+			Data: map[string]any{
 				"end-height": "123",
 			},
 		})
@@ -237,7 +237,7 @@ func (suite *BackfillTxErrorMessagesSuite) TestValidateInvalidFormat() {
 	suite.Run("invalid end-height is greater than latest sealed block", func() {
 		endHeight := 100
 		err := suite.command.Validator(&admin.CommandRequest{
-			Data: map[string]interface{}{
+			Data: map[string]any{
 				"start-height":       float64(1),         // raw json parses to float64
 				"end-height":         float64(endHeight), // raw json parses to float64
 				"execution-node-ids": []any{suite.allENIDs[0].NodeID.String()},
@@ -255,7 +255,7 @@ func (suite *BackfillTxErrorMessagesSuite) TestValidateInvalidFormat() {
 		startHeight := 3
 		endHeight := 1
 		err := suite.command.Validator(&admin.CommandRequest{
-			Data: map[string]interface{}{
+			Data: map[string]any{
 				"start-height": float64(startHeight), // raw json parses to float64
 				"end-height":   float64(endHeight),   // raw json parses to float64
 			},
@@ -269,7 +269,7 @@ func (suite *BackfillTxErrorMessagesSuite) TestValidateInvalidFormat() {
 	suite.Run("invalid execution-node-ids field", func() {
 		// invalid type
 		err := suite.command.Validator(&admin.CommandRequest{
-			Data: map[string]interface{}{
+			Data: map[string]any{
 				"execution-node-ids": []int{1, 2, 3},
 			},
 		})
@@ -279,7 +279,7 @@ func (suite *BackfillTxErrorMessagesSuite) TestValidateInvalidFormat() {
 
 		// invalid type
 		err = suite.command.Validator(&admin.CommandRequest{
-			Data: map[string]interface{}{
+			Data: map[string]any{
 				"execution-node-ids": "123",
 			},
 		})
@@ -290,7 +290,7 @@ func (suite *BackfillTxErrorMessagesSuite) TestValidateInvalidFormat() {
 		// invalid execution node id
 		invalidENID := unittest.IdentifierFixture()
 		err = suite.command.Validator(&admin.CommandRequest{
-			Data: map[string]interface{}{
+			Data: map[string]any{
 				"start-height":       float64(1), // raw json parses to float64
 				"end-height":         float64(4), // raw json parses to float64
 				"execution-node-ids": []any{invalidENID.String()},
@@ -313,7 +313,7 @@ func (suite *BackfillTxErrorMessagesSuite) TestValidateValidFormat() {
 	// execution-node-ids is not provided, any valid execution node will be used.
 	suite.Run("happy case, all default parameters", func() {
 		err := suite.command.Validator(&admin.CommandRequest{
-			Data: map[string]interface{}{},
+			Data: map[string]any{},
 		})
 		suite.NoError(err)
 	})
@@ -321,7 +321,7 @@ func (suite *BackfillTxErrorMessagesSuite) TestValidateValidFormat() {
 	// all parameters are provided
 	suite.Run("happy case, all parameters are provided", func() {
 		err := suite.command.Validator(&admin.CommandRequest{
-			Data: map[string]interface{}{
+			Data: map[string]any{
 				"start-height":       float64(1), // raw json parses to float64
 				"end-height":         float64(3), // raw json parses to float64
 				"execution-node-ids": []any{suite.allENIDs[0].NodeID.String()},
@@ -339,7 +339,7 @@ func (suite *BackfillTxErrorMessagesSuite) TestHandleBackfillTxErrorMessages() {
 
 	// default parameters
 	req := &admin.CommandRequest{
-		Data: map[string]interface{}{},
+		Data: map[string]any{},
 	}
 	suite.Require().NoError(suite.command.Validator(req))
 
@@ -389,7 +389,7 @@ func (suite *BackfillTxErrorMessagesSuite) TestHandleBackfillTxErrorMessages() {
 
 		executorID := suite.allENIDs[1].NodeID
 		req = &admin.CommandRequest{
-			Data: map[string]interface{}{
+			Data: map[string]any{
 				"start-height":       float64(startHeight), // raw json parses to float64
 				"end-height":         float64(endHeight),   // raw json parses to float64
 				"execution-node-ids": []any{executorID.String()},
@@ -433,7 +433,7 @@ func (suite *BackfillTxErrorMessagesSuite) TestHandleBackfillTxErrorMessagesErro
 	defer cancel()
 
 	suite.Run("error when txErrorMessagesCore is nil", func() {
-		req := &admin.CommandRequest{Data: map[string]interface{}{}}
+		req := &admin.CommandRequest{Data: map[string]any{}}
 		command := NewBackfillTxErrorMessagesCommand(
 			suite.log,
 			suite.state,
@@ -448,7 +448,7 @@ func (suite *BackfillTxErrorMessagesSuite) TestHandleBackfillTxErrorMessagesErro
 
 	suite.Run("error when failing to retrieve block header", func() {
 		req := &admin.CommandRequest{
-			Data: map[string]interface{}{
+			Data: map[string]any{
 				"start-height": float64(1), // raw json parses to float64
 			},
 		}
@@ -471,7 +471,7 @@ func (suite *BackfillTxErrorMessagesSuite) TestHandleBackfillTxErrorMessagesErro
 func (suite *BackfillTxErrorMessagesSuite) generateResultsForBlock() []flow.LightTransactionResult {
 	results := make([]flow.LightTransactionResult, 0)
 
-	for i := 0; i < 5; i++ {
+	for i := range 5 {
 		results = append(results, flow.LightTransactionResult{
 			TransactionID:   unittest.IdentifierFixture(),
 			Failed:          i%2 == 0, // create a mix of failed and non-failed transactions

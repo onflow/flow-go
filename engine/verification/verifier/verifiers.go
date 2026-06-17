@@ -256,11 +256,9 @@ func verifyConcurrently(
 	// Start nWorker workers
 	var wg sync.WaitGroup
 	for i := 0; i < int(nWorker); i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			worker()
-		}()
+		})
 	}
 
 	// Send tasks to workers

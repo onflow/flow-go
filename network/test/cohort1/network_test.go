@@ -69,7 +69,7 @@ type tagsObserver struct {
 	log  zerolog.Logger
 }
 
-func (co *tagsObserver) OnNext(peertag interface{}) {
+func (co *tagsObserver) OnNext(peertag any) {
 	pt, ok := peertag.(testutils.PeerTag)
 
 	if ok {
@@ -368,7 +368,7 @@ func (suite *NetworkTestSuite) TestUnicastRateLimit_Messages() {
 	// with the rate limit configured to 5 msg/sec we send 10 messages at once and expect the rate limiter
 	// to be invoked at-least once. We send 10 messages due to the flakiness that is caused by async stream
 	// handling of streams.
-	for i := 0; i < 10; i++ {
+	for i := range 10 {
 		err = con0.Unicast(&libp2pmessage.TestMessage{
 			Text: fmt.Sprintf("hello-%d", i),
 		}, newId.NodeID)
@@ -691,7 +691,7 @@ func (suite *NetworkTestSuite) MultiPing(count int) {
 			receivedPayloads.Add(msgPayload.Text, struct{}{})
 		}).Return(nil)
 
-	for i := 0; i < count; i++ {
+	for i := range count {
 		receiveWG.Add(1)
 		sendWG.Add(1)
 

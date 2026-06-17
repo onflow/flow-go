@@ -124,7 +124,7 @@ func (suite *ProtocolStateProviderTestSuite) checkStateTransition() {
 }
 
 func (suite *ProtocolStateProviderTestSuite) TestUpdateState() {
-	for i := 0; i < 10; i++ {
+	for range 10 {
 		suite.checkStateTransition()
 	}
 }

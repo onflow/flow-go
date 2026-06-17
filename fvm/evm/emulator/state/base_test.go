@@ -312,7 +312,7 @@ func TestBaseView(t *testing.T) {
 		nonces := make(map[gethCommon.Address]uint64)
 		balances := make(map[gethCommon.Address]*uint256.Int)
 		codeHashes := make(map[gethCommon.Address]gethCommon.Hash)
-		for i := 0; i < accountCounts; i++ {
+		for range accountCounts {
 			addr := testutils.RandomCommonAddress(t)
 			balance := testutils.RandomUint256Int(1000)
 			nonce := testutils.RandomBigInt(1000).Uint64()
@@ -360,7 +360,7 @@ func TestBaseView(t *testing.T) {
 		codeCounts := 10
 		codeByCodeHash := make(map[gethCommon.Hash][]byte)
 		refCountByCodeHash := make(map[gethCommon.Hash]uint64)
-		for i := 0; i < codeCounts; i++ {
+		for i := range codeCounts {
 
 			code := testutils.RandomData(t)
 			codeHash := testutils.RandomCommonHash(t)
@@ -417,7 +417,7 @@ func TestBaseView(t *testing.T) {
 		slotCounts := 10
 		values := make(map[gethCommon.Hash]gethCommon.Hash)
 
-		for i := 0; i < slotCounts; i++ {
+		for range slotCounts {
 			key := testutils.RandomCommonHash(t)
 			value := testutils.RandomCommonHash(t)
 

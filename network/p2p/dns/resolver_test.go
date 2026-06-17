@@ -215,13 +215,13 @@ func syncThenAsyncQuery(t *testing.T,
 	wg.Add(times * (len(txtTestCases) + len(ipTestCases)))
 
 	for _, txttc := range txtTestCases {
-		cacheAndQuery(t, func(domain string) (interface{}, error) {
+		cacheAndQuery(t, func(domain string) (any, error) {
 			return resolver.LookupTXT(ctx, domain)
 		}, txttc.Txt, txttc.Records, times, wg, happyPath)
 	}
 
 	for _, iptc := range ipTestCases {
-		cacheAndQuery(t, func(domain string) (interface{}, error) {
+		cacheAndQuery(t, func(domain string) (any, error) {
 			return resolver.LookupIPAddr(ctx, domain)
 		}, iptc.Domain, iptc.Result, times, wg, happyPath)
 	}
@@ -233,16 +233,16 @@ func syncThenAsyncQuery(t *testing.T,
 // concurrent queries for each test case for the specified number of times. The wait group is released when all
 // queries resolved.
 func cacheAndQuery(t *testing.T,
-	resolver func(domain string) (interface{}, error),
+	resolver func(domain string) (any, error),
 	domain string,
-	result interface{},
+	result any,
 	times int,
 	wg *sync.WaitGroup,
 	happyPath bool) {
 
-	firstCallDone := make(chan interface{})
+	firstCallDone := make(chan any)
 
-	for i := 0; i < times; i++ {
+	for i := range times {
 		go func(index int) {
 			if index != 0 {
 				// other invocations (except first one) of each test

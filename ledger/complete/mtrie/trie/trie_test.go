@@ -59,7 +59,7 @@ func Test_TrieWithRightRegister(t *testing.T) {
 	emptyTrie := trie.NewEmptyMTrie()
 	// build a path with all 1s
 	var path ledger.Path
-	for i := 0; i < len(path); i++ {
+	for i := range len(path) {
 		path[i] = uint8(255)
 	}
 	payload := testutils.LightPayload(12346, 54321)
@@ -125,7 +125,7 @@ func Test_FullTrie(t *testing.T) {
 	paths := make([]ledger.Path, 0, numberRegisters)
 	payloads := make([]ledger.Payload, 0, numberRegisters)
 	var totalPayloadSize uint64
-	for i := 0; i < numberRegisters; i++ {
+	for i := range numberRegisters {
 		paths = append(paths, testutils.PathByUint16LeftPadded(uint16(i)))
 		temp := rng.next()
 		payload := testutils.LightPayload(temp, temp)
@@ -187,7 +187,7 @@ func Test_UpdateTrie(t *testing.T) {
 	var payloads []ledger.Payload
 	parentTrieRegCount := updatedTrie.AllocatedRegCount()
 	parentTrieRegSize := updatedTrie.AllocatedRegSize()
-	for r := 0; r < 20; r++ {
+	for r := range 20 {
 		paths, payloads = deduplicateWrites(sampleRandomRegisterWrites(rng, r*100))
 		var totalPayloadSize uint64
 		for _, p := range payloads {
@@ -288,7 +288,7 @@ func (rng *LinearCongruentialGenerator) next() uint16 {
 func sampleRandomRegisterWrites(rng *LinearCongruentialGenerator, number int) ([]ledger.Path, []ledger.Payload) {
 	paths := make([]ledger.Path, 0, number)
 	payloads := make([]ledger.Payload, 0, number)
-	for i := 0; i < number; i++ {
+	for range number {
 		path := testutils.PathByUint16LeftPadded(rng.next())
 		paths = append(paths, path)
 		t := rng.next()
@@ -311,7 +311,7 @@ func sampleRandomRegisterWritesWithPrefix(rng *LinearCongruentialGenerator, numb
 	payloads := make([]ledger.Payload, 0, number)
 	nextRandomBytes := make([]byte, 2)
 	nextRandomByteIndex := 2 // index of next unused byte in nextRandomBytes; if value is >= 2, we need to generate new random bytes
-	for i := 0; i < number; i++ {
+	for range number {
 		var p ledger.Path
 		copy(p[:prefixLen], prefix)
 		for b := prefixLen; b < hash.HashLen; b++ {
@@ -361,13 +361,13 @@ func TestSplitByPath(t *testing.T) {
 
 	// create path slice with redundant paths
 	paths := make([]ledger.Path, 0, pathsNumber)
-	for i := 0; i < pathsNumber-redundantPaths; i++ {
+	for range pathsNumber - redundantPaths {
 		var p ledger.Path
 		_, err := rand.Read(p[:])
 		require.NoError(t, err)
 		paths = append(paths, p)
 	}
-	for i := 0; i < redundantPaths; i++ {
+	for i := range redundantPaths {
 		paths = append(paths, paths[i])
 	}
 
@@ -382,7 +382,7 @@ func TestSplitByPath(t *testing.T) {
 	index := trie.SplitPaths(paths, randomIndex)
 
 	// check correctness
-	for i := 0; i < index; i++ {
+	for i := range index {
 		assert.Equal(t, bitutils.ReadBit(paths[i][:], randomIndex), 0)
 	}
 	for i := index; i < len(paths); i++ {
@@ -643,7 +643,7 @@ func Test_Pruning(t *testing.T) {
 		var maxDepthTouched, maxDepthTouchedWithPruning uint16
 		var parentTrieRegCount, parentTrieRegSize uint64
 
-		for step := 0; step < numberOfSteps; step++ {
+		for range numberOfSteps {
 
 			updatePaths := make([]ledger.Path, 0)
 			updatePayloads := make([]ledger.Payload, 0)
@@ -681,7 +681,7 @@ func Test_Pruning(t *testing.T) {
 			}
 
 			// only set it for the updates
-			for i := 0; i < numberOfUpdates; i++ {
+			for i := range numberOfUpdates {
 				allPaths[updatePaths[i]] = updatePayloads[i]
 			}
 
@@ -795,7 +795,7 @@ func TestValueSizes(t *testing.T) {
 
 		// Populate pathsToGetValueSize with all possible paths for the first 4 bits.
 		pathsToGetValueSize := make([]ledger.Path, 16)
-		for i := 0; i < 16; i++ {
+		for i := range 16 {
 			pathsToGetValueSize[i] = testutils.PathByUint16(uint16(i << 12))
 		}
 
@@ -886,7 +886,7 @@ func TestTrieAllocatedRegCountRegSize(t *testing.T) {
 	paths := make([]ledger.Path, numberRegisters)
 	payloads := make([]ledger.Payload, numberRegisters)
 	var totalPayloadSize uint64
-	for i := 0; i < numberRegisters; i++ {
+	for i := range numberRegisters {
 		var p ledger.Path
 		p[0] = byte(i)
 
@@ -926,7 +926,7 @@ func TestTrieAllocatedRegCountRegSize(t *testing.T) {
 	// to test reg count and size with new empty registers.
 	newPaths := []ledger.Path{}
 	newPayloads := []ledger.Payload{}
-	for i := 0; i < len(paths); i++ {
+	for i := range paths {
 		oldPath := paths[i]
 
 		path1, _ := ledger.ToPath(oldPath[:])
@@ -959,7 +959,7 @@ func TestTrieAllocatedRegCountRegSize(t *testing.T) {
 
 		// Remove register one by one to test reg count and size with empty registers
 		// (old payload size > 0 and new payload size == 0)
-		for i := 0; i < len(paths); i++ {
+		for i := range paths {
 			newPaths := []ledger.Path{paths[i]}
 			newPayloads := []ledger.Payload{*ledger.EmptyPayload()}
 
@@ -987,7 +987,7 @@ func TestTrieAllocatedRegCountRegSize(t *testing.T) {
 
 		// Remove register one by one to test reg count and size with empty registers
 		// (old payload size > 0 and new payload size == 0)
-		for i := 0; i < len(paths); i++ {
+		for i := range paths {
 			newPaths := []ledger.Path{paths[i]}
 			newPayloads := []ledger.Payload{*ledger.EmptyPayload()}
 
@@ -1009,7 +1009,7 @@ func TestTrieAllocatedRegCountRegSize(t *testing.T) {
 		// Update with removed paths and empty payloads
 		// (old payload size == 0 and new payload size == 0)
 		newPayloads := make([]ledger.Payload, len(paths))
-		for i := 0; i < len(paths); i++ {
+		for i := range paths {
 			newPayloads[i] = *ledger.EmptyPayload()
 		}
 
@@ -1047,7 +1047,7 @@ func TestTrieAllocatedRegCountRegSizeWithMixedPruneFlag(t *testing.T) {
 	paths := make([]ledger.Path, numberRegisters)
 	payloads := make([]ledger.Payload, numberRegisters)
 	var totalPayloadSize uint64
-	for i := 0; i < numberRegisters; i++ {
+	for i := range numberRegisters {
 		var p ledger.Path
 		p[0] = byte(i)
 
@@ -1181,7 +1181,7 @@ func TestReadSinglePayload(t *testing.T) {
 		//
 
 		// Test reading payload for all possible paths for the first 4 bits.
-		for i := 0; i < 16; i++ {
+		for i := range 16 {
 			path := testutils.PathByUint16(uint16(i << 12))
 
 			retPayload := newTrie.ReadSinglePayload(path)

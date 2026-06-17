@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"strings"
 
 	"github.com/onflow/cadence"
@@ -257,9 +258,7 @@ func VerifyRegisterUpdates(expectedUpdates map[flow.RegisterID]flow.RegisterValu
 		delete(actualUpdates, k)
 	}
 
-	for k, v := range actualUpdates {
-		additionalUpdates[k] = v
-	}
+	maps.Copy(additionalUpdates, actualUpdates)
 
 	// Build a combined error message
 	var errorMessage strings.Builder

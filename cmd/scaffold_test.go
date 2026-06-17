@@ -595,7 +595,7 @@ func testErrorHandler(logger *testLog, expected error) component.OnError {
 // * Start order should be 3, 1, 2
 // run test 10 times to ensure order is consistent
 func TestDependableComponentWaitForDependencies(t *testing.T) {
-	for i := 0; i < 10; i++ {
+	for range 10 {
 		testDependableComponentWaitForDependencies(t)
 	}
 }

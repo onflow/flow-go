@@ -165,7 +165,7 @@ func (suite *BuilderSuite) SetupTest() {
 	require.NoError(suite.T(), err)
 
 	// add some transactions to transaction pool
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		transaction := unittest.TransactionBodyFixture(func(tx *flow.TransactionBody) {
 			tx.ReferenceBlockID = root.ID()
 			tx.ProposalKey.SequenceNumber = uint64(i)
@@ -256,7 +256,7 @@ func (suite *BuilderSuite) ClearPool() {
 
 // FillPool adds n transactions to the pool, using the given generator function.
 func (suite *BuilderSuite) FillPool(n int, create func() *flow.TransactionBody) {
-	for i := 0; i < n; i++ {
+	for range n {
 		tx := create()
 		suite.pool.Add(tx.ID(), tx)
 	}
@@ -798,7 +798,7 @@ func (suite *BuilderSuite) TestBuildOn_ExpiredTransaction() {
 	protocolStateID := protocolState.ID()
 
 	head := genesis
-	for i := 0; i < flow.DefaultTransactionExpiry+1; i++ {
+	for range flow.DefaultTransactionExpiry + 1 {
 		block := unittest.BlockWithParentAndPayload(
 			head,
 			unittest.PayloadFixture(unittest.WithProtocolStateID(protocolStateID)),
@@ -956,7 +956,7 @@ func (suite *BuilderSuite) TestBuildOn_NoRateLimiting() {
 		return nil
 	}
 
-	for i := 0; i < 10; i++ {
+	for range 10 {
 		header, err := suite.builder.BuildOn(parentID, setter, signer)
 		suite.Require().NoError(err)
 		parentID = header.Header.ID()
@@ -1027,7 +1027,7 @@ func (suite *BuilderSuite) TestBuildOn_RateLimitNonPayer() {
 
 		return nil
 	}
-	for i := 0; i < 10; i++ {
+	for range 10 {
 		header, err := suite.builder.BuildOn(parentID, setter, signer)
 		suite.Require().NoError(err)
 		parentID = header.Header.ID()
@@ -1089,7 +1089,7 @@ func (suite *BuilderSuite) TestBuildOn_HighRateLimit() {
 
 		return nil
 	}
-	for i := 0; i < 10; i++ {
+	for range 10 {
 		header, err := suite.builder.BuildOn(parentID, setter, signer)
 		suite.Require().NoError(err)
 		parentID = header.Header.ID()
@@ -1149,7 +1149,7 @@ func (suite *BuilderSuite) TestBuildOn_MaxCollectionSizeRateLimiting() {
 	head := genesis
 	// build a long chain of blocks that were finalized but not sealed
 	// this will lead to a big sealing lag.
-	for i := 0; i < 100; i++ {
+	for range 100 {
 		block := unittest.BlockWithParentAndPayload(head, unittest.PayloadFixture(unittest.WithProtocolStateID(protocolStateID)))
 		err = suite.protoState.ExtendCertified(context.Background(), unittest.NewCertifiedBlock(block))
 		suite.Require().NoError(err)
@@ -1172,7 +1172,7 @@ func (suite *BuilderSuite) TestBuildOn_MaxCollectionSizeRateLimiting() {
 			WithProposerID(unittest.IdentifierFixture())
 		return nil
 	}
-	for i := 0; i < 10; i++ {
+	for range 10 {
 		header, err := suite.builder.BuildOn(parentID, setter, signer)
 		suite.Require().NoError(err)
 		parentID = header.Header.ID()
@@ -1235,7 +1235,7 @@ func (suite *BuilderSuite) TestBuildOn_LowRateLimit() {
 
 		return nil
 	}
-	for i := 0; i < 10; i++ {
+	for i := range 10 {
 		header, err := suite.builder.BuildOn(parentID, setter, signer)
 		suite.Require().NoError(err)
 		parentID = header.Header.ID()
@@ -1300,7 +1300,7 @@ func (suite *BuilderSuite) TestBuildOn_UnlimitedPayer() {
 
 		return nil
 	}
-	for i := 0; i < 10; i++ {
+	for range 10 {
 		header, err := suite.builder.BuildOn(parentID, setter, signer)
 		suite.Require().NoError(err)
 		parentID = header.Header.ID()
@@ -1365,7 +1365,7 @@ func (suite *BuilderSuite) TestBuildOn_RateLimitDryRun() {
 
 		return nil
 	}
-	for i := 0; i < 10; i++ {
+	for range 10 {
 		header, err := suite.builder.BuildOn(parentID, setter, signer)
 		suite.Require().NoError(err)
 		parentID = header.Header.ID()
@@ -1503,7 +1503,7 @@ func benchmarkBuildOn(b *testing.B, size int) {
 		assert.NoError(b, err)
 
 		// add some transactions to transaction pool
-		for i := 0; i < 3; i++ {
+		for range 3 {
 			tx := unittest.TransactionBodyFixture()
 			added := suite.pool.Add(tx.ID(), &tx)
 			assert.True(b, added)
@@ -1529,7 +1529,7 @@ func benchmarkBuildOn(b *testing.B, size int) {
 
 	// create a block history to test performance against
 	final := suite.genesis
-	for i := 0; i < size; i++ {
+	for range size {
 		block := unittest.ClusterBlockFixture(
 			unittest.ClusterBlock.WithParent(final),
 		)

@@ -37,7 +37,7 @@ type CompactorObserver struct {
 	done      chan struct{}
 }
 
-func (co *CompactorObserver) OnNext(val interface{}) {
+func (co *CompactorObserver) OnNext(val any) {
 	res, ok := val.(int)
 	if ok {
 		newCheckpoint := res
@@ -107,7 +107,7 @@ func TestCompactorCreation(t *testing.T) {
 			// update the ledger size (10) times, since each update will trigger a segment file creation
 			// and checkpointDistance is 3, then, 10 segment files should trigger generating checkpoint:
 			// 2, 5, 8, that's why the fromBound is 8
-			for i := 0; i < size; i++ {
+			for i := range size {
 				// slow down updating the ledger, because running too fast would cause the previous checkpoint
 				// to not finish and get delayed
 				time.Sleep(LedgerUpdateDelay)
@@ -328,7 +328,7 @@ func TestCompactorSkipCheckpointing(t *testing.T) {
 		rootState := l.InitialState()
 
 		// Generate the tree and create WAL
-		for i := 0; i < size; i++ {
+		for i := range size {
 
 			// slow down updating the ledger, because running too fast would cause the previous checkpoint
 			// to not finish and get delayed
@@ -434,7 +434,7 @@ func TestCompactorAccuracy(t *testing.T) {
 		rootHash := trie.EmptyTrieRootHash()
 
 		// Create DiskWAL and Ledger repeatedly to test rebuilding ledger state at restart.
-		for i := 0; i < 3; i++ {
+		for i := range 3 {
 
 			wal, err := realWAL.NewDiskWAL(unittest.Logger(), nil, metrics.NewNoopCollector(), dir, forestCapacity, pathByteSize, 32*1024)
 			require.NoError(t, err)
@@ -455,7 +455,7 @@ func TestCompactorAccuracy(t *testing.T) {
 
 			// Generate the tree and create WAL
 			// size+2 is used to ensure that size/2 segments are finalized.
-			for i := 0; i < size+2; i++ {
+			for range size + 2 {
 				// slow down updating the ledger, because running too fast would cause the previous checkpoint
 				// to not finish and get delayed
 				time.Sleep(LedgerUpdateDelay)
@@ -570,7 +570,7 @@ func TestCompactorTriggeredByAdminTool(t *testing.T) {
 		fmt.Println("generate the tree and create WAL")
 		fmt.Println("2 trie updates will fill a segment file, and 12 trie updates will fill 6 segment files")
 		fmt.Println("13 trie updates in total will trigger segment 5 to be finished, which should trigger checkpoint 5")
-		for i := 0; i < 13; i++ {
+		for range 13 {
 			// slow down updating the ledger, because running too fast would cause the previous checkpoint
 			// to not finish and get delayed
 			time.Sleep(LedgerUpdateDelay)
@@ -671,12 +671,12 @@ func TestCompactorConcurrency(t *testing.T) {
 		wg.Add(numGoroutine)
 
 		// Run 4 goroutines and each goroutine updates size+1 tries.
-		for j := 0; j < numGoroutine; j++ {
+		for range numGoroutine {
 			go func(parentState ledger.State) {
 				defer wg.Done()
 
 				// size+1 is used to ensure that size/2*numGoroutine segments are finalized.
-				for i := 0; i < size+1; i++ {
+				for range size + 1 {
 					// slow down updating the ledger, because running too fast would cause the previous checkpoint
 					// to not finish and get delayed
 					time.Sleep(LedgerUpdateDelay)
@@ -751,7 +751,7 @@ func testCheckpointedTriesMatchReplayedTriesFromSegments(
 	if inSequence {
 		// Test that checkpointed tries match replayed tries in content and sequence (insertion order).
 		require.Equal(t, len(triesFromReplayingSegments), len(triesFromLoadingCheckpoint))
-		for i := 0; i < len(triesFromReplayingSegments); i++ {
+		for i := range triesFromReplayingSegments {
 			require.Equal(t, triesFromReplayingSegments[i].RootHash(), triesFromLoadingCheckpoint[i].RootHash())
 		}
 		return

@@ -14,7 +14,7 @@ type ToggleUploaderCommand struct {
 	uploadManager *uploader.Manager
 }
 
-func (t *ToggleUploaderCommand) Handler(ctx context.Context, req *admin.CommandRequest) (interface{}, error) {
+func (t *ToggleUploaderCommand) Handler(ctx context.Context, req *admin.CommandRequest) (any, error) {
 	enabled := req.ValidatorData.(bool)
 	t.uploadManager.SetEnabled(enabled)
 	return "ok", nil

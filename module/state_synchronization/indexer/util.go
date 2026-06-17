@@ -2,6 +2,7 @@ package indexer
 
 import (
 	"fmt"
+	"slices"
 
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/common"
@@ -22,10 +23,8 @@ var (
 func hasAuthorizedTransaction(collections []*flow.Collection, address flow.Address) bool {
 	for _, collection := range collections {
 		for _, tx := range collection.Transactions {
-			for _, authorizer := range tx.Authorizers {
-				if authorizer == address {
-					return true
-				}
+			if slices.Contains(tx.Authorizers, address) {
+				return true
 			}
 		}
 	}

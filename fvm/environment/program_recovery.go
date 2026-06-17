@@ -41,7 +41,7 @@ func RecoverProgram(
 }
 
 func RecoveredFungibleTokenCode(fungibleTokenAddress common.Address, contractName string) []byte {
-	return []byte(fmt.Sprintf(
+	return fmt.Appendf(nil,
 		//language=Cadence
 		`
           import FungibleToken from %[1]s
@@ -126,11 +126,11 @@ func RecoveredFungibleTokenCode(fungibleTokenAddress common.Address, contractNam
 			"A version of the contract has been recovered to allow access to the fields declared in the FT standard.",
 			contractName,
 		),
-	))
+	)
 }
 
 func RecoveredNonFungibleTokenCode(nonFungibleTokenAddress common.Address, contractName string) []byte {
-	return []byte(fmt.Sprintf(
+	return fmt.Appendf(nil,
 		//language=Cadence
 		`
           import NonFungibleToken from %[1]s
@@ -239,7 +239,7 @@ func RecoveredNonFungibleTokenCode(nonFungibleTokenAddress common.Address, contr
 			"A version of the contract has been recovered to allow access to the fields declared in the NFT standard.",
 			contractName,
 		),
-	))
+	)
 }
 
 func importsAddressLocation(program *ast.Program, address common.Address, name string) bool {
