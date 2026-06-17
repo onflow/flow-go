@@ -21,7 +21,7 @@ require (
 	github.com/ipfs/go-ds-pebble v0.5.0
 	github.com/libp2p/go-libp2p v0.38.2
 	github.com/onflow/cadence v1.10.3
-	github.com/onflow/crypto v0.25.4
+	github.com/onflow/crypto v0.25.5-0.20260617202012-4e680657f0f5
 	github.com/onflow/flow v0.4.20-0.20260303141511-b7c99b4fb01b
 	github.com/onflow/flow-core-contracts/lib/go/contracts v1.10.3
 	github.com/onflow/flow-core-contracts/lib/go/templates v1.10.3
