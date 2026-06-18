@@ -72,21 +72,12 @@ const (
 // carried over verbatim from the V6 stream, so root hashes are structurally
 // preserved.
 //
-// When verifyLeafHash is true, every allocated leaf is additionally checked: the
-// node hash derived from (path, value) is compared against the leaf's V6 node hash
-// read from disk, and a mismatch aborts the conversion. This is the streaming,
-// per-leaf equivalent of the root-hash cross-check performed by the in-memory
-// [ConvertCheckpointV6ToV7] (a wrong leaf hash would otherwise only surface as a
-// root-hash mismatch when the forest is loaded). It adds a hash recomputation per
-// allocated leaf but no extra memory.
-//
 // The output filename must carry the V7 suffix and no output part file may already
 // exist; otherwise the call is rejected. On any failure, partially written output
 // files are removed.
 //
 // No error returns are expected during normal operation; all error returns indicate
-// a malformed input, a clobbering output, an IO failure, or a leaf-hash mismatch
-// when verifyLeafHash is enabled.
+// a malformed input, a clobbering output, or an IO failure.
 func ConvertCheckpointV6ToV7Stream(
 	inputDir string,
 	inputFileName string,
@@ -94,9 +85,8 @@ func ConvertCheckpointV6ToV7Stream(
 	outputFileName string,
 	logger zerolog.Logger,
 	nWorker uint,
-	verifyLeafHash bool,
 ) error {
-	err := convertCheckpointV6ToV7Stream(inputDir, inputFileName, outputDir, outputFileName, logger, nWorker, verifyLeafHash)
+	err := convertCheckpointV6ToV7Stream(inputDir, inputFileName, outputDir, outputFileName, logger, nWorker)
 	if err != nil {
 		cleanupErr := deleteCheckpointFiles(outputDir, outputFileName)
 		if cleanupErr != nil {
@@ -114,7 +104,6 @@ func convertCheckpointV6ToV7Stream(
 	outputFileName string,
 	logger zerolog.Logger,
 	nWorker uint,
-	verifyLeafHash bool,
 ) error {
 	if nWorker == 0 || nWorker > subtrieCount {
 		return fmt.Errorf("invalid nWorker %v, valid range is [1, %v]", nWorker, subtrieCount)
@@ -159,19 +148,18 @@ func convertCheckpointV6ToV7Stream(
 		Str("v7_dir", outputDir).
 		Str("v7_file", outputFileName).
 		Uint("nworker", nWorker).
-		Bool("verify_leaf_hash", verifyLeafHash).
 		Msg("starting streaming V6→V7 checkpoint conversion")
 
 	// Convert the 16 subtrie part files concurrently, recomputing each checksum.
 	newSubtrieChecksums, err := convertSubTriesV6ToV7StreamConcurrently(
-		inputDir, inputFileName, outputDir, outputFileName, subtrieChecksums, logger, nWorker, verifyLeafHash)
+		inputDir, inputFileName, outputDir, outputFileName, subtrieChecksums, logger, nWorker)
 	if err != nil {
 		return fmt.Errorf("could not convert subtrie files: %w", err)
 	}
 
 	// Convert the top-trie part file.
 	newTopTrieChecksum, err := convertTopTrieFileV6ToV7Stream(
-		inputDir, inputFileName, outputDir, outputFileName, topTrieChecksum, logger, verifyLeafHash)
+		inputDir, inputFileName, outputDir, outputFileName, topTrieChecksum, logger)
 	if err != nil {
 		return fmt.Errorf("could not convert top-trie file: %w", err)
 	}
@@ -202,7 +190,6 @@ func convertSubTriesV6ToV7StreamConcurrently(
 	subtrieChecksums []uint32,
 	logger zerolog.Logger,
 	nWorker uint,
-	verifyLeafHash bool,
 ) ([]uint32, error) {
 	jobs := make(chan int, subtrieCount)
 	for i := 0; i < subtrieCount; i++ {
@@ -218,7 +205,7 @@ func convertSubTriesV6ToV7StreamConcurrently(
 		go func() {
 			for i := range jobs {
 				sum, err := convertSubTrieFileV6ToV7Stream(
-					inputDir, inputFileName, outputDir, outputFileName, i, subtrieChecksums[i], logger, verifyLeafHash)
+					inputDir, inputFileName, outputDir, outputFileName, i, subtrieChecksums[i], logger)
 				results <- streamSubtrieResult{index: i, checksum: sum, err: err}
 			}
 		}()
@@ -248,7 +235,6 @@ func convertSubTrieFileV6ToV7Stream(
 	index int,
 	expectedSum uint32,
 	logger zerolog.Logger,
-	verifyLeafHash bool,
 ) (checksum uint32, errToReturn error) {
 	inPath, _, err := filePathSubTries(inputDir, inputFileName, index)
 	if err != nil {
@@ -294,7 +280,7 @@ func convertSubTrieFileV6ToV7Stream(
 	}
 
 	logging := logProgress(fmt.Sprintf("converting %v-th sub trie (streaming)", index), int(nodeCount), logger)
-	conv := newV6ToV7NodeConverter(verifyLeafHash)
+	conv := newV6ToV7NodeConverter()
 	for i := uint64(0); i < nodeCount; i++ {
 		if err := conv.convertNode(reader, writer); err != nil {
 			return 0, fmt.Errorf("cannot convert node %d of subtrie %d: %w", i, index, err)
@@ -322,7 +308,6 @@ func convertTopTrieFileV6ToV7Stream(
 	outputFileName string,
 	expectedSum uint32,
 	logger zerolog.Logger,
-	verifyLeafHash bool,
 ) (checksum uint32, errToReturn error) {
 	inPath, _ := filePathTopTries(inputDir, inputFileName)
 
@@ -374,7 +359,7 @@ func convertTopTrieFileV6ToV7Stream(
 	}
 
 	// Convert the top-level nodes (above subtrieLevel).
-	conv := newV6ToV7NodeConverter(verifyLeafHash)
+	conv := newV6ToV7NodeConverter()
 	for i := uint64(0); i < topLevelNodesCount; i++ {
 		if err := conv.convertNode(reader, writer); err != nil {
 			return 0, fmt.Errorf("cannot convert top-level node %d: %w", i, err)
@@ -421,22 +406,17 @@ type v6ToV7NodeConverter struct {
 	lenBuf     []byte // leaf payload length prefix
 	payload    []byte // leaf payload bytes (grows as needed)
 	enc        []byte // scratch for the payloadless leaf encoding
-
-	// verifyLeafHash, when true, makes convertLeaf compare each derived V7 leaf
-	// node hash against the V6 leaf node hash read from disk.
-	verifyLeafHash bool
 }
 
 // newV6ToV7NodeConverter returns a converter with preallocated scratch buffers.
-func newV6ToV7NodeConverter(verifyLeafHash bool) *v6ToV7NodeConverter {
+func newV6ToV7NodeConverter() *v6ToV7NodeConverter {
 	return &v6ToV7NodeConverter{
-		prefix:         make([]byte, fixedNodePrefixSize),
-		childIndex:     make([]byte, 2*encNodeIndexSize),
-		path:           make([]byte, encPathSize),
-		lenBuf:         make([]byte, encPayloadLengthSize),
-		payload:        make([]byte, 1024),
-		enc:            make([]byte, 1024*4),
-		verifyLeafHash: verifyLeafHash,
+		prefix:     make([]byte, fixedNodePrefixSize),
+		childIndex: make([]byte, 2*encNodeIndexSize),
+		path:       make([]byte, encPathSize),
+		lenBuf:     make([]byte, encPayloadLengthSize),
+		payload:    make([]byte, 1024),
+		enc:        make([]byte, 1024*4),
 	}
 }
 
@@ -478,12 +458,8 @@ func (c *v6ToV7NodeConverter) convertNode(reader io.Reader, writer io.Writer) er
 // having already consumed the shared prefix into c.prefix, and writes its V7
 // payloadless encoding to writer.
 //
-// When c.verifyLeafHash is set, the V7 node hash derived from (path, value) is
-// compared against the V6 node hash read from disk, and a mismatch is reported as
-// an error.
-//
 // No error returns are expected during normal operation; all error returns indicate
-// a malformed input stream, an IO failure, or (when verifying) a leaf-hash mismatch.
+// a malformed input stream or an IO failure.
 func (c *v6ToV7NodeConverter) convertLeaf(reader io.Reader, writer io.Writer) error {
 	height := binary.BigEndian.Uint16(c.prefix[encNodeTypeSize:])
 	nodeHash, err := hash.ToHash(c.prefix[encNodeTypeSize+encHeightSize:])
@@ -526,16 +502,6 @@ func (c *v6ToV7NodeConverter) convertLeaf(reader io.Reader, writer io.Writer) er
 	v7leaf, err := FromV6LeafNode(v6leaf)
 	if err != nil {
 		return fmt.Errorf("cannot convert leaf node: %w", err)
-	}
-
-	// Optionally verify that the V7 node hash derived from (path, value) matches
-	// the V6 node hash carried on disk. This is the per-leaf, streaming equivalent
-	// of the forest-level root-hash cross-check in ConvertCheckpointV6ToV7.
-	if c.verifyLeafHash {
-		if derived := v7leaf.Hash(); derived != nodeHash {
-			return fmt.Errorf("leaf hash verification failed for path %x: derived node hash %x does not match V6 node hash %x",
-				path, derived, nodeHash)
-		}
 	}
 
 	encoded := payloadless.EncodeNode(v7leaf, 0, 0, c.enc)
