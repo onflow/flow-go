@@ -110,7 +110,19 @@ func (f *Forest) ReadSingleLeafHash(r *ledger.TrieReadSingleValue) (*hash.Hash, 
 		return nil, err
 	}
 
-	return trie.ReadSingleLeafHash(r.Path), nil
+	return copyLeafHash(trie.ReadSingleLeafHash(r.Path)), nil
+}
+
+// copyLeafHash returns a defensive copy of the given leaf hash, or nil if the input is nil.
+// The trie nodes are immutable and hand out pointers to their stored leaf hashes; returning a
+// copy ensures callers cannot mutate a node's leaf hash through the returned pointer. This
+// mirrors the full forest, which deep-copies values before returning them from Read.
+func copyLeafHash(leafHash *hash.Hash) *hash.Hash {
+	if leafHash == nil {
+		return nil
+	}
+	h := *leafHash
+	return &h
 }
 
 // ReadLeafHashes reads leaf hashes for a slice of paths and returns the leaf hashes
@@ -131,7 +143,7 @@ func (f *Forest) ReadLeafHashes(r *ledger.TrieRead) ([]*hash.Hash, error) {
 
 	// call ReadSingleLeafHash if there is only one path
 	if len(r.Paths) == 1 {
-		return []*hash.Hash{trie.ReadSingleLeafHash(r.Paths[0])}, nil
+		return []*hash.Hash{copyLeafHash(trie.ReadSingleLeafHash(r.Paths[0]))}, nil
 	}
 
 	// deduplicate keys:
@@ -157,7 +169,8 @@ func (f *Forest) ReadLeafHashes(r *ledger.TrieRead) ([]*hash.Hash, error) {
 	for i, p := range deduplicatedPaths {
 		lh := leafHashes[i]
 		for _, j := range pathOrgIndex[p] {
-			orderedLeafHashes[j] = lh
+			// copy per output slot so duplicate paths don't alias the same hash
+			orderedLeafHashes[j] = copyLeafHash(lh)
 		}
 	}
 
