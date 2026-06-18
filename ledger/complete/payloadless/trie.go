@@ -49,7 +49,9 @@ func (mt *MTrie) IsEmpty() bool {
 	return mt.root == nil
 }
 
-// NewMTrie returns a Mtrie given the root
+// NewMTrie returns a Mtrie given the root.
+//
+// No error returns are expected during normal operation.
 func NewMTrie(root *Node, regCount uint64) (*MTrie, error) {
 	if root != nil && root.Height() != ledger.NodeMaxHeight {
 		return nil, fmt.Errorf("height of root node must be %d but is %d, hash: %s", ledger.NodeMaxHeight, root.Height(), root.Hash().String())
