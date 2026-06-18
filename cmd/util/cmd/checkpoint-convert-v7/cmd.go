@@ -11,12 +11,12 @@ import (
 )
 
 var (
-	flagCheckpointDir  string
-	flagCheckpoint     string
-	flagOutputDir      string
-	flagOutput         string
-	flagNWorker        uint
-	flagStream         bool
+	flagCheckpointDir string
+	flagCheckpoint    string
+	flagOutputDir     string
+	flagOutput        string
+	flagNWorker       uint
+	flagStream        bool
 )
 
 // Cmd converts a V6 checkpoint to a V7 (payloadless) checkpoint by reading
