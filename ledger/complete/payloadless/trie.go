@@ -1,4 +1,4 @@
-package trie
+package payloadless
 
 import (
 	"encoding/json"
@@ -8,7 +8,7 @@ import (
 
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/bitutils"
-	"github.com/onflow/flow-go/ledger/complete/mtrie/node"
+	"github.com/onflow/flow-go/ledger/common/hash"
 )
 
 // MTrie represents a perfect in-memory full binary Merkle tree with uniform height.
@@ -33,9 +33,8 @@ import (
 //     between v and a tree leaf. The height of a tree is the height of its root.
 //     The height of a Trie is always the height of the fully-expanded tree.
 type MTrie struct {
-	root     *node.Node
+	root     *Node
 	regCount uint64 // number of registers allocated in the trie
-	regSize  uint64 // size of registers allocated in the trie
 }
 
 // NewEmptyMTrie returns an empty Mtrie (root is nil)
@@ -50,15 +49,16 @@ func (mt *MTrie) IsEmpty() bool {
 	return mt.root == nil
 }
 
-// NewMTrie returns a Mtrie given the root
-func NewMTrie(root *node.Node, regCount uint64, regSize uint64) (*MTrie, error) {
+// NewMTrie returns a Mtrie given the root.
+//
+// No error returns are expected during normal operation.
+func NewMTrie(root *Node, regCount uint64) (*MTrie, error) {
 	if root != nil && root.Height() != ledger.NodeMaxHeight {
 		return nil, fmt.Errorf("height of root node must be %d but is %d, hash: %s", ledger.NodeMaxHeight, root.Height(), root.Hash().String())
 	}
 	return &MTrie{
 		root:     root,
 		regCount: regCount,
-		regSize:  regSize,
 	}, nil
 }
 
@@ -78,15 +78,9 @@ func (mt *MTrie) AllocatedRegCount() uint64 {
 	return mt.regCount
 }
 
-// AllocatedRegSize returns the size (number of bytes) of allocated registers in the trie.
-// Concurrency safe (as Tries are immutable structures by convention)
-func (mt *MTrie) AllocatedRegSize() uint64 {
-	return mt.regSize
-}
-
 // RootNode returns the Trie's root Node
 // Concurrency safe (as Tries are immutable structures by convention)
-func (mt *MTrie) RootNode() *node.Node {
+func (mt *MTrie) RootNode() *Node {
 	return mt.root
 }
 
@@ -100,113 +94,19 @@ func (mt *MTrie) String() string {
 	return trieStr + mt.root.FmtStr("", "")
 }
 
-// UnsafeValueSizes returns payload value sizes for the given paths.
-// UNSAFE: requires _all_ paths to have a length of mt.Height bits.
-// CAUTION: while getting payload value sizes, `paths` is permuted IN-PLACE for optimized processing.
-// Return:
-//   - `sizes` []int
-//     For each path, the corresponding payload value size is written into sizes. AFTER
-//     the size operation completes, the order of `path` and `sizes` are such that
-//     for `path[i]` the corresponding register value size is referenced by `sizes[i]`.
-//
-// TODO move consistency checks from Forest into Trie to obtain a safe, self-contained API
-func (mt *MTrie) UnsafeValueSizes(paths []ledger.Path) []int {
-	sizes := make([]int, len(paths)) // pre-allocate slice for the result
-	valueSizes(sizes, paths, mt.root)
-	return sizes
+// ReadSingleLeafHash reads and returns the leaf hash for a single path.
+// Returns nil if no leaf exists at the given path or if the leaf represents
+// an unallocated register.
+func (mt *MTrie) ReadSingleLeafHash(path ledger.Path) *hash.Hash {
+	return readSingleLeafHash(path, mt.root)
 }
 
-// valueSizes returns value sizes of all the registers in `paths“ in subtree with `head` as root node.
-// For each `path[i]`, the corresponding value size is written into `sizes[i]` for the same index `i`.
-// CAUTION:
-//   - while reading the payloads, `paths` is permuted IN-PLACE for optimized processing.
-//   - unchecked requirement: all paths must go through the `head` node
-func valueSizes(sizes []int, paths []ledger.Path, head *node.Node) {
-	// check for empty paths
-	if len(paths) == 0 {
-		return
-	}
-
-	// path not found
-	if head == nil {
-		return
-	}
-
-	// reached a leaf node
-	if head.IsLeaf() {
-		for i, p := range paths {
-			if *head.Path() == p {
-				payload := head.Payload()
-				if payload != nil {
-					sizes[i] = payload.Value().Size()
-				}
-				// NOTE: break isn't used here because precondition
-				// doesn't require paths being deduplicated.
-			}
-		}
-		return
-	}
-
-	// reached an interim node with only one path
-	if len(paths) == 1 {
-		path := paths[0][:]
-
-		// traverse nodes following the path until a leaf node or nil node is reached.
-		// "for" loop helps to skip partition and recursive call when there's only one path to follow.
-		for {
-			depth := ledger.NodeMaxHeight - head.Height() // distance to the tree root
-			bit := bitutils.ReadBit(path, depth)
-			if bit == 0 {
-				head = head.LeftChild()
-			} else {
-				head = head.RightChild()
-			}
-			if head.IsLeaf() {
-				break
-			}
-		}
-
-		valueSizes(sizes, paths, head)
-		return
-	}
-
-	// reached an interim node with more than one paths
-
-	// partition step to quick sort the paths:
-	// lpaths contains all paths that have `0` at the partitionIndex
-	// rpaths contains all paths that have `1` at the partitionIndex
-	depth := ledger.NodeMaxHeight - head.Height() // distance to the tree root
-	partitionIndex := SplitPaths(paths, depth)
-	lpaths, rpaths := paths[:partitionIndex], paths[partitionIndex:]
-	lsizes, rsizes := sizes[:partitionIndex], sizes[partitionIndex:]
-
-	// read values from left and right subtrees in parallel
-	parallelRecursionThreshold := 32 // threshold to avoid the parallelization going too deep in the recursion
-	if len(lpaths) < parallelRecursionThreshold || len(rpaths) < parallelRecursionThreshold {
-		valueSizes(lsizes, lpaths, head.LeftChild())
-		valueSizes(rsizes, rpaths, head.RightChild())
-	} else {
-		// concurrent read of left and right subtree
-		wg := sync.WaitGroup{}
-		wg.Go(func() {
-			valueSizes(lsizes, lpaths, head.LeftChild())
-		})
-		valueSizes(rsizes, rpaths, head.RightChild())
-		wg.Wait() // wait for all threads
-	}
-}
-
-// ReadSinglePayload reads and returns a payload for a single path.
-func (mt *MTrie) ReadSinglePayload(path ledger.Path) *ledger.Payload {
-	return readSinglePayload(path, mt.root)
-}
-
-// readSinglePayload reads and returns a payload for a single path in subtree with `head` as root node.
-func readSinglePayload(path ledger.Path, head *node.Node) *ledger.Payload {
+// readSingleLeafHash reads and returns the leaf hash for a single path in subtree with `head` as root node.
+func readSingleLeafHash(path ledger.Path, head *Node) *hash.Hash {
 	pathBytes := path[:]
 
 	if head == nil {
-		return ledger.EmptyPayload()
+		return nil
 	}
 
 	depth := ledger.NodeMaxHeight - head.Height() // distance to the tree root
@@ -223,34 +123,36 @@ func readSinglePayload(path ledger.Path, head *node.Node) *ledger.Payload {
 	}
 
 	if head != nil && *head.Path() == path {
-		return head.Payload()
+		return head.LeafHash()
 	}
 
-	return ledger.EmptyPayload()
+	return nil
 }
 
-// UnsafeRead reads payloads for the given paths.
+// UnsafeRead reads leaf hashes for the given paths.
 // UNSAFE: requires _all_ paths to have a length of mt.Height bits.
-// CAUTION: while reading the payloads, `paths` is permuted IN-PLACE for optimized processing.
+// CAUTION: while reading the leaf hashes, `paths` is permuted IN-PLACE for optimized processing.
 // Return:
-//   - `payloads` []*ledger.Payload
-//     For each path, the corresponding payload is written into payloads. AFTER
-//     the read operation completes, the order of `path` and `payloads` are such that
-//     for `path[i]` the corresponding register value is referenced by 0`payloads[i]`.
+//   - `leafHashes` []*hash.Hash
+//     For each path, the corresponding leaf hash is written into leafHashes. AFTER
+//     the read operation completes, the order of `path` and `leafHashes` are such that
+//     for `path[i]` the corresponding leaf hash is referenced by `leafHashes[i]`.
+//     A nil entry indicates that no leaf exists at that path or the leaf represents
+//     an unallocated register.
 //
 // TODO move consistency checks from Forest into Trie to obtain a safe, self-contained API
-func (mt *MTrie) UnsafeRead(paths []ledger.Path) []*ledger.Payload {
-	payloads := make([]*ledger.Payload, len(paths)) // pre-allocate slice for the result
-	read(payloads, paths, mt.root)
-	return payloads
+func (mt *MTrie) UnsafeRead(paths []ledger.Path) []*hash.Hash {
+	leafHashes := make([]*hash.Hash, len(paths)) // pre-allocate slice for the result
+	read(leafHashes, paths, mt.root)
+	return leafHashes
 }
 
 // read reads all the registers in subtree with `head` as root node. For each
-// `path[i]`, the corresponding payload is written into `payloads[i]` for the same index `i`.
+// `path[i]`, the corresponding leaf hash is written into `leafHashes[i]` for the same index `i`.
 // CAUTION:
-//   - while reading the payloads, `paths` is permuted IN-PLACE for optimized processing.
+//   - while reading the leaf hashes, `paths` is permuted IN-PLACE for optimized processing.
 //   - unchecked requirement: all paths must go through the `head` node
-func read(payloads []*ledger.Payload, paths []ledger.Path, head *node.Node) {
+func read(leafHashes []*hash.Hash, paths []ledger.Path, head *Node) {
 	// check for empty paths
 	if len(paths) == 0 {
 		return
@@ -258,9 +160,7 @@ func read(payloads []*ledger.Payload, paths []ledger.Path, head *node.Node) {
 
 	// path not found
 	if head == nil {
-		for i := range paths {
-			payloads[i] = ledger.EmptyPayload()
-		}
+		// leafHashes entries remain nil
 		return
 	}
 
@@ -268,18 +168,17 @@ func read(payloads []*ledger.Payload, paths []ledger.Path, head *node.Node) {
 	if head.IsLeaf() {
 		for i, p := range paths {
 			if *head.Path() == p {
-				payloads[i] = head.Payload()
-			} else {
-				payloads[i] = ledger.EmptyPayload()
+				leafHashes[i] = head.LeafHash()
 			}
+			// else: leafHashes[i] remains nil
 		}
 		return
 	}
 
 	// reached an interim node
 	if len(paths) == 1 {
-		// call readSinglePayload to skip partition and recursive calls when there is only one path
-		payloads[0] = readSinglePayload(paths[0], head)
+		// call readSingleLeafHash to skip partition and recursive calls when there is only one path
+		leafHashes[0] = readSingleLeafHash(paths[0], head)
 		return
 	}
 
@@ -289,20 +188,20 @@ func read(payloads []*ledger.Payload, paths []ledger.Path, head *node.Node) {
 	depth := ledger.NodeMaxHeight - head.Height() // distance to the tree root
 	partitionIndex := SplitPaths(paths, depth)
 	lpaths, rpaths := paths[:partitionIndex], paths[partitionIndex:]
-	lpayloads, rpayloads := payloads[:partitionIndex], payloads[partitionIndex:]
+	lLeafHashes, rLeafHashes := leafHashes[:partitionIndex], leafHashes[partitionIndex:]
 
 	// read values from left and right subtrees in parallel
 	parallelRecursionThreshold := 32 // threshold to avoid the parallelization going too deep in the recursion
 	if len(lpaths) < parallelRecursionThreshold || len(rpaths) < parallelRecursionThreshold {
-		read(lpayloads, lpaths, head.LeftChild())
-		read(rpayloads, rpaths, head.RightChild())
+		read(lLeafHashes, lpaths, head.LeftChild())
+		read(rLeafHashes, rpaths, head.RightChild())
 	} else {
 		// concurrent read of left and right subtree
 		wg := sync.WaitGroup{}
 		wg.Go(func() {
-			read(lpayloads, lpaths, head.LeftChild())
+			read(lLeafHashes, lpaths, head.LeftChild())
 		})
-		read(rpayloads, rpaths, head.RightChild())
+		read(rLeafHashes, rpaths, head.RightChild())
 		wg.Wait() // wait for all threads
 	}
 }
@@ -322,29 +221,28 @@ func read(payloads []*ledger.Payload, paths []ledger.Path, head *node.Node) {
 //   - keys are NOT duplicated
 //   - requires _all_ paths to have a length of mt.Height bits.
 //
-// CAUTION: `updatedPaths` and `updatedPayloads` are permuted IN-PLACE for optimized processing.
-// CAUTION: MTrie expects that for a specific path, the payload's key never changes.
+// CAUTION: `updatedPaths` and `updatedValues` are permuted IN-PLACE for optimized processing.
+// CAUTION: MTrie expects that for a specific path, the value's key never changes.
 // TODO: move consistency checks from MForest to here, to make API safe and self-contained
 func NewTrieWithUpdatedRegisters(
 	parentTrie *MTrie,
 	updatedPaths []ledger.Path,
-	updatedPayloads []ledger.Payload,
+	updatedValues [][]byte,
 	prune bool,
 ) (*MTrie, uint16, error) {
-	updatedRoot, regCountDelta, regSizeDelta, lowestHeightTouched := update(
+	updatedRoot, allocatedRegCountDelta, lowestHeightTouched := update(
 		ledger.NodeMaxHeight,
 		parentTrie.root,
 		updatedPaths,
-		updatedPayloads,
+		updatedValues,
 		nil,
 		prune,
 	)
 
-	updatedTrieRegCount := int64(parentTrie.AllocatedRegCount()) + regCountDelta
-	updatedTrieRegSize := int64(parentTrie.AllocatedRegSize()) + regSizeDelta
+	updatedTrieRegCount := int64(parentTrie.AllocatedRegCount()) + allocatedRegCountDelta
 	maxDepthTouched := uint16(ledger.NodeMaxHeight - lowestHeightTouched)
 
-	updatedTrie, err := NewMTrie(updatedRoot, uint64(updatedTrieRegCount), uint64(updatedTrieRegSize))
+	updatedTrie, err := NewMTrie(updatedRoot, uint64(updatedTrieRegCount))
 	if err != nil {
 		return nil, 0, fmt.Errorf("constructing updated trie failed: %w", err)
 	}
@@ -354,66 +252,67 @@ func NewTrieWithUpdatedRegisters(
 // updateResult is a wrapper of return values from update().
 // It's used to communicate values from goroutine.
 type updateResult struct {
-	child                  *node.Node
+	child                  *Node
 	allocatedRegCountDelta int64
-	allocatedRegSizeDelta  int64
 	lowestHeightTouched    int
 }
 
 // update traverses the subtree recursively and create new nodes with
-// the updated payloads on the given paths
+// the updated values on the given paths
 //
 // it returns:
 //   - new updated node or original node if nothing was updated
 //   - allocated register count delta in subtrie (allocatedRegCountDelta)
-//   - allocated register size delta in subtrie (allocatedRegSizeDelta)
 //   - lowest height reached during recursive update in subtrie (lowestHeightTouched)
 //
 // update also compact a subtree into a single compact leaf node in the case where
-// there is only 1 payload stored in the subtree.
+// there is only 1 value stored in the subtree.
 //
-// allocatedRegCountDelta and allocatedRegSizeDelta are used to compute updated
-// trie's allocated register count and size.  lowestHeightTouched is used to
-// compute max depth touched during update.
-// CAUTION: while updating, `paths` and `payloads` are permuted IN-PLACE for optimized processing.
+// allocatedRegCountDelta is used to compute updated trie's allocated register count.
+// lowestHeightTouched is used to compute max depth touched during update.
+// CAUTION: while updating, `paths` and `values` are permuted IN-PLACE for optimized processing.
 // UNSAFE: method requires the following conditions to be satisfied:
 //   - paths all share the same common prefix [0 : mt.maxHeight-1 - nodeHeight)
 //     (excluding the bit at index headHeight)
 //   - paths are NOT duplicated
 func update(
 	nodeHeight int, // the height of the node during traversing the subtree
-	currentNode *node.Node, // the current node on the travesing path, if it's nil it means the trie has no node on this path
-	paths []ledger.Path, // the paths to update the payloads
-	payloads []ledger.Payload, // the payloads to be updated at the given paths
-	compactLeaf *node.Node, // a compact leaf node from its ancester, it could be nil
-	prune bool, // prune is a flag for whether pruning nodes with empty payload. not pruning is useful for generating proof, expecially non-inclusion proof
-) (n *node.Node, allocatedRegCountDelta int64, allocatedRegSizeDelta int64, lowestHeightTouched int) {
+	currentNode *Node, // the current node on the travesing path, if it's nil it means the trie has no node on this path
+	paths []ledger.Path, // the paths to update the values
+	values [][]byte, // the values to be updated at the given paths
+	compactLeaf *Node, // a compact leaf node from its ancester, it could be nil
+	prune bool, // prune is a flag for whether pruning nodes with empty values. not pruning is useful for generating proof, expecially non-inclusion proof
+) (n *Node, allocatedRegCountDelta int64, lowestHeightTouched int) {
 	// No new path to update
 	if len(paths) == 0 {
 		if compactLeaf != nil {
 			// if a compactLeaf from a higher height is still left,
 			// then expand the compact leaf node to the current height by creating a new compact leaf
-			// node with the same path and payload.
+			// node with the same path and value.
 			// The old node shouldn't be recycled as it is still used by the tree copy before the update.
-			n = node.NewLeaf(*compactLeaf.Path(), compactLeaf.Payload(), nodeHeight)
-			return n, 0, 0, nodeHeight
+			if compactLeaf.leafHash != nil {
+				n = NewLeafWithHash(compactLeaf.path, *compactLeaf.leafHash, nodeHeight)
+			} else {
+				n = NewLeaf(compactLeaf.path, nil, nodeHeight)
+			}
+			return n, 0, nodeHeight
 		}
 		// if no path to update and there is no compact leaf node on this path, we return
 		// the current node regardless it exists or not.
-		return currentNode, 0, 0, nodeHeight
+		return currentNode, 0, nodeHeight
 	}
 
 	if len(paths) == 1 && currentNode == nil && compactLeaf == nil {
 		// if there is only 1 path to update, and the existing tree has no node on this path, also
-		// no compact leaf node from its ancester, it means we are storing a payload on a new path,
-		n = node.NewLeaf(paths[0], payloads[0].DeepCopy(), nodeHeight)
-		if payloads[0].IsEmpty() {
-			// if we are storing an empty node, then no register is allocated
-			// allocatedRegCountDelta and allocatedRegSizeDelta should both be 0
-			return n, 0, 0, nodeHeight
+		// no compact leaf node from its ancester, it means we are storing a value on a new path,
+		n = NewLeaf(paths[0], values[0], nodeHeight)
+		if len(values[0]) == 0 {
+			// if we are storing an empty value, then no register is allocated
+			// allocatedRegCountDelta should be 0
+			return n, 0, nodeHeight
 		}
-		// if we are storing a non-empty node, we are allocating a new register
-		return n, 1, int64(payloads[0].Size()), nodeHeight
+		// if we are storing a non-empty value, we are allocating a new register
+		return n, 1, nodeHeight
 	}
 
 	if currentNode != nil && currentNode.IsLeaf() { // if we're here then compactLeaf == nil
@@ -424,25 +323,38 @@ func update(
 			if p == currentPath {
 				// the case where the recursion stops: only one path to update
 				if len(paths) == 1 {
-					// check if the only path to update has the same payload.
-					// if payload is the same, we could skip the update to avoid creating duplicated node
-					if !currentNode.Payload().ValueEquals(&payloads[i]) {
-						n = node.NewLeaf(paths[i], payloads[i].DeepCopy(), nodeHeight)
-
-						allocatedRegCountDelta, allocatedRegSizeDelta =
-							computeAllocatedRegDeltas(currentNode.Payload(), &payloads[i])
-
-						return n, allocatedRegCountDelta, allocatedRegSizeDelta, nodeHeight
+					// check if the only path to update has the same value.
+					// if value is the same, we could skip the update to avoid creating duplicated node
+					hadValue := currentNode.leafHash != nil
+					hasValue := len(values[i]) > 0
+					var newLeafHash hash.Hash
+					if hasValue {
+						newLeafHash = hash.HashLeaf(hash.Hash(paths[i]), values[i])
 					}
-					// avoid creating a new node when the same payload is written
-					return currentNode, 0, 0, nodeHeight
+
+					if hadValue == hasValue {
+						// when value equals, if didn't have value before, then still no value after update;
+						// if had value before, then the leaf hash is still the same after update,
+						// so we can reuse the current node without creating a new one.
+						if !hasValue || *currentNode.leafHash == newLeafHash {
+							// avoid creating a new node when the same value is written
+							return currentNode, 0, nodeHeight
+						}
+					}
+
+					// the value is updated, we need to create a new leaf node with the updated value.
+					// The old node shouldn't be recycled as it is still used by the trie before the update.
+					if hasValue {
+						n = NewLeafWithHash(paths[i], newLeafHash, nodeHeight)
+					} else {
+						n = NewLeaf(paths[i], nil, nodeHeight)
+					}
+					allocatedRegCountDelta = computeAllocatedRegCountDelta(hadValue, hasValue)
+					return n, allocatedRegCountDelta, nodeHeight
 				}
 				// the case where the recursion carries on: len(paths)>1
 				found = true
-
-				allocatedRegCountDelta, allocatedRegSizeDelta =
-					computeAllocatedRegDeltasFromHigherHeight(currentNode.Payload())
-
+				allocatedRegCountDelta = computeAllocatedRegCountDeltaFromHigherHeight(currentNode.leafHash != nil)
 				break
 			}
 		}
@@ -458,16 +370,16 @@ func update(
 	//   - or len(paths) == 1 and compactLeaf!= nil
 	//   - or len(paths) == 1 and currentNode != nil && !currentNode.IsLeaf()
 
-	// Split paths and payloads to recurse:
+	// Split paths and values to recurse:
 	// lpaths contains all paths that have `0` at the partitionIndex
 	// rpaths contains all paths that have `1` at the partitionIndex
 	depth := ledger.NodeMaxHeight - nodeHeight // distance to the tree root
-	partitionIndex := splitByPath(paths, payloads, depth)
+	partitionIndex := splitByPath(paths, values, depth)
 	lpaths, rpaths := paths[:partitionIndex], paths[partitionIndex:]
-	lpayloads, rpayloads := payloads[:partitionIndex], payloads[partitionIndex:]
+	lvalues, rvalues := values[:partitionIndex], values[partitionIndex:]
 
 	// check if there is a compact leaf that needs to get deep to height 0
-	var lcompactLeaf, rcompactLeaf *node.Node
+	var lcompactLeaf, rcompactLeaf *Node
 	if compactLeaf != nil {
 		// if yes, check which branch it will go to.
 		path := *compactLeaf.Path()
@@ -479,99 +391,91 @@ func update(
 	}
 
 	// set the node children
-	var oldLeftChild, oldRightChild *node.Node
+	var oldLeftChild, oldRightChild *Node
 	if currentNode != nil {
 		oldLeftChild = currentNode.LeftChild()
 		oldRightChild = currentNode.RightChild()
 	}
 
 	// recurse over each branch
-	var newLeftChild, newRightChild *node.Node
+	var newLeftChild, newRightChild *Node
 	var lRegCountDelta, rRegCountDelta int64
-	var lRegSizeDelta, rRegSizeDelta int64
 	var lLowestHeightTouched, rLowestHeightTouched int
 	parallelRecursionThreshold := 16
 	if len(lpaths) < parallelRecursionThreshold || len(rpaths) < parallelRecursionThreshold {
 		// runtime optimization: if there are _no_ updates for either left or right sub-tree, proceed single-threaded
-		newLeftChild, lRegCountDelta, lRegSizeDelta, lLowestHeightTouched = update(nodeHeight-1, oldLeftChild, lpaths, lpayloads, lcompactLeaf, prune)
-		newRightChild, rRegCountDelta, rRegSizeDelta, rLowestHeightTouched = update(nodeHeight-1, oldRightChild, rpaths, rpayloads, rcompactLeaf, prune)
+		newLeftChild, lRegCountDelta, lLowestHeightTouched = update(nodeHeight-1, oldLeftChild, lpaths, lvalues, lcompactLeaf, prune)
+		newRightChild, rRegCountDelta, rLowestHeightTouched = update(nodeHeight-1, oldRightChild, rpaths, rvalues, rcompactLeaf, prune)
 	} else {
 		// runtime optimization: process the left child in a separate thread
 
-		// Since we're receiving 4 values from goroutine, use a
+		// Since we're receiving 3 values from goroutine, use a
 		// struct and channel to reduce allocs/op.
 		// Although WaitGroup approach can be faster than channel (esp. with 2+ goroutines),
 		// we only use 1 goroutine here and need to communicate results from it. So using
 		// channel is faster and uses fewer allocs/op in this case.
 		results := make(chan updateResult, 1)
 		go func(retChan chan<- updateResult) {
-			child, regCountDelta, regSizeDelta, lowestHeightTouched := update(nodeHeight-1, oldLeftChild, lpaths, lpayloads, lcompactLeaf, prune)
-			retChan <- updateResult{child, regCountDelta, regSizeDelta, lowestHeightTouched}
+			child, regCountDelta, lowestHeightTouched := update(nodeHeight-1, oldLeftChild, lpaths, lvalues, lcompactLeaf, prune)
+			retChan <- updateResult{child, regCountDelta, lowestHeightTouched}
 		}(results)
 
-		newRightChild, rRegCountDelta, rRegSizeDelta, rLowestHeightTouched = update(nodeHeight-1, oldRightChild, rpaths, rpayloads, rcompactLeaf, prune)
+		newRightChild, rRegCountDelta, rLowestHeightTouched = update(nodeHeight-1, oldRightChild, rpaths, rvalues, rcompactLeaf, prune)
 
 		// Wait for results from goroutine.
 		ret := <-results
-		newLeftChild, lRegCountDelta, lRegSizeDelta, lLowestHeightTouched = ret.child, ret.allocatedRegCountDelta, ret.allocatedRegSizeDelta, ret.lowestHeightTouched
+		newLeftChild, lRegCountDelta, lLowestHeightTouched = ret.child, ret.allocatedRegCountDelta, ret.lowestHeightTouched
 	}
 
 	allocatedRegCountDelta += lRegCountDelta + rRegCountDelta
-	allocatedRegSizeDelta += lRegSizeDelta + rRegSizeDelta
 	lowestHeightTouched = minInt(lLowestHeightTouched, rLowestHeightTouched)
 
 	// mitigate storage exhaustion attack: avoids creating a new node when the exact same
-	// payload is re-written at a register. CAUTION: we only check that the children are
+	// value is re-written at a register. CAUTION: we only check that the children are
 	// unchanged. This is only sufficient for interim nodes (for leaf nodes, the children
-	// might be unchanged, i.e. both nil, but the payload could have changed).
+	// might be unchanged, i.e. both nil, but the value could have changed).
 	// In case the current node was a leaf, we _cannot reuse_ it, because we potentially
 	// updated registers in the sub-trie
 	if !currentNode.IsLeaf() && newLeftChild == oldLeftChild && newRightChild == oldRightChild {
-		return currentNode, 0, 0, lowestHeightTouched
+		return currentNode, 0, lowestHeightTouched
 	}
 
 	// if prune is on, then will check and create a compact leaf node if one child is nil, and the
 	// other child is a leaf node
 	if prune {
-		n = node.NewInterimCompactifiedNode(nodeHeight, newLeftChild, newRightChild)
-		return n, allocatedRegCountDelta, allocatedRegSizeDelta, lowestHeightTouched
+		n = NewInterimCompactifiedNode(nodeHeight, newLeftChild, newRightChild)
+		return n, allocatedRegCountDelta, lowestHeightTouched
 	}
 
-	n = node.NewInterimNode(nodeHeight, newLeftChild, newRightChild)
-	return n, allocatedRegCountDelta, allocatedRegSizeDelta, lowestHeightTouched
+	n = NewInterimNode(nodeHeight, newLeftChild, newRightChild)
+	return n, allocatedRegCountDelta, lowestHeightTouched
 }
 
-// computeAllocatedRegDeltasFromHigherHeight returns the deltas
-// needed to compute the allocated reg count and reg size when
-// a payload is updated or unallocated at a lower height.
-func computeAllocatedRegDeltasFromHigherHeight(oldPayload *ledger.Payload) (allocatedRegCountDelta, allocatedRegSizeDelta int64) {
-	if !oldPayload.IsEmpty() {
+// computeAllocatedRegCountDeltaFromHigherHeight returns the delta
+// needed to compute the allocated reg count when
+// a value is updated or unallocated at a lower height.
+func computeAllocatedRegCountDeltaFromHigherHeight(hadValue bool) (allocatedRegCountDelta int64) {
+	if hadValue {
 		// Allocated register will be updated or unallocated at lower height.
 		allocatedRegCountDelta--
 	}
-	oldPayloadSize := oldPayload.Size()
-	allocatedRegSizeDelta -= int64(oldPayloadSize)
 	return
 }
 
-// computeAllocatedRegDeltas returns the allocated reg count
-// and reg size deltas computed from old payload and new payload.
-// PRECONDITION: !oldPayload.Equals(newPayload)
-func computeAllocatedRegDeltas(oldPayload, newPayload *ledger.Payload) (allocatedRegCountDelta, allocatedRegSizeDelta int64) {
+// computeAllocatedRegCountDelta returns the allocated reg count
+// delta computed from the presence of the old and new value.
+// PRECONDITION: hadValue != hasValue OR the stored value changed
+func computeAllocatedRegCountDelta(hadValue, hasValue bool) (allocatedRegCountDelta int64) {
 	allocatedRegCountDelta = 0
-	if newPayload.IsEmpty() {
-		// Old payload is not empty while new payload is empty.
+	if !hasValue {
+		// Old value is present while new value is empty.
 		// Allocated register will be unallocated.
 		allocatedRegCountDelta = -1
-	} else if oldPayload.IsEmpty() {
-		// Old payload is empty while new payload is not empty.
+	} else if !hadValue {
+		// Old value is empty while new value is present.
 		// Unallocated register will be allocated.
 		allocatedRegCountDelta = 1
 	}
-
-	oldPayloadSize := oldPayload.Size()
-	newPayloadSize := newPayload.Size()
-	allocatedRegSizeDelta = int64(newPayloadSize - oldPayloadSize)
 	return
 }
 
@@ -581,8 +485,8 @@ func computeAllocatedRegDeltas(oldPayload, newPayload *ledger.Payload) (allocate
 // UNSAFE: requires _all_ paths to have a length of mt.Height bits.
 // Paths in the input query don't have to be deduplicated, though deduplication would
 // result in allocating less dynamic memory to store the proofs.
-func (mt *MTrie) UnsafeProofs(paths []ledger.Path) *ledger.TrieBatchProof {
-	batchProofs := ledger.NewTrieBatchProofWithEmptyProofs(len(paths))
+func (mt *MTrie) UnsafeProofs(paths []ledger.Path) *ledger.PayloadlessTrieBatchProof {
+	batchProofs := ledger.NewPayloadlessTrieBatchProofWithEmptyProofs(len(paths))
 	prove(mt.root, paths, batchProofs.Proofs)
 	return batchProofs
 }
@@ -593,7 +497,7 @@ func (mt *MTrie) UnsafeProofs(paths []ledger.Path) *ledger.TrieBatchProof {
 // UNSAFE: method requires the following conditions to be satisfied:
 //   - paths all share the same common prefix [0 : mt.maxHeight-1 - nodeHeight)
 //     (excluding the bit at index headHeight)
-func prove(head *node.Node, paths []ledger.Path, proofs []*ledger.TrieProof) {
+func prove(head *Node, paths []ledger.Path, proofs []*ledger.PayloadlessTrieProof) {
 	// check for empty paths
 	if len(paths) == 0 {
 		return
@@ -612,7 +516,7 @@ func prove(head *node.Node, paths []ledger.Path, proofs []*ledger.TrieProof) {
 			// value matches (inclusion proof)
 			if *head.Path() == path {
 				proofs[i].Path = *head.Path()
-				proofs[i].Payload = head.Payload()
+				proofs[i].LeafHash = head.LeafHash()
 				proofs[i].Inclusion = true
 			}
 		}
@@ -657,7 +561,7 @@ func prove(head *node.Node, paths []ledger.Path, proofs []*ledger.TrieProof) {
 // addSiblingTrieHashToProofs inspects the sibling Trie and adds its root hash
 // to the proofs, if the trie contains non-empty registers (i.e. the
 // siblingTrie has a non-default hash).
-func addSiblingTrieHashToProofs(siblingTrie *node.Node, depth int, proofs []*ledger.TrieProof) {
+func addSiblingTrieHashToProofs(siblingTrie *Node, depth int, proofs []*ledger.PayloadlessTrieProof) {
 	if siblingTrie == nil || len(proofs) == 0 {
 		return
 	}
@@ -694,7 +598,8 @@ func (mt *MTrie) Equals(o *MTrie) bool {
 	return o.RootHash() == mt.RootHash()
 }
 
-// DumpAsJSON dumps the trie key value pairs to a file having each key value pair as a json row
+// DumpAsJSON dumps the trie leaf entries to a writer having each leaf as a json row.
+// Each entry contains the leaf's path and its stored leaf hash.
 func (mt *MTrie) DumpAsJSON(w io.Writer) error {
 
 	// Use encoder to prevent building entire trie in memory
@@ -708,11 +613,17 @@ func (mt *MTrie) DumpAsJSON(w io.Writer) error {
 	return nil
 }
 
+// dumpLeafEntry is the JSON form of a leaf encoded by DumpAsJSON.
+type dumpLeafEntry struct {
+	Path     ledger.Path `json:"path"`
+	LeafHash *hash.Hash  `json:"leafHash"`
+}
+
 // dumpAsJSON serializes the sub-trie with root n to json and feeds it into encoder
-func dumpAsJSON(n *node.Node, encoder *json.Encoder) error {
+func dumpAsJSON(n *Node, encoder *json.Encoder) error {
 	if n.IsLeaf() {
 		if n != nil {
-			err := encoder.Encode(n.Payload())
+			err := encoder.Encode(dumpLeafEntry{Path: n.path, LeafHash: n.leafHash})
 			if err != nil {
 				return err
 			}
@@ -741,9 +652,10 @@ func EmptyTrieRootHash() ledger.RootHash {
 	return ledger.RootHash(ledger.GetDefaultHashForHeight(ledger.NodeMaxHeight))
 }
 
-// AllPayloads returns all payloads
-func (mt *MTrie) AllPayloads() []*ledger.Payload {
-	return mt.root.AllPayloads()
+// AllLeafHashes returns all leaf hashes stored in the trie. Empty leaves
+// (unallocated registers) are skipped.
+func (mt *MTrie) AllLeafHashes() []*hash.Hash {
+	return mt.root.AllLeafHashes()
 }
 
 // IsAValidTrie verifies the content of the trie for potential issues
@@ -754,7 +666,7 @@ func (mt *MTrie) IsAValidTrie() bool {
 
 // splitByPath permutes the input paths to be partitioned into 2 parts. The first part contains paths with a zero bit
 // at the input bitIndex, the second part contains paths with a one at the bitIndex. The index of partition
-// is returned. The same permutation is applied to the payloads slice.
+// is returned. The same permutation is applied to the values slice.
 //
 // This would be the partition step of an ascending quick sort of paths (lexicographic order)
 // with the pivot being the path with all zeros and 1 at bitIndex.
@@ -765,13 +677,13 @@ func (mt *MTrie) IsAValidTrie() bool {
 //	[[0,0,1,1], [0,1,0,1], [0,0,0,1]]
 //	then `splitByPath` returns 2 and updates `paths` into:
 //	[[0,0,1,1], [0,0,0,1], [0,1,0,1]]
-func splitByPath(paths []ledger.Path, payloads []ledger.Payload, bitIndex int) int {
+func splitByPath(paths []ledger.Path, values [][]byte, bitIndex int) int {
 	i := 0
 	for j, path := range paths {
 		bit := bitutils.ReadBit(path[:], bitIndex)
 		if bit == 0 {
 			paths[i], paths[j] = paths[j], paths[i]
-			payloads[i], payloads[j] = payloads[j], payloads[i]
+			values[i], values[j] = values[j], values[i]
 			i++
 		}
 	}
@@ -806,7 +718,7 @@ func SplitPaths(paths []ledger.Path, bitIndex int) int {
 // with the pivot being the path with all zeros and 1 at bitIndex.
 // The comparison of paths is only based on the bit at bitIndex, the function therefore assumes all paths have
 // equal bits from 0 to bitIndex-1
-func splitTrieProofsByPath(paths []ledger.Path, proofs []*ledger.TrieProof, bitIndex int) int {
+func splitTrieProofsByPath(paths []ledger.Path, proofs []*ledger.PayloadlessTrieProof, bitIndex int) int {
 	i := 0
 	for j, path := range paths {
 		bit := bitutils.ReadBit(path[:], bitIndex)
@@ -827,11 +739,11 @@ func minInt(a, b int) int {
 }
 
 // TraverseNodes traverses all nodes of the trie in DFS order
-func TraverseNodes(trie *MTrie, processNode func(*node.Node) error) error {
+func TraverseNodes(trie *MTrie, processNode func(*Node) error) error {
 	return traverseRecursive(trie.root, processNode)
 }
 
-func traverseRecursive(n *node.Node, processNode func(*node.Node) error) error {
+func traverseRecursive(n *Node, processNode func(*Node) error) error {
 	if n == nil {
 		return nil
 	}

@@ -1,4 +1,4 @@
-package node
+package payloadless
 
 import (
 	"encoding/hex"
@@ -8,7 +8,11 @@ import (
 	"github.com/onflow/flow-go/ledger/common/hash"
 )
 
-// Node defines an Mtrie node
+// Node defines a payloadless Mtrie node.
+//
+// Unlike the regular mtrie Node which stores full payloads, a payloadless Node
+// stores only the leaf hash (HashLeaf(path, value)) for leaf nodes. This enables
+// significant memory savings while preserving the same root hash as a full trie.
 //
 // DEFINITIONS:
 //   - HEIGHT of a node v in a tree is the number of edges on the longest
@@ -16,8 +20,8 @@ import (
 //
 // Conceptually, an MTrie is a sparse Merkle Trie, which has two node types:
 //   - INTERIM node: has at least one child (i.e. lChild or rChild is not
-//     nil). Interim nodes do not store a path and have no payload.
-//   - LEAF node: has _no_ children.
+//     nil). Interim nodes do not store a path and have no leafHash.
+//   - LEAF node: has _no_ children. Stores a path and (optionally) a leafHash.
 //
 // Per convention, we also consider nil as a leaf. Formally, nil is the generic
 // representative for any empty (sub)-trie (i.e. a trie without allocated
@@ -31,12 +35,12 @@ type Node struct {
 	// the current implementation is designed to operate on a sparsely populated
 	// tree, holding much less than 2^64 registers.
 
-	lChild    *Node           // Left Child
-	rChild    *Node           // Right Child
-	height    int             // height where the Node is at
-	path      ledger.Path     // the storage path (dummy value for interim nodes)
-	payload   *ledger.Payload // the payload this node is storing (leaf nodes only)
-	hashValue hash.Hash       // hash value of node (cached)
+	lChild    *Node       // Left Child
+	rChild    *Node       // Right Child
+	height    int         // height where the Node is at
+	path      ledger.Path // the storage path (dummy value for interim nodes)
+	leafHash  *hash.Hash  // HashLeaf(path, value) - the height-0 leaf hash (leaf nodes only; nil for unallocated registers)
+	hashValue hash.Hash   // hash value of node (cached)
 }
 
 // NewNode creates a new Node.
@@ -46,7 +50,7 @@ func NewNode(height int,
 	lchild,
 	rchild *Node,
 	path ledger.Path,
-	payload *ledger.Payload,
+	leafHash *hash.Hash,
 	hashValue hash.Hash,
 ) *Node {
 	n := &Node{
@@ -54,40 +58,61 @@ func NewNode(height int,
 		rChild:    rchild,
 		height:    height,
 		path:      path,
+		leafHash:  leafHash,
 		hashValue: hashValue,
-		payload:   payload,
 	}
 	return n
 }
 
-// NewLeaf creates a compact leaf Node.
+// NewLeaf creates a leaf Node from a path and the original payload value.
+// The leafHash is computed as HashLeaf(path, value), and the node hash is
+// computed using the original value to ensure the same root hash as a full trie.
+//
 // UNCHECKED requirement: height must be non-negative
-// UNCHECKED requirement: payload is non nil
-// UNCHECKED requirement: payload should be deep copied if received from external sources
-func NewLeaf(path ledger.Path,
-	payload *ledger.Payload,
-	height int,
-) *Node {
-	n := &Node{
-		lChild:  nil,
-		rChild:  nil,
-		height:  height,
-		path:    path,
-		payload: payload,
+func NewLeaf(path ledger.Path, value []byte, height int) *Node {
+	// For empty values, create a default node
+	if len(value) == 0 {
+		return &Node{
+			height:    height,
+			path:      path,
+			leafHash:  nil,
+			hashValue: ledger.GetDefaultHashForHeight(height),
+		}
 	}
-	n.hashValue = n.computeHash()
-	return n
+
+	// Compute the leaf hash (height-0)
+	leafHash := hash.HashLeaf(hash.Hash(path), value)
+
+	return NewLeafWithHash(path, leafHash, height)
+}
+
+// NewLeafWithHash creates a leaf Node from a pre-computed leaf hash.
+// This is used when converting from a full trie or loading from a payloadless checkpoint.
+//
+// The nodeHash is computed by extending the leafHash (height-0) to the specified height.
+//
+// UNCHECKED requirement: height must be non-negative
+// UNCHECKED requirement: leafHash must be HashLeaf(path, originalValue)
+func NewLeafWithHash(path ledger.Path, leafHash hash.Hash, height int) *Node {
+	// Compute the node hash by extending the leaf hash to the target height
+	nodeHash := ledger.ComputeCompactValueFromLeafHash(hash.Hash(path), leafHash, height)
+
+	return &Node{
+		height:    height,
+		path:      path,
+		leafHash:  &leafHash,
+		hashValue: nodeHash,
+	}
 }
 
 // NewInterimNode creates a new interim Node.
 // UNCHECKED requirement:
 //   - for any child `c` that is non-nil, its height must satisfy: height = c.height + 1
-func NewInterimNode(height int, lchild, rchild *Node) *Node {
+func NewInterimNode(height int, lChild, rChild *Node) *Node {
 	n := &Node{
-		lChild:  lchild,
-		rChild:  rchild,
-		height:  height,
-		payload: nil,
+		lChild: lChild,
+		rChild: rChild,
+		height: height,
 	}
 	n.hashValue = n.computeHash()
 	return n
@@ -122,11 +147,11 @@ func NewInterimCompactifiedNode(height int, lChild, rChild *Node) *Node {
 	// an empty subtrie => in total we have one allocated register, which we represent as single leaf node
 	if rChild == nil && lChild.IsLeaf() {
 		h := hash.HashInterNode(lChild.hashValue, ledger.GetDefaultHashForHeight(lChild.height))
-		return &Node{height: height, path: lChild.path, payload: lChild.payload, hashValue: h}
+		return &Node{height: height, path: lChild.path, leafHash: lChild.leafHash, hashValue: h}
 	}
 	if lChild == nil && rChild.IsLeaf() {
 		h := hash.HashInterNode(ledger.GetDefaultHashForHeight(rChild.height), rChild.hashValue)
-		return &Node{height: height, path: rChild.path, payload: rChild.payload, hashValue: h}
+		return &Node{height: height, path: rChild.path, leafHash: rChild.leafHash, hashValue: h}
 	}
 
 	// CASE (b): both children contain some allocated registers => we can't compactify; return a full interim leaf
@@ -147,11 +172,11 @@ func (n *Node) IsDefaultNode() bool {
 func (n *Node) computeHash() hash.Hash {
 	// check for leaf node
 	if n.lChild == nil && n.rChild == nil {
-		// if payload is non-nil, compute the hash based on the payload content
-		if n.payload != nil {
-			return ledger.ComputeCompactValue(hash.Hash(n.path), n.payload.Value(), n.height)
+		// if leafHash is non-nil, extend the height-0 leaf hash to the node's height
+		if n.leafHash != nil {
+			return ledger.ComputeCompactValueFromLeafHash(hash.Hash(n.path), *n.leafHash, n.height)
 		}
-		// if payload is nil, return the default hash
+		// if leafHash is nil, return the default hash
 		return ledger.GetDefaultHashForHeight(n.height)
 	}
 
@@ -211,10 +236,11 @@ func (n *Node) Path() *ledger.Path {
 	return nil
 }
 
-// Payload returns the Node's payload.
-// Do NOT MODIFY returned slices!
-func (n *Node) Payload() *ledger.Payload {
-	return n.payload
+// LeafHash returns the Node's leaf hash HashLeaf(path, value).
+// Returns nil for interim nodes and for leaves that represent unallocated registers.
+// Do NOT MODIFY returned hash!
+func (n *Node) LeafHash() *hash.Hash {
+	return n.leafHash
 }
 
 // LeftChild returns the Node's left child.
@@ -243,30 +269,36 @@ func (n *Node) FmtStr(prefix string, subpath string) string {
 	if n.lChild != nil {
 		left = fmt.Sprintf("\n%v", n.lChild.FmtStr(prefix+"\t", subpath+"0"))
 	}
-	payloadSize := 0
-	if n.payload != nil {
-		payloadSize = n.payload.Size()
+	leafHashStr := "nil"
+	if n.leafHash != nil {
+		leafHashStr = hex.EncodeToString(n.leafHash[:])[:6] + "..."
 	}
 	hashStr := hex.EncodeToString(n.hashValue[:])
 	hashStr = hashStr[:3] + "..." + hashStr[len(hashStr)-3:]
-	return fmt.Sprintf("%v%v: (path:%v, payloadSize:%d hash:%v)[%s] (obj %p) %v %v ", prefix, n.height, n.path, payloadSize, hashStr, subpath, n, left, right)
+	return fmt.Sprintf("%v%v: (path:%v, leafHash:%s, hash:%v)[%s] (obj %p) %v %v",
+		prefix, n.height, n.path, leafHashStr, hashStr, subpath, n, left, right)
 }
 
-// AllPayloads returns the payload of this node and all payloads of the subtrie
-func (n *Node) AllPayloads() []*ledger.Payload {
-	return n.appendSubtreePayloads([]*ledger.Payload{})
+// AllLeafHashes returns the leaf hash of this node and all leaf hashes of the subtrie.
+// Empty leaves (unallocated registers) are skipped.
+func (n *Node) AllLeafHashes() []*hash.Hash {
+	return n.appendSubtreeLeafHashes([]*hash.Hash{})
 }
 
-// appendSubtreePayloads appends the payloads of the subtree with this node as root
-// to the provided Payload slice. Follows same pattern as Go's native append method.
-func (n *Node) appendSubtreePayloads(result []*ledger.Payload) []*ledger.Payload {
+// appendSubtreeLeafHashes appends the leaf hashes of the subtree with this node as root
+// to the provided slice. Follows same pattern as Go's native append method.
+// Empty leaves (unallocated registers) are skipped.
+func (n *Node) appendSubtreeLeafHashes(result []*hash.Hash) []*hash.Hash {
 	if n == nil {
 		return result
 	}
 	if n.IsLeaf() {
-		return append(result, n.Payload())
+		if n.leafHash != nil {
+			return append(result, n.leafHash)
+		}
+		return result
 	}
-	result = n.lChild.appendSubtreePayloads(result)
-	result = n.rChild.appendSubtreePayloads(result)
+	result = n.lChild.appendSubtreeLeafHashes(result)
+	result = n.rChild.appendSubtreeLeafHashes(result)
 	return result
 }
