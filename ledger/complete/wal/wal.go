@@ -143,10 +143,18 @@ func (w *DiskWAL) ReplayOnForest(forest *mtrie.Forest) error {
 //
 // When no numbered V7 checkpoint is available it falls back to a V7 root
 // checkpoint (converted from the V6 root.checkpoint during bootstrap), mirroring
-// the V6 root-checkpoint fallback in [DiskWAL.replay]. With no V7 checkpoint of
-// either kind it replays all segments onto the (presumably empty) `forest`.
+// the V6 root-checkpoint fallback in [DiskWAL.replay].
 //
-// No error returns are expected during normal operation.
+// A V7 checkpoint of one kind or the other is required: a payloadless forest
+// retains only leaf-hash commitments, which cannot be reconstructed by WAL
+// replay alone (the WAL records full payload updates, but replaying every update
+// from genesis to rebuild the commitment is not feasible at runtime). When
+// neither a numbered V7 checkpoint nor a V7 root checkpoint is present, this
+// refuses to seed rather than silently booting an empty, uncommitted forest.
+//
+// Expected error returns during normal operation:
+//   - error containing "no V7 checkpoint found": when the WAL directory contains
+//     no V7 checkpoint of either kind, so the forest cannot be seeded.
 func (w *DiskWAL) ReplayOnPayloadlessForest(forest *payloadless.Forest) error {
 	checkpointer, err := w.NewCheckpointer()
 	if err != nil {
@@ -156,6 +164,16 @@ func (w *DiskWAL) ReplayOnPayloadlessForest(forest *payloadless.Forest) error {
 	tries, loadedCheckpoint, err := checkpointer.LoadLatestCheckpointV7()
 	if err != nil {
 		return fmt.Errorf("cannot load latest V7 checkpoint: %w", err)
+	}
+
+	// LoadLatestCheckpointV7 returns no tries and loadedCheckpoint == -1 only when
+	// neither a numbered V7 checkpoint nor a V7 root checkpoint was found. In that
+	// case there is no seed for the leaf-hash commitment, so refuse to start.
+	if loadedCheckpoint < 0 && len(tries) == 0 {
+		return fmt.Errorf(
+			"no V7 checkpoint found in %s; a V7 checkpoint is required to start a payloadless ledger",
+			w.wal.Dir(),
+		)
 	}
 
 	if err := forest.AddTries(tries); err != nil {

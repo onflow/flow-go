@@ -941,16 +941,16 @@ func (exeNode *ExecutionNode) LoadExecutionStateLedger(
 	module.ReadyDoneAware,
 	error,
 ) {
+	// Ledger selection is two independent choices passed to the factory:
+	//   - --payloadless picks the payloadless vs. full ledger (this branch).
+	//   - --ledger-service-addr (Config.LedgerServiceAddr), when set, means this
+	//     node connects to a remote ledger service rather than running a local
+	//     ledger; the factory then returns a gRPC client instead of a local one.
+	// Combined: payloadless + remote address -> remote payloadless client;
+	// payloadless + no address -> local payloadless ledger; likewise for full mode.
 	if exeNode.exeConf.payloadless {
 		// Payloadless mode. ValidateFlags enforces --enable-storehouse,
 		// so the storehouse is the value source for reads.
-		//
-		// The factory call mirrors the full-mode call below: same Config,
-		// same triggerCheckpoint. Today the factory body is a placeholder
-		// (no WAL, no checkpoint load) — see TODOs at
-		// ledgerfactory.NewPayloadlessLedger. When the WAL/checkpoint
-		// pieces land, only the factory body changes; this call site stays
-		// the same.
 		pl, err := ledgerfactory.NewPayloadlessLedger(ledgerfactory.Config{
 			LedgerServiceAddr:     exeNode.exeConf.ledgerServiceAddr,
 			LedgerMaxRequestSize:  exeNode.exeConf.ledgerMaxRequestSize,
@@ -1485,6 +1485,10 @@ func (exeNode *ExecutionNode) LoadBootstrapper(node *NodeConfig) error {
 
 		// when bootstrapping, the bootstrap folder must have a checkpoint file
 		// we need to cover this file to the trie folder to restore the trie to restore the execution state.
+		//
+		// Note: in payloadless mode the V6 root checkpoint placed here is later
+		// converted to root.checkpoint.v7 by ledgerfactory.NewPayloadlessLedger
+		// before the bundle reads it. Bootstrap itself stays mode-agnostic.
 		err = copyBootstrapState(node.BootstrapDir, exeNode.exeConf.triedir)
 		if err != nil {
 			return fmt.Errorf("could not load bootstrap state from checkpoint file: %w", err)
@@ -1497,11 +1501,16 @@ func (exeNode *ExecutionNode) LoadBootstrapper(node *NodeConfig) error {
 		// HasRootCheckpointV7 guard keeps a re-entry after an interrupted
 		// bootstrap from hitting ConvertCheckpointV6ToV7's "output exists" check.
 		//
+		// Only nodes running a local payloadless ledger need this: a node using a
+		// remote ledger service (ledgerServiceAddr set) never reads its local trie
+		// dir, and the remote ledger service performs its own V7 bootstrap. Skipping
+		// the conversion avoids a needless full-forest load on remote-ledger nodes.
+		//
 		// TODO: ConvertCheckpointV6ToV7 reads the entire V6 forest into memory
 		// before emitting V7, a memory/time spike at first boot for mainnet-scale
 		// root checkpoints. A future optimization is to convert subtrie-by-subtrie
 		// without loading the whole forest.
-		if exeNode.exeConf.payloadless {
+		if exeNode.exeConf.payloadless && exeNode.exeConf.ledgerServiceAddr == "" {
 			triedir := exeNode.exeConf.triedir
 			hasV7Root, err := wal.HasRootCheckpointV7(triedir)
 			if err != nil {

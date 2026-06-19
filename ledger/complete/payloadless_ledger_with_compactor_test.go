@@ -12,9 +12,28 @@ import (
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
 	"github.com/onflow/flow-go/ledger/complete"
+	"github.com/onflow/flow-go/ledger/complete/payloadless"
 	realWAL "github.com/onflow/flow-go/ledger/complete/wal"
 	"github.com/onflow/flow-go/module/metrics"
 )
+
+// seedV7Root writes a minimal V7 root checkpoint (a single empty payloadless
+// trie) into dir. Tests that construct NewPayloadlessLedgerWithCompactor
+// directly against a fresh temp dir need this because the bundle now refuses
+// to start without seedable V7 state on disk; in production the equivalent
+// seeding is performed by ledger/factory.NewPayloadlessLedger when it
+// converts a V6 root to V7.
+func seedV7Root(t *testing.T, dir string) {
+	t.Helper()
+	err := realWAL.StoreCheckpointV7(
+		[]*payloadless.MTrie{payloadless.NewEmptyMTrie()},
+		dir,
+		realWAL.RootCheckpointFilenameV7(),
+		zerolog.Nop(),
+		1,
+	)
+	require.NoError(t, err)
+}
 
 // buildDiskWAL returns a fresh DiskWAL bound to the given directory. The
 // caller is responsible for Ready/Done lifecycle (typically handled by the
@@ -39,9 +58,11 @@ func buildDiskWAL(t *testing.T, dir string) *realWAL.DiskWAL {
 }
 
 // TestPayloadlessLedgerWithCompactor_NewEmpty constructs the bundle against a
-// fresh directory and verifies the lifecycle and basic API surface.
+// fresh directory seeded with an empty V7 root checkpoint and verifies the
+// lifecycle and basic API surface.
 func TestPayloadlessLedgerWithCompactor_NewEmpty(t *testing.T) {
 	dir := t.TempDir()
+	seedV7Root(t, dir)
 	diskWAL := buildDiskWAL(t, dir)
 
 	bundle, err := complete.NewPayloadlessLedgerWithCompactor(
@@ -74,6 +95,7 @@ func TestPayloadlessLedgerWithCompactor_NewEmpty(t *testing.T) {
 // the replayed forest contains the same state.
 func TestPayloadlessLedgerWithCompactor_SetPersists(t *testing.T) {
 	dir := t.TempDir()
+	seedV7Root(t, dir)
 
 	// First run: apply updates and capture the final state.
 	var finalState ledger.State
@@ -135,6 +157,33 @@ func TestPayloadlessLedgerWithCompactor_SetPersists(t *testing.T) {
 		"replayed forest should contain final state %s", finalState)
 }
 
+// TestPayloadlessLedgerWithCompactor_RequiresV7Checkpoint verifies the
+// constructor refuses to start when the directory contains no V7 checkpoint
+// (neither numbered nor root). The error message should mention what's
+// missing so an operator can act on it.
+func TestPayloadlessLedgerWithCompactor_RequiresV7Checkpoint(t *testing.T) {
+	dir := t.TempDir()
+	// No seedV7Root: dir is entirely empty.
+	diskWAL := buildDiskWAL(t, dir)
+
+	_, err := complete.NewPayloadlessLedgerWithCompactor(
+		diskWAL,
+		100,
+		&ledger.CompactorConfig{
+			CheckpointCapacity: 100,
+			CheckpointDistance: 100,
+			CheckpointsToKeep:  10,
+			Metrics:            &metrics.NoopCollector{},
+		},
+		atomic.NewBool(false),
+		&metrics.NoopCollector{},
+		zerolog.Nop(),
+		complete.DefaultPathFinderVersion,
+	)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "no V7 checkpoint found")
+}
+
 // TestPayloadlessLedgerWithCompactor_RequiresWAL verifies the constructor
 // rejects a nil WAL — that path is intended for direct in-memory construction
 // via NewPayloadlessLedger(nil, ...).
@@ -160,6 +209,7 @@ func TestPayloadlessLedgerWithCompactor_RequiresWAL(t *testing.T) {
 // flag and verifies a V7 checkpoint file is produced.
 func TestPayloadlessLedgerWithCompactor_TriggerCheckpoint(t *testing.T) {
 	dir := t.TempDir()
+	seedV7Root(t, dir)
 	diskWAL := buildDiskWAL(t, dir)
 	trigger := atomic.NewBool(false)
 

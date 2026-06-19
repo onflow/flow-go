@@ -46,23 +46,25 @@ func NewLedger(config Config, triggerCheckpoint *atomic.Bool) (ledger.Ledger, er
 
 // newRemoteLedger creates a remote ledger client that connects to a ledger service.
 func newRemoteLedger(config Config) (ledger.Ledger, error) {
-	config.Logger.Info().
+	logger := config.Logger.With().Str("subcomponent", "ledger").Logger()
+	logger.Info().
 		Str("ledger_service_addr", config.LedgerServiceAddr).
 		Msg("using remote ledger service")
 
-	factory := remote.NewRemoteLedgerFactory(
-		config.LedgerServiceAddr,
-		config.Logger.With().Str("subcomponent", "ledger").Logger(),
-		config.LedgerMaxRequestSize,
-		config.LedgerMaxResponseSize,
-	)
+	var opts []remote.ClientOption
+	if config.LedgerMaxRequestSize > 0 {
+		opts = append(opts, remote.WithMaxRequestSize(config.LedgerMaxRequestSize))
+	}
+	if config.LedgerMaxResponseSize > 0 {
+		opts = append(opts, remote.WithMaxResponseSize(config.LedgerMaxResponseSize))
+	}
 
-	ledgerStorage, err := factory.NewLedger()
+	client, err := remote.NewClient(config.LedgerServiceAddr, logger, opts...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create remote ledger: %w", err)
 	}
 
-	return ledgerStorage, nil
+	return client, nil
 }
 
 // newLocalLedger creates a local ledger with WAL and compactor.
@@ -97,8 +99,8 @@ func newLocalLedger(config Config, triggerCheckpoint *atomic.Bool) (ledger.Ledge
 		Metrics:            config.WALMetrics,
 	}
 
-	// Use factory to create ledger with internal compactor
-	factory := complete.NewLocalLedgerFactory(
+	// Create ledger with internal compactor
+	ledgerStorage, err := complete.NewLedgerWithCompactor(
 		diskWal,
 		int(config.MTrieCacheSize),
 		compactorConfig,
@@ -107,8 +109,6 @@ func newLocalLedger(config Config, triggerCheckpoint *atomic.Bool) (ledger.Ledge
 		config.Logger.With().Str("subcomponent", "ledger").Logger(),
 		complete.DefaultPathFinderVersion,
 	)
-
-	ledgerStorage, err := factory.NewLedger()
 	if err != nil {
 		return nil, fmt.Errorf("failed to create local ledger: %w", err)
 	}
@@ -116,13 +116,53 @@ func newLocalLedger(config Config, triggerCheckpoint *atomic.Bool) (ledger.Ledge
 	return ledgerStorage, nil
 }
 
-// NewPayloadlessLedger creates a payloadless ledger instance.
+// NewPayloadlessLedger creates a payloadless ledger instance based on the
+// configuration. If LedgerServiceAddr is set, it creates a remote payloadless
+// ledger client. Otherwise, it creates a local payloadless ledger with WAL
+// and compactor.
 //
-// This is the payloadless-mode counterpart of [NewLedger]. It mirrors that
-// function's signature and contract so call sites in cmd/execution_builder.go
-// can switch between the two without changing how config is plumbed —
-// including the requirement that config.Triedir be non-empty (the same
-// requirement [newLocalLedger] places on the V6 ledger).
+// This is the payloadless-mode counterpart of [NewLedger]. The signature and
+// dispatch shape mirror that function so call sites in
+// cmd/execution_builder.go can switch between the two without changing how
+// config is plumbed.
+//
+// triggerCheckpoint is a runtime control signal to trigger checkpoint on
+// next segment finish (ignored by the remote client; can be nil).
+func NewPayloadlessLedger(config Config, triggerCheckpoint *atomic.Bool) (ledger.PayloadlessLedger, error) {
+	if config.LedgerServiceAddr != "" {
+		return newRemotePayloadlessLedger(config)
+	}
+	return newLocalPayloadlessLedger(config, triggerCheckpoint)
+}
+
+// newRemotePayloadlessLedger creates a remote payloadless ledger client that
+// connects to a payloadless ledger service over gRPC. The client's [Ready]
+// method verifies the server is running in payloadless mode and crashes if
+// it is not — i.e. a wrong-mode server is treated as a deployment error, not
+// a retryable failure.
+func newRemotePayloadlessLedger(config Config) (ledger.PayloadlessLedger, error) {
+	logger := config.Logger.With().Str("subcomponent", "ledger").Logger()
+	logger.Info().
+		Str("ledger_service_addr", config.LedgerServiceAddr).
+		Msg("using remote payloadless ledger service")
+
+	var opts []remote.ClientOption
+	if config.LedgerMaxRequestSize > 0 {
+		opts = append(opts, remote.WithMaxRequestSize(config.LedgerMaxRequestSize))
+	}
+	if config.LedgerMaxResponseSize > 0 {
+		opts = append(opts, remote.WithMaxResponseSize(config.LedgerMaxResponseSize))
+	}
+
+	client, err := remote.NewPayloadlessClient(config.LedgerServiceAddr, logger, opts...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create remote payloadless ledger client: %w", err)
+	}
+	return client, nil
+}
+
+// newLocalPayloadlessLedger creates a local payloadless ledger with WAL and
+// compactor, mirroring [newLocalLedger] for the full ledger.
 //
 // The factory opens a [wal.DiskWAL] over config.Triedir and returns a
 // [complete.PayloadlessLedgerWithCompactor], which:
@@ -136,15 +176,13 @@ func newLocalLedger(config Config, triggerCheckpoint *atomic.Bool) (ledger.Ledge
 // Either a numbered V7 checkpoint or a V7 root checkpoint must be present in
 // config.Triedir. If only V6 checkpoints exist (no V7 of either kind), the
 // factory logs a hint pointing to the checkpoint-convert-v7 utility and refuses
-// to start.
-//
-// TODO: remote payloadless ledger client. When config.LedgerServiceAddr is
-// set, this factory should construct a remote.PayloadlessClient (Spec 004).
-// For now config.LedgerServiceAddr is ignored.
+// to start — the leaf-hash commitment cannot be reconstructed by WAL replay
+// alone.
 //
 // Expected error returns during normal operation:
 //   - error if config.Triedir is empty
-func NewPayloadlessLedger(config Config, triggerCheckpoint *atomic.Bool) (ledger.PayloadlessLedger, error) {
+//   - error if no V7 (payloadless) checkpoint exists in config.Triedir
+func newLocalPayloadlessLedger(config Config, triggerCheckpoint *atomic.Bool) (ledger.PayloadlessLedger, error) {
 	logger := config.Logger.With().Str("subcomponent", "ledger").Logger()
 
 	if config.Triedir == "" {
