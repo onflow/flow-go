@@ -16,6 +16,7 @@ var (
 	flagOutputDir     string
 	flagOutput        string
 	flagNWorker       uint
+	flagStream        bool
 )
 
 // Cmd converts a V6 checkpoint to a V7 (payloadless) checkpoint by reading
@@ -54,6 +55,10 @@ func init() {
 
 	Cmd.Flags().UintVar(&flagNWorker, "nworker", 16,
 		"number of subtrie files to encode in parallel (valid range [1, 16])")
+
+	Cmd.Flags().BoolVar(&flagStream, "stream", false,
+		"stream part files node-by-node instead of loading the full trie forest into memory "+
+			"(constant memory, preserves node hashes without re-deriving root hashes)")
 }
 
 func run(*cobra.Command, []string) {
@@ -73,21 +78,36 @@ func run(*cobra.Command, []string) {
 		Str("output_dir", outputDir).
 		Str("output", outputFile).
 		Uint("nworker", flagNWorker).
+		Bool("stream", flagStream).
 		Msg("converting V6 checkpoint to V7")
 
-	err := wal.ConvertCheckpointV6ToV7(
-		flagCheckpointDir,
-		flagCheckpoint,
-		outputDir,
-		outputFile,
-		log.Logger,
-		flagNWorker,
-	)
+	var err error
+	if flagStream {
+		err = wal.ConvertCheckpointV6ToV7Stream(
+			flagCheckpointDir,
+			flagCheckpoint,
+			outputDir,
+			outputFile,
+			log.Logger,
+			flagNWorker,
+		)
+	} else {
+		err = wal.ConvertCheckpointV6ToV7(
+			flagCheckpointDir,
+			flagCheckpoint,
+			outputDir,
+			outputFile,
+			log.Logger,
+			flagNWorker,
+		)
+	}
 	if err != nil {
 		log.Fatal().Err(err).Msg("checkpoint conversion failed")
 	}
 
-	log.Info().Msgf("wrote V7 checkpoint to %s", filepath.Join(outputDir, outputFile))
+	log.Info().
+		Str("output", filepath.Join(outputDir, outputFile)).
+		Msg("✅ V6→V7 checkpoint conversion completed successfully")
 }
 
 // defaultV7Filename returns the default V7 output filename for a given V6
