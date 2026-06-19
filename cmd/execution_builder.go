@@ -1490,6 +1490,38 @@ func (exeNode *ExecutionNode) LoadBootstrapper(node *NodeConfig) error {
 			return fmt.Errorf("could not load bootstrap state from checkpoint file: %w", err)
 		}
 
+		// In payloadless (V7) mode the spork only produces a V6 root.checkpoint.
+		// Convert it to a V7 root checkpoint here so the payloadless ledger can
+		// seed its forest from it on first boot; later restarts reuse this file
+		// (or a newer numbered V7 checkpoint written by the compactor). The
+		// HasRootCheckpointV7 guard keeps a re-entry after an interrupted
+		// bootstrap from hitting ConvertCheckpointV6ToV7's "output exists" check.
+		//
+		// TODO: ConvertCheckpointV6ToV7 reads the entire V6 forest into memory
+		// before emitting V7, a memory/time spike at first boot for mainnet-scale
+		// root checkpoints. A future optimization is to convert subtrie-by-subtrie
+		// without loading the whole forest.
+		if exeNode.exeConf.payloadless {
+			triedir := exeNode.exeConf.triedir
+			hasV7Root, err := wal.HasRootCheckpointV7(triedir)
+			if err != nil {
+				return fmt.Errorf("could not check for V7 root checkpoint: %w", err)
+			}
+			if !hasV7Root {
+				err = wal.ConvertCheckpointV6ToV7(
+					triedir,
+					modelbootstrap.FilenameWALRootCheckpoint,
+					triedir,
+					modelbootstrap.FilenameWALRootCheckpoint+wal.V7FileSuffix,
+					node.Logger,
+					16,
+				)
+				if err != nil {
+					return fmt.Errorf("could not convert V6 root checkpoint to V7 for payloadless node: %w", err)
+				}
+			}
+		}
+
 		err = bootstrapper.BootstrapExecutionDatabase(node.StorageLockMgr, node.ProtocolDB, node.RootSeal)
 		if err != nil {
 			return fmt.Errorf("could not bootstrap execution database: %w", err)

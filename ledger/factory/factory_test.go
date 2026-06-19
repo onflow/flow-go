@@ -15,13 +15,17 @@ import (
 	"go.uber.org/atomic"
 	"google.golang.org/grpc"
 
+	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/utils/unittest"
 
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
+	"github.com/onflow/flow-go/ledger/common/testutils"
 	"github.com/onflow/flow-go/ledger/complete"
+	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
+	"github.com/onflow/flow-go/ledger/complete/payloadless"
 	"github.com/onflow/flow-go/ledger/complete/wal"
 	ledgerpb "github.com/onflow/flow-go/ledger/protobuf"
 	"github.com/onflow/flow-go/ledger/remote"
@@ -497,4 +501,330 @@ func withLedgerPair(t *testing.T, fn func(localLedger, remoteLedger ledger.Ledge
 
 	// Execute the test function with the ledgers
 	fn(localLedger, remoteLedger)
+}
+
+// forestSizer is satisfied by both *complete.PayloadlessLedger (no-WAL mode)
+// and *complete.PayloadlessLedgerWithCompactor (the embedded type promotes
+// ForestSize). Tests use it to compare forest size regardless of which factory
+// path constructed the ledger.
+type forestSizer interface {
+	ForestSize() int
+}
+
+func payloadlessLedgerForestSize(t *testing.T, l ledger.PayloadlessLedger) int {
+	t.Helper()
+	fs, ok := l.(forestSizer)
+	require.True(t, ok, "expected ledger to expose ForestSize")
+	return fs.ForestSize()
+}
+
+// TestNewPayloadlessLedger_EmptyTriedir verifies that an empty Triedir is
+// rejected — the payloadless ledger has the same Triedir requirement as the
+// V6 [NewLedger] path.
+func TestNewPayloadlessLedger_EmptyTriedir(t *testing.T) {
+	logger := zerolog.Nop()
+	metricsCollector := &metrics.NoopCollector{}
+
+	_, err := NewPayloadlessLedger(Config{
+		MTrieCacheSize: 100,
+		WALMetrics:     metricsCollector,
+		LedgerMetrics:  metricsCollector,
+		Logger:         logger,
+	}, atomic.NewBool(false))
+	require.Error(t, err, "empty Triedir must be rejected")
+}
+
+// TestNewPayloadlessLedger_NoCheckpoint verifies that pointing at an empty
+// directory is rejected: a V7 checkpoint is required to boot a payloadless
+// node.
+func TestNewPayloadlessLedger_NoCheckpoint(t *testing.T) {
+	tempDir := t.TempDir()
+	logger := zerolog.Nop()
+	metricsCollector := &metrics.NoopCollector{}
+
+	_, err := NewPayloadlessLedger(Config{
+		Triedir:        tempDir,
+		MTrieCacheSize: 100,
+		WALMetrics:     metricsCollector,
+		LedgerMetrics:  metricsCollector,
+		Logger:         logger,
+	}, atomic.NewBool(false))
+	require.Error(t, err, "missing V7 checkpoint must be rejected")
+	require.Contains(t, err.Error(), "no V7")
+}
+
+// TestNewPayloadlessLedger_LoadsV7Checkpoint seeds a directory with a V7
+// checkpoint and verifies the factory loads its tries into the new ledger.
+func TestNewPayloadlessLedger_LoadsV7Checkpoint(t *testing.T) {
+	tempDir := t.TempDir()
+	logger := zerolog.Nop()
+	metricsCollector := &metrics.NoopCollector{}
+
+	// Build a small payloadless trie and store it as a V7 checkpoint in tempDir.
+	emptyTrie := payloadless.NewEmptyMTrie()
+	p := testutils.PathByUint8(0)
+	v := testutils.LightPayload8('A', 'a')
+	updated, _, err := payloadless.NewTrieWithUpdatedRegisters(
+		emptyTrie, []ledger.Path{p}, [][]byte{v.Value()}, true,
+	)
+	require.NoError(t, err)
+	expectedRoot := updated.RootHash()
+
+	v7Name := wal.NumberToFilenameV7(7)
+	require.NoError(t, wal.StoreCheckpointV7Concurrently(
+		[]*payloadless.MTrie{updated}, tempDir, v7Name, logger,
+	))
+
+	plLedger, err := NewPayloadlessLedger(Config{
+		Triedir:        tempDir,
+		MTrieCacheSize: 100,
+		WALMetrics:     metricsCollector,
+		LedgerMetrics:  metricsCollector,
+		Logger:         logger,
+	}, atomic.NewBool(false))
+	require.NoError(t, err)
+	require.NotNil(t, plLedger)
+	<-plLedger.Ready()
+	defer func() { <-plLedger.Done() }()
+
+	// Forest must contain the seeded trie (in addition to the initial empty trie).
+	require.True(t, plLedger.HasState(ledger.State(expectedRoot)),
+		"expected payloadless ledger to contain the seeded V7 root hash %s", expectedRoot)
+}
+
+// TestNewPayloadlessLedger_LatestV7Wins seeds a directory with two V7
+// checkpoints and verifies the factory loads only the latest one.
+func TestNewPayloadlessLedger_LatestV7Wins(t *testing.T) {
+	tempDir := t.TempDir()
+	logger := zerolog.Nop()
+	metricsCollector := &metrics.NoopCollector{}
+
+	// Two distinct payloadless tries at different checkpoint numbers.
+	emptyTrie := payloadless.NewEmptyMTrie()
+
+	p1 := testutils.PathByUint8(0)
+	v1 := testutils.LightPayload8('A', 'a')
+	trie1, _, err := payloadless.NewTrieWithUpdatedRegisters(
+		emptyTrie, []ledger.Path{p1}, [][]byte{v1.Value()}, true,
+	)
+	require.NoError(t, err)
+
+	p2 := testutils.PathByUint8(1)
+	v2 := testutils.LightPayload8('B', 'b')
+	trie2, _, err := payloadless.NewTrieWithUpdatedRegisters(
+		emptyTrie, []ledger.Path{p2}, [][]byte{v2.Value()}, true,
+	)
+	require.NoError(t, err)
+	require.NotEqual(t, trie1.RootHash(), trie2.RootHash())
+
+	require.NoError(t, wal.StoreCheckpointV7Concurrently(
+		[]*payloadless.MTrie{trie1}, tempDir, wal.NumberToFilenameV7(5), logger,
+	))
+	require.NoError(t, wal.StoreCheckpointV7Concurrently(
+		[]*payloadless.MTrie{trie2}, tempDir, wal.NumberToFilenameV7(9), logger,
+	))
+
+	plLedger, err := NewPayloadlessLedger(Config{
+		Triedir:        tempDir,
+		MTrieCacheSize: 100,
+		WALMetrics:     metricsCollector,
+		LedgerMetrics:  metricsCollector,
+		Logger:         logger,
+	}, atomic.NewBool(false))
+	require.NoError(t, err)
+	require.NotNil(t, plLedger)
+	<-plLedger.Ready()
+	defer func() { <-plLedger.Done() }()
+
+	require.True(t, plLedger.HasState(ledger.State(trie2.RootHash())),
+		"latest V7 checkpoint trie should be loaded")
+	require.False(t, plLedger.HasState(ledger.State(trie1.RootHash())),
+		"older V7 checkpoint should not be loaded")
+}
+
+// TestNewPayloadlessLedger_OnlyV6 places a V6 checkpoint in the directory and
+// verifies that the factory rejects boot with an error that mentions the
+// convert utility (V6 cannot be loaded into the payloadless forest directly).
+func TestNewPayloadlessLedger_OnlyV6(t *testing.T) {
+	tempDir := t.TempDir()
+	logger := zerolog.Nop()
+	metricsCollector := &metrics.NoopCollector{}
+
+	emptyV6 := trie.NewEmptyMTrie()
+	p := testutils.PathByUint8(0)
+	v := testutils.LightPayload8('A', 'a')
+	v6, _, err := trie.NewTrieWithUpdatedRegisters(
+		emptyV6, []ledger.Path{p}, []ledger.Payload{*v}, true,
+	)
+	require.NoError(t, err)
+
+	require.NoError(t, wal.StoreCheckpointV6Concurrently(
+		[]*trie.MTrie{v6}, tempDir, "checkpoint.00000007", logger,
+	))
+
+	_, err = NewPayloadlessLedger(Config{
+		Triedir:        tempDir,
+		MTrieCacheSize: 100,
+		WALMetrics:     metricsCollector,
+		LedgerMetrics:  metricsCollector,
+		Logger:         logger,
+	}, atomic.NewBool(false))
+	require.Error(t, err, "V6-only triedir must be rejected")
+	require.Contains(t, err.Error(), "checkpoint-convert-v7",
+		"error must point operator at the convert utility")
+}
+
+// TestNewPayloadlessLedger_LoadsConvertedV6 verifies the end-to-end story:
+// store V6 → convert to V7 → factory loads the V7 → ledger has the V6 root.
+func TestNewPayloadlessLedger_LoadsConvertedV6(t *testing.T) {
+	tempDir := t.TempDir()
+	logger := zerolog.Nop()
+	metricsCollector := &metrics.NoopCollector{}
+
+	emptyV6 := trie.NewEmptyMTrie()
+	p := testutils.PathByUint8(0)
+	v := testutils.LightPayload8('A', 'a')
+	v6Trie, _, err := trie.NewTrieWithUpdatedRegisters(
+		emptyV6, []ledger.Path{p}, []ledger.Payload{*v}, true,
+	)
+	require.NoError(t, err)
+
+	v6Name := "checkpoint.00000011"
+	require.NoError(t, wal.StoreCheckpointV6Concurrently(
+		[]*trie.MTrie{v6Trie}, tempDir, v6Name, logger,
+	))
+
+	v7Name := v6Name + wal.V7FileSuffix
+	require.NoError(t, wal.ConvertCheckpointV6ToV7(tempDir, v6Name, tempDir, v7Name, logger, 16))
+
+	plLedger, err := NewPayloadlessLedger(Config{
+		Triedir:        tempDir,
+		MTrieCacheSize: 100,
+		WALMetrics:     metricsCollector,
+		LedgerMetrics:  metricsCollector,
+		Logger:         logger,
+	}, atomic.NewBool(false))
+	require.NoError(t, err)
+	require.NotNil(t, plLedger)
+	<-plLedger.Ready()
+	defer func() { <-plLedger.Done() }()
+
+	// Root hash is preserved across V6 → V7 conversion, so the payloadless
+	// ledger should contain the V6 root hash.
+	require.True(t, plLedger.HasState(ledger.State(v6Trie.RootHash())),
+		"payloadless ledger should contain the converted V7 root (== V6 root)")
+}
+
+// TestNewPayloadlessLedger_LoadsV7RootCheckpoint verifies that a freshly-sporked
+// payloadless node boots from a V7 root checkpoint alone, with no numbered V7
+// checkpoint present: the factory gate accepts the V7 root and
+// ReplayOnPayloadlessForest seeds the forest from it. This mirrors the
+// post-bootstrap state produced by LoadBootstrapper, which converts the V6
+// root.checkpoint into root.checkpoint.v7 for payloadless nodes.
+func TestNewPayloadlessLedger_LoadsV7RootCheckpoint(t *testing.T) {
+	tempDir := t.TempDir()
+	logger := zerolog.Nop()
+	metricsCollector := &metrics.NoopCollector{}
+
+	// Build a V6 root checkpoint, then convert it to a V7 root checkpoint — the
+	// same root.checkpoint -> root.checkpoint.v7 step the node bootstrap performs.
+	emptyV6 := trie.NewEmptyMTrie()
+	p := testutils.PathByUint8(0)
+	v := testutils.LightPayload8('A', 'a')
+	v6Trie, _, err := trie.NewTrieWithUpdatedRegisters(
+		emptyV6, []ledger.Path{p}, []ledger.Payload{*v}, true,
+	)
+	require.NoError(t, err)
+
+	require.NoError(t, wal.StoreCheckpointV6Concurrently(
+		[]*trie.MTrie{v6Trie}, tempDir, bootstrap.FilenameWALRootCheckpoint, logger,
+	))
+	require.NoError(t, wal.ConvertCheckpointV6ToV7(
+		tempDir, bootstrap.FilenameWALRootCheckpoint,
+		tempDir, bootstrap.FilenameWALRootCheckpoint+wal.V7FileSuffix,
+		logger, 16,
+	))
+
+	// Ensure the test actually exercises the root-checkpoint path: no numbered
+	// V7 checkpoint must be present, only the V7 root checkpoint.
+	_, latestV7, err := wal.ListV7Checkpoints(tempDir)
+	require.NoError(t, err)
+	require.Equal(t, -1, latestV7, "test must exercise the root-checkpoint path (no numbered V7)")
+
+	plLedger, err := NewPayloadlessLedger(Config{
+		Triedir:        tempDir,
+		MTrieCacheSize: 100,
+		WALMetrics:     metricsCollector,
+		LedgerMetrics:  metricsCollector,
+		Logger:         logger,
+	}, atomic.NewBool(false))
+	require.NoError(t, err)
+	require.NotNil(t, plLedger)
+	<-plLedger.Ready()
+	defer func() { <-plLedger.Done() }()
+
+	// Root hash is preserved across V6 → V7 conversion, so the payloadless ledger
+	// should be seeded with the V6 root hash from the V7 root checkpoint.
+	require.True(t, plLedger.HasState(ledger.State(v6Trie.RootHash())),
+		"payloadless ledger should be seeded from the V7 root checkpoint")
+}
+
+// TestNewPayloadlessLedger_V7SeedSurvivesRestart verifies that V7 checkpoint
+// loading at boot is deterministic across restarts: the seeded state is
+// recovered on every reopen.
+//
+// Note: this test does NOT exercise WAL-segment replay of post-checkpoint Sets.
+// A production V7 checkpoint's number aligns with the WAL segment it covers
+// (the compactor sets `checkpointNum = prevSegmentNum` when emitting), so
+// replay correctly skips segments through that number. A synthetic seed V7
+// (created via [wal.StoreCheckpointV7Concurrently] in a test) carries number 0
+// but does NOT actually cover WAL segment 0 — so testing the runtime
+// Set→WAL→restart→replay round-trip via the factory would falsely lose
+// segment 0's records. That flow is covered at the bundle layer in
+// TestPayloadlessLedgerWithCompactor_SetPersists, which starts from no V7
+// checkpoint (replay-everything semantics) and exercises the full WAL replay
+// loop.
+func TestNewPayloadlessLedger_V7SeedSurvivesRestart(t *testing.T) {
+	tempDir := t.TempDir()
+	logger := zerolog.Nop()
+	metricsCollector := &metrics.NoopCollector{}
+
+	// Seed the triedir with a non-empty V7 checkpoint so the factory accepts
+	// the boot.
+	empty := payloadless.NewEmptyMTrie()
+	p := testutils.PathByUint8(0)
+	v := testutils.LightPayload8('A', 'a')
+	seedTrie, _, err := payloadless.NewTrieWithUpdatedRegisters(
+		empty, []ledger.Path{p}, [][]byte{v.Value()}, true,
+	)
+	require.NoError(t, err)
+	seedRoot := seedTrie.RootHash()
+	require.NoError(t, wal.StoreCheckpointV7Concurrently(
+		[]*payloadless.MTrie{seedTrie}, tempDir, wal.NumberToFilenameV7(0), logger,
+	))
+
+	cfg := Config{
+		Triedir:            tempDir,
+		MTrieCacheSize:     100,
+		CheckpointDistance: 100,
+		CheckpointsToKeep:  10,
+		WALMetrics:         metricsCollector,
+		LedgerMetrics:      metricsCollector,
+		Logger:             logger,
+	}
+
+	plLedger, err := NewPayloadlessLedger(cfg, atomic.NewBool(false))
+	require.NoError(t, err)
+	<-plLedger.Ready()
+	require.True(t, plLedger.HasState(ledger.State(seedRoot)),
+		"first boot should load seeded V7 state")
+	<-plLedger.Done()
+
+	// Reopen and verify the seeded state still loads.
+	plLedger2, err := NewPayloadlessLedger(cfg, atomic.NewBool(false))
+	require.NoError(t, err)
+	<-plLedger2.Ready()
+	defer func() { <-plLedger2.Done() }()
+	require.True(t, plLedger2.HasState(ledger.State(seedRoot)),
+		"second boot should also load seeded V7 state")
 }

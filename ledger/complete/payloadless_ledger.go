@@ -2,6 +2,7 @@ package complete
 
 import (
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -10,9 +11,20 @@ import (
 	"github.com/onflow/flow-go/ledger/common/hash"
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
 	"github.com/onflow/flow-go/ledger/complete/payloadless"
+	realWAL "github.com/onflow/flow-go/ledger/complete/wal"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 )
+
+// WALPayloadlessTrieUpdate is the message sent from [PayloadlessLedger.Set]
+// to a payloadless compactor over the trie-update channel. It mirrors
+// [WALTrieUpdate] but carries the new *payloadless.MTrie back to the compactor
+// on TrieCh so the compactor can enqueue it in its checkpoint queue.
+type WALPayloadlessTrieUpdate struct {
+	Update   *ledger.TrieUpdate        // update to be encoded into the WAL
+	ResultCh chan<- error              // compactor sends back the WAL write result
+	TrieCh   <-chan *payloadless.MTrie // ledger sends the freshly-built trie to the compactor
+}
 
 // PayloadlessLedger is a fork-aware, in-memory trie-based key/leaf-hash storage.
 //
@@ -27,20 +39,39 @@ import (
 // memory and is bounded by `forestCapacity`. When more tries are added than the
 // capacity, the Least Recently Added trie is removed (FIFO).
 //
-// PayloadlessLedger is currently in-memory only; it does not persist updates
-// to a write-ahead log.
+// PayloadlessLedger persists updates to a write-ahead log when constructed
+// with a non-nil [realWAL.LedgerWAL]; otherwise it operates purely in-memory.
 type PayloadlessLedger struct {
 	forest            *payloadless.Forest
+	wal               realWAL.LedgerWAL
 	metrics           module.LedgerMetrics
 	logger            zerolog.Logger
+	trieUpdateCh      chan *WALPayloadlessTrieUpdate
+	closeTrieUpdateCh sync.Once
 	pathFinderVersion uint8
 }
 
-// NewPayloadlessLedger creates a new in-memory payloadless trie-backed ledger.
+// defaultPayloadlessTrieUpdateChanSize matches the V6 ledger's buffer size and
+// is shared by [PayloadlessLedger.trieUpdateCh]. Tuned for the same workload
+// characteristics — a burst-tolerant buffer between Set and the compactor.
+const defaultPayloadlessTrieUpdateChanSize = defaultTrieUpdateChanSize
+
+// NewPayloadlessLedger creates a new payloadless trie-backed ledger.
+//
+// When `wal` is non-nil the ledger:
+//   - serializes each [Set] update through a [WALPayloadlessTrieUpdate] sent
+//     over [TrieUpdateChan], blocking until the consumer (typically a
+//     [PayloadlessCompactor]) reports the WAL write outcome;
+//   - exposes a non-nil channel from [TrieUpdateChan].
+//
+// When `wal` is nil the ledger is purely in-memory: [Set] applies updates
+// synchronously and [TrieUpdateChan] returns nil. This mode is intended for
+// tests and short-lived experimental nodes that don't need persistence.
 //
 // `capacity` bounds the number of tries kept in the forest; the least-recently
 // added trie is evicted once capacity is exceeded.
 func NewPayloadlessLedger(
+	wal realWAL.LedgerWAL,
 	capacity int,
 	metrics module.LedgerMetrics,
 	log zerolog.Logger,
@@ -54,28 +85,80 @@ func NewPayloadlessLedger(
 		return nil, fmt.Errorf("cannot create payloadless forest: %w", err)
 	}
 
-	return &PayloadlessLedger{
+	l := &PayloadlessLedger{
 		forest:            forest,
+		wal:               wal,
 		metrics:           metrics,
 		logger:            logger,
 		pathFinderVersion: pathFinderVer,
-	}, nil
+	}
+
+	// When a WAL is attached, recover in-memory state from the latest V7
+	// checkpoint plus newer WAL segments before serving requests. This mirrors
+	// the V6 [NewLedger] recovery via [realWAL.LedgerWAL.ReplayOnForest]. When no
+	// WAL is attached the ledger is purely in-memory and there is nothing to
+	// recover.
+	if wal != nil {
+		l.trieUpdateCh = make(chan *WALPayloadlessTrieUpdate, defaultPayloadlessTrieUpdateChanSize)
+
+		// pause records to prevent double logging trie updates during replay
+		wal.PauseRecord()
+		defer wal.UnpauseRecord()
+
+		err = wal.ReplayOnPayloadlessForest(forest)
+		if err != nil {
+			return nil, fmt.Errorf("cannot restore LedgerWAL: %w", err)
+		}
+
+		wal.UnpauseRecord()
+	}
+	return l, nil
 }
 
-// Ready implements module.ReadyDoneAware. The payloadless ledger has no
-// asynchronous initialization, so the returned channel is already closed.
+// TrieUpdateChan returns the channel that [Set] uses to publish trie updates
+// to the consumer (typically a [PayloadlessCompactor]). Returns nil when the
+// ledger was constructed without a WAL — in that case [Set] applies updates
+// synchronously.
+//
+// The returned channel is closed by [PayloadlessLedger.Done] so the consumer
+// can drain any in-flight updates.
+func (l *PayloadlessLedger) TrieUpdateChan() <-chan *WALPayloadlessTrieUpdate {
+	return l.trieUpdateCh
+}
+
+// Ready implements module.ReadyDoneAware. When a WAL is attached, Ready
+// gates on the WAL's own readiness; otherwise it returns an already-closed
+// channel.
 func (l *PayloadlessLedger) Ready() <-chan struct{} {
+	if l.wal == nil {
+		ch := make(chan struct{})
+		close(ch)
+		return ch
+	}
 	ready := make(chan struct{})
-	close(ready)
+	go func() {
+		defer close(ready)
+		<-l.wal.Ready()
+	}()
 	return ready
 }
 
-// Done implements module.ReadyDoneAware. The payloadless ledger has no
-// background workers, so the returned channel is already closed.
+// Done implements module.ReadyDoneAware. When a WAL is attached, Done closes
+// the trie-update channel so a compactor can drain pending updates before the
+// WAL is shut down. The WAL itself is closed by the compactor (matching the V6
+// ordering), so Done returns once channel closure has been signaled.
 func (l *PayloadlessLedger) Done() <-chan struct{} {
-	done := make(chan struct{})
-	close(done)
-	return done
+	if l.trieUpdateCh == nil {
+		ch := make(chan struct{})
+		close(ch)
+		return ch
+	}
+	l.closeTrieUpdateCh.Do(func() {
+		close(l.trieUpdateCh)
+	})
+	ch := make(chan struct{})
+	close(ch)
+	return ch
 }
 
 // InitialState returns the state of an empty ledger.
@@ -162,6 +245,11 @@ func (l *PayloadlessLedger) GetLeafHashes(query *ledger.Query) ([]*hash.Hash, er
 // Set applies the given update to the ledger and returns the new state and
 // the trie update that was applied. The update payload's `value` bytes are
 // hashed into the trie; the payload's key is not retained.
+//
+// When the ledger was constructed with a WAL, Set publishes the trie update on
+// [TrieUpdateChan] and waits for the consumer (compactor) to confirm the WAL
+// write; the new trie is computed in parallel with the WAL write. When the
+// ledger was constructed without a WAL, Set applies the update synchronously.
 func (l *PayloadlessLedger) Set(update *ledger.Update) (newState ledger.State, trieUpdate *ledger.TrieUpdate, err error) {
 	if update.Size() == 0 {
 		return update.State(),
@@ -182,17 +270,10 @@ func (l *PayloadlessLedger) Set(update *ledger.Update) (newState ledger.State, t
 
 	l.metrics.UpdateCount()
 
-	newTrie, err := l.forest.NewTrie(trieUpdate)
+	newState, err = l.set(trieUpdate)
 	if err != nil {
-		return ledger.State(hash.DummyHash), nil, fmt.Errorf("cannot update state: %w", err)
+		return ledger.State(hash.DummyHash), nil, err
 	}
-
-	err = l.forest.AddTrie(newTrie)
-	if err != nil {
-		return ledger.State(hash.DummyHash), nil, fmt.Errorf("failed to add new trie to forest: %w", err)
-	}
-
-	newState = ledger.State(newTrie.RootHash())
 
 	elapsed := time.Since(start)
 	l.metrics.UpdateDuration(elapsed)
@@ -208,6 +289,59 @@ func (l *PayloadlessLedger) Set(update *ledger.Update) (newState ledger.State, t
 		Int("update_size", update.Size()).
 		Msg("payloadless ledger updated")
 	return newState, trieUpdate, nil
+}
+
+// set applies a [ledger.TrieUpdate] to the forest and returns the new root.
+//
+// If a WAL is attached, set publishes the update on [trieUpdateCh] and waits
+// for the compactor's WAL-write outcome on ResultCh; the new trie is computed
+// concurrently with the WAL write and handed back to the compactor on TrieCh
+// for inclusion in the checkpoint queue. This mirrors the V6 [Ledger.set]
+// contract exactly so [TrieUpdateChan] consumers can be uniform across modes.
+//
+// If no WAL is attached, set applies the update synchronously without any
+// channel coordination.
+//
+// No error returns are expected during normal operation.
+func (l *PayloadlessLedger) set(trieUpdate *ledger.TrieUpdate) (ledger.State, error) {
+	if l.trieUpdateCh == nil {
+		newTrie, err := l.forest.NewTrie(trieUpdate)
+		if err != nil {
+			return ledger.State(hash.DummyHash), fmt.Errorf("cannot update state: %w", err)
+		}
+		if err := l.forest.AddTrie(newTrie); err != nil {
+			return ledger.State(hash.DummyHash), fmt.Errorf("failed to add new trie to forest: %w", err)
+		}
+		return ledger.State(newTrie.RootHash()), nil
+	}
+
+	// resultCh is a buffered channel to receive the WAL write outcome from the
+	// compactor.
+	resultCh := make(chan error, 1)
+	// trieCh is a buffered channel used to ship the freshly-built trie from this
+	// goroutine to the compactor. The compactor stages it into its checkpoint
+	// queue. trieCh may be closed without sending when trie construction fails.
+	trieCh := make(chan *payloadless.MTrie, 1)
+	defer close(trieCh)
+
+	l.trieUpdateCh <- &WALPayloadlessTrieUpdate{Update: trieUpdate, ResultCh: resultCh, TrieCh: trieCh}
+
+	newTrie, err := l.forest.NewTrie(trieUpdate)
+	walError := <-resultCh
+
+	if err != nil {
+		return ledger.State(hash.DummyHash), fmt.Errorf("cannot update state: %w", err)
+	}
+	if walError != nil {
+		return ledger.State(hash.DummyHash), fmt.Errorf("error while writing LedgerWAL: %w", walError)
+	}
+
+	if err := l.forest.AddTrie(newTrie); err != nil {
+		return ledger.State(hash.DummyHash), fmt.Errorf("failed to add new trie to forest: %w", err)
+	}
+
+	trieCh <- newTrie
+	return ledger.State(newTrie.RootHash()), nil
 }
 
 // Prove returns a payloadless batch proof for the given keys at the given
