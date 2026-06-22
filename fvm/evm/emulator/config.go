@@ -154,6 +154,7 @@ func defaultConfig() *Config {
 			GetHash: func(n uint64) gethCommon.Hash {
 				return gethCommon.Hash{}
 			},
+			CostPerStateByte: gethParams.CostPerStateByte,
 		},
 		PCTracker: NewCallTracker(),
 	}

@@ -64,7 +64,7 @@ func TestNativeTokenBridging(t *testing.T) {
 						call := types.NewDepositCall(bridgeAccount, testAccount, originalBalance, 0)
 						res, err := blk.DirectCall(call)
 						requireSuccessfulExecution(t, err, res)
-						require.Equal(t, defaultCtx.DirectCallBaseGasUsage, res.GasConsumed)
+						require.Equal(t, uint64(204_600), res.GasConsumed)
 						require.Equal(t, call.Hash(), res.TxHash)
 					})
 				})
@@ -91,7 +91,7 @@ func TestNativeTokenBridging(t *testing.T) {
 						call := types.NewDeployCall(
 							bridgeAccount,
 							emptyContractByteCode,
-							100_000,
+							350_000,
 							big.NewInt(0),
 							1)
 						res, err := blk.DirectCall(call)
@@ -565,7 +565,7 @@ func TestContractInteraction(t *testing.T) {
 							Nonce:     account.Nonce(),
 							GasTipCap: big.NewInt(2),
 							GasFeeCap: big.NewInt(3),
-							Gas:       gethParams.TxGas,
+							Gas:       204_600,
 							To:        &gethCommon.Address{},
 							Value:     big.NewInt(1),
 						}),
@@ -850,7 +850,7 @@ func TestFactoryPatterns(t *testing.T) {
 									factoryDeployer,
 									factoryAddress,
 									factoryContract.MakeCallData(t, "deploy", salt),
-									250_000,
+									1_500_000,
 									big.NewInt(0),
 									0,
 								),
@@ -889,7 +889,7 @@ func TestFactoryPatterns(t *testing.T) {
 										contracts.FactoryDeployableContractABIJSON,
 										"set",
 										storedValue),
-									120_000,
+									225_000,
 									big.NewInt(0),
 									0,
 								),
@@ -908,7 +908,7 @@ func TestFactoryPatterns(t *testing.T) {
 										contracts.FactoryDeployableContractABIJSON,
 										"destroy",
 										refundAddress),
-									120_000,
+									225_000,
 									big.NewInt(0),
 									0,
 								),
@@ -967,7 +967,7 @@ func TestFactoryPatterns(t *testing.T) {
 										"deployAndDestroy",
 										salt,
 										storedValue),
-									400_000,
+									1_500_000,
 									big.NewInt(0),
 									0,
 								),
@@ -994,7 +994,7 @@ func TestFactoryPatterns(t *testing.T) {
 									factoryDeployer,
 									factoryAddress,
 									factoryContract.MakeCallData(t, "depositAndDeploy", salt, balance, storedValue),
-									250_000,
+									1_550_000,
 									big.NewInt(0),
 									1,
 								),
@@ -1046,7 +1046,7 @@ func TestFactoryPatterns(t *testing.T) {
 									factoryDeployer,
 									factoryAddress,
 									factoryContract.MakeCallData(t, "depositDeployAndDestroy", salt, big.NewInt(100), big.NewInt(10)),
-									250_000,
+									1_550_000,
 									big.NewInt(0),
 									1,
 								),

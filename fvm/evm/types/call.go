@@ -36,6 +36,10 @@ const (
 	// to smart contract addresses.
 	DepositCallGasLimit  = DefaultGasLimitForTokenTransfer
 	WithdrawCallGasLimit = DefaultGasLimitForTokenTransfer
+
+	// With EIP-8037, each state-creation transaction (such as funding a fresh EOA),
+	// needs an extra gas limit, as calculated below.
+	StateCreationGasLimit = gethParams.AccountCreationSize * gethParams.CostPerStateByte
 )
 
 // DirectCall captures all the data related to a direct call to evm
@@ -201,7 +205,7 @@ func NewDepositCall(
 		To:       address,
 		Data:     nil,
 		Value:    amount,
-		GasLimit: DepositCallGasLimit,
+		GasLimit: DepositCallGasLimit + StateCreationGasLimit,
 		Nonce:    nonce,
 	}
 }
@@ -238,7 +242,7 @@ func NewTransferCall(
 		To:       to,
 		Data:     nil,
 		Value:    amount,
-		GasLimit: DefaultGasLimitForTokenTransfer,
+		GasLimit: DefaultGasLimitForTokenTransfer + StateCreationGasLimit,
 		Nonce:    nonce,
 	}
 }
