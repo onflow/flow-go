@@ -3,6 +3,7 @@ package emulator
 import (
 	"errors"
 	"fmt"
+	"math"
 	"math/big"
 
 	gethCommon "github.com/ethereum/go-ethereum/common"
@@ -600,7 +601,7 @@ func (proc *procedure) deployAt(
 		return res, nil
 	}
 
-	// increment the nonce for the caller
+	// increment the caller's nonce after passing all validations
 	nonce := proc.state.GetNonce(caller)
 	if nonce+1 < nonce {
 		res.SetValidationError(gethVM.ErrNonceUintOverflow)
@@ -612,6 +613,15 @@ func (proc *procedure) deployAt(
 		gethTracing.NonceChangeContractCreator,
 	)
 
+	// After Amsterdam we limit the regular gas to 16M, the data gas to the transaction limit
+	limit := call.GasLimit
+	if proc.config.ChainRules().IsAmsterdam {
+		limit = min(call.GasLimit, gethParams.MaxTxGas)
+	}
+	gasBudget := gethVM.NewGasBudget(limit, call.GasLimit-limit)
+
+	reservoir := gasBudget.StateGas
+
 	addr := call.To.ToCommon()
 	// update access list (Berlin)
 	proc.state.AddAddressToAccessList(addr)
@@ -621,12 +631,21 @@ func (proc *procedure) deployAt(
 	if proc.state.GetNonce(addr) != 0 ||
 		(contractHash != (gethCommon.Hash{}) && contractHash != gethTypes.EmptyCodeHash) {
 		res.VMError = gethVM.ErrContractAddressCollision
+		halt := gasBudget.ExitHalt(reservoir)
+		if proc.evm.Config.Tracer.HasGasHook() {
+			proc.evm.Config.Tracer.EmitGasChange(
+				gasBudget.AsTracing(),
+				halt.AsTracing(),
+				gethTracing.GasChangeCallFailedExecution,
+			)
+		}
 		return res, nil
 	}
 
 	// create a new account on the state only if the object was not present.
 	// it might be possible the contract code is deployed to a pre-existent
 	// account with non-zero balance.
+	snapshot := proc.evm.StateDB.Snapshot()
 	if !proc.state.Exist(addr) {
 		proc.state.CreateAccount(addr)
 	}
@@ -650,7 +669,6 @@ func (proc *procedure) deployAt(
 
 	// initialise a new contract and set the code that is to be used by the EVM.
 	// the contract is a scoped environment for this execution context only.
-	gasBudget := gethVM.NewGasBudget(call.GasLimit)
 	contract := gethVM.NewContract(
 		caller,
 		addr,
@@ -664,50 +682,30 @@ func (proc *procedure) deployAt(
 	contract.SetCallCode(gethCommon.Hash{}, call.Data)
 	contract.IsDeployment = true
 
-	ret, err := proc.evm.Run(contract, nil, false)
-	createDataGas := uint64(len(ret)) * gethParams.CreateDataGas
-	res.GasConsumed = createDataGas
-
+	gasConsumed, err := proc.initNewContract(contract, addr, call)
 	// handle errors
 	if err != nil {
+		proc.evm.StateDB.RevertToSnapshot(snapshot)
+
 		// for all errors except this one consume all the remaining gas (Homestead)
+		exit := contract.Gas.Exit(err, reservoir)
 		if err != gethVM.ErrExecutionReverted {
-			res.GasConsumed = call.GasLimit
+			res.GasConsumed = gasConsumed
+			if proc.evm.Config.Tracer.HasGasHook() {
+				proc.evm.Config.Tracer.EmitGasChange(
+					contract.Gas.AsTracing(),
+					exit.AsTracing(),
+					gethTracing.GasChangeCallFailedExecution,
+				)
+			}
 		}
 		res.VMError = err
 		return res, nil
 	}
 
-	// check whether the max code size has been exceeded
-	if err := gethVM.CheckMaxCodeSize(&rules, uint64(len(ret))); err != nil {
-		// consume all the remaining gas (Homestead)
-		res.GasConsumed = call.GasLimit
-		res.VMError = gethVM.ErrMaxCodeSizeExceeded
-		return res, nil
-	}
-
-	// reject code starting with 0xEF (EIP-3541)
-	if len(ret) >= 1 && ret[0] == 0xEF {
-		// consume all the remaining gas (Homestead)
-		res.GasConsumed = call.GasLimit
-		res.VMError = gethVM.ErrInvalidCode
-		return res, nil
-	}
-
-	// update gas usage
-	if !contract.UseGas(gethVM.GasCosts{RegularGas: createDataGas}, proc.evm.Config.Tracer, gethTracing.GasChangeCallCodeStorage) {
-		// consume all the remaining gas (Homestead)
-		res.GasConsumed = call.GasLimit
-		res.VMError = gethVM.ErrCodeStoreOutOfGas
-		return res, nil
-	}
-
+	res.GasConsumed = gasConsumed
 	res.DeployedContractAddress = &call.To
 	res.CumulativeGasUsed = proc.config.BlockTotalGasUsedSoFar + res.GasConsumed
-
-	if len(ret) > 0 {
-		proc.state.SetCode(addr, ret, gethTracing.CodeChangeContractCreation)
-	}
 
 	res.StateChangeCommitment, err = proc.commit(true)
 	return res, err
@@ -769,6 +767,9 @@ func (proc *procedure) run(
 	)
 
 	// transit the state
+	txIndex := proc.config.BlockTxCountSoFar
+	// `blockAccessIndex` should be 0 for pre-execution, 1..n for transactions, n+1 for post-execution
+	proc.state.SetTxContext(txHash, int(txIndex), uint32(txIndex+1))
 	execResult, err := gethCore.ApplyMessage(proc.evm, msg, gasPool)
 	if err != nil {
 		// if the error is a fatal error or a non-fatal state error or a backend err return it
@@ -782,7 +783,6 @@ func (proc *procedure) run(
 		return &res, nil
 	}
 
-	txIndex := proc.config.BlockTxCountSoFar
 	// if pre-checks are passed, the exec result won't be nil
 	if execResult != nil {
 		res.GasConsumed = execResult.UsedGas
@@ -823,6 +823,62 @@ func (proc *procedure) run(
 	return &res, nil
 }
 
+func (proc *procedure) initNewContract(
+	contract *gethVM.Contract,
+	addr gethCommon.Address,
+	call *types.DirectCall,
+) (uint64, error) {
+	ret, err := proc.evm.Run(contract, nil, false)
+	if err != nil {
+		return call.GasLimit, err
+	}
+
+	// check prefix before gas calculation.
+	// reject code starting with 0xEF (EIP-3541)
+	if len(ret) >= 1 && ret[0] == 0xEF {
+		return call.GasLimit, gethVM.ErrInvalidCode
+	}
+
+	var gasConsumed uint64
+
+	rules := proc.config.ChainRules()
+	if rules.IsAmsterdam {
+		// check max code size BEFORE charging gas so over-max code
+		// does not consume state gas (which would inflate tx_state).
+		// check whether the max code size has been exceeded
+		if err := gethVM.CheckMaxCodeSize(&rules, uint64(len(ret))); err != nil {
+			return call.GasLimit, gethVM.ErrMaxCodeSizeExceeded
+		}
+		// charge regular gas (hash cost) before state gas.
+		regularCost := toWordSize(uint64(len(ret))) * gethParams.Keccak256WordGas
+		if !chargeRegular(contract, regularCost, proc.evm.Config.Tracer, gethTracing.GasChangeCallCodeStorage) {
+			return call.GasLimit, gethVM.ErrCodeStoreOutOfGas
+		}
+		// charge state gas (code-deposit) afterwards.
+		stateCost := uint64(len(ret)) * proc.evm.Context.CostPerStateByte
+		if !chargeState(contract, stateCost, proc.evm.Config.Tracer, gethTracing.GasChangeCallCodeStorage) {
+			return call.GasLimit, gethVM.ErrCodeStoreOutOfGas
+		}
+		gasConsumed = regularCost + stateCost
+	} else {
+		// update gas usage
+		createDataCost := uint64(len(ret)) * gethParams.CreateDataGas
+		if !chargeRegular(contract, createDataCost, proc.evm.Config.Tracer, gethTracing.GasChangeCallCodeStorage) {
+			return call.GasLimit, gethVM.ErrCodeStoreOutOfGas
+		}
+		if err := gethVM.CheckMaxCodeSize(&rules, uint64(len(ret))); err != nil {
+			return call.GasLimit, gethVM.ErrMaxCodeSizeExceeded
+		}
+		gasConsumed = createDataCost
+	}
+
+	if len(ret) > 0 {
+		proc.state.SetCode(addr, ret, gethTracing.CodeChangeContractCreation)
+	}
+
+	return gasConsumed, nil
+}
+
 func checkAndConvertValue(input *big.Int) (converted *uint256.Int, isValid bool) {
 	// check for negative input
 	if input.Sign() < 0 {
@@ -834,4 +890,48 @@ func checkAndConvertValue(input *big.Int) (converted *uint256.Int, isValid bool)
 		return nil, false
 	}
 	return value, true
+}
+
+// chargeRegular deducts regular gas only, with tracer integration.
+// Returns false on OOG. Delegates the arithmetic to GasBudget.ChargeRegular.
+func chargeRegular(
+	c *gethVM.Contract,
+	r uint64,
+	logger *gethTracing.Hooks,
+	reason gethTracing.GasChangeReason,
+) bool {
+	prior, ok := c.Gas.ChargeRegular(r)
+	if !ok {
+		return false
+	}
+	if logger.HasGasHook() && reason != gethTracing.GasChangeIgnored {
+		logger.EmitGasChange(prior.AsTracing(), c.Gas.AsTracing(), reason)
+	}
+	return true
+}
+
+// chargeState deducts state gas (spilling into regular when the reservoir is
+// exhausted), with tracer integration. Returns false on OOG.
+func chargeState(
+	c *gethVM.Contract,
+	s uint64,
+	logger *gethTracing.Hooks,
+	reason gethTracing.GasChangeReason,
+) bool {
+	prior, ok := c.Gas.ChargeState(s)
+	if !ok {
+		return false
+	}
+	if logger.HasGasHook() && reason != gethTracing.GasChangeIgnored {
+		logger.EmitGasChange(prior.AsTracing(), c.Gas.AsTracing(), reason)
+	}
+	return true
+}
+
+// toWordSize returns the ceiled word size required for memory expansion.
+func toWordSize(size uint64) uint64 {
+	if size > math.MaxUint64-31 {
+		return math.MaxUint64/32 + 1
+	}
+	return (size + 31) / 32
 }
