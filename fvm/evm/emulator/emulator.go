@@ -10,6 +10,7 @@ import (
 	gethCore "github.com/ethereum/go-ethereum/core"
 	gethTracing "github.com/ethereum/go-ethereum/core/tracing"
 	gethTypes "github.com/ethereum/go-ethereum/core/types"
+	gethBAL "github.com/ethereum/go-ethereum/core/types/bal"
 	gethVM "github.com/ethereum/go-ethereum/core/vm"
 	gethCrypto "github.com/ethereum/go-ethereum/crypto"
 	gethParams "github.com/ethereum/go-ethereum/params"
@@ -209,7 +210,7 @@ func (bl *BlockView) RunTransaction(
 	}
 
 	// all commit errors (StateDB errors) has to be returned
-	res.StateChangeCommitment, err = proc.commit(true)
+	res.StateChangeCommitment, res.StateAccessList, err = proc.commit(true)
 	if err != nil {
 		return nil, err
 	}
@@ -265,7 +266,7 @@ func (bl *BlockView) BatchRunTransactions(txs []*gethTypes.Transaction) ([]*type
 		}
 
 		// all commit errors (StateDB errors) has to be returned
-		res.StateChangeCommitment, err = proc.commit(false)
+		res.StateChangeCommitment, res.StateAccessList, err = proc.commit(false)
 		if err != nil {
 			return nil, err
 		}
@@ -430,21 +431,21 @@ type procedure struct {
 }
 
 // commit commits the changes to the state (with optional finalization)
-func (proc *procedure) commit(finalize bool) (hash.Hash, error) {
+func (proc *procedure) commit(finalize bool) (hash.Hash, *gethBAL.ConstructionBlockAccessList, error) {
 	// Calling `StateDB.Finalise(true)` is currently a no-op, but
 	// we add it here to be more in line with how its envisioned.
-	proc.state.Finalise(true)
+	bal := proc.state.Finalise(true)
 	stateUpdateCommitment, err := proc.state.Commit(finalize)
 	if err != nil {
 		// if known types (state errors) don't do anything and return
 		if types.IsAFatalError(err) || types.IsAStateError(err) || types.IsABackendError(err) {
-			return stateUpdateCommitment, err
+			return stateUpdateCommitment, bal, err
 		}
 
 		// else is a new fatal error
-		return stateUpdateCommitment, types.NewFatalError(err)
+		return stateUpdateCommitment, bal, types.NewFatalError(err)
 	}
-	return stateUpdateCommitment, nil
+	return stateUpdateCommitment, bal, nil
 }
 
 func (proc *procedure) mintTo(
@@ -489,7 +490,7 @@ func (proc *procedure) mintTo(
 	}
 
 	// commit and finalize the state and return any stateDB error
-	res.StateChangeCommitment, err = proc.commit(true)
+	res.StateChangeCommitment, res.StateAccessList, err = proc.commit(true)
 	return res, err
 }
 
@@ -540,7 +541,7 @@ func (proc *procedure) withdrawFrom(
 	proc.state.SubBalance(bridge, value, gethTracing.BalanceIncreaseWithdrawal)
 
 	// commit and finalize the state and return any stateDB error
-	res.StateChangeCommitment, err = proc.commit(true)
+	res.StateChangeCommitment, res.StateAccessList, err = proc.commit(true)
 	return res, err
 }
 
@@ -707,7 +708,7 @@ func (proc *procedure) deployAt(
 	res.DeployedContractAddress = &call.To
 	res.CumulativeGasUsed = proc.config.BlockTotalGasUsedSoFar + res.GasConsumed
 
-	res.StateChangeCommitment, err = proc.commit(true)
+	res.StateChangeCommitment, res.StateAccessList, err = proc.commit(true)
 	return res, err
 }
 
@@ -724,7 +725,7 @@ func (proc *procedure) runDirect(
 		return nil, err
 	}
 	// commit and finalize the state and return any stateDB error
-	res.StateChangeCommitment, err = proc.commit(true)
+	res.StateChangeCommitment, res.StateAccessList, err = proc.commit(true)
 	return res, err
 }
 

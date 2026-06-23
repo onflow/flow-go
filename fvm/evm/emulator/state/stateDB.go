@@ -37,13 +37,17 @@ type removedAccountWithBalance struct {
 // thread safe. yet the current design supports addition of concurrency in the
 // future if needed
 type StateDB struct {
-	ledger   atree.Ledger
-	root     flow.Address
-	baseView types.BaseView
-	views    []*DeltaView
+	ledger      atree.Ledger
+	root        flow.Address
+	baseView    types.BaseView
+	views       []*DeltaView
+	cachedError error
+
 	// Per-transaction state access footprint for EIP-7928
-	stateReadList *gethBAL.StateAccessList
-	cachedError   error
+	stateAccessList *gethBAL.ConstructionBlockAccessList
+
+	// Block access index (0 for pre-execution, 1..n for transactions, n+1 for post-execution)
+	blockAccessIndex uint32
 }
 
 var _ types.StateDB = &StateDB{}
@@ -290,6 +294,10 @@ func (db *StateDB) GetRefund() uint64 {
 // GetCommittedState returns the value for the given storage slot considering only the committed state and not
 // changes in the scope of current transaction.
 func (db *StateDB) GetCommittedState(addr gethCommon.Address, key gethCommon.Hash) gethCommon.Hash {
+	// Record slot access regardless of whether the storage slot exists.
+	if db.stateAccessList != nil {
+		db.stateAccessList.StorageRead(addr, key)
+	}
 	// EIP-7928: per-transaction state access tracking
 	db.recordStateAccess(addr)
 	value, err := db.baseView.GetState(types.SlotAddress{Address: addr, Key: key})
@@ -312,9 +320,27 @@ func (db *StateDB) GetStateAndCommittedState(
 
 // GetState returns the value for the given storage slot
 func (db *StateDB) GetState(addr gethCommon.Address, key gethCommon.Hash) gethCommon.Hash {
+	sk := types.SlotAddress{Address: addr, Key: key}
+
+	// Record slot access only for non-dirty slots, essentially only
+	// when falling back to committed state access.
+	if db.stateAccessList != nil {
+		dirty := false
+		for _, view := range db.views {
+			_, dirty = view.DirtySlots()[sk]
+			if dirty {
+				break
+			}
+		}
+		if !dirty {
+			db.stateAccessList.StorageRead(addr, key)
+		}
+	}
+
 	// EIP-7928: per-transaction state access tracking
 	db.recordStateAccess(addr)
-	state, err := db.latestView().GetState(types.SlotAddress{Address: addr, Key: key})
+
+	state, err := db.latestView().GetState(sk)
 	db.handleError(err)
 	return state
 }
@@ -660,8 +686,74 @@ func (db *StateDB) LogsForBurnAccounts() []*gethTypes.Log {
 // This is a no-op for our custom implementation of the StateDB interface,
 // since Commit() already handles finalization and deletion of empty
 // objects.
-func (db *StateDB) Finalise(deleteEmptyObjects bool) *gethBAL.StateAccessList {
-	return db.stateReadList
+func (db *StateDB) Finalise(deleteEmptyObjects bool) *gethBAL.ConstructionBlockAccessList {
+	// iterate views and collect dirty addresses and slots
+	dirtyAddresses := make(map[gethCommon.Address]struct{})
+	dirtySlots := make(map[types.SlotAddress]gethCommon.Hash)
+	for _, view := range db.views {
+		for key := range view.DirtyAddresses() {
+			dirtyAddresses[key] = struct{}{}
+		}
+		for key, val := range view.DirtySlots() {
+			dirtySlots[key] = val
+		}
+	}
+
+	for slot, value := range dirtySlots {
+		address := slot.Address
+		if db.HasSelfDestructed(address) || (deleteEmptyObjects && db.Empty(address)) {
+			continue
+		}
+		// Aggregate storage writes into the block-level access list.
+		// All slots in the dirtyStorage set must have post-transaction
+		// values that differ from their pre-transaction values.
+		if db.stateAccessList != nil {
+			db.stateAccessList.StorageWrite(db.blockAccessIndex, address, slot.Key, value)
+		}
+	}
+
+	for addr := range dirtyAddresses {
+		if db.HasSelfDestructed(addr) || (deleteEmptyObjects && db.Empty(addr)) {
+			// Aggregate the account mutation into the block-level accessList
+			// if Amsterdam has been activated.
+			if db.stateAccessList != nil {
+				// Notably, if the account is deleted during the transaction,
+				// its pre-transaction nonce, code, and storage must be empty.
+				//
+				// EIP-6780 restricts self-destruct to contracts deployed within
+				// the same transaction, while EIP-7610 rejects deployments to
+				// destinations with non-empty storage, non-zero nonce and non-empty
+				// code.
+				//
+				// Therefore, when an account is deleted, its pre-transaction nonce
+				// code and storage is guaranteed to be empty, leaving nothing to
+				// clean up here.
+				balance := uint256.NewInt(0)
+				if db.balanceChange(addr, balance) {
+					db.stateAccessList.BalanceChange(db.blockAccessIndex, addr, balance)
+				}
+			}
+		} else {
+			// Aggregate the account mutation into the block-level accessList
+			// if Amsterdam has been activated.
+			if db.stateAccessList != nil {
+				balance := db.GetBalance(addr)
+				if db.balanceChange(addr, balance) {
+					db.stateAccessList.BalanceChange(db.blockAccessIndex, addr, balance)
+				}
+				nonce := db.GetNonce(addr)
+				if db.nonceChange(addr, nonce) {
+					db.stateAccessList.NonceChange(addr, db.blockAccessIndex, nonce)
+				}
+				code := db.GetCode(addr)
+				if db.codeChange(addr, code) {
+					db.stateAccessList.CodeChange(addr, db.blockAccessIndex, code)
+				}
+			}
+		}
+	}
+
+	return db.stateAccessList
 }
 
 // Finalize flushes all the changes
@@ -697,7 +789,7 @@ func (db *StateDB) Prepare(rules gethParams.Rules, sender, coinbase gethCommon.A
 	}
 
 	if rules.IsAmsterdam {
-		db.stateReadList = gethBAL.NewStateAccessList()
+		db.stateAccessList = gethBAL.NewConstructionBlockAccessList()
 	}
 }
 
@@ -710,9 +802,22 @@ func (db *StateDB) Reset() {
 	// If Amsterdam is activated, we need to create a new state read list.
 	// This method is mainly used to reset the state between EVM.batchRun
 	// transactions.
-	if db.stateReadList != nil {
-		db.stateReadList = gethBAL.NewStateAccessList()
+	if db.stateAccessList != nil {
+		db.stateAccessList = gethBAL.NewConstructionBlockAccessList()
 	}
+}
+
+// SetTxContext sets the current transaction hash and index which are
+// used when the EVM emits new state logs. It should be invoked before
+// transaction execution.
+func (s *StateDB) SetTxContext(
+	txHash gethCommon.Hash,
+	txIndex int,
+	blockAccessIndex uint32,
+) {
+	// We are only interested in keeping `blockAccessIndex`, as logs are filled
+	// with tx info from the `StateDB.Logs(blockNumber, txHash, txIndex)` method.
+	s.blockAccessIndex = blockAccessIndex
 }
 
 // Error returns the memorized database failure occurred earlier.
@@ -739,14 +844,35 @@ func (s *StateDB) AccessEvents() *gethState.AccessEvents {
 // recordStateAccess records state access regardless of whether the account exists.
 func (db *StateDB) recordStateAccess(addr gethCommon.Address) {
 	// Amsterdam hard-fork not activated
-	if db.stateReadList == nil {
+	if db.stateAccessList == nil {
 		return
 	}
-	db.stateReadList.AddAccount(addr)
+	db.stateAccessList.AccountRead(addr)
 }
 
 func (db *StateDB) latestView() *DeltaView {
 	return db.views[len(db.views)-1]
+}
+
+func (db *StateDB) balanceChange(addr gethCommon.Address, current *uint256.Int) bool {
+	balance, err := db.baseView.GetBalance(addr)
+	db.handleError(err)
+
+	return balance.Cmp(current) != 0
+}
+
+func (db *StateDB) nonceChange(addr gethCommon.Address, current uint64) bool {
+	nonce, err := db.baseView.GetNonce(addr)
+	db.handleError(err)
+
+	return nonce != current
+}
+
+func (db *StateDB) codeChange(addr gethCommon.Address, current []byte) bool {
+	code, err := db.baseView.GetCode(addr)
+	db.handleError(err)
+
+	return !bytes.Equal(code, current)
 }
 
 // set error captures the first non-nil error it is called with.
