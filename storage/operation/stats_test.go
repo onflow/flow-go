@@ -28,7 +28,7 @@ func TestSummarizeKeysByFirstByteConcurrent(t *testing.T) {
 				}
 
 				// insert 100 chunk data packs
-				for i := 0; i < 100; i++ {
+				for range 100 {
 					collectionID := unittest.IdentifierFixture()
 					cdp := &storage.StoredChunkDataPack{
 						ChunkID:      unittest.IdentifierFixture(),
@@ -48,7 +48,7 @@ func TestSummarizeKeysByFirstByteConcurrent(t *testing.T) {
 
 		// insert 20 results
 		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			for i := 0; i < 20; i++ {
+			for range 20 {
 				result := unittest.ExecutionResultFixture()
 				err := operation.InsertExecutionResult(rw.Writer(), result.ID(), result)
 				if err != nil {
@@ -66,7 +66,7 @@ func TestSummarizeKeysByFirstByteConcurrent(t *testing.T) {
 		// print
 		operation.PrintStats(unittest.Logger(), stats)
 
-		for i := 0; i < 256; i++ {
+		for i := range 256 {
 			count := 0
 			if i == 102 { // events (codeEvent)
 				count = 30

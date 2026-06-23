@@ -254,7 +254,7 @@ func TestRemoveChunkDataPackID(t *testing.T) {
 			chunkDataPackIDs := unittest.IdentifierListFixture(3)
 
 			// Insert multiple chunk data pack IDs
-			for i := 0; i < 3; i++ {
+			for i := range 3 {
 
 				err := unittest.WithLock(t, lockManager, storage.LockIndexChunkDataPackByChunkID, func(lctx lockctx.Context) error {
 					return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
@@ -265,7 +265,7 @@ func TestRemoveChunkDataPackID(t *testing.T) {
 			}
 
 			// Remove all of them
-			for i := 0; i < 3; i++ {
+			for i := range 3 {
 				err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 					return operation.RemoveChunkDataPackID(rw.Writer(), chunkIDs[i])
 				})
@@ -273,7 +273,7 @@ func TestRemoveChunkDataPackID(t *testing.T) {
 			}
 
 			// Verify all are gone
-			for i := 0; i < 3; i++ {
+			for i := range 3 {
 				var retrievedID flow.Identifier
 				err := operation.RetrieveChunkDataPackID(db.Reader(), chunkIDs[i], &retrievedID)
 				require.Error(t, err)

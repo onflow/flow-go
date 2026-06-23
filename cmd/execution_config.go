@@ -181,8 +181,8 @@ func (exeConf *ExecutionConfig) ValidateFlags() error {
 		}
 	}
 	if exeConf.executionDataAllowedPeers != "" {
-		ids := strings.Split(exeConf.executionDataAllowedPeers, ",")
-		for _, id := range ids {
+		ids := strings.SplitSeq(exeConf.executionDataAllowedPeers, ",")
+		for id := range ids {
 			if _, err := flow.HexStringToIdentifier(id); err != nil {
 				return fmt.Errorf("invalid node ID in execution-data-allowed-requesters %s: %w", id, err)
 			}

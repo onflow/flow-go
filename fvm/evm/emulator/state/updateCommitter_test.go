@@ -114,13 +114,13 @@ func BenchmarkDeltaCommitter(b *testing.B) {
 	dc := state.NewUpdateCommitter()
 
 	numberOfAccountUpdates := 10
-	for i := 0; i < numberOfAccountUpdates; i++ {
+	for range numberOfAccountUpdates {
 		err := dc.UpdateAccount(addr.ToCommon(), balance, nonce, randomHash)
 		require.NoError(b, err)
 	}
 
 	numberOfSlotUpdates := 10
-	for i := 0; i < numberOfSlotUpdates; i++ {
+	for range numberOfSlotUpdates {
 		err := dc.UpdateSlot(addr.ToCommon(), randomHash, randomHash)
 		require.NoError(b, err)
 	}

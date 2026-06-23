@@ -26,7 +26,7 @@ func generateLevel2SummaryFromStructs(level1Summaries []common.Level1Summary) co
 	level2Summary.TestResultsMap = make(map[string]*common.Level2TestResult)
 
 	// go through all level 1 test runs create level 2 summary
-	for i := 0; i < len(level1Summaries); i++ {
+	for i := range level1Summaries {
 		for _, level1TestResultRow := range level1Summaries[i] {
 			// check if already started collecting summary for this test
 			level2TestResultsMapKey := level1TestResultRow.Package + "/" + level1TestResultRow.Test
@@ -81,7 +81,7 @@ func buildLevel1SummariesFromJSON(level1Directory string) []common.Level1Summary
 	dirEntries, err := os.ReadDir(filepath.Join(level1Directory))
 	common.AssertNoError(err, "error reading level 1 directory")
 
-	for i := 0; i < len(dirEntries); i++ {
+	for i := range dirEntries {
 		// read in each level 1 summary
 		var level1Summary common.Level1Summary
 

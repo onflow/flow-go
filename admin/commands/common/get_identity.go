@@ -32,7 +32,7 @@ type GetIdentityCommand struct {
 	idProvider module.IdentityProvider
 }
 
-func (r *GetIdentityCommand) Handler(ctx context.Context, req *admin.CommandRequest) (interface{}, error) {
+func (r *GetIdentityCommand) Handler(ctx context.Context, req *admin.CommandRequest) (any, error) {
 	data := req.ValidatorData.(*getIdentityRequestData)
 
 	if data.requestType == FlowID {
@@ -53,7 +53,7 @@ func (r *GetIdentityCommand) Handler(ctx context.Context, req *admin.CommandRequ
 // Validator validates the request.
 // Returns admin.InvalidAdminReqError for invalid/malformed requests.
 func (r *GetIdentityCommand) Validator(req *admin.CommandRequest) error {
-	input, ok := req.Data.(map[string]interface{})
+	input, ok := req.Data.(map[string]any)
 	if !ok {
 		return admin.NewInvalidAdminReqFormatError("expected map[string]any")
 	}

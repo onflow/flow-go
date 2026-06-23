@@ -228,7 +228,7 @@ func trieWithValidRegisterIDs(t *testing.T, n uint16) ([]*trie.MTrie, []*flow.Re
 
 func randomRegisterPayloads(n uint16) []ledger.Payload {
 	p := make([]ledger.Payload, 0, n)
-	for i := uint16(0); i < n; i++ {
+	for range n {
 		o := make([]byte, 0, 8)
 		o = binary.BigEndian.AppendUint16(o, n)
 		k := ledger.Key{KeyParts: []ledger.KeyPart{
@@ -245,7 +245,7 @@ func randomRegisterPayloads(n uint16) []ledger.Payload {
 
 func randomRegisterPaths(n uint16) []ledger.Path {
 	p := make([]ledger.Path, 0, n)
-	for i := uint16(0); i < n; i++ {
+	for i := range n {
 		p = append(p, testutils.PathByUint16(i))
 	}
 	return p

@@ -71,7 +71,7 @@ func NewApprovalCollector(
 		// The high-level logic is: as soon as we have collected enough approvals, we aggregate
 		// them and store them in collector.aggregatedSignatures. If we don't require any signatures,
 		// this condition is satisfied right away. Hence, we add aggregated signature for each chunk.
-		for i := uint64(0); i < numberOfChunks; i++ {
+		for i := range numberOfChunks {
 			_, err := collector.aggregatedSignatures.PutSignature(i, flow.AggregatedSignature{})
 			if err != nil {
 				return nil, fmt.Errorf("sealing result %x failed: %w", result.ID(), err)

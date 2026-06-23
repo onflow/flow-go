@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/fxamacker/cbor/v2"
 
@@ -118,18 +119,19 @@ func (u *TrieUpdate) IsEmpty() bool {
 }
 
 func (u *TrieUpdate) String() string {
-	str := "Trie Update:\n "
-	str += "\t triehash : " + u.RootHash.String() + "\n"
+	var str strings.Builder
+	str.WriteString("Trie Update:\n ")
+	str.WriteString("\t triehash : " + u.RootHash.String() + "\n")
 	for i, p := range u.Paths {
-		str += fmt.Sprintf("\t\t path %d : %s\n", i, p)
+		str.WriteString(fmt.Sprintf("\t\t path %d : %s\n", i, p))
 	}
-	str += fmt.Sprintf("\t paths len: %d , bytesize: %d\n", len(u.Paths), len(u.Paths)*PathLen)
+	str.WriteString(fmt.Sprintf("\t paths len: %d , bytesize: %d\n", len(u.Paths), len(u.Paths)*PathLen))
 	tp := 0
 	for _, p := range u.Payloads {
 		tp += p.Size()
 	}
-	str += fmt.Sprintf("\t total size of payloads : %d \n", tp)
-	return str
+	str.WriteString(fmt.Sprintf("\t total size of payloads : %d \n", tp))
+	return str.String()
 }
 
 // Equals compares this trie update to another trie update
@@ -486,27 +488,28 @@ func NewTrieProof() *TrieProof {
 }
 
 func (p *TrieProof) String() string {
-	flagStr := ""
+	var flagStr strings.Builder
 	for _, f := range p.Flags {
-		flagStr += fmt.Sprintf("%08b", f)
+		flagStr.WriteString(fmt.Sprintf("%08b", f))
 	}
-	proofStr := fmt.Sprintf("size: %d flags: %v\n", p.Steps, flagStr)
-	proofStr += fmt.Sprintf("\t path: %v payload: %v\n", p.Path, p.Payload)
+	var proofStr strings.Builder
+	proofStr.WriteString(fmt.Sprintf("size: %d flags: %v\n", p.Steps, flagStr.String()))
+	proofStr.WriteString(fmt.Sprintf("\t path: %v payload: %v\n", p.Path, p.Payload))
 
 	if p.Inclusion {
-		proofStr += "\t inclusion proof:\n"
+		proofStr.WriteString("\t inclusion proof:\n")
 	} else {
-		proofStr += "\t noninclusion proof:\n"
+		proofStr.WriteString("\t noninclusion proof:\n")
 	}
 	interimIndex := 0
 	for j := 0; j < int(p.Steps); j++ {
 		// if bit is set
 		if p.Flags[j/8]&(1<<(7-j%8)) != 0 {
-			proofStr += fmt.Sprintf("\t\t %d: [%x]\n", j, p.Interims[interimIndex])
+			proofStr.WriteString(fmt.Sprintf("\t\t %d: [%x]\n", j, p.Interims[interimIndex]))
 			interimIndex++
 		}
 	}
-	return proofStr
+	return proofStr.String()
 }
 
 // Equals compares this proof to another payload

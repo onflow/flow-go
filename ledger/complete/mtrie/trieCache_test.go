@@ -33,7 +33,7 @@ func TestTrieCache(t *testing.T) {
 	var savedTries []*trie.MTrie
 
 	// Push tries to queue to fill out capacity
-	for i := 0; i < capacity; i++ {
+	for range capacity {
 		trie, err := randomMTrie()
 		require.NoError(t, err)
 
@@ -56,7 +56,7 @@ func TestTrieCache(t *testing.T) {
 	}
 
 	// Push more tries to queue to overwrite older elements
-	for i := 0; i < capacity; i++ {
+	for range capacity {
 		trie, err := randomMTrie()
 		require.NoError(t, err)
 

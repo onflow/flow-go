@@ -162,7 +162,7 @@ func generateEventsMocks(backend *mock.API, n int) []flow.BlockEvents {
 	ids := make([]flow.Identifier, n)
 
 	var lastHeader *flow.Header
-	for i := 0; i < n; i++ {
+	for i := range n {
 		header := unittest.BlockHeaderFixture(unittest.WithHeaderHeight(uint64(i)))
 		ids[i] = header.ID()
 

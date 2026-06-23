@@ -26,7 +26,7 @@ func (suite *LifecycleManagerSuite) TestConcurrentStart() {
 	var numStarts uint32
 
 	lm := suite.lm
-	for i := 0; i < 10; i++ {
+	for range 10 {
 		go func() {
 			lm.OnStart(func() {
 				atomic.AddUint32(&numStarts, 1)
@@ -48,7 +48,7 @@ func (suite *LifecycleManagerSuite) TestConcurrentStop() {
 	var numStops uint32
 
 	lm := suite.lm
-	for i := 0; i < 10; i++ {
+	for range 10 {
 		go func() {
 			lm.OnStop(func() {
 				atomic.AddUint32(&numStops, 1)

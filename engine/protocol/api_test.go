@@ -589,7 +589,7 @@ func (suite *Suite) TestGetBlockHeaderByHeight_InternalFailure() {
 	suite.assertAllExpectations()
 }
 
-func (suite *Suite) checkResponse(resp interface{}, err error) {
+func (suite *Suite) checkResponse(resp any, err error) {
 	suite.Require().NoError(err)
 	suite.Require().NotNil(resp)
 }

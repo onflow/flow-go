@@ -148,7 +148,7 @@ func TestAppSpecificScoreCache_Eviction(t *testing.T) {
 	require.Equal(t, len(peerIds), len(scores), "peer ids and scores must have the same length")
 
 	// add scores to cache
-	for i := 0; i < len(peerIds); i++ {
+	for i := range peerIds {
 		err := cache.AdjustWithInit(peerIds[i], scores[i], time.Now())
 		require.Nil(t, err, "failed to add score to cache")
 	}

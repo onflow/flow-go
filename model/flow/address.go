@@ -82,7 +82,7 @@ func (a Address) Short() string {
 }
 
 func (a Address) MarshalJSON() ([]byte, error) {
-	return []byte(fmt.Sprintf("\"%s\"", a.Hex())), nil
+	return fmt.Appendf(nil, "\"%s\"", a.Hex()), nil
 }
 
 func (a *Address) UnmarshalJSON(data []byte) error {

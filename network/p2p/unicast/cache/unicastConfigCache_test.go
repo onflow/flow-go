@@ -178,9 +178,7 @@ func TestConcurrent_Adjust_And_Get_Is_Safe(t *testing.T) {
 	wg := sync.WaitGroup{}
 	for i := 0; i < int(sizeLimit); i++ {
 		// concurrently adjusts the unicast configs.
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			peerId := unittest.PeerIdFixture(t)
 			updatedConfig, err := cache.AdjustWithInit(peerId, func(cfg unicast.Config) (unicast.Config, error) {
 				cfg.StreamCreationRetryAttemptBudget = 2 // some random adjustment
@@ -190,7 +188,7 @@ func TestConcurrent_Adjust_And_Get_Is_Safe(t *testing.T) {
 			require.NoError(t, err) // concurrent adjustment must not fail.
 			require.Equal(t, uint64(2), updatedConfig.StreamCreationRetryAttemptBudget)
 			require.Equal(t, uint64(3), updatedConfig.ConsecutiveSuccessfulStream)
-		}()
+		})
 	}
 
 	// assert that the unicast config for each peer is adjusted i times, concurrently.

@@ -579,15 +579,13 @@ func (b *Builder) getInsertableReceipts(parentID flow.Identifier) (*InsertableRe
 func toInsertables(receipts []*flow.ExecutionReceipt, includedResults map[flow.Identifier]struct{}, maxReceiptCount uint) *InsertableReceipts {
 	results := make([]*flow.ExecutionResult, 0)
 
-	count := uint(len(receipts))
-	// don't collect more than maxReceiptCount receipts
-	if count > maxReceiptCount {
-		count = maxReceiptCount
-	}
+	count := min(
+		// don't collect more than maxReceiptCount receipts
+		uint(len(receipts)), maxReceiptCount)
 
 	filteredReceipts := make([]*flow.ExecutionReceiptStub, 0, count)
 
-	for i := uint(0); i < count; i++ {
+	for i := range count {
 		receipt := receipts[i]
 		meta := receipt.Stub()
 		resultID := meta.ResultID

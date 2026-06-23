@@ -415,7 +415,7 @@ func CompleteExecutionReceiptChainFixture(t *testing.T,
 		"number of executors in the tests should be greater than or equal to the number of receipts per block")
 
 	var sourcesIndex = 0
-	for i := 0; i < count; i++ {
+	for range count {
 		// Generates two blocks as parent <- R <- C where R is a reference block containing guarantees,
 		// and C is a container block containing execution receipt for R.
 		receipts, allData, head := ExecutionReceiptsFromParentBlockFixture(t, parent, rootProtocolStateID, builder, sources[sourcesIndex:])

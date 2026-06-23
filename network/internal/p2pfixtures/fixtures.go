@@ -373,7 +373,7 @@ func LongStringMessageFactoryFixture(t *testing.T) func() string {
 }
 
 // MustEncodeEvent encodes and returns the given event and fails the test if it faces any issue while encoding.
-func MustEncodeEvent(t *testing.T, v interface{}, channel channels.Channel) []byte {
+func MustEncodeEvent(t *testing.T, v any, channel channels.Channel) []byte {
 	bz, err := unittest.NetworkCodec().Encode(v)
 	require.NoError(t, err)
 

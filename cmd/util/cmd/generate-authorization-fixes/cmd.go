@@ -99,7 +99,7 @@ func run(*cobra.Command, []string) {
 	var addressFilter map[common.Address]struct{}
 
 	if len(flagAddresses) > 0 {
-		for _, hexAddr := range strings.Split(flagAddresses, ",") {
+		for hexAddr := range strings.SplitSeq(flagAddresses, ",") {
 
 			hexAddr = strings.TrimSpace(hexAddr)
 

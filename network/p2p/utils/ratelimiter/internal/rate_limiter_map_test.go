@@ -71,8 +71,7 @@ func TestLimiterMap_cleanup(t *testing.T) {
 	limiter, _ = m.Get(peerID3)
 	limiter.SetLastAccessed(start.Add(-20 * time.Minute))
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
 
 	// kick off clean up process, tick should happen immediately

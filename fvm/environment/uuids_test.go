@@ -19,20 +19,20 @@ func TestUUIDPartition(t *testing.T) {
 
 	// With enough samples, all partitions should be used.  (The first 1500 blocks
 	// only uses 254 partitions)
-	for numBlocks := 0; numBlocks < 2500; numBlocks++ {
+	for range 2500 {
 		blockId := blockHeader.ID()
 
 		partition0 := uuidPartition(blockId, 0)
 		usedPartitions[partition0] = struct{}{}
 
-		for txnIndex := 0; txnIndex < 256; txnIndex++ {
+		for txnIndex := range 256 {
 			partition := uuidPartition(blockId, uint32(txnIndex))
 
 			// Ensure neighboring transactions uses neighoring partitions.
 			require.Equal(t, partition, partition0+byte(txnIndex))
 
 			// Ensure wrap around.
-			for i := 0; i < 5; i++ {
+			for i := range 5 {
 				require.Equal(
 					t,
 					partition,
@@ -47,7 +47,7 @@ func TestUUIDPartition(t *testing.T) {
 }
 
 func TestUUIDGeneratorInitializePartitionNoHeader(t *testing.T) {
-	for txnIndex := uint32(0); txnIndex < 256; txnIndex++ {
+	for txnIndex := range uint32(256) {
 		uuids := NewUUIDGenerator(
 			tracing.NewTracerSpan(),
 			zerolog.Nop(),
@@ -68,10 +68,10 @@ func TestUUIDGeneratorInitializePartitionNoHeader(t *testing.T) {
 func TestUUIDGeneratorInitializePartition(t *testing.T) {
 	blockHeader := &flow.Header{}
 
-	for numBlocks := 0; numBlocks < 10; numBlocks++ {
+	for range 10 {
 		blockId := blockHeader.ID()
 
-		for txnIndex := uint32(0); txnIndex < 256; txnIndex++ {
+		for txnIndex := range uint32(256) {
 			uuids := NewUUIDGenerator(
 				tracing.NewTracerSpan(),
 				zerolog.Nop(),
@@ -99,7 +99,7 @@ func TestUUIDGeneratorInitializePartition(t *testing.T) {
 }
 
 func TestUUIDGeneratorIdGeneration(t *testing.T) {
-	for txnIndex := uint32(0); txnIndex < 256; txnIndex++ {
+	for txnIndex := range uint32(256) {
 		testUUIDGenerator(t, &flow.Header{}, txnIndex)
 	}
 }
@@ -312,7 +312,7 @@ func TestUUIDGeneratorHardcodedPartitionIdGeneration(t *testing.T) {
 	err = uuids.setCounter(cafBad)
 	require.NoError(t, err)
 
-	for i := 0; i < 5; i++ {
+	for i := range 5 {
 		value, err = uuids.GenerateUUID()
 		require.NoError(t, err)
 		require.Equal(t, value, decafBad+uint64(i))

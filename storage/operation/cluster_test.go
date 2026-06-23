@@ -82,7 +82,7 @@ func TestClusterHeights(t *testing.T) {
 			clusterBlockIDs := unittest.IdentifierListFixture(3)
 			clusterIDs := []flow.ChainID{"cluster-0", "cluster-1", "cluster-2"}
 			var actual flow.Identifier
-			for i := 0; i < len(clusterBlockIDs); i++ {
+			for i := range clusterBlockIDs {
 				err = operation.LookupClusterBlockHeight(db.Reader(), clusterIDs[i], height, &actual)
 				assert.ErrorIs(t, err, storage.ErrNotFound)
 
@@ -93,7 +93,7 @@ func TestClusterHeights(t *testing.T) {
 				})
 				require.NoError(t, err)
 			}
-			for i := 0; i < len(clusterBlockIDs); i++ {
+			for i := range clusterBlockIDs {
 				err = operation.LookupClusterBlockHeight(db.Reader(), clusterIDs[i], height, &actual)
 				assert.NoError(t, err)
 				assert.Equal(t, clusterBlockIDs[i], actual)
@@ -156,7 +156,7 @@ func Test_RetrieveClusterFinalizedHeight(t *testing.T) {
 			clusterFinalizedHeights := []uint64{117, 11, 791}
 			clusterIDs := []flow.ChainID{"cluster-0", "cluster-1", "cluster-2"}
 			var actual uint64
-			for i := 0; i < len(clusterFinalizedHeights); i++ {
+			for i := range clusterFinalizedHeights {
 				err = operation.RetrieveClusterFinalizedHeight(db.Reader(), clusterIDs[i], &actual)
 				assert.ErrorIs(t, err, storage.ErrNotFound)
 
@@ -167,7 +167,7 @@ func Test_RetrieveClusterFinalizedHeight(t *testing.T) {
 				})
 				require.NoError(t, err)
 			}
-			for i := 0; i < len(clusterFinalizedHeights); i++ {
+			for i := range clusterFinalizedHeights {
 				err = operation.RetrieveClusterFinalizedHeight(db.Reader(), clusterIDs[i], &actual)
 				assert.NoError(t, err)
 				assert.Equal(t, clusterFinalizedHeights[i], actual)
@@ -283,7 +283,7 @@ func TestClusterBlockByReferenceHeight(t *testing.T) {
 			// keep track of which ids are indexed at each nextHeight
 			lookup := make(map[uint64][]flow.Identifier)
 			err := unittest.WithLock(t, lockManager, storage.LockInsertOrFinalizeClusterBlock, func(lctx lockctx.Context) error {
-				for i := 0; i < len(ids); i++ {
+				for i := range ids {
 					// randomly adjust the nextHeight, increasing on average
 					r := rand.Intn(100)
 					if r < 20 {
@@ -445,7 +445,7 @@ func BenchmarkLookupClusterBlocksByReferenceHeightRange_100_000(b *testing.B) {
 func benchmarkLookupClusterBlocksByReferenceHeightRange(b *testing.B, n int) {
 	lockManager := storage.NewTestingLockManager()
 	dbtest.BenchWithStorages(b, func(b *testing.B, r storage.Reader, wr dbtest.WithWriter) {
-		for i := 0; i < n; i++ {
+		for range n {
 			err := unittest.WithLock(b, lockManager, storage.LockInsertOrFinalizeClusterBlock, func(lctx lockctx.Context) error {
 				return wr(func(w storage.Writer) error {
 					return operation.IndexClusterBlockByReferenceHeight(lctx, w, rand.Uint64()%1000, unittest.IdentifierFixture())

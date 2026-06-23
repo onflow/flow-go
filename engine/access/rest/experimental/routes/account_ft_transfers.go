@@ -12,7 +12,7 @@ import (
 )
 
 // GetAccountFungibleTokenTransfers returns a paginated list of fungible token transfers for the given account address.
-func GetAccountFungibleTokenTransfers(r *common.Request, backend extended.API, link models.LinkGenerator) (interface{}, error) {
+func GetAccountFungibleTokenTransfers(r *common.Request, backend extended.API, link models.LinkGenerator) (any, error) {
 	req, err := request.NewGetAccountFTTransfers(r)
 	if err != nil {
 		return nil, common.NewBadRequestError(err)

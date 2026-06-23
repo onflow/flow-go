@@ -252,7 +252,7 @@ func TestConnectionGater_InterceptUpgrade(t *testing.T) {
 	allPeerIds := make(peer.IDSlice, 0, count)
 	idProvider := mockmodule.NewIdentityProvider(t)
 	connectionGater := mockp2p.NewConnectionGater(t)
-	for i := 0; i < count; i++ {
+	for range count {
 		handler, inbound := p2ptest.StreamHandlerFixture(t)
 		node, id := p2ptest.NodeFixture(
 			t,
@@ -335,7 +335,7 @@ func TestConnectionGater_Disallow_Integration(t *testing.T) {
 
 	disallowedList := concurrentmap.New[*flow.Identity, struct{}]()
 
-	for i := 0; i < count; i++ {
+	for range count {
 		handler, inbound := p2ptest.StreamHandlerFixture(t)
 		node, id := p2ptest.NodeFixture(
 			t,
@@ -427,7 +427,7 @@ func ensureCommunicationSilenceAmongGroups(
 		groupBIdentifiers,
 		blockTopic,
 		1,
-		func() interface{} {
+		func() any {
 			return (*messages.Proposal)(unittest.ProposalFixture())
 		})
 	p2pfixtures.EnsureNoStreamCreationBetweenGroups(t, ctx, groupANodes, groupBNodes)
@@ -437,7 +437,7 @@ func ensureCommunicationSilenceAmongGroups(
 func ensureCommunicationOverAllProtocols(t *testing.T, ctx context.Context, sporkId flow.Identifier, nodes []p2p.LibP2PNode, inbounds []chan string) {
 	blockTopic := channels.TopicFromChannel(channels.PushBlocks, sporkId)
 	p2ptest.TryConnectionAndEnsureConnected(t, ctx, nodes)
-	p2ptest.EnsurePubsubMessageExchange(t, ctx, nodes, blockTopic, 1, func() interface{} {
+	p2ptest.EnsurePubsubMessageExchange(t, ctx, nodes, blockTopic, 1, func() any {
 		return (*messages.Proposal)(unittest.ProposalFixture())
 	})
 	p2pfixtures.EnsureMessageExchangeOverUnicast(t, ctx, nodes, inbounds, p2pfixtures.LongStringMessageFactoryFixture(t))

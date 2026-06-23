@@ -18,7 +18,7 @@ import (
 // This test shows we can't use ECDSA P-256 keys for libp2p and expect PeerID <=> PublicKey bijections
 func TestIDTranslationP256(t *testing.T) {
 	loops := 50
-	for i := 0; i < loops; i++ {
+	for range loops {
 		pID := createPeerIDFromAlgo(t, fcrypto.ECDSAP256)
 
 		// check that we can not extract the public key back
@@ -33,7 +33,7 @@ func TestIDTranslationP256(t *testing.T) {
 // This test shows we can use ECDSA Secp256k1 keys for libp2p and expect PeerID <=> PublicKey bijections
 func TestIDTranslationSecp256k1(t *testing.T) {
 	loops := 50
-	for i := 0; i < loops; i++ {
+	for range loops {
 		pID := createPeerIDFromAlgo(t, fcrypto.ECDSASecp256k1)
 
 		// check that we can extract the public key back

@@ -260,10 +260,7 @@ func checkAtreeInlinedStatus(payloads []*ledger.Payload, nWorkers int) (
 			break
 		}
 
-		endIndex := payloadStartIndex + numOfPayloadPerJob
-		if endIndex > len(payloads) {
-			endIndex = len(payloads)
-		}
+		endIndex := min(payloadStartIndex+numOfPayloadPerJob, len(payloads))
 
 		jobs <- job{payloads: payloads[payloadStartIndex:endIndex]}
 

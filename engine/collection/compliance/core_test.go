@@ -535,7 +535,7 @@ func (cs *CoreSuite) TestProposalBufferingOrder() {
 	var proposals []*cluster.Proposal
 	proposalsLookup := make(map[flow.Identifier]*cluster.Proposal)
 	parent := missing
-	for i := 0; i < 3; i++ {
+	for range 3 {
 		block := unittest.ClusterBlockFixture(
 			unittest.ClusterBlock.WithParent(parent),
 		)

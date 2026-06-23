@@ -453,16 +453,13 @@ func (c *Core) checkEmergencySealing(observer consensus.SealingObservation, last
 
 	// we will check all the unsealed finalized height except the last approvals.DefaultEmergencySealingThresholdForFinalization
 	// number of finalized heights
-	heightCountForCheckingEmergencySealing := unsealedFinalizedCount - approvals.DefaultEmergencySealingThresholdForFinalization
-
-	// If there are too many unsealed and finalized blocks, we don't have to check emergency sealing for all of them,
-	// instead, only check for at most 100 blocks. This limits computation cost.
-	// Note: the block builder also limits the max number of seals that can be included in a new block to `maxSealCount`.
-	// While `maxSealCount` doesn't have to be the same value as the limit below, there is little benefit of our limit
-	// exceeding `maxSealCount`.
-	if heightCountForCheckingEmergencySealing > 100 {
-		heightCountForCheckingEmergencySealing = 100
-	}
+	heightCountForCheckingEmergencySealing := min(
+		// If there are too many unsealed and finalized blocks, we don't have to check emergency sealing for all of them,
+		// instead, only check for at most 100 blocks. This limits computation cost.
+		// Note: the block builder also limits the max number of seals that can be included in a new block to `maxSealCount`.
+		// While `maxSealCount` doesn't have to be the same value as the limit below, there is little benefit of our limit
+		// exceeding `maxSealCount`.
+		unsealedFinalizedCount-approvals.DefaultEmergencySealingThresholdForFinalization, 100)
 	// if block is emergency sealable depends on it's incorporated block height
 	// collectors tree stores collector by executed block height
 	// we need to select multiple levels to find eligible collectors for emergency sealing

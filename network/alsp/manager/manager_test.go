@@ -136,7 +136,7 @@ func TestHandleReportedMisbehavior_Cache_Integration(t *testing.T) {
 	numReportsPerPeer := 5
 	peersReports := make(map[flow.Identifier][]network.MisbehaviorReport)
 
-	for i := 0; i < numPeers; i++ {
+	for range numPeers {
 		originID := unittest.IdentifierFixture()
 		reports := createRandomMisbehaviorReportsForOriginId(t, originID, numReportsPerPeer)
 		peersReports[originID] = reports
@@ -251,7 +251,7 @@ func TestHandleReportedMisbehavior_And_DisallowListing_Integration(t *testing.T)
 	// the spammer is definitely disallow-listed.
 	reportCount := 120
 	wg := sync.WaitGroup{}
-	for i := 0; i < reportCount; i++ {
+	for range reportCount {
 		wg.Add(1)
 		// reports the misbehavior
 		r := report // capture range variable
@@ -357,7 +357,7 @@ func TestHandleReportedMisbehavior_And_DisallowListing_RepeatOffender_Integratio
 		// the spammer is definitely disallow-listed.
 		reportCount := 120
 		wg := sync.WaitGroup{}
-		for reportCounter := 0; reportCounter < reportCount; reportCounter++ {
+		for range reportCount {
 			wg.Add(1)
 			// reports the misbehavior
 			r := report // capture range variable
@@ -511,13 +511,11 @@ func TestHandleReportedMisbehavior_And_SlashingViolationsConsumer_Integration(t 
 	violationsWg := sync.WaitGroup{}
 	violationCount := 120
 	for _, testCase := range slashingViolationTestCases {
-		for i := 0; i < violationCount; i++ {
+		for range violationCount {
 			testCase := testCase
-			violationsWg.Add(1)
-			go func() {
-				defer violationsWg.Done()
+			violationsWg.Go(func() {
 				testCase.violationsConsumerFunc(testCase.violation)
-			}()
+			})
 		}
 	}
 	unittest.RequireReturnsBefore(t, violationsWg.Wait, 100*time.Millisecond, "slashing violations not reported in time")
@@ -1116,7 +1114,7 @@ func TestHandleMisbehaviorReport_MultiplePenaltyReportsForMultiplePeers_Sequenti
 	numReportsPerPeer := 5
 	peersReports := make(map[flow.Identifier][]network.MisbehaviorReport)
 
-	for i := 0; i < numPeers; i++ {
+	for range numPeers {
 		originID := unittest.IdentifierFixture()
 		reports := createRandomMisbehaviorReportsForOriginId(t, originID, numReportsPerPeer)
 		peersReports[originID] = reports
@@ -1197,7 +1195,7 @@ func TestHandleMisbehaviorReport_MultiplePenaltyReportsForMultiplePeers_Concurre
 	numReportsPerPeer := 5
 	peersReports := make(map[flow.Identifier][]network.MisbehaviorReport)
 
-	for i := 0; i < numPeers; i++ {
+	for range numPeers {
 		originID := unittest.IdentifierFixture()
 		reports := createRandomMisbehaviorReportsForOriginId(t, originID, numReportsPerPeer)
 		peersReports[originID] = reports
@@ -1278,7 +1276,7 @@ func TestHandleMisbehaviorReport_DuplicateReportsForSinglePeer_Concurrently(t *t
 	wg.Add(times)
 
 	// concurrently reports the same misbehavior report twice
-	for i := 0; i < times; i++ {
+	for range times {
 		go func() {
 			defer wg.Done()
 
@@ -1348,7 +1346,7 @@ func TestDecayMisbehaviorPenalty_SingleHeartbeat(t *testing.T) {
 	wg.Add(times)
 
 	// concurrently reports the same misbehavior report twice
-	for i := 0; i < times; i++ {
+	for range times {
 		go func() {
 			defer wg.Done()
 
@@ -1438,7 +1436,7 @@ func TestDecayMisbehaviorPenalty_MultipleHeartbeats(t *testing.T) {
 	wg.Add(times)
 
 	// concurrently reports the same misbehavior report twice
-	for i := 0; i < times; i++ {
+	for range times {
 		go func() {
 			defer wg.Done()
 
@@ -1528,7 +1526,7 @@ func TestDecayMisbehaviorPenalty_DecayToZero(t *testing.T) {
 	wg.Add(times)
 
 	// concurrently reports the same misbehavior report twice
-	for i := 0; i < times; i++ {
+	for range times {
 		go func() {
 			defer wg.Done()
 
@@ -1700,7 +1698,7 @@ func TestDisallowListNotification(t *testing.T) {
 	wg.Add(times)
 
 	// concurrently reports the same misbehavior report twice
-	for i := 0; i < times; i++ {
+	for range times {
 		go func() {
 			defer wg.Done()
 
@@ -1756,7 +1754,7 @@ func TestDisallowListNotification(t *testing.T) {
 func createRandomMisbehaviorReportsForOriginId(t *testing.T, originID flow.Identifier, numReports int) []network.MisbehaviorReport {
 	reports := make([]network.MisbehaviorReport, numReports)
 
-	for i := 0; i < numReports; i++ {
+	for i := range numReports {
 		reports[i] = misbehaviorReportFixture(t, originID)
 	}
 
@@ -1773,7 +1771,7 @@ func createRandomMisbehaviorReportsForOriginId(t *testing.T, originID flow.Ident
 func createRandomMisbehaviorReports(t *testing.T, numReports int) []network.MisbehaviorReport {
 	reports := make([]network.MisbehaviorReport, numReports)
 
-	for i := 0; i < numReports; i++ {
+	for i := range numReports {
 		reports[i] = misbehaviorReportFixture(t, unittest.IdentifierFixture())
 	}
 

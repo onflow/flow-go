@@ -36,7 +36,7 @@ func TestExtractPayloads(t *testing.T) {
 			keysValues := make(map[string]keyPair)
 			var payloads []*ledger.Payload
 
-			for i := 0; i < size; i++ {
+			for i := range size {
 				keys, values := getSampleKeyValues(i)
 
 				for j, key := range keys {
@@ -131,7 +131,7 @@ func TestExtractPayloads(t *testing.T) {
 			keysValues := make(map[string]keyPair)
 			var payloads []*ledger.Payload
 
-			for i := 0; i < size; i++ {
+			for i := range size {
 				keys, values := getSampleKeyValues(i)
 
 				for j, key := range keys {
@@ -198,7 +198,7 @@ func getSampleKeyValues(i int) ([]ledger.Key, []ledger.Value) {
 	default:
 		keys := make([]ledger.Key, 0)
 		values := make([]ledger.Value, 0)
-		for j := 0; j < 10; j++ {
+		for range 10 {
 			// address := make([]byte, 32)
 			address := make([]byte, 8)
 			_, err := rand.Read(address)

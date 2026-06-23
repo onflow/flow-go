@@ -25,21 +25,17 @@ func TestHappyPath(t *testing.T) {
 
 	// writes on stream mca
 	writeWG := sync.WaitGroup{}
-	writeWG.Add(1)
-	go func() {
-		defer writeWG.Done()
+	writeWG.Go(func() {
 
 		n, err := mca.Write(textByte)
 		require.NoError(t, err)
 
 		require.Equal(t, n, len(text))
-	}()
+	})
 
 	// write on stream mca should be read on steam mcb
 	readWG := sync.WaitGroup{}
-	readWG.Add(1)
-	go func() {
-		defer readWG.Done()
+	readWG.Go(func() {
 
 		b := make([]byte, textByteLen)
 		n, err := mcb.Read(b)
@@ -47,7 +43,7 @@ func TestHappyPath(t *testing.T) {
 
 		require.Equal(t, n, textByteLen)
 		require.Equal(t, b, textByte)
-	}()
+	})
 
 	unittest.RequireReturnsBefore(t, writeWG.Wait, 1*time.Second, "timeout for writing on stream")
 	unittest.RequireReturnsBefore(t, readWG.Wait, 1*time.Second, "timeout for reading from stream")
@@ -66,22 +62,18 @@ func TestUnhappyPath(t *testing.T) {
 
 	// writes on sa (uncompressed)
 	writeWG := sync.WaitGroup{}
-	writeWG.Add(1)
-	go func() {
-		defer writeWG.Done()
+	writeWG.Go(func() {
 
 		// writes data uncompressed
 		n, err := sa.Write(textByte)
 		require.NoError(t, err)
 
 		require.Equal(t, n, len(text))
-	}()
+	})
 
 	// write on uncompressed stream sa should NOT be read on compressed steam mcb
 	readWG := sync.WaitGroup{}
-	readWG.Add(1)
-	go func() {
-		defer readWG.Done()
+	readWG.Go(func() {
 
 		b := make([]byte, textByteLen)
 		n, err := mcb.Read(b)
@@ -92,7 +84,7 @@ func TestUnhappyPath(t *testing.T) {
 		// b on reader side.
 		require.Equal(t, n, 0)
 		require.Equal(t, b, make([]byte, textByteLen))
-	}()
+	})
 
 	unittest.RequireReturnsBefore(t, writeWG.Wait, 1*time.Second, "timeout for writing on stream")
 	unittest.RequireReturnsBefore(t, readWG.Wait, 1*time.Second, "timeout for reading from stream")

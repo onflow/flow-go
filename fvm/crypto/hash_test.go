@@ -3,6 +3,7 @@ package crypto_test
 import (
 	"crypto/rand"
 	"crypto/sha256"
+	sha30 "crypto/sha3"
 	"crypto/sha512"
 	"testing"
 
@@ -24,7 +25,7 @@ func TestPrefixedHash(t *testing.T) {
 			return h[:]
 		},
 		hash.SHA3_256: func(data []byte) []byte {
-			h := sha3.Sum256(data)
+			h := sha30.Sum256(data)
 			return h[:]
 		},
 		hash.SHA2_384: func(data []byte) []byte {
@@ -32,7 +33,7 @@ func TestPrefixedHash(t *testing.T) {
 			return h[:]
 		},
 		hash.SHA3_384: func(data []byte) []byte {
-			h := sha3.Sum384(data)
+			h := sha30.Sum384(data)
 			return h[:]
 		},
 		hash.Keccak_256: func(data []byte) []byte {

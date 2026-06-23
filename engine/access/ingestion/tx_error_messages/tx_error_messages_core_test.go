@@ -335,7 +335,7 @@ func createExpectedTxErrorMessages(resultsByBlockID []flow.LightTransactionResul
 func mockTransactionResultsByBlock(count int) []flow.LightTransactionResult {
 	// Create mock transaction results with a mix of failed and non-failed transactions.
 	resultsByBlockID := make([]flow.LightTransactionResult, 0)
-	for i := 0; i < count; i++ {
+	for i := range count {
 		resultsByBlockID = append(resultsByBlockID, flow.LightTransactionResult{
 			TransactionID:   unittest.IdentifierFixture(),
 			Failed:          i%2 == 0, // create a mix of failed and non-failed transactions

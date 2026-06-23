@@ -36,11 +36,11 @@ import (
 func CreateContractDeploymentTransaction(contractName string, contract string, authorizer flow.Address, chain flow.Chain) *flow.TransactionBodyBuilder {
 	encoded := hex.EncodeToString([]byte(contract))
 
-	script := []byte(fmt.Sprintf(`transaction {
+	script := fmt.Appendf(nil, `transaction {
               prepare(signer: auth(AddContract) &Account, service: &Account) {
                 signer.contracts.add(name: "%s", code: "%s".decodeHex())
               }
-            }`, contractName, encoded))
+            }`, contractName, encoded)
 
 	txBodyBuilder := flow.NewTransactionBodyBuilder().
 		SetScript(script).
@@ -54,11 +54,11 @@ func UpdateContractDeploymentTransaction(contractName string, contract string, a
 	encoded := hex.EncodeToString([]byte(contract))
 
 	return flow.NewTransactionBodyBuilder().
-		SetScript([]byte(fmt.Sprintf(`transaction {
+		SetScript(fmt.Appendf(nil, `transaction {
               prepare(signer: auth(UpdateContract) &Account, service: &Account) {
                 signer.contracts.update(name: "%s", code: "%s".decodeHex())
               }
-            }`, contractName, encoded)),
+            }`, contractName, encoded),
 		).
 		AddAuthorizer(authorizer).
 		AddAuthorizer(chain.ServiceAddress())
@@ -68,22 +68,22 @@ func UpdateContractUnathorizedDeploymentTransaction(contractName string, contrac
 	encoded := hex.EncodeToString([]byte(contract))
 
 	return flow.NewTransactionBodyBuilder().
-		SetScript([]byte(fmt.Sprintf(`transaction {
+		SetScript(fmt.Appendf(nil, `transaction {
               prepare(signer: auth(UpdateContract) &Account) {
                 signer.contracts.update(name: "%s", code: "%s".decodeHex())
               }
-            }`, contractName, encoded)),
+            }`, contractName, encoded),
 		).
 		AddAuthorizer(authorizer)
 }
 
 func RemoveContractDeploymentTransaction(contractName string, authorizer flow.Address, chain flow.Chain) *flow.TransactionBodyBuilder {
 	return flow.NewTransactionBodyBuilder().
-		SetScript([]byte(fmt.Sprintf(`transaction {
+		SetScript(fmt.Appendf(nil, `transaction {
               prepare(signer: auth(RemoveContract) &Account, service: &Account) {
                 signer.contracts.remove(name: "%s")
               }
-            }`, contractName)),
+            }`, contractName),
 		).
 		AddAuthorizer(authorizer).
 		AddAuthorizer(chain.ServiceAddress())
@@ -91,11 +91,11 @@ func RemoveContractDeploymentTransaction(contractName string, authorizer flow.Ad
 
 func RemoveContractUnathorizedDeploymentTransaction(contractName string, authorizer flow.Address) *flow.TransactionBodyBuilder {
 	return flow.NewTransactionBodyBuilder().
-		SetScript([]byte(fmt.Sprintf(`transaction {
+		SetScript(fmt.Appendf(nil, `transaction {
               prepare(signer: auth(RemoveContract) &Account) {
                 signer.contracts.remove(name: "%s")
               }
-            }`, contractName)),
+            }`, contractName),
 		).
 		AddAuthorizer(authorizer)
 }
@@ -104,11 +104,11 @@ func CreateUnauthorizedContractDeploymentTransaction(contractName string, contra
 	encoded := hex.EncodeToString([]byte(contract))
 
 	return flow.NewTransactionBodyBuilder().
-		SetScript([]byte(fmt.Sprintf(`transaction {
+		SetScript(fmt.Appendf(nil, `transaction {
               prepare(signer: auth(AddContract) &Account) {
                 signer.contracts.add(name: "%s", code: "%s".decodeHex())
               }
-            }`, contractName, encoded)),
+            }`, contractName, encoded),
 		).
 		AddAuthorizer(authorizer)
 }
@@ -165,7 +165,7 @@ func SignTransactionAsServiceAccount(tx *flow.TransactionBodyBuilder, seqNum uin
 // GenerateAccountPrivateKeys generates a number of private keys.
 func GenerateAccountPrivateKeys(numberOfPrivateKeys int) ([]flow.AccountPrivateKey, error) {
 	var privateKeys []flow.AccountPrivateKey
-	for i := 0; i < numberOfPrivateKeys; i++ {
+	for range numberOfPrivateKeys {
 		pk, err := GenerateAccountPrivateKey()
 		if err != nil {
 			return nil, err
@@ -251,14 +251,13 @@ func CreateAccountsWithSimpleAddresses(
 		cadPublicKey := BytesToCadenceArray(encPublicKey)
 		encCadPublicKey, _ := jsoncdc.Encode(cadPublicKey)
 
-		script := []byte(
-			fmt.Sprintf(
+		script :=
+			fmt.Appendf(nil,
 				scriptTemplate,
 				accountKey.SignAlgo.String(),
 				accountKey.HashAlgo.String(),
 				accountKey.Weight,
-			),
-		)
+			)
 
 		txBody, err := flow.NewTransactionBodyBuilder().
 			SetScript(script).
@@ -444,7 +443,7 @@ func CreateMultiAccountCreationTransaction(t *testing.T, chain flow.Chain, n int
 // CreateAddAnAccountKeyMultipleTimesTransaction generates a tx that adds a key several times to an account.
 // this can be used to exhaust an account's storage.
 func CreateAddAnAccountKeyMultipleTimesTransaction(t *testing.T, accountKey *flow.AccountPrivateKey, counts int) *flow.TransactionBodyBuilder {
-	script := []byte(fmt.Sprintf(`
+	script := fmt.Appendf(nil, `
       transaction(counts: Int, key: [UInt8]) {
         prepare(signer: auth(AddKey) &Account) {
           var i = 0
@@ -462,7 +461,7 @@ func CreateAddAnAccountKeyMultipleTimesTransaction(t *testing.T, accountKey *flo
 	      }
         }
       }
-   	`, accountKey.SignAlgo.String(), accountKey.HashAlgo.String()))
+   	`, accountKey.SignAlgo.String(), accountKey.HashAlgo.String())
 
 	arg1, err := jsoncdc.Encode(cadence.NewInt(counts))
 	require.NoError(t, err)

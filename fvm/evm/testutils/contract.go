@@ -22,7 +22,7 @@ type TestContract struct {
 	DeployedAt types.Address
 }
 
-func MakeCallData(t testing.TB, abiString string, name string, args ...interface{}) []byte {
+func MakeCallData(t testing.TB, abiString string, name string, args ...any) []byte {
 	abi, err := gethABI.JSON(strings.NewReader(abiString))
 	require.NoError(t, err)
 	call, err := abi.Pack(name, args...)
@@ -30,7 +30,7 @@ func MakeCallData(t testing.TB, abiString string, name string, args ...interface
 	return call
 }
 
-func (tc *TestContract) MakeCallData(t testing.TB, name string, args ...interface{}) []byte {
+func (tc *TestContract) MakeCallData(t testing.TB, name string, args ...any) []byte {
 	return MakeCallData(t, tc.ABI, name, args...)
 }
 

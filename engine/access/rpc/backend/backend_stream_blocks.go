@@ -235,7 +235,7 @@ func (b *backendSubscribeBlocks) subscribeFromLatest(ctx context.Context, getDat
 
 // getBlockResponse returns a GetDataByHeightFunc that retrieves block information for the specified height.
 func (b *backendSubscribeBlocks) getBlockResponse(blockStatus flow.BlockStatus) subscription.GetDataByHeightFunc {
-	return func(_ context.Context, height uint64) (interface{}, error) {
+	return func(_ context.Context, height uint64) (any, error) {
 		block, err := b.getBlock(height, blockStatus)
 		if err != nil {
 			return nil, err
@@ -252,7 +252,7 @@ func (b *backendSubscribeBlocks) getBlockResponse(blockStatus flow.BlockStatus) 
 
 // getBlockHeaderResponse returns a GetDataByHeightFunc that retrieves block header information for the specified height.
 func (b *backendSubscribeBlocks) getBlockHeaderResponse(blockStatus flow.BlockStatus) subscription.GetDataByHeightFunc {
-	return func(_ context.Context, height uint64) (interface{}, error) {
+	return func(_ context.Context, height uint64) (any, error) {
 		header, err := b.getBlockHeader(height, blockStatus)
 		if err != nil {
 			return nil, err
@@ -269,7 +269,7 @@ func (b *backendSubscribeBlocks) getBlockHeaderResponse(blockStatus flow.BlockSt
 
 // getBlockDigestResponse returns a GetDataByHeightFunc that retrieves lightweight block information for the specified height.
 func (b *backendSubscribeBlocks) getBlockDigestResponse(blockStatus flow.BlockStatus) subscription.GetDataByHeightFunc {
-	return func(_ context.Context, height uint64) (interface{}, error) {
+	return func(_ context.Context, height uint64) (any, error) {
 		header, err := b.getBlockHeader(height, blockStatus)
 		if err != nil {
 			return nil, err

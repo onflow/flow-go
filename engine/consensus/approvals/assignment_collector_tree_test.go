@@ -109,10 +109,10 @@ func (s *AssignmentCollectorTreeSuite) TestGetSize_ConcurrentAccess() {
 
 	var wg sync.WaitGroup
 	wg.Add(numberOfWorkers)
-	for worker := 0; worker < numberOfWorkers; worker++ {
+	for worker := range numberOfWorkers {
 		go func(workerIndex int) {
 			defer wg.Done()
-			for i := 0; i < batchSize; i++ {
+			for i := range batchSize {
 				result := &receipts[workerIndex*batchSize+i].ExecutionResult
 				collector, err := s.collectorTree.GetOrCreateCollector(result)
 				require.NoError(s.T(), err)
@@ -233,7 +233,7 @@ func (s *AssignmentCollectorTreeSuite) TestGetOrCreateCollector_AddingSealedColl
 
 	// generate a few sealed blocks
 	prevSealedBlock := block.ToHeader()
-	for i := 0; i < 5; i++ {
+	for range 5 {
 		sealedBlock := unittest.BlockHeaderWithParentFixture(prevSealedBlock)
 		s.MarkFinalized(sealedBlock)
 		_ = s.collectorTree.FinalizeForkAtLevel(sealedBlock, sealedBlock)
@@ -270,7 +270,7 @@ func (s *AssignmentCollectorTreeSuite) TestFinalizeForkAtLevel_ProcessableAfterS
 		unittest.WithPreviousResult(*s.IncorporatedResult.Result),
 		unittest.WithExecutionResultBlockID(s.IncorporatedBlock.ID()))
 	s.prepareMockedCollector(firstResult)
-	for i := 0; i < len(forks); i++ {
+	for i := range forks {
 		fork := unittest.ChainFixtureFrom(3, s.IncorporatedBlock)
 		forks[i] = fork
 		prevResult := firstResult

@@ -4,6 +4,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"maps"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
@@ -56,9 +57,7 @@ func (r *SealingRecord) ApprovalsRequested(requestCount uint) {
 // plus auxiliary data.
 func (r *SealingRecord) Generate() (Rec, error) {
 	rec := make(Rec)
-	for k, v := range r.entries {
-		rec[k] = v
-	}
+	maps.Copy(rec, r.entries)
 
 	irID := r.IncorporatedResult.ID()
 	result := r.IncorporatedResult.Result

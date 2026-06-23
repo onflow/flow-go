@@ -42,7 +42,7 @@ func TestMakeFinalValidChain(t *testing.T) {
 	parent := final
 	var pending []*flow.Header
 	total := 8
-	for i := 0; i < total; i++ {
+	for range total {
 		header := unittest.BlockHeaderFixture()
 		header.Height = parent.Height + 1
 		header.ParentID = parent.ID()
@@ -56,7 +56,7 @@ func TestMakeFinalValidChain(t *testing.T) {
 	// make sure we get a finalize call for the blocks that we want to
 	cutoff := total - 3
 	var lastID flow.Identifier
-	for i := 0; i < cutoff; i++ {
+	for i := range cutoff {
 		state.On("Finalize", mock.Anything, pending[i].ID()).Return(nil)
 		lastID = pending[i].ID()
 	}

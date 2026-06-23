@@ -31,7 +31,7 @@ func getExecutionDataStore(blobstore blobs.Blobstore, serializer execution_data.
 
 func generateBlockExecutionData(t *testing.T, numChunks int, minSerializedSizePerChunk uint64) *execution_data.BlockExecutionData {
 	ceds := make([]*execution_data.ChunkExecutionData, numChunks)
-	for i := 0; i < numChunks; i++ {
+	for i := range numChunks {
 		ceds[i] = unittest.ChunkExecutionDataFixture(t, int(minSerializedSizePerChunk))
 	}
 
@@ -84,14 +84,14 @@ func TestHappyPath(t *testing.T) {
 
 type randomSerializer struct{}
 
-func (rs *randomSerializer) Serialize(w io.Writer, v interface{}) error {
+func (rs *randomSerializer) Serialize(w io.Writer, v any) error {
 	data := make([]byte, 1024)
 	_, _ = rand.Read(data)
 	_, err := w.Write(data)
 	return err
 }
 
-func (rs *randomSerializer) Deserialize(r io.Reader) (interface{}, error) {
+func (rs *randomSerializer) Deserialize(r io.Reader) (any, error) {
 	return nil, fmt.Errorf("not implemented")
 }
 
@@ -106,7 +106,7 @@ func newCorruptedTailSerializer(numChunks int) *corruptedTailSerializer {
 	}
 }
 
-func (cts *corruptedTailSerializer) Serialize(w io.Writer, v interface{}) error {
+func (cts *corruptedTailSerializer) Serialize(w io.Writer, v any) error {
 	if _, ok := v.(*execution_data.ChunkExecutionData); ok {
 		cts.i++
 		if cts.i == cts.corruptedChunk {
@@ -128,7 +128,7 @@ func (cts *corruptedTailSerializer) Serialize(w io.Writer, v interface{}) error 
 	return execution_data.DefaultSerializer.Serialize(w, v)
 }
 
-func (cts *corruptedTailSerializer) Deserialize(r io.Reader) (interface{}, error) {
+func (cts *corruptedTailSerializer) Deserialize(r io.Reader) (any, error) {
 	return nil, fmt.Errorf("not implemented")
 }
 

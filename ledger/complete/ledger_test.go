@@ -523,7 +523,7 @@ func Test_WAL(t *testing.T) {
 		//saved data after updates
 		savedData := make(map[string]map[string]ledger.Value)
 
-		for i := 0; i < size; i++ {
+		for range size {
 
 			keys := testutils.RandomUniqueKeys(numInsPerStep, keyNumberOfParts, keyPartMinByteSize, keyPartMaxByteSize)
 			values := testutils.RandomValues(numInsPerStep, 1, valueMaxByteSize)
@@ -595,7 +595,7 @@ func TestLedgerFunctionality(t *testing.T) {
 	metricsCollector := &metrics.NoopCollector{}
 	logger := zerolog.Logger{}
 
-	for e := 0; e < experimentRep; e++ {
+	for range experimentRep {
 		numInsPerStep := 100
 		numHistLookupPerStep := 10
 		keyNumberOfParts := 10
@@ -617,7 +617,7 @@ func TestLedgerFunctionality(t *testing.T) {
 			<-compactor.Ready()
 
 			state := led.InitialState()
-			for i := 0; i < steps; i++ {
+			for range steps {
 				// add new keys
 				// TODO update some of the existing keys and shuffle them
 				keys := testutils.RandomUniqueKeys(numInsPerStep, keyNumberOfParts, keyPartMinByteSize, keyPartMaxByteSize)
@@ -886,7 +886,7 @@ func TestLedger_StateByIndex(t *testing.T) {
 	values := testutils.RandomValues(3, 1, 32)
 
 	// Create multiple updates
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		update, err := ledger.NewUpdate(state, keys[i:i+1], values[i:i+1])
 		require.NoError(t, err)
 		newState, _, err := l.Set(update)

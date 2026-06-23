@@ -51,7 +51,7 @@ func (s *TraverseSuite) SetupTest() {
 	s.genesis = genesis
 
 	parent := genesis
-	for i := 0; i < 10; i++ {
+	for range 10 {
 		child := unittest.BlockHeaderWithParentFixture(parent)
 		s.byID[child.ID()] = child
 		s.byHeight[child.Height] = child
@@ -508,7 +508,7 @@ func (s *TraverseSuite) TestTraverse_OnDifferentForkThanTerminalBlock() {
 	// make other fork
 	otherForkHead := s.genesis
 	otherForkByHeight := make(map[uint64]*flow.Header)
-	for i := 0; i < 10; i++ {
+	for range 10 {
 		child := unittest.BlockHeaderWithParentFixture(otherForkHead)
 		s.byID[child.ID()] = child
 		otherForkByHeight[child.Height] = child

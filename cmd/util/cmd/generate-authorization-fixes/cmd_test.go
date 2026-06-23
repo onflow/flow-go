@@ -64,7 +64,7 @@ type testReportWriter struct {
 	entries []any
 }
 
-func (t *testReportWriter) Write(entry interface{}) {
+func (t *testReportWriter) Write(entry any) {
 	t.entries = append(t.entries, entry)
 }
 
@@ -142,7 +142,7 @@ func TestGenerateAuthorizationFixes(t *testing.T) {
 	require.NoError(t, err)
 
 	setupTx, err := flow.NewTransactionBodyBuilder().
-		SetScript([]byte(fmt.Sprintf(`
+		SetScript(fmt.Appendf(nil, `
               import Test from %s
 
               transaction {
@@ -181,7 +181,7 @@ func TestGenerateAuthorizationFixes(t *testing.T) {
               }
             `,
 			address.HexWithPrefix(),
-		))).
+		)).
 		AddAuthorizer(address).
 		Build()
 	require.NoError(t, err)

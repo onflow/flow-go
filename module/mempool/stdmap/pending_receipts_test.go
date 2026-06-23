@@ -65,29 +65,29 @@ func TestPendingReceipts(t *testing.T) {
 		pool := NewPendingReceipts(headers, 100)
 
 		rs := chainedReceipts(100)
-		for i := 0; i < 100; i++ {
+		for i := range 100 {
 			rs[i] = unittest.ExecutionReceiptFixture()
 		}
 
-		for i := 0; i < 100; i++ {
+		for i := range 100 {
 			r := rs[i]
 			ok := pool.Add(r)
 			require.True(t, ok)
 		}
 
-		for i := 0; i < 100; i++ {
+		for i := range 100 {
 			r := rs[i]
 			actual := pool.ByPreviousResultID(r.ExecutionResult.PreviousResultID)
 			require.Equal(t, []*flow.ExecutionReceipt{r}, actual)
 		}
 
-		for i := 0; i < 100; i++ {
+		for i := range 100 {
 			r := rs[i]
 			ok := pool.Remove(r.ID())
 			require.True(t, ok)
 		}
 
-		for i := 0; i < 100; i++ {
+		for i := range 100 {
 			r := rs[i]
 			actual := pool.ByPreviousResultID(r.ExecutionResult.PreviousResultID)
 			require.Equal(t, empty, actual)
@@ -100,7 +100,7 @@ func TestPendingReceipts(t *testing.T) {
 		parent := unittest.ExecutionReceiptFixture()
 		parentID := parent.ID()
 		rs := make([]*flow.ExecutionReceipt, 100)
-		for i := 0; i < 100; i++ {
+		for i := range 100 {
 			rs[i] = unittest.ExecutionReceiptFixture(func(receipt *flow.ExecutionReceipt) {
 				// having the same parent
 				receipt.ExecutionResult.PreviousResultID = parentID
@@ -120,11 +120,11 @@ func TestPendingReceipts(t *testing.T) {
 		pool := NewPendingReceipts(headers, 60)
 
 		rs := chainedReceipts(100)
-		for i := 0; i < 100; i++ {
+		for i := range 100 {
 			rs[i] = unittest.ExecutionReceiptFixture()
 		}
 
-		for i := 0; i < 100; i++ {
+		for i := range 100 {
 			r := rs[i]
 			ok := pool.Add(r)
 			require.True(t, ok)
@@ -133,7 +133,7 @@ func TestPendingReceipts(t *testing.T) {
 		// adding 100 will cause 40 to be ejected,
 		// since there are 60 left and be found
 		total := 0
-		for i := 0; i < 100; i++ {
+		for i := range 100 {
 			r := rs[i]
 			actual := pool.ByPreviousResultID(r.ExecutionResult.PreviousResultID)
 			if len(actual) > 0 {
@@ -144,7 +144,7 @@ func TestPendingReceipts(t *testing.T) {
 
 		// since there are 60 left, should remove 60 in total
 		total = 0
-		for i := 0; i < 100; i++ {
+		for i := range 100 {
 			ok := pool.Remove(rs[i].ID())
 			if ok {
 				total++
@@ -157,7 +157,7 @@ func TestPendingReceipts(t *testing.T) {
 		pool := NewPendingReceipts(headers, 100)
 
 		rs := chainedReceipts(100)
-		for i := 0; i < 100; i++ {
+		for i := range 100 {
 			rs[i] = unittest.ExecutionReceiptFixture()
 		}
 
@@ -195,7 +195,7 @@ func TestPendingReceipts(t *testing.T) {
 		headers.On("ByBlockID", executedBlock.ID()).Return(executedBlock.ToHeader(), nil)
 		headers.On("ByBlockID", nextExecutedBlock.ID()).Return(nextExecutedBlock.ToHeader(), nil)
 		ids := make(map[flow.Identifier]struct{})
-		for i := 0; i < 10; i++ {
+		for range 10 {
 			receipt := unittest.ExecutionReceiptFixture(unittest.WithResult(er))
 			pool.Add(receipt)
 			ids[receipt.ID()] = struct{}{}

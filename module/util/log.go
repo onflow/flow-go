@@ -60,13 +60,10 @@ func NewLogProgressConfig[T int | uint | int32 | uint32 | uint64 | int64](
 	}
 
 	// add the tick at 0%
-	ticks = ticks + 1
-
-	// sanitize ticks
-	// number of ticks should be at most total + 1
-	if uint64(total+1) < ticks {
-		ticks = uint64(total + 1)
-	}
+	ticks = min(
+		// sanitize ticks
+		// number of ticks should be at most total + 1
+		uint64(total+1), ticks+1)
 
 	// sanitize noDataLogDuration
 	if noDataLogDuration < time.Millisecond {
@@ -118,10 +115,7 @@ func LogProgress[T int | uint | int32 | uint32 | uint64 | int64](
 
 		etaString := "unknown"
 		if percentage > 0 {
-			eta := time.Duration(float64(elapsed) / percentage * (100 - percentage))
-			if eta < 0 {
-				eta = 0
-			}
+			eta := max(time.Duration(float64(elapsed)/percentage*(100-percentage)), 0)
 			etaString = eta.Round(1 * time.Second).String()
 		}
 
@@ -136,10 +130,7 @@ func LogProgress[T int | uint | int32 | uint32 | uint64 | int64](
 	logProgress(0)
 
 	// sanitize inputs and calculate increment
-	ticksIncludingZero := config.ticks
-	if ticksIncludingZero < 2 {
-		ticksIncludingZero = 2
-	}
+	ticksIncludingZero := max(config.ticks, 2)
 	ticks := ticksIncludingZero - 1
 
 	increment := total / ticks

@@ -125,7 +125,7 @@ func (suite *ReadBlocksSuite) TestValidateInvalidFormat() {
 		Data: "foo",
 	}))
 	assert.Error(suite.T(), suite.command.Validator(&admin.CommandRequest{
-		Data: map[string]interface{}{
+		Data: map[string]any{
 			"blah": 123,
 		},
 	}))
@@ -133,22 +133,22 @@ func (suite *ReadBlocksSuite) TestValidateInvalidFormat() {
 
 func (suite *ReadBlocksSuite) TestValidateInvalidBlock() {
 	assert.Error(suite.T(), suite.command.Validator(&admin.CommandRequest{
-		Data: map[string]interface{}{
+		Data: map[string]any{
 			"block": true,
 		},
 	}))
 	assert.Error(suite.T(), suite.command.Validator(&admin.CommandRequest{
-		Data: map[string]interface{}{
+		Data: map[string]any{
 			"block": "",
 		},
 	}))
 	assert.Error(suite.T(), suite.command.Validator(&admin.CommandRequest{
-		Data: map[string]interface{}{
+		Data: map[string]any{
 			"block": "uhznms",
 		},
 	}))
 	assert.Error(suite.T(), suite.command.Validator(&admin.CommandRequest{
-		Data: map[string]interface{}{
+		Data: map[string]any{
 			"block": "deadbeef",
 		},
 	}))
@@ -156,12 +156,12 @@ func (suite *ReadBlocksSuite) TestValidateInvalidBlock() {
 
 func (suite *ReadBlocksSuite) TestValidateInvalidBlockHeight() {
 	assert.Error(suite.T(), suite.command.Validator(&admin.CommandRequest{
-		Data: map[string]interface{}{
+		Data: map[string]any{
 			"block": float64(-1),
 		},
 	}))
 	assert.Error(suite.T(), suite.command.Validator(&admin.CommandRequest{
-		Data: map[string]interface{}{
+		Data: map[string]any{
 			"block": float64(1.1),
 		},
 	}))
@@ -169,26 +169,26 @@ func (suite *ReadBlocksSuite) TestValidateInvalidBlockHeight() {
 
 func (suite *ReadBlocksSuite) TestValidateInvalidN() {
 	assert.Error(suite.T(), suite.command.Validator(&admin.CommandRequest{
-		Data: map[string]interface{}{
+		Data: map[string]any{
 			"block": 1,
 			"n":     "foo",
 		},
 	}))
 	assert.Error(suite.T(), suite.command.Validator(&admin.CommandRequest{
-		Data: map[string]interface{}{
+		Data: map[string]any{
 			"block": 1,
 			"n":     float64(1.1),
 		},
 	}))
 	assert.Error(suite.T(), suite.command.Validator(&admin.CommandRequest{
-		Data: map[string]interface{}{
+		Data: map[string]any{
 			"block": 1,
 			"n":     float64(0),
 		},
 	}))
 }
 
-func (suite *ReadBlocksSuite) getBlocks(reqData map[string]interface{}) []*flow.Block {
+func (suite *ReadBlocksSuite) getBlocks(reqData map[string]any) []*flow.Block {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -208,7 +208,7 @@ func (suite *ReadBlocksSuite) getBlocks(reqData map[string]interface{}) []*flow.
 }
 
 func (suite *ReadBlocksSuite) TestHandleFinal() {
-	blocks := suite.getBlocks(map[string]interface{}{
+	blocks := suite.getBlocks(map[string]any{
 		"block": "final",
 	})
 	require.Len(suite.T(), blocks, 1)
@@ -216,7 +216,7 @@ func (suite *ReadBlocksSuite) TestHandleFinal() {
 }
 
 func (suite *ReadBlocksSuite) TestHandleSealed() {
-	blocks := suite.getBlocks(map[string]interface{}{
+	blocks := suite.getBlocks(map[string]any{
 		"block": "sealed",
 	})
 	require.Len(suite.T(), blocks, 1)
@@ -225,7 +225,7 @@ func (suite *ReadBlocksSuite) TestHandleSealed() {
 
 func (suite *ReadBlocksSuite) TestHandleHeight() {
 	for i, block := range suite.allBlocks {
-		responseBlocks := suite.getBlocks(map[string]interface{}{
+		responseBlocks := suite.getBlocks(map[string]any{
 			"block": float64(i),
 		})
 		require.Len(suite.T(), responseBlocks, 1)
@@ -235,7 +235,7 @@ func (suite *ReadBlocksSuite) TestHandleHeight() {
 
 func (suite *ReadBlocksSuite) TestHandleID() {
 	for _, block := range suite.allBlocks {
-		responseBlocks := suite.getBlocks(map[string]interface{}{
+		responseBlocks := suite.getBlocks(map[string]any{
 			"block": block.ID().String(),
 		})
 		require.Len(suite.T(), responseBlocks, 1)
@@ -244,7 +244,7 @@ func (suite *ReadBlocksSuite) TestHandleID() {
 }
 
 func (suite *ReadBlocksSuite) TestHandleNExceedsRootBlock() {
-	responseBlocks := suite.getBlocks(map[string]interface{}{
+	responseBlocks := suite.getBlocks(map[string]any{
 		"block": "final",
 		"n":     float64(len(suite.allBlocks) + 1),
 	})

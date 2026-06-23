@@ -45,7 +45,7 @@ func TestServiceEvents(t *testing.T) {
 func TestServiceEventAll_Consistency(t *testing.T) {
 	chains := flow.AllChainIDs()
 
-	fields := reflect.TypeOf(ServiceEvents{}).NumField()
+	fields := reflect.TypeFor[ServiceEvents]().NumField()
 	for _, chain := range chains {
 		events := ServiceEventsForChain(chain)
 

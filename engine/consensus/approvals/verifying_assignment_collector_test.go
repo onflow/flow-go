@@ -320,7 +320,7 @@ func (s *AssignmentCollectorTestSuite) TestRequestMissingApprovals() {
 	incorporatedBlocks := make([]*flow.Header, 0)
 
 	lastHeight := uint64(rand.Uint32())
-	for i := 0; i < 2; i++ {
+	for range 2 {
 		incorporatedBlock := unittest.BlockHeaderFixture()
 		incorporatedBlock.Height = lastHeight
 		lastHeight++

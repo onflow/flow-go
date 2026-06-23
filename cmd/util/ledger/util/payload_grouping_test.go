@@ -32,7 +32,7 @@ func TestGroupPayloadsByAccountForDataRace(t *testing.T) {
 
 	const accountSize = 4
 	var payloads []*ledger.Payload
-	for i := 0; i < accountSize; i++ {
+	for range accountSize {
 		payloads = append(payloads, generateRandomPayloadsWithAddress(generateRandomAddress(), 100_000)...)
 	}
 
@@ -122,14 +122,11 @@ func generateRandomPayloads(n int) []*ledger.Payload {
 
 	for i := 0; i < n; {
 
-		registersForAccount := minPayloadsPerAccount + int(rand2.ExpFloat64()*(meanPayloadsPerAccount-minPayloadsPerAccount))
-		if registersForAccount > n-i {
-			registersForAccount = n - i
-		}
+		registersForAccount := min(minPayloadsPerAccount+int(rand2.ExpFloat64()*(meanPayloadsPerAccount-minPayloadsPerAccount)), n-i)
 		i += registersForAccount
 
 		accountKey := generateRandomAccountKey()
-		for j := 0; j < registersForAccount; j++ {
+		for range registersForAccount {
 			payloads = append(payloads,
 				ledger.NewPayload(
 					accountKey,
@@ -149,17 +146,14 @@ func generateRandomPayloadsWithAddress(address string, n int) []*ledger.Payload 
 
 	for i := 0; i < n; {
 
-		registersForAccount := minPayloadsPerAccount + int(rand2.ExpFloat64()*(meanPayloadsPerAccount-minPayloadsPerAccount))
-		if registersForAccount > n-i {
-			registersForAccount = n - i
-		}
+		registersForAccount := min(minPayloadsPerAccount+int(rand2.ExpFloat64()*(meanPayloadsPerAccount-minPayloadsPerAccount)), n-i)
 		i += registersForAccount
 
 		accountKey := convert.RegisterIDToLedgerKey(flow.RegisterID{
 			Owner: address,
 			Key:   generateRandomString(10),
 		})
-		for j := 0; j < registersForAccount; j++ {
+		for range registersForAccount {
 			payloads = append(payloads,
 				ledger.NewPayload(
 					accountKey,

@@ -333,10 +333,7 @@ func (v *TransactionVerifier) verifySignatures(
 	toVerifyChan := make(chan *signatureContinuation, len(signatures))
 	verifiedChan := make(chan *signatureContinuation, len(signatures))
 
-	verificationConcurrency := v.VerificationConcurrency
-	if len(signatures) < verificationConcurrency {
-		verificationConcurrency = len(signatures)
-	}
+	verificationConcurrency := min(len(signatures), v.VerificationConcurrency)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -344,7 +341,7 @@ func (v *TransactionVerifier) verifySignatures(
 	wg := sync.WaitGroup{}
 	wg.Add(verificationConcurrency)
 
-	for i := 0; i < verificationConcurrency; i++ {
+	for range verificationConcurrency {
 		go func() {
 			defer wg.Done()
 

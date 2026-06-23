@@ -131,7 +131,7 @@ func Test_AccountCreations(t *testing.T) {
 
 	accountChart := "accounts,storage_size"
 	maxAccounts := 50_000
-	for i := 0; i < maxAccounts; i++ {
+	for i := range maxAccounts {
 		err = tester.run(func(state types.StateDB) {
 			state.AddBalance(tester.newAddress(), uint256.NewInt(100), tracing.BalanceChangeUnspecified)
 		})
@@ -158,7 +158,7 @@ func Test_AccountContractInteraction(t *testing.T) {
 
 	// build test contract storage state
 	contractState := make(map[common.Hash]common.Hash)
-	for i := 0; i < 10; i++ {
+	for i := range 10 {
 		h := common.HexToHash(fmt.Sprintf("%d", i))
 		v := common.HexToHash(fmt.Sprintf("%d %s", i, make([]byte, 32)))
 		contractState[h] = v
@@ -168,7 +168,7 @@ func Test_AccountContractInteraction(t *testing.T) {
 	code := make([]byte, 50000)
 
 	interactions := 50000
-	for i := 0; i < interactions; i++ {
+	for i := range interactions {
 		err = tester.run(func(state types.StateDB) {
 			// create a new account
 			accAddr := tester.newAddress()
