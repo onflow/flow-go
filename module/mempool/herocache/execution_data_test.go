@@ -71,7 +71,7 @@ func TestBlockExecutionDataConcurrentWriteAndRead(t *testing.T) {
 	wg.Add(total)
 
 	// storing all cache
-	for i := range total {
+	for i := 0; i < total; i++ {
 		go func(ed *execution_data.BlockExecutionDataEntity) {
 			require.True(t, cache.Add(ed.BlockID, ed))
 
@@ -84,7 +84,7 @@ func TestBlockExecutionDataConcurrentWriteAndRead(t *testing.T) {
 
 	wg.Add(total)
 	// reading all cache
-	for i := range total {
+	for i := 0; i < total; i++ {
 		go func(ed *execution_data.BlockExecutionDataEntity) {
 			actual, ok := cache.Get(ed.BlockID)
 			require.True(t, ok)
@@ -104,7 +104,7 @@ func TestBlockExecutionDataAllReturnsInOrder(t *testing.T) {
 	cache := herocache.NewBlockExecutionData(uint32(total), unittest.Logger(), metrics.NewNoopCollector())
 
 	// storing all cache
-	for i := range total {
+	for i := 0; i < total; i++ {
 		require.True(t, cache.Add(execDatas[i].BlockID, execDatas[i]))
 		ed, ok := cache.Get(execDatas[i].BlockID)
 		require.True(t, ok)
@@ -113,7 +113,7 @@ func TestBlockExecutionDataAllReturnsInOrder(t *testing.T) {
 
 	// all cache must be retrieved in the same order as they are added
 	all := cache.All()
-	for i := range total {
+	for i := 0; i < total; i++ {
 		val, exists := all[execDatas[i].BlockID]
 		require.True(t, exists)
 		assert.Equal(t, execDatas[i], val)

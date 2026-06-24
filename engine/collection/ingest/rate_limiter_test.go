@@ -69,7 +69,7 @@ func TestLimiterBurst(t *testing.T) {
 	l := ingest.NewAddressRateLimiter(numPerSec, burst)
 
 	l.AddAddress(limited1)
-	for i := range burst {
+	for i := 0; i < burst; i++ {
 		require.False(t, l.IsRateLimited(limited1), fmt.Sprintf("%v-nth call", i))
 	}
 
@@ -173,7 +173,7 @@ func TestLimiterGetSetConfig(t *testing.T) {
 	l.SetLimitConfig(rate.Limit(20), 4)
 
 	// verify the quota is reset, and the new limit is applied
-	for i := range 4 {
+	for i := 0; i < 4; i++ {
 		require.False(t, l.IsRateLimited(addr1), fmt.Sprintf("fail at %v-th call", i))
 	}
 	require.True(t, l.IsRateLimited(addr1))

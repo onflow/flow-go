@@ -25,7 +25,7 @@ import (
 //		t: the testing.TB instance
 //	 a: the first float
 //	 b: the second float
-func RequireNumericallyClose(t testing.TB, a, b float64, epsilon float64, msgAndArgs ...any) {
+func RequireNumericallyClose(t testing.TB, a, b float64, epsilon float64, msgAndArgs ...interface{}) {
 	require.True(t, AreNumericallyClose(a, b, epsilon), msgAndArgs...)
 }
 

@@ -2,7 +2,6 @@ package inspection
 
 import (
 	"fmt"
-	"maps"
 	"math"
 	"runtime/debug"
 	"sync"
@@ -56,7 +55,9 @@ func (td *TokenChanges) Name() string {
 func (td *TokenChanges) SetSearchedTokens(searchedTokens TokenChangesSearchTokens) {
 	// copy the map in case the user tries to modify the map
 	st := make(map[string]SearchToken, len(searchedTokens))
-	maps.Copy(st, searchedTokens)
+	for k, v := range searchedTokens {
+		st[k] = v
+	}
 	td.searchedTokensMu.Lock()
 	defer td.searchedTokensMu.Unlock()
 	td.searchedTokens = st
@@ -162,7 +163,9 @@ func (td *TokenChanges) getTokenDiff(
 	for a := range addresses {
 		// Copy beforeTokens before calling diffAccountTokens, which mutates the before map
 		beforeTokens := make(accountTokens, len(before[a]))
-		maps.Copy(beforeTokens, before[a])
+		for k, v := range before[a] {
+			beforeTokens[k] = v
+		}
 		afterTokens := after[a]
 		diff := diffAccountTokens(before[a], after[a])
 		if len(diff) == 0 {

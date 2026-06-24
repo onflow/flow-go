@@ -398,7 +398,7 @@ func StoreCheckpointV5(dir string, fileName string, logger zerolog.Logger, tries
 	// - subtrieRoots[subtrieCount-1] is a list of all subtrie roots at path [1,1,1,1]
 	// subtrie roots in subtrieRoots[0] have the same path, therefore might have shared child nodes.
 	var subtrieRoots [subtrieCount][]*node.Node
-	for i := range len(subtrieRoots) {
+	for i := 0; i < len(subtrieRoots); i++ {
 		subtrieRoots[i] = make([]*node.Node, len(tries))
 	}
 
@@ -756,7 +756,7 @@ func readCheckpointV3AndEarlier(f *os.File, version uint16) ([]*trie.MTrie, erro
 		nodes[i].regSize = regSize
 	}
 
-	for i := range triesCount {
+	for i := uint16(0); i < triesCount; i++ {
 		trie, err := flattener.ReadTrieFromCheckpointV3AndEarlier(reader, func(nodeIndex uint64) (*node.Node, uint64, uint64, error) {
 			if nodeIndex >= uint64(len(nodes)) {
 				return nil, 0, 0, fmt.Errorf("sequence of stored nodes doesn't contain node")
@@ -863,7 +863,7 @@ func readCheckpointV4(f *os.File) ([]*trie.MTrie, error) {
 		nodes[i].regSize = regSize
 	}
 
-	for i := range triesCount {
+	for i := uint16(0); i < triesCount; i++ {
 		trie, err := flattener.ReadTrieFromCheckpointV4(reader, scratch, func(nodeIndex uint64) (*node.Node, uint64, uint64, error) {
 			if nodeIndex >= uint64(len(nodes)) {
 				return nil, 0, 0, fmt.Errorf("sequence of stored nodes doesn't contain node")
@@ -977,7 +977,7 @@ func readCheckpointV5(f *os.File, logger zerolog.Logger) ([]*trie.MTrie, error) 
 
 	logger.Info().Msgf("finished loading %v trie nodes, start loading %v tries", nodesCount, triesCount)
 
-	for i := range triesCount {
+	for i := uint16(0); i < triesCount; i++ {
 		trie, err := flattener.ReadTrie(reader, scratch, func(nodeIndex uint64) (*node.Node, error) {
 			if nodeIndex >= uint64(len(nodes)) {
 				return nil, fmt.Errorf("sequence of stored nodes doesn't contain node")

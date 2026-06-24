@@ -127,7 +127,10 @@ func (c *BlockThrottle) Init(processables chan<- BlockIDHeight, threshold int) e
 
 	c.processables = processables
 
-	lastFinalizedToLoad := min(c.loaded+uint64(threshold), c.finalized)
+	lastFinalizedToLoad := c.loaded + uint64(threshold)
+	if lastFinalizedToLoad > c.finalized {
+		lastFinalizedToLoad = c.finalized
+	}
 
 	loadedAll := lastFinalizedToLoad == c.finalized
 

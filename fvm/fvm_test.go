@@ -6,7 +6,6 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
-	"maps"
 	"math"
 	"strconv"
 	"strings"
@@ -194,7 +193,7 @@ func TestHashing(t *testing.T) {
 	snapshotTree := testutil.RootBootstrappedLedger(vm, ctx)
 
 	hashScript := func(hashName string) []byte {
-		return fmt.Appendf(nil,
+		return []byte(fmt.Sprintf(
 			`
 				import Crypto
 
@@ -202,17 +201,17 @@ func TestHashing(t *testing.T) {
 				fun main(data: [UInt8]): [UInt8] {
 					return Crypto.hash(data, algorithm: HashAlgorithm.%s)
 				}
-			`, hashName)
+			`, hashName))
 	}
 	hashWithTagScript := func(hashName string) []byte {
-		return fmt.Appendf(nil,
+		return []byte(fmt.Sprintf(
 			`
 				import Crypto
 
 				access(all) fun main(data: [UInt8], tag: String): [UInt8] {
 					return Crypto.hashWithTag(data, tag: tag, algorithm: HashAlgorithm.%s)
 				}
-			`, hashName)
+			`, hashName))
 	}
 
 	data := []byte("some random message")
@@ -527,7 +526,7 @@ func TestEventLimits(t *testing.T) {
 		fvm.WithEventCollectionSizeLimit(2))
 
 	txBody, err := flow.NewTransactionBodyBuilder().
-		SetScript(fmt.Appendf(nil, deployingContractScriptTemplate, hex.EncodeToString([]byte(testContract)))).
+		SetScript([]byte(fmt.Sprintf(deployingContractScriptTemplate, hex.EncodeToString([]byte(testContract))))).
 		SetPayer(chain.ServiceAddress()).
 		AddAuthorizer(chain.ServiceAddress()).
 		Build()
@@ -543,14 +542,14 @@ func TestEventLimits(t *testing.T) {
 	snapshotTree = snapshotTree.Append(executionSnapshot)
 
 	txBody, err = flow.NewTransactionBodyBuilder().
-		SetScript(fmt.Appendf(nil, `
+		SetScript([]byte(fmt.Sprintf(`
 		import TestContract from 0x%s
 			transaction {
 			prepare(acct: &Account) {}
 			execute {
 				TestContract.EmitEvent()
 			}
-		}`, chain.ServiceAddress())).
+		}`, chain.ServiceAddress()))).
 		SetPayer(chain.ServiceAddress()).
 		AddAuthorizer(chain.ServiceAddress()).
 		Build()
@@ -636,7 +635,7 @@ func TestTransactionFeeDeduction(t *testing.T) {
 
 	getBalance := func(vm fvm.VM, chain flow.Chain, ctx fvm.Context, snapshotTree snapshot.SnapshotTree, address flow.Address) uint64 {
 		sc := systemcontracts.SystemContractsForChain(chain.ChainID())
-		code := fmt.Appendf(nil,
+		code := []byte(fmt.Sprintf(
 			`
 					import FungibleToken from 0x%s
 					import FlowToken from 0x%s
@@ -651,7 +650,7 @@ func TestTransactionFeeDeduction(t *testing.T) {
 				`,
 			sc.FungibleToken.Address.Hex(),
 			sc.FlowToken.Address.Hex(),
-		)
+		))
 		script := fvm.Script(code).WithArguments(
 			jsoncdc.MustEncode(cadence.NewAddress(address)),
 		)
@@ -1168,7 +1167,9 @@ func TestSettingExecutionWeights(t *testing.T) {
 		))
 
 	memoryWeights := make(map[common.MemoryKind]uint64)
-	maps.Copy(memoryWeights, meter.DefaultMemoryWeights)
+	for k, v := range meter.DefaultMemoryWeights {
+		memoryWeights[k] = v
+	}
 
 	const highWeight = 20_000_000_000
 	memoryWeights[common.MemoryKindIntegerExpression] = highWeight
@@ -1276,7 +1277,9 @@ func TestSettingExecutionWeights(t *testing.T) {
 		))
 
 	memoryWeights = make(map[common.MemoryKind]uint64)
-	maps.Copy(memoryWeights, meter.DefaultMemoryWeights)
+	for k, v := range meter.DefaultMemoryWeights {
+		memoryWeights[k] = v
+	}
 	memoryWeights[common.MemoryKindBreakStatement] = 1_000_000
 	t.Run("transaction should fail with low memory limit (set in the state)", newVMTest().
 		withChain(chain).
@@ -1506,9 +1509,9 @@ func TestSettingExecutionWeights(t *testing.T) {
 				executionEffortNeededToCheckStorage := uint64(1)
 				maxExecutionEffort := uint64(997)
 				txBodyBuilder := flow.NewTransactionBodyBuilder().
-					SetScript(fmt.Appendf(nil, `
+					SetScript([]byte(fmt.Sprintf(`
 				transaction() {prepare(signer: &Account){var i=0;  while i < %d {i = i +1 } } execute{}}
-			`, loops)).
+			`, loops))).
 					SetProposalKey(chain.ServiceAddress(), 0, 0).
 					AddAuthorizer(chain.ServiceAddress()).
 					SetPayer(chain.ServiceAddress()).
@@ -1535,9 +1538,9 @@ func TestSettingExecutionWeights(t *testing.T) {
 				// increasing the number of loops should fail the transaction.
 				loops = loops + 1
 				txBodyBuilder = flow.NewTransactionBodyBuilder().
-					SetScript(fmt.Appendf(nil, `
+					SetScript([]byte(fmt.Sprintf(`
 				transaction() {prepare(signer: &Account){var i=0;  while i < %d {i = i +1 } } execute{}}
-			`, loops)).
+			`, loops))).
 					SetProposalKey(chain.ServiceAddress(), 0, 1).
 					AddAuthorizer(chain.ServiceAddress()).
 					SetPayer(chain.ServiceAddress()).
@@ -1621,7 +1624,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 
 				// create a transaction without loops so only the looping in the storage check is counted.
 				txBodyBuilder := flow.NewTransactionBodyBuilder().
-					SetScript(fmt.Appendf(nil, `
+					SetScript([]byte(fmt.Sprintf(`
 					import FungibleToken from 0x%s
 					import FlowToken from 0x%s
 
@@ -1669,7 +1672,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 						accounts[2].HexWithPrefix(),
 						accounts[3].HexWithPrefix(),
 						accounts[4].HexWithPrefix(),
-					)).
+					))).
 					SetProposalKey(chain.ServiceAddress(), 0, 0).
 					AddAuthorizer(chain.ServiceAddress()).
 					SetPayer(chain.ServiceAddress())
@@ -1822,8 +1825,8 @@ func TestEnforcingComputationLimit(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			ctx := fvm.NewContext(chain, fvm.WithAuthorizationChecksEnabled(false), fvm.WithSequenceNumberCheckAndIncrementEnabled(false))
 
-			script :=
-				fmt.Appendf(nil,
+			script := []byte(
+				fmt.Sprintf(
 					`
                       transaction {
                           prepare() {
@@ -1832,7 +1835,8 @@ func TestEnforcingComputationLimit(t *testing.T) {
                       }
                     `,
 					test.code,
-				)
+				),
+			)
 
 			txBodyBuilder := flow.NewTransactionBodyBuilder().
 				SetScript(script).
@@ -1937,7 +1941,7 @@ func TestStorageCapacity(t *testing.T) {
 			sc := systemcontracts.SystemContractsForChain(chain.ChainID())
 
 			txBody, err := flow.NewTransactionBodyBuilder().
-				SetScript(fmt.Appendf(nil,
+				SetScript([]byte(fmt.Sprintf(
 					`
 					import FungibleToken from 0x%s
 					import FlowToken from 0x%s
@@ -1963,7 +1967,7 @@ func TestStorageCapacity(t *testing.T) {
 					}`,
 					sc.FungibleToken.Address.Hex(),
 					sc.FlowToken.Address.Hex(),
-				)).
+				))).
 				SetPayer(signer).
 				AddArgument(jsoncdc.MustEncode(cadence.NewAddress(target))).
 				AddAuthorizer(signer).
@@ -2008,11 +2012,12 @@ func TestScriptContractMutationsFailure(t *testing.T) {
 
 				contract := "access(all) contract Foo {}"
 
-				script := fvm.Script(fmt.Appendf(nil, `
+				script := fvm.Script([]byte(fmt.Sprintf(`
 				access(all) fun main(account: Address) {
 					let acc = getAuthAccount<auth(AddContract) &Account>(account)
 					acc.contracts.add(name: "Foo", code: "%s".decodeHex())
-				}`, hex.EncodeToString([]byte(contract)))).WithArguments(
+				}`, hex.EncodeToString([]byte(contract))),
+				)).WithArguments(
 					jsoncdc.MustEncode(address),
 				)
 
@@ -2049,13 +2054,13 @@ func TestScriptContractMutationsFailure(t *testing.T) {
 
 				contract := "access(all) contract Foo {}"
 
-				txBodyBuilder := flow.NewTransactionBodyBuilder().SetScript(fmt.Appendf(nil, `
+				txBodyBuilder := flow.NewTransactionBodyBuilder().SetScript([]byte(fmt.Sprintf(`
 					transaction {
 						prepare(signer: auth(AddContract) &Account, service: &Account) {
 							signer.contracts.add(name: "Foo", code: "%s".decodeHex())
 						}
 					}
-				`, hex.EncodeToString([]byte(contract)))).
+				`, hex.EncodeToString([]byte(contract))))).
 					AddAuthorizer(account).
 					AddAuthorizer(chain.ServiceAddress()).
 					SetPayer(chain.ServiceAddress()).
@@ -2122,13 +2127,13 @@ func TestScriptContractMutationsFailure(t *testing.T) {
 
 				contract := "access(all) contract Foo {}"
 
-				txBodyBuilder := flow.NewTransactionBodyBuilder().SetScript(fmt.Appendf(nil, `
+				txBodyBuilder := flow.NewTransactionBodyBuilder().SetScript([]byte(fmt.Sprintf(`
 					transaction {
 						prepare(signer: auth(AddContract) &Account, service: &Account) {
 							signer.contracts.add(name: "Foo", code: "%s".decodeHex())
 						}
 					}
-				`, hex.EncodeToString([]byte(contract)))).
+				`, hex.EncodeToString([]byte(contract))))).
 					AddAuthorizer(account).
 					AddAuthorizer(chain.ServiceAddress()).
 					SetPayer(chain.ServiceAddress()).
@@ -2152,12 +2157,12 @@ func TestScriptContractMutationsFailure(t *testing.T) {
 
 				snapshotTree = snapshotTree.Append(executionSnapshot)
 
-				script := fvm.Script(fmt.Appendf(nil, `
+				script := fvm.Script([]byte(fmt.Sprintf(`
 				access(all) fun main(account: Address) {
 					let acc = getAuthAccount<auth(UpdateContract) &Account>(account)
 					let n = acc.contracts.names[0]
 					acc.contracts.update(name: n, code: "%s".decodeHex())
-				}`, hex.EncodeToString([]byte(contract)))).WithArguments(
+				}`, hex.EncodeToString([]byte(contract))))).WithArguments(
 					jsoncdc.MustEncode(address),
 				)
 
@@ -2768,7 +2773,7 @@ func TestStorageIterationWithBrokenValues(t *testing.T) {
 				))
 
 				// Store values
-				runTransaction(fmt.Appendf(nil,
+				runTransaction([]byte(fmt.Sprintf(
 					`
 					import D from %s
 					import C from %s
@@ -2801,7 +2806,7 @@ func TestStorageIterationWithBrokenValues(t *testing.T) {
 					accounts[0].HexWithPrefix(),
 					accounts[0].HexWithPrefix(),
 					accounts[0].HexWithPrefix(),
-				))
+				)))
 
 				// Update `A`, such that `B`, `C` and `D` are now broken.
 				runTransaction(runtime_utils.UpdateTransaction(
@@ -3001,7 +3006,7 @@ func TestFlowCallbackScheduler(t *testing.T) {
 			require.NoError(t, err)
 
 			// Verify that the capability was stored in the executor account
-			script := fvm.Script(fmt.Appendf(nil, `
+			script := fvm.Script([]byte(fmt.Sprintf(`
 			import FlowTransactionScheduler from %s
 
 			access(all) fun main(executorAddress: Address): Bool {
@@ -3010,7 +3015,7 @@ func TestFlowCallbackScheduler(t *testing.T) {
 					from: /storage/executeScheduledTransactionsCapability
 				)
 			}
-			`, sc.FlowTransactionScheduler.Address.HexWithPrefix()))
+			`, sc.FlowTransactionScheduler.Address.HexWithPrefix())))
 
 			executorAddressArg, err := jsoncdc.Encode(cadence.Address(sc.ScheduledTransactionExecutor.Address))
 			require.NoError(t, err)
@@ -3020,12 +3025,12 @@ func TestFlowCallbackScheduler(t *testing.T) {
 			require.NoError(t, output.Err)
 			require.Equal(t, cadence.Bool(true), output.Value)
 
-			script = fvm.Script(fmt.Appendf(nil, `
+			script = fvm.Script([]byte(fmt.Sprintf(`
 				import FlowTransactionScheduler from %s
 				access(all) fun main(): FlowTransactionScheduler.Status? {
 					return FlowTransactionScheduler.getStatus(id: 1)
 				}
-			`, sc.FlowTransactionScheduler.Address.HexWithPrefix()))
+			`, sc.FlowTransactionScheduler.Address.HexWithPrefix())))
 
 			_, output, err = vm.Run(ctx, script, snapshotTree)
 			require.NoError(t, err)
@@ -3033,12 +3038,12 @@ func TestFlowCallbackScheduler(t *testing.T) {
 			require.NotNil(t, output.Value)
 			require.Equal(t, output.Value, cadence.NewOptional(nil))
 
-			script = fvm.Script(fmt.Appendf(nil, `
+			script = fvm.Script([]byte(fmt.Sprintf(`
 				import FlowTransactionScheduler from %s
 				access(all) fun main(): UInt64 {
 					return FlowTransactionScheduler.getSlotAvailableEffort(timestamp: 1.0, priority: FlowTransactionScheduler.Priority.High)
 				}
-			`, sc.FlowTransactionScheduler.Address.HexWithPrefix()))
+			`, sc.FlowTransactionScheduler.Address.HexWithPrefix())))
 
 			const maxEffortAvailable = 15_000 // FLIP 330
 			_, output, err = vm.Run(ctx, script, snapshotTree)
@@ -3091,7 +3096,7 @@ func TestEVM(t *testing.T) {
 			sc := systemcontracts.SystemContractsForChain(chain.ChainID())
 
 			txBodyBuilder := flow.NewTransactionBodyBuilder().
-				SetScript(fmt.Appendf(nil, `
+				SetScript([]byte(fmt.Sprintf(`
 						import EVM from %s
 
 						transaction(bytes: [UInt8; 20]) {
@@ -3100,7 +3105,7 @@ func TestEVM(t *testing.T) {
 								log(addr)
 							}
 						}
-					`, sc.EVMContract.Address.HexWithPrefix())).
+					`, sc.EVMContract.Address.HexWithPrefix()))).
 				SetProposalKey(chain.ServiceAddress(), 0, 0).
 				SetPayer(chain.ServiceAddress()).
 				AddArgument(encodedArg)
@@ -3142,7 +3147,7 @@ func TestEVM(t *testing.T) {
 			snapshotTree snapshot.SnapshotTree,
 		) {
 			sc := systemcontracts.SystemContractsForChain(chain.ChainID())
-			script := fvm.Script(fmt.Appendf(nil, `
+			script := fvm.Script([]byte(fmt.Sprintf(`
 				import EVM from %s
 
 				access(all) fun main() {
@@ -3153,7 +3158,7 @@ func TestEVM(t *testing.T) {
 					destroy acc.withdraw(balance: bal)
 					destroy acc
 				}
-			`, sc.EVMContract.Address.HexWithPrefix()))
+			`, sc.EVMContract.Address.HexWithPrefix())))
 
 			_, output, err := vm.Run(ctx, script, snapshotTree)
 
@@ -3208,14 +3213,14 @@ func TestEVM(t *testing.T) {
 						return snapshotTree.Get(id)
 					})
 
-				script := fvm.Script(fmt.Appendf(nil, `
+				script := fvm.Script([]byte(fmt.Sprintf(`
 					import EVM from %s
 
 					access(all)
                     fun main() {
 						destroy <- EVM.createCadenceOwnedAccount()
 					}
-				`, sc.EVMContract.Address.HexWithPrefix()))
+				`, sc.EVMContract.Address.HexWithPrefix())))
 
 				_, output, err := vm.Run(ctx, script, errStorage)
 
@@ -3243,7 +3248,7 @@ func TestEVM(t *testing.T) {
 			sc := systemcontracts.SystemContractsForChain(chain.ChainID())
 
 			txBodyBuilder := flow.NewTransactionBodyBuilder().
-				SetScript(fmt.Appendf(nil, `
+				SetScript([]byte(fmt.Sprintf(`
 					import FungibleToken from %s
 					import FlowToken from %s
 					import EVM from %s
@@ -3270,7 +3275,7 @@ func TestEVM(t *testing.T) {
 					sc.FungibleToken.Address.HexWithPrefix(),
 					sc.FlowToken.Address.HexWithPrefix(),
 					sc.FlowServiceAccount.Address.HexWithPrefix(), // TODO this should be sc.EVM.Address not found there???
-				)).
+				))).
 				SetProposalKey(chain.ServiceAddress(), 0, 0).
 				AddAuthorizer(chain.ServiceAddress()).
 				SetPayer(chain.ServiceAddress())
@@ -3752,7 +3757,7 @@ func TestVMBridge(t *testing.T) {
 
 			// Mint an NFT
 			txBodyBuilder = flow.NewTransactionBodyBuilder().
-				SetScript(fmt.Appendf(nil,
+				SetScript([]byte(fmt.Sprintf(
 					`
 						import NonFungibleToken from 0x%s
 						import ExampleNFT from 0x%s
@@ -3799,7 +3804,7 @@ func TestVMBridge(t *testing.T) {
 						}
 			`,
 					env.NonFungibleTokenAddress, accounts[0].String(), env.NonFungibleTokenAddress, env.FungibleTokenAddress, accounts[0].String(),
-				)).AddAuthorizer(accounts[0])
+				))).AddAuthorizer(accounts[0])
 
 			err = testutil.SignTransaction(txBodyBuilder, accounts[0], privateKey, 3)
 			require.NoError(t, err)
@@ -4070,7 +4075,7 @@ func TestCrypto(t *testing.T) {
 			fvm.WithCadenceLogging(true),
 		)
 
-		script := fmt.Appendf(nil,
+		script := []byte(fmt.Sprintf(
 			`
               %s
 
@@ -4125,7 +4130,7 @@ func TestCrypto(t *testing.T) {
               }
             `,
 			importDecl,
-		)
+		))
 
 		accountKeys := test.AccountKeyGenerator()
 
@@ -4588,7 +4593,7 @@ func TestFlowTokenChangesInspector(t *testing.T) {
 				sc := systemcontracts.SystemContractsForChain(chain.ChainID())
 
 				txBodyBuilder := flow.NewTransactionBodyBuilder().
-					SetScript(fmt.Appendf(nil, `
+					SetScript([]byte(fmt.Sprintf(`
 						import FungibleToken from %s
 						import FlowToken from %s
 						import EVM from %s
@@ -4614,7 +4619,7 @@ func TestFlowTokenChangesInspector(t *testing.T) {
 						sc.FungibleToken.Address.HexWithPrefix(),
 						sc.FlowToken.Address.HexWithPrefix(),
 						sc.FlowServiceAccount.Address.HexWithPrefix(),
-					)).
+					))).
 					SetProposalKey(chain.ServiceAddress(), 0, 0).
 					AddAuthorizer(chain.ServiceAddress()).
 					SetPayer(chain.ServiceAddress())

@@ -236,10 +236,10 @@ func (s *CacheSuite) TestConcurrentAdd() {
 
 	var certifiedBlocksLock sync.Mutex
 	var allCertifiedBlocks []flow.CertifiedBlock
-	for i := range workers {
+	for i := 0; i < workers; i++ {
 		go func(blocks []*flow.Proposal) {
 			defer wg.Done()
-			for batch := range batchesPerWorker {
+			for batch := 0; batch < batchesPerWorker; batch++ {
 				certifiedBlocks, err := s.cache.AddBlocks(blocks[batch*blocksPerBatch : (batch+1)*blocksPerBatch])
 				require.NoError(s.T(), err)
 				certifiedBlocksLock.Lock()
@@ -354,7 +354,7 @@ func (s *CacheSuite) TestAddOverCacheLimit() {
 
 	var wg sync.WaitGroup
 	wg.Add(workers)
-	for i := range workers {
+	for i := 0; i < workers; i++ {
 		go func(blocks []*flow.Proposal) {
 			defer wg.Done()
 			for !done.Load() {

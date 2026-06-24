@@ -87,8 +87,8 @@ func TestKeyListSignature(t *testing.T) {
 
 	testForHash := func(signatureAlgorithm signatureAlgorithm, hashAlgorithm hashAlgorithm) {
 
-		code :=
-			fmt.Appendf(nil,
+		code := []byte(
+			fmt.Sprintf(
 				`
                       import Crypto
 
@@ -135,7 +135,8 @@ func TestKeyListSignature(t *testing.T) {
 				signatureAlgorithm.name,
 				hashAlgorithm.name,
 				tag,
-			)
+			),
+		)
 
 		t.Run(fmt.Sprintf("%s %s", signatureAlgorithm.name, hashAlgorithm.name), func(t *testing.T) {
 
@@ -406,8 +407,9 @@ func TestBLSMultiSignature(t *testing.T) {
 			) {
 
 				code := func(signatureAlgorithm signatureAlgorithm) []byte {
-					return fmt.Appendf(nil,
-						`
+					return []byte(
+						fmt.Sprintf(
+							`
 								import Crypto
 		
 								access(all)
@@ -422,7 +424,8 @@ func TestBLSMultiSignature(t *testing.T) {
 									return p.verifyPoP(proof)
 								}
 								`,
-						signatureAlgorithm.name,
+							signatureAlgorithm.name,
+						),
 					)
 				}
 
@@ -537,7 +540,7 @@ func TestBLSMultiSignature(t *testing.T) {
 				sigs := make([]crypto.Signature, 0, numSigs)
 
 				kmac := msig.NewBLSHasher("test tag")
-				for range numSigs {
+				for i := 0; i < numSigs; i++ {
 					sk := randomSK(t, BLSSignatureAlgorithm)
 					// a valid BLS signature
 					s, err := sk.Sign(input, kmac)
@@ -627,8 +630,9 @@ func TestBLSMultiSignature(t *testing.T) {
 			) {
 
 				code := func(signatureAlgorithm signatureAlgorithm) []byte {
-					return fmt.Appendf(nil,
-						`
+					return []byte(
+						fmt.Sprintf(
+							`
 								import Crypto
 		
 								access(all) fun main(
@@ -644,7 +648,8 @@ func TestBLSMultiSignature(t *testing.T) {
 									return BLS.aggregatePublicKeys(pks)!.publicKey
 								}
 								`,
-						signatureAlgorithm.name,
+							signatureAlgorithm.name,
+						),
 					)
 				}
 
@@ -654,7 +659,7 @@ func TestBLSMultiSignature(t *testing.T) {
 				t.Run("valid BLS keys", func(t *testing.T) {
 
 					publicKeys := make([]cadence.Value, 0, pkNum)
-					for range pkNum {
+					for i := 0; i < pkNum; i++ {
 						sk := randomSK(t, BLSSignatureAlgorithm)
 						pk := sk.PublicKey()
 						pks = append(pks, pk)
@@ -684,7 +689,7 @@ func TestBLSMultiSignature(t *testing.T) {
 					t.Run("non BLS keys/"+signatureAlgorithm.name, func(t *testing.T) {
 
 						publicKeys := make([]cadence.Value, 0, pkNum)
-						for range pkNum {
+						for i := 0; i < pkNum; i++ {
 							sk := randomSK(t, signatureAlgorithm)
 							pk := sk.PublicKey()
 							pks = append(pks, pk)
@@ -771,7 +776,7 @@ func TestBLSMultiSignature(t *testing.T) {
 				signatures := make([]cadence.Value, 0, num)
 
 				kmac := msig.NewBLSHasher(string(tag))
-				for range num {
+				for i := 0; i < num; i++ {
 					sk := randomSK(t, BLSSignatureAlgorithm)
 					pk := sk.PublicKey()
 					publicKeys = append(

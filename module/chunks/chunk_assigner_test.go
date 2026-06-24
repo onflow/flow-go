@@ -58,7 +58,7 @@ func (a *PublicAssignmentTestSuite) TestByNodeID() {
 
 	// evaluating the chunk assignment
 	// each verifier should have two certain chunks based on the assignment
-	for i := range size {
+	for i := 0; i < size; i++ {
 		assignedChunks := assignment.ByNodeID(ids[i].NodeID)
 		require.Len(a.T(), assignedChunks, 2)
 		c, ok := chunks.ByIndex(uint64(i))
@@ -314,7 +314,7 @@ func (a *PublicAssignmentTestSuite) TestCacheAssignment() {
 // chunks to make them distinct from each other.
 func (a *PublicAssignmentTestSuite) CreateChunks(num int, t *testing.T) flow.ChunkList {
 	list := flow.ChunkList{}
-	for i := range num {
+	for i := 0; i < num; i++ {
 		// creates random state for each chunk
 		// to provide random ordering after sorting
 		var state flow.StateCommitment

@@ -25,7 +25,7 @@ func TransactionForCluster(clusters flow.ClusterList, target flow.IdentitySkelet
 func AlterTransactionForCluster(tx flow.TransactionBody, clusters flow.ClusterList, target flow.IdentitySkeletonList, after func(tx *flow.TransactionBody)) flow.TransactionBody {
 
 	// Bound to avoid infinite loop in case the routing algorithm is broken
-	for range 10000 {
+	for i := 0; i < 10000; i++ {
 		tx.Script = append(tx.Script, '/', '/')
 
 		if after != nil {

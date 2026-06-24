@@ -84,7 +84,7 @@ func TestCache_ConcurrentSameRecordAdd(t *testing.T) {
 
 	successGauge := atomic.Int32{}
 
-	for range concurrentAttempts {
+	for i := 0; i < concurrentAttempts; i++ {
 		go func() {
 			defer wg.Done()
 			initSuccess := cache.add(messageID, controlMsgType)

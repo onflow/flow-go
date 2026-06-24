@@ -27,7 +27,7 @@ func TestSingleConsensusNode(t *testing.T) {
 	rng := getPRG(t, someSeed)
 	selection, err := ComputeLeaderSelection(0, rng, 10, flow.IdentitySkeletonList{&identity.IdentitySkeleton})
 	require.NoError(t, err)
-	for i := range uint64(10) {
+	for i := uint64(0); i < 10; i++ {
 		leaderID, err := selection.LeaderForView(i)
 		require.NoError(t, err)
 		require.Equal(t, identity.NodeID, leaderID)
@@ -42,14 +42,14 @@ func TestBsearchVSsortSearch(t *testing.T) {
 	var sum2 int
 	sums := make([]uint64, 0)
 	sums2 := make([]int, 0)
-	for i := range weights {
+	for i := 0; i < len(weights); i++ {
 		sum += weights[i]
 		sum2 += weights2[i]
 		sums = append(sums, sum)
 		sums2 = append(sums2, sum2)
 	}
 	sel := make([]int, 0, 10)
-	for i := range 10 {
+	for i := 0; i < 10; i++ {
 		index := binarySearchStrictlyBigger(uint64(i), sums)
 		sel = append(sel, index)
 	}
@@ -68,12 +68,12 @@ func TestBsearch(t *testing.T) {
 	weights := []uint64{1, 2, 3, 4}
 	var sum uint64
 	sums := make([]uint64, 0)
-	for i := range weights {
+	for i := 0; i < len(weights); i++ {
 		sum += weights[i]
 		sums = append(sums, sum)
 	}
 	sel := make([]int, 0, 10)
-	for i := range 10 {
+	for i := 0; i < 10; i++ {
 		index := binarySearchStrictlyBigger(uint64(i), sums)
 		sel = append(sel, index)
 	}
@@ -86,14 +86,14 @@ func TestBsearchWithNormalSearch(t *testing.T) {
 	count := 100
 	sums := make([]uint64, 0, count)
 	sum := 0
-	for i := range count {
+	for i := 0; i < count; i++ {
 		sum += i
 		sums = append(sums, uint64(sum))
 	}
 
 	var value uint64
 	total := sums[len(sums)-1]
-	for value = range total {
+	for value = 0; value < total; value++ {
 		expected, err := bruteSearch(value, sums)
 		require.NoError(t, err)
 
@@ -140,7 +140,7 @@ func TestDeterministic(t *testing.T) {
 	leaders2, err := ComputeLeaderSelection(0, rng, N_VIEWS, identities)
 	require.NoError(t, err)
 
-	for i := range N_VIEWS {
+	for i := 0; i < N_VIEWS; i++ {
 		l1, err := leaders1.LeaderForView(uint64(i))
 		require.NoError(t, err)
 
@@ -243,7 +243,7 @@ func TestDifferentSeedWillProduceDifferentSelection(t *testing.T) {
 	require.NoError(t, err)
 
 	diff := 0
-	for view := range N_VIEWS {
+	for view := 0; view < N_VIEWS; view++ {
 		l1, err := leaders1.LeaderForView(uint64(view))
 		require.NoError(t, err)
 
@@ -276,7 +276,7 @@ func TestLeaderSelectionAreWeighted(t *testing.T) {
 	require.NoError(t, err)
 
 	selected := make(map[flow.Identifier]uint64)
-	for view := range N_VIEWS {
+	for view := 0; view < N_VIEWS; view++ {
 		nodeID, err := leaders.LeaderForView(uint64(view))
 		require.NoError(t, err)
 
@@ -308,7 +308,7 @@ func BenchmarkLeaderSelection(b *testing.B) {
 	const N_NODES = 20
 
 	identities := make(flow.IdentityList, 0, N_NODES)
-	for i := range N_NODES {
+	for i := 0; i < N_NODES; i++ {
 		identities = append(identities, unittest.IdentityFixture(unittest.WithInitialWeight(uint64(i))))
 	}
 	skeletonIdentities := identities.ToSkeleton()
@@ -353,7 +353,7 @@ func TestZeroWeightNodeWillNotBeSelected(t *testing.T) {
 		selectionFromWeightful, err := ComputeLeaderSelection(0, rng_copy, N_VIEWS, weightful)
 		require.NoError(t, err)
 
-		for i := range N_VIEWS {
+		for i := 0; i < N_VIEWS; i++ {
 			nodeIDFromAll, err := selectionFromAll.LeaderForView(uint64(i))
 			require.NoError(t, err)
 
@@ -389,7 +389,7 @@ func TestZeroWeightNodeWillNotBeSelected(t *testing.T) {
 		selectionFromWeightful, err := ComputeLeaderSelection(0, rng_copy, count, votingConsensusNodes)
 		require.NoError(t, err)
 
-		for i := range count {
+		for i := 0; i < count; i++ {
 			nodeIDFromAll, err := selectionFromAll.LeaderForView(uint64(i))
 			require.NoError(t, err)
 
@@ -413,7 +413,7 @@ func TestZeroWeightNodeWillNotBeSelected(t *testing.T) {
 			selections, err := ComputeLeaderSelection(0, toolRng, 1000, identities)
 			require.NoError(t, err)
 
-			for i := range 1000 {
+			for i := 0; i < 1000; i++ {
 				nodeID, err := selections.LeaderForView(uint64(i))
 				require.NoError(t, err)
 				require.Equal(t, onlyNodeWithWeight.NodeID, nodeID)

@@ -3,7 +3,6 @@ package component_test
 import (
 	"context"
 	"fmt"
-	"slices"
 	"testing"
 	"time"
 
@@ -64,7 +63,12 @@ func (s WorkerState) String() string {
 type WorkerStateList []WorkerState
 
 func (wsl WorkerStateList) Contains(ws WorkerState) bool {
-	return slices.Contains(wsl, ws)
+	for _, s := range wsl {
+		if s == ws {
+			return true
+		}
+	}
+	return false
 }
 
 type WorkerStateTransition int
@@ -381,9 +385,9 @@ type ComponentManagerMachine struct {
 	workerStates []WorkerState
 
 	resetChannelReadTimeout  func()
-	assertClosed             func(t *rapid.T, ch <-chan struct{}, msgAndArgs ...any)
-	assertNotClosed          func(t *rapid.T, ch <-chan struct{}, msgAndArgs ...any)
-	assertErrorThrownMatches func(t *rapid.T, err error, msgAndArgs ...any)
+	assertClosed             func(t *rapid.T, ch <-chan struct{}, msgAndArgs ...interface{})
+	assertNotClosed          func(t *rapid.T, ch <-chan struct{}, msgAndArgs ...interface{})
+	assertErrorThrownMatches func(t *rapid.T, err error, msgAndArgs ...interface{})
 	assertErrorNotThrown     func(t *rapid.T)
 
 	cancelGenerator     *rapid.Generator[bool]
@@ -430,7 +434,7 @@ func (c *ComponentManagerMachine) init(t *rapid.T) {
 		channelReadTimeout = ctx.Done()
 	}
 
-	c.assertClosed = func(t *rapid.T, ch <-chan struct{}, msgAndArgs ...any) {
+	c.assertClosed = func(t *rapid.T, ch <-chan struct{}, msgAndArgs ...interface{}) {
 		select {
 		case <-ch:
 		default:
@@ -442,7 +446,7 @@ func (c *ComponentManagerMachine) init(t *rapid.T) {
 		}
 	}
 
-	c.assertNotClosed = func(t *rapid.T, ch <-chan struct{}, msgAndArgs ...any) {
+	c.assertNotClosed = func(t *rapid.T, ch <-chan struct{}, msgAndArgs ...interface{}) {
 		select {
 		case <-ch:
 			assert.Fail(t, "channel is closed", msgAndArgs...)
@@ -455,7 +459,7 @@ func (c *ComponentManagerMachine) init(t *rapid.T) {
 		}
 	}
 
-	c.assertErrorThrownMatches = func(t *rapid.T, err error, msgAndArgs ...any) {
+	c.assertErrorThrownMatches = func(t *rapid.T, err error, msgAndArgs ...interface{}) {
 		if signalerErr == nil {
 			select {
 			case signalerErr = <-errChan:
@@ -493,7 +497,7 @@ func (c *ComponentManagerMachine) init(t *rapid.T) {
 
 	cmb := component.NewComponentManagerBuilder()
 
-	for i := range numWorkers {
+	for i := 0; i < numWorkers; i++ {
 		wtc, wtp := MakeWorkerTransitionFuncs()
 		c.workerTransitionConsumers[i] = wtc
 		cmb.AddWorker(ComponentWorker(t, i, wtp))
@@ -502,7 +506,7 @@ func (c *ComponentManagerMachine) init(t *rapid.T) {
 	c.cm = cmb.Build()
 	c.cm.Start(signalerCtx)
 
-	for i := range numWorkers {
+	for i := 0; i < numWorkers; i++ {
 		c.workerStates[i] = WorkerStartingUp
 	}
 }
@@ -527,6 +531,8 @@ func (c *ComponentManagerMachine) ExecuteStateTransition(t *rapid.T) {
 	}
 
 	for i, workerId := range st.workerIDs {
+		i := i
+		workerId := workerId
 		addTransition(func() {
 			wst := st.workerTransitions[i]
 			t.Logf("executing worker %v transition: %v\n", workerId, wst)
@@ -648,7 +654,7 @@ func TestComponentManagerShutdown(t *testing.T) {
 
 // run the test many times to reproduce consistently
 func TestComponentManagerShutdown_100(t *testing.T) {
-	for range 100 {
+	for i := 0; i < 100; i++ {
 		TestComponentManagerShutdown(t)
 	}
 }

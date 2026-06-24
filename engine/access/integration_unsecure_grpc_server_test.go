@@ -154,7 +154,7 @@ func (suite *SameGRPCPortTestSuite) SetupTest() {
 	parent := rootBlock.ToHeader()
 	suite.blockMap[rootBlock.Height] = rootBlock
 
-	for range blockCount {
+	for i := 0; i < blockCount; i++ {
 		block := unittest.BlockWithParentFixture(parent)
 		suite.blockMap[block.Height] = block
 	}

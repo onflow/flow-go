@@ -69,7 +69,7 @@ func TestConcurrentWriteAndRead(t *testing.T) {
 	wg.Add(total)
 
 	// storing all transactions
-	for i := range total {
+	for i := 0; i < total; i++ {
 		go func(tx flow.TransactionBody) {
 			require.True(t, transactions.Add(tx.ID(), &tx))
 
@@ -82,7 +82,7 @@ func TestConcurrentWriteAndRead(t *testing.T) {
 
 	wg.Add(total)
 	// reading all transactions
-	for i := range total {
+	for i := 0; i < total; i++ {
 		go func(tx flow.TransactionBody) {
 			actual, ok := transactions.Get(tx.ID())
 			require.True(t, ok)
@@ -102,7 +102,7 @@ func TestValuesReturnsInOrder(t *testing.T) {
 	transactions := herocache.NewTransactions(uint32(total), unittest.Logger(), metrics.NewNoopCollector())
 
 	// storing all transactions
-	for i := range total {
+	for i := 0; i < total; i++ {
 		require.True(t, transactions.Add(txs[i].ID(), &txs[i]))
 		tx, ok := transactions.Get(txs[i].ID())
 		require.True(t, ok)
@@ -111,7 +111,7 @@ func TestValuesReturnsInOrder(t *testing.T) {
 
 	// all transactions must be retrieved in the same order as they are added
 	all := transactions.Values()
-	for i := range total {
+	for i := 0; i < total; i++ {
 		require.Equal(t, txs[i], *all[i])
 	}
 }

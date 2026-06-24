@@ -108,7 +108,7 @@ func NewEngine(
 // Process receives events from the network and checks their type,
 // before enqueuing them to be processed by a worker in a non-blocking manner.
 // No errors expected during normal operation (errors are logged instead).
-func (e *Engine) Process(channel channels.Channel, originID flow.Identifier, event any) error {
+func (e *Engine) Process(channel channels.Channel, originID flow.Identifier, event interface{}) error {
 	receipt, ok := event.(*flow.ExecutionReceipt)
 	if !ok {
 		e.log.Warn().Msgf("%v delivered unsupported message %T through %v", originID, event, channel)

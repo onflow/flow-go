@@ -114,7 +114,7 @@ func TestAggregatedSignatures_PutSignature_Sequence(t *testing.T) {
 	sigs, err := NewAggregatedSignatures(chunks)
 	require.NoError(t, err)
 
-	for index := range chunks {
+	for index := uint64(0); index < chunks; index++ {
 		n, err := sigs.PutSignature(index, flow.AggregatedSignature{})
 		require.NoError(t, err)
 		require.Equal(t, n, index+1)
@@ -132,7 +132,7 @@ func TestAggregatedSignatures_Collect(t *testing.T) {
 
 	// collecting over signatures with missing chunks results in empty array
 	require.Len(t, sigs.Collect(), int(chunks))
-	for index := range chunks {
+	for index := uint64(0); index < chunks; index++ {
 		_, err := sigs.PutSignature(index, sig)
 		require.NoError(t, err)
 		require.Len(t, sigs.Collect(), int(chunks))

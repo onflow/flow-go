@@ -90,7 +90,7 @@ func NewRequestHandler(
 
 // Process processes the given event from the node with the given origin ID in a blocking manner.
 // No errors are expected during normal operation.
-func (r *RequestHandler) Process(channel channels.Channel, originID flow.Identifier, event any) error {
+func (r *RequestHandler) Process(channel channels.Channel, originID flow.Identifier, event interface{}) error {
 	err := r.requestMessageHandler.Process(originID, event)
 	if err != nil {
 		if engine.IsIncompatibleInputTypeError(err) {

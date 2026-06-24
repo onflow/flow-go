@@ -338,7 +338,7 @@ func (s *BackendEventsSuite) runTestSubscribeEventsFromLatest() {
 //  8. Cancels the subscription and ensures it shuts down gracefully.
 func (s *BackendEventsSuite) subscribe(
 	subscribeFn func(ctx context.Context, startBlockID flow.Identifier, startHeight uint64, filter state_stream.EventFilter) subscription.Subscription,
-	requireFn func(any, *EventsResponse),
+	requireFn func(interface{}, *EventsResponse),
 	tests []eventsTestType,
 ) {
 	ctx, cancel := context.WithCancel(context.Background())
@@ -417,7 +417,7 @@ func (s *BackendEventsSuite) subscribe(
 }
 
 // requireEventsResponse ensures that the received event information matches the expected data.
-func (s *BackendEventsSuite) requireEventsResponse(v any, expected *EventsResponse) {
+func (s *BackendEventsSuite) requireEventsResponse(v interface{}, expected *EventsResponse) {
 	actual, ok := v.(*EventsResponse)
 	require.True(s.T(), ok, "unexpected response type: %T", v)
 

@@ -192,7 +192,7 @@ func (s *ApprovalProcessingCoreTestSuite) TestOnBlockFinalized_RejectOldFinalize
 func (s *ApprovalProcessingCoreTestSuite) TestProcessFinalizedBlock_CollectorsCleanup() {
 	blockID := s.Block.ID()
 	numResults := uint(10)
-	for range numResults {
+	for i := uint(0); i < numResults; i++ {
 		// all results incorporated in different blocks
 		incorporatedBlock := unittest.BlockHeaderWithParentFixture(s.IncorporatedBlock)
 		s.Blocks[incorporatedBlock.ID()] = incorporatedBlock
@@ -351,7 +351,7 @@ func (s *ApprovalProcessingCoreTestSuite) TestOnBlockFinalized_EmergencySealing(
 
 	lastFinalizedBlock := s.IncorporatedBlock
 	s.MarkFinalized(lastFinalizedBlock)
-	for range approvals.DefaultEmergencySealingThresholdForFinalization {
+	for i := 0; i < approvals.DefaultEmergencySealingThresholdForFinalization; i++ {
 		finalizedBlock := unittest.BlockHeaderWithParentFixture(lastFinalizedBlock)
 		s.Blocks[finalizedBlock.ID()] = finalizedBlock
 		s.MarkFinalized(finalizedBlock)
@@ -534,7 +534,7 @@ func (s *ApprovalProcessingCoreTestSuite) TestRequestPendingApprovals() {
 	// create blocks
 	unsealedFinalizedBlocks := make([]flow.Block, 0, n)
 	parentBlock := s.ParentBlock
-	for range n {
+	for i := 0; i < n; i++ {
 		block := unittest.BlockWithParentFixture(parentBlock)
 		s.Blocks[block.ID()] = block.ToHeader()
 		s.IdentitiesCache[block.ID()] = s.AuthorizedVerifiers
@@ -629,7 +629,7 @@ func (s *ApprovalProcessingCoreTestSuite) TestRequestPendingApprovals() {
 
 	// process two more blocks, this will trigger requesting approvals for lastSealed + 1 height
 	// but they will be in blackout period
-	for range 2 {
+	for i := 0; i < 2; i++ {
 		finalized := unsealedFinalizedBlocks[lastProcessedIndex].ToHeader()
 		s.MarkFinalized(finalized)
 		err := s.core.ProcessFinalizedBlock(finalized.ID())
@@ -717,7 +717,7 @@ func (s *ApprovalProcessingCoreTestSuite) TestRepopulateAssignmentCollectorTree(
 	assigner.On("Assign", s.IncorporatedResult.Result, mock.Anything).Return(s.ChunksAssignment, nil)
 
 	// two forks
-	for i := range 2 {
+	for i := 0; i < 2; i++ {
 		fork := unittest.ChainFixtureFrom(i+3, s.IncorporatedBlock)
 		prevResult := s.IncorporatedResult.Result
 		// create execution results for all blocks except last one, since it won't be valid by definition

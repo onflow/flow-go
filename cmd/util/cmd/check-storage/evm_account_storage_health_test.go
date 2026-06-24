@@ -131,7 +131,7 @@ func createCadenceStorage(t *testing.T, ledger atree.Ledger, address common.Addr
 		storageDomain := storage.GetDomainStorageMap(inter, address, domain, true)
 
 		// Create large domain map so there are more than one atree registers under the hood.
-		for i := range 100 {
+		for i := 0; i < 100; i++ {
 			domainStr := domain.Identifier()
 			key := interpreter.StringStorageMapKey(domainStr + "_key_" + strconv.Itoa(i))
 			value := interpreter.NewUnmeteredStringValue(domainStr + "_value_" + strconv.Itoa(i))

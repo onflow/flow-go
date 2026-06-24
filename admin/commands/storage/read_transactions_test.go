@@ -13,7 +13,7 @@ import (
 func TestReadTransactionsRangeTooWide(t *testing.T) {
 	c := GetTransactionsCommand{}
 
-	data := map[string]any{
+	data := map[string]interface{}{
 		"start-height": float64(1),
 		"end-height":   float64(10002),
 	}
@@ -32,7 +32,7 @@ func TestReadTransactionsRangeTooWide(t *testing.T) {
 func TestReadTransactionsRangeInvalid(t *testing.T) {
 	c := GetTransactionsCommand{}
 
-	data := map[string]any{
+	data := map[string]interface{}{
 		"start-height": float64(1001),
 		"end-height":   float64(1000),
 	}
@@ -46,7 +46,7 @@ func TestReadTransactionsRangeInvalid(t *testing.T) {
 func TestReadTransactionsMissingStart(t *testing.T) {
 	c := GetTransactionsCommand{}
 
-	data := map[string]any{
+	data := map[string]interface{}{
 		"start-height": float64(1001),
 	}
 	err := c.Validator(&admin.CommandRequest{
@@ -59,7 +59,7 @@ func TestReadTransactionsMissingStart(t *testing.T) {
 func TestReadTransactionsMissingEnd(t *testing.T) {
 	c := GetTransactionsCommand{}
 
-	data := map[string]any{
+	data := map[string]interface{}{
 		"end-height": float64(1001),
 	}
 	err := c.Validator(&admin.CommandRequest{

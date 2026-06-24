@@ -578,7 +578,7 @@ func mockReceiptsBlockID(t *testing.T,
 	agreeExecutors := flow.IdentityList{}
 	disagreeExecutors := flow.IdentityList{}
 
-	for range agrees {
+	for i := 0; i < agrees; i++ {
 		receipt := unittest.ExecutionReceiptFixture(unittest.WithResult(result))
 		require.NotContains(t, agreeExecutors.NodeIDs(), receipt.ExecutorID) // should not have duplicate executors
 		agreeExecutors = append(agreeExecutors, unittest.IdentityFixture(
@@ -587,7 +587,7 @@ func mockReceiptsBlockID(t *testing.T,
 		agreeReceipts = append(agreeReceipts, receipt)
 	}
 
-	for range disagrees {
+	for i := 0; i < disagrees; i++ {
 		disagreeResult := unittest.ExecutionResultFixture()
 		require.NotEqual(t, disagreeResult.ID(), result.ID())
 

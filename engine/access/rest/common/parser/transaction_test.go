@@ -14,7 +14,7 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-func buildTransaction() map[string]any {
+func buildTransaction() map[string]interface{} {
 	tx := unittest.TransactionFixture()
 	tx.Arguments = [][]uint8{}
 	tx.PayloadSignatures = []flow.TransactionSignature{}
@@ -23,19 +23,19 @@ func buildTransaction() map[string]any {
 		auth[i] = a.String()
 	}
 
-	return map[string]any{
+	return map[string]interface{}{
 		"script":             util.ToBase64(tx.Script),
 		"arguments":          tx.Arguments,
 		"reference_block_id": tx.ReferenceBlockID.String(),
 		"gas_limit":          fmt.Sprintf("%d", tx.GasLimit),
 		"payer":              tx.Payer.String(),
-		"proposal_key": map[string]any{
+		"proposal_key": map[string]interface{}{
 			"address":         tx.ProposalKey.Address.String(),
 			"key_index":       fmt.Sprintf("%d", tx.ProposalKey.KeyIndex),
 			"sequence_number": fmt.Sprintf("%d", tx.ProposalKey.SequenceNumber),
 		},
 		"authorizers": auth,
-		"envelope_signatures": []map[string]any{{
+		"envelope_signatures": []map[string]interface{}{{
 			"address":   tx.EnvelopeSignatures[0].Address.String(),
 			"key_index": fmt.Sprintf("%d", tx.EnvelopeSignatures[0].KeyIndex),
 			"signature": util.ToBase64(tx.EnvelopeSignatures[0].Signature),
@@ -43,7 +43,7 @@ func buildTransaction() map[string]any {
 	}
 }
 
-func transactionToReader(tx map[string]any) io.Reader {
+func transactionToReader(tx map[string]interface{}) io.Reader {
 	res, _ := json.Marshal(tx)
 	return bytes.NewReader(res)
 }
@@ -88,7 +88,7 @@ func TestTransaction_InvalidParse(t *testing.T) {
 
 	for _, test := range keyTests {
 		tx := buildTransaction()
-		tx["proposal_key"].(map[string]any)[test.inputField] = test.inputValue
+		tx["proposal_key"].(map[string]interface{})[test.inputField] = test.inputValue
 		input := transactionToReader(tx)
 
 		var transaction Transaction
@@ -109,7 +109,7 @@ func TestTransaction_InvalidParse(t *testing.T) {
 
 	for _, test := range sigTests {
 		tx := buildTransaction()
-		tx["envelope_signatures"].([]map[string]any)[0][test.inputField] = test.inputValue
+		tx["envelope_signatures"].([]map[string]interface{})[0][test.inputField] = test.inputValue
 		input := transactionToReader(tx)
 
 		var transaction Transaction

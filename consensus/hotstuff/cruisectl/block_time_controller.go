@@ -234,17 +234,17 @@ func (ctl *BlockTimeController) getProposalTiming() ProposalTiming {
 func (ctl *BlockTimeController) TargetPublicationTime(proposalView uint64, timeViewEntered time.Time, parentBlockId flow.Identifier) time.Time {
 	targetPublicationTime := ctl.getProposalTiming().TargetPublicationTime(proposalView, timeViewEntered, parentBlockId)
 
-	publicationDelay := max(
-		// targetPublicationTime should already account for the controller's upper limit of authority (longest view time
-		// the controller is allowed to select). However, targetPublicationTime is allowed to be in the past, if the
-		// controller want to signal that the proposal should be published asap. We could hypothetically update a past
-		// targetPublicationTime to 'now' at every level in the code. However, this time stamp would move into the past
-		// immediately, and we would have to update the targetPublicationTime over and over. Instead, we just allow values
-		// in the past, thereby making repeated corrections unnecessary. In this model, the code _interpreting_ the value
-		// needs to apply the convention a negative publicationDelay essentially means "no delay".
-		time.Until(targetPublicationTime),
-		// Controller can only delay publication of proposal. Hence, the delay is lower-bounded by zero.
-		0)
+	publicationDelay := time.Until(targetPublicationTime)
+	// targetPublicationTime should already account for the controller's upper limit of authority (longest view time
+	// the controller is allowed to select). However, targetPublicationTime is allowed to be in the past, if the
+	// controller want to signal that the proposal should be published asap. We could hypothetically update a past
+	// targetPublicationTime to 'now' at every level in the code. However, this time stamp would move into the past
+	// immediately, and we would have to update the targetPublicationTime over and over. Instead, we just allow values
+	// in the past, thereby making repeated corrections unnecessary. In this model, the code _interpreting_ the value
+	// needs to apply the convention a negative publicationDelay essentially means "no delay".
+	if publicationDelay < 0 {
+		publicationDelay = 0 // Controller can only delay publication of proposal. Hence, the delay is lower-bounded by zero.
+	}
 	ctl.metrics.ProposalPublicationDelay(publicationDelay)
 
 	return targetPublicationTime

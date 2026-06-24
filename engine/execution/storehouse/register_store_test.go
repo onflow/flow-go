@@ -557,14 +557,16 @@ func TestRegisterStoreConcurrentFinalizeAndExecute(t *testing.T) {
 		var wg sync.WaitGroup
 		savedHeights := make(chan uint64, len(headerByHeight)) // enough buffer so that producer won't be blocked
 
-		wg.Go(func() {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
 
 			for savedHeight := range savedHeights {
 				err := finalized.MockFinal(savedHeight)
 				require.NoError(t, err)
 				require.NoError(t, rs.OnBlockFinalized(), fmt.Sprintf("saved height %v", savedHeight))
 			}
-		})
+		}()
 
 		for height := rootHeight + 1; height <= endHeight; height++ {
 			if height >= 50 {

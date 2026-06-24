@@ -72,7 +72,7 @@ func TestDeploy(t *testing.T) {
 		chainID,
 		Contract{
 			Name: "NewContract",
-			Code: fmt.Appendf(nil,
+			Code: []byte(fmt.Sprintf(
 				`
                   import FungibleToken from %s
 
@@ -86,7 +86,7 @@ func TestDeploy(t *testing.T) {
                   }
                 `,
 				fungibleTokenAddress.HexWithPrefix(),
-			),
+			)),
 		},
 		targetAddress,
 		map[flow.Address]struct{}{
@@ -127,7 +127,7 @@ func TestDeploy(t *testing.T) {
 	require.NoError(t, err)
 
 	txBody, err := flow.NewTransactionBodyBuilder().
-		SetScript(fmt.Appendf(nil,
+		SetScript([]byte(fmt.Sprintf(
 			`
               import NewContract from %s
 
@@ -138,7 +138,7 @@ func TestDeploy(t *testing.T) {
               }
             `,
 			targetAddress.HexWithPrefix(),
-		)).
+		))).
 		SetPayer(serviceAccountAddress).
 		Build()
 	require.NoError(t, err)

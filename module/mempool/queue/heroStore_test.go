@@ -20,7 +20,7 @@ func TestHeroStore_Sequential(t *testing.T) {
 	store := queue.NewHeroStore(uint32(sizeLimit), unittest.Logger(), metrics.NewNoopCollector())
 
 	messages := unittest.EngineMessageFixtures(sizeLimit)
-	for i := range sizeLimit {
+	for i := 0; i < sizeLimit; i++ {
 		require.True(t, store.Put(messages[i]))
 
 		// duplicate put should fail
@@ -28,12 +28,12 @@ func TestHeroStore_Sequential(t *testing.T) {
 	}
 
 	// once store meets the size limit, any extra put should fail.
-	for range 100 {
+	for i := 0; i < 100; i++ {
 		require.False(t, store.Put(unittest.EngineMessageFixture()))
 	}
 
 	// getting entities sequentially.
-	for i := range sizeLimit {
+	for i := 0; i < sizeLimit; i++ {
 		msg, ok := store.Get()
 		require.True(t, ok)
 		require.Equal(t, messages[i], msg)
@@ -56,6 +56,7 @@ func TestHeroStore_Concurrent(t *testing.T) {
 	messages := unittest.EngineMessageFixtures(sizeLimit)
 	// putting messages concurrently.
 	for _, m := range messages {
+		m := m
 		go func() {
 			require.True(t, store.Put(m))
 			putWG.Done()
@@ -65,7 +66,7 @@ func TestHeroStore_Concurrent(t *testing.T) {
 
 	// once store meets the size limit, any extra put should fail.
 	putWG.Add(sizeLimit)
-	for range sizeLimit {
+	for i := 0; i < sizeLimit; i++ {
 		go func() {
 			require.False(t, store.Put(unittest.EngineMessageFixture()))
 			putWG.Done()
@@ -78,7 +79,7 @@ func TestHeroStore_Concurrent(t *testing.T) {
 	matchLock := &sync.Mutex{}
 
 	// pop-ing entities concurrently.
-	for range sizeLimit {
+	for i := 0; i < sizeLimit; i++ {
 		go func() {
 			msg, ok := store.Get()
 			require.True(t, ok)

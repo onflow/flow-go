@@ -4,7 +4,6 @@ import (
 	"crypto/rand"
 	"encoding/binary"
 	"fmt"
-	maps0 "maps"
 	"testing"
 
 	gocommon "github.com/ethereum/go-ethereum/common"
@@ -135,9 +134,13 @@ func GetSimpleValueStorePopulated(
 		CloneFunc: func() *TestValueStore {
 			// clone data
 			newData := make(map[string][]byte)
-			maps0.Copy(newData, data)
+			for k, v := range data {
+				newData[k] = v
+			}
 			newAllocator := make(map[string]uint64)
-			maps0.Copy(newAllocator, allocator)
+			for k, v := range allocator {
+				newAllocator[k] = v
+			}
 			// clone allocator
 			return GetSimpleValueStorePopulated(newData, newAllocator)
 		},
@@ -145,9 +148,13 @@ func GetSimpleValueStorePopulated(
 		DumpFunc: func() (map[string][]byte, map[string]uint64) {
 			// clone data
 			newData := make(map[string][]byte)
-			maps0.Copy(newData, data)
+			for k, v := range data {
+				newData[k] = v
+			}
 			newAllocator := make(map[string]uint64)
-			maps0.Copy(newAllocator, allocator)
+			for k, v := range allocator {
+				newAllocator[k] = v
+			}
 			return newData, newAllocator
 		},
 	}

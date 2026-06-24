@@ -12,7 +12,7 @@ import (
 )
 
 // GetAccountTransactions returns a paginated list of transactions for the given account address.
-func GetAccountTransactions(r *common.Request, backend extended.API, link models.LinkGenerator) (any, error) {
+func GetAccountTransactions(r *common.Request, backend extended.API, link models.LinkGenerator) (interface{}, error) {
 	req, err := request.NewGetAccountTransactions(r)
 	if err != nil {
 		return nil, common.NewBadRequestError(err)

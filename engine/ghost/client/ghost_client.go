@@ -53,7 +53,7 @@ func (c *GhostClient) Close() error {
 	return c.close()
 }
 
-func (c *GhostClient) Send(ctx context.Context, channel channels.Channel, event any, targetIDs ...flow.Identifier) error {
+func (c *GhostClient) Send(ctx context.Context, channel channels.Channel, event interface{}, targetIDs ...flow.Identifier) error {
 
 	message, err := c.codec.Encode(event)
 	if err != nil {
@@ -94,7 +94,7 @@ type FlowMessageStreamReader struct {
 	codec  network.Codec
 }
 
-func (fmsr *FlowMessageStreamReader) Next() (flow.Identifier, any, error) {
+func (fmsr *FlowMessageStreamReader) Next() (flow.Identifier, interface{}, error) {
 	msg, err := fmsr.stream.Recv()
 	if errors.Is(err, io.EOF) {
 		// read done.

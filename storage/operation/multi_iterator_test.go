@@ -24,7 +24,7 @@ func TestMultiIterator(t *testing.T) {
 
 		keys := make([][]byte, 0, keyCount)
 		values := make([][]byte, 0, keyCount)
-		for i := range highBound + 1 {
+		for i := lowBound; i < highBound+1; i++ {
 			keys = append(keys, operation.MakePrefix(prefix, byte(i)))
 			values = append(values, []byte{byte(i)})
 		}

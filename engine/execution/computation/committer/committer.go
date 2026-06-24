@@ -42,9 +42,11 @@ func (committer *LedgerViewCommitter) CommitView(
 ) {
 	var err1, err2 error
 	var wg sync.WaitGroup
-	wg.Go(func() {
+	wg.Add(1)
+	go func() {
 		proof, err2 = committer.collectProofs(snapshot, baseStorageSnapshot)
-	})
+		wg.Done()
+	}()
 
 	newCommit, trieUpdate, newStorageSnapshot, err1 = execState.CommitDelta(
 		committer.ledger,

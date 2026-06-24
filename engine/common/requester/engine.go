@@ -197,7 +197,7 @@ func (e *Engine) WithHandle(handle HandleFunc) {
 // For inputs of unexpected type, a warning is logged and the message is dropped.
 //
 // No error returns are expected during normal operations.
-func (e *Engine) Process(channel channels.Channel, originID flow.Identifier, event any) error {
+func (e *Engine) Process(channel channels.Channel, originID flow.Identifier, event interface{}) error {
 	select {
 	case <-e.ShutdownSignal():
 		e.log.Warn().
@@ -471,11 +471,15 @@ func (e *Engine) dispatchRequest() (bool, error) {
 		entityIDs = append(entityIDs, entityID)
 		item.NumAttempts++
 		item.LastRequested = now
-		item.RetryAfter = min(
-			// make sure the interval is within parameters
-			max(
+		item.RetryAfter = e.cfg.RetryFunction(item.RetryAfter)
 
-				e.cfg.RetryFunction(item.RetryAfter), e.cfg.RetryInitial), e.cfg.RetryMaximum)
+		// make sure the interval is within parameters
+		if item.RetryAfter < e.cfg.RetryInitial {
+			item.RetryAfter = e.cfg.RetryInitial
+		}
+		if item.RetryAfter > e.cfg.RetryMaximum {
+			item.RetryAfter = e.cfg.RetryMaximum
+		}
 
 		// if we reached the maximum size for a batch, bail
 		if uint(len(entityIDs)) >= e.cfg.BatchThreshold {

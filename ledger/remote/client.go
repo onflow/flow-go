@@ -385,7 +385,7 @@ func (c *Client) Ready() <-chan struct{} {
 		retryDelay := 100 * time.Millisecond
 		maxRetryDelay := 30 * time.Second
 
-		for i := range maxRetries {
+		for i := 0; i < maxRetries; i++ {
 			ctx, cancel := c.callCtx()
 			_, err := c.client.InitialState(ctx, &emptypb.Empty{})
 			cancel()

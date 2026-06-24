@@ -16,7 +16,7 @@ var (
 	segmentSize  = 32 * 1024
 )
 
-func RunWithWALCheckpointerWithFiles(t *testing.T, names ...any) {
+func RunWithWALCheckpointerWithFiles(t *testing.T, names ...interface{}) {
 	f := names[len(names)-1].(func(*testing.T, *DiskWAL, *Checkpointer))
 
 	fileNames := make([]string, len(names)-1)

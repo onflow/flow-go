@@ -16,7 +16,7 @@ func PrettyPrintEntity(entity flow.Entity) {
 }
 
 // PrettyPrint an interface
-func PrettyPrint(entity any) {
+func PrettyPrint(entity interface{}) {
 	bytes, err := json.MarshalIndent(entity, "", "  ")
 	if err != nil {
 		log.Fatal().Err(err).Msg("could not marshal interface into json")

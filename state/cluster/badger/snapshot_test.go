@@ -162,7 +162,7 @@ func (suite *SnapshotSuite) InsertSubtree(parent model.Block, depth, fanout int)
 		return
 	}
 
-	for range fanout {
+	for i := 0; i < fanout; i++ {
 		proposal := suite.ProposalWithParentAndPayload(&parent, suite.Payload())
 		suite.InsertBlock(proposal)
 		suite.InsertSubtree(proposal.Block, depth-1, fanout)
@@ -275,7 +275,7 @@ func (suite *SnapshotSuite) TestPending_WithPendingBlocks() {
 	// check with some finalized blocks
 	parent := suite.genesis
 	pendings := make([]flow.Identifier, 0, 10)
-	for range 10 {
+	for i := 0; i < 10; i++ {
 		next := suite.ProposalWithParentAndPayload(parent, suite.Payload())
 		suite.InsertBlock(next)
 		pendings = append(pendings, next.Block.ID())

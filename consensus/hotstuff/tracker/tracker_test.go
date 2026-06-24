@@ -30,13 +30,13 @@ func TestNewestQCTracker_Track(t *testing.T) {
 	// setup initial value
 	tracker.Track(helper.MakeQC(helper.WithQCView(0)))
 
-	for range times {
+	for i := 0; i < times; i++ {
 		startView := tracker.NewestQC().View
 		var readyWg, startWg, doneWg sync.WaitGroup
 		startWg.Add(1)
 		readyWg.Add(samples)
 		doneWg.Add(samples)
-		for s := range samples {
+		for s := 0; s < samples; s++ {
 			qc := helper.MakeQC(helper.WithQCView(startView + uint64(s+1)))
 			go func(newestQC *flow.QuorumCertificate) {
 				defer doneWg.Done()
@@ -77,13 +77,13 @@ func TestNewestTCTracker_Track(t *testing.T) {
 	// setup initial value
 	tracker.Track(helper.MakeTC(helper.WithTCView(0)))
 
-	for range times {
+	for i := 0; i < times; i++ {
 		startView := tracker.NewestTC().View
 		var readyWg, startWg, doneWg sync.WaitGroup
 		startWg.Add(1)
 		readyWg.Add(samples)
 		doneWg.Add(samples)
-		for s := range samples {
+		for s := 0; s < samples; s++ {
 			tc := helper.MakeTC(helper.WithTCView(startView + uint64(s+1)))
 			go func(newestTC *flow.TimeoutCertificate) {
 				defer doneWg.Done()
@@ -124,13 +124,13 @@ func TestNewestBlockTracker_Track(t *testing.T) {
 	// setup initial value
 	tracker.Track(helper.MakeBlock(helper.WithBlockView(0)))
 
-	for range times {
+	for i := 0; i < times; i++ {
 		startView := tracker.NewestBlock().View
 		var readyWg, startWg, doneWg sync.WaitGroup
 		startWg.Add(1)
 		readyWg.Add(samples)
 		doneWg.Add(samples)
-		for s := range samples {
+		for s := 0; s < samples; s++ {
 			block := helper.MakeBlock(helper.WithBlockView(startView + uint64(s+1)))
 			go func(newestBlock *model.Block) {
 				defer doneWg.Done()

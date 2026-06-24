@@ -124,7 +124,7 @@ func New(
 		AddWorker(finalizedCacheWorker).
 		AddWorker(e.checkLoop).
 		AddWorker(e.responseProcessingLoop)
-	for range defaultEngineRequestsWorkers {
+	for i := 0; i < defaultEngineRequestsWorkers; i++ {
 		builder.AddWorker(e.requestHandler.requestProcessingWorker)
 	}
 	e.Component = builder.Build()
@@ -191,7 +191,7 @@ func (e *Engine) setupResponseMessageHandler() error {
 
 // Process processes the given event from the node with the given origin ID in
 // a blocking manner. It returns the potential processing error when done.
-func (e *Engine) Process(channel channels.Channel, originID flow.Identifier, event any) error {
+func (e *Engine) Process(channel channels.Channel, originID flow.Identifier, event interface{}) error {
 	err := e.process(channel, originID, event)
 	if err != nil {
 		if engine.IsIncompatibleInputTypeError(err) {
@@ -207,7 +207,7 @@ func (e *Engine) Process(channel channels.Channel, originID flow.Identifier, eve
 // Error returns:
 //   - IncompatibleInputTypeError if input has unexpected type
 //   - All other errors are potential symptoms of internal state corruption or bugs (fatal).
-func (e *Engine) process(channel channels.Channel, originID flow.Identifier, event any) error {
+func (e *Engine) process(channel channels.Channel, originID flow.Identifier, event interface{}) error {
 	switch message := event.(type) {
 	case *flow.BatchRequest:
 		err := e.validateBatchRequestForALSP(originID, message)

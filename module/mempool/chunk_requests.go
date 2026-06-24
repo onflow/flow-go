@@ -27,7 +27,11 @@ func ExponentialUpdater(multiplier float64, maxInterval time.Duration, minInterv
 		if float64(retryAfter) >= float64(maxInterval)/multiplier {
 			retryAfter = maxInterval
 		} else {
-			retryAfter = max(time.Duration(float64(retryAfter)*multiplier), minInterval)
+			retryAfter = time.Duration(float64(retryAfter) * multiplier)
+
+			if retryAfter < minInterval {
+				retryAfter = minInterval
+			}
 		}
 
 		return attempts + 1, retryAfter, true

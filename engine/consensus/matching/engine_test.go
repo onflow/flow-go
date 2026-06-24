@@ -134,12 +134,14 @@ func (s *MatchingEngineSuite) TestMultipleProcessingItems() {
 	}
 
 	var wg sync.WaitGroup
-	wg.Go(func() {
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
 		for _, receipt := range receipts {
 			err := s.engine.Process(channels.ReceiveReceipts, originID, receipt)
 			s.Require().NoError(err, "should add receipt and result to mempool if valid")
 		}
-	})
+	}()
 
 	wg.Wait()
 

@@ -25,13 +25,13 @@ func ComputationResultToBlockData(computationResult *execution.ComputationResult
 
 	AllResults := computationResult.AllTransactionResults()
 	txResults := make([]*flow.TransactionResult, len(AllResults))
-	for i := range AllResults {
+	for i := 0; i < len(AllResults); i++ {
 		txResults[i] = &AllResults[i]
 	}
 
 	eventsList := computationResult.AllEvents()
 	events := make([]*flow.Event, len(eventsList))
-	for i := range eventsList {
+	for i := 0; i < len(eventsList); i++ {
 		events[i] = &eventsList[i]
 	}
 

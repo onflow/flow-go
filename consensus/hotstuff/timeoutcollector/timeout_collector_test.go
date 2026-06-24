@@ -53,14 +53,16 @@ func (s *TimeoutCollectorTestSuite) TestView() {
 // all operations should be successful, no errors expected
 func (s *TimeoutCollectorTestSuite) TestAddTimeout_HappyPath() {
 	var wg sync.WaitGroup
-	for range 20 {
-		wg.Go(func() {
+	for i := 0; i < 20; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
 			timeout := helper.TimeoutObjectFixture(helper.WithTimeoutObjectView(s.view))
 			s.notifier.On("OnTimeoutProcessed", timeout).Once()
 			s.processor.On("Process", timeout).Return(nil).Once()
 			err := s.collector.AddTimeout(timeout)
 			require.NoError(s.T(), err)
-		})
+		}()
 	}
 
 	unittest.AssertReturnsBefore(s.T(), wg.Wait, time.Second)
@@ -155,7 +157,7 @@ func (s *TimeoutCollectorTestSuite) TestAddTimeout_TONotifications() {
 	s.notifier.On("OnNewTcDiscovered", lastViewTC).Once()
 
 	timeouts := make([]*model.TimeoutObject, 0, qcCount)
-	for i := range qcCount {
+	for i := 0; i < qcCount; i++ {
 		qc := helper.MakeQC(helper.WithQCView(uint64(i)))
 		timeout := helper.TimeoutObjectFixture(func(timeout *model.TimeoutObject) {
 			timeout.View = s.view

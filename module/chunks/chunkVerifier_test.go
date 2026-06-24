@@ -671,6 +671,7 @@ func generateEvents(t *testing.T, collection *flow.Collection, includeServiceEve
 	// service events are also included as regular events
 	if includeServiceEvent {
 		for _, e := range serviceEventsList {
+			e := e
 			event, err := convert.ServiceEvent(testChainID, e)
 			require.NoError(t, err)
 

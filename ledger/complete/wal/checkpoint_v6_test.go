@@ -99,7 +99,7 @@ func randPathPayload() (ledger.Path, ledger.Payload) {
 func randNPathPayloads(n int) ([]ledger.Path, []ledger.Payload) {
 	paths := make([]ledger.Path, n)
 	payloads := make([]ledger.Payload, n)
-	for i := range n {
+	for i := 0; i < n; i++ {
 		path, payload := randPathPayload()
 		paths[i] = path
 		payloads[i] = payload
@@ -113,7 +113,7 @@ func createMultipleRandomTries(t *testing.T) []*trie.MTrie {
 
 	var err error
 	// add tries with no shared paths
-	for range 100 {
+	for i := 0; i < 100; i++ {
 		paths, payloads := randNPathPayloads(100)
 		activeTrie, _, err = trie.NewTrieWithUpdatedRegisters(activeTrie, paths, payloads, false)
 		require.NoError(t, err, "update registers")
@@ -159,7 +159,7 @@ func createMultipleRandomTriesMini(t *testing.T) ([]*trie.MTrie, *trie.MTrie) {
 
 	var err error
 	// add tries with no shared paths
-	for range 5 {
+	for i := 0; i < 5; i++ {
 		paths, payloads := randNPathPayloads(20)
 		activeTrie, _, err = trie.NewTrieWithUpdatedRegisters(activeTrie, paths, payloads, false)
 		require.NoError(t, err, "update registers")
@@ -265,7 +265,7 @@ func randomNode() *node.Node {
 func TestGetNodesByIndex(t *testing.T) {
 	n := 10
 	ns := make([]*node.Node, n)
-	for i := range n {
+	for i := 0; i < n; i++ {
 		ns[i] = randomNode()
 	}
 	subtrieNodes := [][]*node.Node{
@@ -553,7 +553,7 @@ func TestCleanupOnErrorIfNotExist(t *testing.T) {
 // verify that if a part file is missing then os.ErrNotExist should return
 func TestAllPartFileExist(t *testing.T) {
 	unittest.RunWithTempDir(t, func(dir string) {
-		for i := range 17 {
+		for i := 0; i < 17; i++ {
 			tries := createSimpleTrie(t)
 			fileName := fmt.Sprintf("checkpoint_missing_part_file_%v", i)
 			var fileToDelete string
@@ -581,7 +581,7 @@ func TestAllPartFileExist(t *testing.T) {
 // verify that if a part file is missing then os.ErrNotExist should return
 func TestAllPartFileExistLeafReader(t *testing.T) {
 	unittest.RunWithTempDir(t, func(dir string) {
-		for i := range 17 {
+		for i := 0; i < 17; i++ {
 			tries := createSimpleTrie(t)
 			fileName := fmt.Sprintf("checkpoint_missing_part_file_%v", i)
 			var fileToDelete string
@@ -626,7 +626,7 @@ func filePaths(dir string, fileName string, subtrieLevel uint16) []string {
 	paths = append(paths, filePathCheckpointHeader(dir, fileName))
 
 	subtrieCount := subtrieCountByLevel(subtrieLevel)
-	for i := range subtrieCount {
+	for i := 0; i < subtrieCount; i++ {
 		partFile := partFileName(fileName, i)
 		paths = append(paths, path.Join(dir, partFile))
 	}

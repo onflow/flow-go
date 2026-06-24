@@ -49,7 +49,7 @@ type scriptTestSuite struct {
 func (s *scriptTestSuite) TestScriptExecution() {
 	s.Run("Simple Script Execution", func() {
 		number := int64(42)
-		code := fmt.Appendf(nil, "access(all) fun main(): Int { return %d; }", number)
+		code := []byte(fmt.Sprintf("access(all) fun main(): Int { return %d; }", number))
 
 		result, err := s.scripts.ExecuteAtBlockHeight(context.Background(), code, nil, s.height)
 		s.Require().NoError(err)
@@ -59,10 +59,10 @@ func (s *scriptTestSuite) TestScriptExecution() {
 	})
 
 	s.Run("Get Block", func() {
-		code := fmt.Appendf(nil, `access(all) fun main(): UInt64 {
+		code := []byte(fmt.Sprintf(`access(all) fun main(): UInt64 {
 			getBlock(at: %d)!
 			return getCurrentBlock().height
-		}`, s.height)
+		}`, s.height))
 
 		result, err := s.scripts.ExecuteAtBlockHeight(context.Background(), code, nil, s.height)
 		s.Require().NoError(err)
@@ -441,7 +441,7 @@ func transferTokensTx(chain flow.Chain) *flow.TransactionBodyBuilder {
 	sc := systemcontracts.SystemContractsForChain(chain.ChainID())
 
 	return flow.NewTransactionBodyBuilder().
-		SetScript(fmt.Appendf(nil,
+		SetScript([]byte(fmt.Sprintf(
 			`
 	// This transaction is a template for a transaction that
 	// could be used by anyone to send tokens to another account
@@ -483,6 +483,6 @@ func transferTokensTx(chain flow.Chain) *flow.TransactionBodyBuilder {
 	}`,
 			sc.FungibleToken.Address.Hex(),
 			sc.FlowToken.Address.Hex(),
-		),
+		)),
 		)
 }

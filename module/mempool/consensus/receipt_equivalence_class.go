@@ -62,7 +62,7 @@ func (rsr *ReceiptsOfSameResult) AddReceipt(receipt *flow.ExecutionReceipt) (uin
 //   - error in case of unforeseen problems
 func (rsr *ReceiptsOfSameResult) AddReceipts(receipts ...*flow.ExecutionReceipt) (uint, error) {
 	receiptsAdded := uint(0)
-	for i := range receipts {
+	for i := 0; i < len(receipts); i++ {
 		added, err := rsr.AddReceipt(receipts[i])
 		if err != nil {
 			return receiptsAdded, fmt.Errorf("failed to add receipt (%x) to equivalence class: %w", receipts[i].ID(), err)

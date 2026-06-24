@@ -15,7 +15,7 @@ func TestLightReceipts(t *testing.T) {
 	receipts := make(gethTypes.Receipts, resCount)
 	reconstructedReceipts := make(gethTypes.Receipts, resCount)
 	var totalGas uint64
-	for i := range resCount {
+	for i := 0; i < resCount; i++ {
 		res := testutils.RandomResultFixture(t)
 		receipts[i] = res.Receipt()
 		reconstructedReceipts[i] = res.LightReceipt().ToReceipt()

@@ -31,7 +31,7 @@ func main() {
 			NetworkCollector:   metrics.NewNetworkCollector(unittest.Logger()),
 		}
 		diskTotal := rand.Int63n(1024 * 1024 * 1024)
-		for range 1000 {
+		for i := 0; i < 1000; i++ {
 			blockID := unittest.BlockFixture().ID()
 			collector.StartBlockReceivedToExecuted(blockID)
 

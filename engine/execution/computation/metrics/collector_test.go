@@ -40,11 +40,11 @@ func Test_CollectorCollection(t *testing.T) {
 	wg := sync.WaitGroup{}
 
 	wg.Add(16 * 16 * 16)
-	for height := range 16 {
+	for height := 0; height < 16; height++ {
 		// for each height we add multiple blocks. Only one block will be popped per height
-		for block := range 16 {
+		for block := 0; block < 16; block++ {
 			// for each block we add multiple transactions
-			for transaction := range 16 {
+			for transaction := 0; transaction < 16; transaction++ {
 				go func(h, b, t int) {
 					defer wg.Done()
 
@@ -74,7 +74,7 @@ func Test_CollectorCollection(t *testing.T) {
 	data := collector.Pop(startHeight, flow.ZeroID)
 	require.Nil(t, data)
 
-	for height := range 16 {
+	for height := 0; height < 16; height++ {
 		block := flow.Identifier{}
 		block[0] = byte(height)
 		// always pop the first block each height

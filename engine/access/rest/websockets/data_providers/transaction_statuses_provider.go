@@ -43,7 +43,7 @@ func NewTransactionStatusesDataProvider(
 	linkGenerator commonmodels.LinkGenerator,
 	topic string,
 	rawArguments wsmodels.Arguments,
-	send chan<- any,
+	send chan<- interface{},
 ) (*TransactionStatusesDataProvider, error) {
 	args, err := parseTransactionStatusesArguments(rawArguments)
 	if err != nil {

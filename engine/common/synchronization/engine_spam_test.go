@@ -33,7 +33,7 @@ func (ss *SyncSuite) TestLoad_Process_SyncRequest_HigherThanReceiver_OutsideTole
 	// reset misbehavior report counter for each subtest
 	misbehaviorsCounter := 0
 
-	for range load {
+	for i := 0; i < load; i++ {
 		// generate origin and request message
 		originID := unittest.IdentifierFixture()
 
@@ -123,7 +123,7 @@ func (ss *SyncSuite) TestLoad_Process_SyncRequest_HigherThanReceiver_OutsideTole
 
 	for _, loadGroup := range loadGroups {
 		ss.T().Run(fmt.Sprintf("load test; pfactor=%f lower=%d upper=%d", loadGroup.syncRequestProbabilityFactor, loadGroup.expectedMisbehaviorsLower, loadGroup.expectedMisbehaviorsUpper), func(t *testing.T) {
-			for i := range load {
+			for i := 0; i < load; i++ {
 				ss.T().Log("load iteration", i)
 				nonce, err := rand.Uint64()
 				require.NoError(ss.T(), err, "should generate nonce")
@@ -239,7 +239,7 @@ func (ss *SyncSuite) TestLoad_Process_RangeRequest_SometimesReportSpam() {
 	misbehaviorsCounter := 0
 
 	for _, loadGroup := range loadGroups {
-		for i := range load {
+		for i := 0; i < load; i++ {
 			ss.T().Log("load iteration", i)
 
 			nonce, err := rand.Uint64()
@@ -339,7 +339,7 @@ func (ss *SyncSuite) TestLoad_Process_BatchRequest_SometimesReportSpam() {
 	// reset misbehavior report counter for each subtest
 	misbehaviorsCounter := 0
 	for _, loadGroup := range loadGroups {
-		for i := range load {
+		for i := 0; i < load; i++ {
 			ss.T().Log("load iteration", i)
 
 			nonce, err := rand.Uint64()
@@ -388,7 +388,7 @@ func repeatedBlockIDs(n int) []flow.Identifier {
 	blockID := unittest.BlockFixture().ID()
 
 	arr := make([]flow.Identifier, n)
-	for i := range n {
+	for i := 0; i < n; i++ {
 		arr[i] = blockID
 	}
 	return arr

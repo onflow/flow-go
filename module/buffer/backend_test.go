@@ -107,7 +107,7 @@ func (suite *BackendSuite) TestPruneByView() {
 	items := make([]*item[*flow.Proposal], 0, N)
 
 	// build a pending buffer
-	for i := range N {
+	for i := 0; i < N; i++ {
 
 		// 10% of the time, add a new unrelated pending header
 		if i%10 == 0 {

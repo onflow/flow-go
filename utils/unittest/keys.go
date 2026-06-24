@@ -11,7 +11,7 @@ import (
 func NetworkingKeys(n int) []crypto.PrivateKey {
 	keys := make([]crypto.PrivateKey, 0, n)
 
-	for range n {
+	for i := 0; i < n; i++ {
 		key := NetworkingPrivKeyFixture()
 		keys = append(keys, key)
 	}
@@ -22,7 +22,7 @@ func NetworkingKeys(n int) []crypto.PrivateKey {
 func StakingKeys(n int) []crypto.PrivateKey {
 	keys := make([]crypto.PrivateKey, 0, n)
 
-	for range n {
+	for i := 0; i < n; i++ {
 		key := StakingPrivKeyFixture()
 		keys = append(keys, key)
 	}

@@ -235,7 +235,7 @@ func (ms *MatchingSuite) TestRequestPendingReceipts() {
 	n := 100
 	orderedBlocks := make([]flow.Block, 0, n)
 	parentBlock := ms.UnfinalizedBlock
-	for range n {
+	for i := 0; i < n; i++ {
 		block := unittest.BlockWithParentFixture(parentBlock.ToHeader())
 		ms.Extend(block)
 		orderedBlocks = append(orderedBlocks, *block)
