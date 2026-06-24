@@ -29,7 +29,7 @@ derived from the key, called path. While all register paths have the same fixed 
 (measured in bits), the keys and values are variable-length byte slices. A register holds both the key and value, 
 which forms a payload. A path is derived deterministically from the key part of the payload. 
 We define an **unallocated register** as holding no value, i.e. a nil payload or an empty value byte slice.
-By default, each register is unallocated. In contrast, an **allocated_ register**
+By default, each register is unallocated. In contrast, an **allocated register**
 holds a non-nil payload and a value with positive storage size, i.e. a byte slice with length larger than zero.
 Note that we do not introduce the concept of registers with `nil` values. 
 

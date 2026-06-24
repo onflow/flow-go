@@ -277,10 +277,10 @@ type updateResult struct {
 //   - paths are NOT duplicated
 func update(
 	nodeHeight int, // the height of the node during traversing the subtree
-	currentNode *Node, // the current node on the travesing path, if it's nil it means the trie has no node on this path
+	currentNode *Node, // the current node on the traversing path, if it's nil it means the trie has no node on this path
 	paths []ledger.Path, // the paths to update the values
 	values [][]byte, // the values to be updated at the given paths
-	compactLeaf *Node, // a compact leaf node from its ancester, it could be nil
+	compactLeaf *Node, // a compact leaf node from its ancestor, it could be nil
 	prune bool, // prune is a flag for whether pruning nodes with empty values. not pruning is useful for generating proof, expecially non-inclusion proof
 ) (n *Node, allocatedRegCountDelta int64, lowestHeightTouched int) {
 	// No new path to update
@@ -315,7 +315,7 @@ func update(
 		return n, 1, nodeHeight
 	}
 
-	if currentNode != nil && currentNode.IsLeaf() { // if we're here then compactLeaf == nil
+	if currentNode != nil && currentNode.IsLeaf() { // if we're here then compactLeaf == nil (see Lemma in ledger/complete/mtrie/README.md )
 		// check if the current node path is among the updated paths
 		found := false
 		currentPath := *currentNode.Path()
@@ -568,7 +568,7 @@ func addSiblingTrieHashToProofs(siblingTrie *Node, depth int, proofs []*ledger.P
 
 	// This code is necessary, because we do not remove nodes from the trie
 	// when a register is deleted. Instead, we just set the respective leaf's
-	// payload to empty. While this will cause the lead's hash to become the
+	// payload to empty. While this will cause the leaf's hash to become the
 	// default hash, the node itself remains as part of the trie.
 	// However, a proof has the convention that the hash of the sibling trie
 	// should only be included, if it is _non-default_. Therefore, we can

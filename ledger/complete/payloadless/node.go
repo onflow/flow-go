@@ -68,6 +68,8 @@ func NewNode(height int,
 // The leafHash is computed as HashLeaf(path, value), and the node hash is
 // computed using the original value to ensure the same root hash as a full trie.
 //
+// `value` being `nil` or the empty slice result in identical leafs (default hash).
+//
 // UNCHECKED requirement: height must be non-negative
 func NewLeaf(path ledger.Path, value []byte, height int) *Node {
 	// For empty values, create a default node
@@ -118,7 +120,7 @@ func NewInterimNode(height int, lChild, rChild *Node) *Node {
 	return n
 }
 
-// NewInterimCompactifiedNode creates a new compactified interim Node. For compactification,
+// NewInterimCompactifiedNode creates a new interim Node - compactified if possible. For compactification,
 // we only consider the immediate children. When starting with a maximally pruned trie and
 // creating only InterimCompactifiedNodes during an update, the resulting trie remains maximally
 // pruned. Details on compactification:
