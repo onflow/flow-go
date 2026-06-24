@@ -72,7 +72,7 @@ func NewTimeoutAggregator(log zerolog.Logger,
 	}
 
 	componentBuilder := component.NewComponentManagerBuilder()
-	for range defaultTimeoutAggregatorWorkers { // manager for worker routines that process inbound events
+	for i := 0; i < defaultTimeoutAggregatorWorkers; i++ { // manager for worker routines that process inbound events
 		componentBuilder.AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 			ready()
 			aggregator.queuedTimeoutsProcessingLoop(ctx)

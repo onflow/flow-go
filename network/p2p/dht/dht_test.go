@@ -216,7 +216,7 @@ func TestPubSubWithDHTDiscovery(t *testing.T) {
 
 	// fullyConnectedGraph checks that each node is directly connected to all the other nodes
 	fullyConnectedGraph := func() bool {
-		for i := range nodes {
+		for i := 0; i < len(nodes); i++ {
 			for j := i + 1; j < len(nodes); j++ {
 				if nodes[i].Host().Network().Connectedness(nodes[j].ID()) == network.NotConnected {
 					return false
@@ -236,7 +236,7 @@ func TestPubSubWithDHTDiscovery(t *testing.T) {
 	recv := make(map[peer.ID]bool, count)
 
 loop:
-	for range count {
+	for i := 0; i < count; i++ {
 		select {
 		case res := <-ch:
 			recv[res] = true

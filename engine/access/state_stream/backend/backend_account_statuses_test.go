@@ -31,7 +31,7 @@ var testProtocolEventTypes = []flow.EventType{
 type testType struct {
 	name            string // Test case name
 	highestBackfill int    // Highest backfill index
-	startValue      any
+	startValue      interface{}
 	filters         state_stream.AccountStatusFilter // Event filters
 }
 
@@ -89,7 +89,7 @@ func (s *BackendAccountStatusesSuite) SetupTest() {
 	parent := s.rootBlock.ToHeader()
 	events := s.generateProtocolMockEvents()
 
-	for i := range blockCount {
+	for i := 0; i < blockCount; i++ {
 		block := unittest.BlockWithParentFixture(parent)
 		// update for next iteration
 		parent = block.ToHeader()
@@ -267,7 +267,7 @@ func (s *BackendAccountStatusesSuite) generateFiltersForTestCases(baseTests []te
 // For each test case, it simulates backfill blocks and verifies the expected account events for each block.
 // It also ensures that the subscription shuts down gracefully after completing the test cases.
 func (s *BackendAccountStatusesSuite) subscribeToAccountStatuses(
-	subscribeFn func(ctx context.Context, startValue any, filter state_stream.AccountStatusFilter) subscription.Subscription,
+	subscribeFn func(ctx context.Context, startValue interface{}, filter state_stream.AccountStatusFilter) subscription.Subscription,
 	tests []testType,
 ) {
 	ctx, cancel := context.WithCancel(context.Background())
@@ -346,7 +346,7 @@ func (s *BackendAccountStatusesSuite) TestSubscribeAccountStatusesFromStartBlock
 		return s.executionDataTrackerReal.GetStartHeightFromBlockID(startBlockID)
 	}, nil)
 
-	call := func(ctx context.Context, startValue any, filter state_stream.AccountStatusFilter) subscription.Subscription {
+	call := func(ctx context.Context, startValue interface{}, filter state_stream.AccountStatusFilter) subscription.Subscription {
 		return s.backend.SubscribeAccountStatusesFromStartBlockID(ctx, startValue.(flow.Identifier), filter)
 	}
 
@@ -362,7 +362,7 @@ func (s *BackendAccountStatusesSuite) TestSubscribeAccountStatusesFromStartHeigh
 		return s.executionDataTrackerReal.GetStartHeightFromHeight(startHeight)
 	}, nil)
 
-	call := func(ctx context.Context, startValue any, filter state_stream.AccountStatusFilter) subscription.Subscription {
+	call := func(ctx context.Context, startValue interface{}, filter state_stream.AccountStatusFilter) subscription.Subscription {
 		return s.backend.SubscribeAccountStatusesFromStartHeight(ctx, startValue.(uint64), filter)
 	}
 
@@ -378,7 +378,7 @@ func (s *BackendAccountStatusesSuite) TestSubscribeAccountStatusesFromLatestBloc
 		return s.executionDataTrackerReal.GetStartHeightFromLatest(ctx)
 	}, nil)
 
-	call := func(ctx context.Context, startValue any, filter state_stream.AccountStatusFilter) subscription.Subscription {
+	call := func(ctx context.Context, startValue interface{}, filter state_stream.AccountStatusFilter) subscription.Subscription {
 		return s.backend.SubscribeAccountStatusesFromLatestBlock(ctx, filter)
 	}
 
@@ -386,7 +386,7 @@ func (s *BackendAccountStatusesSuite) TestSubscribeAccountStatusesFromLatestBloc
 }
 
 // requireEventsResponse ensures that the received event information matches the expected data.
-func (s *BackendAccountStatusesSuite) requireEventsResponse(v any, expected *AccountStatusesResponse) {
+func (s *BackendAccountStatusesSuite) requireEventsResponse(v interface{}, expected *AccountStatusesResponse) {
 	actual, ok := v.(*AccountStatusesResponse)
 	require.True(s.T(), ok, "unexpected response type: %T", v)
 

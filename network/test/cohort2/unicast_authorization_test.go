@@ -260,7 +260,7 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_UnknownMsgCode(
 
 	invalidMessageCode := codec.MessageCode(byte('X'))
 	// register a custom encoder that encodes the message with an invalid message code when encoding a string.
-	u.codec.RegisterEncoder(reflect.TypeFor[string](), func(v any) ([]byte, error) {
+	u.codec.RegisterEncoder(reflect.TypeOf(""), func(v interface{}) ([]byte, error) {
 		e, err := unittest.NetworkCodec().Encode(&libp2pmessage.TestMessage{
 			Text: v.(string),
 		})
@@ -312,7 +312,7 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_WrongMsgCode() 
 
 	modifiedMessageCode := codec.CodeDKGMessage
 	// register a custom encoder that overrides the message code when encoding a TestMessage.
-	u.codec.RegisterEncoder(reflect.TypeFor[*libp2pmessage.TestMessage](), func(v any) ([]byte, error) {
+	u.codec.RegisterEncoder(reflect.TypeOf(&libp2pmessage.TestMessage{}), func(v interface{}) ([]byte, error) {
 		e, err := unittest.NetworkCodec().Encode(v)
 		require.NoError(u.T(), err)
 		e[0] = modifiedMessageCode.Uint8()
@@ -594,7 +594,7 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_UnauthorizedSen
 // We specifically use this to override the encoder for the TestMessage type to encode it with an invalid message code.
 type overridableMessageEncoder struct {
 	codec           network.Codec
-	specificEncoder map[reflect.Type]func(any) ([]byte, error)
+	specificEncoder map[reflect.Type]func(interface{}) ([]byte, error)
 }
 
 var _ network.Codec = (*overridableMessageEncoder)(nil)
@@ -602,12 +602,12 @@ var _ network.Codec = (*overridableMessageEncoder)(nil)
 func newOverridableMessageEncoder(codec network.Codec) *overridableMessageEncoder {
 	return &overridableMessageEncoder{
 		codec:           codec,
-		specificEncoder: make(map[reflect.Type]func(any) ([]byte, error)),
+		specificEncoder: make(map[reflect.Type]func(interface{}) ([]byte, error)),
 	}
 }
 
 // RegisterEncoder registers an encoder for a specific type, overriding the default encoder for that type.
-func (u *overridableMessageEncoder) RegisterEncoder(t reflect.Type, encoder func(any) ([]byte, error)) {
+func (u *overridableMessageEncoder) RegisterEncoder(t reflect.Type, encoder func(interface{}) ([]byte, error)) {
 	u.specificEncoder[t] = encoder
 }
 
@@ -623,7 +623,7 @@ func (u *overridableMessageEncoder) NewDecoder(r io.Reader) network.Decoder {
 
 // Encode encodes a value into a byte slice. If a specific encoder is registered for the type of the value, it will be used.
 // Otherwise, the default encoder will be used.
-func (u *overridableMessageEncoder) Encode(v any) ([]byte, error) {
+func (u *overridableMessageEncoder) Encode(v interface{}) ([]byte, error) {
 	if encoder, ok := u.specificEncoder[reflect.TypeOf(v)]; ok {
 		return encoder(v)
 	}

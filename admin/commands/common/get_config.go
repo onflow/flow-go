@@ -28,7 +28,7 @@ type validatedGetConfigData struct {
 	field updatable_configs.Field
 }
 
-func (s *GetConfigCommand) Handler(_ context.Context, req *admin.CommandRequest) (any, error) {
+func (s *GetConfigCommand) Handler(_ context.Context, req *admin.CommandRequest) (interface{}, error) {
 	validatedReq := req.ValidatorData.(validatedGetConfigData)
 	curValue := validatedReq.field.Get()
 	return curValue, nil

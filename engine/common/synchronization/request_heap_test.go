@@ -15,7 +15,7 @@ func TestRequestQueue_Get(t *testing.T) {
 	q := NewRequestHeap(100)
 	items := 20
 	messages := make(map[flow.Identifier]*engine.Message)
-	for range items {
+	for i := 0; i < items; i++ {
 		msg := &engine.Message{
 			OriginID: unittest.IdentifierFixture(),
 			Payload:  unittest.IdentifierFixture(),
@@ -24,7 +24,7 @@ func TestRequestQueue_Get(t *testing.T) {
 		require.True(t, q.Put(msg))
 	}
 
-	for range items {
+	for i := 0; i < items; i++ {
 		msg, ok := q.Get()
 		require.True(t, ok)
 		expected, ok := messages[msg.OriginID]
@@ -77,7 +77,7 @@ func TestRequestQueue_PutAtMaxCapacity(t *testing.T) {
 	// 10 of these elements. By convention, the last-inserted element should be stored (no
 	// ejecting the just stored element).
 	lastMessagePopped := false
-	for range limit {
+	for k := uint(0); k < limit; k++ {
 		m, ok := q.Get()
 		require.True(t, ok)
 

@@ -43,7 +43,7 @@ func NewBlocksDataProvider(
 	linkGenerator commonmodels.LinkGenerator,
 	topic string,
 	rawArguments wsmodels.Arguments,
-	send chan<- any,
+	send chan<- interface{},
 ) (*BlocksDataProvider, error) {
 	args, err := parseBlocksArguments(rawArguments)
 	if err != nil {

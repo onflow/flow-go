@@ -20,6 +20,7 @@ func Connect(t *testing.T, instances []*Instance) {
 
 	// then, for each instance, initialize a wired up communicator
 	for _, sender := range instances {
+		sender := sender // avoid capturing loop variable in closure
 
 		*sender.notifier = *NewMockedCommunicatorConsumer()
 		sender.notifier.On("OnOwnProposal", mock.Anything, mock.Anything).Run(

@@ -192,7 +192,7 @@ func TestBatchStoreLightTransactionResultsWrongLock(t *testing.T) {
 
 func getLightTransactionResultsFixture(n int) []flow.LightTransactionResult {
 	txResults := make([]flow.LightTransactionResult, 0, n)
-	for i := range n {
+	for i := 0; i < n; i++ {
 		expected := flow.LightTransactionResult{
 			TransactionID:   unittest.IdentifierFixture(),
 			Failed:          i%2 == 0,

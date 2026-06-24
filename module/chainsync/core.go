@@ -2,7 +2,7 @@ package chainsync
 
 import (
 	"fmt"
-	"slices"
+	"sort"
 	"sync"
 	"time"
 
@@ -421,7 +421,9 @@ func (c *Core) BatchRequested(batch chainsync.Batch) {
 func (c *Core) getRanges(heights []uint64) []chainsync.Range {
 
 	// sort the heights so we can build contiguous ranges more easily
-	slices.Sort(heights)
+	sort.Slice(heights, func(i int, j int) bool {
+		return heights[i] < heights[j]
+	})
 
 	// build contiguous height ranges with maximum batch size
 	start := uint64(0)
@@ -479,7 +481,10 @@ func (c *Core) getBatches(blockIDs []flow.Identifier) []chainsync.Batch {
 	for from := 0; from < len(blockIDs); from += int(c.Config.MaxSize) {
 
 		// make sure last range is not out of bounds
-		to := min(from+int(c.Config.MaxSize), len(blockIDs))
+		to := from + int(c.Config.MaxSize)
+		if to > len(blockIDs) {
+			to = len(blockIDs)
+		}
 
 		// create the block IDs slice
 		requestIDs := blockIDs[from:to]

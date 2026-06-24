@@ -3,7 +3,6 @@ package environment
 import (
 	"bytes"
 	"fmt"
-	"slices"
 	"sort"
 
 	"github.com/onflow/cadence"
@@ -521,9 +520,11 @@ func (updater *ContractUpdaterImpl) isAuthorized(
 ) bool {
 	accts := updater.GetAuthorizedAccounts(path)
 	for _, authorized := range accts {
-		if slices.Contains(signingAccounts, authorized) {
-			// a single authorized singer is enough
-			return true
+		for _, signer := range signingAccounts {
+			if signer == authorized {
+				// a single authorized singer is enough
+				return true
+			}
 		}
 	}
 	return false

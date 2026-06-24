@@ -21,7 +21,7 @@ func (f *sealFactory) Fixture(opts ...func(*flow.Seal)) *flow.Seal {
 
 func (f *sealFactory) Fixtures(n int) []*flow.Seal {
 	seals := make([]*flow.Seal, 0, n)
-	for range n {
+	for i := 0; i < n; i++ {
 		seal := Seal.Fixture()
 		seals = append(seals, seal)
 	}

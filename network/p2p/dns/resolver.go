@@ -86,11 +86,11 @@ func NewResolver(logger zerolog.Logger, collector module.ResolverMetrics, dnsCac
 
 	cm := component.NewComponentManagerBuilder()
 
-	for range numIPAddrLookupWorkers {
+	for i := 0; i < numIPAddrLookupWorkers; i++ {
 		cm.AddWorker(resolver.processIPAddrLookups)
 	}
 
-	for range numTxtLookupWorkers {
+	for i := 0; i < numTxtLookupWorkers; i++ {
 		cm.AddWorker(resolver.processTxtLookups)
 	}
 

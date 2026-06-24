@@ -139,7 +139,7 @@ func TestConcurrentConnectionsAndDisconnects(t *testing.T) {
 		wg := sync.WaitGroup{}
 		wg.Add(connectionCount)
 		callCount := atomic.NewInt32(0)
-		for range connectionCount {
+		for i := 0; i < connectionCount; i++ {
 			go func() {
 				defer wg.Done()
 				cachedConn, err := cache.GetConnected("foo", cfg, nil, func(string, Config, crypto.PublicKey, *CachedClient) (*grpc.ClientConn, error) {
@@ -173,10 +173,10 @@ func TestConcurrentConnectionsAndDisconnects(t *testing.T) {
 		batchSize := 1000
 		numBatches := 100
 
-		for range numBatches {
+		for batch := 0; batch < numBatches; batch++ {
 			wg := sync.WaitGroup{}
 			wg.Add(batchSize)
-			for range batchSize {
+			for i := 0; i < batchSize; i++ {
 				go func() {
 					defer wg.Done()
 					cachedConn, err := cache.GetConnected("foo", cfg, nil, connectFn)

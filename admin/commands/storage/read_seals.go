@@ -22,7 +22,7 @@ const (
 
 type readSealsRequest struct {
 	requestType      readSealsRequestType
-	value            any
+	value            interface{}
 	numBlocksToQuery uint64
 }
 
@@ -45,7 +45,7 @@ type ReadSealsCommand struct {
 	index storage.Index
 }
 
-func (r *ReadSealsCommand) Handler(ctx context.Context, req *admin.CommandRequest) (any, error) {
+func (r *ReadSealsCommand) Handler(ctx context.Context, req *admin.CommandRequest) (interface{}, error) {
 	data := req.ValidatorData.(*readSealsRequest)
 
 	if data.requestType == readSealsRequestByID {
@@ -124,7 +124,7 @@ func (r *ReadSealsCommand) Handler(ctx context.Context, req *admin.CommandReques
 // Validator validates the request.
 // Returns admin.InvalidAdminReqError for invalid/malformed requests.
 func (r *ReadSealsCommand) Validator(req *admin.CommandRequest) error {
-	input, ok := req.Data.(map[string]any)
+	input, ok := req.Data.(map[string]interface{})
 	if !ok {
 		return admin.NewInvalidAdminReqFormatError("expected map[string]any")
 	}

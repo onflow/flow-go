@@ -354,7 +354,7 @@ func TestIterate(t *testing.T) {
 				return !bytes.Equal(key, []byte{0x12})
 			}
 			var val bool
-			create := func() any {
+			create := func() interface{} {
 				return &val
 			}
 			handle := func() error {
@@ -393,7 +393,7 @@ func TestTraverse(t *testing.T) {
 				return !bytes.Equal(key, []byte{0x42, 0x56})
 			}
 			var val bool
-			create := func() any {
+			create := func() interface{} {
 				return &val
 			}
 			handle := func() error {
@@ -578,7 +578,7 @@ func TestIterateBoundaries(t *testing.T) {
 				found = append(found, key)
 				return false
 			}
-			create := func() any {
+			create := func() interface{} {
 				return nil
 			}
 			handle := func() error {

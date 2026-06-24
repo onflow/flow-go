@@ -29,7 +29,7 @@ type TestCase struct {
 	Identity    *flow.Identity
 	GetIdentity func(pid peer.ID) (*flow.Identity, bool)
 	Channel     channels.Channel
-	Message     any
+	Message     interface{}
 	MessageCode codec.MessageCode
 	MessageStr  string
 	Protocols   message.Protocols

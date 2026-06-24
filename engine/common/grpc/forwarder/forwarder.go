@@ -91,7 +91,7 @@ func (f *Forwarder) FaultTolerantClient() (access.AccessAPIClient, io.Closer, er
 	defer f.lock.Unlock()
 
 	var err error
-	for range retryMax {
+	for i := 0; i < retryMax; i++ {
 		f.roundRobin++
 		f.roundRobin = f.roundRobin % len(f.upstream)
 		err = f.reconnectingClient(f.roundRobin)

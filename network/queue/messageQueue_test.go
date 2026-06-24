@@ -165,7 +165,8 @@ func testQueue(t *testing.T, messages map[string]queue.Priority) {
 
 func BenchmarkPush(b *testing.B) {
 	b.StopTimer()
-	ctx := b.Context()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	var mq = queue.NewMessageQueue(ctx, randomPriority, metrics.NewNoopCollector(), 0)
 	for i := 0; i < b.N; i++ {
 		err := mq.Insert("test")
@@ -184,7 +185,8 @@ func BenchmarkPush(b *testing.B) {
 
 func BenchmarkPop(b *testing.B) {
 	b.StopTimer()
-	ctx := b.Context()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	var mq = queue.NewMessageQueue(ctx, randomPriority, metrics.NewNoopCollector(), 0)
 	for i := 0; i < b.N; i++ {
 		err := mq.Insert("test")
@@ -222,13 +224,14 @@ func randomPriority(_ any) (queue.Priority, error) {
 
 // TestQueueFull tests that inserting into a full queue returns ErrQueueFull
 func TestQueueFull(t *testing.T) {
-	ctx := t.Context()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	maxSize := 10
 	mq := queue.NewMessageQueue(ctx, fixedPriority, metrics.NewNoopCollector(), maxSize)
 
 	// fill the queue to capacity
-	for range maxSize {
+	for i := 0; i < maxSize; i++ {
 		err := mq.Insert("message")
 		assert.NoError(t, err)
 	}

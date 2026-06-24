@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"math/rand"
-	"slices"
 	"sync"
 	"testing"
 	"time"
@@ -337,8 +336,10 @@ func TestControlMessageInspection_ValidRpc(t *testing.T) {
 		id, ok := args[0].(string)
 		require.True(t, ok)
 		for _, iwant := range iwants {
-			if slices.Contains(iwant.GetMessageIDs(), id) {
-				return
+			for _, messageID := range iwant.GetMessageIDs() {
+				if id == messageID {
+					return
+				}
 			}
 		}
 		require.Fail(t, "message id not found in iwant messages")
@@ -1446,7 +1447,7 @@ func TestNewControlMsgValidationInspector_validateClusterPrefixedTopic(t *testin
 		inspector.Start(signalerCtx)
 		unittest.RequireComponentsReadyBefore(t, 1*time.Second, inspector)
 
-		for range 11 {
+		for i := 0; i < 11; i++ {
 			require.NoError(t, inspector.Inspect(from, inspectMsgRpc))
 		}
 		require.Eventually(t, func() bool {

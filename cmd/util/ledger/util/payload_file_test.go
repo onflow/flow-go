@@ -35,7 +35,7 @@ func TestPayloadFile(t *testing.T) {
 			keysValues := make(map[string]keyPair)
 			var payloads []*ledger.Payload
 
-			for i := range size {
+			for i := 0; i < size; i++ {
 				keys, values := getSampleKeyValues(i)
 
 				for j, key := range keys {
@@ -88,7 +88,7 @@ func TestPayloadFile(t *testing.T) {
 			keysValues := make(map[string]keyPair)
 			var payloads []*ledger.Payload
 
-			for i := range size {
+			for i := 0; i < size; i++ {
 				keys, values := getSampleKeyValues(i)
 
 				for j, key := range keys {
@@ -143,7 +143,7 @@ func TestPayloadFile(t *testing.T) {
 			var payloads []*ledger.Payload
 
 			var globalRegisterCount int
-			for i := range size {
+			for i := 0; i < size; i++ {
 				keys, values := getSampleKeyValues(i)
 
 				for j, key := range keys {
@@ -249,7 +249,7 @@ func TestPayloadFile(t *testing.T) {
 
 			var globalRegisterCount int
 
-			for i := range size {
+			for i := 0; i < size; i++ {
 				keys, values := getSampleKeyValues(i)
 
 				for j, key := range keys {
@@ -312,7 +312,7 @@ func getSampleKeyValues(i int) ([]ledger.Key, []ledger.Value) {
 	default:
 		keys := make([]ledger.Key, 0)
 		values := make([]ledger.Value, 0)
-		for range 10 {
+		for j := 0; j < 10; j++ {
 			// address := make([]byte, 32)
 			address := make([]byte, 8)
 			_, err := rand.Read(address)

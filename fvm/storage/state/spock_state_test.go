@@ -325,7 +325,7 @@ func TestSpockStateRandomOps(t *testing.T) {
 		nil, // control experiment
 	}
 
-	for range 500 {
+	for i := 0; i < 500; i++ {
 		roll, err := rand.Uintn(4)
 		require.NoError(t, err)
 
@@ -357,7 +357,7 @@ func TestSpockStateRandomOps(t *testing.T) {
 					func(t *testing.T, state *spockState) {
 						err := state.Set(
 							flow.NewRegisterID(flow.EmptyAddress, fmt.Sprintf("%d", id)),
-							fmt.Appendf(nil, "%d", value))
+							[]byte(fmt.Sprintf("%d", value)))
 						require.NoError(t, err)
 					}))
 		case uint(2):
@@ -371,7 +371,7 @@ func TestSpockStateRandomOps(t *testing.T) {
 					func(t *testing.T, state *spockState) {
 						err := state.Merge(
 							&snapshot.ExecutionSnapshot{
-								SpockSecret: fmt.Appendf(nil, "%d", spock),
+								SpockSecret: []byte(fmt.Sprintf("%d", spock)),
 							})
 						require.NoError(t, err)
 					}))

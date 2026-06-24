@@ -135,8 +135,10 @@ func TestConcurrencyLimiter_Acquire_ConcurrentCalls(t *testing.T) {
 
 	start := make(chan struct{})
 
-	for range totalGoroutines {
-		wg.Go(func() {
+	for i := 0; i < totalGoroutines; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
 			<-start
 			if limiter.Acquire() {
 				n := current.Add(1)
@@ -150,7 +152,7 @@ func TestConcurrencyLimiter_Acquire_ConcurrentCalls(t *testing.T) {
 				current.Add(-1)
 				limiter.Release()
 			}
-		})
+		}()
 	}
 
 	close(start)
@@ -188,8 +190,10 @@ func TestConcurrencyLimiter_Allow_ConcurrentCalls(t *testing.T) {
 
 	start := make(chan struct{})
 
-	for range totalGoroutines {
-		wg.Go(func() {
+	for i := 0; i < totalGoroutines; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
 			<-start
 			limiter.Allow(func() {
 				n := current.Add(1)
@@ -204,7 +208,7 @@ func TestConcurrencyLimiter_Allow_ConcurrentCalls(t *testing.T) {
 				time.Sleep(time.Millisecond) // hold the slot briefly
 				current.Add(-1)
 			})
-		})
+		}()
 	}
 
 	close(start)

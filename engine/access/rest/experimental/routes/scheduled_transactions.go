@@ -13,7 +13,7 @@ import (
 )
 
 // GetScheduledTransactions handles GET /scheduled.
-func GetScheduledTransactions(r *common.Request, backend extended.API, link models.LinkGenerator) (any, error) {
+func GetScheduledTransactions(r *common.Request, backend extended.API, link models.LinkGenerator) (interface{}, error) {
 	req, err := request.NewGetScheduledTransactions(r)
 	if err != nil {
 		return nil, common.NewBadRequestError(err)
@@ -35,7 +35,7 @@ func GetScheduledTransactions(r *common.Request, backend extended.API, link mode
 }
 
 // GetScheduledTransaction handles GET /scheduled/transaction/{id}.
-func GetScheduledTransaction(r *common.Request, backend extended.API, link models.LinkGenerator) (any, error) {
+func GetScheduledTransaction(r *common.Request, backend extended.API, link models.LinkGenerator) (interface{}, error) {
 	req, err := request.NewGetScheduledTransaction(r)
 	if err != nil {
 		return nil, common.NewBadRequestError(err)
@@ -60,7 +60,7 @@ func GetScheduledTransaction(r *common.Request, backend extended.API, link model
 }
 
 // GetScheduledTransactionsByAddress handles GET /accounts/{address}/scheduled.
-func GetScheduledTransactionsByAddress(r *common.Request, backend extended.API, link models.LinkGenerator) (any, error) {
+func GetScheduledTransactionsByAddress(r *common.Request, backend extended.API, link models.LinkGenerator) (interface{}, error) {
 	req, err := request.NewGetScheduledTransactionsByAddress(r)
 	if err != nil {
 		return nil, common.NewBadRequestError(err)

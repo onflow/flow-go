@@ -1,4 +1,4 @@
-FROM golang:1.26
+FROM golang:1.25
 
 COPY flow-localnet.json /go
 

@@ -2,7 +2,6 @@ package fvm_test
 
 import (
 	"fmt"
-	"maps"
 	"testing"
 
 	"github.com/stretchr/testify/mock"
@@ -153,7 +152,9 @@ func runTests[T common.ComputationKind | common.MemoryKind](
 			expectedWeights := make(map[T]uint64)
 			var existingWeightKey T
 			var existingWeightValue uint64
-			maps.Copy(expectedWeights, defaultWeights)
+			for k, v := range defaultWeights {
+				expectedWeights[k] = v
+			}
 			// change one existing value
 			for kind, u := range defaultWeights {
 				existingWeightKey = kind

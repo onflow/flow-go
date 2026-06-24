@@ -31,7 +31,7 @@ func NewPebbleDBCheckpointCommand(checkpointDir string, dbname string, pebbleDB 
 	}
 }
 
-func (c *PebbleDBCheckpointCommand) Handler(ctx context.Context, req *admin.CommandRequest) (any, error) {
+func (c *PebbleDBCheckpointCommand) Handler(ctx context.Context, req *admin.CommandRequest) (interface{}, error) {
 	log.Info().Msgf("admintool: creating %v database checkpoint", c.dbname)
 
 	targetDir := nextTmpFolder(c.checkpointDir)

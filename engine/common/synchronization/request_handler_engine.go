@@ -18,14 +18,14 @@ import (
 )
 
 type ResponseSender interface {
-	SendResponse(any, flow.Identifier) error
+	SendResponse(interface{}, flow.Identifier) error
 }
 
 type ResponseSenderImpl struct {
 	con network.Conduit
 }
 
-func (r *ResponseSenderImpl) SendResponse(res any, target flow.Identifier) error {
+func (r *ResponseSenderImpl) SendResponse(res interface{}, target flow.Identifier) error {
 	switch res.(type) {
 	case *messages.BlockResponse:
 		err := r.con.Unicast(res, target)
@@ -98,7 +98,7 @@ func NewRequestHandlerEngine(
 		false,
 	)
 	builder := component.NewComponentManagerBuilder().AddWorker(finalizedCacheWorker)
-	for range defaultEngineRequestsWorkers {
+	for i := 0; i < defaultEngineRequestsWorkers; i++ {
 		builder.AddWorker(e.requestHandler.requestProcessingWorker)
 	}
 	e.Component = builder.Build()
@@ -110,6 +110,6 @@ func NewRequestHandlerEngine(
 	return e, nil
 }
 
-func (r *RequestHandlerEngine) Process(channel channels.Channel, originID flow.Identifier, event any) error {
+func (r *RequestHandlerEngine) Process(channel channels.Channel, originID flow.Identifier, event interface{}) error {
 	return r.requestHandler.Process(channel, originID, event)
 }

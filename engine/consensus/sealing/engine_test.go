@@ -173,7 +173,7 @@ func (s *SealingEngineSuite) TestMultipleProcessingItems() {
 	responseApprovals := make([]*flow.ApprovalResponse, 0)
 	approverID := unittest.IdentifierFixture()
 	for _, receipt := range receipts {
-		for range numApprovalsPerReceipt {
+		for j := 0; j < numApprovalsPerReceipt; j++ {
 			approval := unittest.ResultApprovalFixture(
 				unittest.WithExecutionResultID(receipt.ExecutionResult.ID()),
 				unittest.WithApproverID(approverID),
@@ -192,19 +192,23 @@ func (s *SealingEngineSuite) TestMultipleProcessingItems() {
 	}
 
 	var wg sync.WaitGroup
-	wg.Go(func() {
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
 		for _, approval := range approvals {
 			err := s.engine.Process(channels.ReceiveApprovals, approverID, approval)
 			s.Require().NoError(err, "should process approval (trusted)")
 		}
-	})
-	wg.Go(func() {
+	}()
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
 		for _, resp := range responseApprovals {
 
 			err := s.engine.Process(channels.ReceiveApprovals, approverID, resp)
 			s.Require().NoError(err, "should process approval (converted from wire)")
 		}
-	})
+	}()
 
 	wg.Wait()
 

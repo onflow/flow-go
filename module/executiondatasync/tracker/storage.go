@@ -349,7 +349,10 @@ func (s *storage) trackBlobs(blockHeight uint64, cids ...cid.Cid) error {
 	}
 
 	for len(cids) > 0 {
-		batchSize := min(len(cids), cidsPerBatch)
+		batchSize := cidsPerBatch
+		if len(cids) < batchSize {
+			batchSize = len(cids)
+		}
 		batch := cids[:batchSize]
 
 		if err := retryOnConflict(s.db, func(txn *badger.Txn) error {

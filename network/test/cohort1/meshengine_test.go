@@ -92,7 +92,7 @@ func (suite *MeshEngineTestSuite) SetupTest() {
 	require.NoError(suite.T(), err)
 	opts := []p2ptest.NodeFixtureParameterOption{p2ptest.WithUnicastHandlerFunc(nil)}
 
-	for range count {
+	for i := 0; i < count; i++ {
 		connManager, err := testutils.NewTagWatchingConnManager(
 			unittest.Logger(),
 			metrics.NewNoopCollector(),
@@ -280,7 +280,7 @@ func (suite *MeshEngineTestSuite) allToAllScenario(send testutils.ConduitSendWra
 		receivedIndices, err := extractSenderID(count, e.Event, "hello from node")
 		require.NoError(suite.Suite.T(), err)
 
-		for j := range count {
+		for j := 0; j < count; j++ {
 			// evaluates self-gossip
 			if j == index {
 				assert.False(suite.Suite.T(), (receivedIndices)[index], fmt.Sprintf("self gossiped for node %v detected", index))
@@ -469,7 +469,7 @@ func (suite *MeshEngineTestSuite) conduitCloseScenario(send testutils.ConduitSen
 		wg.Add(1)
 		go func(e *testutils.MeshEngine) {
 			expectedMsgCnt := count - 2 // count less self and unsubscribed engine
-			for range expectedMsgCnt {
+			for x := 0; x < expectedMsgCnt; x++ {
 				<-e.Received
 			}
 			wg.Done()
@@ -496,11 +496,11 @@ func assertChannelReceived(t *testing.T, e *testutils.MeshEngine, channel channe
 // events is the channel of received events
 // expectedMsgTxt is the common prefix among all the messages that we expect to receive, for example
 // we expect to receive "hello from node x" in this test, and then expectedMsgTxt is "hello form node"
-func extractSenderID(enginesNum int, events chan any, expectedMsgTxt string) ([]bool, error) {
+func extractSenderID(enginesNum int, events chan interface{}, expectedMsgTxt string) ([]bool, error) {
 	indices := make([]bool, enginesNum)
 	expectedMsgSize := len(expectedMsgTxt)
 	for i := 0; i < enginesNum-1; i++ {
-		var event any
+		var event interface{}
 		select {
 		case event = <-events:
 		default:

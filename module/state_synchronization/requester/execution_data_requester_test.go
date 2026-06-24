@@ -654,7 +654,7 @@ func generateTestData(t *testing.T, blobstore blobs.Blobstore, blockCount int, s
 
 	var previousBlock *flow.Block
 	var previousResult *flow.ExecutionResult
-	for i := range blockCount {
+	for i := 0; i < blockCount; i++ {
 		var seals []*flow.Header
 
 		if i >= firstSeal {

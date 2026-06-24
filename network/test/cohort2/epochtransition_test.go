@@ -211,7 +211,7 @@ func (suite *MutableIdentityTableSuite) addNodes(count int) {
 	}
 
 	// create the test engines
-	for i := range count {
+	for i := 0; i < count; i++ {
 		node := testNode{
 			id:         ids[i],
 			libp2pNode: nodes[i],
@@ -436,7 +436,7 @@ func (suite *MutableIdentityTableSuite) exchangeMessages(
 	for i := range allowedEngs {
 		wg.Add(expectedMsgCnt)
 		go func(e *testutils.MeshEngine) {
-			for range expectedMsgCnt {
+			for x := 0; x < expectedMsgCnt; x++ {
 				<-e.Received
 				wg.Done()
 			}

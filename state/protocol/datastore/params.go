@@ -138,7 +138,7 @@ func NewVersionedInstanceParams(
 	versionedInstanceParams := &flow.VersionedInstanceParams{
 		Version: version,
 	}
-	var data any
+	var data interface{}
 	switch version {
 	case 0:
 		data = InstanceParamsV0{

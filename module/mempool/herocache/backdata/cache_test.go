@@ -509,9 +509,11 @@ func TestArrayBackData_All(t *testing.T) {
 				testIdentifiersMatchCount(t, bd.Keys(), entities, int(tc.limit))
 			} else {
 				// in LRU ejection mode we match All items based on a from index (i.e., last "from" items).
-				from := max(int(tc.items)-int(tc.limit),
+				from := int(tc.items) - int(tc.limit)
+				if from < 0 {
 					// we are below limit, hence we start matching from index 0
-					0)
+					from = 0
+				}
 				testMapMatchFrom(t, bd.All(), entities, from)
 				testEntitiesMatchFrom(t, bd.Values(), entities, from)
 				testIdentifiersMatchFrom(t, bd.Keys(), entities, from)

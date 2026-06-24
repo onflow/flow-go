@@ -632,7 +632,9 @@ func TestInMemoryRegisterStore(t *testing.T) {
 		var wg sync.WaitGroup
 		savedHeights := make(chan uint64, 100)
 
-		wg.Go(func() {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
 
 			lastPrunedHeight := pruned
 			for savedHeight := range savedHeights {
@@ -644,7 +646,7 @@ func TestInMemoryRegisterStore(t *testing.T) {
 				require.NoError(t, err)
 				lastPrunedHeight = rdHeight
 			}
-		})
+		}()
 
 		// save 100 blocks
 		for i := 1; i < count; i++ {

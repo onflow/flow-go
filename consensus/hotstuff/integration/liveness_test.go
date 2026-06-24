@@ -40,7 +40,7 @@ func Test2TimeoutOutof7Instances(t *testing.T) {
 	require.NoError(t, err)
 
 	// set up five instances that work fully
-	for n := range healthyReplicas {
+	for n := 0; n < healthyReplicas; n++ {
 		in := NewInstance(t,
 			WithRoot(root),
 			WithParticipants(participants),
@@ -107,7 +107,7 @@ func Test2TimeoutOutof4Instances(t *testing.T) {
 	require.NoError(t, err)
 
 	// set up two instances that work fully
-	for n := range healthyReplicas {
+	for n := 0; n < healthyReplicas; n++ {
 		in := NewInstance(t,
 			WithRoot(root),
 			WithParticipants(participants),
@@ -176,7 +176,7 @@ func Test1TimeoutOutof5Instances(t *testing.T) {
 	require.NoError(t, err)
 
 	// set up instances that work fully
-	for n := range healthyReplicas {
+	for n := 0; n < healthyReplicas; n++ {
 		in := NewInstance(t,
 			WithRoot(root),
 			WithParticipants(participants),
@@ -273,7 +273,7 @@ func TestBlockDelayIsHigherThanTimeout(t *testing.T) {
 	require.NoError(t, err)
 
 	// set up 2 instances that fully work (incl. sending TimeoutObjects)
-	for n := range healthyReplicas {
+	for n := 0; n < healthyReplicas; n++ {
 		in := NewInstance(t,
 			WithRoot(root),
 			WithParticipants(participants),
@@ -358,7 +358,7 @@ func TestAsyncClusterStartup(t *testing.T) {
 	// set up instances that work fully
 	var lock sync.Mutex
 	timeoutObjectGenerated := make(map[flow.Identifier]struct{}, 0)
-	for n := range replicas {
+	for n := 0; n < replicas; n++ {
 		in := NewInstance(t,
 			WithRoot(root),
 			WithParticipants(participants),

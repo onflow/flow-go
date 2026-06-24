@@ -306,12 +306,12 @@ func (s *HotStuffFollowerSuite) TestOutOfOrderBlocks() {
 }
 
 // blockWithID returns a testify `argumentMatcher` that only accepts blocks with the given ID
-func blockWithID(expectedBlockID flow.Identifier) any {
+func blockWithID(expectedBlockID flow.Identifier) interface{} {
 	return mock.MatchedBy(func(block *model.Block) bool { return expectedBlockID == block.BlockID })
 }
 
 // blockID returns a testify `argumentMatcher` that only accepts the given ID
-func blockID(expectedBlockID flow.Identifier) any {
+func blockID(expectedBlockID flow.Identifier) interface{} {
 	return mock.MatchedBy(func(blockID flow.Identifier) bool { return expectedBlockID == blockID })
 }
 

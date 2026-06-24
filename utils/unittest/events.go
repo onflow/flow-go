@@ -127,7 +127,7 @@ func (e *eventGeneratorFactory) WithEncoding(encoding entities.EventEncodingVers
 func (e *eventGeneratorFactory) GetEventsWithEncoding(n int, version entities.EventEncodingVersion) []flow.Event {
 	eventGenerator := NewEventGenerator(EventGenerator.WithEncoding(version))
 	events := make([]flow.Event, 0, n)
-	for range n {
+	for i := 0; i < n; i++ {
 		events = append(events, eventGenerator.New())
 	}
 	return events
@@ -258,7 +258,7 @@ func EventsFixture(
 ) []flow.Event {
 	events := make([]flow.Event, n)
 	g := NewEventGenerator(EventGenerator.WithEncoding(entities.EventEncodingVersion_CCF_V0))
-	for i := range n {
+	for i := 0; i < n; i++ {
 		events[i] = g.New(
 			Event.WithTransactionIndex(0),
 			Event.WithEventIndex(uint32(i)),

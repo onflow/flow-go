@@ -32,7 +32,7 @@ func TestBlockExecutionResult_ServiceEventCountForChunk(t *testing.T) {
 		nChunks := rand.Intn(10) + 1 // always contains at least system chunk
 		blockResult := makeBlockExecutionResultFixture(make([]int, nChunks))
 		// all chunks should have 0 service event count
-		for chunkIndex := range nChunks {
+		for chunkIndex := 0; chunkIndex < nChunks; chunkIndex++ {
 			count := blockResult.ServiceEventCountForChunk(chunkIndex)
 			assert.Equal(t, uint16(0), count)
 		}
@@ -75,7 +75,7 @@ func TestBlockExecutionResult_ServiceEventCountForChunk(t *testing.T) {
 
 		blockResult := makeBlockExecutionResultFixture(serviceEventAllocation)
 		// all chunks should have service event count of 1
-		for chunkIndex := range nChunks {
+		for chunkIndex := 0; chunkIndex < nChunks; chunkIndex++ {
 			count := blockResult.ServiceEventCountForChunk(chunkIndex)
 			assert.Equal(t, uint16(1), count)
 		}

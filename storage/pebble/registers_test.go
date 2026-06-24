@@ -308,7 +308,7 @@ func Benchmark_PayloadStorage(b *testing.B) {
 		return flow.NewRegisterID(owner, strconv.Itoa(i))
 	}
 	valueForHeightAndKey := func(i, j int) []byte {
-		return fmt.Appendf(nil, "%d-%d", i, j)
+		return []byte(fmt.Sprintf("%d-%d", i, j))
 	}
 	b.ResetTimer()
 
@@ -320,7 +320,7 @@ func Benchmark_PayloadStorage(b *testing.B) {
 		entries := make(flow.RegisterEntries, 1, batchSize)
 		entries[0] = flow.RegisterEntry{
 			Key:   batchSizeKey,
-			Value: fmt.Appendf(nil, "%d", batchSize),
+			Value: []byte(fmt.Sprintf("%d", batchSize)),
 		}
 		for j := 1; j < batchSize; j++ {
 			entries = append(entries, flow.RegisterEntry{

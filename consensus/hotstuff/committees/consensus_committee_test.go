@@ -282,7 +282,7 @@ func (suite *ConsensusSuite) TestProtocolEvents_EpochExtendedMultiple() {
 	suite.AssertKnownViews(expectedKnownViews...)
 
 	// Add several extensions in series
-	for range 10 {
+	for i := 0; i < 10; i++ {
 		finalView := curEpoch.FinalView()
 		extension := flow.EpochExtension{
 			FirstView: finalView + 1,
@@ -717,7 +717,7 @@ func TestRemoveOldEpochs(t *testing.T) {
 			}
 
 			// check we have the correct epochs stored
-			for i := range uint64(3) {
+			for i := uint64(0); i < 3; i++ {
 				counter := currentEpochCounter - i
 				if counter < firstEpochCounter {
 					break

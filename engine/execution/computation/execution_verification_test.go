@@ -78,14 +78,14 @@ func Test_ExecutionMatchesVerification(t *testing.T) {
 			}`), "Foo")
 
 		emitTxBuilder := flow.NewTransactionBodyBuilder().
-			SetScript(fmt.Appendf(nil, `
+			SetScript([]byte(fmt.Sprintf(`
 			import Foo from 0x%s
 			transaction {
 				prepare() {}
 				execute {
 					Foo.emitEvent()
 				}
-			}`, chain.ServiceAddress()))
+			}`, chain.ServiceAddress())))
 
 		err := testutil.SignTransactionAsServiceAccount(deployTxBuilder, 0, chain)
 		require.NoError(t, err)
@@ -125,14 +125,14 @@ func Test_ExecutionMatchesVerification(t *testing.T) {
 			}`), "Foo")
 
 		emitTx1Builder := flow.NewTransactionBodyBuilder().
-			SetScript(fmt.Appendf(nil, `
+			SetScript([]byte(fmt.Sprintf(`
 			import Foo from 0x%s
 			transaction {
 				prepare() {}
 				execute {
 					Foo.emitEvent()
 				}
-			}`, chain.ServiceAddress()))
+			}`, chain.ServiceAddress())))
 
 		// copy txs
 		emitTx2Builder := *emitTx1Builder
@@ -174,7 +174,7 @@ func Test_ExecutionMatchesVerification(t *testing.T) {
 			colResult := cr.CollectionExecutionResultAt(colIndex)
 			txResults := colResult.TransactionResults()
 			require.Len(t, txResults, expResCount)
-			for i := range expResCount {
+			for i := 0; i < expResCount; i++ {
 				require.Empty(t, txResults[i].ErrorMessage)
 			}
 		}
@@ -602,7 +602,7 @@ func TestTransactionFeeDeduction(t *testing.T) {
 
 	transferTokensTx := func(chain flow.Chain) *flow.TransactionBodyBuilder {
 		return flow.NewTransactionBodyBuilder().
-			SetScript(fmt.Appendf(nil, `
+			SetScript([]byte(fmt.Sprintf(`
 							// This transaction is a template for a transaction that
 							// could be used by anyone to send tokens to another account
 							// that has been set up to receive tokens.
@@ -640,7 +640,7 @@ func TestTransactionFeeDeduction(t *testing.T) {
 									// Deposit the withdrawn tokens in the recipient's receiver
 									receiverRef.deposit(from: <-self.sentVault)
 								}
-							}`, sc.FungibleToken.Address, sc.FlowToken.Address),
+							}`, sc.FungibleToken.Address, sc.FlowToken.Address)),
 			)
 	}
 

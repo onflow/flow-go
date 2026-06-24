@@ -1,7 +1,5 @@
 package ledger
 
-import "strings"
-
 // ErrLedgerConstruction is returned upon a failure in ledger creation steps
 type ErrLedgerConstruction struct {
 	Err error
@@ -29,12 +27,11 @@ type ErrMissingKeys struct {
 }
 
 func (e ErrMissingKeys) Error() string {
-	var str strings.Builder
-	str.WriteString("keys are missing: \n")
+	str := "keys are missing: \n"
 	for _, k := range e.Keys {
-		str.WriteString("\t" + k.String() + "\n")
+		str += "\t" + k.String() + "\n"
 	}
-	return str.String()
+	return str
 }
 
 // Is returns true if the type of errors are the same

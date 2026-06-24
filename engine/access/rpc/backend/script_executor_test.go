@@ -274,7 +274,7 @@ func versionBeaconEventFixture(
 ) *flow.SealedVersionBeacon {
 	require.Equal(t, len(heights), len(versions), "the heights array should be the same length as the versions array")
 	var vb []flow.VersionBoundary
-	for i := range heights {
+	for i := 0; i < len(heights); i++ {
 		vb = append(vb, flow.VersionBoundary{
 			BlockHeight: heights[i],
 			Version:     versions[i],

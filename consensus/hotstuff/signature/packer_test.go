@@ -121,7 +121,7 @@ func TestPackUnpackManyNodes(t *testing.T) {
 	view := rand.Uint64()
 	blockSigData := makeBlockSigData(committee)
 	stakingSigners := make([]flow.Identifier, 0)
-	for i := range 60 {
+	for i := 0; i < 60; i++ {
 		stakingSigners = append(stakingSigners, committee[i].NodeID)
 	}
 	randomBeaconSigners := make([]flow.Identifier, 0)

@@ -177,7 +177,7 @@ func TestDNSCache_LRU(t *testing.T) {
 	require.Equal(t, uint(sizeLimit), txts)
 
 	// only last 500 ip domains and txt records must be retained in the DNS cache
-	for i := range total {
+	for i := 0; i < total; i++ {
 		if i < total-int(sizeLimit) {
 			// old dns entries must be ejected
 			// ip
@@ -266,7 +266,7 @@ func TestDNSCache_Remove(t *testing.T) {
 	require.Equal(t, uint(total-1), txts)
 
 	// only last 500 ip domains and txt records must be retained in the DNS cache
-	for i := range total {
+	for i := 0; i < total; i++ {
 		if i == 0 {
 			// removed entries must no longer exist.
 			// ip

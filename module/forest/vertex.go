@@ -120,7 +120,7 @@ func IsInvalidVertexError(err error) bool {
 
 // NewInvalidVertexErrorf instantiates an [InvalidVertexError]. The
 // inputs `msg` and `args` follow the pattern of [fmt.Errorf].
-func NewInvalidVertexErrorf(vertex Vertex, msg string, args ...any) InvalidVertexError {
+func NewInvalidVertexErrorf(vertex Vertex, msg string, args ...interface{}) InvalidVertexError {
 	return InvalidVertexError{
 		Vertex: vertex,
 		msg:    fmt.Sprintf(msg, args...),

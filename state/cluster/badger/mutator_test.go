@@ -428,7 +428,7 @@ func (suite *MutatorSuite) TestExtend_WithExpiredReferenceBlock() {
 	// build enough blocks so that using genesis as a reference block causes
 	// the collection to be expired
 	parent := suite.protoGenesis
-	for range flow.DefaultTransactionExpiry + 1 {
+	for i := 0; i < flow.DefaultTransactionExpiry+1; i++ {
 		next := unittest.BlockWithParentProtocolState(parent)
 		err := suite.protoState.ExtendCertified(context.Background(), unittest.NewCertifiedBlock(next))
 		suite.Require().Nil(err)
