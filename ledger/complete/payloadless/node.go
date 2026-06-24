@@ -15,13 +15,19 @@ import (
 // significant memory savings while preserving the same root hash as a full trie.
 //
 // DEFINITIONS:
-//   - HEIGHT of a node v in a tree is the number of edges on the longest
-//     downward path between v and a tree leaf.
+//   - HEIGHT of a node v in a tree is the number of edges on the longest downward
+//     path between v and a tree leaf (in hypothetical tree without compactification).
 //
 // Conceptually, an MTrie is a sparse Merkle Trie, which has two node types:
 //   - INTERIM node: has at least one child (i.e. lChild or rChild is not
 //     nil). Interim nodes do not store a path and have no leafHash.
 //   - LEAF node: has _no_ children. Stores a path and (optionally) a leafHash.
+//     Nodes at height 0 are always leafs: we call those uncompactified leafs.
+//     Leafs might have positive height: this is an optimization, which may be
+//     applied (on best effort basis), where we represent a leaf that has a tailing
+//     path segment leading to it *without branches* as a single data structure.
+//     We call those compactified leafs. Compactification is optional and leaves the
+//     root hash unchanged.
 //
 // Per convention, we also consider nil as a leaf. Formally, nil is the generic
 // representative for any empty (sub)-trie (i.e. a trie without allocated
@@ -35,12 +41,42 @@ type Node struct {
 	// the current implementation is designed to operate on a sparsely populated
 	// tree, holding much less than 2^64 registers.
 
-	lChild    *Node       // Left Child
-	rChild    *Node       // Right Child
-	height    int         // height where the Node is at
-	path      ledger.Path // the storage path (dummy value for interim nodes)
-	leafHash  *hash.Hash  // HashLeaf(path, value) - the height-0 leaf hash (leaf nodes only; nil for unallocated registers)
-	hashValue hash.Hash   // hash value of node (cached)
+	height int         // height where the Node is at (root node has largest height of 255)
+	lChild *Node       // Left Child (always nil for 0-height nodes)
+	rChild *Node       // Right Child (always nil for 0-height nodes)
+	path   ledger.Path // the storage path (dummy value for interim nodes)
+
+	// leafHash is nil for all non-leaf nodes. For leafs (node with both children nil), leafHash
+	// is nil if and only if the leaf represents an unallocated register (value is nil or empty).
+	// Formally:
+	//              ╭ hash(path, value)    if len(value) > 0
+	//   leafHash = ┥
+	//              ╰ nil                  otherwise
+	leafHash *hash.Hash
+
+	// hashValue contains the hash of this node: cached, always present for all nodes.
+	// For height-0 nodes (necessarily leafs) representing a register with key `path` and
+	// holding `value`, we define:
+	//               ╭ hash(path, value)         if len(value) > 0
+	//   hashValue = ┥
+	//               ╰ DefaultHashForHeight(0)   otherwise
+	// For nodes with height > 0, we define:
+	//   hashValue = hash( lChild.hashValue , rChild.hashValue )
+	// where the DefaultHashForHeight(height-1) is substituted for nil children
+	//
+	// Notes:
+	//  • We deliberately defined hashValue such that it matches `leafHash` for height-0 nodes
+	//    that are representing *allocated* registers. For a compactified leaf (height > 0), its
+	//    hashValue is obtained from the height-0 leaf hash, iteratively hashing it together with
+	//    the default hash for the respective height until reaching the compactified leaf's height.
+	//  • By induction, it follows that the root node of any stub-tree containing only unallocated
+	//    registers has `hashValue` equal to DefaultHashForHeight(height). This holds irrespective of
+	//    whether the unallocated registers in the sub-tree are represented by uncompactified leafs,
+	//    or compactified leafs or stubbed out via nil, or a mixture thereof). Hence, we conclude:
+	//         `hashValue` equals DefaultHashForHeight(height)
+	//       ⟺ sub-tree with this node as root contains only unallocated registers
+	//       ⟺ all nodes in this sub-tree have leafHash == nil.
+	hashValue hash.Hash
 }
 
 // NewNode creates a new Node.

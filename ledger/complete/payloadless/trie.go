@@ -403,7 +403,7 @@ func update(
 	var lLowestHeightTouched, rLowestHeightTouched int
 	parallelRecursionThreshold := 16
 	if len(lpaths) < parallelRecursionThreshold || len(rpaths) < parallelRecursionThreshold {
-		// runtime optimization: if there are _no_ updates for either left or right sub-tree, proceed single-threaded
+		// runtime optimization: if there are only few updates for either left or right sub-tree, proceed single-threaded
 		newLeftChild, lRegCountDelta, lLowestHeightTouched = update(nodeHeight-1, oldLeftChild, lpaths, lvalues, lcompactLeaf, prune)
 		newRightChild, rRegCountDelta, rLowestHeightTouched = update(nodeHeight-1, oldRightChild, rpaths, rvalues, rcompactLeaf, prune)
 	} else {
