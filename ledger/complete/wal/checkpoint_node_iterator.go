@@ -64,12 +64,6 @@ type CheckpointNode struct {
 	// node's children; 0 means a nil (empty) child. Both are 0 for leaf nodes.
 	LeftChildIndex  uint64
 	RightChildIndex uint64
-
-	// LeftChildIsDefault and RightChildIsDefault report whether the referenced
-	// child is a default node (a completely unallocated sub-trie). They are false
-	// when the corresponding child index is 0 (nil child) and for leaf nodes.
-	LeftChildIsDefault  bool
-	RightChildIsDefault bool
 }
 
 // IterateNodeFunc processes a single node during a checkpoint iteration. Nodes
@@ -234,7 +228,8 @@ type checkpointIterator struct {
 //
 // Expected error returns during normal operation:
 //   - [ErrCheckpointIntegrity]: when an interim node references a child whose
-//     global index does not strictly precede this node (forward/unknown reference).
+//     global index does not strictly precede this node (forward/unknown reference),
+//     or references a default (completely unallocated) child.
 func (it *checkpointIterator) emit(meta nodeMeta, globalIndex, lGlobal, rGlobal uint64) error {
 	if !meta.isLeaf {
 		// Descendants-first ordering: both children must have been seen already.
@@ -242,6 +237,20 @@ func (it *checkpointIterator) emit(meta nodeMeta, globalIndex, lGlobal, rGlobal 
 		if lGlobal >= globalIndex || rGlobal >= globalIndex {
 			return fmt.Errorf("%w: interim node at global index %d references an unknown/forward child (left=%d, right=%d)",
 				ErrCheckpointIntegrity, globalIndex, lGlobal, rGlobal)
+		}
+		// A correctly compactified trie never stores a default (completely unallocated)
+		// sub-trie as a referenced child: such children are collapsed to nil during
+		// construction (see node.NewInterimCompactifiedNode). Because children are
+		// emitted before their parent, their default status is already recorded in
+		// it.isDefault. A referenced default child therefore indicates a malformed
+		// (non-compactified) checkpoint trie.
+		if lGlobal != 0 && it.isDefault.get(lGlobal) {
+			return fmt.Errorf("%w: interim node at global index %d references a default (unallocated) left child %d",
+				ErrCheckpointIntegrity, globalIndex, lGlobal)
+		}
+		if rGlobal != 0 && it.isDefault.get(rGlobal) {
+			return fmt.Errorf("%w: interim node at global index %d references a default (unallocated) right child %d",
+				ErrCheckpointIntegrity, globalIndex, rGlobal)
 		}
 		if lGlobal != 0 {
 			it.referenced.set(lGlobal)
@@ -269,8 +278,6 @@ func (it *checkpointIterator) emit(meta nodeMeta, globalIndex, lGlobal, rGlobal 
 	} else {
 		cn.LeftChildIndex = lGlobal
 		cn.RightChildIndex = rGlobal
-		cn.LeftChildIsDefault = lGlobal != 0 && it.isDefault.get(lGlobal)
-		cn.RightChildIsDefault = rGlobal != 0 && it.isDefault.get(rGlobal)
 	}
 
 	it.logProgress(globalIndex)
