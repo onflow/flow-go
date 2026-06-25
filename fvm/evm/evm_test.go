@@ -2231,7 +2231,7 @@ func TestEOAStateAccountCreationCost(t *testing.T) {
 			testContract *TestContract,
 			testAccount *EOATestAccount,
 		) {
-			code := []byte(fmt.Sprintf(
+			code := fmt.Appendf(nil,
 				`
 					import EVM from %s
 					import FlowToken from %s
@@ -2256,7 +2256,7 @@ func TestEOAStateAccountCreationCost(t *testing.T) {
 				`,
 				sc.EVMContract.Address.HexWithPrefix(),
 				sc.FlowToken.Address.HexWithPrefix(),
-			))
+			)
 
 			addr := RandomAddress(t)
 
@@ -2363,7 +2363,7 @@ func TestCOAStateAccountCreationCost(t *testing.T) {
 			testContract *TestContract,
 			testAccount *EOATestAccount,
 		) {
-			code := []byte(fmt.Sprintf(
+			code := fmt.Appendf(nil,
 				`
 					import EVM from %s
 					import FlowToken from %s
@@ -2386,7 +2386,7 @@ func TestCOAStateAccountCreationCost(t *testing.T) {
 				`,
 				sc.EVMContract.Address.HexWithPrefix(),
 				sc.FlowToken.Address.HexWithPrefix(),
-			))
+			)
 
 			addr := RandomAddress(t)
 
@@ -3148,7 +3148,7 @@ func TestCadenceOwnedAccountFunctionalities(t *testing.T) {
 				testContract *TestContract,
 				testAccount *EOATestAccount,
 			) {
-				code := []byte(fmt.Sprintf(
+				code := fmt.Appendf(nil,
 					`
 					import EVM from %s
 					import FlowToken from %s
@@ -3177,7 +3177,7 @@ func TestCadenceOwnedAccountFunctionalities(t *testing.T) {
 					`,
 					sc.EVMContract.Address.HexWithPrefix(),
 					sc.FlowToken.Address.HexWithPrefix(),
-				))
+				)
 
 				txBody, err := flow.NewTransactionBodyBuilder().
 					SetScript(code).
@@ -7259,7 +7259,7 @@ func TestEthLogEmissionWithSelfDestruct(t *testing.T) {
 				testAccount *EOATestAccount,
 			) {
 				sc := systemcontracts.SystemContractsForChain(chain.ChainID())
-				code := []byte(fmt.Sprintf(
+				code := fmt.Appendf(nil,
 					`
 					import EVM from %s
 
@@ -7275,7 +7275,7 @@ func TestEthLogEmissionWithSelfDestruct(t *testing.T) {
 					}
 					`,
 					sc.EVMContract.Address.HexWithPrefix(),
-				))
+				)
 
 				coinbaseAddr := types.Address{1, 2, 3}
 				coinbaseBalance := getEVMAccountBalance(t, ctx, vm, snapshot, coinbaseAddr)
@@ -7365,7 +7365,7 @@ func TestEthLogEmissionWithSelfDestruct(t *testing.T) {
 				testAccount *EOATestAccount,
 			) {
 				sc := systemcontracts.SystemContractsForChain(chain.ChainID())
-				code := []byte(fmt.Sprintf(
+				code := fmt.Appendf(nil,
 					`
 					import EVM from %s
 
@@ -7381,7 +7381,7 @@ func TestEthLogEmissionWithSelfDestruct(t *testing.T) {
 					}
 					`,
 					sc.EVMContract.Address.HexWithPrefix(),
-				))
+				)
 
 				coinbaseAddr := types.Address{1, 2, 3}
 				coinbaseBalance := getEVMAccountBalance(t, ctx, vm, snapshot, coinbaseAddr)
