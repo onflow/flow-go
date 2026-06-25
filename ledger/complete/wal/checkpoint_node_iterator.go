@@ -16,12 +16,6 @@ import (
 	"github.com/onflow/flow-go/ledger/complete/payloadless"
 )
 
-// encLeafHashFlagSize is the size of the V7 leaf-hash presence flag (1 byte).
-// The remaining node field sizes are shared with [checkpoint_v7_convert_stream.go]
-// (encNodeTypeSize, encHeightSize, encHashSize, encPathSize, encNodeIndexSize,
-// encPayloadLengthSize, fixedNodePrefixSize, leafNodeTypeByte, interimNodeTypeByte).
-const encLeafHashFlagSize = 1
-
 // ErrCheckpointIntegrity indicates that a checkpoint's trie structure is corrupt:
 // either an interim node references a child that has not been seen yet (a forward
 // or out-of-range reference, violating the descendants-first ordering), or a node
