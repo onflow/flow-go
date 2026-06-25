@@ -28,6 +28,11 @@ const (
 	encNodeIndexSize     = 8
 	encPayloadLengthSize = 4
 
+	// encLeafHashFlagSize is the size of the V7 leaf-hash presence flag (1 byte).
+	// This must match the (unexported) encLeafHashFlagSize in
+	// ledger/complete/payloadless/flattener.go, which writes this flag.
+	encLeafHashFlagSize = 1
+
 	// fixedNodePrefixSize is the size of the leading bytes shared by every
 	// encoded node (leaf or interim): node type + height + node hash.
 	fixedNodePrefixSize = encNodeTypeSize + encHeightSize + encHashSize
