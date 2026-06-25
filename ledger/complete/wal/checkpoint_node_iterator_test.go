@@ -157,10 +157,11 @@ func TestIterateCheckpointNodesV7(t *testing.T) {
 
 func TestCheckpointIteratorForwardReference(t *testing.T) {
 	it := &checkpointIterator{
-		fn:         func(*CheckpointNode) error { return nil },
-		isDefault:  newBitset(16),
-		referenced: newBitset(16),
-		total:      15,
+		fn:          func(*CheckpointNode) error { return nil },
+		isDefault:   newBitset(16),
+		referenced:  newBitset(16),
+		total:       15,
+		logProgress: func(uint64) {},
 	}
 
 	// An interim node at global index 3 referencing a child at index 5 violates
@@ -174,6 +175,30 @@ func TestCheckpointIteratorForwardReference(t *testing.T) {
 	require.True(t, it.referenced.get(2))
 	require.True(t, it.referenced.get(4))
 	require.False(t, it.referenced.get(6))
+}
+
+func TestCheckpointIteratorDefaultChild(t *testing.T) {
+	it := &checkpointIterator{
+		fn:          func(*CheckpointNode) error { return nil },
+		isDefault:   newBitset(16),
+		referenced:  newBitset(16),
+		total:       15,
+		logProgress: func(uint64) {},
+	}
+
+	// Emit a node at index 2 whose hash equals the default hash for its height: it
+	// is recorded as a default (completely unallocated) sub-trie.
+	const height = 1
+	require.NoError(t, it.emit(
+		nodeMeta{isLeaf: true, height: height, hash: ledger.GetDefaultHashForHeight(height)},
+		2, 0, 0,
+	))
+	require.True(t, it.isDefault.get(2))
+
+	// An interim node referencing the default child is an integrity violation: a
+	// compactified trie collapses default children to nil rather than storing them.
+	err := it.emit(nodeMeta{isLeaf: false, height: height + 1}, 3, 2, 0)
+	require.ErrorIs(t, err, ErrCheckpointIntegrity)
 }
 
 func TestBitset(t *testing.T) {

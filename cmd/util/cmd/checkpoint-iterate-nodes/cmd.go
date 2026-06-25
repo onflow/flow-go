@@ -27,13 +27,13 @@ the whole checkpoint into memory.
 
 It reports:
   - the number of leaf nodes and interim nodes,
-  - the number of interim nodes that effectively have a single child (one child
-    is nil, or both children are present but one is a default/empty node),
+  - the number of interim nodes that have a single (non-nil) child,
   - the total payload size across leaf nodes (V6 only; V7 stores no payloads).
 
 While streaming it verifies trie structural integrity: every interim node must
-reference only already-seen children, and every node must be referenced by some
-parent or trie root. On any integrity violation the command exits fatally.`,
+reference only already-seen, non-default children, and every node must be
+referenced by some parent or trie root. On any integrity violation the command
+exits fatally.`,
 	Run: run,
 }
 
@@ -68,8 +68,6 @@ func run(*cobra.Command, []string) {
 		Uint64("LeafNodes", res.leafNodes).
 		Uint64("InterimNodes", res.interimNodes).
 		Uint64("InterimWithSingleChild", res.interimSingleChild).
-		Uint64("InterimWithDefaultChild", res.interimDefaultChild).
-		Uint64("EffectivelySingleChild", res.interimSingleChild+res.interimDefaultChild).
 		Uint64("LeavesWithPayload", res.leavesWithPayload).
 		Uint64("TotalPayloadSize", res.totalPayloadSize).
 		Msgf("successfully iterated checkpoint %v", flagCheckpoint)
@@ -83,9 +81,6 @@ type result struct {
 	// interimSingleChild counts interim nodes with exactly one non-nil child
 	// (the other child index is 0).
 	interimSingleChild uint64
-	// interimDefaultChild counts interim nodes with two non-nil children where
-	// exactly one of them is a default (empty) node — effectively a single child.
-	interimDefaultChild uint64
 	// leavesWithPayload counts leaf nodes carrying a non-empty payload (V6).
 	leavesWithPayload uint64
 	// totalPayloadSize is the sum of encoded payload sizes across leaf nodes (V6).
@@ -109,18 +104,14 @@ func iterateCheckpoint(dir string, fileName string, logger zerolog.Logger) (resu
 
 		res.interimNodes++
 
+		// An interim node with exactly one nil child is legitimate in a compactified
+		// trie (the present child is itself an interim node). Both-nil cannot occur,
+		// and a non-nil default child is rejected as an integrity violation by the
+		// iterator, so the only remaining case to count here is the single-child one.
 		leftNil := n.LeftChildIndex == 0
 		rightNil := n.RightChildIndex == 0
-
-		switch {
-		case leftNil != rightNil:
-			// exactly one child is nil
+		if leftNil != rightNil {
 			res.interimSingleChild++
-		case !leftNil && !rightNil:
-			// both children present: effectively single child if exactly one is a default node
-			if n.LeftChildIsDefault != n.RightChildIsDefault {
-				res.interimDefaultChild++
-			}
 		}
 
 		return nil
