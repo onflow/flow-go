@@ -139,6 +139,49 @@ func (tb TransactionBody) ID() Identifier {
 	return MakeID(tb)
 }
 
+// Signers returns the unique list of accounts required to sign this transaction.
+//
+// The list is returned in the following order:
+//  1. PROPOSER
+//  2. PAYER
+//  3. AUTHORIZERS (in insertion order)
+//
+// The only exception to the above ordering is for deduplication: if the same
+// account is used in multiple signing roles, only its first occurrence is
+// included. Empty addresses (e.g. an unset payer on the system transaction) are
+// omitted.
+//
+// A nil receiver returns nil, allowing callers holding an optional
+// *TransactionBody (e.g. a non-transaction procedure such as a script) to call
+// this method without a nil check.
+func (tb *TransactionBody) Signers() []Address {
+	if tb == nil {
+		return nil
+	}
+
+	signers := make([]Address, 0, len(tb.Authorizers)+2)
+	seen := make(map[Address]struct{})
+
+	addSigner := func(address Address) {
+		if address == EmptyAddress {
+			return
+		}
+		if _, ok := seen[address]; ok {
+			return
+		}
+		signers = append(signers, address)
+		seen[address] = struct{}{}
+	}
+
+	addSigner(tb.ProposalKey.Address)
+	addSigner(tb.Payer)
+	for _, authorizer := range tb.Authorizers {
+		addSigner(authorizer)
+	}
+
+	return signers
+}
+
 // MissingFields checks if a transaction is missing any required fields and returns those that are missing.
 func (tb *TransactionBody) MissingFields() []string {
 	// Required fields are Script, ReferenceBlockID, Payer

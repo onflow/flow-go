@@ -15,11 +15,15 @@ type Inspector interface {
 	//    only the executionSnapshot.Reads, will be read
 	// - executionSnapshot is the reads and writes of the procedure
 	// - events are all of the events the procedure is emitting
+	// - signers are the accounts that signed the procedure's transaction (its
+	//   authorizers and payer), deduplicated. It is empty for procedures that are
+	//   not transactions (e.g. scripts).
 	Inspect(
 		logger zerolog.Logger,
 		storage snapshot.StorageSnapshot,
 		executionSnapshot *snapshot.ExecutionSnapshot,
 		events []flow.Event,
+		signers []flow.Address,
 	) (Result, error)
 
 	// Name is the name of the inspector
