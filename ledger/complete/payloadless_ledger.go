@@ -248,11 +248,17 @@ func (l *PayloadlessLedger) Tries() ([]*payloadless.MTrie, error) {
 }
 
 // Trie returns the trie stored in the forest with the given root hash.
+//
+// Expected error returns during normal operation:
+//   - an error if no trie with the given root hash is stored in the forest
 func (l *PayloadlessLedger) Trie(rootHash ledger.RootHash) (*payloadless.MTrie, error) {
 	return l.forest.GetTrie(rootHash)
 }
 
 // MostRecentTouchedState returns the state most recently touched.
+//
+// Expected error returns during normal operation:
+//   - an error if no trie is stored in the forest
 func (l *PayloadlessLedger) MostRecentTouchedState() (ledger.State, error) {
 	root, err := l.forest.MostRecentTouchedRootHash()
 	return ledger.State(root), err
@@ -279,6 +285,10 @@ func (l *PayloadlessLedger) StateCount() int {
 }
 
 // StateByIndex returns the state at the given index. `-1` returns the last index.
+//
+// Expected error returns during normal operation:
+//   - an error if no states are available in the forest
+//   - an error if the given index is out of range
 func (l *PayloadlessLedger) StateByIndex(index int) (ledger.State, error) {
 	tries, err := l.Tries()
 	if err != nil {
