@@ -4506,11 +4506,13 @@ func TestFlowTokenChangesInspector(t *testing.T) {
 					GetBalance: func(value *interpreter.CompositeValue) uint64 {
 						return uint64(value.GetField(nil, "balance").(interpreter.UFix64Value).UFix64Value)
 					},
-					SinksSources: map[string]func(flow.Event) (int64, error){
-						flowTokenMintedEventID: func(evt flow.Event) (int64, error) {
-							payload, err := ccf.Decode(nil, evt.Payload)
-							require.NoError(t, err)
-							return int64(payload.(cadence.Event).SearchFieldByName("amount").(cadence.UFix64)), nil
+					SinksSources: map[string]inspection.SourceSink{
+						flowTokenMintedEventID: {
+							Amount: func(evt flow.Event) (int64, error) {
+								payload, err := ccf.Decode(nil, evt.Payload)
+								require.NoError(t, err)
+								return int64(payload.(cadence.Event).SearchFieldByName("amount").(cadence.UFix64)), nil
+							},
 						},
 					},
 				},
@@ -4538,6 +4540,7 @@ func TestFlowTokenChangesInspector(t *testing.T) {
 				unaccounted := result.UnaccountedTokens()
 				require.Len(t, unaccounted, 0, "expectation: all tokens were accounted for")
 				require.Len(t, result.Changes, 3, "change should be on 3 addresses: sender, receiver, fees")
+				require.Len(t, result.Violations, 0, "no allow-list configured: no violations expected")
 			},
 		},
 		{
@@ -4566,6 +4569,58 @@ func TestFlowTokenChangesInspector(t *testing.T) {
 				unaccounted := result.UnaccountedTokens()
 				require.Len(t, unaccounted, 0, "expectation: all tokens were accounted for")
 				require.Len(t, result.Changes, 3, "change should be on 3 addresses: sender, receiver, fees")
+				require.Len(t, result.Violations, 0,
+					"mint is signed by the service account, which is allow-listed by default")
+			},
+		}, {
+			name: "mint by non-allow-listed minter",
+			tokenDefinitions: map[string]inspection.SearchToken{
+				flowTokenVaultID: {
+					ID: flowTokenVaultID,
+					GetBalance: func(value *interpreter.CompositeValue) uint64 {
+						return uint64(value.GetField(nil, "balance").(interpreter.UFix64Value).UFix64Value)
+					},
+					SinksSources: map[string]inspection.SourceSink{
+						flowTokenMintedEventID: {
+							Amount: func(evt flow.Event) (int64, error) {
+								payload, err := ccf.Decode(nil, evt.Payload)
+								require.NoError(t, err)
+								return int64(payload.(cadence.Event).SearchFieldByName("amount").(cadence.UFix64)), nil
+							},
+							// Allow-list an account that is NOT the transaction signer
+							// (the service account), so the mint triggers a violation.
+							MinterAllowlist: map[flow.Address]struct{}{
+								flow.HexToAddress("0000000000000123"): {},
+							},
+						},
+					},
+				},
+			},
+			txBody: func(t *testing.T, chain flow.Chain, accounts []flow.Address) *flow.TransactionBody {
+				sc := systemcontracts.SystemContractsForChain(chain.ChainID())
+				env := sc.AsTemplateEnv()
+
+				txBodyBuilder := flow.NewTransactionBodyBuilder().
+					SetScript(templates.GenerateMintFlowScript(env)).
+					AddArgument(jsoncdc.MustEncode(cadence.Address(accounts[0]))).
+					AddArgument(jsoncdc.MustEncode(cadence.UFix64(10_000_000))).
+					AddAuthorizer(chain.ServiceAddress()).
+					SetPayer(chain.ServiceAddress())
+
+				err := testutil.SignTransactionAsServiceAccount(txBodyBuilder, 0, chain)
+				require.NoError(t, err)
+
+				txBody, err := txBodyBuilder.Build()
+				require.NoError(t, err)
+
+				return txBody
+			},
+			resultChecker: func(t *testing.T, result inspection.TokenDiffResult) {
+				unaccounted := result.UnaccountedTokens()
+				require.Len(t, unaccounted, 0, "the mint amount is still accounted for via the event")
+				require.Len(t, result.Violations, 1, "mint signed by a non-allow-listed account must be flagged")
+				require.Equal(t, flowTokenMintedEventID, result.Violations[0].EventType)
+				require.Equal(t, int64(10_000_000), result.Violations[0].Amount)
 			},
 		}, {
 			name:             "create account",

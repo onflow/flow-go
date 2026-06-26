@@ -183,46 +183,9 @@ func (tb *TransactionBodyBuilder) createSignature(address Address, keyID uint32,
 func (tb *TransactionBodyBuilder) signerMap() map[Address]int {
 	signers := make(map[Address]int)
 
-	for i, signer := range tb.signerList() {
+	body := TransactionBody(tb.u)
+	for i, signer := range body.Signers() {
 		signers[signer] = i
-	}
-
-	return signers
-}
-
-// signerList returns a list of unique accounts required to sign this transaction.
-//
-// The list is returned in the following order:
-// 1. PROPOSER
-// 2. PAYER
-// 2. AUTHORIZERS (in insertion order)
-//
-// The only exception to the above ordering is for deduplication; if the same account
-// is used in multiple signing roles, only the first occurrence is included in the list.
-func (tb *TransactionBodyBuilder) signerList() []Address {
-	signers := make([]Address, 0)
-	seen := make(map[Address]struct{})
-
-	var addSigner = func(address Address) {
-		_, ok := seen[address]
-		if ok {
-			return
-		}
-
-		signers = append(signers, address)
-		seen[address] = struct{}{}
-	}
-
-	if tb.u.ProposalKey.Address != EmptyAddress {
-		addSigner(tb.u.ProposalKey.Address)
-	}
-
-	if tb.u.Payer != EmptyAddress {
-		addSigner(tb.u.Payer)
-	}
-
-	for _, authorizer := range tb.u.Authorizers {
-		addSigner(authorizer)
 	}
 
 	return signers

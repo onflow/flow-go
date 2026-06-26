@@ -58,6 +58,63 @@ func TestTransaction_SignatureOrdering(t *testing.T) {
 	assert.Equal(t, authorizerAddress, signatureB.Address)
 }
 
+// TestTransactionBody_Signers verifies that Signers returns the unique set of
+// accounts required to sign a transaction in the expected order
+// (proposer, payer, authorizers), deduplicating accounts that appear in
+// multiple roles, omitting empty addresses, and tolerating a nil receiver.
+func TestTransactionBody_Signers(t *testing.T) {
+	proposer := unittest.RandomAddressFixture()
+	payer := unittest.RandomAddressFixture()
+	authorizer1 := unittest.RandomAddressFixture()
+	authorizer2 := unittest.RandomAddressFixture()
+
+	t.Run("ordering: proposer, payer, then authorizers in insertion order", func(t *testing.T) {
+		tb := flow.TransactionBody{
+			ProposalKey: flow.ProposalKey{Address: proposer},
+			Payer:       payer,
+			Authorizers: []flow.Address{authorizer1, authorizer2},
+		}
+
+		assert.Equal(t,
+			[]flow.Address{proposer, payer, authorizer1, authorizer2},
+			tb.Signers(),
+		)
+	})
+
+	t.Run("deduplication: account in multiple roles appears once at first occurrence", func(t *testing.T) {
+		// proposer is also the payer and an authorizer, and authorizer1 is repeated.
+		tb := flow.TransactionBody{
+			ProposalKey: flow.ProposalKey{Address: proposer},
+			Payer:       proposer,
+			Authorizers: []flow.Address{authorizer1, proposer, authorizer1, authorizer2},
+		}
+
+		assert.Equal(t,
+			[]flow.Address{proposer, authorizer1, authorizer2},
+			tb.Signers(),
+		)
+	})
+
+	t.Run("empty addresses are omitted", func(t *testing.T) {
+		// No proposer or payer set (e.g. the system transaction).
+		tb := flow.TransactionBody{
+			Authorizers: []flow.Address{authorizer1},
+		}
+
+		assert.Equal(t, []flow.Address{authorizer1}, tb.Signers())
+	})
+
+	t.Run("no signers returns empty", func(t *testing.T) {
+		tb := flow.TransactionBody{}
+		assert.Empty(t, tb.Signers())
+	})
+
+	t.Run("nil receiver returns nil", func(t *testing.T) {
+		var tb *flow.TransactionBody
+		assert.Nil(t, tb.Signers())
+	})
+}
+
 func TestTransaction_Status(t *testing.T) {
 	statuses := map[flow.TransactionStatus]string{
 		flow.TransactionStatusUnknown:   "UNKNOWN",

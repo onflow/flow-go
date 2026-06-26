@@ -81,6 +81,7 @@ func (td *TokenChanges) Inspect(
 	storage snapshot.StorageSnapshot,
 	executionSnapshot *snapshot.ExecutionSnapshot,
 	events []flow.Event,
+	signers []flow.Address,
 ) (diff Result, err error) {
 	log.Debug().
 		Int("events", len(events)).
@@ -100,7 +101,7 @@ func (td *TokenChanges) Inspect(
 		}
 	}()
 
-	diff, err = td.getTokenDiff(log, storage, executionSnapshot, events, td.getSearchedTokensRef())
+	diff, err = td.getTokenDiff(log, storage, executionSnapshot, events, signers, td.getSearchedTokensRef())
 	return
 }
 
@@ -109,6 +110,7 @@ func (td *TokenChanges) getTokenDiff(
 	storage snapshot.StorageSnapshot,
 	executionSnapshot *snapshot.ExecutionSnapshot,
 	events []flow.Event,
+	signers []flow.Address,
 	searchedTokens map[string]SearchToken,
 ) (TokenDiffResult, error) {
 	executionSnapshotLedgers := executionSnapshotLedgers{
@@ -188,11 +190,12 @@ func (td *TokenChanges) getTokenDiff(
 		tokenDiffResult.Changes[flow.Address(a)] = diff
 	}
 
-	sourcesSinks, err := td.findSourcesSinks(events, searchedTokens)
+	sourcesSinks, violations, err := td.findSourcesSinks(events, searchedTokens, signers)
 	if err != nil {
 		return TokenDiffResult{}, fmt.Errorf("failed to find sources/sinks: %w", err)
 	}
 	tokenDiffResult.KnownSourcesSinks = sourcesSinks
+	tokenDiffResult.Violations = violations
 
 	// Log summary of token movements
 	// Only log as debug because it's going to get properly logged in `TokenDiffResult.AsLogEvent()`
@@ -337,15 +340,28 @@ func walkLoaded(
 	f(value)
 }
 
-func (td *TokenChanges) findSourcesSinks(events []flow.Event, tokens map[string]SearchToken) (map[string]int64, error) {
+// findSourcesSinks matches emitted events against the configured per-token
+// source/sink handlers and returns the net known supply change per token. It
+// also returns any MinterAllowlist violations: matched events whose configured
+// allow-list did not include any of the transaction's signers.
+//
+// No error returns are expected during normal operation; an error indicates the
+// token definitions are misconfigured (the same event ID registered by two
+// tokens) or an event payload failed to decode.
+func (td *TokenChanges) findSourcesSinks(
+	events []flow.Event,
+	tokens map[string]SearchToken,
+	signers []flow.Address,
+) (map[string]int64, []MintAllowlistViolation, error) {
 	// create a map of all sinks and sources
 	// TODO: could be created once
 	type tokenSourceSink struct {
 		tokenID string
-		f       func(flow.Event) (int64, error)
+		ss      SourceSink
 	}
 	sourcesSinks := make(map[string]tokenSourceSink)
 	results := make(map[string]int64)
+	var violations []MintAllowlistViolation
 	for _, token := range tokens {
 		for evt, ss := range token.SinksSources {
 			// Each event ID should be unique across all tokens. If two tokens register
@@ -353,27 +369,51 @@ func (td *TokenChanges) findSourcesSinks(events []flow.Event, tokens map[string]
 			// the first, causing incorrect token accounting. This should not happen with
 			// the current token definitions, but we guard against it defensively.
 			if existing, ok := sourcesSinks[evt]; ok {
-				return nil, fmt.Errorf(
+				return nil, nil, fmt.Errorf(
 					"event %s is registered by both token %s and token %s",
 					evt, existing.tokenID, token.ID,
 				)
 			}
-			sourcesSinks[evt] = tokenSourceSink{tokenID: token.ID, f: ss}
+			sourcesSinks[evt] = tokenSourceSink{tokenID: token.ID, ss: ss}
 		}
 	}
 
 	for _, evt := range events {
 		id := string(evt.Type)
-		if ss, ok := sourcesSinks[id]; ok {
-			v, err := ss.f(evt)
-			if err != nil {
-				return nil, fmt.Errorf("failed to parse source/sink event %s: %w", id, err)
-			}
-			results[ss.tokenID] += v
+		ts, ok := sourcesSinks[id]
+		if !ok {
+			continue
+		}
+		v, err := ts.ss.Amount(evt)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to parse source/sink event %s: %w", id, err)
+		}
+		results[ts.tokenID] += v
+
+		// If an allow-list is configured for this event, the transaction must be
+		// signed by at least one allow-listed account; otherwise record a violation.
+		if ts.ss.MinterAllowlist != nil && !anySignerAllowed(signers, ts.ss.MinterAllowlist) {
+			violations = append(violations, MintAllowlistViolation{
+				TokenID:   ts.tokenID,
+				EventType: id,
+				Amount:    v,
+				Signers:   signers,
+			})
 		}
 	}
 
-	return results, nil
+	return results, violations, nil
+}
+
+// anySignerAllowed reports whether at least one of the signers is present in the
+// allow-list.
+func anySignerAllowed(signers []flow.Address, allowlist map[flow.Address]struct{}) bool {
+	for _, s := range signers {
+		if _, ok := allowlist[s]; ok {
+			return true
+		}
+	}
+	return false
 }
 
 func newReadonlyStorageRuntimeWithStorage(storage *runtime.Storage, payloadCount int) (*readonlyStorageRuntime, error) {
@@ -544,11 +584,42 @@ type readonlyStorageRuntime struct {
 	PayloadCount int
 }
 
+// SourceSink describes how to account for a single event type that changes a
+// token's supply (a source/mint with a positive amount, or a sink/burn with a
+// negative amount), and optionally restricts which accounts may trigger it.
+type SourceSink struct {
+	// Amount decodes the signed token-amount delta from the event. A positive
+	// value is a source (tokens entering/created); a negative value is a sink
+	// (tokens leaving/destroyed).
+	Amount func(flow.Event) (int64, error)
+
+	// MinterAllowlist, when non-nil, restricts which accounts may trigger this
+	// event. The check passes if at least one of the transaction's signers
+	// (any authorizer or the payer) is in the set. A nil map disables the check
+	// (the default, preserving prior behavior).
+	MinterAllowlist map[flow.Address]struct{}
+}
+
 type SearchToken struct {
 	ID         string
 	GetBalance func(value *interpreter.CompositeValue) uint64
 	// TODO: optimize by using decoded events
-	SinksSources map[string]func(flow.Event) (int64, error)
+	SinksSources map[string]SourceSink
+}
+
+// MintAllowlistViolation records a mint/source event that was observed in a
+// transaction whose signers (authorizers and payer) did not include any account
+// from the event's configured MinterAllowlist.
+type MintAllowlistViolation struct {
+	// TokenID is the ID of the token whose supply changed.
+	TokenID string
+	// EventType is the event type ID that triggered the violation.
+	EventType string
+	// Amount is the signed token-amount delta decoded from the event.
+	Amount int64
+	// Signers are the transaction's signers (authorizers and payer) at the time
+	// of the violation.
+	Signers []flow.Address
 }
 
 // TokenDiffResult is the result of the inspection
@@ -560,6 +631,11 @@ type TokenDiffResult struct {
 	// KnownSourcesSinks is a map (by token id) of
 	// know mints/burns for the token parsed from predetermined events
 	KnownSourcesSinks map[string]int64
+
+	// Violations holds mint/source events whose triggering transaction was not
+	// signed by any allow-listed account. Empty when no allow-list is configured
+	// or all mint events were authorized.
+	Violations []MintAllowlistViolation
 }
 
 var _ Result = TokenDiffResult{}
@@ -571,7 +647,7 @@ func (r TokenDiffResult) InspectionName() string {
 func (r TokenDiffResult) AsLogEvent() (zerolog.Level, func(e *zerolog.Event)) {
 	unaccountedTokens := r.UnaccountedTokens()
 
-	if len(unaccountedTokens) == 0 {
+	if len(unaccountedTokens) == 0 && len(r.Violations) == 0 {
 		// everything is ok: log no issues with debug logging
 		return zerolog.InfoLevel, func(e *zerolog.Event) { e.Str(r.InspectionName(), "no issues") }
 	}
@@ -585,19 +661,36 @@ func (r TokenDiffResult) AsLogEvent() (zerolog.Level, func(e *zerolog.Event)) {
 	}
 
 	level := zerolog.WarnLevel
-	if anyPositive {
-		// if any tracked token increase in supply
-		// log at error level
-		// otherwise just use warn level
+	if anyPositive || len(r.Violations) > 0 {
+		// if any tracked token increased in supply, or a mint was triggered by a
+		// non-allow-listed signer, log at error level; otherwise just use warn level
 		level = zerolog.ErrorLevel
 	}
 
 	return level, func(e *zerolog.Event) {
-		dict := zerolog.Dict()
-		for k, v := range unaccountedTokens {
-			dict = dict.Int64(k, v)
+		if len(unaccountedTokens) > 0 {
+			dict := zerolog.Dict()
+			for k, v := range unaccountedTokens {
+				dict = dict.Int64(k, v)
+			}
+			e.Dict(r.InspectionName(), dict)
 		}
-		e.Dict(r.InspectionName(), dict)
+
+		if len(r.Violations) > 0 {
+			arr := zerolog.Arr()
+			for _, v := range r.Violations {
+				signers := make([]string, len(v.Signers))
+				for i, s := range v.Signers {
+					signers[i] = s.Hex()
+				}
+				arr = arr.Dict(zerolog.Dict().
+					Str("token", v.TokenID).
+					Str("event", v.EventType).
+					Int64("amount", v.Amount).
+					Strs("signers", signers))
+			}
+			e.Array(r.InspectionName()+"_mint_allowlist_violations", arr)
+		}
 	}
 }
 
@@ -745,10 +838,19 @@ func DefaultTokenDiffSearchTokens(chain flow.Chain) TokenChangesSearchTokens {
 			GetBalance: func(value *interpreter.CompositeValue) uint64 {
 				return uint64(value.GetField(nil, "balance").(interpreter.UFix64Value).UFix64Value)
 			},
-			SinksSources: map[string]func(flow.Event) (int64, error){},
+			SinksSources: map[string]SourceSink{},
 		},
 	}
-	searchTokens[flowTokenID].SinksSources[flowTokenMintedEventID] = decodeFlowEventAmount(false)
+
+	// FlowToken minting is only expected from transactions signed by the service
+	// account (e.g. the system transaction paying epoch staking rewards). Restrict
+	// the mint event to that account; any other minter is flagged as a violation.
+	searchTokens[flowTokenID].SinksSources[flowTokenMintedEventID] = SourceSink{
+		Amount: decodeFlowEventAmount(flowAmountSource),
+		MinterAllowlist: map[flow.Address]struct{}{
+			chain.ServiceAddress(): {},
+		},
+	}
 
 	// EVM bridge events: FLOW tokens moving between Cadence and EVM.
 	// Deposited = tokens leave Cadence into EVM (sink, negative).
@@ -756,17 +858,30 @@ func DefaultTokenDiffSearchTokens(chain flow.Chain) TokenChangesSearchTokens {
 	evmDepositedEventID := fmt.Sprintf("A.%s.EVM.FLOWTokensDeposited", sc.EVMContract.Address.Hex())
 	evmWithdrawnEventID := fmt.Sprintf("A.%s.EVM.FLOWTokensWithdrawn", sc.EVMContract.Address.Hex())
 
-	searchTokens[flowTokenID].SinksSources[evmDepositedEventID] = decodeFlowEventAmount(true)
-	searchTokens[flowTokenID].SinksSources[evmWithdrawnEventID] = decodeFlowEventAmount(false)
+	searchTokens[flowTokenID].SinksSources[evmDepositedEventID] = SourceSink{Amount: decodeFlowEventAmount(flowAmountSink)}
+	searchTokens[flowTokenID].SinksSources[evmWithdrawnEventID] = SourceSink{Amount: decodeFlowEventAmount(flowAmountSource)}
 
 	return searchTokens
 }
 
+// flowAmountDirection indicates whether an event's amount represents tokens
+// entering Cadence (a source, positive) or leaving Cadence (a sink, negative).
+type flowAmountDirection int
+
+const (
+	// flowAmountSource indicates tokens entering Cadence; the decoded amount is
+	// returned as a positive value.
+	flowAmountSource flowAmountDirection = iota
+	// flowAmountSink indicates tokens leaving Cadence; the decoded amount is
+	// returned as a negated value.
+	flowAmountSink
+)
+
 // decodeFlowEventAmount returns a function that decodes the "amount" field from a
-// CCF-encoded event as a UFix64. If isSink is true, the returned value is negated
-// (tokens leaving Cadence). If isSink is false, the value is positive (tokens
-// entering Cadence).
-func decodeFlowEventAmount(isSink bool) func(flow.Event) (int64, error) {
+// CCF-encoded event as a UFix64. The sign of the returned value is determined by
+// direction: flowAmountSource yields a positive value, flowAmountSink yields a
+// negated value.
+func decodeFlowEventAmount(direction flowAmountDirection) func(flow.Event) (int64, error) {
 	return func(evt flow.Event) (int64, error) {
 		payload, err := ccf.Decode(nil, evt.Payload)
 		if err != nil {
@@ -782,7 +897,7 @@ func decodeFlowEventAmount(isSink bool) func(flow.Event) (int64, error) {
 			return 0, fmt.Errorf("amount field is too large")
 		}
 
-		if isSink {
+		if direction == flowAmountSink {
 			return -int64(ufix), nil
 		}
 		return int64(ufix), nil
