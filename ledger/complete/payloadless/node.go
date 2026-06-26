@@ -39,7 +39,7 @@ type Node struct {
 	rChild    *Node       // Right Child
 	height    int         // height where the Node is at
 	path      ledger.Path // the storage path (dummy value for interim nodes)
-	leafHash  *hash.Hash  // HashLeaf(path, value) - the height-0 base hash (leaf nodes only; nil for unallocated registers)
+	leafHash  *hash.Hash  // HashLeaf(path, value) - the height-0 leaf hash (leaf nodes only; nil for unallocated registers)
 	hashValue hash.Hash   // hash value of node (cached)
 }
 
@@ -80,7 +80,7 @@ func NewLeaf(path ledger.Path, value []byte, height int) *Node {
 		}
 	}
 
-	// Compute the leaf hash (height-0 base hash)
+	// Compute the leaf hash (height-0)
 	leafHash := hash.HashLeaf(hash.Hash(path), value)
 
 	return NewLeafWithHash(path, leafHash, height)
@@ -94,8 +94,8 @@ func NewLeaf(path ledger.Path, value []byte, height int) *Node {
 // UNCHECKED requirement: height must be non-negative
 // UNCHECKED requirement: leafHash must be HashLeaf(path, originalValue)
 func NewLeafWithHash(path ledger.Path, leafHash hash.Hash, height int) *Node {
-	// Compute the node hash by extending the base hash to the target height
-	nodeHash := ledger.ComputeCompactValueFromBaseHash(hash.Hash(path), leafHash, height)
+	// Compute the node hash by extending the leaf hash to the target height
+	nodeHash := ledger.ComputeCompactValueFromLeafHash(hash.Hash(path), leafHash, height)
 
 	return &Node{
 		height:    height,
@@ -172,9 +172,9 @@ func (n *Node) IsDefaultNode() bool {
 func (n *Node) computeHash() hash.Hash {
 	// check for leaf node
 	if n.lChild == nil && n.rChild == nil {
-		// if leafHash is non-nil, extend the height-0 base hash to the node's height
+		// if leafHash is non-nil, extend the height-0 leaf hash to the node's height
 		if n.leafHash != nil {
-			return ledger.ComputeCompactValueFromBaseHash(hash.Hash(n.path), *n.leafHash, n.height)
+			return ledger.ComputeCompactValueFromLeafHash(hash.Hash(n.path), *n.leafHash, n.height)
 		}
 		// if leafHash is nil, return the default hash
 		return ledger.GetDefaultHashForHeight(n.height)

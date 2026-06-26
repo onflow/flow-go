@@ -73,28 +73,19 @@ func ComputeCompactValue(path hash.Hash, value []byte, nodeHeight int) hash.Hash
 		return GetDefaultHashForHeight(nodeHeight)
 	}
 
-	baseHash := hash.HashLeaf(path, value) // compute the hash of the fully-expanded leaf (height 0)
-	return ComputeCompactValueFromBaseHash(path, baseHash, nodeHeight)
+	leafHash := hash.HashLeaf(path, value) // compute the hash of the fully-expanded leaf (height 0)
+	return ComputeCompactValueFromLeafHash(path, leafHash, nodeHeight)
 }
 
-// ComputeCompactValueFromBaseHash computes the node hash from a pre-computed base hash
+// ComputeCompactValueFromLeafHash computes the node hash from a pre-computed leaf hash
 // (the height-0 hash, i.e., HashLeaf(path, value)). This is useful for payloadless tries
-// where the base hash is stored instead of the actual value.
+// where the leaf hash is stored instead of the actual value.
 //
-// The function extends the base hash from height 0 to nodeHeight by hashing upward
+// The function extends the leaf hash from height 0 to nodeHeight by hashing upward
 // through the trie structure, combining with default hashes at each level.
-func ComputeCompactValueFromBaseHash(path hash.Hash, baseHash hash.Hash, nodeHeight int) hash.Hash {
-	return ExtendHashToHeight(path, baseHash, 0, nodeHeight)
-}
-
-// ExtendHashToHeight extends a hash from one height to another by continuing the hash chain
-// along the path. This is used in payloadless mode to extend a leaf's hash when the leaf
-// is moved to a higher position in the trie.
-// UNCHECKED requirement: fromHeight < toHeight
-// UNCHECKED requirement: fromHeight >= 0
-func ExtendHashToHeight(path hash.Hash, baseHash hash.Hash, fromHeight, toHeight int) hash.Hash {
-	out := baseHash
-	for h := fromHeight + 1; h <= toHeight; h++ {
+func ComputeCompactValueFromLeafHash(path hash.Hash, leafHash hash.Hash, nodeHeight int) hash.Hash {
+	out := leafHash
+	for h := 1; h <= nodeHeight; h++ {
 		// h is the height of the node whose hash we are computing
 		bit := bitutils.ReadBit(path[:], NodeMaxHeight-h)
 		if bit == 1 { // right branching
