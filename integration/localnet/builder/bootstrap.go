@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/go-yaml/yaml"
+	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/cmd/build"
 	"github.com/onflow/flow-go/ledger/complete/wal"
@@ -81,6 +82,7 @@ var (
 	consensusDelay              time.Duration
 	collectionDelay             time.Duration
 	logLevel                    string
+	payloadless                 bool
 
 	ports *PortAllocator
 )
@@ -109,6 +111,7 @@ func init() {
 	flag.DurationVar(&collectionDelay, "collection-delay", DefaultCollectionDelay, "delay on collection node block proposals")
 	flag.StringVar(&logLevel, "loglevel", DefaultLogLevel, "log level for all nodes")
 	flag.IntVar(&ledgerExecutionCount, "ledger-execution", 0, "number of execution nodes that use remote ledger service (0 = all use local ledger, max = execution count)")
+	flag.BoolVar(&payloadless, "payloadless", false, "enable payloadless trie mode (stores payload hashes instead of full payloads)")
 }
 
 func generateBootstrapData(flowNetworkConf testnet.NetworkConfig) []testnet.ContainerConfig {
@@ -482,6 +485,21 @@ func prepareExecutionService(container testnet.ContainerConfig, i int, n int) Se
 		)
 	}
 
+	// In payloadless mode, both remote-ledger and local-ledger execution nodes
+	// must run payloadless. The flag selects the payloadless committer, state
+	// checker, and ledger client. A remote-ledger node missing this flag would
+	// build a full ledger.LedgerService client and fail against a payloadless
+	// ledger service with "unknown service ledger.LedgerService".
+	if payloadless {
+		service.Command = append(service.Command, "--payloadless")
+	}
+
+	// Payloadless mode requires storehouse to store the actual payloads
+	// (the trie only stores payload hashes)
+	if payloadless {
+		service.Command = append(service.Command, "--enable-storehouse")
+	}
+
 	service.AddExposedPorts(testnet.GRPCPort)
 
 	return service
@@ -834,20 +852,58 @@ func prepareLedgerService(dockerServices Services, flowNodeContainerConfigs []te
 	// 2. Ledger service has /trie mounted and can follow symlinks to /bootstrap (via execution node's mount)
 	// 3. We create symlinks using relative paths that work in both host and container contexts
 	bootstrapExecutionStateDir := filepath.Join(BootstrapDir, bootstrapFilenames.DirnameExecutionState)
-	checkpointSource := filepath.Join(bootstrapExecutionStateDir, bootstrapFilenames.FilenameWALRootCheckpoint)
-	if _, err := os.Stat(checkpointSource); err == nil {
-		// Checkpoint exists, create symlinks on host
-		// The symlinks will use relative paths that resolve correctly inside containers
-		// because both /bootstrap and /trie are mounted in the containers
+
+	// Create symlinks for V6 checkpoint
+	checkpointSourceV6 := filepath.Join(bootstrapExecutionStateDir, bootstrapFilenames.FilenameWALRootCheckpoint)
+	if _, err := os.Stat(checkpointSourceV6); err == nil {
+		// V6 checkpoint exists, create symlinks on host
 		_, err = wal.SoftlinkCheckpointFile(bootstrapFilenames.FilenameWALRootCheckpoint, bootstrapExecutionStateDir, trieDir)
 		if err != nil {
-			panic(fmt.Errorf("failed to create checkpoint symlinks: %w", err))
+			panic(fmt.Errorf("failed to create V6 checkpoint symlinks: %w", err))
 		}
-		fmt.Printf("created checkpoint symlinks in trie directory: %s\n", trieDir)
+		fmt.Printf("created V6 checkpoint symlinks in trie directory: %s\n", trieDir)
 	} else {
-		// Checkpoint doesn't exist, this is expected for fresh bootstrap
-		// The execution node will create it when it initializes
-		fmt.Printf("root checkpoint not found in %s, ledger service will start with empty state\n", checkpointSource)
+		fmt.Printf("V6 root checkpoint not found in %s\n", checkpointSourceV6)
+	}
+
+	// Create symlinks for V7 checkpoint (payloadless)
+	v7Filename := bootstrapFilenames.FilenameWALRootCheckpoint + wal.V7FileSuffix
+	checkpointSourceV7 := filepath.Join(bootstrapExecutionStateDir, v7Filename)
+
+	// In payloadless mode a spork only produces a V6 root.checkpoint, and the
+	// ledger service has no bootstrapper of its own to convert it. Convert the V6
+	// root checkpoint into a V7 root checkpoint here (once, at bootstrap time);
+	// the symlink block below then seeds the ledger service's trie directory from
+	// it. On restart the ledger factory finds an existing V7 checkpoint (this root
+	// or a newer numbered one written by the compactor), so no conversion is
+	// needed at runtime. The os.Stat guard makes a re-run of `make bootstrap`
+	// idempotent and avoids ConvertCheckpointV6ToV7's "output exists" rejection.
+	if payloadless {
+		if _, err := os.Stat(checkpointSourceV7); errors.Is(err, fs.ErrNotExist) {
+			logger := zerolog.New(os.Stderr).With().Timestamp().Logger()
+			if convertErr := wal.ConvertCheckpointV6ToV7(
+				bootstrapExecutionStateDir,
+				bootstrapFilenames.FilenameWALRootCheckpoint,
+				bootstrapExecutionStateDir,
+				v7Filename,
+				logger,
+				16,
+			); convertErr != nil {
+				panic(fmt.Errorf("failed to convert V6 root checkpoint to V7 for payloadless ledger service: %w", convertErr))
+			}
+			fmt.Printf("converted V6 root checkpoint to V7 in %s\n", bootstrapExecutionStateDir)
+		}
+	}
+
+	if _, err := os.Stat(checkpointSourceV7); err == nil {
+		// V7 checkpoint exists, create symlinks on host
+		_, err = wal.SoftlinkCheckpointFile(v7Filename, bootstrapExecutionStateDir, trieDir)
+		if err != nil {
+			panic(fmt.Errorf("failed to create V7 checkpoint symlinks: %w", err))
+		}
+		fmt.Printf("created V7 checkpoint symlinks in trie directory: %s\n", trieDir)
+	} else {
+		fmt.Printf("V7 root checkpoint not found in %s\n", checkpointSourceV7)
 	}
 
 	// Allocate ports for ledger service
@@ -865,17 +921,22 @@ func prepareLedgerService(dockerServices Services, flowNodeContainerConfigs []te
 
 	// Create ledger service
 	// Use Unix domain socket; ledger and execution nodes share absSocketDir mounted at /sockets
+	ledgerCommand := []string{
+		"--triedir=/trie",
+		"--ledger-service-socket=/sockets/ledger.sock",
+		"--mtrie-cache-size=100",
+		"--checkpoint-distance=100",
+		"--checkpoints-to-keep=3",
+		fmt.Sprintf("--loglevel=%s", logLevel),
+	}
+	if payloadless {
+		ledgerCommand = append(ledgerCommand, "--payloadless")
+	}
+
 	service := Service{
-		name:  ledgerServiceName,
-		Image: "localnet-ledger",
-		Command: []string{
-			"--triedir=/trie",
-			"--ledger-service-socket=/sockets/ledger.sock",
-			"--mtrie-cache-size=100",
-			"--checkpoint-distance=100",
-			"--checkpoints-to-keep=3",
-			fmt.Sprintf("--loglevel=%s", logLevel),
-		},
+		name:    ledgerServiceName,
+		Image:   "localnet-ledger",
+		Command: ledgerCommand,
 		Volumes: []string{
 			fmt.Sprintf("%s:/trie:z", trieDir),
 			fmt.Sprintf("%s:/bootstrap:z", BootstrapDir),

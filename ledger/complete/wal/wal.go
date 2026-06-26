@@ -12,6 +12,7 @@ import (
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/complete/mtrie"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
+	"github.com/onflow/flow-go/ledger/complete/payloadless"
 	"github.com/onflow/flow-go/module"
 	utilsio "github.com/onflow/flow-go/utils/io"
 )
@@ -129,6 +130,110 @@ func (w *DiskWAL) ReplayOnForest(forest *mtrie.Forest) error {
 	)
 }
 
+// ReplayOnPayloadlessForest reconstructs in-memory payloadless state by loading
+// the latest V7 (payloadless) checkpoint from the WAL directory onto `forest`,
+// then replaying every WAL segment newer than that checkpoint.
+//
+// This is the payloadless analog of [DiskWAL.ReplayOnForest]: it hides
+// checkpoint selection, checkpoint loading, and segment replay behind a single
+// call so the ledger constructor stays uniform across V6 and V7. Like the V6
+// path, it tries the newest V7 checkpoint first and falls back to older ones if
+// a checkpoint file fails to load. When no V7 checkpoint exists, it replays all
+// segments onto the (presumably empty) `forest`.
+//
+// When no numbered V7 checkpoint is available it falls back to a V7 root
+// checkpoint (converted from the V6 root.checkpoint during bootstrap), mirroring
+// the V6 root-checkpoint fallback in [DiskWAL.replay].
+//
+// A V7 checkpoint of one kind or the other is required: a payloadless forest
+// retains only leaf-hash commitments, which cannot be reconstructed by WAL
+// replay alone (the WAL records full payload updates, but replaying every update
+// from genesis to rebuild the commitment is not feasible at runtime). When
+// neither a numbered V7 checkpoint nor a V7 root checkpoint is present, this
+// refuses to seed rather than silently booting an empty, uncommitted forest.
+//
+// Expected error returns during normal operation:
+//   - error containing "no V7 checkpoint found": when the WAL directory contains
+//     no V7 checkpoint of either kind, so the forest cannot be seeded.
+func (w *DiskWAL) ReplayOnPayloadlessForest(forest *payloadless.Forest) error {
+	checkpointer, err := w.NewCheckpointer()
+	if err != nil {
+		return fmt.Errorf("cannot create checkpointer: %w", err)
+	}
+
+	tries, loadedCheckpoint, err := checkpointer.LoadLatestCheckpointV7()
+	if err != nil {
+		return fmt.Errorf("cannot load latest V7 checkpoint: %w", err)
+	}
+
+	// LoadLatestCheckpointV7 returns no tries and loadedCheckpoint == -1 only when
+	// neither a numbered V7 checkpoint nor a V7 root checkpoint was found. In that
+	// case there is no seed for the leaf-hash commitment, so refuse to start.
+	if loadedCheckpoint < 0 && len(tries) == 0 {
+		return fmt.Errorf(
+			"no V7 checkpoint found in %s; a V7 checkpoint is required to start a payloadless ledger",
+			w.wal.Dir(),
+		)
+	}
+
+	if err := forest.AddTries(tries); err != nil {
+		return fmt.Errorf("failed to seed payloadless forest from V7 checkpoint: %w", err)
+	}
+
+	return w.replaySegmentsForPayloadlessForest(forest, loadedCheckpoint)
+}
+
+// replaySegmentsForPayloadlessForest replays WAL segments onto a payloadless
+// forest, skipping any segments that are already covered by the checkpoint that
+// [DiskWAL.ReplayOnPayloadlessForest] already loaded into `forest`. It is the
+// segment-replay half of that method.
+//
+// `afterCheckpointNum` is the number of the loaded checkpoint; segments through
+// that number are skipped. Pass -1 (or any value < firstSegment) to replay all
+// segments — used when no checkpoint, or only a V7 root checkpoint, was loaded.
+//
+// Unlike [DiskWAL.ReplayOnForest] this does NOT call the V6 checkpoint callback —
+// V6 checkpoints are not directly loadable into a payloadless forest. Delete
+// records are ignored (the WAL has no segment-level concept of trie deletion
+// that needs to be reflected in the payloadless forest).
+//
+// No error returns are expected during normal operation.
+func (w *DiskWAL) replaySegmentsForPayloadlessForest(
+	forest *payloadless.Forest,
+	afterCheckpointNum int,
+) error {
+	firstSeg, lastSeg, err := w.Segments()
+	if err != nil {
+		return fmt.Errorf("could not find segments: %w", err)
+	}
+	from := firstSeg
+	if afterCheckpointNum >= from {
+		from = afterCheckpointNum + 1
+	}
+	if from > lastSeg {
+		// V7 checkpoint already covers everything on disk.
+		return nil
+	}
+	// Replay only the WAL segment records onto the forest. Unlike
+	// [DiskWAL.replay], this deliberately does NOT fall back to loading the V6
+	// root checkpoint when `from` is 0: the payloadless forest is already seeded
+	// from the V7 checkpoint by the caller ([DiskWAL.ReplayOnPayloadlessForest]),
+	// and the V6 root checkpoint is not loadable into a payloadless forest.
+	// Routing through replay would read (and immediately discard) the entire V6
+	// root checkpoint, a wasteful full-forest load at boot.
+	err = w.replaySegments(from, lastSeg,
+		func(update *ledger.TrieUpdate) error {
+			_, err := forest.Update(update)
+			return err
+		},
+		func(rootHash ledger.RootHash) error { return nil },
+	)
+	if err != nil {
+		return fmt.Errorf("could not replay WAL segments [%v:%v] for payloadless forest: %w", from, lastSeg, err)
+	}
+	return nil
+}
+
 func (w *DiskWAL) Segments() (first, last int, err error) {
 	return prometheusWAL.Segments(w.wal.Dir())
 }
@@ -189,7 +294,13 @@ func (w *DiskWAL) replay(
 	}
 
 	if useCheckpoints {
-		allCheckpoints, err := checkpointer.Checkpoints()
+		// Only consider V6 checkpoints here: this replay path loads checkpoints via
+		// LoadCheckpointV6 (full mtrie). V7 (payloadless) files may live in the same
+		// directory but are not loadable here, so including them would only cause
+		// failed load attempts and misleading warnings before falling back to a V6
+		// checkpoint. This mirrors the V6-only enumeration used by the checkpoint
+		// scheduling logic (see Checkpointer.listV6Checkpoints).
+		allCheckpoints, err := checkpointer.CheckpointsV6()
 		if err != nil {
 			return fmt.Errorf("cannot get list of checkpoints: %w", err)
 		}
@@ -286,9 +397,31 @@ func (w *DiskWAL) replay(
 		Int("loaded_checkpoint", loadedCheckpoint).
 		Msgf("replaying segments from %d to %d", startSegment, to)
 
+	err = w.replaySegments(startSegment, to, updateFn, deleteFn)
+	if err != nil {
+		return err
+	}
+
+	w.log.Info().Msgf("finished loading checkpoint and replaying WAL from %d to %d", from, to)
+
+	return nil
+}
+
+// replaySegments reads the WAL segment records in the range [from, to] and
+// applies each record to the provided handlers, dispatching WALUpdate records
+// to `updateFn` and WALDelete records to `deleteFn`. It performs NO checkpoint
+// loading: the caller is responsible for seeding any starting state before
+// calling this.
+//
+// No error returns are expected during normal operation.
+func (w *DiskWAL) replaySegments(
+	from, to int,
+	updateFn func(update *ledger.TrieUpdate) error,
+	deleteFn func(rootHash ledger.RootHash) error,
+) error {
 	sr, err := prometheusWAL.NewSegmentsRangeReader(w.log, prometheusWAL.SegmentRange{
 		Dir:   w.wal.Dir(),
-		First: startSegment,
+		First: from,
 		Last:  to,
 	})
 	if err != nil {
@@ -324,8 +457,6 @@ func (w *DiskWAL) replay(
 			return fmt.Errorf("cannot read LedgerWAL: %w", err)
 		}
 	}
-
-	w.log.Info().Msgf("finished loading checkpoint and replaying WAL from %d to %d", from, to)
 
 	return nil
 }
@@ -395,6 +526,7 @@ type LedgerWAL interface {
 	RecordUpdate(update *ledger.TrieUpdate) (int, bool, error)
 	RecordDelete(rootHash ledger.RootHash) error
 	ReplayOnForest(forest *mtrie.Forest) error
+	ReplayOnPayloadlessForest(forest *payloadless.Forest) error
 	Segments() (first, last int, err error)
 	Replay(
 		checkpointFn func(tries []*trie.MTrie) error,
