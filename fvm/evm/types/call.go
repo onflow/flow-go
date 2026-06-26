@@ -9,6 +9,7 @@ import (
 	gethTypes "github.com/ethereum/go-ethereum/core/types"
 	gethParams "github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/rlp"
+	"github.com/holiman/uint256"
 )
 
 const (
@@ -35,6 +36,10 @@ const (
 	// to smart contract addresses.
 	DepositCallGasLimit  = DefaultGasLimitForTokenTransfer
 	WithdrawCallGasLimit = DefaultGasLimitForTokenTransfer
+
+	// With EIP-8037, each state-creation transaction (such as funding a fresh EOA),
+	// needs an extra gas limit, as calculated below.
+	StateCreationGasLimit = gethParams.AccountCreationSize * gethParams.CostPerStateByte
 )
 
 // DirectCall captures all the data related to a direct call to evm
@@ -94,13 +99,13 @@ func (dc *DirectCall) Message() *gethCore.Message {
 	return &gethCore.Message{
 		From:                  dc.From.ToCommon(),
 		To:                    dc.to(),
-		Value:                 dc.Value,
+		Value:                 uint256.MustFromBig(dc.Value),
 		Data:                  dc.Data,
 		Nonce:                 dc.Nonce,
 		GasLimit:              dc.GasLimit,
-		GasPrice:              big.NewInt(0),            // price is set to zero fo direct calls
-		GasTipCap:             big.NewInt(0),            // also known as maxPriorityFeePerGas (in GWei)
-		GasFeeCap:             big.NewInt(0),            // also known as maxFeePerGas (in GWei)
+		GasPrice:              uint256.NewInt(0),        // price is set to zero fo direct calls
+		GasTipCap:             uint256.NewInt(0),        // also known as maxPriorityFeePerGas (in GWei)
+		GasFeeCap:             uint256.NewInt(0),        // also known as maxFeePerGas (in GWei)
 		SetCodeAuthorizations: dc.setCodeAuthorizations, // introduced in EIP-7702 tx type
 		// TODO: maybe revisit setting the access list
 		// AccessList:        tx.AccessList(),
@@ -167,15 +172,11 @@ func (dc *DirectCall) ValidEIP7825GasLimit(rules gethParams.Rules) bool {
 		return true
 	}
 
-	// If the `Osaka` hard-fork is not activated, then there's no need to
-	// check for EIP-7825 gas limit validity.
-	if !rules.IsOsaka {
-		return true
-	}
-
-	// After the `Osaka` hard-fork, direct calls have the same gas limit
+	// Under the `Osaka` hard-fork, direct calls have the same gas limit
 	// cap as native EVM transactions.
-	if dc.GasLimit > gethParams.MaxTxGas {
+	// Under the `Amsterdam`` hard-fork, the gas limit cap was removed
+	// in favor of EIP-8037.
+	if dc.GasLimit > gethParams.MaxTxGas && rules.IsOsaka && !rules.IsAmsterdam {
 		return false
 	}
 
@@ -204,7 +205,7 @@ func NewDepositCall(
 		To:       address,
 		Data:     nil,
 		Value:    amount,
-		GasLimit: DepositCallGasLimit,
+		GasLimit: DepositCallGasLimit + StateCreationGasLimit,
 		Nonce:    nonce,
 	}
 }
@@ -241,7 +242,7 @@ func NewTransferCall(
 		To:       to,
 		Data:     nil,
 		Value:    amount,
-		GasLimit: DefaultGasLimitForTokenTransfer,
+		GasLimit: DefaultGasLimitForTokenTransfer + StateCreationGasLimit,
 		Nonce:    nonce,
 	}
 }

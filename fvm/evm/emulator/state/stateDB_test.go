@@ -255,6 +255,7 @@ func TestStateDB(t *testing.T) {
 		require.True(t, db.AddressInAccessList(sender))
 		require.True(t, db.AddressInAccessList(coinbase))
 		require.True(t, db.AddressInAccessList(dest))
+		require.Nil(t, db.Finalise(true)) // no BAL unless Amsterdam is activated
 
 		for _, add := range precompiles {
 			require.True(t, db.AddressInAccessList(add))
@@ -267,6 +268,19 @@ func TestStateDB(t *testing.T) {
 				require.True(t, slotFound)
 			}
 		}
+
+		rules = gethParams.Rules{
+			IsBerlin:    true,
+			IsShanghai:  true,
+			IsPrague:    true,
+			IsOsaka:     true,
+			IsAmsterdam: true,
+		}
+
+		require.NoError(t, err)
+		db.Prepare(rules, sender, coinbase, &dest, precompiles, txAccesses)
+
+		require.NotNil(t, db.Finalise(true)) // BAL should be present when Amsterdam is activated
 	})
 
 	t.Run("test non-fatal error handling", func(t *testing.T) {
@@ -370,7 +384,7 @@ func TestStateDB(t *testing.T) {
 		require.NotEqual(t, gethTypes.EmptyRootHash, root)
 	})
 
-	t.Run("test Selfdestruct6780 functionality", func(t *testing.T) {
+	t.Run("test SelfDestruct functionality", func(t *testing.T) {
 		ledger := testutils.GetSimpleValueStore()
 		db, err := state.NewStateDB(ledger, rootAddr)
 		require.NoError(t, err)
@@ -391,12 +405,13 @@ func TestStateDB(t *testing.T) {
 		db, err = state.NewStateDB(ledger, rootAddr)
 		require.NoError(t, err)
 		// call self destruct
-		db.SelfDestruct6780(addr1)
+		db.SelfDestruct(addr1)
 		require.NoError(t, db.Error())
 		// noop is expected
 		require.Equal(t, balance1, db.GetBalance(addr1))
 		require.Equal(t, code1, db.GetCode(addr1))
 		require.NoError(t, db.Error())
+		require.Len(t, db.LogsForBurnAccounts(), 0)
 
 		// test 2 - account exist before with some balance
 		// but not a contract - selfdestruct should work
@@ -412,7 +427,7 @@ func TestStateDB(t *testing.T) {
 		db, err = state.NewStateDB(ledger, rootAddr)
 		require.NoError(t, err)
 		// call self destruct should not work
-		db.SelfDestruct6780(addr2)
+		db.SelfDestruct(addr2)
 		require.NoError(t, db.Error())
 		// still no impact
 		require.Equal(t, balance2, db.GetBalance(addr2))
@@ -429,8 +444,14 @@ func TestStateDB(t *testing.T) {
 		db.CreateContract(addr2)
 		require.Equal(t, code1, db.GetCode(addr2))
 		// now calling selfdestruct should do the job
-		db.SelfDestruct6780(addr2)
+		db.SelfDestruct(addr2)
 		require.NoError(t, db.Error())
+		burnLogs := db.LogsForBurnAccounts()
+		require.Len(t, burnLogs, 1)
+		ethBurnLog := burnLogs[0]
+		require.Equal(t, gethParams.EthBurnLogEvent, ethBurnLog.Topics[0])
+		require.Equal(t, gethCommon.BytesToHash(addr2.Bytes()), ethBurnLog.Topics[1])
+
 		commit, err = db.Commit(true)
 		require.NoError(t, err)
 		require.NotEmpty(t, commit)
@@ -456,8 +477,14 @@ func TestStateDB(t *testing.T) {
 		db.AddBalance(addr3, balance3, gethTracing.BalanceChangeTransfer)
 		require.NoError(t, db.Error())
 		// call self destruct
-		db.SelfDestruct6780(addr3)
+		db.SelfDestruct(addr3)
 		require.NoError(t, db.Error())
+		burnLogs = db.LogsForBurnAccounts()
+		require.Len(t, burnLogs, 1)
+		ethBurnLog = burnLogs[0]
+		require.Equal(t, gethParams.EthBurnLogEvent, ethBurnLog.Topics[0])
+		require.Equal(t, gethCommon.BytesToHash(addr3.Bytes()), ethBurnLog.Topics[1])
+
 		// commit changes
 		commit, err = db.Commit(true)
 		require.NoError(t, err)
@@ -471,5 +498,184 @@ func TestStateDB(t *testing.T) {
 		require.Empty(t, db.GetCode(addr3))
 		require.Equal(t, gethCommon.Hash{}, db.GetState(addr3, key))
 		require.NoError(t, db.Error())
+	})
+
+	t.Run("test Finalise functionality", func(t *testing.T) {
+		ledger := testutils.GetSimpleValueStore()
+		db, err := state.NewStateDB(ledger, rootAddr)
+		require.NoError(t, err)
+
+		sender := testutils.RandomCommonAddress(t)
+		coinbase := testutils.RandomCommonAddress(t)
+		dest := testutils.RandomCommonAddress(t)
+		precompiles := []gethCommon.Address{
+			testutils.RandomCommonAddress(t),
+			testutils.RandomCommonAddress(t),
+		}
+		txAccesses := gethTypes.AccessList([]gethTypes.AccessTuple{
+			{Address: testutils.RandomCommonAddress(t),
+				StorageKeys: []gethCommon.Hash{
+					testutils.RandomCommonHash(t),
+					testutils.RandomCommonHash(t),
+				},
+			},
+		})
+		rules := gethParams.Rules{
+			IsBerlin:    true,
+			IsShanghai:  true,
+			IsAmsterdam: true,
+		}
+
+		db.Prepare(rules, sender, coinbase, &dest, precompiles, txAccesses)
+		require.NoError(t, err)
+
+		// Block access list should be empty initially
+		bal := db.Finalise(true)
+		require.Len(t, bal.Accounts, 0)
+
+		// Block access list with balance change on EOA
+		addr1 := testutils.RandomCommonAddress(t)
+		balance := uint256.NewInt(5)
+		db.AddBalance(addr1, balance, gethTracing.BalanceChangeUnspecified)
+		require.NoError(t, db.Error())
+
+		bal = db.Finalise(true)
+		require.Len(t, bal.Accounts, 1)
+		require.Equal(t, balance, bal.Accounts[addr1].BalanceChanges[0])
+
+		// Block access list with nonce change on EOA
+		addr2 := testutils.RandomCommonAddress(t)
+		nonce := uint64(3)
+		db.SetNonce(addr2, nonce, gethTracing.NonceChangeContractCreator)
+		require.NoError(t, db.Error())
+
+		bal = db.Finalise(true)
+		require.Len(t, bal.Accounts, 2)
+		require.Equal(t, nonce, bal.Accounts[addr2].NonceChanges[0])
+
+		// Block access list with code change on contract creation
+		addr3 := testutils.RandomCommonAddress(t)
+		code := []byte{1, 2, 3}
+		db.SetCode(addr3, code, gethTracing.CodeChangeContractCreation)
+		require.NoError(t, db.Error())
+
+		bal = db.Finalise(true)
+		require.Len(t, bal.Accounts, 3)
+		require.Equal(t, code, bal.Accounts[addr3].CodeChange[0])
+
+		// Block access list with balance change to 0 on smart contract SelfDestruct
+		addr4 := testutils.RandomCommonAddress(t)
+		balance = uint256.NewInt(200)
+		db.CreateAccount(addr4)
+		db.AddBalance(addr4, balance, gethTracing.BalanceChangeTransfer)
+		require.NoError(t, db.Error())
+
+		// commit and renew db
+		commit, err := db.Commit(true)
+		require.NoError(t, err)
+		require.NotEmpty(t, commit)
+		db, err = state.NewStateDB(ledger, rootAddr)
+		require.NoError(t, err)
+		db.Prepare(rules, sender, coinbase, &dest, precompiles, txAccesses)
+		require.NoError(t, err)
+
+		// set code and call contract creation
+		db.SetCode(addr4, code, gethTracing.CodeChangeContractCreation)
+		db.CreateContract(addr4)
+		require.Equal(t, code, db.GetCode(addr4))
+		// now calling selfdestruct should do the job
+		db.SelfDestruct(addr4)
+		require.NoError(t, db.Error())
+
+		bal = db.Finalise(true)
+		require.Len(t, bal.Accounts, 1)
+		require.Equal(t, uint256.NewInt(0), bal.Accounts[addr4].BalanceChanges[0])
+
+		// Block access list with account read
+		addr5 := testutils.RandomCommonAddress(t)
+		db.GetBalance(addr5)
+
+		bal = db.Finalise(true)
+		require.Len(t, bal.Accounts, 2)
+		require.NotNil(t, bal.Accounts[addr5])
+
+		// Block access list with unseen EOA in block transactions
+		addr6 := testutils.RandomCommonAddress(t)
+		require.Nil(t, bal.Accounts[addr6])
+
+		// Block access list with storage read from GetCommittedState()
+		db, err = state.NewStateDB(ledger, rootAddr)
+		require.NoError(t, err)
+		db.Prepare(rules, sender, coinbase, &dest, precompiles, txAccesses)
+		require.NoError(t, err)
+
+		addr7 := testutils.RandomCommonAddress(t)
+		key1 := testutils.RandomCommonHash(t)
+
+		db.CreateAccount(addr7)
+		require.NoError(t, db.Error())
+
+		db.GetCommittedState(addr7, key1)
+		require.NoError(t, db.Error())
+
+		bal = db.Finalise(true)
+		require.Len(t, bal.Accounts, 1)
+		require.Contains(t, bal.Accounts[addr7].StorageReads, key1)
+
+		// Block access list with storage read on GetState() dirty slot
+		db, err = state.NewStateDB(ledger, rootAddr)
+		require.NoError(t, err)
+		db.Prepare(rules, sender, coinbase, &dest, precompiles, txAccesses)
+		require.NoError(t, err)
+
+		addr8 := testutils.RandomCommonAddress(t)
+		value1 := testutils.RandomCommonHash(t)
+
+		// should have code to be able to set state
+		db.SetCode(addr8, []byte{1, 2, 3}, gethTracing.CodeChangeContractCreation)
+		require.NoError(t, db.Error())
+
+		db.SetState(addr8, key1, value1)
+		require.NoError(t, db.Error())
+
+		db.GetState(addr8, key1)
+		require.NoError(t, db.Error())
+
+		bal = db.Finalise(true)
+		require.Len(t, bal.Accounts, 1)
+		require.NotContains(t, bal.Accounts[addr8].StorageReads, key1)
+		require.Equal(t, value1, bal.Accounts[addr8].StorageWrites[key1][0])
+
+		// Block access list with storage read on GetState() existing slot
+		db, err = state.NewStateDB(ledger, rootAddr)
+		require.NoError(t, err)
+		db.Prepare(rules, sender, coinbase, &dest, precompiles, txAccesses)
+		require.NoError(t, err)
+
+		addr9 := testutils.RandomCommonAddress(t)
+
+		// should have code to be able to set state
+		db.SetCode(addr9, []byte{1, 2, 3}, gethTracing.CodeChangeContractCreation)
+		require.NoError(t, db.Error())
+
+		db.SetState(addr9, key1, value1)
+		require.NoError(t, db.Error())
+
+		commit, err = db.Commit(true)
+		require.NoError(t, err)
+		require.NotEmpty(t, commit)
+
+		db, err = state.NewStateDB(ledger, rootAddr)
+		require.NoError(t, err)
+		db.Prepare(rules, sender, coinbase, &dest, precompiles, txAccesses)
+		require.NoError(t, err)
+
+		ret := db.GetState(addr9, key1)
+		require.NoError(t, db.Error())
+		require.Equal(t, value1, ret)
+
+		bal = db.Finalise(true)
+		require.Len(t, bal.Accounts, 1)
+		require.Contains(t, bal.Accounts[addr9].StorageReads, key1)
 	})
 }

@@ -42,7 +42,7 @@ func TestChainReplay(t *testing.T) {
 								testContract.DeployedAt.ToCommon(),
 								testContract.MakeCallData(t, "checkThenStore", big.NewInt(int64(i)), big.NewInt(int64(i+1))),
 								big.NewInt(0),
-								uint64(100_000),
+								uint64(125_000),
 								big.NewInt(1),
 							)
 							rs := handler.Run(tx, gasFeeCollector)
@@ -58,7 +58,7 @@ func TestChainReplay(t *testing.T) {
 								testContract.DeployedAt.ToCommon(),
 								testContract.MakeCallData(t, "store", big.NewInt(int64(i))),
 								big.NewInt(0),
-								uint64(100_000),
+								uint64(125_000),
 								big.NewInt(1),
 							)
 						}

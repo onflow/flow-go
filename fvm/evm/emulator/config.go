@@ -8,6 +8,7 @@ import (
 	gethVM "github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/eth/tracers"
 	gethParams "github.com/ethereum/go-ethereum/params"
+	"github.com/holiman/uint256"
 
 	"github.com/onflow/flow-go/fvm/evm/types"
 )
@@ -25,6 +26,10 @@ var (
 	PreviewnetOsakaActivation = uint64(0)          // already on Osaka for PreviewNet
 	TestnetOsakaActivation    = uint64(1763575200) // Wednesday, November 19, 2025 18:00:00 GMT+0000
 	MainnetOsakaActivation    = uint64(1764784800) // Wednesday, December 03, 2025 18:00:00 GMT+0000
+
+	PreviewnetAmsterdamActivation = uint64(0)          // already on Amsterdam for PreviewNet
+	TestnetAmsterdamActivation    = uint64(1798740000) // Thursday, December 31, 2026 at 18:00:00 GMT+0000
+	MainnetAmsterdamActivation    = uint64(1798740000) // Thursday, December 31, 2026 at 18:00:00 GMT+0000
 )
 
 // Config aggregates all the configuration (chain, evm, block, tx, ...)
@@ -102,22 +107,26 @@ func MakeChainConfig(chainID *big.Int) *gethParams.ChainConfig {
 		MuirGlacierBlock:    bigZero, // already on MuirGlacier
 
 		// Fork scheduling based on timestamps
-		ShanghaiTime: &zero, // already on Shanghai
-		CancunTime:   &zero, // already on Cancun
-		PragueTime:   nil,   // this is conditionally set below
-		OsakaTime:    nil,   // this is conditionally set below
-		VerkleTime:   nil,   // not on Verkle
+		ShanghaiTime:  &zero, // already on Shanghai
+		CancunTime:    &zero, // already on Cancun
+		PragueTime:    nil,   // this is conditionally set below
+		OsakaTime:     nil,   // this is conditionally set below
+		AmsterdamTime: nil,   // this is conditionally set below
+		UBTTime:       nil,   // not on Verkle (a.k.a UBT)
 	}
 
 	if chainID.Cmp(types.FlowEVMPreviewNetChainID) == 0 {
 		chainConfig.PragueTime = &PreviewnetPragueActivation
 		chainConfig.OsakaTime = &PreviewnetOsakaActivation
+		chainConfig.AmsterdamTime = &PreviewnetAmsterdamActivation
 	} else if chainID.Cmp(types.FlowEVMTestNetChainID) == 0 {
 		chainConfig.PragueTime = &TestnetPragueActivation
 		chainConfig.OsakaTime = &TestnetOsakaActivation
+		chainConfig.AmsterdamTime = &TestnetAmsterdamActivation
 	} else if chainID.Cmp(types.FlowEVMMainNetChainID) == 0 {
 		chainConfig.PragueTime = &MainnetPragueActivation
 		chainConfig.OsakaTime = &MainnetOsakaActivation
+		chainConfig.AmsterdamTime = &MainnetAmsterdamActivation
 	}
 
 	return chainConfig
@@ -135,8 +144,7 @@ func defaultConfig() *Config {
 			NoBaseFee: true,
 		},
 		TxContext: &gethVM.TxContext{
-			GasPrice:   new(big.Int),
-			BlobFeeCap: new(big.Int),
+			GasPrice: new(uint256.Int),
 		},
 		BlockContext: &gethVM.BlockContext{
 			CanTransfer: gethCore.CanTransfer,
@@ -146,6 +154,7 @@ func defaultConfig() *Config {
 			GetHash: func(n uint64) gethCommon.Hash {
 				return gethCommon.Hash{}
 			},
+			CostPerStateByte: gethParams.CostPerStateByte,
 		},
 		PCTracker: NewCallTracker(),
 	}
@@ -188,7 +197,7 @@ func WithOrigin(origin gethCommon.Address) Option {
 // WithGasPrice sets the gas price for the transaction (usually the one sets by the sender)
 func WithGasPrice(gasPrice *big.Int) Option {
 	return func(c *Config) *Config {
-		c.TxContext.GasPrice = gasPrice
+		c.TxContext.GasPrice = uint256.MustFromBig(gasPrice)
 		return c
 	}
 }
@@ -260,6 +269,14 @@ func WithExtraPrecompiledContracts(precompiledContracts []types.PrecompiledContr
 func WithRandom(rand *gethCommon.Hash) Option {
 	return func(c *Config) *Config {
 		c.BlockContext.Random = rand
+		return c
+	}
+}
+
+// WithSlotNum sets the slot number in the block context
+func WithSlotNum(slotNum uint64) Option {
+	return func(c *Config) *Config {
+		c.BlockContext.SlotNum = slotNum
 		return c
 	}
 }
