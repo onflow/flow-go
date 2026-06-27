@@ -432,12 +432,16 @@ func buildPartitionPayloadPool(
 ) (map[hash.Hash]*ledger.Payload, error) {
 	pool := make(map[hash.Hash]*ledger.Payload)
 
+	// The payloads passed to the source callbacks are only valid for the duration
+	// of the call (they alias a reused read buffer), so the pool deep-copies on
+	// store. Copying here — after the partition and empty filters — also avoids
+	// copying the ~15/16 of WAL payloads that this partition discards.
 	add := func(path ledger.Path, payload *ledger.Payload) {
 		if payload.IsEmpty() {
 			return
 		}
 		leafHash := hash.HashLeaf(hash.Hash(path), payload.Value())
-		pool[leafHash] = payload
+		pool[leafHash] = payload.DeepCopy()
 	}
 
 	partitionFilteredAdd := func(path ledger.Path, payload *ledger.Payload) {
@@ -511,6 +515,8 @@ func buildTopTriePayloadPool(
 	logger.Info().Int("needed", len(needed)).
 		Msg("V7 top-trie contains leaf nodes; scanning all sources for their payloads")
 
+	// Deep-copy on store: source payloads alias a reused read buffer and are only
+	// valid during the callback.
 	add := func(path ledger.Path, payload *ledger.Payload) {
 		if payload.IsEmpty() {
 			return
@@ -519,7 +525,7 @@ func buildTopTriePayloadPool(
 		if _, ok := needed[leafHash]; !ok {
 			return
 		}
-		pool[leafHash] = payload
+		pool[leafHash] = payload.DeepCopy()
 	}
 
 	// Scan every previous-checkpoint subtrie part file.
@@ -724,6 +730,9 @@ func streamV6TopTrieLeaves(
 // streamV6LeafNodes reads nodeCount V6-encoded nodes from reader and invokes cb
 // for each leaf node with its path and decoded payload. Interim nodes are skipped.
 //
+// The payload passed to cb is decoded zero-copy over a reused scratch buffer and
+// is only valid for the duration of the call; a cb that retains it MUST deep-copy.
+//
 // No error returns are expected during normal operation.
 func streamV6LeafNodes(
 	reader io.Reader,
@@ -764,8 +773,9 @@ func streamV6LeafNodes(
 			if _, err := io.ReadFull(reader, buf); err != nil {
 				return fmt.Errorf("cannot read leaf payload: %w", err)
 			}
-			// zeroCopy=false returns a copy, so reusing payloadBuf next iteration is safe.
-			payload, err := ledger.DecodePayloadWithoutPrefix(buf, false, payloadEncodingVersion)
+			// zeroCopy: the payload aliases payloadBuf and is only valid for this
+			// cb call; cb deep-copies if it retains the payload (see doc).
+			payload, err := ledger.DecodePayloadWithoutPrefix(buf, true, payloadEncodingVersion)
 			if err != nil {
 				return fmt.Errorf("failed to decode leaf payload: %w", err)
 			}
@@ -781,10 +791,10 @@ func streamV6LeafNodes(
 // and invokes cb for every (path, payload) pair in each update record. Delete
 // records are ignored.
 //
-// Each payload passed to cb is a deep copy. This is required because
+// The payload passed to cb is only valid for the duration of the call:
 // [ledger.DecodeTrieUpdate] decodes payloads zero-copy over the WAL record
-// buffer, which the underlying reader reuses on the next record; callers that
-// retain the payload (as the pool builders do) would otherwise observe corruption.
+// buffer, which the underlying reader reuses on the next record. A cb that
+// retains the payload MUST deep-copy it.
 //
 // No error returns are expected during normal operation.
 func scanWALUpdates(
@@ -814,10 +824,7 @@ func scanWALUpdates(
 			continue
 		}
 		for i, path := range update.Paths {
-			// Deep copy: payloads are decoded zero-copy over the reusable WAL
-			// record buffer, so a retained reference would be corrupted by the
-			// next read.
-			cb(path, update.Payloads[i].DeepCopy())
+			cb(path, update.Payloads[i])
 		}
 	}
 	if err := reader.Err(); err != nil {
