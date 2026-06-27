@@ -164,6 +164,40 @@ func overwriteValues(t *testing.T, originals []ledger.Payload) []ledger.Payload 
 	return out
 }
 
+// TestConvertCheckpointV7ToV6_TopTrieLeaf exercises reconstruction of a leaf that
+// lives in the top-trie part file — a register compactified above the subtrie
+// split. A single-register trie's root is exactly such a leaf, so this
+// deterministically pins the buildTopTriePayloadPool path (which is otherwise only
+// hit by chance on larger random tries).
+func TestConvertCheckpointV7ToV6_TopTrieLeaf(t *testing.T) {
+	unittest.RunWithTempDir(t, func(dir string) {
+		logger := zerolog.Nop()
+
+		paths, payloads := randNPathPayloads(1)
+		single, _, err := trie.NewTrieWithUpdatedRegisters(trie.NewEmptyMTrie(), paths, payloads, true)
+		require.NoError(t, err)
+
+		// The register's payload is sourced from the previous checkpoint; no WAL needed.
+		require.NoError(t, StoreCheckpointV6Concurrently([]*trie.MTrie{single}, dir, "checkpoint.00000000", logger))
+		v7Tries, err := FromV6Tries([]*trie.MTrie{single})
+		require.NoError(t, err)
+		require.NoError(t, StoreCheckpointV7Concurrently(v7Tries, dir, "checkpoint.00000005.v7", logger))
+
+		outDir := path.Join(dir, "out")
+		require.NoError(t, os.MkdirAll(outDir, 0755))
+
+		// Empty WAL range (from > to): the payload comes from the previous checkpoint's top-trie.
+		require.NoError(t, ConvertCheckpointV7ToV6(
+			dir, "checkpoint.00000005.v7", dir, 0, 1, 0, outDir, "checkpoint.00000005", logger, 1))
+
+		require.NoError(t, VerifyCheckpointHashes(logger, outDir, "checkpoint.00000005", 1))
+		recon, err := OpenAndReadCheckpointV6(outDir, "checkpoint.00000005", logger)
+		require.NoError(t, err)
+		require.Len(t, recon, 1)
+		require.Equal(t, single.RootHash(), recon[0].RootHash())
+	})
+}
+
 // TestConvertCheckpointV7ToV6_AutoDiscoverPrev verifies that resolvePrevCheckpoint
 // selects the latest V6 checkpoint strictly below the V7 checkpoint number, and
 // errors when none qualifies.
