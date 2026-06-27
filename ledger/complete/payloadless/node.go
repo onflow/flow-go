@@ -11,12 +11,13 @@ import (
 // Node defines a payloadless Mtrie node.
 //
 // Unlike the regular mtrie Node which stores full payloads, a payloadless Node
-// stores only the leaf hash (HashLeaf(path, value)) for leaf nodes. This enables
-// significant memory savings while preserving the same root hash as a full trie.
+// stores only the leaf hash for leaf nodes. This enables significant memory savings
+// while preserving the same root hash as a full trie.
 //
 // DEFINITIONS:
 //   - HEIGHT of a node v in a tree is the number of edges on the longest downward
-//     path between v and a tree leaf (in hypothetical tree without compactification).
+//     path between v and a tree leaf (in hypothetical, fully expanded (perfect)
+//     tree, i.e. without compactification or nil-pruning).
 //
 // Conceptually, an MTrie is a sparse Merkle Trie, which has two node types:
 //   - INTERIM node: has at least one child (i.e. lChild or rChild is not
@@ -24,7 +25,7 @@ import (
 //   - LEAF node: has _no_ children. Stores a path and (optionally) a leafHash.
 //     Nodes at height 0 are always leafs: we call those uncompactified leafs.
 //     Leafs might have positive height: this is an optimization, which may be
-//     applied (on best effort basis), where we represent a leaf that has a tailing
+//     applied (on best effort basis), where we represent a leaf that has a trailing
 //     path segment leading to it *without branches* as a single data structure.
 //     We call those compactified leafs. Compactification is optional and leaves the
 //     root hash unchanged.
@@ -37,13 +38,13 @@ import (
 // TODO: optimized data structures might be able to reduce memory consumption
 type Node struct {
 	// Implementation Comments:
-	// Formally, a tree can hold up to 2^maxDepth number of registers. However,
+	// Formally, a tree of height 𝒽 can hold up to 2^𝒽 number of registers. However,
 	// the current implementation is designed to operate on a sparsely populated
 	// tree, holding much less than 2^64 registers.
 
-	height int         // height where the Node is at (root node has largest height of 255)
-	lChild *Node       // Left Child (always nil for 0-height nodes)
-	rChild *Node       // Right Child (always nil for 0-height nodes)
+	height int         // height where the Node is at (root node has largest height of 256)
+	lChild *Node       // Left Child (nil for all leaves, including compactified leaves of height > 0)
+	rChild *Node       // Right Child (nil for all leaves, including compactified leaves of height > 0)
 	path   ledger.Path // the storage path (dummy value for interim nodes)
 
 	// leafHash is nil for all non-leaf nodes. For leafs (node with both children nil), leafHash
@@ -54,28 +55,36 @@ type Node struct {
 	//              ╰ nil                  otherwise
 	leafHash *hash.Hash
 
-	// hashValue contains the hash of this node: cached, always present for all nodes.
-	// For height-0 nodes (necessarily leafs) representing a register with key `path` and
-	// holding `value`, we define:
-	//               ╭ hash(path, value)         if len(value) > 0
-	//   hashValue = ┥
-	//               ╰ DefaultHashForHeight(0)   otherwise
-	// For nodes with height > 0, we define:
-	//   hashValue = hash( lChild.hashValue , rChild.hashValue )
-	// where the DefaultHashForHeight(height-1) is substituted for nil children
+	// hashValue is the cached hash of this node (always set for every node). By construction,
+	// a node's hashValue equals the hash that the equivalent node would have in the fully-expanded
+	// (perfect) tree; compactification and nil-pruning are chosen precisely to preserve this
+	// value (see mtrie/README.md for details), which is why they leave the root hash unchanged.
+	//
+	// We specify hashValue per node *type* (independent of compactification or nil-pruning). Here
+	// DefaultHashForHeight(𝒽) denotes the hash of a subtree with height 𝒽 holding only unallocated
+	// registers (defined recursively in mtrie/README.md). DefaultHashForHeight is independent of
+	// the sub-trie's location in the overall trie (identical for all empty subtrees of height 𝒽).
+	//
+	//  • LEAF node (both children nil) at height 𝒽, for register (path, value):
+	//                  ╭ subtree-root hash for {(path, value)}   if len(value) > 0   (allocated)
+	//      hashValue = ┥
+	//                  ╰ DefaultHashForHeight(𝒽)                 if len(value) == 0  (unallocated)
+	//    where the `subtree-root hash for {(path, value)}` is the hash of the height-𝒽 subtree that
+	//    holds only this single register: start from the height-0 leaf with hash(path, value) and
+	//    hash upward 𝒽 levels, at each level combining with the default hash of the (empty) sibling
+	//    subtree. For an uncompactified leaf (𝒽 == 0) this is just hash(path, value).
+	//
+	//  • INTERIM node (at least one non-nil child) at height 𝒽 > 0:
+	//      hashValue = hash( lChild.hashValue , rChild.hashValue )
+	//    where a nil child contributes DefaultHashForHeight(𝒽-1) (the hash of the empty
+	//    subtree of height 𝒽-1 it represents).
 	//
 	// Notes:
-	//  • We deliberately defined hashValue such that it matches `leafHash` for height-0 nodes
-	//    that are representing *allocated* registers. For a compactified leaf (height > 0), its
-	//    hashValue is obtained from the height-0 leaf hash, iteratively hashing it together with
-	//    the default hash for the respective height until reaching the compactified leaf's height.
-	//  • By induction, it follows that the root node of any stub-tree containing only unallocated
-	//    registers has `hashValue` equal to DefaultHashForHeight(height). This holds irrespective of
-	//    whether the unallocated registers in the sub-tree are represented by uncompactified leafs,
-	//    or compactified leafs or stubbed out via nil, or a mixture thereof). Hence, we conclude:
-	//         `hashValue` equals DefaultHashForHeight(height)
-	//       ⟺ sub-tree with this node as root contains only unallocated registers
-	//       ⟺ all nodes in this sub-tree have leafHash == nil.
+	//  • For an allocated register, the height-0 leaf's hashValue equals its leafHash by design.
+	//  • hashValue == DefaultHashForHeight(𝒽)
+	//      ⟺ the sub-tree rooted at this node holds only unallocated registers
+	//      ⟺ every node in that sub-tree has leafHash == nil
+	//    (the forward direction relies on our requirement of a collision-resistant hash function).
 	hashValue hash.Hash
 }
 
