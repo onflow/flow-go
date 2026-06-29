@@ -1123,7 +1123,7 @@ func (b *bootstrapExecutor) setupVMBridge(serviceAddress flow.Address, env *temp
 
 	// Arbitrary high gas limit that can be used for all the
 	// EVM transactions to ensure none of them run out of gas
-	gasLimit := 16_777_216
+	gasLimit := 20_000_000
 	deploymentValue := 0.0
 
 	// Retrieve the factory bytecode from the JSON args
