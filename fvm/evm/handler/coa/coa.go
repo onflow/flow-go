@@ -5,7 +5,7 @@ import (
 	"encoding/hex"
 )
 
-var ContractDeploymentRequiredGas = uint64(723_000)
+const ContractDeploymentRequiredGas = uint64(5_385_000)
 
 //go:embed coa_bytes.hex
 var contractBytesInHex string

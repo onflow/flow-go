@@ -250,6 +250,14 @@ func (v *BaseView) CreateAccount(
 		if err != nil {
 			return err
 		}
+	} else {
+		// all codeless accounts should have the following `EmptyCodeHash`
+		// edge case for special system addresses, such as:
+		// - 0x0000000000000000000000020000000000000000
+		// - 0x0000000000000000000000030000000000000000
+		// which are used for COA deployments and gas fees collection.
+		// This is particularly useful for certain built-in tracers.
+		codeHash = gethTypes.EmptyCodeHash
 	}
 
 	// create a new account and store it

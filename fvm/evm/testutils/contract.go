@@ -93,29 +93,31 @@ func DeployContract(t testing.TB, caller types.Address, tc *TestContract, led at
 	blk, err := e.NewBlockView(ctx)
 	require.NoError(t, err)
 
-	_, err = blk.DirectCall(
+	res, err := blk.DirectCall(
 		types.NewDepositCall(
 			RandomAddress(t), // any random non-empty address works here
 			caller,
-			new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1000)),
+			new(big.Int).Mul(big.NewInt(5e18), big.NewInt(1000)),
 			nonce,
 		),
 	)
 	require.NoError(t, err)
+	require.True(t, res.Successful())
 
 	blk2, err := e.NewBlockView(types.NewDefaultBlockContext(3))
 	require.NoError(t, err)
 
-	res, err := blk2.DirectCall(
+	res, err = blk2.DirectCall(
 		types.NewDeployCall(
 			caller,
 			tc.ByteCode,
 			gethParams.MaxTxGas,
-			big.NewInt(0),
+			big.NewInt(1_000_000_000_000_000_000), // fund the newly-deployed contract
 			nonce+1,
 		),
 	)
 	require.NoError(t, err)
+	require.True(t, res.Successful())
 	require.NotNil(t, res.DeployedContractAddress)
 	tc.SetDeployedAt(*res.DeployedContractAddress)
 }

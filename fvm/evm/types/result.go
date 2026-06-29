@@ -6,6 +6,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	gethCommon "github.com/ethereum/go-ethereum/common"
 	gethTypes "github.com/ethereum/go-ethereum/core/types"
+	gethBAL "github.com/ethereum/go-ethereum/core/types/bal"
 	gethVM "github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/rlp"
 )
@@ -99,6 +100,8 @@ type Result struct {
 	PrecompiledCalls []byte
 	// StateChangeCommitment captures a commitment over the state change (delta)
 	StateChangeCommitment []byte
+	// Per-transaction state access footprint for EIP-7928
+	StateAccessList *gethBAL.ConstructionBlockAccessList
 }
 
 // Invalid returns true if transaction has been rejected
