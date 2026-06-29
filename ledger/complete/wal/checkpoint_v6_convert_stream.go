@@ -474,7 +474,8 @@ func buildPartitionPayloadPool(
 
 	// Source B: WAL updates in this partition.
 	if src.walFrom <= src.walTo {
-		err = scanWALUpdates(src.execDir, src.walFrom, src.walTo, partitionFilteredAdd)
+		err = scanWALUpdates(src.execDir, src.walFrom, src.walTo,
+			logger.With().Int("partition", partition).Logger(), partitionFilteredAdd)
 		if err != nil {
 			return nil, fmt.Errorf("could not scan WAL for partition %d: %w", partition, err)
 		}
@@ -541,7 +542,8 @@ func buildTopTriePayloadPool(
 	}
 	// Scan the WAL range.
 	if src.walFrom <= src.walTo {
-		if err := scanWALUpdates(src.execDir, src.walFrom, src.walTo, add); err != nil {
+		if err := scanWALUpdates(src.execDir, src.walFrom, src.walTo,
+			logger.With().Str("scan", "top-trie").Logger(), add); err != nil {
 			return nil, fmt.Errorf("could not scan WAL for top-trie leaves: %w", err)
 		}
 	}
@@ -789,7 +791,8 @@ func streamV6LeafNodes(
 
 // scanWALUpdates reads the WAL segment records in the inclusive range [from, to]
 // and invokes cb for every (path, payload) pair in each update record. Delete
-// records are ignored.
+// records are ignored. It logs one line per WAL segment as the scan advances
+// into it.
 //
 // The payload passed to cb is only valid for the duration of the call:
 // [ledger.DecodeTrieUpdate] decodes payloads zero-copy over the WAL record
@@ -801,6 +804,7 @@ func scanWALUpdates(
 	execDir string,
 	from int,
 	to int,
+	logger zerolog.Logger,
 	cb func(path ledger.Path, payload *ledger.Payload),
 ) error {
 	sr, err := prometheusWAL.NewSegmentsRangeReader(zerolog.Nop(), prometheusWAL.SegmentRange{
@@ -814,7 +818,24 @@ func scanWALUpdates(
 	defer sr.Close()
 
 	reader := prometheusWAL.NewReader(sr)
+	// Log each WAL segment as the reader advances into it. The combined reader is
+	// kept (rather than reading segments individually) so records spanning a
+	// segment boundary still decode; reader.Segment() reports the segment of the
+	// record just read, so logging on change emits one line per segment.
+	// Note: this scan runs once per partition, so each segment is logged ~once per
+	// partition over the full conversion.
+	totalSegments := to - from + 1
+	currentSegment := -1
 	for reader.Next() {
+		if seg := reader.Segment(); seg != currentSegment {
+			currentSegment = seg
+			logger.Info().
+				Int("segment", seg).
+				Int("wal_from", from).
+				Int("wal_to", to).
+				Msgf("processing WAL segment %d/%d", seg-from+1, totalSegments)
+		}
+
 		record := reader.Record()
 		operation, _, update, err := Decode(record)
 		if err != nil {
