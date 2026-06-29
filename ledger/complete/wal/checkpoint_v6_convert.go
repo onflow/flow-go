@@ -6,6 +6,8 @@ import (
 
 	prometheusWAL "github.com/onflow/wal/wal"
 	"github.com/rs/zerolog"
+
+	"github.com/onflow/flow-go/model/bootstrap"
 )
 
 // leaf-hash presence flag values in the V7 (payloadless) leaf encoding. They
@@ -38,7 +40,9 @@ const (
 //     checkpoint part files and the numbered WAL segment files.
 //   - prevCheckpointNum: the previous full V6 checkpoint number M to source
 //     unchanged payloads from. If negative, it is auto-discovered as the latest
-//     V6 checkpoint in execDir with number strictly less than N.
+//     V6 checkpoint in execDir with number strictly less than N. If no such
+//     numbered checkpoint exists, it falls back to the V6 root checkpoint, in
+//     which case the full WAL range [0, N] is replayed.
 //   - walFrom, walTo: the inclusive WAL segment range to source updated payloads
 //     from. If negative, they default to (M+1, N] — i.e. all updates applied
 //     after the previous checkpoint up to and including the V7 checkpoint state.
@@ -129,11 +133,12 @@ func convertCheckpointV7ToV6(
 	n := v7Info.Number
 
 	// Resolve the previous full V6 checkpoint (M) to source unchanged payloads.
-	prevNum, err := resolvePrevCheckpoint(execDir, n, prevCheckpointNum)
+	// prevNum is -1 when the resolved source is the V6 root checkpoint, which
+	// seeds WAL segment 0 (see resolveWALRange).
+	prevNum, prevFile, err := resolvePrevCheckpoint(execDir, n, prevCheckpointNum)
 	if err != nil {
 		return err
 	}
-	prevFile := NumberToFilename(prevNum)
 	prevHeaderPath := filePathCheckpointHeader(execDir, prevFile)
 	if _, err := os.Stat(prevHeaderPath); err != nil {
 		return fmt.Errorf("previous V6 checkpoint header not found at %s: %w", prevHeaderPath, err)
@@ -238,23 +243,32 @@ type payloadSource struct {
 	walTo                int
 }
 
-// resolvePrevCheckpoint returns the previous full V6 checkpoint number to source
-// unchanged payloads from. If override is non-negative it is used directly
-// (and must be < n); otherwise the latest V6 checkpoint with number < n in
-// execDir is returned.
+// resolvePrevCheckpoint returns the previous full V6 checkpoint to source
+// unchanged payloads from, as both its number and its on-disk filename.
+//
+// If override is non-negative it is used directly (and must be < n). Otherwise
+// the latest numbered V6 checkpoint with number < n in execDir is used. If no
+// such numbered checkpoint exists, it falls back to the V6 root checkpoint
+// (bootstrap.FilenameWALRootCheckpoint), which is the bootstrap full checkpoint
+// seeding WAL segment 0: sourcing from it requires replaying the full WAL range
+// [0, n] (resolveWALRange derives walFrom = prevNum+1 = 0 from the returned
+// prevNum of -1).
+//
+// The returned prevNum is the resolved checkpoint number, or -1 when the source
+// is the root checkpoint.
 //
 // No error returns are expected during normal operation.
-func resolvePrevCheckpoint(execDir string, n int, override int) (int, error) {
+func resolvePrevCheckpoint(execDir string, n int, override int) (prevNum int, prevFile string, err error) {
 	if override >= 0 {
 		if override >= n {
-			return 0, fmt.Errorf("previous checkpoint %d must be less than V7 checkpoint %d", override, n)
+			return 0, "", fmt.Errorf("previous checkpoint %d must be less than V7 checkpoint %d", override, n)
 		}
-		return override, nil
+		return override, NumberToFilename(override), nil
 	}
 
 	nums, _, err := ListV6Checkpoints(execDir)
 	if err != nil {
-		return 0, fmt.Errorf("could not list V6 checkpoints in %s: %w", execDir, err)
+		return 0, "", fmt.Errorf("could not list V6 checkpoints in %s: %w", execDir, err)
 	}
 	prev := -1
 	for _, num := range nums {
@@ -262,11 +276,23 @@ func resolvePrevCheckpoint(execDir string, n int, override int) (int, error) {
 			prev = num
 		}
 	}
-	if prev < 0 {
-		return 0, fmt.Errorf("no previous V6 checkpoint with number < %d found in %s; "+
-			"a full checkpoint is required to source unchanged payloads", n, execDir)
+	if prev >= 0 {
+		return prev, NumberToFilename(prev), nil
 	}
-	return prev, nil
+
+	// No numbered V6 checkpoint below n. Fall back to the V6 root checkpoint if
+	// present: it is a full checkpoint that, together with the WAL replayed from
+	// segment 0, can source every payload.
+	hasRoot, err := HasRootCheckpoint(execDir)
+	if err != nil {
+		return 0, "", fmt.Errorf("could not check for V6 root checkpoint in %s: %w", execDir, err)
+	}
+	if hasRoot {
+		return -1, bootstrap.FilenameWALRootCheckpoint, nil
+	}
+
+	return 0, "", fmt.Errorf("no previous V6 checkpoint with number < %d and no V6 root checkpoint found in %s; "+
+		"a full checkpoint is required to source unchanged payloads", n, execDir)
 }
 
 // resolveWALRange returns the inclusive WAL segment range to replay. When
