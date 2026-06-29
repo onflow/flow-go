@@ -12,6 +12,7 @@ import (
 
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
+	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -32,7 +33,7 @@ func TestConvertCheckpointV7ToV6_RoundTrip(t *testing.T) {
 			unittest.RunWithTempDir(t, func(dir string) {
 				logger := zerolog.Nop()
 
-				allTries, lastTrie, lastPaths, lastValues := setupV7ToV6Scenario(t, dir, logger)
+				allTries, lastTrie, lastPaths, lastValues := setupV7ToV6Scenario(t, dir, logger, "checkpoint.00000000")
 
 				outDir := path.Join(dir, "out")
 				require.NoError(t, os.MkdirAll(outDir, 0755))
@@ -84,8 +85,44 @@ func TestConvertCheckpointV7ToV6_RoundTrip(t *testing.T) {
 	}
 }
 
+// TestConvertCheckpointV7ToV6_RoundTripFromRoot is the round-trip test with the
+// previous full checkpoint stored as the V6 root checkpoint rather than a
+// numbered checkpoint. The previous checkpoint is auto-discovered (prevCheckpointNum
+// = -1), exercising the root-checkpoint fallback and the resulting WAL replay from
+// segment 0.
+func TestConvertCheckpointV7ToV6_RoundTripFromRoot(t *testing.T) {
+	unittest.RunWithTempDir(t, func(dir string) {
+		logger := zerolog.Nop()
+
+		allTries, lastTrie, _, _ := setupV7ToV6Scenario(t, dir, logger, bootstrap.FilenameWALRootCheckpoint)
+
+		outDir := path.Join(dir, "out")
+		require.NoError(t, os.MkdirAll(outDir, 0755))
+
+		first, last, err := prometheusWAL.Segments(dir)
+		require.NoError(t, err)
+		require.Equal(t, 0, first, "root-sourced replay must start at WAL segment 0")
+
+		// Auto-discover the previous checkpoint (no numbered checkpoint exists, so
+		// it falls back to root.checkpoint). The WAL range is given explicitly so
+		// the test does not depend on the V7 number matching the last segment.
+		require.NoError(t, ConvertCheckpointV7ToV6(
+			dir, "checkpoint.00000005.v7", dir, -1, first, last, outDir, "checkpoint.00000005", logger, 4))
+
+		require.NoError(t, VerifyCheckpointHashes(logger, outDir, "checkpoint.00000005", 4))
+
+		reconstructed, err := OpenAndReadCheckpointV6(outDir, "checkpoint.00000005", logger)
+		require.NoError(t, err)
+		require.Equal(t, len(allTries), len(reconstructed))
+		for i, expected := range allTries {
+			require.Equal(t, expected.RootHash(), reconstructed[i].RootHash(), "trie %d root hash mismatch", i)
+		}
+		require.Equal(t, lastTrie.RootHash(), reconstructed[len(reconstructed)-1].RootHash())
+	})
+}
+
 // setupV7ToV6Scenario writes, into dir:
-//   - a previous full V6 checkpoint "checkpoint.00000000" (state after update u0),
+//   - a previous full V6 checkpoint named prevName (state after update u0),
 //   - WAL segments carrying two later updates u1 (with overwrites and new
 //     registers) and u2 (with overwrites and a deletion), and
 //   - a V7 checkpoint "checkpoint.00000005.v7" of the forest holding all three
@@ -93,7 +130,7 @@ func TestConvertCheckpointV7ToV6_RoundTrip(t *testing.T) {
 //
 // It returns all three trie states, the final trie, and the final trie's paths
 // and expected values for a register spot-check.
-func setupV7ToV6Scenario(t *testing.T, dir string, logger zerolog.Logger) (
+func setupV7ToV6Scenario(t *testing.T, dir string, logger zerolog.Logger, prevName string) (
 	allTries []*trie.MTrie, lastTrie *trie.MTrie, lastPaths []ledger.Path, lastValues []ledger.Value,
 ) {
 	// u0: initial state -> trie0. Stored only in the previous full checkpoint.
@@ -101,7 +138,7 @@ func setupV7ToV6Scenario(t *testing.T, dir string, logger zerolog.Logger) (
 	trie0, _, err := trie.NewTrieWithUpdatedRegisters(trie.NewEmptyMTrie(), pathsA, payloadsA, true)
 	require.NoError(t, err)
 
-	require.NoError(t, StoreCheckpointV6Concurrently([]*trie.MTrie{trie0}, dir, "checkpoint.00000000", logger))
+	require.NoError(t, StoreCheckpointV6Concurrently([]*trie.MTrie{trie0}, dir, prevName, logger))
 
 	// u1: overwrite the first 10 of A with new values, plus 20 brand-new registers.
 	// Overwrites keep each path's original key and only change the value, honoring
@@ -209,23 +246,55 @@ func TestConvertCheckpointV7ToV6_AutoDiscoverPrev(t *testing.T) {
 			require.NoError(t, StoreCheckpointV6Concurrently(tries, dir, NumberToFilename(num), logger))
 		}
 
-		got, err := resolvePrevCheckpoint(dir, 10, -1)
+		got, gotFile, err := resolvePrevCheckpoint(dir, 10, -1)
 		require.NoError(t, err)
 		require.Equal(t, 7, got)
+		require.Equal(t, NumberToFilename(7), gotFile)
 
-		got, err = resolvePrevCheckpoint(dir, 5, -1)
+		got, gotFile, err = resolvePrevCheckpoint(dir, 5, -1)
 		require.NoError(t, err)
 		require.Equal(t, 3, got)
+		require.Equal(t, NumberToFilename(3), gotFile)
 
-		_, err = resolvePrevCheckpoint(dir, 2, -1)
-		require.Error(t, err, "no checkpoint below 2 exists")
+		_, _, err = resolvePrevCheckpoint(dir, 2, -1)
+		require.Error(t, err, "no checkpoint below 2 and no root checkpoint exists")
 
 		// Override is honored and must be below N.
-		got, err = resolvePrevCheckpoint(dir, 10, 3)
+		got, gotFile, err = resolvePrevCheckpoint(dir, 10, 3)
 		require.NoError(t, err)
 		require.Equal(t, 3, got)
-		_, err = resolvePrevCheckpoint(dir, 5, 5)
+		require.Equal(t, NumberToFilename(3), gotFile)
+		_, _, err = resolvePrevCheckpoint(dir, 5, 5)
 		require.Error(t, err, "override must be < N")
+	})
+}
+
+// TestConvertCheckpointV7ToV6_FallBackToRoot verifies that resolvePrevCheckpoint
+// falls back to the V6 root checkpoint when no numbered V6 checkpoint qualifies,
+// returning -1 as the number and the root checkpoint filename.
+func TestConvertCheckpointV7ToV6_FallBackToRoot(t *testing.T) {
+	unittest.RunWithTempDir(t, func(dir string) {
+		logger := zerolog.Nop()
+		tries := createSimpleTrie(t)
+
+		// With no numbered checkpoint and no root checkpoint, resolution fails.
+		_, _, err := resolvePrevCheckpoint(dir, 10, -1)
+		require.Error(t, err)
+
+		// Write a V6 root checkpoint; resolution now falls back to it.
+		require.NoError(t, StoreCheckpointV6Concurrently(tries, dir, bootstrap.FilenameWALRootCheckpoint, logger))
+
+		got, gotFile, err := resolvePrevCheckpoint(dir, 10, -1)
+		require.NoError(t, err)
+		require.Equal(t, -1, got)
+		require.Equal(t, bootstrap.FilenameWALRootCheckpoint, gotFile)
+
+		// A qualifying numbered checkpoint takes precedence over the root.
+		require.NoError(t, StoreCheckpointV6Concurrently(tries, dir, NumberToFilename(4), logger))
+		got, gotFile, err = resolvePrevCheckpoint(dir, 10, -1)
+		require.NoError(t, err)
+		require.Equal(t, 4, got)
+		require.Equal(t, NumberToFilename(4), gotFile)
 	})
 }
 
