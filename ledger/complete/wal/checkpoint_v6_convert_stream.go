@@ -475,7 +475,7 @@ func buildPartitionPayloadPool(
 	// Source B: WAL updates in this partition.
 	if src.walFrom <= src.walTo {
 		err = scanWALUpdates(src.execDir, src.walFrom, src.walTo,
-			logger.With().Int("partition", partition).Logger(), partitionFilteredAdd)
+			logger, fmt.Sprintf("partition %d", partition), partitionFilteredAdd)
 		if err != nil {
 			return nil, fmt.Errorf("could not scan WAL for partition %d: %w", partition, err)
 		}
@@ -543,7 +543,7 @@ func buildTopTriePayloadPool(
 	// Scan the WAL range.
 	if src.walFrom <= src.walTo {
 		if err := scanWALUpdates(src.execDir, src.walFrom, src.walTo,
-			logger.With().Str("scan", "top-trie").Logger(), add); err != nil {
+			logger, "top-trie", add); err != nil {
 			return nil, fmt.Errorf("could not scan WAL for top-trie leaves: %w", err)
 		}
 	}
@@ -805,6 +805,7 @@ func scanWALUpdates(
 	from int,
 	to int,
 	logger zerolog.Logger,
+	label string,
 	cb func(path ledger.Path, payload *ledger.Payload),
 ) error {
 	sr, err := prometheusWAL.NewSegmentsRangeReader(zerolog.Nop(), prometheusWAL.SegmentRange{
@@ -830,10 +831,11 @@ func scanWALUpdates(
 		if seg := reader.Segment(); seg != currentSegment {
 			currentSegment = seg
 			logger.Info().
+				Str("scan", label).
 				Int("segment", seg).
 				Int("wal_from", from).
 				Int("wal_to", to).
-				Msgf("processing WAL segment %d/%d", seg-from+1, totalSegments)
+				Msgf("[%s] processing WAL segment %d/%d", label, seg-from+1, totalSegments)
 		}
 
 		record := reader.Record()
