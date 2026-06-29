@@ -187,6 +187,8 @@ func verifySubtrie(
 		hashes = make([]hash.Hash, nodesCount+1) // +1: index 0 is the nil sentinel
 		scratch := make([]byte, defaultBufioReadSize)
 
+		logging := logProgress(fmt.Sprintf("verifying %d-th subtrie hashes", index), int(nodesCount), logger)
+
 		for i := uint64(1); i <= nodesCount; i++ {
 			vn, err := readVerifyNode(reader, scratch, isV7)
 			if err != nil {
@@ -207,6 +209,7 @@ func verifySubtrie(
 			}
 
 			hashes[i] = vn.hash
+			logging(i)
 		}
 		return nil
 	}
