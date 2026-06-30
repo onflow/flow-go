@@ -239,7 +239,7 @@ func WithServiceAccount(enabled bool) Option {
 	}
 }
 
-// WithRestrictContractRemoval enables or disables restricted contract removal for a
+// WithContractRemovalRestricted enables or disables restricted contract removal for a
 // virtual machine context. Warning! this would be overridden with the flag stored on chain.
 // this is just a fallback value
 func WithContractRemovalRestricted(enabled bool) Option {
@@ -249,7 +249,7 @@ func WithContractRemovalRestricted(enabled bool) Option {
 	}
 }
 
-// WithRestrictedContractDeployment enables or disables restricted contract deployment for a
+// WithContractDeploymentRestricted enables or disables restricted contract deployment for a
 // virtual machine context. Warning! this would be overridden with the flag stored on chain.
 // this is just a fallback value
 func WithContractDeploymentRestricted(enabled bool) Option {
@@ -277,7 +277,7 @@ func WithAccountStorageLimit(enabled bool) Option {
 	}
 }
 
-// WithAuthorizationCheckxEnabled enables or disables pre-execution
+// WithAuthorizationChecksEnabled enables or disables pre-execution
 // authorization checks.
 func WithAuthorizationChecksEnabled(enabled bool) Option {
 	return func(ctx Context) Context {
@@ -335,7 +335,7 @@ func WithRandomSourceHistoryCallAllowed(allowed bool) Option {
 	}
 }
 
-// WithReusableCadenceRuntimePool set the (shared) RedusableCadenceRuntimePool
+// WithReusableCadenceRuntimePool set the (shared) ReusableCadenceRuntimePool
 // use for creating the cadence runtime.
 func WithReusableCadenceRuntimePool(
 	pool reusableRuntime.ReusableCadenceRuntimePool,
