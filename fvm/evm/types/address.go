@@ -122,7 +122,7 @@ func NewAddressFromString(str string) Address {
 }
 
 var AddressBytesCadenceType = cadence.NewConstantSizedArrayType(AddressLength, cadence.UInt8Type)
-var AddressBytesSemaType = sema.ByteArrayType
+var AddressBytesSemaType = sema.NewConstantSizedType(nil, sema.UInt8Type, AddressLength)
 
 func (a Address) ToCadenceValue() cadence.Array {
 	values := make([]cadence.Value, len(a))

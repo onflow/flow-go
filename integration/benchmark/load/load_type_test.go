@@ -140,6 +140,7 @@ func bootstrapVM(t *testing.T, chain flow.Chain) (*fvm.VirtualMachine, fvm.Conte
 		chain.ChainID(),
 		false,
 		false,
+		false,
 	)
 	opts = append(opts,
 		fvm.WithTransactionFeesEnabled(true),
@@ -150,7 +151,7 @@ func bootstrapVM(t *testing.T, chain flow.Chain) (*fvm.VirtualMachine, fvm.Conte
 		fvm.WithBlockHeader(block1.ToHeader()),
 	)
 
-	ctx := fvm.NewContext(opts...)
+	ctx := fvm.NewContext(chain, opts...)
 
 	vm := fvm.NewVirtualMachine()
 	snapshotTree := snapshot.NewSnapshotTree(nil)
@@ -311,7 +312,7 @@ func (t *TestAccountLoader) Load(
 	t.snapshot.Lock()
 	defer t.snapshot.Unlock()
 
-	acc, err := fvm.GetAccount(t.ctx, flow.ConvertAddress(address), t.snapshot)
+	acc, err := fvm.GetAccount(t.ctx, flow.Address(address), t.snapshot)
 	if err != nil {
 		return nil, wrapErr(err)
 	}

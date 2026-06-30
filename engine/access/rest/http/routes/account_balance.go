@@ -11,7 +11,7 @@ import (
 )
 
 // GetAccountBalance handler retrieves an account balance by address and block height and returns the response
-func GetAccountBalance(r *common.Request, backend access.API, _ commonmodels.LinkGenerator) (interface{}, error) {
+func GetAccountBalance(r *common.Request, backend access.API, _ commonmodels.LinkGenerator) (any, error) {
 	req, err := request.GetAccountBalanceRequest(r)
 	if err != nil {
 		return nil, common.NewBadRequestError(err)

@@ -35,6 +35,7 @@ import (
 	fvmerrors "github.com/onflow/flow-go/fvm/errors"
 	emulator "github.com/onflow/flow-go/integration/internal/emulator"
 	flowgo "github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 const testContract = "access(all) contract Test {}"
@@ -992,6 +993,9 @@ func TestUpdateAccountCode(t *testing.T) {
 			SetProposalKey(serviceAccountAddress, b.ServiceKey().Index, b.ServiceKey().SequenceNumber).
 			SetPayer(serviceAccountAddress)
 
+		// invalid authorizer signature
+		tx.AddPayloadSignature(accountAddressB, 0, unittest.SignatureFixtureForTransactions())
+
 		signer, err := b.ServiceKey().Signer()
 		require.NoError(t, err)
 
@@ -1004,7 +1008,7 @@ func TestUpdateAccountCode(t *testing.T) {
 		result, err := b.ExecuteNextTransaction()
 		assert.NoError(t, err)
 
-		assert.True(t, fvmerrors.HasErrorCode(result.Error, fvmerrors.ErrCodeAccountAuthorizationError))
+		assert.True(t, fvmerrors.HasErrorCode(result.Error, fvmerrors.ErrCodeInvalidProposalSignatureError))
 
 		_, err = b.CommitBlock()
 		assert.NoError(t, err)
@@ -1041,7 +1045,7 @@ func TestImportAccountCode(t *testing.T) {
 
 	script := []byte(fmt.Sprintf(`
 		// address imports can omit leading zeros
-		import 0x%s
+		import Computer from 0x%s
 
 		transaction {
 		  execute {

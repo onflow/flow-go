@@ -312,6 +312,7 @@ func New(params Params) (*Backend, error) {
 		backendExecutionResults: backendExecutionResults{
 			executionResults: params.ExecutionResults,
 			seals:            params.Seals,
+			receipts:         params.ExecutionReceipts,
 		},
 		backendNetwork: backendNetwork{
 			state:                params.State,

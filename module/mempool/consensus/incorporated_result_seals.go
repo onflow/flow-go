@@ -46,7 +46,7 @@ func (ir *IncorporatedResultSeals) All() []*flow.IncorporatedResultSeal {
 }
 
 // resultHasMultipleReceipts implements an additional _temporary_ safety measure:
-// only consider incorporatedResult sealable if there are at AT LEAST 2 RECEIPTS
+// only consider incorporatedResult sealable if there are AT LEAST 2 RECEIPTS
 // from _different_ ENs committing to the result.
 func (ir *IncorporatedResultSeals) resultHasMultipleReceipts(incorporatedResult *flow.IncorporatedResult) bool {
 	blockID := incorporatedResult.Result.BlockID // block that was computed

@@ -50,11 +50,10 @@ func TestFungibleTokenTracker(t *testing.T) {
 
 	vm := fvm.NewVirtualMachine()
 	opts := []fvm.Option{
-		fvm.WithChain(chain),
 		fvm.WithAuthorizationChecksEnabled(false),
 		fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
 	}
-	ctx := fvm.NewContext(opts...)
+	ctx := fvm.NewContext(chain, opts...)
 	bootstrapOptions := []fvm.BootstrapProcedureOption{
 		fvm.WithTransactionFee(fvm.DefaultTransactionFees),
 		fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),

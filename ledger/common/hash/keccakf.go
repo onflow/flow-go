@@ -29,7 +29,6 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 //go:build !amd64 || purego || !gc
-// +build !amd64 purego !gc
 
 package hash
 

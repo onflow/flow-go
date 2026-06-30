@@ -1,113 +1,91 @@
-dir: "{{.InterfaceDir}}/mock"
-outpkg: "mock"
-filename: "{{.InterfaceName | snakecase}}.go"
-mockname: "{{.InterfaceName}}"
-
-all: True
-with-expecter: False
-include-auto-generated: False
-disable-func-mocks: True
-fail-on-missing: True
-
-# Suppress warnings
-issue-845-fix: True
-disable-version-string: True
-resolve-type-alias: False
-
+all: true
+dir: '{{.InterfaceDir}}/mock'
+structname: '{{.InterfaceName}}'
+pkgname: mock
+filename: '{{.InterfaceName | snakecase}}.go'
+template: testify
+template-data:
+  unroll-variadic: true
 packages:
+  github.com/onflow/flow-go-sdk/access:
+    config:
+      dir: integration/benchmark/mock
+    interfaces:
+      Client: { }
   github.com/onflow/flow-go/access:
+  github.com/onflow/flow-go/access/backends/extended:
   github.com/onflow/flow-go/access/validator:
-  github.com/onflow/flow-go/cmd/util/ledger/reporters:
+    config:
+      all: true
   github.com/onflow/flow-go/consensus/hotstuff:
     config:
-      dir: "consensus/hotstuff/mocks"
-      outpkg: "mocks"
-  github.com/onflow/flow-go/engine/access/ingestion/collections:
-  github.com/onflow/flow-go/engine/access/ingestion/tx_error_messages:
-  github.com/onflow/flow-go/engine/access/rest/common/models:
-  github.com/onflow/flow-go/engine/access/rest/websockets:
-  github.com/onflow/flow-go/engine/access/rest/websockets/data_providers:
-  github.com/onflow/flow-go/engine/access/rpc/backend/accounts/provider:
-  github.com/onflow/flow-go/engine/access/rpc/backend/events/provider:
-  github.com/onflow/flow-go/engine/access/rpc/backend/node_communicator:
-  github.com/onflow/flow-go/engine/access/rpc/backend/transactions/error_messages:
-  github.com/onflow/flow-go/engine/access/rpc/backend/transactions/provider:
-  github.com/onflow/flow-go/engine/access/rpc/connection:
-  github.com/onflow/flow-go/engine/access/state_stream:
-  github.com/onflow/flow-go/engine/access/subscription:
-  github.com/onflow/flow-go/engine/access/subscription/tracker:
+      dir: consensus/hotstuff/mocks
+      pkgname: mocks
+  github.com/onflow/flow-go/engine/access/ingestion/collections: { }
+  github.com/onflow/flow-go/engine/access/ingestion/tx_error_messages: { }
+  github.com/onflow/flow-go/engine/access/rest/common/models: { }
+  github.com/onflow/flow-go/engine/access/rest/websockets: { }
+  github.com/onflow/flow-go/engine/access/rest/websockets/data_providers: { }
+  github.com/onflow/flow-go/engine/access/rpc/backend/node_communicator: { }
+  github.com/onflow/flow-go/engine/access/rpc/backend/transactions/provider: { }
+  github.com/onflow/flow-go/engine/access/state_stream: { }
+  github.com/onflow/flow-go/engine/access/subscription: { }
+  github.com/onflow/flow-go/engine/access/subscription/tracker: { }
   github.com/onflow/flow-go/engine/access/wrapper:
     config:
-      dir: "engine/access/mock"
-  github.com/onflow/flow-go/engine/collection:
-  github.com/onflow/flow-go/engine/collection/epochmgr:
-  github.com/onflow/flow-go/engine/collection/rpc:
+      dir: engine/access/mock
+  github.com/onflow/flow-go/engine/collection: { }
+  github.com/onflow/flow-go/engine/collection/epochmgr: { }
+  github.com/onflow/flow-go/engine/collection/rpc: { }
   github.com/onflow/flow-go/engine/common/follower:
     interfaces:
       complianceCore:
         config:
-          exported: true
-          mockname:  "{{.InterfaceName | firstUpper}}"
-  github.com/onflow/flow-go/engine/common/follower/cache:
-  github.com/onflow/flow-go/engine/consensus:
-  github.com/onflow/flow-go/engine/consensus/approvals:
-  github.com/onflow/flow-go/engine/execution:
-  github.com/onflow/flow-go/engine/execution/computation:
-  github.com/onflow/flow-go/engine/execution/computation/computer:
-  github.com/onflow/flow-go/engine/execution/computation/query:
-  github.com/onflow/flow-go/engine/execution/ingestion/uploader:
-  github.com/onflow/flow-go/engine/execution/provider:
-  github.com/onflow/flow-go/engine/execution/state:
-  github.com/onflow/flow-go/engine/protocol:
-  github.com/onflow/flow-go/engine/verification/fetcher:
-  github.com/onflow/flow-go/fvm:
-  github.com/onflow/flow-go/fvm/environment:
-  github.com/onflow/flow-go/fvm/storage/snapshot:
-  github.com/onflow/flow-go/insecure:
-  github.com/onflow/flow-go/ledger:
-  github.com/onflow/flow-go/model/fingerprint:
-  github.com/onflow/flow-go/module:
-  github.com/onflow/flow-go/module/component:
-  github.com/onflow/flow-go/module/execution:
-  github.com/onflow/flow-go/module/executiondatasync/execution_data:
+          structname: '{{.InterfaceName | firstUpper}}'
+  github.com/onflow/flow-go/engine/common/follower/cache: { }
+  github.com/onflow/flow-go/engine/consensus: { }
+  github.com/onflow/flow-go/engine/execution: { }
+  github.com/onflow/flow-go/engine/execution/computation/computer: { }
+  github.com/onflow/flow-go/engine/execution/ingestion/uploader: { }
+  github.com/onflow/flow-go/engine/execution/state: { }
+  github.com/onflow/flow-go/engine/verification/fetcher: { }
+  github.com/onflow/flow-go/fvm: { }
+  github.com/onflow/flow-go/fvm/environment: { }
+  github.com/onflow/flow-go/fvm/storage/snapshot: { }
+  github.com/onflow/flow-go/ledger: { }
+  github.com/onflow/flow-go/model/fingerprint: { }
+  github.com/onflow/flow-go/module: { }
+  github.com/onflow/flow-go/module/component: { }
+  github.com/onflow/flow-go/module/execution: { }
+  github.com/onflow/flow-go/module/executiondatasync/execution_data: { }
   github.com/onflow/flow-go/module/executiondatasync/optimistic_sync:
     config:
-      all: False
+      all: false
     interfaces:
-      Core:
-  github.com/onflow/flow-go/module/executiondatasync/tracker:
-  github.com/onflow/flow-go/module/forest:
-  github.com/onflow/flow-go/module/mempool:
+      Core: { }
+  github.com/onflow/flow-go/module/executiondatasync/tracker: { }
+  github.com/onflow/flow-go/module/forest: { }
+  github.com/onflow/flow-go/module/mempool: { }
   github.com/onflow/flow-go/module/mempool/consensus/mock_interfaces:
     config:
-      dir: "module/mempool/consensus/mock"
-  github.com/onflow/flow-go/module/state_synchronization:
-  github.com/onflow/flow-go/module/state_synchronization/requester:
-  github.com/onflow/flow-go/network:
-  github.com/onflow/flow-go/network/alsp:
-  github.com/onflow/flow-go/network/p2p:
-  github.com/onflow/flow-go/state/cluster:
-  github.com/onflow/flow-go/state/protocol:
-  github.com/onflow/flow-go/state/protocol/events:
-  github.com/onflow/flow-go/state/protocol/protocol_state:
-  github.com/onflow/flow-go/state/protocol/protocol_state/mock_interfaces:
-    config:
-      dir: "state/protocol/protocol_state/mock"
-  github.com/onflow/flow-go/state/protocol/protocol_state/epochs:
-  github.com/onflow/flow-go/state/protocol/protocol_state/epochs/mock_interfaces:
-    config:
-      dir: "state/protocol/protocol_state/epochs/mock"
-  github.com/onflow/flow-go/storage:
-
-  # external libraries
-  github.com/onflow/flow-go-sdk/access:
-    config:
-      dir: "integration/benchmark/mock"
-    interfaces:
-      Client:
-
+      dir: module/mempool/consensus/mock
+  github.com/onflow/flow-go/module/state_synchronization: { }
+  github.com/onflow/flow-go/module/state_synchronization/indexer/extended: { }
+  github.com/onflow/flow-go/module/state_synchronization/requester: { }
   github.com/onflow/crypto:
     config:
-      dir: "module/mock"
+      dir: module/mock
+      filename: crypto_mocks.go
     interfaces:
-      PublicKey:
+      PublicKey: { }
+  github.com/onflow/flow-go/network: { }
+  github.com/onflow/flow-go/network/alsp: { }
+  github.com/onflow/flow-go/network/p2p: { }
+  github.com/onflow/flow-go/state/cluster: { }
+  github.com/onflow/flow-go/state/protocol: { }
+  github.com/onflow/flow-go/state/protocol/events: { }
+  github.com/onflow/flow-go/state/protocol/protocol_state: { }
+  github.com/onflow/flow-go/state/protocol/protocol_state/mock_interfaces: { }
+  github.com/onflow/flow-go/state/protocol/protocol_state/epochs: { }
+  github.com/onflow/flow-go/state/protocol/protocol_state/epochs/mock_interfaces: { }
+  github.com/onflow/flow-go/storage: { }

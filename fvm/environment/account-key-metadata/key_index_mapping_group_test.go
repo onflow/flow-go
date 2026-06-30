@@ -115,6 +115,11 @@ func TestAppendAndGetStoredKeyIndexFromMapping(t *testing.T) {
 				require.NoError(t, err)
 				require.Equal(t, expectedStoredKeyIndex, storedKeyIndex)
 			}
+
+			// Decode entire mapping.
+			decoded, err := DecodeMappings(b)
+			require.NoError(t, err)
+			require.Equal(t, tc.mappings, decoded)
 		})
 	}
 
@@ -122,37 +127,44 @@ func TestAppendAndGetStoredKeyIndexFromMapping(t *testing.T) {
 		testcases := []struct {
 			name                    string
 			encodedExistingMappings []byte
-			mapping                 uint32
-			expected                []byte
-			expectedCount           uint32
-			expectedMapping         uint32
-			expectedStartMapping    uint32
-			isConsecutiveGroup      bool
+			newMapping              uint32
+			expectedEncodedMappings []byte
+			expectedMappings        []uint32
 		}{
 			{
 				name: "regular group, run length maxRunLengthInMappingGroup - 1",
 				encodedExistingMappings: []byte{
 					0x7f, 0xfe, 0x00, 0x00, 0x00, 0x01,
 				},
-				mapping: 1,
-				expected: []byte{
+				newMapping: 1,
+				expectedEncodedMappings: []byte{
 					0x7f, 0xff, 0x00, 0x00, 0x00, 0x01,
 				},
-				expectedCount:   maxRunLengthInMappingGroup,
-				expectedMapping: 1,
+				expectedMappings: func() []uint32 {
+					m := make([]uint32, maxRunLengthInMappingGroup)
+					for i := range len(m) {
+						m[i] = 1
+					}
+					return m
+				}(),
 			},
 			{
 				name: "regular group, run length maxRunLengthInMappingGroup",
 				encodedExistingMappings: []byte{
 					0x7f, 0xff, 0x00, 0x00, 0x00, 0x01,
 				},
-				mapping: 1,
-				expected: []byte{
+				newMapping: 1,
+				expectedEncodedMappings: []byte{
 					0x7f, 0xff, 0x00, 0x00, 0x00, 0x01,
 					0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
 				},
-				expectedCount:   maxRunLengthInMappingGroup + 1,
-				expectedMapping: 1,
+				expectedMappings: func() []uint32 {
+					m := make([]uint32, maxRunLengthInMappingGroup+1)
+					for i := range len(m) {
+						m[i] = 1
+					}
+					return m
+				}(),
 			},
 			{
 				name: "regular group, run length maxRunLengthInMappingGroup + 1",
@@ -160,40 +172,53 @@ func TestAppendAndGetStoredKeyIndexFromMapping(t *testing.T) {
 					0x7f, 0xff, 0x00, 0x00, 0x00, 0x01,
 					0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
 				},
-				mapping: 1,
-				expected: []byte{
+				newMapping: 1,
+				expectedEncodedMappings: []byte{
 					0x7f, 0xff, 0x00, 0x00, 0x00, 0x01,
 					0x00, 0x02, 0x00, 0x00, 0x00, 0x01,
 				},
-				expectedCount:   maxRunLengthInMappingGroup + 2,
-				expectedMapping: 1,
+				expectedMappings: func() []uint32 {
+					m := make([]uint32, maxRunLengthInMappingGroup+2)
+					for i := range len(m) {
+						m[i] = 1
+					}
+					return m
+				}(),
 			},
 			{
 				name: "consecutive group, run length maxRunLengthInMappingGroup - 1",
 				encodedExistingMappings: []byte{
 					0xff, 0xfe, 0x00, 0x00, 0x00, 0x01,
 				},
-				mapping: maxRunLengthInMappingGroup,
-				expected: []byte{
+				newMapping: maxRunLengthInMappingGroup,
+				expectedEncodedMappings: []byte{
 					0xff, 0xff, 0x00, 0x00, 0x00, 0x01,
 				},
-				expectedCount:        maxRunLengthInMappingGroup,
-				expectedStartMapping: 1,
-				isConsecutiveGroup:   true,
+				expectedMappings: func() []uint32 {
+					m := make([]uint32, maxRunLengthInMappingGroup)
+					for i := range len(m) {
+						m[i] = uint32(1 + i)
+					}
+					return m
+				}(),
 			},
 			{
 				name: "consecutive group, run length maxRunLengthInMappingGroup",
 				encodedExistingMappings: []byte{
 					0xff, 0xff, 0x00, 0x00, 0x00, 0x01,
 				},
-				mapping: maxRunLengthInMappingGroup + 1,
-				expected: []byte{
+				newMapping: maxRunLengthInMappingGroup + 1,
+				expectedEncodedMappings: []byte{
 					0xff, 0xff, 0x00, 0x00, 0x00, 0x01,
 					0x00, 0x01, 0x00, 0x00, 0x80, 0x00,
 				},
-				expectedCount:        maxRunLengthInMappingGroup + 1,
-				expectedStartMapping: 1,
-				isConsecutiveGroup:   true,
+				expectedMappings: func() []uint32 {
+					m := make([]uint32, maxRunLengthInMappingGroup+1)
+					for i := range len(m) {
+						m[i] = uint32(1 + i)
+					}
+					return m
+				}(),
 			},
 			{
 				name: "consecutive group, run length maxRunLengthInMappingGroup + 1",
@@ -201,14 +226,18 @@ func TestAppendAndGetStoredKeyIndexFromMapping(t *testing.T) {
 					0xff, 0xff, 0x00, 0x00, 0x00, 0x01,
 					0x00, 0x01, 0x00, 0x00, 0x80, 0x00,
 				},
-				mapping: maxRunLengthInMappingGroup + 2,
-				expected: []byte{
+				newMapping: maxRunLengthInMappingGroup + 2,
+				expectedEncodedMappings: []byte{
 					0xff, 0xff, 0x00, 0x00, 0x00, 0x01,
 					0x80, 0x02, 0x00, 0x00, 0x80, 0x00,
 				},
-				expectedCount:        maxRunLengthInMappingGroup + 2,
-				expectedStartMapping: 1,
-				isConsecutiveGroup:   true,
+				expectedMappings: func() []uint32 {
+					m := make([]uint32, maxRunLengthInMappingGroup+2)
+					for i := range len(m) {
+						m[i] = uint32(1 + i)
+					}
+					return m
+				}(),
 			},
 		}
 
@@ -216,24 +245,21 @@ func TestAppendAndGetStoredKeyIndexFromMapping(t *testing.T) {
 			t.Run(tc.name, func(t *testing.T) {
 
 				// Encode and append stored key index
-				b, err := appendStoredKeyIndexToMappings(tc.encodedExistingMappings, tc.mapping)
+				b, err := appendStoredKeyIndexToMappings(tc.encodedExistingMappings, tc.newMapping)
 				require.NoError(t, err)
-				require.Equal(t, tc.expected, b)
+				require.Equal(t, tc.expectedEncodedMappings, b)
 
-				// Get stored key index from mappings
-				if tc.isConsecutiveGroup {
-					for i := range tc.expectedCount {
-						retrievedStoredKeyIndex, err := getStoredKeyIndexFromMappings(b, i)
-						require.NoError(t, err)
-						require.Equal(t, tc.expectedStartMapping+i, retrievedStoredKeyIndex)
-					}
-				} else {
-					for i := range tc.expectedCount {
-						retrievedStoredKeyIndex, err := getStoredKeyIndexFromMappings(b, i)
-						require.NoError(t, err)
-						require.Equal(t, tc.expectedMapping, retrievedStoredKeyIndex)
-					}
+				// Get stored key index from mappings.
+				for index, expected := range tc.expectedMappings {
+					retrievedStoredKeyIndex, err := getStoredKeyIndexFromMappings(b, uint32(index))
+					require.NoError(t, err)
+					require.Equal(t, expected, retrievedStoredKeyIndex)
 				}
+
+				// Decode entire mapping.
+				decoded, err := DecodeMappings(b)
+				require.NoError(t, err)
+				require.Equal(t, tc.expectedMappings, decoded)
 			})
 		}
 	})

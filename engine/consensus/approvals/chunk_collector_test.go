@@ -1,4 +1,4 @@
-package approvals
+package approvals_test
 
 import (
 	"testing"
@@ -6,6 +6,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
+	"github.com/onflow/flow-go/engine/consensus/approvals"
+	"github.com/onflow/flow-go/engine/consensus/approvals/testutil"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -19,11 +21,11 @@ func TestChunkApprovalCollector(t *testing.T) {
 }
 
 type ChunkApprovalCollectorTestSuite struct {
-	BaseApprovalsTestSuite
+	testutil.BaseApprovalsTestSuite
 
 	chunk           *flow.Chunk
 	chunkAssignment map[flow.Identifier]struct{}
-	collector       *ChunkApprovalCollector
+	collector       *approvals.ChunkApprovalCollector
 }
 
 func (s *ChunkApprovalCollectorTestSuite) SetupTest() {
@@ -32,16 +34,17 @@ func (s *ChunkApprovalCollectorTestSuite) SetupTest() {
 	verifiers, err := s.ChunksAssignment.Verifiers(s.chunk.Index)
 	require.NoError(s.T(), err)
 	s.chunkAssignment = verifiers
-	s.collector = NewChunkApprovalCollector(s.chunkAssignment, uint(len(s.chunkAssignment)))
+	s.collector = approvals.NewChunkApprovalCollector(s.chunkAssignment, uint(len(s.chunkAssignment)))
 }
 
 // TestProcessApproval_ValidApproval tests processing a valid approval. Expected to process it without error
 // and report status to caller.
 func (s *ChunkApprovalCollectorTestSuite) TestProcessApproval_ValidApproval() {
 	approval := unittest.ResultApprovalFixture(unittest.WithChunk(s.chunk.Index), unittest.WithApproverID(s.VerID))
+	require.Len(s.T(), s.collector.GetMissingSigners(), len(s.chunkAssignment))
 	_, collected := s.collector.ProcessApproval(approval)
 	require.False(s.T(), collected)
-	require.Equal(s.T(), uint(1), s.collector.chunkApprovals.NumberSignatures())
+	require.Len(s.T(), s.collector.GetMissingSigners(), len(s.chunkAssignment)-1)
 }
 
 // TestProcessApproval_InvalidChunkAssignment tests processing approval with invalid chunk assignment. Expected to
@@ -49,9 +52,10 @@ func (s *ChunkApprovalCollectorTestSuite) TestProcessApproval_ValidApproval() {
 func (s *ChunkApprovalCollectorTestSuite) TestProcessApproval_InvalidChunkAssignment() {
 	approval := unittest.ResultApprovalFixture(unittest.WithChunk(s.chunk.Index), unittest.WithApproverID(s.VerID))
 	delete(s.chunkAssignment, s.VerID)
+	require.Len(s.T(), s.collector.GetMissingSigners(), len(s.chunkAssignment))
 	_, collected := s.collector.ProcessApproval(approval)
 	require.False(s.T(), collected)
-	require.Equal(s.T(), uint(0), s.collector.chunkApprovals.NumberSignatures())
+	require.Len(s.T(), s.collector.GetMissingSigners(), len(s.chunkAssignment))
 }
 
 // TestGetAggregatedSignature_MultipleApprovals tests processing approvals from different verifiers. Expected to provide a valid
@@ -59,7 +63,8 @@ func (s *ChunkApprovalCollectorTestSuite) TestProcessApproval_InvalidChunkAssign
 func (s *ChunkApprovalCollectorTestSuite) TestGetAggregatedSignature_MultipleApprovals() {
 	var aggregatedSig flow.AggregatedSignature
 	var collected bool
-	sigCollector := NewSignatureCollector()
+	sigCollector := approvals.NewSignatureCollector()
+	require.Len(s.T(), s.collector.GetMissingSigners(), len(s.chunkAssignment))
 	for verID := range s.AuthorizedVerifiers {
 		approval := unittest.ResultApprovalFixture(unittest.WithChunk(s.chunk.Index), unittest.WithApproverID(verID))
 		aggregatedSig, collected = s.collector.ProcessApproval(approval)
@@ -68,7 +73,7 @@ func (s *ChunkApprovalCollectorTestSuite) TestGetAggregatedSignature_MultipleApp
 
 	require.True(s.T(), collected)
 	require.NotNil(s.T(), aggregatedSig)
-	require.Equal(s.T(), uint(len(s.AuthorizedVerifiers)), s.collector.chunkApprovals.NumberSignatures())
+	require.Empty(s.T(), s.collector.GetMissingSigners())
 	require.Equal(s.T(), sigCollector.ToAggregatedSignature(), aggregatedSig)
 }
 

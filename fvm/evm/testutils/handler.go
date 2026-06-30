@@ -3,6 +3,7 @@ package testutils
 import (
 	"github.com/onflow/cadence/common"
 
+	"github.com/onflow/flow-go/fvm/evm/backends"
 	"github.com/onflow/flow-go/fvm/evm/emulator"
 	"github.com/onflow/flow-go/fvm/evm/handler"
 	"github.com/onflow/flow-go/fvm/evm/precompiles"
@@ -13,15 +14,14 @@ import (
 
 func SetupHandler(
 	chainID flow.ChainID,
-	backend types.Backend,
+	backend backends.Backend,
 	rootAddr flow.Address,
 ) *handler.ContractHandler {
 	return handler.NewContractHandler(
 		chainID,
 		rootAddr,
-		common.MustBytesToAddress(systemcontracts.SystemContractsForChain(chainID).FlowToken.Address.Bytes()),
+		common.Address(systemcontracts.SystemContractsForChain(chainID).FlowToken.Address),
 		rootAddr,
-		handler.NewBlockStore(chainID, backend, rootAddr),
 		handler.NewAddressAllocator(),
 		backend,
 		emulator.NewEmulator(backend, rootAddr),

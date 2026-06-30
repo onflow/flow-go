@@ -4,6 +4,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/require"
 
@@ -14,7 +15,7 @@ func TestCopyCheckpointFileV5(t *testing.T) {
 	unittest.RunWithTempDir(t, func(dir string) {
 		tries := createSimpleTrie(t)
 		fileName := "checkpoint"
-		logger := unittest.Logger()
+		logger := zerolog.Nop()
 		require.NoErrorf(t, StoreCheckpointV5(dir, fileName, logger, tries...), "fail to store checkpoint")
 		to := filepath.Join(dir, "newfolder")
 		newPaths, err := CopyCheckpointFile(fileName, dir, to)

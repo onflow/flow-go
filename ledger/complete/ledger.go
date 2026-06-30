@@ -3,6 +3,7 @@ package complete
 import (
 	"fmt"
 	"io"
+	"sync"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -40,6 +41,7 @@ type Ledger struct {
 	metrics           module.LedgerMetrics
 	logger            zerolog.Logger
 	trieUpdateCh      chan *WALTrieUpdate
+	closeTrieUpdateCh sync.Once
 	pathFinderVersion uint8
 }
 
@@ -110,7 +112,9 @@ func (l *Ledger) Done() <-chan struct{} {
 
 		// Ledger is responsible for closing trieUpdateCh channel,
 		// so Compactor can drain and process remaining updates.
-		close(l.trieUpdateCh)
+		l.closeTrieUpdateCh.Do(func() {
+			close(l.trieUpdateCh)
+		})
 	}()
 	return done
 }
@@ -456,4 +460,37 @@ func (l *Ledger) FindTrieByStateCommit(commitment flow.StateCommitment) (*trie.M
 	}
 
 	return nil, nil
+}
+
+// StateCount returns the number of states (tries) stored in the forest
+func (l *Ledger) StateCount() int {
+	return l.ForestSize()
+}
+
+// StateByIndex returns the state at the given index
+// -1 is the last index
+func (l *Ledger) StateByIndex(index int) (ledger.State, error) {
+	tries, err := l.Tries()
+	if err != nil {
+		return ledger.DummyState, fmt.Errorf("failed to get tries: %w", err)
+	}
+
+	count := len(tries)
+	if count == 0 {
+		return ledger.DummyState, fmt.Errorf("no states available")
+	}
+
+	// Handle negative index (-1 means last index)
+	if index < 0 {
+		index = count + index
+		if index < 0 {
+			return ledger.DummyState, fmt.Errorf("index %d is out of range (count: %d)", index-count, count)
+		}
+	}
+
+	if index >= count {
+		return ledger.DummyState, fmt.Errorf("index %d is out of range (count: %d)", index, count)
+	}
+
+	return ledger.State(tries[index].RootHash()), nil
 }

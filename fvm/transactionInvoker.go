@@ -12,8 +12,6 @@ import (
 
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/errors"
-	"github.com/onflow/flow-go/fvm/evm"
-	"github.com/onflow/flow-go/fvm/runtime"
 	"github.com/onflow/flow-go/fvm/storage"
 	"github.com/onflow/flow-go/fvm/storage/derived"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
@@ -70,7 +68,7 @@ type transactionExecutor struct {
 	// writes to any of those registers
 	executionStateRead *snapshot.ExecutionSnapshot
 
-	cadenceRuntime  *runtime.ReusableCadenceRuntime
+	cadenceRuntime  environment.ReusableCadenceRuntime
 	txnBodyExecutor cadenceRuntime.Executor
 
 	output ProcedureOutput
@@ -92,30 +90,6 @@ func newTransactionExecutor(
 		span,
 		ctx.EnvironmentParams,
 		txnState)
-
-	if ctx.EVMEnabled {
-		chainID := ctx.Chain.ChainID()
-
-		cadenceVMEnabled := ctx.CadenceVMEnabled
-
-		env.Runtime.ConfigureCadenceRuntime = func(
-			reusableCadenceRuntime *runtime.ReusableCadenceRuntime,
-			env environment.Environment,
-		) {
-			var txRuntimeEnv cadenceRuntime.Environment
-			if cadenceVMEnabled {
-				txRuntimeEnv = reusableCadenceRuntime.VMTxRuntimeEnv
-			} else {
-				txRuntimeEnv = reusableCadenceRuntime.TxRuntimeEnv
-			}
-
-			evm.SetupEnvironment(
-				chainID,
-				env,
-				txRuntimeEnv,
-			)
-		}
-	}
 
 	return &transactionExecutor{
 		TransactionExecutorParams: ctx.TransactionExecutorParams,
@@ -210,8 +184,6 @@ func (executor *transactionExecutor) preprocess() error {
 // infrequently modified and are expensive to compute.  For now this includes
 // reading meter parameter overrides and parsing programs.
 func (executor *transactionExecutor) preprocessTransactionBody() error {
-
-	// setup EVM
 	// get meter parameters
 	executionParameters, executionStateRead, err := getExecutionParameters(
 		executor.env.Logger(),
@@ -245,7 +217,6 @@ func (executor *transactionExecutor) preprocessTransactionBody() error {
 			Arguments: executor.proc.Transaction.Arguments,
 		},
 		common.TransactionLocation(executor.proc.ID),
-		executor.ctx.CadenceVMEnabled,
 	)
 
 	// This initializes various cadence variables and parses the programs used
@@ -269,7 +240,6 @@ func (executor *transactionExecutor) execute() error {
 }
 
 func (executor *transactionExecutor) ExecuteTransactionBody() error {
-
 	var invalidator derived.TransactionInvalidator
 	if !executor.errs.CollectedError() {
 
@@ -488,13 +458,15 @@ func (executor *transactionExecutor) commit(
 	// the same as a successful transaction without any updates.
 	executor.txnState.AddInvalidator(invalidator)
 
-	_, commitErr := executor.txnState.CommitNestedTransaction(
+	executionSnapshot, commitErr := executor.txnState.CommitNestedTransaction(
 		executor.nestedTxnId)
 	if commitErr != nil {
 		return fmt.Errorf(
 			"transaction invocation failed when merging state: %w",
 			commitErr)
 	}
+
+	executor.output.PopulateInspectionResults(executor.ctx.Logger, executor.ctx, executor.env, executor.txnState.BaseStorageSnapshot(), executionSnapshot)
 
 	return nil
 }

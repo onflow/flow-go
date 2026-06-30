@@ -21,6 +21,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
+	"github.com/onflow/flow-go/module/state_synchronization/indexer/extended"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/logging"
 )
@@ -42,6 +43,8 @@ type IndexerCore struct {
 	results               storage.LightTransactionResults
 	scheduledTransactions storage.ScheduledTransactions
 	protocolDB            storage.DB
+
+	extendedIndexer *extended.ExtendedIndexer
 
 	derivedChainData *derived.DerivedChainData
 	serviceAddress   flow.Address
@@ -67,6 +70,7 @@ func New(
 	collectionIndexer collections.CollectionIndexer,
 	collectionExecutedMetric module.CollectionExecutedMetric,
 	lockManager lockctx.Manager,
+	extendedIndexer *extended.ExtendedIndexer,
 ) *IndexerCore {
 	log = log.With().Str("component", "execution_indexer").Logger()
 	metrics.InitializeLatestHeight(registers.LatestHeight())
@@ -76,7 +80,8 @@ func New(
 		Uint64("latest_height", registers.LatestHeight()).
 		Msg("indexer initialized")
 
-	fvmEnv := systemcontracts.SystemContractsForChain(chainID).AsTemplateEnv()
+	sc := systemcontracts.SystemContractsForChain(chainID)
+	fvmEnv := sc.AsTemplateEnv()
 
 	return &IndexerCore{
 		log:                   log,
@@ -94,32 +99,11 @@ func New(
 		serviceAddress:        chainID.Chain().ServiceAddress(),
 		derivedChainData:      derivedChainData,
 
+		extendedIndexer:          extendedIndexer,
 		collectionIndexer:        collectionIndexer,
 		collectionExecutedMetric: collectionExecutedMetric,
 		lockManager:              lockManager,
 	}
-}
-
-// RegisterValue retrieves register values by the register IDs at the provided block height.
-// Even if the register wasn't indexed at the provided height, returns the highest height the register was indexed at.
-// If a register is not found it will return a nil value and not an error.
-//
-// Expected error returns during normal operation:
-//   - [storage.ErrHeightNotIndexed]: if the given height was not indexed yet or lower than the first indexed height.
-func (c *IndexerCore) RegisterValue(ID flow.RegisterID, height uint64) (flow.RegisterValue, error) {
-	value, err := c.registers.Get(ID, height)
-	if err != nil {
-		// only return an error if the error doesn't match the not found error, since we have
-		// to gracefully handle not found values and instead assign nil, that is because the script executor
-		// expects that behaviour
-		if errors.Is(err, storage.ErrNotFound) {
-			return nil, nil
-		}
-
-		return nil, err
-	}
-
-	return value, nil
 }
 
 // IndexBlockData indexes all execution block data by height.
@@ -298,6 +282,15 @@ func (c *IndexerCore) IndexBlockData(data *execution_data.BlockExecutionDataEnti
 	err = g.Wait()
 	if err != nil {
 		return fmt.Errorf("failed to index block data at height %d: %w", header.Height, err)
+	}
+
+	// Notify the extended indexer after all other indexing (including register writing) has
+	// completed. This ordering is required because some extended indexers (e.g. contracts) read
+	// from the register index when processing blocks, so the registers must be committed first.
+	if c.extendedIndexer != nil {
+		if err := c.extendedIndexer.IndexBlockExecutionData(data); err != nil {
+			return fmt.Errorf("could not index extended block data: %w", err)
+		}
 	}
 
 	c.metrics.BlockIndexed(header.Height, time.Since(start), eventCount, registerCount, resultCount)

@@ -95,6 +95,7 @@ const (
 	subsystemExeDataPruner          = "pruner"
 	subsystemExecutionDataRequester = "execution_data_requester"
 	subsystemExecutionStateIndexer  = "execution_state_indexer"
+	subsystemExtendedIndexing       = "extended"
 	subsystemExeDataBlobstore       = "blobstore"
 	subsystemTxErrorFetcher         = "tx_errors"
 )

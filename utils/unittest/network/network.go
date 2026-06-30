@@ -11,8 +11,8 @@ import (
 	mocknetwork "github.com/onflow/flow-go/network/mock"
 )
 
-type EngineProcessFunc func(channels.Channel, flow.Identifier, interface{}) error
-type PublishFunc func(channels.Channel, interface{}, ...flow.Identifier) error
+type EngineProcessFunc func(channels.Channel, flow.Identifier, any) error
+type PublishFunc func(channels.Channel, any, ...flow.Identifier) error
 
 // Conduit represents a mock conduit.
 
@@ -52,7 +52,7 @@ func (n *Network) Register(channel channels.Channel, engine network.MessageProce
 
 // Send sends a message to the engine registered to the given channel on this mock network and returns
 // an error if one occurs. If no engine is registered, this is a noop.
-func (n *Network) Send(channel channels.Channel, originID flow.Identifier, event interface{}) error {
+func (n *Network) Send(channel channels.Channel, originID flow.Identifier, event any) error {
 	if eng, ok := n.engines[channel]; ok {
 		return eng.Process(channel, originID, event)
 	}
@@ -81,7 +81,7 @@ func NewEngine() *Engine {
 // OnProcess specifies the callback that should be executed when `Process` is called on this mock engine.
 func (e *Engine) OnProcess(processFunc EngineProcessFunc) *Engine {
 	e.On("Process", mock.AnythingOfType("channels.Channel"), mock.AnythingOfType("flow.Identifier"), mock.Anything).
-		Return((func(channels.Channel, flow.Identifier, interface{}) error)(processFunc))
+		Return((func(channels.Channel, flow.Identifier, any) error)(processFunc))
 
 	return e
 }

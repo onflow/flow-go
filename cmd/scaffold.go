@@ -56,6 +56,7 @@ import (
 	netcache "github.com/onflow/flow-go/network/cache"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/converter"
+	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/p2p"
 	p2pbuilder "github.com/onflow/flow-go/network/p2p/builder"
 	p2pbuilderconfig "github.com/onflow/flow-go/network/p2p/builder/config"
@@ -692,6 +693,13 @@ func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(
 		SlashingViolationConsumerFactory: func(adapter network.ConduitAdapter) network.ViolationsConsumer {
 			return slashing.NewSlashingViolationsConsumer(fnb.Logger, fnb.Metrics.Network, adapter)
 		},
+		UnicastStreamAuthorizer: func() func(flow.Role, flow.Role) bool {
+			if fnb.ObserverMode {
+				// observer mode uses public network where peers are not authorized based on role
+				return message.AlwaysAuthorizedUnicastSenderRole
+			}
+			return nil // use default (IsAuthorizedUnicastSenderRole)
+		}(),
 	}, networkOptions...)
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize network: %w", err)

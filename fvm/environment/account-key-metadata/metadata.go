@@ -135,49 +135,67 @@ func NewKeyMetadataAppenderFromBytes(b []byte, deduplicated bool, maxStoredDiges
 		return nil, fmt.Errorf("failed to create KeyMetadataAppender with empty data: use NewKeyMetadataAppend() instead")
 	}
 
+	weightAndRevokedStatusBytes, mappingBytes, digestBytes, startIndexForMappings, startIndexForDigests, err := parseKeyMetadata(b, deduplicated)
+	if err != nil {
+		return nil, err
+	}
+
 	keyMetadata := KeyMetadataAppender{
-		original:         b,
-		deduplicated:     deduplicated,
-		maxStoredDigests: maxStoredDigests,
-	}
-
-	var err error
-
-	// Get revoked and weight raw bytes.
-	var weightAndRevokedStatusBytes []byte
-	weightAndRevokedStatusBytes, b, err = parseWeightAndRevokedStatusFromKeyMetadataBytes(b)
-	if err != nil {
-		return nil, err
-	}
-	keyMetadata.weightAndRevokedStatusBytes = slices.Clone(weightAndRevokedStatusBytes)
-
-	// Get mapping raw bytes.
-	if deduplicated {
-		var mappingBytes []byte
-		keyMetadata.startIndexForMapping, mappingBytes, b, err = parseStoredKeyMappingFromKeyMetadataBytes(b)
-		if err != nil {
-			return nil, err
-		}
-		keyMetadata.mappingBytes = slices.Clone(mappingBytes)
-	}
-
-	// Get digests list
-	var digestBytes []byte
-	keyMetadata.startIndexForDigests, digestBytes, b, err = parseDigestsFromKeyMetadataBytes(b)
-	if err != nil {
-		return nil, err
-	}
-	keyMetadata.digestBytes = slices.Clone(digestBytes)
-
-	if len(b) != 0 {
-		return nil,
-			errors.NewKeyMetadataTrailingDataError(
-				"failed to parse key metadata",
-				len(b),
-			)
+		original:                    b,
+		weightAndRevokedStatusBytes: slices.Clone(weightAndRevokedStatusBytes),
+		mappingBytes:                slices.Clone(mappingBytes),
+		digestBytes:                 slices.Clone(digestBytes),
+		startIndexForMapping:        startIndexForMappings,
+		startIndexForDigests:        startIndexForDigests,
+		maxStoredDigests:            maxStoredDigests,
+		deduplicated:                deduplicated,
 	}
 
 	return &keyMetadata, nil
+}
+
+func parseKeyMetadata(b []byte, deduplicated bool) (
+	weightAndRevokedStatusBytes []byte,
+	mappingBytes []byte,
+	digestBytes []byte,
+	startIndexForMappings uint32,
+	startIndexForDigests uint32,
+	err error,
+) {
+	if len(b) == 0 {
+		err = errors.NewKeyMetadataEmptyError("failed to decode key metadata")
+		return
+	}
+
+	// Get revoked and weight raw bytes.
+	weightAndRevokedStatusBytes, b, err = parseWeightAndRevokedStatusFromKeyMetadataBytes(b)
+	if err != nil {
+		return
+	}
+
+	// Get mapping raw bytes.
+	if deduplicated {
+		startIndexForMappings, mappingBytes, b, err = parseStoredKeyMappingFromKeyMetadataBytes(b)
+		if err != nil {
+			return
+		}
+	}
+
+	// Get digests list
+	startIndexForDigests, digestBytes, b, err = parseDigestsFromKeyMetadataBytes(b)
+	if err != nil {
+		return
+	}
+
+	if len(b) != 0 {
+		err = errors.NewKeyMetadataTrailingDataError(
+			"failed to parse key metadata",
+			len(b),
+		)
+		return
+	}
+
+	return
 }
 
 // With deduplicated flag, account key metadata is encoded as:
@@ -345,4 +363,45 @@ func (m *KeyMetadataAppender) findDuplicateDigest(digest uint64) (found bool, du
 	}
 
 	return false, 0
+}
+
+// Utility functions for tests and validation
+
+// DecodeKeyMetadata decodes account key metadata.
+func DecodeKeyMetadata(b []byte, deduplicated bool) (
+	weightAndRevokedStatuses []WeightAndRevokedStatus,
+	startKeyIndexForMappings uint32,
+	mappings []uint32,
+	startKeyIndexForDigests uint32,
+	digests []uint64,
+	err error,
+) {
+	// Parse key metadata
+	var weightAndRevokedStatusBytes, mappingBytes, digestBytes []byte
+	weightAndRevokedStatusBytes, mappingBytes, digestBytes, startKeyIndexForMappings, startKeyIndexForDigests, err = parseKeyMetadata(b, deduplicated)
+	if err != nil {
+		return
+	}
+
+	// Decode weight and revoked list
+	weightAndRevokedStatuses, err = DecodeWeightAndRevokedStatuses(weightAndRevokedStatusBytes)
+	if err != nil {
+		return
+	}
+
+	// Decode key mapping if deduplication is on
+	if deduplicated {
+		mappings, err = DecodeMappings(mappingBytes)
+		if err != nil {
+			return
+		}
+	}
+
+	// Decode digests list
+	digests, err = DecodeDigests(digestBytes)
+	if err != nil {
+		return
+	}
+
+	return
 }

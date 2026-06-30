@@ -44,7 +44,7 @@ func Test_TimeoutIncrease(t *testing.T) {
 	tc := initTimeoutController(t)
 
 	// advance failed rounds beyond `happyPathMaxRoundFailures`;
-	for r := uint64(0); r < happyPathMaxRoundFailures; r++ {
+	for range happyPathMaxRoundFailures {
 		tc.OnTimeout()
 	}
 
@@ -81,7 +81,7 @@ func Test_TimeoutDecrease(t *testing.T) {
 func Test_MinCutoff(t *testing.T) {
 	tc := initTimeoutController(t)
 
-	for r := uint64(0); r < happyPathMaxRoundFailures; r++ {
+	for range happyPathMaxRoundFailures {
 		tc.OnTimeout() // replica timeout doesn't increase since r < happyPathMaxRoundFailures.
 	}
 

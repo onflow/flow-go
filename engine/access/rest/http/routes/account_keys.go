@@ -12,7 +12,7 @@ import (
 )
 
 // GetAccountKeyByIndex handler retrieves an account key by address and index and returns the response
-func GetAccountKeyByIndex(r *common.Request, backend access.API, _ commonmodels.LinkGenerator) (interface{}, error) {
+func GetAccountKeyByIndex(r *common.Request, backend access.API, _ commonmodels.LinkGenerator) (any, error) {
 	req, err := request.GetAccountKeyRequest(r)
 	if err != nil {
 		return nil, common.NewBadRequestError(err)
@@ -42,7 +42,7 @@ func GetAccountKeyByIndex(r *common.Request, backend access.API, _ commonmodels.
 }
 
 // GetAccountKeys handler retrieves an account keys by address and returns the response
-func GetAccountKeys(r *common.Request, backend access.API, _ commonmodels.LinkGenerator) (interface{}, error) {
+func GetAccountKeys(r *common.Request, backend access.API, _ commonmodels.LinkGenerator) (any, error) {
 	req, err := request.GetAccountKeysRequest(r)
 	if err != nil {
 		return nil, common.NewBadRequestError(err)

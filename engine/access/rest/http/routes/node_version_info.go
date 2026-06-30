@@ -8,7 +8,7 @@ import (
 )
 
 // GetNodeVersionInfo returns node version information
-func GetNodeVersionInfo(r *common.Request, backend access.API, _ commonmodels.LinkGenerator) (interface{}, error) {
+func GetNodeVersionInfo(r *common.Request, backend access.API, _ commonmodels.LinkGenerator) (any, error) {
 	params, err := backend.GetNodeVersionInfo(r.Context())
 	if err != nil {
 		return nil, err

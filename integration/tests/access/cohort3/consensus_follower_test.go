@@ -53,9 +53,20 @@ func (s *ConsensusFollowerSuite) SetupTest() {
 	s.log = unittest.LoggerForTest(s.Suite.T(), zerolog.InfoLevel)
 	s.log.Info().Msg("================> SetupTest")
 	s.ctx, s.cancel = context.WithCancel(context.Background())
-	s.buildNetworkConfig()
-	// start the network
+	followerNodeIDs := s.buildNetworkConfig()
+	// start the network (consensus followers are initialized during Start)
 	s.net.Start(s.ctx)
+
+	// set up follower managers after Start, since consensus followers are created
+	// during Start() when container ports are available
+	var err error
+	follower1 := s.net.ConsensusFollowerByID(followerNodeIDs[0])
+	s.followerMgr1, err = newFollowerManager(s.T(), follower1)
+	require.NoError(s.T(), err)
+
+	follower2 := s.net.ConsensusFollowerByID(followerNodeIDs[1])
+	s.followerMgr2, err = newFollowerManager(s.T(), follower2)
+	require.NoError(s.T(), err)
 }
 
 // TestReceiveBlocks tests the following
@@ -115,7 +126,10 @@ func (s *ConsensusFollowerSuite) TestReceiveBlocks() {
 	})
 }
 
-func (s *ConsensusFollowerSuite) buildNetworkConfig() {
+// buildNetworkConfig prepares the network configuration and returns the follower node IDs.
+// The consensus followers themselves are initialized later during Start() when container
+// ports become available.
+func (s *ConsensusFollowerSuite) buildNetworkConfig() []flow.Identifier {
 
 	// staked access node
 	s.stakedID = unittest.IdentifierFixture()
@@ -165,13 +179,7 @@ func (s *ConsensusFollowerSuite) buildNetworkConfig() {
 	conf := testnet.NewNetworkConfig("consensus follower test", net, testnet.WithConsensusFollowers(followerConfigs...))
 	s.net = testnet.PrepareFlowNetwork(s.T(), conf, flow.Localnet)
 
-	follower1 := s.net.ConsensusFollowerByID(followerConfigs[0].NodeID)
-	s.followerMgr1, err = newFollowerManager(s.T(), follower1)
-	require.NoError(s.T(), err)
-
-	follower2 := s.net.ConsensusFollowerByID(followerConfigs[1].NodeID)
-	s.followerMgr2, err = newFollowerManager(s.T(), follower2)
-	require.NoError(s.T(), err)
+	return []flow.Identifier{followerConfigs[0].NodeID, followerConfigs[1].NodeID}
 }
 
 // TODO: Move this to unittest and resolve the circular dependency issue

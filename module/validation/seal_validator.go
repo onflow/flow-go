@@ -8,6 +8,7 @@ import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/state/fork"
 	"github.com/onflow/flow-go/state/protocol"
@@ -241,17 +242,38 @@ func (s *sealValidator) Validate(candidate *flow.Block) (*flow.Seal, error) {
 	return latestSeal, nil
 }
 
-// validateSeal performs integrity checks of single seal. To be valid, we
-// require that seal:
-// 1) Contains correct number of approval signatures, one aggregated sig for each chunk.
-// 2) Every aggregated signature contains valid signer ids. module.ChunkAssigner is used to perform this check.
-// 3) Every aggregated signature contains valid signatures.
+// validateSeal performs integrity checks of single seal. To be valid, we require that the seal:
+//  1. `Seal.FinalState` is equal to the final state as committed to by the sealed execution result.
+//  2. Contains correct number of approval signatures, one aggregated sig for each chunk.
+//  3. Every aggregated signature contains valid signer ids. `module.ChunkAssigner` is used to perform this check.
+//  4. Every aggregated signature contains valid signatures.
+//
 // Returns:
-// * nil - in case of success
-// * engine.InvalidInputError - in case of malformed seal
-// * exception - in case of unexpected error
+//   - nil - in case of success
+//   - engine.InvalidInputError - in case of malformed seal
+//   - exception - in case of unexpected error
 func (s *sealValidator) validateSeal(seal *flow.Seal, incorporatedResult *flow.IncorporatedResult) error {
 	executionResult := incorporatedResult.Result
+
+	// Check that `Seal.FinalState` equals the final state of the execution result, i.e. the last chunk's `EndState`, returned by
+	// `executionResult.FinalStateCommitment()`. `Seal.FinalState` is a redundant copy of that value, included so that callers such as
+	// `Snapshot.Commit` can read the sealed state commitment directly from the seal without looking up the execution result. The verifier
+	// signatures are computed over the fields `{chunk.BlockID, ExecutionResultID, chunk.Index}` for each chunk in the execution result,
+	// so tampering with those fields in the seal would invalidate verifier signatures in seal, which is caught when checking those
+	// verifier signatures. Verifiers check the `IncorporatedResult` while consensus nodes check the correct construction of the seal for
+	// the `IncorporatedResult`. So the only remaining field that a Byzantine proposer could tamper with is the `Seal.FinalState`. We check
+	// this field first before the  per-chunk work, because the check is cheap. But formally, there is no order dependence of the checks.
+	expectedFinalState, err := executionResult.FinalStateCommitment()
+	if err != nil {
+		// `FinalStateCommitment` is documented to fail only with `flow.ErrNoChunks`. That error cannot occur here: `incorporatedResult.Result`
+		// was loaded from local storage after being incorporated in an ancestor of the candidate block (not the candidate itself), so
+		// `ReceiptValidator.verifyChunksFormat` has already enforced `Chunks.Len() ≥ 1` (the system chunk is mandatory). Any error observed here
+		// therefore indicates a bug or storage corruption.
+		return irrecoverable.NewExceptionf("could not derive final state commitment for execution result %x: %w", executionResult.ID(), err)
+	}
+	if seal.FinalState != expectedFinalState {
+		return engine.NewInvalidInputErrorf("seal's final state %x does not match execution result (final state %x)", seal.FinalState, expectedFinalState)
+	}
 
 	// check that each chunk has an AggregatedSignature
 	if len(seal.AggregatedApprovalSigs) != executionResult.Chunks.Len() {

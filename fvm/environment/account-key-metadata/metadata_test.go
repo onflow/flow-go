@@ -641,3 +641,138 @@ func TestAppendDuplicateKeyMetadata(t *testing.T) {
 		})
 	}
 }
+
+func TestDecodeKeyMetadata(t *testing.T) {
+	testcases := []struct {
+		name                             string
+		deduplicated                     bool
+		data                             []byte
+		expectedWeightAndRevokedStatuses []WeightAndRevokedStatus
+		expectedStartKeyIndexForMappings uint32
+		expectedMappings                 []uint32
+		expectedStartKeyIndexForDigests  uint32
+		expectedDigests                  []uint64
+	}{
+		{
+			name:         "not deduplicated, 2 account public keys",
+			deduplicated: false,
+			data: []byte{
+				0, 0, 0, 4, // length prefix for weight and revoked list
+				0, 1, 3, 0xe8, // weight and revoked group
+				0, 0, 0, 0, // start index for digests
+				0, 0, 0, 0x10, // length prefix for digests
+				0, 0, 0, 0, 0, 0, 0, 1, // digest 1
+				0, 0, 0, 0, 0, 0, 0, 2, // digest 2
+			},
+			expectedWeightAndRevokedStatuses: []WeightAndRevokedStatus{
+				{Weight: 1000, Revoked: false},
+			},
+			expectedStartKeyIndexForMappings: 0,
+			expectedMappings:                 nil,
+			expectedStartKeyIndexForDigests:  0,
+			expectedDigests:                  []uint64{1, 2},
+		},
+		{
+			name:         "not deduplicated, 3 account public keys",
+			deduplicated: false,
+			data: []byte{
+				0, 0, 0, 8, // length prefix for weight and revoked list
+				0, 1, 3, 0xe8, // weight and revoked group
+				0, 1, 0x80, 0x01, // weight and revoked group
+				0, 0, 0, 1, // start index for digests
+				0, 0, 0, 0x10, // length prefix for digests
+				0, 0, 0, 0, 0, 0, 0, 2, // digest 2
+				0, 0, 0, 0, 0, 0, 0, 3, // digest 3
+			},
+			expectedWeightAndRevokedStatuses: []WeightAndRevokedStatus{
+				{Weight: 1000, Revoked: false},
+				{Weight: 1, Revoked: true},
+			},
+			expectedStartKeyIndexForMappings: 0,
+			expectedMappings:                 nil,
+			expectedStartKeyIndexForDigests:  1,
+			expectedDigests:                  []uint64{2, 3},
+		},
+		{
+			name:         "deduplicated, 2 account public keys, 1 stored key, deduplication from key at index 1",
+			deduplicated: true,
+			data: []byte{
+				0, 0, 0, 4, // length prefix for weight and revoked list
+				0, 1, 3, 0xe8, // weight and revoked group
+				0, 0, 0, 1, // start index for mapping
+				0, 0, 0, 6, // length prefix for mapping
+				0, 1, 0, 0, 0, 0, // mapping group 1
+				0, 0, 0, 0, // start index for digests
+				0, 0, 0, 8, // length prefix for digests
+				0, 0, 0, 0, 0, 0, 0, 1, // digest 1
+			},
+			expectedWeightAndRevokedStatuses: []WeightAndRevokedStatus{
+				{Weight: 1000, Revoked: false},
+			},
+			expectedStartKeyIndexForMappings: 1,
+			expectedMappings:                 []uint32{0},
+			expectedStartKeyIndexForDigests:  0,
+			expectedDigests:                  []uint64{1},
+		},
+		{
+			name:         "deduplicated, 3 account public keys, 2 stored keys, deduplication from key at index 1",
+			deduplicated: true,
+			data: []byte{
+				0, 0, 0, 4, // length prefix for weight and revoked list
+				0, 2, 3, 0xe8, // weight and revoked group
+				0, 0, 0, 1, // start index for mapping
+				0, 0, 0, 6, // length prefix for mapping
+				0x80, 2, 0, 0, 0, 0, // mapping group 1
+				0, 0, 0, 0, // start index for digests
+				0, 0, 0, 0x10, // length prefix for digests
+				0, 0, 0, 0, 0, 0, 0, 1, // digest 1
+				0, 0, 0, 0, 0, 0, 0, 2, // digest 2
+			},
+			expectedWeightAndRevokedStatuses: []WeightAndRevokedStatus{
+				{Weight: 1000, Revoked: false},
+				{Weight: 1000, Revoked: false},
+			},
+			expectedStartKeyIndexForMappings: 1,
+			expectedMappings:                 []uint32{0, 1},
+			expectedStartKeyIndexForDigests:  0,
+			expectedDigests:                  []uint64{1, 2},
+		},
+		{
+			name:         "deduplicated, 4 account public keys, 2 stored keys, deduplication from key at index 2",
+			deduplicated: true,
+			data: []byte{
+				0, 0, 0, 8, // length prefix for weight and revoked list
+				0, 2, 3, 0xe8, // weight and revoked group
+				0, 1, 0x80, 0x01, // weight and revoked group
+				0, 0, 0, 2, // start index for mapping
+				0, 0, 0, 0x06, // length prefix for mapping
+				0, 2, 0, 0, 0, 0, // mapping group 1
+				0, 0, 0, 2, // start index for digests
+				0, 0, 0, 0x10, // length prefix for digests
+				0, 0, 0, 0, 0, 0, 0, 3, // digest 3
+				0, 0, 0, 0, 0, 0, 0, 4, // digest 4
+			},
+			expectedWeightAndRevokedStatuses: []WeightAndRevokedStatus{
+				{Weight: 1000, Revoked: false},
+				{Weight: 1000, Revoked: false},
+				{Weight: 1, Revoked: true},
+			},
+			expectedStartKeyIndexForMappings: 2,
+			expectedMappings:                 []uint32{0, 0},
+			expectedStartKeyIndexForDigests:  2,
+			expectedDigests:                  []uint64{3, 4},
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			weightAndRevokedStatuses, startKeyIndexForMappings, mappings, startKeyIndexForDigests, digests, err := DecodeKeyMetadata(tc.data, tc.deduplicated)
+			require.NoError(t, err)
+			require.Equal(t, tc.expectedWeightAndRevokedStatuses, weightAndRevokedStatuses)
+			require.Equal(t, tc.expectedStartKeyIndexForMappings, startKeyIndexForMappings)
+			require.Equal(t, tc.expectedMappings, mappings)
+			require.Equal(t, tc.expectedStartKeyIndexForDigests, startKeyIndexForDigests)
+			require.Equal(t, tc.expectedDigests, digests)
+		})
+	}
+}

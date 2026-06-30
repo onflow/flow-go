@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/gammazero/workerpool"
 	"github.com/stretchr/testify/require"
@@ -49,7 +50,7 @@ func (s *VoteCollectorsTestSuite) SetupTest() {
 }
 
 func (s *VoteCollectorsTestSuite) TearDownTest() {
-	s.workerPool.StopWait()
+	unittest.AssertReturnsBefore(s.T(), s.workerPool.StopWait, time.Second)
 }
 
 // prepareMockedCollector prepares a mocked collector and stores it in map, later it will be used

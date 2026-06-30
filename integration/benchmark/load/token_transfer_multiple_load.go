@@ -65,7 +65,7 @@ func (l *TokenTransferMultiLoad) Load(log zerolog.Logger, lc LoadContext) error 
 				l.destinationAddresses = apply(
 					destinationSDKAddresses,
 					func(a flowsdk.Address) flow.Address {
-						return flow.ConvertAddress(a)
+						return flow.Address(a)
 					})
 			})
 			// get another account to send tokens to

@@ -14,7 +14,6 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
-	model "github.com/onflow/flow-go/model/messages"
 	dkgmod "github.com/onflow/flow-go/module/dkg"
 )
 
@@ -65,7 +64,7 @@ func (c *DKGClientWrapper) WaitForSealed(ctx context.Context, txID sdk.Identifie
 }
 
 // Broadcast implements the DKGContractClient interface
-func (c *DKGClientWrapper) Broadcast(msg model.BroadcastDKGMessage) error {
+func (c *DKGClientWrapper) Broadcast(msg messages.BroadcastDKGMessage) error {
 	if !c.enabled.Load() {
 		return fmt.Errorf("failed to broadcast DKG message: %w", errClientDisabled)
 	}

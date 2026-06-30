@@ -127,15 +127,13 @@ func (store *valueStore) GetValue(
 	error,
 ) {
 	span := store.tracer.StartChildSpan(trace.FVMEnvGetValue)
-	defer func() {
-		if span.Tracer != nil {
-			span.SetAttributes(
-				attribute.String("owner", hex.EncodeToString(owner)),
-				attribute.String("key", hex.EncodeToString(keyBytes)),
-			)
-		}
-		span.End()
-	}()
+	if span.Tracer != nil {
+		span.SetAttributes(
+			attribute.String("owner", hex.EncodeToString(owner)),
+			attribute.String("key", hex.EncodeToString(keyBytes)),
+		)
+	}
+	defer span.End()
 
 	id := flow.CadenceRegisterID(owner, keyBytes)
 	if id.IsInternalState() {
@@ -165,16 +163,14 @@ func (store *valueStore) SetValue(
 	value []byte,
 ) error {
 	span := store.tracer.StartChildSpan(trace.FVMEnvSetValue)
-	defer func() {
-		if span.Tracer != nil {
-			span.SetAttributes(
-				attribute.String("owner", hex.EncodeToString(owner)),
-				attribute.String("key", hex.EncodeToString(keyBytes)),
-				attribute.String("value", hex.EncodeToString(value)),
-			)
-		}
-		span.End()
-	}()
+	if span.Tracer != nil {
+		span.SetAttributes(
+			attribute.String("owner", hex.EncodeToString(owner)),
+			attribute.String("key", hex.EncodeToString(keyBytes)),
+			attribute.String("value", hex.EncodeToString(value)),
+		)
+	}
+	defer span.End()
 
 	id := flow.CadenceRegisterID(owner, keyBytes)
 	if id.IsInternalState() {

@@ -35,7 +35,7 @@ type UntrustedMessage interface {
 //
 // No errors are expected during normal operation.
 // TODO: investigate how to eliminate this workaround in both ghost/rpc.go and corruptnet/message_processor.go
-func InternalToMessage(event interface{}) (UntrustedMessage, error) {
+func InternalToMessage(event any) (UntrustedMessage, error) {
 	switch internal := event.(type) {
 	case *flow.Proposal:
 		return (*Proposal)(internal), nil

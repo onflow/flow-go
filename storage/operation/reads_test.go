@@ -408,6 +408,42 @@ func TestFindHighestAtOrBelow(t *testing.T) {
 	})
 }
 
+func TestPrefixExists(t *testing.T) {
+	dbtest.RunWithStorages(t, func(t *testing.T, r storage.Reader, withWriter dbtest.WithWriter) {
+		// Empty prefix should return an error.
+		_, err := operation.PrefixExists(r, []byte{}, storage.DefaultIteratorOptions())
+		require.Error(t, err)
+
+		prefix := []byte{0x10, 0x20}
+
+		// No keys with the prefix exist yet.
+		exists, err := operation.PrefixExists(r, prefix, storage.DefaultIteratorOptions())
+		require.NoError(t, err)
+		require.False(t, exists)
+
+		// Insert a key with the prefix.
+		require.NoError(t, withWriter(func(writer storage.Writer) error {
+			return operation.Upsert(append(prefix, 0x03), []byte{0x00})(writer)
+		}))
+
+		// The key exists for the prefix should fail
+		exists, err = operation.KeyExists(r, prefix)
+		require.NoError(t, err)
+		require.False(t, exists)
+
+		// The prefix should now be found.
+		exists, err = operation.PrefixExists(r, prefix, storage.DefaultIteratorOptions())
+		require.NoError(t, err)
+		require.True(t, exists)
+
+		// A different prefix should not be found.
+		differentPrefix := []byte{0x10, 0x30}
+		exists, err = operation.PrefixExists(r, differentPrefix, storage.DefaultIteratorOptions())
+		require.NoError(t, err)
+		require.False(t, exists)
+	})
+}
+
 func TestCommonPrefix(t *testing.T) {
 	testCases := []struct {
 		name                 string

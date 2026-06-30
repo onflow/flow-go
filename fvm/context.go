@@ -6,6 +6,9 @@ import (
 	"github.com/rs/zerolog"
 	otelTrace "go.opentelemetry.io/otel/trace"
 
+	"github.com/onflow/flow-go/fvm/inspection"
+
+	"github.com/onflow/flow-go/fvm/cadence_vm"
 	"github.com/onflow/flow-go/fvm/environment"
 	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
 	"github.com/onflow/flow-go/fvm/storage/derived"
@@ -33,7 +36,6 @@ type Context struct {
 	// DisableMemoryAndInteractionLimits will override memory and interaction
 	// limits and set them to MaxUint64, effectively disabling these limits.
 	DisableMemoryAndInteractionLimits bool
-	EVMEnabled                        bool
 	ScheduledTransactionsEnabled      bool
 	ComputationLimit                  uint64
 	MemoryLimit                       uint64
@@ -52,11 +54,13 @@ type Context struct {
 	// AllowProgramCacheWritesInScripts determines if the program cache can be written to in scripts
 	// By default, the program cache is only updated by transactions.
 	AllowProgramCacheWritesInScripts bool
+
+	Inspectors []inspection.Inspector
 }
 
 // NewContext initializes a new execution context with the provided options.
-func NewContext(opts ...Option) Context {
-	return newContext(defaultContext(), opts...)
+func NewContext(chain flow.Chain, opts ...Option) Context {
+	return newContext(defaultContext(chain), opts...)
 }
 
 // NewContextFromParent spawns a child execution context with the provided options.
@@ -72,8 +76,8 @@ func newContext(ctx Context, opts ...Option) Context {
 	return ctx
 }
 
-func defaultContext() Context {
-	return Context{
+func defaultContext(chain flow.Chain) Context {
+	ctx := Context{
 		DisableMemoryAndInteractionLimits: false,
 		ComputationLimit:                  DefaultComputationLimit,
 		MemoryLimit:                       DefaultMemoryLimit,
@@ -81,29 +85,30 @@ func defaultContext() Context {
 		MaxStateValueSize:                 state.DefaultMaxValueSize,
 		MaxStateInteractionSize:           DefaultMaxInteractionSize,
 		TransactionExecutorParams:         DefaultTransactionExecutorParams(),
-		EnvironmentParams:                 environment.DefaultEnvironmentParams(),
+		EnvironmentParams:                 DefaultEnvironmentParams(chain),
+	}
+	return ctx
+}
+
+// DefaultEnvironmentParams creates environment.EnvironmentParams that serve as base settings
+// for EnvironmentParams and can be used as is for tests.
+func DefaultEnvironmentParams(chain flow.Chain) environment.EnvironmentParams {
+	return environment.EnvironmentParams{
+		Chain:                    chain,
+		ServiceAccountEnabled:    true,
+		CadenceVMEnabled:         cadence_vm.DefaultEnabled,
+		RuntimeParams:            reusableRuntime.DefaultRuntimeParams(chain),
+		ProgramLoggerParams:      environment.DefaultProgramLoggerParams(),
+		EventEmitterParams:       environment.DefaultEventEmitterParams(),
+		BlockInfoParams:          environment.DefaultBlockInfoParams(),
+		TransactionInfoParams:    environment.DefaultTransactionInfoParams(),
+		ContractUpdaterParams:    environment.DefaultContractUpdaterParams(),
+		ExecutionVersionProvider: environment.ZeroExecutionVersionProvider{},
 	}
 }
 
 // An Option sets a configuration parameter for a virtual machine context.
 type Option func(ctx Context) Context
-
-// WithChain sets the chain parameters for a virtual machine context.
-func WithChain(chain flow.Chain) Option {
-	return func(ctx Context) Context {
-		ctx.Chain = chain
-		return ctx
-	}
-}
-
-// Deprecated: WithGasLimit sets the computation limit for a virtual machine context.
-// Use WithComputationLimit instead.
-func WithGasLimit(limit uint64) Option {
-	return func(ctx Context) Context {
-		ctx.ComputationLimit = limit
-		return ctx
-	}
-}
 
 // WithMemoryAndInteractionLimitsDisabled will override memory and interaction
 // limits and set them to MaxUint64, effectively disabling these limits.
@@ -368,18 +373,18 @@ func WithEventEncoder(encoder environment.EventEncoder) Option {
 	}
 }
 
-// WithEVMEnabled enables access to the evm environment
-func WithEVMEnabled(enabled bool) Option {
-	return func(ctx Context) Context {
-		ctx.EVMEnabled = enabled
-		return ctx
-	}
-}
-
 // WithAllowProgramCacheWritesInScriptsEnabled enables caching of programs accessed by scripts
 func WithAllowProgramCacheWritesInScriptsEnabled(enabled bool) Option {
 	return func(ctx Context) Context {
 		ctx.AllowProgramCacheWritesInScripts = enabled
+		return ctx
+	}
+}
+
+// WithEVMTestOperationsAllowed enables EVM test operations in the context
+func WithEVMTestOperationsAllowed(enabled bool) Option {
+	return func(ctx Context) Context {
+		ctx.EVMTestOperationsAllowed = enabled
 		return ctx
 	}
 }
@@ -427,4 +432,11 @@ func WithScheduledTransactionsEnabled(enabled bool) Option {
 // Deprecated: WithScheduleCallbacksEnabled is deprecated, use WithScheduledTransactionsEnabled instead.
 func WithScheduleCallbacksEnabled(enabled bool) Option {
 	return WithScheduledTransactionsEnabled(enabled)
+}
+
+func WithInspectors(inspectors []inspection.Inspector) Option {
+	return func(ctx Context) Context {
+		ctx.Inspectors = inspectors
+		return ctx
+	}
 }

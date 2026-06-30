@@ -56,6 +56,8 @@ const (
 	// It is a separate account on all networks in order to separate it away
 	// from the frequently changing data on the service account.
 	AccountNameExecutionParametersAccount = "ExecutionParametersAccount"
+	// AccountNameFlowFeesReceivers is not a contract, but a special account that is used to store flow fees receivers
+	AccountNameFlowFeesReceivers = "FlowFeesReceiversAccount"
 
 	// Unqualified names of service events (not including address prefix or contract name)
 
@@ -124,6 +126,16 @@ var (
 	executionParametersAddressTestnet = flow.HexToAddress("6997a2f2cf57b73a")
 	// executionParametersAddressMainnet is the address of the Execution Parameters contract on Mainnet
 	executionParametersAddressMainnet = flow.HexToAddress("f426ff57ee8f6110")
+
+	// flowFeesReceiversAddressTestnet is the address of the Flow Fees Receivers contract on Testnet
+	// See tx be210889dd26a320f530595bd369093e866e26c3941bf7a3d01f861db3eeda81
+	flowFeesReceiversAddressesTestnet = []flow.Address{
+		flow.HexToAddress("912d5440f7e3769e"),
+		flow.HexToAddress("e1ac6b2740d204c2"),
+		flow.HexToAddress("05cbd2fa5128041d"),
+		flow.HexToAddress("139fb7c9c82c0e7c"),
+	}
+	// TODO: add mainnet addresses once they are created
 )
 
 // SystemContract represents a system contract on a particular chain.
@@ -185,6 +197,7 @@ type SystemContracts struct {
 	FungibleToken              SystemContract
 	FungibleTokenSwitchboard   SystemContract
 	FungibleTokenMetadataViews SystemContract
+	FlowFeesReceivers          []SystemAccount
 
 	// NFT related contracts
 	NonFungibleToken     SystemContract
@@ -469,6 +482,26 @@ func init() {
 			}
 		}
 
+		flowFeesReceiversAddressesFunc := func(chainID flow.ChainID) []SystemAccount {
+			var addresses []flow.Address
+			if chainID == flow.Testnet {
+				addresses = flowFeesReceiversAddressesTestnet
+			} else {
+				// otherwise, just use the flow fees contract address
+				contract := addressOfContract(ContractNameFlowFees)
+				addresses = append(addresses, contract.Address)
+			}
+
+			receivers := make([]SystemAccount, len(addresses))
+			for i, address := range addresses {
+				receivers[i] = SystemAccount{
+					Address: address,
+					Name:    AccountNameFlowFeesReceivers,
+				}
+			}
+			return receivers
+		}
+
 		contracts := &SystemContracts{
 			Epoch:          addressOfContract(ContractNameEpoch),
 			IDTableStaking: addressOfContract(ContractNameIDTableStaking),
@@ -486,6 +519,7 @@ func init() {
 			FungibleToken:              addressOfContract(ContractNameFungibleToken),
 			FungibleTokenMetadataViews: addressOfContract(ContractNameFungibleTokenMetadataViews),
 			FungibleTokenSwitchboard:   addressOfContract(ContractNameFungibleTokenSwitchboard),
+			FlowFeesReceivers:          flowFeesReceiversAddressesFunc(chainID),
 
 			NonFungibleToken:     addressOfContract(ContractNameNonFungibleToken),
 			MetadataViews:        addressOfContract(ContractNameMetadataViews),

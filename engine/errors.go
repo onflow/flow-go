@@ -22,7 +22,7 @@ type InvalidInputError struct {
 	err error
 }
 
-func NewInvalidInputErrorf(msg string, args ...interface{}) error {
+func NewInvalidInputErrorf(msg string, args ...any) error {
 	return InvalidInputError{
 		err: fmt.Errorf(msg, args...),
 	}
@@ -54,7 +54,7 @@ type NetworkTransmissionError struct {
 	err error
 }
 
-func NewNetworkTransmissionErrorf(msg string, args ...interface{}) error {
+func NewNetworkTransmissionErrorf(msg string, args ...any) error {
 	return NetworkTransmissionError{
 		err: fmt.Errorf(msg, args...),
 	}
@@ -76,7 +76,7 @@ type OutdatedInputError struct {
 	err error
 }
 
-func NewOutdatedInputErrorf(msg string, args ...interface{}) error {
+func NewOutdatedInputErrorf(msg string, args ...any) error {
 	return OutdatedInputError{
 		err: fmt.Errorf(msg, args...),
 	}
@@ -102,7 +102,7 @@ type UnverifiableInputError struct {
 	err error
 }
 
-func NewUnverifiableInputError(msg string, args ...interface{}) error {
+func NewUnverifiableInputError(msg string, args ...any) error {
 	return UnverifiableInputError{
 		err: fmt.Errorf(msg, args...),
 	}
@@ -125,7 +125,7 @@ type DuplicatedEntryError struct {
 	err error
 }
 
-func NewDuplicatedEntryErrorf(msg string, args ...interface{}) error {
+func NewDuplicatedEntryErrorf(msg string, args ...any) error {
 	return DuplicatedEntryError{
 		err: fmt.Errorf(msg, args...),
 	}

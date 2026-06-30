@@ -19,7 +19,7 @@ type InvalidExtensionError struct {
 	error
 }
 
-func NewInvalidExtensionErrorf(msg string, args ...interface{}) error {
+func NewInvalidExtensionErrorf(msg string, args ...any) error {
 	return InvalidExtensionError{
 		error: fmt.Errorf(msg, args...),
 	}
@@ -42,7 +42,7 @@ type OutdatedExtensionError struct {
 	error
 }
 
-func NewOutdatedExtensionErrorf(msg string, args ...interface{}) error {
+func NewOutdatedExtensionErrorf(msg string, args ...any) error {
 	return OutdatedExtensionError{
 		error: fmt.Errorf(msg, args...),
 	}
@@ -65,7 +65,7 @@ type UnverifiableExtensionError struct {
 	error
 }
 
-func NewUnverifiableExtensionError(msg string, args ...interface{}) error {
+func NewUnverifiableExtensionError(msg string, args ...any) error {
 	return UnverifiableExtensionError{
 		error: fmt.Errorf(msg, args...),
 	}

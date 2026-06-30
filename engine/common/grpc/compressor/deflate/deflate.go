@@ -16,7 +16,7 @@ const Name = "deflate"
 func init() {
 	c := &compressor{}
 	w, _ := flate.NewWriter(nil, flate.DefaultCompression)
-	c.poolCompressor.New = func() interface{} {
+	c.poolCompressor.New = func() any {
 		return &writer{Writer: w, pool: &c.poolCompressor}
 	}
 	encoding.RegisterCompressor(c)

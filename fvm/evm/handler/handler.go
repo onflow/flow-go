@@ -11,6 +11,9 @@ import (
 
 	"github.com/onflow/flow-go/fvm/environment"
 	fvmErrors "github.com/onflow/flow-go/fvm/errors"
+	"github.com/onflow/flow-go/fvm/evm"
+	"github.com/onflow/flow-go/fvm/evm/backends"
+	"github.com/onflow/flow-go/fvm/evm/emulator/state"
 	"github.com/onflow/flow-go/fvm/evm/events"
 	"github.com/onflow/flow-go/fvm/evm/handler/coa"
 	"github.com/onflow/flow-go/fvm/evm/types"
@@ -18,17 +21,31 @@ import (
 	"github.com/onflow/flow-go/module/trace"
 )
 
+const (
+	maxDryCallCacheResultDataSize = 1024
+	maxDryCallCacheCount          = 16
+)
+
+type evmDryCallCacheKey struct {
+	from   types.Address
+	txHash gethCommon.Hash
+}
+
 // ContractHandler is responsible for triggering calls to emulator, metering,
 // event emission and updating the block
 type ContractHandler struct {
 	flowChainID          flow.ChainID
 	evmContractAddress   flow.Address
 	flowTokenAddress     common.Address
-	blockStore           types.BlockStore
 	addressAllocator     types.AddressAllocator
-	backend              types.Backend
+	backend              backends.Backend
 	emulator             types.Emulator
 	precompiledContracts []types.PrecompiledContract
+	// evmDryCallCache caches EVM drycall results in a transaction.
+	// evmDryCallCache is cleared when the EVM state is changed via
+	// COA.deploy(), COA.call(), Run(), BatchRun(), etc., or
+	// at the end of a transaction.
+	evmDryCallCache map[evmDryCallCacheKey]*types.ResultSummary
 }
 
 var _ types.ContractHandler = &ContractHandler{}
@@ -39,16 +56,14 @@ func NewContractHandler(
 	evmContractAddress flow.Address,
 	flowTokenAddress common.Address,
 	randomBeaconAddress flow.Address,
-	blockStore types.BlockStore,
 	addressAllocator types.AddressAllocator,
-	backend types.Backend,
+	backend backends.Backend,
 	emulator types.Emulator,
 ) *ContractHandler {
 	return &ContractHandler{
 		flowChainID:        flowChainID,
 		evmContractAddress: evmContractAddress,
 		flowTokenAddress:   flowTokenAddress,
-		blockStore:         blockStore,
 		addressAllocator:   addressAllocator,
 		backend:            backend,
 		emulator:           emulator,
@@ -61,6 +76,18 @@ func NewContractHandler(
 	}
 }
 
+// ResetCaches resets caches. It is called by the runtime pool via
+// SwappableEnvironment.onSwap when the runtime is borrowed or returned.
+func (h *ContractHandler) ResetCaches() {
+	h.evmDryCallCache = nil
+}
+
+// invalidateDryCallCache clear evmDryCallCache.  It is called when
+// the EVM state is about to change via COA.deploy(), COA.call(), Run(), BatchRun(), etc.
+func (h *ContractHandler) invalidateDryCallCache() {
+	clear(h.evmDryCallCache)
+}
+
 // FlowTokenAddress returns the address where the FlowToken contract is deployed
 func (h *ContractHandler) FlowTokenAddress() common.Address {
 	return h.flowTokenAddress
@@ -69,6 +96,67 @@ func (h *ContractHandler) FlowTokenAddress() common.Address {
 // EVMContractAddress returns the address where EVM contract is deployed
 func (h *ContractHandler) EVMContractAddress() common.Address {
 	return common.Address(h.evmContractAddress)
+}
+
+func (h *ContractHandler) validateTestOperation() {
+	if !h.backend.EVMTestOperationsAllowed() {
+		panicOnError(types.ErrUnsupportedOperation)
+	}
+}
+
+// SetState sets a value for the given storage slot.
+// It returns the previous value in any case.
+// The operation is only allowed for testing purposes.
+func (h *ContractHandler) SetState(
+	address types.Address,
+	slot gethCommon.Hash,
+	value gethCommon.Hash,
+) gethCommon.Hash {
+
+	h.validateTestOperation()
+
+	execState, err := state.NewStateDB(h.backend, evm.StorageAccountAddress(h.flowChainID))
+	panicOnError(err)
+
+	prevValue := execState.SetState(address.ToCommon(), slot, value)
+	_, err = execState.Commit(true)
+	panicOnError(err)
+
+	h.invalidateDryCallCache()
+
+	return prevValue
+}
+
+// GetState returns the value for the given storage slot.
+// The operation is only allowed for testing purposes.
+func (h *ContractHandler) GetState(
+	address types.Address,
+	slot gethCommon.Hash,
+) gethCommon.Hash {
+
+	h.validateTestOperation()
+
+	execState, err := state.NewStateDB(h.backend, evm.StorageAccountAddress(h.flowChainID))
+	panicOnError(err)
+
+	return execState.GetState(address.ToCommon(), slot)
+}
+
+// RunTxAs runs a transaction by setting the call's `msg.sender`
+// to be the `from` address.
+// The operation is only allowed for testing purposes.
+func (h *ContractHandler) RunTxAs(
+	from types.Address,
+	to types.Address,
+	txData types.Data,
+	gasLimit types.GasLimit,
+	balance types.Balance,
+) *types.ResultSummary {
+
+	h.validateTestOperation()
+
+	account := h.AccountByAddress(from, true)
+	return account.Call(to, txData, gasLimit, balance)
 }
 
 // DeployCOA deploys a cadence-owned-account and returns the address
@@ -125,7 +213,7 @@ func (h *ContractHandler) AccountByAddress(addr types.Address, isAuthorized bool
 
 // LastExecutedBlock returns the last executed block
 func (h *ContractHandler) LastExecutedBlock() *types.Block {
-	block, err := h.blockStore.LatestBlock()
+	block, err := h.backend.LatestBlock()
 	panicOnError(err)
 	return block
 }
@@ -184,7 +272,9 @@ func (h *ContractHandler) runWithGasFeeRefund(gasFeeCollector types.Address, f f
 func (h *ContractHandler) BatchRun(rlpEncodedTxs [][]byte, gasFeeCollector types.Address) []*types.ResultSummary {
 	// capture open tracing
 	span := h.backend.StartChildSpan(trace.FVMEVMBatchRun)
-	span.SetAttributes(attribute.Int("tx_counts", len(rlpEncodedTxs)))
+	if span.Tracer != nil {
+		span.SetAttributes(attribute.Int("tx_counts", len(rlpEncodedTxs)))
+	}
 	defer span.End()
 
 	var results []*types.Result
@@ -203,7 +293,14 @@ func (h *ContractHandler) BatchRun(rlpEncodedTxs [][]byte, gasFeeCollector types
 	return resSummaries
 }
 
-func (h *ContractHandler) batchRun(rlpEncodedTxs [][]byte) ([]*types.Result, error) {
+func (h *ContractHandler) batchRun(rlpEncodedTxs [][]byte) (_ []*types.Result, err error) {
+	defer func() {
+		if err == nil {
+			// Invalidate drycall cache if EVM state is changed (batchRun is successful).
+			h.invalidateDryCallCache()
+		}
+	}()
+
 	// step 1 - transaction decoding and check that enough evm gas is available in the FVM transaction
 
 	// remainingGasLimit is the remaining EVM gas available in hte FVM transaction
@@ -309,10 +406,7 @@ func (h *ContractHandler) batchRun(rlpEncodedTxs [][]byte) ([]*types.Result, err
 	}
 
 	// update the block proposal
-	err = h.blockStore.UpdateBlockProposal(bp)
-	if err != nil {
-		return nil, err
-	}
+	h.backend.StageBlockProposal(bp)
 
 	return res, nil
 }
@@ -323,15 +417,22 @@ func (h *ContractHandler) CommitBlockProposal() {
 	panicOnError(h.commitBlockProposal())
 }
 
-func (h *ContractHandler) commitBlockProposal() error {
+func (h *ContractHandler) commitBlockProposal() (err error) {
+	defer func() {
+		if err == nil {
+			// Invalidate drycall cache if EVM state is changed (commitBlockProposal is successful).
+			h.invalidateDryCallCache()
+		}
+	}()
+
 	// load latest block proposal
-	bp, err := h.blockStore.BlockProposal()
+	bp, err := h.backend.BlockProposal()
 	if err != nil {
 		return err
 	}
 
 	// commit the proposal
-	err = h.blockStore.CommitBlockProposal(bp)
+	err = h.backend.CommitBlockProposal(bp)
 	if err != nil {
 		return err
 	}
@@ -361,7 +462,14 @@ func (h *ContractHandler) commitBlockProposal() error {
 	return nil
 }
 
-func (h *ContractHandler) run(rlpEncodedTx []byte) (*types.Result, error) {
+func (h *ContractHandler) run(rlpEncodedTx []byte) (_ *types.Result, err error) {
+	defer func() {
+		if err == nil {
+			// Invalidate drycall cache if EVM state is changed (run is successful).
+			h.invalidateDryCallCache()
+		}
+	}()
+
 	// step 1 - transaction decoding
 	tx, err := h.decodeTransaction(rlpEncodedTx)
 	if err != nil {
@@ -418,10 +526,7 @@ func (h *ContractHandler) run(rlpEncodedTx []byte) (*types.Result, error) {
 
 	// step 8 - update the block proposal
 	bp.AppendTransaction(res)
-	err = h.blockStore.UpdateBlockProposal(bp)
-	if err != nil {
-		return nil, err
-	}
+	h.backend.StageBlockProposal(bp)
 
 	// step 9 - emit transaction event
 	err = h.emitEvent(
@@ -449,16 +554,16 @@ func (h *ContractHandler) DryRun(
 ) *types.ResultSummary {
 	defer h.backend.StartChildSpan(trace.FVMEVMDryRun).End()
 
-	res, err := h.dryRun(rlpEncodedTx, from)
+	resSummary, err := h.dryRun(rlpEncodedTx, from)
 	panicOnError(err)
 
-	return res.ResultSummary()
+	return resSummary
 }
 
 func (h *ContractHandler) dryRun(
 	rlpEncodedTx []byte,
 	from types.Address,
-) (*types.Result, error) {
+) (*types.ResultSummary, error) {
 	// step 1 - transaction decoding
 	err := h.backend.MeterComputation(
 		common.ComputationUsage{
@@ -476,6 +581,30 @@ func (h *ContractHandler) dryRun(
 		return nil, err
 	}
 
+	return h.dryRunTx(&tx, from)
+}
+
+func (h *ContractHandler) dryRunTx(
+	tx *gethTypes.Transaction,
+	from types.Address,
+) (*types.ResultSummary, error) {
+	// check if enough computation is available
+	err := h.checkGasLimit(types.GasLimit(tx.Gas()))
+	if err != nil {
+		return nil, err
+	}
+
+	// Cache lookup
+	key := evmDryCallCacheKey{from: from, txHash: tx.Hash()}
+	if cached, ok := h.evmDryCallCache[key]; ok {
+		// Meter cached gas
+		panicOnError(h.backend.MeterComputation(common.ComputationUsage{
+			Kind:      environment.ComputationKindEVMGasUsage,
+			Intensity: cached.GasConsumed,
+		}))
+		return cached, nil
+	}
+
 	bp, err := h.getBlockProposal()
 	if err != nil {
 		return nil, err
@@ -490,7 +619,13 @@ func (h *ContractHandler) dryRun(
 		return nil, err
 	}
 
-	res, err := blk.DryRunTransaction(&tx, from.ToCommon())
+	var res *types.Result
+	// just like with EVM.run / EVM.batchRun / COA.call, we disable metering
+	// so we can fully meter the gas usage in the next step, even in case
+	// of unhandled errors/exceptions.
+	h.backend.RunWithMeteringDisabled(func() {
+		res, err = blk.DryRunTransaction(tx, from.ToCommon())
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -498,7 +633,49 @@ func (h *ContractHandler) dryRun(
 		return nil, types.ErrUnexpectedEmptyResult
 	}
 
-	return res, nil
+	// gas meter even invalid or failed status
+	if err = h.meterGasUsage(res); err != nil {
+		return nil, err
+	}
+
+	resSummary := res.ResultSummary()
+
+	// Skip caching results if they are too large or if the cache has reached its limit.
+	// These safeguards prevent excessive memory usage from large return data and
+	// uncontrolled cache growth within a single transaction.
+	if len(resSummary.ReturnedData) > maxDryCallCacheResultDataSize ||
+		len(h.evmDryCallCache) >= maxDryCallCacheCount {
+		return resSummary, nil
+	}
+
+	// Store in cache
+	if h.evmDryCallCache == nil {
+		h.evmDryCallCache = make(map[evmDryCallCacheKey]*types.ResultSummary)
+	}
+	h.evmDryCallCache[key] = resSummary
+
+	return resSummary, nil
+}
+
+// DryRunWithTxData simulates execution of the provided transaction data.
+// The from address is required since the transaction is unsigned.
+// The function should not have any persisted changes made to the state.
+func (h *ContractHandler) DryRunWithTxData(
+	txData gethTypes.TxData,
+	from types.Address,
+) *types.ResultSummary {
+	if txData == nil {
+		panicOnError(types.ErrUnexpectedEmptyTransactionData)
+	}
+
+	defer h.backend.StartChildSpan(trace.FVMEVMDryRun).End()
+
+	tx := gethTypes.NewTx(txData)
+
+	resSummary, err := h.dryRunTx(tx, from)
+	panicOnError(err)
+
+	return resSummary
 }
 
 // checkGasLimit checks if enough computation is left in the environment
@@ -560,7 +737,7 @@ func (h *ContractHandler) getBlockContext(bp *types.BlockProposal) (
 		BlockTimestamp:         bp.Timestamp,
 		DirectCallBaseGasUsage: types.DefaultDirectCallBaseGasUsage,
 		GetHashFunc: func(n uint64) gethCommon.Hash {
-			hash, err := h.blockStore.BlockHash(n)
+			hash, err := h.backend.BlockHash(n)
 			panicOnError(err) // we have to handle it here given we can't continue with it even in try case
 			return hash
 		},
@@ -573,14 +750,21 @@ func (h *ContractHandler) getBlockContext(bp *types.BlockProposal) (
 }
 
 func (h *ContractHandler) getBlockProposal() (*types.BlockProposal, error) {
-	return h.blockStore.BlockProposal()
+	return h.backend.BlockProposal()
 }
 
 func (h *ContractHandler) executeAndHandleCall(
 	call *types.DirectCall,
 	totalSupplyDiff *big.Int,
 	deductSupplyDiff bool,
-) (*types.Result, error) {
+) (_ *types.Result, err error) {
+	defer func() {
+		if err == nil {
+			// Invalidate drycall cache if EVM state is changed (executeAndHandleCall is successful).
+			h.invalidateDryCallCache()
+		}
+	}()
+
 	// step 1 - check enough computation is available
 	if err := h.checkGasLimit(types.GasLimit(call.GasLimit)); err != nil {
 		return nil, err
@@ -645,10 +829,7 @@ func (h *ContractHandler) executeAndHandleCall(
 	}
 
 	// update the block proposal
-	err = h.blockStore.UpdateBlockProposal(bp)
-	if err != nil {
-		return nil, err
-	}
+	h.backend.StageBlockProposal(bp)
 
 	// step 8 - emit transaction event
 	encoded, err := call.Encode()
@@ -709,16 +890,7 @@ func (a *Account) Nonce() uint64 {
 }
 
 func (a *Account) nonce() (uint64, error) {
-	bp, err := a.fch.getBlockProposal()
-	if err != nil {
-		return 0, err
-	}
-	ctx, err := a.fch.getBlockContext(bp)
-	if err != nil {
-		return 0, err
-	}
-
-	blk, err := a.fch.emulator.NewReadOnlyBlockView(ctx)
+	blk, err := a.fch.emulator.NewReadOnlyBlockView()
 	if err != nil {
 		return 0, err
 	}
@@ -737,17 +909,7 @@ func (a *Account) Balance() types.Balance {
 }
 
 func (a *Account) balance() (types.Balance, error) {
-	bp, err := a.fch.getBlockProposal()
-	if err != nil {
-		return nil, err
-	}
-
-	ctx, err := a.fch.getBlockContext(bp)
-	if err != nil {
-		return nil, err
-	}
-
-	blk, err := a.fch.emulator.NewReadOnlyBlockView(ctx)
+	blk, err := a.fch.emulator.NewReadOnlyBlockView()
 	if err != nil {
 		return nil, err
 	}
@@ -767,17 +929,7 @@ func (a *Account) Code() types.Code {
 }
 
 func (a *Account) code() (types.Code, error) {
-	bp, err := a.fch.getBlockProposal()
-	if err != nil {
-		return nil, err
-	}
-
-	ctx, err := a.fch.getBlockContext(bp)
-	if err != nil {
-		return nil, err
-	}
-
-	blk, err := a.fch.emulator.NewReadOnlyBlockView(ctx)
+	blk, err := a.fch.emulator.NewReadOnlyBlockView()
 	if err != nil {
 		return nil, err
 	}
@@ -795,17 +947,7 @@ func (a *Account) CodeHash() []byte {
 }
 
 func (a *Account) codeHash() ([]byte, error) {
-	bp, err := a.fch.getBlockProposal()
-	if err != nil {
-		return nil, err
-	}
-
-	ctx, err := a.fch.getBlockContext(bp)
-	if err != nil {
-		return nil, err
-	}
-
-	blk, err := a.fch.emulator.NewReadOnlyBlockView(ctx)
+	blk, err := a.fch.emulator.NewReadOnlyBlockView()
 	if err != nil {
 		return nil, err
 	}

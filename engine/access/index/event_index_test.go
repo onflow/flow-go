@@ -1,9 +1,7 @@
 package index
 
 import (
-	"bytes"
 	"math"
-	"sort"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -24,18 +22,6 @@ func TestGetEvents(t *testing.T) {
 
 	storedEvents := make([]flow.Event, len(expectedEvents))
 	copy(storedEvents, expectedEvents)
-
-	// sort events in storage order (by tx ID)
-	sort.Slice(storedEvents, func(i, j int) bool {
-		cmp := bytes.Compare(storedEvents[i].TransactionID[:], storedEvents[j].TransactionID[:])
-		if cmp == 0 {
-			if storedEvents[i].TransactionIndex == storedEvents[j].TransactionIndex {
-				return storedEvents[i].EventIndex < storedEvents[j].EventIndex
-			}
-			return storedEvents[i].TransactionIndex < storedEvents[j].TransactionIndex
-		}
-		return cmp < 0
-	})
 
 	events := storagemock.NewEvents(t)
 	header := unittest.BlockHeaderFixture()

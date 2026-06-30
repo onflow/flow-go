@@ -122,7 +122,7 @@ func (r *FungibleTokenTracker) Report(payloads []ledger.Payload, commit ledger.S
 	close(jobs)
 
 	workerCount := runtime.NumCPU()
-	for i := 0; i < workerCount; i++ {
+	for range workerCount {
 		wg.Add(1)
 		go r.worker(jobs, wg)
 	}

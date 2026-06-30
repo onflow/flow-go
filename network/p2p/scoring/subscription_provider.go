@@ -7,7 +7,6 @@ import (
 	"github.com/go-playground/validator/v10"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/rs/zerolog"
-	"go.uber.org/atomic"
 
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
@@ -34,8 +33,6 @@ type SubscriptionProvider struct {
 	// idProvider translates the peer ids to flow ids.
 	idProvider module.IdentityProvider
 
-	// allTopics is a list of all topics in the pubsub network that this node is subscribed to.
-	allTopicsUpdate         atomic.Bool   // whether a goroutine is already updating the list of topics
 	allTopicsUpdateInterval time.Duration // the interval for updating the list of topics in the pubsub network that this node has subscribed to.
 }
 
@@ -99,22 +96,14 @@ func (s *SubscriptionProvider) updateTopicsLoop(ctx irrecoverable.SignalerContex
 	}
 }
 
-// updateTopics returns all the topics in the pubsub network that this node (peer) has subscribed to.
-// Note that this method always returns the cached version of the subscribed topics while querying the
-// pubsub network for the list of topics in a goroutine. Hence, the first call to this method always returns an empty
-// list.
-// Args:
-// - ctx: the context of the caller.
-// Returns:
-// - error on failure to update the list of topics. The returned error is irrecoverable and indicates an exception.
+// updateTopics queries the pubsub network for all topics this node subscribes to and updates the cache
+// with the current peer subscriptions for each topic.
+//
+// IMPORTANT: This method is designed to be called only from the single-goroutine ticker loop in updateTopicsLoop.
+// No synchronization is needed because the ticker guarantees sequential execution.
+//
+// No errors are expected during normal operation.
 func (s *SubscriptionProvider) updateTopics() error {
-	if updateInProgress := s.allTopicsUpdate.CompareAndSwap(false, true); updateInProgress {
-		// another goroutine is already updating the list of topics
-		s.logger.Trace().Msg("skipping topic update; another update is already in progress")
-		return nil
-	}
-
-	// start of critical section; protected by updateInProgress atomic flag
 	allTopics := s.topicProviderOracle().GetTopics()
 	s.logger.Trace().Msgf("all topics updated: %v", allTopics)
 
@@ -145,9 +134,6 @@ func (s *SubscriptionProvider) updateTopics() error {
 				Msg("updated topics for peer")
 		}
 	}
-
-	// remove the update flag; end of critical section
-	s.allTopicsUpdate.Store(false)
 	return nil
 }
 

@@ -81,6 +81,13 @@ func New(
 		interceptors = append(interceptors, rateLimitInterceptor)
 	}
 
+	// Note: logging interceptor should be last (innermost) to capture all messages.
+	// Both start and finish logs are at debug level.
+	// Example log messages for searching:
+	//   - Start:  DBG "started call" grpc.method=SendTransaction grpc.service=flow.access.AccessAPI peer.address=...
+	//   - Finish: DBG "finished call" grpc.method=SendTransaction grpc.service=flow.access.AccessAPI peer.address=... grpc.code=OK grpc.time_ms=...
+	interceptors = append(interceptors, grpcserver.LoggingInterceptor(log))
+
 	// create a chained unary interceptor
 	chainedInterceptors := grpc.ChainUnaryInterceptor(interceptors...)
 	grpcOpts = append(grpcOpts, chainedInterceptors)

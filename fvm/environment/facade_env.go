@@ -8,6 +8,8 @@ import (
 	"github.com/onflow/cadence/interpreter"
 	"github.com/onflow/cadence/sema"
 
+	"github.com/onflow/flow-go/fvm/evm"
+
 	"github.com/onflow/flow-go/fvm/storage"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/fvm/storage/state"
@@ -19,7 +21,7 @@ var _ Environment = &facadeEnvironment{}
 
 // facadeEnvironment exposes various fvm business logic as a single interface.
 type facadeEnvironment struct {
-	*Runtime
+	CadenceRuntimeProvider
 
 	tracing.TracerSpan
 	Meter
@@ -51,9 +53,16 @@ type facadeEnvironment struct {
 	*ContractReader
 	ContractUpdater
 	*Programs
+	*BlockStore
 
 	accounts Accounts
 	txnState storage.TransactionPreparer
+
+	evmTestOperationsAllowed bool
+}
+
+func (env *facadeEnvironment) EVMTestOperationsAllowed() bool {
+	return env.evmTestOperationsAllowed
 }
 
 func newFacadeEnvironment(
@@ -61,14 +70,13 @@ func newFacadeEnvironment(
 	params EnvironmentParams,
 	txnState storage.TransactionPreparer,
 	meter Meter,
+	runtime CadenceRuntimeProvider,
 ) *facadeEnvironment {
 	accounts := NewAccounts(txnState)
 	logger := NewProgramLogger(tracer, params.ProgramLoggerParams)
-	runtime := NewRuntime(params.RuntimeParams)
 	chain := params.Chain
 	systemContracts := NewSystemContracts(
 		chain,
-		params.CadenceVMEnabled,
 		tracer,
 		logger,
 		runtime)
@@ -76,7 +84,7 @@ func newFacadeEnvironment(
 	sc := systemcontracts.SystemContractsForChain(chain.ChainID())
 
 	env := &facadeEnvironment{
-		Runtime: runtime,
+		CadenceRuntimeProvider: runtime,
 
 		TracerSpan: tracer,
 		Meter:      meter,
@@ -142,6 +150,7 @@ func newFacadeEnvironment(
 			common.Address(sc.Crypto.Address),
 		),
 		ContractUpdater: NoContractUpdater{},
+
 		Programs: NewPrograms(
 			tracer,
 			meter,
@@ -151,9 +160,11 @@ func newFacadeEnvironment(
 
 		accounts: accounts,
 		txnState: txnState,
+
+		evmTestOperationsAllowed: params.TransactionInfoParams.EVMTestOperationsAllowed,
 	}
 
-	env.Runtime.SetEnvironment(env)
+	env.CadenceRuntimeProvider.SetEnvironment(env)
 
 	return env
 }
@@ -179,17 +190,31 @@ func NewScriptEnv(
 	params EnvironmentParams,
 	txnState storage.TransactionPreparer,
 ) *facadeEnvironment {
+	runtimeType := CadenceScriptRuntime
+	if params.CadenceVMEnabled {
+		runtimeType = CadenceScriptVMRuntime
+	}
+	cadenceRuntime := NewRuntime(params.RuntimeParams, runtimeType)
+
 	env := newFacadeEnvironment(
 		tracer,
 		params,
 		txnState,
-		NewCancellableMeter(ctx, txnState))
+		NewCancellableMeter(ctx, txnState),
+		cadenceRuntime)
 	env.RandomGenerator = NewRandomGenerator(
 		tracer,
 		params.EntropyProvider,
 		params.ScriptInfoParams.ID[:],
 	)
 	env.addParseRestrictedChecks()
+	env.BlockStore = NewBlockStore(
+		params.Chain.ChainID(),
+		env.ValueStore,
+		env.BlockInfo,
+		env.RandomGenerator,
+		evm.StorageAccountAddress(params.Chain.ChainID()),
+	)
 	return env
 }
 
@@ -198,11 +223,17 @@ func NewTransactionEnvironment(
 	params EnvironmentParams,
 	txnState storage.TransactionPreparer,
 ) *facadeEnvironment {
+	runtimeType := CadenceTransactionRuntime
+	if params.CadenceVMEnabled {
+		runtimeType = CadenceTransactionVMRuntime
+	}
+	cadenceRuntime := NewRuntime(params.RuntimeParams, runtimeType)
 	env := newFacadeEnvironment(
 		tracer,
 		params,
 		txnState,
 		NewMeter(txnState),
+		cadenceRuntime,
 	)
 
 	env.TransactionInfo = NewTransactionInfo(
@@ -236,7 +267,7 @@ func NewTransactionEnvironment(
 		params.ContractUpdaterParams,
 		env.ProgramLogger,
 		env.SystemContracts,
-		env.Runtime)
+		cadenceRuntime)
 
 	env.AccountKeyUpdater = NewAccountKeyUpdater(
 		tracer,
@@ -256,6 +287,14 @@ func NewTransactionEnvironment(
 		env.Meter,
 		params.EntropyProvider,
 		params.TransactionInfoParams.RandomSourceHistoryCallAllowed,
+	)
+
+	env.BlockStore = NewBlockStore(
+		params.Chain.ChainID(),
+		env.ValueStore,
+		env.BlockInfo,
+		env.RandomGenerator,
+		evm.StorageAccountAddress(params.Chain.ChainID()),
 	)
 
 	env.addParseRestrictedChecks()
@@ -319,13 +358,22 @@ func (env *facadeEnvironment) FlushPendingUpdates() (
 	ContractUpdates,
 	error,
 ) {
-	return env.ContractUpdater.Commit()
+	updates, err := env.ContractUpdater.Commit()
+	if err != nil {
+		return ContractUpdates{}, err
+	}
+	err = env.BlockStore.FlushBlockProposal()
+	if err != nil {
+		return ContractUpdates{}, err
+	}
+	return updates, nil
 }
 
 func (env *facadeEnvironment) Reset() {
 	env.ContractUpdater.Reset()
 	env.EventEmitter.Reset()
 	env.Programs.Reset()
+	env.BlockStore.ResetBlockProposal()
 }
 
 // Miscellaneous Cadence runtime.Interface API
