@@ -1379,6 +1379,7 @@ func TestEVMEncodeABIBytesRoundtrip(t *testing.T) {
 				Location:         nextScriptLocation(),
 				MemoryGauge:      gauge,
 				ComputationGauge: gauge,
+				UseVM:            cadence_vm.DefaultEnabled,
 			},
 		)
 		require.NoError(t, err)
@@ -1447,6 +1448,7 @@ func TestEVMEncodeABIBytesRoundtrip(t *testing.T) {
 				Location:         nextScriptLocation(),
 				MemoryGauge:      gauge,
 				ComputationGauge: gauge,
+				UseVM:            cadence_vm.DefaultEnabled,
 			},
 		)
 		require.NoError(t, err)
@@ -3900,6 +3902,7 @@ func TestEVMDecodeABIWithInsufficientData(t *testing.T) {
 			Interface:   runtimeInterface,
 			Environment: scriptEnvironment,
 			Location:    nextScriptLocation(),
+			UseVM:       cadence_vm.DefaultEnabled,
 		},
 	)
 	require.Error(t, err)
@@ -4714,6 +4717,7 @@ func TestEVMDryCallWithSigAndArgs(t *testing.T) {
 				Interface:   runtimeInterface,
 				Environment: scriptEnvironment,
 				Location:    nextScriptLocation(),
+				UseVM:       cadence_vm.DefaultEnabled,
 			},
 		)
 	}
@@ -5568,6 +5572,7 @@ func TestCadenceOwnedAccountCallWithSigAndArgs(t *testing.T) {
 				Interface:   runtimeInterface,
 				Environment: scriptEnvironment,
 				Location:    nextScriptLocation(),
+				UseVM:       cadence_vm.DefaultEnabled,
 			},
 		)
 	}
@@ -6155,6 +6160,7 @@ func TestCadenceOwnedAccountDryCallWithSigAndArgs(t *testing.T) {
 				Interface:   runtimeInterface,
 				Environment: scriptEnvironment,
 				Location:    nextScriptLocation(),
+				UseVM:       cadence_vm.DefaultEnabled,
 			},
 		)
 	}
