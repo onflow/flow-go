@@ -121,7 +121,7 @@ jobs:
         uses: actions/checkout@v6
 
       - name: Setup private build environment
-        if: ${{ vars.PRIVATE_BUILDS_SUPPORTED == 'true' }} 
+        if: ${{ vars.PRIVATE_BUILDS_SUPPORTED == 'true' }}
         uses: ./actions/private-setup
         with:
           cadence_deploy_key: ${{ secrets.CADENCE_DEPLOY_KEY }}
@@ -205,7 +205,7 @@ jobs:
       uses: actions/checkout@v6
 
     - name: Setup private build environment
-      if: ${{ vars.PRIVATE_BUILDS_SUPPORTED == 'true' }} 
+      if: ${{ vars.PRIVATE_BUILDS_SUPPORTED == 'true' }}
       uses: ./actions/private-setup
       with:
         cadence_deploy_key: ${{ secrets.CADENCE_DEPLOY_KEY }}
@@ -251,7 +251,7 @@ jobs:
         uses: actions/checkout@v6
 
       - name: Setup private build environment
-        if: ${{ vars.PRIVATE_BUILDS_SUPPORTED == 'true' }} 
+        if: ${{ vars.PRIVATE_BUILDS_SUPPORTED == 'true' }}
         uses: ./actions/private-setup
         with:
           cadence_deploy_key: ${{ secrets.CADENCE_DEPLOY_KEY }}
@@ -296,7 +296,7 @@ jobs:
           fetch-depth: 0
 
       - name: Setup private build environment
-        if: ${{ vars.PRIVATE_BUILDS_SUPPORTED == 'true' }} 
+        if: ${{ vars.PRIVATE_BUILDS_SUPPORTED == 'true' }}
         uses: ./actions/private-setup
         with:
           cadence_deploy_key: ${{ secrets.CADENCE_DEPLOY_KEY }}
@@ -317,11 +317,11 @@ jobs:
         # this docker auth is exclusively for higher rate limits. continue unauthenticated if it fails
         continue-on-error: true
 
-
       - name: Docker build
         env:
           CADENCE_DEPLOY_KEY: ${{ secrets.CADENCE_DEPLOY_KEY }}
         run: make docker-native-build-flow docker-native-build-flow-corrupt
+
       - name: Save Docker images
         run: |
           docker save \
@@ -336,6 +336,7 @@ jobs:
           gcr.io/flow-container-registry/access-corrupted:latest \
           gcr.io/flow-container-registry/execution-corrupted:latest \
           gcr.io/flow-container-registry/verification-corrupted:latest > flow-docker-images.tar
+
       - name: Cache Docker images
         uses: actions/cache@v5
         with:
@@ -356,9 +357,9 @@ jobs:
     steps:
       - name: Checkout repo
         uses: actions/checkout@v6
-      
+
       - name: Setup private build environment
-        if: ${{ vars.PRIVATE_BUILDS_SUPPORTED == 'true' }} 
+        if: ${{ vars.PRIVATE_BUILDS_SUPPORTED == 'true' }}
         uses: ./actions/private-setup
         with:
           cadence_deploy_key: ${{ secrets.CADENCE_DEPLOY_KEY }}
@@ -458,7 +459,7 @@ jobs:
           fetch-depth: 0
 
     - name: Setup private build environment
-      if: ${{ vars.PRIVATE_BUILDS_SUPPORTED == 'true' }} 
+      if: ${{ vars.PRIVATE_BUILDS_SUPPORTED == 'true' }}
       uses: ./actions/private-setup
       with:
         cadence_deploy_key: ${{ secrets.CADENCE_DEPLOY_KEY }}

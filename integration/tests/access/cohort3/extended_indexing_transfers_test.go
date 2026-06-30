@@ -327,7 +327,7 @@ func (s *ExtendedIndexingSuite) sendExampleTokenTransferTx(
 
 	amountArg, err := cadence.NewUFix64(amount)
 	s.Require().NoError(err)
-	toArg := cadence.NewAddress(cadence.BytesToAddress(to.Bytes()))
+	toArg := cadence.NewAddress(to)
 
 	result := s.sendTransaction(ctx, client, script, amountArg, toArg)
 	s.T().Logf("ExampleToken transfer sealed at height %d", result.BlockHeight)
@@ -347,7 +347,7 @@ func (s *ExtendedIndexingSuite) sendMintNFTTx(
 		contracts.MetadataViews.Address.Hex(),
 	)
 
-	toArg := cadence.NewAddress(cadence.BytesToAddress(to.Bytes()))
+	toArg := cadence.NewAddress(to)
 	result := s.sendTransaction(ctx, client, script, toArg)
 	s.T().Logf("ExampleNFT mint sealed at height %d", result.BlockHeight)
 	return result

@@ -65,7 +65,7 @@ func TokenTransferTransaction(ftAddr, flowToken, toAddr flow.Address, amount cad
 	if err != nil {
 		return nil, err
 	}
-	err = tx.AddArgument(cadence.BytesToAddress(toAddr.Bytes()))
+	err = tx.AddArgument(cadence.Address(toAddr))
 	if err != nil {
 		return nil, err
 	}

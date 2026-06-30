@@ -23,7 +23,7 @@ var (
 	flagFromTo                       string
 	flagWorkerCount                  uint // number of workers to verify the blocks concurrently
 	flagStopOnMismatch               bool
-	flagtransactionFeesDisabled      bool
+	flagTransactionFeesDisabled      bool
 	flagScheduledTransactionsEnabled bool
 )
 
@@ -58,7 +58,7 @@ func init() {
 
 	Cmd.Flags().BoolVar(&flagStopOnMismatch, "stop_on_mismatch", false, "stop verification on first mismatch")
 
-	Cmd.Flags().BoolVar(&flagtransactionFeesDisabled, "fees_disabled", false, "disable transaction fees")
+	Cmd.Flags().BoolVar(&flagTransactionFeesDisabled, "fees_disabled", false, "disable transaction fees")
 
 	Cmd.Flags().BoolVar(&flagScheduledTransactionsEnabled, "scheduled_callbacks_enabled", fvm.DefaultScheduledTransactionsEnabled, "[deprecated] enable scheduled transactions")
 }
@@ -106,7 +106,7 @@ func run(*cobra.Command, []string) {
 			flagChunkDataPackDir,
 			flagWorkerCount,
 			flagStopOnMismatch,
-			flagtransactionFeesDisabled,
+			flagTransactionFeesDisabled,
 			flagScheduledTransactionsEnabled,
 		)
 		if err != nil {
@@ -124,7 +124,7 @@ func run(*cobra.Command, []string) {
 			flagChunkDataPackDir,
 			flagWorkerCount,
 			flagStopOnMismatch,
-			flagtransactionFeesDisabled,
+			flagTransactionFeesDisabled,
 			flagScheduledTransactionsEnabled,
 		)
 		if err != nil {

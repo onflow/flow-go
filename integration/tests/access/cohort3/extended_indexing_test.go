@@ -488,7 +488,7 @@ func buildFlowTransferTx(t *testing.T, to sdk.Address, amount string) *sdk.Trans
 
 	amountArg, err := cadence.NewUFix64(amount)
 	require.NoError(t, err)
-	toArg := cadence.NewAddress(cadence.BytesToAddress(to.Bytes()))
+	toArg := cadence.NewAddress(to)
 
 	tx := sdk.NewTransaction().
 		SetScript([]byte(strings.TrimSpace(script))).
