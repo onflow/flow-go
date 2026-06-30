@@ -12,12 +12,12 @@ import (
 func NewInvalidAddressErrorf(
 	address flow.Address,
 	msg string,
-	args ...interface{},
+	args ...any,
 ) CodedError {
 	return NewCodedError(
 		ErrCodeInvalidAddressError,
 		"invalid address (%s): "+msg,
-		append([]interface{}{address.String()}, args...)...)
+		append([]any{address.String()}, args...)...)
 }
 
 // NewInvalidArgumentErrorf constructs a new CodedError which indicates that a
@@ -26,7 +26,7 @@ func NewInvalidAddressErrorf(
 // - number of arguments doesn't match the template
 //
 // TODO add more cases like argument size
-func NewInvalidArgumentErrorf(msg string, args ...interface{}) CodedError {
+func NewInvalidArgumentErrorf(msg string, args ...any) CodedError {
 	return NewCodedError(
 		ErrCodeInvalidArgumentError,
 		"transaction arguments are invalid: ("+msg+")",
@@ -42,7 +42,7 @@ func IsInvalidArgumentError(err error) bool {
 func NewInvalidLocationErrorf(
 	location runtime.Location,
 	msg string,
-	args ...interface{},
+	args ...any,
 ) CodedError {
 	locationStr := ""
 	if location != nil {
@@ -52,7 +52,7 @@ func NewInvalidLocationErrorf(
 	return NewCodedError(
 		ErrCodeInvalidLocationError,
 		"location (%s) is not a valid location: "+msg,
-		append([]interface{}{locationStr}, args...)...)
+		append([]any{locationStr}, args...)...)
 }
 
 // NewValueErrorf constructs a new CodedError which indicates a value is not
@@ -60,12 +60,12 @@ func NewInvalidLocationErrorf(
 func NewValueErrorf(
 	valueStr string,
 	msg string,
-	args ...interface{},
+	args ...any,
 ) CodedError {
 	return NewCodedError(
 		ErrCodeValueError,
 		"invalid value (%s): "+msg,
-		append([]interface{}{valueStr}, args...)...)
+		append([]any{valueStr}, args...)...)
 }
 
 func IsValueError(err error) bool {
@@ -78,12 +78,12 @@ func IsValueError(err error) bool {
 func NewOperationAuthorizationErrorf(
 	operation string,
 	msg string,
-	args ...interface{},
+	args ...any,
 ) CodedError {
 	return NewCodedError(
 		ErrCodeOperationAuthorizationError,
 		"(%s) is not authorized: "+msg,
-		append([]interface{}{operation}, args...)...)
+		append([]any{operation}, args...)...)
 }
 
 // NewAccountAuthorizationErrorf constructs a new CodedError which indicates
@@ -95,10 +95,10 @@ func NewOperationAuthorizationErrorf(
 func NewAccountAuthorizationErrorf(
 	address flow.Address,
 	msg string,
-	args ...interface{},
+	args ...any,
 ) CodedError {
 	return NewCodedError(
 		ErrCodeAccountAuthorizationError,
 		"authorization failed for account %s: "+msg,
-		append([]interface{}{address}, args...)...)
+		append([]any{address}, args...)...)
 }

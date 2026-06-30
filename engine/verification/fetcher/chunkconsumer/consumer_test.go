@@ -8,7 +8,6 @@ import (
 
 	"github.com/cockroachdb/pebble/v2"
 	"github.com/stretchr/testify/require"
-	"go.uber.org/atomic"
 
 	"github.com/onflow/flow-go/engine/verification/fetcher/chunkconsumer"
 	"github.com/onflow/flow-go/model/chunks"
@@ -68,11 +67,11 @@ func TestProduceConsume(t *testing.T) {
 		var called chunks.LocatorList
 		lock := &sync.Mutex{}
 		var finishAll sync.WaitGroup
+		finishAll.Add(10)
 		alwaysFinish := func(notifier module.ProcessingNotifier, locator *chunks.Locator) {
 			lock.Lock()
 			defer lock.Unlock()
 			called = append(called, locator)
-			finishAll.Add(1)
 			go func() {
 				notifier.Notify(locator.ID())
 				finishAll.Done()
@@ -90,8 +89,8 @@ func TestProduceConsume(t *testing.T) {
 				consumer.Check() // notify the consumer
 			}
 
+			finishAll.Wait() // wait until all 10 jobs are processed and notified
 			<-consumer.Done()
-			finishAll.Wait() // wait until all finished
 			// expect the mock engine receives all 10 calls
 			require.Equal(t, locators, called)
 		})
@@ -115,7 +114,6 @@ func TestProduceConsume(t *testing.T) {
 		}
 		WithConsumer(t, alwaysFinish, func(consumer *chunkconsumer.ChunkConsumer, chunksQueue storage.ChunksQueue) {
 			<-consumer.Ready()
-			total := atomic.NewUint32(0)
 
 			locators := unittest.ChunkLocatorListFixture(100)
 
@@ -124,16 +122,19 @@ func TestProduceConsume(t *testing.T) {
 					ok, err := chunksQueue.StoreChunkLocator(locators[i])
 					require.NoError(t, err, fmt.Sprintf("chunk locator %v can't be stored", i))
 					require.True(t, ok)
-					total.Inc()
 					consumer.Check() // notify the consumer
 				}(i)
 			}
 
-			finishAll.Wait()
+			finishAll.Wait() // wait until all 100 jobs are processed and notified
 			<-consumer.Done()
 
-			// expect the mock engine receives all 100 calls
-			require.Equal(t, uint32(100), total.Load())
+			// expect the mock engine receives all 100 calls. `called` is appended to synchronously
+			// within the process callback (before the notify goroutine is spawned), so once
+			// finishAll.Wait returns all 100 appends are guaranteed visible.
+			lock.Lock()
+			defer lock.Unlock()
+			require.Len(t, called, 100)
 		})
 	})
 }
@@ -148,7 +149,8 @@ func WithConsumer(
 		db := pebbleimpl.ToDB(pebbleDB)
 
 		collector := &metrics.NoopCollector{}
-		processedIndex := store.NewConsumerProgress(db, module.ConsumeProgressVerificationChunkIndex)
+		processedIndex, err := store.NewConsumerProgress(db, module.ConsumeProgressVerificationChunkIndex).Initialize(chunkconsumer.DefaultJobIndex)
+		require.NoError(t, err)
 		chunksQueue := store.NewChunkQueue(collector, db)
 		ok, err := chunksQueue.Init(chunkconsumer.DefaultJobIndex)
 		require.NoError(t, err)

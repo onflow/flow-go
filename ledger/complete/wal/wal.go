@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"sort"
 
+	"github.com/hashicorp/go-multierror"
 	prometheusWAL "github.com/onflow/wal/wal"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rs/zerolog"
@@ -12,6 +13,7 @@ import (
 	"github.com/onflow/flow-go/ledger/complete/mtrie"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
 	"github.com/onflow/flow-go/module"
+	utilsio "github.com/onflow/flow-go/utils/io"
 )
 
 const SegmentSize = 32 * 1024 * 1024 // 32 MB
@@ -23,21 +25,43 @@ type DiskWAL struct {
 	pathByteSize   int
 	log            zerolog.Logger
 	dir            string
+	fileLock       *utilsio.FileLock
 }
 
 // TODO use real logger and metrics, but that would require passing them to Trie storage
 func NewDiskWAL(logger zerolog.Logger, reg prometheus.Registerer, metrics module.WALMetrics, dir string, forestCapacity int, pathByteSize int, segmentSize int) (*DiskWAL, error) {
+	// Acquire exclusive file lock to ensure only one process can write to this WAL directory
+	fileLock, err := utilsio.NewFileLock(dir)
+	if err != nil {
+		panic(fmt.Sprintf("failed to create file lock for WAL directory %s: %v", dir, err))
+	}
+	if err := fileLock.Lock(); err != nil {
+		// The Lock() method returns a complete error message that distinguishes between
+		// permission denied and lock conflicts. This is a fatal error - the process should crash.
+		panic(err.Error())
+	}
+
 	w, err := prometheusWAL.NewSize(logger, reg, dir, segmentSize, false)
 	if err != nil {
-		return nil, fmt.Errorf("could not create disk wal from dir %v, segmentSize %v: %w", dir, segmentSize, err)
+		// Release the lock if WAL creation fails
+		err = fmt.Errorf("could not create disk wal from dir %v, segmentSize %v: %w", dir, segmentSize, err)
+		if unlockErr := fileLock.Unlock(); unlockErr != nil {
+			err = multierror.Append(err, fmt.Errorf("failed to release file lock: %w", unlockErr))
+		}
+		return nil, err
 	}
+
+	log := logger.With().Str("ledger_mod", "diskwal").Logger()
+	log.Info().Str("lock_path", fileLock.Path()).Msg("acquired exclusive lock on WAL directory")
+
 	return &DiskWAL{
 		wal:            w,
 		paused:         false,
 		forestCapacity: forestCapacity,
 		pathByteSize:   pathByteSize,
-		log:            logger.With().Str("ledger_mod", "diskwal").Logger(),
+		log:            log,
 		dir:            dir,
+		fileLock:       fileLock,
 	}, nil
 }
 
@@ -341,12 +365,22 @@ func (w *DiskWAL) Ready() <-chan struct{} {
 }
 
 // Done implements interface module.ReadyDoneAware
-// it closes all the open write-ahead log files.
+// it closes all the open write-ahead log files and releases the file lock.
 func (w *DiskWAL) Done() <-chan struct{} {
 	err := w.wal.Close()
 	if err != nil {
 		w.log.Err(err).Msg("error while closing WAL")
 	}
+
+	// Release the file lock
+	if w.fileLock != nil {
+		if err := w.fileLock.Unlock(); err != nil {
+			w.log.Err(err).Msg("error while releasing file lock")
+		} else {
+			w.log.Info().Str("lock_path", w.fileLock.Path()).Msg("released exclusive lock on WAL directory")
+		}
+	}
+
 	done := make(chan struct{})
 	close(done)
 	return done

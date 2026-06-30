@@ -1,7 +1,6 @@
 package corruptlibp2p
 
 import (
-	corrupt "github.com/libp2p/go-libp2p-pubsub"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	pubsubpb "github.com/libp2p/go-libp2p-pubsub/pb"
 	"github.com/libp2p/go-libp2p/core/peer"
@@ -9,16 +8,16 @@ import (
 	"github.com/onflow/flow-go/network/p2p"
 )
 
-// CorruptInspectorFunc wraps a normal RPC inspector with a corrupt inspector func by translating corrupt.RPC -> pubsubpb.RPC
+// CorruptInspectorFunc wraps a normal RPC inspector with a corrupt inspector func by translating pubsub.RPC -> pubsubpb.RPC
 // before calling Inspect func.
-func CorruptInspectorFunc(inspector p2p.GossipSubRPCInspector) func(id peer.ID, rpc *corrupt.RPC) error {
-	return func(id peer.ID, rpc *corrupt.RPC) error {
+func CorruptInspectorFunc(inspector p2p.GossipSubRPCInspector) func(id peer.ID, rpc *pubsub.RPC) error {
+	return func(id peer.ID, rpc *pubsub.RPC) error {
 		return inspector.Inspect(id, CorruptRPCToPubSubRPC(rpc))
 	}
 }
 
-// CorruptRPCToPubSubRPC translates a corrupt.RPC -> pubsub.RPC
-func CorruptRPCToPubSubRPC(rpc *corrupt.RPC) *pubsub.RPC {
+// CorruptRPCToPubSubRPC translates a pubsub.RPC -> pubsub.RPC
+func CorruptRPCToPubSubRPC(rpc *pubsub.RPC) *pubsub.RPC {
 	return &pubsub.RPC{
 		RPC: pubsubpb.RPC{
 			Subscriptions:        rpc.Subscriptions,

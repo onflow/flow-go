@@ -100,6 +100,7 @@ type CombinedVoteProcessorV2 struct {
 	rbRector          hotstuff.RandomBeaconReconstructor
 	onQCCreated       hotstuff.OnQCCreated
 	packer            hotstuff.Packer
+	votesCache        *AppendOnlyIdentifierSet
 	minRequiredWeight uint64
 	done              atomic.Bool
 }
@@ -121,6 +122,7 @@ func NewCombinedVoteProcessor(log zerolog.Logger,
 		rbRector:          rbRector,
 		onQCCreated:       onQCCreated,
 		packer:            packer,
+		votesCache:        NewConcurrentIdentifierSet(),
 		minRequiredWeight: minRequiredWeight,
 		done:              *atomic.NewBool(false),
 	}
@@ -136,25 +138,43 @@ func (p *CombinedVoteProcessorV2) Status() hotstuff.VoteCollectorStatus {
 	return hotstuff.VoteCollectorStatusVerifying
 }
 
-// Process performs processing of single vote in concurrent safe way. This function is implemented to be
-// called by multiple goroutines at the same time. Supports processing of both staking and random beacon signatures.
-// Design of this function is event driven: as soon as we collect enough signatures to create a QC we will immediately do so
-// and submit it via callback for further processing.
-// Expected error returns during normal operations:
-// * VoteForIncompatibleBlockError - submitted vote for incompatible block
-// * VoteForIncompatibleViewError - submitted vote for incompatible view
-// * model.InvalidVoteError - submitted vote with invalid signature
-// * model.DuplicatedSignerError if the signer has been already added
-// All other errors should be treated as exceptions.
+// Process ingests a single vote. It can be called by multiple goroutines at the same time. While all valid
+// votes must carry a staking signature, most nodes should also include their random beacon signatures as
+// part of their vote (but technically it's optional).
+// Design of this function is event driven: as soon as we collect enough signatures to create a QC, we will
+// immediately do so and submit it via callback for further processing. However, due to concurrency, a few
+// more than the minimum required signatures might be container in the QC (permitted by the protocol).
 //
-// Impossibility of vote double-counting: Our signature scheme requires _every_ vote to supply a
-// staking signature. Therefore, the `stakingSigAggtor` has the set of _all_ signerIDs that have
-// provided a valid vote. Hence, the `stakingSigAggtor` guarantees that only a single vote can
-// be successfully added for each `signerID`, i.e. double-counting votes is impossible.
+// IMPORTANT: The VerifyingVoteProcessor provides the final defense against any vote-equivocation attacks
+// for its specific block. These attacks typically aim at multiple votes from the same node being counted
+// towards the supermajority threshold. This must cover attacks by the leader concurrently utilizing
+// stand-alone votes and votes embedded into the proposal.
+//
+// Expected error returns during normal operations:
+//   - [VoteForIncompatibleBlockError] if vote is for incompatible block
+//   - [VoteForIncompatibleViewError] if vote is for incompatible view
+//   - [model.InvalidVoteError] if vote has invalid signature
+//   - [model.DuplicatedSignerError] if the same vote from the same signer has been already added
+//
+// All other errors should be treated as exceptions.
 func (p *CombinedVoteProcessorV2) Process(vote *model.Vote) error {
 	err := EnsureVoteForBlock(vote, p.block)
 	if err != nil {
 		return fmt.Errorf("received incompatible vote %v: %w", vote.ID(), err)
+	}
+
+	// Impossibility of vote double-counting: Our signature scheme requires _every_ vote to include a staking signature.
+	// Therefore, the `stakingSigAggtor` has the set of _all_ signerIDs that have provided a valid vote. Only a single
+	// competing thread for any specific voter can pass through `stakingSigAggtor` and succeed in adding a vote (validation
+	// front-loaded). Only threads that pass the `stakingSigAggtor` can reach the random beacon reconstructor. Therefore,
+	// the `stakingSigAggtor` acts like a trapdoor for competing threads, guaranteeing that only a single vote per signerID
+	// is accepted by the CombinedVoteProcessorV2.
+	// However, note that we *must prevalidate votes*  to avoid detecting ann invalid vote only after having added its
+	// staking signature to the `stakingSigAggtor`. This performance overhead makes the `CombinedVoteProcessorV2` vulnerable
+	// to resource exhaustion attacks. We therefore include a dedicated `votesCache` to reject all votes beyond the first
+	// before we run the expensive cryptographic validation.
+	if !p.votesCache.Add(vote.SignerID) {
+		return model.NewDuplicatedSignerErrorf("vote from %s has been already added", vote.SignerID)
 	}
 
 	// Vote Processing state machine

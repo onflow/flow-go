@@ -26,7 +26,7 @@ func Test_ParseBody(t *testing.T) {
 
 	for i, test := range invalid {
 		readerIn := strings.NewReader(test.in)
-		var out interface{}
+		var out any
 		err := ParseBody(readerIn, out)
 		assert.EqualError(t, err, test.err, fmt.Sprintf("test #%d failed", i))
 	}
@@ -50,7 +50,7 @@ func Test_ParseBody(t *testing.T) {
 func TestConvertInterfaceToArrayOfStrings(t *testing.T) {
 	tests := []struct {
 		name      string
-		input     interface{}
+		input     any
 		expect    []string
 		expectErr bool
 	}{
@@ -62,25 +62,25 @@ func TestConvertInterfaceToArrayOfStrings(t *testing.T) {
 		},
 		{
 			name:      "Valid slice of interfaces containing strings",
-			input:     []interface{}{"a", "b", "c"},
+			input:     []any{"a", "b", "c"},
 			expect:    []string{"a", "b", "c"},
 			expectErr: false,
 		},
 		{
 			name:      "Empty slice",
-			input:     []interface{}{},
+			input:     []any{},
 			expect:    []string{},
 			expectErr: false,
 		},
 		{
 			name:      "Array contains nil value",
-			input:     []interface{}{"a", nil, "c"},
+			input:     []any{"a", nil, "c"},
 			expect:    nil,
 			expectErr: true,
 		},
 		{
 			name:      "Mixed types in slice",
-			input:     []interface{}{"a", 123, "c"},
+			input:     []any{"a", 123, "c"},
 			expect:    nil,
 			expectErr: true,
 		},
@@ -98,13 +98,13 @@ func TestConvertInterfaceToArrayOfStrings(t *testing.T) {
 		},
 		{
 			name:      "Slice with non-string interface values",
-			input:     []interface{}{true, false},
+			input:     []any{true, false},
 			expect:    nil,
 			expectErr: true,
 		},
 		{
 			name:      "Slice with nested slices",
-			input:     []interface{}{[]string{"a"}},
+			input:     []any{[]string{"a"}},
 			expect:    nil,
 			expectErr: true,
 		},

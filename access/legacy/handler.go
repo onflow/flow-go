@@ -35,7 +35,7 @@ func (h *Handler) GetNetworkParameters(
 	context.Context,
 	*accessproto.GetNetworkParametersRequest,
 ) (*accessproto.GetNetworkParametersResponse, error) {
-	panic("implement me")
+	return nil, status.Error(codes.Unimplemented, "not implemented")
 }
 
 // SendTransaction submits a transaction to the network.
@@ -252,7 +252,7 @@ func (h *Handler) GetAccountAtBlockHeight(
 	ctx context.Context,
 	request *accessproto.GetAccountAtBlockHeightRequest,
 ) (*accessproto.AccountResponse, error) {
-	panic("implement me")
+	return nil, status.Error(codes.Unimplemented, "not implemented")
 }
 
 // ExecuteScriptAtLatestBlock executes a script at a the latest block

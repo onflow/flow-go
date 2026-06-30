@@ -36,7 +36,7 @@ func (k *KeyTranslatorTestSuite) TestPrivateKeyConversion() {
 
 	loops := 50
 	for j, s := range sa {
-		for i := 0; i < loops; i++ {
+		for range loops {
 			// generate seed
 			seed := k.createSeed()
 			// generate a Flow private key
@@ -80,7 +80,7 @@ func (k *KeyTranslatorTestSuite) TestPublicKeyConversion() {
 
 	loops := 50
 	for _, s := range sa {
-		for i := 0; i < loops; i++ {
+		for range loops {
 			// generate seed
 			seed := k.createSeed()
 			fpk, err := fcrypto.GeneratePrivateKey(s, seed)
@@ -113,7 +113,7 @@ func (k *KeyTranslatorTestSuite) TestPublicKeyRoundTrip() {
 	sa := []fcrypto.SigningAlgorithm{fcrypto.ECDSAP256, fcrypto.ECDSASecp256k1}
 	loops := 50
 	for _, s := range sa {
-		for i := 0; i < loops; i++ {
+		for range loops {
 
 			// generate seed
 			seed := k.createSeed()
@@ -154,7 +154,7 @@ func (k *KeyTranslatorTestSuite) TestPeerIDGenerationIsConsistent() {
 
 	// check that the LibP2P Id generation is deterministic
 	var prev peer.ID
-	for i := 0; i < 100; i++ {
+	for i := range 100 {
 
 		// generate a Libp2p Peer ID from the converted public key
 		fpeerID, err := peer.IDFromPublicKey(lconverted)

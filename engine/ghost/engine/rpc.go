@@ -149,7 +149,7 @@ func (e *RPC) Done() <-chan struct{} {
 }
 
 // SubmitLocal submits an event originating on the local node.
-func (e *RPC) SubmitLocal(event interface{}) {
+func (e *RPC) SubmitLocal(event any) {
 	e.unit.Launch(func() {
 		err := e.process(e.me.NodeID(), event)
 		if err != nil {
@@ -161,7 +161,7 @@ func (e *RPC) SubmitLocal(event interface{}) {
 // Submit submits the given event from the node with the given origin ID
 // for processing in a non-blocking manner. It returns instantly and logs
 // a potential processing error internally when done.
-func (e *RPC) Submit(channel channels.Channel, originID flow.Identifier, event interface{}) {
+func (e *RPC) Submit(channel channels.Channel, originID flow.Identifier, event any) {
 	e.unit.Launch(func() {
 		err := e.process(originID, event)
 		if err != nil {
@@ -171,7 +171,7 @@ func (e *RPC) Submit(channel channels.Channel, originID flow.Identifier, event i
 }
 
 // ProcessLocal processes an event originating on the local node.
-func (e *RPC) ProcessLocal(event interface{}) error {
+func (e *RPC) ProcessLocal(event any) error {
 	return e.unit.Do(func() error {
 		return e.process(e.me.NodeID(), event)
 	})
@@ -179,13 +179,13 @@ func (e *RPC) ProcessLocal(event interface{}) error {
 
 // Process processes the given event from the node with the given origin ID in
 // a blocking manner. It returns the potential processing error when done.
-func (e *RPC) Process(channel channels.Channel, originID flow.Identifier, event interface{}) error {
+func (e *RPC) Process(channel channels.Channel, originID flow.Identifier, event any) error {
 	return e.unit.Do(func() error {
 		return e.process(originID, event)
 	})
 }
 
-func (e *RPC) process(originID flow.Identifier, event interface{}) error {
+func (e *RPC) process(originID flow.Identifier, event any) error {
 	msg, err := messages.InternalToMessage(event)
 	if err != nil {
 		return fmt.Errorf("failed to convert event to message: %v", err)

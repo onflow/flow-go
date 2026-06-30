@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	corrupt "github.com/libp2p/go-libp2p-pubsub"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
@@ -24,8 +23,8 @@ import (
 // observability.
 type CorruptGossipSubAdapter struct {
 	component.Component
-	gossipSub             *corrupt.PubSub
-	router                *corrupt.GossipSubRouter
+	gossipSub             *pubsub.PubSub
+	router                *pubsub.GossipSubRouter
 	logger                zerolog.Logger
 	clusterChangeConsumer p2p.CollectionClusterChangesConsumer
 	peerScoreExposer      p2p.PeerScoreExposer
@@ -34,10 +33,10 @@ type CorruptGossipSubAdapter struct {
 var _ p2p.PubSubAdapter = (*CorruptGossipSubAdapter)(nil)
 
 func (c *CorruptGossipSubAdapter) RegisterTopicValidator(topic string, topicValidator p2p.TopicValidatorFunc) error {
-	// instantiates a corrupt.ValidatorEx that wraps the topicValidatorFunc
-	var corruptValidator corrupt.ValidatorEx = func(ctx context.Context, from peer.ID, message *corrupt.Message) corrupt.ValidationResult {
+	// instantiates a pubsub.ValidatorEx that wraps the topicValidatorFunc
+	var corruptValidator pubsub.ValidatorEx = func(ctx context.Context, from peer.ID, message *pubsub.Message) pubsub.ValidationResult {
 		pubsubMsg := &pubsub.Message{
-			Message:       message.Message, // converting corrupt.Message to pubsub.Message
+			Message:       message.Message, // converting pubsub.Message to pubsub.Message
 			ID:            message.ID,
 			ReceivedFrom:  message.ReceivedFrom,
 			ValidatorData: message.ValidatorData,
@@ -45,16 +44,16 @@ func (c *CorruptGossipSubAdapter) RegisterTopicValidator(topic string, topicVali
 		}
 		result := topicValidator(ctx, from, pubsubMsg)
 
-		// overriding the corrupt.ValidationResult with the result from pubsub.TopicValidatorFunc
+		// overriding the pubsub.ValidationResult with the result from pubsub.TopicValidatorFunc
 		message.ValidatorData = pubsubMsg.ValidatorData
 
 		switch result {
 		case p2p.ValidationAccept:
-			return corrupt.ValidationAccept
+			return pubsub.ValidationAccept
 		case p2p.ValidationIgnore:
-			return corrupt.ValidationIgnore
+			return pubsub.ValidationIgnore
 		case p2p.ValidationReject:
-			return corrupt.ValidationReject
+			return pubsub.ValidationReject
 		default:
 			// should never happen, indicates a bug in the topic validator
 			c.logger.Fatal().
@@ -73,9 +72,9 @@ func (c *CorruptGossipSubAdapter) RegisterTopicValidator(topic string, topicVali
 			Str("result", fmt.Sprintf("%v", result)).
 			Str("message_type", fmt.Sprintf("%T", message.Data)).
 			Msg("invalid validation result, returning reject")
-		return corrupt.ValidationReject
+		return pubsub.ValidationReject
 	}
-	err := c.gossipSub.RegisterTopicValidator(topic, corruptValidator, corrupt.WithValidatorInline(true))
+	err := c.gossipSub.RegisterTopicValidator(topic, corruptValidator, pubsub.WithValidatorInline(true))
 	if err != nil {
 		return fmt.Errorf("could not register topic validator on corrupt gossipsub: %w", err)
 	}
@@ -130,17 +129,17 @@ func NewCorruptGossipSubAdapter(ctx context.Context,
 	logger zerolog.Logger,
 	h host.Host,
 	cfg p2p.PubSubAdapterConfig,
-	clusterChangeConsumer p2p.CollectionClusterChangesConsumer) (p2p.PubSubAdapter, *corrupt.GossipSubRouter, error) {
+	clusterChangeConsumer p2p.CollectionClusterChangesConsumer) (p2p.PubSubAdapter, *pubsub.GossipSubRouter, error) {
 	gossipSubConfig, ok := cfg.(*CorruptPubSubAdapterConfig)
 	if !ok {
 		return nil, nil, fmt.Errorf("invalid gossipsub config type: %T", cfg)
 	}
 
 	// initializes a default gossipsub router and wraps it with the corrupt router.
-	router := corrupt.DefaultGossipSubRouter(h)
+	router := pubsub.DefaultGossipSubRouter(h)
 
 	// injects the corrupt router into the gossipsub constructor
-	gossipSub, err := corrupt.NewGossipSubWithRouter(ctx, h, router, gossipSubConfig.Build()...)
+	gossipSub, err := pubsub.NewGossipSubWithRouter(ctx, h, router, gossipSubConfig.Build()...)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to create corrupt gossipsub: %w", err)
 	}

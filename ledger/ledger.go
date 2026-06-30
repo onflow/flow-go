@@ -39,6 +39,13 @@ type Ledger interface {
 
 	// Prove returns proofs for the given keys at specific state
 	Prove(query *Query) (proof Proof, err error)
+
+	// StateCount returns the count
+	StateCount() int
+
+	// StateByIndex returns the state at the given index
+	// -1 is the last index
+	StateByIndex(index int) (State, error)
 }
 
 // Query holds all data needed for a ledger read or ledger proof

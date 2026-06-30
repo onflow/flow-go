@@ -234,7 +234,11 @@ func Test_ConflictingResults(t *testing.T) {
 	})
 	t.Run("by-id-query", func(t *testing.T) {
 		assertConflictingResult(t, func(irSeals []*flow.IncorporatedResultSeal, conflictingSeal *flow.IncorporatedResultSeal, wrapper *ExecForkSuppressor, wrappedMempool *poolmock.IncorporatedResultSeals) {
-			wrappedMempool.On("Get", conflictingSeal.IncorporatedResultID()).Return(conflictingSeal, true).Once()
+			// Get is called once for the initial lookup plus once per seal in sealsForBlock
+			// (to filter inclusion candidates). conflictingSeal is looked up twice total.
+			wrappedMempool.On("Get", conflictingSeal.IncorporatedResultID()).Return(conflictingSeal, true).Twice()
+			// irSeals[1] shares the same block as conflictingSeal
+			wrappedMempool.On("Get", irSeals[1].IncorporatedResultID()).Return(irSeals[1], true).Once()
 			byID, found := wrapper.Get(conflictingSeal.IncorporatedResultID())
 			require.False(t, found)
 			require.Nil(t, byID)
@@ -271,7 +275,10 @@ func Test_ForkDetectionPersisted(t *testing.T) {
 			added, _ := wrapper.Add(sealB) // should be rejected because it is conflicting with sealA
 			require.True(t, added)
 
-			wrappedMempool.On("Get", sealA.IncorporatedResultID()).Return(sealA, true).Once()
+			// Get is called once for the initial lookup, plus once per seal in sealsForBlock
+			// (to filter inclusion candidates). sealA is looked up twice total.
+			wrappedMempool.On("Get", sealA.IncorporatedResultID()).Return(sealA, true).Twice()
+			wrappedMempool.On("Get", sealB.IncorporatedResultID()).Return(sealB, true).Once()
 			execForkActor.On("OnExecFork", mock.Anything).Run(func(args mock.Arguments) {
 				conflictingSeals := args.Get(0).([]*flow.IncorporatedResultSeal)
 				require.ElementsMatch(t, []*flow.IncorporatedResultSeal{sealA, sealB}, conflictingSeals)

@@ -177,7 +177,8 @@ func (s *Suite) SetupTest() {
 // initEngineAndSyncer create new instance of ingestion engine and collection syncer.
 // It waits until the ingestion engine starts.
 func (s *Suite) initEngineAndSyncer() (*Engine, *collections.Syncer, *collections.Indexer) {
-	processedHeightInitializer := store.NewConsumerProgress(s.db, module.ConsumeProgressIngestionEngineBlockHeight)
+	processedHeight, err := store.NewConsumerProgress(s.db, module.ConsumeProgressIngestionEngineBlockHeight).Initialize(s.finalizedBlock.Height)
+	require.NoError(s.T(), err)
 	lastFullBlockHeight, err := store.NewConsumerProgress(s.db, module.ConsumeProgressLastFullBlockHeight).Initialize(s.finalizedBlock.Height)
 	require.NoError(s.T(), err)
 
@@ -217,10 +218,11 @@ func (s *Suite) initEngineAndSyncer() (*Engine, *collections.Syncer, *collection
 		s.blocks,
 		s.results,
 		s.receipts,
-		processedHeightInitializer,
+		processedHeight,
 		syncer,
 		indexer,
 		s.collectionExecutedMetric,
+		metrics.NewNoopCollector(),
 		nil,
 		s.distributor,
 	)
@@ -272,8 +274,8 @@ func (s *Suite) TestOnFinalizedBlockSingle() {
 	snap := new(protocolmock.Snapshot)
 
 	finalSnapshot := protocolmock.NewSnapshot(s.T())
-	finalSnapshot.On("Head").Return(s.finalizedBlock, nil).Twice()
-	s.proto.state.On("Final").Return(finalSnapshot, nil).Twice()
+	finalSnapshot.On("Head").Return(s.finalizedBlock, nil).Once()
+	s.proto.state.On("Final").Return(finalSnapshot, nil).Once()
 
 	epoch.On("ClusterByChainID", mock.Anything).Return(cluster, nil)
 	epochs.On("Current").Return(epoch, nil)
@@ -338,8 +340,8 @@ func (s *Suite) TestOnFinalizedBlockSeveralBlocksAhead() {
 	snap := new(protocolmock.Snapshot)
 
 	finalSnapshot := protocolmock.NewSnapshot(s.T())
-	finalSnapshot.On("Head").Return(s.finalizedBlock, nil).Twice()
-	s.proto.state.On("Final").Return(finalSnapshot, nil).Twice()
+	finalSnapshot.On("Head").Return(s.finalizedBlock, nil).Once()
+	s.proto.state.On("Final").Return(finalSnapshot, nil).Once()
 
 	epoch.On("ClusterByChainID", mock.Anything).Return(cluster, nil)
 	epochs.On("Current").Return(epoch, nil)
@@ -415,10 +417,6 @@ func (s *Suite) TestOnFinalizedBlockSeveralBlocksAhead() {
 
 // TestExecutionReceiptsAreIndexed checks that execution receipts are properly indexed
 func (s *Suite) TestExecutionReceiptsAreIndexed() {
-	finalSnapshot := protocolmock.NewSnapshot(s.T())
-	finalSnapshot.On("Head").Return(s.finalizedBlock, nil).Once()
-	s.proto.state.On("Final").Return(finalSnapshot, nil).Once()
-
 	eng, _, _ := s.initEngineAndSyncer()
 
 	originID := unittest.IdentifierFixture()
@@ -565,6 +563,77 @@ func (s *Suite) TestCollectionSyncing() {
 	require.Eventually(s.T(), func() bool {
 		return s.lastFullBlockHeight.Value() == block.Height
 	}, 2*time.Second, 100*time.Millisecond, "last full block height never updated")
+}
+
+// TestOnFinalizedBlockAlreadyIndexed checks that when a block has already been indexed
+// (storage.ErrAlreadyExists), the engine logs a warning and continues processing by
+// requesting collections and updating metrics. This can happen when the job queue processed
+// index hasn't been updated yet after a previous indexing operation.
+func (s *Suite) TestOnFinalizedBlockAlreadyIndexed() {
+	cluster := new(protocolmock.Cluster)
+	epoch := new(protocolmock.CommittedEpoch)
+	epochs := new(protocolmock.EpochQuery)
+	snap := new(protocolmock.Snapshot)
+
+	finalSnapshot := protocolmock.NewSnapshot(s.T())
+	finalSnapshot.On("Head").Return(s.finalizedBlock, nil).Once()
+	s.proto.state.On("Final").Return(finalSnapshot, nil).Once()
+
+	epoch.On("ClusterByChainID", mock.Anything).Return(cluster, nil)
+	epochs.On("Current").Return(epoch, nil)
+	snap.On("Epochs").Return(epochs)
+
+	// prepare cluster committee members
+	clusterCommittee := unittest.IdentityListFixture(32 * 4).Filter(filter.HasRole[flow.Identity](flow.RoleCollection)).ToSkeleton()
+	cluster.On("Members").Return(clusterCommittee, nil)
+
+	eng, _, _ := s.initEngineAndSyncer()
+
+	irrecoverableCtx, cancel := irrecoverable.NewMockSignalerContextWithCancel(s.T(), s.ctx)
+	eng.ComponentManager.Start(irrecoverableCtx)
+	unittest.RequireCloseBefore(s.T(), eng.Ready(), 100*time.Millisecond, "could not start worker")
+	defer func() {
+		cancel()
+		unittest.RequireCloseBefore(s.T(), eng.Done(), 100*time.Millisecond, "could not stop worker")
+	}()
+
+	block := s.generateBlock(clusterCommittee, snap)
+	block.Height = s.finalizedBlock.Height + 1
+	s.blockMap[block.Height] = block
+	s.mockCollectionsForBlock(block)
+	s.finalizedBlock = block.ToHeader()
+
+	hotstuffBlock := hotmodel.Block{
+		BlockID: block.ID(),
+	}
+
+	// simulate that the block has already been indexed (e.g., by a previous job queue run)
+	// by returning storage.ErrAlreadyExists
+	s.blocks.On("BatchIndexBlockContainingCollectionGuarantees", mock.Anything, mock.Anything, block.ID(), []flow.Identifier(flow.GetIDs(block.Payload.Guarantees))).
+		Return(storage.ErrAlreadyExists).Once()
+
+	missingCollectionCount := 4
+	wg := sync.WaitGroup{}
+	wg.Add(missingCollectionCount)
+
+	// even though block is already indexed, collections should still be requested
+	for _, cg := range block.Payload.Guarantees {
+		s.request.On("EntityByID", cg.CollectionID, mock.Anything).Return().Run(func(args mock.Arguments) {
+			wg.Done()
+		}).Once()
+	}
+
+	// force should be called once
+	s.request.On("Force").Return().Once()
+
+	// process the block through the finalized callback
+	s.distributor.OnFinalizedBlock(&hotstuffBlock)
+
+	unittest.RequireReturnsBefore(s.T(), wg.Wait, 100*time.Millisecond, "expect to process new block before timeout")
+
+	// assert that collections were still requested despite the block being already indexed
+	s.headers.AssertExpectations(s.T())
+	s.request.AssertNumberOfCalls(s.T(), "EntityByID", len(block.Payload.Guarantees))
 }
 
 func (s *Suite) mockGuarantorsForCollection(guarantee *flow.CollectionGuarantee, members flow.IdentitySkeletonList) {

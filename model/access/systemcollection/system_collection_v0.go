@@ -8,6 +8,7 @@ import (
 
 	"github.com/rs/zerolog/log"
 
+	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
 
@@ -86,6 +87,32 @@ func (b *builderV0) ExecuteCallbacksTransactions(chain flow.Chain, processEvents
 	}
 
 	return txs, nil
+}
+
+// ExecuteCallbacksTransaction constructs a list of transaction to execute callbacks, for the given chain.
+//
+// No error returns are expected during normal operation.
+func (b *builderV0) ExecuteCallbacksTransaction(chain flow.Chain, id uint64, effort uint64) (*flow.TransactionBody, error) {
+	sc := systemcontracts.SystemContractsForChain(chain.ChainID())
+	env := sc.AsTemplateEnv()
+	script := templates.GenerateSchedulerExecutorTransactionScript(env)
+
+	encID, err := jsoncdc.Encode(cadence.NewUInt64(id))
+	if err != nil {
+		return nil, fmt.Errorf("failed to encode id: %w", err)
+	}
+
+	tx, err := flow.NewTransactionBodyBuilder().
+		AddAuthorizer(sc.FlowServiceAccount.Address).
+		SetScript(script).
+		AddArgument(encID).
+		SetComputeLimit(effort).
+		Build()
+	if err != nil {
+		return nil, fmt.Errorf("failed to construct execute callback transactions: %w", err)
+	}
+
+	return tx, nil
 }
 
 // callbackArgsFromEventV1 decodes the event payload and returns the callback ID and effort.

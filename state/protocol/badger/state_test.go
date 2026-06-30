@@ -17,7 +17,6 @@ import (
 	bprotocol "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/inmem"
 	"github.com/onflow/flow-go/state/protocol/util"
-	protoutil "github.com/onflow/flow-go/state/protocol/util"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
 	"github.com/onflow/flow-go/storage/store"
@@ -34,7 +33,7 @@ func TestBootstrapAndOpen(t *testing.T) {
 		block.ParentID = unittest.IdentifierFixture()
 	})
 
-	protoutil.RunWithBootstrapState(t, rootSnapshot, func(db storage.DB, _ *bprotocol.State) {
+	util.RunWithBootstrapState(t, rootSnapshot, func(db storage.DB, _ *bprotocol.State) {
 		lockManager := storage.NewTestingLockManager()
 		// expect the final view metric to be set to current epoch's final view
 		epoch, err := rootSnapshot.Epochs().Current()
@@ -111,7 +110,7 @@ func TestBootstrapAndOpen_EpochCommitted(t *testing.T) {
 		}
 	})
 
-	protoutil.RunWithBootstrapState(t, committedPhaseSnapshot, func(db storage.DB, _ *bprotocol.State) {
+	util.RunWithBootstrapState(t, committedPhaseSnapshot, func(db storage.DB, _ *bprotocol.State) {
 		lockManager := storage.NewTestingLockManager()
 
 		complianceMetrics := new(mock.ComplianceMetrics)
@@ -879,7 +878,7 @@ func bootstrap(t *testing.T, rootSnapshot protocol.Snapshot, f func(*bprotocol.S
 // from non-root states.
 func snapshotAfter(t *testing.T, rootSnapshot protocol.Snapshot, f func(*bprotocol.FollowerState, protocol.MutableProtocolState) protocol.Snapshot) protocol.Snapshot {
 	var after protocol.Snapshot
-	protoutil.RunWithFullProtocolStateAndMutator(t, rootSnapshot, func(_ storage.DB, state *bprotocol.ParticipantState, mutableState protocol.MutableProtocolState) {
+	util.RunWithFullProtocolStateAndMutator(t, rootSnapshot, func(_ storage.DB, state *bprotocol.ParticipantState, mutableState protocol.MutableProtocolState) {
 		snap := f(state.FollowerState, mutableState)
 		var err error
 		after, err = inmem.FromSnapshot(snap)

@@ -10,7 +10,7 @@ import (
 )
 
 // GetExecutionResultsByBlockIDs gets Execution Result payload by block IDs.
-func GetExecutionResultsByBlockIDs(r *common.Request, backend access.API, link commonmodels.LinkGenerator) (interface{}, error) {
+func GetExecutionResultsByBlockIDs(r *common.Request, backend access.API, link commonmodels.LinkGenerator) (any, error) {
 	req, err := request.GetExecutionResultByBlockIDsRequest(r)
 	if err != nil {
 		return nil, common.NewBadRequestError(err)
@@ -36,7 +36,7 @@ func GetExecutionResultsByBlockIDs(r *common.Request, backend access.API, link c
 }
 
 // GetExecutionResultByID gets execution result by the ID.
-func GetExecutionResultByID(r *common.Request, backend access.API, link commonmodels.LinkGenerator) (interface{}, error) {
+func GetExecutionResultByID(r *common.Request, backend access.API, link commonmodels.LinkGenerator) (any, error) {
 	req, err := request.GetExecutionResultRequest(r)
 	if err != nil {
 		return nil, common.NewBadRequestError(err)

@@ -267,7 +267,7 @@ func decodeSignerIndices(
 
 	// decode bits to Identifiers
 	indices := make([]int, 0, numberCanonicalNodes)
-	for i := 0; i < numberCanonicalNodes; i++ {
+	for i := range numberCanonicalNodes {
 		if bitutils.ReadBit(signerIndices, i) == 1 {
 			indices = append(indices, i)
 		}

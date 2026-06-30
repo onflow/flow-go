@@ -53,9 +53,7 @@ func (connector *upstreamConnector) Ready() <-chan struct{} {
 		// spawn a connect worker for each bootstrap node
 		for _, b := range connector.bootstrapIdentities {
 			id := *b
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
+			wg.Go(func() {
 				lg := connector.logger.With().Str("bootstrap_node", id.NodeID.String()).Logger()
 
 				backoff := retry.NewFibonacci(connector.retryInitialTimeout)
@@ -69,7 +67,7 @@ func (connector *upstreamConnector) Ready() <-chan struct{} {
 					lg.Info().Msg("successfully connected to bootstrap node")
 					success.Store(true)
 				}
-			}()
+			})
 		}
 
 		wg.Wait()

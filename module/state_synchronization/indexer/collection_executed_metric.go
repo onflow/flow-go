@@ -58,12 +58,11 @@ func (c *CollectionExecutedMetricImpl) CollectionFinalized(light *flow.LightColl
 	lightID := light.ID()
 	if ti, found := c.collectionsToMarkFinalized.Get(lightID); found {
 
-		block, err := c.blocks.ByCollectionID(lightID)
+		blockID, err := c.blocks.BlockIDByCollectionID(lightID)
 		if err != nil {
 			c.log.Warn().Err(err).Msg("could not find block by collection ID")
 			return
 		}
-		blockID := block.ID()
 
 		for _, t := range light.Transactions {
 			c.accessMetrics.TransactionFinalized(t, ti)

@@ -68,7 +68,7 @@ func NewHeaderBodyBuilder() *HeaderBodyBuilder {
 // All errors indicate that a valid HeaderBody cannot be created from the current builder state.
 func (b *HeaderBodyBuilder) Build() (*HeaderBody, error) {
 	// make sure every required field was initialized
-	for bit := 0; bit < int(numHeaderBodyFields); bit++ {
+	for bit := range int(numHeaderBodyFields) {
 		if bitutils.ReadBit(b.present, bit) == 0 {
 			return nil, fmt.Errorf("HeaderBodyBuilder: missing field %s", headerBodyFieldBitIndex(bit))
 		}

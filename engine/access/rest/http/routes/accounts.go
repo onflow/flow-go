@@ -9,7 +9,7 @@ import (
 )
 
 // GetAccount handler retrieves account by address and returns the response
-func GetAccount(r *common.Request, backend access.API, link commonmodels.LinkGenerator) (interface{}, error) {
+func GetAccount(r *common.Request, backend access.API, link commonmodels.LinkGenerator) (any, error) {
 	req, err := request.GetAccountRequest(r)
 	if err != nil {
 		return nil, common.NewBadRequestError(err)

@@ -350,7 +350,7 @@ HEIGHT_LOOP:
 
 	// request missing execution results, if sealed height is low enough
 	for _, blockID := range missingBlocksOrderedByHeight {
-		c.receiptRequester.Query(blockID, filter.Any)
+		c.receiptRequester.EntityBySecondaryKey(blockID, filter.Any)
 	}
 
 	return len(missingBlocksOrderedByHeight), firstMissingHeight, nil

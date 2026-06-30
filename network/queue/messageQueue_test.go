@@ -38,7 +38,7 @@ func TestConcurrentQueueAccess(t *testing.T) {
 
 	messages := createMessages(messageCnt, randomPriority)
 
-	var priorityFunc queue.MessagePriorityFunc = func(message interface{}) (queue.Priority, error) {
+	var priorityFunc queue.MessagePriorityFunc = func(message any) (queue.Priority, error) {
 		return messages[message.(string)], nil
 	}
 
@@ -49,7 +49,7 @@ func TestConcurrentQueueAccess(t *testing.T) {
 	close(msgChan)
 
 	ctx, cancel := context.WithCancel(context.Background())
-	mq := queue.NewMessageQueue(ctx, priorityFunc, metrics.NewNoopCollector())
+	mq := queue.NewMessageQueue(ctx, priorityFunc, metrics.NewNoopCollector(), 0)
 
 	writeWg := sync.WaitGroup{}
 	write := func() {
@@ -71,13 +71,13 @@ func TestConcurrentQueueAccess(t *testing.T) {
 	}
 
 	// kick off writers
-	for i := 0; i < writerCnt; i++ {
+	for range writerCnt {
 		writeWg.Add(1)
 		go write()
 	}
 
 	// kick off readers
-	for i := 0; i < readerCnt; i++ {
+	for range readerCnt {
 		go read()
 	}
 
@@ -96,7 +96,7 @@ func TestConcurrentQueueAccess(t *testing.T) {
 // TestQueueShutdown tests that Remove unblocks when the context is shutdown
 func TestQueueShutdown(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
-	mq := queue.NewMessageQueue(ctx, fixedPriority, metrics.NewNoopCollector())
+	mq := queue.NewMessageQueue(ctx, fixedPriority, metrics.NewNoopCollector(), 0)
 	ch := make(chan struct{})
 
 	go func() {
@@ -118,7 +118,7 @@ func TestQueueShutdown(t *testing.T) {
 func testQueue(t *testing.T, messages map[string]queue.Priority) {
 
 	// create the priority function
-	var priorityFunc queue.MessagePriorityFunc = func(message interface{}) (queue.Priority, error) {
+	var priorityFunc queue.MessagePriorityFunc = func(message any) (queue.Priority, error) {
 		return messages[message.(string)], nil
 	}
 
@@ -131,7 +131,7 @@ func testQueue(t *testing.T, messages map[string]queue.Priority) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	// create the queue
-	mq := queue.NewMessageQueue(ctx, priorityFunc, metrics.NewNoopCollector())
+	mq := queue.NewMessageQueue(ctx, priorityFunc, metrics.NewNoopCollector(), 0)
 
 	// insert all elements in the queue
 	for msg, p := range messages {
@@ -167,7 +167,7 @@ func BenchmarkPush(b *testing.B) {
 	b.StopTimer()
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	var mq = queue.NewMessageQueue(ctx, randomPriority, metrics.NewNoopCollector())
+	var mq = queue.NewMessageQueue(ctx, randomPriority, metrics.NewNoopCollector(), 0)
 	for i := 0; i < b.N; i++ {
 		err := mq.Insert("test")
 		if err != nil {
@@ -187,7 +187,7 @@ func BenchmarkPop(b *testing.B) {
 	b.StopTimer()
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	var mq = queue.NewMessageQueue(ctx, randomPriority, metrics.NewNoopCollector())
+	var mq = queue.NewMessageQueue(ctx, randomPriority, metrics.NewNoopCollector(), 0)
 	for i := 0; i < b.N; i++ {
 		err := mq.Insert("test")
 		if err != nil {
@@ -205,7 +205,7 @@ func createMessages(messageCnt int, priorityFunc queue.MessagePriorityFunc) map[
 	// create a map of messages -> priority
 	messages := make(map[string]queue.Priority, messageCnt)
 
-	for i := 0; i < messageCnt; i++ {
+	for i := range messageCnt {
 		// choose a random priority
 		p, _ := priorityFunc(nil)
 		// create a message
@@ -216,12 +216,45 @@ func createMessages(messageCnt int, priorityFunc queue.MessagePriorityFunc) map[
 	return messages
 }
 
-func randomPriority(_ interface{}) (queue.Priority, error) {
+func randomPriority(_ any) (queue.Priority, error) {
 
 	p := rand.Intn(int(queue.HighPriority-queue.LowPriority+1)) + int(queue.LowPriority)
 	return queue.Priority(p), nil
 }
 
-func fixedPriority(_ interface{}) (queue.Priority, error) {
+// TestQueueFull tests that inserting into a full queue returns ErrQueueFull
+func TestQueueFull(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	maxSize := 10
+	mq := queue.NewMessageQueue(ctx, fixedPriority, metrics.NewNoopCollector(), maxSize)
+
+	// fill the queue to capacity
+	for i := 0; i < maxSize; i++ {
+		err := mq.Insert("message")
+		assert.NoError(t, err)
+	}
+
+	assert.Equal(t, maxSize, mq.Len())
+
+	// next insert should fail with ErrQueueFull
+	err := mq.Insert("overflow")
+	assert.Error(t, err)
+	assert.ErrorIs(t, err, queue.ErrQueueFull)
+
+	// queue length should still be at maxSize
+	assert.Equal(t, maxSize, mq.Len())
+
+	// removing one element should allow inserting again
+	_ = mq.Remove()
+	assert.Equal(t, maxSize-1, mq.Len())
+
+	err = mq.Insert("new message")
+	assert.NoError(t, err)
+	assert.Equal(t, maxSize, mq.Len())
+}
+
+func fixedPriority(_ any) (queue.Priority, error) {
 	return queue.MediumPriority, nil
 }

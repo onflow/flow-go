@@ -308,7 +308,7 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(
 				Str("event_tx_id", event.TransactionID.String()).
 				Uint32("event_tx_index", event.TransactionIndex).
 				Uint32("event_index", event.EventIndex).
-				Bytes("event_payload", event.Payload).
+				Hex("event_payload", event.Payload).
 				Str("block_id", chunk.BlockID.String()).
 				Str("collection_id", collectionID).
 				Str("result_id", result.ID().String()).

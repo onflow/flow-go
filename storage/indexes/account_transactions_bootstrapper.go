@@ -1,0 +1,134 @@
+package indexes
+
+import (
+	"errors"
+	"fmt"
+
+	"github.com/jordanschalm/lockctx"
+	"go.uber.org/atomic"
+
+	"github.com/onflow/flow-go/model/access"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/storage"
+)
+
+// AccountTransactionsBootstrapper wraps an [AccountTransactions] and performs just-in-time initialization
+// of the index when the initial block is provided.
+//
+// Account transactions are indexed from execution data which may not be available for the root block
+// during bootstrapping. This module acts as a proxy for the underlying [AccountTransactions] and
+// encapsulates the complexity of initializing the index when the initial block is eventually provided.
+type AccountTransactionsBootstrapper struct {
+	db                 storage.DB
+	initialStartHeight uint64
+
+	store *atomic.Pointer[AccountTransactions]
+}
+
+var _ storage.AccountTransactionsBootstrapper = (*AccountTransactionsBootstrapper)(nil)
+
+// NewAccountTransactionsBootstrapper creates a new account transactions bootstrapper.
+//
+// No error returns are expected during normal operation.
+func NewAccountTransactionsBootstrapper(db storage.DB, initialStartHeight uint64) (*AccountTransactionsBootstrapper, error) {
+	store, err := NewAccountTransactions(db)
+	if err != nil {
+		if !errors.Is(err, storage.ErrNotBootstrapped) {
+			return nil, fmt.Errorf("could not create account transactions: %w", err)
+		}
+		// make sure it's nil
+		store = nil
+	}
+
+	return &AccountTransactionsBootstrapper{
+		db:                 db,
+		initialStartHeight: initialStartHeight,
+		store:              atomic.NewPointer(store),
+	}, nil
+}
+
+// FirstIndexedHeight returns the first (oldest) block height that has been indexed.
+//
+// Expected error returns during normal operations:
+//   - [storage.ErrNotBootstrapped] if the index has not been initialized
+func (b *AccountTransactionsBootstrapper) FirstIndexedHeight() (uint64, error) {
+	store := b.store.Load()
+	if store == nil {
+		return 0, storage.ErrNotBootstrapped
+	}
+	return store.FirstIndexedHeight(), nil
+}
+
+// LatestIndexedHeight returns the latest block height that has been indexed.
+//
+// Expected error returns during normal operations:
+//   - [storage.ErrNotBootstrapped] if the index has not been initialized
+func (b *AccountTransactionsBootstrapper) LatestIndexedHeight() (uint64, error) {
+	store := b.store.Load()
+	if store == nil {
+		return 0, storage.ErrNotBootstrapped
+	}
+	return store.LatestIndexedHeight(), nil
+}
+
+// UninitializedFirstHeight returns the height the index will accept as the first height, and a boolean
+// indicating if the index is initialized.
+// If the index is not initialized, the first call to `Store` must include data for this height.
+func (b *AccountTransactionsBootstrapper) UninitializedFirstHeight() (uint64, bool) {
+	store := b.store.Load()
+	if store == nil {
+		return b.initialStartHeight, false
+	}
+	return store.FirstIndexedHeight(), true
+}
+
+// ByAddress returns an iterator over transactions for the given account.
+// See [AccountTransactions.ByAddress] for full documentation.
+//
+// Expected error returns during normal operations:
+//   - [storage.ErrNotBootstrapped] if the index has not been initialized
+//   - [storage.ErrHeightNotIndexed] if the cursor height extends beyond indexed heights
+func (b *AccountTransactionsBootstrapper) ByAddress(
+	account flow.Address,
+	cursor *access.AccountTransactionCursor,
+) (storage.IndexIterator[access.AccountTransaction, access.AccountTransactionCursor], error) {
+	store := b.store.Load()
+	if store == nil {
+		return nil, storage.ErrNotBootstrapped
+	}
+	return store.ByAddress(account, cursor)
+}
+
+// Store indexes all account-transaction associations for a block.
+// Must be called sequentially with consecutive heights (latestHeight + 1).
+// The caller must hold the [storage.LockIndexAccountTransactions] lock until the batch is committed.
+//
+// Expected error returns during normal operations:
+//   - [storage.ErrNotBootstrapped] if the index has not been initialized and the provided block height is not the initial start height
+//   - [storage.ErrAlreadyExists] if the block height is already indexed
+func (b *AccountTransactionsBootstrapper) Store(lctx lockctx.Proof, rw storage.ReaderBatchWriter, blockHeight uint64, txData []access.AccountTransaction) error {
+	// if the index is already initialized, store the data directly
+	if store := b.store.Load(); store != nil {
+		return store.Store(lctx, rw, blockHeight, txData)
+	}
+
+	// otherwise bootstrap the index. this will store the data during initialization
+	if blockHeight != b.initialStartHeight {
+		return fmt.Errorf("expected first indexed height %d, got %d: %w", b.initialStartHeight, blockHeight, storage.ErrNotBootstrapped)
+	}
+
+	store, err := BootstrapAccountTransactions(lctx, rw, b.db, b.initialStartHeight, txData)
+	if err != nil {
+		return fmt.Errorf("could not initialize account transactions storage: %w", err)
+	}
+
+	if !b.store.CompareAndSwap(nil, store) {
+		// this should never happen. if it does, there is a bug. this indicates another goroutine
+		// successfully initialized `store` since we checked the value above. since the bootstrap
+		// operation is protected by the lock and it performs sanity checks to ensure the table
+		// is actually empty, the bootstrap operation should fail if there was concurrent access.
+		return fmt.Errorf("account transactions initialized during bootstrap")
+	}
+
+	return nil
+}

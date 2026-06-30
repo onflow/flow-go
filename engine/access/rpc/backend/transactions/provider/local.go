@@ -30,7 +30,7 @@ var ErrTransactionNotInBlock = errors.New("transaction not in block")
 // LocalTransactionProvider provides functionality for retrieving transaction results and error messages from local storages
 type LocalTransactionProvider struct {
 	state             protocol.State
-	collections       storage.Collections
+	collections       storage.CollectionsReader
 	blocks            storage.Blocks
 	eventsIndex       *index.EventsIndex
 	txResultsIndex    *index.TransactionResultsIndex
@@ -44,7 +44,7 @@ var _ TransactionProvider = (*LocalTransactionProvider)(nil)
 
 func NewLocalTransactionProvider(
 	state protocol.State,
-	collections storage.Collections,
+	collections storage.CollectionsReader,
 	blocks storage.Blocks,
 	eventsIndex *index.EventsIndex,
 	txResultsIndex *index.TransactionResultsIndex,
@@ -91,9 +91,13 @@ func (t *LocalTransactionProvider) TransactionResult(
 	var txErrorMessage string
 	var txStatusCode uint = 0
 	if txResult.Failed {
-		txErrorMessage, err = t.txErrorMessages.ErrorMessageByTransactionID(ctx, blockID, header.Height, transactionID)
-		if err != nil {
-			return nil, err
+		if t.txErrorMessages != nil {
+			txErrorMessage, err = t.txErrorMessages.ErrorMessageByTransactionID(ctx, blockID, header.Height, transactionID)
+			if err != nil {
+				return nil, err
+			}
+		} else {
+			txErrorMessage = error_messages.DefaultFailedErrorMessage
 		}
 
 		if len(txErrorMessage) == 0 {
@@ -130,14 +134,15 @@ func (t *LocalTransactionProvider) TransactionResult(
 	}
 
 	return &accessmodel.TransactionResult{
-		TransactionID: txResult.TransactionID,
-		Status:        txStatus,
-		StatusCode:    txStatusCode,
-		Events:        events,
-		ErrorMessage:  txErrorMessage,
-		BlockID:       blockID,
-		BlockHeight:   header.Height,
-		CollectionID:  collectionID,
+		TransactionID:   txResult.TransactionID,
+		Status:          txStatus,
+		StatusCode:      txStatusCode,
+		Events:          events,
+		ErrorMessage:    txErrorMessage,
+		BlockID:         blockID,
+		BlockHeight:     header.Height,
+		CollectionID:    collectionID,
+		ComputationUsed: txResult.ComputationUsed,
 	}, nil
 }
 
@@ -166,9 +171,13 @@ func (t *LocalTransactionProvider) TransactionResultByIndex(
 	var txErrorMessage string
 	var txStatusCode uint = 0
 	if txResult.Failed {
-		txErrorMessage, err = t.txErrorMessages.ErrorMessageByIndex(ctx, blockID, block.Height, index)
-		if err != nil {
-			return nil, err
+		if t.txErrorMessages != nil {
+			txErrorMessage, err = t.txErrorMessages.ErrorMessageByIndex(ctx, blockID, block.Height, index)
+			if err != nil {
+				return nil, err
+			}
+		} else {
+			txErrorMessage = error_messages.DefaultFailedErrorMessage
 		}
 
 		if len(txErrorMessage) == 0 {
@@ -200,14 +209,15 @@ func (t *LocalTransactionProvider) TransactionResultByIndex(
 	}
 
 	return &accessmodel.TransactionResult{
-		TransactionID: txResult.TransactionID,
-		Status:        txStatus,
-		StatusCode:    txStatusCode,
-		Events:        events,
-		ErrorMessage:  txErrorMessage,
-		BlockID:       blockID,
-		BlockHeight:   block.Height,
-		CollectionID:  collectionID,
+		TransactionID:   txResult.TransactionID,
+		Status:          txStatus,
+		StatusCode:      txStatusCode,
+		Events:          events,
+		ErrorMessage:    txErrorMessage,
+		BlockID:         blockID,
+		BlockHeight:     block.Height,
+		CollectionID:    collectionID,
+		ComputationUsed: txResult.ComputationUsed,
 	}, nil
 }
 
@@ -268,9 +278,12 @@ func (t *LocalTransactionProvider) TransactionResultsByBlockID(
 		return nil, rpc.ConvertIndexError(err, block.Height, "failed to get transaction result")
 	}
 
-	txErrors, err := t.txErrorMessages.ErrorMessagesByBlockID(ctx, blockID, block.Height)
-	if err != nil {
-		return nil, err
+	txErrors := make(map[flow.Identifier]string)
+	if t.txErrorMessages != nil {
+		txErrors, err = t.txErrorMessages.ErrorMessagesByBlockID(ctx, blockID, block.Height)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	numberOfTxResults := len(txResults)
@@ -301,9 +314,13 @@ func (t *LocalTransactionProvider) TransactionResultsByBlockID(
 		var txErrorMessage string
 		var txStatusCode uint = 0
 		if txResult.Failed {
-			txErrorMessage = txErrors[txResult.TransactionID]
-			if len(txErrorMessage) == 0 {
-				return nil, status.Errorf(codes.Internal, "transaction failed but error message is empty for tx ID: %s block ID: %s", txID, blockID)
+			if t.txErrorMessages != nil {
+				txErrorMessage = txErrors[txResult.TransactionID]
+				if len(txErrorMessage) == 0 {
+					return nil, status.Errorf(codes.Internal, "transaction failed but error message is empty for tx ID: %s block ID: %s", txID, blockID)
+				}
+			} else {
+				txErrorMessage = error_messages.DefaultFailedErrorMessage
 			}
 			txStatusCode = 1
 		}
@@ -329,14 +346,15 @@ func (t *LocalTransactionProvider) TransactionResultsByBlockID(
 		}
 
 		results = append(results, &accessmodel.TransactionResult{
-			Status:        txStatus,
-			StatusCode:    txStatusCode,
-			Events:        events,
-			ErrorMessage:  txErrorMessage,
-			BlockID:       blockID,
-			TransactionID: txID,
-			CollectionID:  collectionID,
-			BlockHeight:   block.Height,
+			Status:          txStatus,
+			StatusCode:      txStatusCode,
+			Events:          events,
+			ErrorMessage:    txErrorMessage,
+			BlockID:         blockID,
+			TransactionID:   txID,
+			CollectionID:    collectionID,
+			BlockHeight:     block.Height,
+			ComputationUsed: txResult.ComputationUsed,
 		})
 	}
 

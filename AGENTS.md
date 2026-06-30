@@ -32,8 +32,8 @@ This file provides guidance to AI Agents when working with code in this reposito
 - Include a note that the message was produced in collaboration with [your agent name - e.g. claude, gemini, cursor, etc].
 
 ### Answering Questions
-- When asked a question, consider the answer and perform any exploration of the codebase required to provide quality answer.
-- DO NOT attempt to write or modify code. Simply answer the question.
+- When asked a question, consider the answer and perform any exploration of the codebase required to provide a quality answer.
+- When asked a question, do not write or modify code. Simply answer the question.
 
 ### Communication
 - Be direct and straight forward.
@@ -74,6 +74,10 @@ This file provides guidance to AI Agents when working with code in this reposito
 
 Flow is a multi-node blockchain protocol implementing a byzantine fault-tolerant consensus mechanism. The architecture follows a data flow graph pattern where components are processing vertices connected by message-passing edges.
 
+Note: this repo includes 2 go modules:
+- `/`: this is the main module `github.com/onflow/flow-go`
+- `integration/`: this is a separate module for integration tests `github.com/onflow/flow-go/integration`
+
 ### Node Types
 - **Access Node** (`/cmd/access/`) - Public API gateway, transaction submission and execution
 - **Collection Node** (`/cmd/collection/`) - Transaction batching into collections
@@ -81,6 +85,14 @@ Flow is a multi-node blockchain protocol implementing a byzantine fault-tolerant
 - **Execution Node** (`/cmd/execution/`) - Transaction execution and state management
 - **Verification Node** (`/cmd/verification/`) - Execution result verification
 - **Observer Node** (`/cmd/observer/`) - Read-only network participant
+
+Abbreviations:
+- **AN**: Access Node
+- **LN**: Collection Node
+- **SN**: Consensus Node
+- **EN**: Execution Node
+- **VN**: Verification Node
+- **ON**: Observer Node
 
 ### Core Components
 
@@ -166,4 +178,14 @@ Flow uses a high-assurance approach where:
 - Network messages must be authenticated and validated
 - State consistency is paramount - use proper synchronization primitives
 
-This codebase implements a production blockchain protocol with high security and performance requirements. Changes should be made carefully with thorough testing and consideration of byzantine failure modes.z
+This codebase implements a production blockchain protocol with high security and performance requirements. Changes should be made carefully with thorough testing and consideration of byzantine failure modes.
+
+## Relevant External Repos
+
+Flow Protobuf: https://github.com/onflow/flow/protobuf/go/flow
+OpenAPI Specs: https://github.com/onflow/flow/openapi
+Flow SDK: https://github.com/onflow/flow-go-sdk
+Flow Core Contracts: https://github.com/onflow/flow-core-contracts
+FungibleToken Contracts: https://github.com/onflow/flow-ft
+NonFungibleToken Contracts: https://github.com/onflow/flow-nft
+Cadence: https://github.com/onflow/cadence

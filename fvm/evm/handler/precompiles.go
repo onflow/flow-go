@@ -8,16 +8,33 @@ import (
 	"github.com/onflow/cadence/sema"
 
 	"github.com/onflow/flow-go/fvm/environment"
+	"github.com/onflow/flow-go/fvm/evm/backends"
 	"github.com/onflow/flow-go/fvm/evm/precompiles"
 	"github.com/onflow/flow-go/fvm/evm/types"
 	"github.com/onflow/flow-go/model/flow"
 )
 
+// The Cadence Arch precompiled contract that is injected in the EVM environment,
+// implements the following functions:
+// - `flowBlockHeight()`
+// - `revertibleRandom()`
+// - `getRandomSource(uint64)`
+// - `verifyCOAOwnershipProof(address,bytes32,bytes)`
+//
+// By design, all errors that are the result of user input, will be propagated
+// in the EVM environment, and can be handled by developers, as they see fit.
+// However, all FVM fatal errors, will cause a panic and abort the outer Cadence
+// transaction. The reason behind this is that we want to have visibility when
+// such special errors occur. This way, any potential bugs will not go unnoticed.
+// The Cadence runtime recovers any Go crashers (index out of bounds, nil
+// dereferences, etc.) and fails the transaction gracefully, so a panic in the
+// precompiled contract does not indicate a node/runtime crash.
+
 func preparePrecompiledContracts(
 	evmContractAddress flow.Address,
 	randomBeaconAddress flow.Address,
 	addressAllocator types.AddressAllocator,
-	backend types.Backend,
+	backend backends.Backend,
 ) []types.PrecompiledContract {
 	archAddress := addressAllocator.AllocatePrecompileAddress(1)
 	archContract := precompiles.ArchContract(
@@ -30,10 +47,10 @@ func preparePrecompiledContracts(
 	return []types.PrecompiledContract{archContract}
 }
 
-func blockHeightProvider(backend types.Backend) func() (uint64, error) {
+func blockHeightProvider(backend backends.Backend) func() (uint64, error) {
 	return func() (uint64, error) {
 		h, err := backend.GetCurrentBlockHeight()
-		if types.IsAFatalError(err) || types.IsABackendError(err) {
+		if types.IsAFatalError(err) {
 			panic(err)
 		}
 		return h, err
@@ -42,7 +59,7 @@ func blockHeightProvider(backend types.Backend) func() (uint64, error) {
 
 const RandomSourceTypeValueFieldName = "value"
 
-func randomSourceProvider(contractAddress flow.Address, backend types.Backend) func(uint64) ([]byte, error) {
+func randomSourceProvider(contractAddress flow.Address, backend backends.Backend) func(uint64) ([]byte, error) {
 	return func(blockHeight uint64) ([]byte, error) {
 		value, err := backend.Invoke(
 			environment.ContractFunctionSpec{
@@ -60,7 +77,7 @@ func randomSourceProvider(contractAddress flow.Address, backend types.Backend) f
 			},
 		)
 		if err != nil {
-			if types.IsAFatalError(err) || types.IsABackendError(err) {
+			if types.IsAFatalError(err) {
 				panic(err)
 			}
 			return nil, err
@@ -81,7 +98,7 @@ func randomSourceProvider(contractAddress flow.Address, backend types.Backend) f
 	}
 }
 
-func revertibleRandomGenerator(backend types.Backend) func() (uint64, error) {
+func revertibleRandomGenerator(backend backends.Backend) func() (uint64, error) {
 	return func() (uint64, error) {
 		rand := make([]byte, 8)
 		err := backend.ReadRandom(rand)
@@ -95,7 +112,7 @@ func revertibleRandomGenerator(backend types.Backend) func() (uint64, error) {
 
 const ValidationResultTypeIsValidFieldName = "isValid"
 
-func coaOwnershipProofValidator(contractAddress flow.Address, backend types.Backend) func(proof *types.COAOwnershipProofInContext) (bool, error) {
+func coaOwnershipProofValidator(contractAddress flow.Address, backend backends.Backend) func(proof *types.COAOwnershipProofInContext) (bool, error) {
 	return func(proof *types.COAOwnershipProofInContext) (bool, error) {
 		value, err := backend.Invoke(
 			environment.ContractFunctionSpec{
@@ -116,7 +133,7 @@ func coaOwnershipProofValidator(contractAddress flow.Address, backend types.Back
 			proof.ToCadenceValues(),
 		)
 		if err != nil {
-			if types.IsAFatalError(err) || types.IsABackendError(err) {
+			if types.IsAFatalError(err) {
 				panic(err)
 			}
 			return false, err

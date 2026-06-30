@@ -8,6 +8,8 @@ import (
 	"strings"
 	"testing"
 
+	gethABI "github.com/ethereum/go-ethereum/accounts/abi"
+	gethCommon "github.com/ethereum/go-ethereum/common"
 	gethTypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/onflow/cadence"
@@ -64,7 +66,11 @@ type testContractHandler struct {
 	batchRun             func(txs [][]byte, coinbase types.Address) []*types.ResultSummary
 	generateResourceUUID func() uint64
 	dryRun               func(tx []byte, from types.Address) *types.ResultSummary
+	dryRunWithTxData     func(txData gethTypes.TxData, from types.Address) *types.ResultSummary
 	commitBlockProposal  func()
+	getState             func(target types.Address, slot gethCommon.Hash) gethCommon.Hash
+	setState             func(target types.Address, slot gethCommon.Hash, value gethCommon.Hash) gethCommon.Hash
+	runTxAs              func(from types.Address, to types.Address, txData types.Data, gasLimit types.GasLimit, balance types.Balance) *types.ResultSummary
 }
 
 var _ types.ContractHandler = &testContractHandler{}
@@ -114,6 +120,13 @@ func (t *testContractHandler) DryRun(tx []byte, from types.Address) *types.Resul
 	return t.dryRun(tx, from)
 }
 
+func (t *testContractHandler) DryRunWithTxData(txData gethTypes.TxData, from types.Address) *types.ResultSummary {
+	if t.dryRunWithTxData == nil {
+		panic("unexpected DryRunWithTxData")
+	}
+	return t.dryRunWithTxData(txData, from)
+}
+
 func (t *testContractHandler) BatchRun(txs [][]byte, coinbase types.Address) []*types.ResultSummary {
 	if t.batchRun == nil {
 		panic("unexpected BatchRun")
@@ -133,6 +146,40 @@ func (t *testContractHandler) CommitBlockProposal() {
 		panic("unexpected CommitBlockProposal")
 	}
 	t.commitBlockProposal()
+}
+
+func (t *testContractHandler) SetState(
+	target types.Address,
+	slot gethCommon.Hash,
+	value gethCommon.Hash,
+) gethCommon.Hash {
+	if t.setState == nil {
+		panic("unexpected SetState")
+	}
+	return t.setState(target, slot, value)
+}
+
+func (t *testContractHandler) GetState(
+	target types.Address,
+	slot gethCommon.Hash,
+) gethCommon.Hash {
+	if t.getState == nil {
+		panic("unexpected GetState")
+	}
+	return t.getState(target, slot)
+}
+
+func (t *testContractHandler) RunTxAs(
+	from types.Address,
+	to types.Address,
+	txData types.Data,
+	gasLimit types.GasLimit,
+	balance types.Balance,
+) *types.ResultSummary {
+	if t.runTxAs == nil {
+		panic("unexpected RunTxAs")
+	}
+	return t.runTxAs(from, to, txData, gasLimit, balance)
 }
 
 type testFlowAccount struct {
@@ -305,7 +352,12 @@ func deployContracts(
 		},
 		{
 			name: stdlib.ContractName,
-			code: stdlib.ContractCode(contractsAddress, contractsAddress, contractsAddress),
+			code: stdlib.ContractCode(
+				contractsAddress,
+				contractsAddress,
+				contractsAddress,
+				true,
+			),
 		},
 	}
 
@@ -1022,7 +1074,7 @@ func TestEVMEncodeABIBytesRoundtrip(t *testing.T) {
           import EVM from 0x1
 
           access(all)
-          fun main(): Bool {
+          fun main() {
             let bytes: EVM.EVMBytes = EVM.EVMBytes(value: [5, 10, 15, 20, 25])
             let encodedData = EVM.encodeABI([bytes])
             let types = [Type<EVM.EVMBytes>()]
@@ -1031,8 +1083,6 @@ func TestEVMEncodeABIBytesRoundtrip(t *testing.T) {
             assert(values.length == 1)
             let evmBytes = values[0] as! EVM.EVMBytes
             assert(evmBytes.value == [5, 10, 15, 20, 25])
-
-            return true
           }
 		`)
 
@@ -1041,7 +1091,7 @@ func TestEVMEncodeABIBytesRoundtrip(t *testing.T) {
 		}))
 
 		// Run script
-		result, err := rt.ExecuteScript(
+		_, err := rt.ExecuteScript(
 			runtime.Script{
 				Source: script,
 			},
@@ -1055,11 +1105,6 @@ func TestEVMEncodeABIBytesRoundtrip(t *testing.T) {
 			},
 		)
 		require.NoError(t, err)
-
-		assert.Equal(t,
-			cadence.Bool(true),
-			result,
-		)
 
 		assert.Equal(t, uint64(96), gauge.TotalComputationUsed())
 	})
@@ -1069,7 +1114,7 @@ func TestEVMEncodeABIBytesRoundtrip(t *testing.T) {
           import EVM from 0x1
 
           access(all)
-          fun main(): Bool {
+          fun main() {
             let bytes: EVM.EVMBytes = EVM.EVMBytes(value: [5, 10, 15, 20, 25])
             let bytesArray: [EVM.EVMBytes] = [bytes]
             let encodedData = EVM.encodeABI([bytesArray])
@@ -1079,8 +1124,6 @@ func TestEVMEncodeABIBytesRoundtrip(t *testing.T) {
             assert(values.length == 1)
             let evmBytes = values[0] as! [EVM.EVMBytes]
             assert(evmBytes[0].value == [5, 10, 15, 20, 25])
-
-            return true
           }
 		`)
 
@@ -1089,7 +1132,7 @@ func TestEVMEncodeABIBytesRoundtrip(t *testing.T) {
 		}))
 
 		// Run script
-		result, err := rt.ExecuteScript(
+		_, err := rt.ExecuteScript(
 			runtime.Script{
 				Source: script,
 			},
@@ -1103,11 +1146,6 @@ func TestEVMEncodeABIBytesRoundtrip(t *testing.T) {
 			},
 		)
 		require.NoError(t, err)
-
-		assert.Equal(t,
-			cadence.Bool(true),
-			result,
-		)
 
 		assert.Equal(t, uint64(160), gauge.TotalComputationUsed())
 	})
@@ -1117,7 +1155,7 @@ func TestEVMEncodeABIBytesRoundtrip(t *testing.T) {
           import EVM from 0x1
 
           access(all)
-          fun main(): Bool {
+          fun main() {
             let bytes: EVM.EVMBytes4 = EVM.EVMBytes4(value: [5, 10, 15, 20])
             let encodedData = EVM.encodeABI([bytes])
             let types = [Type<EVM.EVMBytes4>()]
@@ -1126,8 +1164,6 @@ func TestEVMEncodeABIBytesRoundtrip(t *testing.T) {
             assert(values.length == 1)
             let evmBytes = values[0] as! EVM.EVMBytes4
             assert(evmBytes.value == [5, 10, 15, 20])
-
-            return true
           }
 		`)
 		gauge := meter.NewMeter(meter.DefaultParameters().WithComputationWeights(meter.ExecutionEffortWeights{
@@ -1135,7 +1171,7 @@ func TestEVMEncodeABIBytesRoundtrip(t *testing.T) {
 		}))
 
 		// Run script
-		result, err := rt.ExecuteScript(
+		_, err := rt.ExecuteScript(
 			runtime.Script{
 				Source: script,
 			},
@@ -1149,11 +1185,6 @@ func TestEVMEncodeABIBytesRoundtrip(t *testing.T) {
 			},
 		)
 		require.NoError(t, err)
-
-		assert.Equal(t,
-			cadence.Bool(true),
-			result,
-		)
 
 		assert.Equal(t, uint64(32), gauge.TotalComputationUsed())
 	})
@@ -1163,7 +1194,7 @@ func TestEVMEncodeABIBytesRoundtrip(t *testing.T) {
           import EVM from 0x1
 
           access(all)
-          fun main(): Bool {
+          fun main() {
             let bytes: EVM.EVMBytes4 = EVM.EVMBytes4(value: [5, 10, 15, 20])
             let bytesArray: [EVM.EVMBytes4] = [bytes]
             let encodedData = EVM.encodeABI([bytesArray])
@@ -1173,8 +1204,6 @@ func TestEVMEncodeABIBytesRoundtrip(t *testing.T) {
             assert(values.length == 1)
             let evmBytes = values[0] as! [EVM.EVMBytes4]
             assert(evmBytes[0].value == [5, 10, 15, 20])
-
-            return true
           }
 		`)
 		gauge := meter.NewMeter(meter.DefaultParameters().WithComputationWeights(meter.ExecutionEffortWeights{
@@ -1182,7 +1211,7 @@ func TestEVMEncodeABIBytesRoundtrip(t *testing.T) {
 		}))
 
 		// Run script
-		result, err := rt.ExecuteScript(
+		_, err := rt.ExecuteScript(
 			runtime.Script{
 				Source: script,
 			},
@@ -1197,11 +1226,6 @@ func TestEVMEncodeABIBytesRoundtrip(t *testing.T) {
 		)
 		require.NoError(t, err)
 
-		assert.Equal(t,
-			cadence.Bool(true),
-			result,
-		)
-
 		assert.Equal(t, uint64(96), gauge.TotalComputationUsed())
 	})
 
@@ -1210,7 +1234,7 @@ func TestEVMEncodeABIBytesRoundtrip(t *testing.T) {
           import EVM from 0x1
 
           access(all)
-          fun main(): Bool {
+          fun main() {
             let bytes: EVM.EVMBytes32 = EVM.EVMBytes32(
               value: [
                 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16,
@@ -1229,8 +1253,6 @@ func TestEVMEncodeABIBytesRoundtrip(t *testing.T) {
               17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30,
               31, 32
             ])
-
-            return true
           }
 		`)
 		gauge := meter.NewMeter(meter.DefaultParameters().WithComputationWeights(meter.ExecutionEffortWeights{
@@ -1238,7 +1260,7 @@ func TestEVMEncodeABIBytesRoundtrip(t *testing.T) {
 		}))
 
 		// Run script
-		result, err := rt.ExecuteScript(
+		_, err := rt.ExecuteScript(
 			runtime.Script{
 				Source: script,
 			},
@@ -1253,11 +1275,6 @@ func TestEVMEncodeABIBytesRoundtrip(t *testing.T) {
 		)
 		require.NoError(t, err)
 
-		assert.Equal(t,
-			cadence.Bool(true),
-			result,
-		)
-
 		assert.Equal(t, uint64(32), gauge.TotalComputationUsed())
 	})
 
@@ -1266,7 +1283,7 @@ func TestEVMEncodeABIBytesRoundtrip(t *testing.T) {
           import EVM from 0x1
 
           access(all)
-          fun main(): Bool {
+          fun main() {
             let bytes: EVM.EVMBytes32 = EVM.EVMBytes32(
               value: [
                 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16,
@@ -1286,8 +1303,6 @@ func TestEVMEncodeABIBytesRoundtrip(t *testing.T) {
               17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30,
               31, 32
             ])
-
-            return true
           }
 		`)
 		gauge := meter.NewMeter(meter.DefaultParameters().WithComputationWeights(meter.ExecutionEffortWeights{
@@ -1295,7 +1310,7 @@ func TestEVMEncodeABIBytesRoundtrip(t *testing.T) {
 		}))
 
 		// Run script
-		result, err := rt.ExecuteScript(
+		_, err := rt.ExecuteScript(
 			runtime.Script{
 				Source: script,
 			},
@@ -1310,12 +1325,133 @@ func TestEVMEncodeABIBytesRoundtrip(t *testing.T) {
 		)
 		require.NoError(t, err)
 
-		assert.Equal(t,
-			cadence.Bool(true),
-			result,
-		)
-
 		assert.Equal(t, uint64(96), gauge.TotalComputationUsed())
+	})
+
+	t.Run("ABI encode struct into tuple Solidity type", func(t *testing.T) {
+		script := []byte(`
+          import EVM from 0x1
+
+          access(all)
+          struct S {
+              access(all) let x: UInt8
+              access(all) let y: Int16
+
+              init(x: UInt8, y: Int16) {
+                  self.x = x
+                  self.y = y
+              }
+
+              access(all) fun toString(): String {
+                  return "S(x: \(self.x), y: \(self.y))"
+              }
+          }
+
+          access(all)
+          fun main() {
+              let s = S(x: 4, y: 2)
+              let encodedData = EVM.encodeABI([s])
+              assert(encodedData == [
+                  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x4,
+                  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x2
+              ])
+
+              let values = EVM.decodeABI(types: [Type<S>()], data: encodedData)
+              assert(values.length == 1)
+			  let s2 = values[0] as! S
+			  assert(s2.x == 4)
+			  assert(s2.y == 2)
+          }
+    	`)
+
+		gauge := meter.NewMeter(meter.DefaultParameters().WithComputationWeights(meter.ExecutionEffortWeights{
+			environment.ComputationKindEVMEncodeABI: 1 << meter.MeterExecutionInternalPrecisionBytes,
+		}))
+
+		// Run script
+		_, err := rt.ExecuteScript(
+			runtime.Script{
+				Source: script,
+			},
+			runtime.Context{
+				Interface:        runtimeInterface,
+				Environment:      scriptEnvironment,
+				Location:         nextScriptLocation(),
+				MemoryGauge:      gauge,
+				ComputationGauge: gauge,
+			},
+		)
+		require.NoError(t, err)
+
+		assert.Equal(t, uint64(64), gauge.TotalComputationUsed())
+	})
+
+	t.Run("ABI encode array of structs into tuple Solidity type", func(t *testing.T) {
+		script := []byte(`
+          import EVM from 0x1
+
+          access(all)
+          struct S {
+              access(all) let x: UInt8
+              access(all) let y: Int16
+
+              init(x: UInt8, y: Int16) {
+                  self.x = x
+                  self.y = y
+              }
+
+              access(all) fun toString(): String {
+                  return "S(x: \(self.x), y: \(self.y))"
+              }
+          }
+
+          access(all)
+          fun main() {
+              let s1 = S(x: 4, y: 2)
+              let s2 = S(x: 5, y: 9)
+              let structArray = [s1, s2]
+              let encodedData = EVM.encodeABI([structArray])
+              assert(encodedData == [
+                  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x20,
+                  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x2,
+                  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x4,
+                  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x2,
+                  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x5,
+                  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x9
+              ], message: String.encodeHex(encodedData))
+
+              let values = EVM.decodeABI(types: [Type<[S]>()], data: encodedData)
+              assert(values.length == 1)
+              let decodedStructArray = values[0] as! [S]
+              assert(decodedStructArray.length == 2)
+
+              assert(decodedStructArray[0].x == 4)
+              assert(decodedStructArray[0].y == 2)
+              assert(decodedStructArray[1].x == 5)
+              assert(decodedStructArray[1].y == 9)
+          }
+		`)
+
+		gauge := meter.NewMeter(meter.DefaultParameters().WithComputationWeights(meter.ExecutionEffortWeights{
+			environment.ComputationKindEVMEncodeABI: 1 << meter.MeterExecutionInternalPrecisionBytes,
+		}))
+
+		// Run script
+		_, err := rt.ExecuteScript(
+			runtime.Script{
+				Source: script,
+			},
+			runtime.Context{
+				Interface:        runtimeInterface,
+				Environment:      scriptEnvironment,
+				Location:         nextScriptLocation(),
+				MemoryGauge:      gauge,
+				ComputationGauge: gauge,
+			},
+		)
+		require.NoError(t, err)
+
+		assert.Equal(t, uint64(192), gauge.TotalComputationUsed())
 	})
 }
 
@@ -1634,7 +1770,7 @@ func TestEVMDecodeABI(t *testing.T) {
       import EVM from 0x1
 
       access(all)
-      fun main(data: [UInt8]): Bool {
+      fun main(data: [UInt8]) {
         let types = [Type<String>(), Type<UInt64>(), Type<Bool>()]
         let values = EVM.decodeABI(types: types, data: data)
 
@@ -1642,8 +1778,6 @@ func TestEVMDecodeABI(t *testing.T) {
         assert((values[0] as! String) == "John Doe")
         assert((values[1] as! UInt64) == UInt64(33))
         assert((values[2] as! Bool) == false)
-
-        return true
       }
 	`)
 
@@ -1714,7 +1848,7 @@ func TestEVMDecodeABI(t *testing.T) {
 		cdcBytes,
 	).WithType(cadence.NewVariableSizedArrayType(cadence.UInt8Type))
 
-	result, err := rt.ExecuteScript(
+	_, err := rt.ExecuteScript(
 		runtime.Script{
 			Source: script,
 			Arguments: EncodeArgs([]cadence.Value{
@@ -1732,7 +1866,6 @@ func TestEVMDecodeABI(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	assert.Equal(t, cadence.NewBool(true), result)
 	assert.Equal(t, uint64(len(cdcBytes)), gauge.TotalComputationUsed())
 }
 
@@ -1910,7 +2043,7 @@ func TestEVMEncodeDecodeABIRoundtripForUintIntTypes(t *testing.T) {
         import EVM from 0x1
 
         access(all)
-        fun main(): Bool {
+        fun main() {
           // Check UInt/Int encode/decode
           let amount: UInt256 = 18446744073709551615
           let minBalance: Int256 = -18446744073709551615
@@ -1925,14 +2058,12 @@ func TestEVMEncodeDecodeABIRoundtripForUintIntTypes(t *testing.T) {
           )
           assert((values[0] as! UInt) == UInt(amount))
           assert((values[1] as! Int) == Int(minBalance))
-
-          return true
         }
 		`)
 
 		// Run script
 
-		result, err := rt.ExecuteScript(
+		_, err := rt.ExecuteScript(
 			runtime.Script{
 				Source: script,
 			},
@@ -1944,8 +2075,6 @@ func TestEVMEncodeDecodeABIRoundtripForUintIntTypes(t *testing.T) {
 			},
 		)
 		require.NoError(t, err)
-
-		assert.Equal(t, cadence.Bool(true), result)
 	})
 
 	t.Run("with values at the boundaries", func(t *testing.T) {
@@ -1954,11 +2083,11 @@ func TestEVMEncodeDecodeABIRoundtripForUintIntTypes(t *testing.T) {
         import EVM from 0x1
 
         access(all)
-        fun main(): Bool {
+        fun main() {
           // Check UInt*/Int* encode/decode
           let data = EVM.encodeABIWithSignature(
             "withdraw(uint,int,uint,int)",
-            [UInt(UInt256.max), Int(Int256.max),UInt(UInt256.min), Int(Int256.min)]
+            [UInt(UInt256.max), Int(Int256.max), UInt(UInt256.min), Int(Int256.min)]
           )
           let values = EVM.decodeABIWithSignature(
             "withdraw(uint,int,uint,int)",
@@ -1969,14 +2098,12 @@ func TestEVMEncodeDecodeABIRoundtripForUintIntTypes(t *testing.T) {
           assert((values[1] as! Int) == Int(Int256.max))
           assert((values[2] as! UInt) == UInt(UInt256.min))
           assert((values[3] as! Int) == Int(Int256.min))
-
-          return true
         }
 		`)
 
 		// Run script
 
-		result, err := rt.ExecuteScript(
+		_, err := rt.ExecuteScript(
 			runtime.Script{
 				Source: script,
 			},
@@ -1988,8 +2115,6 @@ func TestEVMEncodeDecodeABIRoundtripForUintIntTypes(t *testing.T) {
 			},
 		)
 		require.NoError(t, err)
-
-		assert.Equal(t, cadence.Bool(true), result)
 	})
 
 	t.Run("with UInt values outside the boundaries", func(t *testing.T) {
@@ -1998,13 +2123,11 @@ func TestEVMEncodeDecodeABIRoundtripForUintIntTypes(t *testing.T) {
         import EVM from 0x1
 
         access(all)
-        fun main(): Bool {
+        fun main() {
           let data = EVM.encodeABIWithSignature(
             "withdraw(uint)",
             [UInt(UInt256.max)+10]
           )
-
-          return true
         }
 		`)
 
@@ -2036,13 +2159,11 @@ func TestEVMEncodeDecodeABIRoundtripForUintIntTypes(t *testing.T) {
         import EVM from 0x1
 
         access(all)
-        fun main(): Bool {
+        fun main() {
           let data = EVM.encodeABIWithSignature(
             "withdraw(int)",
             [Int(Int256.max)+10]
           )
-
-          return true
         }
 		`)
 
@@ -2074,13 +2195,11 @@ func TestEVMEncodeDecodeABIRoundtripForUintIntTypes(t *testing.T) {
         import EVM from 0x1
 
         access(all)
-        fun main(): Bool {
+        fun main() {
           let data = EVM.encodeABIWithSignature(
             "withdraw(int)",
             [Int(Int256.min)-10]
           )
-
-          return true
         }
 		`)
 
@@ -2124,7 +2243,7 @@ func TestEVMEncodeDecodeABIRoundtrip(t *testing.T) {
       import EVM from 0x1
 
       access(all)
-      fun main(): Bool {
+      fun main() {
         // Check EVM.EVMAddress encode/decode
         let address = EVM.EVMAddress(
             bytes: "7A58c0Be72BE218B41C608b7Fe7C5bB630736C71"
@@ -2318,8 +2437,6 @@ func TestEVMEncodeDecodeABIRoundtrip(t *testing.T) {
         values = EVM.decodeABI(types: [Type<[[String]]>()], data: data)
         assert(values.length == 1)
         assert((values[0] as! [[String]]) == [["Foo", "Bar"], ["Baz", "Qux"]])
-
-        return true
       }
 	`)
 
@@ -2365,7 +2482,7 @@ func TestEVMEncodeDecodeABIRoundtrip(t *testing.T) {
 
 	// Run script
 
-	result, err := rt.ExecuteScript(
+	_, err := rt.ExecuteScript(
 		runtime.Script{
 			Source: script,
 		},
@@ -2377,11 +2494,6 @@ func TestEVMEncodeDecodeABIRoundtrip(t *testing.T) {
 		},
 	)
 	require.NoError(t, err)
-
-	assert.Equal(t,
-		cadence.Bool(true),
-		result,
-	)
 }
 
 func TestEVMEncodeDecodeABIErrors(t *testing.T) {
@@ -2447,11 +2559,9 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
           import EVM from 0x1
 
           access(all)
-          fun main(): Bool {
+          fun main() {
             let address: Address = 0x045a1763c93006ca
-            let data = EVM.encodeABI([address])
-
-            return true
+            EVM.encodeABI([address])
           }
 		`)
 
@@ -2533,10 +2643,8 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
           import EVM from 0x1
 
           access(all)
-          fun main(): Bool {
-            let data = EVM.encodeABI([0.2])
-
-            return true
+          fun main() {
+            EVM.encodeABI([0.2])
           }
 		`)
 
@@ -2618,11 +2726,9 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
           import EVM from 0x1
 
           access(all)
-          fun main(): Bool {
+          fun main() {
             let dict: {Int: Bool} = {0: false, 1: true}
-            let data = EVM.encodeABI([dict])
-
-            return true
+            EVM.encodeABI([dict])
           }
 		`)
 
@@ -2704,11 +2810,9 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
           import EVM from 0x1
 
           access(all)
-          fun main(): Bool {
+          fun main() {
             let chars: [Character] = ["a", "b", "c"]
-            let data = EVM.encodeABI([chars])
-
-            return true
+            EVM.encodeABI([chars])
           }
 		`)
 
@@ -2789,22 +2893,17 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 		script := []byte(`
           import EVM from 0x1
 
-          access(all) struct Token {
-            access(all) let id: Int
-            access(all) var balance: UInt
+          access(all) struct Fun {
+              access(all) let f: fun(): Void
 
-            init(id: Int, balance: UInt) {
-              self.id = id
-              self.balance = balance
-            }
+			  init() {
+				  self.f = fun(): Void {}
+              }
           }
 
           access(all)
-          fun main(): Bool {
-            let token = Token(id: 9, balance: 150)
-            let data = EVM.encodeABI([token])
-
-            return true
+          fun main() {
+            EVM.encodeABI([Fun()])
           }
 		`)
 
@@ -2823,7 +2922,7 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 		assert.ErrorContains(
 			t,
 			err,
-			"failed to ABI encode value of type s.0100000000000000000000000000000000000000000000000000000000000000.Token",
+			"failed to ABI encode value of type fun(): Void",
 		)
 	})
 
@@ -2886,11 +2985,9 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
           import EVM from 0x1
 
           access(all)
-          fun main(): Bool {
+          fun main() {
             let data = EVM.encodeABI(["Peter"])
-            let values = EVM.decodeABI(types: [Type<Bool>()], data: data)
-
-            return true
+            EVM.decodeABI(types: [Type<Bool>()], data: data)
           }
 		`)
 
@@ -2972,11 +3069,9 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
           import EVM from 0x1
 
           access(all)
-          fun main(): Bool {
+          fun main() {
             let data = EVM.encodeABI(["Peter"])
-            let values = EVM.decodeABI(types: [Type<String>(), Type<Bool>()], data: data)
-
-            return true
+            EVM.decodeABI(types: [Type<String>(), Type<Bool>()], data: data)
           }
 		`)
 
@@ -3058,11 +3153,9 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
           import EVM from 0x1
 
           access(all)
-          fun main(): Bool {
+          fun main() {
             let data = EVM.encodeABI(["Peter"])
-            let values = EVM.decodeABI(types: [Type<UFix64>()], data: data)
-
-            return true
+            EVM.decodeABI(types: [Type<UFix64>()], data: data)
           }
 		`)
 
@@ -3144,11 +3237,9 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
           import EVM from 0x1
 
           access(all)
-          fun main(): Bool {
+          fun main() {
             let data = EVM.encodeABI(["Peter"])
-            let values = EVM.decodeABI(types: [Type<{Int: Bool}>()], data: data)
-
-            return true
+            EVM.decodeABI(types: [Type<{Int: Bool}>()], data: data)
           }
 		`)
 
@@ -3230,11 +3321,9 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
           import EVM from 0x1
 
           access(all)
-          fun main(): Bool {
+          fun main() {
             let data = EVM.encodeABI(["Peter"])
-            let values = EVM.decodeABI(types: [Type<[Character]>()], data: data)
-
-            return true
+            EVM.decodeABI(types: [Type<[Character]>()], data: data)
           }
 		`)
 
@@ -3315,22 +3404,24 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 		script := []byte(`
           import EVM from 0x1
 
-          access(all) struct Token {
-            access(all) let id: Int
-            access(all) var balance: UInt
+          access(all) struct S {
+            access(all) let x: UInt8
+            init() {
+              self.x = 42
+            }
+          }
 
-            init(id: Int, balance: UInt) {
-              self.id = id
-              self.balance = balance
+          access(all) resource R {
+            access(all) let x: UInt8
+            init() {
+			  self.x = 42
             }
           }
 
           access(all)
-          fun main(): Bool {
-            let data = EVM.encodeABI(["Peter"])
-            let values = EVM.decodeABI(types: [Type<Token>()], data: data)
-
-            return true
+          fun main() {
+            let data = EVM.encodeABI([S()])
+            EVM.decodeABI(types: [Type<@R>()], data: data)
           }
 		`)
 
@@ -3349,7 +3440,7 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 		assert.ErrorContains(
 			t,
 			err,
-			"failed to ABI decode data with type s.0100000000000000000000000000000000000000000000000000000000000000.Token",
+			"failed to ABI decode data with type s.0100000000000000000000000000000000000000000000000000000000000000.R",
 		)
 	})
 }
@@ -3493,7 +3584,7 @@ func TestEVMDecodeABIWithSignature(t *testing.T) {
       import EVM from 0x1
 
       access(all)
-      fun main(data: [UInt8]): Bool {
+      fun main(data: [UInt8]) {
         let values = EVM.decodeABIWithSignature(
           "withdraw(address,uint256)",
           types: [Type<EVM.EVMAddress>(), Type<UInt256>()],
@@ -3511,8 +3602,6 @@ func TestEVMDecodeABIWithSignature(t *testing.T) {
         assert(values.length == 2)
         assert((values[0] as! EVM.EVMAddress).bytes == address.bytes)
         assert((values[1] as! UInt256) == UInt256(250))
-
-        return true
       }
 	`)
 
@@ -3584,7 +3673,7 @@ func TestEVMDecodeABIWithSignature(t *testing.T) {
 		cdcBytes,
 	).WithType(cadence.NewVariableSizedArrayType(cadence.UInt8Type))
 
-	result, err := rt.ExecuteScript(
+	_, err := rt.ExecuteScript(
 		runtime.Script{
 			Source: script,
 			Arguments: EncodeArgs([]cadence.Value{
@@ -3601,8 +3690,6 @@ func TestEVMDecodeABIWithSignature(t *testing.T) {
 		},
 	)
 	require.NoError(t, err)
-
-	assert.Equal(t, cadence.NewBool(true), result)
 	// The method ID is a byte array of length 4
 	assert.Equal(t, uint64(len(cdcBytes)), gauge.TotalComputationUsed()+4)
 }
@@ -3624,7 +3711,7 @@ func TestEVMDecodeABIWithSignatureMismatch(t *testing.T) {
       import EVM from 0x1
 
       access(all)
-      fun main(data: [UInt8]): Bool {
+      fun main(data: [UInt8]) {
         // The data was encoded for the function "withdraw(address,uint256)",
         // but we pass a different function signature
         let values = EVM.decodeABIWithSignature(
@@ -3632,8 +3719,6 @@ func TestEVMDecodeABIWithSignatureMismatch(t *testing.T) {
           types: [Type<UInt256>(), Type<EVM.EVMAddress>()],
           data: data
         )
-
-        return true
       }
 	`)
 
@@ -3717,6 +3802,108 @@ func TestEVMDecodeABIWithSignatureMismatch(t *testing.T) {
 	)
 	require.Error(t, err)
 	assert.ErrorContains(t, err, "EVM.decodeABIWithSignature(): Cannot decode! The signature does not match the provided data.")
+}
+
+func TestEVMDecodeABIWithInsufficientData(t *testing.T) {
+
+	t.Parallel()
+
+	handler := &testContractHandler{}
+
+	contractsAddress := flow.BytesToAddress([]byte{0x1})
+
+	transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
+	scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
+
+	rt := runtime.NewRuntime(runtime.Config{})
+
+	script := []byte(`
+      import EVM from 0x1
+
+      access(all)
+      fun main(data: [UInt8]) {
+        // We are passing less than 4 bytes, which is the minimum bytes needed
+        // for the function selector.
+        let values = EVM.decodeABIWithSignature(
+          "deposit(uint256, address)",
+          types: [Type<UInt256>(), Type<EVM.EVMAddress>()],
+          data: data
+        )
+      }
+	`)
+
+	accountCodes := map[common.Location][]byte{}
+	var events []cadence.Event
+
+	runtimeInterface := &TestRuntimeInterface{
+		Storage: NewTestLedger(nil, nil),
+		OnGetSigningAccounts: func() ([]runtime.Address, error) {
+			return []runtime.Address{runtime.Address(contractsAddress)}, nil
+		},
+		OnResolveLocation: newLocationResolver(contractsAddress),
+		OnUpdateAccountContractCode: func(location common.AddressLocation, code []byte) error {
+			accountCodes[location] = code
+			return nil
+		},
+		OnGetAccountContractCode: func(location common.AddressLocation) (code []byte, err error) {
+			code = accountCodes[location]
+			return code, nil
+		},
+		OnEmitEvent: func(event cadence.Event) error {
+			events = append(events, event)
+			return nil
+		},
+		OnDecodeArgument: func(b []byte, t cadence.Type) (cadence.Value, error) {
+			return json.Decode(nil, b)
+		},
+		OnHash: func(
+			data []byte,
+			tag string,
+			hashAlgorithm runtime.HashAlgorithm,
+		) ([]byte, error) {
+			return crypto.Keccak256(data), nil
+		},
+	}
+
+	nextTransactionLocation := NewTransactionLocationGenerator()
+	nextScriptLocation := NewScriptLocationGenerator()
+
+	// Deploy contracts
+
+	deployContracts(
+		t,
+		rt,
+		contractsAddress,
+		runtimeInterface,
+		transactionEnvironment,
+		nextTransactionLocation,
+	)
+
+	// Run script
+	abiBytes := []byte{0xf3, 0xfe, 0xa3}
+	cdcBytes := make([]cadence.Value, 0)
+	for _, bt := range abiBytes {
+		cdcBytes = append(cdcBytes, cadence.UInt8(bt))
+	}
+	encodedABI := cadence.NewArray(
+		cdcBytes,
+	).WithType(cadence.NewVariableSizedArrayType(cadence.UInt8Type))
+
+	_, err := rt.ExecuteScript(
+		runtime.Script{
+			Source: script,
+			Arguments: EncodeArgs([]cadence.Value{
+				encodedABI,
+			}),
+		},
+		runtime.Context{
+			Interface:   runtimeInterface,
+			Environment: scriptEnvironment,
+			Location:    nextScriptLocation(),
+		},
+	)
+	require.Error(t, err)
+	assert.ErrorContains(t, err, "EVM.decodeABIWithSignature(): Cannot decode! The provided data does not contain a signature.")
 }
 
 func TestEVMAddressConstructionAndReturn(t *testing.T) {
@@ -4356,12 +4543,9 @@ func TestEVMDryCall(t *testing.T) {
 	contractsAddress := flow.BytesToAddress([]byte{0x1})
 	handler := &testContractHandler{
 		evmContractAddress: common.Address(contractsAddress),
-		dryRun: func(tx []byte, from types.Address) *types.ResultSummary {
+		dryRunWithTxData: func(txData gethTypes.TxData, from types.Address) *types.ResultSummary {
 			dryCallCalled = true
-			gethTx := &gethTypes.Transaction{}
-			if err := gethTx.UnmarshalBinary(tx); err != nil {
-				require.Fail(t, err.Error())
-			}
+			gethTx := gethTypes.NewTx(txData)
 
 			require.NotNil(t, gethTx.To())
 
@@ -4466,6 +4650,463 @@ func TestEVMDryCall(t *testing.T) {
 	assert.True(t, dryCallCalled)
 }
 
+func TestEVMDryCallWithSigAndArgs(t *testing.T) {
+
+	t.Parallel()
+
+	contractsAddress := flow.BytesToAddress([]byte{0x1})
+
+	executeScript := func(handler types.ContractHandler, script []byte) (cadence.Value, error) {
+
+		rt := runtime.NewRuntime(runtime.Config{})
+
+		accountCodes := map[common.Location][]byte{}
+		var events []cadence.Event
+
+		runtimeInterface := &TestRuntimeInterface{
+			Storage: NewTestLedger(nil, nil),
+			OnGetSigningAccounts: func() ([]runtime.Address, error) {
+				return []runtime.Address{runtime.Address(contractsAddress)}, nil
+			},
+			OnResolveLocation: newLocationResolver(contractsAddress),
+			OnUpdateAccountContractCode: func(location common.AddressLocation, code []byte) error {
+				accountCodes[location] = code
+				return nil
+			},
+			OnGetAccountContractCode: func(location common.AddressLocation) (code []byte, err error) {
+				code = accountCodes[location]
+				return code, nil
+			},
+			OnEmitEvent: func(event cadence.Event) error {
+				events = append(events, event)
+				return nil
+			},
+			OnDecodeArgument: func(b []byte, t cadence.Type) (cadence.Value, error) {
+				return json.Decode(nil, b)
+			},
+		}
+
+		nextTransactionLocation := NewTransactionLocationGenerator()
+		nextScriptLocation := NewScriptLocationGenerator()
+
+		transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
+		scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
+
+		// Deploy contracts
+
+		deployContracts(
+			t,
+			rt,
+			contractsAddress,
+			runtimeInterface,
+			transactionEnvironment,
+			nextTransactionLocation,
+		)
+
+		// Run script
+
+		return rt.ExecuteScript(
+			runtime.Script{
+				Source:    script,
+				Arguments: nil,
+			},
+			runtime.Context{
+				Interface:   runtimeInterface,
+				Environment: scriptEnvironment,
+				Location:    nextScriptLocation(),
+			},
+		)
+	}
+
+	t.Run("dryCall includes result types, tx fails", func(t *testing.T) {
+		dryCallCalled := false
+
+		handler := &testContractHandler{
+			evmContractAddress: common.Address(contractsAddress),
+			dryRunWithTxData: func(txData gethTypes.TxData, from types.Address) *types.ResultSummary {
+				dryCallCalled = true
+
+				gethTx := gethTypes.NewTx(txData)
+
+				require.NotNil(t, gethTx.To())
+
+				assert.Equal(
+					t,
+					types.Address{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 0, 0, 0, 0, 0, 0, 0, 0, 10},
+					from,
+				)
+				assert.Equal(
+					t,
+					types.Address{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 0, 0, 0, 0, 0, 0, 0, 0, 15},
+					types.NewAddress(*gethTx.To()),
+				)
+
+				expectedData := []byte{0xcc, 0x43, 0x5b, 0xf3, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0xa, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x14}
+				assert.Equal(t, expectedData, gethTx.Data())
+				assert.Equal(t, uint64(33_000), gethTx.Gas())
+				assert.Equal(t, big.NewInt(150), gethTx.Value())
+
+				return &types.ResultSummary{
+					Status:       types.StatusFailed,
+					ReturnedData: types.Data([]byte{0, 1, 2}),
+				}
+			},
+		}
+
+		script := []byte(`
+      import EVM from 0x1
+
+      access(all)
+      fun main(): EVM.ResultDecoded {
+          return EVM.dryCallWithSigAndArgs(
+            from: EVM.EVMAddress(bytes: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 0, 0, 0, 0, 0, 0, 0, 0, 10]),
+            to: EVM.EVMAddress(bytes: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 0, 0, 0, 0, 0, 0, 0, 0, 15]),
+			signature: "isValidAsset(address)",
+			args: [EVM.EVMAddress(bytes: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 0, 0, 0, 0, 0, 0, 0, 0, 20])],
+            gasLimit: 33000,
+            value: 150,
+			resultTypes: [Type<Bool>()],
+          )
+      }
+    `)
+		val, err := executeScript(handler, script)
+		require.NoError(t, err)
+		assert.True(t, dryCallCalled)
+
+		res, err := ResultDecodedFromEVMResultValue(val)
+		require.NoError(t, err)
+		assert.Equal(t, types.StatusFailed, res.Status)
+		assert.True(t, len(res.Results) == 3)
+		assert.Equal(t, cadence.UInt8(0), res.Results[0])
+		assert.Equal(t, cadence.UInt8(1), res.Results[1])
+		assert.Equal(t, cadence.UInt8(2), res.Results[2])
+	})
+
+	t.Run("dryCall includes result types, tx result data is empty", func(t *testing.T) {
+		dryCallCalled := false
+
+		handler := &testContractHandler{
+			evmContractAddress: common.Address(contractsAddress),
+			dryRunWithTxData: func(txData gethTypes.TxData, from types.Address) *types.ResultSummary {
+				dryCallCalled = true
+				gethTx := gethTypes.NewTx(txData)
+
+				require.NotNil(t, gethTx.To())
+
+				assert.Equal(
+					t,
+					types.Address{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 0, 0, 0, 0, 0, 0, 0, 0, 10},
+					from,
+				)
+				assert.Equal(
+					t,
+					types.Address{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 0, 0, 0, 0, 0, 0, 0, 0, 15},
+					types.NewAddress(*gethTx.To()),
+				)
+				expectedData := []byte{0xcc, 0x43, 0x5b, 0xf3, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0xa, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x14}
+				assert.Equal(t, expectedData, gethTx.Data())
+				assert.Equal(t, uint64(33_000), gethTx.Gas())
+				assert.Equal(t, big.NewInt(150), gethTx.Value())
+
+				return &types.ResultSummary{
+					Status: types.StatusSuccessful,
+				}
+			},
+		}
+
+		script := []byte(`
+      import EVM from 0x1
+
+      access(all)
+      fun main(): EVM.ResultDecoded {
+          return EVM.dryCallWithSigAndArgs(
+            from: EVM.EVMAddress(bytes: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 0, 0, 0, 0, 0, 0, 0, 0, 10]),
+            to: EVM.EVMAddress(bytes: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 0, 0, 0, 0, 0, 0, 0, 0, 15]),
+			signature: "isValidAsset(address)",
+			args: [EVM.EVMAddress(bytes: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 0, 0, 0, 0, 0, 0, 0, 0, 20])],
+            gasLimit: 33000,
+            value: 150,
+			resultTypes: [Type<Bool>()],
+          )
+      }
+    `)
+
+		_, err := executeScript(handler, script)
+		require.ErrorContains(t, err, "failed to ABI decode data")
+		assert.True(t, dryCallCalled)
+	})
+
+	t.Run("dryCall includes result types, tx result data doesn't match result types", func(t *testing.T) {
+		dryCallCalled := false
+
+		handler := &testContractHandler{
+			evmContractAddress: common.Address(contractsAddress),
+			dryRunWithTxData: func(txData gethTypes.TxData, from types.Address) *types.ResultSummary {
+				dryCallCalled = true
+				gethTx := gethTypes.NewTx(txData)
+
+				require.NotNil(t, gethTx.To())
+
+				assert.Equal(
+					t,
+					types.Address{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 0, 0, 0, 0, 0, 0, 0, 0, 10},
+					from,
+				)
+				assert.Equal(
+					t,
+					types.Address{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 0, 0, 0, 0, 0, 0, 0, 0, 15},
+					types.NewAddress(*gethTx.To()),
+				)
+				expectedData := []byte{0xcc, 0x43, 0x5b, 0xf3, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0xa, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x14}
+				assert.Equal(t, expectedData, gethTx.Data())
+				assert.Equal(t, uint64(33_000), gethTx.Gas())
+				assert.Equal(t, big.NewInt(150), gethTx.Value())
+
+				// Result data is uint64(42)
+
+				arguments := gethABI.Arguments{
+					gethABI.Argument{Type: gethABI.Type{T: gethABI.UintTy, Size: 64}},
+				}
+
+				encodedValues, err := arguments.Pack(uint64(42))
+				assert.NoError(t, err)
+
+				return &types.ResultSummary{
+					Status:       types.StatusSuccessful,
+					ReturnedData: encodedValues,
+				}
+			},
+		}
+
+		script := []byte(`
+      import EVM from 0x1
+
+      access(all)
+      fun main(): EVM.ResultDecoded {
+          return EVM.dryCallWithSigAndArgs(
+            from: EVM.EVMAddress(bytes: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 0, 0, 0, 0, 0, 0, 0, 0, 10]),
+            to: EVM.EVMAddress(bytes: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 0, 0, 0, 0, 0, 0, 0, 0, 15]),
+			signature: "isValidAsset(address)",
+			args: [EVM.EVMAddress(bytes: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 0, 0, 0, 0, 0, 0, 0, 0, 20])],
+            gasLimit: 33000,
+            value: 150,
+			resultTypes: [Type<Bool>()],
+          )
+      }
+    `)
+
+		_, err := executeScript(handler, script)
+		require.ErrorContains(t, err, "failed to ABI decode data")
+		assert.True(t, dryCallCalled)
+	})
+
+	t.Run("dryCall includes result types, tx result data matches provided result types", func(t *testing.T) {
+		dryCallCalled := false
+
+		handler := &testContractHandler{
+			evmContractAddress: common.Address(contractsAddress),
+			dryRunWithTxData: func(txData gethTypes.TxData, from types.Address) *types.ResultSummary {
+				dryCallCalled = true
+				gethTx := gethTypes.NewTx(txData)
+
+				require.NotNil(t, gethTx.To())
+
+				assert.Equal(
+					t,
+					types.Address{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 0, 0, 0, 0, 0, 0, 0, 0, 10},
+					from,
+				)
+				assert.Equal(
+					t,
+					types.Address{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 0, 0, 0, 0, 0, 0, 0, 0, 15},
+					types.NewAddress(*gethTx.To()),
+				)
+				expectedData := []byte{0xcc, 0x43, 0x5b, 0xf3, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0xa, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x14}
+				assert.Equal(t, expectedData, gethTx.Data())
+				assert.Equal(t, uint64(33_000), gethTx.Gas())
+				assert.Equal(t, big.NewInt(150), gethTx.Value())
+
+				arguments := gethABI.Arguments{
+					gethABI.Argument{Type: gethABI.Type{T: gethABI.BoolTy}},
+				}
+
+				encodedValues, err := arguments.Pack(true)
+				assert.NoError(t, err)
+
+				return &types.ResultSummary{
+					Status:       types.StatusSuccessful,
+					ReturnedData: encodedValues,
+				}
+			},
+		}
+
+		script := []byte(`
+      import EVM from 0x1
+
+      access(all)
+      fun main(): EVM.ResultDecoded {
+          return EVM.dryCallWithSigAndArgs(
+            from: EVM.EVMAddress(bytes: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 0, 0, 0, 0, 0, 0, 0, 0, 10]),
+            to: EVM.EVMAddress(bytes: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 0, 0, 0, 0, 0, 0, 0, 0, 15]),
+			signature: "isValidAsset(address)",
+			args: [EVM.EVMAddress(bytes: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 0, 0, 0, 0, 0, 0, 0, 0, 20])],
+            gasLimit: 33000,
+            value: 150,
+			resultTypes: [Type<Bool>()],
+          )
+      }
+    `)
+
+		val, err := executeScript(handler, script)
+		require.NoError(t, err)
+		assert.True(t, dryCallCalled)
+
+		res, err := ResultDecodedFromEVMResultValue(val)
+		require.NoError(t, err)
+		assert.Equal(t, types.StatusSuccessful, res.Status)
+		assert.True(t, len(res.Results) == 1)
+		assert.Equal(t, cadence.Bool(true), res.Results[0])
+	})
+
+	t.Run("dryCall doesn't result types, tx fails", func(t *testing.T) {
+		dryCallCalled := false
+
+		handler := &testContractHandler{
+			evmContractAddress: common.Address(contractsAddress),
+			dryRunWithTxData: func(txData gethTypes.TxData, from types.Address) *types.ResultSummary {
+				dryCallCalled = true
+
+				gethTx := gethTypes.NewTx(txData)
+
+				require.NotNil(t, gethTx.To())
+
+				assert.Equal(
+					t,
+					types.Address{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 0, 0, 0, 0, 0, 0, 0, 0, 10},
+					from,
+				)
+				assert.Equal(
+					t,
+					types.Address{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 0, 0, 0, 0, 0, 0, 0, 0, 15},
+					types.NewAddress(*gethTx.To()),
+				)
+
+				expectedData := []byte{0xcc, 0x43, 0x5b, 0xf3, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0xa, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x14}
+				assert.Equal(t, expectedData, gethTx.Data())
+				assert.Equal(t, uint64(33_000), gethTx.Gas())
+				assert.Equal(t, big.NewInt(150), gethTx.Value())
+
+				return &types.ResultSummary{
+					Status:       types.StatusFailed,
+					ReturnedData: types.Data([]byte{0, 1, 2}),
+				}
+			},
+		}
+
+		script := []byte(`
+      import EVM from 0x1
+
+      access(all)
+      fun main(): EVM.ResultDecoded {
+          return EVM.dryCallWithSigAndArgs(
+            from: EVM.EVMAddress(bytes: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 0, 0, 0, 0, 0, 0, 0, 0, 10]),
+            to: EVM.EVMAddress(bytes: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 0, 0, 0, 0, 0, 0, 0, 0, 15]),
+			signature: "isValidAsset(address)",
+			args: [EVM.EVMAddress(bytes: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 0, 0, 0, 0, 0, 0, 0, 0, 20])],
+            gasLimit: 33000,
+            value: 150,
+			resultTypes: nil,
+          )
+      }
+    `)
+		val, err := executeScript(handler, script)
+		require.NoError(t, err)
+		assert.True(t, dryCallCalled)
+
+		res, err := ResultDecodedFromEVMResultValue(val)
+		require.NoError(t, err)
+		assert.Equal(t, types.StatusFailed, res.Status)
+		assert.True(t, len(res.Results) == 3)
+		assert.Equal(t, cadence.UInt8(0), res.Results[0])
+		assert.Equal(t, cadence.UInt8(1), res.Results[1])
+		assert.Equal(t, cadence.UInt8(2), res.Results[2])
+	})
+
+	t.Run("dryCall doesn't include result types, tx is successful", func(t *testing.T) {
+		dryCallCalled := false
+
+		handler := &testContractHandler{
+			evmContractAddress: common.Address(contractsAddress),
+			dryRunWithTxData: func(txData gethTypes.TxData, from types.Address) *types.ResultSummary {
+				dryCallCalled = true
+				gethTx := gethTypes.NewTx(txData)
+
+				require.NotNil(t, gethTx.To())
+
+				assert.Equal(
+					t,
+					types.Address{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 0, 0, 0, 0, 0, 0, 0, 0, 10},
+					from,
+				)
+				assert.Equal(
+					t,
+					types.Address{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 0, 0, 0, 0, 0, 0, 0, 0, 15},
+					types.NewAddress(*gethTx.To()),
+				)
+				expectedData := []byte{0xcc, 0x43, 0x5b, 0xf3, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0xa, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x14}
+				assert.Equal(t, expectedData, gethTx.Data())
+				assert.Equal(t, uint64(33_000), gethTx.Gas())
+				assert.Equal(t, big.NewInt(150), gethTx.Value())
+
+				arguments := gethABI.Arguments{
+					gethABI.Argument{Type: gethABI.Type{T: gethABI.BoolTy}},
+				}
+
+				encodedValues, err := arguments.Pack(true)
+				assert.NoError(t, err)
+
+				return &types.ResultSummary{
+					Status:       types.StatusSuccessful,
+					ReturnedData: encodedValues,
+				}
+			},
+		}
+
+		script := []byte(`
+      import EVM from 0x1
+
+      access(all)
+      fun main(): EVM.ResultDecoded {
+          return EVM.dryCallWithSigAndArgs(
+            from: EVM.EVMAddress(bytes: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 0, 0, 0, 0, 0, 0, 0, 0, 10]),
+            to: EVM.EVMAddress(bytes: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 0, 0, 0, 0, 0, 0, 0, 0, 15]),
+			signature: "isValidAsset(address)",
+			args: [EVM.EVMAddress(bytes: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 0, 0, 0, 0, 0, 0, 0, 0, 20])],
+            gasLimit: 33000,
+            value: 150,
+			resultTypes: nil,
+          )
+      }
+    `)
+
+		val, err := executeScript(handler, script)
+		require.NoError(t, err)
+		assert.True(t, dryCallCalled)
+
+		res, err := ResultDecodedFromEVMResultValue(val)
+		require.NoError(t, err)
+		assert.Equal(t, types.StatusSuccessful, res.Status)
+		assert.True(t, len(res.Results) == 32)
+		for i, v := range res.Results {
+			if i == len(res.Results)-1 {
+				assert.Equal(t, cadence.UInt8(1), v)
+			} else {
+				assert.Equal(t, cadence.UInt8(0), v)
+			}
+		}
+	})
+}
+
 func TestEVMBatchRun(t *testing.T) {
 
 	t.Parallel()
@@ -4497,9 +5138,14 @@ func TestEVMBatchRun(t *testing.T) {
 		batchRun: func(txs [][]byte, coinbase types.Address) []*types.ResultSummary {
 			runCalled = true
 
-			assert.EqualValues(t, [][]byte{
-				{1, 2, 3}, {4, 5, 6}, {7, 8, 9},
-			}, txs)
+			assert.EqualValues(t,
+				[][]byte{
+					{1, 2, 3},
+					{4, 5, 6},
+					{7, 8, 9},
+				},
+				txs,
+			)
 			assert.Equal(t,
 				types.Address{
 					1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9, 10, 10,
@@ -4856,6 +5502,469 @@ func TestCadenceOwnedAccountCall(t *testing.T) {
 	require.Equal(t, expected, actual)
 }
 
+func TestCadenceOwnedAccountCallWithSigAndArgs(t *testing.T) {
+
+	t.Parallel()
+
+	expectedBalance, err := cadence.NewUFix64FromParts(1, 23000000)
+	require.NoError(t, err)
+
+	contractsAddress := flow.BytesToAddress([]byte{0x1})
+
+	executeScript := func(handler types.ContractHandler, script []byte) (cadence.Value, error) {
+
+		transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
+		scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
+
+		accountCodes := map[common.Location][]byte{}
+		var events []cadence.Event
+
+		runtimeInterface := &TestRuntimeInterface{
+			Storage: NewTestLedger(nil, nil),
+			OnGetSigningAccounts: func() ([]runtime.Address, error) {
+				return []runtime.Address{runtime.Address(contractsAddress)}, nil
+			},
+			OnResolveLocation: newLocationResolver(contractsAddress),
+			OnUpdateAccountContractCode: func(location common.AddressLocation, code []byte) error {
+				accountCodes[location] = code
+				return nil
+			},
+			OnGetAccountContractCode: func(location common.AddressLocation) (code []byte, err error) {
+				code = accountCodes[location]
+				return code, nil
+			},
+			OnEmitEvent: func(event cadence.Event) error {
+				events = append(events, event)
+				return nil
+			},
+			OnDecodeArgument: func(b []byte, t cadence.Type) (cadence.Value, error) {
+				return json.Decode(nil, b)
+			},
+		}
+
+		nextTransactionLocation := NewTransactionLocationGenerator()
+		nextScriptLocation := NewScriptLocationGenerator()
+
+		rt := runtime.NewRuntime(runtime.Config{})
+
+		// Deploy contracts
+
+		deployContracts(
+			t,
+			rt,
+			contractsAddress,
+			runtimeInterface,
+			transactionEnvironment,
+			nextTransactionLocation,
+		)
+
+		// Run script
+
+		return rt.ExecuteScript(
+			runtime.Script{
+				Source: script,
+			},
+			runtime.Context{
+				Interface:   runtimeInterface,
+				Environment: scriptEnvironment,
+				Location:    nextScriptLocation(),
+			},
+		)
+	}
+
+	t.Run("call includes result types, tx fails", func(t *testing.T) {
+		handler := &testContractHandler{
+			evmContractAddress: common.Address(contractsAddress),
+			accountByAddress: func(fromAddress types.Address, isAuthorized bool) types.Account {
+				assert.Equal(t, types.Address{4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, fromAddress)
+				assert.True(t, isAuthorized)
+
+				return &testFlowAccount{
+					address: fromAddress,
+					call: func(
+						toAddress types.Address,
+						data types.Data,
+						limit types.GasLimit,
+						balance types.Balance,
+					) *types.ResultSummary {
+						assert.Equal(t, types.Address{4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, toAddress)
+						assert.Equal(t, types.Data{54, 9, 29, 255, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1}, data)
+						assert.Equal(t, types.GasLimit(9999), limit)
+						assert.Equal(t, types.NewBalanceFromUFix64(expectedBalance), balance)
+
+						return &types.ResultSummary{
+							Status:       types.StatusFailed,
+							ReturnedData: types.Data([]byte{0, 1, 2}),
+						}
+					},
+				}
+			},
+		}
+
+		script := []byte(`
+      import EVM from 0x1
+
+      access(all)
+      fun main(): EVM.ResultDecoded {
+          let cadenceOwnedAccount <- EVM.createCadenceOwnedAccount()
+		  let bal = EVM.Balance(attoflow: 0)
+		  bal.setFLOW(flow: 1.23)
+          let response = cadenceOwnedAccount.callWithSigAndArgs(
+              to: EVM.EVMAddress(
+                  bytes: [4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+              ),
+			  signature: "test(bool)",
+			  args: [true],
+              gasLimit: 9999,
+              value: bal.attoflow,
+			  resultTypes: [Type<Bool>()], 
+          )
+          destroy cadenceOwnedAccount
+          return response
+      }
+   `)
+
+		val, err := executeScript(handler, script)
+		require.NoError(t, err)
+
+		res, err := ResultDecodedFromEVMResultValue(val)
+		require.NoError(t, err)
+		assert.Equal(t, types.StatusFailed, res.Status)
+		assert.True(t, len(res.Results) == 3)
+		assert.Equal(t, cadence.UInt8(0), res.Results[0])
+		assert.Equal(t, cadence.UInt8(1), res.Results[1])
+		assert.Equal(t, cadence.UInt8(2), res.Results[2])
+	})
+
+	t.Run("call includes result types, tx result data is empty", func(t *testing.T) {
+		handler := &testContractHandler{
+			evmContractAddress: common.Address(contractsAddress),
+			accountByAddress: func(fromAddress types.Address, isAuthorized bool) types.Account {
+				assert.Equal(t, types.Address{4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, fromAddress)
+				assert.True(t, isAuthorized)
+
+				return &testFlowAccount{
+					address: fromAddress,
+					call: func(
+						toAddress types.Address,
+						data types.Data,
+						limit types.GasLimit,
+						balance types.Balance,
+					) *types.ResultSummary {
+						assert.Equal(t, types.Address{4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, toAddress)
+						assert.Equal(t, types.Data{54, 9, 29, 255, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1}, data)
+						assert.Equal(t, types.GasLimit(9999), limit)
+						assert.Equal(t, types.NewBalanceFromUFix64(expectedBalance), balance)
+
+						return &types.ResultSummary{
+							Status: types.StatusSuccessful,
+						}
+					},
+				}
+			},
+		}
+
+		script := []byte(`
+      import EVM from 0x1
+
+      access(all)
+      fun main(): EVM.ResultDecoded {
+          let cadenceOwnedAccount <- EVM.createCadenceOwnedAccount()
+		  let bal = EVM.Balance(attoflow: 0)
+		  bal.setFLOW(flow: 1.23)
+          let response = cadenceOwnedAccount.callWithSigAndArgs(
+              to: EVM.EVMAddress(
+                  bytes: [4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+              ),
+			  signature: "test(bool)",
+			  args: [true],
+              gasLimit: 9999,
+              value: bal.attoflow,
+			  resultTypes: [Type<Bool>()], 
+          )
+          destroy cadenceOwnedAccount
+          return response
+      }
+   `)
+
+		_, err := executeScript(handler, script)
+		require.ErrorContains(t, err, "failed to ABI decode data")
+	})
+
+	t.Run("call includes result types, tx result data doesn't match result types", func(t *testing.T) {
+		handler := &testContractHandler{
+			evmContractAddress: common.Address(contractsAddress),
+			accountByAddress: func(fromAddress types.Address, isAuthorized bool) types.Account {
+				assert.Equal(t, types.Address{4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, fromAddress)
+				assert.True(t, isAuthorized)
+
+				return &testFlowAccount{
+					address: fromAddress,
+					call: func(
+						toAddress types.Address,
+						data types.Data,
+						limit types.GasLimit,
+						balance types.Balance,
+					) *types.ResultSummary {
+						assert.Equal(t, types.Address{4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, toAddress)
+						assert.Equal(t, types.Data{54, 9, 29, 255, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1}, data)
+						assert.Equal(t, types.GasLimit(9999), limit)
+						assert.Equal(t, types.NewBalanceFromUFix64(expectedBalance), balance)
+
+						// Result data is uint64(42)
+
+						arguments := gethABI.Arguments{
+							gethABI.Argument{Type: gethABI.Type{T: gethABI.UintTy, Size: 64}},
+						}
+
+						encodedValues, err := arguments.Pack(uint64(42))
+						assert.NoError(t, err)
+
+						return &types.ResultSummary{
+							Status:       types.StatusSuccessful,
+							ReturnedData: encodedValues,
+						}
+					},
+				}
+			},
+		}
+
+		script := []byte(`
+      import EVM from 0x1
+
+      access(all)
+      fun main(): EVM.ResultDecoded {
+          let cadenceOwnedAccount <- EVM.createCadenceOwnedAccount()
+		  let bal = EVM.Balance(attoflow: 0)
+		  bal.setFLOW(flow: 1.23)
+          let response = cadenceOwnedAccount.callWithSigAndArgs(
+              to: EVM.EVMAddress(
+                  bytes: [4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+              ),
+			  signature: "test(bool)",
+			  args: [true],
+              gasLimit: 9999,
+              value: bal.attoflow,
+			  resultTypes: [Type<Bool>()], 
+          )
+          destroy cadenceOwnedAccount
+          return response
+      }
+   `)
+
+		_, err := executeScript(handler, script)
+		require.ErrorContains(t, err, "failed to ABI decode data")
+	})
+
+	t.Run("call includes result types, tx result data matches", func(t *testing.T) {
+		handler := &testContractHandler{
+			evmContractAddress: common.Address(contractsAddress),
+			accountByAddress: func(fromAddress types.Address, isAuthorized bool) types.Account {
+				assert.Equal(t, types.Address{4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, fromAddress)
+				assert.True(t, isAuthorized)
+
+				return &testFlowAccount{
+					address: fromAddress,
+					call: func(
+						toAddress types.Address,
+						data types.Data,
+						limit types.GasLimit,
+						balance types.Balance,
+					) *types.ResultSummary {
+						assert.Equal(t, types.Address{4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, toAddress)
+						assert.Equal(t, types.Data{54, 9, 29, 255, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1}, data)
+						assert.Equal(t, types.GasLimit(9999), limit)
+						assert.Equal(t, types.NewBalanceFromUFix64(expectedBalance), balance)
+
+						arguments := gethABI.Arguments{
+							gethABI.Argument{Type: gethABI.Type{T: gethABI.BoolTy}},
+						}
+
+						encodedValues, err := arguments.Pack(true)
+						assert.NoError(t, err)
+
+						return &types.ResultSummary{
+							Status:       types.StatusSuccessful,
+							ReturnedData: encodedValues,
+						}
+					},
+				}
+			},
+		}
+
+		script := []byte(`
+      import EVM from 0x1
+
+      access(all)
+      fun main(): EVM.ResultDecoded {
+          let cadenceOwnedAccount <- EVM.createCadenceOwnedAccount()
+		  let bal = EVM.Balance(attoflow: 0)
+		  bal.setFLOW(flow: 1.23)
+          let response = cadenceOwnedAccount.callWithSigAndArgs(
+              to: EVM.EVMAddress(
+                  bytes: [4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+              ),
+			  signature: "test(bool)",
+			  args: [true],
+              gasLimit: 9999,
+              value: bal.attoflow,
+			  resultTypes: [Type<Bool>()], 
+          )
+          destroy cadenceOwnedAccount
+          return response
+      }
+   `)
+
+		val, err := executeScript(handler, script)
+		require.NoError(t, err)
+
+		res, err := ResultDecodedFromEVMResultValue(val)
+		require.NoError(t, err)
+		assert.Equal(t, types.StatusSuccessful, res.Status)
+		assert.True(t, len(res.Results) == 1)
+		assert.Equal(t, cadence.Bool(true), res.Results[0])
+	})
+
+	t.Run("call doesn't result types, tx failed", func(t *testing.T) {
+		handler := &testContractHandler{
+			evmContractAddress: common.Address(contractsAddress),
+			accountByAddress: func(fromAddress types.Address, isAuthorized bool) types.Account {
+				assert.Equal(t, types.Address{4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, fromAddress)
+				assert.True(t, isAuthorized)
+
+				return &testFlowAccount{
+					address: fromAddress,
+					call: func(
+						toAddress types.Address,
+						data types.Data,
+						limit types.GasLimit,
+						balance types.Balance,
+					) *types.ResultSummary {
+						assert.Equal(t, types.Address{4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, toAddress)
+						assert.Equal(t, types.Data{54, 9, 29, 255, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1}, data)
+						assert.Equal(t, types.GasLimit(9999), limit)
+						assert.Equal(t, types.NewBalanceFromUFix64(expectedBalance), balance)
+
+						return &types.ResultSummary{
+							Status:       types.StatusFailed,
+							ReturnedData: types.Data([]byte{0, 1, 2}),
+						}
+					},
+				}
+			},
+		}
+
+		script := []byte(`
+      import EVM from 0x1
+
+      access(all)
+      fun main(): EVM.ResultDecoded {
+          let cadenceOwnedAccount <- EVM.createCadenceOwnedAccount()
+		  let bal = EVM.Balance(attoflow: 0)
+		  bal.setFLOW(flow: 1.23)
+          let response = cadenceOwnedAccount.callWithSigAndArgs(
+              to: EVM.EVMAddress(
+                  bytes: [4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+              ),
+			  signature: "test(bool)",
+			  args: [true],
+              gasLimit: 9999,
+              value: bal.attoflow,
+			  resultTypes: nil, 
+          )
+          destroy cadenceOwnedAccount
+          return response
+      }
+   `)
+
+		val, err := executeScript(handler, script)
+		require.NoError(t, err)
+
+		res, err := ResultDecodedFromEVMResultValue(val)
+		require.NoError(t, err)
+		assert.Equal(t, types.StatusFailed, res.Status)
+		assert.True(t, len(res.Results) == 3)
+		assert.Equal(t, cadence.UInt8(0), res.Results[0])
+		assert.Equal(t, cadence.UInt8(1), res.Results[1])
+		assert.Equal(t, cadence.UInt8(2), res.Results[2])
+	})
+
+	t.Run("call doesn't result types, tx is successful", func(t *testing.T) {
+		handler := &testContractHandler{
+			evmContractAddress: common.Address(contractsAddress),
+			accountByAddress: func(fromAddress types.Address, isAuthorized bool) types.Account {
+				assert.Equal(t, types.Address{4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, fromAddress)
+				assert.True(t, isAuthorized)
+
+				return &testFlowAccount{
+					address: fromAddress,
+					call: func(
+						toAddress types.Address,
+						data types.Data,
+						limit types.GasLimit,
+						balance types.Balance,
+					) *types.ResultSummary {
+						assert.Equal(t, types.Address{4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, toAddress)
+						assert.Equal(t, types.Data{54, 9, 29, 255, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1}, data)
+						assert.Equal(t, types.GasLimit(9999), limit)
+						assert.Equal(t, types.NewBalanceFromUFix64(expectedBalance), balance)
+
+						arguments := gethABI.Arguments{
+							gethABI.Argument{Type: gethABI.Type{T: gethABI.BoolTy}},
+						}
+
+						encodedValues, err := arguments.Pack(true)
+						assert.NoError(t, err)
+
+						return &types.ResultSummary{
+							Status:       types.StatusSuccessful,
+							ReturnedData: encodedValues,
+						}
+					},
+				}
+			},
+		}
+
+		script := []byte(`
+      import EVM from 0x1
+
+      access(all)
+      fun main(): EVM.ResultDecoded {
+          let cadenceOwnedAccount <- EVM.createCadenceOwnedAccount()
+		  let bal = EVM.Balance(attoflow: 0)
+		  bal.setFLOW(flow: 1.23)
+          let response = cadenceOwnedAccount.callWithSigAndArgs(
+              to: EVM.EVMAddress(
+                  bytes: [4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+              ),
+			  signature: "test(bool)",
+			  args: [true],
+              gasLimit: 9999,
+              value: bal.attoflow,
+			  resultTypes: nil, 
+          )
+          destroy cadenceOwnedAccount
+          return response
+      }
+   `)
+
+		val, err := executeScript(handler, script)
+		require.NoError(t, err)
+
+		res, err := ResultDecodedFromEVMResultValue(val)
+		require.NoError(t, err)
+		assert.Equal(t, types.StatusSuccessful, res.Status)
+		assert.True(t, len(res.Results) == 32)
+		for i, v := range res.Results {
+			if i == len(res.Results)-1 {
+				assert.Equal(t, cadence.UInt8(1), v)
+			} else {
+				assert.Equal(t, cadence.UInt8(0), v)
+			}
+		}
+	})
+}
+
 func TestCadenceOwnedAccountDryCall(t *testing.T) {
 
 	t.Parallel()
@@ -4866,12 +5975,9 @@ func TestCadenceOwnedAccountDryCall(t *testing.T) {
 
 	handler := &testContractHandler{
 		evmContractAddress: common.Address(contractsAddress),
-		dryRun: func(tx []byte, from types.Address) *types.ResultSummary {
+		dryRunWithTxData: func(txData gethTypes.TxData, from types.Address) *types.ResultSummary {
 			dryCallCalled = true
-			gethTx := &gethTypes.Transaction{}
-			if err := gethTx.UnmarshalBinary(tx); err != nil {
-				require.Fail(t, err.Error())
-			}
+			gethTx := gethTypes.NewTx(txData)
 
 			require.NotNil(t, gethTx.To())
 
@@ -4985,6 +6091,507 @@ func TestCadenceOwnedAccountDryCall(t *testing.T) {
 
 	require.Equal(t, expected, actual)
 	require.True(t, dryCallCalled)
+}
+
+func TestCadenceOwnedAccountDryCallWithSigAndArgs(t *testing.T) {
+
+	t.Parallel()
+
+	contractsAddress := flow.BytesToAddress([]byte{0x1})
+
+	executeScript := func(handler types.ContractHandler, script []byte) (cadence.Value, error) {
+		transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
+		scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
+
+		rt := runtime.NewRuntime(runtime.Config{})
+
+		accountCodes := map[common.Location][]byte{}
+		var events []cadence.Event
+
+		runtimeInterface := &TestRuntimeInterface{
+			Storage: NewTestLedger(nil, nil),
+			OnGetSigningAccounts: func() ([]runtime.Address, error) {
+				return []runtime.Address{runtime.Address(contractsAddress)}, nil
+			},
+			OnResolveLocation: newLocationResolver(contractsAddress),
+			OnUpdateAccountContractCode: func(location common.AddressLocation, code []byte) error {
+				accountCodes[location] = code
+				return nil
+			},
+			OnGetAccountContractCode: func(location common.AddressLocation) (code []byte, err error) {
+				code = accountCodes[location]
+				return code, nil
+			},
+			OnEmitEvent: func(event cadence.Event) error {
+				events = append(events, event)
+				return nil
+			},
+			OnDecodeArgument: func(b []byte, t cadence.Type) (cadence.Value, error) {
+				return json.Decode(nil, b)
+			},
+		}
+
+		nextTransactionLocation := NewTransactionLocationGenerator()
+		nextScriptLocation := NewScriptLocationGenerator()
+
+		// Deploy contracts
+
+		deployContracts(
+			t,
+			rt,
+			contractsAddress,
+			runtimeInterface,
+			transactionEnvironment,
+			nextTransactionLocation,
+		)
+
+		// Run script
+
+		return rt.ExecuteScript(
+			runtime.Script{
+				Source: script,
+			},
+			runtime.Context{
+				Interface:   runtimeInterface,
+				Environment: scriptEnvironment,
+				Location:    nextScriptLocation(),
+			},
+		)
+	}
+
+	t.Run("dryCall includes result types, tx fails", func(t *testing.T) {
+		dryCallCalled := false
+
+		handler := &testContractHandler{
+			evmContractAddress: common.Address(contractsAddress),
+			dryRunWithTxData: func(txData gethTypes.TxData, from types.Address) *types.ResultSummary {
+				dryCallCalled = true
+				gethTx := gethTypes.NewTx(txData)
+
+				require.NotNil(t, gethTx.To())
+
+				assert.Equal(
+					t,
+					types.Address{4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+					from,
+				)
+				assert.Equal(
+					t,
+					types.Address{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 0, 0, 0, 0, 0, 0, 0, 0, 15},
+					types.NewAddress(*gethTx.To()),
+				)
+				expectedData := []byte{223, 225, 172, 54, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 0, 0, 0, 0, 0, 0, 0, 0, 20}
+				assert.Equal(t, expectedData, gethTx.Data())
+				assert.Equal(t, uint64(33_000), gethTx.Gas())
+				assert.Equal(t, big.NewInt(1230000000000000000), gethTx.Value())
+
+				return &types.ResultSummary{
+					Status:       types.StatusFailed,
+					ReturnedData: types.Data([]byte{0, 1, 2}),
+				}
+			},
+		}
+
+		script := []byte(`
+      import EVM from 0x1
+
+      access(all)
+      fun main(): EVM.ResultDecoded {
+          let cadenceOwnedAccount <- EVM.createCadenceOwnedAccount()
+          let bal = EVM.Balance(attoflow: 0)
+          bal.setFLOW(flow: 1.23)
+          let response = cadenceOwnedAccount.dryCallWithSigAndArgs(
+              to: EVM.EVMAddress(
+                  bytes: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 0, 0, 0, 0, 0, 0, 0, 0, 15]
+              ),
+			  signature: "isBridgeDeployed(address)",
+			  args: [EVM.EVMAddress(
+                  bytes: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 0, 0, 0, 0, 0, 0, 0, 0, 20]
+              )],
+              gasLimit: 33000,
+              value: bal.attoflow,
+			  resultTypes: [Type<Bool>()],
+          )
+          destroy cadenceOwnedAccount
+          return response
+      }
+	`)
+
+		val, err := executeScript(handler, script)
+		require.NoError(t, err)
+		require.True(t, dryCallCalled)
+
+		res, err := ResultDecodedFromEVMResultValue(val)
+		require.NoError(t, err)
+		assert.Equal(t, types.StatusFailed, res.Status)
+		assert.True(t, len(res.Results) == 3)
+		assert.Equal(t, cadence.UInt8(0), res.Results[0])
+		assert.Equal(t, cadence.UInt8(1), res.Results[1])
+		assert.Equal(t, cadence.UInt8(2), res.Results[2])
+	})
+
+	t.Run("dryCall includes result types, tx result data is empty", func(t *testing.T) {
+		dryCallCalled := false
+
+		handler := &testContractHandler{
+			evmContractAddress: common.Address(contractsAddress),
+			dryRunWithTxData: func(txData gethTypes.TxData, from types.Address) *types.ResultSummary {
+				dryCallCalled = true
+				gethTx := gethTypes.NewTx(txData)
+
+				require.NotNil(t, gethTx.To())
+
+				assert.Equal(
+					t,
+					types.Address{4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+					from,
+				)
+				assert.Equal(
+					t,
+					types.Address{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 0, 0, 0, 0, 0, 0, 0, 0, 15},
+					types.NewAddress(*gethTx.To()),
+				)
+				expectedData := []byte{223, 225, 172, 54, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 0, 0, 0, 0, 0, 0, 0, 0, 20}
+				assert.Equal(t, expectedData, gethTx.Data())
+				assert.Equal(t, uint64(33_000), gethTx.Gas())
+				assert.Equal(t, big.NewInt(1230000000000000000), gethTx.Value())
+
+				return &types.ResultSummary{
+					Status: types.StatusSuccessful,
+				}
+			},
+		}
+
+		script := []byte(`
+      import EVM from 0x1
+
+      access(all)
+      fun main(): EVM.ResultDecoded {
+          let cadenceOwnedAccount <- EVM.createCadenceOwnedAccount()
+          let bal = EVM.Balance(attoflow: 0)
+          bal.setFLOW(flow: 1.23)
+          let response = cadenceOwnedAccount.dryCallWithSigAndArgs(
+              to: EVM.EVMAddress(
+                  bytes: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 0, 0, 0, 0, 0, 0, 0, 0, 15]
+              ),
+			  signature: "isBridgeDeployed(address)",
+			  args: [EVM.EVMAddress(
+                  bytes: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 0, 0, 0, 0, 0, 0, 0, 0, 20]
+              )],
+              gasLimit: 33000,
+              value: bal.attoflow,
+			  resultTypes: [Type<Bool>()],
+          )
+          destroy cadenceOwnedAccount
+          return response
+      }
+	`)
+
+		_, err := executeScript(handler, script)
+		require.ErrorContains(t, err, "failed to ABI decode data")
+		assert.True(t, dryCallCalled)
+	})
+
+	t.Run("dryCall includes result types, tx result data doesn't match result types", func(t *testing.T) {
+		dryCallCalled := false
+
+		handler := &testContractHandler{
+			evmContractAddress: common.Address(contractsAddress),
+			dryRunWithTxData: func(txData gethTypes.TxData, from types.Address) *types.ResultSummary {
+				dryCallCalled = true
+				gethTx := gethTypes.NewTx(txData)
+
+				require.NotNil(t, gethTx.To())
+
+				assert.Equal(
+					t,
+					types.Address{4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+					from,
+				)
+				assert.Equal(
+					t,
+					types.Address{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 0, 0, 0, 0, 0, 0, 0, 0, 15},
+					types.NewAddress(*gethTx.To()),
+				)
+				expectedData := []byte{223, 225, 172, 54, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 0, 0, 0, 0, 0, 0, 0, 0, 20}
+				assert.Equal(t, expectedData, gethTx.Data())
+				assert.Equal(t, uint64(33_000), gethTx.Gas())
+				assert.Equal(t, big.NewInt(1230000000000000000), gethTx.Value())
+
+				// Result data is uint64(42)
+
+				arguments := gethABI.Arguments{
+					gethABI.Argument{Type: gethABI.Type{T: gethABI.UintTy, Size: 64}},
+				}
+
+				encodedValues, err := arguments.Pack(uint64(42))
+				assert.NoError(t, err)
+
+				return &types.ResultSummary{
+					Status:       types.StatusSuccessful,
+					ReturnedData: encodedValues,
+				}
+			},
+		}
+
+		script := []byte(`
+      import EVM from 0x1
+
+      access(all)
+      fun main(): EVM.ResultDecoded {
+          let cadenceOwnedAccount <- EVM.createCadenceOwnedAccount()
+          let bal = EVM.Balance(attoflow: 0)
+          bal.setFLOW(flow: 1.23)
+          let response = cadenceOwnedAccount.dryCallWithSigAndArgs(
+              to: EVM.EVMAddress(
+                  bytes: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 0, 0, 0, 0, 0, 0, 0, 0, 15]
+              ),
+			  signature: "isBridgeDeployed(address)",
+			  args: [EVM.EVMAddress(
+                  bytes: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 0, 0, 0, 0, 0, 0, 0, 0, 20]
+              )],
+              gasLimit: 33000,
+              value: bal.attoflow,
+			  resultTypes: [Type<Bool>()],
+          )
+          destroy cadenceOwnedAccount
+          return response
+      }
+	`)
+
+		_, err := executeScript(handler, script)
+		require.ErrorContains(t, err, "failed to ABI decode data")
+		assert.True(t, dryCallCalled)
+	})
+
+	t.Run("dryCall includes result types, tx result data matches", func(t *testing.T) {
+		dryCallCalled := false
+
+		handler := &testContractHandler{
+			evmContractAddress: common.Address(contractsAddress),
+			dryRunWithTxData: func(txData gethTypes.TxData, from types.Address) *types.ResultSummary {
+				dryCallCalled = true
+				gethTx := gethTypes.NewTx(txData)
+
+				require.NotNil(t, gethTx.To())
+
+				assert.Equal(
+					t,
+					types.Address{4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+					from,
+				)
+				assert.Equal(
+					t,
+					types.Address{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 0, 0, 0, 0, 0, 0, 0, 0, 15},
+					types.NewAddress(*gethTx.To()),
+				)
+				expectedData := []byte{223, 225, 172, 54, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 0, 0, 0, 0, 0, 0, 0, 0, 20}
+				assert.Equal(t, expectedData, gethTx.Data())
+				assert.Equal(t, uint64(33_000), gethTx.Gas())
+				assert.Equal(t, big.NewInt(1230000000000000000), gethTx.Value())
+
+				arguments := gethABI.Arguments{
+					gethABI.Argument{Type: gethABI.Type{T: gethABI.BoolTy}},
+				}
+
+				encodedValues, err := arguments.Pack(true)
+				assert.NoError(t, err)
+
+				return &types.ResultSummary{
+					Status:       types.StatusSuccessful,
+					ReturnedData: encodedValues,
+				}
+			},
+		}
+
+		script := []byte(`
+      import EVM from 0x1
+
+      access(all)
+      fun main(): EVM.ResultDecoded {
+          let cadenceOwnedAccount <- EVM.createCadenceOwnedAccount()
+          let bal = EVM.Balance(attoflow: 0)
+          bal.setFLOW(flow: 1.23)
+          let response = cadenceOwnedAccount.dryCallWithSigAndArgs(
+              to: EVM.EVMAddress(
+                  bytes: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 0, 0, 0, 0, 0, 0, 0, 0, 15]
+              ),
+			  signature: "isBridgeDeployed(address)",
+			  args: [EVM.EVMAddress(
+                  bytes: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 0, 0, 0, 0, 0, 0, 0, 0, 20]
+              )],
+              gasLimit: 33000,
+              value: bal.attoflow,
+			  resultTypes: [Type<Bool>()],
+          )
+          destroy cadenceOwnedAccount
+          return response
+      }
+	`)
+
+		val, err := executeScript(handler, script)
+		require.NoError(t, err)
+		assert.True(t, dryCallCalled)
+
+		res, err := ResultDecodedFromEVMResultValue(val)
+		require.NoError(t, err)
+		assert.Equal(t, types.StatusSuccessful, res.Status)
+		assert.True(t, len(res.Results) == 1)
+		assert.Equal(t, cadence.Bool(true), res.Results[0])
+	})
+
+	t.Run("dryCall doesn't result types, tx fails", func(t *testing.T) {
+		dryCallCalled := false
+
+		handler := &testContractHandler{
+			evmContractAddress: common.Address(contractsAddress),
+			dryRunWithTxData: func(txData gethTypes.TxData, from types.Address) *types.ResultSummary {
+				dryCallCalled = true
+				gethTx := gethTypes.NewTx(txData)
+
+				require.NotNil(t, gethTx.To())
+
+				assert.Equal(
+					t,
+					types.Address{4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+					from,
+				)
+				assert.Equal(
+					t,
+					types.Address{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 0, 0, 0, 0, 0, 0, 0, 0, 15},
+					types.NewAddress(*gethTx.To()),
+				)
+				expectedData := []byte{223, 225, 172, 54, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 0, 0, 0, 0, 0, 0, 0, 0, 20}
+				assert.Equal(t, expectedData, gethTx.Data())
+				assert.Equal(t, uint64(33_000), gethTx.Gas())
+				assert.Equal(t, big.NewInt(1230000000000000000), gethTx.Value())
+
+				return &types.ResultSummary{
+					Status:       types.StatusFailed,
+					ReturnedData: types.Data([]byte{0, 1, 2}),
+				}
+			},
+		}
+
+		script := []byte(`
+      import EVM from 0x1
+
+      access(all)
+      fun main(): EVM.ResultDecoded {
+          let cadenceOwnedAccount <- EVM.createCadenceOwnedAccount()
+          let bal = EVM.Balance(attoflow: 0)
+          bal.setFLOW(flow: 1.23)
+          let response = cadenceOwnedAccount.dryCallWithSigAndArgs(
+              to: EVM.EVMAddress(
+                  bytes: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 0, 0, 0, 0, 0, 0, 0, 0, 15]
+              ),
+			  signature: "isBridgeDeployed(address)",
+			  args: [EVM.EVMAddress(
+                  bytes: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 0, 0, 0, 0, 0, 0, 0, 0, 20]
+              )],
+              gasLimit: 33000,
+              value: bal.attoflow,
+			  resultTypes: nil,
+          )
+          destroy cadenceOwnedAccount
+          return response
+      }
+	`)
+
+		val, err := executeScript(handler, script)
+		require.NoError(t, err)
+		assert.True(t, dryCallCalled)
+
+		res, err := ResultDecodedFromEVMResultValue(val)
+		require.NoError(t, err)
+		assert.Equal(t, types.StatusFailed, res.Status)
+		assert.True(t, len(res.Results) == 3)
+		assert.Equal(t, cadence.UInt8(0), res.Results[0])
+		assert.Equal(t, cadence.UInt8(1), res.Results[1])
+		assert.Equal(t, cadence.UInt8(2), res.Results[2])
+	})
+
+	t.Run("dryCall doesn't result types, tx is successful", func(t *testing.T) {
+		dryCallCalled := false
+
+		handler := &testContractHandler{
+			evmContractAddress: common.Address(contractsAddress),
+			dryRunWithTxData: func(txData gethTypes.TxData, from types.Address) *types.ResultSummary {
+				dryCallCalled = true
+				gethTx := gethTypes.NewTx(txData)
+
+				require.NotNil(t, gethTx.To())
+
+				assert.Equal(
+					t,
+					types.Address{4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+					from,
+				)
+				assert.Equal(
+					t,
+					types.Address{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 0, 0, 0, 0, 0, 0, 0, 0, 15},
+					types.NewAddress(*gethTx.To()),
+				)
+				expectedData := []byte{223, 225, 172, 54, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 0, 0, 0, 0, 0, 0, 0, 0, 20}
+				assert.Equal(t, expectedData, gethTx.Data())
+				assert.Equal(t, uint64(33_000), gethTx.Gas())
+				assert.Equal(t, big.NewInt(1230000000000000000), gethTx.Value())
+
+				arguments := gethABI.Arguments{
+					gethABI.Argument{Type: gethABI.Type{T: gethABI.BoolTy}},
+				}
+
+				encodedValues, err := arguments.Pack(true)
+				assert.NoError(t, err)
+
+				return &types.ResultSummary{
+					Status:       types.StatusSuccessful,
+					ReturnedData: encodedValues,
+				}
+			},
+		}
+
+		script := []byte(`
+      import EVM from 0x1
+
+      access(all)
+      fun main(): EVM.ResultDecoded {
+          let cadenceOwnedAccount <- EVM.createCadenceOwnedAccount()
+          let bal = EVM.Balance(attoflow: 0)
+          bal.setFLOW(flow: 1.23)
+          let response = cadenceOwnedAccount.dryCallWithSigAndArgs(
+              to: EVM.EVMAddress(
+                  bytes: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 0, 0, 0, 0, 0, 0, 0, 0, 15]
+              ),
+			  signature: "isBridgeDeployed(address)",
+			  args: [EVM.EVMAddress(
+                  bytes: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 0, 0, 0, 0, 0, 0, 0, 0, 20]
+              )],
+              gasLimit: 33000,
+              value: bal.attoflow,
+			  resultTypes: nil,
+          )
+          destroy cadenceOwnedAccount
+          return response
+      }
+	`)
+
+		val, err := executeScript(handler, script)
+		require.NoError(t, err)
+		assert.True(t, dryCallCalled)
+
+		res, err := ResultDecodedFromEVMResultValue(val)
+		require.NoError(t, err)
+		assert.Equal(t, types.StatusSuccessful, res.Status)
+		assert.True(t, len(res.Results) == 32)
+		for i, v := range res.Results {
+			if i == len(res.Results)-1 {
+				assert.Equal(t, cadence.UInt8(1), v)
+			} else {
+				assert.Equal(t, cadence.UInt8(0), v)
+			}
+		}
+	})
 }
 
 func TestEVMAddressDeposit(t *testing.T) {
@@ -5317,8 +6924,9 @@ func TestCadenceOwnedAccountWithdraw(t *testing.T) {
           let cadenceOwnedAccount <- EVM.createCadenceOwnedAccount()
           cadenceOwnedAccount.deposit(from: <-vault)
 
-          let vault2 <- cadenceOwnedAccount.withdraw(balance: EVM.Balance(attoflow: 1230000000000000000))
+          let vault2 <- cadenceOwnedAccount.withdraw(balance: EVM.Balance(attoflow: 1230000000900000000))
           let balance = vault2.balance
+          assert(balance == 1.23000000, message: "mismatching vault balance")
           log(vault2.uuid)
 
           destroy cadenceOwnedAccount
@@ -5737,9 +7345,13 @@ func TestEVMAccountCodeHash(t *testing.T) {
 	t.Parallel()
 
 	contractsAddress := flow.BytesToAddress([]byte{0x1})
-	expectedCodeHashRaw := []byte{1, 2, 3}
+	expectedCodeHashRaw := gethCommon.HexToHash("0x5edac053e2bb5dc30d05a4dcdc5a31e0717212966cb1e8225daa4105f1dabf9c")
+	byteValues := []cadence.Value{}
+	for _, val := range expectedCodeHashRaw.Bytes() {
+		byteValues = append(byteValues, cadence.NewUInt8(val))
+	}
 	expectedCodeHashValue := cadence.NewArray(
-		[]cadence.Value{cadence.UInt8(1), cadence.UInt8(2), cadence.UInt8(3)},
+		byteValues,
 	).WithType(cadence.NewVariableSizedArrayType(cadence.UInt8Type))
 
 	handler := &testContractHandler{
@@ -5752,7 +7364,7 @@ func TestEVMAccountCodeHash(t *testing.T) {
 			return &testFlowAccount{
 				address: fromAddress,
 				codeHash: func() []byte {
-					return expectedCodeHashRaw
+					return expectedCodeHashRaw.Bytes()
 				},
 			}
 		},

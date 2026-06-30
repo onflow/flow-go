@@ -135,6 +135,8 @@ func (s *MessageHubSuite) SetupTest() {
 		},
 		nil,
 	)
+	// set up conduit mock
+	s.con.On("Close").Return(nil).Once()
 
 	// set up protocol snapshot mock
 	s.snapshot = &clusterstate.Snapshot{}

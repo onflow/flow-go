@@ -8,7 +8,7 @@ import "github.com/onflow/flow-go/storage"
 // Using these deprecated functions could minimize the changes during refactor and easier to review the changes.
 // The simplified implementation of the functions are in the writes.go file, which are encouraged to be used instead.
 
-func Upsert(key []byte, val interface{}) func(storage.Writer) error {
+func Upsert(key []byte, val any) func(storage.Writer) error {
 	return func(w storage.Writer) error {
 		return UpsertByKey(w, key, val)
 	}

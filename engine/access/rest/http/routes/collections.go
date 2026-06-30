@@ -9,7 +9,7 @@ import (
 )
 
 // GetCollectionByID retrieves a collection by ID and builds a response
-func GetCollectionByID(r *common.Request, backend access.API, link commonmodels.LinkGenerator) (interface{}, error) {
+func GetCollectionByID(r *common.Request, backend access.API, link commonmodels.LinkGenerator) (any, error) {
 	req, err := request.GetCollectionRequest(r)
 	if err != nil {
 		return nil, common.NewBadRequestError(err)

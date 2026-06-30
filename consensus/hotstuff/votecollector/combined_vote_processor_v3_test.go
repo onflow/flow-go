@@ -26,6 +26,7 @@ import (
 	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
+	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/local"
 	modulemock "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/module/signature"
@@ -97,6 +98,7 @@ func (s *CombinedVoteProcessorV3TestSuite) SetupTest() {
 		onQCCreated:       s.onQCCreated,
 		packer:            s.packer,
 		minRequiredWeight: s.minRequiredWeight,
+		votesCache:        NewConcurrentIdentifierSet(),
 		done:              *atomic.NewBool(false),
 	}
 }
@@ -227,19 +229,23 @@ func (s *CombinedVoteProcessorV3TestSuite) TestProcess_TrustedAdd_Exception() {
 		require.ErrorIs(s.T(), err, exception)
 		require.False(s.T(), model.IsInvalidVoteError(err))
 	})
-	s.Run("threshold-sig", func() {
+	s.Run("threshold-sig-aggregator", func() {
 		thresholdVote := unittest.VoteForBlockFixture(s.proposal.Block, unittest.VoteWithBeaconSig())
 		*s.rbSigAggregator = mockhotstuff.WeightedSignatureAggregator{}
-		*s.reconstructor = mockhotstuff.RandomBeaconReconstructor{}
 		s.rbSigAggregator.On("Verify", thresholdVote.SignerID, mock.Anything).Return(nil)
 		s.rbSigAggregator.On("TrustedAdd", thresholdVote.SignerID, mock.Anything).Return(uint64(0), exception).Once()
 		err := s.processor.Process(thresholdVote)
 		require.ErrorIs(s.T(), err, exception)
 		require.False(s.T(), model.IsInvalidVoteError(err))
-		// test also if reconstructor failed to add it
+	})
+	s.Run("threshold-sig-reconstructor", func() {
+		thresholdVote := unittest.VoteForBlockFixture(s.proposal.Block, unittest.VoteWithBeaconSig())
+		*s.rbSigAggregator = mockhotstuff.WeightedSignatureAggregator{}
+		*s.reconstructor = mockhotstuff.RandomBeaconReconstructor{}
+		s.rbSigAggregator.On("Verify", thresholdVote.SignerID, mock.Anything).Return(nil).Once()
 		s.rbSigAggregator.On("TrustedAdd", thresholdVote.SignerID, mock.Anything).Return(s.sigWeight, nil).Once()
 		s.reconstructor.On("TrustedAdd", thresholdVote.SignerID, mock.Anything).Return(false, exception).Once()
-		err = s.processor.Process(thresholdVote)
+		err := s.processor.Process(thresholdVote)
 		require.ErrorIs(s.T(), err, exception)
 		require.False(s.T(), model.IsInvalidVoteError(err))
 	})
@@ -291,6 +297,7 @@ func (s *CombinedVoteProcessorV3TestSuite) TestProcess_BuildQCError() {
 			onQCCreated:       s.onQCCreated,
 			packer:            packer,
 			minRequiredWeight: s.minRequiredWeight,
+			votesCache:        NewConcurrentIdentifierSet(),
 			done:              *atomic.NewBool(false),
 		}
 	}
@@ -414,7 +421,9 @@ func (s *CombinedVoteProcessorV3TestSuite) TestProcess_ConcurrentCreatingQC() {
 			defer shutdownWg.Done()
 			startupWg.Wait()
 			err := s.processor.Process(vote)
-			require.NoError(s.T(), err)
+			if err != nil {
+				require.True(s.T(), model.IsDuplicatedSignerError(err))
+			}
 		}()
 	}
 
@@ -606,6 +615,7 @@ func TestCombinedVoteProcessorV3_PropertyCreatingQCCorrectness(testifyT *testing
 			onQCCreated:       onQCCreated,
 			packer:            pcker,
 			minRequiredWeight: minRequiredWeight,
+			votesCache:        NewConcurrentIdentifierSet(),
 			done:              *atomic.NewBool(false),
 		}
 
@@ -706,6 +716,7 @@ func TestCombinedVoteProcessorV3_OnlyRandomBeaconSigners(testifyT *testing.T) {
 		onQCCreated:       func(qc *flow.QuorumCertificate) { /* no op */ },
 		packer:            packer,
 		minRequiredWeight: 70,
+		votesCache:        NewConcurrentIdentifierSet(),
 		done:              *atomic.NewBool(false),
 	}
 
@@ -846,6 +857,7 @@ func TestCombinedVoteProcessorV3_PropertyCreatingQCLiveness(testifyT *testing.T)
 			onQCCreated:       onQCCreated,
 			packer:            pcker,
 			minRequiredWeight: minRequiredWeight,
+			votesCache:        NewConcurrentIdentifierSet(),
 			done:              *atomic.NewBool(false),
 		}
 
@@ -1044,4 +1056,106 @@ func TestCombinedVoteProcessorV3_BuildVerifyQC(t *testing.T) {
 	}
 
 	require.True(t, qcCreated)
+}
+
+// TestCombinedVoteProcessorV3_DoubleVoting tests that CombinedVoteProcessorV3 is able to
+// detect a situation where a consensus participant is sending two different votes, first vote is
+// signed with the staking key only and the other one is signed with the random beacon key.
+// This is a form of vote equivocation where a node sends a different vote from the one it has submitted previously.
+// CombinedVoteProcessorV3 has to detect that the vote from given participant has been already processed and return a respective error.
+//
+// There are two conceptually different attack scenarios we are testing here:
+//   - Leader-based attacks:
+//     (a) The leader might send block proposal and equivocate by sending a different conflicting vote.
+//     (b) The leader might send a block proposal and (repeatedly) send the same vote again as an independent message.
+//   - Any byzantine node (replicas and leader alike) might send multiple individual vote messages (repeated identical votes, or equivocating with different votes).
+func TestCombinedVoteProcessorV3_DoubleVoting(t *testing.T) {
+	proposerView := uint64(20)
+
+	dkgData, err := bootstrapDKG.RandomBeaconKG(4, unittest.RandomBytes(32))
+	require.NoError(t, err)
+
+	// prepare a minimal consensus committee with all nodes participating in the RandomBeacon KG
+	allIdentities := unittest.IdentityListFixture(len(dkgData.PubKeyShares)).Sort(flow.Canonical[flow.Identity])
+	dkgParticipants := make(map[flow.Identifier]flow.DKGParticipant)
+	for index, identity := range allIdentities {
+		dkgParticipants[identity.NodeID] = flow.DKGParticipant{
+			Index:    uint(index),
+			KeyShare: dkgData.PubKeyShares[index],
+		}
+	}
+
+	leader := allIdentities[0]
+
+	stakingPriv := unittest.StakingPrivKeyFixture()
+	leader.StakingPubKey = stakingPriv.PublicKey()
+
+	leaderParticipantData := dkgParticipants[leader.NodeID]
+	dkgKey := encodable.RandomBeaconPrivKey{
+		PrivateKey: dkgData.PrivKeyShares[leaderParticipantData.Index],
+	}
+
+	me, err := local.New(leader.IdentitySkeleton, stakingPriv)
+	require.NoError(t, err)
+
+	beaconSignerStore := modulemock.NewRandomBeaconKeyStore(t)
+	beaconSignerStore.On("ByView", proposerView).Return(dkgKey, nil)
+	rbSigner := verification.NewCombinedSignerV3(me, beaconSignerStore)
+
+	stakingSignerStore := modulemock.NewRandomBeaconKeyStore(t)
+	stakingSignerStore.On("ByView", proposerView).Return(nil, module.ErrNoBeaconKeyForEpoch)
+	stakingSigner := verification.NewCombinedSignerV3(me, stakingSignerStore)
+
+	block := helper.MakeBlock(helper.WithBlockView(proposerView), helper.WithBlockProposer(leader.NodeID))
+
+	// create and sign proposal
+	leaderVote, err := rbSigner.CreateVote(block)
+	require.NoError(t, err)
+	proposal := helper.MakeSignedProposal(helper.WithProposal(helper.MakeProposal(helper.WithBlock(block))), helper.WithSigData(leaderVote.SigData))
+
+	// construct another vote for this block but using staking key this time.
+	// While both votes are individually valid, the voter violates the protocol by publishing inconsistent votes.
+	leaderDifferentVote, err := stakingSigner.CreateVote(block)
+	require.NoError(t, err)
+
+	// construct an equivocating vote, same view, but different block ID
+	otherBlock := helper.MakeBlock(helper.WithBlockView(block.View))
+	leaderDifferentBlockVote, err := rbSigner.CreateVote(otherBlock)
+	require.NoError(t, err)
+
+	onQCCreated := func(qc *flow.QuorumCertificate) {
+		require.Fail(t, "qc is not expected to be created in this test scenario")
+	}
+
+	committee, err := committees.NewStaticCommittee(allIdentities, flow.ZeroID, dkgParticipants, dkgData.PubGroupKey)
+	require.NoError(t, err)
+
+	baseFactory := &combinedVoteProcessorFactoryBaseV3{
+		committee:   committee,
+		onQCCreated: onQCCreated,
+		packer:      hsig.NewConsensusSigDataPacker(committee),
+	}
+	voteProcessorFactory := &VoteProcessorFactory{
+		baseFactory: baseFactory.Create,
+	}
+	voteProcessor, err := voteProcessorFactory.Create(unittest.Logger(), proposal)
+	require.NoError(t, err)
+
+	t.Run("duplicated-vote", func(t *testing.T) {
+		// process the same vote again
+		err = voteProcessor.Process(leaderVote)
+		require.Error(t, err)
+		require.True(t, model.IsDuplicatedSignerError(err))
+	})
+	t.Run("vote for different block", func(t *testing.T) {
+		// process the double vote, this has to result in an error.
+		err = voteProcessor.Process(leaderDifferentBlockVote)
+		require.ErrorAs(t, err, &VoteForIncompatibleBlockError)
+	})
+	t.Run("vote for same block with different signature scheme", func(t *testing.T) {
+		// process the double vote, this has to result in an error.
+		err = voteProcessor.Process(leaderDifferentVote)
+		require.Error(t, err)
+		require.True(t, model.IsDuplicatedSignerError(err))
+	})
 }

@@ -12,6 +12,7 @@ import (
 )
 
 type ExecutionCollector struct {
+	*LedgerCollector
 	tracer                                  module.Tracer
 	totalExecutedBlocksCounter              prometheus.Counter
 	totalExecutedCollectionsCounter         prometheus.Counter
@@ -24,24 +25,6 @@ type ExecutionCollector struct {
 	targetChunkDataPackPrunedHeightGauge    prometheus.Gauge
 	stateStorageDiskTotal                   prometheus.Gauge
 	storageStateCommitment                  prometheus.Gauge
-	checkpointSize                          prometheus.Gauge
-	forestApproxMemorySize                  prometheus.Gauge
-	forestNumberOfTrees                     prometheus.Gauge
-	latestTrieRegCount                      prometheus.Gauge
-	latestTrieRegCountDiff                  prometheus.Gauge
-	latestTrieRegSize                       prometheus.Gauge
-	latestTrieRegSizeDiff                   prometheus.Gauge
-	latestTrieMaxDepthTouched               prometheus.Gauge
-	updated                                 prometheus.Counter
-	proofSize                               prometheus.Gauge
-	updatedValuesNumber                     prometheus.Counter
-	updatedValuesSize                       prometheus.Gauge
-	updatedDuration                         prometheus.Histogram
-	updatedDurationPerValue                 prometheus.Histogram
-	readValuesNumber                        prometheus.Counter
-	readValuesSize                          prometheus.Gauge
-	readDuration                            prometheus.Histogram
-	readDurationPerValue                    prometheus.Histogram
 	blockComputationUsed                    prometheus.Histogram
 	blockComputationVector                  *prometheus.GaugeVec
 	blockCachedPrograms                     prometheus.Gauge
@@ -104,129 +87,8 @@ type ExecutionCollector struct {
 }
 
 func NewExecutionCollector(tracer module.Tracer) *ExecutionCollector {
-
-	forestApproxMemorySize := promauto.NewGauge(prometheus.GaugeOpts{
-		Namespace: namespaceExecution,
-		Subsystem: subsystemMTrie,
-		Name:      "forest_approx_memory_size",
-		Help:      "an approximate size of in-memory forest in bytes",
-	})
-
-	forestNumberOfTrees := promauto.NewGauge(prometheus.GaugeOpts{
-		Namespace: namespaceExecution,
-		Subsystem: subsystemMTrie,
-		Name:      "forest_number_of_trees",
-		Help:      "the number of trees in memory",
-	})
-
-	latestTrieRegCount := promauto.NewGauge(prometheus.GaugeOpts{
-		Namespace: namespaceExecution,
-		Subsystem: subsystemMTrie,
-		Name:      "latest_trie_reg_count",
-		Help:      "the number of allocated registers (latest created trie)",
-	})
-
-	latestTrieRegCountDiff := promauto.NewGauge(prometheus.GaugeOpts{
-		Namespace: namespaceExecution,
-		Subsystem: subsystemMTrie,
-		Name:      "latest_trie_reg_count_diff",
-		Help:      "the difference between number of unique register allocated of the latest created trie and parent trie",
-	})
-
-	latestTrieRegSize := promauto.NewGauge(prometheus.GaugeOpts{
-		Namespace: namespaceExecution,
-		Subsystem: subsystemMTrie,
-		Name:      "latest_trie_reg_size",
-		Help:      "the size of allocated registers (latest created trie)",
-	})
-
-	latestTrieRegSizeDiff := promauto.NewGauge(prometheus.GaugeOpts{
-		Namespace: namespaceExecution,
-		Subsystem: subsystemMTrie,
-		Name:      "latest_trie_reg_size_diff",
-		Help:      "the difference between size of unique register allocated of the latest created trie and parent trie",
-	})
-
-	latestTrieMaxDepthTouched := promauto.NewGauge(prometheus.GaugeOpts{
-		Namespace: namespaceExecution,
-		Subsystem: subsystemMTrie,
-		Name:      "latest_trie_max_depth_touched",
-		Help:      "the maximum depth touched of the latest created trie",
-	})
-
-	updatedCount := promauto.NewCounter(prometheus.CounterOpts{
-		Namespace: namespaceExecution,
-		Subsystem: subsystemMTrie,
-		Name:      "updates_counted",
-		Help:      "the number of updates",
-	})
-
-	proofSize := promauto.NewGauge(prometheus.GaugeOpts{
-		Namespace: namespaceExecution,
-		Subsystem: subsystemMTrie,
-		Name:      "average_proof_size",
-		Help:      "the average size of a single generated proof in bytes",
-	})
-
-	updatedValuesNumber := promauto.NewCounter(prometheus.CounterOpts{
-		Namespace: namespaceExecution,
-		Subsystem: subsystemMTrie,
-		Name:      "update_values_number",
-		Help:      "the total number of values updated",
-	})
-
-	updatedValuesSize := promauto.NewGauge(prometheus.GaugeOpts{
-		Namespace: namespaceExecution,
-		Subsystem: subsystemMTrie,
-		Name:      "update_values_size",
-		Help:      "the total size of values for single update in bytes",
-	})
-
-	updatedDuration := promauto.NewHistogram(prometheus.HistogramOpts{
-		Namespace: namespaceExecution,
-		Subsystem: subsystemMTrie,
-		Name:      "update_duration",
-		Help:      "the duration of update operation",
-		Buckets:   []float64{0.05, 0.2, 0.5, 1, 2, 5},
-	})
-
-	updatedDurationPerValue := promauto.NewHistogram(prometheus.HistogramOpts{
-		Namespace: namespaceExecution,
-		Subsystem: subsystemMTrie,
-		Name:      "update_duration_per_value",
-		Help:      "the duration of update operation per value",
-		Buckets:   []float64{0.05, 0.2, 0.5, 1, 2, 5},
-	})
-
-	readValuesNumber := promauto.NewCounter(prometheus.CounterOpts{
-		Namespace: namespaceExecution,
-		Subsystem: subsystemMTrie,
-		Name:      "read_values_number",
-		Help:      "the total number of values read",
-	})
-
-	readValuesSize := promauto.NewGauge(prometheus.GaugeOpts{
-		Namespace: namespaceExecution,
-		Subsystem: subsystemMTrie,
-		Name:      "read_values_size",
-		Help:      "the total size of values for single read in bytes",
-	})
-
-	readDuration := promauto.NewHistogram(prometheus.HistogramOpts{
-		Namespace: namespaceExecution,
-		Subsystem: subsystemMTrie,
-		Name:      "read_duration",
-		Help:      "the duration of read operation",
-		Buckets:   []float64{0.05, 0.2, 0.5, 1, 2, 5},
-	})
-
-	readDurationPerValue := promauto.NewHistogram(prometheus.HistogramOpts{
-		Namespace: namespaceExecution,
-		Subsystem: subsystemMTrie,
-		Name:      "read_duration_per_value",
-		Help:      "the duration of read operation per value",
-		Buckets:   []float64{0.05, 0.2, 0.5, 1, 2, 5},
-	})
+	// Create LedgerCollector with execution namespace and state_storage subsystem for checkpoint
+	ledgerCollector := NewLedgerCollector(namespaceExecution, subsystemStateStorage)
 
 	blockExecutionTime := promauto.NewHistogram(prometheus.HistogramOpts{
 		Namespace: namespaceExecution,
@@ -549,25 +411,8 @@ func NewExecutionCollector(tracer module.Tracer) *ExecutionCollector {
 	})
 
 	ec := &ExecutionCollector{
-		tracer: tracer,
-
-		forestApproxMemorySize:                  forestApproxMemorySize,
-		forestNumberOfTrees:                     forestNumberOfTrees,
-		latestTrieRegCount:                      latestTrieRegCount,
-		latestTrieRegCountDiff:                  latestTrieRegCountDiff,
-		latestTrieRegSize:                       latestTrieRegSize,
-		latestTrieRegSizeDiff:                   latestTrieRegSizeDiff,
-		latestTrieMaxDepthTouched:               latestTrieMaxDepthTouched,
-		updated:                                 updatedCount,
-		proofSize:                               proofSize,
-		updatedValuesNumber:                     updatedValuesNumber,
-		updatedValuesSize:                       updatedValuesSize,
-		updatedDuration:                         updatedDuration,
-		updatedDurationPerValue:                 updatedDurationPerValue,
-		readValuesNumber:                        readValuesNumber,
-		readValuesSize:                          readValuesSize,
-		readDuration:                            readDuration,
-		readDurationPerValue:                    readDurationPerValue,
+		LedgerCollector:                         ledgerCollector,
+		tracer:                                  tracer,
 		blockExecutionTime:                      blockExecutionTime,
 		blockComputationUsed:                    blockComputationUsed,
 		blockComputationVector:                  blockComputationVector,
@@ -685,13 +530,6 @@ func NewExecutionCollector(tracer module.Tracer) *ExecutionCollector {
 			Subsystem: subsystemStateStorage,
 			Name:      "commitment_size_bytes",
 			Help:      "the storage size of a state commitment in bytes",
-		}),
-
-		checkpointSize: promauto.NewGauge(prometheus.GaugeOpts{
-			Namespace: namespaceExecution,
-			Subsystem: subsystemStateStorage,
-			Name:      "checkpoint_size_bytes",
-			Help:      "the size of a checkpoint in bytes",
 		}),
 
 		stateSyncActive: promauto.NewGauge(prometheus.GaugeOpts{
@@ -929,11 +767,6 @@ func (ec *ExecutionCollector) ExecutionStorageStateCommitment(bytes int64) {
 	ec.storageStateCommitment.Set(float64(bytes))
 }
 
-// ExecutionCheckpointSize reports the size of a checkpoint in bytes
-func (ec *ExecutionCollector) ExecutionCheckpointSize(bytes uint64) {
-	ec.checkpointSize.Set(float64(bytes))
-}
-
 // ExecutionLastExecutedBlockHeight reports last executed block height
 func (ec *ExecutionCollector) ExecutionLastExecutedBlockHeight(height uint64) {
 	ec.lastExecutedBlockHeightGauge.Set(float64(height))
@@ -951,91 +784,6 @@ func (ec *ExecutionCollector) ExecutionLastChunkDataPackPrunedHeight(height uint
 
 func (ec *ExecutionCollector) ExecutionTargetChunkDataPackPrunedHeight(height uint64) {
 	ec.targetChunkDataPackPrunedHeightGauge.Set(float64(height))
-}
-
-// ForestApproxMemorySize records approximate memory usage of forest (all in-memory trees)
-func (ec *ExecutionCollector) ForestApproxMemorySize(bytes uint64) {
-	ec.forestApproxMemorySize.Set(float64(bytes))
-}
-
-// ForestNumberOfTrees current number of trees in a forest (in memory)
-func (ec *ExecutionCollector) ForestNumberOfTrees(number uint64) {
-	ec.forestNumberOfTrees.Set(float64(number))
-}
-
-// LatestTrieRegCount records the number of unique register allocated (the lastest created trie)
-func (ec *ExecutionCollector) LatestTrieRegCount(number uint64) {
-	ec.latestTrieRegCount.Set(float64(number))
-}
-
-// LatestTrieRegCountDiff records the difference between the number of unique register allocated of the latest created trie and parent trie
-func (ec *ExecutionCollector) LatestTrieRegCountDiff(number int64) {
-	ec.latestTrieRegCountDiff.Set(float64(number))
-}
-
-// LatestTrieRegSize records the size of unique register allocated (the lastest created trie)
-func (ec *ExecutionCollector) LatestTrieRegSize(size uint64) {
-	ec.latestTrieRegSize.Set(float64(size))
-}
-
-// LatestTrieRegSizeDiff records the difference between the size of unique register allocated of the latest created trie and parent trie
-func (ec *ExecutionCollector) LatestTrieRegSizeDiff(size int64) {
-	ec.latestTrieRegSizeDiff.Set(float64(size))
-}
-
-// LatestTrieMaxDepthTouched records the maximum depth touched of the last created trie
-func (ec *ExecutionCollector) LatestTrieMaxDepthTouched(maxDepth uint16) {
-	ec.latestTrieMaxDepthTouched.Set(float64(maxDepth))
-}
-
-// UpdateCount increase a counter of performed updates
-func (ec *ExecutionCollector) UpdateCount() {
-	ec.updated.Inc()
-}
-
-// ProofSize records a proof size
-func (ec *ExecutionCollector) ProofSize(bytes uint32) {
-	ec.proofSize.Set(float64(bytes))
-}
-
-// UpdateValuesNumber accumulates number of updated values
-func (ec *ExecutionCollector) UpdateValuesNumber(number uint64) {
-	ec.updatedValuesNumber.Add(float64(number))
-}
-
-// UpdateValuesSize total size (in bytes) of updates values
-func (ec *ExecutionCollector) UpdateValuesSize(bytes uint64) {
-	ec.updatedValuesSize.Set(float64(bytes))
-}
-
-// UpdateDuration records absolute time for the update of a trie
-func (ec *ExecutionCollector) UpdateDuration(duration time.Duration) {
-	ec.updatedDuration.Observe(duration.Seconds())
-}
-
-// UpdateDurationPerItem records update time for single value (total duration / number of updated values)
-func (ec *ExecutionCollector) UpdateDurationPerItem(duration time.Duration) {
-	ec.updatedDurationPerValue.Observe(duration.Seconds())
-}
-
-// ReadValuesNumber accumulates number of read values
-func (ec *ExecutionCollector) ReadValuesNumber(number uint64) {
-	ec.readValuesNumber.Add(float64(number))
-}
-
-// ReadValuesSize total size (in bytes) of read values
-func (ec *ExecutionCollector) ReadValuesSize(bytes uint64) {
-	ec.readValuesSize.Set(float64(bytes))
-}
-
-// ReadDuration records absolute time for the read from a trie
-func (ec *ExecutionCollector) ReadDuration(duration time.Duration) {
-	ec.readDuration.Observe(duration.Seconds())
-}
-
-// ReadDurationPerItem records read time for single value (total duration / number of read values)
-func (ec *ExecutionCollector) ReadDurationPerItem(duration time.Duration) {
-	ec.readDurationPerValue.Observe(duration.Seconds())
 }
 
 func (ec *ExecutionCollector) ExecutionCollectionRequestSent() {

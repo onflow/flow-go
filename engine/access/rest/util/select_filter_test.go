@@ -73,11 +73,11 @@ func TestSelectFilter(t *testing.T) {
 }
 
 func testFilter(t *testing.T, inputJson, exepectedJson string, description string, selectKeys ...string) {
-	var outputInterface interface{}
+	var outputInterface any
 	if strings.HasPrefix(inputJson, "{") {
-		outputInterface = make(map[string]interface{})
+		outputInterface = make(map[string]any)
 	} else {
-		outputInterface = make([]interface{}, 0)
+		outputInterface = make([]any, 0)
 	}
 	err := json.Unmarshal([]byte(inputJson), &outputInterface)
 	require.NoErrorf(t, err, description)

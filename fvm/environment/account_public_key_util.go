@@ -353,3 +353,46 @@ func encodeBatchedPublicKey(encodedPublicKey []byte) ([]byte, error) {
 
 	return buf, nil
 }
+
+// Utility functions for tests and validation
+
+// DecodeBatchPublicKeys decodes raw bytes of batch public keys in the batch public key payload.
+func DecodeBatchPublicKeys(b []byte) ([][]byte, error) {
+	if len(b) == 0 {
+		return nil, nil
+	}
+
+	encodedPublicKeys := make([][]byte, 0, MaxPublicKeyCountInBatch)
+
+	off := 0
+	for off < len(b) {
+		size := int(b[off])
+		off++
+
+		if off+size > len(b) {
+			return nil, errors.NewCodedFailuref(
+				errors.FailureCodeBatchPublicKeyDecodingFailure,
+				"failed to decode batch public key",
+				"batch public key data is too short: %x",
+				b,
+			)
+		}
+
+		encodedPublicKey := b[off : off+size]
+		off += size
+
+		encodedPublicKeys = append(encodedPublicKeys, encodedPublicKey)
+	}
+
+	if off != len(b) {
+		return nil, errors.NewCodedFailuref(
+			errors.FailureCodeBatchPublicKeyDecodingFailure,
+			"failed to decode batch public key",
+			"batch public key data has trailing data (%d bytes): %x",
+			len(b)-off,
+			b,
+		)
+	}
+
+	return encodedPublicKeys, nil
+}

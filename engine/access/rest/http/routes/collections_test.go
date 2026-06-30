@@ -129,9 +129,9 @@ func TestGetCollections(t *testing.T) {
 			{
 				unittest.IdentifierFixture().String(),
 				nil,
-				status.Errorf(codes.Internal, "block not found"),
-				`{"code":400,"message":"Invalid Flow request: block not found"}`,
-				http.StatusBadRequest,
+				status.Errorf(codes.Internal, "some internal error"),
+				`{"code":500,"message":"Invalid Flow request: some internal error"}`,
+				http.StatusInternalServerError,
 			},
 		}
 

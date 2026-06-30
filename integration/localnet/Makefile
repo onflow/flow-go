@@ -3,6 +3,8 @@ CONSENSUS = 2
 VALID_CONSENSUS := $(shell test $(CONSENSUS) -ge 2; echo $$?)
 EXECUTION = 2
 VALID_EXECUTION := $(shell test $(EXECUTION) -ge 2; echo $$?)
+LEDGER_EXECUTION = 0
+VALID_LEDGER_EXECUTION := $(shell test $(LEDGER_EXECUTION) -le $(EXECUTION); echo $$?)
 TEST_EXECUTION = 0
 VERIFICATION = 1
 ACCESS = 1
@@ -49,6 +51,8 @@ ifeq ($(strip $(VALID_EXECUTION)), 1)
 	$(error Number of Execution nodes should be no less than 2)
 else ifeq ($(strip $(VALID_CONSENSUS)), 1)
 	$(error Number of Consensus nodes should be no less than 2)
+else ifeq ($(strip $(VALID_LEDGER_EXECUTION)), 1)
+	$(error LEDGER_EXECUTION ($(LEDGER_EXECUTION)) should not be greater than EXECUTION ($(EXECUTION)))
 else
 	go run \
 		-ldflags="-X 'github.com/onflow/flow-go/cmd/build.commit=${COMMIT}' \
@@ -74,7 +78,8 @@ else
 		-tracing=$(TRACING) \
 		-extensive-tracing=$(EXTENSIVE_TRACING) \
 		-consensus-delay=$(CONSENSUS_DELAY) \
-		-collection-delay=$(COLLECTION_DELAY)
+		-collection-delay=$(COLLECTION_DELAY) \
+		-ledger-execution=$(LEDGER_EXECUTION)
 endif
 
 # Creates a light version of the localnet with just 1 instance for each node type
@@ -130,6 +135,10 @@ build-flow:
 stop:
 	DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker compose -f docker-compose.metrics.yml -f docker-compose.nodes.yml down -v --remove-orphans
 
+.PHONY: stop-flow
+stop-flow:
+	DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker compose -f docker-compose.nodes.yml down -v
+
 .PHONY: load
 load:
 	go run ../benchmark/cmd/manual -log-level info -tps 1,1,1 -tps-durations 30s,30s
@@ -152,6 +161,7 @@ clean-data:
 	rm -rf ./bootstrap
 	rm -rf ./trie
 	rm -rf ./profiler
+	rm -rf ./sockets
 	rm -f ./targets.nodes.json
 	rm -f ./docker-compose.nodes.yml
 	rm -f ./ports.nodes.json

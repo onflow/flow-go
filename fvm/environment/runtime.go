@@ -1,60 +1,72 @@
 package environment
 
-import (
-	cadenceRuntime "github.com/onflow/cadence/runtime"
-
-	"github.com/onflow/flow-go/fvm/runtime"
-)
-
-type RuntimeParams struct {
-	runtime.ReusableCadenceRuntimePool
-	ConfigureCadenceRuntime func(
-		reusableCadenceRuntime *runtime.ReusableCadenceRuntime,
-		env Environment,
+// ReusableCadenceRuntimePool is the pool that holds ReusableCadenceRuntime-s so that they
+// can be reused between procedures
+type ReusableCadenceRuntimePool interface {
+	Borrow(
+		fvmEnv Environment,
+		runtimeType CadenceRuntimeType,
+	) ReusableCadenceRuntime
+	Return(
+		reusable ReusableCadenceRuntime,
 	)
 }
 
-func DefaultRuntimeParams() RuntimeParams {
-	return RuntimeParams{
-		ReusableCadenceRuntimePool: runtime.NewReusableCadenceRuntimePool(
-			0,
-			cadenceRuntime.Config{},
-		),
-	}
+type RuntimeParams struct {
+	ReusableCadenceRuntimePool
 }
 
-// Runtime expose the cadence runtime to the rest of the envionment package.
-type Runtime struct {
+type cadenceRuntimeProvider struct {
 	RuntimeParams
 
-	env Environment
+	env         Environment
+	runtimeType CadenceRuntimeType
 }
 
-func NewRuntime(params RuntimeParams) *Runtime {
-	return &Runtime{
+// CadenceRuntimeProvider exposes the cadence runtime to the rest of the environment package.
+type CadenceRuntimeProvider interface {
+	// SetEnvironment sets the fvm Environment that will be injected into a ReusableCadenceRuntime
+	// when it is borrowed
+	SetEnvironment(env Environment)
+	// BorrowCadenceRuntime borrows a runtime from the ReusableCadenceRuntimePool moving it so its only used in
+	// this procedure until returned
+	BorrowCadenceRuntime() ReusableCadenceRuntime
+	// ReturnCadenceRuntime returns a runtime from the ReusableCadenceRuntimePool so that it can be reused
+	// for a different procedure later.
+	ReturnCadenceRuntime(reusable ReusableCadenceRuntime)
+}
+
+// CadenceRuntimeType is used to specify if a runtime will be used for scripts or transactions
+type CadenceRuntimeType int
+
+const (
+	// CadenceScriptRuntime is a marker to indicate to use the cadence interpreter runtime set up for scripts
+	CadenceScriptRuntime CadenceRuntimeType = iota
+	// CadenceTransactionRuntime is a marker to indicate to use the cadence interpreter runtime set up for transactions
+	CadenceTransactionRuntime
+	// CadenceScriptVMRuntime is a marker to indicate to use the cadence VM runtime set up for scripts
+	CadenceScriptVMRuntime
+	// CadenceTransactionVMRuntime is a marker to indicate to use the cadence VM runtime set up for transactions
+	CadenceTransactionVMRuntime
+)
+
+func NewRuntime(params RuntimeParams, runtimeType CadenceRuntimeType) *cadenceRuntimeProvider {
+	return &cadenceRuntimeProvider{
 		RuntimeParams: params,
+		runtimeType:   runtimeType,
 	}
 }
 
-func (runtime *Runtime) SetEnvironment(env Environment) {
+func (runtime *cadenceRuntimeProvider) SetEnvironment(env Environment) {
 	runtime.env = env
 }
 
-func (runtime *Runtime) BorrowCadenceRuntime() *runtime.ReusableCadenceRuntime {
-	env := runtime.env
-
-	reusableCadenceRuntime := runtime.ReusableCadenceRuntimePool.Borrow(env)
-
-	configure := runtime.ConfigureCadenceRuntime
-	if configure != nil {
-		configure(reusableCadenceRuntime, env)
-	}
-
-	return reusableCadenceRuntime
+func (runtime *cadenceRuntimeProvider) BorrowCadenceRuntime() ReusableCadenceRuntime {
+	return runtime.ReusableCadenceRuntimePool.Borrow(runtime.env, runtime.runtimeType)
 }
 
-func (runtime *Runtime) ReturnCadenceRuntime(
-	reusable *runtime.ReusableCadenceRuntime,
+func (runtime *cadenceRuntimeProvider) ReturnCadenceRuntime(
+	reusable ReusableCadenceRuntime,
 ) {
 	runtime.ReusableCadenceRuntimePool.Return(reusable)
 }

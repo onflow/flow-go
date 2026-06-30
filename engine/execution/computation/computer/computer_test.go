@@ -36,6 +36,7 @@ import (
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/environment"
 	fvmErrors "github.com/onflow/flow-go/fvm/errors"
+	"github.com/onflow/flow-go/fvm/inspection"
 	fvmmock "github.com/onflow/flow-go/fvm/mock"
 	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
 	"github.com/onflow/flow-go/fvm/storage"
@@ -134,7 +135,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 	t.Run("single collection", func(t *testing.T) {
 
-		execCtx := fvm.NewContext()
+		execCtx := fvm.NewContext(flow.Mainnet.Chain())
 
 		vm := &testVM{
 			t:                    t,
@@ -201,7 +202,6 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			committer,
 			me,
 			prov,
-			nil,
 			testutil.ProtocolStateWithSourceFixture(nil),
 			testMaxConcurrency)
 		require.NoError(t, err)
@@ -315,7 +315,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 	t.Run("empty block still computes system chunk", func(t *testing.T) {
 
-		execCtx := fvm.NewContext()
+		execCtx := fvm.NewContext(flow.Mainnet.Chain())
 
 		vm := new(fvmmock.VM)
 		committer := new(computermock.ViewCommitter)
@@ -340,7 +340,6 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			committer,
 			me,
 			prov,
-			nil,
 			testutil.ProtocolStateWithSourceFixture(nil),
 			testMaxConcurrency)
 		require.NoError(t, err)
@@ -381,7 +380,6 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 	t.Run("system chunk transaction should not fail", func(t *testing.T) {
 		// include all fees. System chunk should ignore them
 		contextOptions := []fvm.Option{
-			fvm.WithEVMEnabled(true),
 			fvm.WithTransactionFeesEnabled(true),
 			fvm.WithAccountStorageLimit(true),
 			fvm.WithBlocks(&environment.NoopBlockFinder{}),
@@ -401,12 +399,11 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		vm := fvm.NewVirtualMachine()
 		derivedBlockData := derived.NewEmptyDerivedBlockData(0)
 		baseOpts := []fvm.Option{
-			fvm.WithChain(chain),
 			fvm.WithDerivedBlockData(derivedBlockData),
 		}
 
 		opts := append(baseOpts, contextOptions...)
-		ctx := fvm.NewContext(opts...)
+		ctx := fvm.NewContext(chain, opts...)
 		snapshotTree := snapshot.NewSnapshotTree(nil)
 
 		baseBootstrapOpts := []fvm.BootstrapProcedureOption{
@@ -443,7 +440,6 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			comm,
 			me,
 			prov,
-			nil,
 			testutil.ProtocolStateWithSourceFixture(nil),
 			testMaxConcurrency)
 		require.NoError(t, err)
@@ -475,7 +471,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 	})
 
 	t.Run("multiple collections", func(t *testing.T) {
-		execCtx := fvm.NewContext()
+		execCtx := fvm.NewContext(flow.Mainnet.Chain())
 
 		committer := new(computermock.ViewCommitter)
 
@@ -508,7 +504,6 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			committer,
 			me,
 			prov,
-			nil,
 			testutil.ProtocolStateWithSourceFixture(nil),
 			testMaxConcurrency)
 		require.NoError(t, err)
@@ -592,6 +587,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 	t.Run(
 		"service events are emitted", func(t *testing.T) {
 			execCtx := fvm.NewContext(
+				flow.Mainnet.Chain(),
 				fvm.WithAuthorizationChecksEnabled(false),
 				fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
 			)
@@ -704,6 +700,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 				fvm.WithReusableCadenceRuntimePool(
 					reusableRuntime.NewCustomReusableCadenceRuntimePool(
 						0,
+						execCtx.Chain,
 						runtime.Config{},
 						func(_ runtime.Config) runtime.Runtime {
 							return emittingRuntime
@@ -734,7 +731,6 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 				committer.NewNoopViewCommitter(),
 				me,
 				prov,
-				nil,
 				testutil.ProtocolStateWithSourceFixture(nil),
 				testMaxConcurrency)
 			require.NoError(t, err)
@@ -781,7 +777,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 	t.Run("succeeding transactions store programs", func(t *testing.T) {
 
-		execCtx := fvm.NewContext()
+		execCtx := fvm.NewContext(flow.Mainnet.Chain())
 
 		address := common.Address{0x1}
 		contractLocation := common.AddressLocation{
@@ -818,6 +814,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			fvm.WithReusableCadenceRuntimePool(
 				reusableRuntime.NewCustomReusableCadenceRuntimePool(
 					0,
+					execCtx.Chain,
 					runtime.Config{},
 					func(_ runtime.Config) runtime.Runtime {
 						return rt
@@ -846,7 +843,6 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			committer.NewNoopViewCommitter(),
 			me,
 			prov,
-			nil,
 			testutil.ProtocolStateWithSourceFixture(nil),
 			testMaxConcurrency)
 		require.NoError(t, err)
@@ -871,6 +867,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 	t.Run("failing transactions do not store programs", func(t *testing.T) {
 		execCtx := fvm.NewContext(
+			flow.Mainnet.Chain(),
 			fvm.WithAuthorizationChecksEnabled(false),
 			fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
 		)
@@ -932,6 +929,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			fvm.WithReusableCadenceRuntimePool(
 				reusableRuntime.NewCustomReusableCadenceRuntimePool(
 					0,
+					execCtx.Chain,
 					runtime.Config{},
 					func(_ runtime.Config) runtime.Runtime {
 						return rt
@@ -960,7 +958,6 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			committer.NewNoopViewCommitter(),
 			me,
 			prov,
-			nil,
 			testutil.ProtocolStateWithSourceFixture(nil),
 			testMaxConcurrency)
 		require.NoError(t, err)
@@ -980,7 +977,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 	})
 
 	t.Run("internal error", func(t *testing.T) {
-		execCtx := fvm.NewContext()
+		execCtx := fvm.NewContext(flow.Mainnet.Chain())
 
 		committer := new(computermock.ViewCommitter)
 
@@ -1005,7 +1002,6 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			committer,
 			me,
 			prov,
-			nil,
 			testutil.ProtocolStateWithSourceFixture(nil),
 			testMaxConcurrency)
 		require.NoError(t, err)
@@ -1231,8 +1227,7 @@ func (f *FixedAddressGenerator) AddressCount() uint64 {
 func Test_ExecutingSystemCollection(t *testing.T) {
 
 	execCtx := fvm.NewContext(
-		fvm.WithEVMEnabled(true),
-		fvm.WithChain(flow.Localnet.Chain()),
+		flow.Localnet.Chain(),
 		fvm.WithBlocks(&environment.NoopBlockFinder{}),
 	)
 
@@ -1345,7 +1340,6 @@ func Test_ExecutingSystemCollection(t *testing.T) {
 		committer,
 		me,
 		prov,
-		nil,
 		testutil.ProtocolStateWithSourceFixture(constRandomSource),
 		testMaxConcurrency)
 	require.NoError(t, err)
@@ -1451,8 +1445,8 @@ func testScheduledTransactionsWithError(
 	testLogger := NewTestLogger()
 
 	execCtx := fvm.NewContext(
-		fvm.WithScheduledTransactionsEnabled(true), // Enable scheduled transactions
-		fvm.WithChain(chain),
+		chain,
+		fvm.WithScheduledTransactionsEnabled(true),
 		fvm.WithLogger(testLogger.Logger),
 	)
 
@@ -1592,7 +1586,6 @@ func testScheduledTransactionsWithError(
 		committer,
 		me,
 		prov,
-		nil,
 		testutil.ProtocolStateWithSourceFixture(nil),
 		testMaxConcurrency)
 	require.NoError(t, err)
@@ -2011,6 +2004,16 @@ func (testVM) GetAccount(
 	panic("not implemented")
 }
 
+func (testVM) Inspect(
+	_ fvm.Context,
+	_ fvm.Procedure,
+	_ snapshot.StorageSnapshot,
+	_ *snapshot.ExecutionSnapshot,
+	_ fvm.ProcedureOutput,
+) []inspection.Result {
+	return nil
+}
+
 func generateEvents(eventCount int, txIndex uint32) []flow.Event {
 	events := make([]flow.Event, eventCount)
 	for i := 0; i < eventCount; i++ {
@@ -2085,6 +2088,16 @@ func (errorVM) GetAccount(
 	error,
 ) {
 	panic("not implemented")
+}
+
+func (errorVM) Inspect(
+	_ fvm.Context,
+	_ fvm.Procedure,
+	_ snapshot.StorageSnapshot,
+	_ *snapshot.ExecutionSnapshot,
+	_ fvm.ProcedureOutput,
+) []inspection.Result {
+	return nil
 }
 
 func getSetAProgram(

@@ -8,7 +8,7 @@ import (
 )
 
 // EncodeKeyPart encodes a value to be used as a part of a key to be stored in storage.
-func EncodeKeyPart(v interface{}) []byte {
+func EncodeKeyPart(v any) []byte {
 	switch i := v.(type) {
 	case uint8:
 		return []byte{i}

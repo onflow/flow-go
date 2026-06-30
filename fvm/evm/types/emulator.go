@@ -102,7 +102,7 @@ type BlockView interface {
 // Emulator emulates an evm-compatible chain
 type Emulator interface {
 	// constructs a new block view
-	NewReadOnlyBlockView(ctx BlockContext) (ReadOnlyBlockView, error)
+	NewReadOnlyBlockView() (ReadOnlyBlockView, error)
 
 	// constructs a new block
 	NewBlockView(ctx BlockContext) (BlockView, error)

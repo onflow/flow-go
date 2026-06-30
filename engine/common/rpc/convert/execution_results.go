@@ -143,6 +143,48 @@ func MessagesToExecutionResultMetaList(m []*entities.ExecutionReceiptMeta) (flow
 	return execMetaList[:], nil
 }
 
+// ExecutionReceiptToMessage converts an execution receipt to a protobuf message.
+// If includeResult is true, the full ExecutionResult is included in the message;
+// otherwise only the ExecutionReceiptMeta is set.
+//
+// No error returns are expected during normal operation.
+func ExecutionReceiptToMessage(receipt *flow.ExecutionReceipt, includeResult bool) (*entities.ExecutionReceipt, error) {
+	msg := &entities.ExecutionReceipt{
+		Meta: &entities.ExecutionReceiptMeta{
+			ExecutorId:        IdentifierToMessage(receipt.ExecutorID),
+			ResultId:          IdentifierToMessage(receipt.ExecutionResult.ID()),
+			Spocks:            SignaturesToMessages(receipt.Spocks),
+			ExecutorSignature: MessageToSignature(receipt.ExecutorSignature),
+		},
+	}
+
+	if includeResult {
+		result, err := ExecutionResultToMessage(&receipt.ExecutionResult)
+		if err != nil {
+			return nil, fmt.Errorf("could not convert execution result: %w", err)
+		}
+		msg.ExecutionResult = result
+	}
+
+	return msg, nil
+}
+
+// ExecutionReceiptsToMessages converts a slice of execution receipts to a slice of protobuf messages.
+// If includeResult is true, each message will include the full ExecutionResult.
+//
+// No error returns are expected during normal operation.
+func ExecutionReceiptsToMessages(receipts []*flow.ExecutionReceipt, includeResult bool) ([]*entities.ExecutionReceipt, error) {
+	msgs := make([]*entities.ExecutionReceipt, len(receipts))
+	for i, receipt := range receipts {
+		msg, err := ExecutionReceiptToMessage(receipt, includeResult)
+		if err != nil {
+			return nil, fmt.Errorf("could not convert execution receipt at index %d: %w", i, err)
+		}
+		msgs[i] = msg
+	}
+	return msgs, nil
+}
+
 // ChunkToMessage converts a chunk to a protobuf message
 func ChunkToMessage(chunk *flow.Chunk) *entities.Chunk {
 	return &entities.Chunk{

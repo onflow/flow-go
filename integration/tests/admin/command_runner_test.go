@@ -19,7 +19,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dapperlabs/testingdock"
+	"github.com/onflow/testingdock"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"

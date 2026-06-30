@@ -13,14 +13,15 @@ import (
 // TransactionResultToMessage converts a TransactionResult to a protobuf message
 func TransactionResultToMessage(result *accessmodel.TransactionResult) *access.TransactionResultResponse {
 	return &access.TransactionResultResponse{
-		Status:        entities.TransactionStatus(result.Status),
-		StatusCode:    uint32(result.StatusCode),
-		ErrorMessage:  result.ErrorMessage,
-		Events:        EventsToMessages(result.Events),
-		BlockId:       result.BlockID[:],
-		TransactionId: result.TransactionID[:],
-		CollectionId:  result.CollectionID[:],
-		BlockHeight:   result.BlockHeight,
+		Status:           entities.TransactionStatus(result.Status),
+		StatusCode:       uint32(result.StatusCode),
+		ErrorMessage:     result.ErrorMessage,
+		Events:           EventsToMessages(result.Events),
+		BlockId:          result.BlockID[:],
+		TransactionId:    result.TransactionID[:],
+		CollectionId:     result.CollectionID[:],
+		BlockHeight:      result.BlockHeight,
+		ComputationUsage: result.ComputationUsed,
 	}
 }
 
@@ -33,14 +34,15 @@ func MessageToTransactionResult(message *access.TransactionResultResponse) (*acc
 	}
 
 	return &accessmodel.TransactionResult{
-		Status:        flow.TransactionStatus(message.Status),
-		StatusCode:    uint(message.StatusCode),
-		ErrorMessage:  message.ErrorMessage,
-		Events:        events,
-		BlockID:       flow.HashToID(message.BlockId),
-		TransactionID: flow.HashToID(message.TransactionId),
-		CollectionID:  flow.HashToID(message.CollectionId),
-		BlockHeight:   message.BlockHeight,
+		Status:          flow.TransactionStatus(message.Status),
+		StatusCode:      uint(message.StatusCode),
+		ErrorMessage:    message.ErrorMessage,
+		Events:          events,
+		BlockID:         flow.HashToID(message.BlockId),
+		TransactionID:   flow.HashToID(message.TransactionId),
+		CollectionID:    flow.HashToID(message.CollectionId),
+		BlockHeight:     message.BlockHeight,
+		ComputationUsed: message.ComputationUsage,
 	}, nil
 }
 

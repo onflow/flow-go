@@ -226,7 +226,7 @@ func RetrieveTransactionResultErrorMessageByIndex(r storage.Reader, blockID flow
 // TransactionResultErrorMessagesExists checks whether tx result error messages exist in the database.
 // No error returns are expected during normal operations.
 func TransactionResultErrorMessagesExists(r storage.Reader, blockID flow.Identifier, blockExists *bool) error {
-	exists, err := KeyExists(r, MakePrefix(codeTransactionResultErrorMessageIndex, blockID))
+	exists, err := PrefixExists(r, MakePrefix(codeTransactionResultErrorMessageIndex, blockID), storage.DefaultIteratorOptions())
 	if err != nil {
 		return err
 	}

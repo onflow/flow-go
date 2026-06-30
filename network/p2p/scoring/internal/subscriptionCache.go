@@ -2,6 +2,7 @@ package internal
 
 import (
 	"fmt"
+	"slices"
 
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/rs/zerolog"
@@ -121,11 +122,9 @@ func (s *SubscriptionRecordCache) AddWithInitTopicForPeer(pid peer.ID, topic str
 			record.Topics = make([]string, 0)
 		}
 		// check if the topic already exists; if it does, we do not need to update the record.
-		for _, t := range record.Topics {
-			if t == topic {
-				// topic already exists
-				return record
-			}
+		if slices.Contains(record.Topics, topic) {
+			// topic already exists
+			return record
 		}
 		record.LastUpdatedCycle = currentCycle
 		record.Topics = append(record.Topics, topic)

@@ -17,7 +17,6 @@ func InitFvmOptions(
 ) []fvm.Option {
 	blockFinder := environment.NewBlockFinder(headers)
 	vmOpts := []fvm.Option{
-		fvm.WithChain(chainID.Chain()),
 		fvm.WithBlocks(blockFinder),
 		fvm.WithAccountStorageLimit(true),
 	}
