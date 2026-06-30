@@ -137,11 +137,11 @@ func NewLeaf(path ledger.Path, value []byte, height int) *Node {
 // compactifed to a trie node at the given height. Its leafHash is nil and its hash is DefaultHashForHeight(height).
 //
 // Note that the hash of an empty subtree (at any height) is technically independent of path. However, subtries
-// containing only unallocated registers should be replaced by nil in a compactified trie. Creating explicitly a
+// containing only unallocated registers should be replaced by nil in a compactified trie. Explicitly creating a
 // default node is only useful if the caller wants to explicitly represent represent a specific register that is
-// not yet allocated. Doing so is useful as an interim simplification until we have non-inclusion proofs as a
-// special case implemented (at the moment, non-inclusion proofs fall back on inclusion proofs of explicitly
-// represented default nodes).
+// not yet allocated. Explicity representing specific unallocated registers is an interim shortcut until we have
+// speciallized (more efficient) non-inclusion proofs implemented (at the moment, non-inclusion proofs fall back
+// on inclusion proofs of explicitly represented default nodes).
 //
 // UNCHECKED requirement: height must be non-negative.
 func newDefaultLeaf(path ledger.Path, height int) *Node {
@@ -171,15 +171,22 @@ func newDefaultLeaf(path ledger.Path, height int) *Node {
 //	         (the reason 𝓁 sits at height 𝒽, not higher). Unchanged by allocating r.
 //	◯      : interim node materialized at 𝓁's former position ( height-𝒽 ).
 //	𝓁, 𝓁'  : the SAME register (path, value); 𝓁' is 𝓁 re-levelled to a lower height 𝒽' (𝒽-1 shown).
-//	𝓃      : leaf of register r.
+//	𝓃      : compactified leaf representing register r.
 //	•      : the register's actual leaf at height 0 in the fully-expanded (perfect) trie.
 //	dotted : single-child perfect-trie path (┊) that compactification collapses into one node.
 //
-// The nodeHash is computed by extending the leafHash (height-0) to the specified height.
+// so we reuse the stored height-0 leafHash and recompute the compacted hash for `relevellingHeight`, without
+// the original value.
 //
 // UNCHECKED requirement: `leaf.IsLeaf()` must be true
 func NewRelevelledLeaf(leaf *Node, relevellingHeight int) *Node {
-	if leaf.leafHash == nil { // leaf.leafHash is nil ⟺ unallocaled register ⟺ node is a default leaf
+	// Implementation details:
+	//   - A default leaf (leafHash == nil, i.e. an unallocated register) is relevelled to the default node at height `relevellingHeight`.
+	//     The resulting node's hash is `DefaultHashForHeight(relevellingHeight)`; it is path-independent, but height-dependent.
+	//   - For an allocated register (leafHash ≠ nil), the `leafHash` by convention always contains the hash of the fully-expanded leaf at
+	//     height 0. The hash of any compactified leaf is computed by iteratively hashing the `leafHash` together with the default hash of
+	//     the default hash at the corresponding height (sibling subtree representing only empty registers).
+	if leaf.leafHash == nil { // leaf.leafHash is nil ⟺ unallocated register ⟺ node is a default leaf
 		return newDefaultLeaf(leaf.path, relevellingHeight)
 	}
 
