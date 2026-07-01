@@ -48,6 +48,7 @@ import (
 	"github.com/onflow/flow-go/engine/execution/checker"
 	"github.com/onflow/flow-go/engine/execution/computation"
 	"github.com/onflow/flow-go/engine/execution/computation/committer"
+	"github.com/onflow/flow-go/engine/execution/computation/computer"
 	txmetrics "github.com/onflow/flow-go/engine/execution/computation/metrics"
 	"github.com/onflow/flow-go/engine/execution/ingestion"
 	"github.com/onflow/flow-go/engine/execution/ingestion/fetcher"
@@ -64,6 +65,7 @@ import (
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/ledger"
+	"github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/ledger/complete/wal"
 	ledgerfactory "github.com/onflow/flow-go/ledger/factory"
 	modelbootstrap "github.com/onflow/flow-go/model/bootstrap"
@@ -125,12 +127,13 @@ type ExecutionNode struct {
 
 	ingestionUnit *engine.Unit
 
-	collector      *metrics.ExecutionCollector
-	executionState state.ExecutionState
-	followerState  protocol.FollowerState
-	committee      hotstuff.DynamicCommittee
-	ledgerStorage  ledger.Ledger
-	registerStore  *storehouse.RegisterStore
+	collector         *metrics.ExecutionCollector
+	executionState    state.ExecutionState
+	followerState     protocol.FollowerState
+	committee         hotstuff.DynamicCommittee
+	ledgerStorage     ledger.Ledger            // set iff !exeConf.payloadless
+	payloadlessLedger ledger.PayloadlessLedger // set iff exeConf.payloadless
+	registerStore     *storehouse.RegisterStore
 
 	// storage
 	events          storageerr.Events
@@ -626,7 +629,16 @@ func (exeNode *ExecutionNode) LoadProviderEngine(
 			})
 	}
 
-	ledgerViewCommitter := committer.NewLedgerViewCommitter(exeNode.ledgerStorage, node.Tracer)
+	var ledgerViewCommitter computer.ViewCommitter
+	if exeNode.exeConf.payloadless {
+		ledgerViewCommitter = committer.NewPayloadlessLedgerViewCommitter(
+			exeNode.payloadlessLedger,
+			node.Tracer,
+			complete.DefaultPathFinderVersion,
+		)
+	} else {
+		ledgerViewCommitter = committer.NewLedgerViewCommitter(exeNode.ledgerStorage, node.Tracer)
+	}
 	exeNode.exeConf.computationConfig.TokenTrackingEnabled = exeNode.exeConf.tokenTrackingEnabled
 	manager, err := computation.New(
 		node.Logger,
@@ -801,8 +813,21 @@ func (exeNode *ExecutionNode) LoadExecutionState(
 
 	// migrate execution data for last sealed and executed block
 
+	// In full mode, both args are the same *complete.Ledger; in payloadless
+	// mode the first is the payloadless ledger (narrow LedgerStateChecker)
+	// and the snapshot-source slot is nil because storehouse is required.
+	var stateChecker state.LedgerStateChecker
+	var snapshotLedger ledger.Ledger
+	if exeNode.exeConf.payloadless {
+		stateChecker = exeNode.payloadlessLedger
+		snapshotLedger = nil
+	} else {
+		stateChecker = exeNode.ledgerStorage
+		snapshotLedger = exeNode.ledgerStorage
+	}
 	exeNode.executionState = state.NewExecutionState(
-		exeNode.ledgerStorage,
+		stateChecker,
+		snapshotLedger,
 		exeNode.commits,
 		node.Storage.Blocks,
 		node.Storage.Headers,
@@ -916,7 +941,41 @@ func (exeNode *ExecutionNode) LoadExecutionStateLedger(
 	module.ReadyDoneAware,
 	error,
 ) {
-	// Create ledger using factory
+	// Ledger selection is two independent choices passed to the factory:
+	//   - --payloadless picks the payloadless vs. full ledger (this branch).
+	//   - --ledger-service-addr (Config.LedgerServiceAddr), when set, means this
+	//     node connects to a remote ledger service rather than running a local
+	//     ledger; the factory then returns a gRPC client instead of a local one.
+	// Combined: payloadless + remote address -> remote payloadless client;
+	// payloadless + no address -> local payloadless ledger; likewise for full mode.
+	if exeNode.exeConf.payloadless {
+		// Payloadless mode. ValidateFlags enforces --enable-storehouse,
+		// so the storehouse is the value source for reads.
+		pl, err := ledgerfactory.NewPayloadlessLedger(ledgerfactory.Config{
+			LedgerServiceAddr:     exeNode.exeConf.ledgerServiceAddr,
+			LedgerMaxRequestSize:  exeNode.exeConf.ledgerMaxRequestSize,
+			LedgerMaxResponseSize: exeNode.exeConf.ledgerMaxResponseSize,
+			Triedir:               exeNode.exeConf.triedir,
+			MTrieCacheSize:        exeNode.exeConf.mTrieCacheSize,
+			CheckpointDistance:    exeNode.exeConf.checkpointDistance,
+			CheckpointsToKeep:     exeNode.exeConf.checkpointsToKeep,
+			MetricsRegisterer:     node.MetricsRegisterer,
+			WALMetrics:            exeNode.collector,
+			LedgerMetrics:         exeNode.collector,
+			Logger:                node.Logger,
+		}, exeNode.toTriggerCheckpoint)
+		if err != nil {
+			return nil, fmt.Errorf("could not create payloadless ledger: %w", err)
+		}
+		exeNode.payloadlessLedger = pl
+		// exeNode.ledgerStorage stays nil in payloadless mode; the
+		// LedgerStateChecker slot in state.NewExecutionState receives the
+		// payloadless ledger directly, and the snapshotLedger slot stays
+		// nil because the storehouse is the value source.
+		return pl, nil
+	}
+
+	// Full mode (default): WAL-backed ledger via the factory.
 	ledgerStorage, err := ledgerfactory.NewLedger(ledgerfactory.Config{
 		LedgerServiceAddr:     exeNode.exeConf.ledgerServiceAddr,
 		LedgerMaxRequestSize:  exeNode.exeConf.ledgerMaxRequestSize,
@@ -1426,9 +1485,50 @@ func (exeNode *ExecutionNode) LoadBootstrapper(node *NodeConfig) error {
 
 		// when bootstrapping, the bootstrap folder must have a checkpoint file
 		// we need to cover this file to the trie folder to restore the trie to restore the execution state.
+		//
+		// Note: in payloadless mode the V6 root checkpoint placed here is later
+		// converted to root.checkpoint.v7 by ledgerfactory.NewPayloadlessLedger
+		// before the bundle reads it. Bootstrap itself stays mode-agnostic.
 		err = copyBootstrapState(node.BootstrapDir, exeNode.exeConf.triedir)
 		if err != nil {
 			return fmt.Errorf("could not load bootstrap state from checkpoint file: %w", err)
+		}
+
+		// In payloadless (V7) mode the spork only produces a V6 root.checkpoint.
+		// Convert it to a V7 root checkpoint here so the payloadless ledger can
+		// seed its forest from it on first boot; later restarts reuse this file
+		// (or a newer numbered V7 checkpoint written by the compactor). The
+		// HasRootCheckpointV7 guard keeps a re-entry after an interrupted
+		// bootstrap from hitting ConvertCheckpointV6ToV7's "output exists" check.
+		//
+		// Only nodes running a local payloadless ledger need this: a node using a
+		// remote ledger service (ledgerServiceAddr set) never reads its local trie
+		// dir, and the remote ledger service performs its own V7 bootstrap. Skipping
+		// the conversion avoids a needless full-forest load on remote-ledger nodes.
+		//
+		// TODO: ConvertCheckpointV6ToV7 reads the entire V6 forest into memory
+		// before emitting V7, a memory/time spike at first boot for mainnet-scale
+		// root checkpoints. A future optimization is to convert subtrie-by-subtrie
+		// without loading the whole forest.
+		if exeNode.exeConf.payloadless && exeNode.exeConf.ledgerServiceAddr == "" {
+			triedir := exeNode.exeConf.triedir
+			hasV7Root, err := wal.HasRootCheckpointV7(triedir)
+			if err != nil {
+				return fmt.Errorf("could not check for V7 root checkpoint: %w", err)
+			}
+			if !hasV7Root {
+				err = wal.ConvertCheckpointV6ToV7(
+					triedir,
+					modelbootstrap.FilenameWALRootCheckpoint,
+					triedir,
+					modelbootstrap.FilenameWALRootCheckpoint+wal.V7FileSuffix,
+					node.Logger,
+					16,
+				)
+				if err != nil {
+					return fmt.Errorf("could not convert V6 root checkpoint to V7 for payloadless node: %w", err)
+				}
+			}
 		}
 
 		err = bootstrapper.BootstrapExecutionDatabase(node.StorageLockMgr, node.ProtocolDB, node.RootSeal)

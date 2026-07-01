@@ -45,6 +45,8 @@ type Ledger struct {
 	pathFinderVersion uint8
 }
 
+var _ ledger.Ledger = (*Ledger)(nil)
+
 // NewLedger creates a new in-memory trie-backed ledger storage with persistence.
 func NewLedger(
 	wal realWAL.LedgerWAL,
@@ -331,15 +333,6 @@ func (l *Ledger) Tries() ([]*trie.MTrie, error) {
 // Trie returns the trie stored in the forest
 func (l *Ledger) Trie(rootHash ledger.RootHash) (*trie.MTrie, error) {
 	return l.forest.GetTrie(rootHash)
-}
-
-// Checkpointer returns a checkpointer instance
-func (l *Ledger) Checkpointer() (*realWAL.Checkpointer, error) {
-	checkpointer, err := l.wal.NewCheckpointer()
-	if err != nil {
-		return nil, fmt.Errorf("cannot create checkpointer for compactor: %w", err)
-	}
-	return checkpointer, nil
 }
 
 func (l *Ledger) MigrateAt(

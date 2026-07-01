@@ -3,6 +3,7 @@ package checkpoint_collect_stats
 import (
 	"cmp"
 	"encoding/hex"
+	"fmt"
 	"math"
 	"slices"
 	"strings"
@@ -315,6 +316,15 @@ func getPayloadStatsFromCheckpoint(payloadCallBack func(payload *ledger.Payload)
 	memAllocBefore := debug.GetHeapAllocsBytes()
 	log.Info().Msgf("loading checkpoint(s) from %v", flagCheckpointDir)
 
+	// checkpoint-collect-stats analyzes payload contents (register types, sizes,
+	// account info). V7 (payloadless) checkpoints store only leaf hashes and contain
+	// no payloads, so they cannot be processed here. The WAL replay below loads only
+	// V6 checkpoints and silently ignores V7 files, which would otherwise produce
+	// misleading (stale or empty) stats. Fail fast with a clear error instead.
+	if err := requireV6Checkpoint(flagCheckpointDir); err != nil {
+		log.Fatal().Err(err).Msg("cannot collect stats from checkpoint")
+	}
+
 	diskWal, err := wal.NewDiskWAL(zerolog.Nop(), nil, &metrics.NoopCollector{}, flagCheckpointDir, complete.DefaultCacheSize, pathfinder.PathByteSize, wal.SegmentSize)
 	if err != nil {
 		log.Fatal().Err(err).Msg("cannot create WAL")
@@ -367,6 +377,33 @@ func getPayloadStatsFromCheckpoint(payloadCallBack func(payload *ledger.Payload)
 	}
 
 	return ledgerStats
+}
+
+// requireV6Checkpoint returns an error if the latest checkpoint in dir is a V7
+// (payloadless) checkpoint. checkpoint-collect-stats requires full payloads,
+// which V7 checkpoints do not contain.
+//
+// Only numbered checkpoints are considered (the WAL bootstrap loads the latest
+// numbered V6 checkpoint). If the latest numbered checkpoint is V7, this command
+// would otherwise silently fall back to an older V6 checkpoint or an empty state,
+// reporting misleading stats.
+//
+// Expected error returns during normal operation:
+//   - an error when the latest checkpoint in dir is a V7 (payloadless) checkpoint
+func requireV6Checkpoint(dir string) error {
+	_, latest, err := wal.ListCheckpointsWithInfo(dir)
+	if err != nil {
+		return fmt.Errorf("cannot list checkpoints in %s: %w", dir, err)
+	}
+
+	if latest != nil && latest.Version == wal.VersionV7 {
+		return fmt.Errorf(
+			"checkpoint %d in %s is a V7 (payloadless) checkpoint, which contains no payloads; "+
+				"checkpoint-collect-stats requires a V6 checkpoint",
+			latest.Number, dir)
+	}
+
+	return nil
 }
 
 func getRegisterStats(valueSizesByType sizesByType) []RegisterStatsByTypes {
