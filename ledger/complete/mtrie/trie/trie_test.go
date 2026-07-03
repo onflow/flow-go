@@ -20,6 +20,9 @@ import (
 )
 
 // TestEmptyTrie tests whether the root hash of an empty trie matches the formal specification.
+// The expected value originates from the standalone Merkle reference implementation (the source of
+// truth): github.com/onflow/flow-internal → reference_implementations/merkle_tree.py. Run it to
+// regenerate; MTrie is the implementation under test, checked against it.
 func Test_EmptyTrie(t *testing.T) {
 	// Make new Trie (independently of MForest):
 	emptyTrie := trie.NewEmptyMTrie()
@@ -36,7 +39,9 @@ func Test_EmptyTrie(t *testing.T) {
 
 // Test_TrieWithLeftRegister tests whether the root hash of trie with only the left-most
 // register populated matches the formal specification.
-// The expected value is coming from a reference implementation in python and is hard-coded here.
+// The expected value originates from the standalone Merkle reference implementation (the source of
+// truth): github.com/onflow/flow-internal → reference_implementations/merkle_tree.py. Run it to
+// regenerate; MTrie is the implementation under test, checked against it.
 func Test_TrieWithLeftRegister(t *testing.T) {
 	// Make new Trie (independently of MForest):
 	emptyTrie := trie.NewEmptyMTrie()
@@ -53,7 +58,9 @@ func Test_TrieWithLeftRegister(t *testing.T) {
 
 // Test_TrieWithRightRegister tests whether the root hash of trie with only the right-most
 // register populated matches the formal specification.
-// The expected value is coming from a reference implementation in python and is hard-coded here.
+// The expected value originates from the standalone Merkle reference implementation (the source of
+// truth): github.com/onflow/flow-internal → reference_implementations/merkle_tree.py. Run it to
+// regenerate; MTrie is the implementation under test, checked against it.
 func Test_TrieWithRightRegister(t *testing.T) {
 	// Make new Trie (independently of MForest):
 	emptyTrie := trie.NewEmptyMTrie()
@@ -74,7 +81,9 @@ func Test_TrieWithRightRegister(t *testing.T) {
 
 // Test_TrieWithMiddleRegister tests the root hash of trie holding only a single
 // allocated register somewhere in the middle.
-// The expected value is coming from a reference implementation in python and is hard-coded here.
+// The expected value originates from the standalone Merkle reference implementation (the source of
+// truth): github.com/onflow/flow-internal → reference_implementations/merkle_tree.py. Run it to
+// regenerate; MTrie is the implementation under test, checked against it.
 func Test_TrieWithMiddleRegister(t *testing.T) {
 	// Make new Trie (independently of MForest):
 	emptyTrie := trie.NewEmptyMTrie()
@@ -92,7 +101,9 @@ func Test_TrieWithMiddleRegister(t *testing.T) {
 
 // Test_TrieWithManyRegisters tests whether the root hash of a trie storing 12001 randomly selected registers
 // matches the formal specification.
-// The expected value is coming from a reference implementation in python and is hard-coded here.
+// The expected value originates from the standalone Merkle reference implementation (the source of
+// truth): github.com/onflow/flow-internal → reference_implementations/merkle_tree.py. Run it to
+// regenerate; MTrie is the implementation under test, checked against it.
 func Test_TrieWithManyRegisters(t *testing.T) {
 	// Make new Trie (independently of MForest):
 	emptyTrie := trie.NewEmptyMTrie()
@@ -114,7 +125,9 @@ func Test_TrieWithManyRegisters(t *testing.T) {
 
 // Test_FullTrie tests whether the root hash of a trie,
 // whose left-most 65536 registers are populated, matches the formal specification.
-// The expected value is coming from a reference implementation in python and is hard-coded here.
+// The expected value originates from the standalone Merkle reference implementation (the source of
+// truth): github.com/onflow/flow-internal → reference_implementations/merkle_tree.py. Run it to
+// regenerate; MTrie is the implementation under test, checked against it.
 func Test_FullTrie(t *testing.T) {
 	// Make new Trie (independently of MForest):
 	emptyTrie := trie.NewEmptyMTrie()
@@ -142,7 +155,9 @@ func Test_FullTrie(t *testing.T) {
 }
 
 // TestUpdateTrie tests whether iteratively updating a Trie matches the formal specification.
-// The expected root hashes are coming from a reference implementation in python and is hard-coded here.
+// The expected root hashes originate from the standalone Merkle reference implementation (the source
+// of truth): github.com/onflow/flow-internal → reference_implementations/merkle_tree.py. Run it to
+// regenerate; MTrie is the implementation under test, checked against it.
 func Test_UpdateTrie(t *testing.T) {
 	expectedRootHashes := []string{
 		"08db9aeed2b9fcc66b63204a26a4c28652e44e3035bd87ba0ed632a227b3f6dd",
@@ -223,7 +238,9 @@ func Test_UpdateTrie(t *testing.T) {
 
 // Test_UnallocateRegisters tests whether unallocating registers matches the formal specification.
 // Unallocating here means, to set the stored register value to an empty byte slice.
-// The expected value is coming from a reference implementation in python and is hard-coded here.
+// The expected value originates from the standalone Merkle reference implementation (the source of
+// truth): github.com/onflow/flow-internal → reference_implementations/merkle_tree.py. Run it to
+// regenerate; MTrie is the implementation under test, checked against it.
 func Test_UnallocateRegisters(t *testing.T) {
 	rng := &LinearCongruentialGenerator{seed: 0}
 	emptyTrie := trie.NewEmptyMTrie()
