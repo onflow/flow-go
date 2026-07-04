@@ -522,7 +522,7 @@ func Test_ReferenceImplementationHashes(t *testing.T) {
 }
 
 // =============================================================================================
-// Predicate methods: IsDefaultNode / IsNonDefaultCompactifiedLeaf
+// Predicate methods: IsDefaultNode / IsAllocatedRegisterLeaf
 // =============================================================================================
 //
 // INTENT (from node.go):
@@ -530,7 +530,7 @@ func Test_ReferenceImplementationHashes(t *testing.T) {
 //     default subtree). Universally applicable: correct for nil, leaves, AND interim nodes,
 //     irrespective of compactification or nil-pruning. Mechanism: nil ⇒ true; else
 //     hashValue == D(𝒽) where D(𝒽) := GetDefaultHashForHeight(𝒽).
-//   • IsNonDefaultCompactifiedLeaf(𝓃): a CHEAP, leaf-only check (reads only leafHash).
+//   • IsAllocatedRegisterLeaf(𝓃): a CHEAP, leaf-only check (reads only leafHash).
 //       – for a LEAF 𝓃 (incl. nil):  ≡ ¬IsDefaultNode(𝓃)  ≡  "𝓃 is a leaf holding one allocated register".
 //       – for an INTERIM 𝓃:          ALWAYS false — deliberately, even when the interim subtree holds
 //         allocated registers. This is the documented divergence from ¬IsDefaultNode on interim nodes
@@ -566,7 +566,7 @@ func Test_ReferenceImplementationHashes(t *testing.T) {
 // Test_IsDefaultNode is the EXHAUSTIVE inductive sweep. Per node it asserts the full node-class
 // invariant bundle (via requireDefaultSubtree / requireAllocatedLeaf / requireNonDefaultInterim),
 // which checks BOTH predicates together — so this test also fully exercises
-// IsNonDefaultCompactifiedLeaf across the case set. Test_IsNonDefaultCompactifiedLeaf below re-covers
+// IsAllocatedRegisterLeaf across the case set. Test_IsAllocatedRegisterLeaf below re-covers
 // the leaf/interim partition with emphasis on that predicate's deliberate interim under-approximation.
 func Test_IsDefaultNode(t *testing.T) {
 	t.Run("L0: nil node is default", func(t *testing.T) {
@@ -646,14 +646,14 @@ func Test_IsDefaultNode(t *testing.T) {
 	})
 }
 
-// Test_IsNonDefaultCompactifiedLeaf re-covers the case space partitioned by leaf-vs-interim, with the
+// Test_IsAllocatedRegisterLeaf re-covers the case space partitioned by leaf-vs-interim, with the
 // spotlight on this predicate's peculiarities: it recognises allocated leaves at ANY height (compactified
 // or not), and it ALWAYS returns false on interim nodes — coinciding with ¬IsDefaultNode on all-empty
 // interims but deliberately DIVERGING from it on interims that hold allocated registers.
-func Test_IsNonDefaultCompactifiedLeaf(t *testing.T) {
+func Test_IsAllocatedRegisterLeaf(t *testing.T) {
 	t.Run("nil ⇒ false", func(t *testing.T) {
 		var n *Node
-		requireDefaultSubtree(t, n) // bundle asserts IsNonDefaultCompactifiedLeaf()==false
+		requireDefaultSubtree(t, n) // bundle asserts IsAllocatedRegisterLeaf()==false
 	})
 
 	t.Run("default leaf ⇒ false (any height)", func(t *testing.T) {
@@ -682,7 +682,7 @@ func Test_IsNonDefaultCompactifiedLeaf(t *testing.T) {
 }
 
 // Test_LeafPredicateGuarantee verifies the guarantee stated in node.go: for every LEAF node 𝓃
-// (including nil), IsNonDefaultCompactifiedLeaf() == ¬IsDefaultNode().
+// (including nil), IsAllocatedRegisterLeaf() == ¬IsDefaultNode().
 func Test_LeafPredicateGuarantee(t *testing.T) {
 	var nilNode *Node
 	leaves := []*Node{
@@ -696,7 +696,7 @@ func Test_LeafPredicateGuarantee(t *testing.T) {
 	}
 	for i, n := range leaves {
 		require.True(t, n.IsLeaf(), "case %d must be a leaf", i)
-		require.Equal(t, !n.IsDefaultNode(), n.IsNonDefaultCompactifiedLeaf(), "leaf guarantee violated at case %d", i)
+		require.Equal(t, !n.IsDefaultNode(), n.IsAllocatedRegisterLeaf(), "leaf guarantee violated at case %d", i)
 	}
 }
 
@@ -741,7 +741,7 @@ func twoRegisterInterimNode(height int) *Node {
 func requireDefaultSubtree(t *testing.T, n *Node) {
 	t.Helper()
 	require.True(t, n.IsDefaultNode(), "expected an all-empty (default) subtree")
-	require.False(t, n.IsNonDefaultCompactifiedLeaf(), "a default subtree is never a non-default leaf")
+	require.False(t, n.IsAllocatedRegisterLeaf(), "a default subtree is never a non-default leaf")
 	if n != nil {
 		require.True(t, n.VerifyCachedHash())
 		require.Equal(t, ledger.GetDefaultHashForHeight(n.height), n.Hash())
@@ -754,7 +754,7 @@ func requireAllocatedLeaf(t *testing.T, n *Node) {
 	t.Helper()
 	require.True(t, n.IsLeaf(), "expected a leaf")
 	require.False(t, n.IsDefaultNode(), "an allocated leaf is not default")
-	require.True(t, n.IsNonDefaultCompactifiedLeaf(), "cheap leaf-check must recognise an allocated leaf")
+	require.True(t, n.IsAllocatedRegisterLeaf(), "cheap leaf-check must recognise an allocated leaf")
 	require.True(t, n.VerifyCachedHash())
 }
 
@@ -765,7 +765,7 @@ func requireNonDefaultInterim(t *testing.T, n *Node) {
 	t.Helper()
 	require.False(t, n.IsLeaf(), "expected an interim node")
 	require.False(t, n.IsDefaultNode(), "expected a non-default (allocated) subtree")
-	require.False(t, n.IsNonDefaultCompactifiedLeaf(), "cheap leaf-check must return false on interim nodes")
+	require.False(t, n.IsAllocatedRegisterLeaf(), "cheap leaf-check must return false on interim nodes")
 	require.True(t, n.VerifyCachedHash())
 }
 

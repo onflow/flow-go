@@ -313,11 +313,11 @@ func update(
 	// Recursion base case (B): *single register write* into previously pruned subtree (`currentNode` and `compactLeaf` are nil)
 	if len(paths) == 1 && currentNode == nil && compactLeaf == nil {
 		n = NewLeaf(paths[0], values[0], nodeHeight)
-		if n.IsDefaultNode() { // If `n` has default hash, it represents an unallocated register inside a subtree containing only unallocated registers.
-			// Since we only track the number of *allocated* registers, the register count remains unchanged.
+		if !n.IsAllocatedRegisterLeaf() { // n is leaf, but not an allocated register => default leaf
+			// Since we only track the number of *allocated* registers, the register count remains unchanged:
 			return n, 0, nodeHeight
 		}
-		return n, 1, nodeHeight // by adding a non-default node, we effectively allocated a new register
+		return n, 1, nodeHeight // we allocated a new register
 	}
 
 	// What remains to be handled are the following cases:
@@ -340,7 +340,7 @@ func update(
 			if n.hashValue == currentNode.hashValue {
 				return currentNode, 0, nodeHeight
 			}
-			if n.IsDefaultNode() {
+			if !n.IsAllocatedRegisterLeaf() { // n is leaf, but not an allocated register => default leaf, i.e. n has default hash
 				// since prior register `currentNode` had non-default hash as per check above, we have removed a previously allocated register
 				return n, -1, nodeHeight
 			}
@@ -351,13 +351,13 @@ func update(
 
 		// Check whether we are in recursive case (1.a.ii) or (1.b):
 		if slices.Contains(paths, currentPath) { // `currentNode.path ∈ paths` and `len(paths) > 1`, i.e. we are in recursive case (1.a.ii)
-			// Mechanically, we are not includig `currentNode` in the updated trie and hence, temporarily reducing the
-			// allocated register count by 1. Depending on whether the register's updated value represents an unallocated
-			// or allocated register, the `allocatedRegCountDelta` is updated when the new leaf is instantiated.
-			if currentNode.IsDefaultNode() {
-				allocatedRegCountDelta = 0
+			// Mechanically, we are not includig the leaf  `currentNode` in the updated trie, because its value is overwritten.
+			// Effectively, we are reducing the allocated register count by 1. Depending on whether the register's updated value
+			// represents an unallocated or allocated register, the `allocatedRegCountDelta` is updated when the new leaf is instantiated.
+			if !currentNode.IsAllocatedRegisterLeaf() { // n is leaf, but not an allocated register => default leaf, i.e. n has default hash
+				allocatedRegCountDelta = 0 // dropping an unallocated register => no change of allocated register count
 			} else {
-				allocatedRegCountDelta = -1
+				allocatedRegCountDelta = -1 // dropping an allocated register => decrease allocated register count by 1
 			}
 		} else { // `currentNode.path ∉ path`, i.e. we are in recursive case (1.b)
 			// Current node carries a path that is not in the set of updated register `paths`. Hence, then the current node
