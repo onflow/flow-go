@@ -182,10 +182,11 @@ During the recursion, we can encounter the following cases:
     write the contents of the previously existing register as well as the new register `(path, payload)` to the
     interim-node's children. We set `compactLeaf := node` and continue the recursive construction 
     of the new the sub-tree. 
-* **Case 2: `node == nil`**: A `nil` sub-trie means that the sub-trie is empty and at least a new leaf has to be created. 
-  - **case 2.a: there is only one leaf to create**. If there is only one leaf to create (either the one representing the input `(path, payload)`, 
-or the one representing a compactified leaf carried over from a higher height), then a new leaf is created.
-The new leaf can be either fully expanded or compactified. 
+* **Case 2: `node == nil`**: the sub-trie is empty, so at least one new leaf must be created.
+  - **case 2.a: exactly one leaf is created** (fully expanded or compactified). It represents one of:
+      - **(i)** the input register `(path, payload)`: the input path falls into this empty sub-trie and no compactified leaf was carried over;
+      - **(ii)** the compactified leaf carried over from a higher height: no input path falls into this sub-trie, so that carried leaf is re-created at the current (lower) height.
+
   - **case 2.b: there are 2 leafs to create**. If there are 2 leafs to create (both the input `(path, payload)` and the compactified leaf carried over),
 then we are still at an interim-node height. Hence, we create a new interim-node with `nil` children, check the path index of both the input `path`
 and the compactified node `path` and continue the recursion over the children. Eventually the recursion calls will fall into 2.a 
@@ -201,8 +202,7 @@ We now generalize this algorithm to an arbitrary number of `K` register updates:
     The first partition has all updates for registers with `paths[k][i] = 0` and goes into the left child recursion, while the second partition has the updates
     pertaining to registers with `paths[k][i] = 1` and goes into the right child recursion. 
     This results in sorting the overall input `paths` using an implicit quick sort.
- - if `len(paths) == 0` and there is no compact leaf carried over (`compactLeaf == nil`), no update will be done 
-and the original sub-trie can be re-used in the new trie.
+ - if `len(paths) == 0` and there is no compact leaf carried over (`compactLeaf == nil`), no update will be done and the original sub-trie can be re-used in the new trie.
 
 
 * **Case 0: `node` is an interim node.** An interim-node is created, the paths are split into left and right.
@@ -216,7 +216,7 @@ all the input paths. Case 1.a is when the leaf path is found among the inputs, C
     - **case 1.b: `node.path ∉ path`**. If the leaf path is not found among the inputs, `node` must be a compactified leaf
       (as multiple different registers fall in its respective sub-trie). We call the recursion with the same inputs but with `compactLeaf` being set to the current node. 
 * **Case 2: `node == nil`** : The sub-trie is empty
-    - **Case 2a: `node == nil` and there is only one leaf to create**, i.e. `len(paths) == 1 && compactLeaf == nil` or `len(paths) == 0 && compactLeaf ≠ nil`.
+    - **Case 2a: `node == nil` and there is only one leaf to create**, i.e. (i) `len(paths) == 1 && compactLeaf == nil` or (ii) `len(paths) == 0 && compactLeaf ≠ nil`.
     - **Case 2b: there are 2 or more leafs to create**. An interim-node is created, the paths are split into left and right, and `compactLeaf` is carried over into the left or right child. We note that this case is very similar to Case 0 where the current node is `nil`. The pseudo-code below will treat case 0 and 2.b in the same code section. 
 
 **Lemma**:
