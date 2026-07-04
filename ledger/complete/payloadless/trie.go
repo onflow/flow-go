@@ -313,11 +313,8 @@ func update(
 	// Recursion base case (B): *single register write* into previously pruned subtree (`currentNode` and `compactLeaf` are nil)
 	if len(paths) == 1 && currentNode == nil && compactLeaf == nil {
 		n = NewLeaf(paths[0], values[0], nodeHeight)
-		if !n.IsAllocatedRegisterLeaf() { // n is leaf, but not an allocated register => default leaf
-			// Since we only track the number of *allocated* registers, the register count remains unchanged:
-			return n, 0, nodeHeight
-		}
-		return n, 1, nodeHeight // we allocated a new register
+		allocatedRegCountDelta = computeAllocatedRegCountDelta(false, n.IsAllocatedRegisterLeaf())
+		return n, allocatedRegCountDelta, nodeHeight
 	}
 
 	// What remains to be handled are the following cases:
@@ -340,28 +337,22 @@ func update(
 			if n.hashValue == currentNode.hashValue {
 				return currentNode, 0, nodeHeight
 			}
-			if !n.IsAllocatedRegisterLeaf() { // n is leaf, but not an allocated register => default leaf, i.e. n has default hash
-				// since prior register `currentNode` had non-default hash as per check above, we have removed a previously allocated register
-				return n, -1, nodeHeight
-			}
-			return n, 1, nodeHeight
+			allocatedRegCountDelta = computeAllocatedRegCountDelta(currentNode.IsAllocatedRegisterLeaf(), n.IsAllocatedRegisterLeaf())
+			return n, allocatedRegCountDelta, nodeHeight
 		}
 
 		// -- from here on, until the end of the method, we are handling the recursive cases --
 
 		// Check whether we are in recursive case (1.a.ii) or (1.b):
 		if slices.Contains(paths, currentPath) { // `currentNode.path ∈ paths` and `len(paths) > 1`, i.e. we are in recursive case (1.a.ii)
-			// Mechanically, we are not includig the leaf  `currentNode` in the updated trie, because its value is overwritten.
-			// Effectively, we are reducing the allocated register count by 1. Depending on whether the register's updated value
-			// represents an unallocated or allocated register, the `allocatedRegCountDelta` is updated when the new leaf is instantiated.
-			if !currentNode.IsAllocatedRegisterLeaf() { // n is leaf, but not an allocated register => default leaf, i.e. n has default hash
-				allocatedRegCountDelta = 0 // dropping an unallocated register => no change of allocated register count
-			} else {
-				allocatedRegCountDelta = -1 // dropping an allocated register => decrease allocated register count by 1
-			}
-		} else { // `currentNode.path ∉ path`, i.e. we are in recursive case (1.b)
-			// Current node carries a path that is not in the set of updated register `paths`. Hence, then the current node
-			// represents a compact leaf that needs to be carried down the recursion.
+			// The register at `currentNode`'s path is among the updated `paths`, so its value will be overwritten. Here we
+			// only account for removing `currentNode`'s own contribution to the count; the new value is counted separately,
+			// deeper in the recursion, when its leaf is (re)created. Dropping `currentNode` yields -1 if it held an
+			// allocated register and 0 if it was a default (unallocated) leaf.
+			allocatedRegCountDelta = computeAllocatedRegCountDelta(currentNode.IsAllocatedRegisterLeaf(), false) // drop `currentNode`
+		} else { // `currentNode.path ∉ paths`, i.e. we are in recursive case (1.b)
+			// `currentNode` carries a path that is not among the updated `paths`. Hence it represents a compact leaf
+			// that must be carried down the recursion.
 			compactLeaf = currentNode
 		}
 	}
@@ -449,6 +440,18 @@ func update(
 
 	n = NewInterimNode(nodeHeight, newLeftChild, newRightChild)
 	return n, allocatedRegCountDelta, lowestHeightTouched
+}
+
+// computeAllocatedRegCountDelta returns *change* in allocated reg count when updating a
+// leaf to-and-from allocated register vs default leaf (representing an unallocated register).
+func computeAllocatedRegCountDelta(wasAllocatedRegister, updatedToAllocatedRegister bool) (allocatedRegCountDelta int64) {
+	if wasAllocatedRegister == updatedToAllocatedRegister {
+		return 0
+	}
+	if updatedToAllocatedRegister {
+		return 1 // previously unallocated register will be allocated.
+	}
+	return -1 // previously allocated register will be unallocated.
 }
 
 // UnsafeProofs provides proofs for the given paths.
