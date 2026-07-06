@@ -1,6 +1,7 @@
 package wal
 
 import (
+	"errors"
 	"fmt"
 	"sort"
 
@@ -232,6 +233,96 @@ func (w *DiskWAL) replaySegmentsForPayloadlessForest(
 		return fmt.Errorf("could not replay WAL segments [%v:%v] for payloadless forest: %w", from, lastSeg, err)
 	}
 	return nil
+}
+
+// errStopPayloadlessReplay is a sentinel used to break out of segment replay in
+// [DiskWAL.ReplayOnPayloadlessForestUntil] once the target trie has been
+// produced. It never escapes that method.
+var errStopPayloadlessReplay = errors.New("target payloadless trie found; stopping replay")
+
+// ReplayOnPayloadlessForestUntil reconstructs payloadless state like
+// [DiskWAL.ReplayOnPayloadlessForest], but stops replaying WAL segments as soon
+// as an update produces a trie whose root hash equals `targetRootHash` (or the
+// target is already one of the loaded V7 checkpoint tries).
+//
+// Stopping early bounds both time and memory to the segments up to the target.
+// This also avoids a correctness pitfall of replaying to the end: the forest is
+// LRU-bounded, so a target more than `capacity` tries before the WAL tip would
+// be evicted before it could be read.
+//
+// It returns true when the target trie is present after loading the V7
+// checkpoint or during segment replay, and false when all segments were replayed
+// without producing it. The caller reads the trie back via [payloadless.Forest.GetTrie].
+//
+// Expected error returns during normal operation:
+//   - error containing "no V7 checkpoint found": when the WAL directory contains
+//     no V7 checkpoint of either kind, so the forest cannot be seeded.
+func (w *DiskWAL) ReplayOnPayloadlessForestUntil(
+	forest *payloadless.Forest,
+	targetRootHash ledger.RootHash,
+) (bool, error) {
+	checkpointer, err := w.NewCheckpointer()
+	if err != nil {
+		return false, fmt.Errorf("cannot create checkpointer: %w", err)
+	}
+
+	tries, loadedCheckpoint, err := checkpointer.LoadLatestCheckpointV7()
+	if err != nil {
+		return false, fmt.Errorf("cannot load latest V7 checkpoint: %w", err)
+	}
+
+	// Mirrors [DiskWAL.ReplayOnPayloadlessForest]: a payloadless forest cannot be
+	// seeded by WAL replay alone, so a V7 checkpoint of either kind is required.
+	if loadedCheckpoint < 0 && len(tries) == 0 {
+		return false, fmt.Errorf(
+			"no V7 checkpoint found in %s; a V7 checkpoint is required to start a payloadless ledger",
+			w.wal.Dir(),
+		)
+	}
+
+	if err := forest.AddTries(tries); err != nil {
+		return false, fmt.Errorf("failed to seed payloadless forest from V7 checkpoint: %w", err)
+	}
+
+	// The target may already be one of the checkpoint tries; if so, no segment
+	// replay is needed.
+	if forest.HasTrie(targetRootHash) {
+		return true, nil
+	}
+
+	firstSeg, lastSeg, err := w.Segments()
+	if err != nil {
+		return false, fmt.Errorf("could not find segments: %w", err)
+	}
+	from := firstSeg
+	if loadedCheckpoint >= from {
+		from = loadedCheckpoint + 1
+	}
+	if from > lastSeg {
+		// V7 checkpoint already covers everything on disk and did not contain the target.
+		return false, nil
+	}
+
+	found := false
+	err = w.replaySegments(from, lastSeg,
+		func(update *ledger.TrieUpdate) error {
+			rootHash, err := forest.Update(update)
+			if err != nil {
+				return err
+			}
+			if rootHash.Equals(targetRootHash) {
+				found = true
+				return errStopPayloadlessReplay
+			}
+			return nil
+		},
+		func(rootHash ledger.RootHash) error { return nil },
+	)
+	if err != nil && !errors.Is(err, errStopPayloadlessReplay) {
+		return false, fmt.Errorf("could not replay WAL segments [%v:%v] for payloadless forest: %w", from, lastSeg, err)
+	}
+
+	return found, nil
 }
 
 func (w *DiskWAL) Segments() (first, last int, err error) {
