@@ -8,6 +8,8 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 
+	prometheusWAL "github.com/onflow/wal/wal"
+
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
 	"github.com/onflow/flow-go/ledger/complete"
@@ -34,11 +36,43 @@ var (
 // Cmd produces a single WAL update record that, when replayed by the ledger service on startup,
 // rolls the ledger's latest trie back to the historical state at a target block height.
 //
-// The reconstruction resets, on top of the latest (base) trie, every register that has been written
-// since the target height back to its historical value — read from the Storehouse register store as
-// of the target height. Because a trie's root hash is a pure function of its register content, the
-// resulting trie has the target block's state commitment. The command verifies this equality before
-// writing (or, in dry-run mode, without writing) the WAL record.
+// Approach:
+//
+// The reconstruction never walks the WAL backwards. It instead resets, on top of the latest (base)
+// trie the ledger already has, every register that could differ between the base state and the target
+// state back to its historical value. This works because a trie's root hash is a pure function of its
+// final register key/value content — independent of the order or path of the updates that produced it.
+// So applying the historical value of every differing register on top of the base yields a trie whose
+// root equals the target block's parent state commitment.
+//
+// Concretely, `runE` performs the following steps:
+//
+//  1. Load the base trie. The ledger's WAL and checkpoints are replayed into a (payloadless) forest;
+//     the base root is the most recently touched state (or --base-state-commitment).
+//
+//  2. Resolve the target state commitment — the known root to reconstruct — from the protocol/results
+//     database at --target-height (or from --target-state-commitment).
+//
+//  3. Resolve the WAL segment range to scan. The registers that differ between the target and base
+//     states are exactly those written by the blocks after the target, whose update records begin at
+//     the one whose base root equals the target commitment (the block executed right after the
+//     target). That segment is auto-detected (see [resolveSegmentRange]); the scan runs from there to
+//     the newest segment, avoiding a needless full-history pass.
+//
+//  4. Build the rollback update (see [BuildRollbackTrieUpdate]): collect the set of registers written
+//     in that segment range from the WAL, read each one's value as of the target height from the
+//     Storehouse register store (a not-found register reads back as empty, i.e. a deletion), and
+//     assemble a [ledger.TrieUpdate] anchored on the base root. Rewriting a register that did not
+//     actually change with its unchanged value is a no-op on the root, so an over-broad register set
+//     is harmless.
+//
+//  5. Verify — apply the update to the base trie and require the resulting root to equal the target
+//     state commitment. Only if it matches is the record trusted; this also guards against a missing
+//     WAL segment or insufficient register-history retention.
+//
+//  6. Write the record via RecordUpdate (skipped under --dry-run). On the next ledger startup, replay
+//     applies this record last, leaving the ledger's latest trie at the target historical state,
+//     ready for isolated re-execution.
 var Cmd = &cobra.Command{
 	Use:   "rollback-trie-to-height",
 	Short: "Produce a WAL update that rolls the ledger's trie back to a historical state",
@@ -79,8 +113,8 @@ func init() {
 		"hex-encoded base (anchor) state commitment; if empty the ledger's most recently touched state is used")
 
 	Cmd.Flags().IntVar(&flagFromSegment, "from-segment", -1,
-		"first WAL segment number to scan for written registers; -1 scans from the first segment on disk. "+
-			"Bounding the scan is safe only when the target height is at or above the height of that segment.")
+		"first WAL segment number to scan for written registers; -1 (default) auto-detects the segment "+
+			"where the target state commitment first appears. Set explicitly only to override auto-detection.")
 
 	Cmd.Flags().BoolVar(&flagDryRun, "dry-run", false,
 		"verify the reconstruction without writing the WAL update record")
@@ -149,11 +183,16 @@ func runE(*cobra.Command, []string) error {
 	}
 	logger.Info().Str("target_commit", targetCommit.String()).Msg("resolved target state commitment")
 
-	// 4. Determine the WAL segment range to scan for written registers.
-	from, to, err := resolveSegmentRange(diskWal, flagFromSegment)
+	// 4. Determine the WAL segment range to scan for written registers. The registers that differ
+	// between the target and base states are exactly those written by the blocks after the target, so
+	// the scan need only start at the segment where the target state commitment first appears as an
+	// update's base root (the block executed immediately after the target). Scanning earlier segments
+	// is a harmless superset but wastes a full-history pass.
+	from, to, err := resolveSegmentRange(logger, flagExecutionStateDir, diskWal, flagFromSegment, targetCommit)
 	if err != nil {
 		return err
 	}
+	logger.Info().Int("from_segment", from).Int("to_segment", to).Msg("resolved WAL segment range to scan")
 
 	// 5. Build the rollback trie update.
 	trieUpdate, err := BuildRollbackTrieUpdate(logger, flagExecutionStateDir, from, to, baseRoot, registers, flagTargetHeight)
@@ -279,19 +318,33 @@ func rootHashByHeight(headers storage.Headers, results storage.ExecutionResults,
 	return ledger.RootHash(commit), nil
 }
 
-// resolveSegmentRange returns the [from, to] WAL segment range to scan. `to` is always the last
-// segment on disk. `from` is fromFlag when non-negative, otherwise the first segment on disk.
+// resolveSegmentRange returns the [from, to] WAL segment range to scan for written registers. `to`
+// is always the last segment on disk.
 //
-// No error returns are expected during normal operation.
-func resolveSegmentRange(diskWal *wal.DiskWAL, fromFlag int) (int, int, error) {
+// `from` is fromFlag when it is non-negative (an explicit override). Otherwise `from` is auto-detected
+// as the segment where targetCommit first appears as an update record's base root — i.e. the segment
+// holding the block executed immediately after the target height. Starting there yields exactly the
+// blocks whose writes differ between the target and base states; earlier segments would only add
+// no-op rewrites.
+//
+// Expected error returns during normal operation:
+//   - an error when targetCommit cannot be located in the WAL (the target is older than the retained
+//     WAL/checkpoint window, or a covering segment is missing).
+func resolveSegmentRange(
+	logger zerolog.Logger,
+	dir string,
+	diskWal *wal.DiskWAL,
+	fromFlag int,
+	targetCommit ledger.RootHash,
+) (int, int, error) {
 	first, last, err := diskWal.Segments()
 	if err != nil {
 		return 0, 0, fmt.Errorf("cannot list WAL segments: %w", err)
 	}
 	if first < 0 {
-		return 0, 0, fmt.Errorf("no WAL segments found in %s", flagExecutionStateDir)
+		return 0, 0, fmt.Errorf("no WAL segments found in %s", dir)
 	}
-	from := first
+
 	if fromFlag >= 0 {
 		if fromFlag < first {
 			return 0, 0, fmt.Errorf("requested from-segment %d is before the first segment on disk %d", fromFlag, first)
@@ -299,9 +352,81 @@ func resolveSegmentRange(diskWal *wal.DiskWAL, fromFlag int) (int, int, error) {
 		if fromFlag > last {
 			return 0, 0, fmt.Errorf("requested from-segment %d is after the last segment on disk %d", fromFlag, last)
 		}
-		from = fromFlag
+		return fromFlag, last, nil
+	}
+
+	from, err := findSegmentWithBaseRoot(logger, dir, first, last, targetCommit)
+	if err != nil {
+		return 0, 0, err
 	}
 	return from, last, nil
+}
+
+// findSegmentWithBaseRoot returns the WAL segment in [first, last] that contains an update record
+// whose base root equals targetCommit — the block executed immediately after the target height.
+//
+// The search runs backwards from the newest segment because re-execution targets are typically
+// recent, so the target commitment is usually near the end. On the Flow chain every block changes the
+// state commitment (the system transaction always updates block-level registers), so a given
+// commitment appears as a base root in at most one update record; the newest matching segment is
+// therefore the only matching segment. The final root verification in the caller is the backstop
+// against any mislocation.
+//
+// Expected error returns during normal operation:
+//   - an error when no update record in [first, last] has targetCommit as its base root.
+func findSegmentWithBaseRoot(
+	logger zerolog.Logger,
+	dir string,
+	first, last int,
+	targetCommit ledger.RootHash,
+) (int, error) {
+	for seg := last; seg >= first; seg-- {
+		logger.Info().
+			Int("segment", seg).
+			Int("first_segment", first).
+			Int("last_segment", last).
+			Msg("scanning WAL segment for target state commitment as a base root")
+		found, err := segmentContainsBaseRoot(logger, dir, seg, targetCommit)
+		if err != nil {
+			return 0, fmt.Errorf("cannot scan WAL segment %d: %w", seg, err)
+		}
+		if found {
+			return seg, nil
+		}
+	}
+	return 0, fmt.Errorf(
+		"target state commitment %s not found as a base root in WAL segments [%d,%d]; "+
+			"the target height may be older than the retained WAL/checkpoint window, or a covering segment is missing",
+		targetCommit, first, last,
+	)
+}
+
+// segmentContainsBaseRoot reports whether the single WAL segment `seg` contains an update record
+// whose base root equals targetRoot.
+//
+// No error returns are expected during normal operation.
+func segmentContainsBaseRoot(logger zerolog.Logger, dir string, seg int, targetRoot ledger.RootHash) (bool, error) {
+	sr, err := prometheusWAL.NewSegmentsRangeReader(logger, prometheusWAL.SegmentRange{
+		Dir:   dir,
+		First: seg,
+		Last:  seg,
+	})
+	if err != nil {
+		return false, fmt.Errorf("cannot create WAL segment reader: %w", err)
+	}
+	defer sr.Close()
+
+	reader := prometheusWAL.NewReader(sr)
+	for reader.Next() {
+		operation, _, update, err := wal.Decode(reader.Record())
+		if err != nil {
+			return false, fmt.Errorf("cannot decode WAL record: %w", err)
+		}
+		if operation == wal.WALUpdate && update.RootHash.Equals(targetRoot) {
+			return true, nil
+		}
+	}
+	return false, reader.Err()
 }
 
 // parseRootHash decodes a hex-encoded state commitment / root hash.

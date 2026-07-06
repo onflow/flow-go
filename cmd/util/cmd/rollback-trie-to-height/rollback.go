@@ -61,7 +61,19 @@ func CollectWrittenRegisters(
 
 	written := make(map[ledger.Path]flow.RegisterID)
 	records := 0
+	currentSegment := -1
 	for reader.Next() {
+		if seg := reader.Segment(); seg != currentSegment {
+			currentSegment = seg
+			logger.Info().
+				Int("segment", seg).
+				Int("first_segment", from).
+				Int("last_segment", to).
+				Int("update_records_so_far", records).
+				Int("distinct_registers_so_far", len(written)).
+				Msg("collecting written registers from WAL segment")
+		}
+
 		operation, _, update, err := wal.Decode(reader.Record())
 		if err != nil {
 			return nil, fmt.Errorf("cannot decode WAL record: %w", err)
@@ -134,7 +146,27 @@ func BuildRollbackTrieUpdate(
 	paths := make([]ledger.Path, 0, len(written))
 	payloads := make([]*ledger.Payload, 0, len(written))
 	deletions := 0
+
+	total := len(written)
+	const logEvery = 100_000
+	processed := 0
+
+	logger.Info().
+		Int("registers", total).
+		Uint64("target_height", targetHeight).
+		Msg("reading historical register values to build rollback trie update")
+
 	for path, regID := range written {
+		processed++
+		if processed%logEvery == 0 {
+			logger.Info().
+				Int("processed", processed).
+				Int("total", total).
+				Str("progress", fmt.Sprintf("%.1f%%", float64(processed)/float64(total)*100)).
+				Int("deletions", deletions).
+				Msg("building rollback trie update")
+		}
+
 		value, err := getter.Get(regID, targetHeight)
 		if err != nil {
 			if errors.Is(err, storage.ErrNotFound) {

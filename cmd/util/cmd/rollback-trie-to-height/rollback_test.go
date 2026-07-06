@@ -1,6 +1,7 @@
 package rollback_trie_to_height
 
 import (
+	"fmt"
 	"math"
 	"testing"
 
@@ -251,6 +252,66 @@ func TestRollbackRecordAndReplay(t *testing.T) {
 	})
 }
 
+// TestFindSegmentWithBaseRoot verifies that the WAL-scan start segment is auto-detected as the
+// segment holding the update whose base root is the target state commitment (the block executed right
+// after the target), rather than scanning from the first segment on disk.
+func TestFindSegmentWithBaseRoot(t *testing.T) {
+	unittest.RunWithTempDir(t, func(dir string) {
+		// A small segment size forces the updates to spread across many segment files.
+		led, compactor := newLedgerWithSegmentSize(t, dir, 32*1024)
+
+		// Apply a chain of updates, each writing a distinct sizeable register, capturing every
+		// intermediate root. root[i] is the state after update i; the update i+1 has base root[i].
+		roots := make([]ledger.State, 0, 40)
+		prev := led.InitialState()
+		for i := 0; i < 40; i++ {
+			value := make([]byte, 2048)
+			value[0] = byte(i)
+			writes := map[flow.RegisterID]flow.RegisterValue{
+				reg(byte(i%8), fmt.Sprintf("reg-%d", i)): value,
+			}
+			root, _, err := led.Set(buildUpdate(t, prev, writes))
+			require.NoError(t, err)
+			roots = append(roots, root)
+			prev = root
+		}
+
+		<-led.Done()
+		<-compactor.Done()
+
+		first, last, err := segmentsOf(dir)
+		require.NoError(t, err)
+		require.Greater(t, last, first, "updates should span multiple WAL segments")
+
+		// Target a middle state. The update record with this state as its base root is roots[k]->roots[k+1].
+		const k = 20
+		target := ledger.RootHash(roots[k])
+
+		seg, err := findSegmentWithBaseRoot(zerolog.Nop(), dir, first, last, target)
+		require.NoError(t, err)
+
+		// The located segment actually contains the target as a base root...
+		found, err := segmentContainsBaseRoot(zerolog.Nop(), dir, seg, target)
+		require.NoError(t, err)
+		require.True(t, found)
+
+		// ...and it is strictly after the first segment (auto-detection narrowed the range).
+		require.Greater(t, seg, first, "start segment should be narrowed past the first segment on disk")
+
+		// No segment strictly before the located one contains the target as a base root (uniqueness),
+		// confirming the located segment is the correct lower bound.
+		for s := first; s < seg; s++ {
+			f, err := segmentContainsBaseRoot(zerolog.Nop(), dir, s, target)
+			require.NoError(t, err)
+			require.False(t, f, "segment %d before the located segment %d must not contain the target base root", s, seg)
+		}
+
+		// A commitment that never appears as a base root is reported as not found.
+		_, err = findSegmentWithBaseRoot(zerolog.Nop(), dir, first, last, ledger.RootHash(unittest.StateCommitmentFixture()))
+		require.Error(t, err)
+	})
+}
+
 // lastWALUpdate returns the last WALUpdate record present in the WAL segments in dir.
 func lastWALUpdate(t *testing.T, dir string) *ledger.TrieUpdate {
 	from, to, err := segmentsOf(dir)
@@ -277,9 +338,15 @@ func lastWALUpdate(t *testing.T, dir string) *ledger.TrieUpdate {
 // newLedger creates a fresh on-disk WAL, ledger and compactor in dir, mirroring the standard
 // cmd/util loading pattern. The caller is responsible for draining led.Done()/compactor.Done().
 func newLedger(t *testing.T, dir string) (*complete.Ledger, *complete.Compactor) {
+	return newLedgerWithSegmentSize(t, dir, wal.SegmentSize)
+}
+
+// newLedgerWithSegmentSize is like newLedger but uses the given WAL segment size, so tests can force
+// records to spread across multiple segment files.
+func newLedgerWithSegmentSize(t *testing.T, dir string, segmentSize int) (*complete.Ledger, *complete.Compactor) {
 	logger := zerolog.Nop()
 	diskWal, err := wal.NewDiskWAL(logger, nil, metrics.NewNoopCollector(), dir,
-		complete.DefaultCacheSize, pathfinder.PathByteSize, wal.SegmentSize)
+		complete.DefaultCacheSize, pathfinder.PathByteSize, segmentSize)
 	require.NoError(t, err)
 
 	led, err := complete.NewLedger(diskWal, complete.DefaultCacheSize, &metrics.NoopCollector{}, logger,
