@@ -251,6 +251,9 @@ func reExecuteHeight(
 		}
 	}
 
+	endState := result.CurrentEndState()
+	resultID := result.ExecutionReceipt.ExecutionResult.ID()
+
 	logger.Info().
 		Uint64("height", height).
 		Hex("block_id", blockID[:]).
@@ -259,6 +262,8 @@ func reExecuteHeight(
 		Int("failed_transactions", failedTxs).
 		Uint64("total_computation_used", totalComputation).
 		Int("events", len(events)).
+		Hex("state_commitment", endState[:]).
+		Hex("result_id", resultID[:]).
 		Dur("duration", elapsed).
 		Msg("re-executed block")
 
