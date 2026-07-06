@@ -44,6 +44,7 @@ import (
 	read_execution_state "github.com/onflow/flow-go/cmd/util/cmd/read-execution-state"
 	read_hotstuff "github.com/onflow/flow-go/cmd/util/cmd/read-hotstuff/cmd"
 	read_protocol_state "github.com/onflow/flow-go/cmd/util/cmd/read-protocol-state/cmd"
+	reexecute_block "github.com/onflow/flow-go/cmd/util/cmd/reexecute-block"
 	remove_execution_fork "github.com/onflow/flow-go/cmd/util/cmd/remove-execution-fork/cmd"
 	rollback_executed_height "github.com/onflow/flow-go/cmd/util/cmd/rollback-executed-height/cmd"
 	run_script "github.com/onflow/flow-go/cmd/util/cmd/run-script"
@@ -122,6 +123,7 @@ func addCommands() {
 	rootCmd.AddCommand(epochs.RootCmd)
 	rootCmd.AddCommand(edbs.RootCmd)
 	rootCmd.AddCommand(rollback_executed_height.Cmd)
+	rootCmd.AddCommand(reexecute_block.Cmd)
 	rootCmd.AddCommand(read_execution_state.Cmd)
 	rootCmd.AddCommand(snapshot.Cmd)
 	rootCmd.AddCommand(export_json_transactions.Cmd)
