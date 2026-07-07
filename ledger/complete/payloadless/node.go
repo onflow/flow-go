@@ -179,18 +179,31 @@ func newDefaultLeaf(path ledger.Path, height int) *Node {
 //	•      : the register's actual leaf at height 0 in the fully-expanded (perfect) trie.
 //	dotted : single-child perfect-trie path (┊) that compactification collapses into one node.
 //
-// Implementation correctly handles leaves that represent either allocated or unallocated registers.
+// Implementation correctly handles leaves that represent either allocated or unallocated registers. For an
+// unallocated register represented by an explicit default leaf (which carries the register's path), a new
+// default leaf at `relevellingHeight` is created; this is useful for our shortcut for non-inclusion proofs
+// utilizing explicitly represented default leaf nodes. A `nil` input yields a `nil` result.
 //
 // UNCHECKED requirement: `leaf.IsLeaf()` must be true
 func NewRelevelledLeaf(leaf *Node, relevellingHeight int) *Node {
+	// If the leaf represents an unallocated register, return the default node at the relevelling height.
 	// Implementation details:
+	//   - A nil input represents an empty sub-trie that carries no register path. By convention a default leaf
+	//     must carry the path of the register it represents, which a nil input cannot supply, so we return nil
+	//     (an empty sub-trie stays empty).
 	//   - A default leaf (leafHash == nil, i.e. an unallocated register) is relevelled to the default node at height `relevellingHeight`.
 	//     The resulting node's hash is `DefaultHashForHeight(relevellingHeight)`; it is path-independent, but height-dependent.
 	//   - For an allocated register (leafHash ≠ nil), the `leafHash` by convention always contains the hash of the fully-expanded leaf at
 	//     height 0. The hash of any compactified leaf is computed by iteratively hashing the `leafHash` together with the
 	//     default hash at the corresponding height (sibling subtree representing only empty registers).
+	if leaf == nil { // empty sub-trie carries no register path => cannot form a path-bearing default leaf; stays empty
+		return nil
+	}
 	if leaf.leafHash == nil { // leaf.leafHash is nil ⟺ unallocated register ⟺ node is a default leaf
 		return newDefaultLeaf(leaf.path, relevellingHeight)
+	}
+	if relevellingHeight == leaf.height { // same height => no relevelling needed
+		return leaf
 	}
 
 	// Leaf represent an allocated register:

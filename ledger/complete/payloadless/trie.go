@@ -4,9 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"sync"
-
 	"slices"
+	"sync"
 
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/bitutils"
@@ -16,7 +15,7 @@ import (
 // MTrie represents a perfect in-memory full binary Merkle tree with uniform height.
 // For a detailed description of the storage model, please consult `mtrie/README.md`
 //
-// A MTrie is a thin wrapper around a the trie's root Node. An MTrie implements the
+// A MTrie is a thin wrapper around a trie's root Node. An MTrie implements the
 // logic for forming MTrie-graphs from the elementary nodes. Specifically:
 //   - how Nodes (graph vertices) form a Trie,
 //   - how register values are read from the trie,
@@ -25,7 +24,7 @@ import (
 //
 // `MTrie`s are _immutable_ data structures. Updating register values is implemented through
 // copy-on-write, which creates a new `MTrie`. For minimal memory consumption, all sub-tries
-// that where not affected by the write operation are shared between the original MTrie
+// that were not affected by the write operation are shared between the original MTrie
 // (before the register updates) and the updated MTrie (after the register writes).
 //
 // MTrie expects that for a specific path, the register's key never changes.
@@ -46,7 +45,7 @@ func NewEmptyMTrie() *MTrie {
 
 // IsEmpty checks if a trie is empty.
 //
-// An empty try doesn't mean a trie with no allocated registers.
+// An empty trie (root is nil) is not the same as a trie whose registers are all unallocated.
 func (mt *MTrie) IsEmpty() bool {
 	return mt.root == nil
 }
@@ -217,7 +216,7 @@ func read(leafHashes []*hash.Hash, paths []ledger.Path, head *Node) {
 // The key-value pairs specify the registers whose values are supposed to hold updated values
 // compared to the parent trie. Constructing the new trie is done in a COPY-ON-WRITE manner:
 //   - The original trie remains unchanged.
-//   - subtries that remain unchanged are from the parent trie instead of copied.
+//   - subtries that remain unchanged are referenced from the parent trie instead of copied.
 //
 // UNSAFE: method requires the following conditions to be satisfied:
 //   - keys are NOT duplicated
@@ -259,7 +258,7 @@ type updateResult struct {
 	lowestHeightTouched    int
 }
 
-// update traverses the subtree recursively and create new nodes with
+// update traverses the subtree recursively and creates new nodes with
 // the updated values on the given paths
 //
 // it returns:
@@ -267,7 +266,7 @@ type updateResult struct {
 //   - allocated register count delta in subtrie (allocatedRegCountDelta)
 //   - lowest height reached during recursive update in subtrie (lowestHeightTouched)
 //
-// update also compact a subtree into a single compact leaf node in the case where
+// update also compacts a subtree into a single compact leaf node in the case where
 // there is only 1 value stored in the subtree.
 //
 // allocatedRegCountDelta is used to compute updated trie's allocated register count.
@@ -286,54 +285,51 @@ func update(
 	prune bool, // prune flag specifies whether the update should prune nodes with empty values; not pruning is useful for generating proof, especially non-inclusion proof
 ) (n *Node, allocatedRegCountDelta int64, lowestHeightTouched int) {
 	// IMPLEMENTATION Notes:
-	// - This method proceeds recursively, essentially partitioning the remaining set of `paths` and corresponding `values` at each bit of the path
-	//   we are descending down. In essence, the base case of the recursion is when there is only a single path-value pair left to be updated in the
-	//   trie. We *always create a leaf* in the recursion base case, no matter whether the leaf represents an unallocated or allocated register.
+	// - This method proceeds recursively, essentially partitioning the remaining set of `paths` and corresponding `values` according to each bit of
+	//   the path we are descending down. In essence, the base case of the recursion is when there is only a single path-value pair left to be updated
+	//   in the trie. We *always create a leaf* in the recursion base case, no matter whether the leaf represents an unallocated or allocated register.
 	//   Explicitly representing specific unallocated registers is an interim shortcut until we have specialized (more efficient) non-inclusion proofs
 	//   implemented (at the moment, non-inclusion proofs fall back on inclusion proofs of explicitly represented default leaf nodes).
 	// - When descending upwards again from the recursion, `NewInterimCompactifiedNode` takes care of the compaction if `prune` is true. When `prune`
 	//   is enabled (unchanged for the entire update), it follows by induction that the trie always produces maximally compactified leaves for all
-	//   registers written during the update.
+	//   registers written during the update (untouched registers may remain in the state before the update, potentially uncompactified).
 	// - Important: we only track the number of *allocated* registers (the change thereof to be precise). Therefore, whenever a new leaf is created,
 	//   we need to check if it represents an unallocated register and return the appropriate change of allocated register count.
 
 	// [Recursion Base Case] empty update (len(paths) == 0), i.e. no register to write in this sub-trie.
 	if len(paths) == 0 {
 		if compactLeaf != nil { // this implies currentNode == nil per Lemma in mtrie/README.md
-			// README case 2.a.ii: the sole leaf to create is the compactified leaf carried over from a higher height.
+			// README case 3.a.ii: the sole leaf to create is the compactified leaf carried over from a higher height.
 			// We re-level it to the current height by creating a new compact leaf node with the same path and value.
 			// The old node isn't modified, as it is still used by the trie before the update. No matter whether
 			// `compactLeaf` represents an unallocated or allocated register, the register count remains unchanged.
 			n = NewRelevelledLeaf(compactLeaf, nodeHeight)
 			return n, 0, nodeHeight
 		}
-		// No path to update and no compact leaf carried over ⇒ no update at all: re-use the existing sub-trie
-		// (mtrie/README.md § Update: "no update will be done and the original sub-trie can be re-used"). We
-		// return `currentNode` regardless of whether it exists.
+		// README Case 0 (re-use): no path to update and no compact leaf carried over ⇒ no update at all, so we
+		// re-use the existing sub-trie (mtrie/README.md § Update: "no update will be done and the original
+		// sub-trie can be re-used"). We return `currentNode` regardless of whether it exists.
 		return currentNode, 0, nodeHeight
 	}
 
-	// [Recursion Base Case] README case 2.a.i (currentNode == nil, single input register to create):
-	// len(paths) == 1, currentNode == nil, compactLeaf == nil. A single register is written into a
-	// previously empty (e.g. pruned) sub-trie.
+	// [Recursion Base Case] README case 3.a.i: currentNode == nil: A single register is written into a previously empty (e.g. pruned) sub-trie.
 	if len(paths) == 1 && currentNode == nil && compactLeaf == nil {
 		n = NewLeaf(paths[0], values[0], nodeHeight)
 		allocatedRegCountDelta = computeAllocatedRegCountDelta(false, n.IsAllocatedRegisterLeaf())
 		return n, allocatedRegCountDelta, nodeHeight
 	}
 
-	// Every remaining configuration has len(paths) >= 1. By the Lemma (mtrie/README.md § Update) the configuration
-	// currentNode != nil AND compactLeaf != nil cannot occur on entry, so exactly one of the following holds:
-	//   • README Case 1 (currentNode is a leaf, ⟹ compactLeaf == nil): handled immediately below.
-	//   • README Case 0 (currentNode is an interim node, ⟹ compactLeaf == nil): handled by the split section below.
-	//   • README Case 2 (currentNode == nil): the single-leaf arm 2.a is already handled above (base cases); the
-	//     >=2-leaf arm 2.b is handled by the split section below.
+	// Every remaining configuration has len(paths) ≥ 1. The code branches on currentNode next. By the Lemma (mtrie/README.md § Update), the
+	// configuration currentNode ≠ nil AND compactLeaf ≠ nil cannot occur. So the configurations that remain, classified by currentNode, are:
+	//   • currentNode is a leaf (⟹ compactLeaf == nil, by README's Lemma):                         README Case 2
+	//   • currentNode is an interim node (⟹ compactLeaf == nil, by README's Lemma):                README Case 1
+	//   • currentNode == nil (⟹ ≥2 leaves to create; as single-leaf case 3.a was covered above):   only README case 3.b remains
 
-	// README Case 1: currentNode is a leaf (⟹ compactLeaf == nil per Lemma in mtrie/README.md).
+	// README Case 2: currentNode is a leaf (⟹ compactLeaf == nil per Lemma in mtrie/README.md).
 	if currentNode != nil && currentNode.IsLeaf() {
 		currentPath := *currentNode.Path()
 
-		// [Recursion Base Case] README case 1.a.i: the single updated path coincides with `currentNode`'s path,
+		// [Recursion Base Case] README case 2.a.i: the single updated path coincides with `currentNode`'s path,
 		// so we overwrite the register represented by the existing leaf in place.
 		if len(paths) == 1 && (paths[0] == currentPath) {
 			// In most cases, the new register value will be different from the old value, in which case we need to instantiate a new leaf
@@ -349,30 +345,43 @@ func update(
 
 		// -- from here on, until the end of the method, we are handling the recursive cases --
 
-		// [Recursive Case] README case 1.a.ii or 1.b (both fall through to the split section below):
-		if slices.Contains(paths, currentPath) { // `currentNode.path ∈ paths` and `len(paths) > 1`: README case 1.a.ii
+		// [Recursive Case] README case 2.a.ii or 2.b, both FALL THROUGH to the SPLIT-AND-RECURSE section below
+		if slices.Contains(paths, currentPath) { // `currentNode.path ∈ paths` and `len(paths) > 1`: README case 2.a.ii
 			// The register at `currentNode`'s path is among the updated `paths`, so its value will be overwritten. Here we
 			// only account for removing `currentNode`'s own contribution to the count; the new value is counted separately,
 			// deeper in the recursion, when its leaf is (re)created. Dropping `currentNode` yields -1 if it held an
 			// allocated register and 0 if it was a default (unallocated) leaf.
 			allocatedRegCountDelta = computeAllocatedRegCountDelta(currentNode.IsAllocatedRegisterLeaf(), false) // drop `currentNode`
-		} else { // `currentNode.path ∉ paths`: README case 1.b
+		} else { // `currentNode.path ∉ paths`: README case 2.b
 			// `currentNode` carries a path that is not among the updated `paths`. Hence it represents a compact leaf
 			// that must be carried down the recursion.
 			compactLeaf = currentNode
+			// INSIGHT [not implemented]: formally `currentNode` could be set to nil here. This proof (presumably relatively short)
+			// should be written up in the readme, to keep the complexity out of the code.
 		}
 	}
-	// CAUTION: in README case 1.b the prior block set compactLeaf = currentNode while currentNode != nil, so the
-	// Lemma (currentNode != nil ⟹ compactLeaf == nil) no longer holds from here on. This is safe because currentNode
-	// is a *leaf* in case 1.b, so its LeftChild()/RightChild() are nil (fetched below): the split descends into empty
-	// children while compactLeaf carries the preserved register down.
+	// CAUTION: in the prior code block implementing README case 2.b, we set compactLeaf = currentNode while
+	// currentNode ≠ nil, so the Readme's Lemma no longer holds from here on. This is safe because currentNode
+	// is a *leaf* in case 2.b, so its LeftChild()/RightChild() are nil (fetched below): the split descends into
+	// empty children while compactLeaf carries the preserved register down.
 
-	// [Recursive Cases] shared by README Case 0, Case 2.b, and the fall-through from Case 1 (1.a.ii and 1.b).
-	// mtrie/README.md § Update explicitly folds Case 0 and Case 2.b into one code section. Reachable configurations
-	// here, all with the register(s) still to be written deeper in the recursion:
-	//   - len(paths) > 1                                                    (Case 0 / Case 2.b / 1.a.ii / 1.b)
-	//   - len(paths) == 1 and compactLeaf ≠ nil                             (Case 2.b: input + carried compact leaf; also 1.b, which set compactLeaf := currentNode)
-	//   - len(paths) == 1 and currentNode ≠ nil and !currentNode.IsLeaf()   (Case 0: descend an interim node)
+	// Every remaining configuration has len(paths) ≥ 1. The configurations remaining to be handled are:
+	//   case 1:  node ≠ nil and currentNode is an interim node, with at least one register to write into its sub-trie (len(paths) ≥ 1).
+	//     We descend into currentNode's existing children to apply the update while preserving the rest.
+	//   case 2.a.ii: currentNode is a leaf with currentNode.path ∈ paths and len(paths) > 1.
+	//     currentNode's own register is among those updated, and at least one *other* register (different path) is
+	//     written into the same sub-trie. So currentNode's leaf must be replaced by a sub-trie holding two or more
+	//     distinct registers (built by the recursion).
+	//   case 2.b: currentNode is a leaf with currentNode.path ∉ paths.
+	//     At least one register is written here (len(paths) ≥ 1), but currentNode's own register is not among them
+	//     (no updated path equals currentNode.path). So currentNode's leaf must be replaced by a sub-trie holding two
+	//     or more distinct registers: currentNode's carried register plus the updated one(s) (built by the recursion).
+	//   case 3.b: currentNode == nil with more than one register to create, since either
+	//     - len(paths) == 1 and compactLeaf ≠ nil, or
+	//     - len(paths) > 1.
+	// Common to all these cases: the update continues by recursion. Either currentNode (a leaf or nil) is expanded into a
+	// new sub-trie holding two or more distinct registers (cases 2.a.ii, 2.b, 3.b), or currentNode is already an interim
+	// node and we recurse into its existing children (case 1).
 
 	// Split paths and values to recurse:
 	// lpaths contains all paths that have `0` at the partitionIndex
@@ -441,8 +450,15 @@ func update(
 		return currentNode, 0, lowestHeightTouched
 	}
 
-	// if prune is on, then will check and create a compact leaf node if one child is nil, and the
-	// other child is a leaf node
+	// -- from here on, until the end of the method, we are constructing the updated trie bottom up (increasing height) from the previously (recursively) updated children --
+
+	// Instantiate the node replacing `currentNode` from the recursively-updated children. Each of newLeftChild / newRightChild is itself an update result:
+	// nil, a compact leaf, or an interim node. If prune is on, `NewInterimCompactifiedNode` creates a compact leaf when one child is nil and the other is
+	// a leaf node. When starting from a maximally compactified trie, by induction this process yields an updated trie that is also maximally compactified
+	// (all leaves compactified).
+	// However, if we operate on a sub-trie where some leaves are expanded or unallocated registers are explicitly represented, the resulting updated trie
+	// may still contain leaves that could be pruned or compactified even when `prune == true`: a register deeper in an untouched, reused child stays as-is,
+	// since `NewInterimCompactifiedNode` inspects only the immediate children (for efficiency) and does not traverse sub-tries unless there are register updates.
 	if prune {
 		n = NewInterimCompactifiedNode(nodeHeight, newLeftChild, newRightChild)
 		return n, allocatedRegCountDelta, lowestHeightTouched
