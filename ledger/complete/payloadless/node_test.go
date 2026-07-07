@@ -298,32 +298,48 @@ func Test_NewRelevelledLeaf_Allocated(t *testing.T) {
 }
 
 // Test_NewRelevelledLeaf_Default verifies re-levelling an unallocated (default) leaf produces the
-// default node at the target height.
+// default node at the target height, carrying the SAME register path as the input.
 //
-// As for the allocated case, the result depends only on the target height (the default hash is
-// path-independent), so it must be correct whether the target is LOWER than, EQUAL to, or HIGHER than
-// the origin leaf's own height. We sweep origins at several heights and relevel each to targets below,
-// at, and above its own height.
+// We sweep origins at several heights and relevel each to targets below, at, and above its own height.
+// We also sweep all three branching regimes (left/right/mixed): treating the function as a black box, the
+// path is an input we must check is preserved, not assume is passed through. This is not redundant — note
+// pathLeft is the all-zero path, which aliases ledger.DummyPath, so a bug that dropped the register path
+// and substituted DummyPath would go undetected if we only tested pathLeft. The non-zero regimes catch it.
 func Test_NewRelevelledLeaf_Default(t *testing.T) {
 	heights := []int{0, 1, 9, 256}
-	for _, originHeight := range heights {
-		origin := newDefaultLeaf(pathLeft, originHeight)
-		for _, target := range heights {
-			direction := "equal"
-			if target < originHeight {
-				direction = "down"
-			} else if target > originHeight {
-				direction = "up"
+	for _, p := range branchRegimePaths {
+		for _, originHeight := range heights {
+			origin := newDefaultLeaf(p.path, originHeight)
+			for _, target := range heights {
+				direction := "equal"
+				if target < originHeight {
+					direction = "down"
+				} else if target > originHeight {
+					direction = "up"
+				}
+				t.Run(fmt.Sprintf("%s origin h%d -> target h%d (%s)", p.name, originHeight, target, direction), func(t *testing.T) {
+					relevelled := NewRelevelledLeaf(origin, target)
+					require.Nil(t, relevelled.leafHash)
+					require.Equal(t, ledger.GetDefaultHashForHeight(target), relevelled.Hash())
+					require.True(t, relevelled.IsDefaultNode())
+					require.Equal(t, p.path, *relevelled.Path(), "register path must be preserved")
+					require.True(t, relevelled.VerifyCachedHash())
+				})
 			}
-			t.Run(fmt.Sprintf("origin h%d -> target h%d (%s)", originHeight, target, direction), func(t *testing.T) {
-				relevelled := NewRelevelledLeaf(origin, target)
-				require.Nil(t, relevelled.leafHash)
-				require.Equal(t, ledger.GetDefaultHashForHeight(target), relevelled.Hash())
-				require.True(t, relevelled.IsDefaultNode())
-				require.Equal(t, pathLeft, *relevelled.Path())
-				require.True(t, relevelled.VerifyCachedHash())
-			})
 		}
+	}
+}
+
+// Test_NewRelevelledLeaf_Nil verifies re-levelling a nil input. A nil represents an empty sub-trie that
+// carries no register path. By convention a default leaf must carry the path of the register it represents,
+// which a nil input cannot supply, so NewRelevelledLeaf returns nil (an empty sub-trie stays empty),
+// regardless of the target height. The "same vs different height" axis does not apply: a nil input carries
+// no height of its own.
+func Test_NewRelevelledLeaf_Nil(t *testing.T) {
+	for _, target := range []int{0, 1, 9, 256} {
+		t.Run(fmt.Sprintf("target h%d", target), func(t *testing.T) {
+			require.Nil(t, NewRelevelledLeaf(nil, target), "nil input represents an empty sub-trie => nil output")
+		})
 	}
 }
 
