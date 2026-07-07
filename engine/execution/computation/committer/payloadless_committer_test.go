@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/engine/execution/computation/committer"
@@ -112,6 +113,7 @@ func TestPayloadlessLedgerViewCommitter(t *testing.T) {
 		c := committer.NewPayloadlessLedgerViewCommitter(
 			ledgerMock,
 			trace.NewNoopTracer(),
+			zerolog.Nop(),
 			complete.DefaultPathFinderVersion,
 		)
 
@@ -178,6 +180,7 @@ func TestPayloadlessLedgerViewCommitter(t *testing.T) {
 		c := committer.NewPayloadlessLedgerViewCommitter(
 			ledgerMock,
 			trace.NewNoopTracer(),
+			zerolog.Nop(),
 			complete.DefaultPathFinderVersion,
 		)
 
@@ -222,6 +225,7 @@ func TestPayloadlessLedgerViewCommitter(t *testing.T) {
 		c := committer.NewPayloadlessLedgerViewCommitter(
 			ledgerMock,
 			trace.NewNoopTracer(),
+			zerolog.Nop(),
 			complete.DefaultPathFinderVersion,
 		)
 
@@ -277,6 +281,7 @@ func TestPayloadlessLedgerViewCommitter(t *testing.T) {
 		c := committer.NewPayloadlessLedgerViewCommitter(
 			ledgerMock,
 			trace.NewNoopTracer(),
+			zerolog.Nop(),
 			complete.DefaultPathFinderVersion,
 		)
 
@@ -319,6 +324,7 @@ func TestPayloadlessLedgerViewCommitter(t *testing.T) {
 		c := committer.NewPayloadlessLedgerViewCommitter(
 			ledgerMock,
 			trace.NewNoopTracer(),
+			zerolog.Nop(),
 			complete.DefaultPathFinderVersion,
 		)
 

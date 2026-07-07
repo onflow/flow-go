@@ -634,6 +634,7 @@ func (exeNode *ExecutionNode) LoadProviderEngine(
 		ledgerViewCommitter = committer.NewPayloadlessLedgerViewCommitter(
 			exeNode.payloadlessLedger,
 			node.Tracer,
+			node.Logger,
 			complete.DefaultPathFinderVersion,
 		)
 	} else {

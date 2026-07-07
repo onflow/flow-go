@@ -3,8 +3,10 @@ package committer
 import (
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/hashicorp/go-multierror"
+	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine/execution"
 	execState "github.com/onflow/flow-go/engine/execution/state"
@@ -28,6 +30,7 @@ import (
 type PayloadlessLedgerViewCommitter struct {
 	ledger            ledger.PayloadlessLedger
 	tracer            module.Tracer
+	logger            zerolog.Logger
 	pathFinderVersion uint8
 }
 
@@ -38,14 +41,20 @@ type PayloadlessLedgerViewCommitter struct {
 // the path → registerID mapping built during reconstruction agrees with the
 // paths carried by the proof. In production this is
 // complete.DefaultPathFinderVersion.
+//
+// logger receives a per-collection debug line reporting proof-generation
+// timing (see collectProofs). It is emitted at debug level so production stays
+// quiet; benchmark tooling passes a debug-level logger to surface the numbers.
 func NewPayloadlessLedgerViewCommitter(
 	ledger ledger.PayloadlessLedger,
 	tracer module.Tracer,
+	logger zerolog.Logger,
 	pathFinderVersion uint8,
 ) *PayloadlessLedgerViewCommitter {
 	return &PayloadlessLedgerViewCommitter{
 		ledger:            ledger,
 		tracer:            tracer,
+		logger:            logger,
 		pathFinderVersion: pathFinderVersion,
 	}
 }
@@ -139,6 +148,7 @@ func (committer *PayloadlessLedgerViewCommitter) collectProofs(
 		return baseStorageSnapshot.Get(id)
 	}
 
+	start := time.Now()
 	proof, err = payloadless.ProveAndReconstruct(
 		committer.ledger,
 		ledger.State(baseState),
@@ -149,5 +159,16 @@ func (committer *PayloadlessLedgerViewCommitter) collectProofs(
 	if err != nil {
 		return nil, fmt.Errorf("could not collect payloadless proof: %w", err)
 	}
+
+	// Proof-generation cost per collection. This is the exact work the
+	// ProveAndReconstruct TODO(perf) optimizes, so it is the ground-truth
+	// measurement for before/after benchmarking. Debug level keeps production
+	// quiet; benchmark tooling raises this logger to debug to surface it.
+	committer.logger.Debug().
+		Int("register_count", len(allIds)).
+		Int("proof_bytes", len(proof)).
+		Dur("prove_and_reconstruct_duration", time.Since(start)).
+		Msg("payloadless proof generated")
+
 	return proof, nil
 }

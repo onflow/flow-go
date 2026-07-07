@@ -11,7 +11,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine/execution/computation"
-	"github.com/onflow/flow-go/engine/execution/computation/committer"
+	"github.com/onflow/flow-go/engine/execution/computation/computer"
 	"github.com/onflow/flow-go/engine/execution/computation/query"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/initialize"
@@ -97,10 +97,16 @@ func AssembleExecutableBlock(
 	}, nil
 }
 
-// NewComputeOnlyManager builds a [computation.Manager] configured for persistence-free re-execution
-// in compute-only mode: it uses a no-op view committer (so no trie is required and no state
-// commitment or proofs are produced) and an in-memory execution-data provider (so the execution-data
-// root is still computed by production code, but nothing durable is written).
+// NewComputeOnlyManager builds a [computation.Manager] configured for persistence-free re-execution.
+// The caller supplies the [computer.ViewCommitter]:
+//   - [committer.NewNoopViewCommitter] gives compute-only mode: no trie is required and no state
+//     commitment or proofs are produced.
+//   - [committer.NewPayloadlessLedgerViewCommitter] gives proof-generation mode: a payloadless
+//     ledger is committed to and reconstructed proofs are produced, exercising the exact production
+//     proof path (see openPayloadlessLedger).
+//
+// Either way an in-memory execution-data provider is used (so the execution-data root is still
+// computed by production code, but nothing durable is written).
 //
 // The manager reuses the production execution stack (`fvm.NewVirtualMachine`, the same FVM options as
 // the execution node and `verify_execution_result`, and `computation.New`), so future changes to
@@ -114,6 +120,7 @@ func NewComputeOnlyManager(
 	chainID flow.ChainID,
 	headers storage.Headers,
 	protoState protocol.State,
+	viewCommitter computer.ViewCommitter,
 	transactionFeesDisabled bool,
 	scheduledTransactionsEnabled bool,
 ) (*computation.Manager, error) {
@@ -151,7 +158,7 @@ func NewComputeOnlyManager(
 		me,
 		computation.NewProtocolStateWrapper(protoState),
 		vmCtx,
-		committer.NewNoopViewCommitter(),
+		viewCommitter,
 		execDataProvider,
 		computation.ComputationConfig{
 			QueryConfig:          query.NewDefaultConfig(),

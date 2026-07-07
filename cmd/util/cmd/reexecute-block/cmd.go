@@ -13,12 +13,25 @@ import (
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/engine/execution/computation"
+	"github.com/onflow/flow-go/engine/execution/computation/committer"
+	"github.com/onflow/flow-go/engine/execution/computation/computer"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage"
 	pebblestorage "github.com/onflow/flow-go/storage/pebble"
 	"github.com/onflow/flow-go/storage/store"
 )
+
+// committerModeNone is the default --committer value: compute-only re-execution with a no-op view
+// committer (no trie, no state commitment, no proofs).
+const committerModeNone = "none"
+
+// committerModePayloadless is the --committer value that enables proof-generation mode: a payloadless
+// ledger is opened over --triedir and the production payloadless view committer is used, so each
+// re-executed block runs the real [payloadless.ProveAndReconstruct] path. This is the benchmark
+// environment for the ProveAndReconstruct TODO(perf); per-collection proof timing is logged by the
+// committer at debug level (surfaced here regardless of the tool's global log level).
+const committerModePayloadless = "payloadless"
 
 // reexecStores bundles the read-only storage modules the re-execution loop needs. Some of them
 // (Commits, Events) are not part of [store.All] and are constructed directly.
@@ -33,6 +46,9 @@ type reexecStores struct {
 var (
 	flagDataDir                      string
 	flagRegisterDir                  string
+	flagTrieDir                      string
+	flagWALDir                       string
+	flagCommitter                    string
 	flagChain                        string
 	flagFromHeight                   uint64
 	flagToHeight                     uint64
@@ -49,6 +65,12 @@ var (
 // ComputeBlock and never invokes any persistence step: it computes results in memory and writes
 // nothing to the node's databases (no last-executed-height update, no results/chunk-data-packs/
 // events/receipts/registers). It is safe to run against a stopped node's data directory.
+//
+// Two committer modes are selectable via --committer:
+//   - "none" (default): compute-only mode. No trie is required and no proofs are produced.
+//   - "payloadless": proof-generation mode. A payloadless ledger is opened over --triedir and the
+//     production payloadless view committer generates reconstructed proofs, exercising the real
+//     [payloadless.ProveAndReconstruct] path. This is the benchmark environment for that function.
 var Cmd = &cobra.Command{
 	Use:   "reexecute-block",
 	Short: "Re-execute a historical block or range in memory, without persistence",
@@ -59,8 +81,16 @@ reuses the production computation layer (ComputeBlock). No persistence step is e
 node's databases are untouched. This is the compute-only mode from doc/re-execute-block.md, intended
 for benchmarking execution cost/time and for deterministic replay; it needs no reconstructed trie.
 
+With --committer=payloadless (and --triedir pointing at a payloadless V7 checkpoint/WAL directory),
+each block is additionally committed to an in-memory payloadless ledger and reconstructed proofs are
+generated, running the real ProveAndReconstruct path. Per-collection proof timing is logged. Opening
+the ledger takes an exclusive lock, so run against a stopped node. Pass --wal-dir <fresh dir> to open
+the WAL in a separate directory (the checkpoint/segments are symlinked in for replay) so the empty
+trailing segment, lock, and any WAL writes stay out of --triedir; delete --wal-dir after the run.
+
 With --verify, each re-executed block's events are checked against the events recorded for that block
-in the protocol database, confirming the re-execution is faithful.`,
+in the protocol database; in payloadless mode the re-executed end state is additionally checked
+against the recorded state commitment, confirming the re-execution is faithful.`,
 	RunE: runE,
 }
 
@@ -71,6 +101,19 @@ func init() {
 	Cmd.Flags().StringVar(&flagRegisterDir, "register-dir", "",
 		"directory containing the Pebble Storehouse register store")
 	_ = Cmd.MarkFlagRequired("register-dir")
+
+	Cmd.Flags().StringVar(&flagCommitter, "committer", committerModeNone,
+		"view committer to use: 'none' (compute-only, no proofs) or 'payloadless' (generate "+
+			"reconstructed proofs via the payloadless ledger; requires --triedir)")
+
+	Cmd.Flags().StringVar(&flagTrieDir, "triedir", "",
+		"directory containing the payloadless (V7) ledger checkpoints and WAL to replay from; "+
+			"required when --committer=payloadless. Read-only: its checkpoint/segments are only read")
+
+	Cmd.Flags().StringVar(&flagWALDir, "wal-dir", "",
+		"optional fresh directory where the WAL is opened during proof generation, so the empty "+
+			"trailing segment, lock, and any WAL writes stay out of --triedir (checkpoints/segments are "+
+			"symlinked in for replay). Delete it after the run. When empty, the WAL opens in --triedir")
 
 	Cmd.Flags().StringVar(&flagChain, "chain", "", "chain ID (e.g. flow-mainnet, flow-testnet)")
 	_ = Cmd.MarkFlagRequired("chain")
@@ -105,11 +148,20 @@ func runE(*cobra.Command, []string) error {
 		return fmt.Errorf("to-height %d is less than from-height %d", toHeight, flagFromHeight)
 	}
 
+	if flagCommitter != committerModeNone && flagCommitter != committerModePayloadless {
+		return fmt.Errorf("invalid --committer %q: must be %q or %q",
+			flagCommitter, committerModeNone, committerModePayloadless)
+	}
+	proofMode := flagCommitter == committerModePayloadless
+
 	chainID := flow.ChainID(flagChain)
 
 	logger.Info().
 		Str("datadir", flagDataDir).
 		Str("register-dir", flagRegisterDir).
+		Str("committer", flagCommitter).
+		Str("triedir", flagTrieDir).
+		Str("wal-dir", flagWALDir).
 		Str("chain", flagChain).
 		Uint64("from", flagFromHeight).
 		Uint64("to", toHeight).
@@ -153,9 +205,28 @@ func runE(*cobra.Command, []string) error {
 		Uint64("latest_height", registers.LatestHeight()).
 		Msg("opened register store")
 
-	// Build the compute-only computation manager (no committer, in-memory exec-data provider).
+	// Select the view committer. In 'none' mode we compute without proofs; in 'payloadless' mode we
+	// open a payloadless ledger over --triedir and use the production proof-generating committer.
+	var viewCommitter computer.ViewCommitter
+	if proofMode {
+		ledger, closeLedger, err := openPayloadlessLedger(logger, flagTrieDir, flagWALDir)
+		if err != nil {
+			return fmt.Errorf("could not open payloadless ledger: %w", err)
+		}
+		defer closeLedger()
+
+		logger.Info().
+			Uint64("register_first_height", registers.FirstHeight()).
+			Msg("opened payloadless ledger for proof generation")
+
+		viewCommitter = newPayloadlessCommitter(logger, ledger)
+	} else {
+		viewCommitter = committer.NewNoopViewCommitter()
+	}
+
+	// Build the persistence-free computation manager with the selected committer.
 	manager, err := NewComputeOnlyManager(
-		logger, chainID, storages.Headers, state,
+		logger, chainID, storages.Headers, state, viewCommitter,
 		flagTransactionFeesDisabled, flagScheduledTransactionsEnabled,
 	)
 	if err != nil {
@@ -165,7 +236,7 @@ func runE(*cobra.Command, []string) error {
 	ctx := context.Background()
 	mismatches := 0
 	for height := flagFromHeight; height <= toHeight; height++ {
-		mismatch, err := reExecuteHeight(ctx, logger, manager, stores, registers, height, flagVerify)
+		mismatch, err := reExecuteHeight(ctx, logger, manager, stores, registers, height, flagVerify, proofMode)
 		if err != nil {
 			return fmt.Errorf("could not re-execute height %d: %w", height, err)
 		}
@@ -188,6 +259,11 @@ func runE(*cobra.Command, []string) error {
 // reExecuteHeight re-executes the block at the given height and, when verify is set, compares its
 // events against the stored events. It returns whether a verification mismatch occurred.
 //
+// When proofMode is set the block was executed with the payloadless committer, so proofs are present:
+// the total proof size is logged, and the re-executed end state is checked against the state
+// commitment recorded for the block. An end-state mismatch is reported as a mismatch (like an events
+// mismatch). In compute-only mode the end state is the dummy start state and this check is skipped.
+//
 // No error returns are expected during normal operation.
 func reExecuteHeight(
 	ctx context.Context,
@@ -197,6 +273,7 @@ func reExecuteHeight(
 	registers RegisterGetter,
 	height uint64,
 	verify bool,
+	proofMode bool,
 ) (mismatch bool, err error) {
 	block, err := stores.blocks.ByHeight(height)
 	if err != nil {
@@ -254,6 +331,19 @@ func reExecuteHeight(
 	endState := result.CurrentEndState()
 	resultID := result.ExecutionReceipt.ExecutionResult.ID()
 
+	// In proof mode, total the reconstructed proof bytes across all chunks. Computed after the timed
+	// ComputeBlock call so it does not affect the reported execution duration.
+	totalProofBytes := 0
+	if proofMode {
+		chunkDataPacks, err := result.AllChunkDataPacks()
+		if err != nil {
+			return false, fmt.Errorf("could not get chunk data packs for block %s: %w", blockID, err)
+		}
+		for _, cdp := range chunkDataPacks {
+			totalProofBytes += len(cdp.Proof)
+		}
+	}
+
 	logger.Info().
 		Uint64("height", height).
 		Hex("block_id", blockID[:]).
@@ -262,6 +352,7 @@ func reExecuteHeight(
 		Int("failed_transactions", failedTxs).
 		Uint64("total_computation_used", totalComputation).
 		Int("events", len(events)).
+		Int("total_proof_bytes", totalProofBytes).
 		Hex("state_commitment", endState[:]).
 		Hex("result_id", resultID[:]).
 		Dur("duration", elapsed).
@@ -270,7 +361,54 @@ func reExecuteHeight(
 	if !verify {
 		return false, nil
 	}
+
+	// In proof mode the committed end state is meaningful, so cross-check it against the stored
+	// commitment for this block — a stronger faithfulness check than events alone.
+	if proofMode {
+		if stateMismatch := verifyEndState(logger, stores.commits, blockID, height, endState); stateMismatch {
+			return true, nil
+		}
+	}
+
 	return verifyEvents(logger, stores.events, blockID, height, result)
+}
+
+// verifyEndState compares the end state commitment produced by re-execution against the commitment
+// recorded for the block in the database. It returns whether the commitments did not match.
+//
+// No error returns are expected during normal operation.
+func verifyEndState(
+	logger zerolog.Logger,
+	commitsStore storage.Commits,
+	blockID flow.Identifier,
+	height uint64,
+	endState flow.StateCommitment,
+) (mismatch bool) {
+	storedCommit, err := commitsStore.ByBlockID(blockID)
+	if err != nil {
+		// The block was executed on this node, so its commitment is expected to be stored. Treat a
+		// missing commitment as a mismatch rather than failing the whole run.
+		logger.Error().Err(err).
+			Uint64("height", height).
+			Hex("block_id", blockID[:]).
+			Msg("state commitment mismatch: no stored commitment to compare against")
+		return true
+	}
+
+	if endState != storedCommit {
+		logger.Error().
+			Uint64("height", height).
+			Hex("computed_state_commitment", endState[:]).
+			Hex("stored_state_commitment", storedCommit[:]).
+			Msg("state commitment mismatch: re-execution did not reproduce the recorded end state")
+		return true
+	}
+
+	logger.Info().
+		Uint64("height", height).
+		Hex("state_commitment", endState[:]).
+		Msg("verified: re-executed end state matches the recorded commitment")
+	return false
 }
 
 // verifyEvents compares the events produced by re-execution against those recorded for the block in
