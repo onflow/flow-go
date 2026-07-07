@@ -6,6 +6,7 @@ package mock
 
 import (
 	"github.com/onflow/cadence/common"
+	"github.com/onflow/cadence/interpreter"
 	mock "github.com/stretchr/testify/mock"
 )
 
@@ -37,8 +38,8 @@ func (_m *AccountCreator) EXPECT() *AccountCreator_Expecter {
 }
 
 // CreateAccount provides a mock function for the type AccountCreator
-func (_mock *AccountCreator) CreateAccount(runtimePayer common.Address) (common.Address, error) {
-	ret := _mock.Called(runtimePayer)
+func (_mock *AccountCreator) CreateAccount(runtimePayer common.Address, invocationContext interpreter.InvocationContext) (common.Address, error) {
+	ret := _mock.Called(runtimePayer, invocationContext)
 
 	if len(ret) == 0 {
 		panic("no return value specified for CreateAccount")
@@ -46,18 +47,18 @@ func (_mock *AccountCreator) CreateAccount(runtimePayer common.Address) (common.
 
 	var r0 common.Address
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(common.Address) (common.Address, error)); ok {
-		return returnFunc(runtimePayer)
+	if returnFunc, ok := ret.Get(0).(func(common.Address, interpreter.InvocationContext) (common.Address, error)); ok {
+		return returnFunc(runtimePayer, invocationContext)
 	}
-	if returnFunc, ok := ret.Get(0).(func(common.Address) common.Address); ok {
-		r0 = returnFunc(runtimePayer)
+	if returnFunc, ok := ret.Get(0).(func(common.Address, interpreter.InvocationContext) common.Address); ok {
+		r0 = returnFunc(runtimePayer, invocationContext)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(common.Address)
 		}
 	}
-	if returnFunc, ok := ret.Get(1).(func(common.Address) error); ok {
-		r1 = returnFunc(runtimePayer)
+	if returnFunc, ok := ret.Get(1).(func(common.Address, interpreter.InvocationContext) error); ok {
+		r1 = returnFunc(runtimePayer, invocationContext)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -71,18 +72,24 @@ type AccountCreator_CreateAccount_Call struct {
 
 // CreateAccount is a helper method to define mock.On call
 //   - runtimePayer common.Address
-func (_e *AccountCreator_Expecter) CreateAccount(runtimePayer interface{}) *AccountCreator_CreateAccount_Call {
-	return &AccountCreator_CreateAccount_Call{Call: _e.mock.On("CreateAccount", runtimePayer)}
+//   - invocationContext interpreter.InvocationContext
+func (_e *AccountCreator_Expecter) CreateAccount(runtimePayer interface{}, invocationContext interface{}) *AccountCreator_CreateAccount_Call {
+	return &AccountCreator_CreateAccount_Call{Call: _e.mock.On("CreateAccount", runtimePayer, invocationContext)}
 }
 
-func (_c *AccountCreator_CreateAccount_Call) Run(run func(runtimePayer common.Address)) *AccountCreator_CreateAccount_Call {
+func (_c *AccountCreator_CreateAccount_Call) Run(run func(runtimePayer common.Address, invocationContext interpreter.InvocationContext)) *AccountCreator_CreateAccount_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 common.Address
 		if args[0] != nil {
 			arg0 = args[0].(common.Address)
 		}
+		var arg1 interpreter.InvocationContext
+		if args[1] != nil {
+			arg1 = args[1].(interpreter.InvocationContext)
+		}
 		run(
 			arg0,
+			arg1,
 		)
 	})
 	return _c
@@ -93,7 +100,7 @@ func (_c *AccountCreator_CreateAccount_Call) Return(address common.Address, err 
 	return _c
 }
 
-func (_c *AccountCreator_CreateAccount_Call) RunAndReturn(run func(runtimePayer common.Address) (common.Address, error)) *AccountCreator_CreateAccount_Call {
+func (_c *AccountCreator_CreateAccount_Call) RunAndReturn(run func(runtimePayer common.Address, invocationContext interpreter.InvocationContext) (common.Address, error)) *AccountCreator_CreateAccount_Call {
 	_c.Call.Return(run)
 	return _c
 }
