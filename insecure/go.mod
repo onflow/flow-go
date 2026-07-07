@@ -213,7 +213,6 @@ require (
 	github.com/multiformats/go-multistream v0.6.0 // indirect
 	github.com/multiformats/go-varint v0.0.7 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
-	github.com/olekukonko/tablewriter v0.0.5 // indirect
 	github.com/onflow/atree v0.16.1 // indirect
 	github.com/onflow/cadence v1.10.5 // indirect
 	github.com/onflow/fixed-point v0.1.1 // indirect
