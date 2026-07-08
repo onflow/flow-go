@@ -11,6 +11,8 @@ import (
 // CallTracker captures precompiled calls
 type CallTracker struct {
 	callsByAddress map[types.Address]*types.PrecompiledCalls
+	scheduledTx    bool
+	canceledTx     bool
 }
 
 // NewCallTracker  constructs a new CallTracker
@@ -62,6 +64,10 @@ func (ct *CallTracker) CaptureRun(address types.Address, input []byte, output []
 		Output:   output,
 		ErrorMsg: errMsg,
 	})
+	// record whether the `scheduleTransaction` precompile was used
+	selector, _ := precompiles.SplitFunctionSelector(input)
+	ct.scheduledTx = bytes.Equal(selector[:], precompiles.ScheduleTransactionFuncSig[:])
+	ct.canceledTx = bytes.Equal(selector[:], precompiles.CancelTransactionFuncSig[:])
 }
 
 // IsCalled returns true if any calls has been captured

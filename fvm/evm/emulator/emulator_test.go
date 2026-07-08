@@ -1143,7 +1143,7 @@ func TestCallingExtraPrecompiles(t *testing.T) {
 					require.NoError(t, err)
 				})
 
-				input := []byte{1, 2}
+				input := []byte{1, 2, 8, 9}
 				output := []byte{3, 4}
 				addr := testutils.RandomAddress(t)
 				capturedCall := &types.PrecompiledCalls{

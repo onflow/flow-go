@@ -699,10 +699,13 @@ func (proc *procedure) run(
 	txIndex := proc.config.BlockTxCountSoFar
 	// if pre-checks are passed, the exec result won't be nil
 	if execResult != nil {
+		res.From = msg.From
 		res.GasConsumed = execResult.UsedGas
 		res.MaxGasConsumed = execResult.MaxUsedGas
 		res.Index = uint16(txIndex)
 		res.CumulativeGasUsed = execResult.UsedGas + proc.config.BlockTotalGasUsedSoFar
+		res.ScheduledTransaction = proc.config.PCTracker.scheduledTx
+		res.CanceledTransaction = proc.config.PCTracker.canceledTx
 		res.PrecompiledCalls, err = proc.config.PCTracker.CapturedCalls()
 		if err != nil {
 			return nil, err

@@ -47,3 +47,11 @@ var FileSystemContractBytes, _ = hex.DecodeString(fileSystemContractBytesInHex)
 
 //go:embed file_system_abi.json
 var FileSystemContractABIJSON string
+
+//go:embed flow_transaction_scheduler_abi.json
+var FlowTransactionSchedulerABIJSON string
+
+//go:embed flow_transaction_scheduler_bytes.hex
+var flowTransactionSchedulerBytesInHex string
+
+var FlowTransactionSchedulerContractBytes, _ = hex.DecodeString(flowTransactionSchedulerBytesInHex)

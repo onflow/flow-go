@@ -7,7 +7,9 @@ import (
 	"fmt"
 	"math"
 	"math/big"
+	"regexp"
 	"testing"
+	"time"
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
@@ -37,6 +39,1095 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
+
+func TestProcessAndScheduleEVMTransaction(t *testing.T) {
+	t.Parallel()
+
+	chain := flow.Emulator.Chain()
+
+	sc := systemcontracts.SystemContractsForChain(chain.ChainID())
+	require.NotNil(t, sc.FlowTransactionScheduler.Address)
+	require.NotNil(t, sc.FlowTransactionScheduler.Name)
+	require.NotNil(t, sc.FlowTransactionSchedulerUtils.Address)
+	require.NotNil(t, sc.FlowTransactionSchedulerUtils.Name)
+
+	RunWithNewEnvironment(t,
+		chain, func(
+			ctx fvm.Context,
+			vm fvm.VM,
+			snapshot snapshot.SnapshotTree,
+			testContract *TestContract,
+			testAccount *EOATestAccount,
+		) {
+			// Deploy the `FlowEVMScheduler` Cadence contract
+			deployTx := []byte(
+				`
+					transaction(name: String, code: String) {
+						prepare(signer: auth(AddContract, Storage, Capabilities) &Account) {
+							signer.contracts.add(name: name, code: code.utf8)
+						}
+					}
+				`,
+			)
+
+			contractCode := stdlib.FlowEVMScheduler
+			contractCode = regexp.MustCompile(`"FlowToken"`).ReplaceAllString(contractCode, "FlowToken from 0x"+sc.FlowToken.Address.Hex())
+			contractCode = regexp.MustCompile(`"EVM"`).ReplaceAllString(contractCode, "EVM from 0x"+sc.EVMContract.Address.Hex())
+			contractCode = regexp.MustCompile(`"FlowTransactionScheduler"`).ReplaceAllString(contractCode, "FlowTransactionScheduler from 0x"+sc.FlowTransactionScheduler.Address.Hex())
+			contractCode = regexp.MustCompile(`"FlowTransactionSchedulerUtils"`).ReplaceAllString(contractCode, "FlowTransactionSchedulerUtils from 0x"+sc.FlowTransactionSchedulerUtils.Address.Hex())
+
+			txBody, err := flow.NewTransactionBodyBuilder().
+				SetScript(deployTx).
+				SetPayer(sc.FlowServiceAccount.Address).
+				AddAuthorizer(sc.FlowServiceAccount.Address).
+				AddArgument(json.MustEncode(cadence.String("FlowEVMScheduler"))).
+				AddArgument(json.MustEncode(cadence.String(contractCode))).
+				Build()
+			require.NoError(t, err)
+
+			tx := fvm.Transaction(txBody, 0)
+
+			state, output, err := vm.Run(ctx, tx, snapshot)
+			require.NoError(t, err)
+			require.NoError(t, output.Err)
+			require.NotEmpty(t, state.WriteSet)
+			snapshot = snapshot.Append(state)
+
+			coaAddress, err := types.COAAddressFromFlowCOACreatedEvent(sc.EVMContract.Address, output.Events[3])
+			require.NoError(t, err)
+
+			// Send some funds to the `schedulingFeesCoinbase` special address
+			code := []byte(fmt.Sprintf(
+				`
+					import EVM from %s
+					import FlowToken from %s
+
+					transaction() {
+						prepare(account: auth(BorrowValue) &Account) {
+							let schedulingFeesCoinbase = EVM.EVMAddress(
+								bytes: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0]
+							)
+							let admin = account.storage
+								.borrow<&FlowToken.Administrator>(from: /storage/flowTokenAdmin)!
+
+							let minter <- admin.createNewMinter(allowedAmount: 150.0)
+
+							schedulingFeesCoinbase.deposit(from: <-minter.mintTokens(amount: 50.0))
+
+							destroy minter
+						}
+					}
+				`,
+				sc.EVMContract.Address.HexWithPrefix(),
+				sc.FlowToken.Address.HexWithPrefix(),
+			))
+
+			flowTransactionSchedulerContract := GetFlowTransactionSchedulerContract(t)
+
+			txBody, err = flow.NewTransactionBodyBuilder().
+				SetScript(code).
+				SetPayer(sc.FlowServiceAccount.Address).
+				AddAuthorizer(sc.FlowServiceAccount.Address).
+				Build()
+			require.NoError(t, err)
+
+			tx = fvm.Transaction(txBody, 0)
+
+			state, output, err = vm.Run(ctx, tx, snapshot)
+			require.NoError(t, err)
+			require.NoError(t, output.Err)
+			require.NotEmpty(t, state.WriteSet)
+			snapshot = snapshot.Append(state)
+
+			// Deploy the `FlowTransactionScheduler` Solidity test helper contract
+			code = []byte(fmt.Sprintf(
+				`
+					import EVM from %s
+
+					transaction(code: [UInt8], coinbaseBytes: [UInt8; 20]){
+						prepare(account: &Account) {
+							let cadenceOwnedAccount <- EVM.createCadenceOwnedAccount()
+
+							let res = cadenceOwnedAccount.deploy(
+								code: code,
+								gasLimit: 5_000_000,
+								value: EVM.Balance(attoflow: 0)
+							)
+							assert(res.status == EVM.Status.successful, message: "unexpected status")
+							assert(res.errorCode == 0, message: "unexpected error code")
+							assert(res.deployedContract != nil, message: "failed deployed contract")
+							destroy <- cadenceOwnedAccount
+						}
+					}
+				`,
+				sc.EVMContract.Address.HexWithPrefix(),
+			))
+
+			coinbaseAddr := types.Address{1, 2, 3}
+			coinbaseBalance := getEVMAccountBalance(t, ctx, vm, snapshot, coinbaseAddr)
+			require.Zero(t, types.BalanceToBigInt(coinbaseBalance).Uint64())
+
+			bytecode := cadence.NewArray(
+				unittest.BytesToCdcUInt8(flowTransactionSchedulerContract.ByteCode),
+			).WithType(stdlib.EVMTransactionBytesCadenceType)
+
+			coinbase := cadence.NewArray(
+				unittest.BytesToCdcUInt8(coinbaseAddr.Bytes()),
+			).WithType(stdlib.EVMAddressBytesCadenceType)
+
+			txBody, err = flow.NewTransactionBodyBuilder().
+				SetScript(code).
+				SetPayer(sc.FlowServiceAccount.Address).
+				AddAuthorizer(sc.FlowServiceAccount.Address).
+				AddArgument(json.MustEncode(bytecode)).
+				AddArgument(json.MustEncode(coinbase)).
+				Build()
+			require.NoError(t, err)
+
+			tx = fvm.Transaction(txBody, 0)
+
+			state, output, err = vm.Run(ctx, tx, snapshot)
+			require.NoError(t, err)
+			require.NoError(t, output.Err)
+			require.NotEmpty(t, state.WriteSet)
+			snapshot = snapshot.Append(state)
+
+			require.Len(t, output.Events, 3)
+			txEvent := output.Events[2]
+			txEventPayload := TxEventToPayload(t, txEvent, sc.EVMContract.Address)
+			require.NoError(t, err)
+			require.NotNil(t, txEventPayload.ContractAddress)
+
+			ctrAddress := common.HexToAddress(txEventPayload.ContractAddress)
+			flowTransactionSchedulerContract.SetDeployedAt(types.NewAddress(ctrAddress))
+
+			// Call the `FlowEVMScheduler.scheduleTransaction` contract function
+			contractAddress := testContract.DeployedAt.ToCommon()
+			num := big.NewInt(42)
+			args := testContract.MakeCallData(t, "storeWithLog", num)
+			callData := flowTransactionSchedulerContract.MakeCallData(
+				t,
+				"scheduleTransaction",
+				big.NewInt(time.Now().Unix()+2),
+				uint8(1),
+				uint64(5_000),
+				contractAddress,
+				args,
+			)
+			innerTxBytes := testAccount.PrepareSignAndEncodeTx(t,
+				flowTransactionSchedulerContract.DeployedAt.ToCommon(),
+				callData,
+				big.NewInt(1_000_000_000_000_0),
+				uint64(1_000_000),
+				big.NewInt(1),
+			)
+
+			innerTx := cadence.NewArray(
+				unittest.BytesToCdcUInt8(innerTxBytes),
+			).WithType(stdlib.EVMTransactionBytesCadenceType)
+
+			coinbase = cadence.NewArray(
+				unittest.BytesToCdcUInt8(coinbaseAddr.Bytes()),
+			).WithType(stdlib.EVMAddressBytesCadenceType)
+
+			code = []byte(fmt.Sprintf(
+				`
+					import EVM from %s
+					import FlowEVMScheduler from %s
+
+					transaction(tx: [UInt8], coinbaseBytes: [UInt8; 20]){
+						prepare(account: &Account) {
+							let coinbase = EVM.EVMAddress(bytes: coinbaseBytes)
+							let res = EVM.run(tx: tx, coinbase: coinbase)
+
+							assert(res.status == EVM.Status.successful, message: "scheduleTransaction: \(res.errorMessage) code: \(res.errorCode)")
+							assert(res.errorCode == 0, message: "unexpected error code")
+							assert(res.deployedContract == nil, message: "unexpected deployed contract")
+						}
+					}
+				`,
+				sc.EVMContract.Address.HexWithPrefix(),
+				sc.EVMContract.Address.HexWithPrefix(),
+			))
+
+			txBody, err = flow.NewTransactionBodyBuilder().
+				SetScript(code).
+				SetPayer(sc.FlowServiceAccount.Address).
+				AddAuthorizer(sc.FlowServiceAccount.Address).
+				AddArgument(json.MustEncode(innerTx)).
+				AddArgument(json.MustEncode(coinbase)).
+				Build()
+			require.NoError(t, err)
+
+			tx = fvm.Transaction(txBody, 0)
+
+			state, output, err = vm.Run(ctx, tx, snapshot)
+			require.NoError(t, err)
+			require.NoError(t, output.Err)
+			require.NotEmpty(t, state.WriteSet)
+			snapshot = snapshot.Append(state)
+
+			require.Len(t, output.Events, 5)
+			txEvent = output.Events[3]
+			txEventPayload = TxEventToPayload(t, txEvent, sc.EVMContract.Address)
+			require.NoError(t, err)
+			require.Equal(
+				t,
+				[]byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
+				txEventPayload.ReturnedData,
+			)
+
+			code = []byte(fmt.Sprintf(
+				`
+					import EVM from %s
+
+					access(all)
+					fun main(data: [UInt8], to: String, gasLimit: UInt64): EVM.Result {
+						return EVM.dryCall(
+							from: EVM.EVMAddress(bytes: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 0, 0, 0, 0, 0, 0, 0, 0, 15]),
+							to: EVM.addressFromString(to),
+							data: data,
+							gasLimit: gasLimit,
+							value: EVM.Balance(attoflow: 0)
+						)
+					}
+				`,
+				sc.EVMContract.Address.HexWithPrefix(),
+			))
+
+			// Query the status of the scheduled transaction
+			to := flowTransactionSchedulerContract.DeployedAt.ToCommon()
+			toAddress, err := cadence.NewString(to.Hex())
+			require.NoError(t, err)
+			callData = flowTransactionSchedulerContract.MakeCallData(
+				t,
+				"getTransactionStatus",
+				uint64(1),
+			)
+
+			script := fvm.Script(code).WithArguments(
+				json.MustEncode(
+					cadence.NewArray(
+						unittest.BytesToCdcUInt8(callData),
+					).WithType(stdlib.EVMTransactionBytesCadenceType),
+				),
+				json.MustEncode(toAddress),
+				json.MustEncode(cadence.NewUInt64(55_000)),
+			)
+			_, output, err = vm.Run(ctx, script, snapshot)
+			require.NoError(t, err)
+			require.NoError(t, output.Err)
+			require.Len(t, output.Events, 0)
+
+			result, err := impl.ResultSummaryFromEVMResultValue(output.Value)
+			require.NoError(t, err)
+			require.Equal(
+				t,
+				[]byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
+				[]byte(result.ReturnedData),
+			)
+
+			// Process and execute the previously scheduled transaction
+			code = []byte(fmt.Sprintf(
+				`
+					import FlowTransactionScheduler from %s
+
+					// Execute a scheduled transaction by the FlowTransactionScheduler contract.
+					// This will be called by the FVM and the transaction will be executed by their ID.
+					transaction(id: UInt64) {
+						prepare(serviceAccount: auth(BorrowValue) &Account) {
+							let scheduler = serviceAccount.storage.borrow<auth(FlowTransactionScheduler.Execute,FlowTransactionScheduler.Process) &FlowTransactionScheduler.SharedScheduler>(from: FlowTransactionScheduler.storagePath)
+								?? panic("Could not borrow FlowTransactionScheduler")
+
+							scheduler.process()
+							scheduler.executeTransaction(id: id)
+						}
+					}
+				`,
+				sc.FlowTransactionScheduler.Address.HexWithPrefix(),
+			))
+
+			txBody, err = flow.NewTransactionBodyBuilder().
+				SetScript(code).
+				SetPayer(sc.FlowServiceAccount.Address).
+				AddAuthorizer(sc.FlowServiceAccount.Address).
+				AddArgument(json.MustEncode(cadence.NewUInt64(1))).
+				Build()
+			require.NoError(t, err)
+
+			tx = fvm.Transaction(txBody, 0)
+
+			ctx.BlockHeader.Timestamp = ctx.BlockHeader.Timestamp + 5000
+			state, output, err = vm.Run(ctx, tx, snapshot)
+			require.NoError(t, err)
+			require.NoError(t, output.Err)
+			require.Len(t, output.Events, 3)
+			require.NotEmpty(t, state.WriteSet)
+
+			// Make sure the scheduled EVM contract call was executed
+			txEvent = output.Events[2]
+			txEventPayload = TxEventToPayload(t, txEvent, sc.EVMContract.Address)
+			require.Greater(t, len(txEventPayload.Logs), 0)
+
+			gethLogs := []*gethTypes.Log{}
+			err = rlp.Decode(bytes.NewReader(txEventPayload.Logs), &gethLogs)
+			require.NoError(t, err)
+			require.Len(t, gethLogs, 1)
+
+			newStoreLog := gethLogs[0]
+			require.Equal(t, testContract.DeployedAt.ToCommon(), newStoreLog.Address)
+			require.Equal(t, common.BytesToHash(coaAddress[:]), newStoreLog.Topics[1])
+			require.Equal(t, common.BytesToHash(num.Bytes()), newStoreLog.Topics[2])
+		},
+	)
+}
+
+func TestCancelScheduledEVMTransaction(t *testing.T) {
+	t.Parallel()
+
+	chain := flow.Emulator.Chain()
+
+	sc := systemcontracts.SystemContractsForChain(chain.ChainID())
+	require.NotNil(t, sc.FlowTransactionScheduler.Address)
+	require.NotNil(t, sc.FlowTransactionScheduler.Name)
+	require.NotNil(t, sc.FlowTransactionSchedulerUtils.Address)
+	require.NotNil(t, sc.FlowTransactionSchedulerUtils.Name)
+
+	RunWithNewEnvironment(t,
+		chain, func(
+			ctx fvm.Context,
+			vm fvm.VM,
+			snapshot snapshot.SnapshotTree,
+			testContract *TestContract,
+			testAccount *EOATestAccount,
+		) {
+			// Deploy the `FlowEVMScheduler` Cadence contract
+			deployTx := []byte(
+				`
+					transaction(name: String, code: String) {
+						prepare(signer: auth(AddContract, Storage, Capabilities) &Account) {
+							signer.contracts.add(name: name, code: code.utf8)
+						}
+					}
+				`,
+			)
+
+			contractCode := stdlib.FlowEVMScheduler
+			contractCode = regexp.MustCompile(`"FlowToken"`).ReplaceAllString(contractCode, "FlowToken from 0x"+sc.FlowToken.Address.Hex())
+			contractCode = regexp.MustCompile(`"EVM"`).ReplaceAllString(contractCode, "EVM from 0x"+sc.EVMContract.Address.Hex())
+			contractCode = regexp.MustCompile(`"FlowTransactionScheduler"`).ReplaceAllString(contractCode, "FlowTransactionScheduler from 0x"+sc.FlowTransactionScheduler.Address.Hex())
+			contractCode = regexp.MustCompile(`"FlowTransactionSchedulerUtils"`).ReplaceAllString(contractCode, "FlowTransactionSchedulerUtils from 0x"+sc.FlowTransactionSchedulerUtils.Address.Hex())
+
+			txBody, err := flow.NewTransactionBodyBuilder().
+				SetScript(deployTx).
+				SetPayer(sc.FlowServiceAccount.Address).
+				AddAuthorizer(sc.FlowServiceAccount.Address).
+				AddArgument(json.MustEncode(cadence.String("FlowEVMScheduler"))).
+				AddArgument(json.MustEncode(cadence.String(contractCode))).
+				Build()
+			require.NoError(t, err)
+
+			tx := fvm.Transaction(txBody, 0)
+
+			state, output, err := vm.Run(ctx, tx, snapshot)
+			require.NoError(t, err)
+			require.NoError(t, output.Err)
+			require.NotEmpty(t, state.WriteSet)
+			snapshot = snapshot.Append(state)
+
+			// Send some funds to the `schedulingFeesCoinbase` special address
+			code := []byte(fmt.Sprintf(
+				`
+					import EVM from %s
+					import FlowToken from %s
+
+					transaction() {
+						prepare(account: auth(BorrowValue) &Account) {
+							let schedulingFeesCoinbase = EVM.EVMAddress(
+								bytes: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0]
+							)
+							let admin = account.storage
+								.borrow<&FlowToken.Administrator>(from: /storage/flowTokenAdmin)!
+
+							let minter <- admin.createNewMinter(allowedAmount: 150.0)
+
+							schedulingFeesCoinbase.deposit(from: <-minter.mintTokens(amount: 50.0))
+
+							destroy minter
+						}
+					}
+				`,
+				sc.EVMContract.Address.HexWithPrefix(),
+				sc.FlowToken.Address.HexWithPrefix(),
+			))
+
+			flowTransactionSchedulerContract := GetFlowTransactionSchedulerContract(t)
+
+			txBody, err = flow.NewTransactionBodyBuilder().
+				SetScript(code).
+				SetPayer(sc.FlowServiceAccount.Address).
+				AddAuthorizer(sc.FlowServiceAccount.Address).
+				Build()
+			require.NoError(t, err)
+
+			tx = fvm.Transaction(txBody, 0)
+
+			state, output, err = vm.Run(ctx, tx, snapshot)
+			require.NoError(t, err)
+			require.NoError(t, output.Err)
+			require.NotEmpty(t, state.WriteSet)
+			snapshot = snapshot.Append(state)
+
+			// Deploy the `FlowTransactionScheduler` Solidity contract
+			code = []byte(fmt.Sprintf(
+				`
+					import EVM from %s
+
+					transaction(code: [UInt8], coinbaseBytes: [UInt8; 20]){
+						prepare(account: &Account) {
+							let cadenceOwnedAccount <- EVM.createCadenceOwnedAccount()
+
+							let res = cadenceOwnedAccount.deploy(
+								code: code,
+								gasLimit: 5_000_000,
+								value: EVM.Balance(attoflow: 0)
+							)
+							assert(res.status == EVM.Status.successful, message: "unexpected status")
+							assert(res.errorCode == 0, message: "unexpected error code")
+							assert(res.deployedContract != nil, message: "failed deployed contract")
+							destroy <- cadenceOwnedAccount
+						}
+					}
+				`,
+				sc.EVMContract.Address.HexWithPrefix(),
+			))
+
+			coinbaseAddr := types.Address{1, 2, 3}
+			coinbaseBalance := getEVMAccountBalance(t, ctx, vm, snapshot, coinbaseAddr)
+			require.Zero(t, types.BalanceToBigInt(coinbaseBalance).Uint64())
+
+			bytecode := cadence.NewArray(
+				unittest.BytesToCdcUInt8(flowTransactionSchedulerContract.ByteCode),
+			).WithType(stdlib.EVMTransactionBytesCadenceType)
+
+			coinbase := cadence.NewArray(
+				unittest.BytesToCdcUInt8(coinbaseAddr.Bytes()),
+			).WithType(stdlib.EVMAddressBytesCadenceType)
+
+			txBody, err = flow.NewTransactionBodyBuilder().
+				SetScript(code).
+				SetPayer(sc.FlowServiceAccount.Address).
+				AddAuthorizer(sc.FlowServiceAccount.Address).
+				AddArgument(json.MustEncode(bytecode)).
+				AddArgument(json.MustEncode(coinbase)).
+				Build()
+			require.NoError(t, err)
+
+			tx = fvm.Transaction(txBody, 0)
+
+			state, output, err = vm.Run(ctx, tx, snapshot)
+			require.NoError(t, err)
+			require.NoError(t, output.Err)
+			require.NotEmpty(t, state.WriteSet)
+			snapshot = snapshot.Append(state)
+
+			require.Len(t, output.Events, 3)
+			txEvent := output.Events[2]
+			txEventPayload := TxEventToPayload(t, txEvent, sc.EVMContract.Address)
+			require.NoError(t, err)
+			require.NotNil(t, txEventPayload.ContractAddress)
+
+			ctrAddress := common.HexToAddress(txEventPayload.ContractAddress)
+			flowTransactionSchedulerContract.SetDeployedAt(types.NewAddress(ctrAddress))
+
+			// Call the `FlowEVMScheduler.scheduleTransaction` contract function
+			contractAddress := testContract.DeployedAt.ToCommon()
+			num := big.NewInt(42)
+			args := testContract.MakeCallData(t, "storeWithLog", num)
+			callData := flowTransactionSchedulerContract.MakeCallData(
+				t,
+				"scheduleTransaction",
+				big.NewInt(time.Now().Unix()+2),
+				uint8(1),
+				uint64(5_000),
+				contractAddress,
+				args,
+			)
+			innerTxBytes := testAccount.PrepareSignAndEncodeTx(t,
+				flowTransactionSchedulerContract.DeployedAt.ToCommon(),
+				callData,
+				big.NewInt(1_000_000_000_000_0),
+				uint64(1_000_000),
+				big.NewInt(1),
+			)
+
+			innerTx := cadence.NewArray(
+				unittest.BytesToCdcUInt8(innerTxBytes),
+			).WithType(stdlib.EVMTransactionBytesCadenceType)
+
+			coinbase = cadence.NewArray(
+				unittest.BytesToCdcUInt8(coinbaseAddr.Bytes()),
+			).WithType(stdlib.EVMAddressBytesCadenceType)
+
+			code = []byte(fmt.Sprintf(
+				`
+					import EVM from %s
+					import FlowEVMScheduler from %s
+
+					transaction(tx: [UInt8], coinbaseBytes: [UInt8; 20]){
+						prepare(account: &Account) {
+							let coinbase = EVM.EVMAddress(bytes: coinbaseBytes)
+							let res = EVM.run(tx: tx, coinbase: coinbase)
+
+							assert(res.status == EVM.Status.successful, message: "scheduleTransaction: \(res.errorMessage) code: \(res.errorCode)")
+							assert(res.errorCode == 0, message: "unexpected error code")
+							assert(res.deployedContract == nil, message: "unexpected deployed contract")
+						}
+					}
+				`,
+				sc.EVMContract.Address.HexWithPrefix(),
+				sc.EVMContract.Address.HexWithPrefix(),
+			))
+
+			txBody, err = flow.NewTransactionBodyBuilder().
+				SetScript(code).
+				SetPayer(sc.FlowServiceAccount.Address).
+				AddAuthorizer(sc.FlowServiceAccount.Address).
+				AddArgument(json.MustEncode(innerTx)).
+				AddArgument(json.MustEncode(coinbase)).
+				Build()
+			require.NoError(t, err)
+
+			tx = fvm.Transaction(txBody, 0)
+
+			state, output, err = vm.Run(ctx, tx, snapshot)
+			require.NoError(t, err)
+			require.NoError(t, output.Err)
+			require.NotEmpty(t, state.WriteSet)
+			snapshot = snapshot.Append(state)
+
+			require.Len(t, output.Events, 5)
+			txEvent = output.Events[3]
+			txEventPayload = TxEventToPayload(t, txEvent, sc.EVMContract.Address)
+			require.NoError(t, err)
+			require.Equal(
+				t,
+				[]byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
+				txEventPayload.ReturnedData,
+			)
+
+			code = []byte(fmt.Sprintf(
+				`
+					import EVM from %s
+
+					access(all)
+					fun main(data: [UInt8], to: String, gasLimit: UInt64): EVM.Result {
+						return EVM.dryCall(
+							from: EVM.EVMAddress(bytes: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 0, 0, 0, 0, 0, 0, 0, 0, 15]),
+							to: EVM.addressFromString(to),
+							data: data,
+							gasLimit: gasLimit,
+							value: EVM.Balance(attoflow: 0)
+						)
+					}
+				`,
+				sc.EVMContract.Address.HexWithPrefix(),
+			))
+
+			// Query the status of the scheduled transaction
+			to := flowTransactionSchedulerContract.DeployedAt.ToCommon()
+			toAddress, err := cadence.NewString(to.Hex())
+			require.NoError(t, err)
+			callData = flowTransactionSchedulerContract.MakeCallData(
+				t,
+				"getTransactionStatus",
+				uint64(1),
+			)
+
+			script := fvm.Script(code).WithArguments(
+				json.MustEncode(
+					cadence.NewArray(
+						unittest.BytesToCdcUInt8(callData),
+					).WithType(stdlib.EVMTransactionBytesCadenceType),
+				),
+				json.MustEncode(toAddress),
+				json.MustEncode(cadence.NewUInt64(55_000)),
+			)
+			_, output, err = vm.Run(ctx, script, snapshot)
+			require.NoError(t, err)
+			require.NoError(t, output.Err)
+			require.Len(t, output.Events, 0)
+
+			result, err := impl.ResultSummaryFromEVMResultValue(output.Value)
+			require.NoError(t, err)
+			require.Equal(
+				t,
+				[]byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
+				[]byte(result.ReturnedData),
+			)
+
+			// Call the `FlowEVMScheduler.cancelTransaction` contract function
+			callData = flowTransactionSchedulerContract.MakeCallData(t, "cancelTransaction", uint64(1))
+			innerTxBytes = testAccount.PrepareSignAndEncodeTx(t,
+				flowTransactionSchedulerContract.DeployedAt.ToCommon(),
+				callData,
+				big.NewInt(0),
+				uint64(1_000_000),
+				big.NewInt(1),
+			)
+
+			innerTx = cadence.NewArray(
+				unittest.BytesToCdcUInt8(innerTxBytes),
+			).WithType(stdlib.EVMTransactionBytesCadenceType)
+
+			coinbase = cadence.NewArray(
+				unittest.BytesToCdcUInt8(coinbaseAddr.Bytes()),
+			).WithType(stdlib.EVMAddressBytesCadenceType)
+
+			code = []byte(fmt.Sprintf(
+				`
+					import EVM from %s
+					import FlowEVMScheduler from %s
+
+					transaction(tx: [UInt8], coinbaseBytes: [UInt8; 20]){
+						prepare(account: &Account) {
+							let coinbase = EVM.EVMAddress(bytes: coinbaseBytes)
+							let res = EVM.run(tx: tx, coinbase: coinbase)
+
+							assert(res.status == EVM.Status.successful, message: "cancelTransaction: \(res.errorMessage) code: \(res.errorCode)")
+							assert(res.errorCode == 0, message: "unexpected error code")
+							assert(res.deployedContract == nil, message: "unexpected deployed contract")
+						}
+					}
+				`,
+				sc.EVMContract.Address.HexWithPrefix(),
+				sc.EVMContract.Address.HexWithPrefix(),
+			))
+
+			txBody, err = flow.NewTransactionBodyBuilder().
+				SetScript(code).
+				SetPayer(sc.FlowServiceAccount.Address).
+				AddAuthorizer(sc.FlowServiceAccount.Address).
+				AddArgument(json.MustEncode(innerTx)).
+				AddArgument(json.MustEncode(coinbase)).
+				Build()
+			require.NoError(t, err)
+
+			tx = fvm.Transaction(txBody, 0)
+
+			state, output, err = vm.Run(ctx, tx, snapshot)
+			require.NoError(t, err)
+			require.NoError(t, output.Err)
+			require.NotEmpty(t, state.WriteSet)
+			snapshot = snapshot.Append(state)
+
+			require.Len(t, output.Events, 12)
+			evt := output.Events[6]
+			require.Equal(
+				t,
+				"A.f8d6e0586b0a20c7.FlowTransactionScheduler.Canceled",
+				string(evt.Type),
+			)
+			require.Equal(
+				t,
+				"A.f8d6e0586b0a20c7.FlowEVMScheduler.TransactionCanceled",
+				string(output.Events[9].Type),
+			)
+
+			code = []byte(fmt.Sprintf(
+				`
+					import EVM from %s
+
+					access(all)
+					fun main(data: [UInt8], to: String, gasLimit: UInt64): EVM.Result {
+						return EVM.dryCall(
+							from: EVM.EVMAddress(bytes: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 0, 0, 0, 0, 0, 0, 0, 0, 15]),
+							to: EVM.addressFromString(to),
+							data: data,
+							gasLimit: gasLimit,
+							value: EVM.Balance(attoflow: 0)
+						)
+					}
+				`,
+				sc.EVMContract.Address.HexWithPrefix(),
+			))
+
+			to = flowTransactionSchedulerContract.DeployedAt.ToCommon()
+			toAddress, err = cadence.NewString(to.Hex())
+			require.NoError(t, err)
+			callData = flowTransactionSchedulerContract.MakeCallData(
+				t,
+				"getTransactionStatus",
+				uint64(1),
+			)
+
+			script = fvm.Script(code).WithArguments(
+				json.MustEncode(
+					cadence.NewArray(
+						unittest.BytesToCdcUInt8(callData),
+					).WithType(stdlib.EVMTransactionBytesCadenceType),
+				),
+				json.MustEncode(toAddress),
+				json.MustEncode(cadence.NewUInt64(55_000)),
+			)
+			_, output, err = vm.Run(ctx, script, snapshot)
+			require.NoError(t, err)
+			require.NoError(t, output.Err)
+			require.Len(t, output.Events, 0)
+
+			result, err = impl.ResultSummaryFromEVMResultValue(output.Value)
+			require.NoError(t, err)
+			require.Equal(
+				t,
+				[]byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+				[]byte(result.ReturnedData),
+			)
+		},
+	)
+}
+
+func TestEstimateEVMSchedulingFees(t *testing.T) {
+	t.Parallel()
+
+	chain := flow.Emulator.Chain()
+
+	sc := systemcontracts.SystemContractsForChain(chain.ChainID())
+	require.NotNil(t, sc.FlowTransactionScheduler.Address)
+	require.NotNil(t, sc.FlowTransactionScheduler.Name)
+	require.NotNil(t, sc.FlowTransactionSchedulerUtils.Address)
+	require.NotNil(t, sc.FlowTransactionSchedulerUtils.Name)
+
+	RunWithNewEnvironment(t,
+		chain, func(
+			ctx fvm.Context,
+			vm fvm.VM,
+			snapshot snapshot.SnapshotTree,
+			testContract *TestContract,
+			testAccount *EOATestAccount,
+		) {
+			// Deploy the `FlowEVMScheduler` Cadence contract
+			deployTx := []byte(
+				`
+					transaction(name: String, code: String) {
+						prepare(signer: auth(AddContract, Storage, Capabilities) &Account) {
+							signer.contracts.add(name: name, code: code.utf8)
+						}
+					}
+				`,
+			)
+
+			contractCode := stdlib.FlowEVMScheduler
+			contractCode = regexp.MustCompile(`"FlowToken"`).ReplaceAllString(contractCode, "FlowToken from 0x"+sc.FlowToken.Address.Hex())
+			contractCode = regexp.MustCompile(`"EVM"`).ReplaceAllString(contractCode, "EVM from 0x"+sc.EVMContract.Address.Hex())
+			contractCode = regexp.MustCompile(`"FlowTransactionScheduler"`).ReplaceAllString(contractCode, "FlowTransactionScheduler from 0x"+sc.FlowTransactionScheduler.Address.Hex())
+			contractCode = regexp.MustCompile(`"FlowTransactionSchedulerUtils"`).ReplaceAllString(contractCode, "FlowTransactionSchedulerUtils from 0x"+sc.FlowTransactionSchedulerUtils.Address.Hex())
+
+			txBody, err := flow.NewTransactionBodyBuilder().
+				SetScript(deployTx).
+				SetPayer(sc.FlowServiceAccount.Address).
+				AddAuthorizer(sc.FlowServiceAccount.Address).
+				AddArgument(json.MustEncode(cadence.String("FlowEVMScheduler"))).
+				AddArgument(json.MustEncode(cadence.String(contractCode))).
+				Build()
+			require.NoError(t, err)
+
+			tx := fvm.Transaction(txBody, 0)
+
+			state, output, err := vm.Run(ctx, tx, snapshot)
+			require.NoError(t, err)
+			require.NoError(t, output.Err)
+			require.NotEmpty(t, state.WriteSet)
+			snapshot = snapshot.Append(state)
+
+			// Send some funds to the `schedulingFeesCoinbase` special address
+			code := []byte(fmt.Sprintf(
+				`
+					import EVM from %s
+					import FlowToken from %s
+
+					transaction() {
+						prepare(account: auth(BorrowValue) &Account) {
+							let schedulingFeesCoinbase = EVM.EVMAddress(
+								bytes: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0]
+							)
+							let admin = account.storage
+								.borrow<&FlowToken.Administrator>(from: /storage/flowTokenAdmin)!
+
+							let minter <- admin.createNewMinter(allowedAmount: 150.0)
+
+							schedulingFeesCoinbase.deposit(from: <-minter.mintTokens(amount: 50.0))
+
+							destroy minter
+						}
+					}
+				`,
+				sc.EVMContract.Address.HexWithPrefix(),
+				sc.FlowToken.Address.HexWithPrefix(),
+			))
+
+			flowTransactionSchedulerContract := GetFlowTransactionSchedulerContract(t)
+
+			txBody, err = flow.NewTransactionBodyBuilder().
+				SetScript(code).
+				SetPayer(sc.FlowServiceAccount.Address).
+				AddAuthorizer(sc.FlowServiceAccount.Address).
+				Build()
+			require.NoError(t, err)
+
+			tx = fvm.Transaction(txBody, 0)
+
+			state, output, err = vm.Run(ctx, tx, snapshot)
+			require.NoError(t, err)
+			require.NoError(t, output.Err)
+			require.NotEmpty(t, state.WriteSet)
+			snapshot = snapshot.Append(state)
+
+			// Deploy the `FlowTransactionScheduler` Solidity contract
+			code = []byte(fmt.Sprintf(
+				`
+					import EVM from %s
+
+					transaction(code: [UInt8], coinbaseBytes: [UInt8; 20]){
+						prepare(account: &Account) {
+							let cadenceOwnedAccount <- EVM.createCadenceOwnedAccount()
+
+							let res = cadenceOwnedAccount.deploy(
+								code: code,
+								gasLimit: 5_000_000,
+								value: EVM.Balance(attoflow: 0)
+							)
+							assert(res.status == EVM.Status.successful, message: "unexpected status")
+							assert(res.errorCode == 0, message: "unexpected error code")
+							assert(res.deployedContract != nil, message: "failed deployed contract")
+							destroy <- cadenceOwnedAccount
+						}
+					}
+				`,
+				sc.EVMContract.Address.HexWithPrefix(),
+			))
+
+			coinbaseAddr := types.Address{1, 2, 3}
+			coinbaseBalance := getEVMAccountBalance(t, ctx, vm, snapshot, coinbaseAddr)
+			require.Zero(t, types.BalanceToBigInt(coinbaseBalance).Uint64())
+
+			bytecode := cadence.NewArray(
+				unittest.BytesToCdcUInt8(flowTransactionSchedulerContract.ByteCode),
+			).WithType(stdlib.EVMTransactionBytesCadenceType)
+
+			coinbase := cadence.NewArray(
+				unittest.BytesToCdcUInt8(coinbaseAddr.Bytes()),
+			).WithType(stdlib.EVMAddressBytesCadenceType)
+
+			txBody, err = flow.NewTransactionBodyBuilder().
+				SetScript(code).
+				SetPayer(sc.FlowServiceAccount.Address).
+				AddAuthorizer(sc.FlowServiceAccount.Address).
+				AddArgument(json.MustEncode(bytecode)).
+				AddArgument(json.MustEncode(coinbase)).
+				Build()
+			require.NoError(t, err)
+
+			tx = fvm.Transaction(txBody, 0)
+
+			state, output, err = vm.Run(ctx, tx, snapshot)
+			require.NoError(t, err)
+			require.NoError(t, output.Err)
+			require.NotEmpty(t, state.WriteSet)
+			snapshot = snapshot.Append(state)
+
+			require.Len(t, output.Events, 3)
+			txEvent := output.Events[2]
+			txEventPayload := TxEventToPayload(t, txEvent, sc.EVMContract.Address)
+			require.NoError(t, err)
+			require.NotNil(t, txEventPayload.ContractAddress)
+
+			ctrAddress := common.HexToAddress(txEventPayload.ContractAddress)
+			flowTransactionSchedulerContract.SetDeployedAt(types.NewAddress(ctrAddress))
+
+			// Call the `FlowEVMScheduler.scheduleTransaction` contract function
+			contractAddress := testContract.DeployedAt.ToCommon()
+			num := big.NewInt(42)
+			args := testContract.MakeCallData(t, "storeWithLog", num)
+			callData := flowTransactionSchedulerContract.MakeCallData(
+				t,
+				"scheduleTransaction",
+				big.NewInt(time.Now().Unix()+2),
+				uint8(1),
+				uint64(5_000),
+				contractAddress,
+				args,
+			)
+			innerTxBytes := testAccount.PrepareSignAndEncodeTx(t,
+				flowTransactionSchedulerContract.DeployedAt.ToCommon(),
+				callData,
+				big.NewInt(1_000_000_000_000_0),
+				uint64(1_000_000),
+				big.NewInt(1),
+			)
+
+			innerTx := cadence.NewArray(
+				unittest.BytesToCdcUInt8(innerTxBytes),
+			).WithType(stdlib.EVMTransactionBytesCadenceType)
+
+			coinbase = cadence.NewArray(
+				unittest.BytesToCdcUInt8(coinbaseAddr.Bytes()),
+			).WithType(stdlib.EVMAddressBytesCadenceType)
+
+			code = []byte(fmt.Sprintf(
+				`
+					import EVM from %s
+					import FlowEVMScheduler from %s
+
+					transaction(tx: [UInt8], coinbaseBytes: [UInt8; 20]){
+						prepare(account: &Account) {
+							let coinbase = EVM.EVMAddress(bytes: coinbaseBytes)
+							let res = EVM.run(tx: tx, coinbase: coinbase)
+
+							assert(res.status == EVM.Status.successful, message: "scheduleTransaction: \(res.errorMessage) code: \(res.errorCode)")
+							assert(res.errorCode == 0, message: "unexpected error code")
+							assert(res.deployedContract == nil, message: "unexpected deployed contract")
+						}
+					}
+				`,
+				sc.EVMContract.Address.HexWithPrefix(),
+				sc.EVMContract.Address.HexWithPrefix(),
+			))
+
+			txBody, err = flow.NewTransactionBodyBuilder().
+				SetScript(code).
+				SetPayer(sc.FlowServiceAccount.Address).
+				AddAuthorizer(sc.FlowServiceAccount.Address).
+				AddArgument(json.MustEncode(innerTx)).
+				AddArgument(json.MustEncode(coinbase)).
+				Build()
+			require.NoError(t, err)
+
+			tx = fvm.Transaction(txBody, 0)
+
+			state, output, err = vm.Run(ctx, tx, snapshot)
+			require.NoError(t, err)
+			require.NoError(t, output.Err)
+			require.NotEmpty(t, state.WriteSet)
+			snapshot = snapshot.Append(state)
+
+			require.Len(t, output.Events, 5)
+			txEvent = output.Events[3]
+			txEventPayload = TxEventToPayload(t, txEvent, sc.EVMContract.Address)
+			require.NoError(t, err)
+			require.Equal(
+				t,
+				[]byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
+				txEventPayload.ReturnedData,
+			)
+
+			code = []byte(fmt.Sprintf(
+				`
+					import EVM from %s
+
+					access(all)
+					fun main(data: [UInt8], to: String, gasLimit: UInt64): EVM.Result {
+						return EVM.dryCall(
+							from: EVM.EVMAddress(bytes: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 0, 0, 0, 0, 0, 0, 0, 0, 15]),
+							to: EVM.addressFromString(to),
+							data: data,
+							gasLimit: gasLimit,
+							value: EVM.Balance(attoflow: 0)
+						)
+					}
+				`,
+				sc.EVMContract.Address.HexWithPrefix(),
+			))
+
+			// Query the status of the scheduled transaction
+			to := flowTransactionSchedulerContract.DeployedAt.ToCommon()
+			toAddress, err := cadence.NewString(to.Hex())
+			require.NoError(t, err)
+			callData = flowTransactionSchedulerContract.MakeCallData(
+				t,
+				"getTransactionStatus",
+				uint64(1),
+			)
+
+			script := fvm.Script(code).WithArguments(
+				json.MustEncode(
+					cadence.NewArray(
+						unittest.BytesToCdcUInt8(callData),
+					).WithType(stdlib.EVMTransactionBytesCadenceType),
+				),
+				json.MustEncode(toAddress),
+				json.MustEncode(cadence.NewUInt64(55_000)),
+			)
+			_, output, err = vm.Run(ctx, script, snapshot)
+			require.NoError(t, err)
+			require.NoError(t, output.Err)
+			require.Len(t, output.Events, 0)
+
+			result, err := impl.ResultSummaryFromEVMResultValue(output.Value)
+			require.NoError(t, err)
+			require.Equal(
+				t,
+				[]byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
+				[]byte(result.ReturnedData),
+			)
+
+			code = []byte(fmt.Sprintf(
+				`
+					import EVM from %s
+
+					access(all)
+					fun main(data: [UInt8], to: String, gasLimit: UInt64): EVM.Result {
+						return EVM.dryCall(
+							from: EVM.EVMAddress(bytes: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 0, 0, 0, 0, 0, 0, 0, 0, 15]),
+							to: EVM.addressFromString(to),
+							data: data,
+							gasLimit: gasLimit,
+							value: EVM.Balance(attoflow: 0)
+						)
+					}
+				`,
+				sc.EVMContract.Address.HexWithPrefix(),
+			))
+
+			// Estimate the fees for scheduling a transaction with the given payload
+			to = flowTransactionSchedulerContract.DeployedAt.ToCommon()
+			toAddress, err = cadence.NewString(to.Hex())
+			require.NoError(t, err)
+			num = big.NewInt(42)
+			args = testContract.MakeCallData(t, "storeWithLog", num)
+			callData = flowTransactionSchedulerContract.MakeCallData(
+				t,
+				"estimate",
+				big.NewInt(time.Now().Unix()+2),
+				uint8(0),
+				uint64(7_500),
+				contractAddress,
+				args,
+			)
+
+			script = fvm.Script(code).WithArguments(
+				json.MustEncode(
+					cadence.NewArray(
+						unittest.BytesToCdcUInt8(callData),
+					).WithType(stdlib.EVMTransactionBytesCadenceType),
+				),
+				json.MustEncode(toAddress),
+				json.MustEncode(cadence.NewUInt64(55_000)),
+			)
+			_, output, err = vm.Run(ctx, script, snapshot)
+			require.NoError(t, err)
+			require.NoError(t, output.Err)
+			require.Len(t, output.Events, 0)
+
+			result, err = impl.ResultSummaryFromEVMResultValue(output.Value)
+			require.NoError(t, err)
+			require.Equal(
+				t,
+				new(big.Int).SetUint64(10_000_000_000_000),
+				new(big.Int).SetBytes(result.ReturnedData),
+			)
+		},
+	)
+}
 
 func TestEVMRun(t *testing.T) {
 	t.Parallel()
