@@ -4777,3 +4777,181 @@ func TestFlowTokenChangesInspector(t *testing.T) {
 		t.Run(tc.name, runAndCheckTransactionTest(tc))
 	}
 }
+
+// TestTokenInspectorCreateAndFundNewAccount is a regression test for the account-creation
+// storage-sharing fix, derived from mainnet tx
+// c5f3d77c1b86a9b4ce36e214278aca695702f26bd00e6c93b01d88f706456597.
+//
+// Creating and funding a new account in one transaction used to run `Account(payer:)`'s setup in
+// separate Cadence storage. When the payer's vault was borrowed before `Account(payer:)`, its stale
+// balance overwrote the 0.001 FLOW reservation deduction on commit, creating FLOW with no
+// `TokensMinted` event, which the inspector flagged as unaccounted.
+//
+// The test asserts that both borrow orderings now charge the payer the funding plus the reservation
+// and leave nothing unaccounted.
+func TestTokenInspectorCreateAndFundNewAccount(t *testing.T) {
+	chain := flow.Emulator.Chain()
+	sc := systemcontracts.SystemContractsForChain(chain.ChainID())
+
+	feesDeductedEventID := fmt.Sprintf("A.%s.FlowFees.FeesDeducted", sc.FlowFees.Address.Hex())
+
+	// reservation is the minimum storage reservation funded into every newly created account.
+	reservation := uint64(fvm.DefaultMinimumStorageReservation) // 0.001 FLOW
+	const funding = uint64(50_000_000)                          // 0.5 FLOW deposited into the new account
+
+	// borrowBeforeCreate borrows the payer's vault before `Account(payer:)` — the mainnet
+	// ordering that originally exposed the lost-reservation bug.
+	// Both orderings must now be safe.
+	makeScript := func(borrowBeforeCreate bool) string {
+		borrow := `
+				let flowVaultRef = acct.storage
+					.borrow<auth(FungibleToken.Withdraw) &FlowToken.Vault>(from: /storage/flowTokenVault)
+					?? panic("Could not borrow reference to the owner's Vault!")`
+		create := `let newAcct = Account(payer: acct)`
+
+		preamble := create + "\n" + borrow
+		if borrowBeforeCreate {
+			preamble = borrow + "\n\t\t\t\t" + create
+		}
+
+		return fmt.Sprintf(`
+			import FungibleToken from %s
+			import FlowToken from %s
+
+			transaction() {
+				prepare(acct: auth(Storage, Capabilities) &Account) {
+					%s
+
+					let receiverRef = newAcct.capabilities
+						.get<&{FungibleToken.Receiver}>(/public/flowTokenReceiver)
+						.borrow()
+						?? panic("Could not borrow receiver reference to the newly created account")
+					receiverRef.deposit(from: <- flowVaultRef.withdraw(amount: 0.5))
+				}
+			}`,
+			sc.FungibleToken.Address.HexWithPrefix(),
+			sc.FlowToken.Address.HexWithPrefix(),
+			preamble,
+		)
+	}
+
+	// expectedPayerDebit is the FlowToken amount the payer's balance should drop by (excluding
+	// transaction fees, which are deducted from the same account): the funding plus the reservation,
+	// regardless of borrow ordering.
+	expectedPayerDebit := funding + reservation
+
+	type testCase struct {
+		name               string
+		borrowBeforeCreate bool
+	}
+
+	testCases := []testCase{
+		{
+			name:               "borrow before create (mainnet pattern)",
+			borrowBeforeCreate: true,
+		},
+		{
+			name:               "borrow after create",
+			borrowBeforeCreate: false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, newVMTest().
+			withChain(chain).
+			withBootstrapProcedureOptions(
+				fvm.WithTransactionFee(fvm.DefaultTransactionFees),
+				fvm.WithStorageMBPerFLOW(fvm.DefaultStorageMBPerFLOW),
+				fvm.WithMinimumStorageReservation(fvm.DefaultMinimumStorageReservation),
+				fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
+				fvm.WithExecutionMemoryLimit(math.MaxUint64),
+				fvm.WithExecutionEffortWeights(environment.MainnetExecutionEffortWeights),
+				fvm.WithExecutionMemoryWeights(meter.DefaultMemoryWeights),
+			).
+			withContextOptions(
+				fvm.WithTransactionFeesEnabled(true),
+				fvm.WithAccountStorageLimit(true),
+				fvm.WithAuthorizationChecksEnabled(false),
+				fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
+			).
+			run(func(
+				t *testing.T,
+				vm fvm.VM,
+				chain flow.Chain,
+				ctx fvm.Context,
+				snapshotTree snapshot.SnapshotTree,
+			) {
+				privateKey, err := testutil.GenerateAccountPrivateKey()
+				require.NoError(t, err)
+				snapshotTree, accounts, err := testutil.CreateAccounts(
+					vm, snapshotTree, []flow.AccountPrivateKey{privateKey}, chain)
+				require.NoError(t, err)
+				payer := accounts[0]
+
+				env := sc.AsTemplateEnv()
+				balanceOf := func(snap snapshot.SnapshotTree, addr flow.Address) uint64 {
+					code := fmt.Sprintf(`
+						import FungibleToken from %s
+						import FlowToken from %s
+						access(all) fun main(addr: Address): UFix64 {
+							return getAccount(addr).capabilities
+								.borrow<&FlowToken.Vault>(/public/flowTokenBalance)!.balance
+						}`,
+						sc.FungibleToken.Address.HexWithPrefix(),
+						sc.FlowToken.Address.HexWithPrefix(),
+					)
+					arg, err := jsoncdc.Encode(cadence.Address(addr))
+					require.NoError(t, err)
+					_, out, serr := vm.Run(ctx, fvm.Script([]byte(code)).WithArguments(arg), snap)
+					require.NoError(t, serr)
+					require.NoError(t, out.Err)
+					return uint64(out.Value.(cadence.UFix64))
+				}
+
+				// Fund the (regular) payer account with 10 FLOW from the service account, so the
+				// payer is a normal account just like the mainnet authorizer.
+				fundTx := blueprints.TransferFlowTokenTransaction(env, chain.ServiceAddress(), payer, "10.0")
+				require.NoError(t, testutil.SignTransactionAsServiceAccount(fundTx, 0, chain))
+				fundBody, err := fundTx.Build()
+				require.NoError(t, err)
+				fundSnap, fundOut, err := vm.Run(ctx, fvm.Transaction(fundBody, 0), snapshotTree)
+				require.NoError(t, err)
+				require.NoError(t, fundOut.Err)
+				snapshotTree = snapshotTree.Append(fundSnap)
+
+				txBuilder := flow.NewTransactionBodyBuilder().
+					SetScript([]byte(makeScript(tc.borrowBeforeCreate))).
+					AddAuthorizer(payer)
+				require.NoError(t, testutil.SignTransaction(txBuilder, payer, privateKey, 0))
+				txBody, err := txBuilder.Build()
+				require.NoError(t, err)
+
+				differ := inspection.NewTokenChangesInspector(
+					inspection.DefaultTokenDiffSearchTokens(chain), chain.ChainID())
+				inspectCtx := fvm.NewContextFromParent(ctx, fvm.WithInspectors([]inspection.Inspector{differ}))
+
+				payerBefore := balanceOf(snapshotTree, payer)
+				execSnap, output, err := vm.Run(inspectCtx, fvm.Transaction(txBody, 0), snapshotTree)
+				require.NoError(t, err)
+				require.NoError(t, output.Err)
+				payerAfter := balanceOf(snapshotTree.Append(execSnap), payer)
+
+				// The transaction fee is deducted from the payer in addition to the funding/reservation.
+				var txFee uint64
+				for _, e := range output.Events {
+					if string(e.Type) == feesDeductedEventID {
+						payload, err := ccf.Decode(nil, e.Payload)
+						require.NoError(t, err)
+						txFee = uint64(payload.(cadence.Event).SearchFieldByName("amount").(cadence.UFix64))
+					}
+				}
+				payerDebit := payerBefore - payerAfter
+				require.Equal(t, expectedPayerDebit+txFee, payerDebit,
+					"payer balance change should equal expected debit plus the transaction fee")
+
+				require.Len(t, output.InspectionResults, 1, "expected one inspection result")
+				result := output.InspectionResults[0].(inspection.TokenDiffResult)
+				require.Empty(t, result.UnaccountedTokens(), "all token movements should be accounted for")
+			}))
+	}
+}

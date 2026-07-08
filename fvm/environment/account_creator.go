@@ -3,10 +3,15 @@ package environment
 import (
 	"fmt"
 
+	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/common"
+	"github.com/onflow/cadence/interpreter"
+	"github.com/onflow/cadence/runtime"
+	"github.com/onflow/cadence/sema"
 
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/storage/state"
+	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/fvm/tracing"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/trace"
@@ -47,26 +52,37 @@ func NewParseRestrictedAccountCreator(
 
 func (creator ParseRestrictedAccountCreator) CreateAccount(
 	runtimePayer common.Address,
+	invocationContext interpreter.InvocationContext,
 ) (
 	common.Address,
 	error,
 ) {
-	return parseRestrict1Arg1Ret(
+	return parseRestrict2Arg1Ret(
 		creator.txnState,
 		trace.FVMEnvCreateAccount,
 		creator.impl.CreateAccount,
-		runtimePayer)
+		runtimePayer,
+		invocationContext,
+	)
 }
 
 type AccountCreator interface {
-	CreateAccount(runtimePayer common.Address) (common.Address, error)
+	// CreateAccount creates a new account, deducting the minimum storage reservation from `payer`.
+	//
+	// `context` is the invocation context of the currently-executing Cadence program
+	// (the one that invoked the `Account` constructor).
+	CreateAccount(
+		runtimePayer common.Address,
+		invocationContext interpreter.InvocationContext,
+	) (common.Address, error)
 }
 
 type NoAccountCreator struct {
 }
 
 func (NoAccountCreator) CreateAccount(
-	runtimePayer common.Address,
+	_ common.Address,
+	_ interpreter.InvocationContext,
 ) (
 	common.Address,
 	error,
@@ -246,7 +262,8 @@ func (creator *accountCreator) CreateBootstrapAccount(
 }
 
 func (creator *accountCreator) CreateAccount(
-	runtimePayer common.Address,
+	payer common.Address,
+	invocationContext interpreter.InvocationContext,
 ) (
 	common.Address,
 	error,
@@ -266,7 +283,10 @@ func (creator *accountCreator) CreateAccount(
 	// don't enforce limit during account creation
 	var address flow.Address
 	creator.txnState.RunWithMeteringDisabled(func() {
-		address, err = creator.createAccount(flow.Address(runtimePayer))
+		address, err = creator.createAccount(
+			flow.Address(payer),
+			invocationContext,
+		)
 	})
 
 	return common.Address(address), err
@@ -274,6 +294,7 @@ func (creator *accountCreator) CreateAccount(
 
 func (creator *accountCreator) createAccount(
 	payer flow.Address,
+	invocationContext interpreter.InvocationContext,
 ) (
 	flow.Address,
 	error,
@@ -284,9 +305,30 @@ func (creator *accountCreator) createAccount(
 	}
 
 	if creator.isServiceAccountEnabled {
-		_, invokeErr := creator.systemContracts.SetupNewAccount(
-			address,
-			payer)
+		// Run `FlowServiceAccount.setupNewAccount` against the SAME Cadence invocation context
+		// (and thus the same storage) as the program that triggered account creation.
+		// Rather than borrowing a fresh runtime with its own storage,
+		// using the shared context ensures the minimum storage reservation deducted from the payer here is visible to,
+		// and committed by, that outer program.
+		// Otherwise the deduction would be made in a separate, independently-committed storage instance
+		// and could be overwritten, creating FLOW without a corresponding `TokensMinted` event.
+		contractLocation := common.AddressLocation{
+			Address: common.Address(creator.chain.ServiceAddress()),
+			Name:    systemcontracts.ContractNameServiceAccount,
+		}
+
+		args := []cadence.Value{
+			cadence.Address(address),
+			cadence.Address(payer),
+		}
+
+		_, invokeErr := runtime.InvokeContractFunctionOnContext(
+			invocationContext,
+			contractLocation,
+			systemcontracts.ContractServiceAccountFunction_setupNewAccount,
+			args,
+			setupNewAccountArgumentTypes,
+		)
 		if invokeErr != nil {
 			return flow.EmptyAddress, invokeErr
 		}
@@ -294,4 +336,31 @@ func (creator *accountCreator) createAccount(
 
 	creator.metrics.RuntimeSetNumberOfAccounts(creator.AddressCount())
 	return address, nil
+}
+
+// `FlowServiceAccount.setupNewAccount`
+// from https://github.com/onflow/flow-core-contracts/blob/master/contracts/FlowServiceAccount.cdc
+var setupNewAccountArgumentTypes = []sema.Type{
+	sema.NewReferenceType(
+		nil,
+		sema.NewEntitlementSetAccess(
+			[]*sema.EntitlementType{
+				sema.SaveValueType,
+				sema.BorrowValueType,
+				sema.CapabilitiesType,
+			},
+			sema.Conjunction,
+		),
+		sema.AccountType,
+	),
+	sema.NewReferenceType(
+		nil,
+		sema.NewEntitlementSetAccess(
+			[]*sema.EntitlementType{
+				sema.BorrowValueType,
+			},
+			sema.Conjunction,
+		),
+		sema.AccountType,
+	),
 }

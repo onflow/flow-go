@@ -1056,8 +1056,8 @@ func (_c *Environment_ConvertedServiceEvents_Call) RunAndReturn(run func() flow.
 }
 
 // CreateAccount provides a mock function for the type Environment
-func (_mock *Environment) CreateAccount(payer runtime.Address) (runtime.Address, error) {
-	ret := _mock.Called(payer)
+func (_mock *Environment) CreateAccount(payer runtime.Address, context interpreter.InvocationContext) (runtime.Address, error) {
+	ret := _mock.Called(payer, context)
 
 	if len(ret) == 0 {
 		panic("no return value specified for CreateAccount")
@@ -1065,18 +1065,18 @@ func (_mock *Environment) CreateAccount(payer runtime.Address) (runtime.Address,
 
 	var r0 runtime.Address
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(runtime.Address) (runtime.Address, error)); ok {
-		return returnFunc(payer)
+	if returnFunc, ok := ret.Get(0).(func(runtime.Address, interpreter.InvocationContext) (runtime.Address, error)); ok {
+		return returnFunc(payer, context)
 	}
-	if returnFunc, ok := ret.Get(0).(func(runtime.Address) runtime.Address); ok {
-		r0 = returnFunc(payer)
+	if returnFunc, ok := ret.Get(0).(func(runtime.Address, interpreter.InvocationContext) runtime.Address); ok {
+		r0 = returnFunc(payer, context)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(runtime.Address)
 		}
 	}
-	if returnFunc, ok := ret.Get(1).(func(runtime.Address) error); ok {
-		r1 = returnFunc(payer)
+	if returnFunc, ok := ret.Get(1).(func(runtime.Address, interpreter.InvocationContext) error); ok {
+		r1 = returnFunc(payer, context)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -1090,18 +1090,24 @@ type Environment_CreateAccount_Call struct {
 
 // CreateAccount is a helper method to define mock.On call
 //   - payer runtime.Address
-func (_e *Environment_Expecter) CreateAccount(payer interface{}) *Environment_CreateAccount_Call {
-	return &Environment_CreateAccount_Call{Call: _e.mock.On("CreateAccount", payer)}
+//   - context interpreter.InvocationContext
+func (_e *Environment_Expecter) CreateAccount(payer interface{}, context interface{}) *Environment_CreateAccount_Call {
+	return &Environment_CreateAccount_Call{Call: _e.mock.On("CreateAccount", payer, context)}
 }
 
-func (_c *Environment_CreateAccount_Call) Run(run func(payer runtime.Address)) *Environment_CreateAccount_Call {
+func (_c *Environment_CreateAccount_Call) Run(run func(payer runtime.Address, context interpreter.InvocationContext)) *Environment_CreateAccount_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 runtime.Address
 		if args[0] != nil {
 			arg0 = args[0].(runtime.Address)
 		}
+		var arg1 interpreter.InvocationContext
+		if args[1] != nil {
+			arg1 = args[1].(interpreter.InvocationContext)
+		}
 		run(
 			arg0,
+			arg1,
 		)
 	})
 	return _c
@@ -1112,7 +1118,7 @@ func (_c *Environment_CreateAccount_Call) Return(address runtime.Address, err er
 	return _c
 }
 
-func (_c *Environment_CreateAccount_Call) RunAndReturn(run func(payer runtime.Address) (runtime.Address, error)) *Environment_CreateAccount_Call {
+func (_c *Environment_CreateAccount_Call) RunAndReturn(run func(payer runtime.Address, context interpreter.InvocationContext) (runtime.Address, error)) *Environment_CreateAccount_Call {
 	_c.Call.Return(run)
 	return _c
 }

@@ -164,58 +164,12 @@ func (sys *SystemContracts) DeductTransactionFees(
 	)
 }
 
-// uses `FlowServiceAccount.setupNewAccount` from https://github.com/onflow/flow-core-contracts/blob/master/contracts/FlowServiceAccount.cdc
-var setupNewAccountSpec = ContractFunctionSpec{
-	AddressFromChain: ServiceAddress,
-	LocationName:     systemcontracts.ContractNameServiceAccount,
-	FunctionName:     systemcontracts.ContractServiceAccountFunction_setupNewAccount,
-	ArgumentTypes: []sema.Type{
-		sema.NewReferenceType(
-			nil,
-			sema.NewEntitlementSetAccess(
-				[]*sema.EntitlementType{
-					sema.SaveValueType,
-					sema.BorrowValueType,
-					sema.CapabilitiesType,
-				},
-				sema.Conjunction,
-			),
-			sema.AccountType,
-		),
-		sema.NewReferenceType(
-			nil,
-			sema.NewEntitlementSetAccess(
-				[]*sema.EntitlementType{
-					sema.BorrowValueType,
-				},
-				sema.Conjunction,
-			),
-			sema.AccountType,
-		),
-	},
-}
-
-// SetupNewAccount executes the new account setup contract on the service
-// account.
-func (sys *SystemContracts) SetupNewAccount(
-	flowAddress flow.Address,
-	payer flow.Address,
-) (cadence.Value, error) {
-	return sys.Invoke(
-		setupNewAccountSpec,
-		[]cadence.Value{
-			cadence.BytesToAddress(flowAddress.Bytes()),
-			cadence.BytesToAddress(payer.Bytes()),
-		},
-	)
-}
-
 var accountAvailableBalanceSpec = ContractFunctionSpec{
 	AddressFromChain: ServiceAddress,
 	LocationName:     systemcontracts.ContractNameStorageFees,
 	FunctionName:     systemcontracts.ContractStorageFeesFunction_defaultTokenAvailableBalance,
 	ArgumentTypes: []sema.Type{
-		&sema.AddressType{},
+		sema.TheAddressType,
 	},
 }
 
@@ -263,7 +217,7 @@ var accountStorageCapacitySpec = ContractFunctionSpec{
 	LocationName:     systemcontracts.ContractNameStorageFees,
 	FunctionName:     systemcontracts.ContractStorageFeesFunction_calculateAccountCapacity,
 	ArgumentTypes: []sema.Type{
-		&sema.AddressType{},
+		sema.TheAddressType,
 	},
 }
 
@@ -297,12 +251,11 @@ func (sys *SystemContracts) AccountsStorageCapacity(
 			LocationName:     systemcontracts.ContractNameStorageFees,
 			FunctionName:     systemcontracts.ContractStorageFeesFunction_getAccountsCapacityForTransactionStorageCheck,
 			ArgumentTypes: []sema.Type{
-				sema.NewConstantSizedType(
+				sema.NewVariableSizedType(
 					nil,
-					&sema.AddressType{},
-					int64(len(arrayValues)),
+					sema.TheAddressType,
 				),
-				&sema.AddressType{},
+				sema.TheAddressType,
 				sema.UFix64Type,
 			},
 		},

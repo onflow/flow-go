@@ -8,12 +8,14 @@ on:
       - trying
       - 'feature/**'
       - 'v[0-9]+.[0-9]+'
+      - 'v[0-9]+.[0-9]+-rc'
   pull_request:
     branches:
       - master*
       - 'auto-cadence-upgrade/**'
       - 'feature/**'
       - 'v[0-9]+.[0-9]+'
+      - 'v[0-9]+.[0-9]+-rc'
   merge_group:
     branches:
       - master
@@ -74,6 +76,11 @@ jobs:
     steps:
     - name: Checkout repo
       uses: actions/checkout@v6
+    - name: Setup private build environment
+      if: ${{ vars.PRIVATE_BUILDS_SUPPORTED == 'true' }}
+      uses: ./actions/private-setup
+      with:
+        cadence_deploy_key: ${{ secrets.CADENCE_DEPLOY_KEY }}
     - name: Setup Go
       uses: actions/setup-go@v6
       timeout-minutes: 10 # fail fast. sometimes this step takes an extremely long time
