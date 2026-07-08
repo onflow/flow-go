@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sort"
 	"sync/atomic"
 	"time"
 
@@ -66,6 +67,8 @@ var (
 	flagMTrieCacheSize               uint32
 	flagCheckpointDistance           uint
 	flagCheckpointsToKeep            uint
+	flagRepeat                       uint
+	flagWarmup                       uint
 )
 
 // Cmd re-executes a historical block (or a range of blocks) in memory without persisting anything.
@@ -145,6 +148,15 @@ func init() {
 
 	Cmd.Flags().UintVar(&flagCheckpointsToKeep, "checkpoints-to-keep", 5,
 		"number of checkpoints to retain (payloadless/full committer only)")
+
+	Cmd.Flags().UintVar(&flagRepeat, "repeat", 1,
+		"number of times to re-execute the height range in this single process, for benchmarking. "+
+			"All iterations share the same warm process (Pebble block cache, page cache, seeded ledger, "+
+			"steady-state GC), so per-height min/median/p90 timing is reported at the end")
+
+	Cmd.Flags().UintVar(&flagWarmup, "warmup", 0,
+		"number of leading --repeat iterations to execute but exclude from the timing summary, so cold-"+
+			"cache and GC-warmup effects do not skew the reported statistics. Must be less than --repeat")
 }
 
 func runE(*cobra.Command, []string) error {
@@ -156,6 +168,13 @@ func runE(*cobra.Command, []string) error {
 	}
 	if toHeight < flagFromHeight {
 		return fmt.Errorf("to-height %d is less than from-height %d", toHeight, flagFromHeight)
+	}
+
+	if flagRepeat == 0 {
+		return fmt.Errorf("--repeat must be at least 1")
+	}
+	if flagWarmup >= flagRepeat {
+		return fmt.Errorf("--warmup %d must be less than --repeat %d", flagWarmup, flagRepeat)
 	}
 
 	chainID := flow.ChainID(flagChain)
@@ -215,28 +234,53 @@ func runE(*cobra.Command, []string) error {
 	defer closeCommitter()
 
 	// Wrap the committer so per-block CommitView cost can be reported. For the payloadless/full
-	// committer this is dominated by proof collection, which is what benchmarking targets.
+	// committer this is dominated by proof collection, which is what benchmarking targets. The wrapper
+	// is reset before each block, so it is shared across all repeat iterations.
 	timedCommitter := newTimingViewCommitter(viewCommitter)
-
-	manager, err := NewComputationManager(
-		logger, chainID, storages.Headers, state, timedCommitter,
-		flagTransactionFeesDisabled, flagScheduledTransactionsEnabled,
-	)
-	if err != nil {
-		return fmt.Errorf("could not create computation manager: %w", err)
-	}
 
 	ctx := context.Background()
 	mismatches := 0
-	for height := flagFromHeight; height <= toHeight; height++ {
-		mismatch, err := reExecuteHeight(ctx, logger, manager, timedCommitter, stateChecker, stores, registers, height, flagVerify)
+
+	// durations collects, per height, the block-level ComputeBlock duration from every measured (non-
+	// warmup) repeat iteration. All iterations run in this one warm process, so aggregating them into a
+	// per-height min/median/p90 yields a benchmark far more stable than any single run.
+	// proofDurations collects the corresponding per-block proof-collection time (0 for committers that
+	// do not collect proofs), so proof collection can be benchmarked in isolation.
+	durations := make(map[uint64][]time.Duration)
+	proofDurations := make(map[uint64][]time.Duration)
+
+	for iter := uint(0); iter < flagRepeat; iter++ {
+		warmup := iter < flagWarmup
+
+		// Build a fresh computation manager for each iteration. The manager owns the derived-data cache
+		// (parsed/checked Cadence programs), which advances a per-block monotonic logical clock on commit;
+		// reusing it to re-execute the same height twice fails validation ("non-increasing time"). A fresh
+		// manager gives every iteration an identical cold programs cache — matching the original single-run
+		// behavior — while the register store and (payloadless/full) ledger stay warm and shared across
+		// iterations.
+		manager, err := NewComputationManager(
+			logger, chainID, storages.Headers, state, timedCommitter,
+			flagTransactionFeesDisabled, flagScheduledTransactionsEnabled,
+		)
 		if err != nil {
-			return fmt.Errorf("could not re-execute height %d: %w", height, err)
+			return fmt.Errorf("could not create computation manager (iteration %d): %w", iter, err)
 		}
-		if mismatch {
-			mismatches++
-			if flagStopOnMismatch {
-				return fmt.Errorf("events mismatch at height %d", height)
+
+		for height := flagFromHeight; height <= toHeight; height++ {
+			elapsed, proofElapsed, mismatch, err := reExecuteHeight(
+				ctx, logger, manager, timedCommitter, stateChecker, stores, registers, height, flagVerify, iter, warmup)
+			if err != nil {
+				return fmt.Errorf("could not re-execute height %d (iteration %d): %w", height, iter, err)
+			}
+			if !warmup {
+				durations[height] = append(durations[height], elapsed)
+				proofDurations[height] = append(proofDurations[height], proofElapsed)
+			}
+			if mismatch {
+				mismatches++
+				if flagStopOnMismatch {
+					return fmt.Errorf("events mismatch at height %d", height)
+				}
 			}
 		}
 	}
@@ -245,12 +289,105 @@ func runE(*cobra.Command, []string) error {
 		return fmt.Errorf("re-execution finished with %d block(s) whose events did not match", mismatches)
 	}
 
+	// Report the per-height timing summary over all measured iterations. This is the reliable benchmark
+	// signal: the minimum is the least noise-perturbed sample and best for A/B comparison, while
+	// median/p90 characterize the run-to-run spread.
+	if flagRepeat > 1 {
+		for height := flagFromHeight; height <= toHeight; height++ {
+			s := computeDurationStats(durations[height])
+			logger.Info().
+				Uint64("height", height).
+				Int("samples", s.count).
+				Uint("warmup_discarded", flagWarmup).
+				Float64("min_ms", msFloat(s.min)).
+				Float64("median_ms", msFloat(s.median)).
+				Float64("p90_ms", msFloat(s.p90)).
+				Float64("max_ms", msFloat(s.max)).
+				Float64("mean_ms", msFloat(s.mean)).
+				Msg("re-execution timing summary")
+
+			// Proof-collection timing summary. All-zero for the noop committer, which collects no proofs.
+			ps := computeDurationStats(proofDurations[height])
+			logger.Info().
+				Uint64("height", height).
+				Int("samples", ps.count).
+				Uint("warmup_discarded", flagWarmup).
+				Float64("min_ms", msFloat(ps.min)).
+				Float64("median_ms", msFloat(ps.median)).
+				Float64("p90_ms", msFloat(ps.p90)).
+				Float64("max_ms", msFloat(ps.max)).
+				Float64("mean_ms", msFloat(ps.mean)).
+				Msg("collect proof timing summary")
+		}
+	}
+
 	logger.Info().Msg("re-execution finished")
 	return nil
 }
 
+// durationStats holds summary statistics over a set of measured durations.
+type durationStats struct {
+	count  int
+	min    time.Duration
+	median time.Duration
+	p90    time.Duration
+	max    time.Duration
+	mean   time.Duration
+}
+
+// computeDurationStats returns summary statistics over the given durations. The input slice is copied
+// before sorting, so the caller's ordering is preserved. Returns the zero value for an empty input.
+func computeDurationStats(ds []time.Duration) durationStats {
+	if len(ds) == 0 {
+		return durationStats{}
+	}
+	sorted := make([]time.Duration, len(ds))
+	copy(sorted, ds)
+	sort.Slice(sorted, func(i, j int) bool { return sorted[i] < sorted[j] })
+
+	var sum time.Duration
+	for _, d := range sorted {
+		sum += d
+	}
+
+	return durationStats{
+		count:  len(sorted),
+		min:    sorted[0],
+		median: percentile(sorted, 50),
+		p90:    percentile(sorted, 90),
+		max:    sorted[len(sorted)-1],
+		mean:   sum / time.Duration(len(sorted)),
+	}
+}
+
+// percentile returns the p-th percentile (0..100) of the pre-sorted, ascending, non-empty slice using
+// the nearest-rank method. Returns 0 for an empty slice.
+func percentile(sorted []time.Duration, p int) time.Duration {
+	if len(sorted) == 0 {
+		return 0
+	}
+	rank := (p*len(sorted) + 99) / 100 // ceil(p/100 * n), 1-indexed
+	if rank < 1 {
+		rank = 1
+	}
+	if rank > len(sorted) {
+		rank = len(sorted)
+	}
+	return sorted[rank-1]
+}
+
+// msFloat converts a duration to milliseconds as a float, preserving sub-millisecond precision.
+func msFloat(d time.Duration) float64 {
+	return float64(d.Microseconds()) / 1000.0
+}
+
 // reExecuteHeight re-executes the block at the given height and, when verify is set, compares its
-// events against the stored events. It returns whether a verification mismatch occurred.
+// events against the stored events. It returns the wall-clock duration of the timed ComputeBlock call
+// and whether a verification mismatch occurred.
+//
+// `iteration` is the zero-based --repeat iteration index and `warmup` indicates whether this iteration
+// is a discarded warmup pass; both are attached to the per-block log so lines are attributable across
+// repeated runs. They do not alter execution.
 //
 // `stateChecker` may be nil (the no-op committer needs no trie); when non-nil it is used to confirm
 // the parent trie is present in the ledger forest before execution.
@@ -266,10 +403,12 @@ func reExecuteHeight(
 	registers RegisterGetter,
 	height uint64,
 	verify bool,
-) (mismatch bool, err error) {
+	iteration uint,
+	warmup bool,
+) (elapsed time.Duration, proofElapsed time.Duration, mismatch bool, err error) {
 	block, err := stores.blocks.ByHeight(height)
 	if err != nil {
-		return false, fmt.Errorf("could not get block at height %d: %w", height, err)
+		return 0, 0, false, fmt.Errorf("could not get block at height %d: %w", height, err)
 	}
 	blockID := block.ID()
 	parentID := block.ParentID
@@ -277,19 +416,19 @@ func reExecuteHeight(
 	// The block executes against its parent's final state. Registers as of the parent height feed the
 	// open-world snapshot, and the parent state commitment is the trie the block starts from.
 	if height == 0 {
-		return false, fmt.Errorf("cannot re-execute the root block (height 0)")
+		return 0, 0, false, fmt.Errorf("cannot re-execute the root block (height 0)")
 	}
 	parentHeight := height - 1
 
 	parentCommit, err := stores.commits.ByBlockID(parentID)
 	if err != nil {
-		return false, fmt.Errorf("could not get parent state commitment for block %s: %w", parentID, err)
+		return 0, 0, false, fmt.Errorf("could not get parent state commitment for block %s: %w", parentID, err)
 	}
 
 	// A trie-backed committer can only commit/prove against a trie that is present in its forest. The
 	// block executes on top of the parent's final state, so that trie must be loadable from --triedir.
 	if stateChecker != nil && !stateChecker.HasState(ledger.State(parentCommit)) {
-		return false, fmt.Errorf(
+		return 0, 0, false, fmt.Errorf(
 			"parent trie for height %d (state %x) is not present in the ledger forest; "+
 				"--triedir must contain a checkpoint/WAL covering this height",
 			height, parentCommit)
@@ -301,12 +440,12 @@ func reExecuteHeight(
 	if parentResult, err := stores.results.ByBlockID(parentID); err == nil {
 		parentResultID = parentResult.ID()
 	} else if !errors.Is(err, storage.ErrNotFound) {
-		return false, fmt.Errorf("could not get parent execution result for block %s: %w", parentID, err)
+		return 0, 0, false, fmt.Errorf("could not get parent execution result for block %s: %w", parentID, err)
 	}
 
 	executableBlock, err := AssembleExecutableBlock(block, stores.collections, parentCommit)
 	if err != nil {
-		return false, fmt.Errorf("could not assemble executable block %s: %w", blockID, err)
+		return 0, 0, false, fmt.Errorf("could not assemble executable block %s: %w", blockID, err)
 	}
 
 	registerSnapshot := StorehouseSnapshotAtHeight(registers, parentHeight)
@@ -315,10 +454,12 @@ func reExecuteHeight(
 	start := time.Now()
 	result, err := manager.ComputeBlock(ctx, parentResultID, executableBlock, registerSnapshot)
 	if err != nil {
-		return false, fmt.Errorf("could not compute block %s: %w", blockID, err)
+		return 0, 0, false, fmt.Errorf("could not compute block %s: %w", blockID, err)
 	}
-	elapsed := time.Since(start)
+	elapsed = time.Since(start)
 	commitCalls, commitDuration := timedCommitter.stats()
+	proofCalls, proofDuration := timedCommitter.proofStats()
+	proofElapsed = proofDuration
 
 	txResults := result.AllTransactionResults()
 	events := result.AllEvents()
@@ -336,6 +477,8 @@ func reExecuteHeight(
 
 	logger.Info().
 		Uint64("height", height).
+		Uint("iteration", iteration).
+		Bool("warmup", warmup).
 		Hex("block_id", blockID[:]).
 		Int("collections", len(executableBlock.CompleteCollections)).
 		Int("transactions", len(txResults)).
@@ -347,12 +490,16 @@ func reExecuteHeight(
 		Dur("duration", elapsed).
 		Int64("commit_view_calls", commitCalls).
 		Dur("commit_view_duration", commitDuration).
+		Int64("collect_proof_calls", proofCalls).
+		Dur("collect_proof_duration", proofDuration).
 		Msg("re-executed block")
 
 	if !verify {
-		return false, nil
+		return elapsed, proofElapsed, false, nil
 	}
-	return verifyEvents(logger, stores.events, blockID, height, result)
+
+	mismatch, err = verifyEvents(logger, stores.events, blockID, height, result)
+	return elapsed, proofElapsed, mismatch, err
 }
 
 // verifyEvents compares the events produced by re-execution against those recorded for the block in
@@ -528,13 +675,35 @@ func (c *timingViewCommitter) CommitView(
 	return commit, proof, trieUpdate, newSnapshot, err
 }
 
-// reset zeroes the accumulated CommitView stats. Call before re-executing a block.
+// reset zeroes the accumulated CommitView stats, and the wrapped committer's proof-collection stats
+// when it exposes them. Call before re-executing a block.
 func (c *timingViewCommitter) reset() {
 	c.calls.Store(0)
 	c.nanos.Store(0)
+	if pt, ok := c.inner.(proofTimer); ok {
+		pt.ResetProofCollectionStats()
+	}
 }
 
 // stats returns the accumulated CommitView call count and total duration since the last reset.
 func (c *timingViewCommitter) stats() (calls int64, total time.Duration) {
 	return c.calls.Load(), time.Duration(c.nanos.Load())
+}
+
+// proofStats returns the wrapped committer's accumulated proof-collection call count and total
+// duration since the last reset. Returns (0, 0) when the wrapped committer does not collect proofs
+// (the no-op committer) or does not expose the stats.
+func (c *timingViewCommitter) proofStats() (calls int64, total time.Duration) {
+	if pt, ok := c.inner.(proofTimer); ok {
+		return pt.ProofCollectionStats()
+	}
+	return 0, 0
+}
+
+// proofTimer is implemented by committers that accumulate proof-collection timing (the payloadless
+// committer). It lets the benchmark report per-block proof-collection cost — which runs concurrently
+// with the state commit inside CommitView — separately from the overall CommitView duration.
+type proofTimer interface {
+	ProofCollectionStats() (calls int64, total time.Duration)
+	ResetProofCollectionStats()
 }

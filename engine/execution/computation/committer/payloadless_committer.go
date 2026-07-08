@@ -3,6 +3,8 @@ package committer
 import (
 	"fmt"
 	"sync"
+	"sync/atomic"
+	"time"
 
 	"github.com/hashicorp/go-multierror"
 
@@ -29,6 +31,14 @@ type PayloadlessLedgerViewCommitter struct {
 	ledger            ledger.PayloadlessLedger
 	tracer            module.Tracer
 	pathFinderVersion uint8
+
+	// proofCalls and proofNanos accumulate the number of collectProofs invocations and their total
+	// wall-clock time. They let a benchmark isolate proof-collection cost, which runs concurrently with
+	// the state commit inside CommitView and is therefore not separable from the overall CommitView
+	// duration. Updated with atomics because CommitView collects proofs in a dedicated goroutine and may
+	// be invoked concurrently by the block computer. Not read on the production execution path.
+	proofCalls atomic.Int64
+	proofNanos atomic.Int64
 }
 
 // NewPayloadlessLedgerViewCommitter returns a committer that drives a
@@ -66,7 +76,10 @@ func (committer *PayloadlessLedgerViewCommitter) CommitView(
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go func() {
+		start := time.Now()
 		proof, err2 = committer.collectProofs(snapshot, baseStorageSnapshot)
+		committer.proofNanos.Add(int64(time.Since(start)))
+		committer.proofCalls.Add(1)
 		wg.Done()
 	}()
 
@@ -150,4 +163,23 @@ func (committer *PayloadlessLedgerViewCommitter) collectProofs(
 		return nil, fmt.Errorf("could not collect payloadless proof: %w", err)
 	}
 	return proof, nil
+}
+
+// ProofCollectionStats returns the number of collectProofs calls and their total wall-clock time
+// accumulated since the last ResetProofCollectionStats. It is benchmark instrumentation: proof
+// collection runs concurrently with the state commit inside CommitView, so its cost cannot be derived
+// from the overall CommitView duration.
+//
+// Safe for concurrent access.
+func (committer *PayloadlessLedgerViewCommitter) ProofCollectionStats() (calls int64, total time.Duration) {
+	return committer.proofCalls.Load(), time.Duration(committer.proofNanos.Load())
+}
+
+// ResetProofCollectionStats zeroes the accumulated proof-collection stats. A benchmark calls this
+// before executing a block so the subsequent ProofCollectionStats reflect only that block.
+//
+// Safe for concurrent access.
+func (committer *PayloadlessLedgerViewCommitter) ResetProofCollectionStats() {
+	committer.proofCalls.Store(0)
+	committer.proofNanos.Store(0)
 }
