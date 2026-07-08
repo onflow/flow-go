@@ -206,8 +206,10 @@ func TestProveAndReconstruct_MultipleRegisters(t *testing.T) {
 }
 
 func TestProveAndReconstruct_NonInclusion(t *testing.T) {
-	// Non-inclusion proof: Inclusion = false, no LeafHash. The reader must
-	// not be called; the reconstructed leaf carries an empty payload.
+	// Non-inclusion proof: Inclusion = false, no LeafHash. Values are read
+	// eagerly (in parallel with Prove), so the reader IS called for the
+	// queried register, but its value is discarded and the reconstructed leaf
+	// carries an empty payload.
 	reg := unittest.MakeOwnerReg("k", "v")
 	path := pathFor(t, reg.Key)
 
@@ -221,16 +223,16 @@ func TestProveAndReconstruct_NonInclusion(t *testing.T) {
 	batch := ledger.NewPayloadlessTrieBatchProof()
 	batch.AppendProof(leaf)
 
-	readerNotCalled := func(flow.RegisterID) (flow.RegisterValue, error) {
-		t.Fatalf("valueReader must not be called for non-inclusion proofs")
-		return nil, nil
+	reader := func(id flow.RegisterID) (flow.RegisterValue, error) {
+		require.Equal(t, reg.Key, id)
+		return reg.Value, nil
 	}
 
 	bytes, err := payloadless.ProveAndReconstruct(
 		mockedLedger(batch),
 		ledger.State(unittest.StateCommitmentFixture()),
 		[]flow.RegisterID{reg.Key},
-		readerNotCalled,
+		reader,
 		complete.DefaultPathFinderVersion,
 	)
 	require.NoError(t, err)
@@ -250,7 +252,8 @@ func TestProveAndReconstruct_NonInclusion(t *testing.T) {
 func TestProveAndReconstruct_EmptyLeafInclusion(t *testing.T) {
 	// Inclusion = true but LeafHash = nil. The forest pads non-inclusion
 	// proofs with empty inclusions for non-existent paths; reconstruction
-	// must collapse those to empty payloads, not reach for a value.
+	// must collapse those to empty payloads. Values are read eagerly, so the
+	// reader IS called for the queried register, but the value is discarded.
 	reg := unittest.MakeOwnerReg("k", "v")
 	path := pathFor(t, reg.Key)
 
@@ -262,16 +265,16 @@ func TestProveAndReconstruct_EmptyLeafInclusion(t *testing.T) {
 	batch := ledger.NewPayloadlessTrieBatchProof()
 	batch.AppendProof(leaf)
 
-	readerNotCalled := func(flow.RegisterID) (flow.RegisterValue, error) {
-		t.Fatalf("valueReader must not be called for empty-leaf inclusion proofs")
-		return nil, nil
+	reader := func(id flow.RegisterID) (flow.RegisterValue, error) {
+		require.Equal(t, reg.Key, id)
+		return reg.Value, nil
 	}
 
 	bytes, err := payloadless.ProveAndReconstruct(
 		mockedLedger(batch),
 		ledger.State(unittest.StateCommitmentFixture()),
 		[]flow.RegisterID{reg.Key},
-		readerNotCalled,
+		reader,
 		complete.DefaultPathFinderVersion,
 	)
 	require.NoError(t, err)
@@ -308,13 +311,22 @@ func TestProveAndReconstruct_MixedProofs(t *testing.T) {
 	batch.AppendProof(empty)
 	batch.AppendProof(noninclusion)
 
-	// Atomic counter so this assertion stays valid if the reader is later
-	// invoked from worker goroutines.
+	// Values are read eagerly, in parallel with Prove, before it is known
+	// which paths are inclusion proofs. So the reader is invoked once per
+	// queried register (from worker goroutines); the atomic counter tracks
+	// that. Values for the empty-leaf and non-inclusion paths are discarded
+	// during reconstruction.
+	values := map[flow.RegisterID]flow.RegisterValue{
+		regA.Key: regA.Value,
+		regB.Key: regB.Value,
+		regC.Key: regC.Value,
+	}
 	var called atomic.Int32
 	reader := func(id flow.RegisterID) (flow.RegisterValue, error) {
 		called.Add(1)
-		require.Equal(t, regA.Key, id, "only the real inclusion path should reach the reader")
-		return regA.Value, nil
+		v, ok := values[id]
+		require.Truef(t, ok, "reader called for unknown register %s", id)
+		return v, nil
 	}
 
 	bytes, err := payloadless.ProveAndReconstruct(
@@ -325,7 +337,7 @@ func TestProveAndReconstruct_MixedProofs(t *testing.T) {
 		complete.DefaultPathFinderVersion,
 	)
 	require.NoError(t, err)
-	require.Equal(t, int32(1), called.Load(), "reader should be invoked exactly once (for the real inclusion)")
+	require.Equal(t, int32(3), called.Load(), "reader should be invoked once per queried register")
 
 	full, err := ledger.DecodeTrieBatchProof(bytes)
 	require.NoError(t, err)
@@ -407,9 +419,12 @@ func TestProveAndReconstruct_MissingTargetForProofPath(t *testing.T) {
 	batch := ledger.NewPayloadlessTrieBatchProof()
 	batch.AppendProof(leaf)
 
-	reader := func(flow.RegisterID) (flow.RegisterValue, error) {
-		t.Fatalf("reader must not be called when path → target lookup fails")
-		return nil, nil
+	// Values are read eagerly for the queried register(s), so the reader is
+	// called for queriedReg. The error surfaces later, during reconstruction,
+	// because the proof's foreign path has no entry in the path → target map.
+	reader := func(id flow.RegisterID) (flow.RegisterValue, error) {
+		require.Equal(t, queriedReg.Key, id)
+		return queriedReg.Value, nil
 	}
 
 	_, err := payloadless.ProveAndReconstruct(
