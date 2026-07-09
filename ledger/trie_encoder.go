@@ -912,15 +912,29 @@ func EncodeTrieBatchProof(bp *TrieBatchProof) []byte {
 	return buffer
 }
 
-// encodeBatchProof encodes a batch proof into a byte slice
+// encodeBatchProof encodes a batch proof into a byte slice.
+//
+// Each proof is encoded independently, then the encoded proofs are concatenated in order behind a
+// count header. The output buffer is preallocated to its exact final size (computed from the encoded
+// proofs) to avoid repeated grow-and-copy while appending.
 func encodeTrieBatchProof(bp *TrieBatchProof, version uint16) []byte {
-	buffer := make([]byte, 0)
+	// Encode each proof into its own buffer.
+	encoded := make([][]byte, len(bp.Proofs))
+	for i, p := range bp.Proofs {
+		encoded[i] = encodeTrieProof(p, version)
+	}
+
+	// Preallocate the buffer to its exact size to avoid repeated growth-and-copy while appending.
+	total := 4 // uint32 proof count
+	for _, encP := range encoded {
+		total += 8 + len(encP) // uint64 length prefix + proof content
+	}
+	buffer := make([]byte, 0, total)
+
 	// encode number of proofs
 	buffer = utils.AppendUint32(buffer, uint32(len(bp.Proofs)))
 	// iterate over proofs
-	for _, p := range bp.Proofs {
-		// encode the proof
-		encP := encodeTrieProof(p, version)
+	for _, encP := range encoded {
 		// encode the len of the encoded proof
 		buffer = utils.AppendUint64(buffer, uint64(len(encP)))
 		// append the encoded proof

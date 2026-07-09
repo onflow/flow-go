@@ -11,6 +11,7 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
+	uberatomic "go.uber.org/atomic"
 
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	"github.com/onflow/flow-go/engine/execution"
@@ -597,7 +598,9 @@ func buildViewCommitter(logger zerolog.Logger) (computer.ViewCommitter, ledgerSt
 		if flagTrieDir == "" {
 			return nil, nil, nil, fmt.Errorf("--triedir is required for --committer=payloadless")
 		}
-		pl, err := ledgerfactory.NewPayloadlessLedger(ledgerConfig(logger), nil)
+		// The compactor unconditionally reads the manual-checkpoint-trigger flag, so it must be non-nil
+		// even though this benchmark never triggers a checkpoint manually.
+		pl, err := ledgerfactory.NewPayloadlessLedger(ledgerConfig(logger), uberatomic.NewBool(false))
 		if err != nil {
 			return nil, nil, nil, fmt.Errorf("could not open payloadless ledger at %s: %w", flagTrieDir, err)
 		}
@@ -610,7 +613,9 @@ func buildViewCommitter(logger zerolog.Logger) (computer.ViewCommitter, ledgerSt
 		if flagTrieDir == "" {
 			return nil, nil, nil, fmt.Errorf("--triedir is required for --committer=full")
 		}
-		led, err := ledgerfactory.NewLedger(ledgerConfig(logger), nil)
+		// The compactor unconditionally reads the manual-checkpoint-trigger flag, so it must be non-nil
+		// even though this benchmark never triggers a checkpoint manually.
+		led, err := ledgerfactory.NewLedger(ledgerConfig(logger), uberatomic.NewBool(false))
 		if err != nil {
 			return nil, nil, nil, fmt.Errorf("could not open full ledger at %s: %w", flagTrieDir, err)
 		}

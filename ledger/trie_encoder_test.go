@@ -539,6 +539,30 @@ func TestBatchProofSerialization(t *testing.T) {
 		require.NoError(t, err)
 		require.True(t, newbp.Equals(bp))
 	})
+
+	// A large batch of distinct proofs exercises the exact-size buffer preallocation in
+	// encodeTrieBatchProof: it must round-trip and preserve the proofs' original order (each proof is
+	// made distinct so an ordering or size-calculation bug would be detected).
+	t.Run("large batch", func(t *testing.T) {
+		const n = 500
+		proofs := make([]*ledger.TrieProof, n)
+		for i := 0; i < n; i++ {
+			proofs[i] = &ledger.TrieProof{
+				Payload:   testutils.LightPayload(uint16(i), uint16(i*3+1)),
+				Interims:  []hash.Hash{interim1, interim2},
+				Inclusion: true,
+				Flags:     []byte{byte(130), byte(0)},
+				Steps:     7,
+				Path:      testutils.PathByUint16(uint16(i)),
+			}
+		}
+		large := &ledger.TrieBatchProof{Proofs: proofs}
+
+		encoded := ledger.EncodeTrieBatchProof(large)
+		decoded, err := ledger.DecodeTrieBatchProof(encoded)
+		require.NoError(t, err)
+		require.True(t, decoded.Equals(large))
+	})
 }
 
 // TestTrieUpdateSerialization tests encoding and decoding functionality of a trie update

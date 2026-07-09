@@ -3,6 +3,7 @@ package reexecute_block
 import (
 	"errors"
 	"fmt"
+	"sync"
 
 	"github.com/ipfs/boxo/blockstore"
 	"github.com/ipfs/go-datastore"
@@ -48,8 +49,15 @@ type RegisterGetter interface {
 //
 // A register that does not exist at or below the height reads back as an empty value (nil), matching
 // the value FVM expects for an unset register.
+//
+// The returned snapshot caches reads (see [cachingStorageSnapshot]) so it faithfully mirrors the
+// production base snapshot, [storehouse.BlockEndStateSnapshot], which holds a read cache. Because the
+// block computer passes one base-snapshot instance to both block execution and proof collection, a
+// register read during execution is served from the cache when proof collection re-reads it — exactly
+// as in production. Without this cache the benchmark would count a second register-store read at proof
+// time that never happens on a real execution node.
 func StorehouseSnapshotAtHeight(getter RegisterGetter, height uint64) snapshot.StorageSnapshot {
-	return snapshot.NewReadFuncStorageSnapshot(func(id flow.RegisterID) (flow.RegisterValue, error) {
+	return newCachingStorageSnapshot(func(id flow.RegisterID) (flow.RegisterValue, error) {
 		value, err := getter.Get(id, height)
 		if err != nil {
 			if errors.Is(err, storage.ErrNotFound) {
@@ -60,6 +68,52 @@ func StorehouseSnapshotAtHeight(getter RegisterGetter, height uint64) snapshot.S
 		}
 		return value, nil
 	})
+}
+
+// cachingStorageSnapshot wraps a register read function with an in-memory read cache, mirroring the
+// production [storehouse.BlockEndStateSnapshot]: the first read of a register hits the backing store
+// and is cached; subsequent reads of the same register (notably proof collection re-reading a register
+// already read during block execution) are served from the cache. nil (unset register) values are
+// cached too, since the backing store does not change them for a fixed height.
+//
+// Safe for concurrent access: block execution and proof collection both read concurrently.
+type cachingStorageSnapshot struct {
+	read  func(flow.RegisterID) (flow.RegisterValue, error)
+	mu    sync.RWMutex
+	cache map[flow.RegisterID]flow.RegisterValue
+}
+
+// newCachingStorageSnapshot returns a caching snapshot over the given read function.
+func newCachingStorageSnapshot(
+	read func(flow.RegisterID) (flow.RegisterValue, error),
+) *cachingStorageSnapshot {
+	return &cachingStorageSnapshot{
+		read:  read,
+		cache: make(map[flow.RegisterID]flow.RegisterValue),
+	}
+}
+
+// Get returns the register value, serving it from the cache when present and otherwise reading it from
+// the backing store and caching the result.
+//
+// No error returns are expected during normal operation.
+func (s *cachingStorageSnapshot) Get(id flow.RegisterID) (flow.RegisterValue, error) {
+	s.mu.RLock()
+	value, ok := s.cache[id]
+	s.mu.RUnlock()
+	if ok {
+		return value, nil
+	}
+
+	value, err := s.read(id)
+	if err != nil {
+		return nil, err
+	}
+
+	s.mu.Lock()
+	s.cache[id] = value
+	s.mu.Unlock()
+	return value, nil
 }
 
 // AssembleExecutableBlock builds an [entity.ExecutableBlock] from a full block, its complete
