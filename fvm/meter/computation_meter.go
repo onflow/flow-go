@@ -87,7 +87,11 @@ func NewComputationMeter(params ComputationMeterParameters) ComputationMeter {
 	}
 }
 
-// MeterComputation captures computation usage and returns an error if it goes beyond the limit
+// MeterComputation captures computation usage.
+//
+// Expected error returns during normal operation:
+//   - [errors.LimitExceededError] with [errors.LimitKindComputation] if the
+//     total weighted computation usage exceeds the computation limit
 func (m *ComputationMeter) MeterComputation(usage common.ComputationUsage) error {
 	kind := usage.Kind
 	intensity := usage.Intensity

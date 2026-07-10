@@ -167,7 +167,15 @@ func (state *ExecutionState) DropChanges() error {
 	return state.spockState.DropChanges()
 }
 
-// Get returns a register value given owner and key
+// Get returns a register value given owner and key. Limits are only enforced
+// when metering is enabled.
+//
+// Expected error returns during normal operation:
+//   - [errors.StateKeySizeLimitError] if the key exceeds the key size limit
+//   - [errors.LimitExceededError] with [errors.LimitKindLedgerInteraction] if
+//     the storage interaction limit is exceeded
+//
+// All other errors are exceptions (ledger failures, use after finalization).
 func (state *ExecutionState) Get(id flow.RegisterID) (flow.RegisterValue, error) {
 	if state.finalized {
 		return nil, fmt.Errorf("cannot Get on a finalized state")
@@ -193,7 +201,16 @@ func (state *ExecutionState) Get(id flow.RegisterID) (flow.RegisterValue, error)
 	return value, err
 }
 
-// Set updates state delta with a register update
+// Set updates state delta with a register update. Limits are only enforced
+// when metering is enabled.
+//
+// Expected error returns during normal operation:
+//   - [errors.StateKeySizeLimitError] or [errors.StateValueSizeLimitError] if
+//     the key or value exceeds its size limit
+//   - [errors.LimitExceededError] with [errors.LimitKindLedgerInteraction] if
+//     the storage interaction limit is exceeded
+//
+// All other errors are exceptions (ledger failures, use after finalization).
 func (state *ExecutionState) Set(id flow.RegisterID, value flow.RegisterValue) error {
 	if state.finalized {
 		return fmt.Errorf("cannot Set on a finalized state")
@@ -215,7 +232,14 @@ func (state *ExecutionState) Set(id flow.RegisterID, value flow.RegisterValue) e
 	return state.meter.MeterStorageWrite(id, value, state.meteringEnabled)
 }
 
-// MeterComputation meters computation usage
+// MeterComputation meters computation usage. It is a no-op if metering is
+// disabled.
+//
+// Expected error returns during normal operation:
+//   - [errors.LimitExceededError] with [errors.LimitKindComputation] if the
+//     computation limit is exceeded
+//
+// Returns an exception if called on a finalized state.
 func (state *ExecutionState) MeterComputation(usage common.ComputationUsage) error {
 	if state.finalized {
 		return fmt.Errorf("cannot MeterComputation on a finalized state")
@@ -255,7 +279,13 @@ func (state *ExecutionState) TotalComputationLimit() uint64 {
 	return state.meter.TotalComputationLimit()
 }
 
-// MeterMemory meters memory usage
+// MeterMemory meters memory usage. It is a no-op if metering is disabled.
+//
+// Expected error returns during normal operation:
+//   - [errors.LimitExceededError] with [errors.LimitKindMemory] if the memory
+//     limit is exceeded
+//
+// Returns an exception if called on a finalized state.
 func (state *ExecutionState) MeterMemory(usage common.MemoryUsage) error {
 	if state.finalized {
 		return fmt.Errorf("cannot MeterMemory on a finalized state")
@@ -283,6 +313,14 @@ func (state *ExecutionState) TotalMemoryLimit() uint {
 	return uint(state.meter.TotalMemoryLimit())
 }
 
+// MeterEmittedEvent captures the byte size of an emitted event. It is a no-op
+// if metering is disabled.
+//
+// Expected error returns during normal operation:
+//   - [errors.LimitExceededError] with [errors.LimitKindEvent] if the event
+//     byte size limit is exceeded
+//
+// Returns an exception if called on a finalized state.
 func (state *ExecutionState) MeterEmittedEvent(byteSize uint64) error {
 	if state.finalized {
 		return fmt.Errorf("cannot MeterEmittedEvent on a finalized state")

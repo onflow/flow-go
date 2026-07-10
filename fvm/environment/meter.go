@@ -105,6 +105,11 @@ var MainnetExecutionEffortWeights = meter.ExecutionEffortWeights{
 }
 
 type Meter interface {
+	// Gauge provides MeterComputation and MeterMemory. Both may return
+	// [errors.LimitExceededError] when the corresponding metering limit is
+	// exceeded. In script environments, MeterComputation may additionally
+	// return [errors.ScriptExecutionTimedOutError] or
+	// [errors.ScriptExecutionCancelledError].
 	common.Gauge
 
 	// MeteringResult returns the metering totals accumulated so far.
@@ -112,6 +117,11 @@ type Meter interface {
 
 	ComputationRemaining(kind common.ComputationKind) uint64
 
+	// MeterEmittedEvent captures the byte size of an emitted event.
+	//
+	// Expected error returns during normal operation:
+	//   - [errors.LimitExceededError] with [errors.LimitKindEvent] if the
+	//     event byte size limit is exceeded
 	MeterEmittedEvent(byteSize uint64) error
 
 	RunWithMeteringDisabled(f func())
@@ -153,6 +163,15 @@ func NewCancellableMeter(
 	}
 }
 
+// MeterComputation checks for script cancellation and timeout before
+// delegating to the embedded meter.
+//
+// Expected error returns during normal operation:
+//   - [errors.ScriptExecutionTimedOutError] if the script exceeded its
+//     allotted execution time
+//   - [errors.ScriptExecutionCancelledError] if the script's context was
+//     cancelled
+//   - [errors.LimitExceededError] if a metering limit is exceeded
 func (meter *cancellableMeter) MeterComputation(usage common.ComputationUsage) error {
 	// this method is called on every unit of operation, so
 	// checking the context here is the most likely would capture

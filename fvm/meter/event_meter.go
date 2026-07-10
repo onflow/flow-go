@@ -36,6 +36,11 @@ func NewEventMeter(params EventMeterParameters) EventMeter {
 	}
 }
 
+// MeterEmittedEvent captures the byte size of an emitted event.
+//
+// Expected error returns during normal operation:
+//   - [errors.LimitExceededError] with [errors.LimitKindEvent] if the total
+//     byte size of emitted events exceeds the event byte size limit
 func (m *EventMeter) MeterEmittedEvent(byteSize uint64) error {
 	m.totalEmittedEventBytes += byteSize
 
