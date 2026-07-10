@@ -29,6 +29,7 @@ import (
 	export "github.com/onflow/flow-go/cmd/util/cmd/exec-data-json-export"
 	edbs "github.com/onflow/flow-go/cmd/util/cmd/execution-data-blobstore/cmd"
 	extract "github.com/onflow/flow-go/cmd/util/cmd/execution-state-extract"
+	extractpayloadless "github.com/onflow/flow-go/cmd/util/cmd/execution-state-extract-payloadless"
 	evm_state_exporter "github.com/onflow/flow-go/cmd/util/cmd/export-evm-state"
 	ledger_json_exporter "github.com/onflow/flow-go/cmd/util/cmd/export-json-execution-state"
 	export_json_transactions "github.com/onflow/flow-go/cmd/util/cmd/export-json-transactions"
@@ -44,6 +45,7 @@ import (
 	read_hotstuff "github.com/onflow/flow-go/cmd/util/cmd/read-hotstuff/cmd"
 	read_protocol_state "github.com/onflow/flow-go/cmd/util/cmd/read-protocol-state/cmd"
 	remove_execution_fork "github.com/onflow/flow-go/cmd/util/cmd/remove-execution-fork/cmd"
+	reexecute_block "github.com/onflow/flow-go/cmd/util/cmd/reexecute-block"
 	rollback_executed_height "github.com/onflow/flow-go/cmd/util/cmd/rollback-executed-height/cmd"
 	run_script "github.com/onflow/flow-go/cmd/util/cmd/run-script"
 	"github.com/onflow/flow-go/cmd/util/cmd/snapshot"
@@ -106,6 +108,7 @@ func init() {
 func addCommands() {
 	rootCmd.AddCommand(version.Cmd)
 	rootCmd.AddCommand(extract.Cmd)
+	rootCmd.AddCommand(extractpayloadless.Cmd)
 	rootCmd.AddCommand(export.Cmd)
 	rootCmd.AddCommand(checkpoint_list_tries.Cmd)
 	rootCmd.AddCommand(checkpoint_collect_stats.Cmd)
@@ -120,6 +123,7 @@ func addCommands() {
 	rootCmd.AddCommand(epochs.RootCmd)
 	rootCmd.AddCommand(edbs.RootCmd)
 	rootCmd.AddCommand(rollback_executed_height.Cmd)
+	rootCmd.AddCommand(reexecute_block.Cmd)
 	rootCmd.AddCommand(read_execution_state.Cmd)
 	rootCmd.AddCommand(snapshot.Cmd)
 	rootCmd.AddCommand(export_json_transactions.Cmd)
