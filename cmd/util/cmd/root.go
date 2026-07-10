@@ -46,6 +46,7 @@ import (
 	read_protocol_state "github.com/onflow/flow-go/cmd/util/cmd/read-protocol-state/cmd"
 	remove_execution_fork "github.com/onflow/flow-go/cmd/util/cmd/remove-execution-fork/cmd"
 	rollback_executed_height "github.com/onflow/flow-go/cmd/util/cmd/rollback-executed-height/cmd"
+	rollback_storehouse_height "github.com/onflow/flow-go/cmd/util/cmd/rollback-storehouse-height"
 	run_script "github.com/onflow/flow-go/cmd/util/cmd/run-script"
 	"github.com/onflow/flow-go/cmd/util/cmd/snapshot"
 	storehouse_checkpoint_validator "github.com/onflow/flow-go/cmd/util/cmd/storehouse-checkpoint-validator"
@@ -122,6 +123,7 @@ func addCommands() {
 	rootCmd.AddCommand(epochs.RootCmd)
 	rootCmd.AddCommand(edbs.RootCmd)
 	rootCmd.AddCommand(rollback_executed_height.Cmd)
+	rootCmd.AddCommand(rollback_storehouse_height.Cmd)
 	rootCmd.AddCommand(read_execution_state.Cmd)
 	rootCmd.AddCommand(snapshot.Cmd)
 	rootCmd.AddCommand(export_json_transactions.Cmd)
