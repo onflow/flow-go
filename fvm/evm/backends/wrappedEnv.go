@@ -67,9 +67,8 @@ func (we *WrappedEnvironment) MeterComputation(usage common.ComputationUsage) er
 }
 
 // MeteringResult returns the metering totals accumulated so far.
-func (we *WrappedEnvironment) MeteringResult() (meter.MeteringResult, error) {
-	val, err := we.env.MeteringResult()
-	return val, handleEnvironmentError(err)
+func (we *WrappedEnvironment) MeteringResult() meter.MeteringResult {
+	return we.env.MeteringResult()
 }
 
 // ComputationRemaining returns the remaining computation for the given kind.

@@ -242,7 +242,7 @@ func (_c *Meter_MeterMemory_Call) RunAndReturn(run func(usage common.MemoryUsage
 }
 
 // MeteringResult provides a mock function for the type Meter
-func (_mock *Meter) MeteringResult() (meter.MeteringResult, error) {
+func (_mock *Meter) MeteringResult() meter.MeteringResult {
 	ret := _mock.Called()
 
 	if len(ret) == 0 {
@@ -250,21 +250,12 @@ func (_mock *Meter) MeteringResult() (meter.MeteringResult, error) {
 	}
 
 	var r0 meter.MeteringResult
-	var r1 error
-	if returnFunc, ok := ret.Get(0).(func() (meter.MeteringResult, error)); ok {
-		return returnFunc()
-	}
 	if returnFunc, ok := ret.Get(0).(func() meter.MeteringResult); ok {
 		r0 = returnFunc()
 	} else {
 		r0 = ret.Get(0).(meter.MeteringResult)
 	}
-	if returnFunc, ok := ret.Get(1).(func() error); ok {
-		r1 = returnFunc()
-	} else {
-		r1 = ret.Error(1)
-	}
-	return r0, r1
+	return r0
 }
 
 // Meter_MeteringResult_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'MeteringResult'
@@ -284,12 +275,12 @@ func (_c *Meter_MeteringResult_Call) Run(run func()) *Meter_MeteringResult_Call 
 	return _c
 }
 
-func (_c *Meter_MeteringResult_Call) Return(meteringResult meter.MeteringResult, err error) *Meter_MeteringResult_Call {
-	_c.Call.Return(meteringResult, err)
+func (_c *Meter_MeteringResult_Call) Return(meteringResult meter.MeteringResult) *Meter_MeteringResult_Call {
+	_c.Call.Return(meteringResult)
 	return _c
 }
 
-func (_c *Meter_MeteringResult_Call) RunAndReturn(run func() (meter.MeteringResult, error)) *Meter_MeteringResult_Call {
+func (_c *Meter_MeteringResult_Call) RunAndReturn(run func() meter.MeteringResult) *Meter_MeteringResult_Call {
 	_c.Call.Return(run)
 	return _c
 }

@@ -108,9 +108,7 @@ type Meter interface {
 	common.Gauge
 
 	// MeteringResult returns the metering totals accumulated so far.
-	//
-	// No error returns are expected during normal operation.
-	MeteringResult() (meter.MeteringResult, error)
+	MeteringResult() meter.MeteringResult
 
 	ComputationRemaining(kind common.ComputationKind) uint64
 
@@ -129,12 +127,12 @@ func NewMeter(txnState state.NestedTransactionPreparer) Meter {
 	}
 }
 
-func (m *meterImpl) MeteringResult() (meter.MeteringResult, error) {
+func (m *meterImpl) MeteringResult() meter.MeteringResult {
 	return meter.MeteringResult{
 		ComputationUsed:        m.TotalComputationUsed(),
 		MemoryEstimate:         m.TotalMemoryEstimate(),
 		ComputationIntensities: m.ComputationIntensities(),
-	}, nil
+	}
 }
 
 type cancellableMeter struct {
