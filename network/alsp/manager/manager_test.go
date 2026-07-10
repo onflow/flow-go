@@ -494,7 +494,8 @@ func TestHandleReportedMisbehavior_And_SlashingViolationsConsumer_Integration(t 
 	ctx, cancel := context.WithCancel(context.Background())
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
 	testutils.StartNodesAndNetworks(signalerCtx, t, nodes, []network.EngineRegistry{victimNetwork})
-	defer testutils.StopComponents[p2p.LibP2PNode](t, nodes, 100*time.Millisecond)
+	// under CPU contention, shutting down all 7 libp2p nodes can take a while; a too tight timeout makes the test flaky.
+	defer testutils.StopComponents[p2p.LibP2PNode](t, nodes, 2*time.Second)
 	defer cancel()
 
 	p2ptest.LetNodesDiscoverEachOther(t, ctx, nodes, ids)
@@ -541,18 +542,29 @@ func TestHandleReportedMisbehavior_And_SlashingViolationsConsumer_Integration(t 
 		}
 	}
 
-	// ensures all misbehaving nodes are disconnected from the victim node
+	// ensures all misbehaving nodes are disconnected from the victim node.
+	// the disconnection requires the ALSP manager's heartbeat (1s interval) to apply the disallow-listing, followed by the
+	// victim's peer manager prune cycle (1s interval) to close the connection; under CPU contention this pipeline can take
+	// several seconds, hence the generous timeout (it does not slow down the happy path).
 	forEachMisbehavingNode(func(misbehavingNodeIndex int) {
-		p2ptest.RequireEventuallyNotConnected(t, []p2p.LibP2PNode{nodes[victimIndex]}, []p2p.LibP2PNode{nodes[misbehavingNodeIndex]}, 100*time.Millisecond, 2*time.Second)
+		p2ptest.RequireEventuallyNotConnected(t, []p2p.LibP2PNode{nodes[victimIndex]}, []p2p.LibP2PNode{nodes[misbehavingNodeIndex]}, 100*time.Millisecond, 10*time.Second)
+	})
+
+	// the victim node closes the connections (its peer manager prunes them), and the closure propagates to the misbehaving
+	// nodes' swarms asynchronously. Before performing the strict (no-retry) connectivity checks below, wait until each
+	// misbehaving node has also observed the disconnection; otherwise a stale (half-closed) connection on the misbehaving
+	// node's side makes the test flaky.
+	forEachMisbehavingNode(func(misbehavingNodeIndex int) {
+		p2ptest.RequireEventuallyNotConnected(t, []p2p.LibP2PNode{nodes[misbehavingNodeIndex]}, []p2p.LibP2PNode{nodes[victimIndex]}, 100*time.Millisecond, 10*time.Second)
 	})
 
 	// despite being disconnected from the victim node, misbehaving nodes and the honest node are still connected.
 	forEachMisbehavingNode(func(misbehavingNodeIndex int) {
-		p2ptest.RequireConnectedEventually(t, []p2p.LibP2PNode{nodes[honestNodeIndex], nodes[misbehavingNodeIndex]}, 1*time.Millisecond, 100*time.Millisecond)
+		p2ptest.RequireConnectedEventually(t, []p2p.LibP2PNode{nodes[honestNodeIndex], nodes[misbehavingNodeIndex]}, 1*time.Millisecond, 2*time.Second)
 	})
 
 	// despite disconnecting misbehaving nodes, ensure that (victim and honest) are still connected.
-	p2ptest.RequireConnectedEventually(t, []p2p.LibP2PNode{nodes[honestNodeIndex], nodes[victimIndex]}, 1*time.Millisecond, 100*time.Millisecond)
+	p2ptest.RequireConnectedEventually(t, []p2p.LibP2PNode{nodes[honestNodeIndex], nodes[victimIndex]}, 1*time.Millisecond, 2*time.Second)
 
 	// while misbehaving nodes are disconnected, they cannot connect to the victim node. Also, the victim node  cannot directly dial and connect to the misbehaving nodes until each node's peer score decays.
 	forEachMisbehavingNode(func(misbehavingNodeIndex int) {
