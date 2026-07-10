@@ -13,6 +13,7 @@ import (
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func TestWeightedComputationMetering(t *testing.T) {
@@ -72,8 +73,7 @@ func TestWeightedComputationMetering(t *testing.T) {
 			},
 		)
 		require.Error(t, err)
-		require.True(t, errors.IsComputationLimitExceededError(err))
-		require.Equal(t, err.Error(), errors.NewComputationLimitExceededError(10).Error())
+		unittest.RequireLimitExceededError(t, err, errors.LimitKindComputation, 10)
 
 		err = m.MeterMemory(
 			common.MemoryUsage{
@@ -100,8 +100,7 @@ func TestWeightedComputationMetering(t *testing.T) {
 			},
 		)
 		require.Error(t, err)
-		require.True(t, errors.IsMemoryLimitExceededError(err))
-		require.Equal(t, err.Error(), errors.NewMemoryLimitExceededError(10).Error())
+		unittest.RequireLimitExceededError(t, err, errors.LimitKindMemory, 10)
 	})
 
 	t.Run("meter computation and memory with weights", func(t *testing.T) {
@@ -271,8 +270,7 @@ func TestWeightedComputationMetering(t *testing.T) {
 			},
 		)
 		require.Error(t, err)
-		require.True(t, errors.IsComputationLimitExceededError(err))
-		require.Equal(t, err.Error(), errors.NewComputationLimitExceededError(9).Error())
+		unittest.RequireLimitExceededError(t, err, errors.LimitKindComputation, 9)
 	})
 
 	t.Run("merge meters - ignore limits", func(t *testing.T) {
@@ -341,7 +339,7 @@ func TestWeightedComputationMetering(t *testing.T) {
 				Intensity: 0,
 			},
 		)
-		require.True(t, errors.IsComputationLimitExceededError(err))
+		unittest.RequireLimitExceededError(t, err, errors.LimitKindComputation)
 	})
 
 	t.Run("merge meters - large values - memory", func(t *testing.T) {
@@ -379,8 +377,7 @@ func TestWeightedComputationMetering(t *testing.T) {
 			},
 		)
 		require.Error(t, err)
-		require.True(t, errors.IsMemoryLimitExceededError(err))
-		require.Equal(t, err.Error(), errors.NewMemoryLimitExceededError(math.MaxUint32).Error())
+		unittest.RequireLimitExceededError(t, err, errors.LimitKindMemory, math.MaxUint32)
 	})
 
 	t.Run("add intensity - test limits - computation", func(t *testing.T) {
@@ -489,7 +486,7 @@ func TestWeightedComputationMetering(t *testing.T) {
 				Intensity: 1,
 			},
 		)
-		require.True(t, errors.IsComputationLimitExceededError(err))
+		unittest.RequireLimitExceededError(t, err, errors.LimitKindComputation)
 		reset()
 		err = m.MeterComputation(
 			common.ComputationUsage{
@@ -497,7 +494,7 @@ func TestWeightedComputationMetering(t *testing.T) {
 				Intensity: 1 << meter.MeterExecutionInternalPrecisionBytes,
 			},
 		)
-		require.True(t, errors.IsComputationLimitExceededError(err))
+		unittest.RequireLimitExceededError(t, err, errors.LimitKindComputation)
 		reset()
 		err = m.MeterComputation(
 			common.ComputationUsage{
@@ -505,7 +502,7 @@ func TestWeightedComputationMetering(t *testing.T) {
 				Intensity: math.MaxUint32,
 			},
 		)
-		require.True(t, errors.IsComputationLimitExceededError(err))
+		unittest.RequireLimitExceededError(t, err, errors.LimitKindComputation)
 	})
 
 	t.Run("add intensity - test limits - memory", func(t *testing.T) {
@@ -604,7 +601,7 @@ func TestWeightedComputationMetering(t *testing.T) {
 				Amount: math.MaxUint32,
 			},
 		)
-		require.True(t, errors.IsMemoryLimitExceededError(err))
+		unittest.RequireLimitExceededError(t, err, errors.LimitKindMemory)
 
 		reset()
 		err = m.MeterMemory(
@@ -613,7 +610,7 @@ func TestWeightedComputationMetering(t *testing.T) {
 				Amount: 1,
 			},
 		)
-		require.True(t, errors.IsMemoryLimitExceededError(err))
+		unittest.RequireLimitExceededError(t, err, errors.LimitKindMemory)
 		reset()
 		err = m.MeterMemory(
 			common.MemoryUsage{
@@ -621,7 +618,7 @@ func TestWeightedComputationMetering(t *testing.T) {
 				Amount: 1,
 			},
 		)
-		require.True(t, errors.IsMemoryLimitExceededError(err))
+		unittest.RequireLimitExceededError(t, err, errors.LimitKindMemory)
 		reset()
 		err = m.MeterMemory(
 			common.MemoryUsage{
@@ -629,7 +626,7 @@ func TestWeightedComputationMetering(t *testing.T) {
 				Amount: math.MaxUint32,
 			},
 		)
-		require.True(t, errors.IsMemoryLimitExceededError(err))
+		unittest.RequireLimitExceededError(t, err, errors.LimitKindMemory)
 	})
 }
 
@@ -734,11 +731,7 @@ func TestStorageLimits(t *testing.T) {
 
 		err := meter1.MeterStorageRead(key1, val1, true /* enforced */)
 
-		ledgerInteractionLimitExceedError := errors.NewLedgerInteractionLimitExceededError(
-			meter.GetStorageKeyValueSizeForTesting(key1, val1),
-			testLimit,
-		)
-		require.ErrorAs(t, err, &ledgerInteractionLimitExceedError)
+		unittest.RequireLimitExceededError(t, err, errors.LimitKindLedgerInteraction, testLimit)
 	})
 
 	t.Run("metering storage written - exceeding limit - not enforced", func(t *testing.T) {
@@ -765,11 +758,7 @@ func TestStorageLimits(t *testing.T) {
 
 		err := meter1.MeterStorageWrite(key1, val1, true /* enforced */)
 
-		ledgerInteractionLimitExceedError := errors.NewLedgerInteractionLimitExceededError(
-			meter.GetStorageKeyValueSizeForTesting(key1, val1),
-			testLimit,
-		)
-		require.ErrorAs(t, err, &ledgerInteractionLimitExceedError)
+		unittest.RequireLimitExceededError(t, err, errors.LimitKindLedgerInteraction, testLimit)
 	})
 
 	t.Run("metering storage read and written - within limit", func(t *testing.T) {
@@ -842,11 +831,7 @@ func TestStorageLimits(t *testing.T) {
 
 		// write of key2
 		err = meter1.MeterStorageWrite(key2, val2, true)
-		ledgerInteractionLimitExceedError := errors.NewLedgerInteractionLimitExceededError(
-			size1+size2,
-			testLimit,
-		)
-		require.ErrorAs(t, err, &ledgerInteractionLimitExceedError)
+		unittest.RequireLimitExceededError(t, err, errors.LimitKindLedgerInteraction, testLimit)
 	})
 
 	t.Run("merge storage metering", func(t *testing.T) {
@@ -939,10 +924,7 @@ func TestEventLimits(t *testing.T) {
 		require.Equal(t, testSize1, meter1.TotalEmittedEventBytes())
 
 		err = meter1.MeterEmittedEvent(testSize2)
-		eventLimitExceededError := errors.NewEventLimitExceededError(
-			testSize1+testSize2,
-			testEventLimit)
-		require.ErrorAs(t, err, &eventLimitExceededError)
+		unittest.RequireLimitExceededError(t, err, errors.LimitKindEvent, testEventLimit)
 	})
 
 	t.Run("merge event metering", func(t *testing.T) {

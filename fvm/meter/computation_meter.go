@@ -99,7 +99,8 @@ func (m *ComputationMeter) MeterComputation(usage common.ComputationUsage) error
 	}
 	m.computationUsed += w * intensity
 	if m.computationUsed > m.params.computationLimit {
-		return errors.NewComputationLimitExceededError(
+		return errors.NewLimitExceededError(
+			errors.LimitKindComputation,
 			uint64(m.params.TotalComputationLimit()))
 	}
 	return nil

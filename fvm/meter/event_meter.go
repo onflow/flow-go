@@ -40,8 +40,8 @@ func (m *EventMeter) MeterEmittedEvent(byteSize uint64) error {
 	m.totalEmittedEventBytes += byteSize
 
 	if m.totalEmittedEventBytes > m.params.eventEmitByteLimit {
-		return errors.NewEventLimitExceededError(
-			m.totalEmittedEventBytes,
+		return errors.NewLimitExceededError(
+			errors.LimitKindEvent,
 			m.params.eventEmitByteLimit)
 	}
 	return nil

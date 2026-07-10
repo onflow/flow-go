@@ -1225,9 +1225,10 @@ func TestBlockContext_ExecuteTransaction_InteractionLimitReached(t *testing.T) {
 					snapshotTree)
 				require.NoError(t, err)
 
-				require.True(
+				unittest.RequireLimitExceededError(
 					t,
-					errors.IsLedgerInteractionLimitExceededError(output.Err))
+					output.Err,
+					errors.LimitKindLedgerInteraction)
 			}))
 
 	t.Run("Using to much interaction but not failing because of service account", newVMTest().withBootstrapProcedureOptions(bootstrapOptions...).

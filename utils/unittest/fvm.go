@@ -5,6 +5,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	fvmerrors "github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -14,5 +15,25 @@ func EnsureEventsIndexSeq(t *testing.T, events []flow.Event, chainID flow.ChainI
 	for _, event := range events {
 		require.Equal(t, expectedEventIndex, event.EventIndex)
 		expectedEventIndex++
+	}
+}
+
+// RequireLimitExceededError fails the test unless err's chain contains a
+// [fvmerrors.LimitExceededError] with the given kind. If expectedLimit is
+// provided, the error's limit must match it.
+func RequireLimitExceededError(
+	t testing.TB,
+	err error,
+	kind fvmerrors.LimitKind,
+	expectedLimit ...uint64,
+) {
+	require.LessOrEqual(t, len(expectedLimit), 1,
+		"at most one expected limit may be provided")
+
+	limitErr, ok := fvmerrors.AsLimitExceededError(err)
+	require.True(t, ok, "expected LimitExceededError, got: %v", err)
+	require.Equal(t, kind, limitErr.LimitKind())
+	if len(expectedLimit) == 1 {
+		require.Equal(t, expectedLimit[0], limitErr.Limit())
 	}
 }

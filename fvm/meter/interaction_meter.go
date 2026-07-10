@@ -123,8 +123,9 @@ func (m *InteractionMeter) replaceWrite(
 func (m *InteractionMeter) checkStorageInteractionLimit(enforceLimit bool) error {
 	if enforceLimit &&
 		m.TotalBytesOfStorageInteractions() > m.params.storageInteractionLimit {
-		return errors.NewLedgerInteractionLimitExceededError(
-			m.TotalBytesOfStorageInteractions(), m.params.storageInteractionLimit)
+		return errors.NewLimitExceededError(
+			errors.LimitKindLedgerInteraction,
+			m.params.storageInteractionLimit)
 	}
 	return nil
 }

@@ -1,6 +1,8 @@
 package errors
 
 import (
+	"fmt"
+
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/runtime"
 
@@ -117,32 +119,91 @@ func NewExecutionVersionProviderFailure(
 		"Failure in execution version provider")
 }
 
-// NewComputationLimitExceededError constructs a new CodedError which indicates
-// that computation has exceeded its limit.
-func NewComputationLimitExceededError(limit uint64) CodedError {
-	return NewCodedError(
-		ErrCodeComputationLimitExceededError,
-		"computation exceeds limit (%d)",
-		limit)
+// LimitKind identifies which metering limit was exceeded.
+type LimitKind uint8
+
+const (
+	// LimitKindComputation is the computation (execution effort) limit.
+	LimitKindComputation LimitKind = iota + 1
+	// LimitKindMemory is the memory limit.
+	LimitKindMemory
+	// LimitKindLedgerInteraction is the ledger interaction limit
+	// (total bytes read from and written to storage).
+	LimitKindLedgerInteraction
+	// LimitKindEvent is the total emitted event byte size limit.
+	LimitKindEvent
+)
+
+func (kind LimitKind) String() string {
+	switch kind {
+	case LimitKindComputation:
+		return "computation"
+	case LimitKindMemory:
+		return "memory"
+	case LimitKindLedgerInteraction:
+		return "ledger interaction"
+	case LimitKindEvent:
+		return "event byte size"
+	default:
+		panic(fmt.Sprintf("unknown limit kind: %d", uint8(kind)))
+	}
 }
 
-// IsComputationLimitExceededError returns true if error has this code.
-func IsComputationLimitExceededError(err error) bool {
-	return HasErrorCode(err, ErrCodeComputationLimitExceededError)
+// errorCode returns the ErrorCode associated with the limit kind.
+// Each kind keeps its own distinct, externally visible error code.
+func (kind LimitKind) errorCode() ErrorCode {
+	switch kind {
+	case LimitKindComputation:
+		return ErrCodeComputationLimitExceededError
+	case LimitKindMemory:
+		return ErrCodeMemoryLimitExceededError
+	case LimitKindLedgerInteraction:
+		return ErrCodeLedgerInteractionLimitExceededError
+	case LimitKindEvent:
+		return ErrCodeEventLimitExceededError
+	default:
+		panic(fmt.Sprintf("unknown limit kind: %d", uint8(kind)))
+	}
 }
 
-// NewMemoryLimitExceededError constructs a new CodedError which indicates
-// that execution has exceeded its memory limits.
-func NewMemoryLimitExceededError(limit uint64) CodedError {
-	return NewCodedError(
-		ErrCodeMemoryLimitExceededError,
-		"memory usage exceeds limit (%d)",
-		limit)
+// LimitExceededError is a CodedError which indicates that execution has
+// exceeded one of its metering limits. The exceeded limit is identified by
+// LimitKind. Each kind retains its own distinct error code.
+type LimitExceededError struct {
+	codedError
+	kind  LimitKind
+	limit uint64
 }
 
-// IsMemoryLimitExceededError returns true if error has this code.
-func IsMemoryLimitExceededError(err error) bool {
-	return HasErrorCode(err, ErrCodeMemoryLimitExceededError)
+// NewLimitExceededError constructs a new LimitExceededError for the given
+// limit kind.
+func NewLimitExceededError(kind LimitKind, limit uint64) LimitExceededError {
+	return LimitExceededError{
+		codedError: NewCodedError(
+			kind.errorCode(),
+			"%s limit exceeded (limit: %d)",
+			kind,
+			limit),
+		kind:  kind,
+		limit: limit,
+	}
+}
+
+// LimitKind returns which metering limit was exceeded.
+func (err LimitExceededError) LimitKind() LimitKind {
+	return err.kind
+}
+
+// Limit returns the limit that was exceeded.
+func (err LimitExceededError) Limit() uint64 {
+	return err.limit
+}
+
+// AsLimitExceededError returns the LimitExceededError in err's chain, if any.
+func AsLimitExceededError(err error) (LimitExceededError, bool) {
+	var limitErr LimitExceededError
+	ok := As(err, &limitErr)
+	return limitErr, ok
 }
 
 // NewStorageCapacityExceededError constructs a new CodedError which indicates
@@ -164,18 +225,6 @@ func NewStorageCapacityExceededError(
 
 func IsStorageCapacityExceededError(err error) bool {
 	return HasErrorCode(err, ErrCodeStorageCapacityExceeded)
-}
-
-// NewEventLimitExceededError constructs a CodedError which indicates that the
-// transaction has produced events with size more than limit.
-func NewEventLimitExceededError(
-	totalByteSize uint64,
-	limit uint64) CodedError {
-	return NewCodedError(
-		ErrCodeEventLimitExceededError,
-		"total event byte size (%d) exceeds limit (%d)",
-		totalByteSize,
-		limit)
 }
 
 // NewStateKeySizeLimitError constructs a CodedError which indicates that the
@@ -214,24 +263,6 @@ func NewStateValueSizeLimitError(
 		valueStr,
 		size,
 		limit)
-}
-
-// NewLedgerInteractionLimitExceededError constructs a CodeError. It is
-// returned when a tx hits the maximum ledger interaction limit.
-func NewLedgerInteractionLimitExceededError(
-	used uint64,
-	limit uint64,
-) CodedError {
-	return NewCodedError(
-		ErrCodeLedgerInteractionLimitExceededError,
-		"max interaction with storage has exceeded the limit "+
-			"(used: %d bytes, limit %d bytes)",
-		used,
-		limit)
-}
-
-func IsLedgerInteractionLimitExceededError(err error) bool {
-	return HasErrorCode(err, ErrCodeLedgerInteractionLimitExceededError)
 }
 
 // NewOperationNotSupportedError construct a new CodedError. It is generated
