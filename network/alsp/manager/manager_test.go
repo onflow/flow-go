@@ -102,6 +102,9 @@ func TestNetworkPassesReportedMisbehavior(t *testing.T) {
 // without any duplicate reports and within a specified time.
 func TestHandleReportedMisbehavior_Cache_Integration(t *testing.T) {
 	cfg := managerCfgFixture(t)
+	// this test asserts that the penalties are exactly the sum of the reported penalties; disable the periodic decay
+	// (which would otherwise zero-out the small penalties under test) by using a very long heartbeat interval.
+	cfg.HeartBeatInterval = time.Hour
 
 	// this test is assessing the integration of the ALSP manager with the network. As the ALSP manager is an attribute
 	// of the network, we need to configure the ALSP manager via the network configuration, and let the network create
@@ -170,15 +173,25 @@ func TestHandleReportedMisbehavior_Cache_Integration(t *testing.T) {
 			if !ok {
 				return false
 			}
-			require.NotNil(t, record)
-
-			require.Equal(t, totalPenalty, record.Penalty)
+			// reports are processed asynchronously by the worker pool, so the record may only reflect a subset of
+			// the reported penalties. We return false rather than asserting, because a failed assertion inside this
+			// callback would abort the test immediately; returning false lets require.Eventually retry until the
+			// record reaches its final state.
+			if record.Penalty != totalPenalty {
+				return false
+			}
 			// with just reporting a single misbehavior report, the cutoff counter should not be incremented.
-			require.Equal(t, uint64(0), record.CutoffCounter)
+			if record.CutoffCounter != uint64(0) {
+				return false
+			}
 			// with just reporting a single misbehavior report, the node should not be disallowed.
-			require.False(t, record.DisallowListed)
+			if record.DisallowListed {
+				return false
+			}
 			// the decay should be the default decay value.
-			require.Equal(t, model.SpamRecordFactory()(unittest.IdentifierFixture()).Decay, record.Decay)
+			if record.Decay != model.SpamRecordFactory()(unittest.IdentifierFixture()).Decay {
+				return false
+			}
 		}
 
 		return true
@@ -710,6 +723,9 @@ func TestMisbehaviorReportManager_InitializationError(t *testing.T) {
 // The test ensures that the misbehavior report is handled correctly and the penalty is applied to the peer in the cache.
 func TestHandleMisbehaviorReport_SinglePenaltyReport(t *testing.T) {
 	cfg := managerCfgFixture(t)
+	// this test asserts that the penalty is exactly the reported penalty; disable the periodic decay
+	// (which would otherwise zero-out the small penalty under test) by using a very long heartbeat interval.
+	cfg.HeartBeatInterval = time.Hour
 	consumer := mocknetwork.NewDisallowListNotificationConsumer(t)
 
 	// create a new MisbehaviorReportManager
@@ -752,11 +768,21 @@ func TestHandleMisbehaviorReport_SinglePenaltyReport(t *testing.T) {
 		if !ok {
 			return false
 		}
-		require.NotNil(t, record)
-		require.Equal(t, penalty, record.Penalty)
-		require.False(t, record.DisallowListed)                                                       // the peer should not be disallow listed yet
-		require.Equal(t, uint64(0), record.CutoffCounter)                                             // with just reporting a misbehavior, the cutoff counter should not be incremented.
-		require.Equal(t, model.SpamRecordFactory()(unittest.IdentifierFixture()).Decay, record.Decay) // the decay should be the default decay value.
+		// the report is processed asynchronously by the worker pool. We return false rather than asserting, because
+		// a failed assertion inside this callback would abort the test immediately; returning false lets
+		// require.Eventually retry until the record reaches its final state.
+		if record.Penalty != penalty {
+			return false
+		}
+		if record.DisallowListed { // the peer should not be disallow listed yet
+			return false
+		}
+		if record.CutoffCounter != uint64(0) { // with just reporting a misbehavior, the cutoff counter should not be incremented.
+			return false
+		}
+		if record.Decay != model.SpamRecordFactory()(unittest.IdentifierFixture()).Decay { // the decay should be the default decay value.
+			return false
+		}
 
 		return true
 	}, 1*time.Second, 10*time.Millisecond, "ALSP manager did not handle the misbehavior report")
@@ -825,6 +851,9 @@ func TestHandleMisbehaviorReport_SinglePenaltyReport_PenaltyDisable(t *testing.T
 // The test ensures that each misbehavior report is handled correctly and the penalties are cumulatively applied to the peer in the cache.
 func TestHandleMisbehaviorReport_MultiplePenaltyReportsForSinglePeer_Sequentially(t *testing.T) {
 	cfg := managerCfgFixture(t)
+	// this test asserts that the penalties are exactly the sum of the reported penalties; disable the periodic decay
+	// (which would otherwise zero-out the small penalties under test) by using a very long heartbeat interval.
+	cfg.HeartBeatInterval = time.Hour
 	consumer := mocknetwork.NewDisallowListNotificationConsumer(t)
 
 	// create a new MisbehaviorReportManager
@@ -867,17 +896,21 @@ func TestHandleMisbehaviorReport_MultiplePenaltyReportsForSinglePeer_Sequentiall
 		if !ok {
 			return false
 		}
-		require.NotNil(t, record)
-
 		if totalPenalty != record.Penalty {
 			// all the misbehavior reports should be processed by now, so the penalty should be equal to the total penalty
 			return false
 		}
-		require.False(t, record.DisallowListed) // the peer should not be disallow listed yet.
+		if record.DisallowListed { // the peer should not be disallow listed yet.
+			return false
+		}
 		// with just reporting a few misbehavior reports, the cutoff counter should not be incremented.
-		require.Equal(t, uint64(0), record.CutoffCounter)
+		if record.CutoffCounter != uint64(0) {
+			return false
+		}
 		// the decay should be the default decay value.
-		require.Equal(t, model.SpamRecordFactory()(unittest.IdentifierFixture()).Decay, record.Decay)
+		if record.Decay != model.SpamRecordFactory()(unittest.IdentifierFixture()).Decay {
+			return false
+		}
 
 		return true
 	}, 1*time.Second, 10*time.Millisecond, "ALSP manager did not handle the misbehavior report")
@@ -888,6 +921,9 @@ func TestHandleMisbehaviorReport_MultiplePenaltyReportsForSinglePeer_Sequentiall
 // The test ensures that each misbehavior report is handled correctly and the penalties are cumulatively applied to the peer in the cache.
 func TestHandleMisbehaviorReport_MultiplePenaltyReportsForSinglePeer_Concurrently(t *testing.T) {
 	cfg := managerCfgFixture(t)
+	// this test asserts that the penalties are exactly the sum of the reported penalties; disable the periodic decay
+	// (which would otherwise zero-out the small penalties under test) by using a very long heartbeat interval.
+	cfg.HeartBeatInterval = time.Hour
 	consumer := mocknetwork.NewDisallowListNotificationConsumer(t)
 
 	var cache alsp.SpamRecordCache
@@ -938,17 +974,21 @@ func TestHandleMisbehaviorReport_MultiplePenaltyReportsForSinglePeer_Concurrentl
 		if !ok {
 			return false
 		}
-		require.NotNil(t, record)
-
 		if totalPenalty != record.Penalty {
 			// all the misbehavior reports should be processed by now, so the penalty should be equal to the total penalty
 			return false
 		}
-		require.False(t, record.DisallowListed) // the peer should not be disallow listed yet.
+		if record.DisallowListed { // the peer should not be disallow listed yet.
+			return false
+		}
 		// with just reporting a few misbehavior reports, the cutoff counter should not be incremented.
-		require.Equal(t, uint64(0), record.CutoffCounter)
+		if record.CutoffCounter != uint64(0) {
+			return false
+		}
 		// the decay should be the default decay value.
-		require.Equal(t, model.SpamRecordFactory()(unittest.IdentifierFixture()).Decay, record.Decay)
+		if record.Decay != model.SpamRecordFactory()(unittest.IdentifierFixture()).Decay {
+			return false
+		}
 
 		return true
 	}, 1*time.Second, 10*time.Millisecond, "ALSP manager did not handle the misbehavior report")
@@ -959,6 +999,9 @@ func TestHandleMisbehaviorReport_MultiplePenaltyReportsForSinglePeer_Concurrentl
 // The test ensures that each misbehavior report is handled correctly and the penalties are applied to the corresponding peers in the cache.
 func TestHandleMisbehaviorReport_SinglePenaltyReportsForMultiplePeers_Sequentially(t *testing.T) {
 	cfg := managerCfgFixture(t)
+	// this test asserts that the penalties are exactly the reported penalties; disable the periodic decay
+	// (which would otherwise zero-out the small penalties under test) by using a very long heartbeat interval.
+	cfg.HeartBeatInterval = time.Hour
 	consumer := mocknetwork.NewDisallowListNotificationConsumer(t)
 
 	var cache alsp.SpamRecordCache
@@ -1000,13 +1043,20 @@ func TestHandleMisbehaviorReport_SinglePenaltyReportsForMultiplePeers_Sequential
 			if !ok {
 				return false
 			}
-			require.NotNil(t, record)
-			require.False(t, record.DisallowListed) // the peer should not be disallow listed yet.
-			require.Equal(t, report.Penalty(), record.Penalty)
+			if record.DisallowListed { // the peer should not be disallow listed yet.
+				return false
+			}
+			if record.Penalty != report.Penalty() {
+				return false
+			}
 			// with just reporting a single misbehavior report, the cutoff counter should not be incremented.
-			require.Equal(t, uint64(0), record.CutoffCounter)
+			if record.CutoffCounter != uint64(0) {
+				return false
+			}
 			// the decay should be the default decay value.
-			require.Equal(t, model.SpamRecordFactory()(unittest.IdentifierFixture()).Decay, record.Decay)
+			if record.Decay != model.SpamRecordFactory()(unittest.IdentifierFixture()).Decay {
+				return false
+			}
 		}
 
 		return true
@@ -1019,6 +1069,9 @@ func TestHandleMisbehaviorReport_SinglePenaltyReportsForMultiplePeers_Sequential
 // The test ensures that each misbehavior report is handled correctly and the penalties are applied to the corresponding peers in the cache.
 func TestHandleMisbehaviorReport_SinglePenaltyReportsForMultiplePeers_Concurrently(t *testing.T) {
 	cfg := managerCfgFixture(t)
+	// this test asserts that the penalties are exactly the reported penalties; disable the periodic decay
+	// (which would otherwise zero-out the small penalties under test) by using a very long heartbeat interval.
+	cfg.HeartBeatInterval = time.Hour
 	consumer := mocknetwork.NewDisallowListNotificationConsumer(t)
 
 	var cache alsp.SpamRecordCache
@@ -1071,13 +1124,20 @@ func TestHandleMisbehaviorReport_SinglePenaltyReportsForMultiplePeers_Concurrent
 			if !ok {
 				return false
 			}
-			require.NotNil(t, record)
-			require.False(t, record.DisallowListed) // the peer should not be disallow listed yet.
-			require.Equal(t, report.Penalty(), record.Penalty)
+			if record.DisallowListed { // the peer should not be disallow listed yet.
+				return false
+			}
+			if record.Penalty != report.Penalty() {
+				return false
+			}
 			// with just reporting a single misbehavior report, the cutoff counter should not be incremented.
-			require.Equal(t, uint64(0), record.CutoffCounter)
+			if record.CutoffCounter != uint64(0) {
+				return false
+			}
 			// the decay should be the default decay value.
-			require.Equal(t, model.SpamRecordFactory()(unittest.IdentifierFixture()).Decay, record.Decay)
+			if record.Decay != model.SpamRecordFactory()(unittest.IdentifierFixture()).Decay {
+				return false
+			}
 		}
 
 		return true
@@ -1089,6 +1149,9 @@ func TestHandleMisbehaviorReport_SinglePenaltyReportsForMultiplePeers_Concurrent
 // The test ensures that each misbehavior report is handled correctly and the penalties are cumulatively applied to the corresponding peers in the cache.
 func TestHandleMisbehaviorReport_MultiplePenaltyReportsForMultiplePeers_Sequentially(t *testing.T) {
 	cfg := managerCfgFixture(t)
+	// this test asserts that the penalties are exactly the sum of the reported penalties; disable the periodic decay
+	// (which would otherwise zero-out the small penalties under test) by using a very long heartbeat interval.
+	cfg.HeartBeatInterval = time.Hour
 	consumer := mocknetwork.NewDisallowListNotificationConsumer(t)
 
 	var cache alsp.SpamRecordCache
@@ -1152,13 +1215,20 @@ func TestHandleMisbehaviorReport_MultiplePenaltyReportsForMultiplePeers_Sequenti
 			if !ok {
 				return false
 			}
-			require.NotNil(t, record)
-			require.False(t, record.DisallowListed) // the peer should not be disallow listed yet.
-			require.Equal(t, totalPenalty, record.Penalty)
+			if record.DisallowListed { // the peer should not be disallow listed yet.
+				return false
+			}
+			if record.Penalty != totalPenalty {
+				return false
+			}
 			// with just reporting a single misbehavior report, the cutoff counter should not be incremented.
-			require.Equal(t, uint64(0), record.CutoffCounter)
+			if record.CutoffCounter != uint64(0) {
+				return false
+			}
 			// the decay should be the default decay value.
-			require.Equal(t, model.SpamRecordFactory()(unittest.IdentifierFixture()).Decay, record.Decay)
+			if record.Decay != model.SpamRecordFactory()(unittest.IdentifierFixture()).Decay {
+				return false
+			}
 		}
 
 		return true
@@ -1170,6 +1240,9 @@ func TestHandleMisbehaviorReport_MultiplePenaltyReportsForMultiplePeers_Sequenti
 // The test ensures that each misbehavior report is handled correctly and the penalties are cumulatively applied to the corresponding peers in the cache.
 func TestHandleMisbehaviorReport_MultiplePenaltyReportsForMultiplePeers_Concurrently(t *testing.T) {
 	cfg := managerCfgFixture(t)
+	// this test asserts that the penalties are exactly the sum of the reported penalties; disable the periodic decay
+	// (which would otherwise zero-out the small penalties under test) by using a very long heartbeat interval.
+	cfg.HeartBeatInterval = time.Hour
 	consumer := mocknetwork.NewDisallowListNotificationConsumer(t)
 
 	var cache alsp.SpamRecordCache
@@ -1224,13 +1297,20 @@ func TestHandleMisbehaviorReport_MultiplePenaltyReportsForMultiplePeers_Concurre
 			if !ok {
 				return false
 			}
-			require.NotNil(t, record)
-			require.False(t, record.DisallowListed) // the peer should not be disallow listed yet.
-			require.Equal(t, totalPenalty, record.Penalty)
+			if record.DisallowListed { // the peer should not be disallow listed yet.
+				return false
+			}
+			if record.Penalty != totalPenalty {
+				return false
+			}
 			// with just reporting a single misbehavior report, the cutoff counter should not be incremented.
-			require.Equal(t, uint64(0), record.CutoffCounter)
+			if record.CutoffCounter != uint64(0) {
+				return false
+			}
 			// the decay should be the default decay value.
-			require.Equal(t, model.SpamRecordFactory()(unittest.IdentifierFixture()).Decay, record.Decay)
+			if record.Decay != model.SpamRecordFactory()(unittest.IdentifierFixture()).Decay {
+				return false
+			}
 		}
 
 		return true
@@ -1245,6 +1325,9 @@ func TestHandleMisbehaviorReport_MultiplePenaltyReportsForMultiplePeers_Concurre
 // is uniquely identifying a traffic violation, even though the description of the violation is the same.
 func TestHandleMisbehaviorReport_DuplicateReportsForSinglePeer_Concurrently(t *testing.T) {
 	cfg := managerCfgFixture(t)
+	// this test asserts that the penalty is exactly the sum of the reported penalties; disable the periodic decay
+	// (which would otherwise decay the penalty and potentially disallow-list the peer) by using a very long heartbeat interval.
+	cfg.HeartBeatInterval = time.Hour
 	consumer := mocknetwork.NewDisallowListNotificationConsumer(t)
 
 	var cache alsp.SpamRecordCache
@@ -1293,17 +1376,21 @@ func TestHandleMisbehaviorReport_DuplicateReportsForSinglePeer_Concurrently(t *t
 		if !ok {
 			return false
 		}
-		require.NotNil(t, record)
-
 		// eventually, the penalty should be the accumulated penalty of all the duplicate misbehavior reports.
 		if record.Penalty != report.Penalty()*float64(times) {
 			return false
 		}
-		require.False(t, record.DisallowListed) // the peer should not be disallow listed yet.
+		if record.DisallowListed { // the peer should not be disallow listed yet.
+			return false
+		}
 		// with just reporting a few misbehavior reports, the cutoff counter should not be incremented.
-		require.Equal(t, uint64(0), record.CutoffCounter)
+		if record.CutoffCounter != uint64(0) {
+			return false
+		}
 		// the decay should be the default decay value.
-		require.Equal(t, model.SpamRecordFactory()(unittest.IdentifierFixture()).Decay, record.Decay)
+		if record.Decay != model.SpamRecordFactory()(unittest.IdentifierFixture()).Decay {
+			return false
+		}
 
 		return true
 	}, 1*time.Second, 10*time.Millisecond, "ALSP manager did not handle the misbehavior report")
@@ -1365,17 +1452,21 @@ func TestDecayMisbehaviorPenalty_SingleHeartbeat(t *testing.T) {
 		if !ok {
 			return false
 		}
-		require.NotNil(t, record)
-
 		// eventually, the penalty should be the accumulated penalty of all the duplicate misbehavior reports.
 		if record.Penalty != report.Penalty()*float64(times) {
 			return false
 		}
-		require.False(t, record.DisallowListed) // the peer should not be disallow listed yet.
+		if record.DisallowListed { // the peer should not be disallow listed yet.
+			return false
+		}
 		// with just reporting a few misbehavior reports, the cutoff counter should not be incremented.
-		require.Equal(t, uint64(0), record.CutoffCounter)
+		if record.CutoffCounter != uint64(0) {
+			return false
+		}
 		// the decay should be the default decay value.
-		require.Equal(t, model.SpamRecordFactory()(unittest.IdentifierFixture()).Decay, record.Decay)
+		if record.Decay != model.SpamRecordFactory()(unittest.IdentifierFixture()).Decay {
+			return false
+		}
 
 		penaltyBeforeDecay = record.Penalty
 		return true
@@ -1455,16 +1546,18 @@ func TestDecayMisbehaviorPenalty_MultipleHeartbeats(t *testing.T) {
 		if !ok {
 			return false
 		}
-		require.NotNil(t, record)
-
 		// eventually, the penalty should be the accumulated penalty of all the duplicate misbehavior reports.
 		if record.Penalty != report.Penalty()*float64(times) {
 			return false
 		}
 		// with just reporting a few misbehavior reports, the cutoff counter should not be incremented.
-		require.Equal(t, uint64(0), record.CutoffCounter)
+		if record.CutoffCounter != uint64(0) {
+			return false
+		}
 		// the decay should be the default decay value.
-		require.Equal(t, model.SpamRecordFactory()(unittest.IdentifierFixture()).Decay, record.Decay)
+		if record.Decay != model.SpamRecordFactory()(unittest.IdentifierFixture()).Decay {
+			return false
+		}
 
 		penaltyBeforeDecay = record.Penalty
 		return true
@@ -1544,16 +1637,18 @@ func TestDecayMisbehaviorPenalty_DecayToZero(t *testing.T) {
 		if !ok {
 			return false
 		}
-		require.NotNil(t, record)
-
 		// eventually, the penalty should be the accumulated penalty of all the duplicate misbehavior reports.
 		if record.Penalty != report.Penalty()*float64(times) {
 			return false
 		}
 		// with just reporting a few misbehavior reports, the cutoff counter should not be incremented.
-		require.Equal(t, uint64(0), record.CutoffCounter)
+		if record.CutoffCounter != uint64(0) {
+			return false
+		}
 		// the decay should be the default decay value.
-		require.Equal(t, model.SpamRecordFactory()(unittest.IdentifierFixture()).Decay, record.Decay)
+		if record.Decay != model.SpamRecordFactory()(unittest.IdentifierFixture()).Decay {
+			return false
+		}
 
 		return true
 	}, 1*time.Second, 10*time.Millisecond, "ALSP manager did not handle the misbehavior report")
@@ -1723,18 +1818,22 @@ func TestDisallowListNotification(t *testing.T) {
 		if !ok {
 			return false
 		}
-		require.NotNil(t, record)
-
 		// eventually, the penalty should be the accumulated penalty of all the duplicate misbehavior reports (with the default decay).
 		// the decay is added to the penalty as we allow for a single heartbeat before the disallow list notification is emitted.
 		if record.Penalty != report.Penalty()*float64(times)+record.Decay {
 			return false
 		}
-		require.True(t, record.DisallowListed) // the peer should be disallow-listed.
+		if !record.DisallowListed { // the peer should be disallow-listed.
+			return false
+		}
 		// cutoff counter should be incremented since the penalty is above the disallow-listing threshold.
-		require.Equal(t, uint64(1), record.CutoffCounter)
+		if record.CutoffCounter != uint64(1) {
+			return false
+		}
 		// the decay should be the default decay value.
-		require.Equal(t, model.SpamRecordFactory()(unittest.IdentifierFixture()).Decay, record.Decay)
+		if record.Decay != model.SpamRecordFactory()(unittest.IdentifierFixture()).Decay {
+			return false
+		}
 
 		return true
 	}, 2*time.Second, 10*time.Millisecond, "ALSP manager did not handle the misbehavior report")
