@@ -1210,5 +1210,11 @@ func decodePayloadlessTrieBatchProof(inp []byte) (*PayloadlessTrieBatchProof, er
 		}
 		bp.Proofs = append(bp.Proofs, proof)
 	}
+	// Reject trailing bytes: the input must be fully consumed once the declared
+	// number of sub-proofs has been read. Leftover bytes indicate a malformed or
+	// tampered encoding (proofs may originate from untrusted remote peers).
+	if len(rest) != 0 {
+		return nil, fmt.Errorf("error decoding payloadless batch proof (content): %d unexpected trailing bytes", len(rest))
+	}
 	return bp, nil
 }
