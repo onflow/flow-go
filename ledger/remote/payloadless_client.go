@@ -103,17 +103,23 @@ func (c *PayloadlessClient) InitialState() ledger.State {
 }
 
 // HasState returns true if the given state exists in the payloadless ledger.
-func (c *PayloadlessClient) HasState(state ledger.State) bool {
+//
+// A gRPC failure is surfaced to the caller rather than collapsed into a false
+// return: false must mean "state genuinely absent", not "the server was
+// unreachable", otherwise callers (e.g. execution state) would misreport a
+// reachable state as pruned.
+//
+// No error returns are expected during normal operation.
+func (c *PayloadlessClient) HasState(state ledger.State) (bool, error) {
 	ctx, cancel := c.callCtx()
 	defer cancel()
 	req := &ledgerpb.StateRequest{State: &ledgerpb.State{Hash: state[:]}}
 
 	resp, err := c.client.HasState(ctx, req)
 	if err != nil {
-		c.logger.Error().Err(err).Msg("failed to check state")
-		return false
+		return false, fmt.Errorf("failed to check state: %w", err)
 	}
-	return resp.HasState
+	return resp.HasState, nil
 }
 
 // HasPaths reports, for each key in `query.Keys()`, whether the key has an

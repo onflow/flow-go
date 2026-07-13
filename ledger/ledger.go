@@ -26,7 +26,9 @@ type Ledger interface {
 	InitialState() State
 
 	// HasState returns true if the given state exists inside the ledger
-	HasState(state State) bool
+	//
+	// No error returns are expected during normal operation.
+	HasState(state State) (bool, error)
 
 	// GetSingleValue returns value for a given key at specific state
 	GetSingleValue(query *QuerySingleValue) (value Value, err error)
@@ -67,7 +69,9 @@ type PayloadlessLedger interface {
 	InitialState() State
 
 	// HasState returns true if the given state exists inside the ledger
-	HasState(state State) bool
+	//
+	// No error returns are expected during normal operation.
+	HasState(state State) (bool, error)
 
 	// HasPaths reports, for each key in the query, whether the corresponding
 	// path has an allocated register at the query's state. Used by callers
