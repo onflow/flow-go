@@ -273,3 +273,36 @@ func TestPayloadlessTrieBatchProofEquals(t *testing.T) {
 		require.False(t, bp1.Equals(bp2))
 	})
 }
+
+// TestPayloadlessTrieBatchProof_EncodeDecodeRoundtrip verifies that a batch proof
+// survives an encode/decode roundtrip and that decoding rejects input carrying
+// unexpected trailing bytes after the declared proofs.
+func TestPayloadlessTrieBatchProof_EncodeDecodeRoundtrip(t *testing.T) {
+	leafHash := hash.HashLeaf(hash.DummyHash, []byte("v"))
+
+	p := NewPayloadlessTrieProof()
+	p.Path = Path(hash.DummyHash)
+	p.LeafHash = &leafHash
+	p.Inclusion = true
+	p.Steps = 3
+	p.Flags[0] = 0x01
+	p.Interims = []hash.Hash{hash.DummyHash}
+
+	bp := NewPayloadlessTrieBatchProof()
+	bp.AppendProof(p)
+	bp.AppendProof(NewPayloadlessTrieProof())
+
+	encoded := EncodePayloadlessTrieBatchProof(bp)
+
+	t.Run("roundtrip", func(t *testing.T) {
+		decoded, err := DecodePayloadlessTrieBatchProof(encoded)
+		require.NoError(t, err)
+		require.True(t, bp.Equals(decoded))
+	})
+
+	t.Run("rejects trailing bytes", func(t *testing.T) {
+		tampered := append(append([]byte{}, encoded...), 0xDE, 0xAD)
+		_, err := DecodePayloadlessTrieBatchProof(tampered)
+		require.Error(t, err)
+	})
+}
