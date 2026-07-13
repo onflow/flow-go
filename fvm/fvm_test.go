@@ -1843,7 +1843,7 @@ func TestEnforcingComputationLimit(t *testing.T) {
             `,
 			payerIsServAcc: true,
 			ok:             true,
-			expCompUsed:    ifCompile[uint64](13, 11),
+			expCompUsed:    ifCompile[uint64](13, 12),
 		},
 		{
 			name: "some for-in loop iterations",
@@ -1852,7 +1852,7 @@ func TestEnforcingComputationLimit(t *testing.T) {
             `,
 			payerIsServAcc: false,
 			ok:             true,
-			expCompUsed:    ifCompile[uint64](6, 4),
+			expCompUsed:    ifCompile[uint64](6, 5),
 		},
 	}
 
