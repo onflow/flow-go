@@ -84,8 +84,10 @@ func (l *PayloadlessLedger) InitialState() ledger.State {
 }
 
 // HasState returns true if the given state exists inside the ledger.
-func (l *PayloadlessLedger) HasState(state ledger.State) bool {
-	return l.forest.HasTrie(ledger.RootHash(state))
+//
+// No error returns are expected during normal operation.
+func (l *PayloadlessLedger) HasState(state ledger.State) (bool, error) {
+	return l.forest.HasTrie(ledger.RootHash(state)), nil
 }
 
 // HasPaths reports, for each key in `query`, whether the key has an allocated

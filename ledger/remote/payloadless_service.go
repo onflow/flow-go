@@ -55,7 +55,11 @@ func (s *PayloadlessService) HasState(_ context.Context, req *ledgerpb.StateRequ
 	}
 	var state ledger.State
 	copy(state[:], req.State.Hash)
-	return &ledgerpb.HasStateResponse{HasState: s.ledger.HasState(state)}, nil
+	hasState, err := s.ledger.HasState(state)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to check state: %v", err)
+	}
+	return &ledgerpb.HasStateResponse{HasState: hasState}, nil
 }
 
 // HasPaths reports, for each key in `req.Keys`, whether the key has an
