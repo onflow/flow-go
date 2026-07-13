@@ -160,6 +160,10 @@ type NestedTransactionPreparer interface {
 	Get(id flow.RegisterID) (flow.RegisterValue, error)
 
 	Set(id flow.RegisterID, value flow.RegisterValue) error
+
+	// BaseStorageSnapshot gives access to the storage snapshot as it was without changes
+	// WARNING: this should not be read mid-transaction as reads to it are not recorded in the spocks
+	BaseStorageSnapshot() snapshot.StorageSnapshot
 }
 
 type nestedTransactionStackFrame struct {
@@ -448,6 +452,10 @@ func (txnState *transactionState) Set(
 	value flow.RegisterValue,
 ) error {
 	return txnState.current().Set(id, value)
+}
+
+func (txnState *transactionState) BaseStorageSnapshot() snapshot.StorageSnapshot {
+	return txnState.nestedTransactions[0].ExecutionState.BaseStorageSnapshot()
 }
 
 func (txnState *transactionState) MeterComputation(usage common.ComputationUsage) error {

@@ -19,14 +19,14 @@ func NewTransactionBasedMigration(
 ) RegistersMigration {
 	return func(registersByAccount *registers.ByAccount) error {
 
-		options := computation.DefaultFVMOptions(chainID, false, false)
+		options := computation.DefaultFVMOptions(chainID, false, false, false)
 		options = append(options,
 			fvm.WithContractDeploymentRestricted(false),
 			fvm.WithContractRemovalRestricted(false),
 			fvm.WithAuthorizationChecksEnabled(false),
 			fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
 			fvm.WithTransactionFeesEnabled(false))
-		ctx := fvm.NewContext(options...)
+		ctx := fvm.NewContext(chainID.Chain(), options...)
 
 		storageSnapshot := registers.StorageSnapshot{
 			Registers: registersByAccount,

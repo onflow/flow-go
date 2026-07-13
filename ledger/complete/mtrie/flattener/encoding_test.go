@@ -157,7 +157,7 @@ func TestRandomLeafNodeEncodingDecoding(t *testing.T) {
 	writeScratch := make([]byte, scratchBufferSize)
 	readScratch := make([]byte, scratchBufferSize)
 
-	for i := 0; i < count; i++ {
+	for i := range count {
 		height := rand.Intn(257)
 
 		var hashValue hash.Hash

@@ -5,6 +5,7 @@ import (
 
 	"github.com/onflow/atree"
 
+	"github.com/onflow/flow-go/fvm/evm/backends"
 	"github.com/onflow/flow-go/fvm/evm/types"
 )
 
@@ -13,7 +14,7 @@ type ReadOnlyStorage struct {
 	snapshot types.BackendStorageSnapshot
 }
 
-var _ types.BackendStorage = &ReadOnlyStorage{}
+var _ backends.BackendStorage = &ReadOnlyStorage{}
 
 // NewReadOnlyStorage constructs a new ReadOnlyStorage using the given snapshot
 func NewReadOnlyStorage(snapshot types.BackendStorageSnapshot) *ReadOnlyStorage {

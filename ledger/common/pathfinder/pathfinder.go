@@ -114,7 +114,7 @@ func PathsFromPayloads(payloads []*ledger.Payload, version uint8) ([]ledger.Path
 	return paths, nil
 }
 
-// UpdateToPayloads constructs an slice of payloads given ledger update
+// UpdateToPayloads constructs an slice of payloads given ledger update.
 func UpdateToPayloads(update *ledger.Update) ([]*ledger.Payload, error) {
 	keys := update.Keys()
 	values := update.Values()

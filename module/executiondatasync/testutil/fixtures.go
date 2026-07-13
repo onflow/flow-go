@@ -24,6 +24,8 @@ type TestFixture struct {
 	ExecutionResult *flow.ExecutionResult
 	ExecutionData   *execution_data.BlockExecutionData
 	TxErrorMessages []flow.TransactionResultErrorMessage
+	Guarantees      []*flow.CollectionGuarantee
+	Index           *flow.Index
 
 	ExpectedEvents                []flow.Event
 	ExpectedResults               []flow.LightTransactionResult
@@ -39,12 +41,16 @@ func newTestFixture(
 	execData *execution_data.BlockExecutionData,
 	txErrMsgs []flow.TransactionResultErrorMessage,
 	scheduledTransactionIDs []uint64,
+	guarantees []*flow.CollectionGuarantee,
+	index *flow.Index,
 ) *TestFixture {
 	tf := &TestFixture{
 		Block:           block,
 		ExecutionResult: exeResult,
 		ExecutionData:   execData,
 		TxErrorMessages: txErrMsgs,
+		Guarantees:      guarantees,
+		Index:           index,
 
 		ExpectedScheduledTransactions: make(map[flow.Identifier]uint64),
 	}
@@ -118,6 +124,7 @@ func CompleteFixture(t *testing.T, g *fixtures.GeneratorSuite, parentBlock *flow
 	guarantees := make([]*flow.CollectionGuarantee, collectionCount)
 	path := g.LedgerPaths().Fixture()
 	var txErrMsgs []flow.TransactionResultErrorMessage
+	index := new(flow.Index)
 
 	txCount := 0
 	for i, collection := range collections {
@@ -131,6 +138,8 @@ func CompleteFixture(t *testing.T, g *fixtures.GeneratorSuite, parentBlock *flow
 		chunkExecutionDatas = append(chunkExecutionDatas, chunkData)
 
 		guarantees[i] = g.Guarantees().Fixture(fixtures.Guarantee.WithCollectionID(collection.ID()))
+		index.GuaranteeIDs = append(index.GuaranteeIDs, guarantees[i].ID())
+
 		for txIndex := range chunkExecutionDatas[i].TransactionResults {
 			if txIndex%3 == 0 {
 				chunkExecutionDatas[i].TransactionResults[txIndex].Failed = true
@@ -182,6 +191,17 @@ func CompleteFixture(t *testing.T, g *fixtures.GeneratorSuite, parentBlock *flow
 		fixtures.Block.WithPayload(payload),
 	)
 
+	for _, seal := range payload.Seals {
+		index.SealIDs = append(index.SealIDs, seal.ID())
+	}
+	for _, receipt := range payload.Receipts {
+		index.ReceiptIDs = append(index.ReceiptIDs, receipt.ID())
+	}
+	for _, result := range payload.Results {
+		index.ResultIDs = append(index.ResultIDs, result.ID())
+	}
+	index.ProtocolStateID = payload.ProtocolStateID
+
 	// generate the block execution data with all data
 	execData := g.BlockExecutionDatas().Fixture(
 		fixtures.BlockExecutionData.WithBlockID(block.ID()),
@@ -196,5 +216,5 @@ func CompleteFixture(t *testing.T, g *fixtures.GeneratorSuite, parentBlock *flow
 		fixtures.ExecutionResult.WithExecutionDataID(executionDataID),
 	)
 
-	return newTestFixture(t, block, exeResult, execData, txErrMsgs, scheduledTransactionIDs)
+	return newTestFixture(t, block, exeResult, execData, txErrMsgs, scheduledTransactionIDs, guarantees, index)
 }

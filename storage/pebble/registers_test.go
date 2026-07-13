@@ -373,6 +373,206 @@ func Benchmark_PayloadStorage(b *testing.B) {
 	}
 }
 
+// TestRegisters_ByKeyPrefix_ExactKey tests ByKeyPrefix with an exact key (no prefix
+// matches), verifying it yields one entry per owner and uses nextOwnerStart after a match.
+func TestRegisters_ByKeyPrefix_ExactKey(t *testing.T) {
+	t.Parallel()
+
+	addrA := unittest.RandomAddressFixture()
+	addrB := unittest.RandomAddressFixture()
+	addrC := unittest.RandomAddressFixture() // no contracts, only other registers
+	addrD := unittest.RandomAddressFixture() // contract_names updated across two heights
+
+	regA := flow.ContractNamesRegisterID(addrA)
+	regB := flow.ContractNamesRegisterID(addrB)
+	regD := flow.ContractNamesRegisterID(addrD)
+
+	valA := []byte("namesA")
+	valB := []byte("namesB")
+	valDOld := []byte("namesDold")
+	valDNew := []byte("namesDnew")
+
+	RunWithRegistersStorageAtInitialHeights(t, 1, 1, func(r *Registers) {
+		// height 2: A gets contract_names
+		require.NoError(t, r.Store(flow.RegisterEntries{{Key: regA, Value: valA}}, 2))
+		// height 3: D gets its first contract_names
+		require.NoError(t, r.Store(flow.RegisterEntries{{Key: regD, Value: valDOld}}, 3))
+		// height 4: B gets contract_names; C gets a non-contract register
+		require.NoError(t, r.Store(flow.RegisterEntries{
+			{Key: regB, Value: valB},
+			{Key: flow.RegisterID{Owner: string(addrC.Bytes()), Key: flow.AccountStatusKey}, Value: []byte("status")},
+		}, 4))
+		// height 5: D updates its contract_names
+		require.NoError(t, r.Store(flow.RegisterEntries{{Key: regD, Value: valDNew}}, 5))
+
+		t.Run("yields all accounts with contracts at or before query height", func(t *testing.T) {
+			results := collectRegistersByKey(t, r.ByKeyPrefix(flow.ContractNamesKey, 5, nil))
+			assert.Len(t, results, 3)
+			assert.Equal(t, flow.RegisterValue(valA), results[regA])
+			assert.Equal(t, flow.RegisterValue(valB), results[regB])
+			assert.Equal(t, flow.RegisterValue(valDNew), results[regD])
+		})
+
+		t.Run("yields older version when newest is above target height", func(t *testing.T) {
+			results := collectRegistersByKey(t, r.ByKeyPrefix(flow.ContractNamesKey, 4, nil))
+			assert.Len(t, results, 3)
+			assert.Equal(t, flow.RegisterValue(valDOld), results[regD])
+		})
+
+		t.Run("excludes accounts whose contracts were deployed after target height", func(t *testing.T) {
+			results := collectRegistersByKey(t, r.ByKeyPrefix(flow.ContractNamesKey, 2, nil))
+			assert.Len(t, results, 1)
+			assert.Equal(t, flow.RegisterValue(valA), results[regA])
+		})
+
+		t.Run("empty result when no contracts exist at or before target height", func(t *testing.T) {
+			results := collectRegistersByKey(t, r.ByKeyPrefix(flow.ContractNamesKey, 1, nil))
+			assert.Empty(t, results)
+		})
+
+		t.Run("account with only non-contract registers is not yielded", func(t *testing.T) {
+			results := collectRegistersByKey(t, r.ByKeyPrefix(flow.ContractNamesKey, 5, nil))
+			_, hasC := results[flow.ContractNamesRegisterID(addrC)]
+			assert.False(t, hasC)
+		})
+
+		t.Run("early termination stops iteration", func(t *testing.T) {
+			count := 0
+			for _, err := range r.ByKeyPrefix(flow.ContractNamesKey, 5, nil) {
+				require.NoError(t, err)
+				count++
+				break
+			}
+			assert.Equal(t, 1, count)
+		})
+	})
+}
+
+// TestRegisters_ByKeyPrefix tests ByKeyPrefix, which scans pebble for all registers
+// whose key starts with a given prefix using a single iterator.
+func TestRegisters_ByKeyPrefix(t *testing.T) {
+	t.Parallel()
+
+	addrA := unittest.RandomAddressFixture()
+	addrB := unittest.RandomAddressFixture()
+	addrC := unittest.RandomAddressFixture() // no code registers
+
+	// addrA: two contracts, one updated across heights
+	regAFoo := flow.RegisterID{Owner: string(addrA.Bytes()), Key: "code.Foo"}
+	regABar := flow.RegisterID{Owner: string(addrA.Bytes()), Key: "code.Bar"}
+	// addrB: one contract
+	regBBaz := flow.RegisterID{Owner: string(addrB.Bytes()), Key: "code.Baz"}
+	// addrC: only a non-code register
+	regCStatus := flow.RegisterID{Owner: string(addrC.Bytes()), Key: flow.AccountStatusKey}
+
+	valAFoo1 := []byte("foo-code-v1")
+	valAFoo2 := []byte("foo-code-v2")
+	valABar := []byte("bar-code")
+	valBBaz := []byte("baz-code")
+
+	RunWithRegistersStorageAtInitialHeights(t, 1, 1, func(r *Registers) {
+		// height 2: addrA deploys Foo (v1); addrC gets a non-code register
+		require.NoError(t, r.Store(flow.RegisterEntries{
+			{Key: regAFoo, Value: valAFoo1},
+			{Key: regCStatus, Value: []byte("status")},
+		}, 2))
+		// height 3: addrA deploys Bar; addrB deploys Baz
+		require.NoError(t, r.Store(flow.RegisterEntries{
+			{Key: regABar, Value: valABar},
+			{Key: regBBaz, Value: valBBaz},
+		}, 3))
+		// height 4: addrA updates Foo to v2
+		require.NoError(t, r.Store(flow.RegisterEntries{
+			{Key: regAFoo, Value: valAFoo2},
+		}, 4))
+
+		t.Run("yields one entry per matching register across all owners", func(t *testing.T) {
+			results := collectRegistersByKey(t, r.ByKeyPrefix(flow.CodeKeyPrefix, 4, nil))
+			assert.Len(t, results, 3) // Foo, Bar, Baz
+			assert.Equal(t, flow.RegisterValue(valAFoo2), results[regAFoo])
+			assert.Equal(t, flow.RegisterValue(valABar), results[regABar])
+			assert.Equal(t, flow.RegisterValue(valBBaz), results[regBBaz])
+		})
+
+		t.Run("yields older version when newest is above target height", func(t *testing.T) {
+			results := collectRegistersByKey(t, r.ByKeyPrefix(flow.CodeKeyPrefix, 3, nil))
+			assert.Equal(t, flow.RegisterValue(valAFoo1), results[regAFoo])
+		})
+
+		t.Run("excludes registers deployed after target height", func(t *testing.T) {
+			results := collectRegistersByKey(t, r.ByKeyPrefix(flow.CodeKeyPrefix, 2, nil))
+			assert.Len(t, results, 1)
+			assert.Equal(t, flow.RegisterValue(valAFoo1), results[regAFoo])
+		})
+
+		t.Run("empty result when no matching registers exist at or before target height", func(t *testing.T) {
+			results := collectRegistersByKey(t, r.ByKeyPrefix(flow.CodeKeyPrefix, 1, nil))
+			assert.Empty(t, results)
+		})
+
+		t.Run("non-matching registers are not yielded", func(t *testing.T) {
+			results := collectRegistersByKey(t, r.ByKeyPrefix(flow.CodeKeyPrefix, 4, nil))
+			_, hasStatus := results[regCStatus]
+			assert.False(t, hasStatus)
+		})
+
+		t.Run("early termination stops iteration", func(t *testing.T) {
+			count := 0
+			for _, err := range r.ByKeyPrefix(flow.CodeKeyPrefix, 4, nil) {
+				require.NoError(t, err)
+				count++
+				break
+			}
+			assert.Equal(t, 1, count)
+		})
+	})
+}
+
+// TestRegisters_ByKeyPrefix_GlobalRegisters verifies that ByKeyPrefix does not terminate
+// early when global registers (empty owner) are present in pebble between account registers
+// whose first address bytes straddle the '/' byte (0x2F). Before the fix, nextOwnerStart("")
+// returned [codeRegister+1] which equals the iterator's upper bound, causing the scan to
+// stop before processing any account whose first address byte is > 0x2F.
+func TestRegisters_ByKeyPrefix_GlobalRegisters(t *testing.T) {
+	t.Parallel()
+
+	// addrLow: first address byte 0x01 < '/' (0x2F) — pebble key sorts before global registers
+	addrLow := flow.BytesToAddress([]byte{0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01})
+	// addrHigh: first address byte 0x30 > '/' (0x2F) — pebble key sorts after global registers
+	addrHigh := flow.BytesToAddress([]byte{0x30, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01})
+
+	regLow := flow.RegisterID{Owner: string(addrLow.Bytes()), Key: "code.Low"}
+	regHigh := flow.RegisterID{Owner: string(addrHigh.Bytes()), Key: "code.High"}
+	// global register (empty owner): pebble key [codeRegister, '/', ...] sorts between addrLow and addrHigh
+	regGlobal := flow.RegisterID{Owner: "", Key: flow.AddressStateKey}
+
+	RunWithRegistersStorageAtInitialHeights(t, 1, 1, func(r *Registers) {
+		require.NoError(t, r.Store(flow.RegisterEntries{
+			{Key: regLow, Value: []byte("low-code")},
+			{Key: regHigh, Value: []byte("high-code")},
+			{Key: regGlobal, Value: []byte("global-state")},
+		}, 2))
+
+		results := collectRegistersByKey(t, r.ByKeyPrefix(flow.CodeKeyPrefix, 2, nil))
+		assert.Len(t, results, 2)
+		assert.Equal(t, flow.RegisterValue([]byte("low-code")), results[regLow])
+		assert.Equal(t, flow.RegisterValue([]byte("high-code")), results[regHigh])
+	})
+}
+
+// collectRegistersByKey drains a ByKey iterator into a map keyed by register ID.
+func collectRegistersByKey(t *testing.T, iter storage.IndexIterator[flow.RegisterValue, flow.RegisterID]) map[flow.RegisterID]flow.RegisterValue {
+	t.Helper()
+	results := make(map[flow.RegisterID]flow.RegisterValue)
+	for entry, err := range iter {
+		require.NoError(t, err)
+		val, err := entry.Value()
+		require.NoError(t, err)
+		results[entry.Cursor()] = val
+	}
+	return results
+}
+
 func RunWithRegistersStorageAtHeight1(tb testing.TB, f func(r *Registers)) {
 	defaultHeight := uint64(1)
 	RunWithRegistersStorageAtInitialHeights(tb, defaultHeight, defaultHeight, f)

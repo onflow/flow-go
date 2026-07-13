@@ -34,6 +34,13 @@ func (b *builderV1) ExecuteCallbacksTransactions(chain flow.Chain, processEvents
 	return blueprints.ExecuteCallbacksTransactions(chain, processEvents)
 }
 
+// ExecuteCallbacksTransaction constructs a transaction to execute a callback, for the given chain.
+//
+// No error returns are expected during normal operation.
+func (b *builderV1) ExecuteCallbacksTransaction(chain flow.Chain, id uint64, effort uint64) (*flow.TransactionBody, error) {
+	return blueprints.ExecuteCallbacksTransaction(chain, id, effort)
+}
+
 // SystemChunkTransaction creates and returns the transaction corresponding to the
 // system chunk for the given chain.
 //

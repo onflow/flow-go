@@ -107,7 +107,7 @@ func (t *TransactionResult) Build(txr *accessmodel.TransactionResult, txID flow.
 	t.Execution = &execution
 	t.StatusCode = int32(txr.StatusCode)
 	t.ErrorMessage = txr.ErrorMessage
-	t.ComputationUsed = util.FromUint(uint64(0)) // todo: define this
+	t.ComputationUsed = util.FromUint(txr.ComputationUsed)
 	t.Events = events
 
 	self, _ := SelfLink(txID, link.TransactionResultLink)

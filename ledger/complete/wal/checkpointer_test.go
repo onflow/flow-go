@@ -485,16 +485,25 @@ func randomlyModifyFile(t *testing.T, filename string) {
 
 	file, err := os.OpenFile(filename, os.O_RDWR, 0644)
 	require.NoError(t, err)
+	defer file.Close()
 
 	fileInfo, err := file.Stat()
 	require.NoError(t, err)
 
 	fileSize := fileInfo.Size()
 
+	if fileSize == 0 {
+		// Empty file, nothing to modify - this shouldn't happen in normal test scenarios
+		// but handle gracefully by returning early
+		return
+	}
+
 	buf := make([]byte, 1)
 
 	// get some random offset
-	offset := int64(rand.Int()) % (fileSize + int64(len(buf)))
+	// Use fileSize (not fileSize + len(buf)) to ensure offset is always < fileSize
+	// Valid file positions are 0 to fileSize-1
+	offset := int64(rand.Int()) % fileSize
 
 	_, err = file.ReadAt(buf, offset)
 	require.NoError(t, err)

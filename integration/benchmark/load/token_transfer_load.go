@@ -54,7 +54,7 @@ func (l *TokenTransferLoad) Load(log zerolog.Logger, lc LoadContext) error {
 				// if no accounts are available, just send to the service account
 				destinationAddress = sc.FlowServiceAccount.Address
 			} else {
-				destinationAddress = flow.ConvertAddress(acc2.Address)
+				destinationAddress = flow.Address(acc2.Address)
 				lc.ReturnAvailableAccount(acc2)
 			}
 

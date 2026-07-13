@@ -220,7 +220,7 @@ func Test_ExecutionMatchesVerification(t *testing.T) {
 		err = testutil.SignTransaction(addKeyTxBuilder, accountAddress, accountPrivKey, 0)
 		require.NoError(t, err)
 
-		minimumStorage, err := cadence.NewUFix64("0.00011661")
+		minimumStorage, err := cadence.NewUFix64("0.00015594")
 		require.NoError(t, err)
 
 		createAccountTx, err := createAccountTxBuilder.Build()
@@ -746,14 +746,11 @@ func executeBlockAndVerifyWithParameters(t *testing.T,
 
 	logger := zerolog.Nop()
 
-	opts = append(opts, fvm.WithChain(chain))
 	opts = append(opts, fvm.WithLogger(logger))
 	opts = append(opts, fvm.WithBlocks(&environment.NoopBlockFinder{}))
 
 	fvmContext :=
-		fvm.NewContext(
-			opts...,
-		)
+		fvm.NewContext(chain, opts...)
 
 	collector := metrics.NewNoopCollector()
 	tracer := trace.NewNoopTracer()
@@ -817,7 +814,6 @@ func executeBlockAndVerifyWithParameters(t *testing.T,
 		ledgerCommiter,
 		me,
 		prov,
-		nil,
 		stateForRandomSource,
 		testVerifyMaxConcurrency)
 	require.NoError(t, err)

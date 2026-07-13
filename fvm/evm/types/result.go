@@ -54,10 +54,10 @@ type ResultSummary struct {
 
 // NewInvalidResult creates a new result that hold transaction validation
 // error as well as the defined gas cost for validation.
-func NewInvalidResult(tx *gethTypes.Transaction, err error) *Result {
+func NewInvalidResult(txType uint8, txHash gethCommon.Hash, err error) *Result {
 	return &Result{
-		TxType:          tx.Type(),
-		TxHash:          tx.Hash(),
+		TxType:          txType,
+		TxHash:          txHash,
 		ValidationError: err,
 		GasConsumed:     InvalidTransactionGasCost,
 	}

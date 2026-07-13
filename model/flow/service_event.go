@@ -37,7 +37,7 @@ const (
 // encoding and decoding.
 type ServiceEvent struct {
 	Type  ServiceEventType
-	Event interface{}
+	Event any
 }
 
 // ServiceEventList is a handy container to enable comparisons
@@ -78,8 +78,8 @@ type ServiceEventMarshaller interface {
 }
 
 type marshallerImpl struct {
-	marshalFunc   func(v interface{}) ([]byte, error)
-	unmarshalFunc func(data []byte, v interface{}) error
+	marshalFunc   func(v any) ([]byte, error)
+	unmarshalFunc func(data []byte, v any) error
 }
 
 var _ ServiceEventMarshaller = (*marshallerImpl)(nil)
@@ -162,7 +162,7 @@ func unmarshalWrapped[E any](b []byte, marshaller marshallerImpl) (*E, error) {
 // The input bytes must be encoded as a specific event type (for example, EpochSetup).
 // Forwards errors from the underlying marshaller (treat errors as you would from eg. json.Unmarshal)
 func (marshaller marshallerImpl) UnmarshalWithType(b []byte, eventType ServiceEventType) (ServiceEvent, error) {
-	var event interface{}
+	var event any
 	switch eventType {
 	case ServiceEventSetup:
 		event = new(EpochSetup)

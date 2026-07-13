@@ -19,6 +19,7 @@ const (
 	peerUpdateInterval                = "peerupdate-interval"
 	dnsCacheTTL                       = "dns-cache-ttl"
 	disallowListNotificationCacheSize = "disallow-list-notification-cache-size"
+	messageQueueSize                  = "message-queue-size"
 	// resource manager config
 	rootResourceManagerPrefix  = "libp2p-resource-manager"
 	memoryLimitRatioPrefix     = "memory-limit-ratio"
@@ -51,6 +52,7 @@ func AllFlagNames() []string {
 		preferredUnicastsProtocols,
 		receivedMessageCacheSize,
 		peerUpdateInterval,
+		messageQueueSize,
 		BuildFlagName(unicastKey, MessageTimeoutKey),
 		BuildFlagName(unicastKey, unicastManagerKey, createStreamBackoffDelayKey),
 		BuildFlagName(unicastKey, unicastManagerKey, streamZeroRetryResetThresholdKey),
@@ -235,6 +237,10 @@ func InitializeNetworkFlags(flags *pflag.FlagSet, config *Config) {
 		disallowListNotificationCacheSize,
 		config.DisallowListNotificationCacheSize,
 		"cache size for notification events from disallow list")
+	flags.Uint32(
+		messageQueueSize,
+		config.MessageQueueSize,
+		"maximum number of messages in the inbound message queue (0 = use default)")
 	flags.Duration(peerUpdateInterval, config.PeerUpdateInterval, "how often to refresh the peer connections for the node")
 	flags.Duration(BuildFlagName(unicastKey, MessageTimeoutKey), config.Unicast.MessageTimeout, "how long a unicast transmission can take to complete")
 	flags.Duration(BuildFlagName(unicastKey, unicastManagerKey, createStreamBackoffDelayKey), config.Unicast.UnicastManager.CreateStreamBackoffDelay,

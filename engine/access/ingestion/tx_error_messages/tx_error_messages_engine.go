@@ -2,15 +2,18 @@ package tx_error_messages
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
 	"github.com/rs/zerolog"
 	"github.com/sethvargo/go-retry"
+	"google.golang.org/grpc/status"
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/engine"
+	commonrpc "github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
@@ -72,7 +75,7 @@ func New(
 	metrics module.TransactionErrorMessagesMetrics,
 	state protocol.State,
 	headers storage.Headers,
-	txErrorMessagesProcessedHeight storage.ConsumerProgressInitializer,
+	txErrorMessagesProcessedHeight storage.ConsumerProgress,
 	txErrorMessagesCore *TxErrorMessagesCore,
 	finalizationRegistrar hotstuff.FinalizationRegistrar,
 ) (*Engine, error) {
@@ -104,7 +107,6 @@ func New(
 		e.txErrorMessagesNotifier.Channel(),
 		txErrorMessagesProcessedHeight,
 		sealedBlockReader,
-		e.state.Params().SealedRoot().Height,
 		e.processTxResultErrorMessagesJob,
 		processTxErrorMessagesWorkersCount,
 		0,
@@ -139,20 +141,18 @@ func (e *Engine) processTxResultErrorMessagesJob(ctx irrecoverable.SignalerConte
 	e.metrics.TxErrorsFetchStarted()
 
 	err = e.processErrorMessagesForBlock(ctx, header.ID())
+	if err != nil {
+		if !errors.Is(err, context.Canceled) {
+			ctx.Throw(fmt.Errorf("failed to process transaction result error messages for block: %w", err))
+		}
+		return
+	}
 
 	// use the last processed index to ensure the metrics reflect the highest _consecutive_ height.
 	// this makes it easier to see when downloading gets stuck at a height.
 	e.metrics.TxErrorsFetchFinished(time.Since(start), err == nil, e.txErrorMessagesConsumer.LastProcessedIndex())
 
-	if err == nil {
-		done()
-		return
-	}
-
-	e.log.Error().
-		Err(err).
-		Str("job_id", string(job.ID())).
-		Msg("error encountered while processing transaction result error messages job")
+	done()
 }
 
 // runTxResultErrorMessagesConsumer runs the txErrorMessagesConsumer component
@@ -178,8 +178,9 @@ func (e *Engine) onFinalizedBlock(*model.Block) {
 	e.txErrorMessagesNotifier.Notify()
 }
 
-// processErrorMessagesForBlock processes transaction result error messages for block.
-// If the process fails, it will retry, using exponential backoff.
+// processErrorMessagesForBlock processes transaction result error messages for the provided block.
+// This method will retry indefinitely using exponential backoff until it encounters an exception
+// or the error messages are successfully fetched.
 //
 // No errors are expected during normal operation.
 func (e *Engine) processErrorMessagesForBlock(ctx context.Context, blockID flow.Identifier) error {
@@ -195,14 +196,41 @@ func (e *Engine) processErrorMessagesForBlock(ctx context.Context, blockID flow.
 
 		err := e.txErrorMessagesCore.FetchErrorMessages(ctx, blockID)
 		if err != nil {
-			e.log.Debug().
-				Err(err).
-				Str("block_id", blockID.String()).
-				Uint64("attempt", uint64(attempt)).
-				Msgf("failed to fetch transaction result error messages. will retry")
-		}
-		attempt++
+			if errors.Is(err, context.Canceled) {
+				return err
+			}
+			if !isRetryableError(err) {
+				return fmt.Errorf("failed to fetch transaction result error messages: %w", err)
+			}
 
-		return retry.RetryableError(err)
+			// throttle logging to once every 20 attempts
+			if attempt%20 == 0 {
+				e.log.Warn().
+					Err(err).
+					Str("block_id", blockID.String()).
+					Uint64("attempt", uint64(attempt)).
+					Msgf("failed to fetch transaction result error messages. will retry")
+			}
+
+			attempt++
+			return retry.RetryableError(err)
+		}
+
+		return nil
 	})
+}
+
+// isRetryableError returns true if the error is retryable.
+// If this method returns false, the error is an exception and it should not be retried.
+func isRetryableError(err error) bool {
+	// this is permissive in that it will allow any grpc status error, including those that are not
+	// retryable. This is OK here since the backend will send requests across multiple execution nodes
+	// so retrying will generally result in a new set of nodes to try.
+	if _, ok := status.FromError(err); ok {
+		return true
+	}
+	if errors.Is(err, commonrpc.ErrNoENsFoundForExecutionResult) {
+		return true
+	}
+	return false
 }

@@ -128,7 +128,7 @@ func (m *AddKeyMigration) MigrateAccount(
 		return err
 	}
 
-	account, err := migrationRuntime.Accounts.Get(flow.ConvertAddress(address))
+	account, err := migrationRuntime.Accounts.Get(flow.Address(address))
 	if err != nil {
 		return fmt.Errorf("could not find account at address %s", address)
 	}
@@ -147,7 +147,7 @@ func (m *AddKeyMigration) MigrateAccount(
 		Weight:    fvm.AccountKeyWeightThreshold,
 	}
 
-	flowAddress := flow.ConvertAddress(address)
+	flowAddress := flow.Address(address)
 
 	keyIndex, err := migrationRuntime.Accounts.GetAccountPublicKeyCount(flowAddress)
 	if err != nil {

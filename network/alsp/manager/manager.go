@@ -198,7 +198,7 @@ func NewMisbehaviorReportManager(cfg *MisbehaviorReportManagerConfig, consumer n
 		ready()
 		m.heartbeatLoop(ctx, cfg.HeartBeatInterval) // blocking call
 	})
-	for i := 0; i < defaultMisbehaviorReportManagerWorkers; i++ {
+	for range defaultMisbehaviorReportManagerWorkers {
 		builder.AddWorker(m.workerPool.WorkerLogic())
 	}
 

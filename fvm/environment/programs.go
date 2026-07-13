@@ -93,14 +93,12 @@ func (programs *Programs) GetOrLoadProgram(
 	load func() (*runtime.Program, error),
 ) (*runtime.Program, error) {
 	span := programs.tracer.StartChildSpan(trace.FVMEnvGetOrLoadProgram)
-	defer func() {
-		if span.Tracer != nil {
-			span.SetAttributes(
-				attribute.String("location", location.ID()),
-			)
-		}
-		span.End()
-	}()
+	if span.Tracer != nil {
+		span.SetAttributes(
+			attribute.String("location", location.ID()),
+		)
+	}
+	defer span.End()
 
 	err := programs.meter.MeterComputation(
 		common.ComputationUsage{

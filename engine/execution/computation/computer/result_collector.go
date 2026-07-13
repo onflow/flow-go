@@ -8,12 +8,13 @@ import (
 
 	"github.com/onflow/crypto"
 	"github.com/onflow/crypto/hash"
+	"github.com/rs/zerolog"
 	otelTrace "go.opentelemetry.io/otel/trace"
 
 	"github.com/onflow/flow-go/engine/execution"
-	"github.com/onflow/flow-go/engine/execution/computation/result"
 	"github.com/onflow/flow-go/engine/execution/storehouse"
 	"github.com/onflow/flow-go/fvm"
+	"github.com/onflow/flow-go/fvm/inspection"
 	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/fvm/storage/state"
@@ -72,8 +73,7 @@ type resultCollector struct {
 
 	parentBlockExecutionResultID flow.Identifier
 
-	result    *execution.ComputationResult
-	consumers []result.ExecutedCollectionConsumer
+	result *execution.ComputationResult
 
 	spockSignatures []crypto.Signature
 
@@ -99,7 +99,6 @@ func newResultCollector(
 	parentBlockExecutionResultID flow.Identifier,
 	block *entity.ExecutableBlock,
 	inputChannelSize int,
-	consumers []result.ExecutedCollectionConsumer,
 	previousBlockSnapshot snapshot.StorageSnapshot,
 ) *resultCollector {
 	numCollections := len(block.Collections()) + 1
@@ -117,7 +116,6 @@ func newResultCollector(
 		executionDataProvider:        executionDataProvider,
 		parentBlockExecutionResultID: parentBlockExecutionResultID,
 		result:                       execution.NewEmptyComputationResult(block),
-		consumers:                    consumers,
 		spockSignatures:              make([]crypto.Signature, 0, numCollections),
 		blockStartTime:               now,
 		blockMeter:                   meter.NewMeter(meter.DefaultParameters()),
@@ -209,13 +207,6 @@ func (collector *resultCollector) commitCollection(
 	collector.currentCollectionState = state.NewExecutionState(nil, state.DefaultParameters())
 	collector.currentCollectionStats = module.CollectionExecutionResultStats{}
 
-	for _, consumer := range collector.consumers {
-		err = consumer.OnExecutedCollection(collector.result.CollectionExecutionResultAt(collection.collectionIndex))
-		if err != nil {
-			return fmt.Errorf("consumer failed: %w", err)
-		}
-	}
-
 	return nil
 }
 
@@ -227,6 +218,7 @@ func (collector *resultCollector) processTransactionResult(
 	numConflictRetries int,
 ) error {
 	logger := txn.ctx.Logger.With().
+		Hex("tx_id", txn.ID[:]).
 		Uint64("computation_used", output.ComputationUsed).
 		Uint64("memory_used", output.MemoryEstimate).
 		Int64("time_spent_in_ms", timeSpent.Milliseconds()).
@@ -251,6 +243,14 @@ func (collector *resultCollector) processTransactionResult(
 	} else {
 		logger.Info().Msg("transaction executed successfully")
 	}
+
+	// We log inspection results here, because if we logged them in the FVM
+	// they would get logged on every transaction retry.
+	// Same for the metrics.
+	collector.logInspectionResults(
+		logger.With().Str("module", "transaction-inspection").Logger(),
+		output.InspectionResults,
+	)
 
 	collector.handleTransactionExecutionMetrics(
 		timeSpent,
@@ -291,6 +291,52 @@ func (collector *resultCollector) processTransactionResult(
 		txn.collectionInfo,
 		collector.currentCollectionStartTime,
 		collector.currentCollectionState.Finalize())
+}
+
+func (collector *resultCollector) logInspectionResults(
+	log zerolog.Logger,
+	results []inspection.Result,
+) {
+	if len(results) == 0 {
+		log.Info().
+			Msg("no inspection results for transaction")
+		return
+	}
+
+	logEvents := make([]func(e *zerolog.Event), 0, len(results))
+
+	// The log level will be decided by the inspectionResults
+	// logLevel := zerolog.TraceLevel
+	// leo: debugging with info level log
+	logLevel := zerolog.InfoLevel
+	for i, inspectionResult := range results {
+		if inspectionResult == nil {
+			// This code path is unlikely since it should be handled earlier
+			log.Error().
+				Int("index", i).
+				Msg("inspection result is nil, likely due to a panic or error during inspection")
+			continue
+		}
+		lvl, evt := inspectionResult.AsLogEvent()
+		if lvl > logLevel {
+			logLevel = lvl
+		}
+		if evt != nil {
+			logEvents = append(logEvents, evt)
+		}
+	}
+
+	// if there are no loggable inspection results, don't log at all
+	if len(logEvents) == 0 {
+
+		return
+	}
+
+	evt := log.WithLevel(logLevel)
+	for _, logEvent := range logEvents {
+		logEvent(evt)
+	}
+	evt.Msg("Transaction inspection results")
 }
 
 func (collector *resultCollector) handleTransactionExecutionMetrics(

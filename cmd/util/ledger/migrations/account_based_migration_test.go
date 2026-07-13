@@ -21,7 +21,7 @@ func accountStatusPayload(address common.Address) *ledger.Payload {
 
 	return ledger.NewPayload(
 		convert.RegisterIDToLedgerKey(
-			flow.AccountStatusRegisterID(flow.ConvertAddress(address)),
+			flow.AccountStatusRegisterID(flow.Address(address)),
 		),
 		accountStatus.ToBytes(),
 	)

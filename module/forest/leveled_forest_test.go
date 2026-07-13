@@ -35,19 +35,18 @@ func NewVertexMock(vertexId string, vertexLevel uint64, parentId string, parentL
 
 // FOREST:
 //
-//	                       ↙-- [A]
-//	(Genesis) ← [B] ← [C]  ←-- [D]
-//	   ⋮         ⋮      ⋮        ⋮
-//	   ⋮         ⋮      ⋮   (Missing1) ←---- [W]
-//	   ⋮         ⋮      ⋮        ⋮        (Missing2) ← [X] ← [Y]
-//	   ⋮         ⋮      ⋮        ⋮             ⋮        ⋮  ↖ [Z]
-//	   ⋮         ⋮      ⋮        ⋮             ⋮        ⋮     ⋮
+//			                 ↙-- [A]
+//	  (Genesis) ← [B] ← [C]  ←-- [D]
+//	     ⋮         ⋮     ⋮        ⋮
+//	     ⋮         ⋮     ⋮   (Missing1) ←---- [W]
+//	     ⋮         ⋮     ⋮        ⋮        (Missing2) ← [X] ← [Y]
+//	     ⋮         ⋮     ⋮        ⋮             ⋮        ⋮  ↖ [Z]
+//	     ⋮         ⋮     ⋮        ⋮             ⋮        ⋮     ⋮
+//	     0         1     2        3             4        5     6  Level
 //
-// LEVEL:  0         1     2        3             4       5     6
 // Nomenclature:
-//
-//	[B] Vertex B (internally represented as a full vertex container)
-//	(M) referenced vertex that has not been added (internally represented as empty vertex container)
+// [B] Vertex B (internally represented as a full vertex container)
+// (M) referenced vertex that has not been added (internally represented as empty vertex container)
 var TestVertices = map[string]*mock.Vertex{
 	"A": NewVertexMock("A", 3, "Genesis", 0),
 	"B": NewVertexMock("B", 1, "Genesis", 0),

@@ -282,7 +282,14 @@ Loop:
 	}
 	c.logger.Info().Msg("Finished draining trie update channel in compactor on shutdown")
 
-	// Don't wait for checkpointing to finish because it might take too long.
+	// Don't wait for checkpointing to finish if it takes more than 10ms because it might take too long.
+	// We wait at least a little bit to make the tests a lot more stable.
+	if !checkpointSem.TryAcquire(1) {
+		select {
+		case <-checkpointResultCh:
+		case <-time.After(10 * time.Millisecond):
+		}
+	}
 }
 
 // checkpoint creates checkpoint of tries snapshot,

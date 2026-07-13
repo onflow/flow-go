@@ -77,6 +77,6 @@ func (generator *accountLocalIDGenerator) GenerateAccountID(
 	}
 
 	return generator.accounts.GenerateAccountLocalID(
-		flow.ConvertAddress(runtimeAddress),
+		flow.Address(runtimeAddress),
 	)
 }

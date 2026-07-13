@@ -29,7 +29,7 @@ func Test_accountLocalIDGenerator_GenerateAccountID(t *testing.T) {
 		).Return(nil)
 
 		accounts := envMock.NewAccounts(t)
-		accounts.On("GenerateAccountLocalID", flow.ConvertAddress(address)).
+		accounts.On("GenerateAccountLocalID", flow.Address(address)).
 			Return(uint64(1), nil)
 
 		generator := environment.NewAccountLocalIDGenerator(
@@ -78,7 +78,7 @@ func Test_accountLocalIDGenerator_GenerateAccountID(t *testing.T) {
 		).Return(nil)
 
 		accounts := envMock.NewAccounts(t)
-		accounts.On("GenerateAccountLocalID", flow.ConvertAddress(address)).
+		accounts.On("GenerateAccountLocalID", flow.Address(address)).
 			Return(uint64(0), expectedErr)
 
 		generator := environment.NewAccountLocalIDGenerator(

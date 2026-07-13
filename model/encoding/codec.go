@@ -14,30 +14,30 @@ type Marshaler interface {
 	// Marshaler marshals a value to bytes.
 	//
 	// This function returns an error if the value type is not supported by this marshaler.
-	Marshal(interface{}) ([]byte, error)
+	Marshal(any) ([]byte, error)
 
 	// Unmarshal unmarshals bytes to a value.
 	//
 	// This functions returns an error if the bytes do not fit the provided value type.
-	Unmarshal([]byte, interface{}) error
+	Unmarshal([]byte, any) error
 
 	// MustMarshal marshals a value to bytes.
 	//
 	// This function panics if marshaling fails.
-	MustMarshal(interface{}) []byte
+	MustMarshal(any) []byte
 
 	// MustUnmarshal unmarshals bytes to a value.
 	//
 	// This function panics if decoding fails.
-	MustUnmarshal([]byte, interface{})
+	MustUnmarshal([]byte, any)
 }
 
 type Encoder interface {
-	Encode(interface{}) error
+	Encode(any) error
 }
 
 type Decoder interface {
-	Decode(interface{}) error
+	Decode(any) error
 }
 
 type Codec interface {

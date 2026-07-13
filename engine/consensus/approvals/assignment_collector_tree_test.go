@@ -13,6 +13,7 @@ import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/consensus/approvals"
 	mockAC "github.com/onflow/flow-go/engine/consensus/approvals/mock"
+	"github.com/onflow/flow-go/engine/consensus/approvals/testutil"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -34,7 +35,7 @@ type mockedCollectorWrapper struct {
 }
 
 type AssignmentCollectorTreeSuite struct {
-	approvals.BaseAssignmentCollectorTestSuite
+	testutil.BaseAssignmentCollectorTestSuite
 
 	collectorTree    *approvals.AssignmentCollectorTree
 	factoryMethod    approvals.NewCollectorFactoryMethod

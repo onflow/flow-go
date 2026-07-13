@@ -306,9 +306,8 @@ func (dr *CadenceValueDiffReporter) diffDomain(
 			return nil, nil, nil, false
 		}
 
-		oldValue := oldStorageMap.ReadValue(nil, mapKey)
-
-		newValue := newStorageMap.ReadValue(nil, mapKey)
+		oldValue := oldStorageMap.ReadValue(oldRuntime.Interpreter, mapKey)
+		newValue := newStorageMap.ReadValue(newRuntime.Interpreter, mapKey)
 
 		return oldValue, newValue, trace, true
 	}
@@ -863,6 +862,7 @@ func (dr *CadenceValueDiffReporter) diffCadenceDictionaryValue(
 			oldKeys = append(oldKeys, key)
 			return true
 		},
+		false,
 	)
 
 	newKeys := make([]interpreter.Value, 0, otherDictionary.Count())
@@ -872,6 +872,7 @@ func (dr *CadenceValueDiffReporter) diffCadenceDictionaryValue(
 			newKeys = append(newKeys, key)
 			return true
 		},
+		false,
 	)
 
 	onlyOldKeys := make([]interpreter.Value, 0, len(oldKeys))

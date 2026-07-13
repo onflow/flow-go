@@ -18,7 +18,7 @@ type ApiHandlerFunc func(
 	r *common.Request,
 	backend access.API,
 	generator models.LinkGenerator,
-) (interface{}, error)
+) (any, error)
 
 // Handler is custom http handler implementing custom handler function.
 // Handler function allows easier handling of errors and responses as it

@@ -146,8 +146,8 @@ func New(
 	edrMetrics module.ExecutionDataRequesterMetrics,
 	downloader execution_data.Downloader,
 	execDataCache *cache.ExecutionDataCache,
-	processedHeight storage.ConsumerProgressInitializer,
-	processedNotifications storage.ConsumerProgressInitializer,
+	processedHeight storage.ConsumerProgress,
+	processedNotifications storage.ConsumerProgress,
 	state protocol.State,
 	headers storage.Headers,
 	cfg ExecutionDataConfig,
@@ -186,7 +186,6 @@ func New(
 		e.finalizationNotifier.Channel(), // to listen to finalization events to find newly sealed blocks
 		processedHeight,                  // read and persist the downloaded height
 		sealedBlockReader,                // read sealed blocks by height
-		e.config.InitialBlockHeight,      // initial "last processed" height for empty db
 		e.processBlockJob,                // process the sealed block job to download its execution data
 		fetchWorkers,                     // the number of concurrent workers
 		e.config.MaxSearchAhead,          // max number of unsent notifications to allow before pausing new fetches
@@ -233,7 +232,6 @@ func New(
 		executionDataNotifier.Channel(), // listen for notifications from the block consumer
 		processedNotifications,          // read and persist the notified height
 		e.executionDataReader,           // read execution data by height
-		e.config.InitialBlockHeight,     // initial "last processed" height for empty db
 		e.processNotificationJob,        // process the job to send notifications for an execution data
 		1,                               // use a single worker to ensure notification is delivered in consecutive order
 		0,                               // search ahead limit controlled by worker count

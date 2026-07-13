@@ -308,7 +308,7 @@ func bootstrapFuzzStateAndTxContext(tb testing.TB) (bootstrappedVmTest, transact
 		data, err := ccf.Decode(nil, accountCreatedEvents[0].Payload)
 		require.NoError(tb, err)
 
-		address = flow.ConvertAddress(
+		address = flow.Address(
 			cadence.SearchFieldByName(
 				data.(cadence.Event),
 				stdlib.AccountEventAddressParameter.Identifier,

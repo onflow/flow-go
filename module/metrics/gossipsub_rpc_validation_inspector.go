@@ -7,6 +7,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promauto"
 
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/network/channels"
 	p2pmsg "github.com/onflow/flow-go/network/p2p/message"
 )
 
@@ -421,11 +422,12 @@ func (c *GossipSubRpcValidationInspectorMetrics) OnIWantMessageIDsReceived(msgId
 
 // OnIHaveMessageIDsReceived tracks the number of message ids received by the node from other nodes on an iHave message.
 // This function is called on each iHave message received by the node.
+// Cluster topics are normalized to their prefix to prevent unbounded cardinality growth.
 // Args:
 // - channel: the channel on which the iHave message was received.
 // - msgIdCount: the number of message ids received on the iHave message.
 func (c *GossipSubRpcValidationInspectorMetrics) OnIHaveMessageIDsReceived(channel string, msgIdCount int) {
-	c.receivedIHaveMsgIDsHistogram.WithLabelValues(channel).Observe(float64(msgIdCount))
+	c.receivedIHaveMsgIDsHistogram.WithLabelValues(channels.NormalizeTopicForMetrics(channel)).Observe(float64(msgIdCount))
 }
 
 // OnIncomingRpcReceived tracks the number of incoming RPC messages received by the node.

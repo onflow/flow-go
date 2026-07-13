@@ -32,7 +32,7 @@ func TestAccountStatusMigration(t *testing.T) {
 
 	sizeOfTheStatusPayload := uint64(
 		environment.RegisterSize(
-			flow.AccountStatusRegisterID(flow.ConvertAddress(address)),
+			flow.AccountStatusRegisterID(flow.Address(address)),
 			environment.NewAccountStatus().ToBytes(),
 		),
 	)
@@ -69,70 +69,6 @@ func TestAccountStatusMigration(t *testing.T) {
 
 		_, err := migrate([]*ledger.Payload{})
 		require.Error(t, err)
-	})
-
-	t.Run("status register v1", func(t *testing.T) {
-		t.Parallel()
-
-		accountPublicKeyCount := uint32(5)
-		statusPayloadAndSequenceNubmerSize := sizeOfTheStatusPayload +
-			predefinedSequenceNumberPayloadSizes(string(address[:]), 1, accountPublicKeyCount)
-
-		payloads := []*ledger.Payload{
-			ledger.NewPayload(
-				ledger.NewKey([]ledger.KeyPart{ownerKey, {Type: 2, Value: []byte(flow.AccountStatusKey)}}),
-				[]byte{
-					0,                      // flags
-					0, 0, 0, 0, 0, 0, 0, 7, // storage used
-					0, 0, 0, 0, 0, 0, 0, 6, // storage index
-					0, 0, 0, 0, 0, 0, 0, 5, // public key counts
-				},
-			),
-		}
-
-		migrated, err := migrate(payloads)
-		require.NoError(t, err)
-		require.Len(t, migrated, 1)
-
-		accountStatus, err := environment.AccountStatusFromBytes(migrated[0].Value())
-		require.NoError(t, err)
-
-		require.Equal(t, statusPayloadAndSequenceNubmerSize, accountStatus.StorageUsed())
-		require.Equal(t, atree.SlabIndex{0, 0, 0, 0, 0, 0, 0, 6}, accountStatus.SlabIndex())
-		require.Equal(t, accountPublicKeyCount, accountStatus.AccountPublicKeyCount())
-		require.Equal(t, uint64(0), accountStatus.AccountIdCounter())
-	})
-	t.Run("status register v2", func(t *testing.T) {
-		t.Parallel()
-
-		accountPublicKeyCount := uint32(5)
-		statusPayloadAndSequenceNubmerSize := sizeOfTheStatusPayload +
-			predefinedSequenceNumberPayloadSizes(string(address[:]), 1, accountPublicKeyCount)
-
-		payloads := []*ledger.Payload{
-			ledger.NewPayload(
-				ledger.NewKey([]ledger.KeyPart{ownerKey, {Type: 2, Value: []byte(flow.AccountStatusKey)}}),
-				[]byte{
-					0,                        // flags
-					0, 0, 0, 0, 0, 0, 0, 100, // storage used
-					0, 0, 0, 0, 0, 0, 0, 6, // storage index
-					0, 0, 0, 0, 0, 0, 0, 5, // public key counts
-					0, 0, 0, 0, 0, 0, 0, 3, // account id counter
-				},
-			),
-		}
-
-		migrated, err := migrate(payloads)
-		require.NoError(t, err)
-		require.Len(t, migrated, 1)
-
-		accountStatus, err := environment.AccountStatusFromBytes(migrated[0].Value())
-		require.NoError(t, err)
-
-		require.Equal(t, statusPayloadAndSequenceNubmerSize, accountStatus.StorageUsed())
-		require.Equal(t, atree.SlabIndex{0, 0, 0, 0, 0, 0, 0, 6}, accountStatus.SlabIndex())
-		require.Equal(t, accountPublicKeyCount, accountStatus.AccountPublicKeyCount())
-		require.Equal(t, uint64(3), accountStatus.AccountIdCounter())
 	})
 
 	t.Run("status register v3", func(t *testing.T) {
@@ -210,7 +146,7 @@ func TestAccountStatusMigration(t *testing.T) {
 
 		dataRegisterSize := uint64(environment.RegisterSize(
 			flow.RegisterID{
-				Owner: string(flow.ConvertAddress(address).Bytes()),
+				Owner: string(flow.Address(address).Bytes()),
 				Key:   "1",
 			},
 			make([]byte, 100),

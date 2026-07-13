@@ -90,7 +90,7 @@ func TestSnapshotTree(t *testing.T) {
 
 	compactedTree := tree3
 	numExtraUpdates := 2*compactThreshold + 1
-	for i := 0; i < numExtraUpdates; i++ {
+	for i := range numExtraUpdates {
 		value := []byte(fmt.Sprintf("compacted %d", i))
 		expectedCompacted[id3] = value
 		compactedTree = compactedTree.Append(

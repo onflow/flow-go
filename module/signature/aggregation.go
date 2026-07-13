@@ -74,7 +74,7 @@ func NewSignatureAggregatorSameMessage(
 //
 // This function does not update the internal state.
 // The function errors:
-//   - InvalidSignerIdxError if the signer index is out of bound
+//   - [InvalidSignerIdxError] if the signer index is out of bound
 //   - generic error for unexpected runtime failures
 //
 // The function does not return an error for any invalid signature.
@@ -92,8 +92,8 @@ func (s *SignatureAggregatorSameMessage) Verify(signer int, sig crypto.Signature
 // key at the input index. If the verification passes, the signature is added to the internal
 // signature state.
 // The function errors:
-//   - InvalidSignerIdxError if the signer index is out of bound
-//   - DuplicatedSignerIdxError if a signature from the same signer index has already been added
+//   - [InvalidSignerIdxError] if the signer index is out of bound
+//   - [DuplicatedSignerIdxError] if a signature from the same signer index has already been added
 //   - generic error for unexpected runtime failures
 //
 // The function does not return an error for any invalid signature.
@@ -128,8 +128,8 @@ func (s *SignatureAggregatorSameMessage) add(signer int, sig crypto.Signature) {
 // outputs valid signatures. This would detect if TrustedAdd has added any invalid
 // signature.
 // The function errors:
-//   - InvalidSignerIdxError if the signer index is out of bound
-//   - DuplicatedSignerIdxError if a signature from the same signer index has already been added
+//   - [InvalidSignerIdxError] if the signer index is out of bound
+//   - [DuplicatedSignerIdxError] if a signature from the same signer index has already been added
 //
 // The function is not thread-safe.
 func (s *SignatureAggregatorSameMessage) TrustedAdd(signer int, sig crypto.Signature) error {
@@ -147,7 +147,7 @@ func (s *SignatureAggregatorSameMessage) TrustedAdd(signer int, sig crypto.Signa
 
 // HasSignature checks if a signer has already provided a valid signature.
 // The function errors:
-//   - InvalidSignerIdxError if the signer index is out of bound
+//   - [InvalidSignerIdxError] if the signer index is out of bound
 //
 // The function is not thread-safe.
 func (s *SignatureAggregatorSameMessage) HasSignature(signer int) (bool, error) {
@@ -168,12 +168,12 @@ func (s *SignatureAggregatorSameMessage) HasSignature(signer int) (bool, error) 
 // cases, the function discards the generated aggregate and errors.
 // The function is not thread-safe.
 // Returns:
-//   - InsufficientSignaturesError if no signatures have been added yet
-//   - InvalidSignatureIncludedError if:
+//   - [InsufficientSignaturesError] if no signatures have been added yet
+//   - [InvalidSignatureIncludedError] if:
 //     -- some signature(s), included via TrustedAdd, fail to deserialize (regardless of the aggregated public key)
 //     -- Or all signatures deserialize correctly but some signature(s), included via TrustedAdd, are
 //     invalid (while aggregated public key is valid)
-//   - ErrIdentityPublicKey if the signer's public keys add up to the BLS identity public key.
+//   - [ErrIdentityPublicKey] if the signer's public keys add up to the BLS identity public key.
 //     Any aggregated signature would fail the cryptographic verification if verified against the
 //     the identity public key. This case can only happen if public keys were forged to sum up to
 //     an identity public key. Under the assumption that PoPs of all keys are valid, an identity
@@ -236,8 +236,8 @@ func (s *SignatureAggregatorSameMessage) Aggregate() ([]int, crypto.Signature, e
 //     `agg_key` is equal to the identity public key (because of equivocation). If the caller needs to
 //     differentiate this case, `crypto.IsIdentityPublicKey` can be used to test the returned `agg_key`
 //   - (false, nil, err) with error types:
-//     -- InsufficientSignaturesError if no signer indices are given (`signers` is empty)
-//     -- InvalidSignerIdxError if some signer indices are out of bound
+//     -- [InsufficientSignaturesError] if no signer indices are given (`signers` is empty)
+//     -- [InvalidSignerIdxError] if some signer indices are out of bound
 //     -- generic error in case of an unexpected runtime failure
 func (s *SignatureAggregatorSameMessage) VerifyAggregate(signers []int, sig crypto.Signature) (bool, crypto.PublicKey, error) {
 	keys := make([]crypto.PublicKey, 0, len(signers))
@@ -311,7 +311,7 @@ func NewPublicKeyAggregator(publicKeys []crypto.PublicKey) (*PublicKeyAggregator
 //
 // The aggregation errors if:
 //   - generic error if input signers is empty.
-//   - InvalidSignerIdxError if any signer is out of bound.
+//   - [InvalidSignerIdxError] if any signer is out of bound.
 //   - other generic errors are unexpected during normal operations.
 func (p *PublicKeyAggregator) KeyAggregate(signers []int) (crypto.PublicKey, error) {
 	// check for empty list

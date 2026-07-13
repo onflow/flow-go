@@ -23,49 +23,39 @@ import (
 )
 
 var (
-	// Hard and soft balance limits for collection and consensus nodes.
-	// We will log a warning once for a soft limit, and will log an error
-	// in perpetuity for a hard limit.
+	// Balance limits for collection and consensus nodes.
 	// Taken from https://www.notion.so/dapperlabs/Machine-Account-f3c293593ea442a39614fcebf705a132
-	// TODO update these for FLIP74
 
-	defaultSoftMinBalanceLN cadence.UFix64
-	defaultHardMinBalanceLN cadence.UFix64
-	defaultSoftMinBalanceSN cadence.UFix64
-	defaultHardMinBalanceSN cadence.UFix64
+	cdcRecommendedMinBalanceLN cadence.UFix64
+	cdcRecommendedMinBalanceSN cadence.UFix64
 )
 
 const (
-	recommendedMinBalanceLN = 0.002
-	recommendedMinBalanceSN = 0.05
+	// We recommend node operators refill once they reach this threshold
+	recommendedMinBalanceLN      = 0.25
+	recommendedMinBalanceSN      = 2.0
+	recommendedRefillToBalanceLN = 0.75
+	recommendedRefillToBalanceSN = 6.0
 )
 
 func init() {
 	var err error
-	defaultSoftMinBalanceLN, err = cadence.NewUFix64("0.0025")
-	if err != nil {
-		panic(fmt.Errorf("could not convert soft min balance for LN: %w", err))
-	}
-	defaultHardMinBalanceLN, err = cadence.NewUFix64("0.002")
+	cdcRecommendedMinBalanceLN, err = cadence.NewUFix64("0.25")
 	if err != nil {
 		panic(fmt.Errorf("could not convert hard min balance for LN: %w", err))
 	}
-	defaultSoftMinBalanceSN, err = cadence.NewUFix64("0.125")
-	if err != nil {
-		panic(fmt.Errorf("could not convert soft min balance for SN: %w", err))
-	}
-	defaultHardMinBalanceSN, err = cadence.NewUFix64("0.05")
+	cdcRecommendedMinBalanceSN, err = cadence.NewUFix64("2.0")
 	if err != nil {
 		panic(fmt.Errorf("could not convert hard min balance for SN: %w", err))
 	}
 
 	// sanity checks
-	if asFloat, err := ufix64Tofloat64(defaultHardMinBalanceLN); err != nil {
+	if asFloat, err := ufix64Tofloat64(cdcRecommendedMinBalanceLN); err != nil {
 		panic(err)
 	} else if asFloat != recommendedMinBalanceLN {
 		panic(fmt.Errorf("failed sanity check: %f!=%f", asFloat, recommendedMinBalanceLN))
 	}
-	if asFloat, err := ufix64Tofloat64(defaultHardMinBalanceSN); err != nil {
+	if asFloat, err := ufix64Tofloat64(cdcRecommendedMinBalanceSN); err != nil {
 		panic(err)
 	} else if asFloat != recommendedMinBalanceSN {
 		panic(fmt.Errorf("failed sanity check: %f!=%f", asFloat, recommendedMinBalanceSN))
@@ -91,18 +81,14 @@ func checkMachineAccountRetryBackoff() retry.Backoff {
 
 // MachineAccountValidatorConfig defines configuration options for MachineAccountConfigValidator.
 type MachineAccountValidatorConfig struct {
-	SoftMinBalanceLN cadence.UFix64
 	HardMinBalanceLN cadence.UFix64
-	SoftMinBalanceSN cadence.UFix64
 	HardMinBalanceSN cadence.UFix64
 }
 
 func DefaultMachineAccountValidatorConfig() MachineAccountValidatorConfig {
 	return MachineAccountValidatorConfig{
-		SoftMinBalanceLN: defaultSoftMinBalanceLN,
-		HardMinBalanceLN: defaultHardMinBalanceLN,
-		SoftMinBalanceSN: defaultSoftMinBalanceSN,
-		HardMinBalanceSN: defaultHardMinBalanceSN,
+		HardMinBalanceLN: cdcRecommendedMinBalanceLN,
+		HardMinBalanceSN: cdcRecommendedMinBalanceSN,
 	}
 }
 
@@ -110,9 +96,7 @@ func DefaultMachineAccountValidatorConfig() MachineAccountValidatorConfig {
 // balance checks. This is useful for test networks where transaction fees are
 // disabled.
 func WithoutBalanceChecks(conf *MachineAccountValidatorConfig) {
-	conf.SoftMinBalanceLN = 0
 	conf.HardMinBalanceLN = 0
-	conf.SoftMinBalanceSN = 0
 	conf.HardMinBalanceSN = 0
 }
 
@@ -323,17 +307,11 @@ func CheckMachineAccountInfo(
 	switch role {
 	case flow.RoleCollection:
 		if balance < conf.HardMinBalanceLN {
-			return fmt.Errorf("machine account balance is below hard minimum (%s < %s)", balance, conf.HardMinBalanceLN)
-		}
-		if balance < conf.SoftMinBalanceLN {
-			log.Warn().Msgf("machine account balance is below recommended balance (%s < %s)", balance, conf.SoftMinBalanceLN)
+			return fmt.Errorf("machine account balance is below minimum (%s < %s). Please refill to %f FLOW", balance, conf.HardMinBalanceLN, recommendedRefillToBalanceLN)
 		}
 	case flow.RoleConsensus:
 		if balance < conf.HardMinBalanceSN {
-			return fmt.Errorf("machine account balance is below hard minimum (%s < %s)", balance, conf.HardMinBalanceSN)
-		}
-		if balance < conf.SoftMinBalanceSN {
-			log.Warn().Msgf("machine account balance is below recommended balance (%s < %s)", balance, conf.SoftMinBalanceSN)
+			return fmt.Errorf("machine account balance is below minimum (%s < %s). Please refill to %f FLOW", balance, conf.HardMinBalanceSN, recommendedRefillToBalanceSN)
 		}
 	default:
 		// sanity check - should be caught earlier in this function

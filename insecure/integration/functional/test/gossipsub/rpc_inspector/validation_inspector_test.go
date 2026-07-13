@@ -7,10 +7,8 @@ import (
 	"testing"
 	"time"
 
-	corrupt "github.com/libp2p/go-libp2p-pubsub"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	pb "github.com/libp2p/go-libp2p-pubsub/pb"
-	pubsub_pb "github.com/libp2p/go-libp2p-pubsub/pb"
 	"github.com/libp2p/go-libp2p/core/peer"
 	mockery "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -706,7 +704,7 @@ func TestValidationInspector_UnstakedNode_Detection(t *testing.T) {
 		t.Name(),
 		idProvider,
 		p2ptest.WithRole(role),
-		internal.WithCorruptGossipSub(corruptlibp2p.CorruptGossipSubFactory(), corruptlibp2p.CorruptGossipSubConfigFactoryWithInspector(func(id peer.ID, rpc *corrupt.RPC) error {
+		internal.WithCorruptGossipSub(corruptlibp2p.CorruptGossipSubFactory(), corruptlibp2p.CorruptGossipSubConfigFactoryWithInspector(func(id peer.ID, rpc *pubsub.RPC) error {
 			if nodesConnected.Load() {
 				// after nodes are connected invoke corrupt callback with an unstaked peer ID
 				return corruptInspectorFunc(unstakedPeerID, rpc)
@@ -1055,10 +1053,10 @@ func testGossipSubSpamMitigationIntegration(t *testing.T, msgType p2pmsg.Control
 		return (*messages.Proposal)(unittest.ProposalFixture())
 	})
 
-	var unknownTopicSpam []pubsub_pb.ControlMessage
-	var malformedTopicSpam []pubsub_pb.ControlMessage
-	var invalidSporkIDTopicSpam []pubsub_pb.ControlMessage
-	var duplicateTopicSpam []pubsub_pb.ControlMessage
+	var unknownTopicSpam []pb.ControlMessage
+	var malformedTopicSpam []pb.ControlMessage
+	var invalidSporkIDTopicSpam []pb.ControlMessage
+	var duplicateTopicSpam []pb.ControlMessage
 	switch msgType {
 	case p2pmsg.CtrlMsgGraft:
 		unknownTopicSpam = spammer.GenerateCtlMessages(int(spamCtrlMsgCount), p2ptest.WithGraft(spamRpcCount, unknownTopic.String()))

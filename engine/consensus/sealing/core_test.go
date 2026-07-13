@@ -12,6 +12,7 @@ import (
 
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/consensus/approvals"
+	"github.com/onflow/flow-go/engine/consensus/approvals/testutil"
 	"github.com/onflow/flow-go/engine/consensus/approvals/tracker"
 	"github.com/onflow/flow-go/model/chunks"
 	"github.com/onflow/flow-go/model/flow"
@@ -40,7 +41,7 @@ func TestApprovalProcessingCore(t *testing.T) {
 const RequiredApprovalsForSealConstructionTestingValue = 1
 
 type ApprovalProcessingCoreTestSuite struct {
-	approvals.BaseAssignmentCollectorTestSuite
+	testutil.BaseAssignmentCollectorTestSuite
 
 	sealsDB             *storage.Seals
 	finalizedRootHeader *flow.Header

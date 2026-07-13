@@ -33,7 +33,6 @@ import (
 	"github.com/onflow/flow-go/integration/internal/emulator"
 	"github.com/onflow/flow-go/integration/internal/emulator/utils/unittest"
 	"github.com/onflow/flow-go/model/flow"
-	flowgo "github.com/onflow/flow-go/model/flow"
 	commonunittest "github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -54,7 +53,7 @@ func TestBlocks(t *testing.T) {
 	t.Run("should return error for not found", func(t *testing.T) {
 		t.Run("BlockByID", func(t *testing.T) {
 			freshId := test.IdentifierGenerator().New()
-			_, err := store.BlockByID(context.Background(), flowgo.Identifier(freshId))
+			_, err := store.BlockByID(context.Background(), flow.Identifier(freshId))
 			if assert.Error(t, err) {
 				assert.Equal(t, emulator.ErrNotFound, err)
 			}
@@ -214,7 +213,7 @@ func TestTransactionResults(t *testing.T) {
 			result := unittest.StorableTransactionResultFixture(eventEncodingVersion)
 
 			t.Run("should return error for not found", func(t *testing.T) {
-				txID := flowgo.Identifier(ids.New())
+				txID := flow.Identifier(ids.New())
 
 				_, err := store.TransactionResultByID(context.Background(), txID)
 				if assert.Error(t, err) {
@@ -223,7 +222,7 @@ func TestTransactionResults(t *testing.T) {
 			})
 
 			t.Run("should be able to insert result", func(t *testing.T) {
-				txID := flowgo.Identifier(ids.New())
+				txID := flow.Identifier(ids.New())
 
 				err := store.InsertTransactionResult(txID, result)
 				assert.NoError(t, err)
@@ -366,7 +365,7 @@ func TestInsertEvents(t *testing.T) {
 				event, err := emulator.SDKEventToFlow(events.New())
 				assert.NoError(t, err)
 
-				events := []flowgo.Event{*event}
+				events := []flow.Event{*event}
 
 				var blockHeight uint64 = 1
 
@@ -403,9 +402,9 @@ func TestEventsByHeight(t *testing.T) {
 				emptyBlockHeight       uint64 = 2
 				nonExistentBlockHeight uint64 = 3
 
-				allEvents = make([]flowgo.Event, 10)
-				eventsA   = make([]flowgo.Event, 0, 5)
-				eventsB   = make([]flowgo.Event, 0, 5)
+				allEvents = make([]flow.Event, 10)
+				eventsA   = make([]flow.Event, 0, 5)
+				eventsB   = make([]flow.Event, 0, 5)
 			)
 
 			for i := range allEvents {

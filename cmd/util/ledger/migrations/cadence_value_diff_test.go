@@ -193,7 +193,7 @@ func TestDiffCadenceValues(t *testing.T) {
 			accountStatus := environment.NewAccountStatus()
 			accountStatusPayload := ledger.NewPayload(
 				convert.RegisterIDToLedgerKey(
-					flow.AccountStatusRegisterID(flow.ConvertAddress(address)),
+					flow.AccountStatusRegisterID(flow.Address(address)),
 				),
 				accountStatus.ToBytes(),
 			)
@@ -313,7 +313,7 @@ func TestDiffCadenceValues(t *testing.T) {
 			accountStatus := environment.NewAccountStatus()
 			accountStatusPayload := ledger.NewPayload(
 				convert.RegisterIDToLedgerKey(
-					flow.AccountStatusRegisterID(flow.ConvertAddress(address)),
+					flow.AccountStatusRegisterID(flow.Address(address)),
 				),
 				accountStatus.ToBytes(),
 			)
@@ -432,7 +432,7 @@ func TestDiffCadenceValues(t *testing.T) {
 			accountStatus := environment.NewAccountStatus()
 			accountStatusPayload := ledger.NewPayload(
 				convert.RegisterIDToLedgerKey(
-					flow.AccountStatusRegisterID(flow.ConvertAddress(address)),
+					flow.AccountStatusRegisterID(flow.Address(address)),
 				),
 				accountStatus.ToBytes(),
 			)
@@ -562,7 +562,7 @@ func TestDiffCadenceValues(t *testing.T) {
 			accountStatus := environment.NewAccountStatus()
 			accountStatusPayload := ledger.NewPayload(
 				convert.RegisterIDToLedgerKey(
-					flow.AccountStatusRegisterID(flow.ConvertAddress(address)),
+					flow.AccountStatusRegisterID(flow.Address(address)),
 				),
 				accountStatus.ToBytes(),
 			)
@@ -703,7 +703,7 @@ func createStorageMapRegisters(
 	accountStatus := environment.NewAccountStatus()
 	accountStatusPayload := ledger.NewPayload(
 		convert.RegisterIDToLedgerKey(
-			flow.AccountStatusRegisterID(flow.ConvertAddress(address)),
+			flow.AccountStatusRegisterID(flow.Address(address)),
 		),
 		accountStatus.ToBytes(),
 	)
@@ -759,7 +759,7 @@ func createTestRegisters(t *testing.T, address common.Address, domain common.Sto
 	accountStatus := environment.NewAccountStatus()
 	accountStatusPayload := ledger.NewPayload(
 		convert.RegisterIDToLedgerKey(
-			flow.AccountStatusRegisterID(flow.ConvertAddress(address)),
+			flow.AccountStatusRegisterID(flow.Address(address)),
 		),
 		accountStatus.ToBytes(),
 	)

@@ -58,11 +58,11 @@ func TestBitTools(t *testing.T) {
 		for j := 0; j < len(bytes)/2; j++ {
 			bytes[j], bytes[len(bytes)-j-1] = bytes[len(bytes)-j-1], bytes[j]
 		}
-		for j := 0; j < len(bytes); j++ {
+		for j := range bytes {
 			bytes[j] = bits.Reverse8(bytes[j])
 		}
 		// test bit reads are equal for all indices
-		for i := 0; i < maxBits; i++ {
+		for i := range maxBits {
 			bit := int(b.Bit(i))
 			assert.Equal(t, bit, ReadBit(bytes, i))
 		}
@@ -75,7 +75,7 @@ func TestBitTools(t *testing.T) {
 		require.NoError(t, err)
 
 		// build a random big bit by bit
-		for idx := 0; idx < maxBits; idx++ {
+		for idx := range maxBits {
 			bit := rand.Intn(2)
 			// b = 2*b + bit
 			b.Lsh(&b, 1)
@@ -96,7 +96,7 @@ func TestBitTools(t *testing.T) {
 		require.NoError(t, err)
 
 		// build a random big bit by bit
-		for idx := 0; idx < maxBits; idx++ {
+		for idx := range maxBits {
 			bit := rand.Intn(2)
 			// b = 2*b + bit
 			b.Lsh(&b, 1)

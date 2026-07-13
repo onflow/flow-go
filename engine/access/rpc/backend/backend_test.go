@@ -2031,6 +2031,115 @@ func (suite *Suite) TestNodeCommunicator() {
 	suite.Assert().Equal(codes.Unavailable, status.Code(err))
 }
 
+func (suite *Suite) TestGetExecutionReceiptsByBlockID() {
+	nonexistingBlockID := unittest.IdentifierFixture()
+	blockID := unittest.IdentifierFixture()
+
+	ctx := context.Background()
+
+	receipts := new(storagemock.ExecutionReceipts)
+	receipts.
+		On("ByBlockID", nonexistingBlockID).
+		Return(flow.ExecutionReceiptList{}, nil)
+
+	result1 := unittest.ExecutionResultFixture(unittest.WithExecutionResultBlockID(blockID))
+	receipt1 := unittest.ExecutionReceiptFixture(unittest.WithResult(result1))
+	result2 := unittest.ExecutionResultFixture(unittest.WithExecutionResultBlockID(blockID))
+	receipt2 := unittest.ExecutionReceiptFixture(unittest.WithResult(result2))
+	existingReceipts := flow.ExecutionReceiptList{receipt1, receipt2}
+
+	receipts.
+		On("ByBlockID", blockID).
+		Return(existingReceipts, nil)
+
+	suite.Run("nonexisting block", func() {
+		params := suite.defaultBackendParams()
+		params.ExecutionReceipts = receipts
+
+		backend, err := New(params)
+		suite.Require().NoError(err)
+
+		_, err = backend.GetExecutionReceiptsByBlockID(ctx, nonexistingBlockID)
+		suite.Assert().Error(err)
+	})
+
+	suite.Run("existing block with two receipts", func() {
+		params := suite.defaultBackendParams()
+		params.ExecutionReceipts = receipts
+
+		backend, err := New(params)
+		suite.Require().NoError(err)
+
+		actual, err := backend.GetExecutionReceiptsByBlockID(ctx, blockID)
+		suite.Require().NoError(err)
+		suite.Require().Len(actual, 2)
+		suite.Assert().Equal([]*flow.ExecutionReceipt(existingReceipts), actual)
+	})
+
+	receipts.AssertExpectations(suite.T())
+	suite.assertAllExpectations()
+}
+
+func (suite *Suite) TestGetExecutionReceiptsByResultID() {
+	nonexistingID := unittest.IdentifierFixture()
+	blockID := unittest.IdentifierFixture()
+
+	ctx := context.Background()
+
+	results := new(storagemock.ExecutionResults)
+	results.
+		On("ByID", nonexistingID).
+		Return(nil, storage.ErrNotFound)
+
+	targetResult := unittest.ExecutionResultFixture(unittest.WithExecutionResultBlockID(blockID))
+	matchingReceipt1 := unittest.ExecutionReceiptFixture(unittest.WithResult(targetResult))
+	matchingReceipt2 := unittest.ExecutionReceiptFixture(unittest.WithResult(targetResult))
+
+	otherResult := unittest.ExecutionResultFixture(unittest.WithExecutionResultBlockID(blockID))
+	nonMatchingReceipt := unittest.ExecutionReceiptFixture(unittest.WithResult(otherResult))
+
+	allReceipts := flow.ExecutionReceiptList{matchingReceipt1, matchingReceipt2, nonMatchingReceipt}
+
+	results.
+		On("ByID", targetResult.ID()).
+		Return(targetResult, nil)
+
+	receipts := new(storagemock.ExecutionReceipts)
+	receipts.
+		On("ByBlockID", blockID).
+		Return(allReceipts, nil)
+
+	suite.Run("nonexisting result ID", func() {
+		params := suite.defaultBackendParams()
+		params.ExecutionResults = results
+		params.ExecutionReceipts = receipts
+
+		backend, err := New(params)
+		suite.Require().NoError(err)
+
+		_, err = backend.GetExecutionReceiptsByResultID(ctx, nonexistingID)
+		suite.Assert().Error(err)
+	})
+
+	suite.Run("existing result with two matching receipts", func() {
+		params := suite.defaultBackendParams()
+		params.ExecutionResults = results
+		params.ExecutionReceipts = receipts
+
+		backend, err := New(params)
+		suite.Require().NoError(err)
+
+		actual, err := backend.GetExecutionReceiptsByResultID(ctx, targetResult.ID())
+		suite.Require().NoError(err)
+		suite.Require().Len(actual, 2)
+		suite.Assert().ElementsMatch([]*flow.ExecutionReceipt{matchingReceipt1, matchingReceipt2}, actual)
+	})
+
+	results.AssertExpectations(suite.T())
+	receipts.AssertExpectations(suite.T())
+	suite.assertAllExpectations()
+}
+
 func (suite *Suite) assertAllExpectations() {
 	suite.snapshot.AssertExpectations(suite.T())
 	suite.state.AssertExpectations(suite.T())

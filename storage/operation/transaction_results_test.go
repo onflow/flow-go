@@ -227,3 +227,128 @@ func TestRetrieveAllTxResultsForBlock(t *testing.T) {
 		})
 	})
 }
+
+// TestInsertAndIndexTransactionResultErrorMessages verifies that error messages can be inserted,
+// retrieved by transaction ID and index, and that duplicate inserts are rejected.
+func TestInsertAndIndexTransactionResultErrorMessages(t *testing.T) {
+	t.Run("happy path", func(t *testing.T) {
+		dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
+			lockManager := storage.NewTestingLockManager()
+			blockID := unittest.IdentifierFixture()
+			errorMessages := unittest.TransactionResultErrorMessagesFixture(3)
+
+			err := unittest.WithLock(t, lockManager, storage.LockInsertTransactionResultErrMessage, func(lctx lockctx.Context) error {
+				return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+					return operation.InsertAndIndexTransactionResultErrorMessages(lctx, rw, blockID, errorMessages)
+				})
+			})
+			require.NoError(t, err)
+
+			// Verify retrieval by transaction ID.
+			for _, expected := range errorMessages {
+				var actual flow.TransactionResultErrorMessage
+				err = operation.RetrieveTransactionResultErrorMessage(db.Reader(), blockID, expected.TransactionID, &actual)
+				require.NoError(t, err)
+				assert.Equal(t, expected, actual)
+			}
+
+			// Verify retrieval by index.
+			for i, expected := range errorMessages {
+				var actual flow.TransactionResultErrorMessage
+				err = operation.RetrieveTransactionResultErrorMessageByIndex(db.Reader(), blockID, uint32(i), &actual)
+				require.NoError(t, err)
+				assert.Equal(t, expected, actual)
+			}
+
+			// Verify bulk retrieval.
+			var retrieved []flow.TransactionResultErrorMessage
+			err = operation.LookupTransactionResultErrorMessagesByBlockIDUsingIndex(db.Reader(), blockID, &retrieved)
+			require.NoError(t, err)
+			assert.Equal(t, errorMessages, retrieved)
+		})
+	})
+
+	t.Run("returns ErrAlreadyExists on duplicate insert", func(t *testing.T) {
+		dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
+			lockManager := storage.NewTestingLockManager()
+			blockID := unittest.IdentifierFixture()
+			errorMessages := unittest.TransactionResultErrorMessagesFixture(1)
+
+			insert := func() error {
+				return unittest.WithLock(t, lockManager, storage.LockInsertTransactionResultErrMessage, func(lctx lockctx.Context) error {
+					return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+						return operation.InsertAndIndexTransactionResultErrorMessages(lctx, rw, blockID, errorMessages)
+					})
+				})
+			}
+
+			err := insert()
+			require.NoError(t, err)
+
+			err = insert()
+			require.ErrorIs(t, err, storage.ErrAlreadyExists)
+
+			// Verify that the original error messages are still there and unchanged
+			for _, expected := range errorMessages {
+				var actual flow.TransactionResultErrorMessage
+				err = operation.RetrieveTransactionResultErrorMessage(db.Reader(), blockID, expected.TransactionID, &actual)
+				require.NoError(t, err)
+				assert.Equal(t, expected, actual)
+			}
+		})
+	})
+}
+
+// TestTransactionResultErrorMessagesExists verifies the existence check for tx result error messages.
+func TestTransactionResultErrorMessagesExists(t *testing.T) {
+	t.Run("returns false for unknown block", func(t *testing.T) {
+		dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
+			blockID := unittest.IdentifierFixture()
+			var exists bool
+			err := operation.TransactionResultErrorMessagesExists(db.Reader(), blockID, &exists)
+			require.NoError(t, err)
+			require.False(t, exists)
+		})
+	})
+
+	t.Run("returns true after inserting error messages", func(t *testing.T) {
+		dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
+			lockManager := storage.NewTestingLockManager()
+			blockID := unittest.IdentifierFixture()
+			errorMessages := unittest.TransactionResultErrorMessagesFixture(2)
+
+			err := unittest.WithLock(t, lockManager, storage.LockInsertTransactionResultErrMessage, func(lctx lockctx.Context) error {
+				return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+					return operation.InsertAndIndexTransactionResultErrorMessages(lctx, rw, blockID, errorMessages)
+				})
+			})
+			require.NoError(t, err)
+
+			var exists bool
+			err = operation.TransactionResultErrorMessagesExists(db.Reader(), blockID, &exists)
+			require.NoError(t, err)
+			require.True(t, exists)
+		})
+	})
+
+	t.Run("returns false for a different block", func(t *testing.T) {
+		dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
+			lockManager := storage.NewTestingLockManager()
+			blockID := unittest.IdentifierFixture()
+			otherBlockID := unittest.IdentifierFixture()
+			errorMessages := unittest.TransactionResultErrorMessagesFixture(1)
+
+			err := unittest.WithLock(t, lockManager, storage.LockInsertTransactionResultErrMessage, func(lctx lockctx.Context) error {
+				return db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+					return operation.InsertAndIndexTransactionResultErrorMessages(lctx, rw, blockID, errorMessages)
+				})
+			})
+			require.NoError(t, err)
+
+			var exists bool
+			err = operation.TransactionResultErrorMessagesExists(db.Reader(), otherBlockID, &exists)
+			require.NoError(t, err)
+			require.False(t, exists)
+		})
+	})
+}

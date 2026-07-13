@@ -29,9 +29,7 @@ func newBootstrapPayloads(
 	bootstrapProcedureOptions ...fvm.BootstrapProcedureOption,
 ) ([]*ledger.Payload, error) {
 
-	ctx := fvm.NewContext(
-		fvm.WithChain(chainID.Chain()),
-	)
+	ctx := fvm.NewContext(chainID.Chain())
 
 	vm := fvm.NewVirtualMachine()
 

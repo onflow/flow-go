@@ -356,8 +356,8 @@ func (s *EmulatorSuite) claimDKGParticipant(node *node) {
 	signer, err := s.blockchain.ServiceKey().Signer()
 	require.NoError(s.T(), err)
 	_, err = s.prepareAndSubmit(createParticipantTx,
-		[]sdk.Address{node.account.accountAddress, s.serviceAccountAddress, s.dkgAddress},
-		[]sdkcrypto.Signer{node.account.accountSigner, signer, s.dkgSigner},
+		[]sdk.Address{node.account.accountAddress, s.serviceAccountAddress},
+		[]sdkcrypto.Signer{node.account.accountSigner, signer},
 	)
 	require.NoError(s.T(), err)
 

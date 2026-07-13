@@ -30,7 +30,7 @@ func NewSnapshot(err error) *Snapshot {
 var _ protocol.Snapshot = (*Snapshot)(nil)
 
 // NewSnapshotf is NewSnapshot with ergonomic error formatting.
-func NewSnapshotf(msg string, args ...interface{}) *Snapshot {
+func NewSnapshotf(msg string, args ...any) *Snapshot {
 	return NewSnapshot(fmt.Errorf(msg, args...))
 }
 

@@ -39,12 +39,12 @@ func testCheckAtreeInlinedStatus(t *testing.T, payloadCount int, nWorkers int) {
 	atreeInlinedPayloadCount := payloadCount - atreeNoninlinedPayloadCount
 
 	payloads := make([]*ledger.Payload, 0, payloadCount)
-	for i := 0; i < atreeInlinedPayloadCount; i++ {
+	for range atreeInlinedPayloadCount {
 		key := getRandomKey()
 		value := getAtreeInlinedPayload(t)
 		payloads = append(payloads, ledger.NewPayload(key, value))
 	}
-	for i := 0; i < atreeNoninlinedPayloadCount; i++ {
+	for range atreeNoninlinedPayloadCount {
 		key := getRandomKey()
 		value := getAtreeNoninlinedPayload(t)
 		payloads = append(payloads, ledger.NewPayload(key, value))

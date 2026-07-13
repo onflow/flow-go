@@ -188,7 +188,7 @@ func RandomPayload(minByteSize int, maxByteSize int) *l.Payload {
 // RandomPayloads returns n random payloads
 func RandomPayloads(n int, minByteSize int, maxByteSize int) []*l.Payload {
 	res := make([]*l.Payload, 0)
-	for i := 0; i < n; i++ {
+	for range n {
 		res = append(res, RandomPayload(minByteSize, maxByteSize))
 	}
 	return res
@@ -200,7 +200,7 @@ func RandomValues(n int, minByteSize, maxByteSize int) []l.Value {
 		panic("minByteSize cannot be smaller then maxByteSize")
 	}
 	values := make([]l.Value, 0)
-	for i := 0; i < n; i++ {
+	for range n {
 		var byteSize = maxByteSize
 		if minByteSize < maxByteSize {
 			byteSize = minByteSize + rand.Intn(maxByteSize-minByteSize)
@@ -225,7 +225,7 @@ func RandomUniqueKeys(n, m, minByteSize, maxByteSize int) []l.Key {
 	i := 0
 	for i < n {
 		keyParts := make([]l.KeyPart, 0)
-		for j := 0; j < m; j++ {
+		for j := range m {
 			byteSize := maxByteSize
 			if minByteSize < maxByteSize {
 				byteSize = minByteSize + rand.Intn(maxByteSize-minByteSize)

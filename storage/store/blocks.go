@@ -209,21 +209,43 @@ func (b *Blocks) ProposalByHeight(height uint64) (*flow.Proposal, error) {
 //   - generic error in case of unexpected failure from the database layer, or failure
 //     to decode an existing database value
 func (b *Blocks) ByCollectionID(collID flow.Identifier) (*flow.Block, error) {
+	blockID, err := b.BlockIDByCollectionID(collID)
+	if err != nil {
+		return nil, err
+	}
+	return b.ByID(blockID)
+}
+
+// BlockIDByCollectionID returns the block ID for the finalized block which includes the guarantee for the
+// given collection (the collection guarantee such that `CollectionGuarantee.CollectionID == collID`).
+// This function returns the finalized _consensus_ block including the specified collection, not the cluster
+// block which defines the collection.
+// NOTE: This method is only available for collections included in finalized blocks.
+// While consensus nodes verify that collections are not repeated within the same fork,
+// each different fork can contain a recent collection once. Therefore, we must wait for
+// finality.
+// CAUTION: this method is not backed by a cache and therefore comparatively slow!
+//
+// Error returns:
+//   - storage.ErrNotFound if no FINALIZED block exists containing the expected collection guarantee
+//   - generic error in case of unexpected failure from the database layer, or failure
+//     to decode an existing database value
+func (b *Blocks) BlockIDByCollectionID(collID flow.Identifier) (flow.Identifier, error) {
 	guarantee, err := b.payloads.guarantees.ByCollectionID(collID)
 	if err != nil {
-		return nil, fmt.Errorf("could not look up guarantee: %w", err)
+		return flow.ZeroID, fmt.Errorf("could not look up guarantee: %w", err)
 	}
 	var blockID flow.Identifier
 	err = operation.LookupBlockContainingCollectionGuarantee(b.db.Reader(), guarantee.ID(), &blockID)
 	if err != nil {
-		return nil, fmt.Errorf("could not look up block: %w", err)
+		return flow.ZeroID, fmt.Errorf("could not look up block: %w", err)
 	}
 	// CAUTION: a collection can be included in multiple *unfinalized* blocks. However, the implementation
 	// assumes a one-to-one map from collection ID to a *single* block ID. This holds for FINALIZED BLOCKS ONLY
 	// *and* only in the absence of byzantine collector clusters (which the mature protocol must tolerate).
 	// Hence, this function should be treated as a temporary solution, which requires generalization
 	// (one-to-many mapping) for soft finality and the mature protocol.
-	return b.ByID(blockID)
+	return blockID, nil
 }
 
 // BatchIndexBlockContainingCollectionGuarantees produces mappings from the IDs of [flow.CollectionGuarantee]s to the block ID containing these guarantees.

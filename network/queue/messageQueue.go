@@ -3,6 +3,7 @@ package queue
 import (
 	"container/heap"
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -10,25 +11,38 @@ import (
 	"github.com/onflow/flow-go/module"
 )
 
+// ErrQueueFull is returned when attempting to insert a message into a full queue.
+var ErrQueueFull = errors.New("message queue is full")
+
 type Priority int
 
 const LowPriority = Priority(1)
 const MediumPriority = Priority(5)
 const HighPriority = Priority(10)
 
-// MessagePriorityFunc - the callback function to derive priority of a message
-type MessagePriorityFunc func(message interface{}) (Priority, error)
+// DefaultMaxSize is the default maximum number of messages that can be queued.
+// This limit prevents unbounded memory growth from message flooding attacks.
+const DefaultMaxSize = 100_000
 
-// MessageQueue is the heap based priority queue implementation of the MessageQueue implementation
+// MessagePriorityFunc - the callback function to derive priority of a message
+type MessagePriorityFunc func(message any) (Priority, error)
+
+// MessageQueue is the heap based priority queue implementation of the MessageQueue implementation.
+// It enforces a maximum size limit to prevent unbounded memory growth from message flooding attacks.
 type MessageQueue struct {
 	pq           *priorityQueue
 	cond         *sync.Cond
 	priorityFunc MessagePriorityFunc
 	ctx          context.Context
 	metrics      module.NetworkInboundQueueMetrics
+	maxSize      int
 }
 
-func (mq *MessageQueue) Insert(message interface{}) error {
+// Insert adds a message to the queue.
+//
+// Expected error returns during normal operation:
+//   - [ErrQueueFull]: when the queue has reached its maximum capacity
+func (mq *MessageQueue) Insert(message any) error {
 
 	if err := mq.ctx.Err(); err != nil {
 		return err
@@ -50,6 +64,12 @@ func (mq *MessageQueue) Insert(message interface{}) error {
 	// lock the underlying mutex
 	mq.cond.L.Lock()
 
+	// check if queue is at capacity
+	if mq.pq.Len() >= mq.maxSize {
+		mq.cond.L.Unlock()
+		return fmt.Errorf("queue at capacity (%d messages): %w", mq.maxSize, ErrQueueFull)
+	}
+
 	// push message to the underlying priority queue
 	heap.Push(mq.pq, item)
 
@@ -65,7 +85,7 @@ func (mq *MessageQueue) Insert(message interface{}) error {
 	return nil
 }
 
-func (mq *MessageQueue) Remove() interface{} {
+func (mq *MessageQueue) Remove() any {
 	mq.cond.L.Lock()
 	defer mq.cond.L.Unlock()
 	for mq.pq.Len() == 0 {
@@ -92,7 +112,12 @@ func (mq *MessageQueue) Len() int {
 	return mq.pq.Len()
 }
 
-func NewMessageQueue(ctx context.Context, priorityFunc MessagePriorityFunc, metrics module.NetworkInboundQueueMetrics) *MessageQueue {
+// NewMessageQueue creates a new bounded message queue with the specified maximum size.
+// If maxSize is 0 or negative, DefaultMaxSize is used.
+func NewMessageQueue(ctx context.Context, priorityFunc MessagePriorityFunc, metrics module.NetworkInboundQueueMetrics, maxSize int) *MessageQueue {
+	if maxSize <= 0 {
+		maxSize = DefaultMaxSize
+	}
 	var items = make([]*item, 0)
 	pq := priorityQueue(items)
 	mq := &MessageQueue{
@@ -100,6 +125,7 @@ func NewMessageQueue(ctx context.Context, priorityFunc MessagePriorityFunc, metr
 		priorityFunc: priorityFunc,
 		ctx:          ctx,
 		metrics:      metrics,
+		maxSize:      maxSize,
 	}
 	m := sync.Mutex{}
 	mq.cond = sync.NewCond(&m)

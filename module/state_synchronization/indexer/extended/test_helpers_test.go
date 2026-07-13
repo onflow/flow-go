@@ -1,0 +1,105 @@
+package extended
+
+import (
+	"testing"
+
+	"github.com/onflow/cadence"
+	"github.com/onflow/cadence/common"
+	jsoncdc "github.com/onflow/cadence/encoding/json"
+	"github.com/stretchr/testify/require"
+
+	"github.com/onflow/flow-go/fvm/systemcontracts"
+	"github.com/onflow/flow-go/model/flow"
+)
+
+// MakeTransactionDataComposite creates a cadence Struct value representing a
+// FlowTransactionScheduler.TransactionData with the given fields. sc is used to
+// derive the correct contract address location required for JSON-CDC encoding.
+func MakeTransactionDataComposite(
+	sc *systemcontracts.SystemContracts,
+	id uint64,
+	priority uint8,
+	scheduledTimestamp uint64,
+	executionEffort uint64,
+	fees uint64,
+	owner flow.Address,
+	typeIdentifier string,
+) cadence.Composite {
+	addr := common.Address(sc.FlowTransactionScheduler.Address)
+	loc := common.NewAddressLocation(nil, addr, sc.FlowTransactionScheduler.Name)
+
+	priorityEnumType := cadence.NewEnumType(
+		loc,
+		"Priority",
+		cadence.UInt8Type,
+		[]cadence.Field{{Identifier: "rawValue", Type: cadence.UInt8Type}},
+		nil,
+	)
+	priorityEnum := cadence.NewEnum([]cadence.Value{cadence.UInt8(priority)}).WithType(priorityEnumType)
+
+	typ := cadence.NewStructType(
+		loc,
+		"TransactionData",
+		[]cadence.Field{
+			{Identifier: "id", Type: cadence.UInt64Type},
+			{Identifier: "priority", Type: priorityEnumType},
+			{Identifier: "scheduledTimestamp", Type: cadence.UFix64Type},
+			{Identifier: "executionEffort", Type: cadence.UInt64Type},
+			{Identifier: "fees", Type: cadence.UFix64Type},
+			{Identifier: "handlerAddress", Type: cadence.AddressType},
+			{Identifier: "handlerTypeIdentifier", Type: cadence.StringType},
+		},
+		nil,
+	)
+	return cadence.NewStruct([]cadence.Value{
+		cadence.UInt64(id),
+		priorityEnum,
+		cadence.UFix64(scheduledTimestamp),
+		cadence.UInt64(executionEffort),
+		cadence.UFix64(fees),
+		cadence.NewAddress(owner),
+		cadence.String(typeIdentifier),
+	}).WithType(typ)
+}
+
+// MakeJITScriptResponse encodes a slice of TransactionData composites as a JSON-CDC array
+// of optionals, matching the [FlowTransactionScheduler.TransactionData?] return type of the
+// getTransactionData script.
+func MakeJITScriptResponse(t *testing.T, composites ...cadence.Composite) []byte {
+	t.Helper()
+	values := make([]cadence.Value, len(composites))
+	for i, c := range composites {
+		values[i] = cadence.NewOptional(c)
+	}
+	encoded, err := jsoncdc.Encode(cadence.NewArray(values))
+	require.NoError(t, err)
+	return encoded
+}
+
+// MakeJITScriptResponseWithNils encodes a mix of TransactionData composites and nil optionals
+// as a JSON-CDC array of optionals. nils[i] == true means that slot is a nil optional.
+func MakeJITScriptResponseWithNils(t *testing.T, composites []cadence.Composite, nils []bool) []byte {
+	t.Helper()
+	require.Equal(t, len(composites), len(nils), "composites and nils must have the same length")
+	values := make([]cadence.Value, len(composites))
+	for i, c := range composites {
+		if nils[i] {
+			values[i] = cadence.NewOptional(nil)
+		} else {
+			values[i] = cadence.NewOptional(c)
+		}
+	}
+	encoded, err := jsoncdc.Encode(cadence.NewArray(values))
+	require.NoError(t, err)
+	return encoded
+}
+
+// encodeUInt64Args returns a slice of JSON-CDC encoded UInt64 values, one per id.
+// This mirrors the per-ID encoding used by buildArgs when constructing the
+// arguments slice for ExecuteAtBlockHeight.
+func encodeUInt64Args(t *testing.T, ids ...uint64) [][]byte {
+	t.Helper()
+	args, err := EncodeGetTransactionDataArg(ids)
+	require.NoError(t, err)
+	return [][]byte{args}
+}

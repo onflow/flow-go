@@ -38,7 +38,7 @@ func RunWithNewBlockView(t testing.TB, em *emulator.Emulator, f func(blk types.B
 }
 
 func RunWithNewReadOnlyBlockView(t testing.TB, em *emulator.Emulator, f func(blk types.ReadOnlyBlockView)) {
-	blk, err := em.NewReadOnlyBlockView(defaultCtx)
+	blk, err := em.NewReadOnlyBlockView()
 	require.NoError(t, err)
 	f(blk)
 }
@@ -50,7 +50,7 @@ func requireSuccessfulExecution(t testing.TB, err error, res *types.Result) {
 }
 
 func TestNativeTokenBridging(t *testing.T) {
-	testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
+	testutils.RunWithTestBackend(t, flow.Testnet, func(backend *testutils.TestBackend) {
 		testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
 			originalBalance := types.MakeBigIntInFlow(3)
 			testAccount := types.NewAddressFromString("test")
@@ -152,10 +152,73 @@ func TestNativeTokenBridging(t *testing.T) {
 			t.Run("tokens withdraw that results in rounding error", func(t *testing.T) {
 				RunWithNewEmulator(t, backend, rootAddr, func(env *emulator.Emulator) {
 					RunWithNewBlockView(t, env, func(blk types.BlockView) {
-						call := types.NewWithdrawCall(bridgeAccount, testAccount, big.NewInt(1000), testAccountNonce)
+						// Happy path, withdraw amount fits in Flow vault
+						call := types.NewWithdrawCall(bridgeAccount, testAccount, types.OneFlow(), testAccountNonce)
+						res, err := blk.DirectCall(call)
+						requireSuccessfulExecution(t, err, res)
+						require.Equal(t, defaultCtx.DirectCallBaseGasUsage, res.GasConsumed)
+						require.Equal(t, call.Hash(), res.TxHash)
+						testAccountNonce += 1
+					})
+				})
+				RunWithNewEmulator(t, backend, rootAddr, func(env *emulator.Emulator) {
+					RunWithNewBlockView(t, env, func(blk types.BlockView) {
+						// Unhappy path, withdraw amount is 1e9, less than the minimum
+						// of 1e10.
+						call := types.NewWithdrawCall(bridgeAccount, testAccount, big.NewInt(1000000000), testAccountNonce)
 						res, err := blk.DirectCall(call)
 						require.NoError(t, err)
-						require.Equal(t, res.ValidationError, types.ErrWithdrawBalanceRounding)
+						require.ErrorContains(
+							t,
+							res.ValidationError,
+							types.ErrWithdrawBalanceRounding.Error(),
+						)
+						testAccountNonce += 1
+					})
+				})
+				RunWithNewEmulator(t, backend, rootAddr, func(env *emulator.Emulator) {
+					RunWithNewBlockView(t, env, func(blk types.BlockView) {
+						// Happy path, withdraw amount is 1e10, equal to the minimum
+						// of 1e10.
+						call := types.NewWithdrawCall(bridgeAccount, testAccount, big.NewInt(10000000000), testAccountNonce)
+						res, err := blk.DirectCall(call)
+						requireSuccessfulExecution(t, err, res)
+						require.Equal(t, defaultCtx.DirectCallBaseGasUsage, res.GasConsumed)
+						require.Equal(t, call.Hash(), res.TxHash)
+						testAccountNonce += 1
+					})
+				})
+				RunWithNewEmulator(t, backend, rootAddr, func(env *emulator.Emulator) {
+					RunWithNewBlockView(t, env, func(blk types.BlockView) {
+						// Test withdraw amounts that overflow the UInt256 range
+						amount := big.NewInt(1)
+						amount.Lsh(amount, 256)
+
+						call := types.NewWithdrawCall(bridgeAccount, testAccount, amount, testAccountNonce)
+						res, err := blk.DirectCall(call)
+						require.NoError(t, err)
+						require.ErrorContains(
+							t,
+							res.ValidationError,
+							"invalid amount for transfer or balance change",
+						)
+						testAccountNonce += 1
+					})
+				})
+				RunWithNewEmulator(t, backend, rootAddr, func(env *emulator.Emulator) {
+					RunWithNewBlockView(t, env, func(blk types.BlockView) {
+						// Test withdraw amounts within the max range of UInt256
+						amount := big.NewInt(1)
+						amount.Lsh(amount, 255)
+
+						call := types.NewWithdrawCall(bridgeAccount, testAccount, amount, testAccountNonce)
+						res, err := blk.DirectCall(call)
+						require.NoError(t, err)
+						require.ErrorContains(
+							t,
+							res.ValidationError,
+							"insufficient funds for gas * price + value",
+						)
 						testAccountNonce += 1
 					})
 				})
@@ -182,7 +245,7 @@ func TestNativeTokenBridging(t *testing.T) {
 
 func TestContractInteraction(t *testing.T) {
 	t.Parallel()
-	testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
+	testutils.RunWithTestBackend(t, flow.Testnet, func(backend *testutils.TestBackend) {
 		testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
 
 			testContract := testutils.GetStorageTestContract(t)
@@ -572,7 +635,7 @@ func TestContractInteraction(t *testing.T) {
 }
 
 func TestDeployAtFunctionality(t *testing.T) {
-	testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
+	testutils.RunWithTestBackend(t, flow.Testnet, func(backend *testutils.TestBackend) {
 		testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
 			testContract := testutils.GetStorageTestContract(t)
 			testAccount := types.NewAddressFromString("test")
@@ -661,7 +724,7 @@ func TestDeployAtFunctionality(t *testing.T) {
 // EIP 6780 https://eips.ethereum.org/EIPS/eip-6780 in case where the selfdestruct
 // is not called in the same transaction as deployment.
 func TestSelfdestruct(t *testing.T) {
-	testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
+	testutils.RunWithTestBackend(t, flow.Testnet, func(backend *testutils.TestBackend) {
 		testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
 			testutils.RunWithEOATestAccount(t, backend, rootAddr, func(testAccount *testutils.EOATestAccount) {
 
@@ -745,7 +808,7 @@ func TestSelfdestruct(t *testing.T) {
 
 // test factory patterns
 func TestFactoryPatterns(t *testing.T) {
-	testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
+	testutils.RunWithTestBackend(t, flow.Testnet, func(backend *testutils.TestBackend) {
 		testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
 
 			var factoryAddress types.Address
@@ -1004,7 +1067,7 @@ func TestFactoryPatterns(t *testing.T) {
 }
 
 func TestTransfers(t *testing.T) {
-	testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
+	testutils.RunWithTestBackend(t, flow.Testnet, func(backend *testutils.TestBackend) {
 		testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
 
 			testAccount1 := types.NewAddressFromString("test1")
@@ -1044,7 +1107,7 @@ func TestTransfers(t *testing.T) {
 }
 
 func TestStorageNoSideEffect(t *testing.T) {
-	testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
+	testutils.RunWithTestBackend(t, flow.Testnet, func(backend *testutils.TestBackend) {
 		testutils.RunWithTestFlowEVMRootAddress(t, backend, func(flowEVMRoot flow.Address) {
 			var err error
 			em := emulator.NewEmulator(backend, flowEVMRoot)
@@ -1068,7 +1131,7 @@ func TestStorageNoSideEffect(t *testing.T) {
 }
 
 func TestCallingExtraPrecompiles(t *testing.T) {
-	testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
+	testutils.RunWithTestBackend(t, flow.Testnet, func(backend *testutils.TestBackend) {
 		testutils.RunWithTestFlowEVMRootAddress(t, backend, func(flowEVMRoot flow.Address) {
 			RunWithNewEmulator(t, backend, flowEVMRoot, func(em *emulator.Emulator) {
 
@@ -1135,7 +1198,7 @@ func TestCallingExtraPrecompiles(t *testing.T) {
 }
 
 func TestTxIndex(t *testing.T) {
-	testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
+	testutils.RunWithTestBackend(t, flow.Testnet, func(backend *testutils.TestBackend) {
 		testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
 			RunWithNewEmulator(t, backend, rootAddr, func(em *emulator.Emulator) {
 				ctx := types.NewDefaultBlockContext(blockNumber.Uint64())

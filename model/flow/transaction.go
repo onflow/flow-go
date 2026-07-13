@@ -96,9 +96,9 @@ func (tb TransactionBody) Fingerprint() []byte {
 // EncodeRLP defines RLP encoding behaviour for TransactionBody.
 func (tb TransactionBody) EncodeRLP(w io.Writer) error {
 	encodingCanonicalForm := struct {
-		Payload            interface{}
-		PayloadSignatures  interface{}
-		EnvelopeSignatures interface{}
+		Payload            any
+		PayloadSignatures  any
+		EnvelopeSignatures any
 	}{
 		Payload:            tb.PayloadCanonicalForm(),
 		PayloadSignatures:  signaturesList(tb.PayloadSignatures).canonicalForm(),
@@ -163,7 +163,7 @@ func (tb *TransactionBody) PayloadMessage() []byte {
 	return fingerprint.Fingerprint(tb.PayloadCanonicalForm())
 }
 
-func (tb *TransactionBody) PayloadCanonicalForm() interface{} {
+func (tb *TransactionBody) PayloadCanonicalForm() any {
 	authorizers := make([][]byte, len(tb.Authorizers))
 	for i, auth := range tb.Authorizers {
 		authorizers[i] = auth.Bytes()
@@ -199,10 +199,10 @@ func (tb *TransactionBody) EnvelopeMessage() []byte {
 	return fingerprint.Fingerprint(tb.envelopeCanonicalForm())
 }
 
-func (tb *TransactionBody) envelopeCanonicalForm() interface{} {
+func (tb *TransactionBody) envelopeCanonicalForm() any {
 	return struct {
-		Payload           interface{}
-		PayloadSignatures interface{}
+		Payload           any
+		PayloadSignatures any
 	}{
 		tb.PayloadCanonicalForm(),
 		signaturesList(tb.PayloadSignatures).canonicalForm(),
@@ -333,7 +333,7 @@ func (s TransactionSignature) shouldUseLegacyCanonicalForm() bool {
 	return len(s.ExtensionData) == 0 || (len(s.ExtensionData) == 1 && s.ExtensionData[0] == byte(PlainScheme))
 }
 
-func (s TransactionSignature) canonicalForm() interface{} {
+func (s TransactionSignature) canonicalForm() any {
 	// int is not RLP-serializable, therefore s.SignerIndex and s.KeyIndex are converted to uint
 	if s.shouldUseLegacyCanonicalForm() {
 		// This is the legacy cononical form, mainly here for backward compatibility
@@ -370,8 +370,8 @@ func compareSignatures(sigA, sigB TransactionSignature) int {
 
 type signaturesList []TransactionSignature
 
-func (s signaturesList) canonicalForm() interface{} {
-	signatures := make([]interface{}, len(s))
+func (s signaturesList) canonicalForm() any {
+	signatures := make([]any, len(s))
 
 	for i, signature := range s {
 		signatures[i] = signature.canonicalForm()

@@ -62,14 +62,14 @@ type EngineRegistry interface {
 type ConduitAdapter interface {
 	MisbehaviorReportConsumer
 	// UnicastOnChannel sends the message in a reliable way to the given recipient.
-	UnicastOnChannel(channels.Channel, interface{}, flow.Identifier) error
+	UnicastOnChannel(channels.Channel, any, flow.Identifier) error
 
 	// PublishOnChannel sends the message in an unreliable way to all the given recipients.
-	PublishOnChannel(channels.Channel, interface{}, ...flow.Identifier) error
+	PublishOnChannel(channels.Channel, any, ...flow.Identifier) error
 
 	// MulticastOnChannel unreliably sends the specified event over the channel to randomly selected number of recipients
 	// selected from the specified targetIDs.
-	MulticastOnChannel(channels.Channel, interface{}, uint, ...flow.Identifier) error
+	MulticastOnChannel(channels.Channel, any, uint, ...flow.Identifier) error
 
 	// UnRegisterChannel unregisters the engine for the specified channel. The engine will no longer be able to send or
 	// receive messages from that channel.
@@ -98,8 +98,8 @@ type Underlay interface {
 
 // Connection represents an interface to read from & write to a connection.
 type Connection interface {
-	Send(msg interface{}) error
-	Receive() (interface{}, error)
+	Send(msg any) error
+	Receive() (any, error)
 }
 
 // MisbehaviorReportConsumer set of funcs used to handle MisbehaviorReport disseminated from misbehavior reporters.

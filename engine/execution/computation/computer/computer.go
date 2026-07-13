@@ -11,7 +11,6 @@ import (
 	otelTrace "go.opentelemetry.io/otel/trace"
 
 	"github.com/onflow/flow-go/engine/execution"
-	"github.com/onflow/flow-go/engine/execution/computation/result"
 	"github.com/onflow/flow-go/engine/execution/utils"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/blueprints"
@@ -125,7 +124,6 @@ type blockComputer struct {
 	signer                module.Local
 	spockHasher           hash.Hasher
 	receiptHasher         hash.Hasher
-	colResCons            []result.ExecutedCollectionConsumer
 	protocolState         protocol.SnapshotExecutionSubsetProvider
 	maxConcurrency        int
 }
@@ -169,7 +167,6 @@ func NewBlockComputer(
 	committer ViewCommitter,
 	signer module.Local,
 	executionDataProvider provider.Provider,
-	colResCons []result.ExecutedCollectionConsumer,
 	state protocol.SnapshotExecutionSubsetProvider,
 	maxConcurrency int,
 ) (BlockComputer, error) {
@@ -213,7 +210,6 @@ func NewBlockComputer(
 		signer:                signer,
 		spockHasher:           utils.NewSPOCKHasher(),
 		receiptHasher:         utils.NewExecutionReceiptHasher(),
-		colResCons:            colResCons,
 		protocolState:         state,
 		maxConcurrency:        maxConcurrency,
 	}, nil
@@ -403,7 +399,6 @@ func (e *blockComputer) executeBlock(
 		block,
 		// Add buffer just in case result collection becomes slower than the execution
 		e.maxConcurrency*2,
-		e.colResCons,
 		baseSnapshot,
 	)
 	defer collector.Stop()
@@ -638,7 +633,7 @@ func (e *blockComputer) executeProcessCallback(
 
 	txnIndex++
 
-	txn, err := e.executeTransactionInternal(blockSpan, database, request, 0)
+	txn, err := e.executeTransactionInternal(blockSpan, database, request, 1)
 	if err != nil {
 		snapshotTime := logical.Time(0)
 		if txn != nil {

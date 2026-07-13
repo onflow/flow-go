@@ -143,19 +143,19 @@ func (g *GossipSubScoreMetrics) OnBehaviourPenaltyUpdated(penalty float64) {
 }
 
 func (g *GossipSubScoreMetrics) OnTimeInMeshUpdated(topic channels.Topic, duration time.Duration) {
-	g.timeInMesh.WithLabelValues(string(topic)).Observe(duration.Seconds())
+	g.timeInMesh.WithLabelValues(channels.NormalizeTopicForMetrics(string(topic))).Observe(duration.Seconds())
 }
 
 func (g *GossipSubScoreMetrics) OnFirstMessageDeliveredUpdated(topic channels.Topic, f float64) {
-	g.firstMessageDelivery.WithLabelValues(string(topic)).Observe(f)
+	g.firstMessageDelivery.WithLabelValues(channels.NormalizeTopicForMetrics(string(topic))).Observe(f)
 }
 
 func (g *GossipSubScoreMetrics) OnMeshMessageDeliveredUpdated(topic channels.Topic, f float64) {
-	g.meshMessageDelivery.WithLabelValues(string(topic)).Observe(f)
+	g.meshMessageDelivery.WithLabelValues(channels.NormalizeTopicForMetrics(string(topic))).Observe(f)
 }
 
 func (g *GossipSubScoreMetrics) OnInvalidMessageDeliveredUpdated(topic channels.Topic, f float64) {
-	g.invalidMessageDelivery.WithLabelValues(string(topic)).Observe(f)
+	g.invalidMessageDelivery.WithLabelValues(channels.NormalizeTopicForMetrics(string(topic))).Observe(f)
 }
 
 func (g *GossipSubScoreMetrics) SetWarningStateCount(u uint) {

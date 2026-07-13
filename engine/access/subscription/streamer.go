@@ -59,8 +59,17 @@ func (s *Streamer) Stream(ctx context.Context) {
 	s.log.Debug().Msg("starting streaming")
 	defer s.log.Debug().Msg("finished streaming")
 
+	// Check if context is already cancelled before subscribing to avoid leaking subscribers
+	select {
+	case <-ctx.Done():
+		s.sub.Fail(fmt.Errorf("client disconnected before subscribe: %w", ctx.Err()))
+		return
+	default:
+	}
+
 	notifier := engine.NewNotifier()
 	s.broadcaster.Subscribe(notifier)
+	defer s.broadcaster.Unsubscribe(notifier)
 
 	// always check the first time. This ensures that streaming continues to work even if the
 	// execution sync is not functioning (e.g. on a past spork network, or during an temporary outage)

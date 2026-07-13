@@ -93,7 +93,7 @@ func IsInvalidBlockTimestampError(err error) bool {
 	return errors.As(err, &errInvalidTimestampError)
 }
 
-func NewInvalidBlockTimestamp(msg string, args ...interface{}) error {
+func NewInvalidBlockTimestamp(msg string, args ...any) error {
 	return InvalidBlockTimestampError{
 		error: fmt.Errorf(msg, args...),
 	}
@@ -116,7 +116,7 @@ func IsInvalidServiceEventError(err error) bool {
 // NewInvalidServiceEventErrorf returns an invalid service event error. Since all invalid
 // service events indicate an invalid extension, the service event error is wrapped in
 // the invalid extension error at construction.
-func NewInvalidServiceEventErrorf(msg string, args ...interface{}) error {
+func NewInvalidServiceEventErrorf(msg string, args ...any) error {
 	return state.NewInvalidExtensionErrorf(
 		"cannot extend state with invalid service event: %w",
 		InvalidServiceEventError{
@@ -131,7 +131,7 @@ type UnfinalizedSealingSegmentError struct {
 	error
 }
 
-func NewUnfinalizedSealingSegmentErrorf(msg string, args ...interface{}) error {
+func NewUnfinalizedSealingSegmentErrorf(msg string, args ...any) error {
 	return UnfinalizedSealingSegmentError{
 		error: fmt.Errorf(msg, args...),
 	}

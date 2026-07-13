@@ -307,7 +307,7 @@ func ReadPayloadFile(logger zerolog.Logger, payloadFile string) (bool, []*ledger
 
 	payloads := make([]*ledger.Payload, payloadCount)
 
-	for i := 0; i < payloadCount; i++ {
+	for i := range payloadCount {
 		var rawPayload []byte
 		err := dec.Decode(&rawPayload)
 		if err != nil {

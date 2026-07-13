@@ -53,7 +53,7 @@ func (s *ExecutingBlockSnapshot) getFromUpdates(id flow.RegisterID) (flow.Regist
 	return value, ok
 }
 
-// Extend returns a new storage snapshot at the same block but but for a different state commitment,
+// Extend returns a new storage snapshot at the same block but for a different state commitment,
 // which contains the given registerUpdates
 // Usually it's used to create a new storage snapshot at the next executed collection.
 // The registerUpdates contains the register updates at the executed collection.

@@ -153,7 +153,7 @@ func skipMapExtraData(data []byte, decMode cbor.DecMode) ([]byte, error) {
 	r := bytes.NewReader(data[versionAndFlagSize:])
 	dec := decMode.NewDecoder(r)
 
-	var v []interface{}
+	var v []any
 	err := dec.Decode(&v)
 	if err != nil {
 		return data, errors.New("failed to decode map extra data")

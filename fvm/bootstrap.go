@@ -85,8 +85,8 @@ type BootstrapParams struct {
 	minimumStorageReservation        cadence.UFix64
 	storagePerFlow                   cadence.UFix64
 	restrictedAccountCreationEnabled cadence.Bool
-	setupEVMEnabled                  cadence.Bool
 	setupVMBridgeEnabled             cadence.Bool
+	evmTestHelpersEnabled            cadence.Bool
 
 	// versionFreezePeriod is the number of blocks in the future where the version
 	// changes are frozen. The Node version beacon manages the freeze period,
@@ -222,18 +222,20 @@ func WithRestrictedAccountCreationEnabled(enabled cadence.Bool) BootstrapProcedu
 	}
 }
 
-func WithSetupEVMEnabled(enabled cadence.Bool) BootstrapProcedureOption {
+// WithSetupVMBridgeEnabled returns a bootstrap option that enables deployment and setup
+// of the Flow VM bridge, so that assets can be bridged between Flow-Cadence and Flow-EVM
+func WithSetupVMBridgeEnabled(enabled cadence.Bool) BootstrapProcedureOption {
 	return func(bp *BootstrapProcedure) *BootstrapProcedure {
-		bp.setupEVMEnabled = enabled
+		bp.setupVMBridgeEnabled = enabled
 		return bp
 	}
 }
 
-// Option to deploy and setup the Flow VM bridge during bootstrapping
-// so that assets can be bridged between Flow-Cadence and Flow-EVM
-func WithSetupVMBridgeEnabled(enabled cadence.Bool) BootstrapProcedureOption {
+// WithEVMTestHelpersEnabled returns a bootstrap option that enables testing helper functions
+// in the EVM system contract. Useful for Emulator and forked networks.
+func WithEVMTestHelpersEnabled(enabled cadence.Bool) BootstrapProcedureOption {
 	return func(bp *BootstrapProcedure) *BootstrapProcedure {
-		bp.setupVMBridgeEnabled = enabled
+		bp.evmTestHelpersEnabled = enabled
 		return bp
 	}
 }
@@ -257,12 +259,12 @@ func Bootstrap(
 				ServiceAccountPublicKeys:       []flow.AccountPublicKey{serviceAccountPublicKey},
 				FungibleTokenAccountPublicKeys: []flow.AccountPublicKey{serviceAccountPublicKey},
 				FlowTokenAccountPublicKeys:     []flow.AccountPublicKey{serviceAccountPublicKey},
+				FlowFeesAccountPublicKeys:      []flow.AccountPublicKey{serviceAccountPublicKey},
 				NodeAccountPublicKeys:          []flow.AccountPublicKey{serviceAccountPublicKey},
 			},
 			transactionFees:     BootstrapProcedureFeeParameters{0, 0, 0},
 			epochConfig:         epochs.DefaultEpochConfig(),
 			versionFreezePeriod: DefaultVersionFreezePeriod,
-			setupEVMEnabled:     true,
 		},
 	}
 
@@ -455,9 +457,8 @@ func (b *bootstrapExecutor) Execute() error {
 
 	// sets up the EVM environment
 	b.setupEVM(service, nonFungibleToken, fungibleToken, flowToken, &env)
-	b.setupVMBridge(service, &env)
-
 	b.deployCrossVMMetadataViews(nonFungibleToken, &env)
+	b.setupVMBridge(service, &env)
 
 	err = expectAccounts(systemcontracts.EVMStorageAccountIndex)
 	if err != nil {
@@ -629,8 +630,7 @@ func (b *bootstrapExecutor) deployMetadataViews(fungibleToken, nonFungibleToken 
 }
 
 func (b *bootstrapExecutor) deployCrossVMMetadataViews(nonFungibleToken flow.Address, env *templates.Environment) {
-	if !bool(b.setupEVMEnabled) ||
-		!bool(b.setupVMBridgeEnabled) ||
+	if !bool(b.setupVMBridgeEnabled) ||
 		!b.ctx.Chain.ChainID().Transient() {
 		return
 	}
@@ -796,7 +796,8 @@ func (b *bootstrapExecutor) deployServiceAccount(deployTo flow.Address, env *tem
 func (b *bootstrapExecutor) deployNFTStorefrontV2(deployTo flow.Address, env *templates.Environment) {
 	contract := storefront.NFTStorefrontV2(
 		env.FungibleTokenAddress,
-		env.NonFungibleTokenAddress)
+		env.NonFungibleTokenAddress,
+		env.BurnerAddress)
 	txBody, err := blueprints.DeployContractTransaction(deployTo, contract, "NFTStorefrontV2").Build()
 	if err != nil {
 		panic(fmt.Sprintf("failed to build deploy NFTStorefrontV2 transaction: %s", err))
@@ -1017,31 +1018,34 @@ func (b *bootstrapExecutor) setStakingAllowlist(
 }
 
 func (b *bootstrapExecutor) setupEVM(serviceAddress, nonFungibleTokenAddress, fungibleTokenAddress, flowTokenAddress flow.Address, env *templates.Environment) {
-	if b.setupEVMEnabled {
-		// account for storage
-		// we dont need to deploy anything to this account, but it needs to exist
-		// so that we can store the EVM state on it
-		evmAcc := b.createAccount(nil)
-		b.setupStorageForAccount(evmAcc, serviceAddress, fungibleTokenAddress, flowTokenAddress)
+	// account for storage
+	// we dont need to deploy anything to this account, but it needs to exist
+	// so that we can store the EVM state on it
+	evmAcc := b.createAccount(nil)
+	b.setupStorageForAccount(evmAcc, serviceAddress, fungibleTokenAddress, flowTokenAddress)
 
-		// deploy the EVM contract to the service account
-		txBody, err := blueprints.DeployContractTransaction(
-			serviceAddress,
-			stdlib.ContractCode(nonFungibleTokenAddress, fungibleTokenAddress, flowTokenAddress),
-			stdlib.ContractName,
-		).Build()
-		if err != nil {
-			panic(fmt.Sprintf("failed to build EVM transaction %s", err.Error()))
-		}
-		// WithEVMEnabled should only be used after we create an account for storage
-		txError, err := b.invokeMetaTransaction(
-			NewContextFromParent(b.ctx, WithEVMEnabled(true)),
-			Transaction(txBody, 0),
-		)
-		panicOnMetaInvokeErrf("failed to deploy EVM contract: %s", txError, err)
-
-		env.EVMAddress = env.ServiceAccountAddress
+	// deploy the EVM contract to the service account
+	txBody, err := blueprints.DeployContractTransaction(
+		serviceAddress,
+		stdlib.ContractCode(
+			nonFungibleTokenAddress,
+			fungibleTokenAddress,
+			flowTokenAddress,
+			bool(b.evmTestHelpersEnabled),
+		),
+		stdlib.ContractName,
+	).Build()
+	if err != nil {
+		panic(fmt.Sprintf("failed to build EVM transaction %s", err.Error()))
 	}
+
+	txError, err := b.invokeMetaTransaction(
+		b.ctx,
+		Transaction(txBody, 0),
+	)
+	panicOnMetaInvokeErrf("failed to deploy EVM contract: %s", txError, err)
+
+	env.EVMAddress = env.ServiceAccountAddress
 }
 
 type stubEntropyProvider struct{}
@@ -1053,43 +1057,43 @@ func (stubEntropyProvider) RandomSource() ([]byte, error) {
 func (b *bootstrapExecutor) setupVMBridge(serviceAddress flow.Address, env *templates.Environment) {
 	// only setup VM bridge for transient networks
 	// this is because the evm storage account for testnet and mainnet do not exist yet after boostrapping
-	if !bool(b.setupEVMEnabled) ||
-		!bool(b.setupVMBridgeEnabled) ||
+	if !bool(b.setupVMBridgeEnabled) ||
 		!b.ctx.Chain.ChainID().Transient() {
 		return
 	}
 
 	bridgeEnv := bridge.Environment{
-		CrossVMNFTAddress:                     env.ServiceAccountAddress,
-		CrossVMTokenAddress:                   env.ServiceAccountAddress,
-		FlowEVMBridgeHandlerInterfacesAddress: env.ServiceAccountAddress,
-		IBridgePermissionsAddress:             env.ServiceAccountAddress,
-		ICrossVMAddress:                       env.ServiceAccountAddress,
-		ICrossVMAssetAddress:                  env.ServiceAccountAddress,
-		IEVMBridgeNFTMinterAddress:            env.ServiceAccountAddress,
-		IEVMBridgeTokenMinterAddress:          env.ServiceAccountAddress,
-		IFlowEVMNFTBridgeAddress:              env.ServiceAccountAddress,
-		IFlowEVMTokenBridgeAddress:            env.ServiceAccountAddress,
-		FlowEVMBridgeAddress:                  env.ServiceAccountAddress,
-		FlowEVMBridgeAccessorAddress:          env.ServiceAccountAddress,
-		FlowEVMBridgeConfigAddress:            env.ServiceAccountAddress,
-		FlowEVMBridgeHandlersAddress:          env.ServiceAccountAddress,
-		FlowEVMBridgeNFTEscrowAddress:         env.ServiceAccountAddress,
-		FlowEVMBridgeResolverAddress:          env.ServiceAccountAddress,
-		FlowEVMBridgeTemplatesAddress:         env.ServiceAccountAddress,
-		FlowEVMBridgeTokenEscrowAddress:       env.ServiceAccountAddress,
-		FlowEVMBridgeUtilsAddress:             env.ServiceAccountAddress,
-		ArrayUtilsAddress:                     env.ServiceAccountAddress,
-		ScopedFTProvidersAddress:              env.ServiceAccountAddress,
-		SerializeAddress:                      env.ServiceAccountAddress,
-		SerializeMetadataAddress:              env.ServiceAccountAddress,
-		StringUtilsAddress:                    env.ServiceAccountAddress,
+		CrossVMNFTAddress:                          env.ServiceAccountAddress,
+		CrossVMTokenAddress:                        env.ServiceAccountAddress,
+		FlowEVMBridgeHandlerInterfacesAddress:      env.ServiceAccountAddress,
+		IBridgePermissionsAddress:                  env.ServiceAccountAddress,
+		ICrossVMAddress:                            env.ServiceAccountAddress,
+		ICrossVMAssetAddress:                       env.ServiceAccountAddress,
+		IEVMBridgeNFTMinterAddress:                 env.ServiceAccountAddress,
+		IEVMBridgeTokenMinterAddress:               env.ServiceAccountAddress,
+		IFlowEVMNFTBridgeAddress:                   env.ServiceAccountAddress,
+		IFlowEVMTokenBridgeAddress:                 env.ServiceAccountAddress,
+		FlowEVMBridgeAddress:                       env.ServiceAccountAddress,
+		FlowEVMBridgeAccessorAddress:               env.ServiceAccountAddress,
+		FlowEVMBridgeCustomAssociationTypesAddress: env.ServiceAccountAddress,
+		FlowEVMBridgeCustomAssociationsAddress:     env.ServiceAccountAddress,
+		FlowEVMBridgeConfigAddress:                 env.ServiceAccountAddress,
+		FlowEVMBridgeHandlersAddress:               env.ServiceAccountAddress,
+		FlowEVMBridgeNFTEscrowAddress:              env.ServiceAccountAddress,
+		FlowEVMBridgeResolverAddress:               env.ServiceAccountAddress,
+		FlowEVMBridgeTemplatesAddress:              env.ServiceAccountAddress,
+		FlowEVMBridgeTokenEscrowAddress:            env.ServiceAccountAddress,
+		FlowEVMBridgeUtilsAddress:                  env.ServiceAccountAddress,
+		ArrayUtilsAddress:                          env.ServiceAccountAddress,
+		ScopedFTProvidersAddress:                   env.ServiceAccountAddress,
+		SerializeAddress:                           env.ServiceAccountAddress,
+		SerializeMetadataAddress:                   env.ServiceAccountAddress,
+		StringUtilsAddress:                         env.ServiceAccountAddress,
 	}
 
 	ctx := NewContextFromParent(b.ctx,
 		WithBlockHeader(b.rootHeader),
 		WithEntropyProvider(stubEntropyProvider{}),
-		WithEVMEnabled(true),
 	)
 
 	txIndex := uint32(0)

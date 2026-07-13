@@ -2,6 +2,7 @@ package message
 
 import (
 	"fmt"
+	"slices"
 )
 
 var (
@@ -33,13 +34,7 @@ func validateMessageAuthConfigsMap(excludeList []string) {
 }
 
 func excludeConfig(name string, excludeList []string) bool {
-	for _, s := range excludeList {
-		if s == name {
-			return true
-		}
-	}
-
-	return false
+	return slices.Contains(excludeList, name)
 }
 
 // string constants for all message types sent on the network

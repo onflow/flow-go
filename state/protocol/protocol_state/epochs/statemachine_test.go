@@ -16,7 +16,9 @@ import (
 	protocolmock "github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/state/protocol/protocol_state/epochs"
 	"github.com/onflow/flow-go/state/protocol/protocol_state/epochs/mock"
+	mock_interfaces "github.com/onflow/flow-go/state/protocol/protocol_state/epochs/mock_interfaces/mock"
 	protocol_statemock "github.com/onflow/flow-go/state/protocol/protocol_state/mock"
+	protocol_mock_interfaces "github.com/onflow/flow-go/state/protocol/protocol_state/mock_interfaces/mock"
 	"github.com/onflow/flow-go/storage"
 	storagemock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -39,8 +41,8 @@ type EpochStateMachineSuite struct {
 	parentEpochState                *flow.RichEpochStateEntry
 	mutator                         *protocol_statemock.KVStoreMutator
 	happyPathStateMachine           *mock.StateMachine
-	happyPathStateMachineFactory    *mock.StateMachineFactoryMethod
-	fallbackPathStateMachineFactory *mock.StateMachineFactoryMethod
+	happyPathStateMachineFactory    *mock_interfaces.StateMachineFactoryMethod
+	fallbackPathStateMachineFactory *mock_interfaces.StateMachineFactoryMethod
 	candidate                       *flow.Header
 	lockManager                     lockctx.Manager
 
@@ -57,8 +59,8 @@ func (s *EpochStateMachineSuite) SetupTest() {
 	s.mutator = protocol_statemock.NewKVStoreMutator(s.T())
 	s.candidate = unittest.BlockHeaderFixture(unittest.HeaderWithView(s.parentEpochState.CurrentEpochSetup.FirstView + 1))
 	s.happyPathStateMachine = mock.NewStateMachine(s.T())
-	s.happyPathStateMachineFactory = mock.NewStateMachineFactoryMethod(s.T())
-	s.fallbackPathStateMachineFactory = mock.NewStateMachineFactoryMethod(s.T())
+	s.happyPathStateMachineFactory = mock_interfaces.NewStateMachineFactoryMethod(s.T())
+	s.fallbackPathStateMachineFactory = mock_interfaces.NewStateMachineFactoryMethod(s.T())
 	s.lockManager = storage.NewTestingLockManager()
 
 	s.epochStateDB.On("ByBlockID", mocks.Anything).Return(func(_ flow.Identifier) *flow.RichEpochStateEntry {
@@ -176,12 +178,12 @@ func (s *EpochStateMachineSuite) TestEpochStateMachine_Constructor() {
 	s.Run("EpochStaking phase", func() {
 		// Since we are before the epoch commitment deadline, we should instantiate a happy-path state machine
 		s.Run("before commitment deadline", func() {
-			happyPathStateMachineFactory := mock.NewStateMachineFactoryMethod(s.T())
+			happyPathStateMachineFactory := mock_interfaces.NewStateMachineFactoryMethod(s.T())
 			// expect to be called
 			happyPathStateMachineFactory.On("Execute", s.candidate.View, s.parentEpochState).
 				Return(s.happyPathStateMachine, nil).Once()
 			// don't expect to be called
-			fallbackPathStateMachineFactory := mock.NewStateMachineFactoryMethod(s.T())
+			fallbackPathStateMachineFactory := mock_interfaces.NewStateMachineFactoryMethod(s.T())
 
 			candidate := unittest.BlockHeaderFixture(unittest.HeaderWithView(s.parentEpochState.CurrentEpochSetup.FirstView + 1))
 			stateMachine, err := epochs.NewEpochStateMachine(
@@ -202,9 +204,9 @@ func (s *EpochStateMachineSuite) TestEpochStateMachine_Constructor() {
 		// phase, we should use the epoch fallback state machine.
 		s.Run("past commitment deadline", func() {
 			// don't expect to be called
-			happyPathStateMachineFactory := mock.NewStateMachineFactoryMethod(s.T())
+			happyPathStateMachineFactory := mock_interfaces.NewStateMachineFactoryMethod(s.T())
 			// expect to be called
-			fallbackPathStateMachineFactory := mock.NewStateMachineFactoryMethod(s.T())
+			fallbackPathStateMachineFactory := mock_interfaces.NewStateMachineFactoryMethod(s.T())
 
 			candidate := unittest.BlockHeaderFixture(unittest.HeaderWithView(s.parentEpochState.CurrentEpochSetup.FinalView - 1))
 			fallbackPathStateMachineFactory.On("Execute", candidate.View, s.parentEpochState).
@@ -232,9 +234,9 @@ func (s *EpochStateMachineSuite) TestEpochStateMachine_Constructor() {
 
 		// Since we are before the epoch commitment deadline, we should instantiate a happy-path state machine
 		s.Run("before commitment deadline", func() {
-			happyPathStateMachineFactory := mock.NewStateMachineFactoryMethod(s.T())
+			happyPathStateMachineFactory := mock_interfaces.NewStateMachineFactoryMethod(s.T())
 			// don't expect to be called
-			fallbackPathStateMachineFactory := mock.NewStateMachineFactoryMethod(s.T())
+			fallbackPathStateMachineFactory := mock_interfaces.NewStateMachineFactoryMethod(s.T())
 
 			candidate := unittest.BlockHeaderFixture(unittest.HeaderWithView(s.parentEpochState.CurrentEpochSetup.FirstView + 1))
 			// expect to be called
@@ -258,8 +260,8 @@ func (s *EpochStateMachineSuite) TestEpochStateMachine_Constructor() {
 		// phase, we should use the epoch fallback state machine.
 		s.Run("past commitment deadline", func() {
 			// don't expect to be called
-			happyPathStateMachineFactory := mock.NewStateMachineFactoryMethod(s.T())
-			fallbackPathStateMachineFactory := mock.NewStateMachineFactoryMethod(s.T())
+			happyPathStateMachineFactory := mock_interfaces.NewStateMachineFactoryMethod(s.T())
+			fallbackPathStateMachineFactory := mock_interfaces.NewStateMachineFactoryMethod(s.T())
 
 			candidate := unittest.BlockHeaderFixture(unittest.HeaderWithView(s.parentEpochState.CurrentEpochSetup.FinalView - 1))
 			// expect to be called
@@ -285,12 +287,12 @@ func (s *EpochStateMachineSuite) TestEpochStateMachine_Constructor() {
 		s.parentEpochState = unittest.EpochStateFixture(unittest.WithNextEpochProtocolState())
 		// Since we are before the epoch commitment deadline, we should instantiate a happy-path state machine
 		s.Run("before commitment deadline", func() {
-			happyPathStateMachineFactory := mock.NewStateMachineFactoryMethod(s.T())
+			happyPathStateMachineFactory := mock_interfaces.NewStateMachineFactoryMethod(s.T())
 			// expect to be called
 			happyPathStateMachineFactory.On("Execute", s.candidate.View, s.parentEpochState).
 				Return(s.happyPathStateMachine, nil).Once()
 			// don't expect to be called
-			fallbackPathStateMachineFactory := mock.NewStateMachineFactoryMethod(s.T())
+			fallbackPathStateMachineFactory := mock_interfaces.NewStateMachineFactoryMethod(s.T())
 
 			candidate := unittest.BlockHeaderFixture(unittest.HeaderWithView(s.parentEpochState.CurrentEpochSetup.FirstView + 1))
 			stateMachine, err := epochs.NewEpochStateMachine(
@@ -310,9 +312,9 @@ func (s *EpochStateMachineSuite) TestEpochStateMachine_Constructor() {
 		// Despite being past the epoch commitment deadline, since we are in the EpochCommitted phase
 		// already, we should proceed with the happy-path state machine
 		s.Run("past commitment deadline", func() {
-			happyPathStateMachineFactory := mock.NewStateMachineFactoryMethod(s.T())
+			happyPathStateMachineFactory := mock_interfaces.NewStateMachineFactoryMethod(s.T())
 			// don't expect to be called
-			fallbackPathStateMachineFactory := mock.NewStateMachineFactoryMethod(s.T())
+			fallbackPathStateMachineFactory := mock_interfaces.NewStateMachineFactoryMethod(s.T())
 
 			candidate := unittest.BlockHeaderFixture(unittest.HeaderWithView(s.parentEpochState.CurrentEpochSetup.FinalView - 1))
 			// expect to be called
@@ -339,9 +341,9 @@ func (s *EpochStateMachineSuite) TestEpochStateMachine_Constructor() {
 	s.Run("state machine constructor returns error", func() {
 		s.Run("happy-path", func() {
 			exception := irrecoverable.NewExceptionf("exception")
-			happyPathStateMachineFactory := mock.NewStateMachineFactoryMethod(s.T())
+			happyPathStateMachineFactory := mock_interfaces.NewStateMachineFactoryMethod(s.T())
 			happyPathStateMachineFactory.On("Execute", s.candidate.View, s.parentEpochState).Return(nil, exception).Once()
-			fallbackPathStateMachineFactory := mock.NewStateMachineFactoryMethod(s.T())
+			fallbackPathStateMachineFactory := mock_interfaces.NewStateMachineFactoryMethod(s.T())
 
 			stateMachine, err := epochs.NewEpochStateMachine(
 				s.candidate.View,
@@ -360,8 +362,8 @@ func (s *EpochStateMachineSuite) TestEpochStateMachine_Constructor() {
 		s.Run("epoch-fallback", func() {
 			s.parentEpochState.EpochFallbackTriggered = true // ensure we use epoch-fallback state machine
 			exception := irrecoverable.NewExceptionf("exception")
-			happyPathStateMachineFactory := mock.NewStateMachineFactoryMethod(s.T())
-			fallbackPathStateMachineFactory := mock.NewStateMachineFactoryMethod(s.T())
+			happyPathStateMachineFactory := mock_interfaces.NewStateMachineFactoryMethod(s.T())
+			fallbackPathStateMachineFactory := mock_interfaces.NewStateMachineFactoryMethod(s.T())
 			fallbackPathStateMachineFactory.On("Execute", s.candidate.View, s.parentEpochState).Return(nil, exception).Once()
 
 			stateMachine, err := epochs.NewEpochStateMachine(
@@ -386,9 +388,9 @@ func (s *EpochStateMachineSuite) TestEpochStateMachine_Constructor() {
 // fallback state machine. Errors other than `InvalidServiceEventError` should be bubbled up as exceptions.
 func (s *EpochStateMachineSuite) TestEvolveState_InvalidEpochSetup() {
 	s.Run("invalid-epoch-setup", func() {
-		happyPathStateMachineFactory := mock.NewStateMachineFactoryMethod(s.T())
+		happyPathStateMachineFactory := mock_interfaces.NewStateMachineFactoryMethod(s.T())
 		happyPathStateMachineFactory.On("Execute", s.candidate.View, s.parentEpochState).Return(s.happyPathStateMachine, nil).Once()
-		fallbackPathStateMachineFactory := mock.NewStateMachineFactoryMethod(s.T())
+		fallbackPathStateMachineFactory := mock_interfaces.NewStateMachineFactoryMethod(s.T())
 		stateMachine, err := epochs.NewEpochStateMachine(
 			s.candidate.View,
 			s.candidate.ParentID,
@@ -433,9 +435,9 @@ func (s *EpochStateMachineSuite) TestEvolveState_InvalidEpochSetup() {
 // fallback state machine. Errors other than `InvalidServiceEventError` should be bubbled up as exceptions.
 func (s *EpochStateMachineSuite) TestEvolveState_InvalidEpochCommit() {
 	s.Run("invalid-epoch-commit", func() {
-		happyPathStateMachineFactory := mock.NewStateMachineFactoryMethod(s.T())
+		happyPathStateMachineFactory := mock_interfaces.NewStateMachineFactoryMethod(s.T())
 		happyPathStateMachineFactory.On("Execute", s.candidate.View, s.parentEpochState).Return(s.happyPathStateMachine, nil).Once()
-		fallbackPathStateMachineFactory := mock.NewStateMachineFactoryMethod(s.T())
+		fallbackPathStateMachineFactory := mock_interfaces.NewStateMachineFactoryMethod(s.T())
 		stateMachine, err := epochs.NewEpochStateMachine(
 			s.candidate.View,
 			s.candidate.ParentID,
@@ -522,8 +524,8 @@ func (s *EpochStateMachineSuite) TestEvolveStateTransitionToNextEpoch_WithInvali
 	s.candidate.View = s.parentEpochState.NextEpochSetup.FirstView
 	happyPathTelemetry := protocol_statemock.NewStateMachineTelemetryConsumer(s.T())
 	fallbackPathTelemetry := protocol_statemock.NewStateMachineTelemetryConsumer(s.T())
-	happyPathTelemetryFactory := protocol_statemock.NewStateMachineEventsTelemetryFactory(s.T())
-	fallbackTelemetryFactory := protocol_statemock.NewStateMachineEventsTelemetryFactory(s.T())
+	happyPathTelemetryFactory := protocol_mock_interfaces.NewStateMachineEventsTelemetryFactory(s.T())
+	fallbackTelemetryFactory := protocol_mock_interfaces.NewStateMachineEventsTelemetryFactory(s.T())
 	happyPathTelemetryFactory.On("Execute", s.candidate.View).Return(happyPathTelemetry).Once()
 	fallbackTelemetryFactory.On("Execute", s.candidate.View).Return(fallbackPathTelemetry).Once()
 	stateMachine, err := epochs.NewEpochStateMachineFactory(

@@ -2,8 +2,7 @@ package flow
 
 import (
 	"fmt"
-
-	"golang.org/x/exp/slices"
+	"slices"
 )
 
 // IdentifierList defines a sortable list of identifiers
@@ -59,12 +58,7 @@ func (il IdentifierList) Copy() IdentifierList {
 
 // Contains returns whether this identifier list contains the target identifier.
 func (il IdentifierList) Contains(target Identifier) bool {
-	for _, id := range il {
-		if target == id {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(il, target)
 }
 
 // Union returns a new identifier list containing the union of `il` and `other`.
