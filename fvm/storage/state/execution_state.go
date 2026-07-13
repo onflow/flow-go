@@ -94,6 +94,10 @@ func newLimitsController(params StateParameters) *limitsController {
 	}
 }
 
+// RunWithMeteringDisabled runs f with metering disabled. While metering is
+// disabled, none of the metered quantities (computation, memory, events, and
+// ledger interaction) are accumulated or limited. The previous metering state
+// is restored afterwards, so nested calls behave correctly.
 func (controller *limitsController) RunWithMeteringDisabled(f func()) {
 	if f == nil {
 		return
@@ -167,8 +171,9 @@ func (state *ExecutionState) DropChanges() error {
 	return state.spockState.DropChanges()
 }
 
-// Get returns a register value given owner and key. Limits are only enforced
-// when metering is enabled.
+// Get returns a register value given owner and key. Storage interaction is only
+// metered (accumulated and limited) when metering is enabled; when metering is
+// disabled the read is neither counted nor limited.
 //
 // Expected error returns during normal operation:
 //   - [errors.StateKeySizeLimitError] if the key exceeds the key size limit
@@ -197,12 +202,17 @@ func (state *ExecutionState) Get(id flow.RegisterID) (flow.RegisterValue, error)
 		return nil, fmt.Errorf("failed to read %s: %w", id, getError)
 	}
 
-	err = state.meter.MeterStorageRead(id, value, state.meteringEnabled)
-	return value, err
+	if state.meteringEnabled {
+		if err = state.meter.MeterStorageRead(id, value); err != nil {
+			return value, err
+		}
+	}
+	return value, nil
 }
 
-// Set updates state delta with a register update. Limits are only enforced
-// when metering is enabled.
+// Set updates state delta with a register update. Storage interaction is only
+// metered (accumulated and limited) when metering is enabled; when metering is
+// disabled the write is neither counted nor limited.
 //
 // Expected error returns during normal operation:
 //   - [errors.StateKeySizeLimitError] or [errors.StateValueSizeLimitError] if
@@ -229,7 +239,10 @@ func (state *ExecutionState) Set(id flow.RegisterID, value flow.RegisterValue) e
 		return fmt.Errorf("failed to update %s: %w", id, setError)
 	}
 
-	return state.meter.MeterStorageWrite(id, value, state.meteringEnabled)
+	if state.meteringEnabled {
+		return state.meter.MeterStorageWrite(id, value)
+	}
+	return nil
 }
 
 // MeterComputation meters computation usage. It is a no-op if metering is

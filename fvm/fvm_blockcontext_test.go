@@ -1299,10 +1299,13 @@ func TestBlockContext_ExecuteTransaction_InteractionLimitReached(t *testing.T) {
 					chain)
 				require.NoError(t, err)
 
+				// The account count is sized so that the metered interaction
+				// exceeds MaxStateInteractionSize, triggering the interaction
+				// limit from within Cadence execution.
 				_, txBodyBuilder := testutil.CreateMultiAccountCreationTransaction(
 					t,
 					chain,
-					40)
+					60)
 
 				txBodyBuilder.SetProposalKey(chain.ServiceAddress(), 0, 0).
 					SetPayer(accounts[0])
