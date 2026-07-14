@@ -592,7 +592,9 @@ func TestNewPayloadlessLedger_LoadsV7Checkpoint(t *testing.T) {
 	defer func() { <-plLedger.Done() }()
 
 	// Forest must contain the seeded trie (in addition to the initial empty trie).
-	require.True(t, plLedger.HasState(ledger.State(expectedRoot)),
+	hasState, err := plLedger.HasState(ledger.State(expectedRoot))
+	require.NoError(t, err)
+	require.True(t, hasState,
 		"expected payloadless ledger to contain the seeded V7 root hash %s", expectedRoot)
 }
 
@@ -640,10 +642,12 @@ func TestNewPayloadlessLedger_LatestV7Wins(t *testing.T) {
 	<-plLedger.Ready()
 	defer func() { <-plLedger.Done() }()
 
-	require.True(t, plLedger.HasState(ledger.State(trie2.RootHash())),
-		"latest V7 checkpoint trie should be loaded")
-	require.False(t, plLedger.HasState(ledger.State(trie1.RootHash())),
-		"older V7 checkpoint should not be loaded")
+	hasTrie2, err := plLedger.HasState(ledger.State(trie2.RootHash()))
+	require.NoError(t, err)
+	require.True(t, hasTrie2, "latest V7 checkpoint trie should be loaded")
+	hasTrie1, err := plLedger.HasState(ledger.State(trie1.RootHash()))
+	require.NoError(t, err)
+	require.False(t, hasTrie1, "older V7 checkpoint should not be loaded")
 }
 
 // TestNewPayloadlessLedger_OnlyV6 places a V6 checkpoint in the directory and
@@ -715,8 +719,9 @@ func TestNewPayloadlessLedger_LoadsConvertedV6(t *testing.T) {
 
 	// Root hash is preserved across V6 → V7 conversion, so the payloadless
 	// ledger should contain the V6 root hash.
-	require.True(t, plLedger.HasState(ledger.State(v6Trie.RootHash())),
-		"payloadless ledger should contain the converted V7 root (== V6 root)")
+	hasV6Root, err := plLedger.HasState(ledger.State(v6Trie.RootHash()))
+	require.NoError(t, err)
+	require.True(t, hasV6Root, "payloadless ledger should contain the converted V7 root (== V6 root)")
 }
 
 // TestNewPayloadlessLedger_LoadsV7RootCheckpoint verifies that a freshly-sporked
@@ -769,8 +774,9 @@ func TestNewPayloadlessLedger_LoadsV7RootCheckpoint(t *testing.T) {
 
 	// Root hash is preserved across V6 → V7 conversion, so the payloadless ledger
 	// should be seeded with the V6 root hash from the V7 root checkpoint.
-	require.True(t, plLedger.HasState(ledger.State(v6Trie.RootHash())),
-		"payloadless ledger should be seeded from the V7 root checkpoint")
+	hasV6Root2, err := plLedger.HasState(ledger.State(v6Trie.RootHash()))
+	require.NoError(t, err)
+	require.True(t, hasV6Root2, "payloadless ledger should be seeded from the V7 root checkpoint")
 }
 
 // TestNewPayloadlessLedger_V7SeedSurvivesRestart verifies that V7 checkpoint
@@ -820,8 +826,9 @@ func TestNewPayloadlessLedger_V7SeedSurvivesRestart(t *testing.T) {
 	plLedger, err := NewPayloadlessLedger(cfg, atomic.NewBool(false))
 	require.NoError(t, err)
 	<-plLedger.Ready()
-	require.True(t, plLedger.HasState(ledger.State(seedRoot)),
-		"first boot should load seeded V7 state")
+	hasSeedRoot1, err := plLedger.HasState(ledger.State(seedRoot))
+	require.NoError(t, err)
+	require.True(t, hasSeedRoot1, "first boot should load seeded V7 state")
 	<-plLedger.Done()
 
 	// Reopen and verify the seeded state still loads.
@@ -829,6 +836,7 @@ func TestNewPayloadlessLedger_V7SeedSurvivesRestart(t *testing.T) {
 	require.NoError(t, err)
 	<-plLedger2.Ready()
 	defer func() { <-plLedger2.Done() }()
-	require.True(t, plLedger2.HasState(ledger.State(seedRoot)),
-		"second boot should also load seeded V7 state")
+	hasSeedRoot2, err := plLedger2.HasState(ledger.State(seedRoot))
+	require.NoError(t, err)
+	require.True(t, hasSeedRoot2, "second boot should also load seeded V7 state")
 }
