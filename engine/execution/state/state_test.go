@@ -113,8 +113,12 @@ func TestExecutionStateWithTrieStorage(t *testing.T) {
 		require.Equal(t, flow.RegisterValue("carrot"), b2)
 
 		// verify has state
-		require.True(t, l.HasState(led.State(sc2)))
-		require.False(t, l.HasState(led.State(unittest.StateCommitmentFixture())))
+		hasState, err := l.HasState(led.State(sc2))
+		require.NoError(t, err)
+		require.True(t, hasState)
+		hasState, err = l.HasState(led.State(unittest.StateCommitmentFixture()))
+		require.NoError(t, err)
+		require.False(t, hasState)
 	}))
 
 	t.Run("commit write and read previous state", prepareTest(func(
