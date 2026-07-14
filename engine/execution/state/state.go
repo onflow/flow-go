@@ -99,7 +99,7 @@ type ExecutionState interface {
 // and ledger.PayloadlessLedger satisfy this interface, which is how the
 // execution state can be backed by either.
 type LedgerStateChecker interface {
-	HasState(state ledger.State) bool
+	HasState(state ledger.State) (bool, error)
 }
 
 type state struct {
