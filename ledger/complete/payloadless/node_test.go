@@ -2,7 +2,7 @@ package payloadless
 
 // White-box tests for the payloadless Node constructors. They live in `package payloadless`
 // (not `payloadless_test`) so they can exercise the un-exported constructors `newDefaultLeaf`
-// and `newLeafWithHash` and inspect internal fields (`leafHash`, `path`, `height`, `hashValue`,
+// and `NewLeafWithHash` and inspect internal fields (`leafHash`, `path`, `height`, `hashValue`,
 // `lChild`, `rChild`) directly.
 //
 // Hash-correctness is verified three ways:
@@ -222,17 +222,17 @@ func Test_newDefaultLeaf(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------------------------
-// newLeafWithHash
+// NewLeafWithHash
 // ---------------------------------------------------------------------------------------------
 
-// Test_newLeafWithHash verifies constructing a leaf from a pre-computed height-0 leaf hash, and that
+// Test_NewLeafWithHash verifies constructing a leaf from a pre-computed height-0 leaf hash, and that
 // it is consistent with NewLeaf (which derives the leaf hash from (path, value) internally).
-func Test_newLeafWithHash(t *testing.T) {
+func Test_NewLeafWithHash(t *testing.T) {
 	leafHash := hash.HashLeaf(hash.Hash(pathLeft), value)
 
 	t.Run("stores leaf hash and computes node hash", func(t *testing.T) {
 		for _, height := range []int{0, 1, 9} {
-			n := newLeafWithHash(pathLeft, leafHash, height)
+			n := NewLeafWithHash(pathLeft, leafHash, height)
 			require.NotNil(t, n.leafHash)
 			require.Equal(t, leafHash, *n.leafHash)
 			require.Equal(t, ledger.ComputeCompactValueFromLeafHash(hash.Hash(pathLeft), leafHash, height), n.Hash())
@@ -242,7 +242,7 @@ func Test_newLeafWithHash(t *testing.T) {
 	})
 
 	t.Run("height 0 node hash equals the leaf hash", func(t *testing.T) {
-		n := newLeafWithHash(pathLeft, leafHash, 0)
+		n := NewLeafWithHash(pathLeft, leafHash, 0)
 		require.Equal(t, leafHash, n.Hash())
 	})
 
@@ -250,7 +250,7 @@ func Test_newLeafWithHash(t *testing.T) {
 		for _, p := range branchRegimePaths {
 			lh := hash.HashLeaf(hash.Hash(p.path), value)
 			for _, height := range []int{0, 1, 9, 256} {
-				viaHash := newLeafWithHash(p.path, lh, height)
+				viaHash := NewLeafWithHash(p.path, lh, height)
 				viaValue := NewLeaf(p.path, value, height)
 				require.Equal(t, viaValue.Hash(), viaHash.Hash(), "%s @ height %d", p.name, height)
 				require.Equal(t, *viaValue.leafHash, *viaHash.leafHash)
