@@ -977,6 +977,13 @@ func HasRootCheckpointV7(dir string) (bool, error) {
 	}
 }
 
+// RootCheckpointFilenameV7 returns the filename (not the full path) of the V7
+// (payloadless) root checkpoint: [bootstrap.FilenameWALRootCheckpoint] with the
+// [V7FileSuffix] appended.
+func RootCheckpointFilenameV7() string {
+	return bootstrap.FilenameWALRootCheckpoint + V7FileSuffix
+}
+
 // RemoveCheckpoint deletes both the V6 and the V7 part files for the given checkpoint number.
 // Deleting a version that isn't present is not an error, so this reports a failure whenever
 // either deletion fails.
