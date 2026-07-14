@@ -4,12 +4,20 @@ import (
 	"errors"
 	"fmt"
 
+	"golang.org/x/sync/errgroup"
+
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/convert"
 	"github.com/onflow/flow-go/ledger/common/hash"
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
 	"github.com/onflow/flow-go/model/flow"
 )
+
+// maxConcurrentRegisterReads bounds the fan-out of value reads issued while the
+// proof is being generated. The [RegisterValueReader]'s backend (typically a
+// storage-backed snapshot) has its own concurrency characteristics, so we cap
+// the fan-out rather than launching one goroutine per register.
+const maxConcurrentRegisterReads = 16
 
 // ErrPayloadHashMismatch is returned when the value supplied by valueReader
 // does not hash to the leaf hash stored in the payloadless proof.
@@ -23,13 +31,15 @@ var ErrPayloadHashMismatch = errors.New("payload hash mismatch: storehouse value
 type RegisterValueReader func(registerID flow.RegisterID) (flow.RegisterValue, error)
 
 // registerTarget pairs a register ID with its corresponding ledger key. The
-// register ID drives value lookup via [RegisterValueReader]; the ledger key is
-// used to build the reconstructed payload. Callers that have already converted
-// register IDs to keys (e.g. to derive trie paths) can stash the keys here to
-// avoid a second [convert.RegisterIDToLedgerKey] call per leaf.
+// register ID identifies the leaf for diagnostics; the ledger key is used to
+// build the reconstructed payload; the value is the pre-fetched register value
+// that must hash to the leaf hash carried in the proof. Callers that have
+// already converted register IDs to keys (e.g. to derive trie paths) stash the
+// keys here to avoid a second [convert.RegisterIDToLedgerKey] call per leaf.
 type registerTarget struct {
 	registerID flow.RegisterID
 	key        ledger.Key
+	value      flow.RegisterValue
 }
 
 // ProveAndReconstruct generates a reconstructed full batch proof for the
@@ -41,24 +51,24 @@ type registerTarget struct {
 // The flow:
 //  1. Convert register IDs to ledger keys and derive their paths via
 //     pathfinder.KeysToPaths.
-//  2. Build a path → (registerID, key) map so reconstructPayloadlessProof
-//     can recover the register ID for each leaf in the (path-sorted) proof
-//     and reuse the already-allocated key when building the payload.
-//  3. Call ledger.Prove() to get a *PayloadlessTrieBatchProof (leaf hashes,
-//     no values).
-//  4. Hand the proof, map, and valueReader to reconstructPayloadlessProof
-//     to verify each leaf hash and re-encode as a full *TrieBatchProof.
+//  2. Phase A (parallel I/O): fetch the proof via l.Prove(query) while, at the
+//     same time, reading every register's value through valueReader. Proof
+//     generation and value reads are independent I/O phases keyed off the same
+//     inputs, so they overlap. The value reads fan out via an errgroup with a
+//     bounded SetLimit ([maxConcurrentRegisterReads]) because the reader's
+//     backend has its own concurrency limits — we don't fan out blindly to N.
+//  3. Build a path → (registerID, key, value) map so reconstructPayloadlessProof
+//     can recover, for each leaf in the (path-sorted) proof, the register ID
+//     (for diagnostics), the already-allocated key (for the payload), and the
+//     pre-fetched value (to verify against the leaf hash).
+//  4. Phase B (pure, no I/O): hand the proof and the map to
+//     reconstructPayloadlessProof, which verifies each leaf hash and re-encodes
+//     the batch as a full *TrieBatchProof.
 //
-// TODO(perf): overlap step 3 with the value reads from step 4. Today the
-// steps run sequentially: Prove finishes, then per-leaf value reads run
-// inline inside reconstructPayloadlessProof. The two I/O phases are
-// independent and can run in parallel:
-//   - Phase A (parallel): l.Prove(query) and one valueReader call per
-//     registerID, fanned out via an errgroup with a bounded SetLimit (the
-//     reader's backend has its own concurrency limits — don't fan out
-//     blindly to N).
-//   - Phase B: once both complete, run a pure verify+build pass over the
-//     assembled (proof, value) pairs — no I/O.
+// Because Phase A reads every queried register up front — before it is known
+// which paths are inclusion proofs — valueReader is invoked for every register
+// ID, including those that turn out to be non-inclusion or empty leaves. The
+// values of such leaves are simply discarded during Phase B.
 //
 // The per-leaf verify work (HashLeaf + payload build) is microseconds and
 // is not worth pipelining at finer grain.
@@ -79,18 +89,11 @@ func ProveAndReconstruct(
 		keys = append(keys, convert.RegisterIDToLedgerKey(id))
 	}
 
-	// Build the path → (registerID, key) map. We compute paths the same way
-	// the ledger does internally, so the resulting paths match the ones
-	// carried by the returned proofs. The already-allocated keys are
-	// stashed here so the reconstruction step does not have to convert
-	// register IDs to keys a second time.
+	// Compute paths the same way the ledger does internally, so the resulting
+	// paths match the ones carried by the returned proofs.
 	paths, err := pathfinder.KeysToPaths(keys, pathFinderVersion)
 	if err != nil {
 		return nil, fmt.Errorf("failed to derive paths from keys: %w", err)
-	}
-	pathToTarget := make(map[ledger.Path]registerTarget, len(paths))
-	for i, p := range paths {
-		pathToTarget[p] = registerTarget{registerID: registerIDs[i], key: keys[i]}
 	}
 
 	query, err := ledger.NewQuery(state, keys)
@@ -98,12 +101,53 @@ func ProveAndReconstruct(
 		return nil, fmt.Errorf("failed to create ledger query: %w", err)
 	}
 
-	batchProof, err := l.Prove(query)
-	if err != nil {
-		return nil, fmt.Errorf("failed to generate proof from ledger: %w", err)
+	// Phase A: overlap proof generation with the per-register value reads.
+	// Both are independent I/O phases; running them concurrently hides the
+	// value-read latency behind the (typically slower) proof generation.
+	var batchProof *ledger.PayloadlessTrieBatchProof
+	values := make([]flow.RegisterValue, len(registerIDs))
+
+	var g errgroup.Group
+	g.Go(func() error {
+		proof, proveErr := l.Prove(query)
+		if proveErr != nil {
+			return fmt.Errorf("failed to generate proof from ledger: %w", proveErr)
+		}
+		batchProof = proof
+		return nil
+	})
+	g.Go(func() error {
+		// Bounded fan-out of value reads. Each goroutine writes a distinct
+		// index of values, so no synchronization is needed around the slice.
+		var reads errgroup.Group
+		reads.SetLimit(maxConcurrentRegisterReads)
+		for i := range registerIDs {
+			reads.Go(func() error {
+				v, readErr := valueReader(registerIDs[i])
+				if readErr != nil {
+					return fmt.Errorf("failed to read register value for %s: %w", registerIDs[i], readErr)
+				}
+				values[i] = v
+				return nil
+			})
+		}
+		return reads.Wait()
+	})
+	if err := g.Wait(); err != nil {
+		return nil, err
 	}
 
-	return reconstructPayloadlessProof(batchProof, pathToTarget, valueReader)
+	// Build the path → (registerID, key, value) map now that all values are
+	// available. The already-allocated keys and pre-fetched values are stashed
+	// here so the reconstruction step does not have to convert register IDs to
+	// keys a second time or perform any further I/O.
+	pathToTarget := make(map[ledger.Path]registerTarget, len(paths))
+	for i, p := range paths {
+		pathToTarget[p] = registerTarget{registerID: registerIDs[i], key: keys[i], value: values[i]}
+	}
+
+	// Phase B: pure verify + build, no I/O.
+	return reconstructPayloadlessProof(batchProof, pathToTarget)
 }
 
 // reconstructPayloadlessProof turns a *PayloadlessTrieBatchProof (each leaf
@@ -111,13 +155,14 @@ func ProveAndReconstruct(
 // *ledger.TrieBatchProof (each leaf carrying a *Payload). Used when a
 // downstream consumer expects the wire format of the full mtrie's proofs.
 //
+// This is a pure, CPU-only pass: all register values were pre-fetched by the
+// caller and are carried in `pathToTarget`. It performs no I/O.
+//
 // For each inclusion proof:
 //   - The proof's `Path` is used to look up the target in `pathToTarget`.
-//   - The target's register ID is passed to `valueReader` to fetch the
-//     actual value.
-//   - The leaf hash is verified against `HashLeaf(path, actualValue)`.
+//   - The leaf hash is verified against `HashLeaf(path, target.value)`.
 //   - The reconstructed proof's `Payload` is built from the target's
-//     pre-allocated ledger key and the fetched value.
+//     pre-allocated ledger key and pre-fetched value.
 //
 // Non-inclusion proofs (and inclusion proofs of empty/unallocated leaves,
 // signalled by `LeafHash == nil`) carry `EmptyPayload()` on the reconstructed
@@ -129,7 +174,6 @@ func ProveAndReconstruct(
 func reconstructPayloadlessProof(
 	batchProof *ledger.PayloadlessTrieBatchProof,
 	pathToTarget map[ledger.Path]registerTarget,
-	valueReader RegisterValueReader,
 ) ([]byte, error) {
 	fullBatch := ledger.NewTrieBatchProofWithEmptyProofs(batchProof.Size())
 
@@ -148,35 +192,27 @@ func reconstructPayloadlessProof(
 			continue
 		}
 
-		// Recover the (registerID, key) target for this path. The payloadless
-		// proof does not carry the key; the caller must have provided
-		// pathToTarget covering every path the underlying ledger returned a
-		// proof for.
+		// Recover the (registerID, key, value) target for this path. The
+		// payloadless proof does not carry the key; the caller must have
+		// provided pathToTarget covering every path the underlying ledger
+		// returned a proof for.
 		target, ok := pathToTarget[proof.Path]
 		if !ok {
 			return nil, fmt.Errorf("no register target provided for path %x in proof", proof.Path[:])
 		}
 
-		// TODO(perf): see ProveAndReconstruct. Once values are pre-fetched in
-		// parallel with l.Prove and passed in alongside pathToTarget, this
-		// call becomes a map lookup, not a synchronous read.
-		actualValue, err := valueReader(target.registerID)
-		if err != nil {
-			return nil, fmt.Errorf("failed to read register value for %s: %w", target.registerID, err)
-		}
-
-		// Verify the supplied value hashes to the same leaf hash carried in
+		// Verify the pre-fetched value hashes to the same leaf hash carried in
 		// the proof. If it does not, the storehouse is inconsistent with the
 		// trie — either the wrong value, a deleted register, or a malicious
 		// reader.
-		expectedHash := hash.HashLeaf(hash.Hash(proof.Path), actualValue)
+		expectedHash := hash.HashLeaf(hash.Hash(proof.Path), target.value)
 		if expectedHash != *proof.LeafHash {
 			return nil, fmt.Errorf(
 				"proof reconstruction failed for register %s: storehouse value (len=%d) does not match leaf hash in proof: %w",
-				target.registerID, len(actualValue), ErrPayloadHashMismatch)
+				target.registerID, len(target.value), ErrPayloadHashMismatch)
 		}
 
-		full.Payload = ledger.NewPayload(target.key, actualValue)
+		full.Payload = ledger.NewPayload(target.key, target.value)
 	}
 
 	return ledger.EncodeTrieBatchProof(fullBatch), nil
