@@ -43,7 +43,7 @@ func (m *mockPayloadlessLedger) Done() <-chan struct{} {
 
 func (m *mockPayloadlessLedger) InitialState() ledger.State { return ledger.State{} }
 
-func (m *mockPayloadlessLedger) HasState(ledger.State) bool { return false }
+func (m *mockPayloadlessLedger) HasState(ledger.State) (bool, error) { return false, nil }
 
 func (m *mockPayloadlessLedger) HasPaths(*ledger.Query) ([]bool, error) { return nil, nil }
 

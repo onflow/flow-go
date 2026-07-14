@@ -37,7 +37,7 @@ func (m *mockProofLedger) Done() <-chan struct{} {
 }
 
 func (m *mockProofLedger) InitialState() ledger.State             { return ledger.State{} }
-func (m *mockProofLedger) HasState(ledger.State) bool             { return false }
+func (m *mockProofLedger) HasState(ledger.State) (bool, error)    { return false, nil }
 func (m *mockProofLedger) HasPaths(*ledger.Query) ([]bool, error) { return nil, nil }
 func (m *mockProofLedger) GetSingleLeafHash(*ledger.QuerySingleValue) (*hash.Hash, error) {
 	return nil, nil
