@@ -131,7 +131,9 @@ func TestPayloadlessLedgerWithCompactor_SetPersists(t *testing.T) {
 	<-bundle.Ready()
 	defer func() { <-bundle.Done() }()
 
-	require.True(t, bundle.HasState(finalState),
+	hasFinalState, err := bundle.HasState(finalState)
+	require.NoError(t, err)
+	require.True(t, hasFinalState,
 		"replayed forest should contain final state %s", finalState)
 }
 
