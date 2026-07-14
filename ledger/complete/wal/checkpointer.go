@@ -976,6 +976,13 @@ func HasRootCheckpointV7(dir string) (bool, error) {
 	}
 }
 
+// RootCheckpointFilenameV7 returns the filename (not the full path) of the V7
+// (payloadless) root checkpoint: [bootstrap.FilenameWALRootCheckpoint] with the
+// [V7FileSuffix] appended.
+func RootCheckpointFilenameV7() string {
+	return bootstrap.FilenameWALRootCheckpoint + V7FileSuffix
+}
+
 func (c *Checkpointer) RemoveCheckpoint(checkpoint int) error {
 	// Try to remove both V6 and V7 versions if they exist
 	v6Name := NumberToFilename(checkpoint)
