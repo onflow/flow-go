@@ -79,7 +79,8 @@ func TestSystemContractsInvoke(t *testing.T) {
 				environment.NewProgramLogger(
 					tracer,
 					environment.DefaultProgramLoggerParams()),
-				runtime)
+				runtime,
+			)
 			value, err := invoker.Invoke(
 				environment.ContractFunctionSpec{
 					AddressFromChain: func(_ flow.Chain) flow.Address {
@@ -87,7 +88,8 @@ func TestSystemContractsInvoke(t *testing.T) {
 					},
 					FunctionName: "functionName",
 				},
-				[]cadence.Value{})
+				nil,
+			)
 
 			tc.require(t, value, err)
 		})
