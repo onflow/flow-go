@@ -15,9 +15,9 @@ type Inspector interface {
 	//    only the executionSnapshot.Reads, will be read
 	// - executionSnapshot is the reads and writes of the procedure
 	// - events are all of the events the procedure is emitting
-	// - signers are the accounts that signed the procedure's transaction (its
-	//   authorizers and payer), deduplicated. It is empty for procedures that are
-	//   not transactions (e.g. scripts).
+	// - signers are the transaction's authorizing signers, as returned by
+	//   [AuthorizingSigners]. Empty for procedures that are not transactions
+	//   (e.g. scripts).
 	Inspect(
 		logger zerolog.Logger,
 		storage snapshot.StorageSnapshot,
@@ -34,4 +34,43 @@ type Inspector interface {
 type Result interface {
 	InspectionName() string
 	AsLogEvent() (zerolog.Level, func(e *zerolog.Event))
+}
+
+// AuthorizingSigners returns the deduplicated addresses whose signatures
+// authorize the transaction's actions: the proposer followed by the
+// authorizers (in insertion order). If the same account appears in multiple
+// roles, only its first occurrence is included. Empty addresses (e.g. an unset
+// proposer on the system transaction) are omitted.
+//
+// The payer is deliberately excluded: its signature only authorizes paying the
+// transaction's fees, not the transaction's actions.
+//
+// A nil transaction body returns nil, allowing callers holding an optional
+// *TransactionBody (e.g. a non-transaction procedure such as a script) to call
+// this function without a nil check.
+func AuthorizingSigners(tb *flow.TransactionBody) []flow.Address {
+	if tb == nil {
+		return nil
+	}
+
+	signers := make([]flow.Address, 0, len(tb.Authorizers)+1)
+	seen := make(map[flow.Address]struct{})
+
+	addSigner := func(address flow.Address) {
+		if address == flow.EmptyAddress {
+			return
+		}
+		if _, ok := seen[address]; ok {
+			return
+		}
+		signers = append(signers, address)
+		seen[address] = struct{}{}
+	}
+
+	addSigner(tb.ProposalKey.Address)
+	for _, authorizer := range tb.Authorizers {
+		addSigner(authorizer)
+	}
+
+	return signers
 }

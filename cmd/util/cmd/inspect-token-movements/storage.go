@@ -266,7 +266,7 @@ func (ci *chunkInspector) inspectChunk(
 		events = append(events, output.ServiceEvents...)
 
 		// Run the inspector
-		result, err := ci.inspector.Inspect(ci.logger, snapshotTree, executionSnapshot, events, tx.Transaction.Signers())
+		result, err := ci.inspector.Inspect(ci.logger, snapshotTree, executionSnapshot, events, inspection.AuthorizingSigners(tx.Transaction))
 		if err != nil {
 			ci.logger.Warn().
 				Err(err).

@@ -2,6 +2,7 @@ package inspection
 
 import (
 	"fmt"
+	"maps"
 	"math"
 	"runtime/debug"
 	"sync"
@@ -35,7 +36,7 @@ var _ Inspector = (*TokenChanges)(nil)
 
 // NewTokenChangesInspector return a TokenChanges inspector, that will be run
 // after transaction execution and analyze if any unaccounted tokens were created or
-// destroy.
+// destroyed.
 func NewTokenChangesInspector(searchedTokens TokenChangesSearchTokens, chain flow.ChainID) *TokenChanges {
 	sc := systemcontracts.SystemContractsForChain(chain)
 
@@ -55,9 +56,7 @@ func (td *TokenChanges) Name() string {
 func (td *TokenChanges) SetSearchedTokens(searchedTokens TokenChangesSearchTokens) {
 	// copy the map in case the user tries to modify the map
 	st := make(map[string]SearchToken, len(searchedTokens))
-	for k, v := range searchedTokens {
-		st[k] = v
-	}
+	maps.Copy(st, searchedTokens)
 	td.searchedTokensMu.Lock()
 	defer td.searchedTokensMu.Unlock()
 	td.searchedTokens = st
@@ -165,9 +164,7 @@ func (td *TokenChanges) getTokenDiff(
 	for a := range addresses {
 		// Copy beforeTokens before calling diffAccountTokens, which mutates the before map
 		beforeTokens := make(accountTokens, len(before[a]))
-		for k, v := range before[a] {
-			beforeTokens[k] = v
-		}
+		maps.Copy(beforeTokens, before[a])
 		afterTokens := after[a]
 		diff := diffAccountTokens(before[a], after[a])
 		if len(diff) == 0 {
@@ -195,7 +192,7 @@ func (td *TokenChanges) getTokenDiff(
 		return TokenDiffResult{}, fmt.Errorf("failed to find sources/sinks: %w", err)
 	}
 	tokenDiffResult.KnownSourcesSinks = sourcesSinks
-	tokenDiffResult.Violations = violations
+	tokenDiffResult.UnauthorizedSourcesSinks = violations
 
 	// Log summary of token movements
 	// Only log as debug because it's going to get properly logged in `TokenDiffResult.AsLogEvent()`
@@ -342,17 +339,13 @@ func walkLoaded(
 
 // findSourcesSinks matches emitted events against the configured per-token
 // source/sink handlers and returns the net known supply change per token. It
-// also returns any MinterAllowlist violations: matched events whose configured
-// allow-list did not include any of the transaction's signers.
-//
-// No error returns are expected during normal operation; an error indicates the
-// token definitions are misconfigured (the same event ID registered by two
-// tokens) or an event payload failed to decode.
+// also returns any SignerAllowlist violations: matched events whose configured
+// allow-list did not include any of the given signers.
 func (td *TokenChanges) findSourcesSinks(
 	events []flow.Event,
 	tokens map[string]SearchToken,
 	signers []flow.Address,
-) (map[string]int64, []MintAllowlistViolation, error) {
+) (map[string]int64, []SignerAllowlistViolation, error) {
 	// create a map of all sinks and sources
 	// TODO: could be created once
 	type tokenSourceSink struct {
@@ -361,7 +354,7 @@ func (td *TokenChanges) findSourcesSinks(
 	}
 	sourcesSinks := make(map[string]tokenSourceSink)
 	results := make(map[string]int64)
-	var violations []MintAllowlistViolation
+	var violations []SignerAllowlistViolation
 	for _, token := range tokens {
 		for evt, ss := range token.SinksSources {
 			// Each event ID should be unique across all tokens. If two tokens register
@@ -390,10 +383,8 @@ func (td *TokenChanges) findSourcesSinks(
 		}
 		results[ts.tokenID] += v
 
-		// If an allow-list is configured for this event, the transaction must be
-		// signed by at least one allow-listed account; otherwise record a violation.
-		if ts.ss.MinterAllowlist != nil && !anySignerAllowed(signers, ts.ss.MinterAllowlist) {
-			violations = append(violations, MintAllowlistViolation{
+		if ts.ss.SignerAllowlist != nil && !anySignerAllowed(signers, ts.ss.SignerAllowlist) {
+			violations = append(violations, SignerAllowlistViolation{
 				TokenID:   ts.tokenID,
 				EventType: id,
 				Amount:    v,
@@ -593,11 +584,11 @@ type SourceSink struct {
 	// (tokens leaving/destroyed).
 	Amount func(flow.Event) (int64, error)
 
-	// MinterAllowlist, when non-nil, restricts which accounts may trigger this
-	// event. The check passes if at least one of the transaction's signers
-	// (any authorizer or the payer) is in the set. A nil map disables the check
-	// (the default, preserving prior behavior).
-	MinterAllowlist map[flow.Address]struct{}
+	// SignerAllowlist, when non-nil, restricts which accounts may trigger this
+	// event. The check passes if at least one of the transaction's authorizing
+	// signers (see [AuthorizingSigners]) is in the set. A nil map disables the
+	// check (the default, preserving prior behavior).
+	SignerAllowlist map[flow.Address]struct{}
 }
 
 type SearchToken struct {
@@ -607,18 +598,17 @@ type SearchToken struct {
 	SinksSources map[string]SourceSink
 }
 
-// MintAllowlistViolation records a mint/source event that was observed in a
-// transaction whose signers (authorizers and payer) did not include any account
-// from the event's configured MinterAllowlist.
-type MintAllowlistViolation struct {
-	// TokenID is the ID of the token whose supply changed.
+// SignerAllowlistViolation records a source/sink event (e.g. a mint or burn)
+// observed in a transaction whose authorizing signers did not include any
+// account from the event's configured SignerAllowlist.
+type SignerAllowlistViolation struct {
+	// TokenID is the token whose supply changed.
 	TokenID string
 	// EventType is the event type ID that triggered the violation.
 	EventType string
 	// Amount is the signed token-amount delta decoded from the event.
 	Amount int64
-	// Signers are the transaction's signers (authorizers and payer) at the time
-	// of the violation.
+	// Signers are the transaction's authorizing signers.
 	Signers []flow.Address
 }
 
@@ -632,10 +622,10 @@ type TokenDiffResult struct {
 	// know mints/burns for the token parsed from predetermined events
 	KnownSourcesSinks map[string]int64
 
-	// Violations holds mint/source events whose triggering transaction was not
-	// signed by any allow-listed account. Empty when no allow-list is configured
-	// or all mint events were authorized.
-	Violations []MintAllowlistViolation
+	// UnauthorizedSourcesSinks holds source/sink events whose transaction's
+	// authorizing signers included no allow-listed account. Empty when no
+	// allow-list is configured or all matched events were authorized.
+	UnauthorizedSourcesSinks []SignerAllowlistViolation
 }
 
 var _ Result = TokenDiffResult{}
@@ -645,51 +635,85 @@ func (r TokenDiffResult) InspectionName() string {
 }
 
 func (r TokenDiffResult) AsLogEvent() (zerolog.Level, func(e *zerolog.Event)) {
-	unaccountedTokens := r.UnaccountedTokens()
+	violations := r.violations()
+	return violations.logLevel(), violations.asLogEvent()
+}
 
-	if len(unaccountedTokens) == 0 && len(r.Violations) == 0 {
-		// everything is ok: log no issues with debug logging
-		return zerolog.InfoLevel, func(e *zerolog.Event) { e.Str(r.InspectionName(), "no issues") }
+// tokenDiffViolations holds the issues derived from a TokenDiffResult: token
+// movements that are unaccounted for, and source/sink events that were not
+// authorized by an allow-listed signer.
+type tokenDiffViolations struct {
+	inspectionName           string
+	unaccountedTokens        map[string]int64
+	unauthorizedSourcesSinks []SignerAllowlistViolation
+}
+
+func (r TokenDiffResult) violations() tokenDiffViolations {
+	return tokenDiffViolations{
+		inspectionName:           r.InspectionName(),
+		unaccountedTokens:        r.UnaccountedTokens(),
+		unauthorizedSourcesSinks: r.UnauthorizedSourcesSinks,
+	}
+}
+
+func (v tokenDiffViolations) hasIssues() bool {
+	return len(v.unaccountedTokens) > 0 || len(v.unauthorizedSourcesSinks) > 0
+}
+
+// logLevel returns the level at which the violations should be logged:
+//   - [zerolog.InfoLevel] when there are no issues: all token movements are
+//     accounted for and no signer allow-list was violated,
+//   - [zerolog.ErrorLevel] when any tracked token increased in supply, or an
+//     event's signer allow-list was violated,
+//   - [zerolog.WarnLevel] otherwise: token movements are unaccounted for, but
+//     none of them increased a token's supply.
+func (v tokenDiffViolations) logLevel() zerolog.Level {
+	if !v.hasIssues() {
+		return zerolog.InfoLevel
 	}
 
-	anyPositive := false
-	for _, v := range unaccountedTokens {
-		if v > 0 {
-			anyPositive = true
-			break
+	if len(v.unauthorizedSourcesSinks) > 0 {
+		return zerolog.ErrorLevel
+	}
+	for _, amount := range v.unaccountedTokens {
+		if amount > 0 {
+			return zerolog.ErrorLevel
 		}
 	}
 
-	level := zerolog.WarnLevel
-	if anyPositive || len(r.Violations) > 0 {
-		// if any tracked token increased in supply, or a mint was triggered by a
-		// non-allow-listed signer, log at error level; otherwise just use warn level
-		level = zerolog.ErrorLevel
+	return zerolog.WarnLevel
+}
+
+// asLogEvent returns a function that writes the violations to a log event, or
+// a "no issues" marker when there are none.
+func (v tokenDiffViolations) asLogEvent() func(e *zerolog.Event) {
+	if !v.hasIssues() {
+		return func(e *zerolog.Event) { e.Str(v.inspectionName, "no issues") }
 	}
 
-	return level, func(e *zerolog.Event) {
-		if len(unaccountedTokens) > 0 {
+	return func(e *zerolog.Event) {
+		if len(v.unaccountedTokens) > 0 {
 			dict := zerolog.Dict()
-			for k, v := range unaccountedTokens {
-				dict = dict.Int64(k, v)
+			for k, amount := range v.unaccountedTokens {
+				dict = dict.Int64(k, amount)
 			}
-			e.Dict(r.InspectionName(), dict)
+			e.Dict(v.inspectionName, dict)
 		}
 
-		if len(r.Violations) > 0 {
+		if len(v.unauthorizedSourcesSinks) > 0 {
 			arr := zerolog.Arr()
-			for _, v := range r.Violations {
-				signers := make([]string, len(v.Signers))
-				for i, s := range v.Signers {
+			for _, unauthorized := range v.unauthorizedSourcesSinks {
+				signers := make([]string, len(unauthorized.Signers))
+				for i, s := range unauthorized.Signers {
 					signers[i] = s.Hex()
 				}
 				arr = arr.Dict(zerolog.Dict().
-					Str("token", v.TokenID).
-					Str("event", v.EventType).
-					Int64("amount", v.Amount).
+					Str("token", unauthorized.TokenID).
+					Str("event", unauthorized.EventType).
+					Int64("amount", unauthorized.Amount).
 					Strs("signers", signers))
 			}
-			e.Array(r.InspectionName()+"_mint_allowlist_violations", arr)
+			e.Array(v.inspectionName+"_signer_allowlist_violations", arr)
 		}
 	}
 }
@@ -842,12 +866,11 @@ func DefaultTokenDiffSearchTokens(chain flow.Chain) TokenChangesSearchTokens {
 		},
 	}
 
-	// FlowToken minting is only expected from transactions signed by the service
-	// account (e.g. the system transaction paying epoch staking rewards). Restrict
-	// the mint event to that account; any other minter is flagged as a violation.
+	// FlowToken minting is only expected from the service account (e.g. the system
+	// transaction paying epoch staking rewards).
 	searchTokens[flowTokenID].SinksSources[flowTokenMintedEventID] = SourceSink{
 		Amount: decodeFlowEventAmount(flowAmountSource),
-		MinterAllowlist: map[flow.Address]struct{}{
+		SignerAllowlist: map[flow.Address]struct{}{
 			chain.ServiceAddress(): {},
 		},
 	}

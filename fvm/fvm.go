@@ -102,9 +102,8 @@ func inspectProcedureResults(
 ) []inspection.Result {
 	inspectionResults := make([]inspection.Result, 0, len(context.Inspectors))
 
-	// signers is nil for procedures that are not transactions (e.g. scripts,
-	// where TxBody is nil); Signers handles the nil receiver.
-	signers := context.TxBody.Signers()
+	// TxBody is nil for non-transaction procedures (e.g. scripts)
+	signers := inspection.AuthorizingSigners(context.TxBody)
 
 	for i, inspector := range context.Inspectors {
 		log := log.With().Str("inspector", inspector.Name()).Int("inspector-num", i).Logger()
