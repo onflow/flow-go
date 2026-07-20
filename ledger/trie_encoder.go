@@ -1139,6 +1139,14 @@ func decodePayloadlessTrieProof(inp []byte) (*PayloadlessTrieProof, error) {
 	}
 	pInst.Interims = interims
 
+	// Reject trailing bytes: a well-formed single proof consumes its entire
+	// input. Leftover bytes indicate a malformed or tampered encoding (proofs
+	// may originate from untrusted remote peers). This also guards the batch
+	// decoder, which hands each length-prefixed sub-proof slice to this function.
+	if len(rest) != 0 {
+		return nil, fmt.Errorf("error decoding payloadless proof: %d unexpected trailing bytes", len(rest))
+	}
+
 	return pInst, nil
 }
 

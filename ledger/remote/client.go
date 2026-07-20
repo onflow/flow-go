@@ -142,10 +142,10 @@ func (c *Client) InitialState() ledger.State {
 
 // HasState returns true if the given state exists in the ledger.
 //
-// A gRPC failure is surfaced to the caller rather than collapsed into a false
-// return: false must mean "state genuinely absent", not "the server was
-// unreachable", otherwise callers (e.g. execution state) would misreport a
-// reachable state as pruned.
+// A gRPC failure is surfaced to the caller as an error (an exception) rather
+// than collapsed into a false return: false must mean "state genuinely
+// absent", not "the server was unreachable", otherwise callers (e.g. execution
+// state) would misreport a reachable state as pruned.
 //
 // No error returns are expected during normal operation.
 func (c *Client) HasState(state ledger.State) (bool, error) {
