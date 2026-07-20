@@ -1,0 +1,117 @@
+name: claude-review-fvm
+
+# Runs Claude Code on pull requests that modify fvm/** and posts a review.
+#
+# Authentication uses Workload Identity Federation against the Anthropic
+# API — no ANTHROPIC_API_KEY secret is required. The federation rule ID,
+# service account ID, and organization ID below are identifiers, not
+# credentials, and can safely live in the workflow file.
+#
+# The Claude GitHub App (https://github.com/apps/claude) must be installed
+# on this repository — that is what lets Claude post reviews as
+# claude[bot] (distinct from github-actions[bot]).
+#
+# The prompt currently runs in "comment only" mode as a trial. Claude will
+# post COMMENTED reviews with findings but will NOT approve or request
+# changes. Once we have calibrated trust in the reviewer, flip the final
+# stanza of the prompt to allow APPROVED / REQUEST_CHANGES — see the
+# comment near the end of the prompt block below.
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - 'fvm/**'
+
+permissions:
+  contents: read
+  pull-requests: write   # required for Claude to submit reviews
+  id-token: write        # required for WIF: fetching the GitHub OIDC token
+
+jobs:
+  review:
+    if: github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: anthropics/claude-code-action@v1
+        with:
+          # Workload Identity Federation — no static credentials.
+          anthropic_federation_rule_id: fdrl_01UXEriP26j1qgPvpAvVyYoE
+          anthropic_service_account_id: svac_01RutNzF7FBxds8FhTHZ2BTY
+          anthropic_organization_id: 23ff619e-5bf0-4e8d-936b-87274460531a
+          # anthropic_workspace_id intentionally omitted: the federation
+          # rule is scoped to a single (default) workspace.
+
+          claude_args: |
+            --model claude-sonnet-4-5
+            --max-turns 20
+            --allowedTools "Bash(gh pr *),Bash(gh api *),Bash(git *),Read,Grep,Glob"
+
+          prompt: |
+            You are reviewing PR #${{ github.event.pull_request.number }} on
+            onflow/flow-go. It modifies FVM code (fvm/**) in a high-assurance
+            byzantine-fault-tolerant blockchain implementation.
+
+            Before analyzing the diff, read:
+              - AGENTS.md at the repo root for project conventions
+              - Any CLAUDE.md files under the paths this PR touches
+
+            Focus your review on:
+
+            1. Correctness under byzantine inputs. All external inputs are
+               potentially adversarial. Look for unchecked assumptions.
+
+            2. Error handling per the repo's contract. Benign errors are
+               typed sentinels documented on the function; unexpected errors
+               are exceptions that must propagate (never swallowed, never
+               "best-effort"). Flag any callsite that logs-and-continues on
+               an undocumented error, or that treats a documented sentinel
+               inconsistently with its context (the same error type can be
+               benign in one caller and an exception in another).
+
+            3. GoDoc completeness on public methods. Every method that
+               returns an error must document expected benign errors under
+               "Expected error returns during normal operation" — or state
+               "No error returns are expected during normal operation."
+               Missing or misleading contracts are review-worthy.
+
+            4. Consensus determinism. Metering totals, execution snapshots,
+               and observable side effects must be identical across nodes
+               regardless of cache state, scheduling, or timing. Flag
+               anything that could diverge between warm and cold caches or
+               between concurrent and sequential execution.
+
+            5. Ledger interaction and metering semantics. Reads and writes
+               inside RunWithMeteringDisabled scopes have subtle effects on
+               later metered reads via the interaction meter's read cache.
+               Flag cross-boundary behavior that isn't covered by a test.
+
+            6. Test coverage of the observable contract, especially where
+               behavior changes are subtle (new sentinel error kinds, new
+               metering rules, changed merge semantics).
+
+            Use `gh pr view` and `gh api` for context you can't get from the
+            checkout. Cite file:line for every concern.
+
+            # === Review submission ===
+            #
+            # Trial mode: post ONLY a COMMENTED review, regardless of what
+            # you find. Do NOT approve, do NOT request changes.
+            #
+            # Once the team has calibrated trust in this reviewer, this
+            # stanza will change to allow APPROVE and REQUEST_CHANGES. When
+            # that happens the rule will be: approve only if you found no
+            # important findings; request changes if you found any; comment
+            # if you are uncertain. Not yet.
+            #
+            # For now: submit exactly one COMMENTED review via
+            # `gh pr review --comment`, with a review body that leads with a
+            # short summary and then lists findings in file:line order.
+            # Group findings by severity (Important / Nit / Pre-existing).
+            # If you found nothing worth flagging, still post a comment
+            # saying so — this gives the humans a signal that Claude ran
+            # and had no concerns.
