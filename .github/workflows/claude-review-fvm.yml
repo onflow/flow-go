@@ -8,14 +8,18 @@ name: claude-review-fvm
 # credentials, and can safely live in the workflow file.
 #
 # The Claude GitHub App (https://github.com/apps/claude) must be installed
-# on this repository — that is what lets Claude post reviews as
-# claude[bot] (distinct from github-actions[bot]).
+# on this repository — that is what lets Claude post as claude[bot].
 #
-# The prompt currently runs in "comment only" mode as a trial. Claude will
-# post COMMENTED reviews with findings but will NOT approve or request
-# changes. Once we have calibrated trust in the reviewer, flip the final
-# stanza of the prompt to allow APPROVED / REQUEST_CHANGES — see the
-# comment near the end of the prompt block below.
+# ── TRIAL MODE ─────────────────────────────────────────────────────────
+# Claude currently posts findings as a plain PR comment (`gh pr comment`)
+# and cannot approve: the tool allowlist below does not include
+# `gh pr review`, so approval is impossible at the tool level regardless
+# of the prompt. To promote Claude to a real reviewer later:
+#   1. add `Bash(gh pr review:*)` to --allowedTools
+#   2. replace the "Submitting your findings" section of the prompt with
+#      review-submission rules (approve only when no important findings,
+#      request changes when there are, comment when uncertain)
+# ───────────────────────────────────────────────────────────────────────
 
 on:
   pull_request:
@@ -25,13 +29,18 @@ on:
 
 permissions:
   contents: read
-  pull-requests: write   # required for Claude to submit reviews
+  pull-requests: write   # required for Claude to post comments
   id-token: write        # required for WIF: fetching the GitHub OIDC token
+
+concurrency:
+  group: claude-review-fvm-${{ github.event.pull_request.number }}
+  cancel-in-progress: true   # a new push supersedes the in-flight review
 
 jobs:
   review:
     if: github.event.pull_request.draft == false
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
         with:
@@ -46,72 +55,135 @@ jobs:
           # anthropic_workspace_id intentionally omitted: the federation
           # rule is scoped to a single (default) workspace.
 
+          # Model intentionally not pinned — the action's default tracks
+          # Anthropic's current recommended model. Pin with
+          # `--model <id>` here if reproducibility matters more.
           claude_args: |
-            --model claude-sonnet-4-5
-            --max-turns 20
-            --allowedTools "Bash(gh pr *),Bash(gh api *),Bash(git *),Read,Grep,Glob"
+            --max-turns 30
+            --allowedTools "Bash(gh pr view:*),Bash(gh pr diff:*),Bash(gh pr comment:*),Bash(git diff:*),Bash(git log:*),Bash(git show:*),Read,Grep,Glob"
 
           prompt: |
-            You are reviewing PR #${{ github.event.pull_request.number }} on
-            onflow/flow-go. It modifies FVM code (fvm/**) in a high-assurance
-            byzantine-fault-tolerant blockchain implementation.
+            You are reviewing pull request #${{ github.event.pull_request.number }}
+            on onflow/flow-go. It modifies the Flow Virtual Machine (fvm/**),
+            the execution layer of a byzantine-fault-tolerant blockchain.
+            Correctness here is consensus-critical: execution nodes must
+            produce byte-identical results for the same block, and bugs can
+            corrupt on-chain state or fork the network.
 
-            Before analyzing the diff, read:
-              - AGENTS.md at the repo root for project conventions
-              - Any CLAUDE.md files under the paths this PR touches
+            ## Scope
 
-            Focus your review on:
+            Review ONLY this PR's own changes. The base branch is
+            `${{ github.event.pull_request.base.ref }}` — FVM PRs are often
+            stacked on other feature branches, so diff against that base
+            (e.g. `git diff origin/${{ github.event.pull_request.base.ref }}...HEAD`),
+            never against master. Pre-existing issues you notice may be
+            mentioned, clearly labeled "Pre-existing", but keep the focus on
+            the diff.
 
-            1. Correctness under byzantine inputs. All external inputs are
-               potentially adversarial. Look for unchecked assumptions.
+            ## Read first
 
-            2. Error handling per the repo's contract. Benign errors are
-               typed sentinels documented on the function; unexpected errors
-               are exceptions that must propagate (never swallowed, never
-               "best-effort"). Flag any callsite that logs-and-continues on
-               an undocumented error, or that treats a documented sentinel
-               inconsistently with its context (the same error type can be
-               benign in one caller and an exception in another).
+            - AGENTS.md at the repo root — high-assurance conventions. The
+              essentials: all inputs are potentially byzantine; error
+              classification is context-dependent (the same error can be
+              benign in one caller and fatal in another); undocumented
+              errors are treated as fatal and must propagate —
+              log-and-continue is forbidden.
+            - fvm/README.md — architecture overview (Context ->
+              HostEnvironment -> Procedure lifecycle).
+            - fvm/errors/codes.go and fvm/errors/errors.go — FVM's own
+              error taxonomy. NOTE: fvm/ does NOT use the sentinel-error
+              model from the rest of the repo. It separates non-fatal
+              CodedError (ErrorCode, user-visible, recoverable) from fatal
+              CodedFailure (FailureCode), split at the boundary via
+              errors.SplitErrorTypes.
 
-            3. GoDoc completeness on public methods. Every method that
-               returns an error must document expected benign errors under
-               "Expected error returns during normal operation" — or state
-               "No error returns are expected during normal operation."
-               Missing or misleading contracts are review-worthy.
+            ## FVM-specific bug classes to check
 
-            4. Consensus determinism. Metering totals, execution snapshots,
-               and observable side effects must be identical across nodes
-               regardless of cache state, scheduling, or timing. Flag
-               anything that could diverge between warm and cold caches or
-               between concurrent and sequential execution.
+            These are the failure modes that have actually bitten this
+            codebase. Check the diff against each:
 
-            5. Ledger interaction and metering semantics. Reads and writes
-               inside RunWithMeteringDisabled scopes have subtle effects on
-               later metered reads via the interaction meter's read cache.
-               Flag cross-boundary behavior that isn't covered by a test.
+            1. Execution-result determinism / HCU discipline. Anything that
+               changes observable execution behavior — error messages
+               included in transaction results, metering amounts, emitted
+               events, enforced limits — changes execution results and
+               requires a coordinated height upgrade (HCU) to deploy. If the
+               diff changes such behavior, the PR description must
+               acknowledge it. Flag silent behavior changes loudly.
 
-            6. Test coverage of the observable contract, especially where
-               behavior changes are subtle (new sentinel error kinds, new
-               metering rules, changed merge semantics).
+            2. Cache-state independence. Program loads and other derived-data
+               computations (fvm/storage/derived) must charge identical
+               computation warm or cold. A transaction must never be charged
+               differently because another transaction warmed the cache
+               first. Look for meter state leaking into or out of cached
+               snapshots.
 
-            Use `gh pr view` and `gh api` for context you can't get from the
-            checkout. Cite file:line for every concern.
+            3. Metering scope semantics (fvm/meter, fvm/storage/state).
+               RunWithMeteringDisabled suppresses accumulation AND limit
+               enforcement. Watch the boundaries: the interaction meter
+               counts only the first read of a register (later reads are
+               free cache hits), so reads/writes inside a disabled scope
+               change what later metered reads cost. Nested transaction
+               merges (ExecutionState.Merge) decide whose meter absorbs the
+               charges — check every Begin/Commit/Restart pairing,
+               especially error paths where nested transactions unwind.
+               RunWithMeteringDisabled takes a closure, so errors escape via
+               captured variables (`RunWithMeteringDisabled(func() { err = foo() })`)
+               — check every such site for shadowed or stale `err` and for a
+               missing error check immediately after the closure returns.
 
-            # === Review submission ===
-            #
-            # Trial mode: post ONLY a COMMENTED review, regardless of what
-            # you find. Do NOT approve, do NOT request changes.
-            #
-            # Once the team has calibrated trust in this reviewer, this
-            # stanza will change to allow APPROVE and REQUEST_CHANGES. When
-            # that happens the rule will be: approve only if you found no
-            # important findings; request changes if you found any; comment
-            # if you are uncertain. Not yet.
-            #
-            # For now: submit exactly one COMMENTED review via
-            # `gh pr review --comment`, with a review body that leads with a
-            # short summary and then lists findings in file:line order.
-            # Group findings by severity (Important / Nit / Pre-existing).
-            # If you found nothing worth flagging, still post a comment
-            # saying so — this gives the humans a signal that Claude ran
-            # and had no concerns.
+            4. Error taxonomy discipline (fvm/errors). A CodedFailure must
+               always propagate as a failure — flag any callsite that
+               downgrades one to a benign error, and any re-wrap of a
+               CodedError into a CodedFailure (or vice versa) without
+               justification. Error CODES are an external contract —
+               downstream systems index on them; never renumber or reuse.
+               Error MESSAGES are part of the execution result — changing
+               one is a behavior change (see #1). In fvm/evm, the EVM error
+               path has its own semantics: errors.NewEVMError wraps
+               non-fatal EVM errors as user errors, and IsEVMError /
+               IsFailure classification at that boundary must be preserved.
+
+            5. Transaction pipeline invariants (transactionInvoker.go and
+               friends). Order matters: signature verification → sequence
+               number → payer balance check (unmetered) → body (metered,
+               inside a nested transaction) → storage limit checks → fee
+               deduction (unmetered). Fee deduction and other system-critical
+               unmetered scopes must never be able to fail on a metering
+               limit. The error-execution path must leave the nested
+               transaction stack consistent.
+
+            6. Service-account special cases. Several limits are not
+               enforced when the payer is the service account. Changes to
+               limit enforcement must preserve these exemptions — and must
+               not accidentally widen them.
+
+            7. SPoCK sensitivity (fvm/storage/state spockState). Execution
+               snapshots feed SPoCK proofs. Any nondeterminism in the
+               read/write set — map iteration order reaching the ledger,
+               time, randomness — breaks verification.
+
+            ## What NOT to spend turns on
+
+            - Style, formatting, import ordering — CI and CodeRabbit
+              already cover these.
+            - Refactors out of the PR's scope.
+            - Test-only changes to assertions that keep the same coverage.
+
+            ## Submitting your findings
+
+            Post exactly ONE comment on the PR via `gh pr comment`, with:
+
+            - First line: a one-sentence verdict ("No concerns from this
+              review" or "N findings, M of them important").
+            - Findings grouped by severity: Important (would be a bug in
+              production), Nit (worth fixing, not blocking), Pre-existing
+              (not introduced by this PR).
+            - Every finding cites file:line and states the concrete failure
+              scenario — not "this could be a problem" but "if X happens, Y
+              breaks because Z".
+            - At most 5 nits; summarize the rest in one line if there are
+              more.
+            - If you verified something subtle and found it correct, say so
+              in one line — knowing what was checked has value.
+
+            Do not approve or request changes. Findings only.
