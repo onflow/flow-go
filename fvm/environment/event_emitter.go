@@ -307,10 +307,6 @@ func (collection *EventCollection) AppendServiceEvent(
 	return collection.meter.MeterEmittedEvent(size)
 }
 
-func (collection *EventCollection) TotalByteSize() uint64 {
-	return collection.meter.TotalEmittedEventBytes()
-}
-
 func (collection *EventCollection) TotalEventCounter() uint32 {
 	return collection.eventCounter
 }

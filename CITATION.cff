@@ -1,0 +1,25 @@
+cff-version: 1.2.0
+message: "If you use flow-go in your research or reference it in a publication, please cite it as below."
+title: "flow-go: Flow Network Reference Implementation in Go"
+abstract: "flow-go is the Go reference implementation of the Flow network, a Layer 1 proof-of-stake blockchain. It implements HotStuff consensus, a multi-role node architecture (Access, Collection, Consensus, Execution, Verification), the Flow Virtual Machine, ledger, networking, and cryptography subsystems."
+authors:
+  - name: "Flow Foundation"
+    website: "https://flow.com"
+repository-code: "https://github.com/onflow/flow-go"
+url: "https://flow.com"
+license: AGPL-3.0-only
+type: software
+keywords:
+  - flow
+  - flow-network
+  - blockchain
+  - layer-1
+  - proof-of-stake
+  - consensus
+  - hotstuff
+  - byzantine-fault-tolerance
+  - cadence
+  - smart-contracts
+  - reference-implementation
+  - distributed-systems
+  - go

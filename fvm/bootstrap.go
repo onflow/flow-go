@@ -457,9 +457,8 @@ func (b *bootstrapExecutor) Execute() error {
 
 	// sets up the EVM environment
 	b.setupEVM(service, nonFungibleToken, fungibleToken, flowToken, &env)
-	b.setupVMBridge(service, &env)
-
 	b.deployCrossVMMetadataViews(nonFungibleToken, &env)
+	b.setupVMBridge(service, &env)
 
 	err = expectAccounts(systemcontracts.EVMStorageAccountIndex)
 	if err != nil {
@@ -797,7 +796,8 @@ func (b *bootstrapExecutor) deployServiceAccount(deployTo flow.Address, env *tem
 func (b *bootstrapExecutor) deployNFTStorefrontV2(deployTo flow.Address, env *templates.Environment) {
 	contract := storefront.NFTStorefrontV2(
 		env.FungibleTokenAddress,
-		env.NonFungibleTokenAddress)
+		env.NonFungibleTokenAddress,
+		env.BurnerAddress)
 	txBody, err := blueprints.DeployContractTransaction(deployTo, contract, "NFTStorefrontV2").Build()
 	if err != nil {
 		panic(fmt.Sprintf("failed to build deploy NFTStorefrontV2 transaction: %s", err))
@@ -1063,30 +1063,32 @@ func (b *bootstrapExecutor) setupVMBridge(serviceAddress flow.Address, env *temp
 	}
 
 	bridgeEnv := bridge.Environment{
-		CrossVMNFTAddress:                     env.ServiceAccountAddress,
-		CrossVMTokenAddress:                   env.ServiceAccountAddress,
-		FlowEVMBridgeHandlerInterfacesAddress: env.ServiceAccountAddress,
-		IBridgePermissionsAddress:             env.ServiceAccountAddress,
-		ICrossVMAddress:                       env.ServiceAccountAddress,
-		ICrossVMAssetAddress:                  env.ServiceAccountAddress,
-		IEVMBridgeNFTMinterAddress:            env.ServiceAccountAddress,
-		IEVMBridgeTokenMinterAddress:          env.ServiceAccountAddress,
-		IFlowEVMNFTBridgeAddress:              env.ServiceAccountAddress,
-		IFlowEVMTokenBridgeAddress:            env.ServiceAccountAddress,
-		FlowEVMBridgeAddress:                  env.ServiceAccountAddress,
-		FlowEVMBridgeAccessorAddress:          env.ServiceAccountAddress,
-		FlowEVMBridgeConfigAddress:            env.ServiceAccountAddress,
-		FlowEVMBridgeHandlersAddress:          env.ServiceAccountAddress,
-		FlowEVMBridgeNFTEscrowAddress:         env.ServiceAccountAddress,
-		FlowEVMBridgeResolverAddress:          env.ServiceAccountAddress,
-		FlowEVMBridgeTemplatesAddress:         env.ServiceAccountAddress,
-		FlowEVMBridgeTokenEscrowAddress:       env.ServiceAccountAddress,
-		FlowEVMBridgeUtilsAddress:             env.ServiceAccountAddress,
-		ArrayUtilsAddress:                     env.ServiceAccountAddress,
-		ScopedFTProvidersAddress:              env.ServiceAccountAddress,
-		SerializeAddress:                      env.ServiceAccountAddress,
-		SerializeMetadataAddress:              env.ServiceAccountAddress,
-		StringUtilsAddress:                    env.ServiceAccountAddress,
+		CrossVMNFTAddress:                          env.ServiceAccountAddress,
+		CrossVMTokenAddress:                        env.ServiceAccountAddress,
+		FlowEVMBridgeHandlerInterfacesAddress:      env.ServiceAccountAddress,
+		IBridgePermissionsAddress:                  env.ServiceAccountAddress,
+		ICrossVMAddress:                            env.ServiceAccountAddress,
+		ICrossVMAssetAddress:                       env.ServiceAccountAddress,
+		IEVMBridgeNFTMinterAddress:                 env.ServiceAccountAddress,
+		IEVMBridgeTokenMinterAddress:               env.ServiceAccountAddress,
+		IFlowEVMNFTBridgeAddress:                   env.ServiceAccountAddress,
+		IFlowEVMTokenBridgeAddress:                 env.ServiceAccountAddress,
+		FlowEVMBridgeAddress:                       env.ServiceAccountAddress,
+		FlowEVMBridgeAccessorAddress:               env.ServiceAccountAddress,
+		FlowEVMBridgeCustomAssociationTypesAddress: env.ServiceAccountAddress,
+		FlowEVMBridgeCustomAssociationsAddress:     env.ServiceAccountAddress,
+		FlowEVMBridgeConfigAddress:                 env.ServiceAccountAddress,
+		FlowEVMBridgeHandlersAddress:               env.ServiceAccountAddress,
+		FlowEVMBridgeNFTEscrowAddress:              env.ServiceAccountAddress,
+		FlowEVMBridgeResolverAddress:               env.ServiceAccountAddress,
+		FlowEVMBridgeTemplatesAddress:              env.ServiceAccountAddress,
+		FlowEVMBridgeTokenEscrowAddress:            env.ServiceAccountAddress,
+		FlowEVMBridgeUtilsAddress:                  env.ServiceAccountAddress,
+		ArrayUtilsAddress:                          env.ServiceAccountAddress,
+		ScopedFTProvidersAddress:                   env.ServiceAccountAddress,
+		SerializeAddress:                           env.ServiceAccountAddress,
+		SerializeMetadataAddress:                   env.ServiceAccountAddress,
+		StringUtilsAddress:                         env.ServiceAccountAddress,
 	}
 
 	ctx := NewContextFromParent(b.ctx,

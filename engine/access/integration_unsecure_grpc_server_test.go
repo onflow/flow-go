@@ -38,6 +38,7 @@ import (
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data/cache"
 	"github.com/onflow/flow-go/module/grpcserver"
 	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/module/limiters"
 	"github.com/onflow/flow-go/module/mempool/herocache"
 	"github.com/onflow/flow-go/module/metrics"
 	module "github.com/onflow/flow-go/module/mock"
@@ -211,6 +212,8 @@ func (suite *SameGRPCPortTestSuite) SetupTest() {
 
 	stateStreamConfig := statestreambackend.Config{}
 	followerDistributor := pubsub.NewFollowerDistributor()
+	streamLimiter, err := limiters.NewConcurrencyLimiter(subscription.DefaultMaxGlobalStreams)
+	suite.Require().NoError(err)
 	// create rpc engine builder
 	rpcEngBuilder, err := rpc.NewBuilder(
 		suite.log,
@@ -229,6 +232,7 @@ func (suite *SameGRPCPortTestSuite) SetupTest() {
 		nil,
 		followerDistributor,
 		nil,
+		streamLimiter,
 	)
 	assert.NoError(suite.T(), err)
 	suite.rpcEng, err = rpcEngBuilder.WithLegacy().Build()
@@ -302,6 +306,7 @@ func (suite *SameGRPCPortTestSuite) SetupTest() {
 		suite.chainID,
 		suite.unsecureGrpcServer,
 		stateStreamBackend,
+		streamLimiter,
 	)
 	assert.NoError(suite.T(), err)
 

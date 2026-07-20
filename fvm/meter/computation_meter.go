@@ -105,19 +105,6 @@ func (m *ComputationMeter) MeterComputation(usage common.ComputationUsage) error
 	return nil
 }
 
-// ComputationAvailable returns true if enough computation is left in the transaction for the given intensity and type
-func (m *ComputationMeter) ComputationAvailable(usage common.ComputationUsage) bool {
-	w, ok := m.params.computationWeights[usage.Kind]
-	// if not found return has capacity
-	// given the behaviour of MeterComputation is ignoring intensities without a set weight
-	if !ok {
-		return true
-	}
-
-	potentialComputationUsage := m.computationUsed + w*usage.Intensity
-	return potentialComputationUsage <= m.params.computationLimit
-}
-
 // ComputationRemaining returns the remaining computation (intensity) left in the transaction for the given type
 func (m *ComputationMeter) ComputationRemaining(kind common.ComputationKind) uint64 {
 	w, ok := m.params.computationWeights[kind]
@@ -126,12 +113,14 @@ func (m *ComputationMeter) ComputationRemaining(kind common.ComputationKind) uin
 		return math.MaxUint64
 	}
 
-	remainingComputationUsage := m.params.computationLimit - m.computationUsed
-	if remainingComputationUsage <= 0 {
+	// `computationUsed` can exceed `computationLimit`, since `MeterComputation` increments
+	// the usage before checking the limit; guard against underflow
+	if m.computationUsed >= m.params.computationLimit {
 		return 0
 	}
 
-	return remainingComputationUsage / w
+	// never underflows, as we handled the m.params.computationLimit ≤ m.computationUsed above
+	return (m.params.computationLimit - m.computationUsed) / w
 }
 
 // ComputationIntensities returns all the measured computational intensities

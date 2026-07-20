@@ -107,71 +107,34 @@ var MainnetExecutionEffortWeights = meter.ExecutionEffortWeights{
 type Meter interface {
 	common.Gauge
 
-	ComputationUsed() (uint64, error)
-	MemoryUsed() (uint64, error)
+	// MeteringResult returns the metering totals accumulated so far.
+	//
+	// No error returns are expected during normal operation.
+	MeteringResult() (meter.MeteringResult, error)
 
-	ComputationIntensities() meter.MeteredComputationIntensities
-	ComputationAvailable(common.ComputationUsage) bool
 	ComputationRemaining(kind common.ComputationKind) uint64
 
 	MeterEmittedEvent(byteSize uint64) error
-	TotalEmittedEventBytes() uint64
 
 	RunWithMeteringDisabled(f func())
 }
 
 type meterImpl struct {
-	txnState state.NestedTransactionPreparer
+	state.NestedTransactionPreparer
 }
 
 func NewMeter(txnState state.NestedTransactionPreparer) Meter {
 	return &meterImpl{
-		txnState: txnState,
+		NestedTransactionPreparer: txnState,
 	}
 }
 
-func (meter *meterImpl) MeterComputation(usage common.ComputationUsage) error {
-	return meter.txnState.MeterComputation(usage)
-}
-
-func (meter *meterImpl) ComputationIntensities() meter.MeteredComputationIntensities {
-	return meter.txnState.ComputationIntensities()
-}
-
-func (meter *meterImpl) ComputationAvailable(usage common.ComputationUsage) bool {
-	return meter.txnState.ComputationAvailable(usage)
-}
-
-func (meter *meterImpl) ComputationRemaining(kind common.ComputationKind) uint64 {
-	return meter.txnState.ComputationRemaining(kind)
-}
-
-func (meter *meterImpl) ComputationUsed() (uint64, error) {
-	return meter.txnState.TotalComputationUsed(), nil
-}
-
-func (meter *meterImpl) MeterMemory(usage common.MemoryUsage) error {
-	return meter.txnState.MeterMemory(usage)
-}
-
-func (meter *meterImpl) MemoryUsed() (uint64, error) {
-	return meter.txnState.TotalMemoryEstimate(), nil
-}
-
-func (meter *meterImpl) InteractionUsed() (uint64, error) {
-	return meter.txnState.InteractionUsed(), nil
-}
-
-func (meter *meterImpl) MeterEmittedEvent(byteSize uint64) error {
-	return meter.txnState.MeterEmittedEvent(byteSize)
-}
-
-func (meter *meterImpl) TotalEmittedEventBytes() uint64 {
-	return meter.txnState.TotalEmittedEventBytes()
-}
-
-func (meter *meterImpl) RunWithMeteringDisabled(f func()) {
-	meter.txnState.RunWithMeteringDisabled(f)
+func (m *meterImpl) MeteringResult() (meter.MeteringResult, error) {
+	return meter.MeteringResult{
+		ComputationUsed:        m.TotalComputationUsed(),
+		MemoryEstimate:         m.TotalMemoryEstimate(),
+		ComputationIntensities: m.ComputationIntensities(),
+	}, nil
 }
 
 type cancellableMeter struct {
@@ -186,7 +149,7 @@ func NewCancellableMeter(
 ) Meter {
 	return &cancellableMeter{
 		meterImpl: meterImpl{
-			txnState: txnState,
+			NestedTransactionPreparer: txnState,
 		},
 		ctx: ctx,
 	}

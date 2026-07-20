@@ -1,4 +1,4 @@
-package handler_test
+package environment_test
 
 import (
 	"testing"
@@ -6,7 +6,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/fvm/evm/handler"
+	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/evm/testutils"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -14,17 +14,16 @@ import (
 func BenchmarkProposalGrowth(b *testing.B) { benchmarkBlockProposalGrowth(b, 1000) }
 
 func benchmarkBlockProposalGrowth(b *testing.B, txCounts int) {
-	testutils.RunWithTestBackend(b, func(backend *testutils.TestBackend) {
+	testutils.RunWithTestBackend(b, flow.Testnet, func(backend *testutils.TestBackend) {
 		testutils.RunWithTestFlowEVMRootAddress(b, backend, func(rootAddr flow.Address) {
 
-			bs := handler.NewBlockStore(flow.Testnet, backend, rootAddr)
+			bs := environment.NewBlockStore(flow.Testnet, backend, backend, backend, rootAddr)
 			for i := 0; i < txCounts; i++ {
 				bp, err := bs.BlockProposal()
 				require.NoError(b, err)
 				res := testutils.RandomResultFixture(b)
 				bp.AppendTransaction(res)
-				err = bs.UpdateBlockProposal(bp)
-				require.NoError(b, err)
+				bs.StageBlockProposal(bp)
 			}
 
 			// check the impact of updating block proposal after x number of transactions
@@ -34,8 +33,7 @@ func benchmarkBlockProposalGrowth(b *testing.B, txCounts int) {
 			require.NoError(b, err)
 			res := testutils.RandomResultFixture(b)
 			bp.AppendTransaction(res)
-			err = bs.UpdateBlockProposal(bp)
-			require.NoError(b, err)
+			bs.StageBlockProposal(bp)
 
 			b.ReportMetric(float64(time.Since(startTime).Nanoseconds()), "proposal_update_time_ns")
 			b.ReportMetric(float64(backend.TotalBytesRead()), "proposal_update_bytes_read")

@@ -16,6 +16,8 @@ network-config:
   dns-cache-ttl: 5m
   # The size of the queue for notifications about new peers in the disallow list.
   disallow-list-notification-cache-size: 100
+  # Maximum number of messages in the inbound message queue. Limits memory growth from message flooding.
+  message-queue-size: 100_000
   unicast:
     rate-limiter:
       # Setting this to true will disable connection disconnects and gating when unicast rate limiters are configured

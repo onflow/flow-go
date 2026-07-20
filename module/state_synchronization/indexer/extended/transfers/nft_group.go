@@ -77,6 +77,19 @@ func (g *nftTxEventGroup) addWithdrawal(event flow.Event, decoded *events.NFTWit
 
 // addDeposit adds a deposit event to the event group.
 //
+// NFT transfers emit two separate Cadence events: a Withdrawn event when the NFT leaves the
+// sender's collection, and a Deposited event when it enters the receiver's collection. To
+// reconstruct a complete transfer record (sender → receiver), we must pair these events by
+// matching the NFT's UUID and ID. A deposit without a matching withdrawal indicates a mint;
+// a withdrawal without a matching deposit (resolved later in ResolvePairs) indicates a burn.
+//
+// UUID Reuse Problem:
+// The `pendingWithdrawals` map is keyed by UUID. However, some NFT collections (e.g., TopShot)
+// reuse Cadence resource UUIDs across distinct NFTs, meaning multiple NFTs with different IDs
+// can share the same UUID within a transaction. Therefore, we filter pending withdrawals by
+// both UUID and NFT ID — only withdrawals with a matching ID belong to this deposit; the rest
+// remain pending for future deposits.
+//
 // No error returns are expected during normal operation.
 func (g *nftTxEventGroup) addDeposit(event flow.Event, decoded *events.NFTDepositedEvent) error {
 	d := &nftDecodedDeposit{source: event, decoded: *decoded}
@@ -89,22 +102,44 @@ func (g *nftTxEventGroup) addDeposit(event flow.Event, decoded *events.NFTDeposi
 		return nil
 	}
 
-	// Validate token type and NFT ID against the last pending withdrawal.
-	lastW := pending[len(pending)-1]
+	// Partition pending withdrawals by NFT ID. Some collections (e.g. TopShot) reuse Cadence
+	// resource UUIDs across distinct NFTs, so multiple NFTs with different IDs can share a UUID.
+	// Only withdrawals with a matching ID belong to this deposit; the rest stay pending.
+	//
+	// NFTs can be transferred multiple times within a transaction. capture all matching withdrawals
+	// to include in the transfer event indices.
+	var matching []*nftDecodedWithdrawal
+	var remaining []*nftDecodedWithdrawal
+	for _, w := range pending {
+		if w.decoded.ID == decoded.ID {
+			matching = append(matching, w)
+		} else {
+			remaining = append(remaining, w)
+		}
+	}
+
+	if len(matching) == 0 {
+		// No withdrawal with a matching NFT ID - treat as mint.
+		g.pairedResults = append(g.pairedResults, resolveNFTTransfers(nil, d)...)
+		return nil
+	}
+
+	// Validate token type against the matched withdrawals.
+	lastW := matching[len(matching)-1]
 	if lastW.decoded.Type != decoded.Type {
 		return fmt.Errorf("withdrawal token type %s (eventIdx=%d) is not equal to the deposit token type %s (eventIdx=%d) in transaction %d",
 			lastW.decoded.Type, lastW.source.EventIndex, decoded.Type, event.EventIndex, event.TransactionIndex)
 	}
-	if lastW.decoded.ID != decoded.ID {
-		return fmt.Errorf("withdrawal NFT ID %d (eventIdx=%d) is not equal to the deposit NFT ID %d (eventIdx=%d) in transaction %d",
-			lastW.decoded.ID, lastW.source.EventIndex, decoded.ID, event.EventIndex, event.TransactionIndex)
+
+	g.pairedResults = append(g.pairedResults, resolveNFTTransfers(matching, d)...)
+
+	// Keep only non-matching withdrawals pending. If none remain, clean up the map entry
+	// so the same UUID can be withdrawn again within this transaction (multi-hop: A → B → C).
+	if len(remaining) == 0 {
+		delete(g.pendingWithdrawals, uuid)
+	} else {
+		g.pendingWithdrawals[uuid] = remaining
 	}
-
-	g.pairedResults = append(g.pairedResults, resolveNFTTransfers(pending, d)...)
-
-	// Clear pending withdrawals for this UUID so the same NFT can be withdrawn again
-	// within this transaction (multi-hop: A → B → C).
-	delete(g.pendingWithdrawals, uuid)
 	return nil
 }
 

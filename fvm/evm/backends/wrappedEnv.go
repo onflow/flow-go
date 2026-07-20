@@ -1,6 +1,7 @@
 package backends
 
 import (
+	gocommon "github.com/ethereum/go-ethereum/common"
 	"github.com/onflow/atree"
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/common"
@@ -28,7 +29,7 @@ func NewWrappedEnvironment(env environment.Environment) *WrappedEnvironment {
 	return &WrappedEnvironment{env}
 }
 
-var _ types.Backend = &WrappedEnvironment{}
+var _ Backend = &WrappedEnvironment{}
 
 // GetValue gets a value from the storage for the given owner and key pair,
 // if value not found empty slice and no error is returned.
@@ -65,21 +66,10 @@ func (we *WrappedEnvironment) MeterComputation(usage common.ComputationUsage) er
 	return handleEnvironmentError(err)
 }
 
-// ComputationUsed returns the computation used so far
-func (we *WrappedEnvironment) ComputationUsed() (uint64, error) {
-	val, err := we.env.ComputationUsed()
+// MeteringResult returns the metering totals accumulated so far.
+func (we *WrappedEnvironment) MeteringResult() (meter.MeteringResult, error) {
+	val, err := we.env.MeteringResult()
 	return val, handleEnvironmentError(err)
-}
-
-// ComputationIntensities returns a the list of computation intensities
-func (we *WrappedEnvironment) ComputationIntensities() meter.MeteredComputationIntensities {
-	return we.env.ComputationIntensities()
-}
-
-// ComputationAvailable returns true if there is computation room
-// for the given kind and intensity operation.
-func (we *WrappedEnvironment) ComputationAvailable(usage common.ComputationUsage) bool {
-	return we.env.ComputationAvailable(usage)
 }
 
 // ComputationRemaining returns the remaining computation for the given kind.
@@ -92,21 +82,10 @@ func (we *WrappedEnvironment) MeterMemory(usage common.MemoryUsage) error {
 	return handleEnvironmentError(err)
 }
 
-// MemoryUsed returns the total memory used so far.
-func (we *WrappedEnvironment) MemoryUsed() (uint64, error) {
-	val, err := we.env.MemoryUsed()
-	return val, handleEnvironmentError(err)
-}
-
 // MeterEmittedEvent meters a newly emitted event.
 func (we *WrappedEnvironment) MeterEmittedEvent(byteSize uint64) error {
 	err := we.env.MeterEmittedEvent(byteSize)
 	return handleEnvironmentError(err)
-}
-
-// TotalEmittedEventBytes returns the total byte size of events emitted so far.
-func (we *WrappedEnvironment) TotalEmittedEventBytes() uint64 {
-	return we.env.TotalEmittedEventBytes()
 }
 
 // EmitEvent emits an event.
@@ -224,4 +203,33 @@ func handleEnvironmentError(err error) error {
 	}
 
 	return types.NewBackendError(err)
+}
+
+// BlockHash implements [Backend].
+func (we *WrappedEnvironment) BlockHash(height uint64) (gocommon.Hash, error) {
+	hash, err := we.env.BlockHash(height)
+	return hash, handleEnvironmentError(err)
+}
+
+// BlockProposal implements [Backend].
+func (we *WrappedEnvironment) BlockProposal() (*types.BlockProposal, error) {
+	bp, err := we.env.BlockProposal()
+	return bp, handleEnvironmentError(err)
+}
+
+// CommitBlockProposal implements [Backend].
+func (we *WrappedEnvironment) CommitBlockProposal(bp *types.BlockProposal) error {
+	err := we.env.CommitBlockProposal(bp)
+	return handleEnvironmentError(err)
+}
+
+// LatestBlock implements [Backend].
+func (we *WrappedEnvironment) LatestBlock() (*types.Block, error) {
+	block, err := we.env.LatestBlock()
+	return block, handleEnvironmentError(err)
+}
+
+// StageBlockProposal implements [Backend].
+func (we *WrappedEnvironment) StageBlockProposal(bp *types.BlockProposal) {
+	we.env.StageBlockProposal(bp)
 }

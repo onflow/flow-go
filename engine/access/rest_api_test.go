@@ -29,10 +29,12 @@ import (
 	"github.com/onflow/flow-go/engine/access/rpc/backend/node_communicator"
 	"github.com/onflow/flow-go/engine/access/rpc/backend/query_mode"
 	statestreambackend "github.com/onflow/flow-go/engine/access/state_stream/backend"
+	"github.com/onflow/flow-go/engine/access/subscription"
 	commonrpc "github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/grpcserver"
 	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/module/limiters"
 	"github.com/onflow/flow-go/module/metrics"
 	module "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/network"
@@ -194,6 +196,8 @@ func (suite *RestAPITestSuite) SetupTest() {
 
 	stateStreamConfig := statestreambackend.Config{}
 	followerDistributor := pubsub.NewFollowerDistributor()
+	streamLimiter, err := limiters.NewConcurrencyLimiter(subscription.DefaultMaxGlobalStreams)
+	suite.Require().NoError(err)
 	rpcEngBuilder, err := rpc.NewBuilder(
 		suite.log,
 		suite.state,
@@ -211,6 +215,7 @@ func (suite *RestAPITestSuite) SetupTest() {
 		nil,
 		followerDistributor,
 		nil,
+		streamLimiter,
 	)
 	assert.NoError(suite.T(), err)
 	suite.rpcEng, err = rpcEngBuilder.WithLegacy().Build()

@@ -306,9 +306,8 @@ func (dr *CadenceValueDiffReporter) diffDomain(
 			return nil, nil, nil, false
 		}
 
-		oldValue := oldStorageMap.ReadValue(nil, mapKey)
-
-		newValue := newStorageMap.ReadValue(nil, mapKey)
+		oldValue := oldStorageMap.ReadValue(oldRuntime.Interpreter, mapKey)
+		newValue := newStorageMap.ReadValue(newRuntime.Interpreter, mapKey)
 
 		return oldValue, newValue, trace, true
 	}

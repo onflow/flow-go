@@ -37,103 +37,6 @@ func (_m *Meter) EXPECT() *Meter_Expecter {
 	return &Meter_Expecter{mock: &_m.Mock}
 }
 
-// ComputationAvailable provides a mock function for the type Meter
-func (_mock *Meter) ComputationAvailable(computationUsage common.ComputationUsage) bool {
-	ret := _mock.Called(computationUsage)
-
-	if len(ret) == 0 {
-		panic("no return value specified for ComputationAvailable")
-	}
-
-	var r0 bool
-	if returnFunc, ok := ret.Get(0).(func(common.ComputationUsage) bool); ok {
-		r0 = returnFunc(computationUsage)
-	} else {
-		r0 = ret.Get(0).(bool)
-	}
-	return r0
-}
-
-// Meter_ComputationAvailable_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ComputationAvailable'
-type Meter_ComputationAvailable_Call struct {
-	*mock.Call
-}
-
-// ComputationAvailable is a helper method to define mock.On call
-//   - computationUsage common.ComputationUsage
-func (_e *Meter_Expecter) ComputationAvailable(computationUsage interface{}) *Meter_ComputationAvailable_Call {
-	return &Meter_ComputationAvailable_Call{Call: _e.mock.On("ComputationAvailable", computationUsage)}
-}
-
-func (_c *Meter_ComputationAvailable_Call) Run(run func(computationUsage common.ComputationUsage)) *Meter_ComputationAvailable_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 common.ComputationUsage
-		if args[0] != nil {
-			arg0 = args[0].(common.ComputationUsage)
-		}
-		run(
-			arg0,
-		)
-	})
-	return _c
-}
-
-func (_c *Meter_ComputationAvailable_Call) Return(b bool) *Meter_ComputationAvailable_Call {
-	_c.Call.Return(b)
-	return _c
-}
-
-func (_c *Meter_ComputationAvailable_Call) RunAndReturn(run func(computationUsage common.ComputationUsage) bool) *Meter_ComputationAvailable_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// ComputationIntensities provides a mock function for the type Meter
-func (_mock *Meter) ComputationIntensities() meter.MeteredComputationIntensities {
-	ret := _mock.Called()
-
-	if len(ret) == 0 {
-		panic("no return value specified for ComputationIntensities")
-	}
-
-	var r0 meter.MeteredComputationIntensities
-	if returnFunc, ok := ret.Get(0).(func() meter.MeteredComputationIntensities); ok {
-		r0 = returnFunc()
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(meter.MeteredComputationIntensities)
-		}
-	}
-	return r0
-}
-
-// Meter_ComputationIntensities_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ComputationIntensities'
-type Meter_ComputationIntensities_Call struct {
-	*mock.Call
-}
-
-// ComputationIntensities is a helper method to define mock.On call
-func (_e *Meter_Expecter) ComputationIntensities() *Meter_ComputationIntensities_Call {
-	return &Meter_ComputationIntensities_Call{Call: _e.mock.On("ComputationIntensities")}
-}
-
-func (_c *Meter_ComputationIntensities_Call) Run(run func()) *Meter_ComputationIntensities_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run()
-	})
-	return _c
-}
-
-func (_c *Meter_ComputationIntensities_Call) Return(meteredComputationIntensities meter.MeteredComputationIntensities) *Meter_ComputationIntensities_Call {
-	_c.Call.Return(meteredComputationIntensities)
-	return _c
-}
-
-func (_c *Meter_ComputationIntensities_Call) RunAndReturn(run func() meter.MeteredComputationIntensities) *Meter_ComputationIntensities_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
 // ComputationRemaining provides a mock function for the type Meter
 func (_mock *Meter) ComputationRemaining(kind common.ComputationKind) uint64 {
 	ret := _mock.Called(kind)
@@ -181,112 +84,6 @@ func (_c *Meter_ComputationRemaining_Call) Return(v uint64) *Meter_ComputationRe
 }
 
 func (_c *Meter_ComputationRemaining_Call) RunAndReturn(run func(kind common.ComputationKind) uint64) *Meter_ComputationRemaining_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// ComputationUsed provides a mock function for the type Meter
-func (_mock *Meter) ComputationUsed() (uint64, error) {
-	ret := _mock.Called()
-
-	if len(ret) == 0 {
-		panic("no return value specified for ComputationUsed")
-	}
-
-	var r0 uint64
-	var r1 error
-	if returnFunc, ok := ret.Get(0).(func() (uint64, error)); ok {
-		return returnFunc()
-	}
-	if returnFunc, ok := ret.Get(0).(func() uint64); ok {
-		r0 = returnFunc()
-	} else {
-		r0 = ret.Get(0).(uint64)
-	}
-	if returnFunc, ok := ret.Get(1).(func() error); ok {
-		r1 = returnFunc()
-	} else {
-		r1 = ret.Error(1)
-	}
-	return r0, r1
-}
-
-// Meter_ComputationUsed_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ComputationUsed'
-type Meter_ComputationUsed_Call struct {
-	*mock.Call
-}
-
-// ComputationUsed is a helper method to define mock.On call
-func (_e *Meter_Expecter) ComputationUsed() *Meter_ComputationUsed_Call {
-	return &Meter_ComputationUsed_Call{Call: _e.mock.On("ComputationUsed")}
-}
-
-func (_c *Meter_ComputationUsed_Call) Run(run func()) *Meter_ComputationUsed_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run()
-	})
-	return _c
-}
-
-func (_c *Meter_ComputationUsed_Call) Return(v uint64, err error) *Meter_ComputationUsed_Call {
-	_c.Call.Return(v, err)
-	return _c
-}
-
-func (_c *Meter_ComputationUsed_Call) RunAndReturn(run func() (uint64, error)) *Meter_ComputationUsed_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// MemoryUsed provides a mock function for the type Meter
-func (_mock *Meter) MemoryUsed() (uint64, error) {
-	ret := _mock.Called()
-
-	if len(ret) == 0 {
-		panic("no return value specified for MemoryUsed")
-	}
-
-	var r0 uint64
-	var r1 error
-	if returnFunc, ok := ret.Get(0).(func() (uint64, error)); ok {
-		return returnFunc()
-	}
-	if returnFunc, ok := ret.Get(0).(func() uint64); ok {
-		r0 = returnFunc()
-	} else {
-		r0 = ret.Get(0).(uint64)
-	}
-	if returnFunc, ok := ret.Get(1).(func() error); ok {
-		r1 = returnFunc()
-	} else {
-		r1 = ret.Error(1)
-	}
-	return r0, r1
-}
-
-// Meter_MemoryUsed_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'MemoryUsed'
-type Meter_MemoryUsed_Call struct {
-	*mock.Call
-}
-
-// MemoryUsed is a helper method to define mock.On call
-func (_e *Meter_Expecter) MemoryUsed() *Meter_MemoryUsed_Call {
-	return &Meter_MemoryUsed_Call{Call: _e.mock.On("MemoryUsed")}
-}
-
-func (_c *Meter_MemoryUsed_Call) Run(run func()) *Meter_MemoryUsed_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run()
-	})
-	return _c
-}
-
-func (_c *Meter_MemoryUsed_Call) Return(v uint64, err error) *Meter_MemoryUsed_Call {
-	_c.Call.Return(v, err)
-	return _c
-}
-
-func (_c *Meter_MemoryUsed_Call) RunAndReturn(run func() (uint64, error)) *Meter_MemoryUsed_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -444,6 +241,59 @@ func (_c *Meter_MeterMemory_Call) RunAndReturn(run func(usage common.MemoryUsage
 	return _c
 }
 
+// MeteringResult provides a mock function for the type Meter
+func (_mock *Meter) MeteringResult() (meter.MeteringResult, error) {
+	ret := _mock.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for MeteringResult")
+	}
+
+	var r0 meter.MeteringResult
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func() (meter.MeteringResult, error)); ok {
+		return returnFunc()
+	}
+	if returnFunc, ok := ret.Get(0).(func() meter.MeteringResult); ok {
+		r0 = returnFunc()
+	} else {
+		r0 = ret.Get(0).(meter.MeteringResult)
+	}
+	if returnFunc, ok := ret.Get(1).(func() error); ok {
+		r1 = returnFunc()
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// Meter_MeteringResult_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'MeteringResult'
+type Meter_MeteringResult_Call struct {
+	*mock.Call
+}
+
+// MeteringResult is a helper method to define mock.On call
+func (_e *Meter_Expecter) MeteringResult() *Meter_MeteringResult_Call {
+	return &Meter_MeteringResult_Call{Call: _e.mock.On("MeteringResult")}
+}
+
+func (_c *Meter_MeteringResult_Call) Run(run func()) *Meter_MeteringResult_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *Meter_MeteringResult_Call) Return(meteringResult meter.MeteringResult, err error) *Meter_MeteringResult_Call {
+	_c.Call.Return(meteringResult, err)
+	return _c
+}
+
+func (_c *Meter_MeteringResult_Call) RunAndReturn(run func() (meter.MeteringResult, error)) *Meter_MeteringResult_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // RunWithMeteringDisabled provides a mock function for the type Meter
 func (_mock *Meter) RunWithMeteringDisabled(f func()) {
 	_mock.Called(f)
@@ -481,49 +331,5 @@ func (_c *Meter_RunWithMeteringDisabled_Call) Return() *Meter_RunWithMeteringDis
 
 func (_c *Meter_RunWithMeteringDisabled_Call) RunAndReturn(run func(f func())) *Meter_RunWithMeteringDisabled_Call {
 	_c.Run(run)
-	return _c
-}
-
-// TotalEmittedEventBytes provides a mock function for the type Meter
-func (_mock *Meter) TotalEmittedEventBytes() uint64 {
-	ret := _mock.Called()
-
-	if len(ret) == 0 {
-		panic("no return value specified for TotalEmittedEventBytes")
-	}
-
-	var r0 uint64
-	if returnFunc, ok := ret.Get(0).(func() uint64); ok {
-		r0 = returnFunc()
-	} else {
-		r0 = ret.Get(0).(uint64)
-	}
-	return r0
-}
-
-// Meter_TotalEmittedEventBytes_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'TotalEmittedEventBytes'
-type Meter_TotalEmittedEventBytes_Call struct {
-	*mock.Call
-}
-
-// TotalEmittedEventBytes is a helper method to define mock.On call
-func (_e *Meter_Expecter) TotalEmittedEventBytes() *Meter_TotalEmittedEventBytes_Call {
-	return &Meter_TotalEmittedEventBytes_Call{Call: _e.mock.On("TotalEmittedEventBytes")}
-}
-
-func (_c *Meter_TotalEmittedEventBytes_Call) Run(run func()) *Meter_TotalEmittedEventBytes_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run()
-	})
-	return _c
-}
-
-func (_c *Meter_TotalEmittedEventBytes_Call) Return(v uint64) *Meter_TotalEmittedEventBytes_Call {
-	_c.Call.Return(v)
-	return _c
-}
-
-func (_c *Meter_TotalEmittedEventBytes_Call) RunAndReturn(run func() uint64) *Meter_TotalEmittedEventBytes_Call {
-	_c.Call.Return(run)
 	return _c
 }

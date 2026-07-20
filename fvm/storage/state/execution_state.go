@@ -227,19 +227,6 @@ func (state *ExecutionState) MeterComputation(usage common.ComputationUsage) err
 	return nil
 }
 
-// ComputationAvailable checks if enough computation capacity is available without metering
-func (state *ExecutionState) ComputationAvailable(usage common.ComputationUsage) bool {
-	if state.finalized {
-		// if state is finalized return false
-		return false
-	}
-
-	if state.meteringEnabled {
-		return state.meter.ComputationAvailable(usage)
-	}
-	return true
-}
-
 // ComputationRemaining returns the remaining computation for the given kind.
 func (state *ExecutionState) ComputationRemaining(kind common.ComputationKind) uint64 {
 	if state.finalized {
@@ -306,10 +293,6 @@ func (state *ExecutionState) MeterEmittedEvent(byteSize uint64) error {
 	}
 
 	return nil
-}
-
-func (state *ExecutionState) TotalEmittedEventBytes() uint64 {
-	return state.meter.TotalEmittedEventBytes()
 }
 
 func (state *ExecutionState) Finalize() *snapshot.ExecutionSnapshot {

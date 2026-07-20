@@ -167,7 +167,7 @@ func TestWeightedComputationMetering(t *testing.T) {
 		require.Equal(t, uint64(1<<meter.MeterExecutionInternalPrecisionBytes), m.ComputationIntensities()[0])
 	})
 
-	t.Run("check computation capacity", func(t *testing.T) {
+	t.Run("check computation remaining", func(t *testing.T) {
 		m := meter.NewMeter(
 			meter.DefaultParameters().
 				WithComputationLimit(10).
@@ -175,13 +175,8 @@ func TestWeightedComputationMetering(t *testing.T) {
 					map[common.ComputationKind]uint64{0: 1 << meter.MeterExecutionInternalPrecisionBytes}),
 		)
 
-		hasCapacity := m.ComputationAvailable(
-			common.ComputationUsage{
-				Kind:      0,
-				Intensity: 1,
-			},
-		)
-		require.True(t, hasCapacity)
+		// the full limit is available for the weighted kind
+		require.Equal(t, uint64(10), m.ComputationRemaining(0))
 
 		err := m.MeterComputation(
 			common.ComputationUsage{
@@ -192,52 +187,21 @@ func TestWeightedComputationMetering(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, uint64(1), m.TotalComputationUsed())
 
-		require.True(t, m.ComputationAvailable(
+		// one unit used, nine remaining
+		require.Equal(t, uint64(9), m.ComputationRemaining(0))
+
+		// a kind without a weight is unbounded
+		require.Equal(t, uint64(math.MaxUint64), m.ComputationRemaining(1))
+
+		// exceeding the limit leaves nothing remaining (usage is incremented past the limit)
+		err = m.MeterComputation(
 			common.ComputationUsage{
 				Kind:      0,
-				Intensity: 9,
-			},
-		))
-		require.False(t, m.ComputationAvailable(
-			common.ComputationUsage{
-				Kind:      0,
-				Intensity: 10,
-			},
-		))
-
-		// test a type without a weight (default zero)
-		require.True(t, m.ComputationAvailable(
-			common.ComputationUsage{
-				Kind:      1,
-				Intensity: 10,
-			},
-		))
-	})
-
-	t.Run("check computation available", func(t *testing.T) {
-		m := meter.NewMeter(
-			meter.DefaultParameters().
-				WithComputationLimit(10).
-				WithComputationWeights(
-					map[common.ComputationKind]uint64{0: 1 << meter.MeterExecutionInternalPrecisionBytes}),
-		)
-
-		available := m.ComputationAvailable(common.ComputationUsage{Kind: 0, Intensity: 10})
-		require.True(t, available)
-
-		err := m.MeterComputation(
-			common.ComputationUsage{
-				Kind:      0,
-				Intensity: 1,
+				Intensity: 15,
 			},
 		)
-		require.NoError(t, err)
-		require.Equal(t, uint64(1), m.TotalComputationUsed())
-
-		require.False(t, m.ComputationAvailable(common.ComputationUsage{Kind: 0, Intensity: 10}))
-
-		// test a type without a weight (default MaxUint64)
-		require.True(t, m.ComputationAvailable(common.ComputationUsage{Kind: 1, Intensity: math.MaxUint64}))
+		require.Error(t, err)
+		require.Equal(t, uint64(0), m.ComputationRemaining(0))
 	})
 
 	t.Run("merge meters", func(t *testing.T) {

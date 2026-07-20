@@ -19,8 +19,8 @@ import (
 
 	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
 	"github.com/onflow/flow-go/cmd/util/ledger/util"
+	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/evm/emulator/state"
-	"github.com/onflow/flow-go/fvm/evm/handler"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
 	"github.com/onflow/flow-go/ledger/complete"
@@ -465,9 +465,9 @@ func getRegisterType(key ledger.Key) string {
 		return "account storage ID"
 	case state.CodesStorageIDKey:
 		return "code storage ID"
-	case handler.BlockStoreLatestBlockKey:
+	case environment.BlockStoreLatestBlockKey:
 		return "latest block"
-	case handler.BlockStoreLatestBlockProposalKey:
+	case environment.BlockStoreLatestBlockProposalKey:
 		return "latest block proposal"
 	}
 

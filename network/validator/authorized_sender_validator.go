@@ -63,7 +63,7 @@ func (av *AuthorizedSenderValidator) Validate(from peer.ID, payload []byte, chan
 	identity, ok := av.getIdentity(from)
 	if !ok {
 		violation := &network.Violation{PeerID: p2plogging.PeerId(from), Channel: channel, Protocol: protocol, Err: ErrIdentityUnverified}
-		av.slashingViolationsConsumer.OnUnAuthorizedSenderError(violation)
+		av.slashingViolationsConsumer.OnUnauthorizedSenderError(violation)
 		return "", ErrIdentityUnverified
 	}
 
@@ -84,7 +84,7 @@ func (av *AuthorizedSenderValidator) Validate(from peer.ID, payload []byte, chan
 		return msgType, err
 	case errors.Is(err, message.ErrUnauthorizedMessageOnChannel) || errors.Is(err, message.ErrUnauthorizedRole):
 		violation := &network.Violation{OriginID: identity.NodeID, Identity: identity, PeerID: p2plogging.PeerId(from), MsgType: msgType, Channel: channel, Protocol: protocol, Err: err}
-		av.slashingViolationsConsumer.OnUnAuthorizedSenderError(violation)
+		av.slashingViolationsConsumer.OnUnauthorizedSenderError(violation)
 		return msgType, err
 	case errors.Is(err, ErrSenderEjected):
 		violation := &network.Violation{OriginID: identity.NodeID, Identity: identity, PeerID: p2plogging.PeerId(from), MsgType: msgType, Channel: channel, Protocol: protocol, Err: err}

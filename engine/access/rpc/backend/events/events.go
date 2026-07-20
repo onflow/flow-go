@@ -94,10 +94,15 @@ func (e *Events) GetEventsForHeightRange(
 		return nil, status.Error(codes.InvalidArgument, "start height must not be larger than end height")
 	}
 
-	rangeSize := endHeight - startHeight + 1 // range is inclusive on both ends
-	if rangeSize > uint64(e.maxHeightRange) {
+	// Overflow-safe range validation: compute (endHeight - startHeight) first, then check if
+	// adding 1 (for inclusive range) would exceed maxHeightRange. This avoids the overflow that
+	// occurs when endHeight = math.MaxUint64 and startHeight = 0, where (endHeight - startHeight + 1)
+	// wraps to 0.
+	rangeSpan := endHeight - startHeight // safe: we already checked endHeight >= startHeight
+	if rangeSpan >= uint64(e.maxHeightRange) {
+		// rangeSpan + 1 > maxHeightRange, but we compute it this way to avoid overflow
 		return nil, status.Errorf(codes.InvalidArgument,
-			"requested block range (%d) exceeded maximum (%d)", rangeSize, e.maxHeightRange)
+			"requested block range (%d) exceeded maximum (%d)", rangeSpan+1, e.maxHeightRange)
 	}
 
 	// get the latest sealed block header

@@ -273,13 +273,14 @@ func (executor *transactionExecutor) deductTransactionFees() (err error) {
 
 	computationLimit := executor.txnState.TotalComputationLimit()
 
-	computationUsed, err := executor.env.ComputationUsed()
+	meteringResult, err := executor.env.MeteringResult()
 	if err != nil {
 		return errors.NewTransactionFeeDeductionFailedError(
 			executor.proc.Transaction.Payer,
 			computationLimit,
 			err)
 	}
+	computationUsed := meteringResult.ComputationUsed
 
 	if computationUsed > computationLimit {
 		computationUsed = computationLimit

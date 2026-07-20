@@ -268,12 +268,13 @@ func (v ByteStringValue) StoredValue(_ atree.SlabStorage) (atree.Value, error) {
 }
 
 func (v ByteStringValue) Storable(storage atree.SlabStorage, address atree.Address, maxInlineSize uint32) (atree.Storable, error) {
-	if v.ByteSize() <= maxInlineSize {
+	byteSize := v.ByteSize()
+	if byteSize <= maxInlineSize {
 		return v, nil
 	}
 
 	// Create StorableSlab
-	return atree.NewStorableSlab(storage, address, v)
+	return atree.NewStorableSlab(storage, address, v, byteSize)
 }
 
 func (v ByteStringValue) Encode(enc *atree.Encoder) error {

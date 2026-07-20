@@ -1,4 +1,4 @@
-package handler
+package environment
 
 import (
 	"encoding/binary"
@@ -7,7 +7,6 @@ import (
 
 	gethCommon "github.com/ethereum/go-ethereum/common"
 
-	"github.com/onflow/flow-go/fvm/evm/types"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -41,7 +40,7 @@ func IsBlockHashListMetaKey(id flow.RegisterID) bool {
 // smaller fixed size buckets to minimize the
 // number of bytes read and written during set/get operations.
 type BlockHashList struct {
-	backend     types.BackendStorage
+	backend     ValueStore
 	rootAddress flow.Address
 
 	// cached meta data
@@ -55,7 +54,7 @@ type BlockHashList struct {
 // It tries to load the metadata from the backend
 // and if not exist it creates one
 func NewBlockHashList(
-	backend types.BackendStorage,
+	backend ValueStore,
 	rootAddress flow.Address,
 	capacity int,
 ) (*BlockHashList, error) {

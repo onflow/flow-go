@@ -21,7 +21,6 @@ func (id NestedTransactionId) StateForTestingOnly() *ExecutionState {
 
 type Meter interface {
 	MeterComputation(usage common.ComputationUsage) error
-	ComputationAvailable(usage common.ComputationUsage) bool
 	ComputationRemaining(kind common.ComputationKind) uint64
 	ComputationIntensities() meter.MeteredComputationIntensities
 	TotalComputationLimit() uint64
@@ -34,7 +33,6 @@ type Meter interface {
 	InteractionUsed() uint64
 
 	MeterEmittedEvent(byteSize uint64) error
-	TotalEmittedEventBytes() uint64
 
 	// RunWithMeteringDisabled runs f with limits disabled
 	// This function can be used to run a function that fits one of these cases:
@@ -462,10 +460,6 @@ func (txnState *transactionState) MeterComputation(usage common.ComputationUsage
 	return txnState.current().MeterComputation(usage)
 }
 
-func (txnState *transactionState) ComputationAvailable(usage common.ComputationUsage) bool {
-	return txnState.current().ComputationAvailable(usage)
-}
-
 func (txnState *transactionState) ComputationRemaining(kind common.ComputationKind) uint64 {
 	return txnState.current().ComputationRemaining(kind)
 }
@@ -500,10 +494,6 @@ func (txnState *transactionState) InteractionUsed() uint64 {
 
 func (txnState *transactionState) MeterEmittedEvent(byteSize uint64) error {
 	return txnState.current().MeterEmittedEvent(byteSize)
-}
-
-func (txnState *transactionState) TotalEmittedEventBytes() uint64 {
-	return txnState.current().TotalEmittedEventBytes()
 }
 
 func (txnState *transactionState) RunWithMeteringDisabled(f func()) {

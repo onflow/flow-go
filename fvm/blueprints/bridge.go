@@ -34,6 +34,8 @@ var BridgeContracts = []string{
 	"cadence/contracts/bridge/interfaces/CrossVMToken.cdc",
 	"cadence/contracts/bridge/interfaces/IEVMBridgeNFTMinter.cdc",
 	"cadence/contracts/bridge/interfaces/IEVMBridgeTokenMinter.cdc",
+	"cadence/contracts/bridge/FlowEVMBridgeCustomAssociationTypes.cdc",
+	"cadence/contracts/bridge/FlowEVMBridgeCustomAssociations.cdc",
 	"cadence/contracts/bridge/FlowEVMBridgeConfig.cdc",
 	"cadence/contracts/bridge/interfaces/IFlowEVMNFTBridge.cdc",
 	"cadence/contracts/bridge/interfaces/IFlowEVMTokenBridge.cdc",

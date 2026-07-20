@@ -102,6 +102,7 @@ func NewGrpcServerBuilder(
 
 	// Note: make sure logging interceptor is innermost wrapper to capture all messages
 	unaryInterceptors = append(unaryInterceptors, LoggingInterceptor(log))
+	streamInterceptors = append(streamInterceptors, StreamLoggingInterceptor(log))
 
 	grpcOpts = append(grpcOpts, grpc.ChainUnaryInterceptor(unaryInterceptors...))
 	if len(streamInterceptors) > 0 {

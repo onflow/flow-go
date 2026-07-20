@@ -1,6 +1,7 @@
 package rest
 
 import (
+	"errors"
 	"net/http"
 	"time"
 
@@ -17,6 +18,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/module/limiters"
 )
 
 const (
@@ -39,7 +41,7 @@ type Config struct {
 	MaxResponseSize int64
 }
 
-// NewServer returns an HTTP server initialized with the REST API handler.
+// NewServer returns an HTTP server initialized with the REST API handler
 func NewServer(
 	ctx irrecoverable.SignalerContext,
 	serverAPI access.API,
@@ -52,10 +54,15 @@ func NewServer(
 	enableNewWebsocketsStreamAPI bool,
 	wsConfig websockets.Config,
 	extendedBackend extended.API,
+	limiter *limiters.ConcurrencyLimiter,
 ) (*http.Server, error) {
+	if limiter == nil && (stateStreamApi != nil || enableNewWebsocketsStreamAPI) {
+		return nil, errors.New("stream limiter is required when websocket routes are enabled")
+	}
+
 	builder := router.NewRouterBuilder(logger, restCollector).AddRestRoutes(serverAPI, chain, config.MaxRequestSize, config.MaxResponseSize)
 	if stateStreamApi != nil {
-		builder.AddLegacyWebsocketsRoutes(stateStreamApi, chain, stateStreamConfig, config.MaxRequestSize, config.MaxResponseSize)
+		builder.AddLegacyWebsocketsRoutes(stateStreamApi, chain, stateStreamConfig, config.MaxRequestSize, config.MaxResponseSize, limiter)
 	}
 
 	dataProviderFactory := dp.NewDataProviderFactory(
@@ -69,7 +76,7 @@ func NewServer(
 	)
 
 	if enableNewWebsocketsStreamAPI {
-		builder.AddWebsocketsRoute(ctx, chain, wsConfig, config.MaxRequestSize, config.MaxResponseSize, dataProviderFactory)
+		builder.AddWebsocketsRoute(ctx, chain, wsConfig, config.MaxRequestSize, config.MaxResponseSize, dataProviderFactory, limiter)
 	}
 
 	if extendedBackend != nil {

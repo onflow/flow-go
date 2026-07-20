@@ -44,6 +44,7 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/counters"
 	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/module/limiters"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/module/metrics"
 	mockmodule "github.com/onflow/flow-go/module/mock"
@@ -187,12 +188,15 @@ func (suite *Suite) RunTest(
 		})
 		require.NoError(suite.T(), err)
 
+		limiter, err := limiters.NewConcurrencyLimiter(subscription.DefaultMaxGlobalStreams)
+		require.NoError(suite.T(), err)
+
 		handler := rpc.NewHandler(
 			suite.backend,
 			suite.chainID.Chain(),
 			suite.finalizedHeaderCache,
 			suite.me,
-			subscription.DefaultMaxGlobalStreams,
+			limiter,
 			rpc.WithBlockSignerDecoder(suite.signerIndicesDecoder),
 		)
 		f(handler, db, all)
@@ -358,7 +362,10 @@ func (suite *Suite) TestSendTransactionToRandomCollectionNode() {
 		})
 		require.NoError(suite.T(), err)
 
-		handler := rpc.NewHandler(bnd, suite.chainID.Chain(), suite.finalizedHeaderCache, suite.me, subscription.DefaultMaxGlobalStreams)
+		limiter, err := limiters.NewConcurrencyLimiter(subscription.DefaultMaxGlobalStreams)
+		require.NoError(suite.T(), err)
+
+		handler := rpc.NewHandler(bnd, suite.chainID.Chain(), suite.finalizedHeaderCache, suite.me, limiter)
 
 		// Send transaction 1
 		resp, err := handler.SendTransaction(context.Background(), sendReq1)
@@ -728,7 +735,10 @@ func (suite *Suite) TestGetSealedTransaction() {
 		})
 		require.NoError(suite.T(), err)
 
-		handler := rpc.NewHandler(bnd, suite.chainID.Chain(), suite.finalizedHeaderCache, suite.me, subscription.DefaultMaxGlobalStreams)
+		limiter, err := limiters.NewConcurrencyLimiter(subscription.DefaultMaxGlobalStreams)
+		require.NoError(suite.T(), err)
+
+		handler := rpc.NewHandler(bnd, suite.chainID.Chain(), suite.finalizedHeaderCache, suite.me, limiter)
 
 		collectionExecutedMetric, err := indexer.NewCollectionExecutedMetricImpl(
 			suite.log,
@@ -994,7 +1004,10 @@ func (suite *Suite) TestGetTransactionResult() {
 		})
 		require.NoError(suite.T(), err)
 
-		handler := rpc.NewHandler(bnd, suite.chainID.Chain(), suite.finalizedHeaderCache, suite.me, subscription.DefaultMaxGlobalStreams)
+		limiter, err := limiters.NewConcurrencyLimiter(subscription.DefaultMaxGlobalStreams)
+		require.NoError(suite.T(), err)
+
+		handler := rpc.NewHandler(bnd, suite.chainID.Chain(), suite.finalizedHeaderCache, suite.me, limiter)
 
 		collectionExecutedMetric, err := indexer.NewCollectionExecutedMetricImpl(
 			suite.log,
@@ -1258,7 +1271,10 @@ func (suite *Suite) TestExecuteScript() {
 		})
 		require.NoError(suite.T(), err)
 
-		handler := rpc.NewHandler(suite.backend, suite.chainID.Chain(), suite.finalizedHeaderCache, suite.me, subscription.DefaultMaxGlobalStreams)
+		limiter, err := limiters.NewConcurrencyLimiter(subscription.DefaultMaxGlobalStreams)
+		require.NoError(suite.T(), err)
+
+		handler := rpc.NewHandler(suite.backend, suite.chainID.Chain(), suite.finalizedHeaderCache, suite.me, limiter)
 
 		// initialize metrics related storage
 		metrics := metrics.NewNoopCollector()

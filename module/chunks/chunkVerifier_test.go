@@ -18,6 +18,7 @@ import (
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/blueprints"
 	fvmErrors "github.com/onflow/flow-go/fvm/errors"
+	"github.com/onflow/flow-go/fvm/meter"
 	fvmmock "github.com/onflow/flow-go/fvm/mock"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
@@ -153,7 +154,7 @@ func (s *ChunkVerifierTestSuite) SetupTest() {
 	// subject to overwrite by test cases
 	s.snapshots[string(processTxBody.Script)] = &snapshot.ExecutionSnapshot{}
 	s.outputs[string(processTxBody.Script)] = fvm.ProcedureOutput{
-		ComputationUsed: computationUsed,
+		MeteringResult: meter.MeteringResult{ComputationUsed: computationUsed},
 	}
 }
 
@@ -236,8 +237,8 @@ func (s *ChunkVerifierTestSuite) TestFailedTx() {
 		},
 	}
 	s.outputs["failedTx"] = fvm.ProcedureOutput{
-		ComputationUsed: computationUsed,
-		Err:             fvmErrors.NewCadenceRuntimeError(runtime.Error{}), // inside the runtime (e.g. div by zero, access account)
+		MeteringResult: meter.MeteringResult{ComputationUsed: computationUsed},
+		Err:            fvmErrors.NewCadenceRuntimeError(runtime.Error{}), // inside the runtime (e.g. div by zero, access account)
 	}
 
 	spockSecret, err := s.verifier.Verify(vch)
@@ -281,7 +282,7 @@ func (s *ChunkVerifierTestSuite) TestServiceEventsMismatch_SystemChunk() {
 
 	s.snapshots[string(serviceTxBody.Script)] = &snapshot.ExecutionSnapshot{}
 	s.outputs[string(serviceTxBody.Script)] = fvm.ProcedureOutput{
-		ComputationUsed:        computationUsed,
+		MeteringResult:         meter.MeteringResult{ComputationUsed: computationUsed},
 		ServiceEvents:          unittest.EventsFixture(1),
 		ConvertedServiceEvents: flow.ServiceEventList{*epochCommitServiceEvent},
 		Events:                 meta.ChunkEvents,
@@ -292,7 +293,7 @@ func (s *ChunkVerifierTestSuite) TestServiceEventsMismatch_SystemChunk() {
 
 	s.snapshots[string(processTxBody.Script)] = &snapshot.ExecutionSnapshot{}
 	s.outputs[string(processTxBody.Script)] = fvm.ProcedureOutput{
-		ComputationUsed: computationUsed,
+		MeteringResult: meter.MeteringResult{ComputationUsed: computationUsed},
 	}
 
 	_, err = s.verifier.Verify(vch)
@@ -333,7 +334,7 @@ func (s *ChunkVerifierTestSuite) TestServiceEventsMismatch_NonSystemChunk() {
 	// overwrite the expected output for our custom transaction, passing
 	// in the non-matching EpochCommit event (should cause validation failure)
 	s.outputs[script] = fvm.ProcedureOutput{
-		ComputationUsed:        computationUsed,
+		MeteringResult:         meter.MeteringResult{ComputationUsed: computationUsed},
 		ConvertedServiceEvents: flow.ServiceEventList{*epochCommitServiceEvent},
 		Events:                 meta.ChunkEvents[:3], // 2 default event + EpochSetup
 	}
@@ -490,8 +491,8 @@ func (s *ChunkVerifierTestSuite) TestSystemChunkWithScheduledTransactionsReturni
 
 	// Setup mock outputs for process callback transaction
 	s.outputs[string(processTxBody.Script)] = fvm.ProcedureOutput{
-		ComputationUsed: computationUsed,
-		Events:          flow.EventsList{processEvent},
+		MeteringResult: meter.MeteringResult{ComputationUsed: computationUsed},
+		Events:         flow.EventsList{processEvent},
 	}
 
 	// Create execute callback transaction body
@@ -503,7 +504,7 @@ func (s *ChunkVerifierTestSuite) TestSystemChunkWithScheduledTransactionsReturni
 
 	// Setup mock output for execute callback transaction
 	s.outputs[string(executeCallbackTx.Script)] = fvm.ProcedureOutput{
-		ComputationUsed: computationUsed,
+		MeteringResult: meter.MeteringResult{ComputationUsed: computationUsed},
 	}
 
 	// Setup system transaction output
@@ -511,7 +512,7 @@ func (s *ChunkVerifierTestSuite) TestSystemChunkWithScheduledTransactionsReturni
 	require.NoError(s.T(), err)
 
 	s.outputs[string(serviceTxBody.Script)] = fvm.ProcedureOutput{
-		ComputationUsed:        computationUsed,
+		MeteringResult:         meter.MeteringResult{ComputationUsed: computationUsed},
 		ConvertedServiceEvents: flow.ServiceEventList{*epochSetupServiceEvent},
 		Events:                 flow.EventsList{epochSetupEvent},
 	}
@@ -550,8 +551,8 @@ func (s *ChunkVerifierTestSuite) TestSystemChunkWithScheduledTransactionsReturni
 func (s *ChunkVerifierTestSuite) TestSystemChunkWithNoScheduledTransactions() {
 	// Setup mock outputs for process callback transaction with no events
 	s.outputs[string(processTxBody.Script)] = fvm.ProcedureOutput{
-		ComputationUsed: computationUsed,
-		Events:          flow.EventsList{}, // No callback events
+		MeteringResult: meter.MeteringResult{ComputationUsed: computationUsed},
+		Events:         flow.EventsList{}, // No callback events
 	}
 
 	// Setup system transaction output
@@ -559,7 +560,7 @@ func (s *ChunkVerifierTestSuite) TestSystemChunkWithNoScheduledTransactions() {
 	require.NoError(s.T(), err)
 
 	s.outputs[string(serviceTxBody.Script)] = fvm.ProcedureOutput{
-		ComputationUsed:        computationUsed,
+		MeteringResult:         meter.MeteringResult{ComputationUsed: computationUsed},
 		ConvertedServiceEvents: flow.ServiceEventList{*epochSetupServiceEvent},
 		Events:                 flow.EventsList{epochSetupEvent},
 	}
@@ -749,9 +750,9 @@ func generateDefaultSnapshot() *snapshot.ExecutionSnapshot {
 
 func generateDefaultOutput() fvm.ProcedureOutput {
 	return fvm.ProcedureOutput{
-		ComputationUsed: computationUsed,
-		Logs:            []string{"log1", "log2"},
-		Events:          eventsList,
+		MeteringResult: meter.MeteringResult{ComputationUsed: computationUsed},
+		Logs:           []string{"log1", "log2"},
+		Events:         eventsList,
 	}
 }
 

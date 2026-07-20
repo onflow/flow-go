@@ -734,9 +734,7 @@ var tokenDiffSearchDomains = []common.StorageDomain{
 type TokenChangesSearchTokens map[string]SearchToken
 
 // DefaultTokenDiffSearchTokens returns the default settings for token inspection
-// We temporarily want to handle all token mints as a warning. To do that set the
-// `withoutMintingEvent` to true.
-func DefaultTokenDiffSearchTokens(chain flow.Chain, withoutMintingEvent bool) TokenChangesSearchTokens {
+func DefaultTokenDiffSearchTokens(chain flow.Chain) TokenChangesSearchTokens {
 	sc := systemcontracts.SystemContractsForChain(chain.ChainID())
 	flowTokenID := fmt.Sprintf("A.%s.FlowToken.Vault", sc.FlowToken.Address.Hex())
 	flowTokenMintedEventID := fmt.Sprintf("A.%s.FlowToken.TokensMinted", sc.FlowToken.Address.Hex())
@@ -750,10 +748,7 @@ func DefaultTokenDiffSearchTokens(chain flow.Chain, withoutMintingEvent bool) To
 			SinksSources: map[string]func(flow.Event) (int64, error){},
 		},
 	}
-
-	if !withoutMintingEvent {
-		searchTokens[flowTokenID].SinksSources[flowTokenMintedEventID] = decodeFlowEventAmount(false)
-	}
+	searchTokens[flowTokenID].SinksSources[flowTokenMintedEventID] = decodeFlowEventAmount(false)
 
 	// EVM bridge events: FLOW tokens moving between Cadence and EVM.
 	// Deposited = tokens leave Cadence into EVM (sink, negative).

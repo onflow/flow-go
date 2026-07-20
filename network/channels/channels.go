@@ -338,6 +338,20 @@ func SyncCluster(clusterID flow.ChainID) Channel {
 	return Channel(fmt.Sprintf("%s-%s", SyncClusterPrefix, clusterID))
 }
 
+// NormalizeTopicForMetrics returns a normalized version of the topic suitable for use as a metrics label.
+// For cluster topics (sync-cluster-*, consensus-cluster-*), it returns just the prefix to prevent
+// unbounded cardinality growth during epoch transitions (each epoch creates new cluster IDs).
+// For non-cluster topics, it returns the topic unchanged.
+func NormalizeTopicForMetrics(topic string) string {
+	if strings.HasPrefix(topic, SyncClusterPrefix) {
+		return SyncClusterPrefix
+	}
+	if strings.HasPrefix(topic, ConsensusClusterPrefix) {
+		return ConsensusClusterPrefix
+	}
+	return topic
+}
+
 // IsValidNonClusterFlowTopic ensures the topic is a valid Flow network topic and
 // ensures the sporkID part of the Topic is equal to the current network sporkID.
 // Expected errors:

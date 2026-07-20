@@ -29,14 +29,13 @@ const (
 )
 
 type ProcedureOutput struct {
+	meter.MeteringResult
+
 	// Output by both transaction and script.
 	Logs                   []string
 	Events                 flow.EventsList
 	ServiceEvents          flow.EventsList
 	ConvertedServiceEvents flow.ServiceEventList
-	ComputationUsed        uint64
-	ComputationIntensities meter.MeteredComputationIntensities
-	MemoryEstimate         uint64
 	Err                    errors.CodedError
 	InspectionResults      []inspection.Result
 
@@ -49,19 +48,11 @@ func (output *ProcedureOutput) PopulateEnvironmentValues(
 ) error {
 	output.Logs = env.Logs()
 
-	computationUsed, err := env.ComputationUsed()
+	meteringResult, err := env.MeteringResult()
 	if err != nil {
-		return fmt.Errorf("error getting computation used: %w", err)
+		return fmt.Errorf("error getting metering result: %w", err)
 	}
-	output.ComputationUsed = computationUsed
-
-	memoryUsed, err := env.MemoryUsed()
-	if err != nil {
-		return fmt.Errorf("error getting memory used: %w", err)
-	}
-	output.MemoryEstimate = memoryUsed
-
-	output.ComputationIntensities = env.ComputationIntensities()
+	output.MeteringResult = meteringResult
 
 	// if tx failed this will only contain fee deduction events
 	output.Events = env.Events()
