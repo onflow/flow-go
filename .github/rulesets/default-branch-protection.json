@@ -1,0 +1,248 @@
+{
+  "name": "default-branch-protection",
+  "target": "branch",
+  "enforcement": "active",
+  "bypass_actors": [
+    {
+      "actor_id": 5,
+      "actor_type": "RepositoryRole",
+      "bypass_mode": "always"
+    }
+  ],
+  "conditions": {
+    "ref_name": {
+      "include": [
+        "~DEFAULT_BRANCH"
+      ],
+      "exclude": []
+    }
+  },
+  "rules": [
+    {
+      "type": "deletion"
+    },
+    {
+      "type": "non_fast_forward"
+    },
+    {
+      "type": "pull_request",
+      "parameters": {
+        "required_approving_review_count": 2,
+        "dismiss_stale_reviews_on_push": false,
+        "require_code_owner_review": true,
+        "require_last_push_approval": false,
+        "required_review_thread_resolution": false,
+        "required_reviewers": [
+          {
+            "reviewer_id": 11293013,
+            "file_patterns": [
+              "*",
+              "!fvm/**"
+            ],
+            "approvals_needed": 2
+          }
+        ]
+      }
+    },
+    {
+      "type": "required_status_checks",
+      "parameters": {
+        "strict_required_status_checks_policy": true,
+        "required_status_checks": [
+          {
+            "context": "Lint (./)",
+            "integration_id": 15368
+          },
+          {
+            "context": "Lint (./integration/)",
+            "integration_id": 15368
+          },
+          {
+            "context": "Unit Tests (cmd)",
+            "integration_id": 15368
+          },
+          {
+            "context": "Unit Tests (consensus)",
+            "integration_id": 15368
+          },
+          {
+            "context": "Unit Tests (admin)",
+            "integration_id": 15368
+          },
+          {
+            "context": "Unit Tests (engine)",
+            "integration_id": 15368
+          },
+          {
+            "context": "Unit Tests (fvm)",
+            "integration_id": 15368
+          },
+          {
+            "context": "Unit Tests (others)",
+            "integration_id": 15368
+          },
+          {
+            "context": "Unit Tests (ledger)",
+            "integration_id": 15368
+          },
+          {
+            "context": "Unit Tests (module)",
+            "integration_id": 15368
+          },
+          {
+            "context": "Unit Tests (utils)",
+            "integration_id": 15368
+          },
+          {
+            "context": "Tidy",
+            "integration_id": 15368
+          },
+          {
+            "context": "Lint (./insecure/)",
+            "integration_id": 15368
+          },
+          {
+            "context": "Unit Tests (network/p2p)",
+            "integration_id": 15368
+          },
+          {
+            "context": "Unit Tests (engine/access)",
+            "integration_id": 15368
+          },
+          {
+            "context": "Unit Tests (engine/collection)",
+            "integration_id": 15368
+          },
+          {
+            "context": "Unit Tests (engine/common)",
+            "integration_id": 15368
+          },
+          {
+            "context": "Unit Tests (engine/consensus)",
+            "integration_id": 15368
+          },
+          {
+            "context": "Unit Tests (engine/execution/computation)",
+            "integration_id": 15368
+          },
+          {
+            "context": "Unit Tests (engine/execution/ingestion)",
+            "integration_id": 15368
+          },
+          {
+            "context": "Unit Tests (engine/execution)",
+            "integration_id": 15368
+          },
+          {
+            "context": "Unit Tests (engine/verification)",
+            "integration_id": 15368
+          },
+          {
+            "context": "Unit Tests (module/dkg)",
+            "integration_id": 15368
+          },
+          {
+            "context": "Unit Tests (network/test/cohort1)",
+            "integration_id": 15368
+          },
+          {
+            "context": "Unit Tests (network/test/cohort2)",
+            "integration_id": 15368
+          },
+          {
+            "context": "Unit Tests (network/alsp)",
+            "integration_id": 15368
+          },
+          {
+            "context": "Unit Tests (network/p2p/connection)",
+            "integration_id": 15368
+          },
+          {
+            "context": "Unit Tests (network/p2p/scoring)",
+            "integration_id": 15368
+          },
+          {
+            "context": "Unit Tests (network)",
+            "integration_id": 15368
+          },
+          {
+            "context": "Unit Tests (state)",
+            "integration_id": 15368
+          },
+          {
+            "context": "Unit Tests (storage)",
+            "integration_id": 15368
+          },
+          {
+            "context": "Integration Tests Others (integration)",
+            "integration_id": 15368
+          },
+          {
+            "context": "Integration Tests (MVP Integration Tests, make -C integration mvp-tests, blacksmith-4vcpu-ubuntu-...",
+            "integration_id": 15368
+          },
+          {
+            "context": "Integration Tests (Network Integration Tests, make -C integration network-tests, blacksmith-4vcpu...",
+            "integration_id": 15368
+          },
+          {
+            "context": "Integration Tests (Access Cohort1 Integration Tests, make -C integration access-cohort1-tests, bl...",
+            "integration_id": 15368
+          },
+          {
+            "context": "Integration Tests (Collection Integration Tests, make -C integration collection-tests, blacksmith...",
+            "integration_id": 15368
+          },
+          {
+            "context": "Integration Tests (Consensus Integration Tests, make -C integration consensus-tests, blacksmith-4...",
+            "integration_id": 15368
+          },
+          {
+            "context": "Integration Tests (Execution Integration Tests, make -C integration execution-tests, blacksmith-4...",
+            "integration_id": 15368
+          },
+          {
+            "context": "Integration Tests (Ghost Integration Tests, make -C integration ghost-tests, blacksmith-4vcpu-ubu...",
+            "integration_id": 15368
+          },
+          {
+            "context": "Integration Tests (Upgrade Integration Tests, make -C integration upgrades-tests, blacksmith-4vcp...",
+            "integration_id": 15368
+          },
+          {
+            "context": "Integration Tests (Access Cohort2 Integration Tests, make -C integration access-cohort2-tests, bl...",
+            "integration_id": 15368
+          },
+          {
+            "context": "Integration Tests (Access Cohort3 Integration Tests, make -C integration access-cohort3-tests, bl...",
+            "integration_id": 15368
+          },
+          {
+            "context": "Integration Tests (Access Cohort4 Integration Tests, make -C integration access-cohort4-tests, bl...",
+            "integration_id": 15368
+          },
+          {
+            "context": "Integration Tests (BFT (Gossipsub) Integration Tests, make -C integration bft-gossipsub-tests, bl...",
+            "integration_id": 15368
+          },
+          {
+            "context": "Integration Tests (BFT (Protocol) Integration Tests, make -C integration bft-protocol-tests, blac...",
+            "integration_id": 15368
+          },
+          {
+            "context": "Integration Tests (Epoch Cohort1 Integration Tests, make -C integration epochs-cohort1-tests, bla...",
+            "integration_id": 15368
+          },
+          {
+            "context": "Integration Tests (Epoch Cohort2 Integration Tests, make -C integration epochs-cohort2-tests, bla...",
+            "integration_id": 15368
+          },
+          {
+            "context": "Integration Tests (Verification Integration Tests, make -C integration verification-tests, blacks...",
+            "integration_id": 15368
+          }
+        ]
+      }
+    }
+  ]
+}
