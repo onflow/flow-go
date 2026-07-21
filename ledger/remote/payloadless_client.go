@@ -292,48 +292,27 @@ func (c *PayloadlessClient) Prove(query *ledger.Query) (*ledger.PayloadlessTrieB
 
 // Ready returns a channel that is closed when the client is ready.
 //
-// Readiness has two phases. First, the client waits for the ledger service
-// to finish initialization by calling InitialState() with retries. Second,
-// it calls LedgerInfoService.ServerInfo to verify the server is running in
-// PAYLOADLESS mode. A mode mismatch is treated as a configuration error and
-// crashes the process via log.Fatal — clients of a full server must use
-// [Client], not [PayloadlessClient].
+// Readiness runs the two-phase handshake in [awaitReady]: it first verifies
+// the server is running in PAYLOADLESS mode (crashing via log.Fatal on a
+// mismatch — clients of a full server must use [Client], not
+// [PayloadlessClient]), then waits for the ledger service to finish
+// initialization (WAL replay).
 func (c *PayloadlessClient) Ready() <-chan struct{} {
 	ready := make(chan struct{})
 	go func() {
 		defer close(ready)
-		maxRetries := 30
-		retryDelay := 100 * time.Millisecond
-		maxRetryDelay := 30 * time.Second
-
-		for i := 0; i < maxRetries; i++ {
-			ctx, cancel := c.callCtx()
-			_, err := c.client.InitialState(ctx, &emptypb.Empty{})
-			cancel()
-			if err == nil {
-				c.logger.Info().Msg("payloadless ledger service ready")
-				verifyServerMode(c.ctx, c.infoClient, c.callTimeout, ledgerpb.LedgerMode_LEDGER_MODE_PAYLOADLESS, c.logger)
-				return
-			}
-
-			if c.ctx.Err() != nil {
-				c.logger.Info().Msg("client shutdown during ready check")
-				return
-			}
-
-			if i < maxRetries-1 {
-				c.logger.Warn().
-					Err(err).
-					Int("attempt", i+1).
-					Dur("retry_delay", retryDelay).
-					Time("retry_at", time.Now().Add(retryDelay)).
-					Msg("payloadless ledger service not ready, retrying...")
-				time.Sleep(retryDelay)
-				retryDelay = min(time.Duration(float64(retryDelay)*1.5), maxRetryDelay)
-			} else {
-				c.logger.Warn().Err(err).Msg("payloadless ledger service not ready after retries, proceeding anyway")
-			}
-		}
+		awaitReady(
+			c.ctx,
+			c.infoClient,
+			func(ctx context.Context) error {
+				_, err := c.client.InitialState(ctx, &emptypb.Empty{})
+				return err
+			},
+			ledgerpb.LedgerMode_LEDGER_MODE_PAYLOADLESS,
+			c.callTimeout,
+			"payloadless ledger",
+			c.logger,
+		)
 	}()
 	return ready
 }

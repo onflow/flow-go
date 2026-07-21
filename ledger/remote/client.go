@@ -9,7 +9,9 @@ import (
 
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"
 
 	"github.com/onflow/flow-go/ledger"
@@ -326,80 +328,145 @@ func (c *Client) Prove(query *ledger.Query) (ledger.Proof, error) {
 
 // Ready returns a channel that is closed when the client is ready.
 //
-// Readiness has two phases. First, this client waits for the ledger service
-// to finish initialization by calling InitialState() with retries (the
-// server may still be replaying its WAL). Second, after the service responds,
-// the client calls LedgerInfoService.ServerInfo to verify the server is
-// running in FULL mode. A mode mismatch is treated as a configuration error
-// and crashes the process via log.Fatal — clients of a payloadless server
-// must use [PayloadlessClient], not [Client].
+// Readiness runs the two-phase handshake in [awaitReady]: it first verifies
+// the server is running in FULL mode (crashing via log.Fatal on a mismatch —
+// clients of a payloadless server must use [PayloadlessClient], not [Client]),
+// then waits for the ledger service to finish initialization (WAL replay).
 func (c *Client) Ready() <-chan struct{} {
 	ready := make(chan struct{})
 	go func() {
 		defer close(ready)
-		// Wait for the ledger service to be ready by calling InitialState()
-		// This ensures the service has finished WAL replay and is ready to serve requests
-		// Retry with exponential backoff (delay capped at 30s)
-		maxRetries := 30
-		retryDelay := 100 * time.Millisecond
-		maxRetryDelay := 30 * time.Second
-
-		for i := 0; i < maxRetries; i++ {
-			ctx, cancel := c.callCtx()
-			_, err := c.client.InitialState(ctx, &emptypb.Empty{})
-			cancel()
-			if err == nil {
-				c.logger.Info().Msg("ledger service ready")
-				// Mode check is a configuration-correctness gate. If we
-				// connected to a payloadless server while expecting full,
-				// crash now rather than fail later on every Get call.
-				verifyServerMode(c.ctx, c.infoClient, c.callTimeout, ledgerpb.LedgerMode_LEDGER_MODE_FULL, c.logger)
-				return
-			}
-
-			// Check if the client context was cancelled (shutdown in progress)
-			if c.ctx.Err() != nil {
-				c.logger.Info().Msg("client shutdown during ready check")
-				return
-			}
-
-			if i < maxRetries-1 {
-				c.logger.Warn().
-					Err(err).
-					Int("attempt", i+1).
-					Dur("retry_delay", retryDelay).
-					Time("retry_at", time.Now().Add(retryDelay)).
-					Msg("ledger service not ready, retrying...")
-				time.Sleep(retryDelay)
-				retryDelay = min(time.Duration(float64(retryDelay)*1.5), maxRetryDelay)
-			} else {
-				c.logger.Warn().Err(err).Msg("ledger service not ready after retries, proceeding anyway")
-				// Still close the channel to avoid blocking forever
-				// The execution node will fail later with a more specific error if the service is truly not ready
-			}
-		}
+		awaitReady(
+			c.ctx,
+			c.infoClient,
+			func(ctx context.Context) error {
+				_, err := c.client.InitialState(ctx, &emptypb.Empty{})
+				return err
+			},
+			ledgerpb.LedgerMode_LEDGER_MODE_FULL,
+			c.callTimeout,
+			"ledger",
+			c.logger,
+		)
 	}()
 	return ready
 }
 
-// verifyServerMode calls LedgerInfoService.ServerInfo via `infoClient` and
-// crashes the process via log.Fatal if the reported mode does not match
-// `expected`.
+// awaitReady runs the two-phase startup handshake shared by [Client] and
+// [PayloadlessClient]. The caller is responsible for closing its ready channel
+// once this returns.
 //
-// A mode mismatch is a configuration error (the deployment paired a client
-// of one mode with a server of the other); it is not retryable and not
-// safe to ignore — every subsequent RPC against a wrong-mode server would
-// either return gRPC UNIMPLEMENTED or, worse, succeed against a method that
-// happens to share its name but returns incompatibly-typed data.
+// Phase 1 — mode gate: [verifyServerMode] probes LedgerInfoService.ServerInfo
+// and crashes via log.Fatal if the server does not report `expectedMode`.
+// ServerInfo is stateless and registered on every server regardless of mode,
+// so it is reachable as soon as the server accepts connections — before WAL
+// replay finishes. Probing it first lets us surface a wrong-mode
+// misconfiguration with a clear error before depending on any mode-specific
+// RPC (a mode-specific InitialState against a wrong-mode server returns gRPC
+// Unimplemented, which is indistinguishable from "still initializing").
 //
-// `expected` should be either FULL or PAYLOADLESS; UNSPECIFIED is treated
-// as "client is misconfigured" and also crashes.
+// Phase 2 — readiness gate: `initialState` (the caller's mode-specific
+// InitialState RPC) is retried until the server finishes initialization. If it
+// never succeeds, this proceeds anyway rather than blocking forever; the first
+// real RPC will surface a clearer error if the service is truly unavailable.
 //
-// If the ServerInfo call itself fails, this function logs a warning and
-// returns without crashing — the underlying connection may be transiently
-// flaky, and the failure mode of the next real RPC will surface a clearer
-// error. Crashing on a transport error here would prevent the client from
-// ever recovering from a brief network blip during startup.
+// `serviceName` is used only in log messages (e.g. "ledger", "payloadless
+// ledger").
+func awaitReady(
+	ctx context.Context,
+	infoClient ledgerpb.LedgerInfoServiceClient,
+	initialState func(context.Context) error,
+	expectedMode ledgerpb.LedgerMode,
+	callTimeout time.Duration,
+	serviceName string,
+	logger zerolog.Logger,
+) {
+	// Phase 1: mode gate.
+	verifyServerMode(ctx, infoClient, callTimeout, expectedMode, logger)
+	if ctx.Err() != nil {
+		logger.Info().Msg("client shutdown during ready check")
+		return
+	}
+
+	// Phase 2: readiness gate.
+	err := retryUntilReady(ctx, initialState, callTimeout, logger, serviceName+" service not ready, retrying...")
+	if err != nil {
+		if ctx.Err() != nil {
+			logger.Info().Msg("client shutdown during ready check")
+			return
+		}
+		// Close the channel anyway to avoid blocking forever; the first real
+		// RPC will surface a more specific error if the service is truly down.
+		logger.Warn().Err(err).Msgf("%s service not ready after retries, proceeding anyway", serviceName)
+		return
+	}
+	logger.Info().Msgf("%s service ready", serviceName)
+}
+
+// retryUntilReady repeatedly invokes `attempt` (each call bounded by
+// `callTimeout`) until it returns nil, `ctx` is cancelled, or the retry budget
+// is exhausted. Delays grow geometrically (1.5x), capped at 30s. It returns the
+// final error (nil on success, `ctx.Err()` if the context was cancelled).
+//
+// `notReadyMsg` is logged before each retry.
+func retryUntilReady(
+	ctx context.Context,
+	attempt func(context.Context) error,
+	callTimeout time.Duration,
+	logger zerolog.Logger,
+	notReadyMsg string,
+) error {
+	maxRetries := 30
+	retryDelay := 100 * time.Millisecond
+	maxRetryDelay := 30 * time.Second
+
+	var err error
+	for i := 0; i < maxRetries; i++ {
+		callCtx, cancel := context.WithTimeout(ctx, callTimeout)
+		err = attempt(callCtx)
+		cancel()
+		if err == nil {
+			return nil
+		}
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		if i < maxRetries-1 {
+			logger.Warn().
+				Err(err).
+				Int("attempt", i+1).
+				Dur("retry_delay", retryDelay).
+				Msg(notReadyMsg)
+			time.Sleep(retryDelay)
+			retryDelay = min(time.Duration(float64(retryDelay)*1.5), maxRetryDelay)
+		}
+	}
+	return err
+}
+
+// verifyServerMode probes LedgerInfoService.ServerInfo (retrying on transient
+// transport failures) and crashes the process via log.Fatal if the server's
+// reported mode does not match `expected`.
+//
+// A mode mismatch is a configuration error (the deployment paired a client of
+// one mode with a server of the other); it is not retryable and not safe to
+// ignore — every subsequent RPC against a wrong-mode server would either return
+// gRPC Unimplemented or, worse, succeed against a method that happens to share
+// its name but returns incompatibly-typed data.
+//
+// `expected` should be either FULL or PAYLOADLESS; UNSPECIFIED is treated as
+// "client is misconfigured" and also crashes.
+//
+// Two non-mismatch outcomes are logged and allowed to proceed rather than
+// crashing:
+//   - the server does not implement the info service (gRPC Unimplemented),
+//     e.g. an older server mid-rolling-upgrade — retrying cannot help, so this
+//     returns immediately; and
+//   - ServerInfo stays unreachable across all retries — the connection may be
+//     transiently flaky, and the next real RPC will surface a clearer error.
+//
+// Crashing in either case would prevent the client from recovering from a brief
+// network blip or an upgrade-ordering race during startup.
 func verifyServerMode(
 	ctx context.Context,
 	infoClient ledgerpb.LedgerInfoServiceClient,
@@ -407,25 +474,52 @@ func verifyServerMode(
 	expected ledgerpb.LedgerMode,
 	logger zerolog.Logger,
 ) {
-	infoCtx, cancel := context.WithTimeout(ctx, callTimeout)
-	defer cancel()
+	maxRetries := 30
+	retryDelay := 100 * time.Millisecond
+	maxRetryDelay := 30 * time.Second
 
-	resp, err := infoClient.ServerInfo(infoCtx, &emptypb.Empty{})
-	if err != nil {
-		// Transport-level failure; surface as a warning. The real RPCs will
-		// hit the same error if it persists.
-		logger.Warn().Err(err).Msg("ledger info ServerInfo call failed; skipping mode check")
-		return
+	for i := 0; i < maxRetries; i++ {
+		infoCtx, cancel := context.WithTimeout(ctx, callTimeout)
+		resp, err := infoClient.ServerInfo(infoCtx, &emptypb.Empty{})
+		cancel()
+
+		if err == nil {
+			if resp.Mode != expected {
+				logger.Fatal().
+					Str("expected", expected.String()).
+					Str("actual", resp.Mode.String()).
+					Msg("ledger server mode mismatch: client connected to wrong-mode server")
+			}
+			logger.Info().Str("mode", resp.Mode.String()).Msg("ledger server mode verified")
+			return
+		}
+
+		// An older or misconfigured server that does not register the info
+		// service returns Unimplemented; that will not change without a
+		// restart, so stop retrying and let the mode-specific RPCs surface any
+		// real problem.
+		if status.Code(err) == codes.Unimplemented {
+			logger.Warn().Err(err).Msg("ledger info service not implemented by server; skipping mode check")
+			return
+		}
+
+		// Check if the client context was cancelled (shutdown in progress).
+		if ctx.Err() != nil {
+			return
+		}
+
+		if i < maxRetries-1 {
+			logger.Warn().
+				Err(err).
+				Int("attempt", i+1).
+				Dur("retry_delay", retryDelay).
+				Msg("ledger info service not reachable, retrying mode check...")
+			time.Sleep(retryDelay)
+			retryDelay = min(time.Duration(float64(retryDelay)*1.5), maxRetryDelay)
+		} else {
+			logger.Warn().Err(err).Msg("ledger info service not reachable after retries; skipping mode check")
+		}
 	}
-
-	if resp.Mode != expected {
-		logger.Fatal().
-			Str("expected", expected.String()).
-			Str("actual", resp.Mode.String()).
-			Msg("ledger server mode mismatch: client connected to wrong-mode server")
-	}
-
-	logger.Info().Str("mode", resp.Mode.String()).Msg("ledger server mode verified")
 }
 
 // Done returns a channel that is closed when the client is done.
