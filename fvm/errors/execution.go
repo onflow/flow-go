@@ -2,6 +2,7 @@ package errors
 
 import (
 	"fmt"
+	"slices"
 
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/runtime"
@@ -204,6 +205,20 @@ func AsLimitExceededError(err error) (LimitExceededError, bool) {
 	var limitErr LimitExceededError
 	ok := As(err, &limitErr)
 	return limitErr, ok
+}
+
+// IsLimitExceededError reports whether err's chain contains a
+// LimitExceededError. If any kinds are provided, the error's kind must match
+// one of them.
+func IsLimitExceededError(err error, kinds ...LimitKind) bool {
+	limitErr, ok := AsLimitExceededError(err)
+	if !ok {
+		return false
+	}
+	if len(kinds) == 0 {
+		return true
+	}
+	return slices.Contains(kinds, limitErr.kind)
 }
 
 // NewStorageCapacityExceededError constructs a new CodedError which indicates

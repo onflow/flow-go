@@ -388,6 +388,80 @@ func TestFindFailure(t *testing.T) {
 	}
 }
 
+func TestIsLimitExceededError(t *testing.T) {
+	baseErr := fmt.Errorf("base error")
+	limitErr := NewLimitExceededError(LimitKindComputation, 100)
+
+	tests := []struct {
+		name     string
+		err      error
+		kinds    []LimitKind
+		expected bool
+	}{
+		{
+			name:     "nil error",
+			err:      nil,
+			expected: false,
+		},
+		{
+			name:     "plain error",
+			err:      baseErr,
+			expected: false,
+		},
+		{
+			name:     "other coded error",
+			err:      NewScriptExecutionTimedOutError(),
+			expected: false,
+		},
+		{
+			name:     "limit exceeded error without kind filter",
+			err:      limitErr,
+			expected: true,
+		},
+		{
+			name:     "wrapped limit exceeded error without kind filter",
+			err:      fmt.Errorf("wrapped: %w", limitErr),
+			expected: true,
+		},
+		{
+			name:     "matching kind",
+			err:      limitErr,
+			kinds:    []LimitKind{LimitKindComputation},
+			expected: true,
+		},
+		{
+			name:     "non-matching kind",
+			err:      limitErr,
+			kinds:    []LimitKind{LimitKindMemory},
+			expected: false,
+		},
+		{
+			name:     "one of multiple kinds matches",
+			err:      fmt.Errorf("wrapped: %w", limitErr),
+			kinds:    []LimitKind{LimitKindMemory, LimitKindComputation},
+			expected: true,
+		},
+		{
+			name:     "none of multiple kinds matches",
+			err:      limitErr,
+			kinds:    []LimitKind{LimitKindMemory, LimitKindLedgerInteraction, LimitKindEvent},
+			expected: false,
+		},
+		{
+			name:     "plain error with kind filter",
+			err:      baseErr,
+			kinds:    []LimitKind{LimitKindComputation},
+			expected: false,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.expected, IsLimitExceededError(tc.err, tc.kinds...))
+		})
+	}
+}
+
 func createCheckerErr(errs []error) error {
 	return runtime.Error{
 		Err: cadenceErr.ExternalError{
