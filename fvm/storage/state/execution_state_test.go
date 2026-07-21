@@ -311,4 +311,25 @@ func TestExecutionState_MeteringDisabled(t *testing.T) {
 		err := st.Set(key2, value2)
 		require.Error(t, err)
 	})
+
+	t.Run("write inside disabled scope does not populate the read cache", func(t *testing.T) {
+		st := state.NewExecutionState(
+			nil,
+			state.DefaultParameters(),
+		)
+
+		// the write inside the disabled block is not accumulated, and notably
+		// does not populate the meter's read cache
+		st.RunWithMeteringDisabled(func() {
+			require.NoError(t, st.Set(key1, value1))
+		})
+		require.Equal(t, uint64(0), st.InteractionUsed())
+
+		// a subsequent metered read of the same key is charged as a fresh
+		// storage read (in contrast to a metered write, after which the read
+		// would be a free cache hit)
+		_, err := st.Get(key1)
+		require.NoError(t, err)
+		require.Equal(t, key1Size+value1Size, st.InteractionUsed())
+	})
 }
