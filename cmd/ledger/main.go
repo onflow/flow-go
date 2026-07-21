@@ -127,6 +127,10 @@ func main() {
 	ledgerService := remote.NewService(ledgerStorage, logger)
 	ledgerpb.RegisterLedgerServiceServer(grpcServer, ledgerService)
 
+	// Register the info service so clients can discover this server's mode
+	// before issuing mode-specific RPCs. This binary serves the full ledger.
+	ledgerpb.RegisterLedgerInfoServiceServer(grpcServer, remote.NewInfoService(ledgerpb.LedgerMode_LEDGER_MODE_FULL))
+
 	// Create listeners based on provided flags
 	type listenerInfo struct {
 		listener     net.Listener

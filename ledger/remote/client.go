@@ -9,7 +9,9 @@ import (
 
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"
 
 	"github.com/onflow/flow-go/ledger"
@@ -20,6 +22,7 @@ import (
 type Client struct {
 	conn        *grpc.ClientConn
 	client      ledgerpb.LedgerServiceClient
+	infoClient  ledgerpb.LedgerInfoServiceClient
 	logger      zerolog.Logger
 	done        chan struct{}
 	once        sync.Once
@@ -82,71 +85,17 @@ func NewClient(grpcAddr string, logger zerolog.Logger, opts ...ClientOption) (*C
 		opt(cfg)
 	}
 
-	// Handle Unix domain socket addresses
-	// gRPC client accepts "unix:///absolute/path" or "unix://relative/path" format
-	// For convenience, if an absolute path is provided (starts with /), automatically add the unix:// prefix
-	if strings.HasPrefix(grpcAddr, "/") {
-		grpcAddr = "unix://" + grpcAddr
-		logger.Debug().Str("address", grpcAddr).Msg("using Unix domain socket (auto-prefixed)")
-	} else if strings.HasPrefix(grpcAddr, "unix://") {
-		logger.Debug().Str("address", grpcAddr).Msg("using Unix domain socket")
-	}
-
-	// Create gRPC connection with max message size configuration.
-	// Default to 1 GiB (instead of standard 4 MiB) to handle large proofs that can exceed 4MB.
-	// This was increased to fix "grpc: received message larger than max" errors when generating
-	// proofs for blocks with many state changes.
-	// Retry connection with exponential backoff until the service becomes available.
-	// After approximately 40 minutes of retrying (90 attempts), the client will give up and crash.
-	var conn *grpc.ClientConn
-	retryDelay := 100 * time.Millisecond
-	maxRetryDelay := 30 * time.Second
-	maxRetries := 90 // ~40 minutes total wait time with exponential backoff capped at 30s
-
-	for attempt := 0; ; attempt++ {
-		var err error
-		conn, err = grpc.NewClient(
-			grpcAddr,
-			grpc.WithTransportCredentials(insecure.NewCredentials()),
-			grpc.WithDefaultCallOptions(
-				grpc.MaxCallRecvMsgSize(int(cfg.maxResponseSize)),
-				grpc.MaxCallSendMsgSize(int(cfg.maxRequestSize)),
-			),
-		)
-		if err == nil {
-			logger.Info().Str("address", grpcAddr).Msg("successfully connected to ledger service")
-			break
-		}
-
-		if attempt >= maxRetries {
-			logger.Fatal().
-				Err(err).
-				Int("attempts", attempt).
-				Str("address", grpcAddr).
-				Msg("failed to connect to ledger service after maximum retries, crashing node")
-		}
-
-		logger.Warn().
-			Err(err).
-			Int("attempt", attempt+1).
-			Int("max_attempts", maxRetries).
-			Dur("retry_delay", retryDelay).
-			Time("retry_at", time.Now().Add(retryDelay)).
-			Str("address", grpcAddr).
-			Msg("failed to connect to ledger service, retrying...")
-
-		time.Sleep(retryDelay)
-		// Exponential backoff with max cap
-		retryDelay = min(maxRetryDelay, time.Duration(float64(retryDelay)*1.5))
-	}
+	conn := dialLedgerServer(grpcAddr, cfg, logger)
 
 	client := ledgerpb.NewLedgerServiceClient(conn)
+	infoClient := ledgerpb.NewLedgerInfoServiceClient(conn)
 
 	ctx, cancel := context.WithCancel(context.Background())
 
 	return &Client{
 		conn:        conn,
 		client:      client,
+		infoClient:  infoClient,
 		logger:      logger,
 		done:        make(chan struct{}),
 		ctx:         ctx,
@@ -194,7 +143,14 @@ func (c *Client) InitialState() ledger.State {
 }
 
 // HasState returns true if the given state exists in the ledger.
-func (c *Client) HasState(state ledger.State) bool {
+//
+// A gRPC failure is surfaced to the caller as an error (an exception) rather
+// than collapsed into a false return: false must mean "state genuinely
+// absent", not "the server was unreachable", otherwise callers (e.g. execution
+// state) would misreport a reachable state as pruned.
+//
+// No error returns are expected during normal operation.
+func (c *Client) HasState(state ledger.State) (bool, error) {
 	ctx, cancel := c.callCtx()
 	defer cancel()
 	req := &ledgerpb.StateRequest{
@@ -205,11 +161,10 @@ func (c *Client) HasState(state ledger.State) bool {
 
 	resp, err := c.client.HasState(ctx, req)
 	if err != nil {
-		c.logger.Error().Err(err).Msg("failed to check state")
-		return false
+		return false, fmt.Errorf("failed to check state: %w", err)
 	}
 
-	return resp.HasState
+	return resp.HasState, nil
 }
 
 // GetSingleValue returns a single value for a given key at a specific state.
@@ -372,51 +327,199 @@ func (c *Client) Prove(query *ledger.Query) (ledger.Proof, error) {
 }
 
 // Ready returns a channel that is closed when the client is ready.
-// For a remote client, this waits for the ledger service to be ready by
-// calling InitialState() with retries to ensure the service has finished initialization.
+//
+// Readiness runs the two-phase handshake in [awaitReady]: it first verifies
+// the server is running in FULL mode (crashing via log.Fatal on a mismatch —
+// clients of a payloadless server must use [PayloadlessClient], not [Client]),
+// then waits for the ledger service to finish initialization (WAL replay).
 func (c *Client) Ready() <-chan struct{} {
 	ready := make(chan struct{})
 	go func() {
 		defer close(ready)
-		// Wait for the ledger service to be ready by calling InitialState()
-		// This ensures the service has finished WAL replay and is ready to serve requests
-		// Retry with exponential backoff (delay capped at 30s)
-		maxRetries := 30
-		retryDelay := 100 * time.Millisecond
-		maxRetryDelay := 30 * time.Second
-
-		for i := 0; i < maxRetries; i++ {
-			ctx, cancel := c.callCtx()
-			_, err := c.client.InitialState(ctx, &emptypb.Empty{})
-			cancel()
-			if err == nil {
-				c.logger.Info().Msg("ledger service ready")
-				return
-			}
-
-			// Check if the client context was cancelled (shutdown in progress)
-			if c.ctx.Err() != nil {
-				c.logger.Info().Msg("client shutdown during ready check")
-				return
-			}
-
-			if i < maxRetries-1 {
-				c.logger.Warn().
-					Err(err).
-					Int("attempt", i+1).
-					Dur("retry_delay", retryDelay).
-					Time("retry_at", time.Now().Add(retryDelay)).
-					Msg("ledger service not ready, retrying...")
-				time.Sleep(retryDelay)
-				retryDelay = min(time.Duration(float64(retryDelay)*1.5), maxRetryDelay)
-			} else {
-				c.logger.Warn().Err(err).Msg("ledger service not ready after retries, proceeding anyway")
-				// Still close the channel to avoid blocking forever
-				// The execution node will fail later with a more specific error if the service is truly not ready
-			}
-		}
+		awaitReady(
+			c.ctx,
+			c.infoClient,
+			func(ctx context.Context) error {
+				_, err := c.client.InitialState(ctx, &emptypb.Empty{})
+				return err
+			},
+			ledgerpb.LedgerMode_LEDGER_MODE_FULL,
+			c.callTimeout,
+			"ledger",
+			c.logger,
+		)
 	}()
 	return ready
+}
+
+// awaitReady runs the two-phase startup handshake shared by [Client] and
+// [PayloadlessClient]. The caller is responsible for closing its ready channel
+// once this returns.
+//
+// Phase 1 — mode gate: [verifyServerMode] probes LedgerInfoService.ServerInfo
+// and crashes via log.Fatal if the server does not report `expectedMode`.
+// ServerInfo is stateless and registered on every server regardless of mode,
+// so it is reachable as soon as the server accepts connections — before WAL
+// replay finishes. Probing it first lets us surface a wrong-mode
+// misconfiguration with a clear error before depending on any mode-specific
+// RPC (a mode-specific InitialState against a wrong-mode server returns gRPC
+// Unimplemented, which is indistinguishable from "still initializing").
+//
+// Phase 2 — readiness gate: `initialState` (the caller's mode-specific
+// InitialState RPC) is retried until the server finishes initialization. If it
+// never succeeds, this proceeds anyway rather than blocking forever; the first
+// real RPC will surface a clearer error if the service is truly unavailable.
+//
+// `serviceName` is used only in log messages (e.g. "ledger", "payloadless
+// ledger").
+func awaitReady(
+	ctx context.Context,
+	infoClient ledgerpb.LedgerInfoServiceClient,
+	initialState func(context.Context) error,
+	expectedMode ledgerpb.LedgerMode,
+	callTimeout time.Duration,
+	serviceName string,
+	logger zerolog.Logger,
+) {
+	// Phase 1: mode gate.
+	verifyServerMode(ctx, infoClient, callTimeout, expectedMode, logger)
+	if ctx.Err() != nil {
+		logger.Info().Msg("client shutdown during ready check")
+		return
+	}
+
+	// Phase 2: readiness gate.
+	err := retryUntilReady(ctx, initialState, callTimeout, logger, serviceName+" service not ready, retrying...")
+	if err != nil {
+		if ctx.Err() != nil {
+			logger.Info().Msg("client shutdown during ready check")
+			return
+		}
+		// Close the channel anyway to avoid blocking forever; the first real
+		// RPC will surface a more specific error if the service is truly down.
+		logger.Warn().Err(err).Msgf("%s service not ready after retries, proceeding anyway", serviceName)
+		return
+	}
+	logger.Info().Msgf("%s service ready", serviceName)
+}
+
+// retryUntilReady repeatedly invokes `attempt` (each call bounded by
+// `callTimeout`) until it returns nil, `ctx` is cancelled, or the retry budget
+// is exhausted. Delays grow geometrically (1.5x), capped at 30s. It returns the
+// final error (nil on success, `ctx.Err()` if the context was cancelled).
+//
+// `notReadyMsg` is logged before each retry.
+func retryUntilReady(
+	ctx context.Context,
+	attempt func(context.Context) error,
+	callTimeout time.Duration,
+	logger zerolog.Logger,
+	notReadyMsg string,
+) error {
+	maxRetries := 30
+	retryDelay := 100 * time.Millisecond
+	maxRetryDelay := 30 * time.Second
+
+	var err error
+	for i := 0; i < maxRetries; i++ {
+		callCtx, cancel := context.WithTimeout(ctx, callTimeout)
+		err = attempt(callCtx)
+		cancel()
+		if err == nil {
+			return nil
+		}
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		if i < maxRetries-1 {
+			logger.Warn().
+				Err(err).
+				Int("attempt", i+1).
+				Dur("retry_delay", retryDelay).
+				Msg(notReadyMsg)
+			time.Sleep(retryDelay)
+			retryDelay = min(time.Duration(float64(retryDelay)*1.5), maxRetryDelay)
+		}
+	}
+	return err
+}
+
+// verifyServerMode probes LedgerInfoService.ServerInfo (retrying on transient
+// transport failures) and crashes the process via log.Fatal if the server's
+// reported mode does not match `expected`.
+//
+// A mode mismatch is a configuration error (the deployment paired a client of
+// one mode with a server of the other); it is not retryable and not safe to
+// ignore — every subsequent RPC against a wrong-mode server would either return
+// gRPC Unimplemented or, worse, succeed against a method that happens to share
+// its name but returns incompatibly-typed data.
+//
+// `expected` should be either FULL or PAYLOADLESS; UNSPECIFIED is treated as
+// "client is misconfigured" and also crashes.
+//
+// Two non-mismatch outcomes are logged and allowed to proceed rather than
+// crashing:
+//   - the server does not implement the info service (gRPC Unimplemented),
+//     e.g. an older server mid-rolling-upgrade — retrying cannot help, so this
+//     returns immediately; and
+//   - ServerInfo stays unreachable across all retries — the connection may be
+//     transiently flaky, and the next real RPC will surface a clearer error.
+//
+// Crashing in either case would prevent the client from recovering from a brief
+// network blip or an upgrade-ordering race during startup.
+func verifyServerMode(
+	ctx context.Context,
+	infoClient ledgerpb.LedgerInfoServiceClient,
+	callTimeout time.Duration,
+	expected ledgerpb.LedgerMode,
+	logger zerolog.Logger,
+) {
+	maxRetries := 30
+	retryDelay := 100 * time.Millisecond
+	maxRetryDelay := 30 * time.Second
+
+	for i := 0; i < maxRetries; i++ {
+		infoCtx, cancel := context.WithTimeout(ctx, callTimeout)
+		resp, err := infoClient.ServerInfo(infoCtx, &emptypb.Empty{})
+		cancel()
+
+		if err == nil {
+			if resp.Mode != expected {
+				logger.Fatal().
+					Str("expected", expected.String()).
+					Str("actual", resp.Mode.String()).
+					Msg("ledger server mode mismatch: client connected to wrong-mode server")
+			}
+			logger.Info().Str("mode", resp.Mode.String()).Msg("ledger server mode verified")
+			return
+		}
+
+		// An older or misconfigured server that does not register the info
+		// service returns Unimplemented; that will not change without a
+		// restart, so stop retrying and let the mode-specific RPCs surface any
+		// real problem.
+		if status.Code(err) == codes.Unimplemented {
+			logger.Warn().Err(err).Msg("ledger info service not implemented by server; skipping mode check")
+			return
+		}
+
+		// Check if the client context was cancelled (shutdown in progress).
+		if ctx.Err() != nil {
+			return
+		}
+
+		if i < maxRetries-1 {
+			logger.Warn().
+				Err(err).
+				Int("attempt", i+1).
+				Dur("retry_delay", retryDelay).
+				Msg("ledger info service not reachable, retrying mode check...")
+			time.Sleep(retryDelay)
+			retryDelay = min(time.Duration(float64(retryDelay)*1.5), maxRetryDelay)
+		} else {
+			logger.Warn().Err(err).Msg("ledger info service not reachable after retries; skipping mode check")
+		}
+	}
 }
 
 // Done returns a channel that is closed when the client is done.
@@ -463,5 +566,66 @@ func ledgerKeyToProtoKey(key ledger.Key) *ledgerpb.Key {
 	}
 	return &ledgerpb.Key{
 		Parts: parts,
+	}
+}
+
+// dialLedgerServer establishes a gRPC connection to a ledger server with
+// retry. `grpcAddr` may be a TCP address (e.g. "localhost:9000") or a Unix
+// domain socket (either "unix:///path" or just "/path" — the prefix is
+// auto-added for the latter).
+//
+// Retries with exponential backoff (capped at 30s) for up to ~40 minutes. If
+// the server does not become reachable in that window, the process exits
+// via log.Fatal.
+//
+// Used by both [NewClient] and [NewPayloadlessClient]; the two share the
+// same dial behavior because the underlying gRPC server is the same in both
+// modes — only the registered services differ.
+func dialLedgerServer(grpcAddr string, cfg *clientConfig, logger zerolog.Logger) *grpc.ClientConn {
+	if strings.HasPrefix(grpcAddr, "/") {
+		grpcAddr = "unix://" + grpcAddr
+		logger.Debug().Str("address", grpcAddr).Msg("using Unix domain socket (auto-prefixed)")
+	} else if strings.HasPrefix(grpcAddr, "unix://") {
+		logger.Debug().Str("address", grpcAddr).Msg("using Unix domain socket")
+	}
+
+	// Default to 1 GiB (instead of standard 4 MiB) to handle large proofs.
+	retryDelay := 100 * time.Millisecond
+	maxRetryDelay := 30 * time.Second
+	maxRetries := 90 // ~40 minutes total wait
+
+	for attempt := 0; ; attempt++ {
+		conn, err := grpc.NewClient(
+			grpcAddr,
+			grpc.WithTransportCredentials(insecure.NewCredentials()),
+			grpc.WithDefaultCallOptions(
+				grpc.MaxCallRecvMsgSize(int(cfg.maxResponseSize)),
+				grpc.MaxCallSendMsgSize(int(cfg.maxRequestSize)),
+			),
+		)
+		if err == nil {
+			logger.Info().Str("address", grpcAddr).Msg("successfully connected to ledger service")
+			return conn
+		}
+
+		if attempt >= maxRetries {
+			logger.Fatal().
+				Err(err).
+				Int("attempts", attempt).
+				Str("address", grpcAddr).
+				Msg("failed to connect to ledger service after maximum retries, crashing node")
+		}
+
+		logger.Warn().
+			Err(err).
+			Int("attempt", attempt+1).
+			Int("max_attempts", maxRetries).
+			Dur("retry_delay", retryDelay).
+			Time("retry_at", time.Now().Add(retryDelay)).
+			Str("address", grpcAddr).
+			Msg("failed to connect to ledger service, retrying...")
+
+		time.Sleep(retryDelay)
+		retryDelay = min(maxRetryDelay, time.Duration(float64(retryDelay)*1.5))
 	}
 }
