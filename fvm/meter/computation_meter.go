@@ -119,6 +119,7 @@ func (m *ComputationMeter) ComputationRemaining(kind common.ComputationKind) uin
 		return 0
 	}
 
+	// never underflows, as we handled the m.params.computationLimit ≤ m.computationUsed above
 	return (m.params.computationLimit - m.computationUsed) / w
 }
 

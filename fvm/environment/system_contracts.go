@@ -120,7 +120,7 @@ func (sys *SystemContracts) CheckPayerBalanceAndGetMaxTxFees(
 	return sys.Invoke(
 		verifyPayersBalanceForTransactionExecutionSpec,
 		[]cadence.Value{
-			cadence.BytesToAddress(payer.Bytes()),
+			cadence.Address(payer),
 			cadence.UFix64(inclusionEffort),
 			cadence.UFix64(maxExecutionEffort),
 		},
@@ -157,7 +157,7 @@ func (sys *SystemContracts) DeductTransactionFees(
 	return sys.Invoke(
 		deductTransactionFeeSpec,
 		[]cadence.Value{
-			cadence.BytesToAddress(payer.Bytes()),
+			cadence.Address(payer),
 			cadence.UFix64(inclusionEffort),
 			cadence.UFix64(executionEffort),
 		},
@@ -181,7 +181,7 @@ func (sys *SystemContracts) AccountAvailableBalance(
 	return sys.Invoke(
 		accountAvailableBalanceSpec,
 		[]cadence.Value{
-			cadence.BytesToAddress(address.Bytes()),
+			cadence.Address(address),
 		},
 	)
 }
@@ -207,7 +207,7 @@ func (sys *SystemContracts) AccountBalance(
 	return sys.Invoke(
 		accountBalanceInvocationSpec,
 		[]cadence.Value{
-			cadence.BytesToAddress(address.Bytes()),
+			cadence.Address(address),
 		},
 	)
 }
@@ -229,7 +229,7 @@ func (sys *SystemContracts) AccountStorageCapacity(
 	return sys.Invoke(
 		accountStorageCapacitySpec,
 		[]cadence.Value{
-			cadence.BytesToAddress(address.Bytes()),
+			cadence.Address(address),
 		},
 	)
 }
@@ -242,7 +242,7 @@ func (sys *SystemContracts) AccountsStorageCapacity(
 ) (cadence.Value, error) {
 	arrayValues := make([]cadence.Value, len(addresses))
 	for i, address := range addresses {
-		arrayValues[i] = cadence.BytesToAddress(address.Bytes())
+		arrayValues[i] = cadence.Address(address)
 	}
 
 	return sys.Invoke(
@@ -261,7 +261,7 @@ func (sys *SystemContracts) AccountsStorageCapacity(
 		},
 		[]cadence.Value{
 			cadence.NewArray(arrayValues),
-			cadence.BytesToAddress(payer.Bytes()),
+			cadence.Address(payer),
 			cadence.UFix64(maxTxFees),
 		},
 	)
