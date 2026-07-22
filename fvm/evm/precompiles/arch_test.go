@@ -24,6 +24,10 @@ func TestArchContract(t *testing.T) {
 			nil,
 			nil,
 			nil,
+			nil,
+			nil,
+			nil,
+			nil,
 		)
 
 		input := precompiles.FlowBlockHeightFuncSig.Bytes()
@@ -53,6 +57,10 @@ func TestArchContract(t *testing.T) {
 			func(u uint64) ([]byte, error) {
 				return rand, nil
 			},
+			nil,
+			nil,
+			nil,
+			nil,
 			nil,
 		)
 
@@ -84,6 +92,10 @@ func TestArchContract(t *testing.T) {
 			func() (uint64, error) {
 				return rand, nil
 			},
+			nil,
+			nil,
+			nil,
+			nil,
 		)
 
 		require.Equal(t, address, pc.Address())
@@ -108,6 +120,10 @@ func TestArchContract(t *testing.T) {
 				require.Equal(t, proof, p)
 				return true, nil
 			},
+			nil,
+			nil,
+			nil,
+			nil,
 			nil,
 			nil,
 		)

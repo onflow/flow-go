@@ -1235,6 +1235,20 @@ access(all) contract EVM {
         ) ?? false
     }
 
+    access(account)
+    fun chargeSchedulingFees(balance: Balance): @FlowToken.Vault {
+        if balance.isZero() {
+            return <-FlowToken.createEmptyVault(vaultType: Type<@FlowToken.Vault>())
+        }
+
+        let vault <- InternalEVM.withdraw(
+            from: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0],
+            amount: balance.attoflow
+        ) as! @FlowToken.Vault
+
+        return <-vault
+    }
+
     init() {
         self.setupHeartbeat()
     }
