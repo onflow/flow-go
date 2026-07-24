@@ -192,11 +192,20 @@ func (r *RegisterStore) onBlockFinalized() error {
 		// next block is not finalized yet
 		return nil
 	}
+	if err != nil {
+		return fmt.Errorf("cannot get finalized block ID at height %v: %w", next, err)
+	}
 
 	regs, err := r.memStore.GetUpdatedRegisters(next, blockID)
 	if errors.Is(err, ErrNotExecuted) {
 		// next block is not executed yet
 		return nil
+	}
+	if err != nil {
+		// any other error is an exception, we must not proceed to store
+		// a nil register list to the disk store, which would incorrectly
+		// index the height with no register updates
+		return fmt.Errorf("cannot get updated registers for block %v at height %v: %w", blockID, next, err)
 	}
 
 	// TODO: append WAL
