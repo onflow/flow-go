@@ -1,6 +1,7 @@
 package pebble
 
 import (
+	"bytes"
 	"encoding/binary"
 	"fmt"
 	"math"
@@ -118,8 +119,9 @@ func (s *Registers) Store(
 	// Upon restart, it may be in a state where registers are indexed in pebble for the latest height
 	// but the remaining execution data in badger is not, so we skip the indexing step without throwing an error
 	if height == latestHeight {
-		// already updated
-		return nil
+		// already updated, but verify the entries match what was stored,
+		// so that divergent data is not silently dropped
+		return s.verifyStoredEntries(entries, height)
 	}
 
 	nextHeight := latestHeight + 1
@@ -149,6 +151,24 @@ func (s *Registers) Store(
 
 	s.latestHeight.Store(height)
 
+	return nil
+}
+
+// verifyStoredEntries checks that each of the given entries matches the value already
+// stored at the given height. It is used when Store is called again for the latest height,
+// which can happen when an execution node restarts and re-indexes a height whose registers
+// were already indexed. A mismatch means the previously stored value would be silently
+// kept while the caller assumes the new value was stored, so it must be an error.
+func (s *Registers) verifyStoredEntries(entries flow.RegisterEntries, height uint64) error {
+	for _, entry := range entries {
+		stored, err := s.Get(entry.Key, height)
+		if err != nil {
+			return fmt.Errorf("cannot verify stored register %v at height %d: %w", entry.Key, height, err)
+		}
+		if !bytes.Equal(stored, entry.Value) {
+			return fmt.Errorf("register %v at height %d was already stored with a different value", entry.Key, height)
+		}
+	}
 	return nil
 }
 

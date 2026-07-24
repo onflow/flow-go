@@ -86,6 +86,25 @@ func TestRegisters_Store(t *testing.T) {
 		err = r.Store(entries, height2)
 		require.NoError(t, err)
 
+		// same height with a conflicting value must fail instead of being silently dropped
+		conflicting := flow.RegisterEntries{
+			{Key: key1, Value: []byte("different")},
+		}
+		err = r.Store(conflicting, height2)
+		require.Error(t, err)
+
+		// same height with a register that was not stored must fail
+		notStored := flow.RegisterEntries{
+			{Key: flow.RegisterID{Owner: "owner", Key: "key2"}, Value: []byte("value2")},
+		}
+		err = r.Store(notStored, height2)
+		require.Error(t, err)
+
+		// the originally stored value is unchanged
+		value1, err := r.Get(key1, height2)
+		require.NoError(t, err)
+		require.Equal(t, expectedValue1, value1)
+
 		// out of range
 		height4 := uint64(4)
 		err = r.Store(entries, height4)
