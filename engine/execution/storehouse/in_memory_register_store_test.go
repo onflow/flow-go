@@ -114,6 +114,46 @@ func TestInMemoryRegisterStore(t *testing.T) {
 		require.Equal(t, pe.Height, height-1)
 	})
 
+	// SaveRegisters must copy register values so that mutating the caller's slice
+	// afterwards does not corrupt the store, and GetRegister/GetUpdatedRegisters must
+	// return copies so that mutating the returned slice does not corrupt the store.
+	t.Run("ValuesAreCopied", func(t *testing.T) {
+		t.Parallel()
+		pruned := uint64(10)
+		lastID := unittest.IdentifierFixture()
+		store := NewInMemoryRegisterStore(pruned, lastID)
+
+		height := pruned + 1
+		blockID := unittest.IdentifierFixture()
+		value := []byte("original")
+		reg := flow.RegisterEntry{
+			Key:   unittest.RegisterEntryFixture().Key,
+			Value: value,
+		}
+		require.NoError(t, store.SaveRegisters(height, blockID, lastID, flow.RegisterEntries{reg}))
+
+		// mutating the caller's slice after saving must not change the stored value
+		value[0] = 'X'
+		val, err := store.GetRegister(height, blockID, reg.Key)
+		require.NoError(t, err)
+		require.Equal(t, flow.RegisterValue("original"), val)
+
+		// mutating the slice returned by GetRegister must not change the stored value
+		val[0] = 'Y'
+		val, err = store.GetRegister(height, blockID, reg.Key)
+		require.NoError(t, err)
+		require.Equal(t, flow.RegisterValue("original"), val)
+
+		// mutating the updates returned by GetUpdatedRegisters must not change the stored value
+		updates, err := store.GetUpdatedRegisters(height, blockID)
+		require.NoError(t, err)
+		require.Len(t, updates, 1)
+		updates[0].Value[0] = 'Z'
+		val, err = store.GetRegister(height, blockID, reg.Key)
+		require.NoError(t, err)
+		require.Equal(t, flow.RegisterValue("original"), val)
+	})
+
 	// 3. SaveRegisters should fail if the block is already saved
 	t.Run("StoreFailAlreadyExist", func(t *testing.T) {
 		t.Parallel()

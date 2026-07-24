@@ -66,7 +66,9 @@ func (s *InMemoryRegisterStore) SaveRegisters(
 	// preprocess data before acquiring the lock
 	regs := make(map[flow.RegisterID]flow.RegisterValue, len(registers))
 	for _, reg := range registers {
-		regs[reg.Key] = reg.Value
+		// copy the value so that the stored registers are isolated from
+		// any subsequent mutation of the caller's slices
+		regs[reg.Key] = copyRegisterValue(reg.Value)
 	}
 
 	s.Lock()
@@ -107,6 +109,12 @@ func (s *InMemoryRegisterStore) SaveRegisters(
 	return nil
 }
 
+func copyRegisterValue(value flow.RegisterValue) flow.RegisterValue {
+	copied := make(flow.RegisterValue, len(value))
+	copy(copied, value)
+	return copied
+}
+
 // GetRegister will return the latest updated value of the given register
 // since the pruned height.
 // It returns PrunedError if the register is unknown or not updated since the pruned height
@@ -131,7 +139,9 @@ func (s *InMemoryRegisterStore) GetRegister(height uint64, blockID flow.Identifi
 		// TODO: do not hold the read lock when reading register from the updated register map
 		reg, ok := s.readRegisterAtBlockID(block, register)
 		if ok {
-			return reg, nil
+			// return a copy so that the stored value is isolated from
+			// any mutation of the returned slice by the caller
+			return copyRegisterValue(reg), nil
 		}
 
 		// the register didn't get updated at this block, so check its parent
@@ -178,7 +188,7 @@ func (s *InMemoryRegisterStore) GetUpdatedRegisters(height uint64, blockID flow.
 		return nil, err
 	}
 
-	// since the registerUpdates won't be updated and registers for a block can only be set once,
+	// since getUpdatedRegisters returns a copy of the internal map,
 	// we don't need to hold the lock when converting it from map into slice.
 	registers := make(flow.RegisterEntries, 0, len(registerUpdates))
 	for regID, reg := range registerUpdates {
@@ -202,7 +212,14 @@ func (s *InMemoryRegisterStore) getUpdatedRegisters(height uint64, blockID flow.
 	if !ok {
 		return nil, fmt.Errorf("cannot get register at height %d, block %s is not found: %w", height, blockID, ErrNotExecuted)
 	}
-	return registerUpdates, nil
+
+	// copy the updates so that the stored registers are isolated from
+	// any mutation of the returned values by the caller
+	copied := make(map[flow.RegisterID]flow.RegisterValue, len(registerUpdates))
+	for regID, value := range registerUpdates {
+		copied[regID] = copyRegisterValue(value)
+	}
+	return copied, nil
 }
 
 // Prune prunes the register store to the given height
