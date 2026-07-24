@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -43,6 +44,9 @@ var (
 	flagParallel            int
 	flagSubscribe           bool
 	flagSubscriptionDelay   time.Duration
+	flagBatchSize           int
+	flagProgressFile        string
+	flagResume              bool
 )
 
 var Cmd = &cobra.Command{
@@ -83,9 +87,17 @@ func init() {
 	Cmd.Flags().BoolVar(&flagSubscribe, "subscribe", false, "subscribe to new sealed blocks and compare them as they arrive")
 
 	Cmd.Flags().DurationVar(&flagSubscriptionDelay, "subscription-delay", 1*time.Minute, "delay after receiving a new sealed block before comparing it")
+
+	Cmd.Flags().IntVar(&flagBatchSize, "batch-size", 0, "number of blocks to compare per batch. the progress is recorded after each batch, so that an interrupted run can be resumed (default: 0, compare all blocks in a single batch)")
+
+	Cmd.Flags().StringVar(&flagProgressFile, "progress-file", "", "path of the file which records the progress (default: a file named after the compared blocks, in the current directory)")
+
+	Cmd.Flags().BoolVar(&flagResume, "resume", false, "continue the run recorded in the progress file, repeating only the batch which was interrupted. all other flags must be the same as in the interrupted run")
 }
 
 func run(_ *cobra.Command, args []string) {
+
+	validateBatchingFlags()
 
 	chainID := flow.ChainID(flagChain)
 	chain := chainID.Chain()
@@ -215,75 +227,238 @@ reconnect:
 	}
 }
 
+// validateBatchingFlags checks the flags which control batching and resumption.
+func validateBatchingFlags() {
+	if flagBatchSize < 0 {
+		log.Fatal().Msgf("--batch-size must not be negative, but is %d", flagBatchSize)
+	}
+
+	if flagSubscribe && (flagBatchSize != 0 || flagProgressFile != "" || flagResume) {
+		log.Fatal().Msg("--batch-size, --progress-file, and --resume can not be used with --subscribe")
+	}
+}
+
+type block struct {
+	id     flow.Identifier
+	header *flow.Header
+}
+
+// blockLoader fetches the headers of the blocks of a run, in the order in which they are compared.
+//
+// The blocks of a run are either the explicitly provided block IDs,
+// or the block with the provided ID and its ancestors, when a block count is provided.
+//
+// NOT CONCURRENCY SAFE!
+type blockLoader struct {
+	flowClient *client.Client
+
+	// explicitBlockIDs are the blocks to compare, if they were provided explicitly.
+	// It is empty if the blocks are instead determined by following the parent of each block.
+	explicitBlockIDs []flow.Identifier
+
+	// nextBlockID is the ID of the first block which was not loaded yet.
+	// It is the zero identifier once all blocks of the run were loaded.
+	nextBlockID flow.Identifier
+
+	// loadedBlockCount is the number of blocks which were loaded so far.
+	loadedBlockCount int
+}
+
+// loadNextBlocks fetches the headers of the next count blocks.
+func (l *blockLoader) loadNextBlocks(count int) []block {
+
+	var headerProgress util.LogProgressFunc[int]
+	if len(l.explicitBlockIDs) == 0 {
+		headerProgress = util.LogProgress(
+			log.Logger,
+			util.NewLogProgressConfig(
+				"fetching block headers",
+				count,
+				1*time.Second,
+				100/5, // log every 5%
+			),
+		)
+	}
+
+	blocks := make([]block, 0, count)
+
+	for i := 0; i < count; i++ {
+		if l.nextBlockID == flow.ZeroID {
+			log.Fatal().Msgf("no block left to compare, but %d more were requested", count-i)
+		}
+
+		blockID := l.nextBlockID
+		header := debug_tx.FetchBlockHeader(blockID, l.flowClient)
+
+		blocks = append(blocks, block{
+			id:     blockID,
+			header: header,
+		})
+
+		l.loadedBlockCount++
+		l.advance(header)
+
+		if headerProgress != nil {
+			headerProgress(1)
+		}
+	}
+
+	return blocks
+}
+
+// advance moves the loader to the block which follows the given just loaded block header.
+func (l *blockLoader) advance(header *flow.Header) {
+	if len(l.explicitBlockIDs) == 0 {
+		l.nextBlockID = header.ParentID
+		return
+	}
+
+	if l.loadedBlockCount >= len(l.explicitBlockIDs) {
+		l.nextBlockID = flow.ZeroID
+		return
+	}
+
+	l.nextBlockID = l.explicitBlockIDs[l.loadedBlockCount]
+}
+
 func compareBlocks(
 	blockIDs []flow.Identifier,
 	flowClient *client.Client,
 	remoteClient debug.RemoteClient,
 	chain flow.Chain,
 ) {
-	type block struct {
-		id     flow.Identifier
-		header *flow.Header
-	}
+	followsParents := flagBlockCount != 1
 
-	var blocks []block
-
-	if flagBlockCount != 1 {
+	totalBlockCount := len(blockIDs)
+	if followsParents {
 		if len(blockIDs) > 1 {
 			log.Fatal().Msg("either provide a single block ID and use --block-count, or provide multiple block IDs and do not use --block-count")
 		}
 
-		blockHeaderProgress := util.LogProgress(
-			log.Logger,
-			util.NewLogProgressConfig(
-				"fetching block headers",
-				flagBlockCount,
-				1*time.Second,
-				100/5, // log every 5%
-			),
-		)
+		totalBlockCount = flagBlockCount
+	}
 
-		blockID := blockIDs[0]
-		for i := 0; i < flagBlockCount; i++ {
-			header := debug_tx.FetchBlockHeader(blockID, flowClient)
+	// A run without an explicit batch size compares all blocks in a single batch.
+	batchSize := flagBatchSize
+	if batchSize == 0 {
+		batchSize = totalBlockCount
+	}
 
-			blocks = append(blocks, block{
-				id:     blockID,
-				header: header,
-			})
+	config := runConfig{
+		Chain:        flagChain,
+		BlockIDs:     blockIDStrings(blockIDs),
+		BlockCount:   flagBlockCount,
+		ComputeLimit: flagComputeLimit,
+	}
 
-			blockHeaderProgress(1)
+	progressFilePath := resolveProgressFilePath(blockIDs[0], totalBlockCount)
+	if progressFilePath != "" {
+		log.Info().Msgf("Recording the progress of this run in %s", progressFileLocation(progressFilePath))
+	}
 
-			blockID = header.ParentID
+	progress := startRunProgress(progressFilePath, config, totalBlockCount, blockIDs[0])
+
+	loader := &blockLoader{
+		flowClient:       flowClient,
+		loadedBlockCount: progress.CompletedBlockCount,
+	}
+	if !followsParents {
+		loader.explicitBlockIDs = blockIDs
+	}
+
+	completedBlockCount := progress.CompletedBlockCount
+	stats := progress.Stats
+
+	if completedBlockCount < totalBlockCount {
+		nextBlockID, err := progress.nextBlockID()
+		if err != nil {
+			log.Fatal().Err(err).Msg("failed to determine the block to continue at")
 		}
-
-	} else {
-		for _, blockID := range blockIDs {
-			header := debug_tx.FetchBlockHeader(blockID, flowClient)
-
-			blocks = append(blocks, block{
-				id:     blockID,
-				header: header,
-			})
-		}
+		loader.nextBlockID = nextBlockID
 	}
 
 	blockProgress := util.LogProgress(
 		log.Logger,
 		util.NewLogProgressConfig(
 			"executing blocks",
-			flagBlockCount,
+			totalBlockCount,
 			1*time.Second,
 			100/5, // log every 5%
 		),
 	)
 
-	var (
-		blocksMismatched int64
-		blocksMatched    int64
-		txMismatched     int64
-		txMatched        int64
-	)
+	if completedBlockCount >= totalBlockCount {
+		log.Info().Msgf("All %d blocks of this run were already compared", totalBlockCount)
+	} else if completedBlockCount > 0 {
+		log.Info().Msgf(
+			"Continuing at block %s: %d of %d blocks were already compared",
+			loader.nextBlockID,
+			completedBlockCount,
+			totalBlockCount,
+		)
+
+		blockProgress(completedBlockCount)
+	}
+
+	for completedBlockCount < totalBlockCount {
+		batchBlockCount := min(batchSize, totalBlockCount-completedBlockCount)
+
+		log.Info().Msgf(
+			"Comparing blocks %d to %d of %d, starting at block %s ...",
+			completedBlockCount+1,
+			completedBlockCount+batchBlockCount,
+			totalBlockCount,
+			loader.nextBlockID,
+		)
+
+		blocks := loader.loadNextBlocks(batchBlockCount)
+
+		stats.add(compareBatch(
+			blocks,
+			flowClient,
+			remoteClient,
+			chain,
+			blockProgress,
+		))
+
+		completedBlockCount += batchBlockCount
+
+		if progressFilePath != "" {
+			progress.CompletedBlockCount = completedBlockCount
+			progress.NextBlockID = blockIDString(loader.nextBlockID)
+			progress.Stats = stats
+
+			if err := writeRunProgress(progressFilePath, progress); err != nil {
+				// The batch was compared, but its progress was not recorded.
+				// Continuing would record the following batches as if this batch had been recorded,
+				// so the run stops instead, and repeats this batch when it is resumed.
+				log.Fatal().Err(err).Msgf(
+					"failed to record the progress after comparing %d blocks",
+					completedBlockCount,
+				)
+			}
+		}
+
+		// Report the results so far, so that a long run which is interrupted
+		// still reported the results of all batches it completed.
+		if completedBlockCount < totalBlockCount {
+			logStats(stats)
+		}
+	}
+
+	logStats(stats)
+}
+
+// compareBatch compares the given blocks and returns their combined results.
+func compareBatch(
+	blocks []block,
+	flowClient *client.Client,
+	remoteClient debug.RemoteClient,
+	chain flow.Chain,
+	blockProgress util.LogProgressFunc[int],
+) runStats {
+
+	var stats runStats
 
 	g, _ := errgroup.WithContext(context.Background())
 	g.SetLimit(flagParallel)
@@ -299,12 +474,12 @@ func compareBlocks(
 				chain,
 			)
 
-			atomic.AddInt64(&txMismatched, int64(result.mismatches))
-			atomic.AddInt64(&txMatched, int64(result.matches))
+			atomic.AddInt64(&stats.TransactionsMismatched, int64(result.mismatches))
+			atomic.AddInt64(&stats.TransactionsMatched, int64(result.matches))
 			if result.mismatches > 0 {
-				atomic.AddInt64(&blocksMismatched, 1)
+				atomic.AddInt64(&stats.BlocksMismatched, 1)
 			} else {
-				atomic.AddInt64(&blocksMatched, 1)
+				atomic.AddInt64(&stats.BlocksMatched, 1)
 			}
 
 			blockProgress(1)
@@ -317,8 +492,126 @@ func compareBlocks(
 		log.Fatal().Err(err).Msg("failed to compare blocks")
 	}
 
-	log.Info().Msgf("Compared %d blocks: %d matched, %d mismatched", blocksMatched+blocksMismatched, blocksMatched, blocksMismatched)
-	log.Info().Msgf("Compared %d transactions: %d matched, %d mismatched", txMatched+txMismatched, txMatched, txMismatched)
+	return stats
+}
+
+// resolveProgressFilePath returns the path of the file which records the progress of the run,
+// or the empty string if the run does not record its progress.
+//
+// A run which compares all blocks in a single batch has no intermediate progress to record,
+// so it only records its progress if a progress file was requested explicitly.
+func resolveProgressFilePath(firstBlockID flow.Identifier, totalBlockCount int) string {
+	if flagProgressFile != "" {
+		return flagProgressFile
+	}
+
+	if flagBatchSize == 0 && !flagResume {
+		return ""
+	}
+
+	return defaultProgressFileName(firstBlockID, totalBlockCount)
+}
+
+// defaultProgressFileName returns the name of the progress file for a run
+// which did not request a particular one.
+//
+// The name is derived from the compared blocks, so that resuming the same run
+// finds the progress file of that run in the directory the command is run in.
+func defaultProgressFileName(firstBlockID flow.Identifier, totalBlockCount int) string {
+	return fmt.Sprintf(
+		"compare-cadence-vm-%s-%d.progress.json",
+		firstBlockID.String()[:16],
+		totalBlockCount,
+	)
+}
+
+// progressFileLocation returns the absolute path of the progress file, for reporting it to the user.
+// It falls back to the given path if the absolute path can not be determined.
+func progressFileLocation(path string) string {
+	absolutePath, err := filepath.Abs(path)
+	if err != nil {
+		return path
+	}
+	return absolutePath
+}
+
+// startRunProgress returns the progress which the run continues from.
+//
+// A run which is not resumed refuses to discard the progress of a previous run,
+// and records that it has not compared any block yet, so that a progress file which can not be
+// written is reported before any block is compared, instead of after the first batch.
+func startRunProgress(
+	progressFilePath string,
+	config runConfig,
+	totalBlockCount int,
+	firstBlockID flow.Identifier,
+) runProgress {
+
+	if flagResume {
+		progress, err := readRunProgress(progressFilePath)
+		if err != nil {
+			log.Fatal().Err(err).Msgf(
+				"failed to read the progress file %s. run without --resume to start a new run",
+				progressFileLocation(progressFilePath),
+			)
+		}
+
+		if err := progress.validate(config, totalBlockCount); err != nil {
+			log.Fatal().Err(err).Msg("failed to resume the recorded run")
+		}
+
+		return progress
+	}
+
+	progress := newRunProgress(config, firstBlockID)
+
+	if progressFilePath == "" {
+		return progress
+	}
+
+	exists, err := runProgressExists(progressFilePath)
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to check for an existing progress file")
+	}
+	if exists {
+		log.Fatal().Msgf(
+			"progress file %s already exists. use --resume to continue the recorded run, or remove the file to start over",
+			progressFileLocation(progressFilePath),
+		)
+	}
+
+	if err := writeRunProgress(progressFilePath, progress); err != nil {
+		log.Fatal().Err(err).Msgf(
+			"failed to create the progress file %s",
+			progressFileLocation(progressFilePath),
+		)
+	}
+
+	return progress
+}
+
+// blockIDStrings returns the hexadecimal representations of the given block IDs.
+func blockIDStrings(blockIDs []flow.Identifier) []string {
+	strs := make([]string, 0, len(blockIDs))
+	for _, blockID := range blockIDs {
+		strs = append(strs, blockID.String())
+	}
+	return strs
+}
+
+func logStats(stats runStats) {
+	log.Info().Msgf(
+		"Compared %d blocks: %d matched, %d mismatched",
+		stats.BlocksMatched+stats.BlocksMismatched,
+		stats.BlocksMatched,
+		stats.BlocksMismatched,
+	)
+	log.Info().Msgf(
+		"Compared %d transactions: %d matched, %d mismatched",
+		stats.TransactionsMatched+stats.TransactionsMismatched,
+		stats.TransactionsMatched,
+		stats.TransactionsMismatched,
+	)
 }
 
 type blockResult struct {
