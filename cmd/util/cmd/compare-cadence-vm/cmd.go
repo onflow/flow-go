@@ -413,12 +413,28 @@ func compareBlocks(
 
 		blocks := loader.loadNextBlocks(batchBlockCount)
 
+		// Report the progress within the batch, in addition to the progress of the whole run.
+		// A run with a single batch would report the same progress twice.
+		var batchProgress util.LogProgressFunc[int]
+		if batchBlockCount < totalBlockCount {
+			batchProgress = util.LogProgress(
+				log.Logger,
+				util.NewLogProgressConfig(
+					"executing blocks in current batch",
+					batchBlockCount,
+					1*time.Second,
+					100/5, // log every 5%
+				),
+			)
+		}
+
 		stats.add(compareBatch(
 			blocks,
 			flowClient,
 			remoteClient,
 			chain,
 			blockProgress,
+			batchProgress,
 		))
 
 		completedBlockCount += batchBlockCount
@@ -450,12 +466,16 @@ func compareBlocks(
 }
 
 // compareBatch compares the given blocks and returns their combined results.
+//
+// Each compared block is reported to the progress of the whole run,
+// and to the progress within the batch, if there is more than one batch.
 func compareBatch(
 	blocks []block,
 	flowClient *client.Client,
 	remoteClient debug.RemoteClient,
 	chain flow.Chain,
-	blockProgress util.LogProgressFunc[int],
+	overallProgress util.LogProgressFunc[int],
+	batchProgress util.LogProgressFunc[int],
 ) runStats {
 
 	var stats runStats
@@ -482,7 +502,10 @@ func compareBatch(
 				atomic.AddInt64(&stats.BlocksMatched, 1)
 			}
 
-			blockProgress(1)
+			overallProgress(1)
+			if batchProgress != nil {
+				batchProgress(1)
+			}
 
 			return nil
 		})
