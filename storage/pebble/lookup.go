@@ -1,7 +1,6 @@
 package pebble
 
 import (
-	"bytes"
 	"encoding/binary"
 	"fmt"
 
@@ -30,7 +29,11 @@ type lookupKey struct {
 //
 // Lookup keys are encoded as follows:
 // [codeRegister(1)] [owner] '/' [key] '/' [height(8)]
-// owner and key are variable length fields
+// owner and key are variable length fields.
+//
+// Note: owner must be either empty (global registers) or exactly flow.AddressLength bytes
+// (account registers). lookupKeyToRegisterID relies on this invariant to decode the owner,
+// since both owner and key may contain the '/' separator byte.
 func newLookupKey(height uint64, reg flow.RegisterID) *lookupKey {
 	key := lookupKey{
 		// 1 byte gaps for db prefix and '/' separators
@@ -102,16 +105,27 @@ func lookupKeyToRegisterID(lookupKey []byte) (uint64, flow.RegisterID, error) {
 
 	// 3. Get the owner and key
 	//
-	// we do this by getting everything before the first '/'. since the last '/' was already removed,
-	// all that's left is the key.
-	var found bool
-	ownerBytes, keyBytes, found := bytes.Cut(lookupKey, []byte("/"))
-	if !found {
-		return 0, flow.RegisterID{}, fmt.Errorf("invalid lookup key format: cannot find first slash")
+	// What remains is [owner] '/' [key]. We cannot search for the separator: the owner is raw
+	// address bytes and may itself contain 0x2F ('/'). Instead, decode structurally: the owner
+	// is either exactly flow.AddressLength bytes (account registers) or empty (global registers).
+	//
+	// The account case is checked first so that addresses starting with 0x2F are not misparsed
+	// as global registers. This is unambiguous in practice: no global register key contains
+	// '/' at index flow.AddressLength-1.
+	var owner, key string
+	switch {
+	case len(lookupKey) > flow.AddressLength && lookupKey[flow.AddressLength] == '/':
+		owner = string(lookupKey[:flow.AddressLength])
+		key = string(lookupKey[flow.AddressLength+1:])
+	case lookupKey[0] == '/':
+		// global registers have an empty owner
+		owner = ""
+		key = string(lookupKey[1:])
+	default:
+		// only the two cases above are valid; anything else is a malformed key
+		return 0, flow.RegisterID{},
+			fmt.Errorf("invalid lookup key format: cannot find owner/key separator")
 	}
-
-	owner := string(ownerBytes)
-	key := string(keyBytes)
 
 	return height, flow.RegisterID{Owner: owner, Key: key}, nil
 }
