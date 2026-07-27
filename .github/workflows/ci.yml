@@ -67,7 +67,6 @@ jobs:
         with:
           name: custom-gcl
           path: tools/custom-gcl
-          retention-days: 1
           if-no-files-found: error
           # Allow "Re-run all jobs": the previous attempt's artifact still exists on the run,
           # and without this the upload would fail with a name conflict.
