@@ -1227,7 +1227,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 				require.NoError(t, err)
 				require.Greater(t, output.MemoryEstimate, uint64(highWeight))
 
-				unittest.RequireLimitExceededError(t, output.Err, errors.LimitKindMemory)
+				unittest.RequireLimitExceededError(t, output.Err, errors.LimitKindMemory, 10_000_000_000)
 			},
 		))
 
@@ -1351,7 +1351,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 				// There are 100 breaks and each break uses 1_000_000 memory
 				require.Greater(t, output.MemoryEstimate, uint64(100_000_000))
 
-				unittest.RequireLimitExceededError(t, output.Err, errors.LimitKindMemory)
+				unittest.RequireLimitExceededError(t, output.Err, errors.LimitKindMemory, 100_000_000)
 			},
 		))
 

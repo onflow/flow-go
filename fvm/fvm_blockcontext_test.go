@@ -1228,7 +1228,8 @@ func TestBlockContext_ExecuteTransaction_InteractionLimitReached(t *testing.T) {
 				unittest.RequireLimitExceededError(
 					t,
 					output.Err,
-					errors.LimitKindLedgerInteraction)
+					errors.LimitKindLedgerInteraction,
+					500_000)
 			}))
 
 	t.Run("Using to much interaction but not failing because of service account", newVMTest().withBootstrapProcedureOptions(bootstrapOptions...).

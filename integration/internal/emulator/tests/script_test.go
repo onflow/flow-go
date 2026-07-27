@@ -194,7 +194,7 @@ func TestInfiniteScript(t *testing.T) {
 	result, err := b.ExecuteScript([]byte(code), nil)
 	require.NoError(t, err)
 
-	unittest.RequireLimitExceededError(t, result.Error, fvmerrors.LimitKindComputation)
+	unittest.RequireLimitExceededError(t, result.Error, fvmerrors.LimitKindComputation, limit)
 }
 
 func TestScriptExecutionLimit(t *testing.T) {
@@ -231,7 +231,7 @@ func TestScriptExecutionLimit(t *testing.T) {
 		result, err := b.ExecuteScript([]byte(code), nil)
 		require.NoError(t, err)
 
-		unittest.RequireLimitExceededError(t, result.Error, fvmerrors.LimitKindComputation)
+		unittest.RequireLimitExceededError(t, result.Error, fvmerrors.LimitKindComputation, limit)
 	})
 
 	t.Run("SufficientLimit", func(t *testing.T) {
