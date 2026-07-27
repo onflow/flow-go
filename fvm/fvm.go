@@ -87,11 +87,14 @@ func inspectProcedureResults(
 ) []inspection.Result {
 	inspectionResults := make([]inspection.Result, 0, len(context.Inspectors))
 
+	// TxBody is nil for non-transaction procedures (e.g. scripts)
+	signers := inspection.AuthorizingSigners(context.TxBody)
+
 	for i, inspector := range context.Inspectors {
 		log := log.With().Str("inspector", inspector.Name()).Int("inspector-num", i).Logger()
 		log.Debug().Msg("starting inspection")
 
-		result, err := inspector.Inspect(log, storageSnapshot, executionSnapshot, events)
+		result, err := inspector.Inspect(log, storageSnapshot, executionSnapshot, events, signers)
 		if err != nil {
 			log.Error().Err(err).Msg("failed to inspect procedure results")
 		}
