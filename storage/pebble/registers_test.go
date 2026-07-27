@@ -560,6 +560,40 @@ func TestRegisters_ByKeyPrefix_GlobalRegisters(t *testing.T) {
 	})
 }
 
+// TestRegisters_ByKeyPrefix_OwnerContainsSlash verifies that ByKeyPrefix yields registers of
+// accounts whose raw address bytes contain 0x2F ('/'). Such accounts were previously skipped
+// because lookupKeyToRegisterID split the owner at the first '/' byte (issue #8617).
+func TestRegisters_ByKeyPrefix_OwnerContainsSlash(t *testing.T) {
+	t.Parallel()
+
+	// addresses with 0x2F ('/') at the first, a middle, and the last byte, plus one without
+	addrSlashFirst := flow.BytesToAddress([]byte{0x2f, 0xa2, 0xe8, 0x18, 0x5d, 0xf2, 0xd1, 0x4e})
+	addrSlashMiddle := flow.BytesToAddress([]byte{0x45, 0xa2, 0x2f, 0x85, 0xdf, 0xf2, 0xd1, 0x4e})
+	addrSlashLast := flow.BytesToAddress([]byte{0x45, 0xa2, 0xe8, 0x18, 0x5d, 0xf2, 0xd1, 0x2f})
+	addrPlain := flow.BytesToAddress([]byte{0x8e, 0x70, 0x02, 0x0e, 0x96, 0x5d, 0xf2, 0xea})
+
+	regs := map[flow.RegisterID]flow.RegisterValue{}
+	for i, addr := range []flow.Address{addrSlashFirst, addrSlashMiddle, addrSlashLast, addrPlain} {
+		regs[flow.ContractNamesRegisterID(addr)] = []byte(fmt.Sprintf("names%d", i))
+	}
+	// a global register (empty owner) must not disturb the scan
+	globalReg := flow.RegisterID{Owner: "", Key: flow.AddressStateKey}
+
+	RunWithRegistersStorageAtInitialHeights(t, 1, 1, func(r *Registers) {
+		entries := flow.RegisterEntries{{Key: globalReg, Value: []byte("global")}}
+		for reg, val := range regs {
+			entries = append(entries, flow.RegisterEntry{Key: reg, Value: val})
+		}
+		require.NoError(t, r.Store(entries, 2))
+
+		results := collectRegistersByKey(t, r.ByKeyPrefix(flow.ContractNamesKey, 2, nil))
+		assert.Len(t, results, len(regs))
+		for reg, val := range regs {
+			assert.Equal(t, val, results[reg], "missing or wrong value for owner %x", []byte(reg.Owner))
+		}
+	})
+}
+
 // collectRegistersByKey drains a ByKey iterator into a map keyed by register ID.
 func collectRegistersByKey(t *testing.T, iter storage.IndexIterator[flow.RegisterValue, flow.RegisterID]) map[flow.RegisterID]flow.RegisterValue {
 	t.Helper()

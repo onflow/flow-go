@@ -14,7 +14,6 @@ import (
 	"github.com/onflow/flow/protobuf/go/flow/entities"
 
 	providermock "github.com/onflow/flow-go/engine/access/rpc/backend/transactions/provider/mock"
-	"github.com/onflow/flow-go/fvm/blueprints"
 	accessmodel "github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/access/systemcollection"
 	"github.com/onflow/flow-go/model/flow"
@@ -48,6 +47,15 @@ func makeScheduledTxIter(txs []accessmodel.ScheduledTransaction) storage.Schedul
 			}
 		}
 	}
+}
+
+// signalerCtxNoThrow creates a signaler context that fails the test if irrecoverable.Throw
+// is called. Using this instead of a bare context.Background() ensures that an unexpected
+// irrecoverable error fails the individual test with a useful message instead of escalating
+// to log.Fatalf and killing the whole test process.
+func signalerCtxNoThrow(t *testing.T) context.Context {
+	return irrecoverable.WithSignalerContext(context.Background(),
+		irrecoverable.NewMockSignalerContext(t, context.Background()))
 }
 
 // signalerCtxExpectingThrow creates a context that asserts irrecoverable.Throw is called
@@ -301,7 +309,7 @@ func TestScheduledTransactionsBackend_GetScheduledTransaction(t *testing.T) {
 		store.On("ByID", uint64(1)).Return(expectedTx, nil).Once()
 
 		result, err := backend.GetScheduledTransaction(
-			context.Background(), 1, ScheduledTransactionExpandOptions{}, defaultEncoding,
+			signalerCtxNoThrow(t), 1, ScheduledTransactionExpandOptions{}, defaultEncoding,
 		)
 		require.NoError(t, err)
 		require.NotNil(t, result)
@@ -321,7 +329,7 @@ func TestScheduledTransactionsBackend_GetScheduledTransaction(t *testing.T) {
 		store.On("ByID", uint64(99)).Return(accessmodel.ScheduledTransaction{}, storage.ErrNotFound).Once()
 
 		_, err := backend.GetScheduledTransaction(
-			context.Background(), 99, ScheduledTransactionExpandOptions{}, defaultEncoding,
+			signalerCtxNoThrow(t), 99, ScheduledTransactionExpandOptions{}, defaultEncoding,
 		)
 		require.Error(t, err)
 		st, ok := status.FromError(err)
@@ -339,7 +347,7 @@ func TestScheduledTransactionsBackend_GetScheduledTransaction(t *testing.T) {
 		store.On("ByID", uint64(1)).Return(accessmodel.ScheduledTransaction{}, storage.ErrNotBootstrapped).Once()
 
 		_, err := backend.GetScheduledTransaction(
-			context.Background(), 1, ScheduledTransactionExpandOptions{}, defaultEncoding,
+			signalerCtxNoThrow(t), 1, ScheduledTransactionExpandOptions{}, defaultEncoding,
 		)
 		require.Error(t, err)
 		st, ok := status.FromError(err)
@@ -380,7 +388,7 @@ func TestScheduledTransactionsBackend_GetScheduledTransaction(t *testing.T) {
 
 		// expand options set but status is Scheduled: no storage lookups expected
 		result, err := backend.GetScheduledTransaction(
-			context.Background(), 1,
+			signalerCtxNoThrow(t), 1,
 			ScheduledTransactionExpandOptions{Result: true, Transaction: true},
 			defaultEncoding,
 		)
@@ -422,7 +430,7 @@ func TestScheduledTransactionsBackend_GetScheduledTransaction(t *testing.T) {
 		mockBlocks.On("ByCollectionID", cancelledCollection.ID()).Return(cancelledBlock, nil).Once()
 
 		result, err := backend.GetScheduledTransaction(
-			context.Background(), 1,
+			signalerCtxNoThrow(t), 1,
 			ScheduledTransactionExpandOptions{Result: true, Transaction: true},
 			defaultEncoding,
 		)
@@ -468,7 +476,7 @@ func TestScheduledTransactionsBackend_GetScheduledTransaction(t *testing.T) {
 				Return(expectedResult, nil).Once()
 
 			result, err := backend.GetScheduledTransaction(
-				context.Background(), 1,
+				signalerCtxNoThrow(t), 1,
 				ScheduledTransactionExpandOptions{Result: true},
 				defaultEncoding,
 			)
@@ -479,57 +487,70 @@ func TestScheduledTransactionsBackend_GetScheduledTransaction(t *testing.T) {
 		})
 	}
 
-	// expand tx body works for executed and failed transactions
+	// expand tx body works for executed and failed transactions.
+	// The system collection builder used to reconstruct the tx body is selected by the executed
+	// block's height, so cover both the frozen v0 builder (below the Mainnet27 HCU 1 boundary at
+	// height 133408444) and the current v1 builder (at/above the boundary) deterministically.
 	for _, status := range []accessmodel.ScheduledTransactionStatus{accessmodel.ScheduledTxStatusExecuted, accessmodel.ScheduledTxStatusFailed} {
-		t.Run(fmt.Sprintf("expand transaction body on %s transaction", status), func(t *testing.T) {
-			store := storagemock.NewScheduledTransactionsIndexReader(t)
-			scheduledTxLookup := storagemock.NewScheduledTransactionsReader(t)
-			mockHeaders := storagemock.NewHeaders(t)
+		for _, version := range []struct {
+			name        string
+			blockHeight uint64
+		}{
+			{name: "v0 system collection", blockHeight: 1},           // below the Mainnet27 HCU 1 boundary (133408444)
+			{name: "v1 system collection", blockHeight: 200_000_000}, // above the boundary
+		} {
+			t.Run(fmt.Sprintf("expand transaction body on %s transaction with %s", status, version.name), func(t *testing.T) {
+				store := storagemock.NewScheduledTransactionsIndexReader(t)
+				scheduledTxLookup := storagemock.NewScheduledTransactionsReader(t)
+				mockHeaders := storagemock.NewHeaders(t)
 
-			sysCollections, err := systemcollection.NewVersioned(
-				flow.Mainnet.Chain(), systemcollection.Default(flow.Mainnet),
-			)
-			require.NoError(t, err)
+				sysCollections, err := systemcollection.NewVersioned(
+					flow.Mainnet.Chain(), systemcollection.Default(flow.Mainnet),
+				)
+				require.NoError(t, err)
 
-			backend := NewScheduledTransactionsBackend(
-				unittest.Logger(),
-				&backendBase{
-					config:            defaultConfig,
-					headers:           mockHeaders,
-					systemCollections: sysCollections,
-				},
-				flow.Mainnet, store, nil, scheduledTxLookup, nil, nil,
-			)
+				backend := NewScheduledTransactionsBackend(
+					unittest.Logger(),
+					&backendBase{
+						config:            defaultConfig,
+						headers:           mockHeaders,
+						systemCollections: sysCollections,
+					},
+					flow.Mainnet, store, nil, scheduledTxLookup, nil, nil,
+				)
 
-			// construct the expected tx body using the same path the production code will use
-			const scheduledTxID = uint64(42)
-			const executionEffort = uint64(1000)
-			expectedTxBody, err := blueprints.ExecuteCallbacksTransaction(flow.Mainnet.Chain(), scheduledTxID, executionEffort)
-			require.NoError(t, err)
-			txID := expectedTxBody.ID()
+				// construct the expected tx body using the same height-versioned path the
+				// production code will use for the executed block's height
+				const scheduledTxID = uint64(42)
+				const executionEffort = uint64(1000)
+				expectedTxBody, err := sysCollections.ByHeight(version.blockHeight).
+					ExecuteCallbacksTransaction(flow.Mainnet.Chain(), scheduledTxID, executionEffort)
+				require.NoError(t, err)
+				txID := expectedTxBody.ID()
 
-			blockHeader := unittest.BlockHeaderFixture()
-			blockID := blockHeader.ID()
+				blockHeader := unittest.BlockHeaderFixture(unittest.WithHeaderHeight(version.blockHeight))
+				blockID := blockHeader.ID()
 
-			storedTx := accessmodel.ScheduledTransaction{
-				ID: scheduledTxID, Status: status,
-				ExecutedTransactionID: txID, ExecutionEffort: executionEffort,
-			}
+				storedTx := accessmodel.ScheduledTransaction{
+					ID: scheduledTxID, Status: status,
+					ExecutedTransactionID: txID, ExecutionEffort: executionEffort,
+				}
 
-			store.On("ByID", scheduledTxID).Return(storedTx, nil).Once()
-			scheduledTxLookup.On("BlockIDByTransactionID", txID).Return(blockID, nil).Once()
-			mockHeaders.On("ByBlockID", blockID).Return(blockHeader, nil).Once()
+				store.On("ByID", scheduledTxID).Return(storedTx, nil).Once()
+				scheduledTxLookup.On("BlockIDByTransactionID", txID).Return(blockID, nil).Once()
+				mockHeaders.On("ByBlockID", blockID).Return(blockHeader, nil).Once()
 
-			result, err := backend.GetScheduledTransaction(
-				context.Background(), scheduledTxID,
-				ScheduledTransactionExpandOptions{Transaction: true},
-				defaultEncoding,
-			)
-			require.NoError(t, err)
-			require.NotNil(t, result.Transaction)
-			assert.Equal(t, txID, result.Transaction.ID())
-			assert.Nil(t, result.Result)
-		})
+				result, err := backend.GetScheduledTransaction(
+					signalerCtxNoThrow(t), scheduledTxID,
+					ScheduledTransactionExpandOptions{Transaction: true},
+					defaultEncoding,
+				)
+				require.NoError(t, err)
+				require.NotNil(t, result.Transaction)
+				assert.Equal(t, txID, result.Transaction.ID())
+				assert.Nil(t, result.Result)
+			})
+		}
 	}
 
 	t.Run("expand handler contract", func(t *testing.T) {
@@ -558,7 +579,7 @@ func TestScheduledTransactionsBackend_GetScheduledTransaction(t *testing.T) {
 		).Once()
 
 		result, err := backend.GetScheduledTransaction(
-			context.Background(), 1,
+			signalerCtxNoThrow(t), 1,
 			ScheduledTransactionExpandOptions{HandlerContract: true},
 			defaultEncoding,
 		)
@@ -598,7 +619,7 @@ func TestScheduledTransactionsBackend_GetScheduledTransaction(t *testing.T) {
 		// block not yet indexed by FinalizedBlockProcessor
 		mockBlocks.On("ByCollectionID", createdCollection.ID()).Return((*flow.Block)(nil), storage.ErrNotFound).Once()
 
-		result, err := backend.GetScheduledTransaction(context.Background(), 1, ScheduledTransactionExpandOptions{}, defaultEncoding)
+		result, err := backend.GetScheduledTransaction(signalerCtxNoThrow(t), 1, ScheduledTransactionExpandOptions{}, defaultEncoding)
 		require.NoError(t, err)
 		assert.Zero(t, result.CreatedAt)
 	})
@@ -632,7 +653,7 @@ func TestScheduledTransactionsBackend_GetScheduledTransaction(t *testing.T) {
 		mockCollections.On("LightByTransactionID", cancelledTxID).Return(cancelledCollection, nil).Once()
 		mockBlocks.On("ByCollectionID", cancelledCollection.ID()).Return((*flow.Block)(nil), storage.ErrNotFound).Once()
 
-		result, err := backend.GetScheduledTransaction(context.Background(), 1, ScheduledTransactionExpandOptions{}, defaultEncoding)
+		result, err := backend.GetScheduledTransaction(signalerCtxNoThrow(t), 1, ScheduledTransactionExpandOptions{}, defaultEncoding)
 		require.NoError(t, err)
 		assert.Zero(t, result.CompletedAt)
 	})
@@ -1040,7 +1061,7 @@ func TestScheduledTransactionsBackend_GetScheduledTransactions(t *testing.T) {
 			Return(makeScheduledTxIter(txs), nil).Once()
 
 		page, err := backend.GetScheduledTransactions(
-			context.Background(), 0, nil,
+			signalerCtxNoThrow(t), 0, nil,
 			ScheduledTransactionFilter{}, ScheduledTransactionExpandOptions{},
 			defaultEncoding,
 		)
@@ -1067,7 +1088,7 @@ func TestScheduledTransactionsBackend_GetScheduledTransactions(t *testing.T) {
 			Return(makeScheduledTxIter(txs), nil).Once()
 
 		page, err := backend.GetScheduledTransactions(
-			context.Background(), 2, nil,
+			signalerCtxNoThrow(t), 2, nil,
 			ScheduledTransactionFilter{}, ScheduledTransactionExpandOptions{},
 			defaultEncoding,
 		)
@@ -1088,7 +1109,7 @@ func TestScheduledTransactionsBackend_GetScheduledTransactions(t *testing.T) {
 			Return(makeScheduledTxIter(nil), nil).Once()
 
 		_, err := backend.GetScheduledTransactions(
-			context.Background(), 0, nil,
+			signalerCtxNoThrow(t), 0, nil,
 			ScheduledTransactionFilter{}, ScheduledTransactionExpandOptions{},
 			defaultEncoding,
 		)
@@ -1106,7 +1127,7 @@ func TestScheduledTransactionsBackend_GetScheduledTransactions(t *testing.T) {
 			Return(makeScheduledTxIter(nil), nil).Once()
 
 		_, err := backend.GetScheduledTransactions(
-			context.Background(), 10, nil,
+			signalerCtxNoThrow(t), 10, nil,
 			ScheduledTransactionFilter{}, ScheduledTransactionExpandOptions{},
 			defaultEncoding,
 		)
@@ -1121,7 +1142,7 @@ func TestScheduledTransactionsBackend_GetScheduledTransactions(t *testing.T) {
 		)
 
 		_, err := backend.GetScheduledTransactions(
-			context.Background(), 500, nil,
+			signalerCtxNoThrow(t), 500, nil,
 			ScheduledTransactionFilter{}, ScheduledTransactionExpandOptions{},
 			defaultEncoding,
 		)
@@ -1143,7 +1164,7 @@ func TestScheduledTransactionsBackend_GetScheduledTransactions(t *testing.T) {
 			Return(makeScheduledTxIter(nil), nil).Once()
 
 		_, err := backend.GetScheduledTransactions(
-			context.Background(), 20, cursor,
+			signalerCtxNoThrow(t), 20, cursor,
 			ScheduledTransactionFilter{}, ScheduledTransactionExpandOptions{},
 			defaultEncoding,
 		)
@@ -1161,7 +1182,7 @@ func TestScheduledTransactionsBackend_GetScheduledTransactions(t *testing.T) {
 			Return(makeScheduledTxIter(nil), nil).Once()
 
 		page, err := backend.GetScheduledTransactions(
-			context.Background(), 0, nil,
+			signalerCtxNoThrow(t), 0, nil,
 			ScheduledTransactionFilter{}, ScheduledTransactionExpandOptions{},
 			defaultEncoding,
 		)
@@ -1181,7 +1202,7 @@ func TestScheduledTransactionsBackend_GetScheduledTransactions(t *testing.T) {
 			Return(nil, storage.ErrNotBootstrapped).Once()
 
 		_, err := backend.GetScheduledTransactions(
-			context.Background(), 0, nil,
+			signalerCtxNoThrow(t), 0, nil,
 			ScheduledTransactionFilter{}, ScheduledTransactionExpandOptions{},
 			defaultEncoding,
 		)
@@ -1273,7 +1294,7 @@ func TestScheduledTransactionsBackend_GetScheduledTransactions(t *testing.T) {
 		mockBlocks.On("ByCollectionID", createdCollection.ID()).Return((*flow.Block)(nil), storage.ErrNotFound).Once()
 
 		page, err := backend.GetScheduledTransactions(
-			context.Background(), 0, nil,
+			signalerCtxNoThrow(t), 0, nil,
 			ScheduledTransactionFilter{}, ScheduledTransactionExpandOptions{},
 			defaultEncoding,
 		)
@@ -1307,7 +1328,7 @@ func TestScheduledTransactionsBackend_GetScheduledTransactionsByAddress(t *testi
 			Return(makeScheduledTxIter(txs), nil).Once()
 
 		page, err := backend.GetScheduledTransactionsByAddress(
-			context.Background(), addr, 0, nil,
+			signalerCtxNoThrow(t), addr, 0, nil,
 			ScheduledTransactionFilter{}, ScheduledTransactionExpandOptions{},
 			defaultEncoding,
 		)
@@ -1329,7 +1350,7 @@ func TestScheduledTransactionsBackend_GetScheduledTransactionsByAddress(t *testi
 			Return(makeScheduledTxIter(nil), nil).Once()
 
 		_, err := backend.GetScheduledTransactionsByAddress(
-			context.Background(), addr, 0, nil,
+			signalerCtxNoThrow(t), addr, 0, nil,
 			ScheduledTransactionFilter{}, ScheduledTransactionExpandOptions{},
 			defaultEncoding,
 		)
@@ -1346,7 +1367,7 @@ func TestScheduledTransactionsBackend_GetScheduledTransactionsByAddress(t *testi
 		addr := unittest.RandomAddressFixture()
 
 		_, err := backend.GetScheduledTransactionsByAddress(
-			context.Background(), addr, 500, nil,
+			signalerCtxNoThrow(t), addr, 500, nil,
 			ScheduledTransactionFilter{}, ScheduledTransactionExpandOptions{},
 			defaultEncoding,
 		)
@@ -1369,7 +1390,7 @@ func TestScheduledTransactionsBackend_GetScheduledTransactionsByAddress(t *testi
 			Return(makeScheduledTxIter(nil), nil).Once()
 
 		_, err := backend.GetScheduledTransactionsByAddress(
-			context.Background(), addr, 15, cursor,
+			signalerCtxNoThrow(t), addr, 15, cursor,
 			ScheduledTransactionFilter{}, ScheduledTransactionExpandOptions{},
 			defaultEncoding,
 		)
@@ -1388,7 +1409,7 @@ func TestScheduledTransactionsBackend_GetScheduledTransactionsByAddress(t *testi
 			Return(makeScheduledTxIter(nil), nil).Once()
 
 		page, err := backend.GetScheduledTransactionsByAddress(
-			context.Background(), addr, 0, nil,
+			signalerCtxNoThrow(t), addr, 0, nil,
 			ScheduledTransactionFilter{}, ScheduledTransactionExpandOptions{},
 			defaultEncoding,
 		)
@@ -1409,7 +1430,7 @@ func TestScheduledTransactionsBackend_GetScheduledTransactionsByAddress(t *testi
 			Return(nil, storage.ErrNotBootstrapped).Once()
 
 		_, err := backend.GetScheduledTransactionsByAddress(
-			context.Background(), addr, 0, nil,
+			signalerCtxNoThrow(t), addr, 0, nil,
 			ScheduledTransactionFilter{}, ScheduledTransactionExpandOptions{},
 			defaultEncoding,
 		)
@@ -1504,7 +1525,7 @@ func TestScheduledTransactionsBackend_GetScheduledTransactionsByAddress(t *testi
 		mockBlocks.On("ByCollectionID", createdCollection.ID()).Return((*flow.Block)(nil), storage.ErrNotFound).Once()
 
 		page, err := backend.GetScheduledTransactionsByAddress(
-			context.Background(), addr, 0, nil,
+			signalerCtxNoThrow(t), addr, 0, nil,
 			ScheduledTransactionFilter{}, ScheduledTransactionExpandOptions{},
 			defaultEncoding,
 		)
@@ -1565,7 +1586,7 @@ func TestScheduledTransactionsBackend_PopulateBlockTimestamps(t *testing.T) {
 		mockCollections.On("LightByTransactionID", createdTxID).Return(collection, nil).Once()
 		mockBlocks.On("ByCollectionID", collection.ID()).Return(block, nil).Once()
 
-		result, err := backend.GetScheduledTransaction(context.Background(), 1, ScheduledTransactionExpandOptions{}, defaultEncoding)
+		result, err := backend.GetScheduledTransaction(signalerCtxNoThrow(t), 1, ScheduledTransactionExpandOptions{}, defaultEncoding)
 		require.NoError(t, err)
 		assert.Equal(t, block.Timestamp, result.CreatedAt)
 		assert.Zero(t, result.CompletedAt)
@@ -1585,7 +1606,7 @@ func TestScheduledTransactionsBackend_PopulateBlockTimestamps(t *testing.T) {
 		store.On("ByID", uint64(1)).Return(storedTx, nil).Once()
 		// no lookups expected: placeholder tx skips CreatedAt, Scheduled status skips CompletedAt
 
-		result, err := backend.GetScheduledTransaction(context.Background(), 1, ScheduledTransactionExpandOptions{}, defaultEncoding)
+		result, err := backend.GetScheduledTransaction(signalerCtxNoThrow(t), 1, ScheduledTransactionExpandOptions{}, defaultEncoding)
 		require.NoError(t, err)
 		assert.Zero(t, result.CreatedAt)
 		assert.Zero(t, result.CompletedAt)
@@ -1622,7 +1643,7 @@ func TestScheduledTransactionsBackend_PopulateBlockTimestamps(t *testing.T) {
 		scheduledTxLookup.On("BlockIDByTransactionID", executedTxID).Return(executedBlockID, nil).Once()
 		mockHeaders.On("ByBlockID", executedBlockID).Return(executedBlockHeader, nil).Once()
 
-		result, err := backend.GetScheduledTransaction(context.Background(), 1, ScheduledTransactionExpandOptions{}, defaultEncoding)
+		result, err := backend.GetScheduledTransaction(signalerCtxNoThrow(t), 1, ScheduledTransactionExpandOptions{}, defaultEncoding)
 		require.NoError(t, err)
 		assert.Equal(t, createdBlock.Timestamp, result.CreatedAt)
 		assert.Equal(t, executedBlockHeader.Timestamp, result.CompletedAt)
@@ -1658,7 +1679,7 @@ func TestScheduledTransactionsBackend_PopulateBlockTimestamps(t *testing.T) {
 		mockCollections.On("LightByTransactionID", cancelledTxID).Return(cancelledCollection, nil).Once()
 		mockBlocks.On("ByCollectionID", cancelledCollection.ID()).Return(cancelledBlock, nil).Once()
 
-		result, err := backend.GetScheduledTransaction(context.Background(), 1, ScheduledTransactionExpandOptions{}, defaultEncoding)
+		result, err := backend.GetScheduledTransaction(signalerCtxNoThrow(t), 1, ScheduledTransactionExpandOptions{}, defaultEncoding)
 		require.NoError(t, err)
 		assert.Equal(t, createdBlock.Timestamp, result.CreatedAt)
 		assert.Equal(t, cancelledBlock.Timestamp, result.CompletedAt)
