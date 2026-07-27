@@ -366,6 +366,7 @@ func (m *MemoryMeter) MeterMemory(usage common.MemoryUsage) error {
 	if m.memoryEstimate > m.params.memoryLimit {
 		return errors.NewLimitExceededError(
 			errors.LimitKindMemory,
+			m.memoryEstimate,
 			m.params.TotalMemoryLimit())
 	}
 	return nil

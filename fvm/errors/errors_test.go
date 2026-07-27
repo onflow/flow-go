@@ -388,9 +388,33 @@ func TestFindFailure(t *testing.T) {
 	}
 }
 
+func TestNewLimitExceededError(t *testing.T) {
+	tests := []struct {
+		kind         LimitKind
+		expectedCode ErrorCode
+	}{
+		{LimitKindComputation, ErrCodeComputationLimitExceededError},
+		{LimitKindMemory, ErrCodeMemoryLimitExceededError},
+		{LimitKindLedgerInteraction, ErrCodeLedgerInteractionLimitExceededError},
+		{LimitKindEvent, ErrCodeEventLimitExceededError},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.kind.String(), func(t *testing.T) {
+			err := NewLimitExceededError(tc.kind, 101, 100)
+
+			assert.Equal(t, tc.kind, err.LimitKind())
+			assert.Equal(t, uint64(101), err.Used())
+			assert.Equal(t, uint64(100), err.Limit())
+			assert.Equal(t, tc.expectedCode, err.Code())
+			assert.Contains(t, err.Error(), "used: 101, limit: 100")
+		})
+	}
+}
+
 func TestIsLimitExceededError(t *testing.T) {
 	baseErr := fmt.Errorf("base error")
-	limitErr := NewLimitExceededError(LimitKindComputation, 100)
+	limitErr := NewLimitExceededError(LimitKindComputation, 101, 100)
 
 	tests := []struct {
 		name     string

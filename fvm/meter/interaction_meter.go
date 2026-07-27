@@ -133,6 +133,7 @@ func (m *InteractionMeter) checkStorageInteractionLimit(enforceLimit bool) error
 		m.TotalBytesOfStorageInteractions() > m.params.storageInteractionLimit {
 		return errors.NewLimitExceededError(
 			errors.LimitKindLedgerInteraction,
+			m.TotalBytesOfStorageInteractions(),
 			m.params.storageInteractionLimit)
 	}
 	return nil

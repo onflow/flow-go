@@ -949,3 +949,83 @@ func TestEventLimits(t *testing.T) {
 		require.Equal(t, testSize1+testSize2, meter1.TotalEmittedEventBytes())
 	})
 }
+
+// TestLimitExceededErrorUsedExceedsLimit checks that every meter reports a
+// used amount strictly greater than the exceeded limit (the
+// [errors.NewLimitExceededError] invariant).
+func TestLimitExceededErrorUsedExceedsLimit(t *testing.T) {
+	// RequireLimitExceededError also checks used > limit.
+	requireUsedAndLimit := func(
+		t *testing.T,
+		err error,
+		kind errors.LimitKind,
+		expectedUsed, expectedLimit uint64,
+	) {
+		unittest.RequireLimitExceededError(t, err, kind, expectedLimit)
+		limitErr, ok := errors.AsLimitExceededError(err)
+		require.True(t, ok)
+		require.Equal(t, expectedUsed, limitErr.Used())
+	}
+
+	t.Run("computation", func(t *testing.T) {
+		m := meter.NewMeter(
+			meter.DefaultParameters().
+				WithComputationLimit(10).
+				WithComputationWeights(map[common.ComputationKind]uint64{
+					0: 1 << meter.MeterExecutionInternalPrecisionBytes,
+				}),
+		)
+
+		err := m.MeterComputation(common.ComputationUsage{Kind: 0, Intensity: 12})
+		requireUsedAndLimit(t, err, errors.LimitKindComputation, 12, 10)
+	})
+
+	t.Run("computation - used rounds up", func(t *testing.T) {
+		// With a sub-unit weight the internally used amount (limit + 1/65536
+		// units) would truncate to the limit itself; it must round up instead.
+		m := meter.NewMeter(
+			meter.DefaultParameters().
+				WithComputationLimit(10).
+				WithComputationWeights(map[common.ComputationKind]uint64{0: 1}),
+		)
+
+		err := m.MeterComputation(common.ComputationUsage{
+			Kind:      0,
+			Intensity: 10<<meter.MeterExecutionInternalPrecisionBytes + 1,
+		})
+		requireUsedAndLimit(t, err, errors.LimitKindComputation, 11, 10)
+	})
+
+	t.Run("memory", func(t *testing.T) {
+		m := meter.NewMeter(
+			meter.DefaultParameters().
+				WithMemoryLimit(10).
+				WithMemoryWeights(map[common.MemoryKind]uint64{0: 1}),
+		)
+
+		err := m.MeterMemory(common.MemoryUsage{Kind: 0, Amount: 12})
+		requireUsedAndLimit(t, err, errors.LimitKindMemory, 12, 10)
+	})
+
+	t.Run("ledger interaction", func(t *testing.T) {
+		key := flow.NewRegisterID(flow.EmptyAddress, "1")
+		value := []byte{0x1, 0x2, 0x3}
+		size := meter.GetStorageKeyValueSizeForTesting(key, value)
+
+		m := meter.NewMeter(
+			meter.DefaultParameters().WithStorageInteractionLimit(size - 1),
+		)
+
+		err := m.MeterStorageRead(key, value, true)
+		requireUsedAndLimit(t, err, errors.LimitKindLedgerInteraction, size, size-1)
+	})
+
+	t.Run("event", func(t *testing.T) {
+		m := meter.NewMeter(
+			meter.DefaultParameters().WithEventEmitByteLimit(10),
+		)
+
+		err := m.MeterEmittedEvent(12)
+		requireUsedAndLimit(t, err, errors.LimitKindEvent, 12, 10)
+	})
+}
