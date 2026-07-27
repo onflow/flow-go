@@ -179,12 +179,18 @@ func TestBlockLoaderAdvance(t *testing.T) {
 		header := unittest.BlockHeaderFixture()
 
 		loader := &blockLoader{
-			nextBlockID: header.ID(),
+			nextBlockID:     header.ID(),
+			totalBlockCount: 2,
 		}
 		loader.loadedBlockCount++
 		loader.advance(header)
 
 		assert.Equal(t, header.ParentID, loader.nextBlockID)
+
+		loader.loadedBlockCount++
+		loader.advance(unittest.BlockHeaderFixture())
+
+		assert.Equal(t, flow.ZeroID, loader.nextBlockID)
 	})
 
 	t.Run("explicit block IDs", func(t *testing.T) {
@@ -195,6 +201,7 @@ func TestBlockLoaderAdvance(t *testing.T) {
 		loader := &blockLoader{
 			explicitBlockIDs: blockIDs,
 			nextBlockID:      blockIDs[0],
+			totalBlockCount:  len(blockIDs),
 		}
 
 		// The parent of the loaded block must be ignored, the explicit blocks are unrelated.

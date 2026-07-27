@@ -66,8 +66,9 @@ type runProgress struct {
 	// CompletedBlockCount is the number of blocks that all completed batches compared.
 	CompletedBlockCount int `json:"completed_block_count"`
 
-	// NextBlockID is the ID of the first block of the next batch,
-	// and is empty once all blocks of the run have been compared.
+	// NextBlockID is the ID of the first block of the next batch.
+	// In follow-parents mode, it is the next ancestor only while the run has blocks remaining;
+	// it is empty once all blocks of the run have been compared.
 	NextBlockID string `json:"next_block_id"`
 
 	Stats runStats `json:"stats"`

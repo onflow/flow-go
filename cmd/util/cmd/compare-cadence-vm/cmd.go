@@ -92,7 +92,7 @@ func init() {
 
 	Cmd.Flags().StringVar(&flagProgressFile, "progress-file", "", "path of the file which records the progress (default: a file named after the compared blocks, in the current directory)")
 
-	Cmd.Flags().BoolVar(&flagResume, "resume", false, "continue the run recorded in the progress file, repeating only the batch which was interrupted. all other flags must be the same as in the interrupted run")
+	Cmd.Flags().BoolVar(&flagResume, "resume", false, "continue the run recorded in the progress file, repeating only the batch which was interrupted. all other flags except --batch-size must be the same as in the interrupted run")
 }
 
 func run(_ *cobra.Command, args []string) {
@@ -262,6 +262,9 @@ type blockLoader struct {
 
 	// loadedBlockCount is the number of blocks which were loaded so far.
 	loadedBlockCount int
+
+	// totalBlockCount determines when nextBlockID is cleared after the final block is loaded.
+	totalBlockCount int
 }
 
 // loadNextBlocks fetches the headers of the next count blocks.
@@ -306,15 +309,17 @@ func (l *blockLoader) loadNextBlocks(count int) []block {
 	return blocks
 }
 
-// advance moves the loader to the block which follows the given just loaded block header.
+// advance moves the loader to the next block in the run.
+// It clears nextBlockID once the requested number of blocks has been loaded;
+// otherwise, it selects either the loaded block's parent or the next explicit block ID.
 func (l *blockLoader) advance(header *flow.Header) {
-	if len(l.explicitBlockIDs) == 0 {
-		l.nextBlockID = header.ParentID
+	if l.loadedBlockCount >= l.totalBlockCount {
+		l.nextBlockID = flow.ZeroID
 		return
 	}
 
-	if l.loadedBlockCount >= len(l.explicitBlockIDs) {
-		l.nextBlockID = flow.ZeroID
+	if len(l.explicitBlockIDs) == 0 {
+		l.nextBlockID = header.ParentID
 		return
 	}
 
@@ -361,6 +366,7 @@ func compareBlocks(
 	loader := &blockLoader{
 		flowClient:       flowClient,
 		loadedBlockCount: progress.CompletedBlockCount,
+		totalBlockCount:  totalBlockCount,
 	}
 	if !followsParents {
 		loader.explicitBlockIDs = blockIDs
