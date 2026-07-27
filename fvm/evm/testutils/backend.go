@@ -203,8 +203,8 @@ func getSimpleMeter() *testMeter {
 			}
 			return nil
 		},
-		metering: func() (meter.MeteringResult, error) {
-			return meter.MeteringResult{ComputationUsed: compUsed}, nil
+		metering: func() meter.MeteringResult {
+			return meter.MeteringResult{ComputationUsed: compUsed}
 		},
 		computationRemaining: func(kind common.ComputationKind) uint64 {
 			return TestComputationLimit - compUsed
@@ -405,7 +405,7 @@ func (vs *TestValueStore) Dump() (map[string][]byte, map[string]uint64) {
 
 type testMeter struct {
 	meterComputation     func(usage common.ComputationUsage) error
-	metering             func() (meter.MeteringResult, error)
+	metering             func() meter.MeteringResult
 	computationRemaining func(kind common.ComputationKind) uint64
 
 	meterMemory func(usage common.MemoryUsage) error
@@ -438,7 +438,7 @@ func (m *testMeter) ComputationRemaining(kind common.ComputationKind) uint64 {
 	return computationRemaining(kind)
 }
 
-func (m *testMeter) MeteringResult() (meter.MeteringResult, error) {
+func (m *testMeter) MeteringResult() meter.MeteringResult {
 	metering := m.metering
 	if metering == nil {
 		panic("method not set")

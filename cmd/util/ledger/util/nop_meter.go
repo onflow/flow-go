@@ -18,8 +18,8 @@ func (n NopMeter) MeterComputation(_ common.ComputationUsage) error {
 	return nil
 }
 
-func (n NopMeter) MeteringResult() (meter.MeteringResult, error) {
-	return meter.MeteringResult{}, nil
+func (n NopMeter) MeteringResult() meter.MeteringResult {
+	return meter.MeteringResult{}
 }
 
 func (n NopMeter) ComputationRemaining(_ common.ComputationKind) uint64 {

@@ -45,21 +45,15 @@ type ProcedureOutput struct {
 
 func (output *ProcedureOutput) PopulateEnvironmentValues(
 	env environment.Environment,
-) error {
+) {
 	output.Logs = env.Logs()
 
-	meteringResult, err := env.MeteringResult()
-	if err != nil {
-		return fmt.Errorf("error getting metering result: %w", err)
-	}
-	output.MeteringResult = meteringResult
+	output.MeteringResult = env.MeteringResult()
 
 	// if tx failed this will only contain fee deduction events
 	output.Events = env.Events()
 	output.ServiceEvents = env.ServiceEvents()
 	output.ConvertedServiceEvents = env.ConvertedServiceEvents()
-
-	return nil
 }
 
 func (output *ProcedureOutput) PopulateInspectionResults(
