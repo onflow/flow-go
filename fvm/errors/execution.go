@@ -177,6 +177,8 @@ type LimitExceededError struct {
 	limit uint64
 }
 
+var _ CodedError = (*LimitExceededError)(nil)
+
 // NewLimitExceededError constructs a new LimitExceededError.
 //
 // INVARIANT: used > limit. Only construct this error after a meter has
