@@ -37,15 +37,15 @@ func FuzzTransactionValidatorValidate(f *testing.F) {
 	blocks := &fixedBlocks{header: header}
 	chain := flow.Testnet.Chain()
 	opts := validator.TransactionValidationOptions{
-		Expiry:               flow.DefaultTransactionExpiry,
-		ExpiryBuffer:         0,
+		Expiry:                       flow.DefaultTransactionExpiry,
+		ExpiryBuffer:                 0,
 		AllowEmptyReferenceBlockID:   false,
 		AllowUnknownReferenceBlockID: true,
-		MaxGasLimit:            flow.DefaultMaxTransactionGasLimit,
-		CheckScriptsParse:      false,
-		MaxTransactionByteSize: flow.DefaultMaxTransactionByteSize,
-		MaxCollectionByteSize:  flow.DefaultMaxCollectionByteSize,
-		CheckPayerBalanceMode:  validator.Disabled,
+		MaxGasLimit:                  flow.DefaultMaxTransactionGasLimit,
+		CheckScriptsParse:            false,
+		MaxTransactionByteSize:       flow.DefaultMaxTransactionByteSize,
+		MaxCollectionByteSize:        flow.DefaultMaxCollectionByteSize,
+		CheckPayerBalanceMode:        validator.Disabled,
 	}
 
 	v, err := validator.NewTransactionValidator(blocks, chain, metrics.NewNoopCollector(), opts, nil)
