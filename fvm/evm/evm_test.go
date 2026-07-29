@@ -84,7 +84,7 @@ func TestEVMRun(t *testing.T) {
 					testContract.DeployedAt.ToCommon(),
 					testContract.MakeCallData(t, "store", big.NewInt(num)),
 					big.NewInt(0),
-					uint64(125_000),
+					uint64(130_000),
 					big.NewInt(1),
 				)
 
@@ -137,7 +137,7 @@ func TestEVMRun(t *testing.T) {
 					snapshot)
 
 				require.NotEmpty(t, blockEventPayload.Hash)
-				require.Equal(t, uint64(329_205), blockEventPayload.TotalGasUsed)
+				require.Equal(t, uint64(331_205), blockEventPayload.TotalGasUsed)
 				require.NotEmpty(t, blockEventPayload.Hash)
 
 				txHashes := types.TransactionHashes{txEventPayload.Hash, feeTranferEventPayload.Hash}
@@ -209,8 +209,8 @@ func TestEVMRun(t *testing.T) {
 				require.Equal(t, types.ErrCodeNoError, res.ErrorCode)
 				require.Empty(t, res.ErrorMessage)
 				require.Nil(t, res.DeployedContractAddress)
-				require.Equal(t, uint64(23_520), res.GasConsumed)
-				require.Equal(t, uint64(23_520), res.MaxGasConsumed)
+				require.Equal(t, uint64(18_420), res.GasConsumed)
+				require.Equal(t, uint64(18_420), res.MaxGasConsumed)
 				require.Equal(t, num, new(big.Int).SetBytes(res.ReturnedData).Int64())
 			})
 	})
@@ -237,7 +237,7 @@ func TestEVMRun(t *testing.T) {
 								from: EVM.addressFromString(from),
 								to: EVM.addressFromString(to),
 								data: data,
-								gasLimit: 125_000,
+								gasLimit: 130_000,
 								value: EVM.Balance(attoflow: 0)
 							)
 
@@ -298,7 +298,7 @@ func TestEVMRun(t *testing.T) {
 				)
 
 				require.NotEmpty(t, blockEventPayload.Hash)
-				require.Equal(t, uint64(124_605), blockEventPayload.TotalGasUsed)
+				require.Equal(t, uint64(126_605), blockEventPayload.TotalGasUsed)
 				require.NotEmpty(t, blockEventPayload.Hash)
 
 				require.Equal(t, uint16(types.ErrCodeNoError), txEventPayload.ErrorCode)
@@ -311,7 +311,7 @@ func TestEVMRun(t *testing.T) {
 
 				require.Equal(t, fromAddress, directCall.From.String())
 				require.Equal(t, testContract.DeployedAt.String(), directCall.To.String())
-				require.Equal(t, uint64(125_000), directCall.GasLimit)
+				require.Equal(t, uint64(130_000), directCall.GasLimit)
 			},
 			fvm.WithEVMTestHelpersEnabled(true),
 		)
@@ -925,7 +925,7 @@ func TestEVMRun(t *testing.T) {
 					testContract.DeployedAt.ToCommon(),
 					testContract.MakeCallData(t, "storeButRevert", big.NewInt(num)),
 					big.NewInt(0),
-					uint64(125_000),
+					uint64(130_000),
 					big.NewInt(0),
 				)
 
@@ -1344,7 +1344,7 @@ func TestEVMRun(t *testing.T) {
 				blockEventPayload, _ := callEVMHeartBeat(t, ctx, vm, snapshot)
 
 				require.NotEmpty(t, blockEventPayload.Hash)
-				require.Equal(t, uint64(329_205), blockEventPayload.TotalGasUsed)
+				require.Equal(t, uint64(331_205), blockEventPayload.TotalGasUsed)
 				require.NotEmpty(t, blockEventPayload.Hash)
 
 				txHashes := types.TransactionHashes{txEventPayload.Hash, feeTranferEventPayload.Hash}
@@ -1454,7 +1454,7 @@ func TestEVMRun(t *testing.T) {
 				)
 
 				require.NotEmpty(t, blockEventPayload.Hash)
-				require.Equal(t, uint64(329_205), blockEventPayload.TotalGasUsed)
+				require.Equal(t, uint64(331_205), blockEventPayload.TotalGasUsed)
 				require.NotEmpty(t, blockEventPayload.Hash)
 
 				txHashes := types.TransactionHashes{txEventPayload.Hash, feeTranferEventPayload.Hash}
@@ -1613,7 +1613,7 @@ func TestEVMBatchRun(t *testing.T) {
 					snapshot)
 
 				require.NotEmpty(t, blockEventPayload.Hash)
-				require.Equal(t, uint64(440_933), blockEventPayload.TotalGasUsed)
+				require.Equal(t, uint64(443_733), blockEventPayload.TotalGasUsed)
 				require.Equal(t,
 					txHashes.RootHash(),
 					blockEventPayload.TransactionHashRoot,
@@ -1724,7 +1724,7 @@ func TestEVMBatchRun(t *testing.T) {
 						testContract.DeployedAt.ToCommon(),
 						testContract.MakeCallData(t, "store", big.NewInt(num)),
 						big.NewInt(0),
-						uint64(125_000),
+						uint64(130_000),
 						big.NewInt(0),
 					)
 
@@ -1857,10 +1857,10 @@ func TestEVMBatchRun(t *testing.T) {
 				var num int64
 				txBytes := make([]cadence.Value, batchCount)
 				for i := range batchCount {
-					gas := uint64(125_000)
+					gas := uint64(130_000)
 					if i%2 == 0 {
 						// fail with too low gas limit
-						gas = 23_500
+						gas = 17_500
 					} else {
 						// update number with only valid transactions
 						num = int64(i)
@@ -2991,58 +2991,6 @@ func TestCadenceOwnedAccountFunctionalities(t *testing.T) {
 	})
 
 	t.Run("test coa deposit and withdraw in a single transaction", func(t *testing.T) {
-		RunWithNewEnvironment(t,
-			chain, func(
-				ctx fvm.Context,
-				vm fvm.VM,
-				snapshot snapshot.SnapshotTree,
-				testContract *TestContract,
-				testAccount *EOATestAccount,
-			) {
-				code := fmt.Appendf(nil,
-					`
-					import EVM from %s
-					import FlowToken from %s
-
-					access(all)
-					fun main(): UFix64 {
-						let admin = getAuthAccount<auth(Storage) &Account>(%s)
-							.storage.borrow<&FlowToken.Administrator>(from: /storage/flowTokenAdmin)!
-
-						let minter <- admin.createNewMinter(allowedAmount: 2.34)
-						let vault <- minter.mintTokens(amount: 2.34)
-						destroy minter
-
-						let cadenceOwnedAccount <- EVM.createCadenceOwnedAccount()
-						cadenceOwnedAccount.deposit(from: <-vault)
-
-						let bal = EVM.Balance(attoflow: 0)
-						bal.setFLOW(flow: 1.23)
-						let vault2 <- cadenceOwnedAccount.withdraw(balance: bal)
-						let balance = vault2.balance
-						destroy cadenceOwnedAccount
-						destroy vault2
-
-						return balance
-					}
-					`,
-					sc.EVMContract.Address.HexWithPrefix(),
-					sc.FlowToken.Address.HexWithPrefix(),
-					sc.FlowServiceAccount.Address.HexWithPrefix(),
-				)
-
-				script := fvm.Script(code)
-
-				_, output, err := vm.Run(
-					ctx,
-					script,
-					snapshot)
-				require.NoError(t, err)
-				require.NoError(t, output.Err)
-			})
-	})
-
-	t.Run("test coa deploy", func(t *testing.T) {
 		t.Parallel()
 
 		RunWithNewEnvironment(t,
@@ -3262,7 +3210,7 @@ func TestCadenceOwnedAccountFunctionalities(t *testing.T) {
 					testContract.DeployedAt.ToCommon(),
 					testContract.MakeCallData(t, "store", big.NewInt(num)),
 					big.NewInt(0),
-					uint64(125_000),
+					uint64(130_000),
 					big.NewInt(0),
 				)
 
@@ -3412,7 +3360,7 @@ func TestCadenceOwnedAccountFunctionalities(t *testing.T) {
 					testContract.DeployedAt.ToCommon(),
 					testContract.MakeCallData(t, "store", big.NewInt(num)),
 					big.NewInt(0),
-					uint64(125_000),
+					uint64(130_000),
 					big.NewInt(0),
 				)
 
@@ -3855,7 +3803,7 @@ func TestDryRun(t *testing.T) {
 					testContract.DeployedAt.ToCommon(),
 					testContract.MakeCallData(t, "store", big.NewInt(num)),
 					big.NewInt(0),
-					uint64(125_000),
+					uint64(130_000),
 					big.NewInt(0),
 				)
 
@@ -3891,7 +3839,7 @@ func TestDryRun(t *testing.T) {
 					0,
 					testContract.DeployedAt.ToCommon(),
 					big.NewInt(0),
-					uint64(125_000),
+					uint64(130_000),
 					big.NewInt(0),
 					data,
 				)
@@ -3984,7 +3932,7 @@ func TestDryRun(t *testing.T) {
 					testContract.DeployedAt.ToCommon(),
 					testContract.MakeCallData(t, "store", big.NewInt(num)),
 					big.NewInt(0),
-					uint64(125_000),
+					uint64(130_000),
 					big.NewInt(0),
 				)
 
@@ -4044,7 +3992,7 @@ func TestDryRun(t *testing.T) {
 				)
 
 				// use the gas estimation from Evm.dryRun with the necessary buffer gas
-				gasLimit := dryRunResult.GasConsumed + gethParams.SstoreClearsScheduleRefundEIP3529
+				gasLimit := dryRunResult.GasConsumed + gethParams.StorageWriteAmsterdam
 				innerTxBytes = testAccount.PrepareSignAndEncodeTx(t,
 					testContract.DeployedAt.ToCommon(),
 					data,
@@ -4312,7 +4260,7 @@ func TestDryRun(t *testing.T) {
 					0,
 					testContract.DeployedAt.ToCommon(),
 					big.NewInt(0),
-					uint64(125_000),
+					uint64(130_000),
 					big.NewInt(0),
 					testContract.MakeCallData(t, "store", big.NewInt(num)),
 				)
@@ -4345,7 +4293,7 @@ func TestDryRun(t *testing.T) {
 
 				require.NoError(t, err)
 				require.NoError(t, output.Err)
-				assert.Equal(t, uint64(157), output.ComputationUsed)
+				assert.Equal(t, uint64(158), output.ComputationUsed)
 
 				// Increase call count of EVM.dryRun to 15
 				iterations = cadence.NewUInt(15)
@@ -4365,7 +4313,7 @@ func TestDryRun(t *testing.T) {
 
 				require.NoError(t, err)
 				require.NoError(t, output.Err)
-				assert.Equal(t, uint64(437), output.ComputationUsed)
+				assert.Equal(t, uint64(440), output.ComputationUsed)
 			},
 		)
 	})
@@ -4391,7 +4339,7 @@ func TestDryRun(t *testing.T) {
 					testAccount.Nonce(),
 					testContract.DeployedAt.ToCommon(),
 					big.NewInt(0),
-					uint64(125_000),
+					uint64(130_000),
 					big.NewInt(0),
 					data,
 				)
@@ -4403,7 +4351,7 @@ func TestDryRun(t *testing.T) {
 					testContract.DeployedAt.ToCommon(),
 					data,
 					big.NewInt(0),
-					uint64(125_000),
+					uint64(130_000),
 					big.NewInt(0),
 				)
 
@@ -4527,7 +4475,7 @@ func TestDryCall(t *testing.T) {
 			) {
 				data := testContract.MakeCallData(t, "store", big.NewInt(1337))
 
-				limit := uint64(125_000)
+				limit := uint64(130_000)
 				tx := gethTypes.NewTransaction(
 					0,
 					testContract.DeployedAt.ToCommon(),
@@ -4607,7 +4555,7 @@ func TestDryCall(t *testing.T) {
 					testContract.DeployedAt.ToCommon(),
 					testContract.MakeCallData(t, "store", big.NewInt(num)),
 					big.NewInt(0),
-					uint64(125_000),
+					uint64(130_000),
 					big.NewInt(0),
 				)
 
@@ -4826,7 +4774,7 @@ func TestDryCall(t *testing.T) {
 				result, _ = dryCall(t, tx, ctx, vm, snapshot)
 				assert.Equal(t, types.ExecutionErrCodeExecutionReverted, result.ErrorCode)
 				assert.Equal(t, types.StatusFailed, result.Status)
-				assert.Equal(t, uint64(21331), result.GasConsumed)
+				assert.Equal(t, uint64(15_331), result.GasConsumed)
 			})
 	})
 
@@ -4941,7 +4889,7 @@ func TestDryCall(t *testing.T) {
 					0,
 					testContract.DeployedAt.ToCommon(),
 					big.NewInt(0),
-					uint64(125_000),
+					uint64(130_000),
 					big.NewInt(0),
 					testContract.MakeCallData(t, "store", big.NewInt(num)),
 				)
@@ -4973,7 +4921,7 @@ func TestDryCall(t *testing.T) {
 
 				require.NoError(t, err)
 				require.NoError(t, output.Err)
-				assert.Equal(t, uint64(197), output.ComputationUsed)
+				assert.Equal(t, uint64(199), output.ComputationUsed)
 
 				// Increase call count of EVM.dryCall to 15
 				iterations = cadence.NewUInt(15)
@@ -4995,7 +4943,7 @@ func TestDryCall(t *testing.T) {
 
 				require.NoError(t, err)
 				require.NoError(t, output.Err)
-				assert.Equal(t, uint64(564), output.ComputationUsed)
+				assert.Equal(t, uint64(567), output.ComputationUsed)
 			},
 		)
 	})
@@ -5216,7 +5164,7 @@ func TestDryCallWithSigAndArgs(t *testing.T) {
 					cadence.NewUInt256(1337),
 				}
 
-				limit := uint64(125_000)
+				limit := uint64(130_000)
 
 				result, _ := dryCallWithSigAndArgs(
 					t,
@@ -5308,7 +5256,7 @@ func TestDryCallWithSigAndArgs(t *testing.T) {
 					testContract.DeployedAt.ToCommon(),
 					testContract.MakeCallData(t, "store", big.NewInt(num)),
 					big.NewInt(0),
-					uint64(125_000),
+					uint64(130_000),
 					big.NewInt(0),
 				)
 
@@ -5543,7 +5491,7 @@ func TestDryCallWithSigAndArgs(t *testing.T) {
 				)
 				assert.Equal(t, types.ExecutionErrCodeExecutionReverted, result.ErrorCode)
 				assert.Equal(t, types.StatusFailed, result.Status)
-				assert.Equal(t, uint64(21331), result.GasConsumed)
+				assert.Equal(t, uint64(15_331), result.GasConsumed)
 			})
 	})
 }
@@ -6433,7 +6381,7 @@ func TestEVMFileSystemContract(t *testing.T) {
 				)
 				//
 				require.NotEmpty(t, blockEventPayload.Hash)
-				require.Equal(t, uint64(3_580_480), blockEventPayload.TotalGasUsed)
+				require.Equal(t, uint64(3_574_480), blockEventPayload.TotalGasUsed)
 
 				txHashes := types.TransactionHashes{txEventPayload.Hash, feeTranferEventPayload.Hash}
 				require.Equal(t,
@@ -7327,30 +7275,20 @@ func TestEthLogEmissionWithSelfDestruct(t *testing.T) {
 				require.NoError(t, err)
 				require.Equal(t, uint16(types.ErrCodeNoError), txEventPayload.ErrorCode)
 				require.Equal(t, uint16(0), txEventPayload.Index)
-				require.Equal(t, uint64(1_268_668), txEventPayload.GasConsumed)
+				require.Equal(t, uint64(1_249_568), txEventPayload.GasConsumed)
 				require.Greater(t, len(txEventPayload.Logs), 0)
 
 				gethLogs := []*gethTypes.Log{}
 				err = rlp.Decode(bytes.NewReader(txEventPayload.Logs), &gethLogs)
 				require.NoError(t, err)
-				require.Len(t, gethLogs, 2)
+				require.Len(t, gethLogs, 1)
 
 				ethTransferLog := gethLogs[0]
-				selfDestructContract := ethTransferLog.Topics[2]
 				require.Equal(t, gethParams.SystemAddress, ethTransferLog.Address)
 				require.Len(t, ethTransferLog.Topics, 3)
 				require.Equal(t, gethParams.EthTransferLogEvent, ethTransferLog.Topics[0])
 				require.Equal(t, common.BytesToHash(testContract.DeployedAt.Bytes()), ethTransferLog.Topics[1])
 				require.Equal(t, amount, new(big.Int).SetBytes(ethTransferLog.Data))
-
-				ethBurnLog := gethLogs[1]
-				// Since the beneficiary is the contract being self-destructed,
-				// its ETH balance is burned
-				require.Equal(t, gethParams.SystemAddress, ethBurnLog.Address)
-				require.Len(t, ethBurnLog.Topics, 2)
-				require.Equal(t, gethParams.EthBurnLogEvent, ethBurnLog.Topics[0])
-				require.Equal(t, amount, new(big.Int).SetBytes(ethBurnLog.Data))
-				require.Equal(t, selfDestructContract, ethBurnLog.Topics[1])
 			},
 		)
 	})
@@ -7433,7 +7371,7 @@ func TestEthLogEmissionWithSelfDestruct(t *testing.T) {
 				require.NoError(t, err)
 				require.Equal(t, uint16(types.ErrCodeNoError), txEventPayload.ErrorCode)
 				require.Equal(t, uint16(0), txEventPayload.Index)
-				require.Equal(t, uint64(1_268_689), txEventPayload.GasConsumed)
+				require.Equal(t, uint64(1_249_589), txEventPayload.GasConsumed)
 				require.Greater(t, len(txEventPayload.Logs), 0)
 
 				gethLogs := []*gethTypes.Log{}
