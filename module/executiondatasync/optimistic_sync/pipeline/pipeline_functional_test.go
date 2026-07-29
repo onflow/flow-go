@@ -249,11 +249,11 @@ func (p *PipelineFunctionalSuite) TestPipelineCompletesSuccessfully() {
 
 		pipeline.OnParentStateUpdated(optimistic_sync.StateComplete)
 
-		waitForStateUpdates(p.T(), updateChan, errChan, optimistic_sync.StateProcessing, optimistic_sync.StateWaitingPersist)
+		waitForStateUpdatesAndNoError(p.T(), updateChan, errChan, optimistic_sync.StateProcessing, optimistic_sync.StateWaitingPersist)
 
 		pipeline.SetSealed()
 
-		waitForStateUpdates(p.T(), updateChan, errChan, optimistic_sync.StateComplete)
+		waitForStateUpdatesAndNoError(p.T(), updateChan, errChan, optimistic_sync.StateComplete)
 
 		actualEvents, err := p.persistentEvents.ByBlockID(p.block.ID())
 		p.Require().NoError(err)
@@ -370,7 +370,8 @@ func (p *PipelineFunctionalSuite) TestPipelinePersistingError() {
 	p.WithRunningPipeline(func(pipeline optimistic_sync.Pipeline, updateChan chan optimistic_sync.State, errChan chan error, cancel context.CancelFunc) {
 		pipeline.OnParentStateUpdated(optimistic_sync.StateComplete)
 
-		waitForStateUpdates(p.T(), updateChan, errChan, optimistic_sync.StateProcessing, optimistic_sync.StateWaitingPersist)
+		// no error may occur before SetSealed triggers the persist step
+		waitForStateUpdatesAndNoError(p.T(), updateChan, errChan, optimistic_sync.StateProcessing, optimistic_sync.StateWaitingPersist)
 
 		pipeline.SetSealed()
 
@@ -440,7 +441,8 @@ func (p *PipelineFunctionalSuite) TestMainCtxCancellationDuringWaitingPersist() 
 	p.WithRunningPipeline(func(pipeline optimistic_sync.Pipeline, updateChan chan optimistic_sync.State, errChan chan error, cancel context.CancelFunc) {
 		pipeline.OnParentStateUpdated(optimistic_sync.StateComplete)
 
-		waitForStateUpdates(p.T(), updateChan, errChan, optimistic_sync.StateProcessing, optimistic_sync.StateWaitingPersist)
+		// no error may occur before the context is cancelled below
+		waitForStateUpdatesAndNoError(p.T(), updateChan, errChan, optimistic_sync.StateProcessing, optimistic_sync.StateWaitingPersist)
 
 		cancel()
 

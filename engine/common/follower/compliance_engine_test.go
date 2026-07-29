@@ -200,6 +200,10 @@ func (s *EngineSuite) TestProcessBatchOfDisconnectedBlocks() {
 // After submitting new finalized block, we check if new batches are filtered based on new finalized view.
 func (s *EngineSuite) TestProcessFinalizedBlock() {
 	newFinalizedBlock := unittest.BlockHeaderWithParentFixture(s.finalized)
+	// Ensure a view gap of at least 2 between `s.finalized` and `newFinalizedBlock`, so the child
+	// block created below can use a view that is lower than `newFinalizedBlock.View` while still
+	// being greater than its `ParentView` (the fixture picks a random view increment in [1, 10]).
+	newFinalizedBlock.View = s.finalized.View + 2
 
 	done := make(chan struct{})
 	s.core.On("OnFinalizedBlock", newFinalizedBlock).Run(func(_ mock.Arguments) {
@@ -213,7 +217,7 @@ func (s *EngineSuite) TestProcessFinalizedBlock() {
 	// check if batch gets filtered out since it's lower than finalized view
 	done = make(chan struct{})
 	block := unittest.BlockWithParentFixture(s.finalized)
-	block.View = newFinalizedBlock.View - 1 // use block view lower than new latest finalized view
+	block.View = newFinalizedBlock.View - 1 // use block view lower than new latest finalized view (= s.finalized.View + 1 > block.ParentView)
 
 	proposal := unittest.ProposalFromBlock(block)
 

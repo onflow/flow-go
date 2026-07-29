@@ -1431,6 +1431,11 @@ func TestNewControlMsgValidationInspector_validateClusterPrefixedTopic(t *testin
 			// the 11th unknown cluster ID error should cause an error
 			params.Config.ClusterPrefixedMessage.HardThreshold = 10
 			params.Config.GraftPrune.InvalidTopicIdThreshold = 0
+			// Process the inspections sequentially with a single worker. With multiple workers, the
+			// cluster-prefix tracker increment and the subsequent hard-threshold check interleave, so
+			// more than one worker can observe the tracker above the hard threshold and disseminate
+			// more than one notification, violating the `Once()` expectation below.
+			params.Config.InspectionQueue.NumberOfWorkers = 1
 			params.Logger = logger
 		})
 		clusterID := flow.ChainID(unittest.IdentifierFixture().String())
