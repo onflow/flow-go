@@ -584,6 +584,11 @@ func (proc *procedure) deployAt(
 		TxHash: txHash,
 	}
 
+	// transit the state
+	txIndex := proc.config.BlockTxCountSoFar
+	// `blockAccessIndex` should be 0 for pre-execution, 1..n for transactions, n+1 for post-execution
+	proc.state.SetTxContext(txHash, int(txIndex), uint32(txIndex+1))
+
 	if proc.evm.Config.Tracer != nil {
 		tracer := proc.evm.Config.Tracer
 		if tracer.OnEnter != nil {
@@ -634,8 +639,6 @@ func (proc *procedure) deployAt(
 	}
 	gasBudget := gethVM.NewGasBudget(limit, call.GasLimit-limit)
 
-	reservoir := gasBudget.StateGas
-
 	// update access list (Berlin)
 	proc.state.AddAddressToAccessList(addr)
 
@@ -644,7 +647,7 @@ func (proc *procedure) deployAt(
 	if proc.state.GetNonce(addr) != 0 ||
 		(contractHash != (gethCommon.Hash{}) && contractHash != gethTypes.EmptyCodeHash) {
 		res.VMError = gethVM.ErrContractAddressCollision
-		halt := gasBudget.ExitHalt(reservoir)
+		halt := gasBudget.ExitHalt()
 		if proc.evm.Config.Tracer.HasGasHook() {
 			proc.evm.Config.Tracer.EmitGasChange(
 				gasBudget.AsTracing(),
@@ -700,7 +703,7 @@ func (proc *procedure) deployAt(
 		proc.evm.StateDB.RevertToSnapshot(snapshot)
 
 		// for all errors except this one consume all the remaining gas (Homestead)
-		exit := contract.Gas.Exit(err, reservoir)
+		exit := contract.Gas.Exit(err)
 		if err != gethVM.ErrExecutionReverted {
 			res.GasConsumed = gasConsumed
 			if proc.evm.Config.Tracer.HasGasHook() {
