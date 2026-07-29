@@ -354,23 +354,23 @@ func (ss *SyncSuite) TestLoad_Process_BatchRequest_SometimesReportSpam() {
 	// (previous, tighter bounds caused flakiness).
 
 	// using a very small batch request (1 block ID) with a 10% base probability factor, expect to almost never get misbehavior report, about 0.3% of the time (3 in 1000 requests)
-	// expected probability factor: 0.1 * ((10-9) + 1)/64 = 0.003125
+	// expected probability factor: 0.1 * (1 + 1)/64 = 0.003125
 	loadGroups = append(loadGroups, loadGroup{0.1, 0, 18, repeatedBlockIDs(1)})
 
 	// using a small batch request (10 block IDs) with a 10% base probability factor, expect to get misbehavior report about 1.7% of the time (17 in 1000 requests)
-	// expected probability factor: 0.1 * ((11-1) + 1)/64 = 0.0171875
+	// expected probability factor: 0.1 * (10 + 1)/64 = 0.0171875
 	loadGroups = append(loadGroups, loadGroup{0.1, 0, 47, repeatedBlockIDs(10)})
 
 	// using a large batch request (99 block IDs) with a 10% base probability factor, expect to get misbehavior report about 15% of the time (150 in 1000 requests)
-	// expected probability factor: 0.1 * ((100-1) + 1)/64 = 0.15625
+	// expected probability factor: 0.1 * (99 + 1)/64 = 0.15625
 	loadGroups = append(loadGroups, loadGroup{0.1, 92, 229, repeatedBlockIDs(99)})
 
 	// using a small batch request (10 block IDs) with a 1% base probability factor, expect to almost never get misbehavior report, about 0.17% of the time (2 in 1000 requests)
-	// expected probability factor: 0.01 * ((11-1) + 1)/64 = 0.00171875
+	// expected probability factor: 0.01 * (10 + 1)/64 = 0.00171875
 	loadGroups = append(loadGroups, loadGroup{0.01, 0, 14, repeatedBlockIDs(10)})
 
 	// using a very large batch request (999 block IDs) with a 1% base probability factor, expect to get misbehavior report about 15% of the time (150 in 1000 requests)
-	// expected probability factor: 0.01 * ((1000-1) + 1)/64 = 0.15625
+	// expected probability factor: 0.01 * (999 + 1)/64 = 0.15625
 	loadGroups = append(loadGroups, loadGroup{0.01, 92, 229, repeatedBlockIDs(999)})
 
 	// ALWAYS REPORT SPAM FOR INVALID BATCH REQUESTS OR BATCH REQUESTS THAT ARE FAR OUTSIDE OF THE TOLERANCE

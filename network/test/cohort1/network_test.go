@@ -550,14 +550,15 @@ func (suite *NetworkTestSuite) TestUnicastRateLimit_Bandwidth() {
 	// sleep for 1 seconds to allow connection pruner to prune connections
 	time.Sleep(1 * time.Second)
 
-	// the rate-limited third message must never be delivered: after the prune window, the call
-	// count must still be exactly 2 (the Eventually above only checks that 2 is reached)
-	require.Equal(suite.T(), uint64(2), callCount.Value(),
-		"no messages beyond the first 2 may be delivered after the rate limit")
-
 	// ensure connection to rate limited peer is pruned
 	p2ptest.EnsureNotConnectedBetweenGroups(suite.T(), ctx, []p2p.LibP2PNode{libP2PNodes[0]}, []p2p.LibP2PNode{suite.libP2PNodes[0]})
 	p2pfixtures.EnsureNoStreamCreationBetweenGroups(suite.T(), ctx, []p2p.LibP2PNode{libP2PNodes[0]}, []p2p.LibP2PNode{suite.libP2PNodes[0]})
+
+	// the rate-limited third message must never be delivered: after the prune window and with the
+	// connection confirmed pruned, the call count must still be exactly 2 (the Eventually above
+	// only checks that 2 is reached)
+	require.Equal(suite.T(), uint64(2), callCount.Value(),
+		"no messages beyond the first 2 may be delivered after the rate limit")
 
 	// eventually the rate limited node should be able to reconnect and send messages
 	require.Eventually(suite.T(), func() bool {
