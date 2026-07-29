@@ -144,9 +144,22 @@ func TestApplyResourceLimitOverride(t *testing.T) {
 		Memory:              9870,
 	}
 
+	// Flow's override config treats every non-positive value as "not overridden". In particular,
+	// negative values must NOT be passed through to rcmgr, where they carry special meaning
+	// (-1 = unlimited, -2 = block-all).
+	transientOverride := p2pconfig.ResourceManagerOverrideLimit{
+		StreamsInbound:      -1, // should not be overridden.
+		StreamsOutbound:     -2, // should not be overridden.
+		ConnectionsInbound:  -1, // should not be overridden.
+		ConnectionsOutbound: -2, // should not be overridden.
+		FD:                  -1, // should not be overridden.
+		Memory:              -2, // should not be overridden.
+	}
+
 	partial := rcmgr.PartialLimitConfig{}
 	partial.System = ApplyResourceLimitOverride(unittest.Logger(), p2pconfig.ResourceScopeSystem, scaled.ToPartialLimitConfig().System, systemOverride)
 	partial.PeerDefault = ApplyResourceLimitOverride(unittest.Logger(), p2pconfig.ResourceScopePeer, scaled.ToPartialLimitConfig().PeerDefault, peerOverride)
+	partial.Transient = ApplyResourceLimitOverride(unittest.Logger(), p2pconfig.ResourceScopeTransient, scaled.ToPartialLimitConfig().Transient, transientOverride)
 
 	final := partial.Build(scaled).ToPartialLimitConfig()
 	require.Equal(t, 456, int(final.System.StreamsOutbound))                                           // should be overridden.
@@ -155,6 +168,48 @@ func TestApplyResourceLimitOverride(t *testing.T) {
 	require.Equal(t, 7890, int(final.System.Memory))                                                   // should be overridden.
 	require.Equal(t, scaled.ToPartialLimitConfig().System.StreamsInbound, final.System.StreamsInbound) // should NOT be overridden.
 	require.Equal(t, scaled.ToPartialLimitConfig().System.ConnsOutbound, final.System.ConnsOutbound)   // should NOT be overridden.
+
+	// none of the negative values may take effect - the entire transient scope keeps its defaults.
+	require.Equal(t, scaled.ToPartialLimitConfig().Transient, final.Transient)
+}
+
+// TestBuildLibp2pResourceManagerLimits_NonPositiveOverridesKeepDefaults tests that overrides with
+// a mix of positive, zero, and negative values are merged correctly end-to-end through
+// BuildLibp2pResourceManagerLimits: positive values override, non-positive values keep the
+// scaled defaults.
+func TestBuildLibp2pResourceManagerLimits_NonPositiveOverridesKeepDefaults(t *testing.T) {
+	cfg, err := config.DefaultConfig()
+	require.NoError(t, err)
+
+	// Build the baseline limits with an explicitly zeroed override (the shipped default config
+	// contains non-zero overrides, e.g. system streams-inbound), so that the baseline reflects
+	// the pure scaled defaults that non-positive override values must fall back to.
+	cfg.NetworkConfig.ResourceManager.Override = p2pconfig.ResourceManagerOverrideScope{}
+	defaultConcreteLimits, err := BuildLibp2pResourceManagerLimits(unittest.Logger(), &cfg.NetworkConfig.ResourceManager)
+	require.NoError(t, err)
+	defaultSystem := defaultConcreteLimits.ToPartialLimitConfig().System
+
+	streamsOutboundOverride := int(defaultSystem.StreamsOutbound) + 42
+	fdOverride := int(defaultSystem.FD) + 42
+	cfg.NetworkConfig.ResourceManager.Override.System = p2pconfig.ResourceManagerOverrideLimit{
+		StreamsInbound:      -1,                      // should not be overridden.
+		StreamsOutbound:     streamsOutboundOverride, // should be overridden.
+		ConnectionsInbound:  0,                       // should not be overridden.
+		ConnectionsOutbound: -2,                      // should not be overridden.
+		FD:                  fdOverride,              // should be overridden.
+		Memory:              0,                       // should not be overridden.
+	}
+
+	overriddenConcreteLimits, err := BuildLibp2pResourceManagerLimits(unittest.Logger(), &cfg.NetworkConfig.ResourceManager)
+	require.NoError(t, err)
+
+	actualSystem := overriddenConcreteLimits.ToPartialLimitConfig().System
+	require.Equal(t, streamsOutboundOverride, int(actualSystem.StreamsOutbound)) // should be overridden.
+	require.Equal(t, fdOverride, int(actualSystem.FD))                           // should be overridden.
+	require.Equal(t, defaultSystem.StreamsInbound, actualSystem.StreamsInbound)  // should NOT be overridden.
+	require.Equal(t, defaultSystem.ConnsInbound, actualSystem.ConnsInbound)      // should NOT be overridden.
+	require.Equal(t, defaultSystem.ConnsOutbound, actualSystem.ConnsOutbound)    // should NOT be overridden.
+	require.Equal(t, defaultSystem.Memory, actualSystem.Memory)                  // should NOT be overridden.
 }
 
 // TestBuildLibp2pResourceManagerLimits tests the BuildLibp2pResourceManagerLimits function.

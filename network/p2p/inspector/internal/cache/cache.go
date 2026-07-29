@@ -75,15 +75,21 @@ func NewRecordCache(config *RecordCacheConfig, recordFactory recordFactory) (*Re
 //   - exception only in cases of internal data inconsistency or bugs. No errors are expected.
 func (r *RecordCache) ReceivedClusterPrefixedMessage(pid peer.ID) (float64, error) {
 	var err error
+	var gauge float64
 	adjustFunc := func(record *ClusterPrefixedMessagesReceivedRecord) *ClusterPrefixedMessagesReceivedRecord {
 		record, err = r.decayAdjustment(record) // first decay the record
 		if err != nil {
 			return record
 		}
-		return r.incrementAdjustment(record) // then increment the record
+		record = r.incrementAdjustment(record) // then increment the record
+		// Capture the gauge value while the cache holds its lock. Records are mutated in place, so
+		// reading the gauge from the returned record pointer after AdjustWithInit releases the lock
+		// would race with concurrent adjustments of the same record.
+		gauge = record.Gauge
+		return record
 	}
 	nodeID := p2p.MakeId(pid)
-	adjustedRecord, adjusted := r.c.AdjustWithInit(nodeID, adjustFunc, func() *ClusterPrefixedMessagesReceivedRecord {
+	_, adjusted := r.c.AdjustWithInit(nodeID, adjustFunc, func() *ClusterPrefixedMessagesReceivedRecord {
 		return r.recordFactory(nodeID)
 	})
 
@@ -95,7 +101,7 @@ func (r *RecordCache) ReceivedClusterPrefixedMessage(pid peer.ID) (float64, erro
 		return 0, fmt.Errorf("adjustment failed for peer %s", pid)
 	}
 
-	return adjustedRecord.Gauge, nil
+	return gauge, nil
 }
 
 // GetWithInit returns the current number of cluster prefixed control messages received from a peer.
@@ -109,13 +115,21 @@ func (r *RecordCache) ReceivedClusterPrefixedMessage(pid peer.ID) (float64, erro
 // No errors are expected during normal operation.
 func (r *RecordCache) GetWithInit(pid peer.ID) (float64, bool, error) {
 	var err error
+	var gauge float64
 	adjustLogic := func(record *ClusterPrefixedMessagesReceivedRecord) *ClusterPrefixedMessagesReceivedRecord {
 		// perform decay on gauge value
 		record, err = r.decayAdjustment(record)
+		if err != nil {
+			return record
+		}
+		// Capture the gauge value while the cache holds its lock. Records are mutated in place, so
+		// reading the gauge from the returned record pointer after AdjustWithInit releases the lock
+		// would race with concurrent adjustments of the same record.
+		gauge = record.Gauge
 		return record
 	}
 	nodeID := p2p.MakeId(pid)
-	adjustedRecord, adjusted := r.c.AdjustWithInit(nodeID, adjustLogic, func() *ClusterPrefixedMessagesReceivedRecord {
+	_, adjusted := r.c.AdjustWithInit(nodeID, adjustLogic, func() *ClusterPrefixedMessagesReceivedRecord {
 		return r.recordFactory(nodeID)
 	})
 	if err != nil {
@@ -125,7 +139,7 @@ func (r *RecordCache) GetWithInit(pid peer.ID) (float64, bool, error) {
 		return 0, false, fmt.Errorf("decay adjustment failed for peer %s", pid)
 	}
 
-	return adjustedRecord.Gauge, true, nil
+	return gauge, true, nil
 }
 
 // Remove removes the record of the given peer id from the cache.

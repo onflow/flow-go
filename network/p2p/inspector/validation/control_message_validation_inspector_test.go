@@ -1461,6 +1461,55 @@ func TestNewControlMsgValidationInspector_validateClusterPrefixedTopic(t *testin
 		cancel()
 		unittest.RequireCloseBefore(t, inspector.Done(), 5*time.Second, "inspector did not stop")
 	})
+
+	t.Run("validateClusterPrefixedTopic with multiple workers disseminates between 1 and one-per-message notifications past the hard threshold", func(t *testing.T) {
+		// total number of inspected messages; with a hard threshold of 10, the last 5 exceed it
+		const total = 15
+		logCounter := atomic.NewInt64(0)
+		logger := hookedLogger(logCounter, zerolog.TraceLevel, worker.QueuedItemProcessedLog)
+		notificationCount := atomic.NewInt64(0)
+		inspector, signalerCtx, cancel, consumer, rpcTracker, sporkID, idProvider, topicProviderOracle := inspectorFixture(t, func(params *validation.InspectorParams) {
+			params.Config.ClusterPrefixedMessage.HardThreshold = 10
+			params.Config.GraftPrune.InvalidTopicIdThreshold = 0
+			// This test deliberately keeps the default (multi-)worker count and documents the
+			// concurrency-tolerant contract: the cluster-prefix tracker increment and the subsequent
+			// hard-threshold check are not atomic, so each of the `total` concurrent inspections may
+			// observe the tracker above the hard threshold and disseminate a notification. At least
+			// one notification is guaranteed (the globally last inspection observes all increments),
+			// and at most one notification per inspected message can be disseminated.
+			params.Logger = logger
+		})
+		clusterID := flow.ChainID(unittest.IdentifierFixture().String())
+		clusterPrefixedTopic := channels.Topic(fmt.Sprintf("%s/%s", channels.SyncCluster(clusterID), sporkID)).String()
+		topicProviderOracle.UpdateTopics([]string{clusterPrefixedTopic})
+		from := unittest.PeerIdFixture(t)
+		identity := unittest.IdentityFixture()
+		idProvider.On("ByPeerID", from).Return(identity, true).Times(total)
+		checkNotification := checkNotificationFunc(t, from, p2pmsg.CtrlMsgGraft, validation.IsInvalidTopicIDThresholdExceeded, p2p.CtrlMsgTopicTypeClusterPrefixed)
+		inspectMsgRpc := unittest.P2PRPCFixture(unittest.WithGrafts(unittest.P2PRPCGraftFixture(&clusterPrefixedTopic)))
+		inspector.ActiveClustersChanged(flow.ChainIDList{flow.ChainID(unittest.IdentifierFixture().String())})
+		rpcTracker.On("LastHighestIHaveRPCSize").Return(int64(100)).Maybe()
+		consumer.On("OnInvalidControlMessageNotification", mock.AnythingOfType("*p2p.InvCtrlMsgNotif")).Return(nil).Run(func(args mock.Arguments) {
+			notificationCount.Inc()
+			checkNotification(args)
+		})
+		inspector.Start(signalerCtx)
+		unittest.RequireComponentsReadyBefore(t, 1*time.Second, inspector)
+
+		for i := 0; i < total; i++ {
+			require.NoError(t, inspector.Inspect(from, inspectMsgRpc))
+		}
+		// wait until all inspections have been processed by the workers
+		require.Eventually(t, func() bool {
+			return logCounter.Load() == total
+		}, time.Second, 100*time.Millisecond)
+
+		count := notificationCount.Load()
+		require.GreaterOrEqual(t, count, int64(1), "at least one inspection past the hard threshold must disseminate a notification")
+		require.LessOrEqual(t, count, int64(total), "at most one notification per inspected message may be disseminated")
+		cancel()
+		unittest.RequireCloseBefore(t, inspector.Done(), 5*time.Second, "inspector did not stop")
+	})
 }
 
 // TestControlMessageValidationInspector_ActiveClustersChanged validates the expected update of the active cluster IDs list.

@@ -484,6 +484,58 @@ func (s *StateMachineTestSuite) TestRegisterVoteConsumer() {
 	require.Equal(s.T(), expectedVotes, actualVotes)
 }
 
+// TestRegisterVoteConsumer_CachingToVerifyingTransition verifies that a vote consumer registered
+// while the collector is in the caching state continues to receive votes, in order of arrival,
+// across the transition to the verifying state. The proposer's vote is cached synchronously by
+// `ProcessBlock` (via `ensureVoteUnique`), so the consumer receives it at a deterministic
+// position: between the votes added before and after the transition.
+func (s *StateMachineTestSuite) TestRegisterVoteConsumer_CachingToVerifyingTransition() {
+	votes := 5
+	proposal := makeSignedProposalWithView(s.view)
+	block := proposal.Block
+	processor := s.prepareMockedProcessor(proposal, 1)
+	proposerVote, err := proposal.ProposerVote()
+	require.NoError(s.T(), err)
+
+	actualVotes := make([]*model.Vote, 0)
+	s.collector.RegisterVoteConsumer(func(vote *model.Vote) {
+		actualVotes = append(actualVotes, vote)
+	})
+
+	expectedVotes := make([]*model.Vote, 0)
+	// Add votes while the collector is in the caching state. Each vote emits `OnVoteProcessed`
+	// twice: once when cached, and once when replayed into the verifying processor during the
+	// transition below (consistent with `TestProcessBlock_ProcessingOfCachedVotes`).
+	for i := 0; i < votes; i++ {
+		vote := unittest.VoteForBlockFixture(block)
+		s.notifier.On("OnVoteProcessed", vote).Twice()
+		processor.On("Process", vote).Return(nil).Once()
+		require.NoError(s.T(), s.collector.AddVote(vote))
+		expectedVotes = append(expectedVotes, vote)
+	}
+
+	// `ProcessBlock` caches the proposer's vote (delivering it to the consumer) and transitions
+	// the collector to the verifying state
+	require.NoError(s.T(), s.collector.ProcessBlock(proposal))
+	require.Equal(s.T(), hotstuff.VoteCollectorStatusVerifying, s.collector.Status())
+	expectedVotes = append(expectedVotes, proposerVote)
+
+	// add more votes after the transition; each is processed exactly once
+	for i := 0; i < votes; i++ {
+		vote := unittest.VoteForBlockFixture(block)
+		s.notifier.On("OnVoteProcessed", vote).Once()
+		processor.On("Process", vote).Return(nil).Once()
+		require.NoError(s.T(), s.collector.AddVote(vote))
+		expectedVotes = append(expectedVotes, vote)
+	}
+
+	// The cache invokes consumers synchronously in the goroutine adding the vote, and all votes
+	// are added on this test's goroutine, so `actualVotes` is complete at this point. The
+	// asynchronous replay of cached votes into the verifying processor does not re-deliver
+	// votes to consumers.
+	require.Equal(s.T(), expectedVotes, actualVotes)
+}
+
 func makeSignedProposalWithView(view uint64) *model.SignedProposal {
 	return helper.MakeSignedProposal(helper.WithProposal(helper.MakeProposal(helper.WithBlock(helper.MakeBlock(helper.WithBlockView(view))))))
 }
