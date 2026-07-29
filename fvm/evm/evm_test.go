@@ -2,6 +2,7 @@ package evm_test
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
@@ -2943,12 +2944,9 @@ func TestCadenceOwnedAccountFunctionalities(t *testing.T) {
 				require.NoError(t, err)
 				require.NoError(t, output.Err)
 				assert.Len(t, output.Events, 3)
-				// This transaction must update state. The exact number of updated registers varies
-				// slightly between runs: the test environment uses a random block ID, which selects
-				// the UUID partition register (`uuid` vs `uuid_N`) and thereby also the atree slab
-				// layout. Hence, we only check that state was updated at all - in contrast to
-				// `dryCall` below, which must not update any registers.
-				assert.NotEmpty(t, state.UpdatedRegisterIDs())
+				// this transaction must update state - in contrast to the dry-run call below,
+				// which must not update any registers
+				assertUpdatedRegisterCount(t, ctx, state, 13)
 				assert.Equal(
 					t,
 					flow.EventType("A.f8d6e0586b0a20c7.EVM.TransactionExecuted"),
@@ -3096,12 +3094,9 @@ func TestCadenceOwnedAccountFunctionalities(t *testing.T) {
 				require.NoError(t, err)
 				require.NoError(t, output.Err)
 				assert.Len(t, output.Events, 3)
-				// This transaction must update state. The exact number of updated registers varies
-				// slightly between runs: the test environment uses a random block ID, which selects
-				// the UUID partition register (`uuid` vs `uuid_N`) and thereby also the atree slab
-				// layout. Hence, we only check that state was updated at all - in contrast to
-				// `dryCall` below, which must not update any registers.
-				assert.NotEmpty(t, state.UpdatedRegisterIDs())
+				// this transaction must update state - in contrast to the dry-run call below,
+				// which must not update any registers
+				assertUpdatedRegisterCount(t, ctx, state, 13)
 				assert.Equal(
 					t,
 					flow.EventType("A.f8d6e0586b0a20c7.EVM.TransactionExecuted"),
@@ -7187,6 +7182,25 @@ func getEVMAccountNonce(
 	val, ok := output.Value.(cadence.UInt64)
 	require.True(t, ok)
 	return uint64(val)
+}
+
+// assertUpdatedRegisterCount asserts that the execution updated exactly the expected number of
+// registers. `countNonZeroPartition` is the expected count for a block whose ID selects a
+// non-zero UUID partition (see `environment.uuidPartition` with txnIndex 0, as used by these
+// tests): such blocks use a fresh `uuid_N` register. A block selecting partition 0 (probability
+// 1/256) reuses the legacy `uuid` register instead, updating one register fewer.
+func assertUpdatedRegisterCount(
+	t *testing.T,
+	ctx fvm.Context,
+	state *snapshot.ExecutionSnapshot,
+	countNonZeroPartition int,
+) {
+	expected := countNonZeroPartition
+	blockID := ctx.BlockHeader.ID()
+	if sha256.Sum256(blockID[:])[0] == 0 {
+		expected--
+	}
+	assert.Len(t, state.UpdatedRegisterIDs(), expected)
 }
 
 func RunWithNewEnvironment(
