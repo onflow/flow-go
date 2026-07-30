@@ -813,21 +813,15 @@ func (exeNode *ExecutionNode) LoadExecutionState(
 
 	// migrate execution data for last sealed and executed block
 
-	// In full mode, both args are the same ledger.Ledger; in payloadless
-	// mode the first is the payloadless ledger (narrow LedgerStateChecker)
-	// and the snapshot-source slot is nil because storehouse is required.
-	var stateChecker state.LedgerStateChecker
-	var snapshotLedger ledger.Ledger
+	// In full mode the ledger serves both state-commitment checks and register reads. In payloadless
+	// mode the payloadless ledger only checks state commitments; register values come from the
+	// storehouse, which `ValidateFlags` guarantees is enabled.
+	ledgerBackend := state.FullLedgerBackend(exeNode.ledgerStorage)
 	if exeNode.exeConf.payloadless {
-		stateChecker = exeNode.payloadlessLedger
-		snapshotLedger = nil
-	} else {
-		stateChecker = exeNode.ledgerStorage
-		snapshotLedger = exeNode.ledgerStorage
+		ledgerBackend = state.PayloadlessLedgerBackend(exeNode.payloadlessLedger)
 	}
 	exeNode.executionState = state.NewExecutionState(
-		stateChecker,
-		snapshotLedger,
+		ledgerBackend,
 		exeNode.commits,
 		node.Storage.Blocks,
 		node.Storage.Headers,
