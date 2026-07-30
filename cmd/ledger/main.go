@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
@@ -41,11 +42,10 @@ var (
 	maxRequestSize      = flag.Uint("max-request-size", 1<<30, "Maximum request message size in bytes (default: 1 GiB)")
 	maxResponseSize     = flag.Uint("max-response-size", 1<<30, "Maximum response message size in bytes (default: 1 GiB)")
 
-	profilerEnabled        = flag.Bool("profiler-enabled", false, "Whether to enable the auto-profiler")
-	profilerDir            = flag.String("profiler-dir", "profiler", "Directory to create auto-profiler profiles")
-	profilerInterval       = flag.Duration("profiler-interval", 15*time.Minute, "Interval between auto-profiler runs")
-	profilerDuration       = flag.Duration("profiler-duration", 10*time.Second, "Duration of each auto-profiler run")
-	profileUploaderEnabled = flag.Bool("profile-uploader-enabled", false, "Whether to upload profiles to a remote uploader (disabled for ledger service)")
+	profilerEnabled  = flag.Bool("profiler-enabled", false, "Whether to enable the auto-profiler")
+	profilerDir      = flag.String("profiler-dir", "profiler", "Directory to create auto-profiler profiles")
+	profilerInterval = flag.Duration("profiler-interval", 15*time.Minute, "Interval between auto-profiler runs")
+	profilerDuration = flag.Duration("profiler-duration", 10*time.Second, "Duration of each auto-profiler run")
 )
 
 func main() {
@@ -69,6 +69,15 @@ func main() {
 		Str("service", "ledger").
 		Logger()
 
+	if *profilerInterval <= 0 {
+		logger.Fatal().Dur("profiler_interval", *profilerInterval).Msg("profiler-interval must be positive")
+	}
+
+	// Validate that at least one address is provided
+	if *ledgerServiceTCP == "" && *ledgerServiceSocket == "" {
+		logger.Fatal().Msg("at least one of --ledger-service-tcp or --ledger-service-socket must be provided")
+	}
+
 	// Initialize updatable config manager and auto-profiler.
 	// The profiler is configured via admin get-config/set-config commands.
 	configManager := updatable_configs.NewManager()
@@ -78,9 +87,6 @@ func main() {
 		Dir:             *profilerDir,
 		Interval:        *profilerInterval,
 		Duration:        *profilerDuration,
-	}
-	if *profileUploaderEnabled {
-		logger.Warn().Msg("profile-uploader-enabled is not supported by the ledger service, ignoring")
 	}
 
 	autoProfiler, err := profiler.New(logger, &profiler.NoopUploader{}, profilerConfig)
@@ -108,11 +114,22 @@ func main() {
 	if err != nil {
 		logger.Fatal().Err(err).Msg("failed to register profiler-set-mem-profile-rate config")
 	}
-	currentBlockRate := new(uint)
+	var currentBlockRateMu sync.Mutex
+	var currentBlockRate uint
 	err = configManager.RegisterUintConfig(
 		"profiler-set-block-profile-rate",
-		func() uint { return *currentBlockRate },
-		func(r uint) error { currentBlockRate = &r; runtime.SetBlockProfileRate(int(r)); return nil },
+		func() uint {
+			currentBlockRateMu.Lock()
+			defer currentBlockRateMu.Unlock()
+			return currentBlockRate
+		},
+		func(r uint) error {
+			currentBlockRateMu.Lock()
+			defer currentBlockRateMu.Unlock()
+			runtime.SetBlockProfileRate(int(r))
+			currentBlockRate = r
+			return nil
+		},
 	)
 	if err != nil {
 		logger.Fatal().Err(err).Msg("failed to register profiler-set-block-profile-rate config")
@@ -124,16 +141,6 @@ func main() {
 	)
 	if err != nil {
 		logger.Fatal().Err(err).Msg("failed to register profiler-set-mutex-profile-fraction config")
-	}
-
-	go func() {
-		<-autoProfiler.Ready()
-		logger.Info().Bool("enabled", autoProfiler.Enabled()).Msg("auto-profiler ready")
-	}()
-
-	// Validate that at least one address is provided
-	if *ledgerServiceTCP == "" && *ledgerServiceSocket == "" {
-		logger.Fatal().Msg("at least one of --ledger-service-tcp or --ledger-service-socket must be provided")
 	}
 
 	logger.Info().
@@ -303,8 +310,12 @@ func main() {
 	if *adminAddr != "" {
 		adminHandler := newAdminHandler(logger, triggerCheckpointOnNextSegmentFinish, configManager)
 		adminServer = &http.Server{
-			Addr:    *adminAddr,
-			Handler: adminHandler,
+			Addr:              *adminAddr,
+			Handler:           adminHandler,
+			ReadHeaderTimeout: 10 * time.Second,
+			ReadTimeout:       10 * time.Second,
+			IdleTimeout:       60 * time.Second,
+			WriteTimeout:      2 * time.Minute,
 		}
 
 		go func() {
@@ -369,6 +380,10 @@ func main() {
 		<-metricsServer.Done()
 		logger.Info().Msg("metrics server stopped")
 	}
+
+	logger.Info().Msg("shutting down auto-profiler...")
+	<-autoProfiler.Done()
+	logger.Info().Msg("auto-profiler stopped")
 
 	logger.Info().Msg("waiting for ledger to stop...")
 	<-ledgerStorage.Done()

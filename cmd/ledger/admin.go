@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/http"
 	"net/http/pprof"
 
@@ -36,6 +37,25 @@ type adminHandler struct {
 	commands          []string
 }
 
+// requireLoopback returns an http.HandlerFunc that only serves requests originating
+// from the loopback interface. It is used to prevent sensitive profiling endpoints
+// from being exposed when the admin server is bound to a publicly reachable address.
+func requireLoopback(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		host, _, err := net.SplitHostPort(r.RemoteAddr)
+		if err != nil {
+			http.Error(w, "forbidden", http.StatusForbidden)
+			return
+		}
+		ip := net.ParseIP(host)
+		if ip == nil || !ip.IsLoopback() {
+			http.Error(w, "forbidden", http.StatusForbidden)
+			return
+		}
+		next(w, r)
+	}
+}
+
 // newAdminHandler creates a new admin HTTP handler.
 func newAdminHandler(logger zerolog.Logger, triggerCheckpoint *atomic.Bool, configManager *updatable_configs.Manager) http.Handler {
 	h := &adminHandler{
@@ -48,12 +68,14 @@ func newAdminHandler(logger zerolog.Logger, triggerCheckpoint *atomic.Bool, conf
 	mux := http.NewServeMux()
 	mux.HandleFunc("/admin/run_command", h.handleCommand)
 
-	// Register pprof handlers for profiling (CPU, heap, goroutine, etc.)
-	mux.HandleFunc("/debug/pprof/", pprof.Index)
-	mux.HandleFunc("/debug/pprof/cmdline", pprof.Cmdline)
-	mux.HandleFunc("/debug/pprof/profile", pprof.Profile)
-	mux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
-	mux.HandleFunc("/debug/pprof/trace", pprof.Trace)
+	// Register pprof handlers for profiling (CPU, heap, goroutine, etc.).
+	// These endpoints are restricted to loopback to avoid exposing profiling
+	// data when the admin server is bound to a public address.
+	mux.HandleFunc("/debug/pprof/", requireLoopback(pprof.Index))
+	mux.HandleFunc("/debug/pprof/cmdline", requireLoopback(pprof.Cmdline))
+	mux.HandleFunc("/debug/pprof/profile", requireLoopback(pprof.Profile))
+	mux.HandleFunc("/debug/pprof/symbol", requireLoopback(pprof.Symbol))
+	mux.HandleFunc("/debug/pprof/trace", requireLoopback(pprof.Trace))
 
 	return mux
 }
@@ -127,7 +149,11 @@ func (h *adminHandler) handleCommand(w http.ResponseWriter, r *http.Request) {
 		}
 		oldValue := field.Get()
 		if err := field.Set(configValue); err != nil {
-			h.writeError(w, http.StatusBadRequest, fmt.Sprintf("failed to set config %s: %v", configName, err))
+			status := http.StatusInternalServerError
+			if updatable_configs.IsValidationError(err) {
+				status = http.StatusBadRequest
+			}
+			h.writeError(w, status, fmt.Sprintf("failed to set config %s: %v", configName, err))
 			return
 		}
 		result = map[string]any{
