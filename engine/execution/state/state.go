@@ -99,6 +99,9 @@ type ExecutionState interface {
 // and ledger.PayloadlessLedger satisfy this interface, which is how the
 // execution state can be backed by either.
 type LedgerStateChecker interface {
+	// HasState returns true if the given state commitment exists in the ledger.
+	//
+	// No error returns are expected during normal operation.
 	HasState(state ledger.State) (bool, error)
 }
 
@@ -118,12 +121,10 @@ type state struct {
 	getLatestFinalized func() (uint64, error)
 	lockManager        lockctx.Manager
 
-	// snapshotLedger and registerStore are needed by the NewStorageSnapshot method,
-	// when enableRegisterStore == false, registerStore is nil, snapshotLedger is used to read register values
-	// when enableRegisterStore == true, 	snapshotLedger is nil, registerStore is used to read register values
-	// note:
-	// in payloadless ledger mode, enableRegisterStore must be true, therefore snapshotLedger is not needed and
-	// registerStore is used to read register values
+	// snapshotLedger and registerStore are needed by the NewStorageSnapshot method:
+	// when enableRegisterStore == false, registerStore is nil and snapshotLedger is used to read register values
+	// when enableRegisterStore == true, registerStore is used to read register values and snapshotLedger is unused
+	// (nil in payloadless ledger mode, which requires enableRegisterStore == true; may be non-nil otherwise)
 	enableRegisterStore bool
 	snapshotLedger      ledger.Ledger
 	registerStore       execution.RegisterStore
@@ -131,6 +132,12 @@ type state struct {
 
 // NewExecutionState returns a new execution state access layer for the given
 // ledger storage.
+//
+// `ls` provides state-commitment existence checks and is always required.
+// `snapshotLedger` is the register-value source backing the snapshots returned by
+// `NewStorageSnapshot`. It may only be nil when `enableRegisterStore` is true, in which case
+// `registerStore` serves register reads instead. With `enableRegisterStore == false`, a nil
+// `snapshotLedger` yields snapshots that panic on the first register read.
 func NewExecutionState(
 	ls LedgerStateChecker,
 	snapshotLedger ledger.Ledger,
