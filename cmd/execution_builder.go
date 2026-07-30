@@ -813,7 +813,7 @@ func (exeNode *ExecutionNode) LoadExecutionState(
 
 	// migrate execution data for last sealed and executed block
 
-	// In full mode, both args are the same *complete.Ledger; in payloadless
+	// In full mode, both args are the same ledger.Ledger; in payloadless
 	// mode the first is the payloadless ledger (narrow LedgerStateChecker)
 	// and the snapshot-source slot is nil because storehouse is required.
 	var stateChecker state.LedgerStateChecker
