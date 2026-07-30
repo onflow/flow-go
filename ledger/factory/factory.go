@@ -148,6 +148,8 @@ func newLocalLedger(config Config, triggerCheckpoint *atomic.Bool) (ledger.Ledge
 // TODO: remote payloadless ledger client. When config.LedgerServiceAddr is
 // set, this factory should construct a remote.PayloadlessClient (Spec 004).
 // For now config.LedgerServiceAddr is ignored.
+//
+// No error returns are expected during normal operation.
 func NewPayloadlessLedger(config Config, triggerCheckpoint *atomic.Bool) (ledger.PayloadlessLedger, error) {
 	_ = triggerCheckpoint // TODO: drive payloadless checkpoint generation once a format exists
 
