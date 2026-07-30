@@ -105,6 +105,47 @@ type LedgerStateChecker interface {
 	HasState(state ledger.State) (bool, error)
 }
 
+// LedgerBackend bundles the ledger-side dependencies of the execution state. Its purpose is to make
+// the valid combinations the only representable ones: a call site cannot forget to supply a
+// register-value source, and it does not need to know that the source is absent in payloadless mode.
+// Construct it with [FullLedgerBackend] or [PayloadlessLedgerBackend].
+type LedgerBackend struct {
+	// stateChecker checks whether a state commitment exists in the underlying trie.
+	// Always required.
+	stateChecker LedgerStateChecker
+
+	// snapshotLedger is the register-value source backing the snapshots handed out by
+	// `NewStorageSnapshot`. It is nil for a payloadless backend, where the ledger retains no
+	// register values and the register store must serve register reads instead.
+	snapshotLedger ledger.Ledger
+}
+
+// FullLedgerBackend returns a [LedgerBackend] where the given full ledger serves both
+// state-commitment checks and register reads. Valid with the register store either enabled or
+// disabled: when it is enabled, register reads go to the register store and the ledger is only used
+// for state-commitment checks.
+func FullLedgerBackend(ls ledger.Ledger) LedgerBackend {
+	return LedgerBackend{
+		stateChecker:   ls,
+		snapshotLedger: ls,
+	}
+}
+
+// PayloadlessLedgerBackend returns a [LedgerBackend] where the given ledger only checks state
+// commitments and cannot serve register values, as is the case for [ledger.PayloadlessLedger].
+//
+// CAUTION: this backend is only usable with the register store enabled, because the register store
+// is then the sole source of register values. With the register store disabled, the snapshots handed
+// out by `NewStorageSnapshot` have no value source and panic on the first register read. Node
+// startup enforces this: `--payloadless` requires `--enable-storehouse` (see
+// `ExecutionConfig.ValidateFlags`).
+func PayloadlessLedgerBackend(ls LedgerStateChecker) LedgerBackend {
+	return LedgerBackend{
+		stateChecker:   ls,
+		snapshotLedger: nil,
+	}
+}
+
 type state struct {
 	tracer             module.Tracer
 	ls                 LedgerStateChecker
@@ -124,23 +165,19 @@ type state struct {
 	// snapshotLedger and registerStore are needed by the NewStorageSnapshot method:
 	// when enableRegisterStore == false, registerStore is nil and snapshotLedger is used to read register values
 	// when enableRegisterStore == true, registerStore is used to read register values and snapshotLedger is unused
-	// (nil in payloadless ledger mode, which requires enableRegisterStore == true; may be non-nil otherwise)
+	// (nil for a payloadless backend, which requires enableRegisterStore == true; non-nil for a full backend)
 	enableRegisterStore bool
 	snapshotLedger      ledger.Ledger
 	registerStore       execution.RegisterStore
 }
 
-// NewExecutionState returns a new execution state access layer for the given
-// ledger storage.
+// NewExecutionState returns a new execution state access layer backed by the given ledger.
 //
-// `ls` provides state-commitment existence checks and is always required.
-// `snapshotLedger` is the register-value source backing the snapshots returned by
-// `NewStorageSnapshot`. It may only be nil when `enableRegisterStore` is true, in which case
-// `registerStore` serves register reads instead. With `enableRegisterStore == false`, a nil
-// `snapshotLedger` yields snapshots that panic on the first register read.
+// `ledgerBackend` supplies the state-commitment checker and, unless the backend is payloadless, the
+// register-value source for the snapshots handed out by `NewStorageSnapshot`. A payloadless backend
+// requires `enableRegisterStore == true`; see [PayloadlessLedgerBackend].
 func NewExecutionState(
-	ls LedgerStateChecker,
-	snapshotLedger ledger.Ledger,
+	ledgerBackend LedgerBackend,
 	commits storage.Commits,
 	blocks storage.Blocks,
 	headers storage.Headers,
@@ -159,8 +196,8 @@ func NewExecutionState(
 ) ExecutionState {
 	return &state{
 		tracer:              tracer,
-		ls:                  ls,
-		snapshotLedger:      snapshotLedger,
+		ls:                  ledgerBackend.stateChecker,
+		snapshotLedger:      ledgerBackend.snapshotLedger,
 		commits:             commits,
 		blocks:              blocks,
 		headers:             headers,
