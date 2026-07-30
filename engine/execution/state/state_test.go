@@ -54,7 +54,7 @@ func prepareTest(f func(t *testing.T, es state.ExecutionState, l *ledger.Ledger,
 
 			db := pebbleimpl.ToDB(pebbleDB)
 			es := state.NewExecutionState(
-				ls, ls, stateCommitments, blocks, headers, chunkDataPacks, results, myReceipts, events, serviceEvents, txResults, db, getLatestFinalized, trace.NewNoopTracer(),
+				state.FullLedgerBackend(ls), stateCommitments, blocks, headers, chunkDataPacks, results, myReceipts, events, serviceEvents, txResults, db, getLatestFinalized, trace.NewNoopTracer(),
 				nil,
 				false,
 				lockManager,
