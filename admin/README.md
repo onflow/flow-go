@@ -91,6 +91,20 @@ curl localhost:9002/admin/run_command -H 'Content-Type: application/json' -d '{"
 curl localhost:9002/admin/run_command -H 'Content-Type: application/json' -d '{"commandName": "set-config", "data": {"profiler-trigger": "1m"}}'
 ```
 
+### Ledger service profiler
+The standalone ledger service (`cmd/ledger`) exposes the same profiler configuration through its admin server (default port `9003`). It also registers the `net/http/pprof` endpoints on the admin server for on-demand profiling.
+
+```
+# Enable the auto-profiler
+curl localhost:9003/admin/run_command -H 'Content-Type: application/json' -d '{"commandName": "set-config", "data": {"profiler-enabled": true}}'
+
+# Trigger a profile run
+curl localhost:9003/admin/run_command -H 'Content-Type: application/json' -d '{"commandName": "set-config", "data": {"profiler-trigger": "1m"}}'
+
+# Get a heap profile via pprof
+curl -o heap.prof localhost:9003/debug/pprof/heap
+```
+
 ### Set a stop height
 ```
 curl localhost:9002/admin/run_command -H 'Content-Type: application/json' -d '{"commandName": "stop-at-height", "data": { "height": 1111, "crash": false }}'

@@ -4,9 +4,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/http/pprof"
 
 	"github.com/rs/zerolog"
 	"go.uber.org/atomic"
+
+	"github.com/onflow/flow-go/module/updatable_configs"
 )
 
 // adminRequest represents the JSON request body for admin commands.
@@ -29,19 +32,29 @@ type adminResponse struct {
 type adminHandler struct {
 	logger            zerolog.Logger
 	triggerCheckpoint *atomic.Bool
+	configManager     *updatable_configs.Manager
 	commands          []string
 }
 
 // newAdminHandler creates a new admin HTTP handler.
-func newAdminHandler(logger zerolog.Logger, triggerCheckpoint *atomic.Bool) http.Handler {
+func newAdminHandler(logger zerolog.Logger, triggerCheckpoint *atomic.Bool, configManager *updatable_configs.Manager) http.Handler {
 	h := &adminHandler{
 		logger:            logger.With().Str("component", "admin").Logger(),
 		triggerCheckpoint: triggerCheckpoint,
-		commands:          []string{"ping", "list-commands", "trigger-checkpoint"},
+		configManager:     configManager,
+		commands:          []string{"ping", "list-commands", "trigger-checkpoint", "get-config", "set-config"},
 	}
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/admin/run_command", h.handleCommand)
+
+	// Register pprof handlers for profiling (CPU, heap, goroutine, etc.)
+	mux.HandleFunc("/debug/pprof/", pprof.Index)
+	mux.HandleFunc("/debug/pprof/cmdline", pprof.Cmdline)
+	mux.HandleFunc("/debug/pprof/profile", pprof.Profile)
+	mux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
+	mux.HandleFunc("/debug/pprof/trace", pprof.Trace)
+
 	return mux
 }
 
@@ -76,6 +89,50 @@ func (h *adminHandler) handleCommand(w http.ResponseWriter, r *http.Request) {
 			result = "ok"
 		} else {
 			result = "checkpoint already triggered"
+		}
+
+	case "get-config":
+		var configName string
+		if err := json.Unmarshal(req.Data, &configName); err != nil {
+			h.writeError(w, http.StatusBadRequest, fmt.Sprintf("get-config data must be a string config name: %v", err))
+			return
+		}
+		field, ok := h.configManager.GetField(configName)
+		if !ok {
+			h.writeError(w, http.StatusBadRequest, fmt.Sprintf("unknown config field: %s", configName))
+			return
+		}
+		result = field.Get()
+
+	case "set-config":
+		var data map[string]any
+		if err := json.Unmarshal(req.Data, &data); err != nil {
+			h.writeError(w, http.StatusBadRequest, fmt.Sprintf("set-config data must be a JSON object: %v", err))
+			return
+		}
+		if len(data) != 1 {
+			h.writeError(w, http.StatusBadRequest, fmt.Sprintf("set-config data must have exactly one entry, got %d", len(data)))
+			return
+		}
+		var configName string
+		var configValue any
+		for k, v := range data {
+			configName = k
+			configValue = v
+		}
+		field, ok := h.configManager.GetField(configName)
+		if !ok {
+			h.writeError(w, http.StatusBadRequest, fmt.Sprintf("unknown config field: %s", configName))
+			return
+		}
+		oldValue := field.Get()
+		if err := field.Set(configValue); err != nil {
+			h.writeError(w, http.StatusBadRequest, fmt.Sprintf("failed to set config %s: %v", configName, err))
+			return
+		}
+		result = map[string]any{
+			"oldValue": oldValue,
+			"newValue": configValue,
 		}
 
 	default:
