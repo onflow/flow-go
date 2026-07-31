@@ -190,6 +190,49 @@ func TestConvertCheckpointV6ToV7_RejectsClobber(t *testing.T) {
 	})
 }
 
+// TestDeleteCheckpointFilesClearsPartialV7Conversion verifies the recovery path that the
+// execution node's bootstrap relies on: a conversion interrupted before its header file was
+// written leaves part files behind, which block a retry, and clearing them with
+// [DeleteCheckpointFiles] makes the retry succeed without touching the V6 source.
+func TestDeleteCheckpointFilesClearsPartialV7Conversion(t *testing.T) {
+	unittest.RunWithTempDir(t, func(dir string) {
+		logger := zerolog.Nop()
+		v6Tries := createSimpleTrie(t)
+		v6Name := "root.checkpoint"
+		require.NoError(t, StoreCheckpointV6Concurrently(v6Tries, dir, v6Name, logger))
+
+		v7Name := v6Name + V7FileSuffix
+
+		// simulate a conversion that died after writing a part file but before the header
+		partialPart := filepath.Join(dir, partFileName(v7Name, 0))
+		require.NoError(t, os.WriteFile(partialPart, []byte("partial"), 0644))
+
+		// the header is what HasRootCheckpointV7 looks for, so the node would retry the
+		// conversion, and the leftover part file makes that retry fail
+		hasV7Root, err := HasRootCheckpointV7(dir)
+		require.NoError(t, err)
+		require.False(t, hasV7Root)
+		require.Error(t, ConvertCheckpointV6ToV7(dir, v6Name, dir, v7Name, logger, 4),
+			"leftover part files must block a retry")
+
+		// clearing the partial output unblocks the retry
+		require.NoError(t, DeleteCheckpointFiles(dir, v7Name))
+		require.NoFileExists(t, partialPart)
+		require.NoError(t, ConvertCheckpointV6ToV7(dir, v6Name, dir, v7Name, logger, 4))
+
+		hasV7Root, err = HasRootCheckpointV7(dir)
+		require.NoError(t, err)
+		require.True(t, hasV7Root)
+
+		// the V6 source is untouched, so it can still be read
+		_, err = OpenAndReadCheckpointV6(dir, v6Name, logger)
+		require.NoError(t, err)
+
+		// deleting a checkpoint that isn't there is not an error
+		require.NoError(t, DeleteCheckpointFiles(dir, "checkpoint.00009999"+V7FileSuffix))
+	})
+}
+
 // TestConvertCheckpointV6ToV7_MissingV6Input verifies that the converter
 // returns an error when the V6 source is missing.
 func TestConvertCheckpointV6ToV7_MissingV6Input(t *testing.T) {
