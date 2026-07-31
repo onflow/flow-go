@@ -7,6 +7,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -313,40 +314,46 @@ func TestLogProgressContinueLoggingAfter100(t *testing.T) {
 func TestLogProgressNoDataForAWhile(t *testing.T) {
 	t.Parallel()
 
-	total := 1000
+	// Run inside a synctest bubble with a fake clock: the "no data for a while" detection compares
+	// the wall-clock gap between two progress updates against the configured 1ms threshold. With a
+	// real clock, any scheduling hiccup between two updates yields an unexpected extra log line
+	// (flaky test). With the fake clock, time only advances during the explicit sleep below.
+	synctest.Test(t, func(t *testing.T) {
+		total := 1000
 
-	buf := bytes.NewBufferString("")
-	lg := zerolog.New(buf)
-	logger := LogProgress(
-		lg,
-		NewLogProgressConfig[uint64](
-			"test",
-			uint64(total),
-			1*time.Millisecond,
-			10,
-		),
-	)
+		buf := bytes.NewBufferString("")
+		lg := zerolog.New(buf)
+		logger := LogProgress(
+			lg,
+			NewLogProgressConfig[uint64](
+				"test",
+				uint64(total),
+				1*time.Millisecond,
+				10,
+			),
+		)
 
-	for i := range total {
-		// somewhere in the middle pause for a bit
-		if i == 13 {
-			<-time.After(3 * time.Millisecond)
+		for i := range total {
+			// somewhere in the middle pause for a bit
+			if i == 13 {
+				time.Sleep(3 * time.Millisecond)
+			}
+
+			logger(1)
 		}
 
-		logger(1)
-	}
+		expectedLogs := []string{
+			fmt.Sprintf(`test progress 0/%d`, total),
+			fmt.Sprintf(`test progress %d/%d (100.0%%)`, total, total),
+		}
 
-	expectedLogs := []string{
-		fmt.Sprintf(`test progress 0/%d`, total),
-		fmt.Sprintf(`test progress %d/%d (100.0%%)`, total, total),
-	}
-
-	for _, log := range expectedLogs {
-		require.Contains(t, buf.String(), log, total)
-	}
-	lines := strings.Count(buf.String(), "\n")
-	// every 10% + 1 for the final log + 1 for the "no data in a while" log
-	require.Equal(t, 12, lines)
+		for _, log := range expectedLogs {
+			require.Contains(t, buf.String(), log, total)
+		}
+		lines := strings.Count(buf.String(), "\n")
+		// every 10% + 1 for the final log + 1 for the "no data in a while" log
+		require.Equal(t, 12, lines)
+	})
 }
 
 func TestLogProgressMultipleGoroutines(t *testing.T) {

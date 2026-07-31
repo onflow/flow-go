@@ -2943,7 +2943,12 @@ func TestCadenceOwnedAccountFunctionalities(t *testing.T) {
 				require.NoError(t, err)
 				require.NoError(t, output.Err)
 				assert.Len(t, output.Events, 3)
-				assert.Len(t, state.UpdatedRegisterIDs(), 13)
+				// This transaction must update state. The exact number of updated registers varies
+				// slightly between runs: the test environment uses a random block ID, which selects
+				// the UUID partition register (`uuid` vs `uuid_N`) and thereby also the atree slab
+				// layout. Hence, we only check that state was updated at all - in contrast to
+				// `dryCall` below, which must not update any registers.
+				assert.NotEmpty(t, state.UpdatedRegisterIDs())
 				assert.Equal(
 					t,
 					flow.EventType("A.f8d6e0586b0a20c7.EVM.TransactionExecuted"),
@@ -3091,7 +3096,12 @@ func TestCadenceOwnedAccountFunctionalities(t *testing.T) {
 				require.NoError(t, err)
 				require.NoError(t, output.Err)
 				assert.Len(t, output.Events, 3)
-				assert.Len(t, state.UpdatedRegisterIDs(), 13)
+				// This transaction must update state. The exact number of updated registers varies
+				// slightly between runs: the test environment uses a random block ID, which selects
+				// the UUID partition register (`uuid` vs `uuid_N`) and thereby also the atree slab
+				// layout. Hence, we only check that state was updated at all - in contrast to
+				// `dryCall` below, which must not update any registers.
+				assert.NotEmpty(t, state.UpdatedRegisterIDs())
 				assert.Equal(
 					t,
 					flow.EventType("A.f8d6e0586b0a20c7.EVM.TransactionExecuted"),

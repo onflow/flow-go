@@ -490,12 +490,15 @@ func (suite *MutatorSuite) TestExtend_WithUnfinalizedReferenceBlock() {
 // to only use finalized blocks as reference, the proposer knowingly generated an invalid
 func (suite *MutatorSuite) TestExtend_WithOrphanedReferenceBlock() {
 	// create a block extending genesis which is not finalized
-	orphaned := unittest.BlockWithParentProtocolState(suite.protoGenesis)
+	// Since `orphaned` and `finalized` are siblings, they must have different views. We track the views
+	// used so far in `usedViews` to prevent the fixtures from generating two blocks with the same view.
+	usedViews := make(map[uint64]struct{})
+	orphaned := unittest.BlockWithParentProtocolStateAndUniqueView(suite.protoGenesis, usedViews)
 	err := suite.protoState.ExtendCertified(context.Background(), unittest.NewCertifiedBlock(orphaned))
 	suite.Require().NoError(err)
 
 	// create a block extending genesis (conflicting with previous) which is finalized
-	finalized := unittest.BlockWithParentProtocolState(suite.protoGenesis)
+	finalized := unittest.BlockWithParentProtocolStateAndUniqueView(suite.protoGenesis, usedViews)
 	finalized.Payload.Guarantees = nil
 	err = suite.protoState.ExtendCertified(context.Background(), unittest.NewCertifiedBlock(finalized))
 	suite.Require().NoError(err)

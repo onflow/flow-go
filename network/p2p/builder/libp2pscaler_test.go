@@ -1,6 +1,7 @@
 package p2pbuilder
 
 import (
+	"math/rand"
 	"testing"
 
 	"github.com/libp2p/go-libp2p"
@@ -166,12 +167,36 @@ func TestBuildLibp2pResourceManagerLimits(t *testing.T) {
 	defaultConcreteLimits, err := BuildLibp2pResourceManagerLimits(unittest.Logger(), &cfg.NetworkConfig.ResourceManager)
 	require.NoError(t, err)
 
+	// overrideFixture generates a random override for a scope, such that every value is guaranteed to
+	// (i) be a positive concrete limit, avoiding the special rcmgr values (default = 0, unlimited = -1,
+	// block-all = -2), and (ii) differ from the corresponding default limit, so that the test can
+	// verify below that each value was indeed overridden. Fully random values (previously
+	// `unittest.LibP2PResourceLimitOverrideFixture`) occasionally collided with a default limit,
+	// making the test flaky.
+	overrideFixture := func(defaults rcmgr.ResourceLimits) p2pconfig.ResourceManagerOverrideLimit {
+		randomAbove := func(limit int) int {
+			if limit < 0 {
+				limit = 0
+			}
+			return limit + 1 + rand.Intn(1000)
+		}
+		return p2pconfig.ResourceManagerOverrideLimit{
+			StreamsInbound:      randomAbove(int(defaults.StreamsInbound)),
+			StreamsOutbound:     randomAbove(int(defaults.StreamsOutbound)),
+			ConnectionsInbound:  randomAbove(int(defaults.ConnsInbound)),
+			ConnectionsOutbound: randomAbove(int(defaults.ConnsOutbound)),
+			FD:                  randomAbove(int(defaults.FD)),
+			Memory:              randomAbove(int(defaults.Memory)),
+		}
+	}
+
 	// now the test creates random override configs for each scope, and re-build the concrete limits.
-	cfg.NetworkConfig.ResourceManager.Override.System = unittest.LibP2PResourceLimitOverrideFixture()
-	cfg.NetworkConfig.ResourceManager.Override.Transient = unittest.LibP2PResourceLimitOverrideFixture()
-	cfg.NetworkConfig.ResourceManager.Override.Protocol = unittest.LibP2PResourceLimitOverrideFixture()
-	cfg.NetworkConfig.ResourceManager.Override.Peer = unittest.LibP2PResourceLimitOverrideFixture()
-	cfg.NetworkConfig.ResourceManager.Override.PeerProtocol = unittest.LibP2PResourceLimitOverrideFixture()
+	defaultPartial := defaultConcreteLimits.ToPartialLimitConfig()
+	cfg.NetworkConfig.ResourceManager.Override.System = overrideFixture(defaultPartial.System)
+	cfg.NetworkConfig.ResourceManager.Override.Transient = overrideFixture(defaultPartial.Transient)
+	cfg.NetworkConfig.ResourceManager.Override.Protocol = overrideFixture(defaultPartial.ProtocolDefault)
+	cfg.NetworkConfig.ResourceManager.Override.Peer = overrideFixture(defaultPartial.PeerDefault)
+	cfg.NetworkConfig.ResourceManager.Override.PeerProtocol = overrideFixture(defaultPartial.ProtocolPeerDefault)
 	overriddenConcreteLimits, err := BuildLibp2pResourceManagerLimits(unittest.Logger(), &cfg.NetworkConfig.ResourceManager)
 	require.NoError(t, err)
 

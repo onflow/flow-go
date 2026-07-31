@@ -117,18 +117,22 @@ func TestCompareKeyValuePairsFromChannels(t *testing.T) {
 			badgerCh := make(chan KVPairs, len(tc.badgerKVs))
 			pebbleCh := make(chan KVPairs, len(tc.pebbleKVs))
 
-			for _, kv := range tc.badgerKVs {
-				badgerCh <- kv
-			}
-			close(badgerCh)
-			for _, kv := range tc.pebbleKVs {
-				pebbleCh <- kv
-			}
-			close(pebbleCh)
-
 			if tc.name == "context cancelled" {
-				// Cancel context before running
+				// Cancel the context before running. We deliberately leave both channels empty and
+				// open: if channel reads were ready at the same time as the cancelled context,
+				// `select` would pick one of the ready cases at random, and the function could
+				// return successfully without ever observing the cancellation (flaky test).
+				// With empty, open channels, observing the cancellation is the only possibility.
 				cancel()
+			} else {
+				for _, kv := range tc.badgerKVs {
+					badgerCh <- kv
+				}
+				close(badgerCh)
+				for _, kv := range tc.pebbleKVs {
+					pebbleCh <- kv
+				}
+				close(pebbleCh)
 			}
 
 			err := compareKeyValuePairsFromChannels(ctx, badgerCh, pebbleCh)

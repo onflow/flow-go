@@ -1,6 +1,7 @@
 package pipeline
 
 import (
+	"sync/atomic"
 	"testing"
 	"testing/synctest"
 	"time"
@@ -16,29 +17,30 @@ import (
 
 // mockStateProvider is a mock implementation of a parent state provider.
 // It tracks the current state and notifies the pipeline when the state changes.
+// The state is stored atomically, since it is updated by the test goroutine while
+// being read concurrently by the pipeline's worker.
 type mockStateProvider struct {
-	state optimistic_sync.State
+	state atomic.Int32
 }
 
 var _ optimistic_sync.PipelineStateProvider = (*mockStateProvider)(nil)
 
 // NewMockStateProvider initializes a mockStateProvider with the default state StatePending.
 func NewMockStateProvider() *mockStateProvider {
-	return &mockStateProvider{
-		state: optimistic_sync.StatePending,
-	}
+	m := &mockStateProvider{}
+	m.state.Store(int32(optimistic_sync.StatePending))
+	return m
 }
 
 // UpdateState sets the internal state and triggers a pipeline update.
 func (m *mockStateProvider) UpdateState(state optimistic_sync.State, pipeline *Pipeline) {
-	m.state = state
+	m.state.Store(int32(state))
 	pipeline.OnParentStateUpdated(state)
 }
 
 // GetState returns the current internal state.
-
 func (m *mockStateProvider) GetState() optimistic_sync.State {
-	return m.state
+	return optimistic_sync.State(m.state.Load())
 }
 
 // mockStateConsumer is a mock implementation used in tests to receive state updates from the pipeline.
@@ -66,6 +68,18 @@ func waitForStateUpdates(t *testing.T, updateChan <-chan optimistic_sync.State, 
 	done := make(chan struct{})
 	unittest.RequireReturnsBefore(t, func() {
 		for _, expected := range expectedStates {
+			// Prefer consuming pending state updates over errors: the pipeline always reports a state
+			// update before emitting an error, but both may already be queued by the time we read
+			// them (e.g. in tests expecting a state transition immediately followed by an expected
+			// error). A single select would pick one of the ready channels at random, potentially
+			// failing on the error before consuming the preceding state update.
+			select {
+			case update := <-updateChan:
+				assert.Equalf(t, expected, update, "expected pipeline to transition to %s, but got %s", expected, update)
+				continue
+			default:
+			}
+
 			select {
 			case <-done:
 				return
@@ -77,6 +91,20 @@ func waitForStateUpdates(t *testing.T, updateChan <-chan optimistic_sync.State, 
 		}
 	}, 500*time.Millisecond, "Timeout waiting for state update")
 	close(done) // make sure function exists after timeout
+}
+
+// waitForStateUpdatesAndNoError behaves like waitForStateUpdates, but additionally requires that
+// no error is queued in errChan once all expected states have been consumed. Use it at call sites
+// that expect no error up to this point. Do NOT use it when an expected error may already be
+// queued concurrently with the state updates (e.g. cancellation tests) - use waitForStateUpdates
+// followed by waitForError instead.
+func waitForStateUpdatesAndNoError(t *testing.T, updateChan <-chan optimistic_sync.State, errChan <-chan error, expectedStates ...optimistic_sync.State) {
+	waitForStateUpdates(t, updateChan, errChan, expectedStates...)
+	select {
+	case err := <-errChan:
+		require.NoError(t, err, "unexpected error queued behind state updates")
+	default:
+	}
 }
 
 // waitForErrorWithCustomCheckers waits for an error from the errChan within 500ms

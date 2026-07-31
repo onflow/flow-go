@@ -423,7 +423,6 @@ func (suite *NetworkTestSuite) TestUnicastRateLimit_Bandwidth() {
 		require.Equal(suite.T(), reason, ratelimit.ReasonBandwidth.String())
 
 		// we only expect messages from the first network on the test suite
-		require.NoError(suite.T(), err)
 		require.Equal(suite.T(), expectedPID, peerID)
 		// update hook calls
 		rateLimits.Inc()
@@ -541,8 +540,12 @@ func (suite *NetworkTestSuite) TestUnicastRateLimit_Bandwidth() {
 	// wait for all rate limits before shutting down network
 	unittest.RequireCloseBefore(suite.T(), ch, 100*time.Millisecond, "could not stop on rate limit test ch on time")
 
-	// remote node should have received the first 2 messages
-	assert.Equal(suite.T(), uint64(2), callCount.Value())
+	// remote node should have received the first 2 messages. Delivery to the receiving engine is
+	// asynchronous, so the messages may still be in flight when the sender observes the rate limit
+	// of the third message - hence, we wait instead of asserting immediately.
+	require.Eventually(suite.T(), func() bool {
+		return callCount.Value() == uint64(2)
+	}, time.Second, 10*time.Millisecond, "expected remote node to receive the first 2 messages")
 
 	// sleep for 1 seconds to allow connection pruner to prune connections
 	time.Sleep(1 * time.Second)
@@ -550,6 +553,12 @@ func (suite *NetworkTestSuite) TestUnicastRateLimit_Bandwidth() {
 	// ensure connection to rate limited peer is pruned
 	p2ptest.EnsureNotConnectedBetweenGroups(suite.T(), ctx, []p2p.LibP2PNode{libP2PNodes[0]}, []p2p.LibP2PNode{suite.libP2PNodes[0]})
 	p2pfixtures.EnsureNoStreamCreationBetweenGroups(suite.T(), ctx, []p2p.LibP2PNode{libP2PNodes[0]}, []p2p.LibP2PNode{suite.libP2PNodes[0]})
+
+	// the rate-limited third message must never be delivered: after the prune window and with the
+	// connection confirmed pruned, the call count must still be exactly 2 (the Eventually above
+	// only checks that 2 is reached)
+	require.Equal(suite.T(), uint64(2), callCount.Value(),
+		"no messages beyond the first 2 may be delivered after the rate limit")
 
 	// eventually the rate limited node should be able to reconnect and send messages
 	require.Eventually(suite.T(), func() bool {
