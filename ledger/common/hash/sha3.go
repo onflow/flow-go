@@ -112,7 +112,7 @@ func (d *state) hash256Plus(p1 Hash, p2 []byte) Hash {
 }
 
 // hash256plus256 absorbs two 256 bits slices of data into the hash's state
-// applies the permutation, and outpute the result in out
+// applies the permutation, and outputs the result in out
 func (d *state) hash256plus256(p1, p2 Hash) Hash {
 	copyIn512(d, p1, p2)
 	// permute

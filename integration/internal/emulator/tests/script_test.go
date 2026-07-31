@@ -194,7 +194,7 @@ func TestInfiniteScript(t *testing.T) {
 	result, err := b.ExecuteScript([]byte(code), nil)
 	require.NoError(t, err)
 
-	unittest.RequireLimitExceededError(t, result.Error, fvmerrors.LimitKindComputation)
+	unittest.RequireLimitExceededError(t, result.Error, fvmerrors.LimitKindComputation, limit)
 }
 
 func TestScriptExecutionLimit(t *testing.T) {
@@ -231,14 +231,14 @@ func TestScriptExecutionLimit(t *testing.T) {
 		result, err := b.ExecuteScript([]byte(code), nil)
 		require.NoError(t, err)
 
-		unittest.RequireLimitExceededError(t, result.Error, fvmerrors.LimitKindComputation)
+		unittest.RequireLimitExceededError(t, result.Error, fvmerrors.LimitKindComputation, limit)
 	})
 
 	t.Run("SufficientLimit", func(t *testing.T) {
 
 		t.Parallel()
 
-		const limit = 25000
+		const limit = 100000
 		b, err := emulator.New(
 			emulator.WithScriptGasLimit(limit),
 		)

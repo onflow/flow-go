@@ -103,9 +103,16 @@ func (m *ComputationMeter) MeterComputation(usage common.ComputationUsage) error
 	}
 	m.computationUsed += w * intensity
 	if m.computationUsed > m.params.computationLimit {
+		// Round the used amount up so it stays strictly greater than the
+		// limit; truncating the internal precision could make them equal.
+		usedCeil := m.computationUsed >> MeterExecutionInternalPrecisionBytes
+		if usedCeil<<MeterExecutionInternalPrecisionBytes < m.computationUsed {
+			usedCeil++
+		}
 		return errors.NewLimitExceededError(
 			errors.LimitKindComputation,
-			uint64(m.params.TotalComputationLimit()))
+			usedCeil,
+			m.params.TotalComputationLimit())
 	}
 	return nil
 }
@@ -124,6 +131,7 @@ func (m *ComputationMeter) ComputationRemaining(kind common.ComputationKind) uin
 		return 0
 	}
 
+	// never underflows, as we handled the m.params.computationLimit ≤ m.computationUsed above
 	return (m.params.computationLimit - m.computationUsed) / w
 }
 

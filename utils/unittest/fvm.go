@@ -21,6 +21,9 @@ func EnsureEventsIndexSeq(t *testing.T, events []flow.Event, chainID flow.ChainI
 // RequireLimitExceededError fails the test unless err's chain contains a
 // [fvmerrors.LimitExceededError] with the given kind. If expectedLimit is
 // provided, the error's limit must match it.
+//
+// It also checks the [fvmerrors.NewLimitExceededError] invariant that the
+// used amount exceeds the limit.
 func RequireLimitExceededError(
 	t testing.TB,
 	err error,
@@ -33,6 +36,8 @@ func RequireLimitExceededError(
 	limitErr, ok := fvmerrors.AsLimitExceededError(err)
 	require.True(t, ok, "expected LimitExceededError, got: %v", err)
 	require.Equal(t, kind, limitErr.LimitKind())
+	require.Greater(t, limitErr.Used(), limitErr.Limit(),
+		"LimitExceededError invariant: used must exceed limit")
 	if len(expectedLimit) == 1 {
 		require.Equal(t, expectedLimit[0], limitErr.Limit())
 	}

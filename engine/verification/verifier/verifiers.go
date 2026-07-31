@@ -110,7 +110,8 @@ func VerifyRange(
 	lockManager lockctx.Manager,
 	from, to uint64,
 	chainID flow.ChainID,
-	protocolDataDir string, chunkDataPackDir string,
+	protocolDataDir string,
+	chunkDataPackDir string,
 	nWorker uint,
 	stopOnMismatch bool,
 	transactionFeesDisabled bool,
@@ -323,7 +324,14 @@ func initStorages(
 	chunkDataPacks := store.NewChunkDataPacks(metrics.NewNoopCollector(),
 		db, storedChunkDataPacks, storages.Collections, 1000)
 
-	verifier := makeVerifier(log.Logger, chainID, storages.Headers, transactionFeesDisabled, scheduledTransactionsEnabled)
+	verifier := makeVerifier(
+		log.Logger,
+		chainID,
+		storages.Headers,
+		transactionFeesDisabled,
+		scheduledTransactionsEnabled,
+	)
+
 	closer := func() error {
 		var dbErr, chunkDataPackDBErr error
 

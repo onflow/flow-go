@@ -121,6 +121,19 @@ func (u *UnicastAuthorizationTestSuite) stopNetworksAndLibp2pNodes() {
 	unittest.RequireComponentsDoneBefore(u.T(), 1*time.Second, u.senderNetwork, u.receiverNetwork)
 }
 
+// requireStreamAcceptedOrReset asserts that a unicast send either succeeded or failed with a
+// benign "stream reset" error. When the receiver rejects an unauthorized message, it resets the
+// inbound stream (see Network.handleIncomingStream). That reset races with the sender closing its
+// side of the stream, so the sender's Unicast call may return a "stream reset" error. This error
+// is benign (see Node.OpenAndWriteOnStream); for these tests the authoritative assertion is that
+// the receiver reported the violation via the slashing violations consumer.
+func (u *UnicastAuthorizationTestSuite) requireStreamAcceptedOrReset(err error) {
+	if err != nil {
+		require.ErrorContains(u.T(), err, "stream reset",
+			"receiver may reset the stream before the sender closes it")
+	}
+}
+
 // TestUnicastAuthorization_UnstakedPeer tests that messages sent via unicast by an unstaked peer is correctly rejected.
 func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_UnstakedPeer() {
 	slashingViolationsConsumer := mocknetwork.NewViolationsConsumer(u.T())
@@ -155,7 +168,7 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_UnstakedPeer() 
 	err = senderCon.Unicast(&libp2pmessage.TestMessage{
 		Text: string("hello"),
 	}, u.receiverID.NodeID)
-	require.NoError(u.T(), err)
+	u.requireStreamAcceptedOrReset(err)
 
 	// wait for slashing violations consumer mock to invoke run func and close ch if expected method call happens
 	unittest.RequireCloseBefore(u.T(), u.waitCh, u.channelCloseDuration, "could close ch on time")
@@ -202,7 +215,7 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_EjectedPeer() {
 	err = senderCon.Unicast(&libp2pmessage.TestMessage{
 		Text: string("hello"),
 	}, u.receiverID.NodeID)
-	require.NoError(u.T(), err)
+	u.requireStreamAcceptedOrReset(err)
 
 	// wait for slashing violations consumer mock to invoke run func and close ch if expected method call happens
 	unittest.RequireCloseBefore(u.T(), u.waitCh, u.channelCloseDuration, "could close ch on time")
@@ -244,7 +257,7 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_UnauthorizedPee
 	err = senderCon.Unicast(&libp2pmessage.TestMessage{
 		Text: string("hello"),
 	}, u.receiverID.NodeID)
-	require.NoError(u.T(), err)
+	u.requireStreamAcceptedOrReset(err)
 
 	// wait for slashing violations consumer mock to invoke run func and close ch if expected method call happens
 	unittest.RequireCloseBefore(u.T(), u.waitCh, u.channelCloseDuration, "could close ch on time")
@@ -296,7 +309,7 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_UnknownMsgCode(
 
 	// send message via unicast
 	err = senderCon.Unicast("hello!", u.receiverID.NodeID)
-	require.NoError(u.T(), err)
+	u.requireStreamAcceptedOrReset(err)
 
 	// wait for slashing violations consumer mock to invoke run func and close ch if expected method call happens
 	unittest.RequireCloseBefore(u.T(), u.waitCh, u.channelCloseDuration, "could close ch on time")
@@ -346,7 +359,7 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_WrongMsgCode() 
 	err = senderCon.Unicast(&libp2pmessage.TestMessage{
 		Text: string("hello"),
 	}, u.receiverID.NodeID)
-	require.NoError(u.T(), err)
+	u.requireStreamAcceptedOrReset(err)
 
 	// wait for slashing violations consumer mock to invoke run func and close ch if expected method call happens
 	unittest.RequireCloseBefore(u.T(), u.waitCh, u.channelCloseDuration, "could close ch on time")
@@ -422,7 +435,7 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_UnauthorizedUni
 	payload := messages.Proposal(*unittest.ProposalFixture())
 	// send message via unicast
 	err = senderCon.Unicast(&payload, u.receiverID.NodeID)
-	require.NoError(u.T(), err)
+	u.requireStreamAcceptedOrReset(err)
 
 	// wait for slashing violations consumer mock to invoke run func and close ch if expected method call happens
 	unittest.RequireCloseBefore(u.T(), u.waitCh, u.channelCloseDuration, "could close ch on time")
@@ -460,11 +473,7 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_ReceiverHasNoSu
 	err = senderCon.Unicast(&libp2pmessage.TestMessage{
 		Text: string("hello"),
 	}, u.receiverID.NodeID)
-	if err != nil {
-		// It can happen that the receiver resets before the sender closes,
-		// in which case the error will be "stream reset"
-		require.ErrorContains(u.T(), err, "stream reset", "expected stream-related error when receiver has no subscription")
-	}
+	u.requireStreamAcceptedOrReset(err)
 
 	// wait for slashing violations consumer mock to invoke run func and close ch if expected method call happens
 	unittest.RequireCloseBefore(u.T(), u.waitCh, u.channelCloseDuration, "could close ch on time")
@@ -584,7 +593,7 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_UnauthorizedSen
 	err = senderCon.Unicast(&libp2pmessage.TestMessage{
 		Text: "hello",
 	}, u.receiverID.NodeID)
-	require.NoError(u.T(), err)
+	u.requireStreamAcceptedOrReset(err)
 
 	// wait for slashing violations consumer to be invoked
 	unittest.RequireCloseBefore(u.T(), u.waitCh, u.channelCloseDuration, "could close ch on time")

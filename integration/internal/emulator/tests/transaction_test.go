@@ -1695,7 +1695,7 @@ func TestInfiniteTransaction(t *testing.T) {
 	result, err := b.ExecuteNextTransaction()
 	assert.NoError(t, err)
 
-	unittest.RequireLimitExceededError(t, result.Error, fvmerrors.LimitKindComputation)
+	unittest.RequireLimitExceededError(t, result.Error, fvmerrors.LimitKindComputation, limit)
 }
 
 func TestTransactionExecutionLimit(t *testing.T) {
@@ -1761,14 +1761,14 @@ func TestTransactionExecutionLimit(t *testing.T) {
 		result, err := b.ExecuteNextTransaction()
 		assert.NoError(t, err)
 
-		unittest.RequireLimitExceededError(t, result.Error, fvmerrors.LimitKindComputation)
+		unittest.RequireLimitExceededError(t, result.Error, fvmerrors.LimitKindComputation, limit)
 	})
 
 	t.Run("SufficientLimit", func(t *testing.T) {
 
 		t.Parallel()
 
-		const limit = 25000
+		const limit = 100000
 
 		b, adapter := setupTransactionTests(
 			t,

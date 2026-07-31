@@ -1227,7 +1227,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 				require.NoError(t, err)
 				require.Greater(t, output.MemoryEstimate, uint64(highWeight))
 
-				unittest.RequireLimitExceededError(t, output.Err, errors.LimitKindMemory)
+				unittest.RequireLimitExceededError(t, output.Err, errors.LimitKindMemory, 10_000_000_000)
 			},
 		))
 
@@ -1351,7 +1351,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 				// There are 100 breaks and each break uses 1_000_000 memory
 				require.Greater(t, output.MemoryEstimate, uint64(100_000_000))
 
-				unittest.RequireLimitExceededError(t, output.Err, errors.LimitKindMemory)
+				unittest.RequireLimitExceededError(t, output.Err, errors.LimitKindMemory, 100_000_000)
 			},
 		))
 
@@ -4447,6 +4447,10 @@ func TestFlowTokenChangesInspector(t *testing.T) {
 		},
 	}
 
+	// payerOnlyAllowlist is the SignerAllowlist of the "mint where only the payer
+	// is allow-listed" test case; see its tokenDefinitions and txBody.
+	payerOnlyAllowlist := map[flow.Address]struct{}{}
+
 	testCases := []testCase{
 		{
 			name:             "transfer",
@@ -4505,11 +4509,13 @@ func TestFlowTokenChangesInspector(t *testing.T) {
 					GetBalance: func(value *interpreter.CompositeValue) uint64 {
 						return uint64(value.GetField(nil, "balance").(interpreter.UFix64Value).UFix64Value)
 					},
-					SinksSources: map[string]func(flow.Event) (int64, error){
-						flowTokenMintedEventID: func(evt flow.Event) (int64, error) {
-							payload, err := ccf.Decode(nil, evt.Payload)
-							require.NoError(t, err)
-							return int64(payload.(cadence.Event).SearchFieldByName("amount").(cadence.UFix64)), nil
+					SinksSources: map[string]inspection.SourceSink{
+						flowTokenMintedEventID: {
+							Amount: func(evt flow.Event) (int64, error) {
+								payload, err := ccf.Decode(nil, evt.Payload)
+								require.NoError(t, err)
+								return int64(payload.(cadence.Event).SearchFieldByName("amount").(cadence.UFix64)), nil
+							},
 						},
 					},
 				},
@@ -4537,6 +4543,7 @@ func TestFlowTokenChangesInspector(t *testing.T) {
 				unaccounted := result.UnaccountedTokens()
 				require.Len(t, unaccounted, 0, "expectation: all tokens were accounted for")
 				require.Len(t, result.Changes, 3, "change should be on 3 addresses: sender, receiver, fees")
+				require.Len(t, result.UnauthorizedSourcesSinks, 0, "no allow-list configured: no violations expected")
 			},
 		},
 		{
@@ -4565,6 +4572,109 @@ func TestFlowTokenChangesInspector(t *testing.T) {
 				unaccounted := result.UnaccountedTokens()
 				require.Len(t, unaccounted, 0, "expectation: all tokens were accounted for")
 				require.Len(t, result.Changes, 3, "change should be on 3 addresses: sender, receiver, fees")
+				require.Len(t, result.UnauthorizedSourcesSinks, 0,
+					"mint is signed by the service account, which is allow-listed by default")
+			},
+		}, {
+			name: "mint by non-allow-listed minter",
+			tokenDefinitions: map[string]inspection.SearchToken{
+				flowTokenVaultID: {
+					ID: flowTokenVaultID,
+					GetBalance: func(value *interpreter.CompositeValue) uint64 {
+						return uint64(value.GetField(nil, "balance").(interpreter.UFix64Value).UFix64Value)
+					},
+					SinksSources: map[string]inspection.SourceSink{
+						flowTokenMintedEventID: {
+							Amount: func(evt flow.Event) (int64, error) {
+								payload, err := ccf.Decode(nil, evt.Payload)
+								require.NoError(t, err)
+								return int64(payload.(cadence.Event).SearchFieldByName("amount").(cadence.UFix64)), nil
+							},
+							// Allow-list an account that is NOT the transaction signer
+							// (the service account), so the mint triggers a violation.
+							SignerAllowlist: map[flow.Address]struct{}{
+								flow.HexToAddress("0000000000000123"): {},
+							},
+						},
+					},
+				},
+			},
+			txBody: func(t *testing.T, chain flow.Chain, accounts []flow.Address) *flow.TransactionBody {
+				sc := systemcontracts.SystemContractsForChain(chain.ChainID())
+				env := sc.AsTemplateEnv()
+
+				txBodyBuilder := flow.NewTransactionBodyBuilder().
+					SetScript(templates.GenerateMintFlowScript(env)).
+					AddArgument(jsoncdc.MustEncode(cadence.Address(accounts[0]))).
+					AddArgument(jsoncdc.MustEncode(cadence.UFix64(10_000_000))).
+					AddAuthorizer(chain.ServiceAddress()).
+					SetPayer(chain.ServiceAddress())
+
+				err := testutil.SignTransactionAsServiceAccount(txBodyBuilder, 0, chain)
+				require.NoError(t, err)
+
+				txBody, err := txBodyBuilder.Build()
+				require.NoError(t, err)
+
+				return txBody
+			},
+			resultChecker: func(t *testing.T, result inspection.TokenDiffResult) {
+				unaccounted := result.UnaccountedTokens()
+				require.Len(t, unaccounted, 0, "the mint amount is still accounted for via the event")
+				require.Len(t, result.UnauthorizedSourcesSinks, 1, "mint signed by a non-allow-listed account must be flagged")
+				require.Equal(t, flowTokenMintedEventID, result.UnauthorizedSourcesSinks[0].EventType)
+				require.Equal(t, int64(10_000_000), result.UnauthorizedSourcesSinks[0].Amount)
+			},
+		}, {
+			// A transaction merely paid for by an allow-listed account must still be
+			// flagged: only the proposer and authorizers authorize the mint.
+			name: "mint where only the payer is allow-listed",
+			tokenDefinitions: func() map[string]inspection.SearchToken {
+				searchTokens := inspection.DefaultTokenDiffSearchTokens(chain)
+				ss := searchTokens[flowTokenVaultID].SinksSources[flowTokenMintedEventID]
+				// Allow-list only the payer, replacing the default (service account).
+				// The payer's address is only known once the test accounts are
+				// created, so txBody below inserts it into this map before the
+				// transaction (and thus the inspector) runs.
+				ss.SignerAllowlist = payerOnlyAllowlist
+				searchTokens[flowTokenVaultID].SinksSources[flowTokenMintedEventID] = ss
+				return searchTokens
+			}(),
+			txBody: func(t *testing.T, chain flow.Chain, accounts []flow.Address) *flow.TransactionBody {
+				sc := systemcontracts.SystemContractsForChain(chain.ChainID())
+				env := sc.AsTemplateEnv()
+
+				txBodyBuilder := flow.NewTransactionBodyBuilder().
+					SetScript(templates.GenerateMintFlowScript(env)).
+					AddArgument(jsoncdc.MustEncode(cadence.Address(accounts[0]))).
+					AddArgument(jsoncdc.MustEncode(cadence.UFix64(10_000_000))).
+					AddAuthorizer(chain.ServiceAddress())
+
+				err := testutil.SignTransactionAsServiceAccount(txBodyBuilder, 0, chain)
+				require.NoError(t, err)
+
+				// Override the payer set by SignTransactionAsServiceAccount with the
+				// allow-listed account. Authorization checks are disabled in this
+				// test, so the payer's missing envelope signature is not an issue.
+				// The payer is also the mint's recipient, so the minted tokens cover
+				// the transaction fees (the test accounts are created unfunded).
+				payerOnlyAllowlist[accounts[0]] = struct{}{}
+				txBodyBuilder.SetPayer(accounts[0])
+
+				txBody, err := txBodyBuilder.Build()
+				require.NoError(t, err)
+
+				return txBody
+			},
+			resultChecker: func(t *testing.T, result inspection.TokenDiffResult) {
+				unaccounted := result.UnaccountedTokens()
+				require.Len(t, unaccounted, 0, "the mint amount is still accounted for via the event")
+				require.Len(t, result.UnauthorizedSourcesSinks, 1,
+					"the payer's signature must not authorize the mint")
+				require.Equal(t, flowTokenMintedEventID, result.UnauthorizedSourcesSinks[0].EventType)
+				require.Equal(t, int64(10_000_000), result.UnauthorizedSourcesSinks[0].Amount)
+				require.Equal(t, []flow.Address{chain.ServiceAddress()}, result.UnauthorizedSourcesSinks[0].Signers,
+					"only the proposer and authorizers count as signers")
 			},
 		}, {
 			name:             "create account",

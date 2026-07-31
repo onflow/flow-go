@@ -2,6 +2,7 @@ package errors
 
 import (
 	"fmt"
+	"slices"
 
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/runtime"
@@ -172,19 +173,28 @@ func (kind LimitKind) errorCode() ErrorCode {
 type LimitExceededError struct {
 	codedError
 	kind  LimitKind
+	used  uint64
 	limit uint64
 }
 
-// NewLimitExceededError constructs a new LimitExceededError for the given
-// limit kind.
-func NewLimitExceededError(kind LimitKind, limit uint64) LimitExceededError {
+var _ CodedError = (*LimitExceededError)(nil)
+
+// NewLimitExceededError constructs a new LimitExceededError.
+//
+// INVARIANT: used > limit. Only construct this error after a meter has
+// recorded usage exceeding the limit, never from "is enough left?"
+// pre-checks (e.g. the EVM gas pre-check), which must use their own error
+// types.
+func NewLimitExceededError(kind LimitKind, used uint64, limit uint64) LimitExceededError {
 	return LimitExceededError{
 		codedError: NewCodedError(
 			kind.errorCode(),
-			"%s limit exceeded (limit: %d)",
+			"%s limit exceeded (used: %d, limit: %d)",
 			kind,
+			used,
 			limit),
 		kind:  kind,
+		used:  used,
 		limit: limit,
 	}
 }
@@ -192,6 +202,13 @@ func NewLimitExceededError(kind LimitKind, limit uint64) LimitExceededError {
 // LimitKind returns which metering limit was exceeded.
 func (err LimitExceededError) LimitKind() LimitKind {
 	return err.kind
+}
+
+// Used returns the metered usage at the moment the limit was exceeded. It is
+// always greater than Limit, but since metering aborts on the first detected
+// excess, it does not reflect the execution's total demand.
+func (err LimitExceededError) Used() uint64 {
+	return err.used
 }
 
 // Limit returns the limit that was exceeded.
@@ -204,6 +221,20 @@ func AsLimitExceededError(err error) (LimitExceededError, bool) {
 	var limitErr LimitExceededError
 	ok := As(err, &limitErr)
 	return limitErr, ok
+}
+
+// IsLimitExceededError reports whether err's chain contains a
+// LimitExceededError. If any kinds are provided, the error's kind must match
+// one of them.
+func IsLimitExceededError(err error, kinds ...LimitKind) bool {
+	limitErr, ok := AsLimitExceededError(err)
+	if !ok {
+		return false
+	}
+	if len(kinds) == 0 {
+		return true
+	}
+	return slices.Contains(kinds, limitErr.kind)
 }
 
 // NewStorageCapacityExceededError constructs a new CodedError which indicates

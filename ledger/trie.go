@@ -73,11 +73,20 @@ func ComputeCompactValue(path hash.Hash, value []byte, nodeHeight int) hash.Hash
 		return GetDefaultHashForHeight(nodeHeight)
 	}
 
-	var out hash.Hash
-	out = hash.HashLeaf(path, value)   // we first compute the hash of the fully-expanded leaf
-	for h := 1; h <= nodeHeight; h++ { // then, we hash our way upwards towards the root until we hit the specified nodeHeight
-		// h is the height of the node, whose hash we are computing in this iteration.
-		// The hash is computed from the node's children at height h-1.
+	leafHash := hash.HashLeaf(path, value) // compute the hash of the fully-expanded leaf (height 0)
+	return ComputeCompactValueFromLeafHash(path, leafHash, nodeHeight)
+}
+
+// ComputeCompactValueFromLeafHash computes the node hash from a pre-computed leaf hash
+// (the height-0 hash, i.e., HashLeaf(path, value)). This is useful for payloadless tries
+// where the leaf hash is stored instead of the actual value.
+//
+// The function extends the leaf hash from height 0 to nodeHeight by hashing upward
+// through the trie structure, combining with default hashes at each level.
+func ComputeCompactValueFromLeafHash(path hash.Hash, leafHash hash.Hash, nodeHeight int) hash.Hash {
+	out := leafHash
+	for h := 1; h <= nodeHeight; h++ {
+		// h is the height of the node whose hash we are computing
 		bit := bitutils.ReadBit(path[:], NodeMaxHeight-h)
 		if bit == 1 { // right branching
 			out = hash.HashInterNode(GetDefaultHashForHeight(h-1), out)
