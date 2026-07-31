@@ -433,11 +433,13 @@ func (w *DiskWAL) replaySegments(
 				return fmt.Errorf("error while processing LedgerWAL deletion: %w", err)
 			}
 		}
+	}
 
-		err = reader.Err()
-		if err != nil {
-			return fmt.Errorf("cannot read LedgerWAL: %w", err)
-		}
+	// reader.Next() returns false both on clean EOF and on a read error, so the error
+	// must be checked after the loop to detect a corrupt or truncated final record.
+	err = reader.Err()
+	if err != nil {
+		return fmt.Errorf("cannot read LedgerWAL: %w", err)
 	}
 
 	return nil
