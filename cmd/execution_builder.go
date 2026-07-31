@@ -1497,16 +1497,29 @@ func (exeNode *ExecutionNode) LoadBootstrapper(node *NodeConfig) error {
 		// without loading the whole forest.
 		if exeNode.exeConf.payloadless {
 			triedir := exeNode.exeConf.triedir
+			v7RootFileName := modelbootstrap.FilenameWALRootCheckpoint + wal.V7FileSuffix
 			hasV7Root, err := wal.HasRootCheckpointV7(triedir)
 			if err != nil {
 				return fmt.Errorf("could not check for V7 root checkpoint: %w", err)
 			}
 			if !hasV7Root {
+				// HasRootCheckpointV7 only looks for the header file, which the writer emits
+				// last. If a previous attempt died mid-conversion — a realistic outcome, since
+				// this is the memory-heavy step of bootstrap — its part files are still on
+				// disk and would trip ConvertCheckpointV6ToV7's refusal to clobber existing
+				// output, leaving the node unable to boot without manual cleanup. Discarding
+				// that partial output is always safe: the V6 source is untouched, and a
+				// checkpoint whose header was never written is unusable anyway.
+				err = wal.DeleteCheckpointFiles(triedir, v7RootFileName)
+				if err != nil {
+					return fmt.Errorf("could not remove partially converted V7 root checkpoint: %w", err)
+				}
+
 				err = wal.ConvertCheckpointV6ToV7(
 					triedir,
 					modelbootstrap.FilenameWALRootCheckpoint,
 					triedir,
-					modelbootstrap.FilenameWALRootCheckpoint+wal.V7FileSuffix,
+					v7RootFileName,
 					node.Logger,
 					16,
 				)

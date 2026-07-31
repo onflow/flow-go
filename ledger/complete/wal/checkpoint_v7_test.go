@@ -1,6 +1,7 @@
 package wal
 
 import (
+	"crypto/rand"
 	"os"
 	"testing"
 
@@ -10,7 +11,6 @@ import (
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/hash"
 	"github.com/onflow/flow-go/ledger/common/testutils"
-	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
 	"github.com/onflow/flow-go/ledger/complete/payloadless"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -376,5 +376,124 @@ func TestCheckpointHasRootHashV7Dispatch(t *testing.T) {
 	})
 }
 
-// Ensure the trie package import is retained for converter use in helpers above.
-var _ = trie.NewEmptyMTrie
+// randomPayloadlessNode mirrors `randomNode` for the payloadless node type: a leaf
+// node at height 256 with a random path and hash, and no leaf hash.
+func randomPayloadlessNode() *payloadless.Node {
+	var randomPath ledger.Path
+	_, err := rand.Read(randomPath[:])
+	if err != nil {
+		panic("randomness failed")
+	}
+
+	var randomHashValue hash.Hash
+	_, err = rand.Read(randomHashValue[:])
+	if err != nil {
+		panic("randomness failed")
+	}
+
+	return payloadless.NewNode(256, nil, nil, randomPath, nil, randomHashValue)
+}
+
+// TestGetPayloadlessNodesByIndex is the V7 analog of `TestGetNodesByIndex`: it checks that
+// the index assigned to a node while writing resolves back to the same node while reading,
+// across the subtrie groups and the top-level node slice.
+func TestGetPayloadlessNodesByIndex(t *testing.T) {
+	n := 10
+	ns := make([]*payloadless.Node, n)
+	for i := 0; i < n; i++ {
+		ns[i] = randomPayloadlessNode()
+	}
+	subtrieNodes := [][]*payloadless.Node{
+		{ns[0], ns[1]},
+		{ns[2]},
+		{},
+		{},
+	}
+	topLevelNodes := []*payloadless.Node{nil, ns[3]}
+	totalSubTrieNodeCount := computeTotalPayloadlessSubTrieNodeCount(subtrieNodes)
+
+	for i := uint64(1); i <= 4; i++ {
+		node, err := getPayloadlessNodeByIndex(subtrieNodes, totalSubTrieNodeCount, topLevelNodes, i)
+		require.NoError(t, err, "cannot get node by index", i)
+		require.Same(t, ns[i-1], node, "got wrong node by index %v", i)
+	}
+
+	// index 0 is the nil sentinel
+	nilNode, err := getPayloadlessNodeByIndex(subtrieNodes, totalSubTrieNodeCount, topLevelNodes, 0)
+	require.NoError(t, err)
+	require.Nil(t, nilNode)
+
+	// an index past the top-level nodes is an error rather than a panic
+	_, err = getPayloadlessNodeByIndex(subtrieNodes, totalSubTrieNodeCount, topLevelNodes, totalSubTrieNodeCount+10)
+	require.Error(t, err)
+}
+
+// TestEncodeSubTrieV7 is the V7 analog of `TestEncodeSubTrie`: it stores each subtrie group
+// to its own part file and verifies that every root is reachable under the index that
+// `storeCheckpointSubTrieV7` reported for it.
+func TestEncodeSubTrieV7(t *testing.T) {
+	file := "checkpoint" + V7FileSuffix
+	logger := zerolog.Nop()
+	tries := createMultiplePayloadlessTries(t)
+	estimatedSubtrieNodeCount := estimatePayloadlessSubtrieNodeCount(tries[0])
+	subtrieRoots := createPayloadlessSubTrieRoots(tries)
+
+	for index, roots := range subtrieRoots {
+		unittest.RunWithTempDir(t, func(dir string) {
+			uniqueIndices, nodeCount, checksum, err := storeCheckpointSubTrieV7(
+				index, roots, estimatedSubtrieNodeCount, dir, file, logger)
+			require.NoError(t, err)
+
+			// subtrie roots might have duplicates, that's why they are grouped and each
+			// group is stored in a different part file in order to deduplicate. The
+			// returned uniqueIndices contains the index for each unique root. To verify
+			// that, build uniqueRoots first, then verify no unique root is missing from
+			// the uniqueIndices.
+			uniqueRoots := make(map[*payloadless.Node]struct{})
+			for _, root := range roots {
+				uniqueRoots[root] = struct{}{}
+			}
+
+			// each root should be included in the uniqueIndices
+			for _, root := range roots {
+				_, ok := uniqueIndices[root]
+				require.True(t, ok, "each root should be included in the uniqueIndices")
+			}
+
+			if len(uniqueIndices) > 1 {
+				require.Len(t, uniqueIndices, len(uniqueRoots),
+					"uniqueIndices should include all roots")
+			}
+
+			logger.Info().Msgf("payloadless sub trie checkpoint stored, uniqueIndices: %v, node count: %v, checksum: %v",
+				uniqueIndices, nodeCount, checksum)
+
+			// all the nodes
+			nodes, err := readCheckpointSubTrieV7(dir, file, index, checksum, logger)
+			require.NoError(t, err)
+
+			for _, root := range roots {
+				if root == nil {
+					continue
+				}
+				index := uniqueIndices[root]
+				require.Equal(t, root.Hash(), nodes[index-1].Hash(), // -1 because readCheckpointSubTrieV7 returns nodes[1:]
+					"readCheckpointSubTrieV7 should return nodes where the root should be found "+
+						"by the index specified by the uniqueIndices returned by storeCheckpointSubTrieV7")
+			}
+		})
+	}
+}
+
+// TestCannotStoreTwiceV7 is the V7 analog of `TestCannotStoreTwice`: writing a checkpoint
+// must never clobber part files already on disk under the same name.
+func TestCannotStoreTwiceV7(t *testing.T) {
+	unittest.RunWithTempDir(t, func(dir string) {
+		tries := createSimplePayloadlessTrie(t)
+		fileName := "checkpoint" + V7FileSuffix
+		logger := zerolog.Nop()
+		require.NoErrorf(t, StoreCheckpointV7Concurrently(tries, dir, fileName, logger), "fail to store checkpoint")
+		// checkpoint already exists, can't store again
+		require.Error(t, StoreCheckpointV7Concurrently(tries, dir, fileName, logger))
+	})
+}
