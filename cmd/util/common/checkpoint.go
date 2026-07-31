@@ -10,6 +10,7 @@ import (
 
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/complete/wal"
+	modelbootstrap "github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
@@ -137,15 +138,36 @@ func GenerateProtocolSnapshotForCheckpoint(
 
 // findLatestCheckpointFilePath finds the latest checkpoint file in the given directory
 // it returns the header file name of the latest checkpoint file
+//
+// The returned name is version-specific: a V7 (payloadless) checkpoint carries the
+// [wal.V7FileSuffix], a V6 checkpoint does not. Rendering the wrong version's name would point at a
+// file that does not exist, since the two versions coexist in a payloadless triedir.
+//
+// No error returns are expected during normal operation.
 func findLatestCheckpointFilePath(checkpointDir string) (string, error) {
-	_, last, err := wal.ListCheckpoints(checkpointDir)
+	_, last, err := wal.ListCheckpointsWithInfo(checkpointDir)
 	if err != nil {
 		return "", fmt.Errorf("could not list checkpoints in directory %v: %w", checkpointDir, err)
 	}
 
-	fileName := wal.NumberToFilename(last)
-	if last < 0 {
-		fileName = "root.checkpoint"
+	// No numbered checkpoint: fall back to the root checkpoint, which the listing above excludes.
+	// Prefer the V7 root checkpoint, because a payloadless triedir has both (the V7 one is converted
+	// from the V6 one at bootstrap) while a full triedir only has the V6 one.
+	if last == nil {
+		hasV7Root, err := wal.HasRootCheckpointV7(checkpointDir)
+		if err != nil {
+			return "", fmt.Errorf("could not check for V7 root checkpoint in directory %v: %w", checkpointDir, err)
+		}
+		fileName := modelbootstrap.FilenameWALRootCheckpoint
+		if hasV7Root {
+			fileName += wal.V7FileSuffix
+		}
+		return filepath.Join(checkpointDir, fileName), nil
+	}
+
+	fileName := wal.NumberToFilename(last.Number)
+	if last.Version == wal.VersionV7 {
+		fileName = wal.NumberToFilenameV7(last.Number)
 	}
 
 	checkpointFilePath := filepath.Join(checkpointDir, fileName)
