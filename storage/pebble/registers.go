@@ -12,6 +12,7 @@ import (
 	"go.uber.org/atomic"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/storage"
 )
 
@@ -162,8 +163,14 @@ func (s *Registers) Store(
 func (s *Registers) verifyStoredEntries(entries flow.RegisterEntries, height uint64) error {
 	for _, entry := range entries {
 		stored, err := s.Get(entry.Key, height)
+		if errors.Is(err, storage.ErrNotFound) {
+			// a missing entry means divergence from what was previously stored.
+			// Do not wrap storage.ErrNotFound: Store's caller must not mistake
+			// this for a benign "not found" from Get.
+			return fmt.Errorf("register %v was not stored at height %d", entry.Key, height)
+		}
 		if err != nil {
-			return fmt.Errorf("cannot verify stored register %v at height %d: %w", entry.Key, height, err)
+			return irrecoverable.NewExceptionf("cannot verify stored register %v at height %d: %w", entry.Key, height, err)
 		}
 		if !bytes.Equal(stored, entry.Value) {
 			return fmt.Errorf("register %v at height %d was already stored with a different value", entry.Key, height)

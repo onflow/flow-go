@@ -93,12 +93,14 @@ func TestRegisters_Store(t *testing.T) {
 		err = r.Store(conflicting, height2)
 		require.Error(t, err)
 
-		// same height with a register that was not stored must fail
+		// same height with a register that was not stored must fail,
+		// and the failure must not be detectable as storage.ErrNotFound
 		notStored := flow.RegisterEntries{
 			{Key: flow.RegisterID{Owner: "owner", Key: "key2"}, Value: []byte("value2")},
 		}
 		err = r.Store(notStored, height2)
 		require.Error(t, err)
+		require.NotErrorIs(t, err, storage.ErrNotFound)
 
 		// the originally stored value is unchanged
 		value1, err := r.Get(key1, height2)
