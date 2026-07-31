@@ -81,26 +81,15 @@ func run(*cobra.Command, []string) {
 		Bool("stream", flagStream).
 		Msg("converting V6 checkpoint to V7")
 
-	var err error
-	if flagStream {
-		err = wal.ConvertCheckpointV6ToV7Stream(
-			flagCheckpointDir,
-			flagCheckpoint,
-			outputDir,
-			outputFile,
-			log.Logger,
-			flagNWorker,
-		)
-	} else {
-		err = wal.ConvertCheckpointV6ToV7(
-			flagCheckpointDir,
-			flagCheckpoint,
-			outputDir,
-			outputFile,
-			log.Logger,
-			flagNWorker,
-		)
-	}
+	err := wal.ConvertCheckpointV6ToV7(
+		flagCheckpointDir,
+		flagCheckpoint,
+		outputDir,
+		outputFile,
+		log.Logger,
+		flagNWorker,
+		flagStream,
+	)
 	if err != nil {
 		log.Fatal().Err(err).Msg("checkpoint conversion failed")
 	}

@@ -116,7 +116,7 @@ func TestConvertCheckpointV6ToV7_PreservesRootHashes(t *testing.T) {
 		require.NoError(t, StoreCheckpointV6Concurrently(v6Tries, dir, v6Name, logger))
 
 		v7Name := v6Name + V7FileSuffix
-		require.NoError(t, ConvertCheckpointV6ToV7(dir, v6Name, dir, v7Name, logger, 16))
+		require.NoError(t, ConvertCheckpointV6ToV7(dir, v6Name, dir, v7Name, logger, 16, false))
 
 		v7Tries, err := OpenAndReadCheckpointV7(dir, v7Name, logger)
 		require.NoError(t, err)
@@ -138,7 +138,7 @@ func TestConvertCheckpointV6ToV7_NWorkerOne(t *testing.T) {
 		require.NoError(t, StoreCheckpointV6Concurrently(v6Tries, dir, v6Name, logger))
 
 		v7Name := v6Name + V7FileSuffix
-		require.NoError(t, ConvertCheckpointV6ToV7(dir, v6Name, dir, v7Name, logger, 1))
+		require.NoError(t, ConvertCheckpointV6ToV7(dir, v6Name, dir, v7Name, logger, 1, false))
 
 		v7Tries, err := OpenAndReadCheckpointV7(dir, v7Name, logger)
 		require.NoError(t, err)
@@ -152,10 +152,10 @@ func TestConvertCheckpointV6ToV7_NWorkerOne(t *testing.T) {
 func TestConvertCheckpointV6ToV7_InvalidNWorker(t *testing.T) {
 	unittest.RunWithTempDir(t, func(dir string) {
 		logger := zerolog.Nop()
-		err := ConvertCheckpointV6ToV7(dir, "doesnt-matter", dir, "out"+V7FileSuffix, logger, 0)
+		err := ConvertCheckpointV6ToV7(dir, "doesnt-matter", dir, "out"+V7FileSuffix, logger, 0, false)
 		require.Error(t, err, "nWorker=0 must be rejected")
 
-		err = ConvertCheckpointV6ToV7(dir, "doesnt-matter", dir, "out"+V7FileSuffix, logger, 17)
+		err = ConvertCheckpointV6ToV7(dir, "doesnt-matter", dir, "out"+V7FileSuffix, logger, 17, false)
 		require.Error(t, err, "nWorker > subtrieCount must be rejected")
 	})
 }
@@ -169,7 +169,7 @@ func TestConvertCheckpointV6ToV7_RequiresV7Suffix(t *testing.T) {
 		v6Name := "checkpoint.00000001"
 		require.NoError(t, StoreCheckpointV6Concurrently(v6Tries, dir, v6Name, logger))
 
-		err := ConvertCheckpointV6ToV7(dir, v6Name, dir, "no-suffix", logger, 4)
+		err := ConvertCheckpointV6ToV7(dir, v6Name, dir, "no-suffix", logger, 4, false)
 		require.Error(t, err, "output filename without V7 suffix must be rejected")
 	})
 }
@@ -184,9 +184,9 @@ func TestConvertCheckpointV6ToV7_RejectsClobber(t *testing.T) {
 		require.NoError(t, StoreCheckpointV6Concurrently(v6Tries, dir, v6Name, logger))
 
 		v7Name := v6Name + V7FileSuffix
-		require.NoError(t, ConvertCheckpointV6ToV7(dir, v6Name, dir, v7Name, logger, 4))
+		require.NoError(t, ConvertCheckpointV6ToV7(dir, v6Name, dir, v7Name, logger, 4, false))
 
-		err := ConvertCheckpointV6ToV7(dir, v6Name, dir, v7Name, logger, 4)
+		err := ConvertCheckpointV6ToV7(dir, v6Name, dir, v7Name, logger, 4, false)
 		require.Error(t, err, "second conversion to the same V7 output must be rejected")
 	})
 }
@@ -213,13 +213,13 @@ func TestDeleteCheckpointFilesClearsPartialV7Conversion(t *testing.T) {
 		hasV7Root, err := HasRootCheckpointV7(dir)
 		require.NoError(t, err)
 		require.False(t, hasV7Root)
-		require.Error(t, ConvertCheckpointV6ToV7(dir, v6Name, dir, v7Name, logger, 4),
+		require.Error(t, ConvertCheckpointV6ToV7(dir, v6Name, dir, v7Name, logger, 4, false),
 			"leftover part files must block a retry")
 
 		// clearing the partial output unblocks the retry
 		require.NoError(t, DeleteCheckpointFiles(dir, v7Name))
 		require.NoFileExists(t, partialPart)
-		require.NoError(t, ConvertCheckpointV6ToV7(dir, v6Name, dir, v7Name, logger, 4))
+		require.NoError(t, ConvertCheckpointV6ToV7(dir, v6Name, dir, v7Name, logger, 4, false))
 
 		hasV7Root, err = HasRootCheckpointV7(dir)
 		require.NoError(t, err)
@@ -271,7 +271,7 @@ func TestRemoveCheckpointV6KeepsV7(t *testing.T) {
 func TestConvertCheckpointV6ToV7_MissingV6Input(t *testing.T) {
 	unittest.RunWithTempDir(t, func(dir string) {
 		logger := zerolog.Nop()
-		err := ConvertCheckpointV6ToV7(dir, "missing", dir, "missing"+V7FileSuffix, logger, 4)
+		err := ConvertCheckpointV6ToV7(dir, "missing", dir, "missing"+V7FileSuffix, logger, 4, false)
 		require.Error(t, err, "missing V6 input must be reported")
 	})
 }
@@ -287,7 +287,7 @@ func TestConvertCheckpointV6ToV7_DifferentOutputDir(t *testing.T) {
 			require.NoError(t, StoreCheckpointV6Concurrently(v6Tries, srcDir, v6Name, logger))
 
 			v7Name := v6Name + V7FileSuffix
-			require.NoError(t, ConvertCheckpointV6ToV7(srcDir, v6Name, dstDir, v7Name, logger, 4))
+			require.NoError(t, ConvertCheckpointV6ToV7(srcDir, v6Name, dstDir, v7Name, logger, 4, false))
 
 			// V7 files exist in dstDir, not in srcDir.
 			v7Tries, err := OpenAndReadCheckpointV7(dstDir, v7Name, logger)
@@ -313,7 +313,7 @@ func TestConvertCheckpointV6ToV7_EmptyTrie(t *testing.T) {
 		require.NoError(t, StoreCheckpointV6Concurrently(v6Tries, dir, v6Name, logger))
 
 		v7Name := v6Name + V7FileSuffix
-		require.NoError(t, ConvertCheckpointV6ToV7(dir, v6Name, dir, v7Name, logger, 16))
+		require.NoError(t, ConvertCheckpointV6ToV7(dir, v6Name, dir, v7Name, logger, 16, false))
 
 		v7Tries, err := OpenAndReadCheckpointV7(dir, v7Name, logger)
 		require.NoError(t, err)
@@ -440,7 +440,7 @@ func TestFullVsPayloadlessForest_LoadConvertedCheckpoint(t *testing.T) {
 
 		// Convert V6 → V7.
 		v7Name := v6Name + V7FileSuffix
-		require.NoError(t, ConvertCheckpointV6ToV7(dir, v6Name, dir, v7Name, logger, 16))
+		require.NoError(t, ConvertCheckpointV6ToV7(dir, v6Name, dir, v7Name, logger, 16, false))
 
 		// Reload V7 into a fresh payloadless forest.
 		v7Tries, err := OpenAndReadCheckpointV7(dir, v7Name, logger)
@@ -543,8 +543,8 @@ func TestConvertCheckpointV6ToV7_Deterministic(t *testing.T) {
 				require.NoError(t, StoreCheckpointV6Concurrently(v6Tries, srcDir, v6Name, logger))
 
 				v7Name := v6Name + V7FileSuffix
-				require.NoError(t, ConvertCheckpointV6ToV7(srcDir, v6Name, dst1, v7Name, logger, 16))
-				require.NoError(t, ConvertCheckpointV6ToV7(srcDir, v6Name, dst2, v7Name, logger, 16))
+				require.NoError(t, ConvertCheckpointV6ToV7(srcDir, v6Name, dst1, v7Name, logger, 16, false))
+				require.NoError(t, ConvertCheckpointV6ToV7(srcDir, v6Name, dst2, v7Name, logger, 16, false))
 
 				files1 := filePaths(dst1, v7Name, subtrieLevel)
 				files2 := filePaths(dst2, v7Name, subtrieLevel)
@@ -568,7 +568,7 @@ func TestConvertCheckpointV6ToV7_IntermediateNWorker(t *testing.T) {
 
 		for _, nWorker := range []uint{2, 4, 8} {
 			v7Name := fmt.Sprintf("%s.nw%d%s", v6Name, nWorker, V7FileSuffix)
-			require.NoError(t, ConvertCheckpointV6ToV7(dir, v6Name, dir, v7Name, logger, nWorker))
+			require.NoError(t, ConvertCheckpointV6ToV7(dir, v6Name, dir, v7Name, logger, nWorker, false))
 
 			v7Tries, err := OpenAndReadCheckpointV7(dir, v7Name, logger)
 			require.NoError(t, err)
@@ -593,7 +593,7 @@ func TestConvertCheckpointV6ToV7_MatchesDirectV7Write(t *testing.T) {
 
 		// Path A: converter.
 		convertedName := v6Name + ".converted" + V7FileSuffix
-		require.NoError(t, ConvertCheckpointV6ToV7(dir, v6Name, dir, convertedName, logger, 16))
+		require.NoError(t, ConvertCheckpointV6ToV7(dir, v6Name, dir, convertedName, logger, 16, false))
 
 		// Path B: convert tries in-memory and write directly.
 		v7Tries, err := FromV6Tries(v6Tries)
@@ -621,7 +621,7 @@ func TestConvertCheckpointV6ToV7_JunkInput(t *testing.T) {
 		junkPath := filepath.Join(dir, v6Name)
 		require.NoError(t, writeBytes(junkPath, []byte("not a checkpoint header")))
 
-		err := ConvertCheckpointV6ToV7(dir, v6Name, dir, v6Name+V7FileSuffix, logger, 16)
+		err := ConvertCheckpointV6ToV7(dir, v6Name, dir, v6Name+V7FileSuffix, logger, 16, false)
 		require.Error(t, err, "junk V6 header file must be rejected")
 	})
 }
