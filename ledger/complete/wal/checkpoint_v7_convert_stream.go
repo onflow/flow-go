@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 
+	"github.com/hashicorp/go-multierror"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/ledger"
@@ -43,10 +44,11 @@ const (
 	payloadEncodingVersion = 1
 )
 
-// ConvertCheckpointV6ToV7Stream converts a V6 checkpoint at (inputDir, inputFileName)
+// convertCheckpointV6ToV7Stream converts a V6 checkpoint at (inputDir, inputFileName)
 // into a V7 (payloadless) checkpoint at (outputDir, outputFileName) by streaming
 // each part file node-by-node, without ever materializing the full trie forest in
-// memory.
+// memory. Inputs are expected to have been checked by [validateV6ToV7Conversion],
+// which also supplies the V6 header's checksums.
 //
 // How it works:
 //   - The V6 and V7 on-disk layouts are byte-identical except for (a) the version
@@ -60,6 +62,8 @@ const (
 //     the register-size field.
 //   - Node count and ordering are unchanged by the conversion, so every interim
 //     node's child indices remain valid without rewriting.
+//   - Every input part file is fully CRC32-verified while being read, so input
+//     corruption is detected rather than carried into the V7 output.
 //   - Per-part-file CRC32 checksums are recomputed during the write and collected
 //     into a freshly written V7 header.
 //
@@ -67,36 +71,13 @@ const (
 // scratch buffers per part file. The 16 subtrie part files are converted in
 // parallel using up to nWorker goroutines; valid range is [1, subtrieCount].
 //
-// Unlike [ConvertCheckpointV6ToV7], this function does not load the forest and
+// Unlike the in-memory conversion, this function does not load the forest and
 // therefore does not re-derive or cross-check trie root hashes. Node hashes are
 // carried over verbatim from the V6 stream, so root hashes are structurally
 // preserved.
 //
-// The output filename must carry the V7 suffix and no output part file may already
-// exist; otherwise the call is rejected. On any failure, partially written output
-// files are removed.
-//
 // No error returns are expected during normal operation; all error returns indicate
-// a malformed input, a clobbering output, or an IO failure.
-func ConvertCheckpointV6ToV7Stream(
-	inputDir string,
-	inputFileName string,
-	outputDir string,
-	outputFileName string,
-	logger zerolog.Logger,
-	nWorker uint,
-) error {
-	err := convertCheckpointV6ToV7Stream(inputDir, inputFileName, outputDir, outputFileName, logger, nWorker)
-	if err != nil {
-		cleanupErr := deleteCheckpointFiles(outputDir, outputFileName)
-		if cleanupErr != nil {
-			return fmt.Errorf("fail to cleanup temp file %s, after running into error: %w", cleanupErr, err)
-		}
-		return err
-	}
-	return nil
-}
-
+// a malformed input or an IO failure.
 func convertCheckpointV6ToV7Stream(
 	inputDir string,
 	inputFileName string,
@@ -104,51 +85,14 @@ func convertCheckpointV6ToV7Stream(
 	outputFileName string,
 	logger zerolog.Logger,
 	nWorker uint,
+	subtrieChecksums []uint32,
+	topTrieChecksum uint32,
 ) error {
-	if nWorker == 0 || nWorker > subtrieCount {
-		return fmt.Errorf("invalid nWorker %v, valid range is [1, %v]", nWorker, subtrieCount)
-	}
-
-	// Reject obvious filename misuse so converted files can coexist with the V6 source.
-	if err := requireV7Filename(outputFileName); err != nil {
-		return err
-	}
-
-	// Validate V6 input exists (header + part files).
-	v6Header := filePathCheckpointHeader(inputDir, inputFileName)
-	if _, err := os.Stat(v6Header); err != nil {
-		return fmt.Errorf("V6 checkpoint header not found at %s: %w", v6Header, err)
-	}
-	subtrieChecksums, topTrieChecksum, err := readCheckpointHeader(v6Header, logger)
-	if err != nil {
-		return fmt.Errorf("could not read V6 checkpoint header: %w", err)
-	}
-	if err := allPartFileExist(inputDir, inputFileName, len(subtrieChecksums)); err != nil {
-		return fmt.Errorf("V6 part files incomplete for %s/%s: %w", inputDir, inputFileName, err)
-	}
-
-	// Validate V7 output is not present (any of the part files).
-	v7Existing, err := findCheckpointPartFiles(outputDir, outputFileName)
-	if err != nil {
-		return fmt.Errorf("could not check existing V7 output files: %w", err)
-	}
-	if len(v7Existing) != 0 {
-		return fmt.Errorf("V7 output already exists: %v", v7Existing)
-	}
-
 	// Remove any leftover temp part files from a previously interrupted conversion
 	// to this output; they are never reused and would otherwise accumulate.
 	if err := removeStaleTempFiles(outputDir, outputFileName, logger); err != nil {
 		return fmt.Errorf("could not remove stale temp files: %w", err)
 	}
-
-	logger.Info().
-		Str("v6_dir", inputDir).
-		Str("v6_file", inputFileName).
-		Str("v7_dir", outputDir).
-		Str("v7_file", outputFileName).
-		Uint("nworker", nWorker).
-		Msg("starting streaming V6→V7 checkpoint conversion")
 
 	// Convert the 16 subtrie part files concurrently, recomputing each checksum.
 	newSubtrieChecksums, err := convertSubTriesV6ToV7StreamConcurrently(
@@ -169,7 +113,6 @@ func convertCheckpointV6ToV7Stream(
 		return fmt.Errorf("could not write V7 checkpoint header: %w", err)
 	}
 
-	logger.Info().Msg("stream V6→V7 checkpoint conversion complete")
 	return nil
 }
 
@@ -182,6 +125,11 @@ type streamSubtrieResult struct {
 // convertSubTriesV6ToV7StreamConcurrently streams all subtrieCount subtrie part
 // files through the V6→V7 conversion using up to nWorker goroutines, and returns
 // the recomputed per-file checksums in subtrie-index order.
+//
+// subtrieChecksums are the checksums recorded in the V6 checkpoint header, one per
+// subtrie part file; it must have exactly subtrieCount entries.
+//
+// No error returns are expected during normal operation.
 func convertSubTriesV6ToV7StreamConcurrently(
 	inputDir string,
 	inputFileName string,
@@ -191,6 +139,13 @@ func convertSubTriesV6ToV7StreamConcurrently(
 	logger zerolog.Logger,
 	nWorker uint,
 ) ([]uint32, error) {
+	// The workers index subtrieChecksums by subtrie index, so a shorter slice would
+	// panic inside a goroutine. Callers validate this via validateV6ToV7Conversion;
+	// checking here keeps the indexing below provably safe.
+	if len(subtrieChecksums) != subtrieCount {
+		return nil, fmt.Errorf("expect %v subtrie checksums, but got %v", subtrieCount, len(subtrieChecksums))
+	}
+
 	jobs := make(chan int, subtrieCount)
 	for i := 0; i < subtrieCount; i++ {
 		jobs <- i
@@ -211,13 +166,21 @@ func convertSubTriesV6ToV7StreamConcurrently(
 		}()
 	}
 
+	// Drain all results before returning: a worker only renames its temp file to the
+	// final part file when it finishes, so returning early on the first error would
+	// let stragglers create output files after the caller has cleaned up.
 	checksums := make([]uint32, subtrieCount)
+	var merr *multierror.Error
 	for k := 0; k < subtrieCount; k++ {
 		r := <-results
 		if r.err != nil {
-			return nil, fmt.Errorf("fail to convert %v-th subtrie: %w", r.index, r.err)
+			merr = multierror.Append(merr, fmt.Errorf("fail to convert %v-th subtrie: %w", r.index, r.err))
+			continue
 		}
 		checksums[r.index] = r.checksum
+	}
+	if err := merr.ErrorOrNil(); err != nil {
+		return nil, err
 	}
 	return checksums, nil
 }
@@ -258,13 +221,18 @@ func convertSubTrieFileV6ToV7Stream(
 			index, expectedSum, embeddedSum)
 	}
 
+	// Restart from the beginning of the file and read everything through a
+	// Crc32Reader, so the bytes we convert are themselves CRC-verified (against the
+	// checksum stored in the file) rather than only the two stored checksums being
+	// compared. Without this, input corruption would be copied into the V7 output
+	// and covered up by a freshly computed, valid V7 checksum.
 	if _, err := inFile.Seek(0, io.SeekStart); err != nil {
 		return 0, fmt.Errorf("could not seek to start of subtrie file: %w", err)
 	}
-	if err := validateFileHeader(MagicBytesCheckpointSubtrie, VersionV6, inFile); err != nil {
+	reader := NewCRC32Reader(bufio.NewReaderSize(inFile, defaultBufioReadSize))
+	if err := validateFileHeader(MagicBytesCheckpointSubtrie, VersionV6, reader); err != nil {
 		return 0, fmt.Errorf("invalid subtrie file header: %w", err)
 	}
-	reader := bufio.NewReaderSize(inFile, defaultBufioReadSize)
 
 	closable, err := createWriterForSubtrie(outputDir, outputFileName, logger, index)
 	if err != nil {
@@ -286,6 +254,13 @@ func convertSubTrieFileV6ToV7Stream(
 			return 0, fmt.Errorf("cannot convert node %d of subtrie %d: %w", i, index, err)
 		}
 		logging(i)
+	}
+
+	// Read the input's footer (node count) through the CRC reader, which completes
+	// the checksummed byte range, and verify the input file's integrity before
+	// finalizing the output.
+	if err := verifyInputChecksum(reader, encNodeCountSize, embeddedSum); err != nil {
+		return 0, fmt.Errorf("could not verify subtrie file %v: %w", index, err)
 	}
 
 	sum, err := storeSubtrieFooter(nodeCount, writer)
@@ -328,13 +303,16 @@ func convertTopTrieFileV6ToV7Stream(
 			expectedSum, embeddedSum)
 	}
 
+	// Restart from the beginning of the file and read everything through a
+	// Crc32Reader, so the converted bytes are CRC-verified against the checksum
+	// stored in the input file (see convertSubTrieFileV6ToV7Stream).
 	if _, err := inFile.Seek(0, io.SeekStart); err != nil {
 		return 0, fmt.Errorf("could not seek to start of top-trie file: %w", err)
 	}
-	if err := validateFileHeader(MagicBytesCheckpointToptrie, VersionV6, inFile); err != nil {
+	reader := NewCRC32Reader(bufio.NewReaderSize(inFile, defaultBufioReadSize))
+	if err := validateFileHeader(MagicBytesCheckpointToptrie, VersionV6, reader); err != nil {
 		return 0, fmt.Errorf("invalid top-trie file header: %w", err)
 	}
-	reader := bufio.NewReaderSize(inFile, defaultBufioReadSize)
 
 	// Read the subtrie node count and carry it over verbatim (unchanged by conversion).
 	subtrieNodeCountBuf := make([]byte, encNodeCountSize)
@@ -388,11 +366,55 @@ func convertTopTrieFileV6ToV7Stream(
 		}
 	}
 
+	// Read the input's footer (top-level node count + trie count) through the CRC
+	// reader and verify the input file's integrity before finalizing the output.
+	if err := verifyInputChecksum(reader, encNodeCountSize+encTrieCountSize, embeddedSum); err != nil {
+		return 0, fmt.Errorf("could not verify top-trie file: %w", err)
+	}
+
 	sum, err := storeTopLevelTrieFooter(topLevelNodesCount, triesCount, writer)
 	if err != nil {
 		return 0, fmt.Errorf("could not store top-trie footer: %w", err)
 	}
 	return sum, nil
+}
+
+// verifyInputChecksum completes the checksummed byte range of a V6 part file and
+// verifies its integrity. It is called after all nodes (and, for the top-trie
+// file, all trie root records) have been read from `reader`: it consumes the
+// `footerSize` footer bytes — which are part of the checksummed range — compares
+// the CRC32 computed over everything read so far against `expectedSum`, then
+// consumes the stored checksum and asserts that the file ends there.
+//
+// This detects corruption of the input bytes themselves. Comparing the checksum
+// stored in the part file against the one recorded in the checkpoint header is not
+// sufficient: both are stored values and neither is derived from the bytes read.
+//
+// No error returns are expected during normal operation; all error returns
+// indicate a corrupted or truncated input file, or an IO failure.
+func verifyInputChecksum(reader *Crc32Reader, footerSize int, expectedSum uint32) error {
+	scratch := make([]byte, footerSize+crc32SumSize)
+
+	// read the footer and discard it, the converted output writes its own
+	if _, err := io.ReadFull(reader, scratch[:footerSize]); err != nil {
+		return fmt.Errorf("cannot read footer: %w", err)
+	}
+
+	actualSum := reader.Crc32()
+	if actualSum != expectedSum {
+		return fmt.Errorf("invalid checksum, expected %v, actual %v", expectedSum, actualSum)
+	}
+
+	// read the stored checksum and discard it, we only care about reaching EOF
+	if _, err := io.ReadFull(reader, scratch[:crc32SumSize]); err != nil {
+		return fmt.Errorf("could not read stored checksum: %w", err)
+	}
+
+	if err := ensureReachedEOF(reader); err != nil {
+		return fmt.Errorf("fail to reach end of file: %w", err)
+	}
+
+	return nil
 }
 
 // v6ToV7NodeConverter streams individual V6-encoded nodes into V7-encoded nodes,
