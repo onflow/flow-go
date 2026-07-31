@@ -144,12 +144,18 @@ func newLocalLedger(config Config, triggerCheckpoint *atomic.Bool) (ledger.Ledge
 //
 // Expected error returns during normal operation:
 //   - error if config.Triedir is empty
+//   - error if config.Triedir holds no V7 checkpoint, numbered or root. This is the expected
+//     outcome of pointing a payloadless node at a triedir that was never converted; the message
+//     names the `checkpoint-convert-v7` util when V6 checkpoints are present.
 func NewPayloadlessLedger(config Config, triggerCheckpoint *atomic.Bool) (ledger.PayloadlessLedger, error) {
-	logger := config.Logger.With().Str("subcomponent", "ledger").Logger()
-
 	if config.Triedir == "" {
 		return nil, fmt.Errorf("payloadless ledger requires a non-empty config.Triedir")
 	}
+
+	logger := config.Logger.With().
+		Str("subcomponent", "ledger").
+		Str("triedir", config.Triedir).
+		Logger()
 
 	// A V7 (payloadless) checkpoint must exist in `Triedir` before a payloadless
 	// node can boot. There is no payloadless bootstrap path that doesn't go
@@ -178,16 +184,12 @@ func NewPayloadlessLedger(config Config, triggerCheckpoint *atomic.Bool) (ledger
 			v6Numbers, latestV6, v6ListErr := wal.ListV6Checkpoints(config.Triedir)
 			if v6ListErr != nil {
 				logger.Warn().Err(v6ListErr).
-					Str("triedir", config.Triedir).
 					Msg("payloadless ledger: could not also list V6 checkpoints while reporting missing V7")
 			}
 			if latestV6 >= 0 {
-				logger.Warn().
-					Str("triedir", config.Triedir).
-					Int("latest_v6", latestV6).
-					Int("v6_count", len(v6Numbers)).
-					Msg("payloadless ledger: no V7 checkpoint found, but V6 checkpoints exist — " +
-						"run the `checkpoint-convert-v7` util to produce a V7 checkpoint")
+				// No log line here: the returned error carries the same information, including the
+				// pointer to the convert util, and it aborts startup — logging it as well would
+				// duplicate it in the operator's output.
 				return nil, fmt.Errorf(
 					"no V7 (payloadless) checkpoint found in %s but %d V6 checkpoint(s) exist (latest: %d); "+
 						"run the `checkpoint-convert-v7` util to produce a V7 checkpoint before restart",
@@ -200,11 +202,9 @@ func NewPayloadlessLedger(config Config, triggerCheckpoint *atomic.Bool) (ledger
 			)
 		}
 		logger.Info().
-			Str("triedir", config.Triedir).
 			Msg("payloadless ledger: V7 root checkpoint discovered; the bundle will seed from it")
 	} else {
 		logger.Info().
-			Str("triedir", config.Triedir).
 			Int("latest_v7", latestV7).
 			Int("v7_count", len(v7Numbers)).
 			Msg("payloadless ledger: V7 checkpoint discovered; the bundle will seed from it")

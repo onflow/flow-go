@@ -18,11 +18,12 @@ import (
 //
 // Embedding *PayloadlessLedger automatically delegates the public ledger
 // methods (Set, Get*, Has*, Prove, etc.). Ready and Done are overridden so the
-// compactor's lifecycle is coordinated with the ledger's.
+// compactor's lifecycle is coordinated with the ledger's. Lifecycle logging goes
+// through the embedded ledger's logger, so the bundle and the ledger it wraps
+// share one set of log fields.
 type PayloadlessLedgerWithCompactor struct {
 	*PayloadlessLedger
 	compactor *PayloadlessCompactor
-	logger    zerolog.Logger
 }
 
 // NewPayloadlessLedgerWithCompactor constructs a payloadless ledger and a
@@ -57,8 +58,8 @@ func NewPayloadlessLedgerWithCompactor(
 		return nil, fmt.Errorf("payloadless ledger with compactor requires a non-nil WAL")
 	}
 
-	logger = logger.With().Str("ledger_mod", "complete-payloadless").Logger()
-
+	// NewPayloadlessLedger tags the logger it is given; reuse the result rather than
+	// tagging here as well, so `ledger_mod` isn't recorded twice.
 	l, err := NewPayloadlessLedger(
 		diskWAL,
 		ledgerCapacity,
@@ -73,7 +74,7 @@ func NewPayloadlessLedgerWithCompactor(
 	compactor, err := NewPayloadlessCompactor(
 		l,
 		diskWAL,
-		logger.With().Str("subcomponent", "payloadless-compactor").Logger(),
+		l.logger.With().Str("subcomponent", "payloadless-compactor").Logger(),
 		compactorConfig.CheckpointCapacity,
 		compactorConfig.CheckpointDistance,
 		compactorConfig.CheckpointsToKeep,
@@ -87,7 +88,6 @@ func NewPayloadlessLedgerWithCompactor(
 	return &PayloadlessLedgerWithCompactor{
 		PayloadlessLedger: l,
 		compactor:         compactor,
-		logger:            logger,
 	}, nil
 }
 
@@ -100,7 +100,7 @@ func (lwc *PayloadlessLedgerWithCompactor) Ready() <-chan struct{} {
 		defer close(ready)
 		<-lwc.PayloadlessLedger.Ready()
 		<-lwc.compactor.Ready()
-		lwc.logger.Info().Msg("payloadless ledger with compactor ready")
+		lwc.PayloadlessLedger.logger.Info().Msg("payloadless ledger with compactor ready")
 	}()
 	return ready
 }
@@ -113,7 +113,7 @@ func (lwc *PayloadlessLedgerWithCompactor) Done() <-chan struct{} {
 	go func() {
 		defer close(done)
 
-		lwc.logger.Info().Msg("stopping payloadless ledger with compactor...")
+		lwc.PayloadlessLedger.logger.Info().Msg("stopping payloadless ledger with compactor...")
 
 		// Close the trie-update channel so the compactor's drain loop terminates.
 		<-lwc.PayloadlessLedger.Done()
@@ -121,7 +121,7 @@ func (lwc *PayloadlessLedgerWithCompactor) Done() <-chan struct{} {
 		// Then wait for the compactor (which finalizes the WAL).
 		<-lwc.compactor.Done()
 
-		lwc.logger.Info().Msg("payloadless ledger with compactor stopped")
+		lwc.PayloadlessLedger.logger.Info().Msg("payloadless ledger with compactor stopped")
 	}()
 	return done
 }

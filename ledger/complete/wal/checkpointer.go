@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"encoding/binary"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -62,7 +63,7 @@ const VersionV6 uint16 = 0x06
 
 // Version 7 includes these changes:
 //   - payloadless mode: leaf nodes store payload hashes (32 bytes) instead of full payloads
-//   - used for verification nodes that don't need actual payload values
+//   - used by payloadless execution nodes, which read register values from the storehouse
 const VersionV7 uint16 = 0x07
 
 // MaxVersion is the latest checkpoint version we support.
@@ -915,6 +916,15 @@ func HasRootCheckpointV7(dir string) (bool, error) {
 	}
 }
 
+// RemoveCheckpoint deletes both the V6 and the V7 part files for the given checkpoint number.
+// Deleting a version that isn't present is not an error, so this reports a failure whenever
+// either deletion fails.
+//
+// Deprecated: both compactors own their retention independently and use
+// [Checkpointer.RemoveCheckpointV6] / [Checkpointer.RemoveCheckpointV7], so that a writer never
+// deletes files owned by the other version. Prefer those.
+//
+// No error returns are expected during normal operation.
 func (c *Checkpointer) RemoveCheckpoint(checkpoint int) error {
 	// Try to remove both V6 and V7 versions if they exist
 	v6Name := NumberToFilename(checkpoint)
@@ -923,11 +933,24 @@ func (c *Checkpointer) RemoveCheckpoint(checkpoint int) error {
 	v6Err := deleteCheckpointFiles(c.dir, v6Name)
 	v7Err := deleteCheckpointFiles(c.dir, v7Name)
 
-	// If both failed, return combined error
-	if v6Err != nil && v7Err != nil {
-		return fmt.Errorf("failed to remove checkpoint %d: v6 error: %w, v7 error: %v", checkpoint, v6Err, v7Err)
+	if err := errors.Join(v6Err, v7Err); err != nil {
+		return fmt.Errorf("failed to remove checkpoint %d: %w", checkpoint, err)
 	}
 	return nil
+}
+
+// DeleteCheckpointFiles removes the header file and all part files of the checkpoint with the given
+// file name in `dir`. It is version-agnostic: `fileName` selects the checkpoint, so pass the V6 name
+// ("checkpoint.00000100", "root.checkpoint") or the V7 name (same, suffixed with [V7FileSuffix]).
+//
+// Deleting a checkpoint that isn't there is not an error. This makes the function suitable for
+// clearing a partially-written checkpoint left behind by a process that died mid-write: a checkpoint
+// is only complete once its header file exists, so an incomplete one can always be discarded and
+// rewritten from its source.
+//
+// No error returns are expected during normal operation.
+func DeleteCheckpointFiles(dir string, fileName string) error {
+	return deleteCheckpointFiles(dir, fileName)
 }
 
 // RemoveCheckpointV6 deletes only the V6 (full-mtrie) part files for the given
