@@ -1531,6 +1531,7 @@ func (exeNode *ExecutionNode) LoadBootstrapper(node *NodeConfig) error {
 					v7RootFileName,
 					node.Logger,
 					16,
+					false,
 				)
 				if err != nil {
 					return fmt.Errorf("could not convert V6 root checkpoint to V7 for payloadless node: %w", err)

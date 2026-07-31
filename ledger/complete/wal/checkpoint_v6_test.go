@@ -448,9 +448,9 @@ func compareFiles(file1, file2 string) error {
 		f.Close()
 	}(closable1)
 
-	closable2, err := os.Open(file1)
+	closable2, err := os.Open(file2)
 	if err != nil {
-		return fmt.Errorf("could not open file 2 %v: %w", closable2, err)
+		return fmt.Errorf("could not open file 2 %v: %w", file2, err)
 	}
 	defer func(f *os.File) {
 		f.Close()
@@ -462,25 +462,38 @@ func compareFiles(file1, file2 string) error {
 	buf1 := make([]byte, defaultBufioReadSize)
 	buf2 := make([]byte, defaultBufioReadSize)
 	for {
-		_, err1 := reader1.Read(buf1)
-		_, err2 := reader2.Read(buf2)
-		if errors.Is(err1, io.EOF) && errors.Is(err2, io.EOF) {
-			break
+		// io.ReadFull fills the entire buffer unless the file ends, so the number of
+		// bytes read only differs between the two files when their sizes differ
+		n1, err1 := io.ReadFull(reader1, buf1)
+		n2, err2 := io.ReadFull(reader2, buf2)
+
+		if !bytes.Equal(buf1[:n1], buf2[:n2]) {
+			return fmt.Errorf("bytes are different: %x, %x", buf1[:n1], buf2[:n2])
 		}
 
-		if err1 != nil {
-			return err1
-		}
-		if err2 != nil {
-			return err2
+		// both files ended at the same offset with identical content
+		if isEOF(err1) && isEOF(err2) {
+			return nil
 		}
 
-		if !bytes.Equal(buf1, buf2) {
-			return fmt.Errorf("bytes are different: %x, %x", buf1, buf2)
+		if err1 != nil && !isEOF(err1) {
+			return fmt.Errorf("could not read file 1 %v: %w", file1, err1)
+		}
+		if err2 != nil && !isEOF(err2) {
+			return fmt.Errorf("could not read file 2 %v: %w", file2, err2)
+		}
+
+		// exactly one of the files ended here, so they have different lengths
+		if isEOF(err1) != isEOF(err2) {
+			return fmt.Errorf("files have different length: %v, %v", file1, file2)
 		}
 	}
+}
 
-	return nil
+// isEOF returns true if the given error signals that the end of the file was reached,
+// which io.ReadFull reports as io.EOF (nothing read) or io.ErrUnexpectedEOF (partial read).
+func isEOF(err error) bool {
+	return errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF)
 }
 
 func storeCheckpointV5(tries []*trie.MTrie, dir string, fileName string, logger zerolog.Logger) error {

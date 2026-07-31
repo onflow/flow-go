@@ -890,6 +890,7 @@ func prepareLedgerService(dockerServices Services, flowNodeContainerConfigs []te
 				v7Filename,
 				logger,
 				16,
+				false,
 			); convertErr != nil {
 				panic(fmt.Errorf("failed to convert V6 root checkpoint to V7 for payloadless ledger service: %w", convertErr))
 			}
