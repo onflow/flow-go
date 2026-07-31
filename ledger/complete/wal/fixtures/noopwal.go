@@ -4,6 +4,7 @@ import (
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/complete/mtrie"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
+	"github.com/onflow/flow-go/ledger/complete/payloadless"
 	"github.com/onflow/flow-go/ledger/complete/wal"
 )
 
@@ -42,5 +43,9 @@ func (w *NoopWAL) Replay(checkpointFn func(tries []*trie.MTrie) error, updateFn 
 }
 
 func (w *NoopWAL) ReplayLogsOnly(checkpointFn func(tries []*trie.MTrie) error, updateFn func(update *ledger.TrieUpdate) error, deleteFn func(rootHash ledger.RootHash) error) error {
+	return nil
+}
+
+func (w *NoopWAL) ReplaySegmentsForPayloadlessForest(forest *payloadless.Forest, afterCheckpointNum int) error {
 	return nil
 }
