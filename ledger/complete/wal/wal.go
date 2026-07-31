@@ -12,6 +12,7 @@ import (
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/complete/mtrie"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
+	"github.com/onflow/flow-go/ledger/complete/payloadless"
 	"github.com/onflow/flow-go/module"
 	utilsio "github.com/onflow/flow-go/utils/io"
 )
@@ -127,6 +128,53 @@ func (w *DiskWAL) ReplayOnForest(forest *mtrie.Forest) error {
 			return nil
 		},
 	)
+}
+
+// ReplaySegmentsForPayloadlessForest replays WAL segments onto a payloadless
+// forest, skipping any segments that are already covered by a previously-loaded
+// V7 checkpoint.
+//
+// The caller is expected to have already seeded `forest` with the contents of
+// the latest V7 checkpoint (if any) via [OpenAndReadCheckpointV7] +
+// [payloadless.Forest.AddTries], and to pass that checkpoint's number in
+// `afterCheckpointNum`. Pass -1 (or any value < firstSegment) to replay all
+// segments.
+//
+// Unlike [ReplayOnForest] this function does NOT call the V6 checkpoint
+// callback — V6 checkpoints are not directly loadable into a payloadless forest.
+// Delete records are ignored (the WAL has no segment-level concept of trie
+// deletion that needs to be reflected in the payloadless forest).
+//
+// No error returns are expected during normal operation.
+func (w *DiskWAL) ReplaySegmentsForPayloadlessForest(
+	forest *payloadless.Forest,
+	afterCheckpointNum int,
+) error {
+	firstSeg, lastSeg, err := w.Segments()
+	if err != nil {
+		return fmt.Errorf("could not find segments: %w", err)
+	}
+	from := firstSeg
+	if afterCheckpointNum >= from {
+		from = afterCheckpointNum + 1
+	}
+	if from > lastSeg {
+		// V7 checkpoint already covers everything on disk.
+		return nil
+	}
+	err = w.replay(from, lastSeg,
+		func(tries []*trie.MTrie) error { return nil }, // unused when useCheckpoints=false
+		func(update *ledger.TrieUpdate) error {
+			_, err := forest.Update(update)
+			return err
+		},
+		func(rootHash ledger.RootHash) error { return nil },
+		false, // useCheckpoints
+	)
+	if err != nil {
+		return fmt.Errorf("could not replay WAL segments [%v:%v] for payloadless forest: %w", from, lastSeg, err)
+	}
+	return nil
 }
 
 func (w *DiskWAL) Segments() (first, last int, err error) {
@@ -406,4 +454,5 @@ type LedgerWAL interface {
 		updateFn func(update *ledger.TrieUpdate) error,
 		deleteFn func(rootHash ledger.RootHash) error,
 	) error
+	ReplaySegmentsForPayloadlessForest(forest *payloadless.Forest, afterCheckpointNum int) error
 }
