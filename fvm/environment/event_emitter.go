@@ -44,6 +44,12 @@ type EventEmitter interface {
 	// This will encode the cadence event
 	//
 	// Note that the script variant will return OperationNotSupportedError.
+	//
+	// Expected error returns during normal operation:
+	//   - [errors.EventEncodingError] if the event cannot be encoded
+	//   - [errors.LimitExceededError] with [errors.LimitKindComputation] or
+	//     [errors.LimitKindEvent] if a metering limit is exceeded. Event byte
+	//     size limits are not enforced when the payer is the service account.
 	EmitEvent(event cadence.Event) error
 
 	Events() flow.EventsList
