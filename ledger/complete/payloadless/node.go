@@ -132,7 +132,7 @@ func NewLeaf(path ledger.Path, value []byte, height int) *Node {
 
 	// Leaf represent an allocated register:
 	leafHash := hash.HashLeaf(hash.Hash(path), value) // we pre-compute leaf hash at height-0 here
-	return newLeafWithHash(path, leafHash, height)    // handles compactification up to given height if necessary
+	return NewLeafWithHash(path, leafHash, height)    // handles compactification up to given height if necessary
 }
 
 // newDefaultLeaf constructs the default node, which represents an unallocated register (`nil` or empty value)
@@ -207,10 +207,10 @@ func NewRelevelledLeaf(leaf *Node, relevellingHeight int) *Node {
 	}
 
 	// Leaf represent an allocated register:
-	return newLeafWithHash(leaf.path, *leaf.leafHash, relevellingHeight) // handles compactification up to given relevellingHeight if necessary
+	return NewLeafWithHash(leaf.path, *leaf.leafHash, relevellingHeight) // handles compactification up to given relevellingHeight if necessary
 }
 
-// newLeafWithHash creates a leaf Node from a pre-computed leaf hash.
+// NewLeafWithHash creates a leaf Node from a pre-computed leaf hash.
 // This is used when converting from a full trie or loading from a payloadless checkpoint.
 // The nodeHash is computed by extending the leafHash (height-0) to the specified height.
 //
@@ -218,7 +218,7 @@ func NewRelevelledLeaf(leaf *Node, relevellingHeight int) *Node {
 //
 // UNCHECKED requirement: height must be non-negative
 // UNCHECKED requirement: leafHash must be HashLeaf(path, originalValue)
-func newLeafWithHash(path ledger.Path, leafHash hash.Hash, height int) *Node {
+func NewLeafWithHash(path ledger.Path, leafHash hash.Hash, height int) *Node {
 	// Compute the node hash by extending the leaf hash to the target height
 	nodeHash := ledger.ComputeCompactValueFromLeafHash(hash.Hash(path), leafHash, height)
 
