@@ -17,9 +17,11 @@ import (
 )
 
 // newPayloadlessLedger constructs a default payloadless ledger for tests.
+// It uses a nil WAL, which keeps Set synchronous and avoids the need for a
+// compactor in these tests.
 func newPayloadlessLedger(t *testing.T) *complete.PayloadlessLedger {
 	t.Helper()
-	l, err := complete.NewPayloadlessLedger(100, &metrics.NoopCollector{}, zerolog.Logger{}, complete.DefaultPathFinderVersion)
+	l, err := complete.NewPayloadlessLedger(nil, 100, &metrics.NoopCollector{}, zerolog.Logger{}, complete.DefaultPathFinderVersion)
 	require.NoError(t, err)
 	return l
 }
