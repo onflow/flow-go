@@ -490,14 +490,13 @@ func prepareExecutionService(container testnet.ContainerConfig, i int, n int) Se
 	// checker, and ledger client. A remote-ledger node missing this flag would
 	// build a full ledger.LedgerService client and fail against a payloadless
 	// ledger service with "unknown service ledger.LedgerService".
+	// Payloadless mode also requires storehouse to store the actual payloads
+	// (the trie only stores payload hashes).
 	if payloadless {
-		service.Command = append(service.Command, "--payloadless")
-	}
-
-	// Payloadless mode requires storehouse to store the actual payloads
-	// (the trie only stores payload hashes)
-	if payloadless {
-		service.Command = append(service.Command, "--enable-storehouse")
+		service.Command = append(service.Command,
+			"--payloadless",
+			"--enable-storehouse",
+		)
 	}
 
 	service.AddExposedPorts(testnet.GRPCPort)
@@ -855,7 +854,9 @@ func prepareLedgerService(dockerServices Services, flowNodeContainerConfigs []te
 
 	// Create symlinks for V6 checkpoint
 	checkpointSourceV6 := filepath.Join(bootstrapExecutionStateDir, bootstrapFilenames.FilenameWALRootCheckpoint)
-	if _, err := os.Stat(checkpointSourceV6); err == nil {
+	_, statV6Err := os.Stat(checkpointSourceV6)
+	v6Exists := statV6Err == nil
+	if v6Exists {
 		// V6 checkpoint exists, create symlinks on host
 		_, err = wal.SoftlinkCheckpointFile(bootstrapFilenames.FilenameWALRootCheckpoint, bootstrapExecutionStateDir, trieDir)
 		if err != nil {
@@ -876,9 +877,10 @@ func prepareLedgerService(dockerServices Services, flowNodeContainerConfigs []te
 	// the symlink block below then seeds the ledger service's trie directory from
 	// it. On restart the ledger factory finds an existing V7 checkpoint (this root
 	// or a newer numbered one written by the compactor), so no conversion is
-	// needed at runtime. The os.Stat guard makes a re-run of `make bootstrap`
-	// idempotent and avoids ConvertCheckpointV6ToV7's "output exists" rejection.
-	if payloadless {
+	// needed at runtime. The os.Stat guards make a re-run of `make bootstrap`
+	// idempotent, avoid ConvertCheckpointV6ToV7's "output exists" rejection, and
+	// skip the conversion entirely when there is no V6 source to convert from.
+	if payloadless && v6Exists {
 		if _, err := os.Stat(checkpointSourceV7); errors.Is(err, fs.ErrNotExist) {
 			logger := zerolog.New(os.Stderr).With().Timestamp().Logger()
 			if convertErr := wal.ConvertCheckpointV6ToV7(
@@ -1024,4 +1026,3 @@ func prepareTestExecutionService(dockerServices Services, flowNodeContainerConfi
 
 	return dockerServices
 }
-
