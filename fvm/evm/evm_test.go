@@ -4450,7 +4450,16 @@ func TestDryRun(t *testing.T) {
 				_, output, err := vm.Run(ctx, tx, snapshot)
 				require.NoError(t, err)
 				require.NoError(t, output.Err)
-				assert.Equal(t, uint64(92), output.ComputationUsed)
+				// The metered computation depends on the block's UUID partition (see
+				// assertUpdatedRegisterCount): blocks selecting partition 0 (probability 1/256)
+				// reuse the legacy `uuid` register instead of a fresh `uuid_N` one, which
+				// changes the metered effort. Both values verified by forcing each partition.
+				expectedComputation := uint64(92)
+				blockID := ctx.BlockHeader.ID()
+				if sha256.Sum256(blockID[:])[0] == 0 {
+					expectedComputation = 96
+				}
+				assert.Equal(t, expectedComputation, output.ComputationUsed)
 			},
 		)
 	})
