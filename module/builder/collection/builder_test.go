@@ -414,16 +414,21 @@ func (suite *BuilderSuite) TestBuildOn_WithOrphanedReferenceBlock() {
 	protocolStateID := protocolState.ID()
 
 	// create a block extending genesis which will be orphaned
-	orphan := unittest.BlockWithParentAndPayload(
+	// Since `orphan` and `block1` are siblings, they must have different views. We track the views
+	// used so far in `usedViews` to prevent the fixtures from generating two blocks with the same view.
+	usedViews := make(map[uint64]struct{})
+	orphan := unittest.BlockWithParentAndPayloadAndUniqueView(
 		genesis,
 		unittest.PayloadFixture(unittest.WithProtocolStateID(protocolStateID)),
+		usedViews,
 	)
 	err = suite.protoState.ExtendCertified(context.Background(), unittest.NewCertifiedBlock(orphan))
 	suite.Require().NoError(err)
 	// create and finalize a block on top of genesis, orphaning `orphan`
-	block1 := unittest.BlockWithParentAndPayload(
+	block1 := unittest.BlockWithParentAndPayloadAndUniqueView(
 		genesis,
 		unittest.PayloadFixture(unittest.WithProtocolStateID(protocolStateID)),
+		usedViews,
 	)
 	err = suite.protoState.ExtendCertified(context.Background(), unittest.NewCertifiedBlock(block1))
 	suite.Require().NoError(err)
