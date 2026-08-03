@@ -75,7 +75,9 @@ type GossipSubAppSpecificScoreRegistry struct {
 	// silencePeriodDuration duration that the startup silence period will last, during which nodes will not be penalized
 	silencePeriodDuration time.Duration
 	// silencePeriodStartTime time that the silence period begins, this is the time that the registry is started by the node.
-	silencePeriodStartTime time.Time
+	// It is stored atomically: it is written by the startup worker while the gossipsub score function
+	// may concurrently read it (via afterSilencePeriod); a nil value means the registry has not started yet.
+	silencePeriodStartTime *atomic.Pointer[time.Time]
 	// silencePeriodElapsed atomic bool that stores a bool flag which indicates if the silence period is over or not.
 	silencePeriodElapsed *atomic.Bool
 }
@@ -151,6 +153,7 @@ func NewGossipSubAppSpecificScoreRegistry(config *GossipSubAppSpecificScoreRegis
 		idProvider:                config.IdProvider,
 		scoreTTL:                  config.Parameters.ScoreTTL,
 		silencePeriodDuration:     config.ScoringRegistryStartupSilenceDuration,
+		silencePeriodStartTime:    atomic.NewPointer[time.Time](nil),
 		silencePeriodElapsed:      atomic.NewBool(false),
 		appSpecificScoreParams:    config.AppSpecificScoreParams,
 		duplicateMessageThreshold: config.DuplicateMessageThreshold,
@@ -186,10 +189,11 @@ func NewGossipSubAppSpecificScoreRegistry(config *GossipSubAppSpecificScoreRegis
 		<-reg.validator.Done()
 		reg.logger.Info().Msg("subscription validator stopped")
 	}).AddWorker(func(parent irrecoverable.SignalerContext, ready component.ReadyFunc) {
-		if !reg.silencePeriodStartTime.IsZero() {
+		if reg.silencePeriodStartTime.Load() != nil {
 			parent.Throw(fmt.Errorf("gossipsub scoring registry started more than once"))
 		}
-		reg.silencePeriodStartTime = time.Now()
+		now := time.Now()
+		reg.silencePeriodStartTime.Store(&now)
 		ready()
 	}).AddWorker(reg.invCtrlMsgNotifWorkerPool.WorkerLogic()) // we must NOT have more than one worker for processing notifications; handling notifications are NOT idempotent.
 
@@ -483,7 +487,12 @@ func (r *GossipSubAppSpecificScoreRegistry) handleMisbehaviourReport(notificatio
 // afterSilencePeriod returns true if registry silence period is over, false otherwise.
 func (r *GossipSubAppSpecificScoreRegistry) afterSilencePeriod() bool {
 	if !r.silencePeriodElapsed.Load() {
-		if time.Since(r.silencePeriodStartTime) > r.silencePeriodDuration {
+		start := r.silencePeriodStartTime.Load()
+		if start == nil {
+			// registry not started yet: the silence period has not even begun.
+			return false
+		}
+		if time.Since(*start) > r.silencePeriodDuration {
 			r.silencePeriodElapsed.Store(true)
 			return true
 		}

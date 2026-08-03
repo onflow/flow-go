@@ -7,6 +7,7 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/mempool"
 	herocache "github.com/onflow/flow-go/module/mempool/herocache/backdata"
 	"github.com/onflow/flow-go/module/mempool/herocache/backdata/heropool"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
@@ -62,6 +63,10 @@ func NewSpamRecordCache(sizeLimit uint32, logger zerolog.Logger, collector modul
 //   - error any returned error should be considered as an irrecoverable error and indicates a bug.
 func (s *SpamRecordCache) AdjustWithInit(originId flow.Identifier, adjustFunc model.RecordAdjustFunc) (float64, error) {
 	var rErr error
+	// Penalty of the adjusted record, captured while the backend lock is still held: records are
+	// mutated in place by adjust functions, so reading the returned record's fields after
+	// Backend.AdjustWithInit has released the lock would race with concurrent adjustments.
+	var adjustedPenalty float64
 	wrapAdjustFunc := func(record *model.ProtocolSpamRecord) *model.ProtocolSpamRecord {
 		// Adjust the record.
 		adjustedRecord, err := adjustFunc(record)
@@ -70,6 +75,7 @@ func (s *SpamRecordCache) AdjustWithInit(originId flow.Identifier, adjustFunc mo
 			return record // returns the original record (reverse the adjustment).
 		}
 
+		adjustedPenalty = adjustedRecord.Penalty
 		// Return the adjusted record.
 		return adjustedRecord
 	}
@@ -77,7 +83,7 @@ func (s *SpamRecordCache) AdjustWithInit(originId flow.Identifier, adjustFunc mo
 		return s.recordFactory(originId)
 	}
 
-	adjustedRecord, adjusted := s.Backend.AdjustWithInit(originId, wrapAdjustFunc, initFunc)
+	_, adjusted := s.Backend.AdjustWithInit(originId, wrapAdjustFunc, initFunc)
 	if rErr != nil {
 		return 0, fmt.Errorf("failed to adjust record: %w", rErr)
 	}
@@ -86,7 +92,7 @@ func (s *SpamRecordCache) AdjustWithInit(originId flow.Identifier, adjustFunc mo
 		return 0, fmt.Errorf("adjustment failed for origin id %s", originId)
 	}
 
-	return adjustedRecord.Penalty, nil
+	return adjustedPenalty, nil
 }
 
 // Get returns the spam record of the given origin id.
@@ -97,19 +103,33 @@ func (s *SpamRecordCache) AdjustWithInit(originId flow.Identifier, adjustFunc mo
 // - the record and true if the record exists, nil and false otherwise.
 // Note that the returned record is a copy of the record in the cache (we do not want the caller to modify the record).
 func (s *SpamRecordCache) Get(originId flow.Identifier) (*model.ProtocolSpamRecord, bool) {
-	record, ok := s.Backend.Get(originId)
-	if !ok {
-		return nil, false
+	var copied *model.ProtocolSpamRecord
+	// the copy must be made while holding the backend lock (via Run): records are mutated in
+	// place by adjust functions, so copying the fields outside the lock would race with
+	// concurrent adjustments.
+	err := s.Backend.Run(func(backdata mempool.BackData[flow.Identifier, *model.ProtocolSpamRecord]) error {
+		record, ok := backdata.Get(originId)
+		if !ok {
+			return nil
+		}
+
+		// return a copy of the record (we do not want the caller to modify the record).
+		copied = &model.ProtocolSpamRecord{
+			OriginId:       record.OriginId,
+			Decay:          record.Decay,
+			CutoffCounter:  record.CutoffCounter,
+			Penalty:        record.Penalty,
+			DisallowListed: record.DisallowListed,
+		}
+		return nil
+	})
+	if err != nil {
+		// the Run closure above never returns an error; an error here indicates a bug in the
+		// backend implementation.
+		panic(fmt.Errorf("unexpected error while getting spam record from cache: %w", err))
 	}
 
-	// return a copy of the record (we do not want the caller to modify the record).
-	return &model.ProtocolSpamRecord{
-		OriginId:       record.OriginId,
-		Decay:          record.Decay,
-		CutoffCounter:  record.CutoffCounter,
-		Penalty:        record.Penalty,
-		DisallowListed: record.DisallowListed,
-	}, true
+	return copied, copied != nil
 }
 
 // Identities returns the list of identities of the nodes that have a spam record in the cache.
