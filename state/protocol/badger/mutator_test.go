@@ -1628,9 +1628,12 @@ func TestExtendEpochSetupInvalid(t *testing.T) {
 			block1, createSetup := setupState(t, db, state)
 
 			_, receipt, seal := createSetup(func(setup *flow.EpochSetup) {
-				var err error
-				setup.Participants, err = setup.Participants.Shuffle()
-				require.NoError(t, err)
+				// deterministically break the canonical ordering by swapping the first two
+				// participants (a random shuffle occasionally produces the identity permutation,
+				// leaving the setup valid and making the test flaky)
+				require.GreaterOrEqual(t, len(setup.Participants), 2)
+				setup.Participants = setup.Participants.Copy()
+				setup.Participants[0], setup.Participants[1] = setup.Participants[1], setup.Participants[0]
 			})
 
 			receiptBlock, sealingBlock := unittest.SealBlock(t, state, mutableState, block1, receipt, seal)
