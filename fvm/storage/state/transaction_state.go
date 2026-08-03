@@ -49,7 +49,10 @@ type Meter interface {
 	//     byte size limit is exceeded
 	MeterEmittedEvent(byteSize uint64) error
 
-	// RunWithMeteringDisabled runs f with limits disabled
+	// RunWithMeteringDisabled runs f with metering disabled.
+	// While metering is disabled, usage of all metered quantities - computation,
+	// memory, emitted events, and ledger interaction - is neither accumulated
+	// toward the totals nor subject to its limit.
 	// This function can be used to run a function that fits one of these cases:
 	// - the function should not fail due to metering limits
 	// - the function is not invokable by the user and has a constant execution time (e.g. fee deduction)

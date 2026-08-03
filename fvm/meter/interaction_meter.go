@@ -52,14 +52,18 @@ func NewInteractionMeter(params InteractionMeterParameters) InteractionMeter {
 
 // MeterStorageRead captures storage read bytes count.
 //
+// Only the first read of a given register is counted; later reads are treated
+// as free cache hits. Consequently, if a read is not recorded here (e.g.
+// because it happened while metering was disabled), a subsequent recorded read
+// of the same register is counted as a fresh storage read.
+//
 // Expected error returns during normal operation:
 //   - [errors.LimitExceededError] with [errors.LimitKindLedgerInteraction] if
 //     the total bytes of storage interactions (reads + writes) exceeds the
-//     storage interaction limit and enforceLimit is true
+//     storage interaction limit
 func (m *InteractionMeter) MeterStorageRead(
 	storageKey flow.RegisterID,
 	value flow.RegisterValue,
-	enforceLimit bool,
 ) error {
 
 	// all reads are on a View which only read from storage at the first read of a given key
@@ -69,7 +73,7 @@ func (m *InteractionMeter) MeterStorageRead(
 		m.reads[storageKey] = readByteSize
 	}
 
-	return m.checkStorageInteractionLimit(enforceLimit)
+	return m.checkStorageInteractionLimit()
 }
 
 // MeterStorageWrite captures storage written bytes count.
@@ -80,11 +84,10 @@ func (m *InteractionMeter) MeterStorageRead(
 // Expected error returns during normal operation:
 //   - [errors.LimitExceededError] with [errors.LimitKindLedgerInteraction] if
 //     the total bytes of storage interactions (reads + writes) exceeds the
-//     storage interaction limit and enforceLimit is true
+//     storage interaction limit
 func (m *InteractionMeter) MeterStorageWrite(
 	storageKey flow.RegisterID,
 	value flow.RegisterValue,
-	enforceLimit bool,
 ) error {
 	updateSize := getStorageKeyValueSize(storageKey, value)
 	m.replaceWrite(storageKey, updateSize)
@@ -95,7 +98,7 @@ func (m *InteractionMeter) MeterStorageWrite(
 		m.reads[storageKey] = 0
 	}
 
-	return m.checkStorageInteractionLimit(enforceLimit)
+	return m.checkStorageInteractionLimit()
 }
 
 // replaceWrite replaces the write size of a given key with the new size, because
@@ -128,9 +131,8 @@ func (m *InteractionMeter) replaceWrite(
 	m.totalStorageBytesWritten += newSize
 }
 
-func (m *InteractionMeter) checkStorageInteractionLimit(enforceLimit bool) error {
-	if enforceLimit &&
-		m.TotalBytesOfStorageInteractions() > m.params.storageInteractionLimit {
+func (m *InteractionMeter) checkStorageInteractionLimit() error {
+	if m.TotalBytesOfStorageInteractions() > m.params.storageInteractionLimit {
 		return errors.NewLimitExceededError(
 			errors.LimitKindLedgerInteraction,
 			m.TotalBytesOfStorageInteractions(),
