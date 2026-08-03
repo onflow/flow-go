@@ -888,6 +888,11 @@ func (s *WsControllerSuite) TestRateLimiter() {
 	elapsed := timestamps[len(timestamps)-1].Sub(timestamps[0])
 	assert.GreaterOrEqual(t, elapsed, minElapsed-tolerance,
 		"Messages should be paced at no more than the configured rate")
+	// Generous upper bound: catches a limiter that stalls the stream. Emitting the messages
+	// must not take dramatically longer than the rate limit dictates; the slack absorbs
+	// scheduling delays on a loaded machine without reintroducing flakiness.
+	assert.LessOrEqual(t, elapsed, minElapsed+2*time.Second,
+		"Messages should not be excessively delayed by the rate limiter")
 }
 
 // TestConfigureKeepaliveConnection ensures that the WebSocket connection is configured correctly.
