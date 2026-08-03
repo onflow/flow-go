@@ -828,7 +828,7 @@ func TestTransactionFeeDeduction(t *testing.T) {
 			tryToTransfer: transferAmount,
 			gasLimit:      uint64(2),
 			checkResult: func(t *testing.T, balanceBefore uint64, balanceAfter uint64, output fvm.ProcedureOutput) {
-				require.ErrorContains(t, output.Err, "computation exceeds limit (2)")
+				unittest.RequireLimitExceededError(t, output.Err, errors.LimitKindComputation, 2)
 
 				var deposits []flow.Event
 				var withdraws []flow.Event
@@ -1162,7 +1162,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 					snapshotTree)
 				require.NoError(t, err)
 
-				require.True(t, errors.IsComputationLimitExceededError(output.Err))
+				unittest.RequireLimitExceededError(t, output.Err, errors.LimitKindComputation)
 			},
 		))
 
@@ -1227,7 +1227,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 				require.NoError(t, err)
 				require.Greater(t, output.MemoryEstimate, uint64(highWeight))
 
-				require.True(t, errors.IsMemoryLimitExceededError(output.Err))
+				unittest.RequireLimitExceededError(t, output.Err, errors.LimitKindMemory, 10_000_000_000)
 			},
 		))
 
@@ -1351,7 +1351,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 				// There are 100 breaks and each break uses 1_000_000 memory
 				require.Greater(t, output.MemoryEstimate, uint64(100_000_000))
 
-				require.True(t, errors.IsMemoryLimitExceededError(output.Err))
+				unittest.RequireLimitExceededError(t, output.Err, errors.LimitKindMemory, 100_000_000)
 			},
 		))
 
@@ -1393,7 +1393,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 					snapshotTree)
 				require.NoError(t, err)
 
-				require.True(t, errors.IsComputationLimitExceededError(output.Err))
+				unittest.RequireLimitExceededError(t, output.Err, errors.LimitKindComputation)
 			},
 		))
 
@@ -1436,7 +1436,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 					snapshotTree)
 				require.NoError(t, err)
 
-				require.True(t, errors.IsComputationLimitExceededError(output.Err))
+				unittest.RequireLimitExceededError(t, output.Err, errors.LimitKindComputation)
 			},
 		))
 
@@ -1478,7 +1478,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 					snapshotTree)
 				require.NoError(t, err)
 
-				require.True(t, errors.IsComputationLimitExceededError(output.Err))
+				unittest.RequireLimitExceededError(t, output.Err, errors.LimitKindComputation)
 			},
 		))
 
@@ -1558,7 +1558,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 					snapshotTree)
 				require.NoError(t, err)
 
-				require.ErrorContains(t, output.Err, "computation exceeds limit (997)")
+				unittest.RequireLimitExceededError(t, output.Err, errors.LimitKindComputation, 997)
 				// expected computation used is still number of loops + 1 (from the storage limit check).
 				require.Equal(t, loops+executionEffortNeededToCheckStorage, output.ComputationUsed)
 
@@ -2332,8 +2332,7 @@ func TestScriptExecutionLimit(t *testing.T) {
 					_, output, err := vm.Run(scriptCtx, script, snapshotTree)
 					require.NoError(t, err)
 					require.Error(t, output.Err)
-					require.True(t, errors.IsComputationLimitExceededError(output.Err))
-					require.ErrorContains(t, output.Err, "computation exceeds limit (10000)")
+					unittest.RequireLimitExceededError(t, output.Err, errors.LimitKindComputation, 10000)
 					require.GreaterOrEqual(t, output.ComputationUsed, uint64(10000))
 					require.GreaterOrEqual(t, output.MemoryEstimate, uint64(456687216))
 				},

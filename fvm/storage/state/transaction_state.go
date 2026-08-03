@@ -20,18 +20,33 @@ func (id NestedTransactionId) StateForTestingOnly() *ExecutionState {
 }
 
 type Meter interface {
+	// MeterComputation captures computation usage.
+	//
+	// Expected error returns during normal operation:
+	//   - errors.LimitExceededError with errors.LimitKindComputation if the
+	//     computation limit is exceeded
 	MeterComputation(usage common.ComputationUsage) error
 	ComputationRemaining(kind common.ComputationKind) uint64
 	ComputationIntensities() meter.MeteredComputationIntensities
 	TotalComputationLimit() uint64
 	TotalComputationUsed() uint64
 
+	// MeterMemory captures memory usage.
+	//
+	// Expected error returns during normal operation:
+	//   - errors.LimitExceededError with errors.LimitKindMemory if the memory
+	//     limit is exceeded
 	MeterMemory(usage common.MemoryUsage) error
 	MemoryAmounts() meter.MeteredMemoryAmounts
 	TotalMemoryEstimate() uint64
 
 	InteractionUsed() uint64
 
+	// MeterEmittedEvent captures the byte size of an emitted event.
+	//
+	// Expected error returns during normal operation:
+	//   - errors.LimitExceededError with errors.LimitKindEvent if the event
+	//     byte size limit is exceeded
 	MeterEmittedEvent(byteSize uint64) error
 
 	// RunWithMeteringDisabled runs f with limits disabled
@@ -155,8 +170,27 @@ type NestedTransactionPreparer interface {
 		id NestedTransactionId,
 	) error
 
+	// Get returns a register value from the current (nested) transaction's
+	// view. Limits are only enforced when metering is enabled.
+	//
+	// Expected error returns during normal operation:
+	//   - errors.StateKeySizeLimitError if the key exceeds the key size limit
+	//   - errors.LimitExceededError with errors.LimitKindLedgerInteraction if
+	//     the storage interaction limit is exceeded
+	//
+	// All other errors are exceptions (e.g. ledger failures).
 	Get(id flow.RegisterID) (flow.RegisterValue, error)
 
+	// Set updates a register value in the current (nested) transaction's
+	// view. Limits are only enforced when metering is enabled.
+	//
+	// Expected error returns during normal operation:
+	//   - errors.StateKeySizeLimitError or errors.StateValueSizeLimitError if
+	//     the key or value exceeds its size limit
+	//   - errors.LimitExceededError with errors.LimitKindLedgerInteraction if
+	//     the storage interaction limit is exceeded
+	//
+	// All other errors are exceptions (e.g. ledger failures).
 	Set(id flow.RegisterID, value flow.RegisterValue) error
 
 	// BaseStorageSnapshot gives access to the storage snapshot as it was without changes

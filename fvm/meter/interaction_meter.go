@@ -50,8 +50,12 @@ func NewInteractionMeter(params InteractionMeterParameters) InteractionMeter {
 	}
 }
 
-// MeterStorageRead captures storage read bytes count and returns an error
-// if it goes beyond the total interaction limit and limit is enforced
+// MeterStorageRead captures storage read bytes count.
+//
+// Expected error returns during normal operation:
+//   - [errors.LimitExceededError] with [errors.LimitKindLedgerInteraction] if
+//     the total bytes of storage interactions (reads + writes) exceeds the
+//     storage interaction limit and enforceLimit is true
 func (m *InteractionMeter) MeterStorageRead(
 	storageKey flow.RegisterID,
 	value flow.RegisterValue,
@@ -68,11 +72,15 @@ func (m *InteractionMeter) MeterStorageRead(
 	return m.checkStorageInteractionLimit(enforceLimit)
 }
 
-// MeterStorageWrite captures storage written bytes count and returns an error
-// if it goes beyond the total interaction limit and limit is enforced.
+// MeterStorageWrite captures storage written bytes count.
 // If a key is written multiple times, only the last write is counted.
 // If a key is written before it has been read, next time it will be read it will be from the view,
 // not from storage, so count it as read 0.
+//
+// Expected error returns during normal operation:
+//   - [errors.LimitExceededError] with [errors.LimitKindLedgerInteraction] if
+//     the total bytes of storage interactions (reads + writes) exceeds the
+//     storage interaction limit and enforceLimit is true
 func (m *InteractionMeter) MeterStorageWrite(
 	storageKey flow.RegisterID,
 	value flow.RegisterValue,
@@ -123,8 +131,10 @@ func (m *InteractionMeter) replaceWrite(
 func (m *InteractionMeter) checkStorageInteractionLimit(enforceLimit bool) error {
 	if enforceLimit &&
 		m.TotalBytesOfStorageInteractions() > m.params.storageInteractionLimit {
-		return errors.NewLedgerInteractionLimitExceededError(
-			m.TotalBytesOfStorageInteractions(), m.params.storageInteractionLimit)
+		return errors.NewLimitExceededError(
+			errors.LimitKindLedgerInteraction,
+			m.TotalBytesOfStorageInteractions(),
+			m.params.storageInteractionLimit)
 	}
 	return nil
 }
