@@ -311,11 +311,25 @@ func TempDir(t testing.TB) string {
 	return dir
 }
 
+// RemoveTempDir removes the temp directory, retrying briefly if the removal races with a
+// lingering background writer. Some components deliberately abandon in-flight file writes on
+// shutdown (e.g. the WAL compactor abandons checkpoint writes that take too long), so files can
+// appear in the directory while os.RemoveAll is deleting it, failing it with ENOTEMPTY.
+func RemoveTempDir(t testing.TB, dir string) {
+	var err error
+	for deadline := time.Now().Add(10 * time.Second); time.Now().Before(deadline); {
+		err = os.RemoveAll(dir)
+		if err == nil {
+			return
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+	require.NoError(t, err, "failed to remove temp dir %s", dir)
+}
+
 func RunWithTempDir(t testing.TB, f func(string)) {
 	dbDir := TempDir(t)
-	defer func() {
-		require.NoError(t, os.RemoveAll(dbDir))
-	}()
+	defer RemoveTempDir(t, dbDir)
 	f(dbDir)
 }
 
@@ -323,8 +337,8 @@ func RunWithTempDirs(t testing.TB, f func(string, string)) {
 	dbDir := TempDir(t)
 	dbDir2 := TempDir(t)
 	defer func() {
-		require.NoError(t, os.RemoveAll(dbDir))
-		require.NoError(t, os.RemoveAll(dbDir2))
+		RemoveTempDir(t, dbDir)
+		RemoveTempDir(t, dbDir2)
 	}()
 	f(dbDir, dbDir2)
 }
