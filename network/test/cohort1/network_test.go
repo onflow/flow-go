@@ -754,7 +754,10 @@ func (suite *NetworkTestSuite) TestEcho() {
 	// echos back the reply message to the sender.
 	targetEngine2.On("Process", mockery.Anything, mockery.Anything, mockery.Anything).
 		Run(func(args mockery.Arguments) {
-			wg.Done()
+			// signal completion only after all work in this callback finished, so that the test
+			// cannot complete while this network-worker goroutine is still asserting (an assertion
+			// failure after test completion panics and takes down the whole test binary).
+			defer wg.Done()
 
 			msgChannel, ok := args[0].(channels.Channel)
 			require.True(suite.T(), ok)
@@ -768,17 +771,25 @@ func (suite *NetworkTestSuite) TestEcho() {
 			require.True(suite.T(), ok)
 			require.Equal(suite.T(), expectedSendMsg, msgPayload.Text) // payload
 
-			// echos back the same message back to the sender
-			require.NoError(suite.T(), con2.Unicast(&libp2pmessage.TestMessage{
+			// Echo the same message back to the sender. We deliberately do NOT assert on the
+			// returned error: Unicast can return a benign "failed to close the stream" error
+			// after the reply has already been delivered. Correct delivery is verified by
+			// targetEngine1 receiving the reply; a genuine send failure surfaces as the
+			// reception timeout below.
+			err := con2.Unicast(&libp2pmessage.TestMessage{
 				Text: expectedReplyMsg,
-			}, suite.ids[first].NodeID))
+			}, suite.ids[first].NodeID)
+			if err != nil {
+				suite.T().Logf("echo unicast returned error (benign if the reply was still delivered): %v", err)
+			}
 		}).Return(nil).Once()
 
 	// mocks the target engine on the last node of the test suit that will receive the message on the test channel, and
 	// echos back the reply message to the sender.
 	targetEngine1.On("Process", mockery.Anything, mockery.Anything, mockery.Anything).
 		Run(func(args mockery.Arguments) {
-			wg.Done()
+			// see targetEngine2: complete all assertions before signaling the WaitGroup
+			defer wg.Done()
 
 			msgChannel, ok := args[0].(channels.Channel)
 			require.True(suite.T(), ok)

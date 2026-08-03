@@ -217,8 +217,14 @@ func setupGRPCServer(t *testing.T) *grpc.ClientConn {
 	})
 
 	go func() {
-		err = server.Serve(l)
-		require.NoError(t, err)
+		// Serve returns nil when the server is stopped via Stop(). However, if the test finishes
+		// so quickly that the cleanup's server.Stop() runs before this goroutine enters Serve,
+		// Serve returns ErrServerStopped -- after the test has already completed, where failing
+		// an assertion would panic the whole test binary. The error is a benign shutdown race
+		// (and any genuine serve failure surfaces as a connection failure in the test itself),
+		// so it is deliberately ignored.
+		// Note: this must not assign to the outer `err`, as that would race with the Dial below.
+		_ = server.Serve(l)
 	}()
 
 	conn, err := grpc.Dial(l.Addr().String(), grpc.WithTransportCredentials(insecure.NewCredentials()))
