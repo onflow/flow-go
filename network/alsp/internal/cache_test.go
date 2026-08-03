@@ -806,3 +806,56 @@ func TestSpamRecordCache_ConcurrentIdentitiesAndOperations(t *testing.T) {
 
 	unittest.RequireReturnsBefore(t, wg.Wait, 1*time.Second, "timed out waiting for goroutines to finish")
 }
+
+// TestSpamRecordCache_ConcurrentGetWhileAdjustingSameRecord is a regression test for two data
+// races on the same record (run with -race):
+//  1. Get copied the record's fields after the backend lock was released, racing the in-place
+//     mutation performed by a concurrent adjustment of the same record.
+//  2. AdjustWithInit read the adjusted record's penalty after the lock was released, so the
+//     returned penalty could reflect a different (later) adjustment.
+func TestSpamRecordCache_ConcurrentGetWhileAdjustingSameRecord(t *testing.T) {
+	cache := internal.NewSpamRecordCache(100, zerolog.Nop(), metrics.NewNoopCollector(), model.SpamRecordFactory())
+	originID := unittest.IdentifierFixture()
+
+	const adjustments = 500
+	const penaltyDelta = -1.0
+
+	var wg sync.WaitGroup
+	wg.Add(2)
+
+	// writer: repeatedly adjusts the same record, and verifies the returned penalty is the one
+	// produced by its own adjustment (captured inside the adjust function, under the lock).
+	go func() {
+		defer wg.Done()
+		for i := 0; i < adjustments; i++ {
+			var want float64
+			penalty, err := cache.AdjustWithInit(originID, func(record *model.ProtocolSpamRecord) (*model.ProtocolSpamRecord, error) {
+				record.Penalty += penaltyDelta
+				want = record.Penalty
+				return record, nil
+			})
+			require.NoError(t, err)
+			require.Equal(t, want, penalty, "returned penalty must match the penalty produced by this adjustment")
+		}
+	}()
+
+	// reader: repeatedly reads the same record while it is being adjusted.
+	go func() {
+		defer wg.Done()
+		for i := 0; i < adjustments; i++ {
+			record, ok := cache.Get(originID)
+			if !ok {
+				continue // record not initialized yet
+			}
+			// the penalty only ever decreases in steps of penaltyDelta
+			require.LessOrEqual(t, record.Penalty, float64(0))
+			require.GreaterOrEqual(t, record.Penalty, float64(adjustments)*penaltyDelta)
+		}
+	}()
+
+	unittest.RequireReturnsBefore(t, wg.Wait, 10*time.Second, "concurrent adjustments and reads did not finish on time")
+
+	record, ok := cache.Get(originID)
+	require.True(t, ok)
+	require.Equal(t, float64(adjustments)*penaltyDelta, record.Penalty)
+}
