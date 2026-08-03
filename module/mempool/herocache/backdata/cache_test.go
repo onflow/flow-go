@@ -357,6 +357,55 @@ func TestArrayBackData_LRU_Ejection(t *testing.T) {
 	testRetrievableFrom(t, bd, entities, 900_000)
 }
 
+// TestArrayBackData_StalePrefixCollisionOnEjectedSlot is a regression test for a bug where Get
+// would miss an existing entity: when a slot's value is ejected from the underlying pool, the
+// slot retains the ejected value's 32-bit id prefix. If a later slot in the same bucket holds an
+// entity whose id prefix collides with the stale slot's prefix, Get would stop scanning at the
+// stale slot and erroneously report the entity as missing.
+func TestArrayBackData_StalePrefixCollisionOnEjectedSlot(t *testing.T) {
+	limit := uint32(8)
+	bd := NewCache[*unittest.MockEntity](limit,
+		8,
+		heropool.LRUEjection,
+		unittest.Logger(),
+		metrics.NewNoopCollector())
+
+	// two distinct identifiers sharing the same bucket (selected by bytes [0:8]) and the same
+	// 32-bit in-memory prefix (bytes [8:12]), differing only in the remaining bytes.
+	var idA, idB flow.Identifier
+	idA[8] = 0xaa
+	idB[8] = 0xaa
+	idA[12] = 0x01
+	idB[12] = 0x02
+
+	entityA := &unittest.MockEntity{Identifier: idA}
+	entityB := &unittest.MockEntity{Identifier: idB}
+
+	require.True(t, bd.Add(idA, entityA)) // occupies the first slot of the bucket
+	require.True(t, bd.Add(idB, entityB)) // occupies a later slot of the same bucket
+
+	// Fill the cache to capacity and one beyond, so that entityA (the least recently used
+	// entity) is ejected from the pool. Its slot keeps the stale 32-bit prefix, which equals
+	// entityB's prefix. All fillers use a different bucket and a different prefix, so they do
+	// not interfere with the crafted bucket.
+	for i := uint32(0); i < limit-1; i++ {
+		var id flow.Identifier
+		id[0] = byte(4*i + 1) // maps to a different bucket than idA/idB
+		id[8] = 0x11          // different 32-bit prefix than idA/idB
+		require.True(t, bd.Add(id, &unittest.MockEntity{Identifier: id}))
+	}
+
+	// entityA must have been ejected (the pool exceeded its limit by one)
+	_, ok := bd.Get(idA)
+	require.False(t, ok)
+
+	// entityB must still be retrievable, even though the stale slot with the colliding prefix
+	// precedes it in the bucket's scan order
+	actual, ok := bd.Get(idB)
+	require.True(t, ok)
+	require.Equal(t, entityB, actual)
+}
+
 // TestArrayBackData_No_Ejection evaluates correctness of Cache under the writing and retrieving
 // a heavy load of entities beyond its limit. With NoEjection mode, the cache should refuse to add extra entities beyond
 // its limit.
