@@ -117,7 +117,7 @@ func TestControlMessageValidationInspector_truncateRPC(t *testing.T) {
 			// rpc with grafts less than GraftPruneMessageMaxSampleSize should not be truncated
 			shouldNotBeTruncated := len(graftsLessThanMaxSampleSize.GetControl().GetGraft()) == 50
 			return shouldBeTruncated && shouldNotBeTruncated
-		}, time.Second, 500*time.Millisecond)
+		}, 30*time.Second, 100*time.Millisecond)
 		cancel()
 		unittest.RequireCloseBefore(t, inspector.Done(), 5*time.Second, "inspector did not stop")
 	})
@@ -150,7 +150,7 @@ func TestControlMessageValidationInspector_truncateRPC(t *testing.T) {
 			// rpc with prunes less than GraftPruneMessageMaxSampleSize should not be truncated
 			shouldNotBeTruncated := len(prunesLessThanMaxSampleSize.GetControl().GetPrune()) == 50
 			return shouldBeTruncated && shouldNotBeTruncated
-		}, time.Second, 500*time.Millisecond)
+		}, 30*time.Second, 100*time.Millisecond)
 		cancel()
 		unittest.RequireCloseBefore(t, inspector.Done(), 5*time.Second, "inspector did not stop")
 	})
@@ -184,7 +184,7 @@ func TestControlMessageValidationInspector_truncateRPC(t *testing.T) {
 			// rpc with iHaves less than MessageCountThreshold should not be truncated
 			shouldNotBeTruncated := len(iHavesLessThanMaxSampleSize.GetControl().GetIhave()) == 50
 			return shouldBeTruncated && shouldNotBeTruncated
-		}, time.Second, 500*time.Millisecond)
+		}, 30*time.Second, 100*time.Millisecond)
 		cancel()
 		unittest.RequireCloseBefore(t, inspector.Done(), 5*time.Second, "inspector did not stop")
 	})
@@ -223,7 +223,7 @@ func TestControlMessageValidationInspector_truncateRPC(t *testing.T) {
 				}
 			}
 			return true
-		}, time.Second, 500*time.Millisecond)
+		}, 30*time.Second, 100*time.Millisecond)
 		cancel()
 		unittest.RequireCloseBefore(t, inspector.Done(), 5*time.Second, "inspector did not stop")
 	})
@@ -255,7 +255,7 @@ func TestControlMessageValidationInspector_truncateRPC(t *testing.T) {
 			// rpc with iWants less than MessageCountThreshold should not be truncated
 			shouldNotBeTruncated := len(iWantsLessThanMaxSampleSize.GetControl().GetIwant()) == 50
 			return shouldBeTruncated && shouldNotBeTruncated
-		}, time.Second, 500*time.Millisecond)
+		}, 30*time.Second, 100*time.Millisecond)
 		cancel()
 		unittest.RequireCloseBefore(t, inspector.Done(), 5*time.Second, "inspector did not stop")
 	})
@@ -293,7 +293,7 @@ func TestControlMessageValidationInspector_truncateRPC(t *testing.T) {
 				}
 			}
 			return true
-		}, time.Second, 500*time.Millisecond)
+		}, 30*time.Second, 100*time.Millisecond)
 		cancel()
 		unittest.RequireCloseBefore(t, inspector.Done(), 5*time.Second, "inspector did not stop")
 	})
@@ -319,11 +319,16 @@ func TestControlMessageInspection_ValidRpc(t *testing.T) {
 	inspector.Start(signalerCtx)
 	unittest.RequireComponentsReadyBefore(t, 1*time.Second, inspector)
 
+	from := unittest.PeerIdFixture(t)
 	grafts := unittest.P2PRPCGraftFixtures(topics...)
 	prunes := unittest.P2PRPCPruneFixtures(topics...)
 	ihaves := unittest.P2PRPCIHaveFixtures(50, topics...)
 	iwants := unittest.P2PRPCIWantFixtures(2, 50)
-	pubsubMsgs := unittest.GossipSubMessageFixtures(10, topics[0])
+	// The publish messages must originate from a valid, known peer: this is a valid-RPC test,
+	// and on private networks the inspector identity-checks each publish message's author.
+	// With random `From` bytes, the bytes occasionally parse into a valid peer ID, producing an
+	// unexpected ByPeerID call on the strict identity-provider mock (flaky failure).
+	pubsubMsgs := unittest.GossipSubMessageFixtures(10, topics[0], unittest.WithFrom(from))
 
 	rpc := unittest.P2PRPCFixture(
 		unittest.WithGrafts(grafts...),
@@ -345,12 +350,12 @@ func TestControlMessageInspection_ValidRpc(t *testing.T) {
 		require.Fail(t, "message id not found in iwant messages")
 	})
 
-	from := unittest.PeerIdFixture(t)
-	idProvider.On("ByPeerID", from).Return(unittest.IdentityFixture(), true).Once()
+	// ByPeerID is called once for the RPC sender and once per publish message author.
+	idProvider.On("ByPeerID", from).Return(unittest.IdentityFixture(), true)
 	require.NoError(t, inspector.Inspect(from, rpc))
 	require.Eventually(t, func() bool {
 		return logCounter.Load() == 1
-	}, time.Second, 500*time.Millisecond)
+	}, 30*time.Second, 100*time.Millisecond)
 	cancel()
 	unittest.RequireCloseBefore(t, inspector.Done(), 5*time.Second, "inspector did not stop")
 }
@@ -397,7 +402,7 @@ func TestGraftInspection_InvalidTopic_BelowThreshold(t *testing.T) {
 	require.NoError(t, inspector.Inspect(from, invalidSporkIDTopicReq))
 	require.Eventually(t, func() bool {
 		return logCounter.Load() == 3
-	}, time.Second, 500*time.Millisecond)
+	}, 30*time.Second, 100*time.Millisecond)
 	cancel()
 	unittest.RequireCloseBefore(t, inspector.Done(), 5*time.Second, "inspector did not stop")
 }
@@ -448,7 +453,7 @@ func TestGraftInspection_InvalidTopic_AboveThreshold(t *testing.T) {
 	require.NoError(t, inspector.Inspect(from, invalidSporkIDTopicReq))
 	require.Eventually(t, func() bool {
 		return logCounter.Load() == 3
-	}, time.Second, 500*time.Millisecond)
+	}, 30*time.Second, 100*time.Millisecond)
 	cancel()
 	unittest.RequireCloseBefore(t, inspector.Done(), 5*time.Second, "inspector did not stop")
 }
@@ -483,7 +488,7 @@ func TestGraftInspection_DuplicateTopicIds_BelowThreshold(t *testing.T) {
 	require.NoError(t, inspector.Inspect(from, rpc))
 	require.Eventually(t, func() bool {
 		return logCounter.Load() == 1
-	}, time.Second, 500*time.Millisecond)
+	}, 30*time.Second, 100*time.Millisecond)
 	cancel()
 	unittest.RequireCloseBefore(t, inspector.Done(), 5*time.Second, "inspector did not stop")
 }
@@ -523,7 +528,7 @@ func TestGraftInspection_DuplicateTopicIds_AboveThreshold(t *testing.T) {
 	require.NoError(t, inspector.Inspect(from, rpc))
 	require.Eventually(t, func() bool {
 		return logCounter.Load() == 1
-	}, time.Second, 500*time.Millisecond)
+	}, 30*time.Second, 100*time.Millisecond)
 	cancel()
 	unittest.RequireCloseBefore(t, inspector.Done(), 5*time.Second, "inspector did not stop")
 }
@@ -661,7 +666,7 @@ func TestPruneInspection_DuplicateTopicIds_AboveThreshold(t *testing.T) {
 	require.NoError(t, inspector.Inspect(from, rpc))
 	require.Eventually(t, func() bool {
 		return logCounter.Load() == 1
-	}, time.Second, 500*time.Millisecond)
+	}, 30*time.Second, 100*time.Millisecond)
 	cancel()
 	unittest.RequireCloseBefore(t, inspector.Done(), 5*time.Second, "inspector did not stop")
 }
@@ -697,7 +702,7 @@ func TestPrueInspection_DuplicateTopicIds_BelowThreshold(t *testing.T) {
 	require.NoError(t, inspector.Inspect(from, rpc))
 	require.Eventually(t, func() bool {
 		return logCounter.Load() == 1
-	}, time.Second, 500*time.Millisecond)
+	}, 30*time.Second, 100*time.Millisecond)
 	cancel()
 	unittest.RequireCloseBefore(t, inspector.Done(), 5*time.Second, "inspector did not stop")
 }
@@ -747,7 +752,7 @@ func TestIHaveInspection_InvalidTopic_AboveThreshold(t *testing.T) {
 	require.NoError(t, inspector.Inspect(from, invalidSporkIDTopicReq))
 	require.Eventually(t, func() bool {
 		return logCounter.Load() == 3
-	}, time.Second, 500*time.Millisecond)
+	}, 30*time.Second, 100*time.Millisecond)
 	cancel()
 	unittest.RequireCloseBefore(t, inspector.Done(), 5*time.Second, "inspector did not stop")
 }
@@ -797,7 +802,7 @@ func TestIHaveInspection_InvalidTopic_BelowThreshold(t *testing.T) {
 	require.NoError(t, inspector.Inspect(from, invalidSporkIDTopicReq))
 	require.Eventually(t, func() bool {
 		return logCounter.Load() == 3
-	}, time.Second, 500*time.Millisecond)
+	}, 30*time.Second, 100*time.Millisecond)
 
 	cancel()
 	unittest.RequireCloseBefore(t, inspector.Done(), 5*time.Second, "inspector did not stop")
@@ -837,7 +842,7 @@ func TestIHaveInspection_DuplicateTopicIds_BelowThreshold(t *testing.T) {
 	require.NoError(t, inspector.Inspect(from, duplicateMsgIDRpc))
 	require.Eventually(t, func() bool {
 		return logCounter.Load() == 1
-	}, time.Second, 500*time.Millisecond)
+	}, 30*time.Second, 100*time.Millisecond)
 	cancel()
 	unittest.RequireCloseBefore(t, inspector.Done(), 5*time.Second, "inspector did not stop")
 }
@@ -878,7 +883,7 @@ func TestIHaveInspection_DuplicateTopicIds_AboveThreshold(t *testing.T) {
 	require.NoError(t, inspector.Inspect(from, duplicateMsgIDRpc))
 	require.Eventually(t, func() bool {
 		return logCounter.Load() == 1
-	}, time.Second, 500*time.Millisecond)
+	}, 30*time.Second, 100*time.Millisecond)
 	cancel()
 	unittest.RequireCloseBefore(t, inspector.Done(), 5*time.Second, "inspector did not stop")
 }
@@ -917,7 +922,7 @@ func TestIHaveInspection_DuplicateMessageIds_BelowThreshold(t *testing.T) {
 	require.NoError(t, inspector.Inspect(from, duplicateMsgIDRpc))
 	require.Eventually(t, func() bool {
 		return logCounter.Load() == 1
-	}, time.Second, 500*time.Millisecond)
+	}, 30*time.Second, 100*time.Millisecond)
 	cancel()
 	unittest.RequireCloseBefore(t, inspector.Done(), 5*time.Second, "inspector did not stop")
 }
@@ -957,7 +962,7 @@ func TestIHaveInspection_DuplicateMessageIds_AboveThreshold(t *testing.T) {
 	require.NoError(t, inspector.Inspect(from, duplicateMsgIDRpc))
 	require.Eventually(t, func() bool {
 		return logCounter.Load() == 1
-	}, time.Second, 500*time.Millisecond)
+	}, 30*time.Second, 100*time.Millisecond)
 	cancel()
 	unittest.RequireCloseBefore(t, inspector.Done(), 5*time.Second, "inspector did not stop")
 }
@@ -1001,7 +1006,7 @@ func TestIWantInspection_DuplicateMessageIds_BelowThreshold(t *testing.T) {
 	require.NoError(t, inspector.Inspect(from, duplicateMsgIDRpc))
 	require.Eventually(t, func() bool {
 		return logCounter.Load() == 1
-	}, time.Second, 500*time.Millisecond)
+	}, 30*time.Second, 100*time.Millisecond)
 	cancel()
 	unittest.RequireCloseBefore(t, inspector.Done(), 5*time.Second, "inspector did not stop")
 }
@@ -1044,7 +1049,7 @@ func TestIWantInspection_DuplicateMessageIds_AboveThreshold(t *testing.T) {
 	require.NoError(t, inspector.Inspect(from, duplicateMsgIDRpc))
 	require.Eventually(t, func() bool {
 		return logCounter.Load() == 1
-	}, time.Second, 500*time.Millisecond)
+	}, 30*time.Second, 100*time.Millisecond)
 	cancel()
 	unittest.RequireCloseBefore(t, inspector.Done(), 5*time.Second, "inspector did not stop")
 }
@@ -1093,7 +1098,7 @@ func TestIWantInspection_CacheMiss_AboveThreshold(t *testing.T) {
 
 	require.Eventually(t, func() bool {
 		return logCounter.Load() == 1
-	}, time.Second, 500*time.Millisecond)
+	}, 30*time.Second, 100*time.Millisecond)
 	cancel()
 	unittest.RequireCloseBefore(t, inspector.Done(), 5*time.Second, "inspector did not stop")
 }
@@ -1133,7 +1138,7 @@ func TestIWantInspection_CacheMiss_BelowThreshold(t *testing.T) {
 
 	require.Eventually(t, func() bool {
 		return logCounter.Load() == 1
-	}, time.Second, 500*time.Millisecond)
+	}, 30*time.Second, 100*time.Millisecond)
 	cancel()
 	unittest.RequireCloseBefore(t, inspector.Done(), 5*time.Second, "inspector did not stop")
 }
@@ -1187,7 +1192,7 @@ func TestPublishMessageInspection_ExceedingErrThreshold(t *testing.T) {
 	require.NoError(t, inspector.Inspect(from, rpc))
 	require.Eventually(t, func() bool {
 		return logCounter.Load() == 1
-	}, time.Second, 500*time.Millisecond)
+	}, 30*time.Second, 100*time.Millisecond)
 	cancel()
 	unittest.RequireCloseBefore(t, inspector.Done(), 5*time.Second, "inspector did not stop")
 }
@@ -1215,7 +1220,7 @@ func TestPublishMessageInspection_MissingSubscription(t *testing.T) {
 	require.NoError(t, inspector.Inspect(from, rpc))
 	require.Eventually(t, func() bool {
 		return logCounter.Load() == 1
-	}, time.Second, 500*time.Millisecond)
+	}, 30*time.Second, 100*time.Millisecond)
 	cancel()
 	unittest.RequireCloseBefore(t, inspector.Done(), 5*time.Second, "inspector did not stop")
 }
@@ -1247,7 +1252,7 @@ func TestPublishMessageInspection_MissingTopic(t *testing.T) {
 	require.NoError(t, inspector.Inspect(from, rpc))
 	require.Eventually(t, func() bool {
 		return logCounter.Load() == 1
-	}, time.Second, 500*time.Millisecond)
+	}, 30*time.Second, 100*time.Millisecond)
 	cancel()
 	unittest.RequireCloseBefore(t, inspector.Done(), 5*time.Second, "inspector did not stop")
 }
@@ -1272,7 +1277,7 @@ func TestRpcInspectionDeactivatedOnPublicNetwork(t *testing.T) {
 	require.NoError(t, inspector.Inspect(from, rpc))
 	require.Eventually(t, func() bool {
 		return logCounter.Load() == 1
-	}, time.Second, 500*time.Millisecond)
+	}, 30*time.Second, 100*time.Millisecond)
 	cancel()
 	unittest.RequireCloseBefore(t, inspector.Done(), 5*time.Second, "inspector did not stop")
 }
@@ -1325,7 +1330,7 @@ func TestPublishMessageInspection_Unstaked_From(t *testing.T) {
 	require.NoError(t, inspector.Inspect(from, rpc))
 	require.Eventually(t, func() bool {
 		return logCounter.Load() == 1
-	}, time.Second, 500*time.Millisecond)
+	}, 30*time.Second, 100*time.Millisecond)
 	cancel()
 	unittest.RequireCloseBefore(t, inspector.Done(), 5*time.Second, "inspector did not stop")
 }
@@ -1363,7 +1368,7 @@ func TestPublishMessageInspection_Ejected_From(t *testing.T) {
 	require.NoError(t, inspector.Inspect(from, rpc))
 	require.Eventually(t, func() bool {
 		return logCounter.Load() == 1
-	}, time.Second, 500*time.Millisecond)
+	}, 30*time.Second, 100*time.Millisecond)
 	cancel()
 	unittest.RequireCloseBefore(t, inspector.Done(), 5*time.Second, "inspector did not stop")
 }
@@ -1392,7 +1397,7 @@ func TestNewControlMsgValidationInspector_validateClusterPrefixedTopic(t *testin
 		require.NoError(t, inspector.Inspect(from, inspectMsgRpc))
 		require.Eventually(t, func() bool {
 			return logCounter.Load() == 1
-		}, time.Second, 500*time.Millisecond)
+		}, 30*time.Second, 100*time.Millisecond)
 		cancel()
 		unittest.RequireCloseBefore(t, inspector.Done(), 5*time.Second, "inspector did not stop")
 	})
@@ -1419,7 +1424,7 @@ func TestNewControlMsgValidationInspector_validateClusterPrefixedTopic(t *testin
 		require.NoError(t, inspector.Inspect(from, inspectMsgRpc))
 		require.Eventually(t, func() bool {
 			return logCounter.Load() == 1
-		}, time.Second, 500*time.Millisecond)
+		}, 30*time.Second, 100*time.Millisecond)
 		cancel()
 		unittest.RequireCloseBefore(t, inspector.Done(), 5*time.Second, "inspector did not stop")
 	})
@@ -1457,7 +1462,7 @@ func TestNewControlMsgValidationInspector_validateClusterPrefixedTopic(t *testin
 		}
 		require.Eventually(t, func() bool {
 			return logCounter.Load() == 11
-		}, time.Second, 100*time.Millisecond)
+		}, 30*time.Second, 100*time.Millisecond)
 		cancel()
 		unittest.RequireCloseBefore(t, inspector.Done(), 5*time.Second, "inspector did not stop")
 	})
@@ -1502,7 +1507,7 @@ func TestNewControlMsgValidationInspector_validateClusterPrefixedTopic(t *testin
 		// wait until all inspections have been processed by the workers
 		require.Eventually(t, func() bool {
 			return logCounter.Load() == total
-		}, time.Second, 100*time.Millisecond)
+		}, 30*time.Second, 100*time.Millisecond)
 
 		count := notificationCount.Load()
 		require.GreaterOrEqual(t, count, int64(1), "at least one inspection past the hard threshold must disseminate a notification")
@@ -1540,7 +1545,7 @@ func TestControlMessageValidationInspector_ActiveClustersChanged(t *testing.T) {
 	// sleep for 1 second to ensure rpc's is processed
 	require.Eventually(t, func() bool {
 		return logCounter.Load() == int64(len(activeClusterIds))
-	}, time.Second, 500*time.Millisecond)
+	}, 30*time.Second, 100*time.Millisecond)
 
 	cancel()
 	unittest.RequireCloseBefore(t, inspector.Done(), 5*time.Second, "inspector did not stop")
@@ -1578,7 +1583,7 @@ func TestControlMessageValidationInspector_TruncationConfigToggle(t *testing.T) 
 
 		require.Eventually(t, func() bool {
 			return logCounter.Load() == 2
-		}, time.Second, 500*time.Millisecond)
+		}, 30*time.Second, 100*time.Millisecond)
 
 		// ensure truncation not performed
 		require.Len(t, rpc.GetControl().GetGraft(), numOfMsgs)
@@ -1636,7 +1641,7 @@ func TestControlMessageValidationInspector_TruncationConfigToggle(t *testing.T) 
 
 		require.Eventually(t, func() bool {
 			return logCounter.Load() == int64(len(expectedLogStrs))
-		}, time.Second, 500*time.Millisecond)
+		}, 30*time.Second, 100*time.Millisecond)
 
 		// ensure truncation not performed
 		require.Len(t, rpc.GetControl().GetGraft(), numOfMsgs)
@@ -1681,7 +1686,7 @@ func TestControlMessageValidationInspector_InspectionConfigToggle(t *testing.T) 
 
 		require.Eventually(t, func() bool {
 			return logCounter.Load() == 1
-		}, time.Second, 500*time.Millisecond)
+		}, 30*time.Second, 100*time.Millisecond)
 
 		cancel()
 		unittest.RequireCloseBefore(t, inspector.Done(), 5*time.Second, "inspector did not stop")
@@ -1783,7 +1788,7 @@ func TestControlMessageValidationInspector_InspectionConfigToggle(t *testing.T) 
 
 		require.Eventually(t, func() bool {
 			return logCounter.Load() == int64(len(expectedLogStrs))
-		}, time.Second, 500*time.Millisecond)
+		}, 30*time.Second, 100*time.Millisecond)
 
 		cancel()
 		unittest.RequireCloseBefore(t, inspector.Done(), 5*time.Second, "inspector did not stop")

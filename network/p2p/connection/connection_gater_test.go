@@ -200,6 +200,10 @@ func TestConnectionGating_ResourceAllocation_DisAllowListing(t *testing.T) {
 
 	node2Metrics := mockmodule.NewNetworkMetrics(t)
 	node2Metrics.On("AllowConn", network.DirInbound, true).Return()
+	// the node's GossipSub score tracer periodically reports the warning state count (0, since
+	// no peer ever connects); tolerate these calls so the periodic update loop cannot race with
+	// the strict mock and flake the test
+	node2Metrics.On("SetWarningStateCount", uint(0)).Return().Maybe()
 	node2, node2Id := p2ptest.NodeFixture(
 		t,
 		sporkID,
