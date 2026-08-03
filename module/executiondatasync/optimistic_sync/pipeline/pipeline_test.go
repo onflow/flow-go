@@ -68,12 +68,14 @@ func TestPipelineParentDependentTransitions(t *testing.T) {
 		assertNoUpdate(t, pipeline, updateChan, optimistic_sync.StatePending)
 
 		// 2. Update parent to downloading
-		parent.UpdateState(optimistic_sync.StateProcessing, pipeline)
-
 		// Pipeline should now call Download and Index within the processing state, then progress to
-		// WaitingPersist and stop
+		// WaitingPersist and stop.
+		// Note: the mocked calls must be registered BEFORE the parent state update: the pipeline's
+		// event loop may invoke them immediately after the update is delivered, racing the mock
+		// registration (mocks panic on unexpected calls).
 		mockCore.On("Download", mock.Anything).Return(nil)
 		mockCore.On("Index").Return(nil)
+		parent.UpdateState(optimistic_sync.StateProcessing, pipeline)
 		for _, expected := range []optimistic_sync.State{optimistic_sync.StateProcessing, optimistic_sync.StateWaitingPersist} {
 			synctest.Wait()
 			assertUpdate(t, updateChan, expected)
@@ -92,8 +94,9 @@ func TestPipelineParentDependentTransitions(t *testing.T) {
 		assertNoUpdate(t, pipeline, updateChan, optimistic_sync.StateWaitingPersist)
 
 		// 4. Mark the execution result as sealed, this should allow the pipeline to progress to Complete state
-		pipeline.SetSealed()
+		// (the mocked Persist must be registered BEFORE SetSealed, see the note above)
 		mockCore.On("Persist").Return(nil)
+		pipeline.SetSealed()
 
 		// Wait for pipeline to complete
 		synctest.Wait()

@@ -129,7 +129,12 @@ func (p *Pipeline) Run(ctx context.Context, core optimistic_sync.Core, parentSta
 		return irrecoverable.NewExceptionf("pipeline has been already started, it is not designed to be run again")
 	}
 	p.core = core
-	p.parentStateCache.Store(int32(parentState))
+	// Initialize the parent state cache with the provided initial state.
+	// CompareAndSwap ensures that a state update delivered concurrently via OnParentStateUpdated
+	// (which is always at least as current as the caller-provided initial state) is not
+	// overwritten and lost. Otherwise, the pipeline could deadlock, e.g. never observing the
+	// parent reaching StateComplete, and hence never persisting.
+	p.parentStateCache.CompareAndSwap(int32(optimistic_sync.StatePending), int32(parentState))
 	// run the main event loop by calling p.loop. any error returned from it needs to be propagated to the caller.
 	// IMPORTANT: after the main loop has exited we need to ensure that worker goroutine has also finished
 	// because we need to ensure that it can report any error that has happened during the execution of detached operation.
@@ -279,12 +284,13 @@ func (p *Pipeline) SetSealed() {
 }
 
 // OnParentStateUpdated updates the pipeline's state based on the provided parent state.
-// If the parent state has changed, it will notify the state consumer and trigger a state change notification.
+// It will notify the state consumer and trigger a state change notification.
 func (p *Pipeline) OnParentStateUpdated(parentState optimistic_sync.State) {
-	oldState := p.parentStateCache.Load()
-	if p.parentStateCache.CompareAndSwap(oldState, int32(parentState)) {
-		p.stateChangedNotifier.Notify()
-	}
+	// Note: an unconditional store is used, so that an update can never be silently dropped
+	// (a Load-CompareAndSwap sequence could fail if it races with the initialization in Run,
+	// losing the update). Spurious notifications are cheap: the notifier merges them.
+	p.parentStateCache.Store(int32(parentState))
+	p.stateChangedNotifier.Notify()
 }
 
 // Abandon marks the pipeline as abandoned
