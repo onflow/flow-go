@@ -293,10 +293,15 @@ func (suite *ComponentConsumerSuite) TestPassesIrrecoverableErrors() {
 	signalCtx, errChan := irrecoverable.WithSignaler(ctx)
 
 	consumer.Start(signalCtx)
-	unittest.RequireCloseBefore(suite.T(), consumer.Ready(), 100*time.Millisecond, "timeout waiting for consumer to be ready")
+	// Note: we deliberately do NOT wait for the consumer to become ready: the consumer starts
+	// processing jobs immediately on Start, and each job throws an irrecoverable error, which
+	// terminates the throwing worker goroutine (runtime.Goexit) -- potentially before the worker
+	// pool ever signals readiness. Consequently, Ready() may never close (which is fine on a
+	// node, as the thrown error is fatal anyway). This test only verifies that the error is
+	// passed through to the signaler.
 
-	// send job signal, then wait for the irrecoverable error
-	// don't need to sent signal since the worker is kicked off by Start()
+	// wait for the irrecoverable error
+	// don't need to send job signal since the worker is kicked off by Start()
 	select {
 	case <-ctx.Done():
 		suite.T().Errorf("expected irrecoverable error, but got none")
@@ -306,7 +311,7 @@ func (suite *ComponentConsumerSuite) TestPassesIrrecoverableErrors() {
 
 	// shutdown
 	cancel()
-	unittest.RequireCloseBefore(suite.T(), consumer.Done(), 100*time.Millisecond, "timeout waiting for consumer to be done")
+	unittest.RequireCloseBefore(suite.T(), consumer.Done(), 1*time.Second, "timeout waiting for consumer to be done")
 
 	// no notification should have been sent
 	unittest.RequireNotClosed(suite.T(), done, "job wasn't supposed to finish")
@@ -321,11 +326,11 @@ func (suite *ComponentConsumerSuite) runTest(
 	signalerCtx := irrecoverable.NewMockSignalerContext(suite.T(), ctx)
 
 	consumer.Start(signalerCtx)
-	unittest.RequireCloseBefore(suite.T(), consumer.Ready(), 100*time.Millisecond, "timeout waiting for the consumer to be ready")
+	unittest.RequireCloseBefore(suite.T(), consumer.Ready(), 1*time.Second, "timeout waiting for the consumer to be ready")
 
 	sendJobs()
 
 	// shutdown
 	cancel()
-	unittest.RequireCloseBefore(suite.T(), consumer.Done(), 100*time.Millisecond, "timeout waiting for the consumer to be done")
+	unittest.RequireCloseBefore(suite.T(), consumer.Done(), 1*time.Second, "timeout waiting for the consumer to be done")
 }

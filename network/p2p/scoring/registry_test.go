@@ -606,6 +606,12 @@ func testScoreRegistrySpamRecordWithoutDuplicateMessagesPenalty(t *testing.T, me
 		return score != cfg.NetworkConfig.GossipSub.ScoringParameters.PeerScoring.Protocol.AppSpecificScore.MaxAppSpecificReward
 	}, 5*time.Second, 10*time.Millisecond)
 
+	// Capture the query time BEFORE reporting the misbehavior: the app-specific score cache may
+	// incorporate the penalty as soon as the notification is processed (the score refresh loop
+	// runs concurrently with the spam-record polling below), so capturing the time after the
+	// polling would race with the refresh and make the `updated.After(queryTime)` check flaky.
+	queryTime := time.Now()
+
 	// report a misbehavior for the peer id.
 	reg.OnInvalidControlMessageNotification(&p2p.InvCtrlMsgNotif{
 		PeerID:  peerID,
@@ -626,8 +632,6 @@ func testScoreRegistrySpamRecordWithoutDuplicateMessagesPenalty(t *testing.T, me
 
 		return true
 	}, 5*time.Second, 10*time.Millisecond)
-
-	queryTime := time.Now()
 	// eventually, the app specific score should be updated in the cache.
 	require.Eventually(t, func() bool {
 		score := reg.AppSpecificScoreFunc()(peerID)

@@ -179,7 +179,9 @@ func Test_VertexIteratorConcurrencySafe(t *testing.T) {
 	// leve the iterators unchanged.
 	close(start)
 
-	// Wait up to 2 seconds, checking every 100 milliseconds
+	// Wait generously, checking every 100 milliseconds: routine 1 sleeps 1000 x 0.5ms, which
+	// nominally takes ~0.5s, but sub-millisecond sleeps overshoot significantly on loaded
+	// machines. The timeout only bounds the deadlock case.
 	bothDone := func() bool {
 		select {
 		case <-done1:
@@ -193,7 +195,7 @@ func Test_VertexIteratorConcurrencySafe(t *testing.T) {
 			return false
 		}
 	}
-	assert.Eventually(t, bothDone, 2*time.Second, 100*time.Millisecond, "Condition never became true")
+	assert.Eventually(t, bothDone, 30*time.Second, 100*time.Millisecond, "Condition never became true")
 
 }
 
