@@ -93,9 +93,12 @@ func (s *HandlerTestSuite) TestHeartbeatResponse() {
 		}
 
 		// subscribe for events
+		// note: this subscription never terminates within the subtest, so the goroutine must not
+		// assert or log through the test object -- if the handler returned after the subtest
+		// completed, the test binary would panic ("Fail in goroutine after test has completed").
+		// Correct event delivery is verified via the reads from reader.received below.
 		go func() {
-			err := s.handler.SubscribeEvents(req, reader)
-			require.NoError(s.T(), err)
+			_ = s.handler.SubscribeEvents(req, reader)
 		}()
 
 		for _, b := range s.blocks {
@@ -127,9 +130,9 @@ func (s *HandlerTestSuite) TestHeartbeatResponse() {
 		}
 
 		// subscribe for events
+		// note: must not assert or log through the test object; see first subtest for details.
 		go func() {
-			err := s.handler.SubscribeEvents(req, reader)
-			require.NoError(s.T(), err)
+			_ = s.handler.SubscribeEvents(req, reader)
 		}()
 
 		for _, b := range s.blocks {
@@ -163,9 +166,9 @@ func (s *HandlerTestSuite) TestHeartbeatResponse() {
 		}
 
 		// subscribe for events
+		// note: must not assert or log through the test object; see first subtest for details.
 		go func() {
-			err := s.handler.SubscribeEvents(req, reader)
-			require.NoError(s.T(), err)
+			_ = s.handler.SubscribeEvents(req, reader)
 		}()
 
 		// expect a response for every other block
@@ -270,12 +273,16 @@ func TestExecutionDataStream(t *testing.T) {
 	blockHeight := uint64(1)
 
 	// Helper function to perform a stream request and handle responses.
+	// Returns a channel that is closed once the subscription handler goroutine has fully
+	// terminated; the caller MUST wait for it before finishing the (sub)test, otherwise the
+	// goroutine's assertions/logs can fire after test completion and panic the test binary
+	// ("Log in goroutine after test has completed").
 	makeStreamRequest := func(
 		stream *StreamMock[executiondata.SubscribeExecutionDataRequest, executiondata.SubscribeExecutionDataResponse],
 		api *ssmock.API,
 		request *executiondata.SubscribeExecutionDataRequest,
 		response *ExecutionDataResponse,
-	) {
+	) <-chan struct{} {
 		sub := subscription.NewSubscription(1)
 
 		api.On("SubscribeExecutionData", mock.Anything, flow.ZeroID, uint64(0), mock.Anything).Return(sub)
@@ -284,7 +291,9 @@ func TestExecutionDataStream(t *testing.T) {
 
 		wg := sync.WaitGroup{}
 		wg.Add(1)
+		subDone := make(chan struct{})
 		go func() {
+			defer close(subDone)
 			wg.Done()
 			err := h.SubscribeExecutionData(request, stream)
 			require.NoError(t, err)
@@ -297,6 +306,8 @@ func TestExecutionDataStream(t *testing.T) {
 
 		// Notify end of data.
 		sub.Close()
+
+		return subDone
 	}
 
 	// handleExecutionDataStreamResponses handles responses from the execution data stream.
@@ -364,7 +375,7 @@ func TestExecutionDataStream(t *testing.T) {
 			api := ssmock.NewAPI(t)
 			stream := makeStreamMock[executiondata.SubscribeExecutionDataRequest, executiondata.SubscribeExecutionDataResponse](ctx)
 
-			makeStreamRequest(
+			subDone := makeStreamRequest(
 				stream,
 				api,
 				&executiondata.SubscribeExecutionDataRequest{
@@ -381,6 +392,9 @@ func TestExecutionDataStream(t *testing.T) {
 				},
 			)
 			handleExecutionDataStreamResponses(stream, test.eventVersion, test.expected)
+			// wait for the subscription goroutine to finish before completing the test, so that
+			// its trailing assertions/logs cannot fire after test completion (which would panic).
+			unittest.RequireCloseBefore(t, subDone, time.Second, "subscription handler did not terminate")
 		})
 	}
 }
@@ -395,12 +409,16 @@ func TestEventStream(t *testing.T) {
 	blockID := unittest.IdentifierFixture()
 
 	// Helper function to perform a stream request and handle responses.
+	// Returns a channel that is closed once the subscription handler goroutine has fully
+	// terminated; the caller MUST wait for it before finishing the (sub)test, otherwise the
+	// goroutine's assertions/logs can fire after test completion and panic the test binary
+	// ("Log in goroutine after test has completed").
 	makeStreamRequest := func(
 		stream *StreamMock[executiondata.SubscribeEventsRequest, executiondata.SubscribeEventsResponse],
 		api *ssmock.API,
 		request *executiondata.SubscribeEventsRequest,
 		response *EventsResponse,
-	) {
+	) <-chan struct{} {
 		sub := subscription.NewSubscription(1)
 
 		api.On("SubscribeEvents", mock.Anything, flow.ZeroID, uint64(0), mock.Anything).Return(sub)
@@ -409,7 +427,9 @@ func TestEventStream(t *testing.T) {
 
 		wg := sync.WaitGroup{}
 		wg.Add(1)
+		subDone := make(chan struct{})
 		go func() {
+			defer close(subDone)
 			wg.Done()
 			err := h.SubscribeEvents(request, stream)
 			require.NoError(t, err)
@@ -423,6 +443,8 @@ func TestEventStream(t *testing.T) {
 
 		// notify end of data
 		sub.Close()
+
+		return subDone
 	}
 
 	// handleExecutionDataStreamResponses handles responses from the execution data stream.
@@ -489,7 +511,7 @@ func TestEventStream(t *testing.T) {
 		t.Run(fmt.Sprintf("test %s event encoding version", test.eventVersion.String()), func(t *testing.T) {
 			stream := makeStreamMock[executiondata.SubscribeEventsRequest, executiondata.SubscribeEventsResponse](ctx)
 
-			makeStreamRequest(
+			subDone := makeStreamRequest(
 				stream,
 				ssmock.NewAPI(t),
 				&executiondata.SubscribeEventsRequest{
@@ -502,6 +524,9 @@ func TestEventStream(t *testing.T) {
 				},
 			)
 			handleExecutionDataStreamResponses(stream, test.eventVersion, test.expected)
+			// wait for the subscription goroutine to finish before completing the test, so that
+			// its trailing assertions/logs cannot fire after test completion (which would panic).
+			unittest.RequireCloseBefore(t, subDone, time.Second, "subscription handler did not terminate")
 		})
 	}
 }
