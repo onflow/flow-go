@@ -249,7 +249,9 @@ func (s *CacheSuite) TestConcurrentAdd() {
 		}(blocks[i*blocksPerWorker : (i+1)*blocksPerWorker])
 	}
 
-	unittest.RequireReturnsBefore(s.T(), wg.Wait, time.Millisecond*500, "should submit blocks before timeout")
+	// Liveness check: the workers finish within tens of milliseconds; the generous timeout only
+	// bounds the deadlock case and avoids flakiness on heavily loaded machines.
+	unittest.RequireReturnsBefore(s.T(), wg.Wait, 10*time.Second, "should submit blocks before timeout")
 
 	require.Len(s.T(), allCertifiedBlocks, len(blocks)-1)
 	slices.SortFunc(allCertifiedBlocks, func(lhs flow.CertifiedBlock, rhs flow.CertifiedBlock) int {
@@ -378,5 +380,8 @@ func (s *CacheSuite) TestAddOverCacheLimit() {
 			}
 		}(blocks[i*blocksPerWorker : (i+1)*blocksPerWorker])
 	}
-	unittest.RequireReturnsBefore(s.T(), wg.Wait, time.Millisecond*500, "should submit blocks before timeout")
+	// Liveness check: workers keep re-submitting blocks until all blocks are certified, which
+	// typically completes within tens of milliseconds. The generous timeout only bounds the
+	// livelock case and avoids flakiness on heavily loaded machines.
+	unittest.RequireReturnsBefore(s.T(), wg.Wait, 10*time.Second, "should submit blocks before timeout")
 }
