@@ -33,9 +33,10 @@ func TestBasicPrune(t *testing.T) {
 	trackerStorage.AssertExpectations(t)
 
 	downloader := new(exedatamock.Downloader)
+	// the pruner's loop polls the height recorders on every tick (10ms) until the test shuts it
+	// down, so the call count is unbounded (a .Once() expectation would panic on the second tick)
 	downloader.On("HighestCompleteHeight").
-		Return(uint64(16)).
-		Once()
+		Return(uint64(16))
 
 	pruner.RegisterHeightRecorder(downloader)
 
