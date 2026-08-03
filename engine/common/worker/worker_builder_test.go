@@ -62,11 +62,17 @@ func TestWorkerBuilder_UnhappyPaths(t *testing.T) {
 	blockingChannel := make(chan struct{})
 	firstEventArrived := make(chan struct{})
 
+	var firstEventOnce sync.Once
 	pool := worker.NewWorkerPoolBuilder[string](
 		unittest.Logger(),
 		q,
 		func(input string) error {
-			close(firstEventArrived)
+			// the processor is invoked once per queued event: after blockingChannel is closed at
+			// the end of the test, the worker drains the remaining queued events (racing the
+			// shutdown), so the channel close must only happen on the first invocation
+			firstEventOnce.Do(func() {
+				close(firstEventArrived)
+			})
 			// we block the consumer to make sure that the queue is eventually full.
 			<-blockingChannel
 
