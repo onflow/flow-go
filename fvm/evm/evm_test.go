@@ -4030,94 +4030,123 @@ func TestDryRun(t *testing.T) {
 	// one tainted by the dry-run read) and complete successfully.
 	t.Run("test EVM.dryRun followed by EVM.run in same transaction", func(t *testing.T) {
 		RunWithNewEnvironment(t,
-			chain, func(
-				ctx fvm.Context,
-				vm fvm.VM,
-				snapshot snapshot.SnapshotTree,
-				testContract *TestContract,
-				testAccount *EOATestAccount,
-			) {
-				sc := systemcontracts.SystemContractsForChain(chain.ChainID())
-
-				data := testContract.MakeCallData(t, "store", big.NewInt(42))
-
-				// The dry-run tx uses nonce 0 (doesn't consume it).
-				dryTx := gethTypes.NewTransaction(
-					testAccount.Nonce(),
-					testContract.DeployedAt.ToCommon(),
-					big.NewInt(0),
-					uint64(50_000),
-					big.NewInt(0),
-					data,
-				)
-				dryTxBytes, err := dryTx.MarshalBinary()
-				require.NoError(t, err)
-
-				// The real tx is signed and uses the same nonce.
-				realTxBytes := testAccount.PrepareSignAndEncodeTx(t,
-					testContract.DeployedAt.ToCommon(),
-					data,
-					big.NewInt(0),
-					uint64(50_000),
-					big.NewInt(0),
-				)
-
-				code := fmt.Appendf(nil, `
-					import EVM from %s
-
-					transaction(dryTx: [UInt8], realTx: [UInt8], coinbaseBytes: [UInt8; 20]) {
-						prepare(account: &Account) {
-							let from = EVM.EVMAddress(bytes: coinbaseBytes)
-							let coinbase = EVM.EVMAddress(bytes: coinbaseBytes)
-
-							let dryResult = EVM.dryRun(tx: dryTx, from: from)
-							assert(dryResult.status == EVM.Status.successful, message: "dry run failed")
-
-							let runResult = EVM.run(tx: realTx, coinbase: coinbase)
-							assert(runResult.status == EVM.Status.successful, message: "run after dry run failed")
-						}
-					}
-				`, sc.EVMContract.Address.HexWithPrefix())
-
-				dryTxArg := cadence.NewArray(
-					unittest.BytesToCdcUInt8(dryTxBytes),
-				).WithType(stdlib.EVMTransactionBytesCadenceType)
-
-				realTxArg := cadence.NewArray(
-					unittest.BytesToCdcUInt8(realTxBytes),
-				).WithType(stdlib.EVMTransactionBytesCadenceType)
-
-				coinbase := cadence.NewArray(
-					unittest.BytesToCdcUInt8(testAccount.Address().Bytes()),
-				).WithType(stdlib.EVMAddressBytesCadenceType)
-
-				txBody, err := flow.NewTransactionBodyBuilder().
-					SetScript(code).
-					SetPayer(sc.FlowServiceAccount.Address).
-					AddAuthorizer(sc.FlowServiceAccount.Address).
-					AddArgument(json.MustEncode(dryTxArg)).
-					AddArgument(json.MustEncode(realTxArg)).
-					AddArgument(json.MustEncode(coinbase)).
-					Build()
-				require.NoError(t, err)
-
-				tx := fvm.Transaction(txBody, 0)
-				_, output, err := vm.Run(ctx, tx, snapshot)
-				require.NoError(t, err)
-				require.NoError(t, output.Err)
-				// The metered computation depends on the block's UUID partition (see
-				// assertUpdatedRegisterCount): blocks selecting partition 0 (probability 1/256)
-				// reuse the legacy `uuid` register instead of a fresh `uuid_N` one, which
-				// changes the metered effort. Both values verified by forcing each partition.
-				expectedComputation := uint64(74)
-				blockID := ctx.BlockHeader.ID()
-				if sha256.Sum256(blockID[:])[0] == 0 {
-					expectedComputation = 79
-				}
-				assert.Equal(t, expectedComputation, output.ComputationUsed)
-			},
+			chain, dryRunFollowedByRunCase(t, chain),
 		)
 	})
+}
+
+// TestDryRunFollowedByRun_UUIDPartitionZero runs the dryRun-followed-by-run case with a block
+// that deterministically selects UUID partition 0. Partition 0 makes the EVM environment reuse
+// the legacy `uuid` register instead of a fresh partitioned one; this 1/256 branch is
+// practically never exercised by random block fixtures, and previously made exact
+// register-count and computation assertions flaky (see #8629).
+func TestDryRunFollowedByRun_UUIDPartitionZero(t *testing.T) {
+	t.Parallel()
+	chain := flow.Emulator.Chain()
+	runWithNewEnvironmentWithBlock(t,
+		chain, blockFixtureWithUUIDPartitionZero(), dryRunFollowedByRunCase(t, chain),
+	)
+}
+
+// dryRunFollowedByRunCase returns the test case body shared by the random-block and the
+// forced-partition-zero variants: dryRun reads the block proposal into the cache, and a
+// subsequent EVM.run in the same Cadence transaction must still see a clean proposal and
+// complete successfully, with partition-dependent metering.
+func dryRunFollowedByRunCase(t *testing.T, chain flow.Chain) func(fvm.Context, fvm.VM, snapshot.SnapshotTree, *TestContract, *EOATestAccount) {
+	return func(
+		ctx fvm.Context,
+		vm fvm.VM,
+		snapshot snapshot.SnapshotTree,
+		testContract *TestContract,
+		testAccount *EOATestAccount,
+	) {
+		sc := systemcontracts.SystemContractsForChain(chain.ChainID())
+
+		data := testContract.MakeCallData(t, "store", big.NewInt(42))
+
+		// The dry-run tx uses nonce 0 (doesn't consume it).
+		dryTx := gethTypes.NewTransaction(
+			testAccount.Nonce(),
+			testContract.DeployedAt.ToCommon(),
+			big.NewInt(0),
+			uint64(50_000),
+			big.NewInt(0),
+			data,
+		)
+		dryTxBytes, err := dryTx.MarshalBinary()
+		require.NoError(t, err)
+
+		// The real tx is signed and uses the same nonce.
+		realTxBytes := testAccount.PrepareSignAndEncodeTx(t,
+			testContract.DeployedAt.ToCommon(),
+			data,
+			big.NewInt(0),
+			uint64(50_000),
+			big.NewInt(0),
+		)
+
+		code := fmt.Appendf(nil, `
+			import EVM from %s
+
+			transaction(dryTx: [UInt8], realTx: [UInt8], coinbaseBytes: [UInt8; 20]) {
+				prepare(account: &Account) {
+					let from = EVM.EVMAddress(bytes: coinbaseBytes)
+					let coinbase = EVM.EVMAddress(bytes: coinbaseBytes)
+
+					let dryResult = EVM.dryRun(tx: dryTx, from: from)
+					assert(dryResult.status == EVM.Status.successful, message: "dry run failed")
+
+					let runResult = EVM.run(tx: realTx, coinbase: coinbase)
+					assert(runResult.status == EVM.Status.successful, message: "run after dry run failed")
+				}
+			}
+		`, sc.EVMContract.Address.HexWithPrefix())
+
+		dryTxArg := cadence.NewArray(
+			unittest.BytesToCdcUInt8(dryTxBytes),
+		).WithType(stdlib.EVMTransactionBytesCadenceType)
+
+		realTxArg := cadence.NewArray(
+			unittest.BytesToCdcUInt8(realTxBytes),
+		).WithType(stdlib.EVMTransactionBytesCadenceType)
+
+		coinbase := cadence.NewArray(
+			unittest.BytesToCdcUInt8(testAccount.Address().Bytes()),
+		).WithType(stdlib.EVMAddressBytesCadenceType)
+
+		txBody, err := flow.NewTransactionBodyBuilder().
+			SetScript(code).
+			SetPayer(sc.FlowServiceAccount.Address).
+			AddAuthorizer(sc.FlowServiceAccount.Address).
+			AddArgument(json.MustEncode(dryTxArg)).
+			AddArgument(json.MustEncode(realTxArg)).
+			AddArgument(json.MustEncode(coinbase)).
+			Build()
+		require.NoError(t, err)
+
+		tx := fvm.Transaction(txBody, 0)
+		state, output, err := vm.Run(ctx, tx, snapshot)
+		require.NoError(t, err)
+		require.NoError(t, output.Err)
+
+		// the number of updated registers is the same for both UUID partitions (verified by
+		// forcing each partition)
+		assert.Len(t, state.UpdatedRegisterIDs(), 4)
+
+		// The metered computation depends on the block's UUID partition (see
+		// environment.uuidPartition with txnIndex 0): partition 0 (probability 1/256 for a
+		// random block) reuses the legacy `uuid` register, which exists and thus meters more
+		// interaction than the untouched partitioned register. The extra reads happen inside
+		// the dry-run's speculative (discarded) transaction, so they are metered without
+		// appearing in the returned snapshot. Both values verified by forcing each partition.
+		blockID := ctx.BlockHeader.ID()
+		partition := sha256.Sum256(blockID[:])[0]
+		expectedComputation := uint64(74)
+		if partition == 0 {
+			expectedComputation = 79
+		}
+		assert.Equal(t, expectedComputation, output.ComputationUsed)
+	}
 }
 
 func TestDryCall(t *testing.T) {
@@ -7218,12 +7247,38 @@ func RunWithNewEnvironment(
 	f func(fvm.Context, fvm.VM, snapshot.SnapshotTree, *TestContract, *EOATestAccount),
 	bootstrapOpts ...fvm.BootstrapProcedureOption,
 ) {
+	runWithNewEnvironmentWithBlock(t, chain, unittest.BlockFixture(), f, bootstrapOpts...)
+}
+
+// blockFixtureWithUUIDPartitionZero returns a block fixture whose ID selects UUID partition 0
+// for the transaction at index 0 (sha256(blockID)[0] == 0, see environment.uuidPartition).
+// Such blocks make the EVM environment reuse the legacy `uuid` register instead of a fresh
+// partitioned one, a 1/256 branch that random block fixtures practically never exercise.
+// On average this takes 256 attempts (a few milliseconds).
+func blockFixtureWithUUIDPartitionZero() *flow.Block {
+	for {
+		block := unittest.BlockFixture()
+		id := block.ID()
+		if sha256.Sum256(id[:])[0] == 0 {
+			return block
+		}
+	}
+}
+
+// runWithNewEnvironmentWithBlock is RunWithNewEnvironment with a caller-provided block, which
+// (among other things) determines the UUID partition used by the environment.
+func runWithNewEnvironmentWithBlock(
+	t *testing.T,
+	chain flow.Chain,
+	block1 *flow.Block,
+	f func(fvm.Context, fvm.VM, snapshot.SnapshotTree, *TestContract, *EOATestAccount),
+	bootstrapOpts ...fvm.BootstrapProcedureOption,
+) {
 	rootAddr := evm.StorageAccountAddress(chain.ChainID())
 	RunWithTestBackend(t, chain.ChainID(), func(backend *TestBackend) {
 		RunWithDeployedContract(t, GetStorageTestContract(t), backend, rootAddr, func(testContract *TestContract) {
 			RunWithEOATestAccount(t, backend, rootAddr, func(testAccount *EOATestAccount) {
 				blocks := new(envMock.Blocks)
-				block1 := unittest.BlockFixture()
 				blocks.On("ByHeightFrom",
 					block1.Height,
 					block1.ToHeader(),
