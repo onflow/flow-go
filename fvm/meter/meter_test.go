@@ -965,7 +965,7 @@ func TestLimitExceededErrorUsedExceedsLimit(t *testing.T) {
 			meter.DefaultParameters().WithStorageInteractionLimit(size - 1),
 		)
 
-		err := m.MeterStorageRead(key, value, true)
+		err := m.MeterStorageRead(key, value)
 		requireUsedAndLimit(t, err, errors.LimitKindLedgerInteraction, size, size-1)
 	})
 
