@@ -592,7 +592,11 @@ func (suite *Suite) TestStopQcVoting() {
 	// start up the engine
 	suite.StartEngine()
 
-	require.NotNil(suite.T(), suite.engine.inProgressQCVote.Load(), "expected qc vote to be in progress")
+	// the QC voting process is started asynchronously during engine startup, so we may observe
+	// the in-progress vote only after its goroutine has stored the cancel function
+	require.Eventually(suite.T(), func() bool {
+		return suite.engine.inProgressQCVote.Load() != nil
+	}, time.Second, time.Millisecond, "expected qc vote to be in progress")
 
 	// simulate processing efm triggered event, this should cancel all in progress voting
 	suite.engine.EpochEmergencyFallbackTriggered()

@@ -335,7 +335,10 @@ func (s *Suite) TestOnFinalizedBlockSingle() {
 
 	missingCollectionCount := 4
 	wg := sync.WaitGroup{}
-	wg.Add(missingCollectionCount)
+	// wait for the EntityByID calls AND the subsequent Force call: the engine issues them on its
+	// own worker goroutine, so the test must not finish (and assert the mock expectations) until
+	// Force was actually called
+	wg.Add(missingCollectionCount + 1)
 
 	for _, cg := range block.Payload.Guarantees {
 		s.request.On("EntityByID", cg.CollectionID, mock.Anything).Return().Run(func(args mock.Arguments) {
@@ -343,12 +346,14 @@ func (s *Suite) TestOnFinalizedBlockSingle() {
 			wg.Done()
 		}).Once()
 	}
-	s.request.On("Force").Return().Once()
+	s.request.On("Force").Return().Run(func(args mock.Arguments) {
+		wg.Done()
+	}).Once()
 
 	// process the block through the finalized callback
 	eng.OnFinalizedBlock(&hotstuffBlock)
 
-	unittest.RequireReturnsBefore(s.T(), wg.Wait, 100*time.Millisecond, "expect to process new block before timeout")
+	unittest.RequireReturnsBefore(s.T(), wg.Wait, time.Second, "expect to process new block before timeout")
 
 	// assert that the block was retrieved and all collections were requested
 	s.headers.AssertExpectations(s.T())
@@ -398,7 +403,10 @@ func (s *Suite) TestOnFinalizedBlockSeveralBlocksAhead() {
 
 	missingCollectionCountPerBlock := 4
 	wg := sync.WaitGroup{}
-	wg.Add(missingCollectionCountPerBlock * newBlocksCount)
+	// wait for the EntityByID calls AND the per-block Force calls: the engine issues them on its
+	// own worker goroutine, so the test must not finish (and assert the mock expectations) until
+	// all Force calls actually happened
+	wg.Add((missingCollectionCountPerBlock + 1) * newBlocksCount)
 
 	// expected all new blocks after last block processed
 	for _, block := range blocks {
@@ -410,7 +418,9 @@ func (s *Suite) TestOnFinalizedBlockSeveralBlocksAhead() {
 				wg.Done()
 			}).Once()
 		}
-		s.request.On("Force").Return().Once()
+		s.request.On("Force").Return().Run(func(args mock.Arguments) {
+			wg.Done()
+		}).Once()
 
 		for _, seal := range block.Payload.Seals {
 			s.results.On("Index", seal.BlockID, seal.ResultID).Return(nil).Once()
@@ -419,7 +429,7 @@ func (s *Suite) TestOnFinalizedBlockSeveralBlocksAhead() {
 
 	eng.OnFinalizedBlock(&hotstuffBlock)
 
-	unittest.RequireReturnsBefore(s.T(), wg.Wait, 100*time.Millisecond, "expect to process all blocks before timeout")
+	unittest.RequireReturnsBefore(s.T(), wg.Wait, time.Second, "expect to process all blocks before timeout")
 
 	expectedEntityByIDCalls := 0
 	expectedIndexCalls := 0

@@ -184,7 +184,11 @@ func TestExecutionFlow(t *testing.T) {
 		Return(nil)
 
 	var lock sync.Mutex
-	var receipt *flow.ExecutionReceipt
+	// the receipts received by the verification and consensus nodes are tracked separately:
+	// the test must wait for BOTH to arrive before asserting the mock expectations, otherwise
+	// the assertion races with the delivery of the second receipt (flaky failure).
+	var verificationReceipt *flow.ExecutionReceipt
+	var consensusReceipt *flow.ExecutionReceipt
 
 	// create verification engine that can create approvals and send to consensus nodes
 	// check the verification engine received the ER from execution node
@@ -194,9 +198,9 @@ func TestExecutionFlow(t *testing.T) {
 		Run(func(args mock.Arguments) {
 			lock.Lock()
 			defer lock.Unlock()
-			receipt, _ = args[2].(*flow.ExecutionReceipt)
+			verificationReceipt, _ = args[2].(*flow.ExecutionReceipt)
 
-			assert.Equal(t, block.ID(), receipt.ExecutionResult.BlockID)
+			assert.Equal(t, block.ID(), verificationReceipt.ExecutionResult.BlockID)
 		}).
 		Return(nil).
 		Once()
@@ -210,12 +214,12 @@ func TestExecutionFlow(t *testing.T) {
 			lock.Lock()
 			defer lock.Unlock()
 
-			receipt, _ = args[2].(*flow.ExecutionReceipt)
+			consensusReceipt, _ = args[2].(*flow.ExecutionReceipt)
 
-			assert.Equal(t, block.ID(), receipt.ExecutionResult.BlockID)
-			assert.Equal(t, len(collections), len(receipt.ExecutionResult.Chunks)-1) // don't count system chunk
+			assert.Equal(t, block.ID(), consensusReceipt.ExecutionResult.BlockID)
+			assert.Equal(t, len(collections), len(consensusReceipt.ExecutionResult.Chunks)-1) // don't count system chunk
 
-			for i, chunk := range receipt.ExecutionResult.Chunks {
+			for i, chunk := range consensusReceipt.ExecutionResult.Chunks {
 				assert.EqualValues(t, i, chunk.CollectionIndex)
 			}
 		}).
@@ -238,7 +242,7 @@ func TestExecutionFlow(t *testing.T) {
 
 		lock.Lock()
 		defer lock.Unlock()
-		return receipt != nil
+		return verificationReceipt != nil && consensusReceipt != nil
 	}, time.Second*10, time.Millisecond*500)
 
 	// check that the block has been executed.
