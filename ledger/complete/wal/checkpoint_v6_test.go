@@ -96,11 +96,22 @@ func randPathPayload() (ledger.Path, ledger.Payload) {
 	return path, *payload
 }
 
-func randNPathPayloads(n int) ([]ledger.Path, []ledger.Payload) {
+// randNPathPayloadsUnique returns n random path/payload pairs whose payload keys are unique
+// with respect to each other and to the keys already present in `used` (which it updates).
+// Tests compare the payloads of the final trie by payload key, so a duplicate key with a
+// different value makes the comparison nondeterministic: with 1-byte random keys this
+// happens with probability ~1/256 per colliding pair (observed as a rare flake).
+func randNPathPayloadsUnique(n int, used map[string]struct{}) ([]ledger.Path, []ledger.Payload) {
 	paths := make([]ledger.Path, n)
 	payloads := make([]ledger.Payload, n)
 	for i := 0; i < n; i++ {
 		path, payload := randPathPayload()
+		key := hex.EncodeToString(payload.EncodedKey())
+		for _, dup := used[key]; dup; _, dup = used[key] {
+			path, payload = randPathPayload()
+			key = hex.EncodeToString(payload.EncodedKey())
+		}
+		used[key] = struct{}{}
 		paths[i] = path
 		payloads[i] = payload
 	}
@@ -110,23 +121,24 @@ func randNPathPayloads(n int) ([]ledger.Path, []ledger.Payload) {
 func createMultipleRandomTries(t *testing.T) []*trie.MTrie {
 	tries := make([]*trie.MTrie, 0)
 	activeTrie := trie.NewEmptyMTrie()
+	usedKeys := make(map[string]struct{})
 
 	var err error
 	// add tries with no shared paths
 	for i := 0; i < 100; i++ {
-		paths, payloads := randNPathPayloads(100)
+		paths, payloads := randNPathPayloadsUnique(100, usedKeys)
 		activeTrie, _, err = trie.NewTrieWithUpdatedRegisters(activeTrie, paths, payloads, false)
 		require.NoError(t, err, "update registers")
 		tries = append(tries, activeTrie)
 	}
 
 	// add trie with some shared path
-	sharedPaths, payloads1 := randNPathPayloads(100)
+	sharedPaths, payloads1 := randNPathPayloadsUnique(100, usedKeys)
 	activeTrie, _, err = trie.NewTrieWithUpdatedRegisters(activeTrie, sharedPaths, payloads1, false)
 	require.NoError(t, err, "update registers")
 	tries = append(tries, activeTrie)
 
-	_, payloads2 := randNPathPayloads(100)
+	_, payloads2 := randNPathPayloadsUnique(100, usedKeys)
 	activeTrie, _, err = trie.NewTrieWithUpdatedRegisters(activeTrie, sharedPaths, payloads2, false)
 	require.NoError(t, err, "update registers")
 	tries = append(tries, activeTrie)
@@ -156,23 +168,24 @@ func isTrieDeepEnough(trie *trie.MTrie) bool {
 func createMultipleRandomTriesMini(t *testing.T) ([]*trie.MTrie, *trie.MTrie) {
 	tries := make([]*trie.MTrie, 0)
 	activeTrie := trie.NewEmptyMTrie()
+	usedKeys := make(map[string]struct{})
 
 	var err error
 	// add tries with no shared paths
 	for i := 0; i < 5; i++ {
-		paths, payloads := randNPathPayloads(20)
+		paths, payloads := randNPathPayloadsUnique(20, usedKeys)
 		activeTrie, _, err = trie.NewTrieWithUpdatedRegisters(activeTrie, paths, payloads, false)
 		require.NoError(t, err, "update registers")
 		tries = append(tries, activeTrie)
 	}
 
 	// add trie with some shared path
-	sharedPaths, payloads1 := randNPathPayloads(10)
+	sharedPaths, payloads1 := randNPathPayloadsUnique(10, usedKeys)
 	activeTrie, _, err = trie.NewTrieWithUpdatedRegisters(activeTrie, sharedPaths, payloads1, false)
 	require.NoError(t, err, "update registers")
 	tries = append(tries, activeTrie)
 
-	_, payloads2 := randNPathPayloads(10)
+	_, payloads2 := randNPathPayloadsUnique(10, usedKeys)
 	activeTrie, _, err = trie.NewTrieWithUpdatedRegisters(activeTrie, sharedPaths, payloads2, false)
 	require.NoError(t, err, "update registers")
 	tries = append(tries, activeTrie)
