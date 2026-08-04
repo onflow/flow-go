@@ -58,6 +58,8 @@ func (co *CompactorObserver) OnComplete() {
 // TestCompactorCreation tests creation of WAL segments and checkpoints, and
 // checks if the rebuilt ledger state matches previous ledger state.
 func TestCompactorCreation(t *testing.T) {
+	t.Parallel()
+
 	const (
 		numInsPerStep      = 2
 		pathByteSize       = 32
@@ -287,6 +289,8 @@ func TestCompactorCreation(t *testing.T) {
 // TestCompactorSkipCheckpointing tests that only one
 // checkpointing is running at a time.
 func TestCompactorSkipCheckpointing(t *testing.T) {
+	t.Parallel()
+
 	const (
 		numInsPerStep      = 2
 		pathByteSize       = 32
@@ -410,6 +414,8 @@ func TestCompactorSkipCheckpointing(t *testing.T) {
 // (from segment 0, ignoring prior checkpoints) to the checkpoint number.
 // This verifies that checkpointed tries are snapshopt of segments and at segment boundary.
 func TestCompactorAccuracy(t *testing.T) {
+	t.Parallel()
+
 
 	const (
 		numInsPerStep      = 2
@@ -526,6 +532,8 @@ func TestCompactorAccuracy(t *testing.T) {
 // TestCompactorTriggeredByAdminTool tests that the compactor will listen to the signal from admin tool
 // to trigger checkpoint when current segment file is finished.
 func TestCompactorTriggeredByAdminTool(t *testing.T) {
+	t.Parallel()
+
 
 	const (
 		numInsPerStep      = 2 // the number of payloads in each trie update
@@ -628,6 +636,8 @@ func TestCompactorTriggeredByAdminTool(t *testing.T) {
 // When initial state is from ledger's forest (LRU cache), its
 // sequence is altered by reads when replaying segment records.
 func TestCompactorConcurrency(t *testing.T) {
+	t.Parallel()
+
 	const (
 		numInsPerStep      = 2
 		pathByteSize       = 32
