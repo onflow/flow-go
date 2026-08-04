@@ -255,3 +255,81 @@ func TestExecutionState_MaxInteraction(t *testing.T) {
 		st.InteractionUsed(),
 		key1Size+value1Size+key2Size+key4Size)
 }
+
+// TestExecutionState_MeteringDisabled verifies that ledger interaction behaves
+// like computation/memory/events under RunWithMeteringDisabled: storage reads
+// and writes performed inside the disabled block are neither accumulated toward
+// the interaction total nor subject to the interaction limit.
+func TestExecutionState_MeteringDisabled(t *testing.T) {
+	key1 := flow.NewRegisterID(unittest.RandomAddressFixture(), "1")
+	key1Size := uint64(8 + 1)
+	value1 := []byte("A")
+	value1Size := uint64(1)
+
+	key2 := flow.NewRegisterID(unittest.RandomAddressFixture(), "2")
+	value2 := []byte("B")
+
+	t.Run("interaction is not accumulated while metering is disabled", func(t *testing.T) {
+		st := state.NewExecutionState(
+			nil,
+			state.DefaultParameters(),
+		)
+
+		// baseline metered read is accumulated
+		_, err := st.Get(key1)
+		require.NoError(t, err)
+		require.Equal(t, key1Size, st.InteractionUsed())
+
+		// reads and writes inside the disabled block are not accumulated
+		st.RunWithMeteringDisabled(func() {
+			_, gErr := st.Get(key2)
+			require.NoError(t, gErr)
+			sErr := st.Set(key2, value2)
+			require.NoError(t, sErr)
+		})
+		require.Equal(t, key1Size, st.InteractionUsed())
+	})
+
+	t.Run("interaction limit is not enforced while metering is disabled", func(t *testing.T) {
+		// limit smaller than a single write, so a metered write would fail
+		st := state.NewExecutionState(
+			nil,
+			state.DefaultParameters().
+				WithMeterParameters(
+					meter.DefaultParameters().WithStorageInteractionLimit(
+						key1Size+value1Size-1)),
+		)
+
+		// same write is not limited inside the disabled block
+		st.RunWithMeteringDisabled(func() {
+			err := st.Set(key1, value1)
+			require.NoError(t, err)
+		})
+		require.Equal(t, uint64(0), st.InteractionUsed())
+
+		// and is enforced again once metering is re-enabled
+		err := st.Set(key2, value2)
+		require.Error(t, err)
+	})
+
+	t.Run("write inside disabled scope does not populate the read cache", func(t *testing.T) {
+		st := state.NewExecutionState(
+			nil,
+			state.DefaultParameters(),
+		)
+
+		// the write inside the disabled block is not accumulated, and notably
+		// does not populate the meter's read cache
+		st.RunWithMeteringDisabled(func() {
+			require.NoError(t, st.Set(key1, value1))
+		})
+		require.Equal(t, uint64(0), st.InteractionUsed())
+
+		// a subsequent metered read of the same key is charged as a fresh
+		// storage read (in contrast to a metered write, after which the read
+		// would be a free cache hit)
+		_, err := st.Get(key1)
+		require.NoError(t, err)
+		require.Equal(t, key1Size+value1Size, st.InteractionUsed())
+	})
+}

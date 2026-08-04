@@ -87,7 +87,11 @@ func NewComputationMeter(params ComputationMeterParameters) ComputationMeter {
 	}
 }
 
-// MeterComputation captures computation usage and returns an error if it goes beyond the limit
+// MeterComputation captures computation usage.
+//
+// Expected error returns during normal operation:
+//   - [errors.LimitExceededError] with [errors.LimitKindComputation] if the
+//     total weighted computation usage exceeds the computation limit
 func (m *ComputationMeter) MeterComputation(usage common.ComputationUsage) error {
 	kind := usage.Kind
 	intensity := usage.Intensity
@@ -99,8 +103,16 @@ func (m *ComputationMeter) MeterComputation(usage common.ComputationUsage) error
 	}
 	m.computationUsed += w * intensity
 	if m.computationUsed > m.params.computationLimit {
-		return errors.NewComputationLimitExceededError(
-			uint64(m.params.TotalComputationLimit()))
+		// Round the used amount up so it stays strictly greater than the
+		// limit; truncating the internal precision could make them equal.
+		usedCeil := m.computationUsed >> MeterExecutionInternalPrecisionBytes
+		if usedCeil<<MeterExecutionInternalPrecisionBytes < m.computationUsed {
+			usedCeil++
+		}
+		return errors.NewLimitExceededError(
+			errors.LimitKindComputation,
+			usedCeil,
+			m.params.TotalComputationLimit())
 	}
 	return nil
 }
