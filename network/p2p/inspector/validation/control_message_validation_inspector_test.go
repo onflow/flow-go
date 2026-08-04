@@ -1595,6 +1595,8 @@ func TestControlMessageValidationInspector_ActiveClustersChanged(t *testing.T) {
 // TestControlMessageValidationInspector_TruncationConfigToggle ensures that rpc's are not truncated when truncation is disabled through configs.
 func TestControlMessageValidationInspector_TruncationConfigToggle(t *testing.T) {
 	t.Run("should not perform truncation when disabled is set to true", func(t *testing.T) {
+		t.Parallel()
+
 		numOfMsgs := 5000
 		logCounter := atomic.NewInt64(0)
 		logger := hookedLogger(logCounter, zerolog.TraceLevel, validation.RPCTruncationDisabledWarning, worker.QueuedItemProcessedLog)
@@ -1639,6 +1641,8 @@ func TestControlMessageValidationInspector_TruncationConfigToggle(t *testing.T) 
 	})
 
 	t.Run("should not perform truncation when disabled for each individual control message type directly", func(t *testing.T) {
+		t.Parallel()
+
 		numOfMsgs := 5000
 		expectedLogStrs := []string{
 			validation.GraftTruncationDisabledWarning,
@@ -1700,6 +1704,8 @@ func TestControlMessageValidationInspector_TruncationConfigToggle(t *testing.T) 
 // TestControlMessageValidationInspector_InspectionConfigToggle ensures that rpc's are not inspected when inspection is disabled through configs.
 func TestControlMessageValidationInspector_InspectionConfigToggle(t *testing.T) {
 	t.Run("should not perform inspection when disabled is set to true", func(t *testing.T) {
+		t.Parallel()
+
 		numOfMsgs := 5000
 		logCounter := atomic.NewInt64(0)
 		logger := hookedLogger(logCounter, zerolog.TraceLevel, validation.RPCInspectionDisabledWarning)
@@ -1734,6 +1740,8 @@ func TestControlMessageValidationInspector_InspectionConfigToggle(t *testing.T) 
 	})
 
 	t.Run("should not check identity when reject-unstaked-peers is false", func(t *testing.T) {
+		t.Parallel()
+
 		inspector, signalerCtx, cancel, consumer, rpcTracker, _, idProvider, _ := inspectorFixture(t, func(params *validation.InspectorParams) {
 			// disable inspector for all control message types
 			params.Config.InspectionProcess.Inspect.RejectUnstakedPeers = false
@@ -1757,6 +1765,8 @@ func TestControlMessageValidationInspector_InspectionConfigToggle(t *testing.T) 
 	})
 
 	t.Run("should check identity when reject-unstaked-peers is true", func(t *testing.T) {
+		t.Parallel()
+
 		inspector, signalerCtx, cancel, consumer, rpcTracker, _, idProvider, _ := inspectorFixture(t, func(params *validation.InspectorParams) {
 			// disable inspector for all control message types
 			params.Config.InspectionProcess.Inspect.RejectUnstakedPeers = true
@@ -1784,6 +1794,8 @@ func TestControlMessageValidationInspector_InspectionConfigToggle(t *testing.T) 
 	})
 
 	t.Run("should not perform inspection when disabled for each individual control message type directly", func(t *testing.T) {
+		t.Parallel()
+
 		numOfMsgs := 5000
 		expectedLogStrs := []string{
 			validation.GraftInspectionDisabledWarning,

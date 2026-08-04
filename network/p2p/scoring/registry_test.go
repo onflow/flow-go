@@ -38,6 +38,8 @@ import (
 // for its GossipSub app specific score. The "eventually" comes from the fact that the app specific score is updated asynchronously in the cache, and the cache is
 // updated when the app specific score function is called by GossipSub.
 func TestScoreRegistry_FreshStart(t *testing.T) {
+	t.Parallel()
+
 	peerID := peer.ID("peer-1")
 
 	cfg, err := config.DefaultConfig()
@@ -97,6 +99,8 @@ func TestScoreRegistry_FreshStart(t *testing.T) {
 // a staked peer would otherwise receive, leaving only the penalty as the app-specific score. This testing reflects the
 // asynchronous nature of app-specific score updates in GossipSub's cache.
 func TestScoreRegistry_PeerWithSpamRecord(t *testing.T) {
+	t.Parallel()
+
 	t.Run("graft", func(t *testing.T) {
 		testScoreRegistryPeerWithSpamRecord(t, p2pmsg.CtrlMsgGraft, penaltyValueFixtures().GraftMisbehaviour)
 	})
@@ -206,6 +210,8 @@ func testScoreRegistryPeerWithSpamRecord(t *testing.T, messageType p2pmsg.Contro
 // message types, including graft, prune, ihave, iwant, and RpcPublishMessage. Each sub-test validates the app-specific
 // penalty computation and updates to the score registry when a peer with an unknown identity sends these control messages.
 func TestScoreRegistry_SpamRecordWithUnknownIdentity(t *testing.T) {
+	t.Parallel()
+
 	t.Run("graft", func(t *testing.T) {
 		testScoreRegistrySpamRecordWithUnknownIdentity(t, p2pmsg.CtrlMsgGraft, penaltyValueFixtures().GraftMisbehaviour)
 	})
@@ -315,6 +321,8 @@ func testScoreRegistrySpamRecordWithUnknownIdentity(t *testing.T, messageType p2
 // validate the appropriate application of penalties in the ScoreRegistry when a peer with an invalid subscription is involved
 // in spam activities, as indicated by these control messages.
 func TestScoreRegistry_SpamRecordWithSubscriptionPenalty(t *testing.T) {
+	t.Parallel()
+
 	t.Run("graft", func(t *testing.T) {
 		testScoreRegistrySpamRecordWithSubscriptionPenalty(t, p2pmsg.CtrlMsgGraft, penaltyValueFixtures().GraftMisbehaviour)
 	})
@@ -421,6 +429,8 @@ func testScoreRegistrySpamRecordWithSubscriptionPenalty(t *testing.T, messageTyp
 // a different control message type: graft, prune, ihave, iwant, and RpcPublishMessage. These sub-tests are designed to
 // validate the appropriate application of penalties in the ScoreRegistry when a peer has sent duplicate messages.
 func TestScoreRegistry_SpamRecordWithDuplicateMessagesPenalty(t *testing.T) {
+	t.Parallel()
+
 	t.Run("graft", func(t *testing.T) {
 		testScoreRegistrySpamRecordWithDuplicateMessagesPenalty(t, p2pmsg.CtrlMsgGraft, penaltyValueFixtures().GraftMisbehaviour)
 	})
@@ -532,19 +542,31 @@ func testScoreRegistrySpamRecordWithDuplicateMessagesPenalty(t *testing.T, messa
 // It encompasses a series of sub-tests, each focusing on a different control message type: graft, prune, ihave, iwant, and RpcPublishMessage. These sub-tests are designed to
 // validate the appropriate application of penalties in the ScoreRegistry when a peer has sent duplicate messages.
 func TestScoreRegistry_SpamRecordWithoutDuplicateMessagesPenalty(t *testing.T) {
+	t.Parallel()
+
 	t.Run("graft", func(t *testing.T) {
+		t.Parallel()
+
 		testScoreRegistrySpamRecordWithoutDuplicateMessagesPenalty(t, p2pmsg.CtrlMsgGraft, penaltyValueFixtures().GraftMisbehaviour)
 	})
 	t.Run("prune", func(t *testing.T) {
+		t.Parallel()
+
 		testScoreRegistrySpamRecordWithoutDuplicateMessagesPenalty(t, p2pmsg.CtrlMsgPrune, penaltyValueFixtures().PruneMisbehaviour)
 	})
 	t.Run("ihave", func(t *testing.T) {
+		t.Parallel()
+
 		testScoreRegistrySpamRecordWithoutDuplicateMessagesPenalty(t, p2pmsg.CtrlMsgIHave, penaltyValueFixtures().IHaveMisbehaviour)
 	})
 	t.Run("iwant", func(t *testing.T) {
+		t.Parallel()
+
 		testScoreRegistrySpamRecordWithoutDuplicateMessagesPenalty(t, p2pmsg.CtrlMsgIWant, penaltyValueFixtures().IWantMisbehaviour)
 	})
 	t.Run("RpcPublishMessage", func(t *testing.T) {
+		t.Parallel()
+
 		testScoreRegistrySpamRecordWithoutDuplicateMessagesPenalty(t, p2pmsg.RpcPublishMessage, penaltyValueFixtures().PublishMisbehaviour)
 	})
 }
@@ -651,6 +673,8 @@ func testScoreRegistrySpamRecordWithoutDuplicateMessagesPenalty(t *testing.T, me
 
 // TestSpamPenaltyDecaysInCache tests that the spam penalty records decay over time in the cache.
 func TestScoreRegistry_SpamPenaltyDecaysInCache(t *testing.T) {
+	t.Parallel()
+
 	peerID := peer.ID("peer-1")
 	cfg, err := config.DefaultConfig()
 	require.NoError(t, err)
@@ -734,6 +758,8 @@ func TestScoreRegistry_SpamPenaltyDecaysInCache(t *testing.T) {
 // TestSpamPenaltyDecayToZero tests that the spam penalty decays to zero over time, and when the spam penalty of
 // a peer is set back to zero, its app specific penalty is also reset to the initial state.
 func TestScoreRegistry_SpamPenaltyDecayToZero(t *testing.T) {
+	t.Parallel()
+
 	peerID := peer.ID("peer-1")
 	cfg, err := config.DefaultConfig()
 	require.NoError(t, err)
@@ -801,6 +827,8 @@ func TestScoreRegistry_SpamPenaltyDecayToZero(t *testing.T) {
 // TestPersistingUnknownIdentityPenalty tests that even though the spam penalty is decayed to zero, the unknown identity penalty
 // is persisted. This is because the unknown identity penalty is not decayed.
 func TestScoreRegistry_PersistingUnknownIdentityPenalty(t *testing.T) {
+	t.Parallel()
+
 	peerID := peer.ID("peer-1")
 
 	cfg, err := config.DefaultConfig()
@@ -878,6 +906,8 @@ func TestScoreRegistry_PersistingUnknownIdentityPenalty(t *testing.T) {
 // TestPersistingInvalidSubscriptionPenalty tests that even though the spam penalty is decayed to zero, the invalid subscription penalty
 // is persisted. This is because the invalid subscription penalty is not decayed.
 func TestScoreRegistry_PersistingInvalidSubscriptionPenalty(t *testing.T) {
+	t.Parallel()
+
 	peerID := peer.ID("peer-1")
 
 	cfg, err := config.DefaultConfig()
@@ -950,6 +980,8 @@ func TestScoreRegistry_PersistingInvalidSubscriptionPenalty(t *testing.T) {
 // TestScoreRegistry_TestSpamRecordDecayAdjustment ensures that spam record decay is increased each time a peers score reaches the scoring.IncreaseDecayThreshold eventually
 // sustained misbehavior will result in the spam record decay reaching the minimum decay speed .99, and the decay speed is reset to the max decay speed .8.
 func TestScoreRegistry_TestSpamRecordDecayAdjustment(t *testing.T) {
+	t.Parallel()
+
 	cfg, err := config.DefaultConfig()
 	require.NoError(t, err)
 	// refresh cached app-specific score every 100 milliseconds to speed up the test.
@@ -1068,6 +1100,8 @@ func TestScoreRegistry_TestSpamRecordDecayAdjustment(t *testing.T) {
 // the application-specific penalty should be reduced by the default reduction factor. This test verifies the accurate computation
 // of the application-specific score under these conditions.
 func TestPeerSpamPenaltyClusterPrefixed(t *testing.T) {
+	t.Parallel()
+
 	ctlMsgTypes := p2pmsg.ControlMessageTypes()
 	peerIds := unittest.PeerIdFixtures(t, len(ctlMsgTypes))
 
@@ -1166,6 +1200,8 @@ func TestPeerSpamPenaltyClusterPrefixed(t *testing.T) {
 // TestScoringRegistrySilencePeriod ensures that the scoring registry does not penalize nodes during the silence period, and
 // starts to penalize nodes only after the silence period is over.
 func TestScoringRegistrySilencePeriod(t *testing.T) {
+	t.Parallel()
+
 	unittest.SkipUnless(t, unittest.TEST_FLAKY, "flakey tests")
 	peerID := unittest.PeerIdFixture(t)
 	silenceDuration := 5 * time.Second
