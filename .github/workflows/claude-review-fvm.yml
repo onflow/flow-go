@@ -57,6 +57,13 @@ jobs:
           # anthropic_workspace_id intentionally omitted: the federation
           # rule is scoped to a single (default) workspace.
 
+          # TEMPORARY DEBUG: surface Claude's full output to diagnose the
+          # recurring `is_error:true` / num_turns:1 / $0 failures. The
+          # action's own warning applies: this logs ALL Claude messages
+          # (including tool results), publicly visible in the Actions log.
+          # Remove once the root cause is identified.
+          show_full_output: true
+
           # Model intentionally not pinned — the action's default tracks
           # Anthropic's current recommended model. Pin with
           # `--model <id>` here if reproducibility matters more.
@@ -81,3 +88,15 @@ jobs:
               findings format. Do not approve or request changes — the
               workflow's tool allowlist omits `gh pr review`, so approval is
               impossible at the tool level regardless.
+
+      # TEMPORARY DEBUG: persist the raw execution output so the actual
+      # error message survives the runner (it is otherwise only written to
+      # the runner's temp dir and lost). Runs even when the review step
+      # fails. Remove together with show_full_output above.
+      - name: Upload Claude execution output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: claude-execution-output
+          path: /home/runner/work/_temp/claude-execution-output.json
+          if-no-files-found: warn
