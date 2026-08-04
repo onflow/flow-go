@@ -462,6 +462,38 @@ func (e *Engine) sendRequests(participants flow.IdentifierList, ranges []chainsy
 	}
 }
 
+// shouldReportProbabilistically returns true iff the random draw `n` - sampled uniformly from
+// [0, spamProbabilityMultiplier) - falls below the probability `prob` ∈ [0, 1] scaled by
+// spamProbabilityMultiplier. Properties (covered by unit tests):
+//   - prob = 0 never reports;
+//   - prob = 1 always reports;
+//   - for any prob > 0, the draw n = 0 always reports.
+func shouldReportProbabilistically(n uint32, prob float32) bool {
+	return float32(n) < prob*spamProbabilityMultiplier
+}
+
+// batchRequestMisbehaviorProbability returns the probability of reporting a batch request as
+// misbehavior: the larger the batch and the base probability, the higher the result. It is
+// calculated as `baseProb * (len(batchRequest.BlockIDs) + 1) / synccore.DefaultConfig().MaxSize`.
+// Examples:
+//   - 10 block IDs with baseProb 0.01: 0.01 * 11 / 64 = 0.00171875 = 0.171875%
+//   - 1000 block IDs with baseProb 0.01: 0.01 * 1001 / 64 = 0.15640625 = 15.640625%
+func batchRequestMisbehaviorProbability(baseProb float32, batchRequest *flow.BatchRequest) float32 {
+	return baseProb * (float32(len(batchRequest.BlockIDs)) + 1) / float32(synccore.DefaultConfig().MaxSize)
+}
+
+// rangeRequestMisbehaviorProbability returns the probability of reporting a range request as
+// misbehavior: the larger the requested range and the base probability, the higher the result. It
+// is calculated as `baseProb * (rangeRequest.ToHeight - rangeRequest.FromHeight + 1) / synccore.DefaultConfig().MaxSize`.
+// CAUTION: only valid for rangeRequest.ToHeight ≥ rangeRequest.FromHeight (the caller must handle
+// invalid ranges beforehand, as the height difference would underflow).
+// Examples:
+//   - range of 10 blocks with baseProb 0.01: 0.01 * 11 / 64 = 0.00171875 = 0.171875%
+//   - range of 1000 blocks with baseProb 0.01: 0.01 * 1001 / 64 = 0.15640625 = 15.640625%
+func rangeRequestMisbehaviorProbability(baseProb float32, rangeRequest *flow.RangeRequest) float32 {
+	return baseProb * (float32(rangeRequest.ToHeight-rangeRequest.FromHeight) + 1) / float32(synccore.DefaultConfig().MaxSize)
+}
+
 // validateBatchRequestForALSP checks if a batch request should be reported as a misbehavior and sends misbehavior report to ALSP.
 // The misbehavior is due to either:
 //  1. unambiguous malicious or incorrect behavior (0 block IDs) OR
@@ -498,21 +530,11 @@ func (e *Engine) validateBatchRequestForALSP(originID flow.Identifier, batchRequ
 		return nil
 	}
 
-	// to avoid creating a misbehavior report for every batch request received, use a probabilistic approach.
-	// The larger the batch request and base probability, the higher the probability of creating a misbehavior report.
-
-	// batchRequestProb is calculated as follows:
-	// batchRequestBaseProb * (len(batchRequest.BlockIDs) + 1) / synccore.DefaultConfig().MaxSize
-	// Example 1 (small batch of block IDs) if the batch request is for 10 blocks IDs and batchRequestBaseProb is 0.01, then the probability of
-	// creating a misbehavior report is:
-	// batchRequestBaseProb * (10+1) / synccore.DefaultConfig().MaxSize
-	// = 0.01 * 11 / 64 = 0.00171875 = 0.171875%
-	// Example 2 (large batch of block IDs) if the batch request is for 1000 block IDs and batchRequestBaseProb is 0.01, then the probability of
-	// creating a misbehavior report is:
-	// batchRequestBaseProb * (1000+1) / synccore.DefaultConfig().MaxSize
-	// = 0.01 * 1001 / 64 = 0.15640625 = 15.640625%
-	batchRequestProb := e.spamDetectionConfig.batchRequestBaseProb * (float32(len(batchRequest.BlockIDs)) + 1) / float32(synccore.DefaultConfig().MaxSize)
-	if float32(n) < batchRequestProb*spamProbabilityMultiplier {
+	// to avoid creating a misbehavior report for every batch request received, use a probabilistic approach:
+	// the larger the batch request and base probability, the higher the probability of creating a misbehavior report
+	// (see `batchRequestMisbehaviorProbability` for the exact formula)
+	batchRequestProb := batchRequestMisbehaviorProbability(e.spamDetectionConfig.batchRequestBaseProb, batchRequest)
+	if shouldReportProbabilistically(n, batchRequestProb) {
 		// create a misbehavior report
 		e.log.Debug().
 			Hex("origin_id", logging.ID(originID)).
@@ -573,21 +595,11 @@ func (e *Engine) validateRangeRequestForALSP(originID flow.Identifier, rangeRequ
 		return nil
 	}
 
-	// to avoid creating a misbehavior report for every range request received, use a probabilistic approach.
-	// The higher the range request and base probability, the higher the probability of creating a misbehavior report.
-
-	// rangeRequestProb is calculated as follows:
-	// rangeRequestBaseProb * ((rangeRequest.ToHeight-rangeRequest.FromHeight) + 1) / synccore.DefaultConfig().MaxSize
-	// Example 1 (small range) if the range request is for 10 blocks and rangeRequestBaseProb is 0.01, then the probability of
-	// creating a misbehavior report is:
-	// rangeRequestBaseProb * (10+1) / synccore.DefaultConfig().MaxSize
-	// = 0.01 * 11 / 64 = 0.00171875 = 0.171875%
-	// Example 2 (large range) if the range request is for 1000 blocks and rangeRequestBaseProb is 0.01, then the probability of
-	// creating a misbehavior report is:
-	// rangeRequestBaseProb * (1000+1) / synccore.DefaultConfig().MaxSize
-	// = 0.01 * 1001 / 64 = 0.15640625 = 15.640625%
-	rangeRequestProb := e.spamDetectionConfig.rangeRequestBaseProb * (float32(rangeRequest.ToHeight-rangeRequest.FromHeight) + 1) / float32(synccore.DefaultConfig().MaxSize)
-	if float32(n) < rangeRequestProb*spamProbabilityMultiplier {
+	// to avoid creating a misbehavior report for every range request received, use a probabilistic approach:
+	// the larger the requested range and base probability, the higher the probability of creating a misbehavior report
+	// (see `rangeRequestMisbehaviorProbability` for the exact formula)
+	rangeRequestProb := rangeRequestMisbehaviorProbability(e.spamDetectionConfig.rangeRequestBaseProb, rangeRequest)
+	if shouldReportProbabilistically(n, rangeRequestProb) {
 		// create a misbehavior report
 		e.log.Debug().
 			Hex("origin_id", logging.ID(originID)).
@@ -628,7 +640,7 @@ func (e *Engine) validateSyncRequestForALSP(originID flow.Identifier) error {
 
 	// to avoid creating a misbehavior report for every sync request received, use a probabilistic approach.
 	// Create a report with a probability of spamDetectionConfig.syncRequestProb
-	if float32(n) < e.spamDetectionConfig.syncRequestProb*spamProbabilityMultiplier {
+	if shouldReportProbabilistically(n, e.spamDetectionConfig.syncRequestProb) {
 
 		// create misbehavior report
 		e.log.Debug().

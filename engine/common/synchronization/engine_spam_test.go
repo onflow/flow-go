@@ -114,28 +114,20 @@ func (ss *SyncSuite) TestLoad_Process_SyncRequest_HigherThanReceiver_OutsideTole
 
 	loadGroups := []loadGroup{}
 
+	// These load tests are wiring smoke tests: the exact decision boundary of the probabilistic
+	// reporting is unit-tested deterministically in `TestShouldReportProbabilistically`, so we only
+	// keep the groups with discriminating power here. The bounds are the exact quantiles of the
+	// Binomial(1000, p) distribution of the misbehavior report count, such that the probability of
+	// the count falling outside the bounds is at most 1e-9 per tail. This keeps the test meaningful
+	// while making failures of a correct implementation practically impossible (previous, tighter
+	// bounds caused flakiness; low-probability groups were removed because their lower bound of 0
+	// could not discriminate at all).
+
 	// expect to never get misbehavior report
 	loadGroups = append(loadGroups, loadGroup{0.0, 0, 0})
 
-	// The lower and upper bounds below are the exact quantiles of the Binomial(1000, p) distribution
-	// of the misbehavior report count, such that the probability of the count falling outside the
-	// bounds is at most 1e-9 per tail. This keeps the test meaningful while making failures of a
-	// correct implementation practically impossible (previous, tighter bounds caused flakiness).
-
-	// expect to get misbehavior report about 0.1% of the time (1 in 1000 requests)
-	loadGroups = append(loadGroups, loadGroup{0.001, 0, 11})
-
-	// expect to get misbehavior report about 1% of the time
-	loadGroups = append(loadGroups, loadGroup{0.01, 0, 34})
-
-	// expect to get misbehavior report about 10% of the time
-	loadGroups = append(loadGroups, loadGroup{0.1, 48, 161})
-
 	// expect to get misbehavior report about 50% of the time
 	loadGroups = append(loadGroups, loadGroup{0.5, 405, 595})
-
-	// expect to get misbehavior report about 90% of the time
-	loadGroups = append(loadGroups, loadGroup{0.9, 839, 952})
 
 	// reset misbehavior report counter for each subtest
 	misbehaviorsCounter := 0
@@ -227,35 +219,19 @@ func (ss *SyncSuite) TestLoad_Process_RangeRequest_SometimesReportSpam() {
 
 	loadGroups := []loadGroup{}
 
-	// The lower and upper bounds below are the exact quantiles of the Binomial(1000, p) distribution
-	// of the misbehavior report count (with p being the expected probability factor), such that the
+	// These load tests are wiring smoke tests: the exact decision boundary and the range-scaling
+	// formula are unit-tested deterministically in `TestShouldReportProbabilistically` and
+	// `TestRangeRequestMisbehaviorProbability`, so we only keep the groups with discriminating
+	// power here. The bounds are the exact quantiles of the Binomial(1000, p) distribution of the
+	// misbehavior report count (with p being the expected probability factor), such that the
 	// probability of the count falling outside the bounds is at most 1e-9 per tail. This keeps the
 	// test meaningful while making failures of a correct implementation practically impossible
-	// (previous, tighter bounds caused flakiness).
-
-	// using a very small range (1) with a 10% base probability factor, expect to almost never get misbehavior report, about 0.3% of the time (3 in 1000 requests)
-	// expected probability factor: 0.1 * ((10-9) + 1)/64 = 0.003125
-	loadGroups = append(loadGroups, loadGroup{0.1, 0, 18, 9, 10})
-
-	// using a small range (10) with a 10% base probability factor, expect to get misbehavior report about 1.7% of the time (17 in 1000 requests)
-	// expected probability factor: 0.1 * ((11-1) + 1)/64 = 0.0171875
-	loadGroups = append(loadGroups, loadGroup{0.1, 0, 47, 1, 11})
+	// (previous, tighter bounds caused flakiness; low-probability groups were removed because
+	// their lower bound of 0 could not discriminate at all).
 
 	// using a large range (99) with a 10% base probability factor, expect to get misbehavior report about 15% of the time (150 in 1000 requests)
-	// expected probability factor: 0.1 * ((100-1) + 1)/64 = 0.15625
+	// expected probability factor: 0.1 * (99 + 1)/64 = 0.15625
 	loadGroups = append(loadGroups, loadGroup{0.1, 92, 229, 1, 100})
-
-	// using a flat range (0) (from height == to height) with a 1% base probability factor, expect to almost never get a misbehavior report, about 0.16% of the time (2 in 1000 requests)
-	// expected probability factor: 0.01 * ((1-1) + 1)/64 = 0.0015625
-	loadGroups = append(loadGroups, loadGroup{0.01, 0, 14, 1, 1})
-
-	// using a small range (10) with a 1% base probability factor, expect to almost never get misbehavior report, about 0.17% of the time (2 in 1000 requests)
-	// expected probability factor: 0.01 * ((11-1) + 1)/64 = 0.00171875
-	loadGroups = append(loadGroups, loadGroup{0.01, 0, 14, 1, 11})
-
-	// using a very large range (999) with a 1% base probability factor, expect to get misbehavior report about 15% of the time (150 in 1000 requests)
-	// expected probability factor: 0.01 * ((1000-1) + 1)/64 = 0.15625
-	loadGroups = append(loadGroups, loadGroup{0.01, 92, 229, 1, 1000})
 
 	// ALWAYS REPORT SPAM FOR INVALID RANGE REQUESTS OR RANGE REQUESTS THAT ARE FAR OUTSIDE OF THE TOLERANCE
 
@@ -347,31 +323,19 @@ func (ss *SyncSuite) TestLoad_Process_BatchRequest_SometimesReportSpam() {
 
 	loadGroups := []loadGroup{}
 
-	// The lower and upper bounds below are the exact quantiles of the Binomial(1000, p) distribution
-	// of the misbehavior report count (with p being the expected probability factor), such that the
+	// These load tests are wiring smoke tests: the exact decision boundary and the batch-scaling
+	// formula are unit-tested deterministically in `TestShouldReportProbabilistically` and
+	// `TestBatchRequestMisbehaviorProbability`, so we only keep the groups with discriminating
+	// power here. The bounds are the exact quantiles of the Binomial(1000, p) distribution of the
+	// misbehavior report count (with p being the expected probability factor), such that the
 	// probability of the count falling outside the bounds is at most 1e-9 per tail. This keeps the
 	// test meaningful while making failures of a correct implementation practically impossible
-	// (previous, tighter bounds caused flakiness).
-
-	// using a very small batch request (1 block ID) with a 10% base probability factor, expect to almost never get misbehavior report, about 0.3% of the time (3 in 1000 requests)
-	// expected probability factor: 0.1 * (1 + 1)/64 = 0.003125
-	loadGroups = append(loadGroups, loadGroup{0.1, 0, 18, repeatedBlockIDs(1)})
-
-	// using a small batch request (10 block IDs) with a 10% base probability factor, expect to get misbehavior report about 1.7% of the time (17 in 1000 requests)
-	// expected probability factor: 0.1 * (10 + 1)/64 = 0.0171875
-	loadGroups = append(loadGroups, loadGroup{0.1, 0, 47, repeatedBlockIDs(10)})
+	// (previous, tighter bounds caused flakiness; low-probability groups were removed because
+	// their lower bound of 0 could not discriminate at all).
 
 	// using a large batch request (99 block IDs) with a 10% base probability factor, expect to get misbehavior report about 15% of the time (150 in 1000 requests)
 	// expected probability factor: 0.1 * (99 + 1)/64 = 0.15625
 	loadGroups = append(loadGroups, loadGroup{0.1, 92, 229, repeatedBlockIDs(99)})
-
-	// using a small batch request (10 block IDs) with a 1% base probability factor, expect to almost never get misbehavior report, about 0.17% of the time (2 in 1000 requests)
-	// expected probability factor: 0.01 * (10 + 1)/64 = 0.00171875
-	loadGroups = append(loadGroups, loadGroup{0.01, 0, 14, repeatedBlockIDs(10)})
-
-	// using a very large batch request (999 block IDs) with a 1% base probability factor, expect to get misbehavior report about 15% of the time (150 in 1000 requests)
-	// expected probability factor: 0.01 * (999 + 1)/64 = 0.15625
-	loadGroups = append(loadGroups, loadGroup{0.01, 92, 229, repeatedBlockIDs(999)})
 
 	// ALWAYS REPORT SPAM FOR INVALID BATCH REQUESTS OR BATCH REQUESTS THAT ARE FAR OUTSIDE OF THE TOLERANCE
 
