@@ -29,6 +29,8 @@ import (
 // pushing access nodes to the edges of the network (i.e., the access nodes are not in the mesh of any honest nodes)
 // will not cause the network to partition, i.e., all honest nodes can still communicate with each other through GossipSub.
 func TestFullGossipSubConnectivity(t *testing.T) {
+	t.Parallel()
+
 	ctx, cancel := context.WithCancel(context.Background())
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
 	sporkId := unittest.IdentifierFixture()
@@ -121,6 +123,8 @@ func TestFullGossipSubConnectivity(t *testing.T) {
 // when the network topology is a complete graph (i.e., full topology) and a malicious majority of access nodes are present.
 // The honest nodes (i.e., non-Access nodes) are enabled with peer scoring, then the honest nodes are enabled with peer scoring.
 func TestFullGossipSubConnectivityAmongHonestNodesWithMaliciousMajority(t *testing.T) {
+	t.Parallel()
+
 	// Note: if this test is ever flaky, this means a bug in our scoring system. Please escalate to the team instead of skipping.
 	ctx, cancel := context.WithCancel(context.Background())
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
