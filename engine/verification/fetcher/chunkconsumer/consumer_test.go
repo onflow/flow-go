@@ -91,8 +91,10 @@ func TestProduceConsume(t *testing.T) {
 
 			finishAll.Wait() // wait until all 10 jobs are processed and notified
 			<-consumer.Done()
-			// expect the mock engine receives all 10 calls
-			require.Equal(t, locators, called)
+			// expect the mock engine receives all 10 calls.
+			// the consumer processes jobs with 3 concurrent workers, so the receive order is
+			// not deterministic; assert the multiset rather than the exact sequence.
+			require.ElementsMatch(t, locators, called)
 		})
 	})
 

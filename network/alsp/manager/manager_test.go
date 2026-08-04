@@ -416,12 +416,16 @@ func TestHandleReportedMisbehavior_And_DisallowListing_RepeatOffender_Integratio
 
 		penalty1 := record.Penalty
 
-		// wait for one heartbeat to be processed.
-		time.Sleep(1 * time.Second)
-
-		record, ok = victimSpamRecordCache.Get(ids[spammerIndex].NodeID)
-		require.True(t, ok)
-		require.NotNil(t, record)
+		// wait for one heartbeat to be processed: poll for the first penalty change instead of
+		// sleeping exactly one heartbeat interval. A fixed 1s sleep races the 1s heartbeat ticker
+		// (which can be delayed under load) and may span 0 or 2 decays; polling at 10ms granularity
+		// reliably catches the state after exactly one decay.
+		require.Eventually(t, func() bool {
+			record, ok = victimSpamRecordCache.Get(ids[spammerIndex].NodeID)
+			require.True(t, ok)
+			require.NotNil(t, record)
+			return record.Penalty != penalty1
+		}, 10*time.Second, 10*time.Millisecond, "penalty did not decay after one heartbeat")
 
 		// check the penalty of the spammer node, which should be below the disallow-listing threshold.
 		// i.e. spammer penalty should be more negative than the disallow-listing threshold, hence disallow-listed.

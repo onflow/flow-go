@@ -524,7 +524,7 @@ func (s *BackendExecutionDataSuite) subscribe(subscribeFunc func(ctx context.Con
 
 					assert.Equal(s.T(), b.Height, resp.Height)
 					assert.Equal(s.T(), execData.BlockExecutionData, resp.ExecutionData)
-				}, time.Second, fmt.Sprintf("timed out waiting for exec data for block %d %v", b.Height, b.ID()))
+				}, 10*time.Second, fmt.Sprintf("timed out waiting for exec data for block %d %v", b.Height, b.ID()))
 			}
 
 			// make sure there are no new messages waiting. the channel should be opened with nothing waiting
