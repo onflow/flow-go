@@ -46,6 +46,7 @@ import (
 	"github.com/onflow/flow-go/fvm/evm/stdlib"
 	emulator "github.com/onflow/flow-go/integration/internal/emulator"
 	flowgo "github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func setupTransactionTests(t *testing.T, opts ...emulator.Option) (
@@ -1694,7 +1695,7 @@ func TestInfiniteTransaction(t *testing.T) {
 	result, err := b.ExecuteNextTransaction()
 	assert.NoError(t, err)
 
-	require.True(t, fvmerrors.IsComputationLimitExceededError(result.Error))
+	unittest.RequireLimitExceededError(t, result.Error, fvmerrors.LimitKindComputation, limit)
 }
 
 func TestTransactionExecutionLimit(t *testing.T) {
@@ -1760,7 +1761,7 @@ func TestTransactionExecutionLimit(t *testing.T) {
 		result, err := b.ExecuteNextTransaction()
 		assert.NoError(t, err)
 
-		require.True(t, fvmerrors.IsComputationLimitExceededError(result.Error))
+		unittest.RequireLimitExceededError(t, result.Error, fvmerrors.LimitKindComputation, limit)
 	})
 
 	t.Run("SufficientLimit", func(t *testing.T) {

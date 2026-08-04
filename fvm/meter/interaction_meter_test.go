@@ -219,22 +219,22 @@ func TestInteractionMeter_Merge(t *testing.T) {
 
 			var err error
 			if c.ParentReads != nil {
-				err = parentMeter.MeterStorageRead(key, c.ParentReads, false)
+				err = parentMeter.MeterStorageRead(key, c.ParentReads)
 				require.NoError(t, err)
 			}
 
 			if c.ChildReads != nil {
-				err = childMeter.MeterStorageRead(key, c.ChildReads, false)
+				err = childMeter.MeterStorageRead(key, c.ChildReads)
 				require.NoError(t, err)
 			}
 
 			if c.ParentWrites != nil {
-				err = parentMeter.MeterStorageWrite(key, c.ParentWrites, false)
+				err = parentMeter.MeterStorageWrite(key, c.ParentWrites)
 				require.NoError(t, err)
 			}
 
 			if c.ChildWrites != nil {
-				err = childMeter.MeterStorageWrite(key, c.ChildWrites, false)
+				err = childMeter.MeterStorageWrite(key, c.ChildWrites)
 				require.NoError(t, err)
 			}
 
