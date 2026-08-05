@@ -20,6 +20,9 @@ import (
 )
 
 // TestEmptyTrie tests whether the root hash of an empty trie matches the formal specification.
+// The expected value originates from the standalone Merkle reference implementation (the source of
+// truth): github.com/onflow/flow-internal → reference_implementations/merkle_tree.py. Run it to
+// regenerate; MTrie is the implementation under test, checked against it.
 func Test_EmptyTrie(t *testing.T) {
 	// Make new Trie (independently of MForest):
 	emptyTrie := trie.NewEmptyMTrie()
@@ -36,7 +39,9 @@ func Test_EmptyTrie(t *testing.T) {
 
 // Test_TrieWithLeftRegister tests whether the root hash of trie with only the left-most
 // register populated matches the formal specification.
-// The expected value is coming from a reference implementation in python and is hard-coded here.
+// The expected value originates from the standalone Merkle reference implementation (the source of
+// truth): github.com/onflow/flow-internal → reference_implementations/merkle_tree.py. Run it to
+// regenerate; MTrie is the implementation under test, checked against it.
 func Test_TrieWithLeftRegister(t *testing.T) {
 	// Make new Trie (independently of MForest):
 	emptyTrie := trie.NewEmptyMTrie()
@@ -53,13 +58,15 @@ func Test_TrieWithLeftRegister(t *testing.T) {
 
 // Test_TrieWithRightRegister tests whether the root hash of trie with only the right-most
 // register populated matches the formal specification.
-// The expected value is coming from a reference implementation in python and is hard-coded here.
+// The expected value originates from the standalone Merkle reference implementation (the source of
+// truth): github.com/onflow/flow-internal → reference_implementations/merkle_tree.py. Run it to
+// regenerate; MTrie is the implementation under test, checked against it.
 func Test_TrieWithRightRegister(t *testing.T) {
 	// Make new Trie (independently of MForest):
 	emptyTrie := trie.NewEmptyMTrie()
 	// build a path with all 1s
 	var path ledger.Path
-	for i := range len(path) {
+	for i := 0; i < len(path); i++ {
 		path[i] = uint8(255)
 	}
 	payload := testutils.LightPayload(12346, 54321)
@@ -74,7 +81,9 @@ func Test_TrieWithRightRegister(t *testing.T) {
 
 // Test_TrieWithMiddleRegister tests the root hash of trie holding only a single
 // allocated register somewhere in the middle.
-// The expected value is coming from a reference implementation in python and is hard-coded here.
+// The expected value originates from the standalone Merkle reference implementation (the source of
+// truth): github.com/onflow/flow-internal → reference_implementations/merkle_tree.py. Run it to
+// regenerate; MTrie is the implementation under test, checked against it.
 func Test_TrieWithMiddleRegister(t *testing.T) {
 	// Make new Trie (independently of MForest):
 	emptyTrie := trie.NewEmptyMTrie()
@@ -92,7 +101,9 @@ func Test_TrieWithMiddleRegister(t *testing.T) {
 
 // Test_TrieWithManyRegisters tests whether the root hash of a trie storing 12001 randomly selected registers
 // matches the formal specification.
-// The expected value is coming from a reference implementation in python and is hard-coded here.
+// The expected value originates from the standalone Merkle reference implementation (the source of
+// truth): github.com/onflow/flow-internal → reference_implementations/merkle_tree.py. Run it to
+// regenerate; MTrie is the implementation under test, checked against it.
 func Test_TrieWithManyRegisters(t *testing.T) {
 	// Make new Trie (independently of MForest):
 	emptyTrie := trie.NewEmptyMTrie()
@@ -114,7 +125,9 @@ func Test_TrieWithManyRegisters(t *testing.T) {
 
 // Test_FullTrie tests whether the root hash of a trie,
 // whose left-most 65536 registers are populated, matches the formal specification.
-// The expected value is coming from a reference implementation in python and is hard-coded here.
+// The expected value originates from the standalone Merkle reference implementation (the source of
+// truth): github.com/onflow/flow-internal → reference_implementations/merkle_tree.py. Run it to
+// regenerate; MTrie is the implementation under test, checked against it.
 func Test_FullTrie(t *testing.T) {
 	// Make new Trie (independently of MForest):
 	emptyTrie := trie.NewEmptyMTrie()
@@ -125,7 +138,7 @@ func Test_FullTrie(t *testing.T) {
 	paths := make([]ledger.Path, 0, numberRegisters)
 	payloads := make([]ledger.Payload, 0, numberRegisters)
 	var totalPayloadSize uint64
-	for i := range numberRegisters {
+	for i := 0; i < numberRegisters; i++ {
 		paths = append(paths, testutils.PathByUint16LeftPadded(uint16(i)))
 		temp := rng.next()
 		payload := testutils.LightPayload(temp, temp)
@@ -142,7 +155,9 @@ func Test_FullTrie(t *testing.T) {
 }
 
 // TestUpdateTrie tests whether iteratively updating a Trie matches the formal specification.
-// The expected root hashes are coming from a reference implementation in python and is hard-coded here.
+// The expected root hashes originate from the standalone Merkle reference implementation (the source
+// of truth): github.com/onflow/flow-internal → reference_implementations/merkle_tree.py. Run it to
+// regenerate; MTrie is the implementation under test, checked against it.
 func Test_UpdateTrie(t *testing.T) {
 	expectedRootHashes := []string{
 		"08db9aeed2b9fcc66b63204a26a4c28652e44e3035bd87ba0ed632a227b3f6dd",
@@ -187,7 +202,7 @@ func Test_UpdateTrie(t *testing.T) {
 	var payloads []ledger.Payload
 	parentTrieRegCount := updatedTrie.AllocatedRegCount()
 	parentTrieRegSize := updatedTrie.AllocatedRegSize()
-	for r := range 20 {
+	for r := 0; r < 20; r++ {
 		paths, payloads = deduplicateWrites(sampleRandomRegisterWrites(rng, r*100))
 		var totalPayloadSize uint64
 		for _, p := range payloads {
@@ -223,7 +238,9 @@ func Test_UpdateTrie(t *testing.T) {
 
 // Test_UnallocateRegisters tests whether unallocating registers matches the formal specification.
 // Unallocating here means, to set the stored register value to an empty byte slice.
-// The expected value is coming from a reference implementation in python and is hard-coded here.
+// The expected value originates from the standalone Merkle reference implementation (the source of
+// truth): github.com/onflow/flow-internal → reference_implementations/merkle_tree.py. Run it to
+// regenerate; MTrie is the implementation under test, checked against it.
 func Test_UnallocateRegisters(t *testing.T) {
 	rng := &LinearCongruentialGenerator{seed: 0}
 	emptyTrie := trie.NewEmptyMTrie()
@@ -288,7 +305,7 @@ func (rng *LinearCongruentialGenerator) next() uint16 {
 func sampleRandomRegisterWrites(rng *LinearCongruentialGenerator, number int) ([]ledger.Path, []ledger.Payload) {
 	paths := make([]ledger.Path, 0, number)
 	payloads := make([]ledger.Payload, 0, number)
-	for range number {
+	for i := 0; i < number; i++ {
 		path := testutils.PathByUint16LeftPadded(rng.next())
 		paths = append(paths, path)
 		t := rng.next()
@@ -311,7 +328,7 @@ func sampleRandomRegisterWritesWithPrefix(rng *LinearCongruentialGenerator, numb
 	payloads := make([]ledger.Payload, 0, number)
 	nextRandomBytes := make([]byte, 2)
 	nextRandomByteIndex := 2 // index of next unused byte in nextRandomBytes; if value is >= 2, we need to generate new random bytes
-	for range number {
+	for i := 0; i < number; i++ {
 		var p ledger.Path
 		copy(p[:prefixLen], prefix)
 		for b := prefixLen; b < hash.HashLen; b++ {
@@ -361,13 +378,13 @@ func TestSplitByPath(t *testing.T) {
 
 	// create path slice with redundant paths
 	paths := make([]ledger.Path, 0, pathsNumber)
-	for range pathsNumber - redundantPaths {
+	for i := 0; i < pathsNumber-redundantPaths; i++ {
 		var p ledger.Path
 		_, err := rand.Read(p[:])
 		require.NoError(t, err)
 		paths = append(paths, p)
 	}
-	for i := range redundantPaths {
+	for i := 0; i < redundantPaths; i++ {
 		paths = append(paths, paths[i])
 	}
 
@@ -382,7 +399,7 @@ func TestSplitByPath(t *testing.T) {
 	index := trie.SplitPaths(paths, randomIndex)
 
 	// check correctness
-	for i := range index {
+	for i := 0; i < index; i++ {
 		assert.Equal(t, bitutils.ReadBit(paths[i][:], randomIndex), 0)
 	}
 	for i := index; i < len(paths); i++ {
@@ -643,7 +660,7 @@ func Test_Pruning(t *testing.T) {
 		var maxDepthTouched, maxDepthTouchedWithPruning uint16
 		var parentTrieRegCount, parentTrieRegSize uint64
 
-		for range numberOfSteps {
+		for step := 0; step < numberOfSteps; step++ {
 
 			updatePaths := make([]ledger.Path, 0)
 			updatePayloads := make([]ledger.Payload, 0)
@@ -681,7 +698,7 @@ func Test_Pruning(t *testing.T) {
 			}
 
 			// only set it for the updates
-			for i := range numberOfUpdates {
+			for i := 0; i < numberOfUpdates; i++ {
 				allPaths[updatePaths[i]] = updatePayloads[i]
 			}
 
@@ -795,7 +812,7 @@ func TestValueSizes(t *testing.T) {
 
 		// Populate pathsToGetValueSize with all possible paths for the first 4 bits.
 		pathsToGetValueSize := make([]ledger.Path, 16)
-		for i := range 16 {
+		for i := 0; i < 16; i++ {
 			pathsToGetValueSize[i] = testutils.PathByUint16(uint16(i << 12))
 		}
 
@@ -886,7 +903,7 @@ func TestTrieAllocatedRegCountRegSize(t *testing.T) {
 	paths := make([]ledger.Path, numberRegisters)
 	payloads := make([]ledger.Payload, numberRegisters)
 	var totalPayloadSize uint64
-	for i := range numberRegisters {
+	for i := 0; i < numberRegisters; i++ {
 		var p ledger.Path
 		p[0] = byte(i)
 
@@ -926,7 +943,7 @@ func TestTrieAllocatedRegCountRegSize(t *testing.T) {
 	// to test reg count and size with new empty registers.
 	newPaths := []ledger.Path{}
 	newPayloads := []ledger.Payload{}
-	for i := range paths {
+	for i := 0; i < len(paths); i++ {
 		oldPath := paths[i]
 
 		path1, _ := ledger.ToPath(oldPath[:])
@@ -959,7 +976,7 @@ func TestTrieAllocatedRegCountRegSize(t *testing.T) {
 
 		// Remove register one by one to test reg count and size with empty registers
 		// (old payload size > 0 and new payload size == 0)
-		for i := range paths {
+		for i := 0; i < len(paths); i++ {
 			newPaths := []ledger.Path{paths[i]}
 			newPayloads := []ledger.Payload{*ledger.EmptyPayload()}
 
@@ -987,7 +1004,7 @@ func TestTrieAllocatedRegCountRegSize(t *testing.T) {
 
 		// Remove register one by one to test reg count and size with empty registers
 		// (old payload size > 0 and new payload size == 0)
-		for i := range paths {
+		for i := 0; i < len(paths); i++ {
 			newPaths := []ledger.Path{paths[i]}
 			newPayloads := []ledger.Payload{*ledger.EmptyPayload()}
 
@@ -1009,7 +1026,7 @@ func TestTrieAllocatedRegCountRegSize(t *testing.T) {
 		// Update with removed paths and empty payloads
 		// (old payload size == 0 and new payload size == 0)
 		newPayloads := make([]ledger.Payload, len(paths))
-		for i := range paths {
+		for i := 0; i < len(paths); i++ {
 			newPayloads[i] = *ledger.EmptyPayload()
 		}
 
@@ -1047,7 +1064,7 @@ func TestTrieAllocatedRegCountRegSizeWithMixedPruneFlag(t *testing.T) {
 	paths := make([]ledger.Path, numberRegisters)
 	payloads := make([]ledger.Payload, numberRegisters)
 	var totalPayloadSize uint64
-	for i := range numberRegisters {
+	for i := 0; i < numberRegisters; i++ {
 		var p ledger.Path
 		p[0] = byte(i)
 
@@ -1181,7 +1198,7 @@ func TestReadSinglePayload(t *testing.T) {
 		//
 
 		// Test reading payload for all possible paths for the first 4 bits.
-		for i := range 16 {
+		for i := 0; i < 16; i++ {
 			path := testutils.PathByUint16(uint16(i << 12))
 
 			retPayload := newTrie.ReadSinglePayload(path)

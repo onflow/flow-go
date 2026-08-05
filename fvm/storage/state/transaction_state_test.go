@@ -288,7 +288,7 @@ func TestRestartNestedTransaction(t *testing.T) {
 	key := flow.NewRegisterID(unittest.RandomAddressFixture(), "key")
 	val := createByteArray(2)
 
-	for range 10 {
+	for i := 0; i < 10; i++ {
 		_, err := txn.BeginNestedTransaction()
 		require.NoError(t, err)
 
@@ -301,7 +301,7 @@ func TestRestartNestedTransaction(t *testing.T) {
 		Name:    "loc",
 	}
 
-	for range 5 {
+	for i := 0; i < 5; i++ {
 		_, err := txn.BeginParseRestrictedNestedTransaction(loc)
 		require.NoError(t, err)
 
@@ -344,7 +344,7 @@ func TestRestartNestedTransactionWithInvalidId(t *testing.T) {
 	require.NoError(t, err)
 
 	var otherId state.NestedTransactionId
-	for range 10 {
+	for i := 0; i < 10; i++ {
 		otherId, err = txn.BeginNestedTransaction()
 		require.NoError(t, err)
 

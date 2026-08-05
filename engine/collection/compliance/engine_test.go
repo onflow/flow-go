@@ -159,8 +159,9 @@ func (cs *EngineSuite) TearDownTest() {
 func (cs *EngineSuite) TestSubmittingMultipleEntries() {
 	blockCount := 15
 	var wg sync.WaitGroup
-	wg.Go(func() {
-		for range blockCount {
+	wg.Add(1)
+	go func() {
+		for i := 0; i < blockCount; i++ {
 			block := unittest.ClusterBlockFixture(
 				unittest.ClusterBlock.WithParent(&cs.head.Block),
 			)
@@ -175,8 +176,10 @@ func (cs *EngineSuite) TestSubmittingMultipleEntries() {
 				Message:  proposal,
 			})
 		}
-	})
-	wg.Go(func() {
+		wg.Done()
+	}()
+	wg.Add(1)
+	go func() {
 		// create a proposal that directly descends from the latest finalized header
 		block := unittest.ClusterBlockFixture(
 			unittest.ClusterBlock.WithParent(&cs.head.Block),
@@ -191,7 +194,8 @@ func (cs *EngineSuite) TestSubmittingMultipleEntries() {
 			OriginID: unittest.IdentifierFixture(),
 			Message:  proposal,
 		})
-	})
+		wg.Done()
+	}()
 
 	wg.Wait()
 

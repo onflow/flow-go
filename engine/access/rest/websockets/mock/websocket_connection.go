@@ -82,7 +82,7 @@ func (_c *WebsocketConnection_Close_Call) RunAndReturn(run func() error) *Websoc
 }
 
 // ReadJSON provides a mock function for the type WebsocketConnection
-func (_mock *WebsocketConnection) ReadJSON(v any) error {
+func (_mock *WebsocketConnection) ReadJSON(v interface{}) error {
 	ret := _mock.Called(v)
 
 	if len(ret) == 0 {
@@ -90,7 +90,7 @@ func (_mock *WebsocketConnection) ReadJSON(v any) error {
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(any) error); ok {
+	if returnFunc, ok := ret.Get(0).(func(interface{}) error); ok {
 		r0 = returnFunc(v)
 	} else {
 		r0 = ret.Error(0)
@@ -104,16 +104,16 @@ type WebsocketConnection_ReadJSON_Call struct {
 }
 
 // ReadJSON is a helper method to define mock.On call
-//   - v any
+//   - v interface{}
 func (_e *WebsocketConnection_Expecter) ReadJSON(v interface{}) *WebsocketConnection_ReadJSON_Call {
 	return &WebsocketConnection_ReadJSON_Call{Call: _e.mock.On("ReadJSON", v)}
 }
 
-func (_c *WebsocketConnection_ReadJSON_Call) Run(run func(v any)) *WebsocketConnection_ReadJSON_Call {
+func (_c *WebsocketConnection_ReadJSON_Call) Run(run func(v interface{})) *WebsocketConnection_ReadJSON_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 any
+		var arg0 interface{}
 		if args[0] != nil {
-			arg0 = args[0].(any)
+			arg0 = args[0].(interface{})
 		}
 		run(
 			arg0,
@@ -127,7 +127,7 @@ func (_c *WebsocketConnection_ReadJSON_Call) Return(err error) *WebsocketConnect
 	return _c
 }
 
-func (_c *WebsocketConnection_ReadJSON_Call) RunAndReturn(run func(v any) error) *WebsocketConnection_ReadJSON_Call {
+func (_c *WebsocketConnection_ReadJSON_Call) RunAndReturn(run func(v interface{}) error) *WebsocketConnection_ReadJSON_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -332,7 +332,7 @@ func (_c *WebsocketConnection_WriteControl_Call) RunAndReturn(run func(messageTy
 }
 
 // WriteJSON provides a mock function for the type WebsocketConnection
-func (_mock *WebsocketConnection) WriteJSON(v any) error {
+func (_mock *WebsocketConnection) WriteJSON(v interface{}) error {
 	ret := _mock.Called(v)
 
 	if len(ret) == 0 {
@@ -340,7 +340,7 @@ func (_mock *WebsocketConnection) WriteJSON(v any) error {
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(any) error); ok {
+	if returnFunc, ok := ret.Get(0).(func(interface{}) error); ok {
 		r0 = returnFunc(v)
 	} else {
 		r0 = ret.Error(0)
@@ -354,16 +354,16 @@ type WebsocketConnection_WriteJSON_Call struct {
 }
 
 // WriteJSON is a helper method to define mock.On call
-//   - v any
+//   - v interface{}
 func (_e *WebsocketConnection_Expecter) WriteJSON(v interface{}) *WebsocketConnection_WriteJSON_Call {
 	return &WebsocketConnection_WriteJSON_Call{Call: _e.mock.On("WriteJSON", v)}
 }
 
-func (_c *WebsocketConnection_WriteJSON_Call) Run(run func(v any)) *WebsocketConnection_WriteJSON_Call {
+func (_c *WebsocketConnection_WriteJSON_Call) Run(run func(v interface{})) *WebsocketConnection_WriteJSON_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 any
+		var arg0 interface{}
 		if args[0] != nil {
-			arg0 = args[0].(any)
+			arg0 = args[0].(interface{})
 		}
 		run(
 			arg0,
@@ -377,7 +377,7 @@ func (_c *WebsocketConnection_WriteJSON_Call) Return(err error) *WebsocketConnec
 	return _c
 }
 
-func (_c *WebsocketConnection_WriteJSON_Call) RunAndReturn(run func(v any) error) *WebsocketConnection_WriteJSON_Call {
+func (_c *WebsocketConnection_WriteJSON_Call) RunAndReturn(run func(v interface{}) error) *WebsocketConnection_WriteJSON_Call {
 	_c.Call.Return(run)
 	return _c
 }

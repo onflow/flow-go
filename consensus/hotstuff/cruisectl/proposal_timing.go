@@ -138,3 +138,17 @@ func (pt *fallbackTiming) ObservationView() uint64    { return pt.observationVie
 func (pt *fallbackTiming) ObservationTime() time.Time { return pt.observationTime }
 
 /* *************************************** auxiliary functions *************************************** */
+
+func min(d1, d2 time.Duration) time.Duration {
+	if d1 < d2 {
+		return d1
+	}
+	return d2
+}
+
+func max(d1, d2 time.Duration) time.Duration {
+	if d1 > d2 {
+		return d1
+	}
+	return d2
+}

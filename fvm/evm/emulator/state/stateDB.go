@@ -4,7 +4,6 @@ import (
 	"bytes"
 	stdErrors "errors"
 	"fmt"
-	"maps"
 	"sort"
 
 	gethCommon "github.com/ethereum/go-ethereum/common"
@@ -430,7 +429,9 @@ func (db *StateDB) Logs(
 func (db *StateDB) Preimages() map[gethCommon.Hash][]byte {
 	preImages := make(map[gethCommon.Hash][]byte, 0)
 	for _, view := range db.views {
-		maps.Copy(preImages, view.Preimages())
+		for k, v := range view.Preimages() {
+			preImages[k] = v
+		}
 	}
 	return preImages
 }

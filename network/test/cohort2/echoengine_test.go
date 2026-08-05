@@ -222,7 +222,7 @@ func (suite *EchoEngineTestSuite) duplicateMessageSequential(send testutils.Cond
 	}
 
 	// sends the same message 10 times
-	for range 10 {
+	for i := 0; i < 10; i++ {
 		require.NoError(suite.Suite.T(), send(event, sender.con, suite.ids[rcvID].NodeID))
 	}
 
@@ -258,10 +258,12 @@ func (suite *EchoEngineTestSuite) duplicateMessageParallel(send testutils.Condui
 
 	// sends the same message 10 times
 	wg := sync.WaitGroup{}
-	for range 10 {
-		wg.Go(func() {
+	for i := 0; i < 10; i++ {
+		wg.Add(1)
+		go func() {
 			require.NoError(suite.Suite.T(), send(event, sender.con, suite.ids[rcvID].NodeID))
-		})
+			wg.Done()
+		}()
 	}
 	unittest.RequireReturnsBefore(suite.T(), wg.Wait, 3*time.Second, "could not send message on time")
 
@@ -314,14 +316,16 @@ func (suite *EchoEngineTestSuite) duplicateMessageDifferentChan(send testutils.C
 
 	// sends the same message 10 times on both channels
 	wg := sync.WaitGroup{}
-	for range 10 {
-		wg.Go(func() {
+	for i := 0; i < 10; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
 			// sender1 to receiver1 on channel1
 			require.NoError(suite.Suite.T(), send(event, sender1.con, suite.ids[rcvNode].NodeID))
 
 			// sender2 to receiver2 on channel2
 			require.NoError(suite.Suite.T(), send(event, sender2.con, suite.ids[rcvNode].NodeID))
-		})
+		}()
 	}
 	unittest.RequireReturnsBefore(suite.T(), wg.Wait, 3*time.Second, "could not handle sending unicasts on time")
 	time.Sleep(1 * time.Second)
@@ -421,7 +425,7 @@ func (suite *EchoEngineTestSuite) multiMessageSync(echo bool, count int, send te
 	// allow nodes to heartbeat and discover each other
 	testutils.OptionalSleep(send)
 
-	for i := range count {
+	for i := 0; i < count; i++ {
 		// Send the message to receiver
 		event := &message.TestMessage{
 			Text: fmt.Sprintf("hello%d", i),
@@ -498,7 +502,7 @@ func (suite *EchoEngineTestSuite) multiMessageAsync(echo bool, count int, send t
 	// keeps track of async received echo messages at sender side
 	// echorcv := make(map[string]struct{})
 
-	for i := range count {
+	for i := 0; i < count; i++ {
 		// Send the message to node 2 using the conduit of node 1
 		event := &message.TestMessage{
 			Text: fmt.Sprintf("hello%d", i),
@@ -506,7 +510,7 @@ func (suite *EchoEngineTestSuite) multiMessageAsync(echo bool, count int, send t
 		require.NoError(suite.Suite.T(), send(event, sender.con, suite.ids[1].NodeID))
 	}
 
-	for range count {
+	for i := 0; i < count; i++ {
 		select {
 		case <-receiver.received:
 			// evaluates reception of message at the other side
@@ -541,7 +545,7 @@ func (suite *EchoEngineTestSuite) multiMessageAsync(echo bool, count int, send t
 		}
 	}
 
-	for range count {
+	for i := 0; i < count; i++ {
 		// evaluates echo back
 		if echo {
 			// evaluates reception of echo response

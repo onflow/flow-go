@@ -33,7 +33,7 @@ import (
 func transferTokensTx(chain flow.Chain) *flow.TransactionBodyBuilder {
 	sc := systemcontracts.SystemContractsForChain(chain.ChainID())
 	return flow.NewTransactionBodyBuilder().
-		SetScript(fmt.Appendf(nil,
+		SetScript([]byte(fmt.Sprintf(
 			`
 							// This transaction is a template for a transaction that
 							// could be used by anyone to send tokens to another account
@@ -75,7 +75,7 @@ func transferTokensTx(chain flow.Chain) *flow.TransactionBodyBuilder {
 							}`,
 			sc.FungibleToken.Address.Hex(),
 			sc.FlowToken.Address.Hex(),
-		),
+		)),
 		)
 }
 
@@ -1075,7 +1075,7 @@ func TestBlockContext_ExecuteTransaction_StorageLimit(t *testing.T) {
 				sc := systemcontracts.SystemContractsForChain(chain.ChainID())
 				// deposit more flow to increase capacity
 				txBodyBuilder := flow.NewTransactionBodyBuilder().
-					SetScript(fmt.Appendf(nil,
+					SetScript([]byte(fmt.Sprintf(
 						`
 					import FungibleToken from %s
 					import FlowToken from %s
@@ -1097,7 +1097,7 @@ func TestBlockContext_ExecuteTransaction_StorageLimit(t *testing.T) {
 						sc.FlowToken.Address.HexWithPrefix(),
 						"Container",
 						hex.EncodeToString([]byte(script)),
-					)).
+					))).
 					AddAuthorizer(accounts[0]).
 					AddAuthorizer(chain.ServiceAddress()).
 					SetProposalKey(chain.ServiceAddress(), 0, 0).
@@ -1225,9 +1225,11 @@ func TestBlockContext_ExecuteTransaction_InteractionLimitReached(t *testing.T) {
 					snapshotTree)
 				require.NoError(t, err)
 
-				require.True(
+				unittest.RequireLimitExceededError(
 					t,
-					errors.IsLedgerInteractionLimitExceededError(output.Err))
+					output.Err,
+					errors.LimitKindLedgerInteraction,
+					500_000)
 			}))
 
 	t.Run("Using to much interaction but not failing because of service account", newVMTest().withBootstrapProcedureOptions(bootstrapOptions...).
@@ -1298,10 +1300,13 @@ func TestBlockContext_ExecuteTransaction_InteractionLimitReached(t *testing.T) {
 					chain)
 				require.NoError(t, err)
 
+				// The account count is sized so that the metered interaction
+				// exceeds MaxStateInteractionSize, triggering the interaction
+				// limit from within Cadence execution.
 				_, txBodyBuilder := testutil.CreateMultiAccountCreationTransaction(
 					t,
 					chain,
-					40)
+					60)
 
 				txBodyBuilder.SetProposalKey(chain.ServiceAddress(), 0, 0).
 					SetPayer(accounts[0])
@@ -1466,7 +1471,7 @@ func TestBlockContext_ExecuteScript(t *testing.T) {
 
 		// Run test script
 
-		code := fmt.Appendf(nil,
+		code := []byte(fmt.Sprintf(
 			`
 			  import Test from 0x%s
 
@@ -1475,7 +1480,7 @@ func TestBlockContext_ExecuteScript(t *testing.T) {
 			  }
 			`,
 			address.String(),
-		)
+		))
 
 		_, output, err = vm.Run(ctx, fvm.Script(code), snapshotTree)
 		require.NoError(t, err)
@@ -1711,14 +1716,14 @@ func TestBlockContext_GetAccount(t *testing.T) {
 
 	addressGen := chain.NewAddressGenerator()
 	// skip the addresses of 4 reserved accounts
-	for range systemcontracts.LastSystemAccountIndex {
+	for i := 0; i < systemcontracts.LastSystemAccountIndex; i++ {
 		_, err := addressGen.NextAddress()
 		require.NoError(t, err)
 	}
 
 	// create a bunch of accounts
 	accounts := make(map[flow.Address]crypto.PublicKey, count)
-	for range count {
+	for i := 0; i < count; i++ {
 		address, key := createAccount()
 		expectedAddress, err := addressGen.NextAddress()
 		require.NoError(t, err)
@@ -1818,7 +1823,7 @@ func TestBlockContext_Random(t *testing.T) {
 	`
 
 	getScriptRandoms := func(t *testing.T, codeSalt int, arg int) [2]uint64 {
-		script := fvm.Script(fmt.Appendf(nil, scriptCode, codeSalt)).
+		script := fvm.Script([]byte(fmt.Sprintf(scriptCode, codeSalt))).
 			WithArguments(jsoncdc.MustEncode(cadence.Int8(arg)))
 
 		_, output, err := vm.Run(ctx, script, testutil.RootBootstrappedLedger(vm, ctx))
@@ -1912,7 +1917,7 @@ func TestBlockContext_ExecuteTransaction_FailingTransactions(t *testing.T) {
 	) uint64 {
 
 		sc := systemcontracts.SystemContractsForChain(chain.ChainID())
-		code := fmt.Appendf(nil,
+		code := []byte(fmt.Sprintf(
 			`
 					import FungibleToken from 0x%s
 					import FlowToken from 0x%s
@@ -1927,7 +1932,7 @@ func TestBlockContext_ExecuteTransaction_FailingTransactions(t *testing.T) {
 				`,
 			sc.FungibleToken.Address.Hex(),
 			sc.FlowToken.Address.Hex(),
-		)
+		))
 		script := fvm.Script(code).WithArguments(
 			jsoncdc.MustEncode(cadence.NewAddress(address)),
 		)

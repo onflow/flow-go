@@ -37,10 +37,12 @@ func TestApprovalsLRUCacheSecondaryIndexPurgeConcurrently(t *testing.T) {
 	var wg sync.WaitGroup
 
 	for i := 0; i < 2*numElements; i++ {
-		wg.Go(func() {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
 			approval := unittest.ResultApprovalFixture()
 			cache.Put(approval)
-		})
+		}()
 	}
 	wg.Wait()
 	require.Len(t, cache.byResultID, int(numElements))

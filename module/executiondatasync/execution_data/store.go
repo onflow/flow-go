@@ -154,7 +154,10 @@ func (s *store) addBlobs(ctx context.Context, v any) ([]cid.Cid, error) {
 
 	// next, chunk the data into blobs of size up to maxBlobSize
 	for len(data) > 0 {
-		blobLen := min(len(data), s.maxBlobSize)
+		blobLen := s.maxBlobSize
+		if len(data) < blobLen {
+			blobLen = len(data)
+		}
 
 		blob := blobs.NewBlob(data[:blobLen])
 		data = data[blobLen:]

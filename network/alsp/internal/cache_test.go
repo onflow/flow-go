@@ -373,7 +373,7 @@ func TestSpamRecordCache_ConcurrentSameRecordAdjust(t *testing.T) {
 	var wg sync.WaitGroup
 	wg.Add(concurrentAttempts)
 
-	for range concurrentAttempts {
+	for i := 0; i < concurrentAttempts; i++ {
 		go func() {
 			defer wg.Done()
 			penalty, err := cache.AdjustWithInit(originID, adjustFn)
@@ -539,6 +539,7 @@ func TestSpamRecordCache_ConcurrentInitAndRemove(t *testing.T) {
 
 	// initialize spam records concurrently
 	for _, originID := range originIDsToAdd {
+		originID := originID // capture range variable
 		go func() {
 			defer wg.Done()
 			penalty, err := cache.AdjustWithInit(originID, adjustFnNoOp)
@@ -611,6 +612,7 @@ func TestSpamRecordCache_ConcurrentInitRemoveAdjust(t *testing.T) {
 
 	// Initialize spam records concurrently
 	for _, originID := range originIDsToAdd {
+		originID := originID // capture range variable
 		go func() {
 			defer wg.Done()
 			penalty, err := cache.AdjustWithInit(originID, adjustFnNoOp)
@@ -682,6 +684,7 @@ func TestSpamRecordCache_ConcurrentInitRemoveAndAdjust(t *testing.T) {
 
 	// initialize spam records concurrently
 	for _, originID := range originIDsToAdd {
+		originID := originID
 		go func() {
 			defer wg.Done()
 			penalty, err := cache.AdjustWithInit(originID, adjustFnNoOp)
@@ -692,6 +695,7 @@ func TestSpamRecordCache_ConcurrentInitRemoveAndAdjust(t *testing.T) {
 
 	// remove spam records concurrently
 	for _, originID := range originIDsToRemove {
+		originID := originID
 		go func() {
 			defer wg.Done()
 			cache.Remove(originID)
@@ -700,6 +704,7 @@ func TestSpamRecordCache_ConcurrentInitRemoveAndAdjust(t *testing.T) {
 
 	// adjust spam records concurrently
 	for _, originID := range originIDsToAdjust {
+		originID := originID
 		go func() {
 			defer wg.Done()
 			_, err := cache.AdjustWithInit(originID, func(record *model.ProtocolSpamRecord) (*model.ProtocolSpamRecord, error) {
@@ -768,6 +773,7 @@ func TestSpamRecordCache_ConcurrentIdentitiesAndOperations(t *testing.T) {
 
 	// initialize spam records concurrently
 	for _, originID := range originIDsToAdd {
+		originID := originID
 		go func() {
 			defer wg.Done()
 			penalty, err := cache.AdjustWithInit(originID, adjustFnNoOp)
@@ -781,6 +787,7 @@ func TestSpamRecordCache_ConcurrentIdentitiesAndOperations(t *testing.T) {
 
 	// remove spam records concurrently
 	for _, originID := range originIDsToRemove {
+		originID := originID
 		go func() {
 			defer wg.Done()
 			require.True(t, cache.Remove(originID))
@@ -791,7 +798,7 @@ func TestSpamRecordCache_ConcurrentIdentitiesAndOperations(t *testing.T) {
 	}
 
 	// call Identities method concurrently
-	for range 10 {
+	for i := 0; i < 10; i++ {
 		go func() {
 			defer wg.Done()
 			ids := cache.Identities()

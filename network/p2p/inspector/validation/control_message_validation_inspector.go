@@ -639,7 +639,10 @@ func (c *ControlMsgValidationInspector) inspectRpcPublishMessages(from peer.ID, 
 		return nil, 0
 	}
 
-	sampleSize := min(c.config.PublishMessages.MaxSampleSize, totalMessages)
+	sampleSize := c.config.PublishMessages.MaxSampleSize
+	if sampleSize > totalMessages {
+		sampleSize = totalMessages
+	}
 	c.performSample(p2pmsg.RpcPublishMessage, uint(totalMessages), uint(sampleSize), func(i, j uint) {
 		messages[i], messages[j] = messages[j], messages[i]
 	})
@@ -828,7 +831,10 @@ func (c *ControlMsgValidationInspector) truncateIHaveMessages(from peer.ID, rpc 
 
 	if originalIHaveCount > c.config.IHave.MessageCountThreshold {
 		// truncate ihaves and update metrics
-		sampleSize := min(c.config.IHave.MessageCountThreshold, originalIHaveCount)
+		sampleSize := c.config.IHave.MessageCountThreshold
+		if sampleSize > originalIHaveCount {
+			sampleSize = originalIHaveCount
+		}
 		c.performSample(p2pmsg.CtrlMsgIHave, uint(originalIHaveCount), uint(sampleSize), func(i, j uint) {
 			ihaves[i], ihaves[j] = ihaves[j], ihaves[i]
 		})
@@ -859,7 +865,10 @@ func (c *ControlMsgValidationInspector) truncateIHaveMessageIds(from peer.ID, rp
 		}
 
 		if originalMessageIdCount > c.config.IHave.MessageIdCountThreshold {
-			sampleSize := min(c.config.IHave.MessageIdCountThreshold, originalMessageIdCount)
+			sampleSize := c.config.IHave.MessageIdCountThreshold
+			if sampleSize > originalMessageIdCount {
+				sampleSize = originalMessageIdCount
+			}
 			c.performSample(p2pmsg.CtrlMsgIHave, uint(originalMessageIdCount), uint(sampleSize), func(i, j uint) {
 				messageIDs[i], messageIDs[j] = messageIDs[j], messageIDs[i]
 			})
@@ -892,7 +901,10 @@ func (c *ControlMsgValidationInspector) truncateIWantMessages(from peer.ID, rpc 
 
 	if originalIWantCount > c.config.IWant.MessageCountThreshold {
 		// truncate iWants and update metrics
-		sampleSize := min(c.config.IWant.MessageCountThreshold, originalIWantCount)
+		sampleSize := c.config.IWant.MessageCountThreshold
+		if sampleSize > originalIWantCount {
+			sampleSize = originalIWantCount
+		}
 		c.performSample(p2pmsg.CtrlMsgIWant, originalIWantCount, sampleSize, func(i, j uint) {
 			iWants[i], iWants[j] = iWants[j], iWants[i]
 		})

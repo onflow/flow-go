@@ -103,7 +103,7 @@ func TestConvertEvents(t *testing.T) {
 	events := make([]flow.Event, eventCount)
 	ccfEvents := make([]flow.Event, eventCount)
 	jsonEvents := make([]flow.Event, eventCount)
-	for i := range eventCount {
+	for i := 0; i < eventCount; i++ {
 		cadenceValue := cadence.NewInt(i)
 
 		ccfPayload, err := ccf.Encode(cadenceValue)
@@ -220,7 +220,7 @@ func TestConvertMessagesToBlockEvents(t *testing.T) {
 
 	count := 2
 	blockEvents := make([]flow.BlockEvents, count)
-	for i := range count {
+	for i := 0; i < count; i++ {
 		header := unittest.BlockHeaderFixture(unittest.WithHeaderHeight(uint64(i)))
 		blockEvents[i] = unittest.BlockEventsFixture(header, 2)
 	}

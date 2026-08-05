@@ -26,7 +26,7 @@ type TestEngine struct {
 	queueB         *engine.FifoMessageStore
 
 	mu       sync.RWMutex
-	messages []any
+	messages []interface{}
 }
 
 type messageA struct {
@@ -109,7 +109,7 @@ func NewEngine(log zerolog.Logger, capacity int) (*TestEngine, error) {
 	return eng, nil
 }
 
-func (e *TestEngine) Process(originID flow.Identifier, event any) error {
+func (e *TestEngine) Process(originID flow.Identifier, event interface{}) error {
 	return e.messageHandler.Process(originID, event)
 }
 
@@ -303,7 +303,7 @@ func TestProcessMessageMultiAll(t *testing.T) {
 
 	WithEngine(t, func(eng *TestEngine) {
 		count := 100
-		for i := range count {
+		for i := 0; i < count; i++ {
 			require.NoError(t, eng.Process(unittest.IdentifierFixture(), &messageA{n: i}))
 		}
 
@@ -320,7 +320,7 @@ func TestProcessMessageMultiInterval(t *testing.T) {
 
 	WithEngine(t, func(eng *TestEngine) {
 		count := 100
-		for i := range count {
+		for i := 0; i < count; i++ {
 			time.Sleep(1 * time.Millisecond)
 			require.NoError(t, eng.Process(unittest.IdentifierFixture(), &messageB{n: i}))
 		}
@@ -338,7 +338,7 @@ func TestProcessMessageMultiConcurrent(t *testing.T) {
 	WithEngine(t, func(eng *TestEngine) {
 		count := 100
 		var sent sync.WaitGroup
-		for i := range count {
+		for i := 0; i < count; i++ {
 			sent.Add(1)
 			go func(i int) {
 				require.NoError(t, eng.Process(unittest.IdentifierFixture(), &messageA{n: i}))

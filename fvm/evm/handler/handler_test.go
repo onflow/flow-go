@@ -394,9 +394,8 @@ func TestHandler_COA(t *testing.T) {
 				require.Equal(t, totalGasUsed, blockEventPayload.TotalGasUsed)
 
 				// check gas usage
-				computationUsed, err := backend.ComputationUsed()
-				require.NoError(t, err)
-				require.Greater(t, computationUsed, types.DefaultDirectCallBaseGasUsage*3)
+				meteringResult := backend.MeteringResult()
+				require.Greater(t, meteringResult.ComputationUsed, types.DefaultDirectCallBaseGasUsage*3)
 
 				// Withdraw with invalid balance
 				assertPanic(t, types.IsAWithdrawBalanceRoundingError, func() {

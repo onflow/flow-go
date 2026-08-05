@@ -37,7 +37,7 @@ func TestStoringTransactionResultErrorMessages(t *testing.T) {
 		require.Nil(t, messages)
 
 		txErrorMessages := make([]flow.TransactionResultErrorMessage, 0)
-		for i := range 10 {
+		for i := 0; i < 10; i++ {
 			expected := flow.TransactionResultErrorMessage{
 				TransactionID: unittest.IdentifierFixture(),
 				ErrorMessage:  fmt.Sprintf("a runtime error %d", i),
@@ -123,7 +123,7 @@ func TestBatchStoreTransactionResultErrorMessagesErrAlreadyExists(t *testing.T) 
 
 		blockID := unittest.IdentifierFixture()
 		txResultErrMsgs := make([]flow.TransactionResultErrorMessage, 0)
-		for i := range 3 {
+		for i := 0; i < 3; i++ {
 			expected := flow.TransactionResultErrorMessage{
 				TransactionID: unittest.IdentifierFixture(),
 				ErrorMessage:  fmt.Sprintf("a runtime error %d", i),
@@ -143,7 +143,7 @@ func TestBatchStoreTransactionResultErrorMessagesErrAlreadyExists(t *testing.T) 
 
 		// Second batch store with the same blockID should fail with ErrAlreadyExists
 		duplicateTxResultErrMsgs := make([]flow.TransactionResultErrorMessage, 0)
-		for i := range 2 {
+		for i := 0; i < 2; i++ {
 			expected := flow.TransactionResultErrorMessage{
 				TransactionID: unittest.IdentifierFixture(),
 				ErrorMessage:  fmt.Sprintf("duplicate error %d", i),
@@ -187,7 +187,7 @@ func TestBatchStoreTransactionResultErrorMessagesMissingLock(t *testing.T) {
 
 		blockID := unittest.IdentifierFixture()
 		txResultErrMsgs := make([]flow.TransactionResultErrorMessage, 0)
-		for i := range 3 {
+		for i := 0; i < 3; i++ {
 			expected := flow.TransactionResultErrorMessage{
 				TransactionID: unittest.IdentifierFixture(),
 				ErrorMessage:  fmt.Sprintf("a runtime error %d", i),
@@ -222,7 +222,7 @@ func TestBatchStoreTransactionResultErrorMessagesWrongLock(t *testing.T) {
 
 		blockID := unittest.IdentifierFixture()
 		txResultErrMsgs := make([]flow.TransactionResultErrorMessage, 0)
-		for i := range 3 {
+		for i := 0; i < 3; i++ {
 			expected := flow.TransactionResultErrorMessage{
 				TransactionID: unittest.IdentifierFixture(),
 				ErrorMessage:  fmt.Sprintf("a runtime error %d", i),

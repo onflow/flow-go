@@ -594,10 +594,12 @@ func TestExecutionNodeClientClosedGracefully(t *testing.T) {
 
 		var waitGroup sync.WaitGroup
 
-		for range nofRequests {
+		for i := 0; i < nofRequests; i++ {
+			waitGroup.Add(1)
 
 			// call Ping request from different goroutines
-			waitGroup.Go(func() {
+			go func() {
+				defer waitGroup.Done()
 				_, err := client.Ping(ctx, req)
 
 				if err == nil {
@@ -605,7 +607,7 @@ func TestExecutionNodeClientClosedGracefully(t *testing.T) {
 				} else {
 					require.Equalf(t, codes.Unavailable, status.Code(err), "unexpected error: %v", err)
 				}
-			})
+			}()
 		}
 
 		// Close connection
@@ -701,7 +703,9 @@ func TestEvictingCacheClients(t *testing.T) {
 
 	// Schedule the invalidation of the access API client while the Ping call is in progress
 	wg := sync.WaitGroup{}
-	wg.Go(func() {
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
 
 		<-startPing // wait until Ping is called
 
@@ -719,7 +723,7 @@ func TestEvictingCacheClients(t *testing.T) {
 		assert.Nil(t, resp)
 
 		close(returnFromPing) // signal it's ok to return from Ping
-	})
+	}()
 
 	// Call a gRPC method on the client
 	_, err = client.Ping(ctx, pingReq)
@@ -816,7 +820,7 @@ func TestConcurrentConnections(t *testing.T) {
 		var wg sync.WaitGroup
 		wg.Add(requestCount)
 
-		for range requestCount {
+		for i := 0; i < requestCount; i++ {
 			go func() {
 				defer wg.Done()
 

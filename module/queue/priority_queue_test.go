@@ -261,7 +261,7 @@ func TestPriorityQueue_HeapOperations(t *testing.T) {
 
 		// Pop items and verify order
 		results := make([]string, 4)
-		for i := range 4 {
+		for i := 0; i < 4; i++ {
 			item := heap.Pop(pq).(*PriorityQueueItem[string])
 			results[i] = item.message
 		}

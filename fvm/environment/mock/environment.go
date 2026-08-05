@@ -808,103 +808,6 @@ func (_c *Environment_CommitBlockProposal_Call) RunAndReturn(run func(blockPropo
 	return _c
 }
 
-// ComputationAvailable provides a mock function for the type Environment
-func (_mock *Environment) ComputationAvailable(computationUsage common0.ComputationUsage) bool {
-	ret := _mock.Called(computationUsage)
-
-	if len(ret) == 0 {
-		panic("no return value specified for ComputationAvailable")
-	}
-
-	var r0 bool
-	if returnFunc, ok := ret.Get(0).(func(common0.ComputationUsage) bool); ok {
-		r0 = returnFunc(computationUsage)
-	} else {
-		r0 = ret.Get(0).(bool)
-	}
-	return r0
-}
-
-// Environment_ComputationAvailable_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ComputationAvailable'
-type Environment_ComputationAvailable_Call struct {
-	*mock.Call
-}
-
-// ComputationAvailable is a helper method to define mock.On call
-//   - computationUsage common0.ComputationUsage
-func (_e *Environment_Expecter) ComputationAvailable(computationUsage interface{}) *Environment_ComputationAvailable_Call {
-	return &Environment_ComputationAvailable_Call{Call: _e.mock.On("ComputationAvailable", computationUsage)}
-}
-
-func (_c *Environment_ComputationAvailable_Call) Run(run func(computationUsage common0.ComputationUsage)) *Environment_ComputationAvailable_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 common0.ComputationUsage
-		if args[0] != nil {
-			arg0 = args[0].(common0.ComputationUsage)
-		}
-		run(
-			arg0,
-		)
-	})
-	return _c
-}
-
-func (_c *Environment_ComputationAvailable_Call) Return(b bool) *Environment_ComputationAvailable_Call {
-	_c.Call.Return(b)
-	return _c
-}
-
-func (_c *Environment_ComputationAvailable_Call) RunAndReturn(run func(computationUsage common0.ComputationUsage) bool) *Environment_ComputationAvailable_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// ComputationIntensities provides a mock function for the type Environment
-func (_mock *Environment) ComputationIntensities() meter.MeteredComputationIntensities {
-	ret := _mock.Called()
-
-	if len(ret) == 0 {
-		panic("no return value specified for ComputationIntensities")
-	}
-
-	var r0 meter.MeteredComputationIntensities
-	if returnFunc, ok := ret.Get(0).(func() meter.MeteredComputationIntensities); ok {
-		r0 = returnFunc()
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(meter.MeteredComputationIntensities)
-		}
-	}
-	return r0
-}
-
-// Environment_ComputationIntensities_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ComputationIntensities'
-type Environment_ComputationIntensities_Call struct {
-	*mock.Call
-}
-
-// ComputationIntensities is a helper method to define mock.On call
-func (_e *Environment_Expecter) ComputationIntensities() *Environment_ComputationIntensities_Call {
-	return &Environment_ComputationIntensities_Call{Call: _e.mock.On("ComputationIntensities")}
-}
-
-func (_c *Environment_ComputationIntensities_Call) Run(run func()) *Environment_ComputationIntensities_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run()
-	})
-	return _c
-}
-
-func (_c *Environment_ComputationIntensities_Call) Return(meteredComputationIntensities meter.MeteredComputationIntensities) *Environment_ComputationIntensities_Call {
-	_c.Call.Return(meteredComputationIntensities)
-	return _c
-}
-
-func (_c *Environment_ComputationIntensities_Call) RunAndReturn(run func() meter.MeteredComputationIntensities) *Environment_ComputationIntensities_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
 // ComputationRemaining provides a mock function for the type Environment
 func (_mock *Environment) ComputationRemaining(kind common0.ComputationKind) uint64 {
 	ret := _mock.Called(kind)
@@ -956,59 +859,6 @@ func (_c *Environment_ComputationRemaining_Call) RunAndReturn(run func(kind comm
 	return _c
 }
 
-// ComputationUsed provides a mock function for the type Environment
-func (_mock *Environment) ComputationUsed() (uint64, error) {
-	ret := _mock.Called()
-
-	if len(ret) == 0 {
-		panic("no return value specified for ComputationUsed")
-	}
-
-	var r0 uint64
-	var r1 error
-	if returnFunc, ok := ret.Get(0).(func() (uint64, error)); ok {
-		return returnFunc()
-	}
-	if returnFunc, ok := ret.Get(0).(func() uint64); ok {
-		r0 = returnFunc()
-	} else {
-		r0 = ret.Get(0).(uint64)
-	}
-	if returnFunc, ok := ret.Get(1).(func() error); ok {
-		r1 = returnFunc()
-	} else {
-		r1 = ret.Error(1)
-	}
-	return r0, r1
-}
-
-// Environment_ComputationUsed_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ComputationUsed'
-type Environment_ComputationUsed_Call struct {
-	*mock.Call
-}
-
-// ComputationUsed is a helper method to define mock.On call
-func (_e *Environment_Expecter) ComputationUsed() *Environment_ComputationUsed_Call {
-	return &Environment_ComputationUsed_Call{Call: _e.mock.On("ComputationUsed")}
-}
-
-func (_c *Environment_ComputationUsed_Call) Run(run func()) *Environment_ComputationUsed_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run()
-	})
-	return _c
-}
-
-func (_c *Environment_ComputationUsed_Call) Return(v uint64, err error) *Environment_ComputationUsed_Call {
-	_c.Call.Return(v, err)
-	return _c
-}
-
-func (_c *Environment_ComputationUsed_Call) RunAndReturn(run func() (uint64, error)) *Environment_ComputationUsed_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
 // ConvertedServiceEvents provides a mock function for the type Environment
 func (_mock *Environment) ConvertedServiceEvents() flow.ServiceEventList {
 	ret := _mock.Called()
@@ -1056,8 +906,8 @@ func (_c *Environment_ConvertedServiceEvents_Call) RunAndReturn(run func() flow.
 }
 
 // CreateAccount provides a mock function for the type Environment
-func (_mock *Environment) CreateAccount(payer runtime.Address) (runtime.Address, error) {
-	ret := _mock.Called(payer)
+func (_mock *Environment) CreateAccount(payer runtime.Address, context interpreter.InvocationContext) (runtime.Address, error) {
+	ret := _mock.Called(payer, context)
 
 	if len(ret) == 0 {
 		panic("no return value specified for CreateAccount")
@@ -1065,18 +915,18 @@ func (_mock *Environment) CreateAccount(payer runtime.Address) (runtime.Address,
 
 	var r0 runtime.Address
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(runtime.Address) (runtime.Address, error)); ok {
-		return returnFunc(payer)
+	if returnFunc, ok := ret.Get(0).(func(runtime.Address, interpreter.InvocationContext) (runtime.Address, error)); ok {
+		return returnFunc(payer, context)
 	}
-	if returnFunc, ok := ret.Get(0).(func(runtime.Address) runtime.Address); ok {
-		r0 = returnFunc(payer)
+	if returnFunc, ok := ret.Get(0).(func(runtime.Address, interpreter.InvocationContext) runtime.Address); ok {
+		r0 = returnFunc(payer, context)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(runtime.Address)
 		}
 	}
-	if returnFunc, ok := ret.Get(1).(func(runtime.Address) error); ok {
-		r1 = returnFunc(payer)
+	if returnFunc, ok := ret.Get(1).(func(runtime.Address, interpreter.InvocationContext) error); ok {
+		r1 = returnFunc(payer, context)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -1090,18 +940,24 @@ type Environment_CreateAccount_Call struct {
 
 // CreateAccount is a helper method to define mock.On call
 //   - payer runtime.Address
-func (_e *Environment_Expecter) CreateAccount(payer interface{}) *Environment_CreateAccount_Call {
-	return &Environment_CreateAccount_Call{Call: _e.mock.On("CreateAccount", payer)}
+//   - context interpreter.InvocationContext
+func (_e *Environment_Expecter) CreateAccount(payer interface{}, context interface{}) *Environment_CreateAccount_Call {
+	return &Environment_CreateAccount_Call{Call: _e.mock.On("CreateAccount", payer, context)}
 }
 
-func (_c *Environment_CreateAccount_Call) Run(run func(payer runtime.Address)) *Environment_CreateAccount_Call {
+func (_c *Environment_CreateAccount_Call) Run(run func(payer runtime.Address, context interpreter.InvocationContext)) *Environment_CreateAccount_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 runtime.Address
 		if args[0] != nil {
 			arg0 = args[0].(runtime.Address)
 		}
+		var arg1 interpreter.InvocationContext
+		if args[1] != nil {
+			arg1 = args[1].(interpreter.InvocationContext)
+		}
 		run(
 			arg0,
+			arg1,
 		)
 	})
 	return _c
@@ -1112,7 +968,7 @@ func (_c *Environment_CreateAccount_Call) Return(address runtime.Address, err er
 	return _c
 }
 
-func (_c *Environment_CreateAccount_Call) RunAndReturn(run func(payer runtime.Address) (runtime.Address, error)) *Environment_CreateAccount_Call {
+func (_c *Environment_CreateAccount_Call) RunAndReturn(run func(payer runtime.Address, context interpreter.InvocationContext) (runtime.Address, error)) *Environment_CreateAccount_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -3024,59 +2880,6 @@ func (_c *Environment_Logs_Call) RunAndReturn(run func() []string) *Environment_
 	return _c
 }
 
-// MemoryUsed provides a mock function for the type Environment
-func (_mock *Environment) MemoryUsed() (uint64, error) {
-	ret := _mock.Called()
-
-	if len(ret) == 0 {
-		panic("no return value specified for MemoryUsed")
-	}
-
-	var r0 uint64
-	var r1 error
-	if returnFunc, ok := ret.Get(0).(func() (uint64, error)); ok {
-		return returnFunc()
-	}
-	if returnFunc, ok := ret.Get(0).(func() uint64); ok {
-		r0 = returnFunc()
-	} else {
-		r0 = ret.Get(0).(uint64)
-	}
-	if returnFunc, ok := ret.Get(1).(func() error); ok {
-		r1 = returnFunc()
-	} else {
-		r1 = ret.Error(1)
-	}
-	return r0, r1
-}
-
-// Environment_MemoryUsed_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'MemoryUsed'
-type Environment_MemoryUsed_Call struct {
-	*mock.Call
-}
-
-// MemoryUsed is a helper method to define mock.On call
-func (_e *Environment_Expecter) MemoryUsed() *Environment_MemoryUsed_Call {
-	return &Environment_MemoryUsed_Call{Call: _e.mock.On("MemoryUsed")}
-}
-
-func (_c *Environment_MemoryUsed_Call) Run(run func()) *Environment_MemoryUsed_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run()
-	})
-	return _c
-}
-
-func (_c *Environment_MemoryUsed_Call) Return(v uint64, err error) *Environment_MemoryUsed_Call {
-	_c.Call.Return(v, err)
-	return _c
-}
-
-func (_c *Environment_MemoryUsed_Call) RunAndReturn(run func() (uint64, error)) *Environment_MemoryUsed_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
 // MeterComputation provides a mock function for the type Environment
 func (_mock *Environment) MeterComputation(usage common0.ComputationUsage) error {
 	ret := _mock.Called(usage)
@@ -3226,6 +3029,50 @@ func (_c *Environment_MeterMemory_Call) Return(err error) *Environment_MeterMemo
 }
 
 func (_c *Environment_MeterMemory_Call) RunAndReturn(run func(usage common0.MemoryUsage) error) *Environment_MeterMemory_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// MeteringResult provides a mock function for the type Environment
+func (_mock *Environment) MeteringResult() meter.MeteringResult {
+	ret := _mock.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for MeteringResult")
+	}
+
+	var r0 meter.MeteringResult
+	if returnFunc, ok := ret.Get(0).(func() meter.MeteringResult); ok {
+		r0 = returnFunc()
+	} else {
+		r0 = ret.Get(0).(meter.MeteringResult)
+	}
+	return r0
+}
+
+// Environment_MeteringResult_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'MeteringResult'
+type Environment_MeteringResult_Call struct {
+	*mock.Call
+}
+
+// MeteringResult is a helper method to define mock.On call
+func (_e *Environment_Expecter) MeteringResult() *Environment_MeteringResult_Call {
+	return &Environment_MeteringResult_Call{Call: _e.mock.On("MeteringResult")}
+}
+
+func (_c *Environment_MeteringResult_Call) Run(run func()) *Environment_MeteringResult_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *Environment_MeteringResult_Call) Return(meteringResult meter.MeteringResult) *Environment_MeteringResult_Call {
+	_c.Call.Return(meteringResult)
+	return _c
+}
+
+func (_c *Environment_MeteringResult_Call) RunAndReturn(run func() meter.MeteringResult) *Environment_MeteringResult_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -4399,50 +4246,6 @@ func (_c *Environment_StartChildSpan_Call) Return(tracerSpan tracing.TracerSpan)
 }
 
 func (_c *Environment_StartChildSpan_Call) RunAndReturn(run func(name trace.SpanName, options ...trace0.SpanStartOption) tracing.TracerSpan) *Environment_StartChildSpan_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// TotalEmittedEventBytes provides a mock function for the type Environment
-func (_mock *Environment) TotalEmittedEventBytes() uint64 {
-	ret := _mock.Called()
-
-	if len(ret) == 0 {
-		panic("no return value specified for TotalEmittedEventBytes")
-	}
-
-	var r0 uint64
-	if returnFunc, ok := ret.Get(0).(func() uint64); ok {
-		r0 = returnFunc()
-	} else {
-		r0 = ret.Get(0).(uint64)
-	}
-	return r0
-}
-
-// Environment_TotalEmittedEventBytes_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'TotalEmittedEventBytes'
-type Environment_TotalEmittedEventBytes_Call struct {
-	*mock.Call
-}
-
-// TotalEmittedEventBytes is a helper method to define mock.On call
-func (_e *Environment_Expecter) TotalEmittedEventBytes() *Environment_TotalEmittedEventBytes_Call {
-	return &Environment_TotalEmittedEventBytes_Call{Call: _e.mock.On("TotalEmittedEventBytes")}
-}
-
-func (_c *Environment_TotalEmittedEventBytes_Call) Run(run func()) *Environment_TotalEmittedEventBytes_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run()
-	})
-	return _c
-}
-
-func (_c *Environment_TotalEmittedEventBytes_Call) Return(v uint64) *Environment_TotalEmittedEventBytes_Call {
-	_c.Call.Return(v)
-	return _c
-}
-
-func (_c *Environment_TotalEmittedEventBytes_Call) RunAndReturn(run func() uint64) *Environment_TotalEmittedEventBytes_Call {
 	_c.Call.Return(run)
 	return _c
 }

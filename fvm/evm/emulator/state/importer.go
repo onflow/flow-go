@@ -3,6 +3,7 @@ package state
 import (
 	"encoding/gob"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -81,12 +82,12 @@ func ImportEVMState(path string) (*EVMState, error) {
 	var codes []*CodeInContext
 	var slots []*types.SlotEntry
 	// Import codes
-	codesData, err := os.ReadFile(filepath.Join(path, ExportedCodesFileName))
+	codesData, err := ioutil.ReadFile(filepath.Join(path, ExportedCodesFileName))
 	if err != nil {
 		return nil, fmt.Errorf("error opening codes file: %w", err)
 	}
-	codesLines := strings.SplitSeq(string(codesData), "\n")
-	for line := range codesLines {
+	codesLines := strings.Split(string(codesData), "\n")
+	for _, line := range codesLines {
 		if line == "" {
 			continue
 		}
@@ -98,12 +99,12 @@ func ImportEVMState(path string) (*EVMState, error) {
 	}
 
 	// Import slots
-	slotsData, err := os.ReadFile(filepath.Join(path, ExportedSlotsFileName))
+	slotsData, err := ioutil.ReadFile(filepath.Join(path, ExportedSlotsFileName))
 	if err != nil {
 		return nil, fmt.Errorf("error opening slots file: %w", err)
 	}
-	slotsLines := strings.SplitSeq(string(slotsData), "\n")
-	for line := range slotsLines {
+	slotsLines := strings.Split(string(slotsData), "\n")
+	for _, line := range slotsLines {
 		if line == "" {
 			continue
 		}
@@ -115,12 +116,12 @@ func ImportEVMState(path string) (*EVMState, error) {
 	}
 
 	// Import accounts
-	accountsData, err := os.ReadFile(filepath.Join(path, ExportedAccountsFileName))
+	accountsData, err := ioutil.ReadFile(filepath.Join(path, ExportedAccountsFileName))
 	if err != nil {
 		return nil, fmt.Errorf("error opening accounts file: %w", err)
 	}
-	accountsLines := strings.SplitSeq(string(accountsData), "\n")
-	for line := range accountsLines {
+	accountsLines := strings.Split(string(accountsData), "\n")
+	for _, line := range accountsLines {
 		if line == "" {
 			continue
 		}

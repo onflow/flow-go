@@ -338,7 +338,7 @@ func TestLoadBackgroundIndexerEngine_Indexing(t *testing.T) {
 
 	blocks := make([]*flow.Block, numBlocks)
 	parentHeader := sealedRoot
-	for i := range numBlocks {
+	for i := 0; i < numBlocks; i++ {
 		height := startHeight + uint64(i) + 1
 		block := unittest.BlockWithParentFixture(parentHeader)
 		blocks[i] = block
@@ -397,7 +397,7 @@ func TestLoadBackgroundIndexerEngine_Indexing(t *testing.T) {
 	resultsReader := storagemock.NewExecutionResults(t)
 
 	// Create execution data and results for all blocks
-	for i := range numBlocks {
+	for i := 0; i < numBlocks; i++ {
 		block := blocks[i]
 
 		// Create valid register entries and convert to trie update
@@ -407,7 +407,7 @@ func TestLoadBackgroundIndexerEngine_Indexing(t *testing.T) {
 					Owner: "owner",
 					Key:   fmt.Sprintf("key%d", i),
 				},
-				Value: fmt.Appendf(nil, "value%d", i),
+				Value: []byte(fmt.Sprintf("value%d", i)),
 			},
 		}
 
@@ -496,7 +496,7 @@ func TestLoadBackgroundIndexerEngine_Indexing(t *testing.T) {
 	// The finalized reader subscribes to protocolEvents during bootstrapping, so it will receive these events
 	// We need to finalize them sequentially so the finalized reader's lastHeight is updated correctly
 	// The FinalizedReader's BlockFinalized method is called synchronously, so we don't need long waits
-	for i := range numBlocks {
+	for i := 0; i < numBlocks; i++ {
 		block := blocks[i]
 		protocolEvents.BlockFinalized(block.ToHeader())
 		// Small wait to ensure the event is processed
@@ -514,7 +514,7 @@ func TestLoadBackgroundIndexerEngine_Indexing(t *testing.T) {
 	finalSnapshot.On("Head").Return(finalizedBlock.ToHeader(), nil)
 
 	// Notify the follower distributor to trigger the background indexer
-	for i := range numBlocks {
+	for i := 0; i < numBlocks; i++ {
 		block := blocks[i]
 		hotstuffBlock := &model.Block{
 			BlockID:    block.ID(),
@@ -530,7 +530,7 @@ func TestLoadBackgroundIndexerEngine_Indexing(t *testing.T) {
 	// Notify that blocks were executed (this triggers indexing)
 	// The background indexer will process all finalized and executed blocks sequentially
 	// We may need to trigger multiple times as blocks get processed
-	for range 10 {
+	for attempt := 0; attempt < 10; attempt++ {
 		blockExecutedNotifier.OnExecuted()
 		time.Sleep(200 * time.Millisecond)
 

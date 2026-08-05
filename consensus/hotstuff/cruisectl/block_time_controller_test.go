@@ -750,7 +750,7 @@ func captureControllerStateDigest(ctl *BlockTimeController) *controllerStateDige
 
 // inProximityOf returns a testify `argumentMatcher` that only accepts durations d,
 // such that |d - t| ≤ ε, for specified constants targetValue t and acceptedDeviation ε.
-func inProximityOf(targetValue, acceptedDeviation time.Duration) any {
+func inProximityOf(targetValue, acceptedDeviation time.Duration) interface{} {
 	return mock.MatchedBy(func(duration time.Duration) bool {
 		e := targetValue.Seconds() - duration.Seconds()
 		return math.Abs(e) <= acceptedDeviation.Abs().Seconds()

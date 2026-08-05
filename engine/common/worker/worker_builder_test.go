@@ -89,7 +89,7 @@ func TestWorkerBuilder_UnhappyPaths(t *testing.T) {
 	unittest.RequireCloseBefore(t, firstEventArrived, 100*time.Millisecond, "first event not distributed")
 
 	// now the worker is blocked, we submit the rest of the events so that the queue is full
-	for i := range size {
+	for i := 0; i < size; i++ {
 		event := fmt.Sprintf("test-event-%d", i)
 		require.True(t, pool.Submit(event))
 		// we also check that re-submitting the same event fails as duplicate event already is in the queue.
@@ -111,7 +111,7 @@ func TestWorkerPool_TwoWorkers_ConcurrentEvents(t *testing.T) {
 
 	tc := make([]string, size)
 
-	for i := range size {
+	for i := 0; i < size; i++ {
 		tc[i] = fmt.Sprintf("test-event-%d", i)
 	}
 
@@ -147,7 +147,7 @@ func TestWorkerPool_TwoWorkers_ConcurrentEvents(t *testing.T) {
 
 	unittest.RequireCloseBefore(t, cm.Ready(), 100*time.Millisecond, "could not start worker")
 
-	for i := range size {
+	for i := 0; i < size; i++ {
 		go func(i int) {
 			require.True(t, pool.Submit(tc[i]))
 		}(i)

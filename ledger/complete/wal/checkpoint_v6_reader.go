@@ -135,7 +135,7 @@ func ReadCheckpointFileSize(dir string, fileName string) (uint64, error) {
 func allFilePaths(dir string, fileName string) []string {
 	paths := make([]string, 0, 1+subtrieCount+1)
 	paths = append(paths, filePathCheckpointHeader(dir, fileName))
-	for i := range subtrieCount {
+	for i := 0; i < subtrieCount; i++ {
 		subTriePath, _, _ := filePathSubTries(dir, fileName, i)
 		paths = append(paths, subTriePath)
 	}
@@ -205,7 +205,7 @@ func readCheckpointHeader(filepath string, logger zerolog.Logger) (
 	}
 
 	subtrieChecksums := make([]uint32, subtrieCount)
-	for i := range subtrieCount {
+	for i := uint16(0); i < subtrieCount; i++ {
 		sum, err := readCRC32Sum(reader)
 		if err != nil {
 			return nil, 0, fmt.Errorf("could not read %v-th subtrie checksum from checkpoint header: %w", i, err)
@@ -287,7 +287,7 @@ func findCheckpointPartFiles(dir string, fileName string) ([]string, error) {
 	}
 
 	// check all subtrie parts
-	for i := range subtrieCount {
+	for i := 0; i < subtrieCount; i++ {
 		subtriePath, _, err := filePathSubTries(dir, fileName, i)
 		if err != nil {
 			return nil, err
@@ -342,7 +342,7 @@ func readSubTriesConcurrently(dir string, fileName string, subtrieChecksums []ui
 
 	// TODO: make nWorker configable
 	nWorker := numOfSubTries // use as many worker as the jobs to read subtries concurrently
-	for range nWorker {
+	for i := 0; i < nWorker; i++ {
 		go func() {
 			for job := range jobs {
 				nodes, err := readCheckpointSubTrie(dir, fileName, job.Index, job.Checksum, logger)
@@ -614,7 +614,7 @@ func readTopLevelTries(dir string, fileName string, subtrieNodes [][]*node.Node,
 		}
 
 		// read the trie root nodes
-		for i := range triesCount {
+		for i := uint16(0); i < triesCount; i++ {
 			trie, err := flattener.ReadTrie(reader, scratch, func(nodeIndex uint64) (*node.Node, error) {
 				return getNodeByIndex(subtrieNodes, totalSubTrieNodeCount, topLevelNodes, nodeIndex)
 			})

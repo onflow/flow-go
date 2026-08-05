@@ -37,7 +37,7 @@ func main() {
 			MempoolCollector:    metrics.NewMempoolCollector(5 * time.Second),
 		}
 
-		for i := range 100 {
+		for i := 0; i < 100; i++ {
 			block := unittest.BlockFixture()
 			collector.MempoolEntries(metrics.ResourceGuarantee, 22)
 			collector.BlockFinalized(block)

@@ -366,7 +366,7 @@ func (s *Suite) TestOnFinalizedBlockSeveralBlocksAhead() {
 	blocks := make([]*flow.Block, newBlocksCount)
 
 	// generate the test blocks, cgs and collections
-	for i := range newBlocksCount {
+	for i := 0; i < newBlocksCount; i++ {
 		block := s.generateBlock(clusterCommittee, snap)
 		block.Height = startHeight + uint64(i)
 		s.blockMap[block.Height] = block

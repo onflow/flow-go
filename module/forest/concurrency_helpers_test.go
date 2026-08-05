@@ -139,7 +139,7 @@ func Test_VertexIteratorConcurrencySafe(t *testing.T) {
 
 	go func() { // Go Routine 1
 		<-start
-		for i := range 1000 {
+		for i := 0; i < 1000; i++ {
 			// add additional child vertex of [C]
 			var v Vertex = NewVertexMock(fmt.Sprintf("v%03d", i), 3, "C", 2)
 			err := forest.VerifyAndAddVertex(&v)

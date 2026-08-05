@@ -132,7 +132,7 @@ func (b *ExecutionDataBackend) SubscribeExecutionDataFromLatest(ctx context.Cont
 	return b.subscriptionHandler.Subscribe(ctx, nextHeight, b.getResponse)
 }
 
-func (b *ExecutionDataBackend) getResponse(ctx context.Context, height uint64) (any, error) {
+func (b *ExecutionDataBackend) getResponse(ctx context.Context, height uint64) (interface{}, error) {
 	executionData, err := b.getExecutionData(ctx, height)
 	if err != nil {
 		return nil, fmt.Errorf("could not get execution data for block %d: %w", height, err)

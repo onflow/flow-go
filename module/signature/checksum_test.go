@@ -65,7 +65,7 @@ func TestPrefixCheckSum(t *testing.T) {
 //  2. `CompareAndExtract` returns `ErrInvalidChecksum` is the checksum does not match
 func Test_InvalidCheckSum(t *testing.T) {
 	t.Run("checksum too short", func(t *testing.T) {
-		for i := range 4 {
+		for i := 0; i < 4; i++ {
 			_, _, err := msig.SplitCheckSum(unittest.RandomBytes(i))
 			require.ErrorIs(t, err, msig.ErrInvalidChecksum)
 		}

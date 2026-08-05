@@ -31,7 +31,7 @@ func (s *BackendBlockHeadersSuite) SetupTest() {
 
 // TestSubscribeBlockHeadersFromStartBlockID tests the SubscribeBlockHeadersFromStartBlockID method.
 func (s *BackendBlockHeadersSuite) TestSubscribeBlockHeadersFromStartBlockID() {
-	call := func(ctx context.Context, startValue any, blockStatus flow.BlockStatus) subscription.Subscription {
+	call := func(ctx context.Context, startValue interface{}, blockStatus flow.BlockStatus) subscription.Subscription {
 		return s.backend.SubscribeBlockHeadersFromStartBlockID(ctx, startValue.(flow.Identifier), blockStatus)
 	}
 
@@ -40,7 +40,7 @@ func (s *BackendBlockHeadersSuite) TestSubscribeBlockHeadersFromStartBlockID() {
 
 // TestSubscribeBlockHeadersFromStartHeight tests the SubscribeBlockHeadersFromStartHeight method.
 func (s *BackendBlockHeadersSuite) TestSubscribeBlockHeadersFromStartHeight() {
-	call := func(ctx context.Context, startValue any, blockStatus flow.BlockStatus) subscription.Subscription {
+	call := func(ctx context.Context, startValue interface{}, blockStatus flow.BlockStatus) subscription.Subscription {
 		return s.backend.SubscribeBlockHeadersFromStartHeight(ctx, startValue.(uint64), blockStatus)
 	}
 
@@ -49,7 +49,7 @@ func (s *BackendBlockHeadersSuite) TestSubscribeBlockHeadersFromStartHeight() {
 
 // TestSubscribeBlockHeadersFromLatest tests the SubscribeBlockHeadersFromLatest method.
 func (s *BackendBlockHeadersSuite) TestSubscribeBlockHeadersFromLatest() {
-	call := func(ctx context.Context, startValue any, blockStatus flow.BlockStatus) subscription.Subscription {
+	call := func(ctx context.Context, startValue interface{}, blockStatus flow.BlockStatus) subscription.Subscription {
 		return s.backend.SubscribeBlockHeadersFromLatest(ctx, blockStatus)
 	}
 
@@ -57,7 +57,7 @@ func (s *BackendBlockHeadersSuite) TestSubscribeBlockHeadersFromLatest() {
 }
 
 // requireBlockHeaders ensures that the received block header information matches the expected data.
-func (s *BackendBlockHeadersSuite) requireBlockHeaders(v any, expectedBlock *flow.Block) {
+func (s *BackendBlockHeadersSuite) requireBlockHeaders(v interface{}, expectedBlock *flow.Block) {
 	actualHeader, ok := v.(*flow.Header)
 	require.True(s.T(), ok, "unexpected response type: %T", v)
 

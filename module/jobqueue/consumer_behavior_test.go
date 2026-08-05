@@ -491,7 +491,7 @@ func testWorkOnNextAfterFastforward(t *testing.T) {
 func testStopRunning(t *testing.T) {
 	runWith(t, DefaultIndex, func(c module.JobConsumer, cp storage.ConsumerProgress, w *mockWorker, j *jobqueue.MockJobs, db *pebble.DB) {
 		require.NoError(t, c.Start())
-		for range 4 {
+		for i := 0; i < 4; i++ {
 			require.NoError(t, j.PushOne())
 			c.Check()
 		}
@@ -525,11 +525,13 @@ func testConcurrency(t *testing.T) {
 
 		// Pushing job and checking job concurrently
 		var pushAll sync.WaitGroup
-		for range 100 {
-			pushAll.Go(func() {
+		for i := 0; i < 100; i++ {
+			pushAll.Add(1)
+			go func() {
 				require.NoError(t, j.PushOne())
 				c.Check()
-			})
+				pushAll.Done()
+			}()
 		}
 
 		// wait until pushed all

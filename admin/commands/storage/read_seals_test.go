@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"context"
 	"fmt"
 	"testing"
 
@@ -41,10 +42,11 @@ func TestReadSealsByID(t *testing.T) {
 
 	command := NewReadSealsCommand(state, seals, index)
 
-	ctx := t.Context()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	req := &admin.CommandRequest{
-		Data: map[string]any{
+		Data: map[string]interface{}{
 			"seal": seal.ID().String(),
 		},
 	}

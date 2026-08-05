@@ -57,7 +57,7 @@ type BackendBlocksSuite struct {
 type testType struct {
 	name            string
 	highestBackfill int
-	startValue      any
+	startValue      interface{}
 	blockStatus     flow.BlockStatus
 	expectedBlocks  []*flow.Block
 }
@@ -94,7 +94,7 @@ func (s *BackendBlocksSuite) SetupTest() {
 	s.blockMap[s.rootBlock.Height] = s.rootBlock
 
 	s.T().Logf("Generating %d blocks, root block: %d %s", blockCount, s.rootBlock.Height, s.rootBlock.ID())
-	for range blockCount {
+	for i := 0; i < blockCount; i++ {
 		block := unittest.BlockWithParentFixture(parent)
 		// update for next iteration
 		parent = block.ToHeader()
@@ -309,7 +309,7 @@ func (s *BackendBlocksSuite) setupBlockTrackerMock(highestHeader *flow.Header) {
 
 // TestSubscribeBlocksFromStartBlockID tests the SubscribeBlocksFromStartBlockID method.
 func (s *BackendBlocksSuite) TestSubscribeBlocksFromStartBlockID() {
-	call := func(ctx context.Context, startValue any, blockStatus flow.BlockStatus) subscription.Subscription {
+	call := func(ctx context.Context, startValue interface{}, blockStatus flow.BlockStatus) subscription.Subscription {
 		return s.backend.SubscribeBlocksFromStartBlockID(ctx, startValue.(flow.Identifier), blockStatus)
 	}
 
@@ -318,7 +318,7 @@ func (s *BackendBlocksSuite) TestSubscribeBlocksFromStartBlockID() {
 
 // TestSubscribeBlocksFromStartHeight tests the SubscribeBlocksFromStartHeight method.
 func (s *BackendBlocksSuite) TestSubscribeBlocksFromStartHeight() {
-	call := func(ctx context.Context, startValue any, blockStatus flow.BlockStatus) subscription.Subscription {
+	call := func(ctx context.Context, startValue interface{}, blockStatus flow.BlockStatus) subscription.Subscription {
 		return s.backend.SubscribeBlocksFromStartHeight(ctx, startValue.(uint64), blockStatus)
 	}
 
@@ -327,7 +327,7 @@ func (s *BackendBlocksSuite) TestSubscribeBlocksFromStartHeight() {
 
 // TestSubscribeBlocksFromLatest tests the SubscribeBlocksFromLatest method.
 func (s *BackendBlocksSuite) TestSubscribeBlocksFromLatest() {
-	call := func(ctx context.Context, startValue any, blockStatus flow.BlockStatus) subscription.Subscription {
+	call := func(ctx context.Context, startValue interface{}, blockStatus flow.BlockStatus) subscription.Subscription {
 		return s.backend.SubscribeBlocksFromLatest(ctx, blockStatus)
 	}
 
@@ -360,8 +360,8 @@ func (s *BackendBlocksSuite) TestSubscribeBlocksFromLatest() {
 //  7. Ensures that there are no new messages waiting after all blocks have been processed.
 //  8. Cancels the subscription and ensures it shuts down gracefully.
 func (s *BackendBlocksSuite) subscribe(
-	subscribeFn func(ctx context.Context, startValue any, blockStatus flow.BlockStatus) subscription.Subscription,
-	requireFn func(any, *flow.Block),
+	subscribeFn func(ctx context.Context, startValue interface{}, blockStatus flow.BlockStatus) subscription.Subscription,
+	requireFn func(interface{}, *flow.Block),
 	tests []testType,
 ) {
 	for _, test := range tests {
@@ -437,7 +437,7 @@ func (s *BackendBlocksSuite) subscribe(
 }
 
 // requireBlocks ensures that the received block information matches the expected data.
-func (s *BackendBlocksSuite) requireBlocks(v any, expectedBlock *flow.Block) {
+func (s *BackendBlocksSuite) requireBlocks(v interface{}, expectedBlock *flow.Block) {
 	actualBlock, ok := v.(*flow.Block)
 	require.True(s.T(), ok, "unexpected response type: %T", v)
 

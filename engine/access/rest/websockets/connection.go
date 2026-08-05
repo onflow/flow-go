@@ -7,8 +7,8 @@ import (
 )
 
 type WebsocketConnection interface {
-	ReadJSON(v any) error
-	WriteJSON(v any) error
+	ReadJSON(v interface{}) error
+	WriteJSON(v interface{}) error
 	WriteControl(messageType int, deadline time.Time) error
 	Close() error
 	SetReadDeadline(deadline time.Time) error
@@ -28,11 +28,11 @@ func NewWebsocketConnection(conn *websocket.Conn) *WebsocketConnectionImpl {
 
 var _ WebsocketConnection = (*WebsocketConnectionImpl)(nil)
 
-func (c *WebsocketConnectionImpl) ReadJSON(v any) error {
+func (c *WebsocketConnectionImpl) ReadJSON(v interface{}) error {
 	return c.conn.ReadJSON(v)
 }
 
-func (c *WebsocketConnectionImpl) WriteJSON(v any) error {
+func (c *WebsocketConnectionImpl) WriteJSON(v interface{}) error {
 	return c.conn.WriteJSON(v)
 }
 

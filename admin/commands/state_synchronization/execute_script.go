@@ -22,7 +22,7 @@ type ExecuteScriptCommand struct {
 	scriptExecutor execution.ScriptExecutor
 }
 
-func (e *ExecuteScriptCommand) Handler(ctx context.Context, req *admin.CommandRequest) (any, error) {
+func (e *ExecuteScriptCommand) Handler(ctx context.Context, req *admin.CommandRequest) (interface{}, error) {
 	d := req.ValidatorData.(*scriptData)
 
 	result, err := e.scriptExecutor.ExecuteAtBlockHeight(context.Background(), d.script, d.arguments, d.height)
@@ -36,7 +36,7 @@ func (e *ExecuteScriptCommand) Handler(ctx context.Context, req *admin.CommandRe
 // Validator validates the request.
 // Returns admin.InvalidAdminReqError for invalid/malformed requests.
 func (e *ExecuteScriptCommand) Validator(req *admin.CommandRequest) error {
-	input, ok := req.Data.(map[string]any)
+	input, ok := req.Data.(map[string]interface{})
 	if !ok {
 		return admin.NewInvalidAdminReqFormatError("expected map[string]any")
 	}

@@ -128,7 +128,7 @@ func SkipBenchmarkUnless(b *testing.B, reason SkipBenchmarkReason, message strin
 
 // AssertReturnsBefore asserts that the given function returns before the
 // duration expires.
-func AssertReturnsBefore(t *testing.T, f func(), duration time.Duration, msgAndArgs ...any) bool {
+func AssertReturnsBefore(t *testing.T, f func(), duration time.Duration, msgAndArgs ...interface{}) bool {
 	done := make(chan struct{})
 
 	go func() {
@@ -155,7 +155,7 @@ func ClosedChannel() <-chan struct{} {
 
 // AssertClosesBefore asserts that the given channel closes before the
 // duration expires.
-func AssertClosesBefore(t assert.TestingT, done <-chan struct{}, duration time.Duration, msgAndArgs ...any) {
+func AssertClosesBefore(t assert.TestingT, done <-chan struct{}, duration time.Duration, msgAndArgs ...interface{}) {
 	select {
 	case <-time.After(duration):
 		assert.Fail(t, "channel did not return in time", msgAndArgs...)
@@ -172,7 +172,7 @@ func AssertFloatEqual(t *testing.T, expected, actual float64, message string) {
 }
 
 // AssertNotClosesBefore asserts that the given channel does not close before the duration expires.
-func AssertNotClosesBefore(t assert.TestingT, done <-chan struct{}, duration time.Duration, msgAndArgs ...any) {
+func AssertNotClosesBefore(t assert.TestingT, done <-chan struct{}, duration time.Duration, msgAndArgs ...interface{}) {
 	select {
 	case <-time.After(duration):
 		return
@@ -232,10 +232,12 @@ func RequireClosed(t *testing.T, ch <-chan struct{}, message string) {
 // and requires all invocations to return within duration.
 func RequireConcurrentCallsReturnBefore(t *testing.T, f func(), count int, duration time.Duration, message string) {
 	wg := &sync.WaitGroup{}
-	for range count {
-		wg.Go(func() {
+	for i := 0; i < count; i++ {
+		wg.Add(1)
+		go func() {
 			f()
-		})
+			wg.Done()
+		}()
 	}
 
 	RequireReturnsBefore(t, wg.Wait, duration, message)
@@ -454,7 +456,7 @@ func RunWithTypedPebbleDB(
 
 func Concurrently(n int, f func(int)) {
 	var wg sync.WaitGroup
-	for i := range n {
+	for i := 0; i < n; i++ {
 		wg.Add(1)
 		go func(i int) {
 			f(i)
@@ -566,7 +568,7 @@ func generateNetworkingKey(s flow.Identifier) (crypto.PrivateKey, error) {
 // PeerIdFixtures creates random and unique peer IDs (libp2p node IDs).
 func PeerIdFixtures(t *testing.T, n int) []peer.ID {
 	peerIDs := make([]peer.ID, n)
-	for i := range n {
+	for i := 0; i < n; i++ {
 		peerIDs[i] = PeerIdFixture(t)
 	}
 	return peerIDs

@@ -171,7 +171,7 @@ func (bhl *BlockHashList) updateBlockHashAt(idx int, bh gethCommon.Hash) error {
 	// store bucket
 	return bhl.backend.SetValue(
 		bhl.rootAddress[:],
-		fmt.Appendf(nil, blockHashListBucketKeyFormat, bucketNumber),
+		[]byte(fmt.Sprintf(blockHashListBucketKeyFormat, bucketNumber)),
 		cpy,
 	)
 }
@@ -180,7 +180,7 @@ func (bhl *BlockHashList) updateBlockHashAt(idx int, bh gethCommon.Hash) error {
 func (bhl *BlockHashList) fetchBucket(num int) ([]byte, error) {
 	data, err := bhl.backend.GetValue(
 		bhl.rootAddress[:],
-		fmt.Appendf(nil, blockHashListBucketKeyFormat, num),
+		[]byte(fmt.Sprintf(blockHashListBucketKeyFormat, num)),
 	)
 	if err != nil {
 		return nil, err

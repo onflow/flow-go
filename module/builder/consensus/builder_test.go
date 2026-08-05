@@ -225,7 +225,7 @@ func (bs *BuilderSuite) SetupTest() {
 
 	// Construct finalized blocks [F0] ... [F4]
 	previous := first
-	for n := range numFinalizedBlocks {
+	for n := 0; n < numFinalizedBlocks; n++ {
 		finalized := bs.createAndRecordBlock(previous, n > 0) // Do not construct candidate seal for [first], as it is already sealed
 		bs.finalizedBlockIDs = append(bs.finalizedBlockIDs, finalized.ID())
 		previous = finalized
@@ -237,7 +237,7 @@ func (bs *BuilderSuite) SetupTest() {
 
 	// Construct the pending (i.e. unfinalized) ancestors [A0], ..., [A3]
 	previous = final
-	for range numPendingBlocks {
+	for n := 0; n < numPendingBlocks; n++ {
 		pending := bs.createAndRecordBlock(previous, true)
 		bs.pendingBlockIDs = append(bs.pendingBlockIDs, pending.ID())
 		previous = pending
@@ -636,7 +636,7 @@ func (bs *BuilderSuite) TestPayloadSeals_OnlyFork() {
 	//   * [F0] ... [F4] and [final] are finalized, unsealed blocks with candidate seals are included in mempool
 	//   * [A0] ... [A2] are non-finalized, unsealed blocks with candidate seals are included in mempool
 	forkHead := bs.blocks[bs.finalID]
-	for i := range 8 {
+	for i := 0; i < 8; i++ {
 		// Usually, the blocks [B6] and [B7] will not have candidate seal for the following reason:
 		// For the verifiers to start checking a result R, they need a source of randomness for the block _incorporating_
 		// result R. The result for block [B6] is incorporated in [B7], which does _not_ have a child yet.
@@ -1107,7 +1107,7 @@ func (bs *BuilderSuite) TestPayloadReceipts_BlockLimit() {
 	metas := []*flow.ExecutionReceiptStub{}
 	expectedResults := []*flow.ExecutionResult{}
 	var i uint64
-	for i = range 5 {
+	for i = 0; i < 5; i++ {
 		blockOnFork := bs.blocks[bs.irsList[i].Seal.BlockID]
 		pendingReceipt := unittest.ReceiptForBlockFixture(blockOnFork)
 		receipts = append(receipts, pendingReceipt)
@@ -1133,7 +1133,7 @@ func (bs *BuilderSuite) TestPayloadReceipts_AsProvidedByReceiptForest() {
 	var expectedReceipts []*flow.ExecutionReceipt
 	var expectedMetas []*flow.ExecutionReceiptStub
 	var expectedResults []*flow.ExecutionResult
-	for i := range 10 {
+	for i := 0; i < 10; i++ {
 		expectedReceipts = append(expectedReceipts, unittest.ExecutionReceiptFixture())
 		expectedMetas = append(expectedMetas, expectedReceipts[i].Stub())
 		expectedResults = append(expectedResults, &expectedReceipts[i].ExecutionResult)

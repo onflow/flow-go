@@ -39,7 +39,7 @@ func createAggregationData(t *testing.T, signersNumber int) (
 	ids := make(flow.IdentitySkeletonList, 0, signersNumber)
 	pks := make([]crypto.PublicKey, 0, signersNumber)
 	view := 10 + uint64(rand.Uint32())
-	for range signersNumber {
+	for i := 0; i < signersNumber; i++ {
 		sk := unittest.PrivateKeyFixture(crypto.BLSBLS12381)
 		identity := unittest.IdentityFixture(unittest.WithStakingPubKey(sk.PublicKey()))
 		// id

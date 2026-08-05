@@ -390,7 +390,7 @@ func (builder *EpochBuilder) addBlock(block *flow.Block) {
 // receipt for the highest block in state to the given block before adding it to the state.
 // NOTE: This func should only be used after BuildEpoch to extend the commit phase
 func (builder *EpochBuilder) AddBlocksWithSeals(n int, counter uint64) *EpochBuilder {
-	for range n {
+	for i := 0; i < n; i++ {
 		// Given the last 2 blocks in state A <- B when we add block C it will contain the following.
 		// - seal for A
 		// - execution result for B

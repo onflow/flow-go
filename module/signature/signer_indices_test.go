@@ -23,7 +23,7 @@ import (
 func TestEncodeDecodeIdentities(t *testing.T) {
 	canonicalIdentities := unittest.IdentityListFixture(20).Sort(flow.Canonical[flow.Identity]).ToSkeleton()
 	canonicalIdentifiers := canonicalIdentities.NodeIDs()
-	for s := range 20 {
+	for s := 0; s < 20; s++ {
 		for e := s; e < 20; e++ {
 			var signers = canonicalIdentities[s:e]
 

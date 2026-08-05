@@ -4,7 +4,6 @@ import (
 	"crypto/rand"
 	"encoding/binary"
 	"fmt"
-	maps0 "maps"
 	"testing"
 
 	gocommon "github.com/ethereum/go-ethereum/common"
@@ -135,9 +134,13 @@ func GetSimpleValueStorePopulated(
 		CloneFunc: func() *TestValueStore {
 			// clone data
 			newData := make(map[string][]byte)
-			maps0.Copy(newData, data)
+			for k, v := range data {
+				newData[k] = v
+			}
 			newAllocator := make(map[string]uint64)
-			maps0.Copy(newAllocator, allocator)
+			for k, v := range allocator {
+				newAllocator[k] = v
+			}
 			// clone allocator
 			return GetSimpleValueStorePopulated(newData, newAllocator)
 		},
@@ -145,9 +148,13 @@ func GetSimpleValueStorePopulated(
 		DumpFunc: func() (map[string][]byte, map[string]uint64) {
 			// clone data
 			newData := make(map[string][]byte)
-			maps0.Copy(newData, data)
+			for k, v := range data {
+				newData[k] = v
+			}
 			newAllocator := make(map[string]uint64)
-			maps0.Copy(newAllocator, allocator)
+			for k, v := range allocator {
+				newAllocator[k] = v
+			}
 			return newData, newAllocator
 		},
 	}
@@ -196,11 +203,8 @@ func getSimpleMeter() *testMeter {
 			}
 			return nil
 		},
-		hasComputationCapacity: func(usage common.ComputationUsage) bool {
-			return compUsed+usage.Intensity < TestComputationLimit
-		},
-		computationUsed: func() (uint64, error) {
-			return compUsed, nil
+		metering: func() meter.MeteringResult {
+			return meter.MeteringResult{ComputationUsed: compUsed}
 		},
 		computationRemaining: func(kind common.ComputationKind) uint64 {
 			return TestComputationLimit - compUsed
@@ -400,17 +404,13 @@ func (vs *TestValueStore) Dump() (map[string][]byte, map[string]uint64) {
 }
 
 type testMeter struct {
-	meterComputation       func(usage common.ComputationUsage) error
-	hasComputationCapacity func(common.ComputationUsage) bool
-	computationUsed        func() (uint64, error)
-	computationIntensities func() meter.MeteredComputationIntensities
-	computationRemaining   func(kind common.ComputationKind) uint64
+	meterComputation     func(usage common.ComputationUsage) error
+	metering             func() meter.MeteringResult
+	computationRemaining func(kind common.ComputationKind) uint64
 
 	meterMemory func(usage common.MemoryUsage) error
-	memoryUsed  func() (uint64, error)
 
-	meterEmittedEvent      func(byteSize uint64) error
-	totalEmittedEventBytes func() uint64
+	meterEmittedEvent func(byteSize uint64) error
 
 	interactionUsed func() (uint64, error)
 
@@ -430,22 +430,6 @@ func (m *testMeter) MeterComputation(usage common.ComputationUsage) error {
 	return meterComputation(usage)
 }
 
-func (m *testMeter) ComputationAvailable(usage common.ComputationUsage) bool {
-	hasComputationCapacity := m.hasComputationCapacity
-	if hasComputationCapacity == nil {
-		panic("method not set")
-	}
-	return hasComputationCapacity(usage)
-}
-
-func (m *testMeter) ComputationIntensities() meter.MeteredComputationIntensities {
-	computationIntensities := m.computationIntensities
-	if computationIntensities == nil {
-		panic("method not set")
-	}
-	return computationIntensities()
-}
-
 func (m *testMeter) ComputationRemaining(kind common.ComputationKind) uint64 {
 	computationRemaining := m.computationRemaining
 	if computationRemaining == nil {
@@ -454,12 +438,12 @@ func (m *testMeter) ComputationRemaining(kind common.ComputationKind) uint64 {
 	return computationRemaining(kind)
 }
 
-func (m *testMeter) ComputationUsed() (uint64, error) {
-	computationUsed := m.computationUsed
-	if computationUsed == nil {
+func (m *testMeter) MeteringResult() meter.MeteringResult {
+	metering := m.metering
+	if metering == nil {
 		panic("method not set")
 	}
-	return computationUsed()
+	return metering()
 }
 
 func (m *testMeter) RunWithMeteringDisabled(f func()) {
@@ -480,14 +464,6 @@ func (m *testMeter) MeterMemory(usage common.MemoryUsage) error {
 	return meterMemory(usage)
 }
 
-func (m *testMeter) MemoryUsed() (uint64, error) {
-	memoryUsed := m.memoryUsed
-	if memoryUsed == nil {
-		panic("method not set")
-	}
-	return memoryUsed()
-}
-
 func (m *testMeter) InteractionUsed() (uint64, error) {
 	interactionUsed := m.interactionUsed
 	if interactionUsed == nil {
@@ -505,14 +481,6 @@ func (m *testMeter) MeterEmittedEvent(byteSize uint64) error {
 		panic("method not set")
 	}
 	return meterEmittedEvent(byteSize)
-}
-
-func (m *testMeter) TotalEmittedEventBytes() uint64 {
-	totalEmittedEventBytes := m.totalEmittedEventBytes
-	if totalEmittedEventBytes == nil {
-		panic("method not set")
-	}
-	return totalEmittedEventBytes()
 }
 
 type testEventEmitter struct {

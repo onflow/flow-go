@@ -78,7 +78,7 @@ func TestWriteMachineAccountFiles(t *testing.T) {
 		nodeIDLookup[addr.HexWithPrefix()] = node.NodeID
 	}
 
-	write := func(path string, value any) error {
+	write := func(path string, value interface{}) error {
 		actual, ok := value.(bootstrap.NodeMachineAccountInfo)
 		require.True(t, ok)
 
@@ -114,7 +114,7 @@ func TestWriteStakingNetworkingKeyFiles(t *testing.T) {
 	}
 
 	// check that the correct path and value are passed to the write function
-	write := func(path string, value any) error {
+	write := func(path string, value interface{}) error {
 		actual, ok := value.(bootstrap.NodeInfoPriv)
 		require.True(t, ok)
 

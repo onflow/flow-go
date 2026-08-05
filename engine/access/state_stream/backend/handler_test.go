@@ -196,7 +196,8 @@ func (s *HandlerTestSuite) TestHeartbeatResponse() {
 
 // TestGetExecutionDataByBlockID tests the execution data by block id with different event encoding versions.
 func TestGetExecutionDataByBlockID(t *testing.T) {
-	ctx := t.Context()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	ccfEvents, jsonEvents := generateEvents(t, 3)
 
@@ -264,7 +265,8 @@ func TestGetExecutionDataByBlockID(t *testing.T) {
 func TestExecutionDataStream(t *testing.T) {
 	t.Parallel()
 
-	ctx := t.Context()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	// Send a single response.
 	blockHeight := uint64(1)
@@ -389,7 +391,8 @@ func TestExecutionDataStream(t *testing.T) {
 func TestEventStream(t *testing.T) {
 	t.Parallel()
 
-	ctx := t.Context()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	blockHeight := uint64(1)
 	blockID := unittest.IdentifierFixture()
@@ -510,7 +513,8 @@ func TestEventStream(t *testing.T) {
 func TestGetRegisterValues(t *testing.T) {
 	t.Parallel()
 
-	ctx := t.Context()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	testHeight := uint64(1)
 

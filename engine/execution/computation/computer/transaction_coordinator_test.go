@@ -10,6 +10,7 @@ import (
 
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/inspection"
+	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/fvm/storage"
 	"github.com/onflow/flow-go/fvm/storage/logical"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
@@ -77,7 +78,7 @@ func (testCoordinatorExecutor) Execute() error {
 
 func (executor testCoordinatorExecutor) Output() fvm.ProcedureOutput {
 	return fvm.ProcedureOutput{
-		ComputationUsed: uint64(executor.executionTime),
+		MeteringResult: meter.MeteringResult{ComputationUsed: uint64(executor.executionTime)},
 	}
 }
 

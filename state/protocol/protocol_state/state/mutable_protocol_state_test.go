@@ -579,8 +579,8 @@ func (s *StateMutatorSuite) Test_EncodeFailed() {
 
 // emptySlice returns a functor for testing that the input `slice` (with element type `T`)
 // is empty. This functor is intended to be used with testify's `Matchby`
-func emptySlice[T any]() func(any) bool {
-	return func(slice any) bool {
+func emptySlice[T any]() func(interface{}) bool {
+	return func(slice interface{}) bool {
 		s := slice.([]T)
 		return len(s) == 0
 	}
@@ -604,7 +604,7 @@ func (s *StateMutatorSuite) mockStateTransition() *mockStateTransition {
 // call. This is helpful for testing cases, where the state machine modifies the Protocol State.
 type mockStateTransition struct {
 	T                     *testing.T
-	expectedServiceEvents any
+	expectedServiceEvents interface{}
 	runInEvolveState      func(_ mock.Arguments)
 }
 
@@ -619,7 +619,7 @@ func (m *mockStateTransition) ExpectedServiceEvents(es []flow.ServiceEvent) *moc
 // ServiceEventsMatch provides an argument matcher to verify properties if the input slice of Service Events.
 // Note that `ExpectedServiceEvents` and `ServiceEventsMatch` override all prior checks for the input slice of Service Events.
 // The method returns a self-reference for chaining.
-func (m *mockStateTransition) ServiceEventsMatch(fn func(arg any) bool) *mockStateTransition {
+func (m *mockStateTransition) ServiceEventsMatch(fn func(arg interface{}) bool) *mockStateTransition {
 	m.expectedServiceEvents = mock.MatchedBy(fn)
 	return m
 }

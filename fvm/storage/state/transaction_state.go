@@ -20,23 +20,39 @@ func (id NestedTransactionId) StateForTestingOnly() *ExecutionState {
 }
 
 type Meter interface {
+	// MeterComputation captures computation usage.
+	//
+	// Expected error returns during normal operation:
+	//   - errors.LimitExceededError with errors.LimitKindComputation if the
+	//     computation limit is exceeded
 	MeterComputation(usage common.ComputationUsage) error
-	ComputationAvailable(usage common.ComputationUsage) bool
 	ComputationRemaining(kind common.ComputationKind) uint64
 	ComputationIntensities() meter.MeteredComputationIntensities
 	TotalComputationLimit() uint64
 	TotalComputationUsed() uint64
 
+	// MeterMemory captures memory usage.
+	//
+	// Expected error returns during normal operation:
+	//   - errors.LimitExceededError with errors.LimitKindMemory if the memory
+	//     limit is exceeded
 	MeterMemory(usage common.MemoryUsage) error
 	MemoryAmounts() meter.MeteredMemoryAmounts
 	TotalMemoryEstimate() uint64
 
 	InteractionUsed() uint64
 
+	// MeterEmittedEvent captures the byte size of an emitted event.
+	//
+	// Expected error returns during normal operation:
+	//   - errors.LimitExceededError with errors.LimitKindEvent if the event
+	//     byte size limit is exceeded
 	MeterEmittedEvent(byteSize uint64) error
-	TotalEmittedEventBytes() uint64
 
-	// RunWithMeteringDisabled runs f with limits disabled
+	// RunWithMeteringDisabled runs f with metering disabled.
+	// While metering is disabled, usage of all metered quantities - computation,
+	// memory, emitted events, and ledger interaction - is neither accumulated
+	// toward the totals nor subject to its limit.
 	// This function can be used to run a function that fits one of these cases:
 	// - the function should not fail due to metering limits
 	// - the function is not invokable by the user and has a constant execution time (e.g. fee deduction)
@@ -157,8 +173,27 @@ type NestedTransactionPreparer interface {
 		id NestedTransactionId,
 	) error
 
+	// Get returns a register value from the current (nested) transaction's
+	// view. Limits are only enforced when metering is enabled.
+	//
+	// Expected error returns during normal operation:
+	//   - errors.StateKeySizeLimitError if the key exceeds the key size limit
+	//   - errors.LimitExceededError with errors.LimitKindLedgerInteraction if
+	//     the storage interaction limit is exceeded
+	//
+	// All other errors are exceptions (e.g. ledger failures).
 	Get(id flow.RegisterID) (flow.RegisterValue, error)
 
+	// Set updates a register value in the current (nested) transaction's
+	// view. Limits are only enforced when metering is enabled.
+	//
+	// Expected error returns during normal operation:
+	//   - errors.StateKeySizeLimitError or errors.StateValueSizeLimitError if
+	//     the key or value exceeds its size limit
+	//   - errors.LimitExceededError with errors.LimitKindLedgerInteraction if
+	//     the storage interaction limit is exceeded
+	//
+	// All other errors are exceptions (e.g. ledger failures).
 	Set(id flow.RegisterID, value flow.RegisterValue) error
 
 	// BaseStorageSnapshot gives access to the storage snapshot as it was without changes
@@ -462,10 +497,6 @@ func (txnState *transactionState) MeterComputation(usage common.ComputationUsage
 	return txnState.current().MeterComputation(usage)
 }
 
-func (txnState *transactionState) ComputationAvailable(usage common.ComputationUsage) bool {
-	return txnState.current().ComputationAvailable(usage)
-}
-
 func (txnState *transactionState) ComputationRemaining(kind common.ComputationKind) uint64 {
 	return txnState.current().ComputationRemaining(kind)
 }
@@ -500,10 +531,6 @@ func (txnState *transactionState) InteractionUsed() uint64 {
 
 func (txnState *transactionState) MeterEmittedEvent(byteSize uint64) error {
 	return txnState.current().MeterEmittedEvent(byteSize)
-}
-
-func (txnState *transactionState) TotalEmittedEventBytes() uint64 {
-	return txnState.current().TotalEmittedEventBytes()
 }
 
 func (txnState *transactionState) RunWithMeteringDisabled(f func()) {

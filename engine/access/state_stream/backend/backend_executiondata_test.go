@@ -98,7 +98,7 @@ func (s *BackendExecutionDataSuite) SetupTest() {
 	var err error
 	parent := s.rootBlock.ToHeader()
 
-	for i := range blockCount {
+	for i := 0; i < blockCount; i++ {
 		block := unittest.BlockWithParentFixture(parent)
 		// update for next iteration
 		parent = block.ToHeader()
@@ -109,7 +109,7 @@ func (s *BackendExecutionDataSuite) SetupTest() {
 
 		numChunks := 5
 		chunkDatas := make([]*execution_data.ChunkExecutionData, 0, numChunks)
-		for i := range numChunks {
+		for i := 0; i < numChunks; i++ {
 			var events flow.EventsList
 			switch {
 			case i >= len(blockEvents.Events):
@@ -300,7 +300,7 @@ func generateMockEvents(header *flow.Header, eventCount int) flow.BlockEvents {
 	eventIndex := uint32(0)
 
 	events := make([]flow.Event, eventCount)
-	for i := range eventCount {
+	for i := 0; i < eventCount; i++ {
 		if i > 0 && i%txCount == 0 {
 			txIndex++
 			txID = unittest.IdentifierFixture()
@@ -567,7 +567,7 @@ func (s *BackendExecutionDataSuite) TestSubscribeExecutionFromSporkRootBlock() {
 		ExecutionData: s.execDataMap[s.blocks[0].ID()].BlockExecutionData,
 	}
 
-	assertExecutionDataResponse := func(v any, expected *ExecutionDataResponse) {
+	assertExecutionDataResponse := func(v interface{}, expected *ExecutionDataResponse) {
 		resp, ok := v.(*ExecutionDataResponse)
 		require.True(s.T(), ok, "unexpected response type: %T", v)
 

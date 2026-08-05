@@ -102,6 +102,9 @@ func TestNetworkPassesReportedMisbehavior(t *testing.T) {
 // without any duplicate reports and within a specified time.
 func TestHandleReportedMisbehavior_Cache_Integration(t *testing.T) {
 	cfg := managerCfgFixture(t)
+	// this test asserts that the penalties are exactly the sum of the reported penalties; disable the periodic decay
+	// (which would otherwise zero-out the small penalties under test) by using a very long heartbeat interval.
+	cfg.HeartBeatInterval = time.Hour
 
 	// this test is assessing the integration of the ALSP manager with the network. As the ALSP manager is an attribute
 	// of the network, we need to configure the ALSP manager via the network configuration, and let the network create
@@ -136,7 +139,7 @@ func TestHandleReportedMisbehavior_Cache_Integration(t *testing.T) {
 	numReportsPerPeer := 5
 	peersReports := make(map[flow.Identifier][]network.MisbehaviorReport)
 
-	for range numPeers {
+	for i := 0; i < numPeers; i++ {
 		originID := unittest.IdentifierFixture()
 		reports := createRandomMisbehaviorReportsForOriginId(t, originID, numReportsPerPeer)
 		peersReports[originID] = reports
@@ -170,15 +173,25 @@ func TestHandleReportedMisbehavior_Cache_Integration(t *testing.T) {
 			if !ok {
 				return false
 			}
-			require.NotNil(t, record)
-
-			require.Equal(t, totalPenalty, record.Penalty)
+			// reports are processed asynchronously by the worker pool, so the record may only reflect a subset of
+			// the reported penalties. We return false rather than asserting, because a failed assertion inside this
+			// callback would abort the test immediately; returning false lets require.Eventually retry until the
+			// record reaches its final state.
+			if record.Penalty != totalPenalty {
+				return false
+			}
 			// with just reporting a single misbehavior report, the cutoff counter should not be incremented.
-			require.Equal(t, uint64(0), record.CutoffCounter)
+			if record.CutoffCounter != uint64(0) {
+				return false
+			}
 			// with just reporting a single misbehavior report, the node should not be disallowed.
-			require.False(t, record.DisallowListed)
+			if record.DisallowListed {
+				return false
+			}
 			// the decay should be the default decay value.
-			require.Equal(t, model.SpamRecordFactory()(unittest.IdentifierFixture()).Decay, record.Decay)
+			if record.Decay != model.SpamRecordFactory()(unittest.IdentifierFixture()).Decay {
+				return false
+			}
 		}
 
 		return true
@@ -251,7 +264,7 @@ func TestHandleReportedMisbehavior_And_DisallowListing_Integration(t *testing.T)
 	// the spammer is definitely disallow-listed.
 	reportCount := 120
 	wg := sync.WaitGroup{}
-	for range reportCount {
+	for i := 0; i < reportCount; i++ {
 		wg.Add(1)
 		// reports the misbehavior
 		r := report // capture range variable
@@ -357,7 +370,7 @@ func TestHandleReportedMisbehavior_And_DisallowListing_RepeatOffender_Integratio
 		// the spammer is definitely disallow-listed.
 		reportCount := 120
 		wg := sync.WaitGroup{}
-		for range reportCount {
+		for reportCounter := 0; reportCounter < reportCount; reportCounter++ {
 			wg.Add(1)
 			// reports the misbehavior
 			r := report // capture range variable
@@ -481,7 +494,8 @@ func TestHandleReportedMisbehavior_And_SlashingViolationsConsumer_Integration(t 
 	ctx, cancel := context.WithCancel(context.Background())
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
 	testutils.StartNodesAndNetworks(signalerCtx, t, nodes, []network.EngineRegistry{victimNetwork})
-	defer testutils.StopComponents[p2p.LibP2PNode](t, nodes, 100*time.Millisecond)
+	// under CPU contention, shutting down all 7 libp2p nodes can take a while; a too tight timeout makes the test flaky.
+	defer testutils.StopComponents[p2p.LibP2PNode](t, nodes, 2*time.Second)
 	defer cancel()
 
 	p2ptest.LetNodesDiscoverEachOther(t, ctx, nodes, ids)
@@ -511,11 +525,13 @@ func TestHandleReportedMisbehavior_And_SlashingViolationsConsumer_Integration(t 
 	violationsWg := sync.WaitGroup{}
 	violationCount := 120
 	for _, testCase := range slashingViolationTestCases {
-		for range violationCount {
+		for i := 0; i < violationCount; i++ {
 			testCase := testCase
-			violationsWg.Go(func() {
+			violationsWg.Add(1)
+			go func() {
+				defer violationsWg.Done()
 				testCase.violationsConsumerFunc(testCase.violation)
-			})
+			}()
 		}
 	}
 	unittest.RequireReturnsBefore(t, violationsWg.Wait, 100*time.Millisecond, "slashing violations not reported in time")
@@ -526,18 +542,29 @@ func TestHandleReportedMisbehavior_And_SlashingViolationsConsumer_Integration(t 
 		}
 	}
 
-	// ensures all misbehaving nodes are disconnected from the victim node
+	// ensures all misbehaving nodes are disconnected from the victim node.
+	// the disconnection requires the ALSP manager's heartbeat (1s interval) to apply the disallow-listing, followed by the
+	// victim's peer manager prune cycle (1s interval) to close the connection; under CPU contention this pipeline can take
+	// several seconds, hence the generous timeout (it does not slow down the happy path).
 	forEachMisbehavingNode(func(misbehavingNodeIndex int) {
-		p2ptest.RequireEventuallyNotConnected(t, []p2p.LibP2PNode{nodes[victimIndex]}, []p2p.LibP2PNode{nodes[misbehavingNodeIndex]}, 100*time.Millisecond, 2*time.Second)
+		p2ptest.RequireEventuallyNotConnected(t, []p2p.LibP2PNode{nodes[victimIndex]}, []p2p.LibP2PNode{nodes[misbehavingNodeIndex]}, 100*time.Millisecond, 10*time.Second)
+	})
+
+	// the victim node closes the connections (its peer manager prunes them), and the closure propagates to the misbehaving
+	// nodes' swarms asynchronously. Before performing the strict (no-retry) connectivity checks below, wait until each
+	// misbehaving node has also observed the disconnection; otherwise a stale (half-closed) connection on the misbehaving
+	// node's side makes the test flaky.
+	forEachMisbehavingNode(func(misbehavingNodeIndex int) {
+		p2ptest.RequireEventuallyNotConnected(t, []p2p.LibP2PNode{nodes[misbehavingNodeIndex]}, []p2p.LibP2PNode{nodes[victimIndex]}, 100*time.Millisecond, 10*time.Second)
 	})
 
 	// despite being disconnected from the victim node, misbehaving nodes and the honest node are still connected.
 	forEachMisbehavingNode(func(misbehavingNodeIndex int) {
-		p2ptest.RequireConnectedEventually(t, []p2p.LibP2PNode{nodes[honestNodeIndex], nodes[misbehavingNodeIndex]}, 1*time.Millisecond, 100*time.Millisecond)
+		p2ptest.RequireConnectedEventually(t, []p2p.LibP2PNode{nodes[honestNodeIndex], nodes[misbehavingNodeIndex]}, 1*time.Millisecond, 2*time.Second)
 	})
 
 	// despite disconnecting misbehaving nodes, ensure that (victim and honest) are still connected.
-	p2ptest.RequireConnectedEventually(t, []p2p.LibP2PNode{nodes[honestNodeIndex], nodes[victimIndex]}, 1*time.Millisecond, 100*time.Millisecond)
+	p2ptest.RequireConnectedEventually(t, []p2p.LibP2PNode{nodes[honestNodeIndex], nodes[victimIndex]}, 1*time.Millisecond, 2*time.Second)
 
 	// while misbehaving nodes are disconnected, they cannot connect to the victim node. Also, the victim node  cannot directly dial and connect to the misbehaving nodes until each node's peer score decays.
 	forEachMisbehavingNode(func(misbehavingNodeIndex int) {
@@ -708,6 +735,9 @@ func TestMisbehaviorReportManager_InitializationError(t *testing.T) {
 // The test ensures that the misbehavior report is handled correctly and the penalty is applied to the peer in the cache.
 func TestHandleMisbehaviorReport_SinglePenaltyReport(t *testing.T) {
 	cfg := managerCfgFixture(t)
+	// this test asserts that the penalty is exactly the reported penalty; disable the periodic decay
+	// (which would otherwise zero-out the small penalty under test) by using a very long heartbeat interval.
+	cfg.HeartBeatInterval = time.Hour
 	consumer := mocknetwork.NewDisallowListNotificationConsumer(t)
 
 	// create a new MisbehaviorReportManager
@@ -750,11 +780,21 @@ func TestHandleMisbehaviorReport_SinglePenaltyReport(t *testing.T) {
 		if !ok {
 			return false
 		}
-		require.NotNil(t, record)
-		require.Equal(t, penalty, record.Penalty)
-		require.False(t, record.DisallowListed)                                                       // the peer should not be disallow listed yet
-		require.Equal(t, uint64(0), record.CutoffCounter)                                             // with just reporting a misbehavior, the cutoff counter should not be incremented.
-		require.Equal(t, model.SpamRecordFactory()(unittest.IdentifierFixture()).Decay, record.Decay) // the decay should be the default decay value.
+		// the report is processed asynchronously by the worker pool. We return false rather than asserting, because
+		// a failed assertion inside this callback would abort the test immediately; returning false lets
+		// require.Eventually retry until the record reaches its final state.
+		if record.Penalty != penalty {
+			return false
+		}
+		if record.DisallowListed { // the peer should not be disallow listed yet
+			return false
+		}
+		if record.CutoffCounter != uint64(0) { // with just reporting a misbehavior, the cutoff counter should not be incremented.
+			return false
+		}
+		if record.Decay != model.SpamRecordFactory()(unittest.IdentifierFixture()).Decay { // the decay should be the default decay value.
+			return false
+		}
 
 		return true
 	}, 1*time.Second, 10*time.Millisecond, "ALSP manager did not handle the misbehavior report")
@@ -823,6 +863,9 @@ func TestHandleMisbehaviorReport_SinglePenaltyReport_PenaltyDisable(t *testing.T
 // The test ensures that each misbehavior report is handled correctly and the penalties are cumulatively applied to the peer in the cache.
 func TestHandleMisbehaviorReport_MultiplePenaltyReportsForSinglePeer_Sequentially(t *testing.T) {
 	cfg := managerCfgFixture(t)
+	// this test asserts that the penalties are exactly the sum of the reported penalties; disable the periodic decay
+	// (which would otherwise zero-out the small penalties under test) by using a very long heartbeat interval.
+	cfg.HeartBeatInterval = time.Hour
 	consumer := mocknetwork.NewDisallowListNotificationConsumer(t)
 
 	// create a new MisbehaviorReportManager
@@ -865,17 +908,21 @@ func TestHandleMisbehaviorReport_MultiplePenaltyReportsForSinglePeer_Sequentiall
 		if !ok {
 			return false
 		}
-		require.NotNil(t, record)
-
 		if totalPenalty != record.Penalty {
 			// all the misbehavior reports should be processed by now, so the penalty should be equal to the total penalty
 			return false
 		}
-		require.False(t, record.DisallowListed) // the peer should not be disallow listed yet.
+		if record.DisallowListed { // the peer should not be disallow listed yet.
+			return false
+		}
 		// with just reporting a few misbehavior reports, the cutoff counter should not be incremented.
-		require.Equal(t, uint64(0), record.CutoffCounter)
+		if record.CutoffCounter != uint64(0) {
+			return false
+		}
 		// the decay should be the default decay value.
-		require.Equal(t, model.SpamRecordFactory()(unittest.IdentifierFixture()).Decay, record.Decay)
+		if record.Decay != model.SpamRecordFactory()(unittest.IdentifierFixture()).Decay {
+			return false
+		}
 
 		return true
 	}, 1*time.Second, 10*time.Millisecond, "ALSP manager did not handle the misbehavior report")
@@ -886,6 +933,9 @@ func TestHandleMisbehaviorReport_MultiplePenaltyReportsForSinglePeer_Sequentiall
 // The test ensures that each misbehavior report is handled correctly and the penalties are cumulatively applied to the peer in the cache.
 func TestHandleMisbehaviorReport_MultiplePenaltyReportsForSinglePeer_Concurrently(t *testing.T) {
 	cfg := managerCfgFixture(t)
+	// this test asserts that the penalties are exactly the sum of the reported penalties; disable the periodic decay
+	// (which would otherwise zero-out the small penalties under test) by using a very long heartbeat interval.
+	cfg.HeartBeatInterval = time.Hour
 	consumer := mocknetwork.NewDisallowListNotificationConsumer(t)
 
 	var cache alsp.SpamRecordCache
@@ -936,17 +986,21 @@ func TestHandleMisbehaviorReport_MultiplePenaltyReportsForSinglePeer_Concurrentl
 		if !ok {
 			return false
 		}
-		require.NotNil(t, record)
-
 		if totalPenalty != record.Penalty {
 			// all the misbehavior reports should be processed by now, so the penalty should be equal to the total penalty
 			return false
 		}
-		require.False(t, record.DisallowListed) // the peer should not be disallow listed yet.
+		if record.DisallowListed { // the peer should not be disallow listed yet.
+			return false
+		}
 		// with just reporting a few misbehavior reports, the cutoff counter should not be incremented.
-		require.Equal(t, uint64(0), record.CutoffCounter)
+		if record.CutoffCounter != uint64(0) {
+			return false
+		}
 		// the decay should be the default decay value.
-		require.Equal(t, model.SpamRecordFactory()(unittest.IdentifierFixture()).Decay, record.Decay)
+		if record.Decay != model.SpamRecordFactory()(unittest.IdentifierFixture()).Decay {
+			return false
+		}
 
 		return true
 	}, 1*time.Second, 10*time.Millisecond, "ALSP manager did not handle the misbehavior report")
@@ -957,6 +1011,9 @@ func TestHandleMisbehaviorReport_MultiplePenaltyReportsForSinglePeer_Concurrentl
 // The test ensures that each misbehavior report is handled correctly and the penalties are applied to the corresponding peers in the cache.
 func TestHandleMisbehaviorReport_SinglePenaltyReportsForMultiplePeers_Sequentially(t *testing.T) {
 	cfg := managerCfgFixture(t)
+	// this test asserts that the penalties are exactly the reported penalties; disable the periodic decay
+	// (which would otherwise zero-out the small penalties under test) by using a very long heartbeat interval.
+	cfg.HeartBeatInterval = time.Hour
 	consumer := mocknetwork.NewDisallowListNotificationConsumer(t)
 
 	var cache alsp.SpamRecordCache
@@ -998,13 +1055,20 @@ func TestHandleMisbehaviorReport_SinglePenaltyReportsForMultiplePeers_Sequential
 			if !ok {
 				return false
 			}
-			require.NotNil(t, record)
-			require.False(t, record.DisallowListed) // the peer should not be disallow listed yet.
-			require.Equal(t, report.Penalty(), record.Penalty)
+			if record.DisallowListed { // the peer should not be disallow listed yet.
+				return false
+			}
+			if record.Penalty != report.Penalty() {
+				return false
+			}
 			// with just reporting a single misbehavior report, the cutoff counter should not be incremented.
-			require.Equal(t, uint64(0), record.CutoffCounter)
+			if record.CutoffCounter != uint64(0) {
+				return false
+			}
 			// the decay should be the default decay value.
-			require.Equal(t, model.SpamRecordFactory()(unittest.IdentifierFixture()).Decay, record.Decay)
+			if record.Decay != model.SpamRecordFactory()(unittest.IdentifierFixture()).Decay {
+				return false
+			}
 		}
 
 		return true
@@ -1017,6 +1081,9 @@ func TestHandleMisbehaviorReport_SinglePenaltyReportsForMultiplePeers_Sequential
 // The test ensures that each misbehavior report is handled correctly and the penalties are applied to the corresponding peers in the cache.
 func TestHandleMisbehaviorReport_SinglePenaltyReportsForMultiplePeers_Concurrently(t *testing.T) {
 	cfg := managerCfgFixture(t)
+	// this test asserts that the penalties are exactly the reported penalties; disable the periodic decay
+	// (which would otherwise zero-out the small penalties under test) by using a very long heartbeat interval.
+	cfg.HeartBeatInterval = time.Hour
 	consumer := mocknetwork.NewDisallowListNotificationConsumer(t)
 
 	var cache alsp.SpamRecordCache
@@ -1069,13 +1136,20 @@ func TestHandleMisbehaviorReport_SinglePenaltyReportsForMultiplePeers_Concurrent
 			if !ok {
 				return false
 			}
-			require.NotNil(t, record)
-			require.False(t, record.DisallowListed) // the peer should not be disallow listed yet.
-			require.Equal(t, report.Penalty(), record.Penalty)
+			if record.DisallowListed { // the peer should not be disallow listed yet.
+				return false
+			}
+			if record.Penalty != report.Penalty() {
+				return false
+			}
 			// with just reporting a single misbehavior report, the cutoff counter should not be incremented.
-			require.Equal(t, uint64(0), record.CutoffCounter)
+			if record.CutoffCounter != uint64(0) {
+				return false
+			}
 			// the decay should be the default decay value.
-			require.Equal(t, model.SpamRecordFactory()(unittest.IdentifierFixture()).Decay, record.Decay)
+			if record.Decay != model.SpamRecordFactory()(unittest.IdentifierFixture()).Decay {
+				return false
+			}
 		}
 
 		return true
@@ -1087,6 +1161,9 @@ func TestHandleMisbehaviorReport_SinglePenaltyReportsForMultiplePeers_Concurrent
 // The test ensures that each misbehavior report is handled correctly and the penalties are cumulatively applied to the corresponding peers in the cache.
 func TestHandleMisbehaviorReport_MultiplePenaltyReportsForMultiplePeers_Sequentially(t *testing.T) {
 	cfg := managerCfgFixture(t)
+	// this test asserts that the penalties are exactly the sum of the reported penalties; disable the periodic decay
+	// (which would otherwise zero-out the small penalties under test) by using a very long heartbeat interval.
+	cfg.HeartBeatInterval = time.Hour
 	consumer := mocknetwork.NewDisallowListNotificationConsumer(t)
 
 	var cache alsp.SpamRecordCache
@@ -1114,7 +1191,7 @@ func TestHandleMisbehaviorReport_MultiplePenaltyReportsForMultiplePeers_Sequenti
 	numReportsPerPeer := 5
 	peersReports := make(map[flow.Identifier][]network.MisbehaviorReport)
 
-	for range numPeers {
+	for i := 0; i < numPeers; i++ {
 		originID := unittest.IdentifierFixture()
 		reports := createRandomMisbehaviorReportsForOriginId(t, originID, numReportsPerPeer)
 		peersReports[originID] = reports
@@ -1150,13 +1227,20 @@ func TestHandleMisbehaviorReport_MultiplePenaltyReportsForMultiplePeers_Sequenti
 			if !ok {
 				return false
 			}
-			require.NotNil(t, record)
-			require.False(t, record.DisallowListed) // the peer should not be disallow listed yet.
-			require.Equal(t, totalPenalty, record.Penalty)
+			if record.DisallowListed { // the peer should not be disallow listed yet.
+				return false
+			}
+			if record.Penalty != totalPenalty {
+				return false
+			}
 			// with just reporting a single misbehavior report, the cutoff counter should not be incremented.
-			require.Equal(t, uint64(0), record.CutoffCounter)
+			if record.CutoffCounter != uint64(0) {
+				return false
+			}
 			// the decay should be the default decay value.
-			require.Equal(t, model.SpamRecordFactory()(unittest.IdentifierFixture()).Decay, record.Decay)
+			if record.Decay != model.SpamRecordFactory()(unittest.IdentifierFixture()).Decay {
+				return false
+			}
 		}
 
 		return true
@@ -1168,6 +1252,9 @@ func TestHandleMisbehaviorReport_MultiplePenaltyReportsForMultiplePeers_Sequenti
 // The test ensures that each misbehavior report is handled correctly and the penalties are cumulatively applied to the corresponding peers in the cache.
 func TestHandleMisbehaviorReport_MultiplePenaltyReportsForMultiplePeers_Concurrently(t *testing.T) {
 	cfg := managerCfgFixture(t)
+	// this test asserts that the penalties are exactly the sum of the reported penalties; disable the periodic decay
+	// (which would otherwise zero-out the small penalties under test) by using a very long heartbeat interval.
+	cfg.HeartBeatInterval = time.Hour
 	consumer := mocknetwork.NewDisallowListNotificationConsumer(t)
 
 	var cache alsp.SpamRecordCache
@@ -1195,7 +1282,7 @@ func TestHandleMisbehaviorReport_MultiplePenaltyReportsForMultiplePeers_Concurre
 	numReportsPerPeer := 5
 	peersReports := make(map[flow.Identifier][]network.MisbehaviorReport)
 
-	for range numPeers {
+	for i := 0; i < numPeers; i++ {
 		originID := unittest.IdentifierFixture()
 		reports := createRandomMisbehaviorReportsForOriginId(t, originID, numReportsPerPeer)
 		peersReports[originID] = reports
@@ -1222,13 +1309,20 @@ func TestHandleMisbehaviorReport_MultiplePenaltyReportsForMultiplePeers_Concurre
 			if !ok {
 				return false
 			}
-			require.NotNil(t, record)
-			require.False(t, record.DisallowListed) // the peer should not be disallow listed yet.
-			require.Equal(t, totalPenalty, record.Penalty)
+			if record.DisallowListed { // the peer should not be disallow listed yet.
+				return false
+			}
+			if record.Penalty != totalPenalty {
+				return false
+			}
 			// with just reporting a single misbehavior report, the cutoff counter should not be incremented.
-			require.Equal(t, uint64(0), record.CutoffCounter)
+			if record.CutoffCounter != uint64(0) {
+				return false
+			}
 			// the decay should be the default decay value.
-			require.Equal(t, model.SpamRecordFactory()(unittest.IdentifierFixture()).Decay, record.Decay)
+			if record.Decay != model.SpamRecordFactory()(unittest.IdentifierFixture()).Decay {
+				return false
+			}
 		}
 
 		return true
@@ -1243,6 +1337,9 @@ func TestHandleMisbehaviorReport_MultiplePenaltyReportsForMultiplePeers_Concurre
 // is uniquely identifying a traffic violation, even though the description of the violation is the same.
 func TestHandleMisbehaviorReport_DuplicateReportsForSinglePeer_Concurrently(t *testing.T) {
 	cfg := managerCfgFixture(t)
+	// this test asserts that the penalty is exactly the sum of the reported penalties; disable the periodic decay
+	// (which would otherwise decay the penalty and potentially disallow-list the peer) by using a very long heartbeat interval.
+	cfg.HeartBeatInterval = time.Hour
 	consumer := mocknetwork.NewDisallowListNotificationConsumer(t)
 
 	var cache alsp.SpamRecordCache
@@ -1276,7 +1373,7 @@ func TestHandleMisbehaviorReport_DuplicateReportsForSinglePeer_Concurrently(t *t
 	wg.Add(times)
 
 	// concurrently reports the same misbehavior report twice
-	for range times {
+	for i := 0; i < times; i++ {
 		go func() {
 			defer wg.Done()
 
@@ -1291,17 +1388,21 @@ func TestHandleMisbehaviorReport_DuplicateReportsForSinglePeer_Concurrently(t *t
 		if !ok {
 			return false
 		}
-		require.NotNil(t, record)
-
 		// eventually, the penalty should be the accumulated penalty of all the duplicate misbehavior reports.
 		if record.Penalty != report.Penalty()*float64(times) {
 			return false
 		}
-		require.False(t, record.DisallowListed) // the peer should not be disallow listed yet.
+		if record.DisallowListed { // the peer should not be disallow listed yet.
+			return false
+		}
 		// with just reporting a few misbehavior reports, the cutoff counter should not be incremented.
-		require.Equal(t, uint64(0), record.CutoffCounter)
+		if record.CutoffCounter != uint64(0) {
+			return false
+		}
 		// the decay should be the default decay value.
-		require.Equal(t, model.SpamRecordFactory()(unittest.IdentifierFixture()).Decay, record.Decay)
+		if record.Decay != model.SpamRecordFactory()(unittest.IdentifierFixture()).Decay {
+			return false
+		}
 
 		return true
 	}, 1*time.Second, 10*time.Millisecond, "ALSP manager did not handle the misbehavior report")
@@ -1346,7 +1447,7 @@ func TestDecayMisbehaviorPenalty_SingleHeartbeat(t *testing.T) {
 	wg.Add(times)
 
 	// concurrently reports the same misbehavior report twice
-	for range times {
+	for i := 0; i < times; i++ {
 		go func() {
 			defer wg.Done()
 
@@ -1363,17 +1464,21 @@ func TestDecayMisbehaviorPenalty_SingleHeartbeat(t *testing.T) {
 		if !ok {
 			return false
 		}
-		require.NotNil(t, record)
-
 		// eventually, the penalty should be the accumulated penalty of all the duplicate misbehavior reports.
 		if record.Penalty != report.Penalty()*float64(times) {
 			return false
 		}
-		require.False(t, record.DisallowListed) // the peer should not be disallow listed yet.
+		if record.DisallowListed { // the peer should not be disallow listed yet.
+			return false
+		}
 		// with just reporting a few misbehavior reports, the cutoff counter should not be incremented.
-		require.Equal(t, uint64(0), record.CutoffCounter)
+		if record.CutoffCounter != uint64(0) {
+			return false
+		}
 		// the decay should be the default decay value.
-		require.Equal(t, model.SpamRecordFactory()(unittest.IdentifierFixture()).Decay, record.Decay)
+		if record.Decay != model.SpamRecordFactory()(unittest.IdentifierFixture()).Decay {
+			return false
+		}
 
 		penaltyBeforeDecay = record.Penalty
 		return true
@@ -1436,7 +1541,7 @@ func TestDecayMisbehaviorPenalty_MultipleHeartbeats(t *testing.T) {
 	wg.Add(times)
 
 	// concurrently reports the same misbehavior report twice
-	for range times {
+	for i := 0; i < times; i++ {
 		go func() {
 			defer wg.Done()
 
@@ -1453,16 +1558,18 @@ func TestDecayMisbehaviorPenalty_MultipleHeartbeats(t *testing.T) {
 		if !ok {
 			return false
 		}
-		require.NotNil(t, record)
-
 		// eventually, the penalty should be the accumulated penalty of all the duplicate misbehavior reports.
 		if record.Penalty != report.Penalty()*float64(times) {
 			return false
 		}
 		// with just reporting a few misbehavior reports, the cutoff counter should not be incremented.
-		require.Equal(t, uint64(0), record.CutoffCounter)
+		if record.CutoffCounter != uint64(0) {
+			return false
+		}
 		// the decay should be the default decay value.
-		require.Equal(t, model.SpamRecordFactory()(unittest.IdentifierFixture()).Decay, record.Decay)
+		if record.Decay != model.SpamRecordFactory()(unittest.IdentifierFixture()).Decay {
+			return false
+		}
 
 		penaltyBeforeDecay = record.Penalty
 		return true
@@ -1526,7 +1633,7 @@ func TestDecayMisbehaviorPenalty_DecayToZero(t *testing.T) {
 	wg.Add(times)
 
 	// concurrently reports the same misbehavior report twice
-	for range times {
+	for i := 0; i < times; i++ {
 		go func() {
 			defer wg.Done()
 
@@ -1542,16 +1649,18 @@ func TestDecayMisbehaviorPenalty_DecayToZero(t *testing.T) {
 		if !ok {
 			return false
 		}
-		require.NotNil(t, record)
-
 		// eventually, the penalty should be the accumulated penalty of all the duplicate misbehavior reports.
 		if record.Penalty != report.Penalty()*float64(times) {
 			return false
 		}
 		// with just reporting a few misbehavior reports, the cutoff counter should not be incremented.
-		require.Equal(t, uint64(0), record.CutoffCounter)
+		if record.CutoffCounter != uint64(0) {
+			return false
+		}
 		// the decay should be the default decay value.
-		require.Equal(t, model.SpamRecordFactory()(unittest.IdentifierFixture()).Decay, record.Decay)
+		if record.Decay != model.SpamRecordFactory()(unittest.IdentifierFixture()).Decay {
+			return false
+		}
 
 		return true
 	}, 1*time.Second, 10*time.Millisecond, "ALSP manager did not handle the misbehavior report")
@@ -1698,7 +1807,7 @@ func TestDisallowListNotification(t *testing.T) {
 	wg.Add(times)
 
 	// concurrently reports the same misbehavior report twice
-	for range times {
+	for i := 0; i < times; i++ {
 		go func() {
 			defer wg.Done()
 
@@ -1721,18 +1830,22 @@ func TestDisallowListNotification(t *testing.T) {
 		if !ok {
 			return false
 		}
-		require.NotNil(t, record)
-
 		// eventually, the penalty should be the accumulated penalty of all the duplicate misbehavior reports (with the default decay).
 		// the decay is added to the penalty as we allow for a single heartbeat before the disallow list notification is emitted.
 		if record.Penalty != report.Penalty()*float64(times)+record.Decay {
 			return false
 		}
-		require.True(t, record.DisallowListed) // the peer should be disallow-listed.
+		if !record.DisallowListed { // the peer should be disallow-listed.
+			return false
+		}
 		// cutoff counter should be incremented since the penalty is above the disallow-listing threshold.
-		require.Equal(t, uint64(1), record.CutoffCounter)
+		if record.CutoffCounter != uint64(1) {
+			return false
+		}
 		// the decay should be the default decay value.
-		require.Equal(t, model.SpamRecordFactory()(unittest.IdentifierFixture()).Decay, record.Decay)
+		if record.Decay != model.SpamRecordFactory()(unittest.IdentifierFixture()).Decay {
+			return false
+		}
 
 		return true
 	}, 2*time.Second, 10*time.Millisecond, "ALSP manager did not handle the misbehavior report")
@@ -1754,7 +1867,7 @@ func TestDisallowListNotification(t *testing.T) {
 func createRandomMisbehaviorReportsForOriginId(t *testing.T, originID flow.Identifier, numReports int) []network.MisbehaviorReport {
 	reports := make([]network.MisbehaviorReport, numReports)
 
-	for i := range numReports {
+	for i := 0; i < numReports; i++ {
 		reports[i] = misbehaviorReportFixture(t, originID)
 	}
 
@@ -1771,7 +1884,7 @@ func createRandomMisbehaviorReportsForOriginId(t *testing.T, originID flow.Ident
 func createRandomMisbehaviorReports(t *testing.T, numReports int) []network.MisbehaviorReport {
 	reports := make([]network.MisbehaviorReport, numReports)
 
-	for i := range numReports {
+	for i := 0; i < numReports; i++ {
 		reports[i] = misbehaviorReportFixture(t, unittest.IdentifierFixture())
 	}
 

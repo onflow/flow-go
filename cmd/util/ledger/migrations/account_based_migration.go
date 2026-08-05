@@ -156,7 +156,7 @@ func MigrateAccountsConcurrently(
 
 	workersLeft := int64(nWorker)
 
-	for range nWorker {
+	for workerIndex := 0; workerIndex < nWorker; workerIndex++ {
 		g.Go(func() error {
 			defer func() {
 				if syncAtomic.AddInt64(&workersLeft, -1) == 0 {

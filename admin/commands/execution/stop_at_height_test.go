@@ -20,7 +20,7 @@ func TestCommandParsing(t *testing.T) {
 	t.Run("happy path", func(t *testing.T) {
 
 		req := &admin.CommandRequest{
-			Data: map[string]any{
+			Data: map[string]interface{}{
 				"height": float64(21), // raw json parses to float64
 				"crash":  true,
 			},
@@ -40,7 +40,7 @@ func TestCommandParsing(t *testing.T) {
 	t.Run("empty", func(t *testing.T) {
 
 		req := &admin.CommandRequest{
-			Data: map[string]any{},
+			Data: map[string]interface{}{},
 		}
 
 		err := cmd.Validator(req)
@@ -51,7 +51,7 @@ func TestCommandParsing(t *testing.T) {
 	t.Run("wrong height type", func(t *testing.T) {
 
 		req := &admin.CommandRequest{
-			Data: map[string]any{
+			Data: map[string]interface{}{
 				"height": "abc",
 			},
 		}
@@ -64,7 +64,7 @@ func TestCommandParsing(t *testing.T) {
 	t.Run("wrong height type", func(t *testing.T) {
 
 		req := &admin.CommandRequest{
-			Data: map[string]any{
+			Data: map[string]interface{}{
 				"height": "abc",
 			},
 		}
@@ -77,7 +77,7 @@ func TestCommandParsing(t *testing.T) {
 	t.Run("negative", func(t *testing.T) {
 
 		req := &admin.CommandRequest{
-			Data: map[string]any{
+			Data: map[string]interface{}{
 				"height": -12,
 			},
 		}

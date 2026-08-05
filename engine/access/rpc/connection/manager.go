@@ -182,8 +182,8 @@ func createRequestWatcherInterceptor(cachedClient *CachedClient) grpc.UnaryClien
 	requestWatcherInterceptor := func(
 		ctx context.Context,
 		method string,
-		req any,
-		reply any,
+		req interface{},
+		reply interface{},
 		cc *grpc.ClientConn,
 		invoker grpc.UnaryInvoker,
 		opts ...grpc.CallOption,
@@ -215,8 +215,8 @@ func createClientTimeoutInterceptor(timeout time.Duration) grpc.UnaryClientInter
 	clientTimeoutInterceptor := func(
 		ctx context.Context,
 		method string,
-		req any,
-		reply any,
+		req interface{},
+		reply interface{},
 		cc *grpc.ClientConn,
 		invoker grpc.UnaryInvoker,
 		opts ...grpc.CallOption,
@@ -241,8 +241,8 @@ func (m *Manager) createClientInvalidationInterceptor(cachedClient *CachedClient
 	return func(
 		ctx context.Context,
 		method string,
-		req any,
-		reply any,
+		req interface{},
+		reply interface{},
 		cc *grpc.ClientConn,
 		invoker grpc.UnaryInvoker,
 		opts ...grpc.CallOption,
@@ -313,8 +313,8 @@ func (m *Manager) createCircuitBreakerInterceptor() grpc.UnaryClientInterceptor 
 		circuitBreakerInterceptor := func(
 			ctx context.Context,
 			method string,
-			req any,
-			reply any,
+			req interface{},
+			reply interface{},
 			cc *grpc.ClientConn,
 			invoker grpc.UnaryInvoker,
 			opts ...grpc.CallOption,
@@ -326,7 +326,7 @@ func (m *Manager) createCircuitBreakerInterceptor() grpc.UnaryClientInterceptor 
 			// "RestoreTimeout" period elapses, the circuit breaker transitions to the "StateHalfOpen" and attempts the
 			// invocation again. If the invocation fails, it returns to the "StateOpen"; otherwise, it transitions to
 			// the "StateClosed" and handles invocations as usual.
-			_, err := circuitBreaker.Execute(func() (any, error) {
+			_, err := circuitBreaker.Execute(func() (interface{}, error) {
 				err := invoker(ctx, method, req, reply, cc, opts...)
 				return nil, err
 			})

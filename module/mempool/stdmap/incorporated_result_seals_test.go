@@ -204,7 +204,7 @@ func TestIncorporatedResultSeals(t *testing.T) {
 		pool := NewIncorporatedResultSeals(1000)
 
 		seals := make([]*flow.IncorporatedResultSeal, 0, 100)
-		for i := range 100 {
+		for i := 0; i < 100; i++ {
 			seal := unittest.IncorporatedResultSeal.Fixture(func(s *flow.IncorporatedResultSeal) {
 				s.Header.Height = uint64(i)
 			})

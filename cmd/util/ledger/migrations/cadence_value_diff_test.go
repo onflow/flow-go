@@ -822,7 +822,7 @@ func createTestRegisters(t *testing.T, address common.Address, domain common.Sto
 	// Add Cadence DictionaryValue
 	const dictCount = 10
 	dictValues := make([]interpreter.Value, 0, dictCount*2)
-	for i := range dictCount {
+	for i := 0; i < dictCount; i++ {
 		k := interpreter.NewUnmeteredUInt64Value(uint64(i))
 		v := interpreter.NewUnmeteredStringValue(fmt.Sprintf("value %d", i))
 		dictValues = append(dictValues, k, v)

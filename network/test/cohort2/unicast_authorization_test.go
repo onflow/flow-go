@@ -121,6 +121,19 @@ func (u *UnicastAuthorizationTestSuite) stopNetworksAndLibp2pNodes() {
 	unittest.RequireComponentsDoneBefore(u.T(), 1*time.Second, u.senderNetwork, u.receiverNetwork)
 }
 
+// requireStreamAcceptedOrReset asserts that a unicast send either succeeded or failed with a
+// benign "stream reset" error. When the receiver rejects an unauthorized message, it resets the
+// inbound stream (see Network.handleIncomingStream). That reset races with the sender closing its
+// side of the stream, so the sender's Unicast call may return a "stream reset" error. This error
+// is benign (see Node.OpenAndWriteOnStream); for these tests the authoritative assertion is that
+// the receiver reported the violation via the slashing violations consumer.
+func (u *UnicastAuthorizationTestSuite) requireStreamAcceptedOrReset(err error) {
+	if err != nil {
+		require.ErrorContains(u.T(), err, "stream reset",
+			"receiver may reset the stream before the sender closes it")
+	}
+}
+
 // TestUnicastAuthorization_UnstakedPeer tests that messages sent via unicast by an unstaked peer is correctly rejected.
 func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_UnstakedPeer() {
 	slashingViolationsConsumer := mocknetwork.NewViolationsConsumer(u.T())
@@ -155,7 +168,7 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_UnstakedPeer() 
 	err = senderCon.Unicast(&libp2pmessage.TestMessage{
 		Text: string("hello"),
 	}, u.receiverID.NodeID)
-	require.NoError(u.T(), err)
+	u.requireStreamAcceptedOrReset(err)
 
 	// wait for slashing violations consumer mock to invoke run func and close ch if expected method call happens
 	unittest.RequireCloseBefore(u.T(), u.waitCh, u.channelCloseDuration, "could close ch on time")
@@ -202,7 +215,7 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_EjectedPeer() {
 	err = senderCon.Unicast(&libp2pmessage.TestMessage{
 		Text: string("hello"),
 	}, u.receiverID.NodeID)
-	require.NoError(u.T(), err)
+	u.requireStreamAcceptedOrReset(err)
 
 	// wait for slashing violations consumer mock to invoke run func and close ch if expected method call happens
 	unittest.RequireCloseBefore(u.T(), u.waitCh, u.channelCloseDuration, "could close ch on time")
@@ -244,7 +257,7 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_UnauthorizedPee
 	err = senderCon.Unicast(&libp2pmessage.TestMessage{
 		Text: string("hello"),
 	}, u.receiverID.NodeID)
-	require.NoError(u.T(), err)
+	u.requireStreamAcceptedOrReset(err)
 
 	// wait for slashing violations consumer mock to invoke run func and close ch if expected method call happens
 	unittest.RequireCloseBefore(u.T(), u.waitCh, u.channelCloseDuration, "could close ch on time")
@@ -260,7 +273,7 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_UnknownMsgCode(
 
 	invalidMessageCode := codec.MessageCode(byte('X'))
 	// register a custom encoder that encodes the message with an invalid message code when encoding a string.
-	u.codec.RegisterEncoder(reflect.TypeFor[string](), func(v any) ([]byte, error) {
+	u.codec.RegisterEncoder(reflect.TypeOf(""), func(v interface{}) ([]byte, error) {
 		e, err := unittest.NetworkCodec().Encode(&libp2pmessage.TestMessage{
 			Text: v.(string),
 		})
@@ -296,7 +309,7 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_UnknownMsgCode(
 
 	// send message via unicast
 	err = senderCon.Unicast("hello!", u.receiverID.NodeID)
-	require.NoError(u.T(), err)
+	u.requireStreamAcceptedOrReset(err)
 
 	// wait for slashing violations consumer mock to invoke run func and close ch if expected method call happens
 	unittest.RequireCloseBefore(u.T(), u.waitCh, u.channelCloseDuration, "could close ch on time")
@@ -312,7 +325,7 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_WrongMsgCode() 
 
 	modifiedMessageCode := codec.CodeDKGMessage
 	// register a custom encoder that overrides the message code when encoding a TestMessage.
-	u.codec.RegisterEncoder(reflect.TypeFor[*libp2pmessage.TestMessage](), func(v any) ([]byte, error) {
+	u.codec.RegisterEncoder(reflect.TypeOf(&libp2pmessage.TestMessage{}), func(v interface{}) ([]byte, error) {
 		e, err := unittest.NetworkCodec().Encode(v)
 		require.NoError(u.T(), err)
 		e[0] = modifiedMessageCode.Uint8()
@@ -346,7 +359,7 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_WrongMsgCode() 
 	err = senderCon.Unicast(&libp2pmessage.TestMessage{
 		Text: string("hello"),
 	}, u.receiverID.NodeID)
-	require.NoError(u.T(), err)
+	u.requireStreamAcceptedOrReset(err)
 
 	// wait for slashing violations consumer mock to invoke run func and close ch if expected method call happens
 	unittest.RequireCloseBefore(u.T(), u.waitCh, u.channelCloseDuration, "could close ch on time")
@@ -422,7 +435,7 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_UnauthorizedUni
 	payload := messages.Proposal(*unittest.ProposalFixture())
 	// send message via unicast
 	err = senderCon.Unicast(&payload, u.receiverID.NodeID)
-	require.NoError(u.T(), err)
+	u.requireStreamAcceptedOrReset(err)
 
 	// wait for slashing violations consumer mock to invoke run func and close ch if expected method call happens
 	unittest.RequireCloseBefore(u.T(), u.waitCh, u.channelCloseDuration, "could close ch on time")
@@ -460,11 +473,7 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_ReceiverHasNoSu
 	err = senderCon.Unicast(&libp2pmessage.TestMessage{
 		Text: string("hello"),
 	}, u.receiverID.NodeID)
-	if err != nil {
-		// It can happen that the receiver resets before the sender closes,
-		// in which case the error will be "stream reset"
-		require.ErrorContains(u.T(), err, "stream reset", "expected stream-related error when receiver has no subscription")
-	}
+	u.requireStreamAcceptedOrReset(err)
 
 	// wait for slashing violations consumer mock to invoke run func and close ch if expected method call happens
 	unittest.RequireCloseBefore(u.T(), u.waitCh, u.channelCloseDuration, "could close ch on time")
@@ -584,7 +593,7 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_UnauthorizedSen
 	err = senderCon.Unicast(&libp2pmessage.TestMessage{
 		Text: "hello",
 	}, u.receiverID.NodeID)
-	require.NoError(u.T(), err)
+	u.requireStreamAcceptedOrReset(err)
 
 	// wait for slashing violations consumer to be invoked
 	unittest.RequireCloseBefore(u.T(), u.waitCh, u.channelCloseDuration, "could close ch on time")
@@ -594,7 +603,7 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_UnauthorizedSen
 // We specifically use this to override the encoder for the TestMessage type to encode it with an invalid message code.
 type overridableMessageEncoder struct {
 	codec           network.Codec
-	specificEncoder map[reflect.Type]func(any) ([]byte, error)
+	specificEncoder map[reflect.Type]func(interface{}) ([]byte, error)
 }
 
 var _ network.Codec = (*overridableMessageEncoder)(nil)
@@ -602,12 +611,12 @@ var _ network.Codec = (*overridableMessageEncoder)(nil)
 func newOverridableMessageEncoder(codec network.Codec) *overridableMessageEncoder {
 	return &overridableMessageEncoder{
 		codec:           codec,
-		specificEncoder: make(map[reflect.Type]func(any) ([]byte, error)),
+		specificEncoder: make(map[reflect.Type]func(interface{}) ([]byte, error)),
 	}
 }
 
 // RegisterEncoder registers an encoder for a specific type, overriding the default encoder for that type.
-func (u *overridableMessageEncoder) RegisterEncoder(t reflect.Type, encoder func(any) ([]byte, error)) {
+func (u *overridableMessageEncoder) RegisterEncoder(t reflect.Type, encoder func(interface{}) ([]byte, error)) {
 	u.specificEncoder[t] = encoder
 }
 
@@ -623,7 +632,7 @@ func (u *overridableMessageEncoder) NewDecoder(r io.Reader) network.Decoder {
 
 // Encode encodes a value into a byte slice. If a specific encoder is registered for the type of the value, it will be used.
 // Otherwise, the default encoder will be used.
-func (u *overridableMessageEncoder) Encode(v any) ([]byte, error) {
+func (u *overridableMessageEncoder) Encode(v interface{}) ([]byte, error) {
 	if encoder, ok := u.specificEncoder[reflect.TypeOf(v)]; ok {
 		return encoder(v)
 	}

@@ -748,7 +748,7 @@ func (s *EpochFallbackStateMachineSuite) TestProcessingMultipleEventsInTheSameBl
 
 		var events []flow.ServiceEvent
 		setupEvents := rapid.IntRange(0, 5).Draw(t, "number-of-setup-events")
-		for range setupEvents {
+		for i := 0; i < setupEvents; i++ {
 			serviceEvent := unittest.EpochSetupFixture().ServiceEvent()
 			s.consumer.On("OnServiceEventReceived", serviceEvent).Once()
 			s.consumer.On("OnInvalidServiceEvent", serviceEvent,
@@ -757,7 +757,7 @@ func (s *EpochFallbackStateMachineSuite) TestProcessingMultipleEventsInTheSameBl
 		}
 
 		commitEvents := rapid.IntRange(0, 5).Draw(t, "number-of-commit-events")
-		for range commitEvents {
+		for i := 0; i < commitEvents; i++ {
 			serviceEvent := unittest.EpochCommitFixture().ServiceEvent()
 			s.consumer.On("OnServiceEventReceived", serviceEvent).Once()
 			s.consumer.On("OnInvalidServiceEvent", serviceEvent,
@@ -766,7 +766,7 @@ func (s *EpochFallbackStateMachineSuite) TestProcessingMultipleEventsInTheSameBl
 		}
 
 		recoverEvents := rapid.IntRange(0, 5).Draw(t, "number-of-recover-events")
-		for range recoverEvents {
+		for i := 0; i < recoverEvents; i++ {
 			serviceEvent := unittest.EpochRecoverFixture().ServiceEvent()
 			s.consumer.On("OnServiceEventReceived", serviceEvent).Once()
 			s.consumer.On("OnInvalidServiceEvent", serviceEvent,

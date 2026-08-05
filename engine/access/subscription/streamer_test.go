@@ -34,7 +34,7 @@ func TestStream(t *testing.T) {
 	sub.On("ID").Return(uuid.NewString())
 
 	tests := []testData{}
-	for i := range 4 {
+	for i := 0; i < 4; i++ {
 		tests = append(tests, testData{fmt.Sprintf("test%d", i), nil})
 	}
 	tests = append(tests, testData{"", testErr})
@@ -223,7 +223,7 @@ func TestStreamUnsubscribesOnContextCancel(t *testing.T) {
 
 			cancels := make([]context.CancelFunc, numStreams)
 
-			for i := range numStreams {
+			for i := 0; i < numStreams; i++ {
 				var ctx context.Context
 				ctx, cancels[i] = context.WithCancel(context.Background())
 
@@ -247,7 +247,7 @@ func TestStreamUnsubscribesOnContextCancel(t *testing.T) {
 			synctest.Wait()
 
 			// Cancel streams one by one and verify count decreases
-			for i := range numStreams {
+			for i := 0; i < numStreams; i++ {
 				cancels[i]()
 				synctest.Wait()
 				assert.Equal(t, numStreams-i-1, broadcaster.SubscriberCount())

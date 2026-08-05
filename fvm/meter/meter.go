@@ -1,5 +1,12 @@
 package meter
 
+// MeteringResult bundles the metering totals reported after execution.
+type MeteringResult struct {
+	ComputationUsed        uint64
+	MemoryEstimate         uint64
+	ComputationIntensities MeteredComputationIntensities
+}
+
 type MeterParameters struct {
 	ComputationMeterParameters
 	MemoryMeterParameters

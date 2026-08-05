@@ -132,7 +132,7 @@ func (b *EventsBackend) SubscribeEventsFromLatest(ctx context.Context, filter st
 // Expected errors during normal operation:
 // - subscription.ErrBlockNotReady: execution data for the given block height is not available.
 func (b *EventsBackend) getResponseFactory(filter state_stream.EventFilter) subscription.GetDataByHeightFunc {
-	return func(ctx context.Context, height uint64) (response any, err error) {
+	return func(ctx context.Context, height uint64) (response interface{}, err error) {
 		eventsResponse, err := b.eventsProvider.GetAllEventsResponse(ctx, height)
 		if err != nil {
 			if errors.Is(err, storage.ErrNotFound) ||

@@ -10,7 +10,7 @@ func DeployLocalReplayLimitedTransaction(authorizer flow.Address, chain flow.Cha
 
 	var builder strings.Builder
 	builder.WriteString("let t = T")
-	for range 30 {
+	for i := 0; i < 30; i++ {
 		builder.WriteString("<T")
 	}
 	builder.WriteString(">()")
@@ -26,9 +26,9 @@ func DeployLocalReplayLimitedTransaction(authorizer flow.Address, chain flow.Cha
 func DeployGlobalReplayLimitedTransaction(authorizer flow.Address, chain flow.Chain) *flow.TransactionBodyBuilder {
 
 	var builder strings.Builder
-	for range 2 {
+	for j := 0; j < 2; j++ {
 		builder.WriteString(";let t = T")
-		for range 16 {
+		for i := 0; i < 16; i++ {
 			builder.WriteString("<T")
 		}
 	}

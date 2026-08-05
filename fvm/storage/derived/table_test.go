@@ -736,7 +736,7 @@ func TestDerivedDataTableCommitSnapshotReadDontAdvanceTime(t *testing.T) {
 	err = testSetupTxn.Commit()
 	require.NoError(t, err)
 
-	for range 10 {
+	for i := 0; i < 10; i++ {
 		txn := block.NewSnapshotReadTableTransaction()
 
 		err = txn.Commit()

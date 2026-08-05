@@ -29,14 +29,13 @@ const (
 )
 
 type ProcedureOutput struct {
+	meter.MeteringResult
+
 	// Output by both transaction and script.
 	Logs                   []string
 	Events                 flow.EventsList
 	ServiceEvents          flow.EventsList
 	ConvertedServiceEvents flow.ServiceEventList
-	ComputationUsed        uint64
-	ComputationIntensities meter.MeteredComputationIntensities
-	MemoryEstimate         uint64
 	Err                    errors.CodedError
 	InspectionResults      []inspection.Result
 
@@ -46,29 +45,15 @@ type ProcedureOutput struct {
 
 func (output *ProcedureOutput) PopulateEnvironmentValues(
 	env environment.Environment,
-) error {
+) {
 	output.Logs = env.Logs()
 
-	computationUsed, err := env.ComputationUsed()
-	if err != nil {
-		return fmt.Errorf("error getting computation used: %w", err)
-	}
-	output.ComputationUsed = computationUsed
-
-	memoryUsed, err := env.MemoryUsed()
-	if err != nil {
-		return fmt.Errorf("error getting memory used: %w", err)
-	}
-	output.MemoryEstimate = memoryUsed
-
-	output.ComputationIntensities = env.ComputationIntensities()
+	output.MeteringResult = env.MeteringResult()
 
 	// if tx failed this will only contain fee deduction events
 	output.Events = env.Events()
 	output.ServiceEvents = env.ServiceEvents()
 	output.ConvertedServiceEvents = env.ConvertedServiceEvents()
-
-	return nil
 }
 
 func (output *ProcedureOutput) PopulateInspectionResults(
@@ -102,11 +87,14 @@ func inspectProcedureResults(
 ) []inspection.Result {
 	inspectionResults := make([]inspection.Result, 0, len(context.Inspectors))
 
+	// TxBody is nil for non-transaction procedures (e.g. scripts)
+	signers := inspection.AuthorizingSigners(context.TxBody)
+
 	for i, inspector := range context.Inspectors {
 		log := log.With().Str("inspector", inspector.Name()).Int("inspector-num", i).Logger()
 		log.Debug().Msg("starting inspection")
 
-		result, err := inspector.Inspect(log, storageSnapshot, executionSnapshot, events)
+		result, err := inspector.Inspect(log, storageSnapshot, executionSnapshot, events, signers)
 		if err != nil {
 			log.Error().Err(err).Msg("failed to inspect procedure results")
 		}

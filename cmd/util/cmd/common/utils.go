@@ -52,7 +52,7 @@ func PathExists(path string) (bool, error) {
 	return false, err
 }
 
-func ReadJSON(path string, target any) error {
+func ReadJSON(path string, target interface{}) error {
 	dat, err := io.ReadFile(path)
 	if err != nil {
 		return fmt.Errorf("cannot read json: %w", err)
@@ -64,7 +64,7 @@ func ReadJSON(path string, target any) error {
 	return nil
 }
 
-func WriteJSON(path string, out string, data any) error {
+func WriteJSON(path string, out string, data interface{}) error {
 	bz, err := json.MarshalIndent(data, "", "  ")
 	if err != nil {
 		return fmt.Errorf("cannot marshal json: %w", err)

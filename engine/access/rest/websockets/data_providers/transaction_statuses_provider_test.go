@@ -78,7 +78,7 @@ func (s *TransactionStatusesProviderSuite) TestTransactionStatusesDataProvider_H
 		TransactionStatusesTopic,
 		s.factory,
 		s.subscribeTransactionStatusesDataProviderTestCases(backendResponse),
-		func(dataChan chan any) {
+		func(dataChan chan interface{}) {
 			dataChan <- backendResponse
 		},
 		s.requireTransactionStatuses,
@@ -109,8 +109,8 @@ func (s *TransactionStatusesProviderSuite) subscribeTransactionStatusesDataProvi
 
 // requireTransactionStatuses ensures that the received transaction statuses information matches the expected data.
 func (s *TransactionStatusesProviderSuite) requireTransactionStatuses(
-	actual any,
-	expected any,
+	actual interface{},
+	expected interface{},
 ) {
 	expectedResponse, expectedResponsePayload := extractPayload[*models.TransactionStatusesResponse](s.T(), expected)
 	actualResponse, actualResponsePayload := extractPayload[*models.TransactionStatusesResponse](s.T(), actual)
@@ -133,7 +133,7 @@ func backendTransactionStatusesResponse(block *flow.Block) []*accessmodel.Transa
 
 	var expectedTxResultsResponses []*accessmodel.TransactionResult
 
-	for range 2 {
+	for i := 0; i < 2; i++ {
 		expectedTxResultsResponses = append(expectedTxResultsResponses, &txr)
 	}
 
@@ -144,8 +144,8 @@ func backendTransactionStatusesResponse(block *flow.Block) []*accessmodel.Transa
 func (s *TransactionStatusesProviderSuite) expectedTransactionStatusesResponses(
 	backendResponses []*accessmodel.TransactionResult,
 	topic string,
-) []any {
-	expectedResponses := make([]any, len(backendResponses))
+) []interface{} {
+	expectedResponses := make([]interface{}, len(backendResponses))
 
 	for i, resp := range backendResponses {
 		expectedResponsePayload := models.NewTransactionStatusesResponse(s.linkGenerator, resp, uint64(i))
@@ -160,16 +160,16 @@ func (s *TransactionStatusesProviderSuite) expectedTransactionStatusesResponses(
 
 // TestMessageIndexTransactionStatusesProviderResponse_HappyPath tests that MessageIndex values in response are strictly increasing.
 func (s *TransactionStatusesProviderSuite) TestMessageIndexTransactionStatusesProviderResponse_HappyPath() {
-	send := make(chan any, 10)
+	send := make(chan interface{}, 10)
 	topic := TransactionStatusesTopic
 	txStatusesCount := 4
 
 	// Create a channel to simulate the subscription's account statuses channel
-	txStatusesChan := make(chan any)
+	txStatusesChan := make(chan interface{})
 
 	// Create a mock subscription and mock the channel
 	sub := submock.NewSubscription(s.T())
-	sub.On("Channel").Return((<-chan any)(txStatusesChan))
+	sub.On("Channel").Return((<-chan interface{})(txStatusesChan))
 	sub.On("Err").Return(nil).Once()
 
 	s.api.On(
@@ -186,7 +186,7 @@ func (s *TransactionStatusesProviderSuite) TestMessageIndexTransactionStatusesPr
 	)
 
 	arguments :=
-		map[string]any{
+		map[string]interface{}{
 			"tx_id": unittest.TransactionFixture().ID().String(),
 		}
 
@@ -217,7 +217,7 @@ func (s *TransactionStatusesProviderSuite) TestMessageIndexTransactionStatusesPr
 
 	// Simulate emitting data to the tx statuses channel
 	var txResults []*accessmodel.TransactionResult
-	for range txStatusesCount {
+	for i := 0; i < txStatusesCount; i++ {
 		txResults = append(txResults, &accessmodel.TransactionResult{
 			BlockHeight: s.rootBlock.Height,
 		})
@@ -231,7 +231,7 @@ func (s *TransactionStatusesProviderSuite) TestMessageIndexTransactionStatusesPr
 
 	// Collect responses
 	var responses []*models.TransactionStatusesResponse
-	for range txStatusesCount {
+	for i := 0; i < txStatusesCount; i++ {
 		res := <-send
 		_, txStatusesResData := extractPayload[*models.TransactionStatusesResponse](s.T(), res)
 		responses = append(responses, txStatusesResData)
@@ -255,7 +255,7 @@ func (s *TransactionStatusesProviderSuite) TestMessageIndexTransactionStatusesPr
 // when invalid arguments are provided. It verifies that appropriate errors are returned
 // for missing or conflicting arguments.
 func (s *TransactionStatusesProviderSuite) TestTransactionStatusesDataProvider_InvalidArguments() {
-	send := make(chan any)
+	send := make(chan interface{})
 
 	topic := TransactionStatusesTopic
 
@@ -285,26 +285,26 @@ func invalidTransactionStatusesArgumentsTestCases() []testErrType {
 	return []testErrType{
 		{
 			name: "invalid 'tx_id' argument",
-			arguments: map[string]any{
+			arguments: map[string]interface{}{
 				"tx_id": "invalid_tx_id",
 			},
 			expectedErrorMsg: "invalid ID format",
 		},
 		{
 			name: "empty 'tx_id' argument",
-			arguments: map[string]any{
+			arguments: map[string]interface{}{
 				"tx_id": "",
 			},
 			expectedErrorMsg: "'tx_id' must not be empty",
 		},
 		{
 			name:             "missing 'tx_id' argument",
-			arguments:        map[string]any{},
+			arguments:        map[string]interface{}{},
 			expectedErrorMsg: "missing 'tx_id' field",
 		},
 		{
 			name: "unexpected argument",
-			arguments: map[string]any{
+			arguments: map[string]interface{}{
 				"unexpected_argument": "dummy",
 				"tx_id":               unittest.TransactionFixture().ID().String(),
 			},

@@ -273,13 +273,7 @@ func (executor *transactionExecutor) deductTransactionFees() (err error) {
 
 	computationLimit := executor.txnState.TotalComputationLimit()
 
-	computationUsed, err := executor.env.ComputationUsed()
-	if err != nil {
-		return errors.NewTransactionFeeDeductionFailedError(
-			executor.proc.Transaction.Payer,
-			computationLimit,
-			err)
-	}
+	computationUsed := executor.env.MeteringResult().ComputationUsed
 
 	if computationUsed > computationLimit {
 		computationUsed = computationLimit
@@ -447,10 +441,7 @@ func (executor *transactionExecutor) commit(
 				"nested transactions.")
 	}
 
-	err := executor.output.PopulateEnvironmentValues(executor.env)
-	if err != nil {
-		return err
-	}
+	executor.output.PopulateEnvironmentValues(executor.env)
 
 	// Based on various (e.g., contract) updates, we decide
 	// how to clean up the derived data.  For failed transactions we also do

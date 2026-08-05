@@ -37,7 +37,8 @@ type testCaseConfig struct {
 
 // TestVersionControlInitialization tests the initialization process of the VersionControl component
 func TestVersionControlInitialization(t *testing.T) {
-	ctx := t.Context()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	sealedRootBlockHeight := uint64(1000)
 	latestBlockHeight := sealedRootBlockHeight + 100
@@ -354,7 +355,8 @@ func TestVersionControlStartHeight(t *testing.T) {
 
 // TestVersionControlInitializationWithErrors tests the initialization process of the VersionControl component with error cases
 func TestVersionControlInitializationWithErrors(t *testing.T) {
-	ctx := t.Context()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	sealedRootBlockHeight := uint64(1000)
 	latestBlockHeight := sealedRootBlockHeight + 100

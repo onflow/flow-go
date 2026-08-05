@@ -51,7 +51,7 @@ func setContractAuthorizersTransaction(
 	for _, address := range authorized {
 		addressValues = append(
 			addressValues,
-			cadence.BytesToAddress(address.Bytes()))
+			cadence.Address(address))
 	}
 
 	addressesArg, err := jsoncdc.Encode(cadence.NewArray(addressValues))

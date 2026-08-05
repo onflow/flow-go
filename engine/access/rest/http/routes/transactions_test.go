@@ -115,7 +115,7 @@ func newGetTransactionResultsRequest(blockIdQuery string, height string) *http.R
 	return req
 }
 
-func newCreateTransactionRequest(body any) *http.Request {
+func newCreateTransactionRequest(body interface{}) *http.Request {
 	jsonBody, _ := json.Marshal(body)
 	req, _ := http.NewRequest("POST", "/v1/transactions", bytes.NewBuffer(jsonBody))
 	return req

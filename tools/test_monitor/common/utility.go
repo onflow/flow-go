@@ -111,7 +111,7 @@ func DirExists(path string) bool {
 }
 
 // SaveToFile save test run/summary to local JSON file.
-func SaveToFile(fileName string, testSummary any) {
+func SaveToFile(fileName string, testSummary interface{}) {
 	testSummaryBytes, err := json.MarshalIndent(testSummary, "", "  ")
 	AssertNoError(err, "error marshalling json")
 
@@ -123,7 +123,7 @@ func SaveToFile(fileName string, testSummary any) {
 	AssertNoError(err, "error saving test summary to file")
 }
 
-func SaveLinesToFile(fileName string, list any) {
+func SaveLinesToFile(fileName string, list interface{}) {
 	sliceType := reflect.TypeOf(list)
 	if sliceType.Kind() != reflect.Slice && sliceType.Kind() != reflect.Array {
 		panic("argument must be an array or slice")

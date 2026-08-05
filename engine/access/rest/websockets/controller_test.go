@@ -100,7 +100,7 @@ func (s *WsControllerSuite) TestSubscribeRequest() {
 
 		conn.
 			On("WriteJSON", mock.Anything).
-			Return(func(msg any) error {
+			Return(func(msg interface{}) error {
 				defer close(done)
 
 				response, ok := msg.(models.SubscribeMessageResponse)
@@ -149,7 +149,7 @@ func (s *WsControllerSuite) TestSubscribeRequest() {
 		done := make(chan struct{})
 		conn.
 			On("WriteJSON", mock.Anything).
-			Return(func(msg any) error {
+			Return(func(msg interface{}) error {
 				defer close(done)
 
 				response, ok := msg.(models.BaseMessageResponse)
@@ -186,7 +186,7 @@ func (s *WsControllerSuite) TestSubscribeRequest() {
 
 		conn.
 			On("WriteJSON", mock.Anything).
-			Return(func(msg any) error {
+			Return(func(msg interface{}) error {
 				defer close(done)
 
 				response, ok := msg.(models.BaseMessageResponse)
@@ -233,7 +233,7 @@ func (s *WsControllerSuite) TestSubscribeRequest() {
 
 		conn.
 			On("WriteJSON", mock.Anything).
-			Return(func(msg any) error {
+			Return(func(msg interface{}) error {
 				defer close(done)
 
 				response, ok := msg.(models.BaseMessageResponse)
@@ -276,7 +276,7 @@ func (s *WsControllerSuite) TestGlobalStreamLimiter() {
 
 		conn.
 			On("WriteJSON", mock.Anything).
-			Return(func(msg any) error {
+			Return(func(msg interface{}) error {
 				defer close(done)
 
 				response, ok := msg.(models.BaseMessageResponse)
@@ -322,7 +322,7 @@ func (s *WsControllerSuite) TestGlobalStreamLimiter() {
 
 		conn.
 			On("WriteJSON", mock.Anything).
-			Return(func(msg any) error {
+			Return(func(msg interface{}) error {
 				defer close(done)
 
 				response, ok := msg.(models.BaseMessageResponse)
@@ -447,7 +447,7 @@ func (s *WsControllerSuite) TestUnsubscribeRequest() {
 
 		conn.
 			On("WriteJSON", mock.Anything).
-			Return(func(msg any) error {
+			Return(func(msg interface{}) error {
 				defer close(done)
 
 				response, ok := msg.(models.UnsubscribeMessageResponse)
@@ -516,7 +516,7 @@ func (s *WsControllerSuite) TestUnsubscribeRequest() {
 
 		conn.
 			On("WriteJSON", mock.Anything).
-			Return(func(msg any) error {
+			Return(func(msg interface{}) error {
 				defer close(done)
 
 				response, ok := msg.(models.BaseMessageResponse)
@@ -587,7 +587,7 @@ func (s *WsControllerSuite) TestUnsubscribeRequest() {
 
 		conn.
 			On("WriteJSON", mock.Anything).
-			Return(func(msg any) error {
+			Return(func(msg interface{}) error {
 				defer close(done)
 
 				response, ok := msg.(models.BaseMessageResponse)
@@ -669,7 +669,7 @@ func (s *WsControllerSuite) TestListSubscriptions() {
 
 		conn.
 			On("WriteJSON", mock.Anything).
-			Return(func(msg any) error {
+			Return(func(msg interface{}) error {
 				defer close(done)
 
 				response, ok := msg.(models.ListSubscriptionsMessageResponse)
@@ -731,7 +731,7 @@ func (s *WsControllerSuite) TestSubscribeBlocks() {
 		var actualBlock flow.Block
 		conn.
 			On("WriteJSON", mock.Anything).
-			Return(func(msg any) error {
+			Return(func(msg interface{}) error {
 				defer close(done)
 
 				block, ok := msg.(flow.Block)
@@ -790,7 +790,7 @@ func (s *WsControllerSuite) TestSubscribeBlocks() {
 		// If we got to this point, the controller executed all its logic properly
 		conn.
 			On("WriteJSON", mock.Anything).
-			Return(func(msg any) error {
+			Return(func(msg interface{}) error {
 				block, ok := msg.(flow.Block)
 				require.True(t, ok)
 
@@ -846,8 +846,8 @@ func (s *WsControllerSuite) TestRateLimiter() {
 
 	// Step 3: Simulate sending messages to the controller's `multiplexedStream`.
 	go func() {
-		for i := range totalMessages {
-			controller.multiplexedStream <- map[string]any{
+		for i := 0; i < totalMessages; i++ {
+			controller.multiplexedStream <- map[string]interface{}{
 				"message": i,
 			}
 		}
@@ -861,8 +861,8 @@ func (s *WsControllerSuite) TestRateLimiter() {
 		timestamps = append(timestamps, time.Now())
 
 		// Extract the actual written message
-		actualMessage := args.Get(0).(map[string]any)
-		expectedMessage := map[string]any{"message": msgCounter}
+		actualMessage := args.Get(0).(map[string]interface{})
+		expectedMessage := map[string]interface{}{"message": msgCounter}
 		msgCounter++
 
 		assert.Equal(t, expectedMessage, actualMessage, "Received message does not match the expected message")
@@ -928,7 +928,7 @@ func (s *WsControllerSuite) TestControllerShutdown() {
 
 		conn.
 			On("ReadJSON", mock.Anything).
-			Return(func(any) error {
+			Return(func(interface{}) error {
 				<-done
 				return &websocket.CloseError{Code: websocket.CloseNormalClosure}
 			}).
@@ -953,7 +953,7 @@ func (s *WsControllerSuite) TestControllerShutdown() {
 
 		conn.
 			On("ReadJSON", mock.Anything).
-			Return(func(_ any) error {
+			Return(func(_ interface{}) error {
 				return &websocket.CloseError{Code: websocket.CloseNormalClosure}
 			}).
 			Once()
@@ -992,7 +992,7 @@ func (s *WsControllerSuite) TestControllerShutdown() {
 
 		conn.
 			On("WriteJSON", mock.Anything).
-			Return(func(msg any) error {
+			Return(func(msg interface{}) error {
 				close(done)
 				return assert.AnError
 			})
@@ -1045,7 +1045,7 @@ func (s *WsControllerSuite) TestControllerShutdown() {
 
 		conn.
 			On("ReadJSON", mock.Anything).
-			Return(func(any) error {
+			Return(func(interface{}) error {
 				// make sure the reader routine sleeps for more time than InactivityTimeout + inactivity ticker period.
 				// meanwhile, the writer routine must shut down the controller.
 				<-time.After(wsConfig.InactivityTimeout + controller.inactivityTickerPeriod()*2)
@@ -1087,7 +1087,7 @@ func (s *WsControllerSuite) TestKeepaliveRoutine() {
 			}).
 			Times(expectedCalls + 1)
 
-		conn.On("ReadJSON", mock.Anything).Return(func(_ any) error {
+		conn.On("ReadJSON", mock.Anything).Return(func(_ interface{}) error {
 			<-done
 			return &websocket.CloseError{Code: websocket.CloseNormalClosure}
 		})
@@ -1113,7 +1113,8 @@ func (s *WsControllerSuite) TestKeepaliveRoutine() {
 		require.NoError(t, err)
 		controller.keepaliveConfig = keepaliveConfig
 
-		ctx := t.Context()
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
 
 		err = controller.keepalive(ctx)
 		s.Require().Error(err)
@@ -1132,7 +1133,8 @@ func (s *WsControllerSuite) TestKeepaliveRoutine() {
 		require.NoError(t, err)
 		controller.keepaliveConfig = keepaliveConfig
 
-		ctx := t.Context()
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
 
 		err = controller.keepalive(ctx)
 		s.Require().Error(err)
@@ -1212,7 +1214,7 @@ func (s *WsControllerSuite) expectCloseConnection(conn *connmock.WebsocketConnec
 	// This call is optional because it is not needed in cases where readMessages exits promptly when the context is canceled.
 	conn.
 		On("ReadJSON", mock.Anything).
-		Return(func(msg any) error {
+		Return(func(msg interface{}) error {
 			<-done
 			return &websocket.CloseError{Code: websocket.CloseNormalClosure}
 		}).

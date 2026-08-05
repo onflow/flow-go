@@ -71,20 +71,24 @@ func CopyFromBadgerToPebbleSSTables(badgerDB *badger.DB, pebbleDB *pebble.DB, cf
 
 	var readerWg sync.WaitGroup
 	for i := 0; i < cfg.ReaderWorkerCount; i++ {
-		readerWg.Go(func() {
+		readerWg.Add(1)
+		go func() {
+			defer readerWg.Done()
 			if err := readerWorker(ctx, lg, badgerDB, prefixJobs, kvChan, cfg.BatchByteSize); err != nil {
 				reportFirstError(err)
 			}
-		})
+		}()
 	}
 
 	var writerWg sync.WaitGroup
 	for i := 0; i < cfg.WriterWorkerCount; i++ {
-		writerWg.Go(func() {
+		writerWg.Add(1)
+		go func() {
+			defer writerWg.Done()
 			if err := writerSSTableWorker(ctx, i, pebbleDB, sstableDir, kvChan); err != nil {
 				reportFirstError(err)
 			}
-		})
+		}()
 	}
 
 	// Close kvChan after readers complete

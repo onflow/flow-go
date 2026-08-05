@@ -107,7 +107,7 @@ type ScoringParameters struct {
 // Note: When new topic delivery weights are added to the struct this func should be updated.
 func (g *GossipSubParameters) PeerGaterTopicDeliveryWeights() (map[string]float64, error) {
 	m := make(map[string]float64)
-	for weightConfig := range strings.SplitSeq(g.PeerGaterTopicDeliveryWeightsOverride, ",") {
+	for _, weightConfig := range strings.Split(g.PeerGaterTopicDeliveryWeightsOverride, ",") {
 		wc := strings.Split(weightConfig, ":")
 		f, err := strconv.ParseFloat(strings.TrimSpace(wc[1]), 64)
 		if err != nil {

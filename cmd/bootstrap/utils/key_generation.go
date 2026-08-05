@@ -77,7 +77,7 @@ func GeneratePublicNetworkingKey(seed []byte) (key crypto.PrivateKey, err error)
 	hkdf := hkdf.New(func() gohash.Hash { return sha256.New() }, seed, nil, []byte("public network"))
 	round_seed := make([]byte, len(seed))
 	max_iterations := 20 // 1/(2^20) failure chance
-	for range max_iterations {
+	for i := 0; i < max_iterations; i++ {
 		if _, err = io.ReadFull(hkdf, round_seed); err != nil {
 			// the hkdf Reader should not fail
 			panic(err)
@@ -128,7 +128,7 @@ func GenerateStakingKey(seed []byte) (crypto.PrivateKey, error) {
 
 func GenerateStakingKeys(n int, seeds [][]byte) ([]crypto.PrivateKey, error) {
 	keys := make([]crypto.PrivateKey, 0, n)
-	for i := range n {
+	for i := 0; i < n; i++ {
 		key, err := GenerateStakingKey(seeds[i])
 		if err != nil {
 			return nil, err
@@ -159,7 +159,7 @@ func GenerateKeys(algo crypto.SigningAlgorithm, n int, seeds [][]byte) ([]crypto
 // accepts the path for the file (relative to the bootstrapping root directory)
 // and the value to write. The function must marshal the value as JSON and write
 // the result to the given path.
-type WriteJSONFileFunc func(relativePath string, value any) error
+type WriteJSONFileFunc func(relativePath string, value interface{}) error
 
 // WriteFileFunc is the same as WriteJSONFileFunc, but it writes the bytes directly
 // rather than marshalling a structure to json.

@@ -31,7 +31,7 @@ func (f *incorporatedResultSealFactory) Fixture(opts ...func(*flow.IncorporatedR
 
 func (f *incorporatedResultSealFactory) Fixtures(n int) []*flow.IncorporatedResultSeal {
 	seals := make([]*flow.IncorporatedResultSeal, 0, n)
-	for range n {
+	for i := 0; i < n; i++ {
 		seals = append(seals, IncorporatedResultSeal.Fixture())
 	}
 	return seals

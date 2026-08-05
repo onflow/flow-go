@@ -1938,8 +1938,8 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			return nil
 		}).
 		Module("historical access node clients", func(node *cmd.NodeConfig) error {
-			addrs := strings.SplitSeq(builder.rpcConf.HistoricalAccessAddrs, ",")
-			for addr := range addrs {
+			addrs := strings.Split(builder.rpcConf.HistoricalAccessAddrs, ",")
+			for _, addr := range addrs {
 				if strings.TrimSpace(addr) == "" {
 					continue
 				}

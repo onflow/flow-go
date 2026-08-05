@@ -222,7 +222,7 @@ func (b *baselineLRU[K, V]) Keys() []K {
 	keys := make([]K, b.c.Len())
 	valueKeys := b.c.Keys()
 	total := len(valueKeys)
-	for i := range total {
+	for i := 0; i < total; i++ {
 		keys[i] = valueKeys[i]
 	}
 	return keys
@@ -232,7 +232,7 @@ func (b *baselineLRU[K, V]) Values() []V {
 	values := make([]V, b.c.Len())
 	valuesIds := b.c.Keys()
 	total := len(valuesIds)
-	for i := range total {
+	for i := 0; i < total; i++ {
 		entity, ok := b.Get(valuesIds[i])
 		if !ok {
 			panic("could not retrieve entity from mempool")

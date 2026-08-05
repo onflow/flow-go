@@ -43,7 +43,7 @@ func runBenchmark(b *testing.B, compressorName string) {
 
 	blockHeaders := getHeaders(5)
 	exeResults := make([]*execution.GetEventsForBlockIDsResponse_Result, len(blockHeaders))
-	for i := range blockHeaders {
+	for i := 0; i < len(blockHeaders); i++ {
 		exeResults[i] = &execution.GetEventsForBlockIDsResponse_Result{
 			BlockId:     convert.IdentifierToMessage(blockHeaders[i].ID()),
 			BlockHeight: blockHeaders[i].Height,

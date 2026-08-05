@@ -31,7 +31,7 @@ func (s *BackendBlockDigestSuite) SetupTest() {
 
 // TestSubscribeBlockDigestsFromStartBlockID tests the SubscribeBlockDigestsFromStartBlockID method.
 func (s *BackendBlockDigestSuite) TestSubscribeBlockDigestsFromStartBlockID() {
-	call := func(ctx context.Context, startValue any, blockStatus flow.BlockStatus) subscription.Subscription {
+	call := func(ctx context.Context, startValue interface{}, blockStatus flow.BlockStatus) subscription.Subscription {
 		return s.backend.SubscribeBlockDigestsFromStartBlockID(ctx, startValue.(flow.Identifier), blockStatus)
 	}
 
@@ -40,7 +40,7 @@ func (s *BackendBlockDigestSuite) TestSubscribeBlockDigestsFromStartBlockID() {
 
 // TestSubscribeBlockDigestsFromStartHeight tests the SubscribeBlockDigestsFromStartHeight method.
 func (s *BackendBlockDigestSuite) TestSubscribeBlockDigestsFromStartHeight() {
-	call := func(ctx context.Context, startValue any, blockStatus flow.BlockStatus) subscription.Subscription {
+	call := func(ctx context.Context, startValue interface{}, blockStatus flow.BlockStatus) subscription.Subscription {
 		return s.backend.SubscribeBlockDigestsFromStartHeight(ctx, startValue.(uint64), blockStatus)
 	}
 
@@ -49,7 +49,7 @@ func (s *BackendBlockDigestSuite) TestSubscribeBlockDigestsFromStartHeight() {
 
 // TestSubscribeBlockDigestsFromLatest tests the SubscribeBlockDigestsFromLatest method.
 func (s *BackendBlockDigestSuite) TestSubscribeBlockDigestsFromLatest() {
-	call := func(ctx context.Context, startValue any, blockStatus flow.BlockStatus) subscription.Subscription {
+	call := func(ctx context.Context, startValue interface{}, blockStatus flow.BlockStatus) subscription.Subscription {
 		return s.backend.SubscribeBlockDigestsFromLatest(ctx, blockStatus)
 	}
 
@@ -57,7 +57,7 @@ func (s *BackendBlockDigestSuite) TestSubscribeBlockDigestsFromLatest() {
 }
 
 // requireBlockDigests ensures that the received block digest information matches the expected data.
-func (s *BackendBlockDigestSuite) requireBlockDigests(v any, expectedBlock *flow.Block) {
+func (s *BackendBlockDigestSuite) requireBlockDigests(v interface{}, expectedBlock *flow.Block) {
 	actualBlock, ok := v.(*flow.BlockDigest)
 	require.True(s.T(), ok, "unexpected response type: %T", v)
 

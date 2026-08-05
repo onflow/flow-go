@@ -46,7 +46,7 @@ func NewWorkerPool(processor JobProcessor, notify NotifyDone, workers uint64) *W
 
 	builder := component.NewComponentManagerBuilder()
 
-	for range workers {
+	for i := uint64(0); i < workers; i++ {
 		builder.AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 			ready()
 			w.workerLoop(ctx)

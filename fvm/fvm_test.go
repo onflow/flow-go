@@ -6,7 +6,6 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
-	"maps"
 	"math"
 	"strconv"
 	"strings"
@@ -194,7 +193,7 @@ func TestHashing(t *testing.T) {
 	snapshotTree := testutil.RootBootstrappedLedger(vm, ctx)
 
 	hashScript := func(hashName string) []byte {
-		return fmt.Appendf(nil,
+		return []byte(fmt.Sprintf(
 			`
 				import Crypto
 
@@ -202,17 +201,17 @@ func TestHashing(t *testing.T) {
 				fun main(data: [UInt8]): [UInt8] {
 					return Crypto.hash(data, algorithm: HashAlgorithm.%s)
 				}
-			`, hashName)
+			`, hashName))
 	}
 	hashWithTagScript := func(hashName string) []byte {
-		return fmt.Appendf(nil,
+		return []byte(fmt.Sprintf(
 			`
 				import Crypto
 
 				access(all) fun main(data: [UInt8], tag: String): [UInt8] {
 					return Crypto.hashWithTag(data, tag: tag, algorithm: HashAlgorithm.%s)
 				}
-			`, hashName)
+			`, hashName))
 	}
 
 	data := []byte("some random message")
@@ -527,7 +526,7 @@ func TestEventLimits(t *testing.T) {
 		fvm.WithEventCollectionSizeLimit(2))
 
 	txBody, err := flow.NewTransactionBodyBuilder().
-		SetScript(fmt.Appendf(nil, deployingContractScriptTemplate, hex.EncodeToString([]byte(testContract)))).
+		SetScript([]byte(fmt.Sprintf(deployingContractScriptTemplate, hex.EncodeToString([]byte(testContract))))).
 		SetPayer(chain.ServiceAddress()).
 		AddAuthorizer(chain.ServiceAddress()).
 		Build()
@@ -543,14 +542,14 @@ func TestEventLimits(t *testing.T) {
 	snapshotTree = snapshotTree.Append(executionSnapshot)
 
 	txBody, err = flow.NewTransactionBodyBuilder().
-		SetScript(fmt.Appendf(nil, `
+		SetScript([]byte(fmt.Sprintf(`
 		import TestContract from 0x%s
 			transaction {
 			prepare(acct: &Account) {}
 			execute {
 				TestContract.EmitEvent()
 			}
-		}`, chain.ServiceAddress())).
+		}`, chain.ServiceAddress()))).
 		SetPayer(chain.ServiceAddress()).
 		AddAuthorizer(chain.ServiceAddress()).
 		Build()
@@ -636,7 +635,7 @@ func TestTransactionFeeDeduction(t *testing.T) {
 
 	getBalance := func(vm fvm.VM, chain flow.Chain, ctx fvm.Context, snapshotTree snapshot.SnapshotTree, address flow.Address) uint64 {
 		sc := systemcontracts.SystemContractsForChain(chain.ChainID())
-		code := fmt.Appendf(nil,
+		code := []byte(fmt.Sprintf(
 			`
 					import FungibleToken from 0x%s
 					import FlowToken from 0x%s
@@ -651,7 +650,7 @@ func TestTransactionFeeDeduction(t *testing.T) {
 				`,
 			sc.FungibleToken.Address.Hex(),
 			sc.FlowToken.Address.Hex(),
-		)
+		))
 		script := fvm.Script(code).WithArguments(
 			jsoncdc.MustEncode(cadence.NewAddress(address)),
 		)
@@ -829,7 +828,7 @@ func TestTransactionFeeDeduction(t *testing.T) {
 			tryToTransfer: transferAmount,
 			gasLimit:      uint64(2),
 			checkResult: func(t *testing.T, balanceBefore uint64, balanceAfter uint64, output fvm.ProcedureOutput) {
-				require.ErrorContains(t, output.Err, "computation exceeds limit (2)")
+				unittest.RequireLimitExceededError(t, output.Err, errors.LimitKindComputation, 2)
 
 				var deposits []flow.Event
 				var withdraws []flow.Event
@@ -1163,12 +1162,14 @@ func TestSettingExecutionWeights(t *testing.T) {
 					snapshotTree)
 				require.NoError(t, err)
 
-				require.True(t, errors.IsComputationLimitExceededError(output.Err))
+				unittest.RequireLimitExceededError(t, output.Err, errors.LimitKindComputation)
 			},
 		))
 
 	memoryWeights := make(map[common.MemoryKind]uint64)
-	maps.Copy(memoryWeights, meter.DefaultMemoryWeights)
+	for k, v := range meter.DefaultMemoryWeights {
+		memoryWeights[k] = v
+	}
 
 	const highWeight = 20_000_000_000
 	memoryWeights[common.MemoryKindIntegerExpression] = highWeight
@@ -1226,7 +1227,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 				require.NoError(t, err)
 				require.Greater(t, output.MemoryEstimate, uint64(highWeight))
 
-				require.True(t, errors.IsMemoryLimitExceededError(output.Err))
+				unittest.RequireLimitExceededError(t, output.Err, errors.LimitKindMemory, 10_000_000_000)
 			},
 		))
 
@@ -1276,7 +1277,9 @@ func TestSettingExecutionWeights(t *testing.T) {
 		))
 
 	memoryWeights = make(map[common.MemoryKind]uint64)
-	maps.Copy(memoryWeights, meter.DefaultMemoryWeights)
+	for k, v := range meter.DefaultMemoryWeights {
+		memoryWeights[k] = v
+	}
 	memoryWeights[common.MemoryKindBreakStatement] = 1_000_000
 	t.Run("transaction should fail with low memory limit (set in the state)", newVMTest().
 		withChain(chain).
@@ -1348,7 +1351,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 				// There are 100 breaks and each break uses 1_000_000 memory
 				require.Greater(t, output.MemoryEstimate, uint64(100_000_000))
 
-				require.True(t, errors.IsMemoryLimitExceededError(output.Err))
+				unittest.RequireLimitExceededError(t, output.Err, errors.LimitKindMemory, 100_000_000)
 			},
 		))
 
@@ -1390,7 +1393,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 					snapshotTree)
 				require.NoError(t, err)
 
-				require.True(t, errors.IsComputationLimitExceededError(output.Err))
+				unittest.RequireLimitExceededError(t, output.Err, errors.LimitKindComputation)
 			},
 		))
 
@@ -1433,7 +1436,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 					snapshotTree)
 				require.NoError(t, err)
 
-				require.True(t, errors.IsComputationLimitExceededError(output.Err))
+				unittest.RequireLimitExceededError(t, output.Err, errors.LimitKindComputation)
 			},
 		))
 
@@ -1475,7 +1478,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 					snapshotTree)
 				require.NoError(t, err)
 
-				require.True(t, errors.IsComputationLimitExceededError(output.Err))
+				unittest.RequireLimitExceededError(t, output.Err, errors.LimitKindComputation)
 			},
 		))
 
@@ -1506,9 +1509,9 @@ func TestSettingExecutionWeights(t *testing.T) {
 				executionEffortNeededToCheckStorage := uint64(1)
 				maxExecutionEffort := uint64(997)
 				txBodyBuilder := flow.NewTransactionBodyBuilder().
-					SetScript(fmt.Appendf(nil, `
+					SetScript([]byte(fmt.Sprintf(`
 				transaction() {prepare(signer: &Account){var i=0;  while i < %d {i = i +1 } } execute{}}
-			`, loops)).
+			`, loops))).
 					SetProposalKey(chain.ServiceAddress(), 0, 0).
 					AddAuthorizer(chain.ServiceAddress()).
 					SetPayer(chain.ServiceAddress()).
@@ -1535,9 +1538,9 @@ func TestSettingExecutionWeights(t *testing.T) {
 				// increasing the number of loops should fail the transaction.
 				loops = loops + 1
 				txBodyBuilder = flow.NewTransactionBodyBuilder().
-					SetScript(fmt.Appendf(nil, `
+					SetScript([]byte(fmt.Sprintf(`
 				transaction() {prepare(signer: &Account){var i=0;  while i < %d {i = i +1 } } execute{}}
-			`, loops)).
+			`, loops))).
 					SetProposalKey(chain.ServiceAddress(), 0, 1).
 					AddAuthorizer(chain.ServiceAddress()).
 					SetPayer(chain.ServiceAddress()).
@@ -1555,7 +1558,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 					snapshotTree)
 				require.NoError(t, err)
 
-				require.ErrorContains(t, output.Err, "computation exceeds limit (997)")
+				unittest.RequireLimitExceededError(t, output.Err, errors.LimitKindComputation, 997)
 				// expected computation used is still number of loops + 1 (from the storage limit check).
 				require.Equal(t, loops+executionEffortNeededToCheckStorage, output.ComputationUsed)
 
@@ -1621,7 +1624,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 
 				// create a transaction without loops so only the looping in the storage check is counted.
 				txBodyBuilder := flow.NewTransactionBodyBuilder().
-					SetScript(fmt.Appendf(nil, `
+					SetScript([]byte(fmt.Sprintf(`
 					import FungibleToken from 0x%s
 					import FlowToken from 0x%s
 
@@ -1669,7 +1672,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 						accounts[2].HexWithPrefix(),
 						accounts[3].HexWithPrefix(),
 						accounts[4].HexWithPrefix(),
-					)).
+					))).
 					SetProposalKey(chain.ServiceAddress(), 0, 0).
 					AddAuthorizer(chain.ServiceAddress()).
 					SetPayer(chain.ServiceAddress())
@@ -1822,8 +1825,8 @@ func TestEnforcingComputationLimit(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			ctx := fvm.NewContext(chain, fvm.WithAuthorizationChecksEnabled(false), fvm.WithSequenceNumberCheckAndIncrementEnabled(false))
 
-			script :=
-				fmt.Appendf(nil,
+			script := []byte(
+				fmt.Sprintf(
 					`
                       transaction {
                           prepare() {
@@ -1832,7 +1835,8 @@ func TestEnforcingComputationLimit(t *testing.T) {
                       }
                     `,
 					test.code,
-				)
+				),
+			)
 
 			txBodyBuilder := flow.NewTransactionBodyBuilder().
 				SetScript(script).
@@ -1937,7 +1941,7 @@ func TestStorageCapacity(t *testing.T) {
 			sc := systemcontracts.SystemContractsForChain(chain.ChainID())
 
 			txBody, err := flow.NewTransactionBodyBuilder().
-				SetScript(fmt.Appendf(nil,
+				SetScript([]byte(fmt.Sprintf(
 					`
 					import FungibleToken from 0x%s
 					import FlowToken from 0x%s
@@ -1963,7 +1967,7 @@ func TestStorageCapacity(t *testing.T) {
 					}`,
 					sc.FungibleToken.Address.Hex(),
 					sc.FlowToken.Address.Hex(),
-				)).
+				))).
 				SetPayer(signer).
 				AddArgument(jsoncdc.MustEncode(cadence.NewAddress(target))).
 				AddAuthorizer(signer).
@@ -2008,11 +2012,12 @@ func TestScriptContractMutationsFailure(t *testing.T) {
 
 				contract := "access(all) contract Foo {}"
 
-				script := fvm.Script(fmt.Appendf(nil, `
+				script := fvm.Script([]byte(fmt.Sprintf(`
 				access(all) fun main(account: Address) {
 					let acc = getAuthAccount<auth(AddContract) &Account>(account)
 					acc.contracts.add(name: "Foo", code: "%s".decodeHex())
-				}`, hex.EncodeToString([]byte(contract)))).WithArguments(
+				}`, hex.EncodeToString([]byte(contract))),
+				)).WithArguments(
 					jsoncdc.MustEncode(address),
 				)
 
@@ -2049,13 +2054,13 @@ func TestScriptContractMutationsFailure(t *testing.T) {
 
 				contract := "access(all) contract Foo {}"
 
-				txBodyBuilder := flow.NewTransactionBodyBuilder().SetScript(fmt.Appendf(nil, `
+				txBodyBuilder := flow.NewTransactionBodyBuilder().SetScript([]byte(fmt.Sprintf(`
 					transaction {
 						prepare(signer: auth(AddContract) &Account, service: &Account) {
 							signer.contracts.add(name: "Foo", code: "%s".decodeHex())
 						}
 					}
-				`, hex.EncodeToString([]byte(contract)))).
+				`, hex.EncodeToString([]byte(contract))))).
 					AddAuthorizer(account).
 					AddAuthorizer(chain.ServiceAddress()).
 					SetPayer(chain.ServiceAddress()).
@@ -2122,13 +2127,13 @@ func TestScriptContractMutationsFailure(t *testing.T) {
 
 				contract := "access(all) contract Foo {}"
 
-				txBodyBuilder := flow.NewTransactionBodyBuilder().SetScript(fmt.Appendf(nil, `
+				txBodyBuilder := flow.NewTransactionBodyBuilder().SetScript([]byte(fmt.Sprintf(`
 					transaction {
 						prepare(signer: auth(AddContract) &Account, service: &Account) {
 							signer.contracts.add(name: "Foo", code: "%s".decodeHex())
 						}
 					}
-				`, hex.EncodeToString([]byte(contract)))).
+				`, hex.EncodeToString([]byte(contract))))).
 					AddAuthorizer(account).
 					AddAuthorizer(chain.ServiceAddress()).
 					SetPayer(chain.ServiceAddress()).
@@ -2152,12 +2157,12 @@ func TestScriptContractMutationsFailure(t *testing.T) {
 
 				snapshotTree = snapshotTree.Append(executionSnapshot)
 
-				script := fvm.Script(fmt.Appendf(nil, `
+				script := fvm.Script([]byte(fmt.Sprintf(`
 				access(all) fun main(account: Address) {
 					let acc = getAuthAccount<auth(UpdateContract) &Account>(account)
 					let n = acc.contracts.names[0]
 					acc.contracts.update(name: n, code: "%s".decodeHex())
-				}`, hex.EncodeToString([]byte(contract)))).WithArguments(
+				}`, hex.EncodeToString([]byte(contract))))).WithArguments(
 					jsoncdc.MustEncode(address),
 				)
 
@@ -2327,8 +2332,7 @@ func TestScriptExecutionLimit(t *testing.T) {
 					_, output, err := vm.Run(scriptCtx, script, snapshotTree)
 					require.NoError(t, err)
 					require.Error(t, output.Err)
-					require.True(t, errors.IsComputationLimitExceededError(output.Err))
-					require.ErrorContains(t, output.Err, "computation exceeds limit (10000)")
+					unittest.RequireLimitExceededError(t, output.Err, errors.LimitKindComputation, 10000)
 					require.GreaterOrEqual(t, output.ComputationUsed, uint64(10000))
 					require.GreaterOrEqual(t, output.MemoryEstimate, uint64(456687216))
 				},
@@ -2768,7 +2772,7 @@ func TestStorageIterationWithBrokenValues(t *testing.T) {
 				))
 
 				// Store values
-				runTransaction(fmt.Appendf(nil,
+				runTransaction([]byte(fmt.Sprintf(
 					`
 					import D from %s
 					import C from %s
@@ -2801,7 +2805,7 @@ func TestStorageIterationWithBrokenValues(t *testing.T) {
 					accounts[0].HexWithPrefix(),
 					accounts[0].HexWithPrefix(),
 					accounts[0].HexWithPrefix(),
-				))
+				)))
 
 				// Update `A`, such that `B`, `C` and `D` are now broken.
 				runTransaction(runtime_utils.UpdateTransaction(
@@ -3001,7 +3005,7 @@ func TestFlowCallbackScheduler(t *testing.T) {
 			require.NoError(t, err)
 
 			// Verify that the capability was stored in the executor account
-			script := fvm.Script(fmt.Appendf(nil, `
+			script := fvm.Script([]byte(fmt.Sprintf(`
 			import FlowTransactionScheduler from %s
 
 			access(all) fun main(executorAddress: Address): Bool {
@@ -3010,7 +3014,7 @@ func TestFlowCallbackScheduler(t *testing.T) {
 					from: /storage/executeScheduledTransactionsCapability
 				)
 			}
-			`, sc.FlowTransactionScheduler.Address.HexWithPrefix()))
+			`, sc.FlowTransactionScheduler.Address.HexWithPrefix())))
 
 			executorAddressArg, err := jsoncdc.Encode(cadence.Address(sc.ScheduledTransactionExecutor.Address))
 			require.NoError(t, err)
@@ -3020,12 +3024,12 @@ func TestFlowCallbackScheduler(t *testing.T) {
 			require.NoError(t, output.Err)
 			require.Equal(t, cadence.Bool(true), output.Value)
 
-			script = fvm.Script(fmt.Appendf(nil, `
+			script = fvm.Script([]byte(fmt.Sprintf(`
 				import FlowTransactionScheduler from %s
 				access(all) fun main(): FlowTransactionScheduler.Status? {
 					return FlowTransactionScheduler.getStatus(id: 1)
 				}
-			`, sc.FlowTransactionScheduler.Address.HexWithPrefix()))
+			`, sc.FlowTransactionScheduler.Address.HexWithPrefix())))
 
 			_, output, err = vm.Run(ctx, script, snapshotTree)
 			require.NoError(t, err)
@@ -3033,12 +3037,12 @@ func TestFlowCallbackScheduler(t *testing.T) {
 			require.NotNil(t, output.Value)
 			require.Equal(t, output.Value, cadence.NewOptional(nil))
 
-			script = fvm.Script(fmt.Appendf(nil, `
+			script = fvm.Script([]byte(fmt.Sprintf(`
 				import FlowTransactionScheduler from %s
 				access(all) fun main(): UInt64 {
 					return FlowTransactionScheduler.getSlotAvailableEffort(timestamp: 1.0, priority: FlowTransactionScheduler.Priority.High)
 				}
-			`, sc.FlowTransactionScheduler.Address.HexWithPrefix()))
+			`, sc.FlowTransactionScheduler.Address.HexWithPrefix())))
 
 			const maxEffortAvailable = 15_000 // FLIP 330
 			_, output, err = vm.Run(ctx, script, snapshotTree)
@@ -3091,7 +3095,7 @@ func TestEVM(t *testing.T) {
 			sc := systemcontracts.SystemContractsForChain(chain.ChainID())
 
 			txBodyBuilder := flow.NewTransactionBodyBuilder().
-				SetScript(fmt.Appendf(nil, `
+				SetScript([]byte(fmt.Sprintf(`
 						import EVM from %s
 
 						transaction(bytes: [UInt8; 20]) {
@@ -3100,7 +3104,7 @@ func TestEVM(t *testing.T) {
 								log(addr)
 							}
 						}
-					`, sc.EVMContract.Address.HexWithPrefix())).
+					`, sc.EVMContract.Address.HexWithPrefix()))).
 				SetProposalKey(chain.ServiceAddress(), 0, 0).
 				SetPayer(chain.ServiceAddress()).
 				AddArgument(encodedArg)
@@ -3142,7 +3146,7 @@ func TestEVM(t *testing.T) {
 			snapshotTree snapshot.SnapshotTree,
 		) {
 			sc := systemcontracts.SystemContractsForChain(chain.ChainID())
-			script := fvm.Script(fmt.Appendf(nil, `
+			script := fvm.Script([]byte(fmt.Sprintf(`
 				import EVM from %s
 
 				access(all) fun main() {
@@ -3153,7 +3157,7 @@ func TestEVM(t *testing.T) {
 					destroy acc.withdraw(balance: bal)
 					destroy acc
 				}
-			`, sc.EVMContract.Address.HexWithPrefix()))
+			`, sc.EVMContract.Address.HexWithPrefix())))
 
 			_, output, err := vm.Run(ctx, script, snapshotTree)
 
@@ -3208,14 +3212,14 @@ func TestEVM(t *testing.T) {
 						return snapshotTree.Get(id)
 					})
 
-				script := fvm.Script(fmt.Appendf(nil, `
+				script := fvm.Script([]byte(fmt.Sprintf(`
 					import EVM from %s
 
 					access(all)
                     fun main() {
 						destroy <- EVM.createCadenceOwnedAccount()
 					}
-				`, sc.EVMContract.Address.HexWithPrefix()))
+				`, sc.EVMContract.Address.HexWithPrefix())))
 
 				_, output, err := vm.Run(ctx, script, errStorage)
 
@@ -3243,7 +3247,7 @@ func TestEVM(t *testing.T) {
 			sc := systemcontracts.SystemContractsForChain(chain.ChainID())
 
 			txBodyBuilder := flow.NewTransactionBodyBuilder().
-				SetScript(fmt.Appendf(nil, `
+				SetScript([]byte(fmt.Sprintf(`
 					import FungibleToken from %s
 					import FlowToken from %s
 					import EVM from %s
@@ -3270,7 +3274,7 @@ func TestEVM(t *testing.T) {
 					sc.FungibleToken.Address.HexWithPrefix(),
 					sc.FlowToken.Address.HexWithPrefix(),
 					sc.FlowServiceAccount.Address.HexWithPrefix(), // TODO this should be sc.EVM.Address not found there???
-				)).
+				))).
 				SetProposalKey(chain.ServiceAddress(), 0, 0).
 				AddAuthorizer(chain.ServiceAddress()).
 				SetPayer(chain.ServiceAddress())
@@ -3752,7 +3756,7 @@ func TestVMBridge(t *testing.T) {
 
 			// Mint an NFT
 			txBodyBuilder = flow.NewTransactionBodyBuilder().
-				SetScript(fmt.Appendf(nil,
+				SetScript([]byte(fmt.Sprintf(
 					`
 						import NonFungibleToken from 0x%s
 						import ExampleNFT from 0x%s
@@ -3799,7 +3803,7 @@ func TestVMBridge(t *testing.T) {
 						}
 			`,
 					env.NonFungibleTokenAddress, accounts[0].String(), env.NonFungibleTokenAddress, env.FungibleTokenAddress, accounts[0].String(),
-				)).AddAuthorizer(accounts[0])
+				))).AddAuthorizer(accounts[0])
 
 			err = testutil.SignTransaction(txBodyBuilder, accounts[0], privateKey, 3)
 			require.NoError(t, err)
@@ -4070,7 +4074,7 @@ func TestCrypto(t *testing.T) {
 			fvm.WithCadenceLogging(true),
 		)
 
-		script := fmt.Appendf(nil,
+		script := []byte(fmt.Sprintf(
 			`
               %s
 
@@ -4125,7 +4129,7 @@ func TestCrypto(t *testing.T) {
               }
             `,
 			importDecl,
-		)
+		))
 
 		accountKeys := test.AccountKeyGenerator()
 
@@ -4443,6 +4447,10 @@ func TestFlowTokenChangesInspector(t *testing.T) {
 		},
 	}
 
+	// payerOnlyAllowlist is the SignerAllowlist of the "mint where only the payer
+	// is allow-listed" test case; see its tokenDefinitions and txBody.
+	payerOnlyAllowlist := map[flow.Address]struct{}{}
+
 	testCases := []testCase{
 		{
 			name:             "transfer",
@@ -4501,11 +4509,13 @@ func TestFlowTokenChangesInspector(t *testing.T) {
 					GetBalance: func(value *interpreter.CompositeValue) uint64 {
 						return uint64(value.GetField(nil, "balance").(interpreter.UFix64Value).UFix64Value)
 					},
-					SinksSources: map[string]func(flow.Event) (int64, error){
-						flowTokenMintedEventID: func(evt flow.Event) (int64, error) {
-							payload, err := ccf.Decode(nil, evt.Payload)
-							require.NoError(t, err)
-							return int64(payload.(cadence.Event).SearchFieldByName("amount").(cadence.UFix64)), nil
+					SinksSources: map[string]inspection.SourceSink{
+						flowTokenMintedEventID: {
+							Amount: func(evt flow.Event) (int64, error) {
+								payload, err := ccf.Decode(nil, evt.Payload)
+								require.NoError(t, err)
+								return int64(payload.(cadence.Event).SearchFieldByName("amount").(cadence.UFix64)), nil
+							},
 						},
 					},
 				},
@@ -4533,6 +4543,7 @@ func TestFlowTokenChangesInspector(t *testing.T) {
 				unaccounted := result.UnaccountedTokens()
 				require.Len(t, unaccounted, 0, "expectation: all tokens were accounted for")
 				require.Len(t, result.Changes, 3, "change should be on 3 addresses: sender, receiver, fees")
+				require.Len(t, result.UnauthorizedSourcesSinks, 0, "no allow-list configured: no violations expected")
 			},
 		},
 		{
@@ -4561,6 +4572,109 @@ func TestFlowTokenChangesInspector(t *testing.T) {
 				unaccounted := result.UnaccountedTokens()
 				require.Len(t, unaccounted, 0, "expectation: all tokens were accounted for")
 				require.Len(t, result.Changes, 3, "change should be on 3 addresses: sender, receiver, fees")
+				require.Len(t, result.UnauthorizedSourcesSinks, 0,
+					"mint is signed by the service account, which is allow-listed by default")
+			},
+		}, {
+			name: "mint by non-allow-listed minter",
+			tokenDefinitions: map[string]inspection.SearchToken{
+				flowTokenVaultID: {
+					ID: flowTokenVaultID,
+					GetBalance: func(value *interpreter.CompositeValue) uint64 {
+						return uint64(value.GetField(nil, "balance").(interpreter.UFix64Value).UFix64Value)
+					},
+					SinksSources: map[string]inspection.SourceSink{
+						flowTokenMintedEventID: {
+							Amount: func(evt flow.Event) (int64, error) {
+								payload, err := ccf.Decode(nil, evt.Payload)
+								require.NoError(t, err)
+								return int64(payload.(cadence.Event).SearchFieldByName("amount").(cadence.UFix64)), nil
+							},
+							// Allow-list an account that is NOT the transaction signer
+							// (the service account), so the mint triggers a violation.
+							SignerAllowlist: map[flow.Address]struct{}{
+								flow.HexToAddress("0000000000000123"): {},
+							},
+						},
+					},
+				},
+			},
+			txBody: func(t *testing.T, chain flow.Chain, accounts []flow.Address) *flow.TransactionBody {
+				sc := systemcontracts.SystemContractsForChain(chain.ChainID())
+				env := sc.AsTemplateEnv()
+
+				txBodyBuilder := flow.NewTransactionBodyBuilder().
+					SetScript(templates.GenerateMintFlowScript(env)).
+					AddArgument(jsoncdc.MustEncode(cadence.Address(accounts[0]))).
+					AddArgument(jsoncdc.MustEncode(cadence.UFix64(10_000_000))).
+					AddAuthorizer(chain.ServiceAddress()).
+					SetPayer(chain.ServiceAddress())
+
+				err := testutil.SignTransactionAsServiceAccount(txBodyBuilder, 0, chain)
+				require.NoError(t, err)
+
+				txBody, err := txBodyBuilder.Build()
+				require.NoError(t, err)
+
+				return txBody
+			},
+			resultChecker: func(t *testing.T, result inspection.TokenDiffResult) {
+				unaccounted := result.UnaccountedTokens()
+				require.Len(t, unaccounted, 0, "the mint amount is still accounted for via the event")
+				require.Len(t, result.UnauthorizedSourcesSinks, 1, "mint signed by a non-allow-listed account must be flagged")
+				require.Equal(t, flowTokenMintedEventID, result.UnauthorizedSourcesSinks[0].EventType)
+				require.Equal(t, int64(10_000_000), result.UnauthorizedSourcesSinks[0].Amount)
+			},
+		}, {
+			// A transaction merely paid for by an allow-listed account must still be
+			// flagged: only the proposer and authorizers authorize the mint.
+			name: "mint where only the payer is allow-listed",
+			tokenDefinitions: func() map[string]inspection.SearchToken {
+				searchTokens := inspection.DefaultTokenDiffSearchTokens(chain)
+				ss := searchTokens[flowTokenVaultID].SinksSources[flowTokenMintedEventID]
+				// Allow-list only the payer, replacing the default (service account).
+				// The payer's address is only known once the test accounts are
+				// created, so txBody below inserts it into this map before the
+				// transaction (and thus the inspector) runs.
+				ss.SignerAllowlist = payerOnlyAllowlist
+				searchTokens[flowTokenVaultID].SinksSources[flowTokenMintedEventID] = ss
+				return searchTokens
+			}(),
+			txBody: func(t *testing.T, chain flow.Chain, accounts []flow.Address) *flow.TransactionBody {
+				sc := systemcontracts.SystemContractsForChain(chain.ChainID())
+				env := sc.AsTemplateEnv()
+
+				txBodyBuilder := flow.NewTransactionBodyBuilder().
+					SetScript(templates.GenerateMintFlowScript(env)).
+					AddArgument(jsoncdc.MustEncode(cadence.Address(accounts[0]))).
+					AddArgument(jsoncdc.MustEncode(cadence.UFix64(10_000_000))).
+					AddAuthorizer(chain.ServiceAddress())
+
+				err := testutil.SignTransactionAsServiceAccount(txBodyBuilder, 0, chain)
+				require.NoError(t, err)
+
+				// Override the payer set by SignTransactionAsServiceAccount with the
+				// allow-listed account. Authorization checks are disabled in this
+				// test, so the payer's missing envelope signature is not an issue.
+				// The payer is also the mint's recipient, so the minted tokens cover
+				// the transaction fees (the test accounts are created unfunded).
+				payerOnlyAllowlist[accounts[0]] = struct{}{}
+				txBodyBuilder.SetPayer(accounts[0])
+
+				txBody, err := txBodyBuilder.Build()
+				require.NoError(t, err)
+
+				return txBody
+			},
+			resultChecker: func(t *testing.T, result inspection.TokenDiffResult) {
+				unaccounted := result.UnaccountedTokens()
+				require.Len(t, unaccounted, 0, "the mint amount is still accounted for via the event")
+				require.Len(t, result.UnauthorizedSourcesSinks, 1,
+					"the payer's signature must not authorize the mint")
+				require.Equal(t, flowTokenMintedEventID, result.UnauthorizedSourcesSinks[0].EventType)
+				require.Equal(t, int64(10_000_000), result.UnauthorizedSourcesSinks[0].Amount)
+				require.Equal(t, []flow.Address{chain.ServiceAddress()}, result.UnauthorizedSourcesSinks[0].Signers,
+					"only the proposer and authorizers count as signers")
 			},
 		}, {
 			name:             "create account",
@@ -4588,7 +4702,7 @@ func TestFlowTokenChangesInspector(t *testing.T) {
 				sc := systemcontracts.SystemContractsForChain(chain.ChainID())
 
 				txBodyBuilder := flow.NewTransactionBodyBuilder().
-					SetScript(fmt.Appendf(nil, `
+					SetScript([]byte(fmt.Sprintf(`
 						import FungibleToken from %s
 						import FlowToken from %s
 						import EVM from %s
@@ -4614,7 +4728,7 @@ func TestFlowTokenChangesInspector(t *testing.T) {
 						sc.FungibleToken.Address.HexWithPrefix(),
 						sc.FlowToken.Address.HexWithPrefix(),
 						sc.FlowServiceAccount.Address.HexWithPrefix(),
-					)).
+					))).
 					SetProposalKey(chain.ServiceAddress(), 0, 0).
 					AddAuthorizer(chain.ServiceAddress()).
 					SetPayer(chain.ServiceAddress())
@@ -4703,5 +4817,183 @@ func TestFlowTokenChangesInspector(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, runAndCheckTransactionTest(tc))
+	}
+}
+
+// TestTokenInspectorCreateAndFundNewAccount is a regression test for the account-creation
+// storage-sharing fix, derived from mainnet tx
+// c5f3d77c1b86a9b4ce36e214278aca695702f26bd00e6c93b01d88f706456597.
+//
+// Creating and funding a new account in one transaction used to run `Account(payer:)`'s setup in
+// separate Cadence storage. When the payer's vault was borrowed before `Account(payer:)`, its stale
+// balance overwrote the 0.001 FLOW reservation deduction on commit, creating FLOW with no
+// `TokensMinted` event, which the inspector flagged as unaccounted.
+//
+// The test asserts that both borrow orderings now charge the payer the funding plus the reservation
+// and leave nothing unaccounted.
+func TestTokenInspectorCreateAndFundNewAccount(t *testing.T) {
+	chain := flow.Emulator.Chain()
+	sc := systemcontracts.SystemContractsForChain(chain.ChainID())
+
+	feesDeductedEventID := fmt.Sprintf("A.%s.FlowFees.FeesDeducted", sc.FlowFees.Address.Hex())
+
+	// reservation is the minimum storage reservation funded into every newly created account.
+	reservation := uint64(fvm.DefaultMinimumStorageReservation) // 0.001 FLOW
+	const funding = uint64(50_000_000)                          // 0.5 FLOW deposited into the new account
+
+	// borrowBeforeCreate borrows the payer's vault before `Account(payer:)` — the mainnet
+	// ordering that originally exposed the lost-reservation bug.
+	// Both orderings must now be safe.
+	makeScript := func(borrowBeforeCreate bool) string {
+		borrow := `
+				let flowVaultRef = acct.storage
+					.borrow<auth(FungibleToken.Withdraw) &FlowToken.Vault>(from: /storage/flowTokenVault)
+					?? panic("Could not borrow reference to the owner's Vault!")`
+		create := `let newAcct = Account(payer: acct)`
+
+		preamble := create + "\n" + borrow
+		if borrowBeforeCreate {
+			preamble = borrow + "\n\t\t\t\t" + create
+		}
+
+		return fmt.Sprintf(`
+			import FungibleToken from %s
+			import FlowToken from %s
+
+			transaction() {
+				prepare(acct: auth(Storage, Capabilities) &Account) {
+					%s
+
+					let receiverRef = newAcct.capabilities
+						.get<&{FungibleToken.Receiver}>(/public/flowTokenReceiver)
+						.borrow()
+						?? panic("Could not borrow receiver reference to the newly created account")
+					receiverRef.deposit(from: <- flowVaultRef.withdraw(amount: 0.5))
+				}
+			}`,
+			sc.FungibleToken.Address.HexWithPrefix(),
+			sc.FlowToken.Address.HexWithPrefix(),
+			preamble,
+		)
+	}
+
+	// expectedPayerDebit is the FlowToken amount the payer's balance should drop by (excluding
+	// transaction fees, which are deducted from the same account): the funding plus the reservation,
+	// regardless of borrow ordering.
+	expectedPayerDebit := funding + reservation
+
+	type testCase struct {
+		name               string
+		borrowBeforeCreate bool
+	}
+
+	testCases := []testCase{
+		{
+			name:               "borrow before create (mainnet pattern)",
+			borrowBeforeCreate: true,
+		},
+		{
+			name:               "borrow after create",
+			borrowBeforeCreate: false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, newVMTest().
+			withChain(chain).
+			withBootstrapProcedureOptions(
+				fvm.WithTransactionFee(fvm.DefaultTransactionFees),
+				fvm.WithStorageMBPerFLOW(fvm.DefaultStorageMBPerFLOW),
+				fvm.WithMinimumStorageReservation(fvm.DefaultMinimumStorageReservation),
+				fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
+				fvm.WithExecutionMemoryLimit(math.MaxUint64),
+				fvm.WithExecutionEffortWeights(environment.MainnetExecutionEffortWeights),
+				fvm.WithExecutionMemoryWeights(meter.DefaultMemoryWeights),
+			).
+			withContextOptions(
+				fvm.WithTransactionFeesEnabled(true),
+				fvm.WithAccountStorageLimit(true),
+				fvm.WithAuthorizationChecksEnabled(false),
+				fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
+			).
+			run(func(
+				t *testing.T,
+				vm fvm.VM,
+				chain flow.Chain,
+				ctx fvm.Context,
+				snapshotTree snapshot.SnapshotTree,
+			) {
+				privateKey, err := testutil.GenerateAccountPrivateKey()
+				require.NoError(t, err)
+				snapshotTree, accounts, err := testutil.CreateAccounts(
+					vm, snapshotTree, []flow.AccountPrivateKey{privateKey}, chain)
+				require.NoError(t, err)
+				payer := accounts[0]
+
+				env := sc.AsTemplateEnv()
+				balanceOf := func(snap snapshot.SnapshotTree, addr flow.Address) uint64 {
+					code := fmt.Sprintf(`
+						import FungibleToken from %s
+						import FlowToken from %s
+						access(all) fun main(addr: Address): UFix64 {
+							return getAccount(addr).capabilities
+								.borrow<&FlowToken.Vault>(/public/flowTokenBalance)!.balance
+						}`,
+						sc.FungibleToken.Address.HexWithPrefix(),
+						sc.FlowToken.Address.HexWithPrefix(),
+					)
+					arg, err := jsoncdc.Encode(cadence.Address(addr))
+					require.NoError(t, err)
+					_, out, serr := vm.Run(ctx, fvm.Script([]byte(code)).WithArguments(arg), snap)
+					require.NoError(t, serr)
+					require.NoError(t, out.Err)
+					return uint64(out.Value.(cadence.UFix64))
+				}
+
+				// Fund the (regular) payer account with 10 FLOW from the service account, so the
+				// payer is a normal account just like the mainnet authorizer.
+				fundTx := blueprints.TransferFlowTokenTransaction(env, chain.ServiceAddress(), payer, "10.0")
+				require.NoError(t, testutil.SignTransactionAsServiceAccount(fundTx, 0, chain))
+				fundBody, err := fundTx.Build()
+				require.NoError(t, err)
+				fundSnap, fundOut, err := vm.Run(ctx, fvm.Transaction(fundBody, 0), snapshotTree)
+				require.NoError(t, err)
+				require.NoError(t, fundOut.Err)
+				snapshotTree = snapshotTree.Append(fundSnap)
+
+				txBuilder := flow.NewTransactionBodyBuilder().
+					SetScript([]byte(makeScript(tc.borrowBeforeCreate))).
+					AddAuthorizer(payer)
+				require.NoError(t, testutil.SignTransaction(txBuilder, payer, privateKey, 0))
+				txBody, err := txBuilder.Build()
+				require.NoError(t, err)
+
+				differ := inspection.NewTokenChangesInspector(
+					inspection.DefaultTokenDiffSearchTokens(chain), chain.ChainID())
+				inspectCtx := fvm.NewContextFromParent(ctx, fvm.WithInspectors([]inspection.Inspector{differ}))
+
+				payerBefore := balanceOf(snapshotTree, payer)
+				execSnap, output, err := vm.Run(inspectCtx, fvm.Transaction(txBody, 0), snapshotTree)
+				require.NoError(t, err)
+				require.NoError(t, output.Err)
+				payerAfter := balanceOf(snapshotTree.Append(execSnap), payer)
+
+				// The transaction fee is deducted from the payer in addition to the funding/reservation.
+				var txFee uint64
+				for _, e := range output.Events {
+					if string(e.Type) == feesDeductedEventID {
+						payload, err := ccf.Decode(nil, e.Payload)
+						require.NoError(t, err)
+						txFee = uint64(payload.(cadence.Event).SearchFieldByName("amount").(cadence.UFix64))
+					}
+				}
+				payerDebit := payerBefore - payerAfter
+				require.Equal(t, expectedPayerDebit+txFee, payerDebit,
+					"payer balance change should equal expected debit plus the transaction fee")
+
+				require.Len(t, output.InspectionResults, 1, "expected one inspection result")
+				result := output.InspectionResults[0].(inspection.TokenDiffResult)
+				require.Empty(t, result.UnaccountedTokens(), "all token movements should be accounted for")
+			}))
 	}
 }

@@ -158,7 +158,7 @@ func generateRandomKVData(count, keyLen, valLen int) map[string]string {
 		return string(b)
 	}
 
-	for range count {
+	for i := 0; i < count; i++ {
 		k := randomStr(keyLen)
 		v := randomStr(valLen)
 		data[k] = v

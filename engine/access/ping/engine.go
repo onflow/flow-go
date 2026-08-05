@@ -117,6 +117,7 @@ func (e *Engine) pingAllNodes(ctx context.Context) {
 
 	peers := e.idProvider.Identities(filter.Not(filter.HasNodeID[flow.Identity](e.me.NodeID())))
 	for i, peer := range peers {
+		peer := peer
 		delay := makeJitter(i)
 
 		g.Go(func() error {

@@ -101,7 +101,7 @@ func (s *TransactionStatusesProviderSuite) TestSendTransactionStatusesDataProvid
 		SendAndGetTransactionStatusesTopic,
 		s.factory,
 		sendTxStatutesTestCases,
-		func(dataChan chan any) {
+		func(dataChan chan interface{}) {
 			dataChan <- backendResponse
 		},
 		s.requireTransactionStatuses,
@@ -110,8 +110,8 @@ func (s *TransactionStatusesProviderSuite) TestSendTransactionStatusesDataProvid
 
 // requireTransactionStatuses ensures that the received transaction statuses information matches the expected data.
 func (s *SendTransactionStatusesProviderSuite) requireTransactionStatuses(
-	actual any,
-	expected any,
+	actual interface{},
+	expected interface{},
 ) {
 	expectedResponse, expectedResponsePayload := extractPayload[*models.TransactionStatusesResponse](s.T(), expected)
 	actualResponse, actualResponsePayload := extractPayload[*models.TransactionStatusesResponse](s.T(), actual)
@@ -124,7 +124,7 @@ func (s *SendTransactionStatusesProviderSuite) requireTransactionStatuses(
 // when invalid arguments are provided. It verifies that appropriate errors are returned
 // for missing or conflicting arguments.
 func (s *SendTransactionStatusesProviderSuite) TestSendTransactionStatusesDataProvider_InvalidArguments() {
-	send := make(chan any)
+	send := make(chan interface{})
 	topic := SendAndGetTransactionStatusesTopic
 
 	for _, test := range invalidSendTransactionStatusesArgumentsTestCases() {
@@ -154,84 +154,84 @@ func invalidSendTransactionStatusesArgumentsTestCases() []testErrType {
 	return []testErrType{
 		{
 			name: "invalid 'script' argument type",
-			arguments: map[string]any{
+			arguments: map[string]interface{}{
 				"script": 0,
 			},
 			expectedErrorMsg: "failed to parse transaction",
 		},
 		{
 			name: "invalid 'script' argument",
-			arguments: map[string]any{
+			arguments: map[string]interface{}{
 				"script": "invalid_script",
 			},
 			expectedErrorMsg: "failed to parse transaction",
 		},
 		{
 			name: "invalid 'arguments' type",
-			arguments: map[string]any{
+			arguments: map[string]interface{}{
 				"arguments": 0,
 			},
 			expectedErrorMsg: "failed to parse transaction",
 		},
 		{
 			name: "invalid 'arguments' argument",
-			arguments: map[string]any{
+			arguments: map[string]interface{}{
 				"arguments": []string{"invalid_base64_1", "invalid_base64_2"},
 			},
 			expectedErrorMsg: "failed to parse transaction",
 		},
 		{
 			name: "invalid 'reference_block_id' argument",
-			arguments: map[string]any{
+			arguments: map[string]interface{}{
 				"reference_block_id": "invalid_reference_block_id",
 			},
 			expectedErrorMsg: "failed to parse transaction",
 		},
 		{
 			name: "invalid 'gas_limit' argument",
-			arguments: map[string]any{
+			arguments: map[string]interface{}{
 				"gas_limit": "-1",
 			},
 			expectedErrorMsg: "failed to parse transaction",
 		},
 		{
 			name: "invalid 'payer' argument",
-			arguments: map[string]any{
+			arguments: map[string]interface{}{
 				"payer": "invalid_payer",
 			},
 			expectedErrorMsg: "failed to parse transaction",
 		},
 		{
 			name: "invalid 'proposal_key' argument",
-			arguments: map[string]any{
+			arguments: map[string]interface{}{
 				"proposal_key": "invalid ProposalKey object",
 			},
 			expectedErrorMsg: "failed to parse transaction",
 		},
 		{
 			name: "invalid 'authorizers' argument",
-			arguments: map[string]any{
+			arguments: map[string]interface{}{
 				"authorizers": []string{"invalid_base64_1", "invalid_base64_2"},
 			},
 			expectedErrorMsg: "failed to parse transaction",
 		},
 		{
 			name: "invalid 'payload_signatures' argument",
-			arguments: map[string]any{
+			arguments: map[string]interface{}{
 				"payload_signatures": "invalid TransactionSignature array",
 			},
 			expectedErrorMsg: "failed to parse transaction",
 		},
 		{
 			name: "invalid 'envelope_signatures' argument",
-			arguments: map[string]any{
+			arguments: map[string]interface{}{
 				"envelope_signatures": "invalid TransactionSignature array",
 			},
 			expectedErrorMsg: "failed to parse transaction",
 		},
 		{
 			name: "unexpected argument",
-			arguments: map[string]any{
+			arguments: map[string]interface{}{
 				"unexpected_argument": "dummy",
 			},
 			expectedErrorMsg: "request body contains unknown field",

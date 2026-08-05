@@ -158,33 +158,33 @@ func (suite *ReadResultsSuite) SetupTest() {
 
 func (suite *ReadResultsSuite) TestValidateInvalidResultID() {
 	assert.Error(suite.T(), suite.command.Validator(&admin.CommandRequest{
-		Data: map[string]any{
+		Data: map[string]interface{}{
 			"result": true,
 		},
 	}))
 	assert.Error(suite.T(), suite.command.Validator(&admin.CommandRequest{
-		Data: map[string]any{
+		Data: map[string]interface{}{
 			"result": "",
 		},
 	}))
 	assert.Error(suite.T(), suite.command.Validator(&admin.CommandRequest{
-		Data: map[string]any{
+		Data: map[string]interface{}{
 			"result": "uhznms",
 		},
 	}))
 	assert.Error(suite.T(), suite.command.Validator(&admin.CommandRequest{
-		Data: map[string]any{
+		Data: map[string]interface{}{
 			"result": "deadbeef",
 		},
 	}))
 	assert.Error(suite.T(), suite.command.Validator(&admin.CommandRequest{
-		Data: map[string]any{
+		Data: map[string]interface{}{
 			"result": 1,
 		},
 	}))
 }
 
-func (suite *ReadResultsSuite) getResults(reqData map[string]any) []*flow.ExecutionResult {
+func (suite *ReadResultsSuite) getResults(reqData map[string]interface{}) []*flow.ExecutionResult {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -204,7 +204,7 @@ func (suite *ReadResultsSuite) getResults(reqData map[string]any) []*flow.Execut
 }
 
 func (suite *ReadResultsSuite) TestHandleFinalBlock() {
-	results := suite.getResults(map[string]any{
+	results := suite.getResults(map[string]interface{}{
 		"block": "final",
 	})
 	require.Len(suite.T(), results, 1)
@@ -212,7 +212,7 @@ func (suite *ReadResultsSuite) TestHandleFinalBlock() {
 }
 
 func (suite *ReadResultsSuite) TestHandleSealedBlock() {
-	results := suite.getResults(map[string]any{
+	results := suite.getResults(map[string]interface{}{
 		"block": "sealed",
 	})
 	require.Len(suite.T(), results, 1)
@@ -221,7 +221,7 @@ func (suite *ReadResultsSuite) TestHandleSealedBlock() {
 
 func (suite *ReadResultsSuite) TestHandleBlockHeight() {
 	for i, result := range suite.allResults {
-		results := suite.getResults(map[string]any{
+		results := suite.getResults(map[string]interface{}{
 			"block": float64(i),
 		})
 		require.Len(suite.T(), results, 1)
@@ -231,7 +231,7 @@ func (suite *ReadResultsSuite) TestHandleBlockHeight() {
 
 func (suite *ReadResultsSuite) TestHandleBlockID() {
 	for i, result := range suite.allResults {
-		results := suite.getResults(map[string]any{
+		results := suite.getResults(map[string]interface{}{
 			"block": suite.allBlocks[i].ID().String(),
 		})
 		require.Len(suite.T(), results, 1)
@@ -241,7 +241,7 @@ func (suite *ReadResultsSuite) TestHandleBlockID() {
 
 func (suite *ReadResultsSuite) TestHandleID() {
 	for _, result := range suite.allResults {
-		results := suite.getResults(map[string]any{
+		results := suite.getResults(map[string]interface{}{
 			"result": result.ID().String(),
 		})
 		require.Len(suite.T(), results, 1)
@@ -251,7 +251,7 @@ func (suite *ReadResultsSuite) TestHandleID() {
 
 func (suite *ReadResultsSuite) TestHandleNExceedsRootBlock() {
 	// request by block
-	results := suite.getResults(map[string]any{
+	results := suite.getResults(map[string]interface{}{
 		"block": "final",
 		"n":     float64(len(suite.allResults) + 1),
 	})
@@ -259,7 +259,7 @@ func (suite *ReadResultsSuite) TestHandleNExceedsRootBlock() {
 	require.ElementsMatch(suite.T(), results, suite.allResults)
 
 	// request by result ID
-	results = suite.getResults(map[string]any{
+	results = suite.getResults(map[string]interface{}{
 		"result": suite.finalResult.ID().String(),
 		"n":      float64(len(suite.allResults) + 1),
 	})

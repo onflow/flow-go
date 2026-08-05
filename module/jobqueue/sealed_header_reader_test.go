@@ -62,7 +62,7 @@ func RunWithReader(
 
 		var seals []*flow.Header
 		parent := unittest.Block.Genesis(flow.Emulator).ToHeader()
-		for i := range blockCount {
+		for i := 0; i < blockCount; i++ {
 			seals = []*flow.Header{parent}
 			height := uint64(i) + 1
 

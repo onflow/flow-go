@@ -66,8 +66,9 @@ func (cs *EngineSuite) TestSubmittingMultipleEntries() {
 	blockCount := 15
 
 	var wg sync.WaitGroup
-	wg.Go(func() {
-		for range blockCount {
+	wg.Add(1)
+	go func() {
+		for i := 0; i < blockCount; i++ {
 			block := unittest.BlockWithParentFixture(cs.head)
 			proposal := unittest.ProposalFromBlock(block)
 			hotstuffProposal := model.SignedProposalFromBlock(proposal)
@@ -80,8 +81,10 @@ func (cs *EngineSuite) TestSubmittingMultipleEntries() {
 				Message:  proposal,
 			})
 		}
-	})
-	wg.Go(func() {
+		wg.Done()
+	}()
+	wg.Add(1)
+	go func() {
 		// create a proposal that directly descends from the latest finalized header
 		block := unittest.BlockWithParentFixture(cs.head)
 		proposal := unittest.ProposalFromBlock(block)
@@ -94,7 +97,8 @@ func (cs *EngineSuite) TestSubmittingMultipleEntries() {
 			OriginID: unittest.IdentifierFixture(),
 			Message:  proposal,
 		})
-	})
+		wg.Done()
+	}()
 
 	// wait for all messages to be delivered to the engine message queue
 	wg.Wait()

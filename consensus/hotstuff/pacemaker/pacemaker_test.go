@@ -28,7 +28,7 @@ const (
 	happyPathMaxRoundFailures uint64  = 6     // number of failed rounds before first timeout increase
 )
 
-func expectedTimerInfo(view uint64) any {
+func expectedTimerInfo(view uint64) interface{} {
 	return mock.MatchedBy(
 		func(timerInfo model.TimerInfo) bool {
 			return timerInfo.View == view
@@ -318,7 +318,7 @@ func (s *ActivePaceMakerTestSuite) Test_Initialization() {
 	//    This is useful as a fallback, because it allows replicas other than the designated
 	//     leader to also collect votes and generate a QC.
 	tcs := make([]*flow.TimeoutCertificate, 110)
-	for i := range 80 {
+	for i := 0; i < 80; i++ {
 		tcView := s.initialView + uint64(rand.Intn(100))
 		qcView := 1 + uint64(rand.Intn(int(tcView)))
 		tcs[i] = helper.MakeTC(helper.WithTCView(tcView), helper.WithTCNewestQC(QC(qcView)))
@@ -330,7 +330,7 @@ func (s *ActivePaceMakerTestSuite) Test_Initialization() {
 
 	// randomly create 80 QCs (same logic as above)
 	qcs := make([]*flow.QuorumCertificate, 110)
-	for i := range 80 {
+	for i := 0; i < 80; i++ {
 		qcs[i] = QC(s.initialView + uint64(rand.Intn(100)))
 		highestView = max(highestView, qcs[i].View)
 	}

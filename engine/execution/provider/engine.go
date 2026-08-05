@@ -40,7 +40,7 @@ type NoopEngine struct {
 	module.NoopReadyDoneAware
 }
 
-func (*NoopEngine) Process(channel channels.Channel, originID flow.Identifier, message any) error {
+func (*NoopEngine) Process(channel channels.Channel, originID flow.Identifier, message interface{}) error {
 	return nil
 }
 
@@ -163,7 +163,7 @@ func New(
 
 	cm := component.NewComponentManagerBuilder()
 	cm.AddWorker(engine.processQueuedChunkDataPackRequestsShovelerWorker)
-	for range chdpRequestWorkers {
+	for i := uint(0); i < chdpRequestWorkers; i++ {
 		cm.AddWorker(engine.processChunkDataPackRequestWorker)
 	}
 
@@ -251,7 +251,7 @@ func (e *Engine) processChunkDataPackRequestWorker(ctx irrecoverable.SignalerCon
 	}
 }
 
-func (e *Engine) Process(channel channels.Channel, originID flow.Identifier, event any) error {
+func (e *Engine) Process(channel channels.Channel, originID flow.Identifier, event interface{}) error {
 	select {
 	case <-e.cm.ShutdownSignal():
 		e.log.Warn().Msgf("received message from %x after shut down", originID)

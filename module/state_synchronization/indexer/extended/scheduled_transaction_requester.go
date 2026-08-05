@@ -147,5 +147,5 @@ func (r *ScheduledTransactionRequester) fetchMissingTxs(
 // lookups on the given chain. Exposed for testing.
 func GetTransactionDataScript(chainID flow.ChainID) []byte {
 	sc := systemcontracts.SystemContractsForChain(chainID)
-	return fmt.Appendf(nil, getTransactionDataScriptTemplate, sc.FlowTransactionScheduler.Address.Hex())
+	return []byte(fmt.Sprintf(getTransactionDataScriptTemplate, sc.FlowTransactionScheduler.Address.Hex()))
 }

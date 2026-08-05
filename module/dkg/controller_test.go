@@ -229,7 +229,7 @@ func initNodes(t *testing.T, n int, phase1Duration, phase2Duration, phase3Durati
 	// Create the channels through which the nodes will communicate
 	privateChannels := make([]chan msg.PrivDKGMessageIn, 0, n)
 	broadcastChannels := make([]chan msg.BroadcastDKGMessage, 0, n)
-	for range n {
+	for i := 0; i < n; i++ {
 		privateChannels = append(privateChannels, make(chan msg.PrivDKGMessageIn, 5*n*n))
 		broadcastChannels = append(broadcastChannels, make(chan msg.BroadcastDKGMessage, 5*n*n))
 	}
@@ -237,7 +237,7 @@ func initNodes(t *testing.T, n int, phase1Duration, phase2Duration, phase3Durati
 	nodes := make([]*node, 0, n)
 
 	// Setup
-	for i := range n {
+	for i := 0; i < n; i++ {
 		logger := zerolog.New(os.Stderr).With().Int("id", i).Logger()
 
 		broker := &broker{
@@ -309,7 +309,7 @@ func checkArtifacts(t *testing.T, nodes []*node, totalNodes int) {
 
 		require.Len(t, publicKeys, totalNodes)
 
-		for j := range totalNodes {
+		for j := 0; j < totalNodes; j++ {
 			if !refPublicKeys[j].Equals(publicKeys[j]) {
 				t.Fatalf("node %d has a different pubs[%d] than node 0: %s, %s",
 					i,

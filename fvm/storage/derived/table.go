@@ -2,7 +2,6 @@ package derived
 
 import (
 	"fmt"
-	"maps"
 	"sync"
 
 	"github.com/hashicorp/go-multierror"
@@ -142,7 +141,9 @@ func (table *DerivedDataTable[TKey, TVal]) EntriesForTestingOnly() map[TKey]*inv
 	entries := make(
 		map[TKey]*invalidatableEntry[TVal],
 		len(table.items))
-	maps.Copy(entries, table.items)
+	for key, entry := range table.items {
+		entries[key] = entry
+	}
 
 	return entries
 }

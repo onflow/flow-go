@@ -110,7 +110,8 @@ func VerifyRange(
 	lockManager lockctx.Manager,
 	from, to uint64,
 	chainID flow.ChainID,
-	protocolDataDir string, chunkDataPackDir string,
+	protocolDataDir string,
+	chunkDataPackDir string,
 	nWorker uint,
 	stopOnMismatch bool,
 	transactionFeesDisabled bool,
@@ -256,9 +257,11 @@ func verifyConcurrently(
 	// Start nWorker workers
 	var wg sync.WaitGroup
 	for i := 0; i < int(nWorker); i++ {
-		wg.Go(func() {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
 			worker()
-		})
+		}()
 	}
 
 	// Send tasks to workers
@@ -321,7 +324,14 @@ func initStorages(
 	chunkDataPacks := store.NewChunkDataPacks(metrics.NewNoopCollector(),
 		db, storedChunkDataPacks, storages.Collections, 1000)
 
-	verifier := makeVerifier(log.Logger, chainID, storages.Headers, transactionFeesDisabled, scheduledTransactionsEnabled)
+	verifier := makeVerifier(
+		log.Logger,
+		chainID,
+		storages.Headers,
+		transactionFeesDisabled,
+		scheduledTransactionsEnabled,
+	)
+
 	closer := func() error {
 		var dbErr, chunkDataPackDBErr error
 

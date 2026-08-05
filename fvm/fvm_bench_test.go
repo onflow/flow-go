@@ -500,7 +500,7 @@ func BenchmarkRuntimeTransaction(b *testing.B) {
 		b.StopTimer()
 		for i := 0; i < b.N; i++ {
 			transactions := make([]*flow.TransactionBody, transactionsPerBlock)
-			for j := range transactionsPerBlock {
+			for j := 0; j < transactionsPerBlock; j++ {
 				tx := txStringFunc(b, benchTransactionContext)
 
 				btx := []byte(tx)
@@ -739,21 +739,20 @@ func BenchmarkRuntimeTransaction(b *testing.B) {
 			b,
 			func(b *testing.B, context benchTransactionContext) string {
 				coinbaseBytes := context.EvmTestAccount.Address().Bytes()
-				var transactionBody strings.Builder
-				transactionBody.WriteString(fmt.Sprintf(`
+				transactionBody := fmt.Sprintf(`
 				                    let coinbaseBytesRaw = "%s".decodeHex()
 					let coinbaseBytes: [UInt8; 20] = [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
 					for j, v in coinbaseBytesRaw {
 						coinbaseBytes[j] = v
 					}
 					let coinbase = EVM.EVMAddress(bytes: coinbaseBytes)
-				`, hex.EncodeToString(coinbaseBytes)))
+				`, hex.EncodeToString(coinbaseBytes))
 
 				num := int64(12)
 				gasLimit := uint64(100_000)
 
 				// add 10 EVM transactions to the Flow transaction body
-				for i := range 100 {
+				for i := 0; i < 100; i++ {
 					txBytes := context.EvmTestAccount.PrepareSignAndEncodeTx(b,
 						context.EvmTestContract.DeployedAt.ToCommon(),
 						context.EvmTestContract.MakeCallData(b, "store", big.NewInt(num)),
@@ -762,27 +761,27 @@ func BenchmarkRuntimeTransaction(b *testing.B) {
 						big.NewInt(0),
 					)
 					if control {
-						transactionBody.WriteString(fmt.Sprintf(`
+						transactionBody += fmt.Sprintf(`
 						let txBytes%[1]d = "%[2]s".decodeHex()
 						EVM.run(tx: txBytes%[1]d, coinbase: coinbase)
 						`,
 							i,
 							hex.EncodeToString(txBytes),
-						))
+						)
 					} else {
 						// don't run the EVM transaction but do the hex conversion
-						transactionBody.WriteString(fmt.Sprintf(`
+						transactionBody += fmt.Sprintf(`
 						let txBytes%[1]d = "%[2]s".decodeHex()
 						//EVM.run(tx: txBytes%[1]d, coinbase: coinbase)
 						`,
 							i,
 							hex.EncodeToString(txBytes),
-						))
+						)
 					}
 
 				}
 
-				return templateTx(1, transactionBody.String())
+				return templateTx(1, transactionBody)
 			},
 		)
 	}
@@ -864,7 +863,7 @@ func BenchRunNFTBatchTransfer(b *testing.B,
 	setupReceiver(b, blockExecutor, &nftAccount, &batchNFTAccount, &accounts[2])
 
 	// Transfer NFTs
-	transferTx := fmt.Appendf(nil, TransferTxTemplate, accounts[0].Address.Hex(), accounts[1].Address.Hex())
+	transferTx := []byte(fmt.Sprintf(TransferTxTemplate, accounts[0].Address.Hex(), accounts[1].Address.Hex()))
 
 	encodedAddress, err := jsoncdc.Encode(cadence.Address(accounts[2].Address))
 	require.NoError(b, err)
@@ -874,10 +873,10 @@ func BenchRunNFTBatchTransfer(b *testing.B,
 	b.ResetTimer() // setup done, lets start measuring
 	for i := 0; i < b.N; i++ {
 		transactions := make([]*flow.TransactionBody, transactionsPerBlock)
-		for j := range transactionsPerBlock {
+		for j := 0; j < transactionsPerBlock; j++ {
 			cadenceValues := make([]cadence.Value, testTokensPerTransaction)
 			startTestToken := (i*transactionsPerBlock+j)*testTokensPerTransaction + 1
-			for m := range testTokensPerTransaction {
+			for m := 0; m < testTokensPerTransaction; m++ {
 				cadenceValues[m] = cadence.NewUInt64(uint64(startTestToken + m))
 			}
 
@@ -931,7 +930,7 @@ func setupReceiver(b *testing.B, be TestBenchBlockExecutor, nftAccount, batchNFT
 		}
 	}`
 
-	setupTx := fmt.Appendf(nil, setUpReceiverTemplate, nftAccount.Address.Hex(), batchNFTAccount.Address.Hex())
+	setupTx := []byte(fmt.Sprintf(setUpReceiverTemplate, nftAccount.Address.Hex(), batchNFTAccount.Address.Hex()))
 
 	txBodyBuilder := flow.NewTransactionBodyBuilder().
 		SetScript(setupTx).
@@ -969,7 +968,7 @@ func mintNFTs(b *testing.B, be TestBenchBlockExecutor, batchNFTAccount *TestBenc
 				.batchDeposit(tokens: <-testTokens)
 		}
 	}`
-	mintScript := fmt.Appendf(nil, mintScriptTemplate, batchNFTAccount.Address.Hex(), size)
+	mintScript := []byte(fmt.Sprintf(mintScriptTemplate, batchNFTAccount.Address.Hex(), size))
 
 	txBodyBuilder := flow.NewTransactionBodyBuilder().
 		SetComputeLimit(999999).

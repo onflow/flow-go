@@ -177,7 +177,7 @@ func (c *ConcurrentErroringComponent) Start(ctx irrecoverable.SignalerContext) {
 	c.ready.Add(2)
 	c.done.Add(2)
 
-	for range 2 {
+	for i := 0; i < 2; i++ {
 		go func() {
 			c.ready.Done()
 			defer c.done.Done()
@@ -298,7 +298,8 @@ func TestRunComponentShutdownError(t *testing.T) {
 }
 
 func TestRunComponentConcurrentError(t *testing.T) {
-	ctx := t.Context()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	componentFactory := func() (component.Component, error) {
 		return NewConcurrentErroringComponent(100 * time.Millisecond), nil
@@ -321,7 +322,8 @@ func TestRunComponentConcurrentError(t *testing.T) {
 }
 
 func TestRunComponentNoError(t *testing.T) {
-	ctx := t.Context()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	componentFactory := func() (component.Component, error) {
 		return NewNonErroringComponent(100 * time.Millisecond), nil
@@ -363,7 +365,8 @@ func TestRunComponentFactoryError(t *testing.T) {
 		return component.ErrorHandlingStop
 	}
 
-	ctx := t.Context()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	err := component.RunComponent(ctx, componentFactory, onError)
 	require.ErrorIs(t, err, ErrCouldNotCreateComponent)

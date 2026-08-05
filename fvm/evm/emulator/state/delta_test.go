@@ -583,7 +583,7 @@ func TestDeltaView(t *testing.T) {
 	t.Run("test dirty addresses functionality", func(t *testing.T) {
 		addrCount := 6
 		addresses := make([]gethCommon.Address, addrCount)
-		for i := range addrCount {
+		for i := 0; i < addrCount; i++ {
 			addresses[i] = testutils.RandomCommonAddress(t)
 		}
 

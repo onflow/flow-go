@@ -251,14 +251,14 @@ func TestExecuteScript(t *testing.T) {
 
 	sc := systemcontracts.SystemContractsForChain(execCtx.Chain.ChainID())
 
-	script := fmt.Appendf(nil,
+	script := []byte(fmt.Sprintf(
 		`
 			import FungibleToken from %s
 
 			access(all) fun main() {}
 		`,
 		sc.FungibleToken.Address.HexWithPrefix(),
-	)
+	))
 
 	bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
 	trackerStorage := mocktracker.NewMockStorage()
@@ -319,14 +319,14 @@ func TestExecuteScript_BalanceScriptFailsIfViewIsEmpty(t *testing.T) {
 
 	sc := systemcontracts.SystemContractsForChain(execCtx.Chain.ChainID())
 
-	script := fmt.Appendf(nil,
+	script := []byte(fmt.Sprintf(
 		`
 			access(all) fun main(): UFix64 {
 				return getAccount(%s).balance
 			}
 		`,
 		sc.FungibleToken.Address.HexWithPrefix(),
-	)
+	))
 
 	bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
 	trackerStorage := mocktracker.NewMockStorage()
@@ -762,7 +762,8 @@ func TestExecuteScriptCancelled(t *testing.T) {
 	var value []byte
 	var wg sync.WaitGroup
 	reqCtx, cancel := context.WithCancel(context.Background())
-	wg.Go(func() {
+	wg.Add(1)
+	go func() {
 		header := unittest.BlockHeaderFixture()
 		value, _, err = manager.ExecuteScript(
 			reqCtx,
@@ -770,7 +771,8 @@ func TestExecuteScriptCancelled(t *testing.T) {
 			nil,
 			header,
 			nil)
-	})
+		wg.Done()
+	}()
 	cancel()
 	wg.Wait()
 	require.Nil(t, value)

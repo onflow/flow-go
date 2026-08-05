@@ -339,7 +339,7 @@ func Test_AddRemove_SmokeTest(t *testing.T) {
 		//  * add 10 seals to mempool, which should eject 7 seals
 		//  * test that ejected seals are not in mempool anymore
 		//  * remove remaining seals
-		for i := range 100 {
+		for i := 0; i < 100; i++ {
 			seals := unittest.IncorporatedResultSeal.Fixtures(10)
 			for j, s := range seals {
 				// fix height for each seal

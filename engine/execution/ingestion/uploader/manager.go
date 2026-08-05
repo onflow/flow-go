@@ -68,6 +68,7 @@ func (m *Manager) Upload(
 	var group errgroup.Group
 
 	for _, uploader := range m.uploaders {
+		uploader := uploader
 
 		group.Go(func() error {
 			span, _ := m.tracer.StartSpanFromContext(ctx, trace.EXEUploadCollections)

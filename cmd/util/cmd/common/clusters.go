@@ -94,7 +94,7 @@ func ConstructClusterAssignment(log zerolog.Logger, partnerNodes, internalNodes 
 	// check the 2/3 constraint: for every cluster `i`, constraint[i] must be strictly positive
 	// for a QC to be created without external votes
 	canConstructAllClusterQCs := true
-	for i := range numCollectionClusters {
+	for i := 0; i < numCollectionClusters; i++ {
 		if constraint[i] <= 0 {
 			canConstructAllClusterQCs = false
 		}

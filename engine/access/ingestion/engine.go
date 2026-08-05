@@ -309,7 +309,7 @@ func (e *Engine) processTransactionResultErrorMessagesByReceipts(ctx irrecoverab
 // process processes the given ingestion engine event. Events that are given
 // to this function originate within the expulsion engine on the node with the
 // given origin ID.
-func (e *Engine) process(originID flow.Identifier, event any) error {
+func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	select {
 	case <-e.ComponentManager.ShutdownSignal():
 		return component.ErrComponentShutdown
@@ -328,7 +328,7 @@ func (e *Engine) process(originID flow.Identifier, event any) error {
 
 // Process processes the given event from the node with the given origin ID in
 // a blocking manner. It returns the potential processing error when done.
-func (e *Engine) Process(_ channels.Channel, originID flow.Identifier, event any) error {
+func (e *Engine) Process(_ channels.Channel, originID flow.Identifier, event interface{}) error {
 	return e.process(originID, event)
 }
 

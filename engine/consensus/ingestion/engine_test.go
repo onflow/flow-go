@@ -79,7 +79,8 @@ func (s *IngestionSuite) TestSubmittingMultipleEntries() {
 	processed := atomic.NewUint64(0)
 
 	var wg sync.WaitGroup
-	wg.Go(func() {
+	wg.Add(1)
+	go func() {
 		for i := 0; i < int(count); i++ {
 			guarantee := s.validGuarantee()
 			s.pool.On("Has", guarantee.ID()).Return(false)
@@ -90,7 +91,8 @@ func (s *IngestionSuite) TestSubmittingMultipleEntries() {
 			// execute the vote submission
 			_ = s.ingest.Process(channels.ProvideCollections, originID, guarantee)
 		}
-	})
+		wg.Done()
+	}()
 
 	wg.Wait()
 

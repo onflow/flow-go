@@ -682,11 +682,7 @@ func (h *ContractHandler) DryRunWithTxData(
 // before attempting executing a evm operation
 func (h *ContractHandler) checkGasLimit(limit types.GasLimit) error {
 	// check gas limit against what has been left on the transaction side
-	usage := common.ComputationUsage{
-		Kind:      environment.ComputationKindEVMGasUsage,
-		Intensity: uint64(limit),
-	}
-	if !h.backend.ComputationAvailable(usage) {
+	if h.backend.ComputationRemaining(environment.ComputationKindEVMGasUsage) < uint64(limit) {
 		return types.ErrInsufficientComputation
 	}
 	return nil

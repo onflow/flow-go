@@ -27,7 +27,7 @@ func NewReadRangeBlocksCommand(blocks storage.Blocks) commands.AdminCommand {
 	}
 }
 
-func (c *ReadRangeBlocksCommand) Handler(ctx context.Context, req *admin.CommandRequest) (any, error) {
+func (c *ReadRangeBlocksCommand) Handler(ctx context.Context, req *admin.CommandRequest) (interface{}, error) {
 	reqData, err := parseHeightRangeRequestData(req)
 	if err != nil {
 		return nil, err

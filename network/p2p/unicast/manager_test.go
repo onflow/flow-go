@@ -1,6 +1,7 @@
 package unicast_test
 
 import (
+	"context"
 	"fmt"
 	"testing"
 
@@ -133,7 +134,8 @@ func TestUnicastManager_SuccessfulStream(t *testing.T) {
 
 	streamFactory.On("NewStream", mock.Anything, peerID, mock.Anything).Return(&p2ptest.MockStream{}, nil).Once()
 
-	ctx := t.Context()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	s, err := mgr.CreateStream(ctx, peerID)
 	require.NoError(t, err)
@@ -162,7 +164,8 @@ func TestUnicastManager_StreamBackoff(t *testing.T) {
 		Return(nil, fmt.Errorf("some error")).
 		Times(int(cfg.NetworkConfig.Unicast.UnicastManager.MaxStreamCreationRetryAttemptTimes + 1))
 
-	ctx := t.Context()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	s, err := mgr.CreateStream(ctx, peerID)
 	require.Error(t, err)
@@ -192,7 +195,8 @@ func TestUnicastManager_StreamFactory_StreamBackoff(t *testing.T) {
 		Return(nil, fmt.Errorf("some error")).
 		Times(int(cfg.NetworkConfig.Unicast.UnicastManager.MaxStreamCreationRetryAttemptTimes + 1))
 
-	ctx := t.Context()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	s, err := mgr.CreateStream(ctx, peerID)
 	require.Error(t, err)
 	require.Nil(t, s)
@@ -221,9 +225,10 @@ func TestUnicastManager_Stream_ConsecutiveStreamCreation_Increment(t *testing.T)
 	// mocks that it attempts to create a stream 10 times, and each time it succeeds.
 	streamFactory.On("NewStream", mock.Anything, peerID, mock.Anything).Return(&p2ptest.MockStream{}, nil).Times(totalSuccessAttempts)
 
-	ctx := t.Context()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
-	for i := range totalSuccessAttempts {
+	for i := 0; i < totalSuccessAttempts; i++ {
 		s, err := mgr.CreateStream(ctx, peerID)
 		require.NoError(t, err)
 		require.NotNil(t, s)
@@ -260,7 +265,8 @@ func TestUnicastManager_Stream_ConsecutiveStreamCreation_Reset(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, uint64(5), adjustedUnicastConfig.ConsecutiveSuccessfulStream)
 
-	ctx := t.Context()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	s, err := mgr.CreateStream(ctx, peerID)
 	require.Error(t, err)
@@ -286,7 +292,8 @@ func TestUnicastManager_StreamFactory_ErrProtocolNotSupported(t *testing.T) {
 		Return(nil, stream.NewProtocolNotSupportedErr(peerID, protocol.ID("protocol-1"), fmt.Errorf("some error"))).
 		Once()
 
-	ctx := t.Context()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	s, err := mgr.CreateStream(ctx, peerID)
 	require.Error(t, err)
 	require.Nil(t, s)
@@ -307,7 +314,8 @@ func TestUnicastManager_StreamFactory_ErrNoAddresses(t *testing.T) {
 		Return(nil, fmt.Errorf("some error to ensure wrapping works fine: %w", swarm.ErrNoAddresses)).
 		Once()
 
-	ctx := t.Context()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	s, err := mgr.CreateStream(ctx, peerID)
 	require.Error(t, err)
 	require.Nil(t, s)
@@ -335,7 +343,8 @@ func TestUnicastManager_Stream_ErrSecurityProtocolNegotiationFailed(t *testing.T
 		Return(nil, stream.NewSecurityProtocolNegotiationErr(peerID, fmt.Errorf("some error"))).
 		Once()
 
-	ctx := t.Context()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	s, err := mgr.CreateStream(ctx, peerID)
 	require.Error(t, err)
 	require.Nil(t, s)
@@ -361,7 +370,8 @@ func TestUnicastManager_StreamFactory_ErrGaterDisallowedConnection(t *testing.T)
 		Return(nil, stream.NewGaterDisallowedConnectionErr(fmt.Errorf("some error"))).
 		Once()
 
-	ctx := t.Context()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	s, err := mgr.CreateStream(ctx, peerID)
 	require.Error(t, err)
 	require.Nil(t, s)
@@ -396,7 +406,8 @@ func TestUnicastManager_Stream_BackoffBudgetDecremented(t *testing.T) {
 		Return(nil, fmt.Errorf("some error")).
 		Times(int(totalAttempts))
 
-	ctx := t.Context()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	for i := 0; i < int(maxStreamRetryBudget); i++ {
 		s, err := mgr.CreateStream(ctx, peerID)
 		require.Error(t, err)
@@ -448,7 +459,8 @@ func TestUnicastManager_Stream_BackoffBudgetResetToDefault(t *testing.T) {
 	require.Equal(t, uint64(0), adjustedCfg.StreamCreationRetryAttemptBudget)
 	require.Equal(t, cfg.NetworkConfig.Unicast.UnicastManager.StreamZeroRetryResetThreshold+1, adjustedCfg.ConsecutiveSuccessfulStream)
 
-	ctx := t.Context()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	s, err := mgr.CreateStream(ctx, peerID)
 	require.NoError(t, err)
@@ -480,7 +492,8 @@ func TestUnicastManager_Stream_NoBackoff_When_Budget_Is_Zero(t *testing.T) {
 	require.Equal(t, uint64(0), adjustedCfg.StreamCreationRetryAttemptBudget)
 	require.Equal(t, uint64(2), adjustedCfg.ConsecutiveSuccessfulStream)
 
-	ctx := t.Context()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	s, err := mgr.CreateStream(ctx, peerID)
 	require.Error(t, err)

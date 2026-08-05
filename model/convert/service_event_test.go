@@ -153,8 +153,8 @@ func TestDecodeCadenceValue(t *testing.T) {
 		name             string
 		location         string
 		value            cadence.Value
-		decodeInner      func(cadence.Value) (any, error)
-		expected         any
+		decodeInner      func(cadence.Value) (interface{}, error)
+		expected         interface{}
 		expectError      bool
 		expectedLocation string
 	}{
@@ -163,7 +163,7 @@ func TestDecodeCadenceValue(t *testing.T) {
 			location: "test",
 			value:    cadence.UInt64(42),
 			decodeInner: func(value cadence.Value) (
-				any,
+				interface{},
 				error,
 			) {
 				return 42, nil
@@ -176,7 +176,7 @@ func TestDecodeCadenceValue(t *testing.T) {
 			location: "test",
 			value:    nil,
 			decodeInner: func(value cadence.Value) (
-				any,
+				interface{},
 				error,
 			) {
 				return 42, nil
@@ -189,7 +189,7 @@ func TestDecodeCadenceValue(t *testing.T) {
 			location: "test",
 			value:    cadence.String("hello"),
 			decodeInner: func(value cadence.Value) (
-				any,
+				interface{},
 				error,
 			) {
 				return nil, fmt.Errorf("custom error")
@@ -201,10 +201,10 @@ func TestDecodeCadenceValue(t *testing.T) {
 			name:     "Nested location",
 			location: "outer",
 			value:    cadence.String("hello"),
-			decodeInner: func(value cadence.Value) (any, error) {
+			decodeInner: func(value cadence.Value) (interface{}, error) {
 				return convert.DecodeCadenceValue(
 					".inner", value,
-					func(value cadence.Value) (any, error) {
+					func(value cadence.Value) (interface{}, error) {
 						return nil, fmt.Errorf("custom error")
 					},
 				)

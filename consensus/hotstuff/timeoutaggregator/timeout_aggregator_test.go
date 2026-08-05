@@ -79,7 +79,7 @@ func (s *TimeoutAggregatorTestSuite) TestAddTimeout_HappyPath() {
 
 	var start sync.WaitGroup
 	start.Add(timeoutsCount)
-	for range timeoutsCount {
+	for i := 0; i < timeoutsCount; i++ {
 		go func() {
 			timeout := helper.TimeoutObjectFixture(helper.WithTimeoutObjectView(s.lowestRetainedView))
 

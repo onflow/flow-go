@@ -13,7 +13,7 @@ import (
 func CreateTokenTransferTransaction(chain flow.Chain, amount int, to flow.Address, signer flow.Address) *flow.TransactionBodyBuilder {
 	sc := systemcontracts.SystemContractsForChain(chain.ChainID())
 	return flow.NewTransactionBodyBuilder().
-		SetScript(fmt.Appendf(nil, `
+		SetScript([]byte(fmt.Sprintf(`
 		import FungibleToken from 0x%s
 		import FlowToken from 0x%s
 
@@ -32,7 +32,7 @@ func CreateTokenTransferTransaction(chain flow.Chain, amount int, to flow.Addres
 					?? panic("Could not borrow receiver reference to the recipient's Vault")
 				receiverRef.deposit(from: <-self.sentVault)
 			}
-		}`, sc.FungibleToken.Address.Hex(), sc.FlowToken.Address.Hex())).
+		}`, sc.FungibleToken.Address.Hex(), sc.FlowToken.Address.Hex()))).
 		AddArgument(jsoncdc.MustEncode(cadence.UFix64(amount))).
 		AddArgument(jsoncdc.MustEncode(cadence.NewAddress(to))).
 		AddAuthorizer(signer)

@@ -11,7 +11,7 @@ import (
 )
 
 // VerifyCdcArguments verifies that the actual slice of Go values match the expected set of Cadence values.
-func VerifyCdcArguments(t *testing.T, expected []cadence.Value, actual []any) {
+func VerifyCdcArguments(t *testing.T, expected []cadence.Value, actual []interface{}) {
 	for index, arg := range actual {
 		// marshal to bytes
 		bz, err := json.Marshal(arg)
@@ -26,7 +26,7 @@ func VerifyCdcArguments(t *testing.T, expected []cadence.Value, actual []any) {
 }
 
 // InterfaceToCdcValues decodes jsoncdc encoded values from interface -> cadence value.
-func InterfaceToCdcValues(t *testing.T, vals []any) []cadence.Value {
+func InterfaceToCdcValues(t *testing.T, vals []interface{}) []cadence.Value {
 	decoded := make([]cadence.Value, len(vals))
 	for index, val := range vals {
 		// marshal to bytes

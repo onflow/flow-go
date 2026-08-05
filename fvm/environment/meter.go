@@ -58,120 +58,101 @@ const (
 )
 
 // MainnetExecutionEffortWeights are the execution effort weights as they are on mainnet
+// from the FLIP 370 calibration (https://github.com/onflow/flips/blob/main/protocol/20260611-execution-effort-3.md),
+// deployed to mainnet on 2026-07-27.
 var MainnetExecutionEffortWeights = meter.ExecutionEffortWeights{
-	ComputationKindCreateAccount:                      2143437,
-	ComputationKindBLSVerifyPOP:                       1538600,
-	ComputationKindGetAccountBalance:                  485476,
-	ComputationKindBLSAggregatePublicKeys:             402728,
-	ComputationKindGetStorageCapacity:                 397087,
-	ComputationKindGetAccountAvailableBalance:         375235,
-	ComputationKindUpdateAccountContractCode:          369407,
-	ComputationKindBLSAggregateSignatures:             325309,
-	ComputationKindGenerateAccountLocalID:             75507,
-	ComputationKindGetAccountContractNames:            32771,
-	ComputationKindGetStorageUsed:                     25416,
-	ComputationKindAccountKeysCount:                   24709,
-	ComputationKindAllocateSlabIndex:                  15372,
-	common.ComputationKindAtreeMapGet:                 8837,
-	common.ComputationKindAtreeMapRemove:              7373,
-	common.ComputationKindCreateArrayValue:            4364,
-	common.ComputationKindCreateDictionaryValue:       3818,
-	common.ComputationKindAtreeMapSet:                 3656,
-	common.ComputationKindAtreeArrayInsert:            3652,
-	common.ComputationKindAtreeMapReadIteration:       3325,
-	ComputationKindEncodeEvent:                        2911,
-	common.ComputationKindTransferCompositeValue:      2358,
-	common.ComputationKindAtreeArrayAppend:            1907,
-	common.ComputationKindStatement:                   1770,
-	common.ComputationKindAtreeArraySet:               1737,
-	common.ComputationKindFunctionInvocation:          1399,
-	common.ComputationKindAtreeMapPopIteration:        1210,
-	common.ComputationKindAtreeArrayPopIteration:      736,
-	ComputationKindRLPDecoding:                        516,
-	common.ComputationKindGraphemesIteration:          278,
-	common.ComputationKindUfixParse:                   257,
-	common.ComputationKindFixParse:                    223,
-	common.ComputationKindLoop:                        179,
-	common.ComputationKindAtreeArrayBatchConstruction: 177,
-	common.ComputationKindTransferDictionaryValue:     125,
-	common.ComputationKindBigIntParse:                 69,
-	common.ComputationKindTransferArrayValue:          48,
-	ComputationKindSetValue:                           48,
-	common.ComputationKindUintParse:                   31,
-	common.ComputationKindIntParse:                    28,
-	ComputationKindGetValue:                           23,
-	common.ComputationKindStringToLower:               5,
-	ComputationKindEVMGasUsage:                        3,
+	ComputationKindBLSAggregatePublicKeys:                  63851230,
+	ComputationKindBLSAggregateSignatures:                  45031044,
+	ComputationKindCreateAccount:                           15751197,
+	ComputationKindBLSVerifyPOP:                            9888886,
+	ComputationKindUpdateAccountContractCode:               1923478,
+	ComputationKindGetAccountBalance:                       1828131,
+	ComputationKindGetStorageCapacity:                      1497945,
+	ComputationKindGetAccountAvailableBalance:              1443208,
+	ComputationKindVerifySignature:                         627265,
+	ComputationKindGenerateAccountLocalID:                  249708,
+	common.ComputationKindDestroyArrayValue:                155788,
+	ComputationKindGetStorageUsed:                          147167,
+	ComputationKindGetAccountContractNames:                 135863,
+	ComputationKindAccountKeysCount:                        103486,
+	ComputationKindEncodeEvent:                             46569,
+	common.ComputationKindAtreeMapHas:                      46122,
+	common.ComputationKindAtreeArrayGet:                    42997,
+	ComputationKindAllocateSlabIndex:                       36924,
+	common.ComputationKindAtreeMapGet:                      35646,
+	ComputationKindGenerateUUID:                            31935,
+	common.ComputationKindAtreeMapSet:                      26932,
+	common.ComputationKindAtreeArrayInsert:                 22087,
+	common.ComputationKindAtreeMapRemove:                   20860,
+	ComputationKindHash:                                    20801,
+	common.ComputationKindCreateArrayValue:                 20072,
+	common.ComputationKindAtreeMapConstruction:             12342,
+	common.ComputationKindAtreeArrayAppend:                 12291,
+	common.ComputationKindAtreeMapReadIteration:            10864,
+	common.ComputationKindFunctionInvocation:               10547,
+	common.ComputationKindAtreeMapBatchConstruction:        8289,
+	common.ComputationKindDestroyDictionaryValue:           7533,
+	common.ComputationKindAtreeArraySet:                    7199,
+	common.ComputationKindCreateCompositeValue:             6704,
+	common.ComputationKindStatement:                        5610,
+	common.ComputationKindLoop:                             4467,
+	common.ComputationKindAtreeArrayPopIteration:           2052,
+	common.ComputationKindUfixParse:                        1807,
+	ComputationKindRLPDecoding:                             1791,
+	common.ComputationKindFixParse:                         1508,
+	common.ComputationKindGraphemesIteration:               1245,
+	common.ComputationKindBigIntParse:                      1102,
+	common.ComputationKindUintParse:                        833,
+	common.ComputationKindAtreeArrayBatchConstruction:      830,
+	common.ComputationKindIntParse:                         742,
+	common.ComputationKindAtreeArraySingleSlabConstruction: 534,
+	ComputationKindEVMDecodeABI:                            399,
+	common.ComputationKindWordSliceOperation:               353,
+	ComputationKindGetValue:                                247,
+	ComputationKindSetValue:                                30,
+	common.ComputationKindStringToLower:                    24,
+	ComputationKindEVMGasUsage:                             7,
 }
 
 type Meter interface {
+	// Gauge provides MeterComputation and MeterMemory. Both may return
+	// [errors.LimitExceededError] when the corresponding metering limit is
+	// exceeded. In script environments, MeterComputation may additionally
+	// return [errors.ScriptExecutionTimedOutError] or
+	// [errors.ScriptExecutionCancelledError].
 	common.Gauge
 
-	ComputationUsed() (uint64, error)
-	MemoryUsed() (uint64, error)
+	// MeteringResult returns the metering totals accumulated so far.
+	MeteringResult() meter.MeteringResult
 
-	ComputationIntensities() meter.MeteredComputationIntensities
-	ComputationAvailable(common.ComputationUsage) bool
 	ComputationRemaining(kind common.ComputationKind) uint64
 
+	// MeterEmittedEvent captures the byte size of an emitted event.
+	//
+	// Expected error returns during normal operation:
+	//   - [errors.LimitExceededError] with [errors.LimitKindEvent] if the
+	//     event byte size limit is exceeded
 	MeterEmittedEvent(byteSize uint64) error
-	TotalEmittedEventBytes() uint64
 
 	RunWithMeteringDisabled(f func())
 }
 
 type meterImpl struct {
-	txnState state.NestedTransactionPreparer
+	state.NestedTransactionPreparer
 }
 
 func NewMeter(txnState state.NestedTransactionPreparer) Meter {
 	return &meterImpl{
-		txnState: txnState,
+		NestedTransactionPreparer: txnState,
 	}
 }
 
-func (meter *meterImpl) MeterComputation(usage common.ComputationUsage) error {
-	return meter.txnState.MeterComputation(usage)
-}
-
-func (meter *meterImpl) ComputationIntensities() meter.MeteredComputationIntensities {
-	return meter.txnState.ComputationIntensities()
-}
-
-func (meter *meterImpl) ComputationAvailable(usage common.ComputationUsage) bool {
-	return meter.txnState.ComputationAvailable(usage)
-}
-
-func (meter *meterImpl) ComputationRemaining(kind common.ComputationKind) uint64 {
-	return meter.txnState.ComputationRemaining(kind)
-}
-
-func (meter *meterImpl) ComputationUsed() (uint64, error) {
-	return meter.txnState.TotalComputationUsed(), nil
-}
-
-func (meter *meterImpl) MeterMemory(usage common.MemoryUsage) error {
-	return meter.txnState.MeterMemory(usage)
-}
-
-func (meter *meterImpl) MemoryUsed() (uint64, error) {
-	return meter.txnState.TotalMemoryEstimate(), nil
-}
-
-func (meter *meterImpl) InteractionUsed() (uint64, error) {
-	return meter.txnState.InteractionUsed(), nil
-}
-
-func (meter *meterImpl) MeterEmittedEvent(byteSize uint64) error {
-	return meter.txnState.MeterEmittedEvent(byteSize)
-}
-
-func (meter *meterImpl) TotalEmittedEventBytes() uint64 {
-	return meter.txnState.TotalEmittedEventBytes()
-}
-
-func (meter *meterImpl) RunWithMeteringDisabled(f func()) {
-	meter.txnState.RunWithMeteringDisabled(f)
+func (m *meterImpl) MeteringResult() meter.MeteringResult {
+	return meter.MeteringResult{
+		ComputationUsed:        m.TotalComputationUsed(),
+		MemoryEstimate:         m.TotalMemoryEstimate(),
+		ComputationIntensities: m.ComputationIntensities(),
+	}
 }
 
 type cancellableMeter struct {
@@ -186,12 +167,21 @@ func NewCancellableMeter(
 ) Meter {
 	return &cancellableMeter{
 		meterImpl: meterImpl{
-			txnState: txnState,
+			NestedTransactionPreparer: txnState,
 		},
 		ctx: ctx,
 	}
 }
 
+// MeterComputation checks for script cancellation and timeout before
+// delegating to the embedded meter.
+//
+// Expected error returns during normal operation:
+//   - [errors.ScriptExecutionTimedOutError] if the script exceeded its
+//     allotted execution time
+//   - [errors.ScriptExecutionCancelledError] if the script's context was
+//     cancelled
+//   - [errors.LimitExceededError] if a metering limit is exceeded
 func (meter *cancellableMeter) MeterComputation(usage common.ComputationUsage) error {
 	// this method is called on every unit of operation, so
 	// checking the context here is the most likely would capture

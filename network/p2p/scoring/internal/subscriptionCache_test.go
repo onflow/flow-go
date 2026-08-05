@@ -244,10 +244,12 @@ func TestSubscriptionCache_ConcurrentUpdate(t *testing.T) {
 		for _, topic := range topics {
 			pid := pid
 			topic := topic
-			allUpdatesDone.Go(func() {
+			allUpdatesDone.Add(1)
+			go func() {
+				defer allUpdatesDone.Done()
 				_, err := cache.AddWithInitTopicForPeer(pid, topic)
 				require.NoError(t, err, "adding topic to peer should not produce an error")
-			})
+			}()
 		}
 	}
 
@@ -256,11 +258,14 @@ func TestSubscriptionCache_ConcurrentUpdate(t *testing.T) {
 	// verify that all peers have all topics; concurrently
 	allTopicsVerified := sync.WaitGroup{}
 	for _, pid := range peerIds {
-		allTopicsVerified.Go(func() {
+		pid := pid
+		allTopicsVerified.Add(1)
+		go func() {
+			defer allTopicsVerified.Done()
 			topics, found := cache.GetSubscribedTopics(pid)
 			require.True(t, found, "peer should be found")
 			require.ElementsMatch(t, topics, topics, "retrieved topics should match the added topics")
-		})
+		}()
 	}
 
 	unittest.RequireReturnsBefore(t, allTopicsVerified.Wait, 1*time.Second, "all topics were not verified in time")

@@ -222,6 +222,7 @@ func TestMessageToRegisterID(t *testing.T) {
 
 		messages := make([]*entities.RegisterID, len(expected))
 		for i, regID := range expected {
+			regID := regID
 			messages[i] = convert.RegisterIDToMessage(regID)
 			require.Equal(t, regID.Owner, string(messages[i].Owner))
 			require.Equal(t, regID.Key, string(messages[i].Key))

@@ -272,7 +272,7 @@ func storeTopLevelNodesAndTrieRoots(
 
 func createSubTrieRoots(tries []*trie.MTrie) [subtrieCount][]*node.Node {
 	var subtrieRoots [subtrieCount][]*node.Node
-	for i := range len(subtrieRoots) {
+	for i := 0; i < len(subtrieRoots); i++ {
 		subtrieRoots[i] = make([]*node.Node, len(tries))
 	}
 

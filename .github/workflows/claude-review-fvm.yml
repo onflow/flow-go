@@ -1,0 +1,102 @@
+name: claude-review-fvm
+
+# Runs Claude Code on pull requests that modify fvm/** and posts a review.
+#
+# Authentication uses Workload Identity Federation against the Anthropic
+# API — no ANTHROPIC_API_KEY secret is required. The federation rule ID,
+# service account ID, and organization ID below are identifiers, not
+# credentials, and can safely live in the workflow file.
+#
+# The Claude GitHub App (https://github.com/apps/claude) must be installed
+# on this repository — that is what lets Claude post as claude[bot].
+#
+# ── TRIAL MODE ─────────────────────────────────────────────────────────
+# Claude currently posts findings as a plain PR comment (`gh pr comment`)
+# and cannot approve: the tool allowlist below does not include
+# `gh pr review`, so approval is impossible at the tool level regardless
+# of the prompt. To promote Claude to a real reviewer later:
+#   1. add `Bash(gh pr review:*)` to --allowedTools
+#   2. update the "Submitting your findings" section of the `fvm-review`
+#      skill (`.claude/skills/fvm-review/SKILL.md`) with review-submission
+#      rules (approve only when no important findings, request changes when
+#      there are, comment when uncertain)
+# ───────────────────────────────────────────────────────────────────────
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - 'fvm/**'
+
+permissions:
+  contents: read
+  pull-requests: write   # required for Claude to post comments
+  id-token: write        # required for WIF: fetching the GitHub OIDC token
+
+concurrency:
+  group: claude-review-fvm-${{ github.event.pull_request.number }}
+  cancel-in-progress: true   # a new push supersedes the in-flight review
+
+jobs:
+  review:
+    if: github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false   # don't leave GITHUB_TOKEN in git config
+
+      - uses: anthropics/claude-code-action@v1
+        with:
+          # Workload Identity Federation — no static credentials.
+          anthropic_federation_rule_id: fdrl_01UXEriP26j1qgPvpAvVyYoE
+          anthropic_service_account_id: svac_01RutNzF7FBxds8FhTHZ2BTY
+          anthropic_organization_id: 23ff619e-5bf0-4e8d-936b-87274460531a
+          # anthropic_workspace_id intentionally omitted: the federation
+          # rule is scoped to a single (default) workspace.
+
+          # TEMPORARY DEBUG: surface Claude's full output to diagnose the
+          # recurring `is_error:true` / num_turns:1 / $0 failures. The
+          # action's own warning applies: this logs ALL Claude messages
+          # (including tool results), publicly visible in the Actions log.
+          # Remove once the root cause is identified.
+          show_full_output: true
+
+          # Model intentionally not pinned — the action's default tracks
+          # Anthropic's current recommended model. Pin with
+          # `--model <id>` here if reproducibility matters more.
+          claude_args: |
+            --max-turns 30
+            --allowedTools "Bash(gh pr view:*),Bash(gh pr diff:*),Bash(gh pr comment:*),Bash(git diff:*),Bash(git log:*),Bash(git show:*),Read,Grep,Glob"
+
+          prompt: |
+            You are reviewing pull request #${{ github.event.pull_request.number }}
+            on onflow/flow-go. It modifies the Flow Virtual Machine (fvm/**).
+
+            Run the `fvm-review` skill (`.claude/skills/fvm-review/SKILL.md`)
+            to perform the review. The skill holds the FVM-specific review
+            doctrine: the bug classes to check, the error-taxonomy rules, the
+            scope guidance, and the findings format. Apply it to this PR.
+
+            Runtime context for this run:
+            - PR number: ${{ github.event.pull_request.number }}
+            - Base ref (diff against this, not master):
+              ${{ github.event.pull_request.base.ref }}
+            - Submission: post exactly one `gh pr comment` with the skill's
+              findings format. Do not approve or request changes — the
+              workflow's tool allowlist omits `gh pr review`, so approval is
+              impossible at the tool level regardless.
+
+      # TEMPORARY DEBUG: persist the raw execution output so the actual
+      # error message survives the runner (it is otherwise only written to
+      # the runner's temp dir and lost). Runs even when the review step
+      # fails. Remove together with show_full_output above.
+      - name: Upload Claude execution output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: claude-execution-output
+          path: /home/runner/work/_temp/claude-execution-output.json
+          if-no-files-found: warn

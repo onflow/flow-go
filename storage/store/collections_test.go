@@ -144,8 +144,10 @@ func TestCollections_ConcurrentIndexByTx(t *testing.T) {
 		errChan := make(chan error, 2*numCollections)
 
 		// Insert col1 batch
-		wg.Go(func() {
-			for range numCollections {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for i := 0; i < numCollections; i++ {
 				col := unittest.CollectionFixture(1)
 				col.Transactions[0] = sharedTx // Ensure it shares the same transaction
 				err := unittest.WithLock(t, lockManager, storage.LockInsertCollection, func(lctx lockctx.Context) error {
@@ -154,11 +156,13 @@ func TestCollections_ConcurrentIndexByTx(t *testing.T) {
 				})
 				errChan <- err
 			}
-		})
+		}()
 
 		// Insert col2 batch
-		wg.Go(func() {
-			for range numCollections {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for i := 0; i < numCollections; i++ {
 				col := unittest.CollectionFixture(1)
 				col.Transactions[0] = sharedTx // Ensure it shares the same transaction
 				err := unittest.WithLock(t, lockManager, storage.LockInsertCollection, func(lctx lockctx.Context) error {
@@ -167,7 +171,7 @@ func TestCollections_ConcurrentIndexByTx(t *testing.T) {
 				})
 				errChan <- err
 			}
-		})
+		}()
 
 		wg.Wait()
 		close(errChan)

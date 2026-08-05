@@ -211,7 +211,7 @@ func (s *RequesterEngineSuite) TestDispatchRequestBatchSize() {
 	}
 
 	// item that has just been added, should be included
-	for range totalItems {
+	for i := uint(0); i < totalItems; i++ {
 		item := &Request{
 			QueryKey:      unittest.IdentifierFixture(),
 			NumAttempts:   0,

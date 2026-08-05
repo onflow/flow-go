@@ -156,8 +156,8 @@ func main() {
 	// Create Unix socket listeners if socket path(s) are provided
 	if *ledgerServiceSocket != "" {
 		// Support multiple socket paths separated by comma
-		socketPathsList := strings.SplitSeq(*ledgerServiceSocket, ",")
-		for socketPath := range socketPathsList {
+		socketPathsList := strings.Split(*ledgerServiceSocket, ",")
+		for _, socketPath := range socketPathsList {
 			socketPath = strings.TrimSpace(socketPath)
 			if socketPath == "" {
 				continue

@@ -129,7 +129,7 @@ func TestHeadersByParentID(t *testing.T) {
 
 		// Test case 2: Parent with 3 children
 		var childProposals []*flow.Proposal
-		for range 3 {
+		for i := 0; i < 3; i++ {
 			childProposal := unittest.ProposalFromBlock(unittest.BlockWithParentFixture(parentBlock.ToHeader()))
 			childProposals = append(childProposals, childProposal)
 

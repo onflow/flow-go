@@ -27,7 +27,7 @@ import (
 
 type Event struct {
 	OriginID flow.Identifier
-	Msg      any
+	Msg      interface{}
 }
 
 // defaultApprovalQueueCapacity maximum capacity of approvals queue
@@ -171,7 +171,7 @@ func NewEngine(log zerolog.Logger,
 // reason it is factored out from NewEngine is so that it can be used in tests.
 func (e *Engine) buildComponentManager() *component.ComponentManager {
 	builder := component.NewComponentManagerBuilder()
-	for range defaultSealingEngineWorkers {
+	for i := 0; i < defaultSealingEngineWorkers; i++ {
 		builder.AddWorker(e.loop)
 	}
 	builder.AddWorker(e.finalizationProcessingLoop)
@@ -287,7 +287,7 @@ func (e *Engine) setupMessageHandler(getSealingConfigs module.SealingConfigsGett
 }
 
 // Process sends event into channel with pending events. Generally speaking shouldn't lock for too long.
-func (e *Engine) Process(channel channels.Channel, originID flow.Identifier, event any) error {
+func (e *Engine) Process(channel channels.Channel, originID flow.Identifier, event interface{}) error {
 	err := e.messageHandler.Process(originID, event)
 	if err != nil {
 		if engine.IsIncompatibleInputTypeError(err) {

@@ -56,7 +56,7 @@ func (s *CachingAssignmentCollectorTestSuite) TestProcessApproval() {
 	require.True(s.T(), engine.IsInvalidInputError(err))
 
 	var expected []*flow.ResultApproval
-	for i := range 5 {
+	for i := 0; i < 5; i++ {
 		approval := unittest.ResultApprovalFixture(
 			unittest.WithBlockID(s.executedBlock.ID()),
 			unittest.WithExecutionResultID(s.result.ID()),
@@ -78,7 +78,7 @@ func (s *CachingAssignmentCollectorTestSuite) TestProcessIncorporatedResult() {
 
 	// processing valid IR should result in no error
 	var expected []*flow.IncorporatedResult
-	for range 5 {
+	for i := 0; i < 5; i++ {
 		IR := unittest.IncorporatedResult.Fixture(
 			unittest.IncorporatedResult.WithResult(s.result),
 		)

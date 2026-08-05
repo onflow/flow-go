@@ -84,7 +84,7 @@ type ServerAuthError struct {
 }
 
 // newServerAuthError constructs a new ServerAuthError
-func newServerAuthError(msg string, args ...any) *ServerAuthError {
+func newServerAuthError(msg string, args ...interface{}) *ServerAuthError {
 	return &ServerAuthError{message: fmt.Sprintf(msg, args...)}
 }
 
@@ -133,7 +133,7 @@ func verifyPeerCertificateFunc(expectedPublicKey crypto.PublicKey) (func(rawCert
 	verifyFunc := func(rawCerts [][]byte, _ [][]*x509.Certificate) error {
 
 		chain := make([]*x509.Certificate, len(rawCerts))
-		for i := range rawCerts {
+		for i := 0; i < len(rawCerts); i++ {
 			cert, err := x509.ParseCertificate(rawCerts[i])
 			if err != nil {
 				return newServerAuthError("failed to parse certificate: %s", err.Error())

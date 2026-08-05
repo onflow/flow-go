@@ -46,13 +46,13 @@ require (
 	github.com/multiformats/go-multiaddr v0.14.0
 	github.com/multiformats/go-multiaddr-dns v0.4.1
 	github.com/multiformats/go-multihash v0.2.3
-	github.com/onflow/atree v0.16.0
-	github.com/onflow/cadence v1.10.3
+	github.com/onflow/atree v0.16.1
+	github.com/onflow/cadence v1.10.5
 	github.com/onflow/crypto v0.26.1-0.20260805220104-ab90dbfecf36
 	github.com/onflow/flow v0.4.20-0.20260303141511-b7c99b4fb01b
-	github.com/onflow/flow-core-contracts/lib/go/contracts v1.10.3
-	github.com/onflow/flow-core-contracts/lib/go/templates v1.10.3
-	github.com/onflow/flow-go-sdk v1.10.3
+	github.com/onflow/flow-core-contracts/lib/go/contracts v1.10.4
+	github.com/onflow/flow-core-contracts/lib/go/templates v1.10.4
+	github.com/onflow/flow-go-sdk v1.10.5
 	github.com/onflow/flow/protobuf/go/flow v0.4.20
 	github.com/pbnjay/memory v0.0.0-20210728143218-7b4eea64cf58
 	github.com/pkg/errors v0.9.1
@@ -173,7 +173,7 @@ require (
 	github.com/cockroachdb/fifo v0.0.0-20240606204812-0bbfbd93a7ce // indirect
 	github.com/cockroachdb/logtags v0.0.0-20230118201751-21c54148d20b // indirect
 	github.com/cockroachdb/redact v1.1.5 // indirect
-	github.com/cockroachdb/swiss v0.0.0-20251224182025-b0f6560f979b // indirect
+	github.com/cockroachdb/swiss v0.0.0-20250624142022-d6e517c1d961 // indirect
 	github.com/cockroachdb/tokenbucket v0.0.0-20230807174530-cc333fc44b06 // indirect
 	github.com/consensys/gnark-crypto v0.18.1 // indirect
 	github.com/containerd/cgroups v1.1.0 // indirect

@@ -5,9 +5,11 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/engine/execution"
+	executionMock "github.com/onflow/flow-go/engine/execution/mock"
 	"github.com/onflow/flow-go/engine/execution/storehouse"
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/model/flow"
@@ -557,14 +559,16 @@ func TestRegisterStoreConcurrentFinalizeAndExecute(t *testing.T) {
 		var wg sync.WaitGroup
 		savedHeights := make(chan uint64, len(headerByHeight)) // enough buffer so that producer won't be blocked
 
-		wg.Go(func() {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
 
 			for savedHeight := range savedHeights {
 				err := finalized.MockFinal(savedHeight)
 				require.NoError(t, err)
 				require.NoError(t, rs.OnBlockFinalized(), fmt.Sprintf("saved height %v", savedHeight))
 			}
-		})
+		}()
 
 		for height := rootHeight + 1; height <= endHeight; height++ {
 			if height >= 50 {
@@ -580,5 +584,64 @@ func TestRegisterStoreConcurrentFinalizeAndExecute(t *testing.T) {
 
 		// after all heights are executed and finalized, the LastFinalizedAndExecutedHeight should be the last height
 		require.Equal(t, endHeight, rs.LastFinalizedAndExecutedHeight())
+	})
+}
+
+// OnBlockFinalized must return an exception (instead of storing registers to the
+// disk store) when the finalized reader fails with a non-NotFound error, or when
+// the in memory store fails with a non-ErrNotExecuted error. Storing in those cases
+// would incorrectly index the height with no register updates.
+func TestRegisterStoreOnBlockFinalizedErrorHandling(t *testing.T) {
+	t.Parallel()
+
+	rootHeight := uint64(10)
+	rootID := unittest.IdentifierFixture()
+
+	t.Run("finalized reader exception", func(t *testing.T) {
+		diskStore := executionMock.NewOnDiskRegisterStore(t)
+		// called twice by NewRegisterStore's syncDiskStore
+		diskStore.On("LatestHeight").Return(rootHeight).Twice()
+		// called once by onBlockFinalized
+		diskStore.On("LatestHeight").Return(rootHeight).Once()
+
+		finalized := executionMock.NewFinalizedReader(t)
+		// called by NewRegisterStore to initialize the memStore
+		finalized.On("FinalizedBlockIDAtHeight", rootHeight).Return(rootID, nil).Once()
+		// the finalized reader returns an exception for the next height
+		finalized.On("FinalizedBlockIDAtHeight", rootHeight+1).
+			Return(flow.Identifier{}, fmt.Errorf("db exception")).Once()
+
+		rs, err := storehouse.NewRegisterStore(diskStore, nil, finalized, unittest.Logger(), storehouse.NewNoopNotifier())
+		require.NoError(t, err)
+
+		err = rs.OnBlockFinalized()
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "cannot get finalized block ID at height")
+
+		// no registers should be stored to the disk store
+		diskStore.AssertNotCalled(t, "Store", mock.Anything, mock.Anything)
+	})
+
+	t.Run("mem store exception", func(t *testing.T) {
+		diskStore := executionMock.NewOnDiskRegisterStore(t)
+		// called twice by NewRegisterStore's syncDiskStore, initializing the memStore at rootHeight
+		diskStore.On("LatestHeight").Return(rootHeight).Twice()
+		// simulate an inconsistent state where the disk store falls behind the memStore's
+		// pruned height, so that GetUpdatedRegisters fails with a non-ErrNotExecuted error
+		diskStore.On("LatestHeight").Return(rootHeight - 5).Once()
+
+		finalized := executionMock.NewFinalizedReader(t)
+		finalized.On("FinalizedBlockIDAtHeight", rootHeight).Return(rootID, nil).Once()
+		finalized.On("FinalizedBlockIDAtHeight", rootHeight-4).Return(unittest.IdentifierFixture(), nil).Once()
+
+		rs, err := storehouse.NewRegisterStore(diskStore, nil, finalized, unittest.Logger(), storehouse.NewNoopNotifier())
+		require.NoError(t, err)
+
+		err = rs.OnBlockFinalized()
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "cannot get updated registers")
+
+		// nil registers must not be stored to the disk store
+		diskStore.AssertNotCalled(t, "Store", mock.Anything, mock.Anything)
 	})
 }

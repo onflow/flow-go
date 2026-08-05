@@ -24,7 +24,7 @@ func BenchmarkPeerIdString(b *testing.B) {
 
 	count := 100
 	pids := make([]peer.ID, 0, count)
-	for range count {
+	for i := 0; i < count; i++ {
 		pids = append(pids, unittest.PeerIdFixture(b))
 	}
 
@@ -41,7 +41,7 @@ func BenchmarkPeerIdLogging(b *testing.B) {
 
 	count := 100
 	pids := make([]peer.ID, 0, count)
-	for range count {
+	for i := 0; i < count; i++ {
 		pids = append(pids, unittest.PeerIdFixture(b))
 	}
 

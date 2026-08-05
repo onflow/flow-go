@@ -46,7 +46,7 @@ func TestGetEvents(t *testing.T) {
 
 func generateTxEvents(txID flow.Identifier, txIndex uint32, count int) flow.EventsList {
 	events := make(flow.EventsList, count)
-	for i := range count {
+	for i := 0; i < count; i++ {
 		events[i] = flow.Event{
 			Type:             unittest.EventTypeFixture(flow.Localnet),
 			TransactionID:    txID,

@@ -3,7 +3,6 @@ package extended_test
 import (
 	"bytes"
 	"fmt"
-	"maps"
 	"strings"
 	"testing"
 
@@ -942,8 +941,12 @@ func makeMultiAccountSnapshot(
 ) fvmsnapshot.MapStorageSnapshot {
 	t.Helper()
 	snap := make(fvmsnapshot.MapStorageSnapshot)
-	maps.Copy(snap, makeContractSnapshot(t, addr1, contracts1))
-	maps.Copy(snap, makeContractSnapshot(t, addr2, contracts2))
+	for k, v := range makeContractSnapshot(t, addr1, contracts1) {
+		snap[k] = v
+	}
+	for k, v := range makeContractSnapshot(t, addr2, contracts2) {
+		snap[k] = v
+	}
 	return snap
 }
 

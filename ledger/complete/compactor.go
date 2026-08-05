@@ -193,7 +193,10 @@ func (c *Compactor) run() {
 	// Compute next checkpoint number.
 	// nextCheckpointNum is updated when checkpointing starts, fails to start, or fails.
 	// NOTE: next checkpoint number must >= active segment num.
-	nextCheckpointNum := max(activeSegmentNum, lastCheckpointNum+int(c.checkpointDistance))
+	nextCheckpointNum := lastCheckpointNum + int(c.checkpointDistance)
+	if activeSegmentNum > nextCheckpointNum {
+		nextCheckpointNum = activeSegmentNum
+	}
 
 	ctx, cancel := context.WithCancel(context.Background())
 

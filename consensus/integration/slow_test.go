@@ -71,7 +71,7 @@ func TestOneNodeBehind(t *testing.T) {
 	rootSnapshot := createRootSnapshot(t, participantsData)
 	nodes, hub, runFor := createNodes(t, NewConsensusParticipants(participantsData), rootSnapshot, stopper)
 
-	hub.WithFilter(func(channelID channels.Channel, event any, sender, receiver *Node) (bool, time.Duration) {
+	hub.WithFilter(func(channelID channels.Channel, event interface{}, sender, receiver *Node) (bool, time.Duration) {
 		if receiver == nodes[0] {
 			return false, hotstuffTimeout + time.Millisecond
 		}
@@ -103,7 +103,7 @@ func TestTimeoutRebroadcast(t *testing.T) {
 	// nodeID -> view -> numTimeoutMessages
 	lock := new(sync.Mutex)
 	blockedTimeoutObjectsTracker := make(map[flow.Identifier]map[uint64]uint64)
-	hub.WithFilter(func(channelID channels.Channel, event any, sender, receiver *Node) (bool, time.Duration) {
+	hub.WithFilter(func(channelID channels.Channel, event interface{}, sender, receiver *Node) (bool, time.Duration) {
 		switch m := event.(type) {
 		case *messages.Proposal:
 			return m.Block.View == 5, 0 // drop proposals only for view 5

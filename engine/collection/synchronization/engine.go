@@ -192,7 +192,7 @@ func (e *Engine) Done() <-chan struct{} {
 }
 
 // SubmitLocal submits an event originating on the local node.
-func (e *Engine) SubmitLocal(event any) {
+func (e *Engine) SubmitLocal(event interface{}) {
 	err := e.ProcessLocal(event)
 	if err != nil {
 		e.log.Fatal().Err(err).Msg("internal error processing event")
@@ -202,7 +202,7 @@ func (e *Engine) SubmitLocal(event any) {
 // Submit submits the given event from the node with the given origin ID
 // for processing in a non-blocking manner. It returns instantly and logs
 // a potential processing error internally when done.
-func (e *Engine) Submit(channel channels.Channel, originID flow.Identifier, event any) {
+func (e *Engine) Submit(channel channels.Channel, originID flow.Identifier, event interface{}) {
 	err := e.Process(channel, originID, event)
 	if err != nil {
 		e.log.Fatal().Err(err).Msg("internal error processing event")
@@ -210,13 +210,13 @@ func (e *Engine) Submit(channel channels.Channel, originID flow.Identifier, even
 }
 
 // ProcessLocal processes an event originating on the local node.
-func (e *Engine) ProcessLocal(event any) error {
+func (e *Engine) ProcessLocal(event interface{}) error {
 	return e.process(e.me.NodeID(), event)
 }
 
 // Process processes the given event from the node with the given origin ID in
 // a blocking manner. It returns the potential processing error when done.
-func (e *Engine) Process(channel channels.Channel, originID flow.Identifier, event any) error {
+func (e *Engine) Process(channel channels.Channel, originID flow.Identifier, event interface{}) error {
 	err := e.process(originID, event)
 	if err != nil {
 		if engine.IsIncompatibleInputTypeError(err) {
@@ -232,7 +232,7 @@ func (e *Engine) Process(channel channels.Channel, originID flow.Identifier, eve
 // Error returns:
 //   - IncompatibleInputTypeError if input has unexpected type
 //   - All other errors are potential symptoms of internal state corruption or bugs (fatal).
-func (e *Engine) process(originID flow.Identifier, event any) error {
+func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	switch event.(type) {
 	case *flow.RangeRequest, *flow.BatchRequest, *flow.SyncRequest:
 		return e.requestHandler.process(originID, event)

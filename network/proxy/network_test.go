@@ -14,7 +14,7 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-func getEvent() any {
+func getEvent() interface{} {
 	return struct {
 		foo string
 	}{
@@ -71,7 +71,7 @@ func (suite *Suite) TestPublish() {
 	channel := channels.TestNetworkChannel
 	targetIDs := make([]flow.Identifier, 10)
 
-	for range 10 {
+	for i := 0; i < 10; i++ {
 		targetIDs = append(targetIDs, unittest.IdentifierFixture())
 	}
 
@@ -95,7 +95,7 @@ func (suite *Suite) TestMulticast() {
 	channel := channels.TestNetworkChannel
 	targetIDs := make([]flow.Identifier, 10)
 
-	for range 10 {
+	for i := 0; i < 10; i++ {
 		targetIDs = append(targetIDs, unittest.IdentifierFixture())
 	}
 
