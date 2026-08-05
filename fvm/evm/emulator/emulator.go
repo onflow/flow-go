@@ -285,7 +285,9 @@ func (bl *BlockView) BatchRunTransactions(txs []*gethTypes.Transaction) ([]*type
 			}
 		}
 
-		// this clears state for any subsequent transaction runs
+		// this clears state for any subsequent transaction runs;
+		// it is required after committing a valid transaction, and is a
+		// harmless no-op for invalid ones (discardIfInvalid already reset)
 		proc.state.Reset()
 
 		// collect result
