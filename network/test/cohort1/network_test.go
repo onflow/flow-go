@@ -534,7 +534,9 @@ func (suite *NetworkTestSuite) TestUnicastRateLimit_Bandwidth() {
 		Text: generate('C'),
 	}, newId.NodeID)
 	if err != nil {
-		require.Contains(suite.T(), err.Error(), "stream reset")
+		// depending on the send timing, the sender either observes a "stream reset" write error,
+		// or an EOF when closing the already-reset stream.
+		require.Regexp(suite.T(), "stream reset|EOF", err.Error())
 	}
 
 	// wait for all rate limits before shutting down network
