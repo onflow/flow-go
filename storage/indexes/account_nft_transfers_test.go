@@ -777,11 +777,11 @@ func TestNFTTransfers_PaginationCoversAllEntries(t *testing.T) {
 		require.Len(t, allCollected, 6)
 
 		// First 3 results are from height 6 (newest first), next 3 from firstHeight.
-		for i := 0; i < 3; i++ {
+		for i := range 3 {
 			assert.Equal(t, uint64(6), allCollected[i].BlockHeight)
 			assert.Equal(t, uint32(i), allCollected[i].TransactionIndex)
 		}
-		for i := 0; i < 3; i++ {
+		for i := range 3 {
 			assert.Equal(t, firstHeight, allCollected[3+i].BlockHeight)
 			assert.Equal(t, uint32(i), allCollected[3+i].TransactionIndex)
 		}

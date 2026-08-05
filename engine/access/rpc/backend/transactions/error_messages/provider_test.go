@@ -652,7 +652,7 @@ func (suite *Suite) TestLookupByIndex_ExecutionNodeError_TxResultFailed() {
 
 func (suite *Suite) TestLookupByBlockID_FromExecutionNode_HappyPath() {
 	resultsByBlockID := make([]flow.LightTransactionResult, 0)
-	for i := 0; i < 5; i++ {
+	for i := range 5 {
 		resultsByBlockID = append(resultsByBlockID, flow.LightTransactionResult{
 			TransactionID:   unittest.IdentifierFixture(),
 			Failed:          i%2 == 0, // create a mix of failed and non-failed transactions
@@ -718,7 +718,7 @@ func (suite *Suite) TestLookupByBlockID_FromExecutionNode_HappyPath() {
 
 func (suite *Suite) TestLookupByBlockID_FromStorage_HappyPath() {
 	resultsByBlockID := make([]flow.LightTransactionResult, 0)
-	for i := 0; i < 5; i++ {
+	for i := range 5 {
 		resultsByBlockID = append(resultsByBlockID, flow.LightTransactionResult{
 			TransactionID:   unittest.IdentifierFixture(),
 			Failed:          i%2 == 0, // create a mix of failed and non-failed transactions

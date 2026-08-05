@@ -63,7 +63,7 @@ func (ss *SyncSuite) TestLoad_Process_SyncRequest_HigherThanReceiver_OutsideTole
 
 	ss.metrics.On("MessageReceived", metrics.EngineSynchronization, metrics.MessageSyncRequest).Times(load)
 
-	for i := 0; i < load; i++ {
+	for range load {
 		// generate origin and request message
 		originID := unittest.IdentifierFixture()
 
@@ -157,7 +157,8 @@ func (ss *SyncSuite) TestLoad_Process_SyncRequest_HigherThanReceiver_OutsideTole
 			ss.metrics.On("MessageSent", metrics.EngineSynchronization, metrics.MessageSyncRequest).Maybe()
 			ss.metrics.On("MessageReceived", metrics.EngineSynchronization, metrics.MessageSyncRequest).Times(load)
 
-			for i := 0; i < load; i++ {
+			for i := range load {
+				ss.T().Log("load iteration", i)
 				nonce, err := rand.Uint64()
 				require.NoError(ss.T(), err, "should generate nonce")
 
@@ -402,7 +403,7 @@ func repeatedBlockIDs(n int) []flow.Identifier {
 	blockID := unittest.BlockFixture().ID()
 
 	arr := make([]flow.Identifier, n)
-	for i := 0; i < n; i++ {
+	for i := range n {
 		arr[i] = blockID
 	}
 	return arr

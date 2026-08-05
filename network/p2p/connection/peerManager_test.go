@@ -40,7 +40,7 @@ func (suite *PeerManagerTestSuite) SetupTest() {
 
 func (suite *PeerManagerTestSuite) generatePeerIDs(n int) peer.IDSlice {
 	pids := peer.IDSlice{}
-	for i := 0; i < n; i++ {
+	for range n {
 		key := p2pfixtures.NetworkingKeyFixtures(suite.T())
 		pid, err := keyutils.PeerIDFromFlowPublicKey(key.PublicKey())
 		require.NoError(suite.T(), err)

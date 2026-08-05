@@ -124,11 +124,11 @@ func TestTransactionAuthenticationSchemes(t *testing.T) {
 
 		legacyEnvelopeSignatureCanonicalForm := func(tb flow.TransactionBody) []byte {
 			return fingerprint.Fingerprint(struct {
-				Payload           interface{}
-				PayloadSignatures interface{}
+				Payload           any
+				PayloadSignatures any
 			}{
 				tb.PayloadCanonicalForm(),
-				[]interface{}{
+				[]any{
 					// Expected canonical form of payload signature
 					struct {
 						SignerIndex uint
@@ -165,11 +165,11 @@ func TestTransactionAuthenticationSchemes(t *testing.T) {
 				payloadExtensionData: []byte{0x0, 1, 2, 3},
 				expectedEnvelopeSignatureCanonicalForm: func(tb flow.TransactionBody) []byte {
 					return fingerprint.Fingerprint(struct {
-						Payload           interface{}
-						PayloadSignatures interface{}
+						Payload           any
+						PayloadSignatures any
 					}{
 						tb.PayloadCanonicalForm(),
-						[]interface{}{
+						[]any{
 							// Expected canonical form of payload signature
 							struct {
 								SignerIndex   uint
@@ -190,11 +190,11 @@ func TestTransactionAuthenticationSchemes(t *testing.T) {
 				payloadExtensionData: slices.Concat([]byte{0x5}, randomExtensionData[:]),
 				expectedEnvelopeSignatureCanonicalForm: func(tb flow.TransactionBody) []byte {
 					return fingerprint.Fingerprint(struct {
-						Payload           interface{}
-						PayloadSignatures interface{}
+						Payload           any
+						PayloadSignatures any
 					}{
 						tb.PayloadCanonicalForm(),
-						[]interface{}{
+						[]any{
 							// Expected canonical form of payload signature
 							struct {
 								SignerIndex   uint
@@ -215,11 +215,11 @@ func TestTransactionAuthenticationSchemes(t *testing.T) {
 				payloadExtensionData: slices.Concat([]byte{0x1}, randomExtensionData[:]),
 				expectedEnvelopeSignatureCanonicalForm: func(tb flow.TransactionBody) []byte {
 					return fingerprint.Fingerprint(struct {
-						Payload           interface{}
-						PayloadSignatures interface{}
+						Payload           any
+						PayloadSignatures any
 					}{
 						tb.PayloadCanonicalForm(),
-						[]interface{}{
+						[]any{
 							// Expected canonical form of payload signature
 							struct {
 								SignerIndex   uint
@@ -256,12 +256,12 @@ func TestTransactionAuthenticationSchemes(t *testing.T) {
 
 		legacyTransactionCanonicalForm := func(tb flow.TransactionBody) []byte {
 			return fingerprint.Fingerprint(struct {
-				Payload            interface{}
-				PayloadSignatures  interface{}
-				EnvelopeSignatures interface{}
+				Payload            any
+				PayloadSignatures  any
+				EnvelopeSignatures any
 			}{
 				tb.PayloadCanonicalForm(),
-				[]interface{}{
+				[]any{
 					// Expected canonical form of payload signature
 					struct {
 						SignerIndex uint
@@ -273,7 +273,7 @@ func TestTransactionAuthenticationSchemes(t *testing.T) {
 						Signature:   tb.PayloadSignatures[0].Signature,
 					},
 				},
-				[]interface{}{
+				[]any{
 					// Expected canonical form of payload signature
 					struct {
 						SignerIndex uint
@@ -312,12 +312,12 @@ func TestTransactionAuthenticationSchemes(t *testing.T) {
 				payloadExtensionData: slices.Concat([]byte{0x1}, randomExtensionData[:]),
 				expectedTransactionCanonicalForm: func(tb flow.TransactionBody) []byte {
 					return fingerprint.Fingerprint(struct {
-						Payload            interface{}
-						PayloadSignatures  interface{}
-						EnvelopeSignatures interface{}
+						Payload            any
+						PayloadSignatures  any
+						EnvelopeSignatures any
 					}{
 						tb.PayloadCanonicalForm(),
-						[]interface{}{
+						[]any{
 							// Expected canonical form of payload signature
 							struct {
 								SignerIndex   uint
@@ -331,7 +331,7 @@ func TestTransactionAuthenticationSchemes(t *testing.T) {
 								ExtensionData: slices.Concat([]byte{0x1}, randomExtensionData[:]),
 							},
 						},
-						[]interface{}{
+						[]any{
 							// Expected canonical form of payload signature
 							struct {
 								SignerIndex   uint

@@ -19,7 +19,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-func scriptReq(id string, height string, body interface{}) *http.Request {
+func scriptReq(id string, height string, body any) *http.Request {
 	u, _ := url.ParseRequestURI("/v1/scripts")
 	q := u.Query()
 
@@ -41,7 +41,7 @@ func scriptReq(id string, height string, body interface{}) *http.Request {
 func TestScripts(t *testing.T) {
 	validCode := []byte(`access(all) fun main(foo: String): String { return foo }`)
 	validArgs := []byte(`{ "type": "String", "value": "hello world" }`)
-	validBody := map[string]interface{}{
+	validBody := map[string]any{
 		"script":    util.ToBase64(validCode),
 		"arguments": []string{util.ToBase64(validArgs)},
 	}
@@ -114,7 +114,7 @@ func TestScripts(t *testing.T) {
 		tests := []struct {
 			id     string
 			height string
-			body   map[string]interface{}
+			body   map[string]any
 			out    string
 			status int
 		}{

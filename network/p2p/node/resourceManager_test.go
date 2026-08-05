@@ -72,14 +72,12 @@ func TestCreateStream_InboundConnResourceLimit(t *testing.T) {
 	// streams this indicates a bug in the libp2p PeerBaseLimitConnsInbound limit.
 	defaultProtocolID := protocols.FlowProtocolID(sporkID)
 	expectedNumOfStreams := int64(50)
-	for i := int64(0); i < expectedNumOfStreams; i++ {
-		allStreamsCreated.Add(1)
-		go func() {
-			defer allStreamsCreated.Done()
+	for range expectedNumOfStreams {
+		allStreamsCreated.Go(func() {
 			require.NoError(t, sender.Host().Connect(ctx, receiver.Host().Peerstore().PeerInfo(receiver.ID())))
 			_, err := sender.Host().NewStream(ctx, receiver.ID(), defaultProtocolID)
 			require.NoError(t, err)
-		}()
+		})
 	}
 
 	unittest.RequireReturnsBefore(t, allStreamsCreated.Wait, 2*time.Second, "could not create streams on time")
@@ -376,7 +374,7 @@ func testCreateStreamInboundStreamResourceLimits(t *testing.T, cfg *testPeerLimi
 	streamListMu := sync.Mutex{}             // mutex to protect the streamsList.
 	streamsList := make([]network.Stream, 0) // list of all streams created to avoid garbage collection.
 	for sIndex := range senders {
-		for i := 0; i < loadLimit; i++ {
+		for range loadLimit {
 			allStreamsCreated.Add(1)
 			go func(sIndex int) {
 				defer allStreamsCreated.Done()

@@ -428,7 +428,7 @@ func TestBootstrapNonRoot(t *testing.T) {
 			seals := []*flow.Seal{seal1, seal2, seal3}
 
 			parent := block3
-			for i := 0; i < flow.DefaultTransactionExpiry-1; i++ {
+			for range flow.DefaultTransactionExpiry - 1 {
 				next := unittest.BlockWithParentAndPayload(parent.ToHeader(), unittest.PayloadFixture(
 					unittest.WithReceipts(receipts[0]),
 					unittest.WithProtocolStateID(calculateExpectedStateId(t, mutableState)(parent.ID(), parent.View+1, []*flow.Seal{seals[0]})),

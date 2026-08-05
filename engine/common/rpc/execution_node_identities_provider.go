@@ -94,7 +94,7 @@ func (e *ExecutionNodeIdentitiesProvider) ExecutionNodesForBlockID(
 		executorIDs = executorIdentities.NodeIDs()
 	} else {
 		// try to find at least minExecutionNodesCnt execution node ids from the execution receipts for the given blockID
-		for attempt := 0; attempt < maxAttemptsForExecutionReceipt; attempt++ {
+		for attempt := range maxAttemptsForExecutionReceipt {
 			executorIDs, err = e.findAllExecutionNodes(blockID)
 			if err != nil {
 				return nil, err

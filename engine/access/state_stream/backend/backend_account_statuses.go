@@ -96,7 +96,7 @@ func (b *AccountStatusesBackend) SubscribeAccountStatusesFromLatestBlock(
 func (b *AccountStatusesBackend) getAccountStatusResponseFactory(
 	filter state_stream.AccountStatusFilter,
 ) subscription.GetDataByHeightFunc {
-	return func(ctx context.Context, height uint64) (interface{}, error) {
+	return func(ctx context.Context, height uint64) (any, error) {
 		eventsResponse, err := b.eventsProvider.GetAllEventsResponse(ctx, height)
 		if err != nil {
 			if errors.Is(err, storage.ErrNotFound) ||

@@ -122,7 +122,7 @@ func TestBackend_RunLimitChecking(t *testing.T) {
 	wg := sync.WaitGroup{}
 	wg.Add(swarm)
 
-	for i := 0; i < swarm; i++ {
+	for i := range swarm {
 		go func(x int) {
 			// creates and adds a fake item to the mempool
 			item := unittest.MockEntityFixture()
@@ -170,7 +170,7 @@ func TestBackend_RegisterEjectionCallback(t *testing.T) {
 
 	wg := sync.WaitGroup{}
 	wg.Add(swarm)
-	for i := 0; i < swarm; i++ {
+	for i := range swarm {
 		go func(x int) {
 			// creates and adds a fake item to the mempool
 			item := unittest.MockEntityFixture()

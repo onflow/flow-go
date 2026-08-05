@@ -30,7 +30,7 @@ func TestExecute(t *testing.T) {
 		// prepare data - create execution receipts for blocks
 		receipts := make([]*flow.ExecutionReceipt, 0, blockCount)
 		bs := make([]flow.Identifier, 0, blockCount)
-		for i := 0; i < blockCount; i++ {
+		for range blockCount {
 			block := unittest.BlockFixture()
 			receipt := unittest.ReceiptForBlockFixture(block)
 			receipts = append(receipts, receipt)
@@ -87,7 +87,7 @@ func TestExecuteCanBeResumed(t *testing.T) {
 		// prepare data - create execution receipts for blocks
 		receipts := make([]*flow.ExecutionReceipt, 0, blockCount)
 		bs := make([]flow.Identifier, 0, blockCount)
-		for i := 0; i < blockCount; i++ {
+		for range blockCount {
 			block := unittest.BlockFixture()
 			receipt := unittest.ReceiptForBlockFixture(block)
 			receipts = append(receipts, receipt)

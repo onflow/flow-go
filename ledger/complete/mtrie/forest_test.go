@@ -792,7 +792,7 @@ func TestRandomUpdateReadProofValueSizes(t *testing.T) {
 	require.NoError(t, err)
 	latestPayloadByPath := make(map[ledger.Path]*ledger.Payload) // map store
 
-	for e := 0; e < rep; e++ {
+	for range rep {
 		paths := testutils.RandomPathsRandLen(maxNumPathsPerStep)
 		payloads := testutils.RandomPayloads(len(paths), minPayloadByteSize, maxPayloadByteSize)
 

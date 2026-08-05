@@ -106,7 +106,7 @@ func TestCanIterate(t *testing.T) {
 	require.True(t, hasNext)
 
 	// Iterate through initial blocks
-	for i := 0; i < len(additionalBlocks); i++ {
+	for range additionalBlocks {
 		blockID, ok, err := iterator.Next()
 		require.NoError(t, err)
 		require.True(t, ok)
@@ -180,7 +180,7 @@ func TestCanResume(t *testing.T) {
 
 	// Iterate through blocks
 	visitedBlocks := make([]flow.Identifier, 0, len(blocks))
-	for i := 0; i < 3; i++ { // iterate up to Height 3
+	for range 3 { // iterate up to Height 3
 		blockID, ok, err := iterator.Next()
 		require.NoError(t, err)
 		if !ok {

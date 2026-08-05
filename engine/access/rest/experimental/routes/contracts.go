@@ -13,7 +13,7 @@ import (
 )
 
 // GetContracts handles GET /experimental/v1/contracts.
-func GetContracts(r *common.Request, backend extended.API, link models.LinkGenerator) (interface{}, error) {
+func GetContracts(r *common.Request, backend extended.API, link models.LinkGenerator) (any, error) {
 	req, err := request.NewGetContracts(r)
 	if err != nil {
 		return nil, common.NewBadRequestError(err)
@@ -35,7 +35,7 @@ func GetContracts(r *common.Request, backend extended.API, link models.LinkGener
 }
 
 // GetContract handles GET /experimental/v1/contracts/{identifier}.
-func GetContract(r *common.Request, backend extended.API, link models.LinkGenerator) (interface{}, error) {
+func GetContract(r *common.Request, backend extended.API, link models.LinkGenerator) (any, error) {
 	req, err := request.NewGetContract(r)
 	if err != nil {
 		return nil, common.NewBadRequestError(err)
@@ -61,7 +61,7 @@ func GetContract(r *common.Request, backend extended.API, link models.LinkGenera
 }
 
 // GetContractDeployments handles GET /experimental/v1/contracts/{identifier}/deployments.
-func GetContractDeployments(r *common.Request, backend extended.API, link models.LinkGenerator) (interface{}, error) {
+func GetContractDeployments(r *common.Request, backend extended.API, link models.LinkGenerator) (any, error) {
 	req, err := request.NewGetContractDeployments(r)
 	if err != nil {
 		return nil, common.NewBadRequestError(err)
@@ -84,7 +84,7 @@ func GetContractDeployments(r *common.Request, backend extended.API, link models
 }
 
 // GetContractsByAddress handles GET /experimental/v1/accounts/{address}/contracts.
-func GetContractsByAddress(r *common.Request, backend extended.API, link models.LinkGenerator) (interface{}, error) {
+func GetContractsByAddress(r *common.Request, backend extended.API, link models.LinkGenerator) (any, error) {
 	req, err := request.NewGetContractsByAddress(r)
 	if err != nil {
 		return nil, common.NewBadRequestError(err)

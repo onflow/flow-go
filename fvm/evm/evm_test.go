@@ -56,7 +56,7 @@ func TestEVMRun(t *testing.T) {
 				testAccount *EOATestAccount,
 			) {
 				sc := systemcontracts.SystemContractsForChain(chain.ChainID())
-				code := []byte(fmt.Sprintf(
+				code := fmt.Appendf(nil,
 					`
 					import EVM from %s
 
@@ -72,7 +72,7 @@ func TestEVMRun(t *testing.T) {
 					}
 					`,
 					sc.EVMContract.Address.HexWithPrefix(),
-				))
+				)
 
 				coinbaseAddr := types.Address{1, 2, 3}
 				coinbaseBalance := getEVMAccountBalance(t, ctx, vm, snapshot, coinbaseAddr)
@@ -161,7 +161,7 @@ func TestEVMRun(t *testing.T) {
 				require.Equal(t, types.BalanceToBigInt(coinbaseBalance).Uint64(), txEventPayload.GasConsumed)
 
 				// query the value
-				code = []byte(fmt.Sprintf(
+				code = fmt.Appendf(nil,
 					`
 					import EVM from %s
 					access(all)
@@ -176,7 +176,7 @@ func TestEVMRun(t *testing.T) {
 					}
 					`,
 					sc.EVMContract.Address.HexWithPrefix(),
-				))
+				)
 
 				innerTxBytes = testAccount.PrepareSignAndEncodeTx(t,
 					testContract.DeployedAt.ToCommon(),
@@ -226,7 +226,7 @@ func TestEVMRun(t *testing.T) {
 				testAccount *EOATestAccount,
 			) {
 				sc := systemcontracts.SystemContractsForChain(chain.ChainID())
-				code := []byte(fmt.Sprintf(
+				code := fmt.Appendf(nil,
 					`
 					import EVM from %s
 
@@ -247,7 +247,7 @@ func TestEVMRun(t *testing.T) {
 					}
 					`,
 					sc.EVMContract.Address.HexWithPrefix(),
-				))
+				)
 
 				num := int64(42)
 				callData := cadence.NewArray(
@@ -328,7 +328,7 @@ func TestEVMRun(t *testing.T) {
 				testAccount *EOATestAccount,
 			) {
 				sc := systemcontracts.SystemContractsForChain(chain.ChainID())
-				code := []byte(fmt.Sprintf(
+				code := fmt.Appendf(nil,
 					`
 					import EVM from %s
 
@@ -349,7 +349,7 @@ func TestEVMRun(t *testing.T) {
 					}
 					`,
 					sc.EVMContract.Address.HexWithPrefix(),
-				))
+				)
 
 				num := int64(42)
 				callData := cadence.NewArray(
@@ -402,7 +402,7 @@ func TestEVMRun(t *testing.T) {
 				testAccount *EOATestAccount,
 			) {
 				sc := systemcontracts.SystemContractsForChain(chain.ChainID())
-				code := []byte(fmt.Sprintf(
+				code := fmt.Appendf(nil,
 					`
 					import EVM from %s
 
@@ -423,7 +423,7 @@ func TestEVMRun(t *testing.T) {
 					}
 					`,
 					sc.EVMContract.Address.HexWithPrefix(),
-				))
+				)
 
 				num := int64(42)
 				callData := cadence.NewArray(
@@ -476,7 +476,7 @@ func TestEVMRun(t *testing.T) {
 				testAccount *EOATestAccount,
 			) {
 				sc := systemcontracts.SystemContractsForChain(chain.ChainID())
-				code := []byte(fmt.Sprintf(
+				code := fmt.Appendf(nil,
 					`
 					import EVM from %s
 
@@ -511,7 +511,7 @@ func TestEVMRun(t *testing.T) {
 					}
 					`,
 					sc.EVMContract.Address.HexWithPrefix(),
-				))
+				)
 
 				coinbaseAddr := types.Address{1, 2, 3}
 				coinbaseBalance := getEVMAccountBalance(t, ctx, vm, snapshot, coinbaseAddr)
@@ -577,7 +577,7 @@ func TestEVMRun(t *testing.T) {
 				testAccount *EOATestAccount,
 			) {
 				sc := systemcontracts.SystemContractsForChain(chain.ChainID())
-				code := []byte(fmt.Sprintf(
+				code := fmt.Appendf(nil,
 					`
 					import EVM from %s
 
@@ -594,7 +594,7 @@ func TestEVMRun(t *testing.T) {
 					}
 					`,
 					sc.EVMContract.Address.HexWithPrefix(),
-				))
+				)
 
 				coinbaseAddr := types.Address{1, 2, 3}
 				coinbaseBalance := getEVMAccountBalance(t, ctx, vm, snapshot, coinbaseAddr)
@@ -658,7 +658,7 @@ func TestEVMRun(t *testing.T) {
 				testAccount *EOATestAccount,
 			) {
 				sc := systemcontracts.SystemContractsForChain(chain.ChainID())
-				code := []byte(fmt.Sprintf(
+				code := fmt.Appendf(nil,
 					`
 					import EVM from %s
 
@@ -675,7 +675,7 @@ func TestEVMRun(t *testing.T) {
 					}
 					`,
 					sc.EVMContract.Address.HexWithPrefix(),
-				))
+				)
 
 				coinbaseAddr := types.Address{1, 2, 3}
 				coinbaseBalance := getEVMAccountBalance(t, ctx, vm, snapshot, coinbaseAddr)
@@ -739,7 +739,7 @@ func TestEVMRun(t *testing.T) {
 				testAccount *EOATestAccount,
 			) {
 				sc := systemcontracts.SystemContractsForChain(chain.ChainID())
-				code := []byte(fmt.Sprintf(
+				code := fmt.Appendf(nil,
 					`
 					import EVM from %s
 
@@ -756,7 +756,7 @@ func TestEVMRun(t *testing.T) {
 					}
 					`,
 					sc.EVMContract.Address.HexWithPrefix(),
-				))
+				)
 
 				coinbaseAddr := types.Address{1, 2, 3}
 				coinbaseBalance := getEVMAccountBalance(t, ctx, vm, snapshot, coinbaseAddr)
@@ -820,7 +820,7 @@ func TestEVMRun(t *testing.T) {
 				testAccount *EOATestAccount,
 			) {
 				sc := systemcontracts.SystemContractsForChain(chain.ChainID())
-				code := []byte(fmt.Sprintf(
+				code := fmt.Appendf(nil,
 					`
 					import EVM from %s
 
@@ -837,7 +837,7 @@ func TestEVMRun(t *testing.T) {
 					}
 					`,
 					sc.EVMContract.Address.HexWithPrefix(),
-				))
+				)
 
 				coinbaseAddr := types.Address{1, 2, 3}
 				coinbaseBalance := getEVMAccountBalance(t, ctx, vm, snapshot, coinbaseAddr)
@@ -900,7 +900,7 @@ func TestEVMRun(t *testing.T) {
 				testAccount *EOATestAccount,
 			) {
 				sc := systemcontracts.SystemContractsForChain(chain.ChainID())
-				code := []byte(fmt.Sprintf(
+				code := fmt.Appendf(nil,
 					`
 					import EVM from %s
 
@@ -917,7 +917,7 @@ func TestEVMRun(t *testing.T) {
 					`,
 					sc.EVMContract.Address.HexWithPrefix(),
 					types.ExecutionErrCodeExecutionReverted,
-				))
+				)
 
 				num := int64(12)
 				innerTxBytes := testAccount.PrepareSignAndEncodeTx(t,
@@ -958,7 +958,7 @@ func TestEVMRun(t *testing.T) {
 				snapshot = snapshot.Append(state)
 
 				// query the value
-				code = []byte(fmt.Sprintf(
+				code = fmt.Appendf(nil,
 					`
 					import EVM from %s
 					access(all)
@@ -968,7 +968,7 @@ func TestEVMRun(t *testing.T) {
 					}
 				`,
 					sc.EVMContract.Address.HexWithPrefix(),
-				))
+				)
 
 				innerTxBytes = testAccount.PrepareSignAndEncodeTx(t,
 					testContract.DeployedAt.ToCommon(),
@@ -1014,7 +1014,7 @@ func TestEVMRun(t *testing.T) {
 				testAccount *EOATestAccount,
 			) {
 				sc := systemcontracts.SystemContractsForChain(chain.ChainID())
-				code := []byte(fmt.Sprintf(
+				code := fmt.Appendf(nil,
 					`
 					import EVM from %s
 
@@ -1029,7 +1029,7 @@ func TestEVMRun(t *testing.T) {
 					}
 					`,
 					sc.EVMContract.Address.HexWithPrefix(),
-				))
+				)
 
 				num := int64(12)
 				innerTxBytes := testAccount.PrepareSignAndEncodeTx(t,
@@ -1095,7 +1095,7 @@ func TestEVMRun(t *testing.T) {
 				testAccount *EOATestAccount,
 			) {
 				sc := systemcontracts.SystemContractsForChain(chain.ChainID())
-				code := []byte(fmt.Sprintf(
+				code := fmt.Appendf(nil,
 					`
 					import EVM from %s
 
@@ -1111,7 +1111,7 @@ func TestEVMRun(t *testing.T) {
 					}
 					`,
 					sc.EVMContract.Address.HexWithPrefix(),
-				))
+				)
 
 				coinbaseAddr := types.Address{1, 2, 3}
 				coinbaseBalance := getEVMAccountBalance(t, ctx, vm, snapshot, coinbaseAddr)
@@ -1181,7 +1181,7 @@ func TestEVMRun(t *testing.T) {
 				testAccount *EOATestAccount,
 			) {
 				sc := systemcontracts.SystemContractsForChain(chain.ChainID())
-				code := []byte(fmt.Sprintf(
+				code := fmt.Appendf(nil,
 					`
 					import EVM from %s
 
@@ -1197,7 +1197,7 @@ func TestEVMRun(t *testing.T) {
 					}
 					`,
 					sc.EVMContract.Address.HexWithPrefix(),
-				))
+				)
 
 				coinbaseAddr := types.Address{1, 2, 3}
 				coinbaseBalance := getEVMAccountBalance(t, ctx, vm, snapshot, coinbaseAddr)
@@ -1268,7 +1268,7 @@ func TestEVMRun(t *testing.T) {
 				testAccount *EOATestAccount,
 			) {
 				sc := systemcontracts.SystemContractsForChain(chain.ChainID())
-				code := []byte(fmt.Sprintf(
+				code := fmt.Appendf(nil,
 					`
 					import EVM from %s
 					transaction(tx: [UInt8], coinbaseBytes: [UInt8; 20]){
@@ -1282,7 +1282,7 @@ func TestEVMRun(t *testing.T) {
 					}
 					`,
 					sc.EVMContract.Address.HexWithPrefix(),
-				))
+				)
 
 				coinbaseAddr := types.Address{1, 2, 3}
 				coinbaseBalance := getEVMAccountBalance(t, ctx, vm, snapshot, coinbaseAddr)
@@ -1342,7 +1342,7 @@ func TestEVMRun(t *testing.T) {
 				testAccount *EOATestAccount,
 			) {
 				sc := systemcontracts.SystemContractsForChain(chain.ChainID())
-				code := []byte(fmt.Sprintf(
+				code := fmt.Appendf(nil,
 					`
 					import EVM from %s
 					transaction(tx: [UInt8], coinbaseBytes: [UInt8; 20]){
@@ -1355,7 +1355,7 @@ func TestEVMRun(t *testing.T) {
 					}
 					`,
 					sc.EVMContract.Address.HexWithPrefix(),
-				))
+				)
 
 				coinbaseAddr := types.Address{1, 2, 3}
 				coinbaseBalance := getEVMAccountBalance(t, ctx, vm, snapshot, coinbaseAddr)
@@ -1458,7 +1458,7 @@ func TestEVMBatchRun(t *testing.T) {
 				testAccount *EOATestAccount,
 			) {
 				sc := systemcontracts.SystemContractsForChain(chain.ChainID())
-				batchRunCode := []byte(fmt.Sprintf(
+				batchRunCode := fmt.Appendf(nil,
 					`
 					import EVM from %s
 
@@ -1476,7 +1476,7 @@ func TestEVMBatchRun(t *testing.T) {
 					}
 					`,
 					sc.EVMContract.Address.HexWithPrefix(),
-				))
+				)
 
 				coinbaseAddr := types.Address{1, 2, 3}
 				coinbaseBalance := getEVMAccountBalance(t, ctx, vm, snapshot, coinbaseAddr)
@@ -1485,7 +1485,7 @@ func TestEVMBatchRun(t *testing.T) {
 				batchCount := 5
 				var storedValues []int64
 				txBytes := make([]cadence.Value, batchCount)
-				for i := 0; i < batchCount; i++ {
+				for i := range batchCount {
 					num := int64(i)
 					storedValues = append(storedValues, num)
 					// prepare batch of transaction payloads
@@ -1587,7 +1587,7 @@ func TestEVMBatchRun(t *testing.T) {
 				)
 
 				// retrieve the values
-				retrieveCode := []byte(fmt.Sprintf(
+				retrieveCode := fmt.Appendf(nil,
 					`
 						import EVM from %s
 						access(all)
@@ -1597,7 +1597,7 @@ func TestEVMBatchRun(t *testing.T) {
 						}
 					`,
 					sc.EVMContract.Address.HexWithPrefix(),
-				))
+				)
 
 				innerTxBytes := testAccount.PrepareSignAndEncodeTx(t,
 					testContract.DeployedAt.ToCommon(),
@@ -1650,7 +1650,7 @@ func TestEVMBatchRun(t *testing.T) {
 				// we make transaction at specific index invalid to fail
 				const failedTxIndex = 3
 				sc := systemcontracts.SystemContractsForChain(chain.ChainID())
-				batchRunCode := []byte(fmt.Sprintf(
+				batchRunCode := fmt.Appendf(nil,
 					`
 					import EVM from %s
 
@@ -1674,12 +1674,12 @@ func TestEVMBatchRun(t *testing.T) {
 					`,
 					sc.EVMContract.Address.HexWithPrefix(),
 					failedTxIndex,
-				))
+				)
 
 				batchCount := 5
 				var num int64
 				txBytes := make([]cadence.Value, batchCount)
-				for i := 0; i < batchCount; i++ {
+				for i := range batchCount {
 					num = int64(i)
 
 					if i == failedTxIndex {
@@ -1730,7 +1730,7 @@ func TestEVMBatchRun(t *testing.T) {
 				snapshot = snapshot.Append(state)
 
 				// retrieve the values
-				retrieveCode := []byte(fmt.Sprintf(
+				retrieveCode := fmt.Appendf(nil,
 					`
 						import EVM from %s
 						access(all)
@@ -1740,7 +1740,7 @@ func TestEVMBatchRun(t *testing.T) {
 						}
 					`,
 					sc.EVMContract.Address.HexWithPrefix(),
-				))
+				)
 
 				innerTxBytes := testAccount.PrepareSignAndEncodeTx(t,
 					testContract.DeployedAt.ToCommon(),
@@ -1791,7 +1791,7 @@ func TestEVMBatchRun(t *testing.T) {
 				testAccount *EOATestAccount,
 			) {
 				sc := systemcontracts.SystemContractsForChain(chain.ChainID())
-				batchRunCode := []byte(fmt.Sprintf(
+				batchRunCode := fmt.Appendf(nil,
 					`
 					import EVM from %s
 
@@ -1818,12 +1818,12 @@ func TestEVMBatchRun(t *testing.T) {
 					}
 					`,
 					sc.EVMContract.Address.HexWithPrefix(),
-				))
+				)
 
 				batchCount := 6
 				var num int64
 				txBytes := make([]cadence.Value, batchCount)
-				for i := 0; i < batchCount; i++ {
+				for i := range batchCount {
 					gas := uint64(100_000)
 					if i%2 == 0 {
 						// fail with too low gas limit
@@ -1877,7 +1877,7 @@ func TestEVMBatchRun(t *testing.T) {
 				snapshot = snapshot.Append(state)
 
 				// retrieve the values
-				retrieveCode := []byte(fmt.Sprintf(
+				retrieveCode := fmt.Appendf(nil,
 					`
 						import EVM from %s
 						access(all)
@@ -1887,7 +1887,7 @@ func TestEVMBatchRun(t *testing.T) {
 						}
 					`,
 					sc.EVMContract.Address.HexWithPrefix(),
-				))
+				)
 
 				innerTxBytes := testAccount.PrepareSignAndEncodeTx(t,
 					testContract.DeployedAt.ToCommon(),
@@ -1937,7 +1937,7 @@ func TestEVMBatchRun(t *testing.T) {
 				testAccount *EOATestAccount,
 			) {
 				sc := systemcontracts.SystemContractsForChain(chain.ChainID())
-				batchRunCode := []byte(fmt.Sprintf(
+				batchRunCode := fmt.Appendf(nil,
 					`
 					import EVM from %s
 
@@ -1949,7 +1949,7 @@ func TestEVMBatchRun(t *testing.T) {
 					}
 					`,
 					sc.EVMContract.Address.HexWithPrefix(),
-				))
+				)
 
 				coinbaseAddr := types.Address{1, 2, 3}
 				coinbaseBalance := getEVMAccountBalance(t, ctx, vm, snapshot, coinbaseAddr)
@@ -2022,7 +2022,7 @@ func TestEVMBlockData(t *testing.T) {
 		) {
 
 			// query the block timestamp
-			code := []byte(fmt.Sprintf(
+			code := fmt.Appendf(nil,
 				`
 					import EVM from %s
 					access(all)
@@ -2032,7 +2032,7 @@ func TestEVMBlockData(t *testing.T) {
 					}
 				`,
 				sc.EVMContract.Address.HexWithPrefix(),
-			))
+			)
 
 			innerTxBytes := testAccount.PrepareSignAndEncodeTx(t,
 				testContract.DeployedAt.ToCommon(),
@@ -2086,7 +2086,7 @@ func TestEVMAddressDeposit(t *testing.T) {
 			testAccount *EOATestAccount,
 		) {
 
-			code := []byte(fmt.Sprintf(
+			code := fmt.Appendf(nil,
 				`
 				import EVM from %s
 				import FlowToken from %s
@@ -2107,7 +2107,7 @@ func TestEVMAddressDeposit(t *testing.T) {
 			`,
 				sc.EVMContract.Address.HexWithPrefix(),
 				sc.FlowToken.Address.HexWithPrefix(),
-			))
+			)
 
 			addr := RandomAddress(t)
 
@@ -2180,7 +2180,7 @@ func TestCOAAddressDeposit(t *testing.T) {
 			testContract *TestContract,
 			testAccount *EOATestAccount,
 		) {
-			code := []byte(fmt.Sprintf(
+			code := fmt.Appendf(nil,
 				`
 				import EVM from %s
 				import FlowToken from %s
@@ -2201,7 +2201,7 @@ func TestCOAAddressDeposit(t *testing.T) {
 				sc.EVMContract.Address.HexWithPrefix(),
 				sc.FlowToken.Address.HexWithPrefix(),
 				sc.FlowServiceAccount.Address.HexWithPrefix(),
-			))
+			)
 
 			script := fvm.Script(code)
 
@@ -2283,7 +2283,7 @@ func TestCadenceOwnedAccountFunctionalities(t *testing.T) {
 				testContract *TestContract,
 				testAccount *EOATestAccount,
 			) {
-				code := []byte(fmt.Sprintf(
+				code := fmt.Appendf(nil,
 					`
 				import EVM from %s
 				import FlowToken from %s
@@ -2313,7 +2313,7 @@ func TestCadenceOwnedAccountFunctionalities(t *testing.T) {
 				`,
 					sc.EVMContract.Address.HexWithPrefix(),
 					sc.FlowToken.Address.HexWithPrefix(),
-				))
+				)
 
 				txBody, err := flow.NewTransactionBodyBuilder().
 					SetScript(code).
@@ -2350,7 +2350,7 @@ func TestCadenceOwnedAccountFunctionalities(t *testing.T) {
 				testContract *TestContract,
 				testAccount *EOATestAccount,
 			) {
-				code := []byte(fmt.Sprintf(
+				code := fmt.Appendf(nil,
 					`
 				import EVM from %s
 				import FlowToken from %s
@@ -2378,7 +2378,7 @@ func TestCadenceOwnedAccountFunctionalities(t *testing.T) {
 				`,
 					sc.EVMContract.Address.HexWithPrefix(),
 					sc.FlowToken.Address.HexWithPrefix(),
-				))
+				)
 
 				txBody, err := flow.NewTransactionBodyBuilder().
 					SetScript(code).
@@ -2422,7 +2422,7 @@ func TestCadenceOwnedAccountFunctionalities(t *testing.T) {
 				testContract *TestContract,
 				testAccount *EOATestAccount,
 			) {
-				code := []byte(fmt.Sprintf(
+				code := fmt.Appendf(nil,
 					`
 				import EVM from %s
 				import FlowToken from %s
@@ -2450,7 +2450,7 @@ func TestCadenceOwnedAccountFunctionalities(t *testing.T) {
 				`,
 					sc.EVMContract.Address.HexWithPrefix(),
 					sc.FlowToken.Address.HexWithPrefix(),
-				))
+				)
 
 				txBody, err := flow.NewTransactionBodyBuilder().
 					SetScript(code).
@@ -2494,7 +2494,7 @@ func TestCadenceOwnedAccountFunctionalities(t *testing.T) {
 				testContract *TestContract,
 				testAccount *EOATestAccount,
 			) {
-				code := []byte(fmt.Sprintf(
+				code := fmt.Appendf(nil,
 					`
 				import EVM from %s
 				import FlowToken from %s
@@ -2522,7 +2522,7 @@ func TestCadenceOwnedAccountFunctionalities(t *testing.T) {
 				`,
 					sc.EVMContract.Address.HexWithPrefix(),
 					sc.FlowToken.Address.HexWithPrefix(),
-				))
+				)
 
 				txBody, err := flow.NewTransactionBodyBuilder().
 					SetScript(code).
@@ -2566,7 +2566,7 @@ func TestCadenceOwnedAccountFunctionalities(t *testing.T) {
 				testContract *TestContract,
 				testAccount *EOATestAccount,
 			) {
-				code := []byte(fmt.Sprintf(
+				code := fmt.Appendf(nil,
 					`
 				import EVM from %s
 				import FlowToken from %s
@@ -2594,7 +2594,7 @@ func TestCadenceOwnedAccountFunctionalities(t *testing.T) {
 				`,
 					sc.EVMContract.Address.HexWithPrefix(),
 					sc.FlowToken.Address.HexWithPrefix(),
-				))
+				)
 
 				txBody, err := flow.NewTransactionBodyBuilder().
 					SetScript(code).
@@ -2631,7 +2631,7 @@ func TestCadenceOwnedAccountFunctionalities(t *testing.T) {
 				testContract *TestContract,
 				testAccount *EOATestAccount,
 			) {
-				code := []byte(fmt.Sprintf(
+				code := fmt.Appendf(nil,
 					`
 				import EVM from %s
 				import FlowToken from %s
@@ -2659,7 +2659,7 @@ func TestCadenceOwnedAccountFunctionalities(t *testing.T) {
 				`,
 					sc.EVMContract.Address.HexWithPrefix(),
 					sc.FlowToken.Address.HexWithPrefix(),
-				))
+				)
 
 				txBody, err := flow.NewTransactionBodyBuilder().
 					SetScript(code).
@@ -2703,7 +2703,7 @@ func TestCadenceOwnedAccountFunctionalities(t *testing.T) {
 				testContract *TestContract,
 				testAccount *EOATestAccount,
 			) {
-				code := []byte(fmt.Sprintf(
+				code := fmt.Appendf(nil,
 					`
 				import EVM from %s
 				import FlowToken from %s
@@ -2741,7 +2741,7 @@ func TestCadenceOwnedAccountFunctionalities(t *testing.T) {
 					sc.EVMContract.Address.HexWithPrefix(),
 					sc.FlowToken.Address.HexWithPrefix(),
 					sc.FlowServiceAccount.Address.HexWithPrefix(),
-				))
+				)
 
 				addr := cadence.NewArray(
 					unittest.BytesToCdcUInt8(RandomAddress(t).Bytes()),
@@ -2771,7 +2771,7 @@ func TestCadenceOwnedAccountFunctionalities(t *testing.T) {
 				testContract *TestContract,
 				testAccount *EOATestAccount,
 			) {
-				code := []byte(fmt.Sprintf(
+				code := fmt.Appendf(nil,
 					`
 				import EVM from %s
 				import FlowToken from %s
@@ -2801,7 +2801,7 @@ func TestCadenceOwnedAccountFunctionalities(t *testing.T) {
 					sc.EVMContract.Address.HexWithPrefix(),
 					sc.FlowToken.Address.HexWithPrefix(),
 					sc.FlowServiceAccount.Address.HexWithPrefix(),
-				))
+				)
 
 				script := fvm.Script(code)
 
@@ -2823,7 +2823,7 @@ func TestCadenceOwnedAccountFunctionalities(t *testing.T) {
 				testContract *TestContract,
 				testAccount *EOATestAccount,
 			) {
-				code := []byte(fmt.Sprintf(
+				code := fmt.Appendf(nil,
 					`
 					import EVM from %s
 					import FlowToken from %s
@@ -2851,7 +2851,7 @@ func TestCadenceOwnedAccountFunctionalities(t *testing.T) {
 					sc.EVMContract.Address.HexWithPrefix(),
 					sc.FlowToken.Address.HexWithPrefix(),
 					sc.FlowServiceAccount.Address.HexWithPrefix(),
-				))
+				)
 
 				script := fvm.Script(code).
 					WithArguments(json.MustEncode(
@@ -2888,7 +2888,7 @@ func TestCadenceOwnedAccountFunctionalities(t *testing.T) {
 				testAccount *EOATestAccount,
 			) {
 				sc := systemcontracts.SystemContractsForChain(chain.ChainID())
-				code := []byte(fmt.Sprintf(
+				code := fmt.Appendf(nil,
 					`
 					import EVM from %s
 
@@ -2906,7 +2906,7 @@ func TestCadenceOwnedAccountFunctionalities(t *testing.T) {
 					}
 					`,
 					sc.EVMContract.Address.HexWithPrefix(),
-				))
+				)
 
 				num := int64(42)
 				innerTxBytes := testAccount.PrepareSignAndEncodeTx(t,
@@ -2964,7 +2964,7 @@ func TestCadenceOwnedAccountFunctionalities(t *testing.T) {
 				)
 				snapshot = snapshot.Append(state)
 
-				code = []byte(fmt.Sprintf(
+				code = fmt.Appendf(nil,
 					`
 					import EVM from %s
 
@@ -2992,7 +2992,7 @@ func TestCadenceOwnedAccountFunctionalities(t *testing.T) {
 					}
 					`,
 					sc.EVMContract.Address.HexWithPrefix(),
-				))
+				)
 
 				data := json.MustEncode(
 					cadence.NewArray(
@@ -3038,7 +3038,7 @@ func TestCadenceOwnedAccountFunctionalities(t *testing.T) {
 				testAccount *EOATestAccount,
 			) {
 				sc := systemcontracts.SystemContractsForChain(chain.ChainID())
-				code := []byte(fmt.Sprintf(
+				code := fmt.Appendf(nil,
 					`
 					import EVM from %s
 
@@ -3056,7 +3056,7 @@ func TestCadenceOwnedAccountFunctionalities(t *testing.T) {
 					}
 					`,
 					sc.EVMContract.Address.HexWithPrefix(),
-				))
+				)
 
 				num := int64(42)
 				innerTxBytes := testAccount.PrepareSignAndEncodeTx(t,
@@ -3114,7 +3114,7 @@ func TestCadenceOwnedAccountFunctionalities(t *testing.T) {
 				)
 				snapshot = snapshot.Append(state)
 
-				code = []byte(fmt.Sprintf(
+				code = fmt.Appendf(nil,
 					`
 					import EVM from %s
 
@@ -3143,7 +3143,7 @@ func TestCadenceOwnedAccountFunctionalities(t *testing.T) {
 					}
 					`,
 					sc.EVMContract.Address.HexWithPrefix(),
-				))
+				)
 
 				signatureValue, err := cadence.NewString("retrieve()")
 				require.NoError(t, err)
@@ -3190,7 +3190,7 @@ func TestCadenceOwnedAccountFunctionalities(t *testing.T) {
 				testContract *TestContract,
 				testAccount *EOATestAccount,
 			) {
-				code := []byte(fmt.Sprintf(
+				code := fmt.Appendf(nil,
 					`
 					import EVM from %s
 					import FlowToken from %s
@@ -3215,7 +3215,7 @@ func TestCadenceOwnedAccountFunctionalities(t *testing.T) {
 					sc.EVMContract.Address.HexWithPrefix(),
 					sc.FlowToken.Address.HexWithPrefix(),
 					sc.FlowServiceAccount.Address.HexWithPrefix(),
-				))
+				)
 
 				script := fvm.Script(code).
 					WithArguments(json.MustEncode(
@@ -3252,7 +3252,7 @@ func TestCadenceOwnedAccountFunctionalities(t *testing.T) {
 				testContract *TestContract,
 				testAccount *EOATestAccount,
 			) {
-				code := []byte(fmt.Sprintf(
+				code := fmt.Appendf(nil,
 					`
 					import EVM from %s
 					import FlowToken from %s
@@ -3277,7 +3277,7 @@ func TestCadenceOwnedAccountFunctionalities(t *testing.T) {
 					sc.EVMContract.Address.HexWithPrefix(),
 					sc.FlowToken.Address.HexWithPrefix(),
 					sc.FlowServiceAccount.Address.HexWithPrefix(),
-				))
+				)
 
 				script := fvm.Script(code).
 					WithArguments(json.MustEncode(
@@ -3323,7 +3323,7 @@ func TestDryRun(t *testing.T) {
 		vm fvm.VM,
 		snapshot snapshot.SnapshotTree,
 	) *types.ResultSummary {
-		code := []byte(fmt.Sprintf(`
+		code := fmt.Appendf(nil, `
 			import EVM from %s
 
 			access(all)
@@ -3334,7 +3334,7 @@ func TestDryRun(t *testing.T) {
 				)
 			}`,
 			evmAddress,
-		))
+		)
 
 		innerTxBytes, err := tx.MarshalBinary()
 		require.NoError(t, err)
@@ -3427,7 +3427,7 @@ func TestDryRun(t *testing.T) {
 				require.Equal(t, types.StatusSuccessful, dryRunResult.Status)
 				require.Greater(t, dryRunResult.GasConsumed, uint64(0))
 
-				code := []byte(fmt.Sprintf(
+				code := fmt.Appendf(nil,
 					`
 					import EVM from %s
 					access(all)
@@ -3437,7 +3437,7 @@ func TestDryRun(t *testing.T) {
 					}
 					`,
 					evmAddress,
-				))
+				)
 
 				// Use the gas estimation from Evm.dryRun with some buffer
 				gasLimit := dryRunResult.GasConsumed + gethParams.SstoreSentryGasEIP2200
@@ -3488,7 +3488,7 @@ func TestDryRun(t *testing.T) {
 				testAccount *EOATestAccount,
 			) {
 				sc := systemcontracts.SystemContractsForChain(chain.ChainID())
-				code := []byte(fmt.Sprintf(
+				code := fmt.Appendf(nil,
 					`
 					import EVM from %s
 
@@ -3503,7 +3503,7 @@ func TestDryRun(t *testing.T) {
 					}
 					`,
 					sc.EVMContract.Address.HexWithPrefix(),
-				))
+				)
 
 				num := int64(12)
 				innerTxBytes := testAccount.PrepareSignAndEncodeTx(t,
@@ -3556,7 +3556,7 @@ func TestDryRun(t *testing.T) {
 				require.Equal(t, types.StatusSuccessful, dryRunResult.Status)
 				require.Greater(t, dryRunResult.GasConsumed, uint64(0))
 
-				code = []byte(fmt.Sprintf(
+				code = fmt.Appendf(nil,
 					`
 					import EVM from %s
 					access(all)
@@ -3566,7 +3566,7 @@ func TestDryRun(t *testing.T) {
 					}
 					`,
 					evmAddress,
-				))
+				)
 
 				// Decrease nonce because we are Cadence using scripts, and not
 				// transactions, which means that no state change is happening.
@@ -3617,7 +3617,7 @@ func TestDryRun(t *testing.T) {
 				testAccount *EOATestAccount,
 			) {
 				sc := systemcontracts.SystemContractsForChain(chain.ChainID())
-				code := []byte(fmt.Sprintf(
+				code := fmt.Appendf(nil,
 					`
 					import EVM from %s
 
@@ -3632,7 +3632,7 @@ func TestDryRun(t *testing.T) {
 					}
 					`,
 					sc.EVMContract.Address.HexWithPrefix(),
-				))
+				)
 
 				num := int64(100)
 				innerTxBytes := testAccount.PrepareSignAndEncodeTx(t,
@@ -3686,7 +3686,7 @@ func TestDryRun(t *testing.T) {
 				require.Equal(t, types.StatusSuccessful, dryRunResult.Status)
 				require.Greater(t, dryRunResult.GasConsumed, uint64(0))
 
-				code = []byte(fmt.Sprintf(
+				code = fmt.Appendf(nil,
 					`
 					import EVM from %s
 					access(all)
@@ -3696,7 +3696,7 @@ func TestDryRun(t *testing.T) {
 					}
 					`,
 					evmAddress,
-				))
+				)
 
 				// use the gas estimation from Evm.dryRun with the necessary buffer gas
 				gasLimit := dryRunResult.GasConsumed + gethParams.SstoreClearsScheduleRefundEIP3529
@@ -3765,7 +3765,7 @@ func TestDryRun(t *testing.T) {
 				require.Greater(t, result.GasConsumed, uint64(0))
 
 				// query the value make sure it's not updated
-				code := []byte(fmt.Sprintf(
+				code := fmt.Appendf(nil,
 					`
 					import EVM from %s
 					access(all)
@@ -3775,7 +3775,7 @@ func TestDryRun(t *testing.T) {
 					}
 					`,
 					evmAddress,
-				))
+				)
 
 				innerTxBytes := testAccount.PrepareSignAndEncodeTx(t,
 					testContract.DeployedAt.ToCommon(),
@@ -3875,7 +3875,7 @@ func TestDryRun(t *testing.T) {
 				testAccount *EOATestAccount,
 			) {
 				sc := systemcontracts.SystemContractsForChain(chain.ChainID())
-				code := []byte(fmt.Sprintf(
+				code := fmt.Appendf(nil,
 					`
 					import EVM from %s
 
@@ -3890,7 +3890,7 @@ func TestDryRun(t *testing.T) {
 					}
 					`,
 					sc.EVMContract.Address.HexWithPrefix(),
-				))
+				)
 
 				num := int64(100)
 				evmTx := gethTypes.NewTransaction(
@@ -3942,7 +3942,7 @@ func TestDryRun(t *testing.T) {
 				testAccount *EOATestAccount,
 			) {
 				sc := systemcontracts.SystemContractsForChain(chain.ChainID())
-				code := []byte(fmt.Sprintf(
+				code := fmt.Appendf(nil,
 					`
 					import EVM from %s
 
@@ -3960,7 +3960,7 @@ func TestDryRun(t *testing.T) {
 					}
 					`,
 					sc.EVMContract.Address.HexWithPrefix(),
-				))
+				)
 
 				num := int64(100)
 				evmTx := gethTypes.NewTransaction(
@@ -4062,7 +4062,7 @@ func TestDryRun(t *testing.T) {
 					big.NewInt(0),
 				)
 
-				code := []byte(fmt.Sprintf(`
+				code := fmt.Appendf(nil, `
 					import EVM from %s
 
 					transaction(dryTx: [UInt8], realTx: [UInt8], coinbaseBytes: [UInt8; 20]) {
@@ -4077,7 +4077,7 @@ func TestDryRun(t *testing.T) {
 							assert(runResult.status == EVM.Status.successful, message: "run after dry run failed")
 						}
 					}
-				`, sc.EVMContract.Address.HexWithPrefix()))
+				`, sc.EVMContract.Address.HexWithPrefix())
 
 				dryTxArg := cadence.NewArray(
 					unittest.BytesToCdcUInt8(dryTxBytes),
@@ -4125,7 +4125,7 @@ func TestDryCall(t *testing.T) {
 		vm fvm.VM,
 		snapshot snapshot.SnapshotTree,
 	) (*types.ResultSummary, *snapshot.ExecutionSnapshot) {
-		code := []byte(fmt.Sprintf(`
+		code := fmt.Appendf(nil, `
 			import EVM from %s
 
 			access(all)
@@ -4139,7 +4139,7 @@ func TestDryCall(t *testing.T) {
 				)
 			}`,
 			evmAddress,
-		))
+		)
 
 		require.NotNil(t, tx.To())
 		to := tx.To().Hex()
@@ -4240,7 +4240,7 @@ func TestDryCall(t *testing.T) {
 				testAccount *EOATestAccount,
 			) {
 				sc := systemcontracts.SystemContractsForChain(chain.ChainID())
-				code := []byte(fmt.Sprintf(
+				code := fmt.Appendf(nil,
 					`
 					import EVM from %s
 
@@ -4255,7 +4255,7 @@ func TestDryCall(t *testing.T) {
 					}
 					`,
 					sc.EVMContract.Address.HexWithPrefix(),
-				))
+				)
 
 				num := int64(42)
 				innerTxBytes := testAccount.PrepareSignAndEncodeTx(t,
@@ -4301,7 +4301,7 @@ func TestDryCall(t *testing.T) {
 				)
 				snapshot = snapshot.Append(state)
 
-				code = []byte(fmt.Sprintf(
+				code = fmt.Appendf(nil,
 					`
 					import EVM from %s
 
@@ -4327,7 +4327,7 @@ func TestDryCall(t *testing.T) {
 					}
 					`,
 					sc.EVMContract.Address.HexWithPrefix(),
-				))
+				)
 
 				data := json.MustEncode(
 					cadence.NewArray(
@@ -4392,7 +4392,7 @@ func TestDryCall(t *testing.T) {
 				require.Greater(t, result.GasConsumed, uint64(0))
 
 				// query the value make sure it's not updated
-				code := []byte(fmt.Sprintf(
+				code := fmt.Appendf(nil,
 					`
 					import EVM from %s
 					access(all)
@@ -4402,7 +4402,7 @@ func TestDryCall(t *testing.T) {
 					}
 					`,
 					evmAddress,
-				))
+				)
 
 				innerTxBytes := testAccount.PrepareSignAndEncodeTx(t,
 					testContract.DeployedAt.ToCommon(),
@@ -4495,7 +4495,7 @@ func TestDryCall(t *testing.T) {
 				testAccount *EOATestAccount,
 			) {
 				sc := systemcontracts.SystemContractsForChain(chain.ChainID())
-				code := []byte(fmt.Sprintf(
+				code := fmt.Appendf(nil,
 					`
 					import EVM from %s
 
@@ -4515,7 +4515,7 @@ func TestDryCall(t *testing.T) {
 					}
 					`,
 					sc.EVMContract.Address.HexWithPrefix(),
-				))
+				)
 
 				num := int64(100)
 				evmTx := gethTypes.NewTransaction(
@@ -4566,7 +4566,7 @@ func TestDryCall(t *testing.T) {
 				testAccount *EOATestAccount,
 			) {
 				sc := systemcontracts.SystemContractsForChain(chain.ChainID())
-				code := []byte(fmt.Sprintf(
+				code := fmt.Appendf(nil,
 					`
 					import EVM from %s
 
@@ -4589,7 +4589,7 @@ func TestDryCall(t *testing.T) {
 					}
 					`,
 					sc.EVMContract.Address.HexWithPrefix(),
-				))
+				)
 
 				num := int64(100)
 				evmTx := gethTypes.NewTransaction(
@@ -4676,7 +4676,7 @@ func TestDryCallCacheInvalidationAfterDeposit(t *testing.T) {
 			oneFlow := new(big.Int).SetUint64(1e18)
 			checkBalanceOneFlowData := testContract.MakeCallData(t, "checkBalance", addr.ToCommon(), oneFlow)
 
-			code := []byte(fmt.Sprintf(
+			code := fmt.Appendf(nil,
 				`
 				import EVM from %s
 				import FlowToken from %s
@@ -4756,7 +4756,7 @@ func TestDryCallCacheInvalidationAfterDeposit(t *testing.T) {
 				`,
 				sc.EVMContract.Address.HexWithPrefix(),
 				sc.FlowToken.Address.HexWithPrefix(),
-			))
+			)
 
 			txBody, err := flow.NewTransactionBodyBuilder().
 				SetScript(code).
@@ -4806,7 +4806,7 @@ func TestDryCallWithSigAndArgs(t *testing.T) {
 		vm fvm.VM,
 		snapshot snapshot.SnapshotTree,
 	) (*ResultDecoded, *snapshot.ExecutionSnapshot) {
-		code := []byte(fmt.Sprintf(`
+		code := fmt.Appendf(nil, `
 				import EVM from %s
 
 				access(all)
@@ -4822,7 +4822,7 @@ func TestDryCallWithSigAndArgs(t *testing.T) {
 					)
 				}`,
 			evmAddress,
-		))
+		)
 
 		toAddress, err := cadence.NewString(to.Hex())
 		require.NoError(t, err)
@@ -4941,7 +4941,7 @@ func TestDryCallWithSigAndArgs(t *testing.T) {
 				testAccount *EOATestAccount,
 			) {
 				sc := systemcontracts.SystemContractsForChain(chain.ChainID())
-				code := []byte(fmt.Sprintf(
+				code := fmt.Appendf(nil,
 					`
 							import EVM from %s
 
@@ -4956,7 +4956,7 @@ func TestDryCallWithSigAndArgs(t *testing.T) {
 							}
 							`,
 					sc.EVMContract.Address.HexWithPrefix(),
-				))
+				)
 
 				num := int64(42)
 				innerTxBytes := testAccount.PrepareSignAndEncodeTx(t,
@@ -5002,7 +5002,7 @@ func TestDryCallWithSigAndArgs(t *testing.T) {
 				)
 				snapshot = snapshot.Append(state)
 
-				code = []byte(fmt.Sprintf(
+				code = fmt.Appendf(nil,
 					`
 							import EVM from %s
 
@@ -5029,7 +5029,7 @@ func TestDryCallWithSigAndArgs(t *testing.T) {
 							}
 							`,
 					sc.EVMContract.Address.HexWithPrefix(),
-				))
+				)
 
 				signatureValue, err := cadence.NewString("retrieve()")
 				require.NoError(t, err)
@@ -5101,7 +5101,7 @@ func TestDryCallWithSigAndArgs(t *testing.T) {
 				require.Greater(t, result.GasConsumed, uint64(0))
 
 				// query the value make sure it's not updated
-				code := []byte(fmt.Sprintf(
+				code := fmt.Appendf(nil,
 					`
 							import EVM from %s
 							access(all)
@@ -5111,7 +5111,7 @@ func TestDryCallWithSigAndArgs(t *testing.T) {
 							}
 							`,
 					evmAddress,
-				))
+				)
 
 				innerTxBytes := testAccount.PrepareSignAndEncodeTx(t,
 					testContract.DeployedAt.ToCommon(),
@@ -5217,7 +5217,7 @@ func TestCadenceArch(t *testing.T) {
 				testContract *TestContract,
 				testAccount *EOATestAccount,
 			) {
-				code := []byte(fmt.Sprintf(
+				code := fmt.Appendf(nil,
 					`
 					import EVM from %s
 
@@ -5229,7 +5229,7 @@ func TestCadenceArch(t *testing.T) {
 					}
                     `,
 					sc.EVMContract.Address.HexWithPrefix(),
-				))
+				)
 				innerTxBytes := testAccount.PrepareSignAndEncodeTx(t,
 					testContract.DeployedAt.ToCommon(),
 					testContract.MakeCallData(t, "verifyArchCallToFlowBlockHeight", ctx.BlockHeader.Height),
@@ -5269,7 +5269,7 @@ func TestCadenceArch(t *testing.T) {
 				testContract *TestContract,
 				testAccount *EOATestAccount,
 			) {
-				code := []byte(fmt.Sprintf(
+				code := fmt.Appendf(nil,
 					`
 					import EVM from %s
 
@@ -5282,7 +5282,7 @@ func TestCadenceArch(t *testing.T) {
 					}
                     `,
 					sc.EVMContract.Address.HexWithPrefix(),
-				))
+				)
 				innerTxBytes := testAccount.PrepareSignAndEncodeTx(t,
 					testContract.DeployedAt.ToCommon(),
 					testContract.MakeCallData(t, "verifyArchCallToRevertibleRandom"),
@@ -5350,7 +5350,7 @@ func TestCadenceArch(t *testing.T) {
 				ctx.EntropyProvider = testutil.EntropyProviderFixture(entropy) // fix the entropy
 
 				txBody, err := flow.NewTransactionBodyBuilder().
-					SetScript([]byte(fmt.Sprintf(`
+					SetScript(fmt.Appendf(nil, `
 						import RandomBeaconHistory from %s
 
 						transaction {
@@ -5360,7 +5360,7 @@ func TestCadenceArch(t *testing.T) {
 										?? panic("Couldn't borrow RandomBeaconHistory.Heartbeat Resource")
 								randomBeaconHistoryHeartbeat.heartbeat(randomSourceHistory: randomSourceHistory())
 							}
-						}`, sc.RandomBeaconHistory.Address.HexWithPrefix())),
+						}`, sc.RandomBeaconHistory.Address.HexWithPrefix()),
 					).
 					SetPayer(sc.FlowServiceAccount.Address).
 					AddAuthorizer(sc.FlowServiceAccount.Address).
@@ -5373,7 +5373,7 @@ func TestCadenceArch(t *testing.T) {
 
 				snapshot = snapshot.Append(s)
 
-				code := []byte(fmt.Sprintf(
+				code := fmt.Appendf(nil,
 					`
 					import EVM from %s
 
@@ -5386,7 +5386,7 @@ func TestCadenceArch(t *testing.T) {
 					}
                     `,
 					sc.EVMContract.Address.HexWithPrefix(),
-				))
+				)
 
 				// we fake progressing to new block height since random beacon does the check the
 				// current height (2) is bigger than the height requested (1)
@@ -5450,7 +5450,7 @@ func TestCadenceArch(t *testing.T) {
 				ctx.BlockHeader = block1.ToHeader()
 
 				txBody, err := flow.NewTransactionBodyBuilder().
-					SetScript([]byte(fmt.Sprintf(`
+					SetScript(fmt.Appendf(nil, `
 						import RandomBeaconHistory from %s
 
 						transaction {
@@ -5460,7 +5460,7 @@ func TestCadenceArch(t *testing.T) {
 										?? panic("Couldn't borrow RandomBeaconHistory.Heartbeat Resource")
 								randomBeaconHistoryHeartbeat.heartbeat(randomSourceHistory: randomSourceHistory())
 							}
-						}`, sc.RandomBeaconHistory.Address.HexWithPrefix())),
+						}`, sc.RandomBeaconHistory.Address.HexWithPrefix()),
 					).
 					SetPayer(sc.FlowServiceAccount.Address).
 					AddAuthorizer(sc.FlowServiceAccount.Address).
@@ -5475,7 +5475,7 @@ func TestCadenceArch(t *testing.T) {
 
 				height = 1337 // invalid
 				// we make sure the transaction fails, due to requested height being invalid
-				code := []byte(fmt.Sprintf(
+				code := fmt.Appendf(nil,
 					`
 					import EVM from %s
 
@@ -5486,7 +5486,7 @@ func TestCadenceArch(t *testing.T) {
 					}
 					`,
 					sc.EVMContract.Address.HexWithPrefix(),
-				))
+				)
 
 				// we fake progressing to new block height since random beacon does the check the
 				// current height (2) is bigger than the height requested (1)
@@ -5581,7 +5581,7 @@ func TestCadenceArch(t *testing.T) {
 				require.NoError(t, err)
 
 				// create transaction for proof verification
-				code := []byte(fmt.Sprintf(
+				code := fmt.Appendf(nil,
 					`
 					import EVM from %s
 
@@ -5593,7 +5593,7 @@ func TestCadenceArch(t *testing.T) {
 					}
                 	`,
 					sc.EVMContract.Address.HexWithPrefix(),
-				))
+				)
 				innerTxBytes := testAccount.PrepareSignAndEncodeTx(t,
 					testContract.DeployedAt.ToCommon(),
 					testContract.MakeCallData(t, "verifyArchCallToVerifyCOAOwnershipProof",
@@ -5691,7 +5691,7 @@ func TestCadenceArch(t *testing.T) {
 				testContract *TestContract,
 				testAccount *EOATestAccount,
 			) {
-				code := []byte(fmt.Sprintf(
+				code := fmt.Appendf(nil,
 					`
 					import EVM from %s
 
@@ -5761,7 +5761,7 @@ func TestCadenceArch(t *testing.T) {
 					}
 					`,
 					sc.EVMContract.Address.HexWithPrefix(),
-				))
+				)
 
 				txBody, err := flow.NewTransactionBodyBuilder().
 					SetScript(code).
@@ -5818,7 +5818,7 @@ func TestCadenceArch(t *testing.T) {
 				require.NoError(t, err)
 
 				// create transaction for proof verification
-				code := []byte(fmt.Sprintf(
+				code := fmt.Appendf(nil,
 					`
 					import EVM from %s
 					access(all)
@@ -5828,7 +5828,7 @@ func TestCadenceArch(t *testing.T) {
 					}
 					`,
 					sc.EVMContract.Address.HexWithPrefix(),
-				))
+				)
 				innerTxBytes := testAccount.PrepareSignAndEncodeTx(t,
 					testContract.DeployedAt.ToCommon(),
 					testContract.MakeCallData(t, "verifyArchCallToVerifyCOAOwnershipProof",
@@ -5892,7 +5892,7 @@ func TestNativePrecompiles(t *testing.T) {
 				testAccount *EOATestAccount,
 			) {
 				sc := systemcontracts.SystemContractsForChain(chain.ChainID())
-				code := []byte(fmt.Sprintf(
+				code := fmt.Appendf(nil,
 					`
 					import EVM from %s
 
@@ -5908,7 +5908,7 @@ func TestNativePrecompiles(t *testing.T) {
 					}
 					`,
 					sc.EVMContract.Address.HexWithPrefix(),
-				))
+				)
 
 				coinbaseAddr := types.Address{1, 2, 3}
 				coinbaseBalance := getEVMAccountBalance(t, ctx, vm, snapshot, coinbaseAddr)
@@ -5980,7 +5980,7 @@ func TestEVMFileSystemContract(t *testing.T) {
 		*snapshot.ExecutionSnapshot,
 		fvm.ProcedureOutput,
 	) {
-		code := []byte(fmt.Sprintf(
+		code := fmt.Appendf(nil,
 			`
 					import EVM from %s
 
@@ -5992,7 +5992,7 @@ func TestEVMFileSystemContract(t *testing.T) {
 					}
 					`,
 			sc.EVMContract.Address.HexWithPrefix(),
-		))
+		)
 
 		coinbaseAddr := types.Address{1, 2, 3}
 		coinbaseBalance := getEVMAccountBalance(t, ctx, vm, snapshot, coinbaseAddr)
@@ -6161,7 +6161,7 @@ func TestEVMaddressFromString(t *testing.T) {
 				testContract *TestContract,
 				testAccount *EOATestAccount,
 			) {
-				code := []byte(fmt.Sprintf(
+				code := fmt.Appendf(nil,
 					`
 					import EVM from %s
 
@@ -6176,7 +6176,7 @@ func TestEVMaddressFromString(t *testing.T) {
 					}
 					`,
 					sc.EVMContract.Address.HexWithPrefix(),
-				))
+				)
 
 				script := fvm.Script(code)
 				_, output, err := vm.Run(ctx, script, snapshot)
@@ -6195,7 +6195,7 @@ func TestEVMaddressFromString(t *testing.T) {
 				testContract *TestContract,
 				testAccount *EOATestAccount,
 			) {
-				code := []byte(fmt.Sprintf(
+				code := fmt.Appendf(nil,
 					`
 					import EVM from %s
 
@@ -6210,7 +6210,7 @@ func TestEVMaddressFromString(t *testing.T) {
 					}
 					`,
 					sc.EVMContract.Address.HexWithPrefix(),
-				))
+				)
 
 				script := fvm.Script(code)
 				_, output, err := vm.Run(ctx, script, snapshot)
@@ -6229,7 +6229,7 @@ func TestEVMaddressFromString(t *testing.T) {
 				testContract *TestContract,
 				testAccount *EOATestAccount,
 			) {
-				code := []byte(fmt.Sprintf(
+				code := fmt.Appendf(nil,
 					`
 					import EVM from %s
 
@@ -6244,7 +6244,7 @@ func TestEVMaddressFromString(t *testing.T) {
 					}
 					`,
 					sc.EVMContract.Address.HexWithPrefix(),
-				))
+				)
 
 				script := fvm.Script(code)
 				_, output, err := vm.Run(ctx, script, snapshot)
@@ -6268,7 +6268,7 @@ func TestEVMaddressFromString(t *testing.T) {
 				testContract *TestContract,
 				testAccount *EOATestAccount,
 			) {
-				code := []byte(fmt.Sprintf(
+				code := fmt.Appendf(nil,
 					`
 					import EVM from %s
 
@@ -6279,7 +6279,7 @@ func TestEVMaddressFromString(t *testing.T) {
 					}
 					`,
 					sc.EVMContract.Address.HexWithPrefix(),
-				))
+				)
 
 				script := fvm.Script(code)
 				_, output, err := vm.Run(ctx, script, snapshot)
@@ -6303,7 +6303,7 @@ func TestEVMaddressFromString(t *testing.T) {
 				testContract *TestContract,
 				testAccount *EOATestAccount,
 			) {
-				code := []byte(fmt.Sprintf(
+				code := fmt.Appendf(nil,
 					`
 					import EVM from %s
 
@@ -6318,7 +6318,7 @@ func TestEVMaddressFromString(t *testing.T) {
 					}
 					`,
 					sc.EVMContract.Address.HexWithPrefix(),
-				))
+				)
 
 				script := fvm.Script(code)
 				_, output, err := vm.Run(ctx, script, snapshot)
@@ -6342,7 +6342,7 @@ func TestEVMaddressFromString(t *testing.T) {
 				testContract *TestContract,
 				testAccount *EOATestAccount,
 			) {
-				code := []byte(fmt.Sprintf(
+				code := fmt.Appendf(nil,
 					`
 					import EVM from %s
 
@@ -6357,7 +6357,7 @@ func TestEVMaddressFromString(t *testing.T) {
 					}
 					`,
 					sc.EVMContract.Address.HexWithPrefix(),
-				))
+				)
 
 				script := fvm.Script(code)
 				_, output, err := vm.Run(ctx, script, snapshot)
@@ -6379,7 +6379,7 @@ func TestEVMPauseFunctionality(t *testing.T) {
 	chain := flow.Emulator.Chain()
 	sc := systemcontracts.SystemContractsForChain(chain.ChainID())
 
-	code := []byte(fmt.Sprintf(
+	code := fmt.Appendf(nil,
 		`
 		import EVM from %s
 
@@ -6391,7 +6391,7 @@ func TestEVMPauseFunctionality(t *testing.T) {
 		}
 		`,
 		sc.EVMContract.Address.HexWithPrefix(),
-	))
+	)
 
 	txBody, err := flow.NewTransactionBodyBuilder().
 		SetScript(code).
@@ -6420,7 +6420,7 @@ func TestEVMPauseFunctionality(t *testing.T) {
 			snapshot = snapshot.Append(state)
 
 			t.Run("testing EOA deposit when EVM is paused", func(t *testing.T) {
-				code = []byte(fmt.Sprintf(
+				code = fmt.Appendf(nil,
 					`
 					import EVM from %s
 					import FlowToken from %s
@@ -6441,7 +6441,7 @@ func TestEVMPauseFunctionality(t *testing.T) {
 					`,
 					sc.EVMContract.Address.HexWithPrefix(),
 					sc.FlowToken.Address.HexWithPrefix(),
-				))
+				)
 
 				addr := RandomAddress(t)
 				txBody, err = flow.NewTransactionBodyBuilder().
@@ -6466,7 +6466,7 @@ func TestEVMPauseFunctionality(t *testing.T) {
 			})
 
 			t.Run("testing EVM.run when EVM is paused", func(t *testing.T) {
-				code = []byte(fmt.Sprintf(
+				code = fmt.Appendf(nil,
 					`
 					import EVM from %s
 
@@ -6482,7 +6482,7 @@ func TestEVMPauseFunctionality(t *testing.T) {
 					}
 					`,
 					sc.EVMContract.Address.HexWithPrefix(),
-				))
+				)
 
 				coinbaseAddr := types.Address{1, 2, 3}
 				coinbaseBalance := getEVMAccountBalance(t, ctx, vm, snapshot, coinbaseAddr)
@@ -6526,7 +6526,7 @@ func TestEVMPauseFunctionality(t *testing.T) {
 			})
 
 			t.Run("testing EVM.batchRun when EVM is paused", func(t *testing.T) {
-				batchRunCode := []byte(fmt.Sprintf(
+				batchRunCode := fmt.Appendf(nil,
 					`
 					import EVM from %s
 
@@ -6544,7 +6544,7 @@ func TestEVMPauseFunctionality(t *testing.T) {
 					}
 					`,
 					sc.EVMContract.Address.HexWithPrefix(),
-				))
+				)
 
 				coinbaseAddr := types.Address{1, 2, 3}
 				coinbaseBalance := getEVMAccountBalance(t, ctx, vm, snapshot, coinbaseAddr)
@@ -6552,7 +6552,7 @@ func TestEVMPauseFunctionality(t *testing.T) {
 
 				batchCount := 5
 				txBytes := make([]cadence.Value, batchCount)
-				for i := 0; i < batchCount; i++ {
+				for i := range batchCount {
 					num := int64(i)
 					// prepare batch of transaction payloads
 					tx := testAccount.PrepareSignAndEncodeTx(t,
@@ -6599,7 +6599,7 @@ func TestEVMPauseFunctionality(t *testing.T) {
 			})
 
 			t.Run("testing EVM.createCadenceOwnedAccount when EVM is paused", func(t *testing.T) {
-				code = []byte(fmt.Sprintf(
+				code = fmt.Appendf(nil,
 					`
 					import EVM from %s
 
@@ -6616,7 +6616,7 @@ func TestEVMPauseFunctionality(t *testing.T) {
 					}
 					`,
 					sc.EVMContract.Address.HexWithPrefix(),
-				))
+				)
 
 				coinbaseAddr := types.Address{1, 2, 3}
 				coinbaseBalance := getEVMAccountBalance(t, ctx, vm, snapshot, coinbaseAddr)
@@ -6648,7 +6648,7 @@ func TestEVMPauseFunctionality(t *testing.T) {
 			})
 
 			t.Run("testing CadenceOwnedAccount.deploy when EVM is paused", func(t *testing.T) {
-				code = []byte(fmt.Sprintf(
+				code = fmt.Appendf(nil,
 					`
 					import EVM from %s
 
@@ -6666,7 +6666,7 @@ func TestEVMPauseFunctionality(t *testing.T) {
 					}
 					`,
 					sc.EVMContract.Address.HexWithPrefix(),
-				))
+				)
 
 				coinbaseAddr := types.Address{1, 2, 3}
 				coinbaseBalance := getEVMAccountBalance(t, ctx, vm, snapshot, coinbaseAddr)
@@ -6698,7 +6698,7 @@ func TestEVMPauseFunctionality(t *testing.T) {
 			})
 
 			t.Run("testing CadenceOwnedAccount.call when EVM is paused", func(t *testing.T) {
-				code = []byte(fmt.Sprintf(
+				code = fmt.Appendf(nil,
 					`
 					import EVM from %s
 
@@ -6720,7 +6720,7 @@ func TestEVMPauseFunctionality(t *testing.T) {
 					}
 					`,
 					sc.EVMContract.Address.HexWithPrefix(),
-				))
+				)
 
 				data := json.MustEncode(
 					cadence.NewArray(
@@ -6754,7 +6754,7 @@ func TestEVMPauseFunctionality(t *testing.T) {
 			})
 
 			t.Run("testing CadenceOwnedAccount.deposit when EVM is paused", func(t *testing.T) {
-				code = []byte(fmt.Sprintf(
+				code = fmt.Appendf(nil,
 					`
 					import EVM from %s
 					import FlowToken from %s
@@ -6776,7 +6776,7 @@ func TestEVMPauseFunctionality(t *testing.T) {
 					`,
 					sc.EVMContract.Address.HexWithPrefix(),
 					sc.FlowToken.Address.HexWithPrefix(),
-				))
+				)
 
 				txBody, err = flow.NewTransactionBodyBuilder().
 					SetScript(code).
@@ -6797,7 +6797,7 @@ func TestEVMPauseFunctionality(t *testing.T) {
 			})
 
 			t.Run("testing CadenceOwnedAccount.withdraw when EVM is paused", func(t *testing.T) {
-				code = []byte(fmt.Sprintf(
+				code = fmt.Appendf(nil,
 					`
 					import EVM from %s
 					import FlowToken from %s
@@ -6816,7 +6816,7 @@ func TestEVMPauseFunctionality(t *testing.T) {
 					`,
 					sc.EVMContract.Address.HexWithPrefix(),
 					sc.FlowToken.Address.HexWithPrefix(),
-				))
+				)
 
 				txBody, err = flow.NewTransactionBodyBuilder().
 					SetScript(code).
@@ -6837,7 +6837,7 @@ func TestEVMPauseFunctionality(t *testing.T) {
 			})
 
 			t.Run("testing CadenceOwnedAccount.callWithSigAndArgs when EVM is paused", func(t *testing.T) {
-				code = []byte(fmt.Sprintf(
+				code = fmt.Appendf(nil,
 					`
 					import EVM from %s
 
@@ -6861,7 +6861,7 @@ func TestEVMPauseFunctionality(t *testing.T) {
 					}
 					`,
 					sc.EVMContract.Address.HexWithPrefix(),
-				))
+				)
 
 				data := json.MustEncode(
 					cadence.NewArray(
@@ -6917,7 +6917,7 @@ func createAndFundFlowAccount(
 
 	// fund the account with 100 tokens
 	sc := systemcontracts.SystemContractsForChain(ctx.Chain.ChainID())
-	code := []byte(fmt.Sprintf(
+	code := fmt.Appendf(nil,
 		`
 		import FlowToken from %s
 		import FungibleToken from %s
@@ -6942,7 +6942,7 @@ func createAndFundFlowAccount(
 		sc.FlowToken.Address.HexWithPrefix(),
 		sc.FungibleToken.Address.HexWithPrefix(),
 		flowAccount.HexWithPrefix(),
-	))
+	)
 
 	txBody, err := flow.NewTransactionBodyBuilder().
 		SetScript(code).
@@ -6981,7 +6981,7 @@ func setupCOA(
 
 	sc := systemcontracts.SystemContractsForChain(ctx.Chain.ChainID())
 	// create a COA and store it under flow account
-	script := []byte(fmt.Sprintf(
+	script := fmt.Appendf(nil,
 		`
 	import EVM from %s
 	import FungibleToken from %s
@@ -7014,7 +7014,7 @@ func setupCOA(
 		sc.EVMContract.Address.HexWithPrefix(),
 		sc.FungibleToken.Address.HexWithPrefix(),
 		sc.FlowToken.Address.HexWithPrefix(),
-	))
+	)
 
 	txBody, err := flow.NewTransactionBodyBuilder().
 		SetScript(script).
@@ -7045,7 +7045,7 @@ func callEVMHeartBeat(
 ) (*events.BlockEventPayload, snapshot.SnapshotTree) {
 	sc := systemcontracts.SystemContractsForChain(ctx.Chain.ChainID())
 
-	heartBeatCode := []byte(fmt.Sprintf(
+	heartBeatCode := fmt.Appendf(nil,
 		`
 	import EVM from %s
 	transaction {
@@ -7058,7 +7058,7 @@ func callEVMHeartBeat(
 	}
 	`,
 		sc.EVMContract.Address.HexWithPrefix(),
-	))
+	)
 	txBody, err := flow.NewTransactionBodyBuilder().
 		SetScript(heartBeatCode).
 		SetPayer(sc.FlowServiceAccount.Address).
@@ -7087,14 +7087,14 @@ func getFlowAccountBalance(
 	snap snapshot.SnapshotTree,
 	address flow.Address,
 ) uint64 {
-	code := []byte(fmt.Sprintf(
+	code := fmt.Appendf(nil,
 		`
 		access(all) fun main(): UFix64 {
 			return getAccount(%s).balance
 		}
 		`,
 		address.HexWithPrefix(),
-	))
+	)
 
 	script := fvm.Script(code)
 	_, output, err := vm.Run(
@@ -7115,7 +7115,7 @@ func getEVMAccountBalance(
 	snap snapshot.SnapshotTree,
 	address types.Address,
 ) types.Balance {
-	code := []byte(fmt.Sprintf(
+	code := fmt.Appendf(nil,
 		`
 		import EVM from %s
 		access(all)
@@ -7126,7 +7126,7 @@ func getEVMAccountBalance(
 		systemcontracts.SystemContractsForChain(
 			ctx.Chain.ChainID(),
 		).EVMContract.Address.HexWithPrefix(),
-	))
+	)
 
 	script := fvm.Script(code).WithArguments(
 		json.MustEncode(
@@ -7153,7 +7153,7 @@ func getEVMAccountNonce(
 	snap snapshot.SnapshotTree,
 	address types.Address,
 ) uint64 {
-	code := []byte(fmt.Sprintf(
+	code := fmt.Appendf(nil,
 		`
 		import EVM from %s
 		access(all)
@@ -7164,7 +7164,7 @@ func getEVMAccountNonce(
 		systemcontracts.SystemContractsForChain(
 			ctx.Chain.ChainID(),
 		).EVMContract.Address.HexWithPrefix(),
-	))
+	)
 
 	script := fvm.Script(code).WithArguments(
 		json.MustEncode(

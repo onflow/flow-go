@@ -96,7 +96,7 @@ func (suite *ExecutionResultQueryProviderSuite) TestExecutionResultQuery() {
 		provider := suite.createProvider(flow.IdentifierList{}, optimistic_sync.Criteria{})
 
 		receipts := make(flow.ExecutionReceiptList, totalReceipts)
-		for i := 0; i < totalReceipts; i++ {
+		for i := range totalReceipts {
 			r := unittest.ReceiptForBlockFixture(block)
 			r.ExecutorID = allExecutionNodes[i].NodeID
 			r.ExecutionResult = *executionResult
@@ -128,7 +128,7 @@ func (suite *ExecutionResultQueryProviderSuite) TestExecutionResultQuery() {
 		otherResult := unittest.ExecutionResultFixture()
 		// Create 3 receipts with the same result (executionResult) and 2 with a different result (otherResult)
 		receipts := make(flow.ExecutionReceiptList, totalReceipts)
-		for i := 0; i < 3; i++ {
+		for i := range 3 {
 			r := unittest.ReceiptForBlockFixture(block)
 			r.ExecutorID = allExecutionNodes[i].NodeID
 			r.ExecutionResult = *executionResult
@@ -183,7 +183,7 @@ func (suite *ExecutionResultQueryProviderSuite) TestExecutionResultQuery() {
 	suite.Run("required executors not found returns error", func() {
 		provider := suite.createProvider(flow.IdentifierList{}, optimistic_sync.Criteria{})
 		receipts := make(flow.ExecutionReceiptList, totalReceipts)
-		for i := 0; i < totalReceipts; i++ {
+		for i := range totalReceipts {
 			r := unittest.ReceiptForBlockFixture(block)
 			r.ExecutorID = allExecutionNodes[i].NodeID
 			r.ExecutionResult = *executionResult
@@ -245,7 +245,7 @@ func (suite *ExecutionResultQueryProviderSuite) TestPreferredAndRequiredExecutio
 	numReceipts := 6
 	// Create receipts from the first `numReceipts` execution nodes
 	receipts := make(flow.ExecutionReceiptList, numReceipts)
-	for i := 0; i < numReceipts; i++ {
+	for i := range numReceipts {
 		r := unittest.ReceiptForBlockFixture(block)
 		r.ExecutorID = allExecutionNodes[i].NodeID
 		r.ExecutionResult = *executionResult

@@ -169,7 +169,7 @@ func TestMachineAccountValidatorBackoff_Overflow(t *testing.T) {
 
 	lastWait, stop := backoff.Next()
 	assert.False(t, stop)
-	for i := 0; i < 100; i++ {
+	for range 100 {
 		wait, stop := backoff.Next()
 		assert.False(t, stop)
 		// the backoff value should either:

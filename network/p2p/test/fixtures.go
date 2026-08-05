@@ -439,7 +439,7 @@ func NodesFixture(t *testing.T,
 
 	// creating nodes
 	var identities flow.IdentityList
-	for i := 0; i < count; i++ {
+	for range count {
 		// create a node on localhost with a random port assigned by the OS
 		node, identity := NodeFixture(t, sporkID, dhtPrefix, idProvider, opts...)
 		nodes = append(nodes, node)
@@ -628,7 +628,7 @@ func EnsureStreamCreationInBothDirections(t *testing.T, ctx context.Context, nod
 //
 // Note-1: this function assumes a timeout of 5 seconds for each message to be received.
 // Note-2: TryConnectionAndEnsureConnected() must be called to connect all nodes before calling this function.
-func EnsurePubsubMessageExchange(t *testing.T, ctx context.Context, nodes []p2p.LibP2PNode, topic channels.Topic, count int, messageFactory func() interface{}) {
+func EnsurePubsubMessageExchange(t *testing.T, ctx context.Context, nodes []p2p.LibP2PNode, topic channels.Topic, count int, messageFactory func() any) {
 	subs := make([]p2p.Subscription, len(nodes))
 	for i, node := range nodes {
 		ps, err := node.Subscribe(topic, validator.TopicValidator(unittest.Logger(), unittest.AllowAllPeerFilter()))
@@ -640,7 +640,7 @@ func EnsurePubsubMessageExchange(t *testing.T, ctx context.Context, nodes []p2p.
 	time.Sleep(1 * time.Second)
 
 	for _, node := range nodes {
-		for i := 0; i < count; i++ {
+		for range count {
 			// creates a unique message to be published by the node
 			payload := messageFactory()
 			outgoingMessageScope, err := message.NewOutgoingScope(flow.IdentifierList{unittest.IdentifierFixture()},
@@ -679,7 +679,7 @@ func EnsurePubsubMessageExchangeFromNode(t *testing.T,
 	receiverIdentifier flow.Identifier,
 	topic channels.Topic,
 	count int,
-	messageFactory func() interface{}) {
+	messageFactory func() any) {
 	_, err := sender.Subscribe(topic, validator.TopicValidator(unittest.Logger(), unittest.AllowAllPeerFilter()))
 	require.NoError(t, err)
 
@@ -689,7 +689,7 @@ func EnsurePubsubMessageExchangeFromNode(t *testing.T,
 	// let subscriptions propagate
 	time.Sleep(1 * time.Second)
 
-	for i := 0; i < count; i++ {
+	for range count {
 		// creates a unique message to be published by the node
 		payload := messageFactory()
 		outgoingMessageScope, err := message.NewOutgoingScope(flow.IdentifierList{receiverIdentifier},
@@ -732,7 +732,7 @@ func EnsureNoPubsubMessageExchange(t *testing.T,
 	toIdentifiers flow.IdentifierList,
 	topic channels.Topic,
 	count int,
-	messageFactory func() interface{}) {
+	messageFactory func() any) {
 	subs := make([]p2p.Subscription, len(to))
 	tv := validator.TopicValidator(unittest.Logger(), unittest.AllowAllPeerFilter())
 	var err error
@@ -752,10 +752,8 @@ func EnsureNoPubsubMessageExchange(t *testing.T,
 
 	wg := &sync.WaitGroup{}
 	for _, node := range from {
-		node := node // capture range variable
-		for i := 0; i < count; i++ {
-			wg.Add(1)
-			go func() {
+		for range count {
+			wg.Go(func() {
 				// creates a unique message to be published by the node.
 
 				payload := messageFactory()
@@ -766,8 +764,7 @@ func EnsureNoPubsubMessageExchange(t *testing.T,
 				ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 				p2pfixtures.SubsMustNeverReceiveAnyMessage(t, ctx, subs)
 				cancel()
-				wg.Done()
-			}()
+			})
 		}
 	}
 
@@ -795,7 +792,7 @@ func EnsureNoPubsubExchangeBetweenGroups(t *testing.T,
 	groupBIdentifiers flow.IdentifierList,
 	topic channels.Topic,
 	count int,
-	messageFactory func() interface{}) {
+	messageFactory func() any) {
 	// ensure no message exchange from group A to group B
 	EnsureNoPubsubMessageExchange(t, ctx, groupANodes, groupBNodes, groupBIdentifiers, topic, count, messageFactory)
 	// ensure no message exchange from group B to group A
@@ -811,7 +808,7 @@ func EnsureNoPubsubExchangeBetweenGroups(t *testing.T,
 // - peer.IDSlice: slice of peer IDs
 func PeerIdSliceFixture(t *testing.T, n int) peer.IDSlice {
 	ids := make([]peer.ID, n)
-	for i := 0; i < n; i++ {
+	for i := range n {
 		ids[i] = unittest.PeerIdFixture(t)
 	}
 	return ids
@@ -834,7 +831,7 @@ func NewConnectionGater(idProvider module.IdentityProvider, allowListFilter p2p.
 func GossipSubRpcFixtures(t *testing.T, count int) []*pb.RPC {
 	c := 10
 	rpcs := make([]*pb.RPC, 0)
-	for i := 0; i < count; i++ {
+	for range count {
 		rpcs = append(rpcs,
 			GossipSubRpcFixture(t,
 				c,
@@ -862,7 +859,7 @@ func GossipSubRpcFixture(t *testing.T, msgCnt int, opts ...GossipSubCtrlOption) 
 	numSubscriptions := 10
 	topicIdSize := 10
 	subscriptions := make([]*pb.RPC_SubOpts, numSubscriptions)
-	for i := 0; i < numSubscriptions; i++ {
+	for i := range numSubscriptions {
 		subscribe := rand.Intn(2) == 1
 		topicID, err := randutils.GenerateRandomString(topicIdSize)
 		require.NoError(t, err)
@@ -874,7 +871,7 @@ func GossipSubRpcFixture(t *testing.T, msgCnt int, opts ...GossipSubCtrlOption) 
 
 	// generates random messages
 	messages := make([]*pb.Message, msgCnt)
-	for i := 0; i < msgCnt; i++ {
+	for i := range msgCnt {
 		messages[i] = GossipSubMessageFixture(t)
 	}
 
@@ -906,7 +903,7 @@ func GossipSubCtrlFixture(opts ...GossipSubCtrlOption) *pb.ControlMessage {
 func WithIHave(msgCount, msgIDCount int, topicId string) GossipSubCtrlOption {
 	return func(msg *pb.ControlMessage) {
 		iHaves := make([]*pb.ControlIHave, msgCount)
-		for i := 0; i < msgCount; i++ {
+		for i := range msgCount {
 			iHaves[i] = &pb.ControlIHave{
 				TopicID:    &topicId,
 				MessageIDs: GossipSubMessageIdsFixture(msgIDCount),
@@ -941,7 +938,7 @@ func WithIHaveMessageIDs(msgIDs []string, topicId string) GossipSubCtrlOption {
 func WithIWant(iWantCount int, msgIdsPerIWant int) GossipSubCtrlOption {
 	return func(msg *pb.ControlMessage) {
 		iWants := make([]*pb.ControlIWant, iWantCount)
-		for i := 0; i < iWantCount; i++ {
+		for i := range iWantCount {
 			iWants[i] = &pb.ControlIWant{
 				MessageIDs: GossipSubMessageIdsFixture(msgIdsPerIWant),
 			}
@@ -954,7 +951,7 @@ func WithIWant(iWantCount int, msgIdsPerIWant int) GossipSubCtrlOption {
 func WithGraft(msgCount int, topicId string) GossipSubCtrlOption {
 	return func(msg *pb.ControlMessage) {
 		grafts := make([]*pb.ControlGraft, msgCount)
-		for i := 0; i < msgCount; i++ {
+		for i := range msgCount {
 			grafts[i] = &pb.ControlGraft{
 				TopicID: &topicId,
 			}
@@ -980,7 +977,7 @@ func WithGrafts(topicIds ...string) GossipSubCtrlOption {
 func WithPrune(msgCount int, topicId string) GossipSubCtrlOption {
 	return func(msg *pb.ControlMessage) {
 		prunes := make([]*pb.ControlPrune, msgCount)
-		for i := 0; i < msgCount; i++ {
+		for i := range msgCount {
 			prunes[i] = &pb.ControlPrune{
 				TopicID: &topicId,
 			}
@@ -1017,7 +1014,7 @@ func GossipSubTopicIdFixture() string {
 // GossipSubMessageIdsFixture returns a slice of random gossipSub message IDs of the given size.
 func GossipSubMessageIdsFixture(count int) []string {
 	msgIds := make([]string, count)
-	for i := 0; i < count; i++ {
+	for i := range count {
 		msgIds[i] = gossipSubMessageIdFixture()
 	}
 	return msgIds

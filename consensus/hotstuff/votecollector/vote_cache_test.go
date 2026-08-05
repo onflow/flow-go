@@ -114,7 +114,7 @@ func TestVotesCache_RegisterVoteConsumer(t *testing.T) {
 	require.Equal(t, expectedVotes, consumedVotes)
 
 	// produce second batch after registering vote consumer
-	for i := 0; i < votesBatchSize; i++ {
+	for range votesBatchSize {
 		vote := unittest.VoteFixture(unittest.WithVoteView(view))
 		expectedVotes = append(expectedVotes, vote)
 		require.NoError(t, cache.AddVote(vote))
