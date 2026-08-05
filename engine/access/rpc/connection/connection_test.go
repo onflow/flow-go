@@ -839,24 +839,42 @@ func TestConcurrentConnections(t *testing.T) {
 		var wg sync.WaitGroup
 		wg.Add(requestCount)
 
+		// failures are collected and asserted on the main test goroutine: calling require inside
+		// these goroutines invokes FailNow, which panics in rapid and kills the whole package binary.
+		getClientErrs := make(chan error, requestCount)
+		pingErrCodes := make(chan codes.Code, requestCount)
+
 		for i := 0; i < requestCount; i++ {
 			go func() {
 				defer wg.Done()
 
 				client, _, err := connectionFactory.GetExecutionAPIClient(clientAddress)
-				require.NoError(tt, err)
+				if err != nil {
+					getClientErrs <- err
+					return
+				}
 
 				_, err = client.Ping(ctx, req)
-
 				if err != nil {
-					// Note: for some reason, when Unavailable is returned, the error message is
-					// changed to "the connection to 127.0.0.1:57753 was closed". Other error codes
-					// preserve the message.
-					require.Equalf(tt, codes.Unavailable, status.Code(err), "unexpected error: %v", err)
+					pingErrCodes <- status.Code(err)
 				}
 			}()
 		}
 		wg.Wait()
+		close(getClientErrs)
+		close(pingErrCodes)
+
+		for err := range getClientErrs {
+			require.NoError(tt, err)
+		}
+		for code := range pingErrCodes {
+			// Note: for some reason, when Unavailable is returned, the error message is
+			// changed to "the connection to 127.0.0.1:57753 was closed". Other error codes
+			// preserve the message.
+			// DeadlineExceeded is also allowed: under heavy load the 1s client timeout can
+			// fire before the request reaches the server.
+			require.Contains(tt, []codes.Code{codes.Unavailable, codes.DeadlineExceeded}, code, "unexpected error code")
+		}
 
 		// the grpc client seems to throttle requests to servers that return Unavailable, so not
 		// all of the requests make it through to the backend every test. Requiring that at least 1
