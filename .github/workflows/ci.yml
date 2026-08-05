@@ -224,7 +224,7 @@ jobs:
         go-version: ${{ env.GO_VERSION }}
         cache: true
     - name: Setup tests (${{ matrix.targets.name }})
-      run: VERBOSE=1 make -e GO_TEST_PACKAGES="${{ matrix.targets.packages }}" install-tools
+      run: make install-tools
     - name: Run tests (${{ matrix.targets.name }})
       uses: nick-fields/retry@v4
       with:
@@ -270,7 +270,7 @@ jobs:
           go-version: ${{ env.GO_VERSION }}
           cache: true
       - name: Setup tests (${{ matrix.targets.name }})
-        run: VERBOSE=1 make -e GO_TEST_PACKAGES="${{ matrix.targets.packages }}" install-tools
+        run: make install-tools
       - name: Run tests (${{ matrix.targets.name }})
         uses: nick-fields/retry@v4
         with:
@@ -285,7 +285,8 @@ jobs:
         timeout-minutes: 1
         continue-on-error: true
         with:
-          files: ./coverage.txt
+          # the insecure module's Makefile writes its coverage profile to cover.out
+          files: ./insecure/cover.out
           flags: unittests
           name: codecov-umbrella
           token: ${{ secrets.CODECOV_TOKEN }}
@@ -378,7 +379,7 @@ jobs:
           go-version: ${{ env.GO_VERSION }}
           cache: true
       - name: Setup tests (${{ matrix.targets.name }})
-        run: VERBOSE=1 make -e GO_TEST_PACKAGES="${{ matrix.targets.packages }}" install-tools
+        run: make install-tools
       - name: Run tests (${{ matrix.targets.name }})
         uses: nick-fields/retry@v4
         with:
@@ -393,7 +394,8 @@ jobs:
         timeout-minutes: 1
         continue-on-error: true
         with:
-          files: ./coverage.txt
+          # the integration module's Makefile writes its coverage profile to cover.out
+          files: ./integration/cover.out
           flags: unittests
           name: codecov-umbrella
           token: ${{ secrets.CODECOV_TOKEN }}

@@ -153,10 +153,6 @@ test: verify-mocks unittest-main
 integration-test: docker-native-build-flow
 	$(MAKE) -C integration integration-test
 
-.PHONY: benchmark
-benchmark: docker-native-build-flow
-	$(MAKE) -C integration benchmark
-
 .PHONY: coverage
 coverage:
 ifeq ($(COVER), true)
@@ -241,13 +237,6 @@ ci: install-tools test
 .PHONY: ci-integration
 ci-integration:
 	$(MAKE) -C integration integration-test
-
-# Runs benchmark tests
-# NOTE: we do not need `docker-native-build-flow` as this is run as a separate step
-# on Teamcity
-.PHONY: ci-benchmark
-ci-benchmark: install-tools
-	$(MAKE) -C integration ci-benchmark
 
 # Runs unit tests, test coverage, lint in Docker (for mac)
 .PHONY: docker-ci
