@@ -41,10 +41,10 @@ func (suite *MultiClusterSuite) TestProposal_MultiCluster() {
 
 	// create a client for each node, organized by cluster
 	clientsByCluster := [3][]*client.Client{{}, {}, {}}
-	for i := 0; i < nClusters; i++ {
+	for i := range nClusters {
 		forCluster := make([]*client.Client, 0, clusterSize)
 
-		for j := 0; j < clusterSize; j++ {
+		for j := range clusterSize {
 			node := suite.Collector(uint(i), uint(j))
 			client, err := node.SDKClient()
 			suite.Require().NoError(err)
@@ -62,10 +62,10 @@ func (suite *MultiClusterSuite) TestProposal_MultiCluster() {
 		// keep track of which cluster is responsible for which transaction ID
 		txIDsByCluster := [3][]flow.Identifier{{}, {}, {}}
 
-		for clusterIdx := 0; clusterIdx < nClusters; clusterIdx++ {
+		for clusterIdx := range nClusters {
 			forCluster := make([]flow.Identifier, 0, nTransactions)
 
-			for txIdx := 0; txIdx < nTransactions; txIdx++ {
+			for txIdx := range nTransactions {
 				cluster, ok := clusters.ByIndex(uint(clusterIdx))
 				require.True(suite.T(), ok)
 				tx := suite.TxForCluster(cluster)
@@ -100,10 +100,10 @@ func (suite *MultiClusterSuite) TestProposal_MultiCluster() {
 		// keep track of which cluster is responsible for which transaction ID
 		txIDsByCluster := [3][]flow.Identifier{{}, {}, {}}
 
-		for clusterIdx := 0; clusterIdx < nClusters; clusterIdx++ {
+		for clusterIdx := range nClusters {
 			forCluster := make([]flow.Identifier, 0, nTransactions)
 
-			for txIdx := 0; txIdx < nTransactions; txIdx++ {
+			for range nTransactions {
 				cluster, ok := clusters.ByIndex(uint(clusterIdx))
 				require.True(suite.T(), ok)
 				tx := suite.TxForCluster(cluster)
@@ -142,10 +142,10 @@ func (suite *MultiClusterSuite) TestProposal_MultiCluster() {
 		// keep track of which cluster is responsible for which transaction ID
 		txIDsByCluster := [3][]flow.Identifier{{}, {}, {}}
 
-		for clusterIdx := 0; clusterIdx < nClusters; clusterIdx++ {
+		for clusterIdx := range nClusters {
 			forCluster := make([]flow.Identifier, 0, nTransactions)
 
-			for txIdx := 0; txIdx < nTransactions; txIdx++ {
+			for txIdx := range nTransactions {
 				cluster, ok := clusters.ByIndex(uint(clusterIdx))
 				require.True(suite.T(), ok)
 				tx := suite.TxForCluster(cluster)
@@ -185,16 +185,16 @@ func (suite *MultiClusterSuite) TestProposal_MultiCluster() {
 		// keep track of which cluster is responsible for which transaction ID
 		txIDsByCluster := [3][]flow.Identifier{{}, {}, {}}
 
-		for clusterIdx := 0; clusterIdx < nClusters; clusterIdx++ {
+		for clusterIdx := range nClusters {
 			forCluster := make([]flow.Identifier, 0, nTransactions)
 
-			for txIdx := 0; txIdx < nTransactions; txIdx++ {
+			for range nTransactions {
 				cluster, ok := clusters.ByIndex(uint(clusterIdx))
 				require.True(suite.T(), ok)
 				tx := suite.TxForCluster(cluster)
 				forCluster = append(forCluster, convert.IDFromSDK(tx.ID()))
 
-				for senderIdx := 0; senderIdx < nClusters; senderIdx++ {
+				for senderIdx := range nClusters {
 					// don't send the responsible cluster
 					if senderIdx == clusterIdx {
 						continue

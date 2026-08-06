@@ -36,7 +36,7 @@ func (s *TestStopAtHeightSuite) TestStopAtHeight() {
 	// make sure stop at height admin command is available
 	resp, err := admin.RunCommand(context.Background(), "list-commands", struct{}{})
 	require.NoError(s.T(), err)
-	commandsList, ok := resp.Output.([]interface{})
+	commandsList, ok := resp.Output.([]any)
 	s.True(ok)
 	s.Contains(commandsList, "stop-at-height")
 

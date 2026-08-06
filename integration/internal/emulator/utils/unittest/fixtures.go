@@ -50,7 +50,7 @@ func StorableTransactionResultFixture(eventEncodingVersion entities.EventEncodin
 
 func FullCollectionFixture(n int) flowgo.Collection {
 	transactions := make([]*flowgo.TransactionBody, n)
-	for i := 0; i < n; i++ {
+	for i := range n {
 		tx := TransactionFixture()
 		transactions[i] = &tx
 	}

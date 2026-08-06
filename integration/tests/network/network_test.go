@@ -30,7 +30,7 @@ func TestNetwork(t *testing.T) {
 	id := uint(1)
 	// create node configs
 	for role, nc := range nodeCounts {
-		for i := 0; i < nc; i++ {
+		for range nc {
 			// create a ghost node config for each node
 			n := testnet.NewNodeConfig(role, testnet.WithLogLevel(zerolog.FatalLevel), testnet.WithIDInt(id), testnet.AsGhost())
 			nodes = append(nodes, n)
@@ -50,8 +50,7 @@ func TestNetwork(t *testing.T) {
 	net := testnet.PrepareFlowNetwork(t, conf, flow.Localnet)
 
 	var wg sync.WaitGroup
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 	net.Start(ctx)
 	defer net.Remove()
 
@@ -97,7 +96,7 @@ func launchReadLoop(
 
 	// subscribe to all the events the ghost execution node will receive
 	var msgReader *ghostclient.FlowMessageStreamReader
-	for attempts := 0; attempts < 10; attempts++ {
+	for range 10 {
 		msgReader, err = ghostClient.Subscribe(ctx)
 		if err == nil {
 			break

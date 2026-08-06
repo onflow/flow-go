@@ -65,7 +65,7 @@ type ContainerConfig struct {
 
 func (c ContainerConfig) WriteKeyFiles(bootstrapDir string, machineAccountAddr sdk.Address, machineAccountKey encodable.MachineAccountPrivKey, role flow.Role) error {
 	// write staking and machine account private key files
-	writeJSONFile := func(relativePath string, val interface{}) error {
+	writeJSONFile := func(relativePath string, val any) error {
 		return WriteJSON(filepath.Join(bootstrapDir, relativePath), val)
 	}
 

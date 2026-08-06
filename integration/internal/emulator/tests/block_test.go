@@ -140,7 +140,7 @@ func TestBlockView(t *testing.T) {
 	addTwoScript, _ := DeployAndGenerateAddTwoScript(t, adapter)
 
 	// create a few blocks, each with one transaction
-	for i := 0; i < nBlocks; i++ {
+	for range nBlocks {
 
 		tx := flowsdk.NewTransaction().
 			SetScript([]byte(addTwoScript)).

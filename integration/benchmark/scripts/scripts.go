@@ -19,7 +19,7 @@ var AddKeysToAccountTransaction []byte
 var createAccountsTransactionTemplate string
 
 func CreateAccountsTransaction(fungibleToken, flowToken flowsdk.Address) []byte {
-	return []byte(fmt.Sprintf(createAccountsTransactionTemplate, fungibleToken, flowToken))
+	return fmt.Appendf(nil, createAccountsTransactionTemplate, fungibleToken, flowToken)
 }
 
 //go:embed compHeavyTransaction.cdc

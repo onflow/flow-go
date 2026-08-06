@@ -178,7 +178,6 @@ func (s *AccessSuite) runTestSignerIndicesDecoding() {
 	// transform to assert
 	var transformed [][]byte
 	for _, identity := range decodedIdentities {
-		identity := identity
 		transformed = append(transformed, identity[:])
 	}
 	assert.ElementsMatch(s.T(), transformed, msg.ParentVoterIds, "response must contain correctly encoded signer IDs")

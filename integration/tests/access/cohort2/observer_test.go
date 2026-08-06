@@ -196,7 +196,7 @@ func (s *ObserverSuite) TestObserverRest() {
 	observerAddr := s.net.ContainerByName("observer_1").Addr(testnet.RESTPort)
 
 	httpClient := http.DefaultClient
-	makeHttpCall := func(method string, url string, body interface{}) (*http.Response, error) {
+	makeHttpCall := func(method string, url string, body any) (*http.Response, error) {
 		switch method {
 		case http.MethodGet:
 			return httpClient.Get(url)
@@ -206,10 +206,10 @@ func (s *ObserverSuite) TestObserverRest() {
 		}
 		panic("not supported")
 	}
-	makeObserverCall := func(method string, path string, body interface{}) (*http.Response, error) {
+	makeObserverCall := func(method string, path string, body any) (*http.Response, error) {
 		return makeHttpCall(method, "http://"+observerAddr+"/v1"+path, body)
 	}
-	makeAccessCall := func(method string, path string, body interface{}) (*http.Response, error) {
+	makeAccessCall := func(method string, path string, body any) (*http.Response, error) {
 		return makeHttpCall(method, "http://"+accessAddr+"/v1"+path, body)
 	}
 
@@ -416,7 +416,7 @@ type RestEndpointTest struct {
 	name   string
 	method string
 	path   string
-	body   interface{}
+	body   any
 }
 
 func (s *ObserverSuite) getRestEndpoints() []RestEndpointTest {
@@ -523,7 +523,7 @@ func (s *ObserverSuite) getRestEndpoints() []RestEndpointTest {
 	}
 }
 
-func createTx(t *testing.T, net *testnet.FlowNetwork) interface{} {
+func createTx(t *testing.T, net *testnet.FlowNetwork) any {
 	flowAddr := flow.Localnet.Chain().ServiceAddress()
 	payloadSignature := unittest.TransactionSignatureFixture()
 	envelopeSignature := unittest.TransactionSignatureFixture()
@@ -548,10 +548,10 @@ func createTx(t *testing.T, net *testnet.FlowNetwork) interface{} {
 	return unittest.CreateSendTxHttpPayload(*tx)
 }
 
-func createScript() interface{} {
+func createScript() any {
 	validCode := []byte(`access(all) fun main(foo: String): String { return foo }`)
 	validArgs := []byte(`{ "type": "String", "value": "hello world" }`)
-	body := map[string]interface{}{
+	body := map[string]any{
 		"script":    util.ToBase64(validCode),
 		"arguments": []string{util.ToBase64(validArgs)},
 	}
