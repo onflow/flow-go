@@ -35,11 +35,17 @@ jobs:
         with:
             go-version-file: ./go.mod
 
+      - name: Install third-party vendor
+        run: go get github.com/nomad-software/vend
+
      # - name: set credentials for private repos
      #   run: rm -f ~/.gitconfig && git config --global url.https://$ORG_READER_USERNAME:$ORG_READER_PAT@github.com/.insteadOf https://github.com/ && cat ~/.gitconfig
 
+      # use a third-party vendoring tool instead of "go mod vend" because of the issue
+      # reported here https://github.com/golang/go/issues/26366. onflow/crypto has
+      # non-go files that are not copied by the Go standard tooling.
       - name: Tidy Go and mod vendor
-        run: go mod tidy && go mod vendor
+        run: go mod tidy && vend
 
 
       - name: Initialize CodeQL
@@ -49,7 +55,7 @@ jobs:
           queries: security-extended
 
       - name: Build
-        run: CGO_ENABLED=0 go build -mod=vendor -tags=no_cgo ./... 
+        run: go build -mod=vendor ./...
 
       - name: CodeQL Analyze 
         uses: github/codeql-action/analyze@v4
