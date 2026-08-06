@@ -116,6 +116,19 @@ fuzz-fvm:
 	# run fuzz tests in the fvm package
 	cd ./fvm && CGO_CFLAGS=$(CRYPTO_FLAG) go test -fuzz=Fuzz -run ^$$
 
+# FUZZ_TIME controls how long each fuzz target runs (default 5m for local dev; override for CI).
+# Example: make fuzz-FuzzCBORDecoder FUZZ_TIME=10m
+FUZZ_TIME ?= 5m
+
+# fuzz-<FuzzFunctionName>: run a single named fuzz target for FUZZ_TIME.
+# The package is auto-discovered by locating the func declaration in *_test.go files.
+# Example: make fuzz-FuzzCBORDecoder
+fuzz-%:
+	@FUNC=$*; \
+	PKG=$$(grep -rl "func $${FUNC}(" --include="*_test.go" . | head -1 | xargs -I{} dirname {} | sed 's|^\./||'); \
+	if [ -z "$${PKG}" ]; then echo "Error: no fuzz function $${FUNC} found in *_test.go files"; exit 1; fi; \
+	CGO_CFLAGS=$(CRYPTO_FLAG) go test -fuzz=$${FUNC} -fuzztime=$(FUZZ_TIME) "./$${PKG}/"
+
 .PHONY: test
 test: verify-mocks unittest-main
 
