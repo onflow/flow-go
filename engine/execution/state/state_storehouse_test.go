@@ -96,7 +96,7 @@ func prepareStorehouseTest(f func(t *testing.T, es state.ExecutionState, l *ledg
 				}
 
 				es := state.NewExecutionState(
-					ls, stateCommitments, blocks, headers, chunkDataPacks, results, myReceipts, events, serviceEvents, txResults, pebbleimpl.ToDB(pebbleDB),
+					state.FullLedgerBackend(ls), stateCommitments, blocks, headers, chunkDataPacks, results, myReceipts, events, serviceEvents, txResults, pebbleimpl.ToDB(pebbleDB),
 					getLatestFinalized,
 					trace.NewNoopTracer(),
 					rs,
@@ -191,8 +191,12 @@ func TestExecutionStateWithStorehouse(t *testing.T) {
 		require.Equal(t, flow.RegisterValue("carrot"), b2)
 
 		// verify has state
-		require.True(t, l.HasState(led.State(sc2)))
-		require.False(t, l.HasState(led.State(unittest.StateCommitmentFixture())))
+		hasState, err := l.HasState(led.State(sc2))
+		require.NoError(t, err)
+		require.True(t, hasState)
+		hasState, err = l.HasState(led.State(unittest.StateCommitmentFixture()))
+		require.NoError(t, err)
+		require.False(t, hasState)
 	}))
 }
 
