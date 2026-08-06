@@ -6,14 +6,21 @@ FLITE is a tool for running a full version of the Flow blockchain.
 <!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
 ## Table of Contents
 
+- [Prerequisites](#prerequisites)
 - [Bootstrapping](#bootstrapping)
   - [Configuration](#configuration)
   - [Profiling](#profiling)
 - [Start the network](#start-the-network)
 - [Stop the network](#stop-the-network)
+- [Build Localnet images](#build-localnet-images)
+- [Verify the network is working](#verify-the-network-is-working)
 - [Logs](#logs)
-- [Metrics](#metrics)
+- [Observability](#observability)
+  - [Metrics](#metrics)
+  - [Traces](#traces)
+  - [Logs](#logs-1)
 - [Benchmarking](#benchmarking)
+- [Debugging](#debugging)
 - [Playing with Localnet](#playing-with-localnet)
   - [Configure Flow CLI to work with localnet](#configure-flow-cli-to-work-with-localnet)
     - [Add localnet network](#add-localnet-network)
@@ -24,8 +31,19 @@ FLITE is a tool for running a full version of the Flow blockchain.
     - [Getting account information](#getting-account-information)
     - [Running a cadence script](#running-a-cadence-script)
     - [Moving tokens from the service account to another account](#moving-tokens-from-the-service-account-to-another-account)
+- [admin tool](#admin-tool)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
+
+## Prerequisites
+
+Required:
+- [Docker](https://docs.docker.com/get-docker/) with the Compose plugin (`docker compose`)
+- [Go](https://go.dev/doc/install) - bootstrapping runs the network builder with `go run`
+
+Optional:
+- [Flow CLI](https://docs.onflow.org/flow-cli/install/) - for the examples in [Playing with Localnet](#playing-with-localnet)
+- [grpcurl](https://github.com/fullstorydev/grpcurl) - for querying the access node gRPC API directly
 
 ## Bootstrapping
 
@@ -82,10 +100,18 @@ make start-cached
 
 ## Stop the network
 
-The network needs to be stopped between each consecutive run to clear the chain state:
+```sh
+make stop
+```
+
+Chain state persists across restarts - it is stored in the `./data` directory, which is
+bind-mounted into the node containers. To start from a fresh genesis, stop the network,
+remove the generated data, and re-bootstrap:
 
 ```sh
 make stop
+make clean-data
+make bootstrap
 ```
 
 ## Build Localnet images
@@ -95,6 +121,17 @@ To build images for Localnet, run this command.
 make build-flow
 ```
 
+## Verify the network is working
+
+Once the network is running, you can smoke-test that it is producing and sealing blocks:
+
+```sh
+make verify
+```
+
+This polls the access node REST API (http://localhost:4004) and confirms the sealed block
+height is increasing.
+
 ## Logs
 
 You can view log output from all nodes:
@@ -103,7 +140,7 @@ You can view log output from all nodes:
 make logs
 ```
 
-## Observabilitty
+## Observability
 You can view realtime metrics, logs, and traces while the network is running:
 
 - Grafana: http://localhost:3000/
@@ -120,9 +157,9 @@ Here's an example of a Prometheus query that filters by the `consensus` role:
 avg(rate(consensus_compliance_finalized_blocks_total{role="consensus"}[$__interval]))
 ```
 
-## Traces
+### Traces
 Traces are available through the Tempo backend.
-You can to traces either by searching for logs that have a `traceID` label, clicking on them and pressing "Open in Tempo" button: 
+You can get to traces either by searching for logs that have a `traceID` label, clicking on them and pressing "Open in Tempo" button: 
 ```
 {role="execution"} | json | __error__ != "JSONParserErr" | timeSpentInMS > 10 | traceID != ""
 ```
@@ -130,21 +167,28 @@ You can to traces either by searching for logs that have a `traceID` label, clic
 Or by using the grafana's Search feature in explore:
 - http://localhost:3000/explore?orgId=1&left=%7B%22datasource%22:%22Tempo%22,%22queries%22:%5B%7B%22refId%22:%22A%22,%22queryType%22:%22clear%22%7D%5D,%22range%22:%7B%22from%22:%22now-1h%22,%22to%22:%22now%22%7D%7D
 
-## Logs
+### Logs
 Logs are available through the Loki backend.  You can use them either through the Logs/TimeSeries panels or through the explore:
 - http://localhost:3000/explore?orgId=1&left=%7B%22datasource%22:%22Loki%22,%22queries%22:%5B%7B%22refId%22:%22A%22,%22expr%22:%22%22,%22queryType%22:%22range%22%7D%5D,%22range%22:%7B%22from%22:%22now-1h%22,%22to%22:%22now%22%7D%7D
 
 ## Benchmarking
 
-Localnet can be loaded easily as well
+To load a running localnet with transactions, use the TPS loader from the
+[flow-execution-effort-estimation](https://github.com/onflow/flow-execution-effort-estimation)
+repository (private - requires repository access).
+
+The localnet is already set up for it: the docker network is attachable, the loader's
+Prometheus scrape target (`loader:8443`) is pre-configured, and a `loader` dashboard is
+installed in the local Grafana. From the root of the loader repository, run:
 
 ```
-make load
+make load-local
 ```
 
-The command by default will load your localnet with 1 tps for 30s, then 10 tps for 30s, and finally 100 tps indefinitely.
+Load progress can be observed in the local Grafana (http://localhost:3000) via the
+`flow_execution_effort_estimation_*` metrics.
 
-More about the loader can be found in the benchmark module.
+More about the loader can be found in the loader repository.
 
 ## Debugging
 It is possible to connect a debugger to a localnet instance to debug the code. To set this up, find the
@@ -165,16 +209,16 @@ node you want to debug in `docker-compose.nodes.yml`, then make the following ch
 	```
 3. Rebuild the node. In these examples, we are rebuilding the `execution_1` node.
 	```
-	docker-compose -f docker-compose.nodes.yml build execution_1
+	docker compose -f docker-compose.nodes.yml build execution_1
 	```
 4. Stop and restart the node
 	```
-	docker-compose -f docker-compose.nodes.yml stop execution_1
-	docker-compose -f docker-compose.nodes.yml up -d execution_1
+	docker compose -f docker-compose.nodes.yml stop execution_1
+	docker compose -f docker-compose.nodes.yml up -d execution_1
 	```
 5. Check the logs to make sure it's working
 	```
-	docker-compose -f docker-compose.nodes.yml logs -f execution_1
+	docker compose -f docker-compose.nodes.yml logs -f execution_1
 
 	localnet-execution_1-1  | API server listening at: [::]:2345
 	```
@@ -254,6 +298,9 @@ An example of the Flow CLI configuration with the service account added:
 	}
 }
 ```
+> Note: recent Flow CLI versions print a security warning about private keys stored directly in `flow.json`.
+> This is expected here - the localnet service account key is publicly known and holds no value.
+
 to check if the address above really is a service account, query the service account address:
 ```
 flow -n localnet accounts get f8d6e0586b0a20c7
@@ -354,8 +401,8 @@ flow transactions send transfer_tokens.cdc 9999.9 <ACCOUNT_ADDRESS> -n localnet 
 
 After the transaction is sealed, the account with `<ACCOUNT_ADDRESS>` should have the balance increased by 9999.9 tokens.
 
-# admin tool
-The admin tool is enabled by default in localnet for all node type except access node.
+## admin tool
+The admin tool is enabled by default in localnet for all node types.
 
 For instance, in order to use admin tool to change log level, first find the local port that maps to `9002` which is the admin tool address, if the local port is `6100`, then run:
 ```
