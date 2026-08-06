@@ -33,6 +33,7 @@ var (
 	flagOnlyTraceCadence    bool
 	flagEntropyProvider     string
 	flagShowTraceDiff       bool
+	flagBlockIDs            string
 )
 
 var Cmd = &cobra.Command{
@@ -73,6 +74,26 @@ func init() {
 	Cmd.Flags().StringVar(&flagEntropyProvider, "entropy-provider", "none", "entropy provider to use (default: none; options: none, block-hash)")
 
 	Cmd.Flags().BoolVar(&flagShowTraceDiff, "show-trace-diff", false, "show trace diff output (default: false)")
+
+	Cmd.Flags().StringVar(&flagBlockIDs, "block-ids", "", "comma-separated hex block IDs (alternative to --block-id + --block-count)")
+}
+
+// Config holds the parameters for a compare-debug-tx invocation.
+type Config struct {
+	Branch1             string
+	Branch2             string
+	Chain               string
+	AccessAddress       string
+	ExecutionAddress    string
+	ComputeLimit        uint64
+	UseExecutionDataAPI bool
+	BlockIDs            []string // pre-resolved block IDs (hex strings)
+	TxIDs               []string // positional transaction IDs
+	Parallel            int
+	LogCadenceTraces    bool
+	OnlyTraceCadence    bool
+	EntropyProvider     string
+	ShowTraceDiff       bool
 }
 
 // closeFile closes the file and fatals on failure.
@@ -90,20 +111,54 @@ func removeFile(path string) {
 }
 
 func run(_ *cobra.Command, args []string) {
-	repoRoot := findRepoRoot()
-	checkCleanWorkingTree(repoRoot)
+	cfg := Config{
+		Branch1:             flagBranch1,
+		Branch2:             flagBranch2,
+		Chain:               flagChain,
+		AccessAddress:       flagAccessAddress,
+		ExecutionAddress:    flagExecutionAddress,
+		ComputeLimit:        flagComputeLimit,
+		UseExecutionDataAPI: flagUseExecutionDataAPI,
+		TxIDs:               args,
+		Parallel:            flagParallel,
+		LogCadenceTraces:    flagLogCadenceTraces,
+		OnlyTraceCadence:    flagOnlyTraceCadence,
+		EntropyProvider:     flagEntropyProvider,
+		ShowTraceDiff:       flagShowTraceDiff,
+	}
 
-	// Resolve block IDs before git checkouts when --block-count > 0.
-	var blockIDs []string
-	if flagBlockCount > 0 {
+	// Resolve block IDs before git checkouts.
+	if flagBlockIDs != "" {
+		if flagBlockID != "" || flagBlockCount > 1 {
+			log.Fatal().Msg("--block-ids cannot be used with --block-id or --block-count > 1")
+		}
+		if len(args) > 0 {
+			log.Fatal().Msg("--block-ids cannot be used with positional transaction IDs")
+		}
+		for _, raw := range strings.Split(flagBlockIDs, ",") {
+			raw = strings.TrimSpace(raw)
+			if _, err := flow.HexStringToIdentifier(raw); err != nil {
+				log.Fatal().Err(err).Str("id", raw).Msg("invalid block ID in --block-ids")
+			}
+			cfg.BlockIDs = append(cfg.BlockIDs, raw)
+		}
+	} else if flagBlockCount > 0 {
 		if flagBlockID == "" {
 			log.Fatal().Msg("--block-count requires --block-id to be set")
 		}
 		if len(args) > 0 {
 			log.Fatal().Msg("--block-count cannot be used with positional transaction IDs")
 		}
-		blockIDs = resolveBlockChain(flagBlockID, flagBlockCount)
+		cfg.BlockIDs = resolveBlockChain(flagAccessAddress, flagBlockID, flagBlockCount)
 	}
+
+	Run(cfg)
+}
+
+// Run executes the compare-debug-tx workflow with the given configuration.
+func Run(cfg Config) {
+	repoRoot := findRepoRoot()
+	checkCleanWorkingTree(repoRoot)
 
 	result1, err := os.CreateTemp("", "compare-debug-tx-result1-*")
 	if err != nil {
@@ -133,29 +188,29 @@ func run(_ *cobra.Command, args []string) {
 	defer removeFile(trace2.Name())
 	defer closeFile(trace2)
 
-	checkoutBranch(repoRoot, flagBranch1)
+	checkoutBranch(repoRoot, cfg.Branch1)
 	binary1 := buildUtil(repoRoot)
 	defer removeFile(binary1)
-	perBlock1 := runAllBlocks(binary1, args, blockIDs, result1, trace1)
+	perBlock1 := runAllBlocks(cfg, binary1, result1, trace1)
 	defer cleanupPerBlockFiles(perBlock1)
 
-	checkoutBranch(repoRoot, flagBranch2)
+	checkoutBranch(repoRoot, cfg.Branch2)
 	binary2 := buildUtil(repoRoot)
 	defer removeFile(binary2)
-	perBlock2 := runAllBlocks(binary2, args, blockIDs, result2, trace2)
+	perBlock2 := runAllBlocks(cfg, binary2, result2, trace2)
 	defer cleanupPerBlockFiles(perBlock2)
 
-	if len(blockIDs) == 1 {
-		fmt.Printf("=== Result diff (%s vs %s) ===\n", flagBranch1, flagBranch2)
-		diffFiles(result1.Name(), result2.Name(), flagBranch1, flagBranch2)
+	if len(cfg.BlockIDs) == 1 {
+		fmt.Printf("=== Result diff (%s vs %s) ===\n", cfg.Branch1, cfg.Branch2)
+		diffFiles(result1.Name(), result2.Name(), cfg.Branch1, cfg.Branch2)
 
-		if flagShowTraceDiff {
-			fmt.Printf("=== Trace diff (%s vs %s) ===\n", flagBranch1, flagBranch2)
-			diffFiles(trace1.Name(), trace2.Name(), flagBranch1, flagBranch2)
+		if cfg.ShowTraceDiff {
+			fmt.Printf("=== Trace diff (%s vs %s) ===\n", cfg.Branch1, cfg.Branch2)
+			diffFiles(trace1.Name(), trace2.Name(), cfg.Branch1, cfg.Branch2)
 		}
 	}
 
-	printMismatchStats(blockIDs, perBlock1, perBlock2)
+	printMismatchStats(cfg.BlockIDs, perBlock1, perBlock2)
 }
 
 // perBlockFiles holds per-block result and trace temp files.
@@ -174,23 +229,23 @@ func cleanupPerBlockFiles(files []perBlockFiles) {
 	}
 }
 
-// runAllBlocks runs debug-tx for each block ID in blockIDs (or a single invocation when
-// blockIDs is empty), up to flagParallel blocks concurrently. Results and traces from each
+// runAllBlocks runs debug-tx for each block ID in cfg.BlockIDs (or a single invocation when
+// BlockIDs is empty), up to cfg.Parallel blocks concurrently. Results and traces from each
 // block are collected into per-block temp files and concatenated into resultDst and traceDst
 // in deterministic order after all blocks complete.
 //
-// When blockIDs has entries, the per-block files are returned and the caller is responsible
-// for cleanup via cleanupPerBlockFiles. When blockIDs is empty, nil is returned.
-func runAllBlocks(binaryPath string, txIDs []string, blockIDs []string, resultDst *os.File, traceDst *os.File) []perBlockFiles {
-	if len(blockIDs) == 0 {
-		if err := runDebugTx(binaryPath, buildDebugTxArgs(txIDs, traceDst.Name(), ""), resultDst); err != nil {
+// When BlockIDs has entries, the per-block files are returned and the caller is responsible
+// for cleanup via cleanupPerBlockFiles. When BlockIDs is empty, nil is returned.
+func runAllBlocks(cfg Config, binaryPath string, resultDst *os.File, traceDst *os.File) []perBlockFiles {
+	if len(cfg.BlockIDs) == 0 {
+		if err := runDebugTx(binaryPath, buildDebugTxArgs(cfg, traceDst.Name(), ""), resultDst); err != nil {
 			log.Fatal().Err(err).Msg("failed to run debug-tx")
 		}
 		return nil
 	}
 
-	files := make([]perBlockFiles, len(blockIDs))
-	for i := range blockIDs {
+	files := make([]perBlockFiles, len(cfg.BlockIDs))
+	for i := range cfg.BlockIDs {
 		result, err := os.CreateTemp("", "compare-debug-tx-block-result-*")
 		if err != nil {
 			log.Fatal().Err(err).Msg("failed to create per-block result temp file")
@@ -203,11 +258,11 @@ func runAllBlocks(binaryPath string, txIDs []string, blockIDs []string, resultDs
 	}
 
 	g, _ := errgroup.WithContext(context.Background())
-	g.SetLimit(flagParallel)
+	g.SetLimit(cfg.Parallel)
 
-	for i, blockID := range blockIDs {
+	for i, blockID := range cfg.BlockIDs {
 		g.Go(func() error {
-			return runDebugTx(binaryPath, buildDebugTxArgs(txIDs, files[i].trace.Name(), blockID), files[i].result)
+			return runDebugTx(binaryPath, buildDebugTxArgs(cfg, files[i].trace.Name(), blockID), files[i].result)
 		})
 	}
 	if err := g.Wait(); err != nil {
@@ -234,13 +289,13 @@ func runAllBlocks(binaryPath string, txIDs []string, blockIDs []string, resultDs
 
 // resolveBlockChain fetches count consecutive block IDs starting from startBlockID,
 // following parent IDs, and returns them as hex strings.
-func resolveBlockChain(startBlockID string, count int) []string {
+func resolveBlockChain(accessAddress string, startBlockID string, count int) []string {
 	blockID, err := flow.HexStringToIdentifier(startBlockID)
 	if err != nil {
 		log.Fatal().Err(err).Str("ID", startBlockID).Msg("failed to parse block ID")
 	}
 
-	config, err := grpcclient.NewFlowClientConfig(flagAccessAddress, "", flow.ZeroID, true)
+	config, err := grpcclient.NewFlowClientConfig(accessAddress, "", flow.ZeroID, true)
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to create flow client config")
 	}
@@ -334,35 +389,30 @@ func runDebugTx(binaryPath string, fwdArgs []string, resultDst *os.File) error {
 	return cmd.Run()
 }
 
-// buildDebugTxArgs assembles the flag arguments for the debug-tx command, appending
-// --show-result=true, --trace=<tracePath>, and the given tx IDs.
-// blockIDOverride, when non-empty, overrides --block-id instead of using flagBlockID.
-func buildDebugTxArgs(txIDs []string, tracePath string, blockIDOverride string) []string {
+// buildDebugTxArgs assembles the flag arguments for the debug-tx command.
+// blockIDOverride, when non-empty, is passed as --block-id.
+func buildDebugTxArgs(cfg Config, tracePath string, blockIDOverride string) []string {
 	args := []string{
-		"--chain=" + flagChain,
-		"--access-address=" + flagAccessAddress,
-		fmt.Sprintf("--compute-limit=%d", flagComputeLimit),
-		fmt.Sprintf("--use-execution-data-api=%t", flagUseExecutionDataAPI),
-		fmt.Sprintf("--log-cadence-traces=%t", flagLogCadenceTraces),
-		fmt.Sprintf("--only-trace-cadence=%t", flagOnlyTraceCadence),
-		"--entropy-provider=" + flagEntropyProvider,
+		"--chain=" + cfg.Chain,
+		"--access-address=" + cfg.AccessAddress,
+		fmt.Sprintf("--compute-limit=%d", cfg.ComputeLimit),
+		fmt.Sprintf("--use-execution-data-api=%t", cfg.UseExecutionDataAPI),
+		fmt.Sprintf("--log-cadence-traces=%t", cfg.LogCadenceTraces),
+		fmt.Sprintf("--only-trace-cadence=%t", cfg.OnlyTraceCadence),
+		"--entropy-provider=" + cfg.EntropyProvider,
 		"--show-result=true",
 		"--trace=" + tracePath,
 	}
 
-	if flagExecutionAddress != "" {
-		args = append(args, "--execution-address="+flagExecutionAddress)
+	if cfg.ExecutionAddress != "" {
+		args = append(args, "--execution-address="+cfg.ExecutionAddress)
 	}
 
-	blockID := flagBlockID
 	if blockIDOverride != "" {
-		blockID = blockIDOverride
-	}
-	if blockID != "" {
-		args = append(args, "--block-id="+blockID)
+		args = append(args, "--block-id="+blockIDOverride)
 	}
 
-	args = append(args, txIDs...)
+	args = append(args, cfg.TxIDs...)
 	return args
 }
 

@@ -230,6 +230,7 @@ func verifyConcurrently(
 				totalStats.MismatchedChunkCount += blockStats.MismatchedChunkCount
 				totalStats.MatchedTransactionCount += blockStats.MatchedTransactionCount
 				totalStats.MismatchedTransactionCount += blockStats.MismatchedTransactionCount
+				totalStats.MismatchedBlockIDs = append(totalStats.MismatchedBlockIDs, blockStats.MismatchedBlockIDs...)
 
 				if err != nil {
 					log.Error().Uint64("height", height).Err(err).Msg("error encountered while verifying height")
@@ -352,6 +353,7 @@ type BlockVerificationStats struct {
 	MismatchedChunkCount       uint64
 	MatchedTransactionCount    uint64
 	MismatchedTransactionCount uint64
+	MismatchedBlockIDs         []flow.Identifier
 }
 
 // verifyHeight verifies all chunks in the results of the block at the given height.
@@ -410,6 +412,7 @@ func verifyHeight(
 				return BlockVerificationStats{
 						MismatchedChunkCount:       1,
 						MismatchedTransactionCount: chunkTransactionCount,
+						MismatchedBlockIDs:         []flow.Identifier{blockID},
 					}, fmt.Errorf(
 						"could not verify chunk (index: %v, ID: %v) at block %v (%v): %w",
 						i,
@@ -441,6 +444,10 @@ func verifyHeight(
 			stats.MatchedChunkCount++
 			stats.MatchedTransactionCount += chunkTransactionCount
 		}
+	}
+
+	if stats.MismatchedChunkCount > 0 {
+		stats.MismatchedBlockIDs = []flow.Identifier{blockID}
 	}
 
 	return stats, nil
