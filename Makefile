@@ -123,10 +123,6 @@ test: verify-mocks unittest-main
 integration-test: docker-native-build-flow
 	$(MAKE) -C integration integration-test
 
-.PHONY: benchmark
-benchmark: docker-native-build-flow
-	$(MAKE) -C integration benchmark
-
 .PHONY: coverage
 coverage:
 ifeq ($(COVER), true)
@@ -211,13 +207,6 @@ ci: install-tools test
 .PHONY: ci-integration
 ci-integration:
 	$(MAKE) -C integration integration-test
-
-# Runs benchmark tests
-# NOTE: we do not need `docker-native-build-flow` as this is run as a separate step
-# on Teamcity
-.PHONY: ci-benchmark
-ci-benchmark: install-tools
-	$(MAKE) -C integration ci-benchmark
 
 # Runs unit tests, test coverage, lint in Docker (for mac)
 .PHONY: docker-ci
@@ -620,13 +609,6 @@ PHONY: tool-transit
 tool-transit: docker-build-bootstrap-transit
 	docker container create --name transit $(CONTAINER_REGISTRY)/bootstrap-transit:latest;docker container cp transit:/bin/app ./transit;docker container rm transit
 
-.PHONY: docker-native-build-loader
-docker-native-build-loader:
-	docker build -f ./integration/benchmark/cmd/manual/Dockerfile --build-arg TARGET=./benchmark/cmd/manual  --build-arg CGO_FLAG=$(CRYPTO_FLAG) --target production \
-		--label "git_commit=${COMMIT}" --label "git_tag=${IMAGE_TAG}" \
-		-t "$(CONTAINER_REGISTRY)/loader:latest" \
-		-t "$(CONTAINER_REGISTRY)/loader:$(IMAGE_TAG)" .
-
 .PHONY: docker-native-build-flow
 docker-native-build-flow: docker-native-build-collection docker-native-build-consensus docker-native-build-execution docker-native-build-execution-ledger docker-native-build-verification docker-native-build-access docker-native-build-observer docker-native-build-ghost
 
@@ -646,9 +628,6 @@ docker-cross-build-flow-arm: docker-cross-build-collection-arm docker-cross-buil
 
 .PHONY: docker-native-build-flow-corrupt
 docker-native-build-flow-corrupt: docker-native-build-execution-corrupt docker-native-build-verification-corrupt docker-native-build-access-corrupt
-
-.PHONY: docker-native-build-benchnet
-docker-native-build-benchnet: docker-native-build-flow docker-native-build-loader
 
 .PHONY: docker-push-collection-with-adx
 docker-push-collection-with-adx:
@@ -807,14 +786,6 @@ docker-push-ghost:
 docker-push-ghost-latest: docker-push-ghost
 	docker push "$(CONTAINER_REGISTRY)/ghost:latest"
 
-.PHONY: docker-push-loader
-docker-push-loader:
-	docker push "$(CONTAINER_REGISTRY)/loader:$(IMAGE_TAG)"
-
-.PHONY: docker-push-loader-latest
-docker-push-loader-latest: docker-push-loader
-	docker push "$(CONTAINER_REGISTRY)/loader:latest"
-
 .PHONY: docker-push-flow-with-adx
 docker-push-flow-with-adx: docker-push-collection-with-adx docker-push-consensus-with-adx docker-push-execution-with-adx docker-push-verification-with-adx docker-push-access-with-adx docker-push-observer-with-adx
 
@@ -832,12 +803,6 @@ docker-push-flow-latest: docker-push-collection-latest docker-push-consensus-lat
 
 .PHONY: docker-push-flow-corrupt
 docker-push-flow-corrupt: docker-push-access-corrupt docker-push-execution-corrupt docker-push-verification-corrupt
-
-.PHONY: docker-push-benchnet
-docker-push-benchnet: docker-push-flow docker-push-loader
-
-.PHONY: docker-push-benchnet-latest
-docker-push-benchnet-latest: docker-push-flow-latest docker-push-loader-latest
 
 .PHONY: docker-run-collection
 docker-run-collection:

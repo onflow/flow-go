@@ -35,15 +35,6 @@ endif
 
 CURRENT_DIRECTORY=$(shell pwd)
 
-# These vars set the default TPS values for tps-ci
-# These can be overwritten at the time make is called on tps-ci
-# by setting these as arguments at the time the make target is called
-# e.g. "make tps-ci TPS_INIT=5 TPS_MIN=1 TPS_MAX=30"
-TPS_MIN=100
-TPS_MAX=1000
-TPS_INIT=$(shell echo $$(( $(TPS_MAX) * 9 / 10 )) )
-DURATION=30m
-
 .PHONY: bootstrap
 bootstrap:
 ifeq ($(strip $(VALID_EXECUTION)), 1)
@@ -91,11 +82,6 @@ bootstrap-light:
 bootstrap-test-en:
 	$(MAKE) -e COLLECTION=1 CONSENSUS=2 EXECUTION=2 VERIFICATION=1 ACCESS=1 NCLUSTERS=1 TEST_EXECUTION=1 bootstrap
 
-# CI tests have a larger number of nodes
-.PHONY: bootstrap-ci
-bootstrap-ci:
-	$(MAKE) -e COLLECTION=10 VERIFICATION=10 NCLUSTERS=10 LOGLEVEL=INFO bootstrap
-
 # Creates a version of localnet configured with short epochs
 .PHONY: bootstrap-short-epochs
 bootstrap-short-epochs:
@@ -139,17 +125,23 @@ stop:
 stop-flow:
 	DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker compose -f docker-compose.nodes.yml down -v
 
-.PHONY: load
-load:
-	go run ../benchmark/cmd/manual -log-level info -tps 1,1,1 -tps-durations 30s,30s
-
-.PHONY: tps-ci-smoke
-tps-ci-smoke:
-	go run ../benchmark/cmd/ci -log-level info -tps-initial 1 -tps-min 1 -tps-max 10 -duration 20s -tps-adjust-interval 1s -stat-interval 1s -bigquery-upload=false
-
-.PHONY: tps-ci
-tps-ci: bootstrap-ci build-flow start-flow
-	go run ../benchmark/cmd/ci -log-level info -tps-initial $(TPS_INIT) -tps-min $(TPS_MIN) -tps-max $(TPS_MAX) -duration $(DURATION)
+# Smoke-checks that the network is running and sealing blocks, by polling the
+# access_1 REST API twice and confirming the sealed height increased.
+.PHONY: verify
+verify:
+	@get_height() { curl -sf "http://localhost:4004/v1/blocks?height=sealed" | sed -n 's/.*"height": "\([0-9]*\)".*/\1/p' | head -1; }; \
+	h1=$$(get_height); \
+	if [ -z "$$h1" ]; then \
+		echo "FAIL: could not query sealed block height from http://localhost:4004 - is the network running? (make start)"; \
+		exit 1; \
+	fi; \
+	sleep 5; \
+	h2=$$(get_height); \
+	if [ -z "$$h2" ] || [ "$$h2" -le "$$h1" ]; then \
+		echo "FAIL: sealed height did not increase ($$h1 -> $$h2)"; \
+		exit 1; \
+	fi; \
+	echo "OK: localnet is sealing blocks (height $$h1 -> $$h2)"
 
 .PHONY: clean-data
 clean-data:
