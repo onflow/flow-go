@@ -121,6 +121,10 @@ func TestVerificationHappyPath(t *testing.T) {
 
 	for _, tc := range testcases {
 		t.Run(tc.msg, func(t *testing.T) {
+			// each subtest builds its own full node fixture (own hub, networks, mocks,
+			// and FVM instance), so they are independent and can run in parallel.
+			t.Parallel()
+
 			collector := &metrics.NoopCollector{}
 
 			vertestutils.NewVerificationHappyPathTest(t,

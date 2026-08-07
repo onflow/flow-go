@@ -3,6 +3,7 @@ package connection_test
 import (
 	"context"
 	"fmt"
+	"sync"
 	"testing"
 	"time"
 
@@ -421,19 +422,26 @@ func ensureCommunicationSilenceAmongGroups(
 	// ensures no connection, unicast, or pubsub going to the disallow-listed nodes
 	p2ptest.EnsureNotConnectedBetweenGroups(t, ctx, groupANodes, groupBNodes)
 
+	// check both pubsub directions (A->B and B->A) concurrently on two distinct topics.
+	// Each direction is self-paced (1s subscription propagation + 5s never-receive window);
+	// checking them sequentially doubles that cost, while distinct topics keep the checks
+	// fully isolated from each other. Identical per-direction windows and assertions.
 	blockTopic := channels.TopicFromChannel(channels.PushBlocks, sporkId)
-	p2ptest.EnsureNoPubsubExchangeBetweenGroups(
-		t,
-		ctx,
-		groupANodes,
-		groupAIdentifiers,
-		groupBNodes,
-		groupBIdentifiers,
-		blockTopic,
-		1,
-		func() interface{} {
-			return (*messages.Proposal)(unittest.ProposalFixture())
-		})
+	receiptTopic := channels.TopicFromChannel(channels.PushReceipts, sporkId)
+	messageFactory := func() interface{} {
+		return (*messages.Proposal)(unittest.ProposalFixture())
+	}
+	wg := sync.WaitGroup{}
+	wg.Add(2)
+	go func() {
+		defer wg.Done()
+		p2ptest.EnsureNoPubsubMessageExchange(t, ctx, groupANodes, groupBNodes, groupBIdentifiers, blockTopic, 1, messageFactory)
+	}()
+	go func() {
+		defer wg.Done()
+		p2ptest.EnsureNoPubsubMessageExchange(t, ctx, groupBNodes, groupANodes, groupAIdentifiers, receiptTopic, 1, messageFactory)
+	}()
+	unittest.RequireReturnsBefore(t, wg.Wait, 12*time.Second, "timed out waiting for pubsub silence checks")
 	p2pfixtures.EnsureNoStreamCreationBetweenGroups(t, ctx, groupANodes, groupBNodes)
 }
 
@@ -441,8 +449,19 @@ func ensureCommunicationSilenceAmongGroups(
 func ensureCommunicationOverAllProtocols(t *testing.T, ctx context.Context, sporkId flow.Identifier, nodes []p2p.LibP2PNode, inbounds []chan string) {
 	blockTopic := channels.TopicFromChannel(channels.PushBlocks, sporkId)
 	p2ptest.TryConnectionAndEnsureConnected(t, ctx, nodes)
-	p2ptest.EnsurePubsubMessageExchange(t, ctx, nodes, blockTopic, 1, func() interface{} {
-		return (*messages.Proposal)(unittest.ProposalFixture())
-	})
-	p2pfixtures.EnsureMessageExchangeOverUnicast(t, ctx, nodes, inbounds, p2pfixtures.LongStringMessageFactoryFixture(t))
+	// the pubsub and unicast exchanges are independent of each other (different protocols);
+	// run them concurrently. Both return early on success.
+	wg := sync.WaitGroup{}
+	wg.Add(2)
+	go func() {
+		defer wg.Done()
+		p2ptest.EnsurePubsubMessageExchange(t, ctx, nodes, blockTopic, 1, func() interface{} {
+			return (*messages.Proposal)(unittest.ProposalFixture())
+		})
+	}()
+	go func() {
+		defer wg.Done()
+		p2pfixtures.EnsureMessageExchangeOverUnicast(t, ctx, nodes, inbounds, p2pfixtures.LongStringMessageFactoryFixture(t))
+	}()
+	unittest.RequireReturnsBefore(t, wg.Wait, 30*time.Second, "timed out waiting for protocol exchanges")
 }
