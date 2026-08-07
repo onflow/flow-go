@@ -268,6 +268,10 @@ func (suite *EchoEngineTestSuite) duplicateMessageParallel(send testutils.Condui
 	unittest.RequireReturnsBefore(suite.T(), wg.Wait, 3*time.Second, "could not send message on time")
 
 	require.Eventually(suite.T(), func() bool {
+		// the receiver's lock must be held while reading `seen`: the engine's Process method
+		// writes to it concurrently from the network's worker goroutines (data race otherwise)
+		receiver.RLock()
+		defer receiver.RUnlock()
 		return len(receiver.seen) > 0
 	}, 3*time.Second, 500*time.Millisecond)
 

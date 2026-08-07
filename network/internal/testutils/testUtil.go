@@ -1,6 +1,7 @@
 package testutils
 
 import (
+	"errors"
 	"fmt"
 	"reflect"
 	"runtime"
@@ -11,6 +12,7 @@ import (
 
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/rs/zerolog"
+	mocktestify "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/config"
@@ -217,7 +219,17 @@ func NetworkConfigFixture(
 			HeroCacheMetricsFactory: metrics.NewNoopHeroCacheMetricsFactory(),
 		},
 		SlashingViolationConsumerFactory: func(_ network.ConduitAdapter) network.ViolationsConsumer {
-			return mocknetwork.NewViolationsConsumer(t)
+			consumer := mocknetwork.NewViolationsConsumer(t)
+			// A unicast message may legitimately arrive while the test network is being torn down,
+			// after the channel subscription has already been removed (message delivery is
+			// asynchronous relative to the sender's Unicast call). The networking layer classifies
+			// this as an unauthorized unicast with ErrUnicastMsgWithoutSub; tolerate exactly this
+			// violation so the teardown race cannot flake tests. All other violations still fail
+			// the test via the strict mock.
+			consumer.On("OnUnauthorizedUnicastOnChannel", mocktestify.MatchedBy(func(violation *network.Violation) bool {
+				return errors.Is(violation.Err, underlay.ErrUnicastMsgWithoutSub)
+			})).Return().Maybe()
+			return consumer
 		},
 		UnicastStreamAuthorizer: func(_, _ flow.Role) bool { return true },
 	}

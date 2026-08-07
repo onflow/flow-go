@@ -1,6 +1,7 @@
 package merkle
 
 import (
+	"bytes"
 	"math/rand"
 	"testing"
 
@@ -31,7 +32,13 @@ func TestProofWithASingleKey(t *testing.T) {
 		assert.NoError(t, err)
 
 		// fail for non-existing key
+		// draw a random key that is guaranteed to differ from the inserted key: for the
+		// shortest key length (1 byte), a fresh random key collides with the inserted key
+		// with probability 1/256, which would make the test flaky.
 		key2, _ := randomKeyValuePair(keyLength, 128)
+		for bytes.Equal(key2, key) {
+			key2, _ = randomKeyValuePair(keyLength, 128)
+		}
 
 		proof, existed = tree1.Prove(key2)
 		require.False(t, existed)

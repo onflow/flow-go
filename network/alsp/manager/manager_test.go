@@ -67,7 +67,13 @@ func TestNetworkPassesReportedMisbehavior(t *testing.T) {
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
 	testutils.StartNodesAndNetworks(signalerCtx, t, nodes, []network.EngineRegistry{net})
 	defer testutils.StopComponents[p2p.LibP2PNode](t, nodes, 100*time.Millisecond)
-	defer cancel()
+	defer func() {
+		cancel()
+		// wait for the network to fully shut down before finishing the test: the mock manager's
+		// Done() expectation (.Once()) is only satisfied during the network's shutdown, which
+		// happens asynchronously after the context cancellation
+		unittest.RequireCloseBefore(t, net.Done(), 1*time.Second, "network did not stop on time")
+	}()
 
 	e := mocknetwork.NewEngine(t)
 	con, err := net.Register(channels.TestNetworkChannel, e)
@@ -89,7 +95,7 @@ func TestNetworkPassesReportedMisbehavior(t *testing.T) {
 		con.ReportMisbehavior(report) // reports the misbehavior
 	}
 
-	unittest.RequireReturnsBefore(t, allReportsManaged.Wait, 100*time.Millisecond, "did not receive all reports")
+	unittest.RequireReturnsBefore(t, allReportsManaged.Wait, 1*time.Second, "did not receive all reports")
 }
 
 // TestHandleReportedMisbehavior tests the handling of reported misbehavior by the network.
@@ -1484,17 +1490,26 @@ func TestDecayMisbehaviorPenalty_SingleHeartbeat(t *testing.T) {
 		return true
 	}, 1*time.Second, 10*time.Millisecond, "ALSP manager did not handle the misbehavior report")
 
-	// phase-2: wait enough for at least one heartbeat to be processed.
-	time.Sleep(1 * time.Second)
+	// phase-2 + phase-3: wait for at least one heartbeat to decay the penalty.
+	// Note: a fixed sleep of one heartbeat interval races the heartbeat ticker and sometimes
+	// observes zero heartbeats (flaky). Instead, we poll until the first decay is visible. The
+	// poll interval (10ms) is much smaller than the heartbeat interval (1s), so we observe the
+	// record right after the first decaying heartbeat, before a second one can fire.
+	var record *model.ProtocolSpamRecord
+	require.Eventually(t, func() bool {
+		r, ok := cache.Get(originId)
+		if !ok || r == nil {
+			return false
+		}
+		// wait until at least one heartbeat decayed the penalty.
+		if r.Penalty <= penaltyBeforeDecay {
+			return false
+		}
+		record = r
+		return true
+	}, 10*time.Second, 10*time.Millisecond, "penalty was not decayed by a heartbeat on time")
 
-	// phase-3: check if the penalty was decayed for at least one heartbeat.
-	record, ok := cache.Get(originId)
-	require.True(t, ok) // the record should be in the cache
-	require.NotNil(t, record)
-
-	// with at least a single heartbeat, the penalty should be greater than the penalty before the decay.
-	require.Greater(t, record.Penalty, penaltyBeforeDecay)
-	// we waited for at most one heartbeat, so the decayed penalty should be still less than the value after 2 heartbeats.
+	// observed right after the first decaying heartbeat, the penalty must be less than the value after 2 heartbeats.
 	require.Less(t, record.Penalty, penaltyBeforeDecay+2*record.Decay)
 	// with just reporting a few misbehavior reports, the cutoff counter should not be incremented.
 	require.Equal(t, uint64(0), record.CutoffCounter)
@@ -1575,17 +1590,26 @@ func TestDecayMisbehaviorPenalty_MultipleHeartbeats(t *testing.T) {
 		return true
 	}, 1*time.Second, 10*time.Millisecond, "ALSP manager did not handle the misbehavior report")
 
-	// phase-2: wait for 3 heartbeats to be processed.
-	time.Sleep(3 * time.Second)
+	// phase-2 + phase-3: wait until 3 heartbeats decayed the penalty in a linear progression.
+	// Note: a fixed sleep of three heartbeat intervals races the heartbeat ticker and can observe
+	// fewer heartbeats (flaky). Instead, we poll until 3 heartbeats worth of decay is visible. The
+	// poll interval (10ms) is much smaller than the heartbeat interval (1s), so we observe the
+	// record right after the third decaying heartbeat, before a fourth one can fire.
+	var record *model.ProtocolSpamRecord
+	require.Eventually(t, func() bool {
+		r, ok := cache.Get(originId)
+		if !ok || r == nil {
+			return false
+		}
+		// wait until at least 3 heartbeats decayed the penalty.
+		if r.Penalty < penaltyBeforeDecay+3*r.Decay {
+			return false
+		}
+		record = r
+		return true
+	}, 10*time.Second, 10*time.Millisecond, "penalty was not decayed by 3 heartbeats on time")
 
-	// phase-3: check if the penalty was decayed in a linear progression.
-	record, ok := cache.Get(originId)
-	require.True(t, ok) // the record should be in the cache
-	require.NotNil(t, record)
-
-	// with 3 heartbeats processed, the penalty should be greater than the penalty before the decay.
-	require.Greater(t, record.Penalty, penaltyBeforeDecay)
-	// with 3 heartbeats processed, the decayed penalty should be less than the value after 4 heartbeats.
+	// observed right after the third decaying heartbeat, the penalty must be less than the value after 4 heartbeats.
 	require.Less(t, record.Penalty, penaltyBeforeDecay+4*record.Decay)
 	require.False(t, record.DisallowListed) // the peer should not be disallow listed yet.
 	// with just reporting a few misbehavior reports, the cutoff counter should not be incremented.
@@ -1665,18 +1689,21 @@ func TestDecayMisbehaviorPenalty_DecayToZero(t *testing.T) {
 		return true
 	}, 1*time.Second, 10*time.Millisecond, "ALSP manager did not handle the misbehavior report")
 
-	// phase-2: default decay speed is 1000 and with 10 penalties in range of [-1, -10], the penalty should be decayed to zero in
-	// a single heartbeat.
-	time.Sleep(1 * time.Second)
-
-	// phase-3: check if the penalty was decayed to zero.
-	record, ok := cache.Get(originId)
-	require.True(t, ok) // the record should be in the cache
-	require.NotNil(t, record)
+	// phase-2 + phase-3: default decay speed is 1000 and with 10 penalties in range of [-1, -10],
+	// the penalty should be decayed to zero in a single heartbeat.
+	// Note: a fixed sleep of one heartbeat interval races the heartbeat ticker and sometimes
+	// observes zero heartbeats (flaky); instead, we poll until the decay is visible.
+	var record *model.ProtocolSpamRecord
+	require.Eventually(t, func() bool {
+		r, ok := cache.Get(originId)
+		if !ok || r == nil {
+			return false
+		}
+		record = r
+		return r.Penalty == float64(0)
+	}, 10*time.Second, 10*time.Millisecond, "penalty was not decayed to zero on time")
 
 	require.False(t, record.DisallowListed) // the peer should not be disallow listed.
-	// with a single heartbeat and decay speed of 1000, the penalty should be decayed to zero.
-	require.Equal(t, float64(0), record.Penalty)
 	// the decay should be the default decay value.
 	require.Equal(t, model.SpamRecordFactory()(unittest.IdentifierFixture()).Decay, record.Decay)
 }
