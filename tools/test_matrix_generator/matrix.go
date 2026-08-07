@@ -5,6 +5,7 @@ import (
 	_ "embed"
 	"encoding/json"
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/spf13/pflag"
@@ -100,8 +101,9 @@ func main() {
 	printCIString(testMatrices)
 }
 
-// printCIString encodes the test matrices and prints the json string to stdout. The CI runner will read this json string
-// and make the data available for our github workflows.
+// printCIString encodes the test matrices as a compact JSON string and writes it to the $GITHUB_OUTPUT file so the
+// CI workflow can read it as a step output and make the data available to the test matrix jobs. The JSON is also
+// printed to stdout for local debugging.
 func printCIString(testMatrices []*testMatrix) {
 	// generate JSON output that will be read in by CI matrix
 	// can't use json.MarshalIndent because fromJSON() in CI can’t read JSON with any spaces
@@ -109,10 +111,18 @@ func printCIString(testMatrices []*testMatrix) {
 	if err != nil {
 		panic(fmt.Errorf("failed to marshal test matrices json: %w", err))
 	}
-	// this string will be read by CI to generate groups of tests to run in separate CI jobs
-	testMatrixStr := "::set-output name=" + ciMatrixName + "::" + string(b)
-	// very important to add newline character at the end of the compacted JSON - otherwise fromJSON() in CI will throw unmarshalling error
-	fmt.Println(testMatrixStr)
+	if outputFile := os.Getenv("GITHUB_OUTPUT"); outputFile != "" {
+		f, err := os.OpenFile(outputFile, os.O_APPEND|os.O_WRONLY, 0o644)
+		if err != nil {
+			panic(fmt.Errorf("failed to open GITHUB_OUTPUT file: %w", err))
+		}
+		defer f.Close()
+		// the compacted JSON is a single line, so the simple name=value format is sufficient (no multiline delimiter needed)
+		if _, err := fmt.Fprintf(f, "%s=%s\n", ciMatrixName, b); err != nil {
+			panic(fmt.Errorf("failed to write test matrix to GITHUB_OUTPUT: %w", err))
+		}
+	}
+	fmt.Println(string(b))
 }
 
 // buildTestMatrices builds the test matrices.
