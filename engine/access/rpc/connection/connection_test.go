@@ -270,10 +270,14 @@ func TestExecutionNodeClientTimeout(t *testing.T) {
 	// setup the handler mock to not respond within the timeout
 	req := &execution.PingRequest{}
 	resp := &execution.PingResponse{}
+	handlerReached := atomic.NewInt64(0)
 	en.handler.
 		On("Ping",
 			testifymock.Anything,
 			testifymock.AnythingOfType("*execution.PingRequest")).
+		Run(func(_ testifymock.Arguments) {
+			handlerReached.Inc()
+		}).
 		After(timeout+time.Second).
 		Return(resp, nil).
 		Maybe() // under load, the client's deadline can fire before the request even reaches the server
@@ -305,11 +309,15 @@ func TestExecutionNodeClientTimeout(t *testing.T) {
 	require.NoError(t, err)
 
 	ctx := context.Background()
-	// make the call to the execution node
-	_, err = client.Ping(ctx, req)
-
-	// assert that the client timed out
-	assert.Equal(t, codes.DeadlineExceeded, status.Code(err))
+	// Make the call to the execution node. Every attempt must time out. Under load, an attempt
+	// can time out before the request even reaches the server (e.g. during connection setup);
+	// retry a few times so that at least one timeout is deterministically caused by the slow
+	// handler, which is the behavior under test.
+	require.Eventually(t, func() bool {
+		_, err = client.Ping(ctx, req)
+		assert.Equal(t, codes.DeadlineExceeded, status.Code(err))
+		return handlerReached.Load() > 0
+	}, 5*time.Second, 10*time.Millisecond, "server handler was never reached; timeouts were not caused by the slow handler")
 }
 
 // TestCollectionNodeClientTimeout tests that the collection API client times out after the timeout duration
@@ -327,10 +335,14 @@ func TestCollectionNodeClientTimeout(t *testing.T) {
 	// setup the handler mock to not respond within the timeout
 	req := &access.PingRequest{}
 	resp := &access.PingResponse{}
+	handlerReached := atomic.NewInt64(0)
 	cn.handler.
 		On("Ping",
 			testifymock.Anything,
 			testifymock.AnythingOfType("*access.PingRequest")).
+		Run(func(_ testifymock.Arguments) {
+			handlerReached.Inc()
+		}).
 		After(timeout+time.Second).
 		Return(resp, nil).
 		Maybe() // under load, the client's deadline can fire before the request even reaches the server
@@ -362,11 +374,15 @@ func TestCollectionNodeClientTimeout(t *testing.T) {
 	assert.NoError(t, err)
 
 	ctx := context.Background()
-	// make the call to the execution node
-	_, err = client.Ping(ctx, req)
-
-	// assert that the client timed out
-	assert.Equal(t, codes.DeadlineExceeded, status.Code(err))
+	// Make the call to the collection node. Every attempt must time out. Under load, an attempt
+	// can time out before the request even reaches the server (e.g. during connection setup);
+	// retry a few times so that at least one timeout is deterministically caused by the slow
+	// handler, which is the behavior under test.
+	require.Eventually(t, func() bool {
+		_, err = client.Ping(ctx, req)
+		assert.Equal(t, codes.DeadlineExceeded, status.Code(err))
+		return handlerReached.Load() > 0
+	}, 5*time.Second, 10*time.Millisecond, "server handler was never reached; timeouts were not caused by the slow handler")
 }
 
 // TestConnectionPoolFull tests that the LRU cache replaces connections when full
