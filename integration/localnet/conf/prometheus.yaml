@@ -12,11 +12,6 @@ scrape_configs:
     file_sd_configs:
       - files:
           - "/etc/prometheus/targets.nodes.json"
-  - job_name: pushgateway
-    honor_labels: true
-    static_configs:
-      - targets: [ "pushgateway:9091" ]
-
   # this is used if the loader is added to the network later
   - job_name: loader
     scrape_interval: 1s
