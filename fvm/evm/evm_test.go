@@ -2880,13 +2880,13 @@ func TestCadenceOwnedAccountFunctionalities(t *testing.T) {
 
 	t.Run("test coa dryCall", func(t *testing.T) {
 		RunWithNewEnvironment(t,
-			chain, coaDryCallCase(t, chain),
+			chain, coaDryCallCase(t),
 		)
 	})
 
 	t.Run("test coa dryCallWithSigAndArgs", func(t *testing.T) {
 		RunWithNewEnvironment(t,
-			chain, coaDryCallWithSigAndArgsCase(t, chain),
+			chain, coaDryCallWithSigAndArgsCase(t),
 		)
 	})
 
@@ -3025,14 +3025,13 @@ func TestCadenceOwnedAccountFunctionalities(t *testing.T) {
 // the execution state appended.
 func createCOAAndRunEVMTx(
 	t *testing.T,
-	chain flow.Chain,
 	ctx fvm.Context,
 	vm fvm.VM,
 	snapshot snapshot.SnapshotTree,
 	testContract *TestContract,
 	testAccount *EOATestAccount,
 ) snapshot.SnapshotTree {
-	sc := systemcontracts.SystemContractsForChain(chain.ChainID())
+	sc := systemcontracts.SystemContractsForChain(ctx.Chain.ChainID())
 	code := []byte(fmt.Sprintf(
 		`
 		import EVM from %s
@@ -3089,9 +3088,18 @@ func createCOAAndRunEVMTx(
 	require.NoError(t, err)
 	require.NoError(t, output.Err)
 	assert.Len(t, output.Events, 3)
+
+	// Cross-check the test-local partition formula against production behavior: this
+	// transaction generates UUIDs, so the legacy `uuid` register must be written exactly
+	// when the formula predicts partition 0. If environment.uuidPartition ever changes,
+	// this fails deterministically in the forced-partition-zero variants.
+	_, legacyUUIDWritten := state.WriteSet[flow.UUIDRegisterID(0)]
+	require.Equal(t, usesLegacyUUIDPartition(ctx, 0), legacyUUIDWritten,
+		"test-local UUID partition formula out of sync with environment.uuidPartition")
+
 	// this transaction must update state - in contrast to the dry-call transaction
 	// run afterwards by the callers, which must not update any registers
-	assertUpdatedRegisterCount(t, ctx, state, 13)
+	assertUpdatedRegisterCount(t, state, 13)
 	assert.Equal(
 		t,
 		flow.EventType("A.f8d6e0586b0a20c7.EVM.TransactionExecuted"),
@@ -3113,7 +3121,7 @@ func createCOAAndRunEVMTx(
 // coaDryCallCase returns the test case body shared by the random-block and the
 // forced-partition-zero variants: after creating a COA (with partition-dependent register
 // count), a coa.dryCall in a new transaction must succeed without updating any registers.
-func coaDryCallCase(t *testing.T, chain flow.Chain) func(fvm.Context, fvm.VM, snapshot.SnapshotTree, *TestContract, *EOATestAccount) {
+func coaDryCallCase(t *testing.T) func(fvm.Context, fvm.VM, snapshot.SnapshotTree, *TestContract, *EOATestAccount) {
 	return func(
 		ctx fvm.Context,
 		vm fvm.VM,
@@ -3121,9 +3129,9 @@ func coaDryCallCase(t *testing.T, chain flow.Chain) func(fvm.Context, fvm.VM, sn
 		testContract *TestContract,
 		testAccount *EOATestAccount,
 	) {
-		snapshot = createCOAAndRunEVMTx(t, chain, ctx, vm, snapshot, testContract, testAccount)
+		snapshot = createCOAAndRunEVMTx(t, ctx, vm, snapshot, testContract, testAccount)
 
-		sc := systemcontracts.SystemContractsForChain(chain.ChainID())
+		sc := systemcontracts.SystemContractsForChain(ctx.Chain.ChainID())
 
 		code := []byte(fmt.Sprintf(
 			`
@@ -3197,12 +3205,12 @@ func TestCOADryCall_UUIDPartitionZero(t *testing.T) {
 	chain := flow.Emulator.Chain()
 	runWithNewEnvironmentWithBlock(t,
 		chain, blockFixtureWithUUIDPartitionZero(t),
-		requireUUIDPartitionZero(t, coaDryCallCase(t, chain)),
+		requireUUIDPartitionZero(t, coaDryCallCase(t)),
 	)
 }
 
 // coaDryCallWithSigAndArgsCase is coaDryCallCase for coa.dryCallWithSigAndArgs.
-func coaDryCallWithSigAndArgsCase(t *testing.T, chain flow.Chain) func(fvm.Context, fvm.VM, snapshot.SnapshotTree, *TestContract, *EOATestAccount) {
+func coaDryCallWithSigAndArgsCase(t *testing.T) func(fvm.Context, fvm.VM, snapshot.SnapshotTree, *TestContract, *EOATestAccount) {
 	return func(
 		ctx fvm.Context,
 		vm fvm.VM,
@@ -3210,9 +3218,9 @@ func coaDryCallWithSigAndArgsCase(t *testing.T, chain flow.Chain) func(fvm.Conte
 		testContract *TestContract,
 		testAccount *EOATestAccount,
 	) {
-		snapshot = createCOAAndRunEVMTx(t, chain, ctx, vm, snapshot, testContract, testAccount)
+		snapshot = createCOAAndRunEVMTx(t, ctx, vm, snapshot, testContract, testAccount)
 
-		sc := systemcontracts.SystemContractsForChain(chain.ChainID())
+		sc := systemcontracts.SystemContractsForChain(ctx.Chain.ChainID())
 
 		code := []byte(fmt.Sprintf(
 			`
@@ -3288,7 +3296,7 @@ func TestCOADryCallWithSigAndArgs_UUIDPartitionZero(t *testing.T) {
 	chain := flow.Emulator.Chain()
 	runWithNewEnvironmentWithBlock(t,
 		chain, blockFixtureWithUUIDPartitionZero(t),
-		requireUUIDPartitionZero(t, coaDryCallWithSigAndArgsCase(t, chain)),
+		requireUUIDPartitionZero(t, coaDryCallWithSigAndArgsCase(t)),
 	)
 }
 
@@ -4012,7 +4020,7 @@ func TestDryRun(t *testing.T) {
 	// one tainted by the dry-run read) and complete successfully.
 	t.Run("test EVM.dryRun followed by EVM.run in same transaction", func(t *testing.T) {
 		RunWithNewEnvironment(t,
-			chain, dryRunFollowedByRunCase(t, chain),
+			chain, dryRunFollowedByRunCase(t),
 		)
 	})
 }
@@ -4027,7 +4035,7 @@ func TestDryRunFollowedByRun_UUIDPartitionZero(t *testing.T) {
 	chain := flow.Emulator.Chain()
 	runWithNewEnvironmentWithBlock(t,
 		chain, blockFixtureWithUUIDPartitionZero(t),
-		requireUUIDPartitionZero(t, dryRunFollowedByRunCase(t, chain)),
+		requireUUIDPartitionZero(t, dryRunFollowedByRunCase(t)),
 	)
 }
 
@@ -4035,7 +4043,7 @@ func TestDryRunFollowedByRun_UUIDPartitionZero(t *testing.T) {
 // forced-partition-zero variants: dryRun reads the block proposal into the cache, and a
 // subsequent EVM.run in the same Cadence transaction must still see a clean proposal and
 // complete successfully, with partition-dependent metering.
-func dryRunFollowedByRunCase(t *testing.T, chain flow.Chain) func(fvm.Context, fvm.VM, snapshot.SnapshotTree, *TestContract, *EOATestAccount) {
+func dryRunFollowedByRunCase(t *testing.T) func(fvm.Context, fvm.VM, snapshot.SnapshotTree, *TestContract, *EOATestAccount) {
 	return func(
 		ctx fvm.Context,
 		vm fvm.VM,
@@ -4043,7 +4051,7 @@ func dryRunFollowedByRunCase(t *testing.T, chain flow.Chain) func(fvm.Context, f
 		testContract *TestContract,
 		testAccount *EOATestAccount,
 	) {
-		sc := systemcontracts.SystemContractsForChain(chain.ChainID())
+		sc := systemcontracts.SystemContractsForChain(ctx.Chain.ChainID())
 
 		data := testContract.MakeCallData(t, "store", big.NewInt(42))
 
@@ -4123,7 +4131,7 @@ func dryRunFollowedByRunCase(t *testing.T, chain flow.Chain) func(fvm.Context, f
 		// the dry-run's speculative (discarded) transaction, so they are metered without
 		// appearing in the returned snapshot. Both values verified by forcing each partition.
 		expectedComputation := uint64(74)
-		if usesLegacyUUIDPartition(ctx) {
+		if usesLegacyUUIDPartition(ctx, 0) {
 			expectedComputation = 79
 		}
 		assert.Equal(t, expectedComputation, output.ComputationUsed)
@@ -7204,35 +7212,36 @@ func getEVMAccountNonce(
 }
 
 // assertUpdatedRegisterCount asserts that the execution updated exactly the expected number of
-// registers. `countNonZeroPartition` is the expected count for a block whose ID selects a
-// non-zero UUID partition (see `environment.uuidPartition` with txnIndex 0, as used by these
-// tests): such blocks use a fresh `uuid_N` register. A block selecting partition 0 (probability
-// 1/256) reuses the legacy `uuid` register instead, updating one register fewer.
+// registers. `countNonZeroPartition` is the expected count for an execution that used a fresh
+// `uuid_N` register (non-zero UUID partition). An execution that reused the legacy `uuid`
+// register (partition 0, probability 1/256 for a random block) updates one register fewer.
+// The branch is taken on the observed write set, so it holds for any transaction index.
 func assertUpdatedRegisterCount(
 	t *testing.T,
-	ctx fvm.Context,
 	state *snapshot.ExecutionSnapshot,
 	countNonZeroPartition int,
 ) {
 	expected := countNonZeroPartition
-	if usesLegacyUUIDPartition(ctx) {
+	if _, legacy := state.WriteSet[flow.UUIDRegisterID(0)]; legacy {
 		expected--
 	}
 	assert.Len(t, state.UpdatedRegisterIDs(), expected)
 }
 
 // usesLegacyUUIDPartition reports whether the environment built from the given context reuses
-// the legacy `uuid` register, i.e. whether the context's block header selects UUID partition 0
-// for the transaction at index 0 (see environment.uuidPartition; the tests here all submit
-// transactions with `fvm.Transaction(txBody, 0)`).
-func usesLegacyUUIDPartition(ctx fvm.Context) bool {
+// the legacy `uuid` register for the transaction at the given index, mirroring the production
+// formula in environment.uuidPartition. createCOAAndRunEVMTx cross-checks this prediction
+// against the observed write set on every run.
+func usesLegacyUUIDPartition(ctx fvm.Context, txnIndex uint32) bool {
 	blockID := ctx.BlockHeader.ID()
-	return sha256.Sum256(blockID[:])[0] == 0
+	return (uint32(sha256.Sum256(blockID[:])[0])+txnIndex)%256 == 0
 }
 
 // requireUUIDPartitionZero wraps a test case body with a guard asserting that the environment
-// really selects UUID partition 0, so that a forced-partition-zero test fails loudly instead
-// of silently passing via the non-zero-partition branch if the block forcing ever breaks.
+// really selects UUID partition 0. It keeps the block fixture, the context wiring, and the
+// test-local partition formula in sync; divergence of that formula from production is caught
+// separately, by the cross-check in createCOAAndRunEVMTx and by the partition-dependent
+// assertions in the case bodies.
 func requireUUIDPartitionZero(
 	t *testing.T,
 	f func(fvm.Context, fvm.VM, snapshot.SnapshotTree, *TestContract, *EOATestAccount),
@@ -7244,7 +7253,7 @@ func requireUUIDPartitionZero(
 		testContract *TestContract,
 		testAccount *EOATestAccount,
 	) {
-		require.True(t, usesLegacyUUIDPartition(ctx), "block fixture did not select UUID partition 0")
+		require.True(t, usesLegacyUUIDPartition(ctx, 0), "block fixture did not select UUID partition 0")
 		f(ctx, vm, snapshot, testContract, testAccount)
 	}
 }
