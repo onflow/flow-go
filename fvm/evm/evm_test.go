@@ -2880,305 +2880,14 @@ func TestCadenceOwnedAccountFunctionalities(t *testing.T) {
 
 	t.Run("test coa dryCall", func(t *testing.T) {
 		RunWithNewEnvironment(t,
-			chain, func(
-				ctx fvm.Context,
-				vm fvm.VM,
-				snapshot snapshot.SnapshotTree,
-				testContract *TestContract,
-				testAccount *EOATestAccount,
-			) {
-				sc := systemcontracts.SystemContractsForChain(chain.ChainID())
-				code := []byte(fmt.Sprintf(
-					`
-					import EVM from %s
-
-					transaction(tx: [UInt8], coinbaseBytes: [UInt8; 20]){
-						prepare(account: auth(Storage) &Account ) {
-							let cadenceOwnedAccount <- EVM.createCadenceOwnedAccount()
-							account.storage.save(<- cadenceOwnedAccount, to: /storage/evmCOA)
-
-							let coinbase = EVM.EVMAddress(bytes: coinbaseBytes)
-							let res = EVM.run(tx: tx, coinbase: coinbase)
-
-							assert(res.status == EVM.Status.successful, message: "unexpected status")
-							assert(res.errorCode == 0, message: "unexpected error code")
-						}
-					}
-					`,
-					sc.EVMContract.Address.HexWithPrefix(),
-				))
-
-				num := int64(42)
-				innerTxBytes := testAccount.PrepareSignAndEncodeTx(t,
-					testContract.DeployedAt.ToCommon(),
-					testContract.MakeCallData(t, "store", big.NewInt(num)),
-					big.NewInt(0),
-					uint64(50_000),
-					big.NewInt(0),
-				)
-
-				innerTx := cadence.NewArray(
-					unittest.BytesToCdcUInt8(innerTxBytes),
-				).WithType(stdlib.EVMTransactionBytesCadenceType)
-
-				coinbase := cadence.NewArray(
-					unittest.BytesToCdcUInt8(testAccount.Address().Bytes()),
-				).WithType(stdlib.EVMAddressBytesCadenceType)
-
-				txBody, err := flow.NewTransactionBodyBuilder().
-					SetScript(code).
-					SetPayer(sc.FlowServiceAccount.Address).
-					AddAuthorizer(sc.FlowServiceAccount.Address).
-					AddArgument(json.MustEncode(innerTx)).
-					AddArgument(json.MustEncode(coinbase)).
-					Build()
-				require.NoError(t, err)
-
-				tx := fvm.Transaction(txBody, 0)
-
-				state, output, err := vm.Run(
-					ctx,
-					tx,
-					snapshot,
-				)
-				require.NoError(t, err)
-				require.NoError(t, output.Err)
-				assert.Len(t, output.Events, 3)
-				// this transaction must update state - in contrast to the dry-run call below,
-				// which must not update any registers
-				assertUpdatedRegisterCount(t, ctx, state, 13)
-				assert.Equal(
-					t,
-					flow.EventType("A.f8d6e0586b0a20c7.EVM.TransactionExecuted"),
-					output.Events[0].Type,
-				)
-				assert.Equal(
-					t,
-					flow.EventType("A.f8d6e0586b0a20c7.EVM.CadenceOwnedAccountCreated"),
-					output.Events[1].Type,
-				)
-				assert.Equal(
-					t,
-					flow.EventType("A.f8d6e0586b0a20c7.EVM.TransactionExecuted"),
-					output.Events[2].Type,
-				)
-				snapshot = snapshot.Append(state)
-
-				code = []byte(fmt.Sprintf(
-					`
-					import EVM from %s
-
-					transaction(data: [UInt8], to: String, gasLimit: UInt64, value: UInt){
-						prepare(account: auth(Storage) &Account) {
-							let coa = account.storage.borrow<&EVM.CadenceOwnedAccount>(
-								from: /storage/evmCOA
-							) ?? panic("could not borrow COA reference!")
-							let res = coa.dryCall(
-								to: EVM.addressFromString(to),
-								data: data,
-								gasLimit: gasLimit,
-								value: EVM.Balance(attoflow: value)
-							)
-
-							assert(res.status == EVM.Status.successful, message: "unexpected status")
-							assert(res.errorCode == 0, message: "unexpected error code")
-
-							let values = EVM.decodeABI(types: [Type<UInt256>()], data: res.data)
-							assert(values.length == 1)
-
-							let number = values[0] as! UInt256
-							assert(number == 42, message: String.encodeHex(res.data))
-						}
-					}
-					`,
-					sc.EVMContract.Address.HexWithPrefix(),
-				))
-
-				data := json.MustEncode(
-					cadence.NewArray(
-						unittest.BytesToCdcUInt8(testContract.MakeCallData(t, "retrieve")),
-					).WithType(stdlib.EVMTransactionBytesCadenceType),
-				)
-				toAddress, err := cadence.NewString(testContract.DeployedAt.ToCommon().Hex())
-				require.NoError(t, err)
-				to := json.MustEncode(toAddress)
-
-				txBody, err = flow.NewTransactionBodyBuilder().
-					SetScript(code).
-					SetPayer(sc.FlowServiceAccount.Address).
-					AddAuthorizer(sc.FlowServiceAccount.Address).
-					AddArgument(data).
-					AddArgument(to).
-					AddArgument(json.MustEncode(cadence.NewUInt64(50_000))).
-					AddArgument(json.MustEncode(cadence.NewUInt(0))).
-					Build()
-				require.NoError(t, err)
-
-				tx = fvm.Transaction(txBody, 0)
-
-				state, output, err = vm.Run(
-					ctx,
-					tx,
-					snapshot,
-				)
-				require.NoError(t, err)
-				require.NoError(t, output.Err)
-				assert.Len(t, output.Events, 0)
-				assert.Len(t, state.UpdatedRegisterIDs(), 0)
-			})
+			chain, coaDryCallCase(t),
+		)
 	})
 
 	t.Run("test coa dryCallWithSigAndArgs", func(t *testing.T) {
 		RunWithNewEnvironment(t,
-			chain, func(
-				ctx fvm.Context,
-				vm fvm.VM,
-				snapshot snapshot.SnapshotTree,
-				testContract *TestContract,
-				testAccount *EOATestAccount,
-			) {
-				sc := systemcontracts.SystemContractsForChain(chain.ChainID())
-				code := []byte(fmt.Sprintf(
-					`
-					import EVM from %s
-
-					transaction(tx: [UInt8], coinbaseBytes: [UInt8; 20]){
-						prepare(account: auth(Storage) &Account ) {
-							let cadenceOwnedAccount <- EVM.createCadenceOwnedAccount()
-							account.storage.save(<- cadenceOwnedAccount, to: /storage/evmCOA)
-
-							let coinbase = EVM.EVMAddress(bytes: coinbaseBytes)
-							let res = EVM.run(tx: tx, coinbase: coinbase)
-
-							assert(res.status == EVM.Status.successful, message: "unexpected status")
-							assert(res.errorCode == 0, message: "unexpected error code")
-						}
-					}
-					`,
-					sc.EVMContract.Address.HexWithPrefix(),
-				))
-
-				num := int64(42)
-				innerTxBytes := testAccount.PrepareSignAndEncodeTx(t,
-					testContract.DeployedAt.ToCommon(),
-					testContract.MakeCallData(t, "store", big.NewInt(num)),
-					big.NewInt(0),
-					uint64(50_000),
-					big.NewInt(0),
-				)
-
-				innerTx := cadence.NewArray(
-					unittest.BytesToCdcUInt8(innerTxBytes),
-				).WithType(stdlib.EVMTransactionBytesCadenceType)
-
-				coinbase := cadence.NewArray(
-					unittest.BytesToCdcUInt8(testAccount.Address().Bytes()),
-				).WithType(stdlib.EVMAddressBytesCadenceType)
-
-				txBody, err := flow.NewTransactionBodyBuilder().
-					SetScript(code).
-					SetPayer(sc.FlowServiceAccount.Address).
-					AddAuthorizer(sc.FlowServiceAccount.Address).
-					AddArgument(json.MustEncode(innerTx)).
-					AddArgument(json.MustEncode(coinbase)).
-					Build()
-				require.NoError(t, err)
-
-				tx := fvm.Transaction(txBody, 0)
-
-				state, output, err := vm.Run(
-					ctx,
-					tx,
-					snapshot,
-				)
-				require.NoError(t, err)
-				require.NoError(t, output.Err)
-				assert.Len(t, output.Events, 3)
-				// this transaction must update state - in contrast to the dry-run call below,
-				// which must not update any registers
-				assertUpdatedRegisterCount(t, ctx, state, 13)
-				assert.Equal(
-					t,
-					flow.EventType("A.f8d6e0586b0a20c7.EVM.TransactionExecuted"),
-					output.Events[0].Type,
-				)
-				assert.Equal(
-					t,
-					flow.EventType("A.f8d6e0586b0a20c7.EVM.CadenceOwnedAccountCreated"),
-					output.Events[1].Type,
-				)
-				assert.Equal(
-					t,
-					flow.EventType("A.f8d6e0586b0a20c7.EVM.TransactionExecuted"),
-					output.Events[2].Type,
-				)
-				snapshot = snapshot.Append(state)
-
-				code = []byte(fmt.Sprintf(
-					`
-					import EVM from %s
-
-					transaction(signature: String, args: [AnyStruct], to: String, gasLimit: UInt64, value: UInt){
-						prepare(account: auth(Storage) &Account) {
-							let coa = account.storage.borrow<&EVM.CadenceOwnedAccount>(
-								from: /storage/evmCOA
-							) ?? panic("could not borrow COA reference!")
-							let res = coa.dryCallWithSigAndArgs(
-								to: EVM.addressFromString(to),
-								signature: signature,
-								args: args,
-								gasLimit: gasLimit,
-								value: value,
-								resultTypes: [Type<UInt256>()],
-							)
-
-							assert(res.status == EVM.Status.successful, message: "unexpected status")
-							assert(res.errorCode == 0, message: "unexpected error code")
-
-							assert(res.results!.length == 1)
-
-							let number = res.results![0] as! UInt256
-							assert(number == 42, message: number.toString())
-						}
-					}
-					`,
-					sc.EVMContract.Address.HexWithPrefix(),
-				))
-
-				signatureValue, err := cadence.NewString("retrieve()")
-				require.NoError(t, err)
-				signature := json.MustEncode(signatureValue)
-
-				args := json.MustEncode(cadence.NewArray(nil))
-
-				toAddress, err := cadence.NewString(testContract.DeployedAt.ToCommon().Hex())
-				require.NoError(t, err)
-				to := json.MustEncode(toAddress)
-
-				txBody, err = flow.NewTransactionBodyBuilder().
-					SetScript(code).
-					SetPayer(sc.FlowServiceAccount.Address).
-					AddAuthorizer(sc.FlowServiceAccount.Address).
-					AddArgument(signature).
-					AddArgument(args).
-					AddArgument(to).
-					AddArgument(json.MustEncode(cadence.NewUInt64(50_000))).
-					AddArgument(json.MustEncode(cadence.NewUInt(0))).
-					Build()
-				require.NoError(t, err)
-
-				tx = fvm.Transaction(txBody, 0)
-
-				state, output, err = vm.Run(
-					ctx,
-					tx,
-					snapshot,
-				)
-				require.NoError(t, err)
-				require.NoError(t, output.Err)
-				assert.Len(t, output.Events, 0)
-				assert.Len(t, state.UpdatedRegisterIDs(), 0)
-			})
+			chain, coaDryCallWithSigAndArgsCase(t),
+		)
 	})
 
 	t.Run("test coa deploy with max gas limit cap", func(t *testing.T) {
@@ -3308,6 +3017,287 @@ func TestCadenceOwnedAccountFunctionalities(t *testing.T) {
 				require.Empty(t, []byte(res.ReturnedData))
 			})
 	})
+}
+
+// createCOAAndRunEVMTx submits a transaction that creates a COA and executes an EVM
+// transaction storing a value in the test contract. It asserts the emitted events and the
+// (UUID-partition-dependent) number of updated registers, and returns the snapshot with
+// the execution state appended.
+func createCOAAndRunEVMTx(
+	t *testing.T,
+	ctx fvm.Context,
+	vm fvm.VM,
+	snapshot snapshot.SnapshotTree,
+	testContract *TestContract,
+	testAccount *EOATestAccount,
+) snapshot.SnapshotTree {
+	sc := systemcontracts.SystemContractsForChain(ctx.Chain.ChainID())
+	code := []byte(fmt.Sprintf(
+		`
+		import EVM from %s
+
+		transaction(tx: [UInt8], coinbaseBytes: [UInt8; 20]){
+			prepare(account: auth(Storage) &Account ) {
+				let cadenceOwnedAccount <- EVM.createCadenceOwnedAccount()
+				account.storage.save(<- cadenceOwnedAccount, to: /storage/evmCOA)
+
+				let coinbase = EVM.EVMAddress(bytes: coinbaseBytes)
+				let res = EVM.run(tx: tx, coinbase: coinbase)
+
+				assert(res.status == EVM.Status.successful, message: "unexpected status")
+				assert(res.errorCode == 0, message: "unexpected error code")
+			}
+		}
+		`,
+		sc.EVMContract.Address.HexWithPrefix(),
+	))
+
+	num := int64(42)
+	innerTxBytes := testAccount.PrepareSignAndEncodeTx(t,
+		testContract.DeployedAt.ToCommon(),
+		testContract.MakeCallData(t, "store", big.NewInt(num)),
+		big.NewInt(0),
+		uint64(50_000),
+		big.NewInt(0),
+	)
+
+	innerTx := cadence.NewArray(
+		unittest.BytesToCdcUInt8(innerTxBytes),
+	).WithType(stdlib.EVMTransactionBytesCadenceType)
+
+	coinbase := cadence.NewArray(
+		unittest.BytesToCdcUInt8(testAccount.Address().Bytes()),
+	).WithType(stdlib.EVMAddressBytesCadenceType)
+
+	txBody, err := flow.NewTransactionBodyBuilder().
+		SetScript(code).
+		SetPayer(sc.FlowServiceAccount.Address).
+		AddAuthorizer(sc.FlowServiceAccount.Address).
+		AddArgument(json.MustEncode(innerTx)).
+		AddArgument(json.MustEncode(coinbase)).
+		Build()
+	require.NoError(t, err)
+
+	tx := fvm.Transaction(txBody, 0)
+
+	state, output, err := vm.Run(
+		ctx,
+		tx,
+		snapshot,
+	)
+	require.NoError(t, err)
+	require.NoError(t, output.Err)
+	assert.Len(t, output.Events, 3)
+
+	// Cross-check the test-local partition formula against production behavior: this
+	// transaction generates UUIDs, so the legacy `uuid` register must be written exactly
+	// when the formula predicts partition 0. If environment.uuidPartition ever changes,
+	// this fails deterministically in the forced-partition-zero variants.
+	_, legacyUUIDWritten := state.WriteSet[flow.UUIDRegisterID(0)]
+	require.Equal(t, usesLegacyUUIDPartition(ctx, 0), legacyUUIDWritten,
+		"test-local UUID partition formula out of sync with environment.uuidPartition")
+
+	// this transaction must update state - in contrast to the dry-call transaction
+	// run afterwards by the callers, which must not update any registers
+	assertUpdatedRegisterCount(t, state, 13)
+	assert.Equal(
+		t,
+		flow.EventType("A.f8d6e0586b0a20c7.EVM.TransactionExecuted"),
+		output.Events[0].Type,
+	)
+	assert.Equal(
+		t,
+		flow.EventType("A.f8d6e0586b0a20c7.EVM.CadenceOwnedAccountCreated"),
+		output.Events[1].Type,
+	)
+	assert.Equal(
+		t,
+		flow.EventType("A.f8d6e0586b0a20c7.EVM.TransactionExecuted"),
+		output.Events[2].Type,
+	)
+	return snapshot.Append(state)
+}
+
+// coaDryCallCase returns the test case body shared by the random-block and the
+// forced-partition-zero variants: after creating a COA (with partition-dependent register
+// count), a coa.dryCall in a new transaction must succeed without updating any registers.
+func coaDryCallCase(t *testing.T) func(fvm.Context, fvm.VM, snapshot.SnapshotTree, *TestContract, *EOATestAccount) {
+	return func(
+		ctx fvm.Context,
+		vm fvm.VM,
+		snapshot snapshot.SnapshotTree,
+		testContract *TestContract,
+		testAccount *EOATestAccount,
+	) {
+		snapshot = createCOAAndRunEVMTx(t, ctx, vm, snapshot, testContract, testAccount)
+
+		sc := systemcontracts.SystemContractsForChain(ctx.Chain.ChainID())
+
+		code := []byte(fmt.Sprintf(
+			`
+			import EVM from %s
+
+			transaction(data: [UInt8], to: String, gasLimit: UInt64, value: UInt){
+				prepare(account: auth(Storage) &Account) {
+					let coa = account.storage.borrow<&EVM.CadenceOwnedAccount>(
+						from: /storage/evmCOA
+					) ?? panic("could not borrow COA reference!")
+					let res = coa.dryCall(
+						to: EVM.addressFromString(to),
+						data: data,
+						gasLimit: gasLimit,
+						value: EVM.Balance(attoflow: value)
+					)
+
+					assert(res.status == EVM.Status.successful, message: "unexpected status")
+					assert(res.errorCode == 0, message: "unexpected error code")
+
+					let values = EVM.decodeABI(types: [Type<UInt256>()], data: res.data)
+					assert(values.length == 1)
+
+					let number = values[0] as! UInt256
+					assert(number == 42, message: String.encodeHex(res.data))
+				}
+			}
+			`,
+			sc.EVMContract.Address.HexWithPrefix(),
+		))
+
+		data := json.MustEncode(
+			cadence.NewArray(
+				unittest.BytesToCdcUInt8(testContract.MakeCallData(t, "retrieve")),
+			).WithType(stdlib.EVMTransactionBytesCadenceType),
+		)
+		toAddress, err := cadence.NewString(testContract.DeployedAt.ToCommon().Hex())
+		require.NoError(t, err)
+		to := json.MustEncode(toAddress)
+
+		txBody, err := flow.NewTransactionBodyBuilder().
+			SetScript(code).
+			SetPayer(sc.FlowServiceAccount.Address).
+			AddAuthorizer(sc.FlowServiceAccount.Address).
+			AddArgument(data).
+			AddArgument(to).
+			AddArgument(json.MustEncode(cadence.NewUInt64(50_000))).
+			AddArgument(json.MustEncode(cadence.NewUInt(0))).
+			Build()
+		require.NoError(t, err)
+
+		tx := fvm.Transaction(txBody, 0)
+
+		state, output, err := vm.Run(
+			ctx,
+			tx,
+			snapshot,
+		)
+		require.NoError(t, err)
+		require.NoError(t, output.Err)
+		assert.Len(t, output.Events, 0)
+		assert.Len(t, state.UpdatedRegisterIDs(), 0)
+	}
+}
+
+// TestCOADryCall_UUIDPartitionZero runs the COA dryCall case with a block that
+// deterministically selects UUID partition 0, covering the otherwise 1/256-probability
+// partition-0 branch of assertUpdatedRegisterCount (see #8629).
+func TestCOADryCall_UUIDPartitionZero(t *testing.T) {
+	t.Parallel()
+	chain := flow.Emulator.Chain()
+	runWithNewEnvironmentWithBlock(t,
+		chain, blockFixtureWithUUIDPartitionZero(t),
+		requireUUIDPartitionZero(t, coaDryCallCase(t)),
+	)
+}
+
+// coaDryCallWithSigAndArgsCase is coaDryCallCase for coa.dryCallWithSigAndArgs.
+func coaDryCallWithSigAndArgsCase(t *testing.T) func(fvm.Context, fvm.VM, snapshot.SnapshotTree, *TestContract, *EOATestAccount) {
+	return func(
+		ctx fvm.Context,
+		vm fvm.VM,
+		snapshot snapshot.SnapshotTree,
+		testContract *TestContract,
+		testAccount *EOATestAccount,
+	) {
+		snapshot = createCOAAndRunEVMTx(t, ctx, vm, snapshot, testContract, testAccount)
+
+		sc := systemcontracts.SystemContractsForChain(ctx.Chain.ChainID())
+
+		code := []byte(fmt.Sprintf(
+			`
+			import EVM from %s
+
+			transaction(signature: String, args: [AnyStruct], to: String, gasLimit: UInt64, value: UInt){
+				prepare(account: auth(Storage) &Account) {
+					let coa = account.storage.borrow<&EVM.CadenceOwnedAccount>(
+						from: /storage/evmCOA
+					) ?? panic("could not borrow COA reference!")
+					let res = coa.dryCallWithSigAndArgs(
+						to: EVM.addressFromString(to),
+						signature: signature,
+						args: args,
+						gasLimit: gasLimit,
+						value: value,
+						resultTypes: [Type<UInt256>()],
+					)
+
+					assert(res.status == EVM.Status.successful, message: "unexpected status")
+					assert(res.errorCode == 0, message: "unexpected error code")
+
+					assert(res.results!.length == 1)
+
+					let number = res.results![0] as! UInt256
+					assert(number == 42, message: number.toString())
+				}
+			}
+			`,
+			sc.EVMContract.Address.HexWithPrefix(),
+		))
+
+		signatureValue, err := cadence.NewString("retrieve()")
+		require.NoError(t, err)
+		signature := json.MustEncode(signatureValue)
+
+		args := json.MustEncode(cadence.NewArray(nil))
+
+		toAddress, err := cadence.NewString(testContract.DeployedAt.ToCommon().Hex())
+		require.NoError(t, err)
+		to := json.MustEncode(toAddress)
+
+		txBody, err := flow.NewTransactionBodyBuilder().
+			SetScript(code).
+			SetPayer(sc.FlowServiceAccount.Address).
+			AddAuthorizer(sc.FlowServiceAccount.Address).
+			AddArgument(signature).
+			AddArgument(args).
+			AddArgument(to).
+			AddArgument(json.MustEncode(cadence.NewUInt64(50_000))).
+			AddArgument(json.MustEncode(cadence.NewUInt(0))).
+			Build()
+		require.NoError(t, err)
+
+		tx := fvm.Transaction(txBody, 0)
+
+		state, output, err := vm.Run(
+			ctx,
+			tx,
+			snapshot,
+		)
+		require.NoError(t, err)
+		require.NoError(t, output.Err)
+		assert.Len(t, output.Events, 0)
+		assert.Len(t, state.UpdatedRegisterIDs(), 0)
+	}
+}
+
+// TestCOADryCallWithSigAndArgs_UUIDPartitionZero is TestCOADryCall_UUIDPartitionZero for
+// coa.dryCallWithSigAndArgs.
+func TestCOADryCallWithSigAndArgs_UUIDPartitionZero(t *testing.T) {
+	t.Parallel()
+	chain := flow.Emulator.Chain()
+	runWithNewEnvironmentWithBlock(t,
+		chain, blockFixtureWithUUIDPartitionZero(t),
+		requireUUIDPartitionZero(t, coaDryCallWithSigAndArgsCase(t)),
+	)
 }
 
 func TestDryRun(t *testing.T) {
@@ -4030,7 +4020,7 @@ func TestDryRun(t *testing.T) {
 	// one tainted by the dry-run read) and complete successfully.
 	t.Run("test EVM.dryRun followed by EVM.run in same transaction", func(t *testing.T) {
 		RunWithNewEnvironment(t,
-			chain, dryRunFollowedByRunCase(t, chain),
+			chain, dryRunFollowedByRunCase(t),
 		)
 	})
 }
@@ -4044,7 +4034,8 @@ func TestDryRunFollowedByRun_UUIDPartitionZero(t *testing.T) {
 	t.Parallel()
 	chain := flow.Emulator.Chain()
 	runWithNewEnvironmentWithBlock(t,
-		chain, blockFixtureWithUUIDPartitionZero(), dryRunFollowedByRunCase(t, chain),
+		chain, blockFixtureWithUUIDPartitionZero(t),
+		requireUUIDPartitionZero(t, dryRunFollowedByRunCase(t)),
 	)
 }
 
@@ -4052,7 +4043,7 @@ func TestDryRunFollowedByRun_UUIDPartitionZero(t *testing.T) {
 // forced-partition-zero variants: dryRun reads the block proposal into the cache, and a
 // subsequent EVM.run in the same Cadence transaction must still see a clean proposal and
 // complete successfully, with partition-dependent metering.
-func dryRunFollowedByRunCase(t *testing.T, chain flow.Chain) func(fvm.Context, fvm.VM, snapshot.SnapshotTree, *TestContract, *EOATestAccount) {
+func dryRunFollowedByRunCase(t *testing.T) func(fvm.Context, fvm.VM, snapshot.SnapshotTree, *TestContract, *EOATestAccount) {
 	return func(
 		ctx fvm.Context,
 		vm fvm.VM,
@@ -4060,7 +4051,7 @@ func dryRunFollowedByRunCase(t *testing.T, chain flow.Chain) func(fvm.Context, f
 		testContract *TestContract,
 		testAccount *EOATestAccount,
 	) {
-		sc := systemcontracts.SystemContractsForChain(chain.ChainID())
+		sc := systemcontracts.SystemContractsForChain(ctx.Chain.ChainID())
 
 		data := testContract.MakeCallData(t, "store", big.NewInt(42))
 
@@ -4139,10 +4130,8 @@ func dryRunFollowedByRunCase(t *testing.T, chain flow.Chain) func(fvm.Context, f
 		// interaction than the untouched partitioned register. The extra reads happen inside
 		// the dry-run's speculative (discarded) transaction, so they are metered without
 		// appearing in the returned snapshot. Both values verified by forcing each partition.
-		blockID := ctx.BlockHeader.ID()
-		partition := sha256.Sum256(blockID[:])[0]
 		expectedComputation := uint64(74)
-		if partition == 0 {
+		if usesLegacyUUIDPartition(ctx, 0) {
 			expectedComputation = 79
 		}
 		assert.Equal(t, expectedComputation, output.ComputationUsed)
@@ -7223,22 +7212,50 @@ func getEVMAccountNonce(
 }
 
 // assertUpdatedRegisterCount asserts that the execution updated exactly the expected number of
-// registers. `countNonZeroPartition` is the expected count for a block whose ID selects a
-// non-zero UUID partition (see `environment.uuidPartition` with txnIndex 0, as used by these
-// tests): such blocks use a fresh `uuid_N` register. A block selecting partition 0 (probability
-// 1/256) reuses the legacy `uuid` register instead, updating one register fewer.
+// registers. `countNonZeroPartition` is the expected count for an execution that used a fresh
+// `uuid_N` register (non-zero UUID partition). An execution that reused the legacy `uuid`
+// register (partition 0, probability 1/256 for a random block) updates one register fewer.
+// The branch is taken on the observed write set, so it holds for any transaction index.
 func assertUpdatedRegisterCount(
 	t *testing.T,
-	ctx fvm.Context,
 	state *snapshot.ExecutionSnapshot,
 	countNonZeroPartition int,
 ) {
 	expected := countNonZeroPartition
-	blockID := ctx.BlockHeader.ID()
-	if sha256.Sum256(blockID[:])[0] == 0 {
+	if _, legacy := state.WriteSet[flow.UUIDRegisterID(0)]; legacy {
 		expected--
 	}
 	assert.Len(t, state.UpdatedRegisterIDs(), expected)
+}
+
+// usesLegacyUUIDPartition reports whether the environment built from the given context reuses
+// the legacy `uuid` register for the transaction at the given index, mirroring the production
+// formula in environment.uuidPartition. createCOAAndRunEVMTx cross-checks this prediction
+// against the observed write set on every run.
+func usesLegacyUUIDPartition(ctx fvm.Context, txnIndex uint32) bool {
+	blockID := ctx.BlockHeader.ID()
+	return (uint32(sha256.Sum256(blockID[:])[0])+txnIndex)%256 == 0
+}
+
+// requireUUIDPartitionZero wraps a test case body with a guard asserting that the environment
+// really selects UUID partition 0. It keeps the block fixture, the context wiring, and the
+// test-local partition formula in sync; divergence of that formula from production is caught
+// separately, by the cross-check in createCOAAndRunEVMTx and by the partition-dependent
+// assertions in the case bodies.
+func requireUUIDPartitionZero(
+	t *testing.T,
+	f func(fvm.Context, fvm.VM, snapshot.SnapshotTree, *TestContract, *EOATestAccount),
+) func(fvm.Context, fvm.VM, snapshot.SnapshotTree, *TestContract, *EOATestAccount) {
+	return func(
+		ctx fvm.Context,
+		vm fvm.VM,
+		snapshot snapshot.SnapshotTree,
+		testContract *TestContract,
+		testAccount *EOATestAccount,
+	) {
+		require.True(t, usesLegacyUUIDPartition(ctx, 0), "block fixture did not select UUID partition 0")
+		f(ctx, vm, snapshot, testContract, testAccount)
+	}
 }
 
 func RunWithNewEnvironment(
@@ -7255,14 +7272,19 @@ func RunWithNewEnvironment(
 // Such blocks make the EVM environment reuse the legacy `uuid` register instead of a fresh
 // partitioned one, a 1/256 branch that random block fixtures practically never exercise.
 // On average this takes 256 attempts (a few milliseconds).
-func blockFixtureWithUUIDPartitionZero() *flow.Block {
-	for {
+func blockFixtureWithUUIDPartitionZero(t *testing.T) *flow.Block {
+	// Each attempt succeeds with probability 1/256; exhausting the budget is practically
+	// impossible unless the block fixture stops being random.
+	const maxAttempts = 100_000
+	for range maxAttempts {
 		block := unittest.BlockFixture()
 		id := block.ID()
 		if sha256.Sum256(id[:])[0] == 0 {
 			return block
 		}
 	}
+	t.Fatalf("no block fixture selecting UUID partition 0 in %d attempts; fixture no longer random?", maxAttempts)
+	return nil
 }
 
 // runWithNewEnvironmentWithBlock is RunWithNewEnvironment with a caller-provided block, which
