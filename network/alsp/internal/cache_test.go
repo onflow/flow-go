@@ -821,12 +821,10 @@ func TestSpamRecordCache_ConcurrentGetWhileAdjustingSameRecord(t *testing.T) {
 	const penaltyDelta = -1.0
 
 	var wg sync.WaitGroup
-	wg.Add(2)
 
 	// writer: repeatedly adjusts the same record, and verifies the returned penalty is the one
 	// produced by its own adjustment (captured inside the adjust function, under the lock).
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		for i := 0; i < adjustments; i++ {
 			var want float64
 			penalty, err := cache.AdjustWithInit(originID, func(record *model.ProtocolSpamRecord) (*model.ProtocolSpamRecord, error) {
@@ -837,11 +835,10 @@ func TestSpamRecordCache_ConcurrentGetWhileAdjustingSameRecord(t *testing.T) {
 			require.NoError(t, err)
 			require.Equal(t, want, penalty, "returned penalty must match the penalty produced by this adjustment")
 		}
-	}()
+	})
 
 	// reader: repeatedly reads the same record while it is being adjusted.
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		for i := 0; i < adjustments; i++ {
 			record, ok := cache.Get(originID)
 			if !ok {
@@ -851,7 +848,7 @@ func TestSpamRecordCache_ConcurrentGetWhileAdjustingSameRecord(t *testing.T) {
 			require.LessOrEqual(t, record.Penalty, float64(0))
 			require.GreaterOrEqual(t, record.Penalty, float64(adjustments)*penaltyDelta)
 		}
-	}()
+	})
 
 	unittest.RequireReturnsBefore(t, wg.Wait, 10*time.Second, "concurrent adjustments and reads did not finish on time")
 
