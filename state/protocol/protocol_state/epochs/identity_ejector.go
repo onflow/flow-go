@@ -44,14 +44,14 @@ func newEjector() ejector {
 func (e *ejector) Eject(nodeID flow.Identifier) bool {
 	l := len(e.identityLists)
 	if len(e.ejected) == 0 { // if this is the first ejection sealed in this block, we have to populate the lookup first
-		for i := 0; i < l; i++ {
+		for i := range l {
 			e.identityLists[i].identityLookup = e.identityLists[i].dynamicIdentities.Lookup()
 		}
 	}
 	e.ejected = append(e.ejected, nodeID)
 
 	var nodeFound bool
-	for i := 0; i < l; i++ {
+	for i := range l {
 		dynamicIdentity, found := e.identityLists[i].identityLookup[nodeID]
 		if found {
 			nodeFound = true

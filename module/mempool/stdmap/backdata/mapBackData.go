@@ -1,5 +1,7 @@
 package backdata
 
+import "maps"
+
 // MapBackData implements a map-based generic memory BackData backed by a Go map.
 // Note that this implementation is NOT thread-safe, and the higher-level Backend is responsible for concurrency management.
 type MapBackData[K comparable, V any] struct {
@@ -96,9 +98,7 @@ func (b *MapBackData[K, V]) Size() uint {
 // All returns all stored key-value pairs as a map.
 func (b *MapBackData[K, V]) All() map[K]V {
 	values := make(map[K]V)
-	for key, value := range b.dataMap {
-		values[key] = value
-	}
+	maps.Copy(values, b.dataMap)
 	return values
 }
 

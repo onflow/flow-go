@@ -2,6 +2,7 @@ package id
 
 import (
 	"math/rand"
+	"slices"
 	"testing"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -14,7 +15,7 @@ import (
 
 func TestFixedIdentifierProvider(t *testing.T) {
 	identifiers := make([]flow.Identifier, 10)
-	for i := 0; i < len(identifiers); i++ {
+	for i := range identifiers {
 		identifiers[i] = unittest.IdentifierFixture()
 	}
 
@@ -30,7 +31,7 @@ func TestFixedIdentifierProvider(t *testing.T) {
 
 func TestFixedIdentitiesProvider(t *testing.T) {
 	identities := make([]*flow.Identity, 10)
-	for i := 0; i < len(identities); i++ {
+	for i := range identities {
 		identities[i] = unittest.IdentityFixture()
 	}
 
@@ -45,19 +46,9 @@ func TestFixedIdentitiesProvider(t *testing.T) {
 }
 
 func contains(a []flow.Identifier, b flow.Identifier) bool {
-	for _, i := range a {
-		if b == i {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(a, b)
 }
 
 func idContains(a []*flow.Identity, b *flow.Identity) bool {
-	for _, i := range a {
-		if b == i {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(a, b)
 }

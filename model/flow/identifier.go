@@ -81,7 +81,7 @@ func (id Identifier) Format(state fmt.State, verb rune) {
 	case 'x', 's', 'v':
 		_, _ = state.Write([]byte(id.String()))
 	default:
-		_, _ = state.Write([]byte(fmt.Sprintf("%%!%c(%s=%s)", verb, reflect.TypeOf(id), id)))
+		_, _ = state.Write(fmt.Appendf(nil, "%%!%c(%s=%s)", verb, reflect.TypeFor[Identifier](), id))
 	}
 }
 

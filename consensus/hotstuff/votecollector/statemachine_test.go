@@ -223,7 +223,7 @@ func (s *StateMachineTestSuite) TestProcessBlock_ProcessingOfCachedVotes() {
 	proposal := makeSignedProposalWithView(s.view)
 	block := proposal.Block
 	processor := s.prepareMockedProcessor(proposal, 1)
-	for i := 0; i < votes; i++ {
+	for range votes {
 		vote := unittest.VoteForBlockFixture(block)
 		// once when caching vote, and once when processing cached vote
 		s.notifier.On("OnVoteProcessed", vote).Twice()
@@ -456,7 +456,7 @@ func (s *StateMachineTestSuite) TestRegisterVoteConsumer() {
 	votes := 10
 	block := helper.MakeBlock(helper.WithBlockView(s.view))
 	expectedVotes := make([]*model.Vote, 0)
-	for i := 0; i < votes; i++ {
+	for range votes {
 		vote := unittest.VoteForBlockFixture(block)
 		// the collector remains in the caching state throughout this test; adding a vote
 		// there only caches it, emitting an `OnVoteProcessed` notification
@@ -474,7 +474,7 @@ func (s *StateMachineTestSuite) TestRegisterVoteConsumer() {
 	// are forwarded to the consumer as they arrive
 	s.collector.RegisterVoteConsumer(consumer)
 
-	for i := 0; i < votes; i++ {
+	for range votes {
 		vote := unittest.VoteForBlockFixture(block)
 		s.notifier.On("OnVoteProcessed", vote).Once()
 		require.NoError(s.T(), s.collector.AddVote(vote))

@@ -40,7 +40,7 @@ func (_m *DataProviderFactory) EXPECT() *DataProviderFactory_Expecter {
 }
 
 // NewDataProvider provides a mock function for the type DataProviderFactory
-func (_mock *DataProviderFactory) NewDataProvider(ctx context.Context, subID string, topic string, args models.Arguments, stream chan<- interface{}) (data_providers.DataProvider, error) {
+func (_mock *DataProviderFactory) NewDataProvider(ctx context.Context, subID string, topic string, args models.Arguments, stream chan<- any) (data_providers.DataProvider, error) {
 	ret := _mock.Called(ctx, subID, topic, args, stream)
 
 	if len(ret) == 0 {
@@ -49,17 +49,17 @@ func (_mock *DataProviderFactory) NewDataProvider(ctx context.Context, subID str
 
 	var r0 data_providers.DataProvider
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string, models.Arguments, chan<- interface{}) (data_providers.DataProvider, error)); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string, models.Arguments, chan<- any) (data_providers.DataProvider, error)); ok {
 		return returnFunc(ctx, subID, topic, args, stream)
 	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string, models.Arguments, chan<- interface{}) data_providers.DataProvider); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string, models.Arguments, chan<- any) data_providers.DataProvider); ok {
 		r0 = returnFunc(ctx, subID, topic, args, stream)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(data_providers.DataProvider)
 		}
 	}
-	if returnFunc, ok := ret.Get(1).(func(context.Context, string, string, models.Arguments, chan<- interface{}) error); ok {
+	if returnFunc, ok := ret.Get(1).(func(context.Context, string, string, models.Arguments, chan<- any) error); ok {
 		r1 = returnFunc(ctx, subID, topic, args, stream)
 	} else {
 		r1 = ret.Error(1)
@@ -77,12 +77,12 @@ type DataProviderFactory_NewDataProvider_Call struct {
 //   - subID string
 //   - topic string
 //   - args models.Arguments
-//   - stream chan<- interface{}
+//   - stream chan<- any
 func (_e *DataProviderFactory_Expecter) NewDataProvider(ctx interface{}, subID interface{}, topic interface{}, args interface{}, stream interface{}) *DataProviderFactory_NewDataProvider_Call {
 	return &DataProviderFactory_NewDataProvider_Call{Call: _e.mock.On("NewDataProvider", ctx, subID, topic, args, stream)}
 }
 
-func (_c *DataProviderFactory_NewDataProvider_Call) Run(run func(ctx context.Context, subID string, topic string, args models.Arguments, stream chan<- interface{})) *DataProviderFactory_NewDataProvider_Call {
+func (_c *DataProviderFactory_NewDataProvider_Call) Run(run func(ctx context.Context, subID string, topic string, args models.Arguments, stream chan<- any)) *DataProviderFactory_NewDataProvider_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
@@ -100,9 +100,9 @@ func (_c *DataProviderFactory_NewDataProvider_Call) Run(run func(ctx context.Con
 		if args[3] != nil {
 			arg3 = args[3].(models.Arguments)
 		}
-		var arg4 chan<- interface{}
+		var arg4 chan<- any
 		if args[4] != nil {
-			arg4 = args[4].(chan<- interface{})
+			arg4 = args[4].(chan<- any)
 		}
 		run(
 			arg0,
@@ -120,7 +120,7 @@ func (_c *DataProviderFactory_NewDataProvider_Call) Return(dataProvider data_pro
 	return _c
 }
 
-func (_c *DataProviderFactory_NewDataProvider_Call) RunAndReturn(run func(ctx context.Context, subID string, topic string, args models.Arguments, stream chan<- interface{}) (data_providers.DataProvider, error)) *DataProviderFactory_NewDataProvider_Call {
+func (_c *DataProviderFactory_NewDataProvider_Call) RunAndReturn(run func(ctx context.Context, subID string, topic string, args models.Arguments, stream chan<- any) (data_providers.DataProvider, error)) *DataProviderFactory_NewDataProvider_Call {
 	_c.Call.Return(run)
 	return _c
 }

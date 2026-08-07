@@ -158,16 +158,16 @@ func testFlagSet(c *FlowConfig) *pflag.FlagSet {
 // - prefix: the prefix to prepend to the keys.
 // Returns:
 // - the list of keys extracted from the YAML data.
-func getAllYAMLKeys(data interface{}, prefix string) []string {
+func getAllYAMLKeys(data any, prefix string) []string {
 	var keys []string
 
 	switch v := data.(type) {
-	case map[interface{}]interface{}:
+	case map[any]any:
 		for key, value := range v {
 			fullKey := prefix + "-" + key.(string)
 			keys = append(keys, getAllYAMLKeys(value, fullKey)...)
 		}
-	case []interface{}:
+	case []any:
 		for i, value := range v {
 			fullKey := prefix + "-" + strings.ToLower(strings.ReplaceAll(reflect.TypeOf(value).Name(), "_", "-"))
 			keys = append(keys, getAllYAMLKeys(value, fullKey+string(rune('a'+i)))...)
@@ -184,14 +184,14 @@ func allResourceManagerFlagNames(t *testing.T) []string {
 	yamlFile, err := os.ReadFile("default-config.yml")
 	require.NoError(t, err, "failed to read YAML file")
 
-	var config map[string]interface{}
+	var config map[string]any
 	err = yaml.Unmarshal(yamlFile, &config)
 	require.NoError(t, err, "failed to unmarshal YAML file")
 
-	networkConfig, exists := config["network-config"].(map[interface{}]interface{})
+	networkConfig, exists := config["network-config"].(map[any]any)
 	require.True(t, exists, "the key 'network-config' does not exist in the YAML file")
 
-	resourceManagerConfig, exists := networkConfig["libp2p-resource-manager"].(map[interface{}]interface{})
+	resourceManagerConfig, exists := networkConfig["libp2p-resource-manager"].(map[any]any)
 	require.True(t, exists, "the key 'libp2p-resource-manager' does not exist in the YAML file")
 
 	return getAllYAMLKeys(resourceManagerConfig, "libp2p-resource-manager")

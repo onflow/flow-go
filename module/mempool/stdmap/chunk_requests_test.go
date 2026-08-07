@@ -121,7 +121,7 @@ func withUpdaterScenario(t *testing.T, chunks int, times int, updater mempool.Ch
 	wg := &sync.WaitGroup{}
 	wg.Add(times * chunks)
 	for _, request := range chunkReqs {
-		for i := 0; i < times; i++ {
+		for range times {
 			go func(chunkID flow.Identifier) {
 				_, _, _, ok := requests.UpdateRequestHistory(chunkID, updater)
 				require.True(t, ok)

@@ -102,7 +102,7 @@ func New(
 // a blocking manner. It returns the potential processing error when done.
 //
 // No errors are expected during normal operations.
-func (e *Engine) Process(chanName channels.Channel, originID flow.Identifier, event interface{}) error {
+func (e *Engine) Process(chanName channels.Channel, originID flow.Identifier, event any) error {
 	select {
 	case <-e.ComponentManager.ShutdownSignal():
 		return component.ErrComponentShutdown

@@ -752,13 +752,13 @@ func Test_ProgramsDoubleCounting(t *testing.T) {
 func callTx(name string, address flow.Address) (*flow.TransactionBody, error) {
 
 	return flow.NewTransactionBodyBuilder().SetScript(
-		[]byte(fmt.Sprintf(`
+		fmt.Appendf(nil, `
 			import %s from %s
 			transaction {
               prepare() {
                 log(%s.hello())
               }
-            }`, name, address.HexWithPrefix(), name)),
+            }`, name, address.HexWithPrefix(), name),
 	).
 		SetPayer(address).
 		Build()
@@ -769,11 +769,11 @@ func contractDeployTx(name, code string, address flow.Address) (*flow.Transactio
 
 	return flow.NewTransactionBodyBuilder().
 		SetScript(
-			[]byte(fmt.Sprintf(`transaction {
+			fmt.Appendf(nil, `transaction {
               prepare(signer: auth(AddContract) &Account) {
                 signer.contracts.add(name: "%s", code: "%s".decodeHex())
               }
-            }`, name, encoded)),
+            }`, name, encoded),
 		).
 		AddAuthorizer(address).
 		SetPayer(address).
@@ -785,11 +785,11 @@ func updateContractTx(name, code string, address flow.Address) (*flow.Transactio
 
 	return flow.NewTransactionBodyBuilder().
 		SetScript(
-			[]byte(fmt.Sprintf(`transaction {
+			fmt.Appendf(nil, `transaction {
              prepare(signer: auth(UpdateContract) &Account) {
                signer.contracts.update(name: "%s", code: "%s".decodeHex())
              }
-           }`, name, encoded)),
+           }`, name, encoded),
 		).
 		AddAuthorizer(address).
 		SetPayer(address).

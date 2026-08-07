@@ -21,7 +21,7 @@ func (err ClusterQCNoVoteError) Unwrap() error {
 	return err.Err
 }
 
-func NewClusterQCNoVoteErrorf(msg string, args ...interface{}) ClusterQCNoVoteError {
+func NewClusterQCNoVoteErrorf(msg string, args ...any) ClusterQCNoVoteError {
 	return ClusterQCNoVoteError{
 		Err: fmt.Errorf(msg, args...),
 	}

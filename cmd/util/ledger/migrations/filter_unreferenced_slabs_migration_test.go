@@ -136,7 +136,7 @@ func TestFilterUnreferencedSlabs(t *testing.T) {
 	// Ensure the array is large enough to be stored in a separate slab
 	arrayCount := 100
 	arrayValues := make([]interpreter.Value, arrayCount)
-	for i := 0; i < arrayCount; i++ {
+	for i := range arrayCount {
 		arrayValues[i] = interpreter.NewUnmeteredIntValueFromInt64(int64(i))
 	}
 

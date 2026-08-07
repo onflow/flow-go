@@ -9,7 +9,7 @@ import (
 
 func GenerateRandomSeeds(n int, seedLen int) [][]byte {
 	seeds := make([][]byte, 0, n)
-	for i := 0; i < n; i++ {
+	for range n {
 		seeds = append(seeds, GenerateRandomSeed(seedLen))
 	}
 	return seeds

@@ -82,7 +82,7 @@ func TestSingleNodeLifeCycle(t *testing.T) {
 // their libp2p info. It generates an address, and checks whether repeated translations
 // yields the same info or not.
 func TestGetPeerInfo(t *testing.T) {
-	for i := 0; i < 10; i++ {
+	for range 10 {
 		key := p2pfixtures.NetworkingKeyFixtures(t)
 
 		// creates node-i identity
@@ -93,7 +93,7 @@ func TestGetPeerInfo(t *testing.T) {
 		require.NoError(t, err)
 
 		// repeats the translation for node-i
-		for j := 0; j < 10; j++ {
+		for range 10 {
 			rinfo, err := utils.PeerAddressInfo(identity.IdentitySkeleton)
 			require.NoError(t, err)
 			assert.Equal(t, rinfo.String(), info.String(), "inconsistent id generated")
@@ -301,7 +301,7 @@ func createConcurrentStreams(t *testing.T, ctx context.Context, nodes []p2p.LibP
 			require.NoError(t, err)
 			this.Host().Peerstore().AddAddrs(pInfo.ID, pInfo.Addrs, peerstore.AddressTTL)
 
-			for j := 0; j < n; j++ {
+			for range n {
 				wg.Add(1)
 				go func(sender p2p.LibP2PNode) {
 					defer wg.Done()

@@ -79,7 +79,7 @@ func ValidateWithCheckpoint(
 
 	start := time.Now()
 	log.Info().Msgf("validation registers from checkpoint with %v worker", workerCount)
-	for i := 0; i < workerCount; i++ {
+	for range workerCount {
 		g.Go(func() error {
 			return validatingRegisterInStore(gCtx, log, store, leafNodeChan, blockHeight, &mismatchErrorCount)
 		})

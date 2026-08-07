@@ -726,7 +726,7 @@ func (suite *Suite) TestGetTransactionResultsByBlockID() {
 	convertedEventsForTx1 := make([]*entities.Event, len(eventsForTx1))
 	convertedEventsForTx2 := make([]*entities.Event, len(eventsForTx2))
 
-	for j := 0; j < len(eventsForTx1); j++ {
+	for j := range eventsForTx1 {
 		e := unittest.EventFixture(
 			unittest.Event.WithEventType(flow.EventAccountCreated),
 			unittest.Event.WithTransactionIndex(0),
@@ -737,7 +737,7 @@ func (suite *Suite) TestGetTransactionResultsByBlockID() {
 		eventsForBlock[j] = e
 		convertedEventsForTx1[j] = convert.EventToMessage(e)
 	}
-	for j := 0; j < len(eventsForTx2); j++ {
+	for j := range eventsForTx2 {
 		e := unittest.EventFixture(
 			unittest.Event.WithEventType(flow.EventAccountCreated),
 			unittest.Event.WithTransactionIndex(1),

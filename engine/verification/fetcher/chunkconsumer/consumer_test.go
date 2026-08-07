@@ -72,10 +72,9 @@ func TestProduceConsume(t *testing.T) {
 			lock.Lock()
 			defer lock.Unlock()
 			called = append(called, locator)
-			go func() {
+			finishAll.Go(func() {
 				notifier.Notify(locator.ID())
-				finishAll.Done()
-			}()
+			})
 		}
 		WithConsumer(t, alwaysFinish, func(consumer *chunkconsumer.ChunkConsumer, chunksQueue storage.ChunksQueue) {
 			<-consumer.Ready()
@@ -117,7 +116,7 @@ func TestProduceConsume(t *testing.T) {
 
 			locators := unittest.ChunkLocatorListFixture(100)
 
-			for i := 0; i < len(locators); i++ {
+			for i := range locators {
 				go func(i int) {
 					ok, err := chunksQueue.StoreChunkLocator(locators[i])
 					require.NoError(t, err, fmt.Sprintf("chunk locator %v can't be stored", i))

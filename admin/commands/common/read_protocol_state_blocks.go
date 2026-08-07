@@ -100,7 +100,7 @@ func (r *ReadProtocolStateBlocksCommand) getBlockByHeader(header *flow.Header) (
 	return block, nil
 }
 
-func (r *ReadProtocolStateBlocksCommand) Handler(_ context.Context, req *admin.CommandRequest) (interface{}, error) {
+func (r *ReadProtocolStateBlocksCommand) Handler(_ context.Context, req *admin.CommandRequest) (any, error) {
 	data := req.ValidatorData.(*requestData)
 	var result []*flow.Block
 	var block *flow.Block
@@ -132,7 +132,7 @@ func (r *ReadProtocolStateBlocksCommand) Handler(_ context.Context, req *admin.C
 		result = append(result, block)
 	}
 
-	var resultList []interface{}
+	var resultList []any
 	bytes, err := json.Marshal(result)
 	if err != nil {
 		return nil, err
@@ -145,7 +145,7 @@ func (r *ReadProtocolStateBlocksCommand) Handler(_ context.Context, req *admin.C
 // Validator validates the request.
 // Returns admin.InvalidAdminReqError for invalid/malformed requests.
 func (r *ReadProtocolStateBlocksCommand) Validator(req *admin.CommandRequest) error {
-	input, ok := req.Data.(map[string]interface{})
+	input, ok := req.Data.(map[string]any)
 	if !ok {
 		return admin.NewInvalidAdminReqFormatError("expected map[string]any")
 	}

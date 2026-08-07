@@ -198,15 +198,13 @@ func TestLatestPersistedSealedResult_ConcurrentAccess(t *testing.T) {
 			numGoroutines := 1000
 
 			for range numGoroutines {
-				wg.Add(1)
-				go func() {
-					defer wg.Done()
+				wg.Go(func() {
 
 					actualResultID, actualHeight := latest.Latest()
 
 					assert.Equal(t, initialResult.ID(), actualResultID)
 					assert.Equal(t, initialHeader.Height, actualHeight)
-				}()
+				})
 			}
 
 			wg.Wait()
@@ -216,7 +214,7 @@ func TestLatestPersistedSealedResult_ConcurrentAccess(t *testing.T) {
 			var wg sync.WaitGroup
 			numGoroutines := 1000
 
-			for i := 0; i < numGoroutines; i++ {
+			for i := range numGoroutines {
 				wg.Add(2)
 				go func(i int) {
 					defer wg.Done()

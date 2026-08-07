@@ -39,7 +39,7 @@ func MisbehaviorReportFixture(t *testing.T) network.MisbehaviorReport {
 // This is used in tests to generate random misbehavior reports.
 func MisbehaviorReportsFixture(t *testing.T, count int) []network.MisbehaviorReport {
 	reports := make([]network.MisbehaviorReport, 0, count)
-	for i := 0; i < count; i++ {
+	for range count {
 		reports = append(reports, MisbehaviorReportFixture(t))
 	}
 

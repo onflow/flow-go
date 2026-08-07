@@ -1,7 +1,6 @@
 package internal_test
 
 import (
-	"context"
 	"slices"
 	"testing"
 	"time"
@@ -20,8 +19,7 @@ import (
 )
 
 func TestProtocolPeerCache(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 
 	p1 := protocol.ID("p1")
 	p2 := protocol.ID("p2")

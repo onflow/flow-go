@@ -36,7 +36,7 @@ func WriteText(path string, data []byte) error {
 }
 
 // WriteJSON marshals the given interface into JSON and writes it to the given path
-func WriteJSON(path string, data interface{}) error {
+func WriteJSON(path string, data any) error {
 	bz, err := json.MarshalIndent(data, "", "  ")
 	if err != nil {
 		return fmt.Errorf("could not marshal json: %w", err)

@@ -30,7 +30,7 @@ type StorageLockAcquisitionError struct {
 	err error
 }
 
-func NewStorageLockAcquisitionErrorf(msg string, args ...interface{}) error {
+func NewStorageLockAcquisitionErrorf(msg string, args ...any) error {
 	return StorageLockAcquisitionError{
 		err: fmt.Errorf(msg, args...),
 	}

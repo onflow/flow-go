@@ -39,7 +39,7 @@ func (s *BlockDigestsProviderSuite) TestBlockDigestsDataProvider_HappyPath() {
 		BlockDigestsTopic,
 		s.factory,
 		s.validBlockDigestsArgumentsTestCases(),
-		func(dataChan chan interface{}) {
+		func(dataChan chan any) {
 			for _, block := range s.blocks {
 				dataChan <- flow.NewBlockDigest(block.ID(), block.Height, time.UnixMilli(int64(block.Timestamp)).UTC())
 			}
@@ -51,7 +51,7 @@ func (s *BlockDigestsProviderSuite) TestBlockDigestsDataProvider_HappyPath() {
 // validBlockDigestsArgumentsTestCases defines test happy cases for block digests data providers.
 // Each test case specifies input arguments, and setup functions for the mock API used in the test.
 func (s *BlockDigestsProviderSuite) validBlockDigestsArgumentsTestCases() []testType {
-	expectedResponses := make([]interface{}, len(s.blocks))
+	expectedResponses := make([]any, len(s.blocks))
 	for i, b := range s.blocks {
 		blockDigest := flow.NewBlockDigest(b.ID(), b.Height, time.UnixMilli(int64(b.Timestamp)).UTC())
 		blockDigestPayload := models.NewBlockDigest(blockDigest)
@@ -112,7 +112,7 @@ func (s *BlockDigestsProviderSuite) validBlockDigestsArgumentsTestCases() []test
 }
 
 // requireBlockDigest ensures that the received block header information matches the expected data.
-func (s *BlocksProviderSuite) requireBlockDigest(actual interface{}, expected interface{}) {
+func (s *BlocksProviderSuite) requireBlockDigest(actual any, expected any) {
 	expectedResponse, expectedResponsePayload := extractPayload[*models.BlockDigest](s.T(), expected)
 	actualResponse, actualResponsePayload := extractPayload[*models.BlockDigest](s.T(), actual)
 
@@ -124,7 +124,7 @@ func (s *BlocksProviderSuite) requireBlockDigest(actual interface{}, expected in
 // when invalid arguments are provided. It verifies that appropriate errors are returned
 // for missing or conflicting arguments.
 func (s *BlockDigestsProviderSuite) TestBlockDigestsDataProvider_InvalidArguments() {
-	send := make(chan interface{})
+	send := make(chan any)
 
 	topic := BlockDigestsTopic
 

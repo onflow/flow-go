@@ -777,7 +777,7 @@ func (es *EventHandlerSuite) TestOnTimeout_ReplicaEjected() {
 
 // Test100Timeout tests that receiving 100 TCs for increasing views advances rounds
 func (es *EventHandlerSuite) Test100Timeout() {
-	for i := 0; i < 100; i++ {
+	for i := range 100 {
 		tc := helper.MakeTC(helper.WithTCView(es.initView + uint64(i)))
 		err := es.eventhandler.OnReceiveTc(tc)
 		es.endView++
@@ -794,7 +794,7 @@ func (es *EventHandlerSuite) TestLeaderBuild100Blocks() {
 	es.committee.leaders[es.initView] = struct{}{}
 
 	totalView := 100
-	for i := 0; i < totalView; i++ {
+	for i := range totalView {
 		// I'm the leader for 100 views
 		// I'm the next leader
 		es.committee.leaders[es.initView+uint64(i+1)] = struct{}{}
@@ -842,7 +842,7 @@ func (es *EventHandlerSuite) TestFollowerFollows100Blocks() {
 	// add parent proposal otherwise we can't propose
 	parentProposal := createProposal(es.initView, es.initView-1)
 	es.forks.proposals[parentProposal.Block.BlockID] = parentProposal.Block
-	for i := 0; i < 100; i++ {
+	for i := range 100 {
 		// create each proposal as if they are created by some leader
 		proposal := createProposal(es.initView+uint64(i)+1, es.initView+uint64(i))
 		// as a follower, I receive these proposals
@@ -856,7 +856,7 @@ func (es *EventHandlerSuite) TestFollowerFollows100Blocks() {
 
 // TestFollowerReceives100Forks tests scenario where follower receives 100 forks built on top of the same block
 func (es *EventHandlerSuite) TestFollowerReceives100Forks() {
-	for i := 0; i < 100; i++ {
+	for i := range 100 {
 		// create each proposal as if they are created by some leader
 		proposal := createProposal(es.initView+uint64(i)+1, es.initView-1)
 		proposal.LastViewTC = helper.MakeTC(helper.WithTCView(es.initView+uint64(i)),
