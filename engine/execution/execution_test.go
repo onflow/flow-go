@@ -479,9 +479,12 @@ func TestFailedTxWillNotChangeStateCommitment(t *testing.T) {
 	assert.NoError(t, err)
 
 	// ensure block 1 has been executed
-	hub.DeliverAllEventually(t, func() bool {
+	// the receipt travels a multi-hop async pipeline (follower -> ingestion -> execution ->
+	// pusher -> stub network -> consensus mock), so use a generous liveness bound with a fast
+	// poll: it returns as soon as the receipt arrives and only slow, loaded runs pay the wait.
+	hub.DeliverAllEventuallyUntil(t, func() bool {
 		return receiptsReceived.Load() == 1
-	})
+	}, 60*time.Second, 100*time.Millisecond)
 
 	if exe1Node.StorehouseEnabled {
 		exe1Node.AssertHighestExecutedBlock(t, genesis.ToHeader())
@@ -507,9 +510,11 @@ func TestFailedTxWillNotChangeStateCommitment(t *testing.T) {
 	assert.NoError(t, err)
 
 	// ensure block 1, 2 and 3 have been executed
-	hub.DeliverAllEventually(t, func() bool {
+	// waiting for 2 more receipts doubles the pipeline hops compared to the wait above;
+	// under full-suite load this exceeded the 10s/500ms default bound of DeliverAllEventually.
+	hub.DeliverAllEventuallyUntil(t, func() bool {
 		return receiptsReceived.Load() == 3
-	})
+	}, 60*time.Second, 100*time.Millisecond)
 
 	// ensure state has been synced across both nodes
 	exe1Node.AssertBlockIsExecuted(t, block2.ToHeader())
