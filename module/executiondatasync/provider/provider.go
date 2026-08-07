@@ -160,8 +160,6 @@ func (p *ExecutionDataProvider) provide(ctx context.Context, blockHeight uint64,
 
 	chunkDataIDs := make([]cid.Cid, len(executionData.ChunkExecutionDatas))
 	for i, chunkExecutionData := range executionData.ChunkExecutionDatas {
-		i := i
-		chunkExecutionData := chunkExecutionData
 
 		g.Go(func() error {
 			logger.Debug().Int("chunk_index", i).Msg("adding chunk execution data")
@@ -305,7 +303,7 @@ func (p *ExecutionDataCIDProvider) addChunkExecutionData(
 }
 
 // addBlobs serializes the given object, splits the serialized data into blobs, and sends them to the given channel.
-func (p *ExecutionDataCIDProvider) addBlobs(v interface{}, blobCh chan<- blobs.Blob) ([]cid.Cid, error) {
+func (p *ExecutionDataCIDProvider) addBlobs(v any, blobCh chan<- blobs.Blob) ([]cid.Cid, error) {
 	bcw := blobs.NewBlobChannelWriter(blobCh, p.maxBlobSize)
 	defer bcw.Close()
 

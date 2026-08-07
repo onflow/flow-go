@@ -1449,6 +1449,142 @@ func (_c *API_GetEventsForHeightRange_Call) RunAndReturn(run func(ctx context.Co
 	return _c
 }
 
+// GetExecutionReceiptsByBlockID provides a mock function for the type API
+func (_mock *API) GetExecutionReceiptsByBlockID(ctx context.Context, blockID flow.Identifier) ([]*flow.ExecutionReceipt, error) {
+	ret := _mock.Called(ctx, blockID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetExecutionReceiptsByBlockID")
+	}
+
+	var r0 []*flow.ExecutionReceipt
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, flow.Identifier) ([]*flow.ExecutionReceipt, error)); ok {
+		return returnFunc(ctx, blockID)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, flow.Identifier) []*flow.ExecutionReceipt); ok {
+		r0 = returnFunc(ctx, blockID)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]*flow.ExecutionReceipt)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, flow.Identifier) error); ok {
+		r1 = returnFunc(ctx, blockID)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// API_GetExecutionReceiptsByBlockID_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetExecutionReceiptsByBlockID'
+type API_GetExecutionReceiptsByBlockID_Call struct {
+	*mock.Call
+}
+
+// GetExecutionReceiptsByBlockID is a helper method to define mock.On call
+//   - ctx context.Context
+//   - blockID flow.Identifier
+func (_e *API_Expecter) GetExecutionReceiptsByBlockID(ctx interface{}, blockID interface{}) *API_GetExecutionReceiptsByBlockID_Call {
+	return &API_GetExecutionReceiptsByBlockID_Call{Call: _e.mock.On("GetExecutionReceiptsByBlockID", ctx, blockID)}
+}
+
+func (_c *API_GetExecutionReceiptsByBlockID_Call) Run(run func(ctx context.Context, blockID flow.Identifier)) *API_GetExecutionReceiptsByBlockID_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 flow.Identifier
+		if args[1] != nil {
+			arg1 = args[1].(flow.Identifier)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *API_GetExecutionReceiptsByBlockID_Call) Return(executionReceipts []*flow.ExecutionReceipt, err error) *API_GetExecutionReceiptsByBlockID_Call {
+	_c.Call.Return(executionReceipts, err)
+	return _c
+}
+
+func (_c *API_GetExecutionReceiptsByBlockID_Call) RunAndReturn(run func(ctx context.Context, blockID flow.Identifier) ([]*flow.ExecutionReceipt, error)) *API_GetExecutionReceiptsByBlockID_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// GetExecutionReceiptsByResultID provides a mock function for the type API
+func (_mock *API) GetExecutionReceiptsByResultID(ctx context.Context, resultID flow.Identifier) ([]*flow.ExecutionReceipt, error) {
+	ret := _mock.Called(ctx, resultID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetExecutionReceiptsByResultID")
+	}
+
+	var r0 []*flow.ExecutionReceipt
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, flow.Identifier) ([]*flow.ExecutionReceipt, error)); ok {
+		return returnFunc(ctx, resultID)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, flow.Identifier) []*flow.ExecutionReceipt); ok {
+		r0 = returnFunc(ctx, resultID)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]*flow.ExecutionReceipt)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, flow.Identifier) error); ok {
+		r1 = returnFunc(ctx, resultID)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// API_GetExecutionReceiptsByResultID_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetExecutionReceiptsByResultID'
+type API_GetExecutionReceiptsByResultID_Call struct {
+	*mock.Call
+}
+
+// GetExecutionReceiptsByResultID is a helper method to define mock.On call
+//   - ctx context.Context
+//   - resultID flow.Identifier
+func (_e *API_Expecter) GetExecutionReceiptsByResultID(ctx interface{}, resultID interface{}) *API_GetExecutionReceiptsByResultID_Call {
+	return &API_GetExecutionReceiptsByResultID_Call{Call: _e.mock.On("GetExecutionReceiptsByResultID", ctx, resultID)}
+}
+
+func (_c *API_GetExecutionReceiptsByResultID_Call) Run(run func(ctx context.Context, resultID flow.Identifier)) *API_GetExecutionReceiptsByResultID_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 flow.Identifier
+		if args[1] != nil {
+			arg1 = args[1].(flow.Identifier)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *API_GetExecutionReceiptsByResultID_Call) Return(executionReceipts []*flow.ExecutionReceipt, err error) *API_GetExecutionReceiptsByResultID_Call {
+	_c.Call.Return(executionReceipts, err)
+	return _c
+}
+
+func (_c *API_GetExecutionReceiptsByResultID_Call) RunAndReturn(run func(ctx context.Context, resultID flow.Identifier) ([]*flow.ExecutionReceipt, error)) *API_GetExecutionReceiptsByResultID_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetExecutionResultByID provides a mock function for the type API
 func (_mock *API) GetExecutionResultByID(ctx context.Context, id flow.Identifier) (*flow.ExecutionResult, error) {
 	ret := _mock.Called(ctx, id)

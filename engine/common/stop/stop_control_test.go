@@ -11,6 +11,7 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -99,10 +100,18 @@ func TestStopControl_OnProcessedBlock(t *testing.T) {
 		height := uint64(10)
 
 		// Update processed height and verify it's stored correctly.
+		// Note: `updateProcessedHeight` hands the height over to a worker routine, which updates
+		// `lastProcessedHeight` asynchronously. Hence, we wait for the update to take effect.
 		sc.updateProcessedHeight(height)
-		assert.Equal(t, height, sc.lastProcessedHeight.Value())
+		require.Eventually(t, func() bool {
+			return sc.lastProcessedHeight.Value() == height
+		}, time.Second, 10*time.Millisecond)
 
 		// Attempt to set a lower processed height, which should not be allowed.
+		// Note: `processedHeightChannel` is unbuffered, so once `updateProcessedHeight` returns, the
+		// worker has received the lower height, implying it has fully processed the previous height.
+		// Processing the lower height leaves `lastProcessedHeight` unchanged, so reading it here
+		// concurrently to the worker is safe.
 		sc.updateProcessedHeight(height - 1)
 		assert.Equal(t, height, sc.lastProcessedHeight.Value())
 
@@ -113,7 +122,9 @@ func TestStopControl_OnProcessedBlock(t *testing.T) {
 		sc.OnVersionUpdate(incompatibleHeight, version)
 		height = incompatibleHeight - 2
 		sc.updateProcessedHeight(height)
-		assert.Equal(t, height, sc.lastProcessedHeight.Value())
+		require.Eventually(t, func() bool {
+			return sc.lastProcessedHeight.Value() == height
+		}, time.Second, 10*time.Millisecond)
 
 		// Prepare to trigger the Throw method when the incompatible block height is processed.
 		height = incompatibleHeight - 1

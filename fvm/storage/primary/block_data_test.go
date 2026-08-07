@@ -398,7 +398,7 @@ func TestBlockDataCommit(t *testing.T) {
 
 	// Commit a bunch of unrelated updates
 
-	for i := logical.Time(0); i < 3; i++ {
+	for i := range logical.Time(3) {
 		testSetupTxn, err := block.NewTransactionData(
 			i,
 			state.DefaultParameters())
@@ -616,7 +616,7 @@ func TestBlockDataCommitRejectNonIncreasingExecutionTime1(t *testing.T) {
 	require.NoError(t, err)
 
 	// Commit a bunch of unrelated transactions.
-	for i := logical.Time(0); i < 10; i++ {
+	for i := range logical.Time(10) {
 		txn, err := block.NewTransactionData(i, state.DefaultParameters())
 		require.NoError(t, err)
 

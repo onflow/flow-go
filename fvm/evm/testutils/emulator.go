@@ -29,7 +29,7 @@ func (em *TestEmulator) NewBlockView(_ types.BlockContext) (types.BlockView, err
 }
 
 // NewBlock returns a new block view
-func (em *TestEmulator) NewReadOnlyBlockView(_ types.BlockContext) (types.ReadOnlyBlockView, error) {
+func (em *TestEmulator) NewReadOnlyBlockView() (types.ReadOnlyBlockView, error) {
 	return em, nil
 }
 

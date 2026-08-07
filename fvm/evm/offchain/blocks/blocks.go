@@ -5,7 +5,8 @@ import (
 
 	gethCommon "github.com/ethereum/go-ethereum/common"
 
-	"github.com/onflow/flow-go/fvm/evm/handler"
+	"github.com/onflow/flow-go/fvm/environment"
+	"github.com/onflow/flow-go/fvm/evm/backends"
 	"github.com/onflow/flow-go/fvm/evm/types"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -16,9 +17,9 @@ const BlockStoreLatestBlockMetaKey = "LatestBlockMeta"
 // and also the latest executed block meta data
 type Blocks struct {
 	chainID     flow.ChainID
-	storage     types.BackendStorage
+	storage     backends.BackendStorage
 	rootAddress flow.Address
-	bhl         *handler.BlockHashList
+	bhl         *environment.BlockHashList
 }
 
 var _ types.BlockSnapshot = (*Blocks)(nil)
@@ -27,7 +28,7 @@ var _ types.BlockSnapshot = (*Blocks)(nil)
 func NewBlocks(
 	chainID flow.ChainID,
 	rootAddress flow.Address,
-	storage types.BackendStorage,
+	storage backends.BackendStorage,
 ) (*Blocks, error) {
 	var err error
 	blocks := &Blocks{
@@ -35,10 +36,10 @@ func NewBlocks(
 		storage:     storage,
 		rootAddress: rootAddress,
 	}
-	blocks.bhl, err = handler.NewBlockHashList(
+	blocks.bhl, err = environment.NewBlockHashList(
 		storage,
 		rootAddress,
-		handler.BlockHashListCapacity,
+		environment.BlockHashListCapacity,
 	)
 	if err != nil {
 		return nil, err

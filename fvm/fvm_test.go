@@ -11,9 +11,12 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/onflow/flow-core-contracts/lib/go/templates"
 	"github.com/stretchr/testify/assert"
 	mockery "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+
+	"github.com/onflow/flow-go/fvm/inspection"
 
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/common"
@@ -30,6 +33,7 @@ import (
 	bridge "github.com/onflow/flow-evm-bridge"
 	flowsdk "github.com/onflow/flow-go-sdk"
 	"github.com/onflow/flow-go-sdk/test"
+	nftcontracts "github.com/onflow/flow-nft/lib/go/contracts"
 
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	exeUtils "github.com/onflow/flow-go/engine/execution/utils"
@@ -40,7 +44,6 @@ import (
 	envMock "github.com/onflow/flow-go/fvm/environment/mock"
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/evm/events"
-	"github.com/onflow/flow-go/fvm/evm/handler"
 	"github.com/onflow/flow-go/fvm/evm/stdlib"
 	"github.com/onflow/flow-go/fvm/evm/types"
 	"github.com/onflow/flow-go/fvm/meter"
@@ -825,7 +828,7 @@ func TestTransactionFeeDeduction(t *testing.T) {
 			tryToTransfer: transferAmount,
 			gasLimit:      uint64(2),
 			checkResult: func(t *testing.T, balanceBefore uint64, balanceAfter uint64, output fvm.ProcedureOutput) {
-				require.ErrorContains(t, output.Err, "computation exceeds limit (2)")
+				unittest.RequireLimitExceededError(t, output.Err, errors.LimitKindComputation, 2)
 
 				var deposits []flow.Event
 				var withdraws []flow.Event
@@ -1159,7 +1162,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 					snapshotTree)
 				require.NoError(t, err)
 
-				require.True(t, errors.IsComputationLimitExceededError(output.Err))
+				unittest.RequireLimitExceededError(t, output.Err, errors.LimitKindComputation)
 			},
 		))
 
@@ -1224,7 +1227,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 				require.NoError(t, err)
 				require.Greater(t, output.MemoryEstimate, uint64(highWeight))
 
-				require.True(t, errors.IsMemoryLimitExceededError(output.Err))
+				unittest.RequireLimitExceededError(t, output.Err, errors.LimitKindMemory, 10_000_000_000)
 			},
 		))
 
@@ -1348,7 +1351,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 				// There are 100 breaks and each break uses 1_000_000 memory
 				require.Greater(t, output.MemoryEstimate, uint64(100_000_000))
 
-				require.True(t, errors.IsMemoryLimitExceededError(output.Err))
+				unittest.RequireLimitExceededError(t, output.Err, errors.LimitKindMemory, 100_000_000)
 			},
 		))
 
@@ -1390,7 +1393,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 					snapshotTree)
 				require.NoError(t, err)
 
-				require.True(t, errors.IsComputationLimitExceededError(output.Err))
+				unittest.RequireLimitExceededError(t, output.Err, errors.LimitKindComputation)
 			},
 		))
 
@@ -1433,7 +1436,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 					snapshotTree)
 				require.NoError(t, err)
 
-				require.True(t, errors.IsComputationLimitExceededError(output.Err))
+				unittest.RequireLimitExceededError(t, output.Err, errors.LimitKindComputation)
 			},
 		))
 
@@ -1475,7 +1478,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 					snapshotTree)
 				require.NoError(t, err)
 
-				require.True(t, errors.IsComputationLimitExceededError(output.Err))
+				unittest.RequireLimitExceededError(t, output.Err, errors.LimitKindComputation)
 			},
 		))
 
@@ -1555,7 +1558,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 					snapshotTree)
 				require.NoError(t, err)
 
-				require.ErrorContains(t, output.Err, "computation exceeds limit (997)")
+				unittest.RequireLimitExceededError(t, output.Err, errors.LimitKindComputation, 997)
 				// expected computation used is still number of loops + 1 (from the storage limit check).
 				require.Equal(t, loops+executionEffortNeededToCheckStorage, output.ComputationUsed)
 
@@ -2329,8 +2332,7 @@ func TestScriptExecutionLimit(t *testing.T) {
 					_, output, err := vm.Run(scriptCtx, script, snapshotTree)
 					require.NoError(t, err)
 					require.Error(t, output.Err)
-					require.True(t, errors.IsComputationLimitExceededError(output.Err))
-					require.ErrorContains(t, output.Err, "computation exceeds limit (10000)")
+					unittest.RequireLimitExceededError(t, output.Err, errors.LimitKindComputation, 10000)
 					require.GreaterOrEqual(t, output.ComputationUsed, uint64(10000))
 					require.GreaterOrEqual(t, output.MemoryEstimate, uint64(456687216))
 				},
@@ -3366,30 +3368,32 @@ func TestVMBridge(t *testing.T) {
 			env := sc.AsTemplateEnv()
 
 			bridgeEnv := bridge.Environment{
-				CrossVMNFTAddress:                     env.ServiceAccountAddress,
-				CrossVMTokenAddress:                   env.ServiceAccountAddress,
-				FlowEVMBridgeHandlerInterfacesAddress: env.ServiceAccountAddress,
-				IBridgePermissionsAddress:             env.ServiceAccountAddress,
-				ICrossVMAddress:                       env.ServiceAccountAddress,
-				ICrossVMAssetAddress:                  env.ServiceAccountAddress,
-				IEVMBridgeNFTMinterAddress:            env.ServiceAccountAddress,
-				IEVMBridgeTokenMinterAddress:          env.ServiceAccountAddress,
-				IFlowEVMNFTBridgeAddress:              env.ServiceAccountAddress,
-				IFlowEVMTokenBridgeAddress:            env.ServiceAccountAddress,
-				FlowEVMBridgeAddress:                  env.ServiceAccountAddress,
-				FlowEVMBridgeAccessorAddress:          env.ServiceAccountAddress,
-				FlowEVMBridgeConfigAddress:            env.ServiceAccountAddress,
-				FlowEVMBridgeHandlersAddress:          env.ServiceAccountAddress,
-				FlowEVMBridgeNFTEscrowAddress:         env.ServiceAccountAddress,
-				FlowEVMBridgeResolverAddress:          env.ServiceAccountAddress,
-				FlowEVMBridgeTemplatesAddress:         env.ServiceAccountAddress,
-				FlowEVMBridgeTokenEscrowAddress:       env.ServiceAccountAddress,
-				FlowEVMBridgeUtilsAddress:             env.ServiceAccountAddress,
-				ArrayUtilsAddress:                     env.ServiceAccountAddress,
-				ScopedFTProvidersAddress:              env.ServiceAccountAddress,
-				SerializeAddress:                      env.ServiceAccountAddress,
-				SerializeMetadataAddress:              env.ServiceAccountAddress,
-				StringUtilsAddress:                    env.ServiceAccountAddress,
+				CrossVMNFTAddress:                          env.ServiceAccountAddress,
+				CrossVMTokenAddress:                        env.ServiceAccountAddress,
+				FlowEVMBridgeHandlerInterfacesAddress:      env.ServiceAccountAddress,
+				IBridgePermissionsAddress:                  env.ServiceAccountAddress,
+				ICrossVMAddress:                            env.ServiceAccountAddress,
+				ICrossVMAssetAddress:                       env.ServiceAccountAddress,
+				IEVMBridgeNFTMinterAddress:                 env.ServiceAccountAddress,
+				IEVMBridgeTokenMinterAddress:               env.ServiceAccountAddress,
+				IFlowEVMNFTBridgeAddress:                   env.ServiceAccountAddress,
+				IFlowEVMTokenBridgeAddress:                 env.ServiceAccountAddress,
+				FlowEVMBridgeAddress:                       env.ServiceAccountAddress,
+				FlowEVMBridgeAccessorAddress:               env.ServiceAccountAddress,
+				FlowEVMBridgeCustomAssociationTypesAddress: env.ServiceAccountAddress,
+				FlowEVMBridgeCustomAssociationsAddress:     env.ServiceAccountAddress,
+				FlowEVMBridgeConfigAddress:                 env.ServiceAccountAddress,
+				FlowEVMBridgeHandlersAddress:               env.ServiceAccountAddress,
+				FlowEVMBridgeNFTEscrowAddress:              env.ServiceAccountAddress,
+				FlowEVMBridgeResolverAddress:               env.ServiceAccountAddress,
+				FlowEVMBridgeTemplatesAddress:              env.ServiceAccountAddress,
+				FlowEVMBridgeTokenEscrowAddress:            env.ServiceAccountAddress,
+				FlowEVMBridgeUtilsAddress:                  env.ServiceAccountAddress,
+				ArrayUtilsAddress:                          env.ServiceAccountAddress,
+				ScopedFTProvidersAddress:                   env.ServiceAccountAddress,
+				SerializeAddress:                           env.ServiceAccountAddress,
+				SerializeMetadataAddress:                   env.ServiceAccountAddress,
+				StringUtilsAddress:                         env.ServiceAccountAddress,
 			}
 
 			// Create an account private key.
@@ -3608,30 +3612,32 @@ func TestVMBridge(t *testing.T) {
 			env := sc.AsTemplateEnv()
 
 			bridgeEnv := bridge.Environment{
-				CrossVMNFTAddress:                     env.ServiceAccountAddress,
-				CrossVMTokenAddress:                   env.ServiceAccountAddress,
-				FlowEVMBridgeHandlerInterfacesAddress: env.ServiceAccountAddress,
-				IBridgePermissionsAddress:             env.ServiceAccountAddress,
-				ICrossVMAddress:                       env.ServiceAccountAddress,
-				ICrossVMAssetAddress:                  env.ServiceAccountAddress,
-				IEVMBridgeNFTMinterAddress:            env.ServiceAccountAddress,
-				IEVMBridgeTokenMinterAddress:          env.ServiceAccountAddress,
-				IFlowEVMNFTBridgeAddress:              env.ServiceAccountAddress,
-				IFlowEVMTokenBridgeAddress:            env.ServiceAccountAddress,
-				FlowEVMBridgeAddress:                  env.ServiceAccountAddress,
-				FlowEVMBridgeAccessorAddress:          env.ServiceAccountAddress,
-				FlowEVMBridgeConfigAddress:            env.ServiceAccountAddress,
-				FlowEVMBridgeHandlersAddress:          env.ServiceAccountAddress,
-				FlowEVMBridgeNFTEscrowAddress:         env.ServiceAccountAddress,
-				FlowEVMBridgeResolverAddress:          env.ServiceAccountAddress,
-				FlowEVMBridgeTemplatesAddress:         env.ServiceAccountAddress,
-				FlowEVMBridgeTokenEscrowAddress:       env.ServiceAccountAddress,
-				FlowEVMBridgeUtilsAddress:             env.ServiceAccountAddress,
-				ArrayUtilsAddress:                     env.ServiceAccountAddress,
-				ScopedFTProvidersAddress:              env.ServiceAccountAddress,
-				SerializeAddress:                      env.ServiceAccountAddress,
-				SerializeMetadataAddress:              env.ServiceAccountAddress,
-				StringUtilsAddress:                    env.ServiceAccountAddress,
+				CrossVMNFTAddress:                          env.ServiceAccountAddress,
+				CrossVMTokenAddress:                        env.ServiceAccountAddress,
+				FlowEVMBridgeHandlerInterfacesAddress:      env.ServiceAccountAddress,
+				IBridgePermissionsAddress:                  env.ServiceAccountAddress,
+				ICrossVMAddress:                            env.ServiceAccountAddress,
+				ICrossVMAssetAddress:                       env.ServiceAccountAddress,
+				IEVMBridgeNFTMinterAddress:                 env.ServiceAccountAddress,
+				IEVMBridgeTokenMinterAddress:               env.ServiceAccountAddress,
+				IFlowEVMNFTBridgeAddress:                   env.ServiceAccountAddress,
+				IFlowEVMTokenBridgeAddress:                 env.ServiceAccountAddress,
+				FlowEVMBridgeAddress:                       env.ServiceAccountAddress,
+				FlowEVMBridgeAccessorAddress:               env.ServiceAccountAddress,
+				FlowEVMBridgeCustomAssociationTypesAddress: env.ServiceAccountAddress,
+				FlowEVMBridgeCustomAssociationsAddress:     env.ServiceAccountAddress,
+				FlowEVMBridgeConfigAddress:                 env.ServiceAccountAddress,
+				FlowEVMBridgeHandlersAddress:               env.ServiceAccountAddress,
+				FlowEVMBridgeNFTEscrowAddress:              env.ServiceAccountAddress,
+				FlowEVMBridgeResolverAddress:               env.ServiceAccountAddress,
+				FlowEVMBridgeTemplatesAddress:              env.ServiceAccountAddress,
+				FlowEVMBridgeTokenEscrowAddress:            env.ServiceAccountAddress,
+				FlowEVMBridgeUtilsAddress:                  env.ServiceAccountAddress,
+				ArrayUtilsAddress:                          env.ServiceAccountAddress,
+				ScopedFTProvidersAddress:                   env.ServiceAccountAddress,
+				SerializeAddress:                           env.ServiceAccountAddress,
+				SerializeMetadataAddress:                   env.ServiceAccountAddress,
+				StringUtilsAddress:                         env.ServiceAccountAddress,
 			}
 
 			// Create an account private key.
@@ -3665,8 +3671,13 @@ func TestVMBridge(t *testing.T) {
 
 			snapshotTree = snapshotTree.Append(executionSnapshot)
 
-			// Deploy the ExampleNFT contract
-			nftContract := contracts.ExampleNFT(env)
+			// Deploy the ExampleNFT contract (pre-CrossVM version, since
+			// this test exercises basic bridge onboarding without a pre-deployed EVM contract)
+			nftContract := nftcontracts.ExampleNFT(
+				flowsdk.HexToAddress(env.NonFungibleTokenAddress),
+				flowsdk.HexToAddress(env.MetadataViewsAddress),
+				flowsdk.HexToAddress(env.ViewResolverAddress),
+			)
 			nftContractName := "ExampleNFT"
 			txBodyBuilder = blueprints.DeployContractTransaction(
 				accounts[0],
@@ -3811,10 +3822,10 @@ func TestVMBridge(t *testing.T) {
 			id := cadence.UInt64(0)
 
 			for _, event := range output.Events {
-				if strings.Contains(string(event.Type), "Minted") {
+				if strings.Contains(string(event.Type), "Deposited") {
 					// decode the event payload
 					data, _ := ccf.Decode(nil, event.Payload)
-					// get the contractAddress field from the event
+					// get the id field from the event
 					id = cadence.SearchFieldByName(
 						data.(cadence.Event),
 						"id",
@@ -4227,7 +4238,7 @@ func Test_BlockHashListShouldWriteOnPush(t *testing.T) {
 	chain := flow.Emulator.Chain()
 	sc := systemcontracts.SystemContractsForChain(chain.ChainID())
 
-	push := func(bhl *handler.BlockHashList, height uint64) {
+	push := func(bhl *environment.BlockHashList, height uint64) {
 		buffer := make([]byte, 32)
 		pos := 0
 
@@ -4262,7 +4273,7 @@ func Test_BlockHashListShouldWriteOnPush(t *testing.T) {
 				accounts,
 			)
 
-			bhl, err := handler.NewBlockHashList(valueStore, sc.EVMStorage.Address, capacity)
+			bhl, err := environment.NewBlockHashList(valueStore, sc.EVMStorage.Address, capacity)
 			require.NoError(t, err)
 
 			// fill the block hash list
@@ -4287,7 +4298,7 @@ func Test_BlockHashListShouldWriteOnPush(t *testing.T) {
 				accounts,
 			)
 
-			bhl, err = handler.NewBlockHashList(valueStore, sc.EVMStorage.Address, capacity)
+			bhl, err = environment.NewBlockHashList(valueStore, sc.EVMStorage.Address, capacity)
 			require.NoError(t, err)
 
 			// after we push the changes should be applied and the first block hash in the bucket should be capacity+1 instead of 0
@@ -4401,4 +4412,588 @@ func TestTransactionIndexCall(t *testing.T) {
 				},
 			),
 	)
+}
+
+func TestFlowTokenChangesInspector(t *testing.T) {
+	t.Parallel()
+
+	chain := flow.Emulator.Chain()
+	sc := systemcontracts.SystemContractsForChain(chain.ChainID())
+	flowTokenVaultID := fmt.Sprintf("A.%s.FlowToken.Vault", sc.FlowToken.Address.Hex())
+	flowTokenMintedEventID := fmt.Sprintf("A.%s.FlowToken.TokensMinted", sc.FlowToken.Address.Hex())
+
+	type testCase struct {
+		txBody           func(*testing.T, flow.Chain, []flow.Address) *flow.TransactionBody
+		txErrorExpected  bool
+		resultChecker    func(*testing.T, inspection.TokenDiffResult)
+		tokenDefinitions map[string]inspection.SearchToken
+		name             string
+	}
+
+	// blocks mock needed for EVM test case
+	blocks := new(envMock.Blocks)
+	block1 := unittest.BlockFixture()
+	blocks.On("ByHeightFrom",
+		block1.Height,
+		block1.ToHeader(),
+	).Return(block1.ToHeader(), nil)
+
+	vaultOnlyTokenDefs := map[string]inspection.SearchToken{
+		flowTokenVaultID: {
+			ID: flowTokenVaultID,
+			GetBalance: func(value *interpreter.CompositeValue) uint64 {
+				return uint64(value.GetField(nil, "balance").(interpreter.UFix64Value).UFix64Value)
+			},
+		},
+	}
+
+	// payerOnlyAllowlist is the SignerAllowlist of the "mint where only the payer
+	// is allow-listed" test case; see its tokenDefinitions and txBody.
+	payerOnlyAllowlist := map[flow.Address]struct{}{}
+
+	testCases := []testCase{
+		{
+			name:             "transfer",
+			tokenDefinitions: vaultOnlyTokenDefs,
+			txBody: func(t *testing.T, chain flow.Chain, accounts []flow.Address) *flow.TransactionBody {
+				sc := systemcontracts.SystemContractsForChain(chain.ChainID())
+				env := sc.AsTemplateEnv()
+
+				txBodyBuilder := blueprints.TransferFlowTokenTransaction(env, chain.ServiceAddress(), accounts[0], "2.0")
+				err := testutil.SignTransactionAsServiceAccount(txBodyBuilder, 0, chain)
+				require.NoError(t, err)
+
+				txBody, err := txBodyBuilder.Build()
+				require.NoError(t, err)
+				return txBody
+			},
+			resultChecker: func(t *testing.T, result inspection.TokenDiffResult) {
+				require.Len(t, result.UnaccountedTokens(), 0, "no tokens were created or destroyed")
+				require.Len(t, result.Changes, 3, "change should be on 3 addresses: sender, receiver, fees")
+			},
+		},
+		{
+			name:             "mint without mint event monitoring",
+			tokenDefinitions: vaultOnlyTokenDefs,
+			txBody: func(t *testing.T, chain flow.Chain, accounts []flow.Address) *flow.TransactionBody {
+				sc := systemcontracts.SystemContractsForChain(chain.ChainID())
+				env := sc.AsTemplateEnv()
+
+				txBodyBuilder := flow.NewTransactionBodyBuilder().
+					SetScript(templates.GenerateMintFlowScript(env)).
+					AddArgument(jsoncdc.MustEncode(cadence.Address(accounts[0]))).
+					AddArgument(jsoncdc.MustEncode(cadence.UFix64(10_000_000))).
+					AddAuthorizer(chain.ServiceAddress()).
+					SetPayer(chain.ServiceAddress())
+
+				err := testutil.SignTransactionAsServiceAccount(txBodyBuilder, 0, chain)
+				require.NoError(t, err)
+
+				txBody, err := txBodyBuilder.Build()
+				require.NoError(t, err)
+
+				return txBody
+			},
+			resultChecker: func(t *testing.T, result inspection.TokenDiffResult) {
+				unaccounted := result.UnaccountedTokens()
+				require.Len(t, unaccounted, 1, "expectation: some tokens were created and are unaccounted for")
+				require.Equal(t, unaccounted[flowTokenVaultID], int64(10000000))
+				require.Len(t, result.Changes, 3, "change should be on 3 addresses: sender, receiver, fees")
+			},
+		},
+		{
+			name: "mint with mint event monitoring",
+			tokenDefinitions: map[string]inspection.SearchToken{
+				flowTokenVaultID: {
+					ID: flowTokenVaultID,
+					GetBalance: func(value *interpreter.CompositeValue) uint64 {
+						return uint64(value.GetField(nil, "balance").(interpreter.UFix64Value).UFix64Value)
+					},
+					SinksSources: map[string]inspection.SourceSink{
+						flowTokenMintedEventID: {
+							Amount: func(evt flow.Event) (int64, error) {
+								payload, err := ccf.Decode(nil, evt.Payload)
+								require.NoError(t, err)
+								return int64(payload.(cadence.Event).SearchFieldByName("amount").(cadence.UFix64)), nil
+							},
+						},
+					},
+				},
+			},
+			txBody: func(t *testing.T, chain flow.Chain, accounts []flow.Address) *flow.TransactionBody {
+				sc := systemcontracts.SystemContractsForChain(chain.ChainID())
+				env := sc.AsTemplateEnv()
+
+				txBodyBuilder := flow.NewTransactionBodyBuilder().
+					SetScript(templates.GenerateMintFlowScript(env)).
+					AddArgument(jsoncdc.MustEncode(cadence.Address(accounts[0]))).
+					AddArgument(jsoncdc.MustEncode(cadence.UFix64(10_000_000))).
+					AddAuthorizer(chain.ServiceAddress()).
+					SetPayer(chain.ServiceAddress())
+
+				err := testutil.SignTransactionAsServiceAccount(txBodyBuilder, 0, chain)
+				require.NoError(t, err)
+
+				txBody, err := txBodyBuilder.Build()
+				require.NoError(t, err)
+
+				return txBody
+			},
+			resultChecker: func(t *testing.T, result inspection.TokenDiffResult) {
+				unaccounted := result.UnaccountedTokens()
+				require.Len(t, unaccounted, 0, "expectation: all tokens were accounted for")
+				require.Len(t, result.Changes, 3, "change should be on 3 addresses: sender, receiver, fees")
+				require.Len(t, result.UnauthorizedSourcesSinks, 0, "no allow-list configured: no violations expected")
+			},
+		},
+		{
+			name:             "mint with default tracking",
+			tokenDefinitions: inspection.DefaultTokenDiffSearchTokens(chain),
+			txBody: func(t *testing.T, chain flow.Chain, accounts []flow.Address) *flow.TransactionBody {
+				sc := systemcontracts.SystemContractsForChain(chain.ChainID())
+				env := sc.AsTemplateEnv()
+
+				txBodyBuilder := flow.NewTransactionBodyBuilder().
+					SetScript(templates.GenerateMintFlowScript(env)).
+					AddArgument(jsoncdc.MustEncode(cadence.Address(accounts[0]))).
+					AddArgument(jsoncdc.MustEncode(cadence.UFix64(10_000_000))).
+					AddAuthorizer(chain.ServiceAddress()).
+					SetPayer(chain.ServiceAddress())
+
+				err := testutil.SignTransactionAsServiceAccount(txBodyBuilder, 0, chain)
+				require.NoError(t, err)
+
+				txBody, err := txBodyBuilder.Build()
+				require.NoError(t, err)
+
+				return txBody
+			},
+			resultChecker: func(t *testing.T, result inspection.TokenDiffResult) {
+				unaccounted := result.UnaccountedTokens()
+				require.Len(t, unaccounted, 0, "expectation: all tokens were accounted for")
+				require.Len(t, result.Changes, 3, "change should be on 3 addresses: sender, receiver, fees")
+				require.Len(t, result.UnauthorizedSourcesSinks, 0,
+					"mint is signed by the service account, which is allow-listed by default")
+			},
+		}, {
+			name: "mint by non-allow-listed minter",
+			tokenDefinitions: map[string]inspection.SearchToken{
+				flowTokenVaultID: {
+					ID: flowTokenVaultID,
+					GetBalance: func(value *interpreter.CompositeValue) uint64 {
+						return uint64(value.GetField(nil, "balance").(interpreter.UFix64Value).UFix64Value)
+					},
+					SinksSources: map[string]inspection.SourceSink{
+						flowTokenMintedEventID: {
+							Amount: func(evt flow.Event) (int64, error) {
+								payload, err := ccf.Decode(nil, evt.Payload)
+								require.NoError(t, err)
+								return int64(payload.(cadence.Event).SearchFieldByName("amount").(cadence.UFix64)), nil
+							},
+							// Allow-list an account that is NOT the transaction signer
+							// (the service account), so the mint triggers a violation.
+							SignerAllowlist: map[flow.Address]struct{}{
+								flow.HexToAddress("0000000000000123"): {},
+							},
+						},
+					},
+				},
+			},
+			txBody: func(t *testing.T, chain flow.Chain, accounts []flow.Address) *flow.TransactionBody {
+				sc := systemcontracts.SystemContractsForChain(chain.ChainID())
+				env := sc.AsTemplateEnv()
+
+				txBodyBuilder := flow.NewTransactionBodyBuilder().
+					SetScript(templates.GenerateMintFlowScript(env)).
+					AddArgument(jsoncdc.MustEncode(cadence.Address(accounts[0]))).
+					AddArgument(jsoncdc.MustEncode(cadence.UFix64(10_000_000))).
+					AddAuthorizer(chain.ServiceAddress()).
+					SetPayer(chain.ServiceAddress())
+
+				err := testutil.SignTransactionAsServiceAccount(txBodyBuilder, 0, chain)
+				require.NoError(t, err)
+
+				txBody, err := txBodyBuilder.Build()
+				require.NoError(t, err)
+
+				return txBody
+			},
+			resultChecker: func(t *testing.T, result inspection.TokenDiffResult) {
+				unaccounted := result.UnaccountedTokens()
+				require.Len(t, unaccounted, 0, "the mint amount is still accounted for via the event")
+				require.Len(t, result.UnauthorizedSourcesSinks, 1, "mint signed by a non-allow-listed account must be flagged")
+				require.Equal(t, flowTokenMintedEventID, result.UnauthorizedSourcesSinks[0].EventType)
+				require.Equal(t, int64(10_000_000), result.UnauthorizedSourcesSinks[0].Amount)
+			},
+		}, {
+			// A transaction merely paid for by an allow-listed account must still be
+			// flagged: only the proposer and authorizers authorize the mint.
+			name: "mint where only the payer is allow-listed",
+			tokenDefinitions: func() map[string]inspection.SearchToken {
+				searchTokens := inspection.DefaultTokenDiffSearchTokens(chain)
+				ss := searchTokens[flowTokenVaultID].SinksSources[flowTokenMintedEventID]
+				// Allow-list only the payer, replacing the default (service account).
+				// The payer's address is only known once the test accounts are
+				// created, so txBody below inserts it into this map before the
+				// transaction (and thus the inspector) runs.
+				ss.SignerAllowlist = payerOnlyAllowlist
+				searchTokens[flowTokenVaultID].SinksSources[flowTokenMintedEventID] = ss
+				return searchTokens
+			}(),
+			txBody: func(t *testing.T, chain flow.Chain, accounts []flow.Address) *flow.TransactionBody {
+				sc := systemcontracts.SystemContractsForChain(chain.ChainID())
+				env := sc.AsTemplateEnv()
+
+				txBodyBuilder := flow.NewTransactionBodyBuilder().
+					SetScript(templates.GenerateMintFlowScript(env)).
+					AddArgument(jsoncdc.MustEncode(cadence.Address(accounts[0]))).
+					AddArgument(jsoncdc.MustEncode(cadence.UFix64(10_000_000))).
+					AddAuthorizer(chain.ServiceAddress())
+
+				err := testutil.SignTransactionAsServiceAccount(txBodyBuilder, 0, chain)
+				require.NoError(t, err)
+
+				// Override the payer set by SignTransactionAsServiceAccount with the
+				// allow-listed account. Authorization checks are disabled in this
+				// test, so the payer's missing envelope signature is not an issue.
+				// The payer is also the mint's recipient, so the minted tokens cover
+				// the transaction fees (the test accounts are created unfunded).
+				payerOnlyAllowlist[accounts[0]] = struct{}{}
+				txBodyBuilder.SetPayer(accounts[0])
+
+				txBody, err := txBodyBuilder.Build()
+				require.NoError(t, err)
+
+				return txBody
+			},
+			resultChecker: func(t *testing.T, result inspection.TokenDiffResult) {
+				unaccounted := result.UnaccountedTokens()
+				require.Len(t, unaccounted, 0, "the mint amount is still accounted for via the event")
+				require.Len(t, result.UnauthorizedSourcesSinks, 1,
+					"the payer's signature must not authorize the mint")
+				require.Equal(t, flowTokenMintedEventID, result.UnauthorizedSourcesSinks[0].EventType)
+				require.Equal(t, int64(10_000_000), result.UnauthorizedSourcesSinks[0].Amount)
+				require.Equal(t, []flow.Address{chain.ServiceAddress()}, result.UnauthorizedSourcesSinks[0].Signers,
+					"only the proposer and authorizers count as signers")
+			},
+		}, {
+			name:             "create account",
+			tokenDefinitions: inspection.DefaultTokenDiffSearchTokens(chain),
+			txBody: func(t *testing.T, chain flow.Chain, accounts []flow.Address) *flow.TransactionBody {
+				_, txBodyBuilder := testutil.CreateAccountCreationTransaction(t, chain)
+
+				err := testutil.SignTransactionAsServiceAccount(txBodyBuilder, 0, chain)
+				require.NoError(t, err)
+
+				txBody, err := txBodyBuilder.Build()
+				require.NoError(t, err)
+
+				return txBody
+			},
+			resultChecker: func(t *testing.T, result inspection.TokenDiffResult) {
+				unaccounted := result.UnaccountedTokens()
+				require.Len(t, unaccounted, 0, "no tokens were created or destroyed")
+				require.Len(t, result.Changes, 3, "change should be on 3 addresses: sender, receiver, fees")
+			},
+		}, {
+			name:             "evm transaction",
+			tokenDefinitions: inspection.DefaultTokenDiffSearchTokens(chain),
+			txBody: func(t *testing.T, chain flow.Chain, _ []flow.Address) *flow.TransactionBody {
+				sc := systemcontracts.SystemContractsForChain(chain.ChainID())
+
+				txBodyBuilder := flow.NewTransactionBodyBuilder().
+					SetScript([]byte(fmt.Sprintf(`
+						import FungibleToken from %s
+						import FlowToken from %s
+						import EVM from %s
+
+						transaction() {
+							prepare(acc: auth(Storage) &Account) {
+								let vaultRef = acc.storage
+									.borrow<auth(FungibleToken.Withdraw) &FlowToken.Vault>(from: /storage/flowTokenVault)
+									?? panic("Could not borrow reference to the owner's Vault!")
+
+								let evmHeartbeat = acc.storage
+									.borrow<&EVM.Heartbeat>(from: /storage/EVMHeartbeat)
+									?? panic("Couldn't borrow EVM.Heartbeat Resource")
+
+								let evmAccount <- EVM.createCadenceOwnedAccount()
+								let amount <- vaultRef.withdraw(amount: 1.0) as! @FlowToken.Vault
+								evmAccount.deposit(from: <- amount)
+								destroy evmAccount
+
+								evmHeartbeat.heartbeat()
+							}
+						}`,
+						sc.FungibleToken.Address.HexWithPrefix(),
+						sc.FlowToken.Address.HexWithPrefix(),
+						sc.FlowServiceAccount.Address.HexWithPrefix(),
+					))).
+					SetProposalKey(chain.ServiceAddress(), 0, 0).
+					AddAuthorizer(chain.ServiceAddress()).
+					SetPayer(chain.ServiceAddress())
+
+				err := testutil.SignTransactionAsServiceAccount(txBodyBuilder, 0, chain)
+				require.NoError(t, err)
+
+				txBody, err := txBodyBuilder.Build()
+				require.NoError(t, err)
+				return txBody
+			},
+			resultChecker: func(t *testing.T, result inspection.TokenDiffResult) {
+				unaccounted := result.UnaccountedTokens()
+				require.Len(t, unaccounted, 0, "all tokens should be accounted for (EVM deposit is a known sink)")
+			},
+		},
+	}
+
+	runAndCheckTransactionTest := func(tc testCase) func(t *testing.T) {
+		return newVMTest().
+			withChain(chain).
+			withBootstrapProcedureOptions(
+				fvm.WithTransactionFee(fvm.DefaultTransactionFees),
+				fvm.WithStorageMBPerFLOW(fvm.DefaultStorageMBPerFLOW),
+				fvm.WithMinimumStorageReservation(fvm.DefaultMinimumStorageReservation),
+				fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
+				fvm.WithExecutionMemoryLimit(math.MaxUint64),
+				fvm.WithExecutionEffortWeights(environment.MainnetExecutionEffortWeights),
+				fvm.WithExecutionMemoryWeights(meter.DefaultMemoryWeights),
+			).
+			withContextOptions(
+				fvm.WithTransactionFeesEnabled(true),
+				fvm.WithAccountStorageLimit(true),
+				fvm.WithAuthorizationChecksEnabled(false),
+				fvm.WithBlocks(blocks),
+				fvm.WithBlockHeader(block1.ToHeader()),
+			).
+			run(
+				func(
+					t *testing.T,
+					vm fvm.VM,
+					chain flow.Chain,
+					ctx fvm.Context,
+					snapshotTree snapshot.SnapshotTree,
+				) {
+					t.Parallel()
+
+					differ := inspection.NewTokenChangesInspector(tc.tokenDefinitions, chain.ChainID())
+
+					// Add the inspector to the context so inspection runs
+					// as part of the transaction execution pipeline.
+					ctx = fvm.NewContextFromParent(ctx, fvm.WithInspectors([]inspection.Inspector{differ}))
+
+					// Create an account private key.
+					privateKey, err := testutil.GenerateAccountPrivateKey()
+					require.NoError(t, err)
+
+					// Create accounts with the provided private
+					// key and the root account.
+					snapshotTree, accounts, err := testutil.CreateAccounts(
+						vm,
+						snapshotTree,
+						[]flow.AccountPrivateKey{privateKey, privateKey, privateKey},
+						chain)
+					require.NoError(t, err)
+
+					txBody := tc.txBody(t, chain, accounts)
+
+					_, output, err := vm.Run(
+						ctx,
+						fvm.Transaction(txBody, 0),
+						snapshotTree)
+
+					require.NoError(t, err)
+					if tc.txErrorExpected {
+						require.Error(t, output.Err)
+					} else {
+						require.NoError(t, output.Err)
+					}
+
+					require.Len(t, output.InspectionResults, 1, "expected one inspection result")
+					tc.resultChecker(t, output.InspectionResults[0].(inspection.TokenDiffResult))
+				},
+			)
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, runAndCheckTransactionTest(tc))
+	}
+}
+
+// TestTokenInspectorCreateAndFundNewAccount is a regression test for the account-creation
+// storage-sharing fix, derived from mainnet tx
+// c5f3d77c1b86a9b4ce36e214278aca695702f26bd00e6c93b01d88f706456597.
+//
+// Creating and funding a new account in one transaction used to run `Account(payer:)`'s setup in
+// separate Cadence storage. When the payer's vault was borrowed before `Account(payer:)`, its stale
+// balance overwrote the 0.001 FLOW reservation deduction on commit, creating FLOW with no
+// `TokensMinted` event, which the inspector flagged as unaccounted.
+//
+// The test asserts that both borrow orderings now charge the payer the funding plus the reservation
+// and leave nothing unaccounted.
+func TestTokenInspectorCreateAndFundNewAccount(t *testing.T) {
+	chain := flow.Emulator.Chain()
+	sc := systemcontracts.SystemContractsForChain(chain.ChainID())
+
+	feesDeductedEventID := fmt.Sprintf("A.%s.FlowFees.FeesDeducted", sc.FlowFees.Address.Hex())
+
+	// reservation is the minimum storage reservation funded into every newly created account.
+	reservation := uint64(fvm.DefaultMinimumStorageReservation) // 0.001 FLOW
+	const funding = uint64(50_000_000)                          // 0.5 FLOW deposited into the new account
+
+	// borrowBeforeCreate borrows the payer's vault before `Account(payer:)` — the mainnet
+	// ordering that originally exposed the lost-reservation bug.
+	// Both orderings must now be safe.
+	makeScript := func(borrowBeforeCreate bool) string {
+		borrow := `
+				let flowVaultRef = acct.storage
+					.borrow<auth(FungibleToken.Withdraw) &FlowToken.Vault>(from: /storage/flowTokenVault)
+					?? panic("Could not borrow reference to the owner's Vault!")`
+		create := `let newAcct = Account(payer: acct)`
+
+		preamble := create + "\n" + borrow
+		if borrowBeforeCreate {
+			preamble = borrow + "\n\t\t\t\t" + create
+		}
+
+		return fmt.Sprintf(`
+			import FungibleToken from %s
+			import FlowToken from %s
+
+			transaction() {
+				prepare(acct: auth(Storage, Capabilities) &Account) {
+					%s
+
+					let receiverRef = newAcct.capabilities
+						.get<&{FungibleToken.Receiver}>(/public/flowTokenReceiver)
+						.borrow()
+						?? panic("Could not borrow receiver reference to the newly created account")
+					receiverRef.deposit(from: <- flowVaultRef.withdraw(amount: 0.5))
+				}
+			}`,
+			sc.FungibleToken.Address.HexWithPrefix(),
+			sc.FlowToken.Address.HexWithPrefix(),
+			preamble,
+		)
+	}
+
+	// expectedPayerDebit is the FlowToken amount the payer's balance should drop by (excluding
+	// transaction fees, which are deducted from the same account): the funding plus the reservation,
+	// regardless of borrow ordering.
+	expectedPayerDebit := funding + reservation
+
+	type testCase struct {
+		name               string
+		borrowBeforeCreate bool
+	}
+
+	testCases := []testCase{
+		{
+			name:               "borrow before create (mainnet pattern)",
+			borrowBeforeCreate: true,
+		},
+		{
+			name:               "borrow after create",
+			borrowBeforeCreate: false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, newVMTest().
+			withChain(chain).
+			withBootstrapProcedureOptions(
+				fvm.WithTransactionFee(fvm.DefaultTransactionFees),
+				fvm.WithStorageMBPerFLOW(fvm.DefaultStorageMBPerFLOW),
+				fvm.WithMinimumStorageReservation(fvm.DefaultMinimumStorageReservation),
+				fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
+				fvm.WithExecutionMemoryLimit(math.MaxUint64),
+				fvm.WithExecutionEffortWeights(environment.MainnetExecutionEffortWeights),
+				fvm.WithExecutionMemoryWeights(meter.DefaultMemoryWeights),
+			).
+			withContextOptions(
+				fvm.WithTransactionFeesEnabled(true),
+				fvm.WithAccountStorageLimit(true),
+				fvm.WithAuthorizationChecksEnabled(false),
+				fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
+			).
+			run(func(
+				t *testing.T,
+				vm fvm.VM,
+				chain flow.Chain,
+				ctx fvm.Context,
+				snapshotTree snapshot.SnapshotTree,
+			) {
+				privateKey, err := testutil.GenerateAccountPrivateKey()
+				require.NoError(t, err)
+				snapshotTree, accounts, err := testutil.CreateAccounts(
+					vm, snapshotTree, []flow.AccountPrivateKey{privateKey}, chain)
+				require.NoError(t, err)
+				payer := accounts[0]
+
+				env := sc.AsTemplateEnv()
+				balanceOf := func(snap snapshot.SnapshotTree, addr flow.Address) uint64 {
+					code := fmt.Sprintf(`
+						import FungibleToken from %s
+						import FlowToken from %s
+						access(all) fun main(addr: Address): UFix64 {
+							return getAccount(addr).capabilities
+								.borrow<&FlowToken.Vault>(/public/flowTokenBalance)!.balance
+						}`,
+						sc.FungibleToken.Address.HexWithPrefix(),
+						sc.FlowToken.Address.HexWithPrefix(),
+					)
+					arg, err := jsoncdc.Encode(cadence.Address(addr))
+					require.NoError(t, err)
+					_, out, serr := vm.Run(ctx, fvm.Script([]byte(code)).WithArguments(arg), snap)
+					require.NoError(t, serr)
+					require.NoError(t, out.Err)
+					return uint64(out.Value.(cadence.UFix64))
+				}
+
+				// Fund the (regular) payer account with 10 FLOW from the service account, so the
+				// payer is a normal account just like the mainnet authorizer.
+				fundTx := blueprints.TransferFlowTokenTransaction(env, chain.ServiceAddress(), payer, "10.0")
+				require.NoError(t, testutil.SignTransactionAsServiceAccount(fundTx, 0, chain))
+				fundBody, err := fundTx.Build()
+				require.NoError(t, err)
+				fundSnap, fundOut, err := vm.Run(ctx, fvm.Transaction(fundBody, 0), snapshotTree)
+				require.NoError(t, err)
+				require.NoError(t, fundOut.Err)
+				snapshotTree = snapshotTree.Append(fundSnap)
+
+				txBuilder := flow.NewTransactionBodyBuilder().
+					SetScript([]byte(makeScript(tc.borrowBeforeCreate))).
+					AddAuthorizer(payer)
+				require.NoError(t, testutil.SignTransaction(txBuilder, payer, privateKey, 0))
+				txBody, err := txBuilder.Build()
+				require.NoError(t, err)
+
+				differ := inspection.NewTokenChangesInspector(
+					inspection.DefaultTokenDiffSearchTokens(chain), chain.ChainID())
+				inspectCtx := fvm.NewContextFromParent(ctx, fvm.WithInspectors([]inspection.Inspector{differ}))
+
+				payerBefore := balanceOf(snapshotTree, payer)
+				execSnap, output, err := vm.Run(inspectCtx, fvm.Transaction(txBody, 0), snapshotTree)
+				require.NoError(t, err)
+				require.NoError(t, output.Err)
+				payerAfter := balanceOf(snapshotTree.Append(execSnap), payer)
+
+				// The transaction fee is deducted from the payer in addition to the funding/reservation.
+				var txFee uint64
+				for _, e := range output.Events {
+					if string(e.Type) == feesDeductedEventID {
+						payload, err := ccf.Decode(nil, e.Payload)
+						require.NoError(t, err)
+						txFee = uint64(payload.(cadence.Event).SearchFieldByName("amount").(cadence.UFix64))
+					}
+				}
+				payerDebit := payerBefore - payerAfter
+				require.Equal(t, expectedPayerDebit+txFee, payerDebit,
+					"payer balance change should equal expected debit plus the transaction fee")
+
+				require.Len(t, output.InspectionResults, 1, "expected one inspection result")
+				result := output.InspectionResults[0].(inspection.TokenDiffResult)
+				require.Empty(t, result.UnaccountedTokens(), "all token movements should be accounted for")
+			}))
+	}
 }

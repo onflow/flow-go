@@ -255,6 +255,16 @@ func (u *UnimplementedAPI) GetExecutionResultByID(ctx context.Context, id flow.I
 	return nil, status.Error(codes.Unimplemented, "method GetExecutionResultByID not implemented")
 }
 
+// GetExecutionReceiptsByBlockID returns an unimplemented error.
+func (u *UnimplementedAPI) GetExecutionReceiptsByBlockID(ctx context.Context, blockID flow.Identifier) ([]*flow.ExecutionReceipt, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetExecutionReceiptsByBlockID not implemented")
+}
+
+// GetExecutionReceiptsByResultID returns an unimplemented error.
+func (u *UnimplementedAPI) GetExecutionReceiptsByResultID(ctx context.Context, resultID flow.Identifier) ([]*flow.ExecutionReceipt, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetExecutionReceiptsByResultID not implemented")
+}
+
 // SubscribeBlocksFromStartBlockID returns a failed subscription.
 func (u *UnimplementedAPI) SubscribeBlocksFromStartBlockID(ctx context.Context, startBlockID flow.Identifier, blockStatus flow.BlockStatus) subscription.Subscription {
 	msg := "method SubscribeBlocksFromStartBlockID not implemented"

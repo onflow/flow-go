@@ -36,7 +36,7 @@ func (_m *Encoder) EXPECT() *Encoder_Expecter {
 }
 
 // Encode provides a mock function for the type Encoder
-func (_mock *Encoder) Encode(v interface{}) error {
+func (_mock *Encoder) Encode(v any) error {
 	ret := _mock.Called(v)
 
 	if len(ret) == 0 {
@@ -44,7 +44,7 @@ func (_mock *Encoder) Encode(v interface{}) error {
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(interface{}) error); ok {
+	if returnFunc, ok := ret.Get(0).(func(any) error); ok {
 		r0 = returnFunc(v)
 	} else {
 		r0 = ret.Error(0)
@@ -58,16 +58,16 @@ type Encoder_Encode_Call struct {
 }
 
 // Encode is a helper method to define mock.On call
-//   - v interface{}
+//   - v any
 func (_e *Encoder_Expecter) Encode(v interface{}) *Encoder_Encode_Call {
 	return &Encoder_Encode_Call{Call: _e.mock.On("Encode", v)}
 }
 
-func (_c *Encoder_Encode_Call) Run(run func(v interface{})) *Encoder_Encode_Call {
+func (_c *Encoder_Encode_Call) Run(run func(v any)) *Encoder_Encode_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 interface{}
+		var arg0 any
 		if args[0] != nil {
-			arg0 = args[0].(interface{})
+			arg0 = args[0].(any)
 		}
 		run(
 			arg0,
@@ -81,7 +81,7 @@ func (_c *Encoder_Encode_Call) Return(err error) *Encoder_Encode_Call {
 	return _c
 }
 
-func (_c *Encoder_Encode_Call) RunAndReturn(run func(v interface{}) error) *Encoder_Encode_Call {
+func (_c *Encoder_Encode_Call) RunAndReturn(run func(v any) error) *Encoder_Encode_Call {
 	_c.Call.Return(run)
 	return _c
 }

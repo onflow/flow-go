@@ -71,11 +71,13 @@ func (s *ObserverSuite) SetupTest() {
 	}
 
 	s.localRest = map[string]struct{}{
-		"getBlocksByIDs":       {},
-		"getBlocksByHeight":    {},
-		"getBlockPayloadByID":  {},
-		"getNetworkParameters": {},
-		"getNodeVersionInfo":   {},
+		"getBlocksByIDs":                 {},
+		"getBlocksByHeight":              {},
+		"getBlockPayloadByID":            {},
+		"getNetworkParameters":           {},
+		"getNodeVersionInfo":             {},
+		"getExecutionReceiptsByBlockID":  {},
+		"getExecutionReceiptsByResultID": {},
 	}
 
 	s.testedRPCs = s.getRPCs
@@ -395,6 +397,18 @@ func (s *ObserverSuite) getRPCs() []RPCTest {
 			_, err := client.GetExecutionResultForBlockID(ctx, &accessproto.GetExecutionResultForBlockIDRequest{})
 			return err
 		}},
+		{name: "GetExecutionReceiptsByBlockID", call: func(ctx context.Context, client accessproto.AccessAPIClient) error {
+			_, err := client.GetExecutionReceiptsByBlockID(ctx, &accessproto.GetExecutionReceiptsByBlockIDRequest{
+				BlockId: make([]byte, 32),
+			})
+			return err
+		}},
+		{name: "GetExecutionReceiptsByResultID", call: func(ctx context.Context, client accessproto.AccessAPIClient) error {
+			_, err := client.GetExecutionReceiptsByResultID(ctx, &accessproto.GetExecutionReceiptsByResultIDRequest{
+				ResultId: make([]byte, 32),
+			})
+			return err
+		}},
 	}
 }
 
@@ -495,6 +509,16 @@ func (s *ObserverSuite) getRestEndpoints() []RestEndpointTest {
 			name:   "getNodeVersionInfo",
 			method: http.MethodGet,
 			path:   "/node_version_info",
+		},
+		{
+			name:   "getExecutionReceiptsByBlockID",
+			method: http.MethodGet,
+			path:   "/execution_receipts?block_id=" + block.ID().String(),
+		},
+		{
+			name:   "getExecutionReceiptsByResultID",
+			method: http.MethodGet,
+			path:   "/execution_receipts/results/" + executionResult.ID().String(),
 		},
 	}
 }

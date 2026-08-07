@@ -714,7 +714,7 @@ func TestEvictingCacheClients(t *testing.T) {
 
 		// Invalidate marks the connection for closure asynchronously, so give it some time to run
 		require.Eventually(t, func() bool {
-			return cachedClient.closeRequested.Load()
+			return cachedClient.CloseRequested()
 		}, 100*time.Millisecond, 10*time.Millisecond, "client timed out closing connection")
 
 		// Call a gRPC method on the client, requests should be blocked since the connection is invalidated

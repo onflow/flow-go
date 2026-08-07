@@ -17,7 +17,7 @@ const idQuery = "id"
 // The ID may be either:
 //  1. the hex-encoded 32-byte hash of a user-submitted transaction, or
 //  2. the integral system-assigned identifier of a scheduled transaction
-func GetTransactionByID(r *common.Request, backend access.API, link commonmodels.LinkGenerator) (interface{}, error) {
+func GetTransactionByID(r *common.Request, backend access.API, link commonmodels.LinkGenerator) (any, error) {
 	if !isTransactionID(r.GetVar(idQuery)) {
 		return GetScheduledTransaction(r, backend, link)
 	}
@@ -53,7 +53,7 @@ func GetTransactionByID(r *common.Request, backend access.API, link commonmodels
 }
 
 // GetTransactionsByBlock gets transactions by requested blockID or height.
-func GetTransactionsByBlock(r *common.Request, backend access.API, link commonmodels.LinkGenerator) (interface{}, error) {
+func GetTransactionsByBlock(r *common.Request, backend access.API, link commonmodels.LinkGenerator) (any, error) {
 	req, err := request.NewGetTransactionsByBlockRequest(r)
 	if err != nil {
 		return nil, common.NewBadRequestError(err)
@@ -101,7 +101,7 @@ func GetTransactionsByBlock(r *common.Request, backend access.API, link commonmo
 // The ID may be either:
 //  1. the hex-encoded 32-byte hash of a user-submitted transaction, or
 //  2. the integral system-assigned identifier of a scheduled transaction
-func GetTransactionResultByID(r *common.Request, backend access.API, link commonmodels.LinkGenerator) (interface{}, error) {
+func GetTransactionResultByID(r *common.Request, backend access.API, link commonmodels.LinkGenerator) (any, error) {
 	if !isTransactionID(r.GetVar(idQuery)) {
 		return GetScheduledTransactionResult(r, backend, link)
 	}
@@ -128,7 +128,7 @@ func GetTransactionResultByID(r *common.Request, backend access.API, link common
 }
 
 // GetTransactionResultsByBlock gets transaction results by requested blockID or height.
-func GetTransactionResultsByBlock(r *common.Request, backend access.API, link commonmodels.LinkGenerator) (interface{}, error) {
+func GetTransactionResultsByBlock(r *common.Request, backend access.API, link commonmodels.LinkGenerator) (any, error) {
 	req, err := request.NewGetTransactionResultsByBlockRequest(r)
 	if err != nil {
 		return nil, common.NewBadRequestError(err)
@@ -160,7 +160,7 @@ func GetTransactionResultsByBlock(r *common.Request, backend access.API, link co
 }
 
 // CreateTransaction creates a new transaction from provided payload.
-func CreateTransaction(r *common.Request, backend access.API, link commonmodels.LinkGenerator) (interface{}, error) {
+func CreateTransaction(r *common.Request, backend access.API, link commonmodels.LinkGenerator) (any, error) {
 	req, err := request.CreateTransactionRequest(r)
 	if err != nil {
 		return nil, common.NewBadRequestError(err)
@@ -177,7 +177,7 @@ func CreateTransaction(r *common.Request, backend access.API, link commonmodels.
 }
 
 // GetScheduledTransaction gets a scheduled transaction by scheduled transaction ID.
-func GetScheduledTransaction(r *common.Request, backend access.API, link commonmodels.LinkGenerator) (interface{}, error) {
+func GetScheduledTransaction(r *common.Request, backend access.API, link commonmodels.LinkGenerator) (any, error) {
 	req, err := request.NewGetScheduledTransaction(r)
 	if err != nil {
 		return nil, common.NewBadRequestError(err)
@@ -202,7 +202,7 @@ func GetScheduledTransaction(r *common.Request, backend access.API, link commonm
 }
 
 // GetScheduledTransactionResult gets a scheduled transaction result by scheduled transaction ID.
-func GetScheduledTransactionResult(r *common.Request, backend access.API, link commonmodels.LinkGenerator) (interface{}, error) {
+func GetScheduledTransactionResult(r *common.Request, backend access.API, link commonmodels.LinkGenerator) (any, error) {
 	req, err := request.NewGetScheduledTransactionResult(r)
 	if err != nil {
 		return nil, common.NewBadRequestError(err)

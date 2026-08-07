@@ -56,10 +56,10 @@ func NewRateLimiterInterceptor(log zerolog.Logger, apiRateLimits map[string]int,
 // based on the limits defined when creating the RateLimiterInterceptor
 func (interceptor *RateLimiterInterceptor) UnaryServerInterceptor(
 	ctx context.Context,
-	req interface{},
+	req any,
 	info *grpc.UnaryServerInfo,
 	handler grpc.UnaryHandler,
-) (resp interface{}, err error) {
+) (resp any, err error) {
 	// remove the package name (e.g. "/flow.access.AccessAPI/Ping" to "Ping")
 	methodName := filepath.Base(info.FullMethod)
 

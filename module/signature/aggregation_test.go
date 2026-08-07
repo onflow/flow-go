@@ -41,7 +41,7 @@ func createAggregationData(t *testing.T, rand *mrand.Rand, signersNumber int) (
 	keys := make([]crypto.PublicKey, 0, signersNumber)
 	sigs := make([]crypto.Signature, 0, signersNumber)
 	seed := make([]byte, crypto.KeyGenSeedMinLen)
-	for i := 0; i < signersNumber; i++ {
+	for range signersNumber {
 		_, err := rand.Read(seed)
 		require.NoError(t, err)
 		sk, err := crypto.GeneratePrivateKey(crypto.BLSBLS12381, seed)
@@ -115,7 +115,7 @@ func TestAggregatorSameMessage(t *testing.T) {
 		assert.True(t, expectedKey.Equals(aggKey))
 		// check signers
 		sort.Ints(signers)
-		for i := 0; i < subSet; i++ {
+		for i := range subSet {
 			index := i + subSet
 			assert.Equal(t, index, signers[i])
 		}
@@ -144,7 +144,7 @@ func TestAggregatorSameMessage(t *testing.T) {
 		assert.True(t, expectedKey.Equals(aggKey))
 		// check signers
 		sort.Ints(signers)
-		for i := 0; i < signersNum; i++ {
+		for i := range signersNum {
 			assert.Equal(t, i, signers[i])
 		}
 	})
@@ -419,7 +419,7 @@ func TestKeyAggregator(t *testing.T) {
 	indices := make([]int, 0, signersNum)
 	keys := make([]crypto.PublicKey, 0, signersNum)
 	seed := make([]byte, crypto.KeyGenSeedMinLen)
-	for i := 0; i < signersNum; i++ {
+	for i := range signersNum {
 		indices = append(indices, i)
 		_, err := rand.Read(seed)
 		require.NoError(t, err)
@@ -492,7 +492,7 @@ func TestKeyAggregator(t *testing.T) {
 		// iterate over different random cases to make sure
 		// the delta algorithm works
 		rounds := 30
-		for i := 0; i < rounds; i++ {
+		for range rounds {
 			go func() { // test module concurrency
 				low := rand.Intn(signersNum - 1)
 				high := low + 1 + rand.Intn(signersNum-1-low)

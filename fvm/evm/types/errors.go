@@ -113,13 +113,16 @@ var (
 	// ErrNotImplemented is a fatal error when something is called that is not implemented
 	ErrNotImplemented = NewFatalError(errors.New("a functionality is called that is not implemented"))
 
-	ErrRestrictedEOA = errors.New(
-		"this account has been restricted by the Community Governance Council in connection to malicious activity, please reach out to security@flowfoundation.com for inquiries",
-	)
-
 	// ErrEmptyRLPEncodedProof is returned when the RLP encoded COA Ownership proof is
 	// an empty list
 	ErrEmptyRLPEncodedProof = errors.New("invalid encoded proof: expected list with key indices, got empty list")
+
+	// ErrUnexpectedEmptyTransactionData is returned when empty transaction data is received.
+	// This should never happen and is a safety error.
+	ErrUnexpectedEmptyTransactionData = errors.New("unexpected empty transaction data has been received")
+
+	// ErrUnsupportedOperation is returned when the operation is not supported.
+	ErrUnsupportedOperation = errors.New("operation is not supported")
 )
 
 // StateError is a non-fatal error, returned when a state operation
@@ -185,16 +188,22 @@ func IsAInsufficientTotalSupplyError(err error) bool {
 	return errors.Is(err, ErrInsufficientTotalSupply)
 }
 
-// IsWithdrawBalanceRoundingError returns true if the error type is
+// IsAWithdrawBalanceRoundingError returns true if the error type is
 // ErrWithdrawBalanceRounding
-func IsWithdrawBalanceRoundingError(err error) bool {
+func IsAWithdrawBalanceRoundingError(err error) bool {
 	return errors.Is(err, ErrWithdrawBalanceRounding)
 }
 
 // IsAUnauthorizedMethodCallError returns true if the error type is
-// UnauthorizedMethodCallError
+// ErrUnauthorizedMethodCall
 func IsAUnauthorizedMethodCallError(err error) bool {
 	return errors.Is(err, ErrUnauthorizedMethodCall)
+}
+
+// IsAUnsupportedOperationError returns true if the error type is
+// ErrUnsupportedOperation
+func IsAUnsupportedOperationError(err error) bool {
+	return errors.Is(err, ErrUnsupportedOperation)
 }
 
 // BackendError is a non-fatal error wraps errors returned from the backend

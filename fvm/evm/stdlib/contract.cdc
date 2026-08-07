@@ -7,7 +7,7 @@ import "FlowToken"
 
     The Flow EVM contract defines important types and functionality
     to allow Cadence code and Flow SDKs to interface
-    with the Etherem Virtual Machine environment on Flow.
+    with the Ethereum Virtual Machine environment on Flow.
 
     The EVM contract emits events when relevant actions happen in Flow EVM
     such as creating new blocks, executing transactions, and bridging FLOW
@@ -22,7 +22,7 @@ import "FlowToken"
     and many of its functionality is directly connected to the protocol software
     to allow interaction with the EVM.
 
-    See additional EVM documentation here: https://developers.flow.com/evm/about
+    See additional EVM documentation here: https://developers.flow.com/build/evm/how-it-works
 
 */
 
@@ -175,7 +175,7 @@ access(all) contract EVM {
 
         /// Nonce of the address
         access(all)
-        fun nonce(): UInt64 {
+        view fun nonce(): UInt64 {
             return InternalEVM.nonce(
                 address: self.bytes
             )
@@ -183,7 +183,7 @@ access(all) contract EVM {
 
         /// Code of the address
         access(all)
-        fun code(): [UInt8] {
+        view fun code(): [UInt8] {
             return InternalEVM.code(
                 address: self.bytes
             )
@@ -191,7 +191,7 @@ access(all) contract EVM {
 
         /// CodeHash of the address
         access(all)
-        fun codeHash(): [UInt8] {
+        view fun codeHash(): [UInt8] {
             return InternalEVM.codeHash(
                 address: self.bytes
             )
@@ -200,6 +200,10 @@ access(all) contract EVM {
         /// Deposits the given vault into the EVM account with the given address
         access(all)
         fun deposit(from: @FlowToken.Vault) {
+            pre {
+                !EVM.isPaused(): "EVM operations are temporarily paused"
+            }
+
             let amount = from.balance
             if amount == 0.0 {
                 destroy from
@@ -241,9 +245,18 @@ access(all) contract EVM {
                 "EVM.addressFromString(): Invalid hex string length for an EVM address. The provided string is \(asHex.length), but the length must be 40 or 42."
         }
         // Strip the 0x prefix if it exists
-        var withoutPrefix = (asHex[1] == "x" ? asHex.slice(from: 2, upTo: asHex.length) : asHex).toLower()
-        let bytes = withoutPrefix.decodeHex().toConstantSized<[UInt8; 20]>()!
-        return EVMAddress(bytes: bytes)
+        var withoutPrefix = asHex
+        if asHex.length == 42 {
+            assert(
+                asHex[0] == "0" && asHex[1] == "x",
+                message: "EVM.addressFromString(): The 42-character EVM address string must have a '0x' prefix"
+            )
+            withoutPrefix = asHex.slice(from: 2, upTo: asHex.length)
+        }
+
+        return EVMAddress(
+            bytes: withoutPrefix.decodeHex().toConstantSized<[UInt8; 20]>()!
+        )
     }
 
     /// EVMBytes is a type wrapper used for ABI encoding/decoding into
@@ -320,7 +333,7 @@ access(all) contract EVM {
 
         /// Returns true if the balance is zero
         access(all)
-        fun isZero(): Bool {
+        view fun isZero(): Bool {
             return self.attoflow == 0
         }
     }
@@ -401,6 +414,55 @@ access(all) contract EVM {
         }
     }
 
+    /// Reports the outcome of an evm transaction/call execution attempt.
+    /// The results field has the decoded evm transaction/call results if
+    /// result types are provided; otherwise, the results field is nil.
+    access(all) struct ResultDecoded {
+        /// status of the execution
+        access(all) let status: Status
+
+        /// error code (error code zero means no error)
+        access(all) let errorCode: UInt64
+
+        /// error message
+        access(all) let errorMessage: String
+
+        /// returns the amount of gas metered during
+        /// evm execution
+        access(all) let gasUsed: UInt64
+
+        /// Returns the decoded results from the evm call if
+        /// the evm call is successful and resultTypes are provided.
+        /// Otherwise, returns raw result data from the evm call.
+        access(all) let results: [AnyStruct]
+
+        /// returns the newly deployed contract address
+        /// if the transaction caused such a deployment
+        /// otherwise the value is nil.
+        access(all) let deployedContract: EVMAddress?
+
+        init(
+            status: Status,
+            errorCode: UInt64,
+            errorMessage: String,
+            gasUsed: UInt64,
+            results: [AnyStruct],
+            contractAddress: [UInt8; 20]?
+        ) {
+            self.status = status
+            self.errorCode = errorCode
+            self.errorMessage = errorMessage
+            self.gasUsed = gasUsed
+            self.results = results
+
+            if let addressBytes = contractAddress {
+                self.deployedContract = EVMAddress(bytes: addressBytes)
+            } else {
+                self.deployedContract = nil
+            }
+        }
+    }
+
     /* 
         Cadence-Owned Accounts (COA) 
         A COA is a natively supported EVM smart contract wallet type 
@@ -468,8 +530,6 @@ access(all) contract EVM {
         /// Sets the EVM address for the COA. Only callable once on initial creation.
         ///
         /// @param addressBytes: The 20 byte EVM address
-        ///
-        /// @return the token decimals of the ERC20
         access(contract)
         fun initAddress(addressBytes: [UInt8; 20]) {
             // only allow set address for the first time
@@ -493,14 +553,12 @@ access(all) contract EVM {
         ///
         access(all)
         view fun balance(): Balance {
-            return self.address().balance()
+            return Balance(attoflow: InternalEVM.balance(address: self.addressBytes))
         }
 
         /// Deposits the given vault into the cadence owned account's balance
         ///
         /// @param from: The FlowToken Vault to deposit to this cadence owned account
-        ///
-        /// @return the token decimals of the ERC20
         access(all)
         fun deposit(from: @FlowToken.Vault) {
             self.address().deposit(from: <-from)
@@ -527,6 +585,10 @@ access(all) contract EVM {
         /// @return A FlowToken Vault with the requested balance
         access(Owner | Withdraw)
         fun withdraw(balance: Balance): @FlowToken.Vault {
+            pre {
+                !EVM.isPaused(): "EVM operations are temporarily paused"
+            }
+
             if balance.isZero() {
                 return <-FlowToken.createEmptyVault(vaultType: Type<@FlowToken.Vault>())
             }
@@ -558,6 +620,9 @@ access(all) contract EVM {
             gasLimit: UInt64,
             value: Balance
         ): Result {
+            pre {
+                !EVM.isPaused(): "EVM operations are temporarily paused"
+            }
             return InternalEVM.deploy(
                 from: self.addressBytes,
                 code: code,
@@ -575,6 +640,9 @@ access(all) contract EVM {
             gasLimit: UInt64,
             value: Balance
         ): Result {
+            pre {
+                !EVM.isPaused(): "EVM operations are temporarily paused"
+            }
             return InternalEVM.call(
                 from: self.addressBytes,
                 to: to.bytes,
@@ -582,6 +650,34 @@ access(all) contract EVM {
                 gasLimit: gasLimit,
                 value: value.attoflow
             ) as! Result
+        }
+
+        /// Calls a contract function with the given signature and args.
+        /// The execution is limited by the given amount of gas.
+        /// The value is attoflow.  If the resultTypes is provided,
+        /// the evm call results are decoded and returned in ResultDecoded.results;
+        /// otherwise, the evm call results are discarded and not returned.
+        access(Owner | Call)
+        fun callWithSigAndArgs(
+            to: EVMAddress,
+            signature: String,
+            args: [AnyStruct],
+            gasLimit: UInt64,
+            value: UInt,
+            resultTypes: [Type]?
+        ): ResultDecoded {
+            pre {
+                !EVM.isPaused(): "EVM operations are temporarily paused"
+            }
+            return InternalEVM.callWithSigAndArgs(
+                from: self.addressBytes,
+                to: to.bytes,
+                signature: signature,
+                args: args,
+                gasLimit: gasLimit,
+                value: value,
+                resultTypes: resultTypes
+            ) as! ResultDecoded
         }
 
         /// Calls a contract function with the given data.
@@ -603,6 +699,32 @@ access(all) contract EVM {
             ) as! Result
         }
 
+        /// Calls a contract function with the given signature and args.
+        /// The execution is limited by the given amount of gas.
+        /// The value is attoflow.  If the resultTypes is provided,
+        /// the evm call results are decoded and returned in ResultDecoded.results;
+        /// otherwise, the evm call results are discarded and not returned.
+        /// The transaction state changes are not persisted.
+        access(all)
+        fun dryCallWithSigAndArgs(
+            to: EVMAddress,
+            signature: String,
+            args: [AnyStruct],
+            gasLimit: UInt64,
+            value: UInt,
+            resultTypes: [Type]?
+        ): ResultDecoded {
+            return InternalEVM.dryCallWithSigAndArgs(
+                from: self.addressBytes,
+                to: to.bytes,
+                signature: signature,
+                args: args,
+                gasLimit: gasLimit,
+                value: value,
+                resultTypes: resultTypes,
+            ) as! ResultDecoded
+        }
+
         /// Bridges the given NFT to the EVM environment, requiring a Provider
         /// from which to withdraw a fee to fulfill the bridge request
         ///
@@ -614,6 +736,9 @@ access(all) contract EVM {
             nft: @{NonFungibleToken.NFT},
             feeProvider: auth(FungibleToken.Withdraw) &{FungibleToken.Provider}
         ) {
+            pre {
+                !EVM.isPaused(): "EVM operations are temporarily paused"
+            }
             EVM.borrowBridgeAccessor().depositNFT(nft: <-nft, to: self.address(), feeProvider: feeProvider)
         }
 
@@ -633,6 +758,9 @@ access(all) contract EVM {
             id: UInt256,
             feeProvider: auth(FungibleToken.Withdraw) &{FungibleToken.Provider}
         ): @{NonFungibleToken.NFT} {
+            pre {
+                !EVM.isPaused(): "EVM operations are temporarily paused"
+            }
             return <- EVM.borrowBridgeAccessor().withdrawNFT(
                 caller: &self as auth(Call) &CadenceOwnedAccount,
                 type: type,
@@ -647,6 +775,9 @@ access(all) contract EVM {
             vault: @{FungibleToken.Vault},
             feeProvider: auth(FungibleToken.Withdraw) &{FungibleToken.Provider}
         ) {
+            pre {
+                !EVM.isPaused(): "EVM operations are temporarily paused"
+            }
             EVM.borrowBridgeAccessor().depositTokens(vault: <-vault, to: self.address(), feeProvider: feeProvider)
         }
 
@@ -659,6 +790,9 @@ access(all) contract EVM {
             amount: UInt256,
             feeProvider: auth(FungibleToken.Withdraw) &{FungibleToken.Provider}
         ): @{FungibleToken.Vault} {
+            pre {
+                !EVM.isPaused(): "EVM operations are temporarily paused"
+            }
             return <- EVM.borrowBridgeAccessor().withdrawTokens(
                 caller: &self as auth(Call) &CadenceOwnedAccount,
                 type: type,
@@ -671,6 +805,9 @@ access(all) contract EVM {
     /// Creates a new cadence owned account
     access(all)
     fun createCadenceOwnedAccount(): @CadenceOwnedAccount {
+        pre {
+            !self.isPaused(): "EVM operations are temporarily paused"
+        }
         let acc <-create CadenceOwnedAccount()
         let addr = InternalEVM.createCadenceOwnedAccount(uuid: acc.uuid)
         acc.initAddress(addressBytes: addr)
@@ -689,6 +826,9 @@ access(all) contract EVM {
     /// @return: The transaction result
     access(all)
     fun run(tx: [UInt8], coinbase: EVMAddress): Result {
+        pre {
+            !self.isPaused(): "EVM operations are temporarily paused"
+        }
         return InternalEVM.run(
             tx: tx,
             coinbase: coinbase.bytes
@@ -714,6 +854,8 @@ access(all) contract EVM {
     /// the from address as the signer.
     /// The transaction state changes are not persisted.
     /// This is useful for gas estimation or calling view contract functions.
+    /// Note: dry-run functions are intentionally exempt from the isPaused() guard —
+    /// they perform no state mutations and remain available in read-only mode.
     access(all)
     fun dryRun(tx: [UInt8], from: EVMAddress): Result {
         return InternalEVM.dryRun(
@@ -742,22 +884,62 @@ access(all) contract EVM {
         ) as! Result
     }
 
+    /// Calls a contract function with the given signature and args.
+    /// The execution is limited by the given amount of gas.
+    /// The value is attoflow.  If the resultTypes is provided,
+    /// the evm call results are decoded and returned in ResultDecoded.results;
+    /// otherwise, the evm call results are discarded and not returned.
+    /// The transaction state changes are not persisted.
+    access(all)
+    fun dryCallWithSigAndArgs(
+        from: EVMAddress,
+        to: EVMAddress,
+        signature: String,
+        args: [AnyStruct],
+        gasLimit: UInt64,
+        value: UInt,
+        resultTypes: [Type]?,
+    ): ResultDecoded {
+        return InternalEVM.dryCallWithSigAndArgs(
+            from: from.bytes,
+            to: to.bytes,
+            signature: signature,
+            args: args,
+            gasLimit: gasLimit,
+            value: value,
+            resultTypes: resultTypes
+        ) as! ResultDecoded
+    }
+
     /// Runs a batch of RLP-encoded EVM transactions, deducts the gas fees,
     /// and deposits the gas fees into the provided coinbase address.
     /// An invalid transaction is not executed and not included in the block.
     access(all)
     fun batchRun(txs: [[UInt8]], coinbase: EVMAddress): [Result] {
+        pre {
+            !self.isPaused(): "EVM operations are temporarily paused"
+        }
         return InternalEVM.batchRun(
             txs: txs,
             coinbase: coinbase.bytes,
         ) as! [Result]
     }
 
+    /// Encodes the given values into an ABI-encoded byte array according to
+    /// the Solidity ABI specification. Cadence types are mapped to their
+    /// corresponding Solidity types (e.g. UInt256 → uint256, [UInt8] → bytes).
+    ///
+    /// No error returns are expected during normal operation.
     access(all)
     fun encodeABI(_ values: [AnyStruct]): [UInt8] {
         return InternalEVM.encodeABI(values)
     }
 
+    /// Decodes an ABI-encoded byte array into Cadence values according to
+    /// the Solidity ABI specification. The provided types must match the
+    /// encoding of data exactly; a mismatch will panic.
+    ///
+    /// No error returns are expected during normal operation.
     access(all)
     fun decodeABI(types: [Type], data: [UInt8]): [AnyStruct] {
         return InternalEVM.decodeABI(types: types, data: data)
@@ -782,17 +964,23 @@ access(all) contract EVM {
         types: [Type],
         data: [UInt8]
     ): [AnyStruct] {
+        pre {
+            data.length >= 4: "EVM.decodeABIWithSignature(): Cannot decode! The provided data does not contain a signature."
+        }
         let methodID = HashAlgorithm.KECCAK_256.hash(
             signature.utf8
         ).slice(from: 0, upTo: 4)
 
-        for byte in methodID {
-            if byte != data.removeFirst() {
+        // Compare the 4-byte method ID prefix using index access rather than removeFirst(),
+        // since removeFirst() is O(n) and would shift the entire array on each call.
+        // data.slice() is then used to pass only the ABI-encoded arguments to decodeABI.
+        for i, byte in methodID {
+            if byte != data[i] {
                 panic("EVM.decodeABIWithSignature(): Cannot decode! The signature does not match the provided data.")
             }
         }
 
-        return InternalEVM.decodeABI(types: types, data: data)
+        return InternalEVM.decodeABI(types: types, data: data.slice(from: 4, upTo: data.length))
     }
 
     /// ValidationResult returns the result of COA ownership proof validation
@@ -810,7 +998,15 @@ access(all) contract EVM {
         }
     }
 
-    /// validateCOAOwnershipProof validates a COA ownership proof
+    /// validateCOAOwnershipProof validates a COA ownership proof.
+    ///
+    /// Note: this function does not enforce that `signedData` includes `evmAddress`.
+    /// In principle, a signature produced for one purpose could be replayed here against
+    /// a different COA owned by the same Cadence account. In practice this is low-risk:
+    /// the EVM-side precompile (verifyCOAOwnershipProof) always passes the calling COA's
+    /// address as the evmAddress argument, and Flow wallets historically create at most one
+    /// COA per account. Callers building off-chain authentication flows on top of this
+    /// function should ensure `signedData` encodes `evmAddress` to prevent cross-address replay.
     access(all)
     fun validateCOAOwnershipProof(
         address: Address,
@@ -825,8 +1021,7 @@ access(all) contract EVM {
         if keyIndices.length != signatures.length {
             return ValidationResult(
                 isValid: false,
-                problem: "EVM.validateCOAOwnershipProof(): Key indices array length"
-                         .concat(" doesn't match the signatures array length!")
+                problem: "EVM.validateCOAOwnershipProof(): Key indices array length doesn't match the signatures array length!"
             )
         }
 
@@ -849,8 +1044,7 @@ access(all) contract EVM {
                     if key.isRevoked {
                         return ValidationResult(
                             isValid: false,
-                            problem: "EVM.validateCOAOwnershipProof(): Cannot validate COA ownership"
-                                     .concat(" for Cadence account \(address). The account key at index \(accountKeyIndex) is revoked.")
+                            problem: "EVM.validateCOAOwnershipProof(): Cannot validate COA ownership for Cadence account \(address). The account key at index \(accountKeyIndex) is revoked."
                         )
                     }
 
@@ -869,8 +1063,7 @@ access(all) contract EVM {
                 } else {
                     return ValidationResult(
                         isValid: false,
-                        problem: "EVM.validateCOAOwnershipProof(): Cannot validate COA ownership"
-                                     .concat(" for Cadence account \(address). The key index \(accountKeyIndex) is invalid.")
+                        problem: "EVM.validateCOAOwnershipProof(): Cannot validate COA ownership for Cadence account \(address). The key index \(accountKeyIndex) is invalid."
                     )
                 }
             } else {
@@ -895,35 +1088,30 @@ access(all) contract EVM {
         if !isValid{
             return ValidationResult(
                 isValid: false,
-                problem: "EVM.validateCOAOwnershipProof(): Cannot validate COA ownership"
-                         .concat(" for Cadence account \(address). The given signatures are not valid or provide enough weight.")
+                problem: "EVM.validateCOAOwnershipProof(): Cannot validate COA ownership for Cadence account \(address). The given signatures are not valid or provide enough weight."
             )
         }
 
-        let coaRef = acc.capabilities.borrow<&EVM.CadenceOwnedAccount>(path)
-        if coaRef == nil {
-             return ValidationResult(
-                 isValid: false,
-                 problem: "EVM.validateCOAOwnershipProof(): Cannot validate COA ownership. "
-                          .concat("Could not borrow the COA resource for account \(address).")
-             )
-        }
-
-        // verify evm address matching
-        var addr = coaRef!.address()
-        for index, item in coaRef!.address().bytes {
-            if item != evmAddress[index] {
-                return ValidationResult(
-                    isValid: false,
-                    problem: "EVM.validateCOAOwnershipProof(): Cannot validate COA ownership."
-                             .concat("The provided evm address does not match the account's COA address.")
-                )
+        if let coaRef = acc.capabilities.borrow<&EVM.CadenceOwnedAccount>(path) {
+            // verify evm address matching — capture bytes once to avoid redundant borrow
+            let coaAddressBytes = coaRef.address().bytes
+            for index, item in coaAddressBytes {
+                if item != evmAddress[index] {
+                    return ValidationResult(
+                        isValid: false,
+                        problem: "EVM.validateCOAOwnershipProof(): Cannot validate COA ownership. The provided evm address does not match the account's COA address."
+                    )
+                }
             }
+            return ValidationResult(
+                isValid: true,
+                problem: nil
+            )
         }
 
         return ValidationResult(
-            isValid: true,
-            problem: nil
+            isValid: false,
+            problem: "EVM.validateCOAOwnershipProof(): Cannot validate COA ownership. Could not borrow the COA resource for account \(address)."
         )
     }
 
@@ -976,8 +1164,10 @@ access(all) contract EVM {
         /// Sets the BridgeAccessor Capability in the BridgeRouter
         access(Bridge) fun setBridgeAccessor(_ accessor: Capability<auth(Bridge) &{BridgeAccessor}>) {
             pre {
-                accessor.check(): 
+                accessor.check():
                     "EVM.setBridgeAccessor(): Invalid BridgeAccessor Capability provided"
+            }
+            post {
                 emit BridgeAccessorUpdated(
                     routerType: self.getType(),
                     routerUUID: self.uuid,
@@ -1018,8 +1208,10 @@ access(all) contract EVM {
     /// The heartbeat resource is used to control the block production,
     /// and used in the Flow protocol to call the heartbeat function once per block.
     ///
-    /// The function can be called by anyone, but only once:
-    /// the function will fail if the resource already exists.
+    /// The function is access(all) because it is called during contract initialization
+    /// before account-level access is available. It is safe to be public because
+    /// it can only succeed once: any subsequent call will panic because the storage
+    /// path is already occupied.
     ///
     /// The resulting resource is stored in the account storage,
     /// and is only accessible by the account, not the caller of the function.
@@ -1028,7 +1220,25 @@ access(all) contract EVM {
         self.account.storage.save(<-create Heartbeat(), to: /storage/EVMHeartbeat)
     }
 
+    /// Returns whether EVM transactions have been paused, either for
+    /// maintenance or any situation that requires special governance
+    /// handling.
+    ///
+    /// Only the Governance Committee can pause the EVM transactions, with
+    /// a multi-sig Cadence transaction. The EVM enters a read-only mode,
+    /// where all EVM state is available for reading, but no state updates
+    /// are executed.
+    access(all)
+    view fun isPaused(): Bool {
+        return self.account.storage.copy<Bool>(
+            from: /storage/evmOperationsPaused
+        ) ?? false
+    }
+
     init() {
         self.setupHeartbeat()
     }
+
+    // Placeholder to load test helpers available only on Flow Emulator network
+    // #loadTestHelpers
 }

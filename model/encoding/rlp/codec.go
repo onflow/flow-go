@@ -16,15 +16,15 @@ func NewMarshaler() *Marshaler {
 	return &Marshaler{}
 }
 
-func (m *Marshaler) Marshal(val interface{}) ([]byte, error) {
+func (m *Marshaler) Marshal(val any) ([]byte, error) {
 	return rlp.EncodeToBytes(val)
 }
 
-func (m *Marshaler) Unmarshal(b []byte, val interface{}) error {
+func (m *Marshaler) Unmarshal(b []byte, val any) error {
 	return rlp.DecodeBytes(b, val)
 }
 
-func (m *Marshaler) MustMarshal(val interface{}) []byte {
+func (m *Marshaler) MustMarshal(val any) []byte {
 	b, err := m.Marshal(val)
 	if err != nil {
 		panic(err)
@@ -33,7 +33,7 @@ func (m *Marshaler) MustMarshal(val interface{}) []byte {
 	return b
 }
 
-func (m *Marshaler) MustUnmarshal(b []byte, val interface{}) {
+func (m *Marshaler) MustUnmarshal(b []byte, val any) {
 	err := m.Unmarshal(b, val)
 	if err != nil {
 		panic(err)
@@ -56,7 +56,7 @@ type Encoder struct {
 	w io.Writer
 }
 
-func (e *Encoder) Encode(v interface{}) error {
+func (e *Encoder) Encode(v any) error {
 	return rlp.Encode(e.w, v)
 }
 
@@ -64,6 +64,6 @@ type Decoder struct {
 	r io.Reader
 }
 
-func (e *Decoder) Decode(v interface{}) error {
+func (e *Decoder) Decode(v any) error {
 	return rlp.Decode(e.r, v)
 }

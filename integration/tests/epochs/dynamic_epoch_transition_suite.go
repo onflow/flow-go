@@ -4,7 +4,7 @@
 // and resource-heavy, we split them into several cohorts, which can be run in parallel.
 //
 // If a new cohort is added in the future, it must be added to:
-//   - ci.yml, flaky-test-monitor.yml, bors.toml (ensure new cohort of tests is run)
+//   - ci.yml, flaky-test-monitor.yml (ensure new cohort of tests is run)
 //   - Makefile (include new cohort in integration-test directive, etc.)
 package epochs
 
@@ -51,9 +51,9 @@ func (s *DynamicEpochTransitionSuite) SetupTest() {
 	// NOTE: this value is set fairly aggressively to ensure shorter test times.
 	// If flakiness due to failure to complete staking operations in time is observed,
 	// try increasing (by 10-20 views).
-	s.StakingAuctionLen = 50
+	s.StakingAuctionLen = 70
 	s.DKGPhaseLen = 50
-	s.EpochLen = 250
+	s.EpochLen = 270
 	s.FinalizationSafetyThreshold = 20
 
 	// run the generic setup, which starts up the network
@@ -528,7 +528,7 @@ func (s *DynamicEpochTransitionSuite) RunTestEpochJoinAndLeave(role flow.Role, c
 		segment.Sealed().View, segment.Highest().View)
 
 	testContainer.WriteRootSnapshot(rootSnapshot)
-	testContainer.Container.Start(s.Ctx)
+	require.NoError(s.T(), testContainer.Container.Start(s.Ctx))
 
 	epoch1, err := rootSnapshot.Epochs().Current()
 	require.NoError(s.T(), err)

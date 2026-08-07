@@ -11,7 +11,7 @@ import (
 
 func TestFingerprint(t *testing.T) {
 	tests := []struct {
-		input  interface{}
+		input  any
 		output string
 	}{
 		{"abc", "0x83616263"},

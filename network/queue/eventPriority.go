@@ -18,7 +18,7 @@ const (
 
 // QMessage is the message that is enqueued for each incoming message
 type QMessage struct {
-	Payload  interface{}      // the decoded message
+	Payload  any              // the decoded message
 	Size     int              // the size of the message in bytes
 	Target   channels.Channel // the target channel to lookup the engine
 	SenderID flow.Identifier  // senderID for logging
@@ -26,7 +26,7 @@ type QMessage struct {
 
 // GetEventPriority returns the priority of the flow event message.
 // It is an average of the priority by message type and priority by message size
-func GetEventPriority(message interface{}) (Priority, error) {
+func GetEventPriority(message any) (Priority, error) {
 	qm, ok := message.(QMessage)
 	if !ok {
 		return 0, fmt.Errorf("invalid message format: %T", message)
@@ -37,7 +37,7 @@ func GetEventPriority(message interface{}) (Priority, error) {
 }
 
 // getPriorityByType maps a message type to its priority
-func getPriorityByType(message interface{}) Priority {
+func getPriorityByType(message any) Priority {
 	switch message.(type) {
 	// consensus
 	case *messages.Proposal:

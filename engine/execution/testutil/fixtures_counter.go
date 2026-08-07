@@ -69,7 +69,7 @@ func RemoveCounterContractTransaction(authorizer flow.Address, chain flow.Chain)
 func CreateCounterTransaction(counter, signer flow.Address) *flow.TransactionBodyBuilder {
 	return flow.NewTransactionBodyBuilder().
 		SetScript([]byte(fmt.Sprintf(`
-			import 0x%s
+			import Container from 0x%s
 
 			transaction {
 				prepare(acc: auth(Storage) &Account) {
@@ -91,7 +91,7 @@ func CreateCounterTransaction(counter, signer flow.Address) *flow.TransactionBod
 func CreateCounterPanicTransaction(counter, signer flow.Address) *flow.TransactionBodyBuilder {
 	return flow.NewTransactionBodyBuilder().
 		SetScript([]byte(fmt.Sprintf(`
-			import 0x%s
+			import Container from 0x%s
 
 			transaction {
 				prepare(acc: auth(Storage) &Account) {
@@ -108,7 +108,7 @@ func CreateCounterPanicTransaction(counter, signer flow.Address) *flow.Transacti
 func AddToCounterTransaction(counter, signer flow.Address) *flow.TransactionBodyBuilder {
 	return flow.NewTransactionBodyBuilder().
 		SetScript([]byte(fmt.Sprintf(`
-			import 0x%s
+			import Container from 0x%s
 
 			transaction {
 				prepare(acc: auth(Storage) &Account) {

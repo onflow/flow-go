@@ -487,11 +487,11 @@ func (c *Client) CreateAccount(
 	ctx context.Context,
 	accountKey *sdk.AccountKey,
 	latestBlockID sdk.Identifier,
-) (sdk.Address, error) {
+) (sdk.Address, *sdk.TransactionResult, error) {
 	payer := c.SDKServiceAddress()
 	tx, err := templates.CreateAccount([]*sdk.AccountKey{accountKey}, nil, payer)
 	if err != nil {
-		return sdk.Address{}, fmt.Errorf("failed cusnctruct create account transaction %w", err)
+		return sdk.Address{}, nil, fmt.Errorf("failed to construct create account transaction: %w", err)
 	}
 	tx.SetComputeLimit(1000).
 		SetReferenceBlockID(latestBlockID).
@@ -500,23 +500,23 @@ func (c *Client) CreateAccount(
 
 	err = c.SignAndSendTransaction(ctx, tx)
 	if err != nil {
-		return sdk.Address{}, fmt.Errorf("failed to sign and send create account transaction %w", err)
+		return sdk.Address{}, nil, fmt.Errorf("failed to sign and send create account transaction %w", err)
 	}
 
 	result, err := c.WaitForSealed(ctx, tx.ID())
 	if err != nil {
-		return sdk.Address{}, fmt.Errorf("failed to wait for create account transaction to seal %w", err)
+		return sdk.Address{}, nil, fmt.Errorf("failed to wait for create account transaction to seal %w", err)
 	}
 
 	if result.Error != nil {
-		return sdk.Address{}, fmt.Errorf("failed to create new account %w", result.Error)
+		return sdk.Address{}, nil, fmt.Errorf("failed to create new account %w", result.Error)
 	}
 
 	if address, ok := c.UserAddress(result); ok {
-		return address, nil
+		return address, result, nil
 	}
 
-	return sdk.Address{}, fmt.Errorf("failed to get account address of the created flow account")
+	return sdk.Address{}, nil, fmt.Errorf("failed to get account address of the created flow account")
 }
 
 func (c *Client) GetEventsForBlockIDs(

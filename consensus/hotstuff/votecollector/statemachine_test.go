@@ -65,7 +65,15 @@ func (s *StateMachineTestSuite) SetupTest() {
 // prepareMockedProcessor prepares a mocked processor and stores it in map, later it will be used
 // to mock behavior of verifying vote processor.
 // Additionally, it setups mocks on the processor assuming the proposer vote will be passed into the processing pipeline.
-func (s *StateMachineTestSuite) prepareMockedProcessor(proposal *model.SignedProposal) *mocks.VerifyingVoteProcessor {
+// `expectedProposerVoteProcessings` specifies how many `OnVoteProcessed` notifications for the
+// proposer's vote the test expects. The proposer's vote is fed into the processing pipeline
+// asynchronously, by a worker of the collector's worker pool. Depending on the timing of a
+// concurrent transition to the invalid state (e.g. detected proposal equivocation in
+// `TestStatus_StateTransitions`), the vote may bypass the verifying processor and be consumed by
+// the invalid-state processor instead — in both cases emitting exactly one `OnVoteProcessed`
+// notification. Therefore, we register the expectation upfront, rather than lazily in the `Run`
+// hook of `Process` (the latter races with the asynchronous vote processing and caused flakiness).
+func (s *StateMachineTestSuite) prepareMockedProcessor(proposal *model.SignedProposal, expectedProposerVoteProcessings int) *mocks.VerifyingVoteProcessor {
 	processor := mocks.NewVerifyingVoteProcessor(s.T())
 	processor.On("Block").Return(func() *model.Block {
 		return proposal.Block
@@ -74,9 +82,10 @@ func (s *StateMachineTestSuite) prepareMockedProcessor(proposal *model.SignedPro
 
 	proposerVote, err := proposal.ProposerVote()
 	require.NoError(s.T(), err)
-	processor.On("Process", proposerVote).Run(func(_ mock.Arguments) {
-		s.notifier.On("OnVoteProcessed", proposerVote).Once()
-	}).Return(nil).Maybe()
+	processor.On("Process", proposerVote).Return(nil).Maybe()
+	if expectedProposerVoteProcessings > 0 {
+		s.notifier.On("OnVoteProcessed", proposerVote).Times(expectedProposerVoteProcessings)
+	}
 
 	s.mockedProcessors[proposal.Block.BlockID] = processor
 	return processor
@@ -87,7 +96,7 @@ func (s *StateMachineTestSuite) prepareMockedProcessor(proposal *model.SignedPro
 func (s *StateMachineTestSuite) TestStatus_StateTransitions() {
 	block := helper.MakeBlock(helper.WithBlockView(s.view))
 	proposal := helper.MakeSignedProposal(helper.WithProposal(helper.MakeProposal(helper.WithBlock(block))))
-	s.prepareMockedProcessor(proposal)
+	s.prepareMockedProcessor(proposal, 1)
 
 	// by default, we should create in caching status
 	require.Equal(s.T(), hotstuff.VoteCollectorStatusCaching, s.collector.Status())
@@ -124,7 +133,7 @@ func (s *StateMachineTestSuite) Test_FactoryErrorPropagation() {
 func (s *StateMachineTestSuite) TestAddVote_VerifyingState() {
 	proposal := makeSignedProposalWithView(s.view)
 	block := proposal.Block
-	processor := s.prepareMockedProcessor(proposal)
+	processor := s.prepareMockedProcessor(proposal, 1)
 	err := s.collector.ProcessBlock(proposal)
 	require.NoError(s.T(), err)
 	s.T().Run("add-valid-vote", func(t *testing.T) {
@@ -213,7 +222,7 @@ func (s *StateMachineTestSuite) TestProcessBlock_ProcessingOfCachedVotes() {
 	votes := 10
 	proposal := makeSignedProposalWithView(s.view)
 	block := proposal.Block
-	processor := s.prepareMockedProcessor(proposal)
+	processor := s.prepareMockedProcessor(proposal, 1)
 	for i := 0; i < votes; i++ {
 		vote := unittest.VoteForBlockFixture(block)
 		// once when caching vote, and once when processing cached vote
@@ -250,7 +259,7 @@ func (s *StateMachineTestSuite) TestProcessBlock_ByzantineLeaderEquivocation_Pro
 	block := proposal.Block
 	proposalVote, err := proposal.ProposerVote()
 	require.NoError(s.T(), err)
-	_ = s.prepareMockedProcessor(proposal)
+	_ = s.prepareMockedProcessor(proposal, 1)
 
 	err = s.collector.ProcessBlock(proposal)
 	require.NoError(s.T(), err)
@@ -269,10 +278,11 @@ func (s *StateMachineTestSuite) TestProcessBlock_ByzantineLeaderEquivocation_Pro
 func (s *StateMachineTestSuite) TestProcessBlock_ByzantineLeaderEquivocation_ProposalAfterVote() {
 	proposal := makeSignedProposalWithView(s.view)
 	block := proposal.Block
-	// in this case proposer vote comes in second and acts as equivocated vote
+	// in this case proposer vote comes in second and acts as equivocated vote,
+	// hence it is never processed and no `OnVoteProcessed` notification is expected for it
 	equivocatingVote, err := proposal.ProposerVote()
 	require.NoError(s.T(), err)
-	processor := s.prepareMockedProcessor(proposal)
+	processor := s.prepareMockedProcessor(proposal, 0)
 
 	firstVote := unittest.VoteForBlockFixture(block, unittest.WithVoteSignerID(equivocatingVote.SignerID))
 	s.notifier.On("OnVoteProcessed", firstVote).Twice()
@@ -292,7 +302,7 @@ func (s *StateMachineTestSuite) TestProcessBlock_ByzantineLeaderEquivocation_Pro
 // Case (2.a): proposal arriving first, stand-alone vote arriving later.
 func (s *StateMachineTestSuite) TestProcessBlock_ByzantineLeaderSpamming_ProposalBeforeVote() {
 	proposal := makeSignedProposalWithView(s.view)
-	_ = s.prepareMockedProcessor(proposal)
+	_ = s.prepareMockedProcessor(proposal, 1)
 	proposalVote, err := proposal.ProposerVote()
 	require.NoError(s.T(), err)
 
@@ -310,11 +320,12 @@ func (s *StateMachineTestSuite) TestProcessBlock_ByzantineLeaderSpamming_Proposa
 // Case (2.b): stand-alone vote arriving first, proposal arriving second.
 func (s *StateMachineTestSuite) TestProcessBlock_ByzantineLeaderSpamming_ProposalAfterVote() {
 	proposal := makeSignedProposalWithView(s.view)
-	_ = s.prepareMockedProcessor(proposal)
+	// the proposer's vote is processed twice: once when cached as stand-alone vote (arriving first)
+	// and once when replayed from the cache after the proposal transitioned the collector to verifying
+	_ = s.prepareMockedProcessor(proposal, 2)
 	proposalVote, err := proposal.ProposerVote()
 	require.NoError(s.T(), err)
 
-	s.notifier.On("OnVoteProcessed", proposalVote).Once()
 	err = s.collector.AddVote(proposalVote)
 	require.NoError(s.T(), err)
 
@@ -330,7 +341,7 @@ func (s *StateMachineTestSuite) TestProcessBlock_ByzantineLeaderSpamming_Proposa
 func (s *StateMachineTestSuite) TestProcessBlock_ByzantineReplicaEquivocation_BeforeProposal() {
 	proposal := makeSignedProposalWithView(s.view)
 	block := proposal.Block
-	processor := s.prepareMockedProcessor(proposal)
+	processor := s.prepareMockedProcessor(proposal, 1)
 
 	vote := unittest.VoteForBlockFixture(block)
 	equivocatingVote := unittest.VoteForBlockFixture(block, unittest.WithVoteSignerID(vote.SignerID))
@@ -356,7 +367,7 @@ func (s *StateMachineTestSuite) TestProcessBlock_ByzantineReplicaEquivocation_Be
 func (s *StateMachineTestSuite) TestProcessBlock_ByzantineReplicaEquivocation_AfterProposal() {
 	proposal := makeSignedProposalWithView(s.view)
 	block := proposal.Block
-	processor := s.prepareMockedProcessor(proposal)
+	processor := s.prepareMockedProcessor(proposal, 1)
 
 	vote := unittest.VoteForBlockFixture(block)
 	equivocatingVote := unittest.VoteForBlockFixture(block, unittest.WithVoteSignerID(vote.SignerID))
@@ -381,7 +392,7 @@ func (s *StateMachineTestSuite) TestProcessBlock_ByzantineReplicaEquivocation_Af
 func (s *StateMachineTestSuite) TestProcessBlock_ByzantineReplicaSpamming_BeforeProposal() {
 	proposal := makeSignedProposalWithView(s.view)
 	block := proposal.Block
-	processor := s.prepareMockedProcessor(proposal)
+	processor := s.prepareMockedProcessor(proposal, 1)
 
 	vote := unittest.VoteForBlockFixture(block)
 
@@ -405,7 +416,7 @@ func (s *StateMachineTestSuite) TestProcessBlock_ByzantineReplicaSpamming_Before
 func (s *StateMachineTestSuite) TestProcessBlock_ByzantineReplicaSpamming_AfterProposal() {
 	proposal := makeSignedProposalWithView(s.view)
 	block := proposal.Block
-	processor := s.prepareMockedProcessor(proposal)
+	processor := s.prepareMockedProcessor(proposal, 1)
 
 	vote := unittest.VoteForBlockFixture(block)
 	err := s.collector.ProcessBlock(proposal)
@@ -427,7 +438,7 @@ func (s *StateMachineTestSuite) TestProcessBlock_ByzantineReplicaSpamming_AfterP
 func (s *StateMachineTestSuite) Test_VoteProcessorErrorPropagation() {
 	proposal := makeSignedProposalWithView(s.view)
 	block := proposal.Block
-	processor := s.prepareMockedProcessor(proposal)
+	processor := s.prepareMockedProcessor(proposal, 1)
 
 	err := s.collector.ProcessBlock(proposal)
 	require.NoError(s.T(), err)
@@ -439,18 +450,17 @@ func (s *StateMachineTestSuite) Test_VoteProcessorErrorPropagation() {
 	require.ErrorAs(s.T(), err, &unexpectedError)
 }
 
-// RegisterVoteConsumer verifies that after registering vote consumer we are receiving all new and past votes
+// TestRegisterVoteConsumer verifies that after registering vote consumer we are receiving all new and past votes
 // in strict ordering of arrival.
-func (s *StateMachineTestSuite) RegisterVoteConsumer() {
+func (s *StateMachineTestSuite) TestRegisterVoteConsumer() {
 	votes := 10
-	proposal := makeSignedProposalWithView(s.view)
-	block := proposal.Block
-	processor := s.prepareMockedProcessor(proposal)
+	block := helper.MakeBlock(helper.WithBlockView(s.view))
 	expectedVotes := make([]*model.Vote, 0)
 	for i := 0; i < votes; i++ {
 		vote := unittest.VoteForBlockFixture(block)
-		// eventually it has to be process by processor
-		processor.On("Process", vote).Return(nil).Once()
+		// the collector remains in the caching state throughout this test; adding a vote
+		// there only caches it, emitting an `OnVoteProcessed` notification
+		s.notifier.On("OnVoteProcessed", vote).Once()
 		require.NoError(s.T(), s.collector.AddVote(vote))
 		expectedVotes = append(expectedVotes, vote)
 	}
@@ -460,16 +470,69 @@ func (s *StateMachineTestSuite) RegisterVoteConsumer() {
 		actualVotes = append(actualVotes, vote)
 	}
 
+	// upon registration, the consumer receives all cached votes; subsequently added votes
+	// are forwarded to the consumer as they arrive
 	s.collector.RegisterVoteConsumer(consumer)
 
 	for i := 0; i < votes; i++ {
 		vote := unittest.VoteForBlockFixture(block)
-		// eventually it has to be process by processor
+		s.notifier.On("OnVoteProcessed", vote).Once()
+		require.NoError(s.T(), s.collector.AddVote(vote))
+		expectedVotes = append(expectedVotes, vote)
+	}
+
+	require.Equal(s.T(), expectedVotes, actualVotes)
+}
+
+// TestRegisterVoteConsumer_CachingToVerifyingTransition verifies that a vote consumer registered
+// while the collector is in the caching state continues to receive votes, in order of arrival,
+// across the transition to the verifying state. The proposer's vote is cached synchronously by
+// `ProcessBlock` (via `ensureVoteUnique`), so the consumer receives it at a deterministic
+// position: between the votes added before and after the transition.
+func (s *StateMachineTestSuite) TestRegisterVoteConsumer_CachingToVerifyingTransition() {
+	votes := 5
+	proposal := makeSignedProposalWithView(s.view)
+	block := proposal.Block
+	processor := s.prepareMockedProcessor(proposal, 1)
+	proposerVote, err := proposal.ProposerVote()
+	require.NoError(s.T(), err)
+
+	actualVotes := make([]*model.Vote, 0)
+	s.collector.RegisterVoteConsumer(func(vote *model.Vote) {
+		actualVotes = append(actualVotes, vote)
+	})
+
+	expectedVotes := make([]*model.Vote, 0)
+	// Add votes while the collector is in the caching state. Each vote emits `OnVoteProcessed`
+	// twice: once when cached, and once when replayed into the verifying processor during the
+	// transition below (consistent with `TestProcessBlock_ProcessingOfCachedVotes`).
+	for i := 0; i < votes; i++ {
+		vote := unittest.VoteForBlockFixture(block)
+		s.notifier.On("OnVoteProcessed", vote).Twice()
 		processor.On("Process", vote).Return(nil).Once()
 		require.NoError(s.T(), s.collector.AddVote(vote))
 		expectedVotes = append(expectedVotes, vote)
 	}
 
+	// `ProcessBlock` caches the proposer's vote (delivering it to the consumer) and transitions
+	// the collector to the verifying state
+	require.NoError(s.T(), s.collector.ProcessBlock(proposal))
+	require.Equal(s.T(), hotstuff.VoteCollectorStatusVerifying, s.collector.Status())
+	expectedVotes = append(expectedVotes, proposerVote)
+
+	// add more votes after the transition; each is processed exactly once
+	for i := 0; i < votes; i++ {
+		vote := unittest.VoteForBlockFixture(block)
+		s.notifier.On("OnVoteProcessed", vote).Once()
+		processor.On("Process", vote).Return(nil).Once()
+		require.NoError(s.T(), s.collector.AddVote(vote))
+		expectedVotes = append(expectedVotes, vote)
+	}
+
+	// The cache invokes consumers synchronously in the goroutine adding the vote, and all votes
+	// are added on this test's goroutine, so `actualVotes` is complete at this point. The
+	// asynchronous replay of cached votes into the verifying processor does not re-deliver
+	// votes to consumers.
 	require.Equal(s.T(), expectedVotes, actualVotes)
 }
 

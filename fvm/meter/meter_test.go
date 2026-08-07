@@ -13,6 +13,7 @@ import (
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func TestWeightedComputationMetering(t *testing.T) {
@@ -72,8 +73,7 @@ func TestWeightedComputationMetering(t *testing.T) {
 			},
 		)
 		require.Error(t, err)
-		require.True(t, errors.IsComputationLimitExceededError(err))
-		require.Equal(t, err.Error(), errors.NewComputationLimitExceededError(10).Error())
+		unittest.RequireLimitExceededError(t, err, errors.LimitKindComputation, 10)
 
 		err = m.MeterMemory(
 			common.MemoryUsage{
@@ -100,8 +100,7 @@ func TestWeightedComputationMetering(t *testing.T) {
 			},
 		)
 		require.Error(t, err)
-		require.True(t, errors.IsMemoryLimitExceededError(err))
-		require.Equal(t, err.Error(), errors.NewMemoryLimitExceededError(10).Error())
+		unittest.RequireLimitExceededError(t, err, errors.LimitKindMemory, 10)
 	})
 
 	t.Run("meter computation and memory with weights", func(t *testing.T) {
@@ -167,7 +166,7 @@ func TestWeightedComputationMetering(t *testing.T) {
 		require.Equal(t, uint64(1<<meter.MeterExecutionInternalPrecisionBytes), m.ComputationIntensities()[0])
 	})
 
-	t.Run("check computation capacity", func(t *testing.T) {
+	t.Run("check computation remaining", func(t *testing.T) {
 		m := meter.NewMeter(
 			meter.DefaultParameters().
 				WithComputationLimit(10).
@@ -175,13 +174,8 @@ func TestWeightedComputationMetering(t *testing.T) {
 					map[common.ComputationKind]uint64{0: 1 << meter.MeterExecutionInternalPrecisionBytes}),
 		)
 
-		hasCapacity := m.ComputationAvailable(
-			common.ComputationUsage{
-				Kind:      0,
-				Intensity: 1,
-			},
-		)
-		require.True(t, hasCapacity)
+		// the full limit is available for the weighted kind
+		require.Equal(t, uint64(10), m.ComputationRemaining(0))
 
 		err := m.MeterComputation(
 			common.ComputationUsage{
@@ -192,52 +186,21 @@ func TestWeightedComputationMetering(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, uint64(1), m.TotalComputationUsed())
 
-		require.True(t, m.ComputationAvailable(
+		// one unit used, nine remaining
+		require.Equal(t, uint64(9), m.ComputationRemaining(0))
+
+		// a kind without a weight is unbounded
+		require.Equal(t, uint64(math.MaxUint64), m.ComputationRemaining(1))
+
+		// exceeding the limit leaves nothing remaining (usage is incremented past the limit)
+		err = m.MeterComputation(
 			common.ComputationUsage{
 				Kind:      0,
-				Intensity: 9,
-			},
-		))
-		require.False(t, m.ComputationAvailable(
-			common.ComputationUsage{
-				Kind:      0,
-				Intensity: 10,
-			},
-		))
-
-		// test a type without a weight (default zero)
-		require.True(t, m.ComputationAvailable(
-			common.ComputationUsage{
-				Kind:      1,
-				Intensity: 10,
-			},
-		))
-	})
-
-	t.Run("check computation available", func(t *testing.T) {
-		m := meter.NewMeter(
-			meter.DefaultParameters().
-				WithComputationLimit(10).
-				WithComputationWeights(
-					map[common.ComputationKind]uint64{0: 1 << meter.MeterExecutionInternalPrecisionBytes}),
-		)
-
-		available := m.ComputationAvailable(common.ComputationUsage{Kind: 0, Intensity: 10})
-		require.True(t, available)
-
-		err := m.MeterComputation(
-			common.ComputationUsage{
-				Kind:      0,
-				Intensity: 1,
+				Intensity: 15,
 			},
 		)
-		require.NoError(t, err)
-		require.Equal(t, uint64(1), m.TotalComputationUsed())
-
-		require.False(t, m.ComputationAvailable(common.ComputationUsage{Kind: 0, Intensity: 10}))
-
-		// test a type without a weight (default MaxUint64)
-		require.True(t, m.ComputationAvailable(common.ComputationUsage{Kind: 1, Intensity: math.MaxUint64}))
+		require.Error(t, err)
+		require.Equal(t, uint64(0), m.ComputationRemaining(0))
 	})
 
 	t.Run("merge meters", func(t *testing.T) {
@@ -307,8 +270,7 @@ func TestWeightedComputationMetering(t *testing.T) {
 			},
 		)
 		require.Error(t, err)
-		require.True(t, errors.IsComputationLimitExceededError(err))
-		require.Equal(t, err.Error(), errors.NewComputationLimitExceededError(9).Error())
+		unittest.RequireLimitExceededError(t, err, errors.LimitKindComputation, 9)
 	})
 
 	t.Run("merge meters - ignore limits", func(t *testing.T) {
@@ -377,7 +339,7 @@ func TestWeightedComputationMetering(t *testing.T) {
 				Intensity: 0,
 			},
 		)
-		require.True(t, errors.IsComputationLimitExceededError(err))
+		unittest.RequireLimitExceededError(t, err, errors.LimitKindComputation)
 	})
 
 	t.Run("merge meters - large values - memory", func(t *testing.T) {
@@ -415,8 +377,7 @@ func TestWeightedComputationMetering(t *testing.T) {
 			},
 		)
 		require.Error(t, err)
-		require.True(t, errors.IsMemoryLimitExceededError(err))
-		require.Equal(t, err.Error(), errors.NewMemoryLimitExceededError(math.MaxUint32).Error())
+		unittest.RequireLimitExceededError(t, err, errors.LimitKindMemory, math.MaxUint32)
 	})
 
 	t.Run("add intensity - test limits - computation", func(t *testing.T) {
@@ -525,7 +486,7 @@ func TestWeightedComputationMetering(t *testing.T) {
 				Intensity: 1,
 			},
 		)
-		require.True(t, errors.IsComputationLimitExceededError(err))
+		unittest.RequireLimitExceededError(t, err, errors.LimitKindComputation)
 		reset()
 		err = m.MeterComputation(
 			common.ComputationUsage{
@@ -533,7 +494,7 @@ func TestWeightedComputationMetering(t *testing.T) {
 				Intensity: 1 << meter.MeterExecutionInternalPrecisionBytes,
 			},
 		)
-		require.True(t, errors.IsComputationLimitExceededError(err))
+		unittest.RequireLimitExceededError(t, err, errors.LimitKindComputation)
 		reset()
 		err = m.MeterComputation(
 			common.ComputationUsage{
@@ -541,7 +502,7 @@ func TestWeightedComputationMetering(t *testing.T) {
 				Intensity: math.MaxUint32,
 			},
 		)
-		require.True(t, errors.IsComputationLimitExceededError(err))
+		unittest.RequireLimitExceededError(t, err, errors.LimitKindComputation)
 	})
 
 	t.Run("add intensity - test limits - memory", func(t *testing.T) {
@@ -640,7 +601,7 @@ func TestWeightedComputationMetering(t *testing.T) {
 				Amount: math.MaxUint32,
 			},
 		)
-		require.True(t, errors.IsMemoryLimitExceededError(err))
+		unittest.RequireLimitExceededError(t, err, errors.LimitKindMemory)
 
 		reset()
 		err = m.MeterMemory(
@@ -649,7 +610,7 @@ func TestWeightedComputationMetering(t *testing.T) {
 				Amount: 1,
 			},
 		)
-		require.True(t, errors.IsMemoryLimitExceededError(err))
+		unittest.RequireLimitExceededError(t, err, errors.LimitKindMemory)
 		reset()
 		err = m.MeterMemory(
 			common.MemoryUsage{
@@ -657,7 +618,7 @@ func TestWeightedComputationMetering(t *testing.T) {
 				Amount: 1,
 			},
 		)
-		require.True(t, errors.IsMemoryLimitExceededError(err))
+		unittest.RequireLimitExceededError(t, err, errors.LimitKindMemory)
 		reset()
 		err = m.MeterMemory(
 			common.MemoryUsage{
@@ -665,7 +626,7 @@ func TestWeightedComputationMetering(t *testing.T) {
 				Amount: math.MaxUint32,
 			},
 		)
-		require.True(t, errors.IsMemoryLimitExceededError(err))
+		unittest.RequireLimitExceededError(t, err, errors.LimitKindMemory)
 	})
 }
 
@@ -700,12 +661,12 @@ func TestStorageLimits(t *testing.T) {
 		size1 := meter.GetStorageKeyValueSizeForTesting(key1, val1)
 
 		// first read of key1
-		err := meter1.MeterStorageRead(key1, val1, false)
+		err := meter1.MeterStorageRead(key1, val1)
 		require.NoError(t, err)
 		require.Equal(t, meter1.TotalBytesReadFromStorage(), size1)
 
 		// second read of key1
-		err = meter1.MeterStorageRead(key1, val1, false)
+		err = meter1.MeterStorageRead(key1, val1)
 		require.NoError(t, err)
 		require.Equal(t, meter1.TotalBytesReadFromStorage(), size1)
 
@@ -714,7 +675,7 @@ func TestStorageLimits(t *testing.T) {
 		val2 := []byte{0x3, 0x2, 0x1}
 		size2 := meter.GetStorageKeyValueSizeForTesting(key2, val2)
 
-		err = meter1.MeterStorageRead(key2, val2, false)
+		err = meter1.MeterStorageRead(key2, val2)
 		require.NoError(t, err)
 		require.Equal(t, meter1.TotalBytesReadFromStorage(), size1+size2)
 	})
@@ -729,34 +690,21 @@ func TestStorageLimits(t *testing.T) {
 		val2 := []byte{0x1, 0x2, 0x3, 0x4}
 
 		// first write of key1
-		err := meter1.MeterStorageWrite(key1, val1, false)
+		err := meter1.MeterStorageWrite(key1, val1)
 		require.NoError(t, err)
 		require.Equal(t, meter1.TotalBytesWrittenToStorage(), meter.GetStorageKeyValueSizeForTesting(key1, val1))
 
 		// second write of key1 with val2
-		err = meter1.MeterStorageWrite(key1, val2, false)
+		err = meter1.MeterStorageWrite(key1, val2)
 		require.NoError(t, err)
 		require.Equal(t, meter1.TotalBytesWrittenToStorage(), meter.GetStorageKeyValueSizeForTesting(key1, val2))
 
 		// first write of key2
 		key2 := flow.NewRegisterID(flow.EmptyAddress, "2")
-		err = meter1.MeterStorageWrite(key2, val2, false)
+		err = meter1.MeterStorageWrite(key2, val2)
 		require.NoError(t, err)
 		require.Equal(t, meter1.TotalBytesWrittenToStorage(),
 			meter.GetStorageKeyValueSizeForTesting(key1, val2)+meter.GetStorageKeyValueSizeForTesting(key2, val2))
-	})
-
-	t.Run("metering storage read - exceeding limit - not enforced", func(t *testing.T) {
-		meter1 := meter.NewMeter(
-			meter.DefaultParameters().WithStorageInteractionLimit(1),
-		)
-
-		key1 := flow.NewRegisterID(flow.EmptyAddress, "1")
-		val1 := []byte{0x1, 0x2, 0x3}
-
-		err := meter1.MeterStorageRead(key1, val1, false /* not enforced */)
-		require.NoError(t, err)
-		require.Equal(t, meter1.TotalBytesReadFromStorage(), meter.GetStorageKeyValueSizeForTesting(key1, val1))
 	})
 
 	t.Run("metering storage read - exceeding limit - enforced", func(t *testing.T) {
@@ -768,26 +716,9 @@ func TestStorageLimits(t *testing.T) {
 		key1 := flow.NewRegisterID(flow.EmptyAddress, "1")
 		val1 := []byte{0x1, 0x2, 0x3}
 
-		err := meter1.MeterStorageRead(key1, val1, true /* enforced */)
+		err := meter1.MeterStorageRead(key1, val1)
 
-		ledgerInteractionLimitExceedError := errors.NewLedgerInteractionLimitExceededError(
-			meter.GetStorageKeyValueSizeForTesting(key1, val1),
-			testLimit,
-		)
-		require.ErrorAs(t, err, &ledgerInteractionLimitExceedError)
-	})
-
-	t.Run("metering storage written - exceeding limit - not enforced", func(t *testing.T) {
-		testLimit := uint64(1)
-		meter1 := meter.NewMeter(
-			meter.DefaultParameters().WithStorageInteractionLimit(testLimit),
-		)
-
-		key1 := flow.NewRegisterID(flow.EmptyAddress, "1")
-		val1 := []byte{0x1, 0x2, 0x3}
-
-		err := meter1.MeterStorageWrite(key1, val1, false /* not enforced */)
-		require.NoError(t, err)
+		unittest.RequireLimitExceededError(t, err, errors.LimitKindLedgerInteraction, testLimit)
 	})
 
 	t.Run("metering storage written - exceeding limit - enforced", func(t *testing.T) {
@@ -799,13 +730,9 @@ func TestStorageLimits(t *testing.T) {
 		key1 := flow.NewRegisterID(flow.EmptyAddress, "1")
 		val1 := []byte{0x1, 0x2, 0x3}
 
-		err := meter1.MeterStorageWrite(key1, val1, true /* enforced */)
+		err := meter1.MeterStorageWrite(key1, val1)
 
-		ledgerInteractionLimitExceedError := errors.NewLedgerInteractionLimitExceededError(
-			meter.GetStorageKeyValueSizeForTesting(key1, val1),
-			testLimit,
-		)
-		require.ErrorAs(t, err, &ledgerInteractionLimitExceedError)
+		unittest.RequireLimitExceededError(t, err, errors.LimitKindLedgerInteraction, testLimit)
 	})
 
 	t.Run("metering storage read and written - within limit", func(t *testing.T) {
@@ -821,38 +748,13 @@ func TestStorageLimits(t *testing.T) {
 		size2 := meter.GetStorageKeyValueSizeForTesting(key2, val2)
 
 		// read of key1
-		err := meter1.MeterStorageRead(key1, val1, false)
+		err := meter1.MeterStorageRead(key1, val1)
 		require.NoError(t, err)
 		require.Equal(t, meter1.TotalBytesReadFromStorage(), size1)
 		require.Equal(t, meter1.TotalBytesOfStorageInteractions(), size1)
 
 		// write of key2
-		err = meter1.MeterStorageWrite(key2, val2, false)
-		require.NoError(t, err)
-		require.Equal(t, meter1.TotalBytesWrittenToStorage(), size2)
-		require.Equal(t, meter1.TotalBytesOfStorageInteractions(), size1+size2)
-	})
-
-	t.Run("metering storage read and written - exceeding limit - not enforced", func(t *testing.T) {
-		key1 := flow.NewRegisterID(flow.EmptyAddress, "1")
-		key2 := flow.NewRegisterID(flow.EmptyAddress, "2")
-		val1 := []byte{0x1, 0x2, 0x3}
-		val2 := []byte{0x1, 0x2, 0x3, 0x4}
-		size1 := meter.GetStorageKeyValueSizeForTesting(key1, val1)
-		size2 := meter.GetStorageKeyValueSizeForTesting(key2, val2)
-
-		meter1 := meter.NewMeter(
-			meter.DefaultParameters().WithStorageInteractionLimit(size1 + size2 - 1),
-		)
-
-		// read of key1
-		err := meter1.MeterStorageRead(key1, val1, false)
-		require.NoError(t, err)
-		require.Equal(t, meter1.TotalBytesReadFromStorage(), size1)
-		require.Equal(t, meter1.TotalBytesOfStorageInteractions(), size1)
-
-		// write of key2
-		err = meter1.MeterStorageWrite(key2, val2, false)
+		err = meter1.MeterStorageWrite(key2, val2)
 		require.NoError(t, err)
 		require.Equal(t, meter1.TotalBytesWrittenToStorage(), size2)
 		require.Equal(t, meter1.TotalBytesOfStorageInteractions(), size1+size2)
@@ -871,18 +773,14 @@ func TestStorageLimits(t *testing.T) {
 		)
 
 		// read of key1
-		err := meter1.MeterStorageRead(key1, val1, true)
+		err := meter1.MeterStorageRead(key1, val1)
 		require.NoError(t, err)
 		require.Equal(t, meter1.TotalBytesReadFromStorage(), size1)
 		require.Equal(t, meter1.TotalBytesOfStorageInteractions(), size1)
 
 		// write of key2
-		err = meter1.MeterStorageWrite(key2, val2, true)
-		ledgerInteractionLimitExceedError := errors.NewLedgerInteractionLimitExceededError(
-			size1+size2,
-			testLimit,
-		)
-		require.ErrorAs(t, err, &ledgerInteractionLimitExceedError)
+		err = meter1.MeterStorageWrite(key2, val2)
+		unittest.RequireLimitExceededError(t, err, errors.LimitKindLedgerInteraction, testLimit)
 	})
 
 	t.Run("merge storage metering", func(t *testing.T) {
@@ -893,13 +791,13 @@ func TestStorageLimits(t *testing.T) {
 		readKey1 := flow.NewRegisterID(flow.EmptyAddress, "r1")
 		readVal1 := []byte{0x1, 0x2, 0x3}
 		readSize1 := meter.GetStorageKeyValueSizeForTesting(readKey1, readVal1)
-		err := meter1.MeterStorageRead(readKey1, readVal1, false)
+		err := meter1.MeterStorageRead(readKey1, readVal1)
 		require.NoError(t, err)
 
 		writeKey1 := flow.NewRegisterID(flow.EmptyAddress, "w1")
 		writeVal1 := []byte{0x1, 0x2, 0x3, 0x4}
 		writeSize1 := meter.GetStorageKeyValueSizeForTesting(writeKey1, writeVal1)
-		err = meter1.MeterStorageWrite(writeKey1, writeVal1, false)
+		err = meter1.MeterStorageWrite(writeKey1, writeVal1)
 		require.NoError(t, err)
 
 		// meter 2
@@ -911,17 +809,17 @@ func TestStorageLimits(t *testing.T) {
 		writeVal2 := []byte{0x1, 0x2, 0x3, 0x4, 0x5}
 		writeSize2 := meter.GetStorageKeyValueSizeForTesting(writeKey2, writeVal2)
 
-		err = meter1.MeterStorageRead(readKey1, readVal1, false)
+		err = meter1.MeterStorageRead(readKey1, readVal1)
 		require.NoError(t, err)
 
-		err = meter1.MeterStorageWrite(writeKey1, writeVal1, false)
+		err = meter1.MeterStorageWrite(writeKey1, writeVal1)
 		require.NoError(t, err)
 
 		// read the same key value as meter1
-		err = meter2.MeterStorageRead(readKey1, readVal1, false)
+		err = meter2.MeterStorageRead(readKey1, readVal1)
 		require.NoError(t, err)
 
-		err = meter2.MeterStorageWrite(writeKey2, writeVal2, false)
+		err = meter2.MeterStorageWrite(writeKey2, writeVal2)
 		require.NoError(t, err)
 
 		// merge
@@ -975,10 +873,7 @@ func TestEventLimits(t *testing.T) {
 		require.Equal(t, testSize1, meter1.TotalEmittedEventBytes())
 
 		err = meter1.MeterEmittedEvent(testSize2)
-		eventLimitExceededError := errors.NewEventLimitExceededError(
-			testSize1+testSize2,
-			testEventLimit)
-		require.ErrorAs(t, err, &eventLimitExceededError)
+		unittest.RequireLimitExceededError(t, err, errors.LimitKindEvent, testEventLimit)
 	})
 
 	t.Run("merge event metering", func(t *testing.T) {
@@ -1001,5 +896,85 @@ func TestEventLimits(t *testing.T) {
 		// merge
 		meter1.MergeMeter(meter2)
 		require.Equal(t, testSize1+testSize2, meter1.TotalEmittedEventBytes())
+	})
+}
+
+// TestLimitExceededErrorUsedExceedsLimit checks that every meter reports a
+// used amount strictly greater than the exceeded limit (the
+// [errors.NewLimitExceededError] invariant).
+func TestLimitExceededErrorUsedExceedsLimit(t *testing.T) {
+	// RequireLimitExceededError also checks used > limit.
+	requireUsedAndLimit := func(
+		t *testing.T,
+		err error,
+		kind errors.LimitKind,
+		expectedUsed, expectedLimit uint64,
+	) {
+		unittest.RequireLimitExceededError(t, err, kind, expectedLimit)
+		limitErr, ok := errors.AsLimitExceededError(err)
+		require.True(t, ok)
+		require.Equal(t, expectedUsed, limitErr.Used())
+	}
+
+	t.Run("computation", func(t *testing.T) {
+		m := meter.NewMeter(
+			meter.DefaultParameters().
+				WithComputationLimit(10).
+				WithComputationWeights(map[common.ComputationKind]uint64{
+					0: 1 << meter.MeterExecutionInternalPrecisionBytes,
+				}),
+		)
+
+		err := m.MeterComputation(common.ComputationUsage{Kind: 0, Intensity: 12})
+		requireUsedAndLimit(t, err, errors.LimitKindComputation, 12, 10)
+	})
+
+	t.Run("computation - used rounds up", func(t *testing.T) {
+		// With a sub-unit weight the internally used amount (limit + 1/65536
+		// units) would truncate to the limit itself; it must round up instead.
+		m := meter.NewMeter(
+			meter.DefaultParameters().
+				WithComputationLimit(10).
+				WithComputationWeights(map[common.ComputationKind]uint64{0: 1}),
+		)
+
+		err := m.MeterComputation(common.ComputationUsage{
+			Kind:      0,
+			Intensity: 10<<meter.MeterExecutionInternalPrecisionBytes + 1,
+		})
+		requireUsedAndLimit(t, err, errors.LimitKindComputation, 11, 10)
+	})
+
+	t.Run("memory", func(t *testing.T) {
+		m := meter.NewMeter(
+			meter.DefaultParameters().
+				WithMemoryLimit(10).
+				WithMemoryWeights(map[common.MemoryKind]uint64{0: 1}),
+		)
+
+		err := m.MeterMemory(common.MemoryUsage{Kind: 0, Amount: 12})
+		requireUsedAndLimit(t, err, errors.LimitKindMemory, 12, 10)
+	})
+
+	t.Run("ledger interaction", func(t *testing.T) {
+		key := flow.NewRegisterID(flow.EmptyAddress, "1")
+		value := []byte{0x1, 0x2, 0x3}
+		size := meter.GetStorageKeyValueSizeForTesting(key, value)
+
+		m := meter.NewMeter(
+			meter.DefaultParameters().WithStorageInteractionLimit(size - 1),
+		)
+
+		err := m.MeterStorageRead(key, value)
+		requireUsedAndLimit(t, err, errors.LimitKindLedgerInteraction, size, size-1)
+	})
+
+	t.Run("event", func(t *testing.T) {
+		m := meter.NewMeter(
+			meter.DefaultParameters().WithEventEmitByteLimit(10),
+		)
+
+		err := m.MeterEmittedEvent(12)
+		requireUsedAndLimit(t, err, errors.LimitKindEvent, 12, 10)
 	})
 }

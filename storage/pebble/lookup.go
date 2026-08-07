@@ -1,7 +1,6 @@
 package pebble
 
 import (
-	"bytes"
 	"encoding/binary"
 	"fmt"
 
@@ -27,6 +26,14 @@ type lookupKey struct {
 }
 
 // newLookupKey takes a height and registerID, returns the key for storing the register value in storage
+//
+// Lookup keys are encoded as follows:
+// [codeRegister(1)] [owner] '/' [key] '/' [height(8)]
+// owner and key are variable length fields.
+//
+// Note: owner must be either empty (global registers) or exactly flow.AddressLength bytes
+// (account registers). lookupKeyToRegisterID relies on this invariant to decode the owner,
+// since both owner and key may contain the '/' separator byte.
 func newLookupKey(height uint64, reg flow.RegisterID) *lookupKey {
 	key := lookupKey{
 		// 1 byte gaps for db prefix and '/' separators
@@ -64,51 +71,63 @@ func newLookupKey(height uint64, reg flow.RegisterID) *lookupKey {
 // lookupKeyToRegisterID takes a lookup key and decode it into height and RegisterID
 func lookupKeyToRegisterID(lookupKey []byte) (uint64, flow.RegisterID, error) {
 	if len(lookupKey) < MinLookupKeyLen {
-		return 0, flow.RegisterID{}, fmt.Errorf("invalid lookup key format: expected >= %d bytes, got %d bytes",
-			MinLookupKeyLen, len(lookupKey))
+		return 0, flow.RegisterID{},
+			fmt.Errorf("invalid lookup key format: expected >= %d bytes, got %d bytes", MinLookupKeyLen, len(lookupKey))
 	}
 
-	// check and exclude db prefix
+	// 1. Check and exclude db prefix
 	prefix := lookupKey[0]
 	if prefix != codeRegister {
-		return 0, flow.RegisterID{}, fmt.Errorf("incorrect prefix %d for register lookup key, expected %d",
-			prefix, codeRegister)
+		return 0, flow.RegisterID{}, fmt.Errorf("invalid lookup key format: incorrect prefix %d for register lookup key, expected %d", prefix, codeRegister)
 	}
 	lookupKey = lookupKey[1:]
 
-	// Find the first slash to split the lookup key and decode the owner.
-	firstSlash := bytes.IndexByte(lookupKey, '/')
-	if firstSlash == -1 {
-		return 0, flow.RegisterID{}, fmt.Errorf("invalid lookup key format: cannot find first slash")
-	}
+	// 2. Get the height from the end of the key, and remove the trailing separator
+	//
+	// The height is always exactly HeightSuffixLen bytes at the end of the key. The separator
+	// before the height is therefore always at len(lookupKey) - HeightSuffixLen - 1. We compute
+	// it directly rather than searching for the last '/', because the one's complement height
+	// encoding can contain 0x2F ('/') bytes, which would cause a backward search to find the
+	// wrong separator.
+	heightPos := len(lookupKey) - registers.HeightSuffixLen
 
-	owner := string(lookupKey[:firstSlash])
-
-	// Find the last slash to split encoded height.
-	lastSlashPos := bytes.LastIndexByte(lookupKey, '/')
-	if lastSlashPos == firstSlash {
-		return 0, flow.RegisterID{}, fmt.Errorf("invalid lookup key format: expected 2 separators, got 1 separator")
-	}
-	encodedHeightPos := lastSlashPos + 1
-	if len(lookupKey)-encodedHeightPos != registers.HeightSuffixLen {
+	if lookupKey[heightPos-1] != '/' {
 		return 0, flow.RegisterID{},
-			fmt.Errorf("invalid lookup key format: expected %d bytes of encoded height, got %d bytes",
-				registers.HeightSuffixLen, len(lookupKey)-encodedHeightPos)
+			fmt.Errorf("invalid lookup key format: expected '/' separator at position %d, got %x", heightPos-1, lookupKey[heightPos-1])
 	}
 
-	// Decode height.
-	heightBytes := lookupKey[encodedHeightPos:]
+	heightBytes := lookupKey[heightPos:]
 
 	oneCompliment := binary.BigEndian.Uint64(heightBytes)
 	height := ^oneCompliment
 
-	// Decode the remaining bytes into the key.
-	keyBytes := lookupKey[firstSlash+1 : lastSlashPos]
-	key := string(keyBytes)
+	lookupKey = lookupKey[:heightPos-1] // remove the trailing separator and height
 
-	regID := flow.RegisterID{Owner: owner, Key: key}
+	// 3. Get the owner and key
+	//
+	// What remains is [owner] '/' [key]. We cannot search for the separator: the owner is raw
+	// address bytes and may itself contain 0x2F ('/'). Instead, decode structurally: the owner
+	// is either exactly flow.AddressLength bytes (account registers) or empty (global registers).
+	//
+	// The account case is checked first so that addresses starting with 0x2F are not misparsed
+	// as global registers. This is unambiguous in practice: no global register key contains
+	// '/' at index flow.AddressLength-1.
+	var owner, key string
+	switch {
+	case len(lookupKey) > flow.AddressLength && lookupKey[flow.AddressLength] == '/':
+		owner = string(lookupKey[:flow.AddressLength])
+		key = string(lookupKey[flow.AddressLength+1:])
+	case lookupKey[0] == '/':
+		// global registers have an empty owner
+		owner = ""
+		key = string(lookupKey[1:])
+	default:
+		// only the two cases above are valid; anything else is a malformed key
+		return 0, flow.RegisterID{},
+			fmt.Errorf("invalid lookup key format: cannot find owner/key separator")
+	}
 
-	return height, regID, nil
+	return height, flow.RegisterID{Owner: owner, Key: key}, nil
 }
 
 // Bytes returns the encoded lookup key.

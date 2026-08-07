@@ -6,6 +6,7 @@ package mock
 
 import (
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/storage"
 	mock "github.com/stretchr/testify/mock"
 )
 
@@ -34,6 +35,71 @@ type OnDiskRegisterStore_Expecter struct {
 
 func (_m *OnDiskRegisterStore) EXPECT() *OnDiskRegisterStore_Expecter {
 	return &OnDiskRegisterStore_Expecter{mock: &_m.Mock}
+}
+
+// ByKeyPrefix provides a mock function for the type OnDiskRegisterStore
+func (_mock *OnDiskRegisterStore) ByKeyPrefix(keyPrefix string, height uint64, cursor *flow.RegisterID) storage.IndexIterator[flow.RegisterValue, flow.RegisterID] {
+	ret := _mock.Called(keyPrefix, height, cursor)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ByKeyPrefix")
+	}
+
+	var r0 storage.IndexIterator[flow.RegisterValue, flow.RegisterID]
+	if returnFunc, ok := ret.Get(0).(func(string, uint64, *flow.RegisterID) storage.IndexIterator[flow.RegisterValue, flow.RegisterID]); ok {
+		r0 = returnFunc(keyPrefix, height, cursor)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(storage.IndexIterator[flow.RegisterValue, flow.RegisterID])
+		}
+	}
+	return r0
+}
+
+// OnDiskRegisterStore_ByKeyPrefix_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ByKeyPrefix'
+type OnDiskRegisterStore_ByKeyPrefix_Call struct {
+	*mock.Call
+}
+
+// ByKeyPrefix is a helper method to define mock.On call
+//   - keyPrefix string
+//   - height uint64
+//   - cursor *flow.RegisterID
+func (_e *OnDiskRegisterStore_Expecter) ByKeyPrefix(keyPrefix interface{}, height interface{}, cursor interface{}) *OnDiskRegisterStore_ByKeyPrefix_Call {
+	return &OnDiskRegisterStore_ByKeyPrefix_Call{Call: _e.mock.On("ByKeyPrefix", keyPrefix, height, cursor)}
+}
+
+func (_c *OnDiskRegisterStore_ByKeyPrefix_Call) Run(run func(keyPrefix string, height uint64, cursor *flow.RegisterID)) *OnDiskRegisterStore_ByKeyPrefix_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 string
+		if args[0] != nil {
+			arg0 = args[0].(string)
+		}
+		var arg1 uint64
+		if args[1] != nil {
+			arg1 = args[1].(uint64)
+		}
+		var arg2 *flow.RegisterID
+		if args[2] != nil {
+			arg2 = args[2].(*flow.RegisterID)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *OnDiskRegisterStore_ByKeyPrefix_Call) Return(indexIterator storage.IndexIterator[flow.RegisterValue, flow.RegisterID]) *OnDiskRegisterStore_ByKeyPrefix_Call {
+	_c.Call.Return(indexIterator)
+	return _c
+}
+
+func (_c *OnDiskRegisterStore_ByKeyPrefix_Call) RunAndReturn(run func(keyPrefix string, height uint64, cursor *flow.RegisterID) storage.IndexIterator[flow.RegisterValue, flow.RegisterID]) *OnDiskRegisterStore_ByKeyPrefix_Call {
+	_c.Call.Return(run)
+	return _c
 }
 
 // FirstHeight provides a mock function for the type OnDiskRegisterStore

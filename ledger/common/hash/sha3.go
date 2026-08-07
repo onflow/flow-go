@@ -68,7 +68,7 @@ func xorInAtIndex(d *state, buf []byte, index int) {
 	n := len(buf) >> 3
 	aAtIndex := d.a[index:]
 
-	for i := 0; i < n; i++ {
+	for i := range n {
 		a := binary.LittleEndian.Uint64(buf)
 		aAtIndex[i] ^= a
 		buf = buf[8:]
@@ -112,7 +112,7 @@ func (d *state) hash256Plus(p1 Hash, p2 []byte) Hash {
 }
 
 // hash256plus256 absorbs two 256 bits slices of data into the hash's state
-// applies the permutation, and outpute the result in out
+// applies the permutation, and outputs the result in out
 func (d *state) hash256plus256(p1, p2 Hash) Hash {
 	copyIn512(d, p1, p2)
 	// permute

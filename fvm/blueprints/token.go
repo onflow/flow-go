@@ -154,12 +154,12 @@ func TransferFlowTokenTransaction(
 ) *flow.TransactionBodyBuilder {
 	cadenceAmount, _ := cadence.NewUFix64(amount)
 	txScript := templates.GenerateTransferGenericVaultWithAddressScript(env)
+	ftTypeIdentifier := fmt.Sprintf("A.%s.FlowToken.Vault", env.FlowTokenAddress)
 	return flow.NewTransactionBodyBuilder().
 		SetScript(txScript).
 		SetPayer(from).
 		AddArgument(jsoncdc.MustEncode(cadenceAmount)).
 		AddArgument(jsoncdc.MustEncode(cadence.NewAddress(to))).
-		AddArgument(jsoncdc.MustEncode(cadence.NewAddress(flow.HexToAddress(env.FlowTokenAddress)))).
-		AddArgument(jsoncdc.MustEncode(cadence.String("FlowToken"))).
+		AddArgument(jsoncdc.MustEncode(cadence.String(ftTypeIdentifier))).
 		AddAuthorizer(from)
 }

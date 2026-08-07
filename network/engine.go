@@ -18,25 +18,25 @@ type Engine interface {
 	// * Define a message queue on the component receiving the message
 	// * Define a function (with a concrete argument type) on the component receiving
 	//   the message, which adds the message to the message queue
-	SubmitLocal(event interface{})
+	SubmitLocal(event any)
 
 	// Submit submits the given event from the node with the given origin ID
 	// for processing in a non-blocking manner. It returns instantly and logs
 	// a potential processing error internally when done.
 	// Deprecated: Only applicable for use by the networking layer, which should use MessageProcessor instead
-	Submit(channel channels.Channel, originID flow.Identifier, event interface{})
+	Submit(channel channels.Channel, originID flow.Identifier, event any)
 
 	// ProcessLocal processes an event originating on the local node.
 	// Deprecated: To synchronously process a local message:
 	// * Define a function (with a concrete argument type) on the component receiving
 	//   the message, which blocks until the message is processed
-	ProcessLocal(event interface{}) error
+	ProcessLocal(event any) error
 
 	// Process processes the given event from the node with the given origin ID
 	// in a blocking manner. It returns the potential processing error when
 	// done.
 	// Deprecated: Only applicable for use by the networking layer, which should use MessageProcessor instead
-	Process(channel channels.Channel, originID flow.Identifier, event interface{}) error
+	Process(channel channels.Channel, originID flow.Identifier, event any) error
 }
 
 // MessageProcessor represents a component which receives messages from the
@@ -56,5 +56,5 @@ type MessageProcessor interface {
 	//
 	// Some of the current error returns signal Byzantine behavior, such as forged or malformed
 	// messages. These cases must be logged and routed to a dedicated violation reporting consumer.
-	Process(channel channels.Channel, originID flow.Identifier, message interface{}) error
+	Process(channel channels.Channel, originID flow.Identifier, message any) error
 }

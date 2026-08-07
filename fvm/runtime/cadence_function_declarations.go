@@ -93,7 +93,6 @@ func EVMInternalEVMContractValue(chainID flow.ChainID, fvmEnv environment.Enviro
 
 	evmBackend := backends.NewWrappedEnvironment(fvmEnv)
 	evmEmulator := emulator.NewEmulator(evmBackend, evm.StorageAccountAddress(chainID))
-	blockStore := handler.NewBlockStore(chainID, evmBackend, evm.StorageAccountAddress(chainID))
 	addressAllocator := handler.NewAddressAllocator()
 
 	evmContractAddress := evm.ContractAccountAddress(chainID)
@@ -103,11 +102,17 @@ func EVMInternalEVMContractValue(chainID flow.ChainID, fvmEnv environment.Enviro
 		evmContractAddress,
 		common.Address(flowTokenAddress),
 		randomBeaconAddress,
-		blockStore,
 		addressAllocator,
 		evmBackend,
 		evmEmulator,
 	)
+
+	// Register cache cleanup callback on the SwappableEnvironment.
+	// This ensures the cache is cleared whenever the runtime is
+	// borrowed for a new transaction or returned to the pool.
+	if se, ok := fvmEnv.(*SwappableEnvironment); ok {
+		se.RegisterOnSwapCallback(contractHandler.ResetCaches)
+	}
 
 	return impl.NewInternalEVMContractValue(
 		nil,

@@ -115,7 +115,7 @@ func (s *store) Add(ctx context.Context, executionData *BlockExecutionData) (flo
 // blobstore, and returns the root CID.
 // No errors are expected during normal operation.
 func (s *store) addChunkExecutionData(ctx context.Context, chunkExecutionData *ChunkExecutionData) (cid.Cid, error) {
-	var v interface{} = chunkExecutionData
+	var v any = chunkExecutionData
 
 	// given an arbitrarily large v, split it into blobs of size up to maxBlobSize, adding them to
 	// the blobstore. Then, combine the list of CIDs added into a second level of blobs, and repeat.
@@ -141,7 +141,7 @@ func (s *store) addChunkExecutionData(ctx context.Context, chunkExecutionData *C
 // addBlobs splits the given value into blobs of size up to maxBlobSize, adds them to the blobstore,
 // then returns the CIDs for each blob added.
 // No errors are expected during normal operation.
-func (s *store) addBlobs(ctx context.Context, v interface{}) ([]cid.Cid, error) {
+func (s *store) addBlobs(ctx context.Context, v any) ([]cid.Cid, error) {
 	// first, serialize the data into a large byte slice
 	buf := new(bytes.Buffer)
 	if err := s.serializer.Serialize(buf, v); err != nil {
@@ -247,7 +247,7 @@ func (s *store) getChunkExecutionData(ctx context.Context, chunkExecutionDataID 
 // the deserialized value.
 // - BlobNotFoundError if any of the CIDs could not be found from the blobstore
 // - MalformedDataError if any of the blobs cannot be properly deserialized
-func (s *store) getBlobs(ctx context.Context, cids []cid.Cid) (interface{}, error) {
+func (s *store) getBlobs(ctx context.Context, cids []cid.Cid) (any, error) {
 	buf := new(bytes.Buffer)
 
 	// get each blob and append the raw data to the buffer

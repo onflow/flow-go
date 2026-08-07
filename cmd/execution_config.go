@@ -20,6 +20,7 @@ import (
 	"github.com/onflow/flow-go/engine/execution/storehouse"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/storage/derived"
+	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/module/mempool"
@@ -61,6 +62,7 @@ type ExecutionConfig struct {
 	transactionExecutionMetricsEnabled    bool
 	transactionExecutionMetricsBufferSize uint
 	scheduleCallbacksEnabled              bool
+	tokenTrackingEnabled                  bool
 
 	computationConfig        computation.ComputationConfig
 	receiptRequestWorkers    uint   // common provider engine workers
@@ -81,6 +83,11 @@ type ExecutionConfig struct {
 	pruningConfigBatchSize           uint
 	pruningConfigSleepAfterCommit    time.Duration
 	pruningConfigSleepAfterIteration time.Duration
+
+	ledgerServiceAddr      string // gRPC address for remote ledger service (empty means use local ledger)
+	ledgerServiceAdminAddr string // Admin HTTP address for remote ledger service (for trigger-checkpoint command)
+	ledgerMaxRequestSize   uint   // Maximum request message size in bytes for remote ledger client (0 = default 1 GiB)
+	ledgerMaxResponseSize  uint   // Maximum response message size in bytes for remote ledger client (0 = default 1 GiB)
 }
 
 func (exeConf *ExecutionConfig) SetupFlags(flags *pflag.FlagSet) {
@@ -97,9 +104,9 @@ func (exeConf *ExecutionConfig) SetupFlags(flags *pflag.FlagSet) {
 	flags.StringVar(&exeConf.triedir, "triedir", filepath.Join(datadir, "trie"), "directory to store the execution State")
 	flags.StringVar(&exeConf.executionDataDir, "execution-data-dir", filepath.Join(datadir, "execution_data"), "directory to use for storing Execution Data")
 	flags.StringVar(&exeConf.registerDir, "register-dir", filepath.Join(datadir, "register"), "directory to use for storing registers Data")
-	flags.Uint32Var(&exeConf.mTrieCacheSize, "mtrie-cache-size", 500, "cache size for MTrie")
-	flags.UintVar(&exeConf.checkpointDistance, "checkpoint-distance", 20, "number of WAL segments between checkpoints")
-	flags.UintVar(&exeConf.checkpointsToKeep, "checkpoints-to-keep", 5, "number of recent checkpoints to keep (0 to keep all)")
+	flags.Uint32Var(&exeConf.mTrieCacheSize, "mtrie-cache-size", ledger.DefaultMTrieCacheSize, "cache size for MTrie")
+	flags.UintVar(&exeConf.checkpointDistance, "checkpoint-distance", ledger.DefaultCheckpointDistance, "number of WAL segments between checkpoints")
+	flags.UintVar(&exeConf.checkpointsToKeep, "checkpoints-to-keep", ledger.DefaultCheckpointsToKeep, "number of recent checkpoints to keep (0 to keep all)")
 	flags.UintVar(&exeConf.computationConfig.DerivedDataCacheSize, "cadence-execution-cache", derived.DefaultDerivedDataCacheSize,
 		"cache size for Cadence execution")
 	flags.BoolVar(&exeConf.computationConfig.ExtensiveTracing, "extensive-tracing", false, "adds high-overhead tracing to execution")
@@ -151,6 +158,7 @@ func (exeConf *ExecutionConfig) SetupFlags(flags *pflag.FlagSet) {
 	flags.Uint64Var(&exeConf.backgroundIndexerHeightsPerSecond, "background-indexer-heights-per-second", storehouse.DefaultHeightsPerSecond, fmt.Sprintf("rate limit for background indexer in heights per second. 0 means no rate limiting. default: %v", storehouse.DefaultHeightsPerSecond))
 	flags.BoolVar(&exeConf.enableChecker, "enable-checker", true, "enable checker to check the correctness of the execution result, default is true")
 	flags.BoolVar(&exeConf.scheduleCallbacksEnabled, "scheduled-callbacks-enabled", fvm.DefaultScheduledTransactionsEnabled, "[deprecated] enable execution of scheduled transactions")
+	flags.BoolVar(&exeConf.tokenTrackingEnabled, "token-tracking-enabled", false, "enable tracking and logging of token moves on transactions")
 	// deprecated. Retain it to prevent nodes that previously had this configuration from crashing.
 	var deprecatedEnableNewIngestionEngine bool
 	flags.BoolVar(&deprecatedEnableNewIngestionEngine, "enable-new-ingestion-engine", true, "enable new ingestion engine, default is true")
@@ -160,6 +168,10 @@ func (exeConf *ExecutionConfig) SetupFlags(flags *pflag.FlagSet) {
 	flags.UintVar(&exeConf.pruningConfigBatchSize, "pruning-config-batch-size", exepruner.DefaultConfig.BatchSize, "the batch size is the number of blocks that we want to delete in one batch, default 1200")
 	flags.DurationVar(&exeConf.pruningConfigSleepAfterCommit, "pruning-config-sleep-after-commit", exepruner.DefaultConfig.SleepAfterEachBatchCommit, "sleep time after each batch commit, default 1s")
 	flags.DurationVar(&exeConf.pruningConfigSleepAfterIteration, "pruning-config-sleep-after-iteration", exepruner.DefaultConfig.SleepAfterEachIteration, "sleep time after each iteration, default max int64")
+	flags.StringVar(&exeConf.ledgerServiceAddr, "ledger-service-addr", "", "gRPC address for remote ledger service (TCP: e.g., localhost:9000, or Unix socket: unix:///path/to/socket). If empty, uses local ledger")
+	flags.StringVar(&exeConf.ledgerServiceAdminAddr, "ledger-service-admin-addr", "", "admin HTTP address for remote ledger service (e.g., localhost:9003). Used to provide helpful error messages when trigger-checkpoint is called in remote mode")
+	flags.UintVar(&exeConf.ledgerMaxRequestSize, "ledger-max-request-size", 0, "maximum request message size in bytes for remote ledger client (0 = default 1 GiB)")
+	flags.UintVar(&exeConf.ledgerMaxResponseSize, "ledger-max-response-size", 0, "maximum response message size in bytes for remote ledger client (0 = default 1 GiB)")
 }
 
 func (exeConf *ExecutionConfig) ValidateFlags() error {

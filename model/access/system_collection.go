@@ -20,6 +20,11 @@ type SystemCollectionBuilder interface {
 	// No error returns are expected during normal operation.
 	ExecuteCallbacksTransactions(chain flow.Chain, processEvents flow.EventsList) ([]*flow.TransactionBody, error)
 
+	// ExecuteCallbacksTransaction constructs a transaction to execute a callback, for the given chain.
+	//
+	// No error returns are expected during normal operation.
+	ExecuteCallbacksTransaction(chain flow.Chain, id uint64, effort uint64) (*flow.TransactionBody, error)
+
 	// SystemChunkTransaction creates and returns the transaction corresponding to the
 	// system chunk for the given chain.
 	//

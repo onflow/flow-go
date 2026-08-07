@@ -72,6 +72,8 @@ type Environment interface {
 	// history for commit-reveal schemes.
 	RandomSourceHistory() ([]byte, error)
 
+	EVMTestOperationsAllowed() bool
+
 	// FlushPendingUpdates flushes pending updates from the stateful environment
 	// modules (i.e., ContractUpdater) to the state transaction, and return
 	// the updated contract keys.
@@ -83,6 +85,8 @@ type Environment interface {
 	// Reset resets all stateful environment modules (e.g., ContractUpdater,
 	// EventEmitter) to initial state.
 	Reset()
+
+	EVMBlockStore
 }
 
 // ReusableCadenceRuntime is a wrapper around the cadence runtime and environment that

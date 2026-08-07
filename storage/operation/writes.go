@@ -16,7 +16,7 @@ import (
 // Error returns:
 //   - generic error in case of unexpected failure from the database layer or
 //     encoding failure.
-func UpsertByKey(w storage.Writer, key []byte, val interface{}) error {
+func UpsertByKey(w storage.Writer, key []byte, val any) error {
 	value, err := msgpack.Marshal(val)
 	if err != nil {
 		return irrecoverable.NewExceptionf("failed to encode value: %w", err)
@@ -32,7 +32,7 @@ func UpsertByKey(w storage.Writer, key []byte, val interface{}) error {
 
 // Upserting returns a functor, whose execution will append the given key-value-pair to the provided
 // storage writer (typically a pending batch of database writes).
-func Upserting(key []byte, val interface{}) func(storage.Writer) error {
+func Upserting(key []byte, val any) func(storage.Writer) error {
 	value, err := msgpack.Marshal(val)
 	return func(w storage.Writer) error {
 		if err != nil {

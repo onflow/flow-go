@@ -580,8 +580,12 @@ func assertProcessed(t testing.TB, cp storage.ConsumerProgress, expectProcessed 
 
 func newTestConsumer(t testing.TB, cp storage.ConsumerProgressInitializer, jobs module.Jobs, worker jobqueue.Worker, maxSearchAhead uint64, defaultIndex uint64) module.JobConsumer {
 	log := unittest.Logger().With().Str("module", "consumer").Logger()
+
+	progress, err := cp.Initialize(defaultIndex)
+	require.NoError(t, err)
+
 	maxProcessing := uint64(3)
-	c, err := jobqueue.NewConsumer(log, jobs, cp, worker, maxProcessing, maxSearchAhead, defaultIndex)
+	c, err := jobqueue.NewConsumer(log, jobs, progress, worker, maxProcessing, maxSearchAhead)
 	require.NoError(t, err)
 	return c
 }

@@ -136,7 +136,7 @@ func (er ExecutionResult) ServiceEventsByChunk(chunkIndex uint64) ServiceEventLi
 	}
 
 	startIndex := 0
-	for i := uint64(0); i < chunkIndex; i++ {
+	for i := range chunkIndex {
 		startIndex += int(er.Chunks[i].ServiceEventCount)
 	}
 	return er.ServiceEvents[startIndex : startIndex+int(serviceEventCount)]

@@ -42,7 +42,7 @@ func Is(err error, target error) bool {
 // As finds the first error in err's chain that matches target,
 // and if so, sets target to that error value and returns true. Otherwise, it returns false.
 // The chain consists of err itself followed by the sequence of errors obtained by repeatedly calling Unwrap.
-func As(err error, target interface{}) bool {
+func As(err error, target any) bool {
 	return stdErrors.As(err, target)
 }
 
@@ -249,7 +249,7 @@ func WrapCodedError(
 	code ErrorCode,
 	err error,
 	prefixMsgFormat string,
-	formatArguments ...interface{},
+	formatArguments ...any,
 ) codedError {
 	if prefixMsgFormat != "" {
 		msg := fmt.Sprintf(prefixMsgFormat, formatArguments...)
@@ -261,7 +261,7 @@ func WrapCodedError(
 func NewCodedError(
 	code ErrorCode,
 	format string,
-	formatArguments ...interface{},
+	formatArguments ...any,
 ) codedError {
 	return newError(code, fmt.Errorf(format, formatArguments...))
 }
@@ -299,7 +299,7 @@ func WrapCodedFailure(
 	code FailureCode,
 	err error,
 	prefixMsgFormat string,
-	formatArguments ...interface{},
+	formatArguments ...any,
 ) codedFailure {
 	if prefixMsgFormat != "" {
 		msg := fmt.Sprintf(prefixMsgFormat, formatArguments...)
@@ -311,7 +311,7 @@ func WrapCodedFailure(
 func NewCodedFailure(
 	code FailureCode,
 	format string,
-	formatArguments ...interface{},
+	formatArguments ...any,
 ) codedFailure {
 	return newFailure(code, fmt.Errorf(format, formatArguments...))
 }
@@ -320,7 +320,7 @@ func NewCodedFailuref(
 	code FailureCode,
 	msgPrefix string,
 	format string,
-	formatArguments ...interface{},
+	formatArguments ...any,
 ) codedFailure {
 	err := fmt.Errorf(format, formatArguments...)
 	if msgPrefix != "" {

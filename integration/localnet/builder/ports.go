@@ -53,6 +53,11 @@ var config = map[string]*portConfig{
 		end:       8000,
 		portCount: 2,
 	},
+	"ledger": {
+		start:     8000, // 8000-8100 => 50 ledger services
+		end:       8100,
+		portCount: 2,
+	},
 }
 
 // PortAllocator is responsible for allocating and tracking container-to-host port mappings for each node

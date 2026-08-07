@@ -12,24 +12,36 @@ import (
 )
 
 // LoggingMiddleware creates a middleware which adds a logger interceptor to each request to log the request method, uri,
-// duration and response code
+// duration and response code. Both start and finish logs are at DEBUG level.
+//
+// Example log messages for searching:
+//   - Start:  DBG "started REST request" method=GET uri=/v1/blocks client_ip=... user_agent=...
+//   - Finish: DBG "finished REST request" method=GET uri=/v1/blocks client_ip=... user_agent=... duration=... response_code=200
 func LoggingMiddleware(logger zerolog.Logger) mux.MiddlewareFunc {
 	return func(inner http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-			// record star time
+			lg := logger.With().
+				Str("method", req.Method).
+				Str("uri", req.RequestURI).
+				Str("client_ip", req.RemoteAddr).
+				Str("user_agent", req.UserAgent()).
+				Logger()
+
+			// Log at start of request for debugging and tracing
+			lg.Debug().Msg("started REST request")
+
+			// record start time
 			start := time.Now()
 			// modify the writer
 			respWriter := newResponseWriter(w)
 			// continue to the next handler
 			inner.ServeHTTP(respWriter, req)
-			log := logger.Info()
-			log.Str("method", req.Method).
-				Str("uri", req.RequestURI).
-				Str("client_ip", req.RemoteAddr).
-				Str("user_agent", req.UserAgent()).
+
+			// Log at end of request with response details
+			lg.Debug().
 				Dur("duration", time.Since(start)).
 				Int("response_code", respWriter.statusCode).
-				Msg("api")
+				Msg("finished REST request")
 		})
 	}
 }

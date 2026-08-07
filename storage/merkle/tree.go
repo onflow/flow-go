@@ -192,7 +192,7 @@ PutLoop:
 			remainCount := n.count - commonCount - 1
 			if remainCount > 0 {
 				remainPath := bitutils.MakeBitVector(remainCount)
-				for i := 0; i < remainCount; i++ {
+				for i := range remainCount {
 					bitutils.WriteBit(remainPath, i, bitutils.ReadBit(n.path, i+commonCount+1))
 				}
 				remainNode := &short{count: remainCount, path: remainPath}
@@ -224,7 +224,7 @@ PutLoop:
 			// otherwise, insert a short node with the remainder of the path
 			finalCount := totalCount - index
 			finalPath := bitutils.MakeBitVector(finalCount)
-			for i := 0; i < finalCount; i++ {
+			for i := range finalCount {
 				bitutils.WriteBit(finalPath, i, bitutils.ReadBit(key, index+i))
 			}
 			finalNode := &short{count: finalCount, path: []byte(finalPath)}

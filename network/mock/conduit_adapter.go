@@ -39,14 +39,14 @@ func (_m *ConduitAdapter) EXPECT() *ConduitAdapter_Expecter {
 }
 
 // MulticastOnChannel provides a mock function for the type ConduitAdapter
-func (_mock *ConduitAdapter) MulticastOnChannel(channel channels.Channel, ifaceVal interface{}, v uint, identifiers ...flow.Identifier) error {
+func (_mock *ConduitAdapter) MulticastOnChannel(channel channels.Channel, v any, v1 uint, identifiers ...flow.Identifier) error {
 	// flow.Identifier
 	_va := make([]interface{}, len(identifiers))
 	for _i := range identifiers {
 		_va[_i] = identifiers[_i]
 	}
 	var _ca []interface{}
-	_ca = append(_ca, channel, ifaceVal, v)
+	_ca = append(_ca, channel, v, v1)
 	_ca = append(_ca, _va...)
 	ret := _mock.Called(_ca...)
 
@@ -55,8 +55,8 @@ func (_mock *ConduitAdapter) MulticastOnChannel(channel channels.Channel, ifaceV
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(channels.Channel, interface{}, uint, ...flow.Identifier) error); ok {
-		r0 = returnFunc(channel, ifaceVal, v, identifiers...)
+	if returnFunc, ok := ret.Get(0).(func(channels.Channel, any, uint, ...flow.Identifier) error); ok {
+		r0 = returnFunc(channel, v, v1, identifiers...)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -70,23 +70,23 @@ type ConduitAdapter_MulticastOnChannel_Call struct {
 
 // MulticastOnChannel is a helper method to define mock.On call
 //   - channel channels.Channel
-//   - ifaceVal interface{}
-//   - v uint
+//   - v any
+//   - v1 uint
 //   - identifiers ...flow.Identifier
-func (_e *ConduitAdapter_Expecter) MulticastOnChannel(channel interface{}, ifaceVal interface{}, v interface{}, identifiers ...interface{}) *ConduitAdapter_MulticastOnChannel_Call {
+func (_e *ConduitAdapter_Expecter) MulticastOnChannel(channel interface{}, v interface{}, v1 interface{}, identifiers ...interface{}) *ConduitAdapter_MulticastOnChannel_Call {
 	return &ConduitAdapter_MulticastOnChannel_Call{Call: _e.mock.On("MulticastOnChannel",
-		append([]interface{}{channel, ifaceVal, v}, identifiers...)...)}
+		append([]interface{}{channel, v, v1}, identifiers...)...)}
 }
 
-func (_c *ConduitAdapter_MulticastOnChannel_Call) Run(run func(channel channels.Channel, ifaceVal interface{}, v uint, identifiers ...flow.Identifier)) *ConduitAdapter_MulticastOnChannel_Call {
+func (_c *ConduitAdapter_MulticastOnChannel_Call) Run(run func(channel channels.Channel, v any, v1 uint, identifiers ...flow.Identifier)) *ConduitAdapter_MulticastOnChannel_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 channels.Channel
 		if args[0] != nil {
 			arg0 = args[0].(channels.Channel)
 		}
-		var arg1 interface{}
+		var arg1 any
 		if args[1] != nil {
-			arg1 = args[1].(interface{})
+			arg1 = args[1].(any)
 		}
 		var arg2 uint
 		if args[2] != nil {
@@ -115,20 +115,20 @@ func (_c *ConduitAdapter_MulticastOnChannel_Call) Return(err error) *ConduitAdap
 	return _c
 }
 
-func (_c *ConduitAdapter_MulticastOnChannel_Call) RunAndReturn(run func(channel channels.Channel, ifaceVal interface{}, v uint, identifiers ...flow.Identifier) error) *ConduitAdapter_MulticastOnChannel_Call {
+func (_c *ConduitAdapter_MulticastOnChannel_Call) RunAndReturn(run func(channel channels.Channel, v any, v1 uint, identifiers ...flow.Identifier) error) *ConduitAdapter_MulticastOnChannel_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // PublishOnChannel provides a mock function for the type ConduitAdapter
-func (_mock *ConduitAdapter) PublishOnChannel(channel channels.Channel, ifaceVal interface{}, identifiers ...flow.Identifier) error {
+func (_mock *ConduitAdapter) PublishOnChannel(channel channels.Channel, v any, identifiers ...flow.Identifier) error {
 	// flow.Identifier
 	_va := make([]interface{}, len(identifiers))
 	for _i := range identifiers {
 		_va[_i] = identifiers[_i]
 	}
 	var _ca []interface{}
-	_ca = append(_ca, channel, ifaceVal)
+	_ca = append(_ca, channel, v)
 	_ca = append(_ca, _va...)
 	ret := _mock.Called(_ca...)
 
@@ -137,8 +137,8 @@ func (_mock *ConduitAdapter) PublishOnChannel(channel channels.Channel, ifaceVal
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(channels.Channel, interface{}, ...flow.Identifier) error); ok {
-		r0 = returnFunc(channel, ifaceVal, identifiers...)
+	if returnFunc, ok := ret.Get(0).(func(channels.Channel, any, ...flow.Identifier) error); ok {
+		r0 = returnFunc(channel, v, identifiers...)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -152,22 +152,22 @@ type ConduitAdapter_PublishOnChannel_Call struct {
 
 // PublishOnChannel is a helper method to define mock.On call
 //   - channel channels.Channel
-//   - ifaceVal interface{}
+//   - v any
 //   - identifiers ...flow.Identifier
-func (_e *ConduitAdapter_Expecter) PublishOnChannel(channel interface{}, ifaceVal interface{}, identifiers ...interface{}) *ConduitAdapter_PublishOnChannel_Call {
+func (_e *ConduitAdapter_Expecter) PublishOnChannel(channel interface{}, v interface{}, identifiers ...interface{}) *ConduitAdapter_PublishOnChannel_Call {
 	return &ConduitAdapter_PublishOnChannel_Call{Call: _e.mock.On("PublishOnChannel",
-		append([]interface{}{channel, ifaceVal}, identifiers...)...)}
+		append([]interface{}{channel, v}, identifiers...)...)}
 }
 
-func (_c *ConduitAdapter_PublishOnChannel_Call) Run(run func(channel channels.Channel, ifaceVal interface{}, identifiers ...flow.Identifier)) *ConduitAdapter_PublishOnChannel_Call {
+func (_c *ConduitAdapter_PublishOnChannel_Call) Run(run func(channel channels.Channel, v any, identifiers ...flow.Identifier)) *ConduitAdapter_PublishOnChannel_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 channels.Channel
 		if args[0] != nil {
 			arg0 = args[0].(channels.Channel)
 		}
-		var arg1 interface{}
+		var arg1 any
 		if args[1] != nil {
-			arg1 = args[1].(interface{})
+			arg1 = args[1].(any)
 		}
 		var arg2 []flow.Identifier
 		variadicArgs := make([]flow.Identifier, len(args)-2)
@@ -191,7 +191,7 @@ func (_c *ConduitAdapter_PublishOnChannel_Call) Return(err error) *ConduitAdapte
 	return _c
 }
 
-func (_c *ConduitAdapter_PublishOnChannel_Call) RunAndReturn(run func(channel channels.Channel, ifaceVal interface{}, identifiers ...flow.Identifier) error) *ConduitAdapter_PublishOnChannel_Call {
+func (_c *ConduitAdapter_PublishOnChannel_Call) RunAndReturn(run func(channel channels.Channel, v any, identifiers ...flow.Identifier) error) *ConduitAdapter_PublishOnChannel_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -294,16 +294,16 @@ func (_c *ConduitAdapter_UnRegisterChannel_Call) RunAndReturn(run func(channel c
 }
 
 // UnicastOnChannel provides a mock function for the type ConduitAdapter
-func (_mock *ConduitAdapter) UnicastOnChannel(channel channels.Channel, ifaceVal interface{}, identifier flow.Identifier) error {
-	ret := _mock.Called(channel, ifaceVal, identifier)
+func (_mock *ConduitAdapter) UnicastOnChannel(channel channels.Channel, v any, identifier flow.Identifier) error {
+	ret := _mock.Called(channel, v, identifier)
 
 	if len(ret) == 0 {
 		panic("no return value specified for UnicastOnChannel")
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(channels.Channel, interface{}, flow.Identifier) error); ok {
-		r0 = returnFunc(channel, ifaceVal, identifier)
+	if returnFunc, ok := ret.Get(0).(func(channels.Channel, any, flow.Identifier) error); ok {
+		r0 = returnFunc(channel, v, identifier)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -317,21 +317,21 @@ type ConduitAdapter_UnicastOnChannel_Call struct {
 
 // UnicastOnChannel is a helper method to define mock.On call
 //   - channel channels.Channel
-//   - ifaceVal interface{}
+//   - v any
 //   - identifier flow.Identifier
-func (_e *ConduitAdapter_Expecter) UnicastOnChannel(channel interface{}, ifaceVal interface{}, identifier interface{}) *ConduitAdapter_UnicastOnChannel_Call {
-	return &ConduitAdapter_UnicastOnChannel_Call{Call: _e.mock.On("UnicastOnChannel", channel, ifaceVal, identifier)}
+func (_e *ConduitAdapter_Expecter) UnicastOnChannel(channel interface{}, v interface{}, identifier interface{}) *ConduitAdapter_UnicastOnChannel_Call {
+	return &ConduitAdapter_UnicastOnChannel_Call{Call: _e.mock.On("UnicastOnChannel", channel, v, identifier)}
 }
 
-func (_c *ConduitAdapter_UnicastOnChannel_Call) Run(run func(channel channels.Channel, ifaceVal interface{}, identifier flow.Identifier)) *ConduitAdapter_UnicastOnChannel_Call {
+func (_c *ConduitAdapter_UnicastOnChannel_Call) Run(run func(channel channels.Channel, v any, identifier flow.Identifier)) *ConduitAdapter_UnicastOnChannel_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 channels.Channel
 		if args[0] != nil {
 			arg0 = args[0].(channels.Channel)
 		}
-		var arg1 interface{}
+		var arg1 any
 		if args[1] != nil {
-			arg1 = args[1].(interface{})
+			arg1 = args[1].(any)
 		}
 		var arg2 flow.Identifier
 		if args[2] != nil {
@@ -351,7 +351,7 @@ func (_c *ConduitAdapter_UnicastOnChannel_Call) Return(err error) *ConduitAdapte
 	return _c
 }
 
-func (_c *ConduitAdapter_UnicastOnChannel_Call) RunAndReturn(run func(channel channels.Channel, ifaceVal interface{}, identifier flow.Identifier) error) *ConduitAdapter_UnicastOnChannel_Call {
+func (_c *ConduitAdapter_UnicastOnChannel_Call) RunAndReturn(run func(channel channels.Channel, v any, identifier flow.Identifier) error) *ConduitAdapter_UnicastOnChannel_Call {
 	_c.Call.Return(run)
 	return _c
 }

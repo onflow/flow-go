@@ -8,6 +8,7 @@ import (
 	"github.com/onflow/cadence/sema"
 
 	"github.com/onflow/flow-go/fvm/environment"
+	"github.com/onflow/flow-go/fvm/evm/backends"
 	"github.com/onflow/flow-go/fvm/evm/precompiles"
 	"github.com/onflow/flow-go/fvm/evm/types"
 	"github.com/onflow/flow-go/model/flow"
@@ -33,7 +34,7 @@ func preparePrecompiledContracts(
 	evmContractAddress flow.Address,
 	randomBeaconAddress flow.Address,
 	addressAllocator types.AddressAllocator,
-	backend types.Backend,
+	backend backends.Backend,
 ) []types.PrecompiledContract {
 	archAddress := addressAllocator.AllocatePrecompileAddress(1)
 	archContract := precompiles.ArchContract(
@@ -46,7 +47,7 @@ func preparePrecompiledContracts(
 	return []types.PrecompiledContract{archContract}
 }
 
-func blockHeightProvider(backend types.Backend) func() (uint64, error) {
+func blockHeightProvider(backend backends.Backend) func() (uint64, error) {
 	return func() (uint64, error) {
 		h, err := backend.GetCurrentBlockHeight()
 		if types.IsAFatalError(err) {
@@ -58,7 +59,7 @@ func blockHeightProvider(backend types.Backend) func() (uint64, error) {
 
 const RandomSourceTypeValueFieldName = "value"
 
-func randomSourceProvider(contractAddress flow.Address, backend types.Backend) func(uint64) ([]byte, error) {
+func randomSourceProvider(contractAddress flow.Address, backend backends.Backend) func(uint64) ([]byte, error) {
 	return func(blockHeight uint64) ([]byte, error) {
 		value, err := backend.Invoke(
 			environment.ContractFunctionSpec{
@@ -97,7 +98,7 @@ func randomSourceProvider(contractAddress flow.Address, backend types.Backend) f
 	}
 }
 
-func revertibleRandomGenerator(backend types.Backend) func() (uint64, error) {
+func revertibleRandomGenerator(backend backends.Backend) func() (uint64, error) {
 	return func() (uint64, error) {
 		rand := make([]byte, 8)
 		err := backend.ReadRandom(rand)
@@ -111,7 +112,7 @@ func revertibleRandomGenerator(backend types.Backend) func() (uint64, error) {
 
 const ValidationResultTypeIsValidFieldName = "isValid"
 
-func coaOwnershipProofValidator(contractAddress flow.Address, backend types.Backend) func(proof *types.COAOwnershipProofInContext) (bool, error) {
+func coaOwnershipProofValidator(contractAddress flow.Address, backend backends.Backend) func(proof *types.COAOwnershipProofInContext) (bool, error) {
 	return func(proof *types.COAOwnershipProofInContext) (bool, error) {
 		value, err := backend.Invoke(
 			environment.ContractFunctionSpec{

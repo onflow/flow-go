@@ -39,7 +39,7 @@ var checksumType = cadence.NewConstantSizedArrayType(types.ChecksumLength, caden
 // checksumToCadenceArrayValue converts a checksum ([4]byte) into a Cadence array of type [UInt8;4]
 func checksumToCadenceArrayValue(checksum [types.ChecksumLength]byte) cadence.Array {
 	values := make([]cadence.Value, types.ChecksumLength)
-	for i := 0; i < types.ChecksumLength; i++ {
+	for i := range types.ChecksumLength {
 		values[i] = cadence.NewUInt8(checksum[i])
 	}
 	return cadence.NewArray(values).

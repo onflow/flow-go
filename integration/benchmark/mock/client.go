@@ -2254,6 +2254,142 @@ func (_c *Client_GetProtocolStateSnapshotByHeight_Call) RunAndReturn(run func(ct
 	return _c
 }
 
+// GetScheduledTransaction provides a mock function for the type Client
+func (_mock *Client) GetScheduledTransaction(ctx context.Context, scheduledTxID uint64) (*flow.Transaction, error) {
+	ret := _mock.Called(ctx, scheduledTxID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetScheduledTransaction")
+	}
+
+	var r0 *flow.Transaction
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, uint64) (*flow.Transaction, error)); ok {
+		return returnFunc(ctx, scheduledTxID)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, uint64) *flow.Transaction); ok {
+		r0 = returnFunc(ctx, scheduledTxID)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*flow.Transaction)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, uint64) error); ok {
+		r1 = returnFunc(ctx, scheduledTxID)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// Client_GetScheduledTransaction_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetScheduledTransaction'
+type Client_GetScheduledTransaction_Call struct {
+	*mock.Call
+}
+
+// GetScheduledTransaction is a helper method to define mock.On call
+//   - ctx context.Context
+//   - scheduledTxID uint64
+func (_e *Client_Expecter) GetScheduledTransaction(ctx interface{}, scheduledTxID interface{}) *Client_GetScheduledTransaction_Call {
+	return &Client_GetScheduledTransaction_Call{Call: _e.mock.On("GetScheduledTransaction", ctx, scheduledTxID)}
+}
+
+func (_c *Client_GetScheduledTransaction_Call) Run(run func(ctx context.Context, scheduledTxID uint64)) *Client_GetScheduledTransaction_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 uint64
+		if args[1] != nil {
+			arg1 = args[1].(uint64)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *Client_GetScheduledTransaction_Call) Return(transaction *flow.Transaction, err error) *Client_GetScheduledTransaction_Call {
+	_c.Call.Return(transaction, err)
+	return _c
+}
+
+func (_c *Client_GetScheduledTransaction_Call) RunAndReturn(run func(ctx context.Context, scheduledTxID uint64) (*flow.Transaction, error)) *Client_GetScheduledTransaction_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// GetScheduledTransactionResult provides a mock function for the type Client
+func (_mock *Client) GetScheduledTransactionResult(ctx context.Context, scheduledTxID uint64) (*flow.TransactionResult, error) {
+	ret := _mock.Called(ctx, scheduledTxID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetScheduledTransactionResult")
+	}
+
+	var r0 *flow.TransactionResult
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, uint64) (*flow.TransactionResult, error)); ok {
+		return returnFunc(ctx, scheduledTxID)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, uint64) *flow.TransactionResult); ok {
+		r0 = returnFunc(ctx, scheduledTxID)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*flow.TransactionResult)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, uint64) error); ok {
+		r1 = returnFunc(ctx, scheduledTxID)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// Client_GetScheduledTransactionResult_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetScheduledTransactionResult'
+type Client_GetScheduledTransactionResult_Call struct {
+	*mock.Call
+}
+
+// GetScheduledTransactionResult is a helper method to define mock.On call
+//   - ctx context.Context
+//   - scheduledTxID uint64
+func (_e *Client_Expecter) GetScheduledTransactionResult(ctx interface{}, scheduledTxID interface{}) *Client_GetScheduledTransactionResult_Call {
+	return &Client_GetScheduledTransactionResult_Call{Call: _e.mock.On("GetScheduledTransactionResult", ctx, scheduledTxID)}
+}
+
+func (_c *Client_GetScheduledTransactionResult_Call) Run(run func(ctx context.Context, scheduledTxID uint64)) *Client_GetScheduledTransactionResult_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 uint64
+		if args[1] != nil {
+			arg1 = args[1].(uint64)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *Client_GetScheduledTransactionResult_Call) Return(transactionResult *flow.TransactionResult, err error) *Client_GetScheduledTransactionResult_Call {
+	_c.Call.Return(transactionResult, err)
+	return _c
+}
+
+func (_c *Client_GetScheduledTransactionResult_Call) RunAndReturn(run func(ctx context.Context, scheduledTxID uint64) (*flow.TransactionResult, error)) *Client_GetScheduledTransactionResult_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetSystemTransaction provides a mock function for the type Client
 func (_mock *Client) GetSystemTransaction(ctx context.Context, blockID flow.Identifier) (*flow.Transaction, error) {
 	ret := _mock.Called(ctx, blockID)

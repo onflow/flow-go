@@ -176,7 +176,7 @@ func (st *SealingObservation) Complete() {
 // latestFinalizedSealInfo returns a json string representation with the most
 // relevant data about the latest finalized seal
 func (st *SealingObservation) latestFinalizedSealInfo() (string, error) {
-	r := make(map[string]interface{})
+	r := make(map[string]any)
 	r["executed_block_id"] = st.latestFinalizedSeal.BlockID.String()
 	r["executed_block_height"] = st.latestSealedBlock.Height
 	r["result_id"] = st.latestFinalizedSeal.ResultID.String()

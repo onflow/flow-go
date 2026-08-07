@@ -20,7 +20,7 @@ func Traverse(prefix []byte, iterFunc IterationFunc, opt storage.IteratorOption)
 	}
 }
 
-func Retrieve(key []byte, entity interface{}) func(storage.Reader) error {
+func Retrieve(key []byte, entity any) func(storage.Reader) error {
 	return func(r storage.Reader) error {
 		return RetrieveByKey(r, key, entity)
 	}
@@ -37,7 +37,7 @@ func Exists(key []byte, keyExists *bool) func(storage.Reader) error {
 	}
 }
 
-func FindHighestAtOrBelow(prefix []byte, height uint64, entity interface{}) func(storage.Reader) error {
+func FindHighestAtOrBelow(prefix []byte, height uint64, entity any) func(storage.Reader) error {
 	return func(r storage.Reader) error {
 		return FindHighestAtOrBelowByPrefix(r, prefix, height, entity)
 	}

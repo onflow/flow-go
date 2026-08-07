@@ -103,14 +103,14 @@ func (e *Engine) WithChunkDataPackHandler(handler fetcher.ChunkDataPackHandler) 
 }
 
 // SubmitLocal submits an event originating on the local node.
-func (e *Engine) SubmitLocal(event interface{}) {
+func (e *Engine) SubmitLocal(event any) {
 	e.log.Fatal().Msg("engine is not supposed to be invoked on SubmitLocal")
 }
 
 // Submit submits the given event from the node with the given origin ID
 // for processing in a non-blocking manner. It returns instantly and logs
 // a potential processing error internally when done.
-func (e *Engine) Submit(channel channels.Channel, originID flow.Identifier, event interface{}) {
+func (e *Engine) Submit(channel channels.Channel, originID flow.Identifier, event any) {
 	e.unit.Launch(func() {
 		err := e.Process(channel, originID, event)
 		if err != nil {
@@ -120,13 +120,13 @@ func (e *Engine) Submit(channel channels.Channel, originID flow.Identifier, even
 }
 
 // ProcessLocal processes an event originating on the local node.
-func (e *Engine) ProcessLocal(event interface{}) error {
+func (e *Engine) ProcessLocal(event any) error {
 	return fmt.Errorf("should not invoke ProcessLocal of Match engine, use Process instead")
 }
 
 // Process processes the given event from the node with the given origin ID in
 // a blocking manner. It returns the potential processing error when done.
-func (e *Engine) Process(channel channels.Channel, originID flow.Identifier, event interface{}) error {
+func (e *Engine) Process(channel channels.Channel, originID flow.Identifier, event any) error {
 	return e.unit.Do(func() error {
 		return e.process(originID, event)
 	})
@@ -153,7 +153,7 @@ func (e *Engine) Done() <-chan struct{} {
 // it is successfully processed by the engine.
 // The origin ID indicates the node which originally submitted the event to
 // the peer-to-peer network.
-func (e *Engine) process(originID flow.Identifier, event interface{}) error {
+func (e *Engine) process(originID flow.Identifier, event any) error {
 	switch resource := event.(type) {
 	case *flow.ChunkDataResponse:
 		e.handleChunkDataPackWithTracing(originID, &resource.ChunkDataPack)

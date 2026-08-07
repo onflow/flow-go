@@ -38,8 +38,10 @@ var (
 		common.MemoryKindInterpretedFunctionValue:         128,
 		common.MemoryKindHostFunctionValue:                41,
 		common.MemoryKindBoundFunctionValue:               25,
+		common.MemoryKindWrappedFunctionValue:             25,
 		common.MemoryKindBigInt:                           50,
 		common.MemoryKindVoidExpression:                   1,
+		common.MemoryKindStringBuilder:                    138,
 
 		// Atree
 
@@ -184,6 +186,7 @@ var (
 		common.MemoryKindSwitchStatement:     41,
 		common.MemoryKindWhileStatement:      25,
 		common.MemoryKindRemoveStatement:     33,
+		common.MemoryKindGuardStatement:      25,
 
 		common.MemoryKindBooleanExpression:        9,
 		common.MemoryKindNilExpression:            1,
@@ -345,7 +348,11 @@ func NewMemoryMeter(params MemoryMeterParameters) MemoryMeter {
 	return m
 }
 
-// MeterMemory captures memory usage and returns an error if it goes beyond the limit
+// MeterMemory captures memory usage.
+//
+// Expected error returns during normal operation:
+//   - [errors.LimitExceededError] with [errors.LimitKindMemory] if the total
+//     weighted memory estimate exceeds the memory limit
 func (m *MemoryMeter) MeterMemory(usage common.MemoryUsage) error {
 	kind := usage.Kind
 	amount := usage.Amount
@@ -357,7 +364,10 @@ func (m *MemoryMeter) MeterMemory(usage common.MemoryUsage) error {
 	}
 	m.memoryEstimate += w * amount
 	if m.memoryEstimate > m.params.memoryLimit {
-		return errors.NewMemoryLimitExceededError(m.params.TotalMemoryLimit())
+		return errors.NewLimitExceededError(
+			errors.LimitKindMemory,
+			m.memoryEstimate,
+			m.params.TotalMemoryLimit())
 	}
 	return nil
 }

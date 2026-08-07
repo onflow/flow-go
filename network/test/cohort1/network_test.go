@@ -423,7 +423,6 @@ func (suite *NetworkTestSuite) TestUnicastRateLimit_Bandwidth() {
 		require.Equal(suite.T(), reason, ratelimit.ReasonBandwidth.String())
 
 		// we only expect messages from the first network on the test suite
-		require.NoError(suite.T(), err)
 		require.Equal(suite.T(), expectedPID, peerID)
 		// update hook calls
 		rateLimits.Inc()
@@ -541,8 +540,12 @@ func (suite *NetworkTestSuite) TestUnicastRateLimit_Bandwidth() {
 	// wait for all rate limits before shutting down network
 	unittest.RequireCloseBefore(suite.T(), ch, 100*time.Millisecond, "could not stop on rate limit test ch on time")
 
-	// remote node should have received the first 2 messages
-	assert.Equal(suite.T(), uint64(2), callCount.Value())
+	// remote node should have received the first 2 messages. Delivery to the receiving engine is
+	// asynchronous, so the messages may still be in flight when the sender observes the rate limit
+	// of the third message - hence, we wait instead of asserting immediately.
+	require.Eventually(suite.T(), func() bool {
+		return callCount.Value() == uint64(2)
+	}, time.Second, 10*time.Millisecond, "expected remote node to receive the first 2 messages")
 
 	// sleep for 1 seconds to allow connection pruner to prune connections
 	time.Sleep(1 * time.Second)
@@ -550,6 +553,12 @@ func (suite *NetworkTestSuite) TestUnicastRateLimit_Bandwidth() {
 	// ensure connection to rate limited peer is pruned
 	p2ptest.EnsureNotConnectedBetweenGroups(suite.T(), ctx, []p2p.LibP2PNode{libP2PNodes[0]}, []p2p.LibP2PNode{suite.libP2PNodes[0]})
 	p2pfixtures.EnsureNoStreamCreationBetweenGroups(suite.T(), ctx, []p2p.LibP2PNode{libP2PNodes[0]}, []p2p.LibP2PNode{suite.libP2PNodes[0]})
+
+	// the rate-limited third message must never be delivered: after the prune window and with the
+	// connection confirmed pruned, the call count must still be exactly 2 (the Eventually above
+	// only checks that 2 is reached)
+	require.Equal(suite.T(), uint64(2), callCount.Value(),
+		"no messages beyond the first 2 may be delivered after the rate limit")
 
 	// eventually the rate limited node should be able to reconnect and send messages
 	require.Eventually(suite.T(), func() bool {
@@ -816,20 +825,44 @@ func (suite *NetworkTestSuite) TestMaxMessageSize_Unicast() {
 
 // TestLargeMessageSize_SendDirect asserts that a ChunkDataResponse is treated as a large message and can be unicasted
 // successfully even though it's size is greater than the default message size.
+// The message is sent from an Execution Node (EN) to a Verification Node (VN).
 func (suite *NetworkTestSuite) TestLargeMessageSize_SendDirect() {
-	sourceIndex := 0
-	targetIndex := suite.size - 1
-	targetId := suite.ids[targetIndex].NodeID
+	sourceIndex := 0 // EN
 
 	// creates a network payload with a size greater than the default max size using a known large message type
 	targetSize := uint64(underlay.DefaultMaxUnicastMsgSize) + 1000
 	event := unittest.ChunkDataResponseMsgFixture(unittest.IdentifierFixture(), unittest.WithApproximateSize(targetSize))
 
-	// expect one message to be received by the target
+	// create a VN node as target
+	vnIds, vnLibP2PNodes := testutils.LibP2PNodeForNetworkFixture(suite.T(), suite.sporkId, 1, p2ptest.WithRole(flow.RoleVerification))
+	vnId := vnIds[0]
+
+	// update identity providers to include the VN
+	allIds := flow.IdentityList(append(suite.ids, vnId))
+	suite.providers[sourceIndex].SetIdentities(allIds)
+
+	vnIdProvider := unittest.NewUpdatableIDProvider(allIds)
+	vnNetCfg := testutils.NetworkConfigFixture(suite.T(), *vnId, vnIdProvider, suite.sporkId, vnLibP2PNodes[0])
+	vnNet, err := underlay.NewNetwork(vnNetCfg)
+	require.NoError(suite.T(), err)
+
+	ctx, cancel := context.WithCancel(suite.mwCtx)
+	irrecoverableCtx := irrecoverable.NewMockSignalerContext(suite.T(), ctx)
+
+	testutils.StartNodesAndNetworks(irrecoverableCtx, suite.T(), vnLibP2PNodes, []network.EngineRegistry{vnNet})
+	defer testutils.StopComponents(suite.T(), vnLibP2PNodes, 1*time.Second)
+	defer testutils.StopComponents(suite.T(), []network.EngineRegistry{vnNet}, 1*time.Second)
+	// cancel is deferred last so it runs first (LIFO), signaling components to stop before waiting
+	defer cancel()
+
+	// connect EN and VN so they can communicate
+	p2ptest.LetNodesDiscoverEachOther(suite.T(), ctx, []p2p.LibP2PNode{suite.libP2PNodes[sourceIndex], vnLibP2PNodes[0]}, flow.IdentityList{suite.ids[sourceIndex], vnId})
+	suite.networks[sourceIndex].UpdateNodeAddresses()
+
+	// expect one message to be received by the VN
 	ch := make(chan struct{})
-	// mocks a target engine on the last node of the test suit that will receive the message on the test channel.
 	targetEngine := &mocknetwork.MessageProcessor{}
-	_, err := suite.networks[targetIndex].Register(channels.ProvideChunks, targetEngine)
+	_, err = vnNet.Register(channels.ProvideChunks, targetEngine)
 	require.NoError(suite.T(), err)
 	targetEngine.On("Process", mockery.Anything, mockery.Anything, mockery.Anything).
 		Run(func(args mockery.Arguments) {
@@ -837,11 +870,11 @@ func (suite *NetworkTestSuite) TestLargeMessageSize_SendDirect() {
 
 			msgChannel, ok := args[0].(channels.Channel)
 			require.True(suite.T(), ok)
-			require.Equal(suite.T(), channels.ProvideChunks, msgChannel) // channel
+			require.Equal(suite.T(), channels.ProvideChunks, msgChannel)
 
 			msgOriginID, ok := args[1].(flow.Identifier)
 			require.True(suite.T(), ok)
-			require.Equal(suite.T(), suite.ids[sourceIndex].NodeID, msgOriginID) // sender id
+			require.Equal(suite.T(), suite.ids[sourceIndex].NodeID, msgOriginID)
 
 			msgPayload, ok := args[2].(*flow.ChunkDataResponse)
 			require.True(suite.T(), ok)
@@ -849,16 +882,16 @@ func (suite *NetworkTestSuite) TestLargeMessageSize_SendDirect() {
 			internal, err := event.ToInternal()
 			require.NoError(suite.T(), err)
 
-			require.Equal(suite.T(), internal, msgPayload) // payload
+			require.Equal(suite.T(), internal, msgPayload)
 		}).Return(nil).Once()
 
-	// sends a direct message from source node to the target node
+	// sends a direct message from EN to VN
 	con0, err := suite.networks[sourceIndex].Register(channels.ProvideChunks, &mocknetwork.MessageProcessor{})
 	require.NoError(suite.T(), err)
-	require.NoError(suite.T(), con0.Unicast(event, targetId))
+	require.NoError(suite.T(), con0.Unicast(event, vnId.NodeID))
 
-	// check message reception on target
-	unittest.RequireCloseBefore(suite.T(), ch, 5*time.Second, "source node failed to send large message to target")
+	// check message reception on VN
+	unittest.RequireCloseBefore(suite.T(), ch, 5*time.Second, "EN failed to send large message to VN")
 }
 
 // TestMaxMessageSize_Publish evaluates that invoking Publish method of the network on a message

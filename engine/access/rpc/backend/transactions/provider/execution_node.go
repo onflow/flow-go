@@ -117,14 +117,15 @@ func (e *ENTransactionProvider) TransactionResult(
 	}
 
 	return &accessmodel.TransactionResult{
-		TransactionID: transactionID,
-		Status:        txStatus,
-		StatusCode:    uint(resp.GetStatusCode()),
-		Events:        events,
-		ErrorMessage:  resp.GetErrorMessage(),
-		BlockID:       blockID,
-		BlockHeight:   block.Height,
-		CollectionID:  collectionID,
+		TransactionID:   transactionID,
+		Status:          txStatus,
+		StatusCode:      uint(resp.GetStatusCode()),
+		Events:          events,
+		ErrorMessage:    resp.GetErrorMessage(),
+		BlockID:         blockID,
+		BlockHeight:     block.Height,
+		CollectionID:    collectionID,
+		ComputationUsed: resp.GetComputationUsage(),
 	}, nil
 }
 
@@ -216,14 +217,15 @@ func (e *ENTransactionProvider) TransactionResultByIndex(
 
 	// convert to response, cache and return
 	return &accessmodel.TransactionResult{
-		Status:        txStatus,
-		StatusCode:    uint(resp.GetStatusCode()),
-		Events:        events,
-		ErrorMessage:  resp.GetErrorMessage(),
-		BlockID:       blockID,
-		BlockHeight:   block.Height,
-		TransactionID: txID,
-		CollectionID:  collectionID,
+		Status:          txStatus,
+		StatusCode:      uint(resp.GetStatusCode()),
+		Events:          events,
+		ErrorMessage:    resp.GetErrorMessage(),
+		BlockID:         blockID,
+		BlockHeight:     block.Height,
+		TransactionID:   txID,
+		CollectionID:    collectionID,
+		ComputationUsed: resp.GetComputationUsage(),
 	}, nil
 }
 
@@ -368,14 +370,15 @@ func (e *ENTransactionProvider) userTransactionResults(
 			}
 
 			results = append(results, &accessmodel.TransactionResult{
-				Status:        txStatus,
-				StatusCode:    uint(txResult.GetStatusCode()),
-				Events:        events,
-				ErrorMessage:  txResult.GetErrorMessage(),
-				BlockID:       blockID,
-				TransactionID: txID,
-				CollectionID:  guarantee.CollectionID,
-				BlockHeight:   block.Height,
+				Status:          txStatus,
+				StatusCode:      uint(txResult.GetStatusCode()),
+				Events:          events,
+				ErrorMessage:    txResult.GetErrorMessage(),
+				BlockID:         blockID,
+				TransactionID:   txID,
+				CollectionID:    guarantee.CollectionID,
+				BlockHeight:     block.Height,
+				ComputationUsed: txResult.GetComputationUsage(),
 			})
 
 			i++
@@ -419,14 +422,15 @@ func (e *ENTransactionProvider) systemTransactionResults(
 		}
 
 		results = append(results, &accessmodel.TransactionResult{
-			Status:        txStatus,
-			StatusCode:    uint(systemTxResult.GetStatusCode()),
-			Events:        events,
-			ErrorMessage:  systemTxResult.GetErrorMessage(),
-			BlockID:       blockID,
-			TransactionID: systemTxIDs[i],
-			CollectionID:  flow.ZeroID,
-			BlockHeight:   block.Height,
+			Status:          txStatus,
+			StatusCode:      uint(systemTxResult.GetStatusCode()),
+			Events:          events,
+			ErrorMessage:    systemTxResult.GetErrorMessage(),
+			BlockID:         blockID,
+			TransactionID:   systemTxIDs[i],
+			CollectionID:    flow.ZeroID,
+			BlockHeight:     block.Height,
+			ComputationUsed: systemTxResult.GetComputationUsage(),
 		})
 	}
 

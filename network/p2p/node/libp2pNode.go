@@ -289,7 +289,7 @@ func (n *Node) createStream(ctx context.Context, peerID peer.ID) (libp2pnet.Stre
 		return nil, flownet.NewPeerUnreachableError(fmt.Errorf("could not create stream peer_id: %s: %w", peerID, err))
 	}
 
-	lg.Info().
+	lg.Debug().
 		Str("networking_protocol_id", string(stream.Protocol())).
 		Msg("stream successfully created to remote peer")
 	return stream, nil

@@ -81,9 +81,9 @@ func (builder *RPCEngineBuilder) WithLegacy() *RPCEngineBuilder {
 
 func (builder *RPCEngineBuilder) DefaultHandler(signerIndicesDecoder hotstuff.BlockSignerDecoder) *Handler {
 	if signerIndicesDecoder == nil {
-		return NewHandler(builder.Engine.backend, builder.Engine.chain, builder.finalizedHeaderCache, builder.me, builder.stateStreamConfig.MaxGlobalStreams, WithIndexReporter(builder.indexReporter))
+		return NewHandler(builder.Engine.backend, builder.Engine.chain, builder.finalizedHeaderCache, builder.me, builder.Engine.limiter, WithIndexReporter(builder.indexReporter))
 	} else {
-		return NewHandler(builder.Engine.backend, builder.Engine.chain, builder.finalizedHeaderCache, builder.me, builder.stateStreamConfig.MaxGlobalStreams, WithBlockSignerDecoder(signerIndicesDecoder), WithIndexReporter(builder.indexReporter))
+		return NewHandler(builder.Engine.backend, builder.Engine.chain, builder.finalizedHeaderCache, builder.me, builder.Engine.limiter, WithBlockSignerDecoder(signerIndicesDecoder), WithIndexReporter(builder.indexReporter))
 	}
 }
 

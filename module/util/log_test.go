@@ -7,6 +7,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -26,7 +27,7 @@ func TestLogProgress40(t *testing.T) {
 			total,
 		),
 	)
-	for i := 0; i < total; i++ {
+	for range total {
 		logger(1)
 	}
 
@@ -99,7 +100,7 @@ func TestLogProgress43B(t *testing.T) {
 			total,
 		),
 	)
-	for i := 0; i < total; i++ {
+	for range total {
 		logger(1)
 	}
 
@@ -231,7 +232,7 @@ func TestLogProgressWhenTotalIs0(t *testing.T) {
 		),
 	)
 
-	for i := 0; i < 10; i++ {
+	for range 10 {
 		logger(1)
 	}
 
@@ -261,7 +262,7 @@ func TestLogProgressMoreTicksThenTotal(t *testing.T) {
 		),
 	)
 
-	for i := 0; i < 5; i++ {
+	for range 5 {
 		logger(1)
 	}
 
@@ -291,7 +292,7 @@ func TestLogProgressContinueLoggingAfter100(t *testing.T) {
 		),
 	)
 
-	for i := 0; i < 15; i++ {
+	for range 15 {
 		logger(10)
 	}
 
@@ -313,40 +314,46 @@ func TestLogProgressContinueLoggingAfter100(t *testing.T) {
 func TestLogProgressNoDataForAWhile(t *testing.T) {
 	t.Parallel()
 
-	total := 1000
+	// Run inside a synctest bubble with a fake clock: the "no data for a while" detection compares
+	// the wall-clock gap between two progress updates against the configured 1ms threshold. With a
+	// real clock, any scheduling hiccup between two updates yields an unexpected extra log line
+	// (flaky test). With the fake clock, time only advances during the explicit sleep below.
+	synctest.Test(t, func(t *testing.T) {
+		total := 1000
 
-	buf := bytes.NewBufferString("")
-	lg := zerolog.New(buf)
-	logger := LogProgress(
-		lg,
-		NewLogProgressConfig[uint64](
-			"test",
-			uint64(total),
-			1*time.Millisecond,
-			10,
-		),
-	)
+		buf := bytes.NewBufferString("")
+		lg := zerolog.New(buf)
+		logger := LogProgress(
+			lg,
+			NewLogProgressConfig[uint64](
+				"test",
+				uint64(total),
+				1*time.Millisecond,
+				10,
+			),
+		)
 
-	for i := 0; i < total; i++ {
-		// somewhere in the middle pause for a bit
-		if i == 13 {
-			<-time.After(3 * time.Millisecond)
+		for i := range total {
+			// somewhere in the middle pause for a bit
+			if i == 13 {
+				time.Sleep(3 * time.Millisecond)
+			}
+
+			logger(1)
 		}
 
-		logger(1)
-	}
+		expectedLogs := []string{
+			fmt.Sprintf(`test progress 0/%d`, total),
+			fmt.Sprintf(`test progress %d/%d (100.0%%)`, total, total),
+		}
 
-	expectedLogs := []string{
-		fmt.Sprintf(`test progress 0/%d`, total),
-		fmt.Sprintf(`test progress %d/%d (100.0%%)`, total, total),
-	}
-
-	for _, log := range expectedLogs {
-		require.Contains(t, buf.String(), log, total)
-	}
-	lines := strings.Count(buf.String(), "\n")
-	// every 10% + 1 for the final log + 1 for the "no data in a while" log
-	require.Equal(t, 12, lines)
+		for _, log := range expectedLogs {
+			require.Contains(t, buf.String(), log, total)
+		}
+		lines := strings.Count(buf.String(), "\n")
+		// every 10% + 1 for the final log + 1 for the "no data in a while" log
+		require.Equal(t, 12, lines)
+	})
 }
 
 func TestLogProgressMultipleGoroutines(t *testing.T) {
@@ -365,14 +372,12 @@ func TestLogProgressMultipleGoroutines(t *testing.T) {
 	)
 
 	wg := sync.WaitGroup{}
-	for i := 0; i < 10; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			for j := 0; j < 100; j++ {
+	for range 10 {
+		wg.Go(func() {
+			for range 100 {
 				logger(1)
 			}
-		}()
+		})
 	}
 
 	wg.Wait()

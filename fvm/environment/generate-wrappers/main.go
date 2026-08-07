@@ -51,7 +51,7 @@ func generateWrapper(numArgs int, numRets int, content *FileContent) {
 
 	argTypes := []string{}
 	argNames := []string{}
-	for i := 0; i < numArgs; i++ {
+	for i := range numArgs {
 		argTypes = append(argTypes, fmt.Sprintf("Arg%dT", i))
 		argNames = append(argNames, fmt.Sprintf("arg%d", i))
 	}
@@ -63,7 +63,7 @@ func generateWrapper(numArgs int, numRets int, content *FileContent) {
 
 	retTypes := []string{}
 	retNames := []string{}
-	for i := 0; i < numRets; i++ {
+	for i := range numRets {
 		retTypes = append(retTypes, fmt.Sprintf("Ret%dT", i))
 		retNames = append(retNames, fmt.Sprintf("value%d", i))
 	}

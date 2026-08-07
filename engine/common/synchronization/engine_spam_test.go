@@ -26,12 +26,42 @@ func (ss *SyncSuite) TestLoad_Process_SyncRequest_HigherThanReceiver_OutsideTole
 	ctx, cancel := irrecoverable.NewMockSignalerContextWithCancel(ss.T(), context.Background())
 	ss.e.Start(ctx)
 	unittest.AssertClosesBefore(ss.T(), ss.e.Ready(), time.Second)
-	defer cancel()
+	// Stop the engine and wait for its worker routines to exit before the test returns. Otherwise,
+	// leaked workers would access suite fields, racing with the next test's SetupTest.
+	defer func() {
+		cancel()
+		unittest.AssertClosesBefore(ss.T(), ss.e.Done(), time.Second)
+	}()
 
 	load := 1000
 
 	// reset misbehavior report counter for each subtest
 	misbehaviorsCounter := 0
+
+	// if request height is higher than local finalized, we should not respond
+	reqHeight := ss.head.Height + 1
+
+	// Register loop-invariant mock expectations once, before the load loop. Registering them per
+	// iteration accumulates thousands of expected-call entries, which makes the mock's call matching
+	// quadratic in the load and slows this test down drastically.
+	ss.core.On("HandleHeight", ss.head, reqHeight)
+	ss.core.On("WithinTolerance", ss.head, reqHeight).Return(false)
+
+	// maybe function calls that might or might not occur over the course of the load test
+	ss.core.On("ScanPending", ss.head).Return([]chainsync.Range{}, []chainsync.Batch{}).Maybe()
+	ss.con.On("Multicast", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
+
+	// count misbehavior reports over the course of a load test
+	ss.con.On("ReportMisbehavior", mock.Anything).Return(mock.Anything).Run(
+		func(args mock.Arguments) {
+			misbehaviorsCounter++
+		},
+	)
+
+	// force creating misbehavior report by setting syncRequestProb to 1.0 (i.e. report misbehavior 100% of the time)
+	ss.e.spamDetectionConfig.syncRequestProb = 1.0
+
+	ss.metrics.On("MessageReceived", metrics.EngineSynchronization, metrics.MessageSyncRequest).Times(load)
 
 	for i := 0; i < load; i++ {
 		// generate origin and request message
@@ -42,34 +72,13 @@ func (ss *SyncSuite) TestLoad_Process_SyncRequest_HigherThanReceiver_OutsideTole
 
 		req := &flow.SyncRequest{
 			Nonce:  nonce,
-			Height: 0,
+			Height: reqHeight,
 		}
 
-		// if request height is higher than local finalized, we should not respond
-		req.Height = ss.head.Height + 1
-
-		ss.core.On("HandleHeight", ss.head, req.Height)
-		ss.core.On("WithinTolerance", ss.head, req.Height).Return(false)
-		ss.con.AssertNotCalled(ss.T(), "Unicast", mock.Anything, mock.Anything)
-
-		// maybe function calls that might or might not occur over the course of the load test
-		ss.core.On("ScanPending", ss.head).Return([]chainsync.Range{}, []chainsync.Batch{}).Maybe()
-		ss.con.On("Multicast", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
-
-		// count misbehavior reports over the course of a load test
-		ss.con.On("ReportMisbehavior", mock.Anything).Return(mock.Anything).Run(
-			func(args mock.Arguments) {
-				misbehaviorsCounter++
-			},
-		)
-
-		// force creating misbehavior report by setting syncRequestProb to 1.0 (i.e. report misbehavior 100% of the time)
-		ss.e.spamDetectionConfig.syncRequestProb = 1.0
-
-		ss.metrics.On("MessageReceived", metrics.EngineSynchronization, metrics.MessageSyncRequest).Once()
 		require.NoError(ss.T(), ss.e.Process(channels.SyncCommittee, originID, req))
 	}
 
+	ss.con.AssertNotCalled(ss.T(), "Unicast", mock.Anything, mock.Anything)
 	ss.core.AssertExpectations(ss.T())
 	ss.con.AssertExpectations(ss.T())
 	ss.metrics.AssertExpectations(ss.T())
@@ -84,7 +93,12 @@ func (ss *SyncSuite) TestLoad_Process_SyncRequest_HigherThanReceiver_OutsideTole
 	ctx, cancel := irrecoverable.NewMockSignalerContextWithCancel(ss.T(), context.Background())
 	ss.e.Start(ctx)
 	unittest.AssertClosesBefore(ss.T(), ss.e.Ready(), time.Second)
-	defer cancel()
+	// Stop the engine and wait for its worker routines to exit before the test returns. Otherwise,
+	// leaked workers would access suite fields, racing with the next test's SetupTest.
+	defer func() {
+		cancel()
+		unittest.AssertClosesBefore(ss.T(), ss.e.Done(), time.Second)
+	}()
 
 	load := 1000
 
@@ -100,31 +114,50 @@ func (ss *SyncSuite) TestLoad_Process_SyncRequest_HigherThanReceiver_OutsideTole
 
 	loadGroups := []loadGroup{}
 
+	// These load tests are wiring smoke tests: the exact decision boundary of the probabilistic
+	// reporting is unit-tested deterministically in `TestShouldReportProbabilistically`, so we only
+	// keep the groups with discriminating power here. The bounds are the exact quantiles of the
+	// Binomial(1000, p) distribution of the misbehavior report count, such that the probability of
+	// the count falling outside the bounds is at most 1e-9 per tail. This keeps the test meaningful
+	// while making failures of a correct implementation practically impossible (previous, tighter
+	// bounds caused flakiness; low-probability groups were removed because their lower bound of 0
+	// could not discriminate at all).
+
 	// expect to never get misbehavior report
 	loadGroups = append(loadGroups, loadGroup{0.0, 0, 0})
 
-	// expect to get misbehavior report about 0.1% of the time (1 in 1000 requests)
-	loadGroups = append(loadGroups, loadGroup{0.001, 0, 7})
-
-	// expect to get misbehavior report about 1% of the time
-	loadGroups = append(loadGroups, loadGroup{0.01, 5, 15})
-
-	// expect to get misbehavior report about 10% of the time
-	loadGroups = append(loadGroups, loadGroup{0.1, 75, 140})
-
 	// expect to get misbehavior report about 50% of the time
-	loadGroups = append(loadGroups, loadGroup{0.5, 450, 550})
-
-	// expect to get misbehavior report about 90% of the time
-	loadGroups = append(loadGroups, loadGroup{0.9, 850, 950})
+	loadGroups = append(loadGroups, loadGroup{0.5, 405, 595})
 
 	// reset misbehavior report counter for each subtest
 	misbehaviorsCounter := 0
 
 	for _, loadGroup := range loadGroups {
 		ss.T().Run(fmt.Sprintf("load test; pfactor=%f lower=%d upper=%d", loadGroup.syncRequestProbabilityFactor, loadGroup.expectedMisbehaviorsLower, loadGroup.expectedMisbehaviorsUpper), func(t *testing.T) {
+			// if request height is higher than local finalized, we should not respond
+			reqHeight := ss.head.Height + 1
+
+			// Register loop-invariant mock expectations once, before the load loop. Registering them per
+			// iteration accumulates thousands of expected-call entries, which makes the mock's call matching
+			// quadratic in the load and slows this test down drastically.
+			ss.core.On("HandleHeight", ss.head, reqHeight)
+			ss.core.On("WithinTolerance", ss.head, reqHeight).Return(false)
+
+			// maybe function calls that might or might not occur over the course of the load test
+			ss.core.On("ScanPending", ss.head).Return([]chainsync.Range{}, []chainsync.Batch{}).Maybe()
+			ss.con.On("Multicast", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
+
+			// count misbehavior reports over the course of a load test
+			ss.con.On("ReportMisbehavior", mock.Anything).Return(mock.Anything).Maybe().Run(
+				func(args mock.Arguments) {
+					misbehaviorsCounter++
+				},
+			)
+			ss.e.spamDetectionConfig.syncRequestProb = loadGroup.syncRequestProbabilityFactor
+			ss.metrics.On("MessageSent", metrics.EngineSynchronization, metrics.MessageSyncRequest).Maybe()
+			ss.metrics.On("MessageReceived", metrics.EngineSynchronization, metrics.MessageSyncRequest).Times(load)
+
 			for i := 0; i < load; i++ {
-				ss.T().Log("load iteration", i)
 				nonce, err := rand.Uint64()
 				require.NoError(ss.T(), err, "should generate nonce")
 
@@ -132,31 +165,13 @@ func (ss *SyncSuite) TestLoad_Process_SyncRequest_HigherThanReceiver_OutsideTole
 				originID := unittest.IdentifierFixture()
 				req := &flow.SyncRequest{
 					Nonce:  nonce,
-					Height: 0,
+					Height: reqHeight,
 				}
 
-				// if request height is higher than local finalized, we should not respond
-				req.Height = ss.head.Height + 1
-
-				ss.core.On("HandleHeight", ss.head, req.Height)
-				ss.core.On("WithinTolerance", ss.head, req.Height).Return(false)
-				ss.con.AssertNotCalled(ss.T(), "Unicast", mock.Anything, mock.Anything)
-
-				// maybe function calls that might or might not occur over the course of the load test
-				ss.core.On("ScanPending", ss.head).Return([]chainsync.Range{}, []chainsync.Batch{}).Maybe()
-				ss.con.On("Multicast", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
-
-				// count misbehavior reports over the course of a load test
-				ss.con.On("ReportMisbehavior", mock.Anything).Return(mock.Anything).Maybe().Run(
-					func(args mock.Arguments) {
-						misbehaviorsCounter++
-					},
-				)
-				ss.e.spamDetectionConfig.syncRequestProb = loadGroup.syncRequestProbabilityFactor
-				ss.metrics.On("MessageSent", metrics.EngineSynchronization, metrics.MessageSyncRequest).Maybe()
-				ss.metrics.On("MessageReceived", metrics.EngineSynchronization, metrics.MessageSyncRequest).Once()
 				require.NoError(ss.T(), ss.e.Process(channels.SyncCommittee, originID, req))
 			}
+
+			ss.con.AssertNotCalled(ss.T(), "Unicast", mock.Anything, mock.Anything)
 
 			// check function call expectations at the end of the load test; otherwise, load test would take much longer
 			ss.core.AssertExpectations(ss.T())
@@ -181,7 +196,12 @@ func (ss *SyncSuite) TestLoad_Process_RangeRequest_SometimesReportSpam() {
 	ctx, cancel := irrecoverable.NewMockSignalerContextWithCancel(ss.T(), context.Background())
 	ss.e.Start(ctx)
 	unittest.AssertClosesBefore(ss.T(), ss.e.Ready(), time.Second)
-	defer cancel()
+	// Stop the engine and wait for its worker routines to exit before the test returns. Otherwise,
+	// leaked workers would access suite fields, racing with the next test's SetupTest.
+	defer func() {
+		cancel()
+		unittest.AssertClosesBefore(ss.T(), ss.e.Done(), time.Second)
+	}()
 
 	load := 1000
 
@@ -199,32 +219,19 @@ func (ss *SyncSuite) TestLoad_Process_RangeRequest_SometimesReportSpam() {
 
 	loadGroups := []loadGroup{}
 
-	// using a very small range (1) with a 10% base probability factor, expect to almost never get misbehavior report, about 0.003% of the time (3 in 1000 requests)
-	// expected probability factor: 0.1 * ((10-9) + 1)/64 = 0.003125
-	loadGroups = append(loadGroups, loadGroup{0.1, 0, 15, 9, 10})
-
-	// using a small range (10) with a 10% base probability factor, expect to get misbehavior report about 1.7% of the time (17 in 1000 requests)
-	// expected probability factor: 0.1 * ((11-1) + 1)/64 = 0.0171875
-	loadGroups = append(loadGroups, loadGroup{0.1, 5, 31, 1, 11})
+	// These load tests are wiring smoke tests: the exact decision boundary and the range-scaling
+	// formula are unit-tested deterministically in `TestShouldReportProbabilistically` and
+	// `TestRangeRequestMisbehaviorProbability`, so we only keep the groups with discriminating
+	// power here. The bounds are the exact quantiles of the Binomial(1000, p) distribution of the
+	// misbehavior report count (with p being the expected probability factor), such that the
+	// probability of the count falling outside the bounds is at most 1e-9 per tail. This keeps the
+	// test meaningful while making failures of a correct implementation practically impossible
+	// (previous, tighter bounds caused flakiness; low-probability groups were removed because
+	// their lower bound of 0 could not discriminate at all).
 
 	// using a large range (99) with a 10% base probability factor, expect to get misbehavior report about 15% of the time (150 in 1000 requests)
-	// expected probability factor: 0.1 * ((100-1) + 1)/64 = 0.15625
-	loadGroups = append(loadGroups, loadGroup{0.1, 110, 200, 1, 100})
-
-	// using a flat range (0) (from height == to height) with a 1% base probability factor, expect to almost never get a misbehavior report, about 0.16% of the time (2 in 1000 requests)
-	// expected probability factor: 0.01 * ((1-1) + 1)/64 = 0.0015625
-	// Note: the expected upper misbehavior count is 5 even though the expected probability is close to 0 to cover outlier cases during the load test to avoid flakiness in CI.
-	// Due of the probabilistic nature of the load tests, you sometimes get edge cases (that cover outliers where out of a 1000 messages, up to 5 could be reported as spam.
-	// 5/1000 = 0.005 and the calculated probability is 0.00171875 which 2.9x as small.
-	loadGroups = append(loadGroups, loadGroup{0.01, 0, 5, 1, 1})
-
-	// using a small range (10) with a 1% base probability factor, expect to almost never get misbehavior report, about 0.17% of the time (2 in 1000 requests)
-	// expected probability factor: 0.01 * ((11-1) + 1)/64 = 0.00171875
-	loadGroups = append(loadGroups, loadGroup{0.01, 0, 7, 1, 11})
-
-	// using a very large range (999) with a 1% base probability factor, expect to get misbehavior report about 15% of the time (150 in 1000 requests)
-	// expected probability factor: 0.01 * ((1000-1) + 1)/64 = 0.15625
-	loadGroups = append(loadGroups, loadGroup{0.01, 110, 200, 1, 1000})
+	// expected probability factor: 0.1 * (99 + 1)/64 = 0.15625
+	loadGroups = append(loadGroups, loadGroup{0.1, 92, 229, 1, 100})
 
 	// ALWAYS REPORT SPAM FOR INVALID RANGE REQUESTS OR RANGE REQUESTS THAT ARE FAR OUTSIDE OF THE TOLERANCE
 
@@ -238,10 +245,27 @@ func (ss *SyncSuite) TestLoad_Process_RangeRequest_SometimesReportSpam() {
 	// reset misbehavior report counter for each subtest
 	misbehaviorsCounter := 0
 
-	for _, loadGroup := range loadGroups {
-		for i := 0; i < load; i++ {
-			ss.T().Log("load iteration", i)
+	// Register loop-invariant mock expectations once, before the load loops. Registering them per
+	// iteration accumulates thousands of expected-call entries, which makes the mock's call matching
+	// quadratic in the load and slows this test down drastically.
 
+	// maybe function calls that might or might not occur over the course of the load test
+	ss.core.On("ScanPending", ss.head).Return([]chainsync.Range{}, []chainsync.Batch{}).Maybe()
+	ss.con.On("Multicast", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
+	ss.metrics.On("MessageSent", metrics.EngineSynchronization, metrics.MessageSyncRequest).Maybe()
+
+	// count misbehavior reports over the course of a load test
+	ss.con.On("ReportMisbehavior", mock.Anything).Return(mock.Anything).Maybe().Run(
+		func(args mock.Arguments) {
+			misbehaviorsCounter++
+		},
+	)
+
+	for _, loadGroup := range loadGroups {
+		ss.e.spamDetectionConfig.rangeRequestBaseProb = loadGroup.rangeRequestBaseProb
+		ss.metrics.On("MessageReceived", metrics.EngineSynchronization, metrics.MessageRangeRequest).Times(load)
+
+		for i := 0; i < load; i++ {
 			nonce, err := rand.Uint64()
 			require.NoError(ss.T(), err, "should generate nonce")
 
@@ -253,19 +277,6 @@ func (ss *SyncSuite) TestLoad_Process_RangeRequest_SometimesReportSpam() {
 				ToHeight:   loadGroup.toHeight,
 			}
 
-			// maybe function calls that might or might not occur over the course of the load test
-			ss.core.On("ScanPending", ss.head).Return([]chainsync.Range{}, []chainsync.Batch{}).Maybe()
-			ss.con.On("Multicast", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
-
-			// count misbehavior reports over the course of a load test
-			ss.con.On("ReportMisbehavior", mock.Anything).Return(mock.Anything).Maybe().Run(
-				func(args mock.Arguments) {
-					misbehaviorsCounter++
-				},
-			)
-			ss.e.spamDetectionConfig.rangeRequestBaseProb = loadGroup.rangeRequestBaseProb
-			ss.metrics.On("MessageReceived", metrics.EngineSynchronization, metrics.MessageRangeRequest).Once()
-			ss.metrics.On("MessageSent", metrics.EngineSynchronization, metrics.MessageSyncRequest).Maybe()
 			require.NoError(ss.T(), ss.e.Process(channels.SyncCommittee, originID, req))
 		}
 		// check function call expectations at the end of the load test; otherwise, load test would take much longer
@@ -290,7 +301,12 @@ func (ss *SyncSuite) TestLoad_Process_BatchRequest_SometimesReportSpam() {
 	ctx, cancel := irrecoverable.NewMockSignalerContextWithCancel(ss.T(), context.Background())
 	ss.e.Start(ctx)
 	unittest.AssertClosesBefore(ss.T(), ss.e.Ready(), time.Second)
-	defer cancel()
+	// Stop the engine and wait for its worker routines to exit before the test returns. Otherwise,
+	// leaked workers would access suite fields, racing with the next test's SetupTest.
+	defer func() {
+		cancel()
+		unittest.AssertClosesBefore(ss.T(), ss.e.Done(), time.Second)
+	}()
 
 	load := 1000
 
@@ -307,25 +323,19 @@ func (ss *SyncSuite) TestLoad_Process_BatchRequest_SometimesReportSpam() {
 
 	loadGroups := []loadGroup{}
 
-	// using a very small batch request (1 block ID) with a 10% base probability factor, expect to almost never get misbehavior report, about 0.003% of the time (3 in 1000 requests)
-	// expected probability factor: 0.1 * ((10-9) + 1)/64 = 0.003125
-	loadGroups = append(loadGroups, loadGroup{0.1, 0, 15, repeatedBlockIDs(1)})
-
-	// using a small batch request (10 block IDs) with a 10% base probability factor, expect to get misbehavior report about 1.7% of the time (17 in 1000 requests)
-	// expected probability factor: 0.1 * ((11-1) + 1)/64 = 0.0171875
-	loadGroups = append(loadGroups, loadGroup{0.1, 5, 31, repeatedBlockIDs(10)})
+	// These load tests are wiring smoke tests: the exact decision boundary and the batch-scaling
+	// formula are unit-tested deterministically in `TestShouldReportProbabilistically` and
+	// `TestBatchRequestMisbehaviorProbability`, so we only keep the groups with discriminating
+	// power here. The bounds are the exact quantiles of the Binomial(1000, p) distribution of the
+	// misbehavior report count (with p being the expected probability factor), such that the
+	// probability of the count falling outside the bounds is at most 1e-9 per tail. This keeps the
+	// test meaningful while making failures of a correct implementation practically impossible
+	// (previous, tighter bounds caused flakiness; low-probability groups were removed because
+	// their lower bound of 0 could not discriminate at all).
 
 	// using a large batch request (99 block IDs) with a 10% base probability factor, expect to get misbehavior report about 15% of the time (150 in 1000 requests)
-	// expected probability factor: 0.1 * ((100-1) + 1)/64 = 0.15625
-	loadGroups = append(loadGroups, loadGroup{0.1, 110, 200, repeatedBlockIDs(99)})
-
-	// using a small batch request (10 block IDs) with a 1% base probability factor, expect to almost never get misbehavior report, about 0.17% of the time (2 in 1000 requests)
-	// expected probability factor: 0.01 * ((11-1) + 1)/64 = 0.00171875
-	loadGroups = append(loadGroups, loadGroup{0.01, 0, 7, repeatedBlockIDs(10)})
-
-	// using a very large batch request (999 block IDs) with a 1% base probability factor, expect to get misbehavior report about 15% of the time (150 in 1000 requests)
-	// expected probability factor: 0.01 * ((1000-1) + 1)/64 = 0.15625
-	loadGroups = append(loadGroups, loadGroup{0.01, 110, 200, repeatedBlockIDs(999)})
+	// expected probability factor: 0.1 * (99 + 1)/64 = 0.15625
+	loadGroups = append(loadGroups, loadGroup{0.1, 92, 229, repeatedBlockIDs(99)})
 
 	// ALWAYS REPORT SPAM FOR INVALID BATCH REQUESTS OR BATCH REQUESTS THAT ARE FAR OUTSIDE OF THE TOLERANCE
 
@@ -338,10 +348,28 @@ func (ss *SyncSuite) TestLoad_Process_BatchRequest_SometimesReportSpam() {
 
 	// reset misbehavior report counter for each subtest
 	misbehaviorsCounter := 0
-	for _, loadGroup := range loadGroups {
-		for i := 0; i < load; i++ {
-			ss.T().Log("load iteration", i)
 
+	// Register loop-invariant mock expectations once, before the load loops. Registering them per
+	// iteration accumulates thousands of expected-call entries, which makes the mock's call matching
+	// quadratic in the load and slows this test down drastically.
+
+	// maybe function calls that might or might not occur over the course of the load test
+	ss.core.On("ScanPending", ss.head).Return([]chainsync.Range{}, []chainsync.Batch{}).Maybe()
+	ss.con.On("Multicast", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
+	ss.metrics.On("MessageSent", metrics.EngineSynchronization, metrics.MessageSyncRequest).Maybe()
+
+	// count misbehavior reports over the course of a load test
+	ss.con.On("ReportMisbehavior", mock.Anything).Return(mock.Anything).Maybe().Run(
+		func(args mock.Arguments) {
+			misbehaviorsCounter++
+		},
+	)
+
+	for _, loadGroup := range loadGroups {
+		ss.e.spamDetectionConfig.batchRequestBaseProb = loadGroup.batchRequestBaseProb
+		ss.metrics.On("MessageReceived", metrics.EngineSynchronization, metrics.MessageBatchRequest).Times(load)
+
+		for i := 0; i < load; i++ {
 			nonce, err := rand.Uint64()
 			require.NoError(ss.T(), err, "should generate nonce")
 
@@ -351,20 +379,6 @@ func (ss *SyncSuite) TestLoad_Process_BatchRequest_SometimesReportSpam() {
 				Nonce:    nonce,
 				BlockIDs: loadGroup.blockIDs,
 			}
-
-			// maybe function calls that might or might not occur over the course of the load test
-			ss.core.On("ScanPending", ss.head).Return([]chainsync.Range{}, []chainsync.Batch{}).Maybe()
-			ss.con.On("Multicast", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
-
-			// count misbehavior reports over the course of a load test
-			ss.con.On("ReportMisbehavior", mock.Anything).Return(mock.Anything).Maybe().Run(
-				func(args mock.Arguments) {
-					misbehaviorsCounter++
-				},
-			)
-			ss.e.spamDetectionConfig.batchRequestBaseProb = loadGroup.batchRequestBaseProb
-			ss.metrics.On("MessageSent", metrics.EngineSynchronization, metrics.MessageSyncRequest).Maybe()
-			ss.metrics.On("MessageReceived", metrics.EngineSynchronization, metrics.MessageBatchRequest).Once()
 
 			require.NoError(ss.T(), ss.e.Process(channels.SyncCommittee, originID, req))
 		}

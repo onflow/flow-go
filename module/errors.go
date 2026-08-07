@@ -10,7 +10,7 @@ type UnknownBlockError struct {
 	err error
 }
 
-func NewUnknownBlockError(msg string, args ...interface{}) error {
+func NewUnknownBlockError(msg string, args ...any) error {
 	return UnknownBlockError{
 		err: fmt.Errorf(msg, args...),
 	}
@@ -34,7 +34,7 @@ type UnknownResultError struct {
 	err error
 }
 
-func NewUnknownResultError(msg string, args ...interface{}) error {
+func NewUnknownResultError(msg string, args ...any) error {
 	return UnknownResultError{
 		err: fmt.Errorf(msg, args...),
 	}

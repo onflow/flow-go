@@ -7,14 +7,16 @@ package mock
 import (
 	"time"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/onflow/atree"
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/ast"
-	"github.com/onflow/cadence/common"
+	common0 "github.com/onflow/cadence/common"
 	"github.com/onflow/cadence/interpreter"
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/sema"
 	"github.com/onflow/flow-go/fvm/environment"
+	"github.com/onflow/flow-go/fvm/evm/types"
 	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/fvm/tracing"
 	"github.com/onflow/flow-go/model/flow"
@@ -518,6 +520,123 @@ func (_c *Environment_BLSVerifyPOP_Call) RunAndReturn(run func(publicKey *runtim
 	return _c
 }
 
+// BlockHash provides a mock function for the type Environment
+func (_mock *Environment) BlockHash(height uint64) (common.Hash, error) {
+	ret := _mock.Called(height)
+
+	if len(ret) == 0 {
+		panic("no return value specified for BlockHash")
+	}
+
+	var r0 common.Hash
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(uint64) (common.Hash, error)); ok {
+		return returnFunc(height)
+	}
+	if returnFunc, ok := ret.Get(0).(func(uint64) common.Hash); ok {
+		r0 = returnFunc(height)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(common.Hash)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(uint64) error); ok {
+		r1 = returnFunc(height)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// Environment_BlockHash_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'BlockHash'
+type Environment_BlockHash_Call struct {
+	*mock.Call
+}
+
+// BlockHash is a helper method to define mock.On call
+//   - height uint64
+func (_e *Environment_Expecter) BlockHash(height interface{}) *Environment_BlockHash_Call {
+	return &Environment_BlockHash_Call{Call: _e.mock.On("BlockHash", height)}
+}
+
+func (_c *Environment_BlockHash_Call) Run(run func(height uint64)) *Environment_BlockHash_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 uint64
+		if args[0] != nil {
+			arg0 = args[0].(uint64)
+		}
+		run(
+			arg0,
+		)
+	})
+	return _c
+}
+
+func (_c *Environment_BlockHash_Call) Return(hash common.Hash, err error) *Environment_BlockHash_Call {
+	_c.Call.Return(hash, err)
+	return _c
+}
+
+func (_c *Environment_BlockHash_Call) RunAndReturn(run func(height uint64) (common.Hash, error)) *Environment_BlockHash_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// BlockProposal provides a mock function for the type Environment
+func (_mock *Environment) BlockProposal() (*types.BlockProposal, error) {
+	ret := _mock.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for BlockProposal")
+	}
+
+	var r0 *types.BlockProposal
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func() (*types.BlockProposal, error)); ok {
+		return returnFunc()
+	}
+	if returnFunc, ok := ret.Get(0).(func() *types.BlockProposal); ok {
+		r0 = returnFunc()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*types.BlockProposal)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func() error); ok {
+		r1 = returnFunc()
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// Environment_BlockProposal_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'BlockProposal'
+type Environment_BlockProposal_Call struct {
+	*mock.Call
+}
+
+// BlockProposal is a helper method to define mock.On call
+func (_e *Environment_Expecter) BlockProposal() *Environment_BlockProposal_Call {
+	return &Environment_BlockProposal_Call{Call: _e.mock.On("BlockProposal")}
+}
+
+func (_c *Environment_BlockProposal_Call) Run(run func()) *Environment_BlockProposal_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *Environment_BlockProposal_Call) Return(blockProposal *types.BlockProposal, err error) *Environment_BlockProposal_Call {
+	_c.Call.Return(blockProposal, err)
+	return _c
+}
+
+func (_c *Environment_BlockProposal_Call) RunAndReturn(run func() (*types.BlockProposal, error)) *Environment_BlockProposal_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // BorrowCadenceRuntime provides a mock function for the type Environment
 func (_mock *Environment) BorrowCadenceRuntime() environment.ReusableCadenceRuntime {
 	ret := _mock.Called()
@@ -638,39 +757,39 @@ func (_c *Environment_CheckPayerBalanceAndGetMaxTxFees_Call) RunAndReturn(run fu
 	return _c
 }
 
-// ComputationAvailable provides a mock function for the type Environment
-func (_mock *Environment) ComputationAvailable(computationUsage common.ComputationUsage) bool {
-	ret := _mock.Called(computationUsage)
+// CommitBlockProposal provides a mock function for the type Environment
+func (_mock *Environment) CommitBlockProposal(blockProposal *types.BlockProposal) error {
+	ret := _mock.Called(blockProposal)
 
 	if len(ret) == 0 {
-		panic("no return value specified for ComputationAvailable")
+		panic("no return value specified for CommitBlockProposal")
 	}
 
-	var r0 bool
-	if returnFunc, ok := ret.Get(0).(func(common.ComputationUsage) bool); ok {
-		r0 = returnFunc(computationUsage)
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(*types.BlockProposal) error); ok {
+		r0 = returnFunc(blockProposal)
 	} else {
-		r0 = ret.Get(0).(bool)
+		r0 = ret.Error(0)
 	}
 	return r0
 }
 
-// Environment_ComputationAvailable_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ComputationAvailable'
-type Environment_ComputationAvailable_Call struct {
+// Environment_CommitBlockProposal_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CommitBlockProposal'
+type Environment_CommitBlockProposal_Call struct {
 	*mock.Call
 }
 
-// ComputationAvailable is a helper method to define mock.On call
-//   - computationUsage common.ComputationUsage
-func (_e *Environment_Expecter) ComputationAvailable(computationUsage interface{}) *Environment_ComputationAvailable_Call {
-	return &Environment_ComputationAvailable_Call{Call: _e.mock.On("ComputationAvailable", computationUsage)}
+// CommitBlockProposal is a helper method to define mock.On call
+//   - blockProposal *types.BlockProposal
+func (_e *Environment_Expecter) CommitBlockProposal(blockProposal interface{}) *Environment_CommitBlockProposal_Call {
+	return &Environment_CommitBlockProposal_Call{Call: _e.mock.On("CommitBlockProposal", blockProposal)}
 }
 
-func (_c *Environment_ComputationAvailable_Call) Run(run func(computationUsage common.ComputationUsage)) *Environment_ComputationAvailable_Call {
+func (_c *Environment_CommitBlockProposal_Call) Run(run func(blockProposal *types.BlockProposal)) *Environment_CommitBlockProposal_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 common.ComputationUsage
+		var arg0 *types.BlockProposal
 		if args[0] != nil {
-			arg0 = args[0].(common.ComputationUsage)
+			arg0 = args[0].(*types.BlockProposal)
 		}
 		run(
 			arg0,
@@ -679,64 +798,18 @@ func (_c *Environment_ComputationAvailable_Call) Run(run func(computationUsage c
 	return _c
 }
 
-func (_c *Environment_ComputationAvailable_Call) Return(b bool) *Environment_ComputationAvailable_Call {
-	_c.Call.Return(b)
+func (_c *Environment_CommitBlockProposal_Call) Return(err error) *Environment_CommitBlockProposal_Call {
+	_c.Call.Return(err)
 	return _c
 }
 
-func (_c *Environment_ComputationAvailable_Call) RunAndReturn(run func(computationUsage common.ComputationUsage) bool) *Environment_ComputationAvailable_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// ComputationIntensities provides a mock function for the type Environment
-func (_mock *Environment) ComputationIntensities() meter.MeteredComputationIntensities {
-	ret := _mock.Called()
-
-	if len(ret) == 0 {
-		panic("no return value specified for ComputationIntensities")
-	}
-
-	var r0 meter.MeteredComputationIntensities
-	if returnFunc, ok := ret.Get(0).(func() meter.MeteredComputationIntensities); ok {
-		r0 = returnFunc()
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(meter.MeteredComputationIntensities)
-		}
-	}
-	return r0
-}
-
-// Environment_ComputationIntensities_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ComputationIntensities'
-type Environment_ComputationIntensities_Call struct {
-	*mock.Call
-}
-
-// ComputationIntensities is a helper method to define mock.On call
-func (_e *Environment_Expecter) ComputationIntensities() *Environment_ComputationIntensities_Call {
-	return &Environment_ComputationIntensities_Call{Call: _e.mock.On("ComputationIntensities")}
-}
-
-func (_c *Environment_ComputationIntensities_Call) Run(run func()) *Environment_ComputationIntensities_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run()
-	})
-	return _c
-}
-
-func (_c *Environment_ComputationIntensities_Call) Return(meteredComputationIntensities meter.MeteredComputationIntensities) *Environment_ComputationIntensities_Call {
-	_c.Call.Return(meteredComputationIntensities)
-	return _c
-}
-
-func (_c *Environment_ComputationIntensities_Call) RunAndReturn(run func() meter.MeteredComputationIntensities) *Environment_ComputationIntensities_Call {
+func (_c *Environment_CommitBlockProposal_Call) RunAndReturn(run func(blockProposal *types.BlockProposal) error) *Environment_CommitBlockProposal_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // ComputationRemaining provides a mock function for the type Environment
-func (_mock *Environment) ComputationRemaining(kind common.ComputationKind) uint64 {
+func (_mock *Environment) ComputationRemaining(kind common0.ComputationKind) uint64 {
 	ret := _mock.Called(kind)
 
 	if len(ret) == 0 {
@@ -744,7 +817,7 @@ func (_mock *Environment) ComputationRemaining(kind common.ComputationKind) uint
 	}
 
 	var r0 uint64
-	if returnFunc, ok := ret.Get(0).(func(common.ComputationKind) uint64); ok {
+	if returnFunc, ok := ret.Get(0).(func(common0.ComputationKind) uint64); ok {
 		r0 = returnFunc(kind)
 	} else {
 		r0 = ret.Get(0).(uint64)
@@ -758,16 +831,16 @@ type Environment_ComputationRemaining_Call struct {
 }
 
 // ComputationRemaining is a helper method to define mock.On call
-//   - kind common.ComputationKind
+//   - kind common0.ComputationKind
 func (_e *Environment_Expecter) ComputationRemaining(kind interface{}) *Environment_ComputationRemaining_Call {
 	return &Environment_ComputationRemaining_Call{Call: _e.mock.On("ComputationRemaining", kind)}
 }
 
-func (_c *Environment_ComputationRemaining_Call) Run(run func(kind common.ComputationKind)) *Environment_ComputationRemaining_Call {
+func (_c *Environment_ComputationRemaining_Call) Run(run func(kind common0.ComputationKind)) *Environment_ComputationRemaining_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 common.ComputationKind
+		var arg0 common0.ComputationKind
 		if args[0] != nil {
-			arg0 = args[0].(common.ComputationKind)
+			arg0 = args[0].(common0.ComputationKind)
 		}
 		run(
 			arg0,
@@ -781,60 +854,7 @@ func (_c *Environment_ComputationRemaining_Call) Return(v uint64) *Environment_C
 	return _c
 }
 
-func (_c *Environment_ComputationRemaining_Call) RunAndReturn(run func(kind common.ComputationKind) uint64) *Environment_ComputationRemaining_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// ComputationUsed provides a mock function for the type Environment
-func (_mock *Environment) ComputationUsed() (uint64, error) {
-	ret := _mock.Called()
-
-	if len(ret) == 0 {
-		panic("no return value specified for ComputationUsed")
-	}
-
-	var r0 uint64
-	var r1 error
-	if returnFunc, ok := ret.Get(0).(func() (uint64, error)); ok {
-		return returnFunc()
-	}
-	if returnFunc, ok := ret.Get(0).(func() uint64); ok {
-		r0 = returnFunc()
-	} else {
-		r0 = ret.Get(0).(uint64)
-	}
-	if returnFunc, ok := ret.Get(1).(func() error); ok {
-		r1 = returnFunc()
-	} else {
-		r1 = ret.Error(1)
-	}
-	return r0, r1
-}
-
-// Environment_ComputationUsed_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ComputationUsed'
-type Environment_ComputationUsed_Call struct {
-	*mock.Call
-}
-
-// ComputationUsed is a helper method to define mock.On call
-func (_e *Environment_Expecter) ComputationUsed() *Environment_ComputationUsed_Call {
-	return &Environment_ComputationUsed_Call{Call: _e.mock.On("ComputationUsed")}
-}
-
-func (_c *Environment_ComputationUsed_Call) Run(run func()) *Environment_ComputationUsed_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run()
-	})
-	return _c
-}
-
-func (_c *Environment_ComputationUsed_Call) Return(v uint64, err error) *Environment_ComputationUsed_Call {
-	_c.Call.Return(v, err)
-	return _c
-}
-
-func (_c *Environment_ComputationUsed_Call) RunAndReturn(run func() (uint64, error)) *Environment_ComputationUsed_Call {
+func (_c *Environment_ComputationRemaining_Call) RunAndReturn(run func(kind common0.ComputationKind) uint64) *Environment_ComputationRemaining_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -886,8 +906,8 @@ func (_c *Environment_ConvertedServiceEvents_Call) RunAndReturn(run func() flow.
 }
 
 // CreateAccount provides a mock function for the type Environment
-func (_mock *Environment) CreateAccount(payer runtime.Address) (runtime.Address, error) {
-	ret := _mock.Called(payer)
+func (_mock *Environment) CreateAccount(payer runtime.Address, context interpreter.InvocationContext) (runtime.Address, error) {
+	ret := _mock.Called(payer, context)
 
 	if len(ret) == 0 {
 		panic("no return value specified for CreateAccount")
@@ -895,18 +915,18 @@ func (_mock *Environment) CreateAccount(payer runtime.Address) (runtime.Address,
 
 	var r0 runtime.Address
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(runtime.Address) (runtime.Address, error)); ok {
-		return returnFunc(payer)
+	if returnFunc, ok := ret.Get(0).(func(runtime.Address, interpreter.InvocationContext) (runtime.Address, error)); ok {
+		return returnFunc(payer, context)
 	}
-	if returnFunc, ok := ret.Get(0).(func(runtime.Address) runtime.Address); ok {
-		r0 = returnFunc(payer)
+	if returnFunc, ok := ret.Get(0).(func(runtime.Address, interpreter.InvocationContext) runtime.Address); ok {
+		r0 = returnFunc(payer, context)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(runtime.Address)
 		}
 	}
-	if returnFunc, ok := ret.Get(1).(func(runtime.Address) error); ok {
-		r1 = returnFunc(payer)
+	if returnFunc, ok := ret.Get(1).(func(runtime.Address, interpreter.InvocationContext) error); ok {
+		r1 = returnFunc(payer, context)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -920,18 +940,24 @@ type Environment_CreateAccount_Call struct {
 
 // CreateAccount is a helper method to define mock.On call
 //   - payer runtime.Address
-func (_e *Environment_Expecter) CreateAccount(payer interface{}) *Environment_CreateAccount_Call {
-	return &Environment_CreateAccount_Call{Call: _e.mock.On("CreateAccount", payer)}
+//   - context interpreter.InvocationContext
+func (_e *Environment_Expecter) CreateAccount(payer interface{}, context interface{}) *Environment_CreateAccount_Call {
+	return &Environment_CreateAccount_Call{Call: _e.mock.On("CreateAccount", payer, context)}
 }
 
-func (_c *Environment_CreateAccount_Call) Run(run func(payer runtime.Address)) *Environment_CreateAccount_Call {
+func (_c *Environment_CreateAccount_Call) Run(run func(payer runtime.Address, context interpreter.InvocationContext)) *Environment_CreateAccount_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 runtime.Address
 		if args[0] != nil {
 			arg0 = args[0].(runtime.Address)
 		}
+		var arg1 interpreter.InvocationContext
+		if args[1] != nil {
+			arg1 = args[1].(interpreter.InvocationContext)
+		}
 		run(
 			arg0,
+			arg1,
 		)
 	})
 	return _c
@@ -942,7 +968,7 @@ func (_c *Environment_CreateAccount_Call) Return(address runtime.Address, err er
 	return _c
 }
 
-func (_c *Environment_CreateAccount_Call) RunAndReturn(run func(payer runtime.Address) (runtime.Address, error)) *Environment_CreateAccount_Call {
+func (_c *Environment_CreateAccount_Call) RunAndReturn(run func(payer runtime.Address, context interpreter.InvocationContext) (runtime.Address, error)) *Environment_CreateAccount_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -1138,6 +1164,50 @@ func (_c *Environment_EVMBlockExecuted_Call) Return() *Environment_EVMBlockExecu
 
 func (_c *Environment_EVMBlockExecuted_Call) RunAndReturn(run func(txCount int, totalGasUsed uint64, totalSupplyInFlow float64)) *Environment_EVMBlockExecuted_Call {
 	_c.Run(run)
+	return _c
+}
+
+// EVMTestOperationsAllowed provides a mock function for the type Environment
+func (_mock *Environment) EVMTestOperationsAllowed() bool {
+	ret := _mock.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for EVMTestOperationsAllowed")
+	}
+
+	var r0 bool
+	if returnFunc, ok := ret.Get(0).(func() bool); ok {
+		r0 = returnFunc()
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+	return r0
+}
+
+// Environment_EVMTestOperationsAllowed_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'EVMTestOperationsAllowed'
+type Environment_EVMTestOperationsAllowed_Call struct {
+	*mock.Call
+}
+
+// EVMTestOperationsAllowed is a helper method to define mock.On call
+func (_e *Environment_Expecter) EVMTestOperationsAllowed() *Environment_EVMTestOperationsAllowed_Call {
+	return &Environment_EVMTestOperationsAllowed_Call{Call: _e.mock.On("EVMTestOperationsAllowed")}
+}
+
+func (_c *Environment_EVMTestOperationsAllowed_Call) Run(run func()) *Environment_EVMTestOperationsAllowed_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *Environment_EVMTestOperationsAllowed_Call) Return(b bool) *Environment_EVMTestOperationsAllowed_Call {
+	_c.Call.Return(b)
+	return _c
+}
+
+func (_c *Environment_EVMTestOperationsAllowed_Call) RunAndReturn(run func() bool) *Environment_EVMTestOperationsAllowed_Call {
+	_c.Call.Return(run)
 	return _c
 }
 
@@ -1344,7 +1414,7 @@ func (_c *Environment_FlushPendingUpdates_Call) RunAndReturn(run func() (environ
 }
 
 // GenerateAccountID provides a mock function for the type Environment
-func (_mock *Environment) GenerateAccountID(address common.Address) (uint64, error) {
+func (_mock *Environment) GenerateAccountID(address common0.Address) (uint64, error) {
 	ret := _mock.Called(address)
 
 	if len(ret) == 0 {
@@ -1353,15 +1423,15 @@ func (_mock *Environment) GenerateAccountID(address common.Address) (uint64, err
 
 	var r0 uint64
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(common.Address) (uint64, error)); ok {
+	if returnFunc, ok := ret.Get(0).(func(common0.Address) (uint64, error)); ok {
 		return returnFunc(address)
 	}
-	if returnFunc, ok := ret.Get(0).(func(common.Address) uint64); ok {
+	if returnFunc, ok := ret.Get(0).(func(common0.Address) uint64); ok {
 		r0 = returnFunc(address)
 	} else {
 		r0 = ret.Get(0).(uint64)
 	}
-	if returnFunc, ok := ret.Get(1).(func(common.Address) error); ok {
+	if returnFunc, ok := ret.Get(1).(func(common0.Address) error); ok {
 		r1 = returnFunc(address)
 	} else {
 		r1 = ret.Error(1)
@@ -1375,16 +1445,16 @@ type Environment_GenerateAccountID_Call struct {
 }
 
 // GenerateAccountID is a helper method to define mock.On call
-//   - address common.Address
+//   - address common0.Address
 func (_e *Environment_Expecter) GenerateAccountID(address interface{}) *Environment_GenerateAccountID_Call {
 	return &Environment_GenerateAccountID_Call{Call: _e.mock.On("GenerateAccountID", address)}
 }
 
-func (_c *Environment_GenerateAccountID_Call) Run(run func(address common.Address)) *Environment_GenerateAccountID_Call {
+func (_c *Environment_GenerateAccountID_Call) Run(run func(address common0.Address)) *Environment_GenerateAccountID_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 common.Address
+		var arg0 common0.Address
 		if args[0] != nil {
-			arg0 = args[0].(common.Address)
+			arg0 = args[0].(common0.Address)
 		}
 		run(
 			arg0,
@@ -1398,7 +1468,7 @@ func (_c *Environment_GenerateAccountID_Call) Return(v uint64, err error) *Envir
 	return _c
 }
 
-func (_c *Environment_GenerateAccountID_Call) RunAndReturn(run func(address common.Address) (uint64, error)) *Environment_GenerateAccountID_Call {
+func (_c *Environment_GenerateAccountID_Call) RunAndReturn(run func(address common0.Address) (uint64, error)) *Environment_GenerateAccountID_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -1519,7 +1589,7 @@ func (_c *Environment_GetAccount_Call) RunAndReturn(run func(address flow.Addres
 }
 
 // GetAccountAvailableBalance provides a mock function for the type Environment
-func (_mock *Environment) GetAccountAvailableBalance(address common.Address) (uint64, error) {
+func (_mock *Environment) GetAccountAvailableBalance(address common0.Address) (uint64, error) {
 	ret := _mock.Called(address)
 
 	if len(ret) == 0 {
@@ -1528,15 +1598,15 @@ func (_mock *Environment) GetAccountAvailableBalance(address common.Address) (ui
 
 	var r0 uint64
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(common.Address) (uint64, error)); ok {
+	if returnFunc, ok := ret.Get(0).(func(common0.Address) (uint64, error)); ok {
 		return returnFunc(address)
 	}
-	if returnFunc, ok := ret.Get(0).(func(common.Address) uint64); ok {
+	if returnFunc, ok := ret.Get(0).(func(common0.Address) uint64); ok {
 		r0 = returnFunc(address)
 	} else {
 		r0 = ret.Get(0).(uint64)
 	}
-	if returnFunc, ok := ret.Get(1).(func(common.Address) error); ok {
+	if returnFunc, ok := ret.Get(1).(func(common0.Address) error); ok {
 		r1 = returnFunc(address)
 	} else {
 		r1 = ret.Error(1)
@@ -1550,16 +1620,16 @@ type Environment_GetAccountAvailableBalance_Call struct {
 }
 
 // GetAccountAvailableBalance is a helper method to define mock.On call
-//   - address common.Address
+//   - address common0.Address
 func (_e *Environment_Expecter) GetAccountAvailableBalance(address interface{}) *Environment_GetAccountAvailableBalance_Call {
 	return &Environment_GetAccountAvailableBalance_Call{Call: _e.mock.On("GetAccountAvailableBalance", address)}
 }
 
-func (_c *Environment_GetAccountAvailableBalance_Call) Run(run func(address common.Address)) *Environment_GetAccountAvailableBalance_Call {
+func (_c *Environment_GetAccountAvailableBalance_Call) Run(run func(address common0.Address)) *Environment_GetAccountAvailableBalance_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 common.Address
+		var arg0 common0.Address
 		if args[0] != nil {
-			arg0 = args[0].(common.Address)
+			arg0 = args[0].(common0.Address)
 		}
 		run(
 			arg0,
@@ -1573,13 +1643,13 @@ func (_c *Environment_GetAccountAvailableBalance_Call) Return(value uint64, err 
 	return _c
 }
 
-func (_c *Environment_GetAccountAvailableBalance_Call) RunAndReturn(run func(address common.Address) (uint64, error)) *Environment_GetAccountAvailableBalance_Call {
+func (_c *Environment_GetAccountAvailableBalance_Call) RunAndReturn(run func(address common0.Address) (uint64, error)) *Environment_GetAccountAvailableBalance_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // GetAccountBalance provides a mock function for the type Environment
-func (_mock *Environment) GetAccountBalance(address common.Address) (uint64, error) {
+func (_mock *Environment) GetAccountBalance(address common0.Address) (uint64, error) {
 	ret := _mock.Called(address)
 
 	if len(ret) == 0 {
@@ -1588,15 +1658,15 @@ func (_mock *Environment) GetAccountBalance(address common.Address) (uint64, err
 
 	var r0 uint64
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(common.Address) (uint64, error)); ok {
+	if returnFunc, ok := ret.Get(0).(func(common0.Address) (uint64, error)); ok {
 		return returnFunc(address)
 	}
-	if returnFunc, ok := ret.Get(0).(func(common.Address) uint64); ok {
+	if returnFunc, ok := ret.Get(0).(func(common0.Address) uint64); ok {
 		r0 = returnFunc(address)
 	} else {
 		r0 = ret.Get(0).(uint64)
 	}
-	if returnFunc, ok := ret.Get(1).(func(common.Address) error); ok {
+	if returnFunc, ok := ret.Get(1).(func(common0.Address) error); ok {
 		r1 = returnFunc(address)
 	} else {
 		r1 = ret.Error(1)
@@ -1610,16 +1680,16 @@ type Environment_GetAccountBalance_Call struct {
 }
 
 // GetAccountBalance is a helper method to define mock.On call
-//   - address common.Address
+//   - address common0.Address
 func (_e *Environment_Expecter) GetAccountBalance(address interface{}) *Environment_GetAccountBalance_Call {
 	return &Environment_GetAccountBalance_Call{Call: _e.mock.On("GetAccountBalance", address)}
 }
 
-func (_c *Environment_GetAccountBalance_Call) Run(run func(address common.Address)) *Environment_GetAccountBalance_Call {
+func (_c *Environment_GetAccountBalance_Call) Run(run func(address common0.Address)) *Environment_GetAccountBalance_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 common.Address
+		var arg0 common0.Address
 		if args[0] != nil {
-			arg0 = args[0].(common.Address)
+			arg0 = args[0].(common0.Address)
 		}
 		run(
 			arg0,
@@ -1633,13 +1703,13 @@ func (_c *Environment_GetAccountBalance_Call) Return(value uint64, err error) *E
 	return _c
 }
 
-func (_c *Environment_GetAccountBalance_Call) RunAndReturn(run func(address common.Address) (uint64, error)) *Environment_GetAccountBalance_Call {
+func (_c *Environment_GetAccountBalance_Call) RunAndReturn(run func(address common0.Address) (uint64, error)) *Environment_GetAccountBalance_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // GetAccountContractCode provides a mock function for the type Environment
-func (_mock *Environment) GetAccountContractCode(location common.AddressLocation) ([]byte, error) {
+func (_mock *Environment) GetAccountContractCode(location common0.AddressLocation) ([]byte, error) {
 	ret := _mock.Called(location)
 
 	if len(ret) == 0 {
@@ -1648,17 +1718,17 @@ func (_mock *Environment) GetAccountContractCode(location common.AddressLocation
 
 	var r0 []byte
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(common.AddressLocation) ([]byte, error)); ok {
+	if returnFunc, ok := ret.Get(0).(func(common0.AddressLocation) ([]byte, error)); ok {
 		return returnFunc(location)
 	}
-	if returnFunc, ok := ret.Get(0).(func(common.AddressLocation) []byte); ok {
+	if returnFunc, ok := ret.Get(0).(func(common0.AddressLocation) []byte); ok {
 		r0 = returnFunc(location)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]byte)
 		}
 	}
-	if returnFunc, ok := ret.Get(1).(func(common.AddressLocation) error); ok {
+	if returnFunc, ok := ret.Get(1).(func(common0.AddressLocation) error); ok {
 		r1 = returnFunc(location)
 	} else {
 		r1 = ret.Error(1)
@@ -1672,16 +1742,16 @@ type Environment_GetAccountContractCode_Call struct {
 }
 
 // GetAccountContractCode is a helper method to define mock.On call
-//   - location common.AddressLocation
+//   - location common0.AddressLocation
 func (_e *Environment_Expecter) GetAccountContractCode(location interface{}) *Environment_GetAccountContractCode_Call {
 	return &Environment_GetAccountContractCode_Call{Call: _e.mock.On("GetAccountContractCode", location)}
 }
 
-func (_c *Environment_GetAccountContractCode_Call) Run(run func(location common.AddressLocation)) *Environment_GetAccountContractCode_Call {
+func (_c *Environment_GetAccountContractCode_Call) Run(run func(location common0.AddressLocation)) *Environment_GetAccountContractCode_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 common.AddressLocation
+		var arg0 common0.AddressLocation
 		if args[0] != nil {
-			arg0 = args[0].(common.AddressLocation)
+			arg0 = args[0].(common0.AddressLocation)
 		}
 		run(
 			arg0,
@@ -1695,7 +1765,7 @@ func (_c *Environment_GetAccountContractCode_Call) Return(code []byte, err error
 	return _c
 }
 
-func (_c *Environment_GetAccountContractCode_Call) RunAndReturn(run func(location common.AddressLocation) ([]byte, error)) *Environment_GetAccountContractCode_Call {
+func (_c *Environment_GetAccountContractCode_Call) RunAndReturn(run func(location common0.AddressLocation) ([]byte, error)) *Environment_GetAccountContractCode_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -2621,6 +2691,61 @@ func (_c *Environment_IsServiceAccountAuthorizer_Call) RunAndReturn(run func() b
 	return _c
 }
 
+// LatestBlock provides a mock function for the type Environment
+func (_mock *Environment) LatestBlock() (*types.Block, error) {
+	ret := _mock.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for LatestBlock")
+	}
+
+	var r0 *types.Block
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func() (*types.Block, error)); ok {
+		return returnFunc()
+	}
+	if returnFunc, ok := ret.Get(0).(func() *types.Block); ok {
+		r0 = returnFunc()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*types.Block)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func() error); ok {
+		r1 = returnFunc()
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// Environment_LatestBlock_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'LatestBlock'
+type Environment_LatestBlock_Call struct {
+	*mock.Call
+}
+
+// LatestBlock is a helper method to define mock.On call
+func (_e *Environment_Expecter) LatestBlock() *Environment_LatestBlock_Call {
+	return &Environment_LatestBlock_Call{Call: _e.mock.On("LatestBlock")}
+}
+
+func (_c *Environment_LatestBlock_Call) Run(run func()) *Environment_LatestBlock_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *Environment_LatestBlock_Call) Return(block *types.Block, err error) *Environment_LatestBlock_Call {
+	_c.Call.Return(block, err)
+	return _c
+}
+
+func (_c *Environment_LatestBlock_Call) RunAndReturn(run func() (*types.Block, error)) *Environment_LatestBlock_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // LimitAccountStorage provides a mock function for the type Environment
 func (_mock *Environment) LimitAccountStorage() bool {
 	ret := _mock.Called()
@@ -2755,61 +2880,8 @@ func (_c *Environment_Logs_Call) RunAndReturn(run func() []string) *Environment_
 	return _c
 }
 
-// MemoryUsed provides a mock function for the type Environment
-func (_mock *Environment) MemoryUsed() (uint64, error) {
-	ret := _mock.Called()
-
-	if len(ret) == 0 {
-		panic("no return value specified for MemoryUsed")
-	}
-
-	var r0 uint64
-	var r1 error
-	if returnFunc, ok := ret.Get(0).(func() (uint64, error)); ok {
-		return returnFunc()
-	}
-	if returnFunc, ok := ret.Get(0).(func() uint64); ok {
-		r0 = returnFunc()
-	} else {
-		r0 = ret.Get(0).(uint64)
-	}
-	if returnFunc, ok := ret.Get(1).(func() error); ok {
-		r1 = returnFunc()
-	} else {
-		r1 = ret.Error(1)
-	}
-	return r0, r1
-}
-
-// Environment_MemoryUsed_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'MemoryUsed'
-type Environment_MemoryUsed_Call struct {
-	*mock.Call
-}
-
-// MemoryUsed is a helper method to define mock.On call
-func (_e *Environment_Expecter) MemoryUsed() *Environment_MemoryUsed_Call {
-	return &Environment_MemoryUsed_Call{Call: _e.mock.On("MemoryUsed")}
-}
-
-func (_c *Environment_MemoryUsed_Call) Run(run func()) *Environment_MemoryUsed_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run()
-	})
-	return _c
-}
-
-func (_c *Environment_MemoryUsed_Call) Return(v uint64, err error) *Environment_MemoryUsed_Call {
-	_c.Call.Return(v, err)
-	return _c
-}
-
-func (_c *Environment_MemoryUsed_Call) RunAndReturn(run func() (uint64, error)) *Environment_MemoryUsed_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
 // MeterComputation provides a mock function for the type Environment
-func (_mock *Environment) MeterComputation(usage common.ComputationUsage) error {
+func (_mock *Environment) MeterComputation(usage common0.ComputationUsage) error {
 	ret := _mock.Called(usage)
 
 	if len(ret) == 0 {
@@ -2817,7 +2889,7 @@ func (_mock *Environment) MeterComputation(usage common.ComputationUsage) error 
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(common.ComputationUsage) error); ok {
+	if returnFunc, ok := ret.Get(0).(func(common0.ComputationUsage) error); ok {
 		r0 = returnFunc(usage)
 	} else {
 		r0 = ret.Error(0)
@@ -2831,16 +2903,16 @@ type Environment_MeterComputation_Call struct {
 }
 
 // MeterComputation is a helper method to define mock.On call
-//   - usage common.ComputationUsage
+//   - usage common0.ComputationUsage
 func (_e *Environment_Expecter) MeterComputation(usage interface{}) *Environment_MeterComputation_Call {
 	return &Environment_MeterComputation_Call{Call: _e.mock.On("MeterComputation", usage)}
 }
 
-func (_c *Environment_MeterComputation_Call) Run(run func(usage common.ComputationUsage)) *Environment_MeterComputation_Call {
+func (_c *Environment_MeterComputation_Call) Run(run func(usage common0.ComputationUsage)) *Environment_MeterComputation_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 common.ComputationUsage
+		var arg0 common0.ComputationUsage
 		if args[0] != nil {
-			arg0 = args[0].(common.ComputationUsage)
+			arg0 = args[0].(common0.ComputationUsage)
 		}
 		run(
 			arg0,
@@ -2854,7 +2926,7 @@ func (_c *Environment_MeterComputation_Call) Return(err error) *Environment_Mete
 	return _c
 }
 
-func (_c *Environment_MeterComputation_Call) RunAndReturn(run func(usage common.ComputationUsage) error) *Environment_MeterComputation_Call {
+func (_c *Environment_MeterComputation_Call) RunAndReturn(run func(usage common0.ComputationUsage) error) *Environment_MeterComputation_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -2911,7 +2983,7 @@ func (_c *Environment_MeterEmittedEvent_Call) RunAndReturn(run func(byteSize uin
 }
 
 // MeterMemory provides a mock function for the type Environment
-func (_mock *Environment) MeterMemory(usage common.MemoryUsage) error {
+func (_mock *Environment) MeterMemory(usage common0.MemoryUsage) error {
 	ret := _mock.Called(usage)
 
 	if len(ret) == 0 {
@@ -2919,7 +2991,7 @@ func (_mock *Environment) MeterMemory(usage common.MemoryUsage) error {
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(common.MemoryUsage) error); ok {
+	if returnFunc, ok := ret.Get(0).(func(common0.MemoryUsage) error); ok {
 		r0 = returnFunc(usage)
 	} else {
 		r0 = ret.Error(0)
@@ -2933,16 +3005,16 @@ type Environment_MeterMemory_Call struct {
 }
 
 // MeterMemory is a helper method to define mock.On call
-//   - usage common.MemoryUsage
+//   - usage common0.MemoryUsage
 func (_e *Environment_Expecter) MeterMemory(usage interface{}) *Environment_MeterMemory_Call {
 	return &Environment_MeterMemory_Call{Call: _e.mock.On("MeterMemory", usage)}
 }
 
-func (_c *Environment_MeterMemory_Call) Run(run func(usage common.MemoryUsage)) *Environment_MeterMemory_Call {
+func (_c *Environment_MeterMemory_Call) Run(run func(usage common0.MemoryUsage)) *Environment_MeterMemory_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 common.MemoryUsage
+		var arg0 common0.MemoryUsage
 		if args[0] != nil {
-			arg0 = args[0].(common.MemoryUsage)
+			arg0 = args[0].(common0.MemoryUsage)
 		}
 		run(
 			arg0,
@@ -2956,7 +3028,51 @@ func (_c *Environment_MeterMemory_Call) Return(err error) *Environment_MeterMemo
 	return _c
 }
 
-func (_c *Environment_MeterMemory_Call) RunAndReturn(run func(usage common.MemoryUsage) error) *Environment_MeterMemory_Call {
+func (_c *Environment_MeterMemory_Call) RunAndReturn(run func(usage common0.MemoryUsage) error) *Environment_MeterMemory_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// MeteringResult provides a mock function for the type Environment
+func (_mock *Environment) MeteringResult() meter.MeteringResult {
+	ret := _mock.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for MeteringResult")
+	}
+
+	var r0 meter.MeteringResult
+	if returnFunc, ok := ret.Get(0).(func() meter.MeteringResult); ok {
+		r0 = returnFunc()
+	} else {
+		r0 = ret.Get(0).(meter.MeteringResult)
+	}
+	return r0
+}
+
+// Environment_MeteringResult_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'MeteringResult'
+type Environment_MeteringResult_Call struct {
+	*mock.Call
+}
+
+// MeteringResult is a helper method to define mock.On call
+func (_e *Environment_Expecter) MeteringResult() *Environment_MeteringResult_Call {
+	return &Environment_MeteringResult_Call{Call: _e.mock.On("MeteringResult")}
+}
+
+func (_c *Environment_MeteringResult_Call) Run(run func()) *Environment_MeteringResult_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *Environment_MeteringResult_Call) Return(meteringResult meter.MeteringResult) *Environment_MeteringResult_Call {
+	_c.Call.Return(meteringResult)
+	return _c
+}
+
+func (_c *Environment_MeteringResult_Call) RunAndReturn(run func() meter.MeteringResult) *Environment_MeteringResult_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -3224,7 +3340,7 @@ func (_c *Environment_RecordTrace_Call) RunAndReturn(run func(operation string, 
 }
 
 // RecoverProgram provides a mock function for the type Environment
-func (_mock *Environment) RecoverProgram(program *ast.Program, location common.Location) ([]byte, error) {
+func (_mock *Environment) RecoverProgram(program *ast.Program, location common0.Location) ([]byte, error) {
 	ret := _mock.Called(program, location)
 
 	if len(ret) == 0 {
@@ -3233,17 +3349,17 @@ func (_mock *Environment) RecoverProgram(program *ast.Program, location common.L
 
 	var r0 []byte
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(*ast.Program, common.Location) ([]byte, error)); ok {
+	if returnFunc, ok := ret.Get(0).(func(*ast.Program, common0.Location) ([]byte, error)); ok {
 		return returnFunc(program, location)
 	}
-	if returnFunc, ok := ret.Get(0).(func(*ast.Program, common.Location) []byte); ok {
+	if returnFunc, ok := ret.Get(0).(func(*ast.Program, common0.Location) []byte); ok {
 		r0 = returnFunc(program, location)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]byte)
 		}
 	}
-	if returnFunc, ok := ret.Get(1).(func(*ast.Program, common.Location) error); ok {
+	if returnFunc, ok := ret.Get(1).(func(*ast.Program, common0.Location) error); ok {
 		r1 = returnFunc(program, location)
 	} else {
 		r1 = ret.Error(1)
@@ -3258,20 +3374,20 @@ type Environment_RecoverProgram_Call struct {
 
 // RecoverProgram is a helper method to define mock.On call
 //   - program *ast.Program
-//   - location common.Location
+//   - location common0.Location
 func (_e *Environment_Expecter) RecoverProgram(program interface{}, location interface{}) *Environment_RecoverProgram_Call {
 	return &Environment_RecoverProgram_Call{Call: _e.mock.On("RecoverProgram", program, location)}
 }
 
-func (_c *Environment_RecoverProgram_Call) Run(run func(program *ast.Program, location common.Location)) *Environment_RecoverProgram_Call {
+func (_c *Environment_RecoverProgram_Call) Run(run func(program *ast.Program, location common0.Location)) *Environment_RecoverProgram_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 *ast.Program
 		if args[0] != nil {
 			arg0 = args[0].(*ast.Program)
 		}
-		var arg1 common.Location
+		var arg1 common0.Location
 		if args[1] != nil {
-			arg1 = args[1].(common.Location)
+			arg1 = args[1].(common0.Location)
 		}
 		run(
 			arg0,
@@ -3286,13 +3402,13 @@ func (_c *Environment_RecoverProgram_Call) Return(bytes []byte, err error) *Envi
 	return _c
 }
 
-func (_c *Environment_RecoverProgram_Call) RunAndReturn(run func(program *ast.Program, location common.Location) ([]byte, error)) *Environment_RecoverProgram_Call {
+func (_c *Environment_RecoverProgram_Call) RunAndReturn(run func(program *ast.Program, location common0.Location) ([]byte, error)) *Environment_RecoverProgram_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // RemoveAccountContractCode provides a mock function for the type Environment
-func (_mock *Environment) RemoveAccountContractCode(location common.AddressLocation) error {
+func (_mock *Environment) RemoveAccountContractCode(location common0.AddressLocation) error {
 	ret := _mock.Called(location)
 
 	if len(ret) == 0 {
@@ -3300,7 +3416,7 @@ func (_mock *Environment) RemoveAccountContractCode(location common.AddressLocat
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(common.AddressLocation) error); ok {
+	if returnFunc, ok := ret.Get(0).(func(common0.AddressLocation) error); ok {
 		r0 = returnFunc(location)
 	} else {
 		r0 = ret.Error(0)
@@ -3314,16 +3430,16 @@ type Environment_RemoveAccountContractCode_Call struct {
 }
 
 // RemoveAccountContractCode is a helper method to define mock.On call
-//   - location common.AddressLocation
+//   - location common0.AddressLocation
 func (_e *Environment_Expecter) RemoveAccountContractCode(location interface{}) *Environment_RemoveAccountContractCode_Call {
 	return &Environment_RemoveAccountContractCode_Call{Call: _e.mock.On("RemoveAccountContractCode", location)}
 }
 
-func (_c *Environment_RemoveAccountContractCode_Call) Run(run func(location common.AddressLocation)) *Environment_RemoveAccountContractCode_Call {
+func (_c *Environment_RemoveAccountContractCode_Call) Run(run func(location common0.AddressLocation)) *Environment_RemoveAccountContractCode_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 common.AddressLocation
+		var arg0 common0.AddressLocation
 		if args[0] != nil {
-			arg0 = args[0].(common.AddressLocation)
+			arg0 = args[0].(common0.AddressLocation)
 		}
 		run(
 			arg0,
@@ -3337,7 +3453,7 @@ func (_c *Environment_RemoveAccountContractCode_Call) Return(err error) *Environ
 	return _c
 }
 
-func (_c *Environment_RemoveAccountContractCode_Call) RunAndReturn(run func(location common.AddressLocation) error) *Environment_RemoveAccountContractCode_Call {
+func (_c *Environment_RemoveAccountContractCode_Call) RunAndReturn(run func(location common0.AddressLocation) error) *Environment_RemoveAccountContractCode_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -3444,7 +3560,7 @@ func (_c *Environment_ResolveLocation_Call) RunAndReturn(run func(identifiers []
 }
 
 // ResourceOwnerChanged provides a mock function for the type Environment
-func (_mock *Environment) ResourceOwnerChanged(interpreter1 *interpreter.Interpreter, resource *interpreter.CompositeValue, oldOwner common.Address, newOwner common.Address) {
+func (_mock *Environment) ResourceOwnerChanged(interpreter1 *interpreter.Interpreter, resource *interpreter.CompositeValue, oldOwner common0.Address, newOwner common0.Address) {
 	_mock.Called(interpreter1, resource, oldOwner, newOwner)
 	return
 }
@@ -3457,13 +3573,13 @@ type Environment_ResourceOwnerChanged_Call struct {
 // ResourceOwnerChanged is a helper method to define mock.On call
 //   - interpreter1 *interpreter.Interpreter
 //   - resource *interpreter.CompositeValue
-//   - oldOwner common.Address
-//   - newOwner common.Address
+//   - oldOwner common0.Address
+//   - newOwner common0.Address
 func (_e *Environment_Expecter) ResourceOwnerChanged(interpreter1 interface{}, resource interface{}, oldOwner interface{}, newOwner interface{}) *Environment_ResourceOwnerChanged_Call {
 	return &Environment_ResourceOwnerChanged_Call{Call: _e.mock.On("ResourceOwnerChanged", interpreter1, resource, oldOwner, newOwner)}
 }
 
-func (_c *Environment_ResourceOwnerChanged_Call) Run(run func(interpreter1 *interpreter.Interpreter, resource *interpreter.CompositeValue, oldOwner common.Address, newOwner common.Address)) *Environment_ResourceOwnerChanged_Call {
+func (_c *Environment_ResourceOwnerChanged_Call) Run(run func(interpreter1 *interpreter.Interpreter, resource *interpreter.CompositeValue, oldOwner common0.Address, newOwner common0.Address)) *Environment_ResourceOwnerChanged_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 *interpreter.Interpreter
 		if args[0] != nil {
@@ -3473,13 +3589,13 @@ func (_c *Environment_ResourceOwnerChanged_Call) Run(run func(interpreter1 *inte
 		if args[1] != nil {
 			arg1 = args[1].(*interpreter.CompositeValue)
 		}
-		var arg2 common.Address
+		var arg2 common0.Address
 		if args[2] != nil {
-			arg2 = args[2].(common.Address)
+			arg2 = args[2].(common0.Address)
 		}
-		var arg3 common.Address
+		var arg3 common0.Address
 		if args[3] != nil {
-			arg3 = args[3].(common.Address)
+			arg3 = args[3].(common0.Address)
 		}
 		run(
 			arg0,
@@ -3496,7 +3612,7 @@ func (_c *Environment_ResourceOwnerChanged_Call) Return() *Environment_ResourceO
 	return _c
 }
 
-func (_c *Environment_ResourceOwnerChanged_Call) RunAndReturn(run func(interpreter1 *interpreter.Interpreter, resource *interpreter.CompositeValue, oldOwner common.Address, newOwner common.Address)) *Environment_ResourceOwnerChanged_Call {
+func (_c *Environment_ResourceOwnerChanged_Call) RunAndReturn(run func(interpreter1 *interpreter.Interpreter, resource *interpreter.CompositeValue, oldOwner common0.Address, newOwner common0.Address)) *Environment_ResourceOwnerChanged_Call {
 	_c.Run(run)
 	return _c
 }
@@ -4024,6 +4140,46 @@ func (_c *Environment_SetValue_Call) RunAndReturn(run func(owner []byte, key []b
 	return _c
 }
 
+// StageBlockProposal provides a mock function for the type Environment
+func (_mock *Environment) StageBlockProposal(blockProposal *types.BlockProposal) {
+	_mock.Called(blockProposal)
+	return
+}
+
+// Environment_StageBlockProposal_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'StageBlockProposal'
+type Environment_StageBlockProposal_Call struct {
+	*mock.Call
+}
+
+// StageBlockProposal is a helper method to define mock.On call
+//   - blockProposal *types.BlockProposal
+func (_e *Environment_Expecter) StageBlockProposal(blockProposal interface{}) *Environment_StageBlockProposal_Call {
+	return &Environment_StageBlockProposal_Call{Call: _e.mock.On("StageBlockProposal", blockProposal)}
+}
+
+func (_c *Environment_StageBlockProposal_Call) Run(run func(blockProposal *types.BlockProposal)) *Environment_StageBlockProposal_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 *types.BlockProposal
+		if args[0] != nil {
+			arg0 = args[0].(*types.BlockProposal)
+		}
+		run(
+			arg0,
+		)
+	})
+	return _c
+}
+
+func (_c *Environment_StageBlockProposal_Call) Return() *Environment_StageBlockProposal_Call {
+	_c.Call.Return()
+	return _c
+}
+
+func (_c *Environment_StageBlockProposal_Call) RunAndReturn(run func(blockProposal *types.BlockProposal)) *Environment_StageBlockProposal_Call {
+	_c.Run(run)
+	return _c
+}
+
 // StartChildSpan provides a mock function for the type Environment
 func (_mock *Environment) StartChildSpan(name trace.SpanName, options ...trace0.SpanStartOption) tracing.TracerSpan {
 	// trace0.SpanStartOption
@@ -4090,50 +4246,6 @@ func (_c *Environment_StartChildSpan_Call) Return(tracerSpan tracing.TracerSpan)
 }
 
 func (_c *Environment_StartChildSpan_Call) RunAndReturn(run func(name trace.SpanName, options ...trace0.SpanStartOption) tracing.TracerSpan) *Environment_StartChildSpan_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// TotalEmittedEventBytes provides a mock function for the type Environment
-func (_mock *Environment) TotalEmittedEventBytes() uint64 {
-	ret := _mock.Called()
-
-	if len(ret) == 0 {
-		panic("no return value specified for TotalEmittedEventBytes")
-	}
-
-	var r0 uint64
-	if returnFunc, ok := ret.Get(0).(func() uint64); ok {
-		r0 = returnFunc()
-	} else {
-		r0 = ret.Get(0).(uint64)
-	}
-	return r0
-}
-
-// Environment_TotalEmittedEventBytes_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'TotalEmittedEventBytes'
-type Environment_TotalEmittedEventBytes_Call struct {
-	*mock.Call
-}
-
-// TotalEmittedEventBytes is a helper method to define mock.On call
-func (_e *Environment_Expecter) TotalEmittedEventBytes() *Environment_TotalEmittedEventBytes_Call {
-	return &Environment_TotalEmittedEventBytes_Call{Call: _e.mock.On("TotalEmittedEventBytes")}
-}
-
-func (_c *Environment_TotalEmittedEventBytes_Call) Run(run func()) *Environment_TotalEmittedEventBytes_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run()
-	})
-	return _c
-}
-
-func (_c *Environment_TotalEmittedEventBytes_Call) Return(v uint64) *Environment_TotalEmittedEventBytes_Call {
-	_c.Call.Return(v)
-	return _c
-}
-
-func (_c *Environment_TotalEmittedEventBytes_Call) RunAndReturn(run func() uint64) *Environment_TotalEmittedEventBytes_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -4273,7 +4385,7 @@ func (_c *Environment_TxIndex_Call) RunAndReturn(run func() uint32) *Environment
 }
 
 // UpdateAccountContractCode provides a mock function for the type Environment
-func (_mock *Environment) UpdateAccountContractCode(location common.AddressLocation, code []byte) error {
+func (_mock *Environment) UpdateAccountContractCode(location common0.AddressLocation, code []byte) error {
 	ret := _mock.Called(location, code)
 
 	if len(ret) == 0 {
@@ -4281,7 +4393,7 @@ func (_mock *Environment) UpdateAccountContractCode(location common.AddressLocat
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(common.AddressLocation, []byte) error); ok {
+	if returnFunc, ok := ret.Get(0).(func(common0.AddressLocation, []byte) error); ok {
 		r0 = returnFunc(location, code)
 	} else {
 		r0 = ret.Error(0)
@@ -4295,17 +4407,17 @@ type Environment_UpdateAccountContractCode_Call struct {
 }
 
 // UpdateAccountContractCode is a helper method to define mock.On call
-//   - location common.AddressLocation
+//   - location common0.AddressLocation
 //   - code []byte
 func (_e *Environment_Expecter) UpdateAccountContractCode(location interface{}, code interface{}) *Environment_UpdateAccountContractCode_Call {
 	return &Environment_UpdateAccountContractCode_Call{Call: _e.mock.On("UpdateAccountContractCode", location, code)}
 }
 
-func (_c *Environment_UpdateAccountContractCode_Call) Run(run func(location common.AddressLocation, code []byte)) *Environment_UpdateAccountContractCode_Call {
+func (_c *Environment_UpdateAccountContractCode_Call) Run(run func(location common0.AddressLocation, code []byte)) *Environment_UpdateAccountContractCode_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 common.AddressLocation
+		var arg0 common0.AddressLocation
 		if args[0] != nil {
-			arg0 = args[0].(common.AddressLocation)
+			arg0 = args[0].(common0.AddressLocation)
 		}
 		var arg1 []byte
 		if args[1] != nil {
@@ -4324,7 +4436,7 @@ func (_c *Environment_UpdateAccountContractCode_Call) Return(err error) *Environ
 	return _c
 }
 
-func (_c *Environment_UpdateAccountContractCode_Call) RunAndReturn(run func(location common.AddressLocation, code []byte) error) *Environment_UpdateAccountContractCode_Call {
+func (_c *Environment_UpdateAccountContractCode_Call) RunAndReturn(run func(location common0.AddressLocation, code []byte) error) *Environment_UpdateAccountContractCode_Call {
 	_c.Call.Return(run)
 	return _c
 }

@@ -1218,6 +1218,46 @@ func (_c *AccessMetrics_UpdateExecutionReceiptMaxHeight_Call) RunAndReturn(run f
 	return _c
 }
 
+// UpdateIngestionFinalizedBlockHeight provides a mock function for the type AccessMetrics
+func (_mock *AccessMetrics) UpdateIngestionFinalizedBlockHeight(height uint64) {
+	_mock.Called(height)
+	return
+}
+
+// AccessMetrics_UpdateIngestionFinalizedBlockHeight_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'UpdateIngestionFinalizedBlockHeight'
+type AccessMetrics_UpdateIngestionFinalizedBlockHeight_Call struct {
+	*mock.Call
+}
+
+// UpdateIngestionFinalizedBlockHeight is a helper method to define mock.On call
+//   - height uint64
+func (_e *AccessMetrics_Expecter) UpdateIngestionFinalizedBlockHeight(height interface{}) *AccessMetrics_UpdateIngestionFinalizedBlockHeight_Call {
+	return &AccessMetrics_UpdateIngestionFinalizedBlockHeight_Call{Call: _e.mock.On("UpdateIngestionFinalizedBlockHeight", height)}
+}
+
+func (_c *AccessMetrics_UpdateIngestionFinalizedBlockHeight_Call) Run(run func(height uint64)) *AccessMetrics_UpdateIngestionFinalizedBlockHeight_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 uint64
+		if args[0] != nil {
+			arg0 = args[0].(uint64)
+		}
+		run(
+			arg0,
+		)
+	})
+	return _c
+}
+
+func (_c *AccessMetrics_UpdateIngestionFinalizedBlockHeight_Call) Return() *AccessMetrics_UpdateIngestionFinalizedBlockHeight_Call {
+	_c.Call.Return()
+	return _c
+}
+
+func (_c *AccessMetrics_UpdateIngestionFinalizedBlockHeight_Call) RunAndReturn(run func(height uint64)) *AccessMetrics_UpdateIngestionFinalizedBlockHeight_Call {
+	_c.Run(run)
+	return _c
+}
+
 // UpdateLastFullBlockHeight provides a mock function for the type AccessMetrics
 func (_mock *AccessMetrics) UpdateLastFullBlockHeight(height uint64) {
 	_mock.Called(height)
