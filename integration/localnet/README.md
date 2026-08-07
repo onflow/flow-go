@@ -160,7 +160,7 @@ avg(rate(consensus_compliance_finalized_blocks_total{role="consensus"}[$__interv
 ### Traces
 Traces are available through the Tempo backend.
 You can get to traces either by searching for logs that have a `traceID` label, clicking on them and pressing "Open in Tempo" button: 
-```
+```logql
 {role="execution"} | json | __error__ != "JSONParserErr" | timeSpentInMS > 10 | traceID != ""
 ```
 
@@ -181,7 +181,7 @@ The localnet is already set up for it: the docker network is attachable, the loa
 Prometheus scrape target (`loader:8443`) is pre-configured, and a `loader` dashboard is
 installed in the local Grafana. From the root of the loader repository, run:
 
-```
+```sh
 make load-local
 ```
 
@@ -196,13 +196,13 @@ node you want to debug in `docker-compose.nodes.yml`, then make the following ch
 
 1. Set the build `target` setting to `debug`. This configures it to use the special `debug` image which
    runs the node application within `dlv`.
-	```
+	```yaml
 	build:
 		...
 		target: debug
 	```
 2. Expose the debugger ports to your host network
-	```
+	```yaml
 	ports:
 		...
 		- "2345:2345"

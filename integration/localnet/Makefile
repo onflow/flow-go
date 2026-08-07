@@ -129,7 +129,7 @@ stop-flow:
 # access_1 REST API twice and confirming the sealed height increased.
 .PHONY: verify
 verify:
-	@get_height() { curl -sf "http://localhost:4004/v1/blocks?height=sealed" | sed -n 's/.*"height": "\([0-9]*\)".*/\1/p' | head -1; }; \
+	@get_height() { curl --connect-timeout 2 --max-time 10 -sf "http://localhost:4004/v1/blocks?height=sealed" | sed -n 's/.*"height": "\([0-9]*\)".*/\1/p' | head -1; }; \
 	h1=$$(get_height); \
 	if [ -z "$$h1" ]; then \
 		echo "FAIL: could not query sealed block height from http://localhost:4004 - is the network running? (make start)"; \
