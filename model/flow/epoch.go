@@ -397,25 +397,25 @@ func NewEpochCommit(untrusted UntrustedEpochCommit) (*EpochCommit, error) {
 	if len(untrusted.ClusterQCs) == 0 {
 		return nil, fmt.Errorf("cluster QCs list must not be empty")
 	}
-	// TODO(mainnet27): remove this conditional: https://github.com/onflow/flow-go/issues/6772
-	if untrusted.DKGIndexMap != nil {
-		// enforce invariant: len(DKGParticipantKeys) == len(DKGIndexMap)
-		n := len(untrusted.DKGIndexMap) // size of the DKG committee
-		if len(untrusted.DKGParticipantKeys) != n {
-			return nil, fmt.Errorf("number of %d Random Beacon key shares is inconsistent with number of DKG participants (len=%d)", len(untrusted.DKGParticipantKeys), len(untrusted.DKGIndexMap))
-		}
+	if untrusted.DKGIndexMap == nil {
+		return nil, fmt.Errorf("DKG index map must not be nil")
+	}
+	// enforce invariant: len(DKGParticipantKeys) == len(DKGIndexMap)
+	n := len(untrusted.DKGIndexMap) // size of the DKG committee
+	if len(untrusted.DKGParticipantKeys) != n {
+		return nil, fmt.Errorf("number of %d Random Beacon key shares is inconsistent with number of DKG participants (len=%d)", len(untrusted.DKGParticipantKeys), len(untrusted.DKGIndexMap))
+	}
 
-		// enforce invariant: DKGIndexMap values form the set {0, 1, ..., n-1} where n=len(DKGParticipantKeys)
-		encounteredIndex := make([]bool, n)
-		for _, index := range untrusted.DKGIndexMap {
-			if index < 0 || index >= n {
-				return nil, fmt.Errorf("index %d is outside allowed range [0,n-1] for a DKG committee of size n=%d", index, n)
-			}
-			if encounteredIndex[index] {
-				return nil, fmt.Errorf("duplicated DKG index %d", index)
-			}
-			encounteredIndex[index] = true
+	// enforce invariant: DKGIndexMap values form the set {0, 1, ..., n-1} where n=len(DKGParticipantKeys)
+	encounteredIndex := make([]bool, n)
+	for _, index := range untrusted.DKGIndexMap {
+		if index < 0 || index >= n {
+			return nil, fmt.Errorf("index %d is outside allowed range [0,n-1] for a DKG committee of size n=%d", index, n)
 		}
+		if encounteredIndex[index] {
+			return nil, fmt.Errorf("duplicated DKG index %d", index)
+		}
+		encounteredIndex[index] = true
 	}
 
 	return &EpochCommit{
