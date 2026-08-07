@@ -367,9 +367,12 @@ func (c *Cache[V]) get(key flow.Identifier) (value V, bckIndex bucketIndex, sltI
 
 		id, linkedValue, linked := c.linkedValueOf(b, s)
 		if !linked {
-			// no linked entity for this (bucketIndex, slotIndex) pair.
-			c.collector.OnKeyGetFailure()
-			return value, 0, 0, false
+			// The slot's value is no longer in the underlying entities pool (it was ejected), but
+			// the slot still carries the ejected value's 32-bit id prefix, which happened to match
+			// the queried key's prefix. This does NOT imply the queried key is absent: a different
+			// slot in this bucket may hold the queried key (32-bit prefixes of distinct keys can
+			// collide), so we must continue scanning the remaining slots.
+			continue
 		}
 
 		if id != key {

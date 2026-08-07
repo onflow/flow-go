@@ -643,6 +643,11 @@ func (c *ControlMsgValidationInspector) inspectRpcPublishMessages(from peer.ID, 
 	if sampleSize > totalMessages {
 		sampleSize = totalMessages
 	}
+	// Clone the slice before sampling: this method runs asynchronously on worker goroutines
+	// while the libp2p pubsub layer continues to process the same RPC object, so shuffling the
+	// RPC's own message slice in place would be a data race. The messages themselves are only
+	// read, hence a shallow clone suffices.
+	messages = slices.Clone(messages)
 	c.performSample(p2pmsg.RpcPublishMessage, uint(totalMessages), uint(sampleSize), func(i, j uint) {
 		messages[i], messages[j] = messages[j], messages[i]
 	})

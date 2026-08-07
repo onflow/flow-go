@@ -67,6 +67,8 @@ func (s *SubscriptionRecordCache) GetSubscribedTopics(pid peer.ID) ([]string, bo
 	if !ok {
 		return nil, false
 	}
+	// safe to return without copying: stored records are never mutated in place (adjustments
+	// replace the record, see AddWithInitTopicForPeer), so this is an immutable snapshot.
 	return record.Topics, true
 }
 
@@ -108,7 +110,6 @@ func (s *SubscriptionRecordCache) AddWithInitTopicForPeer(pid peer.ID, topic str
 			LastUpdatedCycle: s.currentCycle.Load(),
 		}
 	}
-	var rErr error
 	adjustLogic := func(record *SubscriptionRecord) *SubscriptionRecord {
 		currentCycle := s.currentCycle.Load()
 		if record.LastUpdatedCycle > currentCycle {
@@ -116,26 +117,35 @@ func (s *SubscriptionRecordCache) AddWithInitTopicForPeer(pid peer.ID, topic str
 			// This should never happen, because the update cycle must be moved forward before adding a topic.
 			panic(fmt.Sprintf("invalid last updated cycle, expected <= %d, got: %d", currentCycle, record.LastUpdatedCycle))
 		}
-		if record.LastUpdatedCycle < currentCycle {
-			// This record was not updated in the current cycle, so we can wipe its topics list (topic list is only
-			// valid for the current cycle).
-			record.Topics = make([]string, 0)
+		// copy-on-write: the cache stores records by pointer, and record fields (in particular
+		// the Topics slice) are read outside the backend lock (e.g. by GetSubscribedTopics and
+		// by this method's caller); mutating the record or its slice in place would be a data
+		// race. Returning a fresh record (which Adjust stores back) keeps previously returned
+		// records immutable.
+		var topics []string
+		if record.LastUpdatedCycle == currentCycle {
+			// check if the topic already exists; if it does, we do not need to update the record.
+			if slices.Contains(record.Topics, topic) {
+				// topic already exists
+				return record
+			}
+			topics = make([]string, 0, len(record.Topics)+1)
+			topics = append(topics, record.Topics...)
+		} else {
+			// This record was not updated in the current cycle, so we start from an empty topics
+			// list (topic list is only valid for the current cycle).
+			topics = make([]string, 0, 1)
 		}
-		// check if the topic already exists; if it does, we do not need to update the record.
-		if slices.Contains(record.Topics, topic) {
-			// topic already exists
-			return record
-		}
-		record.LastUpdatedCycle = currentCycle
-		record.Topics = append(record.Topics, topic)
+		topics = append(topics, topic)
 
 		// Return the adjusted record.
-		return record
+		return &SubscriptionRecord{
+			PeerID:           record.PeerID,
+			Topics:           topics,
+			LastUpdatedCycle: currentCycle,
+		}
 	}
 	adjustedRecord, adjusted := s.c.AdjustWithInit(p2p.MakeId(pid), adjustLogic, initLogic)
-	if rErr != nil {
-		return nil, fmt.Errorf("failed to adjust record with error: %w", rErr)
-	}
 	if !adjusted {
 		return nil, fmt.Errorf("failed to adjust record, entity not found")
 	}
