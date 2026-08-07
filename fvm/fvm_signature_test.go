@@ -499,6 +499,10 @@ func TestBLSMultiSignature(t *testing.T) {
 						_, output, err := vm.Run(ctx, script, snapshotTree)
 						assert.NoError(t, err)
 						assert.Error(t, output.Err)
+
+						// verifyPoP is documented to abort on non-BLS keys; the abort
+						// surfaces as a controlled user error, not a panic
+						assert.ErrorContains(t, output.Err, "public key is not a BLS key")
 					})
 				}
 			},
@@ -704,6 +708,10 @@ func TestBLSMultiSignature(t *testing.T) {
 						_, output, err := vm.Run(ctx, script, snapshotTree)
 						assert.NoError(t, err)
 						assert.Error(t, output.Err)
+
+						// the stdlib maps the host function's user error to the
+						// documented nil return; the script aborts force-unwrapping it
+						assert.ErrorContains(t, output.Err, "unexpectedly found nil while forcing an Optional value")
 					})
 				}
 

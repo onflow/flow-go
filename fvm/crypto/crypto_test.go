@@ -459,6 +459,131 @@ func TestAuthenticationSchemeConversion(t *testing.T) {
 	}
 }
 
+// TestBLSHostFunctionsOnNonBLSKey verifies that the BLS host functions return
+// user errors instead of panicking on valid non-BLS public keys: a Cadence
+// PublicKey built from e.g. a valid ECDSA key passes construction-time
+// validation and reaches these host functions ungated by the stdlib.
+func TestBLSHostFunctionsOnNonBLSKey(t *testing.T) {
+
+	seed := make([]byte, onflowCrypto.KeyGenSeedMinLen)
+	_, err := rand.Read(seed)
+	require.NoError(t, err)
+
+	nonBLSAlgorithms := []struct {
+		name     string
+		signAlgo onflowCrypto.SigningAlgorithm
+		rtAlgo   runtime.SignatureAlgorithm
+	}{
+		{"ECDSA_P256", onflowCrypto.ECDSAP256, runtime.SignatureAlgorithmECDSA_P256},
+		{"ECDSA_secp256k1", onflowCrypto.ECDSASecp256k1, runtime.SignatureAlgorithmECDSA_secp256k1},
+	}
+
+	newRuntimePublicKey := func(
+		t *testing.T,
+		signAlgo onflowCrypto.SigningAlgorithm,
+		rtAlgo runtime.SignatureAlgorithm,
+	) *runtime.PublicKey {
+		sk, err := onflowCrypto.GeneratePrivateKey(signAlgo, seed)
+		require.NoError(t, err)
+		return &runtime.PublicKey{
+			PublicKey: sk.PublicKey().Encode(),
+			SignAlgo:  rtAlgo,
+		}
+	}
+
+	t.Run("VerifyPOP", func(t *testing.T) {
+
+		t.Run("control: valid BLS key", func(t *testing.T) {
+			sk, err := onflowCrypto.GeneratePrivateKey(onflowCrypto.BLSBLS12381, seed)
+			require.NoError(t, err)
+			pop, err := onflowCrypto.BLSGeneratePOP(sk)
+			require.NoError(t, err)
+
+			valid, err := crypto.VerifyPOP(
+				&runtime.PublicKey{
+					PublicKey: sk.PublicKey().Encode(),
+					SignAlgo:  runtime.SignatureAlgorithmBLS_BLS12_381,
+				},
+				pop,
+			)
+			require.NoError(t, err)
+			require.True(t, valid)
+		})
+
+		for _, algo := range nonBLSAlgorithms {
+			t.Run("valid non-BLS key returns user error/"+algo.name, func(t *testing.T) {
+				pk := newRuntimePublicKey(t, algo.signAlgo, algo.rtAlgo)
+				sig := make([]byte, onflowCrypto.SignatureLenBLSBLS12381)
+
+				valid, err := crypto.VerifyPOP(pk, sig)
+				require.Error(t, err)
+				require.True(t, errors.IsValueError(err))
+				require.Contains(t, err.Error(), "public key is not a BLS key")
+				require.False(t, valid)
+			})
+		}
+	})
+
+	t.Run("AggregatePublicKeys", func(t *testing.T) {
+
+		t.Run("control: valid BLS keys", func(t *testing.T) {
+			keys := make([]*runtime.PublicKey, 0, 2)
+			for i := 0; i < 2; i++ {
+				sk, err := onflowCrypto.GeneratePrivateKey(onflowCrypto.BLSBLS12381, seed)
+				require.NoError(t, err)
+				keys = append(keys, &runtime.PublicKey{
+					PublicKey: sk.PublicKey().Encode(),
+					SignAlgo:  runtime.SignatureAlgorithmBLS_BLS12_381,
+				})
+			}
+
+			agg, err := crypto.AggregatePublicKeys(keys)
+			require.NoError(t, err)
+			require.NotNil(t, agg)
+		})
+
+		for _, algo := range nonBLSAlgorithms {
+			t.Run("valid non-BLS key returns user error/"+algo.name, func(t *testing.T) {
+				pk := newRuntimePublicKey(t, algo.signAlgo, algo.rtAlgo)
+
+				agg, err := crypto.AggregatePublicKeys([]*runtime.PublicKey{pk})
+				require.Error(t, err)
+				require.True(t, errors.IsValueError(err))
+				require.Contains(t, err.Error(), "not a BLS key")
+				require.Nil(t, agg)
+			})
+		}
+	})
+}
+
+// Errors returned by the BLS host functions propagate through Cadence and
+// must be valid UTF-8 and CBOR-encodable.
+func TestBLSHostFunctions_error_handling_produces_valid_utf8(t *testing.T) {
+
+	pk := &runtime.PublicKey{
+		PublicKey: []byte{0xc3, 0x28}, // some invalid UTF-8
+		SignAlgo:  runtime.SignatureAlgorithmECDSA_P256,
+	}
+
+	_, popErr := crypto.VerifyPOP(pk, nil)
+	_, aggErr := crypto.AggregatePublicKeys([]*runtime.PublicKey{pk})
+
+	for _, err := range []error{popErr, aggErr} {
+		require.True(t, errors.IsValueError(err))
+
+		errorString := err.Error()
+		assert.True(t, utf8.ValidString(errorString))
+
+		// check the error string can be encoded and decoded using CBOR
+		marshalledBytes, err := cbor.Marshal(errorString)
+		require.NoError(t, err)
+
+		var unmarshalledString string
+		require.NoError(t, cbor.Unmarshal(marshalledBytes, &unmarshalledString))
+		require.Equal(t, errorString, unmarshalledString)
+	}
+}
+
 func TestVerifySignatureFromRuntime_error_handling_produces_valid_utf8_for_invalid_sign_algo(t *testing.T) {
 
 	invalidSignatureAlgo := runtime.SignatureAlgorithm(164)
