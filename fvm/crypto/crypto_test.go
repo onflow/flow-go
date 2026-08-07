@@ -562,7 +562,7 @@ func TestBLSHostFunctions_error_handling_produces_valid_utf8(t *testing.T) {
 
 	pk := &runtime.PublicKey{
 		PublicKey: []byte{0xc3, 0x28}, // some invalid UTF-8
-		SignAlgo:  runtime.SignatureAlgorithmECDSA_P256,
+		SignAlgo:  runtime.SignatureAlgorithmBLS_BLS12_381,
 	}
 
 	_, popErr := crypto.VerifyPOP(pk, nil)
@@ -572,6 +572,8 @@ func TestBLSHostFunctions_error_handling_produces_valid_utf8(t *testing.T) {
 		require.True(t, errors.IsValueError(err))
 
 		errorString := err.Error()
+		// the invalid bytes must appear hex-encoded, not raw
+		assert.Contains(t, errorString, "c328")
 		assert.True(t, utf8.ValidString(errorString))
 
 		// check the error string can be encoded and decoded using CBOR
