@@ -2329,6 +2329,7 @@ func EpochCommitFixture(opts ...func(*flow.EpochCommit)) *flow.EpochCommit {
 		ClusterQCs:         flow.ClusterQCVoteDatasFromQCs(QuorumCertificatesWithSignerIDsFixtures(1)),
 		DKGGroupKey:        KeyFixture(crypto.BLSBLS12381).PublicKey(),
 		DKGParticipantKeys: PublicKeysFixture(2, crypto.BLSBLS12381),
+		DKGIndexMap:        flow.DKGIndexMap{IdentifierFixture(): 0, IdentifierFixture(): 1},
 	}
 	for _, apply := range opts {
 		apply(commit)
