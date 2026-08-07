@@ -177,19 +177,16 @@ func TestAppSpecificScoreCache_ConcurrentGetWhileUpdatingSamePeer(t *testing.T) 
 	const updates = 500
 
 	var wg sync.WaitGroup
-	wg.Add(2)
 
 	// writer: repeatedly updates the same peer's score.
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		for i := 0; i < updates; i++ {
 			require.NoError(t, cache.AdjustWithInit(peerID, float64(i), time.Now()))
 		}
-	}()
+	})
 
 	// reader: repeatedly reads the same peer's score while it is being updated.
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		for i := 0; i < updates; i++ {
 			score, _, found := cache.Get(peerID)
 			if !found {
@@ -198,7 +195,7 @@ func TestAppSpecificScoreCache_ConcurrentGetWhileUpdatingSamePeer(t *testing.T) 
 			require.GreaterOrEqual(t, score, float64(0))
 			require.Less(t, score, float64(updates))
 		}
-	}()
+	})
 
 	unittest.RequireReturnsBefore(t, wg.Wait, 10*time.Second, "concurrent updates and reads did not finish on time")
 
