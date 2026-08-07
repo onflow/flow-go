@@ -81,14 +81,12 @@ func TestConsumer_ConcurrentNotifications(t *testing.T) {
 	workers := 4
 	iterations := 50
 	var wg sync.WaitGroup
-	wg.Add(workers)
 	for range workers {
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			for i := 0; i < iterations; i++ {
 				notify[i%len(notify)](violation)
 			}
-		}()
+		})
 	}
 	unittest.RequireReturnsBefore(t, wg.Wait, 10*time.Second, "concurrent notifications did not finish on time")
 
