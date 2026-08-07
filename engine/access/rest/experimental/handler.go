@@ -13,7 +13,7 @@ import (
 
 // ApiHandlerFunc is the handler function signature for experimental API endpoints.
 // It uses extended.API as the backend instead of access.API.
-type ApiHandlerFunc func(r *common.Request, backend extended.API, link models.LinkGenerator) (interface{}, error)
+type ApiHandlerFunc func(r *common.Request, backend extended.API, link models.LinkGenerator) (any, error)
 
 // Handler wraps an ApiHandlerFunc with common HTTP handling (error handling, JSON responses).
 type Handler struct {

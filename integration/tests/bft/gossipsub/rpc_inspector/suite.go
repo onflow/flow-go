@@ -89,7 +89,7 @@ func (s *Suite) loaderLoop(ctx context.Context, numOfTestAccounts int, interval 
 			case <-ctx.Done():
 				return
 			case <-ticker.C:
-				for i := 0; i < numOfTestAccounts; i++ {
+				for range numOfTestAccounts {
 					s.submitSmokeTestTransaction(s.Ctx)
 				}
 			}

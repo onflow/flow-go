@@ -58,7 +58,7 @@ func TestThreeInstances(t *testing.T) {
 	// since we don't block any messages we should have enough data to advance in happy path
 	// for that reason we will block all TO related communication.
 	instances := make([]*Instance, 0, num)
-	for n := 0; n < num; n++ {
+	for n := range num {
 		in := NewInstance(t,
 			WithRoot(root),
 			WithParticipants(participants),
@@ -119,7 +119,7 @@ func TestSevenInstances(t *testing.T) {
 	require.NoError(t, err)
 
 	// set up five instances that work fully
-	for n := 0; n < numPass; n++ {
+	for n := range numPass {
 		in := NewInstance(t,
 			WithRoot(root),
 			WithParticipants(participants),

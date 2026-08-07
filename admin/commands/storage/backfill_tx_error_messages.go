@@ -53,7 +53,7 @@ func NewBackfillTxErrorMessagesCommand(
 //   - admin.InvalidAdminReqError - if start-height is greater than end-height or
 //     if the input format is invalid, if an invalid execution node ID is provided.
 func (b *BackfillTxErrorMessagesCommand) Validator(request *admin.CommandRequest) error {
-	input, ok := request.Data.(map[string]interface{})
+	input, ok := request.Data.(map[string]any)
 	if !ok {
 		return admin.NewInvalidAdminReqFormatError("expected map[string]any")
 	}
@@ -146,7 +146,7 @@ func (b *BackfillTxErrorMessagesCommand) Validator(request *admin.CommandRequest
 // from data.executionNodeIds if available, otherwise defaults to valid execution nodes.
 //
 // No errors are expected during normal operation.
-func (b *BackfillTxErrorMessagesCommand) Handler(ctx context.Context, request *admin.CommandRequest) (interface{}, error) {
+func (b *BackfillTxErrorMessagesCommand) Handler(ctx context.Context, request *admin.CommandRequest) (any, error) {
 	if b.txErrorMessagesCore == nil {
 		return nil, fmt.Errorf("failed to backfill, could not get transaction error messages storage")
 	}
@@ -187,7 +187,7 @@ func (b *BackfillTxErrorMessagesCommand) Handler(ctx context.Context, request *a
 //
 // Expected errors during normal operation:
 // - admin.InvalidAdminReqParameterError - if execution-node-ids is empty or has an invalid format.
-func (b *BackfillTxErrorMessagesCommand) parseExecutionNodeIds(executionNodeIdsIn interface{}, allIdentities flow.IdentityList) (flow.IdentitySkeletonList, error) {
+func (b *BackfillTxErrorMessagesCommand) parseExecutionNodeIds(executionNodeIdsIn any, allIdentities flow.IdentityList) (flow.IdentitySkeletonList, error) {
 	var ids flow.IdentityList
 	switch executionNodeIds := executionNodeIdsIn.(type) {
 	case []any:

@@ -190,7 +190,7 @@ func TestCapacity(t *testing.T) {
 	wg := sync.WaitGroup{}
 	wg.Add(swarm)
 
-	for i := 0; i < swarm; i++ {
+	for range swarm {
 		go func() {
 			// adds an item on a separate goroutine
 			key := unittest.IdentifierFixture()

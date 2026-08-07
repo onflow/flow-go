@@ -169,7 +169,7 @@ func TestMyExecutionReceiptsStorage(t *testing.T) {
 			errChan := make(chan error, 10)
 
 			// Store receipts concurrently
-			for i := 0; i < 10; i++ {
+			for i := range 10 {
 				doneSinal.Add(1)
 				go func(i int) {
 					block := unittest.BlockFixture() // Each iteration gets a new block

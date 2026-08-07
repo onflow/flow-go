@@ -126,7 +126,7 @@ func (o *Orchestrator) initUnauthorizedEvents() {
 // initAuthorizedEvents returns combinations of unauthorized messages and channels.
 func (o *Orchestrator) initAuthorizedEvents() {
 	channel := channels.RequestChunks
-	for i := uint64(0); i < numOfAuthorizedEvents; i++ {
+	for range uint64(numOfAuthorizedEvents) {
 		chunkDataReq := &messages.ChunkDataRequest{
 			ChunkID: unittest.IdentifierFixture(),
 			Nonce:   rand.Uint64(),
@@ -150,7 +150,7 @@ func (o *Orchestrator) initAuthorizedEvents() {
 // send the FlowProtocolEvent. In this case AN's are not authorized to send block proposals.
 func (o *Orchestrator) initUnauthorizedMsgByRoleEvents(n int) {
 	channel := channels.SyncCommittee
-	for i := 0; i < n; i++ {
+	for range n {
 		unauthorizedProposal := (*messages.Proposal)(unittest.ProposalFixture())
 		eventID := unittest.GetFlowProtocolEventID(o.T, channel, unauthorizedProposal)
 		unauthorizedMsgByRole := &insecure.EgressEvent{
@@ -170,7 +170,7 @@ func (o *Orchestrator) initUnauthorizedMsgByRoleEvents(n int) {
 // authorized to be sent on the event channel.
 func (o *Orchestrator) initUnauthorizedMsgOnChannelEvents(n int) {
 	channel := channels.PushReceipts
-	for i := 0; i < n; i++ {
+	for range n {
 		syncReq := &messages.SyncRequest{
 			Nonce:  rand.Uint64(),
 			Height: rand.Uint64(),
@@ -193,7 +193,7 @@ func (o *Orchestrator) initUnauthorizedMsgOnChannelEvents(n int) {
 // authorized to be sent via insecure.Protocol_UNICAST on the event channel.
 func (o *Orchestrator) initUnauthorizedUnicastOnChannelEvents(n int) {
 	channel := channels.SyncCommittee
-	for i := 0; i < n; i++ {
+	for range n {
 		syncReq := &messages.SyncRequest{
 			Nonce:  rand.Uint64(),
 			Height: rand.Uint64(),
@@ -216,7 +216,7 @@ func (o *Orchestrator) initUnauthorizedUnicastOnChannelEvents(n int) {
 // authorized to be sent via insecure.Protocol_PUBLISH on the event channel.
 func (o *Orchestrator) initUnauthorizedPublishOnChannelEvents(n int) {
 	channel := channels.ProvideChunks
-	for i := 0; i < n; i++ {
+	for range n {
 		chunkDataResponse := unittest.ChunkDataResponseMsgFixture(unittest.IdentifierFixture())
 		eventID := unittest.GetFlowProtocolEventID(o.T, channel, chunkDataResponse)
 		unauthorizedPublishOnChannel := &insecure.EgressEvent{

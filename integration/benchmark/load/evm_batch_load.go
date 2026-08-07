@@ -301,7 +301,7 @@ func (l *EVMBatchTransferLoad) setupTransaction(
 
 			// Fund evm address
 			txBody := flowsdk.NewTransaction().
-				SetScript([]byte(fmt.Sprintf(
+				SetScript(fmt.Appendf(nil,
 					`
 						import EVM from %s
 						import FungibleToken from %s
@@ -339,7 +339,7 @@ func (l *EVMBatchTransferLoad) setupTransaction(
 					sc.FungibleToken.Address.HexWithPrefix(),
 					sc.FlowToken.Address.HexWithPrefix(),
 					l.bridgedAcountAddress.Hex(),
-				)))
+				))
 
 			err = txBody.AddArgument(eoa.addressArg)
 			if err != nil {
@@ -381,7 +381,7 @@ func (l *EVMBatchTransferLoad) transferTransaction(
 			batchCount := int(l.TransfersPerTransaction)
 
 			txBytes := make([]cadence.Value, batchCount)
-			for i := 0; i < batchCount; i++ {
+			for i := range batchCount {
 
 				EVMBatchTx := types.NewTx(&types.LegacyTx{Nonce: nonce + uint64(i), To: &to, Value: amount, Gas: params.TxGas, GasPrice: gasPrice, Data: nil})
 
@@ -411,7 +411,7 @@ func (l *EVMBatchTransferLoad) transferTransaction(
 
 			sc := systemcontracts.SystemContractsForChain(lc.ChainID)
 			txBody := flowsdk.NewTransaction().
-				SetScript([]byte(fmt.Sprintf(
+				SetScript(fmt.Appendf(nil,
 					`
 import EVM from %s
 import FungibleToken from %s
@@ -427,7 +427,7 @@ transaction(txs: [[UInt8]], address: [UInt8; 20]) {
 					sc.EVMContract.Address.HexWithPrefix(),
 					sc.FungibleToken.Address.HexWithPrefix(),
 					sc.FlowToken.Address.HexWithPrefix(),
-				)))
+				))
 
 			err := txBody.AddArgument(txs)
 			if err != nil {

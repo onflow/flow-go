@@ -236,11 +236,11 @@ func runTestFollowerHappyPath(t *testing.T) {
 		submittingBlocks := atomic.NewBool(true)
 		var wg sync.WaitGroup
 		wg.Add(workers)
-		for i := 0; i < workers; i++ {
+		for i := range workers {
 			go func(blocks []*flow.Proposal) {
 				defer wg.Done()
 				for submittingBlocks.Load() {
-					for batch := 0; batch < batchesPerWorker; batch++ {
+					for batch := range batchesPerWorker {
 						engine.OnSyncedBlocks(flow.Slashable[[]*flow.Proposal]{
 							OriginID: originID,
 							Message:  blocks[batch*blocksPerBatch : (batch+1)*blocksPerBatch],

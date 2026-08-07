@@ -580,7 +580,7 @@ func (cs *CoreSuite) TestProposalBufferingOrder() {
 	// create a chain of descendants
 	var proposals []*flow.Proposal
 	parent := missingProposal
-	for i := 0; i < 3; i++ {
+	for range 3 {
 		descendant := unittest.BlockWithParentFixture(parent.Block.ToHeader())
 		proposal := unittest.ProposalFromBlock(descendant)
 		proposals = append(proposals, proposal)

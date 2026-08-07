@@ -14,7 +14,7 @@ var _ commands.AdminCommand = (*SetLogLevelCommand)(nil)
 
 type SetLogLevelCommand struct{}
 
-func (s *SetLogLevelCommand) Handler(_ context.Context, req *admin.CommandRequest) (interface{}, error) {
+func (s *SetLogLevelCommand) Handler(_ context.Context, req *admin.CommandRequest) (any, error) {
 	level := req.ValidatorData.(zerolog.Level)
 	zerolog.SetGlobalLevel(level)
 

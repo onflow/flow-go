@@ -39,7 +39,7 @@ func (s *BlockHeadersProviderSuite) TestBlockHeadersDataProvider_HappyPath() {
 		BlockHeadersTopic,
 		s.factory,
 		s.validBlockHeadersArgumentsTestCases(),
-		func(dataChan chan interface{}) {
+		func(dataChan chan any) {
 			for _, block := range s.blocks {
 				dataChan <- block.ToHeader()
 			}
@@ -51,7 +51,7 @@ func (s *BlockHeadersProviderSuite) TestBlockHeadersDataProvider_HappyPath() {
 // validBlockHeadersArgumentsTestCases defines test happy cases for block headers data providers.
 // Each test case specifies input arguments, and setup functions for the mock API used in the test.
 func (s *BlockHeadersProviderSuite) validBlockHeadersArgumentsTestCases() []testType {
-	expectedResponses := make([]interface{}, len(s.blocks))
+	expectedResponses := make([]any, len(s.blocks))
 	for i, b := range s.blocks {
 		var header commonmodels.BlockHeader
 		header.Build(b.ToHeader())
@@ -113,7 +113,7 @@ func (s *BlockHeadersProviderSuite) validBlockHeadersArgumentsTestCases() []test
 }
 
 // requireBlockHeaders ensures that the received block header information matches the expected data.
-func (s *BlockHeadersProviderSuite) requireBlockHeader(actual interface{}, expected interface{}) {
+func (s *BlockHeadersProviderSuite) requireBlockHeader(actual any, expected any) {
 	expectedResponse, expectedResponsePayload := extractPayload[*commonmodels.BlockHeader](s.T(), expected)
 	actualResponse, actualResponsePayload := extractPayload[*commonmodels.BlockHeader](s.T(), actual)
 
@@ -125,7 +125,7 @@ func (s *BlockHeadersProviderSuite) requireBlockHeader(actual interface{}, expec
 // when invalid arguments are provided. It verifies that appropriate errors are returned
 // for missing or conflicting arguments.
 func (s *BlockHeadersProviderSuite) TestBlockHeadersDataProvider_InvalidArguments() {
-	send := make(chan interface{})
+	send := make(chan any)
 	topic := BlockHeadersTopic
 
 	for _, test := range s.invalidArgumentsTestCases() {

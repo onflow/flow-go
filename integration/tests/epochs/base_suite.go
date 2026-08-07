@@ -154,9 +154,9 @@ func (s *BaseSuite) Ghost() *client.GhostClient {
 
 // TimedLogf logs the message using t.Log and the suite logger, but prefixes the current time.
 // This enables viewing logs inline with Docker logs as well as other test logs.
-func (s *BaseSuite) TimedLogf(msg string, args ...interface{}) {
+func (s *BaseSuite) TimedLogf(msg string, args ...any) {
 	s.Log.Info().Msgf(msg, args...)
-	args = append([]interface{}{time.Now().String()}, args...)
+	args = append([]any{time.Now().String()}, args...)
 	s.T().Logf("%s - "+msg, args...)
 }
 

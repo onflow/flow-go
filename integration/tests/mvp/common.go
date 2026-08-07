@@ -84,7 +84,7 @@ func RunMVPTest(t *testing.T, ctx context.Context, net *testnet.FlowNetwork, acc
 
 	// Generate the fund account transaction (so account can be used as a payer)
 	fundAccountTx := sdk.NewTransaction().
-		SetScript([]byte(fmt.Sprintf(`
+		SetScript(fmt.Appendf(nil, `
 			import FungibleToken from 0x%s
 			import FlowToken from 0x%s
 
@@ -104,7 +104,7 @@ func RunMVPTest(t *testing.T, ctx context.Context, net *testnet.FlowNetwork, acc
 			}`,
 			sc.FungibleToken.Address.Hex(),
 			sc.FlowToken.Address.Hex(),
-		))).
+		)).
 		AddAuthorizer(serviceAddress).
 		SetReferenceBlockID(sdk.Identifier(latestBlockID)).
 		SetProposalKey(serviceAddress, 0, serviceAccountClient.GetAndIncrementSeqNumber()).

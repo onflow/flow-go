@@ -26,7 +26,7 @@ func TestEmptyTrieQueue(t *testing.T) {
 	var savedTries []*trie.MTrie
 
 	// Push tries to queue to fill out capacity
-	for i := 0; i < capacity; i++ {
+	for range capacity {
 		trie, err := randomMTrie()
 		require.NoError(t, err)
 
@@ -40,7 +40,7 @@ func TestEmptyTrieQueue(t *testing.T) {
 	}
 
 	// Push more tries to queue to overwrite older elements
-	for i := 0; i < capacity; i++ {
+	for range capacity {
 		trie, err := randomMTrie()
 		require.NoError(t, err)
 
@@ -69,7 +69,7 @@ func TestTrieQueueWithInitialValues(t *testing.T) {
 	for initialValueCount := 1; initialValueCount <= capacity+1; initialValueCount++ {
 
 		initialValues := make([]*trie.MTrie, initialValueCount)
-		for i := 0; i < len(initialValues); i++ {
+		for i := range initialValues {
 			tr, err := randomMTrie()
 			require.NoError(t, err)
 			initialValues[i] = tr
@@ -109,7 +109,7 @@ func TestTrieQueueWithInitialValues(t *testing.T) {
 		}
 
 		// Push more tries to queue to overwrite older elements.
-		for i := 0; i < capacity; i++ {
+		for range capacity {
 			trie, err := randomMTrie()
 			require.NoError(t, err)
 

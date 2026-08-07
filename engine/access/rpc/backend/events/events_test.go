@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"math"
+	"slices"
 	"sort"
 	"testing"
 
@@ -95,7 +96,7 @@ func (s *EventsSuite) SetupTest() {
 	s.blocks = make([]*flow.Block, blockCount)
 	s.blockIDs = make([]flow.Identifier, blockCount)
 
-	for i := 0; i < blockCount; i++ {
+	for i := range blockCount {
 		var header *flow.Header
 		if i == 0 {
 			header = unittest.BlockHeaderFixture()
@@ -137,10 +138,8 @@ func (s *EventsSuite) SetupTest() {
 	})
 
 	s.events.On("ByBlockID", mock.Anything).Return(func(blockID flow.Identifier) ([]flow.Event, error) {
-		for _, headerID := range s.blockIDs {
-			if blockID == headerID {
-				return returnBlockEvents, nil
-			}
+		if slices.Contains(s.blockIDs, blockID) {
+			return returnBlockEvents, nil
 		}
 		return nil, storage.ErrNotFound
 	}).Maybe()

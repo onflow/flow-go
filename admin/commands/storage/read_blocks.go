@@ -25,7 +25,7 @@ type ReadBlocksCommand struct {
 	blocks storage.Blocks
 }
 
-func (r *ReadBlocksCommand) Handler(ctx context.Context, req *admin.CommandRequest) (interface{}, error) {
+func (r *ReadBlocksCommand) Handler(ctx context.Context, req *admin.CommandRequest) (any, error) {
 	data := req.ValidatorData.(*readBlocksRequest)
 	var result []*flow.Block
 	var blockID flow.Identifier
@@ -56,7 +56,7 @@ func (r *ReadBlocksCommand) Handler(ctx context.Context, req *admin.CommandReque
 // Validator validates the request.
 // Returns admin.InvalidAdminReqError for invalid/malformed requests.
 func (r *ReadBlocksCommand) Validator(req *admin.CommandRequest) error {
-	input, ok := req.Data.(map[string]interface{})
+	input, ok := req.Data.(map[string]any)
 	if !ok {
 		return admin.NewInvalidAdminReqFormatError("expected map[string]any")
 	}

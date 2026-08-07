@@ -92,12 +92,12 @@ func TestGetCollections(t *testing.T) {
 		// really hacky but we can't build whole response since it's really complex
 		// so we just make sure the transactions are included and have defined values
 		// anyhow we already test transaction responses in transaction tests
-		var res map[string]interface{}
+		var res map[string]any
 		err := json.Unmarshal(rr.Body.Bytes(), &res)
 		assert.NoError(t, err)
-		resTx := res["transactions"].([]interface{})
+		resTx := res["transactions"].([]any)
 		for i, r := range resTx {
-			c := r.(map[string]interface{})
+			c := r.(map[string]any)
 			assert.Equal(t, transactions[i].ID().String(), c["id"])
 			assert.NotNil(t, c["envelope_signatures"])
 		}

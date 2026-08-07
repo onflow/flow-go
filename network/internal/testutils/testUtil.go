@@ -131,7 +131,7 @@ func LibP2PNodeForNetworkFixture(t *testing.T, sporkId flow.Identifier, n int, o
 	idProvider := unittest.NewUpdatableIDProvider(flow.IdentityList{})
 	opts = append(opts, p2ptest.WithUnicastHandlerFunc(nil))
 
-	for i := 0; i < n; i++ {
+	for range n {
 		node, nodeId := p2ptest.NodeFixture(t,
 			sporkId,
 			t.Name(),
@@ -155,7 +155,7 @@ func NetworksFixture(t *testing.T,
 	nets := make([]*underlay.Network, 0)
 	idProviders := make([]*unittest.UpdatableIDProvider, 0)
 
-	for i := 0; i < count; i++ {
+	for i := range count {
 		idProvider := unittest.NewUpdatableIDProvider(ids)
 		params := NetworkConfigFixture(t, *ids[i], idProvider, sporkId, libp2pNodes[i])
 

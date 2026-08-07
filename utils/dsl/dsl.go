@@ -77,11 +77,11 @@ func (i Import) ToCadence() string {
 type Imports []Import
 
 func (i Imports) ToCadence() string {
-	imports := ""
+	var imports strings.Builder
 	for _, imp := range i {
-		imports += imp.ToCadence()
+		imports.WriteString(imp.ToCadence())
 	}
-	return imports
+	return imports.String()
 }
 
 type SetAccountCode struct {

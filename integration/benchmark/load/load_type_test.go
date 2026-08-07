@@ -119,7 +119,7 @@ func testLoad(log zerolog.Logger, l load.Load) func(t *testing.T) {
 
 		err = l.Setup(log, lc)
 		require.NoError(t, err)
-		for i := 0; i < 100; i++ {
+		for range 100 {
 			err = l.Load(log, lc)
 			require.NoError(t, err)
 		}

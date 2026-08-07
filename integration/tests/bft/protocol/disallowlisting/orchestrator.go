@@ -92,7 +92,7 @@ func (a *Orchestrator) trackIngressEvents(event *insecure.IngressEvent) error {
 // sendAuthorizedMsgs publishes a number of authorized messages from the senderVN. Authorized messages are messages
 // that are sent before the senderVN is disallow-listed.
 func (a *Orchestrator) sendAuthorizedMsgs(t *testing.T) {
-	for i := 0; i < numOfAuthorizedEvents; i++ {
+	for range numOfAuthorizedEvents {
 		event := bft.RequestChunkDataPackEgressFixture(a.T, a.senderVN, a.receiverEN, insecure.Protocol_PUBLISH)
 		err := a.OrchestratorNetwork.SendEgress(event)
 		require.NoError(t, err)
@@ -104,7 +104,7 @@ func (a *Orchestrator) sendAuthorizedMsgs(t *testing.T) {
 // sendExpectedBlockedMsgs publishes a number of unauthorized messages. Unauthorized messages are messages that are sent
 // after the senderVN is blocked via the admin disallow-listed command. These messages are not expected to be received.
 func (a *Orchestrator) sendExpectedBlockedMsgs(t *testing.T) {
-	for i := 0; i < numOfUnauthorizedEvents; i++ {
+	for range numOfUnauthorizedEvents {
 		event := bft.RequestChunkDataPackEgressFixture(a.T, a.senderVN, a.receiverEN, insecure.Protocol_PUBLISH)
 		err := a.OrchestratorNetwork.SendEgress(event)
 		require.NoError(t, err)

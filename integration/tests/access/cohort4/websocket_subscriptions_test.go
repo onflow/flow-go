@@ -737,7 +737,7 @@ func (s *WebsocketSubscriptionSuite) testSubscriptionMultiplexing() {
 	unsubscribeResponses := make([]models.UnsubscribeMessageResponse, 0)
 	messageBuckets := make(map[string][]dpmodels.BaseDataProvidersResponse)
 
-	parseResponse := func(t *testing.T, msg json.RawMessage) (string, interface{}) {
+	parseResponse := func(t *testing.T, msg json.RawMessage) (string, any) {
 		var message models.BaseMessageResponse
 		err := json.Unmarshal(msg, &message)
 		s.Require().NoError(err, "failed to unmarshal message")

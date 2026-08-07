@@ -21,14 +21,14 @@ func NewMsgState() *MsgState {
 	return &MsgState{}
 }
 
-func (ms *MsgState) Add(sender flow.Identifier, msg interface{}) {
-	var list []interface{}
+func (ms *MsgState) Add(sender flow.Identifier, msg any) {
+	var list []any
 	value, ok := ms.msgs.Load(sender)
 
 	if !ok {
-		list = make([]interface{}, 0)
+		list = make([]any, 0)
 	} else {
-		list = value.([]interface{})
+		list = value.([]any)
 	}
 
 	list = append(list, msg)
@@ -36,12 +36,12 @@ func (ms *MsgState) Add(sender flow.Identifier, msg interface{}) {
 }
 
 // From returns a slice with all the msgs received from the given node and a boolean whether any messages existed
-func (ms *MsgState) From(node flow.Identifier) ([]interface{}, bool) {
+func (ms *MsgState) From(node flow.Identifier) ([]any, bool) {
 	msgs, ok := ms.msgs.Load(node)
 	if !ok {
 		return nil, ok
 	}
-	return msgs.([]interface{}), ok
+	return msgs.([]any), ok
 }
 
 // LenFrom returns the number of msgs received from the given node
@@ -51,16 +51,16 @@ func (ms *MsgState) LenFrom(node flow.Identifier) int {
 		return 0
 	}
 
-	return len(msgs.([]interface{}))
+	return len(msgs.([]any))
 }
 
 // WaitForMsgFrom waits for a msg satisfying the predicate from the given node and returns it
-func (ms *MsgState) WaitForMsgFrom(t *testing.T, predicate func(msg interface{}) bool, node flow.Identifier, msg string) interface{} {
-	var m interface{}
+func (ms *MsgState) WaitForMsgFrom(t *testing.T, predicate func(msg any) bool, node flow.Identifier, msg string) any {
+	var m any
 	i := 0
 	require.Eventually(t, func() bool {
 		if value, ok := ms.msgs.Load(node); ok {
-			list := value.([]interface{})
+			list := value.([]any)
 			for ; i < len(list); i++ {
 				if predicate(list[i]) {
 					m = list[i]
@@ -76,7 +76,7 @@ func (ms *MsgState) WaitForMsgFrom(t *testing.T, predicate func(msg interface{})
 	return m
 }
 
-func MsgIsChunkDataPackResponse(msg interface{}) bool {
+func MsgIsChunkDataPackResponse(msg any) bool {
 	_, ok := msg.(*flow.ChunkDataResponse)
 	return ok
 }

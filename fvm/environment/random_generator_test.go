@@ -26,7 +26,7 @@ func TestRandomGenerator(t *testing.T) {
 			randomSourceHistoryProvider,
 			txId)
 		numbers := make([]uint64, N)
-		for i := 0; i < N; i++ {
+		for i := range N {
 			var buffer [8]byte
 			err := urg.ReadRandom(buffer[:])
 			require.NoError(t, err)
@@ -38,7 +38,7 @@ func TestRandomGenerator(t *testing.T) {
 	// basic randomness test to check outputs are "uniformly" spread over the
 	// output space
 	t.Run("randomness test", func(t *testing.T) {
-		for i := 0; i < 10; i++ {
+		for range 10 {
 			txId := unittest.TransactionFixture().ID()
 			urg := environment.NewRandomGenerator(
 				tracing.NewTracerSpan(),
@@ -62,7 +62,7 @@ func TestRandomGenerator(t *testing.T) {
 
 	// tests that has deterministic outputs.
 	t.Run("PRG-based Random", func(t *testing.T) {
-		for i := 0; i < 10; i++ {
+		for range 10 {
 			txId := unittest.TransactionFixture().ID()
 			N := 100
 			r1 := getRandoms(txId[:], N)
@@ -73,7 +73,7 @@ func TestRandomGenerator(t *testing.T) {
 
 	t.Run("transaction specific randomness", func(t *testing.T) {
 		txns := [][]uint64{}
-		for i := 0; i < 10; i++ {
+		for range 10 {
 			txId := unittest.TransactionFixture().ID()
 			N := 2
 			txns = append(txns, getRandoms(txId[:], N))

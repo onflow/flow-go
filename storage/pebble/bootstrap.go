@@ -139,7 +139,7 @@ func (b *RegisterBootstrap) IndexCheckpointFile(ctx context.Context, workerCount
 
 	start := time.Now()
 	b.log.Info().Msgf("indexing registers from checkpoint with %v worker", workerCount)
-	for i := 0; i < workerCount; i++ {
+	for range workerCount {
 		g.Go(func() error {
 			return b.indexCheckpointFileWorker(gCtx)
 		})

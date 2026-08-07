@@ -169,7 +169,7 @@ func NewComplianceLayer(
 		<-e.core.Done()
 	})
 
-	for i := 0; i < defaultBatchProcessingWorkers; i++ {
+	for range defaultBatchProcessingWorkers {
 		cmBuilder.AddWorker(e.processConnectedBatch)
 	}
 	e.ComponentManager = cmBuilder.Build()
@@ -227,7 +227,7 @@ func (e *ComplianceEngine) onFinalizedBlock(block *model.Block) {
 //
 // Some of the current error returns signal Byzantine behavior, such as forged or malformed
 // messages. These cases must be logged and routed to a dedicated violation reporting consumer.
-func (e *ComplianceEngine) Process(channel channels.Channel, originID flow.Identifier, message interface{}) error {
+func (e *ComplianceEngine) Process(channel channels.Channel, originID flow.Identifier, message any) error {
 	switch msg := message.(type) {
 	case *flow.Proposal:
 		e.OnBlockProposal(flow.Slashable[*flow.Proposal]{

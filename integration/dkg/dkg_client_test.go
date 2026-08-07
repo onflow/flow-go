@@ -167,7 +167,7 @@ func (s *ClientSuite) TestSubmitResult() {
 	numberOfNodes := len(participants)
 	publicKeys := make([]crypto.PublicKey, 0, numberOfNodes)
 	indexMap := make(flow.DKGIndexMap, numberOfNodes)
-	for i := 0; i < numberOfNodes; i++ {
+	for i := range numberOfNodes {
 		privateKey := unittest.KeyFixture(crypto.BLSBLS12381)
 		publicKeys = append(publicKeys, privateKey.PublicKey())
 		indexMap[participants[i]] = i

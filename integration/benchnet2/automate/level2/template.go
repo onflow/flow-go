@@ -31,7 +31,7 @@ func (t *Template) Apply(outputPath string) string {
 	// map any json data to array of maps, so it can be decoded by template engine -
 	// this avoids the use of structs, so we can represent any arbitrary data
 	// https://stackoverflow.com/a/38437140/5719544
-	var dataMap []map[string]interface{}
+	var dataMap []map[string]any
 	if err := json.Unmarshal([]byte(dataBytes), &dataMap); err != nil {
 		log.Fatal(err)
 	}

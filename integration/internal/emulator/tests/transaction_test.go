@@ -355,7 +355,7 @@ func TestSubmitTransaction_Invalid(t *testing.T) {
 		require.NoError(t, err)
 
 		// commit blocks until expiry window is exceeded
-		for i := 0; i < expiry+1; i++ {
+		for range expiry + 1 {
 			_, _, err := b.ExecuteAndCommitBlock()
 			require.NoError(t, err)
 		}
@@ -1009,13 +1009,13 @@ func TestSubmitTransaction_Arguments(t *testing.T) {
 	}
 
 	var script = func(argType cadence.Type) []byte {
-		return []byte(fmt.Sprintf(`
+		return fmt.Appendf(nil, `
             transaction(x: %s) {
               execute {
                 log(x)
               }
             }
-		`, argType.ID()))
+		`, argType.ID())
 	}
 
 	for _, tt := range tests {
@@ -1351,7 +1351,7 @@ func TestGetTxByBlockIDMethods(t *testing.T) {
 	submittedTx := make([]*flowsdk.Transaction, 0)
 
 	// submit 5 tx to be executed in a single block
-	for i := uint64(0); i < 5; i++ {
+	for range uint64(5) {
 		tx := flowsdk.NewTransaction().
 			SetScript([]byte(code)).
 			SetComputeLimit(flowgo.DefaultMaxTransactionGasLimit).
@@ -1496,7 +1496,7 @@ func TestHelloWorld_NewAccount(t *testing.T) {
 
 	accountKey = account.Keys[0]
 
-	callHelloCode := []byte(fmt.Sprintf(callHelloTxTemplate, newAccountAddress.Hex()))
+	callHelloCode := fmt.Appendf(nil, callHelloTxTemplate, newAccountAddress.Hex())
 	callHelloTx := flowsdk.NewTransaction().
 		SetComputeLimit(flowgo.DefaultMaxTransactionGasLimit).
 		SetScript(callHelloCode).
@@ -1622,7 +1622,7 @@ func TestHelloWorld_UpdateAccount(t *testing.T) {
 
 	accountKey.SequenceNumber++
 
-	callHelloCode := []byte(fmt.Sprintf(callHelloTxTemplate, newAccountAddress.Hex()))
+	callHelloCode := fmt.Appendf(nil, callHelloTxTemplate, newAccountAddress.Hex())
 	callHelloTx := flowsdk.NewTransaction().
 		SetComputeLimit(flowgo.DefaultMaxTransactionGasLimit).
 		SetScript(callHelloCode).
@@ -2015,7 +2015,7 @@ func TestTransactionWithCadenceRandom(t *testing.T) {
 
 func TestEVMTransaction(t *testing.T) {
 	serviceAddr := flowgo.Emulator.Chain().ServiceAddress()
-	code := []byte(fmt.Sprintf(
+	code := fmt.Appendf(nil,
 		`
 		import EVM from %s
 
@@ -2027,7 +2027,7 @@ func TestEVMTransaction(t *testing.T) {
 		}
 	 `,
 		serviceAddr.HexWithPrefix(),
-	))
+	)
 
 	b, adapter := setupTransactionTests(t)
 	serviceAccountAddress := flowsdk.Address(b.ServiceKey().Address)

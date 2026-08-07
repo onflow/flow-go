@@ -29,7 +29,7 @@ func TestBlockHashList(t *testing.T) {
 			require.Equal(t, gethCommon.Hash{}, h)
 
 			// first add blocks for the full range of capacity
-			for i := 0; i < capacity; i++ {
+			for i := range capacity {
 				err := bhl.Push(uint64(i), gethCommon.Hash{byte(i)})
 				require.NoError(t, err)
 				require.Equal(t, uint64(0), bhl.MinAvailableHeight())
@@ -40,7 +40,7 @@ func TestBlockHashList(t *testing.T) {
 			}
 
 			// check the value for all of them
-			for i := 0; i < capacity; i++ {
+			for i := range capacity {
 				found, h, err := bhl.BlockHashByHeight(uint64(i))
 				require.NoError(t, err)
 				require.True(t, found)
@@ -58,7 +58,7 @@ func TestBlockHashList(t *testing.T) {
 				require.Equal(t, uint64(i), bhl.MaxAvailableHeight())
 			}
 			// check that old block has been replaced
-			for i := 0; i < 3; i++ {
+			for i := range 3 {
 				found, _, err := bhl.BlockHashByHeight(uint64(i))
 				require.NoError(t, err)
 				require.False(t, found)

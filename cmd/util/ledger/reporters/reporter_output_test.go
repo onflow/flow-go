@@ -59,12 +59,10 @@ func TestReportFileWriterJSONArray(t *testing.T) {
 		rw := reporters.NewReportFileWriter(filename, log, reporters.ReportFormatJSONArray)
 
 		wg := &sync.WaitGroup{}
-		for i := 0; i < 3; i++ {
-			wg.Add(1)
-			go func() {
+		for range 3 {
+			wg.Go(func() {
 				rw.Write(testData{TestField: "something"})
-				wg.Done()
-			}()
+			})
 		}
 
 		wg.Wait()
@@ -126,12 +124,10 @@ func TestReportFileWriterJSONL(t *testing.T) {
 		rw := reporters.NewReportFileWriter(filename, log, reporters.ReportFormatJSONL)
 
 		wg := &sync.WaitGroup{}
-		for i := 0; i < 3; i++ {
-			wg.Add(1)
-			go func() {
+		for range 3 {
+			wg.Go(func() {
 				rw.Write(testData{TestField: "something"})
-				wg.Done()
-			}()
+			})
 		}
 
 		wg.Wait()
@@ -190,12 +186,10 @@ func TestReportFileWriterCSV(t *testing.T) {
 		rw := reporters.NewReportFileWriter(filename, log, reporters.ReportFormatCSV)
 
 		wg := &sync.WaitGroup{}
-		for i := 0; i < 3; i++ {
-			wg.Add(1)
-			go func() {
+		for range 3 {
+			wg.Go(func() {
 				rw.Write([]string{"something"})
-				wg.Done()
-			}()
+			})
 		}
 
 		wg.Wait()

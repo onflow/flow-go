@@ -40,19 +40,15 @@ func NewWorker(
 }
 
 func (w *Worker) Start() {
-	w.wg.Add(1)
 
-	go func() {
-		defer w.wg.Done()
+	w.wg.Go(func() {
 
 		t := time.NewTicker(w.interval)
 		defer t.Stop()
 		for {
-			w.wg.Add(1)
-			go func() {
-				defer w.wg.Done()
+			w.wg.Go(func() {
 				w.work(w.workerID)
-			}()
+			})
 
 			select {
 			case <-w.ctx.Done():
@@ -60,7 +56,7 @@ func (w *Worker) Start() {
 			case <-t.C:
 			}
 		}
-	}()
+	})
 }
 
 func (w *Worker) Stop() {

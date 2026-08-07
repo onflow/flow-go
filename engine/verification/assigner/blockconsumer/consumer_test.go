@@ -52,7 +52,7 @@ func TestProduceConsume(t *testing.T) {
 		withConsumer(t, 10, 3, neverFinish, func(consumer *blockconsumer.BlockConsumer, blocks []*flow.Block, followerDistributor *pubsub.FollowerDistributor) {
 			unittest.RequireCloseBefore(t, consumer.Ready(), time.Second, "could not start consumer")
 
-			for i := 0; i < len(blocks); i++ {
+			for range blocks {
 				// consumer is only required to be "notified" that a new finalized block available.
 				// It keeps track of the last finalized block it has read, and read the next height upon
 				// getting notified as follows:
@@ -93,7 +93,7 @@ func TestProduceConsume(t *testing.T) {
 			}()
 			processAll.Add(len(blocks))
 
-			for i := 0; i < len(blocks); i++ {
+			for range blocks {
 				// consumer is only required to be "notified" that a new finalized block available.
 				// It keeps track of the last finalized block it has read, and read the next height upon
 				// getting notified as follows:

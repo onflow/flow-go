@@ -94,13 +94,13 @@ func TestFungibleTokenTracker(t *testing.T) {
 		}
 	}`, sc.FungibleToken.Address.Hex())
 
-	deployingTestContractScript := []byte(fmt.Sprintf(`
+	deployingTestContractScript := fmt.Appendf(nil, `
 	transaction {
 		prepare(signer: auth(AddContract) &Account) {
 				signer.contracts.add(name: "%s", code: "%s".decodeHex())
 		}
 	}
-	`, "WrappedToken", hex.EncodeToString([]byte(testContract))))
+	`, "WrappedToken", hex.EncodeToString([]byte(testContract)))
 
 	txBody, err := flow.NewTransactionBodyBuilder().
 		SetScript(deployingTestContractScript).
@@ -117,7 +117,7 @@ func TestFungibleTokenTracker(t *testing.T) {
 	err = view.Merge(snapshot)
 	require.NoError(t, err)
 
-	wrapTokenScript := []byte(fmt.Sprintf(
+	wrapTokenScript := fmt.Appendf(nil,
 		`
 							import FungibleToken from 0x%s
 							import FlowToken from 0x%s
@@ -136,7 +136,7 @@ func TestFungibleTokenTracker(t *testing.T) {
 		sc.FungibleToken.Address.Hex(),
 		sc.FlowToken.Address.Hex(),
 		sc.FlowServiceAccount.Address.Hex(),
-	))
+	)
 
 	txBody, err = flow.NewTransactionBodyBuilder().
 		SetScript(wrapTokenScript).

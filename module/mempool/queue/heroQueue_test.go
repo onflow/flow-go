@@ -37,7 +37,7 @@ func TestHeroQueue_Sequential(t *testing.T) {
 	}
 
 	// once queue meets the size limit, any extra push should fail.
-	for i := 0; i < 100; i++ {
+	for range 100 {
 		entity := unittest.MockEntityFixture()
 		require.False(t, q.Push(entity.Identifier, entity))
 
@@ -73,7 +73,6 @@ func TestHeroQueue_Concurrent(t *testing.T) {
 	entities := unittest.EntityListFixture(uint(sizeLimit))
 	// pushing entities concurrently.
 	for _, e := range entities {
-		e := e // suppress loop variable
 		go func() {
 			require.True(t, q.Push(e.Identifier, e))
 			pushWG.Done()
@@ -83,7 +82,7 @@ func TestHeroQueue_Concurrent(t *testing.T) {
 
 	// once queue meets the size limit, any extra push should fail.
 	pushWG.Add(sizeLimit)
-	for i := 0; i < sizeLimit; i++ {
+	for range sizeLimit {
 		go func() {
 			entity := unittest.MockEntityFixture()
 			require.False(t, q.Push(entity.Identifier, entity))
@@ -97,7 +96,7 @@ func TestHeroQueue_Concurrent(t *testing.T) {
 	matchLock := &sync.Mutex{}
 
 	// pop-ing entities concurrently.
-	for i := 0; i < sizeLimit; i++ {
+	for range sizeLimit {
 		go func() {
 			popedE, ok := q.Pop()
 			require.True(t, ok)
