@@ -2,6 +2,7 @@ package p2ptest_test
 
 import (
 	"context"
+	"net"
 	"testing"
 	"time"
 
@@ -40,6 +41,21 @@ import (
 
 // TestCrosstalkPreventionOnNetworkKeyChange tests that a node from the old chain cannot talk to a node in the new chain
 // if it's network key is updated while the libp2p protocol ID remains the same
+// requireAddressReleased waits until the given address can be bound again. The libp2p
+// component's Done signal does not guarantee the OS has released the listener socket yet,
+// so re-binding the same address immediately after stopping a node can race the socket
+// release and fail with "address already in use".
+func requireAddressReleased(t *testing.T, address string) {
+	require.Eventually(t, func() bool {
+		l, err := net.Listen("tcp4", address)
+		if err != nil {
+			return false
+		}
+		_ = l.Close()
+		return true
+	}, 10*time.Second, 50*time.Millisecond, "address %s was not released in time", address)
+}
+
 func TestCrosstalkPreventionOnNetworkKeyChange(t *testing.T) {
 	idProvider := unittest.NewUpdatableIDProvider(flow.IdentityList{})
 	ctx, cancel := context.WithCancel(context.Background())
@@ -98,6 +114,7 @@ func TestCrosstalkPreventionOnNetworkKeyChange(t *testing.T) {
 	// Simulate a hard-spoon: node1 is on the old chain, but node2 is moved from the old chain to the new chain
 	// stop node 2 and start it again with a different networking key but on the same IP and port
 	p2ptest.StopNode(t, node2, cancel2)
+	requireAddressReleased(t, id2.Address)
 
 	// start node2 with the same name, ip and port but with the new key
 	node2keyNew := p2pfixtures.NetworkingKeyFixtures(t)
@@ -167,6 +184,7 @@ func TestOneToOneCrosstalkPrevention(t *testing.T) {
 	// Simulate a hard-spoon: node1 is on the old chain, but node2 is moved from the old chain to the new chain
 	// stop node 2 and start it again with a different libp2p protocol id to listen for
 	p2ptest.StopNode(t, node2, cancel2)
+	requireAddressReleased(t, id2.Address)
 
 	// start node2 with the same address and root key but different root block id
 	node2, id2New := p2ptest.NodeFixture(t,
