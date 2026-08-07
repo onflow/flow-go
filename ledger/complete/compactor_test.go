@@ -416,7 +416,6 @@ func TestCompactorSkipCheckpointing(t *testing.T) {
 func TestCompactorAccuracy(t *testing.T) {
 	t.Parallel()
 
-
 	const (
 		numInsPerStep      = 2
 		pathByteSize       = 32
@@ -533,7 +532,6 @@ func TestCompactorAccuracy(t *testing.T) {
 // to trigger checkpoint when current segment file is finished.
 func TestCompactorTriggeredByAdminTool(t *testing.T) {
 	t.Parallel()
-
 
 	const (
 		numInsPerStep      = 2 // the number of payloads in each trie update
