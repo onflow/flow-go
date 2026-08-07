@@ -529,7 +529,12 @@ func TestBLSHostFunctionsOnNonBLSKey(t *testing.T) {
 		t.Run("control: valid BLS keys", func(t *testing.T) {
 			keys := make([]*runtime.PublicKey, 0, 2)
 			for i := 0; i < 2; i++ {
-				sk, err := onflowCrypto.GeneratePrivateKey(onflowCrypto.BLSBLS12381, seed)
+				// use a distinct seed per key so the control case aggregates
+				// two different keys
+				keySeed := make([]byte, onflowCrypto.KeyGenSeedMinLen)
+				_, err := rand.Read(keySeed)
+				require.NoError(t, err)
+				sk, err := onflowCrypto.GeneratePrivateKey(onflowCrypto.BLSBLS12381, keySeed)
 				require.NoError(t, err)
 				keys = append(keys, &runtime.PublicKey{
 					PublicKey: sk.PublicKey().Encode(),

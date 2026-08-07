@@ -268,7 +268,9 @@ func VerifyPOP(pk *runtime.PublicKey, s crypto.Signature) (bool, error) {
 
 	key, err := crypto.DecodePublicKey(crypto.BLSBLS12381, pk.PublicKey)
 	if err != nil {
-		// invalid BLS bytes are a user error
+		// invalid BLS bytes are a user error; any other decode error is
+		// unexpected and escalated, unlike VerifySignatureFromRuntime which
+		// treats all decode errors as user errors
 		if crypto.IsInvalidInputsError(err) {
 			return false, errors.NewValueErrorf(hex.EncodeToString(pk.PublicKey), "cannot decode public key: %w", err)
 		}
@@ -319,7 +321,9 @@ func AggregatePublicKeys(keys []*runtime.PublicKey) (*runtime.PublicKey, error) 
 		// This requires exporting an unsafe function in the crypto package.
 		pk, err := crypto.DecodePublicKey(crypto.BLSBLS12381, key.PublicKey)
 		if err != nil {
-			// invalid BLS bytes are a user error
+			// invalid BLS bytes are a user error; any other decode error is
+			// unexpected and escalated, unlike VerifySignatureFromRuntime which
+			// treats all decode errors as user errors
 			if crypto.IsInvalidInputsError(err) {
 				return nil, errors.NewValueErrorf(hex.EncodeToString(key.PublicKey), "cannot decode public key: %w", err)
 			}
