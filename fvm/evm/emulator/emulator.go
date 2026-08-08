@@ -563,6 +563,21 @@ func (proc *procedure) deployAt(
 		), nil
 	}
 
+	// Execute the preparatory steps for state transition which includes:
+	// - prepare accessList(post-berlin)
+	// - reset transient storage(EIP-1153)
+	// - enable block-level accessList construction (EIP-7928)
+	rules := proc.config.ChainRules()
+	addr := call.To.ToCommon()
+	proc.state.Prepare(
+		rules,
+		call.From.ToCommon(),
+		proc.evm.Context.Coinbase,
+		&addr,
+		gethVM.ActivePrecompiles(rules),
+		gethTypes.AccessList{},
+	)
+
 	txHash := call.Hash()
 	res := &types.Result{
 		TxType: types.DirectCallTxType,
@@ -614,14 +629,13 @@ func (proc *procedure) deployAt(
 
 	// After Amsterdam we limit the regular gas to 16M, the state gas to the transaction limit
 	limit := call.GasLimit
-	if proc.config.ChainRules().IsAmsterdam {
+	if rules.IsAmsterdam {
 		limit = min(call.GasLimit, gethParams.MaxTxGas)
 	}
 	gasBudget := gethVM.NewGasBudget(limit, call.GasLimit-limit)
 
 	reservoir := gasBudget.StateGas
 
-	addr := call.To.ToCommon()
 	// update access list (Berlin)
 	proc.state.AddAddressToAccessList(addr)
 
@@ -655,7 +669,6 @@ func (proc *procedure) deployAt(
 	// acts inside that account.
 	proc.state.CreateContract(addr)
 	proc.state.SetNonce(addr, 1, gethTracing.NonceChangeNewContract) // (EIP-158)
-	rules := proc.config.ChainRules()
 	if call.Value.Sign() > 0 {
 		proc.evm.Context.Transfer( // transfer value
 			proc.state,
