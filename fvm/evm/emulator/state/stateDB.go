@@ -711,7 +711,7 @@ func (db *StateDB) Finalise(deleteEmptyObjects bool) *gethBAL.ConstructionBlockA
 		// Aggregate storage writes into the block-level access list.
 		// All slots in the dirtyStorage set must have post-transaction
 		// values that differ from their pre-transaction values.
-		if db.stateAccessList != nil {
+		if db.stateAccessList != nil && db.slotChange(slot, value) {
 			db.stateAccessList.StorageWrite(db.blockAccessIndex, address, slot.Key, value)
 		}
 	}
@@ -877,6 +877,13 @@ func (db *StateDB) codeChange(addr gethCommon.Address, current []byte) bool {
 	db.handleError(err)
 
 	return !bytes.Equal(code, current)
+}
+
+func (db *StateDB) slotChange(slot types.SlotAddress, current gethCommon.Hash) bool {
+	value, err := db.baseView.GetState(slot)
+	db.handleError(err)
+
+	return value != current
 }
 
 // set error captures the first non-nil error it is called with.
