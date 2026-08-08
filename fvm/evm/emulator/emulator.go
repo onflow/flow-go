@@ -612,7 +612,7 @@ func (proc *procedure) deployAt(
 		gethTracing.NonceChangeContractCreator,
 	)
 
-	// After Amsterdam we limit the regular gas to 16M, the data gas to the transaction limit
+	// After Amsterdam we limit the regular gas to 16M, the state gas to the transaction limit
 	limit := call.GasLimit
 	if proc.config.ChainRules().IsAmsterdam {
 		limit = min(call.GasLimit, gethParams.MaxTxGas)
