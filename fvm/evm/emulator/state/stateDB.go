@@ -662,7 +662,9 @@ func (db *StateDB) LogsForBurnAccounts() []*gethTypes.Log {
 
 	var list []removedAccountWithBalance
 	for addr := range dirtyAddresses {
-		hasSelfDestructed, balance := db.latestView().HasSelfDestructed(addr)
+		hasSelfDestructed, _ := db.latestView().HasSelfDestructed(addr)
+		balance, err := db.latestView().GetBalance(addr)
+		db.handleError(err)
 		if hasSelfDestructed && !balance.IsZero() {
 			list = append(list, removedAccountWithBalance{
 				address: addr,

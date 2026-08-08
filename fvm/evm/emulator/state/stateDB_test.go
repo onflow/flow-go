@@ -446,11 +446,6 @@ func TestStateDB(t *testing.T) {
 		// now calling selfdestruct should do the job
 		db.SelfDestruct(addr2)
 		require.NoError(t, db.Error())
-		burnLogs := db.LogsForBurnAccounts()
-		require.Len(t, burnLogs, 1)
-		ethBurnLog := burnLogs[0]
-		require.Equal(t, gethParams.EthBurnLogEvent, ethBurnLog.Topics[0])
-		require.Equal(t, gethCommon.BytesToHash(addr2.Bytes()), ethBurnLog.Topics[1])
 
 		commit, err = db.Commit(true)
 		require.NoError(t, err)
@@ -479,11 +474,6 @@ func TestStateDB(t *testing.T) {
 		// call self destruct
 		db.SelfDestruct(addr3)
 		require.NoError(t, db.Error())
-		burnLogs = db.LogsForBurnAccounts()
-		require.Len(t, burnLogs, 1)
-		ethBurnLog = burnLogs[0]
-		require.Equal(t, gethParams.EthBurnLogEvent, ethBurnLog.Topics[0])
-		require.Equal(t, gethCommon.BytesToHash(addr3.Bytes()), ethBurnLog.Topics[1])
 
 		// commit changes
 		commit, err = db.Commit(true)
@@ -498,6 +488,33 @@ func TestStateDB(t *testing.T) {
 		require.Empty(t, db.GetCode(addr3))
 		require.Equal(t, gethCommon.Hash{}, db.GetState(addr3, key))
 		require.NoError(t, db.Error())
+
+		// test 4 - create account, call self destruct and update balance
+		// afterwards, it should create logs for the burned account
+		db, err = state.NewStateDB(ledger, rootAddr)
+		require.NoError(t, err)
+		addr4 := testutils.RandomCommonAddress(t)
+		balance4 := uint256.NewInt(300)
+		key = testutils.RandomCommonHash(t)
+		value = testutils.RandomCommonHash(t)
+		db.CreateAccount(addr4)
+		db.CreateContract(addr4)
+		db.SetCode(addr4, code1, gethTracing.CodeChangeContractCreation)
+		db.SetState(addr4, key, value)
+
+		// call self destruct
+		db.SelfDestruct(addr4)
+		require.NoError(t, db.Error())
+
+		// send some value
+		db.AddBalance(addr4, balance4, gethTracing.BalanceChangeTransfer)
+		require.NoError(t, db.Error())
+
+		// assert the balance burning
+		burnLogs := db.LogsForBurnAccounts()
+		ethBurnLog := burnLogs[0]
+		require.Equal(t, gethParams.EthBurnLogEvent, ethBurnLog.Topics[0])
+		require.Equal(t, gethCommon.BytesToHash(addr4.Bytes()), ethBurnLog.Topics[1])
 	})
 
 	t.Run("test Finalise functionality", func(t *testing.T) {
