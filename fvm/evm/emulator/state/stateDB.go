@@ -799,7 +799,7 @@ func (db *StateDB) Prepare(rules gethParams.Rules, sender, coinbase gethCommon.A
 func (db *StateDB) Reset() {
 	db.views = []*DeltaView{NewDeltaView(db.baseView)}
 	db.cachedError = nil
-	// If Amsterdam is activated, we need to create a new state read list.
+	// If Amsterdam is activated, we need to create a new block access list.
 	// This method is mainly used to reset the state between EVM.batchRun
 	// transactions.
 	if db.stateAccessList != nil {
