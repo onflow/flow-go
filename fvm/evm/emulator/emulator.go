@@ -330,8 +330,8 @@ func (bl *BlockView) DryRunTransaction(
 	if overflow {
 		res.SetValidationError(
 			fmt.Errorf(
-				"%w: address %v, maxFeePerGas bit length: %d",
-				gethCore.ErrFeeCapVeryHigh,
+				"%w: address %v, gasPrice bit length: %d",
+				gethCore.ErrGasUintOverflow,
 				from.Hex(),
 				tx.GasPrice().BitLen(),
 			),
