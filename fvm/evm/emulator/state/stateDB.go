@@ -685,8 +685,12 @@ func (db *StateDB) LogsForBurnAccounts() []*gethTypes.Log {
 
 // This is a no-op for our custom implementation of the StateDB interface,
 // since Commit() already handles finalization and deletion of empty
-// objects.
+// objects. But it still produces a valid BAL, under Amsterdam.
 func (db *StateDB) Finalise(deleteEmptyObjects bool) *gethBAL.ConstructionBlockAccessList {
+	if db.stateAccessList == nil {
+		return nil
+	}
+
 	// iterate views and collect dirty addresses and slots
 	dirtyAddresses := make(map[gethCommon.Address]struct{})
 	dirtySlots := make(map[types.SlotAddress]gethCommon.Hash)
