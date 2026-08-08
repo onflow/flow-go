@@ -1121,9 +1121,9 @@ func (b *bootstrapExecutor) setupVMBridge(serviceAddress flow.Address, env *temp
 	}
 	_ = run(txBody, "failed to create COA in Service Account: %s")
 
-	// Arbitrary high gas limit that can be used for all the
-	// EVM transactions to ensure none of them run out of gas
-	gasLimit := 20_000_000
+	// Max gas limit cap that can be used for all the EVM
+	// transactions to ensure none of them run out of gas
+	gasLimit := 16_777_216
 	deploymentValue := 0.0
 
 	// Retrieve the factory bytecode from the JSON args
