@@ -36,7 +36,7 @@ jobs:
             go-version-file: ./go.mod
 
       - name: Install third-party vendor
-        run: go get github.com/nomad-software/vend
+        run: go install github.com/nomad-software/vend@v1.0.3
 
      # - name: set credentials for private repos
      #   run: rm -f ~/.gitconfig && git config --global url.https://$ORG_READER_USERNAME:$ORG_READER_PAT@github.com/.insteadOf https://github.com/ && cat ~/.gitconfig
