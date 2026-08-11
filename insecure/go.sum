@@ -894,8 +894,8 @@ github.com/onflow/boxo v0.0.0-20240201202436-f2477b92f483 h1:LpiQhTAfM9CAmNVEs0n
 github.com/onflow/boxo v0.0.0-20240201202436-f2477b92f483/go.mod h1:pIZgTWdm3k3pLF9Uq6MB8JEcW07UDwNJjlXW1HELW80=
 github.com/onflow/cadence v1.10.5 h1:Y5kk4aY70SpxJtG/Wd05+xvkUL6tvodeQjSxnXNq65A=
 github.com/onflow/cadence v1.10.5/go.mod h1:axaADpRs+qTlq5cdHBawCiJ7dgqusRbBqOPkyWUwUOo=
-github.com/onflow/crypto v0.26.1-0.20260805220104-ab90dbfecf36 h1:h94RrWfAnL7HlXPfbwuqcDElUL//Le1VUTmC1FLtOn0=
-github.com/onflow/crypto v0.26.1-0.20260805220104-ab90dbfecf36/go.mod h1:S5/xE4HLmnykt0giPP1C/ZhojezKHOKcbLE7Lzs5Im0=
+github.com/onflow/crypto v0.27.0 h1:6DqPMGBGTJ5TLHoFtBBh1uJXbStbzW1e4iA9oWuKTnY=
+github.com/onflow/crypto v0.27.0/go.mod h1:WKkt/5jDJDVBGiM8v3j4C1dl2y7CPsQIXE+ozIzm1NU=
 github.com/onflow/fixed-point v0.1.1 h1:j0jYZVO8VGyk1476alGudEg7XqCkeTVxb5ElRJRKS90=
 github.com/onflow/fixed-point v0.1.1/go.mod h1:gJdoHqKtToKdOZbvryJvDZfcpzC7d2fyWuo3ZmLtcGY=
 github.com/onflow/flow-core-contracts/lib/go/contracts v1.10.4 h1:tUmbvKlApxfLfguNj9UCvgIB9kxiYqdPbK/IGdKzINQ=
