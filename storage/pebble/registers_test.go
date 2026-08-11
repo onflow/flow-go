@@ -574,7 +574,7 @@ func TestRegisters_ByKeyPrefix_OwnerContainsSlash(t *testing.T) {
 
 	regs := map[flow.RegisterID]flow.RegisterValue{}
 	for i, addr := range []flow.Address{addrSlashFirst, addrSlashMiddle, addrSlashLast, addrPlain} {
-		regs[flow.ContractNamesRegisterID(addr)] = []byte(fmt.Sprintf("names%d", i))
+		regs[flow.ContractNamesRegisterID(addr)] = fmt.Appendf(nil, "names%d", i)
 	}
 	// a global register (empty owner) must not disturb the scan
 	globalReg := flow.RegisterID{Owner: "", Key: flow.AddressStateKey}

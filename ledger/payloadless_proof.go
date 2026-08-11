@@ -3,6 +3,7 @@ package ledger
 import (
 	"bytes"
 	"fmt"
+	"strings"
 
 	"github.com/onflow/flow-go/ledger/common/hash"
 )
@@ -36,11 +37,11 @@ func NewPayloadlessTrieProof() *PayloadlessTrieProof {
 }
 
 func (p *PayloadlessTrieProof) String() string {
-	flagStr := ""
+	var flagStr strings.Builder
 	for _, f := range p.Flags {
-		flagStr += fmt.Sprintf("%08b", f)
+		flagStr.WriteString(fmt.Sprintf("%08b", f))
 	}
-	proofStr := fmt.Sprintf("size: %d flags: %v\n", p.Steps, flagStr)
+	proofStr := fmt.Sprintf("size: %d flags: %v\n", p.Steps, flagStr.String())
 	leafHashStr := "nil"
 	if p.LeafHash != nil {
 		leafHashStr = fmt.Sprintf("%x", *p.LeafHash)

@@ -185,7 +185,7 @@ func TestEquivalence_ReadSinglePath(t *testing.T) {
 	}
 
 	// Non-existent paths: mtrie returns empty, payloadless returns nil.
-	for i := 0; i < 50; i++ {
+	for i := range 50 {
 		var p ledger.Path
 		// Choose a path that almost certainly isn't in the trie.
 		p[0] = byte(0xff)
@@ -211,7 +211,7 @@ func TestEquivalence_UnsafeRead(t *testing.T) {
 	// Build a query: half of the allocated paths plus some unallocated paths.
 	queryPaths := make([]ledger.Path, 0, len(paths)/2+50)
 	queryPaths = append(queryPaths, paths[:len(paths)/2]...)
-	for i := 0; i < 50; i++ {
+	for i := range 50 {
 		var p ledger.Path
 		p[0] = byte(0xff)
 		p[31] = byte(i)
@@ -269,7 +269,7 @@ func TestEquivalence_UnsafeProofs(t *testing.T) {
 	// Query a mix of allocated and unallocated paths.
 	queryPaths := make([]ledger.Path, 0, len(paths)/4+25)
 	queryPaths = append(queryPaths, paths[:len(paths)/4]...)
-	for i := 0; i < 25; i++ {
+	for i := range 25 {
 		var p ledger.Path
 		p[0] = byte(0xfe)
 		p[31] = byte(i)
@@ -346,7 +346,7 @@ func TestEquivalence_UnsafeProofs_NoPruning(t *testing.T) {
 	queryPaths := make([]ledger.Path, 0)
 	queryPaths = append(queryPaths, paths[numUnalloc:len(paths)/2]...)
 	queryPaths = append(queryPaths, paths[:numUnalloc]...)
-	for i := 0; i < 10; i++ {
+	for i := range 10 {
 		var p ledger.Path
 		p[0] = byte(0xfe)
 		p[31] = byte(i)
@@ -412,12 +412,12 @@ func TestEquivalence_RandomWalk(t *testing.T) {
 	pl := payloadless.NewEmptyMTrie()
 	live := make(map[ledger.Path][]byte)
 
-	for step := 0; step < steps; step++ {
+	for step := range steps {
 		updatePaths := make([]ledger.Path, 0, allocPerStep+unallocPerStep)
 		updateValues := make([][]byte, 0, allocPerStep+unallocPerStep)
 
 		// Allocate / update some registers.
-		for i := 0; i < allocPerStep; i++ {
+		for range allocPerStep {
 			var p ledger.Path
 			_, err := rand.Read(p[:])
 			require.NoError(t, err)

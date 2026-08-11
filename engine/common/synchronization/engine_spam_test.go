@@ -63,7 +63,7 @@ func (ss *SyncSuite) TestLoad_Process_SyncRequest_HigherThanReceiver_OutsideTole
 
 	ss.metrics.On("MessageReceived", metrics.EngineSynchronization, metrics.MessageSyncRequest).Times(load)
 
-	for i := 0; i < load; i++ {
+	for range load {
 		// generate origin and request message
 		originID := unittest.IdentifierFixture()
 
@@ -157,7 +157,7 @@ func (ss *SyncSuite) TestLoad_Process_SyncRequest_HigherThanReceiver_OutsideTole
 			ss.metrics.On("MessageSent", metrics.EngineSynchronization, metrics.MessageSyncRequest).Maybe()
 			ss.metrics.On("MessageReceived", metrics.EngineSynchronization, metrics.MessageSyncRequest).Times(load)
 
-			for i := 0; i < load; i++ {
+			for range load {
 				nonce, err := rand.Uint64()
 				require.NoError(ss.T(), err, "should generate nonce")
 
@@ -265,7 +265,7 @@ func (ss *SyncSuite) TestLoad_Process_RangeRequest_SometimesReportSpam() {
 		ss.e.spamDetectionConfig.rangeRequestBaseProb = loadGroup.rangeRequestBaseProb
 		ss.metrics.On("MessageReceived", metrics.EngineSynchronization, metrics.MessageRangeRequest).Times(load)
 
-		for i := 0; i < load; i++ {
+		for range load {
 			nonce, err := rand.Uint64()
 			require.NoError(ss.T(), err, "should generate nonce")
 
@@ -369,7 +369,7 @@ func (ss *SyncSuite) TestLoad_Process_BatchRequest_SometimesReportSpam() {
 		ss.e.spamDetectionConfig.batchRequestBaseProb = loadGroup.batchRequestBaseProb
 		ss.metrics.On("MessageReceived", metrics.EngineSynchronization, metrics.MessageBatchRequest).Times(load)
 
-		for i := 0; i < load; i++ {
+		for range load {
 			nonce, err := rand.Uint64()
 			require.NoError(ss.T(), err, "should generate nonce")
 

@@ -1495,7 +1495,7 @@ func TestNewControlMsgValidationInspector_validateClusterPrefixedTopic(t *testin
 		inspector.Start(signalerCtx)
 		unittest.RequireComponentsReadyBefore(t, 1*time.Second, inspector)
 
-		for i := 0; i < total; i++ {
+		for range total {
 			require.NoError(t, inspector.Inspect(from, inspectMsgRpc))
 		}
 		// wait until all inspections have been processed by the workers
