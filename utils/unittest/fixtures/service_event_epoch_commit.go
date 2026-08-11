@@ -87,6 +87,10 @@ func (g *EpochCommitGenerator) Fixture(opts ...EpochCommitOption) *flow.EpochCom
 		ClusterQCs:         flow.ClusterQCVoteDatasFromQCs(g.quorumCerts.List(1)),
 		DKGGroupKey:        g.cryptoGen.PrivateKey(crypto.BLSBLS12381).PublicKey(),
 		DKGParticipantKeys: g.cryptoGen.PublicKeys(2, crypto.BLSBLS12381),
+		DKGIndexMap: flow.DKGIndexMap{
+			g.identifiers.Fixture(): 0,
+			g.identifiers.Fixture(): 1,
+		},
 	}
 
 	for _, opt := range opts {

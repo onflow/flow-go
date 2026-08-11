@@ -1,0 +1,94 @@
+name: verify-rulesets
+
+# Verifies that every JSON spec under .github/rulesets/ matches the live
+# ruleset with the same name on this repository. Read-only: the workflow
+# never writes to GitHub. On drift, it fails loudly so a repo admin can
+# reconcile via the UI (Settings -> Rules -> Rulesets).
+#
+# See .github/rulesets/README.md for the reconciliation flow.
+
+on:
+  pull_request:
+    paths:
+      - '.github/rulesets/**'
+      - '.github/workflows/verify-rulesets.yml'
+  push:
+    branches: [master]
+    paths:
+      - '.github/rulesets/**'
+      - '.github/workflows/verify-rulesets.yml'
+  schedule:
+    - cron: '0 8 * * *'   # daily at 08:00 UTC, catches out-of-band UI edits
+  workflow_dispatch:
+
+permissions:
+  administration: read
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fetch live rulesets index
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh api "/repos/${{ github.repository }}/rulesets" > live_index.json
+
+      - name: Compare each spec against live
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          # Fields that live rulesets carry but the spec does not. We strip
+          # both sides equally before diffing so unrelated metadata cannot
+          # produce false positives. bypass_actors is intentionally NOT
+          # stripped: it is part of the policy and we want drift on it.
+          STRIP='del(
+            .id,
+            .node_id,
+            .created_at,
+            .updated_at,
+            .source,
+            .source_type,
+            ._links,
+            .current_user_can_bypass
+          )'
+
+          shopt -s nullglob
+          specs=(.github/rulesets/*.json)
+          if [ ${#specs[@]} -eq 0 ]; then
+            echo "no ruleset specs found under .github/rulesets/"
+            exit 0
+          fi
+
+          fail=0
+          for spec in "${specs[@]}"; do
+            name=$(jq -r .name "$spec")
+            id=$(jq -r --arg n "$name" \
+              '.[] | select(.name == $n) | .id' live_index.json)
+
+            if [ -z "$id" ] || [ "$id" = "null" ]; then
+              echo "::error file=$spec::ruleset '$name' does not exist on the live repo"
+              echo "  create it via Settings -> Rules -> Rulesets, then re-run this workflow."
+              fail=1
+              continue
+            fi
+
+            gh api "/repos/${{ github.repository }}/rulesets/$id" > "live_${name}.json"
+
+            jq "$STRIP" "live_${name}.json" | jq -S . > "live_${name}.norm.json"
+            jq "$STRIP" "$spec"             | jq -S . > "spec_${name}.norm.json"
+
+            if ! diff -u "spec_${name}.norm.json" "live_${name}.norm.json"; then
+              echo "::error file=$spec::ruleset '$name' has drifted from the spec"
+              echo "  reconcile the live ruleset via Settings -> Rules -> Rulesets"
+              echo "  to match this spec, then re-run this workflow."
+              fail=1
+            fi
+          done
+
+          exit $fail
