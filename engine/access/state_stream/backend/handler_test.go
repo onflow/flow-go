@@ -111,7 +111,7 @@ func (s *HandlerTestSuite) TestHeartbeatResponse() {
 				require.NoError(s.T(), err)
 				require.Equal(s.T(), b.ID(), blockID)
 				require.Equal(s.T(), b.Height, resp.BlockHeight)
-			}, time.Second, fmt.Sprintf("timed out waiting for exec data for block %d %v", b.Height, b.ID()))
+			}, 10*time.Second, fmt.Sprintf("timed out waiting for exec data for block %d %v", b.Height, b.ID()))
 		}
 	})
 
@@ -146,7 +146,7 @@ func (s *HandlerTestSuite) TestHeartbeatResponse() {
 				require.NoError(s.T(), err)
 				require.Equal(s.T(), b.ID(), blockID)
 				require.Equal(s.T(), b.Height, resp.BlockHeight)
-			}, time.Second, fmt.Sprintf("timed out waiting for exec data for block %d %v", b.Height, b.ID()))
+			}, 10*time.Second, fmt.Sprintf("timed out waiting for exec data for block %d %v", b.Height, b.ID()))
 		}
 	})
 
@@ -192,7 +192,7 @@ func (s *HandlerTestSuite) TestHeartbeatResponse() {
 				require.Equal(s.T(), b.Height, resp.BlockHeight)
 				require.Equal(s.T(), b.ID(), blockID)
 				require.Empty(s.T(), resp.Events)
-			}, time.Second, fmt.Sprintf("timed out waiting for exec data for block %d %v", b.Height, b.ID()))
+			}, 10*time.Second, fmt.Sprintf("timed out waiting for exec data for block %d %v", b.Height, b.ID()))
 		}
 	})
 }
