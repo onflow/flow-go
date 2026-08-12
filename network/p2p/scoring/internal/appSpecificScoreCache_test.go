@@ -164,3 +164,42 @@ func TestAppSpecificScoreCache_Eviction(t *testing.T) {
 	_, _, found := cache.Get(peerIds[0])
 	require.False(t, found, "score should not be in cache")
 }
+
+// TestAppSpecificScoreCache_ConcurrentGetWhileUpdatingSamePeer is a regression test for a data
+// race on a single peer's record (run with -race): Get read the record's fields after the
+// backend lock was released, racing the in-place mutation performed by a concurrent update of
+// the same record. The cache now replaces records copy-on-write, keeping returned records
+// immutable.
+func TestAppSpecificScoreCache_ConcurrentGetWhileUpdatingSamePeer(t *testing.T) {
+	cache := internal.NewAppSpecificScoreCache(10, unittest.Logger(), metrics.NewNoopCollector())
+
+	peerID := unittest.PeerIdFixture(t)
+	const updates = 500
+
+	var wg sync.WaitGroup
+
+	// writer: repeatedly updates the same peer's score.
+	wg.Go(func() {
+		for i := range updates {
+			require.NoError(t, cache.AdjustWithInit(peerID, float64(i), time.Now()))
+		}
+	})
+
+	// reader: repeatedly reads the same peer's score while it is being updated.
+	wg.Go(func() {
+		for range updates {
+			score, _, found := cache.Get(peerID)
+			if !found {
+				continue // not initialized yet
+			}
+			require.GreaterOrEqual(t, score, float64(0))
+			require.Less(t, score, float64(updates))
+		}
+	})
+
+	unittest.RequireReturnsBefore(t, wg.Wait, 10*time.Second, "concurrent updates and reads did not finish on time")
+
+	score, _, found := cache.Get(peerID)
+	require.True(t, found)
+	require.Equal(t, float64(updates-1), score)
+}
