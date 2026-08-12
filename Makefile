@@ -137,10 +137,6 @@ go-fix:
 	go fix ./...
 	git diff --exit-code
 
-
-.PHONY: code-sanity-check
-code-sanity-check: go-fix check-geth-crypto-versions go-math-rand-check
-
 .PHONY: fuzz-fvm
 fuzz-fvm:
 	# run fuzz tests in the fvm package
@@ -189,8 +185,9 @@ generate-mocks: install-mock-generators
 	mockery --config .mockery.yaml --log-level warn
 
 # this ensures there is no unused dependency being added by accident
+# also runs sanity checks: go-fix, geth/crypto version consistency, math/rand usage
 .PHONY: tidy
-tidy:
+tidy: go-fix check-geth-crypto-versions go-math-rand-check
 	go mod tidy -v
 	cd integration; go mod tidy -v
 	cd crypto; go mod tidy -v
