@@ -16,6 +16,7 @@ import (
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/fvm"
 	fvmCrypto "github.com/onflow/flow-go/fvm/crypto"
+	fvmErrors "github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/model/flow"
 	msig "github.com/onflow/flow-go/module/signature"
@@ -499,6 +500,13 @@ func TestBLSMultiSignature(t *testing.T) {
 						_, output, err := vm.Run(ctx, script, snapshotTree)
 						assert.NoError(t, err)
 						assert.Error(t, output.Err)
+
+						// verifyPoP is documented to abort on non-BLS keys; the abort
+						// surfaces as a controlled user error, not a panic
+						assert.ErrorContains(t, output.Err, "public key is not a BLS key")
+						// the user error is reported as a value error, not a generic
+						// Cadence runtime error
+						assert.True(t, fvmErrors.HasErrorCode(output.Err, fvmErrors.ErrCodeValueError))
 					})
 				}
 			},
@@ -704,6 +712,13 @@ func TestBLSMultiSignature(t *testing.T) {
 						_, output, err := vm.Run(ctx, script, snapshotTree)
 						assert.NoError(t, err)
 						assert.Error(t, output.Err)
+
+						// the stdlib maps the host function's user error to the
+						// documented nil return; the script aborts force-unwrapping it
+						assert.ErrorContains(t, output.Err, "unexpectedly found nil while forcing an Optional value")
+						// the surfaced error is the nil-force abort, a Cadence runtime
+						// error, since the host function's error was mapped to nil
+						assert.True(t, fvmErrors.HasErrorCode(output.Err, fvmErrors.ErrCodeCadenceRunTimeError))
 					})
 				}
 
