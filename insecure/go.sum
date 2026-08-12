@@ -821,8 +821,8 @@ github.com/onflow/boxo v0.0.0-20240201202436-f2477b92f483 h1:LpiQhTAfM9CAmNVEs0n
 github.com/onflow/boxo v0.0.0-20240201202436-f2477b92f483/go.mod h1:pIZgTWdm3k3pLF9Uq6MB8JEcW07UDwNJjlXW1HELW80=
 github.com/onflow/cadence v1.10.5 h1:Y5kk4aY70SpxJtG/Wd05+xvkUL6tvodeQjSxnXNq65A=
 github.com/onflow/cadence v1.10.5/go.mod h1:axaADpRs+qTlq5cdHBawCiJ7dgqusRbBqOPkyWUwUOo=
-github.com/onflow/crypto v0.27.1 h1:R6oFWIrR5+M344yEeqdS/BYvOwIBdFiEEA1NxyGXSIM=
-github.com/onflow/crypto v0.27.1/go.mod h1:sCZuq5wAKj4d37+Aa00DufhvdxjSXDVap9FfxquvKes=
+github.com/onflow/crypto v0.27.2 h1:2bcZg986sTVvhI/L0+loReNMRDTyMpa9HIk/XPZr+Bo=
+github.com/onflow/crypto v0.27.2/go.mod h1:85OE9fNJsKSiv0yu09l+YOgtXogLp14VNZ9AxKKE1Rg=
 github.com/onflow/fixed-point v0.1.1 h1:j0jYZVO8VGyk1476alGudEg7XqCkeTVxb5ElRJRKS90=
 github.com/onflow/fixed-point v0.1.1/go.mod h1:gJdoHqKtToKdOZbvryJvDZfcpzC7d2fyWuo3ZmLtcGY=
 github.com/onflow/flow-core-contracts/lib/go/contracts v1.10.4 h1:tUmbvKlApxfLfguNj9UCvgIB9kxiYqdPbK/IGdKzINQ=
@@ -835,8 +835,8 @@ github.com/onflow/flow-ft/lib/go/contracts v1.1.1 h1:BNbP3CrTIgScpx2NS9snq9XDESF
 github.com/onflow/flow-ft/lib/go/contracts v1.1.1/go.mod h1:PwsL8fC81cjnUnTfmyL/HOIyHnyaw/JA474Wfj2tl6A=
 github.com/onflow/flow-ft/lib/go/templates v1.1.1 h1:X+EGTWKeVlsF33JD5QBFZLr8KW2apl6Oh1AXRWHmzLI=
 github.com/onflow/flow-ft/lib/go/templates v1.1.1/go.mod h1:uQ8XFqmMK2jxyBSVrmyuwdWjTEb+6zGjRYotfDJ5pAE=
-github.com/onflow/flow-go-sdk v1.10.7 h1:wrBbQcwlHW5cfqjTsBMC5QLWiVnr7R3Pkan82pIQLcM=
-github.com/onflow/flow-go-sdk v1.10.7/go.mod h1:5FDf9wgzHxSDGvNCIxKca3r7NYzMDCkXzt1UW60bkos=
+github.com/onflow/flow-go-sdk v1.10.8 h1:aByu6hmNKQBtkMUcR5ffCCaUyWAotVk6OdR7WII5EO0=
+github.com/onflow/flow-go-sdk v1.10.8/go.mod h1:lUVwcjQsqCVVEzQ5xSzAHKzGe1qjV0d8NRcyg64GLFg=
 github.com/onflow/flow-nft/lib/go/contracts v1.4.1 h1:iQ8s4W5HNWd92MVRZbKxYpQ6UJn9snHLKQ9hFFNCiys=
 github.com/onflow/flow-nft/lib/go/contracts v1.4.1/go.mod h1:XUsJjlbVoI0kebgv87xsO70U/ITGYbSEgTwbyg1RcOs=
 github.com/onflow/flow-nft/lib/go/templates v1.4.1 h1:P+FN51waQrACpyVeXzLl1cnlD5J8bUYiemHXgeZBM+8=
