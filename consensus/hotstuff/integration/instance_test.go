@@ -326,24 +326,19 @@ func NewInstance(t *testing.T, options ...Option) *Instance {
 	// program the finalizer module behaviour
 	in.finalizer.On("MakeFinal", mock.Anything).Return(
 		func(blockID flow.Identifier) error {
-
-			// as we don't use mocks to assert expectations, but only to
-			// simulate behaviour, we should drop the call data regularly
 			in.updatingBlocks.RLock()
-			block, found := in.headers[blockID]
+			_, found := in.headers[blockID]
 			in.updatingBlocks.RUnlock()
 			if !found {
 				return fmt.Errorf("can't broadcast with unknown parent")
 			}
-			if block.Height%100 == 0 {
-				in.committee.Calls = nil
-				in.builder.Calls = nil
-				in.signer.Calls = nil
-				in.verifier.Calls = nil
-				in.notifier.Calls = nil
-				in.finalizer.Calls = nil
-			}
-
+			// Note: an earlier version of this callback periodically reset the mocks' recorded
+			// call data (`in.verifier.Calls = nil` etc.) to bound memory usage. This is NOT safe:
+			// the mocks are invoked concurrently by the instance's worker goroutines (e.g. vote
+			// and timeout aggregators), which append to Calls under the mock's internal mutex.
+			// Writing the field directly corrupts the slice and crashes the test binary with a
+			// SIGSEGV. The memory bounding is unnecessary anyway: all tests in this package
+			// finalize at most ~100 views, accumulating only a modest number of recorded calls.
 			return nil
 		},
 	)

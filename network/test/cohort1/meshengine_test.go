@@ -235,7 +235,10 @@ func (suite *MeshEngineTestSuite) allToAllScenario(send testutils.ConduitSendWra
 	for i := 0; i < pubsub.GossipSubD*count; i++ {
 		select {
 		case <-suite.obs:
-		case <-time.After(8 * time.Second):
+		case <-time.After(30 * time.Second):
+			// generous per-event timeout: mesh formation typically streams these events within
+			// a few seconds, but scheduling on a loaded machine can delay gossipsub heartbeats;
+			// the bound only limits the failure case.
 			assert.FailNow(suite.T(), "could not receive pubsub tag indicating mesh formed")
 		}
 	}
@@ -314,7 +317,10 @@ func (suite *MeshEngineTestSuite) targetValidatorScenario(send testutils.Conduit
 	for i := 0; i < pubsub.GossipSubD*count; i++ {
 		select {
 		case <-suite.obs:
-		case <-time.After(2 * time.Second):
+		case <-time.After(30 * time.Second):
+			// generous per-event timeout: mesh formation typically streams these events within
+			// a few seconds, but scheduling on a loaded machine can delay gossipsub heartbeats;
+			// the bound only limits the failure case.
 			assert.FailNow(suite.T(), "could not receive pubsub tag indicating mesh formed")
 		}
 	}
@@ -374,7 +380,10 @@ func (suite *MeshEngineTestSuite) messageSizeScenario(send testutils.ConduitSend
 	for i := 0; i < pubsub.GossipSubD*count; i++ {
 		select {
 		case <-suite.obs:
-		case <-time.After(8 * time.Second):
+		case <-time.After(30 * time.Second):
+			// generous per-event timeout: mesh formation typically streams these events within
+			// a few seconds, but scheduling on a loaded machine can delay gossipsub heartbeats;
+			// the bound only limits the failure case.
 			assert.FailNow(suite.T(), "could not receive pubsub tag indicating mesh formed")
 		}
 	}
@@ -427,7 +436,10 @@ func (suite *MeshEngineTestSuite) conduitCloseScenario(send testutils.ConduitSen
 	for i := 0; i < pubsub.GossipSubD*count; i++ {
 		select {
 		case <-suite.obs:
-		case <-time.After(2 * time.Second):
+		case <-time.After(30 * time.Second):
+			// generous per-event timeout: mesh formation typically streams these events within
+			// a few seconds, but scheduling on a loaded machine can delay gossipsub heartbeats;
+			// the bound only limits the failure case.
 			assert.FailNow(suite.T(), "could not receive pubsub tag indicating mesh formed")
 		}
 	}

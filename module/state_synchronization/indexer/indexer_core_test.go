@@ -383,6 +383,8 @@ func TestExecutionState_IndexBlockData(t *testing.T) {
 		}
 
 		mockState := newMockStateForBlock(t, tf.Block)
+		mockHeaders := storagemock.NewHeaders(t)
+		expectBackfillProbes(t, mockState, mockHeaders)
 		extendedIndexer, err := extended.NewExtendedIndexer(
 			test.indexer.log,
 			metrics.NewNoopCollector(),
@@ -390,7 +392,7 @@ func TestExecutionState_IndexBlockData(t *testing.T) {
 			storage.NewTestingLockManager(),
 			mockState,
 			storagemock.NewIndex(t),
-			storagemock.NewHeaders(t),
+			mockHeaders,
 			storagemock.NewGuarantees(t),
 			test.collections,
 			test.events,
@@ -479,6 +481,8 @@ func TestExecutionState_IndexBlockData(t *testing.T) {
 		}
 
 		mockState := newMockStateForBlock(t, tf.Block)
+		mockHeaders := storagemock.NewHeaders(t)
+		expectBackfillProbes(t, mockState, mockHeaders)
 		extendedIndexer, err := extended.NewExtendedIndexer(
 			test.indexer.log,
 			metrics.NewNoopCollector(),
@@ -486,7 +490,7 @@ func TestExecutionState_IndexBlockData(t *testing.T) {
 			storage.NewTestingLockManager(),
 			mockState,
 			storagemock.NewIndex(t),
-			storagemock.NewHeaders(t),
+			mockHeaders,
 			storagemock.NewGuarantees(t),
 			test.collections,
 			test.events,
@@ -668,6 +672,18 @@ func newMockStateForBlock(t *testing.T, block *flow.Block) *protocolmock.State {
 	return state
 }
 
+// expectBackfillProbes tolerates the storage probes of the extended indexer's backfill loop.
+// The loop (ticking every extended.DefaultBackfillDelay = 5ms) races with the live ingest path:
+// before the block is ingested, it may look up the block data for the stub indexer's next height.
+// Production code treats the resulting [storage.ErrNotFound] as "retry later", so these calls
+// are benign and may happen any number of times.
+func expectBackfillProbes(t *testing.T, state *protocolmock.State, headers *storagemock.Headers) {
+	params := protocolmock.NewParams(t)
+	params.On("SporkRootBlockHeight").Return(uint64(0)).Maybe()
+	state.On("Params").Return(params).Maybe()
+	headers.On("BlockIDByHeight", mock.Anything).Return(flow.ZeroID, storage.ErrNotFound).Maybe()
+}
+
 type testExtendedIndexer struct {
 	name         string
 	latestHeight uint64
@@ -678,8 +694,17 @@ func (t *testExtendedIndexer) Name() string { return t.name }
 
 func (t *testExtendedIndexer) IndexBlockData(_ lockctx.Proof, data extended.BlockData, _ storage.ReaderBatchWriter) error {
 	if t.indexBlockFn != nil {
-		return t.indexBlockFn(data)
+		if err := t.indexBlockFn(data); err != nil {
+			return err
+		}
 	}
+	// advance the height like a real indexer would: otherwise the extended indexer's ingest
+	// loop (ticking every backfillDelay) considers this indexer perpetually behind and
+	// re-indexes the same height over and over (e.g. closing the test's `done` channel twice,
+	// which panics the test binary).
+	// No lock needed: the extended indexer invokes NextHeight and IndexBlockData from the same
+	// goroutine.
+	t.latestHeight = data.Header.Height
 	return nil
 }
 

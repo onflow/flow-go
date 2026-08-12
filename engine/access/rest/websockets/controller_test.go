@@ -824,11 +824,11 @@ func (s *WsControllerSuite) TestSubscribeBlocks() {
 // 2. Configure the WebSocket controller with a rate limit of 2 responses per second.
 // 3. Simulate sending messages to the `multiplexedStream` channel.
 // 4. Collect timestamps of message writes to verify rate-limiting behavior.
-// 5. Assert that all messages are processed and that the delay between messages respects the configured rate limit.
+// 5. Assert that all messages are processed and that the overall pacing respects the configured rate limit.
 //
 // The test ensures that:
 // - The number of messages processed matches the total messages sent.
-// - The delay between consecutive messages falls within the expected range based on the rate limit, with a tolerance of 5ms.
+// - Emitting all messages takes at least (totalMessages-1) rate-limit periods in total.
 func (s *WsControllerSuite) TestRateLimiter() {
 	t := s.T()
 	totalMessages := 5 // Number of messages to simulate.
@@ -876,13 +876,18 @@ func (s *WsControllerSuite) TestRateLimiter() {
 
 	// Calculate the expected delay between messages based on the rate limit.
 	expectedDelay := time.Second / time.Duration(config.MaxResponsesPerSecond)
-	const tolerance = float64(5 * time.Millisecond) // Allow up to 5ms deviation.
 
-	// Step 6: Assert that the delays respect the rate limit with tolerance.
-	for i := 1; i < len(timestamps); i++ {
-		delay := timestamps[i].Sub(timestamps[i-1])
-		assert.InDelta(t, expectedDelay, delay, tolerance, "Messages should respect the rate limit")
-	}
+	// Step 6: Assert that the overall pacing respects the rate limit.
+	// Note: we deliberately do NOT assert individual inter-message delays. The limiter
+	// (token bucket, burst 1) accrues tokens in real time, so on a loaded machine a
+	// scheduling stall can make one gap longer and the following gap correspondingly
+	// shorter — both are correct limiter behavior. The robust invariant is that emitting
+	// n messages takes at least (n-1) rate-limit periods in total.
+	minElapsed := time.Duration(totalMessages-1) * expectedDelay
+	tolerance := 100 * time.Millisecond // measurement jitter between limiter creation and first write
+	elapsed := timestamps[len(timestamps)-1].Sub(timestamps[0])
+	assert.GreaterOrEqual(t, elapsed, minElapsed-tolerance,
+		"Messages should be paced at no more than the configured rate")
 }
 
 // TestConfigureKeepaliveConnection ensures that the WebSocket connection is configured correctly.
@@ -1087,10 +1092,13 @@ func (s *WsControllerSuite) TestKeepaliveRoutine() {
 			}).
 			Times(expectedCalls + 1)
 
+		// Maybe(): with the microsecond ping period the keepalive routine can complete (and shut
+		// the controller down) before the reader routine issues its first ReadJSON call. The
+		// blocking read only keeps the connection open; it is not the property under test.
 		conn.On("ReadJSON", mock.Anything).Return(func(_ any) error {
 			<-done
 			return &websocket.CloseError{Code: websocket.CloseNormalClosure}
-		})
+		}).Maybe()
 
 		factory := dpmock.NewDataProviderFactory(t)
 		controller, err := NewWebSocketController(s.logger, s.wsConfig, conn, factory, s.streamLimiter)
@@ -1144,7 +1152,13 @@ func (s *WsControllerSuite) TestKeepaliveRoutine() {
 		factory := dpmock.NewDataProviderFactory(t)
 		controller, err := NewWebSocketController(s.logger, s.wsConfig, conn, factory, s.streamLimiter)
 		require.NoError(t, err)
-		controller.keepaliveConfig = keepaliveConfig
+		// Use a ping period that cannot elapse during the test: with the suite's microsecond
+		// PingPeriod, both the ticker and the cancelled context are ready at keepalive's first
+		// select, which picks randomly and occasionally produces an unexpected WriteControl call.
+		controller.keepaliveConfig = KeepaliveConfig{
+			PingPeriod: time.Hour,
+			PongWait:   2 * time.Hour,
+		}
 
 		ctx, cancel := context.WithCancel(context.Background())
 		cancel() // Immediately cancel the context

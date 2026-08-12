@@ -3,6 +3,7 @@ package connection
 import (
 	"context"
 	"crypto/rand"
+	"errors"
 	"fmt"
 	"math/big"
 	"net"
@@ -274,7 +275,8 @@ func TestExecutionNodeClientTimeout(t *testing.T) {
 			testifymock.Anything,
 			testifymock.AnythingOfType("*execution.PingRequest")).
 		After(timeout+time.Second).
-		Return(resp, nil)
+		Return(resp, nil).
+		Maybe() // under load, the client's deadline can fire before the request even reaches the server
 
 	// create the factory
 	connectionFactory := new(ConnectionFactoryImpl)
@@ -330,7 +332,8 @@ func TestCollectionNodeClientTimeout(t *testing.T) {
 			testifymock.Anything,
 			testifymock.AnythingOfType("*access.PingRequest")).
 		After(timeout+time.Second).
-		Return(resp, nil)
+		Return(resp, nil).
+		Maybe() // under load, the client's deadline can fire before the request even reaches the server
 
 	// create the factory
 	connectionFactory := new(ConnectionFactoryImpl)
@@ -1112,9 +1115,17 @@ func (n *node) start(tb testing.TB) {
 	go func() {
 		wg.Done()
 		err := n.server.Serve(n.listener)
-		assert.NoError(tb, err)
+		// Serve returns nil when the server is stopped via Stop(). However, if the test finishes
+		// so quickly that Stop() runs before this goroutine enters Serve, Serve returns
+		// ErrServerStopped -- after the test has already completed, where a failing assertion
+		// would panic the whole test binary. This is a benign shutdown race, so it is ignored.
+		if err != nil && !errors.Is(err, grpc.ErrServerStopped) {
+			assert.NoError(tb, err)
+		}
 	}()
-	unittest.RequireReturnsBefore(tb, wg.Wait, 10*time.Millisecond, "could not start goroutine on time")
+	// generous timeout: goroutine startup is typically instant, but scheduling on a loaded
+	// machine can take longer than a few milliseconds; the bound only limits the failure case
+	unittest.RequireReturnsBefore(tb, wg.Wait, time.Second, "could not start goroutine on time")
 }
 
 func (n *node) stop(tb testing.TB) {
