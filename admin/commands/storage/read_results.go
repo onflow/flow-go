@@ -22,7 +22,7 @@ const (
 
 type readResultsRequest struct {
 	requestType       readResultsRequestType
-	value             interface{}
+	value             any
 	numResultsToQuery uint64
 }
 
@@ -31,7 +31,7 @@ type ReadResultsCommand struct {
 	results storage.ExecutionResults
 }
 
-func (r *ReadResultsCommand) Handler(ctx context.Context, req *admin.CommandRequest) (interface{}, error) {
+func (r *ReadResultsCommand) Handler(ctx context.Context, req *admin.CommandRequest) (any, error) {
 	data := req.ValidatorData.(*readResultsRequest)
 	var results []*flow.ExecutionResult
 	var resultID flow.Identifier
@@ -67,7 +67,7 @@ func (r *ReadResultsCommand) Handler(ctx context.Context, req *admin.CommandRequ
 // Validator validates the request.
 // Returns admin.InvalidAdminReqError for invalid/malformed requests.
 func (r *ReadResultsCommand) Validator(req *admin.CommandRequest) error {
-	input, ok := req.Data.(map[string]interface{})
+	input, ok := req.Data.(map[string]any)
 	if !ok {
 		return admin.NewInvalidAdminReqFormatError("expected map[string]any")
 	}

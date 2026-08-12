@@ -29,8 +29,8 @@ func NewTxRateLimitCommand(limiter *ingest.AddressRateLimiter) *TxRateLimitComma
 	}
 }
 
-func (s *TxRateLimitCommand) Handler(_ context.Context, req *admin.CommandRequest) (interface{}, error) {
-	input, ok := req.Data.(map[string]interface{})
+func (s *TxRateLimitCommand) Handler(_ context.Context, req *admin.CommandRequest) (any, error) {
+	input, ok := req.Data.(map[string]any)
 	if !ok {
 		return admin.NewInvalidAdminReqFormatError("expected { \"command\": \"add|remove|get|get_config|set_config\", \"addresses\": \"addresses\""), nil
 	}

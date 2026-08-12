@@ -1,7 +1,6 @@
 package mvp
 
 import (
-	"context"
 	"fmt"
 	"testing"
 
@@ -22,8 +21,7 @@ func TestMVP_Network(t *testing.T) {
 	logger.Info().Msgf("================> START TESTING")
 	flowNetwork := testnet.PrepareFlowNetwork(t, buildMVPNetConfig(), flow.Localnet)
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 
 	flowNetwork.Start(ctx)
 	defer func() {
@@ -49,8 +47,7 @@ func TestMVP_Bootstrap(t *testing.T) {
 		logger.Info().Msg("================> Finish TearDownTest")
 	}()
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 
 	flowNetwork.Start(ctx)
 

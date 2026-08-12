@@ -123,16 +123,14 @@ func (s *TimeoutCollectorsTestSuite) TestGetOrCreateCollectors_ConcurrentAccess(
 	view := s.lowestView + 10
 	s.prepareMockedCollector(view)
 	var wg sync.WaitGroup
-	for i := 0; i < 10; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+	for range 10 {
+		wg.Go(func() {
 			_, created, err := s.collectors.GetOrCreateCollector(view)
 			require.NoError(s.T(), err)
 			if created {
 				createdTimes.Add(1)
 			}
-		}()
+		})
 	}
 
 	unittest.AssertReturnsBefore(s.T(), wg.Wait, time.Second)
@@ -143,7 +141,7 @@ func (s *TimeoutCollectorsTestSuite) TestGetOrCreateCollectors_ConcurrentAccess(
 func (s *TimeoutCollectorsTestSuite) TestPruneUpToView() {
 	numberOfCollectors := uint64(10)
 	prunedViews := make([]uint64, 0)
-	for i := uint64(0); i < numberOfCollectors; i++ {
+	for i := range numberOfCollectors {
 		view := s.lowestView + i
 		s.prepareMockedCollector(view)
 		_, _, err := s.collectors.GetOrCreateCollector(view)
@@ -154,7 +152,7 @@ func (s *TimeoutCollectorsTestSuite) TestPruneUpToView() {
 	pruningHeight := s.lowestView + numberOfCollectors
 
 	expectedCollectors := make([]hotstuff.TimeoutCollector, 0)
-	for i := uint64(0); i < numberOfCollectors; i++ {
+	for i := range numberOfCollectors {
 		view := pruningHeight + i
 		s.prepareMockedCollector(view)
 		collector, _, err := s.collectors.GetOrCreateCollector(view)

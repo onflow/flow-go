@@ -16,7 +16,7 @@ on:
         type: string
 
 env:
-  GO_VERSION: "1.25"
+  GO_VERSION: "1.26"
   PRIVATE_REGISTRY_HOST: us-central1-docker.pkg.dev
 
 jobs:

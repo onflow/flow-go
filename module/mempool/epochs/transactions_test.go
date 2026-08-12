@@ -38,14 +38,12 @@ func TestMultipleEpochs(t *testing.T) {
 	pools := epochs.NewTransactionPools(create)
 
 	var wg sync.WaitGroup
-	for i := 0; i < 10; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+	for range 10 {
+		wg.Go(func() {
 			epoch := rand.Uint64()
 
 			var transactions []*flow.TransactionBody
-			for i := 0; i < 10; i++ {
+			for range 10 {
 				pool := pools.ForEpoch(epoch)
 				assert.Equal(t, uint(len(transactions)), pool.Size())
 				for _, tx := range transactions {
@@ -56,7 +54,7 @@ func TestMultipleEpochs(t *testing.T) {
 				transactions = append(transactions, &tx)
 				pool.Add(tx.ID(), &tx)
 			}
-		}()
+		})
 	}
 	unittest.AssertReturnsBefore(t, wg.Wait, time.Second)
 }
@@ -72,7 +70,7 @@ func TestCombinedSize(t *testing.T) {
 	transactionsPerEpoch := rand.Uint64() % 10
 	expected := uint(nEpochs * transactionsPerEpoch)
 
-	for epoch := uint64(0); epoch < nEpochs; epoch++ {
+	for epoch := range nEpochs {
 		pool := pools.ForEpoch(epoch)
 		for i := 0; i < int(transactionsPerEpoch); i++ {
 			next := unittest.TransactionBodyFixture()

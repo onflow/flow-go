@@ -47,7 +47,7 @@ func NewProtocolSnapshotCommand(
 	}
 }
 
-func (s *ProtocolSnapshotCommand) Handler(_ context.Context, req *admin.CommandRequest) (interface{}, error) {
+func (s *ProtocolSnapshotCommand) Handler(_ context.Context, req *admin.CommandRequest) (any, error) {
 	validated, ok := req.ValidatorData.(*protocolSnapshotData)
 	if !ok {
 		return nil, fmt.Errorf("fail to parse validator data")
@@ -102,7 +102,7 @@ func (s *ProtocolSnapshotCommand) Validator(req *admin.CommandRequest) error {
 		blocksToSkip: uint(0),
 	}
 
-	input, ok := req.Data.(map[string]interface{})
+	input, ok := req.Data.(map[string]any)
 	if ok {
 		data, ok := input["blocks-to-skip"]
 

@@ -465,7 +465,7 @@ func (ss *SyncSuite) TestProcessingMultipleItems() {
 	defer cancel()
 
 	originID := unittest.IdentifierFixture()
-	for i := 0; i < 5; i++ {
+	for i := range 5 {
 		msg := &flow.SyncResponse{
 			Nonce:  uint64(i),
 			Height: uint64(1000 + i),
@@ -479,7 +479,7 @@ func (ss *SyncSuite) TestProcessingMultipleItems() {
 	}
 
 	finalHeight := ss.head.Height
-	for i := 0; i < 5; i++ {
+	for i := range 5 {
 		msg := &flow.SyncRequest{
 			Nonce:  uint64(i),
 			Height: finalHeight - 100,

@@ -235,7 +235,7 @@ func TestRemoveDiskUsage(t *testing.T) {
 		}
 
 		items := make([]*flow.ChunkDataPack, count)
-		for i := 0; i < count; i++ {
+		for i := range count {
 			chunkID := unittest.IdentifierFixture()
 			chunkDataPack := unittest.ChunkDataPackFixture(chunkID)
 			items[i] = chunkDataPack
@@ -243,7 +243,7 @@ func TestRemoveDiskUsage(t *testing.T) {
 
 		// 1. Insert 10000 entities.
 		require.NoError(t, withWriter(func(writer storage.Writer) error {
-			for i := 0; i < count; i++ {
+			for i := range count {
 				if err := operation.Upsert(getKey(items[i]), items[i])(writer); err != nil {
 					return err
 				}
@@ -261,7 +261,7 @@ func TestRemoveDiskUsage(t *testing.T) {
 
 		// 4. Remove all entities
 		require.NoError(t, withWriter(func(writer storage.Writer) error {
-			for i := 0; i < count; i++ {
+			for i := range count {
 				if err := operation.Remove(getKey(items[i]))(writer); err != nil {
 					return err
 				}
@@ -289,7 +289,7 @@ func TestConcurrentWrite(t *testing.T) {
 		var wg sync.WaitGroup
 		numWrites := 10 // number of concurrent writes
 
-		for i := 0; i < numWrites; i++ {
+		for i := range numWrites {
 			wg.Add(1)
 			go func(i int) {
 				defer wg.Done()
@@ -314,13 +314,13 @@ func TestConcurrentRemove(t *testing.T) {
 		numDeletes := 10 // number of concurrent deletions
 
 		// First, insert entities to be deleted concurrently
-		for i := 0; i < numDeletes; i++ {
+		for i := range numDeletes {
 			e := Entity{ID: uint64(i)}
 			require.NoError(t, withWriter(operation.Upsert(e.Key(), e)))
 		}
 
 		// Now, perform concurrent deletes
-		for i := 0; i < numDeletes; i++ {
+		for i := range numDeletes {
 			wg.Add(1)
 			go func(i int) {
 				defer wg.Done()

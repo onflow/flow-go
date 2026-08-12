@@ -1433,7 +1433,7 @@ func (suite *Suite) TestExecuteScript() {
 			return &expectedResp
 		}
 
-		assertResult := func(err error, expected interface{}, actual interface{}) {
+		assertResult := func(err error, expected any, actual any) {
 			suite.Require().NoError(err)
 			suite.Require().Equal(expected, actual)
 			suite.execClient.AssertExpectations(suite.T())

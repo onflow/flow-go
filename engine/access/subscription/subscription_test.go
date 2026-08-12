@@ -26,23 +26,21 @@ func TestSubscription_SendReceive(t *testing.T) {
 
 	messageCount := 20
 	messages := []string{}
-	for i := 0; i < messageCount; i++ {
+	for i := range messageCount {
 		messages = append(messages, fmt.Sprintf("test messages %d", i))
 	}
 	receivedCount := 0
 
 	wg := sync.WaitGroup{}
-	wg.Add(1)
 
 	// receive each message and validate it has the expected value
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 
 		for v := range sub.Channel() {
 			assert.Equal(t, messages[receivedCount], v)
 			receivedCount++
 		}
-	}()
+	})
 
 	// send all messages in order
 	for _, d := range messages {
@@ -107,7 +105,7 @@ func TestHeightBasedSubscription(t *testing.T) {
 	errNoData := fmt.Errorf("no more data")
 
 	next := start
-	getData := func(_ context.Context, height uint64) (interface{}, error) {
+	getData := func(_ context.Context, height uint64) (any, error) {
 		require.Equal(t, next, height)
 		if height >= last {
 			return nil, errNoData

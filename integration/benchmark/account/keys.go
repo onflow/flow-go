@@ -147,7 +147,7 @@ func AddKeysToAccount(
 		return fmt.Errorf("error adding keys to account %s: %w", account.Address, err)
 	}
 	accountKeys := make([]flowsdk.AccountKey, numberOfKeysToAdd)
-	for i := 0; i < numberOfKeysToAdd; i++ {
+	for i := range numberOfKeysToAdd {
 		accountKey := key.AccountKey
 		accountKey.Index = uint32(i + account.NumKeys())
 		accountKey.SequenceNumber = 0
@@ -155,7 +155,7 @@ func AddKeysToAccount(
 	}
 
 	cadenceKeys := make([]cadence.Value, numberOfKeysToAdd)
-	for i := 0; i < numberOfKeysToAdd; i++ {
+	for i := range numberOfKeysToAdd {
 		cadenceKeys[i] = blueprints.BytesToCadenceArray(accountKeys[i].PublicKey.Encode())
 	}
 	cadenceKeysArray := cadence.NewArray(cadenceKeys)

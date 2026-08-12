@@ -308,7 +308,7 @@ func (l *EVMTransferLoad) setupTransaction(
 
 			// Fund evm address
 			txBody := flowsdk.NewTransaction().
-				SetScript([]byte(fmt.Sprintf(
+				SetScript(fmt.Appendf(nil,
 					`
 						import EVM from %s
 						import FungibleToken from %s
@@ -346,7 +346,7 @@ func (l *EVMTransferLoad) setupTransaction(
 					sc.FungibleToken.Address.HexWithPrefix(),
 					sc.FlowToken.Address.HexWithPrefix(),
 					l.bridgedAcountAddress.Hex(),
-				)))
+				))
 
 			err = txBody.AddArgument(eoa.addressArg)
 			if err != nil {
@@ -404,7 +404,7 @@ func (l *EVMTransferLoad) transferTransaction(
 
 			sc := systemcontracts.SystemContractsForChain(lc.ChainID)
 			txBody := flowsdk.NewTransaction().
-				SetScript([]byte(fmt.Sprintf(
+				SetScript(fmt.Appendf(nil,
 					`
 import EVM from %s
 import FungibleToken from %s
@@ -420,7 +420,7 @@ transaction(encodedTx: [UInt8], address: [UInt8; 20]) {
 					sc.EVMContract.Address.HexWithPrefix(),
 					sc.FungibleToken.Address.HexWithPrefix(),
 					sc.FlowToken.Address.HexWithPrefix(),
-				)))
+				))
 
 			err = txBody.AddArgument(transactionBytes)
 			if err != nil {

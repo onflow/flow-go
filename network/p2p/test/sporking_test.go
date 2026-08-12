@@ -42,8 +42,7 @@ import (
 // if it's network key is updated while the libp2p protocol ID remains the same
 func TestCrosstalkPreventionOnNetworkKeyChange(t *testing.T) {
 	idProvider := unittest.NewUpdatableIDProvider(flow.IdentityList{})
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 
 	ctx1, cancel1 := context.WithCancel(ctx)
 	signalerCtx1 := irrecoverable.NewMockSignalerContext(t, ctx1)
@@ -127,8 +126,7 @@ func TestCrosstalkPreventionOnNetworkKeyChange(t *testing.T) {
 // if the Flow libp2p protocol ID is updated while the network keys are kept the same.
 func TestOneToOneCrosstalkPrevention(t *testing.T) {
 	idProvider := unittest.NewUpdatableIDProvider(flow.IdentityList{})
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 
 	ctx1, cancel1 := context.WithCancel(ctx)
 	signalerCtx1 := irrecoverable.NewMockSignalerContext(t, ctx1)
@@ -192,8 +190,7 @@ func TestOneToOneCrosstalkPrevention(t *testing.T) {
 // if the channel is updated while the network keys are kept the same.
 func TestOneToKCrosstalkPrevention(t *testing.T) {
 	idProvider := unittest.NewUpdatableIDProvider(flow.IdentityList{})
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 
 	ctx1, cancel1 := context.WithCancel(ctx)
 	signalerCtx1 := irrecoverable.NewMockSignalerContext(t, ctx1)

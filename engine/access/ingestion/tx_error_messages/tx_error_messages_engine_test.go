@@ -120,7 +120,7 @@ func (s *TxErrorMessagesEngineSuite) SetupTest() {
 	s.rootBlock = unittest.Block.Genesis(flow.Emulator)
 	parent := s.rootBlock.ToHeader()
 
-	for i := 0; i < blockCount; i++ {
+	for range blockCount {
 		block := unittest.BlockWithParentFixture(parent)
 		// update for next iteration
 		parent = block.ToHeader()

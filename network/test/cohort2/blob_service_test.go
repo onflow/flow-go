@@ -109,7 +109,7 @@ func (suite *BlobServiceTestSuite) SetupTest() {
 	for i, net := range suite.networks {
 		ds := sync.MutexWrap(datastore.NewMapDatastore())
 		suite.datastores = append(suite.datastores, ds)
-		blob := blobs.NewBlob([]byte(fmt.Sprintf("foo%v", i)))
+		blob := blobs.NewBlob(fmt.Appendf(nil, "foo%v", i))
 		suite.blobCids = append(suite.blobCids, blob.Cid())
 		suite.putBlob(ds, blob)
 		blobService, err := net.RegisterBlobService(blobExchangeChannel, ds)
@@ -207,7 +207,7 @@ func (suite *BlobServiceTestSuite) TestHas() {
 		var blobsToGet []cid.Cid
 		for j := 0; j < suite.numNodes; j++ {
 			if j != i {
-				blob := blobs.NewBlob([]byte(fmt.Sprintf("bar%v", i)))
+				blob := blobs.NewBlob(fmt.Appendf(nil, "bar%v", i))
 				blobsToGet = append(blobsToGet, blob.Cid())
 				unreceivedBlobs[i][blob.Cid()] = struct{}{}
 			}
@@ -239,7 +239,7 @@ func (suite *BlobServiceTestSuite) TestHas() {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 
-		err := bex.AddBlob(ctx, blobs.NewBlob([]byte(fmt.Sprintf("bar%v", i))))
+		err := bex.AddBlob(ctx, blobs.NewBlob(fmt.Appendf(nil, "bar%v", i)))
 		suite.Require().NoError(err)
 	}
 

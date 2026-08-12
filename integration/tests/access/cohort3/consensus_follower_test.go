@@ -83,7 +83,7 @@ func (s *ConsensusFollowerSuite) TestReceiveBlocks() {
 		s.followerMgr1.startFollower(ctx)
 		var err error
 		receiveBlocks := func() {
-			for i := 0; i < blockCount; i++ {
+			for range blockCount {
 				blockID := <-s.followerMgr1.blockIDChan
 				receivedBlocks[blockID] = struct{}{}
 				_, err = s.followerMgr1.getBlock(blockID)

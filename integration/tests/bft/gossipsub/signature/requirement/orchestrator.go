@@ -94,7 +94,7 @@ func (s *Orchestrator) trackIngressEvents(event *insecure.IngressEvent) error {
 // The sender is corrupt since the attacker needs to take control over what it sends. Moreover, the receiver is also corrupt as the testing
 // framework needs to have an eye on what it receives (i.e., ingress traffic).
 func (s *Orchestrator) sendUnauthorizedMsgs(t *testing.T) {
-	for i := 0; i < numOfUnauthorizedEvents; i++ {
+	for range numOfUnauthorizedEvents {
 		event := bft.RequestChunkDataPackEgressFixture(s.T, s.attackerVNNoMsgSigning, s.victimENID, insecure.Protocol_PUBLISH)
 		err := s.OrchestratorNetwork.SendEgress(event)
 		require.NoError(t, err)
@@ -105,7 +105,7 @@ func (s *Orchestrator) sendUnauthorizedMsgs(t *testing.T) {
 // sendAuthorizedMsgs publishes a number of authorized messages from one corrupt VN with message signing enabled to another (victim) corrupt EN.
 // This func allows us to ensure that unauthorized messages have been processed.
 func (s *Orchestrator) sendAuthorizedMsgs(t *testing.T) {
-	for i := 0; i < numOfAuthorizedEvents; i++ {
+	for range numOfAuthorizedEvents {
 		event := bft.RequestChunkDataPackEgressFixture(s.T, s.attackerVNWithMsgSigning, s.victimENID, insecure.Protocol_PUBLISH)
 		err := s.OrchestratorNetwork.SendEgress(event)
 		require.NoError(t, err)

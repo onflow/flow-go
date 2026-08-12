@@ -145,7 +145,7 @@ func (s *Suite) SetupTest() {
 	s.rootBlock = unittest.Block.Genesis(flow.Emulator)
 	parent := s.rootBlock.ToHeader()
 
-	for i := 0; i < blockCount; i++ {
+	for range blockCount {
 		block := unittest.BlockWithParentFixture(parent)
 		// update for next iteration
 		parent = block.ToHeader()
@@ -379,7 +379,7 @@ func (s *Suite) TestOnFinalizedBlockSeveralBlocksAhead() {
 	blocks := make([]*flow.Block, newBlocksCount)
 
 	// generate the test blocks, cgs and collections
-	for i := 0; i < newBlocksCount; i++ {
+	for i := range newBlocksCount {
 		block := s.generateBlock(clusterCommittee, snap)
 		block.Height = startHeight + uint64(i)
 		s.blockMap[block.Height] = block

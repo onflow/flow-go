@@ -62,7 +62,7 @@ func (p *provider) ReturnAvailableAccount(account *FlowAccount) {
 
 func (p *provider) GetAddresses(u uint) ([]flowsdk.Address, error) {
 	addresses := make([]flowsdk.Address, 0, u)
-	for i := uint(0); i < u; i++ {
+	for range u {
 		select {
 		case account := <-p.availableAccounts:
 			addresses = append(addresses, account.Address)

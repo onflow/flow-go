@@ -2,6 +2,7 @@ package execution
 
 import (
 	"fmt"
+	"maps"
 	"math"
 
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
@@ -114,9 +115,7 @@ func (er *BlockExecutionResult) AllConvertedServiceEvents() flow.ServiceEventLis
 func (er *BlockExecutionResult) AllUpdatedRegisters() []flow.RegisterEntry {
 	updates := make(map[flow.RegisterID]flow.RegisterValue)
 	for _, ce := range er.collectionExecutionResults {
-		for regID, regVal := range ce.executionSnapshot.WriteSet {
-			updates[regID] = regVal
-		}
+		maps.Copy(updates, ce.executionSnapshot.WriteSet)
 	}
 	res := make([]flow.RegisterEntry, 0, len(updates))
 	for regID, regVal := range updates {

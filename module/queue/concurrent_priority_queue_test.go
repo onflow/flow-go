@@ -1,7 +1,6 @@
 package queue
 
 import (
-	"context"
 	"fmt"
 	"math"
 	"sync"
@@ -236,7 +235,7 @@ func TestConcurrentPriorityQueue_Channel(t *testing.T) {
 		ch := mq.Channel()
 
 		// Push multiple items rapidly
-		for i := 0; i < 10; i++ {
+		for i := range 10 {
 			mq.Push("test", uint64(i))
 		}
 
@@ -257,7 +256,7 @@ func TestConcurrentPriorityQueue_Channel(t *testing.T) {
 		ch := mq.Channel()
 
 		// Push multiple items without reading from channel
-		for i := 0; i < 5; i++ {
+		for i := range 5 {
 			mq.Push("test", uint64(i))
 		}
 
@@ -282,7 +281,7 @@ func TestConcurrentPriorityQueue_Concurrency(t *testing.T) {
 		var wg sync.WaitGroup
 
 		// Start multiple goroutines pushing items
-		for i := 0; i < numGoroutines; i++ {
+		for i := range numGoroutines {
 			wg.Add(1)
 			go func(id int) {
 				defer wg.Done()
@@ -297,7 +296,7 @@ func TestConcurrentPriorityQueue_Concurrency(t *testing.T) {
 
 		// Verify items can be popped correctly
 		popped := make(map[int]bool)
-		for i := 0; i < numGoroutines; i++ {
+		for range numGoroutines {
 			item, ok := mq.Pop()
 			assert.True(t, ok)
 			assert.False(t, popped[item], "duplicate item popped: %d", item)
@@ -315,7 +314,7 @@ func TestConcurrentPriorityQueue_Concurrency(t *testing.T) {
 		popped := make(map[int]bool)
 
 		// Start goroutines that push items
-		for i := 0; i < numGoroutines; i++ {
+		for i := range numGoroutines {
 			wg.Add(1)
 			go func(id int) {
 				defer wg.Done()
@@ -329,9 +328,7 @@ func TestConcurrentPriorityQueue_Concurrency(t *testing.T) {
 		// Now start goroutines that pop items
 		var popWg sync.WaitGroup
 		for i := 0; i < numGoroutines/2; i++ {
-			popWg.Add(1)
-			go func() {
-				defer popWg.Done()
+			popWg.Go(func() {
 				for {
 					item, ok := mq.Pop()
 					if !ok {
@@ -342,7 +339,7 @@ func TestConcurrentPriorityQueue_Concurrency(t *testing.T) {
 					popped[item] = true
 					mu.Unlock()
 				}
-			}()
+			})
 		}
 
 		popWg.Wait()
@@ -357,7 +354,7 @@ func TestConcurrentPriorityQueue_Concurrency(t *testing.T) {
 		var wg sync.WaitGroup
 
 		// Start goroutines that push items
-		for i := 0; i < numGoroutines; i++ {
+		for i := range numGoroutines {
 			wg.Add(1)
 			go func(id int) {
 				defer wg.Done()
@@ -367,13 +364,11 @@ func TestConcurrentPriorityQueue_Concurrency(t *testing.T) {
 
 		// Start goroutines that call Len
 		for i := 0; i < numGoroutines/2; i++ {
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
-				for j := 0; j < 100; j++ {
+			wg.Go(func() {
+				for range 100 {
 					_ = mq.Len()
 				}
-			}()
+			})
 		}
 
 		wg.Wait()
@@ -501,8 +496,7 @@ func TestConcurrentPriorityQueue_Integration(t *testing.T) {
 	})
 
 	t.Run("queue processing using channel", func(t *testing.T) {
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
+		ctx := t.Context()
 
 		mq := NewConcurrentPriorityQueue[string](true)
 

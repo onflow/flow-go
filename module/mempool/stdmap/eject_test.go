@@ -75,7 +75,7 @@ func TestLRUEjector_Track_Many(t *testing.T) {
 	// creates and tracks 100 items
 	size := 100
 	items := flow.IdentifierList{}
-	for i := 0; i < size; i++ {
+	for range size {
 		var id flow.Identifier
 		_, _ = crand.Read(id[:])
 		ejector.Track(id)
@@ -183,7 +183,7 @@ func TestLRUEjector_UntrackEject(t *testing.T) {
 
 	items := make(flow.IdentifierList, size)
 
-	for i := 0; i < size; i++ {
+	for i := range size {
 		mockEntity := unittest.MockEntityFixture()
 		require.True(t, backEnd.Add(mockEntity.Identifier, mockEntity))
 
@@ -211,7 +211,7 @@ func TestLRUEjector_EjectAll(t *testing.T) {
 
 	items := make(flow.IdentifierList, size)
 
-	for i := 0; i < size; i++ {
+	for i := range size {
 		mockEntity := unittest.MockEntityFixture()
 		require.True(t, backEnd.Add(mockEntity.Identifier, mockEntity))
 
@@ -223,7 +223,7 @@ func TestLRUEjector_EjectAll(t *testing.T) {
 	require.Equal(t, uint(size), backEnd.Size())
 
 	// ejects one by one
-	for i := 0; i < size; i++ {
+	for i := range size {
 		id := Eject(ejector, backEnd)
 		require.Equal(t, id, items[i])
 	}

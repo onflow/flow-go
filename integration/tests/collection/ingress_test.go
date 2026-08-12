@@ -253,7 +253,7 @@ func (suite *IngressSuite) TestTxIngressMultiCluster_OtherCluster() {
 	// submit the transaction to the other NON-TARGET cluster and retry
 	// several times to give the mesh network a chance to form
 	go func() {
-		for i := 0; i < 10; i++ {
+		for i := range 10 {
 			select {
 			case <-suite.ctx.Done():
 				// exit when suite is finished

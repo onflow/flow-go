@@ -29,7 +29,7 @@ func TestBatchStoringTransactionResults(t *testing.T) {
 
 		blockID := unittest.IdentifierFixture()
 		txResults := make([]flow.TransactionResult, 0)
-		for i := 0; i < 10; i++ {
+		for i := range 10 {
 			txID := unittest.IdentifierFixture()
 			expected := flow.TransactionResult{
 				TransactionID: txID,
@@ -201,7 +201,7 @@ func TestBatchStoreTransactionResultsErrAlreadyExists(t *testing.T) {
 
 		blockID := unittest.IdentifierFixture()
 		txResults := make([]flow.TransactionResult, 0)
-		for i := 0; i < 3; i++ {
+		for i := range 3 {
 			txID := unittest.IdentifierFixture()
 			expected := flow.TransactionResult{
 				TransactionID: txID,
@@ -220,7 +220,7 @@ func TestBatchStoreTransactionResultsErrAlreadyExists(t *testing.T) {
 
 		// Second batch store with the same blockID should fail with ErrAlreadyExists
 		duplicateTxResults := make([]flow.TransactionResult, 0)
-		for i := 0; i < 2; i++ {
+		for i := range 2 {
 			txID := unittest.IdentifierFixture()
 			expected := flow.TransactionResult{
 				TransactionID: txID,
@@ -264,7 +264,7 @@ func TestBatchStoreTransactionResultsMissingLock(t *testing.T) {
 
 		blockID := unittest.IdentifierFixture()
 		txResults := make([]flow.TransactionResult, 0)
-		for i := 0; i < 3; i++ {
+		for i := range 3 {
 			txID := unittest.IdentifierFixture()
 			expected := flow.TransactionResult{
 				TransactionID: txID,
@@ -297,7 +297,7 @@ func TestBatchStoreTransactionResultsWrongLock(t *testing.T) {
 
 		blockID := unittest.IdentifierFixture()
 		txResults := make([]flow.TransactionResult, 0)
-		for i := 0; i < 3; i++ {
+		for i := range 3 {
 			txID := unittest.IdentifierFixture()
 			expected := flow.TransactionResult{
 				TransactionID: txID,

@@ -25,6 +25,8 @@ IMAGE_TAG_ARM := $(IMAGE_TAG)-arm
 
 # Name of the cover profile
 COVER_PROFILE := coverage.txt
+# go-ethereum module shared between flow-go and onflow/crypto, whose versions must match
+GETH_MODULE := github.com/ethereum/go-ethereum
 # Disable go sum database lookup for private repos
 GOPRIVATE=github.com/onflow/*-internal
 # OS
@@ -101,6 +103,34 @@ go-math-rand-check:
        echo "[Error] Go production code should not use math/rand package"; exit 1; \
     fi
 
+.SILENT: check-geth-crypto-versions
+check-geth-crypto-versions:
+	# check that flow-go and onflow/crypto depend on the same go-ethereum version.
+	# a mismatch means the two modules use different geth versions, which can lead to
+	# inconsistent behavior of the crypto primitives backed by geth.
+	# the onflow/crypto version checked is the one pinned by this module's go.mod
+	# (resolved via `go list -m`), not the latest released version.
+	GETH_VERSION=$$(go list -m -f '{{.Version}}' $(GETH_MODULE)); \
+	if [ -z "$$GETH_VERSION" ]; then \
+	   echo "[Error] could not resolve $(GETH_MODULE) version in flow-go"; exit 1; \
+	fi; \
+	CRYPTO_VERSION=$$(go list -m -f '{{.Version}}' github.com/onflow/crypto); \
+	if [ -z "$$CRYPTO_VERSION" ]; then \
+	   echo "[Error] could not resolve onflow/crypto version in flow-go"; exit 1; \
+	fi; \
+	CRYPTO_DIR=$$(go mod download -json github.com/onflow/crypto@$$CRYPTO_VERSION | jq -r '.Dir // empty'); \
+	if [ -z "$$CRYPTO_DIR" ]; then \
+	   echo "[Error] could not download onflow/crypto $$CRYPTO_VERSION"; exit 1; \
+	fi; \
+	CRYPTO_GETH_VERSION=$$(go mod edit -json $$CRYPTO_DIR/go.mod | jq -r '.Require[] | select(.Path=="$(GETH_MODULE)") | .Version'); \
+	if [ -z "$$CRYPTO_GETH_VERSION" ]; then \
+	   echo "[Error] could not resolve $(GETH_MODULE) version in onflow/crypto"; exit 1; \
+	fi; \
+	if [ "$$GETH_VERSION" != "$$CRYPTO_GETH_VERSION" ]; then \
+	   echo "[Error] onflow/crypto must properly update geth first, including auditing geth crypto changes"; \
+	   echo "flow-go uses $(GETH_MODULE) $$GETH_VERSION, onflow/crypto uses $$CRYPTO_GETH_VERSION"; exit 1; \
+	fi
+
 .SILENT: go-fix
 go-fix:
 	# fix go code style issues
@@ -109,7 +139,7 @@ go-fix:
 
 
 .PHONY: code-sanity-check
-code-sanity-check: go-fix go-math-rand-check
+code-sanity-check: go-fix check-geth-crypto-versions go-math-rand-check
 
 .PHONY: fuzz-fvm
 fuzz-fvm:

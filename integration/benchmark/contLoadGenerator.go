@@ -200,7 +200,7 @@ func (lg *ContLoadGenerator) stopped() bool {
 }
 
 func (lg *ContLoadGenerator) startWorkers(num int) error {
-	for i := 0; i < num; i++ {
+	for range num {
 		worker := NewWorker(lg.ctx, len(lg.workers), 1*time.Second, lg.workFunc)
 		lg.log.Trace().Int("workerID", worker.workerID).Msg("starting worker")
 		worker.Start()

@@ -142,12 +142,11 @@ func addAccountCreator(
 	snapshotTree snapshot.SnapshotTree,
 	account flow.Address,
 ) snapshot.SnapshotTree {
-	script := []byte(
-		fmt.Sprintf(addAccountCreatorTransactionTemplate,
+	script :=
+		fmt.Appendf(nil, addAccountCreatorTransactionTemplate,
 			chain.ServiceAddress().String(),
 			account.String(),
-		),
-	)
+		)
 
 	txBody, err := flow.NewTransactionBodyBuilder().
 		SetScript(script).
@@ -174,13 +173,12 @@ func removeAccountCreator(
 	snapshotTree snapshot.SnapshotTree,
 	account flow.Address,
 ) snapshot.SnapshotTree {
-	script := []byte(
-		fmt.Sprintf(
+	script :=
+		fmt.Appendf(nil,
 			removeAccountCreatorTransactionTemplate,
 			chain.ServiceAddress(),
 			account.String(),
-		),
-	)
+		)
 
 	txBody, err := flow.NewTransactionBodyBuilder().
 		SetScript(script).
@@ -888,7 +886,7 @@ func TestAddAccountKey(t *testing.T) {
 						_, publicKeyArg := newAccountKey(t, privateKey, accountKeyAPIVersionV2)
 
 						txBody, err := flow.NewTransactionBodyBuilder().
-							SetScript([]byte(fmt.Sprintf(
+							SetScript(fmt.Appendf(nil,
 								`
 								transaction(key: [UInt8]) {
 								  prepare(signer: auth(AddKey) &Account) {
@@ -905,7 +903,7 @@ func TestAddAccountKey(t *testing.T) {
 								}
 								`,
 								hashAlgo,
-							))).
+							)).
 							SetPayer(address).
 							AddArgument(publicKeyArg).
 							AddAuthorizer(address).
@@ -975,7 +973,7 @@ func TestRemoveAccountKey(t *testing.T) {
 
 					const keyCount = 2
 
-					for i := 0; i < keyCount; i++ {
+					for range keyCount {
 						snapshotTree, _ = addAccountKey(
 							t,
 							vm,
@@ -1039,7 +1037,7 @@ func TestRemoveAccountKey(t *testing.T) {
 					const keyCount = 2
 					const keyIndex = keyCount - 1
 
-					for i := 0; i < keyCount; i++ {
+					for range keyCount {
 						snapshotTree, _ = addAccountKey(
 							t,
 							vm,
@@ -1098,7 +1096,7 @@ func TestRemoveAccountKey(t *testing.T) {
 					const keyCount = 2
 					const keyIndex = keyCount - 1
 
-					for i := 0; i < keyCount; i++ {
+					for range keyCount {
 						snapshotTree, _ = addAccountKey(
 							t,
 							vm,
@@ -1167,7 +1165,7 @@ func TestRemoveAccountKey(t *testing.T) {
 
 					const keyCount = 2
 
-					for i := 0; i < keyCount; i++ {
+					for range keyCount {
 						snapshotTree, _ = addAccountKey(
 							t,
 							vm,
@@ -1186,7 +1184,7 @@ func TestRemoveAccountKey(t *testing.T) {
 						SetPayer(address).
 						AddAuthorizer(address)
 
-					for i := 0; i < keyCount; i++ {
+					for i := range keyCount {
 						keyIndexArg, err := jsoncdc.Encode(cadence.NewInt(i))
 						require.NoError(t, err)
 
@@ -1239,7 +1237,7 @@ func TestGetAccountKey(t *testing.T) {
 
 				const keyCount = 2
 
-				for i := 0; i < keyCount; i++ {
+				for range keyCount {
 					snapshotTree, _ = addAccountKey(
 						t,
 						vm,
@@ -1294,7 +1292,7 @@ func TestGetAccountKey(t *testing.T) {
 				const keyIndex = keyCount - 1
 
 				keys := make([]flow.AccountPublicKey, keyCount)
-				for i := 0; i < keyCount; i++ {
+				for i := range keyCount {
 					snapshotTree, keys[i] = addAccountKey(
 						t,
 						vm,
@@ -1359,7 +1357,7 @@ func TestGetAccountKey(t *testing.T) {
 				const keyIndex = keyCount - 1
 
 				keys := make([]flow.AccountPublicKey, keyCount)
-				for i := 0; i < keyCount; i++ {
+				for i := range keyCount {
 
 					// Use the old version of API to add the key
 					snapshotTree, keys[i] = addAccountKey(
@@ -1426,7 +1424,7 @@ func TestGetAccountKey(t *testing.T) {
 				const keyCount = 2
 
 				keys := make([]flow.AccountPublicKey, keyCount)
-				for i := 0; i < keyCount; i++ {
+				for i := range keyCount {
 
 					snapshotTree, keys[i] = addAccountKey(
 						t,
@@ -1446,7 +1444,7 @@ func TestGetAccountKey(t *testing.T) {
 					SetPayer(address).
 					AddAuthorizer(address)
 
-				for i := 0; i < keyCount; i++ {
+				for i := range keyCount {
 					keyIndexArg, err := jsoncdc.Encode(cadence.NewInt(i))
 					require.NoError(t, err)
 
@@ -1465,7 +1463,7 @@ func TestGetAccountKey(t *testing.T) {
 
 				assert.Len(t, output.Logs, 2)
 
-				for i := 0; i < keyCount; i++ {
+				for i := range keyCount {
 					expected := fmt.Sprintf(
 						"AccountKey("+
 							"keyIndex: %d, "+
@@ -1528,12 +1526,12 @@ func TestAccountBalanceFields(t *testing.T) {
 
 				snapshotTree = snapshotTree.Append(executionSnapshot)
 
-				script := fvm.Script([]byte(fmt.Sprintf(`
+				script := fvm.Script(fmt.Appendf(nil, `
 					access(all) fun main(): UFix64 {
 						let acc = getAccount(0x%s)
 						return acc.balance
 					}
-				`, account.Hex())))
+				`, account.Hex()))
 
 				_, output, err = vm.Run(ctx, script, snapshotTree)
 				require.NoError(t, err)
@@ -1558,12 +1556,12 @@ func TestAccountBalanceFields(t *testing.T) {
 				nonExistentAddress, err := chain.AddressAtIndex(100)
 				require.NoError(t, err)
 
-				script := fvm.Script([]byte(fmt.Sprintf(`
+				script := fvm.Script(fmt.Appendf(nil, `
 					access(all) fun main(): UFix64 {
 						let acc = getAccount(0x%s)
 						return acc.balance
 					}
-				`, nonExistentAddress)))
+				`, nonExistentAddress))
 
 				_, output, err := vm.Run(ctx, script, snapshotTree)
 				require.NoError(t, err)
@@ -1589,12 +1587,12 @@ func TestAccountBalanceFields(t *testing.T) {
 					ctx,
 					snapshotTree)
 
-				script := fvm.Script([]byte(fmt.Sprintf(`
+				script := fvm.Script(fmt.Appendf(nil, `
 					access(all) fun main(): UFix64 {
 						let acc = getAccount(0x%s)
 						return acc.balance
 					}
-				`, address)))
+				`, address))
 
 				snapshot := errorOnAddressSnapshotWrapper{
 					snapshotTree: snapshotTree,
@@ -1645,12 +1643,12 @@ func TestAccountBalanceFields(t *testing.T) {
 
 				snapshotTree = snapshotTree.Append(executionSnapshot)
 
-				script := fvm.Script([]byte(fmt.Sprintf(`
+				script := fvm.Script(fmt.Appendf(nil, `
 					access(all) fun main(): UFix64 {
 						let acc = getAccount(0x%s)
 						return acc.availableBalance
 					}
-				`, account.Hex())))
+				`, account.Hex()))
 
 				_, output, err = vm.Run(ctx, script, snapshotTree)
 				assert.NoError(t, err)
@@ -1672,12 +1670,12 @@ func TestAccountBalanceFields(t *testing.T) {
 				nonExistentAddress, err := chain.AddressAtIndex(100)
 				require.NoError(t, err)
 
-				script := fvm.Script([]byte(fmt.Sprintf(`
+				script := fvm.Script(fmt.Appendf(nil, `
 					access(all) fun main(): UFix64 {
 						let acc = getAccount(0x%s)
 						return acc.availableBalance
 					}
-				`, nonExistentAddress)))
+				`, nonExistentAddress))
 
 				_, output, err := vm.Run(ctx, script, snapshotTree)
 				assert.NoError(t, err)
@@ -1721,12 +1719,12 @@ func TestAccountBalanceFields(t *testing.T) {
 
 				snapshotTree = snapshotTree.Append(executionSnapshot)
 
-				script := fvm.Script([]byte(fmt.Sprintf(`
+				script := fvm.Script(fmt.Appendf(nil, `
 					access(all) fun main(): UFix64 {
 						let acc = getAccount(0x%s)
 						return acc.availableBalance
 					}
-				`, account.Hex())))
+				`, account.Hex()))
 
 				_, output, err = vm.Run(ctx, script, snapshotTree)
 				assert.NoError(t, err)
@@ -1778,12 +1776,12 @@ func TestGetStorageCapacity(t *testing.T) {
 
 				snapshotTree = snapshotTree.Append(executionSnapshot)
 
-				script := fvm.Script([]byte(fmt.Sprintf(`
+				script := fvm.Script(fmt.Appendf(nil, `
 					access(all) fun main(): UInt64 {
 						let acc = getAccount(0x%s)
 						return acc.storage.capacity
 					}
-				`, account)))
+				`, account))
 
 				_, output, err = vm.Run(ctx, script, snapshotTree)
 				require.NoError(t, err)
@@ -1807,12 +1805,12 @@ func TestGetStorageCapacity(t *testing.T) {
 				nonExistentAddress, err := chain.AddressAtIndex(100)
 				require.NoError(t, err)
 
-				script := fvm.Script([]byte(fmt.Sprintf(`
+				script := fvm.Script(fmt.Appendf(nil, `
 					access(all) fun main(): UInt64 {
 						let acc = getAccount(0x%s)
 						return acc.storage.capacity
 					}
-				`, nonExistentAddress)))
+				`, nonExistentAddress))
 
 				_, output, err := vm.Run(ctx, script, snapshotTree)
 
@@ -1835,12 +1833,12 @@ func TestGetStorageCapacity(t *testing.T) {
 			run(func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, snapshotTree snapshot.SnapshotTree) {
 				address := chain.ServiceAddress()
 
-				script := fvm.Script([]byte(fmt.Sprintf(`
+				script := fvm.Script(fmt.Appendf(nil, `
 					access(all) fun main(): UInt64 {
 						let acc = getAccount(0x%s)
 						return acc.storage.capacity
 					}
-				`, address)))
+				`, address))
 
 				storageSnapshot := errorOnAddressSnapshotWrapper{
 					owner:        address,

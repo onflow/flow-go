@@ -84,7 +84,7 @@ func getSeed() ([]byte, error) {
 	return seed, nil
 }
 
-func WriteJSON(path string, data interface{}) error {
+func WriteJSON(path string, data any) error {
 	err := os.MkdirAll(filepath.Dir(path), 0755)
 	if err != nil {
 		return err
