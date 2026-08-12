@@ -2947,7 +2947,7 @@ func TestCadenceOwnedAccountFunctionalities(t *testing.T) {
 					`,
 					sc.EVMContract.Address.HexWithPrefix(),
 					sc.FlowToken.Address.HexWithPrefix(),
-				))
+				)
 
 				addr := RandomAddress(t)
 				addrBytes := cadence.NewArray(
@@ -3082,7 +3082,7 @@ func TestCadenceOwnedAccountFunctionalities(t *testing.T) {
 					`,
 					sc.EVMContract.Address.HexWithPrefix(),
 					sc.FlowToken.Address.HexWithPrefix(),
-				))
+				)
 
 				txBody, err := flow.NewTransactionBodyBuilder().
 					SetScript(code).

@@ -197,7 +197,7 @@ func WithOrigin(origin gethCommon.Address) Option {
 // WithGasPrice sets the gas price for the transaction (usually the one sets by the sender)
 func WithGasPrice(gasPrice *uint256.Int) Option {
 	return func(c *Config) *Config {
-		c.TxContext.GasPrice = uint256.MustFromBig(gasPrice)
+		c.TxContext.GasPrice = gasPrice
 		return c
 	}
 }
