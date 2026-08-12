@@ -315,9 +315,14 @@ func TempDir(t testing.TB) string {
 // appear in the directory while os.RemoveAll is deleting it, failing it with ENOTEMPTY.
 func RemoveTempDir(t testing.TB, dir string) {
 	var err error
-	for deadline := time.Now().Add(10 * time.Second); time.Now().Before(deadline); {
+	for attempt, deadline := 0, time.Now().Add(10*time.Second); time.Now().Before(deadline); attempt++ {
 		err = os.RemoveAll(dir)
 		if err == nil {
+			if attempt > 0 {
+				// preserve the signal that something was still writing to the directory: this
+				// usually means a component leaked a background writer past its shutdown
+				t.Logf("removing temp dir %s required %d retries, something was still writing to it", dir, attempt)
+			}
 			return
 		}
 		time.Sleep(100 * time.Millisecond)
