@@ -699,9 +699,7 @@ func (db *StateDB) Finalise(deleteEmptyObjects bool) *gethBAL.ConstructionBlockA
 		for key := range view.DirtyAddresses() {
 			dirtyAddresses[key] = struct{}{}
 		}
-		for key, val := range view.DirtySlots() {
-			dirtySlots[key] = val
-		}
+		maps.Copy(dirtySlots, view.DirtySlots())
 	}
 
 	for slot, value := range dirtySlots {
