@@ -577,10 +577,6 @@ func (d *DeltaView) DirtyAddresses() map[gethCommon.Address]struct{} {
 }
 
 // DirtySlots returns a set of slots that has been updated in this view
-func (d *DeltaView) DirtySlots() map[types.SlotAddress]struct{} {
-	dirtySlots := make(map[types.SlotAddress]struct{})
-	for sk := range d.slots {
-		dirtySlots[sk] = struct{}{}
-	}
-	return dirtySlots
+func (d *DeltaView) DirtySlots() map[types.SlotAddress]gethCommon.Hash {
+	return d.slots
 }

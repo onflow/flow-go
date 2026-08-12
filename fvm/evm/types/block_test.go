@@ -3,6 +3,7 @@ package types
 import (
 	"math/big"
 	"testing"
+	"time"
 
 	gethCommon "github.com/ethereum/go-ethereum/common"
 	gethTypes "github.com/ethereum/go-ethereum/core/types"
@@ -49,6 +50,24 @@ func Test_BlockHash(t *testing.T) {
 
 	// hashes should not equal if any data is changed
 	assert.NotEqual(t, h1, h2)
+}
+
+func Test_SlotNumber(t *testing.T) {
+	timestamp := uint64(time.Date(2026, time.January, 1, 0, 0, 0, 0, time.UTC).Unix())
+	b := Block{
+		ParentBlockHash:     gethCommon.HexToHash("0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"),
+		Height:              1,
+		TotalSupply:         big.NewInt(1000),
+		ReceiptRoot:         gethCommon.Hash{0x2, 0x3, 0x4},
+		TotalGasUsed:        135,
+		TransactionHashRoot: gethCommon.Hash{0x5, 0x6, 0x7},
+		Timestamp:           timestamp,
+	}
+
+	require.Equal(t, uint64(63_158_400), b.SlotNumber(flow.Emulator))
+	require.Equal(t, uint64(63_158_400), b.SlotNumber(flow.Previewnet))
+	require.Equal(t, uint64(89_510_400), b.SlotNumber(flow.Testnet))
+	require.Equal(t, uint64(52_596_000), b.SlotNumber(flow.Mainnet))
 }
 
 func Test_BlockProposal(t *testing.T) {
