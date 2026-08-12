@@ -136,7 +136,7 @@ func (s *AccessStoreTxErrorMessagesSuite) TestBackfillTxErrorMessages() {
 	// Create and send a transactions that will result in an error.
 	transactionCount := 5
 	txResults := make([]*sdk.TransactionResult, transactionCount)
-	for i := 0; i < transactionCount; i++ {
+	for i := range transactionCount {
 		txResults[i] = s.createAndSendTxWithTxError()
 	}
 
@@ -145,7 +145,7 @@ func (s *AccessStoreTxErrorMessagesSuite) TestBackfillTxErrorMessages() {
 
 	startHeight := 1
 	endHeight := txResults[len(txResults)-1].BlockHeight // last tx result block height
-	data := map[string]interface{}{"start-height": startHeight, "endHeight": endHeight}
+	data := map[string]any{"start-height": startHeight, "endHeight": endHeight}
 	// executes the backfill command for transaction error messages
 	_, err := adminClient.RunCommand(context.Background(), "backfill-tx-error-messages", data)
 	require.NoError(s.T(), err)

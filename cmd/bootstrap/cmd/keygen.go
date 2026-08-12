@@ -48,7 +48,7 @@ var keygenCmd = &cobra.Command{
 		log.Info().Msg("")
 
 		// write key files
-		writeJSONFile := func(relativePath string, val interface{}) error {
+		writeJSONFile := func(relativePath string, val any) error {
 			return common.WriteJSON(relativePath, flagOutdir, val)
 		}
 		writeFile := func(relativePath string, data []byte) error {

@@ -86,7 +86,7 @@ type MalleabilityCheckerOpt func(*MalleabilityChecker)
 // ATTENTION: In order for the MalleabilityChecker to work properly, two calls of the generator should produce two different values.
 func WithTypeGenerator[T any](generator func() T) MalleabilityCheckerOpt {
 	return func(mc *MalleabilityChecker) {
-		mc.typeGenerator[reflect.TypeOf((*T)(nil)).Elem()] = func() reflect.Value {
+		mc.typeGenerator[reflect.TypeFor[T]()] = func() reflect.Value {
 			return reflect.ValueOf(generator())
 		}
 	}
@@ -174,7 +174,7 @@ func (mc *MalleabilityChecker) Check(model any, hashModel func() flow.Identifier
 	if !v.IsValid() {
 		return fmt.Errorf("input is not a valid entity")
 	}
-	if v.Kind() != reflect.Ptr {
+	if v.Kind() != reflect.Pointer {
 		// If it is not a pointer type, we may not be able to set fields to test malleability, since the model may not be addressable
 		return fmt.Errorf("entity is not a pointer type (try checking a reference to it), entity: %v %v", v.Kind(), v.Type())
 	}
@@ -227,7 +227,7 @@ func (mc *MalleabilityChecker) isModelMalleable(modelOrField reflect.Value, stru
 		}
 	}
 
-	if modelOrField.Kind() == reflect.Ptr {
+	if modelOrField.Kind() == reflect.Pointer {
 		if modelOrField.IsNil() {
 			modelOrField.Set(reflect.New(modelOrField.Type().Elem()))
 		}
@@ -332,7 +332,7 @@ func (mc *MalleabilityChecker) generateRandomReflectValue(field reflect.Value) e
 			return err
 		}
 		field.SetMapIndex(key, val)
-	case reflect.Ptr:
+	case reflect.Pointer:
 		if field.IsNil() {
 			field.Set(reflect.New(field.Type().Elem()))
 		}
@@ -341,8 +341,7 @@ func (mc *MalleabilityChecker) generateRandomReflectValue(field reflect.Value) e
 		// if we are dealing with a struct, we need to go through all fields and generate random values for them
 		// if the field is another struct, we will deal with it recursively.
 		// at the end of the recursion, we must encounter a primitive type, which we can generate a random value for, otherwise an error is returned.
-		for i := 0; i < field.NumField(); i++ {
-			structField := field.Field(i)
+		for _, structField := range field.Fields() {
 			err := mc.generateRandomReflectValue(structField)
 			if err != nil {
 				return fmt.Errorf("cannot generate random value for struct field: %s", field.Type().String())
@@ -363,7 +362,7 @@ func (mc *MalleabilityChecker) generateRandomReflectValue(field reflect.Value) e
 // generateInterfaceFlowValue generates a random value for the field of the struct that is an interface.
 // This can be extended for types that are broadly used in the code base.
 func generateInterfaceFlowValue(field reflect.Value) any {
-	if field.Type().Implements(reflect.TypeOf((*crypto.PublicKey)(nil)).Elem()) {
+	if field.Type().Implements(reflect.TypeFor[crypto.PublicKey]()) {
 		return KeyFixture(crypto.ECDSAP256).PublicKey()
 	}
 	return nil

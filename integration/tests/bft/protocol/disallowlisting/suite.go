@@ -59,14 +59,14 @@ func (s *Suite) disallowListNode(nodeID flow.Identifier) {
 	serverAddr := fmt.Sprintf("localhost:%s", s.Net.ContainerByID(s.receiverEN).Port(testnet.AdminPort))
 	adminClient := client.NewAdminClient(serverAddr)
 
-	data := map[string]interface{}{"network-id-provider-blocklist": []string{nodeID.String()}}
+	data := map[string]any{"network-id-provider-blocklist": []string{nodeID.String()}}
 	resp, err := adminClient.RunCommand(context.Background(), "set-config", data)
 	require.NoError(s.T(), err)
 
-	output, ok := resp.Output.(map[string]interface{})
+	output, ok := resp.Output.(map[string]any)
 	require.True(s.T(), ok)
 
-	newList, ok := output["newValue"].([]interface{})
+	newList, ok := output["newValue"].([]any)
 	require.True(s.T(), ok)
 	require.Contains(s.T(), newList, nodeID.String())
 }

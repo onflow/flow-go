@@ -54,7 +54,7 @@ func TestStreamClosing(t *testing.T) {
 
 	senderWG := sync.WaitGroup{}
 	senderWG.Add(count)
-	for i := 0; i < count; i++ {
+	for i := range count {
 		go func(i int) {
 			// Create stream from node 1 to node 2 (reuse if one already exists)
 			nodes[0].Host().Peerstore().AddAddrs(nodeInfo1.ID, nodeInfo1.Addrs, peerstore.AddressTTL)
@@ -159,7 +159,7 @@ func testCreateStream(t *testing.T, sporkId flow.Identifier, unicasts []protocol
 	streamCount := 100
 	var streams []network.Stream
 	allStreamsClosedWg := sync.WaitGroup{}
-	for i := 0; i < streamCount; i++ {
+	for range streamCount {
 		allStreamsClosedWg.Add(1)
 		pInfo, err := utils.PeerAddressInfo(id2.IdentitySkeleton)
 		require.NoError(t, err)
@@ -234,7 +234,7 @@ func TestCreateStream_FallBack(t *testing.T) {
 	streamCount := 10
 	var streams []network.Stream
 	allStreamsClosedWg := sync.WaitGroup{}
-	for i := 0; i < streamCount; i++ {
+	for range streamCount {
 		allStreamsClosedWg.Add(1)
 		pInfo, err := utils.PeerAddressInfo(otherId.IdentitySkeleton)
 		require.NoError(t, err)
@@ -309,7 +309,7 @@ func TestCreateStreamIsConcurrencySafe(t *testing.T) {
 	}
 
 	// kick off 10 concurrent calls to CreateStream
-	for i := 0; i < 10; i++ {
+	for range 10 {
 		wg.Add(1)
 		go createStream()
 	}
@@ -323,8 +323,7 @@ func TestCreateStreamIsConcurrencySafe(t *testing.T) {
 // TestNoBackoffWhenCreatingStream checks that backoff is not enabled between attempts to connect to a remote peer
 // for one-to-one direct communication.
 func TestNoBackoffWhenCreatingStream(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 
 	// setup per node contexts so they can be stopped independently
 	ctx1, cancel1 := context.WithCancel(ctx)
@@ -378,7 +377,7 @@ func TestNoBackoffWhenCreatingStream(t *testing.T) {
 	//   In this case, there will be MaxDialRetryAttemptTimes (3) connection attempts on the first CreateStream() call and MaxDialRetryAttemptTimes (3) attempts on the second CreateStream() call.
 
 	// make two separate stream creation attempt and assert that no connection back off happened
-	for i := 0; i < 2; i++ {
+	for range 2 {
 
 		// limit the maximum amount of time to wait for a connection to be established by using a context that times out
 		ctx, cancel := context.WithTimeout(ctx, maxTimeToWait)

@@ -60,7 +60,7 @@ func TestIdentityList_Exists(t *testing.T) {
 		// sort the first list
 		il1 = il1.Sort(flow.Canonical[flow.Identity])
 
-		for i := 0; i < 10; i++ {
+		for i := range 10 {
 			assert.True(t, il1.Exists(il1[i]))
 		}
 		assert.False(t, il1.Exists(il2[0]))
@@ -75,7 +75,7 @@ func TestIdentityList_IdentifierExists(t *testing.T) {
 		// sort the first list
 		il1 = il1.Sort(flow.Canonical[flow.Identity])
 
-		for i := 0; i < 10; i++ {
+		for i := range 10 {
 			assert.True(t, il1.IdentifierExists(il1[i].NodeID))
 		}
 		assert.False(t, il1.IdentifierExists(il2[0].NodeID))

@@ -73,7 +73,7 @@ func NewNodeConfigSet(n uint, role flow.Role, opts ...func(*NodeConfig)) NodeCon
 	idPrefix := uint(rand.Intn(10000) * 100)
 
 	confs := make([]NodeConfig, n)
-	for i := uint(0); i < n; i++ {
+	for i := range n {
 		confs[i] = NewNodeConfig(role, append(opts, WithIDInt(idPrefix+i+1))...)
 	}
 

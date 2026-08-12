@@ -3,6 +3,7 @@ package ledger
 import (
 	"bytes"
 	"fmt"
+	"strings"
 
 	"github.com/onflow/flow-go/ledger/common/hash"
 )
@@ -36,31 +37,32 @@ func NewPayloadlessTrieProof() *PayloadlessTrieProof {
 }
 
 func (p *PayloadlessTrieProof) String() string {
-	flagStr := ""
+	var flagStr strings.Builder
 	for _, f := range p.Flags {
-		flagStr += fmt.Sprintf("%08b", f)
+		flagStr.WriteString(fmt.Sprintf("%08b", f))
 	}
-	proofStr := fmt.Sprintf("size: %d flags: %v\n", p.Steps, flagStr)
+	var proofStr strings.Builder
+	proofStr.WriteString(fmt.Sprintf("size: %d flags: %v\n", p.Steps, flagStr.String()))
 	leafHashStr := "nil"
 	if p.LeafHash != nil {
 		leafHashStr = fmt.Sprintf("%x", *p.LeafHash)
 	}
-	proofStr += fmt.Sprintf("\t path: %v leafHash: %s\n", p.Path, leafHashStr)
+	proofStr.WriteString(fmt.Sprintf("\t path: %v leafHash: %s\n", p.Path, leafHashStr))
 
 	if p.Inclusion {
-		proofStr += "\t inclusion proof:\n"
+		proofStr.WriteString("\t inclusion proof:\n")
 	} else {
-		proofStr += "\t noninclusion proof:\n"
+		proofStr.WriteString("\t noninclusion proof:\n")
 	}
 	interimIndex := 0
 	for j := 0; j < int(p.Steps); j++ {
 		// if bit is set
 		if p.Flags[j/8]&(1<<(7-j%8)) != 0 {
-			proofStr += fmt.Sprintf("\t\t %d: [%x]\n", j, p.Interims[interimIndex])
+			proofStr.WriteString(fmt.Sprintf("\t\t %d: [%x]\n", j, p.Interims[interimIndex]))
 			interimIndex++
 		}
 	}
-	return proofStr
+	return proofStr.String()
 }
 
 // Equals compares this proof to another payloadless proof

@@ -22,7 +22,7 @@ func NewListConfigCommand(configs *updatable_configs.Manager) *ListConfigCommand
 	}
 }
 
-func (s *ListConfigCommand) Handler(_ context.Context, _ *admin.CommandRequest) (interface{}, error) {
+func (s *ListConfigCommand) Handler(_ context.Context, _ *admin.CommandRequest) (any, error) {
 	fields := s.configs.AllFields()
 
 	// create a response

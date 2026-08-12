@@ -213,8 +213,8 @@ func (s *EmulatorSuite) createAndFundAccount(netID bootstrap.NodeInfo) *nodeAcco
 
 	fundAccountTx := sdk.NewTransaction().
 		SetScript(
-			[]byte(
-				fmt.Sprintf(`
+
+			fmt.Appendf(nil, `
 				import FungibleToken from 0x%s
 				import FlowToken from 0x%s
 
@@ -232,9 +232,9 @@ func (s *EmulatorSuite) createAndFundAccount(netID bootstrap.NodeInfo) *nodeAcco
 					receiverRef.deposit(from: <-self.sentVault)
 				  }
 				}`,
-					sc.FungibleToken.Address.Hex(),
-					sc.FlowToken.Address.Hex(),
-				))).
+				sc.FungibleToken.Address.Hex(),
+				sc.FlowToken.Address.Hex(),
+			)).
 		AddAuthorizer(s.serviceAccountAddress).
 		SetProposalKey(
 			s.serviceAccountAddress,

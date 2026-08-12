@@ -96,10 +96,7 @@ func processTestRunLineByLine(scanner *bufio.Scanner) map[string][]*common.Level
 				continue
 			}
 
-			lastTestResultIndex := len(testResultMap[testResultMapKey]) - 1
-			if lastTestResultIndex < 0 {
-				lastTestResultIndex = 0
-			}
+			lastTestResultIndex := max(len(testResultMap[testResultMapKey])-1, 0)
 
 			testResults, ok := testResultMap[testResultMapKey]
 			if !ok {

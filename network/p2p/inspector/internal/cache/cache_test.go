@@ -90,7 +90,7 @@ func TestRecordCache_ConcurrentSameRecordInit(t *testing.T) {
 	var wg sync.WaitGroup
 	wg.Add(concurrentAttempts)
 
-	for i := 0; i < concurrentAttempts; i++ {
+	for range concurrentAttempts {
 		go func() {
 			defer wg.Done()
 			gauge, found, err := cache.GetWithInit(nodeID)
@@ -478,7 +478,7 @@ func TestRecordCache_EdgeCasesAndInvalidInputs(t *testing.T) {
 		expectedIds[i] = p2p.MakeId(pid)
 	}
 	// call NodeIDs method concurrently
-	for i := 0; i < 10; i++ {
+	for range 10 {
 		go func() {
 			defer wg.Done()
 			ids := cache.NodeIDs()

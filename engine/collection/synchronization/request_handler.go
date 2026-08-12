@@ -79,7 +79,7 @@ func NewRequestHandlerEngine(
 }
 
 // SubmitLocal submits an event originating on the local node.
-func (r *RequestHandlerEngine) SubmitLocal(event interface{}) {
+func (r *RequestHandlerEngine) SubmitLocal(event any) {
 	err := r.ProcessLocal(event)
 	if err != nil {
 		r.log.Fatal().Err(err).Msg("internal error processing event")
@@ -89,7 +89,7 @@ func (r *RequestHandlerEngine) SubmitLocal(event interface{}) {
 // Submit submits the given event from the node with the given origin ID
 // for processing in a non-blocking manner. It returns instantly and logs
 // a potential processing error internally when done.
-func (r *RequestHandlerEngine) Submit(channel channels.Channel, originID flow.Identifier, event interface{}) {
+func (r *RequestHandlerEngine) Submit(channel channels.Channel, originID flow.Identifier, event any) {
 	err := r.Process(channel, originID, event)
 	if err != nil {
 		r.log.Fatal().Err(err).Msg("internal error processing event")
@@ -97,13 +97,13 @@ func (r *RequestHandlerEngine) Submit(channel channels.Channel, originID flow.Id
 }
 
 // ProcessLocal processes an event originating on the local node.
-func (r *RequestHandlerEngine) ProcessLocal(event interface{}) error {
+func (r *RequestHandlerEngine) ProcessLocal(event any) error {
 	return r.process(r.me.NodeID(), event)
 }
 
 // Process processes the given event from the node with the given origin ID in
 // a blocking manner. It returns the potential processing error when done.
-func (r *RequestHandlerEngine) Process(channel channels.Channel, originID flow.Identifier, event interface{}) error {
+func (r *RequestHandlerEngine) Process(channel channels.Channel, originID flow.Identifier, event any) error {
 	err := r.process(originID, event)
 	if err != nil {
 		if engine.IsIncompatibleInputTypeError(err) {
@@ -119,7 +119,7 @@ func (r *RequestHandlerEngine) Process(channel channels.Channel, originID flow.I
 // Error returns:
 //   - IncompatibleInputTypeError if input has unexpected type
 //   - All other errors are potential symptoms of internal state corruption or bugs (fatal).
-func (r *RequestHandlerEngine) process(originID flow.Identifier, event interface{}) error {
+func (r *RequestHandlerEngine) process(originID flow.Identifier, event any) error {
 	return r.requestMessageHandler.Process(originID, event)
 }
 
@@ -399,7 +399,7 @@ func (r *RequestHandlerEngine) requestProcessingLoop() {
 // Ready returns a ready channel that is closed once the engine has fully started.
 func (r *RequestHandlerEngine) Ready() <-chan struct{} {
 	r.lm.OnStart(func() {
-		for i := 0; i < defaultEngineRequestsWorkers; i++ {
+		for range defaultEngineRequestsWorkers {
 			r.unit.Launch(r.requestProcessingLoop)
 		}
 	})

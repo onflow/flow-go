@@ -77,7 +77,7 @@ func TestFileLock(t *testing.T) {
 			require.NoError(t, err)
 
 			// Acquire and release multiple times
-			for i := 0; i < 3; i++ {
+			for i := range 3 {
 				err := lock.Lock()
 				require.NoError(t, err, "iteration %d", i)
 
@@ -103,7 +103,7 @@ func TestFileLock(t *testing.T) {
 			require.NoError(t, err)
 
 			// Start multiple goroutines trying to acquire the same lock
-			for i := 0; i < numGoroutines; i++ {
+			for range numGoroutines {
 				wg.Add(1)
 				lockHeld.Add(1)
 				go func() {

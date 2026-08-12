@@ -363,7 +363,7 @@ func ScheduleTransactionAtTimestamp(
 	fungibleToken := sdk.Address(sc.FungibleToken.Address)
 
 	serviceAccountAddress := client.SDKServiceAddress()
-	script := []byte(fmt.Sprintf(`
+	script := fmt.Appendf(nil, `
 		import FlowTransactionScheduler from 0x%s
 		import TestFlowTransactionSchedulerHandler from 0x%s
 		import FlowToken from 0x%s
@@ -405,7 +405,7 @@ func ScheduleTransactionAtTimestamp(
 				TestFlowTransactionSchedulerHandler.addScheduledTransaction(tx: <-scheduledTransaction)
 			}
 		} 
-	`, serviceAccountAddress.Hex(), flowTransactionScheduler.Hex(), flowToken.Hex(), fungibleToken.Hex()))
+	`, serviceAccountAddress.Hex(), flowTransactionScheduler.Hex(), flowToken.Hex(), fungibleToken.Hex())
 
 	timeArg, err := cadence.NewUFix64(fmt.Sprintf("%d.0", timestamp))
 	if err != nil {

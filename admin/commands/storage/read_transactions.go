@@ -37,7 +37,7 @@ func NewGetTransactionsCommand(state protocol.State, payloads storage.Payloads, 
 	}
 }
 
-func (c *GetTransactionsCommand) Handler(ctx context.Context, req *admin.CommandRequest) (interface{}, error) {
+func (c *GetTransactionsCommand) Handler(ctx context.Context, req *admin.CommandRequest) (any, error) {
 	data := req.ValidatorData.(*heightRangeReqData)
 
 	limit := uint64(10001)

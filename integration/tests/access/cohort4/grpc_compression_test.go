@@ -63,7 +63,7 @@ func (s *AccessGRPCSuite) SetupTest() {
 	nodeConfigs = append(nodeConfigs, collConfig)
 
 	// need three consensus nodes (unused ghost)
-	for n := 0; n < 3; n++ {
+	for range 3 {
 		conID := unittest.IdentifierFixture()
 		nodeConfig := testnet.NewNodeConfig(flow.RoleConsensus,
 			testnet.WithLogLevel(zerolog.FatalLevel),

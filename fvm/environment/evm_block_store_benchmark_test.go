@@ -18,7 +18,7 @@ func benchmarkBlockProposalGrowth(b *testing.B, txCounts int) {
 		testutils.RunWithTestFlowEVMRootAddress(b, backend, func(rootAddr flow.Address) {
 
 			bs := environment.NewBlockStore(flow.Testnet, backend, backend, backend, rootAddr)
-			for i := 0; i < txCounts; i++ {
+			for range txCounts {
 				bp, err := bs.BlockProposal()
 				require.NoError(b, err)
 				res := testutils.RandomResultFixture(b)

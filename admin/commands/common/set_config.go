@@ -30,7 +30,7 @@ type validatedSetConfigData struct {
 	value any
 }
 
-func (s *SetConfigCommand) Handler(_ context.Context, req *admin.CommandRequest) (interface{}, error) {
+func (s *SetConfigCommand) Handler(_ context.Context, req *admin.CommandRequest) (any, error) {
 	validatedReq := req.ValidatorData.(validatedSetConfigData)
 
 	oldValue := validatedReq.field.Get()

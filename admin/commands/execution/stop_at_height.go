@@ -33,7 +33,7 @@ type StopAtHeightReq struct {
 // Handler method sets the stop height parameters.
 // Errors only if setting of stop height parameters fails.
 // Returns "ok" if successful.
-func (s *StopAtHeightCommand) Handler(_ context.Context, req *admin.CommandRequest) (interface{}, error) {
+func (s *StopAtHeightCommand) Handler(_ context.Context, req *admin.CommandRequest) (any, error) {
 	sah := req.ValidatorData.(StopAtHeightReq)
 
 	oldParams := s.stopControl.GetStopParameters()
@@ -66,7 +66,7 @@ func (s *StopAtHeightCommand) Handler(_ context.Context, req *admin.CommandReque
 // * `admin.InvalidAdminReqError` if any required field is missing or in a wrong format
 func (s *StopAtHeightCommand) Validator(req *admin.CommandRequest) error {
 
-	input, ok := req.Data.(map[string]interface{})
+	input, ok := req.Data.(map[string]any)
 	if !ok {
 		return admin.NewInvalidAdminReqFormatError("expected map[string]any")
 	}

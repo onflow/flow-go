@@ -144,7 +144,7 @@ func (s *GrpcBlocksStreamSuite) TestHappyPath() {
 	currentFinalized := s.BlockState.HighestFinalizedHeight()
 	blockA := s.BlockState.WaitForHighestFinalizedProgress(s.T(), currentFinalized)
 
-	var startValue interface{}
+	var startValue any
 	txCount := 10
 
 	for _, rpc := range s.testedRPCs() {
@@ -243,14 +243,14 @@ func compareBlocks(t *testing.T, accessBlock *flow.Block, observerBlock *flow.Bl
 
 type subscribeBlocksRPCTest struct {
 	name string
-	call func(ctx context.Context, client accessproto.AccessAPIClient, startValue interface{}) func() (*accessproto.SubscribeBlocksResponse, error)
+	call func(ctx context.Context, client accessproto.AccessAPIClient, startValue any) func() (*accessproto.SubscribeBlocksResponse, error)
 }
 
 func (s *GrpcBlocksStreamSuite) getRPCs() []subscribeBlocksRPCTest {
 	return []subscribeBlocksRPCTest{
 		{
 			name: "SubscribeBlocksFromLatest",
-			call: func(ctx context.Context, client accessproto.AccessAPIClient, _ interface{}) func() (*accessproto.SubscribeBlocksResponse, error) {
+			call: func(ctx context.Context, client accessproto.AccessAPIClient, _ any) func() (*accessproto.SubscribeBlocksResponse, error) {
 				stream, err := client.SubscribeBlocksFromLatest(ctx, &accessproto.SubscribeBlocksFromLatestRequest{
 					BlockStatus:       entities.BlockStatus_BLOCK_FINALIZED,
 					FullBlockResponse: true,
@@ -261,7 +261,7 @@ func (s *GrpcBlocksStreamSuite) getRPCs() []subscribeBlocksRPCTest {
 		},
 		{
 			name: "SubscribeBlocksFromStartBlockID",
-			call: func(ctx context.Context, client accessproto.AccessAPIClient, startValue interface{}) func() (*accessproto.SubscribeBlocksResponse, error) {
+			call: func(ctx context.Context, client accessproto.AccessAPIClient, startValue any) func() (*accessproto.SubscribeBlocksResponse, error) {
 				stream, err := client.SubscribeBlocksFromStartBlockID(ctx, &accessproto.SubscribeBlocksFromStartBlockIDRequest{
 					StartBlockId:      startValue.([]byte),
 					BlockStatus:       entities.BlockStatus_BLOCK_FINALIZED,
@@ -273,7 +273,7 @@ func (s *GrpcBlocksStreamSuite) getRPCs() []subscribeBlocksRPCTest {
 		},
 		{
 			name: "SubscribeBlocksFromStartHeight",
-			call: func(ctx context.Context, client accessproto.AccessAPIClient, startValue interface{}) func() (*accessproto.SubscribeBlocksResponse, error) {
+			call: func(ctx context.Context, client accessproto.AccessAPIClient, startValue any) func() (*accessproto.SubscribeBlocksResponse, error) {
 				stream, err := client.SubscribeBlocksFromStartHeight(ctx, &accessproto.SubscribeBlocksFromStartHeightRequest{
 					StartBlockHeight:  startValue.(uint64),
 					BlockStatus:       entities.BlockStatus_BLOCK_FINALIZED,

@@ -186,7 +186,7 @@ func (s *GrpcStateStreamSuite) TestHappyPath() {
 	txGenerator, err := s.net.ContainerByName(testnet.PrimaryAN).TestnetClient()
 	s.Require().NoError(err)
 
-	var startValue interface{}
+	var startValue any
 	txCount := 10
 
 	for _, rpc := range s.testedRPCs() {
@@ -296,7 +296,7 @@ func (s *GrpcStateStreamSuite) generateEvents(client *testnet.Client, txCount in
 
 type subscribeEventsRPCTest struct {
 	name           string
-	call           func(ctx context.Context, client executiondata.ExecutionDataAPIClient, startValue interface{}, filter *executiondata.EventFilter) func() (*executiondata.SubscribeEventsResponse, error)
+	call           func(ctx context.Context, client executiondata.ExecutionDataAPIClient, startValue any, filter *executiondata.EventFilter) func() (*executiondata.SubscribeEventsResponse, error)
 	generateEvents bool // add ability to integration test generate new events or use old events to decrease running test time
 }
 
@@ -304,7 +304,7 @@ func (s *GrpcStateStreamSuite) getRPCs() []subscribeEventsRPCTest {
 	return []subscribeEventsRPCTest{
 		{
 			name: "SubscribeEventsFromLatest",
-			call: func(ctx context.Context, client executiondata.ExecutionDataAPIClient, _ interface{}, filter *executiondata.EventFilter) func() (*executiondata.SubscribeEventsResponse, error) {
+			call: func(ctx context.Context, client executiondata.ExecutionDataAPIClient, _ any, filter *executiondata.EventFilter) func() (*executiondata.SubscribeEventsResponse, error) {
 				stream, err := client.SubscribeEventsFromLatest(ctx, &executiondata.SubscribeEventsFromLatestRequest{
 					EventEncodingVersion: entities.EventEncodingVersion_CCF_V0,
 					Filter:               filter,
@@ -317,7 +317,7 @@ func (s *GrpcStateStreamSuite) getRPCs() []subscribeEventsRPCTest {
 		},
 		{
 			name: "SubscribeEvents",
-			call: func(ctx context.Context, client executiondata.ExecutionDataAPIClient, _ interface{}, filter *executiondata.EventFilter) func() (*executiondata.SubscribeEventsResponse, error) {
+			call: func(ctx context.Context, client executiondata.ExecutionDataAPIClient, _ any, filter *executiondata.EventFilter) func() (*executiondata.SubscribeEventsResponse, error) {
 				// Ignore deprecation warning. keeping these tests until endpoint is removed
 				//nolint:staticcheck
 				stream, err := client.SubscribeEvents(ctx, &executiondata.SubscribeEventsRequest{
@@ -334,7 +334,7 @@ func (s *GrpcStateStreamSuite) getRPCs() []subscribeEventsRPCTest {
 		},
 		{
 			name: "SubscribeEventsFromStartBlockID",
-			call: func(ctx context.Context, client executiondata.ExecutionDataAPIClient, startValue interface{}, filter *executiondata.EventFilter) func() (*executiondata.SubscribeEventsResponse, error) {
+			call: func(ctx context.Context, client executiondata.ExecutionDataAPIClient, startValue any, filter *executiondata.EventFilter) func() (*executiondata.SubscribeEventsResponse, error) {
 				stream, err := client.SubscribeEventsFromStartBlockID(ctx, &executiondata.SubscribeEventsFromStartBlockIDRequest{
 					StartBlockId:         startValue.([]byte),
 					EventEncodingVersion: entities.EventEncodingVersion_CCF_V0,
@@ -348,7 +348,7 @@ func (s *GrpcStateStreamSuite) getRPCs() []subscribeEventsRPCTest {
 		},
 		{
 			name: "SubscribeEventsFromStartHeight",
-			call: func(ctx context.Context, client executiondata.ExecutionDataAPIClient, startValue interface{}, filter *executiondata.EventFilter) func() (*executiondata.SubscribeEventsResponse, error) {
+			call: func(ctx context.Context, client executiondata.ExecutionDataAPIClient, startValue any, filter *executiondata.EventFilter) func() (*executiondata.SubscribeEventsResponse, error) {
 				stream, err := client.SubscribeEventsFromStartHeight(ctx, &executiondata.SubscribeEventsFromStartHeightRequest{
 					StartBlockHeight:     startValue.(uint64),
 					EventEncodingVersion: entities.EventEncodingVersion_CCF_V0,

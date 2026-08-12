@@ -15,7 +15,7 @@ import (
 func eventKey(from flow.Identifier, channel channels.Channel, event any) (string, error) {
 	marshaler := json.NewMarshaler()
 
-	tag, err := marshaler.Marshal([]byte(fmt.Sprintf("testthenetwork %s %T", channel, event)))
+	tag, err := marshaler.Marshal(fmt.Appendf(nil, "testthenetwork %s %T", channel, event))
 	if err != nil {
 		return "", fmt.Errorf("could not encode the tag: %w", err)
 	}

@@ -56,7 +56,7 @@ type Instance struct {
 	stop                  Condition
 
 	// instance data
-	queue          chan interface{}
+	queue          chan any
 	updatingBlocks sync.RWMutex
 	headers        map[flow.Identifier]*flow.Header
 	pendings       map[flow.Identifier]*model.SignedProposal // indexed by parent ID
@@ -153,7 +153,7 @@ func NewInstance(t *testing.T, options ...Option) *Instance {
 		// instance data
 		pendings: make(map[flow.Identifier]*model.SignedProposal),
 		headers:  make(map[flow.Identifier]*flow.Header),
-		queue:    make(chan interface{}, 1024),
+		queue:    make(chan any, 1024),
 
 		// instance mocks
 		committee: &mocks.DynamicCommittee{},

@@ -43,7 +43,7 @@ func (suite *RecoverySuite) TestProposal_Recovery() {
 
 	// create a client for each of the collectors
 	clients := make([]*client.Client, nNodes)
-	for i := 0; i < nNodes; i++ {
+	for i := range nNodes {
 		node := suite.Collector(0, uint(i))
 		clients[i], err = node.SDKClient()
 		suite.Require().NoError(err)
@@ -51,7 +51,7 @@ func (suite *RecoverySuite) TestProposal_Recovery() {
 
 	// send a bunch of transactions
 	txIDs := make([]flow.Identifier, 0, nTransactions)
-	for i := 0; i < nTransactions; i++ {
+	for i := range nTransactions {
 
 		tx := suite.NextTransaction()
 		// round-robin transactions between nodes
@@ -78,7 +78,7 @@ func (suite *RecoverySuite) TestProposal_Recovery() {
 
 	// send some more transactions
 	txIDs = make([]flow.Identifier, 0, nTransactions)
-	for i := 0; i < nTransactions; i++ {
+	for i := range nTransactions {
 		tx := suite.NextTransaction()
 
 		// round-robin transactions between collectors (except the paused one)
@@ -103,7 +103,7 @@ func (suite *RecoverySuite) TestProposal_Recovery() {
 
 	// send some more transactions
 	txIDs = make([]flow.Identifier, 0, nTransactions)
-	for i := 0; i < nTransactions; i++ {
+	for i := range nTransactions {
 		tx := suite.NextTransaction()
 
 		// round-robin transactions between collectors (except the paused ones)

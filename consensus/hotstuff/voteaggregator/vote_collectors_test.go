@@ -103,16 +103,14 @@ func (s *VoteCollectorsTestSuite) TestGetOrCreateCollectors_ConcurrentAccess() {
 	view := s.lowestLevel + 10
 	s.prepareMockedCollector(view)
 	var wg sync.WaitGroup
-	for i := 0; i < 10; i++ {
-		wg.Add(1)
-		go func() {
+	for range 10 {
+		wg.Go(func() {
 			_, created, err := s.collectors.GetOrCreateCollector(view)
 			require.NoError(s.T(), err)
 			if created {
 				createdTimes.Add(1)
 			}
-			wg.Done()
-		}()
+		})
 	}
 
 	wg.Wait()
@@ -123,7 +121,7 @@ func (s *VoteCollectorsTestSuite) TestGetOrCreateCollectors_ConcurrentAccess() {
 func (s *VoteCollectorsTestSuite) TestPruneUpToView() {
 	numberOfCollectors := uint64(10)
 	prunedViews := make([]uint64, 0)
-	for i := uint64(0); i < numberOfCollectors; i++ {
+	for i := range numberOfCollectors {
 		view := s.lowestLevel + i
 		s.prepareMockedCollector(view)
 		_, _, err := s.collectors.GetOrCreateCollector(view)
@@ -134,7 +132,7 @@ func (s *VoteCollectorsTestSuite) TestPruneUpToView() {
 	pruningHeight := s.lowestLevel + numberOfCollectors
 
 	expectedCollectors := make([]hotstuff.VoteCollector, 0)
-	for i := uint64(0); i < numberOfCollectors; i++ {
+	for i := range numberOfCollectors {
 		view := pruningHeight + i
 		s.prepareMockedCollector(view)
 		collector, _, err := s.collectors.GetOrCreateCollector(view)

@@ -109,7 +109,7 @@ func TestEventEmitted(t *testing.T) {
 		)
 		assert.NoError(t, err)
 
-		script := []byte(fmt.Sprintf(`
+		script := fmt.Appendf(nil, `
 			import Test from 0x%s
 
 			transaction {
@@ -117,7 +117,7 @@ func TestEventEmitted(t *testing.T) {
 					Test.emitMyEvent(x: 1, y: 2)
 				}
 			}
-		`, address.Hex()))
+		`, address.Hex())
 
 		tx := flowsdk.NewTransaction().
 			SetScript(script).

@@ -105,7 +105,7 @@ func verifyTCSignatureManyMessages(
 
 	messages := make([][]byte, 0, len(pks))
 	hashers := make([]hash.Hasher, 0, len(pks))
-	for i := 0; i < len(pks); i++ {
+	for i := range pks {
 		messages = append(messages, MakeTimeoutMessage(view, highQCViews[i]))
 		hashers = append(hashers, hasher)
 	}

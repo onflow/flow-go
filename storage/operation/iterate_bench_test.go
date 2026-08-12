@@ -59,7 +59,7 @@ func BenchmarkFindHighestAtOrBelowByPrefixUsingSeeker(t *testing.B) {
 }
 
 // findHighestAtOrBelowByPrefixUsingIterator is the original operation.FindHighestAtOrBelowByPrefix().
-func findHighestAtOrBelowByPrefixUsingIterator(r storage.Reader, prefix []byte, height uint64, entity interface{}) (errToReturn error) {
+func findHighestAtOrBelowByPrefixUsingIterator(r storage.Reader, prefix []byte, height uint64, entity any) (errToReturn error) {
 	if len(prefix) == 0 {
 		return fmt.Errorf("prefix must not be empty")
 	}
@@ -104,6 +104,6 @@ func findHighestAtOrBelowByPrefixUsingIterator(r storage.Reader, prefix []byte, 
 	return nil
 }
 
-func findHighestAtOrBelowByPrefixUsingSeeker(r storage.Reader, prefix []byte, height uint64, entity interface{}) (errToReturn error) {
+func findHighestAtOrBelowByPrefixUsingSeeker(r storage.Reader, prefix []byte, height uint64, entity any) (errToReturn error) {
 	return operation.FindHighestAtOrBelowByPrefix(r, prefix, height, entity)
 }
