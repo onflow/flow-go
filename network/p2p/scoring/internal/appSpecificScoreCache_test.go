@@ -180,14 +180,14 @@ func TestAppSpecificScoreCache_ConcurrentGetWhileUpdatingSamePeer(t *testing.T) 
 
 	// writer: repeatedly updates the same peer's score.
 	wg.Go(func() {
-		for i := 0; i < updates; i++ {
+		for i := range updates {
 			require.NoError(t, cache.AdjustWithInit(peerID, float64(i), time.Now()))
 		}
 	})
 
 	// reader: repeatedly reads the same peer's score while it is being updated.
 	wg.Go(func() {
-		for i := 0; i < updates; i++ {
+		for range updates {
 			score, _, found := cache.Get(peerID)
 			if !found {
 				continue // not initialized yet

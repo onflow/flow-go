@@ -83,7 +83,7 @@ func TestConsumer_ConcurrentNotifications(t *testing.T) {
 	var wg sync.WaitGroup
 	for range workers {
 		wg.Go(func() {
-			for i := 0; i < iterations; i++ {
+			for i := range iterations {
 				notify[i%len(notify)](violation)
 			}
 		})

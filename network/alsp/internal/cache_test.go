@@ -825,7 +825,7 @@ func TestSpamRecordCache_ConcurrentGetWhileAdjustingSameRecord(t *testing.T) {
 	// writer: repeatedly adjusts the same record, and verifies the returned penalty is the one
 	// produced by its own adjustment (captured inside the adjust function, under the lock).
 	wg.Go(func() {
-		for i := 0; i < adjustments; i++ {
+		for range adjustments {
 			var want float64
 			penalty, err := cache.AdjustWithInit(originID, func(record *model.ProtocolSpamRecord) (*model.ProtocolSpamRecord, error) {
 				record.Penalty += penaltyDelta
@@ -839,7 +839,7 @@ func TestSpamRecordCache_ConcurrentGetWhileAdjustingSameRecord(t *testing.T) {
 
 	// reader: repeatedly reads the same record while it is being adjusted.
 	wg.Go(func() {
-		for i := 0; i < adjustments; i++ {
+		for range adjustments {
 			record, ok := cache.Get(originID)
 			if !ok {
 				continue // record not initialized yet
