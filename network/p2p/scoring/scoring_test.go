@@ -36,6 +36,8 @@ import (
 // eventually disconnects from the spamming peer on the gossipsub layer, i.e., messages sent by the spamming peer are no longer
 // received by the node.
 func TestInvalidCtrlMsgScoringIntegration(t *testing.T) {
+	t.Parallel()
+
 	ctx, cancel := context.WithCancel(context.Background())
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
 	sporkId := unittest.IdentifierFixture()

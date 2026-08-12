@@ -585,6 +585,8 @@ func Test_WAL(t *testing.T) {
 }
 
 func TestLedgerFunctionality(t *testing.T) {
+	t.Parallel()
+
 	const (
 		checkpointDistance = math.MaxInt // A large number to prevent checkpoint creation.
 		checkpointsToKeep  = 1

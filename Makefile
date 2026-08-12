@@ -10,6 +10,19 @@ VERSION := $(shell git describe --tags --abbrev=2 --match "v*" --match "secure-c
 # dynamically split up CI jobs into smaller jobs that can be run in parallel
 GO_TEST_PACKAGES := ./...
 
+# The slowest test packages. `go test` schedules package test binaries in argument order
+# (alphabetical for ./...), so these long, internally-sequential packages would otherwise
+# start last and form a straggler tail that dominates the wall time of a full-suite run.
+# Listing them first lets them run while the remaining packages fill the other slots.
+# Only prepended when running the full suite (not for CI's per-job package subsets).
+# Overlapping package patterns are deduplicated by the go tool, so nothing runs twice.
+# First line: the slowest packages (the wall-time critical path).
+# Second line: second-tier packages (~20-35s each) that would otherwise start only
+# after the first wave of short packages drains and form a tail at the end of the run.
+SLOW_TEST_PACKAGES := ./network/p2p/scoring/... ./ledger/complete/... ./network/p2p/connection/... ./network/p2p/inspector/validation/... \
+	./consensus/integration/... ./cmd/util/ledger/util/... ./engine/verification/test/... ./network/alsp/... ./network/test/... \
+	./network/p2p/test/... ./network/p2p/node/... ./engine/verification/assigner/blockconsumer/... ./module/dkg/... ./engine/access/state_stream/backend/...
+
 # Image tag: if image tag is not set, set it with version (or short commit if empty)
 ifeq (${IMAGE_TAG},)
 IMAGE_TAG := ${VERSION}
@@ -70,7 +83,7 @@ update-cadence-version:
 .PHONY: unittest-main
 unittest-main:
 	# test all packages
-	CGO_CFLAGS=$(CRYPTO_FLAG) go test $(if $(VERBOSE),-v,) -coverprofile=$(COVER_PROFILE) -covermode=atomic $(if $(RACE_DETECTOR),-race,) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) $(GO_TEST_PACKAGES)
+	CGO_CFLAGS=$(CRYPTO_FLAG) go test $(if $(VERBOSE),-v,) -coverprofile=$(COVER_PROFILE) -covermode=atomic $(if $(RACE_DETECTOR),-race,) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) $(if $(filter ./...,$(GO_TEST_PACKAGES)),$(SLOW_TEST_PACKAGES)) $(GO_TEST_PACKAGES)
 
 .PHONY: install-mock-generators
 install-mock-generators:
