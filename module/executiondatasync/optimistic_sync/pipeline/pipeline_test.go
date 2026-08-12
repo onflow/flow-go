@@ -16,6 +16,42 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
+// TestPipelineParentUpdateBeforeRunNotLost is a regression test verifying that a parent state
+// update delivered before (or concurrently with) Run is not lost. Run is invoked with a stale
+// initial parent state (StatePending), simulating a parent update that arrives while the
+// pipeline is being started. Before the fix, Run unconditionally overwrote the cached parent
+// state with the stale initial value, so the pipeline never observed the parent reaching
+// StateComplete and deadlocked in StateWaitingPersist without ever persisting.
+func TestPipelineParentUpdateBeforeRunNotLost(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		pipeline, mockCore, updateChan, _ := createPipeline(t)
+
+		mockCore.On("Download", mock.Anything).Return(nil)
+		mockCore.On("Index").Return(nil)
+		mockCore.On("Persist").Return(nil)
+
+		// the parent completes and the result is sealed BEFORE Run is called
+		pipeline.OnParentStateUpdated(optimistic_sync.StateComplete)
+		pipeline.SetSealed()
+
+		go func() {
+			// Run receives the (now stale) initial parent state
+			err := pipeline.Run(context.Background(), mockCore, optimistic_sync.StatePending)
+			require.NoError(t, err)
+		}()
+
+		// despite the stale initial state, the pipeline must progress all the way to Complete
+		for _, expected := range []optimistic_sync.State{optimistic_sync.StateProcessing, optimistic_sync.StateWaitingPersist, optimistic_sync.StateComplete} {
+			synctest.Wait()
+			assertUpdate(t, updateChan, expected)
+		}
+
+		// wait for Run goroutine to finish
+		synctest.Wait()
+		assertNoUpdate(t, pipeline, updateChan, optimistic_sync.StateComplete)
+	})
+}
+
 // TestPipelineStateTransitions verifies that the pipeline correctly transitions
 // through states when provided with the correct conditions.
 func TestPipelineStateTransitions(t *testing.T) {
