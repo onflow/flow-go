@@ -12,7 +12,8 @@ All commands run from `integration/localnet/`:
 - `make start` - Build images and start all nodes + metrics stack
 - `make start-cached` - Start without rebuilding (faster iteration)
 - `make stop` - Stop all services
-- `make clean-data` - Remove all generated data and bootstrap filest
+- `make verify` - Smoke-check that the network is sealing blocks
+- `make clean-data` - Remove all generated data and bootstrap files
 
 ### Network Configuration
 
@@ -48,10 +49,12 @@ grpcurl -plaintext localhost:4001 list
 
 ### Flow CLI
 
-Connect using network name `localnet` (config at `integration/localnet/client/flow-localnet.json`):
+Connect using network name `localnet` (a ready-made config with the network endpoints is at `integration/localnet/client/flow-localnet.json`):
 
 - Service account address: `f8d6e0586b0a20c7`
 - Example: `flow -n localnet accounts get f8d6e0586b0a20c7`
+- To use the checked-in config directly: `flow -f integration/localnet/client/flow-localnet.json -n localnet accounts get f8d6e0586b0a20c7`
+  (the checked-in config only defines networks; account keys still need to be added to your own `flow.json` for signing transactions - see the README)
 
 ### Observability
 
@@ -66,10 +69,10 @@ Connect using network name `localnet` (config at `integration/localnet/client/fl
 
 For single-node rebuild:
 ```
-docker-compose -f docker-compose.nodes.yml build access_1 && docker-compose -f docker-compose.nodes.yml up -d access_1
+docker compose -f docker-compose.nodes.yml build access_1 && docker compose -f docker-compose.nodes.yml up -d access_1
 ```
 
 ### Viewing Logs
 
 - All nodes: `make logs`
-- Specific node: `docker-compose -f docker-compose.nodes.yml logs -f access_1`
+- Specific node: `docker compose -f docker-compose.nodes.yml logs -f access_1`

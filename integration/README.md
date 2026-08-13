@@ -132,6 +132,6 @@ in the Makefile.
 
 ### Load testing
 
-To send random transactions, for example to load test a network, run `cd integration/localnet; make load`.
+To load test a network, use the TPS loader from the [flow-execution-effort-estimation](https://github.com/onflow/flow-execution-effort-estimation) repository (private - requires repository access).
 
-In order to build a docker container with the benchmarking binary, run `make docker-native-build-loader` from the root of this repository.
+To run it against a localnet, start the localnet first, then run `make load-local` from the root of the loader repository. The loader joins the localnet docker network, and its metrics are scraped by the localnet Prometheus and visible in the local Grafana (http://localhost:3000) under the `flow_execution_effort_estimation_*` metrics.
