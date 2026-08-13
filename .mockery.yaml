@@ -7,11 +7,6 @@ template: testify
 template-data:
   unroll-variadic: true
 packages:
-  github.com/onflow/flow-go-sdk/access:
-    config:
-      dir: integration/benchmark/mock
-    interfaces:
-      Client: { }
   github.com/onflow/flow-go/access:
   github.com/onflow/flow-go/access/backends/extended:
   github.com/onflow/flow-go/access/validator:

@@ -253,12 +253,28 @@ func VerifySignatureFromTransaction(
 }
 
 // VerifyPOP verifies a proof of possession (PoP) for the receiver public key; currently only works for BLS
+//
+// The function errors:
+//   - NewValueErrorf for any user error
+//   - panic for any other unexpected error
 func VerifyPOP(pk *runtime.PublicKey, s crypto.Signature) (bool, error) {
+
+	// a non-BLS runtime key is valid user input, so reject it with an error
+	if pk.SignAlgo != runtime.SignatureAlgorithmBLS_BLS12_381 {
+		return false, errors.NewValueErrorf(
+			fmt.Sprintf("%d", pk.SignAlgo),
+			"public key is not a BLS key")
+	}
 
 	key, err := crypto.DecodePublicKey(crypto.BLSBLS12381, pk.PublicKey)
 	if err != nil {
-		// at this stage, the runtime public key is valid and there are no possible user value errors
-		panic(fmt.Errorf("verify PoP failed: runtime BLS public key should be valid %x", pk.PublicKey))
+		// invalid BLS bytes are a user error; any other decode error is
+		// unexpected and escalated, unlike VerifySignatureFromRuntime which
+		// treats all decode errors as user errors
+		if crypto.IsInvalidInputsError(err) {
+			return false, errors.NewValueErrorf(hex.EncodeToString(pk.PublicKey), "cannot decode public key: %w", err)
+		}
+		panic(fmt.Errorf("decode public key failed with unexpected error %w", err))
 	}
 
 	valid, err := crypto.BLSVerifyPOP(key, s)
@@ -288,22 +304,38 @@ func AggregateSignatures(sigs [][]byte) (crypto.Signature, error) {
 }
 
 // AggregatePublicKeys aggregate multiple public keys into one; currently only works for BLS
+//
+// The function errors:
+//   - NewValueErrorf or a propagated crypto module error for any user error
+//   - panic for any other unexpected error
 func AggregatePublicKeys(keys []*runtime.PublicKey) (*runtime.PublicKey, error) {
 	pks := make([]crypto.PublicKey, 0, len(keys))
-	for _, key := range keys {
+	for i, key := range keys {
+		// a non-BLS runtime key is valid user input, so reject it with an error
+		if key.SignAlgo != runtime.SignatureAlgorithmBLS_BLS12_381 {
+			return nil, errors.NewValueErrorf(
+				fmt.Sprintf("%d", key.SignAlgo),
+				"public key at index %d is not a BLS key", i)
+		}
 		// TODO: avoid validating the public keys again since Cadence makes sure runtime keys have been validated.
 		// This requires exporting an unsafe function in the crypto package.
 		pk, err := crypto.DecodePublicKey(crypto.BLSBLS12381, key.PublicKey)
 		if err != nil {
-			// at this stage, the runtime public key is valid and there are no possible user value errors
-			panic(fmt.Errorf("aggregate BLS public keys failed: runtime public key should be valid %x", key.PublicKey))
+			// invalid BLS bytes are a user error; any other decode error is
+			// unexpected and escalated, unlike VerifySignatureFromRuntime which
+			// treats all decode errors as user errors
+			if crypto.IsInvalidInputsError(err) {
+				return nil, errors.NewValueErrorf(hex.EncodeToString(key.PublicKey), "cannot decode public key: %w", err)
+			}
+			panic(fmt.Errorf("decode public key failed with unexpected error %w", err))
 		}
 		pks = append(pks, pk)
 	}
 
 	pk, err := crypto.AggregateBLSPublicKeys(pks)
 	if err != nil {
-		// check for a user error
+		// check for user errors (errNotBLSKey is unreachable since all keys were
+		// decoded as BLS, but the function documents it, so check for it)
 		if crypto.IsBLSAggregateEmptyListError(err) || crypto.IsNotBLSKeyError(err) {
 			return nil, err
 		}
