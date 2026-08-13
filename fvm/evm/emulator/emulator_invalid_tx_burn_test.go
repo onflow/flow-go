@@ -256,17 +256,19 @@ func TestRunTransaction_FloorDataGasFailureBurnsNothing(t *testing.T) {
 			account := fundTestEOA(t, backend, rootAddr)
 			signer := account.Address()
 
-			// calldata heavy in non-zero bytes: floor data gas (21000 + 40/byte)
-			// exceeds intrinsic gas (21000 + 16/byte) for the same payload
+			// calldata heavy in non-zero bytes: floor data gas exceeds
+			// intrinsic gas (21000 + 16/byte) for the same payload
+			// (Amsterdam/EIP-7976 prices the floor at 21000 + 64/byte)
 			data := bytes.Repeat([]byte{0x01}, 100)
-			intrinsic, err := gethCore.IntrinsicGas(data, nil, nil, false, true, true, true)
+			rules := emulator.DefaultChainConfig.Rules(blockNumber, true, 0)
+			intrinsic, err := gethCore.IntrinsicGas(data, nil, nil, false, rules, gethParams.CostPerStateByte)
 			require.NoError(t, err)
-			floor, err := gethCore.FloorDataGas(data)
+			floor, err := gethCore.FloorDataGas(rules, data, nil)
 			require.NoError(t, err)
-			require.Greater(t, floor, intrinsic, "test parameters must straddle the two checks")
+			require.Greater(t, floor, intrinsic.Sum(), "test parameters must straddle the two checks")
 
 			// passes the intrinsic-gas check (equality), fails the floor check
-			gasLimit := intrinsic
+			gasLimit := intrinsic.Sum()
 
 			tx := account.SignTx(t, gethTypes.NewTransaction(
 				0,
