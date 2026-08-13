@@ -55,7 +55,7 @@ func TestInvalidTxDoesNotBurnGas_EndToEnd(t *testing.T) {
 			sc := systemcontracts.SystemContractsForChain(chain.ChainID())
 			coinbaseAddr := types.Address{1, 2, 3}
 
-			code := []byte(fmt.Sprintf(
+			code := fmt.Appendf(nil,
 				`
 				import EVM from %s
 				transaction(tx: [UInt8], coinbaseBytes: [UInt8; 20]){
@@ -68,7 +68,7 @@ func TestInvalidTxDoesNotBurnGas_EndToEnd(t *testing.T) {
 				}
 				`,
 				sc.EVMContract.Address.HexWithPrefix(),
-			))
+			)
 
 			// baseline state of the signer EOA
 			balanceBefore := types.BalanceToBigInt(getEVMAccountBalance(t, ctx, vm, snapshot, testAccount.Address()))
