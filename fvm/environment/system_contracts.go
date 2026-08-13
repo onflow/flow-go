@@ -101,8 +101,8 @@ var verifyPayersBalanceForTransactionExecutionSpec = ContractFunctionSpec{
 			),
 			sema.AccountType,
 		),
-		sema.UInt64Type,
-		sema.UInt64Type,
+		sema.UFix64Type,
+		sema.UFix64Type,
 	},
 }
 
@@ -142,8 +142,8 @@ var deductTransactionFeeSpec = ContractFunctionSpec{
 			),
 			sema.AccountType,
 		),
-		sema.UInt64Type,
-		sema.UInt64Type,
+		sema.UFix64Type,
+		sema.UFix64Type,
 	},
 }
 
