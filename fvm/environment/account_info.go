@@ -6,6 +6,7 @@ import (
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/common"
 
+	"github.com/onflow/flow-go/fvm/blueprints"
 	"github.com/onflow/flow-go/fvm/storage/state"
 	"github.com/onflow/flow-go/fvm/tracing"
 	"github.com/onflow/flow-go/model/flow"
@@ -225,6 +226,10 @@ func (info *accountInfo) GetStorageCapacity(
 	return StorageMBUFixToBytesUInt(result), nil
 }
 
+// flowTokenVaultBalanceFieldName is the name of the balance field on the
+// FlowToken.Vault resource stored at blueprints.FlowTokenVaultStoragePath.
+const flowTokenVaultBalanceFieldName = "balance"
+
 func (info *accountInfo) GetAccountBalance(
 	runtimeAddress common.Address,
 ) (
@@ -243,12 +248,48 @@ func (info *accountInfo) GetAccountBalance(
 		return 0, fmt.Errorf("get account balance failed: %w", err)
 	}
 
-	result, invokeErr := info.systemContracts.AccountBalance(flow.Address(runtimeAddress))
-	if invokeErr != nil {
-		return 0, invokeErr
+	// Read the balance of the account's canonical FlowToken vault directly
+	// from storage, without invoking any contract code.
+	value, err := info.systemContracts.ReadStored(
+		flow.Address(runtimeAddress),
+		blueprints.FlowTokenVaultStoragePath,
+	)
+	if err != nil {
+		return 0, fmt.Errorf("get account balance failed: %w", err)
 	}
 
-	return uint64(result.(cadence.UFix64)), nil
+	// Accounts are not required to have a vault; they have a balance of 0.
+	if value == nil {
+		return 0, nil
+	}
+
+	// The account owner can store any value at the vault path. Only a real
+	// FlowToken.Vault of this chain counts towards the account's balance;
+	// anything else is treated as "no vault", matching the typed
+	// borrow of the previous contract-based implementation, which evaluates
+	// to nil (balance 0) for any type mismatch.
+	vault, ok := value.(cadence.Resource)
+	if !ok {
+		return 0, nil
+	}
+
+	if vaultType := vault.Type(); vaultType == nil ||
+		vaultType.ID() != string(info.systemContracts.FlowTokenVaultTypeID()) {
+		return 0, nil
+	}
+
+	// At this point the value is verified to be this chain's FlowToken.Vault,
+	// which always has a balance: UFix64 field. A missing or wrongly typed
+	// field is therefore not a type mismatch (balance 0) but an error.
+	balance, ok := cadence.FieldsMappedByName(vault)[flowTokenVaultBalanceFieldName].(cadence.UFix64)
+	if !ok {
+		return 0, fmt.Errorf(
+			"get account balance failed: FlowToken.Vault at %s has no UFix64 field %q",
+			blueprints.FlowTokenVaultStoragePath,
+			flowTokenVaultBalanceFieldName)
+	}
+
+	return uint64(balance), nil
 }
 
 func (info *accountInfo) GetAccountAvailableBalance(

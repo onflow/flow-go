@@ -186,32 +186,6 @@ func (sys *SystemContracts) AccountAvailableBalance(
 	)
 }
 
-var accountBalanceInvocationSpec = ContractFunctionSpec{
-	AddressFromChain: ServiceAddress,
-	LocationName:     systemcontracts.ContractNameServiceAccount,
-	FunctionName:     systemcontracts.ContractServiceAccountFunction_defaultTokenBalance,
-	ArgumentTypes: []sema.Type{
-		sema.NewReferenceType(
-			nil,
-			sema.UnauthorizedAccess,
-			sema.AccountType,
-		),
-	},
-}
-
-// AccountBalance executes the get available balance contract on the service
-// account.
-func (sys *SystemContracts) AccountBalance(
-	address flow.Address,
-) (cadence.Value, error) {
-	return sys.Invoke(
-		accountBalanceInvocationSpec,
-		[]cadence.Value{
-			cadence.Address(address),
-		},
-	)
-}
-
 var accountStorageCapacitySpec = ContractFunctionSpec{
 	AddressFromChain: ServiceAddress,
 	LocationName:     systemcontracts.ContractNameStorageFees,
@@ -219,6 +193,26 @@ var accountStorageCapacitySpec = ContractFunctionSpec{
 	ArgumentTypes: []sema.Type{
 		sema.TheAddressType,
 	},
+}
+
+// ReadStored reads a value stored at the given path in an account's storage
+// directly from the state, without invoking any contract code.
+// It returns a nil value (and no error) if nothing is stored at the path.
+func (sys *SystemContracts) ReadStored(
+	address flow.Address,
+	path cadence.Path,
+) (cadence.Value, error) {
+	runtime := sys.runtime.BorrowCadenceRuntime()
+	defer sys.runtime.ReturnCadenceRuntime(runtime)
+
+	return runtime.ReadStored(common.Address(address), path)
+}
+
+// FlowTokenVaultTypeID returns the fully qualified type ID of the
+// FlowToken.Vault resource for this chain
+// (e.g. "A.0ae53cb6e3f42a79.FlowToken.Vault").
+func (sys *SystemContracts) FlowTokenVaultTypeID() common.TypeID {
+	return systemcontracts.SystemContractsForChain(sys.chain.ChainID()).FlowTokenVaultTypeID()
 }
 
 // AccountStorageCapacity executes the get storage capacity contract on the
