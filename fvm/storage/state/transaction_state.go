@@ -103,6 +103,18 @@ type NestedTransactionPreparer interface {
 		error,
 	)
 
+	// BeginNestedTransactionForDerivedData creates a unrestricted nested
+	// transaction for computing a derived data value (e.g. loading a program
+	// into the programs cache). Its state meters unconditionally, so the
+	// cached snapshot's meter is deterministic regardless of the caller's
+	// metering scope; see ExecutionState.NewChildForDerivedData (internal
+	// issue #7126). This returns error if the current nested transaction is
+	// program restricted.
+	BeginNestedTransactionForDerivedData() (
+		NestedTransactionId,
+		error,
+	)
+
 	// BeginNestedTransactionWithMeterParams creates a unrestricted nested
 	// transaction within the current unrestricted (nested) transaction, using
 	// the provided meter parameters. This returns error if the current nested
@@ -310,6 +322,25 @@ func (txnState *transactionState) BeginNestedTransaction() (
 	}
 
 	child := txnState.current().NewChild()
+	txnState.push(child, nil)
+
+	return NestedTransactionId{
+		state: child,
+	}, nil
+}
+
+func (txnState *transactionState) BeginNestedTransactionForDerivedData() (
+	NestedTransactionId,
+	error,
+) {
+	if txnState.IsParseRestricted() {
+		return NestedTransactionId{}, fmt.Errorf(
+			"cannot begin a unrestricted nested transaction inside a " +
+				"program restricted nested transaction",
+		)
+	}
+
+	child := txnState.current().NewChildForDerivedData()
 	txnState.push(child, nil)
 
 	return NestedTransactionId{

@@ -49,6 +49,7 @@ import (
 	"github.com/onflow/flow-go/fvm/evm/types"
 	"github.com/onflow/flow-go/fvm/meter"
 	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
+	"github.com/onflow/flow-go/fvm/storage/derived"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/fvm/storage/snapshot/mock"
 	"github.com/onflow/flow-go/fvm/storage/state"
@@ -1860,6 +1861,84 @@ func TestEnforcingComputationLimit(t *testing.T) {
 
 		})
 	}
+}
+
+// TestProgramCacheMeteringIsDeterministic verifies that the four cache-state
+// dependent computation kinds from internal issue #7126 are charged
+// identically whether a program is loaded into a cold cache (miss) or replayed
+// from a warm cache (hit).
+func TestProgramCacheMeteringIsDeterministic(t *testing.T) {
+	t.Parallel()
+
+	cacheStateDependentKinds := []common.ComputationKind{
+		environment.ComputationKindResolveLocation,
+		environment.ComputationKindGetCode,
+		environment.ComputationKindGetAccountContractCode,
+		environment.ComputationKindGetOrLoadProgram,
+	}
+
+	newVMTest().
+		withContextOptions(
+			fvm.WithAuthorizationChecksEnabled(false),
+			fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
+			fvm.WithContractDeploymentRestricted(false),
+		).
+		run(func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, snapshotTree snapshot.SnapshotTree) {
+			privateKey, err := testutil.GenerateAccountPrivateKey()
+			require.NoError(t, err)
+			snapshotTree, accounts, err := testutil.CreateAccounts(
+				vm, snapshotTree, []flow.AccountPrivateKey{privateKey}, chain)
+			require.NoError(t, err)
+			account := accounts[0]
+
+			// Deploy a trivial contract that the test transaction imports.
+			deploy := blueprints.DeployContractTransaction(
+				account,
+				[]byte("access(all) contract C { access(all) fun answer(): Int { return 42 } }"),
+				"C")
+			require.NoError(t, testutil.SignTransaction(deploy, account, privateKey, 0))
+			deployBody, err := deploy.Build()
+			require.NoError(t, err)
+			executionSnapshot, output, err := vm.Run(ctx, fvm.Transaction(deployBody, 0), snapshotTree)
+			require.NoError(t, err)
+			require.NoError(t, output.Err)
+			snapshotTree = snapshotTree.Append(executionSnapshot)
+
+			// A transaction that imports and uses the contract.
+			importTx, err := flow.NewTransactionBodyBuilder().
+				SetScript(fmt.Appendf(nil, `
+					import C from %s
+					transaction { execute { log(C.answer()) } }
+				`, account.HexWithPrefix())).
+				SetPayer(account).
+				Build()
+			require.NoError(t, err)
+
+			// intensities runs the import tx against the given derived block data
+			// (the program cache) and returns the recorded computation intensities.
+			intensities := func(dbd *derived.DerivedBlockData, txnIndex uint32) meter.MeteredComputationIntensities {
+				runCtx := fvm.NewContextFromParent(ctx, fvm.WithDerivedBlockData(dbd))
+				_, output, err := vm.Run(runCtx, fvm.Transaction(importTx, txnIndex), snapshotTree)
+				require.NoError(t, err)
+				require.NoError(t, output.Err)
+				return output.ComputationIntensities
+			}
+
+			// Cold: a fresh cache computes the program (miss).
+			cold := intensities(derived.NewEmptyDerivedBlockData(0), 0)
+
+			// Warm: an earlier transaction populated the cache, so this is a hit.
+			warmCache := derived.NewEmptyDerivedBlockData(0)
+			_ = intensities(warmCache, 0)
+			warm := intensities(warmCache, 1)
+
+			for _, kind := range cacheStateDependentKinds {
+				// guard against a trivial pass where nothing was charged.
+				require.NotZero(t, cold[kind], "kind %v should be charged on a cold load", kind)
+				require.Equal(t, cold[kind], warm[kind],
+					"kind %v must be charged the same cold vs warm", kind)
+			}
+		})(t)
 }
 
 func TestStorageCapacity(t *testing.T) {

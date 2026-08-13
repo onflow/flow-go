@@ -3,6 +3,7 @@ package state_test
 import (
 	"testing"
 
+	"github.com/onflow/cadence/common"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/fvm/meter"
@@ -10,6 +11,11 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
+
+var computeUsage = common.ComputationUsage{
+	Kind:      common.ComputationKindStatement,
+	Intensity: 3,
+}
 
 func createByteArray(size int) []byte {
 	bytes := make([]byte, size)
@@ -331,5 +337,42 @@ func TestExecutionState_MeteringDisabled(t *testing.T) {
 		_, err := st.Get(key1)
 		require.NoError(t, err)
 		require.Equal(t, key1Size+value1Size, st.InteractionUsed())
+	})
+}
+
+// TestExecutionState_NewChildForDerivedData verifies that a derived-data
+// child meters regardless of the parent's scope, keeps its own controller, and
+// enforces limits only when the parent's metering is enabled (see internal
+// issue #7126).
+func TestExecutionState_NewChildForDerivedData(t *testing.T) {
+	t.Run("meters even when parent metering is disabled", func(t *testing.T) {
+		parent := state.NewExecutionState(nil, state.DefaultParameters())
+		parent.RunWithMeteringDisabled(func() {
+			child := parent.NewChildForDerivedData()
+			require.NoError(t, child.MeterComputation(computeUsage))
+			require.Equal(t, computeUsage.Intensity, child.ComputationIntensities()[computeUsage.Kind])
+		})
+
+		// parent still records nothing while disabled: child controller is separate.
+		parent.RunWithMeteringDisabled(func() {
+			require.NoError(t, parent.MeterComputation(computeUsage))
+		})
+		require.Zero(t, parent.ComputationIntensities()[computeUsage.Kind])
+	})
+
+	t.Run("limits enforced only when parent metering is enabled", func(t *testing.T) {
+		params := state.DefaultParameters().WithMeterParameters(
+			meter.DefaultParameters().WithComputationLimit(1))
+		big := common.ComputationUsage{Kind: common.ComputationKindStatement, Intensity: 100}
+
+		// enabled parent: child inherits the limit and enforces it.
+		enabled := state.NewExecutionState(nil, params)
+		require.Error(t, enabled.NewChildForDerivedData().MeterComputation(big))
+
+		// disabled parent: child lifts limits, so a load can never fail.
+		disabled := state.NewExecutionState(nil, params)
+		disabled.RunWithMeteringDisabled(func() {
+			require.NoError(t, disabled.NewChildForDerivedData().MeterComputation(big))
+		})
 	})
 }
