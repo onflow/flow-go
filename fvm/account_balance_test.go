@@ -69,7 +69,7 @@ func TestAccountBalanceReadsCanonicalVault(t *testing.T) {
 		snapshotTree snapshot.SnapshotTree,
 		address flow.Address,
 	) uint64 {
-		code := []byte(fmt.Sprintf(
+		code := fmt.Appendf(nil,
 			`
 			import FlowToken from 0x%s
 
@@ -79,7 +79,7 @@ func TestAccountBalanceReadsCanonicalVault(t *testing.T) {
 				return vaultRef.balance
 			}`,
 			sc.FlowToken.Address.Hex(),
-		))
+		)
 
 		script := fvm.Script(code).WithArguments(
 			jsoncdc.MustEncode(cadence.NewAddress(address)),

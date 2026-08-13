@@ -1906,10 +1906,10 @@ func TestProgramCacheMeteringIsDeterministic(t *testing.T) {
 
 			// A transaction that imports and uses the contract.
 			importTx, err := flow.NewTransactionBodyBuilder().
-				SetScript([]byte(fmt.Sprintf(`
+				SetScript(fmt.Appendf(nil, `
 					import C from %s
 					transaction { execute { log(C.answer()) } }
-				`, account.HexWithPrefix()))).
+				`, account.HexWithPrefix())).
 				SetPayer(account).
 				Build()
 			require.NoError(t, err)
