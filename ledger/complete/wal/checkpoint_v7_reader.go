@@ -135,7 +135,7 @@ func readCheckpointHeaderV7(filepath string, logger zerolog.Logger) (
 	}
 
 	subtrieChecksums := make([]uint32, subtrieCount)
-	for i := uint16(0); i < subtrieCount; i++ {
+	for i := range subtrieCount {
 		sum, err := readCRC32Sum(reader)
 		if err != nil {
 			return nil, 0, fmt.Errorf("could not read %v-th subtrie checksum from checkpoint header: %w", i, err)
@@ -187,7 +187,7 @@ func readSubTriesConcurrentlyV7(dir string, fileName string, subtrieChecksums []
 	close(jobs)
 
 	nWorker := numOfSubTries
-	for i := 0; i < nWorker; i++ {
+	for range nWorker {
 		go func() {
 			for job := range jobs {
 				nodes, err := readCheckpointSubTrieV7(dir, fileName, job.Index, job.Checksum, logger)
@@ -363,7 +363,7 @@ func readTopLevelTriesV7(dir string, fileName string, subtrieNodes [][]*payloadl
 			topLevelNodes[i] = n
 		}
 
-		for i := uint16(0); i < triesCount; i++ {
+		for i := range triesCount {
 			t, err := payloadless.ReadTrie(reader, scratch, func(nodeIndex uint64) (*payloadless.Node, error) {
 				return getPayloadlessNodeByIndex(subtrieNodes, totalSubTrieNodeCount, topLevelNodes, nodeIndex)
 			})

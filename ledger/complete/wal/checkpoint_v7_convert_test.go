@@ -87,7 +87,7 @@ func TestFromV6Trie_Empty(t *testing.T) {
 func TestFromV6Tries_SharedSubtries(t *testing.T) {
 	tries := make([]*trie.MTrie, 0)
 	active := trie.NewEmptyMTrie()
-	for i := 0; i < 5; i++ {
+	for range 5 {
 		paths, payloads := randNPathPayloads(30)
 		var err error
 		active, _, err = trie.NewTrieWithUpdatedRegisters(active, paths, payloads, false)
@@ -337,14 +337,14 @@ func TestFullVsPayloadlessForest_IncrementalUpdates(t *testing.T) {
 	// Track allocated paths so we can also apply deletions (empty payloads).
 	allocated := make([]ledger.Path, 0)
 
-	for round := 0; round < 8; round++ {
+	for round := range 8 {
 		// New writes for this round.
 		paths, payloads := randNPathPayloads(20)
 		allocated = append(allocated, paths...)
 
 		// Mix in some "deletions" (empty-value writes) for previously-allocated paths.
 		if round > 0 && len(allocated) >= 5 {
-			for i := 0; i < 5; i++ {
+			for i := range 5 {
 				paths = append(paths, allocated[i])
 				payloads = append(payloads, *ledger.EmptyPayload())
 			}
@@ -422,7 +422,7 @@ func TestFullVsPayloadlessForest_LoadConvertedCheckpoint(t *testing.T) {
 		fullRoot, err = fullForest.MostRecentTouchedRootHash()
 		require.NoError(t, err)
 
-		for round := 0; round < 4; round++ {
+		for round := range 4 {
 			updatePaths, updatePayloads := randNPathPayloads(15)
 			update := &ledger.TrieUpdate{
 				RootHash: fullRoot,
@@ -454,10 +454,10 @@ func TestFullVsPayloadlessForest_DeterministicRandom(t *testing.T) {
 	fullRoot := fullForest.GetEmptyRootHash()
 	plRoot := plForest.GetEmptyRootHash()
 
-	for round := 0; round < 12; round++ {
+	for round := range 12 {
 		paths := make([]ledger.Path, 0, 25)
 		payloads := make([]ledger.Payload, 0, 25)
-		for i := 0; i < 25; i++ {
+		for range 25 {
 			var p ledger.Path
 			_, err := rand.Read(p[:])
 			require.NoError(t, err)

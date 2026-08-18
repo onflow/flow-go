@@ -47,7 +47,7 @@ func createMultiplePayloadlessTries(t *testing.T) []*payloadless.MTrie {
 	activeTrie := payloadless.NewEmptyMTrie()
 
 	var err error
-	for i := 0; i < 5; i++ {
+	for range 5 {
 		paths, payloads := randNPathPayloads(20)
 		values := payloadsToValues(payloads)
 		activeTrie, _, err = payloadless.NewTrieWithUpdatedRegisters(activeTrie, paths, values, false)
@@ -203,7 +203,7 @@ func TestWriteAndReadCheckpointV7SingleThread(t *testing.T) {
 // TestV7AllPartFileExist verifies that a missing part file surfaces os.ErrNotExist.
 func TestV7AllPartFileExist(t *testing.T) {
 	unittest.RunWithTempDir(t, func(dir string) {
-		for i := 0; i < 17; i++ {
+		for i := range 17 {
 			tries := createSimplePayloadlessTrie(t)
 			fileName := "checkpoint_v7_missing_part"
 			var fileToDelete string
@@ -400,7 +400,7 @@ func randomPayloadlessNode() *payloadless.Node {
 func TestGetPayloadlessNodesByIndex(t *testing.T) {
 	n := 10
 	ns := make([]*payloadless.Node, n)
-	for i := 0; i < n; i++ {
+	for i := range n {
 		ns[i] = randomPayloadlessNode()
 	}
 	subtrieNodes := [][]*payloadless.Node{
