@@ -2,6 +2,7 @@ package subscription_test
 
 import (
 	"context"
+	"slices"
 	"sync"
 	"testing"
 	"time"
@@ -67,12 +68,7 @@ func TestFilterSubscribe(t *testing.T) {
 
 	// check that node1 and node2 don't accept unstakedNode as a peer
 	require.Never(t, func() bool {
-		for _, pid := range node1.ListPeers(badTopic.String()) {
-			if pid == unstakedNode.ID() {
-				return true
-			}
-		}
-		return false
+		return slices.Contains(node1.ListPeers(badTopic.String()), unstakedNode.ID())
 	}, 1*time.Second, 100*time.Millisecond)
 
 	var wg sync.WaitGroup
