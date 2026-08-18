@@ -501,7 +501,12 @@ func (txn *TableTransaction[TKey, TVal]) GetWithStateOrCompute(
 		return val, state, nil
 	}
 
-	nestedTxId, err := txnState.BeginNestedTransaction()
+	// Use a derived-data nested transaction so the computed value is always
+	// metered when loaded into the cache, regardless of the caller's metering
+	// scope. This keeps the cached execution snapshot's meter deterministic
+	// (see internal issue #7126). The commit gates whether these charges are
+	// applied to the caller.
+	nestedTxId, err := txnState.BeginNestedTransactionForDerivedData()
 	if err != nil {
 		return defaultVal, nil, fmt.Errorf("failed to start nested txn: %w", err)
 	}

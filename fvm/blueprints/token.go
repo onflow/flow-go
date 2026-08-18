@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/onflow/cadence"
+	"github.com/onflow/cadence/common"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 
 	"github.com/onflow/flow-core-contracts/lib/go/contracts"
@@ -13,6 +14,15 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 )
+
+// FlowTokenVaultStoragePath is the storage path of an account's canonical
+// FlowToken vault. Protocol code must always use this vault (and not the
+// republishable /public/flowTokenBalance capability) when reading an
+// account's balance.
+var FlowTokenVaultStoragePath = cadence.Path{
+	Domain:     common.PathDomainStorage,
+	Identifier: "flowTokenVault",
+}
 
 func DeployFungibleTokenContractTransaction(fungibleToken flow.Address, contract []byte) *flow.TransactionBodyBuilder {
 	contractName := "FungibleToken"

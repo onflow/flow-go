@@ -209,10 +209,17 @@ func (bl *BlockView) RunTransaction(
 		return nil, err
 	}
 
-	// all commit errors (StateDB errors) has to be returned
-	res.StateChangeCommitment, res.StateAccessList, err = proc.commit(true)
+	// invalid transactions leave no state change behind
+	invalid, err := proc.discardIfInvalid(res)
 	if err != nil {
 		return nil, err
+	}
+	if !invalid {
+		// all commit errors (StateDB errors) has to be returned
+		res.StateChangeCommitment, res.StateAccessList, err = proc.commit(true)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	// call tracer on tx end
@@ -265,13 +272,22 @@ func (bl *BlockView) BatchRunTransactions(txs []*gethTypes.Transaction) ([]*type
 			return nil, err
 		}
 
-		// all commit errors (StateDB errors) has to be returned
-		res.StateChangeCommitment, res.StateAccessList, err = proc.commit(false)
+		// invalid transactions leave no state change behind
+		invalid, err := proc.discardIfInvalid(res)
 		if err != nil {
 			return nil, err
 		}
+		if !invalid {
+			// all commit errors (StateDB errors) has to be returned
+			res.StateChangeCommitment, res.StateAccessList, err = proc.commit(false)
+			if err != nil {
+				return nil, err
+			}
+		}
 
-		// this clears state for any subsequent transaction runs
+		// this clears state for any subsequent transaction runs;
+		// it is required after committing a valid transaction, and is a
+		// harmless no-op for invalid ones (discardIfInvalid already reset)
 		proc.state.Reset()
 
 		// collect result
@@ -428,6 +444,29 @@ type procedure struct {
 	config *Config
 	evm    *gethVM.EVM
 	state  types.StateDB
+}
+
+// discardIfInvalid discards the state delta of an invalid result and
+// reports whether the result was invalid.
+//
+// An invalid transaction must not alter state: geth's buyGas() deducts
+// gasLimit*gasPrice before the intrinsic-gas, floor-data-gas and
+// initcode-size checks run, so the state delta of a validation failure
+// may be non-empty (see proc.run). Note that failed (VM error) results
+// are not discarded: they are priced failures (gas used is charged,
+// nonce bumped).
+//
+// Any state error withheld for the commit time (see proc.run) is
+// surfaced before the delta is discarded.
+func (proc *procedure) discardIfInvalid(res *types.Result) (bool, error) {
+	if !res.Invalid() {
+		return false, nil
+	}
+	if err := proc.state.Error(); err != nil {
+		return true, err
+	}
+	proc.state.Reset()
+	return true, nil
 }
 
 // commit commits the changes to the state (with optional finalization)
@@ -789,8 +828,13 @@ func (proc *procedure) run(
 		if types.IsAFatalError(err) || types.IsAStateError(err) || types.IsABackendError(err) {
 			return nil, err
 		}
-		// otherwise is a validation error (pre-check failure)
-		// no state change, wrap the error and return
+		// otherwise is a validation error (pre-check failure), wrap
+		// the error and return.
+		// Warning: the state delta is NOT guaranteed to be empty at
+		// this point — geth's buyGas() deducts gasLimit*gasPrice
+		// before the intrinsic-gas, floor-data-gas and initcode-size
+		// checks run, so callers must discard the delta for invalid
+		// results instead of committing it (see discardIfInvalid).
 		res.SetValidationError(err)
 		return &res, nil
 	}
