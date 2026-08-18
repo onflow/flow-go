@@ -214,7 +214,7 @@ func storeTopLevelNodesAndTrieRootsV7(
 // the trie position.
 func createPayloadlessSubTrieRoots(tries []*payloadless.MTrie) [subtrieCount][]*payloadless.Node {
 	var subtrieRoots [subtrieCount][]*payloadless.Node
-	for i := 0; i < len(subtrieRoots); i++ {
+	for i := range len(subtrieRoots) {
 		subtrieRoots[i] = make([]*payloadless.Node, len(tries))
 	}
 	for trieIndex, t := range tries {
