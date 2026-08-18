@@ -56,6 +56,21 @@ func (params MeterParameters) WithComputationLimit(limit uint) MeterParameters {
 	return newParams
 }
 
+// WithoutLimits returns a copy of the parameters with all limits (computation,
+// memory, event emit bytes, storage interaction) set to math.MaxUint64,
+// leaving all weights unchanged. It is used to record metering without
+// enforcing limits (see ExecutionState.NewChildForDerivedData, which uses it
+// so that derived data loads in metering-disabled scopes cannot fail on a
+// limit).
+func (params MeterParameters) WithoutLimits() MeterParameters {
+	newParams := params
+	newParams.computationLimit = math.MaxUint64
+	newParams.memoryLimit = math.MaxUint64
+	newParams.eventEmitByteLimit = math.MaxUint64
+	newParams.storageInteractionLimit = math.MaxUint64
+	return newParams
+}
+
 func (params MeterParameters) WithComputationWeights(
 	weights ExecutionEffortWeights,
 ) MeterParameters {

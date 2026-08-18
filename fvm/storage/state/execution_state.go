@@ -153,6 +153,40 @@ func (state *ExecutionState) NewChild() *ExecutionState {
 	return state.NewChildWithMeterParams(state.ExecutionParameters())
 }
 
+// NewChildForDerivedData generates a new child state for computing a derived
+// data value (e.g. loading a program into the programs cache). The child
+// meters unconditionally, even when the parent runs with metering disabled.
+//
+// Unlike NewChild, the child does NOT share the parent's limitsController: it
+// gets a fresh controller with meteringEnabled=true. This is used by the
+// derived data cache so that a value loaded into the cache always carries a
+// fully-populated meter, independent of the caller's metering scope (see
+// internal issue #7126). Whether those charges are applied to the caller is
+// decided when the child is merged back, by Merge gating on the caller's
+// metering.
+//
+// When the parent's metering is disabled, the child's meter limits are lifted
+// (weights unchanged) so that loads performed in system-critical
+// metering-disabled scopes (e.g. fee deduction) can never fail on a limit,
+// while still recording deterministic intensities.
+func (state *ExecutionState) NewChildForDerivedData() *ExecutionState {
+	params := state.ExecutionParameters()
+	if !state.meteringEnabled {
+		params.MeterParameters = params.MeterParameters.WithoutLimits()
+	}
+
+	return &ExecutionState{
+		finalized:  false,
+		spockState: state.spockState.NewChild(),
+		meter:      meter.NewMeter(params.MeterParameters),
+		limitsController: &limitsController{
+			meteringEnabled:     true,
+			maxKeySizeAllowed:   state.maxKeySizeAllowed,
+			maxValueSizeAllowed: state.maxValueSizeAllowed,
+		},
+	}
+}
+
 // InteractionUsed returns the amount of ledger interaction (total ledger byte read + total ledger byte written)
 func (state *ExecutionState) InteractionUsed() uint64 {
 	return state.meter.TotalBytesOfStorageInteractions()
@@ -353,7 +387,14 @@ func (state *ExecutionState) Finalize() *snapshot.ExecutionSnapshot {
 	return snapshot
 }
 
-// MergeState the changes from a the given execution snapshot to this state.
+// Merge applies the changes from the given execution snapshot to this state.
+// The read/write set and SPoCK are always merged. The snapshot's meter
+// (computation, memory, events, and ledger interaction) is merged only when
+// this state's metering is enabled, so charges from a nested transaction are
+// applied to the caller only while the caller is metering. This keeps program
+// cache metering deterministic: a value loaded into the cache is always fully
+// metered (see NewChildForDerivedData), but replaying it (or a fresh load)
+// charges the caller only when metering is enabled (internal issue #7126).
 func (state *ExecutionState) Merge(other *snapshot.ExecutionSnapshot) error {
 	if state.finalized {
 		return fmt.Errorf("cannot Merge on a finalized state")
@@ -364,7 +405,9 @@ func (state *ExecutionState) Merge(other *snapshot.ExecutionSnapshot) error {
 		return errors.NewStateMergeFailure(err)
 	}
 
-	state.meter.MergeMeter(other.Meter)
+	if state.meteringEnabled {
+		state.meter.MergeMeter(other.Meter)
+	}
 	return nil
 }
 

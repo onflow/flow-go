@@ -251,7 +251,7 @@ func (executor *transactionExecutor) ExecuteTransactionBody() error {
 
 	if executor.errs.CollectedError() {
 		invalidator = nil
-		executor.txnState.RunWithMeteringDisabled(executor.errorExecution)
+		executor.errorExecution()
 		if executor.errs.CollectedFailure() {
 			return executor.errs.ErrorOrNil()
 		}
@@ -272,7 +272,6 @@ func (executor *transactionExecutor) deductTransactionFees() (err error) {
 	}
 
 	computationLimit := executor.txnState.TotalComputationLimit()
-
 	computationUsed := min(executor.env.MeteringResult().ComputationUsed, computationLimit)
 
 	_, err = executor.env.DeductTransactionFees(
@@ -401,14 +400,23 @@ func (executor *transactionExecutor) errorExecution() {
 
 	executor.env.Reset()
 
-	// drop delta since transaction failed
+	// Drop delta since transaction failed. Must run with metering enabled so
+	// the failed body's meter merges down into nestedTxnId (ExecutionState.Merge
+	// drops the meter while metering is disabled): the failed transaction still
+	// reports, and pays fees for, the computation it used. This is safe: a
+	// restart only merges and drops state; it meters nothing and cannot fail on
+	// a metering limit.
 	restartErr := executor.txnState.RestartNestedTransaction(executor.nestedTxnId)
 	if executor.errs.Collect(restartErr).CollectedFailure() {
 		return
 	}
 
-	// try to deduct fees again, to get the fee deduction events
-	feesError := executor.deductTransactionFees()
+	// Try to deduct fees again, to get the fee deduction events. Metering is
+	// disabled so the payer is not charged for the fee deduction itself.
+	var feesError error
+	executor.txnState.RunWithMeteringDisabled(func() {
+		feesError = executor.deductTransactionFees()
+	})
 
 	// if fee deduction fails just do clean up and exit
 	if feesError != nil {
