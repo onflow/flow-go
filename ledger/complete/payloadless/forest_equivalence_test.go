@@ -140,7 +140,7 @@ func TestForestEquivalence_Reads(t *testing.T) {
 	// Mix of allocated and unallocated paths.
 	queryPaths := make([]ledger.Path, 0, len(paths)+30)
 	queryPaths = append(queryPaths, paths...)
-	for i := 0; i < 30; i++ {
+	for i := range 30 {
 		var p ledger.Path
 		p[0] = 0xff
 		p[31] = byte(i)
@@ -200,7 +200,7 @@ func TestForestEquivalence_ReadSingle(t *testing.T) {
 	}
 
 	// unallocated paths
-	for i := 0; i < 20; i++ {
+	for i := range 20 {
 		var p ledger.Path
 		p[0] = 0xfe
 		p[31] = byte(i)
@@ -232,7 +232,7 @@ func TestForestEquivalence_HasPathsVsValueSizes(t *testing.T) {
 	// Mix allocated paths with some unallocated and duplicate entries.
 	queryPaths := make([]ledger.Path, 0, len(paths)+25)
 	queryPaths = append(queryPaths, paths...)
-	for i := 0; i < 20; i++ {
+	for i := range 20 {
 		var p ledger.Path
 		p[0] = 0xfd
 		p[31] = byte(i)
@@ -276,7 +276,7 @@ func TestForestEquivalence_Proofs(t *testing.T) {
 	// Query a mix of allocated and unallocated paths.
 	queryPaths := make([]ledger.Path, 0, 60)
 	queryPaths = append(queryPaths, paths[:40]...)
-	for i := 0; i < 20; i++ {
+	for i := range 20 {
 		var p ledger.Path
 		p[0] = 0xfc
 		p[31] = byte(i)
@@ -348,7 +348,7 @@ func randomUpdate(rng *payloadlessRNG, n int) ([]ledger.Path, []*ledger.Payload)
 	seen := make(map[ledger.Path]int, n)
 	paths := make([]ledger.Path, 0, n)
 	payloads := make([]*ledger.Payload, 0, n)
-	for i := 0; i < n; i++ {
+	for range n {
 		path := testutils.PathByUint16LeftPadded(rng.next())
 		v := rng.next()
 		payload := testutils.LightPayload(v, v)
