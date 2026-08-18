@@ -153,10 +153,7 @@ func (c *PayloadlessCompactor) run() {
 	}
 
 	lastCheckpointNum := latestV7CheckpointNum(c.checkpointer, c.logger)
-	nextCheckpointNum := lastCheckpointNum + int(c.checkpointDistance)
-	if activeSegmentNum > nextCheckpointNum {
-		nextCheckpointNum = activeSegmentNum
-	}
+	nextCheckpointNum := max(activeSegmentNum, lastCheckpointNum+int(c.checkpointDistance))
 
 	ctx, cancel := context.WithCancel(context.Background())
 
