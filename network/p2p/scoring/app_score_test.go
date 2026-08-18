@@ -2,6 +2,7 @@ package scoring_test
 
 import (
 	"context"
+	"slices"
 	"testing"
 	"time"
 
@@ -198,19 +199,13 @@ func TestFullGossipSubConnectivityAmongHonestNodesWithMaliciousMajority(t *testi
 		select {
 		case <-ticker.C:
 			con1BlockTopicPeers := con1Node.GetLocalMeshPeers(blockTopic)
-			for _, p := range con1BlockTopicPeers {
-				if p == con2Node.ID() {
-					con2HasCon1 = true
-					break // con1 has con2 in its mesh, break out of the current loop
-				}
+			if slices.Contains(con1BlockTopicPeers, con2Node.ID()) {
+				con2HasCon1 = true // con1 has con2 in its mesh, break out of the current loop
 			}
 
 			con2BlockTopicPeers := con2Node.GetLocalMeshPeers(blockTopic)
-			for _, p := range con2BlockTopicPeers {
-				if p == con1Node.ID() {
-					con1HasCon2 = true
-					break // con2 has con1 in its mesh, break out of the current loop
-				}
+			if slices.Contains(con2BlockTopicPeers, con1Node.ID()) {
+				con1HasCon2 = true // con2 has con1 in its mesh, break out of the current loop
 			}
 
 			if con2HasCon1 && con1HasCon2 {
