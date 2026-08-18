@@ -20,7 +20,7 @@ require (
 	github.com/ipfs/go-datastore v0.8.2
 	github.com/ipfs/go-ds-pebble v0.5.0
 	github.com/libp2p/go-libp2p v0.38.2
-	github.com/onflow/cadence v1.10.5
+	github.com/onflow/cadence v1.10.6
 	github.com/onflow/crypto v0.27.2
 	github.com/onflow/flow v0.4.20-0.20260303141511-b7c99b4fb01b
 	github.com/onflow/flow-core-contracts/lib/go/contracts v1.10.4
@@ -401,5 +401,3 @@ replace github.com/ipfs/boxo => github.com/onflow/boxo v0.0.0-20240201202436-f24
 replace github.com/ipfs/go-ds-pebble => github.com/onflow/go-ds-pebble v0.0.0-20251003225212-131edca3a897
 
 replace github.com/hashicorp/golang-lru/v2 => github.com/fxamacker/golang-lru/v2 v2.0.0-20250430153159-6f72f038a30f
-
-replace github.com/onflow/cadence => github.com/onflow/cadence-internal v1.10.6-rc.5
