@@ -70,7 +70,6 @@ const (
 	//  Unqualified names of service event contract functions (not including address prefix or contract name)
 
 	ContractServiceAccountFunction_setupNewAccount                            = "setupNewAccount"
-	ContractServiceAccountFunction_defaultTokenBalance                        = "defaultTokenBalance"
 	ContractServiceAccountFunction_deductTransactionFee                       = "deductTransactionFee"
 	ContractServiceAccountFunction_verifyPayersBalanceForTransactionExecution = "verifyPayersBalanceForTransactionExecution"
 	ContractStorageFeesFunction_calculateAccountCapacity                      = "calculateAccountCapacity"
@@ -142,6 +141,16 @@ var (
 type SystemContract struct {
 	Address flow.Address
 	Name    string
+}
+
+// FlowTokenVaultTypeID is the fully qualified type ID of the FlowToken.Vault
+// resource for this chain (e.g. "A.0ae53cb6e3f42a79.FlowToken.Vault").
+func (sc *SystemContracts) FlowTokenVaultTypeID() common.TypeID {
+	return common.NewTypeIDFromQualifiedName(
+		nil,
+		sc.FlowToken.Location(),
+		sc.FlowToken.Name+".Vault",
+	)
 }
 
 func (c SystemContract) Location() common.AddressLocation {
