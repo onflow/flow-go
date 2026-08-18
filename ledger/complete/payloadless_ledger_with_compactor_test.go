@@ -97,7 +97,7 @@ func TestPayloadlessLedgerWithCompactor_SetPersists(t *testing.T) {
 		<-bundle.Ready()
 
 		state := bundle.InitialState()
-		for i := 0; i < 3; i++ {
+		for i := range 3 {
 			key := ledger.NewKey([]ledger.KeyPart{
 				ledger.NewKeyPart(ledger.KeyPartOwner, []byte("owner")),
 				ledger.NewKeyPart(ledger.KeyPartKey, []byte{byte(i)}),
