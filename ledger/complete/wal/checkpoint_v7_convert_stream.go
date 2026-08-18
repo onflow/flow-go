@@ -147,7 +147,7 @@ func convertSubTriesV6ToV7StreamConcurrently(
 	}
 
 	jobs := make(chan int, subtrieCount)
-	for i := 0; i < subtrieCount; i++ {
+	for i := range subtrieCount {
 		jobs <- i
 	}
 	close(jobs)
@@ -171,7 +171,7 @@ func convertSubTriesV6ToV7StreamConcurrently(
 	// let stragglers create output files after the caller has cleaned up.
 	checksums := make([]uint32, subtrieCount)
 	var merr *multierror.Error
-	for k := 0; k < subtrieCount; k++ {
+	for range subtrieCount {
 		r := <-results
 		if r.err != nil {
 			merr = multierror.Append(merr, fmt.Errorf("fail to convert %v-th subtrie: %w", r.index, r.err))
@@ -249,7 +249,7 @@ func convertSubTrieFileV6ToV7Stream(
 
 	logging := logProgress(fmt.Sprintf("converting %v-th sub trie (streaming)", index), int(nodeCount), logger)
 	conv := newV6ToV7NodeConverter()
-	for i := uint64(0); i < nodeCount; i++ {
+	for i := range nodeCount {
 		if err := conv.convertNode(reader, writer); err != nil {
 			return 0, fmt.Errorf("cannot convert node %d of subtrie %d: %w", i, index, err)
 		}
@@ -338,7 +338,7 @@ func convertTopTrieFileV6ToV7Stream(
 
 	// Convert the top-level nodes (above subtrieLevel).
 	conv := newV6ToV7NodeConverter()
-	for i := uint64(0); i < topLevelNodesCount; i++ {
+	for i := range topLevelNodesCount {
 		if err := conv.convertNode(reader, writer); err != nil {
 			return 0, fmt.Errorf("cannot convert top-level node %d: %w", i, err)
 		}
@@ -348,7 +348,7 @@ func convertTopTrieFileV6ToV7Stream(
 	// to V7 (index + regCount + hash), dropping the register-size field.
 	readScratch := make([]byte, flattener.EncodedTrieSize)
 	trieBuf := make([]byte, payloadless.EncodedTrieSize)
-	for i := uint16(0); i < triesCount; i++ {
+	for i := range triesCount {
 		encTrie, err := flattener.ReadEncodedTrie(reader, readScratch)
 		if err != nil {
 			return 0, fmt.Errorf("cannot read trie root record %d: %w", i, err)

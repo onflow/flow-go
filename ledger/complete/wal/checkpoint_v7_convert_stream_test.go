@@ -215,7 +215,7 @@ func TestConvertCheckpointV6ToV7Stream_DetectsCorruptedInput(t *testing.T) {
 func largestSubTrieFilePath(t *testing.T, dir string, fileName string) string {
 	var largestPath string
 	var largestSize int64
-	for i := 0; i < subtrieCount; i++ {
+	for i := range subtrieCount {
 		path, _, err := filePathSubTries(dir, fileName, i)
 		require.NoError(t, err)
 		info, err := os.Stat(path)
