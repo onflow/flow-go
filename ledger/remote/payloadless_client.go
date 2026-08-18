@@ -306,7 +306,7 @@ func (c *PayloadlessClient) Ready() <-chan struct{} {
 		retryDelay := 100 * time.Millisecond
 		maxRetryDelay := 30 * time.Second
 
-		for i := 0; i < maxRetries; i++ {
+		for i := range maxRetries {
 			ctx, cancel := c.callCtx()
 			_, err := c.client.InitialState(ctx, &emptypb.Empty{})
 			cancel()
