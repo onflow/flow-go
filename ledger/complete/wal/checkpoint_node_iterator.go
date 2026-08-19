@@ -342,7 +342,7 @@ func (it *checkpointIterator) iterateTopTrie(dir string, fileName string, isV7 b
 		}
 
 		// Trie root records: each references its root node by global index.
-		for i := uint16(0); i < triesCount; i++ {
+		for i := range triesCount {
 			var rootIndex uint64
 			if isV7 {
 				enc, err := payloadless.ReadEncodedTrie(reader, scratch)
