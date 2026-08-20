@@ -178,7 +178,7 @@ func setupV7ToV6Scenario(t *testing.T, dir string, logger zerolog.Logger, prevNa
 	// For the spot-check: the surviving B registers in trie2 and their values.
 	lastPaths = pathsB
 	lastValues = make([]ledger.Value, len(pathsB))
-	for i := 0; i < 5; i++ {
+	for i := range 5 {
 		lastValues[i] = overwrites2[i].Value()
 	}
 	for i := 5; i < len(pathsB); i++ {
