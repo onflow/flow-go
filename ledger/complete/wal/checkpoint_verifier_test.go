@@ -58,7 +58,7 @@ func TestVerifyCheckpointHashesDetectsCorruption(t *testing.T) {
 		// Find a non-empty subtrie part file and flip a byte inside the first node's
 		// encoding (just past the 4-byte magic+version header).
 		corrupted := false
-		for i := 0; i < subtrieCount; i++ {
+		for i := range subtrieCount {
 			partPath, _, err := filePathSubTries(dir, fileName, i)
 			require.NoError(t, err)
 
