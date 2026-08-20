@@ -43,7 +43,7 @@ func convertSubTriesV7ToV6Concurrently(
 	nWorker uint,
 ) ([]uint32, error) {
 	jobs := make(chan int, subtrieCount)
-	for i := 0; i < subtrieCount; i++ {
+	for i := range subtrieCount {
 		jobs <- i
 	}
 	close(jobs)
@@ -63,7 +63,7 @@ func convertSubTriesV7ToV6Concurrently(
 	}
 
 	checksums := make([]uint32, subtrieCount)
-	for k := 0; k < subtrieCount; k++ {
+	for range subtrieCount {
 		r := <-results
 		if r.err != nil {
 			return nil, fmt.Errorf("fail to convert %v-th subtrie: %w", r.index, r.err)
@@ -144,7 +144,7 @@ func convertSubTrieFileV7ToV6(
 
 	logging := logProgress(fmt.Sprintf("converting %v-th sub trie (V7→V6)", index), int(nodeCount), logger)
 	conv := newV7ToV6NodeConverter(pool)
-	for i := uint64(0); i < nodeCount; i++ {
+	for i := range nodeCount {
 		if err := conv.convertNode(reader, writer); err != nil {
 			return 0, fmt.Errorf("cannot convert node %d of subtrie %d: %w", i, index, err)
 		}
@@ -230,7 +230,7 @@ func convertTopTrieFileV7ToV6(
 
 	// Convert the top-level nodes (above subtrieLevel).
 	conv := newV7ToV6NodeConverter(topPool)
-	for i := uint64(0); i < topLevelNodesCount; i++ {
+	for i := range topLevelNodesCount {
 		if err := conv.convertNode(reader, writer); err != nil {
 			return 0, fmt.Errorf("cannot convert top-level node %d: %w", i, err)
 		}
@@ -246,7 +246,7 @@ func convertTopTrieFileV7ToV6(
 	// (index + regCount + regSize + hash), adding back the register-size field as 0.
 	readScratch := make([]byte, payloadless.EncodedTrieSize)
 	trieBuf := make([]byte, flattener.EncodedTrieSize)
-	for i := uint16(0); i < triesCount; i++ {
+	for i := range triesCount {
 		encTrie, err := payloadless.ReadEncodedTrie(reader, readScratch)
 		if err != nil {
 			return 0, fmt.Errorf("cannot read trie root record %d: %w", i, err)
@@ -530,7 +530,7 @@ func buildTopTriePayloadPool(
 	}
 
 	// Scan every previous-checkpoint subtrie part file.
-	for i := 0; i < subtrieCount; i++ {
+	for i := range subtrieCount {
 		err := streamV6SubtrieLeaves(src.execDir, src.prevFile, i, src.prevSubtrieChecksums[i], add)
 		if err != nil {
 			return nil, fmt.Errorf("could not scan previous checkpoint subtrie %d: %w", i, err)
@@ -602,7 +602,7 @@ func collectTopTrieLeafHashes(
 	leafHashBuf := make([]byte, encHashSize)
 	var flagBuf [encLeafHashFlagSize]byte
 
-	for i := uint64(0); i < topLevelNodesCount; i++ {
+	for range topLevelNodesCount {
 		if _, err := io.ReadFull(reader, prefix); err != nil {
 			return nil, fmt.Errorf("cannot read node prefix: %w", err)
 		}
@@ -747,7 +747,7 @@ func streamV6LeafNodes(
 	lenBuf := make([]byte, encPayloadLengthSize)
 	payloadBuf := make([]byte, 1024)
 
-	for i := uint64(0); i < nodeCount; i++ {
+	for range nodeCount {
 		if _, err := io.ReadFull(reader, prefix); err != nil {
 			return fmt.Errorf("cannot read node prefix: %w", err)
 		}
