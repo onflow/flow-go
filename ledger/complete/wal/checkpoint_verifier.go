@@ -153,7 +153,7 @@ func verifySubtriesConcurrently(
 		}
 	}
 
-	for w := uint(0); w < nWorker; w++ {
+	for range nWorker {
 		wg.Add(1)
 		go worker()
 	}
@@ -350,7 +350,7 @@ func verifyTopTrie(
 
 		// Trie root records: cross-check each stored root hash against the hash of
 		// the node it references.
-		for i := uint16(0); i < triesCount; i++ {
+		for i := range triesCount {
 			var rootIndex uint64
 			var storedRootHash hash.Hash
 			if isV7 {
