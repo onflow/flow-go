@@ -154,7 +154,7 @@ func TestReplayOnPayloadlessForestUntil(t *testing.T) {
 
 		parent := root0
 		roots := make([]ledger.RootHash, 0, 3)
-		for i := 0; i < 3; i++ {
+		for range 3 {
 			pathsi, payloadsi := randNPathPayloads(10)
 			update := &ledger.TrieUpdate{
 				RootHash: parent,
