@@ -49,7 +49,7 @@ func (s *blockingStreamServer) Stream(stream grpc.ServerStream) error {
 	return nil
 }
 
-func blockingStreamHandler(srv interface{}, stream grpc.ServerStream) error {
+func blockingStreamHandler(srv any, stream grpc.ServerStream) error {
 	return srv.(blockingStreamService).Stream(stream)
 }
 
@@ -84,8 +84,7 @@ func TestGrpcServerShutdown_WithActiveStream(t *testing.T) {
 	defer conn.Close()
 
 	// Open a stream; do not cancel clientCtx so the stream stays open indefinitely.
-	clientCtx, cancelClient := context.WithCancel(context.Background())
-	defer cancelClient()
+	clientCtx := t.Context()
 	_, err = conn.NewStream(clientCtx, &grpc.StreamDesc{ServerStreams: true}, "/test.BlockingStream/Stream")
 	require.NoError(t, err)
 
