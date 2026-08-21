@@ -19,9 +19,9 @@ import (
 	"github.com/onflow/flow-go/module/irrecoverable"
 )
 
-// DefaultGracefulStopTimeout is the time [grpc.Server.GracefulStop] is allowed to wait for
-// active RPCs to finish before the server is force-stopped via [grpc.Server.Stop]. Long-lived
-// streaming subscriptions would otherwise block shutdown indefinitely.
+// DefaultGracefulStopTimeout is the time GracefulStop is allowed to wait for active streaming
+// RPCs to finish before the server is force-stopped via Stop. Long-lived streaming subscriptions
+// would otherwise block shutdown indefinitely.
 const DefaultGracefulStopTimeout = 5 * time.Second
 
 // GrpcServer wraps `grpc.Server` and allows to manage it using `component.Component` interface. It can be injected
@@ -45,10 +45,8 @@ type GrpcServer struct {
 
 var _ component.Component = (*GrpcServer)(nil)
 
-// NewGrpcServer returns a new grpc server.
-//
-// If `gracefulStopTimeout` is zero, [DefaultGracefulStopTimeout] is used. A positive value
-// bounds how long shutdown waits for active RPCs to finish before force-stopping.
+// NewGrpcServer returns a new grpc server. If gracefulStopTimeout is zero,
+// DefaultGracefulStopTimeout is used.
 func NewGrpcServer(log zerolog.Logger,
 	grpcListenAddr string,
 	grpcServer *grpc.Server,
@@ -119,23 +117,18 @@ func (g *GrpcServer) GRPCAddress() net.Addr {
 }
 
 // shutdownWorker is a worker routine which shuts down server when the context is cancelled.
-//
-// It attempts a graceful stop first. If active RPCs do not finish within
-// `gracefulStopTimeout`, the server is force-stopped via [grpc.Server.Stop] to avoid
-// blocking shutdown indefinitely.
+// It attempts a graceful stop first. If active streaming RPCs do not finish within
+// gracefulStopTimeout, the server is force-stopped to avoid blocking shutdown indefinitely.
 func (g *GrpcServer) shutdownWorker(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 	ready()
 	<-ctx.Done()
-
 	gracefulDone := make(chan struct{})
 	go func() {
 		defer close(gracefulDone)
 		g.server.GracefulStop()
 	}()
-
 	timer := time.NewTimer(g.gracefulStopTimeout)
 	defer timer.Stop()
-
 	select {
 	case <-gracefulDone:
 	case <-timer.C:
