@@ -1,6 +1,8 @@
 package grpcserver
 
 import (
+	"time"
+
 	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
 	"github.com/rs/zerolog"
 	"go.uber.org/atomic"
@@ -26,6 +28,14 @@ func WithStreamInterceptor() Option {
 	}
 }
 
+// WithGracefulStopTimeout sets how long the server waits for active streaming RPCs to finish
+// before force-stopping during shutdown. Defaults to DefaultGracefulStopTimeout.
+func WithGracefulStopTimeout(d time.Duration) Option {
+	return func(c *GrpcServerBuilder) {
+		c.gracefulStopTimeout = d
+	}
+}
+
 // GrpcServerBuilder created for separating the creation and starting GrpcServer,
 // cause services need to be registered before the server starts.
 type GrpcServerBuilder struct {
@@ -36,6 +46,7 @@ type GrpcServerBuilder struct {
 
 	transportCredentials         credentials.TransportCredentials // the GRPC credentials
 	stateStreamInterceptorEnable bool
+	gracefulStopTimeout          time.Duration
 }
 
 // NewGrpcServerBuilder creates a new builder for configuring and initializing a gRPC server.
@@ -124,5 +135,9 @@ func NewGrpcServerBuilder(
 }
 
 func (b *GrpcServerBuilder) Build() *GrpcServer {
-	return NewGrpcServer(b.log, b.gRPCListenAddr, b.server, b.signalerCtx)
+	timeout := b.gracefulStopTimeout
+	if timeout == 0 {
+		timeout = DefaultGracefulStopTimeout
+	}
+	return NewGrpcServer(b.log, b.gRPCListenAddr, b.server, b.signalerCtx, timeout)
 }
