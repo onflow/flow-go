@@ -100,6 +100,59 @@ func TestGrpcServerShutdown_WithActiveStream(t *testing.T) {
 	unittest.RequireComponentsDoneBefore(t, gracefulStopTimeout+500*time.Millisecond, server)
 }
 
+// TestGrpcServerShutdown_ShutdownStreamInterceptor verifies that when the
+// [grpcserver.ShutdownStreamInterceptor] is registered, an active streaming RPC's
+// stream.Context() is cancelled as soon as the node's SignalerContext is cancelled.
+// This allows GracefulStop to complete cleanly — well under gracefulStopTimeout —
+// even when the client has not disconnected, so the force-stop fallback is not needed.
+func TestGrpcServerShutdown_ShutdownStreamInterceptor(t *testing.T) {
+	// Give the graceful path a generous window so we can prove that the interceptor —
+	// not the force-stop fallback — is what unblocks shutdown.
+	gracefulStopTimeout := 10 * time.Second
+
+	signalerCtx := atomic.NewPointer[irrecoverable.SignalerContext](nil)
+	rawServer := grpc.NewServer(
+		grpc.ChainStreamInterceptor(grpcserver.ShutdownStreamInterceptor(signalerCtx)),
+	)
+	handler := &blockingStreamServer{started: make(chan struct{})}
+	rawServer.RegisterService(&blockingStreamServiceDesc, handler)
+
+	server := grpcserver.NewGrpcServer(
+		zerolog.Nop(),
+		"localhost:0",
+		rawServer,
+		signalerCtx,
+		gracefulStopTimeout,
+	)
+
+	ctx, cancel := irrecoverable.NewMockSignalerContextWithCancel(t, context.Background())
+	server.Start(ctx)
+	unittest.RequireComponentsReadyBefore(t, 2*time.Second, server)
+
+	conn, err := grpc.NewClient(
+		server.GRPCAddress().String(),
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+	)
+	require.NoError(t, err)
+	defer conn.Close()
+
+	// Open a stream and never cancel the client-side context — mimicking a long-lived
+	// subscription that a well-behaved client is happy to keep open indefinitely.
+	clientCtx := t.Context()
+	_, err = conn.NewStream(clientCtx, &grpc.StreamDesc{ServerStreams: true}, "/test.BlockingStream/Stream")
+	require.NoError(t, err)
+
+	unittest.RequireCloseBefore(t, handler.started, 2*time.Second, "stream handler did not start")
+
+	// Trigger node shutdown. The interceptor should cancel the stream's context, the
+	// handler should return, and GracefulStop should complete immediately.
+	cancel()
+
+	// Shutdown must complete well under gracefulStopTimeout; otherwise the force-stop
+	// fallback is what unblocked us, not the interceptor.
+	unittest.RequireComponentsDoneBefore(t, 2*time.Second, server)
+}
+
 // TestGrpcServerShutdown_NoActiveStreams verifies that when no streaming RPCs are active,
 // GrpcServer shuts down promptly via GracefulStop without waiting for the timeout.
 func TestGrpcServerShutdown_NoActiveStreams(t *testing.T) {
