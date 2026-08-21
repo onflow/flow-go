@@ -29,7 +29,7 @@ func WithStreamInterceptor() Option {
 }
 
 // WithGracefulStopTimeout sets how long the server waits for active streaming RPCs to finish
-// before force-stopping during shutdown. Defaults to [DefaultGracefulStopTimeout].
+// before force-stopping during shutdown. Defaults to DefaultGracefulStopTimeout.
 func WithGracefulStopTimeout(d time.Duration) Option {
 	return func(c *GrpcServerBuilder) {
 		c.gracefulStopTimeout = d
