@@ -1,6 +1,7 @@
 package grpcserver
 
 import (
+	"errors"
 	"net"
 	"sync"
 
@@ -89,7 +90,12 @@ func (g *GrpcServer) serveGRPCWorker(ctx irrecoverable.SignalerContext, ready co
 	ready()
 
 	err = g.server.Serve(l) // blocking call
-	if err != nil {
+	if err != nil && !errors.Is(err, grpc.ErrServerStopped) {
+		// Serve returns nil when the server is stopped via Stop or GracefulStop while serving.
+		// ErrServerStopped is only returned when the server was stopped BEFORE Serve was called,
+		// which happens when the component is shut down in the short window between ready() above
+		// and the Serve call: the shutdownWorker may complete GracefulStop first. This is a normal
+		// shutdown, not an exception, hence it must not be thrown as an irrecoverable error.
 		g.log.Err(err).Msg("fatal error in grpc server")
 		ctx.Throw(err)
 	}

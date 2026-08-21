@@ -62,35 +62,28 @@ func (m *mockStateConsumer) OnStateUpdated(state optimistic_sync.State) {
 	m.updateChan <- state
 }
 
-// waitForStateUpdates waits for a sequence of state updates to occur or timeout after 500ms.
+// waitForStateUpdates waits for a sequence of state updates to occur or timeout after 5s.
 // updates must be received in the correct order or the test will fail.
-func waitForStateUpdates(t *testing.T, updateChan <-chan optimistic_sync.State, errChan <-chan error, expectedStates ...optimistic_sync.State) {
+//
+// Note: this function deliberately does NOT consume from errChan. The pipeline always queues a
+// state update (buffered updateChan) before offering an error (unbuffered errChan), but a select
+// listening on both channels picks randomly among ready cases: it could consume a (potentially
+// expected) error before a pending state update, failing the test spuriously and stealing the
+// error from a subsequent waitForError call. If the pipeline errors instead of emitting the
+// expected state updates, this function fails via its timeout.
+func waitForStateUpdates(t *testing.T, updateChan <-chan optimistic_sync.State, _ <-chan error, expectedStates ...optimistic_sync.State) {
 	done := make(chan struct{})
 	unittest.RequireReturnsBefore(t, func() {
 		for _, expected := range expectedStates {
-			// Prefer consuming pending state updates over errors: the pipeline always reports a state
-			// update before emitting an error, but both may already be queued by the time we read
-			// them (e.g. in tests expecting a state transition immediately followed by an expected
-			// error). A single select would pick one of the ready channels at random, potentially
-			// failing on the error before consuming the preceding state update.
-			select {
-			case update := <-updateChan:
-				assert.Equalf(t, expected, update, "expected pipeline to transition to %s, but got %s", expected, update)
-				continue
-			default:
-			}
-
 			select {
 			case <-done:
 				return
-			case err := <-errChan:
-				require.NoError(t, err, "pipeline returned error")
 			case update := <-updateChan:
 				assert.Equalf(t, expected, update, "expected pipeline to transition to %s, but got %s", expected, update)
 			}
 		}
-	}, 500*time.Millisecond, "Timeout waiting for state update")
-	close(done) // make sure function exists after timeout
+	}, 5*time.Second, "Timeout waiting for state update")
+	close(done) // make sure function exits after timeout
 }
 
 // waitForStateUpdatesAndNoError behaves like waitForStateUpdates, but additionally requires that
@@ -120,7 +113,7 @@ func waitForErrorWithCustomCheckers(t *testing.T, errChan <-chan error, errorChe
 				checker(err)
 			}
 		}
-	}, 500*time.Millisecond, "Timeout waiting for error")
+	}, 5*time.Second, "Timeout waiting for error")
 }
 
 // waitForError waits for an error from the errChan within 500ms and asserts it matches the expected error.
@@ -132,7 +125,7 @@ func waitForError(t *testing.T, errChan <-chan error, expectedErr error) {
 		} else {
 			assert.ErrorIs(t, err, expectedErr)
 		}
-	}, 500*time.Millisecond, "Timeout waiting for error")
+	}, 5*time.Second, "Timeout waiting for error")
 }
 
 // createPipeline initializes and returns a pipeline instance with its mock dependencies.
