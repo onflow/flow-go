@@ -29,7 +29,7 @@ func WithStreamInterceptor() Option {
 }
 
 // WithGracefulStopTimeout sets how long the server waits for active streaming RPCs to finish
-// before force-stopping during shutdown. Defaults to DefaultGracefulStopTimeout.
+// before force-stopping during shutdown. Defaults to [DefaultGracefulStopTimeout].
 func WithGracefulStopTimeout(d time.Duration) Option {
 	return func(c *GrpcServerBuilder) {
 		c.gracefulStopTimeout = d
@@ -99,6 +99,12 @@ func NewGrpcServerBuilder(
 	var streamInterceptors []grpc.StreamServerInterceptor
 
 	unaryInterceptors = append(unaryInterceptors, IrrecoverableCtxInjector(signalerCtx))
+
+	// ShutdownStreamInterceptor must be registered before any interceptor or handler that
+	// reads stream.Context(), so subsequent interceptors and the handler see the
+	// shutdown-aware context.
+	streamInterceptors = append(streamInterceptors, ShutdownStreamInterceptor(signalerCtx))
+
 	if rpcMetricsEnabled {
 		unaryInterceptors = append(unaryInterceptors, grpc_prometheus.UnaryServerInterceptor)
 
