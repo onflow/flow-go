@@ -18,9 +18,11 @@ import (
 	"go.uber.org/atomic"
 	"google.golang.org/grpc"
 
+	"github.com/onflow/flow-go/ledger"
 	ledgerfactory "github.com/onflow/flow-go/ledger/factory"
 	ledgerpb "github.com/onflow/flow-go/ledger/protobuf"
 	"github.com/onflow/flow-go/ledger/remote"
+	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 )
@@ -35,6 +37,7 @@ var (
 	checkpointDist      = flag.Uint("checkpoint-distance", 100, "Checkpoint distance")
 	checkpointsToKeep   = flag.Uint("checkpoints-to-keep", 3, "Number of checkpoints to keep")
 	logLevel            = flag.String("loglevel", "info", "Log level (panic, fatal, error, warn, info, debug)")
+	payloadless         = flag.Bool("payloadless", false, "Run the ledger service in payloadless mode (stores leaf hashes instead of full payloads; requires a V7 checkpoint in --triedir).")
 	maxRequestSize      = flag.Uint("max-request-size", 1<<30, "Maximum request message size in bytes (default: 1 GiB)")
 	maxResponseSize     = flag.Uint("max-response-size", 1<<30, "Maximum response message size in bytes (default: 1 GiB)")
 )
@@ -72,14 +75,18 @@ func main() {
 		Str("admin_addr", *adminAddr).
 		Uint("metrics_port", *metricsPort).
 		Int("mtrie_cache_size", *mtrieCacheSize).
+		Bool("payloadless", *payloadless).
 		Msg("starting ledger service")
 
 	// Create trigger for manual checkpointing (used by admin command)
 	triggerCheckpointOnNextSegmentFinish := atomic.NewBool(false)
 
-	// Create ledger using factory
+	// Create ledger using factory. The same config drives both modes; the
+	// payloadless flag selects which factory constructor (and gRPC service) is
+	// wired up. A ledger gRPC server registers either the full [remote.Service]
+	// or the [remote.PayloadlessService], never both.
 	metricsCollector := metrics.NewLedgerCollector("ledger", "wal")
-	ledgerStorage, err := ledgerfactory.NewLedger(ledgerfactory.Config{
+	factoryConfig := ledgerfactory.Config{
 		Triedir:            *triedir,
 		MTrieCacheSize:     uint32(*mtrieCacheSize),
 		CheckpointDistance: *checkpointDist,
@@ -88,9 +95,32 @@ func main() {
 		WALMetrics:         metricsCollector,
 		LedgerMetrics:      metricsCollector,
 		Logger:             logger,
-	}, triggerCheckpointOnNextSegmentFinish)
-	if err != nil {
-		logger.Fatal().Err(err).Msg("failed to create ledger")
+	}
+
+	// ledgerStorage is the lifecycle handle used for readiness, health check,
+	// and shutdown regardless of mode. registerService binds the mode-specific
+	// gRPC service onto the server once it is created.
+	var ledgerStorage module.ReadyDoneAware
+	var registerService func(grpcServer *grpc.Server)
+
+	if *payloadless {
+		payloadlessLedger, err := ledgerfactory.NewPayloadlessLedger(factoryConfig, triggerCheckpointOnNextSegmentFinish)
+		if err != nil {
+			logger.Fatal().Err(err).Msg("failed to create payloadless ledger")
+		}
+		ledgerStorage = payloadlessLedger
+		registerService = func(grpcServer *grpc.Server) {
+			ledgerpb.RegisterPayloadlessLedgerServiceServer(grpcServer, remote.NewPayloadlessService(payloadlessLedger, logger))
+		}
+	} else {
+		fullLedger, err := ledgerfactory.NewLedger(factoryConfig, triggerCheckpointOnNextSegmentFinish)
+		if err != nil {
+			logger.Fatal().Err(err).Msg("failed to create ledger")
+		}
+		ledgerStorage = fullLedger
+		registerService = func(grpcServer *grpc.Server) {
+			ledgerpb.RegisterLedgerServiceServer(grpcServer, remote.NewService(fullLedger, logger))
+		}
 	}
 
 	// Wait for ledger to be ready (WAL replay)
@@ -98,14 +128,25 @@ func main() {
 	<-ledgerStorage.Ready()
 	logger.Info().Msg("ledger ready")
 
+	// Both the full and payloadless ledgers expose state inspection for the
+	// post-startup health check, though only the full ledger declares it on its
+	// public interface; assert it here so the check works in either mode.
+	inspector, ok := ledgerStorage.(interface {
+		StateCount() int
+		StateByIndex(index int) (ledger.State, error)
+	})
+	if !ok {
+		logger.Fatal().Msg("ledger does not support state inspection")
+	}
+
 	// Check if any trie is loaded after startup
-	stateCount := ledgerStorage.StateCount()
+	stateCount := inspector.StateCount()
 	if stateCount == 0 {
 		logger.Fatal().Msg("no trie loaded after startup - no states available")
 	}
 
 	// Get the last trie state for logging
-	lastState, err := ledgerStorage.StateByIndex(-1)
+	lastState, err := inspector.StateByIndex(-1)
 	if err != nil {
 		logger.Fatal().Err(err).Msg("failed to get last state for logging")
 	}
@@ -123,9 +164,8 @@ func main() {
 		grpc.MaxSendMsgSize(int(*maxResponseSize)),
 	)
 
-	// Create and register ledger service
-	ledgerService := remote.NewService(ledgerStorage, logger)
-	ledgerpb.RegisterLedgerServiceServer(grpcServer, ledgerService)
+	// Register the mode-specific ledger service
+	registerService(grpcServer)
 
 	// Create listeners based on provided flags
 	type listenerInfo struct {
