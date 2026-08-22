@@ -130,6 +130,6 @@ func (g *GrpcServer) shutdownWorker(ctx irrecoverable.SignalerContext, ready com
 			Dur("timeout", g.gracefulStopTimeout).
 			Msg("graceful stop timed out; force-stopping gRPC server")
 		g.server.Stop()
-		<-gracefulDone
 	}
+	<-gracefulDone
 }
