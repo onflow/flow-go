@@ -99,6 +99,12 @@ func NewGrpcServerBuilder(
 	var streamInterceptors []grpc.StreamServerInterceptor
 
 	unaryInterceptors = append(unaryInterceptors, IrrecoverableCtxInjector(signalerCtx))
+
+	// ShutdownStreamInterceptor must be registered before any interceptor or handler that
+	// reads stream.Context(), so subsequent interceptors and the handler see the
+	// shutdown-aware context.
+	streamInterceptors = append(streamInterceptors, ShutdownStreamInterceptor(signalerCtx))
+
 	if rpcMetricsEnabled {
 		unaryInterceptors = append(unaryInterceptors, grpc_prometheus.UnaryServerInterceptor)
 

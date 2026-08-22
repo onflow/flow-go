@@ -45,13 +45,17 @@ type GrpcServer struct {
 
 var _ component.Component = (*GrpcServer)(nil)
 
-// NewGrpcServer returns a new grpc server.
+// NewGrpcServer returns a new grpc server. If gracefulStopTimeout is zero,
+// DefaultGracefulStopTimeout is used.
 func NewGrpcServer(log zerolog.Logger,
 	grpcListenAddr string,
 	grpcServer *grpc.Server,
 	grpcSignalerCtx *atomic.Pointer[irrecoverable.SignalerContext],
 	gracefulStopTimeout time.Duration,
 ) *GrpcServer {
+	if gracefulStopTimeout <= 0 {
+		gracefulStopTimeout = DefaultGracefulStopTimeout
+	}
 	server := &GrpcServer{
 		log:                 log,
 		server:              grpcServer,
@@ -123,9 +127,11 @@ func (g *GrpcServer) shutdownWorker(ctx irrecoverable.SignalerContext, ready com
 		defer close(gracefulDone)
 		g.server.GracefulStop()
 	}()
+	timer := time.NewTimer(g.gracefulStopTimeout)
+	defer timer.Stop()
 	select {
 	case <-gracefulDone:
-	case <-time.After(g.gracefulStopTimeout):
+	case <-timer.C:
 		g.log.Warn().
 			Dur("timeout", g.gracefulStopTimeout).
 			Msg("graceful stop timed out; force-stopping gRPC server")
