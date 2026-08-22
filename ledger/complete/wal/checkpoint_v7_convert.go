@@ -134,21 +134,27 @@ func FromV6Tries(v6Tries []*trie.MTrie) ([]*payloadless.MTrie, error) {
 //   - The output filename must use the V7 suffix (e.g. "checkpoint.00000100.v7");
 //     a missing or wrong suffix is rejected.
 //   - No output file (including any part file) with the same name may already
-//     exist; otherwise the call is rejected.
+//     exist; otherwise the call is rejected and the existing output is left
+//     untouched.
 //   - The conversion preserves trie root hashes: a V7 checkpoint round-tripped
 //     through this function matches the V6 root hashes exactly.
+//   - On any failure after the checks above, the partially written output is
+//     removed.
 //
-// nWorker controls how many of the 16 subtrie part files are encoded in
-// parallel during the V7 write step; valid range is [1, 16]. The V6 read step
+// `stream` selects the conversion strategy:
+//   - false: read the entire V6 forest into memory, convert it, and write the V7
+//     checkpoint. Peak memory is approximately the sum of the V6 trie set and the
+//     V7 trie set, so mainnet-scale checkpoints need a host with memory headroom.
+//   - true: stream each part file node-by-node (see
+//     [convertCheckpointV6ToV7Stream]). Peak memory is independent of checkpoint
+//     size, at the cost of not re-deriving the trie root hashes from the
+//     converted nodes.
+//
+// nWorker controls how many of the 16 subtrie part files are processed in
+// parallel; valid range is [1, 16]. In the non-streaming mode, the V6 read step
 // also reads the 16 subtrie part files concurrently using its own internal worker
 // pool (this function does not gate that), so the total parallelism while
 // running may exceed nWorker briefly during the read→write hand-off.
-//
-// Memory: this implementation reads the entire V6 forest into memory before
-// emitting V7 — peak memory is approximately the sum of the V6 trie set and the
-// V7 trie set. For mainnet-scale checkpoints, run this on a host with enough
-// memory headroom. Streaming subtrie-by-subtrie conversion is a possible future
-// optimization but is not implemented here.
 //
 // Expected error returns during normal operation:
 //   - none — all error returns indicate a malformed input, a clobbering output,
@@ -160,36 +166,12 @@ func ConvertCheckpointV6ToV7(
 	outputFileName string,
 	logger zerolog.Logger,
 	nWorker uint,
+	stream bool,
 ) error {
-	if nWorker == 0 || nWorker > subtrieCount {
-		return fmt.Errorf("invalid nWorker %v, valid range is [1, %v]", nWorker, subtrieCount)
-	}
-
-	// Reject obvious filename misuse so converted files can coexist with the V6 source.
-	if err := requireV7Filename(outputFileName); err != nil {
+	subtrieChecksums, topTrieChecksum, err := validateV6ToV7Conversion(
+		inputDir, inputFileName, outputDir, outputFileName, logger, nWorker)
+	if err != nil {
 		return err
-	}
-
-	// Validate V6 input exists (header + part files).
-	v6Header := filePathCheckpointHeader(inputDir, inputFileName)
-	if _, err := os.Stat(v6Header); err != nil {
-		return fmt.Errorf("V6 checkpoint header not found at %s: %w", v6Header, err)
-	}
-	subtrieChecksums, _, err := readCheckpointHeader(v6Header, logger)
-	if err != nil {
-		return fmt.Errorf("could not read V6 checkpoint header: %w", err)
-	}
-	if err := allPartFileExist(inputDir, inputFileName, len(subtrieChecksums)); err != nil {
-		return fmt.Errorf("V6 part files incomplete for %s/%s: %w", inputDir, inputFileName, err)
-	}
-
-	// Validate V7 output is not present (any of the part files).
-	v7Existing, err := findCheckpointPartFiles(outputDir, outputFileName)
-	if err != nil {
-		return fmt.Errorf("could not check existing V7 output files: %w", err)
-	}
-	if len(v7Existing) != 0 {
-		return fmt.Errorf("V7 output already exists: %v", v7Existing)
 	}
 
 	logger.Info().
@@ -198,11 +180,114 @@ func ConvertCheckpointV6ToV7(
 		Str("v7_dir", outputDir).
 		Str("v7_file", outputFileName).
 		Uint("nworker", nWorker).
+		Bool("stream", stream).
 		Msg("starting V6→V7 checkpoint conversion")
+
+	if stream {
+		err = convertCheckpointV6ToV7Stream(
+			inputDir, inputFileName, outputDir, outputFileName, logger, nWorker, subtrieChecksums, topTrieChecksum)
+	} else {
+		err = convertCheckpointV6ToV7InMemory(inputDir, inputFileName, outputDir, outputFileName, logger, nWorker)
+	}
+
+	if err != nil {
+		// validateV6ToV7Conversion established that no output file existed before this
+		// call, so every file matching the output name now was written by this failed
+		// call and is safe to remove.
+		cleanupErr := deleteCheckpointFiles(outputDir, outputFileName)
+		if cleanupErr != nil {
+			return fmt.Errorf("fail to cleanup partially written output %s, after running into error: %w",
+				cleanupErr, err)
+		}
+		return err
+	}
+
+	logger.Info().Msg("V6→V7 checkpoint conversion complete")
+	return nil
+}
+
+// validateV6ToV7Conversion performs the pre-conversion checks shared by both
+// conversion strategies and returns the per-subtrie checksums and the top-trie
+// checksum recorded in the V6 checkpoint header.
+//
+// This function must run before any output file is created, and it must not
+// create any itself: a failure here means this call wrote nothing, so the caller
+// must not run output cleanup - which would delete a pre-existing V7 checkpoint
+// belonging to a previous, successful conversion.
+//
+// No error returns are expected during normal operation.
+func validateV6ToV7Conversion(
+	inputDir string,
+	inputFileName string,
+	outputDir string,
+	outputFileName string,
+	logger zerolog.Logger,
+	nWorker uint,
+) ([]uint32, uint32, error) {
+	if nWorker == 0 || nWorker > subtrieCount {
+		return nil, 0, fmt.Errorf("invalid nWorker %v, valid range is [1, %v]", nWorker, subtrieCount)
+	}
+
+	// Reject obvious filename misuse so converted files can coexist with the V6 source.
+	if err := requireV7Filename(outputFileName); err != nil {
+		return nil, 0, err
+	}
+
+	// Validate V6 input exists (header + part files).
+	v6Header := filePathCheckpointHeader(inputDir, inputFileName)
+	if _, err := os.Stat(v6Header); err != nil {
+		return nil, 0, fmt.Errorf("V6 checkpoint header not found at %s: %w", v6Header, err)
+	}
+	subtrieChecksums, topTrieChecksum, err := readCheckpointHeader(v6Header, logger)
+	if err != nil {
+		return nil, 0, fmt.Errorf("could not read V6 checkpoint header: %w", err)
+	}
+	// The converters address the subtrie part files by index in [0, subtrieCount),
+	// so a header declaring a different number of subtries cannot be converted.
+	if len(subtrieChecksums) != subtrieCount {
+		return nil, 0, fmt.Errorf("V6 checkpoint header declares %v subtrie checksums, expected %v",
+			len(subtrieChecksums), subtrieCount)
+	}
+	if err := allPartFileExist(inputDir, inputFileName, len(subtrieChecksums)); err != nil {
+		return nil, 0, fmt.Errorf("V6 part files incomplete for %s/%s: %w", inputDir, inputFileName, err)
+	}
+
+	// Validate V7 output is not present (any of the part files).
+	v7Existing, err := findCheckpointPartFiles(outputDir, outputFileName)
+	if err != nil {
+		return nil, 0, fmt.Errorf("could not check existing V7 output files: %w", err)
+	}
+	if len(v7Existing) != 0 {
+		return nil, 0, fmt.Errorf("V7 output already exists: %v", v7Existing)
+	}
+
+	return subtrieChecksums, topTrieChecksum, nil
+}
+
+// convertCheckpointV6ToV7InMemory converts a V6 checkpoint by loading the entire
+// V6 forest into memory, converting it to payloadless tries, and writing them out
+// with the V7 writer. Inputs are expected to have been checked by
+// [validateV6ToV7Conversion].
+//
+// No error returns are expected during normal operation.
+func convertCheckpointV6ToV7InMemory(
+	inputDir string,
+	inputFileName string,
+	outputDir string,
+	outputFileName string,
+	logger zerolog.Logger,
+	nWorker uint,
+) error {
+	// Remove any leftover temp part files from a previously interrupted conversion
+	// to this output; they are never reused and would otherwise accumulate.
+	if err := removeStaleTempFiles(outputDir, outputFileName, logger); err != nil {
+		return fmt.Errorf("could not remove stale temp files: %w", err)
+	}
 
 	// Read the V6 checkpoint fully — the V6 reader already reads the 16 subtrie
 	// part files concurrently. The resulting tries share sub-tries via Go pointer
 	// identity, which lets FromV6Tries memoize and avoid redundant conversion.
+	v6Header := filePathCheckpointHeader(inputDir, inputFileName)
 	v6Tries, err := LoadCheckpoint(v6Header, logger)
 	if err != nil {
 		return fmt.Errorf("could not load V6 checkpoint: %w", err)
@@ -231,7 +316,6 @@ func ConvertCheckpointV6ToV7(
 		return fmt.Errorf("could not write V7 checkpoint: %w", err)
 	}
 
-	logger.Info().Msg("V6→V7 checkpoint conversion complete")
 	return nil
 }
 
