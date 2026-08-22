@@ -3,6 +3,7 @@ package grpcserver
 import (
 	"net"
 	"sync"
+	"time"
 
 	"go.uber.org/atomic"
 
@@ -18,6 +19,11 @@ import (
 	"github.com/onflow/flow-go/module/irrecoverable"
 )
 
+// DefaultGracefulStopTimeout is the time GracefulStop is allowed to wait for active streaming
+// RPCs to finish before the server is force-stopped via Stop. Long-lived streaming subscriptions
+// would otherwise block shutdown indefinitely.
+const DefaultGracefulStopTimeout = 5 * time.Second
+
 // GrpcServer wraps `grpc.Server` and allows to manage it using `component.Component` interface. It can be injected
 // into different engines making it possible to use single grpc server for multiple services which live in different modules.
 type GrpcServer struct {
@@ -30,7 +36,8 @@ type GrpcServer struct {
 	// within handler code.
 	grpcSignalerCtx *atomic.Pointer[irrecoverable.SignalerContext]
 
-	grpcListenAddr string // the GRPC server address as ip:port
+	grpcListenAddr      string        // the GRPC server address as ip:port
+	gracefulStopTimeout time.Duration // how long to wait for active RPCs to finish before force-stopping
 
 	addrLock    sync.RWMutex
 	grpcAddress net.Addr
@@ -38,17 +45,23 @@ type GrpcServer struct {
 
 var _ component.Component = (*GrpcServer)(nil)
 
-// NewGrpcServer returns a new grpc server.
+// NewGrpcServer returns a new grpc server. If gracefulStopTimeout is zero,
+// DefaultGracefulStopTimeout is used.
 func NewGrpcServer(log zerolog.Logger,
 	grpcListenAddr string,
 	grpcServer *grpc.Server,
 	grpcSignalerCtx *atomic.Pointer[irrecoverable.SignalerContext],
+	gracefulStopTimeout time.Duration,
 ) *GrpcServer {
+	if gracefulStopTimeout <= 0 {
+		gracefulStopTimeout = DefaultGracefulStopTimeout
+	}
 	server := &GrpcServer{
-		log:             log,
-		server:          grpcServer,
-		grpcListenAddr:  grpcListenAddr,
-		grpcSignalerCtx: grpcSignalerCtx,
+		log:                 log,
+		server:              grpcServer,
+		grpcListenAddr:      grpcListenAddr,
+		grpcSignalerCtx:     grpcSignalerCtx,
+		gracefulStopTimeout: gracefulStopTimeout,
 	}
 	server.Component = component.NewComponentManagerBuilder().
 		AddWorker(server.serveGRPCWorker).
@@ -104,8 +117,25 @@ func (g *GrpcServer) GRPCAddress() net.Addr {
 }
 
 // shutdownWorker is a worker routine which shuts down server when the context is cancelled.
+// It attempts a graceful stop first. If active streaming RPCs do not finish within
+// gracefulStopTimeout, the server is force-stopped to avoid blocking shutdown indefinitely.
 func (g *GrpcServer) shutdownWorker(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 	ready()
 	<-ctx.Done()
-	g.server.GracefulStop()
+	gracefulDone := make(chan struct{})
+	go func() {
+		defer close(gracefulDone)
+		g.server.GracefulStop()
+	}()
+	timer := time.NewTimer(g.gracefulStopTimeout)
+	defer timer.Stop()
+	select {
+	case <-gracefulDone:
+	case <-timer.C:
+		g.log.Warn().
+			Dur("timeout", g.gracefulStopTimeout).
+			Msg("graceful stop timed out; force-stopping gRPC server")
+		g.server.Stop()
+	}
+	<-gracefulDone
 }
