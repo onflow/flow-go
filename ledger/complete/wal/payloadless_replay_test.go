@@ -119,3 +119,109 @@ func TestReplayOnPayloadlessForest_ReplaysWALSegments(t *testing.T) {
 		require.True(t, forest.HasTrie(root1), "forest must contain the root produced by replaying the WAL segment")
 	})
 }
+
+// TestReplayOnPayloadlessForestUntil verifies the early-stop replay: it stops as
+// soon as the target trie is produced (or is already in the V7 checkpoint), and
+// reports whether the target was found. Stopping early is what lets an older
+// state commitment be extracted without being evicted from the LRU forest by a
+// full replay to the WAL tip.
+func TestReplayOnPayloadlessForestUntil(t *testing.T) {
+	unittest.RunWithTempDir(t, func(dir string) {
+		logger := zerolog.Nop()
+
+		// Seed state (root0) captured as the V7 root checkpoint.
+		fullForest, err := mtrie.NewForest(100, &metrics.NoopCollector{}, nil)
+		require.NoError(t, err)
+
+		paths0, payloads0 := randNPathPayloads(10)
+		root0, err := fullForest.Update(&ledger.TrieUpdate{
+			RootHash: fullForest.GetEmptyRootHash(),
+			Paths:    paths0,
+			Payloads: toPayloadPtrs(payloads0),
+		})
+		require.NoError(t, err)
+
+		v6Tries, err := fullForest.GetTries()
+		require.NoError(t, err)
+		v7Tries, err := FromV6Tries(v6Tries)
+		require.NoError(t, err)
+		require.NoError(t, StoreCheckpointV7Concurrently(v7Tries, dir, RootCheckpointFilenameV7(), logger))
+
+		// Three chained updates recorded into the WAL (but NOT the checkpoint):
+		// root0 -> root1 -> root2 -> root3.
+		recordWAL, err := NewDiskWAL(logger, nil, metrics.NewNoopCollector(), dir, 10, pathByteSize, segmentSize)
+		require.NoError(t, err)
+
+		parent := root0
+		roots := make([]ledger.RootHash, 0, 3)
+		for range 3 {
+			pathsi, payloadsi := randNPathPayloads(10)
+			update := &ledger.TrieUpdate{
+				RootHash: parent,
+				Paths:    pathsi,
+				Payloads: toPayloadPtrs(payloadsi),
+			}
+			root, err := fullForest.Update(update)
+			require.NoError(t, err)
+			_, _, err = recordWAL.RecordUpdate(update)
+			require.NoError(t, err)
+			roots = append(roots, root)
+			parent = root
+		}
+		<-recordWAL.Done()
+		root1, root2, root3 := roots[0], roots[1], roots[2]
+
+		// A fourth update built on root3 but never recorded: a valid root hash that
+		// is present neither in the checkpoint nor in the WAL.
+		pathsAbsent, payloadsAbsent := randNPathPayloads(10)
+		rootAbsent, err := fullForest.Update(&ledger.TrieUpdate{
+			RootHash: root3,
+			Paths:    pathsAbsent,
+			Payloads: toPayloadPtrs(payloadsAbsent),
+		})
+		require.NoError(t, err)
+
+		// replayUntil runs a fresh DiskWAL + forest and returns the found flag plus
+		// the populated forest, so each case is independent.
+		replayUntil := func(t *testing.T, target ledger.RootHash) (bool, *payloadless.Forest) {
+			w, err := NewDiskWAL(logger, nil, metrics.NewNoopCollector(), dir, 10, pathByteSize, segmentSize)
+			require.NoError(t, err)
+			t.Cleanup(func() { <-w.Done() })
+
+			forest, err := payloadless.NewForest(100, &metrics.NoopCollector{}, nil)
+			require.NoError(t, err)
+
+			found, err := w.ReplayOnPayloadlessForestUntil(forest, target)
+			require.NoError(t, err)
+			return found, forest
+		}
+
+		t.Run("stops at a mid-WAL target", func(t *testing.T) {
+			found, forest := replayUntil(t, root1)
+			require.True(t, found, "root1 is produced by replaying the first WAL update")
+			require.True(t, forest.HasTrie(root1), "target trie must be present")
+			// Proof of early-stop: updates producing root2/root3 must NOT be applied.
+			require.False(t, forest.HasTrie(root2), "replay must stop at the target, before producing root2")
+			require.False(t, forest.HasTrie(root3), "replay must stop at the target, before producing root3")
+		})
+
+		t.Run("target already in checkpoint replays no segments", func(t *testing.T) {
+			found, forest := replayUntil(t, root0)
+			require.True(t, found, "root0 is a checkpoint trie")
+			require.True(t, forest.HasTrie(root0))
+			require.False(t, forest.HasTrie(root1), "no WAL segment should be replayed when the target is in the checkpoint")
+		})
+
+		t.Run("target reachable only at the WAL tip", func(t *testing.T) {
+			found, forest := replayUntil(t, root3)
+			require.True(t, found, "root3 is produced by replaying all recorded WAL updates")
+			require.True(t, forest.HasTrie(root3))
+		})
+
+		t.Run("absent target returns not found without error", func(t *testing.T) {
+			found, forest := replayUntil(t, rootAbsent)
+			require.False(t, found, "rootAbsent is present neither in the checkpoint nor the WAL")
+			require.False(t, forest.HasTrie(rootAbsent))
+		})
+	})
+}
