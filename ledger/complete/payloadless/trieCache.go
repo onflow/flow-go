@@ -1,6 +1,7 @@
 package payloadless
 
 import (
+	"fmt"
 	"sync"
 
 	"github.com/onflow/flow-go/ledger"
@@ -25,7 +26,11 @@ type TrieCache struct {
 }
 
 // NewTrieCache returns a new TrieCache with given capacity.
-func NewTrieCache(capacity uint, onTreeEvicted OnTreeEvictedFunc) *TrieCache {
+// Returns an error if capacity is zero.
+func NewTrieCache(capacity uint, onTreeEvicted OnTreeEvictedFunc) (*TrieCache, error) {
+	if capacity == 0 {
+		return nil, fmt.Errorf("trie cache capacity must be positive")
+	}
 	return &TrieCache{
 		tries:         make([]*MTrie, capacity),
 		lookup:        make(map[ledger.RootHash]int, capacity),
@@ -34,7 +39,7 @@ func NewTrieCache(capacity uint, onTreeEvicted OnTreeEvictedFunc) *TrieCache {
 		tail:          0,
 		count:         0,
 		onTreeEvicted: onTreeEvicted,
-	}
+	}, nil
 }
 
 // Purge removes all mtries stored in the buffer

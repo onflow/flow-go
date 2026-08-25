@@ -40,7 +40,14 @@ type Forest struct {
 // Make sure you chose a sufficiently large forestCapacity, such that, when reaching the capacity, the
 // Least Recently Added trie will never be needed again.
 func NewForest(forestCapacity int, metrics module.LedgerMetrics, onTreeEvicted func(tree *MTrie)) (*Forest, error) {
-	forest := &Forest{tries: NewTrieCache(uint(forestCapacity), onTreeEvicted),
+	if forestCapacity <= 0 {
+		return nil, fmt.Errorf("forest capacity must be positive, got %d", forestCapacity)
+	}
+	trieCache, err := NewTrieCache(uint(forestCapacity), onTreeEvicted)
+	if err != nil {
+		return nil, fmt.Errorf("creating trie cache failed: %w", err)
+	}
+	forest := &Forest{tries: trieCache,
 		forestCapacity: forestCapacity,
 		onTreeEvicted:  onTreeEvicted,
 		metrics:        metrics,
@@ -48,18 +55,18 @@ func NewForest(forestCapacity int, metrics module.LedgerMetrics, onTreeEvicted f
 
 	// add trie with no allocated registers
 	emptyTrie := NewEmptyMTrie()
-	err := forest.AddTrie(emptyTrie)
+	err = forest.AddTrie(emptyTrie)
 	if err != nil {
 		return nil, fmt.Errorf("adding empty trie to forest failed: %w", err)
 	}
 	return forest, nil
 }
 
-// HasPaths returns, for each input path, whether the path has an allocated register
-// in the trie identified by `r.RootHash`. This replaces the full forest's ValueSizes
-// method since the payloadless trie does not store payload byte sizes.
+// IsAllocatedRegisters returns, for each input path, whether an allocated register exists
+// in the trie identified by `r.RootHash`. A register is considered allocated when the leaf
+// hash stored at its path is non-nil (i.e. the stored value is non-empty).
 // TODO: can be optimized further if we don't care about changing the order of the input r.Paths
-func (f *Forest) HasPaths(r *ledger.TrieRead) ([]bool, error) {
+func (f *Forest) IsAllocatedRegisters(r *ledger.TrieRead) ([]bool, error) {
 
 	if len(r.Paths) == 0 {
 		return []bool{}, nil
@@ -76,29 +83,32 @@ func (f *Forest) HasPaths(r *ledger.TrieRead) ([]bool, error) {
 	// TODO: We could take out the following de-duplication logic
 	//       Which increases the cost for duplicates but reduces complexity without duplicates.
 	deduplicatedPaths := make([]ledger.Path, 0, len(r.Paths))
-	pathOrgIndex := make(map[ledger.Path][]int)
+	pathOrgIndex := make(map[ledger.Path][]int, len(r.Paths))
 	for i, path := range r.Paths {
 		// only collect duplicated paths once
-		indices, ok := pathOrgIndex[path]
-		if !ok { // deduplication here is optional
+		indices, dup := pathOrgIndex[path]
+		if !dup { // deduplication here is optional
 			deduplicatedPaths = append(deduplicatedPaths, path)
 		}
 		// append the index
 		pathOrgIndex[path] = append(indices, i)
 	}
 
-	leafHashes := trie.UnsafeRead(deduplicatedPaths) // this sorts deduplicatedPaths IN-PLACE
+	leafHashes := trie.UnsafeRead(deduplicatedPaths) // for performance reasons, permutes deduplicatedPaths IN-PLACE
+	// Order of `deduplicatedPaths` and `leafHashes` are such that for `deduplicatedPaths[i]` the corresponding leaf hash is given by `leafHashes[i]`.
 
-	// reconstruct existence in the same key order that called the method
-	exists := make([]bool, len(r.Paths))
+	// For each path in the method input `r` (original input order): indicate whether an *allocated* register exists in trie.
+	isAllocated := make([]bool, len(r.Paths))
 	for i, p := range deduplicatedPaths {
-		has := leafHashes[i] != nil
-		for _, j := range pathOrgIndex[p] {
-			exists[j] = has
+		if leafHashes[i] != nil { // register represented by path `p` is allocated
+			for _, j := range pathOrgIndex[p] {
+				isAllocated[j] = true
+			}
 		}
+		// else: corresponding entries of `isAllocated` keep their zero value (false)
 	}
 
-	return exists, nil
+	return isAllocated, nil
 }
 
 // ReadSingleLeafHash reads the leaf hash for a single path. Returns nil if no
@@ -151,18 +161,19 @@ func (f *Forest) ReadLeafHashes(r *ledger.TrieRead) ([]*hash.Hash, error) {
 	// TODO: We could take out the following de-duplication logic
 	//       Which increases the cost for duplicates but reduces read complexity without duplicates.
 	deduplicatedPaths := make([]ledger.Path, 0, len(r.Paths))
-	pathOrgIndex := make(map[ledger.Path][]int)
+	pathOrgIndex := make(map[ledger.Path][]int, len(r.Paths))
 	for i, path := range r.Paths {
 		// only collect duplicated keys once
-		indices, ok := pathOrgIndex[path]
-		if !ok { // deduplication here is optional
+		indices, dup := pathOrgIndex[path]
+		if !dup { // deduplication here is optional
 			deduplicatedPaths = append(deduplicatedPaths, path)
 		}
 		// append the index
 		pathOrgIndex[path] = append(indices, i)
 	}
 
-	leafHashes := trie.UnsafeRead(deduplicatedPaths) // this sorts deduplicatedPaths IN-PLACE
+	leafHashes := trie.UnsafeRead(deduplicatedPaths) // for performance reasons, permutes deduplicatedPaths IN-PLACE
+	// Order of `deduplicatedPaths` and `leafHashes` are such that for `deduplicatedPaths[i]` the corresponding leaf hash is given by `leafHashes[i]`.
 
 	// reconstruct the leaf hashes in the same key order that called the method
 	orderedLeafHashes := make([]*hash.Hash, len(r.Paths))
@@ -267,18 +278,22 @@ func (f *Forest) Proofs(r *ledger.TrieRead) (*ledger.PayloadlessTrieBatchProof, 
 	}
 
 	// look up for non existing paths
-	exists, err := f.HasPaths(r)
+	isAllocated, err := f.IsAllocatedRegisters(r)
 	if err != nil {
 		return nil, err
 	}
 
+	// Collect unallocated paths; deduplicate to satisfy NewTrieWithUpdatedRegisters' precondition.
 	notFoundPaths := make([]ledger.Path, 0)
 	notFoundValues := make([][]byte, 0)
+	seen := make(map[ledger.Path]struct{})
 	for i, path := range r.Paths {
-		// add if empty
-		if !exists[i] {
-			notFoundPaths = append(notFoundPaths, path)
-			notFoundValues = append(notFoundValues, nil)
+		if !isAllocated[i] {
+			if _, already := seen[path]; !already {
+				seen[path] = struct{}{}
+				notFoundPaths = append(notFoundPaths, path)
+				notFoundValues = append(notFoundValues, nil)
+			}
 		}
 	}
 

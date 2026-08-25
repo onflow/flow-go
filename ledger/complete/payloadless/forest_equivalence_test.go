@@ -215,9 +215,9 @@ func TestForestEquivalence_ReadSingle(t *testing.T) {
 	}
 }
 
-// TestForestEquivalence_HasPathsVsValueSizes verifies that for every path,
-// payloadless.HasPaths reports true iff the full forest's ValueSizes is > 0.
-func TestForestEquivalence_HasPathsVsValueSizes(t *testing.T) {
+// TestForestEquivalence_IsAllocatedRegistersVsValueSizes verifies that for every path,
+// payloadless.IsAllocatedRegisters reports true iff the full forest's ValueSizes is > 0.
+func TestForestEquivalence_IsAllocatedRegistersVsValueSizes(t *testing.T) {
 	fp := newForestPair(t, 5)
 
 	rng := &payloadlessRNG{seed: 0}
@@ -246,7 +246,7 @@ func TestForestEquivalence_HasPathsVsValueSizes(t *testing.T) {
 
 	sizes, err := fp.m.ValueSizes(&ledger.TrieRead{RootHash: root, Paths: mPaths})
 	require.NoError(t, err)
-	exists, err := fp.pl.HasPaths(&ledger.TrieRead{RootHash: root, Paths: plPaths})
+	exists, err := fp.pl.IsAllocatedRegisters(&ledger.TrieRead{RootHash: root, Paths: plPaths})
 	require.NoError(t, err)
 
 	require.Equal(t, len(queryPaths), len(sizes))

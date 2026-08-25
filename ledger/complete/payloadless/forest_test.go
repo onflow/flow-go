@@ -733,8 +733,8 @@ func requireLeafHashesMatch(t *testing.T, paths []ledger.Path, payloads []*ledge
 	}
 }
 
-// TestHasPathsOrder tests returned existence flags are in the order as specified by the paths
-func TestHasPathsOrder(t *testing.T) {
+// TestIsAllocatedRegistersOrder tests returned existence flags are in the order as specified by the paths
+func TestIsAllocatedRegistersOrder(t *testing.T) {
 
 	forest, err := NewForest(5, &metrics.NoopCollector{}, nil)
 	require.NoError(t, err)
@@ -753,26 +753,26 @@ func TestHasPathsOrder(t *testing.T) {
 	baseRoot, err := forest.Update(update)
 	require.NoError(t, err)
 
-	// Get HasPaths for paths {p1, p2}
+	// Get IsAllocatedRegisters for paths {p1, p2}
 	read := &ledger.TrieRead{RootHash: baseRoot, Paths: []ledger.Path{p1, p2}}
-	exists, err := forest.HasPaths(read)
+	exists, err := forest.IsAllocatedRegisters(read)
 	require.NoError(t, err)
 	require.Equal(t, len(read.Paths), len(exists))
 	require.True(t, exists[0])
 	require.True(t, exists[1])
 
-	// Get HasPaths for paths {p2, p1}
+	// Get IsAllocatedRegisters for paths {p2, p1}
 	read = &ledger.TrieRead{RootHash: baseRoot, Paths: []ledger.Path{p2, p1}}
-	exists, err = forest.HasPaths(read)
+	exists, err = forest.IsAllocatedRegisters(read)
 	require.NoError(t, err)
 	require.Equal(t, len(read.Paths), len(exists))
 	require.True(t, exists[0])
 	require.True(t, exists[1])
 }
 
-// TestMixHasPaths tests HasPaths for a mix of set and unset registers.
+// TestMixIsAllocatedRegisters tests IsAllocatedRegisters for a mix of set and unset registers.
 // We expect false to be returned for unset registers.
-func TestMixHasPaths(t *testing.T) {
+func TestMixIsAllocatedRegisters(t *testing.T) {
 	forest, err := NewForest(5, &metrics.NoopCollector{}, nil)
 	require.NoError(t, err)
 
@@ -800,7 +800,7 @@ func TestMixHasPaths(t *testing.T) {
 	expected := []bool{true, true, false, false}
 
 	read := &ledger.TrieRead{RootHash: baseRoot, Paths: readPaths}
-	exists, err := forest.HasPaths(read)
+	exists, err := forest.IsAllocatedRegisters(read)
 	require.NoError(t, err)
 	require.Equal(t, len(read.Paths), len(exists))
 	for i := range read.Paths {
@@ -808,9 +808,9 @@ func TestMixHasPaths(t *testing.T) {
 	}
 }
 
-// TestHasPathsWithDuplicatedKeys checks HasPaths for two keys, where both keys are equal.
+// TestIsAllocatedRegistersWithDuplicatedKeys checks IsAllocatedRegisters for two keys, where both keys are equal.
 // We expect to receive the same existence flag twice.
-func TestHasPathsWithDuplicatedKeys(t *testing.T) {
+func TestIsAllocatedRegistersWithDuplicatedKeys(t *testing.T) {
 	forest, err := NewForest(5, &metrics.NoopCollector{}, nil)
 	require.NoError(t, err)
 
@@ -835,7 +835,7 @@ func TestHasPathsWithDuplicatedKeys(t *testing.T) {
 	expected := []bool{true, true, true}
 
 	read := &ledger.TrieRead{RootHash: baseRoot, Paths: readPaths}
-	exists, err := forest.HasPaths(read)
+	exists, err := forest.IsAllocatedRegisters(read)
 	require.NoError(t, err)
 	require.Equal(t, len(read.Paths), len(exists))
 	for i := range read.Paths {
