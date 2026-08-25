@@ -9,6 +9,7 @@ import (
 	"crypto/rand"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/ledger"
@@ -19,7 +20,8 @@ import (
 func TestTrieCache(t *testing.T) {
 	const capacity = 10
 
-	tc := NewTrieCache(capacity, nil)
+	tc, err := NewTrieCache(capacity, nil)
+	require.NoError(t, err)
 	require.Equal(t, 0, tc.Count())
 
 	tries := tc.Tries()
@@ -102,7 +104,7 @@ func TestPurge(t *testing.T) {
 	require.NoError(t, err)
 
 	called := 0
-	tc := NewTrieCache(capacity, func(tree *MTrie) {
+	tc, err := NewTrieCache(capacity, func(tree *MTrie) {
 		switch called {
 		case 0:
 			require.Equal(t, trie1, tree)
@@ -114,6 +116,7 @@ func TestPurge(t *testing.T) {
 		called++
 
 	})
+	require.NoError(t, err)
 	tc.Push(trie1)
 	tc.Push(trie2)
 	tc.Push(trie3)
@@ -133,10 +136,11 @@ func TestEvictCallBack(t *testing.T) {
 	require.NoError(t, err)
 
 	called := false
-	tc := NewTrieCache(capacity, func(tree *MTrie) {
+	tc, err := NewTrieCache(capacity, func(tree *MTrie) {
 		called = true
 		require.Equal(t, trie1, tree)
 	})
+	require.NoError(t, err)
 	tc.Push(trie1)
 
 	trie2, err := randomMTrie()
@@ -155,16 +159,17 @@ func TestConcurrentAccess(t *testing.T) {
 	const worker = 50
 	const capacity = 100 // large enough to not worry evicts
 
-	tc := NewTrieCache(capacity, nil)
+	tc, err := NewTrieCache(capacity, nil)
+	require.NoError(t, err)
 
 	unittest.Concurrently(worker, func(i int) {
-		trie, err := randomMTrie()
-		require.NoError(t, err)
+		trie, triErr := randomMTrie()
+		assert.NoError(t, triErr)
 		tc.Push(trie)
 
 		ret, found := tc.Get(trie.RootHash())
-		require.True(t, found)
-		require.Equal(t, trie, ret)
+		assert.True(t, found)
+		assert.Equal(t, trie, ret)
 	})
 
 	require.Equal(t, worker, tc.Count())
