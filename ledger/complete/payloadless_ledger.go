@@ -100,7 +100,7 @@ func (l *PayloadlessLedger) HasPaths(query *ledger.Query) ([]bool, error) {
 		return nil, err
 	}
 	trieRead := &ledger.TrieRead{RootHash: ledger.RootHash(query.State()), Paths: paths}
-	return l.forest.HasPaths(trieRead)
+	return l.forest.IsAllocatedRegisters(trieRead)
 }
 
 // GetSingleLeafHash returns the leaf hash (HashLeaf(path, value)) for the
