@@ -45,6 +45,26 @@ func NewPayload(untrusted UntrustedPayload) (*Payload, error) {
 	if untrusted.ProtocolStateID == ZeroID {
 		return nil, fmt.Errorf("ProtocolStateID must not be zero")
 	}
+	for i, g := range untrusted.Guarantees {
+		if g == nil {
+			return nil, fmt.Errorf("guarantee at index %d is nil", i)
+		}
+	}
+	for i, s := range untrusted.Seals {
+		if s == nil {
+			return nil, fmt.Errorf("seal at index %d is nil", i)
+		}
+	}
+	for i, r := range untrusted.Receipts {
+		if r == nil {
+			return nil, fmt.Errorf("receipt at index %d is nil", i)
+		}
+	}
+	for i, r := range untrusted.Results {
+		if r == nil {
+			return nil, fmt.Errorf("result at index %d is nil", i)
+		}
+	}
 
 	return &Payload{
 		Guarantees:      untrusted.Guarantees,
