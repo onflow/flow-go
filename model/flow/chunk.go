@@ -230,11 +230,22 @@ func NewChunkDataPack(untrusted UntrustedChunkDataPack) (*ChunkDataPack, error) 
 		return nil, fmt.Errorf("ExecutionDataRoot.ChunkExecutionDataIDs must not be empty")
 	}
 
+	var collection *Collection
+	if untrusted.Collection != nil {
+		c, err := NewCollection(UntrustedCollection{
+			Transactions: untrusted.Collection.Transactions,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("invalid collection: %w", err)
+		}
+		collection = c
+	}
+
 	return &ChunkDataPack{
 		ChunkID:           untrusted.ChunkID,
 		StartState:        untrusted.StartState,
 		Proof:             untrusted.Proof,
-		Collection:        untrusted.Collection,
+		Collection:        collection,
 		ExecutionDataRoot: untrusted.ExecutionDataRoot,
 	}, nil
 }

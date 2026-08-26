@@ -118,17 +118,42 @@ func TestBlock_Status(t *testing.T) {
 	}
 }
 
+// blockWithLastViewTC returns a FullBlockFixture that is guaranteed to have a non-nil LastViewTC.
+// HeaderBodyWithParentFixture omits LastViewTC when view == parent.View+1 (1-in-10 chance).
+// NewHeaderBody now validates LastViewTC via NewTimeoutCertificate, so mutating a nil TC to a
+// zero-value struct would cause hashModel() to panic in the malleability checker.
+func blockWithLastViewTC() *flow.Block {
+	for {
+		if b := unittest.FullBlockFixture(); b.LastViewTC != nil {
+			return b
+		}
+	}
+}
+
 // TestBlockMalleability checks that flow.Block is not malleable: any change in its data
 // should result in a different ID.
-// Because our NewHeaderBody constructor enforces ParentView < View we use
-// WithFieldGenerator to safely pass it.
+// NewHeaderBody enforces ParentView < View and validates LastViewTC via NewTimeoutCertificate,
+// so WithFieldGenerator is used for both to keep those constraints intact.
 func TestBlockMalleability(t *testing.T) {
-	block := unittest.FullBlockFixture()
+	block := blockWithLastViewTC()
 	unittest.RequireEntityNonMalleable(
 		t,
-		unittest.FullBlockFixture(),
+		blockWithLastViewTC(),
 		unittest.WithFieldGenerator("HeaderBody.ParentView", func() uint64 {
 			return block.View - 1 // ParentView must stay below View, so set it to View-1
+		}),
+		// The field generator for LastViewTC must return the struct value (not a pointer):
+		// isModelMalleable dereferences *TimeoutCertificate before invoking the generator,
+		// so modelOrField is flow.TimeoutCertificate at that point.
+		unittest.WithFieldGenerator("HeaderBody.LastViewTC", func() flow.TimeoutCertificate {
+			qc := unittest.QuorumCertificateFixture()
+			return flow.TimeoutCertificate{
+				View:          qc.View + 1,
+				NewestQCViews: []uint64{qc.View},
+				NewestQC:      qc,
+				SignerIndices: unittest.SignerIndicesFixture(4),
+				SigData:       unittest.SignatureFixture(),
+			}
 		}),
 		unittest.WithFieldGenerator("Payload.Results", func() flow.ExecutionResultList {
 			return flow.ExecutionResultList{unittest.ExecutionResultFixture()}
