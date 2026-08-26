@@ -1,6 +1,8 @@
 package common_test
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 
 	prometheusWAL "github.com/onflow/wal/wal"
@@ -246,5 +248,116 @@ func TestSearchRootHashBackward_BoundedRange(t *testing.T) {
 		// hashA is only in segment 0, which is outside the bounded range [1,1].
 		_, _, err = common.SearchRootHashBackward(hashA, dir, 1, 1)
 		require.Error(t, err, "hash outside the bounded range must not be found")
+	})
+}
+
+// TestTrimWALSegmentToHash_TrimsAtTarget verifies that TrimWALSegmentToHash produces a
+// new segment containing all records up to and including the target hash, and stops there
+// even when later records exist in the same segment.
+func TestTrimWALSegmentToHash_TrimsAtTarget(t *testing.T) {
+	unittest.RunWithTempDir(t, func(base string) {
+		srcDir := filepath.Join(base, "src")
+		tmpDir := filepath.Join(base, "tmp")
+		require.NoError(t, os.MkdirAll(srcDir, 0755))
+		require.NoError(t, os.MkdirAll(tmpDir, 0755))
+
+		hashA := makeRootHash(0xA1)
+		hashB := makeRootHash(0xB2)
+		hashC := makeRootHash(0xC3) // target — records after this must be excluded
+
+		// All three records fit in a single segment (large segment size).
+		w := openWALWriter(t, srcDir, singleSegmentSize)
+		writeSmallWALUpdate(t, w, hashA)
+		writeSmallWALUpdate(t, w, hashB) // target
+		writeSmallWALUpdate(t, w, hashC) // must be excluded from trimmed segment
+		require.NoError(t, w.Close())
+
+		newSeg, err := common.TrimWALSegmentToHash(srcDir, 0, hashB, tmpDir)
+		require.NoError(t, err)
+		require.NotEmpty(t, newSeg)
+
+		// Re-read the trimmed segment and check we see exactly hashA and hashB.
+		sr, err := prometheusWAL.NewSegmentsRangeReader(
+			zerolog.Nop(),
+			prometheusWAL.SegmentRange{Dir: tmpDir, First: 0, Last: 0},
+		)
+		require.NoError(t, err)
+		defer sr.Close()
+
+		reader := prometheusWAL.NewReader(sr)
+		var seen []ledger.RootHash
+		for reader.Next() {
+			_, _, update, err := flowWAL.Decode(reader.Record())
+			require.NoError(t, err)
+			seen = append(seen, update.RootHash)
+		}
+		require.Equal(t, []ledger.RootHash{hashA, hashB}, seen,
+			"trimmed segment must contain exactly the records up to and including the target")
+	})
+}
+
+// TestTrimWALSegmentToHash_TargetNotFound verifies that TrimWALSegmentToHash returns an
+// error when the target hash is absent from the segment.
+func TestTrimWALSegmentToHash_TargetNotFound(t *testing.T) {
+	unittest.RunWithTempDir(t, func(base string) {
+		srcDir := filepath.Join(base, "src")
+		tmpDir := filepath.Join(base, "tmp")
+		require.NoError(t, os.MkdirAll(srcDir, 0755))
+		require.NoError(t, os.MkdirAll(tmpDir, 0755))
+
+		w := openWALWriter(t, srcDir, singleSegmentSize)
+		writeSmallWALUpdate(t, w, makeRootHash(0x01))
+		require.NoError(t, w.Close())
+
+		_, err := common.TrimWALSegmentToHash(srcDir, 0, makeRootHash(0xFF), tmpDir)
+		require.Error(t, err, "must error when target hash is absent")
+	})
+}
+
+// TestBackupAndReplaceWALSegment verifies that:
+//  1. Segments at or above the target index are moved to backupDir.
+//  2. The new segment file is placed as the replacement for the target index.
+//  3. Segments below the target remain in walDir.
+func TestBackupAndReplaceWALSegment(t *testing.T) {
+	unittest.RunWithTempDir(t, func(base string) {
+		walDir := filepath.Join(base, "wal")
+		backupDir := filepath.Join(base, "backup")
+		newSegDir := filepath.Join(base, "new")
+		require.NoError(t, os.MkdirAll(walDir, 0755))
+		require.NoError(t, os.MkdirAll(backupDir, 0755))
+		require.NoError(t, os.MkdirAll(newSegDir, 0755))
+
+		// Write three records so we get segments 0, 1, 2.
+		w := openWALWriter(t, walDir, testSegmentSize)
+		writeWALUpdate(t, w, makeRootHash(0xA0)) // segment 0
+		writeWALUpdate(t, w, makeRootHash(0xB0)) // segment 1
+		writeWALUpdate(t, w, makeRootHash(0xC0)) // segment 2
+		require.NoError(t, w.Close())
+
+		// Build a tiny "new" segment file to replace segment 1.
+		wNew := openWALWriter(t, newSegDir, singleSegmentSize)
+		writeSmallWALUpdate(t, wNew, makeRootHash(0xBB))
+		require.NoError(t, wNew.Close())
+		newSegFile := prometheusWAL.SegmentName(newSegDir, 0)
+
+		require.NoError(t, common.BackupAndReplaceWALSegment(1, walDir, backupDir, newSegFile))
+
+		// Segment 0 must remain in walDir.
+		_, err := os.Stat(prometheusWAL.SegmentName(walDir, 0))
+		require.NoError(t, err, "segment 0 must still be in walDir")
+
+		// Segment 1 must be the new file (replacement).
+		_, err = os.Stat(prometheusWAL.SegmentName(walDir, 1))
+		require.NoError(t, err, "replacement segment 1 must exist in walDir")
+
+		// Segment 2 must have been moved to backupDir.
+		_, err = os.Stat(prometheusWAL.SegmentName(walDir, 2))
+		require.True(t, os.IsNotExist(err), "original segment 2 must no longer exist in walDir")
+
+		_, err = os.Stat(prometheusWAL.SegmentName(backupDir, 1))
+		require.NoError(t, err, "original segment 1 must be backed up")
+
+		_, err = os.Stat(prometheusWAL.SegmentName(backupDir, 2))
+		require.NoError(t, err, "segment 2 must be backed up")
 	})
 }
