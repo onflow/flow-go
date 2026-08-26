@@ -9,6 +9,7 @@ import (
 	"github.com/jordanschalm/lockctx"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	"github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/engine/execution/state/bootstrap"
 	"github.com/onflow/flow-go/engine/execution/testutil"
@@ -105,7 +106,7 @@ func TestReExecuteBlock(t *testing.T) {
 
 		// remove execution results
 		var cdpIDs []flow.Identifier
-		cdpIDs, err = removeForBlockID(
+		cdpIDs, err = common.RemoveExecutionResultsForBlock(
 			batch,
 			commits,
 			txResults,
@@ -120,7 +121,7 @@ func TestReExecuteBlock(t *testing.T) {
 		require.NoError(t, err)
 
 		// remove again, to make sure missing entires are handled properly
-		additionalCdpIDs, err := removeForBlockID(
+		additionalCdpIDs, err := common.RemoveExecutionResultsForBlock(
 			batch,
 			commits,
 			txResults,
@@ -151,7 +152,7 @@ func TestReExecuteBlock(t *testing.T) {
 		defer batch.Close()
 
 		// remove again after flushing
-		cdpIDs, err = removeForBlockID(
+		cdpIDs, err = common.RemoveExecutionResultsForBlock(
 			batch,
 			commits,
 			txResults,
@@ -273,7 +274,7 @@ func TestReExecuteBlockWithDifferentResult(t *testing.T) {
 		defer batch.Close()
 
 		// remove execution results
-		cdpIDs, err := removeForBlockID(
+		cdpIDs, err := common.RemoveExecutionResultsForBlock(
 			batch,
 			commits,
 			txResults,
@@ -301,7 +302,7 @@ func TestReExecuteBlockWithDifferentResult(t *testing.T) {
 		defer batch.Close()
 
 		// remove again to test for duplicates handling
-		additionalCdpIDs, err := removeForBlockID(
+		additionalCdpIDs, err := common.RemoveExecutionResultsForBlock(
 			batch,
 			commits,
 			txResults,
