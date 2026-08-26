@@ -65,15 +65,6 @@ func TestPayloadEncodingMsgpack(t *testing.T) {
 }
 
 // TestNewPayload verifies the behavior of the NewPayload constructor.
-// It ensures proper handling of both valid and invalid untrusted input fields.
-//
-// Test Cases:
-//
-// 1. Valid input:
-//   - Verifies that a properly populated UntrustedPayload results in a valid Payload.
-//
-// 2. Valid input with zero ProtocolStateID:
-//   - Ensures that an error is returned when ProtocolStateID is flow.ZeroID.
 func TestNewPayload(t *testing.T) {
 	t.Run("valid input", func(t *testing.T) {
 		payload := unittest.PayloadFixture(
@@ -85,7 +76,7 @@ func TestNewPayload(t *testing.T) {
 		require.NotNil(t, res)
 	})
 
-	t.Run("valid input with zero ProtocolStateID", func(t *testing.T) {
+	t.Run("zero ProtocolStateID rejected", func(t *testing.T) {
 		payload := unittest.PayloadFixture()
 		payload.ProtocolStateID = flow.ZeroID
 
@@ -93,5 +84,53 @@ func TestNewPayload(t *testing.T) {
 		require.Error(t, err)
 		require.Nil(t, res)
 		require.Contains(t, err.Error(), "ProtocolStateID must not be zero")
+	})
+
+	t.Run("nil Guarantee element rejected", func(t *testing.T) {
+		untrusted := flow.UntrustedPayload(unittest.PayloadFixture(
+			unittest.WithProtocolStateID(unittest.IdentifierFixture()),
+		))
+		untrusted.Guarantees = []*flow.CollectionGuarantee{nil}
+
+		res, err := flow.NewPayload(untrusted)
+		require.Error(t, err)
+		require.Nil(t, res)
+		require.Contains(t, err.Error(), "guarantee at index 0 is nil")
+	})
+
+	t.Run("nil Seal element rejected", func(t *testing.T) {
+		untrusted := flow.UntrustedPayload(unittest.PayloadFixture(
+			unittest.WithProtocolStateID(unittest.IdentifierFixture()),
+		))
+		untrusted.Seals = []*flow.Seal{nil}
+
+		res, err := flow.NewPayload(untrusted)
+		require.Error(t, err)
+		require.Nil(t, res)
+		require.Contains(t, err.Error(), "seal at index 0 is nil")
+	})
+
+	t.Run("nil Receipt element rejected", func(t *testing.T) {
+		untrusted := flow.UntrustedPayload(unittest.PayloadFixture(
+			unittest.WithProtocolStateID(unittest.IdentifierFixture()),
+		))
+		untrusted.Receipts = flow.ExecutionReceiptStubList{nil}
+
+		res, err := flow.NewPayload(untrusted)
+		require.Error(t, err)
+		require.Nil(t, res)
+		require.Contains(t, err.Error(), "receipt at index 0 is nil")
+	})
+
+	t.Run("nil Result element rejected", func(t *testing.T) {
+		untrusted := flow.UntrustedPayload(unittest.PayloadFixture(
+			unittest.WithProtocolStateID(unittest.IdentifierFixture()),
+		))
+		untrusted.Results = flow.ExecutionResultList{nil}
+
+		res, err := flow.NewPayload(untrusted)
+		require.Error(t, err)
+		require.Nil(t, res)
+		require.Contains(t, err.Error(), "result at index 0 is nil")
 	})
 }
