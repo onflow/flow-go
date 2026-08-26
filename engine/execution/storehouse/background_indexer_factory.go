@@ -15,6 +15,7 @@ import (
 
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	"github.com/onflow/flow-go/ledger"
+	"github.com/onflow/flow-go/ledger/complete/wal"
 	modelbootstrap "github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
@@ -36,8 +37,126 @@ type BlockExecutedNotifier interface {
 // implementation (bootstrap.ImportRegistersFromCheckpoint) is provided by the caller.
 type ImportRegistersFromCheckpoint func(logger zerolog.Logger, checkpointFile string, checkpointHeight uint64, checkpointRootHash ledger.RootHash, pdb *pebble.DB, workerCount int) error
 
+// StorehouseBootstrapMode controls which checkpoint the register store is seeded from
+// when it is first created (i.e., when the register Pebble DB is not yet bootstrapped).
+type StorehouseBootstrapMode string
+
+const (
+	// StorehouseBootstrapModeRootCheckpoint bootstraps the register store from the
+	// node's root checkpoint (root.checkpoint in the trie directory).  This is the
+	// default mode and corresponds to the historical bootstrap path where every EN
+	// starts from the network's genesis/spork root.
+	StorehouseBootstrapModeRootCheckpoint StorehouseBootstrapMode = "root-checkpoint"
+
+	// StorehouseBootstrapModeSealedCheckpoint bootstraps the register store from the
+	// latest numbered checkpoint in the trie directory (e.g. checkpoint.00000042),
+	// which is produced by the compact-execution-state utility.  Use this mode when
+	// you want to start an EN from a compacted sealed state rather than replaying the
+	// full WAL history from the root checkpoint.
+	StorehouseBootstrapModeSealedCheckpoint StorehouseBootstrapMode = "sealed-checkpoint"
+)
+
+// CheckpointSource resolves the checkpoint file path, the block height that the
+// checkpoint corresponds to, and the trie root hash encoded in the checkpoint.
+// It is called only when the register store is not yet bootstrapped.
+//
+// No error returns are expected during normal operation.
+type CheckpointSource func(
+	log zerolog.Logger,
+	state protocol.State,
+	triedir string,
+) (checkpointFile string, height uint64, rootHash ledger.RootHash, err error)
+
+// RootCheckpointSource is a [CheckpointSource] that resolves the node's root
+// checkpoint (root.checkpoint in triedir) seeded with the height and root hash
+// declared in the node's root seal.
+//
+// No error returns are expected during normal operation.
+func RootCheckpointSource(
+	log zerolog.Logger,
+	state protocol.State,
+	triedir string,
+) (string, uint64, ledger.RootHash, error) {
+	sealedRoot := state.Params().SealedRoot()
+	rootSeal := state.Params().Seal()
+
+	if sealedRoot.ID() != rootSeal.BlockID {
+		return "", 0, ledger.RootHash{}, fmt.Errorf(
+			"mismatching root seal and sealed root: %v != %v", sealedRoot.ID(), rootSeal.BlockID)
+	}
+
+	checkpointFile := path.Join(triedir, modelbootstrap.FilenameWALRootCheckpoint)
+	return checkpointFile, sealedRoot.Height, ledger.RootHash(rootSeal.FinalState), nil
+}
+
+// SealedCheckpointSource is a [CheckpointSource] that resolves the latest
+// numbered checkpoint produced by the compact-execution-state utility.  It reads
+// the checkpoint to extract the single trie's root hash, and derives the
+// corresponding block height from the current sealed block in the protocol state.
+//
+// No error returns are expected during normal operation.
+func SealedCheckpointSource(
+	log zerolog.Logger,
+	state protocol.State,
+	triedir string,
+) (string, uint64, ledger.RootHash, error) {
+	checkpointNums, _, err := wal.ListCheckpoints(triedir)
+	if err != nil {
+		return "", 0, ledger.RootHash{}, fmt.Errorf("cannot list checkpoints in %s: %w", triedir, err)
+	}
+	if len(checkpointNums) == 0 {
+		return "", 0, ledger.RootHash{}, fmt.Errorf(
+			"no checkpoint found in %s; run compact-execution-state first", triedir)
+	}
+
+	latestNum := checkpointNums[0]
+	for _, n := range checkpointNums[1:] {
+		if n > latestNum {
+			latestNum = n
+		}
+	}
+	latestName := wal.NumberToFilename(latestNum)
+
+	tries, err := wal.OpenAndReadCheckpointV6(triedir, latestName, log)
+	if err != nil {
+		return "", 0, ledger.RootHash{}, fmt.Errorf("cannot read checkpoint %s: %w", latestName, err)
+	}
+	if len(tries) != 1 {
+		return "", 0, ledger.RootHash{}, fmt.Errorf(
+			"sealed checkpoint %s must contain exactly 1 trie, found %d", latestName, len(tries))
+	}
+
+	rootHash := ledger.RootHash(tries[0].RootHash())
+
+	sealedHead, err := state.Sealed().Head()
+	if err != nil {
+		return "", 0, ledger.RootHash{}, fmt.Errorf("cannot get sealed head: %w", err)
+	}
+
+	checkpointFile := path.Join(triedir, latestName)
+	log.Info().
+		Str("checkpoint", latestName).
+		Uint64("height", sealedHead.Height).
+		Str("root-hash", rootHash.String()).
+		Msg("resolved sealed checkpoint source")
+
+	return checkpointFile, sealedHead.Height, rootHash, nil
+}
+
+// CheckpointSourceForMode returns the [CheckpointSource] corresponding to the given
+// [StorehouseBootstrapMode].  An unrecognized mode falls back to [RootCheckpointSource].
+func CheckpointSourceForMode(mode StorehouseBootstrapMode) CheckpointSource {
+	if mode == StorehouseBootstrapModeSealedCheckpoint {
+		return SealedCheckpointSource
+	}
+	return RootCheckpointSource
+}
+
 // LoadRegisterStore creates and initializes a RegisterStore.
 // It handles opening the pebble database, bootstrapping if needed, and creating the RegisterStore.
+// When the database is not yet bootstrapped checkpointSource is called to determine which
+// checkpoint file, block height, and root hash to import; use [RootCheckpointSource] for
+// the default behaviour or [SealedCheckpointSource] for compacted-state bootstrapping.
 func LoadRegisterStore(
 	log zerolog.Logger,
 	state protocol.State,
@@ -49,6 +168,7 @@ func LoadRegisterStore(
 	triedir string,
 	importCheckpointWorkerCount int,
 	importFunc ImportRegistersFromCheckpoint,
+	checkpointSource CheckpointSource,
 ) (
 	*RegisterStore,
 	io.Closer,
@@ -78,18 +198,11 @@ func LoadRegisterStore(
 	log.Info().Msgf("register store bootstrapped: %v", bootstrapped)
 
 	if !bootstrapped {
-		checkpointFile := path.Join(triedir, modelbootstrap.FilenameWALRootCheckpoint)
-		sealedRoot := state.Params().SealedRoot()
-
-		rootSeal := state.Params().Seal()
-
-		if sealedRoot.ID() != rootSeal.BlockID {
-			originalErr := fmt.Errorf("mismatching root seal and sealed root: %v != %v", sealedRoot.ID(), rootSeal.BlockID)
+		checkpointFile, checkpointHeight, rootHash, err := checkpointSource(log, state, triedir)
+		if err != nil {
+			originalErr := fmt.Errorf("could not resolve checkpoint source: %w", err)
 			return nil, nil, multierror.Append(originalErr, closer.Close()).ErrorOrNil()
 		}
-
-		checkpointHeight := sealedRoot.Height
-		rootHash := ledger.RootHash(rootSeal.FinalState)
 
 		err = importFunc(log.With().Str("component", "background-indexing").Logger(),
 			checkpointFile, checkpointHeight, rootHash, pebbledb, importCheckpointWorkerCount)
@@ -139,6 +252,7 @@ func LoadBackgroundIndexerEngine(
 	triedir string,
 	importCheckpointWorkerCount int,
 	importFunc ImportRegistersFromCheckpoint,
+	checkpointSource CheckpointSource,
 	executionDataStore execution_data.ExecutionDataGetter,
 	resultsReader storageerr.ExecutionResultsReader,
 	blockExecutedNotifier BlockExecutedNotifier, // optional: notifier for block executed events
@@ -179,6 +293,7 @@ func LoadBackgroundIndexerEngine(
 			triedir,
 			importCheckpointWorkerCount,
 			importFunc,
+			checkpointSource,
 		)
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to load register store: %w", err)

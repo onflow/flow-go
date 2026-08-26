@@ -22,6 +22,8 @@ import (
 	ledgerconvert "github.com/onflow/flow-go/ledger/common/convert"
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
 	ledgercomplete "github.com/onflow/flow-go/ledger/complete"
+	mtrietrie "github.com/onflow/flow-go/ledger/complete/mtrie/trie"
+	flowWAL "github.com/onflow/flow-go/ledger/complete/wal"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/blobs"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
@@ -69,6 +71,7 @@ func TestLoadBackgroundIndexerEngine_StorehouseEnabled(t *testing.T) {
 		triedir,
 		importCheckpointWorkerCount,
 		importFunc,
+		storehouse.RootCheckpointSource,
 		executionDataStore,
 		resultsReader,
 		blockExecutedNotifier,
@@ -113,6 +116,7 @@ func TestLoadBackgroundIndexerEngine_BackgroundIndexingDisabled(t *testing.T) {
 		triedir,
 		importCheckpointWorkerCount,
 		importFunc,
+		storehouse.RootCheckpointSource,
 		executionDataStore,
 		resultsReader,
 		blockExecutedNotifier,
@@ -227,6 +231,7 @@ func TestLoadBackgroundIndexerEngine_Bootstrap(t *testing.T) {
 		triedir,
 		importCheckpointWorkerCount,
 		importFunc,
+		storehouse.RootCheckpointSource,
 		executionDataStore,
 		resultsReader,
 		blockExecutedNotifier,
@@ -286,6 +291,7 @@ func TestLoadBackgroundIndexerEngine_Bootstrap(t *testing.T) {
 		triedir,
 		importCheckpointWorkerCount,
 		importFunc,
+		storehouse.RootCheckpointSource,
 	)
 	require.NoError(t, err)
 	require.NotNil(t, registerStore)
@@ -472,6 +478,7 @@ func TestLoadBackgroundIndexerEngine_Indexing(t *testing.T) {
 		triedir,
 		importCheckpointWorkerCount,
 		importFunc,
+		storehouse.RootCheckpointSource,
 		executionDataStore,
 		resultsReader,
 		blockExecutedNotifier,
@@ -578,6 +585,7 @@ indexingComplete:
 		triedir,
 		importCheckpointWorkerCount,
 		importFunc,
+		storehouse.RootCheckpointSource,
 	)
 	require.NoError(t, err)
 	require.NotNil(t, registerStore)
@@ -592,4 +600,83 @@ indexingComplete:
 	require.GreaterOrEqual(t, latestHeight, targetHeight,
 		"register store should have indexed at least %d heights (from %d to %d), but got %d",
 		numBlocks, registerStoreStart+1, targetHeight, latestHeight)
+}
+
+// TestCheckpointSourceForMode verifies that CheckpointSourceForMode returns the correct
+// source function for each mode and falls back to RootCheckpointSource for unknown modes.
+func TestCheckpointSourceForMode(t *testing.T) {
+	t.Parallel()
+
+	root := storehouse.CheckpointSourceForMode(storehouse.StorehouseBootstrapModeRootCheckpoint)
+	require.NotNil(t, root)
+
+	sealed := storehouse.CheckpointSourceForMode(storehouse.StorehouseBootstrapModeSealedCheckpoint)
+	require.NotNil(t, sealed)
+
+	// Unknown mode must fall back to RootCheckpointSource (not nil, not sealed).
+	unknown := storehouse.CheckpointSourceForMode(storehouse.StorehouseBootstrapMode("unknown"))
+	require.NotNil(t, unknown)
+}
+
+// TestRootCheckpointSource verifies that RootCheckpointSource resolves the checkpoint
+// file path and height from the protocol state's root seal.
+func TestRootCheckpointSource(t *testing.T) {
+	t.Parallel()
+
+	const rootHeight = uint64(42)
+
+	rootHeader := unittest.BlockHeaderFixture()
+	rootHeader.Height = rootHeight
+	seal := unittest.Seal.Fixture()
+	seal.BlockID = rootHeader.ID()
+
+	params := protocolmock.NewParams(t)
+	params.On("SealedRoot").Return(rootHeader)
+	params.On("Seal").Return(seal)
+
+	state := protocolmock.NewState(t)
+	state.On("Params").Return(params)
+
+	triedir := t.TempDir()
+	log := unittest.Logger()
+
+	checkpointFile, height, rootHash, err := storehouse.RootCheckpointSource(log, state, triedir)
+	require.NoError(t, err)
+	require.Equal(t, rootHeight, height)
+	require.NotEmpty(t, checkpointFile)
+	// Root hash must equal the seal's FinalState cast to ledger.RootHash.
+	expected := ledger.RootHash(seal.FinalState)
+	require.Equal(t, expected, rootHash)
+}
+
+// TestSealedCheckpointSource verifies that SealedCheckpointSource finds the latest
+// numbered checkpoint, reads its single trie, and derives the height from the sealed head.
+func TestSealedCheckpointSource(t *testing.T) {
+	t.Parallel()
+
+	const sealedHeight = uint64(99)
+
+	// Write a single-trie V6 checkpoint into a temp dir.
+	triedir := t.TempDir()
+	emptyTrie := mtrietrie.NewEmptyMTrie()
+	checkpointName := flowWAL.NumberToFilename(7)
+	require.NoError(t, flowWAL.StoreCheckpointV6Concurrently(
+		[]*mtrietrie.MTrie{emptyTrie}, triedir, checkpointName, unittest.Logger()))
+
+	sealedHeader := unittest.BlockHeaderFixture()
+	sealedHeader.Height = sealedHeight
+
+	sealedSnapshot := protocolmock.NewSnapshot(t)
+	sealedSnapshot.On("Head").Return(sealedHeader, nil)
+
+	state := protocolmock.NewState(t)
+	state.On("Sealed").Return(sealedSnapshot)
+
+	log := unittest.Logger()
+
+	checkpointFile, height, rootHash, err := storehouse.SealedCheckpointSource(log, state, triedir)
+	require.NoError(t, err)
+	require.Equal(t, sealedHeight, height)
+	require.NotEmpty(t, checkpointFile)
+	require.Equal(t, ledger.RootHash(emptyTrie.RootHash()), rootHash)
 }

@@ -886,6 +886,7 @@ func (exeNode *ExecutionNode) LoadRegisterStore(
 		return nil
 	}
 
+	cs := storehouse.CheckpointSourceForMode(storehouse.StorehouseBootstrapMode(exeNode.exeConf.storehouseBootstrapMode))
 	registerStore, closer, err := storehouse.LoadRegisterStore(
 		node.Logger,
 		node.State,
@@ -897,6 +898,7 @@ func (exeNode *ExecutionNode) LoadRegisterStore(
 		exeNode.exeConf.triedir,
 		exeNode.exeConf.importCheckpointWorkerCount,
 		bootstrap.ImportRegistersFromCheckpoint,
+		cs,
 	)
 	if err != nil {
 		return err
@@ -1366,6 +1368,7 @@ func (exeNode *ExecutionNode) LoadBackgroundIndexerEngine(
 	module.ReadyDoneAware,
 	error,
 ) {
+	cs := storehouse.CheckpointSourceForMode(storehouse.StorehouseBootstrapMode(exeNode.exeConf.storehouseBootstrapMode))
 	engine, created, err := storehouse.LoadBackgroundIndexerEngine(
 		node.Logger,
 		exeNode.exeConf.enableBackgroundStorehouseIndexing,
@@ -1378,6 +1381,7 @@ func (exeNode *ExecutionNode) LoadBackgroundIndexerEngine(
 		exeNode.exeConf.triedir,
 		exeNode.exeConf.importCheckpointWorkerCount,
 		bootstrap.ImportRegistersFromCheckpoint,
+		cs,
 		exeNode.executionDataStore,
 		exeNode.resultsReader,
 		exeNode.blockExecutedNotifier,

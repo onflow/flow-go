@@ -76,6 +76,7 @@ type ExecutionConfig struct {
 	enableStorehouse                   bool
 	enableBackgroundStorehouseIndexing bool
 	backgroundIndexerHeightsPerSecond  uint64
+	storehouseBootstrapMode            string
 	enableChecker                      bool
 	publicAccessID                     string
 
@@ -156,6 +157,15 @@ func (exeConf *ExecutionConfig) SetupFlags(flags *pflag.FlagSet) {
 	flags.BoolVar(&exeConf.enableStorehouse, "enable-storehouse", false, "enable storehouse to store registers on disk, default is false")
 	flags.BoolVar(&exeConf.enableBackgroundStorehouseIndexing, "enable-background-storehouse-indexing", false, "enable background indexing of storehouse data while storehouse is disabled to eliminate downtime when enabling it. default: false.")
 	flags.Uint64Var(&exeConf.backgroundIndexerHeightsPerSecond, "background-indexer-heights-per-second", storehouse.DefaultHeightsPerSecond, fmt.Sprintf("rate limit for background indexer in heights per second. 0 means no rate limiting. default: %v", storehouse.DefaultHeightsPerSecond))
+
+	flags.StringVar(&exeConf.storehouseBootstrapMode,
+		"storehouse-bootstrap-mode",
+		string(storehouse.StorehouseBootstrapModeRootCheckpoint),
+		fmt.Sprintf("controls which checkpoint seeds the register store on first boot: %q (default, uses root.checkpoint) or %q (uses the latest numbered checkpoint produced by compact-execution-state)",
+			storehouse.StorehouseBootstrapModeRootCheckpoint,
+			storehouse.StorehouseBootstrapModeSealedCheckpoint,
+		),
+	)
 	flags.BoolVar(&exeConf.enableChecker, "enable-checker", true, "enable checker to check the correctness of the execution result, default is true")
 	flags.BoolVar(&exeConf.scheduleCallbacksEnabled, "scheduled-callbacks-enabled", fvm.DefaultScheduledTransactionsEnabled, "[deprecated] enable execution of scheduled transactions")
 	flags.BoolVar(&exeConf.tokenTrackingEnabled, "token-tracking-enabled", false, "enable tracking and logging of token moves on transactions")
@@ -197,6 +207,15 @@ func (exeConf *ExecutionConfig) ValidateFlags() error {
 	// Explicitly turn off background storehouse indexing when storehouse is enabled
 	if exeConf.enableStorehouse {
 		exeConf.enableBackgroundStorehouseIndexing = false
+	}
+	switch storehouse.StorehouseBootstrapMode(exeConf.storehouseBootstrapMode) {
+	case storehouse.StorehouseBootstrapModeRootCheckpoint, storehouse.StorehouseBootstrapModeSealedCheckpoint:
+		// valid
+	default:
+		return fmt.Errorf("invalid storehouse-bootstrap-mode %q: must be %q or %q",
+			exeConf.storehouseBootstrapMode,
+			storehouse.StorehouseBootstrapModeRootCheckpoint,
+			storehouse.StorehouseBootstrapModeSealedCheckpoint)
 	}
 	return nil
 }
