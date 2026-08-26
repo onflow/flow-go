@@ -33,6 +33,7 @@ import (
 	find_inconsistent_result "github.com/onflow/flow-go/cmd/util/cmd/find-inconsistent-result"
 	compact_execution_state "github.com/onflow/flow-go/cmd/util/cmd/compact-execution-state"
 	find_trie_root "github.com/onflow/flow-go/cmd/util/cmd/find-trie-root"
+	verify_compacted_state "github.com/onflow/flow-go/cmd/util/cmd/verify-compacted-state"
 	generate_authorization_fixes "github.com/onflow/flow-go/cmd/util/cmd/generate-authorization-fixes"
 	inspect_token_movements "github.com/onflow/flow-go/cmd/util/cmd/inspect-token-movements"
 	"github.com/onflow/flow-go/cmd/util/cmd/leaders"
@@ -126,6 +127,7 @@ func addCommands() {
 	rootCmd.AddCommand(diff_states.Cmd)
 	rootCmd.AddCommand(atree_inlined_status.Cmd)
 	rootCmd.AddCommand(compact_execution_state.Cmd)
+	rootCmd.AddCommand(verify_compacted_state.Cmd)
 	rootCmd.AddCommand(find_trie_root.Cmd)
 	rootCmd.AddCommand(run_script.Cmd)
 	rootCmd.AddCommand(system_addresses.Cmd)
