@@ -48,7 +48,7 @@ var _ blockingStreamService = (*blockingStreamServer)(nil)
 func (s *blockingStreamServer) Stream(stream grpc.ServerStream) error {
 	close(s.started)
 	if s.blockDuration > 0 {
-		// this is to simulate the case that after `grpcServer.Stop()` is called, 
+		// this is to simulate the case that after `grpcServer.Stop()` is called,
 		// `<-gracefulDone` channel is still blocking, so that we can verify
 		// the caller is not waiting for `<-gracefulDone` return before shutdown,
 		// otherwise, the waiting might be still blocking for longer or indefinitely.
