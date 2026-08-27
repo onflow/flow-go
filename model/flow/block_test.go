@@ -140,7 +140,7 @@ func TestBlockMalleability(t *testing.T) {
 	block := blockWithLastViewTC()
 	unittest.RequireEntityNonMalleable(
 		t,
-		blockWithLastViewTC(),
+		block,
 		unittest.WithFieldGenerator("HeaderBody.ParentView", func() uint64 {
 			return block.View - 1 // ParentView must stay below View, so set it to View-1
 		}),
