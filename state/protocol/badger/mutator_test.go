@@ -3361,6 +3361,185 @@ func TestExtendInvalidGuarantee(t *testing.T) {
 	})
 }
 
+// TestExtendConflictingGuaranteeSameCollection verifies that a block carrying a guarantee for a
+// collection that a different guarantee was already ingested for is rejected as a typed
+// state.InvalidExtensionError, rather than crashing the node.
+//
+// The storage layer (operation.IndexGuarantee) enforces one guarantee per collection globally.
+// A proposer can include a guarantee for an already-guaranteed collection by changing the
+// signature — producing a fresh guarantee.ID() that slips past the ancestor-dedup check (which
+// is keyed by guarantee ID). Without an early check in guaranteeExtend, the conflict surfaces
+// later as an untyped storage.ErrDataMismatch from the deferred storage batch. The compliance
+// engine treats any unrecognized error from state.Extend as a fatal exception and crashes the
+// node. The fix detects the conflict in guaranteeExtend and rejects it as InvalidExtensionError.
+func TestExtendConflictingGuaranteeSameCollection(t *testing.T) {
+	rootSnapshot := unittest.RootSnapshotFixture(participants)
+	rootProtocolStateID := getRootProtocolStateID(t, rootSnapshot)
+	util.RunWithFullProtocolState(t, rootSnapshot, func(db storage.DB, state *protocol.ParticipantState) {
+		head, err := rootSnapshot.Head()
+		require.NoError(t, err)
+
+		cluster, err := unittest.SnapshotClusterByIndex(rootSnapshot, 0)
+		require.NoError(t, err)
+
+		all := cluster.Members().NodeIDs()
+		validSignerIndices, err := signature.EncodeSignersToIndices(all, all)
+		require.NoError(t, err)
+
+		usedViews := make(map[uint64]struct{})
+		usedViews[head.View] = struct{}{}
+
+		collectionID := unittest.IdentifierFixture()
+
+		// G1: a valid guarantee for collection C.
+		g1 := &flow.CollectionGuarantee{
+			CollectionID:     collectionID,
+			ClusterChainID:   cluster.ChainID(),
+			ReferenceBlockID: head.ID(),
+			SignerIndices:    validSignerIndices,
+		}
+
+		block1 := unittest.BlockWithParentAndPayloadAndUniqueView(
+			head,
+			flow.Payload{
+				Guarantees:      []*flow.CollectionGuarantee{g1},
+				ProtocolStateID: rootProtocolStateID,
+			},
+			usedViews,
+		)
+		err = state.Extend(context.Background(), unittest.ProposalFromBlock(block1))
+		require.NoError(t, err)
+
+		// G2: a guarantee for the same collection C with a mutated Signature, yielding a fresh
+		// guarantee.ID(). Guarantee signatures are not verified by consensus nodes, so this is
+		// sufficient to produce a distinct ID while keeping all other fields valid.
+		g2 := &flow.CollectionGuarantee{
+			CollectionID:     collectionID,
+			ClusterChainID:   cluster.ChainID(),
+			ReferenceBlockID: head.ID(),
+			SignerIndices:    validSignerIndices,
+			Signature:        unittest.SignatureFixture(),
+		}
+		require.NotEqual(t, g1.ID(), g2.ID(),
+			"mutating the guarantee signature must yield a fresh guarantee ID")
+
+		block2 := unittest.BlockWithParentAndPayloadAndUniqueView(
+			block1.ToHeader(),
+			flow.Payload{
+				Guarantees:      []*flow.CollectionGuarantee{g2},
+				ProtocolStateID: rootProtocolStateID,
+			},
+			usedViews,
+		)
+		err = state.Extend(context.Background(), unittest.ProposalFromBlock(block2))
+
+		require.Error(t, err)
+		require.True(t, st.IsInvalidExtensionError(err),
+			"conflicting guarantee for an already-guaranteed collection must be rejected as InvalidExtensionError, got: %v", err)
+		require.NotErrorIs(t, err, storage.ErrDataMismatch,
+			"storage sentinel must not escape Extend")
+	})
+}
+
+// TestExtendConflictingGuaranteesWithinSamePayload verifies that a block carrying two different
+// guarantees for the same collection within a single payload is rejected as InvalidExtensionError.
+func TestExtendConflictingGuaranteesWithinSamePayload(t *testing.T) {
+	rootSnapshot := unittest.RootSnapshotFixture(participants)
+	rootProtocolStateID := getRootProtocolStateID(t, rootSnapshot)
+	util.RunWithFullProtocolState(t, rootSnapshot, func(db storage.DB, state *protocol.ParticipantState) {
+		head, err := rootSnapshot.Head()
+		require.NoError(t, err)
+
+		cluster, err := unittest.SnapshotClusterByIndex(rootSnapshot, 0)
+		require.NoError(t, err)
+
+		all := cluster.Members().NodeIDs()
+		validSignerIndices, err := signature.EncodeSignersToIndices(all, all)
+		require.NoError(t, err)
+
+		usedViews := make(map[uint64]struct{})
+		usedViews[head.View] = struct{}{}
+
+		collectionID := unittest.IdentifierFixture()
+
+		g1 := &flow.CollectionGuarantee{
+			CollectionID:     collectionID,
+			ClusterChainID:   cluster.ChainID(),
+			ReferenceBlockID: head.ID(),
+			SignerIndices:    validSignerIndices,
+		}
+		g2 := &flow.CollectionGuarantee{
+			CollectionID:     collectionID,
+			ClusterChainID:   cluster.ChainID(),
+			ReferenceBlockID: head.ID(),
+			SignerIndices:    validSignerIndices,
+			Signature:        unittest.SignatureFixture(),
+		}
+		require.NotEqual(t, g1.ID(), g2.ID())
+
+		block := unittest.BlockWithParentAndPayloadAndUniqueView(
+			head,
+			flow.Payload{
+				Guarantees:      []*flow.CollectionGuarantee{g1, g2},
+				ProtocolStateID: rootProtocolStateID,
+			},
+			usedViews,
+		)
+		err = state.Extend(context.Background(), unittest.ProposalFromBlock(block))
+
+		require.Error(t, err)
+		require.True(t, st.IsInvalidExtensionError(err),
+			"two conflicting guarantees for the same collection in one payload must be rejected as InvalidExtensionError, got: %v", err)
+		require.NotErrorIs(t, err, storage.ErrDataMismatch)
+	})
+}
+
+// TestExtendDuplicateGuaranteeWithinSamePayload verifies that a block carrying the same guarantee
+// twice within a single payload is rejected as InvalidExtensionError. The ancestor-based
+// duplicate check does not cover within-payload repeats.
+func TestExtendDuplicateGuaranteeWithinSamePayload(t *testing.T) {
+	rootSnapshot := unittest.RootSnapshotFixture(participants)
+	rootProtocolStateID := getRootProtocolStateID(t, rootSnapshot)
+	util.RunWithFullProtocolState(t, rootSnapshot, func(db storage.DB, state *protocol.ParticipantState) {
+		head, err := rootSnapshot.Head()
+		require.NoError(t, err)
+
+		cluster, err := unittest.SnapshotClusterByIndex(rootSnapshot, 0)
+		require.NoError(t, err)
+
+		all := cluster.Members().NodeIDs()
+		validSignerIndices, err := signature.EncodeSignersToIndices(all, all)
+		require.NoError(t, err)
+
+		usedViews := make(map[uint64]struct{})
+		usedViews[head.View] = struct{}{}
+
+		guarantee := &flow.CollectionGuarantee{
+			CollectionID:     unittest.IdentifierFixture(),
+			ClusterChainID:   cluster.ChainID(),
+			ReferenceBlockID: head.ID(),
+			SignerIndices:    validSignerIndices,
+		}
+
+		block := unittest.BlockWithParentAndPayloadAndUniqueView(
+			head,
+			flow.Payload{
+				Guarantees:      []*flow.CollectionGuarantee{guarantee, guarantee}, // [G, G]
+				ProtocolStateID: rootProtocolStateID,
+			},
+			usedViews,
+		)
+		err = state.Extend(context.Background(), unittest.ProposalFromBlock(block))
+
+		require.Error(t, err)
+		require.True(t, st.IsInvalidExtensionError(err),
+			"identical guarantee twice in one payload must be rejected as InvalidExtensionError, got: %v", err)
+
+		_, err = state.AtBlockID(block.ID()).Head()
+		require.Error(t, err)
+	})
+}
+
 // If block B is finalized and contains a seal for block A, then A is the last sealed block
 func TestSealed(t *testing.T) {
 	rootSnapshot := unittest.RootSnapshotFixture(participants)
