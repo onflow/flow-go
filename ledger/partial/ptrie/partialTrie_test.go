@@ -2,6 +2,7 @@ package ptrie
 
 import (
 	"math/rand"
+	"slices"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -419,6 +420,171 @@ func TestRandomProofs(t *testing.T) {
 
 // TODO add test for incompatible proofs [Byzantine milestone]
 // TODO add test key not exist [Byzantine milestone]
+
+// These tests guard against fabricated register reads in NewPSMT. A byzantine source of proofs
+// (e.g. an execution node's ChunkDataPack) must not be able to make GetSinglePayload/Get serve a
+// value that differs from the committed state while still passing NewPSMT's root check.
+//
+// The proofs a verifier receives are untrusted: the Inclusion flag and Payload are fully
+// attacker-controlled. Before the fix, NewPSMT computed a node's hash from the payload only for
+// inclusion proofs, so a non-inclusion proof carrying a fabricated payload (or a duplicate proof
+// for an already-proven path) left the node's hash at the honest default and slipped past the
+// root check. NewPSMT now binds the payload to the node hash unconditionally, so any fabricated
+// payload changes the node hash and the root check rejects it.
+
+var (
+	// secPathP holds a committed register; secPathP2 is a sibling so the trie has a real branch.
+	secPathP  = testutils.PathByUint16(1)     // bit 0 = 0
+	secPathP2 = testutils.PathByUint16(3)     // bit 0 = 0
+	secPathQ  = testutils.PathByUint16(32768) // bit 0 = 1, EMPTY register on the opposite subtree
+	secPayVP  = testutils.LightPayload('A', 'a')
+	secPayVP2 = testutils.LightPayload('B', 'b')
+)
+
+// secBuildCommittedState inserts the two honest registers and returns the committed root hash.
+func secBuildCommittedState(t *testing.T, f *mtrie.Forest) ledger.RootHash {
+	u := &ledger.TrieUpdate{
+		RootHash: f.GetEmptyRootHash(),
+		Paths:    []ledger.Path{secPathP, secPathP2},
+		Payloads: []*ledger.Payload{secPayVP, secPayVP2},
+	}
+	rootHash, err := f.Update(u)
+	require.NoError(t, err, "error updating trie")
+	return rootHash
+}
+
+// secHonestProofs returns the honest batch proof for [secPathP, secPathQ]:
+//   - honestP: inclusion proof for the committed register secPathP (payload secPayVP)
+//   - honestQ: proof for the EMPTY register secPathQ (carries an empty payload)
+//
+// f.Proofs permutes its input in place, so proofs are matched by their Path field.
+func secHonestProofs(t *testing.T, f *mtrie.Forest, rootHash ledger.RootHash) (honestP, honestQ *ledger.TrieProof) {
+	r := &ledger.TrieRead{RootHash: rootHash, Paths: []ledger.Path{secPathP, secPathQ}}
+	bp, err := f.Proofs(r)
+	require.NoError(t, err, "error getting batch proof")
+	require.Len(t, bp.Proofs, 2)
+	for _, pr := range bp.Proofs {
+		switch pr.Path {
+		case secPathP:
+			honestP = pr
+		case secPathQ:
+			honestQ = pr
+		}
+	}
+	require.NotNil(t, honestP, "expected a proof for secPathP")
+	require.NotNil(t, honestQ, "expected a proof for secPathQ")
+	require.True(t, honestP.Payload.Equals(secPayVP))
+	require.True(t, honestQ.Payload.IsEmpty(), "proof for the empty register Q carries an empty payload")
+	return honestP, honestQ
+}
+
+// secCloneProof deep-copies a proof so a crafted variant can mutate fields without aliasing.
+func secCloneProof(pr *ledger.TrieProof) *ledger.TrieProof {
+	return &ledger.TrieProof{
+		Path:      pr.Path,
+		Payload:   pr.Payload,
+		Interims:  slices.Clone(pr.Interims),
+		Inclusion: pr.Inclusion,
+		Flags:     slices.Clone(pr.Flags),
+		Steps:     pr.Steps,
+	}
+}
+
+// TestNewPSMT_HonestBatchProof is the honest baseline: an untampered batch proof builds a PSMT
+// whose root check passes and serves the committed value for secPathP and an empty payload for the
+// empty register secPathQ. This pins down that the fix does not reject legitimate proofs.
+func TestNewPSMT_HonestBatchProof(t *testing.T) {
+	withForest(t, 32, 10, func(t *testing.T, f *mtrie.Forest) {
+		rootHash := secBuildCommittedState(t, f)
+		honestP, honestQ := secHonestProofs(t, f, rootHash)
+
+		bp := &ledger.TrieBatchProof{Proofs: []*ledger.TrieProof{honestP, honestQ}}
+		psmt, err := NewPSMT(rootHash, bp)
+		require.NoError(t, err, "honest batch proof must build the partial trie")
+		ensureRootHash(t, rootHash, psmt)
+
+		gotP, err := psmt.GetSinglePayload(secPathP)
+		require.NoError(t, err)
+		require.True(t, gotP.Equals(secPayVP), "secPathP serves the committed value")
+
+		gotQ, err := psmt.GetSinglePayload(secPathQ)
+		require.NoError(t, err)
+		require.True(t, gotQ.IsEmpty(), "empty register Q serves an empty payload")
+	})
+}
+
+// TestNewPSMT_RejectsStuffedNonInclusionProof covers attack variant A: a non-inclusion proof for
+// an EMPTY register with a fabricated (non-empty) payload. Because the payload now determines the
+// node hash unconditionally, the fabricated payload changes the reconstructed root and NewPSMT
+// rejects the batch.
+func TestNewPSMT_RejectsStuffedNonInclusionProof(t *testing.T) {
+	withForest(t, 32, 10, func(t *testing.T, f *mtrie.Forest) {
+		rootHash := secBuildCommittedState(t, f)
+		honestP, honestQ := secHonestProofs(t, f, rootHash)
+
+		// Craft the malicious non-inclusion proof: honest Path/Steps/Flags/Interims, but with a
+		// fabricated payload and Inclusion flipped to false.
+		stuffed := testutils.LightPayload('X', 'x')
+		require.False(t, stuffed.IsEmpty())
+		craftedQ := secCloneProof(honestQ)
+		craftedQ.Inclusion = false
+		craftedQ.Payload = stuffed
+
+		// The crafted proof still round-trips through the wire format unchanged (the decoder does
+		// no semantic validation); the defense lives in NewPSMT.
+		attackBatch := &ledger.TrieBatchProof{Proofs: []*ledger.TrieProof{honestP, craftedQ}}
+		decoded, err := ledger.DecodeTrieBatchProof(ledger.EncodeTrieBatchProof(attackBatch))
+		require.NoError(t, err)
+		require.True(t, decoded.Proofs[1].Equals(craftedQ))
+
+		_, err = NewPSMT(rootHash, decoded)
+		require.Error(t, err, "NewPSMT must reject a non-inclusion proof carrying a fabricated payload")
+	})
+}
+
+// TestNewPSMT_RejectsDuplicatePathOverwrite covers attack variant B: an honest inclusion proof for
+// secPathP plus a duplicate proof for the same path carrying a fabricated payload. The duplicate's
+// payload now necessarily changes P's node hash, so the reconstructed root no longer matches and
+// NewPSMT rejects the batch.
+func TestNewPSMT_RejectsDuplicatePathOverwrite(t *testing.T) {
+	withForest(t, 32, 10, func(t *testing.T, f *mtrie.Forest) {
+		rootHash := secBuildCommittedState(t, f)
+		honestP, _ := secHonestProofs(t, f, rootHash)
+
+		// Duplicate proof for secPathP: identical Path/Steps/Flags/Interims, but a fabricated payload.
+		crafted := testutils.LightPayload('Z', 'z')
+		duplicateP := secCloneProof(honestP)
+		duplicateP.Inclusion = false
+		duplicateP.Payload = crafted
+		require.Equal(t, honestP.Path, duplicateP.Path)
+
+		attackBatch := &ledger.TrieBatchProof{Proofs: []*ledger.TrieProof{honestP, duplicateP}}
+		decoded, err := ledger.DecodeTrieBatchProof(ledger.EncodeTrieBatchProof(attackBatch))
+		require.NoError(t, err)
+		require.Len(t, decoded.Proofs, 2)
+
+		_, err = NewPSMT(rootHash, decoded)
+		require.Error(t, err, "NewPSMT must reject a duplicate proof that overwrites a committed register's payload")
+	})
+}
+
+// TestNewPSMT_RejectsInclusionProofWithForgedPayload is a companion check: even an inclusion proof
+// whose payload was swapped to a fabricated value is rejected, since the fabricated payload no
+// longer hashes to the committed root.
+func TestNewPSMT_RejectsInclusionProofWithForgedPayload(t *testing.T) {
+	withForest(t, 32, 10, func(t *testing.T, f *mtrie.Forest) {
+		rootHash := secBuildCommittedState(t, f)
+		honestP, honestQ := secHonestProofs(t, f, rootHash)
+
+		forgedP := secCloneProof(honestP)
+		forgedP.Payload = testutils.LightPayload('Y', 'y')
+		require.False(t, forgedP.Payload.Equals(secPayVP))
+
+		bp := &ledger.TrieBatchProof{Proofs: []*ledger.TrieProof{forgedP, honestQ}}
+		_, err := NewPSMT(rootHash, bp)
+		require.Error(t, err, "NewPSMT must reject an inclusion proof carrying a forged payload")
+	})
+}
 
 func ensureRootHash(t *testing.T, expectedRootHash ledger.RootHash, psmt *PSMT) {
 	if expectedRootHash != ledger.RootHash(psmt.root.Hash()) {

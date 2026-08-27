@@ -136,10 +136,17 @@ func NewPSMT(
 		}
 
 		currentNode.payload = payload
-		// update node's hash value only for inclusion proofs (for others we assume default value)
-		if pr.Inclusion {
-			currentNode.hashValue = ledger.ComputeCompactValue(hash.Hash(path), payload.Value(), currentNode.height)
-		}
+		// Bind the payload to the node's hash unconditionally, i.e. WITHOUT trusting pr.Inclusion.
+		// The proofs originate from a potentially byzantine source (e.g. an execution node's
+		// ChunkDataPack), so pr.Inclusion is attacker-controlled and must not gate hash computation:
+		// otherwise a non-inclusion proof could carry a fabricated (non-empty) payload while the
+		// node's hash stayed at the honest default, making the fabrication invisible to the root
+		// check below and served by GetSinglePayload/Get as authentic state. Computing the hash from
+		// the payload here mirrors proof.VerifyTrieProof: an empty payload yields the default hash
+		// (so honest non-inclusion proofs are unaffected), while any fabricated payload yields a
+		// non-default hash that fails the root check. This likewise defeats a duplicate-path
+		// overwrite, since the second proof's payload now necessarily changes the node's hash.
+		currentNode.hashValue = ledger.ComputeCompactValue(hash.Hash(path), payload.Value(), currentNode.height)
 		// keep a reference to this node by path (for update purpose)
 		psmt.pathLookUp[path] = currentNode
 	}
