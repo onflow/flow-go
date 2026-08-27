@@ -123,11 +123,13 @@ func TestBlock_Status(t *testing.T) {
 // NewHeaderBody now validates LastViewTC via NewTimeoutCertificate, so mutating a nil TC to a
 // zero-value struct would cause hashModel() to panic in the malleability checker.
 func blockWithLastViewTC() *flow.Block {
-	for {
+	const maxAttempts = 1000
+	for i := 0; i < maxAttempts; i++ {
 		if b := unittest.FullBlockFixture(); b.LastViewTC != nil {
 			return b
 		}
 	}
+	panic("failed to generate FullBlockFixture with non-nil LastViewTC")
 }
 
 // TestBlockMalleability checks that flow.Block is not malleable: any change in its data
