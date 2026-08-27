@@ -39,12 +39,21 @@ var blockingStreamServiceDesc = grpc.ServiceDesc{
 type blockingStreamServer struct {
 	// started is closed when the stream handler has been entered.
 	started chan struct{}
+	// blockDuration will cause `Stream` to block for the set duration
+	blockDuration time.Duration
 }
 
 var _ blockingStreamService = (*blockingStreamServer)(nil)
 
 func (s *blockingStreamServer) Stream(stream grpc.ServerStream) error {
 	close(s.started)
+	if s.blockDuration > 0 {
+		// this is to simulate the case that after `grpcServer.Stop()` is called,
+		// `<-gracefulDone` channel is still blocking, so that we can verify
+		// the caller is not waiting for `<-gracefulDone` return before shutdown,
+		// otherwise, the waiting might be still blocking for longer or indefinitely.
+		time.Sleep(s.blockDuration)
+	}
 	<-stream.Context().Done()
 	return nil
 }
@@ -60,7 +69,10 @@ func TestGrpcServerShutdown_WithActiveStream(t *testing.T) {
 	gracefulStopTimeout := 200 * time.Millisecond
 
 	rawServer := grpc.NewServer()
-	handler := &blockingStreamServer{started: make(chan struct{})}
+	handler := &blockingStreamServer{
+		started:       make(chan struct{}),
+		blockDuration: gracefulStopTimeout * 10,
+	}
 	rawServer.RegisterService(&blockingStreamServiceDesc, handler)
 
 	signalerCtx := atomic.NewPointer[irrecoverable.SignalerContext](nil)
@@ -114,7 +126,10 @@ func TestGrpcServerShutdown_ShutdownStreamInterceptor(t *testing.T) {
 	rawServer := grpc.NewServer(
 		grpc.ChainStreamInterceptor(grpcserver.ShutdownStreamInterceptor(signalerCtx)),
 	)
-	handler := &blockingStreamServer{started: make(chan struct{})}
+	handler := &blockingStreamServer{
+		started:       make(chan struct{}),
+		blockDuration: time.Second,
+	}
 	rawServer.RegisterService(&blockingStreamServiceDesc, handler)
 
 	server := grpcserver.NewGrpcServer(
@@ -159,7 +174,13 @@ func TestGrpcServerShutdown_NoActiveStreams(t *testing.T) {
 	gracefulStopTimeout := 5 * time.Second
 
 	rawServer := grpc.NewServer()
-	rawServer.RegisterService(&blockingStreamServiceDesc, &blockingStreamServer{started: make(chan struct{})})
+	rawServer.RegisterService(
+		&blockingStreamServiceDesc,
+		&blockingStreamServer{
+			started:       make(chan struct{}),
+			blockDuration: gracefulStopTimeout * 10,
+		},
+	)
 
 	signalerCtx := atomic.NewPointer[irrecoverable.SignalerContext](nil)
 	server := grpcserver.NewGrpcServer(
