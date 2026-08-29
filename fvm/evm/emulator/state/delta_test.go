@@ -2,6 +2,7 @@ package state_test
 
 import (
 	"fmt"
+	"math/big"
 	"testing"
 
 	gethCommon "github.com/ethereum/go-ethereum/common"
@@ -742,6 +743,245 @@ func TestDeltaView(t *testing.T) {
 		require.NoError(t, err)
 		emptyValue := gethCommon.Hash{}
 		require.Equal(t, emptyValue, vret)
+	})
+
+	t.Run("test HasData for all combinations", func(t *testing.T) {
+		view := state.NewDeltaView(
+			&MockedReadOnlyView{
+				GetRefundFunc: emptyRefund,
+			},
+		)
+		require.False(t, view.HasData())
+
+		view = state.NewDeltaView(
+			&MockedReadOnlyView{
+				GetRefundFunc: emptyRefund,
+				IsCreatedFunc: func(a gethCommon.Address) bool {
+					return false
+				},
+				ExistFunc: func(a gethCommon.Address) (bool, error) {
+					return false, nil
+				},
+				HasSelfDestructedFunc: func(a gethCommon.Address) (bool, *uint256.Int) {
+					return false, new(uint256.Int)
+				},
+			},
+		)
+		// This will set the `dirtyAddresses` & `created` maps
+		err := view.CreateAccount(gethCommon.Address{0x12})
+		require.NoError(t, err)
+		require.True(t, len(view.DirtyAddresses()) > 0)
+		require.True(t, view.IsCreated(gethCommon.Address{0x12}))
+		require.True(t, view.HasData())
+
+		view = state.NewDeltaView(
+			&MockedReadOnlyView{
+				GetRefundFunc: emptyRefund,
+			},
+		)
+		// This will set the `newContract` map
+		view.CreateContract(gethCommon.Address{0x10})
+		require.True(t, view.IsNewContract(gethCommon.Address{0x10}))
+		require.True(t, view.HasData())
+
+		view = state.NewDeltaView(
+			&MockedReadOnlyView{
+				GetRefundFunc: emptyRefund,
+				ExistFunc: func(a gethCommon.Address) (bool, error) {
+					return true, nil
+				},
+				HasSelfDestructedFunc: func(a gethCommon.Address) (bool, *uint256.Int) {
+					return false, new(uint256.Int)
+				},
+				GetBalanceFunc: func(a gethCommon.Address) (*uint256.Int, error) {
+					return uint256.MustFromBig(big.NewInt(100)), nil
+				},
+			},
+		)
+		// This will set the `toBeDestructed` map
+		err = view.SelfDestruct(gethCommon.Address{0x12})
+		require.NoError(t, err)
+		hasSelfDestructed, _ := view.HasSelfDestructed(gethCommon.Address{0x12})
+		require.True(t, hasSelfDestructed)
+		require.True(t, view.HasData())
+
+		view = state.NewDeltaView(
+			&MockedReadOnlyView{
+				GetRefundFunc: emptyRefund,
+				IsCreatedFunc: func(a gethCommon.Address) bool {
+					return false
+				},
+				ExistFunc: func(a gethCommon.Address) (bool, error) {
+					return true, nil
+				},
+				HasSelfDestructedFunc: func(a gethCommon.Address) (bool, *uint256.Int) {
+					return false, new(uint256.Int)
+				},
+				GetBalanceFunc: func(a gethCommon.Address) (*uint256.Int, error) {
+					return uint256.MustFromBig(big.NewInt(100)), nil
+				},
+			},
+		)
+		// This will set the `recreated` map
+		err = view.CreateAccount(gethCommon.Address{0x12})
+		require.NoError(t, err)
+		require.True(t, view.HasData())
+
+		view = state.NewDeltaView(
+			&MockedReadOnlyView{
+				GetRefundFunc: emptyRefund,
+				IsCreatedFunc: func(a gethCommon.Address) bool {
+					return false
+				},
+				ExistFunc: func(a gethCommon.Address) (bool, error) {
+					return true, nil
+				},
+				HasSelfDestructedFunc: func(a gethCommon.Address) (bool, *uint256.Int) {
+					return true, uint256.MustFromBig(big.NewInt(100))
+				},
+				GetBalanceFunc: func(a gethCommon.Address) (*uint256.Int, error) {
+					return uint256.MustFromBig(big.NewInt(0)), nil
+				},
+			},
+		)
+		// This will set the `balances` map
+		err = view.AddBalance(gethCommon.Address{0x12}, uint256.MustFromBig(big.NewInt(100)))
+		require.NoError(t, err)
+		require.True(t, view.HasData())
+
+		view = state.NewDeltaView(
+			&MockedReadOnlyView{
+				GetRefundFunc: emptyRefund,
+			},
+		)
+		// This will set the `nonces` map
+		err = view.SetNonce(gethCommon.Address{0x10}, 3)
+		require.NoError(t, err)
+		nonce, err := view.GetNonce(gethCommon.Address{0x10})
+		require.NoError(t, err)
+		require.Equal(t, uint64(3), nonce)
+		require.True(t, view.HasData())
+
+		view = state.NewDeltaView(
+			&MockedReadOnlyView{
+				GetRefundFunc: emptyRefund,
+			},
+		)
+		// This will set the `codes` & `codeHashes` map
+		err = view.SetCode(gethCommon.Address{0x10}, []byte{0x1, 0x10, 0x55, 0x16, 0x20})
+		require.NoError(t, err)
+		code, err := view.GetCode(gethCommon.Address{0x10})
+		require.NoError(t, err)
+		require.Equal(t, []byte{0x1, 0x10, 0x55, 0x16, 0x20}, code)
+		require.True(t, view.HasData())
+
+		view = state.NewDeltaView(
+			&MockedReadOnlyView{
+				GetRefundFunc: emptyRefund,
+				GetStateFunc: func(sa types.SlotAddress) (gethCommon.Hash, error) {
+					return gethCommon.Hash{}, nil
+				},
+			},
+		)
+		sk := types.SlotAddress{
+			Address: gethCommon.Address{0x10},
+			Key:     gethCommon.Hash{0x2},
+		}
+		// This will set the `slots` map
+		previousVal, err := view.SetState(sk, gethCommon.Hash{0x55})
+		require.NoError(t, err)
+		require.Equal(t, gethCommon.Hash{}, previousVal)
+		stateVal, err := view.GetState(sk)
+		require.NoError(t, err)
+		require.Equal(t, gethCommon.Hash{0x55}, stateVal)
+		require.True(t, view.HasData())
+
+		view = state.NewDeltaView(
+			&MockedReadOnlyView{
+				GetRefundFunc: emptyRefund,
+			},
+		)
+		sk = types.SlotAddress{
+			Address: gethCommon.Address{0x15},
+			Key:     gethCommon.Hash{0x20},
+		}
+		// This will set the `transient`
+		view.SetTransientState(sk, gethCommon.Hash{0xfa})
+		require.Equal(t, gethCommon.Hash{0xfa}, view.GetTransientState(sk))
+		require.True(t, view.HasData())
+	})
+
+	t.Run("test get refund is carried over", func(t *testing.T) {
+		ledger := testutils.GetSimpleValueStore()
+		rootView, err := state.NewBaseView(ledger, rootAddr)
+		require.NoError(t, err)
+		require.Equal(t, uint64(0), rootView.GetRefund())
+
+		view := state.NewDeltaView(rootView)
+		refund := uint64(100)
+		err = view.AddRefund(refund)
+
+		require.NoError(t, err)
+		require.Equal(t, refund, view.GetRefund())
+		require.False(t, view.HasData())
+
+		childView1 := state.NewDeltaView(view)
+		childView2 := state.NewDeltaView(childView1)
+		childView3 := state.NewDeltaView(childView2)
+		childView4 := state.NewDeltaView(childView3)
+		childView5 := state.NewDeltaView(childView4)
+		childView6 := state.NewDeltaView(childView5)
+		childView7 := state.NewDeltaView(childView6)
+		childView8 := state.NewDeltaView(childView7)
+		childView9 := state.NewDeltaView(childView8)
+		childView10 := state.NewDeltaView(childView9)
+		childView11 := state.NewDeltaView(childView10)
+
+		require.Equal(t, refund, childView11.GetRefund())
+	})
+
+	t.Run("test parent traversal", func(t *testing.T) {
+		ledger := testutils.GetSimpleValueStore()
+		rootView, err := state.NewBaseView(ledger, rootAddr)
+		require.NoError(t, err)
+
+		view := state.NewDeltaView(rootView)
+		sk := types.SlotAddress{
+			Address: gethCommon.Address{0x10},
+			Key:     gethCommon.Hash{0x2},
+		}
+		previousVal, err := view.SetState(sk, gethCommon.Hash{0x55})
+		require.NoError(t, err)
+		require.Equal(t, gethCommon.Hash{}, previousVal)
+		require.True(t, view.HasData())
+
+		childView1 := state.NewDeltaView(view)
+		childView2 := state.NewDeltaView(childView1)
+		childView3 := state.NewDeltaView(childView2)
+		childView4 := state.NewDeltaView(childView3)
+		childView5 := state.NewDeltaView(childView4)
+		childView6 := state.NewDeltaView(childView5)
+
+		stateVal, err := childView6.GetState(sk)
+		require.NoError(t, err)
+		require.False(t, childView6.HasData())
+		require.Equal(t, gethCommon.Hash{0x55}, stateVal)
+
+		previousVal, err = childView6.SetState(sk, gethCommon.Hash{0x32})
+		require.NoError(t, err)
+		require.Equal(t, stateVal, previousVal)
+		require.True(t, childView6.HasData())
+
+		childView7 := state.NewDeltaView(childView6)
+		childView8 := state.NewDeltaView(childView7)
+		childView9 := state.NewDeltaView(childView8)
+		childView10 := state.NewDeltaView(childView9)
+		childView11 := state.NewDeltaView(childView10)
+
+		stateVal, err = childView11.GetState(sk)
+		require.NoError(t, err)
+		require.False(t, childView11.HasData())
+		require.Equal(t, gethCommon.Hash{0x32}, stateVal)
 	})
 }
 
