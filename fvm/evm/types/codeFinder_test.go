@@ -4,10 +4,12 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	gethVM "github.com/ethereum/go-ethereum/core/vm"
 	gethParams "github.com/ethereum/go-ethereum/params"
+
 	"github.com/onflow/flow-go/fvm/evm/types"
-	"github.com/stretchr/testify/require"
 )
 
 func Test_ExecutionErrorCode(t *testing.T) {
