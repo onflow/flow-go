@@ -68,8 +68,6 @@ func ExecutionErrorCode(err error) ErrorCode {
 		return ExecutionErrCodeContractAddressCollision
 	case errors.Is(err, gethVM.ErrExecutionReverted):
 		return ExecutionErrCodeExecutionReverted
-	case errors.Is(err, gethVM.ErrMaxInitCodeSizeExceeded):
-		return ExecutionErrCodeMaxInitCodeSizeExceeded
 	case errors.Is(err, gethVM.ErrMaxCodeSizeExceeded):
 		return ExecutionErrCodeMaxCodeSizeExceeded
 	case errors.Is(err, gethVM.ErrInvalidJump):
