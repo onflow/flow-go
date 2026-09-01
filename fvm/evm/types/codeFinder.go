@@ -54,35 +54,33 @@ func ValidationErrorCode(err error) ErrorCode {
 }
 
 func ExecutionErrorCode(err error) ErrorCode {
-	// execution VM errors are never wrapped
-	switch err {
-	case gethVM.ErrOutOfGas:
+	// the returned execution VM errors can be wrapped
+	switch {
+	case errors.Is(err, gethVM.ErrOutOfGas):
 		return ExecutionErrCodeOutOfGas
-	case gethVM.ErrCodeStoreOutOfGas:
+	case errors.Is(err, gethVM.ErrCodeStoreOutOfGas):
 		return ExecutionErrCodeCodeStoreOutOfGas
-	case gethVM.ErrDepth:
+	case errors.Is(err, gethVM.ErrDepth):
 		return ExecutionErrCodeDepth
-	case gethVM.ErrInsufficientBalance:
+	case errors.Is(err, gethVM.ErrInsufficientBalance):
 		return ExecutionErrCodeInsufficientBalance
-	case gethVM.ErrContractAddressCollision:
+	case errors.Is(err, gethVM.ErrContractAddressCollision):
 		return ExecutionErrCodeContractAddressCollision
-	case gethVM.ErrExecutionReverted:
+	case errors.Is(err, gethVM.ErrExecutionReverted):
 		return ExecutionErrCodeExecutionReverted
-	case gethVM.ErrMaxInitCodeSizeExceeded:
-		return ExecutionErrCodeMaxInitCodeSizeExceeded
-	case gethVM.ErrMaxCodeSizeExceeded:
+	case errors.Is(err, gethVM.ErrMaxCodeSizeExceeded):
 		return ExecutionErrCodeMaxCodeSizeExceeded
-	case gethVM.ErrInvalidJump:
+	case errors.Is(err, gethVM.ErrInvalidJump):
 		return ExecutionErrCodeInvalidJump
-	case gethVM.ErrWriteProtection:
+	case errors.Is(err, gethVM.ErrWriteProtection):
 		return ExecutionErrCodeWriteProtection
-	case gethVM.ErrReturnDataOutOfBounds:
+	case errors.Is(err, gethVM.ErrReturnDataOutOfBounds):
 		return ExecutionErrCodeReturnDataOutOfBounds
-	case gethVM.ErrGasUintOverflow:
+	case errors.Is(err, gethVM.ErrGasUintOverflow):
 		return ExecutionErrCodeGasUintOverflow
-	case gethVM.ErrInvalidCode:
+	case errors.Is(err, gethVM.ErrInvalidCode):
 		return ExecutionErrCodeInvalidCode
-	case gethVM.ErrNonceUintOverflow:
+	case errors.Is(err, gethVM.ErrNonceUintOverflow):
 		return ExecutionErrCodeNonceUintOverflow
 	default:
 		return ExecutionErrCodeMisc

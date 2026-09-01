@@ -166,10 +166,14 @@ func ValidateResult(
 		return fmt.Errorf("gas consumption mismatch %d != %d", res.GasConsumed, txEvent.GasConsumed)
 	}
 
-	// check error code
-	txEventErrorCode := types.ErrorCode(txEvent.ErrorCode)
-	if errorCode := res.ResultSummary().ErrorCode; errorCode != txEventErrorCode {
-		return fmt.Errorf("error code mismatch %d != %d", errorCode, txEventErrorCode)
+	// check tx status according to tx event error code
+	// If `txEvent.ErrorCode != 0`, the original tx had `failed`
+	// If `txEvent.ErrorCode == 0`, the original tx was `successful`
+	if res.Successful() && txEvent.ErrorCode != 0 {
+		return fmt.Errorf("tx status mismatch: expected %s, got %s", "failed", "successful")
+	}
+	if res.Failed() && txEvent.ErrorCode == 0 {
+		return fmt.Errorf("tx status mismatch: expected %s, got %s", "successful", "failed")
 	}
 
 	// check encoded logs
