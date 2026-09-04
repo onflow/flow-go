@@ -2,11 +2,35 @@ package ptrie
 
 import (
 	"fmt"
+	"math/bits"
 
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/bitutils"
 	"github.com/onflow/flow-go/ledger/common/hash"
 )
+
+// countFlagBits returns the number of bits set in the first `steps` bits of
+// `flags` (big-endian bit ordering, matching bitutils.ReadBit). It returns an
+// error if `flags` does not contain enough bytes to cover `steps` bits.
+func countFlagBits(flags []byte, steps uint8) (int, error) {
+	if int(steps) > len(flags)*8 {
+		return 0, fmt.Errorf("flags (%d bytes) only cover %d bits but proof has %d steps", len(flags), len(flags)*8, steps)
+	}
+
+	fullBytes := int(steps / 8)
+	remainder := int(steps % 8)
+
+	count := 0
+	for i := range fullBytes {
+		count += bits.OnesCount8(flags[i])
+	}
+	if remainder > 0 {
+		// big-endian: the first `remainder` bits are the high bits of the byte.
+		mask := byte(0xFF << (8 - remainder))
+		count += bits.OnesCount8(flags[fullBytes] & mask)
+	}
+	return count, nil
+}
 
 // PSMT (Partial Sparse Merkle Tree) holds a subset of an sparse merkle tree at specific
 // state (no historic views). Instead of keeping any unneeded branch, it only keeps
@@ -93,6 +117,17 @@ func NewPSMT(
 		}
 		path := pr.Path
 		payload := pr.Payload
+
+		// Validate structural consistency of the proof before indexing into
+		// Flags or Interims. A malformed proof (e.g. from a byzantine Execution
+		// Node) must be rejected with an error instead of panicking.
+		flagCount, err := countFlagBits(pr.Flags, pr.Steps)
+		if err != nil {
+			return nil, fmt.Errorf("proof at index %d has invalid flags: %w", i, err)
+		}
+		if flagCount != len(pr.Interims) {
+			return nil, fmt.Errorf("proof at index %d has %d flag bits set but %d interims", i, flagCount, len(pr.Interims))
+		}
 
 		// we process the path, bit by bit, until we reach the end of the proof (due to compactness)
 		prValueIndex := 0        // we keep track of our progress through proofs by prValueIndex
