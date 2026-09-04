@@ -951,12 +951,42 @@ type GRPCConnectionPoolMetrics interface {
 	ConnectionFromPoolEvicted()
 }
 
+// BeaconObservabilityMetrics encapsulates the metrics exported by the access node beacon observability
+// component. The component walks finalized blocks and exposes per-proposer signature type facts,
+// committee freshness gauges, and the random beacon threshold for the current epoch.
+//
+// All methods are safe for concurrent use.
+type BeaconObservabilityMetrics interface {
+	// NetworkFinalizedProposerSigType records a finalized block whose proposer signature was of the
+	// given type. The sigType is either "staking" (48-byte bare staking signature) or "beacon"
+	// (96-byte combined staking + beacon share signature).
+	NetworkFinalizedProposerSigType(nodeID flow.Identifier, sigType string)
+
+	// NetworkFinalizedLastProposalHeight updates the latest finalized block height at which the given
+	// node was observed as the proposer.
+	NetworkFinalizedLastProposalHeight(nodeID flow.Identifier, height uint64)
+
+	// NetworkDKGBeaconThreshold updates the random beacon threshold (t+1) for the current epoch.
+	NetworkDKGBeaconThreshold(threshold uint64)
+
+	// NetworkFinalizedDeleteProposerMetrics deletes the per-proposer metric series for the given node.
+	// It is used at epoch boundaries to remove series for nodes that left the consensus committee.
+	NetworkFinalizedDeleteProposerMetrics(nodeID flow.Identifier)
+
+	// NetworkFinalizedInitProposerMetrics pre-initializes the per-proposer metric series for the
+	// given node so that silent committee members are still visible in Prometheus.
+	NetworkFinalizedInitProposerMetrics(nodeID flow.Identifier)
+}
+
+// AccessMetrics is a composed interface of all metrics interfaces required by the access node.
+
 type AccessMetrics interface {
 	RestMetrics
 	GRPCConnectionPoolMetrics
 	TransactionMetrics
 	TransactionValidationMetrics
 	BackendScriptsMetrics
+	BeaconObservabilityMetrics
 
 	// UpdateExecutionReceiptMaxHeight is called whenever we store an execution receipt from a block from a newer height
 	UpdateExecutionReceiptMaxHeight(height uint64)
