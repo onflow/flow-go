@@ -133,4 +133,19 @@ func TestNewPayload(t *testing.T) {
 		require.Nil(t, res)
 		require.Contains(t, err.Error(), "result at index 0 is nil")
 	})
+
+	t.Run("nil Chunk element in Result rejected", func(t *testing.T) {
+		er := unittest.ExecutionResultFixture()
+		er.Chunks = flow.ChunkList{nil}
+
+		untrusted := flow.UntrustedPayload(unittest.PayloadFixture(
+			unittest.WithProtocolStateID(unittest.IdentifierFixture()),
+		))
+		untrusted.Results = flow.ExecutionResultList{er}
+
+		res, err := flow.NewPayload(untrusted)
+		require.Error(t, err)
+		require.Nil(t, res)
+		require.Contains(t, err.Error(), "chunk at index 0 in result at index 0 is nil")
+	})
 }
