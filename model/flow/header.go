@@ -111,8 +111,27 @@ func NewHeaderBody(untrusted UntrustedHeaderBody) (*HeaderBody, error) {
 		return nil, fmt.Errorf("Timestamp must not be zero-value")
 	}
 
-	hb := HeaderBody(untrusted)
-	return &hb, nil
+	var lastViewTC *TimeoutCertificate
+	if untrusted.LastViewTC != nil {
+		tc, err := NewTimeoutCertificate(UntrustedTimeoutCertificate(*untrusted.LastViewTC))
+		if err != nil {
+			return nil, fmt.Errorf("invalid LastViewTC: %w", err)
+		}
+		lastViewTC = tc
+	}
+
+	return &HeaderBody{
+		ChainID:            untrusted.ChainID,
+		ParentID:           untrusted.ParentID,
+		Height:             untrusted.Height,
+		Timestamp:          untrusted.Timestamp,
+		View:               untrusted.View,
+		ParentView:         untrusted.ParentView,
+		ParentVoterIndices: untrusted.ParentVoterIndices,
+		ParentVoterSigData: untrusted.ParentVoterSigData,
+		ProposerID:         untrusted.ProposerID,
+		LastViewTC:         lastViewTC,
+	}, nil
 }
 
 // NewRootHeaderBody creates a new instance of root HeaderBody.

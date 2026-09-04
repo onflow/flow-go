@@ -314,6 +314,22 @@ func TestNewHeaderBody(t *testing.T) {
 		assert.Nil(t, hb)
 		assert.Contains(t, err.Error(), "Timestamp must not be zero-value")
 	})
+
+	t.Run("non-nil LastViewTC with nil NewestQC rejected", func(t *testing.T) {
+		u := UntrustedHeaderBodyFixture(func(u *flow.UntrustedHeaderBody) {
+			u.LastViewTC = &flow.TimeoutCertificate{
+				View:          u.View - 1,
+				NewestQCViews: []uint64{u.View - 2},
+				NewestQC:      nil, // nil nested pointer — the attack vector
+				SignerIndices: unittest.SignerIndicesFixture(4),
+				SigData:       unittest.SignatureFixture(),
+			}
+		})
+		hb, err := flow.NewHeaderBody(u)
+		assert.Error(t, err)
+		assert.Nil(t, hb)
+		assert.Contains(t, err.Error(), "invalid LastViewTC")
+	})
 }
 
 // TestHeaderBodyBuilder_PresenceChecks verifies that HeaderBodyBuilder.Build
