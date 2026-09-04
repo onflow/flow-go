@@ -47,6 +47,11 @@ func NewExecutionResult(untrusted UntrustedExecutionResult) (*ExecutionResult, e
 	if len(untrusted.Chunks) == 0 {
 		return nil, fmt.Errorf("Chunks must not be empty")
 	}
+	for i, ch := range untrusted.Chunks {
+		if ch == nil {
+			return nil, fmt.Errorf("chunk at index %d is nil", i)
+		}
+	}
 
 	if untrusted.ExecutionDataID == ZeroID {
 		return nil, fmt.Errorf("ExecutionDataID must not be empty")
