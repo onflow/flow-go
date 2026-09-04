@@ -94,13 +94,19 @@ func NewTimeoutObject(untrusted UntrustedTimeoutObject) (*TimeoutObject, error) 
 	// If a TC is included, the TC must be for the past round, no matter whether a QC
 	// for the last round is also included. In some edge cases, a node might observe
 	// _both_ QC and TC for the previous round, in which case it can include both.
+	var lastViewTC *flow.TimeoutCertificate
 	if untrusted.LastViewTC != nil {
 		if untrusted.View != untrusted.LastViewTC.View+1 {
 			return nil, fmt.Errorf("invalid TC for non-previous view, expected view %d, got view %d", untrusted.View-1, untrusted.LastViewTC.View)
 		}
-		if untrusted.NewestQC.View < untrusted.LastViewTC.NewestQC.View {
-			return nil, fmt.Errorf("timeout.NewestQC is older (view=%d) than the QC in timeout.LastViewTC (view=%d)", untrusted.NewestQC.View, untrusted.LastViewTC.NewestQC.View)
+		tc, err := flow.NewTimeoutCertificate(flow.UntrustedTimeoutCertificate(*untrusted.LastViewTC))
+		if err != nil {
+			return nil, fmt.Errorf("invalid LastViewTC: %w", err)
 		}
+		if untrusted.NewestQC.View < tc.NewestQC.View {
+			return nil, fmt.Errorf("timeout.NewestQC is older (view=%d) than the QC in timeout.LastViewTC (view=%d)", untrusted.NewestQC.View, tc.NewestQC.View)
+		}
+		lastViewTC = tc
 	}
 	// The TO must contain a proof that sender legitimately entered View. Transitioning
 	// to round timeout.View is possible either by observing a QC or a TC for the previous round.
@@ -118,7 +124,7 @@ func NewTimeoutObject(untrusted UntrustedTimeoutObject) (*TimeoutObject, error) 
 	return &TimeoutObject{
 		View:        untrusted.View,
 		NewestQC:    untrusted.NewestQC,
-		LastViewTC:  untrusted.LastViewTC,
+		LastViewTC:  lastViewTC,
 		SignerID:    untrusted.SignerID,
 		SigData:     untrusted.SigData,
 		TimeoutTick: untrusted.TimeoutTick,
