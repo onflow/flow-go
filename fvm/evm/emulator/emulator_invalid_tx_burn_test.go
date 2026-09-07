@@ -30,6 +30,7 @@ import (
 	gethCore "github.com/ethereum/go-ethereum/core"
 	gethTypes "github.com/ethereum/go-ethereum/core/types"
 	gethParams "github.com/ethereum/go-ethereum/params"
+	"github.com/holiman/uint256"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/fvm/evm/emulator"
@@ -118,7 +119,7 @@ func TestRunTransaction_IntrinsicGasFailureBurnsNothing(t *testing.T) {
 			account := fundTestEOA(t, backend, rootAddr)
 			signer := account.Address()
 
-			const gasLimit = gethParams.TxGas - 1 // 20,999: one below intrinsic
+			const gasLimit = gethParams.TxBaseCost2780 - 1 // 11_999: one below intrinsic
 
 			tx := account.SignTx(t, gethTypes.NewTransaction(
 				0, // nonce
@@ -199,7 +200,7 @@ func TestBatchRunTransactions_IntrinsicGasFailureBurnsNothing(t *testing.T) {
 			account := fundTestEOA(t, backend, rootAddr)
 			signer := account.Address()
 
-			const gasLimit = gethParams.TxGas - 1
+			const gasLimit = gethParams.TxBaseCost2780 - 1 // 11_999: one below intrinsic
 
 			// the SAME signed tx twice: because the nonce is never incremented,
 			// both copies pass the nonce check inside a single batch
@@ -255,24 +256,27 @@ func TestRunTransaction_FloorDataGasFailureBurnsNothing(t *testing.T) {
 		testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
 			account := fundTestEOA(t, backend, rootAddr)
 			signer := account.Address()
+			from := signer.ToCommon()
+			to := testutils.RandomAddress(t).ToCommon()
 
 			// calldata heavy in non-zero bytes: floor data gas exceeds
 			// intrinsic gas (21000 + 16/byte) for the same payload
 			// (Amsterdam/EIP-7976 prices the floor at 21000 + 64/byte)
-			data := bytes.Repeat([]byte{0x01}, 100)
+			data := bytes.Repeat([]byte{0x01}, 150)
 			rules := emulator.DefaultChainConfig.Rules(blockNumber, true, 0)
-			intrinsic, err := gethCore.IntrinsicGas(data, nil, nil, false, rules, gethParams.CostPerStateByte)
+			value := uint256.MustFromBig(big.NewInt(1_000_000_000))
+			intrinsicGas, err := gethCore.IntrinsicGas(data, nil, nil, from, &to, value, rules)
 			require.NoError(t, err)
-			floor, err := gethCore.FloorDataGas(rules, data, nil)
+			floorDataGas, err := gethCore.FloorDataGas(rules, from, &to, value, data, nil)
 			require.NoError(t, err)
-			require.Greater(t, floor, intrinsic.Sum(), "test parameters must straddle the two checks")
+			require.Greater(t, floorDataGas, intrinsicGas, "test parameters must straddle the two checks")
 
 			// passes the intrinsic-gas check (equality), fails the floor check
-			gasLimit := intrinsic.Sum()
+			gasLimit := intrinsicGas
 
 			tx := account.SignTx(t, gethTypes.NewTransaction(
 				0,
-				testutils.RandomAddress(t).ToCommon(),
+				to,
 				big.NewInt(0),
 				gasLimit,
 				invalidTxGasPrice,
