@@ -300,6 +300,48 @@ func TestControlMessageValidationInspector_truncateRPC(t *testing.T) {
 	})
 }
 
+// TestControlMessageInspection_DoesNotMutateRpc is a regression test verifying that the
+// asynchronous inspection does not mutate the inspected RPC: the RPC object remains in use by
+// the libp2p pubsub layer while the inspector's worker pool processes it, so any in-place
+// modification (e.g. shuffling the publish message list for sampling) is a data race.
+func TestControlMessageInspection_DoesNotMutateRpc(t *testing.T) {
+	logCounter := atomic.NewInt64(0)
+	logger := hookedLogger(logCounter, zerolog.TraceLevel, worker.QueuedItemProcessedLog)
+	inspector, signalerCtx, cancel, consumer, rpcTracker, sporkID, idProvider, topicProviderOracle := inspectorFixture(t, func(params *validation.InspectorParams) {
+		params.Logger = logger
+	})
+	defer consumer.AssertNotCalled(t, "OnInvalidControlMessageNotification")
+
+	topic := fmt.Sprintf("%s/%s", channels.TestNetworkChannel, sporkID)
+	topicProviderOracle.UpdateTopics([]string{topic})
+	inspector.Start(signalerCtx)
+	unittest.RequireComponentsReadyBefore(t, 1*time.Second, inspector)
+
+	from := unittest.PeerIdFixture(t)
+	// enough messages that an accidental in-place shuffle is detected with near certainty
+	pubsubMsgs := unittest.GossipSubMessageFixtures(20, topic, unittest.WithFrom(from))
+	rpc := unittest.P2PRPCFixture(unittest.WithPubsubMessages(pubsubMsgs...))
+	rpcTracker.On("LastHighestIHaveRPCSize").Return(int64(100)).Maybe()
+	idProvider.On("ByPeerID", from).Return(unittest.IdentityFixture(), true)
+
+	// snapshot the publish message list before inspection
+	originalPublish := append([]*pubsub_pb.Message{}, rpc.GetPublish()...)
+
+	require.NoError(t, inspector.Inspect(from, rpc))
+	require.Eventually(t, func() bool {
+		return logCounter.Load() == 1
+	}, 30*time.Second, 100*time.Millisecond)
+
+	// the RPC's publish message list must be exactly as it was before the inspection
+	require.Equal(t, len(originalPublish), len(rpc.GetPublish()))
+	for i, msg := range rpc.GetPublish() {
+		require.Same(t, originalPublish[i], msg, "publish message %d was moved or replaced by the inspection", i)
+	}
+
+	cancel()
+	unittest.RequireCloseBefore(t, inspector.Done(), 5*time.Second, "inspector did not stop")
+}
+
 // TestControlMessageInspection_ValidRpc ensures inspector does not disseminate invalid control message notifications for a valid RPC.
 func TestControlMessageInspection_ValidRpc(t *testing.T) {
 	logCounter := atomic.NewInt64(0)
