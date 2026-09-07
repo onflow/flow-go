@@ -2,6 +2,7 @@ package pipeline
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"testing"
@@ -239,10 +240,14 @@ func (p *PipelineFunctionalSuite) TestPipelineCompletesSuccessfully() {
 	p.txResultErrMsgsRequester.On("Request", mock.Anything).Return(p.expectedTxResultErrMsgs, nil).Once()
 
 	p.WithRunningPipeline(func(pipeline optimistic_sync.Pipeline, updateChan chan optimistic_sync.State, errChan chan error, cancel context.CancelFunc) {
-		// Check for errors in a separate goroutine
+		// Check for errors in a separate goroutine.
+		// Note: WithRunningPipeline cancels the pipeline context when the test function returns,
+		// which can race with Run returning after the pipeline has already completed all of its
+		// work. A context.Canceled error is therefore an expected teardown artifact and must not
+		// fail the test.
 		go func() {
 			err := <-errChan
-			if err != nil {
+			if err != nil && !errors.Is(err, context.Canceled) {
 				p.T().Errorf("Pipeline error: %v", err)
 			}
 		}()

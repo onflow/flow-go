@@ -34,10 +34,12 @@ func NewSlashingViolationsConsumer(log zerolog.Logger, metrics module.NetworkSec
 }
 
 // logOffense logs the slashing violation with details.
+// Note: this function must not mutate the violation, as the caller may share it across goroutines.
 func (c *Consumer) logOffense(misbehavior network.Misbehavior, violation *network.Violation) {
 	// if violation fails before the message is decoded the violation.MsgType will be unknown
-	if len(violation.MsgType) == 0 {
-		violation.MsgType = unknown
+	msgType := violation.MsgType
+	if len(msgType) == 0 {
+		msgType = unknown
 	}
 
 	// if violation fails for an unknown peer violation.Identity will be nil
@@ -51,7 +53,7 @@ func (c *Consumer) logOffense(misbehavior network.Misbehavior, violation *networ
 	e := c.log.Error().
 		Str("peer_id", violation.PeerID).
 		Str("misbehavior", misbehavior.String()).
-		Str("message_type", violation.MsgType).
+		Str("message_type", msgType).
 		Str("channel", violation.Channel.String()).
 		Str("protocol", violation.Protocol.String()).
 		Bool(logging.KeySuspicious, true).
@@ -61,7 +63,7 @@ func (c *Consumer) logOffense(misbehavior network.Misbehavior, violation *networ
 	e.Msg(fmt.Sprintf("potential slashable offense: %s", violation.Err))
 
 	// capture unauthorized message count metric
-	c.metrics.OnUnauthorizedMessage(role, violation.MsgType, violation.Channel.String(), misbehavior.String())
+	c.metrics.OnUnauthorizedMessage(role, msgType, violation.Channel.String(), misbehavior.String())
 }
 
 // reportMisbehavior reports the slashing violation to the alsp misbehavior report manager. When violation identity

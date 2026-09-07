@@ -79,9 +79,15 @@ func (a *AppSpecificScoreCache) AdjustWithInit(peerID peer.ID, score float64, ti
 		}
 	}
 	adjustLogic := func(record *appSpecificScoreRecord) *appSpecificScoreRecord {
-		record.Score = score
-		record.LastUpdated = time
-		return record
+		// copy-on-write: the cache stores records by pointer and Get reads the fields of the
+		// retrieved record after the backend lock is released; mutating the record in place
+		// here would be a data race. Returning a fresh record (which Adjust stores back)
+		// keeps previously returned records immutable.
+		return &appSpecificScoreRecord{
+			PeerID:      record.PeerID,
+			Score:       score,
+			LastUpdated: time,
+		}
 	}
 	_, adjusted := a.c.AdjustWithInit(p2p.MakeId(peerID), adjustLogic, initLogic)
 	if !adjusted {
