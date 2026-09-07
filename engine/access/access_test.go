@@ -1121,7 +1121,12 @@ func (suite *Suite) TestGetTransactionResult() {
 		txIdNegative := collectionNegative.Transactions[0].ID()
 		collectionIdNegative := collectionNegative.ID()
 
-		// the transactions should eventually be indexed by the collection indexer
+		// The transactions should eventually be indexed by the collection indexer, AND the
+		// collection-to-block index of the (finalized) positive block should eventually be
+		// written by the finalized-block processor. These are two independent async pipelines
+		// (see the lookup in transactions.Backend), and the API calls below require both to
+		// have completed. Note: blockNegative is deliberately not finalized, so we must not
+		// wait for its collection to be indexed.
 		require.Eventually(suite.T(), func() bool {
 			if _, err := transactions.ByID(txId); err != nil {
 				return false
@@ -1129,8 +1134,11 @@ func (suite *Suite) TestGetTransactionResult() {
 			if _, err := transactions.ByID(txIdNegative); err != nil {
 				return false
 			}
+			if _, err := all.Blocks.ByCollectionID(collectionId); err != nil {
+				return false
+			}
 			return true
-		}, 1*time.Second, 10*time.Millisecond, "transactions never indexed")
+		}, 5*time.Second, 10*time.Millisecond, "transactions and collection-block index never indexed")
 
 		assertTransactionResult := func(
 			resp *accessproto.TransactionResultResponse,

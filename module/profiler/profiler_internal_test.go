@@ -67,12 +67,19 @@ func TestGoAllocsProfile(t *testing.T) {
 			ticker := time.NewTicker(time.Millisecond * 10)
 			defer ticker.Stop()
 
-			// do some allocations in the background
+			// Do some allocations in the background so that the delta profile is guaranteed to
+			// contain allocation samples: the heap profiler only records a sample on average once
+			// per 512KiB allocated (runtime.MemProfileRate), so we must allocate substantially
+			// more than that during the profiling window.
 			go func() {
+				var sink [][]byte // referenced to prevent the allocations from being optimized away
 				for range ticker.C {
-					var m runtime.MemStats
-					runtime.ReadMemStats(&m)
+					sink = append(sink, make([]byte, 256*1024))
+					if len(sink) > 16 {
+						sink = sink[:0] // bound memory usage
+					}
 				}
+				runtime.KeepAlive(sink)
 			}()
 
 			buf := &bytes.Buffer{}
@@ -88,7 +95,14 @@ func TestGoAllocsProfile(t *testing.T) {
 			require.Equal(t, "alloc_space", prof.SampleType[1].Type)
 			require.NotZero(t, len(prof.Sample))
 			require.Equal(t, 2, len(prof.Sample[0].Value))
-			require.NotZero(t, prof.Sample[0].Value[0]+prof.Sample[0].Value[1])
+			// the individual samples of a delta profile can be zero-valued, so we assert that the
+			// profile as a whole recorded a nonzero amount of allocations instead of singling out
+			// one arbitrary sample
+			var totalAllocs int64
+			for _, sample := range prof.Sample {
+				totalAllocs += sample.Value[0] + sample.Value[1]
+			}
+			require.NotZero(t, totalAllocs)
 
 			unittest.AssertClosesBefore(t, p.Done(), 5*time.Second)
 		})

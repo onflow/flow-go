@@ -90,13 +90,16 @@ func (s *SealingEngineSuite) SetupTest() {
 	ctx, cancel := irrecoverable.NewMockSignalerContextWithCancel(s.T(), context.Background())
 	s.cancel = cancel
 	s.engine.Start(ctx)
-	unittest.AssertClosesBefore(s.T(), s.engine.Ready(), 10*time.Millisecond)
+	// generous timeout: startup typically completes in well under 10ms, but a loaded machine
+	// can delay goroutine scheduling; the bound only limits the failure case
+	unittest.AssertClosesBefore(s.T(), s.engine.Ready(), time.Second)
 }
 
 func (s *SealingEngineSuite) TearDownTest() {
 	if s.cancel != nil {
 		s.cancel()
-		unittest.AssertClosesBefore(s.T(), s.engine.Done(), 10*time.Millisecond)
+		// generous timeout: see the note on the Ready() bound in SetupTest
+		unittest.AssertClosesBefore(s.T(), s.engine.Done(), time.Second)
 	}
 }
 

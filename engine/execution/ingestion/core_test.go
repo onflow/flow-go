@@ -28,7 +28,7 @@ import (
 	unittestMocks "github.com/onflow/flow-go/utils/unittest/mocks"
 )
 
-func TestInogestionCoreExecuteBlock(t *testing.T) {
+func TestIngestionCoreExecuteBlock(t *testing.T) {
 	// Given R <- 1 <- 2 (Col0) <- 3 <- 4 (Col1)
 	blocks, cols := makeBlocksAndCollections(t)
 	// create core
@@ -147,13 +147,17 @@ func makeBlocksAndCollections(t *testing.T) ([]*flow.Block, []*flow.Collection) 
 func receiveBlock(t *testing.T, throttle Throttle, state *unittestMocks.ProtocolState, headers *headerStore, blocksDB *storage.Blocks, consumer *mockConsumer, block *flow.Block, wg *sync.WaitGroup) {
 	require.NoError(t, state.Extend(block))
 	blocksDB.On("ByID", block.ID()).Return(block, nil)
-	require.NoError(t, throttle.OnBlock(block.ID(), block.Height))
+	// The WaitGroup must be registered BEFORE OnBlock triggers the (asynchronous) execution
+	// pipeline: if the block is executed before registration, OnComputationResultSaved would
+	// look up a nil WaitGroup for the block and crash the test binary with a SIGSEGV.
 	consumer.WaitForExecuted(block.ID(), wg)
+	require.NoError(t, throttle.OnBlock(block.ID(), block.Height))
 }
 
 func verifyBlockExecuted(t *testing.T, consumer *mockConsumer, wg *sync.WaitGroup, blocks ...*flow.Block) {
-	// Wait until blocks are executed
-	unittest.AssertReturnsBefore(t, func() { wg.Wait() }, time.Millisecond*20)
+	// Wait until blocks are executed. Execution typically completes within a few milliseconds;
+	// the generous timeout only bounds the failure case and avoids flakiness on loaded machines.
+	unittest.AssertReturnsBefore(t, func() { wg.Wait() }, time.Second)
 	for _, block := range blocks {
 		require.True(t, consumer.MockIsBlockExecuted(block.ID()))
 	}
@@ -216,7 +220,14 @@ func (m *mockConsumer) OnComputationResultSaved(_ context.Context, result *execu
 	}
 	m.executed[blockID] = struct{}{}
 	log.Info().Uint64("height", result.BlockExecutionResult.ExecutableBlock.Block.Height).Msg("mockConsumer: block result saved")
-	m.wgs[blockID].Done()
+	wg, ok := m.wgs[blockID]
+	if !ok {
+		// fail loudly instead of dereferencing a nil WaitGroup (SIGSEGV would kill the whole
+		// package's test binary); this indicates the test triggered execution of a block before
+		// registering it via WaitForExecuted.
+		panic(fmt.Sprintf("mockConsumer: block %v executed but no WaitGroup was registered for it", blockID))
+	}
+	wg.Done()
 	return ""
 }
 

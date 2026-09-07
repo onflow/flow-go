@@ -415,6 +415,11 @@ func (s *ExtendedIndexerSuite) TestBackfillRetryOnNotFound() {
 			return blockID, nil
 		})
 
+	// After height 5 is processed, the backfill timer (1ms interval) may tick again before the
+	// test shuts the component down and probe height 6; the indexer treats the ErrNotFound as
+	// "retry later", so this call is benign and may happen any number of times.
+	s.headers.On("BlockIDByHeight", uint64(6)).Return(flow.ZeroID, storage.ErrNotFound).Maybe()
+
 	// Remaining storage mocks are only called after available=true.
 	s.headers.On("ByBlockID", blockID).Return(block.Header, nil)
 	s.index.On("ByBlockID", blockID).Return(block.Index, nil)
@@ -534,12 +539,16 @@ func (s *ExtendedIndexerSuite) TestAlreadyIndexedSkipped() {
 // TestNonSequentialHeight verifies that IndexBlockData rejects non-sequential heights
 // after the first block has been provided.
 func (s *ExtendedIndexerSuite) TestNonSequentialHeight() {
-	idx := newMockIndexer(s.T(), "a", 11, 0)
+	idx := newMockIndexer(s.T(), "a", 11, 11)
 	s.newExtendedIndexer(protocolmock.NewState(s.T()), []extended.Indexer{idx}, time.Hour)
 	s.startComponent()
 
 	// First call succeeds
 	s.provideBlock(11)
+	// wait until the ingest loop has actually passed the block to the indexer: processing is
+	// asynchronous, and the strict mock's expectations (Name/NextHeight/IndexBlockData) fail at
+	// teardown if the test finishes before the loop gets scheduled
+	unittest.RequireCloseBefore(s.T(), idx.done, testTimeout, "timeout waiting for indexer to process the first block")
 
 	// Non-sequential height is rejected
 	header := unittest.BlockHeaderFixtureOnChain(flow.Testnet, unittest.WithHeaderHeight(13))
