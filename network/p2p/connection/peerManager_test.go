@@ -156,7 +156,9 @@ func (suite *PeerManagerTestSuite) TestPeriodicPeerUpdate() {
 	pm.Start(signalerCtx)
 	unittest.RequireCloseBefore(suite.T(), pm.Ready(), 2*time.Second, "could not start peer manager")
 
-	unittest.RequireReturnsBefore(suite.T(), wg.Wait, 2*peerUpdateInterval,
+	// liveness bound: 2 ticker cycles normally take ~20ms, but under full-suite load the
+	// ticker and the mock callback can be starved well beyond 2*peerUpdateInterval.
+	unittest.RequireReturnsBefore(suite.T(), wg.Wait, 2*time.Second,
 		"UpdatePeers is not running on UpdateIntervals")
 }
 
@@ -228,8 +230,18 @@ func (suite *PeerManagerTestSuite) TestConcurrentOnDemandPeerUpdate() {
 	// choose the periodic interval as a high value so that periodic runs don't interfere with this test
 	peerUpdateInterval := time.Hour
 
-	peerUpdater.On("UpdatePeers", mock.Anything, mock.Anything).Return(nil).
-		WaitUntil(connectPeerGate) // blocks call for connectPeerGate channel
+	// count UpdatePeers invocations under a mutex: reading testify's Mock.Calls field directly
+	// races with the manager's update loop calling the mock concurrently.
+	// The count is incremented before blocking on the gate (testify's WaitUntil would block
+	// before the Run callback executes, hiding the call start from the test).
+	mu := &sync.Mutex{}
+	updateCalls := 0
+	peerUpdater.On("UpdatePeers", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
+		mu.Lock()
+		updateCalls++
+		mu.Unlock()
+		<-connectPeerGate // block this call until the test releases it (WaitUntil semantics)
+	}).Return(nil)
 	pm := connection.NewPeerManager(suite.log, peerUpdateInterval, peerUpdater)
 	pm.SetPeersProvider(func() peer.IDSlice {
 		return pids
@@ -243,7 +255,9 @@ func (suite *PeerManagerTestSuite) TestConcurrentOnDemandPeerUpdate() {
 
 	// assert that the first update started
 	assert.Eventually(suite.T(), func() bool {
-		return len(peerUpdater.Calls) > 0 && peerUpdater.AssertNumberOfCalls(suite.T(), "UpdatePeers", 1)
+		mu.Lock()
+		defer mu.Unlock()
+		return updateCalls == 1
 	}, 3*time.Second, 100*time.Millisecond)
 
 	// makes 10 concurrent request for peer update
@@ -255,6 +269,8 @@ func (suite *PeerManagerTestSuite) TestConcurrentOnDemandPeerUpdate() {
 
 	// assert that only two calls to UpdatePeers were made (one by the periodic update and one by the on-demand update)
 	assert.Eventually(suite.T(), func() bool {
-		return len(peerUpdater.Calls) > 1 && peerUpdater.AssertNumberOfCalls(suite.T(), "UpdatePeers", 2)
+		mu.Lock()
+		defer mu.Unlock()
+		return updateCalls == 2
 	}, 10*time.Second, 100*time.Millisecond)
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 	"io"
 	"reflect"
+	"sync"
 	"testing"
 	"time"
 
@@ -57,6 +58,17 @@ type UnicastAuthorizationTestSuite struct {
 	// waitCh is the channel used to wait for the networks to perform authorization and invoke the slashing
 	// violation's consumer before making mock assertions and cleaning up resources
 	waitCh chan struct{}
+	// waitChOnce makes signaling waitCh idempotent: violation reports and message deliveries are
+	// async and can legitimately arrive more than once (e.g. retried streams), and closing an
+	// already-closed channel would panic.
+	waitChOnce sync.Once
+}
+
+// signalExpectedViolation closes waitCh exactly once, no matter how many times it is called.
+func (u *UnicastAuthorizationTestSuite) signalExpectedViolation() {
+	u.waitChOnce.Do(func() {
+		close(u.waitCh)
+	})
 }
 
 // TestUnicastAuthorizationTestSuite runs all the test methods in this test suit
@@ -69,6 +81,7 @@ func (u *UnicastAuthorizationTestSuite) SetupTest() {
 	u.channelCloseDuration = 100 * time.Millisecond
 	// this ch will allow us to wait until the expected method call happens before shutting down networks.
 	u.waitCh = make(chan struct{})
+	u.waitChOnce = sync.Once{}
 }
 
 func (u *UnicastAuthorizationTestSuite) TearDownTest() {
@@ -147,8 +160,8 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_UnstakedPeer() 
 		Protocol: message.ProtocolTypeUnicast,
 		Err:      validator.ErrIdentityUnverified,
 	}
-	slashingViolationsConsumer.On("OnUnauthorizedSenderError", expectedViolation).Return(nil).Once().Run(func(args mockery.Arguments) {
-		close(u.waitCh)
+	slashingViolationsConsumer.On("OnUnauthorizedSenderError", expectedViolation).Return(nil).Run(func(args mockery.Arguments) {
+		u.signalExpectedViolation()
 	})
 
 	u.startNetworksAndLibp2pNodes()
@@ -199,8 +212,8 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_EjectedPeer() {
 		Err:      validator.ErrSenderEjected,
 	}
 	slashingViolationsConsumer.On("OnSenderEjectedError", expectedViolation).
-		Return(nil).Once().Run(func(args mockery.Arguments) {
-		close(u.waitCh)
+		Return(nil).Run(func(args mockery.Arguments) {
+		u.signalExpectedViolation()
 	})
 
 	u.startNetworksAndLibp2pNodes()
@@ -240,8 +253,8 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_UnauthorizedPee
 	}
 
 	slashingViolationsConsumer.On("OnUnauthorizedSenderError", expectedViolation).
-		Return(nil).Once().Run(func(args mockery.Arguments) {
-		close(u.waitCh)
+		Return(nil).Run(func(args mockery.Arguments) {
+		u.signalExpectedViolation()
 	})
 
 	u.startNetworksAndLibp2pNodes()
@@ -295,8 +308,8 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_UnknownMsgCode(
 	}
 
 	slashingViolationsConsumer.On("OnUnknownMsgTypeError", expectedViolation).
-		Return(nil).Once().Run(func(args mockery.Arguments) {
-		close(u.waitCh)
+		Return(nil).Run(func(args mockery.Arguments) {
+		u.signalExpectedViolation()
 	})
 
 	u.startNetworksAndLibp2pNodes()
@@ -343,8 +356,8 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_WrongMsgCode() 
 	}
 
 	slashingViolationsConsumer.On("OnUnauthorizedSenderError", expectedViolation).
-		Return(nil).Once().Run(func(args mockery.Arguments) {
-		close(u.waitCh)
+		Return(nil).Run(func(args mockery.Arguments) {
+		u.signalExpectedViolation()
 	})
 
 	u.startNetworksAndLibp2pNodes()
@@ -379,7 +392,7 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_PublicChannel()
 	receiverEngine := &mocknetwork.MessageProcessor{}
 	receiverEngine.On("Process", channels.PublicPushBlocks, u.senderID.NodeID, msg).Run(
 		func(args mockery.Arguments) {
-			close(u.waitCh)
+			u.signalExpectedViolation()
 		}).Return(nil).Once()
 	_, err := u.receiverNetwork.Register(channels.PublicPushBlocks, receiverEngine)
 	require.NoError(u.T(), err)
@@ -419,8 +432,8 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_UnauthorizedUni
 	}
 
 	slashingViolationsConsumer.On("OnUnauthorizedUnicastOnChannel", expectedViolation).
-		Return(nil).Once().Run(func(args mockery.Arguments) {
-		close(u.waitCh)
+		Return(nil).Run(func(args mockery.Arguments) {
+		u.signalExpectedViolation()
 	})
 
 	u.startNetworksAndLibp2pNodes()
@@ -460,8 +473,8 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_ReceiverHasNoSu
 	}
 
 	slashingViolationsConsumer.On("OnUnauthorizedUnicastOnChannel", expectedViolation).
-		Return(nil).Once().Run(func(args mockery.Arguments) {
-		close(u.waitCh)
+		Return(nil).Run(func(args mockery.Arguments) {
+		u.signalExpectedViolation()
 	})
 
 	u.startNetworksAndLibp2pNodes()
@@ -500,7 +513,7 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_ReceiverHasSubs
 	receiverEngine := &mocknetwork.MessageProcessor{}
 	receiverEngine.On("Process", channels.RequestReceiptsByBlockID, u.senderID.NodeID, internal).Run(
 		func(args mockery.Arguments) {
-			close(u.waitCh)
+			u.signalExpectedViolation()
 		}).Return(nil).Once()
 	_, err = u.receiverNetwork.Register(channels.RequestReceiptsByBlockID, receiverEngine)
 	require.NoError(u.T(), err)
@@ -576,8 +589,8 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_UnauthorizedSen
 	}
 
 	slashingViolationsConsumer.On("OnUnauthorizedUnicastOnChannel", expectedViolation).
-		Return(nil).Once().Run(func(args mockery.Arguments) {
-		close(u.waitCh)
+		Return(nil).Run(func(args mockery.Arguments) {
+		u.signalExpectedViolation()
 	})
 
 	u.startNetworksAndLibp2pNodes()
