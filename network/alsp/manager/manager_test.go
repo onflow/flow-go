@@ -30,6 +30,7 @@ import (
 	"github.com/onflow/flow-go/network/internal/testutils"
 	mocknetwork "github.com/onflow/flow-go/network/mock"
 	"github.com/onflow/flow-go/network/p2p"
+	p2pbuilderconfig "github.com/onflow/flow-go/network/p2p/builder/config"
 	p2ptest "github.com/onflow/flow-go/network/p2p/test"
 	"github.com/onflow/flow-go/network/slashing"
 	"github.com/onflow/flow-go/network/underlay"
@@ -299,6 +300,10 @@ func TestHandleReportedMisbehavior_And_DisallowListing_Integration(t *testing.T)
 // handling of repeated reported misbehavior and disallow listing.
 func TestHandleReportedMisbehavior_And_DisallowListing_RepeatOffender_Integration(t *testing.T) {
 	cfg := managerCfgFixture(t)
+	// compress the heartbeat interval: all assertions in this test are per-heartbeat
+	// (decay deltas, disallow-listing rounds), so a faster heartbeat preserves semantics
+	// while cutting the wall time roughly proportionally.
+	cfg.HeartBeatInterval = 100 * time.Millisecond
 	sporkId := unittest.IdentifierFixture()
 	fastDecay := false
 	fastDecayFunc := func(record *model.ProtocolSpamRecord) float64 {
@@ -327,7 +332,11 @@ func TestHandleReportedMisbehavior_And_DisallowListing_RepeatOffender_Integratio
 	}
 
 	ids, nodes := testutils.LibP2PNodeForNetworkFixture(t, sporkId, 3,
-		p2ptest.WithPeerManagerEnabled(p2ptest.PeerManagerConfigFixture(p2ptest.WithZeroJitterAndZeroBackoff(t)), nil))
+		p2ptest.WithPeerManagerEnabled(p2ptest.PeerManagerConfigFixture(p2ptest.WithZeroJitterAndZeroBackoff(t), func(cfg *p2pbuilderconfig.PeerManagerConfig) {
+			// compress the peer manager tick as well: pruning and reconnection waits are
+			// tick-quantized, and the test only cares about the sequence of events.
+			cfg.UpdateInterval = 100 * time.Millisecond
+		}), nil))
 	idProvider := unittest.NewUpdatableIDProvider(ids)
 	networkCfg := testutils.NetworkConfigFixture(t, *ids[0], idProvider, sporkId, nodes[0], underlay.WithAlspConfig(cfg))
 
@@ -417,7 +426,7 @@ func TestHandleReportedMisbehavior_And_DisallowListing_RepeatOffender_Integratio
 		penalty1 := record.Penalty
 
 		// wait for one heartbeat to be processed: poll for the first penalty change instead of
-		// sleeping exactly one heartbeat interval. A fixed 1s sleep races the 1s heartbeat ticker
+		// sleeping exactly one heartbeat interval. A fixed sleep races the heartbeat ticker
 		// (which can be delayed under load) and may span 0 or 2 decays; polling at 10ms granularity
 		// reliably catches the state after exactly one decay.
 		require.Eventually(t, func() bool {
@@ -1420,6 +1429,8 @@ func TestHandleMisbehaviorReport_DuplicateReportsForSinglePeer_Concurrently(t *t
 // is decayed after a single heartbeat. The test guarantees waiting for at least one heartbeat by waiting for the first decay to happen.
 func TestDecayMisbehaviorPenalty_SingleHeartbeat(t *testing.T) {
 	cfg := managerCfgFixture(t)
+	// decay assertions are per-heartbeat; a faster heartbeat preserves semantics.
+	cfg.HeartBeatInterval = 100 * time.Millisecond
 	consumer := mocknetwork.NewDisallowListNotificationConsumer(t)
 
 	var cache alsp.SpamRecordCache
@@ -1523,6 +1534,8 @@ func TestDecayMisbehaviorPenalty_SingleHeartbeat(t *testing.T) {
 // The test ensures that the misbehavior penalty is decayed with a linear progression within multiple heartbeats.
 func TestDecayMisbehaviorPenalty_MultipleHeartbeats(t *testing.T) {
 	cfg := managerCfgFixture(t)
+	// decay assertions are per-heartbeat; a faster heartbeat preserves semantics.
+	cfg.HeartBeatInterval = 100 * time.Millisecond
 	consumer := mocknetwork.NewDisallowListNotificationConsumer(t)
 
 	var cache alsp.SpamRecordCache
