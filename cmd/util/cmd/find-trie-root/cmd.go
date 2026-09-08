@@ -80,7 +80,7 @@ func run(*cobra.Command, []string) {
 		log.Fatal().Msgf("--backup-dir directory %v must be empty", flagBackupDir)
 	}
 
-	segment, offset, err := common.SearchRootHashBackward(rootHash, flagExecutionStateDir, flagFrom, flagTo)
+	segment, offset, err := common.SearchRootHashBackward(log.Logger, rootHash, flagExecutionStateDir, flagFrom, flagTo)
 	if err != nil {
 		log.Fatal().Err(err).Msg("cannot find root hash in segments")
 	}
@@ -117,8 +117,8 @@ func run(*cobra.Command, []string) {
 		}
 	}()
 
-	// genereate a segment file to the temporary folder with the root hash as its last record
-	newSegmentFile, err := findRootHashAndCreateTrimmed(flagExecutionStateDir, segment, rootHash, tmpFolder)
+	// generate a segment file to the temporary folder with the root hash as its last record
+	newSegmentFile, err := findRootHashAndCreateTrimmed(flagExecutionStateDir, segment, offset, rootHash, tmpFolder)
 	if err != nil {
 		log.Fatal().Err(err).Msg("cannot copy WAL")
 	}
@@ -151,9 +151,11 @@ func parseInput(rootHashStr string) (ledger.RootHash, error) {
 
 // findRootHashAndCreateTrimmed finds the root hash in the segment file from the given dir folder
 // and creates a new segment file with the expected root hash as the last record in a temporary folder.
-// it return the path to the new segment file.
+// The selected offset marks the position of the last occurrence of expectedRoot; the new segment
+// contains all records up to and including that occurrence.
+// It returns the path to the new segment file.
 func findRootHashAndCreateTrimmed(
-	dir string, segment int, expectedRoot ledger.RootHash, tmpFolder string) (string, error) {
+	dir string, segment int, offset int64, expectedRoot ledger.RootHash, tmpFolder string) (string, error) {
 	// the new segment file will be created in the temporary folder
 	// and it's always 00000000
 	newSegmentFile := prometheusWAL.SegmentName(tmpFolder, 0)
@@ -167,18 +169,15 @@ func findRootHashAndCreateTrimmed(
 
 	defer writer.Close()
 
-	sr, err := prometheusWAL.NewSegmentsRangeReader(log.Logger, prometheusWAL.SegmentRange{
-		Dir:   dir,
-		First: segment,
-		Last:  segment,
-	})
-	if err != nil {
-		return "", fmt.Errorf("cannot create WAL segments reader: %w", err)
-	}
+	segmentFile := prometheusWAL.SegmentName(dir, segment)
 
+	sr, err := prometheusWAL.OpenReadSegment(segmentFile)
+	if err != nil {
+		return "", fmt.Errorf("cannot open segment %s: %w", segmentFile, err)
+	}
 	defer sr.Close()
 
-	reader := prometheusWAL.NewReader(sr)
+	reader := prometheusWAL.NewReader(prometheusWAL.NewSegmentBufReader(log.Logger, sr))
 
 	for reader.Next() {
 		record := reader.Record()
@@ -198,8 +197,8 @@ func findRootHashAndCreateTrimmed(
 
 			rootHash := update.RootHash
 
-			if rootHash.Equals(expectedRoot) {
-				log.Info().Msgf("found expected trie root hash %v, finish writing", rootHash)
+			if rootHash.Equals(expectedRoot) && reader.Offset() >= offset {
+				log.Info().Msgf("found expected trie root hash %v at offset %d, finish writing", rootHash, reader.Offset())
 				return newSegmentFile, nil
 			}
 		default:
