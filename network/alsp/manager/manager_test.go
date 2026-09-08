@@ -1593,6 +1593,7 @@ func TestDecayMisbehaviorPenalty_MultipleHeartbeats(t *testing.T) {
 	// fewer heartbeats (flaky). Instead, we poll until 3 heartbeats worth of decay is visible. The
 	// poll interval (10ms) is much smaller than the heartbeat interval (1s), so we observe the
 	// record right after the third decaying heartbeat, before a fourth one can fire.
+	decayStart := time.Now()
 	var record *model.ProtocolSpamRecord
 	require.Eventually(t, func() bool {
 		r, ok := cache.Get(originId)
@@ -1606,6 +1607,13 @@ func TestDecayMisbehaviorPenalty_MultipleHeartbeats(t *testing.T) {
 		record = r
 		return true
 	}, 10*time.Second, 10*time.Millisecond, "penalty was not decayed by 3 heartbeats on time")
+
+	// Pacing: decays happen at most once per heartbeat interval. Reaching 3 heartbeats worth of
+	// decay requires at least 2 full intervals after the first decaying heartbeat (which may
+	// fire immediately after the record was created). This is a lower bound only, so it cannot
+	// flake on a slow machine.
+	require.GreaterOrEqual(t, time.Since(decayStart), 2*cfg.HeartBeatInterval,
+		"penalty decayed faster than the heartbeat interval allows")
 
 	// observed right after the third decaying heartbeat, the penalty must be less than the value after 4 heartbeats.
 	require.Less(t, record.Penalty, penaltyBeforeDecay+4*record.Decay)
