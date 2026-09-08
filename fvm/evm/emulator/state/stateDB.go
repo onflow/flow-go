@@ -638,8 +638,8 @@ func (db *StateDB) Commit(finalize bool) (hash.Hash, error) {
 // This is a no-op for our custom implementation of the StateDB interface,
 // since Commit() already handles finalization and deletion of empty
 // objects. But it still produces a valid BAL, under Amsterdam.
-func (db *StateDB) Finalise(deleteEmptyObjects bool) *gethBAL.ConstructionBlockAccessList {
-	if db.stateAccessList == nil {
+func (db *StateDB) Finalise(rules gethParams.Rules) *gethBAL.ConstructionBlockAccessList {
+	if !rules.IsAmsterdam {
 		return nil
 	}
 
@@ -655,7 +655,7 @@ func (db *StateDB) Finalise(deleteEmptyObjects bool) *gethBAL.ConstructionBlockA
 
 	for slot, value := range dirtySlots {
 		address := slot.Address
-		if db.HasSelfDestructed(address) || (deleteEmptyObjects && db.Empty(address)) {
+		if db.HasSelfDestructed(address) || (rules.IsEIP158 && db.Empty(address)) {
 			continue
 		}
 		// Aggregate storage writes into the block-level access list.
@@ -667,7 +667,7 @@ func (db *StateDB) Finalise(deleteEmptyObjects bool) *gethBAL.ConstructionBlockA
 	}
 
 	for addr := range dirtyAddresses {
-		if db.HasSelfDestructed(addr) || (deleteEmptyObjects && db.Empty(addr)) {
+		if db.HasSelfDestructed(addr) || (rules.IsEIP158 && db.Empty(addr)) {
 			// Aggregate the account mutation into the block-level accessList
 			// if Amsterdam has been activated.
 			if db.stateAccessList != nil {

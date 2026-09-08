@@ -471,7 +471,7 @@ func (proc *procedure) discardIfInvalid(res *types.Result) (bool, error) {
 
 // commit commits the changes to the state (with optional finalization)
 func (proc *procedure) commit(finalize bool) (hash.Hash, *gethBAL.ConstructionBlockAccessList, error) {
-	bal := proc.state.Finalise(true)
+	bal := proc.state.Finalise(proc.config.ChainRules())
 	stateUpdateCommitment, err := proc.state.Commit(finalize)
 	if err != nil {
 		// if known types (state errors) don't do anything and return
@@ -898,9 +898,8 @@ func (proc *procedure) initNewContract(
 		return call.GasLimit, gethVM.ErrInvalidCode
 	}
 
-	var gasConsumed uint64
-
 	rules := proc.config.ChainRules()
+	var gasConsumed uint64
 	if rules.IsAmsterdam {
 		// check max code size BEFORE charging gas so over-max code
 		// does not consume state gas (which would inflate tx_state).
@@ -908,9 +907,9 @@ func (proc *procedure) initNewContract(
 		if err := gethVM.CheckMaxCodeSize(&rules, uint64(len(ret))); err != nil {
 			return call.GasLimit, gethVM.ErrMaxCodeSizeExceeded
 		}
-		// charge regular gas (hash cost) before state gas.
-		regularCost := toWordSize(uint64(len(ret))) * gethParams.Keccak256WordGas
-		if !chargeRegular(contract, regularCost, proc.evm.Config.Tracer, gethTracing.GasChangeCallCodeStorage) {
+		// charge execution gas (hash cost) before state gas.
+		executionCost := toWordSize(uint64(len(ret))) * gethParams.Keccak256WordGas
+		if !chargeExecution(contract, executionCost, proc.evm.Config.Tracer, gethTracing.GasChangeCallCodeStorage) {
 			return call.GasLimit, gethVM.ErrCodeStoreOutOfGas
 		}
 		// charge state gas (code-deposit) afterwards.
@@ -918,11 +917,11 @@ func (proc *procedure) initNewContract(
 		if !chargeState(contract, stateCost, proc.evm.Config.Tracer, gethTracing.GasChangeCallCodeStorage) {
 			return call.GasLimit, gethVM.ErrCodeStoreOutOfGas
 		}
-		gasConsumed = regularCost + stateCost
+		gasConsumed = executionCost + stateCost
 	} else {
 		// update gas usage
 		createDataCost := uint64(len(ret)) * gethParams.CreateDataGas
-		if !chargeRegular(contract, createDataCost, proc.evm.Config.Tracer, gethTracing.GasChangeCallCodeStorage) {
+		if !chargeExecution(contract, createDataCost, proc.evm.Config.Tracer, gethTracing.GasChangeCallCodeStorage) {
 			return call.GasLimit, gethVM.ErrCodeStoreOutOfGas
 		}
 		if err := gethVM.CheckMaxCodeSize(&rules, uint64(len(ret))); err != nil {
@@ -951,15 +950,15 @@ func checkAndConvertValue(input *big.Int) (converted *uint256.Int, isValid bool)
 	return value, true
 }
 
-// chargeRegular deducts regular gas only, with tracer integration.
-// Returns false on OOG. Delegates the arithmetic to GasBudget.ChargeRegular.
-func chargeRegular(
+// chargeExecution deducts execution gas only, with tracer integration.
+// Returns false on OOG. Delegates the arithmetic to GasBudget.ChargeExecution.
+func chargeExecution(
 	c *gethVM.Contract,
 	r uint64,
 	logger *gethTracing.Hooks,
 	reason gethTracing.GasChangeReason,
 ) bool {
-	prior, ok := c.Gas.ChargeRegular(r)
+	prior, ok := c.Gas.ChargeExecution(r)
 	if !ok {
 		return false
 	}

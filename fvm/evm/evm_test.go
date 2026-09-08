@@ -137,7 +137,7 @@ func TestEVMRun(t *testing.T) {
 					snapshot)
 
 				require.NotEmpty(t, blockEventPayload.Hash)
-				require.Equal(t, uint64(331_205), blockEventPayload.TotalGasUsed)
+				require.Equal(t, uint64(330_305), blockEventPayload.TotalGasUsed)
 				require.NotEmpty(t, blockEventPayload.Hash)
 
 				txHashes := types.TransactionHashes{txEventPayload.Hash, feeTranferEventPayload.Hash}
@@ -209,8 +209,8 @@ func TestEVMRun(t *testing.T) {
 				require.Equal(t, types.ErrCodeNoError, res.ErrorCode)
 				require.Empty(t, res.ErrorMessage)
 				require.Nil(t, res.DeployedContractAddress)
-				require.Equal(t, uint64(18_420), res.GasConsumed)
-				require.Equal(t, uint64(18_420), res.MaxGasConsumed)
+				require.Equal(t, uint64(17_520), res.GasConsumed)
+				require.Equal(t, uint64(17_520), res.MaxGasConsumed)
 				require.Equal(t, num, new(big.Int).SetBytes(res.ReturnedData).Int64())
 			})
 	})
@@ -298,7 +298,7 @@ func TestEVMRun(t *testing.T) {
 				)
 
 				require.NotEmpty(t, blockEventPayload.Hash)
-				require.Equal(t, uint64(126_605), blockEventPayload.TotalGasUsed)
+				require.Equal(t, uint64(125_705), blockEventPayload.TotalGasUsed)
 				require.NotEmpty(t, blockEventPayload.Hash)
 
 				require.Equal(t, uint16(types.ErrCodeNoError), txEventPayload.ErrorCode)
@@ -1344,7 +1344,7 @@ func TestEVMRun(t *testing.T) {
 				blockEventPayload, _ := callEVMHeartBeat(t, ctx, vm, snapshot)
 
 				require.NotEmpty(t, blockEventPayload.Hash)
-				require.Equal(t, uint64(331_205), blockEventPayload.TotalGasUsed)
+				require.Equal(t, uint64(330_305), blockEventPayload.TotalGasUsed)
 				require.NotEmpty(t, blockEventPayload.Hash)
 
 				txHashes := types.TransactionHashes{txEventPayload.Hash, feeTranferEventPayload.Hash}
@@ -1454,7 +1454,7 @@ func TestEVMRun(t *testing.T) {
 				)
 
 				require.NotEmpty(t, blockEventPayload.Hash)
-				require.Equal(t, uint64(331_205), blockEventPayload.TotalGasUsed)
+				require.Equal(t, uint64(330_305), blockEventPayload.TotalGasUsed)
 				require.NotEmpty(t, blockEventPayload.Hash)
 
 				txHashes := types.TransactionHashes{txEventPayload.Hash, feeTranferEventPayload.Hash}
@@ -1613,7 +1613,7 @@ func TestEVMBatchRun(t *testing.T) {
 					snapshot)
 
 				require.NotEmpty(t, blockEventPayload.Hash)
-				require.Equal(t, uint64(443_733), blockEventPayload.TotalGasUsed)
+				require.Equal(t, uint64(439_233), blockEventPayload.TotalGasUsed)
 				require.Equal(t,
 					txHashes.RootHash(),
 					blockEventPayload.TransactionHashRoot,
@@ -4313,7 +4313,7 @@ func TestDryRun(t *testing.T) {
 
 				require.NoError(t, err)
 				require.NoError(t, output.Err)
-				assert.Equal(t, uint64(440), output.ComputationUsed)
+				assert.Equal(t, uint64(439), output.ComputationUsed)
 			},
 		)
 	})
@@ -4921,7 +4921,7 @@ func TestDryCall(t *testing.T) {
 
 				require.NoError(t, err)
 				require.NoError(t, output.Err)
-				assert.Equal(t, uint64(199), output.ComputationUsed)
+				assert.Equal(t, uint64(198), output.ComputationUsed)
 
 				// Increase call count of EVM.dryCall to 15
 				iterations = cadence.NewUInt(15)
@@ -4943,7 +4943,7 @@ func TestDryCall(t *testing.T) {
 
 				require.NoError(t, err)
 				require.NoError(t, output.Err)
-				assert.Equal(t, uint64(567), output.ComputationUsed)
+				assert.Equal(t, uint64(566), output.ComputationUsed)
 			},
 		)
 	})
@@ -7275,7 +7275,7 @@ func TestEthLogEmissionWithSelfDestruct(t *testing.T) {
 				require.NoError(t, err)
 				require.Equal(t, uint16(types.ErrCodeNoError), txEventPayload.ErrorCode)
 				require.Equal(t, uint16(0), txEventPayload.Index)
-				require.Equal(t, uint64(1_249_568), txEventPayload.GasConsumed)
+				require.Equal(t, uint64(1_250_668), txEventPayload.GasConsumed)
 				require.Greater(t, len(txEventPayload.Logs), 0)
 
 				gethLogs := []*gethTypes.Log{}
@@ -7371,7 +7371,7 @@ func TestEthLogEmissionWithSelfDestruct(t *testing.T) {
 				require.NoError(t, err)
 				require.Equal(t, uint16(types.ErrCodeNoError), txEventPayload.ErrorCode)
 				require.Equal(t, uint16(0), txEventPayload.Index)
-				require.Equal(t, uint64(1_249_589), txEventPayload.GasConsumed)
+				require.Equal(t, uint64(1_250_689), txEventPayload.GasConsumed)
 				require.Greater(t, len(txEventPayload.Logs), 0)
 
 				gethLogs := []*gethTypes.Log{}
