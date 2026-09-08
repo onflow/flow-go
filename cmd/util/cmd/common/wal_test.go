@@ -1,6 +1,9 @@
 package common_test
 
 import (
+	"crypto/rand"
+	"errors"
+	"os"
 	"testing"
 
 	prometheusWAL "github.com/onflow/wal/wal"
@@ -43,10 +46,35 @@ func makeTrieUpdate(rootHash ledger.RootHash) *ledger.TrieUpdate {
 	}
 }
 
+// makeLargeTrieUpdate returns a TrieUpdate whose encoded size is larger than one WAL page,
+// forcing the WAL writer to split the record across multiple pages.
+func makeLargeTrieUpdate(rootHash ledger.RootHash) *ledger.TrieUpdate {
+	path := testutils.PathByUint16(0)
+	value := make(ledger.Value, 100*1024) // incompressible payload > 32 KB, spans multiple pages
+	_, err := rand.Read(value)
+	if err != nil {
+		panic(err)
+	}
+	payload := ledger.NewPayload(ledger.Key{KeyParts: []ledger.KeyPart{{Type: 0, Value: []byte{1}}}}, value)
+	return &ledger.TrieUpdate{
+		RootHash: rootHash,
+		Paths:    []ledger.Path{path},
+		Payloads: []*ledger.Payload{payload},
+	}
+}
+
 // writeWALUpdate encodes and appends a trie-update record with the given root hash to w.
 func writeWALUpdate(t *testing.T, w *prometheusWAL.WAL, rootHash ledger.RootHash) {
 	t.Helper()
 	update := makeTrieUpdate(rootHash)
+	_, err := w.Log(flowWAL.EncodeUpdate(update))
+	require.NoError(t, err)
+}
+
+// writeLargeWALUpdate encodes and appends a multi-page trie-update record with the given root hash to w.
+func writeLargeWALUpdate(t *testing.T, w *prometheusWAL.WAL, rootHash ledger.RootHash) {
+	t.Helper()
+	update := makeLargeTrieUpdate(rootHash)
 	_, err := w.Log(flowWAL.EncodeUpdate(update))
 	require.NoError(t, err)
 }
@@ -96,14 +124,14 @@ func TestSearchRootHashForward_SingleSegment(t *testing.T) {
 		writeSmallWALUpdate(t, w, hash3)
 		require.NoError(t, w.Close())
 
-		seg, _, err := common.SearchRootHashForward(hash2, dir, common.DefaultWALFrom, common.DefaultWALTo)
+		seg, _, err := common.SearchRootHashForward(zerolog.Nop(), hash2, dir, common.DefaultWALFrom, common.DefaultWALTo)
 		require.NoError(t, err)
 		require.Equal(t, 0, seg)
 	})
 }
 
-// TestSearchRootHashForward_NotFound verifies that a forward scan returns an error when
-// the target hash is absent from the WAL.
+// TestSearchRootHashForward_NotFound verifies that a forward scan returns an expected
+// error when the target hash is absent from the WAL.
 func TestSearchRootHashForward_NotFound(t *testing.T) {
 	unittest.RunWithTempDir(t, func(dir string) {
 		hash1 := makeRootHash(0x01)
@@ -113,8 +141,39 @@ func TestSearchRootHashForward_NotFound(t *testing.T) {
 		writeSmallWALUpdate(t, w, hash1)
 		require.NoError(t, w.Close())
 
-		_, _, err := common.SearchRootHashForward(hashMissing, dir, common.DefaultWALFrom, common.DefaultWALTo)
+		_, _, err := common.SearchRootHashForward(zerolog.Nop(), hashMissing, dir, common.DefaultWALFrom, common.DefaultWALTo)
 		require.Error(t, err)
+		require.ErrorIs(t, err, common.ErrRootHashNotFound)
+	})
+}
+
+// TestSearchRootHashForward_InvalidRange verifies that an inverted range is rejected
+// as an expected error before any WAL access happens.
+func TestSearchRootHashForward_InvalidRange(t *testing.T) {
+	unittest.RunWithTempDir(t, func(dir string) {
+		_, _, err := common.SearchRootHashForward(zerolog.Nop(), makeRootHash(0x01), dir, 5, 2)
+		require.Error(t, err)
+		require.ErrorIs(t, err, common.ErrInvalidSegmentRange)
+	})
+}
+
+// TestSearchRootHashForward_CorruptFinalRecord verifies that a forward scan returns an
+// exception (not a successful match) when the final WAL record is torn/corrupt.
+func TestSearchRootHashForward_CorruptFinalRecord(t *testing.T) {
+	unittest.RunWithTempDir(t, func(dir string) {
+		hash1 := makeRootHash(0x01)
+		hash2 := makeRootHash(0x02)
+
+		w := openWALWriter(t, dir, singleSegmentSize)
+		writeSmallWALUpdate(t, w, hash1)
+		writeLargeWALUpdate(t, w, hash2)
+		require.NoError(t, w.Close())
+
+		truncateLastSegmentToPages(t, dir, 2)
+
+		_, _, err := common.SearchRootHashForward(zerolog.Nop(), hash1, dir, common.DefaultWALFrom, common.DefaultWALTo)
+		require.Error(t, err)
+		require.False(t, errors.Is(err, common.ErrRootHashNotFound), "corrupt WAL must not be reported as not found")
 	})
 }
 
@@ -131,14 +190,14 @@ func TestSearchRootHashBackward_SingleSegment(t *testing.T) {
 		writeSmallWALUpdate(t, w, hash2)
 		require.NoError(t, w.Close())
 
-		seg, _, err := common.SearchRootHashBackward(hash1, dir, common.DefaultWALFrom, common.DefaultWALTo)
+		seg, _, err := common.SearchRootHashBackward(zerolog.Nop(), hash1, dir, common.DefaultWALFrom, common.DefaultWALTo)
 		require.NoError(t, err)
 		require.Equal(t, 0, seg)
 	})
 }
 
-// TestSearchRootHashBackward_NotFound verifies that a backward scan returns an error when
-// the target hash is absent from the WAL.
+// TestSearchRootHashBackward_NotFound verifies that a backward scan returns an expected
+// error when the target hash is absent from the WAL.
 func TestSearchRootHashBackward_NotFound(t *testing.T) {
 	unittest.RunWithTempDir(t, func(dir string) {
 		hash1 := makeRootHash(0x01)
@@ -148,8 +207,40 @@ func TestSearchRootHashBackward_NotFound(t *testing.T) {
 		writeSmallWALUpdate(t, w, hash1)
 		require.NoError(t, w.Close())
 
-		_, _, err := common.SearchRootHashBackward(hashMissing, dir, common.DefaultWALFrom, common.DefaultWALTo)
+		_, _, err := common.SearchRootHashBackward(zerolog.Nop(), hashMissing, dir, common.DefaultWALFrom, common.DefaultWALTo)
 		require.Error(t, err)
+		require.ErrorIs(t, err, common.ErrRootHashNotFound)
+	})
+}
+
+// TestSearchRootHashBackward_InvalidRange verifies that an inverted range is rejected
+// as an expected error before any WAL access happens.
+func TestSearchRootHashBackward_InvalidRange(t *testing.T) {
+	unittest.RunWithTempDir(t, func(dir string) {
+		_, _, err := common.SearchRootHashBackward(zerolog.Nop(), makeRootHash(0x01), dir, 5, 2)
+		require.Error(t, err)
+		require.ErrorIs(t, err, common.ErrInvalidSegmentRange)
+	})
+}
+
+// TestSearchRootHashBackward_CorruptFinalRecord verifies that a backward scan returns an
+// exception when the last segment has a torn final record, even if an earlier segment
+// contains a matching hash.
+func TestSearchRootHashBackward_CorruptFinalRecord(t *testing.T) {
+	unittest.RunWithTempDir(t, func(dir string) {
+		hash1 := makeRootHash(0x01)
+		hash2 := makeRootHash(0x02)
+
+		w := openWALWriter(t, dir, singleSegmentSize)
+		writeSmallWALUpdate(t, w, hash1)
+		writeLargeWALUpdate(t, w, hash2)
+		require.NoError(t, w.Close())
+
+		truncateLastSegmentToPages(t, dir, 2)
+
+		_, _, err := common.SearchRootHashBackward(zerolog.Nop(), hash1, dir, common.DefaultWALFrom, common.DefaultWALTo)
+		require.Error(t, err)
+		require.False(t, errors.Is(err, common.ErrRootHashNotFound), "corrupt WAL must not be reported as not found")
 	})
 }
 
@@ -181,26 +272,27 @@ func TestSearchRootHashBackward_MultipleSegments(t *testing.T) {
 		require.Equal(t, 2, to, "expected 3 segments (0–2)")
 
 		t.Run("hash in first segment", func(t *testing.T) {
-			seg, _, err := common.SearchRootHashBackward(hashA, dir, common.DefaultWALFrom, common.DefaultWALTo)
+			seg, _, err := common.SearchRootHashBackward(zerolog.Nop(), hashA, dir, common.DefaultWALFrom, common.DefaultWALTo)
 			require.NoError(t, err)
 			require.Equal(t, 0, seg)
 		})
 
 		t.Run("hash in middle segment", func(t *testing.T) {
-			seg, _, err := common.SearchRootHashBackward(hashB, dir, common.DefaultWALFrom, common.DefaultWALTo)
+			seg, _, err := common.SearchRootHashBackward(zerolog.Nop(), hashB, dir, common.DefaultWALFrom, common.DefaultWALTo)
 			require.NoError(t, err)
 			require.Equal(t, 1, seg)
 		})
 
 		t.Run("hash in last segment", func(t *testing.T) {
-			seg, _, err := common.SearchRootHashBackward(hashC, dir, common.DefaultWALFrom, common.DefaultWALTo)
+			seg, _, err := common.SearchRootHashBackward(zerolog.Nop(), hashC, dir, common.DefaultWALFrom, common.DefaultWALTo)
 			require.NoError(t, err)
 			require.Equal(t, 2, seg)
 		})
 
 		t.Run("hash not present in any segment", func(t *testing.T) {
-			_, _, err := common.SearchRootHashBackward(makeRootHash(0xFF), dir, common.DefaultWALFrom, common.DefaultWALTo)
+			_, _, err := common.SearchRootHashBackward(zerolog.Nop(), makeRootHash(0xFF), dir, common.DefaultWALFrom, common.DefaultWALTo)
 			require.Error(t, err)
+			require.ErrorIs(t, err, common.ErrRootHashNotFound)
 		})
 	})
 }
@@ -218,9 +310,32 @@ func TestSearchRootHashBackward_ReturnsLastOccurrence(t *testing.T) {
 		writeWALUpdate(t, w, hashDup)   // segment 2 — second (later) occurrence
 		require.NoError(t, w.Close())
 
-		seg, _, err := common.SearchRootHashBackward(hashDup, dir, common.DefaultWALFrom, common.DefaultWALTo)
+		seg, _, err := common.SearchRootHashBackward(zerolog.Nop(), hashDup, dir, common.DefaultWALFrom, common.DefaultWALTo)
 		require.NoError(t, err)
 		require.Equal(t, 2, seg, "backward scan should return the most recent segment")
+	})
+}
+
+// TestSearchRootHashBackward_ReturnsLastOffsetInSegment verifies that when the same root
+// hash appears twice within one segment, the backward scan returns the offset of the
+// last occurrence, not the first.
+func TestSearchRootHashBackward_ReturnsLastOffsetInSegment(t *testing.T) {
+	unittest.RunWithTempDir(t, func(dir string) {
+		hashDup := makeRootHash(0xDD)
+		hashOther := makeRootHash(0xEE)
+
+		// Use a large segment so all records land in segment 0.
+		w := openWALWriter(t, dir, singleSegmentSize)
+		writeSmallWALUpdate(t, w, hashDup)   // offset 0
+		writeSmallWALUpdate(t, w, hashOther) // offset 1
+		writeSmallWALUpdate(t, w, hashDup)   // offset 2 — last occurrence
+		require.NoError(t, w.Close())
+
+		_, offset, err := common.SearchRootHashBackward(zerolog.Nop(), hashDup, dir, common.DefaultWALFrom, common.DefaultWALTo)
+		require.NoError(t, err)
+
+		lastOffset := lastOffsetOfHashInSegment(t, dir, 0, hashDup)
+		require.Equal(t, lastOffset, offset, "backward scan should return the last in-segment offset")
 	})
 }
 
@@ -239,12 +354,49 @@ func TestSearchRootHashBackward_BoundedRange(t *testing.T) {
 		require.NoError(t, w.Close())
 
 		// Restrict search to segment 1 only.
-		seg, _, err := common.SearchRootHashBackward(hashB, dir, 1, 1)
+		seg, _, err := common.SearchRootHashBackward(zerolog.Nop(), hashB, dir, 1, 1)
 		require.NoError(t, err)
 		require.Equal(t, 1, seg)
 
 		// hashA is only in segment 0, which is outside the bounded range [1,1].
-		_, _, err = common.SearchRootHashBackward(hashA, dir, 1, 1)
+		_, _, err = common.SearchRootHashBackward(zerolog.Nop(), hashA, dir, 1, 1)
 		require.Error(t, err, "hash outside the bounded range must not be found")
+		require.ErrorIs(t, err, common.ErrRootHashNotFound)
 	})
+}
+
+// lastOffsetOfHashInSegment reads the given segment and returns the offset of the last
+// record whose root hash equals expectedHash.
+func lastOffsetOfHashInSegment(t *testing.T, dir string, seg int, expectedHash ledger.RootHash) int64 {
+	t.Helper()
+
+	segment, err := prometheusWAL.OpenReadSegment(prometheusWAL.SegmentName(dir, seg))
+	require.NoError(t, err)
+	defer segment.Close()
+
+	reader := prometheusWAL.NewReader(prometheusWAL.NewSegmentBufReader(zerolog.Nop(), segment))
+	var lastOffset int64
+	for reader.Next() {
+		record := reader.Record()
+		op, _, update, err := flowWAL.Decode(record)
+		require.NoError(t, err)
+		if op == flowWAL.WALUpdate && update.RootHash.Equals(expectedHash) {
+			lastOffset = reader.Offset()
+		}
+	}
+
+	return lastOffset
+}
+
+// truncateLastSegmentToPages truncates the last segment in dir to exactly pageCount pages.
+func truncateLastSegmentToPages(t *testing.T, dir string, pageCount int) {
+	t.Helper()
+
+	first, last, err := prometheusWAL.Segments(dir)
+	require.NoError(t, err)
+	require.GreaterOrEqual(t, last, first)
+
+	segPath := prometheusWAL.SegmentName(dir, last)
+	err = os.Truncate(segPath, int64(pageCount*testSegmentSize))
+	require.NoError(t, err)
 }
