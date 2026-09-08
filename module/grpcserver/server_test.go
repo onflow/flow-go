@@ -233,7 +233,7 @@ func TestGrpcServer_StartStop(t *testing.T) {
 // thrown as an irrecoverable error. The mock signaler context fails the test on any Throw;
 // repeated immediate shutdowns make the race likely enough to be exercised.
 func TestGrpcServer_ImmediateShutdown(t *testing.T) {
-	for i := 0; i < 50; i++ {
+	for range 50 {
 		server := serverFixture(t, "localhost:0")
 
 		ctx, cancel := context.WithCancel(context.Background())
@@ -253,8 +253,7 @@ func TestGrpcServer_ListenErrorThrown(t *testing.T) {
 	server := serverFixture(t, "invalid-listen-address")
 
 	thrown := make(chan error, 1)
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 	signalerCtx := irrecoverable.NewMockSignalerContextWithCallback(t, ctx, func(err error) {
 		select {
 		case thrown <- err:
