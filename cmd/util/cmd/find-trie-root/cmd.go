@@ -197,9 +197,13 @@ func findRootHashAndCreateTrimmed(
 
 			rootHash := update.RootHash
 
-			if rootHash.Equals(expectedRoot) && reader.Offset() >= offset {
-				log.Info().Msgf("found expected trie root hash %v at offset %d, finish writing", rootHash, reader.Offset())
-				return newSegmentFile, nil
+			if rootHash.Equals(expectedRoot) {
+				if reader.Offset() < offset {
+					log.Warn().Msgf("expected trie root hash %v found at offset %d before selected offset %d, continuing", rootHash, reader.Offset(), offset)
+				} else {
+					log.Info().Msgf("found expected trie root hash %v at offset %d, finish writing", rootHash, reader.Offset())
+					return newSegmentFile, nil
+				}
 			}
 		default:
 		}
