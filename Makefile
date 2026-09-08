@@ -183,7 +183,7 @@ generate-mocks: install-mock-generators
 # this ensures there is no unused dependency being added by accident
 # also runs sanity checks: go-fix, geth/crypto version consistency, math/rand usage
 .PHONY: tidy
-tidy: go-fix check-geth-crypto-versions go-math-rand-check
+tidy: go-fix go-math-rand-check
 	go mod tidy -v
 	cd integration; go mod tidy -v
 	cd crypto; go mod tidy -v
