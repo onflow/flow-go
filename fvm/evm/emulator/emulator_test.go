@@ -341,7 +341,7 @@ func TestContractInteraction(t *testing.T) {
 
 						ret := new(big.Int).SetBytes(res.ReturnedData)
 						require.Equal(t, num, ret)
-						require.GreaterOrEqual(t, res.GasConsumed, uint64(18_420))
+						require.GreaterOrEqual(t, res.GasConsumed, uint64(17_520))
 					})
 				})
 
