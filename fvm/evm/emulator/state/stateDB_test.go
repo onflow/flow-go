@@ -255,7 +255,7 @@ func TestStateDB(t *testing.T) {
 		require.True(t, db.AddressInAccessList(sender))
 		require.True(t, db.AddressInAccessList(coinbase))
 		require.True(t, db.AddressInAccessList(dest))
-		require.Nil(t, db.Finalise(true)) // no BAL unless Amsterdam is activated
+		require.Nil(t, db.Finalise(rules)) // no BAL unless Amsterdam is activated
 
 		for _, add := range precompiles {
 			require.True(t, db.AddressInAccessList(add))
@@ -280,7 +280,7 @@ func TestStateDB(t *testing.T) {
 		require.NoError(t, err)
 		db.Prepare(rules, sender, coinbase, &dest, precompiles, txAccesses)
 
-		require.NotNil(t, db.Finalise(true)) // BAL should be present when Amsterdam is activated
+		require.NotNil(t, db.Finalise(rules)) // BAL should be present when Amsterdam is activated
 	})
 
 	t.Run("test non-fatal error handling", func(t *testing.T) {
@@ -519,7 +519,7 @@ func TestStateDB(t *testing.T) {
 		require.NoError(t, err)
 
 		// Block access list should be empty initially
-		bal := db.Finalise(true)
+		bal := db.Finalise(rules)
 		require.Len(t, bal.Accounts, 0)
 
 		// Block access list with balance change on EOA
@@ -528,7 +528,7 @@ func TestStateDB(t *testing.T) {
 		db.AddBalance(addr1, balance, gethTracing.BalanceChangeUnspecified)
 		require.NoError(t, db.Error())
 
-		bal = db.Finalise(true)
+		bal = db.Finalise(rules)
 		require.Len(t, bal.Accounts, 1)
 		require.Equal(t, balance, bal.Accounts[addr1].BalanceChanges[0])
 
@@ -538,7 +538,7 @@ func TestStateDB(t *testing.T) {
 		db.SetNonce(addr2, nonce, gethTracing.NonceChangeContractCreator)
 		require.NoError(t, db.Error())
 
-		bal = db.Finalise(true)
+		bal = db.Finalise(rules)
 		require.Len(t, bal.Accounts, 2)
 		require.Equal(t, nonce, bal.Accounts[addr2].NonceChanges[0])
 
@@ -548,7 +548,7 @@ func TestStateDB(t *testing.T) {
 		db.SetCode(addr3, code, gethTracing.CodeChangeContractCreation)
 		require.NoError(t, db.Error())
 
-		bal = db.Finalise(true)
+		bal = db.Finalise(rules)
 		require.Len(t, bal.Accounts, 3)
 		require.Equal(t, code, bal.Accounts[addr3].CodeChange[0])
 
@@ -576,7 +576,7 @@ func TestStateDB(t *testing.T) {
 		db.SelfDestruct(addr4)
 		require.NoError(t, db.Error())
 
-		bal = db.Finalise(true)
+		bal = db.Finalise(rules)
 		require.Len(t, bal.Accounts, 1)
 		require.Equal(t, uint256.NewInt(0), bal.Accounts[addr4].BalanceChanges[0])
 
@@ -584,7 +584,7 @@ func TestStateDB(t *testing.T) {
 		addr5 := testutils.RandomCommonAddress(t)
 		db.GetBalance(addr5)
 
-		bal = db.Finalise(true)
+		bal = db.Finalise(rules)
 		require.Len(t, bal.Accounts, 2)
 		require.NotNil(t, bal.Accounts[addr5])
 
@@ -607,7 +607,7 @@ func TestStateDB(t *testing.T) {
 		db.GetCommittedState(addr7, key1)
 		require.NoError(t, db.Error())
 
-		bal = db.Finalise(true)
+		bal = db.Finalise(rules)
 		require.Len(t, bal.Accounts, 1)
 		require.Contains(t, bal.Accounts[addr7].StorageReads, key1)
 
@@ -630,7 +630,7 @@ func TestStateDB(t *testing.T) {
 		db.GetState(addr8, key1)
 		require.NoError(t, db.Error())
 
-		bal = db.Finalise(true)
+		bal = db.Finalise(rules)
 		require.Len(t, bal.Accounts, 1)
 		require.NotContains(t, bal.Accounts[addr8].StorageReads, key1)
 		require.Equal(t, value1, bal.Accounts[addr8].StorageWrites[key1][0])
@@ -663,7 +663,7 @@ func TestStateDB(t *testing.T) {
 		require.NoError(t, db.Error())
 		require.Equal(t, value1, ret)
 
-		bal = db.Finalise(true)
+		bal = db.Finalise(rules)
 		require.Len(t, bal.Accounts, 1)
 		require.Contains(t, bal.Accounts[addr9].StorageReads, key1)
 	})
