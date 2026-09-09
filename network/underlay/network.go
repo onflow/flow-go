@@ -1271,6 +1271,14 @@ func (n *Network) processAuthenticatedMessage(msg *message.Message, peerID peer.
 		}
 		id, ok := n.Identity(peerID)
 		if !ok {
+			// On a staked channel the peer has already cleared sender authorization, so a
+			// missing identity here means it vanished between those checks and now. Log as
+			// suspicious rather than silently skipping the ALSP report.
+			n.logger.Warn().
+				Str("peer_id", p2plogging.PeerId(peerID)).
+				Str("channel", channel.String()).
+				Bool(logging.KeySuspicious, true).
+				Msg("could not resolve identity of authenticated peer on staked channel")
 			return nil
 		}
 		return id
