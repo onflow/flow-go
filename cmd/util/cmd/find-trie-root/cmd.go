@@ -207,11 +207,10 @@ func findRootHashAndCreateTrimmed(
 			}
 		default:
 		}
+	}
 
-		err = reader.Err()
-		if err != nil {
-			return "", fmt.Errorf("cannot read LedgerWAL: %w", err)
-		}
+	if err := reader.Err(); err != nil {
+		return "", fmt.Errorf("cannot read LedgerWAL: %w", err)
 	}
 
 	return "", fmt.Errorf("finish reading all segment files from %d to %d, but not found", segment, segment)

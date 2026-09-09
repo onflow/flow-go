@@ -15,7 +15,10 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-const singleSegmentSize = 32 * 1024 * 1024
+const (
+	singleSegmentSize = 32 * 1024 * 1024
+	walPageSize       = 32 * 1024
+)
 
 func makeRootHash(b byte) ledger.RootHash {
 	var h ledger.RootHash
@@ -37,6 +40,23 @@ func makeSmallTrieUpdate(rootHash ledger.RootHash) *ledger.TrieUpdate {
 func writeSmallWALUpdate(t *testing.T, w *prometheusWAL.WAL, rootHash ledger.RootHash) {
 	t.Helper()
 	_, err := w.Log(flowWAL.EncodeUpdate(makeSmallTrieUpdate(rootHash)))
+	require.NoError(t, err)
+}
+
+func makeLargeTrieUpdate(rootHash ledger.RootHash) *ledger.TrieUpdate {
+	path := testutils.PathByUint16(0)
+	value := make(ledger.Value, 100*1024)
+	payload := ledger.NewPayload(ledger.Key{KeyParts: []ledger.KeyPart{{Type: 0, Value: []byte{1}}}}, value)
+	return &ledger.TrieUpdate{
+		RootHash: rootHash,
+		Paths:    []ledger.Path{path},
+		Payloads: []*ledger.Payload{payload},
+	}
+}
+
+func writeLargeWALUpdate(t *testing.T, w *prometheusWAL.WAL, rootHash ledger.RootHash) {
+	t.Helper()
+	_, err := w.Log(flowWAL.EncodeUpdate(makeLargeTrieUpdate(rootHash)))
 	require.NoError(t, err)
 }
 
@@ -92,6 +112,37 @@ func TestFindRootHashAndCreateTrimmed_StopsAtSelectedOffset(t *testing.T) {
 
 		require.Equal(t, []ledger.RootHash{hashDup, hashOther, hashDup}, seenHashes,
 			"trimmed segment must stop at the selected occurrence of the target hash")
+	})
+}
+
+// TestFindRootHashAndCreateTrimmed_CorruptRecordBeforeSelectedOffset verifies that a
+// torn WAL record encountered before the selected offset is returned as a read error,
+// not misreported as the target root hash being absent.
+func TestFindRootHashAndCreateTrimmed_CorruptRecordBeforeSelectedOffset(t *testing.T) {
+	unittest.RunWithTempDir(t, func(dir string) {
+		hashOther := makeRootHash(0xEE)
+		hashTarget := makeRootHash(0xDD)
+
+		w := openWALWriter(t, dir, singleSegmentSize)
+		writeSmallWALUpdate(t, w, hashOther)
+		writeLargeWALUpdate(t, w, hashTarget)
+		require.NoError(t, w.Close())
+
+		selectedOffset := lastOffsetOfHashInSegment(t, dir, 0, hashTarget)
+
+		// Keep the first record intact, but truncate the multi-page target record.
+		segmentPath := prometheusWAL.SegmentName(dir, 0)
+		err := os.Truncate(segmentPath, int64(2*walPageSize))
+		require.NoError(t, err)
+
+		tmpDir := filepath.Join(dir, "tmp")
+		err = os.Mkdir(tmpDir, 0o700)
+		require.NoError(t, err)
+
+		_, err = findRootHashAndCreateTrimmed(dir, 0, selectedOffset, hashTarget, tmpDir)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "cannot read LedgerWAL")
+		require.NotContains(t, err.Error(), "not found")
 	})
 }
 
