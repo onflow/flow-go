@@ -151,6 +151,19 @@ func NewPSMT(
 		psmt.pathLookUp[path] = currentNode
 	}
 
+	// Every proof's terminal node (leaf node) must remain a leaf of the partial trie. forceComputeHash
+	// recomputes any node with children from its children and discards the payload-derived
+	// hashValue bound above, while pathLookUp would still serve that node's payload. A byzantine
+	// proof with truncated Steps (Steps=0 lands on the root; a short proof lands on an interior
+	// ancestor of another proof's path) would otherwise pass the root check below while
+	// GetSinglePayload/Get serve a fabricated payload from the interior terminal node. Honest
+	// compact proofs always terminate at compact leaves, so no legitimate proof is rejected.
+	for path, n := range psmt.pathLookUp {
+		if n.lChild != nil || n.rChild != nil {
+			return nil, fmt.Errorf("proof for path %x terminates at an interior node", path)
+		}
+	}
+
 	// check if the rootHash matches the root node's hash value of the partial trie
 	if ledger.RootHash(psmt.root.forceComputeHash()) != rootValue {
 		return nil, fmt.Errorf("rootNode hash doesn't match the proofs expected [%x], got [%x]", psmt.root.Hash(), rootValue)

@@ -430,7 +430,11 @@ func TestRandomProofs(t *testing.T) {
 // inclusion proofs, so a non-inclusion proof carrying a fabricated payload (or a duplicate proof
 // for an already-proven path) left the node's hash at the honest default and slipped past the
 // root check. NewPSMT now binds the payload to the node hash unconditionally, so any fabricated
-// payload changes the node hash and the root check rejects it.
+// payload changes the node hash and the root check rejects it. That binding only holds for proof
+// terminals that remain leaves: forceComputeHash recomputes interior nodes from their children and
+// discards the payload-derived hash, while pathLookUp still serves their payload. NewPSMT therefore
+// also rejects any proof whose terminal node has children, defeating truncated-Steps proofs that
+// land on the root or on an interior ancestor of another proof's path.
 
 var (
 	// secPathP holds a committed register; secPathP2 is a sibling so the trie has a real branch.
@@ -583,6 +587,66 @@ func TestNewPSMT_RejectsInclusionProofWithForgedPayload(t *testing.T) {
 		bp := &ledger.TrieBatchProof{Proofs: []*ledger.TrieProof{forgedP, honestQ}}
 		_, err := NewPSMT(rootHash, bp)
 		require.Error(t, err, "NewPSMT must reject an inclusion proof carrying a forged payload")
+	})
+}
+
+// TestNewPSMT_RejectsTruncatedProofOnRoot covers attack variant C: a proof with Steps truncated
+// to 0, so its terminal node is the root itself. forceComputeHash recomputes the root from its
+// children (supplied by the honest proof) and discards the payload-derived hash, so the root
+// check alone cannot detect the fabricated payload. NewPSMT must instead reject the batch
+// because the crafted proof's terminal node is not a leaf.
+func TestNewPSMT_RejectsTruncatedProofOnRoot(t *testing.T) {
+	withForest(t, 32, 10, func(t *testing.T, f *mtrie.Forest) {
+		rootHash := secBuildCommittedState(t, f)
+		honestP, _ := secHonestProofs(t, f, rootHash)
+
+		// Crafted proof for the distinct path secPathQ: Steps=0 makes the walk stop at the root,
+		// so the fabricated payload is attached to the root node and its payload-derived hash is
+		// discarded when the root is recomputed from its children.
+		craftedQ := secCloneProof(honestP)
+		craftedQ.Path = secPathQ
+		craftedQ.Inclusion = false
+		craftedQ.Steps = 0
+		craftedQ.Flags = nil
+		craftedQ.Interims = nil
+		craftedQ.Payload = testutils.LightPayload('X', 'x')
+
+		attackBatch := &ledger.TrieBatchProof{Proofs: []*ledger.TrieProof{honestP, craftedQ}}
+		decoded, err := ledger.DecodeTrieBatchProof(ledger.EncodeTrieBatchProof(attackBatch))
+		require.NoError(t, err)
+
+		_, err = NewPSMT(rootHash, decoded)
+		require.Error(t, err, "NewPSMT must reject a proof whose terminal node is the root")
+	})
+}
+
+// TestNewPSMT_RejectsTruncatedDuplicateOnInteriorNode covers attack variant D: a duplicate proof
+// for an honestly proven path, but with Steps truncated so its terminal node is an interior
+// ancestor of the honest leaf. The interior node has children (built by the honest proof), so
+// forceComputeHash discards the payload-derived hash and the root check passes. NewPSMT must
+// instead reject the batch because the duplicate's terminal node is not a leaf.
+func TestNewPSMT_RejectsTruncatedDuplicateOnInteriorNode(t *testing.T) {
+	withForest(t, 32, 10, func(t *testing.T, f *mtrie.Forest) {
+		rootHash := secBuildCommittedState(t, f)
+		honestP, honestQ := secHonestProofs(t, f, rootHash)
+
+		// Crafted duplicate of honestP: same Path, but Steps truncated to 1 so the walk stops at
+		// the depth-1 interior node on P's path. Placed after honestP so it wins the pathLookUp
+		// entry for secPathP. Flags carry a single zero byte so the one consumed flag reads as 0
+		// (sibling subtree at the default hash).
+		duplicateP := secCloneProof(honestP)
+		duplicateP.Inclusion = false
+		duplicateP.Steps = 1
+		duplicateP.Flags = []byte{0}
+		duplicateP.Interims = nil
+		duplicateP.Payload = testutils.LightPayload('Z', 'z')
+
+		attackBatch := &ledger.TrieBatchProof{Proofs: []*ledger.TrieProof{honestP, honestQ, duplicateP}}
+		decoded, err := ledger.DecodeTrieBatchProof(ledger.EncodeTrieBatchProof(attackBatch))
+		require.NoError(t, err)
+
+		_, err = NewPSMT(rootHash, decoded)
+		require.Error(t, err, "NewPSMT must reject a proof whose terminal node is an interior node")
 	})
 }
 
