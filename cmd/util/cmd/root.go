@@ -15,6 +15,7 @@ import (
 	bootstrap_execution_state_payloads "github.com/onflow/flow-go/cmd/util/cmd/bootstrap-execution-state-payloads"
 	check_storage "github.com/onflow/flow-go/cmd/util/cmd/check-storage"
 	checkpoint_collect_stats "github.com/onflow/flow-go/cmd/util/cmd/checkpoint-collect-stats"
+	checkpoint_convert_v6 "github.com/onflow/flow-go/cmd/util/cmd/checkpoint-convert-v6"
 	checkpoint_convert_v7 "github.com/onflow/flow-go/cmd/util/cmd/checkpoint-convert-v7"
 	checkpoint_iterate_nodes "github.com/onflow/flow-go/cmd/util/cmd/checkpoint-iterate-nodes"
 	checkpoint_list_tries "github.com/onflow/flow-go/cmd/util/cmd/checkpoint-list-tries"
@@ -108,6 +109,7 @@ func addCommands() {
 	rootCmd.AddCommand(export.Cmd)
 	rootCmd.AddCommand(checkpoint_list_tries.Cmd)
 	rootCmd.AddCommand(checkpoint_collect_stats.Cmd)
+	rootCmd.AddCommand(checkpoint_convert_v6.Cmd)
 	rootCmd.AddCommand(checkpoint_convert_v7.Cmd)
 	rootCmd.AddCommand(checkpoint_iterate_nodes.Cmd)
 	rootCmd.AddCommand(checkpoint_verify_hash.Cmd)
