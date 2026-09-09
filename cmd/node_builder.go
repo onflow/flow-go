@@ -185,6 +185,13 @@ type BaseConfig struct {
 	// This is only meaningful to Access and Execution nodes.
 	BitswapReprovideEnabled bool
 
+	// BitswapBloomCacheEnabled configures whether the Bitswap bloom cache is enabled.
+	// When disabled, uses a plain blockstore instead of cached blockstore, avoiding
+	// the CPU cost of building the bloom filter on startup. Pebble's built-in bloom
+	// filters (persisted in SSTables) are still used for efficient lookups.
+	// This is only meaningful to Access and Execution nodes.
+	BitswapBloomCacheEnabled bool
+
 	TransactionFeesDisabled bool
 }
 
@@ -296,12 +303,13 @@ func DefaultBaseConfig() *BaseConfig {
 			Duration: 10 * time.Second,
 		},
 
-		HeroCacheMetricsEnable:  false,
-		SyncCoreConfig:          chainsync.DefaultConfig(),
-		CodecFactory:            codecFactory,
-		ComplianceConfig:        compliance.DefaultConfig(),
-		DhtSystemEnabled:        true,
-		BitswapReprovideEnabled: true,
+		HeroCacheMetricsEnable:   false,
+		SyncCoreConfig:           chainsync.DefaultConfig(),
+		CodecFactory:             codecFactory,
+		ComplianceConfig:         compliance.DefaultConfig(),
+		DhtSystemEnabled:         true,
+		BitswapReprovideEnabled:  true,
+		BitswapBloomCacheEnabled: true, // default: use cached blockstore TODO leo: change default to false
 	}
 }
 
