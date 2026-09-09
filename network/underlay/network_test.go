@@ -1,18 +1,27 @@
 package underlay
 
 import (
+	"bytes"
 	"testing"
 
+	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/messages"
 	modulemock "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/alsp"
+	"github.com/onflow/flow-go/network/channels"
+	"github.com/onflow/flow-go/network/codec"
+	"github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/network/message"
 	mockmsg "github.com/onflow/flow-go/network/mock"
 	p2plogging "github.com/onflow/flow-go/network/p2p/logging"
+	"github.com/onflow/flow-go/network/slashing"
 	"github.com/onflow/flow-go/network/validator"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -144,4 +153,137 @@ func TestGetAuthorizedIdentity_ActivePeer(t *testing.T) {
 	identity, ok := net.getAuthorizedIdentity(log, remotePeerID)
 	require.True(t, ok)
 	require.Equal(t, activeIdentity, identity)
+}
+
+// stubIDTranslator implements the p2p.IDTranslator interface used by the Network for tests.
+// It only needs to translate a peer ID back to the configured Flow ID.
+type stubIDTranslator struct {
+	id flow.Identifier
+}
+
+func (t stubIDTranslator) GetPeerID(_ flow.Identifier) (peer.ID, error) {
+	return "", nil
+}
+
+func (t stubIDTranslator) GetFlowID(_ peer.ID) (flow.Identifier, error) {
+	return t.id, nil
+}
+
+// TestProcessAuthenticatedMessage_ReportsDecodeFailureOnStakedChannel verifies that a staked peer
+// sending a message with a valid message-code byte but an undecodable payload is reported to ALSP
+// so that a penalty can be applied.
+func TestProcessAuthenticatedMessage_ReportsDecodeFailureOnStakedChannel(t *testing.T) {
+	attackerIdentity := unittest.IdentityFixture(
+		unittest.WithRole(flow.RoleConsensus),
+		unittest.WithParticipationStatus(flow.EpochParticipationStatusActive),
+	)
+	attackerPeerID := unittest.PeerIdFixture(t)
+	channel := channels.ConsensusCommittee
+
+	// A valid message-code byte followed by undecodable CBOR garbage. This passes the
+	// authorized-sender check (which only looks at the code byte) but fails codec.Decode.
+	payload := append([]byte{codec.CodeBlockProposal.Uint8()}, bytes.Repeat([]byte{0xFF}, 32)...)
+
+	reportConsumer := mockmsg.NewMisbehaviorReportConsumer(t)
+	var reported []network.MisbehaviorReport
+	reportConsumer.On("ReportMisbehaviorOnChannel", channel, mock.Anything).
+		Run(func(args mock.Arguments) {
+			reported = append(reported, args.Get(1).(network.MisbehaviorReport))
+		}).
+		Once()
+
+	metrics := modulemock.NewNetworkSecurityMetrics(t)
+	metrics.On("OnUnauthorizedMessage", attackerIdentity.Role.String(), "unknown", channel.String(), alsp.InvalidMessage.String()).Once()
+
+	idProvider := modulemock.NewIdentityProvider(t)
+	idProvider.On("ByPeerID", attackerPeerID).Return(attackerIdentity, true).Once()
+
+	net := &Network{
+		logger:                     unittest.Logger(),
+		identityProvider:           idProvider,
+		identityTranslator:         stubIDTranslator{id: attackerIdentity.NodeID},
+		codec:                      cbor.NewCodec(),
+		slashingViolationsConsumer: slashing.NewSlashingViolationsConsumer(unittest.Logger(), metrics, reportConsumer),
+	}
+
+	net.processAuthenticatedMessage(&message.Message{ChannelID: channel.String(), Payload: payload}, attackerPeerID, message.ProtocolTypePubSub)
+
+	require.Len(t, reported, 1, "ALSP report must be submitted for a staked peer that sends an undecodable message")
+	require.Equal(t, attackerIdentity.NodeID, reported[0].OriginId())
+	require.Equal(t, alsp.InvalidMessage, reported[0].Reason())
+}
+
+// TestProcessAuthenticatedMessage_ReportsToInternalFailureOnStakedChannel verifies that a staked
+// peer sending well-formed CBOR that fails structural validation in ToInternal (e.g. a proposal
+// with a zero parent ID) is also reported to ALSP.
+func TestProcessAuthenticatedMessage_ReportsToInternalFailureOnStakedChannel(t *testing.T) {
+	attackerIdentity := unittest.IdentityFixture(
+		unittest.WithRole(flow.RoleConsensus),
+		unittest.WithParticipationStatus(flow.EpochParticipationStatusActive),
+	)
+	attackerPeerID := unittest.PeerIdFixture(t)
+	channel := channels.ConsensusCommittee
+
+	// Well-formed CBOR that decodes into a proposal but fails structural validation
+	// (empty proposer signature). The payload must carry the message-code byte.
+	cborCodec := cbor.NewCodec()
+	encodedProposal, err := cborCodec.Encode(&messages.Proposal{})
+	require.NoError(t, err)
+	payload := append([]byte{codec.CodeBlockProposal.Uint8()}, encodedProposal...)
+
+	reportConsumer := mockmsg.NewMisbehaviorReportConsumer(t)
+	var reported []network.MisbehaviorReport
+	reportConsumer.On("ReportMisbehaviorOnChannel", channel, mock.Anything).
+		Run(func(args mock.Arguments) {
+			reported = append(reported, args.Get(1).(network.MisbehaviorReport))
+		}).
+		Once()
+
+	metrics := modulemock.NewNetworkSecurityMetrics(t)
+	metrics.On("OnUnauthorizedMessage", attackerIdentity.Role.String(), "unknown", channel.String(), alsp.InvalidMessage.String()).Once()
+
+	idProvider := modulemock.NewIdentityProvider(t)
+	idProvider.On("ByPeerID", attackerPeerID).Return(attackerIdentity, true).Once()
+
+	net := &Network{
+		logger:                     unittest.Logger(),
+		identityProvider:           idProvider,
+		identityTranslator:         stubIDTranslator{id: attackerIdentity.NodeID},
+		codec:                      cbor.NewCodec(),
+		slashingViolationsConsumer: slashing.NewSlashingViolationsConsumer(unittest.Logger(), metrics, reportConsumer),
+	}
+
+	net.processAuthenticatedMessage(&message.Message{ChannelID: channel.String(), Payload: payload}, attackerPeerID, message.ProtocolTypePubSub)
+
+	require.Len(t, reported, 1, "ALSP report must be submitted for a staked peer that sends a structurally invalid message")
+	require.Equal(t, attackerIdentity.NodeID, reported[0].OriginId())
+	require.Equal(t, alsp.InvalidMessage, reported[0].Reason())
+}
+
+// TestProcessAuthenticatedMessage_SkipsPublicChannelDecodeFailure verifies that decode failures on
+// public channels are not reported to ALSP, preserving the existing exemption for the public network.
+func TestProcessAuthenticatedMessage_SkipsPublicChannelDecodeFailure(t *testing.T) {
+	peerID := unittest.PeerIdFixture(t)
+	channel := channels.PublicReceiveBlocks
+
+	// Same undecodable payload as the staked-channel test.
+	payload := append([]byte{codec.CodeBlockProposal.Uint8()}, bytes.Repeat([]byte{0xFF}, 32)...)
+
+	reportConsumer := mockmsg.NewMisbehaviorReportConsumer(t)
+	// No ReportMisbehaviorOnChannel expectation: mock strictness is the assertion that the
+	// violation must be skipped for public channels.
+
+	metrics := modulemock.NewNetworkSecurityMetrics(t)
+	metrics.On("OnUnauthorizedMessage", "unknown", "unknown", channel.String(), alsp.InvalidMessage.String()).Once()
+	metrics.On("OnViolationReportSkipped").Once()
+
+	net := &Network{
+		logger:                     unittest.Logger(),
+		identityProvider:           modulemock.NewIdentityProvider(t),
+		identityTranslator:         stubIDTranslator{id: unittest.IdentifierFixture()},
+		codec:                      cbor.NewCodec(),
+		slashingViolationsConsumer: slashing.NewSlashingViolationsConsumer(unittest.Logger(), metrics, reportConsumer),
+	}
+
+	net.processAuthenticatedMessage(&message.Message{ChannelID: channel.String(), Payload: payload}, peerID, message.ProtocolTypePubSub)
 }
