@@ -255,6 +255,7 @@ func TestVerifyHeight_MismatchWithStop(t *testing.T) {
 	assert.Equal(t, uint64(1), stats.MismatchedChunkCount)
 	assert.Equal(t, uint64(0), stats.MatchedTransactionCount)
 	assert.Equal(t, txPerChunk, stats.MismatchedTransactionCount)
+	assert.Len(t, stats.MismatchedBlockIDs, 1)
 }
 
 func TestVerifyHeight_BlockNotExecuted(t *testing.T) {
