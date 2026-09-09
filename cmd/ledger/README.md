@@ -59,6 +59,10 @@ go build -o flow-ledger-service ./cmd/ledger
 - `-max-request-size`: Maximum request message size in bytes (default: 1 GiB)
 - `-max-response-size`: Maximum response message size in bytes (default: 1 GiB)
 - `-loglevel`: Log level (panic, fatal, error, warn, info, debug) (default: info)
+- `-profiler-enabled`: Whether to enable the auto-profiler (default: false)
+- `-profiler-dir`: Directory to create auto-profiler profiles (default: `profiler`)
+- `-profiler-interval`: Interval between auto-profiler runs (default: 15m)
+- `-profiler-duration`: Duration of each auto-profiler run (default: 10s)
 
 ## Admin Commands
 
@@ -69,6 +73,8 @@ When `-admin-addr` is provided, the service exposes an HTTP admin API for managi
 - `trigger-checkpoint`: Triggers a checkpoint to be created as soon as the current WAL segment file is finished writing. This is useful for manually creating checkpoints without waiting for the automatic checkpoint distance.
 - `ping`: Simple health check command to verify the admin server is responsive.
 - `list-commands`: Lists all available admin commands.
+- `get-config`: Returns the current value of a registered runtime config.
+- `set-config`: Updates the value of a registered runtime config.
 
 **Examples:**
 ```bash
@@ -86,6 +92,24 @@ curl -X POST http://localhost:9003/admin/run_command \
 curl -X POST http://localhost:9003/admin/run_command \
   -H "Content-Type: application/json" \
   -d '{"commandName": "list-commands", "data": {}}'
+
+# Get the current auto-profiler enabled state
+curl -X POST http://localhost:9003/admin/run_command \
+  -H "Content-Type: application/json" \
+  -d '{"commandName": "get-config", "data": "profiler-enabled"}'
+
+# Enable the auto-profiler
+curl -X POST http://localhost:9003/admin/run_command \
+  -H "Content-Type: application/json" \
+  -d '{"commandName": "set-config", "data": {"profiler-enabled": true}}'
+
+# Trigger a profile run manually
+curl -X POST http://localhost:9003/admin/run_command \
+  -H "Content-Type: application/json" \
+  -d '{"commandName": "set-config", "data": {"profiler-trigger": "1m"}}'
+
+# Get a heap profile via pprof (only accessible from loopback)
+curl -o heap.prof http://localhost:9003/debug/pprof/heap
 ```
 
 **Note:** When running an execution node with a remote ledger service (using `--ledger-service-addr`), the `trigger-checkpoint` command on the execution node is disabled. You must use the ledger service's admin endpoint to trigger checkpoints.

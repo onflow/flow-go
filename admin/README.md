@@ -91,6 +91,23 @@ curl localhost:9002/admin/run_command -H 'Content-Type: application/json' -d '{"
 curl localhost:9002/admin/run_command -H 'Content-Type: application/json' -d '{"commandName": "set-config", "data": {"profiler-trigger": "1m"}}'
 ```
 
+### Ledger service profiler
+The standalone ledger service (`cmd/ledger`) can expose the same profiler configuration through its admin server. The admin server is disabled by default because `--admin-addr` defaults to an empty value; start the service with `--admin-addr=127.0.0.1:9003` to enable it. The `net/http/pprof` endpoints are registered on the admin server for on-demand profiling and are restricted to loopback addresses.
+
+```bash
+# Start the ledger service with the admin server enabled
+./ledger --triedir=/path/to/trie --admin-addr=127.0.0.1:9003
+
+# Enable the auto-profiler
+curl localhost:9003/admin/run_command -H 'Content-Type: application/json' -d '{"commandName": "set-config", "data": {"profiler-enabled": true}}'
+
+# Trigger a profile run
+curl localhost:9003/admin/run_command -H 'Content-Type: application/json' -d '{"commandName": "set-config", "data": {"profiler-trigger": "1m"}}'
+
+# Get a heap profile via pprof (only accessible from loopback)
+curl -o heap.prof localhost:9003/debug/pprof/heap
+```
+
 ### Set a stop height
 ```
 curl localhost:9002/admin/run_command -H 'Content-Type: application/json' -d '{"commandName": "stop-at-height", "data": { "height": 1111, "crash": false }}'
