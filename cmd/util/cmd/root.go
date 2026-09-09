@@ -15,8 +15,11 @@ import (
 	bootstrap_execution_state_payloads "github.com/onflow/flow-go/cmd/util/cmd/bootstrap-execution-state-payloads"
 	check_storage "github.com/onflow/flow-go/cmd/util/cmd/check-storage"
 	checkpoint_collect_stats "github.com/onflow/flow-go/cmd/util/cmd/checkpoint-collect-stats"
+	checkpoint_convert_v6 "github.com/onflow/flow-go/cmd/util/cmd/checkpoint-convert-v6"
+	checkpoint_convert_v7 "github.com/onflow/flow-go/cmd/util/cmd/checkpoint-convert-v7"
+	checkpoint_iterate_nodes "github.com/onflow/flow-go/cmd/util/cmd/checkpoint-iterate-nodes"
 	checkpoint_list_tries "github.com/onflow/flow-go/cmd/util/cmd/checkpoint-list-tries"
-	checkpoint_trie_stats "github.com/onflow/flow-go/cmd/util/cmd/checkpoint-trie-stats"
+	checkpoint_verify_hash "github.com/onflow/flow-go/cmd/util/cmd/checkpoint-verify-hash"
 	compare_debug_tx "github.com/onflow/flow-go/cmd/util/cmd/compare-debug-tx"
 	db_migration "github.com/onflow/flow-go/cmd/util/cmd/db-migration"
 	debug_script "github.com/onflow/flow-go/cmd/util/cmd/debug-script"
@@ -26,6 +29,7 @@ import (
 	export "github.com/onflow/flow-go/cmd/util/cmd/exec-data-json-export"
 	edbs "github.com/onflow/flow-go/cmd/util/cmd/execution-data-blobstore/cmd"
 	extract "github.com/onflow/flow-go/cmd/util/cmd/execution-state-extract"
+	extractpayloadless "github.com/onflow/flow-go/cmd/util/cmd/execution-state-extract-payloadless"
 	evm_state_exporter "github.com/onflow/flow-go/cmd/util/cmd/export-evm-state"
 	ledger_json_exporter "github.com/onflow/flow-go/cmd/util/cmd/export-json-execution-state"
 	export_json_transactions "github.com/onflow/flow-go/cmd/util/cmd/export-json-transactions"
@@ -103,10 +107,14 @@ func init() {
 func addCommands() {
 	rootCmd.AddCommand(version.Cmd)
 	rootCmd.AddCommand(extract.Cmd)
+	rootCmd.AddCommand(extractpayloadless.Cmd)
 	rootCmd.AddCommand(export.Cmd)
 	rootCmd.AddCommand(checkpoint_list_tries.Cmd)
-	rootCmd.AddCommand(checkpoint_trie_stats.Cmd)
 	rootCmd.AddCommand(checkpoint_collect_stats.Cmd)
+	rootCmd.AddCommand(checkpoint_convert_v6.Cmd)
+	rootCmd.AddCommand(checkpoint_convert_v7.Cmd)
+	rootCmd.AddCommand(checkpoint_iterate_nodes.Cmd)
+	rootCmd.AddCommand(checkpoint_verify_hash.Cmd)
 	rootCmd.AddCommand(read_badger.RootCmd)
 	rootCmd.AddCommand(read_protocol_state.RootCmd)
 	rootCmd.AddCommand(ledger_json_exporter.Cmd)

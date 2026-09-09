@@ -74,6 +74,7 @@ type ExecutionConfig struct {
 	// file descriptors causing connection failures.
 	onflowOnlyLNs                      bool
 	enableStorehouse                   bool
+	payloadless                        bool
 	enableBackgroundStorehouseIndexing bool
 	backgroundIndexerHeightsPerSecond  uint64
 	enableChecker                      bool
@@ -154,6 +155,9 @@ func (exeConf *ExecutionConfig) SetupFlags(flags *pflag.FlagSet) {
 
 	flags.BoolVar(&exeConf.onflowOnlyLNs, "temp-onflow-only-lns", false, "do not use unless required. forces node to only request collections from onflow collection nodes")
 	flags.BoolVar(&exeConf.enableStorehouse, "enable-storehouse", false, "enable storehouse to store registers on disk, default is false")
+	flags.BoolVar(&exeConf.payloadless, "payloadless", false,
+		"run the execution node with a payloadless ledger that stores only leaf hashes; "+
+			"register values are read from the storehouse during execution. requires --enable-storehouse.")
 	flags.BoolVar(&exeConf.enableBackgroundStorehouseIndexing, "enable-background-storehouse-indexing", false, "enable background indexing of storehouse data while storehouse is disabled to eliminate downtime when enabling it. default: false.")
 	flags.Uint64Var(&exeConf.backgroundIndexerHeightsPerSecond, "background-indexer-heights-per-second", storehouse.DefaultHeightsPerSecond, fmt.Sprintf("rate limit for background indexer in heights per second. 0 means no rate limiting. default: %v", storehouse.DefaultHeightsPerSecond))
 	flags.BoolVar(&exeConf.enableChecker, "enable-checker", true, "enable checker to check the correctness of the execution result, default is true")
@@ -197,6 +201,14 @@ func (exeConf *ExecutionConfig) ValidateFlags() error {
 	// Explicitly turn off background storehouse indexing when storehouse is enabled
 	if exeConf.enableStorehouse {
 		exeConf.enableBackgroundStorehouseIndexing = false
+	}
+	// Payloadless requires storehouse: the payloadless ledger does not retain
+	// register values; the storehouse is the only available value source for
+	// both proof reconstruction and snapshot reads.
+	if exeConf.payloadless && !exeConf.enableStorehouse {
+		return errors.New("--payloadless requires --enable-storehouse: " +
+			"the payloadless ledger does not store register values; " +
+			"the storehouse must provide them at execution time")
 	}
 	return nil
 }

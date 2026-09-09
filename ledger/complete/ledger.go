@@ -45,6 +45,8 @@ type Ledger struct {
 	pathFinderVersion uint8
 }
 
+var _ ledger.Ledger = (*Ledger)(nil)
+
 // NewLedger creates a new in-memory trie-backed ledger storage with persistence.
 func NewLedger(
 	wal realWAL.LedgerWAL,
@@ -333,15 +335,6 @@ func (l *Ledger) Trie(rootHash ledger.RootHash) (*trie.MTrie, error) {
 	return l.forest.GetTrie(rootHash)
 }
 
-// Checkpointer returns a checkpointer instance
-func (l *Ledger) Checkpointer() (*realWAL.Checkpointer, error) {
-	checkpointer, err := l.wal.NewCheckpointer()
-	if err != nil {
-		return nil, fmt.Errorf("cannot create checkpointer for compactor: %w", err)
-	}
-	return checkpointer, nil
-}
-
 func (l *Ledger) MigrateAt(
 	state ledger.State,
 	migration ledger.Migration,
@@ -423,8 +416,10 @@ func (l *Ledger) MostRecentTouchedState() (ledger.State, error) {
 }
 
 // HasState returns true if the given state exists inside the ledger
-func (l *Ledger) HasState(state ledger.State) bool {
-	return l.forest.HasTrie(ledger.RootHash(state))
+//
+// No error returns are expected during normal operation.
+func (l *Ledger) HasState(state ledger.State) (bool, error) {
+	return l.forest.HasTrie(ledger.RootHash(state)), nil
 }
 
 // DumpTrieAsJSON export trie at specific state as JSONL (each line is JSON encoding of a payload)

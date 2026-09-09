@@ -54,7 +54,7 @@ func prepareTest(f func(t *testing.T, es state.ExecutionState, l *ledger.Ledger,
 
 			db := pebbleimpl.ToDB(pebbleDB)
 			es := state.NewExecutionState(
-				ls, stateCommitments, blocks, headers, chunkDataPacks, results, myReceipts, events, serviceEvents, txResults, db, getLatestFinalized, trace.NewNoopTracer(),
+				state.FullLedgerBackend(ls), stateCommitments, blocks, headers, chunkDataPacks, results, myReceipts, events, serviceEvents, txResults, db, getLatestFinalized, trace.NewNoopTracer(),
 				nil,
 				false,
 				lockManager,
@@ -113,8 +113,12 @@ func TestExecutionStateWithTrieStorage(t *testing.T) {
 		require.Equal(t, flow.RegisterValue("carrot"), b2)
 
 		// verify has state
-		require.True(t, l.HasState(led.State(sc2)))
-		require.False(t, l.HasState(led.State(unittest.StateCommitmentFixture())))
+		hasState, err := l.HasState(led.State(sc2))
+		require.NoError(t, err)
+		require.True(t, hasState)
+		hasState, err = l.HasState(led.State(unittest.StateCommitmentFixture()))
+		require.NoError(t, err)
+		require.False(t, hasState)
 	}))
 
 	t.Run("commit write and read previous state", prepareTest(func(
