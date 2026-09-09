@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"math"
 
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
-	libp2pmessage "github.com/onflow/flow-go/model/libp2p/message"
-	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/network/channels"
 )
 
@@ -25,7 +25,8 @@ type QMessage struct {
 }
 
 // GetEventPriority returns the priority of the flow event message.
-// It is an average of the priority by message type and priority by message size
+// Type priority is the primary ordering factor; size priority is only a secondary
+// tie-breaker within the same type priority.
 func GetEventPriority(message any) (Priority, error) {
 	qm, ok := message.(QMessage)
 	if !ok {
@@ -33,70 +34,101 @@ func GetEventPriority(message any) (Priority, error) {
 	}
 	priorityByType := getPriorityByType(qm.Payload)
 	priorityBySize := getPriorityBySize(qm.Size)
-	return Priority(math.Ceil(float64(priorityByType+priorityBySize) / 2)), nil
+
+	// Weight type priority so that it always dominates size priority. The weight
+	// must be larger than the largest possible gap between size priorities so that
+	// even a high size priority cannot promote a low type priority above a medium
+	// type priority, and similarly for medium vs high.
+	const typePriorityWeight = 4
+	const sizePriorityWeight = 1
+	const sumOfWeights = typePriorityWeight + sizePriorityWeight
+
+	weighted := float64(typePriorityWeight*int(priorityByType)+sizePriorityWeight*int(priorityBySize)) / sumOfWeights
+	return Priority(math.Ceil(weighted)), nil
 }
 
-// getPriorityByType maps a message type to its priority
+// getPriorityByType maps a message to its priority based on its internal type.
+//
+// The network layer converts wire messages (model/messages) to their internal
+// representation via ToInternal before enqueueing them (see
+// [Network.processAuthenticatedMessage]), so the queue only ever sees the internal
+// types switched on here. The mapping is many-to-one: several wire types collapse
+// onto the same internal type (e.g. consensus and cluster block votes both convert
+// to [flow.BlockVote]).
+//
+// Priorities follow the message's role: consensus, execution, and verification
+// traffic is high priority; request/response exchanges that drive bulk data sync
+// are medium; protocol-state sync and generic entity exchange are low.
 func getPriorityByType(message any) Priority {
 	switch message.(type) {
-	// consensus
-	case *messages.Proposal:
+	// consensus: proposals, votes, and timeouts are all required for liveness.
+	// [flow.BlockVote] also covers cluster block votes, and [model.TimeoutObject]
+	// also covers cluster timeout objects (their wire types convert to the same
+	// internal types).
+	case *flow.Proposal:
 		return HighPriority
-	case *messages.BlockVote:
+	case *flow.BlockVote:
 		return HighPriority
-
-	// protocol state sync
-	case *messages.SyncRequest:
-		return LowPriority
-	case *messages.SyncResponse:
-		return LowPriority
-	case *messages.RangeRequest:
-		return MediumPriority
-	case *messages.BatchRequest:
-		return MediumPriority
-	case *messages.BlockResponse:
+	case *model.TimeoutObject:
 		return HighPriority
 
 	// cluster consensus (effectively collections)
-	case *messages.ClusterProposal:
+	case *cluster.Proposal:
 		return HighPriority
-	case *messages.ClusterBlockVote:
-		return HighPriority
-	case *messages.ClusterBlockResponse:
+	case *cluster.BlockResponse:
 		return HighPriority
 
 	// collections, guarantees & transactions
-	case *messages.CollectionGuarantee:
+	case *flow.CollectionGuarantee:
 		return HighPriority
-	case *messages.TransactionBody:
+	case *flow.TransactionBody:
 		return HighPriority
 
 	// core messages for execution & verification
-	case *messages.ExecutionReceipt:
+	case *flow.ExecutionReceipt:
 		return HighPriority
-	case *messages.ResultApproval:
+	case *flow.ResultApproval:
 		return HighPriority
 
 	// data exchange for execution of blocks
-	case *messages.ChunkDataRequest:
+	case *flow.ChunkDataRequest:
 		return HighPriority
-	case *messages.ChunkDataResponse:
+	case *flow.ChunkDataResponse:
 		return HighPriority
+
+	// block sync responses are latency-critical for catching up
+	case *flow.BlockResponse:
+		return HighPriority
+
+	// protocol state sync requests
+	case *flow.RangeRequest:
+		return MediumPriority
+	case *flow.BatchRequest:
+		return MediumPriority
 
 	// request/response for result approvals
-	case *messages.ApprovalRequest:
+	case *flow.ApprovalRequest:
 		return MediumPriority
-	case *messages.ApprovalResponse:
+	case *flow.ApprovalResponse:
 		return MediumPriority
 
-	// generic entity exchange engines
-	case *messages.EntityRequest:
+	// DKG messages are exchanged only during epoch setup; low volume and not
+	// latency-sensitive relative to consensus traffic
+	case *flow.DKGMessage:
+		return MediumPriority
+
+	// protocol state sync and generic entity exchange engines
+	case *flow.SyncRequest:
 		return LowPriority
-	case *messages.EntityResponse:
+	case *flow.SyncResponse:
+		return LowPriority
+	case *flow.EntityRequest:
+		return LowPriority
+	case *flow.EntityResponse:
 		return LowPriority
 
 	// test message
-	case *libp2pmessage.TestMessage:
+	case *flow.TestMessage:
 		return LowPriority
 
 	// anything else
