@@ -968,7 +968,7 @@ func chargeExecution(
 	return true
 }
 
-// chargeState deducts state gas (spilling into regular when the reservoir is
+// chargeState deducts state gas (spilling into execution when the reservoir is
 // exhausted), with tracer integration. Returns false on OOG.
 func chargeState(
 	c *gethVM.Contract,
