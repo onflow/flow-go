@@ -63,8 +63,10 @@ func (l *Ledger) InitialState() ledger.State {
 }
 
 // HasState returns true if the given state exists inside the ledger
-func (l *Ledger) HasState(other ledger.State) bool {
-	return l.state.Equals(other)
+//
+// No error returns are expected during normal operation.
+func (l *Ledger) HasState(other ledger.State) (bool, error) {
+	return l.state.Equals(other), nil
 }
 
 // GetSingleValue reads value of a given key at the given state
