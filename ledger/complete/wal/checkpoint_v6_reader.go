@@ -8,6 +8,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"strings"
 
 	"github.com/rs/zerolog"
 
@@ -702,9 +703,20 @@ func readTriesRootHash(logger zerolog.Logger, dir string, fileName string) (
 	return trieRootsToReturn, errToReturn
 }
 
+// readCheckpointTriesRootHash reads the trie root hashes from either a V6 or V7
+// checkpoint, dispatching by the [V7FileSuffix] on filename. Callers that already
+// know which version they want should call [ReadTriesRootHash] or
+// [ReadTriesRootHashV7] directly.
+func readCheckpointTriesRootHash(logger zerolog.Logger, dir, fileName string) ([]ledger.RootHash, error) {
+	if strings.HasSuffix(fileName, V7FileSuffix) {
+		return ReadTriesRootHashV7(logger, dir, fileName)
+	}
+	return ReadTriesRootHash(logger, dir, fileName)
+}
+
 // checkpointHasRootHash check if the given checkpoint file contains the expected root hash
 func checkpointHasRootHash(logger zerolog.Logger, bootstrapDir, filename string, expectedRootHash ledger.RootHash) error {
-	roots, err := ReadTriesRootHash(logger, bootstrapDir, filename)
+	roots, err := readCheckpointTriesRootHash(logger, bootstrapDir, filename)
 	if err != nil {
 		return fmt.Errorf("could not read checkpoint root hash: %w", err)
 	}
@@ -726,7 +738,7 @@ func checkpointHasRootHash(logger zerolog.Logger, bootstrapDir, filename string,
 }
 
 func checkpointHasSingleRootHash(logger zerolog.Logger, bootstrapDir, filename string, expectedRootHash ledger.RootHash) error {
-	roots, err := ReadTriesRootHash(logger, bootstrapDir, filename)
+	roots, err := readCheckpointTriesRootHash(logger, bootstrapDir, filename)
 	if err != nil {
 		return fmt.Errorf("could not read checkpoint root hash: %w", err)
 	}

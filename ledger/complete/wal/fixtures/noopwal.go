@@ -4,6 +4,7 @@ import (
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/complete/mtrie"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
+	"github.com/onflow/flow-go/ledger/complete/payloadless"
 	"github.com/onflow/flow-go/ledger/complete/wal"
 )
 
@@ -34,6 +35,8 @@ func (w *NoopWAL) RecordUpdate(update *ledger.TrieUpdate) (int, bool, error) { r
 func (w *NoopWAL) RecordDelete(rootHash ledger.RootHash) error { return nil }
 
 func (w *NoopWAL) ReplayOnForest(forest *mtrie.Forest) error { return nil }
+
+func (w *NoopWAL) ReplayOnPayloadlessForest(forest *payloadless.Forest) error { return nil }
 
 func (w *NoopWAL) Segments() (first, last int, err error) { return 0, 0, nil }
 

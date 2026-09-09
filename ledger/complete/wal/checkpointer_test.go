@@ -383,7 +383,7 @@ func Test_Checkpointing(t *testing.T) {
 			randomlyModifyFile(t, path.Join(dir, "checkpoint.00000010"))
 
 			// make sure 10 is latest checkpoint
-			latestCheckpoint, err := checkpointer.LatestCheckpoint()
+			latestCheckpoint, err := checkpointer.LatestCheckpointV6()
 			require.NoError(t, err)
 			require.Equal(t, 10, latestCheckpoint)
 
