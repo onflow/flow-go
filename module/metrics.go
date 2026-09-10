@@ -411,6 +411,8 @@ type NetworkCoreMetrics interface {
 	InboundMessageReceived(sizeBytes int, topic string, protocol string, messageType string)
 	// DuplicateInboundMessagesDropped increments the metric tracking the number of duplicate messages dropped by the node.
 	DuplicateInboundMessagesDropped(topic string, protocol string, messageType string)
+	// QueueFullInboundMessagesDropped increments the metric tracking the number of inbound messages dropped because the queue is full.
+	QueueFullInboundMessagesDropped(topic string, protocol string, messageType string)
 	// UnicastMessageSendingStarted increments the metric tracking the number of unicast messages sent by the node.
 	UnicastMessageSendingStarted(topic string)
 	// UnicastMessageSendingCompleted decrements the metric tracking the number of unicast messages sent by the node.

@@ -33,6 +33,7 @@ type NetworkCollector struct {
 	outboundMessageSize          *prometheus.HistogramVec
 	inboundMessageSize           *prometheus.HistogramVec
 	duplicateMessagesDropped     *prometheus.CounterVec
+	queueFullMessagesDropped     *prometheus.CounterVec
 	queueSize                    *prometheus.GaugeVec
 	queueDuration                *prometheus.HistogramVec
 	numMessagesProcessing        *prometheus.GaugeVec
@@ -108,6 +109,15 @@ func NewNetworkCollector(logger zerolog.Logger, opts ...NetworkCollectorOpt) *Ne
 			Subsystem: subsystemGossip,
 			Name:      nc.prefix + "duplicate_messages_dropped",
 			Help:      "number of duplicate messages dropped",
+		}, []string{LabelChannel, LabelProtocol, LabelMessage},
+	)
+
+	nc.queueFullMessagesDropped = promauto.NewCounterVec(
+		prometheus.CounterOpts{
+			Namespace: namespaceNetwork,
+			Subsystem: subsystemGossip,
+			Name:      nc.prefix + "queue_full_messages_dropped",
+			Help:      "number of inbound messages dropped because the queue is full",
 		}, []string{LabelChannel, LabelProtocol, LabelMessage},
 	)
 
@@ -276,6 +286,12 @@ func (nc *NetworkCollector) InboundMessageReceived(sizeBytes int, topic, protoco
 // Cluster topics are normalized to their prefix to prevent unbounded cardinality growth.
 func (nc *NetworkCollector) DuplicateInboundMessagesDropped(topic, protocol, messageType string) {
 	nc.duplicateMessagesDropped.WithLabelValues(channels.NormalizeTopicForMetrics(topic), protocol, messageType).Add(1)
+}
+
+// QueueFullInboundMessagesDropped increments the metric tracking the number of inbound messages dropped because the queue is full.
+// Cluster topics are normalized to their prefix to prevent unbounded cardinality growth.
+func (nc *NetworkCollector) QueueFullInboundMessagesDropped(topic, protocol, messageType string) {
+	nc.queueFullMessagesDropped.WithLabelValues(channels.NormalizeTopicForMetrics(topic), protocol, messageType).Add(1)
 }
 
 func (nc *NetworkCollector) MessageAdded(priority int) {

@@ -47,3 +47,8 @@ func NewReceiveCache(sizeLimit uint, opts ...func(cache *ReceiveCache)) *Receive
 func (r *ReceiveCache) Add(eventID []byte) bool {
 	return r.Backend.Add(flow.HashToID(eventID), struct{}{}) // ignore eviction status
 }
+
+// Remove removes the eventID from the cache. Returns true if the eventID was present and removed, false otherwise.
+func (r *ReceiveCache) Remove(eventID []byte) bool {
+	return r.Backend.Remove(flow.HashToID(eventID))
+}
