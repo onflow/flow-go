@@ -1,6 +1,7 @@
 package common_test
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -77,10 +78,37 @@ func TestMoveCheckpointFiles_MissingSourceFile(t *testing.T) {
 
 		err := common.MoveCheckpointFiles(srcDir, srcName, dstDir, dstName)
 		require.Error(t, err, "expected error when header file is missing")
+		require.True(t, errors.Is(err, common.ErrCheckpointFileMissing), "expected ErrCheckpointFileMissing")
 
 		// Destination directory must not have been created.
 		_, statErr := os.Stat(dstDir)
 		require.True(t, os.IsNotExist(statErr), "destination directory must not be created on validation failure")
+	})
+}
+
+// TestMoveCheckpointFiles_DestinationExists verifies that the function returns an error
+// without moving any files when any destination checkpoint file already exists.
+func TestMoveCheckpointFiles_DestinationExists(t *testing.T) {
+	unittest.RunWithTempDir(t, func(base string) {
+		srcDir := filepath.Join(base, "src")
+		dstDir := filepath.Join(base, "dst")
+		require.NoError(t, os.MkdirAll(srcDir, 0755))
+		require.NoError(t, os.MkdirAll(dstDir, 0755))
+
+		srcName := "checkpoint.00000003"
+		dstName := "checkpoint.00000009"
+
+		createFakeCheckpoint(t, srcDir, srcName)
+		createFakeCheckpoint(t, dstDir, dstName)
+
+		err := common.MoveCheckpointFiles(srcDir, srcName, dstDir, dstName)
+		require.Error(t, err, "expected error when destination file already exists")
+
+		// All source files must remain untouched.
+		for i, src := range wal.CheckpointV6AllFilePaths(srcDir, srcName) {
+			_, statErr := os.Stat(src)
+			require.NoError(t, statErr, "source file %d must remain after failed move: %s", i, src)
+		}
 	})
 }
 
