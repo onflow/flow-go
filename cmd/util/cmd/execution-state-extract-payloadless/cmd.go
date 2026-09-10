@@ -18,11 +18,12 @@ import (
 )
 
 var (
-	flagExecutionStateDir string
-	flagOutputDir         string
-	flagStateCommitment   string
-	flagNWorker           uint
-	flagMTrieCacheSize    uint32
+	flagExecutionStateDir   string
+	flagOutputDir           string
+	flagStateCommitment     string
+	flagNWorker             uint
+	flagMTrieCacheSize      uint32
+	flagUseWalSegmentNumber bool
 )
 
 // Cmd extracts the payloadless (V7) trie at a given state commitment from a WAL directory and writes
@@ -37,7 +38,9 @@ var Cmd = &cobra.Command{
 The trie is loaded from the WAL directory (--execution-state-dir), recovering in-memory state from the
 latest V7 checkpoint plus any newer WAL segments, exactly like the node does at startup. The trie whose
 root hash matches --state-commitment is written to --output-dir as a single-trie V7 root checkpoint
-("` + bootstrap.FilenameWALRootCheckpoint + wal.V7FileSuffix + `").
+("` + bootstrap.FilenameWALRootCheckpoint + wal.V7FileSuffix + `"). With --use-wal-segment-number, the
+output file is instead named after the WAL segment the commitment was recovered from
+(e.g. "` + wal.NumberToFilenameV7(2) + `").
 
 Because a payloadless trie carries only leaf hashes and no payloads, no migration is possible or needed;
 this command only re-checkpoints the selected trie. It acquires an exclusive lock on the WAL directory,
@@ -65,6 +68,11 @@ func init() {
 		"number of tries retained in the forest during WAL replay; match the node's --mtrie-cache-size. "+
 			"This is the main driver of peak memory; lower it to reduce memory (at the risk of failing to "+
 			"resolve tries across WAL forks)")
+
+	Cmd.Flags().BoolVar(&flagUseWalSegmentNumber, "use-wal-segment-number", false,
+		"name the output checkpoint after the WAL segment number where the state commitment was found "+
+			"(e.g. \""+wal.NumberToFilenameV7(2)+"\") instead of the default \""+
+			bootstrap.FilenameWALRootCheckpoint+wal.V7FileSuffix+"\"")
 }
 
 func runE(*cobra.Command, []string) error {
@@ -77,27 +85,36 @@ func runE(*cobra.Command, []string) error {
 		return fmt.Errorf("invalid state commitment length: %w", err)
 	}
 
-	outputFile := bootstrap.FilenameWALRootCheckpoint + wal.V7FileSuffix
-
 	log.Info().
 		Str("execution-state-dir", flagExecutionStateDir).
 		Str("output-dir", flagOutputDir).
 		Str("state-commitment", stateCommitment.String()).
-		Str("output", path.Join(flagOutputDir, outputFile)).
 		Msg("extracting payloadless (V7) trie at state commitment")
 
 	if err := os.MkdirAll(flagOutputDir, 0755); err != nil {
 		return fmt.Errorf("cannot create output directory %s: %w", flagOutputDir, err)
 	}
 
-	trie, err := util.ReadPayloadlessTrie(flagExecutionStateDir, stateCommitment, int(flagMTrieCacheSize))
+	trie, sourceNumber, err := util.ReadPayloadlessTrie(flagExecutionStateDir, stateCommitment, int(flagMTrieCacheSize))
 	if err != nil {
 		return fmt.Errorf("cannot read payloadless trie for state commitment %s: %w", stateCommitment, err)
+	}
+
+	// By default the output uses the canonical V7 root checkpoint name. With
+	// --use-wal-segment-number, it is named after the WAL segment (or numbered
+	// checkpoint) the state commitment was recovered from, e.g.
+	// "checkpoint.00000002.v7". A sourceNumber of -1 means the target was found
+	// in the unnumbered V7 root checkpoint, so the default name is kept.
+	outputFile := bootstrap.FilenameWALRootCheckpoint + wal.V7FileSuffix
+	if flagUseWalSegmentNumber && sourceNumber >= 0 {
+		outputFile = wal.NumberToFilenameV7(sourceNumber)
 	}
 
 	log.Info().
 		Str("root_hash", trie.RootHash().String()).
 		Uint64("allocated_reg_count", trie.AllocatedRegCount()).
+		Int("source_number", sourceNumber).
+		Str("output", path.Join(flagOutputDir, outputFile)).
 		Msg("loaded payloadless trie, storing V7 root checkpoint")
 
 	err = wal.StoreCheckpointV7(
