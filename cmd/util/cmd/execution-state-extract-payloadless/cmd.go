@@ -110,11 +110,24 @@ func runE(*cobra.Command, []string) error {
 		outputFile = wal.NumberToFilenameV7(sourceNumber)
 	}
 
+	// Refuse to overwrite: storing a checkpoint writes the header file plus part
+	// files named "<outputFile>.NNN", so fail if any file with that prefix
+	// already exists in the output directory.
+	outputPath := path.Join(flagOutputDir, outputFile)
+	exists, err := wal.AnyCheckpointFileExists(flagOutputDir, outputFile)
+	if err != nil {
+		return fmt.Errorf("cannot check for existing checkpoint files %s: %w", outputPath, err)
+	}
+	if exists {
+		return fmt.Errorf("output checkpoint %s already exists in %s; refusing to overwrite",
+			outputFile, flagOutputDir)
+	}
+
 	log.Info().
 		Str("root_hash", trie.RootHash().String()).
 		Uint64("allocated_reg_count", trie.AllocatedRegCount()).
 		Int("source_number", sourceNumber).
-		Str("output", path.Join(flagOutputDir, outputFile)).
+		Str("output", outputPath).
 		Msg("loaded payloadless trie, storing V7 root checkpoint")
 
 	err = wal.StoreCheckpointV7(
@@ -130,7 +143,7 @@ func runE(*cobra.Command, []string) error {
 
 	log.Info().
 		Str("state-commitment", ledger.State(trie.RootHash()).String()).
-		Str("output", path.Join(flagOutputDir, outputFile)).
+		Str("output", outputPath).
 		Msg("✅ payloadless (V7) state extraction completed successfully")
 	return nil
 }
