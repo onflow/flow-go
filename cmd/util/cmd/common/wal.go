@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"math"
 	"os"
+	"path/filepath"
+	"strings"
 
 	prometheusWAL "github.com/onflow/wal/wal"
 	"github.com/rs/zerolog"
@@ -263,7 +265,6 @@ const DefaultWALTo = math.MaxInt32
 // TrimWALSegmentToHash reads the given WAL segment forward, copies every record up to
 // and including the occurrence of targetHash at the selected offset into a new segment
 // file inside outputDir, and returns the path of the newly created segment file.
-//
 // The selected offset must be the offset of a WALUpdate record whose root hash equals
 // targetHash. Records that precede that offset are copied; the matching record is copied
 // and the function returns immediately after it. Any earlier occurrence of targetHash is
@@ -272,7 +273,9 @@ const DefaultWALTo = math.MaxInt32
 // The new segment file is always named "00000000" (segment 0) inside outputDir.
 // The caller is responsible for moving it to the correct destination after this call.
 //
-// No error returns are expected during normal operation.
+// Expected error returns during normal operation:
+//   - [ErrRootHashNotFound]: if targetHash does not appear in the selected segment at or after
+//     the selected offset.
 func TrimWALSegmentToHash(
 	lg zerolog.Logger,
 	dir string,
@@ -280,14 +283,19 @@ func TrimWALSegmentToHash(
 	offset int64,
 	targetHash ledger.RootHash,
 	outputDir string,
-) (string, error) {
-	newSegmentFile := prometheusWAL.SegmentName(outputDir, 0)
+) (newSegmentFile string, err error) {
+	newSegmentFile = prometheusWAL.SegmentName(outputDir, 0)
 
 	writer, err := prometheusWAL.NewSize(lg, nil, outputDir, wal.SegmentSize, false)
 	if err != nil {
-		return "", fmt.Errorf("cannot create WAL writer in %s: %w", outputDir, err)
+		return "", irrecoverable.NewExceptionf("cannot create WAL writer in %s: %w", outputDir, err)
 	}
-	defer writer.Close()
+	writerClosed := false
+	defer func() {
+		if !writerClosed {
+			_ = writer.Close()
+		}
+	}()
 
 	segmentFile := prometheusWAL.SegmentName(dir, segment)
 	sr, err := prometheusWAL.OpenReadSegment(segmentFile)
@@ -297,19 +305,20 @@ func TrimWALSegmentToHash(
 	defer sr.Close()
 
 	reader := prometheusWAL.NewReader(prometheusWAL.NewSegmentBufReader(lg, sr))
+	found := false
 	for reader.Next() {
 		record := reader.Record()
-		operation, _, update, err := wal.Decode(record)
-		if err != nil {
-			return "", irrecoverable.NewExceptionf("cannot decode WAL record in segment %d at offset %d: %w", segment, reader.Offset(), err)
+		operation, _, update, decodeErr := wal.Decode(record)
+		if decodeErr != nil {
+			return "", irrecoverable.NewExceptionf("cannot decode WAL record in segment %d at offset %d: %w", segment, reader.Offset(), decodeErr)
 		}
 
 		if operation != wal.WALUpdate {
 			continue
 		}
 
-		if _, err = writer.Log(wal.EncodeUpdate(update)); err != nil {
-			return "", fmt.Errorf("cannot write WAL record: %w", err)
+		if _, logErr := writer.Log(wal.EncodeUpdate(update)); logErr != nil {
+			return "", irrecoverable.NewExceptionf("cannot write WAL record: %w", logErr)
 		}
 
 		if update.RootHash.Equals(targetHash) {
@@ -317,16 +326,36 @@ func TrimWALSegmentToHash(
 				lg.Warn().Msgf("expected trie root hash %v found at offset %d before selected offset %d, continuing", targetHash, reader.Offset(), offset)
 			} else {
 				lg.Info().Msgf("found expected trie root hash %v at offset %d, finish writing", targetHash, reader.Offset())
-				return newSegmentFile, nil
+				found = true
+				break
 			}
 		}
 	}
 
-	if err := reader.Err(); err != nil {
-		return "", irrecoverable.NewExceptionf("cannot read WAL in segment %d: %w", segment, err)
+	if readErr := reader.Err(); readErr != nil {
+		return "", irrecoverable.NewExceptionf("cannot read WAL in segment %d: %w", segment, readErr)
 	}
 
-	return "", fmt.Errorf("target hash not found in segment %d", segment)
+	if !found {
+		return "", fmt.Errorf("target hash not found in segment %d: %w", segment, ErrRootHashNotFound)
+	}
+
+	closeErr := writer.Close()
+	writerClosed = true
+	if closeErr != nil {
+		return "", irrecoverable.NewExceptionf("cannot close WAL writer: %w", closeErr)
+	}
+
+	_, maxSeg, segErr := prometheusWAL.Segments(outputDir)
+	if segErr != nil {
+		return "", irrecoverable.NewExceptionf("cannot enumerate output WAL segments: %w", segErr)
+	}
+
+	if maxSeg > 0 {
+		return "", irrecoverable.NewExceptionf("trimmed records rolled over to segment %d; target update does not fit in one segment", maxSeg)
+	}
+
+	return newSegmentFile, nil
 }
 
 // BackupAndReplaceWALSegment moves all WAL segments from segment index segment through
@@ -351,18 +380,56 @@ func BackupAndReplaceWALSegment(
 		return fmt.Errorf("segment %d is before the first segment %d", segment, first)
 	}
 
+	if err := verifySameFilesystem(walDir, backupDir); err != nil {
+		return fmt.Errorf("walDir %s and backupDir %s must be on the same filesystem: %w", walDir, backupDir, err)
+	}
+
+	moved := make([]int, 0, last-segment+1)
 	for i := segment; i <= last; i++ {
 		src := prometheusWAL.SegmentName(walDir, i)
 		dst := prometheusWAL.SegmentName(backupDir, i)
 		if err := os.Rename(src, dst); err != nil {
-			return fmt.Errorf("cannot move segment %d to backup: %w", i, err)
+			return fmt.Errorf("cannot move segment %d to backup (already moved %v): %w", i, moved, err)
 		}
+		moved = append(moved, i)
 	}
 
 	dst := prometheusWAL.SegmentName(walDir, segment)
 	if err := os.Rename(newSegmentFile, dst); err != nil {
-		return fmt.Errorf("cannot replace segment %d: %w", segment, err)
+		return fmt.Errorf("cannot replace segment %d (segments already moved to backup %v): %w", segment, moved, err)
 	}
 
 	return nil
+}
+
+// verifySameFilesystem returns an error if a and b are on different filesystems.
+// It creates a temporary file in a and tries to rename it into b; a cross-device
+// rename failure is reported as an error so callers can avoid partial moves.
+func verifySameFilesystem(a, b string) error {
+	f, err := os.CreateTemp(a, ".wal-same-fs-probe-*")
+	if err != nil {
+		return fmt.Errorf("cannot create filesystem probe in %s: %w", a, err)
+	}
+	src := f.Name()
+	if err := f.Close(); err != nil {
+		_ = os.Remove(src)
+		return fmt.Errorf("cannot close filesystem probe in %s: %w", src, err)
+	}
+
+	dst := filepath.Join(b, filepath.Base(src))
+	defer func() {
+		_ = os.Remove(src)
+		_ = os.Remove(dst)
+	}()
+
+	err = os.Rename(src, dst)
+	if err == nil {
+		return nil
+	}
+
+	var linkErr *os.LinkError
+	if errors.As(err, &linkErr) && strings.Contains(linkErr.Err.Error(), "cross-device") {
+		return fmt.Errorf("%s and %s are on different filesystems: %w", a, b, err)
+	}
+	return fmt.Errorf("cannot verify filesystem between %s and %s: %w", a, b, err)
 }

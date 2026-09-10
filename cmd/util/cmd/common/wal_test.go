@@ -462,6 +462,7 @@ func TestTrimWALSegmentToHash_TargetNotFound(t *testing.T) {
 
 		_, err := common.TrimWALSegmentToHash(zerolog.Nop(), srcDir, 0, 0, makeRootHash(0xFF), tmpDir)
 		require.Error(t, err, "must error when target hash is absent")
+		require.ErrorIs(t, err, common.ErrRootHashNotFound)
 	})
 }
 
@@ -530,6 +531,18 @@ func TestBackupAndReplaceWALSegment(t *testing.T) {
 		// Segment 1 must be the new file (replacement).
 		_, err = os.Stat(prometheusWAL.SegmentName(walDir, 1))
 		require.NoError(t, err, "replacement segment 1 must exist in walDir")
+
+		replacement, err := prometheusWAL.OpenReadSegment(prometheusWAL.SegmentName(walDir, 1))
+		require.NoError(t, err)
+		defer replacement.Close()
+
+		reader := prometheusWAL.NewReader(prometheusWAL.NewSegmentBufReader(zerolog.Nop(), replacement))
+		require.True(t, reader.Next())
+		_, _, update, err := flowWAL.Decode(reader.Record())
+		require.NoError(t, err)
+		require.Equal(t, makeRootHash(0xBB), update.RootHash)
+		require.False(t, reader.Next())
+		require.NoError(t, reader.Err())
 
 		// Segment 2 must have been moved to backupDir.
 		_, err = os.Stat(prometheusWAL.SegmentName(walDir, 2))

@@ -23,9 +23,11 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger"
+	"github.com/onflow/flow-go/storage/operation"
 	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
 	storagepebble "github.com/onflow/flow-go/storage/pebble"
 	"github.com/onflow/flow-go/storage/store"
+	utilsio "github.com/onflow/flow-go/utils/io"
 )
 
 var (
@@ -42,12 +44,16 @@ var Cmd = &cobra.Command{
   1. Resolving the last sealed and executed block and its state commitment C.
   2. Locating the WAL segment that contains the last occurrence of root hash C.
   3. Trimming the WAL to end at that root hash (backed-up segments are moved to --backup-dir).
+     The WAL must be trimmed before checkpoint extraction because the ledger forest only
+     retains a bounded number of recent tries; without trimming, C could be evicted while
+     the full WAL is replayed.
   4. Extracting a single-trie V6 checkpoint from the trimmed WAL.
   5. Moving the checkpoint into the execution-state directory, named after the WAL segment.
   6. Rolling back the highest-executed-block pointer to the sealed height.`,
 	RunE: runE,
 }
 
+// init registers the compact-execution-state command flags.
 func init() {
 	common.InitDataDirFlag(Cmd, &flagDatadir)
 	_ = Cmd.MarkFlagRequired("datadir")
@@ -65,6 +71,7 @@ func init() {
 	_ = Cmd.MarkFlagRequired("backup-dir")
 }
 
+// runE implements the compact-execution-state command.
 func runE(*cobra.Command, []string) error {
 	lockManager := storage.MakeSingletonLockManager()
 
@@ -79,11 +86,15 @@ func runE(*cobra.Command, []string) error {
 		return fmt.Errorf("--backup-dir must differ from --execution-state-dir")
 	}
 
-	if err := ensureEmptyOrCreate(flagBackupDir); err != nil {
+	if err := utilsio.EnsureEmptyOrCreate(flagBackupDir); err != nil {
 		return fmt.Errorf("--backup-dir validation failed: %w", err)
 	}
 
 	// ── Step 1: resolve anchor (last sealed and executed block ) ──────────────
+	// The WAL is trimmed before extracting the checkpoint because ReadTrie replays
+	// the WAL into an in-memory forest with bounded capacity. If the full, untrimmed
+	// WAL were replayed, the target state commitment could be evicted before the trie
+	// could be read.
 
 	var sealedHeader *flow.Header
 	var stateCommitment flow.StateCommitment
@@ -114,12 +125,12 @@ func runE(*cobra.Command, []string) error {
 
 			commit, err := storages.Commits.ByBlockID(header.ID())
 			if err == nil {
-				log.Info().Uint64("height", mid).Uint64("lo", lo).Uint64("hi", hi).Msg("executed: searching higher")
+				log.Debug().Uint64("height", mid).Uint64("lo", lo).Uint64("hi", hi).Msg("executed: searching higher")
 				sealedHeader = header
 				stateCommitment = commit
 				lo = mid + 1
 			} else if errors.Is(err, storage.ErrNotFound) {
-				log.Info().Uint64("height", mid).Uint64("lo", lo).Uint64("hi", hi).Msg("not executed: searching lower")
+				log.Debug().Uint64("height", mid).Uint64("lo", lo).Uint64("hi", hi).Msg("not executed: searching lower")
 				hi = mid - 1
 			} else {
 				return fmt.Errorf("cannot check execution state at height %d: %w", mid, err)
@@ -179,7 +190,9 @@ func runE(*cobra.Command, []string) error {
 	log.Info().Int("segment", segment).Msg("WAL trimmed")
 
 	// ── Step 4: extract single-trie checkpoint ────────────────────────────────
-	checkpointTmpDir, err := os.MkdirTemp("", "compact-checkpoint-*")
+	// Keep the checkpoint temp directory on the same filesystem as the execution-state
+	// directory so MoveCheckpointFiles can rename the V6 checkpoint parts atomically.
+	checkpointTmpDir, err := os.MkdirTemp(flagExecutionStateDir, "compact-checkpoint-*")
 	if err != nil {
 		return fmt.Errorf("cannot create checkpoint temp dir: %w", err)
 	}
@@ -225,31 +238,48 @@ func runE(*cobra.Command, []string) error {
 			return fmt.Errorf("cannot open transaction results store: %w", err)
 		}
 
-		commits := store.NewCommits(m, db)
-		results := store.NewExecutionResults(m, db)
-		receipts := store.NewExecutionReceipts(m, db, results, badger.DefaultCacheSize)
-		myReceipts := store.NewMyExecutionReceipts(m, db, receipts)
-		headers := store.NewHeaders(m, db)
+		myReceipts := store.NewMyExecutionReceipts(m, db, storages.Receipts)
 		events := store.NewEvents(m, db)
 		serviceEvents := store.NewServiceEvents(m, db)
-		transactions := store.NewTransactions(m, db)
-		collections := store.NewCollections(db, transactions)
 
 		cdpPebbleDB, err := storagepebble.ShouldOpenDefaultPebbleDB(
 			log.Logger.With().Str("pebbledb", "cdp").Logger(), flagChunkDataPackDir)
 		if err != nil {
 			return fmt.Errorf("cannot open chunk data pack DB: %w", err)
 		}
+		defer func() {
+			if cerr := cdpPebbleDB.Close(); cerr != nil {
+				log.Error().Err(cerr).Msg("cannot close chunk data pack DB")
+			}
+		}()
 		cdpDB := pebbleimpl.ToDB(cdpPebbleDB)
 		storedCDP := store.NewStoredChunkDataPacks(m, cdpDB, 1000)
-		chunkDataPacks := store.NewChunkDataPacks(m, db, storedCDP, collections, 1000)
+		chunkDataPacks := store.NewChunkDataPacks(m, db, storedCDP, storages.Collections, 1000)
+
+		var executedBlockID flow.Identifier
+		err = operation.RetrieveExecutedBlock(db.Reader(), &executedBlockID)
+		if err != nil {
+			return fmt.Errorf("cannot retrieve executed block: %w", err)
+		}
+		executedHeader, err := storages.Headers.ByBlockID(executedBlockID)
+		if err != nil {
+			return fmt.Errorf("cannot retrieve executed header: %w", err)
+		}
+
+		if executedHeader.Height <= sealedHeader.Height {
+			log.Info().
+				Uint64("executed-height", executedHeader.Height).
+				Uint64("sealed-height", sealedHeader.Height).
+				Msg("executed height is already at or below sealed height; skipping execution-result rollback")
+			return nil
+		}
 
 		batch := db.NewBatch()
 		defer batch.Close()
 
 		chunkIDs, err := common.RemoveExecutionResultsFromHeight(
-			batch, state, transactionResults, commits, chunkDataPacks,
-			results, myReceipts, events, serviceEvents, sealedHeader.Height+1)
+			batch, state, transactionResults, storages.Commits, storages.Results,
+			myReceipts, events, serviceEvents, sealedHeader.Height+1)
 		if err != nil {
 			return fmt.Errorf("cannot remove execution results: %w", err)
 		}
@@ -264,7 +294,7 @@ func runE(*cobra.Command, []string) error {
 			return fmt.Errorf("cannot commit batch: %w", err)
 		}
 
-		if err = headers.RollbackExecutedBlock(sealedHeader); err != nil {
+		if err = storages.Headers.RollbackExecutedBlock(sealedHeader); err != nil {
 			return fmt.Errorf("cannot rollback executed block: %w", err)
 		}
 
@@ -281,28 +311,5 @@ func runE(*cobra.Command, []string) error {
 		Str("checkpoint", destName).
 		Msg("compact-execution-state complete")
 
-	return nil
-}
-
-// ensureEmptyOrCreate checks that dir is either absent or an empty directory.
-// If absent it is created; if non-empty it returns an error.
-func ensureEmptyOrCreate(dir string) error {
-	info, err := os.Stat(dir)
-	if os.IsNotExist(err) {
-		return os.MkdirAll(dir, 0o755)
-	}
-	if err != nil {
-		return err
-	}
-	if !info.IsDir() {
-		return fmt.Errorf("%s exists but is not a directory", dir)
-	}
-	entries, err := os.ReadDir(dir)
-	if err != nil {
-		return fmt.Errorf("cannot read directory %s: %w", dir, err)
-	}
-	if len(entries) > 0 {
-		return fmt.Errorf("directory %s must be empty", dir)
-	}
 	return nil
 }

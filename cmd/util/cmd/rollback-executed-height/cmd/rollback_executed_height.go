@@ -26,6 +26,7 @@ var Cmd = &cobra.Command{
 	RunE:  runE,
 }
 
+// init registers the rollback-executed-height command flags.
 func init() {
 
 	// execution results from height + 1 will be removed
@@ -40,6 +41,7 @@ func init() {
 	_ = Cmd.MarkFlagRequired("chunk_data_pack_dir")
 }
 
+// runE implements the rollback-executed-height command.
 func runE(*cobra.Command, []string) error {
 	lockManager := storage.MakeSingletonLockManager()
 
@@ -95,7 +97,6 @@ func runE(*cobra.Command, []string) error {
 			state,
 			transactionResults,
 			commits,
-			chunkDataPacks,
 			results,
 			myReceipts,
 			events,
