@@ -93,7 +93,6 @@ func SetIsContractDeploymentRestrictedTransaction(serviceAccount flow.Address, r
 		Build()
 }
 
-// TODO (ramtin) get rid of authorizers
 func DeployContractTransaction(address flow.Address, contract []byte, contractName string) *flow.TransactionBodyBuilder {
 	return flow.NewTransactionBodyBuilder().
 		SetScript(DeployContractTransactionTemplate).

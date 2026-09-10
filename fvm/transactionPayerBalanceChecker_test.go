@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/cadence"
+	"github.com/onflow/cadence/common"
 
 	"github.com/onflow/flow-go/fvm"
 	fvmmock "github.com/onflow/flow-go/fvm/environment/mock"
@@ -16,11 +17,11 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
+// verifyPayerBalanceResultType mirrors the VerifyPayerBalanceResult struct
+// defined in the FlowFees contract.
 var verifyPayerBalanceResultType = cadence.NewStructType(
-	// TODO: location
-	nil,
-	// TODO: qualified identifier
-	"",
+	common.NewAddressLocation(nil, common.Address(flow.HexToAddress("1")), "FlowFees"),
+	"A.0000000000000001.FlowFees.VerifyPayerBalanceResult",
 	[]cadence.Field{
 		{
 			Identifier: fvm.VerifyPayerBalanceResultTypeCanExecuteTransactionFieldName,
