@@ -254,45 +254,53 @@ var errStopPayloadlessReplay = errors.New("target payloadless trie found; stoppi
 // checkpoint or during segment replay, and false when all segments were replayed
 // without producing it. The caller reads the trie back via [payloadless.Forest.GetTrie].
 //
+// When the target is found, `sourceNumber` identifies where it came from: the
+// number of the loaded V7 checkpoint when the target was already one of the
+// checkpoint tries, or the number of the WAL segment whose replay produced it.
+// Segments are replayed one at a time precisely so this number is observable.
+// `sourceNumber` is -1 when the target was found in the unnumbered V7 root
+// checkpoint, and when the target was not found at all.
+//
 // Expected error returns during normal operation:
 //   - error containing "no V7 checkpoint found": when the WAL directory contains
 //     no V7 checkpoint of either kind, so the forest cannot be seeded.
 func (w *DiskWAL) ReplayOnPayloadlessForestUntil(
 	forest *payloadless.Forest,
 	targetRootHash ledger.RootHash,
-) (bool, error) {
+) (found bool, sourceNumber int, err error) {
 	checkpointer, err := w.NewCheckpointer()
 	if err != nil {
-		return false, fmt.Errorf("cannot create checkpointer: %w", err)
+		return false, -1, fmt.Errorf("cannot create checkpointer: %w", err)
 	}
 
 	tries, loadedCheckpoint, err := checkpointer.LoadLatestCheckpointV7()
 	if err != nil {
-		return false, fmt.Errorf("cannot load latest V7 checkpoint: %w", err)
+		return false, -1, fmt.Errorf("cannot load latest V7 checkpoint: %w", err)
 	}
 
 	// Mirrors [DiskWAL.ReplayOnPayloadlessForest]: a payloadless forest cannot be
 	// seeded by WAL replay alone, so a V7 checkpoint of either kind is required.
 	if loadedCheckpoint < 0 && len(tries) == 0 {
-		return false, fmt.Errorf(
+		return false, -1, fmt.Errorf(
 			"no V7 checkpoint found in %s; a V7 checkpoint is required to start a payloadless ledger",
 			w.wal.Dir(),
 		)
 	}
 
 	if err := forest.AddTries(tries); err != nil {
-		return false, fmt.Errorf("failed to seed payloadless forest from V7 checkpoint: %w", err)
+		return false, -1, fmt.Errorf("failed to seed payloadless forest from V7 checkpoint: %w", err)
 	}
 
 	// The target may already be one of the checkpoint tries; if so, no segment
-	// replay is needed.
+	// replay is needed. The source number is the loaded checkpoint's number, or
+	// -1 when the unnumbered V7 root checkpoint was loaded.
 	if forest.HasTrie(targetRootHash) {
-		return true, nil
+		return true, loadedCheckpoint, nil
 	}
 
 	firstSeg, lastSeg, err := w.Segments()
 	if err != nil {
-		return false, fmt.Errorf("could not find segments: %w", err)
+		return false, -1, fmt.Errorf("could not find segments: %w", err)
 	}
 	from := firstSeg
 	if loadedCheckpoint >= from {
@@ -300,29 +308,35 @@ func (w *DiskWAL) ReplayOnPayloadlessForestUntil(
 	}
 	if from > lastSeg {
 		// V7 checkpoint already covers everything on disk and did not contain the target.
-		return false, nil
+		return false, -1, nil
 	}
 
-	found := false
-	err = w.replaySegments(from, lastSeg,
-		func(update *ledger.TrieUpdate) error {
-			rootHash, err := forest.Update(update)
-			if err != nil {
-				return err
-			}
-			if rootHash.Equals(targetRootHash) {
-				found = true
-				return errStopPayloadlessReplay
-			}
-			return nil
-		},
-		func(rootHash ledger.RootHash) error { return nil },
-	)
-	if err != nil && !errors.Is(err, errStopPayloadlessReplay) {
-		return false, fmt.Errorf("could not replay WAL segments [%v:%v] for payloadless forest: %w", from, lastSeg, err)
+	updateFn := func(update *ledger.TrieUpdate) error {
+		rootHash, err := forest.Update(update)
+		if err != nil {
+			return err
+		}
+		if rootHash.Equals(targetRootHash) {
+			found = true
+			return errStopPayloadlessReplay
+		}
+		return nil
+	}
+	deleteFn := func(rootHash ledger.RootHash) error { return nil }
+
+	// Replay one segment at a time so the segment number that produced the
+	// target trie is observable for the returned `sourceNumber`.
+	for seg := from; seg <= lastSeg; seg++ {
+		err = w.replaySegments(seg, seg, updateFn, deleteFn)
+		if err != nil && !errors.Is(err, errStopPayloadlessReplay) {
+			return false, -1, fmt.Errorf("could not replay WAL segment %v for payloadless forest: %w", seg, err)
+		}
+		if found {
+			return true, seg, nil
+		}
 	}
 
-	return found, nil
+	return false, -1, nil
 }
 
 func (w *DiskWAL) Segments() (first, last int, err error) {

@@ -116,8 +116,12 @@ func ReadTrie(dir string, targetHash flow.StateCommitment) (*mtrie.MTrie, error)
 // directory lock acquired on open is released before this returns, and only the returned trie's
 // reachable nodes stay resident for any downstream checkpoint writing.
 //
+// `sourceNumber` identifies where the trie was recovered from: the number of the loaded V7 checkpoint
+// when the target was already one of its tries, or the number of the WAL segment whose replay produced
+// it. It is -1 when the target was found in the unnumbered V7 root checkpoint.
+//
 // No error returns are expected during normal operation.
-func ReadPayloadlessTrie(dir string, targetHash flow.StateCommitment, capacity int) (*payloadless.MTrie, error) {
+func ReadPayloadlessTrie(dir string, targetHash flow.StateCommitment, capacity int) (*payloadless.MTrie, int, error) {
 	log.Info().Msg("init WAL")
 
 	diskWal, err := wal.NewDiskWAL(
@@ -130,7 +134,7 @@ func ReadPayloadlessTrie(dir string, targetHash flow.StateCommitment, capacity i
 		wal.SegmentSize,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("cannot create disk WAL: %w", err)
+		return nil, -1, fmt.Errorf("cannot create disk WAL: %w", err)
 	}
 
 	// Done closes the WAL and releases the exclusive directory lock.
@@ -140,29 +144,29 @@ func ReadPayloadlessTrie(dir string, targetHash flow.StateCommitment, capacity i
 
 	forest, err := payloadless.NewForest(capacity, metrics.NewNoopCollector(), nil)
 	if err != nil {
-		return nil, fmt.Errorf("cannot create payloadless forest: %w", err)
+		return nil, -1, fmt.Errorf("cannot create payloadless forest: %w", err)
 	}
 
 	targetRootHash := ledger.RootHash(targetHash)
 
 	log.Info().Msg("loading V7 checkpoint and replaying WAL until the target trie is found")
 
-	found, err := diskWal.ReplayOnPayloadlessForestUntil(forest, targetRootHash)
+	found, sourceNumber, err := diskWal.ReplayOnPayloadlessForestUntil(forest, targetRootHash)
 	if err != nil {
-		return nil, fmt.Errorf("cannot replay payloadless WAL: %w", err)
+		return nil, -1, fmt.Errorf("cannot replay payloadless WAL: %w", err)
 	}
 	if !found {
-		return nil, fmt.Errorf(
+		return nil, -1, fmt.Errorf(
 			"no payloadless trie with state commitment %x was found in %s; check the --state-commitment and --execution-state-dir flags",
 			targetHash[:], dir)
 	}
 
 	trie, err := forest.GetTrie(targetRootHash)
 	if err != nil {
-		return nil, fmt.Errorf("cannot get payloadless trie at state commitment %x: %w", targetHash[:], err)
+		return nil, -1, fmt.Errorf("cannot get payloadless trie at state commitment %x: %w", targetHash[:], err)
 	}
 
-	return trie, nil
+	return trie, sourceNumber, nil
 }
 
 func ReadTrieForPayloads(dir string, targetHash flow.StateCommitment) ([]*ledger.Payload, error) {
