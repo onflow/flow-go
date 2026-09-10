@@ -3347,7 +3347,7 @@ func TestEVM(t *testing.T) {
 					}`,
 					sc.FungibleToken.Address.HexWithPrefix(),
 					sc.FlowToken.Address.HexWithPrefix(),
-					sc.FlowServiceAccount.Address.HexWithPrefix(), // TODO this should be sc.EVM.Address not found there???
+					sc.EVMContract.Address.HexWithPrefix(),
 				)).
 				SetProposalKey(chain.ServiceAddress(), 0, 0).
 				AddAuthorizer(chain.ServiceAddress()).
