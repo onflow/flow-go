@@ -7,6 +7,8 @@ import (
 	"os"
 
 	"github.com/rs/zerolog"
+
+	utilsio "github.com/onflow/flow-go/utils/io"
 )
 
 type WriterSeekerCloser interface {
@@ -20,6 +22,8 @@ type WriterSeekerCloser interface {
 // Typical usecase is to write data to a temporary file and only rename it
 // to target one as the last step. This help avoid situation when writing is
 // interrupted  and unusable file but with target name exists.
+// If the source and target paths are on different file systems, the file will
+// be moved by copying the contents and removing the source file.
 type SyncOnCloseRenameFile struct {
 	logger     zerolog.Logger
 	file       *os.File
@@ -37,6 +41,12 @@ func (s *SyncOnCloseRenameFile) Sync() error {
 
 }
 
+// Close flushes and syncs the buffered data to the temporary file, closes the
+// temporary file, and moves it to the target name. If the temporary file and target
+// path are on different file systems, the file is moved by copying the contents and
+// removing the temporary file.
+//
+// No error returns are expected during normal operation.
 func (s *SyncOnCloseRenameFile) Close() error {
 	if s.savedError != nil {
 		// If there is any error saved from previous op, close temp file without renaming to target file.
@@ -65,9 +75,9 @@ func (s *SyncOnCloseRenameFile) Close() error {
 		return fmt.Errorf("error while closing file %s: %w", s.file.Name(), err)
 	}
 
-	err = os.Rename(s.file.Name(), s.targetName)
+	err = utilsio.MoveFile(s.file.Name(), s.targetName)
 	if err != nil {
-		return fmt.Errorf("error while renaming from %s to %s: %w", s.file.Name(), s.targetName, err)
+		return fmt.Errorf("error while moving file from %s to %s: %w", s.file.Name(), s.targetName, err)
 	}
 
 	return nil
