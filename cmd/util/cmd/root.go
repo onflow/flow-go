@@ -101,6 +101,7 @@ func init() {
 	addCommands()
 }
 
+// addCommands registers all utility subcommands with the root command.
 func addCommands() {
 	rootCmd.AddCommand(version.Cmd)
 	rootCmd.AddCommand(extract.Cmd)

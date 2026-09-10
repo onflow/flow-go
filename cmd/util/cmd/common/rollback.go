@@ -16,14 +16,12 @@ import (
 // It returns the set of chunk IDs that were removed from the protocol-state DB so
 // that the caller can delete the corresponding chunk-data-packs from the chunk DB.
 //
-// Expected error returns during normal operation:
-//   - [storage.ErrNotFound]: if a required block header or execution result is absent
+// No error returns are expected during normal operation.
 func RemoveExecutionResultsFromHeight(
 	protocolDBBatch storage.Batch,
 	protoState protocol.State,
 	transactionResults storage.TransactionResults,
 	commits storage.Commits,
-	chunkDataPacks storage.ChunkDataPacks,
 	results storage.ExecutionResults,
 	myReceipts storage.MyExecutionReceipts,
 	events storage.Events,
@@ -56,14 +54,14 @@ func RemoveExecutionResultsFromHeight(
 		return nil, fmt.Errorf("could not get pending descendants: %w", err)
 	}
 
-	// Remove pending descendants before finalized blocks, and iterate in reverse so
-	// that deeper descendants are removed before their ancestors, avoiding gaps if
-	// the operation is interrupted.
+	// Remove pending descendants before finalized blocks, and iterate in reverse only
+	// so that deeper descendants are logged before their ancestors in progress messages.
+	// All removals are staged in protocolDBBatch and committed once by the caller.
 	for i := len(pendings) - 1; i >= 0; i-- {
 		pending := pendings[i]
 		chunkIDs, err := RemoveExecutionResultsForBlock(
 			protocolDBBatch, commits, transactionResults, results,
-			chunkDataPacks, myReceipts, events, serviceEvents, pending)
+			myReceipts, events, serviceEvents, pending)
 		if err != nil {
 			return nil, fmt.Errorf("could not remove result for pending block %v: %w", pending, err)
 		}
@@ -75,8 +73,8 @@ func RemoveExecutionResultsFromHeight(
 	total := int(final.Height-fromHeight) + 1
 	finalRemoved := 0
 
-	// Iterate from highest to lowest so that any interruption leaves a contiguous
-	// range intact (no gaps between remaining heights).
+	// Iterate from highest to lowest only for clearer progress logging.
+	// All removals are staged in protocolDBBatch and committed once by the caller.
 	for height := final.Height; height >= fromHeight; height-- {
 		head, err := protoState.AtHeight(height).Head()
 		if err != nil {
@@ -85,7 +83,7 @@ func RemoveExecutionResultsFromHeight(
 
 		chunkIDs, err := RemoveExecutionResultsForBlock(
 			protocolDBBatch, commits, transactionResults, results,
-			chunkDataPacks, myReceipts, events, serviceEvents, head.ID())
+			myReceipts, events, serviceEvents, head.ID())
 		if err != nil {
 			return nil, fmt.Errorf("could not remove result for finalized block at height %v: %w", height, err)
 		}
@@ -105,15 +103,12 @@ func RemoveExecutionResultsFromHeight(
 // single block in a single batch write and returns the chunk IDs that should be
 // removed from the chunk-data-pack database.
 //
-// Expected error returns during normal operation:
-//   - [storage.ErrNotFound]: if the execution result for the block is absent (treated
-//     as a no-op — the block was never executed)
+// No error returns are expected during normal operation.
 func RemoveExecutionResultsForBlock(
 	protocolDBBatch storage.Batch,
 	commits storage.Commits,
 	transactionResults storage.TransactionResults,
 	results storage.ExecutionResults,
-	chunks storage.ChunkDataPacks,
 	myReceipts storage.MyExecutionReceipts,
 	events storage.Events,
 	serviceEvents storage.ServiceEvents,

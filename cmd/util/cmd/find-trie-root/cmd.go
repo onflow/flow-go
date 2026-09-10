@@ -14,6 +14,7 @@ import (
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/hash"
+	utilsio "github.com/onflow/flow-go/utils/io"
 )
 
 var (
@@ -40,6 +41,7 @@ var Cmd = &cobra.Command{
 	Run:   run,
 }
 
+// init registers the find-trie-root command flags.
 func init() {
 	Cmd.Flags().StringVar(&flagExecutionStateDir, "execution-state-dir", "/var/flow/data/execution",
 		"directory to the execution state")
@@ -59,6 +61,7 @@ func init() {
 		"trim the wal file to the last record with the target trie root hash")
 }
 
+// run implements the find-trie-root command.
 func run(*cobra.Command, []string) {
 	rootHash, err := parseInput(flagRootHash)
 	if err != nil {
@@ -69,14 +72,8 @@ func run(*cobra.Command, []string) {
 		log.Fatal().Msg("--backup-dir directory cannot be the same as the execution state directory")
 	}
 
-	// making sure the backup dir is empty
-	empty, err := checkFolderIsEmpty(flagBackupDir)
-	if err != nil {
-		log.Fatal().Msgf("--backup-dir directory %v must exist and empty", flagBackupDir)
-	}
-
-	if !empty {
-		log.Fatal().Msgf("--backup-dir directory %v must be empty", flagBackupDir)
+	if err := utilsio.EnsureEmptyOrCreate(flagBackupDir); err != nil {
+		log.Fatal().Err(err).Msgf("--backup-dir directory %v must exist and empty", flagBackupDir)
 	}
 
 	segment, offset, err := common.SearchRootHashBackward(log.Logger, rootHash, flagExecutionStateDir, flagFrom, flagTo)
@@ -135,6 +132,7 @@ func run(*cobra.Command, []string) {
 		segment, rootHash, flagBackupDir)
 }
 
+// parseInput decodes the hex-encoded root-hash flag into a ledger root hash.
 func parseInput(rootHashStr string) (ledger.RootHash, error) {
 	rootHashBytes, err := hex.DecodeString(rootHashStr)
 	if err != nil {
@@ -145,36 +143,4 @@ func parseInput(rootHashStr string) (ledger.RootHash, error) {
 		return ledger.RootHash(hash.DummyHash), fmt.Errorf("invalid root hash: %w", err)
 	}
 	return rootHash, nil
-}
-
-func checkFolderIsEmpty(folderPath string) (bool, error) {
-	// Check if the folder exists
-	info, err := os.Stat(folderPath)
-	if err != nil {
-		if os.IsNotExist(err) {
-			log.Info().Msgf("folder %v does not exist, creating the folder", folderPath)
-
-			// create the folder if not exist
-			err = os.MkdirAll(folderPath, os.ModePerm)
-			if err != nil {
-				return false, fmt.Errorf("Cannot create the folder.")
-			}
-
-			return true, nil
-		}
-		return false, err
-	}
-
-	// Check if the path is a directory
-	if !info.IsDir() {
-		return false, fmt.Errorf("The path is not a directory.")
-	}
-
-	// Check if the folder is empty
-	files, err := os.ReadDir(folderPath)
-	if err != nil {
-		return false, fmt.Errorf("Cannot read the folder.")
-	}
-
-	return len(files) == 0, nil
 }
