@@ -28,6 +28,7 @@ func NewNoopCollector() *NoopCollector {
 func (nc *NoopCollector) OutboundMessageSent(int, string, string, string)        {}
 func (nc *NoopCollector) InboundMessageReceived(int, string, string, string)     {}
 func (nc *NoopCollector) DuplicateInboundMessagesDropped(string, string, string) {}
+func (nc *NoopCollector) QueueFullInboundMessagesDropped(string, string, string) {}
 func (nc *NoopCollector) UnicastMessageSendingStarted(topic string)              {}
 func (nc *NoopCollector) UnicastMessageSendingCompleted(topic string)            {}
 func (nc *NoopCollector) BlockProposed(*flow.Block)                              {}

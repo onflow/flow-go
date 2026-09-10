@@ -62,6 +62,21 @@ func (r *ReceiveCacheTestSuite) TestSingleElementAdd() {
 	assert.False(r.Suite.T(), r.c.Add(eventID3))
 }
 
+// TestRemove verifies that an event ID can be explicitly removed from the cache,
+// allowing future messages with the same event ID to be added again.
+func (r *ReceiveCacheTestSuite) TestRemove() {
+	eventID, err := message.EventId(channels.Channel("0"), []byte("event-1"))
+	require.NoError(r.T(), err)
+
+	assert.True(r.Suite.T(), r.c.Add(eventID))
+	assert.False(r.Suite.T(), r.c.Add(eventID))
+
+	assert.True(r.Suite.T(), r.c.Remove(eventID))
+	assert.False(r.Suite.T(), r.c.Remove(eventID))
+
+	assert.True(r.Suite.T(), r.c.Add(eventID))
+}
+
 // TestNoneExistence evaluates the correctness of cache operation against non-existing element
 func (r *ReceiveCacheTestSuite) TestNoneExistence() {
 	eventID, err := message.EventId(channels.Channel("1"), []byte("non-existing event"))
