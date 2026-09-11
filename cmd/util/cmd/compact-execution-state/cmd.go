@@ -9,6 +9,7 @@ package compact_execution_state
 import (
 	"errors"
 	"fmt"
+	"math"
 	"os"
 
 	"github.com/rs/zerolog/log"
@@ -16,11 +17,14 @@ import (
 
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	utilledger "github.com/onflow/flow-go/cmd/util/ledger/util"
+	exestate "github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
 	flowWAL "github.com/onflow/flow-go/ledger/complete/wal"
+	"github.com/onflow/flow-go/ledger/factory"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/storage/operation"
@@ -50,7 +54,10 @@ var Cmd = &cobra.Command{
   4. Extracting a single-trie V6 checkpoint from the trimmed WAL.
   5. Moving any pre-existing checkpoint at or beyond the trimmed WAL segment to --backup-dir.
   6. Moving the checkpoint into the execution-state directory, named after the WAL segment.
-  7. Rolling back the highest-executed-block pointer to the sealed height.`,
+  7. Rolling back the highest-executed-block pointer to the sealed height.
+	8. validating the compacted execution state: the highest finalized-and-executed block
+		 reported by the execution state must match the sealed anchor, its commit must exist
+		 in the protocol database, and its root hash must be present in the compacted ledger.`,
 	RunE: runE,
 }
 
@@ -233,7 +240,7 @@ func runE(*cobra.Command, []string) error {
 
 	log.Info().Str("name", destName).Msg("checkpoint placed in execution state dir")
 
-	// ── Step 7: roll back executed height ─────────────────────────────────────
+	// ── Step 7: roll back executed height and validate ─────────────────────
 	err = common.WithStorage(flagDatadir, func(db storage.DB) error {
 		storages := common.InitStorages(db)
 		state, err := common.OpenProtocolState(lockManager, db, storages)
@@ -281,34 +288,80 @@ func runE(*cobra.Command, []string) error {
 				Uint64("executed-height", executedHeader.Height).
 				Uint64("sealed-height", sealedHeader.Height).
 				Msg("executed height is already at or below sealed height; skipping execution-result rollback")
-			return nil
-		}
+		} else {
+			batch := db.NewBatch()
+			defer batch.Close()
 
-		batch := db.NewBatch()
-		defer batch.Close()
-
-		chunkIDs, err := common.RemoveExecutionResultsFromHeight(
-			batch, state, transactionResults, storages.Commits, storages.Results,
-			myReceipts, events, serviceEvents, sealedHeader.Height+1)
-		if err != nil {
-			return fmt.Errorf("cannot remove execution results: %w", err)
-		}
-
-		if len(chunkIDs) > 0 {
-			if _, err = chunkDataPacks.BatchRemove(chunkIDs, batch); err != nil {
-				return fmt.Errorf("cannot remove chunk data packs: %w", err)
+			chunkIDs, err := common.RemoveExecutionResultsFromHeight(
+				batch, state, transactionResults, storages.Commits, storages.Results,
+				myReceipts, events, serviceEvents, sealedHeader.Height+1)
+			if err != nil {
+				return fmt.Errorf("cannot remove execution results: %w", err)
 			}
+
+			if len(chunkIDs) > 0 {
+				if _, err = chunkDataPacks.BatchRemove(chunkIDs, batch); err != nil {
+					return fmt.Errorf("cannot remove chunk data packs: %w", err)
+				}
+			}
+
+			if err = batch.Commit(); err != nil {
+				return fmt.Errorf("cannot commit batch: %w", err)
+			}
+
+			if err = storages.Headers.RollbackExecutedBlock(sealedHeader); err != nil {
+				return fmt.Errorf("cannot rollback executed block: %w", err)
+			}
+
+			log.Info().Uint64("height", sealedHeader.Height).Msg("executed height rolled back")
 		}
 
-		if err = batch.Commit(); err != nil {
-			return fmt.Errorf("cannot commit batch: %w", err)
+		// ── validate compacted execution state ──────────────────────────────────
+		// Replicating the execution node's startup wiring (LoadExecutionState and
+		// LoadExecutionStateLedger in cmd/execution_builder.go), so that the block
+		// reported by GetHighestFinalizedExecuted is exactly the block the node will
+		// resume from after restarting on the compacted state.
+		ledgerStorage, err := openValidationLedger(flagExecutionStateDir)
+		if err != nil {
+			return err
+		}
+		defer func() {
+			<-ledgerStorage.Done()
+		}()
+
+		execState := exestate.NewExecutionState(
+			ledgerStorage,
+			storages.Commits,
+			storages.Blocks,
+			storages.Headers,
+			chunkDataPacks,
+			storages.Results,
+			myReceipts,
+			events,
+			serviceEvents,
+			transactionResults,
+			db,
+			func() (uint64, error) {
+				final, err := state.Final().Head()
+				if err != nil {
+					return 0, err
+				}
+				return final.Height, nil
+			},
+			trace.NewNoopTracer(),
+			nil,   // register store (storehouse) is not used by compaction
+			false, // storehouse disabled
+			lockManager,
+		)
+
+		if err := validateCompactedState(execState, ledgerStorage, storages.Headers, storages.Commits, sealedHeader, stateCommitment); err != nil {
+			return err
 		}
 
-		if err = storages.Headers.RollbackExecutedBlock(sealedHeader); err != nil {
-			return fmt.Errorf("cannot rollback executed block: %w", err)
-		}
-
-		log.Info().Uint64("height", sealedHeader.Height).Msg("executed height rolled back")
+		log.Info().
+			Uint64("height", sealedHeader.Height).
+			Hex("state-commitment", stateCommitment[:]).
+			Msg("validated compacted execution state")
 
 		return nil
 	})
@@ -320,6 +373,90 @@ func runE(*cobra.Command, []string) error {
 		Uint64("sealed-height", sealedHeader.Height).
 		Str("checkpoint", destName).
 		Msg("compact-execution-state complete")
+
+	return nil
+}
+
+// openValidationLedger opens a local ledger over the trimmed WAL and extracted
+// checkpoint in execStateDir, using the same factory the execution node uses at
+// startup (ledger/factory.NewLedger in LoadExecutionStateLedger).
+//
+// CheckpointDistance is set to the maximum value to prevent the compactor from
+// creating new checkpoints during this read-only validation, mirroring other
+// read-only execution-state utilities. The caller must wait for the returned ledger
+// to become Ready before use and call Done afterwards to release the WAL file lock.
+//
+// No error returns are expected during normal operation.
+func openValidationLedger(execStateDir string) (ledger.Ledger, error) {
+	const (
+		checkpointDistance = math.MaxInt
+		checkpointsToKeep  = 1
+	)
+
+	ledgerStorage, err := factory.NewLedger(factory.Config{
+		Triedir:            execStateDir,
+		MTrieCacheSize:     ledger.DefaultMTrieCacheSize,
+		CheckpointDistance: checkpointDistance,
+		CheckpointsToKeep:  checkpointsToKeep,
+		WALMetrics:         &metrics.NoopCollector{},
+		LedgerMetrics:      &metrics.NoopCollector{},
+		Logger:             log.Logger,
+	}, nil)
+	if err != nil {
+		return nil, fmt.Errorf("cannot open local ledger over %s: %w", execStateDir, err)
+	}
+
+	// wait for the WAL replay (checkpoint loading) to complete
+	<-ledgerStorage.Ready()
+
+	return ledgerStorage, nil
+}
+
+// validateCompactedState verifies that the compacted execution state is consistent
+// with the protocol state and the ledger built over the trimmed WAL and extracted
+// checkpoint:
+//   - the highest finalized-and-executed block reported by execState (the block the
+//     execution node resumes from after restart) matches the resolved anchor block;
+//   - the anchor block's state commitment exists in the commits store;
+//   - the ledger contains the corresponding root hash.
+//
+// No error returns are expected during normal operation.
+func validateCompactedState(
+	execState exestate.ExecutionState,
+	ledgerStorage ledger.Ledger,
+	headers storage.Headers,
+	commits storage.Commits,
+	sealedHeader *flow.Header,
+	stateCommitment flow.StateCommitment,
+) error {
+	highest, err := execState.GetHighestFinalizedExecuted()
+	if err != nil {
+		return fmt.Errorf("cannot get highest finalized and executed block: %w", err)
+	}
+
+	if highest != sealedHeader.Height {
+		return fmt.Errorf("highest finalized and executed height %d does not match the resolved sealed height %d",
+			highest, sealedHeader.Height)
+	}
+
+	blockID, err := headers.BlockIDByHeight(highest)
+	if err != nil {
+		return fmt.Errorf("cannot get block ID at height %d: %w", highest, err)
+	}
+
+	commit, err := commits.ByBlockID(blockID)
+	if err != nil {
+		return fmt.Errorf("cannot get state commitment of the highest executed block %v: %w", blockID, err)
+	}
+
+	if commit != stateCommitment {
+		return fmt.Errorf("state commitment %x of the highest executed block does not match the resolved state commitment %x",
+			commit, stateCommitment)
+	}
+
+	if !ledgerStorage.HasState(ledger.State(commit)) {
+		return fmt.Errorf("root hash %x not found in the compacted ledger", ledger.RootHash(commit))
+	}
 
 	return nil
 }
