@@ -79,6 +79,12 @@ func init() {
 	_ = Cmd.MarkFlagRequired("backup-dir")
 }
 
+// TODO: compact-execution-state does not work for execution nodes running the storehouse
+// "payloadless" feature (enableStorehouse). For payloadless ENs, the execution state lives
+// in the register store (Pebble) instead of the ledger WAL/checkpoints, so the WAL
+// trimming and single-trie checkpoint extraction performed here do not apply. Additional
+// work is needed to create a compact execution state for payloadless ENs.
+//
 // runE implements the compact-execution-state command.
 func runE(*cobra.Command, []string) error {
 	lockManager := storage.MakeSingletonLockManager()
