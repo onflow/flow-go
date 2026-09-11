@@ -48,8 +48,9 @@ var Cmd = &cobra.Command{
      retains a bounded number of recent tries; without trimming, C could be evicted while
      the full WAL is replayed.
   4. Extracting a single-trie V6 checkpoint from the trimmed WAL.
-  5. Moving the checkpoint into the execution-state directory, named after the WAL segment.
-  6. Rolling back the highest-executed-block pointer to the sealed height.`,
+  5. Moving any pre-existing checkpoint at or beyond the trimmed WAL segment to --backup-dir.
+  6. Moving the checkpoint into the execution-state directory, named after the WAL segment.
+  7. Rolling back the highest-executed-block pointer to the sealed height.`,
 	RunE: runE,
 }
 
@@ -215,7 +216,16 @@ func runE(*cobra.Command, []string) error {
 
 	log.Info().Msg("checkpoint extracted")
 
-	// ── Step 5: name checkpoint after WAL segment ─────────────────────────────
+	// ── Step 5: move stale checkpoints to backup ──────────────────────────────
+	// The trimmed WAL ends at segment `segment`; any pre-existing checkpoint at or
+	// beyond this segment references state newer than the target block and is
+	// inconsistent with the trimmed WAL, so it is moved to the backup directory.
+	err = common.BackupCheckpointsFrom(log.Logger, flagExecutionStateDir, flagBackupDir, segment)
+	if err != nil {
+		return fmt.Errorf("cannot backup checkpoints newer than or equal to trimmed segment: %w", err)
+	}
+
+	// ── Step 6: name checkpoint after WAL segment ─────────────────────────────
 	destName := flowWAL.NumberToFilename(segment)
 	if err = common.MoveCheckpointFiles(checkpointTmpDir, tmpCheckpointName, flagExecutionStateDir, destName); err != nil {
 		return fmt.Errorf("cannot move checkpoint to execution state dir: %w", err)
@@ -223,7 +233,7 @@ func runE(*cobra.Command, []string) error {
 
 	log.Info().Str("name", destName).Msg("checkpoint placed in execution state dir")
 
-	// ── Step 6: roll back executed height ─────────────────────────────────────
+	// ── Step 7: roll back executed height ─────────────────────────────────────
 	err = common.WithStorage(flagDatadir, func(db storage.DB) error {
 		storages := common.InitStorages(db)
 		state, err := common.OpenProtocolState(lockManager, db, storages)
