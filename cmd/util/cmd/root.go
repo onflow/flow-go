@@ -34,6 +34,7 @@ import (
 	find_inconsistent_result "github.com/onflow/flow-go/cmd/util/cmd/find-inconsistent-result"
 	find_trie_root "github.com/onflow/flow-go/cmd/util/cmd/find-trie-root"
 	generate_authorization_fixes "github.com/onflow/flow-go/cmd/util/cmd/generate-authorization-fixes"
+	import_compact_execution_state_to_storehouse "github.com/onflow/flow-go/cmd/util/cmd/import-compact-execution-state-to-storehouse"
 	inspect_token_movements "github.com/onflow/flow-go/cmd/util/cmd/inspect-token-movements"
 	"github.com/onflow/flow-go/cmd/util/cmd/leaders"
 	pebble_checkpoint "github.com/onflow/flow-go/cmd/util/cmd/pebble-checkpoint"
@@ -141,6 +142,7 @@ func addCommands() {
 	rootCmd.AddCommand(pebble_checkpoint.Cmd)
 	rootCmd.AddCommand(db_migration.Cmd)
 	rootCmd.AddCommand(storehouse_checkpoint_validator.Cmd)
+	rootCmd.AddCommand(import_compact_execution_state_to_storehouse.Cmd)
 	rootCmd.AddCommand(remove_execution_fork.RootCmd)
 	rootCmd.AddCommand(inspect_token_movements.Cmd)
 }
