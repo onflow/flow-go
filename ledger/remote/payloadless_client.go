@@ -91,6 +91,10 @@ func (c *PayloadlessClient) InitialState() ledger.State {
 	}
 
 	var state ledger.State
+	if resp == nil || resp.State == nil {
+		c.logger.Fatal().Msg("invalid initial state response: missing state")
+		return ledger.DummyState
+	}
 	if len(resp.State.Hash) != len(state) {
 		c.logger.Fatal().
 			Int("expected", len(state)).
