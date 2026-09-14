@@ -2,6 +2,7 @@ package wal
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -166,7 +167,7 @@ func IterateCheckpointNodes(logger zerolog.Logger, dir string, fileName string, 
 		process := func(reader *Crc32Reader, nodesCount uint64) error {
 			scratch := make([]byte, 1024*4)
 			for localIndex := uint64(1); localIndex <= nodesCount; localIndex++ {
-				meta, err := readNodeMeta(reader, scratch, isV7)
+				meta, err := readNodeMeta(reader, scratch, isV7, false)
 				if err != nil {
 					return fmt.Errorf("cannot read subtrie %d node %d: %w", i, localIndex, err)
 				}
@@ -359,7 +360,7 @@ func (it *checkpointIterator) iterateTopTrie(dir string, fileName string, isV7 b
 
 		// Top-level nodes: child indices are already global (0 = nil child).
 		for j := uint64(1); j <= topLevelNodesCount; j++ {
-			meta, err := readNodeMeta(reader, scratch, isV7)
+			meta, err := readNodeMeta(reader, scratch, isV7, false)
 			if err != nil {
 				return fmt.Errorf("cannot read top-level node %d: %w", j, err)
 			}
@@ -433,6 +434,10 @@ func (it *checkpointIterator) markTrieRoot(recordIndex uint16, rootIndex uint64)
 // For interim nodes, lChild/rChild are the child indices exactly as stored (local
 // to the subtrie file, or global in the top-trie file); the caller converts them
 // as needed. For leaf nodes, lChild/rChild are 0.
+//
+// The leaf material (value for V6, leafHash/hasLeafHash for V7) is populated only
+// when [readNodeMeta] is called with retainLeafMaterial set; otherwise it is left
+// zero-valued so the caller's per-node memory footprint stays constant.
 type nodeMeta struct {
 	isLeaf      bool
 	height      uint16
@@ -441,19 +446,32 @@ type nodeMeta struct {
 	payloadSize int
 	lChild      uint64
 	rChild      uint64
+
+	// value is the decoded V6 leaf payload value (nil for interim nodes, V7 leaves,
+	// and whenever retainLeafMaterial is false).
+	value []byte
+	// leafHash is the V7 stored leaf hash; it is valid only if hasLeafHash is set.
+	leafHash hash.Hash
+	// hasLeafHash reports whether a V7 leaf hash was present on disk.
+	hasLeafHash bool
 }
 
-// readNodeMeta decodes one node from reader, extracting only the fields needed for
+// readNodeMeta decodes one node from reader, extracting the fields needed for
 // iteration and integrity checking. It does NOT construct a node or resolve child
-// references. Leaf payload bytes (V6) and optional leaf hashes (V7) are consumed
-// from the reader — so the wrapping CRC32 reader still sees them — but discarded.
+// references. It validates the decoded node height against [ledger.NodeMaxHeight]
+// before the height is used to index the default-hash table.
+//
+// When retainLeafMaterial is false, leaf payload bytes (V6) and optional leaf hashes
+// (V7) are consumed from the reader — so the wrapping CRC32 reader still sees them —
+// but discarded. When it is true, they are retained on the returned [nodeMeta] so
+// the caller can recompute the leaf's hash.
 //
 // scratch is a reusable buffer; if it is smaller than 1024 bytes a new buffer is
 // allocated. The same scratch may be reused across calls.
 //
 // No error returns are expected during normal operation; all error returns indicate
-// a malformed input stream or an IO failure.
-func readNodeMeta(reader io.Reader, scratch []byte, isV7 bool) (nodeMeta, error) {
+// a malformed input stream, an integrity violation, or an IO failure.
+func readNodeMeta(reader io.Reader, scratch []byte, isV7 bool, retainLeafMaterial bool) (nodeMeta, error) {
 	const minBufSize = 1024
 	if len(scratch) < minBufSize {
 		scratch = make([]byte, minBufSize)
@@ -470,8 +488,19 @@ func readNodeMeta(reader io.Reader, scratch []byte, isV7 bool) (nodeMeta, error)
 		return nodeMeta{}, fmt.Errorf("failed to decode node hash: %w", err)
 	}
 
+	// The height indexes the default-hash table (and, for interim nodes, height-1
+	// does too), so validate it before any use. A corrupt height must surface as a
+	// clean integrity error rather than an out-of-range panic.
+	if height > ledger.NodeMaxHeight {
+		return nodeMeta{}, fmt.Errorf("%w: node height %d exceeds maximum %d",
+			ErrCheckpointIntegrity, height, ledger.NodeMaxHeight)
+	}
+
 	switch nType {
 	case interimNodeTypeByte:
+		if height == 0 {
+			return nodeMeta{}, fmt.Errorf("%w: interim node has invalid height 0", ErrCheckpointIntegrity)
+		}
 		if _, err := io.ReadFull(reader, scratch[:2*encNodeIndexSize]); err != nil {
 			return nodeMeta{}, fmt.Errorf("cannot read interim node child indices: %w", err)
 		}
@@ -501,9 +530,17 @@ func readNodeMeta(reader io.Reader, scratch []byte, isV7 bool) (nodeMeta, error)
 			}
 			switch scratch[0] {
 			case 0: // leaf hash absent
-			case 1: // leaf hash present: consume and discard 32 bytes
+			case 1: // leaf hash present
 				if _, err := io.ReadFull(reader, scratch[:encHashSize]); err != nil {
 					return nodeMeta{}, fmt.Errorf("cannot read leaf hash: %w", err)
+				}
+				if retainLeafMaterial {
+					lh, err := hash.ToHash(scratch[:encHashSize])
+					if err != nil {
+						return nodeMeta{}, fmt.Errorf("failed to decode leaf hash: %w", err)
+					}
+					meta.leafHash = lh
+					meta.hasLeafHash = true
 				}
 			default:
 				return nodeMeta{}, fmt.Errorf("invalid leaf hash flag: %d", scratch[0])
@@ -516,10 +553,40 @@ func readNodeMeta(reader io.Reader, scratch []byte, isV7 bool) (nodeMeta, error)
 			}
 			size := binary.BigEndian.Uint32(scratch[:encPayloadLengthSize])
 			meta.payloadSize = int(size)
-			// Consume the payload through the reader (so the CRC sees it) without retaining it.
-			if _, err := io.CopyN(io.Discard, reader, int64(size)); err != nil {
-				return nodeMeta{}, fmt.Errorf("cannot read leaf payload: %w", err)
+
+			if !retainLeafMaterial {
+				// Consume the payload through the reader (so the CRC sees it) without
+				// retaining it.
+				if _, err := io.CopyN(io.Discard, reader, int64(size)); err != nil {
+					return nodeMeta{}, fmt.Errorf("cannot read leaf payload: %w", err)
+				}
+				return meta, nil
 			}
+
+			// Retain the payload so the caller can recompute the leaf hash. The declared
+			// size is untrusted: read into scratch when it fits, otherwise grow a buffer
+			// by the bytes actually present in the stream, so a corrupt length in a small
+			// file fails cleanly instead of triggering a huge allocation.
+			var payloadBuf []byte
+			if uint32(len(scratch)) >= size {
+				if _, err := io.ReadFull(reader, scratch[:size]); err != nil {
+					return nodeMeta{}, fmt.Errorf("cannot read leaf payload: %w", err)
+				}
+				payloadBuf = scratch[:size]
+			} else {
+				var buf bytes.Buffer
+				if _, err := io.CopyN(&buf, reader, int64(size)); err != nil {
+					return nodeMeta{}, fmt.Errorf("cannot read leaf payload: %w", err)
+				}
+				payloadBuf = buf.Bytes()
+			}
+			// DecodePayloadWithoutPrefix with zeroCopy=false copies the value, so it is
+			// safe to retain after scratch is reused.
+			payload, err := ledger.DecodePayloadWithoutPrefix(payloadBuf, false, payloadEncodingVersion)
+			if err != nil {
+				return nodeMeta{}, fmt.Errorf("failed to decode leaf payload: %w", err)
+			}
+			meta.value = payload.Value()
 		}
 
 		return meta, nil

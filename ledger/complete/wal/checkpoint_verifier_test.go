@@ -6,11 +6,13 @@ import (
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
+
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 // TestVerifyCheckpointHashesV6 verifies a valid V6 checkpoint at several worker counts.
 func TestVerifyCheckpointHashesV6(t *testing.T) {
-	unittestRunWithTempDir(t, func(dir string) {
+	unittest.RunWithTempDir(t, func(dir string) {
 		const fileName = "checkpoint"
 		tries := createMultipleRandomTries(t)
 		require.NoError(t, StoreCheckpointV6Concurrently(tries, dir, fileName, zerolog.Nop()))
@@ -23,7 +25,7 @@ func TestVerifyCheckpointHashesV6(t *testing.T) {
 
 // TestVerifyCheckpointHashesV7 verifies a valid V7 (payloadless) checkpoint.
 func TestVerifyCheckpointHashesV7(t *testing.T) {
-	unittestRunWithTempDir(t, func(dir string) {
+	unittest.RunWithTempDir(t, func(dir string) {
 		fileName := "checkpoint" + V7FileSuffix
 		tries := createMultiplePayloadlessTries(t)
 		require.NoError(t, StoreCheckpointV7Concurrently(tries, dir, fileName, zerolog.Nop()))
@@ -36,7 +38,7 @@ func TestVerifyCheckpointHashesV7(t *testing.T) {
 
 // TestVerifyCheckpointHashesWorkerRange verifies nWorker outside [1, subtrieCount] is rejected.
 func TestVerifyCheckpointHashesWorkerRange(t *testing.T) {
-	unittestRunWithTempDir(t, func(dir string) {
+	unittest.RunWithTempDir(t, func(dir string) {
 		const fileName = "checkpoint"
 		tries := createSimpleTrie(t)
 		require.NoError(t, StoreCheckpointV6Concurrently(tries, dir, fileName, zerolog.Nop()))
@@ -50,7 +52,7 @@ func TestVerifyCheckpointHashesWorkerRange(t *testing.T) {
 // TestVerifyCheckpointHashesDetectsCorruption verifies that corrupting a node in a
 // subtrie part file is detected as a hash mismatch.
 func TestVerifyCheckpointHashesDetectsCorruption(t *testing.T) {
-	unittestRunWithTempDir(t, func(dir string) {
+	unittest.RunWithTempDir(t, func(dir string) {
 		const fileName = "checkpoint"
 		tries := createMultipleRandomTries(t)
 		require.NoError(t, StoreCheckpointV6Concurrently(tries, dir, fileName, zerolog.Nop()))
@@ -81,6 +83,40 @@ func TestVerifyCheckpointHashesDetectsCorruption(t *testing.T) {
 	})
 }
 
+// TestVerifyCheckpointHashesRejectsOutOfRangeHeight verifies that a node whose
+// stored height exceeds ledger.NodeMaxHeight is reported as an integrity violation
+// instead of panicking while indexing the default-hash table.
+func TestVerifyCheckpointHashesRejectsOutOfRangeHeight(t *testing.T) {
+	unittest.RunWithTempDir(t, func(dir string) {
+		const fileName = "checkpoint"
+		tries := createMultipleRandomTries(t)
+		require.NoError(t, StoreCheckpointV6Concurrently(tries, dir, fileName, zerolog.Nop()))
+
+		// Overwrite the first node's 2-byte height. It sits just past the 4-byte
+		// magic+version header and the 1-byte node type.
+		corrupted := false
+		for i := range subtrieCount {
+			partPath, _, err := filePathSubTries(dir, fileName, i)
+			require.NoError(t, err)
+
+			info, err := os.Stat(partPath)
+			require.NoError(t, err)
+			if info.Size() < 64 {
+				continue
+			}
+
+			writeBytesInFile(t, partPath, 5, []byte{0xFF, 0xFF})
+			corrupted = true
+			break
+		}
+		require.True(t, corrupted, "expected at least one non-empty subtrie part file")
+
+		err := VerifyCheckpointHashes(zerolog.Nop(), dir, fileName, 16)
+		require.Error(t, err)
+		require.ErrorIs(t, err, ErrCheckpointIntegrity)
+	})
+}
+
 // flipByteInFile flips one bit of the byte at the given offset in the file.
 func flipByteInFile(t *testing.T, path string, offset int64) {
 	f, err := os.OpenFile(path, os.O_RDWR, 0)
@@ -96,7 +132,12 @@ func flipByteInFile(t *testing.T, path string, offset int64) {
 	require.NoError(t, err)
 }
 
-// unittestRunWithTempDir runs fn with a fresh temp directory.
-func unittestRunWithTempDir(t *testing.T, fn func(dir string)) {
-	fn(t.TempDir())
+// writeBytesInFile overwrites len(data) bytes at the given offset in the file.
+func writeBytesInFile(t *testing.T, path string, offset int64, data []byte) {
+	f, err := os.OpenFile(path, os.O_RDWR, 0)
+	require.NoError(t, err)
+	defer func() { require.NoError(t, f.Close()) }()
+
+	_, err = f.WriteAt(data, offset)
+	require.NoError(t, err)
 }

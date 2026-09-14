@@ -2,12 +2,12 @@ package wal
 
 import (
 	"bufio"
-	"encoding/binary"
 	"errors"
 	"fmt"
 	"io"
 	"os"
 	"sync"
+	"sync/atomic"
 
 	"github.com/rs/zerolog"
 
@@ -102,26 +102,16 @@ func VerifyCheckpointHashes(logger zerolog.Logger, dir string, fileName string, 
 	return nil
 }
 
-// verifyNode holds the per-node fields decoded from the raw checkpoint byte stream
-// that are needed to recompute and verify the node's hash. Unlike the iterator's
-// nodeMeta, it retains the material needed to recompute leaf hashes (the V6 payload
-// value or the V7 leaf hash).
-type verifyNode struct {
-	isLeaf      bool
-	height      uint16
-	hash        hash.Hash
-	path        ledger.Path
-	value       []byte    // V6 leaf: decoded payload value (nil for interim/V7)
-	leafHash    hash.Hash // V7 leaf: stored leaf hash (valid only if hasLeafHash)
-	hasLeafHash bool      // V7 leaf: whether a leaf hash is present on disk
-	lChild      uint64
-	rChild      uint64
-}
+// minEncodedNodeSize is the smallest number of bytes any node occupies in a
+// checkpoint part file (an interim node: type + height + hash + two child indices).
+// It bounds how many nodes a footer count can plausibly describe for a given file
+// size, so a corrupt count cannot drive an unbounded allocation.
+const minEncodedNodeSize = fixedNodePrefixSize + 2*encNodeIndexSize
 
 // verifySubtriesConcurrently verifies all subtrie part files using up to nWorker
 // goroutines and returns, for each subtrie file (in index order), the slice of its
 // node hashes indexed by the file-local node index (index 0 is an unused nil
-// sentinel).
+// sentinel). Workers stop early once any subtrie has failed.
 //
 // Expected error returns during normal operation:
 //   - [ErrCheckpointHashMismatch], [ErrCheckpointIntegrity]: see [VerifyCheckpointHashes].
@@ -143,13 +133,23 @@ func verifySubtriesConcurrently(
 	}
 	close(jobs)
 
+	// failed is set as soon as any subtrie fails so the remaining workers stop
+	// draining the job channel instead of reading multi-GB part files to the end.
+	var failed atomic.Bool
 	var wg sync.WaitGroup
 	worker := func() {
 		defer wg.Done()
 		for i := range jobs {
+			if failed.Load() {
+				return
+			}
 			hashes, err := verifySubtrie(logger, dir, fileName, i, subtrieChecksums[i], isV7)
+			if err != nil {
+				errs[i] = err
+				failed.Store(true)
+				return
+			}
 			results[i] = hashes
-			errs[i] = err
 		}
 	}
 
@@ -183,14 +183,31 @@ func verifySubtrie(
 ) ([]hash.Hash, error) {
 	var hashes []hash.Hash
 
+	// The footer's node count is untrusted until the CRC is verified, so bound it by
+	// the part file's size before using it to size the hash slice.
+	partPath, _, err := filePathSubTries(dir, fileName, index)
+	if err != nil {
+		return nil, err
+	}
+	partInfo, err := os.Stat(partPath)
+	if err != nil {
+		return nil, fmt.Errorf("could not stat subtrie %d file: %w", index, err)
+	}
+	maxNodes := uint64(partInfo.Size()) / minEncodedNodeSize
+
 	process := func(reader *Crc32Reader, nodesCount uint64) error {
+		if nodesCount > maxNodes {
+			return fmt.Errorf("%w: subtrie %d footer claims %d nodes, but file size %d allows at most %d",
+				ErrCheckpointIntegrity, index, nodesCount, partInfo.Size(), maxNodes)
+		}
+
 		hashes = make([]hash.Hash, nodesCount+1) // +1: index 0 is the nil sentinel
 		scratch := make([]byte, defaultBufioReadSize)
 
 		logging := logProgress(fmt.Sprintf("verifying %d-th subtrie hashes", index), int(nodesCount), logger)
 
 		for i := uint64(1); i <= nodesCount; i++ {
-			vn, err := readVerifyNode(reader, scratch, isV7)
+			meta, err := readNodeMeta(reader, scratch, isV7, true)
 			if err != nil {
 				return fmt.Errorf("cannot read subtrie %d node %d: %w", index, i, err)
 			}
@@ -204,17 +221,16 @@ func verifySubtrie(
 				return hashes[childIdx], nil
 			}
 
-			if err := checkNodeHash(vn, isV7, childHash); err != nil {
+			if err := checkNodeHash(meta, isV7, childHash); err != nil {
 				return err
 			}
 
-			hashes[i] = vn.hash
+			hashes[i] = meta.hash
 			logging(i)
 		}
 		return nil
 	}
 
-	var err error
 	if isV7 {
 		err = processCheckpointSubTrieV7(dir, fileName, index, checksum, logger, process)
 	} else {
@@ -282,6 +298,17 @@ func verifyTopTrie(
 				topTrieChecksum, expectedSum)
 		}
 
+		// The footer's node count is untrusted until the CRC is verified, so bound it
+		// by the file size before using it to size the hash slice.
+		topInfo, err := file.Stat()
+		if err != nil {
+			return fmt.Errorf("could not stat top trie file: %w", err)
+		}
+		if maxNodes := uint64(topInfo.Size()) / minEncodedNodeSize; topLevelNodesCount > maxNodes {
+			return fmt.Errorf("%w: top trie footer claims %d top-level nodes, but file size %d allows at most %d",
+				ErrCheckpointIntegrity, topLevelNodesCount, topInfo.Size(), maxNodes)
+		}
+
 		if _, err := file.Seek(0, io.SeekStart); err != nil {
 			return fmt.Errorf("could not seek to start of top trie file: %w", err)
 		}
@@ -310,7 +337,7 @@ func verifyTopTrie(
 		scratch := make([]byte, defaultBufioReadSize)
 
 		for j := uint64(1); j <= topLevelNodesCount; j++ {
-			vn, err := readVerifyNode(reader, scratch, isV7)
+			meta, err := readNodeMeta(reader, scratch, isV7, true)
 			if err != nil {
 				return fmt.Errorf("cannot read top-level node %d: %w", j, err)
 			}
@@ -330,11 +357,11 @@ func verifyTopTrie(
 				return topLevelHashes[childIdx-totalSub], nil
 			}
 
-			if err := checkNodeHash(vn, isV7, childHash); err != nil {
+			if err := checkNodeHash(meta, isV7, childHash); err != nil {
 				return err
 			}
 
-			topLevelHashes[j] = vn.hash
+			topLevelHashes[j] = meta.hash
 		}
 
 		// resolveGlobal resolves any global node index to its verified hash.
@@ -407,31 +434,31 @@ func verifyTopTrie(
 	})
 }
 
-// checkNodeHash recomputes vn's hash and compares it against the stored hash.
+// checkNodeHash recomputes meta's hash and compares it against the stored hash.
 // childHash resolves a (non-nil) child's already-verified hash; a nil child (index
 // 0) is handled here using the height-appropriate default hash.
 //
 // Expected error returns during normal operation:
 //   - [ErrCheckpointHashMismatch]: when the recomputed hash does not match.
 //   - [ErrCheckpointIntegrity]: when childHash reports an invalid child reference.
-func checkNodeHash(vn verifyNode, isV7 bool, childHash func(childIdx uint64) (hash.Hash, error)) error {
+func checkNodeHash(meta nodeMeta, isV7 bool, childHash func(childIdx uint64) (hash.Hash, error)) error {
 	var expected hash.Hash
 
-	if vn.isLeaf {
-		expected = leafExpectedHash(vn, isV7)
+	if meta.isLeaf {
+		expected = leafExpectedHash(meta, isV7)
 	} else {
-		lh := ledger.GetDefaultHashForHeight(int(vn.height) - 1)
-		if vn.lChild != 0 {
-			h, err := childHash(vn.lChild)
+		lh := ledger.GetDefaultHashForHeight(int(meta.height) - 1)
+		if meta.lChild != 0 {
+			h, err := childHash(meta.lChild)
 			if err != nil {
 				return err
 			}
 			lh = h
 		}
 
-		rh := ledger.GetDefaultHashForHeight(int(vn.height) - 1)
-		if vn.rChild != 0 {
-			h, err := childHash(vn.rChild)
+		rh := ledger.GetDefaultHashForHeight(int(meta.height) - 1)
+		if meta.rChild != 0 {
+			h, err := childHash(meta.rChild)
 			if err != nil {
 				return err
 			}
@@ -441,13 +468,13 @@ func checkNodeHash(vn verifyNode, isV7 bool, childHash func(childIdx uint64) (ha
 		expected = hash.HashInterNode(lh, rh)
 	}
 
-	if expected != vn.hash {
+	if expected != meta.hash {
 		nodeKind := "interim"
-		if vn.isLeaf {
+		if meta.isLeaf {
 			nodeKind = "leaf"
 		}
 		return fmt.Errorf("%w: %s node at height %d has stored hash %x but recomputed hash %x",
-			ErrCheckpointHashMismatch, nodeKind, vn.height, vn.hash, expected)
+			ErrCheckpointHashMismatch, nodeKind, meta.height, meta.hash, expected)
 	}
 
 	return nil
@@ -460,113 +487,12 @@ func checkNodeHash(vn verifyNode, isV7 bool, childHash func(childIdx uint64) (ha
 // valid if it is a default (unallocated) node, so the expected hash is the default
 // hash for its height (any non-default V7 leaf missing its leaf hash will therefore
 // fail the comparison in checkNodeHash).
-func leafExpectedHash(vn verifyNode, isV7 bool) hash.Hash {
+func leafExpectedHash(meta nodeMeta, isV7 bool) hash.Hash {
 	if !isV7 {
-		return ledger.ComputeCompactValue(hash.Hash(vn.path), vn.value, int(vn.height))
+		return ledger.ComputeCompactValue(hash.Hash(meta.path), meta.value, int(meta.height))
 	}
-	if vn.hasLeafHash {
-		return ledger.ComputeCompactValueFromLeafHash(hash.Hash(vn.path), vn.leafHash, int(vn.height))
+	if meta.hasLeafHash {
+		return ledger.ComputeCompactValueFromLeafHash(hash.Hash(meta.path), meta.leafHash, int(meta.height))
 	}
-	return ledger.GetDefaultHashForHeight(int(vn.height))
-}
-
-// readVerifyNode decodes one node from reader, retaining the fields needed to
-// verify its hash. For V6 leaves the payload is decoded and its value retained; for
-// V7 leaves the optional leaf hash is retained. Interim nodes retain their child
-// indices (local to a subtrie file, or global in the top-trie file; the caller
-// interprets them).
-//
-// scratch is a reusable buffer; the same scratch may be reused across calls.
-//
-// No error returns are expected during normal operation; all error returns indicate
-// a malformed input stream or an IO failure.
-func readVerifyNode(reader io.Reader, scratch []byte, isV7 bool) (verifyNode, error) {
-	const minBufSize = 1024
-	if len(scratch) < minBufSize {
-		scratch = make([]byte, minBufSize)
-	}
-
-	if _, err := io.ReadFull(reader, scratch[:fixedNodePrefixSize]); err != nil {
-		return verifyNode{}, fmt.Errorf("cannot read node prefix: %w", err)
-	}
-
-	nType := scratch[0]
-	height := binary.BigEndian.Uint16(scratch[encNodeTypeSize:])
-	nodeHash, err := hash.ToHash(scratch[encNodeTypeSize+encHeightSize : fixedNodePrefixSize])
-	if err != nil {
-		return verifyNode{}, fmt.Errorf("failed to decode node hash: %w", err)
-	}
-
-	switch nType {
-	case interimNodeTypeByte:
-		if _, err := io.ReadFull(reader, scratch[:2*encNodeIndexSize]); err != nil {
-			return verifyNode{}, fmt.Errorf("cannot read interim node child indices: %w", err)
-		}
-		return verifyNode{
-			isLeaf: false,
-			height: height,
-			hash:   nodeHash,
-			lChild: binary.BigEndian.Uint64(scratch[:encNodeIndexSize]),
-			rChild: binary.BigEndian.Uint64(scratch[encNodeIndexSize : 2*encNodeIndexSize]),
-		}, nil
-
-	case leafNodeTypeByte:
-		if _, err := io.ReadFull(reader, scratch[:encPathSize]); err != nil {
-			return verifyNode{}, fmt.Errorf("cannot read leaf path: %w", err)
-		}
-		path, err := ledger.ToPath(scratch[:encPathSize])
-		if err != nil {
-			return verifyNode{}, fmt.Errorf("failed to decode leaf path: %w", err)
-		}
-
-		vn := verifyNode{isLeaf: true, height: height, hash: nodeHash, path: path}
-
-		if isV7 {
-			// V7 leaf: 1-byte leaf-hash flag, then an optional 32-byte leaf hash.
-			if _, err := io.ReadFull(reader, scratch[:encLeafHashFlagSize]); err != nil {
-				return verifyNode{}, fmt.Errorf("cannot read leaf hash flag: %w", err)
-			}
-			switch scratch[0] {
-			case 0: // leaf hash absent
-			case 1: // leaf hash present
-				if _, err := io.ReadFull(reader, scratch[:encHashSize]); err != nil {
-					return verifyNode{}, fmt.Errorf("cannot read leaf hash: %w", err)
-				}
-				lh, err := hash.ToHash(scratch[:encHashSize])
-				if err != nil {
-					return verifyNode{}, fmt.Errorf("failed to decode leaf hash: %w", err)
-				}
-				vn.leafHash = lh
-				vn.hasLeafHash = true
-			default:
-				return verifyNode{}, fmt.Errorf("invalid leaf hash flag: %d", scratch[0])
-			}
-			return vn, nil
-		}
-
-		// V6 leaf: 4-byte encoded payload length, then that many payload bytes.
-		if _, err := io.ReadFull(reader, scratch[:encPayloadLengthSize]); err != nil {
-			return verifyNode{}, fmt.Errorf("cannot read leaf payload length: %w", err)
-		}
-		size := binary.BigEndian.Uint32(scratch[:encPayloadLengthSize])
-
-		payloadBuf := scratch
-		if uint32(len(payloadBuf)) < size {
-			payloadBuf = make([]byte, size)
-		}
-		if _, err := io.ReadFull(reader, payloadBuf[:size]); err != nil {
-			return verifyNode{}, fmt.Errorf("cannot read leaf payload: %w", err)
-		}
-		// DecodePayloadWithoutPrefix with zeroCopy=false copies the value, so it is
-		// safe to retain after scratch is reused.
-		payload, err := ledger.DecodePayloadWithoutPrefix(payloadBuf[:size], false, payloadEncodingVersion)
-		if err != nil {
-			return verifyNode{}, fmt.Errorf("failed to decode leaf payload: %w", err)
-		}
-		vn.value = payload.Value()
-		return vn, nil
-
-	default:
-		return verifyNode{}, fmt.Errorf("failed to decode node type %d", nType)
-	}
+	return ledger.GetDefaultHashForHeight(int(meta.height))
 }
