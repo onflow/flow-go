@@ -136,7 +136,8 @@ func setupV7ToV6Scenario(t *testing.T, dir string, logger zerolog.Logger, prevNa
 	allTries []*trie.MTrie, lastTrie *trie.MTrie, lastPaths []ledger.Path, lastValues []ledger.Value,
 ) {
 	// u0: initial state -> trie0. Stored only in the previous full checkpoint.
-	pathsA, payloadsA := randNPathPayloads(50)
+	usedKeys := make(map[string]struct{})
+	pathsA, payloadsA := randNPathPayloadsUnique(50, usedKeys)
 	trie0, _, err := trie.NewTrieWithUpdatedRegisters(trie.NewEmptyMTrie(), pathsA, payloadsA, true)
 	require.NoError(t, err)
 
@@ -146,7 +147,7 @@ func setupV7ToV6Scenario(t *testing.T, dir string, logger zerolog.Logger, prevNa
 	// Overwrites keep each path's original key and only change the value, honoring
 	// the MTrie invariant that a path's key never changes (in Flow, path = hash(key)).
 	overwrites1 := overwriteValues(t, payloadsA[:10])
-	pathsB, payloadsB := randNPathPayloads(20)
+	pathsB, payloadsB := randNPathPayloadsUnique(20, usedKeys)
 	u1Paths := append(append([]ledger.Path{}, pathsA[:10]...), pathsB...)
 	u1Payloads := append(append([]ledger.Payload{}, overwrites1...), payloadsB...)
 	trie1, _, err := trie.NewTrieWithUpdatedRegisters(trie0, u1Paths, u1Payloads, true)
@@ -193,7 +194,7 @@ func setupV7ToV6Scenario(t *testing.T, dir string, logger zerolog.Logger, prevNa
 // replace its value with a fresh random value, honoring the MTrie invariant that
 // a path's key never changes across updates.
 func overwriteValues(t *testing.T, originals []ledger.Payload) []ledger.Payload {
-	_, randoms := randNPathPayloads(len(originals))
+	_, randoms := randNPathPayloadsUnique(len(originals), make(map[string]struct{}))
 	out := make([]ledger.Payload, len(originals))
 	for i, orig := range originals {
 		key, err := orig.Key()
@@ -212,7 +213,7 @@ func TestConvertCheckpointV7ToV6_TopTrieLeaf(t *testing.T) {
 	unittest.RunWithTempDir(t, func(dir string) {
 		logger := zerolog.Nop()
 
-		paths, payloads := randNPathPayloads(1)
+		paths, payloads := randNPathPayloadsUnique(1, make(map[string]struct{}))
 		single, _, err := trie.NewTrieWithUpdatedRegisters(trie.NewEmptyMTrie(), paths, payloads, true)
 		require.NoError(t, err)
 
