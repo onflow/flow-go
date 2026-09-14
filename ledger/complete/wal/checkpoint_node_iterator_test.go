@@ -1,6 +1,7 @@
 package wal
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/rs/zerolog"
@@ -199,6 +200,84 @@ func TestCheckpointIteratorDefaultChild(t *testing.T) {
 	// compactified trie collapses default children to nil rather than storing them.
 	err := it.emit(nodeMeta{isLeaf: false, height: height + 1}, 3, 2, 0)
 	require.ErrorIs(t, err, ErrCheckpointIntegrity)
+}
+
+func TestCheckpointIteratorHeightValidation(t *testing.T) {
+	it := &checkpointIterator{
+		fn:          func(*CheckpointNode) error { return nil },
+		isDefault:   newBitset(16),
+		referenced:  newBitset(16),
+		total:       15,
+		logProgress: func(uint64) {},
+	}
+
+	// A height above the trie's maximum would index past the default-hash table.
+	err := it.emit(nodeMeta{isLeaf: true, height: ledger.NodeMaxHeight + 1}, 1, 0, 0)
+	require.ErrorIs(t, err, ErrCheckpointIntegrity)
+
+	// The maximum valid height is accepted.
+	require.NoError(t, it.emit(nodeMeta{isLeaf: true, height: ledger.NodeMaxHeight}, 2, 0, 0))
+}
+
+func TestCheckpointIteratorOrphanNode(t *testing.T) {
+	it := &checkpointIterator{
+		referenced: newBitset(4),
+		total:      3,
+	}
+
+	// Nodes 1 and 2 are referenced, node 3 is not: the orphan pass must report it.
+	it.referenced.set(1)
+	it.referenced.set(2)
+	err := it.verifyAllReferenced()
+	require.ErrorIs(t, err, ErrCheckpointIntegrity)
+	require.Contains(t, err.Error(), "orphan node")
+
+	// Referencing the last node clears the violation.
+	it.referenced.set(3)
+	require.NoError(t, it.verifyAllReferenced())
+}
+
+func TestCheckpointIteratorTrieRootRange(t *testing.T) {
+	it := &checkpointIterator{
+		referenced: newBitset(16),
+		total:      15,
+	}
+
+	// A root index past the node count is rejected.
+	err := it.markTrieRoot(0, 16)
+	require.ErrorIs(t, err, ErrCheckpointIntegrity)
+
+	// An in-range root index is recorded; 0 references no stored node.
+	require.NoError(t, it.markTrieRoot(1, 15))
+	require.True(t, it.referenced.get(15))
+	require.NoError(t, it.markTrieRoot(2, 0))
+}
+
+func TestCheckpointIteratorCallbackError(t *testing.T) {
+	logger := zerolog.Nop()
+	unittest.RunWithTempDir(t, func(dir string) {
+		tries := createSimpleTrie(t)
+		fileName := "checkpoint-iterate-callback-error"
+		require.NoError(t, StoreCheckpointV6Concurrently(tries, dir, fileName, logger))
+
+		sentinel := errors.New("callback aborted")
+		invocations := 0
+		err := IterateCheckpointNodes(logger, dir, fileName, func(*CheckpointNode) error {
+			invocations++
+			return sentinel
+		})
+		require.ErrorIs(t, err, sentinel)
+		require.Equal(t, 1, invocations, "iteration must abort on the first callback error")
+	})
+}
+
+func TestValidateFooterNodeCount(t *testing.T) {
+	// A count that cannot fit in the file is rejected.
+	err := validateFooterNodeCount(1<<40, 1024, "subtrie file 0")
+	require.ErrorIs(t, err, ErrCheckpointIntegrity)
+
+	// A count within the file size is accepted.
+	require.NoError(t, validateFooterNodeCount(1024, 1024, "subtrie file 0"))
 }
 
 func TestBitset(t *testing.T) {
