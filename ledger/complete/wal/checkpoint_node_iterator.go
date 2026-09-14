@@ -17,9 +17,10 @@ import (
 )
 
 // ErrCheckpointIntegrity indicates that a checkpoint's trie structure is corrupt:
-// either an interim node references a child that has not been seen yet (a forward
-// or out-of-range reference, violating the descendants-first ordering), or a node
-// is not referenced by any parent interim node or trie root (an orphan node).
+// an interim node references a child that has not been seen yet (a forward or
+// out-of-range reference, violating the descendants-first ordering), a node is not
+// referenced by any parent interim node or trie root (an orphan node), or a node
+// declares a height outside the valid range.
 var ErrCheckpointIntegrity = errors.New("checkpoint integrity violation")
 
 // CheckpointNode carries the decoded, per-node information passed to an
@@ -93,22 +94,24 @@ type IterateNodeFunc func(*CheckpointNode) error
 //
 // Expected error returns during normal operation:
 //   - [ErrCheckpointIntegrity]: when an interim node references an unknown/forward
-//     child, or when a node is not referenced by any parent or trie root.
+//     child, when a node is not referenced by any parent or trie root, or when a
+//     node declares an out-of-range height.
 //   - [os.ErrNotExist] (wrapped): when a checkpoint part file is missing.
 func IterateCheckpointNodes(logger zerolog.Logger, dir string, fileName string, fn IterateNodeFunc) error {
 	headerPath := filePathCheckpointHeader(dir, fileName)
 
-	version, err := readCheckpointHeaderVersion(headerPath)
+	version, err := readCheckpointHeaderVersion(logger, headerPath)
 	if err != nil {
 		return fmt.Errorf("could not read checkpoint header version: %w", err)
 	}
 	isV7 := version == VersionV7
 
 	var subtrieChecksums []uint32
+	var topTrieChecksum uint32
 	if isV7 {
-		subtrieChecksums, _, err = readCheckpointHeaderV7(headerPath, logger)
+		subtrieChecksums, topTrieChecksum, err = readCheckpointHeaderV7(headerPath, logger)
 	} else {
-		subtrieChecksums, _, err = readCheckpointHeader(headerPath, logger)
+		subtrieChecksums, topTrieChecksum, err = readCheckpointHeader(headerPath, logger)
 	}
 	if err != nil {
 		return fmt.Errorf("could not read checkpoint header: %w", err)
@@ -188,20 +191,28 @@ func IterateCheckpointNodes(logger zerolog.Logger, dir string, fileName string, 
 		}
 	}
 
-	if err := it.iterateTopTrie(dir, fileName, isV7, logger); err != nil {
+	if err := it.iterateTopTrie(dir, fileName, isV7, topTrieChecksum, logger); err != nil {
 		return fmt.Errorf("could not iterate top trie: %w", err)
 	}
 
 	logger.Info().Uint64("total_nodes", total).Msg("finished streaming checkpoint nodes, verifying every node is referenced")
 
-	// Every node must be referenced by a parent interim node or a trie root.
-	for idx := uint64(1); idx <= total; idx++ {
+	return it.verifyAllReferenced()
+}
+
+// verifyAllReferenced enforces that every node of the checkpoint is referenced by
+// a parent interim node or a trie root, returning [ErrCheckpointIntegrity]
+// otherwise.
+//
+// Expected error returns during normal operation:
+//   - [ErrCheckpointIntegrity]: when an orphan node is found.
+func (it *checkpointIterator) verifyAllReferenced() error {
+	for idx := uint64(1); idx <= it.total; idx++ {
 		if !it.referenced.get(idx) {
 			return fmt.Errorf("%w: node at global index %d is not referenced by any parent or trie root (orphan node)",
 				ErrCheckpointIntegrity, idx)
 		}
 	}
-
 	return nil
 }
 
@@ -223,7 +234,8 @@ type checkpointIterator struct {
 // Expected error returns during normal operation:
 //   - [ErrCheckpointIntegrity]: when an interim node references a child whose
 //     global index does not strictly precede this node (forward/unknown reference),
-//     or references a default (completely unallocated) child.
+//     references a default (completely unallocated) child, or declares an
+//     out-of-range height.
 func (it *checkpointIterator) emit(meta nodeMeta, globalIndex, lGlobal, rGlobal uint64) error {
 	if !meta.isLeaf {
 		// Descendants-first ordering: both children must have been seen already.
@@ -252,6 +264,13 @@ func (it *checkpointIterator) emit(meta nodeMeta, globalIndex, lGlobal, rGlobal 
 		if rGlobal != 0 {
 			it.referenced.set(rGlobal)
 		}
+	}
+
+	// meta.height is an unvalidated uint16 from disk; [ledger.GetDefaultHashForHeight]
+	// indexes a 257-entry table, so an out-of-range height would panic. Reject it first.
+	if int(meta.height) > ledger.NodeMaxHeight {
+		return fmt.Errorf("%w: node at global index %d declares height %d, exceeding the maximum of %d",
+			ErrCheckpointIntegrity, globalIndex, meta.height, ledger.NodeMaxHeight)
 	}
 
 	isDef := meta.hash == ledger.GetDefaultHashForHeight(int(meta.height))
@@ -285,9 +304,13 @@ func (it *checkpointIterator) emit(meta nodeMeta, globalIndex, lGlobal, rGlobal 
 // (V6) / readTopLevelTriesV7 (V7) but extracts only per-node metadata and verifies
 // the CRC32 checksum.
 //
+// topTrieChecksum is the checksum recorded for the top-trie part file in the
+// checkpoint header; it is cross-checked against the top-trie file footer, the
+// same way processCheckpointSubTrie cross-checks each subtrie's header checksum.
+//
 // Expected error returns during normal operation:
 //   - [ErrCheckpointIntegrity]: see [checkpointIterator.emit] and trie-root range checks.
-func (it *checkpointIterator) iterateTopTrie(dir string, fileName string, isV7 bool, logger zerolog.Logger) error {
+func (it *checkpointIterator) iterateTopTrie(dir string, fileName string, isV7 bool, topTrieChecksum uint32, logger zerolog.Logger) error {
 	version := VersionV6
 	if isV7 {
 		version = VersionV7
@@ -302,6 +325,11 @@ func (it *checkpointIterator) iterateTopTrie(dir string, fileName string, isV7 b
 		topLevelNodesCount, triesCount, expectedSum, err := readTopTriesFooter(file)
 		if err != nil {
 			return fmt.Errorf("could not read top tries footer: %w", err)
+		}
+
+		if topTrieChecksum != expectedSum {
+			return fmt.Errorf("mismatch top trie checksum, header file has %v, toptrie file has %v",
+				topTrieChecksum, expectedSum)
 		}
 
 		if _, err := file.Seek(0, io.SeekStart); err != nil {
@@ -357,12 +385,8 @@ func (it *checkpointIterator) iterateTopTrie(dir string, fileName string, isV7 b
 				}
 				rootIndex = enc.RootIndex
 			}
-			if rootIndex > it.total {
-				return fmt.Errorf("%w: trie root record %d references out-of-range node index %d (total %d)",
-					ErrCheckpointIntegrity, i, rootIndex, it.total)
-			}
-			if rootIndex != 0 {
-				it.referenced.set(rootIndex)
+			if err := it.markTrieRoot(i, rootIndex); err != nil {
+				return err
 			}
 		}
 
@@ -386,6 +410,23 @@ func (it *checkpointIterator) iterateTopTrie(dir string, fileName string, isV7 b
 
 		return nil
 	})
+}
+
+// markTrieRoot records the node reference carried by trie root record recordIndex.
+// A root index of 0 denotes the empty (all-default) trie and references no stored
+// node. Any index above the checkpoint's node count is rejected.
+//
+// Expected error returns during normal operation:
+//   - [ErrCheckpointIntegrity]: when the root index is out of range.
+func (it *checkpointIterator) markTrieRoot(recordIndex uint16, rootIndex uint64) error {
+	if rootIndex > it.total {
+		return fmt.Errorf("%w: trie root record %d references out-of-range node index %d (total %d)",
+			ErrCheckpointIntegrity, recordIndex, rootIndex, it.total)
+	}
+	if rootIndex != 0 {
+		it.referenced.set(rootIndex)
+	}
+	return nil
 }
 
 // nodeMeta holds the per-node fields decoded from the raw checkpoint byte stream.
@@ -504,22 +545,40 @@ func subtrieChildToGlobal(localChild uint64, offset uint64) uint64 {
 // that during the main pass).
 //
 // No error returns are expected during normal operation.
-func readCheckpointHeaderVersion(headerPath string) (uint16, error) {
-	f, err := os.Open(headerPath)
+func readCheckpointHeaderVersion(logger zerolog.Logger, headerPath string) (uint16, error) {
+	var version uint16
+	err := withFile(logger, headerPath, func(f *os.File) error {
+		magic, v, err := readFileHeader(f)
+		if err != nil {
+			return fmt.Errorf("could not read header magic and version: %w", err)
+		}
+		if magic != MagicBytesCheckpointHeader {
+			return fmt.Errorf("wrong magic bytes for checkpoint header, expect %#x, got %#x",
+				MagicBytesCheckpointHeader, magic)
+		}
+		version = v
+		return nil
+	})
 	if err != nil {
-		return 0, fmt.Errorf("could not open header file: %w", err)
-	}
-	defer f.Close()
-
-	magic, version, err := readFileHeader(f)
-	if err != nil {
-		return 0, fmt.Errorf("could not read header magic and version: %w", err)
-	}
-	if magic != MagicBytesCheckpointHeader {
-		return 0, fmt.Errorf("wrong magic bytes for checkpoint header, expect %#x, got %#x",
-			MagicBytesCheckpointHeader, magic)
+		return 0, err
 	}
 	return version, nil
+}
+
+// validateFooterNodeCount rejects a footer-declared node count that cannot possibly
+// fit in the file it was read from. Every stored node occupies at least one byte on
+// disk, so a count exceeding the file size is necessarily corrupt. This guards the
+// O(nodeCount) integrity bitsets against a corrupt footer declaring an absurd count
+// (which would otherwise panic with an out-of-memory error).
+//
+// Expected error returns during normal operation:
+//   - [ErrCheckpointIntegrity]: when the declared count exceeds the file size.
+func validateFooterNodeCount(count uint64, fileSize int64, fileDesc string) error {
+	if count > uint64(fileSize) {
+		return fmt.Errorf("%w: %s footer declares %d nodes, which cannot fit in a %d-byte file",
+			ErrCheckpointIntegrity, fileDesc, count, fileSize)
+	}
+	return nil
 }
 
 // readSubtrieNodeCountFromFooter opens the subtrie part file at the given index and
@@ -535,6 +594,13 @@ func readSubtrieNodeCountFromFooter(logger zerolog.Logger, dir string, fileName 
 	err = withFile(logger, filepath, func(f *os.File) error {
 		c, _, err := readSubTriesFooter(f)
 		if err != nil {
+			return err
+		}
+		info, err := f.Stat()
+		if err != nil {
+			return fmt.Errorf("could not stat subtrie file: %w", err)
+		}
+		if err := validateFooterNodeCount(c, info.Size(), fmt.Sprintf("subtrie file %d", index)); err != nil {
 			return err
 		}
 		count = c
@@ -553,6 +619,13 @@ func readTopTrieNodeCountFromFooter(logger zerolog.Logger, dir string, fileName 
 	err := withFile(logger, filepath, func(f *os.File) error {
 		c, _, _, err := readTopTriesFooter(f)
 		if err != nil {
+			return err
+		}
+		info, err := f.Stat()
+		if err != nil {
+			return fmt.Errorf("could not stat top trie file: %w", err)
+		}
+		if err := validateFooterNodeCount(c, info.Size(), "top trie file"); err != nil {
 			return err
 		}
 		count = c

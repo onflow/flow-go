@@ -105,9 +105,10 @@ func iterateCheckpoint(dir string, fileName string, logger zerolog.Logger) (resu
 		res.interimNodes++
 
 		// An interim node with exactly one nil child is legitimate in a compactified
-		// trie (the present child is itself an interim node). Both-nil cannot occur,
-		// and a non-nil default child is rejected as an integrity violation by the
-		// iterator, so the only remaining case to count here is the single-child one.
+		// trie (the present child is itself an interim node). Both-nil does not occur
+		// in a valid checkpoint, and a non-nil default child is rejected as an
+		// integrity violation by the iterator, so the only remaining case to count
+		// here is the single-child one.
 		leftNil := n.LeftChildIndex == 0
 		rightNil := n.RightChildIndex == 0
 		if leftNil != rightNil {
