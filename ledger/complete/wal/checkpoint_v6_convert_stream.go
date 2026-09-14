@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 
+	"github.com/hashicorp/go-multierror"
 	prometheusWAL "github.com/onflow/wal/wal"
 	"github.com/rs/zerolog"
 
@@ -42,6 +43,13 @@ func convertSubTriesV7ToV6Concurrently(
 	logger zerolog.Logger,
 	nWorker uint,
 ) ([]uint32, error) {
+	// The workers index v7SubtrieChecksums by subtrie index, so a shorter slice
+	// would panic inside a goroutine. Callers validate this; checking here keeps
+	// the indexing below provably safe.
+	if len(v7SubtrieChecksums) != subtrieCount {
+		return nil, fmt.Errorf("expect %v subtrie checksums, but got %v", subtrieCount, len(v7SubtrieChecksums))
+	}
+
 	jobs := make(chan int, subtrieCount)
 	for i := range subtrieCount {
 		jobs <- i
@@ -62,13 +70,23 @@ func convertSubTriesV7ToV6Concurrently(
 		}()
 	}
 
+	// The results channel is buffered for all subtrieCount results, so draining it
+	// fully is safe. Draining is required: a worker only renames its temp part file
+	// into place once it finishes, so returning on the first error would let
+	// stragglers create output files after the caller has cleaned up, wedging
+	// retries behind the "V6 output already exists" refusal.
 	checksums := make([]uint32, subtrieCount)
+	var merr *multierror.Error
 	for range subtrieCount {
 		r := <-results
 		if r.err != nil {
-			return nil, fmt.Errorf("fail to convert %v-th subtrie: %w", r.index, r.err)
+			merr = multierror.Append(merr, fmt.Errorf("fail to convert %v-th subtrie: %w", r.index, r.err))
+			continue
 		}
 		checksums[r.index] = r.checksum
+	}
+	if err := merr.ErrorOrNil(); err != nil {
+		return nil, err
 	}
 	return checksums, nil
 }
@@ -121,13 +139,19 @@ func convertSubTrieFileV7ToV6(
 			index, expectedSum, embeddedSum)
 	}
 
+	// Restart from the beginning of the file and read everything through a
+	// Crc32Reader, so the bytes we convert are themselves CRC-verified (against the
+	// checksum stored in the file) rather than only the two stored checksums being
+	// compared. Interim nodes are copied over verbatim, so without this, input
+	// corruption would be copied into the V6 output and covered up by a freshly
+	// computed, valid V6 checksum.
 	if _, err := inFile.Seek(0, io.SeekStart); err != nil {
 		return 0, fmt.Errorf("could not seek to start of V7 subtrie file: %w", err)
 	}
-	if err := validateFileHeader(MagicBytesCheckpointSubtrie, VersionV7, inFile); err != nil {
+	reader := NewCRC32Reader(bufio.NewReaderSize(inFile, defaultBufioReadSize))
+	if err := validateFileHeader(MagicBytesCheckpointSubtrie, VersionV7, reader); err != nil {
 		return 0, fmt.Errorf("invalid V7 subtrie file header: %w", err)
 	}
-	reader := bufio.NewReaderSize(inFile, defaultBufioReadSize)
 
 	closable, err := createWriterForSubtrie(outputDir, outputFile, logger, index)
 	if err != nil {
@@ -149,6 +173,13 @@ func convertSubTrieFileV7ToV6(
 			return 0, fmt.Errorf("cannot convert node %d of subtrie %d: %w", i, index, err)
 		}
 		logging(i)
+	}
+
+	// Read the input's footer (node count) through the CRC reader, which completes
+	// the checksummed byte range, and verify the input file's integrity before
+	// finalizing the output.
+	if err := verifyInputChecksum(reader, encNodeCountSize, embeddedSum); err != nil {
+		return 0, fmt.Errorf("could not verify V7 subtrie file %v: %w", index, err)
 	}
 
 	sum, err := storeSubtrieFooter(nodeCount, writer)
@@ -198,13 +229,16 @@ func convertTopTrieFileV7ToV6(
 			expectedSum, embeddedSum)
 	}
 
+	// Restart from the beginning of the file and read everything through a
+	// Crc32Reader, so the bytes we convert are themselves CRC-verified against the
+	// checksum stored in the file (see convertSubTrieFileV7ToV6).
 	if _, err := inFile.Seek(0, io.SeekStart); err != nil {
 		return 0, fmt.Errorf("could not seek to start of V7 top-trie file: %w", err)
 	}
-	if err := validateFileHeader(MagicBytesCheckpointToptrie, VersionV7, inFile); err != nil {
+	reader := NewCRC32Reader(bufio.NewReaderSize(inFile, defaultBufioReadSize))
+	if err := validateFileHeader(MagicBytesCheckpointToptrie, VersionV7, reader); err != nil {
 		return 0, fmt.Errorf("invalid V7 top-trie file header: %w", err)
 	}
-	reader := bufio.NewReaderSize(inFile, defaultBufioReadSize)
 
 	// Read the subtrie node count and carry it over verbatim (unchanged by conversion).
 	subtrieNodeCountBuf := make([]byte, encNodeCountSize)
@@ -264,6 +298,15 @@ func convertTopTrieFileV7ToV6(
 		if _, err := writer.Write(trieBuf); err != nil {
 			return 0, fmt.Errorf("cannot write converted trie root record %d: %w", i, err)
 		}
+	}
+
+	// Read the input's footer (top-level node count + trie count) through the CRC
+	// reader, which completes the checksummed byte range, and verify the input
+	// file's integrity before finalizing the output. Trie root records are carried
+	// over field by field, so unverified input corruption would otherwise slip into
+	// the V6 output.
+	if err := verifyInputChecksum(reader, encNodeCountSize+encTrieCountSize, embeddedSum); err != nil {
+		return 0, fmt.Errorf("could not verify V7 top-trie file: %w", err)
 	}
 
 	sum, err := storeTopLevelTrieFooter(topLevelNodesCount, triesCount, writer)
@@ -677,12 +720,21 @@ func streamV6SubtrieLeaves(
 	if _, err := inFile.Seek(0, io.SeekStart); err != nil {
 		return fmt.Errorf("could not seek to start of V6 subtrie file: %w", err)
 	}
-	if err := validateFileHeader(MagicBytesCheckpointSubtrie, VersionV6, inFile); err != nil {
+	reader := NewCRC32Reader(bufio.NewReaderSize(inFile, defaultBufioReadSize))
+	if err := validateFileHeader(MagicBytesCheckpointSubtrie, VersionV6, reader); err != nil {
 		return fmt.Errorf("invalid V6 subtrie file header: %w", err)
 	}
-	reader := bufio.NewReaderSize(inFile, defaultBufioReadSize)
 
-	return streamV6LeafNodes(reader, nodeCount, cb)
+	if err := streamV6LeafNodes(reader, nodeCount, cb); err != nil {
+		return err
+	}
+
+	// Verify the source bytes themselves (see convertSubTrieFileV7ToV6): a payload
+	// sourced from a corrupted source file must not be trusted silently.
+	if err := verifyInputChecksum(reader, encNodeCountSize, embeddedSum); err != nil {
+		return fmt.Errorf("could not verify V6 subtrie file %v: %w", index, err)
+	}
+	return nil
 }
 
 // streamV6TopTrieLeaves opens the V6 top-trie part file and invokes cb for every
@@ -705,7 +757,7 @@ func streamV6TopTrieLeaves(
 		errToReturn = closeAndMergeError(inFile, errToReturn)
 	}()
 
-	topLevelNodesCount, _, embeddedSum, err := readTopTriesFooter(inFile)
+	topLevelNodesCount, triesCount, embeddedSum, err := readTopTriesFooter(inFile)
 	if err != nil {
 		return fmt.Errorf("could not read V6 top-trie footer: %w", err)
 	}
@@ -716,17 +768,31 @@ func streamV6TopTrieLeaves(
 	if _, err := inFile.Seek(0, io.SeekStart); err != nil {
 		return fmt.Errorf("could not seek to start of V6 top-trie file: %w", err)
 	}
-	if err := validateFileHeader(MagicBytesCheckpointToptrie, VersionV6, inFile); err != nil {
+	reader := NewCRC32Reader(bufio.NewReaderSize(inFile, defaultBufioReadSize))
+	if err := validateFileHeader(MagicBytesCheckpointToptrie, VersionV6, reader); err != nil {
 		return fmt.Errorf("invalid V6 top-trie file header: %w", err)
 	}
-	reader := bufio.NewReaderSize(inFile, defaultBufioReadSize)
 
 	// Skip the subtrie node count.
 	if _, err := io.CopyN(io.Discard, reader, int64(encNodeCountSize)); err != nil {
 		return fmt.Errorf("could not skip subtrie node count: %w", err)
 	}
 
-	return streamV6LeafNodes(reader, topLevelNodesCount, cb)
+	if err := streamV6LeafNodes(reader, topLevelNodesCount, cb); err != nil {
+		return err
+	}
+
+	// Skip the trie root records, which are not needed here but are part of the
+	// checksummed byte range.
+	if _, err := io.CopyN(io.Discard, reader, int64(triesCount)*int64(flattener.EncodedTrieSize)); err != nil {
+		return fmt.Errorf("could not skip trie root records: %w", err)
+	}
+
+	// Verify the source bytes themselves (see convertSubTrieFileV7ToV6).
+	if err := verifyInputChecksum(reader, encNodeCountSize+encTrieCountSize, embeddedSum); err != nil {
+		return fmt.Errorf("could not verify V6 top-trie file: %w", err)
+	}
+	return nil
 }
 
 // streamV6LeafNodes reads nodeCount V6-encoded nodes from reader and invokes cb
@@ -808,7 +874,7 @@ func scanWALUpdates(
 	label string,
 	cb func(path ledger.Path, payload *ledger.Payload),
 ) error {
-	sr, err := prometheusWAL.NewSegmentsRangeReader(zerolog.Nop(), prometheusWAL.SegmentRange{
+	sr, err := prometheusWAL.NewSegmentsRangeReader(logger, prometheusWAL.SegmentRange{
 		Dir:   execDir,
 		First: from,
 		Last:  to,
