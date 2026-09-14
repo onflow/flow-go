@@ -71,7 +71,8 @@ func TestReplayOnPayloadlessForest_ReplaysWALSegments(t *testing.T) {
 		fullForest, err := mtrie.NewForest(100, &metrics.NoopCollector{}, nil)
 		require.NoError(t, err)
 
-		paths0, payloads0 := randNPathPayloads(10)
+		usedKeys := make(map[string]struct{})
+		paths0, payloads0 := randNPathPayloadsUnique(10, usedKeys)
 		seed := &ledger.TrieUpdate{
 			RootHash: fullForest.GetEmptyRootHash(),
 			Paths:    paths0,
@@ -88,7 +89,7 @@ func TestReplayOnPayloadlessForest_ReplaysWALSegments(t *testing.T) {
 
 		// A second update, built on root0, recorded into the WAL but NOT in the
 		// checkpoint. Replay must apply it to reach root1.
-		paths1, payloads1 := randNPathPayloads(10)
+		paths1, payloads1 := randNPathPayloadsUnique(10, usedKeys)
 		update1 := &ledger.TrieUpdate{
 			RootHash: root0,
 			Paths:    paths1,
