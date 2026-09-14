@@ -192,9 +192,11 @@ func ConvertCheckpointV6ToV7(
 
 	if err != nil {
 		// validateV6ToV7Conversion established that no output file existed before this
-		// call, so every file matching the output name now was written by this failed
-		// call and is safe to remove.
-		cleanupErr := deleteCheckpointFiles(outputDir, outputFileName)
+		// call, so every output part file present now was written by this failed call
+		// and is safe to remove. Remove only the exact output part paths: a prefix
+		// glob would also match a V6 input file whose name shares the output's prefix
+		// (possible when inputDir == outputDir), deleting the source checkpoint.
+		cleanupErr := deleteCheckpointPartFiles(outputDir, outputFileName)
 		if cleanupErr != nil {
 			return fmt.Errorf("fail to cleanup partially written output %s, after running into error: %w",
 				cleanupErr, err)
