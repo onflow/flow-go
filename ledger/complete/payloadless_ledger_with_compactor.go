@@ -57,6 +57,9 @@ func NewPayloadlessLedgerWithCompactor(
 	if diskWAL == nil {
 		return nil, fmt.Errorf("payloadless ledger with compactor requires a non-nil WAL")
 	}
+	if compactorConfig == nil {
+		return nil, fmt.Errorf("payloadless ledger with compactor requires a non-nil compactor config")
+	}
 
 	// NewPayloadlessLedger tags the logger it is given; reuse the result rather than
 	// tagging here as well, so `ledger_mod` isn't recorded twice.
