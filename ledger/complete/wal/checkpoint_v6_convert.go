@@ -80,7 +80,18 @@ func ConvertCheckpointV7ToV6(
 	logger zerolog.Logger,
 	nWorker uint,
 ) error {
-	err := convertCheckpointV7ToV6(
+	// Refuse to overwrite an existing V6 output before any cleanup can run: the
+	// inner conversion reports "V6 output already exists" as an ordinary error,
+	// and running the cleanup on that path would delete the pre-existing output.
+	existing, err := findCheckpointPartFiles(outputDir, outputFile)
+	if err != nil {
+		return fmt.Errorf("could not check existing V6 output files: %w", err)
+	}
+	if len(existing) != 0 {
+		return fmt.Errorf("V6 output already exists: %v", existing)
+	}
+
+	err = convertCheckpointV7ToV6(
 		v7Dir, v7File, execDir, prevCheckpointNum, walFrom, walTo, outputDir, outputFile, logger, nWorker)
 	if err != nil {
 		cleanupErr := deleteCheckpointFiles(outputDir, outputFile)
