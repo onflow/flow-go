@@ -248,7 +248,11 @@ func convertSubTrieFileV6ToV7Stream(
 	}
 
 	logging := logProgress(fmt.Sprintf("converting %v-th sub trie (streaming)", index), int(nodeCount), logger)
-	conv := newV6ToV7NodeConverter()
+	info, err := inFile.Stat()
+	if err != nil {
+		return 0, fmt.Errorf("could not stat subtrie file %v: %w", inPath, err)
+	}
+	conv := newV6ToV7NodeConverter(int(info.Size()))
 	for i := range nodeCount {
 		if err := conv.convertNode(reader, writer); err != nil {
 			return 0, fmt.Errorf("cannot convert node %d of subtrie %d: %w", i, index, err)
@@ -337,7 +341,11 @@ func convertTopTrieFileV6ToV7Stream(
 	}
 
 	// Convert the top-level nodes (above subtrieLevel).
-	conv := newV6ToV7NodeConverter()
+	info, err := inFile.Stat()
+	if err != nil {
+		return 0, fmt.Errorf("could not stat top-trie file %v: %w", inPath, err)
+	}
+	conv := newV6ToV7NodeConverter(int(info.Size()))
 	for i := range topLevelNodesCount {
 		if err := conv.convertNode(reader, writer); err != nil {
 			return 0, fmt.Errorf("cannot convert top-level node %d: %w", i, err)
@@ -428,17 +436,25 @@ type v6ToV7NodeConverter struct {
 	lenBuf     []byte // leaf payload length prefix
 	payload    []byte // leaf payload bytes (grows as needed)
 	enc        []byte // scratch for the payloadless leaf encoding
+
+	// maxPayloadSize bounds a single leaf payload by the size of the part file
+	// being converted, so a malformed 4-byte length cannot drive a huge
+	// allocation before the bytes are even read.
+	maxPayloadSize int
 }
 
 // newV6ToV7NodeConverter returns a converter with preallocated scratch buffers.
-func newV6ToV7NodeConverter() *v6ToV7NodeConverter {
+// maxPayloadSize is the size of the part file being converted; it bounds a single
+// leaf payload.
+func newV6ToV7NodeConverter(maxPayloadSize int) *v6ToV7NodeConverter {
 	return &v6ToV7NodeConverter{
-		prefix:     make([]byte, fixedNodePrefixSize),
-		childIndex: make([]byte, 2*encNodeIndexSize),
-		path:       make([]byte, encPathSize),
-		lenBuf:     make([]byte, encPayloadLengthSize),
-		payload:    make([]byte, 1024),
-		enc:        make([]byte, 1024*4),
+		prefix:         make([]byte, fixedNodePrefixSize),
+		childIndex:     make([]byte, 2*encNodeIndexSize),
+		path:           make([]byte, encPathSize),
+		lenBuf:         make([]byte, encPayloadLengthSize),
+		payload:        make([]byte, 1024),
+		enc:            make([]byte, 1024*4),
+		maxPayloadSize: maxPayloadSize,
 	}
 }
 
@@ -503,7 +519,10 @@ func (c *v6ToV7NodeConverter) convertLeaf(reader io.Reader, writer io.Writer) er
 		return fmt.Errorf("cannot read leaf payload length: %w", err)
 	}
 	size := binary.BigEndian.Uint32(c.lenBuf)
-	if uint32(cap(c.payload)) < size {
+	if int(size) > c.maxPayloadSize {
+		return fmt.Errorf("leaf payload length %d exceeds the part file size %d", size, c.maxPayloadSize)
+	}
+	if cap(c.payload) < int(size) {
 		c.payload = make([]byte, size)
 	}
 	payloadBuf := c.payload[:size]
