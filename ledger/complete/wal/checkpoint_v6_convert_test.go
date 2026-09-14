@@ -11,6 +11,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/ledger"
+	"github.com/onflow/flow-go/ledger/common/testutils"
+	"github.com/onflow/flow-go/ledger/complete/mtrie/node"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/module/metrics"
@@ -318,5 +320,113 @@ func TestConvertCheckpointV7ToV6_Validation(t *testing.T) {
 func TestRequireV6Filename(t *testing.T) {
 	require.Error(t, requireV6Filename(""))
 	require.Error(t, requireV6Filename("checkpoint.00000005"+V7FileSuffix))
+	require.Error(t, requireV6Filename(V7FileSuffix), "a bare suffix is not a valid V6 filename")
 	require.NoError(t, requireV6Filename("checkpoint.00000005"))
+}
+
+// TestConvertCheckpointV7ToV6_UnallocatedLeaf exercises the reconstruction of an
+// unallocated leaf — a leaf node above height 0 whose register holds no value. The
+// V7 format stores no leaf hash for it (there is no payload to hash), so the
+// converter must rebuild a V6 leaf that reads back as an unallocated register. If
+// that reconstruction regresses, the output is a silently unreadable (or wrong) V6
+// checkpoint.
+//
+// The forest holds an ordinary trie plus one whose only register was written with an
+// empty payload: the update algorithm keeps such a register as a single leaf, so the
+// trie's root is an unallocated leaf at height [ledger.NodeMaxHeight]. Both leaves
+// (allocated and unallocated) plus a payload sourced from the previous checkpoint
+// are therefore reconstructed in one conversion.
+func TestConvertCheckpointV7ToV6_UnallocatedLeaf(t *testing.T) {
+	unittest.RunWithTempDir(t, func(dir string) {
+		logger := zerolog.Nop()
+
+		// Ordinary trie: two allocated registers, sourcable from the previous checkpoint.
+		allocatedTrie := createSimpleTrie(t)[0]
+
+		// Write an empty payload to a fresh path: the update keeps it as a single leaf
+		// at the root height, i.e. an unallocated leaf rather than an empty trie.
+		unallocatedPath := testutils.PathByUint8(0x00)
+		unallocatedTrie, _, err := trie.NewTrieWithUpdatedRegisters(trie.NewEmptyMTrie(),
+			[]ledger.Path{unallocatedPath}, []ledger.Payload{*ledger.EmptyPayload()}, true)
+		require.NoError(t, err)
+		require.Equal(t, uint64(0), unallocatedTrie.AllocatedRegCount())
+		unallocatedLeaf := findUnallocatedLeaf(unallocatedTrie.RootNode())
+		require.NotNil(t, unallocatedLeaf, "scenario must contain an unallocated leaf above height 0")
+		require.True(t, unallocatedLeaf.IsLeaf())
+		require.Equal(t, ledger.NodeMaxHeight, unallocatedLeaf.Height())
+
+		// Previous full checkpoint: sources the allocated trie's payloads.
+		require.NoError(t, StoreCheckpointV6Concurrently([]*trie.MTrie{allocatedTrie}, dir, "checkpoint.00000000", logger))
+
+		// V7 checkpoint of the forest holding both trie states.
+		srcTries := []*trie.MTrie{allocatedTrie, unallocatedTrie}
+		v7Tries, err := FromV6Tries(srcTries)
+		require.NoError(t, err)
+		require.NoError(t, StoreCheckpointV7Concurrently(v7Tries, dir, "checkpoint.00000005.v7", logger))
+
+		outDir := path.Join(dir, "out")
+		require.NoError(t, os.MkdirAll(outDir, 0755))
+
+		// Empty WAL range: the allocated registers are all sourced from the previous checkpoint.
+		require.NoError(t, ConvertCheckpointV7ToV6(
+			dir, "checkpoint.00000005.v7", dir, 0, 1, 0, outDir, "checkpoint.00000005", logger, 1))
+
+		require.NoError(t, VerifyCheckpointHashes(logger, outDir, "checkpoint.00000005", 1))
+
+		recon, err := OpenAndReadCheckpointV6(outDir, "checkpoint.00000005", logger)
+		require.NoError(t, err, "reconstructed V6 checkpoint must be readable")
+		require.Len(t, recon, len(srcTries))
+		for i, expected := range srcTries {
+			require.Equal(t, expected.RootHash(), recon[i].RootHash(), "trie %d root hash mismatch", i)
+		}
+		require.NotNil(t, findUnallocatedLeaf(recon[1].RootNode()),
+			"unallocated leaf must survive the round trip")
+		require.True(t, recon[1].ReadSinglePayload(unallocatedPath).IsEmpty())
+	})
+}
+
+// findUnallocatedLeaf returns the first leaf node above height 0 in the sub-trie
+// rooted at n whose payload is unallocated, or nil if there is none.
+func findUnallocatedLeaf(n *node.Node) *node.Node {
+	if n == nil {
+		return nil
+	}
+	if n.IsLeaf() {
+		if n.Height() > 0 && (n.Payload() == nil || n.Payload().IsEmpty()) {
+			return n
+		}
+		return nil
+	}
+	if found := findUnallocatedLeaf(n.LeftChild()); found != nil {
+		return found
+	}
+	return findUnallocatedLeaf(n.RightChild())
+}
+
+// TestConvertCheckpointV7ToV6_MissingPayloadSource verifies that a conversion
+// whose sources cannot supply a payload referenced by the V7 checkpoint fails
+// loudly — the operator-facing failure when the previous checkpoint / WAL range is
+// incomplete — and that the failure does not wedge a subsequent retry.
+func TestConvertCheckpointV7ToV6_MissingPayloadSource(t *testing.T) {
+	unittest.RunWithTempDir(t, func(dir string) {
+		logger := zerolog.Nop()
+		setupV7ToV6Scenario(t, dir, logger, "checkpoint.00000000")
+
+		outDir := path.Join(dir, "out")
+		require.NoError(t, os.MkdirAll(outDir, 0755))
+
+		// Empty WAL range: u1/u2's registers exist only in the WAL, so their payloads
+		// are not present in the previous checkpoint and cannot be sourced.
+		err := ConvertCheckpointV7ToV6(
+			dir, "checkpoint.00000005.v7", dir, 0, 1, 0, outDir, "checkpoint.00000005", logger, 4)
+		require.ErrorContains(t, err, "no payload found for leaf hash")
+
+		// The failed attempt must not leave output behind that blocks a retry.
+		first, last, segErr := prometheusWAL.Segments(dir)
+		require.NoError(t, segErr)
+		require.NoError(t, ConvertCheckpointV7ToV6(
+			dir, "checkpoint.00000005.v7", dir, 0, first, last, outDir, "checkpoint.00000005", logger, 4),
+			"retry over the same output name must succeed")
+		require.NoError(t, VerifyCheckpointHashes(logger, outDir, "checkpoint.00000005", 4))
+	})
 }

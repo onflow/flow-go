@@ -3,6 +3,7 @@ package wal
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	prometheusWAL "github.com/onflow/wal/wal"
 	"github.com/rs/zerolog"
@@ -121,6 +122,12 @@ func convertCheckpointV7ToV6(
 	if err != nil {
 		return fmt.Errorf("could not read V7 checkpoint header: %w", err)
 	}
+	// The converters address the subtrie part files by index in [0, subtrieCount),
+	// so a header declaring a different number of subtries cannot be converted.
+	if len(v7SubtrieChecksums) != subtrieCount {
+		return fmt.Errorf("V7 checkpoint header declares %v subtrie checksums, expected %v",
+			len(v7SubtrieChecksums), subtrieCount)
+	}
 	if err := allPartFileExist(v7Dir, v7File, len(v7SubtrieChecksums)); err != nil {
 		return fmt.Errorf("V7 part files incomplete for %s/%s: %w", v7Dir, v7File, err)
 	}
@@ -146,6 +153,12 @@ func convertCheckpointV7ToV6(
 	prevSubtrieChecksums, prevTopTrieChecksum, err := readCheckpointHeader(prevHeaderPath, logger)
 	if err != nil {
 		return fmt.Errorf("could not read previous V6 checkpoint header: %w", err)
+	}
+	// The partition pools index prevSubtrieChecksums by partition, so a shorter
+	// slice would panic inside a worker goroutine.
+	if len(prevSubtrieChecksums) != subtrieCount {
+		return fmt.Errorf("previous V6 checkpoint header declares %v subtrie checksums, expected %v",
+			len(prevSubtrieChecksums), subtrieCount)
 	}
 	if err := allPartFileExist(execDir, prevFile, len(prevSubtrieChecksums)); err != nil {
 		return fmt.Errorf("previous V6 part files incomplete for %s/%s: %w", execDir, prevFile, err)
@@ -338,7 +351,7 @@ func requireV6Filename(fileName string) error {
 	if fileName == "" {
 		return fmt.Errorf("V6 output filename is empty")
 	}
-	if len(fileName) > len(V7FileSuffix) && fileName[len(fileName)-len(V7FileSuffix):] == V7FileSuffix {
+	if strings.HasSuffix(fileName, V7FileSuffix) {
 		return fmt.Errorf("V6 output filename %q must not end with %q", fileName, V7FileSuffix)
 	}
 	return nil
