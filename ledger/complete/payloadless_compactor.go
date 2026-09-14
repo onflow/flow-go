@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -40,6 +41,7 @@ type PayloadlessCompactor struct {
 	trieQueue                            *realWAL.PayloadlessTrieQueue
 	logger                               zerolog.Logger
 	lm                                   *lifecycle.LifecycleManager
+	observersMu                          sync.Mutex                     // guards observers
 	observers                            map[observable.Observer]struct{}
 	checkpointDistance                   uint
 	checkpointsToKeep                    uint
@@ -112,13 +114,30 @@ func NewPayloadlessCompactor(
 
 // Subscribe registers an observer for checkpoint-completion notifications.
 func (c *PayloadlessCompactor) Subscribe(observer observable.Observer) {
+	c.observersMu.Lock()
+	defer c.observersMu.Unlock()
 	var void struct{}
 	c.observers[observer] = void
 }
 
 // Unsubscribe removes a previously-registered observer.
 func (c *PayloadlessCompactor) Unsubscribe(observer observable.Observer) {
+	c.observersMu.Lock()
+	defer c.observersMu.Unlock()
 	delete(c.observers, observer)
+}
+
+// observersSnapshot returns the currently registered observers. Iterating a
+// snapshot lets callers invoke the observer callbacks without holding the lock,
+// so a callback cannot deadlock and cannot race a concurrent map write.
+func (c *PayloadlessCompactor) observersSnapshot() []observable.Observer {
+	c.observersMu.Lock()
+	defer c.observersMu.Unlock()
+	snapshot := make([]observable.Observer, 0, len(c.observers))
+	for observer := range c.observers {
+		snapshot = append(snapshot, observer)
+	}
+	return snapshot
 }
 
 // Ready starts the compactor goroutine.
@@ -140,7 +159,7 @@ func (c *PayloadlessCompactor) Done() <-chan struct{} {
 		// race the WAL close.
 		<-c.wal.Done()
 
-		for observer := range c.observers {
+		for _, observer := range c.observersSnapshot() {
 			observer.OnComplete()
 		}
 	})
@@ -313,7 +332,7 @@ func (c *PayloadlessCompactor) checkpoint(ctx context.Context, tries []*payloadl
 	}
 
 	if checkpointNum > 0 {
-		for observer := range c.observers {
+		for _, observer := range c.observersSnapshot() {
 			select {
 			case <-ctx.Done():
 				return nil
