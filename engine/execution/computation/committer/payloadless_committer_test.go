@@ -15,6 +15,7 @@ import (
 	"github.com/onflow/flow-go/ledger/common/hash"
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
 	"github.com/onflow/flow-go/ledger/complete"
+	"github.com/onflow/flow-go/ledger/complete/payloadless"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -94,6 +95,13 @@ func TestPayloadlessLedgerViewCommitter(t *testing.T) {
 
 		setCalled := false
 		proveCalled := false
+		// proveFn runs inside the committer's proof-collection goroutine, so
+		// the query is captured here and asserted after CommitView returns —
+		// a failed require inside that goroutine would abort it instead of
+		// failing the test.
+		var proveQuerySize int
+		var proveKeys []ledger.Key
+		var proveState ledger.State
 		ledgerMock := &mockPayloadlessLedger{
 			setFn: func(u *ledger.Update) (ledger.State, *ledger.TrieUpdate, error) {
 				setCalled = true
@@ -102,9 +110,9 @@ func TestPayloadlessLedgerViewCommitter(t *testing.T) {
 			},
 			proveFn: func(q *ledger.Query) (*ledger.PayloadlessTrieBatchProof, error) {
 				proveCalled = true
-				require.Equal(t, 1, q.Size())
-				require.True(t, q.Keys()[0].Equals(&ledgerKey))
-				require.True(t, ledger.State(startState).Equals(ledger.State(q.State())))
+				proveQuerySize = q.Size()
+				proveKeys = q.Keys()
+				proveState = ledger.State(q.State())
 				return expectedBatch, nil
 			},
 		}
@@ -137,6 +145,12 @@ func TestPayloadlessLedgerViewCommitter(t *testing.T) {
 		require.NoError(t, err)
 		require.True(t, setCalled, "Set should have been invoked")
 		require.True(t, proveCalled, "Prove should have been invoked")
+
+		// proof-query assertions, captured from the goroutine above.
+		require.Equal(t, 1, proveQuerySize)
+		require.Len(t, proveKeys, 1)
+		require.True(t, proveKeys[0].Equals(&ledgerKey))
+		require.True(t, ledger.State(startState).Equals(proveState))
 
 		// state-side assertions
 		require.Equal(t, previousBlockSnapshot.Commitment(), flow.StateCommitment(trieUpdate.RootHash))
@@ -294,7 +308,7 @@ func TestPayloadlessLedgerViewCommitter(t *testing.T) {
 		}
 
 		_, _, _, _, err = c.CommitView(blockUpdates, previousBlockSnapshot)
-		require.Error(t, err)
+		require.ErrorIs(t, err, payloadless.ErrPayloadHashMismatch)
 	})
 
 	t.Run("query is built from AllRegisterIDs including both reads and writes", func(t *testing.T) {
