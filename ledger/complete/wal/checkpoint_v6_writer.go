@@ -583,8 +583,8 @@ func storeTries(
 	return nil
 }
 
-// removeStaleTempFiles removes leftover "writing-<outputFile>*" temporary part
-// files in outputDir.
+// removeStaleTempFiles removes leftover "writing-<outputFile>-*" (header) and
+// "writing-<outputFile>.<NNN>-*" (part file) temporary files in outputDir.
 //
 // createClosableWriter writes each checkpoint part to such a temp file and renames
 // it to the target on success (or removes it on a handled write error). A process
@@ -592,25 +592,63 @@ func storeTries(
 // subsequent run uses a fresh random suffix rather than reusing it, so orphaned
 // temp files accumulate. Removing them at the start of a run reclaims that space.
 //
-// Only temp files for outputFile are matched. Final part files lack the "writing-"
-// prefix and so are never touched.
+// The patterns pin the character following outputFile ("-" for the header, "."
+// plus the three-digit part index for a part file) so temp files belonging to a
+// different output whose name merely starts with outputFile are left alone; a
+// bare "writing-<outputFile>*" glob would let overlapping conversions remove each
+// other's in-progress files. Final checkpoint files lack the "writing-" prefix and
+// so are never touched.
 //
 // No error returns are expected during normal operation.
 func removeStaleTempFiles(outputDir string, outputFile string, logger zerolog.Logger) error {
-	pattern := path.Join(outputDir, fmt.Sprintf("writing-%v*", outputFile))
-	filesToRemove, err := filepath.Glob(pattern)
-	if err != nil {
-		return fmt.Errorf("could not glob stale temp files with pattern %v: %w", pattern, err)
+	patterns := []string{
+		path.Join(outputDir, fmt.Sprintf("writing-%v-*", outputFile)),
+		path.Join(outputDir, fmt.Sprintf("writing-%v.[0-9][0-9][0-9]-*", outputFile)),
 	}
 
-	for _, file := range filesToRemove {
-		if err := os.Remove(file); err != nil {
-			return fmt.Errorf("could not remove stale temp file %v: %w", file, err)
+	var merror *multierror.Error
+	for _, pattern := range patterns {
+		filesToRemove, err := filepath.Glob(pattern)
+		if err != nil {
+			return fmt.Errorf("could not glob stale temp files with pattern %v: %w", pattern, err)
 		}
-		logger.Info().Msgf("removed stale checkpoint temp file %v", file)
+
+		for _, file := range filesToRemove {
+			if err := os.Remove(file); err != nil && !os.IsNotExist(err) {
+				merror = multierror.Append(merror, err)
+			}
+			logger.Info().Msgf("removed stale checkpoint temp file %v", file)
+		}
 	}
 
-	return nil
+	return merror.ErrorOrNil()
+}
+
+// deleteCheckpointPartFiles removes the checkpoint files (header and the 17 part
+// files) that currently exist for the given fileName in outputDir.
+//
+// Unlike [deleteCheckpointFiles], it treats fileName as an exact name rather than
+// a prefix, so it never matches a different checkpoint whose name merely starts
+// with fileName. This matters when a conversion reads its input from and writes
+// its output to the same directory: a failed V6→V7 conversion cleans up after
+// itself, and a prefix glob would also delete the V6 input when its name shares
+// the output's prefix.
+//
+// No error returns are expected during normal operation.
+func deleteCheckpointPartFiles(outputDir string, fileName string) error {
+	existing, err := findCheckpointPartFiles(outputDir, fileName)
+	if err != nil {
+		return fmt.Errorf("could not locate checkpoint files to delete: %w", err)
+	}
+
+	var merror *multierror.Error
+	for _, file := range existing {
+		if err := os.Remove(file); err != nil && !os.IsNotExist(err) {
+			merror = multierror.Append(merror, err)
+		}
+	}
+
+	return merror.ErrorOrNil()
 }
 
 // deleteCheckpointFiles removes any checkpoint files with given checkpoint prefix in the outputDir.

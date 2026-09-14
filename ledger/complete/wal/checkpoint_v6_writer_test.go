@@ -28,14 +28,17 @@ func TestRemoveStaleTempFiles(t *testing.T) {
 			"writing-root.checkpoint.v7-246069680",      // header
 		}
 
-		// Files that must NOT be removed: final part files, the header, and a temp
-		// file for a different output (e.g. a V6 checkpoint with a different name).
+		// Files that must NOT be removed: final part files, the header, a temp file
+		// for a different output (e.g. a V6 checkpoint with a different name), and a
+		// temp file for a different V7 output whose name starts with outputFile.
 		keepFiles := []string{
 			"root.checkpoint.v7",                       // final header
 			"root.checkpoint.v7.000",                   // final subtrie part
 			"root.checkpoint.v7.016",                   // final top-trie part
 			"writing-root.checkpoint.v6.000-111222333", // temp for a different output
 			"root.checkpoint.v6",                       // unrelated final file
+			// temp for a different V7 output that shares outputFile's prefix
+			"writing-root.checkpoint.v7.00000100.v7-5150",
 		}
 
 		for _, name := range append(append([]string{}, staleTempFiles...), keepFiles...) {
