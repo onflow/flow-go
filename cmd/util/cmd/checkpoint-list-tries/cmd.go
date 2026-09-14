@@ -3,7 +3,6 @@ package checkpoint_list_tries
 import (
 	"fmt"
 	"path/filepath"
-	"strings"
 
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -56,8 +55,5 @@ func run(*cobra.Command, []string) {
 // No error returns are expected during normal operation.
 func readTrieRootHashes(logger zerolog.Logger, checkpointFilePath string) ([]ledger.RootHash, error) {
 	dir, fileName := filepath.Split(checkpointFilePath)
-	if strings.HasSuffix(fileName, wal.V7FileSuffix) {
-		return wal.ReadTriesRootHashV7(logger, dir, fileName)
-	}
-	return wal.ReadTriesRootHash(logger, dir, fileName)
+	return wal.ReadCheckpointTriesRootHash(logger, dir, fileName)
 }
