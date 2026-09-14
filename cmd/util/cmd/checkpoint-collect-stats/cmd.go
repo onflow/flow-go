@@ -379,28 +379,38 @@ func getPayloadStatsFromCheckpoint(payloadCallBack func(payload *ledger.Payload)
 	return ledgerStats
 }
 
-// requireV6Checkpoint returns an error if the latest checkpoint in dir is a V7
-// (payloadless) checkpoint. checkpoint-collect-stats requires full payloads,
-// which V7 checkpoints do not contain.
+// requireV6Checkpoint returns an error if the directory's newest checkpoint is a V7
+// (payloadless) checkpoint, i.e. if the newest V7 number is greater than the newest
+// V6 number. checkpoint-collect-stats requires full payloads, which V7 checkpoints
+// do not contain.
 //
 // Only numbered checkpoints are considered (the WAL bootstrap loads the latest
-// numbered V6 checkpoint). If the latest numbered checkpoint is V7, this command
-// would otherwise silently fall back to an older V6 checkpoint or an empty state,
-// reporting misleading stats.
+// numbered V6 checkpoint). The two versions are compared per version rather than
+// via the combined latest, because a payloadless triedir produced by
+// checkpoint-convert-v7 holds both checkpoint.N (V6) and checkpoint.N.v7 for the
+// same number. Such a directory is accepted: the WAL replay loads the V6 checkpoint
+// and the stats are correct. Only a strictly newer V7 checkpoint would make the
+// replay silently fall back to an older V6 checkpoint or an empty state, reporting
+// misleading stats.
 //
 // Expected error returns during normal operation:
-//   - an error when the latest checkpoint in dir is a V7 (payloadless) checkpoint
+//   - an error when the newest checkpoint in dir is a V7 (payloadless) checkpoint
 func requireV6Checkpoint(dir string) error {
-	_, latest, err := wal.ListCheckpointsWithInfo(dir)
+	_, latestV6, err := wal.ListV6Checkpoints(dir)
 	if err != nil {
-		return fmt.Errorf("cannot list checkpoints in %s: %w", dir, err)
+		return fmt.Errorf("cannot list V6 checkpoints in %s: %w", dir, err)
 	}
 
-	if latest != nil && latest.Version == wal.VersionV7 {
+	_, latestV7, err := wal.ListV7Checkpoints(dir)
+	if err != nil {
+		return fmt.Errorf("cannot list V7 checkpoints in %s: %w", dir, err)
+	}
+
+	if latestV7 > latestV6 {
 		return fmt.Errorf(
 			"checkpoint %d in %s is a V7 (payloadless) checkpoint, which contains no payloads; "+
 				"checkpoint-collect-stats requires a V6 checkpoint",
-			latest.Number, dir)
+			latestV7, dir)
 	}
 
 	return nil
