@@ -70,6 +70,13 @@ func NewPayloadlessCompactor(
 		checkpointDistance = 1
 	}
 
+	// A zero capacity would make the trie queue index an empty slice (its modulo
+	// by capacity panics), so refuse it up front rather than derailing the
+	// compactor goroutine later.
+	if checkpointCapacity < 1 {
+		return nil, fmt.Errorf("payloadless compactor requires a non-zero checkpoint capacity, got %d", checkpointCapacity)
+	}
+
 	checkpointer, err := w.NewCheckpointer()
 	if err != nil {
 		return nil, err

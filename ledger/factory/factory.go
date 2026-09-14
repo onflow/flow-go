@@ -240,6 +240,9 @@ func NewPayloadlessLedger(config Config, triggerCheckpoint *atomic.Bool) (ledger
 		complete.DefaultPathFinderVersion,
 	)
 	if err != nil {
+		// Release the WAL's exclusive directory lock so a retry in the same
+		// process doesn't fail on the retained lock.
+		<-diskWAL.Done()
 		return nil, fmt.Errorf("failed to create payloadless ledger with compactor: %w", err)
 	}
 
