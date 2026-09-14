@@ -231,3 +231,54 @@ func TestReplayOnPayloadlessForestUntil(t *testing.T) {
 		})
 	})
 }
+
+// TestReplayOnPayloadlessForestUntil_TargetRetainedBeyondCapacity is a regression
+// test for a payloadless forest smaller than the V7 checkpoint it is seeded from.
+// The target trie must remain retained (and be reported as found) even when the
+// checkpoint holds more tries than the forest capacity, rather than being LRU-
+// evicted by the bulk insertion before it can be detected.
+func TestReplayOnPayloadlessForestUntil_TargetRetainedBeyondCapacity(t *testing.T) {
+	unittest.RunWithTempDir(t, func(dir string) {
+		logger := zerolog.Nop()
+
+		// Seed a full forest with more tries than the payloadless forest retains.
+		fullForest, err := mtrie.NewForest(100, &metrics.NoopCollector{}, nil)
+		require.NoError(t, err)
+
+		usedKeys := make(map[string]struct{})
+		root := fullForest.GetEmptyRootHash()
+		roots := make([]ledger.RootHash, 0, 5)
+		for range 5 {
+			paths, payloads := randNPathPayloadsUnique(5, usedKeys)
+			update := &ledger.TrieUpdate{
+				RootHash: root,
+				Paths:    paths,
+				Payloads: toPayloadPtrs(payloads),
+			}
+			root, err = fullForest.Update(update)
+			require.NoError(t, err)
+			roots = append(roots, root)
+		}
+
+		v6Tries, err := fullForest.GetTries()
+		require.NoError(t, err)
+		v7Tries, err := FromV6Tries(v6Tries)
+		require.NoError(t, err)
+		require.NoError(t, StoreCheckpointV7Concurrently(v7Tries, dir, RootCheckpointFilenameV7(), logger))
+
+		// Retains only 2 tries, so bulk insertion would evict the earliest
+		// checkpoint trie (the target) without the retention fix.
+		forest, err := payloadless.NewForest(2, &metrics.NoopCollector{}, nil)
+		require.NoError(t, err)
+
+		w, err := NewDiskWAL(logger, nil, metrics.NewNoopCollector(), dir, 10, pathByteSize, segmentSize)
+		require.NoError(t, err)
+		defer func() { <-w.Done() }()
+
+		target := roots[0] // earliest trie in the checkpoint
+		found, sourceNumber, err := w.ReplayOnPayloadlessForestUntil(forest, target)
+		require.NoError(t, err)
+		require.True(t, found, "target must be found in the V7 root checkpoint")
+		require.Equal(t, -1, sourceNumber, "target comes from the unnumbered V7 root checkpoint")
+	})
+}

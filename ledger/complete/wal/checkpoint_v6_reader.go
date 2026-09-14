@@ -179,12 +179,19 @@ func filePathPattern(dir string, fileName string) string {
 //
 // No error returns are expected during normal operation.
 func AnyCheckpointFileExists(dir string, fileName string) (bool, error) {
-	pattern := filePathPattern(dir, fileName)
-	matched, err := filepath.Glob(pattern)
+	// Enumerate the directory and compare literal name prefixes instead of using
+	// filepath.Glob: `dir` is an arbitrary path, so any glob metacharacter in it
+	// would be interpreted as pattern syntax rather than a literal directory name.
+	entries, err := os.ReadDir(dir)
 	if err != nil {
 		return false, fmt.Errorf("could not find checkpoint files: %w", err)
 	}
-	return len(matched) > 0, nil
+	for _, entry := range entries {
+		if strings.HasPrefix(entry.Name(), fileName) {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 // readCheckpointHeader takes a file path and returns subtrieChecksums and topTrieChecksum

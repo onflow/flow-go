@@ -287,7 +287,22 @@ func (w *DiskWAL) ReplayOnPayloadlessForestUntil(
 		)
 	}
 
-	if err := forest.AddTries(tries); err != nil {
+	// If the target is one of the checkpoint tries, insert it last: the forest is
+	// LRU-bounded, so bulk insertion can evict the target when the checkpoint
+	// holds more tries than the forest retains, making the HasTrie check below
+	// report a false negative (and leaving nothing for the caller to read back).
+	ordered := tries
+	for i, t := range tries {
+		if t.RootHash().Equals(targetRootHash) && i != len(tries)-1 {
+			ordered = make([]*payloadless.MTrie, 0, len(tries))
+			ordered = append(ordered, tries[:i]...)
+			ordered = append(ordered, tries[i+1:]...)
+			ordered = append(ordered, t)
+			break
+		}
+	}
+
+	if err := forest.AddTries(ordered); err != nil {
 		return false, -1, fmt.Errorf("failed to seed payloadless forest from V7 checkpoint: %w", err)
 	}
 
