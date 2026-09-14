@@ -46,7 +46,7 @@ func TestFromV6LeafNode_PreservesHash(t *testing.T) {
 // interim V6 node returns an error.
 func TestFromV6LeafNode_RejectsInterim(t *testing.T) {
 	emptyTrie := trie.NewEmptyMTrie()
-	paths, payloads := randNPathPayloads(10)
+	paths, payloads := randNPathPayloadsUnique(10, make(map[string]struct{}))
 	updated, _, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, paths, payloads, true)
 	require.NoError(t, err)
 
@@ -61,7 +61,7 @@ func TestFromV6LeafNode_RejectsInterim(t *testing.T) {
 // verifies that the converted V7 trie has the same root hash.
 func TestFromV6Trie_PreservesRootHash(t *testing.T) {
 	emptyTrie := trie.NewEmptyMTrie()
-	paths, payloads := randNPathPayloads(50)
+	paths, payloads := randNPathPayloadsUnique(50, make(map[string]struct{}))
 	v6Trie, _, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, paths, payloads, true)
 	require.NoError(t, err)
 
@@ -87,8 +87,9 @@ func TestFromV6Trie_Empty(t *testing.T) {
 func TestFromV6Tries_SharedSubtries(t *testing.T) {
 	tries := make([]*trie.MTrie, 0)
 	active := trie.NewEmptyMTrie()
+	usedKeys := make(map[string]struct{})
 	for range 5 {
-		paths, payloads := randNPathPayloads(30)
+		paths, payloads := randNPathPayloadsUnique(30, usedKeys)
 		var err error
 		active, _, err = trie.NewTrieWithUpdatedRegisters(active, paths, payloads, false)
 		require.NoError(t, err)
@@ -299,7 +300,7 @@ func TestFullVsPayloadlessForest_SingleUpdate(t *testing.T) {
 	plForest, err := payloadless.NewForest(forestCapacity, &metrics.NoopCollector{}, nil)
 	require.NoError(t, err)
 
-	paths, payloads := randNPathPayloads(50)
+	paths, payloads := randNPathPayloadsUnique(50, make(map[string]struct{}))
 	update := &ledger.TrieUpdate{
 		RootHash: fullForest.GetEmptyRootHash(),
 		Paths:    paths,
@@ -336,10 +337,11 @@ func TestFullVsPayloadlessForest_IncrementalUpdates(t *testing.T) {
 
 	// Track allocated paths so we can also apply deletions (empty payloads).
 	allocated := make([]ledger.Path, 0)
+	usedKeys := make(map[string]struct{})
 
 	for round := range 8 {
 		// New writes for this round.
-		paths, payloads := randNPathPayloads(20)
+		paths, payloads := randNPathPayloadsUnique(20, usedKeys)
 		allocated = append(allocated, paths...)
 
 		// Mix in some "deletions" (empty-value writes) for previously-allocated paths.
@@ -385,7 +387,8 @@ func TestFullVsPayloadlessForest_LoadConvertedCheckpoint(t *testing.T) {
 		require.NoError(t, err)
 
 		// Seed both forests with the same initial state.
-		paths, payloads := randNPathPayloads(40)
+		usedKeys := make(map[string]struct{})
+		paths, payloads := randNPathPayloadsUnique(40, usedKeys)
 		seed := &ledger.TrieUpdate{
 			RootHash: fullForest.GetEmptyRootHash(),
 			Paths:    paths,
@@ -423,7 +426,7 @@ func TestFullVsPayloadlessForest_LoadConvertedCheckpoint(t *testing.T) {
 		require.NoError(t, err)
 
 		for round := range 4 {
-			updatePaths, updatePayloads := randNPathPayloads(15)
+			updatePaths, updatePayloads := randNPathPayloadsUnique(15, usedKeys)
 			update := &ledger.TrieUpdate{
 				RootHash: fullRoot,
 				Paths:    updatePaths,

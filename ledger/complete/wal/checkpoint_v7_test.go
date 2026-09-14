@@ -45,10 +45,11 @@ func createSimplePayloadlessTrie(t *testing.T) []*payloadless.MTrie {
 func createMultiplePayloadlessTries(t *testing.T) []*payloadless.MTrie {
 	tries := make([]*payloadless.MTrie, 0)
 	activeTrie := payloadless.NewEmptyMTrie()
+	usedKeys := make(map[string]struct{})
 
 	var err error
 	for range 5 {
-		paths, payloads := randNPathPayloads(20)
+		paths, payloads := randNPathPayloadsUnique(20, usedKeys)
 		values := payloadsToValues(payloads)
 		activeTrie, _, err = payloadless.NewTrieWithUpdatedRegisters(activeTrie, paths, values, false)
 		require.NoError(t, err, "update registers")
