@@ -306,14 +306,14 @@ func TestConvertCheckpointV7ToV6_Validation(t *testing.T) {
 	unittest.RunWithTempDir(t, func(dir string) {
 		logger := zerolog.Nop()
 
-		require.Error(t, ConvertCheckpointV7ToV6(dir, "x.v7", dir, -1, -1, -1, dir, "out", logger, 0),
-			"nWorker=0 must be rejected")
-		require.Error(t, ConvertCheckpointV7ToV6(dir, "x.v7", dir, -1, -1, -1, dir, "out", logger, 17),
-			"nWorker > subtrieCount must be rejected")
-		require.Error(t, ConvertCheckpointV7ToV6(dir, "x.v7", dir, -1, -1, -1, dir, "out"+V7FileSuffix, logger, 4),
-			"output filename with V7 suffix must be rejected")
-		require.Error(t, ConvertCheckpointV7ToV6(dir, "missing.v7", dir, -1, -1, -1, dir, "out", logger, 4),
-			"missing V7 input must be reported")
+		require.ErrorContains(t, ConvertCheckpointV7ToV6(dir, "x.v7", dir, -1, -1, -1, dir, "out", logger, 0),
+			"invalid nWorker", "nWorker=0 must be rejected")
+		require.ErrorContains(t, ConvertCheckpointV7ToV6(dir, "x.v7", dir, -1, -1, -1, dir, "out", logger, 17),
+			"invalid nWorker", "nWorker > subtrieCount must be rejected")
+		require.ErrorContains(t, ConvertCheckpointV7ToV6(dir, "x.v7", dir, -1, -1, -1, dir, "out"+V7FileSuffix, logger, 4),
+			"must not end with", "output filename with V7 suffix must be rejected")
+		require.ErrorContains(t, ConvertCheckpointV7ToV6(dir, "missing.v7", dir, -1, -1, -1, dir, "out", logger, 4),
+			"V7 checkpoint header not found", "missing V7 input must be reported")
 	})
 }
 
