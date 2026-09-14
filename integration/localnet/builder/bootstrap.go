@@ -855,6 +855,9 @@ func prepareLedgerService(dockerServices Services, flowNodeContainerConfigs []te
 	// Create symlinks for V6 checkpoint
 	checkpointSourceV6 := filepath.Join(bootstrapExecutionStateDir, bootstrapFilenames.FilenameWALRootCheckpoint)
 	_, statV6Err := os.Stat(checkpointSourceV6)
+	if statV6Err != nil && !errors.Is(statV6Err, fs.ErrNotExist) {
+		panic(fmt.Errorf("failed to check V6 root checkpoint %s: %w", checkpointSourceV6, statV6Err))
+	}
 	v6Exists := statV6Err == nil
 	if v6Exists {
 		// V6 checkpoint exists, create symlinks on host
@@ -871,33 +874,47 @@ func prepareLedgerService(dockerServices Services, flowNodeContainerConfigs []te
 	v7Filename := bootstrapFilenames.FilenameWALRootCheckpoint + wal.V7FileSuffix
 	checkpointSourceV7 := filepath.Join(bootstrapExecutionStateDir, v7Filename)
 
+	_, statV7Err := os.Stat(checkpointSourceV7)
+	if statV7Err != nil && !errors.Is(statV7Err, fs.ErrNotExist) {
+		panic(fmt.Errorf("failed to check V7 root checkpoint %s: %w", checkpointSourceV7, statV7Err))
+	}
+	v7Exists := statV7Err == nil
+
 	// In payloadless mode a spork only produces a V6 root.checkpoint, and the
 	// ledger service has no bootstrapper of its own to convert it. Convert the V6
 	// root checkpoint into a V7 root checkpoint here (once, at bootstrap time);
 	// the symlink block below then seeds the ledger service's trie directory from
 	// it. On restart the ledger factory finds an existing V7 checkpoint (this root
 	// or a newer numbered one written by the compactor), so no conversion is
-	// needed at runtime. The os.Stat guards make a re-run of `make bootstrap`
-	// idempotent, avoid ConvertCheckpointV6ToV7's "output exists" rejection, and
-	// skip the conversion entirely when there is no V6 source to convert from.
-	if payloadless && v6Exists {
-		if _, err := os.Stat(checkpointSourceV7); errors.Is(err, fs.ErrNotExist) {
-			logger := zerolog.New(os.Stderr).With().Timestamp().Logger()
-			if convertErr := wal.ConvertCheckpointV6ToV7(
-				bootstrapExecutionStateDir,
-				bootstrapFilenames.FilenameWALRootCheckpoint,
-				bootstrapExecutionStateDir,
-				v7Filename,
-				logger,
-				16,
-			); convertErr != nil {
-				panic(fmt.Errorf("failed to convert V6 root checkpoint to V7 for payloadless ledger service: %w", convertErr))
-			}
-			fmt.Printf("converted V6 root checkpoint to V7 in %s\n", bootstrapExecutionStateDir)
+	// needed at runtime. The guards make a re-run of `make bootstrap` idempotent,
+	// avoid ConvertCheckpointV6ToV7's "output exists" rejection, and skip the
+	// conversion entirely when there is no V6 source to convert from.
+	if payloadless && v6Exists && !v7Exists {
+		// StoreCheckpointV7 writes the part files before the header, so a conversion
+		// that died mid-write leaves part files without a header. The os.Stat check
+		// above cannot see those, and ConvertCheckpointV6ToV7 would then refuse to
+		// clobber the existing output. Discard any such partial output first; the V6
+		// source is untouched and a header-less checkpoint is unusable anyway.
+		if err := wal.DeleteCheckpointFiles(bootstrapExecutionStateDir, v7Filename); err != nil {
+			panic(fmt.Errorf("failed to remove partial V7 root checkpoint: %w", err))
 		}
+		logger := zerolog.New(os.Stderr).With().Timestamp().Logger()
+		if convertErr := wal.ConvertCheckpointV6ToV7(
+			bootstrapExecutionStateDir,
+			bootstrapFilenames.FilenameWALRootCheckpoint,
+			bootstrapExecutionStateDir,
+			v7Filename,
+			logger,
+			16,
+		); convertErr != nil {
+			panic(fmt.Errorf("failed to convert V6 root checkpoint to V7 for payloadless ledger service: %w", convertErr))
+		}
+		fmt.Printf("converted V6 root checkpoint to V7 in %s\n", bootstrapExecutionStateDir)
+		// The conversion succeeded, so the V7 checkpoint now exists on disk.
+		v7Exists = true
 	}
 
-	if _, err := os.Stat(checkpointSourceV7); err == nil {
+	if v7Exists {
 		// V7 checkpoint exists, create symlinks on host
 		_, err = wal.SoftlinkCheckpointFile(v7Filename, bootstrapExecutionStateDir, trieDir)
 		if err != nil {
