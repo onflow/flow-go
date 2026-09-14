@@ -210,6 +210,37 @@ func TestConvertCheckpointV6ToV7Stream_DetectsCorruptedInput(t *testing.T) {
 	}
 }
 
+// TestConvertCheckpointV6ToV7_OverlappingInputOutputKeepsV6Input verifies that a
+// failed conversion does not delete the V6 input when the input shares the output's
+// name prefix (inputDir == outputDir and inputName = "xxx.v7.backup",
+// outputName = "xxx.v7"). The cleanup after a failed conversion must remove only
+// the exact V7 output paths, not a prefix-glob match that also sweeps up the
+// source checkpoint.
+func TestConvertCheckpointV6ToV7_OverlappingInputOutputKeepsV6Input(t *testing.T) {
+	for _, stream := range []bool{false, true} {
+		t.Run(fmt.Sprintf("stream=%v", stream), func(t *testing.T) {
+			unittest.RunWithTempDir(t, func(dir string) {
+				logger := zerolog.Nop()
+				v6Tries := createMultipleRandomTries(t)
+				v6Name := "checkpoint.00000307.v7.backup"
+				require.NoError(t, StoreCheckpointV6Concurrently(v6Tries, dir, v6Name, logger))
+				outputName := "checkpoint.00000307.v7"
+
+				// corrupt the input so the conversion fails and runs its cleanup path
+				footerSize := encNodeCountSize + crc32SumSize
+				corruptByteAt(t, largestSubTrieFilePath(t, dir, v6Name), -(int64(footerSize) + 1))
+
+				require.Error(t, ConvertCheckpointV6ToV7(dir, v6Name, dir, outputName, logger, 16, stream))
+
+				// the V6 input must survive the failed conversion's cleanup
+				for _, p := range allFilePaths(dir, v6Name) {
+					require.FileExists(t, p, "V6 input file must survive a failed conversion")
+				}
+			})
+		})
+	}
+}
+
 // largestSubTrieFilePath returns the path of the V6 subtrie part file with the most
 // content, i.e. the one guaranteed to hold encoded nodes.
 func largestSubTrieFilePath(t *testing.T, dir string, fileName string) string {
