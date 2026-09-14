@@ -165,6 +165,9 @@ func TestConcurrentAccess(t *testing.T) {
 	unittest.Concurrently(worker, func(i int) {
 		trie, triErr := randomMTrie()
 		assert.NoError(t, triErr)
+		if triErr != nil {
+			return
+		}
 		tc.Push(trie)
 
 		ret, found := tc.Get(trie.RootHash())
