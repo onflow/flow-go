@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"path/filepath"
 
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
@@ -83,6 +84,16 @@ func runE(*cobra.Command, []string) error {
 	stateCommitment, err := flow.ToStateCommitment(stateCommitmentBytes)
 	if err != nil {
 		return fmt.Errorf("invalid state commitment length: %w", err)
+	}
+
+	// The execution state directory is the source WAL directory and must not be
+	// written to: extracting into it would add the output checkpoint to the WAL
+	// directory the node loads on startup (and an interrupted write would delete
+	// source checkpoint files sharing the output name).
+	if filepath.Clean(flagOutputDir) == filepath.Clean(flagExecutionStateDir) {
+		return fmt.Errorf(
+			"--output-dir and --execution-state-dir must differ, but both are %s; refusing to write the extracted checkpoint into the execution state directory",
+			flagOutputDir)
 	}
 
 	log.Info().
