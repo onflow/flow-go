@@ -461,7 +461,7 @@ func compareFiles(file1, file2 string) error {
 		f.Close()
 	}(closable1)
 
-	closable2, err := os.Open(file1)
+	closable2, err := os.Open(file2)
 	if err != nil {
 		return fmt.Errorf("could not open file 2 %v: %w", closable2, err)
 	}

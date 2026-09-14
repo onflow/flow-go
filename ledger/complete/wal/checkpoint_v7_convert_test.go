@@ -234,6 +234,38 @@ func TestDeleteCheckpointFilesClearsPartialV7Conversion(t *testing.T) {
 	})
 }
 
+// TestRemoveCheckpointV6KeepsV7 is a regression test for the V6 compactor's
+// retention path: a V6 checkpoint name is a prefix of the same-numbered V7
+// checkpoint name, so removing the V6 checkpoint must not collaterally delete
+// the V7 files that share its number.
+func TestRemoveCheckpointV6KeepsV7(t *testing.T) {
+	unittest.RunWithTempDir(t, func(dir string) {
+		logger := zerolog.Nop()
+		const num = 7
+		v6Name := NumberToFilename(num)
+		v7Name := NumberToFilenameV7(num)
+
+		require.NoError(t, StoreCheckpointV6Concurrently(createSimpleTrie(t), dir, v6Name, logger))
+		require.NoError(t, StoreCheckpointV7SingleThread(createSimplePayloadlessTrie(t), dir, v7Name, logger))
+
+		v7Header := filepath.Join(dir, v7Name)
+		v7Part := filepath.Join(dir, partFileName(v7Name, 0))
+		require.FileExists(t, filepath.Join(dir, v6Name))
+		require.FileExists(t, v7Header)
+
+		require.NoError(t, (&Checkpointer{dir: dir}).RemoveCheckpointV6(num))
+
+		// The V6 files are gone...
+		require.NoFileExists(t, filepath.Join(dir, v6Name))
+		require.NoFileExists(t, filepath.Join(dir, partFileName(v6Name, 0)))
+		// ...but every V7 file (header and parts) survives and still loads.
+		require.FileExists(t, v7Header)
+		require.FileExists(t, v7Part)
+		_, err := OpenAndReadCheckpointV7(dir, v7Name, logger)
+		require.NoError(t, err)
+	})
+}
+
 // TestConvertCheckpointV6ToV7_MissingV6Input verifies that the converter
 // returns an error when the V6 source is missing.
 func TestConvertCheckpointV6ToV7_MissingV6Input(t *testing.T) {
