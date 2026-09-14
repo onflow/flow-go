@@ -134,7 +134,8 @@ func TestReplayOnPayloadlessForestUntil(t *testing.T) {
 		fullForest, err := mtrie.NewForest(100, &metrics.NoopCollector{}, nil)
 		require.NoError(t, err)
 
-		paths0, payloads0 := randNPathPayloads(10)
+		usedKeys := make(map[string]struct{})
+		paths0, payloads0 := randNPathPayloadsUnique(10, usedKeys)
 		root0, err := fullForest.Update(&ledger.TrieUpdate{
 			RootHash: fullForest.GetEmptyRootHash(),
 			Paths:    paths0,
@@ -156,7 +157,7 @@ func TestReplayOnPayloadlessForestUntil(t *testing.T) {
 		parent := root0
 		roots := make([]ledger.RootHash, 0, 3)
 		for range 3 {
-			pathsi, payloadsi := randNPathPayloads(10)
+			pathsi, payloadsi := randNPathPayloadsUnique(10, usedKeys)
 			update := &ledger.TrieUpdate{
 				RootHash: parent,
 				Paths:    pathsi,
@@ -174,7 +175,7 @@ func TestReplayOnPayloadlessForestUntil(t *testing.T) {
 
 		// A fourth update built on root3 but never recorded: a valid root hash that
 		// is present neither in the checkpoint nor in the WAL.
-		pathsAbsent, payloadsAbsent := randNPathPayloads(10)
+		pathsAbsent, payloadsAbsent := randNPathPayloadsUnique(10, usedKeys)
 		rootAbsent, err := fullForest.Update(&ledger.TrieUpdate{
 			RootHash: root3,
 			Paths:    pathsAbsent,
