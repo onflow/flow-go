@@ -320,7 +320,7 @@ func TestNewHeaderBody(t *testing.T) {
 			u.LastViewTC = &flow.TimeoutCertificate{
 				View:          u.View - 1,
 				NewestQCViews: []uint64{u.View - 2},
-				NewestQC:      nil, // nil nested pointer — the attack vector
+				NewestQC:      nil,
 				SignerIndices: unittest.SignerIndicesFixture(4),
 				SigData:       unittest.SignatureFixture(),
 			}

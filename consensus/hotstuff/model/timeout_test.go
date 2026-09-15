@@ -215,19 +215,15 @@ func TestNewTimeoutObject(t *testing.T) {
 	})
 
 	t.Run("invalid input when LastViewTC has nil NewestQC", func(t *testing.T) {
-		// A non-nil TC whose nested NewestQC is nil must be rejected; this is the
-		// exact attack vector from the security audit (CBOR null → nil pointer).
-		// Build a TC that is initially valid (TC.View=199 >= TC.NewestQC.View=150),
-		// then poison the nested NewestQC pointer to nil.
 		tc := helper.MakeTC(helper.WithTCNewestQC(helper.MakeQC(helper.WithQCView(150))), helper.WithTCView(199))
-		tc.NewestQC = nil // poison the nested pointer
+		tc.NewestQC = nil
 
 		res, err := model.NewTimeoutObject(
 			model.UntrustedTimeoutObject(
 				*helper.TimeoutObjectFixture(
 					helper.WithTimeoutObjectView(200), // TO.View == TC.View+1
 					helper.WithTimeoutLastViewTC(tc),
-					helper.WithTimeoutNewestQC(helper.MakeQC(helper.WithQCView(100))), // TO.NewestQC.View < 200
+					helper.WithTimeoutNewestQC(helper.MakeQC(helper.WithQCView(150))), // TC.NewestQC.View(150) <= TO.NewestQC.View < TO.View(200)
 				),
 			),
 		)
