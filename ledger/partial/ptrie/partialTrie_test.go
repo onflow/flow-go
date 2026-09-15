@@ -417,6 +417,67 @@ func TestRandomProofs(t *testing.T) {
 	}
 }
 
+// TestMalformedProofRejected verifies that structurally inconsistent
+// Steps/Flags/Interims fields in a ledger.TrieProof are rejected by NewPSMT
+// with an error instead of panicking. A byzantine Execution Node can craft such
+// proofs, and a Verification Node must not crash while processing them.
+func TestMalformedProofRejected(t *testing.T) {
+	root := ledger.RootHash(ledger.GetDefaultHashForHeight(ledger.NodeMaxHeight))
+	path := testutils.PathByUint16(0)
+	payload := testutils.LightPayload('A', 'a')
+
+	t.Run("steps exceed flags length", func(t *testing.T) {
+		proof := &ledger.TrieProof{
+			Steps:     8,
+			Flags:     []byte{},
+			Path:      path,
+			Payload:   payload,
+			Inclusion: true,
+			Interims:  nil,
+		}
+		batchProof := &ledger.TrieBatchProof{Proofs: []*ledger.TrieProof{proof}}
+
+		psmt, err := NewPSMT(root, batchProof)
+		require.Error(t, err)
+		require.Nil(t, psmt)
+	})
+
+	t.Run("set flags exceed interims length", func(t *testing.T) {
+		// One flag byte covers 8 steps, but all 8 bits are set while no
+		// interims are supplied. This triggers the popcount-vs-interims check
+		// after the flags-length check has passed.
+		proof := &ledger.TrieProof{
+			Steps:     8,
+			Flags:     []byte{0xFF},
+			Path:      path,
+			Payload:   payload,
+			Inclusion: true,
+			Interims:  nil,
+		}
+		batchProof := &ledger.TrieBatchProof{Proofs: []*ledger.TrieProof{proof}}
+
+		psmt, err := NewPSMT(root, batchProof)
+		require.Error(t, err)
+		require.Nil(t, psmt)
+	})
+
+	t.Run("no panic on malformed proof", func(t *testing.T) {
+		proof := &ledger.TrieProof{
+			Steps:     8,
+			Flags:     []byte{},
+			Path:      path,
+			Payload:   payload,
+			Inclusion: true,
+			Interims:  nil,
+		}
+		batchProof := &ledger.TrieBatchProof{Proofs: []*ledger.TrieProof{proof}}
+
+		require.NotPanics(t, func() {
+			_, _ = NewPSMT(root, batchProof)
+		})
+	})
+}
+
 // TODO add test for incompatible proofs [Byzantine milestone]
 // TODO add test key not exist [Byzantine milestone]
 
