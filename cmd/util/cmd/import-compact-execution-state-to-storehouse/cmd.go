@@ -23,21 +23,16 @@ import (
 	"github.com/onflow/flow-go/ledger"
 	flowWAL "github.com/onflow/flow-go/ledger/complete/wal"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
-	"github.com/onflow/flow-go/storage/operation"
 	pebblestorage "github.com/onflow/flow-go/storage/pebble"
 )
 
 var (
-	flagDatadir           string
-	flagExecutionStateDir string
-	flagRegisterDir       string
+	flagDatadir                     string
+	flagExecutionStateDir           string
+	flagRegisterDir                 string
+	flagImportCheckpointWorkerCount int
 )
-
-// importWorkerCount is the number of concurrent workers used to index the checkpoint
-// registers into the register store.
-const importWorkerCount = 16
 
 var Cmd = &cobra.Command{
 	Use:   "import-compact-execution-state-to-storehouse",
@@ -51,8 +46,10 @@ The command:
      checkpoint whose root hash equals C.
   3. Verifies the register store directory does not exist or is empty, i.e. the register
      store has not been bootstrapped yet.
-  4. Imports the checkpoint registers into the register store with 16 workers, setting the
-     register store's first and latest heights to the resolved block height.`,
+  4. Imports the checkpoint registers into the register store with
+     --import-checkpoint-worker-count workers (default 10, same default as the execution
+     node), setting the register store's first and latest heights to the resolved block
+     height.`,
 	RunE: runE,
 }
 
@@ -68,6 +65,9 @@ func init() {
 	Cmd.Flags().StringVar(&flagRegisterDir, "register-dir", "/var/flow/data/register",
 		"directory of the storehouse register store (Pebble) to bootstrap")
 	_ = Cmd.MarkFlagRequired("register-dir")
+
+	Cmd.Flags().IntVar(&flagImportCheckpointWorkerCount, "import-checkpoint-worker-count", 10,
+		"number of workers to import checkpoint file during bootstrap")
 }
 
 // runE implements the import-compact-execution-state-to-storehouse command.
@@ -100,7 +100,7 @@ func runE(*cobra.Command, []string) error {
 			return fmt.Errorf("cannot open protocol state: %w", err)
 		}
 
-		blockID, height, commit, err = lastFinalizedAndExecutedBlock(state, db, storages.Headers, storages.Commits)
+		blockID, height, commit, err = common.GetLastFinalizedAndExecutedBlock(state, db, storages.Headers, storages.Commits)
 		if err != nil {
 			return err
 		}
@@ -160,7 +160,7 @@ func runE(*cobra.Command, []string) error {
 	}
 
 	checkpointFile := filepath.Join(flagExecutionStateDir, checkpointName)
-	err = esbootstrap.ImportRegistersFromCheckpoint(log.Logger, checkpointFile, height, rootHash, pebbleDB, importWorkerCount)
+	err = esbootstrap.ImportRegistersFromCheckpoint(log.Logger, checkpointFile, height, rootHash, pebbleDB, flagImportCheckpointWorkerCount)
 	if err != nil {
 		return fmt.Errorf("cannot import registers from checkpoint %s: %w", checkpointFile, err)
 	}
@@ -168,55 +168,10 @@ func runE(*cobra.Command, []string) error {
 	log.Info().
 		Str("checkpoint", checkpointName).
 		Uint64("height", height).
-		Int("worker-count", importWorkerCount).
+		Int("worker-count", flagImportCheckpointWorkerCount).
 		Msg("register store bootstrapped from compacted execution state")
 
 	return nil
-}
-
-// lastFinalizedAndExecutedBlock returns the block ID, height and state commitment of the
-// highest finalized and executed block. It replicates the ledger-backed
-// [state.ExecutionState.GetHighestFinalizedExecuted] logic: the executed block pointer is
-// capped by the finalized head, and the state commitment of the resulting block must be
-// present in the commits store.
-//
-// No error returns are expected during normal operation.
-func lastFinalizedAndExecutedBlock(
-	state protocol.State,
-	db storage.DB,
-	headers storage.Headers,
-	commits storage.Commits,
-) (flow.Identifier, uint64, flow.StateCommitment, error) {
-	finalized, err := state.Final().Head()
-	if err != nil {
-		return flow.ZeroID, 0, flow.DummyStateCommitment, fmt.Errorf("cannot get finalized head: %w", err)
-	}
-
-	var executedBlockID flow.Identifier
-	err = operation.RetrieveExecutedBlock(db.Reader(), &executedBlockID)
-	if err != nil {
-		return flow.ZeroID, 0, flow.DummyStateCommitment, fmt.Errorf("cannot retrieve executed block: %w", err)
-	}
-
-	executedHeader, err := headers.ByBlockID(executedBlockID)
-	if err != nil {
-		return flow.ZeroID, 0, flow.DummyStateCommitment, fmt.Errorf("cannot retrieve executed header %v: %w", executedBlockID, err)
-	}
-
-	// the highest finalized and executed height is the min of the two
-	highest := min(finalized.Height, executedHeader.Height)
-
-	blockID, err := headers.BlockIDByHeight(highest)
-	if err != nil {
-		return flow.ZeroID, 0, flow.DummyStateCommitment, fmt.Errorf("cannot get block ID by height %d: %w", highest, err)
-	}
-
-	commit, err := commits.ByBlockID(blockID)
-	if err != nil {
-		return flow.ZeroID, 0, flow.DummyStateCommitment, fmt.Errorf("cannot get state commitment for block %v (height %d): %w", blockID, highest, err)
-	}
-
-	return blockID, highest, commit, nil
 }
 
 // ensureDirEmpty returns an error if dir exists and contains any entry. A non-existent or
@@ -234,7 +189,17 @@ func ensureDirEmpty(dir string) error {
 	}
 
 	if len(entries) > 0 {
-		return fmt.Errorf("register store directory %s is not empty (%d entries); register store must not be bootstrapped",
+		// The directory is non-empty in one of two situations, and the caller cannot
+		// recover by simply re-running this command in either of them:
+		//  - the register store was already bootstrapped, so importing a checkpoint would
+		//    corrupt its height tracker;
+		//  - a previous import failed partway. ImportRegistersFromCheckpoint persists the
+		//    register store heights only after all workers succeed, so a partial import
+		//    leaves registers on disk with unset heights.
+		// Deleting the directory is required before retrying.
+		return fmt.Errorf("register store directory %s is not empty (%d entries): "+
+			"it either contains a bootstrapped register store or a partially imported store "+
+			"left behind by a failed import; delete the directory before retrying",
 			dir, len(entries))
 	}
 
