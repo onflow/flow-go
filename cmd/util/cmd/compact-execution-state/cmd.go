@@ -9,7 +9,6 @@ package compact_execution_state
 import (
 	"errors"
 	"fmt"
-	"math"
 	"os"
 
 	"github.com/rs/zerolog/log"
@@ -21,7 +20,6 @@ import (
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
 	flowWAL "github.com/onflow/flow-go/ledger/complete/wal"
-	"github.com/onflow/flow-go/ledger/factory"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/trace"
@@ -57,7 +55,8 @@ var Cmd = &cobra.Command{
   7. Rolling back the highest-executed-block pointer to the sealed height.
 	8. validating the compacted execution state: the highest finalized-and-executed block
 		 reported by the execution state must match the sealed anchor, its commit must exist
-		 in the protocol database, and its root hash must be present in the compacted ledger.`,
+		 in the protocol database, and the extracted checkpoint must be a single-trie
+		 checkpoint whose root hash is that commit.`,
 	RunE: runE,
 }
 
@@ -323,20 +322,20 @@ func runE(*cobra.Command, []string) error {
 		}
 
 		// ── validate compacted execution state ──────────────────────────────────
-		// Replicating the execution node's startup wiring (LoadExecutionState and
-		// LoadExecutionStateLedger in cmd/execution_builder.go), so that the block
-		// reported by GetHighestFinalizedExecuted is exactly the block the node will
-		// resume from after restarting on the compacted state.
-		ledgerStorage, err := openValidationLedger(flagExecutionStateDir)
-		if err != nil {
-			return err
-		}
-		defer func() {
-			<-ledgerStorage.Done()
-		}()
-
+		// Replicating the execution node's startup wiring for the executed-block pointer
+		// (LoadExecutionState in cmd/execution_builder.go), so that the block reported by
+		// GetHighestFinalizedExecuted is exactly the block the node will resume from after
+		// restarting on the compacted state.
+		//
+		// The ledger is intentionally nil: with storehouse disabled,
+		// GetHighestFinalizedExecuted derives the height exclusively from the protocol
+		// database (finalized head, executed-block pointer, headers and commits) and never
+		// touches the ledger. Opening a real ledger here would decode the whole checkpoint
+		// - hundreds of millions of MTrie nodes, tens of GB of RAM - only to discard the
+		// result. The compacted checkpoint is instead validated from its header and part
+		// file footers, see validateCompactedState.
 		execState := exestate.NewExecutionState(
-			ledgerStorage,
+			nil, // ledger: never used by GetHighestFinalizedExecuted, see comment above
 			storages.Commits,
 			storages.Blocks,
 			storages.Headers,
@@ -360,7 +359,7 @@ func runE(*cobra.Command, []string) error {
 			lockManager,
 		)
 
-		if err := validateCompactedState(execState, ledgerStorage, storages.Headers, storages.Commits, sealedHeader, stateCommitment); err != nil {
+		if err := validateCompactedState(execState, flagExecutionStateDir, destName, storages.Headers, storages.Commits, sealedHeader, stateCommitment); err != nil {
 			return err
 		}
 
@@ -383,53 +382,24 @@ func runE(*cobra.Command, []string) error {
 	return nil
 }
 
-// openValidationLedger opens a local ledger over the trimmed WAL and extracted
-// checkpoint in execStateDir, using the same factory the execution node uses at
-// startup (ledger/factory.NewLedger in LoadExecutionStateLedger).
-//
-// CheckpointDistance is set to the maximum value to prevent the compactor from
-// creating new checkpoints during this read-only validation, mirroring other
-// read-only execution-state utilities. The caller must wait for the returned ledger
-// to become Ready before use and call Done afterwards to release the WAL file lock.
-//
-// No error returns are expected during normal operation.
-func openValidationLedger(execStateDir string) (ledger.Ledger, error) {
-	const (
-		checkpointDistance = math.MaxInt
-		checkpointsToKeep  = 1
-	)
-
-	ledgerStorage, err := factory.NewLedger(factory.Config{
-		Triedir:            execStateDir,
-		MTrieCacheSize:     ledger.DefaultMTrieCacheSize,
-		CheckpointDistance: checkpointDistance,
-		CheckpointsToKeep:  checkpointsToKeep,
-		WALMetrics:         &metrics.NoopCollector{},
-		LedgerMetrics:      &metrics.NoopCollector{},
-		Logger:             log.Logger,
-	}, nil)
-	if err != nil {
-		return nil, fmt.Errorf("cannot open local ledger over %s: %w", execStateDir, err)
-	}
-
-	// wait for the WAL replay (checkpoint loading) to complete
-	<-ledgerStorage.Ready()
-
-	return ledgerStorage, nil
-}
-
 // validateCompactedState verifies that the compacted execution state is consistent
-// with the protocol state and the ledger built over the trimmed WAL and extracted
-// checkpoint:
+// with the protocol state and the extracted checkpoint:
 //   - the highest finalized-and-executed block reported by execState (the block the
 //     execution node resumes from after restart) matches the resolved anchor block;
 //   - the anchor block's state commitment exists in the commits store;
-//   - the ledger contains the corresponding root hash.
+//   - the checkpoint named checkpointName is a single-trie checkpoint whose root hash is
+//     the anchor's state commitment.
+//
+// The checkpoint is validated by reading its header, the footers of the subtrie part files
+// it references and the top-level trie file only. The checkpoint's nodes are not decoded:
+// decoding them would require holding the entire execution state in memory (hundreds of
+// millions of MTrie nodes, tens of GB of RAM).
 //
 // No error returns are expected during normal operation.
 func validateCompactedState(
 	execState exestate.ExecutionState,
-	ledgerStorage ledger.Ledger,
+	execStateDir string,
+	checkpointName string,
 	headers storage.Headers,
 	commits storage.Commits,
 	sealedHeader *flow.Header,
@@ -460,8 +430,9 @@ func validateCompactedState(
 			commit, stateCommitment)
 	}
 
-	if !ledgerStorage.HasState(ledger.State(commit)) {
-		return fmt.Errorf("root hash %x not found in the compacted ledger", ledger.RootHash(commit))
+	if err := flowWAL.CheckpointHasSingleRootHash(log.Logger, execStateDir, checkpointName, ledger.RootHash(commit)); err != nil {
+		return fmt.Errorf("checkpoint %s is not the compacted single-trie checkpoint of state commitment %x: %w",
+			checkpointName, commit, err)
 	}
 
 	return nil
