@@ -1075,7 +1075,7 @@ func decodePayloadlessTrieProof(inp []byte) (*PayloadlessTrieProof, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error decoding payloadless proof: %w", err)
 	}
-	flags, rest, err := utils.ReadSlice(rest, int(flagsSize))
+	flags, rest, err := utils.ReadSlice(rest, uint64(flagsSize))
 	if err != nil {
 		return nil, fmt.Errorf("error decoding payloadless proof: %w", err)
 	}
@@ -1086,7 +1086,7 @@ func decodePayloadlessTrieProof(inp []byte) (*PayloadlessTrieProof, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error decoding payloadless proof: %w", err)
 	}
-	pathBytes, rest, err := utils.ReadSlice(rest, int(pathSize))
+	pathBytes, rest, err := utils.ReadSlice(rest, uint64(pathSize))
 	if err != nil {
 		return nil, fmt.Errorf("error decoding payloadless proof: %w", err)
 	}
@@ -1127,7 +1127,7 @@ func decodePayloadlessTrieProof(inp []byte) (*PayloadlessTrieProof, error) {
 		if err != nil {
 			return nil, fmt.Errorf("error decoding payloadless proof: %w", err)
 		}
-		interimBytes, rest, err = utils.ReadSlice(rest, int(interimSize))
+		interimBytes, rest, err = utils.ReadSlice(rest, uint64(interimSize))
 		if err != nil {
 			return nil, fmt.Errorf("error decoding payloadless proof: %w", err)
 		}
@@ -1200,7 +1200,7 @@ func decodePayloadlessTrieBatchProof(inp []byte) (*PayloadlessTrieBatchProof, er
 		if err != nil {
 			return nil, fmt.Errorf("error decoding payloadless batch proof (content): %w", err)
 		}
-		encProof, rest, err = utils.ReadSlice(rest, int(encProofSize))
+		encProof, rest, err = utils.ReadSlice(rest, encProofSize)
 		if err != nil {
 			return nil, fmt.Errorf("error decoding payloadless batch proof (content): %w", err)
 		}
