@@ -59,6 +59,7 @@ func IsValidEpochSetup(setup *flow.EpochSetup, verifyNetworkAddress bool) error 
 	// (a) each has a unique node ID,
 	// (b) each has a unique network address (if `verifyNetworkAddress` is true),
 	// (c) participants are sorted in canonical order.
+	// (d) each has a valid role.
 	//     Note that the system smart contracts manage the identity table as an unordered set! For the protocol state, we desire a fixed
 	//     ordering to simplify various implementation details, like the DKG. Therefore, we order identities in `flow.EpochSetup` during
 	//     conversion from cadence to Go in the function `convert.ServiceEvent(flow.ChainID, flow.Event)` in package `model/convert`
@@ -84,6 +85,13 @@ func IsValidEpochSetup(setup *flow.EpochSetup, verifyNetworkAddress bool) error 
 
 	if !setup.Participants.Sorted(flow.Canonical[flow.IdentitySkeleton]) { // (c) enforce canonical ordering
 		return fmt.Errorf("participants are not canonically ordered")
+	}
+
+	// (d) each participant has a valid role
+	for _, participant := range setup.Participants {
+		if !participant.Role.Valid() {
+			return fmt.Errorf("invalid participant role (%d) for node (%x)", participant.Role, participant.NodeID)
+		}
 	}
 
 	// 3. CHECK: Enforce sufficient number of nodes for each role
