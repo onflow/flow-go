@@ -45,6 +45,8 @@ type Ledger struct {
 	pathFinderVersion uint8
 }
 
+var _ ledger.Ledger = (*Ledger)(nil)
+
 // NewLedger creates a new in-memory trie-backed ledger storage with persistence.
 func NewLedger(
 	wal realWAL.LedgerWAL,
