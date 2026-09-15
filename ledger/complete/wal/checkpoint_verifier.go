@@ -59,7 +59,7 @@ func VerifyCheckpointHashes(logger zerolog.Logger, dir string, fileName string, 
 
 	headerPath := filePathCheckpointHeader(dir, fileName)
 
-	version, err := readCheckpointHeaderVersion(headerPath)
+	version, err := readCheckpointHeaderVersion(logger, headerPath)
 	if err != nil {
 		return fmt.Errorf("could not read checkpoint header version: %w", err)
 	}
