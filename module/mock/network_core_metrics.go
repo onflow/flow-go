@@ -619,6 +619,58 @@ func (_c *NetworkCoreMetrics_QueueDuration_Call) RunAndReturn(run func(duration 
 	return _c
 }
 
+// QueueFullInboundMessagesDropped provides a mock function for the type NetworkCoreMetrics
+func (_mock *NetworkCoreMetrics) QueueFullInboundMessagesDropped(topic string, protocol string, messageType string) {
+	_mock.Called(topic, protocol, messageType)
+	return
+}
+
+// NetworkCoreMetrics_QueueFullInboundMessagesDropped_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'QueueFullInboundMessagesDropped'
+type NetworkCoreMetrics_QueueFullInboundMessagesDropped_Call struct {
+	*mock.Call
+}
+
+// QueueFullInboundMessagesDropped is a helper method to define mock.On call
+//   - topic string
+//   - protocol string
+//   - messageType string
+func (_e *NetworkCoreMetrics_Expecter) QueueFullInboundMessagesDropped(topic interface{}, protocol interface{}, messageType interface{}) *NetworkCoreMetrics_QueueFullInboundMessagesDropped_Call {
+	return &NetworkCoreMetrics_QueueFullInboundMessagesDropped_Call{Call: _e.mock.On("QueueFullInboundMessagesDropped", topic, protocol, messageType)}
+}
+
+func (_c *NetworkCoreMetrics_QueueFullInboundMessagesDropped_Call) Run(run func(topic string, protocol string, messageType string)) *NetworkCoreMetrics_QueueFullInboundMessagesDropped_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 string
+		if args[0] != nil {
+			arg0 = args[0].(string)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		var arg2 string
+		if args[2] != nil {
+			arg2 = args[2].(string)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *NetworkCoreMetrics_QueueFullInboundMessagesDropped_Call) Return() *NetworkCoreMetrics_QueueFullInboundMessagesDropped_Call {
+	_c.Call.Return()
+	return _c
+}
+
+func (_c *NetworkCoreMetrics_QueueFullInboundMessagesDropped_Call) RunAndReturn(run func(topic string, protocol string, messageType string)) *NetworkCoreMetrics_QueueFullInboundMessagesDropped_Call {
+	_c.Run(run)
+	return _c
+}
+
 // UnicastMessageSendingCompleted provides a mock function for the type NetworkCoreMetrics
 func (_mock *NetworkCoreMetrics) UnicastMessageSendingCompleted(topic string) {
 	_mock.Called(topic)

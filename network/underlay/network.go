@@ -615,6 +615,18 @@ func (n *Network) processNetworkMessage(msg network.IncomingMessageScope) error 
 	// insert the message in the queue
 	err := n.queue.Insert(qm)
 	if err != nil {
+		// Roll back the dedup cache entry so that a later retransmission of the same
+		// payload is not dropped as a duplicate because of a momentary queue-full
+		// window. The goroutine that successfully added the event ID exclusively owns
+		// the entry until this removal, so this cannot remove another goroutine's entry.
+		n.receiveCache.Remove(msg.EventID())
+
+		if errors.Is(err, queue.ErrQueueFull) {
+			// Queue-full drops are back-pressure events; record a metric so they are
+			// observable instead of only logged.
+			n.metrics.QueueFullInboundMessagesDropped(msg.Channel().String(), msg.Protocol().String(), msg.PayloadType())
+		}
+
 		return fmt.Errorf("failed to insert message in queue: %w", err)
 	}
 
