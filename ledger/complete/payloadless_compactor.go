@@ -41,7 +41,7 @@ type PayloadlessCompactor struct {
 	trieQueue                            *realWAL.PayloadlessTrieQueue
 	logger                               zerolog.Logger
 	lm                                   *lifecycle.LifecycleManager
-	observersMu                          sync.Mutex                     // guards observers
+	observersMu                          sync.Mutex // guards observers
 	observers                            map[observable.Observer]struct{}
 	checkpointDistance                   uint
 	checkpointsToKeep                    uint
