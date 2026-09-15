@@ -549,8 +549,9 @@ func (m *ParticipantState) checkOutdatedExtension(header flow.HeaderBody) error 
 }
 
 // guaranteeExtend verifies the validity of the collection guarantees that are
-// included in the block. Specifically, we check for expired collections and
-// duplicated collections (also including ancestor blocks).
+// included in the block. Specifically, we check for expired guarantees, duplicated
+// guarantees (also including ancestor blocks), and conflicting guarantees for the same
+// collection (a different guarantee already indexed for a collection referenced in the payload).
 // Expected errors during normal operations:
 //   - state.InvalidExtensionError if the candidate block contains invalid collection guarantees
 func (m *ParticipantState) guaranteeExtend(ctx context.Context, candidate *flow.Block) error {
@@ -593,6 +594,11 @@ func (m *ParticipantState) guaranteeExtend(ctx context.Context, candidate *flow.
 		ancestorID = ancestor.ParentID
 	}
 
+	// Track the guarantee ID included for each collection within this payload, so that we can reject a
+	// block that references the same collection more than once — whether via an identical or a
+	// conflicting guarantee (see the collection-uniqueness check below).
+	guaranteesByCollection := make(map[flow.Identifier]flow.Identifier, len(payload.Guarantees))
+
 	// check each guarantee included in the payload for duplication and expiry
 	for _, guarantee := range payload.Guarantees {
 
@@ -627,6 +633,42 @@ func (m *ParticipantState) guaranteeExtend(ctx context.Context, candidate *flow.
 			}
 			return fmt.Errorf("could not find guarantor for guarantee %v: %w", guarantee.ID(), err)
 		}
+
+		// A collection may be guaranteed at most once. We enforce this here for two scopes:
+		//
+		//  1. Within this payload: the same collection must not appear twice, whether via an identical
+		//     guarantee (double execution / double fee charge) or via two *different* guarantees for the
+		//     same collection (conflicting guarantees). The duplicate check above only inspects ancestor
+		//     blocks, never the candidate's own guarantees, so it does not catch within-payload repeats.
+		//
+		//  2. Against all previously persisted guarantees: the storage layer enforces a single guarantee ID
+		//     per collection ID globally, across all forks (see operation.IndexGuarantee). A *different*
+		//     guarantee for an already-guaranteed collection therefore cannot be persisted.
+		//		 We reject it here as a typed InvalidExtensionError instead. An identical guarantee already
+		//     persisted on another fork is legitimate (it re-indexes to the same value), so at this scope
+		//     only a differing guarantee ID is a conflict.
+		//
+		// This check is performed last, so that a guarantee that is malformed for a more fundamental reason
+		// (e.g. invalid guarantors or an expired reference block) is reported with that more specific reason.
+		if priorGuaranteeID, ok := guaranteesByCollection[guarantee.CollectionID]; ok {
+			if priorGuaranteeID == guarantee.ID() {
+				return state.NewInvalidExtensionErrorf("payload includes duplicate guarantee (%x) for collection %x",
+					guarantee.ID(), guarantee.CollectionID)
+			}
+			return state.NewInvalidExtensionErrorf("payload includes conflicting guarantees (%x and %x) for the same collection %x",
+				priorGuaranteeID, guarantee.ID(), guarantee.CollectionID)
+		}
+		var indexedGuaranteeID flow.Identifier
+		err = operation.LookupGuarantee(m.db.Reader(), guarantee.CollectionID, &indexedGuaranteeID)
+		if err == nil {
+			if indexedGuaranteeID != guarantee.ID() {
+				return state.NewInvalidExtensionErrorf("payload includes guarantee %x for collection %x that is already guaranteed by a different guarantee %x",
+					guarantee.ID(), guarantee.CollectionID, indexedGuaranteeID)
+			}
+		} else if !errors.Is(err, storage.ErrNotFound) {
+			return fmt.Errorf("could not look up existing guarantee for collection %x: %w", guarantee.CollectionID, err)
+		}
+		guaranteesByCollection[guarantee.CollectionID] = guarantee.ID()
 	}
 
 	return nil
