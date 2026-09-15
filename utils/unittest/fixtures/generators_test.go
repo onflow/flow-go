@@ -25,6 +25,35 @@ func TestGeneratorSuiteRandomSeed(t *testing.T) {
 	assert.NotEqual(t, header, header2)
 }
 
+// TestBlockFixtureLastViewTC verifies that a block which skipped views carries a LastViewTC that is
+// consistent with the block's own `View` and `ParentView`. `ToHeader` runs the trusted header body
+// constructor, which rejects a TC whose newest QC is newer than the TC itself.
+func TestBlockFixtureLastViewTC(t *testing.T) {
+	assertHeader := func(t *testing.T, header *flow.Header) {
+		require.Greater(t, header.View, header.ParentView)
+		if header.LastViewTC == nil {
+			require.Equal(t, header.ParentView+1, header.View)
+			return
+		}
+		// the TC certifies the last view that failed to produce a QC
+		require.Equal(t, header.View-1, header.LastViewTC.View)
+		require.LessOrEqual(t, header.LastViewTC.NewestQC.View, header.LastViewTC.View)
+	}
+
+	// Blocks().List returns a chain whose blocks have a 50% chance of skipping views, so it covers
+	// both blocks with and without a TC. A fixed seed keeps the coverage reproducible.
+	suite := NewGeneratorSuite(WithSeed(42))
+	blocks := suite.Blocks().List(10)
+	for _, block := range blocks {
+		assertHeader(t, block.ToHeader()) // panics if the generated header body is invalid
+	}
+
+	// a header whose view skips multiple views must carry a TC for view-1
+	header := suite.Headers().Fixture(Header.WithView(100), Header.WithParentView(10))
+	require.NotNil(t, header.LastViewTC)
+	assertHeader(t, header)
+}
+
 func TestGeneratorsDeterminism(t *testing.T) {
 	// Test all generators
 	tests := []struct {
