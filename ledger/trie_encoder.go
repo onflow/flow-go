@@ -288,7 +288,7 @@ func decodeKeyPartWithEncodedSizeInfo(
 
 	// Read encoded key part
 	var kpEnc []byte
-	kpEnc, rest, err = utils.ReadSlice(rest, int(kpEncSize))
+	kpEnc, rest, err = utils.ReadSlice(rest, uint64(kpEncSize))
 	if err != nil {
 		return 0, nil, nil, fmt.Errorf("error decoding key part: %w", err)
 	}
@@ -511,7 +511,7 @@ func decodePayload(inp []byte, zeroCopy bool, version uint16) (*Payload, error) 
 	}
 
 	// read encoded key
-	ek, rest, err := utils.ReadSlice(rest, int(encKeySize))
+	ek, rest, err := utils.ReadSlice(rest, uint64(encKeySize))
 	if err != nil {
 		return nil, fmt.Errorf("error decoding payload: %w", err)
 	}
@@ -537,7 +537,7 @@ func decodePayload(inp []byte, zeroCopy bool, version uint16) (*Payload, error) 
 	}
 
 	// read encoded value
-	encValue, _, err := utils.ReadSlice(rest, encValueSize)
+	encValue, _, err := utils.ReadSlice(rest, uint64(encValueSize))
 	if err != nil {
 		return nil, fmt.Errorf("error decoding payload: %w", err)
 	}
@@ -635,7 +635,7 @@ func decodeTrieUpdate(inp []byte, version uint16) (*TrieUpdate, error) {
 		return nil, fmt.Errorf("error decoding trie update: %w", err)
 	}
 
-	rhBytes, rest, err := utils.ReadSlice(rest, int(rhSize))
+	rhBytes, rest, err := utils.ReadSlice(rest, uint64(rhSize))
 	if err != nil {
 		return nil, fmt.Errorf("error decoding trie update: %w", err)
 	}
@@ -662,7 +662,7 @@ func decodeTrieUpdate(inp []byte, version uint16) (*TrieUpdate, error) {
 	var path Path
 	var encPath []byte
 	for i := 0; i < int(numOfPaths); i++ {
-		encPath, rest, err = utils.ReadSlice(rest, int(pathSize))
+		encPath, rest, err = utils.ReadSlice(rest, uint64(pathSize))
 		if err != nil {
 			return nil, fmt.Errorf("error decoding trie update: %w", err)
 		}
@@ -682,7 +682,7 @@ func decodeTrieUpdate(inp []byte, version uint16) (*TrieUpdate, error) {
 		if err != nil {
 			return nil, fmt.Errorf("error decoding trie update: %w", err)
 		}
-		encPayload, rest, err = utils.ReadSlice(rest, int(payloadSize))
+		encPayload, rest, err = utils.ReadSlice(rest, uint64(payloadSize))
 		if err != nil {
 			return nil, fmt.Errorf("error decoding trie update: %w", err)
 		}
@@ -819,7 +819,7 @@ func decodeTrieProof(inp []byte, version uint16) (*TrieProof, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error decoding proof: %w", err)
 	}
-	flags, rest, err := utils.ReadSlice(rest, int(flagsSize))
+	flags, rest, err := utils.ReadSlice(rest, uint64(flagsSize))
 	if err != nil {
 		return nil, fmt.Errorf("error decoding proof: %w", err)
 	}
@@ -830,7 +830,7 @@ func decodeTrieProof(inp []byte, version uint16) (*TrieProof, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error decoding proof: %w", err)
 	}
-	path, rest, err := utils.ReadSlice(rest, int(pathSize))
+	path, rest, err := utils.ReadSlice(rest, uint64(pathSize))
 	if err != nil {
 		return nil, fmt.Errorf("error decoding proof: %w", err)
 	}
@@ -844,7 +844,7 @@ func decodeTrieProof(inp []byte, version uint16) (*TrieProof, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error decoding proof: %w", err)
 	}
-	encPayload, rest, err := utils.ReadSlice(rest, int(encPayloadSize))
+	encPayload, rest, err := utils.ReadSlice(rest, uint64(encPayloadSize))
 	if err != nil {
 		return nil, fmt.Errorf("error decoding proof: %w", err)
 	}
@@ -873,7 +873,7 @@ func decodeTrieProof(inp []byte, version uint16) (*TrieProof, error) {
 			return nil, fmt.Errorf("error decoding proof: %w", err)
 		}
 
-		interimBytes, rest, err = utils.ReadSlice(rest, int(interimSize))
+		interimBytes, rest, err = utils.ReadSlice(rest, uint64(interimSize))
 		if err != nil {
 			return nil, fmt.Errorf("error decoding proof: %w", err)
 		}
@@ -961,7 +961,7 @@ func decodeTrieBatchProof(inp []byte, version uint16) (*TrieBatchProof, error) {
 		}
 
 		// read encoded proof
-		encProof, rest, err = utils.ReadSlice(rest, int(encProofSize))
+		encProof, rest, err = utils.ReadSlice(rest, uint64(encProofSize))
 		if err != nil {
 			return nil, fmt.Errorf("error decoding batch proof (content): %w", err)
 		}

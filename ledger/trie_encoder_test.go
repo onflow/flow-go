@@ -881,3 +881,42 @@ func TestTrieUpdateEncodingMethodsPreservesValueTypes(t *testing.T) {
 		require.Equal(t, decoded2, decoded3, "EncodeTrieUpdateCBOR and EncodeTrieUpdateProtoBuf should produce same TrieUpdate")
 	})
 }
+
+// TestDecodeTrieBatchProofRejectsOversizedProof verifies that DecodeTrieBatchProof
+// returns an error instead of panicking when a proof declares a length larger than
+// the remaining input. This exercises the ReadSlice uint64 bounds check on the
+// proof decoding path.
+func TestDecodeTrieBatchProofRejectsOversizedProof(t *testing.T) {
+	t.Parallel()
+
+	encodedBatchProofHead := []byte{
+		0x00, 0x00, // version 0
+		0x08,                   // type BatchProof
+		0x00, 0x00, 0x00, 0x01, // number of proofs: 1
+	}
+
+	t.Run("proof size exceeds remaining input", func(t *testing.T) {
+		t.Parallel()
+
+		// Declare a proof size of MaxUint64; only a few bytes follow.
+		encoded := append([]byte{}, encodedBatchProofHead...)
+		encoded = append(encoded, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff) // proof size
+		encoded = append(encoded, 0x00, 0x00)                                     // incomplete proof payload
+
+		_, err := ledger.DecodeTrieBatchProof(encoded)
+		require.Error(t, err)
+	})
+
+	t.Run("proof size wraps to negative on int conversion", func(t *testing.T) {
+		t.Parallel()
+
+		// Declare a proof size of 1<<63, which becomes negative if cast to int on a 64-bit platform.
+		encoded := append([]byte{}, encodedBatchProofHead...)
+		encoded = append(encoded,
+			0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // proof size = 1<<63
+		)
+
+		_, err := ledger.DecodeTrieBatchProof(encoded)
+		require.Error(t, err)
+	})
+}
