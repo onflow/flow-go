@@ -23,7 +23,7 @@ var randomSourceFunctionType = &sema.FunctionType{
 }
 
 // BlockRandomSourceDeclaration returns a declaration for the `randomSource` function.
-// if the environment is a SwappableEnvironment the underlying environment can be swapped without causing issues.
+// if the environment is a swappableEnvironment the underlying environment can be swapped without causing issues.
 func BlockRandomSourceDeclaration(fvmEnv environment.Environment) stdlib.StandardLibraryValue {
 	// Declare the `randomSourceHistory` function. This function is **only** used by the
 	// System transaction, to fill the `RandomBeaconHistory` contract via the heartbeat
@@ -61,7 +61,7 @@ var transactionIndexFunctionType = &sema.FunctionType{
 }
 
 // TransactionIndexDeclaration returns a declaration for the `getTransactionIndex` function.
-// if the environment is a SwappableEnvironment the underlying environment can be swapped without causing issues.
+// if the environment is a swappableEnvironment the underlying environment can be swapped without causing issues.
 func TransactionIndexDeclaration(fvmEnv environment.Environment) stdlib.StandardLibraryValue {
 	return stdlib.StandardLibraryValue{
 		Name:      "getTransactionIndex",
@@ -82,7 +82,7 @@ func TransactionIndexDeclaration(fvmEnv environment.Environment) stdlib.Standard
 }
 
 // EVMInternalEVMContractValue creates an internal EVM contract value based on the specified ChainID and environment.
-// if the environment is a SwappableEnvironment the underlying environment can be swapped without causing issues.
+// if the environment is a swappableEnvironment the underlying environment can be swapped without causing issues.
 func EVMInternalEVMContractValue(chainID flow.ChainID, fvmEnv environment.Environment) *interpreter.SimpleCompositeValue {
 	if fvmEnv == nil {
 		return nil
@@ -107,11 +107,11 @@ func EVMInternalEVMContractValue(chainID flow.ChainID, fvmEnv environment.Enviro
 		evmEmulator,
 	)
 
-	// Register cache cleanup callback on the SwappableEnvironment.
+	// Register cache cleanup callback on the swappableEnvironment.
 	// This ensures the cache is cleared whenever the runtime is
 	// borrowed for a new transaction or returned to the pool.
-	if se, ok := fvmEnv.(*SwappableEnvironment); ok {
-		se.RegisterOnSwapCallback(contractHandler.ResetCaches)
+	if se, ok := fvmEnv.(*swappableEnvironment); ok {
+		se.registerOnSwapCallback(contractHandler.ResetCaches)
 	}
 
 	return impl.NewInternalEVMContractValue(

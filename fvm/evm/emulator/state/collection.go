@@ -52,10 +52,7 @@ func (cp *CollectionProvider) CollectionByID(collectionID []byte) (*Collection, 
 		return nil, err
 	}
 
-	// TODO: expose SlabID.Address() in atree
-
-	var address atree.Address
-	binary.BigEndian.PutUint64(address[:], slabID.AddressAsUint64())
+	address := slabID.Address()
 
 	// sanity check the storage ID address
 	if address != cp.rootAddr {

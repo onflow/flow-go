@@ -12,9 +12,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// TODO(JanezP): unexport all types in this file
-// They are just used by some test
-
 // reusableCadenceRuntime is a wrapper around cadence Runtime and cadence Environment
 // with pre-injected cadence context for: EVM, getTransactionIndex, ...
 // it can be reused by changing the fvmEnv. The reuse happens accross blocks and between scripts and transactions
@@ -36,21 +33,21 @@ type reusableCadenceRuntime struct {
 	TxRuntimeEnv     runtime.Environment
 	ScriptRuntimeEnv runtime.Environment
 
-	fvmEnv *SwappableEnvironment
+	fvmEnv *swappableEnvironment
 }
 
-// SwappableEnvironment is a wrapper type that extends the functionality of environment.Environment.
+// swappableEnvironment is a wrapper type that extends the functionality of environment.Environment.
 // It is designed to allow dynamic replacement of the underlying environment implementation.
-type SwappableEnvironment struct {
+type swappableEnvironment struct {
 	environment.Environment
 	onSwap []func() // Callbacks triggered on every SetFvmEnvironment call.
 }
 
-// RegisterOnSwapCallback registers a callback that is invoked whenever
+// registerOnSwapCallback registers a callback that is invoked whenever
 // the underlying Environment is swapped (during pool Borrow and Return).
 // This enables long-lived, reusable objects to clear per-transaction
 // caches at transaction boundaries.
-func (se *SwappableEnvironment) RegisterOnSwapCallback(cb func()) {
+func (se *swappableEnvironment) registerOnSwapCallback(cb func()) {
 	se.onSwap = append(se.onSwap, cb)
 }
 
@@ -64,7 +61,7 @@ func newReusableCadenceRuntime(
 		chain:            chain,
 		TxRuntimeEnv:     runtime.NewBaseInterpreterEnvironment(config),
 		ScriptRuntimeEnv: runtime.NewScriptInterpreterEnvironment(config),
-		fvmEnv:           &SwappableEnvironment{},
+		fvmEnv:           &swappableEnvironment{},
 	}
 
 	reusable.declareStandardLibraryFunctions()

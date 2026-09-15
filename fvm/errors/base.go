@@ -24,8 +24,7 @@ func NewInvalidAddressErrorf(
 // transaction includes invalid arguments. This error is the result of failure
 // in any of the following conditions:
 // - number of arguments doesn't match the template
-//
-// TODO add more cases like argument size
+// - argument is not json decodable
 func NewInvalidArgumentErrorf(msg string, args ...any) CodedError {
 	return NewCodedError(
 		ErrCodeInvalidArgumentError,

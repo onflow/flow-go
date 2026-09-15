@@ -709,8 +709,6 @@ func TestHandler_COA(t *testing.T) {
 			})
 		})
 	})
-
-	// TODO add test with test emulator for unhappy cases (emulator)
 }
 
 func TestHandler_TransactionRun(t *testing.T) {
