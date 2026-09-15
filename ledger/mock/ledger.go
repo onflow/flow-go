@@ -207,7 +207,7 @@ func (_c *Ledger_GetSingleValue_Call) RunAndReturn(run func(query *ledger.QueryS
 }
 
 // HasState provides a mock function for the type Ledger
-func (_mock *Ledger) HasState(state ledger.State) bool {
+func (_mock *Ledger) HasState(state ledger.State) (bool, error) {
 	ret := _mock.Called(state)
 
 	if len(ret) == 0 {
@@ -215,12 +215,21 @@ func (_mock *Ledger) HasState(state ledger.State) bool {
 	}
 
 	var r0 bool
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(ledger.State) (bool, error)); ok {
+		return returnFunc(state)
+	}
 	if returnFunc, ok := ret.Get(0).(func(ledger.State) bool); ok {
 		r0 = returnFunc(state)
 	} else {
 		r0 = ret.Get(0).(bool)
 	}
-	return r0
+	if returnFunc, ok := ret.Get(1).(func(ledger.State) error); ok {
+		r1 = returnFunc(state)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
 }
 
 // Ledger_HasState_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'HasState'
@@ -247,12 +256,12 @@ func (_c *Ledger_HasState_Call) Run(run func(state ledger.State)) *Ledger_HasSta
 	return _c
 }
 
-func (_c *Ledger_HasState_Call) Return(b bool) *Ledger_HasState_Call {
-	_c.Call.Return(b)
+func (_c *Ledger_HasState_Call) Return(b bool, err error) *Ledger_HasState_Call {
+	_c.Call.Return(b, err)
 	return _c
 }
 
-func (_c *Ledger_HasState_Call) RunAndReturn(run func(state ledger.State) bool) *Ledger_HasState_Call {
+func (_c *Ledger_HasState_Call) RunAndReturn(run func(state ledger.State) (bool, error)) *Ledger_HasState_Call {
 	_c.Call.Return(run)
 	return _c
 }
