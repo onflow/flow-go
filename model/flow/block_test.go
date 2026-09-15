@@ -124,7 +124,7 @@ func TestBlock_Status(t *testing.T) {
 // zero-value struct would cause hashModel() to panic in the malleability checker.
 func blockWithLastViewTC() *flow.Block {
 	const maxAttempts = 1000
-	for i := 0; i < maxAttempts; i++ {
+	for range maxAttempts {
 		if b := unittest.FullBlockFixture(); b.LastViewTC != nil {
 			return b
 		}
