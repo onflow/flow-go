@@ -170,6 +170,30 @@ func filePathPattern(dir string, fileName string) string {
 	return fmt.Sprintf("%v*", filePathCheckpointHeader(dir, fileName))
 }
 
+// AnyCheckpointFileExists reports whether any file belonging to a checkpoint
+// with the given fileName exists under dir: the checkpoint header, any of its
+// part files, or any stray file sharing the same prefix (for example a leftover
+// from an interrupted write). It is intended for callers that must refuse to
+// overwrite the checkpoint output, since writing a checkpoint recreates all of
+// these files.
+//
+// No error returns are expected during normal operation.
+func AnyCheckpointFileExists(dir string, fileName string) (bool, error) {
+	// Enumerate the directory and compare literal name prefixes instead of using
+	// filepath.Glob: `dir` is an arbitrary path, so any glob metacharacter in it
+	// would be interpreted as pattern syntax rather than a literal directory name.
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return false, fmt.Errorf("could not find checkpoint files: %w", err)
+	}
+	for _, entry := range entries {
+		if strings.HasPrefix(entry.Name(), fileName) {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
 // readCheckpointHeader takes a file path and returns subtrieChecksums and topTrieChecksum
 // any error returned are exceptions
 func readCheckpointHeader(filepath string, logger zerolog.Logger) (
