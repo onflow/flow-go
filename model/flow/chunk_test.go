@@ -267,6 +267,18 @@ func TestFromUntrustedChunkDataPack(t *testing.T) {
 		assert.Nil(t, pack)
 		assert.Contains(t, err.Error(), "ExecutionDataRoot.ChunkExecutionDataIDs")
 	})
+
+	t.Run("Collection with nil transaction element rejected", func(t *testing.T) {
+		untrusted := baseChunkDataPack
+		untrusted.Collection = &flow.Collection{
+			Transactions: []*flow.TransactionBody{nil},
+		}
+
+		pack, err := flow.NewChunkDataPack(untrusted)
+		assert.Error(t, err)
+		assert.Nil(t, pack)
+		assert.Contains(t, err.Error(), "invalid collection")
+	})
 }
 
 // TestNewChunk verifies that NewChunk constructs a valid Chunk when given
