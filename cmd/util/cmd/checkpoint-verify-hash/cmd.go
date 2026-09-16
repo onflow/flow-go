@@ -26,7 +26,7 @@ into memory) and its stored hash is recomputed and compared:
   - leaf nodes are verified from their content (V6 payload value, V7 leaf hash),
   - interim nodes are verified as HashInterNode of their children's hashes.
 
-The 16 subtrie files are verified concurrently using --n-worker goroutines (1-16);
+The 16 subtrie files are verified concurrently using --nworker goroutines (1-16);
 the top trie is then verified using the subtrie node hashes. On any hash mismatch
 or integrity violation the command exits fatally.`,
 	Run: run,
@@ -41,7 +41,7 @@ func init() {
 		"checkpoint header filename, e.g. \"checkpoint.00000100\" or \"checkpoint.00000100.v7\" (required)")
 	_ = Cmd.MarkFlagRequired("checkpoint")
 
-	Cmd.Flags().UintVar(&flagNWorker, "n-worker", 1,
+	Cmd.Flags().UintVar(&flagNWorker, "nworker", 1,
 		"number of subtrie files to verify concurrently (1-16)")
 }
 
