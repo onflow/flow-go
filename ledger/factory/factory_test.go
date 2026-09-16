@@ -700,7 +700,7 @@ func TestNewPayloadlessLedger_LoadsConvertedV6(t *testing.T) {
 	))
 
 	v7Name := v6Name + wal.V7FileSuffix
-	require.NoError(t, wal.ConvertCheckpointV6ToV7(tempDir, v6Name, tempDir, v7Name, logger, 16))
+	require.NoError(t, wal.ConvertCheckpointV6ToV7(tempDir, v6Name, tempDir, v7Name, logger, 16, false))
 
 	plLedger, err := NewPayloadlessLedger(Config{
 		Triedir:        tempDir,
@@ -748,7 +748,7 @@ func TestNewPayloadlessLedger_LoadsV7RootCheckpoint(t *testing.T) {
 	require.NoError(t, wal.ConvertCheckpointV6ToV7(
 		tempDir, bootstrap.FilenameWALRootCheckpoint,
 		tempDir, bootstrap.FilenameWALRootCheckpoint+wal.V7FileSuffix,
-		logger, 16,
+		logger, 16, false,
 	))
 
 	// Ensure the test actually exercises the root-checkpoint path: no numbered
