@@ -64,6 +64,11 @@ func NewPayload(untrusted UntrustedPayload) (*Payload, error) {
 		if r == nil {
 			return nil, fmt.Errorf("result at index %d is nil", i)
 		}
+		for j, ch := range r.Chunks {
+			if ch == nil {
+				return nil, fmt.Errorf("chunk at index %d in result at index %d is nil", j, i)
+			}
+		}
 	}
 
 	return &Payload{
