@@ -703,11 +703,17 @@ func readTriesRootHash(logger zerolog.Logger, dir string, fileName string) (
 	return trieRootsToReturn, errToReturn
 }
 
-// readCheckpointTriesRootHash reads the trie root hashes from either a V6 or V7
-// checkpoint, dispatching by the [V7FileSuffix] on filename. Callers that already
-// know which version they want should call [ReadTriesRootHash] or
-// [ReadTriesRootHashV7] directly.
-func readCheckpointTriesRootHash(logger zerolog.Logger, dir, fileName string) ([]ledger.RootHash, error) {
+// ReadCheckpointTriesRootHash reads the trie root hashes from either a V6 or V7
+// (payloadless) checkpoint, dispatching by the [V7FileSuffix] on `fileName`.
+//
+// Both checkpoint versions may coexist in the same directory, so callers that only
+// have a directory and filename (and not the version) should use this function
+// rather than dispatching on the suffix themselves. Callers that already know which
+// version they want should call [ReadTriesRootHash] or [ReadTriesRootHashV7]
+// directly.
+//
+// No error returns are expected during normal operation.
+func ReadCheckpointTriesRootHash(logger zerolog.Logger, dir, fileName string) ([]ledger.RootHash, error) {
 	if strings.HasSuffix(fileName, V7FileSuffix) {
 		return ReadTriesRootHashV7(logger, dir, fileName)
 	}
@@ -716,7 +722,7 @@ func readCheckpointTriesRootHash(logger zerolog.Logger, dir, fileName string) ([
 
 // checkpointHasRootHash check if the given checkpoint file contains the expected root hash
 func checkpointHasRootHash(logger zerolog.Logger, bootstrapDir, filename string, expectedRootHash ledger.RootHash) error {
-	roots, err := readCheckpointTriesRootHash(logger, bootstrapDir, filename)
+	roots, err := ReadCheckpointTriesRootHash(logger, bootstrapDir, filename)
 	if err != nil {
 		return fmt.Errorf("could not read checkpoint root hash: %w", err)
 	}
@@ -738,7 +744,7 @@ func checkpointHasRootHash(logger zerolog.Logger, bootstrapDir, filename string,
 }
 
 func checkpointHasSingleRootHash(logger zerolog.Logger, bootstrapDir, filename string, expectedRootHash ledger.RootHash) error {
-	roots, err := readCheckpointTriesRootHash(logger, bootstrapDir, filename)
+	roots, err := ReadCheckpointTriesRootHash(logger, bootstrapDir, filename)
 	if err != nil {
 		return fmt.Errorf("could not read checkpoint root hash: %w", err)
 	}
