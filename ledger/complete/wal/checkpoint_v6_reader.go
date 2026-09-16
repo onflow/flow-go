@@ -132,6 +132,13 @@ func ReadCheckpointFileSize(dir string, fileName string) (uint64, error) {
 	return totalSize, nil
 }
 
+// CheckpointV6AllFilePaths returns the full file paths for all 18 files that make up
+// a V6 checkpoint (1 header file + 16 subtrie files + 1 top-trie file), in header-first
+// order. The caller can use these paths for existence checks, moves, or deletes.
+func CheckpointV6AllFilePaths(dir string, fileName string) []string {
+	return allFilePaths(dir, fileName)
+}
+
 func allFilePaths(dir string, fileName string) []string {
 	paths := make([]string, 0, 1+subtrieCount+1)
 	paths = append(paths, filePathCheckpointHeader(dir, fileName))
