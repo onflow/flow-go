@@ -9,6 +9,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"strings"
 
 	"github.com/docker/go-units"
 	"github.com/hashicorp/go-multierror"
@@ -583,6 +584,11 @@ func storeTries(
 }
 
 // deleteCheckpointFiles removes any checkpoint files with given checkpoint prefix in the outputDir.
+//
+// A V6 checkpoint name is a prefix of the same-numbered V7 checkpoint name (e.g. "checkpoint.00000100"
+// prefixes the V7 header "checkpoint.00000100.v7" and its part files), so a V6 glob also matches V7
+// files. To keep the two versions independent — a writer must never delete files owned by the other
+// version — files carrying the V7 suffix are skipped unless outputFile itself is a V7 name.
 func deleteCheckpointFiles(outputDir string, outputFile string) error {
 	pattern := filePathPattern(outputDir, outputFile)
 	filesToRemove, err := filepath.Glob(pattern)
@@ -592,8 +598,13 @@ func deleteCheckpointFiles(outputDir string, outputFile string) error {
 		)
 	}
 
+	isV7 := strings.Contains(outputFile, V7FileSuffix)
+
 	var merror *multierror.Error
 	for _, file := range filesToRemove {
+		if !isV7 && strings.Contains(filepath.Base(file), V7FileSuffix) {
+			continue
+		}
 		err := os.Remove(file)
 		if err != nil {
 			merror = multierror.Append(merror, err)
