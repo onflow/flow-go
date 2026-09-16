@@ -41,6 +41,7 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
 	recovery "github.com/onflow/flow-go/consensus/recovery/protocol"
 	"github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/engine/access/beaconobservability"
 	"github.com/onflow/flow-go/engine/access/index"
 	"github.com/onflow/flow-go/engine/access/ingestion"
 	"github.com/onflow/flow-go/engine/access/ingestion/collections"
@@ -192,6 +193,7 @@ type AccessNodeConfig struct {
 	versionControlEnabled                bool
 	storeTxResultErrorMessages           bool
 	stopControlEnabled                   bool
+	beaconObservabilityEnabled           bool
 	registerDBPruneThreshold             uint64
 }
 
@@ -303,6 +305,7 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 		versionControlEnabled:                true,
 		storeTxResultErrorMessages:           false,
 		stopControlEnabled:                   false,
+		beaconObservabilityEnabled:           false,
 		registerDBPruneThreshold:             0,
 	}
 }
@@ -1461,6 +1464,10 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 			"stop-control-enabled",
 			defaultConfig.stopControlEnabled,
 			"whether to enable the stop control feature. Default value is false")
+		flags.BoolVar(&builder.beaconObservabilityEnabled,
+			"beacon-observability-enabled",
+			defaultConfig.beaconObservabilityEnabled,
+			"whether to enable the beacon observability feature that exports per-proposer signature type metrics from finalized blocks. Default value is false")
 		// ExecutionDataRequester config
 		flags.BoolVar(&builder.executionDataSyncEnabled,
 			"execution-data-sync-enabled",
@@ -1880,6 +1887,7 @@ func (builder *FlowAccessNodeBuilder) enqueueRelayNetwork() {
 func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 	var processedFinalizedBlockHeightInitializer storage.ConsumerProgressInitializer
 	var processedTxErrorMessagesBlockHeightInitializer storage.ConsumerProgressInitializer
+	var processedBeaconObservabilityBlockHeightInitializer storage.ConsumerProgressInitializer
 
 	if builder.executionDataSyncEnabled {
 		builder.BuildExecutionSyncComponents()
@@ -2004,12 +2012,17 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			return nil
 		}).
 		Module("access metrics", func(node *cmd.NodeConfig) error {
-			builder.AccessMetrics = metrics.NewAccessCollector(
+			opts := []metrics.AccessCollectorOpts{
 				metrics.WithTransactionMetrics(builder.TransactionMetrics),
 				metrics.WithTransactionValidationMetrics(builder.TransactionValidationMetrics),
 				metrics.WithBackendScriptsMetrics(builder.TransactionMetrics),
 				metrics.WithRestMetrics(builder.RestMetrics),
-			)
+			}
+			if builder.beaconObservabilityEnabled {
+				opts = append(opts, metrics.WithBeaconObservabilityMetrics(
+					metrics.NewBeaconObservabilityCollector(node.MetricsRegisterer)))
+			}
+			builder.AccessMetrics = metrics.NewAccessCollector(opts...)
 			return nil
 		}).
 		Module("collection metrics", func(node *cmd.NodeConfig) error {
@@ -2105,6 +2118,13 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 		}).
 		Module("processed finalized block height consumer progress", func(node *cmd.NodeConfig) error {
 			processedFinalizedBlockHeightInitializer = store.NewConsumerProgress(builder.ProtocolDB, module.ConsumeProgressIngestionEngineBlockHeight)
+			return nil
+		}).
+		Module("processed beacon observability block height consumer progress", func(node *cmd.NodeConfig) error {
+			if !builder.beaconObservabilityEnabled {
+				return nil
+			}
+			processedBeaconObservabilityBlockHeightInitializer = store.NewConsumerProgress(builder.ProtocolDB, module.ConsumeProgressBeaconObservabilityBlockHeight)
 			return nil
 		}).
 		Module("processed last full block height monotonic consumer progress", func(node *cmd.NodeConfig) error {
@@ -2498,6 +2518,40 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			ingestionDependable.Init(builder.IngestEng)
 
 			return builder.IngestEng, nil
+		}).
+		Component("beacon observability", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			if !builder.beaconObservabilityEnabled {
+				return &module.NoopReadyDoneAware{}, nil
+			}
+
+			// Start walking finalized blocks from the latest finalized block known at startup, so the
+			// component does not need to catch up from the root block. The progress index is initialized
+			// to one less than the latest finalized height so that the latest finalized block itself is
+			// the first job processed. For a node at the root block, progress starts at the root height.
+			rootHeight := node.SealedRootBlock.Height
+			startHeight := builder.Finalized.Height
+			if startHeight > rootHeight {
+				startHeight--
+			}
+			processedBeaconObservabilityBlockHeight, err := processedBeaconObservabilityBlockHeightInitializer.Initialize(startHeight)
+			if err != nil {
+				return nil, fmt.Errorf("could not initialize processed beacon observability block height: %w", err)
+			}
+
+			beaconObservability, err := beaconobservability.New(
+				node.Logger,
+				node.State,
+				node.Storage.Blocks,
+				builder.AccessMetrics,
+				processedBeaconObservabilityBlockHeight,
+			)
+			if err != nil {
+				return nil, fmt.Errorf("could not create beacon observability component: %w", err)
+			}
+
+			node.ProtocolEvents.AddConsumer(beaconObservability)
+
+			return beaconObservability, nil
 		})
 
 	if builder.storeTxResultErrorMessages {
