@@ -93,9 +93,62 @@ type ExecutionState interface {
 	GetHighestFinalizedExecuted() (uint64, error)
 }
 
+// LedgerStateChecker is the minimum ledger-side contract the execution state
+// always needs, regardless of register-store mode: a way to check whether a
+// given state commitment exists in the underlying trie. Both ledger.Ledger
+// and ledger.PayloadlessLedger satisfy this interface, which is how the
+// execution state can be backed by either.
+type LedgerStateChecker interface {
+	// HasState returns true if the given state commitment exists in the ledger.
+	//
+	// No error returns are expected during normal operation.
+	HasState(state ledger.State) (bool, error)
+}
+
+// LedgerBackend bundles the ledger-side dependencies of the execution state. Its purpose is to make
+// the valid combinations the only representable ones: a call site cannot forget to supply a
+// register-value source, and it does not need to know that the source is absent in payloadless mode.
+// Construct it with [FullLedgerBackend] or [PayloadlessLedgerBackend].
+type LedgerBackend struct {
+	// stateChecker checks whether a state commitment exists in the underlying trie.
+	// Always required.
+	stateChecker LedgerStateChecker
+
+	// snapshotLedger is the register-value source backing the snapshots handed out by
+	// `NewStorageSnapshot`. It is nil for a payloadless backend, where the ledger retains no
+	// register values and the register store must serve register reads instead.
+	snapshotLedger ledger.Ledger
+}
+
+// FullLedgerBackend returns a [LedgerBackend] where the given full ledger serves both
+// state-commitment checks and register reads. Valid with the register store either enabled or
+// disabled: when it is enabled, register reads go to the register store and the ledger is only used
+// for state-commitment checks.
+func FullLedgerBackend(ls ledger.Ledger) LedgerBackend {
+	return LedgerBackend{
+		stateChecker:   ls,
+		snapshotLedger: ls,
+	}
+}
+
+// PayloadlessLedgerBackend returns a [LedgerBackend] where the given ledger only checks state
+// commitments and cannot serve register values, as is the case for [ledger.PayloadlessLedger].
+//
+// CAUTION: this backend is only usable with the register store enabled, because the register store
+// is then the sole source of register values. With the register store disabled, the snapshots handed
+// out by `NewStorageSnapshot` have no value source and panic on the first register read. Node
+// startup enforces this: `--payloadless` requires `--enable-storehouse` (see
+// `ExecutionConfig.ValidateFlags`).
+func PayloadlessLedgerBackend(ls LedgerStateChecker) LedgerBackend {
+	return LedgerBackend{
+		stateChecker:   ls,
+		snapshotLedger: nil,
+	}
+}
+
 type state struct {
 	tracer             module.Tracer
-	ls                 ledger.Ledger
+	ls                 LedgerStateChecker
 	commits            storage.Commits
 	blocks             storage.Blocks
 	headers            storage.Headers
@@ -109,15 +162,22 @@ type state struct {
 	getLatestFinalized func() (uint64, error)
 	lockManager        lockctx.Manager
 
-	registerStore execution.RegisterStore
-	// when it is true, registers are stored in both register store and ledger
-	// and register queries will send to the register store instead of ledger
+	// snapshotLedger and registerStore are needed by the NewStorageSnapshot method:
+	// when enableRegisterStore == false, registerStore is nil and snapshotLedger is used to read register values
+	// when enableRegisterStore == true, registerStore is used to read register values and snapshotLedger is unused
+	// (nil for a payloadless backend, which requires enableRegisterStore == true; non-nil for a full backend)
 	enableRegisterStore bool
+	snapshotLedger      ledger.Ledger
+	registerStore       execution.RegisterStore
 }
 
-// NewExecutionState returns a new execution state access layer for the given ledger storage.
+// NewExecutionState returns a new execution state access layer backed by the given ledger.
+//
+// `ledgerBackend` supplies the state-commitment checker and, unless the backend is payloadless, the
+// register-value source for the snapshots handed out by `NewStorageSnapshot`. A payloadless backend
+// requires `enableRegisterStore == true`; see [PayloadlessLedgerBackend].
 func NewExecutionState(
-	ls ledger.Ledger,
+	ledgerBackend LedgerBackend,
 	commits storage.Commits,
 	blocks storage.Blocks,
 	headers storage.Headers,
@@ -136,7 +196,8 @@ func NewExecutionState(
 ) ExecutionState {
 	return &state{
 		tracer:              tracer,
-		ls:                  ls,
+		ls:                  ledgerBackend.stateChecker,
+		snapshotLedger:      ledgerBackend.snapshotLedger,
 		commits:             commits,
 		blocks:              blocks,
 		headers:             headers,
@@ -262,7 +323,7 @@ func (s *state) NewStorageSnapshot(
 	if s.enableRegisterStore {
 		return storehouse.NewBlockEndStateSnapshot(s.registerStore, blockID, height)
 	}
-	return NewLedgerStorageSnapshot(s.ls, commitment)
+	return NewLedgerStorageSnapshot(s.snapshotLedger, commitment)
 }
 
 func (s *state) CreateStorageSnapshot(
