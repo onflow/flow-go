@@ -285,7 +285,10 @@ func (s *state) CreateStorageSnapshot(
 	}
 
 	// make sure we have trie state for this block
-	ledgerHasState := s.ls.HasState(ledger.State(commit))
+	ledgerHasState, err := s.ls.HasState(ledger.State(commit))
+	if err != nil {
+		return nil, header, fmt.Errorf("cannot check ledger state for commit %x (block %v): %w", commit, blockID, err)
+	}
 	if !ledgerHasState {
 		return nil, header, fmt.Errorf("state not found in ledger for commit %x (block %v): %w", commit, blockID, ErrExecutionStatePruned)
 	}
