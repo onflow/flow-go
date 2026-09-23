@@ -7235,7 +7235,7 @@ func TestEthLogEmissionWithSelfDestruct(t *testing.T) {
 
 	chain := flow.Emulator.Chain()
 
-	t.Run("test SelfDestruct with self as beneficiary emits EthBurnLog", func(t *testing.T) {
+	t.Run("test SelfDestruct with self as beneficiary does not emit EthTransferLog", func(t *testing.T) {
 		t.Parallel()
 
 		RunContractWithNewEnvironment(
@@ -7322,6 +7322,10 @@ func TestEthLogEmissionWithSelfDestruct(t *testing.T) {
 				require.Len(t, gethLogs, 1)
 
 				ethTransferLog := gethLogs[0]
+				// This EthTransferLog is from the Factory contract to the newly
+				// deployed contract.
+				// Since the beneficiary is the contract being self-destructed,
+				// its ETH balance is not transferred, so there is no EthTransferLog
 				require.Equal(t, gethParams.SystemAddress, ethTransferLog.Address)
 				require.Len(t, ethTransferLog.Topics, 3)
 				require.Equal(t, gethParams.EthTransferLogEvent, ethTransferLog.Topics[0])
@@ -7331,7 +7335,7 @@ func TestEthLogEmissionWithSelfDestruct(t *testing.T) {
 		)
 	})
 
-	t.Run("test SelfDestruct with non-self as beneficiary does not emit EthBurnLog", func(t *testing.T) {
+	t.Run("test SelfDestruct with non-self as beneficiary emits EthTransferLog", func(t *testing.T) {
 		t.Parallel()
 
 		RunContractWithNewEnvironment(
