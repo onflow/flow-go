@@ -204,12 +204,12 @@ func TestFullGossipSubConnectivityAmongHonestNodesWithMaliciousMajority(t *testi
 		case <-ticker.C:
 			con1BlockTopicPeers := con1Node.GetLocalMeshPeers(blockTopic)
 			if slices.Contains(con1BlockTopicPeers, con2Node.ID()) {
-				con2HasCon1 = true // con1 has con2 in its mesh, break out of the current loop
+				con2HasCon1 = true // con1 has con2 in its mesh
 			}
 
 			con2BlockTopicPeers := con2Node.GetLocalMeshPeers(blockTopic)
 			if slices.Contains(con2BlockTopicPeers, con1Node.ID()) {
-				con1HasCon2 = true // con2 has con1 in its mesh, break out of the current loop
+				con1HasCon2 = true // con2 has con1 in its mesh
 			}
 
 			if con2HasCon1 && con1HasCon2 {
