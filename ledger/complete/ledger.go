@@ -425,8 +425,10 @@ func (l *Ledger) MostRecentTouchedState() (ledger.State, error) {
 }
 
 // HasState returns true if the given state exists inside the ledger
-func (l *Ledger) HasState(state ledger.State) bool {
-	return l.forest.HasTrie(ledger.RootHash(state))
+//
+// No error returns are expected during normal operation.
+func (l *Ledger) HasState(state ledger.State) (bool, error) {
+	return l.forest.HasTrie(ledger.RootHash(state)), nil
 }
 
 // DumpTrieAsJSON export trie at specific state as JSONL (each line is JSON encoding of a payload)

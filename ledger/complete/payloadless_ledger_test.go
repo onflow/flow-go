@@ -93,7 +93,9 @@ func TestPayloadlessLedger_Set(t *testing.T) {
 		require.NoError(t, err)
 		assert.NotEqual(t, state, newState)
 		assert.False(t, trieUpdate.IsEmpty())
-		assert.True(t, l.HasState(newState))
+		hasState, err := l.HasState(newState)
+		require.NoError(t, err)
+		assert.True(t, hasState)
 	})
 }
 
@@ -260,8 +262,14 @@ func TestPayloadlessLedger_Equivalence_Set(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Equal(t, fullNew, plNew, "states should agree after identical update")
-	assert.True(t, full.HasState(fullNew))
-	assert.True(t, pl.HasState(plNew))
+
+	fullHasState, err := full.HasState(fullNew)
+	require.NoError(t, err)
+	assert.True(t, fullHasState)
+
+	plHasState, err := pl.HasState(plNew)
+	require.NoError(t, err)
+	assert.True(t, plHasState)
 }
 
 // TestPayloadlessLedger_Equivalence_Reads verifies that for every allocated

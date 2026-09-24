@@ -50,15 +50,19 @@ func TestRemoteLedgerClient(t *testing.T) {
 			// Both should have the same initial state
 			assert.Equal(t, localInitialState, remoteInitialState)
 
-			localHasState := localLedger.HasState(localInitialState)
-			remoteHasState := remoteLedger.HasState(remoteInitialState)
+			localHasState, err := localLedger.HasState(localInitialState)
+			require.NoError(t, err)
+			remoteHasState, err := remoteLedger.HasState(remoteInitialState)
+			require.NoError(t, err)
 			assert.Equal(t, localHasState, remoteHasState, "HasState should return the same result for local and remote ledger")
 			assert.True(t, localHasState)
 
 			// Test with non-existent state
 			dummyState := ledger.DummyState
-			localHasState = localLedger.HasState(dummyState)
-			remoteHasState = remoteLedger.HasState(dummyState)
+			localHasState, err = localLedger.HasState(dummyState)
+			require.NoError(t, err)
+			remoteHasState, err = remoteLedger.HasState(dummyState)
+			require.NoError(t, err)
 			assert.Equal(t, localHasState, remoteHasState, "HasState for non-existent state should return the same result")
 			assert.False(t, localHasState)
 		})
