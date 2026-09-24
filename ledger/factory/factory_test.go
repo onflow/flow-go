@@ -392,8 +392,8 @@ func startLedgerServer(t *testing.T, walDir string) (string, func()) {
 	// Create compactor config
 	compactorConfig := ledger.DefaultCompactorConfig(metricsCollector)
 
-	// Create ledger factory
-	factory := complete.NewLocalLedgerFactory(
+	// Create ledger instance with internal compactor
+	ledgerStorage, err := complete.NewLedgerWithCompactor(
 		diskWal,
 		100,
 		compactorConfig,
@@ -402,9 +402,6 @@ func startLedgerServer(t *testing.T, walDir string) (string, func()) {
 		logger,
 		complete.DefaultPathFinderVersion,
 	)
-
-	// Create ledger instance
-	ledgerStorage, err := factory.NewLedger()
 	require.NoError(t, err)
 
 	// Wait for ledger to be ready (WAL replay)
@@ -505,21 +502,6 @@ func withLedgerPair(t *testing.T, fn func(localLedger, remoteLedger ledger.Ledge
 
 	// Execute the test function with the ledgers
 	fn(localLedger, remoteLedger)
-}
-
-// forestSizer is satisfied by both *complete.PayloadlessLedger (no-WAL mode)
-// and *complete.PayloadlessLedgerWithCompactor (the embedded type promotes
-// ForestSize). Tests use it to compare forest size regardless of which factory
-// path constructed the ledger.
-type forestSizer interface {
-	ForestSize() int
-}
-
-func payloadlessLedgerForestSize(t *testing.T, l ledger.PayloadlessLedger) int {
-	t.Helper()
-	fs, ok := l.(forestSizer)
-	require.True(t, ok, "expected ledger to expose ForestSize")
-	return fs.ForestSize()
 }
 
 // TestNewPayloadlessLedger_EmptyTriedir verifies that an empty Triedir is

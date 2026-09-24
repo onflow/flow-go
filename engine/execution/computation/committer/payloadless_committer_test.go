@@ -64,6 +64,12 @@ func (m *mockPayloadlessLedger) Prove(query *ledger.Query) (*ledger.PayloadlessT
 	return m.proveFn(query)
 }
 
+func (m *mockPayloadlessLedger) StateCount() int { return 0 }
+
+func (m *mockPayloadlessLedger) StateByIndex(int) (ledger.State, error) {
+	return ledger.DummyState, nil
+}
+
 func TestPayloadlessLedgerViewCommitter(t *testing.T) {
 
 	t.Run("CommitView returns reconstructed full proof and statecommitment", func(t *testing.T) {

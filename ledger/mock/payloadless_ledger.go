@@ -552,3 +552,109 @@ func (_c *PayloadlessLedger_Set_Call) RunAndReturn(run func(update *ledger.Updat
 	_c.Call.Return(run)
 	return _c
 }
+
+// StateByIndex provides a mock function for the type PayloadlessLedger
+func (_mock *PayloadlessLedger) StateByIndex(index int) (ledger.State, error) {
+	ret := _mock.Called(index)
+
+	if len(ret) == 0 {
+		panic("no return value specified for StateByIndex")
+	}
+
+	var r0 ledger.State
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(int) (ledger.State, error)); ok {
+		return returnFunc(index)
+	}
+	if returnFunc, ok := ret.Get(0).(func(int) ledger.State); ok {
+		r0 = returnFunc(index)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(ledger.State)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(int) error); ok {
+		r1 = returnFunc(index)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// PayloadlessLedger_StateByIndex_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'StateByIndex'
+type PayloadlessLedger_StateByIndex_Call struct {
+	*mock.Call
+}
+
+// StateByIndex is a helper method to define mock.On call
+//   - index int
+func (_e *PayloadlessLedger_Expecter) StateByIndex(index interface{}) *PayloadlessLedger_StateByIndex_Call {
+	return &PayloadlessLedger_StateByIndex_Call{Call: _e.mock.On("StateByIndex", index)}
+}
+
+func (_c *PayloadlessLedger_StateByIndex_Call) Run(run func(index int)) *PayloadlessLedger_StateByIndex_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 int
+		if args[0] != nil {
+			arg0 = args[0].(int)
+		}
+		run(
+			arg0,
+		)
+	})
+	return _c
+}
+
+func (_c *PayloadlessLedger_StateByIndex_Call) Return(state ledger.State, err error) *PayloadlessLedger_StateByIndex_Call {
+	_c.Call.Return(state, err)
+	return _c
+}
+
+func (_c *PayloadlessLedger_StateByIndex_Call) RunAndReturn(run func(index int) (ledger.State, error)) *PayloadlessLedger_StateByIndex_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// StateCount provides a mock function for the type PayloadlessLedger
+func (_mock *PayloadlessLedger) StateCount() int {
+	ret := _mock.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for StateCount")
+	}
+
+	var r0 int
+	if returnFunc, ok := ret.Get(0).(func() int); ok {
+		r0 = returnFunc()
+	} else {
+		r0 = ret.Get(0).(int)
+	}
+	return r0
+}
+
+// PayloadlessLedger_StateCount_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'StateCount'
+type PayloadlessLedger_StateCount_Call struct {
+	*mock.Call
+}
+
+// StateCount is a helper method to define mock.On call
+func (_e *PayloadlessLedger_Expecter) StateCount() *PayloadlessLedger_StateCount_Call {
+	return &PayloadlessLedger_StateCount_Call{Call: _e.mock.On("StateCount")}
+}
+
+func (_c *PayloadlessLedger_StateCount_Call) Run(run func()) *PayloadlessLedger_StateCount_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *PayloadlessLedger_StateCount_Call) Return(n int) *PayloadlessLedger_StateCount_Call {
+	_c.Call.Return(n)
+	return _c
+}
+
+func (_c *PayloadlessLedger_StateCount_Call) RunAndReturn(run func() int) *PayloadlessLedger_StateCount_Call {
+	_c.Call.Return(run)
+	return _c
+}

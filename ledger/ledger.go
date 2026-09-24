@@ -98,6 +98,21 @@ type PayloadlessLedger interface {
 	// query's state. Encoded with [EncodePayloadlessTrieBatchProof] on the
 	// wire; consumers must decode with [DecodePayloadlessTrieBatchProof].
 	Prove(query *Query) (*PayloadlessTrieBatchProof, error)
+
+	// StateCount returns the number of states (tries) stored in the ledger.
+	//
+	// Remote clients do not support state inspection and report zero.
+	StateCount() int
+
+	// StateByIndex returns the state at the given index. `-1` returns the last
+	// index.
+	//
+	// Remote clients do not support state inspection and always return an error.
+	//
+	// Expected error returns during normal operation:
+	//   - an error if no states are available in the ledger
+	//   - an error if the given index is out of range
+	StateByIndex(index int) (State, error)
 }
 
 // Query holds all data needed for a ledger read or ledger proof
