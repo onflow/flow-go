@@ -327,15 +327,15 @@ func runE(*cobra.Command, []string) error {
 		// GetHighestFinalizedExecuted is exactly the block the node will resume from after
 		// restarting on the compacted state.
 		//
-		// The ledger is intentionally nil: with storehouse disabled,
-		// GetHighestFinalizedExecuted derives the height exclusively from the protocol
-		// database (finalized head, executed-block pointer, headers and commits) and never
-		// touches the ledger. Opening a real ledger here would decode the whole checkpoint
-		// - hundreds of millions of MTrie nodes, tens of GB of RAM - only to discard the
-		// result. The compacted checkpoint is instead validated from its header and part
-		// file footers, see validateCompactedState.
+		// The ledger backend is intentionally the zero value (no ledger at all): with
+		// storehouse disabled, GetHighestFinalizedExecuted derives the height exclusively
+		// from the protocol database (finalized head, executed-block pointer, headers and
+		// commits) and never touches the ledger. Opening a real ledger here would decode
+		// the whole checkpoint - hundreds of millions of MTrie nodes, tens of GB of RAM -
+		// only to discard the result. The compacted checkpoint is instead validated from
+		// its header and part file footers, see validateCompactedState.
 		execState := exestate.NewExecutionState(
-			nil, // ledger: never used by GetHighestFinalizedExecuted, see comment above
+			exestate.LedgerBackend{}, // no ledger: only used to reach GetHighestFinalizedExecuted, see comment above
 			storages.Commits,
 			storages.Blocks,
 			storages.Headers,
