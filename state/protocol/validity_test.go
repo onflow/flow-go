@@ -68,6 +68,22 @@ func TestEpochSetupValidity(t *testing.T) {
 		require.Error(t, err)
 	})
 
+	t.Run("invalid participant role", func(t *testing.T) {
+		_, result, _ := unittest.BootstrapFixture(participants)
+		setup := result.ServiceEvents[0].Event.(*flow.EpochSetup)
+
+		// mutate a consensus node (not a collector, so cluster assignment stays valid)
+		for i, p := range setup.Participants {
+			if p.Role == flow.RoleConsensus {
+				setup.Participants[i].Role = flow.Role(42)
+				break
+			}
+		}
+
+		err := protocol.IsValidEpochSetup(setup, true)
+		require.Error(t, err)
+	})
+
 	t.Run("network addresses are not unique", func(t *testing.T) {
 		_, result, _ := unittest.BootstrapFixture(participants)
 		setup := result.ServiceEvents[0].Event.(*flow.EpochSetup)

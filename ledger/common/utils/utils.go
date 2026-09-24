@@ -75,10 +75,13 @@ func AppendLongData(input []byte, data []byte) []byte {
 	return input
 }
 
-// ReadSlice reads `size` bytes from the input
-func ReadSlice(input []byte, size int) (value []byte, rest []byte, err error) {
-	if len(input) < size {
-		return nil, input, fmt.Errorf("input size is too small to be splited %d < %d ", len(input), size)
+// ReadSlice reads `size` bytes from the input and returns the slice and the rest.
+//
+// Expected error returns during normal operation:
+//   - Generic error: if the input has fewer than `size` bytes remaining.
+func ReadSlice(input []byte, size uint64) (value []byte, rest []byte, err error) {
+	if uint64(len(input)) < size {
+		return nil, input, fmt.Errorf("input size is too small to be split: %d < %d", len(input), size)
 	}
 	return input[:size], input[size:], nil
 }
@@ -115,15 +118,20 @@ func ReadUint64(input []byte) (value uint64, rest []byte, err error) {
 	return binary.BigEndian.Uint64(input[:8]), input[8:], nil
 }
 
-// ReadShortData read data shorter than 16kB and return the rest of bytes
+// ReadShortData read data shorter than 16kB and return the rest of bytes.
+//
+// Expected error returns during normal operation:
+//   - Generic error: if the input has fewer than the declared size bytes remaining.
 func ReadShortData(input []byte) (data []byte, rest []byte, err error) {
 	var size uint16
 	size, rest, err = ReadUint16(input)
 	if err != nil {
 		return nil, rest, err
 	}
-	data = rest[:size]
-	rest = rest[size:]
+	data, rest, err = ReadSlice(rest, uint64(size))
+	if err != nil {
+		return nil, rest, fmt.Errorf("short data length exceeds input: %w", err)
+	}
 	return
 }
 

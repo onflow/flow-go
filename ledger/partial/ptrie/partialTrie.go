@@ -2,11 +2,35 @@ package ptrie
 
 import (
 	"fmt"
+	"math/bits"
 
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/bitutils"
 	"github.com/onflow/flow-go/ledger/common/hash"
 )
+
+// countFlagBits returns the number of bits set in the first `steps` bits of
+// `flags` (big-endian bit ordering, matching bitutils.ReadBit). It returns an
+// error if `flags` does not contain enough bytes to cover `steps` bits.
+func countFlagBits(flags []byte, steps uint8) (int, error) {
+	if int(steps) > len(flags)*8 {
+		return 0, fmt.Errorf("flags (%d bytes) only cover %d bits but proof has %d steps", len(flags), len(flags)*8, steps)
+	}
+
+	fullBytes := int(steps / 8)
+	remainder := int(steps % 8)
+
+	count := 0
+	for i := range fullBytes {
+		count += bits.OnesCount8(flags[i])
+	}
+	if remainder > 0 {
+		// big-endian: the first `remainder` bits are the high bits of the byte.
+		mask := byte(0xFF << (8 - remainder))
+		count += bits.OnesCount8(flags[fullBytes] & mask)
+	}
+	return count, nil
+}
 
 // PSMT (Partial Sparse Merkle Tree) holds a subset of an sparse merkle tree at specific
 // state (no historic views). Instead of keeping any unneeded branch, it only keeps
@@ -94,6 +118,17 @@ func NewPSMT(
 		path := pr.Path
 		payload := pr.Payload
 
+		// Validate structural consistency of the proof before indexing into
+		// Flags or Interims. A malformed proof (e.g. from a byzantine Execution
+		// Node) must be rejected with an error instead of panicking.
+		flagCount, err := countFlagBits(pr.Flags, pr.Steps)
+		if err != nil {
+			return nil, fmt.Errorf("proof at index %d has invalid flags: %w", i, err)
+		}
+		if flagCount != len(pr.Interims) {
+			return nil, fmt.Errorf("proof at index %d has %d flag bits set but %d interims", i, flagCount, len(pr.Interims))
+		}
+
 		// we process the path, bit by bit, until we reach the end of the proof (due to compactness)
 		prValueIndex := 0        // we keep track of our progress through proofs by prValueIndex
 		currentNode := psmt.root // start from the rootNode and walk down the tree
@@ -136,17 +171,37 @@ func NewPSMT(
 		}
 
 		currentNode.payload = payload
-		// update node's hash value only for inclusion proofs (for others we assume default value)
-		if pr.Inclusion {
-			currentNode.hashValue = ledger.ComputeCompactValue(hash.Hash(path), payload.Value(), currentNode.height)
-		}
+		// Bind the payload to the node's hash unconditionally, i.e. WITHOUT trusting pr.Inclusion.
+		// The proofs originate from a potentially byzantine source (e.g. an execution node's
+		// ChunkDataPack), so pr.Inclusion is attacker-controlled and must not gate hash computation:
+		// otherwise a non-inclusion proof could carry a fabricated (non-empty) payload while the
+		// node's hash stayed at the honest default, making the fabrication invisible to the root
+		// check below and served by GetSinglePayload/Get as authentic state. Computing the hash from
+		// the payload here mirrors proof.VerifyTrieProof: an empty payload yields the default hash
+		// (so honest non-inclusion proofs are unaffected), while any fabricated payload yields a
+		// non-default hash that fails the root check. This likewise defeats a duplicate-path
+		// overwrite, since the second proof's payload now necessarily changes the node's hash.
+		currentNode.hashValue = ledger.ComputeCompactValue(hash.Hash(path), payload.Value(), currentNode.height)
 		// keep a reference to this node by path (for update purpose)
 		psmt.pathLookUp[path] = currentNode
 	}
 
+	// Every proof's terminal node (leaf node) must remain a leaf of the partial trie. forceComputeHash
+	// recomputes any node with children from its children and discards the payload-derived
+	// hashValue bound above, while pathLookUp would still serve that node's payload. A byzantine
+	// proof with truncated Steps (Steps=0 lands on the root; a short proof lands on an interior
+	// ancestor of another proof's path) would otherwise pass the root check below while
+	// GetSinglePayload/Get serve a fabricated payload from the interior terminal node. Honest
+	// compact proofs always terminate at compact leaves, so no legitimate proof is rejected.
+	for path, n := range psmt.pathLookUp {
+		if n.lChild != nil || n.rChild != nil {
+			return nil, fmt.Errorf("proof for path %x terminates at an interior node", path)
+		}
+	}
+
 	// check if the rootHash matches the root node's hash value of the partial trie
 	if ledger.RootHash(psmt.root.forceComputeHash()) != rootValue {
-		return nil, fmt.Errorf("rootNode hash doesn't match the proofs expected [%x], got [%x]", psmt.root.Hash(), rootValue)
+		return nil, fmt.Errorf("rootNode hash doesn't match the proofs expected [%v], got [%v]", rootValue, psmt.root.Hash())
 	}
 	return &psmt, nil
 }

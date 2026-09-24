@@ -8,13 +8,13 @@ import (
 	"path/filepath"
 
 	prometheusWAL "github.com/onflow/wal/wal"
-	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 
+	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/hash"
-	"github.com/onflow/flow-go/ledger/complete/wal"
+	utilsio "github.com/onflow/flow-go/utils/io"
 )
 
 var (
@@ -41,6 +41,7 @@ var Cmd = &cobra.Command{
 	Run:   run,
 }
 
+// init registers the find-trie-root command flags.
 func init() {
 	Cmd.Flags().StringVar(&flagExecutionStateDir, "execution-state-dir", "/var/flow/data/execution",
 		"directory to the execution state")
@@ -60,6 +61,7 @@ func init() {
 		"trim the wal file to the last record with the target trie root hash")
 }
 
+// run implements the find-trie-root command.
 func run(*cobra.Command, []string) {
 	rootHash, err := parseInput(flagRootHash)
 	if err != nil {
@@ -70,17 +72,11 @@ func run(*cobra.Command, []string) {
 		log.Fatal().Msg("--backup-dir directory cannot be the same as the execution state directory")
 	}
 
-	// making sure the backup dir is empty
-	empty, err := checkFolderIsEmpty(flagBackupDir)
-	if err != nil {
-		log.Fatal().Msgf("--backup-dir directory %v must exist and empty", flagBackupDir)
+	if err := utilsio.EnsureEmptyOrCreate(flagBackupDir); err != nil {
+		log.Fatal().Err(err).Msgf("--backup-dir directory %v must exist and empty", flagBackupDir)
 	}
 
-	if !empty {
-		log.Fatal().Msgf("--backup-dir directory %v must be empty", flagBackupDir)
-	}
-
-	segment, offset, err := searchRootHashInSegments(rootHash, flagExecutionStateDir, flagFrom, flagTo)
+	segment, offset, err := common.SearchRootHashBackward(log.Logger, rootHash, flagExecutionStateDir, flagFrom, flagTo)
 	if err != nil {
 		log.Fatal().Err(err).Msg("cannot find root hash in segments")
 	}
@@ -117,18 +113,17 @@ func run(*cobra.Command, []string) {
 		}
 	}()
 
-	// genereate a segment file to the temporary folder with the root hash as its last record
-	newSegmentFile, err := findRootHashAndCreateTrimmed(flagExecutionStateDir, segment, rootHash, tmpFolder)
+	// generate a segment file in the temporary folder with the root hash as its last record
+	newSegmentFile, err := common.TrimWALSegmentToHash(log.Logger, flagExecutionStateDir, segment, offset, rootHash, tmpFolder)
 	if err != nil {
-		log.Fatal().Err(err).Msg("cannot copy WAL")
+		log.Fatal().Err(err).Msg("cannot trim WAL segment")
 	}
 
-	log.Info().Msgf("successfully copied WAL to the temporary folder %v", newSegmentFile)
+	log.Info().Msgf("successfully created trimmed WAL segment at %v", newSegmentFile)
 
 	// before replacing the last wal file with the newly generated one, backup the rollbacked wals
 	// then move the last segment file to the execution state directory
-	err = backupRollbackedWALsAndMoveLastSegmentFile(
-		segment, flagExecutionStateDir, flagBackupDir, newSegmentFile)
+	err = common.BackupAndReplaceWALSegment(segment, flagExecutionStateDir, flagBackupDir, newSegmentFile)
 	if err != nil {
 		log.Fatal().Err(err).Msg("cannot backup rollbacked WALs")
 	}
@@ -137,6 +132,7 @@ func run(*cobra.Command, []string) {
 		segment, rootHash, flagBackupDir)
 }
 
+// parseInput decodes the hex-encoded root-hash flag into a ledger root hash.
 func parseInput(rootHashStr string) (ledger.RootHash, error) {
 	rootHashBytes, err := hex.DecodeString(rootHashStr)
 	if err != nil {
@@ -147,224 +143,4 @@ func parseInput(rootHashStr string) (ledger.RootHash, error) {
 		return ledger.RootHash(hash.DummyHash), fmt.Errorf("invalid root hash: %w", err)
 	}
 	return rootHash, nil
-}
-
-func searchRootHashInSegments(
-	expectedHash ledger.RootHash,
-	dir string,
-	wantFrom, wantTo int,
-) (int, int64, error) {
-	lg := zerolog.New(os.Stderr).With().Timestamp().Logger()
-	from, to, err := prometheusWAL.Segments(dir)
-	if err != nil {
-		return 0, 0, fmt.Errorf("cannot get segments: %w", err)
-	}
-
-	if from < 0 {
-		return 0, 0, fmt.Errorf("no segments found in %s", dir)
-	}
-
-	if wantFrom > to {
-		return 0, 0, fmt.Errorf("from segment %d is greater than the last segment %d", wantFrom, to)
-	}
-
-	if wantTo < from {
-		return 0, 0, fmt.Errorf("to segment %d is less than the first segment %d", wantTo, from)
-	}
-
-	if wantFrom > from {
-		from = wantFrom
-	}
-
-	if wantTo < to {
-		to = wantTo
-	}
-
-	lg.Info().
-		Str("dir", dir).
-		Int("from", from).
-		Int("to", to).
-		Int("want-from", wantFrom).
-		Int("want-to", wantTo).
-		Msgf("searching for trie root hash %v in segments [%d,%d]", expectedHash, wantFrom, wantTo)
-
-	sr, err := prometheusWAL.NewSegmentsRangeReader(lg, prometheusWAL.SegmentRange{
-		Dir:   dir,
-		First: from,
-		Last:  to,
-	})
-
-	if err != nil {
-		return 0, 0, fmt.Errorf("cannot create WAL segments reader: %w", err)
-	}
-
-	defer sr.Close()
-
-	reader := prometheusWAL.NewReader(sr)
-
-	for reader.Next() {
-		record := reader.Record()
-		operation, _, update, err := wal.Decode(record)
-		if err != nil {
-			return 0, 0, fmt.Errorf("cannot decode LedgerWAL record: %w", err)
-		}
-
-		switch operation {
-		case wal.WALUpdate:
-			rootHash := update.RootHash
-
-			log.Debug().
-				Uint8("operation", uint8(operation)).
-				Str("root-hash", rootHash.String()).
-				Msg("found WALUpdate")
-
-			if rootHash.Equals(expectedHash) {
-				log.Info().Msgf("found expected trie root hash %v", rootHash)
-				return reader.Segment(), reader.Offset(), nil
-			}
-		default:
-		}
-
-		err = reader.Err()
-		if err != nil {
-			return 0, 0, fmt.Errorf("cannot read LedgerWAL: %w", err)
-		}
-	}
-
-	return 0, 0, fmt.Errorf("finish reading all segment files from %d to %d, but not found", from, to)
-}
-
-// findRootHashAndCreateTrimmed finds the root hash in the segment file from the given dir folder
-// and creates a new segment file with the expected root hash as the last record in a temporary folder.
-// it return the path to the new segment file.
-func findRootHashAndCreateTrimmed(
-	dir string, segment int, expectedRoot ledger.RootHash, tmpFolder string) (string, error) {
-	// the new segment file will be created in the temporary folder
-	// and it's always 00000000
-	newSegmentFile := prometheusWAL.SegmentName(tmpFolder, 0)
-
-	log.Info().Msgf("writing new segment file to %v", newSegmentFile)
-
-	writer, err := prometheusWAL.NewSize(log.Logger, nil, tmpFolder, wal.SegmentSize, false)
-	if err != nil {
-		return "", fmt.Errorf("cannot create writer WAL: %w", err)
-	}
-
-	defer writer.Close()
-
-	sr, err := prometheusWAL.NewSegmentsRangeReader(log.Logger, prometheusWAL.SegmentRange{
-		Dir:   dir,
-		First: segment,
-		Last:  segment,
-	})
-	if err != nil {
-		return "", fmt.Errorf("cannot create WAL segments reader: %w", err)
-	}
-
-	defer sr.Close()
-
-	reader := prometheusWAL.NewReader(sr)
-
-	for reader.Next() {
-		record := reader.Record()
-		operation, _, update, err := wal.Decode(record)
-		if err != nil {
-			return "", fmt.Errorf("cannot decode LedgerWAL record: %w", err)
-		}
-
-		switch operation {
-		case wal.WALUpdate:
-
-			bytes := wal.EncodeUpdate(update)
-			_, err = writer.Log(bytes)
-			if err != nil {
-				return "", fmt.Errorf("cannot write LedgerWAL record: %w", err)
-			}
-
-			rootHash := update.RootHash
-
-			if rootHash.Equals(expectedRoot) {
-				log.Info().Msgf("found expected trie root hash %v, finish writing", rootHash)
-				return newSegmentFile, nil
-			}
-		default:
-		}
-
-		err = reader.Err()
-		if err != nil {
-			return "", fmt.Errorf("cannot read LedgerWAL: %w", err)
-		}
-	}
-
-	return "", fmt.Errorf("finish reading all segment files from %d to %d, but not found", segment, segment)
-}
-
-func checkFolderIsEmpty(folderPath string) (bool, error) {
-	// Check if the folder exists
-	info, err := os.Stat(folderPath)
-	if err != nil {
-		if os.IsNotExist(err) {
-			log.Info().Msgf("folder %v does not exist, creating the folder", folderPath)
-
-			// create the folder if not exist
-			err = os.MkdirAll(folderPath, os.ModePerm)
-			if err != nil {
-				return false, fmt.Errorf("Cannot create the folder.")
-			}
-
-			return true, nil
-		}
-		return false, err
-	}
-
-	// Check if the path is a directory
-	if !info.IsDir() {
-		return false, fmt.Errorf("The path is not a directory.")
-	}
-
-	// Check if the folder is empty
-	files, err := os.ReadDir(folderPath)
-	if err != nil {
-		return false, fmt.Errorf("Cannot read the folder.")
-	}
-
-	return len(files) == 0, nil
-}
-
-// backup new wals before replacing
-func backupRollbackedWALsAndMoveLastSegmentFile(
-	segment int, walDir, backupDir string, newSegmentFile string) error {
-	first, last, err := prometheusWAL.Segments(walDir)
-	if err != nil {
-		return fmt.Errorf("cannot get segments: %w", err)
-	}
-
-	if segment < first {
-		return fmt.Errorf("segment %d is less than the first segment %d", segment, first)
-	}
-
-	// backup all the segment files that have higher number than the given segment, including
-	// the segment file itself, since it will be replaced.
-	for i := segment; i <= last; i++ {
-		segmentFile := prometheusWAL.SegmentName(walDir, i)
-		backupFile := prometheusWAL.SegmentName(backupDir, i)
-
-		log.Info().Msgf("backup segment file %s to %s, %v/%v", segmentFile, backupFile, i, last)
-		err := os.Rename(segmentFile, backupFile)
-		if err != nil {
-			return fmt.Errorf("cannot move segment file %s to %s: %w", segmentFile, backupFile, err)
-		}
-	}
-
-	// after backup the segment files, replace the last segment file
-	segmentToBeReplaced := prometheusWAL.SegmentName(walDir, segment)
-
-	log.Info().Msgf("moving segment file %s to %s", newSegmentFile, segmentToBeReplaced)
-
-	err = os.Rename(newSegmentFile, segmentToBeReplaced)
-	if err != nil {
-		return fmt.Errorf("cannot move segment file %s to %s: %w", newSegmentFile, segmentToBeReplaced, err)
-	}
-
-	return nil
 }

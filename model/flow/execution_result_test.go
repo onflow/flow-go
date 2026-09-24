@@ -244,6 +244,19 @@ func TestNewExecutionResult(t *testing.T) {
 		assert.Nil(t, res)
 		assert.Contains(t, err.Error(), "ExecutionDataID")
 	})
+
+	t.Run("nil Chunk element rejected", func(t *testing.T) {
+		u := flow.UntrustedExecutionResult{
+			PreviousResultID: validPrevID,
+			BlockID:          validBlockID,
+			Chunks:           flow.ChunkList{nil},
+			ExecutionDataID:  validExecDataID,
+		}
+		res, err := flow.NewExecutionResult(u)
+		assert.Error(t, err)
+		assert.Nil(t, res)
+		assert.Contains(t, err.Error(), "chunk at index 0 is nil")
+	})
 }
 
 // TestNewRootExecutionResult verifies the behavior of the NewRootExecutionResult constructor.

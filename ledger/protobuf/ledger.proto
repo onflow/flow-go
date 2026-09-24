@@ -116,3 +116,81 @@ message ProofResponse {
   bytes proof = 1; // Encoded Proof (opaque to gRPC)
 }
 
+// LedgerMode reports the operating mode of the ledger server.
+enum LedgerMode {
+  LEDGER_MODE_UNSPECIFIED = 0;
+  LEDGER_MODE_FULL = 1;
+  LEDGER_MODE_PAYLOADLESS = 2;
+}
+
+// ServerInfoResponse reports server metadata such as the operating mode.
+message ServerInfoResponse {
+  LedgerMode mode = 1;
+}
+
+// LedgerInfoService reports mode and other metadata about the ledger server.
+// It is registered unconditionally on every ledger gRPC server regardless of
+// whether the process is running in full or payloadless mode. Clients call
+// ServerInfo at startup to verify they are talking to a server in the
+// expected mode.
+service LedgerInfoService {
+  // ServerInfo returns metadata about this ledger server, including its
+  // operating mode.
+  rpc ServerInfo(google.protobuf.Empty) returns (ServerInfoResponse);
+}
+
+// LeafHash is a 32-byte HashLeaf(path, value).
+// An empty `hash` (length 0) indicates the path is unallocated.
+message LeafHash {
+  bytes hash = 1;
+}
+
+// LeafHashResponse contains a single leaf hash.
+message LeafHashResponse {
+  LeafHash leaf_hash = 1;
+}
+
+// LeafHashesResponse contains a slice of leaf hashes, one per input key,
+// in the same order as the request.
+message LeafHashesResponse {
+  repeated LeafHash leaf_hashes = 1;
+}
+
+// HasPathsResponse reports, for each input key, whether the key has an
+// allocated register at the requested state.
+message HasPathsResponse {
+  repeated bool exists = 1;
+}
+
+// PayloadlessLedgerService provides remote access to a payloadless ledger.
+// Unlike LedgerService, reads return leaf hashes (HashLeaf(path, value))
+// rather than payload values. A server registers either LedgerService or
+// PayloadlessLedgerService at startup, never both.
+service PayloadlessLedgerService {
+  // InitialState returns the initial state of the ledger.
+  rpc InitialState(google.protobuf.Empty) returns (StateResponse);
+
+  // HasState checks if the given state exists in the ledger.
+  rpc HasState(StateRequest) returns (HasStateResponse);
+
+  // HasPaths reports, for each input key, whether the key has an allocated
+  // register at the requested state.
+  rpc HasPaths(GetRequest) returns (HasPathsResponse);
+
+  // GetSingleLeafHash returns the leaf hash for a single key at a specific
+  // state. An empty hash indicates the path is unallocated.
+  rpc GetSingleLeafHash(GetSingleValueRequest) returns (LeafHashResponse);
+
+  // GetLeafHashes returns leaf hashes for multiple keys at a specific state.
+  rpc GetLeafHashes(GetRequest) returns (LeafHashesResponse);
+
+  // Set updates keys with new values at a specific state and returns the
+  // new state. The server discards the keys after hashing; only the values
+  // contribute to the trie.
+  rpc Set(SetRequest) returns (SetResponse);
+
+  // Prove returns a payloadless batch proof for the given keys at a
+  // specific state. Proofs carry leaf hashes rather than payload values.
+  rpc Prove(ProveRequest) returns (ProofResponse);
+}
+
