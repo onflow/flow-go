@@ -9,7 +9,9 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"runtime"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
@@ -23,6 +25,8 @@ import (
 	"github.com/onflow/flow-go/ledger/remote"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/module/profiler"
+	"github.com/onflow/flow-go/module/updatable_configs"
 )
 
 var (
@@ -37,6 +41,11 @@ var (
 	logLevel            = flag.String("loglevel", "info", "Log level (panic, fatal, error, warn, info, debug)")
 	maxRequestSize      = flag.Uint("max-request-size", 1<<30, "Maximum request message size in bytes (default: 1 GiB)")
 	maxResponseSize     = flag.Uint("max-response-size", 1<<30, "Maximum response message size in bytes (default: 1 GiB)")
+
+	profilerEnabled  = flag.Bool("profiler-enabled", false, "Whether to enable the auto-profiler")
+	profilerDir      = flag.String("profiler-dir", "profiler", "Directory to create auto-profiler profiles")
+	profilerInterval = flag.Duration("profiler-interval", 15*time.Minute, "Interval between auto-profiler runs")
+	profilerDuration = flag.Duration("profiler-duration", 10*time.Second, "Duration of each auto-profiler run")
 )
 
 func main() {
@@ -60,9 +69,78 @@ func main() {
 		Str("service", "ledger").
 		Logger()
 
+	if *profilerInterval <= 0 {
+		logger.Fatal().Dur("profiler_interval", *profilerInterval).Msg("profiler-interval must be positive")
+	}
+
 	// Validate that at least one address is provided
 	if *ledgerServiceTCP == "" && *ledgerServiceSocket == "" {
 		logger.Fatal().Msg("at least one of --ledger-service-tcp or --ledger-service-socket must be provided")
+	}
+
+	// Initialize updatable config manager and auto-profiler.
+	// The profiler is configured via admin get-config/set-config commands.
+	configManager := updatable_configs.NewManager()
+	profilerConfig := profiler.ProfilerConfig{
+		Enabled:         *profilerEnabled,
+		UploaderEnabled: false, // ledger service does not support remote profile upload
+		Dir:             *profilerDir,
+		Interval:        *profilerInterval,
+		Duration:        *profilerDuration,
+	}
+
+	autoProfiler, err := profiler.New(logger, &profiler.NoopUploader{}, profilerConfig)
+	if err != nil {
+		logger.Fatal().Err(err).Msg("failed to create auto-profiler")
+	}
+
+	err = configManager.RegisterBoolConfig("profiler-enabled", autoProfiler.Enabled, autoProfiler.SetEnabled)
+	if err != nil {
+		logger.Fatal().Err(err).Msg("failed to register profiler-enabled config")
+	}
+	err = configManager.RegisterDurationConfig(
+		"profiler-trigger",
+		func() time.Duration { return profilerConfig.Duration },
+		func(d time.Duration) error { return autoProfiler.TriggerRun(d) },
+	)
+	if err != nil {
+		logger.Fatal().Err(err).Msg("failed to register profiler-trigger config")
+	}
+	err = configManager.RegisterUintConfig(
+		"profiler-set-mem-profile-rate",
+		func() uint { return uint(runtime.MemProfileRate) },
+		func(r uint) error { runtime.MemProfileRate = int(r); return nil },
+	)
+	if err != nil {
+		logger.Fatal().Err(err).Msg("failed to register profiler-set-mem-profile-rate config")
+	}
+	var currentBlockRateMu sync.Mutex
+	var currentBlockRate uint
+	err = configManager.RegisterUintConfig(
+		"profiler-set-block-profile-rate",
+		func() uint {
+			currentBlockRateMu.Lock()
+			defer currentBlockRateMu.Unlock()
+			return currentBlockRate
+		},
+		func(r uint) error {
+			currentBlockRateMu.Lock()
+			defer currentBlockRateMu.Unlock()
+			runtime.SetBlockProfileRate(int(r))
+			currentBlockRate = r
+			return nil
+		},
+	)
+	if err != nil {
+		logger.Fatal().Err(err).Msg("failed to register profiler-set-block-profile-rate config")
+	}
+	err = configManager.RegisterUintConfig(
+		"profiler-set-mutex-profile-fraction",
+		func() uint { return uint(runtime.SetMutexProfileFraction(-1)) },
+		func(r uint) error { _ = runtime.SetMutexProfileFraction(int(r)); return nil },
+	)
+	if err != nil {
+		logger.Fatal().Err(err).Msg("failed to register profiler-set-mutex-profile-fraction config")
 	}
 
 	logger.Info().
@@ -72,6 +150,7 @@ func main() {
 		Str("admin_addr", *adminAddr).
 		Uint("metrics_port", *metricsPort).
 		Int("mtrie_cache_size", *mtrieCacheSize).
+		Bool("profiler_enabled", *profilerEnabled).
 		Msg("starting ledger service")
 
 	// Create trigger for manual checkpointing (used by admin command)
@@ -229,10 +308,14 @@ func main() {
 	// This is a lightweight HTTP-only server (no gRPC proxy layer)
 	var adminServer *http.Server
 	if *adminAddr != "" {
-		adminHandler := newAdminHandler(logger, triggerCheckpointOnNextSegmentFinish)
+		adminHandler := newAdminHandler(logger, triggerCheckpointOnNextSegmentFinish, configManager)
 		adminServer = &http.Server{
-			Addr:    *adminAddr,
-			Handler: adminHandler,
+			Addr:              *adminAddr,
+			Handler:           adminHandler,
+			ReadHeaderTimeout: 10 * time.Second,
+			ReadTimeout:       10 * time.Second,
+			IdleTimeout:       60 * time.Second,
+			WriteTimeout:      2 * time.Minute,
 		}
 
 		go func() {
@@ -297,6 +380,10 @@ func main() {
 		<-metricsServer.Done()
 		logger.Info().Msg("metrics server stopped")
 	}
+
+	logger.Info().Msg("shutting down auto-profiler...")
+	<-autoProfiler.Done()
+	logger.Info().Msg("auto-profiler stopped")
 
 	logger.Info().Msg("waiting for ledger to stop...")
 	<-ledgerStorage.Done()
