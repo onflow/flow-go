@@ -18,6 +18,7 @@ import (
 	checkpoint_convert_v7 "github.com/onflow/flow-go/cmd/util/cmd/checkpoint-convert-v7"
 	checkpoint_list_tries "github.com/onflow/flow-go/cmd/util/cmd/checkpoint-list-tries"
 	checkpoint_trie_stats "github.com/onflow/flow-go/cmd/util/cmd/checkpoint-trie-stats"
+	compact_execution_state "github.com/onflow/flow-go/cmd/util/cmd/compact-execution-state"
 	compare_debug_tx "github.com/onflow/flow-go/cmd/util/cmd/compare-debug-tx"
 	db_migration "github.com/onflow/flow-go/cmd/util/cmd/db-migration"
 	debug_script "github.com/onflow/flow-go/cmd/util/cmd/debug-script"
@@ -34,6 +35,7 @@ import (
 	find_inconsistent_result "github.com/onflow/flow-go/cmd/util/cmd/find-inconsistent-result"
 	find_trie_root "github.com/onflow/flow-go/cmd/util/cmd/find-trie-root"
 	generate_authorization_fixes "github.com/onflow/flow-go/cmd/util/cmd/generate-authorization-fixes"
+	import_compact_execution_state_to_storehouse "github.com/onflow/flow-go/cmd/util/cmd/import-compact-execution-state-to-storehouse"
 	inspect_token_movements "github.com/onflow/flow-go/cmd/util/cmd/inspect-token-movements"
 	"github.com/onflow/flow-go/cmd/util/cmd/leaders"
 	pebble_checkpoint "github.com/onflow/flow-go/cmd/util/cmd/pebble-checkpoint"
@@ -101,6 +103,7 @@ func init() {
 	addCommands()
 }
 
+// addCommands registers all utility subcommands with the root command.
 func addCommands() {
 	rootCmd.AddCommand(version.Cmd)
 	rootCmd.AddCommand(extract.Cmd)
@@ -126,6 +129,7 @@ func addCommands() {
 	rootCmd.AddCommand(find_inconsistent_result.Cmd)
 	rootCmd.AddCommand(diff_states.Cmd)
 	rootCmd.AddCommand(atree_inlined_status.Cmd)
+	rootCmd.AddCommand(compact_execution_state.Cmd)
 	rootCmd.AddCommand(find_trie_root.Cmd)
 	rootCmd.AddCommand(run_script.Cmd)
 	rootCmd.AddCommand(system_addresses.Cmd)
@@ -140,6 +144,7 @@ func addCommands() {
 	rootCmd.AddCommand(pebble_checkpoint.Cmd)
 	rootCmd.AddCommand(db_migration.Cmd)
 	rootCmd.AddCommand(storehouse_checkpoint_validator.Cmd)
+	rootCmd.AddCommand(import_compact_execution_state_to_storehouse.Cmd)
 	rootCmd.AddCommand(remove_execution_fork.RootCmd)
 	rootCmd.AddCommand(inspect_token_movements.Cmd)
 }

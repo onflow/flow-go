@@ -182,17 +182,6 @@ func (g *HeaderGenerator) Fixture(opts ...HeaderOption) *flow.Header {
 		opt(g, header)
 	}
 
-	if header.View != header.ParentView+1 && header.LastViewTC == nil {
-		newestQC := g.quorumCerts.Fixture(QuorumCertificate.WithView(header.ParentView))
-		header.LastViewTC = &flow.TimeoutCertificate{
-			View:          view - 1,
-			NewestQCViews: []uint64{newestQC.View},
-			NewestQC:      newestQC,
-			SignerIndices: g.signerIndices.Fixture(),
-			SigData:       g.signatures.Fixture(),
-		}
-	}
-
 	// View must be strictly greater than ParentView. Since we are generating default values for each
 	// and allowing the caller to independently update them, we need to do some extra bookkeeping to
 	// ensure that the values remain consistent after applying the options. Since the values start
@@ -209,6 +198,21 @@ func (g *HeaderGenerator) Fixture(opts ...HeaderOption) *flow.Header {
 		}
 		if header.View == view && header.ParentView != view-1 { // case 2
 			header.View = header.ParentView + 1
+		}
+	}
+
+	// A block that skipped views must carry the timeout certificate for the last view that failed to
+	// produce a QC. It is generated from the final `View` and `ParentView` (after the bookkeeping
+	// above), so that `LastViewTC.View` is the highest view below `View` and is never smaller than
+	// `ParentView`, which is the view of the TC's newest QC.
+	if header.View > header.ParentView+1 && header.LastViewTC == nil {
+		newestQC := g.quorumCerts.Fixture(QuorumCertificate.WithView(header.ParentView))
+		header.LastViewTC = &flow.TimeoutCertificate{
+			View:          header.View - 1,
+			NewestQCViews: []uint64{newestQC.View},
+			NewestQC:      newestQC,
+			SignerIndices: g.signerIndices.Fixture(),
+			SigData:       g.signatures.Fixture(),
 		}
 	}
 

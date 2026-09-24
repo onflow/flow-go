@@ -13,17 +13,44 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
+// clusterBlockWithLastViewTC returns a ClusterBlockFixture that is guaranteed to have a non-nil
+// LastViewTC. HeaderBodyWithParentFixture omits LastViewTC when view == parent.View+1 (1-in-10
+// chance). The malleability checker allocates a zero-value struct when a checked field is a nil
+// pointer, and NewHeaderBody rejects that zero-value TC (nil `NewestQC`), so hashModel() would panic.
+func clusterBlockWithLastViewTC() *cluster.Block {
+	const maxAttempts = 1000
+	for range maxAttempts {
+		if b := unittest.ClusterBlockFixture(); b.LastViewTC != nil {
+			return b
+		}
+	}
+	panic("failed to generate ClusterBlockFixture with non-nil LastViewTC")
+}
+
 // TestClusterBlockMalleability checks that cluster.Block is not malleable: any change in its data
 // should result in a different ID.
-// Because our NewHeaderBody constructor enforces ParentView < View we use
-// WithFieldGenerator to safely pass it.
+// Because our NewHeaderBody constructor enforces ParentView < View and validates LastViewTC via
+// NewTimeoutCertificate we use WithFieldGenerator to safely pass both.
 func TestClusterBlockMalleability(t *testing.T) {
-	clusterBlock := unittest.ClusterBlockFixture()
+	clusterBlock := clusterBlockWithLastViewTC()
 	unittest.RequireEntityNonMalleable(
 		t,
 		clusterBlock,
 		unittest.WithFieldGenerator("HeaderBody.ParentView", func() uint64 {
 			return clusterBlock.View - 1 // ParentView must stay below View, so set it to View-1
+		}),
+		// The field generator for LastViewTC must return the struct value (not a pointer):
+		// isModelMalleable dereferences *TimeoutCertificate before invoking the generator,
+		// so modelOrField is flow.TimeoutCertificate at that point.
+		unittest.WithFieldGenerator("HeaderBody.LastViewTC", func() flow.TimeoutCertificate {
+			qc := unittest.QuorumCertificateFixture()
+			return flow.TimeoutCertificate{
+				View:          qc.View + 1,
+				NewestQCViews: []uint64{qc.View},
+				NewestQC:      qc,
+				SignerIndices: unittest.SignerIndicesFixture(4),
+				SigData:       unittest.SignatureFixture(),
+			}
 		}),
 		unittest.WithFieldGenerator("Payload.Collection", func() flow.Collection {
 			return unittest.CollectionFixture(3)

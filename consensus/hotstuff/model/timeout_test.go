@@ -195,13 +195,15 @@ func TestNewTimeoutObject(t *testing.T) {
 	})
 
 	t.Run("invalid input when TimeoutObject's QC is older than TC's QC", func(t *testing.T) {
+		// TC must be valid: TC.View (199) >= TC.NewestQC.View (150).
+		// TO.NewestQC.View (80) < TC.NewestQC.View (150) triggers the error.
 		tcQC := helper.MakeQC(helper.WithQCView(150))
-		tc := helper.MakeTC(helper.WithTCNewestQC(tcQC), helper.WithTCView(99))
+		tc := helper.MakeTC(helper.WithTCNewestQC(tcQC), helper.WithTCView(199))
 
 		res, err := model.NewTimeoutObject(
 			model.UntrustedTimeoutObject(
 				*helper.TimeoutObjectFixture(
-					helper.WithTimeoutObjectView(100),
+					helper.WithTimeoutObjectView(200), // must be TC.View+1
 					helper.WithTimeoutLastViewTC(tc),
 					helper.WithTimeoutNewestQC(helper.MakeQC(helper.WithQCView(80))), // older than TC.NewestQC
 				),
@@ -210,6 +212,24 @@ func TestNewTimeoutObject(t *testing.T) {
 		require.Error(t, err)
 		require.Nil(t, res)
 		assert.Contains(t, err.Error(), "timeout.NewestQC is older")
+	})
+
+	t.Run("invalid input when LastViewTC has nil NewestQC", func(t *testing.T) {
+		tc := helper.MakeTC(helper.WithTCNewestQC(helper.MakeQC(helper.WithQCView(150))), helper.WithTCView(199))
+		tc.NewestQC = nil
+
+		res, err := model.NewTimeoutObject(
+			model.UntrustedTimeoutObject(
+				*helper.TimeoutObjectFixture(
+					helper.WithTimeoutObjectView(200), // TO.View == TC.View+1
+					helper.WithTimeoutLastViewTC(tc),
+					helper.WithTimeoutNewestQC(helper.MakeQC(helper.WithQCView(150))), // TC.NewestQC.View(150) <= TO.NewestQC.View < TO.View(200)
+				),
+			),
+		)
+		require.Error(t, err)
+		require.Nil(t, res)
+		assert.Contains(t, err.Error(), "invalid LastViewTC")
 	})
 
 	t.Run("invalid input when no QC for previous round and TC is missing", func(t *testing.T) {

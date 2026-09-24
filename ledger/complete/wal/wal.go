@@ -138,8 +138,7 @@ func (w *DiskWAL) ReplayOnForest(forest *mtrie.Forest) error {
 // checkpoint selection, checkpoint loading, and segment replay behind a single
 // call so the ledger constructor stays uniform across V6 and V7. Like the V6
 // path, it tries the newest V7 checkpoint first and falls back to older ones if
-// a checkpoint file fails to load. When no V7 checkpoint exists, it replays all
-// segments onto the (presumably empty) `forest`.
+// a checkpoint file fails to load.
 //
 // When no numbered V7 checkpoint is available it falls back to a V7 root
 // checkpoint (converted from the V6 root.checkpoint during bootstrap), mirroring
@@ -175,7 +174,6 @@ func (w *DiskWAL) ReplayOnPayloadlessForest(forest *payloadless.Forest) error {
 			w.wal.Dir(),
 		)
 	}
-
 	if err := forest.AddTries(tries); err != nil {
 		return fmt.Errorf("failed to seed payloadless forest from V7 checkpoint: %w", err)
 	}

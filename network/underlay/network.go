@@ -615,6 +615,18 @@ func (n *Network) processNetworkMessage(msg network.IncomingMessageScope) error 
 	// insert the message in the queue
 	err := n.queue.Insert(qm)
 	if err != nil {
+		// Roll back the dedup cache entry so that a later retransmission of the same
+		// payload is not dropped as a duplicate because of a momentary queue-full
+		// window. The goroutine that successfully added the event ID exclusively owns
+		// the entry until this removal, so this cannot remove another goroutine's entry.
+		n.receiveCache.Remove(msg.EventID())
+
+		if errors.Is(err, queue.ErrQueueFull) {
+			// Queue-full drops are back-pressure events; record a metric so they are
+			// observable instead of only logged.
+			n.metrics.QueueFullInboundMessagesDropped(msg.Channel().String(), msg.Protocol().String(), msg.PayloadType())
+		}
+
 		return fmt.Errorf("failed to insert message in queue: %w", err)
 	}
 
@@ -1260,19 +1272,43 @@ func (n *Network) processAuthenticatedMessage(msg *message.Message, peerID peer.
 	}
 
 	channel := channels.Channel(msg.ChannelID)
+
+	// identity lazily resolves the full identity of the authenticated peer for staked channels.
+	// The lookup is deferred so it only runs on violation paths; the slashing consumer uses a nil
+	// Identity to skip ALSP reporting on public channels, where identities are not treated as
+	// staked participants.
+	identity := func() *flow.Identity {
+		if channels.IsPublicChannel(channel) {
+			return nil
+		}
+		id, ok := n.Identity(peerID)
+		if !ok {
+			// On a staked channel the peer has already cleared sender authorization, so a
+			// missing identity here means it vanished between those checks and now. Log as
+			// suspicious rather than silently skipping the ALSP report.
+			n.logger.Warn().
+				Str("peer_id", p2plogging.PeerId(peerID)).
+				Str("channel", channel.String()).
+				Bool(logging.KeySuspicious, true).
+				Msg("could not resolve identity of authenticated peer on staked channel")
+			return nil
+		}
+		return id
+	}
+
 	decodedMsgPayload, err := n.codec.Decode(msg.Payload)
 	switch {
 	case codec.IsErrUnknownMsgCode(err):
 		// slash peer if message contains unknown message code byte
 		violation := &network.Violation{
-			PeerID: p2plogging.PeerId(peerID), OriginID: originId, Channel: channel, Protocol: protocol, Err: err,
+			Identity: identity(), PeerID: p2plogging.PeerId(peerID), OriginID: originId, Channel: channel, Protocol: protocol, Err: err,
 		}
 		n.slashingViolationsConsumer.OnUnknownMsgTypeError(violation)
 		return
 	case codec.IsErrMsgUnmarshal(err) || codec.IsErrInvalidEncoding(err):
 		// slash if peer sent a message that could not be marshalled into the message type denoted by the message code byte
 		violation := &network.Violation{
-			PeerID: p2plogging.PeerId(peerID), OriginID: originId, Channel: channel, Protocol: protocol, Err: err,
+			Identity: identity(), PeerID: p2plogging.PeerId(peerID), OriginID: originId, Channel: channel, Protocol: protocol, Err: err,
 		}
 		n.slashingViolationsConsumer.OnInvalidMsgError(violation)
 		return
@@ -1282,7 +1318,7 @@ func (n *Network) processAuthenticatedMessage(msg *message.Message, peerID peer.
 		// collect slashing data because this could potentially lead to slashing
 		err = fmt.Errorf("unexpected error during message validation: %w", err)
 		violation := &network.Violation{
-			PeerID: p2plogging.PeerId(peerID), OriginID: originId, Channel: channel, Protocol: protocol, Err: err,
+			Identity: identity(), PeerID: p2plogging.PeerId(peerID), OriginID: originId, Channel: channel, Protocol: protocol, Err: err,
 		}
 		n.slashingViolationsConsumer.OnUnexpectedError(violation)
 		return
@@ -1292,7 +1328,7 @@ func (n *Network) processAuthenticatedMessage(msg *message.Message, peerID peer.
 	if err != nil {
 		err = fmt.Errorf("failed to convert message to internal: %w", err)
 		violation := &network.Violation{
-			PeerID: p2plogging.PeerId(peerID), OriginID: originId, Channel: channel, Protocol: protocol, Err: err,
+			Identity: identity(), PeerID: p2plogging.PeerId(peerID), OriginID: originId, Channel: channel, Protocol: protocol, Err: err,
 		}
 		n.slashingViolationsConsumer.OnInvalidMsgError(violation)
 		return

@@ -4074,6 +4074,58 @@ func (_c *NetworkMetrics_QueueDuration_Call) RunAndReturn(run func(duration time
 	return _c
 }
 
+// QueueFullInboundMessagesDropped provides a mock function for the type NetworkMetrics
+func (_mock *NetworkMetrics) QueueFullInboundMessagesDropped(topic string, protocol1 string, messageType string) {
+	_mock.Called(topic, protocol1, messageType)
+	return
+}
+
+// NetworkMetrics_QueueFullInboundMessagesDropped_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'QueueFullInboundMessagesDropped'
+type NetworkMetrics_QueueFullInboundMessagesDropped_Call struct {
+	*mock.Call
+}
+
+// QueueFullInboundMessagesDropped is a helper method to define mock.On call
+//   - topic string
+//   - protocol1 string
+//   - messageType string
+func (_e *NetworkMetrics_Expecter) QueueFullInboundMessagesDropped(topic interface{}, protocol1 interface{}, messageType interface{}) *NetworkMetrics_QueueFullInboundMessagesDropped_Call {
+	return &NetworkMetrics_QueueFullInboundMessagesDropped_Call{Call: _e.mock.On("QueueFullInboundMessagesDropped", topic, protocol1, messageType)}
+}
+
+func (_c *NetworkMetrics_QueueFullInboundMessagesDropped_Call) Run(run func(topic string, protocol1 string, messageType string)) *NetworkMetrics_QueueFullInboundMessagesDropped_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 string
+		if args[0] != nil {
+			arg0 = args[0].(string)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		var arg2 string
+		if args[2] != nil {
+			arg2 = args[2].(string)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *NetworkMetrics_QueueFullInboundMessagesDropped_Call) Return() *NetworkMetrics_QueueFullInboundMessagesDropped_Call {
+	_c.Call.Return()
+	return _c
+}
+
+func (_c *NetworkMetrics_QueueFullInboundMessagesDropped_Call) RunAndReturn(run func(topic string, protocol1 string, messageType string)) *NetworkMetrics_QueueFullInboundMessagesDropped_Call {
+	_c.Run(run)
+	return _c
+}
+
 // RoutingTablePeerAdded provides a mock function for the type NetworkMetrics
 func (_mock *NetworkMetrics) RoutingTablePeerAdded() {
 	_mock.Called()
