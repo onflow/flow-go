@@ -177,9 +177,16 @@ func main() {
 	}
 
 	// ledgerStorage is the lifecycle handle used for readiness, health check,
-	// and shutdown regardless of mode. registerService binds the mode-specific
-	// gRPC service onto the server once it is created.
-	var ledgerStorage module.ReadyDoneAware
+	// and shutdown regardless of mode. Both [ledger.Ledger] and
+	// [ledger.PayloadlessLedger] are [module.ReadyDoneAware] and expose state
+	// inspection, so this common shape is all the code below needs; both
+	// assignments below are checked at compile time. registerService binds the
+	// mode-specific gRPC service onto the server once it is created.
+	var ledgerStorage interface {
+		module.ReadyDoneAware
+		StateCount() int
+		StateByIndex(index int) (ledger.State, error)
+	}
 	var registerService func(grpcServer *grpc.Server)
 
 	if *payloadless {
@@ -207,25 +214,14 @@ func main() {
 	<-ledgerStorage.Ready()
 	logger.Info().Msg("ledger ready")
 
-	// Both the full and payloadless ledgers expose state inspection for the
-	// post-startup health check, though only the full ledger declares it on its
-	// public interface; assert it here so the check works in either mode.
-	inspector, ok := ledgerStorage.(interface {
-		StateCount() int
-		StateByIndex(index int) (ledger.State, error)
-	})
-	if !ok {
-		logger.Fatal().Msg("ledger does not support state inspection")
-	}
-
-	// Check if any trie is loaded after startup
-	stateCount := inspector.StateCount()
+	// A ledger that loaded no trie during WAL replay has no states to serve.
+	stateCount := ledgerStorage.StateCount()
 	if stateCount == 0 {
 		logger.Fatal().Msg("no trie loaded after startup - no states available")
 	}
 
 	// Get the last trie state for logging
-	lastState, err := inspector.StateByIndex(-1)
+	lastState, err := ledgerStorage.StateByIndex(-1)
 	if err != nil {
 		logger.Fatal().Err(err).Msg("failed to get last state for logging")
 	}

@@ -504,21 +504,6 @@ func withLedgerPair(t *testing.T, fn func(localLedger, remoteLedger ledger.Ledge
 	fn(localLedger, remoteLedger)
 }
 
-// forestSizer is satisfied by both *complete.PayloadlessLedger (no-WAL mode)
-// and *complete.PayloadlessLedgerWithCompactor (the embedded type promotes
-// ForestSize). Tests use it to compare forest size regardless of which factory
-// path constructed the ledger.
-type forestSizer interface {
-	ForestSize() int
-}
-
-func payloadlessLedgerForestSize(t *testing.T, l ledger.PayloadlessLedger) int {
-	t.Helper()
-	fs, ok := l.(forestSizer)
-	require.True(t, ok, "expected ledger to expose ForestSize")
-	return fs.ForestSize()
-}
-
 // TestNewPayloadlessLedger_EmptyTriedir verifies that an empty Triedir is
 // rejected — the payloadless ledger has the same Triedir requirement as the
 // V6 [NewLedger] path.

@@ -356,6 +356,27 @@ func (c *PayloadlessClient) Done() <-chan struct{} {
 	return c.done
 }
 
+// StateCount returns the number of states in the ledger.
+//
+// This is not supported for remote clients: the payloadless gRPC service does
+// not expose state inspection, so no count can be retrieved. Returns 0, which
+// callers must treat as "unknown": a health check that fails on a zero count
+// must not be run against a remote ledger.
+func (c *PayloadlessClient) StateCount() int {
+	return 0
+}
+
+// StateByIndex returns the state at the given index.
+//
+// This is not supported for remote clients: the payloadless gRPC service does
+// not expose state inspection.
+//
+// Expected error returns during normal operation:
+//   - an error is always returned
+func (c *PayloadlessClient) StateByIndex(index int) (ledger.State, error) {
+	return ledger.DummyState, fmt.Errorf("StateByIndex is not supported for remote payloadless ledger clients")
+}
+
 // decodeProtoLeafHash converts a proto LeafHash to a *hash.Hash. An empty
 // `hash` field (length 0) represents an unallocated register and returns nil.
 //

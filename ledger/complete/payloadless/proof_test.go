@@ -51,6 +51,11 @@ func (m *mockProofLedger) Prove(q *ledger.Query) (*ledger.PayloadlessTrieBatchPr
 	return m.proveFn(q)
 }
 
+func (m *mockProofLedger) StateCount() int { return 0 }
+func (m *mockProofLedger) StateByIndex(int) (ledger.State, error) {
+	return ledger.DummyState, nil
+}
+
 // payloadlessLeaf builds a single inclusion-proof leaf at the given path with
 // leafHash = HashLeaf(path, value) and minimal structural fields. Used as the
 // standard fixture shape for reconstruction tests.
