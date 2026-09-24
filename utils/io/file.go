@@ -227,3 +227,28 @@ func copyFileAndRemoveSource(src, dst string) error {
 
 	return nil
 }
+
+// EnsureEmptyOrCreate checks that dir is either absent or an empty directory.
+// If absent it is created; if non-empty it returns an error.
+//
+// No error returns are expected during normal operation.
+func EnsureEmptyOrCreate(dir string) error {
+	info, err := os.Stat(dir)
+	if os.IsNotExist(err) {
+		return os.MkdirAll(dir, 0o755)
+	}
+	if err != nil {
+		return err
+	}
+	if !info.IsDir() {
+		return fmt.Errorf("%s exists but is not a directory", dir)
+	}
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return fmt.Errorf("cannot read directory %s: %w", dir, err)
+	}
+	if len(entries) > 0 {
+		return fmt.Errorf("directory %s must be empty", dir)
+	}
+	return nil
+}

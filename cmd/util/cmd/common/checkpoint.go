@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/rs/zerolog"
+
 	"github.com/onflow/flow-go/ledger/complete/wal"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	utilsio "github.com/onflow/flow-go/utils/io"
@@ -65,6 +67,49 @@ func MoveCheckpointFiles(sourceDir, sourceName, destDir, destName string) error 
 		if err := utilsio.MoveFile(src, dst); err != nil {
 			return irrecoverable.NewExceptionf("cannot move checkpoint file from %s to %s: %w", src, dst, err)
 		}
+	}
+
+	return nil
+}
+
+// BackupCheckpointsFrom moves all checkpoint files in dir whose checkpoint number is
+// greater than or equal to minNumber into backupDir, preserving their file names.
+//
+// A checkpoint number identifies the highest WAL segment the checkpoint was created up
+// to. After the WAL has been trimmed so that segment minNumber is its last segment, any
+// checkpoint at or beyond minNumber references state newer than the trim target and is
+// inconsistent with the remaining WAL; moving those checkpoint files to backupDir keeps
+// the execution-state directory free of checkpoints the node could load over the trimmed
+// WAL, while preserving the files for possible restore.
+//
+// Each checkpoint is moved via [MoveCheckpointFiles]. A partial checkpoint (a subset of
+// the 18 V6 checkpoint files) cannot be moved and is skipped with a warning, since the
+// node ignores checkpoints that fail to load. If backupDir does not exist it is created.
+//
+// No error returns are expected during normal operation.
+func BackupCheckpointsFrom(lg zerolog.Logger, dir, backupDir string, minNumber int) error {
+	checkpoints, err := wal.Checkpoints(dir)
+	if err != nil {
+		return fmt.Errorf("cannot list checkpoints in %s: %w", dir, err)
+	}
+
+	for _, n := range checkpoints {
+		if n < minNumber {
+			continue
+		}
+
+		name := wal.NumberToFilename(n)
+		if err := MoveCheckpointFiles(dir, name, backupDir, name); err != nil {
+			if errors.Is(err, ErrCheckpointFileMissing) {
+				lg.Warn().Int("checkpoint", n).
+					Msg("skipping partial checkpoint in execution state dir")
+				continue
+			}
+			return fmt.Errorf("cannot move checkpoint %d to backup dir: %w", n, err)
+		}
+
+		lg.Info().Int("checkpoint", n).Str("backup-dir", backupDir).
+			Msg("moved checkpoint to backup dir")
 	}
 
 	return nil

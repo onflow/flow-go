@@ -17,6 +17,7 @@ import (
 	checkpoint_collect_stats "github.com/onflow/flow-go/cmd/util/cmd/checkpoint-collect-stats"
 	checkpoint_list_tries "github.com/onflow/flow-go/cmd/util/cmd/checkpoint-list-tries"
 	checkpoint_trie_stats "github.com/onflow/flow-go/cmd/util/cmd/checkpoint-trie-stats"
+	compact_execution_state "github.com/onflow/flow-go/cmd/util/cmd/compact-execution-state"
 	compare_debug_tx "github.com/onflow/flow-go/cmd/util/cmd/compare-debug-tx"
 	db_migration "github.com/onflow/flow-go/cmd/util/cmd/db-migration"
 	debug_script "github.com/onflow/flow-go/cmd/util/cmd/debug-script"
@@ -100,6 +101,7 @@ func init() {
 	addCommands()
 }
 
+// addCommands registers all utility subcommands with the root command.
 func addCommands() {
 	rootCmd.AddCommand(version.Cmd)
 	rootCmd.AddCommand(extract.Cmd)
@@ -124,6 +126,7 @@ func addCommands() {
 	rootCmd.AddCommand(find_inconsistent_result.Cmd)
 	rootCmd.AddCommand(diff_states.Cmd)
 	rootCmd.AddCommand(atree_inlined_status.Cmd)
+	rootCmd.AddCommand(compact_execution_state.Cmd)
 	rootCmd.AddCommand(find_trie_root.Cmd)
 	rootCmd.AddCommand(run_script.Cmd)
 	rootCmd.AddCommand(system_addresses.Cmd)

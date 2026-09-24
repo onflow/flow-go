@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
@@ -160,6 +161,76 @@ func TestMoveCheckpointFiles_SameDirRename(t *testing.T) {
 func TestCheckpointV6AllFilePaths_Count(t *testing.T) {
 	paths := wal.CheckpointV6AllFilePaths("/some/dir", "checkpoint.00000001")
 	require.Len(t, paths, 18)
+}
+
+// TestBackupCheckpointsFrom_FiltersByNumber verifies that only checkpoints with number
+// greater than or equal to minNumber are moved to the backup directory, while older
+// checkpoints remain in place, and that all 18 files of each moved checkpoint are
+// relocated with their names preserved.
+func TestBackupCheckpointsFrom_FiltersByNumber(t *testing.T) {
+	unittest.RunWithTempDir(t, func(base string) {
+		dir := filepath.Join(base, "exec")
+		backupDir := filepath.Join(base, "backup")
+		require.NoError(t, os.MkdirAll(dir, 0755))
+
+		createFakeCheckpoint(t, dir, "checkpoint.00000002")
+		createFakeCheckpoint(t, dir, "checkpoint.00000004")
+		createFakeCheckpoint(t, dir, "checkpoint.00000006")
+
+		logger := zerolog.Nop()
+		require.NoError(t, common.BackupCheckpointsFrom(logger, dir, backupDir, 4))
+
+		// Number 4 and 6 are at or beyond minNumber 4: moved.
+		for _, name := range []string{"checkpoint.00000004", "checkpoint.00000006"} {
+			for i, dst := range wal.CheckpointV6AllFilePaths(backupDir, name) {
+				_, err := os.Stat(dst)
+				require.NoError(t, err, "expected backed up file %d of %s in %s", i, name, dst)
+			}
+			for i, src := range wal.CheckpointV6AllFilePaths(dir, name) {
+				_, err := os.Stat(src)
+				require.True(t, os.IsNotExist(err), "expected moved file %d of %s to be gone: %s", i, name, src)
+			}
+		}
+
+		// Number 2 is below minNumber 4: untouched.
+		for i, src := range wal.CheckpointV6AllFilePaths(dir, "checkpoint.00000002") {
+			_, err := os.Stat(src)
+			require.NoError(t, err, "expected older checkpoint file %d to remain: %s", i, src)
+		}
+	})
+}
+
+// TestBackupCheckpointsFrom_PartialCheckpointSkipped verifies that a partial checkpoint
+// (only a subset of the 18 V6 files present) is skipped with no error and left in place,
+// while a complete checkpoint at or beyond minNumber is moved.
+func TestBackupCheckpointsFrom_PartialCheckpointSkipped(t *testing.T) {
+	unittest.RunWithTempDir(t, func(base string) {
+		dir := filepath.Join(base, "exec")
+		backupDir := filepath.Join(base, "backup")
+		require.NoError(t, os.MkdirAll(dir, 0755))
+
+		// Create only the header file of checkpoint 3, a full checkpoint 4, and a full
+		// older checkpoint 1.
+		header := wal.CheckpointV6AllFilePaths(dir, "checkpoint.00000003")[0]
+		require.NoError(t, os.WriteFile(header, []byte("partial"), 0644))
+		createFakeCheckpoint(t, dir, "checkpoint.00000004")
+		createFakeCheckpoint(t, dir, "checkpoint.00000001")
+
+		logger := zerolog.Nop()
+		require.NoError(t, common.BackupCheckpointsFrom(logger, dir, backupDir, 3))
+
+		// The partial checkpoint 3 remains in place, untouched.
+		_, err := os.Stat(filepath.Join(dir, "checkpoint.00000003"))
+		require.NoError(t, err, "expected partial checkpoint to stay in source")
+		_, err = os.Stat(filepath.Join(backupDir, "checkpoint.00000003"))
+		require.True(t, os.IsNotExist(err), "expected partial checkpoint not to be moved")
+
+		// Complete checkpoint 4 is moved; older checkpoint 1 stayed.
+		_, err = os.Stat(wal.CheckpointV6AllFilePaths(backupDir, "checkpoint.00000004")[0])
+		require.NoError(t, err, "expected complete checkpoint to be moved to backup")
+		_, err = os.Stat(wal.CheckpointV6AllFilePaths(dir, "checkpoint.00000001")[0])
+		require.NoError(t, err, "expected older checkpoint to remain")
+	})
 }
 
 // TestCheckpointV6AllFilePaths_Suffixes verifies the returned paths follow the expected
