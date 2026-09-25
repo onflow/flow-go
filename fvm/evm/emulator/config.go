@@ -28,7 +28,7 @@ var (
 	MainnetOsakaActivation    = uint64(1764784800) // Wednesday, December 03, 2025 18:00:00 GMT+0000
 
 	PreviewnetAmsterdamActivation = uint64(0)          // already on Amsterdam for PreviewNet
-	TestnetAmsterdamActivation    = uint64(1798740000) // Thursday, December 31, 2026 at 18:00:00 GMT+0000
+	TestnetAmsterdamActivation    = uint64(1791294816) // Tuesday, October 6, 2026 at 13:53:36 UTC
 	MainnetAmsterdamActivation    = uint64(1798740000) // Thursday, December 31, 2026 at 18:00:00 GMT+0000
 )
 

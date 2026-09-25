@@ -19,6 +19,7 @@ import (
 	"math/big"
 	"testing"
 
+	gethParams "github.com/ethereum/go-ethereum/params"
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/encoding/json"
 	"github.com/stretchr/testify/require"
@@ -40,7 +41,7 @@ func TestInvalidTxDoesNotBurnGas_EndToEnd(t *testing.T) {
 
 	chain := flow.Emulator.Chain()
 
-	const gasLimit = uint64(20_999) // one below the 21_000 intrinsic gas floor
+	const gasLimit = gethParams.TxBaseCost2780 - 1 // 11_999: one below intrinsic
 	gasPrice := big.NewInt(1_000_000_000)
 	expectedBurn := new(big.Int).Mul(big.NewInt(int64(gasLimit)), gasPrice)
 

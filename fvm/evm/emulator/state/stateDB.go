@@ -22,11 +22,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-type removedAccountWithBalance struct {
-	address gethCommon.Address
-	balance *uint256.Int
-}
-
 // StateDB implements a types.StateDB interface
 //
 // stateDB interface defined by the Geth doesn't support returning errors
@@ -640,55 +635,11 @@ func (db *StateDB) Commit(finalize bool) (hash.Hash, error) {
 	return updateCommit, nil
 }
 
-// LogsForBurnAccounts returns the eth burn logs for accounts scheduled for
-// removal which still have positive balance. The purpose of this function is
-// to handle a corner case of EIP-7708 where a self-destructed account might
-// still receive funds between sending/burning its previous balance and actual
-// removal. In this case the burning of these remaining balances still need to
-// be logged.
-// Specification EIP-7708: https://eips.ethereum.org/EIPS/eip-7708
-//
-// This function should only be invoked at the transaction boundary, specifically
-// before the Finalise.
-func (db *StateDB) LogsForBurnAccounts() []*gethTypes.Log {
-	// iterate views and collect dirty addresses
-	dirtyAddresses := make(map[gethCommon.Address]struct{})
-	for _, view := range db.views {
-		for key := range view.DirtyAddresses() {
-			dirtyAddresses[key] = struct{}{}
-		}
-	}
-
-	var list []removedAccountWithBalance
-	for addr := range dirtyAddresses {
-		hasSelfDestructed, _ := db.latestView().HasSelfDestructed(addr)
-		balance, err := db.latestView().GetBalance(addr)
-		db.handleError(err)
-		if hasSelfDestructed && !balance.IsZero() {
-			list = append(list, removedAccountWithBalance{
-				address: addr,
-				balance: balance,
-			})
-		}
-	}
-	if list == nil {
-		return nil
-	}
-	sort.Slice(list, func(i, j int) bool {
-		return list[i].address.Cmp(list[j].address) < 0
-	})
-	logs := make([]*gethTypes.Log, len(list))
-	for i, acct := range list {
-		logs[i] = gethTypes.EthBurnLog(acct.address, acct.balance)
-	}
-	return logs
-}
-
 // This is a no-op for our custom implementation of the StateDB interface,
 // since Commit() already handles finalization and deletion of empty
 // objects. But it still produces a valid BAL, under Amsterdam.
-func (db *StateDB) Finalise(deleteEmptyObjects bool) *gethBAL.ConstructionBlockAccessList {
-	if db.stateAccessList == nil {
+func (db *StateDB) Finalise(rules gethParams.Rules) *gethBAL.ConstructionBlockAccessList {
+	if !rules.IsAmsterdam {
 		return nil
 	}
 
@@ -704,7 +655,7 @@ func (db *StateDB) Finalise(deleteEmptyObjects bool) *gethBAL.ConstructionBlockA
 
 	for slot, value := range dirtySlots {
 		address := slot.Address
-		if db.HasSelfDestructed(address) || (deleteEmptyObjects && db.Empty(address)) {
+		if db.HasSelfDestructed(address) || (rules.IsEIP158 && db.Empty(address)) {
 			continue
 		}
 		// Aggregate storage writes into the block-level access list.
@@ -716,7 +667,7 @@ func (db *StateDB) Finalise(deleteEmptyObjects bool) *gethBAL.ConstructionBlockA
 	}
 
 	for addr := range dirtyAddresses {
-		if db.HasSelfDestructed(addr) || (deleteEmptyObjects && db.Empty(addr)) {
+		if db.HasSelfDestructed(addr) || (rules.IsEIP158 && db.Empty(addr)) {
 			// Aggregate the account mutation into the block-level accessList
 			// if Amsterdam has been activated.
 			if db.stateAccessList != nil {
