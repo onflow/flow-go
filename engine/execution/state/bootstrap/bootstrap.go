@@ -152,3 +152,25 @@ func ImportRegistersFromCheckpoint(logger zerolog.Logger, checkpointFile string,
 	logger.Info().Msgf("finish importing registers from checkpoint file %s at height %d", checkpointFile, checkpointHeight)
 	return nil
 }
+
+// ImportRegistersFromCheckpointSSTables imports registers from a checkpoint file into the
+// given register store by writing them to sstables and ingesting those sstables into pebble,
+// instead of writing them with batched writes. See [pStorage.RegisterBootstrapSSTables] for
+// the trade-offs and the requirements on the register store directory.
+func ImportRegistersFromCheckpointSSTables(logger zerolog.Logger, checkpointFile string, checkpointHeight uint64, checkpointRootHash ledger.RootHash, registerDir string, workerCount int, pdb *pebble.DB) error {
+	logger.Info().Msgf("importing registers from checkpoint file %s at height %d with root hash: %v into sstables", checkpointFile, checkpointHeight, checkpointRootHash)
+
+	bootstrap, err := pStorage.NewRegisterBootstrapSSTables(pdb, registerDir, checkpointFile, checkpointHeight, checkpointRootHash, logger)
+	if err != nil {
+		return fmt.Errorf("could not create registers bootstrapper: %w", err)
+	}
+
+	// TODO: find a way to hook a context up to this to allow a graceful shutdown
+	err = bootstrap.IndexCheckpointFile(context.Background(), workerCount)
+	if err != nil {
+		return fmt.Errorf("could not load checkpoint file: %w", err)
+	}
+
+	logger.Info().Msgf("finish importing registers from checkpoint file %s at height %d", checkpointFile, checkpointHeight)
+	return nil
+}

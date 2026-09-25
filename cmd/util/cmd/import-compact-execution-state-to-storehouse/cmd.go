@@ -32,6 +32,18 @@ var (
 	flagExecutionStateDir           string
 	flagRegisterDir                 string
 	flagImportCheckpointWorkerCount int
+	flagBootstrapMode               string
+	flagSSTableIngestWorkerCount    int
+)
+
+// Bootstrap modes of the import-compact-execution-state-to-storehouse command.
+const (
+	// bootstrapModeBatched writes the checkpoint's registers to the register store with
+	// batched writes.
+	bootstrapModeBatched = "batched"
+	// bootstrapModeSSTableIngest writes the checkpoint's registers to sstables and ingests
+	// them into the register store.
+	bootstrapModeSSTableIngest = "sstable-ingest"
 )
 
 var Cmd = &cobra.Command{
@@ -46,10 +58,16 @@ The command:
      checkpoint whose root hash equals C.
   3. Verifies the register store directory does not exist or is empty, i.e. the register
      store has not been bootstrapped yet.
-  4. Imports the checkpoint registers into the register store with
-     --import-checkpoint-worker-count workers (default 10, same default as the execution
-     node), setting the register store's first and latest heights to the resolved block
-     height.`,
+  4. Imports the checkpoint registers into the register store with --bootstrap-mode,
+     setting the register store's first and latest heights to the resolved block height.
+
+The batched bootstrap mode ('batched', the default) writes the registers with batched
+writes, using --import-checkpoint-worker-count workers. The sstable bootstrap mode
+('sstable-ingest') writes them to sstables and ingests those into pebble instead, which
+avoids rewriting the register store through the memtables and compactions. It needs enough
+free space in --register-dir for a temporary copy of the register data, and enough memory
+per --sstable-ingest-worker-count worker to sort the largest of its buckets (about 1/256 of
+the register data).`,
 	RunE: runE,
 }
 
@@ -67,7 +85,17 @@ func init() {
 	_ = Cmd.MarkFlagRequired("register-dir")
 
 	Cmd.Flags().IntVar(&flagImportCheckpointWorkerCount, "import-checkpoint-worker-count", 10,
-		"number of workers to import checkpoint file during bootstrap")
+		"number of workers to import checkpoint file during bootstrap ('batched' bootstrap mode)")
+
+	Cmd.Flags().IntVar(&flagSSTableIngestWorkerCount, "sstable-ingest-worker-count", 4,
+		"number of bucket groups to sort and write to sstables in parallel ('sstable-ingest' bootstrap mode); "+
+			"peak memory is roughly this many times the larger of the target sstable size (128MB) and the largest "+
+			"bucket (about 1/256 of the register data)")
+
+	Cmd.Flags().StringVar(&flagBootstrapMode, "bootstrap-mode", bootstrapModeBatched,
+		fmt.Sprintf("how to write the checkpoint registers to the register store: %q writes them with batched writes, "+
+			"%q writes them to sstables and ingests those into pebble (needs free space in --register-dir and enough "+
+			"memory to sort about 1/256 of the register data)", bootstrapModeBatched, bootstrapModeSSTableIngest))
 }
 
 // runE implements the import-compact-execution-state-to-storehouse command.
@@ -76,7 +104,15 @@ func runE(*cobra.Command, []string) error {
 		Str("datadir", flagDatadir).
 		Str("execution-state-dir", flagExecutionStateDir).
 		Str("register-dir", flagRegisterDir).
+		Str("bootstrap-mode", flagBootstrapMode).
 		Msg("starting import-compact-execution-state-to-storehouse")
+
+	switch flagBootstrapMode {
+	case bootstrapModeBatched, bootstrapModeSSTableIngest:
+	default:
+		return fmt.Errorf("invalid bootstrap mode %q, supported modes are %q and %q",
+			flagBootstrapMode, bootstrapModeBatched, bootstrapModeSSTableIngest)
+	}
 
 	// The register store must not have been bootstrapped yet: importing a checkpoint into a
 	// store whose heights are already populated would corrupt its height tracker.
@@ -160,7 +196,12 @@ func runE(*cobra.Command, []string) error {
 	}
 
 	checkpointFile := filepath.Join(flagExecutionStateDir, checkpointName)
-	err = esbootstrap.ImportRegistersFromCheckpoint(log.Logger, checkpointFile, height, rootHash, pebbleDB, flagImportCheckpointWorkerCount)
+	switch flagBootstrapMode {
+	case bootstrapModeBatched:
+		err = esbootstrap.ImportRegistersFromCheckpoint(log.Logger, checkpointFile, height, rootHash, pebbleDB, flagImportCheckpointWorkerCount)
+	case bootstrapModeSSTableIngest:
+		err = esbootstrap.ImportRegistersFromCheckpointSSTables(log.Logger, checkpointFile, height, rootHash, flagRegisterDir, flagSSTableIngestWorkerCount, pebbleDB)
+	}
 	if err != nil {
 		return fmt.Errorf("cannot import registers from checkpoint %s: %w", checkpointFile, err)
 	}
@@ -168,7 +209,7 @@ func runE(*cobra.Command, []string) error {
 	log.Info().
 		Str("checkpoint", checkpointName).
 		Uint64("height", height).
-		Int("worker-count", flagImportCheckpointWorkerCount).
+		Str("bootstrap-mode", flagBootstrapMode).
 		Msg("register store bootstrapped from compacted execution state")
 
 	return nil
@@ -193,8 +234,8 @@ func ensureDirEmpty(dir string) error {
 		// recover by simply re-running this command in either of them:
 		//  - the register store was already bootstrapped, so importing a checkpoint would
 		//    corrupt its height tracker;
-		//  - a previous import failed partway. ImportRegistersFromCheckpoint persists the
-		//    register store heights only after all workers succeed, so a partial import
+		//  - a previous import failed partway. Both bootstrap modes persist the register
+		//    store heights only after all registers have been written, so a partial import
 		//    leaves registers on disk with unset heights.
 		// Deleting the directory is required before retrying.
 		return fmt.Errorf("register store directory %s is not empty (%d entries): "+
