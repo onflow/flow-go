@@ -38,6 +38,7 @@ var (
 	flagImportCheckpointWorkerCount int
 	flagBootstrapMode               string
 	flagSSTableIngestWorkerCount    int
+	flagVerifyDigest                bool
 	flagVerifyRootHash              bool
 	flagVerifyWorkerCount           int
 )
@@ -74,8 +75,9 @@ The command:
      store has not been bootstrapped yet.
   4. Imports the checkpoint registers into the register store with --bootstrap-mode,
      setting the register store's first and latest heights to the resolved block height.
-  5. Unless --verify-root-hash is disabled, verifies the imported registers by recomputing
-     the register store's root hash and comparing it with C.
+  5. Unless disabled, verifies the imported registers: --verify-digest compares an
+     order-independent digest of the register store with the checkpoint's, and
+     --verify-root-hash recomputes the register store's root hash and compares it with C.
 
 The batched bootstrap mode ('batched', the default) writes the registers with batched
 writes, using --import-checkpoint-worker-count workers. The sstable bootstrap mode
@@ -109,16 +111,23 @@ func init() {
 			"many times the larger of the target sstable size (128MB) and the largest bucket (about 1/256 of the "+
 			"register data)")
 
-	Cmd.Flags().BoolVar(&flagVerifyRootHash, "verify-root-hash", true,
+	Cmd.Flags().BoolVar(&flagVerifyDigest, "verify-digest", true,
+		"verify the imported registers by comparing an order-independent digest (the register count and a digest "+
+			"over the keys and values) of the register store with the digest of the checkpoint. It reads the register "+
+			"store and the checkpoint once and hashes every register, which takes minutes at spork scale, and it "+
+			"detects registers that are missing, added or hold a different value")
+
+	Cmd.Flags().BoolVar(&flagVerifyRootHash, "verify-root-hash", false,
 		"verify the imported registers by recomputing the register store's root hash and comparing it with the state "+
-			"commitment. The verification hashes every register (the merkle trie folds each register's leaf through "+
-			"~230 levels of empty sub trees), so it takes a comparable time to building the trie of the whole state: "+
-			"hours at spork scale with few workers, tens of minutes with many. It needs free space in --register-dir "+
-			"for a temporary copy of the register paths and leaf hashes (about half the size of the register data)")
+			"commitment. This is the strongest check (it also anchors to the state commitment, so it detects wrong "+
+			"register keys and registers the checkpoint reader does not deliver), but it hashes every register through "+
+			"the merkle trie's ~230 levels of empty sub trees, which takes hours at spork scale with few workers and "+
+			"tens of minutes with many. It needs free space in --register-dir for a temporary copy of the register "+
+			"paths and leaf hashes (about half the size of the register data)")
 
 	Cmd.Flags().IntVar(&flagVerifyWorkerCount, "verify-worker-count", defaultVerifyWorkerCount(),
-		"number of workers to verify the imported registers; the verification is CPU bound and its memory grows "+
-			"by about 1/256 of the register data per worker")
+		"number of workers to verify the imported registers; the verifications are CPU bound and the root hash "+
+			"verification's memory grows by about 1/256 of the register data per worker")
 
 	Cmd.Flags().StringVar(&flagBootstrapMode, "bootstrap-mode", bootstrapModeBatched,
 		fmt.Sprintf("how to write the checkpoint registers to the register store: %q writes them with batched writes, "+
@@ -235,6 +244,11 @@ func runE(*cobra.Command, []string) error {
 	}
 
 	// ── Step 4: verify the register store holds the committed state ───────────
+	if flagVerifyDigest {
+		if err := verifyRegisterDigest(pebbleDB, checkpointName, rootHash, height); err != nil {
+			return err
+		}
+	}
 	if flagVerifyRootHash {
 		if err := verifyRegisterRootHash(pebbleDB, flagRegisterDir, height, rootHash); err != nil {
 			return err
@@ -245,8 +259,55 @@ func runE(*cobra.Command, []string) error {
 		Str("checkpoint", checkpointName).
 		Uint64("height", height).
 		Str("bootstrap-mode", flagBootstrapMode).
-		Bool("verified", flagVerifyRootHash).
+		Bool("digest-verified", flagVerifyDigest).
+		Bool("root-hash-verified", flagVerifyRootHash).
 		Msg("register store bootstrapped from compacted execution state")
+
+	return nil
+}
+
+// verifyRegisterDigest compares the digest of the registers of the given register store with the
+// digest of the checkpoint the store was bootstrapped from. The returned error is not benign: a
+// register store whose digest differs from the checkpoint's does not hold the checkpoint's
+// registers and has to be deleted before retrying.
+func verifyRegisterDigest(
+	pebbleDB *pebble.DB,
+	checkpointName string,
+	expectedRootHash ledger.RootHash,
+	height uint64,
+) error {
+	log.Info().
+		Int("worker-count", flagVerifyWorkerCount).
+		Msg("verifying the imported registers against the checkpoint's registers")
+
+	registers, err := pebblestorage.NewRegisters(pebbleDB, pebblestorage.PruningDisabled)
+	if err != nil {
+		return fmt.Errorf("cannot open register store for verification: %w", err)
+	}
+
+	// TODO: find a way to hook a context up to this to allow a graceful shutdown
+	storeDigest, err := pebblestorage.ComputeStoreRegisterDigest(
+		context.Background(), log.Logger, registers, height, flagVerifyWorkerCount)
+	if err != nil {
+		return fmt.Errorf("cannot compute the digest of the imported registers: %w", err)
+	}
+
+	checkpointDigest, err := pebblestorage.ComputeCheckpointRegisterDigest(
+		context.Background(), log.Logger, flagExecutionStateDir, checkpointName, expectedRootHash, flagVerifyWorkerCount)
+	if err != nil {
+		return fmt.Errorf("cannot compute the digest of the checkpoint %s: %w", checkpointName, err)
+	}
+
+	if !storeDigest.Equal(checkpointDigest) {
+		return fmt.Errorf("the register store does not hold the checkpoint's registers: the register store's "+
+			"digest is [%s], but the digest of checkpoint %s is [%s]; the register store directory %s has to be "+
+			"deleted before retrying", storeDigest, checkpointName, checkpointDigest, flagRegisterDir)
+	}
+
+	log.Info().
+		Uint64("height", height).
+		Str("digest", storeDigest.String()).
+		Msg("verified the imported registers against the checkpoint's registers")
 
 	return nil
 }
