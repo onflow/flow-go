@@ -12,6 +12,7 @@ import (
 
 	"github.com/onflow/flow-go/cmd/util/cmd/addresses"
 	"github.com/onflow/flow-go/cmd/util/cmd/atree_inlined_status"
+	benchmark_register_reads "github.com/onflow/flow-go/cmd/util/cmd/benchmark-register-reads"
 	bootstrap_execution_state_payloads "github.com/onflow/flow-go/cmd/util/cmd/bootstrap-execution-state-payloads"
 	check_storage "github.com/onflow/flow-go/cmd/util/cmd/check-storage"
 	checkpoint_collect_stats "github.com/onflow/flow-go/cmd/util/cmd/checkpoint-collect-stats"
@@ -144,6 +145,7 @@ func addCommands() {
 	rootCmd.AddCommand(pebble_checkpoint.Cmd)
 	rootCmd.AddCommand(db_migration.Cmd)
 	rootCmd.AddCommand(storehouse_checkpoint_validator.Cmd)
+	rootCmd.AddCommand(benchmark_register_reads.Cmd)
 	rootCmd.AddCommand(import_compact_execution_state_to_storehouse.Cmd)
 	rootCmd.AddCommand(remove_execution_fork.RootCmd)
 	rootCmd.AddCommand(inspect_token_movements.Cmd)
