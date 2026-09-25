@@ -10,17 +10,21 @@
 package import_compact_execution_state_to_storehouse
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 
+	"github.com/cockroachdb/pebble/v2"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	esbootstrap "github.com/onflow/flow-go/engine/execution/state/bootstrap"
 	"github.com/onflow/flow-go/ledger"
+	completeLedger "github.com/onflow/flow-go/ledger/complete"
 	flowWAL "github.com/onflow/flow-go/ledger/complete/wal"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
@@ -34,7 +38,17 @@ var (
 	flagImportCheckpointWorkerCount int
 	flagBootstrapMode               string
 	flagSSTableIngestWorkerCount    int
+	flagVerifyRootHash              bool
+	flagVerifyWorkerCount           int
 )
+
+// defaultVerifyWorkerCount returns the number of workers used to verify the imported registers
+// unless the operator chooses otherwise: the verification is CPU bound, so it uses the machine's
+// processors, capped to bound the memory of a verification (the workers hold the register paths
+// and leaf hashes of one bucket, about 1/256 of the register data, each).
+func defaultVerifyWorkerCount() int {
+	return min(runtime.NumCPU(), 16)
+}
 
 // Bootstrap modes of the import-compact-execution-state-to-storehouse command.
 const (
@@ -60,6 +74,8 @@ The command:
      store has not been bootstrapped yet.
   4. Imports the checkpoint registers into the register store with --bootstrap-mode,
      setting the register store's first and latest heights to the resolved block height.
+  5. Unless --verify-root-hash is disabled, verifies the imported registers by recomputing
+     the register store's root hash and comparing it with C.
 
 The batched bootstrap mode ('batched', the default) writes the registers with batched
 writes, using --import-checkpoint-worker-count workers. The sstable bootstrap mode
@@ -92,6 +108,17 @@ func init() {
 			"mode (the checkpoint's part files are read with twice as many workers); peak memory is roughly this "+
 			"many times the larger of the target sstable size (128MB) and the largest bucket (about 1/256 of the "+
 			"register data)")
+
+	Cmd.Flags().BoolVar(&flagVerifyRootHash, "verify-root-hash", true,
+		"verify the imported registers by recomputing the register store's root hash and comparing it with the state "+
+			"commitment. The verification hashes every register (the merkle trie folds each register's leaf through "+
+			"~230 levels of empty sub trees), so it takes a comparable time to building the trie of the whole state: "+
+			"hours at spork scale with few workers, tens of minutes with many. It needs free space in --register-dir "+
+			"for a temporary copy of the register paths and leaf hashes (about half the size of the register data)")
+
+	Cmd.Flags().IntVar(&flagVerifyWorkerCount, "verify-worker-count", defaultVerifyWorkerCount(),
+		"number of workers to verify the imported registers; the verification is CPU bound and its memory grows "+
+			"by about 1/256 of the register data per worker")
 
 	Cmd.Flags().StringVar(&flagBootstrapMode, "bootstrap-mode", bootstrapModeBatched,
 		fmt.Sprintf("how to write the checkpoint registers to the register store: %q writes them with batched writes, "+
@@ -207,11 +234,60 @@ func runE(*cobra.Command, []string) error {
 		return fmt.Errorf("cannot import registers from checkpoint %s: %w", checkpointFile, err)
 	}
 
+	// ── Step 4: verify the register store holds the committed state ───────────
+	if flagVerifyRootHash {
+		if err := verifyRegisterRootHash(pebbleDB, flagRegisterDir, height, rootHash); err != nil {
+			return err
+		}
+	}
+
 	log.Info().
 		Str("checkpoint", checkpointName).
 		Uint64("height", height).
 		Str("bootstrap-mode", flagBootstrapMode).
+		Bool("verified", flagVerifyRootHash).
 		Msg("register store bootstrapped from compacted execution state")
+
+	return nil
+}
+
+// verifyRegisterRootHash recomputes the root hash of the registers of the given register store
+// at the given height and compares it with the expected state commitment. The returned error is
+// not benign: a register store whose root hash differs from the state commitment does not hold
+// the committed state and has to be deleted before retrying.
+func verifyRegisterRootHash(
+	pebbleDB *pebble.DB,
+	registerDir string,
+	height uint64,
+	expectedRootHash ledger.RootHash,
+) error {
+	log.Info().
+		Int("worker-count", flagVerifyWorkerCount).
+		Msg("verifying the imported registers against the state commitment (this hashes every register and can take a long time)")
+
+	registers, err := pebblestorage.NewRegisters(pebbleDB, pebblestorage.PruningDisabled)
+	if err != nil {
+		return fmt.Errorf("cannot open register store for verification: %w", err)
+	}
+
+	// TODO: find a way to hook a context up to this to allow a graceful shutdown
+	computedRootHash, err := pebblestorage.ComputeRegisterRootHash(
+		context.Background(), log.Logger, registers, height, registerDir,
+		completeLedger.DefaultPathFinderVersion, flagVerifyWorkerCount)
+	if err != nil {
+		return fmt.Errorf("cannot verify the imported registers: %w", err)
+	}
+
+	if computedRootHash != expectedRootHash {
+		return fmt.Errorf("the register store does not hold the committed state: its root hash is %x, "+
+			"but the state commitment of height %d is %x; the register store directory %s has to be deleted "+
+			"before retrying", computedRootHash[:], height, expectedRootHash[:], registerDir)
+	}
+
+	log.Info().
+		Uint64("height", height).
+		Hex("root-hash", computedRootHash[:]).
+		Msg("verified the imported registers against the state commitment")
 
 	return nil
 }
