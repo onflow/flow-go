@@ -44,6 +44,16 @@ const (
 	// buckets are written concurrently, so the buffers of all buckets are held in memory.
 	registerBootstrapBucketBufSize = 256 << 10
 
+	// registerBootstrapLeafNodeBatchBufferSize is the buffer size, in batches of
+	// [wal.LeafNodeBatchSize] leaf nodes, of the channel the checkpoint readers push the
+	// leaf nodes of the checkpoint to.
+	registerBootstrapLeafNodeBatchBufferSize = 64
+
+	// registerBootstrapReaderWorkersPerConsumer is the number of checkpoint readers started
+	// per consumer. Reading a leaf node is CPU bound (deserializing it) and slower per worker
+	// than consuming it, so the readers are the slower side of the pipeline.
+	registerBootstrapReaderWorkersPerConsumer = 2
+
 	// registerBootstrapReadBufSize is the read buffer size used to read a bucket file.
 	registerBootstrapReadBufSize = 1 << 20
 
@@ -96,6 +106,11 @@ type registerBootstrapBucketFile struct {
 //     lowest level's target file size, sorted by lookup key and written to sstables, which
 //     are ingested into pebble with a single ingestion.
 //
+// Both steps are pipelined: the checkpoint's part files are read in parallel (the part files
+// of a checkpoint are independent of each other), their leaf nodes are converted into
+// registers and appended to the bucket files by several consumers, and the bucket files are
+// sorted and written to sstables by several workers.
+//
 // Because each bucket is sorted on its own, the peak memory of a bootstrap is the size of
 // the largest bucket (about 1/registerBootstrapBucketCount of the register data) plus the
 // overhead of sorting it, times the number of workers. The temporary bucket files and
@@ -111,7 +126,7 @@ type RegisterBootstrapSSTables struct {
 	registerDir        string
 	checkpointDir      string
 	checkpointFileName string
-	leafNodeChan       chan *wal.LeafNode
+	leafNodeBatches    chan []*wal.LeafNode
 	rootHeight         uint64
 	rootHash           ledger.RootHash
 
@@ -170,7 +185,7 @@ func NewRegisterBootstrapSSTables(
 		registerDir:          registerDir,
 		checkpointDir:        checkpointDir,
 		checkpointFileName:   checkpointFileName,
-		leafNodeChan:         make(chan *wal.LeafNode, checkpointLeafNodeBufSize),
+		leafNodeBatches:      make(chan []*wal.LeafNode, registerBootstrapLeafNodeBatchBufferSize),
 		rootHeight:           rootHeight,
 		rootHash:             rootHash,
 		sstableWriterOptions: opts.MakeWriterOptions(lowestLevel, registerBootstrapTableFormat),
@@ -188,10 +203,13 @@ func NewRegisterBootstrapSSTables(
 // it fails, the register store directory has to be deleted before retrying, as some of the
 // registers may already have been ingested.
 //
-// `workerCount` (at least 1) groups of bucket files are sorted and written to sstables in
-// parallel. The peak memory of a bootstrap is roughly `workerCount` times the larger of the
-// target sstable size and the largest bucket (about 1/registerBootstrapBucketCount of the
-// register data).
+// `workerCount` (at least 1) is the parallelism of all stages of the bootstrap: the
+// checkpoint's part files are read with
+// [registerBootstrapReaderWorkersPerConsumer]*`workerCount` readers, their leaf nodes are
+// converted into registers and written to bucket files by `workerCount` consumers, and the
+// bucket files are sorted and written to sstables by `workerCount` workers. The peak memory
+// of a bootstrap is roughly `workerCount` times the larger of the target sstable size and the
+// largest bucket (about 1/registerBootstrapBucketCount of the register data).
 //
 // Expected error returns during normal operation:
 //   - [context.Canceled], [context.DeadlineExceeded]: if the context is cancelled
@@ -212,9 +230,10 @@ func (b *RegisterBootstrapSSTables) IndexCheckpointFile(ctx context.Context, wor
 		}
 	}()
 
-	b.log.Info().Msgf("sharding checkpoint registers into %v bucket files", registerBootstrapBucketCount)
+	b.log.Info().Msgf("sharding checkpoint registers into %v bucket files with %v consumers and %v readers",
+		registerBootstrapBucketCount, workerCount, registerBootstrapReaderWorkersPerConsumer*workerCount)
 	shardStart := time.Now()
-	buckets, err := b.writeBucketFiles(ctx, tempDir)
+	buckets, err := b.writeBucketFiles(ctx, tempDir, workerCount)
 	if err != nil {
 		return fmt.Errorf("could not write checkpoint registers to bucket files: %w", err)
 	}
@@ -257,58 +276,58 @@ func (b *RegisterBootstrapSSTables) IndexCheckpointFile(ctx context.Context, wor
 	return nil
 }
 
-// writeBucketFiles reads the leaf nodes of the checkpoint and writes each register to the
-// bucket file of its owner prefix. It returns the bucket files that contain at least one
-// register, in ascending lookup key order.
+// writeBucketFiles reads the leaf nodes of the checkpoint with
+// registerBootstrapReaderWorkersPerConsumer*workerCount readers, and converts them into
+// registers with workerCount consumers, each of which appends the registers it consumes to
+// the bucket file of their owner prefix. It returns the bucket files that contain at least
+// one register, in ascending lookup key order.
 //
 // NOT CONCURRENCY SAFE!
 //
 // No error returns are expected during normal operation.
-func (b *RegisterBootstrapSSTables) writeBucketFiles(ctx context.Context, tempDir string) ([]registerBootstrapBucketFile, error) {
-	bucketFiles := make([]*bucketFile, registerBootstrapBucketCount)
+func (b *RegisterBootstrapSSTables) writeBucketFiles(ctx context.Context, tempDir string, workerCount int) ([]registerBootstrapBucketFile, error) {
+	bucketWriters := make([]bucketWriter, registerBootstrapBucketCount)
 	defer func() {
-		for _, bucketFile := range bucketFiles {
-			if bucketFile == nil {
-				continue
-			}
-			if closeErr := bucketFile.Close(); closeErr != nil {
-				b.log.Error().Err(closeErr).Msgf("could not close bucket file %s", bucketFile.path)
+		for bucket := range bucketWriters {
+			if closeErr := bucketWriters[bucket].Close(); closeErr != nil {
+				b.log.Error().Err(closeErr).Msgf("could not close bucket file of bucket %d", bucket)
 			}
 		}
 	}()
 
-	// The reader pushes leaf nodes to the channel and closes it when it is done, so it has
-	// to run in its own goroutine while this goroutine consumes the channel.
+	g, gCtx := errgroup.WithContext(ctx)
+	for range workerCount {
+		g.Go(func() error {
+			return b.consumeLeafNodeBatches(gCtx, bucketWriters, tempDir)
+		})
+	}
+
+	// The readers push the leaf nodes of the checkpoint's part files to the channel and close
+	// it once all part files have been read, so they run in their own goroutine while the
+	// consumers read from the channel. They get the consumers' context, so that they stop
+	// reading once a consumer has run into an error, instead of blocking on a channel nobody
+	// consumes any more.
 	readErrCh := make(chan error, 1)
 	go func() {
-		readErrCh <- wal.OpenAndReadLeafNodesFromCheckpointV6(
-			b.leafNodeChan, b.checkpointDir, b.checkpointFileName, b.rootHash, b.log)
+		readErrCh <- wal.OpenAndReadLeafNodesFromCheckpointV6Concurrently(
+			gCtx, b.leafNodeBatches, b.checkpointDir, b.checkpointFileName, b.rootHash,
+			registerBootstrapReaderWorkersPerConsumer*workerCount, b.log)
 	}()
 
-	var shardErr error
-	for leafNode := range b.leafNodeChan {
-		if shardErr != nil {
-			// Keep draining the channel, otherwise the reader blocks and never returns.
-			// The bootstrap is aborted anyway: the caller has to delete the register
-			// store directory before retrying.
-			continue
-		}
-		if err := ctx.Err(); err != nil {
-			shardErr = err
-			continue
-		}
-		shardErr = b.writeLeafNodeToBucket(bucketFiles, tempDir, leafNode)
-	}
+	consumeErr := g.Wait()
+	readErr := <-readErrCh
 
-	if err := <-readErrCh; err != nil {
-		return nil, fmt.Errorf("could not read checkpoint file %s: %w", b.checkpointFileName, err)
-	}
-	if shardErr != nil {
-		return nil, shardErr
+	switch {
+	case consumeErr != nil:
+		// a consumer error cancels the readers, whose error is then only the cancellation
+		return nil, consumeErr
+	case readErr != nil:
+		return nil, fmt.Errorf("could not read checkpoint file %s: %w", b.checkpointFileName, readErr)
 	}
 
 	buckets := make([]registerBootstrapBucketFile, 0, registerBootstrapBucketCount)
-	for i, bucketFile := range bucketFiles {
+	for i := range bucketWriters {
+		bucketFile := bucketWriters[i].file
 		if bucketFile == nil {
 			continue
 		}
@@ -324,14 +343,41 @@ func (b *RegisterBootstrapSSTables) writeBucketFiles(ctx context.Context, tempDi
 	return buckets, nil
 }
 
-// writeLeafNodeToBucket appends the register of the given leaf node to the bucket file of
-// its owner prefix, creating that bucket file if it is the first register of the bucket.
+// consumeLeafNodeBatches converts the leaf nodes of the batches it receives into registers and
+// appends them to the bucket file of their owner prefix, until the channel is closed or the
+// context is cancelled.
 //
-// NOT CONCURRENCY SAFE!
+// Expected error returns during normal operation:
+//   - [context.Canceled], [context.DeadlineExceeded]: if the context is cancelled
+func (b *RegisterBootstrapSSTables) consumeLeafNodeBatches(
+	ctx context.Context,
+	bucketWriters []bucketWriter,
+	tempDir string,
+) error {
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case batch, ok := <-b.leafNodeBatches:
+			if !ok {
+				return nil
+			}
+			for _, leafNode := range batch {
+				if err := b.writeLeafNodeToBucket(bucketWriters, tempDir, leafNode); err != nil {
+					return err
+				}
+			}
+		}
+	}
+}
+
+// writeLeafNodeToBucket appends the register of the given leaf node to the bucket file of
+// its owner prefix, creating that bucket file if it is the first register of the bucket. It
+// is safe to call from several consumers: only one of them at a time writes to a bucket file.
 //
 // No error returns are expected during normal operation.
 func (b *RegisterBootstrapSSTables) writeLeafNodeToBucket(
-	bucketFiles []*bucketFile,
+	bucketWriters []bucketWriter,
 	tempDir string,
 	leafNode *wal.LeafNode,
 ) error {
@@ -348,18 +394,43 @@ func (b *RegisterBootstrapSSTables) writeLeafNodeToBucket(
 	lookupKey := newLookupKey(b.rootHeight, registerID).Bytes()
 	bucket := registerBootstrapBucket(lookupKey)
 
-	if bucketFiles[bucket] == nil {
+	bucketWriter := &bucketWriters[bucket]
+	bucketWriter.mutex.Lock()
+	defer bucketWriter.mutex.Unlock()
+
+	if bucketWriter.file == nil {
 		bucketFile, err := createBucketFile(tempDir, bucket)
 		if err != nil {
 			return err
 		}
-		bucketFiles[bucket] = bucketFile
+		bucketWriter.file = bucketFile
 	}
 
-	if err := bucketFiles[bucket].write(lookupKey, leafNode.Payload.Value()); err != nil {
-		return fmt.Errorf("could not write register to bucket file %s: %w", bucketFiles[bucket].path, err)
+	if err := bucketWriter.file.write(lookupKey, leafNode.Payload.Value()); err != nil {
+		return fmt.Errorf("could not write register to bucket file %s: %w", bucketWriter.file.path, err)
 	}
 	return nil
+}
+
+// bucketWriter is the write end of a bucket file, shared by the consumers converting leaf
+// nodes into registers. The mutex guards the bucket file, which is lazily created by the
+// first register of its bucket and may only be written by one consumer at a time.
+type bucketWriter struct {
+	mutex sync.Mutex
+	file  *bucketFile
+}
+
+// Close closes the bucket file of the writer, if it has been created. It is a no-op if the
+// bucket file has not been created or is already closed.
+//
+// No error returns are expected during normal operation.
+func (w *bucketWriter) Close() error {
+	w.mutex.Lock()
+	defer w.mutex.Unlock()
+	if w.file == nil {
+		return nil
+	}
+	return w.file.Close()
 }
 
 // writeSSTables reads the registers of the given bucket files, sorts each group of

@@ -88,9 +88,10 @@ func init() {
 		"number of workers to import checkpoint file during bootstrap ('batched' bootstrap mode)")
 
 	Cmd.Flags().IntVar(&flagSSTableIngestWorkerCount, "sstable-ingest-worker-count", 4,
-		"number of bucket groups to sort and write to sstables in parallel ('sstable-ingest' bootstrap mode); "+
-			"peak memory is roughly this many times the larger of the target sstable size (128MB) and the largest "+
-			"bucket (about 1/256 of the register data)")
+		"number of workers converting, sorting and writing the register data in the 'sstable-ingest' bootstrap "+
+			"mode (the checkpoint's part files are read with twice as many workers); peak memory is roughly this "+
+			"many times the larger of the target sstable size (128MB) and the largest bucket (about 1/256 of the "+
+			"register data)")
 
 	Cmd.Flags().StringVar(&flagBootstrapMode, "bootstrap-mode", bootstrapModeBatched,
 		fmt.Sprintf("how to write the checkpoint registers to the register store: %q writes them with batched writes, "+
