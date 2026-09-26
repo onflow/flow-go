@@ -624,23 +624,26 @@ func (b *RegisterBootstrapSSTables) splitOversizedBuckets(
 			continue
 		}
 
+		// Split the bucket file at the byte of the registers' own keys where possible: the bytes
+		// before it hold the registers' owners, which all registers of a bucket file share the
+		// first byte of, and splitting at those bytes would copy the bucket file once per byte
+		// before the registers are separated.
+		keyOffset, err := registerKeyOffset(bucket.path)
+		if err != nil {
+			return nil, err
+		}
+		bucket.splitOffset = max(bucket.splitOffset, keyOffset)
+
 		children, err := b.splitBucketFile(ctx, dir, bucket)
 		if err != nil {
 			return nil, err
 		}
 		if len(children) == 1 && bucket.splitOffset < registerBootstrapMaxSplitOffset {
 			// All registers of the bucket file share the byte at the split offset, so the split
-			// did not separate them. The offset is still in bytes all registers share, for
-			// example in the owner of a bucket file that holds one owner's registers: retry at
-			// the offset of the registers' own keys, where the registers that differ in their
-			// key are separated, or at the next byte if that offset is not beyond the current
-			// one.
+			// did not separate them, and the bytes before the registers' keys did not either:
+			// retry at the next byte.
 			child := children[0]
-			keyOffset, err := registerKeyOffset(child.path)
-			if err != nil {
-				return nil, err
-			}
-			child.splitOffset = max(keyOffset, bucket.splitOffset+1)
+			child.splitOffset = bucket.splitOffset + 1
 			if removeErr := os.Remove(bucket.path); removeErr != nil {
 				return nil, fmt.Errorf("could not remove the split bucket file %s: %w", bucket.path, removeErr)
 			}
