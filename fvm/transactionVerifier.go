@@ -179,7 +179,7 @@ func newSignatureEntries(tx *flow.TransactionBody) (
 // TransactionVerifier verifies the content of the transaction by
 // checking there is no double signature
 // all signatures are valid
-// all accounts provides enoguh weights
+// all accounts provide enough weights
 //
 // if KeyWeightThreshold is set to a negative number, signature verification is skipped
 type TransactionVerifier struct {
