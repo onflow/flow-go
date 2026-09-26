@@ -79,12 +79,6 @@ const (
 	// memory a worker needs, which is why it is not tied to the target file size of the level
 	// the sstables are ingested into.
 	registerBootstrapMaxBucketFileSize = 256 << 20
-
-	// registerBootstrapMaxSplitOffset bounds how far a bucket file is split into smaller ones:
-	// beyond the owner bytes and the register keys of the lookup keys, splitting cannot separate
-	// a bucket file's registers any more. A bucket file that is still too large at this offset
-	// is sorted in memory, which is reported in a warning.
-	registerBootstrapMaxSplitOffset = 64
 )
 
 // errStopBucketFileRead stops reading a bucket file after its first record, see
@@ -149,9 +143,9 @@ type registerBootstrapBucketFile struct {
 // The peak memory of a bootstrap is the number of workers times the larger of the lowest
 // level's target file size and one bucket file's registers, plus the overhead of sorting
 // them. The memory therefore does not grow with the skew of the registers over the owner
-// bytes, except when a bucket file cannot be split any further, because all of its registers
-// share the byte of their lookup keys at its split offset: such a bucket file is sorted in
-// memory as a whole and reported in a warning. The temporary bucket files and sstables
+// bytes, except when a bucket file cannot be separated at all, because all of its registers
+// share the byte of their lookup keys at the registers' key offset: such a bucket file is
+// sorted in memory as a whole and reported in a warning. The temporary bucket files and sstables
 // require at most twice as much free space as the register data in the register store
 // directory, on the same file system, so that pebble can link the sstables instead of
 // copying them. The bootstrap keeps one file open per bucket (registerBootstrapBucketCount
@@ -638,20 +632,8 @@ func (b *RegisterBootstrapSSTables) splitOversizedBuckets(
 		if err != nil {
 			return nil, err
 		}
-		if len(children) == 1 && bucket.splitOffset < registerBootstrapMaxSplitOffset {
-			// All registers of the bucket file share the byte at the split offset, so the split
-			// did not separate them, and the bytes before the registers' keys did not either:
-			// retry at the next byte.
-			child := children[0]
-			child.splitOffset = bucket.splitOffset + 1
-			if removeErr := os.Remove(bucket.path); removeErr != nil {
-				return nil, fmt.Errorf("could not remove the split bucket file %s: %w", bucket.path, removeErr)
-			}
-			pending = append([]registerBootstrapBucketFile{child}, pending...)
-			continue
-		}
 		if len(children) < 2 {
-			// all registers of the bucket file share the bytes at the split offset, so splitting
+			// all registers of the bucket file share the byte at the split offset, so splitting
 			// it does not make it smaller: remove the split's files and sort it in memory
 			b.log.Warn().
 				Str("bucket_file", bucket.name).
@@ -680,8 +662,7 @@ func (b *RegisterBootstrapSSTables) splitOversizedBuckets(
 // registerKeyOffset returns the offset of the first byte of the register keys of the registers of
 // the given bucket file in their lookup keys: a lookup key holds the register code byte, the
 // register owner and the separator between them, and the register key starts at the byte after the
-// separator. It returns [registerBootstrapMaxSplitOffset] if the bucket file does not hold a
-// register, or if the offset is beyond the bound on splits.
+// separator. It returns the bucket file's split offset if the bucket file does not hold a register.
 //
 // No error returns are expected during normal operation.
 func registerKeyOffset(path string) (int, error) {
@@ -690,7 +671,7 @@ func registerKeyOffset(path string) (int, error) {
 		return 0, err
 	}
 	if !ok {
-		return registerBootstrapMaxSplitOffset, nil
+		return 0, nil
 	}
 
 	_, registerID, err := lookupKeyToRegisterID(lookupKey)
@@ -699,11 +680,7 @@ func registerKeyOffset(path string) (int, error) {
 	}
 	// the lookup key holds the register code byte, the owner and the separator between them
 	// before the register key, see [MinLookupKeyLen]
-	offset := 1 + len(registerID.Owner) + 1
-	if offset > registerBootstrapMaxSplitOffset {
-		return registerBootstrapMaxSplitOffset, nil
-	}
-	return offset, nil
+	return 1 + len(registerID.Owner) + 1, nil
 }
 
 // firstBucketRecordKey returns the lookup key of the first register of the given bucket file, and
