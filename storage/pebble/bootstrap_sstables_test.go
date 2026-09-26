@@ -45,6 +45,7 @@ func TestRegisterBootstrapSSTables_IndexCheckpointFile_Happy(t *testing.T) {
 		require.NoError(t, err)
 		// force multiple sstables per bucket to exercise splitting them by size
 		bootstrap.sstableTargetFileSize = 1 << 10
+		bootstrap.maxBucketFileSize = 1 << 10
 		require.NoError(t, bootstrap.IndexCheckpointFile(context.Background(), sstableBootstrapWorkerCount))
 
 		require.Equal(t, uint64(len(registerIDs)), bootstrap.registerCount)
@@ -101,6 +102,7 @@ func TestRegisterBootstrapSSTables_IndexCheckpointFile_SingleOwner(t *testing.T)
 		// force the bucket files to be split by size, which the bucket file of the single owner
 		// cannot be by the bytes of its owner
 		bootstrap.sstableTargetFileSize = 1 << 10
+		bootstrap.maxBucketFileSize = 1 << 10
 		require.NoError(t, bootstrap.IndexCheckpointFile(context.Background(), sstableBootstrapWorkerCount))
 
 		require.Equal(t, uint64(len(registerIDs)), bootstrap.registerCount)

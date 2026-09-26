@@ -73,7 +73,23 @@ const (
 	// memory. A bucket file holds the registers of one owner prefix byte, so its registers
 	// share the register code byte and that owner prefix byte.
 	registerBootstrapBucketSplitOffset = 2
+
+	// registerBootstrapMaxBucketFileSize is the largest bucket file a worker sorts in memory: a
+	// bucket file that holds more registers is split into smaller ones first. It bounds the
+	// memory a worker needs, which is why it is not tied to the target file size of the level
+	// the sstables are ingested into.
+	registerBootstrapMaxBucketFileSize = 256 << 20
+
+	// registerBootstrapMaxSplitOffset bounds how far a bucket file is split into smaller ones:
+	// beyond the owner bytes and the register keys of the lookup keys, splitting cannot separate
+	// a bucket file's registers any more. A bucket file that is still too large at this offset
+	// is sorted in memory, which is reported in a warning.
+	registerBootstrapMaxSplitOffset = 64
 )
+
+// errStopBucketFileRead stops reading a bucket file after its first record, see
+// [firstBucketRecordKey].
+var errStopBucketFileRead = errors.New("stop reading bucket file")
 
 // registerBootstrapRecord is a register read back from a bucket file.
 type registerBootstrapRecord struct {
@@ -156,10 +172,12 @@ type RegisterBootstrapSSTables struct {
 	// so that the ingested sstables use the same comparer (registers.NewMVCCComparer), the
 	// same bloom filters and the same block sizes as the sstables pebble writes itself.
 	sstableWriterOptions sstable.WriterOptions
-	// sstableTargetFileSize is the target file size of the lowest level: the size the
-	// ingested sstables are split at, and the size above which a bucket file is split into
-	// smaller ones before it is sorted.
+	// sstableTargetFileSize is the target file size of the lowest level, which is the size
+	// the ingested sstables are split at.
 	sstableTargetFileSize uint64
+	// maxBucketFileSize is the largest bucket file a worker sorts in memory: a bucket file
+	// that holds more registers is split into smaller ones first.
+	maxBucketFileSize int64
 
 	registerCount uint64
 	sstableCount  int
@@ -215,6 +233,7 @@ func NewRegisterBootstrapSSTables(
 		sstableTargetFileSize: uint64(
 			opts.Levels[lowestLevel].TargetFileSize,
 		),
+		maxBucketFileSize: registerBootstrapMaxBucketFileSize,
 	}, nil
 }
 
@@ -600,7 +619,7 @@ func (b *RegisterBootstrapSSTables) splitOversizedBuckets(
 		bucket := pending[0]
 		pending = pending[1:]
 
-		if bucket.size <= int64(b.sstableTargetFileSize) {
+		if bucket.size <= b.maxBucketFileSize {
 			resolved = append(resolved, bucket)
 			continue
 		}
@@ -609,8 +628,28 @@ func (b *RegisterBootstrapSSTables) splitOversizedBuckets(
 		if err != nil {
 			return nil, err
 		}
+		if len(children) == 1 {
+			// All registers of the bucket file share the byte at the split offset, so the split
+			// did not separate them. The offset may still be in the bytes all registers share,
+			// for example in the owner of a bucket file that holds one owner's registers: retry
+			// just after the owner separator, where the registers' own keys start, which
+			// separates the registers that differ in their key.
+			child := children[0]
+			keyOffset, err := registerKeyOffset(child.path)
+			if err != nil {
+				return nil, err
+			}
+			if keyOffset > bucket.splitOffset && keyOffset < registerBootstrapMaxSplitOffset {
+				child.splitOffset = keyOffset
+				if removeErr := os.Remove(bucket.path); removeErr != nil {
+					return nil, fmt.Errorf("could not remove the split bucket file %s: %w", bucket.path, removeErr)
+				}
+				pending = append([]registerBootstrapBucketFile{child}, pending...)
+				continue
+			}
+		}
 		if len(children) < 2 {
-			// all registers of the bucket file share the byte at the split offset, so splitting
+			// all registers of the bucket file share the bytes at the split offset, so splitting
 			// it does not make it smaller: remove the split's files and sort it in memory
 			b.log.Warn().
 				Str("bucket_file", bucket.name).
@@ -634,6 +673,56 @@ func (b *RegisterBootstrapSSTables) splitOversizedBuckets(
 		pending = append(children, pending...)
 	}
 	return resolved, nil
+}
+
+// registerKeyOffset returns the offset of the first byte of the register keys of the registers of
+// the given bucket file in their lookup keys: a lookup key holds the register code byte, the
+// register owner and the separator between them, and the register key starts at the byte after the
+// separator. It returns [registerBootstrapMaxSplitOffset] if the bucket file does not hold a
+// register, or if the offset is beyond the bound on splits.
+//
+// No error returns are expected during normal operation.
+func registerKeyOffset(path string) (int, error) {
+	lookupKey, ok, err := firstBucketRecordKey(path)
+	if err != nil {
+		return 0, err
+	}
+	if !ok {
+		return registerBootstrapMaxSplitOffset, nil
+	}
+
+	_, registerID, err := lookupKeyToRegisterID(lookupKey)
+	if err != nil {
+		return 0, fmt.Errorf("could not decode the register key of bucket file %s: %w", path, err)
+	}
+	// the lookup key holds the register code byte, the owner and the separator between them
+	// before the register key, see [MinLookupKeyLen]
+	offset := 1 + len(registerID.Owner) + 1
+	if offset > registerBootstrapMaxSplitOffset {
+		return registerBootstrapMaxSplitOffset, nil
+	}
+	return offset, nil
+}
+
+// firstBucketRecordKey returns the lookup key of the first register of the given bucket file, and
+// false if the bucket file does not hold a register.
+//
+// No error returns are expected during normal operation.
+func firstBucketRecordKey(path string) ([]byte, bool, error) {
+	var key []byte
+	err := forEachBucketRecord(path, func(recordKey []byte, _ []byte) error {
+		copied := make([]byte, len(recordKey))
+		copy(copied, recordKey)
+		key = copied
+		return errStopBucketFileRead
+	})
+	if errors.Is(err, errStopBucketFileRead) {
+		return key, true, nil
+	}
+	if err != nil {
+		return nil, false, err
+	}
+	return nil, false, nil
 }
 
 // splitBucketFile splits the given bucket file at the byte of its registers' lookup keys at the
