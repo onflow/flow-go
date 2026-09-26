@@ -67,6 +67,12 @@ const (
 	// bucket file. Bucket files are written by this process and only read back by this
 	// process, so this only protects against a corrupted file causing a huge allocation.
 	registerBootstrapMaxRecordSize = 64 << 20
+
+	// registerBootstrapBucketSplitOffset is the offset in the lookup keys of the registers of a
+	// bucket file at which the bucket file is first split when it is too large to be sorted in
+	// memory. A bucket file holds the registers of one owner prefix byte, so its registers
+	// share the register code byte and that owner prefix byte.
+	registerBootstrapBucketSplitOffset = 2
 )
 
 // registerBootstrapRecord is a register read back from a bucket file.
@@ -75,14 +81,24 @@ type registerBootstrapRecord struct {
 	value []byte
 }
 
-// registerBootstrapBucketFile describes a bucket file written during the shard phase.
+// registerBootstrapBucketFile describes a bucket file written during the shard phase, or a
+// sub-bucket file an oversized bucket file was split into.
 type registerBootstrapBucketFile struct {
-	// bucket is the index of the bucket, which is also the sort order of its registers.
+	// bucket is the index of the bucket, i.e. of the byte of the register owners the bucket
+	// file holds. It is used for logging.
 	bucket int
-	path   string
+	// name identifies the bucket file and the sstables written from it. It is unique among the
+	// bucket files of a bootstrap.
+	name string
+	// path is the path of the bucket file.
+	path string
 	// size is the size of the bucket file in bytes, which is roughly the size of the
 	// registers it holds.
 	size int64
+	// splitOffset is the offset in the lookup keys of the bucket file's registers at which the
+	// bucket file is split when it is too large to be sorted in memory. All registers of a
+	// bucket file share the bytes of their lookup keys before this offset.
+	splitOffset int
 }
 
 // RegisterBootstrapSSTables bootstraps an empty register store from a compacted single-trie
@@ -104,20 +120,26 @@ type registerBootstrapBucketFile struct {
 //     their owner prefix;
 //  2. the bucket files are read back in key order, grouped into batches of at least the
 //     lowest level's target file size, sorted by lookup key and written to sstables, which
-//     are ingested into pebble with a single ingestion.
+//     are ingested into pebble with a single ingestion. A bucket file that holds more
+//     registers than the target file size is first split into sub-bucket files by the next
+//     byte of its registers' lookup keys, recursively, so that a worker never holds more
+//     than the target file size of registers in memory.
 //
 // Both steps are pipelined: the checkpoint's part files are read in parallel (the part files
 // of a checkpoint are independent of each other), their leaf nodes are converted into
 // registers and appended to the bucket files by several consumers, and the bucket files are
 // sorted and written to sstables by several workers.
 //
-// Because each bucket is sorted on its own, the peak memory of a bootstrap is the size of
-// the largest bucket (about 1/registerBootstrapBucketCount of the register data) plus the
-// overhead of sorting it, times the number of workers. The temporary bucket files and
-// sstables require as much free space as the register data in the register store directory,
-// on the same file system, so that pebble can link the sstables instead of copying them.
-// The bootstrap keeps one file open per bucket (registerBootstrapBucketCount file
-// descriptors), so the file descriptor limit has to accommodate it.
+// The peak memory of a bootstrap is the number of workers times the larger of the lowest
+// level's target file size and one bucket file's registers, plus the overhead of sorting
+// them. The memory therefore does not grow with the skew of the registers over the owner
+// bytes, except when a bucket file cannot be split any further, because all of its registers
+// share the byte of their lookup keys at its split offset: such a bucket file is sorted in
+// memory as a whole and reported in a warning. The temporary bucket files and sstables
+// require at most twice as much free space as the register data in the register store
+// directory, on the same file system, so that pebble can link the sstables instead of
+// copying them. The bootstrap keeps one file open per bucket (registerBootstrapBucketCount
+// file descriptors), so the file descriptor limit has to accommodate it.
 //
 // NOT CONCURRENCY SAFE! IndexCheckpointFile can only be called once.
 type RegisterBootstrapSSTables struct {
@@ -134,8 +156,9 @@ type RegisterBootstrapSSTables struct {
 	// so that the ingested sstables use the same comparer (registers.NewMVCCComparer), the
 	// same bloom filters and the same block sizes as the sstables pebble writes itself.
 	sstableWriterOptions sstable.WriterOptions
-	// sstableTargetFileSize is the target file size of the lowest level, which is the size
-	// the ingested sstables are split at.
+	// sstableTargetFileSize is the target file size of the lowest level: the size the
+	// ingested sstables are split at, and the size above which a bucket file is split into
+	// smaller ones before it is sorted.
 	sstableTargetFileSize uint64
 
 	registerCount uint64
@@ -338,7 +361,13 @@ func (b *RegisterBootstrapSSTables) writeBucketFiles(ctx context.Context, tempDi
 		if err != nil {
 			return nil, err
 		}
-		buckets = append(buckets, registerBootstrapBucketFile{bucket: i, path: bucketFile.path, size: size})
+		buckets = append(buckets, registerBootstrapBucketFile{
+			bucket:      i,
+			name:        bucketFileName(i),
+			path:        bucketFile.path,
+			size:        size,
+			splitOffset: registerBootstrapBucketSplitOffset,
+		})
 	}
 	return buckets, nil
 }
@@ -399,7 +428,7 @@ func (b *RegisterBootstrapSSTables) writeLeafNodeToBucket(
 	defer bucketWriter.mutex.Unlock()
 
 	if bucketWriter.file == nil {
-		bucketFile, err := createBucketFile(tempDir, bucket)
+		bucketFile, err := createBucketFile(tempDir, bucketFileName(bucket))
 		if err != nil {
 			return err
 		}
@@ -433,8 +462,9 @@ func (w *bucketWriter) Close() error {
 	return w.file.Close()
 }
 
-// writeSSTables reads the registers of the given bucket files, sorts each group of
-// consecutive buckets by lookup key and writes the sorted registers to sstables, with up to
+// writeSSTables reads the registers of the given bucket files, splits the bucket files that
+// are too large to be sorted in memory into smaller ones, sorts each group of consecutive
+// bucket files by lookup key and writes the sorted registers to sstables, with up to
 // `workerCount` groups in parallel. It returns the paths of all sstables it wrote.
 //
 // Consecutive buckets are grouped until the group is at least as large as the target sstable
@@ -458,7 +488,7 @@ func (b *RegisterBootstrapSSTables) writeSSTables(
 		sstables []string
 	)
 
-	g, _ := errgroup.WithContext(ctx)
+	g, gCtx := errgroup.WithContext(ctx)
 	g.SetLimit(workerCount)
 	for groupStart := 0; groupStart < len(buckets); {
 		groupEnd := bucketGroupEnd(buckets, groupStart, int64(b.sstableTargetFileSize))
@@ -466,29 +496,14 @@ func (b *RegisterBootstrapSSTables) writeSSTables(
 		groupStart = groupEnd
 
 		g.Go(func() error {
-			records, err := readBucketFiles(group)
+			groupSSTables, registerCount, err := b.writeBucketGroup(gCtx, dir, group)
 			if err != nil {
 				return err
 			}
-
-			slices.SortFunc(records, func(a, b registerBootstrapRecord) int {
-				return bytes.Compare(a.key, b.key)
-			})
-
-			groupSSTables, err := b.writeSortedRecords(dir, group[0].bucket, records)
-			if err != nil {
-				return err
-			}
-
-			b.log.Debug().
-				Int("bucket", group[0].bucket).
-				Int("register_count", len(records)).
-				Int("sstable_count", len(groupSSTables)).
-				Msg("wrote sstables for bucket group")
 
 			mutex.Lock()
 			defer mutex.Unlock()
-			b.registerCount += uint64(len(records))
+			b.registerCount += uint64(registerCount)
 			b.sstableCount += len(groupSSTables)
 			sstables = append(sstables, groupSSTables...)
 			return nil
@@ -499,6 +514,229 @@ func (b *RegisterBootstrapSSTables) writeSSTables(
 		return nil, err
 	}
 	return sstables, nil
+}
+
+// writeBucketGroup writes the registers of the given bucket files, which are in ascending lookup
+// key order, to sstables: the files are split into smaller ones if they are too large to be sorted
+// in memory, then read back in groups of at least the lowest level's target file size, sorted by
+// lookup key and written to sstables. It returns the sstables it wrote and the number of registers
+// it wrote to them.
+//
+// The bucket files are split by size, not by the group: a group is never larger than the target
+// file size plus a single bucket file, which bounds the registers a caller holds in memory.
+//
+// NOT CONCURRENCY SAFE!
+//
+// Expected error returns during normal operation:
+//   - [context.Canceled], [context.DeadlineExceeded]: if the context is cancelled
+func (b *RegisterBootstrapSSTables) writeBucketGroup(
+	ctx context.Context,
+	dir string,
+	group []registerBootstrapBucketFile,
+) ([]string, int, error) {
+	buckets, err := b.splitOversizedBuckets(ctx, dir, group)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	var (
+		sstables      []string
+		registerCount int
+	)
+	for groupStart := 0; groupStart < len(buckets); {
+		groupEnd := bucketGroupEnd(buckets, groupStart, int64(b.sstableTargetFileSize))
+		subGroup := buckets[groupStart:groupEnd]
+		groupStart = groupEnd
+
+		records, err := readBucketFiles(subGroup)
+		if err != nil {
+			return nil, 0, err
+		}
+
+		slices.SortFunc(records, func(a, b registerBootstrapRecord) int {
+			return bytes.Compare(a.key, b.key)
+		})
+
+		subGroupSSTables, err := b.writeSortedRecords(dir, subGroup[0].name, records)
+		if err != nil {
+			return nil, 0, err
+		}
+
+		b.log.Debug().
+			Int("bucket", subGroup[0].bucket).
+			Int("register_count", len(records)).
+			Int("sstable_count", len(subGroupSSTables)).
+			Msg("wrote sstables for bucket group")
+
+		registerCount += len(records)
+		sstables = append(sstables, subGroupSSTables...)
+	}
+	return sstables, registerCount, nil
+}
+
+// splitOversizedBuckets returns the given bucket files, with every bucket file that holds more
+// registers than the lowest level's target file size replaced by the sub-bucket files it was split
+// into, recursively. The returned bucket files are in ascending lookup key order, and each of them
+// is smaller than the target file size, unless a bucket file cannot be split any further because
+// all its registers share the byte of their lookup keys at its split offset: such a bucket file is
+// returned as it is, and sorted in memory.
+//
+// NOT CONCURRENCY SAFE!
+//
+// Expected error returns during normal operation:
+//   - [context.Canceled], [context.DeadlineExceeded]: if the context is cancelled
+func (b *RegisterBootstrapSSTables) splitOversizedBuckets(
+	ctx context.Context,
+	dir string,
+	buckets []registerBootstrapBucketFile,
+) ([]registerBootstrapBucketFile, error) {
+	resolved := make([]registerBootstrapBucketFile, 0, len(buckets))
+	// pending holds the bucket files that still have to be resolved, in ascending lookup key
+	// order, so that the resolved bucket files are returned in that order too
+	pending := make([]registerBootstrapBucketFile, len(buckets))
+	copy(pending, buckets)
+
+	for len(pending) > 0 {
+		bucket := pending[0]
+		pending = pending[1:]
+
+		if bucket.size <= int64(b.sstableTargetFileSize) {
+			resolved = append(resolved, bucket)
+			continue
+		}
+
+		children, err := b.splitBucketFile(ctx, dir, bucket)
+		if err != nil {
+			return nil, err
+		}
+		if len(children) < 2 {
+			// all registers of the bucket file share the byte at the split offset, so splitting
+			// it does not make it smaller: remove the split's files and sort it in memory
+			b.log.Warn().
+				Str("bucket_file", bucket.name).
+				Int64("bucket_file_size", bucket.size).
+				Msg("bucket file cannot be split by the next byte, sorting it in memory")
+			for _, child := range children {
+				if err := os.Remove(child.path); err != nil {
+					return nil, fmt.Errorf("could not remove the sub-bucket file %s: %w", child.path, err)
+				}
+			}
+			resolved = append(resolved, bucket)
+			continue
+		}
+
+		if err := os.Remove(bucket.path); err != nil {
+			return nil, fmt.Errorf("could not remove the split bucket file %s: %w", bucket.path, err)
+		}
+
+		// the children partition the bucket file's lookup key range, so they come before the
+		// bucket files that follow the bucket file
+		pending = append(children, pending...)
+	}
+	return resolved, nil
+}
+
+// splitBucketFile splits the given bucket file at the byte of its registers' lookup keys at the
+// bucket file's split offset: each register is appended to the sub-bucket file of that byte's
+// value, which covers a range of the lookup key space smaller than the bucket file's. It returns
+// the sub-bucket files that hold at least one register, in ascending order of that byte.
+//
+// The bucket file is kept: it is left to the caller to remove it once it uses the sub-bucket
+// files, since a split that did not separate the registers leaves the caller with the bucket file.
+//
+// The registers of the bucket file are streamed, so splitting a bucket file of any size needs the
+// memory of a single register only.
+//
+// NOT CONCURRENCY SAFE!
+//
+// Expected error returns during normal operation:
+//   - [context.Canceled], [context.DeadlineExceeded]: if the context is cancelled
+func (b *RegisterBootstrapSSTables) splitBucketFile(
+	ctx context.Context,
+	dir string,
+	bucket registerBootstrapBucketFile,
+) ([]registerBootstrapBucketFile, error) {
+	bucketFiles := make([]*bucketFile, registerBootstrapBucketCount)
+	closeBucketFiles := func() error {
+		var closeErr error
+		for _, bucketFile := range bucketFiles {
+			if bucketFile == nil {
+				continue
+			}
+			closeErr = errors.Join(closeErr, bucketFile.Close())
+		}
+		return closeErr
+	}
+	defer func() {
+		if closeErr := closeBucketFiles(); closeErr != nil {
+			b.log.Error().Err(closeErr).Msgf("could not close sub-bucket files of %s", bucket.name)
+		}
+	}()
+
+	subBucketFileName := func(index int) string {
+		return fmt.Sprintf("%s.%02x", bucket.name, index)
+	}
+
+	splitErr := forEachBucketRecord(bucket.path, func(key []byte, value []byte) error {
+		// the byte the bucket file is split at; keys shorter than the split offset cannot
+		// happen for the lookup keys of a register store, but map them to the first
+		// sub-bucket file instead of failing
+		index := 0
+		if bucket.splitOffset < len(key) {
+			index = int(key[bucket.splitOffset])
+		}
+
+		if bucketFiles[index] == nil {
+			if err := ctx.Err(); err != nil {
+				return err
+			}
+			bucketFile, err := createBucketFile(dir, subBucketFileName(index))
+			if err != nil {
+				return err
+			}
+			bucketFiles[index] = bucketFile
+		}
+		return bucketFiles[index].write(key, value)
+	})
+	if splitErr != nil {
+		// the sub-bucket files are incomplete, so they must not be used: remove the ones that
+		// were created, and keep the bucket file for a retry
+		for index, bucketFile := range bucketFiles {
+			if bucketFile == nil {
+				continue
+			}
+			_ = bucketFile.Close()
+			bucketFiles[index] = nil
+			if removeErr := os.Remove(bucketFile.path); removeErr != nil {
+				b.log.Error().Err(removeErr).Msgf("could not remove sub-bucket file %s", bucketFile.path)
+			}
+		}
+		return nil, splitErr
+	}
+
+	if err := closeBucketFiles(); err != nil {
+		return nil, err
+	}
+
+	children := make([]registerBootstrapBucketFile, 0, registerBootstrapBucketCount)
+	for index, bucketFile := range bucketFiles {
+		if bucketFile == nil {
+			continue
+		}
+		size, err := bucketFile.size()
+		if err != nil {
+			return nil, err
+		}
+		children = append(children, registerBootstrapBucketFile{
+			bucket:      bucket.bucket,
+			name:        subBucketFileName(index),
+			path:        bucketFile.path,
+			size:        size,
+			splitOffset: bucket.splitOffset + 1,
+		})
+	}
+
+	return children, nil
 }
 
 // bucketGroupEnd returns the index of the first bucket after the group that starts at
@@ -517,14 +755,14 @@ func bucketGroupEnd(buckets []registerBootstrapBucketFile, start int, targetByte
 
 // writeSortedRecords writes the given registers, sorted by lookup key, to sstables of at most
 // the lowest level's target file size, and returns the paths of the sstables it wrote. The
-// sstables are named after the given bucket.
+// sstables are named after the given bucket file.
 //
 // NOT CONCURRENCY SAFE!
 //
 // No error returns are expected during normal operation.
 func (b *RegisterBootstrapSSTables) writeSortedRecords(
 	dir string,
-	bucket int,
+	bucketFileName string,
 	records []registerBootstrapRecord,
 ) ([]string, error) {
 	var (
@@ -556,7 +794,7 @@ func (b *RegisterBootstrapSSTables) writeSortedRecords(
 		}
 
 		if writer == nil {
-			path := filepath.Join(dir, fmt.Sprintf("%s-%04d.sst", bucketFileName(bucket), len(sstables)))
+			path := filepath.Join(dir, fmt.Sprintf("%s-%04d.sst", bucketFileName, len(sstables)))
 			file, err := vfs.Default.Create(path, vfs.WriteCategoryUnspecified)
 			if err != nil {
 				return nil, err
@@ -598,11 +836,11 @@ type bucketFile struct {
 	writer *bufio.Writer
 }
 
-// createBucketFile creates the bucket file of the given bucket in the given directory.
+// createBucketFile creates the bucket file of the given name in the given directory.
 //
 // No error returns are expected during normal operation.
-func createBucketFile(dir string, bucket int) (*bucketFile, error) {
-	path := filepath.Join(dir, bucketFileName(bucket))
+func createBucketFile(dir string, name string) (*bucketFile, error) {
+	path := filepath.Join(dir, name)
 	file, err := os.Create(path)
 	if err != nil {
 		return nil, fmt.Errorf("could not create bucket file %s: %w", path, err)
@@ -680,31 +918,49 @@ func readBucketFiles(buckets []registerBootstrapBucketFile) ([]registerBootstrap
 //
 // No error returns are expected during normal operation.
 func readBucketFile(path string) ([]registerBootstrapRecord, error) {
+	var records []registerBootstrapRecord
+	err := forEachBucketRecord(path, func(key []byte, value []byte) error {
+		records = append(records, registerBootstrapRecord{key: key, value: value})
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return records, nil
+}
+
+// forEachBucketRecord reads all registers of the given bucket file in the order they were
+// written to it, and calls the given function for each of them. The key and the value are only
+// valid until the function returns.
+//
+// No error returns are expected during normal operation.
+func forEachBucketRecord(path string, f func(key []byte, value []byte) error) error {
 	file, err := os.Open(path)
 	if err != nil {
-		return nil, fmt.Errorf("could not open bucket file %s: %w", path, err)
+		return fmt.Errorf("could not open bucket file %s: %w", path, err)
 	}
 	defer func() {
 		_ = file.Close()
 	}()
 
 	reader := bufio.NewReaderSize(file, registerBootstrapReadBufSize)
-	var records []registerBootstrapRecord
 	for {
 		key, err := readBucketRecordPart(reader, path)
 		if errors.Is(err, io.EOF) {
-			return records, nil
+			return nil
 		}
 		if err != nil {
-			return nil, err
+			return err
 		}
 
 		value, err := readBucketRecordPart(reader, path)
 		if err != nil {
-			return nil, fmt.Errorf("truncated bucket file %s: %w", path, err)
+			return fmt.Errorf("truncated bucket file %s: %w", path, err)
 		}
 
-		records = append(records, registerBootstrapRecord{key: key, value: value})
+		if err := f(key, value); err != nil {
+			return err
+		}
 	}
 }
 

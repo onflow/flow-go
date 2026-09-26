@@ -80,6 +80,49 @@ func TestRegisterBootstrapSSTables_IndexCheckpointFile_Happy(t *testing.T) {
 	})
 }
 
+// TestRegisterBootstrapSSTables_IndexCheckpointFile_SingleOwner bootstraps a register store from
+// a checkpoint whose registers almost all belong to one owner, so that the bucket file of that
+// owner cannot be split by the owner's bytes and is sorted in memory instead.
+func TestRegisterBootstrapSSTables_IndexCheckpointFile_SingleOwner(t *testing.T) {
+	t.Parallel()
+	log := zerolog.New(io.Discard)
+	rootHeight := uint64(10000)
+	unittest.RunWithTempDir(t, func(dir string) {
+		checkpointTrie, registerIDs := registerBootstrapTestTrie(t, 1, 1000)
+		rootHash := checkpointTrie.RootHash()
+		fileName := "single-owner-checkpoint"
+		require.NoErrorf(t, wal.StoreCheckpointV6Concurrently([]*trie.MTrie{checkpointTrie}, dir, fileName, log),
+			"fail to store checkpoint")
+		checkpointFile := path.Join(dir, fileName)
+		pb, dbDir := createPebbleForTest(t)
+
+		bootstrap, err := NewRegisterBootstrapSSTables(pb, dbDir, checkpointFile, rootHeight, rootHash, log)
+		require.NoError(t, err)
+		// force the bucket files to be split by size, which the bucket file of the single owner
+		// cannot be by the bytes of its owner
+		bootstrap.sstableTargetFileSize = 1 << 10
+		require.NoError(t, bootstrap.IndexCheckpointFile(context.Background(), sstableBootstrapWorkerCount))
+
+		require.Equal(t, uint64(len(registerIDs)), bootstrap.registerCount)
+		require.Greater(t, bootstrap.sstableCount, 1)
+
+		reg, err := NewRegisters(pb, PruningDisabled)
+		require.NoError(t, err)
+		require.Equal(t, rootHeight, reg.FirstHeight())
+
+		for _, registerID := range registerIDs {
+			val, err := reg.Get(registerID, rootHeight)
+			require.NoError(t, err)
+			require.Equal(t, []byte{defaultRegisterValue}, val)
+		}
+
+		requireNoBootstrapTempDir(t, dbDir)
+
+		require.NoError(t, pb.Close())
+		require.NoError(t, os.RemoveAll(dbDir))
+	})
+}
+
 // TestRegisterBootstrapSSTables_IndexCheckpointFile_Empty bootstraps a register store from
 // a checkpoint without any register.
 func TestRegisterBootstrapSSTables_IndexCheckpointFile_Empty(t *testing.T) {
