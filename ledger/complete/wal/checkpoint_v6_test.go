@@ -756,3 +756,44 @@ func TestCheckpointHasRootHash(t *testing.T) {
 		require.Error(t, CheckpointHasRootHash(logger, dir, fileName, nonExist))
 	})
 }
+
+// TestAnyCheckpointFileExists verifies that [AnyCheckpointFileExists] reports
+// true whenever any file with the checkpoint's prefix exists — the header, a
+// single part file, or a stray leftover — and false only when nothing with that
+// prefix is present. Callers use this to refuse overwriting a checkpoint.
+func TestAnyCheckpointFileExists(t *testing.T) {
+	unittest.RunWithTempDir(t, func(dir string) {
+		fileName := "checkpoint.00000001.v7"
+
+		exists, err := AnyCheckpointFileExists(dir, fileName)
+		require.NoError(t, err)
+		require.False(t, exists, "nothing exists yet")
+
+		// Header file alone.
+		require.NoError(t, os.WriteFile(path.Join(dir, fileName), []byte("header"), 0644))
+		exists, err = AnyCheckpointFileExists(dir, fileName)
+		require.NoError(t, err)
+		require.True(t, exists, "header file must be detected")
+
+		// A single part file alone.
+		require.NoError(t, os.Remove(path.Join(dir, fileName)))
+		require.NoError(t, os.WriteFile(path.Join(dir, partFileName(fileName, 5)), []byte("part"), 0644))
+		exists, err = AnyCheckpointFileExists(dir, fileName)
+		require.NoError(t, err)
+		require.True(t, exists, "any part file must be detected")
+
+		// A stray file sharing the prefix (leftover from an interrupted write).
+		require.NoError(t, os.Remove(path.Join(dir, partFileName(fileName, 5))))
+		require.NoError(t, os.WriteFile(path.Join(dir, fileName+".tmp"), []byte("partial"), 0644))
+		exists, err = AnyCheckpointFileExists(dir, fileName)
+		require.NoError(t, err)
+		require.True(t, exists, "stray file with the prefix must be detected")
+
+		// A file without the prefix must not trigger the check.
+		require.NoError(t, os.Remove(path.Join(dir, fileName+".tmp")))
+		require.NoError(t, os.WriteFile(path.Join(dir, "other.txt"), []byte("x"), 0644))
+		exists, err = AnyCheckpointFileExists(dir, fileName)
+		require.NoError(t, err)
+		require.False(t, exists, "unrelated file must be ignored")
+	})
+}
