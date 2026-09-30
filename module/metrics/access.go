@@ -34,11 +34,18 @@ func WithRestMetrics(m module.RestMetrics) AccessCollectorOpts {
 	}
 }
 
+func WithBeaconObservabilityMetrics(m module.BeaconObservabilityMetrics) AccessCollectorOpts {
+	return func(ac *AccessCollector) {
+		ac.BeaconObservabilityMetrics = m
+	}
+}
+
 type AccessCollector struct {
 	module.RestMetrics
 	module.TransactionMetrics
 	module.TransactionValidationMetrics
 	module.BackendScriptsMetrics
+	module.BeaconObservabilityMetrics
 
 	connectionReused              prometheus.Counter
 	connectionsInPool             *prometheus.GaugeVec
@@ -124,6 +131,10 @@ func NewAccessCollector(opts ...AccessCollectorOpts) *AccessCollector {
 
 	for _, opt := range opts {
 		opt(ac)
+	}
+
+	if ac.BeaconObservabilityMetrics == nil {
+		ac.BeaconObservabilityMetrics = NewNoopCollector()
 	}
 
 	return ac
