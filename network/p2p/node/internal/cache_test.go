@@ -353,3 +353,39 @@ func TestAllowFor_MultiplePeers_Concurrently(t *testing.T) {
 		}(i)
 	}
 }
+
+// TestDisallowListCache_ConcurrentReadWrite verifies that concurrently reading and mutating the causes of a single peer
+// does not race on the stored cause-set. Without the cause-set being copied under the cache lock, this test crashes with
+// "concurrent map iteration and map write" (or is reported by the race detector).
+func TestDisallowListCache_ConcurrentReadWrite(t *testing.T) {
+	disallowListCache := internal.NewDisallowListCache(uint32(100), unittest.Logger(), metrics.NewNoopCollector())
+	peerID := peer.ID("peer1")
+
+	done := make(chan struct{})
+	var wg sync.WaitGroup
+	wg.Add(2)
+	go func() {
+		defer wg.Done()
+		defer close(done)
+		for i := 0; i < 2000; i++ {
+			_, err := disallowListCache.DisallowFor(peerID, network.DisallowListedCauseAdmin)
+			assert.NoError(t, err)
+			_, err = disallowListCache.DisallowFor(peerID, network.DisallowListedCauseAlsp)
+			assert.NoError(t, err)
+			disallowListCache.AllowFor(peerID, network.DisallowListedCauseAdmin)
+			disallowListCache.AllowFor(peerID, network.DisallowListedCauseAlsp)
+		}
+	}()
+	go func() {
+		defer wg.Done()
+		for {
+			select {
+			case <-done:
+				return
+			default:
+				disallowListCache.IsDisallowListed(peerID)
+			}
+		}
+	}()
+	unittest.RequireReturnsBefore(t, wg.Wait, 60*time.Second, "concurrent read/write did not finish")
+}
