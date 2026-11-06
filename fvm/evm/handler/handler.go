@@ -77,7 +77,7 @@ func NewContractHandler(
 }
 
 // ResetCaches resets caches. It is called by the runtime pool via
-// SwappableEnvironment.onSwap when the runtime is borrowed or returned.
+// swappableEnvironment.onSwap when the runtime is borrowed or returned.
 func (h *ContractHandler) ResetCaches() {
 	h.evmDryCallCache = nil
 }
