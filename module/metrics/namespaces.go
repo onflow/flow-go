@@ -33,6 +33,11 @@ const (
 	subsystemSecurity     = "security"
 )
 
+// Finalized subsystems represent network-wide observability metrics derived from finalized blocks.
+const (
+	subsystemFinalized = "finalized"
+)
+
 // Storage subsystems represent the various components of the storage layer.
 const (
 	subsystemBadger  = "badger"
