@@ -161,6 +161,16 @@ jobs:
           REPO="${{ vars.SECURE_BUILDS_REPO || 'flow-go-internal' }}"
           echo "Secure build for ${{ matrix.role }}: https://github.com/onflow/${REPO}/actions/runs/${{ steps.trigger-secure-build.outputs.workflow_id }}"
 
+  # TODO: promote-to-partner-registry — not yet added.
+  # The GCP version pushed `access` to vars.PARTNER_REGISTRY using
+  # secrets.PARTNER_REGISTRY_PROMOTION_SECRET. Both go away with the GCP
+  # shutdown. The AWS destination (private ECR? public ECR? which account?)
+  # needs an owner decision. See
+  # ff-sre-infrastructure/Flow-AWS-Public-Registry/CI_PUSH_PROPOSAL.md.
+  # Add back as an AWS-shaped job (OIDC role, promote-images composite,
+  # `access` matrix, `access image promotion to partner registry` environment)
+  # once that decision lands.
+
   promote-to-public-registry:
     # This job promotes container images for various roles from the private staging ECR to ECR Public.
     # It uses a matrix strategy to handle the promotion of images for different roles in parallel.
