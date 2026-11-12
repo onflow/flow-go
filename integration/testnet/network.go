@@ -794,7 +794,7 @@ func (net *FlowNetwork) AddObserver(t *testing.T, conf ObserverConfig) *Containe
 		ForcePull: false,
 		Name:      conf.ContainerName,
 		Config: &container.Config{
-			Image: "gcr.io/flow-container-registry/observer:latest",
+			Image: defaultRegistry + "/observer:latest",
 			User:  currentUser(),
 			Cmd: append([]string{
 				"--bind=0.0.0.0:3569",
