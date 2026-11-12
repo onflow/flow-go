@@ -29,6 +29,13 @@ jobs:
   build-publish:
     name: Build boot tools
     runs-on: ubuntu-latest
+    # `boot-tools publish` is a GitHub environment with required reviewers.
+    # The AWS OIDC trust policy on AWS_GENESIS_BOOTSTRAP_PUSH_ROLE_ARN pins
+    # `sub` to this environment, so a workflow run must both target this
+    # environment AND pass its approval gate before it can assume the role
+    # and overwrite `boot-tools.tar` — the pointer archive that operators
+    # download at bootstrap.
+    environment: boot-tools publish
     steps:
     - name: Print all input variables
       run: echo '${{ toJson(inputs) }}' | jq
