@@ -329,19 +329,23 @@ jobs:
         run: make docker-native-build-flow docker-native-build-flow-corrupt
 
       - name: Save Docker images
+        # Image tags follow the Makefile's CONTAINER_REGISTRY default
+        # (public.ecr.aws/x4m7o2g2, the ECR Public mirror in flow-common).
+        # ghost and the *-corrupted variants are built locally for integration
+        # tests only; they share the tag prefix but aren't published.
         run: |
           docker save \
-          gcr.io/flow-container-registry/access:latest \
-          gcr.io/flow-container-registry/collection:latest \
-          gcr.io/flow-container-registry/consensus:latest \
-          gcr.io/flow-container-registry/execution:latest \
-          gcr.io/flow-container-registry/execution-ledger:latest \
-          gcr.io/flow-container-registry/ghost:latest \
-          gcr.io/flow-container-registry/observer:latest \
-          gcr.io/flow-container-registry/verification:latest \
-          gcr.io/flow-container-registry/access-corrupted:latest \
-          gcr.io/flow-container-registry/execution-corrupted:latest \
-          gcr.io/flow-container-registry/verification-corrupted:latest > flow-docker-images.tar
+          public.ecr.aws/x4m7o2g2/access:latest \
+          public.ecr.aws/x4m7o2g2/collection:latest \
+          public.ecr.aws/x4m7o2g2/consensus:latest \
+          public.ecr.aws/x4m7o2g2/execution:latest \
+          public.ecr.aws/x4m7o2g2/execution-ledger:latest \
+          public.ecr.aws/x4m7o2g2/ghost:latest \
+          public.ecr.aws/x4m7o2g2/observer:latest \
+          public.ecr.aws/x4m7o2g2/verification:latest \
+          public.ecr.aws/x4m7o2g2/access-corrupted:latest \
+          public.ecr.aws/x4m7o2g2/execution-corrupted:latest \
+          public.ecr.aws/x4m7o2g2/verification-corrupted:latest > flow-docker-images.tar
 
       - name: Cache Docker images
         uses: actions/cache@v5

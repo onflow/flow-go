@@ -49,7 +49,14 @@ UNAME := $(shell uname)
 GOARCH := $(shell go env GOARCH)
 
 # docker container registry
-export CONTAINER_REGISTRY := gcr.io/flow-container-registry
+# Default is the public ECR mirror in the flow-common AWS account. The vanity
+# alias `onflow` is still pending AWS approval; until then the auto-assigned
+# alias `x4m7o2g2` is the canonical pull URL (see
+# ff-sre-infrastructure/Flow-AWS-Public-Registry/README.md). ?= so callers
+# (e.g. image_builds.yml) can override via `make ... CONTAINER_REGISTRY=...`
+# to point at the private staging ECR for release builds.
+CONTAINER_REGISTRY ?= public.ecr.aws/x4m7o2g2
+export CONTAINER_REGISTRY
 export DOCKER_BUILDKIT := 1
 
 # set `CRYPTO_FLAG` when building natively (not cross-compiling)

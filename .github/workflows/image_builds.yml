@@ -15,17 +15,25 @@ on:
         required: true
         type: string
 
+permissions:
+  contents: read
+  id-token: write # GitHub OIDC -> AWS STS
+
 env:
   GO_VERSION: "1.26"
-  PRIVATE_REGISTRY_HOST: us-central1-docker.pkg.dev
+  AWS_REGION: us-east-2
+  # Private staging ECR registry host (flow-common account, us-east-2). Role
+  # images land at $PRIVATE_REGISTRY_HOST/$PRIVATE_REGISTRY_NAMESPACE/<role>.
+  PRIVATE_REGISTRY_HOST: 066899194966.dkr.ecr.us-east-2.amazonaws.com
+  PRIVATE_REGISTRY_NAMESPACE: flow-go-staging
 
 jobs:
-  # This job is responsible for building docker images using flow-go and pushing them to the private registry.
+  # This job is responsible for building docker images using flow-go and pushing them to the private staging ECR.
   # It uses a matrix strategy to handle the builds for different roles in parallel.
-  # The environment is set to 'container builds' that provides the necessary secrets for pushing to the pirvate registry.
+  # The environment is set to 'container builds' that provides the OIDC role ARN for pushing to the private staging ECR.
   public-build:
     if: ${{ github.event.inputs.secure-build == 'false' }}
-    name: Execute public repo build & push to private artifact registry
+    name: Execute public repo build & push to private ECR
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -91,13 +99,16 @@ jobs:
           repository: onflow/flow-go
           ref: ${{ inputs.tag }}
 
-      - name: Authenticate with Docker Registry
-        uses: google-github-actions/auth@v3
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502 # v4.0.2
         with:
-          credentials_json: ${{ secrets.GCP_CREDENTIALS_FOR_PRIVATE_REGISTRY }}
+          role-to-assume: ${{ vars.AWS_ECR_PRIVATE_PUSH_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
 
-      - name: Setup Google Cloud Authentication
-        run: gcloud auth configure-docker ${{ env.PRIVATE_REGISTRY_HOST }}
+      - name: Log in to private ECR
+        uses: aws-actions/amazon-ecr-login@062b18b96a7aff071d4dc91bc00c4c1a7945b076 # v2.0.1
+        with:
+          registries: ${{ env.PRIVATE_REGISTRY_HOST }}
 
       - name: Login to Docker Hub
         uses: docker/login-action@v4
@@ -108,12 +119,12 @@ jobs:
       - name: Execute ${{ matrix.build_command }} command to build and push images
         env:
           IMAGE_TAG: ${{ inputs.tag }}
-          CONTAINER_REGISTRY: ${{ vars.PRIVATE_REGISTRY }}
+          CONTAINER_REGISTRY: ${{ env.PRIVATE_REGISTRY_HOST }}/${{ env.PRIVATE_REGISTRY_NAMESPACE }}
         run: |
           make ${{ matrix.build_command }} CONTAINER_REGISTRY=${CONTAINER_REGISTRY}
 
   secure-build:
-    # This job is responsible for executing secure builds for private dependencies & pushing them to the private registry.
+    # This job is responsible for executing secure builds for private dependencies & pushing them to the private staging ECR.
     # It uses a matrix strategy to handle the builds for different roles in parallel.
     # The environment is set to 'secure builds' to ensure that the builds are gated and only approved images are deployed.
     # The job is triggered only if the 'secure-build' input is set to 'true'.
@@ -150,41 +161,8 @@ jobs:
           REPO="${{ vars.SECURE_BUILDS_REPO || 'flow-go-internal' }}"
           echo "Secure build for ${{ matrix.role }}: https://github.com/onflow/${REPO}/actions/runs/${{ steps.trigger-secure-build.outputs.workflow_id }}"
 
-  promote-to-partner-registry:
-    # This job promotes container images from the private registry to the partner registry.
-    # As of right now, the only role being promoted to the partner registry is 'access'.
-    # It uses a matrix strategy to handle the promotion of images for different roles in parallel.
-    # The environments defined for each role are used to gate the promotion process.
-    # This ensures that only approved images are deployed to the partner registry.
-    name: Promote Images to Partner Registry
-    runs-on: ubuntu-latest
-    needs: [public-build, secure-build]
-    # This job will only run if the previous jobs were successful and not cancelled.
-    # It checks the results of both the public and secure builds to ensure that at least one of them succeeded.
-    if: |
-      ${{ !cancelled() }} &&
-      ${{ needs.public-build.result != 'failure' || needs.secure-build.result != 'failure' }}
-    strategy:
-      fail-fast: false
-      matrix:
-        role: [access]
-    environment: ${{ matrix.role }} image promotion to partner registry
-    steps:
-      - name: Checkout repo
-        uses: actions/checkout@v6
-
-      - name: Promote ${{ matrix.role }}
-        uses: ./actions/promote-images
-        with:
-          gcp_credentials: ${{ secrets.PARTNER_REGISTRY_PROMOTION_SECRET }}
-          private_registry: ${{ vars.PRIVATE_REGISTRY }}
-          private_registry_host: ${{ env.PRIVATE_REGISTRY_HOST }}
-          promotion_registry: ${{ vars.PARTNER_REGISTRY }}
-          role: ${{ matrix.role }}
-          tags: "${{ inputs.tag }},${{ inputs.tag }}-without-adx,${{ inputs.tag }}-without-netgo-without-adx,${{ inputs.tag }}-arm"
-
   promote-to-public-registry:
-    # This job promotes container images for various roles from a private registry to a public registry.
+    # This job promotes container images for various roles from the private staging ECR to ECR Public.
     # It uses a matrix strategy to handle the promotion of images for different roles in parallel.
     # The environments defined for each role are used to gate the promotion process.
     # This ensures that only approved images are deployed to the public registry.
@@ -205,13 +183,21 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v6
 
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502 # v4.0.2
+        with:
+          # Role trust policy is pinned to the "<role> image promotion to
+          # public registry" environment (see
+          # Flow-AWS-Public-Registry/CI_PUSH_PROPOSAL.md). Region must be
+          # us-east-1 for ECR Public STS auth.
+          role-to-assume: ${{ vars.AWS_ECR_PUBLIC_PUSH_ROLE_ARN }}
+          aws-region: us-east-1
+
       - name: Promote ${{ matrix.role }}
         uses: ./actions/promote-images
         with:
-          gcp_credentials: ${{ secrets.PUBLIC_REGISTRY_PROMOTION_SECRET }}
-          private_registry: ${{ vars.PRIVATE_REGISTRY }}
-          private_registry_host: ${{ env.PRIVATE_REGISTRY_HOST }}
+          private_registry: ${{ env.PRIVATE_REGISTRY_HOST }}/${{ env.PRIVATE_REGISTRY_NAMESPACE }}
           promotion_registry: ${{ vars.PUBLIC_REGISTRY }}
+          promotion_registry_type: public
           role: ${{ matrix.role }}
           tags: "${{ inputs.tag }},${{ inputs.tag }}-without-adx,${{ inputs.tag }}-without-netgo-without-adx,${{ inputs.tag }}-arm"
-
