@@ -10,17 +10,11 @@ name: claude-review-fvm
 # The Claude GitHub App (https://github.com/apps/claude) must be installed
 # on this repository — that is what lets Claude post as claude[bot].
 #
-# ── TRIAL MODE ─────────────────────────────────────────────────────────
-# Claude currently posts findings as a plain PR comment (`gh pr comment`)
-# and cannot approve: the tool allowlist below does not include
-# `gh pr review`, so approval is impossible at the tool level regardless
-# of the prompt. To promote Claude to a real reviewer later:
-#   1. add `Bash(gh pr review:*)` to --allowedTools
-#   2. update the "Submitting your findings" section of the `fvm-review`
-#      skill (`.claude/skills/fvm-review/SKILL.md`) with review-submission
-#      rules (approve only when no important findings, request changes when
-#      there are, comment when uncertain)
-# ───────────────────────────────────────────────────────────────────────
+# Claude submits a formal review via `gh pr review` (approve /
+# request-changes / comment). Approvals count toward the ruleset's
+# `required_approving_review_count: 2`; the paired
+# `.github/rulesets/default-branch-protection.json` team requirement
+# still forces at least one human approval from `@onflow/flow-core-protocol`.
 
 on:
   pull_request:
@@ -69,7 +63,7 @@ jobs:
           # `--model <id>` here if reproducibility matters more.
           claude_args: |
             --max-turns 30
-            --allowedTools "Bash(gh pr view:*),Bash(gh pr diff:*),Bash(gh pr comment:*),Bash(git diff:*),Bash(git log:*),Bash(git show:*),Read,Grep,Glob"
+            --allowedTools "Bash(gh pr view:*),Bash(gh pr diff:*),Bash(gh pr review:*),Bash(git diff:*),Bash(git log:*),Bash(git show:*),Read,Grep,Glob"
 
           prompt: |
             You are reviewing pull request #${{ github.event.pull_request.number }}
@@ -78,16 +72,15 @@ jobs:
             Run the `fvm-review` skill (`.claude/skills/fvm-review/SKILL.md`)
             to perform the review. The skill holds the FVM-specific review
             doctrine: the bug classes to check, the error-taxonomy rules, the
-            scope guidance, and the findings format. Apply it to this PR.
+            scope guidance, and the findings + submission format. Apply it to
+            this PR.
 
             Runtime context for this run:
             - PR number: ${{ github.event.pull_request.number }}
             - Base ref (diff against this, not master):
               ${{ github.event.pull_request.base.ref }}
-            - Submission: post exactly one `gh pr comment` with the skill's
-              findings format. Do not approve or request changes — the
-              workflow's tool allowlist omits `gh pr review`, so approval is
-              impossible at the tool level regardless.
+            - Submission: submit exactly one formal review via `gh pr review`
+              following the skill's approve / request-changes / comment rules.
 
       # TEMPORARY DEBUG: persist the raw execution output so the actual
       # error message survives the runner (it is otherwise only written to

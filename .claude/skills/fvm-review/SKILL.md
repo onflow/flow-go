@@ -101,10 +101,33 @@ the diff against each:
 
 ## Submitting your findings
 
-Post exactly ONE comment on the PR via `gh pr comment`, with:
+Submit exactly ONE formal review via `gh pr review` using the verdict
+rules below. The body contains the findings in the format described
+further down.
+
+### Choosing the verdict
+
+- `--approve` when you have NO **Important** findings. Nits are fine;
+  approval signals "merge-ready from this review's perspective, modulo
+  the human reviewer".
+- `--request-changes` when you have at least one **Important** finding
+  (a bug that would ship to production). Say which finding(s) justify
+  the block in the first line of the body.
+- `--comment` ONLY when you could not complete the review (missing
+  context you cannot recover, PR too large to assess responsibly, the
+  diff has structural issues that make line-by-line review meaningless).
+  Explain why in the body. Do NOT use `--comment` as a hedge when
+  `--approve` or `--request-changes` fits — it leaves the PR in limbo.
+
+Approval here is one of two required slots (the other is a human on
+`@onflow/flow-core-protocol`). The policy assumes this review genuinely
+reflects the diff's merge-readiness; drive-by approvals defeat it.
+
+### Body format
 
 - First line: a one-sentence verdict ("No concerns from this review" or
-  "N findings, M of them important").
+  "N findings, M of them important"), optionally followed by the reason
+  for request-changes.
 - Findings grouped by severity: **Important** (would be a bug in production),
   **Nit** (worth fixing, not blocking), **Pre-existing** (not introduced by
   this PR).
@@ -113,7 +136,3 @@ Post exactly ONE comment on the PR via `gh pr comment`, with:
 - At most 5 nits; summarize the rest in one line if there are more.
 - If you verified something subtle and found it correct, say so in one line —
   knowing what was checked has value.
-
-When running in CI trial mode, do not approve or request changes. Findings
-only. (The workflow's tool allowlist omits `gh pr review`, so approval is
-impossible at the tool level regardless of this instruction.)

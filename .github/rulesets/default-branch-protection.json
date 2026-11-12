@@ -36,10 +36,9 @@
           {
             "reviewer_id": 11293013,
             "file_patterns": [
-              "*",
-              "!fvm/**"
+              "*"
             ],
-            "approvals_needed": 2
+            "approvals_needed": 1
           }
         ]
       }

@@ -1,0 +1,84 @@
+name: claude-review
+
+# Runs Claude Code on pull requests that modify non-FVM code and posts a
+# formal review (approve / request-changes / comment). The FVM path is
+# handled by the specialized `claude-review-fvm` workflow + `fvm-review`
+# skill; this workflow is the generalist counterpart for the rest of the
+# repo. Mixed PRs (FVM + non-FVM files) fire BOTH workflows; since both
+# post as `claude[bot]`, the latest-run review is the one that counts for
+# the ruleset's approval tally — that is intentional and fine.
+#
+# Authentication uses Workload Identity Federation against the Anthropic
+# API — no ANTHROPIC_API_KEY secret is required. The federation rule ID,
+# service account ID, and organization ID below are identifiers, not
+# credentials, and can safely live in the workflow file.
+#
+# The Claude GitHub App (https://github.com/apps/claude) must be installed
+# on this repository — that is what lets Claude post as claude[bot].
+#
+# Approvals count toward the ruleset's `required_approving_review_count: 2`;
+# the paired `.github/rulesets/default-branch-protection.json` team
+# requirement still forces at least one human approval from
+# `@onflow/flow-core-protocol`.
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths-ignore:
+      - 'fvm/**'
+
+permissions:
+  contents: read
+  pull-requests: write   # required for Claude to post the review
+  id-token: write        # required for WIF: fetching the GitHub OIDC token
+
+concurrency:
+  group: claude-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true   # a new push supersedes the in-flight review
+
+jobs:
+  review:
+    if: github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false   # don't leave GITHUB_TOKEN in git config
+
+      - uses: anthropics/claude-code-action@v1
+        with:
+          # Workload Identity Federation — no static credentials. Reuses
+          # the same federation rule as claude-review-fvm; one rule covers
+          # both workflows.
+          anthropic_federation_rule_id: fdrl_01UXEriP26j1qgPvpAvVyYoE
+          anthropic_service_account_id: svac_01RutNzF7FBxds8FhTHZ2BTY
+          anthropic_organization_id: 23ff619e-5bf0-4e8d-936b-87274460531a
+          # anthropic_workspace_id intentionally omitted: the federation
+          # rule is scoped to a single (default) workspace.
+
+          # Model intentionally not pinned — the action's default tracks
+          # Anthropic's current recommended model. Pin with
+          # `--model <id>` here if reproducibility matters more.
+          claude_args: |
+            --max-turns 30
+            --allowedTools "Bash(gh pr view:*),Bash(gh pr diff:*),Bash(gh pr review:*),Bash(git diff:*),Bash(git log:*),Bash(git show:*),Read,Grep,Glob"
+
+          prompt: |
+            You are reviewing pull request #${{ github.event.pull_request.number }}
+            on onflow/flow-go. It touches code outside the Flow Virtual Machine
+            (fvm/**). The FVM has its own specialist reviewer; do not duplicate
+            that work here.
+
+            Run the `code-review` skill (`.claude/skills/code-review/SKILL.md`)
+            to perform the review. The skill holds the generalist review
+            doctrine: the conventions to check, the scope guidance, and the
+            findings + submission format. Apply it to this PR.
+
+            Runtime context for this run:
+            - PR number: ${{ github.event.pull_request.number }}
+            - Base ref (diff against this, not master):
+              ${{ github.event.pull_request.base.ref }}
+            - Submission: submit exactly one formal review via `gh pr review`
+              following the skill's approve / request-changes / comment rules.
