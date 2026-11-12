@@ -363,6 +363,11 @@ jobs:
         targets: ${{ fromJSON(needs.create-integration-dynamic-test-matrix.outputs.dynamic-matrix)}}
     ## need to set image explicitly due to GitHub logging issue as described in https://github.com/onflow/flow-go/pull/3087#issuecomment-1234383202
     runs-on: ${{ matrix.targets.runner }}
+    env:
+      # integration/testnet reads CONTAINER_REGISTRY to resolve the node
+      # image tag; without this it falls back to the Go default
+      # (gcr.io/flow-container-registry) and the tests use the wrong images.
+      CONTAINER_REGISTRY: public.ecr.aws/x4m7o2g2
 
     steps:
       - name: Checkout repo
@@ -405,6 +410,11 @@ jobs:
   integration-test:
     name: Integration Tests
     needs: docker-build
+    env:
+      # integration/testnet reads CONTAINER_REGISTRY to resolve the node
+      # image tag loaded from the docker-build job's tarball; without this
+      # it falls back to the Go default (gcr.io/flow-container-registry).
+      CONTAINER_REGISTRY: public.ecr.aws/x4m7o2g2
     strategy:
       fail-fast: false
       matrix:

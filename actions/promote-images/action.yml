@@ -37,7 +37,7 @@ runs:
         # Pin crane to a release + verify the checksum. The release pipeline
         # publishes images operators run, so we don't `curl | sh`.
         CRANE_VERSION="v0.20.2"
-        CRANE_SHA256="4f7c4c7a2b7b7f9e0a6c4a5bb70f68ba6e5e93d3c1f73e4a7c6bea2f6e1f0dc5"
+        CRANE_SHA256="c14340087103ba9dadf61d45acd20675490fd0ccbd56ac7901fc1b502137f44b"
         TMP="$(mktemp -d)"
         curl -fsSL "https://github.com/google/go-containerregistry/releases/download/${CRANE_VERSION}/go-containerregistry_Linux_x86_64.tar.gz" -o "${TMP}/crane.tgz"
         # When updating CRANE_VERSION also update CRANE_SHA256 (sha256sum on the release asset).
@@ -46,10 +46,14 @@ runs:
         sudo install -m 0755 "${TMP}/crane" /usr/local/bin/crane
         crane version
 
+    # amazon-ecr-login's `registries` input takes 12-digit account IDs, not
+    # registry URLs. When omitted, the action logs in to the caller's own
+    # account — which is what we want: the source (and the private
+    # destination, if used) live in the same flow-common account as the
+    # assumed role. Leaving the inputs off avoids parse errors and keeps
+    # auth scoped by the configured STS identity.
     - name: Log in to ECR Private (source)
       uses: aws-actions/amazon-ecr-login@062b18b96a7aff071d4dc91bc00c4c1a7945b076 # v2.0.1
-      with:
-        registries: ${{ inputs.private_registry }}
 
     - name: Log in to destination registry (ECR Public)
       if: ${{ inputs.promotion_registry_type == 'public' }}
@@ -60,8 +64,6 @@ runs:
     - name: Log in to destination registry (ECR Private)
       if: ${{ inputs.promotion_registry_type == 'private' }}
       uses: aws-actions/amazon-ecr-login@062b18b96a7aff071d4dc91bc00c4c1a7945b076 # v2.0.1
-      with:
-        registries: ${{ inputs.promotion_registry }}
 
     - name: Copy ${{ inputs.role }} by digest
       shell: bash

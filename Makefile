@@ -57,6 +57,13 @@ GOARCH := $(shell go env GOARCH)
 # to point at the private staging ECR for release builds.
 CONTAINER_REGISTRY ?= public.ecr.aws/x4m7o2g2
 export CONTAINER_REGISTRY
+# Registry for CI base images (golang-cmake, used only by the local
+# docker-ci / docker-ci-integration targets). public.ecr.aws/x4m7o2g2 does
+# not host golang-cmake today, so keep the GCR path as the default until it
+# is mirrored to ECR Public (TODO). CI itself does not use these targets;
+# only developers running the make targets locally.
+CI_BASE_IMAGE_REGISTRY ?= gcr.io/flow-container-registry
+export CI_BASE_IMAGE_REGISTRY
 export DOCKER_BUILDKIT := 1
 
 # set `CRYPTO_FLAG` when building natively (not cross-compiling)
@@ -261,7 +268,7 @@ docker-ci:
 	docker run --env RACE_DETECTOR=$(RACE_DETECTOR) --env COVER=$(COVER) --env JSON_OUTPUT=$(JSON_OUTPUT) \
 		-v /run/host-services/ssh-auth.sock:/run/host-services/ssh-auth.sock -e SSH_AUTH_SOCK="/run/host-services/ssh-auth.sock" \
 		-v "$(CURDIR)":/go/flow -v "/tmp/.cache":"/root/.cache" -v "/tmp/pkg":"/go/pkg" \
-		-w "/go/flow" "$(CONTAINER_REGISTRY)/golang-cmake:v0.0.7" \
+		-w "/go/flow" "$(CI_BASE_IMAGE_REGISTRY)/golang-cmake:v0.0.7" \
 		make ci
 
 # Runs integration tests in Docker  (for mac)
@@ -274,7 +281,7 @@ docker-ci-integration:
 		-v /tmp:/tmp \
 		-v /var/run/docker.sock:/var/run/docker.sock \
 		-v /run/host-services/ssh-auth.sock:/run/host-services/ssh-auth.sock -e SSH_AUTH_SOCK="/run/host-services/ssh-auth.sock" \
-		-w "/go/flow" "$(CONTAINER_REGISTRY)/golang-cmake:v0.0.7" \
+		-w "/go/flow" "$(CI_BASE_IMAGE_REGISTRY)/golang-cmake:v0.0.7" \
 		make ci-integration
 
 # only works on Debian

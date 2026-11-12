@@ -17,7 +17,9 @@ on:
 
 permissions:
   contents: read
-  id-token: write # GitHub OIDC -> AWS STS
+  # `id-token: write` is granted only on jobs that need it (public-build,
+  # promote-to-public-registry). secure-build does not use AWS OIDC; keeping
+  # the workflow-level grant off prevents an OIDC token leak from that path.
 
 env:
   GO_VERSION: "1.26"
@@ -35,6 +37,9 @@ jobs:
     if: ${{ github.event.inputs.secure-build == 'false' }}
     name: Execute public repo build & push to private ECR
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write # OIDC token for AWS STS AssumeRoleWithWebIdentity
     strategy:
       fail-fast: false
       matrix:
@@ -106,9 +111,11 @@ jobs:
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Log in to private ECR
+        # `registries` input takes 12-digit account IDs. Omitting it logs in
+        # to the caller's own account — which is flow-common
+        # (066899194966), where the staging repos live. The region comes
+        # from configure-aws-credentials above.
         uses: aws-actions/amazon-ecr-login@062b18b96a7aff071d4dc91bc00c4c1a7945b076 # v2.0.1
-        with:
-          registries: ${{ env.PRIVATE_REGISTRY_HOST }}
 
       - name: Login to Docker Hub
         uses: docker/login-action@v4
@@ -179,6 +186,9 @@ jobs:
     name: Promote Images to Public Registry
     runs-on: ubuntu-latest
     needs: [public-build, secure-build]
+    permissions:
+      contents: read
+      id-token: write # OIDC token for AWS STS AssumeRoleWithWebIdentity
     # This job will only run if the previous jobs were successful and not cancelled.
     # It checks the results of both the public and secure builds to ensure that at least one of them succeeded.
     if: |
@@ -198,10 +208,12 @@ jobs:
         with:
           # Role trust policy is pinned to the "<role> image promotion to
           # public registry" environment (see
-          # Flow-AWS-Public-Registry/CI_PUSH_PROPOSAL.md). Region must be
-          # us-east-1 for ECR Public STS auth.
+          # Flow-AWS-Public-Registry/CI_PUSH_PROPOSAL.md). us-east-2 is
+          # needed for the ECR Private source login (staging ECR region);
+          # ECR Public SDK calls use their own us-east-1 endpoint
+          # regardless of AWS_REGION.
           role-to-assume: ${{ vars.AWS_ECR_PUBLIC_PUSH_ROLE_ARN }}
-          aws-region: us-east-1
+          aws-region: ${{ env.AWS_REGION }}
 
       - name: Promote ${{ matrix.role }}
         uses: ./actions/promote-images
