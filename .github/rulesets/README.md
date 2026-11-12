@@ -115,12 +115,6 @@ reviewer from that team on every PR. Combined with the global
 | 2 AI reviewers                 | No — the team requirement is not met.                |
 | 1 human (core-protocol) only   | No — the global count of 2 is not met.               |
 
-This replaces the previous 2-humans policy, which had become impractical
-with a smaller team. The FVM path-scoped carve-out that previously
-excluded `fvm/**` from the team requirement is no longer needed: AI
-approvals now count toward the second slot everywhere in the repo, so
-there is no reason to special-case FVM.
-
 ### Team IDs
 
 `reviewer_id` in the JSON is a numeric GitHub team ID, not a slug. To
