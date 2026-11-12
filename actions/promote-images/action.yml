@@ -60,6 +60,14 @@ runs:
       uses: aws-actions/amazon-ecr-login@062b18b96a7aff071d4dc91bc00c4c1a7945b076 # v2.0.1
       with:
         registry-type: public
+      env:
+        # ECR Public's SDK builds the endpoint as
+        # api.ecr-public.{AWS_REGION}.amazonaws.com and only us-east-1
+        # serves the service. Override just this step so the surrounding
+        # us-east-2 session (used for the private source login) is
+        # unaffected.
+        AWS_REGION: us-east-1
+        AWS_DEFAULT_REGION: us-east-1
 
     - name: Log in to destination registry (ECR Private)
       if: ${{ inputs.promotion_registry_type == 'private' }}
