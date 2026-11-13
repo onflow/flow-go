@@ -1,6 +1,6 @@
 ---
 name: code-review
-description: Reviews a pull request on onflow/flow-go that touches code outside fvm/**. Use when running the `claude-review` CI workflow or when checking non-FVM changes locally before pushing. For PRs that modify fvm/**, use the specialized `fvm-review` skill instead.
+description: Reviews the non-FVM slice of a pull request on onflow/flow-go (everything outside fvm/**). Invoked by the `claude-review` CI workflow for every PR, and usable standalone for checking non-FVM changes locally before pushing. For `fvm/**` files, the orchestrator uses the specialized `fvm-review` skill instead; this rubric explicitly skips them.
 ---
 
 # Flow-go PR Review (generalist)
@@ -109,14 +109,23 @@ Prioritized — spend turns on the earlier items before the later ones.
 
 ## Submitting your findings
 
-Submit exactly ONE formal review via `gh pr review` using the verdict
-rules below. The body contains the findings in the format described
-further down.
+How you report depends on how you were invoked:
 
-### Choosing the verdict
+- **Under the `claude-review` CI orchestrator** (the common case): produce
+  your findings in the body format below and a per-rubric verdict
+  suggestion using the rules below. Do NOT call `gh pr review` yourself —
+  the orchestrator aggregates verdicts across rubrics (FVM + non-FVM)
+  and submits exactly ONE formal review for the whole PR. Submitting
+  your own review here would race the orchestrator and can silently
+  override its verdict, because both would post as the same `claude[bot]`
+  identity.
+- **Standalone** (asked to review directly): submit exactly ONE formal
+  review via `gh pr review` using the verdict rules below.
+
+### Choosing the verdict (per-rubric)
 
 - `--approve` when you have NO **Important** findings. Nits are fine;
-  approval signals "merge-ready from this review's perspective, modulo
+  approval signals "merge-ready from this rubric's perspective, modulo
   the human reviewer".
 - `--request-changes` when you have at least one **Important** finding
   (a bug that would ship to production). Say which finding(s) justify
@@ -127,17 +136,18 @@ further down.
   Explain why in the body. Do NOT use `--comment` as a hedge when
   `--approve` or `--request-changes` fits — it leaves the PR in limbo.
 
-Approval here is one of two required slots (the other is a human on
-`@onflow/flow-core-protocol`). The policy assumes this review genuinely
-reflects the diff's merge-readiness; drive-by approvals defeat it.
+Under the orchestrator, your per-rubric verdict is one input to the
+combined decision (any rubric's request-changes wins; a rubric's comment
+makes the overall verdict a comment unless another rubric blocks). The
+AI approval is one of two required slots (the other is a human on
+`@onflow/flow-core-protocol`); the policy assumes this review genuinely
+reflects the diff's merge-readiness, so drive-by approvals defeat it.
 
 ### Body format
 
 - First line: a one-sentence verdict ("No concerns from this review" or
   "N findings, M of them important"), optionally followed by the reason
   for request-changes.
-- If FVM files were in the diff and deferred to the specialist, say so
-  in one line near the top.
 - Findings grouped by severity: **Important** (would be a bug in
   production), **Nit** (worth fixing, not blocking), **Pre-existing**
   (not introduced by this PR).

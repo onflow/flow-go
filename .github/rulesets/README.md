@@ -96,13 +96,16 @@ The `pull_request` rule includes a `required_reviewers` entry:
 
 ```json
 {
-  "reviewer_id": 11293013,
   "file_patterns": ["*"],
-  "approvals_needed": 1
+  "minimum_approvals": 1,
+  "reviewer": {
+    "id": 11293013,
+    "type": "Team"
+  }
 }
 ```
 
-`reviewer_id: 11293013` is `@onflow/flow-core-protocol`, the team CODEOWNERS
+`reviewer.id: 11293013` is `@onflow/flow-core-protocol`, the team CODEOWNERS
 already designates as the owner of the whole repo. Bot approvals do not
 satisfy a team requirement, so this entry guarantees at least one human
 reviewer from that team on every PR. Combined with the global
@@ -117,8 +120,8 @@ reviewer from that team on every PR. Combined with the global
 
 ### Team IDs
 
-`reviewer_id` in the JSON is a numeric GitHub team ID, not a slug. To
-resolve or verify one:
+`reviewer.id` in the JSON is a numeric GitHub team ID (paired with
+`"type": "Team"`), not a slug. To resolve or verify one:
 
 ```
 gh api /orgs/onflow/teams/<team-slug> --jq .id

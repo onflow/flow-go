@@ -34,11 +34,14 @@
         "required_review_thread_resolution": false,
         "required_reviewers": [
           {
-            "reviewer_id": 11293013,
             "file_patterns": [
               "*"
             ],
-            "approvals_needed": 1
+            "minimum_approvals": 1,
+            "reviewer": {
+              "id": 11293013,
+              "type": "Team"
+            }
           }
         ]
       }

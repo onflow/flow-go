@@ -1,12 +1,21 @@
 name: claude-review
 
-# Runs Claude Code on pull requests that modify non-FVM code and posts a
-# formal review (approve / request-changes / comment). The FVM path is
-# handled by the specialized `claude-review-fvm` workflow + `fvm-review`
-# skill; this workflow is the generalist counterpart for the rest of the
-# repo. Mixed PRs (FVM + non-FVM files) fire BOTH workflows; since both
-# post as `claude[bot]`, the latest-run review is the one that counts for
-# the ruleset's approval tally — that is intentional and fine.
+# Runs Claude Code on every pull request and submits exactly ONE formal
+# review (approve / request-changes / comment). This is the AI slot of
+# the repo's "1 human + 1 AI" merge policy — see
+# `.github/rulesets/default-branch-protection.json`.
+#
+# The prompt orchestrates two review rubrics without ever submitting more
+# than one `gh pr review`:
+#   - Files under `fvm/**` are reviewed with the `fvm-review` skill
+#     (consensus-critical execution-layer rubric).
+#   - Files outside `fvm/**` are reviewed with the `code-review` skill
+#     (generalist Flow-go rubric).
+# On mixed PRs both rubrics run and findings are combined into a single
+# verdict. Running separate workflows that each submit their own review
+# was rejected: both would post as the same `claude[bot]` identity, and
+# GitHub keeps only the latest review per reviewer — so a later approval
+# could silently clear an earlier request-changes.
 #
 # Authentication uses Workload Identity Federation against the Anthropic
 # API — no ANTHROPIC_API_KEY secret is required. The federation rule ID,
@@ -15,17 +24,10 @@ name: claude-review
 #
 # The Claude GitHub App (https://github.com/apps/claude) must be installed
 # on this repository — that is what lets Claude post as claude[bot].
-#
-# Approvals count toward the ruleset's `required_approving_review_count: 2`;
-# the paired `.github/rulesets/default-branch-protection.json` team
-# requirement still forces at least one human approval from
-# `@onflow/flow-core-protocol`.
 
 on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
-    paths-ignore:
-      - 'fvm/**'
 
 permissions:
   contents: read
@@ -49,9 +51,7 @@ jobs:
 
       - uses: anthropics/claude-code-action@v1
         with:
-          # Workload Identity Federation — no static credentials. Reuses
-          # the same federation rule as claude-review-fvm; one rule covers
-          # both workflows.
+          # Workload Identity Federation — no static credentials.
           anthropic_federation_rule_id: fdrl_01UXEriP26j1qgPvpAvVyYoE
           anthropic_service_account_id: svac_01RutNzF7FBxds8FhTHZ2BTY
           anthropic_organization_id: 23ff619e-5bf0-4e8d-936b-87274460531a
@@ -67,18 +67,64 @@ jobs:
 
           prompt: |
             You are reviewing pull request #${{ github.event.pull_request.number }}
-            on onflow/flow-go. It touches code outside the Flow Virtual Machine
-            (fvm/**). The FVM has its own specialist reviewer; do not duplicate
-            that work here.
-
-            Run the `code-review` skill (`.claude/skills/code-review/SKILL.md`)
-            to perform the review. The skill holds the generalist review
-            doctrine: the conventions to check, the scope guidance, and the
-            findings + submission format. Apply it to this PR.
+            on onflow/flow-go. Your job is to produce exactly ONE formal
+            review verdict that reflects the whole diff.
 
             Runtime context for this run:
             - PR number: ${{ github.event.pull_request.number }}
             - Base ref (diff against this, not master):
               ${{ github.event.pull_request.base.ref }}
-            - Submission: submit exactly one formal review via `gh pr review`
-              following the skill's approve / request-changes / comment rules.
+
+            Procedure:
+
+            1. Enumerate the changed files
+               (`gh pr diff ${{ github.event.pull_request.number }} --name-only`
+               or `git diff --name-only origin/${{ github.event.pull_request.base.ref }}...HEAD`).
+               Split them into:
+               - `fvm/**` files
+               - everything else
+
+            2. For each non-empty slice, apply the matching skill's rubric
+               to that slice (and only that slice):
+               - `fvm/**` files → `.claude/skills/fvm-review/SKILL.md`
+                 (FVM specialist rubric; consensus-critical execution-layer
+                 bug classes).
+               - Other files → `.claude/skills/code-review/SKILL.md`
+                 (generalist Flow-go rubric; error handling, byzantine
+                 inputs, concurrency, godocs, etc.).
+               The skills describe the body format and the per-rubric
+               verdict rules; use them to generate findings, but do NOT
+               submit a review yourself inside a skill run. This outer
+               prompt submits the single combined review.
+
+            3. Combine the verdicts into ONE:
+               - If ANY rubric produced an **Important** finding →
+                 overall verdict is `--request-changes`.
+               - Else if every rubric that ran would `--approve` →
+                 overall verdict is `--approve`.
+               - Else (any rubric would `--comment` because it could not
+                 complete) → overall verdict is `--comment`, and the body
+                 explains which slice could not be fully reviewed.
+
+            4. Submit EXACTLY ONE formal review via `gh pr review` with
+               the combined verdict. Body format:
+               - First line: one-sentence verdict. If `--request-changes`,
+                 name the blocking finding(s).
+               - If both rubrics ran, structure the body with two
+                 sections:
+                 ```
+                 ## FVM findings
+                 ...
+                 ## Non-FVM findings
+                 ...
+                 ```
+                 Each section follows the respective skill's body format
+                 (verdict line, grouped findings with severity, `file:line`
+                 citations, at most 5 nits).
+               - If only one rubric ran, use a single section and that
+                 skill's body format directly.
+
+            Approval here is one of two required slots (the other is a
+            human on `@onflow/flow-core-protocol`). The policy assumes this
+            review genuinely reflects the diff's merge-readiness; drive-by
+            approvals defeat it.
