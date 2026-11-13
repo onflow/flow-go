@@ -1,0 +1,130 @@
+name: claude-review
+
+# Runs Claude Code on every pull request and submits exactly ONE formal
+# review (approve / request-changes / comment). This is the AI slot of
+# the repo's "1 human + 1 AI" merge policy — see
+# `.github/rulesets/default-branch-protection.json`.
+#
+# The prompt orchestrates two review rubrics without ever submitting more
+# than one `gh pr review`:
+#   - Files under `fvm/**` are reviewed with the `fvm-review` skill
+#     (consensus-critical execution-layer rubric).
+#   - Files outside `fvm/**` are reviewed with the `code-review` skill
+#     (generalist Flow-go rubric).
+# On mixed PRs both rubrics run and findings are combined into a single
+# verdict. Running separate workflows that each submit their own review
+# was rejected: both would post as the same `claude[bot]` identity, and
+# GitHub keeps only the latest review per reviewer — so a later approval
+# could silently clear an earlier request-changes.
+#
+# Authentication uses Workload Identity Federation against the Anthropic
+# API — no ANTHROPIC_API_KEY secret is required. The federation rule ID,
+# service account ID, and organization ID below are identifiers, not
+# credentials, and can safely live in the workflow file.
+#
+# The Claude GitHub App (https://github.com/apps/claude) must be installed
+# on this repository — that is what lets Claude post as claude[bot].
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
+  pull-requests: write   # required for Claude to post the review
+  id-token: write        # required for WIF: fetching the GitHub OIDC token
+
+concurrency:
+  group: claude-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true   # a new push supersedes the in-flight review
+
+jobs:
+  review:
+    if: github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false   # don't leave GITHUB_TOKEN in git config
+
+      - uses: anthropics/claude-code-action@v1
+        with:
+          # Workload Identity Federation — no static credentials.
+          anthropic_federation_rule_id: fdrl_01UXEriP26j1qgPvpAvVyYoE
+          anthropic_service_account_id: svac_01RutNzF7FBxds8FhTHZ2BTY
+          anthropic_organization_id: 23ff619e-5bf0-4e8d-936b-87274460531a
+          # anthropic_workspace_id intentionally omitted: the federation
+          # rule is scoped to a single (default) workspace.
+
+          # Model intentionally not pinned — the action's default tracks
+          # Anthropic's current recommended model. Pin with
+          # `--model <id>` here if reproducibility matters more.
+          claude_args: |
+            --max-turns 30
+            --allowedTools "Bash(gh pr view:*),Bash(gh pr diff:*),Bash(gh pr review:*),Bash(git diff:*),Bash(git log:*),Bash(git show:*),Read,Grep,Glob"
+
+          prompt: |
+            You are reviewing pull request #${{ github.event.pull_request.number }}
+            on onflow/flow-go. Your job is to produce exactly ONE formal
+            review verdict that reflects the whole diff.
+
+            Runtime context for this run:
+            - PR number: ${{ github.event.pull_request.number }}
+            - Base ref (diff against this, not master):
+              ${{ github.event.pull_request.base.ref }}
+
+            Procedure:
+
+            1. Enumerate the changed files
+               (`gh pr diff ${{ github.event.pull_request.number }} --name-only`
+               or `git diff --name-only origin/${{ github.event.pull_request.base.ref }}...HEAD`).
+               Split them into:
+               - `fvm/**` files
+               - everything else
+
+            2. For each non-empty slice, apply the matching skill's rubric
+               to that slice (and only that slice):
+               - `fvm/**` files → `.claude/skills/fvm-review/SKILL.md`
+                 (FVM specialist rubric; consensus-critical execution-layer
+                 bug classes).
+               - Other files → `.claude/skills/code-review/SKILL.md`
+                 (generalist Flow-go rubric; error handling, byzantine
+                 inputs, concurrency, godocs, etc.).
+               The skills describe the body format and the per-rubric
+               verdict rules; use them to generate findings, but do NOT
+               submit a review yourself inside a skill run. This outer
+               prompt submits the single combined review.
+
+            3. Combine the verdicts into ONE:
+               - If ANY rubric produced an **Important** finding →
+                 overall verdict is `--request-changes`.
+               - Else if every rubric that ran would `--approve` →
+                 overall verdict is `--approve`.
+               - Else (any rubric would `--comment` because it could not
+                 complete) → overall verdict is `--comment`, and the body
+                 explains which slice could not be fully reviewed.
+
+            4. Submit EXACTLY ONE formal review via `gh pr review` with
+               the combined verdict. Body format:
+               - First line: one-sentence verdict. If `--request-changes`,
+                 name the blocking finding(s).
+               - If both rubrics ran, structure the body with two
+                 sections:
+                 ```
+                 ## FVM findings
+                 ...
+                 ## Non-FVM findings
+                 ...
+                 ```
+                 Each section follows the respective skill's body format
+                 (verdict line, grouped findings with severity, `file:line`
+                 citations, at most 5 nits).
+               - If only one rubric ran, use a single section and that
+                 skill's body format directly.
+
+            Approval here is one of two required slots (the other is a
+            human on `@onflow/flow-core-protocol`). The policy assumes this
+            review genuinely reflects the diff's merge-readiness; drive-by
+            approvals defeat it.
