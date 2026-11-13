@@ -315,6 +315,12 @@ func (s TransactionSignature) ValidateExtensionDataAndReconstructMessage(payload
 		}
 		return true, slices.Concat(TransactionDomainTag[:], payload)
 	case WebAuthnScheme: // See FLIP 264 for more details
+		// WebAuthn transaction signatures are currently disabled; signatures submitted under
+		// this scheme are rejected at the dispatch layer, leaving [validateWebAuthNExtensionData]
+		// available for re-enablement without further changes.
+		if !webAuthnEnabled {
+			return false, nil
+		}
 		return validateWebAuthNExtensionData(s.ExtensionData, payload)
 	default:
 		// authentication scheme not found
