@@ -13,24 +13,37 @@ on:
         required: false
         type: boolean
 
+permissions:
+  contents: read
+  id-token: write # GitHub OIDC -> AWS STS
+
 env:
   GO_VERSION: "1.26"
+  # Public mirror of gs://flow-genesis-bootstrap. Bucket lives in flow-common
+  # (us-east-2) and is public-read over HTTPS; write access is restricted to
+  # this workflow via the OIDC role AWS_GENESIS_BOOTSTRAP_PUSH_ROLE_ARN.
+  BOOTSTRAP_BUCKET: flow-genesis-bootstrap
+  AWS_REGION: us-east-2
 
 jobs:
   build-publish:
     name: Build boot tools
     runs-on: ubuntu-latest
+    # `boot-tools publish` is a GitHub environment with required reviewers.
+    # The AWS OIDC trust policy on AWS_GENESIS_BOOTSTRAP_PUSH_ROLE_ARN pins
+    # `sub` to this environment, so a workflow run must both target this
+    # environment AND pass its approval gate before it can assume the role
+    # and overwrite `boot-tools.tar` — the pointer archive that operators
+    # download at bootstrap.
+    environment: boot-tools publish
     steps:
     - name: Print all input variables
       run: echo '${{ toJson(inputs) }}' | jq
-    - id: auth
-      uses: google-github-actions/auth@v3
+    - name: Configure AWS credentials (OIDC)
+      uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502 # v4.0.2
       with:
-        credentials_json: ${{ secrets.GCR_SERVICE_KEY }}
-    - name: Set up Google Cloud SDK
-      uses: google-github-actions/setup-gcloud@v3
-      with:
-        project_id: flow
+        role-to-assume: ${{ vars.AWS_GENESIS_BOOTSTRAP_PUSH_ROLE_ARN }}
+        aws-region: ${{ env.AWS_REGION }}
     - name: Setup Go
       uses: actions/setup-go@v6
       with:
@@ -53,7 +66,7 @@ jobs:
         sha256sum boot-tools/transit > boot-tools/transit.sha256sum
         cat boot-tools/transit.sha256sum
         tar -czf boot-tools.tar ./boot-tools/
-        gsutil cp boot-tools.tar gs://flow-genesis-bootstrap/tools/${{ inputs.tag }}/boot-tools.tar
+        aws s3 cp boot-tools.tar s3://${BOOTSTRAP_BUCKET}/tools/${{ inputs.tag }}/boot-tools.tar
     - name: Build and upload util
       env:
         CADENCE_DEPLOY_KEY: ${{ secrets.CADENCE_DEPLOY_KEY }}
@@ -62,15 +75,15 @@ jobs:
         sha256sum util > util.sha256sum
         cat util.sha256sum
         tar -czf util.tar util util.sha256sum
-        gsutil cp util.tar gs://flow-genesis-bootstrap/tools/${{ inputs.tag }}/util.tar
+        aws s3 cp util.tar s3://${BOOTSTRAP_BUCKET}/tools/${{ inputs.tag }}/util.tar
     - name: Promote boot-tools
       run: |
         if [[ "${{ inputs.promote }}" = true ]]; then
           echo "promoting boot-tools.tar"
-          gsutil cp boot-tools.tar gs://flow-genesis-bootstrap/boot-tools.tar
-          SUMMARY=$'# Tool Build and Upload Summary \n Your tools were uploaded to the following GCS objects \n * Boot Tools gs://flow-genesis-bootstrap/boot-tools.tar \n * Util util.tar gs://flow-genesis-bootstrap/tools/${{ inputs.tag }}/util.tar'
+          aws s3 cp boot-tools.tar s3://${BOOTSTRAP_BUCKET}/boot-tools.tar
+          SUMMARY=$'# Tool Build and Upload Summary \n Your tools were uploaded to the following S3 objects \n * Boot Tools s3://'"${BOOTSTRAP_BUCKET}"$'/boot-tools.tar \n * Util util.tar s3://'"${BOOTSTRAP_BUCKET}"$'/tools/${{ inputs.tag }}/util.tar'
         else
           echo "not promoting boot-tools.tar"
-          SUMMARY=$'# Tool Build and Upload Summary \n Your tools were uploaded to the following GCS objects \n * Boot Tools gs://flow-genesis-bootstrap/tools/${{ inputs.tag }}/boot-tools.tar \n * Util util.tar gs://flow-genesis-bootstrap/tools/${{ inputs.tag }}/util.tar'
+          SUMMARY=$'# Tool Build and Upload Summary \n Your tools were uploaded to the following S3 objects \n * Boot Tools s3://'"${BOOTSTRAP_BUCKET}"$'/tools/${{ inputs.tag }}/boot-tools.tar \n * Util util.tar s3://'"${BOOTSTRAP_BUCKET}"$'/tools/${{ inputs.tag }}/util.tar'
         fi
         echo "$SUMMARY" >> $GITHUB_STEP_SUMMARY
