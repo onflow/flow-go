@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"strconv"
 
+	"github.com/onflow/flow/protobuf/go/flow/entities"
+
 	"github.com/onflow/flow-go/engine/access/rest/common"
 	"github.com/onflow/flow-go/engine/access/rest/common/parser"
 	"github.com/onflow/flow-go/model/flow"
@@ -12,10 +14,12 @@ import (
 const resultExpandable = "result"
 const blockIDQueryParam = "block_id"
 const collectionIDQueryParam = "collection_id"
+const eventEncodingVersionQueryParam = "event_encoding_version"
 
 type TransactionOptionals struct {
-	BlockID      flow.Identifier
-	CollectionID flow.Identifier
+	BlockID              flow.Identifier
+	CollectionID         flow.Identifier
+	EventEncodingVersion entities.EventEncodingVersion
 }
 
 func (t *TransactionOptionals) Parse(r *common.Request) error {
@@ -32,6 +36,12 @@ func (t *TransactionOptionals) Parse(r *common.Request) error {
 		return err
 	}
 	t.CollectionID = collectionId.Flow()
+
+	version, err := parser.ParseEventEncodingVersion(r.GetQueryParam(eventEncodingVersionQueryParam))
+	if err != nil {
+		return err
+	}
+	t.EventEncodingVersion = version
 
 	return nil
 }
