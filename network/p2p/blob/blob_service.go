@@ -55,6 +55,7 @@ var _ component.Component = (*blobService)(nil)
 type BlobServiceConfig struct {
 	ReprovideInterval time.Duration    // the interval at which the DHT provider entries are refreshed
 	BitswapOptions    []bitswap.Option // options to pass to the Bitswap service
+	UseBloomCache     bool             // if true, use the bloom cache (cached blockstore), otherwise use plain blockstore
 }
 
 // WithReprovideInterval sets the interval at which DHT provider entries are refreshed
@@ -98,6 +99,17 @@ func WithRateLimit(r float64, b int) network.BlobServiceOption {
 	}
 }
 
+// WithUseBloomCache enables or disables the bloom cache.
+// When enabled (true), uses a cached blockstore with bloom filter (default behavior).
+// When disabled (false), uses a plain blockstore instead, avoiding the CPU cost of building
+// the bloom filter on startup by scanning all keys. Pebble's built-in bloom filters
+// (persisted in SSTables) are still used for efficient lookups.
+func WithUseBloomCache(use bool) network.BlobServiceOption {
+	return func(bs network.BlobService) {
+		bs.(*blobService).config.UseBloomCache = use
+	}
+}
+
 // NewBlobService creates a new BlobService.
 func NewBlobService(
 	host host.Host,
@@ -109,24 +121,33 @@ func NewBlobService(
 	opts ...network.BlobServiceOption,
 ) (*blobService, error) {
 	bsNetwork := bsnet.NewFromIpfsHost(host, r, bsnet.Prefix(protocol.ID(prefix)))
-	blockStore, err := blockstore.CachedBlockstore(
-		context.Background(),
-		blockstore.NewBlockstore(ds),
-		blockstore.DefaultCacheOpts(),
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create cached blockstore: %w", err)
-	}
+
+	blockStore := blockstore.NewBlockstore(ds)
+
 	bs := &blobService{
 		prefix: prefix,
 		config: &BlobServiceConfig{
 			ReprovideInterval: DefaultReprovideInterval,
+			UseBloomCache:     true, // default: use bloom cache
 		},
 		blockStore: blockStore,
 	}
 
+	// Apply options before creating blockstore, as UseBloomCache affects blockstore creation
 	for _, opt := range opts {
 		opt(bs)
+	}
+
+	if bs.config.UseBloomCache {
+		cachedBlockStore, err := blockstore.CachedBlockstore(
+			context.Background(),
+			blockStore,
+			blockstore.DefaultCacheOpts(),
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create cached blockstore: %w", err)
+		}
+		bs.blockStore = cachedBlockStore
 	}
 
 	cm := component.NewComponentManagerBuilder().
