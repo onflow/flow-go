@@ -44,7 +44,7 @@ type checkpointResult struct {
 // main ledger state to allow separate optimization and looser coupling, etc.
 // CAUTION: If the forest LRU Cache is used for main state,
 // then ledger state and checkpointing queue may contain different tries.
-// This will be resolved automaticaly after the forest LRU Cache
+// This will be resolved automatically after the forest LRU Cache
 // (code outside checkpointing) is replaced by something like a FIFO queue.
 type Compactor struct {
 	checkpointer                         *realWAL.Checkpointer
