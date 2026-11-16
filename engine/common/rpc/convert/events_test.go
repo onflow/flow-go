@@ -1,6 +1,7 @@
 package convert_test
 
 import (
+	"encoding/hex"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -93,6 +94,73 @@ func TestConvertEventWithPayloadConversion(t *testing.T) {
 
 		require.Equal(t, jsonEvent, *convertedEvent)
 	})
+}
+
+// TestConvertEventPayloadWithCyclicReference tests converting the CCF payload of an event
+// with a cyclic reference value to JSON-CDC.
+// Export truncates the cyclic reference value to nil, and both encodings encode it as null.
+// See https://github.com/onflow/flow-go/issues/8701
+func TestConvertEventPayloadWithCyclicReference(t *testing.T) {
+	t.Parallel()
+
+	// Payload of event 4 of mainnet transaction f6dfeb871ff649eb37a5e19e4cfa1c2737da5e63f1a02f5684ba5bd978d57011,
+	// emitted by contract RecursiveEventReceiver at 0xe291d9e45266db1e
+	ccfPayload, err := hex.DecodeString(
+		"d8818282d8a283407830412e653239316439653435323636646231652e5265637572736976654576656e745265636569766572" +
+			"2e506f69736f6e818269726563757273697665d8884101d8a08341017833412e653239316439653435323636646231652e5265" +
+			"637572736976654576656e7452656365697665722e5265637572736976658182686368696c6472656ed88bd88e82f6d8884101" +
+			"82d888408181818181f6",
+	)
+	require.NoError(t, err)
+
+	jsonPayload, err := convert.CcfPayloadToJsonPayload(ccfPayload)
+	require.NoError(t, err)
+
+	require.JSONEq(t,
+		`{
+		  "type": "Event",
+		  "value": {
+		    "id": "A.e291d9e45266db1e.RecursiveEventReceiver.Poison",
+		    "fields": [
+		      {
+		        "name": "recursive",
+		        "value": {
+		          "type": "Struct",
+		          "value": {
+		            "id": "A.e291d9e45266db1e.RecursiveEventReceiver.Recursive",
+		            "fields": [
+		              {
+		                "name": "children",
+		                "value": {
+		                  "type": "Array",
+		                  "value": [
+		                    {
+		                      "type": "Struct",
+		                      "value": {
+		                        "id": "A.e291d9e45266db1e.RecursiveEventReceiver.Recursive",
+		                        "fields": [
+		                          {
+		                            "name": "children",
+		                            "value": {
+		                              "type": "Array",
+		                              "value": [null]
+		                            }
+		                          }
+		                        ]
+		                      }
+		                    }
+		                  ]
+		                }
+		              }
+		            ]
+		          }
+		        }
+		      }
+		    ]
+		  }
+		}`,
+		string(jsonPayload),
+	)
 }
 
 func TestConvertEvents(t *testing.T) {
