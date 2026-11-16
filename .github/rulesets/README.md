@@ -61,17 +61,17 @@ After creation, run the `verify-rulesets` workflow once via
 
 ### `default-branch-protection.json`
 
-Mirrors the legacy branch protection currently on `master`, and adds a
-path-scoped required-reviewer entry for the FVM policy. Intended to
-replace the legacy branch protection entirely once bootstrapped.
+Replaces the legacy branch protection on `master` with a "one human +
+one AI" review policy.
 
 The ruleset carries four rules:
 
 - **`deletion`** — the branch cannot be deleted.
 - **`non_fast_forward`** — force pushes are blocked.
 - **`pull_request`** — 2 approving reviews, code-owner review required,
-  stale reviews are NOT dismissed on push (matches legacy). Adds the FVM
-  path-scoped required reviewer (see below).
+  stale reviews are NOT dismissed on push (matches legacy). One of the
+  two approvals must come from a human on `@onflow/flow-core-protocol`
+  (see below).
 - **`required_status_checks`** — the 48 checks currently required by legacy
   branch protection, with strict mode (branches must be up to date).
 
@@ -90,46 +90,38 @@ Existing tag ruleset on this repo uses a team-based bypass
 that here — the tag ruleset and this branch ruleset serve different
 purposes and can carry different bypass policies.
 
-#### FVM path-scoped review policy
+#### One human + one AI review policy
 
 The `pull_request` rule includes a `required_reviewers` entry:
 
 ```json
 {
-  "reviewer_id": 11293013,
-  "file_patterns": ["*", "!fvm/**"],
-  "approvals_needed": 2
+  "file_patterns": ["*"],
+  "minimum_approvals": 1,
+  "reviewer": {
+    "id": 11293013,
+    "type": "Team"
+  }
 }
 ```
 
-`reviewer_id: 11293013` is `@onflow/flow-core-protocol`, the team CODEOWNERS
-already designates as the owner of the whole repo. Combined with the global
+`reviewer.id: 11293013` is `@onflow/flow-core-protocol`, the team CODEOWNERS
+already designates as the owner of the whole repo. Bot approvals do not
+satisfy a team requirement, so this entry guarantees at least one human
+reviewer from that team on every PR. Combined with the global
 `required_approving_review_count: 2`, the effect is:
 
-| PR touches           | Approvals that satisfy the policy                                                                     |
-| -------------------- | ----------------------------------------------------------------------------------------------------- |
-| non-FVM files        | 2 humans in `@onflow/flow-core-protocol`. Bot approvals do not satisfy the team requirement.          |
-| FVM files only       | Any 2 approvers with write access (satisfies the global count; no team requirement on FVM paths).     |
-| Mixed FVM + non-FVM  | Must satisfy both: 2 humans in `@onflow/flow-core-protocol` for the non-FVM portion.                  |
-
-The point is to let an approving AI reviewer count as one of the two on
-strictly-FVM PRs, without allowing bot approvals to substitute for humans
-anywhere else.
-
-**Assumption:** exactly one AI reviewer account exists on the repo. If a
-second is introduced, add a second required-reviewer entry with
-`file_patterns: ["fvm/**"]` and `approvals_needed: 1` pointing at a
-humans-only team, so a "2 bots, 0 humans" merge on FVM stays impossible.
-
-If FVM eventually gets a dedicated reviewer team (e.g.
-`@onflow/flow-cadence-execution`, which exists on the org and is described
-as covering the Cadence execution stack), a second required-reviewer entry
-can carry that too.
+| Approver combination           | Satisfies the policy?                                |
+| ------------------------------ | ---------------------------------------------------- |
+| 1 human (core-protocol) + 1 AI | Yes — the intended "1 human + 1 AI" case.            |
+| 2 humans on core-protocol      | Yes — the team requirement and global count are met. |
+| 2 AI reviewers                 | No — the team requirement is not met.                |
+| 1 human (core-protocol) only   | No — the global count of 2 is not met.               |
 
 ### Team IDs
 
-`reviewer_id` in the JSON is a numeric GitHub team ID, not a slug. To
-resolve or verify one:
+`reviewer.id` in the JSON is a numeric GitHub team ID (paired with
+`"type": "Team"`), not a slug. To resolve or verify one:
 
 ```
 gh api /orgs/onflow/teams/<team-slug> --jq .id
