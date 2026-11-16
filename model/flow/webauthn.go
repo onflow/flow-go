@@ -16,6 +16,11 @@ import (
 // Consolidation of WebAuthn related constants, types and functions
 // All WebAuthn related constants, types and functions should be defined here
 
+// webAuthnEnabled gates acceptance of the WebAuthn authentication scheme on transaction
+// signatures. WebAuthn support is currently disabled; any signature submitted under the
+// WebAuthn scheme is rejected by [validateWebAuthNExtensionData].
+const webAuthnEnabled = false
+
 const webAuthnChallengeLength = 32
 const webAuthnExtensionDataMinimumLength = 37
 const WebAuthnTypeGet = "webauthn.get"
@@ -72,6 +77,9 @@ func validateFlags(flags byte, extensions []byte) error {
 }
 
 func validateWebAuthNExtensionData(extensionData []byte, payload []byte) (bool, []byte) {
+	if !webAuthnEnabled {
+		return false, nil
+	}
 	// See FLIP 264 for more details
 	if len(extensionData) == 0 {
 		return false, nil
