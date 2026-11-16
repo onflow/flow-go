@@ -12,7 +12,8 @@
   "conditions": {
     "ref_name": {
       "include": [
-        "~DEFAULT_BRANCH"
+        "~DEFAULT_BRANCH",
+        "refs/heads/v0.51"
       ],
       "exclude": []
     }
