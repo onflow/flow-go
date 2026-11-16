@@ -61,8 +61,12 @@ After creation, run the `verify-rulesets` workflow once via
 
 ### `default-branch-protection.json`
 
-Replaces the legacy branch protection on `master` with a "one human +
-one AI" review policy.
+Replaces the legacy branch protection on `master` and on active release
+branches with a "one human + one AI" review policy. The `ref_name.include`
+list enumerates every covered branch — currently `~DEFAULT_BRANCH`
+(master) plus `refs/heads/v0.51`. Add new release branches to that list
+as they ship; the file name stays the same so `apply.sh` keeps updating
+the same live ruleset in place.
 
 The ruleset carries four rules:
 
