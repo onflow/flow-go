@@ -1141,6 +1141,35 @@ func TestGetTransactionResult(t *testing.T) {
 		expected := `{"code":400, "message":"invalid ID format"}`
 		router.AssertResponse(t, req, http.StatusBadRequest, expected, backend)
 	})
+
+	t.Run("event_encoding_version=CCF-V0 forwards to backend", func(t *testing.T) {
+		backend := mock.NewAPI(t)
+
+		u, _ := url.Parse(fmt.Sprintf("/v1/transaction_results/%s", id.String()))
+		q := u.Query()
+		q.Add("event_encoding_version", "CCF-V0")
+		u.RawQuery = q.Encode()
+		req, _ := http.NewRequest("GET", u.String(), nil)
+
+		backend.Mock.
+			On("GetTransactionResult", mocks.Anything, id, flow.ZeroID, flow.ZeroID, entities.EventEncodingVersion_CCF_V0).
+			Return(txr, nil)
+
+		router.AssertOKResponse(t, req, expected, backend)
+	})
+
+	t.Run("event_encoding_version invalid returns 400", func(t *testing.T) {
+		backend := mock.NewAPI(t)
+
+		u, _ := url.Parse(fmt.Sprintf("/v1/transaction_results/%s", id.String()))
+		q := u.Query()
+		q.Add("event_encoding_version", "bogus")
+		u.RawQuery = q.Encode()
+		req, _ := http.NewRequest("GET", u.String(), nil)
+
+		expected := `{"code":400, "message":"invalid 'event_encoding_version', must be 'JSON-CDC-V0' or 'CCF-V0'"}`
+		router.AssertResponse(t, req, http.StatusBadRequest, expected, backend)
+	})
 }
 
 func TestGetTransactionResultsByBlock(t *testing.T) {
