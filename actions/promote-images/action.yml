@@ -1,71 +1,97 @@
 name: Promote Image to another Registry
-description: Pull image from private registry and push to another registry
+description: >
+  Copy an image (all tag variants) by digest from the private staging ECR to
+  another ECR repository (private or public). Uses crane so the destination
+  digest matches the source digest, which is what operators verify.
 
 inputs:
-  gcp_credentials:
-    description: 'GCP Credentials JSON'
-    required: true
   private_registry:
-    description: 'Private container registry URL'
-    required: true
-  private_registry_host:
-    description: 'Private Google Artifact Registry hostname'
+    description: >
+      Private container registry base, e.g.
+      066899194966.dkr.ecr.us-east-2.amazonaws.com/flow-go-staging.
+      Role images are expected at <private_registry>/<role>:<tag>.
     required: true
   promotion_registry:
-    description: 'Registry to promote images to'
+    description: >
+      Destination registry base, e.g. public.ecr.aws/onflow or
+      066899194966.dkr.ecr.us-east-2.amazonaws.com/flow-go-partner.
+      Role images are pushed to <promotion_registry>/<role>:<tag>.
+    required: true
+  promotion_registry_type:
+    description: 'Either "public" or "private". Controls which ECR login type is used for the destination.'
     required: true
   role:
-    description: 'Role to promote'
+    description: 'Flow role to promote (access, collection, consensus, execution, observer, verification).'
     required: true
   tags:
-    description: 'Comma-separated list of tags to use'
+    description: 'Comma-separated list of tags to copy.'
     required: true
 
 runs:
   using: "composite"
   steps:
-    - name: Authenticate with Google Cloud
-      uses: google-github-actions/auth@v1
+    - name: Install crane
+      shell: bash
+      run: |
+        set -euo pipefail
+        # Pin crane to a release + verify the checksum. The release pipeline
+        # publishes images operators run, so we don't `curl | sh`.
+        CRANE_VERSION="v0.20.2"
+        CRANE_SHA256="c14340087103ba9dadf61d45acd20675490fd0ccbd56ac7901fc1b502137f44b"
+        TMP="$(mktemp -d)"
+        curl -fsSL "https://github.com/google/go-containerregistry/releases/download/${CRANE_VERSION}/go-containerregistry_Linux_x86_64.tar.gz" -o "${TMP}/crane.tgz"
+        # When updating CRANE_VERSION also update CRANE_SHA256 (sha256sum on the release asset).
+        echo "${CRANE_SHA256}  ${TMP}/crane.tgz" | sha256sum -c -
+        tar -xzf "${TMP}/crane.tgz" -C "${TMP}" crane
+        sudo install -m 0755 "${TMP}/crane" /usr/local/bin/crane
+        crane version
+
+    # amazon-ecr-login's `registries` input takes 12-digit account IDs, not
+    # registry URLs. When omitted, the action logs in to the caller's own
+    # account — which is what we want: the source (and the private
+    # destination, if used) live in the same flow-common account as the
+    # assumed role. Leaving the inputs off avoids parse errors and keeps
+    # auth scoped by the configured STS identity.
+    - name: Log in to ECR Private (source)
+      uses: aws-actions/amazon-ecr-login@062b18b96a7aff071d4dc91bc00c4c1a7945b076 # v2.0.1
+
+    - name: Log in to destination registry (ECR Public)
+      if: ${{ inputs.promotion_registry_type == 'public' }}
+      uses: aws-actions/amazon-ecr-login@062b18b96a7aff071d4dc91bc00c4c1a7945b076 # v2.0.1
       with:
-        credentials_json: ${{ inputs.gcp_credentials }} 
+        registry-type: public
+      env:
+        # ECR Public's SDK builds the endpoint as
+        # api.ecr-public.{AWS_REGION}.amazonaws.com and only us-east-1
+        # serves the service. Override just this step so the surrounding
+        # us-east-2 session (used for the private source login) is
+        # unaffected.
+        AWS_REGION: us-east-1
+        AWS_DEFAULT_REGION: us-east-1
 
-    - name: Set up Google Cloud SDK
-      uses: google-github-actions/setup-gcloud@v1
+    - name: Log in to destination registry (ECR Private)
+      if: ${{ inputs.promotion_registry_type == 'private' }}
+      uses: aws-actions/amazon-ecr-login@062b18b96a7aff071d4dc91bc00c4c1a7945b076 # v2.0.1
 
-    - name: Authenticate with Private Docker Registry
-      run: |
-        gcloud auth configure-docker ${{ inputs.private_registry_host }} 
+    - name: Copy ${{ inputs.role }} by digest
       shell: bash
-
-    - name: Pull and Tag Images 
-      shell: bash
+      env:
+        SRC: ${{ inputs.private_registry }}/${{ inputs.role }}
+        DST: ${{ inputs.promotion_registry }}/${{ inputs.role }}
+        TAGS: ${{ inputs.tags }}
       run: |
-        # Convert comma-separated tags input into an array
-        IFS=',' read -ra TAGS <<< "${{ inputs.tags }}"
-
-        # Loop through each tag and pull the image from the private registry, then tag it for the registry to promote to 
-        for TAG in "${TAGS[@]}"; do
-          IMAGE_PRIVATE="${{ inputs.private_registry }}/${{ inputs.role }}:${TAG}"
-          IMAGE_PROMOTION="${{ inputs.promotion_registry }}/${{ inputs.role }}:${TAG}"
-          echo "Processing ${IMAGE_PRIVATE} -> ${IMAGE_PROMOTION}"
-          docker pull "${IMAGE_PRIVATE}"
-          docker tag "${IMAGE_PRIVATE}" "${IMAGE_PROMOTION}"
+        set -euo pipefail
+        IFS=',' read -ra TAG_LIST <<< "${TAGS}"
+        for TAG in "${TAG_LIST[@]}"; do
+          TAG="${TAG// /}"
+          [[ -z "${TAG}" ]] && continue
+          echo "Copying ${SRC}:${TAG} -> ${DST}:${TAG}"
+          SRC_DIGEST="$(crane digest "${SRC}:${TAG}")"
+          crane copy "${SRC}@${SRC_DIGEST}" "${DST}:${TAG}"
+          DST_DIGEST="$(crane digest "${DST}:${TAG}")"
+          if [[ "${SRC_DIGEST}" != "${DST_DIGEST}" ]]; then
+            echo "digest mismatch for ${TAG}: src=${SRC_DIGEST} dst=${DST_DIGEST}" >&2
+            exit 1
+          fi
+          echo "Verified ${DST}:${TAG} = ${DST_DIGEST}"
         done
-
-    - name: Authenticate with registry to promote to
-      run: |
-        gcloud auth configure-docker 
-      shell: bash
-
-    - name: Push Images to registry to promote to 
-      shell: bash
-      run: |
-        # Convert comma-separated tags input into an array
-        IFS=',' read -ra TAGS <<< "${{ inputs.tags }}"
-        # Loop through each tag and push the image to the promotion registry
-        for TAG in "${TAGS[@]}"; do
-          IMAGE_PROMOTION="${{ inputs.promotion_registry }}/${{ inputs.role }}:${TAG}"
-          echo "Pushing Image ${IMAGE_PROMOTION} to Public registry"
-          docker push "${IMAGE_PROMOTION}"
-        done
-

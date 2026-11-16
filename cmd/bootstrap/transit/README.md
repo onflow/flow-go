@@ -135,7 +135,7 @@ Example usage:
 
 ```shell
 ansible-playbook -i inventories/mainnet/mainnet26.yml/ vote_on_root_block.yml \ 
-    -e "boot_tools_tar=https://storage.googleapis.com/flow-genesis-bootstrap/boot-tools.tar" \
+    -e "boot_tools_tar=https://flow-genesis-bootstrap.s3.us-east-2.amazonaws.com/boot-tools.tar" \
     -e "bootstrap_directory=/var/flow/bootstrap"
     -e "genesis_bucket=flow-genesis-bootstrap" \
     -e "network_version_token=mainnet-26" \
