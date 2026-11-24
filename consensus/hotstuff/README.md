@@ -4,8 +4,7 @@ We use a BFT consensus algorithm with deterministic finality in Flow for
 * Consensus Nodes: decide on the content of blocks by including collections of transactions,
 * Cluster of Collector Nodes: batch transactions into collections. 
 
-Conceptually, Flow uses a derivative of [HotStuff](https://arxiv.org/abs/1803.05069) called Jolteon.
-It was originally described in the paper ['Jolteon and Ditto: Network-Adaptive Efficient Consensus with Asynchronous Fallback'](https://arxiv.org/abs/2106.10362),
+In May 2020, Flow's [beta mainnet went live](https://assets.website-files.com/5f6294c0c7a8cdd643b1c820/5f7b806074e0de49eb7324ea_FLOW%20Token%20Distribution.pdf). To our knowledge, we were the first to run [HotStuff](https://arxiv.org/abs/1803.05069) in a production network. With no reference implementation to take inspiration from, we worked straight from the [paper](https://arxiv.org/abs/1803.05069) and implemented vanilla event-driven HotStuff. Over several evolutionary steps, our design converged on the HotStuff derivative known as Jolteon. Jolteon was originally described in the paper ['Jolteon and Ditto: Network-Adaptive Efficient Consensus with Asynchronous Fallback'](https://arxiv.org/abs/2106.10362),
 published June 2021 by Meta’s blockchain research team Novi and academic collaborators.
 Meta’s team (then called 'Diem') [implemented](https://github.com/diem/diem/blob/latest/consensus/README.md) Jolteon with marginal modifications and named it
 [DiemBFT v4](https://developers.diem.com/papers/diem-consensus-state-machine-replication-in-the-diem-blockchain/2021-08-17.pdf),
