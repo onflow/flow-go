@@ -22,8 +22,8 @@ section.
 >    `v0.51.0-rc.1` worktree — no Docker, no cross-compile.
 > 2. Args generation runs locally on the laptop, not via SSM into
 >    `devnet54-access-001`. The laptop already holds the
->    `service_account` signer key, so pulling 31 internal-node tars onto
->    the same box does not widen the trust boundary.
+>    `service_account` signer key, so pulling the 14 CN tars onto the
+>    same box does not widen the trust boundary.
 > 3. The `util --config` flag wants a JSON array of
 >    `[{Role, Address, Weight}]` filtered from `node-infos.pub.json` by
 >    the set of node IDs present in `--internal-priv-dir` — **not** the
@@ -159,35 +159,50 @@ derivation; this section walks it with devnet54's current-state numbers.
 
 #### Step-by-step derivation
 
+> **Note on `targetEndTime`.** The Cadence `recover_epoch.cdc` transaction
+> argument `targetEndTime` is **not** a wall-clock quantity we pick; it's
+> computed by the util as `epoch.TargetEndTime() + recoveryEpochTargetDuration`
+> (`cmd/bootstrap/run/epochs.go:259-276`). `epoch.TargetEndTime()` is a
+> Protocol-State value — it is the `EpochSetup` event's `TargetEndTime`
+> plus `extensionViews × setupViewDuration`, maintained as extensions
+> are added (`state/protocol/inmem/epoch.go:190-197`). It is not the
+> on-chain observed extension-end timestamp. So the right way to hit a
+> wall-clock target T is:
+>
+> 1. Read `TargetEndTime()` from the latest snapshot (we do this by
+>    letting the util query the AN — same value appears in arg 5 of the
+>    output JSON, minus our chosen duration).
+> 2. Set `--epoch-timing-recovery-duration = T − TargetEndTime`.
+> 3. After generation, assert `output[5].value == T` (used as Step 7
+>    `refTimestamp`).
+>
+> For devnet54 we expected `TargetEndTime ≈ 1,795,675,640`; we set
+> `--epoch-timing-recovery-duration = 47,550 s` so the sealed
+> `targetEndTime` would land near our noon-PT target. The verification
+> step is below in §4 Step 3.
+
 **(a) `FinalView` of the recovery epoch.** Runbook §1(i) formula:
 
 > The desired recovery epoch length is the difference between `FinalView`
 > for the recovery epoch and the final view of the last extension.
 > `EpochLength = FinalView − LastExtensionFinalView`.
 
-We flip this: pick a target wall-clock end, convert to views via the view
-rate, derive `FinalView`. With view rate 2 v/s:
+We flip this: pick a wall-clock duration we want the recovery epoch to
+span, multiply by the view rate, derive `EpochLength`. With view rate
+2 v/s and target duration ~47,550 s (= target end − AN-reported
+`TargetEndTime`):
 
 ```
-Δt(seconds between extension end and target end) ≈ 1,795,723,200 − 1,795,675,640 ≈ 47,560 s
-EpochLength (views)                              ≈ 47,560 × 2         ≈ 95,120 views
+EpochLength (views) ≈ 47,550 × 2 ≈ 95,100 views
 ```
-
-We round the length to **95,100 views** and pair it with
-`--epoch-timing-recovery-duration = 47,550 s` so that
-`length / duration = 2 v/s` exactly.
 
 **(b) `--epoch-length = 95,100`.** From (a).
 
-**(c) `--epoch-timing-recovery-duration = 47,550` seconds.** Runbook §1(i):
-
-> The duration should be the wall-clock time between when the current epoch
-> extension is scheduled to end and the desired end time of the recovery
-> epoch.
-
-`47,550 s = 95,100 views / 2 v/s` — i.e. ~13.2 wall-clock hours of recovery
-epoch, landing at noon PT Nov 26 (within a few seconds, modulo cruise
-control jitter).
+**(c) `--epoch-timing-recovery-duration = 47,550` seconds.** The gap
+between the AN-reported `TargetEndTime` (~`1,795,675,640` =
+2026-11-26 06:47 UTC) and our target end (noon PT Nov 26 =
+`1,795,723,200`). Paired with `--epoch-length = 95,100` views so
+`length / duration = 2 v/s` exactly.
 
 **(d) `--epoch-staking-phase-length = 83,100` views.** Runbook §1(i)
 constraint:
@@ -345,8 +360,15 @@ Not urgent for this operation; flagging for the next spork handoff.
 |---|---|---|
 | P1 | No new extension since args were generated | `consensus_compliance_current_epoch_final_view{network="devnet54"}` still = `137,220,565` |
 | P2 | ≥ `2 × FinalizationSafetyThreshold` = 2,000 views remaining | `final_view − cur_view ≥ 2000` |
-| P3 | All 14 CNs active (so `util` can emit a valid root cluster QC) | metrics present for all `collection-00{1..14}` |
+| P3 | Generated `targetEndTime` matches intended Step 7 `refTimestamp` | `jq '.[5].value' devnet54_epoch_recovery.json` returns `"1795723190"` (or whatever value Step 7 plans to use) |
 | P4 | Service-account signer available on the submitting machine | Operator's local `flow.json` with the testnet `service_account` alias loaded |
+
+> Note on CN liveness: `util` signs cluster QCs locally from the private
+> keys; it does **not** need the live CNs to be reachable at args-generation
+> time. CN liveness *does* matter after recovery lands — the new clusters
+> need a supermajority of each cluster's internal CNs online to finalize
+> blocks in epoch 3278. If any CN is down post-recovery, surface it in
+> Step 8 monitoring.
 
 If P1 fails, regenerate args using the fallback target in §1 ("If a new
 extension lands before we submit").
@@ -377,7 +399,10 @@ A plain CGO build on the operator laptop produces a working binary — no
 Docker, no cross-compile, no SCP to an AN:
 
 ```bash
-# On a trusted workstation:
+# On a trusted workstation. Run inside the flow-go-internal clone (the
+# tag doesn't exist in public flow-go).
+cd ~/go/src/github.com/onflow/flow-go-internal
+git fetch origin tag v0.51.0-rc.1
 git worktree add /tmp/flow-go-util v0.51.0-rc.1
 cd /tmp/flow-go-util
 CGO_ENABLED=1 go build -o /tmp/util ./cmd/util
@@ -407,7 +432,12 @@ identity list, which is the same copy in every node's tar).
   present in `--internal-priv-dir`.
 
 Prep layout on the laptop, with tight permissions on anything carrying
-private material:
+private material. **Only collection-node tars are pulled** — `util` uses
+private keys exclusively to sign cluster QCs
+(`cmd/bootstrap/run/epochs.go:130-175`), and the only internal keys it
+reads are the CN staking keys. Keeping SN random-beacon, SN/AN/VN/EN
+staking, machine-account, and secretsdb keys off the operator laptop
+minimizes blast radius.
 
 ```bash
 cd ~/testnet_efm_recovery_nov_2026
@@ -415,30 +445,31 @@ mkdir -p stage private-root-information
 chmod 700 stage private-root-information
 export BOOTSTRAP_BUCKET=flow-bootstrap-testnet
 
-# Pull every per-node bootstrap tar.
+# Pull only the 14 internal CN bootstrap tars.
+set -eo pipefail
 for n in $(AWS_PROFILE=flow-testnet aws s3 ls s3://${BOOTSTRAP_BUCKET}/ \
-           | awk '{print $2}' | grep '^devnet54-' | tr -d '/'); do
+           | awk '{print $2}' | grep '^devnet54-collection-' | tr -d '/'); do
   AWS_PROFILE=flow-testnet aws s3 cp \
     s3://${BOOTSTRAP_BUCKET}/${n}/bootstrap.tar.gz stage/${n}.tar.gz --quiet
 done
 
-# Extract all 31 tars into one aggregated tree; copy the
+# Extract the 14 CN tars into one aggregated tree; copy the
 # private-node-info_<id>/ subdirs into the --internal-priv-dir target.
 mkdir -p stage/_all
-for t in stage/devnet54-*.tar.gz; do tar xzf "$t" -C stage/_all/; done
+for t in stage/devnet54-collection-*.tar.gz; do tar xzf "$t" -C stage/_all/; done
 cp -r stage/_all/bootstrap/private-root-information/* private-root-information/
 chmod -R go-rwx private-root-information
-ls private-root-information | wc -l    # expect 31  (7 SN + 14 LN + 2 AN + 5 VN + 3 EN)
+ls private-root-information | wc -l    # expect 14 (all internal CNs)
 
-# Build node-config.json by filtering node-infos.pub.json to just the
-# 31 internal nodes and keeping only {Role, Address, Weight}.
+# Build node-config.json by filtering node-infos.pub.json to the same 14
+# CN node IDs and keeping only {Role, Address, Weight}.
 ls private-root-information | sed 's/^private-node-info_//' \
   > internal-node-ids.txt
 jq --slurpfile ids <(jq -R . internal-node-ids.txt | jq -s .) \
    '[ .[] | select(.NodeID as $x | $ids[0] | index($x)) | {Role, Address, Weight} ]' \
    stage/_all/bootstrap/public-root-information/node-infos.pub.json \
    > node-config.json
-jq 'length' node-config.json      # expect 31
+jq 'length' node-config.json      # expect 14
 ```
 
 ### Step 3 — generate recovery args JSON
@@ -464,9 +495,9 @@ ACCESS_NETWORK_KEY=ba69f7d2e82b9edf25b103c195cd371cf0cc047ef8884a9bbe331e62982d4
 Expected log markers:
 
 ```
-read 31 internal private node-info files
-read internal node configurations  (list of 31 {Role, Address, Weight})
-read 31 weights for internal nodes
+read 14 internal private node-info files
+read internal node configurations  (list of 14 {Role, Address, Weight})
+read 14 weights for internal nodes
 partitioning 0 partners + 14 internal nodes into 2 collector clusters
 constructing root QCs for collection node clusters
 producing QC for cluster (index: 0, size: 7) with 7 internal signers
@@ -509,6 +540,23 @@ Structural counts confirmed against expected topology:
 `clusterQCVoteData = 2`; `dkgPubKeys = 7`; `dkgIdMapping = 7` (current
 7-SN DKG committee carried forward); `nodeIDs = 120`;
 `unsafeAllowOverwrite = false`.
+
+**Step-3 → Step-7 consistency check.** The util computes
+`targetEndTime = epoch.TargetEndTime() + recoveryEpochTargetDuration`
+rather than taking a wall-clock flag. If Step 7 plans to use the
+util-sealed value as `refTimestamp`, confirm equality now:
+
+```bash
+PLANNED_REFTIMESTAMP=1795723190     # from §2, Scenario-B timing config
+SEALED_TARGETENDTIME=$(jq -r '.[5].value' devnet54_epoch_recovery.json)
+[[ "$SEALED_TARGETENDTIME" == "$PLANNED_REFTIMESTAMP" ]] \
+  && echo "OK: targetEndTime == refTimestamp" \
+  || echo "DIVERGE: sealed=$SEALED_TARGETENDTIME planned=$PLANNED_REFTIMESTAMP"
+```
+
+If the Step 7 alternative is chosen (`refCounter=3279,
+refTimestamp=1795766400`), skip this check — those variables are
+independent of arg 5 by construction.
 
 Wipe local bootstrap scratch once the JSON is captured:
 
@@ -648,8 +696,8 @@ noon/midnight PT cadence by noon PT Nov 26.
 |---|---|
 | New extension added before Step 5 (P1 fails) | Re-run §2 with the new `LastExtensionFinalView`; drop in updated params. |
 | `util` panics on args generation | Fix the flag per the panic, re-run; do NOT submit a transaction. |
-| `recover_epoch.cdc` transaction panics (`FlowEpoch` unchanged) | Correct per the panic, rerun Step 3 → Step 5. Rewards have NOT been paid. |
-| Transaction seals but `EpochRecover` service event is rejected | Per runbook Appendix: re-run Steps 1→5 with `--unsafe-overwrite-epoch-data`. Rewards paid in the first attempt are NOT re-paid. |
+| `recover_epoch.cdc` transaction panics (`FlowEpoch` unchanged) | Correct per the panic, rerun Step 3 → Step 5. *(No rewards concern on testnet.)* |
+| Transaction seals but `EpochRecover` service event is rejected | Per runbook Appendix: re-run Steps 1→5 with `--unsafe-overwrite-epoch-data`. *(No rewards concern on testnet; on mainnet, rewards paid in the first attempt are not re-paid.)* |
 | View rate spikes post-recovery | Execute Step 8 cruise-control nudge. |
 | Transaction never seals | Check `service_account` balance & sequence number; retry. |
 
