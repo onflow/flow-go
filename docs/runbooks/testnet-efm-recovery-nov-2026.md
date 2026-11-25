@@ -75,9 +75,14 @@ Constants (independent of the current extension):
 - **Latest extension in play.** `LastExtensionFinalView` is
   `137,220,565`; the recovery-epoch shape in §2 is derived against this
   value.
-- **Submit window is ~10.6 h.** Next extension auto-adds at view
-  `137,219,565` (= final view − `FinalizationSafetyThreshold`), i.e. at
-  ~2026-11-26 06:38 UTC. We have comfortable headroom to submit.
+- **Seal-by view is 137,219,564.** The fallback state machine adds the
+  next extension on the first block whose view `v` satisfies
+  `v + FinalizationSafetyThreshold ≥ 137,220,565`, i.e. at view
+  `137,219,565` (~06:38 UTC at 2 views/s). The block that seals
+  `recover_epoch.cdc` must have view ≤ `137,219,564`. Submission has
+  to be earlier by the inclusion-to-seal delay. P2 (2,000 views left)
+  is an earlier abort we chose; the state machine still accepts a seal
+  until view 137,219,564.
 - Pre-condition P2 (≥ `2 × FinalizationSafetyThreshold = 2,000` views
   remaining) holds trivially (77,581 views left).
 
@@ -159,27 +164,22 @@ derivation; this section walks it with devnet54's current-state numbers.
 
 #### Step-by-step derivation
 
-> **Note on `targetEndTime`.** The Cadence `recover_epoch.cdc` transaction
-> argument `targetEndTime` is **not** a wall-clock quantity we pick; it's
-> computed by the util as `epoch.TargetEndTime() + recoveryEpochTargetDuration`
-> (`cmd/bootstrap/run/epochs.go:259-276`). `epoch.TargetEndTime()` is a
-> Protocol-State value — it is the `EpochSetup` event's `TargetEndTime`
-> plus `extensionViews × setupViewDuration`, maintained as extensions
-> are added (`state/protocol/inmem/epoch.go:190-197`). It is not the
-> on-chain observed extension-end timestamp. So the right way to hit a
-> wall-clock target T is:
+> **Note on `targetEndTime`.** The util sets
+> `targetEndTime = epoch.TargetEndTime() + recoveryEpochTargetDuration`
+> (`cmd/bootstrap/run/epochs.go`). `epoch.TargetEndTime()` is the
+> protocol-state value. Call it `E`. Call the flag `D`. The sealed
+> argument is `E + D`.
 >
-> 1. Read `TargetEndTime()` from the latest snapshot (we do this by
->    letting the util query the AN — same value appears in arg 5 of the
->    output JSON, minus our chosen duration).
-> 2. Set `--epoch-timing-recovery-duration = T − TargetEndTime`.
-> 3. After generation, assert `output[5].value == T` (used as Step 7
->    `refTimestamp`).
+> We also want `epoch length / D = 2` views/s. Those two constraints
+> meet only when `D` divides the epoch length by 2. For devnet54,
+> `E = 1,795,675,640` and the noon target is
+> `T = 1,795,723,200`, so `T − E = 47,560` s. We set `D = 47,550` and
+> epoch length `95,100` (`95,100 / 47,550 = 2`). The sealed end is
+> `E + D = 1,795,723,190`, ten seconds before `T`. Step 7's preferred
+> `refTimestamp` is this sealed value, not `T`.
 >
-> For devnet54 we expected `TargetEndTime ≈ 1,795,675,640`; we set
-> `--epoch-timing-recovery-duration = 47,550 s` so the sealed
-> `targetEndTime` would land near our noon-PT target. The verification
-> step is below in §4 Step 3.
+> After generation, assert `output[5].value == E + D`. The check is in
+> §4 Step 3.
 
 **(a) `FinalView` of the recovery epoch.** Runbook §1(i) formula:
 
@@ -358,9 +358,9 @@ Not urgent for this operation; flagging for the next spork handoff.
 
 | # | Check | Expected |
 |---|---|---|
-| P1 | No new extension since args were generated | `consensus_compliance_current_epoch_final_view{network="devnet54"}` still = `137,220,565` |
+| P1 | No new extension since the JSON about to be submitted was generated | `consensus_compliance_current_epoch_final_view` equals `startView − 1` of that JSON (`jq -r '.[1].value - 1' devnet54_epoch_recovery.json`). For the JSON in §4 Step 3 that is `137,220,565`. After a regeneration it is the final view that regeneration used (`137,320,565` after one more extension). |
 | P2 | ≥ `2 × FinalizationSafetyThreshold` = 2,000 views remaining | `final_view − cur_view ≥ 2000` |
-| P3 | Generated `targetEndTime` matches intended Step 7 `refTimestamp` | `jq '.[5].value' devnet54_epoch_recovery.json` returns `"1795723190"` (or whatever value Step 7 plans to use) |
+| P3 | Preferred Step 7 uses the sealed end. The alternative does not compare the two. | Preferred (`refCounter = 3278`): `jq -r '.[5].value'` equals `1795723190`, and that value is the `refTimestamp`. Alternative (`refCounter = 3279`, `refTimestamp = 1795766400`): do not compare `.[5].value` to `refTimestamp`. Those two are independent, as in the Step 3 note. |
 | P4 | Service-account signer available on the submitting machine | Operator's local `flow.json` with the testnet `service_account` alias loaded |
 
 > Note on LN liveness: `util` signs cluster QCs locally from the private
