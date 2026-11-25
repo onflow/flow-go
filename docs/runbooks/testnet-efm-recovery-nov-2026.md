@@ -586,18 +586,27 @@ From the operator laptop, using a local `flow.json` holding the testnet
 flow transactions send \
   -n testnet \
   -f <path-to-operator-flow.json> \
-  --gas-limit 9999 \
+  --compute-limit 100000 \
   --signer service_account \
   --args-json "$(jq -c . devnet54_epoch_recovery.json)" \
   ./recover_epoch.cdc
 ```
 
+**Compute limit:** the recovery transaction actually used ~10,001
+compute units on devnet54 (see the submission notes), so TN53's
+`--gas-limit 9999` is not enough — the first attempt sealed but
+Cadence-errored with "computation limit exceeded." `--gas-limit` is also
+now a deprecated alias for `--compute-limit`. Setting `--compute-limit
+100000` gives comfortable headroom.
+
 `recover_epoch.cdc` is
 [`transactions/epoch/admin/recover_epoch.cdc`][recover-cdc] from
-`flow-core-contracts`; copy the version at the master commit of
-`flow-core-contracts` deployed on testnet (same commit the on-chain
-`FlowEpoch` contract was compiled from) into the working directory before
-running.
+`flow-core-contracts`. One extra wrinkle on testnet with the default
+`flow.json`: string-form imports like `import "FlowEpoch"` need matching
+contract entries in `flow.json`'s `contracts` section. The simplest fix
+is to rewrite the imports in the local copy to use explicit addresses
+(`import FlowEpoch from 0x9eca2b38b18b5dfe`, same for
+`FlowIDTableStaking` and `FlowClusterQC`). Then run the command above.
 
 [recover-cdc]: https://github.com/onflow/flow-core-contracts/blob/master/transactions/epoch/admin/recover_epoch.cdc
 
@@ -630,6 +639,38 @@ refTimestamp=1,795,766,400` alternative that re-aligns all subsequent
 epoch ends on exact noon/midnight PT.
 
 [upd-timing]: https://github.com/onflow/flow-core-contracts/blob/master/transactions/epoch/admin/update_epoch_timing_config.cdc
+
+Before submitting, confirm the current on-chain timing config so that
+`duration` doesn't drift:
+
+```bash
+cat > get_epoch_timing_config.cdc <<'CDC'
+import FlowEpoch from 0x9eca2b38b18b5dfe
+access(all) fun main(): FlowEpoch.EpochTimingConfig {
+    return FlowEpoch.getEpochTimingConfig()
+}
+CDC
+flow scripts execute -n testnet -f flow.json get_epoch_timing_config.cdc
+# expect: duration: 43200, refCounter and refTimestamp irrelevant for the new submission
+```
+
+Then rewrite the string import in `update_epoch_timing_config.cdc` to an
+explicit address (same as Step 5) and submit:
+
+```bash
+# After `sed -i 's|^import "FlowEpoch"|import FlowEpoch from 0x9eca2b38b18b5dfe|' update_epoch_timing_config.cdc`
+cat > step7_args.json <<'JSON'
+[
+  {"type":"UInt64","value":"43200"},
+  {"type":"UInt64","value":"3278"},
+  {"type":"UInt64","value":"1795723190"}
+]
+JSON
+flow transactions send -n testnet -f flow.json \
+  --compute-limit 100000 --signer service_account \
+  --args-json "$(jq -c . step7_args.json)" \
+  ./update_epoch_timing_config.cdc
+```
 
 Validate with
 [`get_target_end_time_for_epoch.cdc`][get-ete] for the chosen `refCounter`
