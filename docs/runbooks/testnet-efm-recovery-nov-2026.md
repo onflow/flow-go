@@ -22,7 +22,7 @@ section.
 >    `v0.51.0-rc.1` worktree — no Docker, no cross-compile.
 > 2. Args generation runs locally on the laptop, not via SSM into
 >    `devnet54-access-001`. The laptop already holds the
->    `service_account` signer key, so pulling the 14 CN tars onto the
+>    `service_account` signer key, so pulling the 14 LN tars onto the
 >    same box does not widen the trust boundary.
 > 3. The `util --config` flag wants a JSON array of
 >    `[{Role, Address, Weight}]` filtered from `node-infos.pub.json` by
@@ -85,7 +85,7 @@ Constants (independent of the current extension):
 
 If execution slips past ~2026-11-26 06:38 UTC, `LastExtensionFinalView`
 jumps to **137,320,565** and the extension end shifts to
-~2026-11-26 20:27 UTC. The current noon-PT-Nov-26 target
+~2026-11-26 20:40 UTC. The current noon-PT-Nov-26 target
 (`2026-11-26 20:00 UTC`) becomes infeasible by ~27 min; we'd fall back
 to **midnight PT Nov 26/27** (`2026-11-27 08:00 UTC` = Unix
 `1,795,766,400`):
@@ -363,11 +363,11 @@ Not urgent for this operation; flagging for the next spork handoff.
 | P3 | Generated `targetEndTime` matches intended Step 7 `refTimestamp` | `jq '.[5].value' devnet54_epoch_recovery.json` returns `"1795723190"` (or whatever value Step 7 plans to use) |
 | P4 | Service-account signer available on the submitting machine | Operator's local `flow.json` with the testnet `service_account` alias loaded |
 
-> Note on CN liveness: `util` signs cluster QCs locally from the private
-> keys; it does **not** need the live CNs to be reachable at args-generation
-> time. CN liveness *does* matter after recovery lands — the new clusters
-> need a supermajority of each cluster's internal CNs online to finalize
-> blocks in epoch 3278. If any CN is down post-recovery, surface it in
+> Note on LN liveness: `util` signs cluster QCs locally from the private
+> keys; it does **not** need the live LNs to be reachable at args-generation
+> time. LN liveness *does* matter after recovery lands — the new clusters
+> need a supermajority of each cluster's internal LNs online to finalize
+> blocks in epoch 3278. If any LN is down post-recovery, surface it in
 > Step 8 monitoring.
 
 If P1 fails, regenerate args using the fallback target in §1 ("If a new
@@ -435,7 +435,7 @@ Prep layout on the laptop, with tight permissions on anything carrying
 private material. **Only collection-node tars are pulled** — `util` uses
 private keys exclusively to sign cluster QCs
 (`cmd/bootstrap/run/epochs.go:130-175`), and the only internal keys it
-reads are the CN staking keys. Keeping SN random-beacon, SN/AN/VN/EN
+reads are the LN staking keys. Keeping SN random-beacon, SN/AN/VN/EN
 staking, machine-account, and secretsdb keys off the operator laptop
 minimizes blast radius.
 
@@ -445,7 +445,7 @@ mkdir -p stage private-root-information
 chmod 700 stage private-root-information
 export BOOTSTRAP_BUCKET=flow-bootstrap-testnet
 
-# Pull only the 14 internal CN bootstrap tars.
+# Pull only the 14 internal LN bootstrap tars.
 set -eo pipefail
 for n in $(AWS_PROFILE=flow-testnet aws s3 ls s3://${BOOTSTRAP_BUCKET}/ \
            | awk '{print $2}' | grep '^devnet54-collection-' | tr -d '/'); do
@@ -453,16 +453,16 @@ for n in $(AWS_PROFILE=flow-testnet aws s3 ls s3://${BOOTSTRAP_BUCKET}/ \
     s3://${BOOTSTRAP_BUCKET}/${n}/bootstrap.tar.gz stage/${n}.tar.gz --quiet
 done
 
-# Extract the 14 CN tars into one aggregated tree; copy the
+# Extract the 14 LN tars into one aggregated tree; copy the
 # private-node-info_<id>/ subdirs into the --internal-priv-dir target.
 mkdir -p stage/_all
 for t in stage/devnet54-collection-*.tar.gz; do tar xzf "$t" -C stage/_all/; done
 cp -r stage/_all/bootstrap/private-root-information/* private-root-information/
 chmod -R go-rwx private-root-information
-ls private-root-information | wc -l    # expect 14 (all internal CNs)
+ls private-root-information | wc -l    # expect 14 (all internal LNs)
 
 # Build node-config.json by filtering node-infos.pub.json to the same 14
-# CN node IDs and keeping only {Role, Address, Weight}.
+# LN node IDs and keeping only {Role, Address, Weight}.
 ls private-root-information | sed 's/^private-node-info_//' \
   > internal-node-ids.txt
 jq --slurpfile ids <(jq -R . internal-node-ids.txt | jq -s .) \
@@ -661,8 +661,8 @@ Back off to `400ms` / `300ms` as rate stabilizes, mirroring Leo's TN53 pattern.
 Scratch cleanup already happened at the end of Step 3 (`rm -rf stage
 private-root-information internal-node-ids.txt node-config.json`). After
 the recovery epoch completes (Step 8 monitoring window), the
-`devnet54_epoch_recovery.json` and `hello.cdc` (if used) can also be
-deleted; `flow.json` stays in the secure home for future ops.
+`devnet54_epoch_recovery.json` can also be deleted; `flow.json` stays in
+the secure home for future ops.
 
 ### When does the recovery actually occur? (timing semantics)
 
@@ -696,7 +696,7 @@ noon/midnight PT cadence by noon PT Nov 26.
 |---|---|
 | New extension added before Step 5 (P1 fails) | Re-run §2 with the new `LastExtensionFinalView`; drop in updated params. |
 | `util` panics on args generation | Fix the flag per the panic, re-run; do NOT submit a transaction. |
-| `recover_epoch.cdc` transaction panics (`FlowEpoch` unchanged) | Correct per the panic, rerun Step 3 → Step 5. *(No rewards concern on testnet.)* |
+| `recover_epoch.cdc` transaction panics (`FlowEpoch` unchanged) | Step 3's scratch wipe already ran, so re-run Steps 2 → 3 → 5 (not just Step 3). *(No rewards concern on testnet.)* |
 | Transaction seals but `EpochRecover` service event is rejected | Per runbook Appendix: re-run Steps 1→5 with `--unsafe-overwrite-epoch-data`. *(No rewards concern on testnet; on mainnet, rewards paid in the first attempt are not re-paid.)* |
 | View rate spikes post-recovery | Execute Step 8 cruise-control nudge. |
 | Transaction never seals | Check `service_account` balance & sequence number; retry. |
@@ -707,7 +707,7 @@ noon/midnight PT cadence by noon PT Nov 26.
 
 - **Touches testnet only.** Mainnet is explicitly out of scope and no mainnet
   resources will be read or modified during this operation.
-- **Reads** CN (and other internal node) private-node-info files from the
+- **Reads** LN (and other internal node) private-node-info files from the
   testnet bootstrap bucket onto a 700-permed scratch directory on the
   operator laptop for the duration of args generation only, then
   `rm -rf`'d. (Earlier plan said we'd do this in tmpfs on
