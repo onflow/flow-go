@@ -353,3 +353,45 @@ func TestAllowFor_MultiplePeers_Concurrently(t *testing.T) {
 		}(i)
 	}
 }
+
+// TestDisallowListCache_ConcurrentSamePeer tests concurrent DisallowFor, AllowFor, and IsDisallowListed
+// calls targeting the same peer ID to verify there are no data races on the per-peer causes map.
+func TestDisallowListCache_ConcurrentSamePeer(t *testing.T) {
+	disallowListCache := internal.NewDisallowListCache(uint32(100), unittest.Logger(), metrics.NewNoopCollector())
+	require.NotNil(t, disallowListCache)
+
+	peerID := peer.ID("contested-peer")
+	const workers = 4
+	const iterations = 200
+
+	var wg sync.WaitGroup
+	wg.Add(workers * 2)
+
+	for range workers {
+		go func() {
+			defer wg.Done()
+			for range iterations {
+				causes, err := disallowListCache.DisallowFor(peerID, network.DisallowListedCauseAlsp)
+				require.NoError(t, err)
+				require.NotNil(t, causes)
+
+				causes = disallowListCache.AllowFor(peerID, network.DisallowListedCauseAlsp)
+				require.NotNil(t, causes)
+			}
+		}()
+
+		go func() {
+			defer wg.Done()
+			for range iterations {
+				causes, disallowed := disallowListCache.IsDisallowListed(peerID)
+				if disallowed {
+					require.NotEmpty(t, causes)
+				} else {
+					require.Empty(t, causes)
+				}
+			}
+		}()
+	}
+
+	unittest.RequireReturnsBefore(t, wg.Wait, 5*time.Second, "timed out waiting for goroutines to finish")
+}

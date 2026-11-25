@@ -60,15 +60,21 @@ func NewDuplicateMessageTrackerCache(sizeLimit uint32, decay, skipDecayThreshold
 //   - exception only in cases of internal data inconsistency or bugs. No errors are expected.
 func (d *DuplicateMessageTrackerCache) DuplicateMessageReceived(peerID peer.ID) (float64, error) {
 	var err error
+	// Capture the counter value while holding the backend lock: counter is mutated in place
+	// under the lock, so reading adjustedCounter.Value after AdjustWithInit releases the lock
+	// would race with concurrent adjustments.
+	var value float64
 	adjustFunc := func(counter *duplicateMessagesCounter) *duplicateMessagesCounter {
 		counter, err = d.decayAdjustment(counter) // first decay the record
 		if err != nil {
 			return counter
 		}
-		return d.incrementAdjustment(counter) // then increment the record
+		counter = d.incrementAdjustment(counter) // then increment the record
+		value = counter.Value
+		return counter
 	}
 
-	adjustedCounter, adjusted := d.c.AdjustWithInit(p2p.MakeId(peerID), adjustFunc, func() *duplicateMessagesCounter {
+	_, adjusted := d.c.AdjustWithInit(p2p.MakeId(peerID), adjustFunc, func() *duplicateMessagesCounter {
 		return newDuplicateMessagesCounter()
 	})
 
@@ -80,7 +86,7 @@ func (d *DuplicateMessageTrackerCache) DuplicateMessageReceived(peerID peer.ID) 
 		return 0, fmt.Errorf("adjustment failed for peer %s", peerID)
 	}
 
-	return adjustedCounter.Value, nil
+	return value, nil
 }
 
 // GetWithInit returns the current number of duplicate messages received from a peer.
@@ -94,13 +100,18 @@ func (d *DuplicateMessageTrackerCache) DuplicateMessageReceived(peerID peer.ID) 
 // No errors are expected during normal operation, all errors returned are considered irrecoverable.
 func (d *DuplicateMessageTrackerCache) GetWithInit(peerID peer.ID) (float64, bool, error) {
 	var err error
+	// Capture the counter value while holding the backend lock (see DuplicateMessageReceived).
+	var value float64
 	adjustLogic := func(counter *duplicateMessagesCounter) *duplicateMessagesCounter {
 		// perform decay on gauge value
 		counter, err = d.decayAdjustment(counter)
+		if err == nil {
+			value = counter.Value
+		}
 		return counter
 	}
 
-	adjustedCounter, adjusted := d.c.AdjustWithInit(p2p.MakeId(peerID), adjustLogic, func() *duplicateMessagesCounter {
+	_, adjusted := d.c.AdjustWithInit(p2p.MakeId(peerID), adjustLogic, func() *duplicateMessagesCounter {
 		return newDuplicateMessagesCounter()
 	})
 	if err != nil {
@@ -110,7 +121,7 @@ func (d *DuplicateMessageTrackerCache) GetWithInit(peerID peer.ID) (float64, boo
 		return 0, false, fmt.Errorf("decay adjustment failed for peer %s", peerID)
 	}
 
-	return adjustedCounter.Value, true, nil
+	return value, true, nil
 }
 
 // incrementAdjustment performs a cache adjustment that increments the guage for the duplicateMessagesCounter
