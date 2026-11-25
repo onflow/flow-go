@@ -7,13 +7,38 @@
 
 **Author:** vishal (in collaboration with claude)
 **Date drafted:** 2026-11-25
-**Status:** PLAN — not yet executed
+**Status:** **PREP COMPLETE — awaiting go-ahead to submit `recover_epoch.cdc`.**
 **Scope:** testnet (`devnet54`) only. Mainnet is explicitly out of scope.
 
 This document adapts the [existing EFM Recovery runbook][runbook] and [Leo's TN53
 recovery notes][tn53] to the current AWS-hosted testnet (post GCP→AWS fleet
 migration, Nov 2026). Links to the Notion playbooks are in the References
 section.
+
+> **Plan vs. what we actually did (2026-11-25 14:54 UTC).**
+> The original plan ran args generation on `devnet54-access-001` because
+> we assumed `util` would need cross-compilation and in-VPC S3 pulls. In
+> practice:
+>
+> 1. `util` **built natively on the operator laptop** (darwin/arm64) with
+>    a plain `CGO_ENABLED=1 go build ./cmd/util` from the
+>    `v0.51.0-rc.1` worktree — no Docker, no cross-compile.
+> 2. We ran the whole args-generation step **locally on the laptop**
+>    rather than SSM'ing into access-001. The laptop already holds the
+>    `service_account` signer key, so pulling 31 CN-and-friends tars
+>    onto the same box does not widen the trust boundary.
+> 3. The `util --config` flag wants a JSON array of
+>    `[{Role, Address, Weight}]` — **not** the aggregated
+>    `node-internal-infos.pub.json` the earlier plan guessed. See §4
+>    Step 2 for the corrected shape.
+>
+> §4 below has been rewritten to reflect the actually-executed flow.
+> The parameter derivation in §2 is unchanged except for one subtle
+> correction: `util` computes `targetEndTime` itself from the AN's live
+> view rate rather than taking a `--target-end-time` flag, so the
+> sealed value is `1,795,679,640` (= `2026-11-26 07:54 UTC`), six
+> minutes shy of the planned `1,795,680,000`. Scenario-B
+> `refTimestamp` must use the util-sealed value.
 
 [runbook]: # "Runbook: Epoch Fallback Mode (EFM) Recovery (Notion)"
 [tn53]: # "TN53 EFM recovery, Jan 2026, Leo Zhang (Notion)"
@@ -378,21 +403,7 @@ in §1.
 
 ## 4. Execution plan
 
-### Step 1 — pick an operator host & build the `util` binary
-
-Operator host: **`devnet54-access-001`**. It carries the standard Flow
-node IAM role for testnet, which already grants `s3:GetObject` on the
-testnet bootstrap bucket and `kms:Decrypt` on the bootstrap CMK — the
-two things the args-generation step needs. Instance ID can be looked up
-at operation time via:
-
-```bash
-AWS_PROFILE=flow-testnet aws ec2 describe-instances --region us-east-2 \
-  --filters Name=tag:Name,Values=devnet54-access-001 \
-  --query 'Reservations[*].Instances[*].InstanceId' --output text
-```
-
-#### `util` version pin
+### Step 1 — build the `util` binary (ran on operator laptop)
 
 Surveyed devnet54 flow-go versions via SSM `grep FLOW_GO_NODE_VERSION
 /var/flow/runtime-conf.env` (2026-11-25):
@@ -407,94 +418,84 @@ Surveyed devnet54 flow-go versions via SSM `grep FLOW_GO_NODE_VERSION
 
 The `EpochRecover` service event is processed by **consensus nodes**, so
 `util` must be built from the version that SNs run →
-**`v0.51.0-rc.1`**. This tag is a pre-release that lives on the internal
-mirror, not on public `flow-go`. Build locally on a trusted workstation
-(not on the AN), then copy the binary onto access-001 via SSM:
+**`v0.51.0-rc.1`**. This tag lives on the internal `flow-go-internal`
+mirror, not on public `flow-go`.
+
+A plain CGO build on the operator laptop produces a working binary — no
+Docker, no cross-compile, no SCP to an AN:
 
 ```bash
-# On a trusted build host (not an AN):
-git fetch origin tag v0.51.0-rc.1
-git checkout v0.51.0-rc.1
-CGO_ENABLED=1 go build -tags="relic,timetravel" -o /tmp/util ./cmd/util
-file /tmp/util   # confirm linux/amd64 if target host is x86_64 Amazon Linux
-
-# Push to operator host via SSM port-forward (replace <AN-INSTANCE-ID>):
-AWS_PROFILE=flow-testnet aws ssm start-session \
-  --region us-east-2 --target <AN-INSTANCE-ID> \
-  --document-name AWS-StartPortForwardingSession \
-  --parameters portNumber=22,localPortNumber=2222 &
-scp -P 2222 /tmp/util ssm-user@localhost:/tmp/util
+# On a trusted workstation:
+git worktree add /tmp/flow-go-util v0.51.0-rc.1
+cd /tmp/flow-go-util
+CGO_ENABLED=1 go build -o /tmp/util ./cmd/util
+/tmp/util epochs efm-recover-tx-args --help | head -5   # sanity
 ```
 
-Inside an SSM shell session on access-001:
-
-```bash
-# Scratch space on tmpfs so private material never touches the data disk.
-sudo mkdir -p /mnt/efm-recovery && sudo mount -t tmpfs -o size=512m tmpfs /mnt/efm-recovery
-sudo mv /tmp/util /mnt/efm-recovery/util && sudo chmod +x /mnt/efm-recovery/util
-cd /mnt/efm-recovery
-./util epochs efm-recover-tx-args --help | head -5   # sanity
-```
-
-### Step 2 — assemble bootstrap tree on the operator host
+### Step 2 — assemble bootstrap tree on the operator laptop
 
 The testnet bootstrap bucket is organized **per-node**:
-`s3://<testnet-bootstrap-bucket>/<node>/bootstrap.tar.gz`. There is no
-aggregated `node-internal-infos.pub.json` or shared
-`private-root-information/` tree in the bucket yet. We synthesize both
-from the per-node tars.
+`s3://<testnet-bootstrap-bucket>/<node>/bootstrap.tar.gz`. Each tar
+contains `bootstrap/private-root-information/private-node-info_<id>/`
+(with `node-info.priv.json`, `node-machine-account-info.priv.json`,
+`random-beacon.priv.json`, `secretsdb-key`) and
+`bootstrap/public-root-information/node-infos.pub.json` (the full testnet
+identity list, which is the same copy in every node's tar).
+
+`util epochs efm-recover-tx-args` expects two inputs:
+
+- `--internal-priv-dir`: a directory walked recursively for files matching
+  `node-info.priv.*`. The per-node tar's
+  `private-node-info_<id>/node-info.priv.json` matches this.
+- `--config`: a JSON array of `[{Role, Address, Weight}]` for the
+  **internal** nodes only — those whose private keys live in
+  `--internal-priv-dir`. This is **not** the aggregated
+  `node-internal-infos.pub.json` the earlier draft of this plan guessed.
+  It's filtered out of `node-infos.pub.json` by the set of node IDs
+  present in `--internal-priv-dir`.
+
+Prep layout on the laptop, with tight permissions on anything carrying
+private material:
 
 ```bash
-cd /mnt/efm-recovery
-mkdir -p stage public-root-information private-root-information
-export BOOTSTRAP_BUCKET=<testnet-bootstrap-bucket>   # see Terraform remote state
+cd ~/testnet_efm_recovery_nov_2026
+mkdir -p stage private-root-information
+chmod 700 stage private-root-information
+export BOOTSTRAP_BUCKET=flow-bootstrap-testnet
 
-# Pull every internal (Foundation-run) node's bootstrap tar. Internal roles:
-# CN, SN, AN, VN, EN — drop any partner-operated nodes if/when they return to
-# testnet. For devnet54 today, all nodes in the bucket are internal.
-ROLES="collection consensus access verification execution"
-for role in $ROLES; do
-  for n in $(aws s3 ls s3://${BOOTSTRAP_BUCKET}/ | awk '{print $2}' \
-            | grep "^devnet54-${role}-" | tr -d '/'); do
-    aws s3 cp s3://${BOOTSTRAP_BUCKET}/${n}/bootstrap.tar.gz stage/${n}.tar.gz
-    mkdir -p stage/${n} && tar xzf stage/${n}.tar.gz -C stage/${n}
-    # Each per-node tar typically carries:
-    #   private-root-information/private-node-info.<node_id>.json
-    #   public-root-information/node-info.pub.<node_id>.json
-    cp -n stage/${n}/private-root-information/private-node-info.*.json \
-       private-root-information/
-    cp -n stage/${n}/public-root-information/node-info.pub.*.json \
-       public-root-information/ 2>/dev/null || true
-  done
+# Pull every per-node bootstrap tar.
+for n in $(AWS_PROFILE=flow-testnet aws s3 ls s3://${BOOTSTRAP_BUCKET}/ \
+           | awk '{print $2}' | grep '^devnet54-' | tr -d '/'); do
+  AWS_PROFILE=flow-testnet aws s3 cp \
+    s3://${BOOTSTRAP_BUCKET}/${n}/bootstrap.tar.gz stage/${n}.tar.gz --quiet
 done
 
-# Build node-internal-infos.pub.json by concatenating the per-node pub infos.
-# The util tool reads this as a JSON array of {NodeID,Role,Address,
-# NetworkPubKey,StakingPubKey,Weight}.
-jq -s '[ .[] | .[]? // . ]' public-root-information/node-info.pub.*.json \
-   > public-root-information/node-internal-infos.pub.json
-wc -l public-root-information/node-internal-infos.pub.json
-ls private-root-information/ | wc -l    # expect 31 (14+7+2+5+3)
-```
+# Extract all 31 tars into one aggregated tree; copy the
+# private-node-info_<id>/ subdirs into the --internal-priv-dir target.
+mkdir -p stage/_all
+for t in stage/devnet54-*.tar.gz; do tar xzf "$t" -C stage/_all/; done
+cp -r stage/_all/bootstrap/private-root-information/* private-root-information/
+chmod -R go-rwx private-root-information
+ls private-root-information | wc -l    # expect 31  (7 SN + 14 LN + 2 AN + 5 VN + 3 EN)
 
-**Open question flagged for review:** the exact shape of
-`node-internal-infos.pub.json` emitted by current `util bootstrap` may
-differ slightly from a jq-concatenated form. If the generator refuses the
-aggregated file, we fall back to downloading the authoritative file from
-the previous spork artifact (location TBD — Leo kept his under
-`~/bootstrap/public-root-information/` on the legacy GCP mgmt box; AWS
-parity asset not yet confirmed). This fallback adds a cross-cloud lookup
-step.
+# Build node-config.json by filtering node-infos.pub.json to just the
+# 31 internal nodes and keeping only {Role, Address, Weight}.
+ls private-root-information | sed 's/^private-node-info_//' \
+  > internal-node-ids.txt
+jq --slurpfile ids <(jq -R . internal-node-ids.txt | jq -s .) \
+   '[ .[] | select(.NodeID as $x | $ids[0] | index($x)) | {Role, Address, Weight} ]' \
+   stage/_all/bootstrap/public-root-information/node-infos.pub.json \
+   > node-config.json
+jq 'length' node-config.json      # expect 31
+```
 
 ### Step 3 — generate recovery args JSON
 
-Still inside SSM session on `devnet54-access-001`:
-
 ```bash
-cd /mnt/efm-recovery
+cd ~/testnet_efm_recovery_nov_2026
 # Testnet AN network pubkey (published in the Notion runbook):
 ACCESS_NETWORK_KEY=ba69f7d2e82b9edf25b103c195cd371cf0cc047ef8884a9bbe331e62982d46daeebf836f7445a2ac16741013b192959d8ad26998aff12f2adc67a99e1eb2988d
-./util epochs efm-recover-tx-args \
+/tmp/util epochs efm-recover-tx-args \
   --access-address=access-001.devnet54.nodes.onflow.org:9001 \
   --access-network-key=${ACCESS_NETWORK_KEY} \
   --root-chain-id=flow-testnet \
@@ -503,24 +504,67 @@ ACCESS_NETWORK_KEY=ba69f7d2e82b9edf25b103c195cd371cf0cc047ef8884a9bbe331e62982d4
   --epoch-length=108000 \
   --epoch-staking-phase-length=96000 \
   --epoch-timing-recovery-duration=54000 \
-  --config=/mnt/efm-recovery/public-root-information/node-internal-infos.pub.json \
-  --internal-priv-dir=/mnt/efm-recovery/private-root-information/ \
-  --out=/mnt/efm-recovery/devnet54_epoch_recovery.json
-
-# Sanity: args file should contain non-empty clusterQCs, DKG result, etc.
-jq 'keys' devnet54_epoch_recovery.json
+  --config=./node-config.json \
+  --internal-priv-dir=./private-root-information \
+  --out=./devnet54_epoch_recovery.json
 ```
 
-Copy the JSON off the host (this file contains no secrets — only derived
-public cluster QCs + DKG output):
+Expected log markers:
+
+```
+read 31 internal private node-info files
+read internal node configurations  (list of 31 {Role, Address, Weight})
+read 31 weights for internal nodes
+partitioning 0 partners + 14 internal nodes into 2 collector clusters
+constructing root QCs for collection node clusters
+producing QC for cluster (index: 0, size: 7) with 7 internal signers
+producing QC for cluster (index: 1, size: 7) with 7 internal signers
+wrote transaction args to output file ./devnet54_epoch_recovery.json
+```
+
+Sanity-check the JSON:
 
 ```bash
-# From operator laptop (replace <AN-INSTANCE-ID>):
-AWS_PROFILE=flow-testnet aws ssm start-session \
-  --target <AN-INSTANCE-ID> \
-  --document-name AWS-StartPortForwardingSession \
-  --parameters portNumber=22,localPortNumber=2222 &
-scp -P 2222 ec2-user@localhost:/mnt/efm-recovery/devnet54_epoch_recovery.json ./
+jq '[.[] | .type]' devnet54_epoch_recovery.json
+# Expected 13 types matching recover_epoch.cdc, in order:
+# UInt64, UInt64, UInt64, UInt64, UInt64, UInt64,
+# Array, Array, Array, String, Dictionary, Array, Bool
+
+# Decode the scalar args:
+jq -c '{
+  recoveryEpochCounter: .[0].value,
+  startView:            .[1].value,
+  stakingEndView:       .[2].value,
+  endView:              .[3].value,
+  targetDuration:       .[4].value,
+  targetEndTime:        .[5].value
+}' devnet54_epoch_recovery.json
+```
+
+Recorded values from the dry-run (2026-11-25 14:54 UTC):
+
+```
+recoveryEpochCounter = 3278
+startView            = 137,120,566   (LastExtensionFinalView + 1)
+stakingEndView       = 137,216,565   (startView + StakingPhaseLength - 1)
+endView              = 137,228,565   (startView + EpochLength - 1)
+targetDuration       = 54,000 s
+targetEndTime        = 1,795,679,640 (2026-11-26 07:54 UTC)   ← use this for Scenario-B refTimestamp
+```
+
+Wipe local bootstrap scratch once the JSON is captured:
+
+```bash
+cd ~/testnet_efm_recovery_nov_2026
+rm -rf stage private-root-information internal-node-ids.txt node-config.json
+```
+
+Remaining files in the operator directory should be exactly three:
+
+```
+devnet54_epoch_recovery.json   (public: cluster QCs + DKG output)
+flow.json                      (signer: service_account alias)
+recover_epoch.cdc              (from flow-core-contracts master)
 ```
 
 ### Step 4 — re-verify pre-conditions (§3)
@@ -574,13 +618,14 @@ Capture:
 
 **Only** after Step 6 succeeds. Submit
 [`update_epoch_timing_config.cdc`][upd-timing] with the Scenario-B values from
-§2.
+§2 — **use the util-sealed `targetEndTime`** (`1795679640`) as
+`refTimestamp`, not the planned `1795680000`.
 
 [upd-timing]: https://github.com/onflow/flow-core-contracts/blob/master/transactions/epoch/admin/update_epoch_timing_config.cdc
 
 Validate with
 [`get_target_end_time_for_epoch.cdc`][get-ete] for counter `3278` → should
-return `1795680000`.
+return `1795679640`.
 
 [get-ete]: https://github.com/onflow/flow-core-contracts/blob/master/transactions/epoch/scripts/get_target_end_time_for_epoch.cdc
 
@@ -605,11 +650,34 @@ Back off to `400ms` / `300ms` as rate stabilizes, mirroring Leo's TN53 pattern.
 
 ### Step 9 — teardown
 
-```bash
-# Inside SSM on access-001:
-sudo umount /mnt/efm-recovery   # wipes tmpfs, including private material
-sudo rmdir /mnt/efm-recovery
-```
+Scratch cleanup already happened at the end of Step 3 (`rm -rf stage
+private-root-information internal-node-ids.txt node-config.json`). After
+the recovery epoch completes (Step 8 monitoring window), the
+`devnet54_epoch_recovery.json` and `hello.cdc` (if used) can also be
+deleted; `flow.json` stays in the secure home for future ops.
+
+### When does the recovery actually occur? (timing semantics)
+
+Four distinct moments, often conflated:
+
+1. **`FlowEpoch` contract transitions** — *immediately* on tx seal
+   (~15 s after submit). Rewards for epoch 3277 are paid here.
+   `FlowEpoch.currentEpochCounter()` then returns `3278`.
+2. **Protocol state exits EFM** — ~1–2 min after tx seal (sealing lag for
+   the `EpochRecover` service event). This is when the Grafana
+   `..._epoch_fallback_triggered` metric drops 1 → 0 and the epoch phase
+   flips 4 → 3.
+3. **Recovery epoch (3278) starts running** — when the view counter
+   crosses `startView = 137,120,566`. For a submit during the current
+   extension, that's approximately when the current extension would have
+   ended naturally (~2026-11-25 16:54 UTC).
+4. **Network back on normal 12 h cadence** — after the recovery epoch
+   ends at view `endView = 137,228,565` (~2026-11-26 07:54 UTC), epoch
+   3279 kicks off and automated transitions resume.
+
+So a submit inside the current extension clears EFM within minutes, runs
+the 15 h recovery epoch overnight PT, and returns the network to the
+noon/midnight PT cadence by midnight PT.
 
 ---
 
@@ -630,8 +698,12 @@ sudo rmdir /mnt/efm-recovery
 
 - **Touches testnet only.** Mainnet is explicitly out of scope and no mainnet
   resources will be read or modified during this operation.
-- **Reads** CN private-node-info files from the testnet bootstrap bucket into
-  tmpfs on `devnet54-access-001` for the duration of args generation only.
+- **Reads** CN (and other internal node) private-node-info files from the
+  testnet bootstrap bucket onto a 700-permed scratch directory on the
+  operator laptop for the duration of args generation only, then
+  `rm -rf`'d. (Earlier plan said we'd do this in tmpfs on
+  `devnet54-access-001`; in practice the laptop already holds the
+  `service_account` signer key so the trust boundary is unchanged.)
 - **Writes** one testnet transaction (`recover_epoch.cdc`) signed by the
   testnet service account, and (Scenario B) one follow-up
   `update_epoch_timing_config.cdc`.
@@ -646,10 +718,13 @@ sudo rmdir /mnt/efm-recovery
    (vishal, 2026-11-25).
 3. ~~service_account signer key location~~ — **resolved**: operator-local
    `flow.json`, `service_account` alias.
-4. Whether `jq`-concatenated `node-internal-infos.pub.json` is accepted by
-   current `util epochs efm-recover-tx-args`. If not, a GCS fallback step is
-   needed (see §4 Step 2 note). I will probe this on a dry-run before the
-   live submission.
+4. ~~Whether `jq`-concatenated `node-internal-infos.pub.json` is accepted
+   by current `util epochs efm-recover-tx-args`~~ — **resolved differently
+   than planned**: `--config` doesn't want the aggregated public-info
+   file at all. It wants a trimmed `[]{Role, Address, Weight}` filtered
+   from `node-infos.pub.json` by the set of node IDs present in
+   `--internal-priv-dir`. See §4 Step 2 for the actual recipe; dry-run
+   generated a valid 13-arg JSON on 2026-11-25 14:54 UTC.
 5. (Nice-to-have, not blocking) decision on whether to also open a
    Terraform PR to add `epoch_timing_ref_*` to the AWS testnet module for
    next-spork parity. Can be a follow-up.
