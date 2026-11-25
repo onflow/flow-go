@@ -1,8 +1,6 @@
 package routes
 
 import (
-	entitiesproto "github.com/onflow/flow/protobuf/go/flow/entities"
-
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/engine/access/rest/common"
 	commonmodels "github.com/onflow/flow-go/engine/access/rest/common/models"
@@ -40,7 +38,7 @@ func GetTransactionByID(r *common.Request, backend access.API, link commonmodels
 			req.ID,
 			req.BlockID,
 			req.CollectionID,
-			entitiesproto.EventEncodingVersion_JSON_CDC_V0,
+			req.EventEncodingVersion,
 		)
 		if err != nil {
 			return nil, err
@@ -79,7 +77,7 @@ func GetTransactionsByBlock(r *common.Request, backend access.API, link commonmo
 	if req.ExpandsResult {
 		transactionsResponse = make(commonmodels.Transactions, len(transactions))
 
-		txResults, err := backend.GetTransactionResultsByBlockID(r.Context(), blockID, entitiesproto.EventEncodingVersion_JSON_CDC_V0)
+		txResults, err := backend.GetTransactionResultsByBlockID(r.Context(), blockID, req.EventEncodingVersion)
 		if err != nil {
 			return nil, err
 		}
@@ -116,7 +114,7 @@ func GetTransactionResultByID(r *common.Request, backend access.API, link common
 		req.ID,
 		req.BlockID,
 		req.CollectionID,
-		entitiesproto.EventEncodingVersion_JSON_CDC_V0,
+		req.EventEncodingVersion,
 	)
 	if err != nil {
 		return nil, err
@@ -144,7 +142,7 @@ func GetTransactionResultsByBlock(r *common.Request, backend access.API, link co
 		blockID = block.ID()
 	}
 
-	transactionResults, err := backend.GetTransactionResultsByBlockID(r.Context(), blockID, entitiesproto.EventEncodingVersion_JSON_CDC_V0)
+	transactionResults, err := backend.GetTransactionResultsByBlockID(r.Context(), blockID, req.EventEncodingVersion)
 	if err != nil {
 		return nil, err
 	}
@@ -190,7 +188,7 @@ func GetScheduledTransaction(r *common.Request, backend access.API, link commonm
 
 	var txr *accessmodel.TransactionResult
 	if req.ExpandsResult {
-		txr, err = backend.GetScheduledTransactionResult(r.Context(), req.ScheduledTxID, entitiesproto.EventEncodingVersion_JSON_CDC_V0)
+		txr, err = backend.GetScheduledTransactionResult(r.Context(), req.ScheduledTxID, req.EventEncodingVersion)
 		if err != nil {
 			return nil, err
 		}
@@ -208,7 +206,7 @@ func GetScheduledTransactionResult(r *common.Request, backend access.API, link c
 		return nil, common.NewBadRequestError(err)
 	}
 
-	txr, err := backend.GetScheduledTransactionResult(r.Context(), req.ScheduledTxID, entitiesproto.EventEncodingVersion_JSON_CDC_V0)
+	txr, err := backend.GetScheduledTransactionResult(r.Context(), req.ScheduledTxID, req.EventEncodingVersion)
 	if err != nil {
 		return nil, err
 	}
