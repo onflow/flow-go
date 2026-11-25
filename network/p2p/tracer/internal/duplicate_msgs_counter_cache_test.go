@@ -227,3 +227,39 @@ func duplicateMessageTrackerCacheFixture(t *testing.T, sizeLimit uint32, decay, 
 	require.NotNil(t, r)
 	return r
 }
+
+// TestDuplicateMessageTrackerCache_ConcurrentSamePeer tests concurrent DuplicateMessageReceived and GetWithInit
+// calls targeting the same peer ID to verify there are no data races on the counter value.
+func TestDuplicateMessageTrackerCache_ConcurrentSamePeer(t *testing.T) {
+	cache := duplicateMessageTrackerCacheFixture(t, 100, defaultDecay, defaultSkipDecayThreshold, zerolog.Nop(), metrics.NewNoopCollector())
+
+	peerID := unittest.PeerIdFixture(t)
+	const workers = 4
+	const iterations = 200
+
+	var wg sync.WaitGroup
+	wg.Add(workers * 2)
+
+	for range workers {
+		go func() {
+			defer wg.Done()
+			for range iterations {
+				val, err := cache.DuplicateMessageReceived(peerID)
+				require.NoError(t, err)
+				require.GreaterOrEqual(t, val, 0.0)
+			}
+		}()
+
+		go func() {
+			defer wg.Done()
+			for range iterations {
+				val, found, err := cache.GetWithInit(peerID)
+				require.NoError(t, err)
+				require.True(t, found)
+				require.GreaterOrEqual(t, val, 0.0)
+			}
+		}()
+	}
+
+	unittest.RequireReturnsBefore(t, wg.Wait, 5*time.Second, "timed out waiting for goroutines to finish")
+}
