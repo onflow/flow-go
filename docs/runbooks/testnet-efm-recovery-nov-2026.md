@@ -20,24 +20,23 @@ section.
 
 ---
 
-## 1. Current state (re-pulled 2026-11-25 ~13:50 UTC)
+## 1. Current state (observed 2026-11-25 ~13:50 UTC)
 
 Pulled from Grafana Cloud Prometheus (`grafanacloud-flowfoundation-prom`,
-`network="devnet54"`). Two readings so far — unchanged values collapsed to
-one column, values that moved shown side-by-side.
+`network="devnet54"`).
 
-| Signal | At 05:22 UTC (draft) | **At 13:50 UTC (now)** |
-|---|---|---|
-| `consensus_compliance_epoch_fallback_triggered` | 1 | **1** (unchanged) |
-| `consensus_compliance_current_epoch_counter` | 3277 | **3277** (unchanged) |
-| `consensus_compliance_current_epoch_phase` | 4 (`EpochPhaseFallback`) | **4** (unchanged) |
-| `consensus_compliance_current_epoch_final_view` | 137,120,565 | **137,120,565** (unchanged — same extension) |
-| `consensus_hotstuff_cur_view` | 137,037,426 | **137,098,556** |
-| Views remaining in current extension | 83,139 | **22,009** |
-| View rate | ~2.00 v/s | **~2.00 v/s** |
-| Estimated time to current extension end | ~11.5 h (16:55 UTC) | **~3.06 h** (→ 2026-11-25 16:54 UTC) |
-| Views until the next extension gets added | ~82,139 | **~21,009** (at `FinalizationSafetyThreshold = 1,000` before final view) |
-| Est. time until next extension add | ~11.4 h | **~2.92 h** (→ ~2026-11-25 16:45 UTC) |
+| Signal | Value |
+|---|---|
+| `consensus_compliance_epoch_fallback_triggered` | 1 |
+| `consensus_compliance_current_epoch_counter` | 3277 |
+| `consensus_compliance_current_epoch_phase` | 4 (`EpochPhaseFallback`) |
+| `consensus_compliance_current_epoch_final_view` | 137,120,565 |
+| `consensus_hotstuff_cur_view` | 137,098,556 |
+| Views remaining in current extension | 22,009 |
+| View rate | ~2.00 v/s |
+| Estimated time to current extension end | ~3.06 h (→ 2026-11-25 16:54 UTC) |
+| Views until the next extension gets added | ~21,009 (at `FinalizationSafetyThreshold = 1,000` before final view) |
+| Est. time until next extension add | ~2.92 h (→ ~2026-11-25 16:45 UTC) |
 
 Constants (unchanged — re-stated for completeness):
 
