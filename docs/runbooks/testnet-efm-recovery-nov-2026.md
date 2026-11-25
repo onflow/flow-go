@@ -6,7 +6,7 @@
 > operation completes (or supersede with a trimmed, repo-worthy runbook).
 
 **Author:** vishal (in collaboration with claude)
-**Date drafted:** 2026-11-25
+**Last regenerated:** 2026-11-25 ~20:03 UTC (= 12:03 PT)
 **Status:** **PREP COMPLETE — awaiting go-ahead to submit `recover_epoch.cdc`.**
 **Scope:** testnet (`devnet54`) only. Mainnet is explicitly out of scope.
 
@@ -15,37 +15,31 @@ recovery notes][tn53] to the current AWS-hosted testnet (post GCP→AWS fleet
 migration, Nov 2026). Links to the Notion playbooks are in the References
 section.
 
-> **Plan vs. what we actually did (2026-11-25 14:54 UTC).**
-> The original plan ran args generation on `devnet54-access-001` because
-> we assumed `util` would need cross-compilation and in-VPC S3 pulls. In
-> practice:
+> **How this plan was actually executed (operator notes).**
 >
-> 1. `util` **built natively on the operator laptop** (darwin/arm64) with
+> 1. `util` is built natively on the operator laptop (darwin/arm64) with
 >    a plain `CGO_ENABLED=1 go build ./cmd/util` from the
 >    `v0.51.0-rc.1` worktree — no Docker, no cross-compile.
-> 2. We ran the whole args-generation step **locally on the laptop**
->    rather than SSM'ing into access-001. The laptop already holds the
->    `service_account` signer key, so pulling 31 CN-and-friends tars
->    onto the same box does not widen the trust boundary.
+> 2. Args generation runs locally on the laptop, not via SSM into
+>    `devnet54-access-001`. The laptop already holds the
+>    `service_account` signer key, so pulling 31 internal-node tars onto
+>    the same box does not widen the trust boundary.
 > 3. The `util --config` flag wants a JSON array of
->    `[{Role, Address, Weight}]` — **not** the aggregated
->    `node-internal-infos.pub.json` the earlier plan guessed. See §4
->    Step 2 for the corrected shape.
->
-> §4 below has been rewritten to reflect the actually-executed flow.
-> The parameter derivation in §2 is unchanged except for one subtle
-> correction: `util` computes `targetEndTime` itself from the AN's live
-> view rate rather than taking a `--target-end-time` flag, so the
-> sealed value is `1,795,679,640` (= `2026-11-26 07:54 UTC`), six
-> minutes shy of the planned `1,795,680,000`. Scenario-B
-> `refTimestamp` must use the util-sealed value.
+>    `[{Role, Address, Weight}]` filtered from `node-infos.pub.json` by
+>    the set of node IDs present in `--internal-priv-dir` — **not** the
+>    aggregated `node-internal-infos.pub.json` an earlier draft guessed.
+>    See §4 Step 2.
+> 4. `util` computes `targetEndTime` itself from the AN's reported
+>    `currEpochTargetEndTime`, not from a flag. Scenario-B `refTimestamp`
+>    (§4 Step 7) must use the util-sealed value from §2, not a value we
+>    picked ahead of time.
 
 [runbook]: # "Runbook: Epoch Fallback Mode (EFM) Recovery (Notion)"
 [tn53]: # "TN53 EFM recovery, Jan 2026, Leo Zhang (Notion)"
 
 ---
 
-## 1. Current state (observed 2026-11-25 ~13:50 UTC)
+## 1. Current state (observed 2026-11-25 ~20:00 UTC)
 
 Pulled from Grafana Cloud Prometheus (`grafanacloud-flowfoundation-prom`,
 `network="devnet54"`).
@@ -55,15 +49,15 @@ Pulled from Grafana Cloud Prometheus (`grafanacloud-flowfoundation-prom`,
 | `consensus_compliance_epoch_fallback_triggered` | 1 |
 | `consensus_compliance_current_epoch_counter` | 3277 |
 | `consensus_compliance_current_epoch_phase` | 4 (`EpochPhaseFallback`) |
-| `consensus_compliance_current_epoch_final_view` | 137,120,565 |
-| `consensus_hotstuff_cur_view` | 137,098,556 |
-| Views remaining in current extension | 22,009 |
+| `consensus_compliance_current_epoch_final_view` | **137,220,565** |
+| `consensus_hotstuff_cur_view` | 137,142,984 |
+| Views remaining in current extension | 77,581 |
 | View rate | ~2.00 v/s |
-| Estimated time to current extension end | ~3.06 h (→ 2026-11-25 16:54 UTC) |
-| Views until the next extension gets added | ~21,009 (at `FinalizationSafetyThreshold = 1,000` before final view) |
-| Est. time until next extension add | ~2.92 h (→ ~2026-11-25 16:45 UTC) |
+| Estimated time to current extension end | **~10.8 h** (→ ~2026-11-26 06:47 UTC) |
+| Views until the next extension gets added | ~76,581 (at `FinalizationSafetyThreshold = 1,000` before final view) |
+| Est. time until next extension add | ~10.6 h (→ ~2026-11-26 06:38 UTC) |
 
-Constants (unchanged — re-stated for completeness):
+Constants (independent of the current extension):
 
 | Signal | Value |
 |---|---|
@@ -72,95 +66,56 @@ Constants (unchanged — re-stated for completeness):
 | `consensus_compliance_current_dkg_phase3_final_view` | 133,418,165 |
 | Inferred `DKGPhaseLength` | 2,000 views |
 | EFM onset | between 2026-11-04 05:26 UTC and 09:21 UTC |
-| Elapsed time in EFM (at re-pull) | ~21.3 days |
-| Extensions added so far | ~36 (each +100,000 views) |
+| Elapsed time in EFM | ~21.6 days (~43 normal 12 h epochs) |
 | `FinalizationSafetyThreshold` (KV-store) | 1,000 views |
 | `EpochExtensionViewCount` (KV-store) | 100,000 views |
 
-### What this refresh tells us
+### What this reading tells us
 
-- **Recovery parameters are view-based and have not changed.** The last
-  extension's final view (137,120,565) is unchanged, and the recovery-epoch
-  shape in §2 was computed from that value + the wall-clock target end
-  time. Both inputs are still identical to the draft, so the three shape
-  flags stay at `--epoch-length=108,000`, `--epoch-staking-phase-length=96,000`,
-  `--epoch-timing-recovery-duration=54,000`.
-- **The window to submit inside the current extension is now ~3 h.** The
-  next extension gets added at `FinalizationSafetyThreshold = 1,000` views
-  before the current extension's final view, i.e. at view 137,119,565,
-  which is ~2.9 h away at the current rate. See the "if we miss the
-  window" section below.
+- **Latest extension in play.** `LastExtensionFinalView` is
+  `137,220,565`; the recovery-epoch shape in §2 is derived against this
+  value.
+- **Submit window is ~10.6 h.** Next extension auto-adds at view
+  `137,219,565` (= final view − `FinalizationSafetyThreshold`), i.e. at
+  ~2026-11-26 06:38 UTC. We have comfortable headroom to submit.
 - Pre-condition P2 (≥ `2 × FinalizationSafetyThreshold = 2,000` views
-  remaining) still holds comfortably (22,009 views left), but the margin
-  is shrinking.
+  remaining) holds trivially (77,581 views left).
 
-### If a new extension is added before we submit
+### If a new extension lands before we submit
 
-If execution slips past ~2026-11-25 16:45 UTC, the current extension will
-auto-renew: `LastExtensionFinalView` jumps from 137,120,565 → **137,220,565**
-and the new wall-clock extension end shifts to ~2026-11-26 06:47 UTC. The
-target end time (midnight PT Nov 25/26 = 2026-11-26 08:00 UTC) becomes
-infeasible — only ~70 min of recovery-epoch runway left, which does not
-fit a safe Setup+Commit phase.
-
-Fallback targets if the window is missed:
+If execution slips past ~2026-11-26 06:38 UTC, `LastExtensionFinalView`
+jumps to **137,320,565** and the extension end shifts to
+~2026-11-26 20:27 UTC. The current noon-PT-Nov-26 target
+(`2026-11-26 20:00 UTC`) becomes infeasible by ~27 min; we'd fall back
+to **midnight PT Nov 26/27** (`2026-11-27 08:00 UTC` = Unix
+`1,795,766,400`):
 
 | New target end | Recovery duration (~) | `--epoch-length` (~) | `--epoch-staking-phase-length` (~) |
 |---|---|---|---|
-| **2026-11-26 20:00 UTC** (noon PT Nov 26) | 47,500 s (~13.2 h) | 95,000 views | 83,000 views (= 95,000 − 12,000) |
-| **2026-11-27 08:00 UTC** (midnight PT Nov 26/27) | 90,700 s (~25.2 h) | 181,000 views | 169,000 views |
+| **2026-11-27 08:00 UTC** (midnight PT Nov 26/27) | ~40,800 s (~11.3 h) | ~81,500 views | ~69,500 views (= 81,500 − 12,000) |
 
-If this happens:
-1. Pull fresh metrics, confirm new `LastExtensionFinalView = 137,220,565`.
-2. Pick one of the two fallback targets above (default: noon PT Nov 26 for
-   the shorter realignment).
-3. Re-derive `--epoch-timing-recovery-duration`, `--epoch-length`,
-   `--epoch-staking-phase-length` with the formulas in §2.
-4. Regenerate the args JSON. The Scenario-B timing-config `refTimestamp`
-   in §2 also changes to the new target end (`refCounter` stays 3278).
+Procedure if this happens: re-run §4 Steps 2–3 with the fallback numbers;
+`--recovery-epoch-counter` stays `3278`.
 
-### Scenario classification
+### Scenario classification — still Scenario B
 
-#### What the runbook calls Scenario A vs Scenario B
+The runbook splits recovery into two shapes:
 
-Every testnet epoch has a scheduled wall-clock end-time. When EFM kicks in,
-the protocol does **not** cut the current epoch short — it leaves the epoch
-counter as is and extends the current epoch's final view by successive
-`EpochExtensionViewCount` increments until a recovery transaction lands.
-The result: by the time EFM is resolved, the wall-clock "end" of the
-extended epoch is far past where the original schedule put it.
-
-The runbook splits the recovery into two shapes based on how far past the
-original schedule we are:
-
-- **Scenario A — EFM duration < one normal epoch.** Extensions have pushed
-  us past the scheduled end of Epoch N, but not past the scheduled end of
-  Epoch N+1. We can simply configure a short recovery epoch that lands on
-  the original N+1 boundary and we're back on schedule. No change to the
-  on-chain `FlowEpoch` timing config is needed.
+- **Scenario A — EFM duration < one normal epoch.** We can configure a
+  short recovery epoch that lands on the original N+1 boundary; no on-chain
+  `FlowEpoch` timing-config update needed.
 - **Scenario B — EFM duration > one normal epoch.** Extensions have pushed
-  us past the scheduled end of Epoch N+1 (potentially many epochs). We
-  cannot fit a single recovery epoch that returns us to Epoch N+1's original
-  boundary. Instead we align the recovery epoch's end with some *later*
-  epoch boundary (N+K) and update the `FlowEpoch` timing config so the
-  on-chain epoch scheduler uses the recovery epoch as its new reference.
-  Rewards for the skipped epochs (N+1 … N+K-1) are **not** paid
-  automatically — the runbook asks for a separate manual payout before
-  recovery.
+  us past the scheduled end of Epoch N+1 (potentially many). We align the
+  recovery epoch's end with some *later* epoch boundary (N+K) and update
+  the `FlowEpoch` timing config so the on-chain epoch scheduler uses the
+  recovery epoch as its new reference. Rewards for skipped epochs are not
+  paid automatically.
 
-#### Where devnet54 sits
-
-- EFM onset: ~2026-11-04 07:00 UTC (step in
-  `consensus_compliance_epoch_fallback_triggered`).
-- Current time of plan: 2026-11-25 05:22 UTC → **~21 days in EFM**.
-- Testnet epoch duration before EFM: **12 h** (43,200 s). So EFM has lasted
-  **~42 normal epochs**.
-- Original Epoch 3277 was scheduled to end at approximately
-  **noon PT 2026-11-04** (= 2026-11-04 20:00 UTC) — derived from: counter
-  bumped 3276 → 3277 at ~2026-11-03 19:21 UTC + nominal 12 h epoch.
-- Target recovery epoch end: **2026-11-26 08:00 UTC** (= midnight PT
-  Nov 25/26). That's ~44 × 12 h after the scheduled end of Epoch 3277 —
-  i.e. where original Epoch 3277 + 44 ≈ **Epoch 3321** would have ended.
+**Where devnet54 sits.** EFM onset was ~2026-11-04 07:00 UTC, so we're
+~21.6 days / ~43 normal 12 h epochs past the originally-scheduled end of
+Epoch 3277 (~noon PT 2026-11-04). Our noon-PT-Nov-26 target is
+~43 × 12 h after that boundary — i.e. the wall-clock point where
+original Epoch 3277 + 43 ≈ **Epoch 3320** would have ended.
 
 **→ Scenario B.** We need Step 7 (`update_epoch_timing_config.cdc`) in
 addition to the base recovery.
@@ -172,17 +127,17 @@ addition to the base recovery.
 
 ## 2. Target recovery parameters
 
-Target: realign to **midnight PT on Nov 25/26** (= `2026-11-26 08:00:00 UTC` =
-Unix `1795680000`). Gives a ~15 h recovery epoch — long enough to observe,
-intervene on cruise control if needed, and still realign on the canonical
-noon/midnight PT boundary.
+Target: realign to **noon PT on Nov 26** (= `2026-11-26 20:00:00 UTC` =
+Unix `1,795,723,200`). Gives a ~13.2 h recovery epoch starting from the
+current extension's wall-clock end (~2026-11-26 06:47 UTC), landing
+cleanly on the canonical noon-PT boundary.
 
 Alternate targets considered (reject rationale in parens):
 
-- Nov 25 20:00 UTC = noon PT Nov 25 → only 3 h recovery epoch (too short; too
-  much risk of racing a new extension add).
-- Nov 26 20:00 UTC = noon PT Nov 26 → 27 h recovery epoch (fine but longer than
-  needed; prefer the shorter realignment).
+- Nov 26 08:00 UTC = midnight PT Nov 25/26 → infeasible after the latest
+  extension add (would leave only ~1 h of recovery epoch).
+- Nov 27 08:00 UTC = midnight PT Nov 26/27 → ~25 h recovery epoch (fine
+  but longer than needed; prefer the shorter realignment).
 
 ### How each recovery-epoch flag is derived
 
@@ -193,19 +148,14 @@ derivation; this section walks it with devnet54's current-state numbers.
 
 #### Common current-state inputs (from §1)
 
-- `LastExtensionFinalView = 137,120,565`
-- `CurrentView` at re-pull = 137,098,556 → views remaining in extension =
-  22,009. (Important: the derivation of the three shape flags below does
-  not depend on `CurrentView`. It only depends on `LastExtensionFinalView`
-  — which has not changed — and the wall-clock extension end time, which is
-  likewise view-based and so unchanged.)
-- `ViewRate ≈ 2 v/s` → extension end time =
-  `LastExtensionFinalView_wall_clock ≈ 2026-11-25 16:54 UTC` (stable across
-  both measurements, as long as view rate stays ≈ 2 v/s).
-- `FinalizationSafetyThreshold = 1,000 views` (testnet KV-store default).
-- `DKGPhaseLength = 2,000 views` (inferred from phase-final-view deltas).
-- `EpochExtensionViewCount = 100,000 views` (confirmed from the step pattern
-  in `consensus_compliance_current_epoch_final_view`).
+- `LastExtensionFinalView = 137,220,565`
+- `ViewRate ≈ 2 v/s`
+- Estimated wall-clock end of current extension ≈ `2026-11-26 06:47 UTC`
+  (also matches the AN-reported `currEpochTargetEndTime = 1,795,675,640`).
+- Target recovery-epoch end: **noon PT Nov 26 = 2026-11-26 20:00 UTC =
+  Unix `1,795,723,200`**.
+- `FinalizationSafetyThreshold = 1,000 views`.
+- `DKGPhaseLength = 2,000 views`.
 
 #### Step-by-step derivation
 
@@ -215,32 +165,31 @@ derivation; this section walks it with devnet54's current-state numbers.
 > for the recovery epoch and the final view of the last extension.
 > `EpochLength = FinalView − LastExtensionFinalView`.
 
-We flip this: we pick a target wall-clock end time, convert to views using
-the view rate, and derive `FinalView`. With view rate 2 v/s:
+We flip this: pick a target wall-clock end, convert to views via the view
+rate, derive `FinalView`. With view rate 2 v/s:
 
 ```
-Δt(seconds between extension end and target end) ≈ 1,795,680,000 − 1,795,625,724 ≈ 54,276 s
-EpochLength (views)                              ≈ 54,276 × 2         ≈ 108,552 views
+Δt(seconds between extension end and target end) ≈ 1,795,723,200 − 1,795,675,640 ≈ 47,560 s
+EpochLength (views)                              ≈ 47,560 × 2         ≈ 95,120 views
 ```
 
-We round the length **down** to **108,000 views** to match the
-`--epoch-timing-recovery-duration = 54,000 s` we pick next. (Rounding
-down avoids a last-view overshoot past the target wall-clock end.)
+We round the length to **95,100 views** and pair it with
+`--epoch-timing-recovery-duration = 47,550 s` so that
+`length / duration = 2 v/s` exactly.
 
-**(b) `--epoch-length = 108,000`.** Exactly the rounded value from (a).
+**(b) `--epoch-length = 95,100`.** From (a).
 
-**(c) `--epoch-timing-recovery-duration = 54,000` seconds.** Runbook §1(i):
+**(c) `--epoch-timing-recovery-duration = 47,550` seconds.** Runbook §1(i):
 
 > The duration should be the wall-clock time between when the current epoch
 > extension is scheduled to end and the desired end time of the recovery
 > epoch.
 
-`54,000 s = 108,000 views / 2 v/s` — i.e. we want the recovery epoch to be
-exactly 15 wall-clock hours, which lands at Nov 26 08:00 UTC assuming the
-view rate stays near 2 v/s. Cruise control will tighten up the view rate
-over the course of the epoch to hit this.
+`47,550 s = 95,100 views / 2 v/s` — i.e. ~13.2 wall-clock hours of recovery
+epoch, landing at noon PT Nov 26 (within a few seconds, modulo cruise
+control jitter).
 
-**(d) `--epoch-staking-phase-length = 96,000` views.** Runbook §1(i)
+**(d) `--epoch-staking-phase-length = 83,100` views.** Runbook §1(i)
 constraint:
 
 > The staking phase length should provide enough time for the `EpochSetup`
@@ -253,15 +202,14 @@ Plug in testnet values:
 ```
 lower bound on Setup+Commit  = 3 × 2,000 + 2 × 1,000 = 8,000 views
 chosen Setup+Commit margin   = 12,000 views    (matches Leo's TN52 convention)
-StakingPhaseLength           = 108,000 − 12,000 = 96,000 views
+StakingPhaseLength           = 95,100 − 12,000 = 83,100 views
 ```
 
-Why 12,000 and not the bare minimum 8,000? The 4,000-view headroom (~33 min)
-gives slack for a) cruise control settling, b) finalization lag at the
-phase boundary, and c) a small per-phase safety margin. Leo used 12,000 on
-TN52 (also Scenario B); TN53 used only 8,400 because that was a short
-Scenario-A-style recovery where he was confident in the DKG timing budget.
-For our 15 h epoch there is plenty of room to be generous.
+The 4,000-view headroom above the minimum (~33 min at 2 v/s) covers
+cruise-control settling, finalization lag at phase boundaries, and a
+small per-phase safety margin. TN52 used 12,000; TN53 trimmed to 8,400
+on a short Scenario-A run. For our 13 h epoch there's no reason to go
+tight.
 
 **(e) `--recovery-epoch-counter = 3278`.** Runbook: "one above the current
 epoch counter". Current = 3277 → recovery = 3278.
@@ -290,15 +238,15 @@ unchanged.
 |---|---|---|
 | `--root-chain-id` | `flow-testnet` | chain ID |
 | `--access-address` | `access-001.devnet54.nodes.onflow.org:9001` | AN endpoint for snapshot RPC |
-| `--access-network-key` | *(see §4 Step 3 — the testnet AN network pubkey; `ba69f7d2…2988d`)* | AN secure-RPC network pubkey |
+| `--access-network-key` | the testnet AN network pubkey `ba69f7d2…2988d` *(published in the Notion runbook)* | AN secure-RPC network pubkey |
 | `--collection-clusters` | `2` | cluster count — must match current topology |
 | `--recovery-epoch-counter` | `3278` | current counter + 1 |
-| `--epoch-length` | `108000` views | recovery epoch view span, from (a)/(b) |
-| `--epoch-staking-phase-length` | `96000` views | staking phase, from (d) |
-| `--epoch-timing-recovery-duration` | `54000` seconds (15 h) | wall-clock epoch duration, from (c) |
-| `--config` | `<operator-host>:/mnt/efm-recovery/public-root-information/node-internal-infos.pub.json` | assembled on operator host (see §4) |
-| `--internal-priv-dir` | `<operator-host>:/mnt/efm-recovery/private-root-information/` | assembled on operator host |
-| `--out` | `<operator-host>:/mnt/efm-recovery/devnet54_epoch_recovery.json` | tx-args output path |
+| `--epoch-length` | `95100` views | recovery epoch view span, from (a)/(b) |
+| `--epoch-staking-phase-length` | `83100` views | staking phase, from (d) |
+| `--epoch-timing-recovery-duration` | `47550` seconds (~13.2 h) | wall-clock epoch duration, from (c) |
+| `--config` | `./node-config.json` (built in §4 Step 2) | `[]{Role, Address, Weight}` for internal nodes only |
+| `--internal-priv-dir` | `./private-root-information` (built in §4 Step 2) | aggregated per-node private tree |
+| `--out` | `./devnet54_epoch_recovery.json` | tx-args output path |
 
 ### Comparison with prior EFM recoveries
 
@@ -312,57 +260,62 @@ obvious:
 | `--access-network-key` | `ba69f7d2…2988d` | `ba69f7d2…2988d` | `ba69f7d2…2988d` |
 | `--collection-clusters` | 2 | 2 | 2 |
 | `--recovery-epoch-counter` | 2066 | 2719 | **3278** |
-| `--epoch-length` | 138,360 views | 86,400 views | **108,000 views** |
-| `--epoch-staking-phase-length` | 126,360 views | 78,000 views | **96,000 views** |
+| `--epoch-length` | 138,360 views | 86,400 views | **95,100 views** |
+| `--epoch-staking-phase-length` | 126,360 views | 78,000 views | **83,100 views** |
 | ↳ implied Setup+Commit | 12,000 views | 8,400 views | **12,000 views** |
-| `--epoch-timing-recovery-duration` | 69,180 s (~19 h 13 m) | 43,200 s (12 h) | **54,000 s (15 h)** |
+| `--epoch-timing-recovery-duration` | 69,180 s (~19 h 13 m) | 43,200 s (12 h) | **47,550 s (~13.2 h)** |
 | Implied view rate | 2.00 v/s | 2.00 v/s | 2.00 v/s |
 | Scenario | B | A-ish (single-day EFM) | **B** |
 
 **What's the same across all three:**
-- Chain ID, AN network key, cluster count — these are network-wide
-  constants on testnet.
-- The derivation formula — `length ÷ duration = 2 v/s` and
-  `staking = length − (setup+commit margin)` — is identical.
-- Operator pattern: generate args on a trusted operator host with the
-  aggregated bootstrap tree, scp the JSON to the laptop, send the tx.
+- Chain ID, AN network key, cluster count — network-wide testnet
+  constants.
+- Derivation formula — `length ÷ duration = 2 v/s` and
+  `staking = length − (setup+commit margin)` — identical.
+- Operator pattern: generate args with the aggregated bootstrap tree,
+  then send the tx with the service-account key.
 
 **What differs this time:**
 
-- `--recovery-epoch-counter = 3278`. Trivial bump: current counter is 3277
-  vs. 2065/2718 for the prior runs. (Testnet has been resporked between
-  each, hence the jumps.)
-- `--epoch-length = 108,000` and `--epoch-timing-recovery-duration = 54,000`
-  pick a **15 h** recovery epoch. TN52 picked 19 h to span overnight,
-  TN53 picked 12 h to match a normal testnet epoch. We picked 15 h as a
-  compromise: long enough to absorb the known post-recovery cruise-control
-  spike (TN53's 6.9 v/s incident) while still landing cleanly on the
-  midnight PT boundary ~15 h after the current extension ends.
-- `--epoch-staking-phase-length = 96,000` → Setup+Commit margin = 12,000.
+- `--recovery-epoch-counter = 3278`. Current counter is 3277 vs.
+  2065/2718 for the prior runs (testnet has been resporked between each).
+- `--epoch-length = 95,100` and `--epoch-timing-recovery-duration = 47,550`
+  pick a **~13.2 h** recovery epoch. TN52 chose 19 h to span overnight;
+  TN53 chose a vanilla 12 h. Our length is set by what fits between the
+  end of the current extension (~2026-11-26 06:47 UTC) and the next
+  canonical testnet epoch boundary (noon PT Nov 26 = 20:00 UTC).
+- `--epoch-staking-phase-length = 83,100` → Setup+Commit margin = 12,000.
   Same margin TN52 used; we deliberately did **not** copy TN53's tighter
-  8,400 margin because our epoch is longer and there's no cost to being
-  generous.
+  8,400 margin — our epoch is longer and there's no reason to be tight.
 
 **Why the Scenario-B treatment on devnet54 looks similar to TN52 but not
 TN53:**
 
-- TN52 was triggered intentionally in a test window, then left in EFM for
-  ~29 h (about 2.5× the normal epoch length) — Scenario B, resolved with
-  a long recovery epoch.
+- TN52 was triggered intentionally, left in EFM for ~29 h (~2.5× the
+  normal epoch length) — Scenario B, resolved with a long recovery epoch.
 - TN53 was a real incident lasting < 12 h — basically Scenario A, Leo
-  picked a vanilla 12 h recovery epoch.
-- TN54 (this one) has been in EFM for ~21 days (~42 normal epoch lengths).
-  Textbook Scenario B — we need Step 7 (timing-config update) and we have
-  to accept that the on-chain counter won't line up with the "original
-  schedule" counter any more.
+  chose a vanilla 12 h recovery epoch.
+- TN54 (this run) has been in EFM for ~21.6 days (~43 normal epoch
+  lengths). Textbook Scenario B — we need Step 7 (timing-config update)
+  and we accept that the on-chain counter won't line up with the
+  "original schedule" counter any more.
 
 ### Scenario-B timing config update (to pass to `update_epoch_timing_config.cdc`)
 
-| Argument | Value | Derivation |
+Use the util-sealed `targetEndTime` from the recovery args JSON
+(**`1,795,723,190`** = 2026-11-26 19:59:50 UTC) as `refTimestamp`. The
+10-second shortfall vs. exact noon PT (20:00 UTC) is a cosmetic drift
+introduced by the view-rate rounding; it propagates forever through the
+on-chain formula `T_n = refTimestamp + (n − refCounter) × duration`. If
+cleaner alignment matters, use `refCounter = 3279, refTimestamp =
+1,795,766,400` (midnight PT Nov 26/27) instead — the formula will then
+place epoch 3280's end at noon PT Nov 27, 3281 at midnight, etc.
+
+| Argument | Preferred value | Alternative (cleaner alignment) |
 |---|---|---|
-| `duration` | `43200` seconds (12 h) | current testnet epoch duration — unchanged |
-| `refCounter` | `3278` | recovery epoch counter |
-| `refTimestamp` | `1795680000` (= `2026-11-26 00:00:00 PST`) | target recovery-epoch end time |
+| `duration` | `43200` seconds (12 h) | `43200` |
+| `refCounter` | `3278` | `3279` |
+| `refTimestamp` | `1,795,723,190` (util-sealed) | `1,795,766,400` (midnight PT Nov 26/27) |
 
 Current `FlowEpoch` timing config to be read via
 [`get_epoch_timing_config.cdc`][get-timing] immediately before the update to
@@ -390,14 +343,13 @@ Not urgent for this operation; flagging for the next spork handoff.
 
 | # | Check | Expected |
 |---|---|---|
-| P1 | No new extension since this plan was written | `consensus_compliance_current_epoch_final_view{network="devnet54"}` still = `137,120,565` |
+| P1 | No new extension since args were generated | `consensus_compliance_current_epoch_final_view{network="devnet54"}` still = `137,220,565` |
 | P2 | ≥ `2 × FinalizationSafetyThreshold` = 2,000 views remaining | `final_view − cur_view ≥ 2000` |
-| P3 | All 14 CNs active (so `util` can emit a valid root cluster QC) | `up{role="collection", network="devnet54"} == 1` for all |
+| P3 | All 14 CNs active (so `util` can emit a valid root cluster QC) | metrics present for all `collection-00{1..14}` |
 | P4 | Service-account signer available on the submitting machine | Operator's local `flow.json` with the testnet `service_account` alias loaded |
 
-If P1 fails, re-derive params from the new extension's final view and the
-new target end time — see "If a new extension is added before we submit"
-in §1.
+If P1 fails, regenerate args using the fallback target in §1 ("If a new
+extension lands before we submit").
 
 ---
 
@@ -501,9 +453,9 @@ ACCESS_NETWORK_KEY=ba69f7d2e82b9edf25b103c195cd371cf0cc047ef8884a9bbe331e62982d4
   --root-chain-id=flow-testnet \
   --collection-clusters=2 \
   --recovery-epoch-counter=3278 \
-  --epoch-length=108000 \
-  --epoch-staking-phase-length=96000 \
-  --epoch-timing-recovery-duration=54000 \
+  --epoch-length=95100 \
+  --epoch-staking-phase-length=83100 \
+  --epoch-timing-recovery-duration=47550 \
   --config=./node-config.json \
   --internal-priv-dir=./private-root-information \
   --out=./devnet54_epoch_recovery.json
@@ -541,16 +493,22 @@ jq -c '{
 }' devnet54_epoch_recovery.json
 ```
 
-Recorded values from the dry-run (2026-11-25 14:54 UTC):
+Recorded values from the dry-run (2026-11-25 20:03 UTC):
 
 ```
 recoveryEpochCounter = 3278
-startView            = 137,120,566   (LastExtensionFinalView + 1)
-stakingEndView       = 137,216,565   (startView + StakingPhaseLength - 1)
-endView              = 137,228,565   (startView + EpochLength - 1)
-targetDuration       = 54,000 s
-targetEndTime        = 1,795,679,640 (2026-11-26 07:54 UTC)   ← use this for Scenario-B refTimestamp
+startView            = 137,220,566   (LastExtensionFinalView + 1)
+stakingEndView       = 137,303,665   (LastExtensionFinalView + StakingPhaseLength)
+endView              = 137,315,665   (LastExtensionFinalView + EpochLength)
+targetDuration       = 47,550 s
+targetEndTime        = 1,795,723,190 (2026-11-26 19:59:50 UTC)   ← use this for Scenario-B refTimestamp
 ```
+
+Structural counts confirmed against expected topology:
+`clusterAssignments = 2 × 7` (14 internal LNs → 2 clusters of 7);
+`clusterQCVoteData = 2`; `dkgPubKeys = 7`; `dkgIdMapping = 7` (current
+7-SN DKG committee carried forward); `nodeIDs = 120`;
+`unsafeAllowOverwrite = false`.
 
 Wipe local bootstrap scratch once the JSON is captured:
 
@@ -617,15 +575,17 @@ Capture:
 ### Step 7 — Scenario-B epoch-timing-config update
 
 **Only** after Step 6 succeeds. Submit
-[`update_epoch_timing_config.cdc`][upd-timing] with the Scenario-B values from
-§2 — **use the util-sealed `targetEndTime`** (`1795679640`) as
-`refTimestamp`, not the planned `1795680000`.
+[`update_epoch_timing_config.cdc`][upd-timing] with the Scenario-B values
+from §2. See §2 for the choice between the util-sealed value (preserves
+the cosmetic 10-second drift) and the cleaner `refCounter=3279,
+refTimestamp=1,795,766,400` alternative that re-aligns all subsequent
+epoch ends on exact noon/midnight PT.
 
 [upd-timing]: https://github.com/onflow/flow-core-contracts/blob/master/transactions/epoch/admin/update_epoch_timing_config.cdc
 
 Validate with
-[`get_target_end_time_for_epoch.cdc`][get-ete] for counter `3278` → should
-return `1795679640`.
+[`get_target_end_time_for_epoch.cdc`][get-ete] for the chosen `refCounter`
+→ should return the chosen `refTimestamp`.
 
 [get-ete]: https://github.com/onflow/flow-core-contracts/blob/master/transactions/epoch/scripts/get_target_end_time_for_epoch.cdc
 
@@ -668,16 +628,17 @@ Four distinct moments, often conflated:
    `..._epoch_fallback_triggered` metric drops 1 → 0 and the epoch phase
    flips 4 → 3.
 3. **Recovery epoch (3278) starts running** — when the view counter
-   crosses `startView = 137,120,566`. For a submit during the current
+   crosses `startView = 137,220,566`. For a submit during the current
    extension, that's approximately when the current extension would have
-   ended naturally (~2026-11-25 16:54 UTC).
+   ended naturally (~2026-11-26 06:47 UTC).
 4. **Network back on normal 12 h cadence** — after the recovery epoch
-   ends at view `endView = 137,228,565` (~2026-11-26 07:54 UTC), epoch
-   3279 kicks off and automated transitions resume.
+   ends at view `endView = 137,315,665` (~2026-11-26 19:59:50 UTC =
+   noon PT Nov 26), epoch 3279 kicks off and automated transitions
+   resume.
 
-So a submit inside the current extension clears EFM within minutes, runs
-the 15 h recovery epoch overnight PT, and returns the network to the
-noon/midnight PT cadence by midnight PT.
+A submit inside the current extension clears EFM within minutes, runs
+the ~13 h recovery epoch across the day, and returns the network to the
+noon/midnight PT cadence by noon PT Nov 26.
 
 ---
 
